@@ -5,7 +5,7 @@
   "description": "I-DOMS MES 前端框架",
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
+    "build": "vue-cli-service build && cp dist/index.html dist/404.html",
     "lint": "vue-cli-service lint",
     "format": "prettier --write \"src/**/*.{js,vue,less,css}\"",
     "prepare": "husky"
