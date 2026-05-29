@@ -2,24 +2,24 @@
   <div class="work-order-page">
     <!-- 筛选区 -->
     <div class="filter-card">
-      <a-form :model="filters" layout="vertical" class="filter-form">
-        <a-row :gutter="16">
-          <a-col :span="8">
+      <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
+        <a-row :gutter="[12, 12]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="工单编号">
               <a-input v-model:value="filters.code" allow-clear placeholder="请输入" />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="工单名称">
               <a-input v-model:value="filters.name" allow-clear placeholder="请输入" />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="销售订单号">
               <a-input v-model:value="filters.salesOrderNo" allow-clear placeholder="请输入" />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="状态">
               <a-select
                 v-model:value="filters.status"
@@ -29,7 +29,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="工单类别">
               <a-select
                 v-model:value="filters.orderCategory"
@@ -39,7 +39,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="工作中心">
               <a-select
                 v-model:value="filters.workCenter"
@@ -49,19 +49,21 @@
               />
             </a-form-item>
           </a-col>
+          <a-col :span="24">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" @click="handleSearch">
+                  <SearchOutlined />
+                  查询
+                </a-button>
+                <a-button @click="handleReset">
+                  <ReloadOutlined />
+                  重置
+                </a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
         </a-row>
-        <div class="filter-actions">
-          <a-space>
-            <a-button type="primary" @click="handleSearch">
-              <SearchOutlined />
-              查询
-            </a-button>
-            <a-button @click="handleReset">
-              <ReloadOutlined />
-              重置
-            </a-button>
-          </a-space>
-        </div>
       </a-form>
     </div>
 
@@ -159,14 +161,14 @@
           </a-button>
         </div>
 
-        <a-form v-show="!detailCollapsed" layout="vertical" class="basic-form">
-          <a-row :gutter="16">
-            <a-col :span="8">
+        <a-form v-show="!detailCollapsed" layout="inline" class="basic-form horizontal-form">
+          <a-row :gutter="[12, 12]" style="width: 100%">
+            <a-col :xs="24" :sm="12" :md="8">
               <a-form-item label="产品名称">
                 <a-input :value="selectedOrder.productName" disabled />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :xs="24" :sm="12" :md="8">
               <a-form-item label="工作中心">
                 <a-select
                   v-model:value="selectedOrder.workCenter"
@@ -175,7 +177,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :xs="24" :sm="12" :md="8">
               <a-form-item label="BOM">
                 <a-select
                   v-model:value="selectedOrder.bom"
@@ -185,7 +187,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :xs="24" :sm="12" :md="8">
               <a-form-item label="预入仓库">
                 <a-select
                   v-model:value="selectedOrder.warehouse"
@@ -194,7 +196,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :xs="24" :sm="12" :md="8">
               <a-form-item label="紧急度">
                 <a-select
                   v-model:value="selectedOrder.urgency"
@@ -203,17 +205,13 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :xs="24" :sm="12" :md="8">
               <a-form-item label="计划日期">
-                <a-range-picker
-                  v-model:value="planDateValue"
-                  style="width: 100%"
-                  @change="onPlanDateChange"
-                />
+                <a-range-picker v-model:value="planDateValue" @change="onPlanDateChange" />
               </a-form-item>
             </a-col>
             <a-col :span="24">
-              <a-form-item label="备注">
+              <a-form-item label="备注" class="remark-item">
                 <a-textarea
                   v-model:value="selectedOrder.remark"
                   :rows="2"
@@ -514,21 +512,76 @@ function confirmUrgency() {
 }
 
 .filter-card {
-  padding: 16px 20px 8px;
+  padding: 16px 20px 12px;
   margin-bottom: 12px;
+}
 
-  .filter-form {
-    :deep(.ant-form-item) {
-      margin-bottom: 12px;
-    }
+.horizontal-form {
+  width: 100%;
 
-    :deep(.ant-form-item-label > label) {
-      color: rgba(0, 0, 0, 0.65);
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-inline-end: 0;
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label) {
+    flex: 0 0 auto;
+    padding-bottom: 0;
+
+    > label {
+      height: 32px;
+      line-height: 32px;
+      white-space: nowrap;
+
+      &::after {
+        margin-inline: 4px 8px;
+      }
     }
   }
 
-  .filter-actions {
-    padding-bottom: 4px;
+  :deep(.ant-form-item-control) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  :deep(.ant-form-item-control-input),
+  :deep(.ant-form-item-control-input-content) {
+    width: 100%;
+  }
+
+  :deep(.ant-input),
+  :deep(.ant-select),
+  :deep(.ant-picker),
+  :deep(.ant-input-affix-wrapper) {
+    width: 100%;
+  }
+
+  .filter-actions-item {
+    :deep(.ant-form-item-label) {
+      display: none;
+    }
+  }
+
+  .remark-item {
+    :deep(.ant-form-item-label) {
+      flex: 0 0 82px;
+    }
+
+    :deep(.ant-form-item-control) {
+      flex: 1;
+    }
+  }
+}
+
+.filter-form {
+  :deep(.ant-form-item-label > label) {
+    color: rgba(0, 0, 0, 0.65);
   }
 }
 
@@ -698,7 +751,9 @@ function confirmUrgency() {
   }
 
   .basic-form {
-    margin-bottom: 4px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f0;
   }
 
   .detail-tabs {
