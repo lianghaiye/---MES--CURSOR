@@ -170,95 +170,106 @@
             <span class="code">{{ selectedOrder.code }}</span>
             <span class="name">{{ selectedOrder.name }}</span>
           </div>
-          <a-button type="link" class="collapse-btn" @click="detailCollapsed = !detailCollapsed">
+          <a-button
+            v-if="detailTab === 'dispatch' && showDispatchTab"
+            type="link"
+            class="collapse-btn"
+            @click="detailCollapsed = !detailCollapsed"
+          >
             {{ detailCollapsed ? '展开详情' : '收起详情' }}
             <UpOutlined v-if="!detailCollapsed" />
             <DownOutlined v-else />
           </a-button>
         </div>
 
-        <a-form v-show="!detailCollapsed" layout="inline" class="basic-form horizontal-form">
-          <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="产品名称">
-                <a-input :value="selectedOrder.productName" disabled />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="工作中心">
-                <a-select
-                  v-model:value="selectedOrder.workCenter"
-                  :options="workCenterOpts"
-                  @change="saveBasicInfo"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="BOM">
-                <a-select
-                  v-model:value="selectedOrder.bom"
-                  show-search
-                  :options="bomOpts"
-                  @change="saveBasicInfo"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="预入仓库">
-                <a-select
-                  v-model:value="selectedOrder.warehouse"
-                  :options="warehouseOpts"
-                  @change="saveBasicInfo"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="紧急度">
-                <a-select
-                  v-model:value="selectedOrder.urgency"
-                  :options="urgencyOpts"
-                  @change="saveBasicInfo"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="计划日期">
-                <a-range-picker v-model:value="planDateValue" @change="onPlanDateChange" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="24">
-              <a-form-item label="备注" class="remark-item">
-                <a-textarea
-                  v-model:value="selectedOrder.remark"
-                  :rows="2"
-                  placeholder="请输入备注"
-                  @blur="saveBasicInfo"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
-
         <a-tabs v-model:activeKey="detailTab" class="detail-tabs">
-          <a-tab-pane v-if="showDispatchTab" key="dispatch" tab="工单下发" />
-          <a-tab-pane key="detail" tab="工单详情" />
-          <a-tab-pane key="ebom" tab="EBOM" />
-          <a-tab-pane key="current-bom" tab="当前BOM" />
-          <a-tab-pane key="tasks" tab="任务列表" />
-        </a-tabs>
+          <a-tab-pane v-if="showDispatchTab" key="dispatch" tab="工单下发">
+            <a-form
+              v-show="!detailCollapsed"
+              layout="inline"
+              class="basic-form horizontal-form dispatch-basic-form"
+            >
+              <a-row :gutter="[12, 12]" style="width: 100%">
+                <a-col :xs="24" :sm="12" :md="8">
+                  <a-form-item label="产品名称">
+                    <a-input :value="selectedOrder.productName" disabled />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :md="8">
+                  <a-form-item label="工作中心">
+                    <a-select
+                      v-model:value="selectedOrder.workCenter"
+                      :options="workCenterOpts"
+                      @change="saveBasicInfo"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :md="8">
+                  <a-form-item label="BOM">
+                    <a-select
+                      v-model:value="selectedOrder.bom"
+                      show-search
+                      :options="bomOpts"
+                      @change="saveBasicInfo"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :md="8">
+                  <a-form-item label="预入仓库">
+                    <a-select
+                      v-model:value="selectedOrder.warehouse"
+                      :options="warehouseOpts"
+                      @change="saveBasicInfo"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :md="8">
+                  <a-form-item label="紧急度">
+                    <a-select
+                      v-model:value="selectedOrder.urgency"
+                      :options="urgencyOpts"
+                      @change="saveBasicInfo"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :md="8">
+                  <a-form-item label="计划日期">
+                    <a-range-picker v-model:value="planDateValue" @change="onPlanDateChange" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="24">
+                  <a-form-item label="备注" class="remark-item">
+                    <a-textarea
+                      v-model:value="selectedOrder.remark"
+                      :rows="2"
+                      placeholder="请输入备注"
+                      @blur="saveBasicInfo"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </a-form>
 
-        <WorkOrderDispatchTab
-          v-if="detailTab === 'dispatch' && showDispatchTab"
-          :work-order="selectedOrder"
-          @dispatch="handleDispatch(false)"
-          @dispatch-and-start="handleDispatch(true)"
-          @cancel="handleDispatchCancel"
-        />
-        <a-empty
-          v-else-if="detailTab !== 'dispatch'"
-          description="该 Tab 为占位，后续扩展"
-          class="tab-empty"
-        />
+            <WorkOrderDispatchTab
+              :work-order="selectedOrder"
+              @dispatch="handleDispatch(false)"
+              @dispatch-and-start="handleDispatch(true)"
+              @cancel="handleDispatchCancel"
+            />
+          </a-tab-pane>
+          <a-tab-pane key="detail" tab="工单详情">
+            <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
+          </a-tab-pane>
+          <a-tab-pane key="ebom" tab="EBOM">
+            <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
+          </a-tab-pane>
+          <a-tab-pane key="current-bom" tab="当前BOM">
+            <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
+          </a-tab-pane>
+          <a-tab-pane key="tasks" tab="任务列表">
+            <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
+          </a-tab-pane>
+        </a-tabs>
       </div>
 
       <div v-else class="detail-card detail-empty">
@@ -858,9 +869,9 @@ function confirmUrgency() {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #f0f0f0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
 
     .detail-title {
       .code {
@@ -882,16 +893,22 @@ function confirmUrgency() {
     }
   }
 
-  .basic-form {
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #f0f0f0;
-  }
-
   .detail-tabs {
     :deep(.ant-tabs-nav) {
       margin-bottom: 16px;
     }
+  }
+
+  .dispatch-basic-form {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .basic-form {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
   }
 
   .tab-empty {
