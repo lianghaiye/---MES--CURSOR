@@ -70,7 +70,7 @@
     <!-- 操作栏 -->
     <div class="toolbar-row">
       <a-space>
-        <a-button type="primary" @click="createModalOpen = true">
+        <a-button type="primary" @click="openCreateModal">
           <PlusOutlined />
           新增工单
         </a-button>
@@ -94,46 +94,62 @@
     <div class="master-detail">
       <!-- 左侧工单列表 -->
       <div class="list-card">
-        <div class="list-title">工单列表</div>
+        <div class="list-title-row">
+          <a-checkbox
+            :checked="allPageSelected"
+            :indeterminate="pageIndeterminate"
+            @change="onToggleSelectAllPage"
+          />
+          <span class="list-title">工单列表</span>
+          <span v-if="selectedIds.length" class="selected-count"
+            >已选 {{ selectedIds.length }}</span
+          >
+        </div>
         <div class="list-body">
           <div
             v-for="wo in pagedOrders"
             :key="wo.id"
             class="order-card"
-            :class="{ active: selectedId === wo.id }"
+            :class="{ active: selectedId === wo.id, checked: selectedIds.includes(wo.id) }"
             @click="selectOrder(wo.id)"
           >
-            <div class="card-head">
-              <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
-              <a-dropdown :trigger="['click']">
-                <a-button type="text" size="small" class="more-btn" @click.stop>
-                  <EllipsisOutlined />
-                </a-button>
-                <template #overlay>
-                  <a-menu @click="({ key }) => onCardAction(key, wo)">
-                    <a-menu-item key="urgency">调整紧急度</a-menu-item>
-                    <a-menu-item key="pause">暂停</a-menu-item>
-                    <a-menu-item key="terminate">终止</a-menu-item>
-                    <a-menu-item key="complete">完成</a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-            </div>
-            <div class="card-code">{{ wo.code }}</div>
-            <div class="card-name">{{ wo.name }}</div>
-            <div class="card-meta">销售订单号：{{ wo.sourceOrderNo || '-' }}</div>
-            <div class="card-meta">排产数量：{{ wo.scheduleQty }}</div>
-            <div class="card-tags">
-              <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
-                {{ urgencyLabel(wo.urgency) }}
-              </a-tag>
-            </div>
             <a-checkbox
               class="card-checkbox"
               :checked="selectedIds.includes(wo.id)"
               @click.stop
               @change="(e) => toggleSelect(wo.id, e.target.checked)"
             />
+            <div class="card-content">
+              <div class="card-head">
+                <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
+                <a-dropdown :trigger="['click']">
+                  <a-button type="text" size="small" class="more-btn" @click.stop>
+                    <EllipsisOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu @click="({ key }) => onCardAction(key, wo)">
+                      <a-menu-item key="edit">编辑</a-menu-item>
+                      <a-menu-item key="delete" danger>删除</a-menu-item>
+                      <a-menu-item key="clone">克隆</a-menu-item>
+                      <a-menu-divider />
+                      <a-menu-item key="urgency">调整紧急度</a-menu-item>
+                      <a-menu-item key="pause">暂停</a-menu-item>
+                      <a-menu-item key="terminate">终止</a-menu-item>
+                      <a-menu-item key="complete">完成</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
+              </div>
+              <div class="card-code">{{ wo.code }}</div>
+              <div class="card-name">{{ wo.name }}</div>
+              <div class="card-meta">销售订单号：{{ wo.sourceOrderNo || '-' }}</div>
+              <div class="card-meta">排产数量：{{ wo.scheduleQty }}</div>
+              <div class="card-tags">
+                <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
+                  {{ urgencyLabel(wo.urgency) }}
+                </a-tag>
+              </div>
+            </div>
           </div>
         </div>
         <div class="list-pagination">
@@ -250,7 +266,12 @@
       </div>
     </div>
 
-    <CreateWorkOrderModal v-model:open="createModalOpen" @created="onWorkOrderCreated" />
+    <CreateWorkOrderModal
+      v-model:open="createModalOpen"
+      :edit-record="editRecord"
+      @created="onWorkOrderCreated"
+      @updated="onWorkOrderUpdated"
+    />
 
     <a-modal v-model:open="urgencyModalOpen" title="调整紧急度" width="400px" @ok="confirmUrgency">
       <a-select v-model:value="urgencyDraft" style="width: 100%" :options="urgencyOpts" />
@@ -264,7 +285,7 @@ export default { name: 'WorkOrderManagementView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import {
   DownOutlined,
@@ -279,6 +300,8 @@ import {
   filterWorkOrders,
   updateWorkOrder,
   addWorkOrder,
+  deleteWorkOrder,
+  cloneWorkOrder,
   canShowDispatchTab,
 } from '@/store/workOrderStore'
 import { workCenterOptions, warehouseOptions, urgencyOptions } from '@/mock/workOrderOptions'
@@ -303,6 +326,7 @@ const selectedIds = ref([])
 const detailTab = ref('dispatch')
 const detailCollapsed = ref(false)
 const createModalOpen = ref(false)
+const editRecord = ref(null)
 const urgencyModalOpen = ref(false)
 const urgencyDraft = ref('普通')
 const urgencyTargetId = ref(null)
@@ -321,6 +345,17 @@ const filteredOrders = computed(() => filterWorkOrders(workOrderState.orders, ap
 const pagedOrders = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
   return filteredOrders.value.slice(start, start + pagination.pageSize)
+})
+
+const pageIds = computed(() => pagedOrders.value.map((o) => o.id))
+
+const allPageSelected = computed(
+  () => pageIds.value.length > 0 && pageIds.value.every((id) => selectedIds.value.includes(id)),
+)
+
+const pageIndeterminate = computed(() => {
+  const selectedOnPage = pageIds.value.filter((id) => selectedIds.value.includes(id)).length
+  return selectedOnPage > 0 && selectedOnPage < pageIds.value.length
 })
 
 const selectedOrder = computed(() => workOrderState.orders.find((o) => o.id === selectedId.value))
@@ -387,6 +422,22 @@ function toggleSelect(id, checked) {
   }
 }
 
+function onToggleSelectAllPage(e) {
+  const checked = e.target.checked
+  if (checked) {
+    pageIds.value.forEach((id) => {
+      if (!selectedIds.value.includes(id)) selectedIds.value.push(id)
+    })
+  } else {
+    selectedIds.value = selectedIds.value.filter((id) => !pageIds.value.includes(id))
+  }
+}
+
+function openCreateModal() {
+  editRecord.value = null
+  createModalOpen.value = true
+}
+
 function handleSearch() {
   appliedFilters.value = { ...filters }
   pagination.current = 1
@@ -427,6 +478,16 @@ function onWorkOrderCreated(wo) {
   detailTab.value = 'dispatch'
 }
 
+function onWorkOrderUpdated({ id, patch }) {
+  updateWorkOrder(id, patch)
+  const wo = workOrderState.orders.find((o) => o.id === id)
+  if (selectedId.value === id && wo) {
+    if (!canShowDispatchTab(wo.status) && detailTab.value === 'dispatch') {
+      detailTab.value = 'detail'
+    }
+  }
+}
+
 function validateProcesses(processes) {
   const missing = processes.filter((p) => !p.executors?.length)
   if (missing.length) {
@@ -452,11 +513,15 @@ function handleDispatchCancel() {
 }
 
 function handleBatchDispatch() {
+  if (!selectedIds.value.length) {
+    message.warning('请勾选要下发的工单')
+    return
+  }
   const targets = workOrderState.orders.filter(
     (o) => selectedIds.value.includes(o.id) && o.status === '待下发',
   )
   if (!targets.length) {
-    message.warning('请勾选状态为「待下发」的工单')
+    message.warning('所选工单中没有状态为「待下发」的可下发项')
     return
   }
   for (const wo of targets) {
@@ -467,12 +532,58 @@ function handleBatchDispatch() {
   selectedIds.value = []
 }
 
+function handleBatchExport() {
+  if (!selectedIds.value.length) {
+    message.warning('请勾选要导出的工单')
+    return
+  }
+  const data = workOrderState.orders.filter((o) => selectedIds.value.includes(o.id))
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `work-orders-${dayjs().format('YYYYMMDD-HHmmss')}.json`
+  link.click()
+  URL.revokeObjectURL(url)
+  message.success(`已导出 ${data.length} 条工单`)
+}
+
 function onBatchMenu({ key }) {
   if (key === 'import') message.info('批量导入功能开发中')
-  else message.info('批量导出功能开发中')
+  else if (key === 'export') handleBatchExport()
 }
 
 function onCardAction(key, wo) {
+  if (key === 'edit') {
+    editRecord.value = wo
+    createModalOpen.value = true
+    return
+  }
+  if (key === 'delete') {
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定删除工单「${wo.code}」吗？此操作不可恢复。`,
+      okType: 'danger',
+      onOk: () => {
+        deleteWorkOrder(wo.id)
+        selectedIds.value = selectedIds.value.filter((id) => id !== wo.id)
+        if (selectedId.value === wo.id) {
+          selectedId.value = workOrderState.orders[0]?.id || null
+        }
+        message.success('工单已删除')
+      },
+    })
+    return
+  }
+  if (key === 'clone') {
+    const cloned = cloneWorkOrder(wo.id)
+    if (cloned) {
+      selectedId.value = cloned.id
+      detailTab.value = 'dispatch'
+      message.success('工单已克隆')
+    }
+    return
+  }
   if (key === 'urgency') {
     urgencyTargetId.value = wo.id
     urgencyDraft.value = wo.urgency
@@ -619,11 +730,23 @@ function confirmUrgency() {
   flex-direction: column;
   max-height: calc(100vh - 280px);
 
-  .list-title {
-    padding: 14px 16px 10px;
-    font-weight: 600;
-    font-size: 15px;
+  .list-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px 10px;
     border-bottom: 1px solid #f0f0f0;
+
+    .list-title {
+      font-weight: 600;
+      font-size: 15px;
+      flex: 1;
+    }
+
+    .selected-count {
+      font-size: 12px;
+      color: #1677ff;
+    }
   }
 
   .list-body {
@@ -641,10 +764,12 @@ function confirmUrgency() {
 }
 
 .order-card {
-  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   border: 1px solid #f0f0f0;
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px 12px 10px 10px;
   margin-bottom: 10px;
   cursor: pointer;
   background: #fff;
@@ -660,6 +785,20 @@ function confirmUrgency() {
     border-color: #91caff;
     border-left-color: #1677ff;
     background: #f0f7ff;
+  }
+
+  &.checked {
+    background: #fafcff;
+  }
+
+  .card-checkbox {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .card-content {
+    flex: 1;
+    min-width: 0;
   }
 
   .card-head {
@@ -705,13 +844,6 @@ function confirmUrgency() {
       margin: 0;
       font-size: 12px;
     }
-  }
-
-  .card-checkbox {
-    position: absolute;
-    left: 8px;
-    bottom: 8px;
-    opacity: 0.6;
   }
 }
 

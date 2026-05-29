@@ -1,7 +1,7 @@
 <template>
   <a-modal
     :open="open"
-    title="新增工单"
+    :title="isEdit ? '编辑工单' : '新增工单'"
     width="720px"
     :mask-closable="false"
     destroy-on-close
@@ -91,12 +91,16 @@ import {
 } from '@/mock/workOrderOptions'
 import { bomOptions } from '@/mock/workOrderMaster'
 import { createWorkOrderPayload } from '@/store/workOrderStore'
+import { buildProcessesFromRoute } from '@/mock/processRoutes'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  editRecord: { type: Object, default: null },
 })
 
-const emit = defineEmits(['update:open', 'created'])
+const emit = defineEmits(['update:open', 'created', 'updated'])
+
+const isEdit = computed(() => Boolean(props.editRecord?.id))
 
 const form = reactive({
   productName: '',
@@ -120,18 +124,34 @@ const urgencyOpts = computed(() => urgencyOptions.map((v) => ({ label: v, value:
 watch(
   () => props.open,
   (val) => {
-    if (val) {
-      form.productName = ''
-      form.processRouteName = processRouteOptions[0]
-      form.planQty = 1
-      form.scheduleQty = 1
-      form.workCenter = '默认工厂'
-      form.bom = undefined
-      form.warehouse = '半成品仓'
-      form.urgency = '普通'
-      form.planDateRange = [dayjs(), dayjs().add(14, 'day')]
-      form.remark = ''
+    if (!val) return
+    if (props.editRecord) {
+      const wo = props.editRecord
+      form.productName = wo.productName
+      form.processRouteName = wo.processRouteName
+      form.planQty = wo.planQty
+      form.scheduleQty = wo.scheduleQty
+      form.workCenter = wo.workCenter
+      form.bom = wo.bom
+      form.warehouse = wo.warehouse
+      form.urgency = wo.urgency
+      form.remark = wo.remark || ''
+      form.planDateRange =
+        wo.planDateRange?.length === 2
+          ? [dayjs(wo.planDateRange[0]), dayjs(wo.planDateRange[1])]
+          : null
+      return
     }
+    form.productName = ''
+    form.processRouteName = processRouteOptions[0]
+    form.planQty = 1
+    form.scheduleQty = 1
+    form.workCenter = '默认工厂'
+    form.bom = undefined
+    form.warehouse = '半成品仓'
+    form.urgency = '普通'
+    form.planDateRange = [dayjs(), dayjs().add(14, 'day')]
+    form.remark = ''
   },
 )
 
@@ -152,7 +172,31 @@ function handleSubmit() {
   const planDateRange =
     form.planDateRange?.length === 2
       ? [form.planDateRange[0].format('YYYY-MM-DD'), form.planDateRange[1].format('YYYY-MM-DD')]
-      : undefined
+      : []
+
+  if (isEdit.value) {
+    const routeChanged = props.editRecord.processRouteName !== form.processRouteName
+    emit('updated', {
+      id: props.editRecord.id,
+      patch: {
+        productName: form.productName.trim(),
+        name: `${form.productName.trim()}${props.editRecord.orderCategory || '生产工单'}`,
+        processRouteName: form.processRouteName,
+        planQty: form.planQty,
+        scheduleQty: form.scheduleQty,
+        workCenter: form.workCenter,
+        bom: form.bom || form.productName.trim(),
+        warehouse: form.warehouse,
+        urgency: form.urgency,
+        planDateRange,
+        remark: form.remark,
+        ...(routeChanged ? { processes: buildProcessesFromRoute(form.processRouteName) } : {}),
+      },
+    })
+    message.success('工单已更新')
+    emit('update:open', false)
+    return
+  }
 
   const wo = createWorkOrderPayload({
     productName: form.productName.trim(),

@@ -119,6 +119,27 @@ export function addWorkOrder(order) {
   workOrderState.orders.unshift(order)
 }
 
+export function deleteWorkOrder(id) {
+  const idx = workOrderState.orders.findIndex((o) => o.id === id)
+  if (idx === -1) return false
+  workOrderState.orders.splice(idx, 1)
+  return true
+}
+
+export function cloneWorkOrder(id) {
+  const source = workOrderState.orders.find((o) => o.id === id)
+  if (!source) return null
+  const cloned = JSON.parse(JSON.stringify(source))
+  cloned.id = `wo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  cloned.code = generateCode()
+  cloned.name = `${source.productName}${source.orderCategory || '生产工单'}`
+  cloned.status = '待下发'
+  cloned.createdAt = dayjs().format('YYYY-MM-DD')
+  cloned.source = 'manual'
+  addWorkOrder(cloned)
+  return cloned
+}
+
 export function updateWorkOrder(id, patch) {
   const idx = workOrderState.orders.findIndex((o) => o.id === id)
   if (idx === -1) return null
