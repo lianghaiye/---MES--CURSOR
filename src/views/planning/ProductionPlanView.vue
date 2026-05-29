@@ -160,9 +160,19 @@
           <div class="action-row">
             <a-space wrap>
               <span>计划总装日期</span>
-              <a-date-picker />
+              <a-date-picker
+                :value="planAssemblyDateValue"
+                size="small"
+                allow-clear
+                @change="onPlanAssemblyDateChange"
+              />
               <span>计划完成日期</span>
-              <a-date-picker />
+              <a-date-picker
+                :value="planCompleteDateValue"
+                size="small"
+                allow-clear
+                @change="onPlanCompleteDateChange"
+              />
               <span>调整紧急度</span>
               <a-select style="width: 100px" placeholder="选择" />
               <a-button type="primary">生成采购申请</a-button>
@@ -221,6 +231,7 @@ export default {
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import dayjs from 'dayjs'
 import { cloneOrders, filterOrders } from '@/mock/orders'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
 import { addWorkOrdersFromPlanRows } from '@/store/workOrderStore'
@@ -326,6 +337,30 @@ const selfMadeMaterials = computed(() =>
   selectedOrder.value ? getSelfMadeMaterials(selectedOrder.value) : [],
 )
 
+const planAssemblyDateValue = computed(() => {
+  const order = selectedOrder.value
+  if (!order) return null
+  const date = order.planAssemblyDate || order.workItems?.[0]?.deliveryDate || order.deliveryDate
+  return date ? dayjs(date) : null
+})
+
+const planCompleteDateValue = computed(() => {
+  const order = selectedOrder.value
+  if (!order) return null
+  const date = order.planCompleteDate || order.deliveryDate
+  return date ? dayjs(date) : null
+})
+
+function onPlanAssemblyDateChange(date) {
+  if (!selectedOrder.value) return
+  selectedOrder.value.planAssemblyDate = date ? date.format('YYYY-MM-DD') : ''
+}
+
+function onPlanCompleteDateChange(date) {
+  if (!selectedOrder.value) return
+  selectedOrder.value.planCompleteDate = date ? date.format('YYYY-MM-DD') : ''
+}
+
 watch(selectedOrder, (order) => {
   if (!order) return
   order.workItems?.forEach((wi) => {
@@ -376,7 +411,7 @@ function handleWorkOrderSave(savedRows) {
   ordersData.value = [...ordersData.value]
   const created = addWorkOrdersFromPlanRows(savedRows, order)
   if (created.length) {
-    message.success(`已同步 ${created.length} 条工单至工单管理`)
+    message.success(`已同步 ${created.length} 条工单至生产工单`)
   }
 }
 

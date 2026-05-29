@@ -1,5 +1,7 @@
 /** 物料树工具函数 */
 
+import dayjs from 'dayjs'
+
 export function flattenMaterials(materials, list = []) {
   if (!materials?.length) return list
   materials.forEach((item) => {
@@ -47,8 +49,20 @@ export function getSelfMadeMaterials(order) {
   return all.filter((m) => m.supplyType === '自制件')
 }
 
+/** 解析订单计划总装日期 */
+export function resolveAssemblyDate(order) {
+  if (order?.planAssemblyDate) return order.planAssemblyDate
+  const wiDate = order?.workItems?.[0]?.deliveryDate
+  if (wiDate) return wiDate
+  return order?.deliveryDate || ''
+}
+
 /** 构建加工工单弹窗行数据 */
 export function buildWorkOrderRows(materials, order) {
+  const assemblyDate = resolveAssemblyDate(order)
+  const startDate = dayjs().format('YYYY-MM-DD')
+  const endDate = assemblyDate || dayjs().add(14, 'day').format('YYYY-MM-DD')
+
   return materials.map((m, index) => {
     const demandQty = calcDemandQty(m.unitUsage, order.productQty)
     const gapQty = calcGapQty(demandQty, m.availableStock)
@@ -71,6 +85,8 @@ export function buildWorkOrderRows(materials, order) {
       demandQty,
       gapQty,
       planQty: m.planQty ?? gapQty,
+      planDateRange:
+        m.planDateRange?.length === 2 ? [...m.planDateRange] : [startDate, endDate],
       unit: m.unit || '件',
       warehouse: m.warehouse || '半成品仓',
       urgency: m.urgency || order.urgency || '普通',
@@ -86,6 +102,7 @@ export function patchMaterialFromWorkOrderRow(row) {
     workCenter: row.workCenter,
     personInCharge: row.personInCharge,
     planQty: row.planQty,
+    planDateRange: row.planDateRange,
     unit: row.unit,
     warehouse: row.warehouse,
     urgency: row.urgency,

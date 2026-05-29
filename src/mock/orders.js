@@ -64,6 +64,8 @@ export const mockOrders = [
     remark: '优先排产',
     tags: ['部分下达', '已逾期'],
     daysToDelivery: 0,
+    planAssemblyDate: '2025-05-18',
+    planCompleteDate: '2025-05-20',
     workItems: [
       {
         id: 'w1',

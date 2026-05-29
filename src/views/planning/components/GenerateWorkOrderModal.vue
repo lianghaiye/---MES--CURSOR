@@ -9,7 +9,7 @@
     @cancel="handleCancel"
   >
     <div class="modal-toolbar">
-      <span class="hint">提示：拖动表头右侧边线可调整列宽，双击单元格可直接编辑</span>
+      <span class="hint">提示：拖动表头右侧边线可调整列宽，单击可编辑单元格进行编辑</span>
       <a-popover trigger="click" placement="bottomRight">
         <template #title>列设置</template>
         <template #content>
@@ -59,16 +59,26 @@
               editable: isEditable(column.key),
               editing: isEditing(record.key, column.key),
             }"
-            @dblclick="startEdit(record, column.key)"
+            @click="startEdit(record, column.key)"
           >
-            <template v-if="isEditing(record.key, column.key)">
+            <div v-if="isEditing(record.key, column.key)" class="edit-wrap" @click.stop>
+              <a-range-picker
+                v-if="column.key === 'planDateRange'"
+                :value="planDateDayjs(record)"
+                size="small"
+                style="width: 100%"
+                :open="planDatePickerOpen"
+                @change="(dates) => onPlanDateChange(record, dates)"
+                @openChange="onPlanDateOpenChange"
+              />
               <a-select
-                v-if="selectOptions[column.key]"
+                v-else-if="selectOptions[column.key]"
                 v-model:value="record[column.key]"
                 size="small"
                 style="width: 100%"
+                :open="selectOpen"
                 :options="selectOptions[column.key]"
-                @blur="endEdit"
+                @dropdownVisibleChange="onSelectOpenChange"
                 @change="endEdit"
               />
               <a-input-number
@@ -77,6 +87,7 @@
                 size="small"
                 :min="0"
                 style="width: 100%"
+                autofocus
                 @blur="endEdit"
                 @pressEnter="endEdit"
               />
@@ -84,10 +95,11 @@
                 v-else
                 v-model:value="record.remark"
                 size="small"
+                autofocus
                 @blur="endEdit"
                 @pressEnter="endEdit"
               />
-            </template>
+            </div>
             <template v-else>
               <span :class="{ placeholder: isEditable(column.key) && !text && text !== 0 }">
                 {{ formatCell(record, column.key, text) }}
@@ -125,9 +137,10 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import dayjs from 'dayjs'
 import {
   processRouteOptions,
   workCenterOptions,
@@ -163,6 +176,7 @@ const columnDefs = [
   { key: 'demandQty', title: '需求数', width: 80, total: true, numeric: true },
   { key: 'gapQty', title: '缺口数', width: 80, total: true, numeric: true },
   { key: 'planQty', title: '计划数量', width: 90, editable: true, total: true, numeric: true },
+  { key: 'planDateRange', title: '计划时间', width: 220, editable: true, total: false },
   { key: 'unit', title: '计量单位', width: 90, editable: true, total: false },
   { key: 'warehouse', title: '预入仓库', width: 100, editable: true, total: false },
   { key: 'urgency', title: '紧急度', width: 80, editable: true, total: false },
@@ -177,6 +191,8 @@ const columnWidths = reactive(Object.fromEntries(columnDefs.map((c) => [c.key, c
 const rows = ref([])
 const editingCell = ref(null)
 const tableWrapRef = ref(null)
+const selectOpen = ref(false)
+const planDatePickerOpen = ref(false)
 
 const selectOptions = {
   processRoute: processRouteOptions.map((v) => ({ label: v, value: v })),
@@ -235,13 +251,51 @@ function isEditing(rowKey, field) {
 function startEdit(record, field) {
   if (!isEditable(field)) return
   editingCell.value = { rowKey: record.key, field }
+  nextTick(() => {
+    if (field === 'planDateRange') {
+      planDatePickerOpen.value = true
+    } else if (selectOptions[field]) {
+      selectOpen.value = true
+    }
+  })
 }
 
 function endEdit() {
   editingCell.value = null
+  selectOpen.value = false
+  planDatePickerOpen.value = false
+}
+
+function onSelectOpenChange(open) {
+  selectOpen.value = open
+  if (!open) endEdit()
+}
+
+function planDateDayjs(record) {
+  const range = record.planDateRange
+  if (range?.length === 2) return [dayjs(range[0]), dayjs(range[1])]
+  return null
+}
+
+function onPlanDateChange(record, dates) {
+  if (dates?.length === 2) {
+    record.planDateRange = [dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')]
+  } else {
+    record.planDateRange = []
+  }
+}
+
+function onPlanDateOpenChange(open) {
+  planDatePickerOpen.value = open
+  if (!open) endEdit()
 }
 
 function formatCell(record, key, text) {
+  if (key === 'planDateRange') {
+    const range = record.planDateRange
+    if (range?.length === 2) return `${range[0]} ~ ${range[1]}`
+    return '请选择'
+  }
   if (isEditable(key) && (text === '' || text == null)) {
     if (['processRoute', 'workCenter', 'personInCharge'].includes(key)) return '请选择'
     return '-'
@@ -342,6 +396,10 @@ function handleSave() {
 
   &.editing {
     padding: 0;
+  }
+
+  .edit-wrap {
+    width: 100%;
   }
 
   .placeholder {

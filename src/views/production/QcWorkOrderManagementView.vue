@@ -36,6 +36,17 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="8" :xl="4">
+            <a-form-item label="执行状态">
+              <a-select
+                v-model:value="filters.execStatus"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                :options="execStatusOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8" :xl="4">
             <a-form-item label="工单类别">
               <a-select
                 v-model:value="filters.orderCategory"
@@ -132,7 +143,15 @@
             />
             <div class="card-content">
               <div class="card-head">
-                <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
+                <a-space :size="4" wrap class="card-tags-row">
+                  <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
+                  <a-tag :color="execStatusColor(wo.execStatus)" class="status-tag">
+                    {{ wo.execStatus }}
+                  </a-tag>
+                  <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
+                    {{ urgencyLabel(wo.urgency) }}
+                  </a-tag>
+                </a-space>
                 <a-dropdown :trigger="['click']">
                   <a-button type="text" size="small" class="more-btn" @click.stop>
                     <EllipsisOutlined />
@@ -153,16 +172,8 @@
               </div>
               <div class="card-code">{{ wo.code }}</div>
               <div class="card-name">{{ wo.name }}</div>
-              <div class="card-meta">
-                <span>订单 {{ wo.sourceOrderNo || '-' }}</span>
-                <span class="meta-divider">·</span>
-                <span>数量 {{ wo.scheduleQty }}</span>
-              </div>
-              <div class="card-tags">
-                <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
-                  {{ urgencyLabel(wo.urgency) }}
-                </a-tag>
-              </div>
+              <div class="card-meta">销售订单号：{{ wo.sourceOrderNo || '-' }}</div>
+              <div class="card-meta">计划数量：{{ wo.planQty }}</div>
             </div>
           </div>
         </div>
@@ -180,6 +191,7 @@
       <!-- 右侧详情 -->
       <div v-if="selectedOrder" class="detail-card">
         <WorkOrderDetailPanel
+          variant="qc"
           :work-order-id="selectedOrder.id"
           v-model:detail-tab="detailTab"
           v-model:detail-collapsed="detailCollapsed"
@@ -225,6 +237,7 @@
       >
         <WorkOrderDetailPanel
           v-if="selectedOrder"
+          variant="qc"
           :work-order-id="selectedOrder.id"
           v-model:detail-tab="detailTab"
           v-model:detail-collapsed="detailCollapsed"
@@ -242,7 +255,7 @@
       </a-drawer>
     </template>
 
-    <CreateWorkOrderModal
+    <CreateQcWorkOrderModal
       v-model:open="createModalOpen"
       :edit-record="editRecord"
       @created="onWorkOrderCreated"
@@ -256,7 +269,7 @@
 </template>
 
 <script>
-export default { name: 'WorkOrderManagementView' }
+export default { name: 'QcWorkOrderManagementView' }
 </script>
 
 <script setup>
@@ -272,35 +285,37 @@ import {
   TableOutlined,
 } from '@ant-design/icons-vue'
 import {
-  workOrderState,
-  filterWorkOrders,
-  updateWorkOrder,
-  addWorkOrder,
-  deleteWorkOrder,
-  cloneWorkOrder,
-  canShowDispatchTab,
-} from '@/store/workOrderStore'
+  qcWorkOrderState,
+  filterQcWorkOrders,
+  updateQcWorkOrder,
+  addQcWorkOrder,
+  deleteQcWorkOrder,
+  cloneQcWorkOrder,
+  canShowQcDispatchTab,
+} from '@/store/qcWorkOrderStore'
 import { workCenterOptions, warehouseOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { bomOptions } from '@/mock/workOrderMaster'
-import CreateWorkOrderModal from './components/CreateWorkOrderModal.vue'
+import CreateQcWorkOrderModal from './components/CreateQcWorkOrderModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
 
-const LAYOUT_STORAGE_KEY = 'i_doms_wo_layout'
+const LAYOUT_STORAGE_KEY = 'i_doms_qc_wo_layout'
 
 const statusOptions = ['待下发', '已下发', '执行中', '完成', '暂停', '终止']
-const categoryOptions = ['生产工单', '返修工单', '试制工单']
+const execStatusOptions = ['未开始', '执行中', '已完成', '暂停']
+const categoryOptions = ['质检工单']
 
 const filters = reactive({
   code: '',
   name: '',
   salesOrderNo: '',
   status: undefined,
+  execStatus: undefined,
   orderCategory: undefined,
   workCenter: undefined,
 })
 const appliedFilters = ref({ ...filters })
-const selectedId = ref(workOrderState.orders[0]?.id || null)
+const selectedId = ref(qcWorkOrderState.orders[0]?.id || null)
 const selectedIds = ref([])
 const detailTab = ref('dispatch')
 const detailCollapsed = ref(false)
@@ -315,13 +330,14 @@ const detailDrawerOpen = ref(false)
 const pagination = reactive({ current: 1, pageSize: 12 })
 
 const statusOpts = statusOptions.map((v) => ({ label: v, value: v }))
+const execStatusOpts = execStatusOptions.map((v) => ({ label: v, value: v }))
 const categoryOpts = categoryOptions.map((v) => ({ label: v, value: v }))
 const workCenterOpts = workCenterOptions.map((v) => ({ label: v, value: v }))
 const warehouseOpts = warehouseOptions.map((v) => ({ label: v, value: v }))
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const bomOpts = bomOptions.map((v) => ({ label: v, value: v }))
 
-const filteredOrders = computed(() => filterWorkOrders(workOrderState.orders, appliedFilters.value))
+const filteredOrders = computed(() => filterQcWorkOrders(qcWorkOrderState.orders, appliedFilters.value))
 
 const pagedOrders = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -339,10 +355,10 @@ const pageIndeterminate = computed(() => {
   return selectedOnPage > 0 && selectedOnPage < pageIds.value.length
 })
 
-const selectedOrder = computed(() => workOrderState.orders.find((o) => o.id === selectedId.value))
+const selectedOrder = computed(() => qcWorkOrderState.orders.find((o) => o.id === selectedId.value))
 
 const showDispatchTab = computed(() =>
-  selectedOrder.value ? canShowDispatchTab(selectedOrder.value.status) : false,
+  selectedOrder.value ? canShowQcDispatchTab(selectedOrder.value.status) : false,
 )
 
 const planDateValue = computed({
@@ -356,9 +372,9 @@ const planDateValue = computed({
 
 watch(selectedOrder, (wo) => {
   if (!wo) return
-  if (!canShowDispatchTab(wo.status) && detailTab.value === 'dispatch') {
+  if (!canShowQcDispatchTab(wo.status) && detailTab.value === 'dispatch') {
     detailTab.value = 'detail'
-  } else if (canShowDispatchTab(wo.status)) {
+  } else if (canShowQcDispatchTab(wo.status)) {
     detailTab.value = 'dispatch'
   }
 })
@@ -379,6 +395,16 @@ function statusColor(status) {
     终止: 'error',
   }
   return map[status] || 'default'
+}
+
+function execStatusColor(execStatus) {
+  const map = {
+    未开始: 'default',
+    执行中: 'processing',
+    已完成: 'success',
+    暂停: 'warning',
+  }
+  return map[execStatus] || 'default'
 }
 
 function urgencyTagColor(urgency) {
@@ -464,6 +490,7 @@ function handleReset() {
   filters.name = ''
   filters.salesOrderNo = ''
   filters.status = undefined
+  filters.execStatus = undefined
   filters.orderCategory = undefined
   filters.workCenter = undefined
   appliedFilters.value = { ...filters }
@@ -472,7 +499,7 @@ function handleReset() {
 
 function saveBasicInfo() {
   if (!selectedOrder.value) return
-  updateWorkOrder(selectedOrder.value.id, { ...selectedOrder.value })
+  updateQcWorkOrder(selectedOrder.value.id, { ...selectedOrder.value })
 }
 
 function onPlanDateChange(dates) {
@@ -489,16 +516,16 @@ function onPlanDateChange(dates) {
 }
 
 function onWorkOrderCreated(wo) {
-  addWorkOrder(wo)
+  addQcWorkOrder(wo)
   selectedId.value = wo.id
   detailTab.value = 'dispatch'
 }
 
 function onWorkOrderUpdated({ id, patch }) {
-  updateWorkOrder(id, patch)
-  const wo = workOrderState.orders.find((o) => o.id === id)
+  updateQcWorkOrder(id, patch)
+  const wo = qcWorkOrderState.orders.find((o) => o.id === id)
   if (selectedId.value === id && wo) {
-    if (!canShowDispatchTab(wo.status) && detailTab.value === 'dispatch') {
+    if (!canShowQcDispatchTab(wo.status) && detailTab.value === 'dispatch') {
       detailTab.value = 'detail'
     }
   }
@@ -516,11 +543,12 @@ function validateProcesses(processes) {
 function handleDispatch(startAfter) {
   const wo = selectedOrder.value
   if (!wo || !validateProcesses(wo.processes)) return
-  updateWorkOrder(wo.id, {
+  updateQcWorkOrder(wo.id, {
     processes: wo.processes,
     status: startAfter ? '执行中' : '已下发',
+    execStatus: startAfter ? '执行中' : wo.execStatus,
   })
-  message.success(startAfter ? '工单已下发并开始执行' : '工单已下发')
+  message.success(startAfter ? '质检工单已下发并开始执行' : '质检工单已下发')
   if (!startAfter) detailTab.value = 'detail'
 }
 
@@ -533,7 +561,7 @@ function handleBatchDispatch() {
     message.warning('请勾选要下发的工单')
     return
   }
-  const targets = workOrderState.orders.filter(
+  const targets = qcWorkOrderState.orders.filter(
     (o) => selectedIds.value.includes(o.id) && o.status === '待下发',
   )
   if (!targets.length) {
@@ -542,7 +570,7 @@ function handleBatchDispatch() {
   }
   for (const wo of targets) {
     if (!validateProcesses(wo.processes)) return
-    updateWorkOrder(wo.id, { status: '已下发' })
+    updateQcWorkOrder(wo.id, { status: '已下发' })
   }
   message.success(`已批量下发 ${targets.length} 条工单`)
   selectedIds.value = []
@@ -553,12 +581,12 @@ function handleBatchExport() {
     message.warning('请勾选要导出的工单')
     return
   }
-  const data = workOrderState.orders.filter((o) => selectedIds.value.includes(o.id))
+  const data = qcWorkOrderState.orders.filter((o) => selectedIds.value.includes(o.id))
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `work-orders-${dayjs().format('YYYYMMDD-HHmmss')}.json`
+  link.download = `qc-work-orders-${dayjs().format('YYYYMMDD-HHmmss')}.json`
   link.click()
   URL.revokeObjectURL(url)
   message.success(`已导出 ${data.length} 条工单`)
@@ -581,10 +609,10 @@ function onCardAction(key, wo) {
       content: `确定删除工单「${wo.code}」吗？此操作不可恢复。`,
       okType: 'danger',
       onOk: () => {
-        deleteWorkOrder(wo.id)
+        deleteQcWorkOrder(wo.id)
         selectedIds.value = selectedIds.value.filter((id) => id !== wo.id)
         if (selectedId.value === wo.id) {
-          selectedId.value = workOrderState.orders[0]?.id || null
+          selectedId.value = qcWorkOrderState.orders[0]?.id || null
         }
         message.success('工单已删除')
       },
@@ -592,7 +620,7 @@ function onCardAction(key, wo) {
     return
   }
   if (key === 'clone') {
-    const cloned = cloneWorkOrder(wo.id)
+    const cloned = cloneQcWorkOrder(wo.id)
     if (cloned) {
       selectedId.value = cloned.id
       detailTab.value = 'dispatch'
@@ -608,14 +636,17 @@ function onCardAction(key, wo) {
   }
   const map = { pause: '暂停', terminate: '终止', complete: '完成' }
   if (map[key]) {
-    updateWorkOrder(wo.id, { status: map[key] })
-    message.success(`工单已${map[key]}`)
+    const patch = { status: map[key] }
+    if (key === 'pause') patch.execStatus = '暂停'
+    if (key === 'complete') patch.execStatus = '已完成'
+    updateQcWorkOrder(wo.id, patch)
+    message.success(`质检工单已${map[key]}`)
   }
 }
 
 function confirmUrgency() {
   if (urgencyTargetId.value) {
-    updateWorkOrder(urgencyTargetId.value, { urgency: urgencyDraft.value })
+    updateQcWorkOrder(urgencyTargetId.value, { urgency: urgencyDraft.value })
     message.success('紧急度已调整')
   }
   urgencyModalOpen.value = false
@@ -827,14 +858,21 @@ function confirmUrgency() {
 
   .card-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    gap: 4px;
 
-    .status-tag {
+    .card-tags-row {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .status-tag,
+    .urgency-tag {
       margin: 0;
       line-height: 18px;
-      font-size: 12px;
+      font-size: 11px;
       padding-inline: 6px;
     }
 
@@ -867,22 +905,7 @@ function confirmUrgency() {
   .card-meta {
     font-size: 11px;
     color: rgba(0, 0, 0, 0.45);
-    line-height: 1.4;
-
-    .meta-divider {
-      margin: 0 4px;
-    }
-  }
-
-  .card-tags {
-    margin-top: 4px;
-
-    .urgency-tag {
-      margin: 0;
-      font-size: 11px;
-      line-height: 18px;
-      padding-inline: 6px;
-    }
+    line-height: 1.5;
   }
 }
 

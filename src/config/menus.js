@@ -35,8 +35,8 @@ export const sideMenus = {
     { key: 'design-task', label: '设计任务', path: '/planning/design-task' },
   ],
   production: [
-    { key: 'work-orders', label: '工单管理', path: '/production/work-orders' },
-    { key: 'shop-floor', label: '车间执行', path: '/production/shop-floor' },
+    { key: 'work-orders', label: '生产工单', path: '/production/work-orders' },
+    { key: 'qc-work-orders', label: '质检工单', path: '/production/qc-work-orders' },
   ],
   inventory: [
     { key: 'stock', label: '库存查询', path: '/inventory/stock' },
@@ -78,8 +78,8 @@ export const routeTitles = {
   '/sales/customers': '客户档案',
   '/planning/production-plan': '生产计划',
   '/planning/design-task': '设计任务',
-  '/production/work-orders': '工单管理',
-  '/production/shop-floor': '车间执行',
+  '/production/work-orders': '生产工单',
+  '/production/qc-work-orders': '质检工单',
   '/inventory/stock': '库存查询',
   '/inventory/in-out': '出入库',
   '/quality/inspection': '检验任务',
