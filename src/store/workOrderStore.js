@@ -47,7 +47,7 @@ function createInitialOrders() {
       remark: '',
       processRouteName: routeName,
       source: 'manual',
-      sourceOrderNo: '',
+      sourceOrderNo: 'SO202505001',
       processes: buildProcessesFromRoute(routeName),
       createdAt: '2025-05-28',
     },
@@ -68,7 +68,7 @@ function createInitialOrders() {
       remark: '加急排产',
       processRouteName: '装配标准路线',
       source: 'manual',
-      sourceOrderNo: '',
+      sourceOrderNo: 'SO202505002',
       processes: buildProcessesFromRoute('装配标准路线').map((p, i) =>
         i < 2 ? { ...p, executors: ['孙琴丽', '张三'] } : p,
       ),
@@ -91,7 +91,7 @@ function createInitialOrders() {
       remark: '',
       processRouteName: '装配标准路线',
       source: 'manual',
-      sourceOrderNo: '',
+      sourceOrderNo: 'SO202505003',
       processes: buildProcessesFromRoute('装配标准路线').map((p) => ({
         ...p,
         executors: ['李四'],
@@ -192,15 +192,11 @@ export function filterWorkOrders(list, filters) {
   return list.filter((wo) => {
     if (filters.code && !wo.code.includes(filters.code)) return false
     if (filters.name && !wo.name.includes(filters.name)) return false
+    if (filters.salesOrderNo && !(wo.sourceOrderNo || '').includes(filters.salesOrderNo))
+      return false
     if (filters.status && wo.status !== filters.status) return false
-    if (filters.dateRange?.length === 2) {
-      const [start, end] = filters.dateRange
-      const created = wo.createdAt || wo.planDateRange?.[0]
-      if (created) {
-        if (dayjs(created).isBefore(start, 'day') || dayjs(created).isAfter(end, 'day'))
-          return false
-      }
-    }
+    if (filters.orderCategory && wo.orderCategory !== filters.orderCategory) return false
+    if (filters.workCenter && wo.workCenter !== filters.workCenter) return false
     return true
   })
 }

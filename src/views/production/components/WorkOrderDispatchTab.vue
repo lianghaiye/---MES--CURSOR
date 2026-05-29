@@ -4,74 +4,75 @@
       :columns="columns"
       :data-source="workOrder.processes"
       row-key="id"
-      size="small"
+      size="middle"
       bordered
       :pagination="false"
-      v-model:expanded-row-keys="expandedKeys"
-      :row-expandable="(record) => record.hasFeeding"
+      class="process-table"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'process'">
           <div class="process-cell">
-            <component :is="iconMap[record.icon] || ToolOutlined" class="process-icon" />
+            <span class="process-icon-wrap">
+              <SettingOutlined />
+            </span>
             <span>{{ record.name }}</span>
           </div>
         </template>
+        <template v-else-if="column.key === 'processCode'">
+          {{ record.processCode || '-' }}
+        </template>
         <template v-else-if="column.key === 'executors'">
-          <div class="executor-cell" @click="openPersonModal(record)">
+          <a class="executor-link" @click.prevent="openPersonModal(record)">
             <template v-if="record.executors?.length">
-              <a-tag v-for="name in record.executors" :key="name" color="blue">{{ name }}</a-tag>
+              {{ record.executors.join('、') }}
             </template>
-            <span v-else class="placeholder">请选择执行人</span>
-          </div>
+            <template v-else>请选择执行人</template>
+          </a>
         </template>
         <template v-else-if="column.key === 'feeding'">
-          <span v-if="record.hasFeeding" class="feeding-hint">展开配置投料</span>
-          <span v-else class="muted">—</span>
-        </template>
-      </template>
-
-      <template #expandedRowRender="{ record }">
-        <div v-if="record.hasFeeding" class="feeding-panel">
-          <div class="feeding-title">投料配置</div>
-          <div v-for="(item, idx) in record.feedingMaterials" :key="item.id" class="feeding-row">
-            <span class="feeding-label">物料</span>
-            <a-select
-              v-model:value="item.materialId"
-              show-search
-              allow-clear
-              placeholder="请选择物料"
-              style="width: 220px"
-              :options="materialOptions"
-              @change="(val) => onMaterialChange(item, val)"
-            />
-            <span class="feeding-label">数量</span>
-            <a-input-number v-model:value="item.qty" :min="0" placeholder="请输入数量" />
-            <a-space>
-              <a-button type="text" size="small" @click="addFeedingRow(record)">
-                <PlusOutlined />
-              </a-button>
+          <div v-if="record.hasFeeding" class="feeding-cell">
+            <div v-for="(item, idx) in record.feedingMaterials" :key="item.id" class="feeding-row">
+              <a-select
+                v-model:value="item.materialId"
+                show-search
+                allow-clear
+                placeholder="请选择物料"
+                style="width: 180px"
+                size="small"
+                :options="materialOptions"
+                @change="(val) => onMaterialChange(item, val)"
+              />
+              <a-input-number
+                v-model:value="item.qty"
+                :min="0"
+                size="small"
+                placeholder="数量"
+                style="width: 100px"
+              />
               <a-button
-                type="text"
+                type="link"
                 size="small"
                 danger
                 :disabled="record.feedingMaterials.length <= 1"
                 @click="removeFeedingRow(record, idx)"
               >
-                <DeleteOutlined />
+                删除
               </a-button>
-            </a-space>
+            </div>
+            <a-button type="link" size="small" class="add-feed-btn" @click="addFeedingRow(record)">
+              + 增加投料
+            </a-button>
           </div>
-        </div>
+          <span v-else class="muted">—</span>
+        </template>
       </template>
     </a-table>
 
     <div class="dispatch-footer">
       <a-space>
         <a-button type="primary" @click="emitDispatch('dispatch')">下发</a-button>
-        <a-button type="primary" ghost @click="emitDispatch('dispatchAndStart')">
-          下发并开始
-        </a-button>
+        <a-button type="primary" @click="emitDispatch('dispatchAndStart')">下发并开始</a-button>
+        <a-button @click="emit('cancel')">取消</a-button>
       </a-space>
     </div>
 
@@ -86,26 +87,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import {
-  ScissorOutlined,
-  SyncOutlined,
-  ToolOutlined,
-  ExperimentOutlined,
-  InboxOutlined,
-  ShoppingOutlined,
-  BuildOutlined,
-  ClusterOutlined,
-  SettingOutlined,
-  FireOutlined,
-  HeatMapOutlined,
-  CloudOutlined,
-  AuditOutlined,
-  BlockOutlined,
-  ThunderboltOutlined,
-  ScanOutlined,
-  PlusOutlined,
-  DeleteOutlined,
-} from '@ant-design/icons-vue'
+import { SettingOutlined } from '@ant-design/icons-vue'
 import SelectPersonModal from './SelectPersonModal.vue'
 import { mockFeedingMaterials } from '@/mock/workOrderMaster'
 
@@ -113,37 +95,18 @@ const props = defineProps({
   workOrder: { type: Object, required: true },
 })
 
-const emit = defineEmits(['dispatch', 'dispatch-and-start'])
-
-const iconMap = {
-  ScissorOutlined,
-  SyncOutlined,
-  ToolOutlined,
-  ExperimentOutlined,
-  InboxOutlined,
-  ShoppingOutlined,
-  BuildOutlined,
-  ClusterOutlined,
-  SettingOutlined,
-  FireOutlined,
-  HeatMapOutlined,
-  CloudOutlined,
-  AuditOutlined,
-  BlockOutlined,
-  ThunderboltOutlined,
-  ScanOutlined,
-}
+const emit = defineEmits(['dispatch', 'dispatch-and-start', 'cancel'])
 
 const columns = [
-  { title: '序号', dataIndex: 'index', width: 64, align: 'center' },
-  { title: '工序', key: 'process', width: 160 },
-  { title: '选择执行人', key: 'executors', width: 240 },
-  { title: '投料', key: 'feeding', width: 120 },
+  { title: '序号', dataIndex: 'index', width: 70, align: 'center' },
+  { title: '工序名称', key: 'process', width: 140 },
+  { title: '工序编码', key: 'processCode', width: 120 },
+  { title: '选择执行人', key: 'executors', width: 160 },
+  { title: '投料信息', key: 'feeding' },
 ]
 
 const personModalOpen = ref(false)
 const editingProcess = ref(null)
-const expandedKeys = ref(props.workOrder.processes.filter((p) => p.hasFeeding).map((p) => p.id))
 
 const materialOptions = computed(() =>
   mockFeedingMaterials.map((m) => ({ label: m.name, value: m.id })),
@@ -195,65 +158,57 @@ function emitDispatch(type) {
 </script>
 
 <style lang="less" scoped>
+.process-table {
+  :deep(.ant-table-thead > tr > th) {
+    background: #fafafa;
+    font-weight: 500;
+  }
+}
+
 .process-cell {
   display: flex;
   align-items: center;
   gap: 8px;
 
-  .process-icon {
-    font-size: 16px;
+  .process-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: #e6f4ff;
     color: #1677ff;
+    font-size: 14px;
   }
 }
 
-.executor-cell {
-  min-height: 32px;
-  cursor: pointer;
-  padding: 4px 0;
-
-  .placeholder {
-    color: rgba(0, 0, 0, 0.35);
-  }
-
-  &:hover {
-    background: #fafafa;
-  }
-}
-
-.feeding-hint {
+.executor-link {
   color: #1677ff;
-  font-size: 12px;
+}
+
+.feeding-cell {
+  .feeding-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+
+  .add-feed-btn {
+    padding-left: 0;
+  }
 }
 
 .muted {
   color: rgba(0, 0, 0, 0.25);
 }
 
-.feeding-panel {
-  padding: 8px 12px 4px 48px;
-  background: #fafafa;
-
-  .feeding-title {
-    font-weight: 500;
-    margin-bottom: 8px;
-  }
-
-  .feeding-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-  }
-
-  .feeding-label {
-    color: rgba(0, 0, 0, 0.65);
-    font-size: 13px;
-  }
-}
-
 .dispatch-footer {
-  margin-top: 16px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
   display: flex;
   justify-content: flex-end;
 }
