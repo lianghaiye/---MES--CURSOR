@@ -4,7 +4,7 @@
       :columns="columns"
       :data-source="workOrder.processes"
       row-key="id"
-      size="middle"
+      size="small"
       bordered
       :pagination="false"
       class="process-table"
@@ -37,7 +37,7 @@
                 show-search
                 allow-clear
                 placeholder="请选择物料"
-                style="width: 180px"
+                style="width: 150px"
                 size="small"
                 :options="materialOptions"
                 @change="(val) => onMaterialChange(item, val)"
@@ -47,7 +47,7 @@
                 :min="0"
                 size="small"
                 placeholder="数量"
-                style="width: 100px"
+                style="width: 80px"
               />
               <a-button
                 type="link"
@@ -69,10 +69,12 @@
     </a-table>
 
     <div class="dispatch-footer">
-      <a-space>
-        <a-button type="primary" @click="emitDispatch('dispatch')">下发</a-button>
-        <a-button type="primary" @click="emitDispatch('dispatchAndStart')">下发并开始</a-button>
-        <a-button @click="emit('cancel')">取消</a-button>
+      <a-space :size="8">
+        <a-button type="primary" size="small" @click="emitDispatch('dispatch')">下发</a-button>
+        <a-button type="primary" size="small" @click="emitDispatch('dispatchAndStart')">
+          下发并开始
+        </a-button>
+        <a-button size="small" @click="emit('cancel')">取消</a-button>
       </a-space>
     </div>
 
@@ -98,10 +100,10 @@ const props = defineProps({
 const emit = defineEmits(['dispatch', 'dispatch-and-start', 'cancel'])
 
 const columns = [
-  { title: '序号', dataIndex: 'index', width: 70, align: 'center' },
-  { title: '工序名称', key: 'process', width: 140 },
-  { title: '工序编码', key: 'processCode', width: 120 },
-  { title: '选择执行人', key: 'executors', width: 160 },
+  { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
+  { title: '工序名称', key: 'process', width: 120 },
+  { title: '工序编码', key: 'processCode', width: 100 },
+  { title: '选择执行人', key: 'executors', width: 140 },
   { title: '投料信息', key: 'feeding' },
 ]
 
@@ -162,24 +164,31 @@ function emitDispatch(type) {
   :deep(.ant-table-thead > tr > th) {
     background: #fafafa;
     font-weight: 500;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  :deep(.ant-table-tbody > tr > td) {
+    padding: 4px 8px;
+    font-size: 12px;
   }
 }
 
 .process-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 
   .process-icon-wrap {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
     background: #e6f4ff;
     color: #1677ff;
-    font-size: 14px;
+    font-size: 12px;
   }
 }
 
@@ -191,13 +200,15 @@ function emitDispatch(type) {
   .feeding-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
+    gap: 6px;
+    margin-bottom: 4px;
     flex-wrap: wrap;
   }
 
   .add-feed-btn {
     padding-left: 0;
+    height: 22px;
+    font-size: 12px;
   }
 }
 
@@ -206,8 +217,8 @@ function emitDispatch(type) {
 }
 
 .dispatch-footer {
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid #f0f0f0;
   display: flex;
   justify-content: flex-end;

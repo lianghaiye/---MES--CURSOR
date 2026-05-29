@@ -3,91 +3,97 @@
     <!-- 筛选区 -->
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
-        <a-row :gutter="[12, 12]" style="width: 100%">
-          <a-col :xs="24" :sm="12" :md="8">
+        <a-row :gutter="[8, 6]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="8" :xl="4">
             <a-form-item label="工单编号">
-              <a-input v-model:value="filters.code" allow-clear placeholder="请输入" />
+              <a-input v-model:value="filters.code" allow-clear placeholder="请输入" size="small" />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="8">
+          <a-col :xs="24" :sm="12" :md="8" :xl="4">
             <a-form-item label="工单名称">
-              <a-input v-model:value="filters.name" allow-clear placeholder="请输入" />
+              <a-input v-model:value="filters.name" allow-clear placeholder="请输入" size="small" />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="8">
+          <a-col :xs="24" :sm="12" :md="8" :xl="4">
             <a-form-item label="销售订单号">
-              <a-input v-model:value="filters.salesOrderNo" allow-clear placeholder="请输入" />
+              <a-input
+                v-model:value="filters.salesOrderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="8">
+          <a-col :xs="24" :sm="12" :md="8" :xl="4">
             <a-form-item label="状态">
               <a-select
                 v-model:value="filters.status"
                 allow-clear
                 placeholder="全部"
+                size="small"
                 :options="statusOpts"
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="8">
+          <a-col :xs="24" :sm="12" :md="8" :xl="4">
             <a-form-item label="工单类别">
               <a-select
                 v-model:value="filters.orderCategory"
                 allow-clear
                 placeholder="全部"
+                size="small"
                 :options="categoryOpts"
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="8">
+          <a-col :xs="24" :sm="12" :md="8" :xl="4">
             <a-form-item label="工作中心">
               <a-select
                 v-model:value="filters.workCenter"
                 allow-clear
                 placeholder="全部"
+                size="small"
                 :options="workCenterOpts"
               />
             </a-form-item>
           </a-col>
           <a-col :span="24">
-            <a-form-item class="filter-actions-item">
-              <a-space>
-                <a-button type="primary" @click="handleSearch">
+            <div class="filter-footer">
+              <a-space :size="8">
+                <a-button type="primary" size="small" @click="handleSearch">
                   <SearchOutlined />
                   查询
                 </a-button>
-                <a-button @click="handleReset">
+                <a-button size="small" @click="handleReset">
                   <ReloadOutlined />
                   重置
                 </a-button>
               </a-space>
-            </a-form-item>
+              <a-space :size="8">
+                <a-button type="primary" size="small" @click="openCreateModal">
+                  <PlusOutlined />
+                  新增工单
+                </a-button>
+                <a-dropdown>
+                  <a-button size="small">
+                    批量操作
+                    <DownOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu @click="onBatchMenu">
+                      <a-menu-item key="import">批量导入</a-menu-item>
+                      <a-menu-item key="export">批量导出</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
+                <a-button class="batch-dispatch-btn" size="small" @click="handleBatchDispatch">
+                  批量下发
+                </a-button>
+              </a-space>
+            </div>
           </a-col>
         </a-row>
       </a-form>
-    </div>
-
-    <!-- 操作栏 -->
-    <div class="toolbar-row">
-      <a-space>
-        <a-button type="primary" @click="openCreateModal">
-          <PlusOutlined />
-          新增工单
-        </a-button>
-        <a-dropdown>
-          <a-button>
-            批量操作
-            <DownOutlined />
-          </a-button>
-          <template #overlay>
-            <a-menu @click="onBatchMenu">
-              <a-menu-item key="import">批量导入</a-menu-item>
-              <a-menu-item key="export">批量导出</a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
-        <a-button class="batch-dispatch-btn" @click="handleBatchDispatch">批量下发</a-button>
-      </a-space>
     </div>
 
     <!-- 主从布局 -->
@@ -142,8 +148,11 @@
               </div>
               <div class="card-code">{{ wo.code }}</div>
               <div class="card-name">{{ wo.name }}</div>
-              <div class="card-meta">销售订单号：{{ wo.sourceOrderNo || '-' }}</div>
-              <div class="card-meta">排产数量：{{ wo.scheduleQty }}</div>
+              <div class="card-meta">
+                <span>订单 {{ wo.sourceOrderNo || '-' }}</span>
+                <span class="meta-divider">·</span>
+                <span>数量 {{ wo.scheduleQty }}</span>
+              </div>
               <div class="card-tags">
                 <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
                   {{ urgencyLabel(wo.urgency) }}
@@ -189,59 +198,67 @@
               layout="inline"
               class="basic-form horizontal-form dispatch-basic-form"
             >
-              <a-row :gutter="[12, 12]" style="width: 100%">
-                <a-col :xs="24" :sm="12" :md="8">
+              <a-row :gutter="[8, 6]" style="width: 100%">
+                <a-col :xs="24" :sm="12" :md="6">
                   <a-form-item label="产品名称">
-                    <a-input :value="selectedOrder.productName" disabled />
+                    <a-input :value="selectedOrder.productName" disabled size="small" />
                   </a-form-item>
                 </a-col>
-                <a-col :xs="24" :sm="12" :md="8">
+                <a-col :xs="24" :sm="12" :md="6">
                   <a-form-item label="工作中心">
                     <a-select
                       v-model:value="selectedOrder.workCenter"
+                      size="small"
                       :options="workCenterOpts"
                       @change="saveBasicInfo"
                     />
                   </a-form-item>
                 </a-col>
-                <a-col :xs="24" :sm="12" :md="8">
+                <a-col :xs="24" :sm="12" :md="6">
                   <a-form-item label="BOM">
                     <a-select
                       v-model:value="selectedOrder.bom"
                       show-search
+                      size="small"
                       :options="bomOpts"
                       @change="saveBasicInfo"
                     />
                   </a-form-item>
                 </a-col>
-                <a-col :xs="24" :sm="12" :md="8">
+                <a-col :xs="24" :sm="12" :md="6">
                   <a-form-item label="预入仓库">
                     <a-select
                       v-model:value="selectedOrder.warehouse"
+                      size="small"
                       :options="warehouseOpts"
                       @change="saveBasicInfo"
                     />
                   </a-form-item>
                 </a-col>
-                <a-col :xs="24" :sm="12" :md="8">
+                <a-col :xs="24" :sm="12" :md="6">
                   <a-form-item label="紧急度">
                     <a-select
                       v-model:value="selectedOrder.urgency"
+                      size="small"
                       :options="urgencyOpts"
                       @change="saveBasicInfo"
                     />
                   </a-form-item>
                 </a-col>
-                <a-col :xs="24" :sm="12" :md="8">
+                <a-col :xs="24" :sm="12" :md="10">
                   <a-form-item label="计划日期">
-                    <a-range-picker v-model:value="planDateValue" @change="onPlanDateChange" />
+                    <a-range-picker
+                      v-model:value="planDateValue"
+                      size="small"
+                      @change="onPlanDateChange"
+                    />
                   </a-form-item>
                 </a-col>
-                <a-col :span="24">
+                <a-col :xs="24" :sm="24" :md="8">
                   <a-form-item label="备注" class="remark-item">
-                    <a-textarea
+                    <a-input
                       v-model:value="selectedOrder.remark"
-                      :rows="2"
+                      size="small"
                       placeholder="请输入备注"
                       @blur="saveBasicInfo"
                     />
@@ -342,7 +359,7 @@ const urgencyModalOpen = ref(false)
 const urgencyDraft = ref('普通')
 const urgencyTargetId = ref(null)
 
-const pagination = reactive({ current: 1, pageSize: 8 })
+const pagination = reactive({ current: 1, pageSize: 12 })
 
 const statusOpts = statusOptions.map((v) => ({ label: v, value: v }))
 const categoryOpts = categoryOptions.map((v) => ({ label: v, value: v }))
@@ -622,20 +639,41 @@ function confirmUrgency() {
   margin: -12px;
   padding: 0;
   background: #f5f6f8;
-  min-height: calc(100vh - 120px);
+  min-height: calc(100vh - 112px);
 }
 
 .filter-card,
 .list-card,
 .detail-card {
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .filter-card {
-  padding: 16px 20px 12px;
-  margin-bottom: 12px;
+  padding: 8px 12px 6px;
+  margin-bottom: 8px;
+}
+
+.filter-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+
+  .batch-dispatch-btn {
+    color: #d48806;
+    border-color: #ffd591;
+    background: #fff7e6;
+
+    &:hover {
+      color: #fa8c16;
+      border-color: #ffc069;
+      background: #fff1d6;
+    }
+  }
 }
 
 .horizontal-form {
@@ -657,12 +695,13 @@ function confirmUrgency() {
     padding-bottom: 0;
 
     > label {
-      height: 32px;
-      line-height: 32px;
+      height: 24px;
+      line-height: 24px;
+      font-size: 13px;
       white-space: nowrap;
 
       &::after {
-        margin-inline: 4px 8px;
+        margin-inline: 2px 6px;
       }
     }
   }
@@ -684,15 +723,9 @@ function confirmUrgency() {
     width: 100%;
   }
 
-  .filter-actions-item {
-    :deep(.ant-form-item-label) {
-      display: none;
-    }
-  }
-
   .remark-item {
     :deep(.ant-form-item-label) {
-      flex: 0 0 82px;
+      flex: 0 0 68px;
     }
 
     :deep(.ant-form-item-control) {
@@ -707,50 +740,32 @@ function confirmUrgency() {
   }
 }
 
-.toolbar-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-
-  .batch-dispatch-btn {
-    color: #d48806;
-    border-color: #ffd591;
-    background: #fff7e6;
-
-    &:hover {
-      color: #fa8c16;
-      border-color: #ffc069;
-      background: #fff1d6;
-    }
-  }
-}
-
 .master-detail {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: flex-start;
-  min-height: 560px;
+  min-height: 520px;
 }
 
 .list-card {
-  width: 26%;
-  min-width: 260px;
-  max-width: 320px;
+  width: 22%;
+  min-width: 220px;
+  max-width: 268px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 280px);
+  max-height: calc(100vh - 220px);
 
   .list-title-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 12px 16px 10px;
+    gap: 6px;
+    padding: 8px 10px 6px;
     border-bottom: 1px solid #f0f0f0;
 
     .list-title {
       font-weight: 600;
-      font-size: 15px;
+      font-size: 14px;
       flex: 1;
     }
 
@@ -763,11 +778,11 @@ function confirmUrgency() {
   .list-body {
     flex: 1;
     overflow-y: auto;
-    padding: 10px;
+    padding: 6px;
   }
 
   .list-pagination {
-    padding: 10px;
+    padding: 6px 8px;
     border-top: 1px solid #f0f0f0;
     display: flex;
     justify-content: center;
@@ -777,19 +792,19 @@ function confirmUrgency() {
 .order-card {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 6px;
   border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  padding: 10px 12px 10px 10px;
-  margin-bottom: 10px;
+  border-radius: 6px;
+  padding: 6px 8px 6px 6px;
+  margin-bottom: 6px;
   cursor: pointer;
   background: #fff;
   transition: all 0.2s;
-  border-left: 3px solid transparent;
+  border-left: 2px solid transparent;
 
   &:hover {
     border-color: #d6e4ff;
-    box-shadow: 0 2px 8px rgba(22, 119, 255, 0.08);
+    box-shadow: 0 1px 4px rgba(22, 119, 255, 0.08);
   }
 
   &.active {
@@ -804,7 +819,7 @@ function confirmUrgency() {
 
   .card-checkbox {
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: 1px;
   }
 
   .card-content {
@@ -816,44 +831,59 @@ function confirmUrgency() {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 
     .status-tag {
       margin: 0;
+      line-height: 18px;
+      font-size: 12px;
+      padding-inline: 6px;
     }
 
     .more-btn {
-      padding: 0 4px;
+      padding: 0 2px;
+      height: 22px;
       color: rgba(0, 0, 0, 0.45);
     }
   }
 
   .card-code {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
     color: rgba(0, 0, 0, 0.88);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
+    line-height: 1.3;
   }
 
   .card-name {
-    font-size: 13px;
+    font-size: 12px;
     color: rgba(0, 0, 0, 0.65);
-    margin-bottom: 6px;
-    line-height: 1.4;
+    margin-bottom: 4px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .card-meta {
-    font-size: 12px;
+    font-size: 11px;
     color: rgba(0, 0, 0, 0.45);
-    line-height: 20px;
+    line-height: 1.4;
+
+    .meta-divider {
+      margin: 0 4px;
+    }
   }
 
   .card-tags {
-    margin-top: 8px;
+    margin-top: 4px;
 
     .urgency-tag {
       margin: 0;
-      font-size: 12px;
+      font-size: 11px;
+      line-height: 18px;
+      padding-inline: 6px;
     }
   }
 }
@@ -861,47 +891,65 @@ function confirmUrgency() {
 .detail-card {
   flex: 1;
   min-width: 0;
-  padding: 16px 20px 20px;
-  max-height: calc(100vh - 280px);
+  padding: 8px 12px 10px;
+  max-height: calc(100vh - 220px);
   overflow-y: auto;
 
   .detail-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     margin-bottom: 0;
     padding-bottom: 0;
     border-bottom: none;
 
     .detail-title {
+      min-width: 0;
+
       .code {
-        font-size: 16px;
+        font-size: 14px;
         font-weight: 600;
         color: rgba(0, 0, 0, 0.88);
-        margin-right: 12px;
+        margin-right: 8px;
       }
 
       .name {
-        font-size: 14px;
+        font-size: 13px;
         color: rgba(0, 0, 0, 0.65);
       }
     }
 
     .collapse-btn {
+      flex-shrink: 0;
       padding-right: 0;
+      font-size: 12px;
+      height: auto;
       color: rgba(0, 0, 0, 0.45);
     }
   }
 
   .detail-tabs {
     :deep(.ant-tabs-nav) {
-      margin-bottom: 16px;
+      margin-bottom: 8px;
+
+      &::before {
+        border-bottom-color: #f0f0f0;
+      }
+    }
+
+    :deep(.ant-tabs-tab) {
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    :deep(.ant-tabs-tab + .ant-tabs-tab) {
+      margin-left: 20px;
     }
   }
 
   .dispatch-basic-form {
-    margin-bottom: 16px;
-    padding-bottom: 16px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
     border-bottom: 1px solid #f0f0f0;
   }
 
@@ -912,7 +960,7 @@ function confirmUrgency() {
   }
 
   .tab-empty {
-    margin: 48px 0;
+    margin: 24px 0;
   }
 }
 
@@ -920,7 +968,7 @@ function confirmUrgency() {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
+  min-height: 320px;
 }
 
 @media (max-width: 992px) {
@@ -931,7 +979,16 @@ function confirmUrgency() {
   .list-card {
     width: 100%;
     max-width: none;
-    max-height: 280px;
+    max-height: 240px;
+  }
+
+  .filter-footer {
+    flex-direction: column;
+    align-items: stretch;
+
+    > .ant-space {
+      justify-content: flex-start;
+    }
   }
 }
 </style>
