@@ -57,7 +57,12 @@ const routes = [
       { path: 'inventory/in-out', ...emptyChild('inventory-in-out', '出入库') },
       { path: 'quality/inspection', ...emptyChild('quality-inspection', '检验任务') },
       { path: 'quality/defect', ...emptyChild('quality-defect', '不良品') },
-      { path: 'procurement/purchase-req', ...emptyChild('procurement-purchase-req', '采购申请') },
+      {
+        path: 'procurement/purchase-req',
+        name: 'procurement-purchase-req',
+        component: () => import('@/views/procurement/PurchaseRequisitionView.vue'),
+        meta: { title: '采购申请' },
+      },
       { path: 'procurement/suppliers', ...emptyChild('procurement-suppliers', '供应商') },
       {
         path: 'after-sales/service-orders',

@@ -49,6 +49,22 @@ export function getSelfMadeMaterials(order) {
   return all.filter((m) => m.supplyType === '自制件')
 }
 
+/** 筛选供应型态为「外购件」且存在采购缺口的物料（扁平） */
+export function getPurchasedMaterials(order) {
+  const all = []
+  order?.workItems?.forEach((wi) => {
+    flattenMaterials(wi.materials, all)
+  })
+  return all.filter((m) => {
+    if (m.supplyType !== '外购件') return false
+    const gap = calcGapQty(
+      m.demandQty ?? calcDemandQty(m.unitUsage, order.productQty),
+      m.availableStock,
+    )
+    return gap > 0
+  })
+}
+
 /** 解析订单计划总装日期 */
 export function resolveAssemblyDate(order) {
   if (order?.planAssemblyDate) return order.planAssemblyDate

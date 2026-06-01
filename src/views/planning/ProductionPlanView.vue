@@ -175,7 +175,7 @@
               />
               <span>调整紧急度</span>
               <a-select style="width: 100px" placeholder="选择" />
-              <a-button type="primary">生成采购申请</a-button>
+              <a-button type="primary" @click="generatePurchaseReq">生成采购申请</a-button>
               <a-button type="primary" @click="openWorkOrderModal">生成加工工单</a-button>
               <a-button type="primary">生成外协工单</a-button>
             </a-space>
@@ -237,11 +237,16 @@ import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
 import { addWorkOrdersFromPlanRows } from '@/store/workOrderStore'
 import {
   getSelfMadeMaterials,
+  getPurchasedMaterials,
   updateMaterialInOrder,
   patchMaterialFromWorkOrderRow,
   calcDemandQty,
   calcGapQty,
 } from '@/utils/material'
+import {
+  addPurchaseRequisition,
+  buildRequisitionFromMaterials,
+} from '@/store/purchaseRequisitionStore'
 
 const ordersData = ref(cloneOrders())
 
@@ -337,6 +342,10 @@ const selfMadeMaterials = computed(() =>
   selectedOrder.value ? getSelfMadeMaterials(selectedOrder.value) : [],
 )
 
+const purchasedMaterials = computed(() =>
+  selectedOrder.value ? getPurchasedMaterials(selectedOrder.value) : [],
+)
+
 const planAssemblyDateValue = computed(() => {
   const order = selectedOrder.value
   if (!order) return null
@@ -400,6 +409,21 @@ function openWorkOrderModal() {
     message.info('当前订单没有供应型态为「自制件」的物料')
   }
   workOrderModalOpen.value = true
+}
+
+function generatePurchaseReq() {
+  if (!selectedOrder.value) {
+    message.warning('请先选择订单')
+    return
+  }
+  const materials = purchasedMaterials.value
+  if (!materials.length) {
+    message.info('当前订单没有需要采购的外购件（缺口为 0）')
+    return
+  }
+  const requisition = buildRequisitionFromMaterials(materials, selectedOrder.value)
+  addPurchaseRequisition(requisition)
+  message.success(`已生成采购申请 ${requisition.reqNo}，共 ${materials.length} 条物料`)
 }
 
 function handleWorkOrderSave(savedRows) {
