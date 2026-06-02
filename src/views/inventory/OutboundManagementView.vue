@@ -92,10 +92,7 @@
                   <SearchOutlined />
                   搜索
                 </a-button>
-                <a-button size="small" @click="handleReset">
-                  <DeleteOutlined />
-                  清空
-                </a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
               </a-space>
             </a-form-item>
           </a-col>
@@ -103,6 +100,7 @@
       </a-form>
     </div>
 
+    <div class="list-panel">
     <div class="toolbar-row">
       <a-space wrap :size="8">
         <a-button type="primary" size="small" @click="stubAction('新增')">
@@ -215,6 +213,7 @@
         />
       </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -290,7 +289,7 @@ const columns = [
   { title: '所在车间', dataIndex: 'workshop', width: 100 },
   { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
   { title: '创建人', dataIndex: 'creator', width: 80 },
-  { title: '操作', key: 'action', width: 260, fixed: 'right' },
+  { title: '操作', key: 'action', width: 280, fixed: 'right' },
 ]
 
 const filteredList = computed(() =>
@@ -440,42 +439,131 @@ function handleBatchInitiateQc() {
 <style lang="less" scoped>
 .outbound-page {
   margin: -12px;
+  padding: 0;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }
 
 .filter-card,
+.list-panel,
 .table-card {
   background: #fff;
   border-radius: 6px;
-  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.filter-card {
+  padding: 10px 12px 6px;
   margin-bottom: 8px;
+}
+
+.list-panel {
+  padding: 10px 12px 12px;
+}
+
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+    margin-inline-end: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label) {
+    flex: 0 0 auto;
+    padding-bottom: 0;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    height: 24px;
+    line-height: 24px;
+    font-size: 13px;
+    white-space: nowrap;
+
+    &::after {
+      margin-inline: 2px 6px;
+    }
+  }
+
+  :deep(.ant-form-item-control) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  :deep(.ant-input),
+  :deep(.ant-select),
+  :deep(.ant-picker) {
+    width: 100%;
+  }
+
+  .filter-actions-item {
+    :deep(.ant-form-item-label) {
+      display: none;
+    }
+  }
 }
 
 .toolbar-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  background: #fff;
-  border-radius: 6px 6px 0 0;
-  padding: 10px 12px 0;
-  margin-bottom: 0;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  .toolbar-icons {
+    color: rgba(0, 0, 0, 0.45);
+  }
 }
 
 .summary-bar {
-  margin: 0 0 8px;
-  border-radius: 0;
+  margin-bottom: 8px;
+  padding: 0;
+
+  :deep(.ant-alert) {
+    border-radius: 4px;
+  }
+
+  :deep(.ant-alert-message) {
+    font-size: 13px;
+  }
 }
 
 .table-card {
-  border-radius: 0 0 6px 6px;
-  padding-top: 8px;
+  padding: 0;
+
+  :deep(.ant-table-thead > tr > th) {
+    background: #fafafa;
+    font-weight: 500;
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-tbody > tr > td) {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-cell) {
+    vertical-align: middle;
+  }
+
+  :deep(.ant-table-cell-fix-right) {
+    background: #fff;
+  }
 }
 
 .table-pagination {
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
+  padding-top: 4px;
 }
 
 .link-code {
@@ -483,12 +571,8 @@ function handleBatchInitiateQc() {
   cursor: pointer;
 }
 
-:deep(.filter-form .ant-form-item) {
-  margin-bottom: 0;
-  width: 100%;
-}
-
-:deep(.filter-form .ant-form-item-label) {
-  min-width: 72px;
+:deep(.ant-table-wrapper .ant-btn-link) {
+  padding: 0 4px;
+  height: auto;
 }
 </style>
