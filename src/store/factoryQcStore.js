@@ -7,6 +7,7 @@ import {
 } from '@/mock/factoryQcRecords'
 
 const STORAGE_KEY = 'i_doms_factory_qc'
+const STORAGE_VERSION = 2
 const QC_NO_PREFIX = 'CCZJ'
 
 function loadFromStorage() {
@@ -14,7 +15,9 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.records)) return parsed.records
+      if (parsed.version === STORAGE_VERSION && Array.isArray(parsed.records)) {
+        return parsed.records
+      }
     }
   } catch {
     /* ignore */
@@ -23,7 +26,10 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ records: factoryQcState.records }))
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ version: STORAGE_VERSION, records: factoryQcState.records }),
+  )
 }
 
 /** 生成出厂质检单号：CCZJ + yyyyMMdd + 4位流水（按当日已有单号递增） */
