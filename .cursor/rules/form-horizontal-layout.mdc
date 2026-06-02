@@ -1,0 +1,42 @@
+---
+description: i-doms-web 表单横向布局规范（标签与控件平行排列）
+globs: i-doms-web/**/*.vue
+alwaysApply: false
+---
+
+# 表单横向布局
+
+弹窗、页面内编辑表单**必须**使用标签与控件**同一行**的横向布局，禁止使用 `layout="vertical"`（标签在上、控件在下）。
+
+## 标准写法
+
+```vue
+<a-form layout="inline" class="horizontal-form">
+  <a-row :gutter="[12, 8]" style="width: 100%">
+    <a-col :span="8">
+      <a-form-item label="字段名" required>
+        <a-input v-model:value="form.xxx" size="small" placeholder="请输入" />
+      </a-form-item>
+    </a-col>
+    <a-col :span="24">
+      <a-form-item label="备注" class="remark-item">
+        <a-textarea v-model:value="form.remark" :rows="2" size="small" />
+      </a-form-item>
+    </a-col>
+  </a-row>
+</a-form>
+```
+
+## 约定
+
+- 全局样式：`src/styles/horizontal-form.less`（已在 `global.less` 引入），表单项加 class `horizontal-form`
+- 控件统一 `size="small"`
+- 常规字段 `a-col :span="8"`（三列）；备注等长文本 `span="24"` + `class="remark-item"`
+- 弹窗可参考：`CreateSalesOrderModal.vue`、`ApplyDeliveryModal.vue`
+
+## 避免
+
+```vue
+<!-- ❌ 不要 -->
+<a-form layout="vertical">
+```

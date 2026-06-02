@@ -7,19 +7,26 @@
     destroy-on-close
     @cancel="handleCancel"
   >
-    <a-form layout="vertical">
-      <a-form-item label="销售单号" required>
-        <a-select
-          v-model:value="selectedSalesOrderId"
-          show-search
-          placeholder="请选择销售订单"
-          :options="salesOrderOpts"
-          @change="onSalesOrderChange"
-        />
-      </a-form-item>
-      <a-form-item label="客户名称">
-        <a-input :value="customerName" disabled />
-      </a-form-item>
+    <a-form layout="inline" class="horizontal-form">
+      <a-row :gutter="[12, 8]" style="width: 100%">
+        <a-col :span="12">
+          <a-form-item label="销售单号" required>
+            <a-select
+              v-model:value="selectedSalesOrderId"
+              show-search
+              size="small"
+              placeholder="请选择销售订单"
+              :options="salesOrderOpts"
+              @change="onSalesOrderChange"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="客户名称">
+            <a-input :value="customerName" disabled size="small" />
+          </a-form-item>
+        </a-col>
+      </a-row>
     </a-form>
     <p class="hint">保存后将生成待质检任务，可在列表中点击「质检」录入结果。</p>
 
