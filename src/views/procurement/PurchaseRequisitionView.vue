@@ -254,8 +254,8 @@ const operatorOpts = operatorOptions.map((v) => ({ label: v, value: v }))
 const columns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '单据状态', key: 'docStatus', width: 90, fixed: 'left' },
-  { title: '逾期状态', key: 'overdueStatus', width: 90 },
   { title: '申请单号', key: 'reqNo', dataIndex: 'reqNo', width: 160, fixed: 'left' },
+  { title: '逾期状态', key: 'overdueStatus', width: 90 },
   { title: '紧急度', dataIndex: 'urgency', width: 80 },
   { title: '销售单号', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '采购单号', dataIndex: 'purchaseOrderNo', width: 140, ellipsis: true },
@@ -302,6 +302,7 @@ const summary = computed(() => ({
 }))
 
 const rowSelection = computed(() => ({
+  fixed: true,
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys) => {
     selectedRowKeys.value = keys

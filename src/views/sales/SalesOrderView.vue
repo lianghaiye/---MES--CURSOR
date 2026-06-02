@@ -88,7 +88,7 @@
           <PlusOutlined />
           新增
         </a-button>
-        <a-button size="small" @click="stubAction('审核')">
+        <a-button size="small" @click="handleApprove">
           <CheckOutlined />
           审核
         </a-button>
@@ -114,7 +114,7 @@
             <DownOutlined />
           </a-button>
           <template #overlay>
-            <a-menu @click="({ key }) => stubAction(key)">
+            <a-menu @click="onBatchMenuClick">
               <a-menu-item key="批量导出">批量导出</a-menu-item>
               <a-menu-item key="批量审核">批量审核</a-menu-item>
             </a-menu>
@@ -184,10 +184,11 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space :size="0">
+            <a-space v-if="canEditSalesOrder(record)" :size="0">
               <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
               <a-button type="link" size="small" danger @click="confirmDelete(record)">删除</a-button>
             </a-space>
+            <span v-else class="action-disabled">-</span>
           </template>
         </template>
       </a-table>
@@ -247,6 +248,8 @@ import {
   updateSalesOrder,
   deleteSalesOrder,
   recalcOrderAmounts,
+  approveSalesOrder,
+  canEditSalesOrder,
 } from '@/store/salesOrderStore'
 import {
   customerOptions,
@@ -289,6 +292,8 @@ const columns = [
   { title: '业务员', dataIndex: 'salesperson', width: 90 },
   { title: '发货状态', dataIndex: 'deliveryStatus', width: 90 },
   { title: '进度状态', key: 'progressStatus', dataIndex: 'progressStatus', width: 90 },
+  { title: '业务类型', dataIndex: 'businessType', width: 90 },
+  { title: '采购申请单号', dataIndex: 'purchaseRequisitionNo', width: 160, ellipsis: true },
   { title: '销售渠道', dataIndex: 'salesChannel', width: 90 },
   { title: '状态', dataIndex: 'status', width: 70 },
   { title: '单据日期', dataIndex: 'documentDate', width: 110 },
@@ -367,12 +372,67 @@ function stubAction(name) {
   message.info(`${name}功能开发中`)
 }
 
+function onBatchMenuClick({ key }) {
+  if (key === '批量审核') {
+    handleApprove()
+    return
+  }
+  stubAction(key)
+}
+
+function handleApprove() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择要审核的销售订单')
+    return
+  }
+
+  const targets = salesOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
+  const pending = targets.filter((o) => o.progressStatus === '未审')
+  if (!pending.length) {
+    message.warning('所选订单均已审核')
+    return
+  }
+
+  const count = pending.length
+  Modal.confirm({
+    title: count > 1 ? `已选择 ${count} 条订单` : undefined,
+    content: '审核通过？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => {
+      const results = pending.map((o) => approveSalesOrder(o.id))
+      const succeeded = results.filter((r) => r.ok)
+      const failed = results.filter((r) => !r.ok)
+      const withPr = succeeded.filter((r) => r.purchaseReqNo)
+
+      if (withPr.length === 1) {
+        message.success(withPr[0].message)
+      } else if (withPr.length > 1) {
+        message.success(
+          `已审核 ${succeeded.length} 条，其中 ${withPr.length} 条外购销售已自动生成采购申请`,
+        )
+      } else if (succeeded.length === 1) {
+        message.success(succeeded[0].message)
+      } else if (succeeded.length > 1) {
+        message.success(`已成功审核 ${succeeded.length} 条销售订单，进度状态已变更为已审`)
+      }
+
+      failed.forEach((r) => message.warning(r.message))
+      selectedRowKeys.value = []
+    },
+  })
+}
+
 function openCreateModal() {
   editRecord.value = null
   createModalOpen.value = true
 }
 
 function openEditModal(record) {
+  if (!canEditSalesOrder(record)) {
+    message.warning('已审核的销售订单不可编辑')
+    return
+  }
   editRecord.value = record
   createModalOpen.value = true
 }
@@ -392,6 +452,11 @@ function openDeliveryModal() {
 
 function onOrderSaved({ isEdit, id, data }) {
   if (isEdit) {
+    const existing = salesOrderState.orders.find((o) => o.id === id)
+    if (!canEditSalesOrder(existing)) {
+      message.warning('已审核的销售订单不可编辑')
+      return
+    }
     updateSalesOrder(id, data)
   } else {
     addSalesOrder({ ...data, id: `so-${Date.now()}` })
@@ -404,6 +469,10 @@ function onDeliveryConfirmed() {
 }
 
 function confirmDelete(record) {
+  if (!canEditSalesOrder(record)) {
+    message.warning('已审核的销售订单不可删除')
+    return
+  }
   Modal.confirm({
     title: '确认删除',
     content: `确定删除销售订单「${record.orderNo}」吗？`,
@@ -503,6 +572,10 @@ function confirmDelete(record) {
 
 .link-code {
   color: #1677ff;
+}
+
+.action-disabled {
+  color: rgba(0, 0, 0, 0.25);
 }
 
 .table-pagination {

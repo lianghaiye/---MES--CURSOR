@@ -40,14 +40,16 @@ export const sideMenus = {
   ],
   inventory: [
     { key: 'stock', label: '库存查询', path: '/inventory/stock' },
+    { key: 'outbound', label: '出库管理', path: '/inventory/outbound' },
     { key: 'in-out', label: '出入库', path: '/inventory/in-out' },
   ],
   quality: [
-    { key: 'inspection', label: '检验任务', path: '/quality/inspection' },
+    { key: 'factory-qc', label: '出厂质检', path: '/quality/factory-qc' },
     { key: 'defect', label: '不良品', path: '/quality/defect' },
   ],
   procurement: [
     { key: 'purchase-req', label: '采购申请', path: '/procurement/purchase-req' },
+    { key: 'purchase-orders', label: '采购订单', path: '/procurement/purchase-orders' },
     { key: 'suppliers', label: '供应商', path: '/procurement/suppliers' },
   ],
   'after-sales': [
@@ -81,10 +83,13 @@ export const routeTitles = {
   '/production/work-orders': '生产工单',
   '/production/qc-work-orders': '质检工单',
   '/inventory/stock': '库存查询',
+  '/inventory/outbound': '出库管理',
+  '/inventory/sales-outbound': '出库管理',
   '/inventory/in-out': '出入库',
-  '/quality/inspection': '检验任务',
+  '/quality/factory-qc': '出厂质检',
   '/quality/defect': '不良品',
   '/procurement/purchase-req': '采购申请',
+  '/procurement/purchase-orders': '采购订单',
   '/procurement/suppliers': '供应商',
   '/after-sales/service-orders': '服务工单',
   '/after-sales/returns': '退换货',

@@ -713,6 +713,8 @@ function handleSave() {
     amountExTax: form.lineItems.reduce((s, i) => s + (Number(i.totalPriceExTax) || 0), 0),
     amountInTax: orderAmount.value,
     totalQty: form.lineItems.reduce((s, i) => s + (Number(i.salesQty) || 0), 0),
+    purchaseRequisitionNo: props.editRecord?.purchaseRequisitionNo || '',
+    purchaseRequisitionId: props.editRecord?.purchaseRequisitionId || '',
     attachments: fileList.value.map((file) => ({
       uid: file.uid,
       name: file.name,

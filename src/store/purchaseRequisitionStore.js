@@ -5,11 +5,25 @@ import {
   recalcRequisitionTotals,
   createLineItem,
 } from '@/mock/purchaseRequisitions'
-import { groupBySupplier } from '@/utils/purchaseMerge'
+import { round2 } from '@/utils/purchaseMerge'
+import { createPurchaseOrdersFromMergedLines } from '@/store/purchaseOrderStore'
+
+function mapSalesUrgency(urgency) {
+  if (urgency === '紧急') return '紧急'
+  if (urgency === '加急') return '特急'
+  return '正常'
+}
+
+function resolveEarliestDeliveryDate(lineItems, fallback) {
+  const dates = (lineItems || [])
+    .map((l) => l.deliveryDate)
+    .filter(Boolean)
+    .sort()
+  return dates[0] || fallback || dayjs().format('YYYY-MM-DD')
+}
 
 const STORAGE_KEY = 'i_doms_purchase_requisitions'
 let reqSeq = 5
-let poSeq = 2
 
 function loadFromStorage() {
   try {
@@ -36,10 +50,7 @@ export function generateReqNo() {
   return `CGSQ-${dayjs().format('YYYYMMDD')}-${String(reqSeq).padStart(4, '0')}`
 }
 
-export function generatePurchaseOrderNo() {
-  poSeq += 1
-  return `CG${dayjs().format('YYYYMMDD')}${String(poSeq).padStart(3, '0')}`
-}
+export { generatePurchaseOrderNo } from '@/store/purchaseOrderStore'
 
 export const purchaseRequisitionState = reactive({
   requisitions: loadFromStorage() || clonePurchaseRequisitions(),
@@ -126,26 +137,82 @@ export function buildRequisitionFromMaterials(materials, sourceOrder) {
   }
 }
 
+/** 从外购销售订单生成采购申请 */
+export function buildRequisitionFromSalesOrder(salesOrder) {
+  const now = dayjs()
+  const deliveryDate = resolveEarliestDeliveryDate(
+    salesOrder.lineItems,
+    salesOrder.documentDate,
+  )
+
+  const lineItems = (salesOrder.lineItems || []).map((line) => {
+    const qty = Number(line.salesQty) || Number(line.qty) || 0
+    const ex = Number(line.unitPriceExTax) || 0
+    const rate = line.taxRate ?? 13
+    const inTax = round2(ex * (1 + rate / 100))
+    const lineDelivery = line.deliveryDate || deliveryDate
+    return createLineItem({
+      inventoryName: line.productName,
+      inventoryCode: line.productCode,
+      specModel: line.specModel,
+      material: line.material,
+      materialType: line.productAttr || '零部件',
+      supplyType: line.productAttr || '外购件',
+      unit: line.unit || '件',
+      demandQty: qty,
+      planPurchaseQty: qty,
+      supplierName: '',
+      designatedSupplier: false,
+      unitPriceExTax: ex,
+      taxRate: rate,
+      unitPriceInTax: inTax,
+      totalPriceExTax: round2(qty * ex),
+      totalPriceInTax: round2(qty * inTax),
+      deliveryDate: lineDelivery,
+      expectedArrivalDate: lineDelivery,
+    })
+  })
+
+  return {
+    id: `pr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    reqNo: generateReqNo(),
+    salesOrderNo: salesOrder.orderNo || '',
+    sourceSalesOrderId: salesOrder.id,
+    docStatus: '待处理',
+    overdueStatus: '未逾期',
+    urgency: mapSalesUrgency(salesOrder.urgency),
+    orderDate: now.format('YYYY-MM-DD'),
+    deliveryDate,
+    estimatedArrivalDate: deliveryDate,
+    source: '外购销售',
+    operator: '管理员',
+    creator: '管理员',
+    createdAt: now.format('YYYY-MM-DD HH:mm'),
+    updatedAt: now.format('YYYY-MM-DD HH:mm'),
+    remark: salesOrder.remark || '',
+    purchaseOrderNo: '',
+    lineItems,
+  }
+}
+
 /**
  * 确认生成采购单：按供应商拆单，回填申请单号与状态
  * @returns {{ poCount: number, poNos: string[] }}
  */
 export function confirmGeneratePurchaseOrders(mergedLines) {
-  const supplierGroups = groupBySupplier(mergedLines)
-  const poNos = []
+  const created = createPurchaseOrdersFromMergedLines(mergedLines)
+  const poNos = created.map((o) => o.orderNo)
   const reqPoMap = new Map()
 
-  supplierGroups.forEach((lines, supplier) => {
-    const poNo = generatePurchaseOrderNo()
-    poNos.push(poNo)
-    lines.forEach((line) => {
-      ;(line.sourceReqIds || []).forEach((reqId) => {
-        if (!reqPoMap.has(reqId)) reqPoMap.set(reqId, new Set())
-        reqPoMap.get(reqId).add(poNo)
+  created.forEach((order) => {
+    mergedLines
+      .filter((l) => (l.supplierName || '未指定供应商') === order.supplier)
+      .forEach((line) => {
+        ;(line.sourceReqIds || []).forEach((reqId) => {
+          if (!reqPoMap.has(reqId)) reqPoMap.set(reqId, new Set())
+          reqPoMap.get(reqId).add(order.orderNo)
+        })
       })
-    })
-    // Mock: purchase orders stored only as numbers on requisitions
-    void supplier
   })
 
   reqPoMap.forEach((poSet, reqId) => {

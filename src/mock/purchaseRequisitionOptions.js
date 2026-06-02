@@ -4,7 +4,7 @@ export const docStatusOptions = ['待处理', '处理中', '处理完成']
 
 export const overdueStatusOptions = ['未逾期', '已逾期']
 
-export const sourceOptions = ['新增', '生产计划']
+export const sourceOptions = ['新增', '生产计划', '外购销售']
 
 export const operatorOptions = ['管理员', '张三', '李四']
 

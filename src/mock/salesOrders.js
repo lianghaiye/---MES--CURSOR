@@ -60,6 +60,8 @@ function createSalesOrder(partial) {
     amountExTax,
     amountInTax,
     lineItems,
+    purchaseRequisitionNo: '',
+    purchaseRequisitionId: '',
     ...partial,
   }
 }

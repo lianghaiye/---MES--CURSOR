@@ -1,6 +1,10 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { cloneSalesOrders } from '@/mock/salesOrders'
+import {
+  addPurchaseRequisition,
+  buildRequisitionFromSalesOrder,
+} from '@/store/purchaseRequisitionStore'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
 let orderSeq = 3
@@ -68,4 +72,46 @@ export function recalcOrderAmounts(order) {
   order.amountExTax = lineItems.reduce((s, i) => s + (Number(i.totalPriceExTax) || 0), 0)
   order.amountInTax = lineItems.reduce((s, i) => s + (Number(i.totalPriceInTax) || 0), 0)
   order.orderAmount = order.amountInTax
+}
+
+export function canEditSalesOrder(order) {
+  return order?.progressStatus === '未审'
+}
+
+/**
+ * 审核销售订单；外购销售审核通过时自动生成采购申请
+ * @returns {{ ok: boolean, message: string, purchaseReqNo?: string }}
+ */
+export function approveSalesOrder(id) {
+  const order = salesOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '订单不存在' }
+  if (order.progressStatus !== '未审') {
+    return { ok: false, message: `订单「${order.orderNo}」已审核，不可重复操作` }
+  }
+  if (!order.lineItems?.length) {
+    return { ok: false, message: `订单「${order.orderNo}」请先添加销售明细后再审核` }
+  }
+
+  let purchaseReqNo
+  if (order.businessType === '外购销售') {
+    if (order.purchaseRequisitionNo) {
+      return { ok: false, message: `订单「${order.orderNo}」已关联采购申请` }
+    }
+    const requisition = buildRequisitionFromSalesOrder(order)
+    addPurchaseRequisition(requisition)
+    order.purchaseRequisitionNo = requisition.reqNo
+    order.purchaseRequisitionId = requisition.id
+    purchaseReqNo = requisition.reqNo
+  }
+
+  order.progressStatus = '已审'
+
+  if (purchaseReqNo) {
+    return {
+      ok: true,
+      message: `订单「${order.orderNo}」审核通过，已自动生成采购申请 ${purchaseReqNo}`,
+      purchaseReqNo,
+    }
+  }
+  return { ok: true, message: `订单「${order.orderNo}」审核通过` }
 }
