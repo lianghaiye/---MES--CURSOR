@@ -83,6 +83,7 @@ export const routeTitles = {
   '/product-process/materials': '物料信息',
   '/product-process/products': '产品信息',
   '/product-process/bom': '产品BOM',
+  '/product-process/bom/new': '新增BOM',
   '/product-process/routing': '工艺路线',
   '/product-process/process-config': '工序配置',
   '/product-process/process-doc': '工艺文件',

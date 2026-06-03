@@ -131,6 +131,12 @@ export function addProductBom(payload) {
     createdAt: ts,
     updatedAt: ts,
     remark: payload.remark || '',
+    bomType: payload.bomType || '基础BOM',
+    specModel: payload.specModel || '',
+    treeNodes: payload.treeNodes || [],
+    lineItems: payload.lineItems || [],
+    templateRef: payload.templateRef || null,
+    columnSettings: payload.columnSettings || [],
   }
   productBomState.boms.unshift(record)
   return record

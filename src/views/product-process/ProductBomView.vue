@@ -217,7 +217,9 @@ export default { name: 'ProductBomView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
+import { useTabs } from '@/composables/useTabs'
 import {
   PlusOutlined,
   SearchOutlined,
@@ -248,6 +250,9 @@ import { materialInfoState } from '@/store/materialInfoStore'
 import ProductBomFormModal from './components/ProductBomFormModal.vue'
 import ProductBomAuditModal from './components/ProductBomAuditModal.vue'
 import ProductBomVersionDrawer from './components/ProductBomVersionDrawer.vue'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({
   bomNo: '',
@@ -329,8 +334,9 @@ function handleReset() {
 }
 
 function openCreate() {
-  editRecord.value = null
-  formOpen.value = true
+  const path = '/product-process/bom/new'
+  openTab(path, '新增BOM')
+  router.push(path)
 }
 
 function openEdit(record) {
