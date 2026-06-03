@@ -8,6 +8,11 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <a-tooltip title="切换为卡片视图">
+          <a-button type="text" size="small" class="toolbar-icon-btn" @click="emit('toggle-layout')">
+            <AppstoreOutlined />
+          </a-button>
+        </a-tooltip>
       </div>
     </div>
 
@@ -77,7 +82,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ReloadOutlined } from '@ant-design/icons-vue'
+import { AppstoreOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 
 const props = defineProps({
   dataSource: { type: Array, default: () => [] },
@@ -87,7 +92,14 @@ const props = defineProps({
   activeId: { type: String, default: null },
 })
 
-const emit = defineEmits(['refresh', 'select', 'action', 'update:pagination', 'update:selectedIds'])
+const emit = defineEmits([
+  'refresh',
+  'toggle-layout',
+  'select',
+  'action',
+  'update:pagination',
+  'update:selectedIds',
+])
 
 const columns = [
   { title: '#', key: 'index', width: 56, align: 'center', fixed: 'left' },
