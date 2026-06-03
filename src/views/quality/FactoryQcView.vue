@@ -165,8 +165,10 @@ import {
 import { qcStatusOptions, qcResultOptions } from '@/mock/factoryQcOptions'
 import CreateFactoryQcModal from './components/CreateFactoryQcModal.vue'
 import FactoryQcInspectModal from './components/FactoryQcInspectModal.vue'
+import { useTabs } from '@/composables/useTabs'
 
 const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({
   qcStatus: undefined,
@@ -226,11 +228,12 @@ function resultColor(result) {
 }
 
 function openDetail(record) {
-  const { href } = router.resolve({
+  const resolved = router.resolve({
     name: 'quality-factory-qc-detail',
     params: { id: record.id },
   })
-  window.open(href, '_blank')
+  openTab(resolved.path, record.qcNo || '出厂质检详情')
+  router.push(resolved)
 }
 
 function handleSearch() {
