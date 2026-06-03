@@ -161,11 +161,6 @@
                       <a-menu-item key="edit">编辑</a-menu-item>
                       <a-menu-item key="delete" danger>删除</a-menu-item>
                       <a-menu-item key="clone">克隆</a-menu-item>
-                      <a-menu-divider />
-                      <a-menu-item key="urgency">调整紧急度</a-menu-item>
-                      <a-menu-item key="pause">暂停</a-menu-item>
-                      <a-menu-item key="terminate">终止</a-menu-item>
-                      <a-menu-item key="complete">完成</a-menu-item>
                     </a-menu>
                   </template>
                 </a-dropdown>
@@ -655,10 +650,13 @@ function confirmUrgency() {
 }
 
 function onDetailAction({ key, workOrder: wo }) {
-  if (key === 'urgency' && wo) {
-    urgencyTargetId.value = wo.id
-    urgencyDraft.value = wo.urgency
-    urgencyModalOpen.value = true
+  if (!wo) return
+  if (key === 'schedule-qty') {
+    message.info('修改排产数量功能开发中')
+    return
+  }
+  if (['urgency', 'pause', 'terminate', 'complete'].includes(key)) {
+    onCardAction(key, wo)
   }
 }
 </script>
