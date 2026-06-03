@@ -1,11 +1,14 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { cloneOrders } from '@/mock/orders'
+import { mockProducts } from '@/mock/productInfo'
+import { buildCatalogProductBoms } from '@/mock/productBomSeed'
+import { buildMockSalesOrders } from '@/mock/salesOrderSeed'
+import { buildInitialProductionPlans } from '@/mock/productionPlanSeed'
 import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 
 const STORAGE_KEY = 'i_doms_production_plans'
-const DATA_VERSION = 1
+const DATA_VERSION = 2
 
 function normalizePlanStatuses(orders) {
   return orders.map((o) => {
@@ -49,8 +52,16 @@ function persist() {
   )
 }
 
+function loadInitialPlans() {
+  const stored = loadFromStorage()
+  if (stored) return stored
+  const boms = buildCatalogProductBoms(mockProducts)
+  const salesOrders = buildMockSalesOrders(mockProducts)
+  return normalizePlanStatuses(buildInitialProductionPlans(boms, salesOrders))
+}
+
 export const productionPlanState = reactive({
-  plans: loadFromStorage() || normalizePlanStatuses(cloneOrders()),
+  plans: loadInitialPlans(),
 })
 
 watch(

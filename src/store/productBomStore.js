@@ -1,6 +1,7 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { mockProductBoms } from '@/mock/productBom'
+import { mockProducts } from '@/mock/productInfo'
+import { buildCatalogProductBoms } from '@/mock/productBomSeed'
 import { isBomProductionReady } from '@/mock/productBomOptions'
 import {
   formatBomVersion,
@@ -9,7 +10,7 @@ import {
 } from '@/utils/bomVersion'
 
 const STORAGE_KEY = 'i_doms_product_bom'
-const DATA_VERSION = 3
+const DATA_VERSION = 4
 let bomNoSeq = 31000
 
 const VALID_STATUSES = ['待启用', '使用中', '已归档']
@@ -48,8 +49,14 @@ function persist() {
   )
 }
 
+function loadInitialBoms() {
+  const stored = loadFromStorage()
+  if (stored) return stored
+  return buildCatalogProductBoms(mockProducts)
+}
+
 export const productBomState = reactive({
-  boms: loadFromStorage() || JSON.parse(JSON.stringify(mockProductBoms)),
+  boms: loadInitialBoms(),
 })
 
 watch(

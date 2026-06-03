@@ -1,6 +1,7 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { cloneSalesOrders } from '@/mock/salesOrders'
+import { mockProducts } from '@/mock/productInfo'
+import { buildMockSalesOrders } from '@/mock/salesOrderSeed'
 import {
   addPurchaseRequisition,
   buildRequisitionFromSalesOrder,
@@ -9,7 +10,8 @@ import { getActiveBomForItem } from '@/store/productBomStore'
 import { createProductionPlanFromSalesOrder } from '@/store/productionPlanStore'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-let orderSeq = 3
+const DATA_VERSION = 2
+let orderSeq = 20
 let deliverySeq = 113
 
 function loadFromStorage() {
@@ -17,7 +19,9 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.orders)) return parsed.orders
+      if (parsed.version === DATA_VERSION && Array.isArray(parsed.orders)) {
+        return parsed.orders
+      }
     }
   } catch {
     /* ignore */
@@ -26,7 +30,14 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: salesOrderState.orders }))
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ version: DATA_VERSION, orders: salesOrderState.orders }),
+  )
+}
+
+function loadInitialSalesOrders() {
+  return loadFromStorage() || buildMockSalesOrders(mockProducts)
 }
 
 export function generateSalesOrderNo() {
@@ -40,7 +51,7 @@ export function generateDeliveryCode() {
 }
 
 export const salesOrderState = reactive({
-  orders: loadFromStorage() || cloneSalesOrders(),
+  orders: loadInitialSalesOrders(),
 })
 
 watch(
