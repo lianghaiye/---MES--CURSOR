@@ -12,10 +12,10 @@
 
     <div class="action-bar">
       <a-button class="btn-outline" @click="onAction('schedule-qty')">修改排产数量</a-button>
-      <a-button type="primary" @click="onAction('urgency')">紧急度调整</a-button>
-      <a-button class="btn-warn" @click="onAction('pause')">工单暂停</a-button>
-      <a-button class="btn-danger" @click="onAction('terminate')">工单终止</a-button>
-      <a-button class="btn-success" @click="onAction('complete')">工单完成</a-button>
+      <a-button type="primary" @click="onAction('urgency')">调整紧急度</a-button>
+      <a-button class="btn-warn" @click="onAction('pause')">暂停</a-button>
+      <a-button class="btn-danger" @click="onAction('terminate')">终止</a-button>
+      <a-button class="btn-success" @click="onAction('complete')">完成</a-button>
     </div>
 
     <a-collapse v-model:activeKey="collapseKeys" :bordered="false" class="detail-sections">
@@ -313,21 +313,19 @@ const inboundCols = [
   { title: '入库数量', dataIndex: 'inboundQty', width: 100 },
 ]
 
+const detailActionKeys = ['urgency', 'pause', 'terminate', 'complete']
+
 function onAction(key) {
+  if (detailActionKeys.includes(key)) {
+    emit('action', { key, workOrder: props.workOrder })
+    return
+  }
   const labels = {
     'schedule-qty': '修改排产数量',
-    urgency: '紧急度调整',
-    pause: '工单暂停',
-    terminate: '工单终止',
-    complete: '工单完成',
     'sales-order': '查看销售订单',
     'gen-task': '生成任务',
     'edit-executor': '修改执行者',
     'batch-edit': '批量修改',
-  }
-  if (key === 'urgency') {
-    emit('action', { key, workOrder: props.workOrder })
-    return
   }
   message.info(`${labels[key] || key}（演示）`)
 }

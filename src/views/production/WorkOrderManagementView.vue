@@ -96,113 +96,8 @@
       </a-form>
     </div>
 
-    <!-- 主从布局 / 列表布局 -->
-    <div v-if="layoutMode === 'split'" class="master-detail">
-      <!-- 左侧工单列表 -->
-      <div class="list-card">
-        <div class="list-title-row">
-          <a-checkbox
-            :checked="allPageSelected"
-            :indeterminate="pageIndeterminate"
-            @change="onToggleSelectAllPage"
-          />
-          <span class="list-title">工单列表</span>
-          <span v-if="selectedIds.length" class="selected-count"
-            >已选 {{ selectedIds.length }}</span
-          >
-          <a-tooltip title="切换为列表视图">
-            <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
-              <TableOutlined />
-            </a-button>
-          </a-tooltip>
-        </div>
-        <div class="list-body">
-          <div
-            v-for="wo in pagedOrders"
-            :key="wo.id"
-            class="order-card"
-            :class="{ active: selectedId === wo.id, checked: selectedIds.includes(wo.id) }"
-            @click="selectOrder(wo.id)"
-          >
-            <a-checkbox
-              class="card-checkbox"
-              :checked="selectedIds.includes(wo.id)"
-              @click.stop
-              @change="(e) => toggleSelect(wo.id, e.target.checked)"
-            />
-            <div class="card-content">
-              <div class="card-head">
-                <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
-                <a-dropdown :trigger="['click']">
-                  <a-button type="text" size="small" class="more-btn" @click.stop>
-                    <EllipsisOutlined />
-                  </a-button>
-                  <template #overlay>
-                    <a-menu @click="({ key }) => onCardAction(key, wo)">
-                      <a-menu-item key="edit">编辑</a-menu-item>
-                      <a-menu-item key="delete" danger>删除</a-menu-item>
-                      <a-menu-item key="clone">克隆</a-menu-item>
-                      <a-menu-divider />
-                      <a-menu-item key="urgency">调整紧急度</a-menu-item>
-                      <a-menu-item key="pause">暂停</a-menu-item>
-                      <a-menu-item key="terminate">终止</a-menu-item>
-                      <a-menu-item key="complete">完成</a-menu-item>
-                    </a-menu>
-                  </template>
-                </a-dropdown>
-              </div>
-              <div class="card-code">{{ wo.code }}</div>
-              <div class="card-name">{{ wo.name }}</div>
-              <div class="card-meta">
-                <span>订单 {{ wo.sourceOrderNo || '-' }}</span>
-                <span class="meta-divider">·</span>
-                <span>数量 {{ wo.scheduleQty }}</span>
-              </div>
-              <div class="card-tags">
-                <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
-                  {{ urgencyLabel(wo.urgency) }}
-                </a-tag>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="list-pagination">
-          <a-pagination
-            v-model:current="pagination.current"
-            :total="filteredOrders.length"
-            :page-size="pagination.pageSize"
-            size="small"
-            simple
-          />
-        </div>
-      </div>
-
-      <!-- 右侧详情 -->
-      <div v-if="selectedOrder" class="detail-card">
-        <WorkOrderDetailPanel
-          :work-order-id="selectedOrder.id"
-          v-model:detail-tab="detailTab"
-          v-model:detail-collapsed="detailCollapsed"
-          :show-dispatch-tab="showDispatchTab"
-          :plan-date-value="planDateValue"
-          :work-center-opts="workCenterOpts"
-          :warehouse-opts="warehouseOpts"
-          :urgency-opts="urgencyOpts"
-          :bom-opts="bomOpts"
-          @save-basic="saveBasicInfo"
-          @plan-date-change="onPlanDateChange"
-          @dispatch="handleDispatch"
-          @cancel-dispatch="handleDispatchCancel"
-          @detail-action="onDetailAction"
-        />
-      </div>
-
-      <div v-else class="detail-card detail-empty">
-        <a-empty description="请选择左侧工单" />
-      </div>
-    </div>
-
-    <template v-else>
+    <!-- 列表 + 全宽详情 -->
+    <div class="work-order-main">
       <WorkOrderTableLayout
         :data-source="pagedOrders"
         :total="filteredOrders.length"
@@ -210,22 +105,14 @@
         :selected-ids="selectedIds"
         :active-id="selectedId"
         @refresh="handleSearch"
-        @toggle-layout="toggleLayout"
         @select="onTableRowSelect"
         @action="handleTableAction"
         @update:pagination="onTablePaginationUpdate"
         @update:selected-ids="onSelectedIdsUpdate"
       />
 
-      <a-drawer
-        v-model:open="detailDrawerOpen"
-        :title="selectedOrder ? `${selectedOrder.code} · ${selectedOrder.name}` : '工单详情'"
-        width="1200"
-        destroy-on-close
-        class="work-order-detail-drawer"
-      >
+      <div v-if="selectedOrder" class="detail-card detail-card-below">
         <WorkOrderDetailPanel
-          v-if="selectedOrder"
           :work-order-id="selectedOrder.id"
           v-model:detail-tab="detailTab"
           v-model:detail-collapsed="detailCollapsed"
@@ -241,8 +128,12 @@
           @cancel-dispatch="handleDispatchCancel"
           @detail-action="onDetailAction"
         />
-      </a-drawer>
-    </template>
+      </div>
+
+      <div v-else class="detail-card detail-card-below detail-empty">
+        <a-empty description="请点击上方列表中的工单查看详情" />
+      </div>
+    </div>
 
     <CreateWorkOrderModal
       v-model:open="createModalOpen"
@@ -265,14 +156,7 @@ export default { name: 'WorkOrderManagementView' }
 import { computed, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import {
-  DownOutlined,
-  EllipsisOutlined,
-  PlusOutlined,
-  SearchOutlined,
-  ReloadOutlined,
-  TableOutlined,
-} from '@ant-design/icons-vue'
+import { DownOutlined, PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   workOrderState,
   filterWorkOrders,
@@ -287,8 +171,6 @@ import { bomOptions } from '@/mock/workOrderMaster'
 import CreateWorkOrderModal from './components/CreateWorkOrderModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
-
-const LAYOUT_STORAGE_KEY = 'i_doms_wo_layout'
 
 const statusOptions = ['待下发', '已下发', '执行中', '完成', '暂停', '终止']
 const categoryOptions = ['生产工单', '返修工单', '试制工单']
@@ -311,10 +193,7 @@ const editRecord = ref(null)
 const urgencyModalOpen = ref(false)
 const urgencyDraft = ref('普通')
 const urgencyTargetId = ref(null)
-const layoutMode = ref(localStorage.getItem(LAYOUT_STORAGE_KEY) || 'split')
-const detailDrawerOpen = ref(false)
-
-const pagination = reactive({ current: 1, pageSize: 12 })
+const pagination = reactive({ current: 1, pageSize: 10 })
 
 const statusOpts = statusOptions.map((v) => ({ label: v, value: v }))
 const categoryOpts = categoryOptions.map((v) => ({ label: v, value: v }))
@@ -328,17 +207,6 @@ const filteredOrders = computed(() => filterWorkOrders(workOrderState.orders, ap
 const pagedOrders = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
   return filteredOrders.value.slice(start, start + pagination.pageSize)
-})
-
-const pageIds = computed(() => pagedOrders.value.map((o) => o.id))
-
-const allPageSelected = computed(
-  () => pageIds.value.length > 0 && pageIds.value.every((id) => selectedIds.value.includes(id)),
-)
-
-const pageIndeterminate = computed(() => {
-  const selectedOnPage = pageIds.value.filter((id) => selectedIds.value.includes(id)).length
-  return selectedOnPage > 0 && selectedOnPage < pageIds.value.length
 })
 
 const selectedOrder = computed(() => workOrderState.orders.find((o) => o.id === selectedId.value))
@@ -371,56 +239,17 @@ watch(filteredOrders, (list) => {
   }
 })
 
-function statusColor(status) {
-  const map = {
-    待下发: 'warning',
-    已下发: 'processing',
-    执行中: 'blue',
-    完成: 'success',
-    暂停: 'default',
-    终止: 'error',
-  }
-  return map[status] || 'default'
-}
-
-function urgencyTagColor(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return 'error'
-  return 'default'
-}
-
-function urgencyLabel(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return '紧急'
-  return '不紧急'
-}
-
-function selectOrder(id) {
-  selectedId.value = id
-}
-
-function toggleLayout() {
-  layoutMode.value = layoutMode.value === 'split' ? 'table' : 'split'
-  localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode.value)
-  if (layoutMode.value === 'split') {
-    detailDrawerOpen.value = false
-  } else {
-    pagination.current = 1
-    if (pagination.pageSize > 20) pagination.pageSize = 10
-  }
-}
-
 function onTableRowSelect(id) {
   selectedId.value = id
-  detailDrawerOpen.value = true
 }
 
 function handleTableAction(key, wo) {
   if (key === 'dispatch') {
     selectedId.value = wo.id
     detailTab.value = 'dispatch'
-    detailDrawerOpen.value = true
     return
   }
-  onCardAction(key, wo)
+  onOrderAction(key, wo)
 }
 
 function onTablePaginationUpdate(next) {
@@ -430,25 +259,6 @@ function onTablePaginationUpdate(next) {
 
 function onSelectedIdsUpdate(ids) {
   selectedIds.value = ids
-}
-
-function toggleSelect(id, checked) {
-  if (checked) {
-    if (!selectedIds.value.includes(id)) selectedIds.value.push(id)
-  } else {
-    selectedIds.value = selectedIds.value.filter((v) => v !== id)
-  }
-}
-
-function onToggleSelectAllPage(e) {
-  const checked = e.target.checked
-  if (checked) {
-    pageIds.value.forEach((id) => {
-      if (!selectedIds.value.includes(id)) selectedIds.value.push(id)
-    })
-  } else {
-    selectedIds.value = selectedIds.value.filter((id) => !pageIds.value.includes(id))
-  }
 }
 
 function openCreateModal() {
@@ -571,7 +381,7 @@ function onBatchMenu({ key }) {
   else if (key === 'export') handleBatchExport()
 }
 
-function onCardAction(key, wo) {
+function onOrderAction(key, wo) {
   if (key === 'edit') {
     editRecord.value = wo
     createModalOpen.value = true
@@ -624,11 +434,12 @@ function confirmUrgency() {
 }
 
 function onDetailAction({ key, workOrder: wo }) {
-  if (key === 'urgency' && wo) {
-    urgencyTargetId.value = wo.id
-    urgencyDraft.value = wo.urgency
-    urgencyModalOpen.value = true
+  if (!wo) return
+  if (key === 'schedule-qty') {
+    message.info('修改排产数量功能开发中')
+    return
   }
+  onOrderAction(key, wo)
 }
 </script>
 
@@ -641,11 +452,16 @@ function onDetailAction({ key, workOrder: wo }) {
 }
 
 .filter-card,
-.list-card,
 .detail-card {
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.work-order-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .filter-card {
@@ -738,170 +554,8 @@ function onDetailAction({ key, workOrder: wo }) {
   }
 }
 
-.master-detail {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  min-height: 520px;
-}
-
-.list-card {
-  width: 22%;
-  min-width: 220px;
-  max-width: 268px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 220px);
-
-  .list-title-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 10px 6px;
-    border-bottom: 1px solid #f0f0f0;
-
-    .list-title {
-      font-weight: 600;
-      font-size: 14px;
-      flex: 1;
-    }
-
-    .selected-count {
-      font-size: 12px;
-      color: #1677ff;
-    }
-
-    .layout-toggle-btn {
-      margin-left: auto;
-      color: rgba(0, 0, 0, 0.45);
-      flex-shrink: 0;
-
-      &:hover {
-        color: #1677ff;
-      }
-    }
-  }
-
-  .list-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 6px;
-  }
-
-  .list-pagination {
-    padding: 6px 8px;
-    border-top: 1px solid #f0f0f0;
-    display: flex;
-    justify-content: center;
-  }
-}
-
-.order-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-  padding: 6px 8px 6px 6px;
-  margin-bottom: 6px;
-  cursor: pointer;
-  background: #fff;
-  transition: all 0.2s;
-  border-left: 2px solid transparent;
-
-  &:hover {
-    border-color: #d6e4ff;
-    box-shadow: 0 1px 4px rgba(22, 119, 255, 0.08);
-  }
-
-  &.active {
-    border-color: #91caff;
-    border-left-color: #1677ff;
-    background: #f0f7ff;
-  }
-
-  &.checked {
-    background: #fafcff;
-  }
-
-  .card-checkbox {
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
-
-  .card-content {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 4px;
-
-    .status-tag {
-      margin: 0;
-      line-height: 18px;
-      font-size: 12px;
-      padding-inline: 6px;
-    }
-
-    .more-btn {
-      padding: 0 2px;
-      height: 22px;
-      color: rgba(0, 0, 0, 0.45);
-    }
-  }
-
-  .card-code {
-    font-weight: 600;
-    font-size: 13px;
-    color: rgba(0, 0, 0, 0.88);
-    margin-bottom: 2px;
-    line-height: 1.3;
-  }
-
-  .card-name {
-    font-size: 12px;
-    color: rgba(0, 0, 0, 0.65);
-    margin-bottom: 4px;
-    line-height: 1.35;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .card-meta {
-    font-size: 11px;
-    color: rgba(0, 0, 0, 0.45);
-    line-height: 1.4;
-
-    .meta-divider {
-      margin: 0 4px;
-    }
-  }
-
-  .card-tags {
-    margin-top: 4px;
-
-    .urgency-tag {
-      margin: 0;
-      font-size: 11px;
-      line-height: 18px;
-      padding-inline: 6px;
-    }
-  }
-}
-
-.detail-card {
-  flex: 1;
-  min-width: 0;
+.detail-card-below {
   padding: 8px 12px 10px;
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
 }
 
 .detail-empty {
@@ -911,23 +565,7 @@ function onDetailAction({ key, workOrder: wo }) {
   min-height: 320px;
 }
 
-:deep(.work-order-detail-drawer) {
-  .ant-drawer-body {
-    padding: 12px 16px 16px;
-  }
-}
-
 @media (max-width: 992px) {
-  .master-detail {
-    flex-direction: column;
-  }
-
-  .list-card {
-    width: 100%;
-    max-width: none;
-    max-height: 240px;
-  }
-
   .filter-footer {
     flex-direction: column;
     align-items: stretch;
