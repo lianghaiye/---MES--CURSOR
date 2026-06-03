@@ -89,6 +89,12 @@ const routes = [
         meta: { title: '生产工单' },
       },
       {
+        path: 'production/assembly-work-orders',
+        name: 'production-assembly-work-orders',
+        component: () => import('@/views/production/AssemblyWorkOrderManagementView.vue'),
+        meta: { title: '总装工单' },
+      },
+      {
         path: 'production/qc-work-orders',
         name: 'production-qc-work-orders',
         component: () => import('@/views/production/QcWorkOrderManagementView.vue'),

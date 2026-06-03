@@ -104,7 +104,7 @@
       <a-tab-pane key="detail" tab="工单详情">
         <WorkOrderDetailTab :work-order="workOrder" @action="emit('detail-action', $event)" />
       </a-tab-pane>
-      <template v-if="variant === 'production'">
+      <template v-if="variant === 'production' || variant === 'assembly'">
         <a-tab-pane key="ebom" tab="EBOM">
           <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
         </a-tab-pane>
@@ -124,6 +124,7 @@ import { computed } from 'vue'
 import { DownOutlined, UpOutlined } from '@ant-design/icons-vue'
 import { workOrderState } from '@/store/workOrderStore'
 import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
+import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import WorkOrderDispatchTab from './WorkOrderDispatchTab.vue'
 import WorkOrderDetailTab from './WorkOrderDetailTab.vue'
 
@@ -140,7 +141,12 @@ const props = defineProps({
 
 const workOrder = computed(() => {
   if (!props.workOrderId) return null
-  const list = props.variant === 'qc' ? qcWorkOrderState.orders : workOrderState.orders
+  const list =
+    props.variant === 'qc'
+      ? qcWorkOrderState.orders
+      : props.variant === 'assembly'
+        ? assemblyWorkOrderState.orders
+        : workOrderState.orders
   return list.find((o) => o.id === props.workOrderId)
 })
 

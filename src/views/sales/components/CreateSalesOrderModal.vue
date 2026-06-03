@@ -205,6 +205,14 @@
               />
             </template>
 
+            <template v-else-if="column.key === 'bomName'">
+              <span class="readonly-cell">{{ record.bomName || '—' }}</span>
+            </template>
+
+            <template v-else-if="column.key === 'bomVersion'">
+              <span class="readonly-cell">{{ record.bomVersion || '—' }}</span>
+            </template>
+
             <template v-else-if="column.key === 'unit'">
               <a-input v-model:value="record.unit" size="small" />
             </template>
@@ -307,8 +315,8 @@
     <a-modal v-model:open="productPickerOpen" title="选择产品" width="720px" @ok="confirmProductPick">
       <a-table
         :columns="productPickerColumns"
-        :data-source="mockProducts"
-        row-key="code"
+        :data-source="productPickerRows"
+        row-key="id"
         size="small"
         :row-selection="{ type: 'checkbox', selectedRowKeys: pickedProductKeys, onChange: (keys) => (pickedProductKeys = keys) }"
         :pagination="false"
@@ -341,6 +349,8 @@ import {
   salespersonOptions,
 } from '@/mock/salesOrderOptions'
 import { createLineItem } from '@/mock/salesOrders'
+import { productInfoState } from '@/store/productInfoStore'
+import { getActiveBomForItem } from '@/store/productBomStore'
 import { generateSalesOrderNo } from '@/store/salesOrderStore'
 
 const props = defineProps({
@@ -385,47 +395,25 @@ const columnDefs = [
 
 const visibleColumnKeys = ref(columnDefs.map((c) => c.key))
 
-const mockProducts = [
-  {
-    code: 'SPARE-50*30-001',
-    name: '测试产品00002',
-    productAttr: '自制',
-    specAttr: '标准',
-    specModel: '50*30',
-    material: '钢',
-    unit: '件',
-    bomName: '测试BoM',
-    bomVersion: 'V1.0',
-  },
-  {
-    code: 'PRD-YQST250',
-    name: '潜水电机',
-    productAttr: '自制',
-    specAttr: '标准',
-    specModel: '750kW',
-    material: '钢',
-    unit: '台',
-    bomName: '潜水电机',
-    bomVersion: 'V2.1',
-  },
-  {
-    code: 'MD-200-BLK',
-    name: '精密模芯',
-    productAttr: '外购',
-    specAttr: 'H13',
-    specModel: '200mm',
-    material: '模具钢',
-    unit: '件',
-    bomName: '模芯BoM',
-    bomVersion: 'V1.0',
-  },
-]
+const productPickerRows = computed(() =>
+  productInfoState.products.slice(0, 300).map((p) => ({
+    id: p.id,
+    code: p.code,
+    name: p.name,
+    productAttr: p.productAttribute,
+    specModel: p.specModel,
+    material: p.material,
+    unit: p.inventoryUnit,
+    unitPrice: p.unitPrice,
+    categoryName: p.categoryName,
+  })),
+)
 
 const productPickerColumns = [
   { title: '产品编码', dataIndex: 'code', width: 140 },
-  { title: '产品名称', dataIndex: 'name', width: 140 },
-  { title: '产品属性', dataIndex: 'productAttr', width: 90 },
-  { title: '规格型号', dataIndex: 'specModel', width: 100 },
+  { title: '产品名称', dataIndex: 'name', width: 160 },
+  { title: '产品属性', dataIndex: 'productAttr', width: 100 },
+  { title: '规格型号', dataIndex: 'specModel', width: 110 },
 ]
 
 const displayColumns = computed(() =>
@@ -640,27 +628,41 @@ function openProductPicker() {
 }
 
 function confirmProductPick() {
-  pickedProductKeys.value.forEach((code) => {
-    const p = mockProducts.find((m) => m.code === code)
+  const skipped = []
+  pickedProductKeys.value.forEach((productId) => {
+    const p = productInfoState.products.find((m) => m.id === productId)
     if (!p) return
+    const bom = getActiveBomForItem('product', p.id)
+    if (!bom) {
+      skipped.push(p.name)
+      return
+    }
     const line = createLineItem({
-      productAttr: p.productAttr,
+      productId: p.id,
+      bomId: bom.id,
+      productAttr: p.productAttribute,
       productName: p.name,
       productCode: p.code,
-      specAttr: p.specAttr,
+      specAttr: p.standardSpec || '',
       specModel: p.specModel,
       material: p.material,
-      unit: p.unit,
-      bomName: p.bomName,
-      bomVersion: p.bomVersion,
+      category: p.categoryName,
+      unit: p.inventoryUnit || '件',
+      bomName: bom.bomName,
+      bomVersion: bom.version,
       salesQty: 1,
       taxRate: 13,
-      unitPriceExTax: 0,
+      unitPriceExTax: Number(p.unitPrice) || 0,
       unitPriceInTax: 0,
     })
     recalcLine(line)
     form.lineItems.push(line)
   })
+  if (skipped.length) {
+    message.warning(
+      `以下产品无使用中的 BOM，已跳过：${skipped.join('、')}。请先在产品 BOM 中维护并启用。`,
+    )
+  }
   productPickerOpen.value = false
 }
 
@@ -907,6 +909,11 @@ function handleSave() {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
     line-height: 1.5;
+  }
+
+  .readonly-cell {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.65);
   }
 }
 </style>

@@ -42,6 +42,7 @@ export const sideMenus = {
   ],
   production: [
     { key: 'work-orders', label: '生产工单', path: '/production/work-orders' },
+    { key: 'assembly-work-orders', label: '总装工单', path: '/production/assembly-work-orders' },
     { key: 'qc-work-orders', label: '质检工单', path: '/production/qc-work-orders' },
   ],
   inventory: [
@@ -95,6 +96,7 @@ export const routeTitles = {
   '/planning/production-plan': '生产计划',
   '/planning/design-task': '设计任务',
   '/production/work-orders': '生产工单',
+  '/production/assembly-work-orders': '总装工单',
   '/production/qc-work-orders': '质检工单',
   '/inventory/stock': '库存查询',
   '/inventory/outbound': '出库管理',

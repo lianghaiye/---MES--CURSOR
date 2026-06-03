@@ -404,12 +404,19 @@ function handleApprove() {
       const succeeded = results.filter((r) => r.ok)
       const failed = results.filter((r) => !r.ok)
       const withPr = succeeded.filter((r) => r.purchaseReqNo)
+      const withPlan = succeeded.filter((r) => r.planOrderNo)
 
       if (withPr.length === 1) {
         message.success(withPr[0].message)
+      } else if (withPlan.length === 1) {
+        message.success(withPlan[0].message)
       } else if (withPr.length > 1) {
         message.success(
           `已审核 ${succeeded.length} 条，其中 ${withPr.length} 条外购销售已自动生成采购申请`,
+        )
+      } else if (withPlan.length > 1) {
+        message.success(
+          `已审核 ${succeeded.length} 条，其中 ${withPlan.length} 条自产销售已自动生成生产计划`,
         )
       } else if (succeeded.length === 1) {
         message.success(succeeded[0].message)

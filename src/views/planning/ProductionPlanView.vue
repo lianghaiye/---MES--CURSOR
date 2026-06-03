@@ -35,8 +35,8 @@
               style="width: 100%"
             >
               <a-select-option value="部分下达">部分下达</a-select-option>
-              <a-select-option value="待排产">待排产</a-select-option>
-              <a-select-option value="生产中">生产中</a-select-option>
+              <a-select-option value="待下达">待下达</a-select-option>
+              <a-select-option value="执行中">执行中</a-select-option>
               <a-select-option value="已完成">已完成</a-select-option>
             </a-select>
           </a-form-item>
@@ -150,7 +150,9 @@
               </template>
               <template v-else-if="column.key === 'action'">
                 <a-space>
-                  <a-button type="link" size="small">收起</a-button>
+                  <a-button type="link" size="small" @click="toggleWorkItemExpand(record)">
+                    {{ expandedWorkItemId === record.id ? '收起' : '展开' }}
+                  </a-button>
                   <a-button type="link" size="small" danger>终止</a-button>
                 </a-space>
               </template>
@@ -181,7 +183,13 @@
             </a-space>
           </div>
 
+          <a-empty
+            v-if="!materialTree.length"
+            description="请在工作项中展开一条明细以查看 EBOM"
+            class="ebom-empty"
+          />
           <a-table
+            v-else
             :columns="materialColumns"
             :data-source="materialTree"
             :pagination="false"
@@ -232,7 +240,7 @@ export default {
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { cloneOrders, filterOrders } from '@/mock/orders'
+import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
 import { addWorkOrdersFromPlanRows } from '@/store/workOrderStore'
 import {
@@ -248,8 +256,6 @@ import {
   buildRequisitionFromMaterials,
 } from '@/store/purchaseRequisitionStore'
 
-const ordersData = ref(cloneOrders())
-
 const filters = reactive({
   orderNo: '',
   customerName: '',
@@ -260,7 +266,8 @@ const filters = reactive({
 })
 
 const appliedFilters = ref({ ...filters })
-const selectedId = ref(ordersData.value[0]?.id || null)
+const selectedId = ref(productionPlanState.plans[0]?.id || null)
+const expandedWorkItemId = ref(null)
 const detailCollapsed = ref(false)
 const detailTab = ref('work')
 const workOrderModalOpen = ref(false)
@@ -322,7 +329,7 @@ const filteredOrders = computed(() => {
       f.deliveryDateRange[1].format('YYYY-MM-DD'),
     ]
   }
-  return filterOrders(ordersData.value, f)
+  return filterProductionPlans(productionPlanState.plans, f)
 })
 
 const pagedOrders = computed(() => {
@@ -334,8 +341,9 @@ const selectedOrder = computed(() => filteredOrders.value.find((o) => o.id === s
 
 const materialTree = computed(() => {
   const order = selectedOrder.value
-  if (!order?.workItems?.length) return []
-  return order.workItems.flatMap((wi) => wi.materials || [])
+  if (!order?.workItems?.length || !expandedWorkItemId.value) return []
+  const wi = order.workItems.find((w) => w.id === expandedWorkItemId.value)
+  return wi?.materials || []
 })
 
 const selfMadeMaterials = computed(() =>
@@ -371,18 +379,46 @@ function onPlanCompleteDateChange(date) {
 }
 
 watch(selectedOrder, (order) => {
-  if (!order) return
-  order.workItems?.forEach((wi) => {
+  if (!order) {
+    expandedWorkItemId.value = null
+    return
+  }
+  const items = order.workItems || []
+  const current = items.find((w) => w.id === expandedWorkItemId.value)
+  if (!current) {
+    const preferred = items.find((w) => w.expanded) || items[0]
+    expandedWorkItemId.value = preferred?.id || null
+  }
+  items.forEach((wi) => {
+    wi.expanded = wi.id === expandedWorkItemId.value
+    const baseQty = wi.salesQty ?? order.productQty
     const walk = (nodes) => {
       nodes?.forEach((m) => {
-        m.demandQty = calcDemandQty(m.unitUsage, order.productQty)
+        m.demandQty = calcDemandQty(m.unitUsage, baseQty)
         m.gapQty = calcGapQty(m.demandQty, m.availableStock)
+        if (m.planQty == null) m.planQty = m.gapQty
         if (m.children?.length) walk(m.children)
       })
     }
     walk(wi.materials)
   })
 })
+
+function toggleWorkItemExpand(record) {
+  const order = selectedOrder.value
+  if (!order) return
+  if (expandedWorkItemId.value === record.id) {
+    expandedWorkItemId.value = null
+    order.workItems?.forEach((w) => {
+      w.expanded = false
+    })
+    return
+  }
+  expandedWorkItemId.value = record.id
+  order.workItems?.forEach((w) => {
+    w.expanded = w.id === record.id
+  })
+}
 
 watch(filteredOrders, (list) => {
   if (!list.find((o) => o.id === selectedId.value)) {
@@ -427,12 +463,11 @@ function generatePurchaseReq() {
 }
 
 function handleWorkOrderSave(savedRows) {
-  const order = ordersData.value.find((o) => o.id === selectedId.value)
+  const order = productionPlanState.plans.find((o) => o.id === selectedId.value)
   if (!order) return
   savedRows.forEach((row) => {
     updateMaterialInOrder(order, row.materialId, patchMaterialFromWorkOrderRow(row))
   })
-  ordersData.value = [...ordersData.value]
   const created = addWorkOrdersFromPlanRows(savedRows, order)
   if (created.length) {
     message.success(`已同步 ${created.length} 条工单至生产工单`)
@@ -561,6 +596,10 @@ function handleReset() {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.ebom-empty {
+  margin: 16px 0 8px;
 }
 
 @media (max-width: 992px) {

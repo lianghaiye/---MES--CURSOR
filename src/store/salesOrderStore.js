@@ -5,6 +5,8 @@ import {
   addPurchaseRequisition,
   buildRequisitionFromSalesOrder,
 } from '@/store/purchaseRequisitionStore'
+import { getActiveBomForItem } from '@/store/productBomStore'
+import { createProductionPlanFromSalesOrder } from '@/store/productionPlanStore'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
 let orderSeq = 3
@@ -93,6 +95,33 @@ export function approveSalesOrder(id) {
   }
 
   let purchaseReqNo
+  let planOrderNo
+
+  if (order.businessType === '自产销售') {
+    for (const line of order.lineItems) {
+      if (!line.productId) {
+        return {
+          ok: false,
+          message: `订单「${order.orderNo}」明细「${line.productName || '未命名'}」未关联产品，请重新选择产品`,
+        }
+      }
+      const bom = getActiveBomForItem('product', line.productId)
+      if (!bom) {
+        return {
+          ok: false,
+          message: `产品「${line.productName}」无使用中的 BOM，请先在产品 BOM 中维护并启用`,
+        }
+      }
+      if (!line.bomId) {
+        line.bomId = bom.id
+        line.bomName = bom.bomName
+        line.bomVersion = bom.version
+      }
+    }
+    const plan = createProductionPlanFromSalesOrder(order)
+    planOrderNo = plan.orderNo
+  }
+
   if (order.businessType === '外购销售') {
     if (order.purchaseRequisitionNo) {
       return { ok: false, message: `订单「${order.orderNo}」已关联采购申请` }
@@ -111,6 +140,13 @@ export function approveSalesOrder(id) {
       ok: true,
       message: `订单「${order.orderNo}」审核通过，已自动生成采购申请 ${purchaseReqNo}`,
       purchaseReqNo,
+    }
+  }
+  if (planOrderNo) {
+    return {
+      ok: true,
+      message: `订单「${order.orderNo}」审核通过，已自动生成生产计划任务（待下达）`,
+      planOrderNo,
     }
   }
   return { ok: true, message: `订单「${order.orderNo}」审核通过` }

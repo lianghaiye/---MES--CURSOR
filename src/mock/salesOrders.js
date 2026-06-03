@@ -5,8 +5,10 @@ function createLineItem(partial = {}) {
   return {
     id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     productAttr: '',
+    productId: '',
     productName: '',
     productCode: '',
+    bomId: '',
     specAttr: '',
     specModel: '',
     material: '',
