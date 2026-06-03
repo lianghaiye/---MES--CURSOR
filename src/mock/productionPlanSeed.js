@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import { cloneOrders } from '@/mock/orders'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
-import { catalogBomIdForProduct } from '@/mock/productBomSeed'
+import { catalogBomIdForProduct, hydrateCatalogBom } from '@/mock/productBomSeed'
 
 function mapUrgencyToPlan(urgency) {
   if (urgency === '紧急' || urgency === '加急') return urgency === '加急' ? '加急' : '紧急'
@@ -22,7 +22,8 @@ function buildPlanFromSalesOrder(salesOrder, bomsById) {
 
   const workItems = lineItems.map((line, index) => {
     const bomId = line.bomId || catalogBomIdForProduct(line.productId)
-    const bom = bomsById.get(bomId)
+    const bomRaw = bomsById.get(bomId)
+    const bom = bomRaw ? hydrateCatalogBom(bomRaw) : null
     const salesQty = Number(line.salesQty) || 1
     const snapshot = bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [] }
 

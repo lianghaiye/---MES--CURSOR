@@ -1,7 +1,12 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
-import { buildCatalogProductBoms } from '@/mock/productBomSeed'
+import {
+  buildCatalogProductBoms,
+  hydrateCatalogBom,
+  isCatalogSeedBom,
+} from '@/mock/productBomSeed'
+import { safeRemoveItem, safeSetItem } from '@/utils/safeStorage'
 import { isBomProductionReady } from '@/mock/productBomOptions'
 import {
   formatBomVersion,
@@ -10,7 +15,7 @@ import {
 } from '@/utils/bomVersion'
 
 const STORAGE_KEY = 'i_doms_product_bom'
-const DATA_VERSION = 4
+const DATA_VERSION = 5
 let bomNoSeq = 31000
 
 const VALID_STATUSES = ['待启用', '使用中', '已归档']
@@ -32,21 +37,44 @@ function loadFromStorage() {
       if (parsed.version === DATA_VERSION && Array.isArray(parsed.boms)) {
         return normalizeBoms(parsed.boms)
       }
-      if (Array.isArray(parsed.boms)) {
-        return normalizeBoms(parsed.boms)
-      }
     }
   } catch {
-    /* ignore */
+    safeRemoveItem(STORAGE_KEY)
   }
   return null
 }
 
+/** 目录种子 BOM 不落库树结构，避免撑爆 localStorage */
+function serializeBomForStorage(bom) {
+  if (!isCatalogSeedBom(bom)) return bom
+  return {
+    ...bom,
+    seedSource: 'catalog',
+    treeNodes: [],
+    lineItems: [],
+    columnSettings: [],
+  }
+}
+
+function serializeBomsForStorage(boms) {
+  return boms.map(serializeBomForStorage)
+}
+
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ version: DATA_VERSION, boms: productBomState.boms }),
-  )
+  const payload = JSON.stringify({
+    version: DATA_VERSION,
+    boms: serializeBomsForStorage(productBomState.boms),
+  })
+  if (safeSetItem(STORAGE_KEY, payload)) return
+
+  safeRemoveItem(STORAGE_KEY)
+  safeSetItem(STORAGE_KEY, payload)
+}
+
+function ensureBomStructure(bom) {
+  if (!bom) return bom
+  if (isCatalogSeedBom(bom)) return hydrateCatalogBom(bom, mockProducts)
+  return bom
 }
 
 function loadInitialBoms() {
@@ -89,16 +117,18 @@ function versionsInGroup(versionGroupId) {
 }
 
 export function getProductBomById(id) {
-  return productBomState.boms.find((b) => b.id === id) || null
+  const row = productBomState.boms.find((b) => b.id === id)
+  return row ? ensureBomStructure(row) : null
 }
 
 export function getActiveBomForItem(itemType, itemId) {
-  return productBomState.boms.find(
+  const row = productBomState.boms.find(
     (b) =>
       b.itemType === itemType &&
       b.itemId === itemId &&
       b.status === '使用中',
   )
+  return row ? ensureBomStructure(row) : null
 }
 
 function archiveActiveForItem(itemType, itemId, exceptId) {
@@ -185,7 +215,7 @@ export function createBomNewVersion(sourceId) {
   const ver = buildVersion(source.itemType, source.itemId, source.versionGroupId)
   const ts = nowStr()
   const record = {
-    ...JSON.parse(JSON.stringify(source)),
+    ...JSON.parse(JSON.stringify(ensureBomStructure(source))),
     id: `bom-${Date.now()}`,
     bomNo: generateBomNo(),
     ...ver,
@@ -258,7 +288,7 @@ export function cloneProductBom(id) {
   const ver = buildVersion(source.itemType, source.itemId, `bom-grp-${Date.now()}`)
   const ts = nowStr()
   const cloned = {
-    ...JSON.parse(JSON.stringify(source)),
+    ...JSON.parse(JSON.stringify(ensureBomStructure(source))),
     id: `bom-${Date.now()}`,
     versionGroupId: `bom-grp-${Date.now()}`,
     bomNo: generateBomNo(),

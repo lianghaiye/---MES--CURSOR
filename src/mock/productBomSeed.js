@@ -62,20 +62,50 @@ function cloneTemplateForProduct(template, product, index) {
   }
 }
 
+export function isCatalogSeedBom(bom) {
+  return bom?.seedSource === 'catalog' || String(bom?.id || '').startsWith('bom-catalog-')
+}
+
+/** 按需为目录种子 BOM 填充树结构（内存中，不写入 localStorage） */
+export function hydrateCatalogBom(bom, products) {
+  if (!bom || !isCatalogSeedBom(bom)) return bom
+  if (bom.treeNodes?.length && bom.lineItems?.length) return bom
+
+  const template = getBaseTemplate()
+  if (!template) return bom
+
+  const list = products || []
+  const index = list.findIndex((p) => p.id === bom.itemId)
+  const product =
+    index >= 0
+      ? list[index]
+      : {
+          id: bom.itemId,
+          code: bom.itemCode,
+          name: bom.itemName,
+          specModel: bom.specModel || '',
+        }
+
+  const { treeNodes, lineItems } = cloneTemplateForProduct(
+    template,
+    product,
+    index >= 0 ? index : 0,
+  )
+  bom.treeNodes = treeNodes
+  bom.lineItems = lineItems
+  return bom
+}
+
 /**
- * 为产品库中每个产品生成一条「使用中」的产品 BOM（唯一对应）
+ * 为产品库中每个产品生成一条「使用中」的产品 BOM 元数据（树结构按需 hydrate）
  * @param {Array} products mockProducts / productInfoState.products
  */
 export function buildCatalogProductBoms(products) {
-  const template = getBaseTemplate()
-  if (!template) return []
-
   const year = getBomVersionYear()
   const version = formatBomVersion(year, 1)
   const ts = dayjs().format('YYYY-MM-DD HH:mm')
 
   return products.map((product, index) => {
-    const { treeNodes, lineItems } = cloneTemplateForProduct(template, product, index)
     const created = dayjs('2026-01-01').add(index % 90, 'day')
 
     return {
@@ -101,8 +131,10 @@ export function buildCatalogProductBoms(products) {
       remark: '',
       bomType: '基础BOM',
       specModel: product.specModel || '',
-      treeNodes,
-      lineItems,
+      seedSource: 'catalog',
+      catalogTemplateKey: 'isg50-standard',
+      treeNodes: [],
+      lineItems: [],
       templateRef: {
         bomId: `bom-catalog-${product.id}`,
         bomNo: `BOM${String(100000 + index).slice(-6)}`,
