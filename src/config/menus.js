@@ -23,8 +23,14 @@ export const moreModules = [
 export const sideMenus = {
   home: [{ key: 'dashboard', label: '工作台', path: '/home/dashboard' }],
   'product-process': [
-    { key: 'bom', label: 'BOM 管理', path: '/product-process/bom' },
+    { key: 'materials', label: '物料信息', path: '/product-process/materials' },
+    { key: 'products', label: '产品信息', path: '/product-process/products' },
+    { key: 'bom', label: '产品BOM', path: '/product-process/bom' },
     { key: 'routing', label: '工艺路线', path: '/product-process/routing' },
+    { key: 'process-config', label: '工序配置', path: '/product-process/process-config' },
+    { key: 'process-doc', label: '工艺文件', path: '/product-process/process-doc' },
+    { key: 'process-category', label: '工序分类', path: '/product-process/process-category' },
+    { key: 'process-form', label: '工序表单模板', path: '/product-process/process-form' },
   ],
   sales: [
     { key: 'orders', label: '销售订单', path: '/sales/orders' },
@@ -74,8 +80,14 @@ export function resolveModuleKey(path) {
 /** 路由 meta.title 映射 */
 export const routeTitles = {
   '/home/dashboard': '首页',
-  '/product-process/bom': 'BOM 管理',
+  '/product-process/materials': '物料信息',
+  '/product-process/products': '产品信息',
+  '/product-process/bom': '产品BOM',
   '/product-process/routing': '工艺路线',
+  '/product-process/process-config': '工序配置',
+  '/product-process/process-doc': '工艺文件',
+  '/product-process/process-category': '工序分类',
+  '/product-process/process-form': '工序表单模板',
   '/sales/orders': '销售订单',
   '/sales/customers': '客户档案',
   '/planning/production-plan': '生产计划',

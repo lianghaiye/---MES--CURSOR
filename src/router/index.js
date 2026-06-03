@@ -24,8 +24,38 @@ const routes = [
     redirect: '/home/dashboard',
     children: [
       { path: 'home/dashboard', ...emptyChild('home-dashboard', '首页') },
-      { path: 'product-process/bom', ...emptyChild('product-bom', 'BOM 管理') },
+      {
+        path: 'product-process/materials',
+        name: 'product-process-materials',
+        component: () => import('@/views/product-process/MaterialInfoView.vue'),
+        meta: { title: '物料信息' },
+      },
+      {
+        path: 'product-process/products',
+        name: 'product-process-products',
+        component: () => import('@/views/product-process/ProductInfoView.vue'),
+        meta: { title: '产品信息' },
+      },
+      {
+        path: 'product-process/bom',
+        name: 'product-process-bom',
+        component: () => import('@/views/product-process/ProductBomView.vue'),
+        meta: { title: '产品BOM' },
+      },
       { path: 'product-process/routing', ...emptyChild('product-routing', '工艺路线') },
+      {
+        path: 'product-process/process-config',
+        ...emptyChild('product-process-config', '工序配置'),
+      },
+      { path: 'product-process/process-doc', ...emptyChild('product-process-doc', '工艺文件') },
+      {
+        path: 'product-process/process-category',
+        ...emptyChild('product-process-category', '工序分类'),
+      },
+      {
+        path: 'product-process/process-form',
+        ...emptyChild('product-process-form', '工序表单模板'),
+      },
       {
         path: 'sales/orders',
         name: 'sales-orders',
@@ -68,6 +98,12 @@ const routes = [
         component: () => import('@/views/quality/FactoryQcView.vue'),
         meta: { title: '出厂质检' },
       },
+      {
+        path: 'quality/factory-qc/:id',
+        name: 'quality-factory-qc-detail',
+        component: () => import('@/views/quality/FactoryQcDetailView.vue'),
+        meta: { title: '出厂质检详情' },
+      },
       { path: 'quality/inspection', redirect: '/quality/factory-qc' },
       { path: 'quality/defect', ...emptyChild('quality-defect', '不良品') },
       {
@@ -75,6 +111,12 @@ const routes = [
         name: 'procurement-purchase-req',
         component: () => import('@/views/procurement/PurchaseRequisitionView.vue'),
         meta: { title: '采购申请' },
+      },
+      {
+        path: 'procurement/purchase-req/:id',
+        name: 'procurement-purchase-req-detail',
+        component: () => import('@/views/procurement/PurchaseRequisitionDetailView.vue'),
+        meta: { title: '采购申请详情' },
       },
       {
         path: 'procurement/purchase-orders',

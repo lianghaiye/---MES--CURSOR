@@ -101,7 +101,12 @@
             <span v-else>-</span>
           </template>
           <template v-else-if="column.key === 'qcNo'">
-            {{ record.qcNo || '-' }}
+            <a
+              v-if="record.qcNo"
+              class="link-qc-no"
+              @click.prevent="openDetail(record)"
+            >{{ record.qcNo }}</a>
+            <span v-else>-</span>
           </template>
           <template v-else-if="column.key === 'action'">
             <a-button
@@ -147,6 +152,7 @@ export default { name: 'FactoryQcView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, StopOutlined } from '@ant-design/icons-vue'
 import { filterFactoryQcRecords } from '@/mock/factoryQcRecords'
@@ -159,6 +165,8 @@ import {
 import { qcStatusOptions, qcResultOptions } from '@/mock/factoryQcOptions'
 import CreateFactoryQcModal from './components/CreateFactoryQcModal.vue'
 import FactoryQcInspectModal from './components/FactoryQcInspectModal.vue'
+
+const router = useRouter()
 
 const filters = reactive({
   qcStatus: undefined,
@@ -215,6 +223,14 @@ function statusColor(status) {
 function resultColor(result) {
   const map = { 质检通过: 'success', 质检不通过: 'error', 部分通过: 'warning' }
   return map[result] || 'default'
+}
+
+function openDetail(record) {
+  const { href } = router.resolve({
+    name: 'quality-factory-qc-detail',
+    params: { id: record.id },
+  })
+  window.open(href, '_blank')
 }
 
 function handleSearch() {
@@ -328,6 +344,15 @@ function handleTerminate() {
 
 .action-disabled {
   color: rgba(0, 0, 0, 0.25);
+}
+
+.link-qc-no {
+  color: #1677ff;
+  cursor: pointer;
+
+  &:hover {
+    color: #4096ff;
+  }
 }
 
 .table-pagination {

@@ -144,7 +144,7 @@
             </span>
           </template>
           <template v-else-if="column.key === 'reqNo'">
-            <a class="link-code">{{ record.reqNo }}</a>
+            <a class="link-code" @click.prevent="openDetail(record)">{{ record.reqNo }}</a>
           </template>
           <template v-else-if="column.key === 'plannedQty'">
             {{ formatQty(record.plannedQty) }}
@@ -200,6 +200,7 @@ export default { name: 'PurchaseRequisitionView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -227,6 +228,8 @@ import {
 } from '@/mock/purchaseRequisitionOptions'
 import CreatePurchaseRequisitionModal from './components/CreatePurchaseRequisitionModal.vue'
 import GeneratePurchaseOrderModal from './components/GeneratePurchaseOrderModal.vue'
+
+const router = useRouter()
 
 const filters = reactive({
   reqNo: '',
@@ -325,6 +328,14 @@ function docStatusColor(status) {
     已作废: 'default',
   }
   return map[status] || 'default'
+}
+
+function openDetail(record) {
+  const { href } = router.resolve({
+    name: 'procurement-purchase-req-detail',
+    params: { id: record.id },
+  })
+  window.open(href, '_blank')
 }
 
 function handleSearch() {
@@ -525,6 +536,11 @@ function handleInvalidate() {
 
 .link-code {
   color: #1677ff;
+  cursor: pointer;
+
+  &:hover {
+    color: #4096ff;
+  }
 }
 
 .overdue {

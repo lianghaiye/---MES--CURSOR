@@ -92,6 +92,10 @@ export function getRequisitionsByIds(ids) {
   return purchaseRequisitionState.requisitions.filter((r) => ids.includes(r.id))
 }
 
+export function getPurchaseRequisitionById(id) {
+  return purchaseRequisitionState.requisitions.find((r) => r.id === id) || null
+}
+
 /** 从生产计划物料生成采购申请 */
 export function buildRequisitionFromMaterials(materials, sourceOrder) {
   const now = dayjs()
