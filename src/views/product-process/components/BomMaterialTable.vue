@@ -2,7 +2,7 @@
   <div class="bom-material-table">
     <div class="table-toolbar">
       <span class="toolbar-title">物料清单</span>
-      <a-space :size="4">
+      <a-space v-if="!readonly" :size="4">
         <a-tooltip title="刷新">
           <a-button type="text" size="small" @click="emit('refresh')">
             <ReloadOutlined />
@@ -22,10 +22,15 @@
       size="small"
       bordered
       :pagination="false"
-      :scroll="{ x: scrollX }"
+      :scroll="lines.length ? { x: scrollX } : undefined"
     >
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+        <template v-else-if="readonly">
+          <template v-if="column.key === 'unitQty'">{{ formatQty(record.unitQty) }}</template>
+          <template v-else-if="column.key === 'unitPrice'">{{ formatPrice(record.unitPrice) }}</template>
+          <template v-else>{{ record[column.dataIndex] ?? record[column.key] ?? '—' }}</template>
+        </template>
         <template v-else-if="column.key === 'unitQty'">
           <a-input-number
             v-model:value="record.unitQty"
@@ -142,7 +147,18 @@ import { unitOptions, processDocOptions, processRouteOptions } from '@/mock/bomM
 const props = defineProps({
   lines: { type: Array, default: () => [] },
   columnSettings: { type: Array, default: () => [] },
+  readonly: { type: Boolean, default: false },
 })
+
+function formatQty(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toFixed(2)
+}
+
+function formatPrice(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toFixed(4)
+}
 
 const emit = defineEmits([
   'refresh',
@@ -191,7 +207,9 @@ const tableColumns = computed(() => {
       fixed: c.frozen ? 'left' : undefined,
       ellipsis: ['itemName', 'remark', 'material'].includes(c.key),
     })),
-    { title: '操作', key: 'action', width: 140, fixed: 'right' },
+    ...(props.readonly
+      ? []
+      : [{ title: '操作', key: 'action', width: 140, fixed: 'right' }]),
   ]
   return cols
 })

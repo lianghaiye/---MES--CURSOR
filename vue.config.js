@@ -9,6 +9,13 @@ module.exports = defineConfig({
   devServer: {
     port: 8080,
     open: true,
+    client: {
+      overlay: {
+        errors: true,
+        warnings: false,
+        runtimeErrors: (error) => !/ResizeObserver loop/.test(error?.message || ''),
+      },
+    },
   },
   css: {
     loaderOptions: {

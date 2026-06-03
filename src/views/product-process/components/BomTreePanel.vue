@@ -1,6 +1,12 @@
 <template>
   <div class="bom-tree-panel">
-    <a-button type="primary" block class="tpl-btn" @click="emit('import-template')">
+    <a-button
+      v-if="!readonly"
+      type="primary"
+      block
+      class="tpl-btn"
+      @click="emit('import-template')"
+    >
       从模板创建
     </a-button>
     <div class="tree-wrap">
@@ -25,7 +31,7 @@
               <a-tag v-if="node.isKeyPart" color="error" class="key-tag">关键件</a-tag>
             </span>
             <span
-              v-if="hoverKey === node.key && !node.isRoot"
+              v-if="!readonly && hoverKey === node.key && !node.isRoot"
               class="node-actions"
               @click.stop
             >
@@ -37,7 +43,7 @@
               </a-button>
             </span>
             <span
-              v-else-if="hoverKey === node.key && node.isRoot"
+              v-else-if="!readonly && hoverKey === node.key && node.isRoot"
               class="node-actions"
               @click.stop
             >
@@ -50,21 +56,23 @@
       </a-tree>
       <a-empty v-else :image="false" description="请选择产品/物料作为根节点" />
     </div>
-    <div v-if="templateRef?.version" class="tree-footer">
-      <div>引用BOM版本：{{ templateRef.version }}</div>
-      <div>生效日期：{{ templateRef.effectiveAt }}</div>
+    <div v-if="versionInfo?.version || templateRef?.version" class="tree-footer">
+      <div>BOM版本：{{ versionInfo?.version || templateRef?.version }}</div>
+      <div>生效日期：{{ versionInfo?.effectiveAt || templateRef?.effectiveAt || '—' }}</div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { buildAntTreeData } from '@/utils/bomTree'
 
 const props = defineProps({
   flatNodes: { type: Array, default: () => [] },
   selectedNodeId: { type: String, default: '' },
   templateRef: { type: Object, default: null },
+  readonly: { type: Boolean, default: false },
+  versionInfo: { type: Object, default: null },
 })
 
 const emit = defineEmits(['import-template', 'add-child', 'delete-node', 'select-node', 'update:expandedKeys'])
@@ -94,9 +102,11 @@ const selectedKeys = computed(() =>
 )
 
 watch(
-  () => props.flatNodes.length,
+  () => props.flatNodes.map((n) => n.id).join(','),
   () => {
-    expandedKeys.value = props.flatNodes.map((n) => n.id)
+    nextTick(() => {
+      expandedKeys.value = props.flatNodes.map((n) => n.id)
+    })
   },
   { immediate: true },
 )

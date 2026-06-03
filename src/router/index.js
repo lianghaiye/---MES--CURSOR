@@ -48,6 +48,12 @@ const routes = [
         component: () => import('@/views/product-process/ProductBomCreateView.vue'),
         meta: { title: '新增BOM' },
       },
+      {
+        path: 'product-process/bom/:id',
+        name: 'product-process-bom-detail',
+        component: () => import('@/views/product-process/ProductBomDetailView.vue'),
+        meta: { title: 'BOM详情' },
+      },
       { path: 'product-process/routing', ...emptyChild('product-routing', '工艺路线') },
       {
         path: 'product-process/process-config',

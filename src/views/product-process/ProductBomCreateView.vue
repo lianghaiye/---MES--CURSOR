@@ -103,6 +103,8 @@
     <ImportBomTemplateModal
       v-model:open="templateModalOpen"
       :has-root="hasRoot"
+      :flat-nodes="flatNodes"
+      :line-items="lineItems"
       @imported="onTemplateImported"
     />
     <SelectBomMaterialModal
@@ -134,10 +136,10 @@ import {
   getLinesForTreeNode,
   addChildMaterial,
   deleteTreeNode,
-  mergeTemplateIntoRoot,
   ROOT_ID,
   isRootNode,
 } from '@/utils/bomTree'
+import { syncRootNodeFromItem } from '@/utils/bomImport'
 import { useTabs } from '@/composables/useTabs'
 import BomTreePanel from './components/BomTreePanel.vue'
 import BomMaterialTable from './components/BomMaterialTable.vue'
@@ -221,15 +223,27 @@ function onItemChange(val) {
   form.specModel = opt.specModel
   if (!form.bomName) form.bomName = `${opt.itemName} BOM`
 
-  const root = createRootTreeNode({
-    itemCode: opt.itemCode,
-    itemName: opt.itemName,
-    specModel: opt.specModel,
-    bomName: form.bomName,
-  })
-  flatNodes.value = [root]
-  lineItems.value = []
-  selectedNodeId.value = ROOT_ID
+  const hadRoot = hasRoot.value
+  if (hadRoot) {
+    flatNodes.value = syncRootNodeFromItem(flatNodes.value, {
+      itemCode: opt.itemCode,
+      itemName: opt.itemName,
+      specModel: opt.specModel,
+      bomName: form.bomName,
+    })
+    lineItems.value = []
+    selectedNodeId.value = ROOT_ID
+  } else {
+    const root = createRootTreeNode({
+      itemCode: opt.itemCode,
+      itemName: opt.itemName,
+      specModel: opt.specModel,
+      bomName: form.bomName,
+    })
+    flatNodes.value = [root]
+    lineItems.value = []
+    selectedNodeId.value = ROOT_ID
+  }
   templateRef.value = null
 }
 
@@ -284,11 +298,13 @@ function onChangeLine(line) {
   message.info('请选择物料以替换当前行')
 }
 
-function onTemplateImported(data) {
-  const merged = mergeTemplateIntoRoot(flatNodes.value, lineItems.value, data)
-  flatNodes.value = merged.flatNodes
-  lineItems.value = merged.lineItems
-  templateRef.value = merged.templateRef
+function onTemplateImported(result) {
+  if (result.mode === 'full') {
+    Object.assign(form, result.basicInfo)
+  }
+  flatNodes.value = result.flatNodes
+  lineItems.value = result.lineItems
+  templateRef.value = result.templateRef
   selectedNodeId.value = ROOT_ID
 }
 
@@ -334,7 +350,7 @@ async function handleSave() {
       templateRef: templateRef.value,
       columnSettings: columnSettings.value,
     })
-    message.success('BOM 已保存，状态为待发布，请进行审核发布')
+    message.success('BOM 已保存，状态为待启用，可在列表中启用')
     const path = '/product-process/bom'
     closeTab('/product-process/bom/new')
     router.push(path)

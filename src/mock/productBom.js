@@ -2,7 +2,7 @@ import dayjs from 'dayjs'
 import { pumpProductNames, pumpMaterialNames } from '@/mock/pumpIndustryNames'
 import { formatBomVersion, getBomVersionYear } from '@/utils/bomVersion'
 
-const statuses = ['使用中', '待启用', '已归档', '待发布']
+const statuses = ['使用中', '待启用', '已归档']
 const operators = ['admin', '张三', '李四']
 
 function pickItem(index) {

@@ -68,6 +68,10 @@
           <PlusOutlined />
           新增
         </a-button>
+        <a-button size="small" @click="handleBatchEnable">
+          <CheckOutlined />
+          启用
+        </a-button>
         <a-button size="small" @click="handleBatchArchive">
           <InboxOutlined />
           归档
@@ -114,7 +118,10 @@
             <a-tag :color="bomStatusColor(record.status)">{{ record.status }}</a-tag>
           </template>
           <template v-else-if="column.key === 'bomName'">
-            <a class="link-name" @click.prevent="openVersionDrawer(record)">{{ record.bomName }}</a>
+            <a class="link-name" @click.prevent="openDetail(record)">{{ record.bomName }}</a>
+          </template>
+          <template v-else-if="column.key === 'version'">
+            <a class="link-name" @click.prevent="openVersionDrawer(record)">{{ record.version }}</a>
           </template>
           <template v-else-if="column.key === 'isDefault'">
             <a-tag :color="record.isDefault ? 'success' : 'error'">
@@ -122,32 +129,22 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space :size="0" wrap>
-              <a-button
-                v-if="record.status === '待发布'"
-                type="link"
-                size="small"
-                @click="openEdit(record)"
-              >
+            <a-space v-if="record.status === '待启用'" :size="0" wrap>
+              <a-button type="link" size="small" @click="openEdit(record)">
                 <EditOutlined />
                 编辑
               </a-button>
-              <a-button
-                v-if="canDelete(record)"
-                type="link"
-                size="small"
-                danger
-                @click="confirmDelete(record)"
-              >
+              <a-button type="link" size="small" danger @click="confirmDelete(record)">
                 <DeleteOutlined />
                 删除
               </a-button>
-              <a-button
-                v-if="record.status !== '已归档'"
-                type="link"
-                size="small"
-                @click="handleArchive(record)"
-              >
+              <a-button type="link" size="small" @click="handleEnable(record)">
+                <CheckOutlined />
+                启用
+              </a-button>
+            </a-space>
+            <a-space v-else-if="record.status === '使用中'" :size="0" wrap>
+              <a-button type="link" size="small" @click="handleArchive(record)">
                 <InboxOutlined />
                 归档
               </a-button>
@@ -155,34 +152,14 @@
                 <CopyOutlined />
                 克隆
               </a-button>
-              <a-button
-                v-if="record.status === '待发布'"
-                type="link"
-                size="small"
-                @click="openAudit(record)"
-              >
-                <AuditOutlined />
-                审核发布
-              </a-button>
-              <a-button
-                v-if="record.status === '待启用'"
-                type="link"
-                size="small"
-                @click="handleEnable(record)"
-              >
-                <CheckOutlined />
-                启用
-              </a-button>
-              <a-button
-                v-if="record.status === '使用中' || record.status === '已归档'"
-                type="link"
-                size="small"
-                @click="handleNewVersion(record)"
-              >
-                <PlusCircleOutlined />
-                新版本
+            </a-space>
+            <a-space v-else-if="record.status === '已归档'" :size="0" wrap>
+              <a-button type="link" size="small" @click="handleClone(record)">
+                <CopyOutlined />
+                克隆
               </a-button>
             </a-space>
+            <span v-else class="action-disabled">—</span>
           </template>
         </template>
       </a-table>
@@ -206,7 +183,6 @@
       :edit-record="editRecord"
       @saved="onSaved"
     />
-    <ProductBomAuditModal v-model:open="auditOpen" :record="auditRecord" @done="onSaved" />
     <ProductBomVersionDrawer v-model:open="versionOpen" :record="versionRecord" />
   </div>
 </template>
@@ -231,8 +207,6 @@ import {
   DownloadOutlined,
   DownOutlined,
   CheckOutlined,
-  AuditOutlined,
-  PlusCircleOutlined,
 } from '@ant-design/icons-vue'
 import { filterProductBoms } from '@/mock/productBom'
 import { bomStatusOptions, bomStatusColor } from '@/mock/productBomOptions'
@@ -242,13 +216,12 @@ import {
   cloneProductBom,
   archiveProductBom,
   batchArchiveProductBom,
+  batchEnableProductBom,
   enableProductBom,
-  createBomNewVersion,
 } from '@/store/productBomStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import ProductBomFormModal from './components/ProductBomFormModal.vue'
-import ProductBomAuditModal from './components/ProductBomAuditModal.vue'
 import ProductBomVersionDrawer from './components/ProductBomVersionDrawer.vue'
 
 const router = useRouter()
@@ -264,10 +237,8 @@ const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 const formOpen = ref(false)
-const auditOpen = ref(false)
 const versionOpen = ref(false)
 const editRecord = ref(null)
-const auditRecord = ref(null)
 const versionRecord = ref(null)
 
 const itemFilterOptions = computed(() => {
@@ -313,7 +284,7 @@ const columns = [
   { title: '是否默认', key: 'isDefault', width: 88, align: 'center' },
   { title: '生效日期', dataIndex: 'effectiveAt', width: 150 },
   { title: '失效日期', dataIndex: 'expiredAt', width: 150 },
-  { title: '操作', key: 'action', width: 280, fixed: 'right' },
+  { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
 
 function rowIndex(index) {
@@ -333,6 +304,15 @@ function handleReset() {
   handleSearch()
 }
 
+function openDetail(record) {
+  const resolved = router.resolve({
+    name: 'product-process-bom-detail',
+    params: { id: record.id },
+  })
+  openTab(resolved.path, record.bomName || 'BOM详情')
+  router.push(resolved)
+}
+
 function openCreate() {
   const path = '/product-process/bom/new'
   openTab(path, '新增BOM')
@@ -344,11 +324,6 @@ function openEdit(record) {
   formOpen.value = true
 }
 
-function openAudit(record) {
-  auditRecord.value = record
-  auditOpen.value = true
-}
-
 function openVersionDrawer(record) {
   versionRecord.value = record
   versionOpen.value = true
@@ -356,10 +331,6 @@ function openVersionDrawer(record) {
 
 function onSaved() {
   handleSearch()
-}
-
-function canDelete(record) {
-  return record.status === '待发布' || record.status === '已归档'
 }
 
 function confirmDelete(record) {
@@ -384,25 +355,58 @@ function handleArchive(record) {
   message.success('已归档')
 }
 
+function handleBatchEnable() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择要启用的 BOM')
+    return
+  }
+  const targets = productBomState.boms.filter(
+    (r) => selectedRowKeys.value.includes(r.id) && r.status === '待启用',
+  )
+  if (!targets.length) {
+    message.warning('所选记录中没有「待启用」状态的 BOM')
+    return
+  }
+  Modal.confirm({
+    title: '批量启用',
+    content: `确定启用选中的 ${targets.length} 条待启用 BOM 吗？同物品仅允许一个使用中版本。`,
+    onOk: () => {
+      const { ok, errors } = batchEnableProductBom(selectedRowKeys.value)
+      selectedRowKeys.value = []
+      if (ok) message.success(`已成功启用 ${ok} 条`)
+      if (errors.length) {
+        message.warning(errors.slice(0, 3).join('；') + (errors.length > 3 ? '…' : ''))
+      }
+    },
+  })
+}
+
 function handleBatchArchive() {
   if (!selectedRowKeys.value.length) {
     message.warning('请先选择要归档的 BOM')
     return
   }
+  const targets = productBomState.boms.filter(
+    (r) => selectedRowKeys.value.includes(r.id) && r.status !== '已归档',
+  )
+  if (!targets.length) {
+    message.warning('所选记录均已归档或不可归档')
+    return
+  }
   Modal.confirm({
     title: '批量归档',
-    content: `确定归档选中的 ${selectedRowKeys.value.length} 条 BOM 吗？`,
+    content: `确定归档选中的 ${targets.length} 条 BOM 吗？`,
     onOk: () => {
-      batchArchiveProductBom(selectedRowKeys.value)
+      const count = batchArchiveProductBom(selectedRowKeys.value)
       selectedRowKeys.value = []
-      message.success('已归档')
+      message.success(`已归档 ${count} 条`)
     },
   })
 }
 
 function handleClone(record) {
   const cloned = cloneProductBom(record.id)
-  if (cloned) message.success('已克隆为待发布版本')
+  if (cloned) message.success('已克隆为待启用版本')
 }
 
 function handleEnable(record) {
@@ -412,19 +416,6 @@ function handleEnable(record) {
     return
   }
   message.success('已启用，当前版本可用于生产')
-}
-
-function handleNewVersion(record) {
-  Modal.confirm({
-    title: '创建新版本',
-    content: `将基于「${record.version}」生成次版本号 +1 的待发布 BOM，需审核发布后方可用于生产。`,
-    onOk: () => {
-      const created = createBomNewVersion(record.id)
-      if (created) {
-        message.success(`已创建新版本 ${created.version}，状态：待发布`)
-      }
-    },
-  })
 }
 
 function onExportMenu({ key }) {
@@ -511,6 +502,11 @@ function onExportMenu({ key }) {
   &:hover {
     color: #4096ff;
   }
+}
+
+.action-disabled {
+  color: rgba(0, 0, 0, 0.25);
+  font-size: 13px;
 }
 
 .table-pagination {

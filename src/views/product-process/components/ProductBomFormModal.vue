@@ -36,7 +36,7 @@
       </a-form-item>
       <a-form-item v-if="isEdit" label="BOM版本">
         <span>{{ editRecord?.version }}</span>
-        <span class="version-hint">（待发布状态保存后不自动升版，请用列表「新版本」）</span>
+        <span class="version-hint">（待启用状态保存后不自动升版）</span>
       </a-form-item>
       <a-form-item v-else label="初始版本">
         <span>{{ previewVersion }}</span>
@@ -47,7 +47,7 @@
       <a-alert
         type="info"
         show-icon
-        message="保存后状态为「待发布」，需审核发布后方可用于生产；同一产品/物料同时仅允许一个「使用中」版本。"
+        message="保存后状态为「待启用」，需手动启用后方可用于生产；同一产品/物料同时仅允许一个「使用中」版本。"
         class="form-tip"
       />
     </a-form>
@@ -190,7 +190,7 @@ async function handleOk() {
       message.success('已保存')
     } else {
       addProductBom(payload)
-      message.success('已创建，状态为待发布，请进行审核发布')
+      message.success('已创建，状态为待启用，可在列表中启用')
     }
     emit('saved')
     emit('update:open', false)

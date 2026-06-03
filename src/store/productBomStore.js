@@ -9,8 +9,19 @@ import {
 } from '@/utils/bomVersion'
 
 const STORAGE_KEY = 'i_doms_product_bom'
-const DATA_VERSION = 2
+const DATA_VERSION = 3
 let bomNoSeq = 31000
+
+const VALID_STATUSES = ['待启用', '使用中', '已归档']
+
+function normalizeBomStatus(status) {
+  if (status === '待发布') return '待启用'
+  return VALID_STATUSES.includes(status) ? status : '待启用'
+}
+
+function normalizeBoms(boms) {
+  return boms.map((b) => ({ ...b, status: normalizeBomStatus(b.status) }))
+}
 
 function loadFromStorage() {
   try {
@@ -18,7 +29,10 @@ function loadFromStorage() {
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed.version === DATA_VERSION && Array.isArray(parsed.boms)) {
-        return parsed.boms
+        return normalizeBoms(parsed.boms)
+      }
+      if (Array.isArray(parsed.boms)) {
+        return normalizeBoms(parsed.boms)
       }
     }
   } catch {
@@ -65,6 +79,10 @@ function versionsInGroup(versionGroupId) {
   return productBomState.boms
     .filter((b) => b.versionGroupId === versionGroupId)
     .map((b) => b.version)
+}
+
+export function getProductBomById(id) {
+  return productBomState.boms.find((b) => b.id === id) || null
 }
 
 export function getActiveBomForItem(itemType, itemId) {
@@ -122,7 +140,7 @@ export function addProductBom(payload) {
     itemName: payload.itemName,
     itemCode: payload.itemCode,
     ...ver,
-    status: '待发布',
+    status: '待启用',
     isDefault: false,
     effectiveAt: '',
     expiredAt: '',
@@ -146,14 +164,14 @@ export function updateProductBom(id, patch) {
   const idx = productBomState.boms.findIndex((b) => b.id === id)
   if (idx === -1) return null
   const row = productBomState.boms[idx]
-  if (row.status !== '待发布') {
-    return { error: '仅待发布状态的 BOM 可直接编辑，已生效版本请使用「新版本」升版' }
+  if (row.status !== '待启用') {
+    return { error: '仅待启用状态的 BOM 可编辑' }
   }
   Object.assign(row, patch, { updatedAt: nowStr(), operator: 'admin' })
   return row
 }
 
-/** 基于当前记录生成次版本+1 的待发布新版本 */
+/** 基于当前记录生成次版本+1 的待启用新版本 */
 export function createBomNewVersion(sourceId) {
   const source = productBomState.boms.find((b) => b.id === sourceId)
   if (!source) return null
@@ -164,7 +182,7 @@ export function createBomNewVersion(sourceId) {
     id: `bom-${Date.now()}`,
     bomNo: generateBomNo(),
     ...ver,
-    status: '待发布',
+    status: '待启用',
     isDefault: false,
     effectiveAt: '',
     expiredAt: '',
@@ -175,39 +193,6 @@ export function createBomNewVersion(sourceId) {
   }
   productBomState.boms.unshift(record)
   return record
-}
-
-/** 审核发布：通过后变为使用中，并保证同物品仅一条生效 */
-export function auditPublishBom(id, { approved, asPendingEnable = false } = {}) {
-  const row = productBomState.boms.find((b) => b.id === id)
-  if (!row) return { error: '记录不存在' }
-  if (row.status !== '待发布') return { error: '仅待发布状态可审核发布' }
-  if (!approved) {
-    row.updatedAt = nowStr()
-    return row
-  }
-
-  const ts = nowStr()
-  if (asPendingEnable) {
-    row.status = '待启用'
-    row.updatedAt = ts
-    row.operator = 'admin'
-    return row
-  }
-
-  archiveActiveForItem(row.itemType, row.itemId, row.id)
-  productBomState.boms.forEach((b) => {
-    if (b.itemType === row.itemType && b.itemId === row.itemId) {
-      b.isDefault = false
-    }
-  })
-  row.status = '使用中'
-  row.isDefault = true
-  row.effectiveAt = ts
-  row.expiredAt = ''
-  row.updatedAt = ts
-  row.operator = 'admin'
-  return row
 }
 
 export function enableProductBom(id) {
@@ -272,7 +257,7 @@ export function cloneProductBom(id) {
     bomNo: generateBomNo(),
     bomName: `${source.bomName}-克隆`,
     ...ver,
-    status: '待发布',
+    status: '待启用',
     isDefault: false,
     effectiveAt: '',
     expiredAt: '',
@@ -286,5 +271,24 @@ export function cloneProductBom(id) {
 }
 
 export function batchArchiveProductBom(ids) {
-  ids.forEach((id) => archiveProductBom(id))
+  let count = 0
+  ids.forEach((id) => {
+    const row = productBomState.boms.find((b) => b.id === id)
+    if (!row || row.status === '已归档') return
+    if (archiveProductBom(id)) count += 1
+  })
+  return count
+}
+
+export function batchEnableProductBom(ids) {
+  let ok = 0
+  const errors = []
+  ids.forEach((id) => {
+    const row = productBomState.boms.find((b) => b.id === id)
+    if (!row || row.status !== '待启用') return
+    const res = enableProductBom(id)
+    if (res?.error) errors.push(`${row.bomNo}: ${res.error}`)
+    else ok += 1
+  })
+  return { ok, errors }
 }
