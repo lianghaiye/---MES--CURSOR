@@ -102,7 +102,7 @@
         />
       </a-tab-pane>
       <a-tab-pane key="detail" tab="工单详情">
-        <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
+        <WorkOrderDetailTab :work-order="workOrder" @action="emit('detail-action', $event)" />
       </a-tab-pane>
       <template v-if="variant === 'production'">
         <a-tab-pane key="ebom" tab="EBOM">
@@ -125,6 +125,7 @@ import { DownOutlined, UpOutlined } from '@ant-design/icons-vue'
 import { workOrderState } from '@/store/workOrderStore'
 import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
 import WorkOrderDispatchTab from './WorkOrderDispatchTab.vue'
+import WorkOrderDetailTab from './WorkOrderDetailTab.vue'
 
 const props = defineProps({
   workOrderId: { type: String, default: null },
@@ -146,7 +147,13 @@ const workOrder = computed(() => {
 const detailTab = defineModel('detailTab', { type: String, default: 'dispatch' })
 const detailCollapsed = defineModel('detailCollapsed', { type: Boolean, default: false })
 
-const emit = defineEmits(['save-basic', 'plan-date-change', 'dispatch', 'cancel-dispatch'])
+const emit = defineEmits([
+  'save-basic',
+  'plan-date-change',
+  'dispatch',
+  'cancel-dispatch',
+  'detail-action',
+])
 </script>
 
 <style lang="less" scoped>

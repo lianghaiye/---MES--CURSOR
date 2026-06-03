@@ -42,6 +42,16 @@ export const processRouteMaster = {
       { name: '探伤', code: 'OP-TS-04', icon: 'ScanOutlined', hasFeeding: false },
     ],
   },
+  蒸馏生产路线: {
+    id: 'route-distill',
+    name: '蒸馏生产路线',
+    steps: [
+      { name: '配比', code: 'OP-PB-01', icon: 'ExperimentOutlined', hasFeeding: true },
+      { name: '蒸馏冷却', code: 'OP-ZL-02', icon: 'CloudOutlined', hasFeeding: false },
+      { name: '质检', code: 'OP-ZJ-03', icon: 'AuditOutlined', hasFeeding: false },
+      { name: '入库', code: 'OP-RK-04', icon: 'InboxOutlined', hasFeeding: false },
+    ],
+  },
 }
 
 export function buildProcessesFromRoute(routeName) {

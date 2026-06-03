@@ -193,6 +193,7 @@
           @plan-date-change="onPlanDateChange"
           @dispatch="handleDispatch"
           @cancel-dispatch="handleDispatchCancel"
+          @detail-action="onDetailAction"
         />
       </div>
 
@@ -219,7 +220,7 @@
       <a-drawer
         v-model:open="detailDrawerOpen"
         :title="selectedOrder ? `${selectedOrder.code} · ${selectedOrder.name}` : '工单详情'"
-        width="960"
+        width="1200"
         destroy-on-close
         class="work-order-detail-drawer"
       >
@@ -238,6 +239,7 @@
           @plan-date-change="onPlanDateChange"
           @dispatch="handleDispatch"
           @cancel-dispatch="handleDispatchCancel"
+          @detail-action="onDetailAction"
         />
       </a-drawer>
     </template>
@@ -619,6 +621,14 @@ function confirmUrgency() {
     message.success('紧急度已调整')
   }
   urgencyModalOpen.value = false
+}
+
+function onDetailAction({ key, workOrder: wo }) {
+  if (key === 'urgency' && wo) {
+    urgencyTargetId.value = wo.id
+    urgencyDraft.value = wo.urgency
+    urgencyModalOpen.value = true
+  }
 }
 </script>
 

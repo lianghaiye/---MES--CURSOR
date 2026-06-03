@@ -27,9 +27,52 @@ function generateCode() {
   return code
 }
 
+const DEMO_ORDER_ID = 'wo-init-demo'
+
+function createDemoWorkOrder() {
+  const routeName = '蒸馏生产路线'
+  return {
+    id: DEMO_ORDER_ID,
+    code: 'T-HHHSCGD20260531002',
+    name: '衡环(毛坯) 260531生产工单',
+    productName: '衡环(毛坯)',
+    orderCategory: '生产工单',
+    status: '待下发',
+    progressLabel: '新建',
+    taskStatus: '正常',
+    scheduleQty: 3,
+    planQty: 3,
+    actualQty: 0,
+    workCenter: '默认工厂',
+    bom: '',
+    warehouse: '报废仓',
+    urgency: '正常',
+    planDateRange: ['2026-05-31', '2026-05-31'],
+    remark: '',
+    processRouteName: routeName,
+    source: 'manual',
+    sourceOrderNo: '1-20260531-002',
+    owner: 'admin1',
+    submittedAt: '2026-05-31 17:41:31',
+    submittedBy: 'admin',
+    processes: buildProcessesFromRoute(routeName).map((p) => ({
+      ...p,
+      executors: ['admin'],
+    })),
+    createdAt: '2026-05-31',
+  }
+}
+
+function ensureDemoWorkOrder(orders) {
+  if (!orders.some((o) => o.id === DEMO_ORDER_ID)) {
+    orders.unshift(createDemoWorkOrder())
+  }
+  return orders
+}
+
 function createInitialOrders() {
   const routeName = '机加标准路线'
-  return [
+  return ensureDemoWorkOrder([
     {
       id: 'wo-init-1',
       code: 'WO202505280-001',
@@ -98,11 +141,12 @@ function createInitialOrders() {
       })),
       createdAt: '2025-05-20',
     },
-  ]
+  ])
 }
 
+const loadedOrders = loadFromStorage()
 export const workOrderState = reactive({
-  orders: loadFromStorage() || createInitialOrders(),
+  orders: loadedOrders ? ensureDemoWorkOrder(loadedOrders) : createInitialOrders(),
 })
 
 watch(
