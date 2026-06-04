@@ -4,7 +4,9 @@ export const contractTypeOptions = ['标准合同', '框架合同', '临时合�
 export const settlementCurrencyOptions = ['人民币', '美元', '欧元']
 export const orderTypeOptions = ['国内订单', '海外订单']
 export const deliveryMethodOptions = ['物流', '自提', '送货上门']
+/** @deprecated 请使用行级 deliveryMode（整机 / 散件） */
 export const fulfillmentMethodOptions = ['整机成品发货', '软件零部件发货']
+export const deliveryModeOptions = ['整机', '散件']
 export const orderSourceOptions = ['内部新增', '客户门户', 'API导入']
 export const deliveryStatusOptions = ['未发货', '部分发货', '已发货', '已签收']
 export const progressStatusOptions = ['未审', '已审', '已完成', '已终止']

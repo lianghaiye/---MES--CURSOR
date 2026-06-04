@@ -1,12 +1,19 @@
 import { materialCategoryTree, flattenCategoryNodes } from '@/mock/materialCategories'
+import { bomTemplateMaterials } from '@/mock/bomTemplateMaterials'
 import { pumpMaterialNames, barcodeTypesCycle } from '@/mock/pumpIndustryNames'
+import {
+  linkProductMaterialRows,
+  migrateMaterialList,
+} from '@/utils/masterDataMigrate'
+import { buildMaterialFromProduct } from '@/utils/productMaterialMap'
+import { mockProducts } from '@/mock/productInfo'
 
 const flatCats = flattenCategoryNodes(materialCategoryTree)
 const leafCats = flatCats.filter((c) => !c.children?.length)
 
 const specs = ['HT250', '304', 'GHMB-35', '38CrMoAl', '45#', '316L', 'DN80', 'M16']
-const materialTypes = ['零部件', '标准件', '原材料']
-const supplyForms = ['外购件', '自制件', '外协件']
+const materialTypes = ['零部件', '标准件', '原材料', '毛胚', '半成品', '虚拟件']
+const supplyForms = ['外协件', '外购件', '自制件', '组装', '其他']
 const categoryLabels = ['部件', '离心泵', '电脑', '叶轮', '托架', '电机', '标准件', '零件']
 
 function createMaterial(index) {
@@ -39,7 +46,18 @@ function createMaterial(index) {
   }
 }
 
-export const mockMaterials = Array.from({ length: 194 }, (_, i) => createMaterial(i))
+const rawMockMaterials = [
+  ...bomTemplateMaterials,
+  ...Array.from({ length: 194 }, (_, i) => createMaterial(i)),
+]
+
+export const mockMaterials = migrateMaterialList(
+  linkProductMaterialRows(
+    JSON.parse(JSON.stringify(mockProducts)),
+    migrateMaterialList(rawMockMaterials),
+    buildMaterialFromProduct,
+  ),
+)
 
 export function filterMaterials(list, filters, selectedCategoryKey) {
   const categoryKeys = getCategoryFilterKeys(selectedCategoryKey)

@@ -16,8 +16,15 @@ export function createRootTreeNode({ itemCode, itemName, specModel, bomName }) {
   })
 }
 
-export function isRootNode(nodeId) {
-  return nodeId === ROOT_ID
+export function getRootTreeId(flatNodes) {
+  return flatNodes?.find((n) => n.isRoot)?.id || ROOT_ID
+}
+
+export function isRootNode(nodeId, flatNodes) {
+  if (!nodeId) return true
+  if (nodeId === ROOT_ID) return true
+  const rootId = getRootTreeId(flatNodes)
+  return nodeId === rootId
 }
 
 /** 扁平树节点转 ant-design treeData */
@@ -40,6 +47,13 @@ export function buildAntTreeData(flatNodes) {
   return [mapNode(root)]
 }
 
+/** 从树节点标题解析展示用物料编码（模板节点 title 常为「编码 名称」） */
+export function parseMaterialCodeFromNodeTitle(title) {
+  const t = String(title || '').trim()
+  const m = t.match(/^(\d{6,})\s+/)
+  return m ? m[1] : ''
+}
+
 export function getChildTreeNodes(flatNodes, parentId) {
   if (parentId === ROOT_ID || !parentId) {
     return flatNodes.filter((n) => n.parentId === ROOT_ID && !n.isRoot)
@@ -48,10 +62,14 @@ export function getChildTreeNodes(flatNodes, parentId) {
 }
 
 /** 当前选中节点下展示的物料行（直属子级） */
-export function getLinesForTreeNode(lineItems, treeNodeId) {
-  const pid = !treeNodeId || isRootNode(treeNodeId) ? ROOT_ID : treeNodeId
+export function getLinesForTreeNode(lineItems, treeNodeId, flatNodes = []) {
+  const rootId = getRootTreeId(flatNodes)
+  const pid = !treeNodeId || isRootNode(treeNodeId, flatNodes) ? rootId : treeNodeId
   return lineItems.filter(
-    (l) => l.parentTreeId === pid || (l.parentTreeId === '__ROOT__' && pid === ROOT_ID),
+    (l) =>
+      l.parentTreeId === pid ||
+      l.treeNodeId === pid ||
+      (l.parentTreeId === '__ROOT__' && (pid === rootId || pid === ROOT_ID)),
   )
 }
 

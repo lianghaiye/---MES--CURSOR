@@ -4,9 +4,10 @@ import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
 
 export const barcodeTypeOptions = ['一物一码', '一类一码', '一批一码']
 
-export const materialTypeOptions = ['零部件', '标准件', '原材料', '半成品', '成品']
-
-export const supplyFormOptions = ['外购件', '自制件', '外协件']
+export {
+  MATERIAL_TYPE_OPTIONS as materialTypeOptions,
+  SUPPLY_FORM_OPTIONS as supplyFormOptions,
+} from '@/utils/masterDataMigrate'
 
 export const inventoryUnitOptions = ['个', '件', '套', 'kg', 'm', '台']
 

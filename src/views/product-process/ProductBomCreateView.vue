@@ -15,7 +15,7 @@
 
       <main class="right-panel">
         <div class="section-card">
-          <div class="section-title">基础信息</div>
+          <div class="section-title">{{ isEditMode ? '编辑 BOM' : '新增 BOM' }}</div>
           <a-form
             ref="formRef"
             :model="form"
@@ -33,8 +33,11 @@
                       v-model:value="form.bomNo"
                       style="width: calc(100% - 88px)"
                       placeholder="保存时自动生成"
+                      :disabled="isEditMode"
                     />
-                    <a-button @click="form.bomNo = generateBomNo()">生成编码</a-button>
+                    <a-button v-if="!isEditMode" @click="form.bomNo = generateBomNo()">
+                      生成编码
+                    </a-button>
                   </a-input-group>
                 </a-form-item>
               </a-col>
@@ -56,8 +59,14 @@
                     placeholder="请选择产品/物料"
                     :filter-option="filterItem"
                     :options="itemOptions"
+                    :disabled="isEditMode"
                     @change="onItemChange"
                   />
+                </a-form-item>
+              </a-col>
+              <a-col v-if="isEditMode" :span="12">
+                <a-form-item label="BOM版本">
+                  <a-input :value="editVersion" disabled />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
@@ -123,13 +132,14 @@ export default { name: 'ProductBomCreateView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { addProductBom, generateBomNo } from '@/store/productBomStore'
+import { addProductBom, generateBomNo, getProductBomById, updateProductBom } from '@/store/productBomStore'
+import { loadBomDetailStructure } from '@/utils/bomImport'
 import { defaultBomColumnSettings, bomTypeOptions } from '@/mock/bomMaterialColumns'
 import {
   createRootTreeNode,
@@ -147,8 +157,18 @@ import ImportBomTemplateModal from './components/ImportBomTemplateModal.vue'
 import SelectBomMaterialModal from './components/SelectBomMaterialModal.vue'
 import BomColumnSettingDrawer from './components/BomColumnSettingDrawer.vue'
 
+const route = useRoute()
 const router = useRouter()
 const { closeTab } = useTabs()
+
+const isEditMode = computed(() => route.name === 'product-process-bom-edit')
+const editBomId = computed(() => route.params.id)
+const pageTabPath = computed(() =>
+  isEditMode.value && editBomId.value
+    ? `/product-process/bom/${editBomId.value}/edit`
+    : '/product-process/bom/new',
+)
+const editVersion = ref('')
 
 const formRef = ref()
 const saving = ref(false)
@@ -207,7 +227,7 @@ const itemOptions = computed(() => {
 const hasRoot = computed(() => flatNodes.value.some((n) => n.isRoot))
 
 const displayLines = computed(() =>
-  getLinesForTreeNode(lineItems.value, selectedNodeId.value),
+  getLinesForTreeNode(lineItems.value, selectedNodeId.value, flatNodes.value),
 )
 
 function filterItem(input, option) {
@@ -312,6 +332,48 @@ function refreshLines() {
   lineItems.value = [...lineItems.value]
 }
 
+function loadEditBom(id) {
+  const bom = getProductBomById(id)
+  if (!bom) {
+    message.error('BOM 不存在')
+    router.push('/product-process/bom')
+    return
+  }
+  if (bom.status !== '待启用') {
+    message.warning('仅待启用状态的 BOM 可编辑')
+    router.push('/product-process/bom')
+    return
+  }
+
+  const { flatNodes: nodes, lineItems: lines } = loadBomDetailStructure(bom)
+  flatNodes.value = nodes
+  lineItems.value = lines
+  selectedNodeId.value = nodes.find((n) => n.isRoot)?.id || ROOT_ID
+  templateRef.value = bom.templateRef || null
+  columnSettings.value = bom.columnSettings?.length
+    ? JSON.parse(JSON.stringify(bom.columnSettings))
+    : JSON.parse(JSON.stringify(defaultBomColumnSettings))
+
+  editVersion.value = bom.version || ''
+  form.bomNo = bom.bomNo
+  form.bomName = bom.bomName
+  form.bomType = bom.bomType || '基础BOM'
+  form.itemId = `${bom.itemType}:${bom.itemId}`
+  form.itemType = bom.itemType
+  form.itemName = bom.itemName
+  form.itemCode = bom.itemCode
+  form.specModel = bom.specModel || ''
+  form.remark = bom.remark || ''
+}
+
+watch(
+  () => [isEditMode.value, editBomId.value],
+  ([edit, id]) => {
+    if (edit && id) loadEditBom(id)
+  },
+  { immediate: true },
+)
+
 async function handleSave() {
   try {
     await formRef.value.validate()
@@ -333,27 +395,37 @@ async function handleSave() {
       ? rawItemId.split(':')[1]
       : rawItemId
 
+  const payload = {
+    bomNo: form.bomNo || generateBomNo(),
+    bomName: form.bomName,
+    bomType: form.bomType,
+    itemType: form.itemType,
+    itemId,
+    itemName: form.itemName,
+    itemCode: form.itemCode,
+    specModel: form.specModel,
+    remark: form.remark,
+    treeNodes: flatNodes.value,
+    lineItems: lineItems.value,
+    templateRef: templateRef.value,
+    columnSettings: columnSettings.value,
+  }
+
   saving.value = true
   try {
-    addProductBom({
-      bomNo: form.bomNo || generateBomNo(),
-      bomName: form.bomName,
-      bomType: form.bomType,
-      itemType: form.itemType,
-      itemId,
-      itemName: form.itemName,
-      itemCode: form.itemCode,
-      specModel: form.specModel,
-      remark: form.remark,
-      treeNodes: flatNodes.value,
-      lineItems: lineItems.value,
-      templateRef: templateRef.value,
-      columnSettings: columnSettings.value,
-    })
-    message.success('BOM 已保存，状态为待启用，可在列表中启用')
-    const path = '/product-process/bom'
-    closeTab('/product-process/bom/new')
-    router.push(path)
+    if (isEditMode.value) {
+      const res = updateProductBom(editBomId.value, payload)
+      if (res?.error) {
+        message.warning(res.error)
+        return
+      }
+      message.success('BOM 已更新')
+    } else {
+      addProductBom(payload)
+      message.success('BOM 已保存，状态为待启用，可在列表中启用')
+    }
+    closeTab(pageTabPath.value)
+    router.push('/product-process/bom')
   } finally {
     saving.value = false
   }
@@ -364,7 +436,7 @@ function handleCancel() {
     title: '确认取消',
     content: '未保存的内容将丢失，是否离开？',
     onOk: () => {
-      closeTab('/product-process/bom/new')
+      closeTab(pageTabPath.value)
       router.push('/product-process/bom')
     },
   })

@@ -178,11 +178,6 @@
       </div>
     </div>
 
-    <ProductBomFormModal
-      v-model:open="formOpen"
-      :edit-record="editRecord"
-      @saved="onSaved"
-    />
     <ProductBomVersionDrawer v-model:open="versionOpen" :record="versionRecord" />
   </div>
 </template>
@@ -221,7 +216,6 @@ import {
 } from '@/store/productBomStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import ProductBomFormModal from './components/ProductBomFormModal.vue'
 import ProductBomVersionDrawer from './components/ProductBomVersionDrawer.vue'
 
 const router = useRouter()
@@ -236,9 +230,7 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
-const formOpen = ref(false)
 const versionOpen = ref(false)
-const editRecord = ref(null)
 const versionRecord = ref(null)
 
 const itemFilterOptions = computed(() => {
@@ -320,17 +312,18 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  editRecord.value = record
-  formOpen.value = true
+  if (record.status !== '待启用') {
+    message.warning('仅待启用状态的 BOM 可编辑')
+    return
+  }
+  const path = `/product-process/bom/${record.id}/edit`
+  openTab(path, `编辑BOM·${record.bomName || ''}`)
+  router.push(path)
 }
 
 function openVersionDrawer(record) {
   versionRecord.value = record
   versionOpen.value = true
-}
-
-function onSaved() {
-  handleSearch()
 }
 
 function confirmDelete(record) {

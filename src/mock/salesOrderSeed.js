@@ -69,9 +69,9 @@ export function buildMockSalesOrders(products) {
       contactPerson: 'TEST',
       contactPhone: '16522033362',
       lineItems: [
-        lineFromProduct(p(0), { id: 'line-seed-1a', salesQty: 3 }),
-        lineFromProduct(p(1), { id: 'line-seed-1b', salesQty: 2 }),
-        lineFromProduct(p(2), { id: 'line-seed-1c', salesQty: 1 }),
+        lineFromProduct(p(0), { id: 'line-seed-1a', salesQty: 3, deliveryMode: '整机' }),
+        lineFromProduct(p(1), { id: 'line-seed-1b', salesQty: 2, deliveryMode: '散件' }),
+        lineFromProduct(p(2), { id: 'line-seed-1c', salesQty: 1, deliveryMode: '整机' }),
       ],
     }),
     createSalesOrder({

@@ -119,11 +119,6 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="履约方式" required>
-            <a-select v-model:value="form.fulfillmentMethod" size="small" :options="fulfillmentMethodOpts" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
           <a-form-item label="首付/定金金额">
             <a-input-number v-model:value="form.downPaymentAmount" size="small" :min="0" :precision="2" style="width: 100%" placeholder="请输入 首付/定金金额" />
           </a-form-item>
@@ -193,6 +188,15 @@
                 :min="0"
                 style="width: 100%"
                 @change="onLineFieldChange(record)"
+              />
+            </template>
+
+            <template v-else-if="column.key === 'deliveryMode'">
+              <a-select
+                v-model:value="record.deliveryMode"
+                size="small"
+                style="width: 100%"
+                :options="deliveryModeOpts"
               />
             </template>
 
@@ -312,14 +316,62 @@
       </a-form>
     </div>
 
-    <a-modal v-model:open="productPickerOpen" title="选择产品" width="720px" @ok="confirmProductPick">
+    <a-modal
+      v-model:open="productPickerOpen"
+      title="选择产品"
+      width="880px"
+      :mask-closable="false"
+      @ok="confirmProductPick"
+    >
+      <a-form layout="inline" class="product-picker-search">
+        <a-form-item label="产品类别">
+          <a-select
+            v-model:value="productPickerFilters.categoryKey"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+            placeholder="请选择"
+            size="small"
+            style="width: 200px"
+            :options="productCategoryOpts"
+          />
+        </a-form-item>
+        <a-form-item label="产品编号">
+          <a-input
+            v-model:value="productPickerFilters.code"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 160px"
+            @press-enter="applyProductPickerSearch"
+          />
+        </a-form-item>
+        <a-form-item label="产品名称">
+          <a-input
+            v-model:value="productPickerFilters.name"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 160px"
+            @press-enter="applyProductPickerSearch"
+          />
+        </a-form-item>
+        <a-form-item>
+          <a-space>
+            <a-button type="primary" size="small" @click="applyProductPickerSearch">查询</a-button>
+            <a-button size="small" @click="resetProductPickerSearch">重置</a-button>
+          </a-space>
+        </a-form-item>
+      </a-form>
       <a-table
         :columns="productPickerColumns"
-        :data-source="productPickerRows"
+        :data-source="pagedProductPickerRows"
         row-key="id"
         size="small"
-        :row-selection="{ type: 'checkbox', selectedRowKeys: pickedProductKeys, onChange: (keys) => (pickedProductKeys = keys) }"
-        :pagination="false"
+        bordered
+        :row-selection="productPickerRowSelection"
+        :pagination="productPickerPagination"
+        :scroll="{ y: 360 }"
       />
     </a-modal>
 
@@ -342,13 +394,15 @@ import {
   settlementCurrencyOptions,
   orderTypeOptions,
   deliveryMethodOptions,
-  fulfillmentMethodOptions,
+  deliveryModeOptions,
   settlementTypeOptions,
   paymentRatioOptions,
   customerOptions,
   salespersonOptions,
 } from '@/mock/salesOrderOptions'
 import { createLineItem } from '@/mock/salesOrders'
+import { filterProducts } from '@/mock/productInfo'
+import { productCategoryTree, flattenCategoryNodes } from '@/mock/productCategories'
 import { productInfoState } from '@/store/productInfoStore'
 import { getActiveBomForItem } from '@/store/productBomStore'
 import { generateSalesOrderNo } from '@/store/salesOrderStore'
@@ -367,6 +421,28 @@ const productPickerOpen = ref(false)
 const pickedProductKeys = ref([])
 const fileList = ref([])
 
+const productPickerFilters = reactive({
+  categoryKey: undefined,
+  code: '',
+  name: '',
+})
+const appliedProductPickerFilters = ref({
+  categoryKey: undefined,
+  code: '',
+  name: '',
+})
+const productPickerPage = reactive({
+  current: 1,
+  pageSize: 10,
+})
+
+const flatProductCats = flattenCategoryNodes(productCategoryTree)
+const leafProductCats = flatProductCats.filter((c) => !c.children?.length)
+const productCategoryOpts = leafProductCats.map((c) => ({
+  label: `(${c.code}) ${c.title}`,
+  value: c.key,
+}))
+
 const MAX_FILE_SIZE = 200 * 1024 * 1024
 
 const columnDefs = [
@@ -378,6 +454,7 @@ const columnDefs = [
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 100 },
   { key: 'material', title: '材质', dataIndex: 'material', width: 80 },
   { key: 'salesQty', title: '销售数量', width: 90 },
+  { key: 'deliveryMode', title: '交付方式', width: 100 },
   { key: 'deliveryDate', title: '交货日期', width: 120 },
   { key: 'unit', title: '单位', width: 70 },
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 100, ellipsis: true },
@@ -395,8 +472,8 @@ const columnDefs = [
 
 const visibleColumnKeys = ref(columnDefs.map((c) => c.key))
 
-const productPickerRows = computed(() =>
-  productInfoState.products.slice(0, 300).map((p) => ({
+const allProductPickerRows = computed(() =>
+  productInfoState.products.map((p) => ({
     id: p.id,
     code: p.code,
     name: p.name,
@@ -406,14 +483,57 @@ const productPickerRows = computed(() =>
     unit: p.inventoryUnit,
     unitPrice: p.unitPrice,
     categoryName: p.categoryName,
+    categoryKey: p.categoryKey,
   })),
 )
 
+const filteredProductPickerRows = computed(() => {
+  const f = appliedProductPickerFilters.value
+  const ids = new Set(
+    filterProducts(productInfoState.products, f, null).map((p) => p.id),
+  )
+  return allProductPickerRows.value.filter((row) => ids.has(row.id))
+})
+
+const pagedProductPickerRows = computed(() => {
+  const list = filteredProductPickerRows.value
+  const start = (productPickerPage.current - 1) * productPickerPage.pageSize
+  return list.slice(start, start + productPickerPage.pageSize)
+})
+
+const productPickerPagination = computed(() => ({
+  current: productPickerPage.current,
+  pageSize: productPickerPage.pageSize,
+  total: filteredProductPickerRows.value.length,
+  showSizeChanger: true,
+  showTotal: (total) => `共 ${total} 条`,
+  pageSizeOptions: ['10', '20', '50'],
+  onChange: (page, pageSize) => {
+    productPickerPage.current = page
+    productPickerPage.pageSize = pageSize
+  },
+}))
+
+watch(filteredProductPickerRows, (list) => {
+  const maxPage = Math.max(1, Math.ceil(list.length / productPickerPage.pageSize) || 1)
+  if (productPickerPage.current > maxPage) productPickerPage.current = 1
+})
+
+const productPickerRowSelection = computed(() => ({
+  type: 'checkbox',
+  selectedRowKeys: pickedProductKeys.value,
+  preserveSelectedRowKeys: true,
+  onChange: (keys) => {
+    pickedProductKeys.value = keys
+  },
+}))
+
 const productPickerColumns = [
-  { title: '产品编码', dataIndex: 'code', width: 140 },
-  { title: '产品名称', dataIndex: 'name', width: 160 },
-  { title: '产品属性', dataIndex: 'productAttr', width: 100 },
-  { title: '规格型号', dataIndex: 'specModel', width: 110 },
+  { title: '产品编码', dataIndex: 'code', width: 130, ellipsis: true },
+  { title: '产品名称', dataIndex: 'name', width: 180, ellipsis: true },
+  { title: '产品类别', dataIndex: 'categoryName', width: 100, ellipsis: true },
+  { title: '产品属性', dataIndex: 'productAttr', width: 96 },
+  { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
 ]
 
 const displayColumns = computed(() =>
@@ -458,7 +578,6 @@ const form = reactive({
   salesperson: 'admin1',
   settlementType: undefined,
   paymentRatio: undefined,
-  fulfillmentMethod: '整机成品发货',
   downPaymentAmount: null,
   remark: '',
   lineItems: [],
@@ -470,7 +589,7 @@ const contractTypeOpts = contractTypeOptions.map((v) => ({ label: v, value: v })
 const currencyOpts = settlementCurrencyOptions.map((v) => ({ label: v, value: v }))
 const orderTypeOpts = orderTypeOptions.map((v) => ({ label: v, value: v }))
 const deliveryMethodOpts = deliveryMethodOptions.map((v) => ({ label: v, value: v }))
-const fulfillmentMethodOpts = fulfillmentMethodOptions.map((v) => ({ label: v, value: v }))
+const deliveryModeOpts = deliveryModeOptions.map((v) => ({ label: v, value: v }))
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const paymentRatioOpts = paymentRatioOptions.map((v) => ({ label: v, value: v }))
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
@@ -510,7 +629,6 @@ watch(
         salesperson: r.salesperson,
         settlementType: r.settlementType || undefined,
         paymentRatio: r.paymentRatio || undefined,
-        fulfillmentMethod: r.fulfillmentMethod,
         downPaymentAmount: r.downPaymentAmount,
         remark: r.remark || '',
         lineItems: JSON.parse(JSON.stringify(r.lineItems || [])).map(normalizeLineItem),
@@ -537,6 +655,7 @@ function normalizeLineItem(item) {
     issueQty: item.issueQty ?? 0,
     unit: item.unit || '件',
     productAttr: item.productAttr || '',
+    deliveryMode: item.deliveryMode || '整机',
   }
 }
 
@@ -558,7 +677,6 @@ function resetForm() {
   form.salesperson = 'admin1'
   form.settlementType = undefined
   form.paymentRatio = undefined
-  form.fulfillmentMethod = '整机成品发货'
   form.downPaymentAmount = null
   form.remark = ''
   form.lineItems = []
@@ -622,8 +740,30 @@ function onContactChange(name) {
   if (contact?.phone) form.contactPhone = contact.phone
 }
 
+function resetProductPickerSearch() {
+  productPickerFilters.categoryKey = undefined
+  productPickerFilters.code = ''
+  productPickerFilters.name = ''
+  appliedProductPickerFilters.value = {
+    categoryKey: undefined,
+    code: '',
+    name: '',
+  }
+  productPickerPage.current = 1
+}
+
+function applyProductPickerSearch() {
+  appliedProductPickerFilters.value = {
+    categoryKey: productPickerFilters.categoryKey,
+    code: (productPickerFilters.code || '').trim(),
+    name: (productPickerFilters.name || '').trim(),
+  }
+  productPickerPage.current = 1
+}
+
 function openProductPicker() {
   pickedProductKeys.value = []
+  resetProductPickerSearch()
   productPickerOpen.value = true
 }
 
@@ -640,6 +780,7 @@ function confirmProductPick() {
     const line = createLineItem({
       productId: p.id,
       bomId: bom.id,
+      deliveryMode: '整机',
       productAttr: p.productAttribute,
       productName: p.name,
       productCode: p.code,
@@ -690,11 +831,6 @@ function handleSave() {
     message.warning('请选择客户名称')
     return
   }
-  if (!form.fulfillmentMethod) {
-    message.warning('请选择履约方式')
-    return
-  }
-
   form.lineItems.forEach(recalcLine)
 
   const orderNo = form.orderNo?.trim() || generateSalesOrderNo()
@@ -732,6 +868,21 @@ function handleSave() {
 </script>
 
 <style lang="less" scoped>
+.product-picker-search {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+
+  :deep(.ant-form-item) {
+    margin-bottom: 8px;
+    margin-inline-end: 12px;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    font-size: 13px;
+  }
+}
+
 .header-form {
   :deep(.ant-form-item) {
     width: 100%;

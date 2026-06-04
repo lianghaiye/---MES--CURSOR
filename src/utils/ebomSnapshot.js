@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import { loadBomDetailStructure } from '@/utils/bomImport'
-import { getLinesForTreeNode, isRootNode } from '@/utils/bomTree'
+import { getLinesForTreeNode, isRootNode, parseMaterialCodeFromNodeTitle } from '@/utils/bomTree'
 
 let materialSeq = 0
 
@@ -12,6 +12,8 @@ function nextMaterialId() {
 function mapSupplyType(supplyForm) {
   if (supplyForm === '自制件') return '自制件'
   if (supplyForm === '外购件') return '外购件'
+  if (supplyForm === '组装' || supplyForm === '组装件') return '组装'
+  if (supplyForm === '其他') return '其他'
   return supplyForm || '其他'
 }
 
@@ -91,11 +93,23 @@ function lineToMaterial(line, flatNodes, lineItems, demandQty) {
   })
 }
 
+function nodeTitleParts(node) {
+  const code = node.materialCode || parseMaterialCodeFromNodeTitle(node.title) || ''
+  const name = String(node.title || '')
+    .replace(/^\d+\s+/, '')
+    .trim()
+  return { code, name: name || node.title || code }
+}
+
+function isAssemblyGroupNode(node) {
+  return node.nodeType === 'virtual' || node.nodeType === 'assembly'
+}
+
 function buildSubtreeFromNode(node, flatNodes, lineItems, parentDemand) {
   const nodeQty = Number(node.quantity) || 1
   const nodeDemand = parentDemand * nodeQty
 
-  const lines = getLinesForTreeNode(lineItems, node.id)
+  const lines = getLinesForTreeNode(lineItems, node.id, flatNodes)
   const fromLines = lines.map((line) => {
     const lineQty = Number(line.unitQty) || 1
     return lineToMaterial(line, flatNodes, lineItems, nodeDemand * lineQty)
@@ -108,7 +122,30 @@ function buildSubtreeFromNode(node, flatNodes, lineItems, parentDemand) {
     buildSubtreeFromNode(cn, flatNodes, lineItems, nodeDemand),
   )
 
-  return [...fromLines, ...fromChildren]
+  const childMaterials = [...fromLines, ...fromChildren]
+  if (isAssemblyGroupNode(node) && childMaterials.length) {
+    const { code, name } = nodeTitleParts(node)
+    const supplyType = mapSupplyType('组装')
+    return [
+      createPlanMaterial({
+        id: nextMaterialId(),
+        name,
+        code,
+        spec: node.specModel || '',
+        type: '半成品',
+        unitUsage: nodeQty,
+        unit: '套',
+        supplyType,
+        demandQty: nodeDemand,
+        planQty: nodeDemand,
+        joinPlan: '否',
+        remark: '',
+        children: childMaterials,
+      }),
+    ]
+  }
+
+  return childMaterials
 }
 
 function explodeToMaterials(flatNodes, lineItems, salesQty) {
@@ -121,7 +158,7 @@ function explodeToMaterials(flatNodes, lineItems, salesQty) {
   )
 
   if (!topNodes.length) {
-    const rootLines = getLinesForTreeNode(lineItems, rootId)
+    const rootLines = getLinesForTreeNode(lineItems, rootId, flatNodes)
     return rootLines.map((line) => {
       const lineQty = Number(line.unitQty) || 1
       return lineToMaterial(line, flatNodes, lineItems, qty * lineQty)

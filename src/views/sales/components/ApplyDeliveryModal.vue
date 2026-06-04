@@ -148,8 +148,8 @@
       </a-form>
     </div>
 
-    <div class="section-block">
-      <div class="section-title">发货明细</div>
+    <div v-if="form.lineItems.length" class="section-block">
+      <div class="section-title">整机发货</div>
       <a-divider class="section-divider" />
       <a-table
         :columns="lineColumns"
@@ -158,21 +158,29 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 3200 }"
+        :scroll="{ x: 1960 }"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-
+          <template v-else-if="column.key === 'lineShipStatus'">
+            <a-tag :color="lineShipStatusColor(record.lineShipStatus)">
+              {{ record.lineShipStatus }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'shipProgress'">
+            {{ formatShipProgress(record.shippedQty, record.orderQty) }}
+          </template>
           <template v-else-if="column.key === 'orderQty'">
             {{ formatDeliveryQty(record.orderQty) }}
           </template>
-          <template v-else-if="column.key === 'productUnitPrice'">
-            {{ formatDeliveryPrice(record.productUnitPrice) }}
+          <template v-else-if="column.key === 'unitPriceExTax'">
+            {{ formatDeliveryPrice(record.unitPriceExTax) }}
           </template>
-          <template v-else-if="column.key === 'shippedQty'">
-            {{ formatDeliveryQty(record.shippedQty) }}
+          <template v-else-if="column.key === 'deliveryMode'">
+            <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
+              {{ record.deliveryMode || '整机' }}
+            </a-tag>
           </template>
-
           <template v-else-if="column.key === 'shipQty'">
             <a-input-number
               v-model:value="record.shipQty"
@@ -196,38 +204,113 @@
           <template v-else-if="column.key === 'deliveryAmountExTax'">
             {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
           </template>
-          <template v-else-if="column.key === 'itemWeightKg'">
-            <a-input-number
-              v-model:value="record.itemWeightKg"
-              size="small"
-              :min="0"
-              :precision="2"
-              style="width: 100%"
-            />
-          </template>
-          <template v-else-if="column.key === 'plannedDeliveryDate'">
-            <a-date-picker
-              :value="lineDateValue(record.plannedDeliveryDate)"
-              size="small"
-              style="width: 100%"
-              placeholder="请选择"
-              @change="(d) => onLineDateChange(record, d)"
-            />
-          </template>
           <template v-else-if="column.key === 'lineRemark'">
             <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
           </template>
-
           <template v-else-if="column.key === 'action'">
             <a-button type="link" size="small" danger @click="form.lineItems.splice(index, 1)">
               删除
             </a-button>
           </template>
-
           <template v-else>{{ displayCell(record, column) }}</template>
         </template>
       </a-table>
     </div>
+
+    <div v-if="form.scatterShipments.length" class="section-block">
+      <div class="section-title">散件发运</div>
+      <a-divider class="section-divider" />
+      <a-table
+        :columns="scatterLineColumns"
+        :data-source="form.scatterShipments"
+        row-key="salesLineId"
+        size="small"
+        bordered
+        :pagination="false"
+        :scroll="{ x: 1848 }"
+        v-model:expanded-row-keys="expandedScatterRowKeys"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'lineShipStatus'">
+            <a-tag :color="lineShipStatusColor(record.lineShipStatus)">
+              {{ record.lineShipStatus }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'shipProgress'">
+            {{ formatScatterShipProgress(record) }}
+          </template>
+          <template v-else-if="column.key === 'orderQty'">
+            {{ formatDeliveryQty(record.orderQty) }}
+          </template>
+          <template v-else-if="column.key === 'unitPriceExTax'">
+            {{ formatDeliveryPrice(record.unitPriceExTax) }}
+          </template>
+          <template v-else-if="column.key === 'deliveryMode'">
+            <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
+              {{ record.deliveryMode || '散件' }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
+            <a-input-number
+              v-model:value="record.deliveryUnitPriceExTax"
+              size="small"
+              :min="0"
+              :precision="4"
+              style="width: 100%"
+              @change="onScatterLinePriceChange(record)"
+            />
+          </template>
+          <template v-else-if="column.key === 'deliveryAmountExTax'">
+            {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
+          </template>
+          <template v-else-if="column.key === 'lineRemark'">
+            <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
+          </template>
+          <template v-else-if="column.key === 'scatterAction'">
+            <a-button type="link" size="small" @click="openScatterDrawer(record)">
+              选择发运物料
+            </a-button>
+          </template>
+          <template v-else>{{ displayCell(record, column) }}</template>
+        </template>
+        <template #expandedRowRender="{ record }">
+          <div class="scatter-picks-panel">
+            <div class="scatter-picks-title">已选发运物料</div>
+            <a-table
+              v-if="selectedMaterialPicks(record).length"
+              :columns="scatterPickColumns"
+              :data-source="selectedMaterialPicks(record)"
+              :row-key="(r) => r.materialId"
+              size="small"
+              bordered
+              :pagination="false"
+            >
+              <template #bodyCell="{ column, record: mat }">
+                <template v-if="column.key === 'pickAction'">
+                  <a-button
+                    type="link"
+                    size="small"
+                    danger
+                    @click="removeScatterMaterialPick(record, mat)"
+                  >
+                    删除
+                  </a-button>
+                </template>
+              </template>
+            </a-table>
+            <a-empty v-else description="请点击「选择发运物料」勾选 EBOM" :image="false" />
+            <div v-if="record.remark" class="scatter-line-remark">发运备注：{{ record.remark }}</div>
+          </div>
+        </template>
+      </a-table>
+    </div>
+
+    <ScatterShipDrawer
+      v-model:open="scatterDrawerOpen"
+      :shipment="activeScatterShipment"
+      @save="onScatterDrawerSave"
+    />
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
@@ -237,9 +320,8 @@
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import dayjs from 'dayjs'
 import {
   customerOptions,
   shipmentMethodOptions,
@@ -251,7 +333,17 @@ import {
   recalcDeliveryLine,
   formatDeliveryQty,
   formatDeliveryPrice,
+  formatShipProgress,
+  lineShipStatusColor,
 } from '@/utils/deliveryLine'
+import {
+  formatScatterShipProgress,
+  getSelectedMaterialPicks,
+  initScatterShipment,
+  refreshScatterShipmentMeta,
+  removeMaterialPickFromShipment,
+} from '@/utils/shipEbom'
+import ScatterShipDrawer from './ScatterShipDrawer.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -260,27 +352,51 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'confirmed'])
 
+const scatterDrawerOpen = ref(false)
+const activeScatterShipment = ref(null)
+const expandedScatterRowKeys = ref([])
+
 const lineColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
-  { title: '产品名称', dataIndex: 'productName', width: 130, ellipsis: true, fixed: 'left' },
-  { title: '产品编码', dataIndex: 'productCode', width: 130, ellipsis: true },
+  { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
+  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
+  { title: '发货状态', key: 'lineShipStatus', width: 88, align: 'center' },
+  { title: '发货进度', key: 'shipProgress', width: 110, align: 'right' },
+  { title: '编码', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
   { title: '规格属性', dataIndex: 'specAttr', width: 88 },
-  { title: '规格型号', dataIndex: 'specModel', width: 88 },
   { title: '材质', dataIndex: 'material', width: 72 },
-  { title: '技术参数', dataIndex: 'techParams', width: 90, ellipsis: true },
-  { title: '包装形式', dataIndex: 'packagingForm', width: 88 },
-  { title: '类别', dataIndex: 'category', width: 88 },
-  { title: '订单数量', key: 'orderQty', width: 96, align: 'right' },
-  { title: '产品单价', key: 'productUnitPrice', width: 100, align: 'right' },
-  { title: '已出库数量', key: 'shippedQty', width: 100, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 56 },
-  { title: '本次发货数量', key: 'shipQty', width: 120, align: 'right' },
-  { title: '发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 130, align: 'right' },
-  { title: '本次发货总额', key: 'deliveryAmountExTax', width: 110, align: 'right' },
-  { title: '物品重量(kg)', key: 'itemWeightKg', width: 110, align: 'right' },
-  { title: '计划交期', key: 'plannedDeliveryDate', width: 120 },
+  { title: '订单数量', key: 'orderQty', width: 88, align: 'right' },
+  { title: '单价', key: 'unitPriceExTax', width: 96, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 56, align: 'center' },
+  { title: '本次发货数量', key: 'shipQty', width: 112, align: 'right' },
+  { title: '本次发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 150, align: 'right' },
+  { title: '发货总额', key: 'deliveryAmountExTax', width: 100, align: 'right' },
+  { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
+  { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
   { title: '备注', key: 'lineRemark', width: 120 },
   { title: '操作', key: 'action', width: 64, fixed: 'right' },
+]
+
+const scatterLineColumns = computed(() =>
+  lineColumns
+    .filter((c) => c.key !== 'shipQty')
+    .map((c) =>
+      c.key === 'action'
+        ? { title: '操作', key: 'scatterAction', width: 108, fixed: 'right' }
+        : c,
+    ),
+)
+
+const scatterPickColumns = [
+  { title: '物料名称', dataIndex: 'name', width: 160, ellipsis: true },
+  { title: '编码', dataIndex: 'code', width: 120, ellipsis: true },
+  { title: '规格', dataIndex: 'spec', width: 100, ellipsis: true },
+  { title: '需求数量', dataIndex: 'demandQty', width: 88, align: 'right' },
+  { title: '可用库存', dataIndex: 'availableStock', width: 88, align: 'right' },
+  { title: '本次发运', dataIndex: 'shipQty', width: 88, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 56 },
+  { title: '供应型态', dataIndex: 'supplyType', width: 88 },
+  { title: '操作', key: 'pickAction', width: 64, align: 'center' },
 ]
 
 const form = reactive({
@@ -300,6 +416,7 @@ const form = reactive({
   plateNo: '',
   remark: '',
   lineItems: [],
+  scatterShipments: [],
 })
 
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
@@ -330,16 +447,53 @@ watch(
     form.driverPhone = ''
     form.plateNo = ''
     form.remark = ''
-    form.lineItems = (so.lineItems || []).map(mapSalesLineToDeliveryLine)
+    form.lineItems = (so.lineItems || [])
+      .map((line) => mapSalesLineToDeliveryLine(line, so))
+      .filter(Boolean)
+    form.scatterShipments = (so.lineItems || [])
+      .map((line) => initScatterShipment(line, so))
+      .filter(Boolean)
+    form.scatterShipments.forEach((s) => refreshScatterShipmentMeta(s))
+    syncExpandedScatterRows()
   },
 )
 
-function lineDateValue(str) {
-  return str ? dayjs(str) : null
+function selectedMaterialPicks(record) {
+  return getSelectedMaterialPicks(record)
 }
 
-function onLineDateChange(record, date) {
-  record.plannedDeliveryDate = date ? date.format('YYYY-MM-DD') : ''
+function syncExpandedScatterRows() {
+  expandedScatterRowKeys.value = form.scatterShipments
+    .filter((s) => getSelectedMaterialPicks(s).length > 0)
+    .map((s) => s.salesLineId)
+}
+
+function openScatterDrawer(ship) {
+  activeScatterShipment.value = ship
+  scatterDrawerOpen.value = true
+}
+
+function onScatterLinePriceChange(record) {
+  recalcDeliveryLine(record)
+}
+
+function onScatterDrawerSave(payload) {
+  if (!activeScatterShipment.value) return
+  Object.assign(activeScatterShipment.value, payload)
+  refreshScatterShipmentMeta(activeScatterShipment.value)
+  const id = activeScatterShipment.value.salesLineId
+  if (
+    getSelectedMaterialPicks(activeScatterShipment.value).length &&
+    !expandedScatterRowKeys.value.includes(id)
+  ) {
+    expandedScatterRowKeys.value = [...expandedScatterRowKeys.value, id]
+  }
+  syncExpandedScatterRows()
+}
+
+function removeScatterMaterialPick(shipment, mat) {
+  removeMaterialPickFromShipment(shipment, mat.materialId)
+  syncExpandedScatterRows()
 }
 
 function onLineCalc(record) {
@@ -360,7 +514,7 @@ function handleCancel() {
   emit('update:open', false)
 }
 
-function validateLineItems() {
+function validateWholeMachineLines() {
   for (const line of form.lineItems) {
     const shipQty = Number(line.shipQty)
     if (!shipQty && shipQty !== 0) {
@@ -373,7 +527,19 @@ function validateLineItems() {
     }
     const maxQty = Number(line.orderQty) - Number(line.shippedQty)
     if (shipQty > maxQty + 1e-9) {
-      message.warning(`「${line.productName}」本次发货数量不能超过可发数量 ${formatDeliveryQty(maxQty)}`)
+      message.warning(
+        `「${line.productName}」本次发货数量不能超过可发数量 ${formatDeliveryQty(maxQty)}`,
+      )
+      return false
+    }
+  }
+  return true
+}
+
+function validateScatterShipments() {
+  for (const ship of form.scatterShipments) {
+    if (!getSelectedMaterialPicks(ship).length) {
+      message.warning(`散件行「${ship.productName}」请选择发运物料`)
       return false
     }
   }
@@ -397,11 +563,16 @@ function handleConfirm() {
     message.warning('请选择出库仓库')
     return
   }
-  if (!form.lineItems.length) {
-    message.warning('发货明细不能为空')
+
+  const hasWhole = form.lineItems.length > 0
+  const hasScatter = form.scatterShipments.length > 0
+  if (!hasWhole && !hasScatter) {
+    message.warning('本单无整机或散件可发运明细')
     return
   }
-  if (!validateLineItems()) return
+
+  if (hasWhole && !validateWholeMachineLines()) return
+  if (hasScatter && !validateScatterShipments()) return
 
   form.lineItems.forEach(recalcDeliveryLine)
 
@@ -434,9 +605,34 @@ function handleConfirm() {
   margin: 8px 0 12px;
 }
 
+.scatter-picks-panel {
+  margin: 4px 0 8px 48px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border: 1px dashed #e8e8e8;
+  border-radius: 4px;
+}
+
+.scatter-picks-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.scatter-line-remark {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+:deep(.ant-table-expanded-row > .ant-table-cell) {
+  padding: 8px 12px !important;
+  background: #fff;
+}
+
 :deep(.ant-table-cell) {
-  .ant-input-number,
-  .ant-picker {
+  .ant-input-number {
     width: 100%;
   }
 }

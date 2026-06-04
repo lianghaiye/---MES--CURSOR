@@ -1,9 +1,15 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
+import { migrateProductList } from '@/utils/masterDataMigrate'
+import {
+  generateSharedItemId,
+  syncAfterProductSave,
+  removeLinkedMaterial,
+} from '@/utils/productMaterialSync'
 
 const STORAGE_KEY = 'i_doms_product_info'
-const DATA_VERSION = 2
+const DATA_VERSION = 3
 let codeSeq = 20000
 
 function loadFromStorage() {
@@ -12,7 +18,7 @@ function loadFromStorage() {
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed.version === DATA_VERSION && Array.isArray(parsed.products)) {
-        return parsed.products
+        return migrateProductList(parsed.products)
       }
     }
   } catch {
@@ -40,32 +46,47 @@ watch(
 
 export function generateProductCode() {
   codeSeq += 1
-  return `P${codeSeq}`
+  return `CP${dayjs().format('YY')}${String(codeSeq).slice(-5)}`
 }
 
 export function addProduct(record) {
   const now = dayjs().format('YYYY-MM-DD')
-  productInfoState.products.unshift({
+  const id =
+    record.id ||
+    (record.isProductMaterial ? generateSharedItemId() : `prod-${Date.now()}`)
+  const row = {
     ...record,
-    id: `prod-${Date.now()}`,
+    id,
     createdAt: now,
     updatedAt: now,
-  })
+  }
+  productInfoState.products.unshift(row)
+  syncAfterProductSave(row, { isEdit: false })
+  return row
 }
 
 export function updateProduct(id, patch) {
   const idx = productInfoState.products.findIndex((p) => p.id === id)
   if (idx === -1) return null
+  const prev = productInfoState.products[idx]
+  const wasLinked = Boolean(prev.isProductMaterial)
   Object.assign(productInfoState.products[idx], patch, {
     updatedAt: dayjs().format('YYYY-MM-DD'),
   })
-  return productInfoState.products[idx]
+  const row = productInfoState.products[idx]
+  syncAfterProductSave(row, {
+    isEdit: true,
+    previousId: wasLinked && !row.isProductMaterial ? id : undefined,
+  })
+  return row
 }
 
 export function deleteProduct(id) {
   const idx = productInfoState.products.findIndex((p) => p.id === id)
   if (idx === -1) return false
+  const row = productInfoState.products[idx]
   productInfoState.products.splice(idx, 1)
+  if (row.isProductMaterial) removeLinkedMaterial(id)
   return true
 }
 
@@ -76,6 +97,7 @@ export function cloneProduct(id) {
   cloned.id = `prod-${Date.now()}`
   cloned.code = generateProductCode()
   cloned.name = `${source.name}-克隆`
+  cloned.isProductMaterial = false
   const now = dayjs().format('YYYY-MM-DD')
   cloned.createdAt = now
   cloned.updatedAt = now

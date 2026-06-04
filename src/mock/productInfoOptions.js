@@ -13,7 +13,12 @@ export {
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
 
-export const productAttributeOptions = ['标准产品', '定制产品', '标准-成品', '试制产品']
+export const productAttributeOptions = [
+  '标准产品',
+  '定制产品',
+  '标准-成品零部件',
+  '定制-成品零部件',
+]
 
 export const standardSpecOptions = ['国标', '行标', '企标', 'ISO标准']
 

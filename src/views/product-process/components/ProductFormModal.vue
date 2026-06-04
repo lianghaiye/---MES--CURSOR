@@ -104,6 +104,38 @@
                 <a-switch v-model:checked="form.isProductMaterial" />
               </a-form-item>
             </a-col>
+            <template v-if="form.isProductMaterial">
+              <a-col :span="8">
+                <a-form-item label="物料类型" required>
+                  <a-select
+                    v-model:value="form.materialType"
+                    size="small"
+                    :options="materialTypeOpts"
+                    placeholder="请选择 物料类型"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="物料类别" required>
+                  <a-select
+                    v-model:value="form.materialCategoryKey"
+                    size="small"
+                    :options="materialCategoryOpts"
+                    placeholder="请选择 物料类别"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="供应型态" required>
+                  <a-select
+                    v-model:value="form.supplyForm"
+                    size="small"
+                    :options="supplyFormOpts"
+                    placeholder="请选择 供应型态"
+                  />
+                </a-form-item>
+              </a-col>
+            </template>
             <a-col :span="24">
               <a-form-item label="备注" class="remark-item">
                 <a-textarea
@@ -371,8 +403,11 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { flattenCategoryNodes, productCategoryTree } from '@/mock/productCategories'
+import { flattenCategoryNodes as flattenMatCats, materialCategoryTree } from '@/mock/materialCategories'
 import {
   barcodeTypeOptions,
+  materialTypeOptions,
+  supplyFormOptions,
   inventoryUnitOptions,
   reportTypeOptions,
   salaryMethodOptions,
@@ -397,8 +432,15 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'saved'])
 
 const flatCats = flattenCategoryNodes(productCategoryTree).filter((c) => !c.children?.length)
+const flatMatCats = flattenMatCats(materialCategoryTree).filter((c) => !c.children?.length)
 
 const barcodeOpts = barcodeTypeOptions.map((v) => ({ label: v, value: v }))
+const materialTypeOpts = materialTypeOptions.map((v) => ({ label: v, value: v }))
+const supplyFormOpts = supplyFormOptions.map((v) => ({ label: v, value: v }))
+const materialCategoryOpts = flatMatCats.map((c) => ({
+  label: `(${c.code}) ${c.title}`,
+  value: c.key,
+}))
 const unitOpts = inventoryUnitOptions.map((v) => ({ label: v, value: v }))
 const productAttrOpts = productAttributeOptions.map((v) => ({ label: v, value: v }))
 const standardSpecOpts = standardSpecOptions.map((v) => ({ label: v, value: v }))
@@ -426,6 +468,9 @@ const form = reactive({
   unitPrice: undefined,
   standardSpec: undefined,
   isProductMaterial: true,
+  materialType: '零部件',
+  materialCategoryKey: undefined,
+  supplyForm: '自制件',
   remark: '',
   laborEnabled: true,
   laborRows: [createDefaultLaborRow()],
@@ -446,6 +491,9 @@ function resetForm() {
   form.unitPrice = undefined
   form.standardSpec = undefined
   form.isProductMaterial = true
+  form.materialType = '零部件'
+  form.materialCategoryKey = undefined
+  form.supplyForm = '自制件'
   form.remark = ''
   form.laborEnabled = true
   form.laborRows = [createDefaultLaborRow()]
@@ -470,6 +518,9 @@ function loadEditRecord(record) {
     unitPrice: record.unitPrice,
     standardSpec: record.standardSpec,
     isProductMaterial: record.isProductMaterial !== false,
+    materialType: record.materialType || '零部件',
+    materialCategoryKey: record.materialCategoryKey,
+    supplyForm: record.supplyForm || '自制件',
     remark: record.remark || '',
     laborEnabled: record.laborEnabled ?? false,
   })
@@ -536,6 +587,20 @@ function validate() {
     message.warning('请选择库存单位')
     return false
   }
+  if (form.isProductMaterial) {
+    if (!form.materialType) {
+      message.warning('请选择物料类型')
+      return false
+    }
+    if (!form.materialCategoryKey) {
+      message.warning('请选择物料类别')
+      return false
+    }
+    if (!form.supplyForm) {
+      message.warning('请选择供应型态')
+      return false
+    }
+  }
   if (!form.production.defaultWorkCenter) {
     message.warning('请选择默认工作中心')
     return false
@@ -582,6 +647,9 @@ function buildPayload() {
     standardSpec: form.standardSpec || '',
     unitPrice: form.unitPrice ?? 0,
     isProductMaterial: form.isProductMaterial,
+    materialType: form.isProductMaterial ? form.materialType : undefined,
+    materialCategoryKey: form.isProductMaterial ? form.materialCategoryKey : undefined,
+    supplyForm: form.isProductMaterial ? form.supplyForm : undefined,
     remark: form.remark,
     expiryAlertEnabled: form.alert.expiryAlertEnabled,
     laborEnabled: form.laborEnabled,

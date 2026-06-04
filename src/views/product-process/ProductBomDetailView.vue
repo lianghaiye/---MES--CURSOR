@@ -178,7 +178,7 @@ const versionInfo = computed(() =>
 )
 
 const displayLines = computed(() =>
-  getLinesForTreeNode(lineItems.value, selectedNodeId.value),
+  getLinesForTreeNode(lineItems.value, selectedNodeId.value, flatNodes.value),
 )
 
 const versionList = computed(() => {
@@ -204,7 +204,7 @@ function loadDetail() {
     const structure = loadBomDetailStructure(bom)
     flatNodes.value = structure.flatNodes
     lineItems.value = structure.lineItems
-    selectedNodeId.value = ROOT_ID
+    selectedNodeId.value = structure.flatNodes.find((n) => n.isRoot)?.id || ROOT_ID
 
     const tab = tabStore.tabs.find((t) => t.path === route.path)
     if (tab) tab.title = bom.bomName || 'BOM详情'

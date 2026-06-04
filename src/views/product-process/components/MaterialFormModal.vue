@@ -103,6 +103,28 @@
                 <a-switch v-model:checked="form.isProductMaterial" />
               </a-form-item>
             </a-col>
+            <template v-if="form.isProductMaterial">
+              <a-col :span="8">
+                <a-form-item label="产品属性" required>
+                  <a-select
+                    v-model:value="form.productAttribute"
+                    size="small"
+                    :options="productAttrOpts"
+                    placeholder="请选择 产品属性"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="产品类别" required>
+                  <a-select
+                    v-model:value="form.productCategoryKey"
+                    size="small"
+                    :options="productCategoryOpts"
+                    placeholder="请选择 产品类别"
+                  />
+                </a-form-item>
+              </a-col>
+            </template>
             <a-col :span="24">
               <a-form-item label="备注" class="remark-item">
                 <a-textarea
@@ -398,6 +420,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { flattenCategoryNodes, materialCategoryTree } from '@/mock/materialCategories'
+import { productCategoryTree } from '@/mock/productCategories'
+import { productAttributeOptions } from '@/mock/productInfoOptions'
 import {
   barcodeTypeOptions,
   materialTypeOptions,
@@ -425,6 +449,7 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'saved'])
 
 const flatCats = flattenCategoryNodes(materialCategoryTree).filter((c) => !c.children?.length)
+const flatProductCats = flattenCategoryNodes(productCategoryTree).filter((c) => !c.children?.length)
 
 const barcodeOpts = barcodeTypeOptions.map((v) => ({ label: v, value: v }))
 const materialTypeOpts = materialTypeOptions.map((v) => ({ label: v, value: v }))
@@ -434,6 +459,11 @@ const reportTypeOpts = reportTypeOptions.map((v) => ({ label: v, value: v }))
 const salaryMethodOpts = salaryMethodOptions.map((v) => ({ label: v, value: v }))
 const inboundQcOpts = inboundQcOptions.map((v) => ({ label: v, value: v }))
 const categoryOpts = flatCats.map((c) => ({
+  label: `(${c.code}) ${c.title}`,
+  value: c.key,
+}))
+const productAttrOpts = productAttributeOptions.map((v) => ({ label: v, value: v }))
+const productCategoryOpts = flatProductCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
 }))
@@ -454,6 +484,8 @@ const form = reactive({
   inventoryUnit: undefined,
   unitPrice: undefined,
   isProductMaterial: false,
+  productAttribute: '标准产品',
+  productCategoryKey: undefined,
   remark: '',
   laborEnabled: true,
   laborRows: [createDefaultLaborRow()],
@@ -474,6 +506,8 @@ function resetForm() {
   form.inventoryUnit = undefined
   form.unitPrice = undefined
   form.isProductMaterial = false
+  form.productAttribute = '标准产品'
+  form.productCategoryKey = undefined
   form.remark = ''
   form.laborEnabled = true
   form.laborRows = [createDefaultLaborRow()]
@@ -496,6 +530,8 @@ function loadEditRecord(record) {
   form.inventoryUnit = record.inventoryUnit
   form.unitPrice = record.unitPrice
   form.isProductMaterial = Boolean(record.isProductMaterial)
+  form.productAttribute = record.productAttribute || '标准产品'
+  form.productCategoryKey = record.productCategoryKey
   form.remark = record.remark || ''
   form.laborEnabled = record.laborEnabled ?? false
   form.laborRows =
@@ -560,6 +596,16 @@ function validate() {
     message.warning('请选择库存单位')
     return false
   }
+  if (form.isProductMaterial) {
+    if (!form.productAttribute) {
+      message.warning('请选择产品属性')
+      return false
+    }
+    if (!form.productCategoryKey) {
+      message.warning('请选择产品类别')
+      return false
+    }
+  }
   if (form.laborEnabled) {
     for (let i = 0; i < form.laborRows.length; i += 1) {
       const row = form.laborRows[i]
@@ -605,6 +651,8 @@ function buildPayload() {
     inventoryUnit: form.inventoryUnit,
     unitPrice: form.unitPrice ?? 0,
     isProductMaterial: form.isProductMaterial,
+    productAttribute: form.isProductMaterial ? form.productAttribute : undefined,
+    productCategoryKey: form.isProductMaterial ? form.productCategoryKey : undefined,
     remark: form.remark,
     requisitionAttr: form.production.requisitionEnabled ? 1 : 0,
     laborEnabled: form.laborEnabled,

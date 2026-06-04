@@ -1,23 +1,71 @@
-/** 将销售订单明细转为申请发货明细行 */
-export function mapSalesLineToDeliveryLine(line) {
+import { isWholeMachineLine, isScatterLine, normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
+
+/** 行级发货状态：未发货、部分发货、已发完 */
+export function calcLineShipStatus(shippedQty, orderQty) {
+  const shipped = Number(shippedQty) || 0
+  const order = Number(orderQty) || 0
+  if (order <= 0 || shipped <= 0) return '未发货'
+  if (shipped >= order - 1e-9) return '已发完'
+  return '部分发货'
+}
+
+export function lineShipStatusColor(status) {
+  const map = {
+    未发货: 'default',
+    部分发货: 'processing',
+    已发完: 'success',
+  }
+  return map[status] || 'default'
+}
+
+/** 数量展示为整数（发货进度等） */
+export function formatDeliveryQtyInt(val) {
+  const n = Number(val)
+  if (Number.isNaN(n)) return '-'
+  return String(Math.round(n))
+}
+
+/** 发货进度：已发货数量/订单数量（整数） */
+export function formatShipProgress(shippedQty, orderQty) {
+  return `${formatDeliveryQtyInt(shippedQty)} / ${formatDeliveryQtyInt(orderQty)}`
+}
+
+function buildDeliveryLineBase(line, order) {
   const orderQty = Number(line.salesQty ?? line.qty ?? 0)
   const shippedQty = Number(line.shippedQty ?? line.issueQty ?? 0)
   const remain = Math.max(0, orderQty - shippedQty)
   const unitPriceExTax = Number(line.unitPriceExTax ?? 0)
-  const shipQty = remain > 0 ? remain : orderQty
+  const shipQty = remain > 0 ? remain : 0
 
   return {
     ...JSON.parse(JSON.stringify(line)),
     orderQty,
-    productUnitPrice: unitPriceExTax,
     shippedQty,
+    lineShipStatus: calcLineShipStatus(shippedQty, orderQty),
+    unitPriceExTax,
     shipQty,
     deliveryUnitPriceExTax: unitPriceExTax,
     deliveryAmountExTax: calcDeliveryAmount(shipQty, unitPriceExTax),
-    itemWeightKg: Number(line.itemWeightKg ?? 0),
-    plannedDeliveryDate: line.deliveryDate || line.plannedDeliveryDate || '',
+    deliveryMode: normalizeDeliveryMode(line, order),
+    packagingForm: line.packagingForm || '',
     lineRemark: line.lineRemark || '',
-    category: line.category || line.productAttr || '',
+  }
+}
+
+/** 将销售订单明细转为申请发货明细行（仅整机行） */
+export function mapSalesLineToDeliveryLine(line, order) {
+  if (order && !isWholeMachineLine(line, order)) return null
+  return buildDeliveryLineBase(line, order)
+}
+
+/** 散件发运产品行展示（字段与整机一致，不含本次发货数量列） */
+export function mapScatterShipDisplayLine(line, order) {
+  if (order && !isScatterLine(line, order)) return null
+  const base = buildDeliveryLineBase(line, order)
+  return {
+    ...base,
+    id: line.id,
+    salesLineId: line.id,
   }
 }
 

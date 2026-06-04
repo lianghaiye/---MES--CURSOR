@@ -1,9 +1,15 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockMaterials } from '@/mock/materialInfo'
+import { migrateMaterialList } from '@/utils/masterDataMigrate'
+import {
+  generateSharedItemId,
+  syncAfterMaterialSave,
+  removeLinkedProduct,
+} from '@/utils/productMaterialSync'
 
 const STORAGE_KEY = 'i_doms_material_info'
-const DATA_VERSION = 2
+const DATA_VERSION = 5
 let codeSeq = 100048
 
 function loadFromStorage() {
@@ -12,7 +18,7 @@ function loadFromStorage() {
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed.version === DATA_VERSION && Array.isArray(parsed.materials)) {
-        return parsed.materials
+        return migrateMaterialList(parsed.materials)
       }
     }
   } catch {
@@ -44,24 +50,39 @@ export function generateMaterialCode() {
 }
 
 export function addMaterial(record) {
-  materialInfoState.materials.unshift({
+  const id =
+    record.id ||
+    (record.isProductMaterial ? generateSharedItemId() : `mat-${Date.now()}`)
+  const row = {
     ...record,
-    id: `mat-${Date.now()}`,
+    id,
     createdAt: dayjs().format('YYYY-MM-DD'),
-  })
+  }
+  materialInfoState.materials.unshift(row)
+  syncAfterMaterialSave(row, { isEdit: false })
+  return row
 }
 
 export function updateMaterial(id, patch) {
   const idx = materialInfoState.materials.findIndex((m) => m.id === id)
   if (idx === -1) return null
+  const prev = materialInfoState.materials[idx]
+  const wasLinked = Boolean(prev.isProductMaterial)
   Object.assign(materialInfoState.materials[idx], patch)
-  return materialInfoState.materials[idx]
+  const row = materialInfoState.materials[idx]
+  syncAfterMaterialSave(row, {
+    isEdit: true,
+    previousId: wasLinked && !row.isProductMaterial ? id : undefined,
+  })
+  return row
 }
 
 export function deleteMaterial(id) {
   const idx = materialInfoState.materials.findIndex((m) => m.id === id)
   if (idx === -1) return false
+  const row = materialInfoState.materials[idx]
   materialInfoState.materials.splice(idx, 1)
+  if (row.isProductMaterial) removeLinkedProduct(id)
   return true
 }
 
@@ -72,6 +93,7 @@ export function cloneMaterial(id) {
   cloned.id = `mat-${Date.now()}`
   cloned.code = generateMaterialCode()
   cloned.name = `${source.name}-克隆`
+  cloned.isProductMaterial = false
   materialInfoState.materials.unshift(cloned)
   return cloned
 }

@@ -141,6 +141,9 @@
             row-key="id"
             size="small"
             bordered
+            :scroll="{ x: 1680 }"
+            :row-class-name="workItemRowClassName"
+            :custom-row="workItemCustomRow"
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
@@ -148,13 +151,40 @@
                   {{ record.status }}
                 </a-tag>
               </template>
+              <template v-else-if="column.key === 'deliveryMode'">
+                <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
+                  {{ record.deliveryMode || '整机' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'stockQty'">
+                <a-input-number
+                  v-model:value="record.stockQty"
+                  size="small"
+                  :min="0"
+                  :precision="3"
+                  style="width: 100%"
+                  @change="onWorkItemStockChange(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'planQty'">
+                <a-input-number
+                  v-model:value="record.planQty"
+                  size="small"
+                  :min="0"
+                  :precision="3"
+                  style="width: 100%"
+                />
+              </template>
               <template v-else-if="column.key === 'action'">
-                <a-space>
+                <a-space @click.stop>
                   <a-button type="link" size="small" @click="toggleWorkItemExpand(record)">
                     {{ expandedWorkItemId === record.id ? '收起' : '展开' }}
                   </a-button>
                   <a-button type="link" size="small" danger>终止</a-button>
                 </a-space>
+              </template>
+              <template v-else-if="column.key === 'techParams' || column.key === 'packagingForm'">
+                <span class="ellipsis-cell">{{ record[column.dataIndex] || '—' }}</span>
               </template>
             </template>
           </a-table>
@@ -183,9 +213,13 @@
             </a-space>
           </div>
 
+          <div v-if="activeWorkItem && materialTree.length" class="ebom-panel-title">
+            物料树 · {{ activeWorkItem.productName }}
+            <span class="ebom-sub">{{ activeWorkItem.productCode }}</span>
+          </div>
           <a-empty
             v-if="!materialTree.length"
-            description="请在工作项中展开一条明细以查看 EBOM"
+            description="请点击产品明细行查看 EBOM 物料树"
             class="ebom-empty"
           />
           <a-table
@@ -251,6 +285,7 @@ import {
   calcDemandQty,
   calcGapQty,
 } from '@/utils/material'
+import { calcDefaultPlanQty } from '@/utils/productionPlanWorkItem'
 import {
   addPurchaseRequisition,
   buildRequisitionFromMaterials,
@@ -278,15 +313,19 @@ const pagination = reactive({
 })
 
 const workColumns = [
-  { title: '状态', key: 'status', dataIndex: 'status', width: 90 },
-  { title: '产品名称', dataIndex: 'productName', ellipsis: true },
-  { title: '产品编码', dataIndex: 'productCode', width: 110 },
-  { title: '产品属性', dataIndex: 'productAttr', width: 90 },
-  { title: '产品类型', dataIndex: 'productType', width: 90 },
-  { title: '型号', dataIndex: 'model', width: 100 },
-  { title: '规格属性', dataIndex: 'spec', width: 100 },
-  { title: '交付日期', dataIndex: 'deliveryDate', width: 110 },
-  { title: '操作', key: 'action', width: 120 },
+  { title: '状态', key: 'status', dataIndex: 'status', width: 80, fixed: 'left' },
+  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
+  { title: '产品编码', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { title: '订单数量', dataIndex: 'orderQty', width: 88, align: 'right' },
+  { title: '交付方式', key: 'deliveryMode', dataIndex: 'deliveryMode', width: 88 },
+  { title: '已发货数量', dataIndex: 'shippedQty', width: 96, align: 'right' },
+  { title: '库存数量', key: 'stockQty', width: 100, align: 'right' },
+  { title: '计划数量', key: 'planQty', width: 100, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 56 },
+  { title: '技术参数', key: 'techParams', dataIndex: 'techParams', width: 100, ellipsis: true },
+  { title: '包装形式', key: 'packagingForm', dataIndex: 'packagingForm', width: 88, ellipsis: true },
+  { title: '交付日期', dataIndex: 'deliveryDate', width: 100 },
+  { title: '操作', key: 'action', width: 110, fixed: 'right' },
 ]
 
 const materialColumns = [
@@ -339,12 +378,13 @@ const pagedOrders = computed(() => {
 
 const selectedOrder = computed(() => filteredOrders.value.find((o) => o.id === selectedId.value))
 
-const materialTree = computed(() => {
+const activeWorkItem = computed(() => {
   const order = selectedOrder.value
-  if (!order?.workItems?.length || !expandedWorkItemId.value) return []
-  const wi = order.workItems.find((w) => w.id === expandedWorkItemId.value)
-  return wi?.materials || []
+  if (!order?.workItems?.length || !expandedWorkItemId.value) return null
+  return order.workItems.find((w) => w.id === expandedWorkItemId.value) || null
 })
+
+const materialTree = computed(() => activeWorkItem.value?.materials || [])
 
 const selfMadeMaterials = computed(() =>
   selectedOrder.value ? getSelfMadeMaterials(selectedOrder.value) : [],
@@ -378,46 +418,79 @@ function onPlanCompleteDateChange(date) {
   selectedOrder.value.planCompleteDate = date ? date.format('YYYY-MM-DD') : ''
 }
 
+function refreshWorkItemMaterials(wi, order) {
+  const baseQty = wi.orderQty ?? wi.salesQty ?? order?.productQty ?? 0
+  const walk = (nodes) => {
+    nodes?.forEach((m) => {
+      m.demandQty = calcDemandQty(m.unitUsage, baseQty)
+      m.gapQty = calcGapQty(m.demandQty, m.availableStock)
+      if (m.planQty == null) m.planQty = m.gapQty
+      if (m.children?.length) walk(m.children)
+    })
+  }
+  walk(wi.materials)
+}
+
+function selectWorkItem(record) {
+  const order = selectedOrder.value
+  if (!order || !record) return
+  expandedWorkItemId.value = record.id
+  order.workItems?.forEach((w) => {
+    w.expanded = w.id === record.id
+  })
+  refreshWorkItemMaterials(record, order)
+}
+
+function collapseWorkItem() {
+  expandedWorkItemId.value = null
+  selectedOrder.value?.workItems?.forEach((w) => {
+    w.expanded = false
+  })
+}
+
+function workItemRowClassName(record) {
+  return expandedWorkItemId.value === record.id ? 'work-item-row-active' : 'work-item-row'
+}
+
+function workItemCustomRow(record) {
+  return {
+    onClick: () => selectWorkItem(record),
+  }
+}
+
+function onWorkItemStockChange(record) {
+  record.planQty = calcDefaultPlanQty(record.orderQty, record.stockQty)
+  const order = selectedOrder.value
+  if (order && expandedWorkItemId.value === record.id) {
+    refreshWorkItemMaterials(record, order)
+  }
+}
+
 watch(selectedOrder, (order) => {
   if (!order) {
     expandedWorkItemId.value = null
     return
   }
   const items = order.workItems || []
+  if (!items.length) {
+    expandedWorkItemId.value = null
+    return
+  }
   const current = items.find((w) => w.id === expandedWorkItemId.value)
   if (!current) {
     const preferred = items.find((w) => w.expanded) || items[0]
-    expandedWorkItemId.value = preferred?.id || null
+    if (preferred) selectWorkItem(preferred)
+    return
   }
-  items.forEach((wi) => {
-    wi.expanded = wi.id === expandedWorkItemId.value
-    const baseQty = wi.salesQty ?? order.productQty
-    const walk = (nodes) => {
-      nodes?.forEach((m) => {
-        m.demandQty = calcDemandQty(m.unitUsage, baseQty)
-        m.gapQty = calcGapQty(m.demandQty, m.availableStock)
-        if (m.planQty == null) m.planQty = m.gapQty
-        if (m.children?.length) walk(m.children)
-      })
-    }
-    walk(wi.materials)
-  })
+  selectWorkItem(current)
 })
 
 function toggleWorkItemExpand(record) {
-  const order = selectedOrder.value
-  if (!order) return
   if (expandedWorkItemId.value === record.id) {
-    expandedWorkItemId.value = null
-    order.workItems?.forEach((w) => {
-      w.expanded = false
-    })
+    collapseWorkItem()
     return
   }
-  expandedWorkItemId.value = record.id
-  order.workItems?.forEach((w) => {
-    w.expanded = w.id === record.id
-  })
+  selectWorkItem(record)
 }
 
 watch(filteredOrders, (list) => {
@@ -483,6 +556,7 @@ function tagColor(tag) {
 
 function selectOrder(id) {
   selectedId.value = id
+  expandedWorkItemId.value = null
 }
 
 function handleSearch() {
@@ -598,8 +672,41 @@ function handleReset() {
   justify-content: center;
 }
 
+.ebom-panel-title {
+  margin: 12px 0 8px;
+  font-weight: 600;
+  font-size: 13px;
+
+  .ebom-sub {
+    margin-left: 8px;
+    font-weight: 400;
+    color: rgba(0, 0, 0, 0.45);
+  }
+}
+
 .ebom-empty {
   margin: 16px 0 8px;
+}
+
+:deep(.work-item-row) {
+  cursor: pointer;
+}
+
+:deep(.work-item-row-active) {
+  cursor: pointer;
+  background: #e6f4ff !important;
+
+  > td {
+    background: #e6f4ff !important;
+  }
+}
+
+.ellipsis-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 992px) {

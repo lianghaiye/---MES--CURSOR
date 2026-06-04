@@ -63,13 +63,15 @@ function buildIsg50TemplateChildren() {
     parentId: '__ROOT__',
     title: '010040001 泵体部件总成',
     quantity: 1,
-    nodeType: 'virtual',
+    nodeType: 'assembly',
+    materialCode: '010040001',
   })
   const assemblyPumpHead = createBomTreeNode({
     parentId: '__ROOT__',
     title: '010070014 泵头部件总成',
     quantity: 1,
-    nodeType: 'virtual',
+    nodeType: 'assembly',
+    materialCode: '010070014',
   })
 
   const linePumpBody = createBomLineItem({

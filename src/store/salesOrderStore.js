@@ -8,9 +8,13 @@ import {
 } from '@/store/purchaseRequisitionStore'
 import { getActiveBomForItem } from '@/store/productBomStore'
 import { createProductionPlanFromSalesOrder } from '@/store/productionPlanStore'
+import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
+import { buildLineAccessoryKits, buildOrderAccessoryKits } from '@/mock/accessoryPacks'
+import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
+import { hydrateApprovedSelfProdOrders } from '@/utils/hydrateSalesLines'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 2
+const DATA_VERSION = 3
 let orderSeq = 20
 let deliverySeq = 113
 
@@ -37,7 +41,8 @@ function persist() {
 }
 
 function loadInitialSalesOrders() {
-  return loadFromStorage() || buildMockSalesOrders(mockProducts)
+  const orders = loadFromStorage() || buildMockSalesOrders(mockProducts)
+  return hydrateApprovedSelfProdOrders(orders)
 }
 
 export function generateSalesOrderNo() {
@@ -128,6 +133,15 @@ export function approveSalesOrder(id) {
         line.bomName = bom.bomName
         line.bomVersion = bom.version
       }
+      line.deliveryMode = normalizeDeliveryMode(line, order)
+      const salesQty = Number(line.salesQty ?? line.qty) || 1
+      line.ebomSnapshot = buildEbomSnapshotFromBom(bom, salesQty)
+      if (!line.lineAccessoryKits?.length) {
+        line.lineAccessoryKits = buildLineAccessoryKits(line)
+      }
+    }
+    if (!order.orderAccessoryKits?.length) {
+      order.orderAccessoryKits = buildOrderAccessoryKits(order)
     }
     const plan = createProductionPlanFromSalesOrder(order)
     planOrderNo = plan.orderNo

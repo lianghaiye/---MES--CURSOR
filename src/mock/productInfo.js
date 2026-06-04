@@ -1,11 +1,12 @@
 import dayjs from 'dayjs'
 import { productCategoryTree, flattenCategoryNodes } from '@/mock/productCategories'
 import { pumpProductNames, barcodeTypesCycle } from '@/mock/pumpIndustryNames'
+import { migrateProductList } from '@/utils/masterDataMigrate'
 
 const flatCats = flattenCategoryNodes(productCategoryTree)
 const leafCats = flatCats.filter((c) => !c.children?.length)
 
-const attrs = ['标准产品', '定制产品', '标准-成品', '试制产品']
+const attrs = ['标准产品', '定制产品', '标准-成品零部件', '定制-成品零部件']
 const specs = ['50*30', 'ISG50-160', '80-65-200', 'DN100', 'QJ200-40', '65-160A', '32-25']
 const workCenters = ['默认工厂', '机械中心', '机加车间']
 
@@ -33,6 +34,9 @@ function createProduct(index) {
     standardSpec: index % 3 === 0 ? '国标' : '',
     unitPrice: [0, 98.68, 666.66, 569.63][index % 4],
     isProductMaterial: true,
+    materialType: ['零部件', '半成品', '虚拟件'][index % 3],
+    supplyForm: ['自制件', '外购件', '组装', '其他'][index % 4],
+    materialCategoryKey: cat.key,
     remark: '',
     expiryAlertEnabled: index % 7 === 0,
     production: {
@@ -55,7 +59,9 @@ function createProduct(index) {
   }
 }
 
-export const mockProducts = Array.from({ length: 793 }, (_, i) => createProduct(i))
+export const mockProducts = migrateProductList(
+  Array.from({ length: 793 }, (_, i) => createProduct(i)),
+)
 
 export function getCategoryFilterKeys(selectedKey) {
   if (!selectedKey) return null

@@ -85,6 +85,7 @@ export const routeTitles = {
   '/product-process/products': '产品信息',
   '/product-process/bom': '产品BOM',
   '/product-process/bom/new': '新增BOM',
+  '/product-process/bom/:id/edit': '编辑BOM',
   '/product-process/bom/:id': 'BOM详情',
   '/product-process/routing': '工艺路线',
   '/product-process/process-config': '工序配置',

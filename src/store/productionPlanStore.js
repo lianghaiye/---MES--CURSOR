@@ -6,9 +6,9 @@ import { buildMockSalesOrders } from '@/mock/salesOrderSeed'
 import { buildInitialProductionPlans } from '@/mock/productionPlanSeed'
 import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
-
+import { enrichWorkItem, normalizePlanWorkItems } from '@/utils/productionPlanWorkItem'
 const STORAGE_KEY = 'i_doms_production_plans'
-const DATA_VERSION = 2
+const DATA_VERSION = 3
 
 function normalizePlanStatuses(orders) {
   return orders.map((o) => {
@@ -22,10 +22,7 @@ function normalizePlanStatuses(orders) {
         return t
       })
     }
-    plan.workItems?.forEach((wi, idx) => {
-      if (wi.expanded == null) wi.expanded = idx === 0
-      if (!wi.salesQty && plan.productQty) wi.salesQty = plan.productQty
-    })
+    normalizePlanWorkItems(plan)
     return plan
   })
 }
@@ -112,27 +109,33 @@ export function createProductionPlanFromSalesOrder(salesOrder) {
       getActiveBomForItem('product', line.productId)
 
     const salesQty = Number(line.salesQty) || 1
-    const snapshot = bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [] }
+    const snapshot =
+      line.ebomSnapshot ||
+      (bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [] })
 
-    return {
-      id: `wi-${line.id}`,
-      salesLineId: line.id,
-      status: '待下达',
-      expanded: index === 0,
-      salesQty,
-      productName: line.productName,
-      productCode: line.productCode,
-      productAttr: line.productAttr,
-      productType: line.category || line.productAttr || '',
-      model: line.specModel,
-      spec: line.specAttr,
-      deliveryDate: line.deliveryDate || deliveryDate,
-      bomId: line.bomId,
-      bomName: line.bomName,
-      bomVersion: line.bomVersion,
-      ebomSnapshot: snapshot,
-      materials: snapshot.materials || [],
-    }
+    return enrichWorkItem(
+      {
+        id: `wi-${line.id}`,
+        salesLineId: line.id,
+        status: '待下达',
+        expanded: index === 0,
+        salesQty,
+        productName: line.productName,
+        productCode: line.productCode,
+        productAttr: line.productAttr,
+        productType: line.category || line.productAttr || '',
+        model: line.specModel,
+        spec: line.specAttr,
+        deliveryDate: line.deliveryDate || deliveryDate,
+        bomId: line.bomId,
+        bomName: line.bomName,
+        bomVersion: line.bomVersion,
+        ebomSnapshot: snapshot,
+        materials: snapshot.materials || [],
+      },
+      line,
+      index,
+    )
   })
 
   const plan = {

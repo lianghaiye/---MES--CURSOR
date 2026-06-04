@@ -28,6 +28,8 @@
             <span class="node-label">
               {{ node.title }}
               <span v-if="node.quantity != null" class="qty">({{ node.quantity }})</span>
+              <a-tag v-if="node.nodeType === 'virtual'" color="purple" class="key-tag">虚拟件</a-tag>
+              <a-tag v-else-if="node.nodeType === 'assembly'" color="orange" class="key-tag">组装件</a-tag>
               <a-tag v-if="node.isKeyPart" color="error" class="key-tag">关键件</a-tag>
             </span>
             <span

@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import { cloneOrders } from '@/mock/orders'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
+import { enrichWorkItem } from '@/utils/productionPlanWorkItem'
 import { catalogBomIdForProduct, hydrateCatalogBom } from '@/mock/productBomSeed'
 
 function mapUrgencyToPlan(urgency) {
@@ -27,25 +28,29 @@ function buildPlanFromSalesOrder(salesOrder, bomsById) {
     const salesQty = Number(line.salesQty) || 1
     const snapshot = bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [] }
 
-    return {
-      id: `wi-${line.id}`,
-      salesLineId: line.id,
-      status: index === 0 ? '进行中' : '待下达',
-      expanded: index === 0,
-      salesQty,
-      productName: line.productName,
-      productCode: line.productCode,
-      productAttr: line.productAttr,
-      productType: line.category || line.productAttr || '',
-      model: line.specModel,
-      spec: line.specAttr,
-      deliveryDate: line.deliveryDate || deliveryDate,
-      bomId,
-      bomName: line.bomName,
-      bomVersion: line.bomVersion,
-      ebomSnapshot: snapshot,
-      materials: snapshot.materials || [],
-    }
+    return enrichWorkItem(
+      {
+        id: `wi-${line.id}`,
+        salesLineId: line.id,
+        status: index === 0 ? '进行中' : '待下达',
+        expanded: index === 0,
+        salesQty,
+        productName: line.productName,
+        productCode: line.productCode,
+        productAttr: line.productAttr,
+        productType: line.category || line.productAttr || '',
+        model: line.specModel,
+        spec: line.specAttr,
+        deliveryDate: line.deliveryDate || deliveryDate,
+        bomId,
+        bomName: line.bomName,
+        bomVersion: line.bomVersion,
+        ebomSnapshot: snapshot,
+        materials: snapshot.materials || [],
+      },
+      line,
+      index,
+    )
   })
 
   const statusTags =
@@ -97,8 +102,8 @@ export function buildInitialProductionPlans(boms, salesOrders) {
     if (normalized.orderStatus === '待排产') normalized.orderStatus = '待下达'
     if (normalized.orderStatus === '生产中') normalized.orderStatus = '执行中'
     normalized.workItems?.forEach((wi, wiIdx) => {
+      Object.assign(wi, enrichWorkItem(wi, null, wiIdx))
       if (wi.expanded == null) wi.expanded = wiIdx === 0
-      if (!wi.salesQty) wi.salesQty = normalized.productQty
     })
     if (!normalized.salesOrderNo && normalized.orderNo?.startsWith('1-')) {
       normalized.salesOrderNo = normalized.orderNo
