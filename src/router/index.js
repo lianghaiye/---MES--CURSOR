@@ -119,6 +119,18 @@ const routes = [
         meta: { title: '总装工单' },
       },
       {
+        path: 'production/disassembly-work-orders',
+        name: 'production-disassembly-work-orders',
+        component: () => import('@/views/production/DisassemblyWorkOrderManagementView.vue'),
+        meta: { title: '拆解工单' },
+      },
+      {
+        path: 'production/disassembly-work-orders/:id',
+        name: 'production-disassembly-work-order-detail',
+        component: () => import('@/views/production/DisassemblyWorkOrderDetailView.vue'),
+        meta: { title: '拆解工单详情' },
+      },
+      {
         path: 'production/qc-work-orders',
         name: 'production-qc-work-orders',
         component: () => import('@/views/production/QcWorkOrderManagementView.vue'),

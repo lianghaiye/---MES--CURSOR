@@ -217,8 +217,7 @@ export function updateDeliveryOrder(id, patch) {
   row.totalAmountExTax = calcDeliveryAmountExTax(row)
   row.shipWeight = patch.shipWeight ?? calcShipWeight(row)
   refreshRowMetrics(row)
-  const editable =
-    prev.deliveryStatus === '待发货' || prev.deliveryStatus === '待出库'
+  const editable = prev.deliveryStatus === '待发货' || prev.deliveryStatus === '待出库'
   if (editable && hasLinkedSalesOutbound(row)) {
     upsertSalesOutboundFromDelivery(row)
     row.deliveryStatus = '待出库'

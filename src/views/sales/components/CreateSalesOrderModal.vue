@@ -218,7 +218,7 @@
                   <a-col v-for="col in columnDefs" :key="col.key" :span="12">
                     <a-checkbox
                       :value="col.key"
-                      :disabled="col.key === 'index' || col.key === 'action'"
+                      :disabled="fixedColumnKeys.includes(col.key)"
                     >
                       {{ col.title }}
                     </a-checkbox>
@@ -505,11 +505,14 @@ const productCategoryOpts = leafProductCats.map((c) => ({
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024
 
+/** 销售明细固定列：不可隐藏、左侧冻结 */
+const fixedColumnKeys = ['index', 'productName', 'productCode', 'action']
+
 const columnDefs = [
-  { key: 'index', title: '#', width: 48 },
+  { key: 'index', title: '序号', width: 56, fixed: 'left' },
+  { key: 'productName', title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
+  { key: 'productCode', title: '产品编码', dataIndex: 'productCode', width: 130, ellipsis: true, fixed: 'left' },
   { key: 'productAttr', title: '产品属性', dataIndex: 'productAttr', width: 90 },
-  { key: 'productName', title: '产品名称', dataIndex: 'productName', width: 130, ellipsis: true },
-  { key: 'productCode', title: '产品编码', dataIndex: 'productCode', width: 130, ellipsis: true },
   { key: 'specAttr', title: '规格属性', dataIndex: 'specAttr', width: 90 },
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 100 },
   { key: 'material', title: '材质', dataIndex: 'material', width: 80 },
@@ -527,7 +530,7 @@ const columnDefs = [
   { key: 'techParams', title: '技术参数', width: 100 },
   { key: 'packagingForm', title: '包装形式', width: 90 },
   { key: 'supplementDesc', title: '补充说明', width: 90 },
-  { key: 'action', title: '操作', width: 110 },
+  { key: 'action', title: '操作', width: 110, fixed: 'right' },
 ]
 
 const visibleColumnKeys = ref(columnDefs.map((c) => c.key))
@@ -604,9 +607,17 @@ const displayColumns = computed(() =>
       width: c.width,
       ellipsis: c.ellipsis,
       align: c.key === 'index' ? 'center' : undefined,
-      fixed: c.key === 'index' ? 'left' : c.key === 'action' ? 'right' : undefined,
+      fixed: c.fixed,
     })),
 )
+
+watch(visibleColumnKeys, (keys) => {
+  const required = fixedColumnKeys.filter((k) => k !== 'action')
+  const missing = required.filter((k) => !keys.includes(k))
+  if (missing.length) {
+    visibleColumnKeys.value = [...new Set([...keys, ...required])]
+  }
+})
 
 const tableScrollX = computed(() =>
   displayColumns.value.reduce((sum, c) => sum + (c.width || 100), 0),

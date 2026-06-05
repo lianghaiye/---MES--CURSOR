@@ -1,7 +1,7 @@
 <template>
   <div v-if="workOrder" class="detail-panel">
     <div class="detail-header">
-      <div class="detail-title" :class="{ 'title-bold': variant === 'qc' }">
+      <div class="detail-title">
         <span class="code">{{ workOrder.code }}</span>
         <span class="name">{{ workOrder.name }}</span>
       </div>
@@ -26,8 +26,8 @@
         >
           <a-row :gutter="[16, 12]" style="width: 100%">
             <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="产品名称">
-                <a-input :value="workOrder.productName" disabled size="small" />
+              <a-form-item label="物品名称">
+                <a-input :value="workOrder.itemName" disabled size="small" />
               </a-form-item>
             </a-col>
             <a-col :xs="24" :sm="12" :md="8">
@@ -57,6 +57,16 @@
                   v-model:value="workOrder.warehouse"
                   size="small"
                   :options="warehouseOpts"
+                  @change="emit('save-basic')"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :xs="24" :sm="12" :md="8">
+              <a-form-item label="负责人">
+                <a-select
+                  v-model:value="workOrder.personInCharge"
+                  size="small"
+                  :options="personOpts"
                   @change="emit('save-basic')"
                 />
               </a-form-item>
@@ -102,19 +112,11 @@
         />
       </a-tab-pane>
       <a-tab-pane key="detail" tab="工单详情">
-        <WorkOrderDetailTab :work-order="workOrder" @action="emit('detail-action', $event)" />
+        <WorkOrderDetailTab :work-order="detailWorkOrder" @action="emit('detail-action', $event)" />
       </a-tab-pane>
-      <template v-if="variant === 'production' || variant === 'assembly'">
-        <a-tab-pane key="ebom" tab="EBOM">
-          <WorkOrderEbomTreeTab :work-order="workOrder" :variant="variant" />
-        </a-tab-pane>
-        <a-tab-pane v-if="variant === 'production'" key="current-bom" tab="当前BOM">
-          <WorkOrderCurrentBomTab :work-order="workOrder" />
-        </a-tab-pane>
-        <a-tab-pane key="tasks" tab="任务列表">
-          <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
-        </a-tab-pane>
-      </template>
+      <a-tab-pane key="ebom" tab="EBOM">
+        <DisassemblyEbomTreeTab :work-order="workOrder" />
+      </a-tab-pane>
     </a-tabs>
   </div>
 </template>
@@ -122,35 +124,29 @@
 <script setup>
 import { computed } from 'vue'
 import { DownOutlined, UpOutlined } from '@ant-design/icons-vue'
-import { workOrderState } from '@/store/workOrderStore'
-import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
-import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
+import { disassemblyWorkOrderState } from '@/store/disassemblyWorkOrderStore'
+import { mapDisassemblyForDetailTab } from '@/utils/disassemblyWorkOrder'
 import WorkOrderDispatchTab from './WorkOrderDispatchTab.vue'
 import WorkOrderDetailTab from './WorkOrderDetailTab.vue'
-import WorkOrderEbomTreeTab from './WorkOrderEbomTreeTab.vue'
-import WorkOrderCurrentBomTab from './WorkOrderCurrentBomTab.vue'
+import DisassemblyEbomTreeTab from './DisassemblyEbomTreeTab.vue'
 
 const props = defineProps({
   workOrderId: { type: String, default: null },
-  variant: { type: String, default: 'production' },
   showDispatchTab: { type: Boolean, default: false },
   planDateValue: { type: Object, default: null },
   workCenterOpts: { type: Array, default: () => [] },
   warehouseOpts: { type: Array, default: () => [] },
   urgencyOpts: { type: Array, default: () => [] },
   bomOpts: { type: Array, default: () => [] },
+  personOpts: { type: Array, default: () => [] },
 })
 
 const workOrder = computed(() => {
   if (!props.workOrderId) return null
-  const list =
-    props.variant === 'qc'
-      ? qcWorkOrderState.orders
-      : props.variant === 'assembly'
-        ? assemblyWorkOrderState.orders
-        : workOrderState.orders
-  return list.find((o) => o.id === props.workOrderId)
+  return disassemblyWorkOrderState.orders.find((o) => o.id === props.workOrderId)
 })
+
+const detailWorkOrder = computed(() => mapDisassemblyForDetailTab(workOrder.value))
 
 const detailTab = defineModel('detailTab', { type: String, default: 'dispatch' })
 const detailCollapsed = defineModel('detailCollapsed', { type: Boolean, default: false })
@@ -175,23 +171,9 @@ const emit = defineEmits([
     .detail-title {
       min-width: 0;
 
-      &.title-bold {
-        .code,
-        .name {
-          font-weight: 600;
-          font-size: 14px;
-          color: rgba(0, 0, 0, 0.88);
-        }
-
-        .name {
-          margin-left: 8px;
-        }
-      }
-
       .code {
-        font-size: 14px;
         font-weight: 600;
-        color: rgba(0, 0, 0, 0.88);
+        font-size: 14px;
         margin-right: 8px;
       }
 
@@ -202,11 +184,9 @@ const emit = defineEmits([
     }
 
     .collapse-btn {
-      flex-shrink: 0;
-      padding-right: 0;
-      font-size: 12px;
+      padding: 0;
       height: auto;
-      color: rgba(0, 0, 0, 0.45);
+      font-size: 12px;
     }
   }
 
@@ -214,61 +194,16 @@ const emit = defineEmits([
     :deep(.ant-tabs-nav) {
       margin-bottom: 8px;
     }
-
-    :deep(.ant-tabs-tab) {
-      padding: 6px 0;
-      font-size: 13px;
-    }
   }
 
   .dispatch-basic-form {
-    padding-bottom: 16px;
-    border-bottom: 1px solid #f0f0f0;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #f0f0f0;
   }
 
   .dispatch-process-section {
-    margin-top: 20px;
-  }
-
-  .horizontal-form {
-    width: 100%;
-
-    :deep(.ant-form-item) {
-      width: 100%;
-      margin-bottom: 0;
-    }
-
-    :deep(.ant-form-item-row) {
-      flex-wrap: nowrap;
-      align-items: center;
-    }
-
-    :deep(.ant-form-item-label) {
-      flex: 0 0 auto;
-      padding-bottom: 0;
-
-      > label {
-        height: 24px;
-        line-height: 24px;
-        font-size: 13px;
-        white-space: nowrap;
-      }
-    }
-
-    :deep(.ant-form-item-control) {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .remark-item {
-      :deep(.ant-form-item-label) {
-        flex: 0 0 68px;
-      }
-    }
-  }
-
-  .tab-empty {
-    margin: 24px 0;
+    margin-top: 4px;
   }
 }
 </style>
