@@ -12,9 +12,7 @@ function reIdStructure(raw, templateRef) {
     ...n,
     id: idMap.get(n.id),
     parentId:
-      n.parentId === '__ROOT__' || !n.parentId
-        ? '__ROOT__'
-        : idMap.get(n.parentId) || '__ROOT__',
+      n.parentId === '__ROOT__' || !n.parentId ? '__ROOT__' : idMap.get(n.parentId) || '__ROOT__',
     isRoot: false,
   }))
 
@@ -112,11 +110,7 @@ export function applyBomTemplateImport(bom, hasExistingRoot, flatNodes) {
 
   if (hasExistingRoot) {
     const cleared = clearBomChildren(flatNodes)
-    const merged = mergeTemplateIntoRoot(
-      cleared.flatNodes,
-      cleared.lineItems,
-      structure,
-    )
+    const merged = mergeTemplateIntoRoot(cleared.flatNodes, cleared.lineItems, structure)
     return {
       mode: 'children',
       flatNodes: merged.flatNodes,

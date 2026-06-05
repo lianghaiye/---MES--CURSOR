@@ -68,6 +68,29 @@ export function buildMockSalesOrders(products) {
       remark: '多明细自产订单（已审，已联动生产计划）',
       contactPerson: 'TEST',
       contactPhone: '16522033362',
+      attachments: [
+        {
+          uid: 'att-seed-1',
+          name: '合同-HT-20260512-005.pdf',
+          type: '合同',
+          uploadedAt: '2026-05-12 10:00',
+        },
+      ],
+      deliveryApplications: [
+        {
+          id: 'da-seed-1',
+          deliveryCode: 'SH20260513001',
+          createdAt: '2026-05-13 14:30',
+          deliveryDate: '2026-05-20',
+          shipmentMethod: '物流',
+          outboundWarehouse: '成品仓',
+          status: '已提交',
+          remark: '首批整机+散件发运',
+          lineItems: [],
+          scatterShipments: [],
+          totalShipQty: 0,
+        },
+      ],
       lineItems: [
         lineFromProduct(p(0), { id: 'line-seed-1a', salesQty: 3, deliveryMode: '整机' }),
         lineFromProduct(p(1), { id: 'line-seed-1b', salesQty: 2, deliveryMode: '散件' }),

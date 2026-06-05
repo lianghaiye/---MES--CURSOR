@@ -12,12 +12,12 @@ export function buildWorkOrderDetail(workOrder) {
       ? workOrder.processes
       : buildProcessesFromRoute(workOrder.processRouteName || DEMO_ROUTE)
 
-  const planStart = workOrder.planDateRange?.[0] || workOrder.createdAt || dayjs().format('YYYY-MM-DD')
+  const planStart =
+    workOrder.planDateRange?.[0] || workOrder.createdAt || dayjs().format('YYYY-MM-DD')
   const planEnd = workOrder.planDateRange?.[1] || planStart
   const scheduleQty = workOrder.scheduleQty ?? workOrder.planQty ?? 0
   const actualQty = workOrder.actualQty ?? 0
-  const progressPct =
-    scheduleQty > 0 ? ((actualQty / scheduleQty) * 100).toFixed(2) : '0.00'
+  const progressPct = scheduleQty > 0 ? ((actualQty / scheduleQty) * 100).toFixed(2) : '0.00'
 
   return {
     timeline: buildTimeline(workOrder, { planEnd, scheduleQty, actualQty, progressPct }),
@@ -104,10 +104,7 @@ function buildTimeline(wo, ctx) {
       title: '工单执行',
       status: isDone ? 'finish' : isExecuting ? 'process' : 'wait',
       description: isExecuting || isDone ? `${ctx.progressPct}%` : '',
-      sub:
-        isExecuting || isDone
-          ? `计划/实际生产: ${ctx.scheduleQty}/${ctx.actualQty}`
-          : '',
+      sub: isExecuting || isDone ? `计划/实际生产: ${ctx.scheduleQty}/${ctx.actualQty}` : '',
     },
     {
       key: 'complete',

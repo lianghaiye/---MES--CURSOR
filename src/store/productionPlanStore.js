@@ -110,8 +110,7 @@ export function createProductionPlanFromSalesOrder(salesOrder) {
 
     const salesQty = Number(line.salesQty) || 1
     const snapshot =
-      line.ebomSnapshot ||
-      (bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [] })
+      line.ebomSnapshot || (bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [] })
 
     return enrichWorkItem(
       {

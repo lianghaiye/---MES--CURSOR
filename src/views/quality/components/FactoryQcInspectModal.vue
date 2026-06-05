@@ -14,7 +14,12 @@
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :span="8">
             <a-form-item label="质检单号">
-              <a-input :value="displayQcNo" disabled size="small" placeholder="保存后系统自动生成" />
+              <a-input
+                :value="displayQcNo"
+                disabled
+                size="small"
+                placeholder="保存后系统自动生成"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -109,7 +114,11 @@
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { inspectMethodOptions, lineQcResultOptions, treatmentPlanOptions } from '@/mock/factoryQcOptions'
+import {
+  inspectMethodOptions,
+  lineQcResultOptions,
+  treatmentPlanOptions,
+} from '@/mock/factoryQcOptions'
 import { submitFactoryQcInspection } from '@/store/factoryQcStore'
 
 const props = defineProps({

@@ -52,7 +52,34 @@ export const mockOutboundOrders = [
     status: '待处理',
     createdAt: '2026-06-02',
     lineItems: [
-      createOutboundLine({ itemName: '轴承座', itemCode: 'MAT-001', shipQty: 20, shipWarehouse: '库A仓' }),
+      createOutboundLine({
+        itemName: '轴承座',
+        itemCode: 'MAT-001',
+        shipQty: 20,
+        shipWarehouse: '库A仓',
+      }),
+    ],
+  }),
+  createOutboundOrder({
+    id: 'ob-so-seed-1',
+    docNo: 'OUT202605130001',
+    outboundType: '销售出库',
+    warehouse: '成品仓',
+    sourceOrderNo: 'SH20260513001',
+    salesOrderNo: '1-20260512-005',
+    linkedDeliveryId: 'do-seed-1',
+    linkedDeliveryCode: 'SH20260513001',
+    customerName: '测试人员',
+    status: '待出库',
+    createdAt: '2026-05-13',
+    lineItems: [
+      createOutboundLine({
+        itemName: '清水离心泵',
+        itemCode: 'CP2610001',
+        itemType: '产品',
+        shipQty: 3,
+        shipWarehouse: '成品仓',
+      }),
     ],
   }),
   createOutboundOrder({
@@ -87,7 +114,12 @@ export const mockOutboundOrders = [
     status: '待出库',
     createdAt: '2026-06-01',
     lineItems: [
-      createOutboundLine({ itemName: '螺栓组', itemCode: 'MAT-STD-100', shipQty: 100, shipWarehouse: '半成品仓' }),
+      createOutboundLine({
+        itemName: '螺栓组',
+        itemCode: 'MAT-STD-100',
+        shipQty: 100,
+        shipWarehouse: '半成品仓',
+      }),
     ],
   }),
   createOutboundOrder({
@@ -102,7 +134,13 @@ export const mockOutboundOrders = [
     completedAt: '2026-05-28',
     auditDate: '2026-05-28',
     lineItems: [
-      createOutboundLine({ itemName: '钢锭', itemCode: 'RAW-STEEL-01', shipQty: 500, shipWarehouse: '原材料仓', unit: 'kg' }),
+      createOutboundLine({
+        itemName: '钢锭',
+        itemCode: 'RAW-STEEL-01',
+        shipQty: 500,
+        shipWarehouse: '原材料仓',
+        unit: 'kg',
+      }),
     ],
   }),
   createOutboundOrder({

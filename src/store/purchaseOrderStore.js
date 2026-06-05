@@ -121,7 +121,10 @@ export function createPurchaseOrdersFromMergedLines(mergedLines) {
     const first = lines[0]
     const reqNos = [...new Set(lines.flatMap((l) => l.sourceReqNos || []))]
     const salesNos = [...new Set(lines.flatMap((l) => l.sourceSalesOrderNos || []))]
-    const deliveryDates = lines.map((l) => l.deliveryDate).filter(Boolean).sort()
+    const deliveryDates = lines
+      .map((l) => l.deliveryDate)
+      .filter(Boolean)
+      .sort()
 
     const lineItems = lines.map((line) =>
       createPoLineItem({

@@ -265,10 +265,18 @@ const batchEditMeta = {
   planPurchaseQty: { label: '计划采购量', type: 'number', precision: 2 },
   designatedSupplier: { label: '指定供应商', type: 'select', options: designatedSupplierOptions },
   supplierName: { label: '供应商名称', type: 'select', options: supplierOptions },
-  settlementType: { label: '结算类型', type: 'select', options: settlementTypeOptions.map((v) => ({ label: v, value: v })) },
+  settlementType: {
+    label: '结算类型',
+    type: 'select',
+    options: settlementTypeOptions.map((v) => ({ label: v, value: v })),
+  },
   unitPriceExTax: { label: '不含税单价', type: 'number', precision: 2 },
   taxRate: { label: '税率(%)', type: 'number', precision: 2 },
-  receivingMode: { label: '收货模式', type: 'select', options: receivingModeOptions.map((v) => ({ label: v, value: v })) },
+  receivingMode: {
+    label: '收货模式',
+    type: 'select',
+    options: receivingModeOptions.map((v) => ({ label: v, value: v })),
+  },
   leadTimeDays: { label: '供货期/天', type: 'number', precision: 0 },
   deliveryDate: { label: '交货日期', type: 'date' },
   receivingWarehouse: { label: '收货仓库', type: 'select', options: warehouseOptions },
@@ -277,7 +285,14 @@ const batchEditMeta = {
 
 const columns = [
   { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
-  { title: '物料名称', key: 'materialName', dataIndex: 'materialName', width: 110, ellipsis: true, fixed: 'left' },
+  {
+    title: '物料名称',
+    key: 'materialName',
+    dataIndex: 'materialName',
+    width: 110,
+    ellipsis: true,
+    fixed: 'left',
+  },
   { title: '物料类型', key: 'materialType', dataIndex: 'materialType', width: 90 },
   { title: '物料编码', key: 'materialCode', dataIndex: 'materialCode', width: 120 },
   { title: '型号规格', key: 'specModel', dataIndex: 'specModel', width: 100 },
@@ -294,7 +309,12 @@ const columns = [
   { title: '总价（含税）', key: 'totalPriceInTax', width: 100, align: 'right' },
   { title: '收货模式', key: 'receivingMode', width: 100 },
   { title: '供货期/天', key: 'leadTimeDays', width: 90 },
-  { title: '期望到货日期', key: 'expectedArrivalDate', dataIndex: 'expectedArrivalDate', width: 120 },
+  {
+    title: '期望到货日期',
+    key: 'expectedArrivalDate',
+    dataIndex: 'expectedArrivalDate',
+    width: 120,
+  },
   { title: '交货日期', key: 'deliveryDate', width: 120 },
   { title: '收货仓库', key: 'receivingWarehouse', width: 100 },
   { title: '计量单位', key: 'unit', dataIndex: 'unit', width: 80 },
@@ -315,7 +335,9 @@ const batchEditLabel = computed(() => batchEditMeta[batchEditKey.value]?.label |
 const batchEditType = computed(() => batchEditMeta[batchEditKey.value]?.type || 'text')
 const batchEditOptions = computed(() => batchEditMeta[batchEditKey.value]?.options || [])
 const batchEditPrecision = computed(() => batchEditMeta[batchEditKey.value]?.precision ?? 2)
-const batchEditDateValue = computed(() => (batchEditValue.value ? dayjs(batchEditValue.value) : null))
+const batchEditDateValue = computed(() =>
+  batchEditValue.value ? dayjs(batchEditValue.value) : null,
+)
 
 const summaryCells = computed(() => {
   const dataCols = columns.slice(1)

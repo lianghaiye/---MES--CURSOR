@@ -249,9 +249,7 @@ function filterItem(input, option) {
   return (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
 }
 
-const filteredList = computed(() =>
-  filterProductBoms(productBomState.boms, appliedFilters.value),
-)
+const filteredList = computed(() => filterProductBoms(productBomState.boms, appliedFilters.value))
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize

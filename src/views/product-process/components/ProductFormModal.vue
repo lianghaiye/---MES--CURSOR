@@ -403,7 +403,10 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { flattenCategoryNodes, productCategoryTree } from '@/mock/productCategories'
-import { flattenCategoryNodes as flattenMatCats, materialCategoryTree } from '@/mock/materialCategories'
+import {
+  flattenCategoryNodes as flattenMatCats,
+  materialCategoryTree,
+} from '@/mock/materialCategories'
 import {
   barcodeTypeOptions,
   materialTypeOptions,

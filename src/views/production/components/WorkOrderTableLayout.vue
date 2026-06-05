@@ -9,7 +9,12 @@
           </a-button>
         </a-tooltip>
         <a-tooltip title="切换为卡片视图">
-          <a-button type="text" size="small" class="toolbar-icon-btn" @click="emit('toggle-layout')">
+          <a-button
+            type="text"
+            size="small"
+            class="toolbar-icon-btn"
+            @click="emit('toggle-layout')"
+          >
             <AppstoreOutlined />
           </a-button>
         </a-tooltip>
@@ -45,7 +50,12 @@
             <a-button type="link" size="small" @click.stop="emit('action', 'edit', record)">
               编辑
             </a-button>
-            <a-button type="link" size="small" danger @click.stop="emit('action', 'delete', record)">
+            <a-button
+              type="link"
+              size="small"
+              danger
+              @click.stop="emit('action', 'delete', record)"
+            >
               删除
             </a-button>
             <a-button type="link" size="small" @click.stop="emit('action', 'clone', record)">

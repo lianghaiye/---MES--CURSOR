@@ -1,7 +1,12 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { cloneOutboundOrders } from '@/mock/outboundOrders'
-import { createFactoryQcFromOutbound, getFactoryQcById, qcResultBlocksOutbound, QC_RESULT_PASS } from '@/store/factoryQcStore'
+import {
+  createFactoryQcFromOutbound,
+  getFactoryQcById,
+  qcResultBlocksOutbound,
+  QC_RESULT_PASS,
+} from '@/store/factoryQcStore'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 
@@ -73,13 +78,22 @@ export function confirmOutbound(ids) {
     const check = validateOutboundForConfirm(order)
     if (!check.ok) {
       if (check.code !== 'already_done') {
-        blocked.push({ docNo: order?.docNo || id, message: check.message, qcBlocked: check.qcBlocked })
+        blocked.push({
+          docNo: order?.docNo || id,
+          message: check.message,
+          qcBlocked: check.qcBlocked,
+        })
       }
       return
     }
     order.status = '已出库'
     order.completedAt = dayjs().format('YYYY-MM-DD')
     if (!order.auditDate) order.auditDate = order.completedAt
+    if (order.outboundType === '销售出库') {
+      import('@/utils/deliveryOutboundSync').then(({ syncDeliveryAfterOutboundConfirm }) => {
+        syncDeliveryAfterOutboundConfirm(order)
+      })
+    }
     count += 1
   })
   return { count, blocked }
@@ -177,8 +191,7 @@ export function initiateFactoryQcFromOutbound(outboundId) {
   }
 
   const previousQc = outbound.factoryQcId ? getFactoryQcById(outbound.factoryQcId) : null
-  const isRetry =
-    previousQc?.qcStatus === '已完成' && qcResultBlocksOutbound(previousQc.qcResult)
+  const isRetry = previousQc?.qcStatus === '已完成' && qcResultBlocksOutbound(previousQc.qcResult)
 
   const payload = {
     ...outbound,

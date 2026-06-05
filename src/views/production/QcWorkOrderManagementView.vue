@@ -334,7 +334,9 @@ const warehouseOpts = warehouseOptions.map((v) => ({ label: v, value: v }))
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const bomOpts = bomOptions.map((v) => ({ label: v, value: v }))
 
-const filteredOrders = computed(() => filterQcWorkOrders(qcWorkOrderState.orders, appliedFilters.value))
+const filteredOrders = computed(() =>
+  filterQcWorkOrders(qcWorkOrderState.orders, appliedFilters.value),
+)
 
 const pagedOrders = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize

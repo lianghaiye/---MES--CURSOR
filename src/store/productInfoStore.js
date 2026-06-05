@@ -51,9 +51,7 @@ export function generateProductCode() {
 
 export function addProduct(record) {
   const now = dayjs().format('YYYY-MM-DD')
-  const id =
-    record.id ||
-    (record.isProductMaterial ? generateSharedItemId() : `prod-${Date.now()}`)
+  const id = record.id || (record.isProductMaterial ? generateSharedItemId() : `prod-${Date.now()}`)
   const row = {
     ...record,
     id,

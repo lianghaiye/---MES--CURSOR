@@ -130,9 +130,7 @@ const columns = [
   { title: '失效日期', dataIndex: 'expiredAt', width: 150 },
 ]
 
-const activeBomList = computed(() =>
-  productBomState.boms.filter((b) => b.status === '使用中'),
-)
+const activeBomList = computed(() => productBomState.boms.filter((b) => b.status === '使用中'))
 
 const itemFilterOptions = computed(() => {
   const products = productInfoState.products.slice(0, 150).map((p) => ({
@@ -213,11 +211,7 @@ function confirm() {
     return
   }
 
-  const result = applyBomTemplateImport(
-    selectedBom.value,
-    props.hasRoot,
-    props.flatNodes,
-  )
+  const result = applyBomTemplateImport(selectedBom.value, props.hasRoot, props.flatNodes)
   if (!result) {
     message.error('无法加载该 BOM 结构')
     return

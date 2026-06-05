@@ -71,6 +71,8 @@ function createSalesOrder(partial) {
     lineItems,
     purchaseRequisitionNo: '',
     purchaseRequisitionId: '',
+    deliveryApplications: [],
+    attachments: [],
     ...partial,
   }
 }

@@ -50,9 +50,7 @@ export function generateMaterialCode() {
 }
 
 export function addMaterial(record) {
-  const id =
-    record.id ||
-    (record.isProductMaterial ? generateSharedItemId() : `mat-${Date.now()}`)
+  const id = record.id || (record.isProductMaterial ? generateSharedItemId() : `mat-${Date.now()}`)
   const row = {
     ...record,
     id,

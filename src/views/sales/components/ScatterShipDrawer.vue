@@ -171,19 +171,14 @@ const displayRows = computed(() => {
   return visible.map((v) => map.get(v.materialId) || v)
 })
 
-const selectableRows = computed(() =>
-  displayRows.value.filter((r) => r.selectable !== false),
-)
+const selectableRows = computed(() => displayRows.value.filter((r) => r.selectable !== false))
 
 const selectAllChecked = computed(
-  () =>
-    selectableRows.value.length > 0 && selectableRows.value.every((r) => r.selected),
+  () => selectableRows.value.length > 0 && selectableRows.value.every((r) => r.selected),
 )
 
 const selectAllIndeterminate = computed(
-  () =>
-    selectableRows.value.some((r) => r.selected) &&
-    !selectAllChecked.value,
+  () => selectableRows.value.some((r) => r.selected) && !selectAllChecked.value,
 )
 
 const materialColumns = [
@@ -214,16 +209,11 @@ watch(
     const saved = props.shipment.materialPicks || []
     if (snapshot?.materials?.length) {
       const built = buildShipMaterialRowsFromSnapshot(snapshot)
-      allMaterialRows.value = saved.length
-        ? mergeMaterialPicksWithSaved(built, saved)
-        : built
+      allMaterialRows.value = saved.length ? mergeMaterialPicksWithSaved(built, saved) : built
     } else {
       allMaterialRows.value = JSON.parse(JSON.stringify(saved))
     }
-    expandedMaterialIds.value = resolveInitialExpandedMaterialIds(
-      allMaterialRows.value,
-      saved,
-    )
+    expandedMaterialIds.value = resolveInitialExpandedMaterialIds(allMaterialRows.value, saved)
     localRemark.value = props.shipment.remark || ''
     applyExpandAndSelectability()
   },
@@ -284,14 +274,9 @@ function toggleExpandAllAssembly() {
   if (assemblyFullyExpanded.value) {
     const remove = new Set(assemblyExpandableIds.value)
     expandedMaterialIds.value = expandedMaterialIds.value.filter((id) => !remove.has(id))
-    assemblyExpandableIds.value.forEach((id) =>
-      unselectDescendantPicks(allMaterialRows.value, id),
-    )
+    assemblyExpandableIds.value.forEach((id) => unselectDescendantPicks(allMaterialRows.value, id))
   } else {
-    const merged = new Set([
-      ...expandedMaterialIds.value,
-      ...assemblyExpandableIds.value,
-    ])
+    const merged = new Set([...expandedMaterialIds.value, ...assemblyExpandableIds.value])
     expandedMaterialIds.value = [...merged]
   }
   applyExpandAndSelectability()

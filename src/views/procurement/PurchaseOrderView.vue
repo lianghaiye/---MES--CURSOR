@@ -5,7 +5,12 @@
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="采购单号">
-              <a-input v-model:value="filters.orderNo" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.orderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
@@ -22,12 +27,22 @@
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="申请单号">
-              <a-input v-model:value="filters.reqNo" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.reqNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="销售单号">
-              <a-input v-model:value="filters.salesOrderNo" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.salesOrderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
@@ -54,7 +69,11 @@
           </a-col>
           <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="单据日期">
-              <a-range-picker v-model:value="filters.documentDateRange" size="small" style="width: 100%" />
+              <a-range-picker
+                v-model:value="filters.documentDateRange"
+                size="small"
+                style="width: 100%"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="8">
@@ -124,9 +143,11 @@
         <span>
           当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
           <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
-          共计 {{ filteredList.length }} 条数据，总计采购数量：{{ summary.totalQty.toLocaleString() }}，总计采购金额含税：￥{{
-            summary.amountInTax.toFixed(2)
-          }}元，不含税：￥{{ summary.amountExTax.toFixed(2) }}元。
+          共计 {{ filteredList.length }} 条数据，总计采购数量：{{
+            summary.totalQty.toLocaleString()
+          }}，总计采购金额含税：￥{{ summary.amountInTax.toFixed(2) }}元，不含税：￥{{
+            summary.amountExTax.toFixed(2)
+          }}元。
         </span>
       </template>
     </a-alert>
@@ -181,7 +202,10 @@
                 <CheckCircleOutlined />
                 审批
               </a-button>
-              <span v-if="!canEditPurchaseOrder(record) && !canApprovePurchaseOrder(record)" class="action-disabled">
+              <span
+                v-if="!canEditPurchaseOrder(record) && !canApprovePurchaseOrder(record)"
+                class="action-disabled"
+              >
                 -
               </span>
             </a-space>
@@ -246,11 +270,7 @@ import {
   canCompletePurchaseOrder,
   getPurchaseOrdersByIds,
 } from '@/store/purchaseOrderStore'
-import {
-  poStatusOptions,
-  poSourceOptions,
-  supplierOptions,
-} from '@/mock/purchaseOrderOptions'
+import { poStatusOptions, poSourceOptions, supplierOptions } from '@/mock/purchaseOrderOptions'
 import CreatePurchaseOrderModal from './components/CreatePurchaseOrderModal.vue'
 import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
 

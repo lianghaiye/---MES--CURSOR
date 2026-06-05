@@ -2,10 +2,7 @@ import dayjs from 'dayjs'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { linkProductMaterialRows } from '@/utils/masterDataMigrate'
-import {
-  buildMaterialFromProduct,
-  buildProductFromMaterial,
-} from '@/utils/productMaterialMap'
+import { buildMaterialFromProduct, buildProductFromMaterial } from '@/utils/productMaterialMap'
 
 export { buildMaterialFromProduct, buildProductFromMaterial } from '@/utils/productMaterialMap'
 

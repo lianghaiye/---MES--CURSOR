@@ -175,7 +175,9 @@ export function createFactoryQcFromOutbound(outbound, options = {}) {
     outboundDocNo: outbound.docNo,
     inspectMethod: '抽检',
     inspectDate: dayjs().format('YYYY-MM-DD'),
-    remark: retryFromQc ? `复检（原质检单 ${retryFromQc.qcNo || retryFromQc.id}）` : outbound.remark || '',
+    remark: retryFromQc
+      ? `复检（原质检单 ${retryFromQc.qcNo || retryFromQc.id}）`
+      : outbound.remark || '',
     lineItems,
     retryFromQcId: retryFromQc?.id || '',
   }

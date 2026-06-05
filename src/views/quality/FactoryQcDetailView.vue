@@ -7,12 +7,7 @@
             <span class="page-title">{{ record.qcNo || '出厂质检详情' }}</span>
             <a-tag :color="statusColor(record.qcStatus)">{{ record.qcStatus }}</a-tag>
           </div>
-          <a-button
-            v-if="canInspect(record)"
-            type="primary"
-            size="small"
-            @click="openInspect"
-          >
+          <a-button v-if="canInspect(record)" type="primary" size="small" @click="openInspect">
             执行质检
           </a-button>
         </div>
@@ -73,7 +68,11 @@
                 {{ formatQty(line.shipQty) }}
               </template>
               <template v-else-if="column.key === 'inspectQty'">
-                {{ line.inspectQty != null && line.inspectQty !== '' ? formatQty(line.inspectQty) : '—' }}
+                {{
+                  line.inspectQty != null && line.inspectQty !== ''
+                    ? formatQty(line.inspectQty)
+                    : '—'
+                }}
               </template>
               <template v-else-if="column.key === 'lineQcResult'">
                 <a-tag v-if="line.lineQcResult" :color="lineResultColor(line.lineQcResult)">

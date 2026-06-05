@@ -1,10 +1,7 @@
 import { materialCategoryTree, flattenCategoryNodes } from '@/mock/materialCategories'
 import { bomTemplateMaterials } from '@/mock/bomTemplateMaterials'
 import { pumpMaterialNames, barcodeTypesCycle } from '@/mock/pumpIndustryNames'
-import {
-  linkProductMaterialRows,
-  migrateMaterialList,
-} from '@/utils/masterDataMigrate'
+import { linkProductMaterialRows, migrateMaterialList } from '@/utils/masterDataMigrate'
 import { buildMaterialFromProduct } from '@/utils/productMaterialMap'
 import { mockProducts } from '@/mock/productInfo'
 
@@ -65,8 +62,7 @@ export function filterMaterials(list, filters, selectedCategoryKey) {
   return list.filter((item) => {
     if (categoryKeys?.length) {
       const match =
-        categoryKeys.includes(item.categoryKey) ||
-        categoryKeys.includes(item.parentCategoryKey)
+        categoryKeys.includes(item.categoryKey) || categoryKeys.includes(item.parentCategoryKey)
       if (!match) return false
     }
     if (filters.code && !item.code.includes(filters.code)) return false

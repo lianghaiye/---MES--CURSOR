@@ -84,6 +84,37 @@ export function deleteSalesOrder(id) {
   return true
 }
 
+export function getSalesOrderById(id) {
+  return salesOrderState.orders.find((o) => o.id === id) || null
+}
+
+/** 记录一次发货申请 */
+export function addDeliveryApplication(orderId, application) {
+  const order = salesOrderState.orders.find((o) => o.id === orderId)
+  if (!order) return null
+  if (!Array.isArray(order.deliveryApplications)) {
+    order.deliveryApplications = []
+  }
+  const row = {
+    id: `da-${Date.now()}`,
+    createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    status: '已提交',
+    ...application,
+  }
+  order.deliveryApplications.unshift(row)
+  const issued = Number(application.totalShipQty) || 0
+  if (issued > 0) {
+    order.totalIssuedQty = (Number(order.totalIssuedQty) || 0) + issued
+    if (order.deliveryStatus === '未发货') order.deliveryStatus = '部分发货'
+  }
+  queueMicrotask(() => {
+    import('@/store/deliveryOrderStore').then(({ registerDeliveryFromApplication }) => {
+      registerDeliveryFromApplication(orderId, row)
+    })
+  })
+  return row
+}
+
 export function recalcOrderAmounts(order) {
   const lineItems = order.lineItems || []
   order.totalQty = lineItems.reduce((s, i) => s + (Number(i.qty) || 0), 0)

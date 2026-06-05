@@ -27,12 +27,22 @@
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="销售单号">
-              <a-input v-model:value="filters.salesOrderNo" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.salesOrderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="客户名称">
-              <a-input v-model:value="filters.customerName" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.customerName"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="8">
@@ -97,15 +107,15 @@
             <a-tag :color="statusColor(record.qcStatus)">{{ record.qcStatus }}</a-tag>
           </template>
           <template v-else-if="column.key === 'qcResult'">
-            <a-tag v-if="record.qcResult" :color="resultColor(record.qcResult)">{{ record.qcResult }}</a-tag>
+            <a-tag v-if="record.qcResult" :color="resultColor(record.qcResult)">{{
+              record.qcResult
+            }}</a-tag>
             <span v-else>-</span>
           </template>
           <template v-else-if="column.key === 'qcNo'">
-            <a
-              v-if="record.qcNo"
-              class="link-qc-no"
-              @click.prevent="openDetail(record)"
-            >{{ record.qcNo }}</a>
+            <a v-if="record.qcNo" class="link-qc-no" @click.prevent="openDetail(record)">{{
+              record.qcNo
+            }}</a>
             <span v-else>-</span>
           </template>
           <template v-else-if="column.key === 'action'">
@@ -198,7 +208,9 @@ const columns = [
   { title: '操作', key: 'action', width: 80, fixed: 'right' },
 ]
 
-const filteredList = computed(() => filterFactoryQcRecords(factoryQcState.records, appliedFilters.value))
+const filteredList = computed(() =>
+  filterFactoryQcRecords(factoryQcState.records, appliedFilters.value),
+)
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize

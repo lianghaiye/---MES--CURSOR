@@ -34,6 +34,7 @@ export const sideMenus = {
   ],
   sales: [
     { key: 'orders', label: '销售订单', path: '/sales/orders' },
+    { key: 'delivery', label: '发货管理', path: '/sales/delivery' },
     { key: 'customers', label: '客户档案', path: '/sales/customers' },
   ],
   planning: [
@@ -93,6 +94,9 @@ export const routeTitles = {
   '/product-process/process-category': '工序分类',
   '/product-process/process-form': '工序表单模板',
   '/sales/orders': '销售订单',
+  '/sales/orders/:id': '销售订单详情',
+  '/sales/delivery': '发货管理',
+  '/sales/delivery/:id': '发货单详情',
   '/sales/customers': '客户档案',
   '/planning/production-plan': '生产计划',
   '/planning/design-task': '设计任务',

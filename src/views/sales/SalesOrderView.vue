@@ -6,12 +6,22 @@
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="销售单号">
-              <a-input v-model:value="filters.orderNo" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.orderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="合同编号">
-              <a-input v-model:value="filters.contractNo" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.contractNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
@@ -61,7 +71,11 @@
           </a-col>
           <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="单据日期">
-              <a-range-picker v-model:value="filters.documentDateRange" size="small" style="width: 100%" />
+              <a-range-picker
+                v-model:value="filters.documentDateRange"
+                size="small"
+                style="width: 100%"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="10">
@@ -71,9 +85,7 @@
                   <SearchOutlined />
                   搜索
                 </a-button>
-                <a-button size="small" @click="handleReset">
-                  清空
-                </a-button>
+                <a-button size="small" @click="handleReset"> 清空 </a-button>
               </a-space>
             </a-form-item>
           </a-col>
@@ -146,9 +158,11 @@
         <span>
           当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
           <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
-          共计 {{ filteredOrders.length }} 条数据，总计销售数量：{{ summary.totalQty }}，总计销售金额含税：￥{{
-            summary.amountInTax.toFixed(2)
-          }}元，不含税：￥{{ summary.amountExTax.toFixed(2) }}元。
+          共计 {{ filteredOrders.length }} 条数据，总计销售数量：{{
+            summary.totalQty
+          }}，总计销售金额含税：￥{{ summary.amountInTax.toFixed(2) }}元，不含税：￥{{
+            summary.amountExTax.toFixed(2)
+          }}元。
         </span>
       </template>
     </a-alert>
@@ -170,7 +184,7 @@
             {{ rowIndex(index) }}
           </template>
           <template v-else-if="column.key === 'orderNo'">
-            <a class="link-code">{{ record.orderNo }}</a>
+            <a class="link-code" @click="openDetail(record)">{{ record.orderNo }}</a>
           </template>
           <template v-else-if="column.key === 'progressStatus'">
             <a-tag :color="progressColor(record.progressStatus)">{{ record.progressStatus }}</a-tag>
@@ -186,7 +200,9 @@
           <template v-else-if="column.key === 'action'">
             <a-space v-if="canEditSalesOrder(record)" :size="0">
               <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="confirmDelete(record)">删除</a-button>
+              <a-button type="link" size="small" danger @click="confirmDelete(record)"
+                >删除</a-button
+              >
             </a-space>
             <span v-else class="action-disabled">-</span>
           </template>
@@ -227,7 +243,9 @@ export default { name: 'SalesOrderView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
+import { useTabs } from '@/composables/useTabs'
 import {
   PlusOutlined,
   SearchOutlined,
@@ -250,7 +268,9 @@ import {
   recalcOrderAmounts,
   approveSalesOrder,
   canEditSalesOrder,
+  addDeliveryApplication,
 } from '@/store/salesOrderStore'
+import { sumSelectedShipQty } from '@/utils/shipEbom'
 import {
   customerOptions,
   orderSourceOptions,
@@ -259,6 +279,9 @@ import {
 } from '@/mock/salesOrderOptions'
 import CreateSalesOrderModal from './components/CreateSalesOrderModal.vue'
 import ApplyDeliveryModal from './components/ApplyDeliveryModal.vue'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({
   orderNo: '',
@@ -471,8 +494,28 @@ function onOrderSaved({ isEdit, id, data }) {
   }
 }
 
-function onDeliveryConfirmed() {
+/** 申请发货确认：仅写入销售订单，发货单由 store 内同步 */
+function onDeliveryConfirmed(payload) {
+  if (!payload?.salesOrderId) {
+    message.success('发货申请已记录')
+    return
+  }
+  const wholeQty = (payload.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
+  const scatterQty = (payload.scatterShipments || []).reduce(
+    (s, ship) => s + sumSelectedShipQty(ship),
+    0,
+  )
+  addDeliveryApplication(payload.salesOrderId, {
+    ...payload,
+    totalShipQty: wholeQty + scatterQty,
+  })
   message.success('发货申请已记录')
+}
+
+function openDetail(record) {
+  const path = `/sales/orders/${record.id}`
+  openTab(path, `销售订单 ${record.orderNo}`)
+  router.push({ name: 'sales-orders-detail', params: { id: record.id } })
 }
 
 function confirmDelete(record) {

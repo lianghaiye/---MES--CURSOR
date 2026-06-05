@@ -101,8 +101,7 @@ export function buildWorkOrderRows(materials, order) {
       demandQty,
       gapQty,
       planQty: m.planQty ?? gapQty,
-      planDateRange:
-        m.planDateRange?.length === 2 ? [...m.planDateRange] : [startDate, endDate],
+      planDateRange: m.planDateRange?.length === 2 ? [...m.planDateRange] : [startDate, endDate],
       unit: m.unit || '件',
       warehouse: m.warehouse || '半成品仓',
       urgency: m.urgency || order.urgency || '普通',

@@ -15,12 +15,7 @@ export const supplierOptions = [
   { label: '标准件供应商', value: '标准件供应商' },
 ]
 
-export const settlementTypeOptions = [
-  '预付款+货到付',
-  '货到付款',
-  '月结',
-  '预付全款',
-]
+export const settlementTypeOptions = ['预付款+货到付', '货到付款', '月结', '预付全款']
 
 export const receivingModeOptions = ['正常收货', '免检收货', '抽检收货']
 

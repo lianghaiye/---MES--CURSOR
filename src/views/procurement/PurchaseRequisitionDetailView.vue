@@ -22,10 +22,16 @@
             <a-descriptions-item label="期望到货日期">
               {{ record.estimatedArrivalDate || '—' }}
             </a-descriptions-item>
-            <a-descriptions-item label="交货日期">{{ record.deliveryDate || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="最近更新时间">{{ record.updatedAt || '—' }}</a-descriptions-item>
+            <a-descriptions-item label="交货日期">{{
+              record.deliveryDate || '—'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="最近更新时间">{{
+              record.updatedAt || '—'
+            }}</a-descriptions-item>
             <a-descriptions-item label="操作人">{{ record.operator || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="创建时间">{{ record.createdAt || '—' }}</a-descriptions-item>
+            <a-descriptions-item label="创建时间">{{
+              record.createdAt || '—'
+            }}</a-descriptions-item>
             <a-descriptions-item label="创建人">{{ record.creator || '—' }}</a-descriptions-item>
           </a-descriptions>
         </div>

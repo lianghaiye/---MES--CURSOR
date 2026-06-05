@@ -24,7 +24,10 @@ function cloneTemplateForProduct(template, product, index) {
   const rootId = `root-${product.id}`
   root.id = rootId
 
-  const idMap = new Map([['__ROOT__', rootId], [ROOT_ID, rootId]])
+  const idMap = new Map([
+    ['__ROOT__', rootId],
+    [ROOT_ID, rootId],
+  ])
   template.treeNodes.forEach((n, i) => {
     idMap.set(n.id, `node-${pfx}-${i}`)
   })
@@ -39,9 +42,7 @@ function cloneTemplateForProduct(template, product, index) {
   const lineItems = template.lineItems.map((line, i) => {
     const lineId = `line-${pfx}-${i}`
     const parentTreeId =
-      line.parentTreeId === '__ROOT__'
-        ? rootId
-        : idMap.get(line.parentTreeId) || rootId
+      line.parentTreeId === '__ROOT__' ? rootId : idMap.get(line.parentTreeId) || rootId
     const treeNodeId = line.treeNodeId ? idMap.get(line.treeNodeId) || '' : ''
     return {
       ...line,

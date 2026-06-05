@@ -300,7 +300,9 @@
               </template>
             </a-table>
             <a-empty v-else description="请点击「选择发运物料」勾选 EBOM" :image="false" />
-            <div v-if="record.remark" class="scatter-line-remark">发运备注：{{ record.remark }}</div>
+            <div v-if="record.remark" class="scatter-line-remark">
+              发运备注：{{ record.remark }}
+            </div>
           </div>
         </template>
       </a-table>
@@ -381,9 +383,7 @@ const scatterLineColumns = computed(() =>
   lineColumns
     .filter((c) => c.key !== 'shipQty')
     .map((c) =>
-      c.key === 'action'
-        ? { title: '操作', key: 'scatterAction', width: 108, fixed: 'right' }
-        : c,
+      c.key === 'action' ? { title: '操作', key: 'scatterAction', width: 108, fixed: 'right' } : c,
     ),
 )
 

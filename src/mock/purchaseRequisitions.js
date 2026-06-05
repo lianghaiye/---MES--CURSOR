@@ -274,7 +274,6 @@ export function filterPurchaseRequisitions(list, filters) {
 export function recalcRequisitionTotals(req) {
   const lineItems = req.lineItems || []
   req.plannedQty = lineItems.reduce((s, i) => s + (Number(i.planPurchaseQty) || 0), 0)
-  req.amountWan =
-    lineItems.reduce((s, i) => s + (Number(i.totalPriceInTax) || 0), 0) / 10000
+  req.amountWan = lineItems.reduce((s, i) => s + (Number(i.totalPriceInTax) || 0), 0) / 10000
   return req
 }

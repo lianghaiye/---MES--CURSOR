@@ -8,9 +8,7 @@ const flatMaterialCats = flattenCategoryNodes(materialCategoryTree)
 
 function resolveProductCategory(categoryKey) {
   const cat = flatProductCats.find((c) => c.key === categoryKey)
-  const parent = cat?.parentKey
-    ? flatProductCats.find((c) => c.key === cat.parentKey)
-    : null
+  const parent = cat?.parentKey ? flatProductCats.find((c) => c.key === cat.parentKey) : null
   return {
     categoryKey: cat?.key || categoryKey,
     categoryCode: cat?.code || '',
@@ -21,9 +19,7 @@ function resolveProductCategory(categoryKey) {
 
 function resolveMaterialCategory(categoryKey) {
   const cat = flatMaterialCats.find((c) => c.key === categoryKey)
-  const parent = cat?.parentKey
-    ? flatMaterialCats.find((c) => c.key === cat.parentKey)
-    : null
+  const parent = cat?.parentKey ? flatMaterialCats.find((c) => c.key === cat.parentKey) : null
   return {
     categoryKey: cat?.key || categoryKey,
     categoryCode: cat?.code || '',
@@ -82,9 +78,7 @@ export function buildProductFromMaterial(material) {
     remark: material.remark || '',
     laborEnabled: material.laborEnabled ?? false,
     laborRows: material.laborRows ? JSON.parse(JSON.stringify(material.laborRows)) : [],
-    production: material.production
-      ? JSON.parse(JSON.stringify(material.production))
-      : undefined,
+    production: material.production ? JSON.parse(JSON.stringify(material.production)) : undefined,
     alert: material.alert ? JSON.parse(JSON.stringify(material.alert)) : undefined,
     createdAt: material.createdAt || dayjs().format('YYYY-MM-DD'),
     updatedAt: dayjs().format('YYYY-MM-DD'),

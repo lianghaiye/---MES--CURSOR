@@ -79,8 +79,7 @@ export function filterProducts(list, filters, selectedCategoryKey) {
   return list.filter((item) => {
     if (categoryKeys?.length) {
       const match =
-        categoryKeys.includes(item.categoryKey) ||
-        categoryKeys.includes(item.parentCategoryKey)
+        categoryKeys.includes(item.categoryKey) || categoryKeys.includes(item.parentCategoryKey)
       if (!match) return false
     }
     if (filters.code && !item.code.includes(filters.code)) return false

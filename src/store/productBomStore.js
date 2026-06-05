@@ -1,18 +1,10 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
-import {
-  buildCatalogProductBoms,
-  hydrateCatalogBom,
-  isCatalogSeedBom,
-} from '@/mock/productBomSeed'
+import { buildCatalogProductBoms, hydrateCatalogBom, isCatalogSeedBom } from '@/mock/productBomSeed'
 import { safeRemoveItem, safeSetItem } from '@/utils/safeStorage'
 import { isBomProductionReady } from '@/mock/productBomOptions'
-import {
-  formatBomVersion,
-  getBomVersionYear,
-  nextSubVersionForYear,
-} from '@/utils/bomVersion'
+import { formatBomVersion, getBomVersionYear, nextSubVersionForYear } from '@/utils/bomVersion'
 
 const STORAGE_KEY = 'i_doms_product_bom'
 const DATA_VERSION = 5
@@ -123,10 +115,7 @@ export function getProductBomById(id) {
 
 export function getActiveBomForItem(itemType, itemId) {
   const row = productBomState.boms.find(
-    (b) =>
-      b.itemType === itemType &&
-      b.itemId === itemId &&
-      b.status === '使用中',
+    (b) => b.itemType === itemType && b.itemId === itemId && b.status === '使用中',
   )
   return row ? ensureBomStructure(row) : null
 }
@@ -151,10 +140,7 @@ function archiveActiveForItem(itemType, itemId, exceptId) {
 
 function buildVersion(itemType, itemId, versionGroupId) {
   const year = getBomVersionYear()
-  const allVersions = [
-    ...versionsForItem(itemType, itemId),
-    ...versionsInGroup(versionGroupId),
-  ]
+  const allVersions = [...versionsForItem(itemType, itemId), ...versionsInGroup(versionGroupId)]
   const sub = nextSubVersionForYear(allVersions, year)
   return {
     version: formatBomVersion(year, sub),

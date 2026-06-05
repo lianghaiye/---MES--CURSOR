@@ -24,22 +24,36 @@
           <a-descriptions-item label="工单编号">{{ detail.basic.code }}</a-descriptions-item>
           <a-descriptions-item label="工单名称">{{ detail.basic.name }}</a-descriptions-item>
           <a-descriptions-item label="产品名称">{{ detail.basic.productName }}</a-descriptions-item>
-          <a-descriptions-item label="工艺路线">{{ detail.basic.processRoute || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="工艺路线">{{
+            detail.basic.processRoute || '—'
+          }}</a-descriptions-item>
           <a-descriptions-item label="物料BOM">{{ detail.basic.bom || '—' }}</a-descriptions-item>
-          <a-descriptions-item label="产品仓库">{{ detail.basic.warehouse || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="产品仓库">{{
+            detail.basic.warehouse || '—'
+          }}</a-descriptions-item>
           <a-descriptions-item label="工作中心">{{ detail.basic.workCenter }}</a-descriptions-item>
           <a-descriptions-item label="紧急程度">{{ detail.basic.urgency }}</a-descriptions-item>
           <a-descriptions-item label="进度">{{ detail.basic.progress }}</a-descriptions-item>
           <a-descriptions-item label="状态">{{ detail.basic.taskStatus }}</a-descriptions-item>
           <a-descriptions-item label="计划生产">{{ detail.basic.planQty }}</a-descriptions-item>
           <a-descriptions-item label="排产数量">{{ detail.basic.scheduleQty }}</a-descriptions-item>
-          <a-descriptions-item label="报废数量">{{ detail.basic.scrapQty || '—' }}</a-descriptions-item>
-          <a-descriptions-item label="计划开始日期">{{ detail.basic.planStartDate }}</a-descriptions-item>
-          <a-descriptions-item label="计划结束日期">{{ detail.basic.planEndDate }}</a-descriptions-item>
+          <a-descriptions-item label="报废数量">{{
+            detail.basic.scrapQty || '—'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="计划开始日期">{{
+            detail.basic.planStartDate
+          }}</a-descriptions-item>
+          <a-descriptions-item label="计划结束日期">{{
+            detail.basic.planEndDate
+          }}</a-descriptions-item>
           <a-descriptions-item label="创建日期">{{ detail.basic.createdAt }}</a-descriptions-item>
           <a-descriptions-item label="负责人">{{ detail.basic.owner }}</a-descriptions-item>
           <a-descriptions-item label="销售订单号" :span="2">
-            <a v-if="detail.basic.salesOrderNo" class="link" @click.prevent="onAction('sales-order')">
+            <a
+              v-if="detail.basic.salesOrderNo"
+              class="link"
+              @click.prevent="onAction('sales-order')"
+            >
               {{ detail.basic.salesOrderNo }}
             </a>
             <span v-else>—</span>

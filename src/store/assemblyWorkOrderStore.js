@@ -19,10 +19,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ orders: assemblyWorkOrderState.orders }),
-  )
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: assemblyWorkOrderState.orders }))
 }
 
 /** ZZGD + 年月日 + 3位流水 */

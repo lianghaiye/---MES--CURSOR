@@ -42,7 +42,11 @@
         </a-col>
         <a-col :span="8">
           <a-form-item label="结算币种" required>
-            <a-select v-model:value="form.settlementCurrency" size="small" :options="currencyOpts" />
+            <a-select
+              v-model:value="form.settlementCurrency"
+              size="small"
+              :options="currencyOpts"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
@@ -75,57 +79,114 @@
         </a-col>
         <a-col :span="8">
           <a-form-item label="联系人电话">
-            <a-input v-model:value="form.contactPhone" size="small" placeholder="请输入 联系人电话" />
+            <a-input
+              v-model:value="form.contactPhone"
+              size="small"
+              placeholder="请输入 联系人电话"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="交货地址">
-            <a-input v-model:value="form.deliveryAddress" size="small" placeholder="请输入 交货地址" />
+            <a-input
+              v-model:value="form.deliveryAddress"
+              size="small"
+              placeholder="请输入 交货地址"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="送货方式" required>
-            <a-select v-model:value="form.deliveryMethod" size="small" :options="deliveryMethodOpts" />
+            <a-select
+              v-model:value="form.deliveryMethod"
+              size="small"
+              :options="deliveryMethodOpts"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="订单金额">
-            <a-input-number :value="orderAmount" :precision="2" disabled size="small" style="width: 100%" />
+            <a-input-number
+              :value="orderAmount"
+              :precision="2"
+              disabled
+              size="small"
+              style="width: 100%"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="技术规范编码">
-            <a-input v-model:value="form.techSpecCode" size="small" placeholder="请输入 技术规范编码" />
+            <a-input
+              v-model:value="form.techSpecCode"
+              size="small"
+              placeholder="请输入 技术规范编码"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="提醒日期">
-            <a-date-picker v-model:value="form.reminderDate" size="small" style="width: 100%" placeholder="请选择 提醒日期" />
+            <a-date-picker
+              v-model:value="form.reminderDate"
+              size="small"
+              style="width: 100%"
+              placeholder="请选择 提醒日期"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="业务员">
-            <a-select v-model:value="form.salesperson" size="small" :options="salespersonOpts" show-search />
+            <a-select
+              v-model:value="form.salesperson"
+              size="small"
+              :options="salespersonOpts"
+              show-search
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="结算类型">
-            <a-select v-model:value="form.settlementType" size="small" allow-clear placeholder="请选择 结算类型" :options="settlementTypeOpts" />
+            <a-select
+              v-model:value="form.settlementType"
+              size="small"
+              allow-clear
+              placeholder="请选择 结算类型"
+              :options="settlementTypeOpts"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="付款比例">
-            <a-select v-model:value="form.paymentRatio" size="small" allow-clear placeholder="请选择 付款比例" :options="paymentRatioOpts" />
+            <a-select
+              v-model:value="form.paymentRatio"
+              size="small"
+              allow-clear
+              placeholder="请选择 付款比例"
+              :options="paymentRatioOpts"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="首付/定金金额">
-            <a-input-number v-model:value="form.downPaymentAmount" size="small" :min="0" :precision="2" style="width: 100%" placeholder="请输入 首付/定金金额" />
+            <a-input-number
+              v-model:value="form.downPaymentAmount"
+              size="small"
+              :min="0"
+              :precision="2"
+              style="width: 100%"
+              placeholder="请输入 首付/定金金额"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="24">
           <a-form-item label="备注" class="remark-item">
-            <a-textarea v-model:value="form.remark" :rows="2" :maxlength="1000" show-count placeholder="请输入 备注" />
+            <a-textarea
+              v-model:value="form.remark"
+              :rows="2"
+              :maxlength="1000"
+              show-count
+              placeholder="请输入 备注"
+            />
           </a-form-item>
         </a-col>
       </a-row>
@@ -155,7 +216,10 @@
               <a-checkbox-group v-model:value="visibleColumnKeys" class="column-settings">
                 <a-row>
                   <a-col v-for="col in columnDefs" :key="col.key" :span="12">
-                    <a-checkbox :value="col.key" :disabled="col.key === 'index' || col.key === 'action'">
+                    <a-checkbox
+                      :value="col.key"
+                      :disabled="col.key === 'index' || col.key === 'action'"
+                    >
                       {{ col.title }}
                     </a-checkbox>
                   </a-col>
@@ -300,11 +364,7 @@
       <a-form layout="inline" class="attachment-form horizontal-form">
         <a-form-item label="文件上传">
           <div class="upload-field">
-            <a-upload
-              v-model:file-list="fileList"
-              :before-upload="beforeUpload"
-              multiple
-            >
+            <a-upload v-model:file-list="fileList" :before-upload="beforeUpload" multiple>
               <a-button type="primary" size="small">
                 <UploadOutlined />
                 点击上传
@@ -489,9 +549,7 @@ const allProductPickerRows = computed(() =>
 
 const filteredProductPickerRows = computed(() => {
   const f = appliedProductPickerFilters.value
-  const ids = new Set(
-    filterProducts(productInfoState.products, f, null).map((p) => p.id),
-  )
+  const ids = new Set(filterProducts(productInfoState.products, f, null).map((p) => p.id))
   return allProductPickerRows.value.filter((row) => ids.has(row.id))
 })
 

@@ -126,7 +126,8 @@ export function buildRequisitionFromMaterials(materials, sourceOrder) {
     salesOrderNo: sourceOrder.orderNo || '',
     docStatus: '待处理',
     overdueStatus: '未逾期',
-    urgency: sourceOrder.urgency === '紧急' ? '紧急' : sourceOrder.urgency === '加急' ? '特急' : '正常',
+    urgency:
+      sourceOrder.urgency === '紧急' ? '紧急' : sourceOrder.urgency === '加急' ? '特急' : '正常',
     orderDate: now.format('YYYY-MM-DD'),
     deliveryDate,
     estimatedArrivalDate: deliveryDate,
@@ -144,10 +145,7 @@ export function buildRequisitionFromMaterials(materials, sourceOrder) {
 /** 从外购销售订单生成采购申请 */
 export function buildRequisitionFromSalesOrder(salesOrder) {
   const now = dayjs()
-  const deliveryDate = resolveEarliestDeliveryDate(
-    salesOrder.lineItems,
-    salesOrder.documentDate,
-  )
+  const deliveryDate = resolveEarliestDeliveryDate(salesOrder.lineItems, salesOrder.documentDate)
 
   const lineItems = (salesOrder.lineItems || []).map((line) => {
     const qty = Number(line.salesQty) || Number(line.qty) || 0

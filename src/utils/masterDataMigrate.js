@@ -1,12 +1,5 @@
 /** 物料类型（与表单下拉一致） */
-export const MATERIAL_TYPE_OPTIONS = [
-  '零部件',
-  '原材料',
-  '标准件',
-  '毛胚',
-  '半成品',
-  '虚拟件',
-]
+export const MATERIAL_TYPE_OPTIONS = ['零部件', '原材料', '标准件', '毛胚', '半成品', '虚拟件']
 
 /** 供应型态（与表单下拉一致） */
 export const SUPPLY_FORM_OPTIONS = ['外协件', '外购件', '自制件', '组装', '其他']
@@ -86,9 +79,7 @@ export function migrateProductRecord(record) {
     materialType: record.materialType
       ? normalizeMaterialType(record.materialType)
       : record.materialType,
-    supplyForm: record.supplyForm
-      ? normalizeSupplyForm(record.supplyForm)
-      : record.supplyForm,
+    supplyForm: record.supplyForm ? normalizeSupplyForm(record.supplyForm) : record.supplyForm,
     productAttribute: normalizeProductAttribute(record.productAttribute),
   }
 }

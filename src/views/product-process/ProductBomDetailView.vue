@@ -101,10 +101,7 @@
         <div class="page-footer">
           <a-space>
             <a-button :disabled="!canEdit" @click="handleEdit">编辑</a-button>
-            <a-button
-              :disabled="record.status === '已归档'"
-              @click="handleArchive"
-            >
+            <a-button :disabled="record.status === '已归档'" @click="handleArchive">
               归档
             </a-button>
             <a-button @click="handleBack">返回</a-button>
@@ -128,11 +125,7 @@ import { getVersionsInGroup } from '@/mock/productBom'
 import { buildBomOperationLogs } from '@/mock/bomOperationLogs'
 import { defaultBomColumnSettings } from '@/mock/bomMaterialColumns'
 import { bomStatusColor } from '@/mock/productBomOptions'
-import {
-  getProductBomById,
-  archiveProductBom,
-  productBomState,
-} from '@/store/productBomStore'
+import { getProductBomById, archiveProductBom, productBomState } from '@/store/productBomStore'
 import { loadBomDetailStructure } from '@/utils/bomImport'
 import { getLinesForTreeNode, ROOT_ID } from '@/utils/bomTree'
 import { tabStore, useTabs } from '@/composables/useTabs'

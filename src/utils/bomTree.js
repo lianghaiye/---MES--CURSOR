@@ -151,9 +151,7 @@ export function mergeTemplateIntoRoot(flatNodes, lineItems, imported) {
     ...line,
     id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     parentTreeId:
-      line.parentTreeId === '__ROOT__'
-        ? ROOT_ID
-        : idMap.get(line.parentTreeId) || ROOT_ID,
+      line.parentTreeId === '__ROOT__' ? ROOT_ID : idMap.get(line.parentTreeId) || ROOT_ID,
     treeNodeId: line.treeNodeId ? idMap.get(line.treeNodeId) || '' : '',
   }))
 

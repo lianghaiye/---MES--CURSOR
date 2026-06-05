@@ -36,22 +36,38 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="结算类型">
-              <a-select v-model:value="form.settlementType" size="small" :options="settlementTypeOpts" />
+              <a-select
+                v-model:value="form.settlementType"
+                size="small"
+                :options="settlementTypeOpts"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
             <a-form-item label="结算周期">
-              <a-select v-model:value="form.settlementCycle" size="small" :options="settlementCycleOpts" />
+              <a-select
+                v-model:value="form.settlementCycle"
+                size="small"
+                :options="settlementCycleOpts"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
             <a-form-item label="结算方式">
-              <a-select v-model:value="form.settlementMethod" size="small" :options="settlementMethodOpts" />
+              <a-select
+                v-model:value="form.settlementMethod"
+                size="small"
+                :options="settlementMethodOpts"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
             <a-form-item label="生产工单号">
-              <a-input v-model:value="form.workOrderNo" size="small" placeholder="请输入 生产工单号" />
+              <a-input
+                v-model:value="form.workOrderNo"
+                size="small"
+                placeholder="请输入 生产工单号"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -66,17 +82,30 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="交货方式">
-              <a-select v-model:value="form.deliveryMethod" size="small" :options="deliveryMethodOpts" />
+              <a-select
+                v-model:value="form.deliveryMethod"
+                size="small"
+                :options="deliveryMethodOpts"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
             <a-form-item label="供货期/天">
-              <a-input-number v-model:value="form.leadTimeDays" size="small" :min="0" style="width: 100%" />
+              <a-input-number
+                v-model:value="form.leadTimeDays"
+                size="small"
+                :min="0"
+                style="width: 100%"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
             <a-form-item label="物流单号">
-              <a-input v-model:value="form.logisticsNo" size="small" placeholder="请输入 物流单号" />
+              <a-input
+                v-model:value="form.logisticsNo"
+                size="small"
+                placeholder="请输入 物流单号"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -92,7 +121,11 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="联系方式">
-              <a-input v-model:value="form.contactPhone" size="small" placeholder="请输入 联系方式" />
+              <a-input
+                v-model:value="form.contactPhone"
+                size="small"
+                placeholder="请输入 联系方式"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -107,22 +140,41 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="销售单号">
-              <a-input v-model:value="form.salesOrderNo" size="small" placeholder="请输入 销售单号" />
+              <a-input
+                v-model:value="form.salesOrderNo"
+                size="small"
+                placeholder="请输入 销售单号"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="16">
             <a-form-item label="收货地址">
-              <a-input v-model:value="form.shippingAddress" size="small" placeholder="请输入 收货地址" />
+              <a-input
+                v-model:value="form.shippingAddress"
+                size="small"
+                placeholder="请输入 收货地址"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
             <a-form-item label="采购员">
-              <a-select v-model:value="form.purchaser" size="small" show-search :options="purchaserOpts" />
+              <a-select
+                v-model:value="form.purchaser"
+                size="small"
+                show-search
+                :options="purchaserOpts"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="24">
             <a-form-item label="备注" class="remark-item">
-              <a-textarea v-model:value="form.remark" :rows="2" :maxlength="500" show-count placeholder="请输入备注" />
+              <a-textarea
+                v-model:value="form.remark"
+                :rows="2"
+                :maxlength="500"
+                show-count
+                placeholder="请输入备注"
+              />
             </a-form-item>
           </a-col>
         </a-row>
@@ -435,7 +487,7 @@ function recalcLineWithMode(record) {
     record.unitPriceInTax = Math.round(ex * (1 + rate / 100) * 100) / 100
   } else {
     const inc = Number(record.unitPriceInTax) || 0
-    record.unitPriceExTax = Math.round(inc / (1 + rate / 100) * 100) / 100
+    record.unitPriceExTax = Math.round((inc / (1 + rate / 100)) * 100) / 100
   }
   recalcPoLine(record)
   void qty

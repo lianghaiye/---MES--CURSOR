@@ -80,6 +80,24 @@ const routes = [
         component: () => import('@/views/sales/SalesOrderView.vue'),
         meta: { title: '销售订单' },
       },
+      {
+        path: 'sales/orders/:id',
+        name: 'sales-orders-detail',
+        component: () => import('@/views/sales/SalesOrderDetailView.vue'),
+        meta: { title: '销售订单详情' },
+      },
+      {
+        path: 'sales/delivery',
+        name: 'sales-delivery',
+        component: () => import('@/views/sales/DeliveryManagementView.vue'),
+        meta: { title: '发货管理' },
+      },
+      {
+        path: 'sales/delivery/:id',
+        name: 'sales-delivery-detail',
+        component: () => import('@/views/sales/DeliveryOrderDetailView.vue'),
+        meta: { title: '发货单详情' },
+      },
       { path: 'sales/customers', ...emptyChild('sales-customers', '客户档案') },
       {
         path: 'planning/production-plan',

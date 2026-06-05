@@ -116,14 +116,8 @@
       :line-items="lineItems"
       @imported="onTemplateImported"
     />
-    <SelectBomMaterialModal
-      v-model:open="materialModalOpen"
-      @selected="onMaterialSelected"
-    />
-    <BomColumnSettingDrawer
-      v-model:open="columnDrawerOpen"
-      v-model:settings="columnSettings"
-    />
+    <SelectBomMaterialModal v-model:open="materialModalOpen" @selected="onMaterialSelected" />
+    <BomColumnSettingDrawer v-model:open="columnDrawerOpen" v-model:settings="columnSettings" />
   </div>
 </template>
 
@@ -138,7 +132,12 @@ import { Modal, message } from 'ant-design-vue'
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { addProductBom, generateBomNo, getProductBomById, updateProductBom } from '@/store/productBomStore'
+import {
+  addProductBom,
+  generateBomNo,
+  getProductBomById,
+  updateProductBom,
+} from '@/store/productBomStore'
 import { loadBomDetailStructure } from '@/utils/bomImport'
 import { defaultBomColumnSettings, bomTypeOptions } from '@/mock/bomMaterialColumns'
 import {
@@ -391,9 +390,7 @@ async function handleSave() {
 
   const rawItemId = form.itemId
   const itemId =
-    typeof rawItemId === 'string' && rawItemId.includes(':')
-      ? rawItemId.split(':')[1]
-      : rawItemId
+    typeof rawItemId === 'string' && rawItemId.includes(':') ? rawItemId.split(':')[1] : rawItemId
 
   const payload = {
     bomNo: form.bomNo || generateBomNo(),

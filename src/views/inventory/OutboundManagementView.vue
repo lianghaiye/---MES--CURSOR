@@ -5,12 +5,22 @@
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="项目编号">
-              <a-input v-model:value="filters.projectNo" allow-clear placeholder="请输入 项目编号" size="small" />
+              <a-input
+                v-model:value="filters.projectNo"
+                allow-clear
+                placeholder="请输入 项目编号"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="出库单号">
-              <a-input v-model:value="filters.docNo" allow-clear placeholder="请输入 出库单号" size="small" />
+              <a-input
+                v-model:value="filters.docNo"
+                allow-clear
+                placeholder="请输入 出库单号"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
@@ -71,7 +81,12 @@
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="源单编号">
-              <a-input v-model:value="filters.sourceOrderNo" allow-clear placeholder="请输入 源单编号" size="small" />
+              <a-input
+                v-model:value="filters.sourceOrderNo"
+                allow-clear
+                placeholder="请输入 源单编号"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
@@ -101,118 +116,120 @@
     </div>
 
     <div class="list-panel">
-    <div class="toolbar-row">
-      <a-space wrap :size="8">
-        <a-button type="primary" size="small" @click="stubAction('新增')">
-          <PlusOutlined />
-          新增
-        </a-button>
-        <a-button size="small" @click="handleConfirmOutbound">
-          <CheckOutlined />
-          确认出库
-        </a-button>
-        <a-button size="small" @click="stubAction('生成采购单')">
-          <CheckOutlined />
-          生成采购单
-        </a-button>
-        <a-button size="small" @click="handleBatchDelete">
-          <DeleteOutlined />
-          删除
-        </a-button>
-        <a-button size="small" @click="stubAction('打印')">
-          <PrinterOutlined />
-          打印
-        </a-button>
-        <a-dropdown>
-          <a-button size="small" @click.prevent>
-            批量操作
-            <DownOutlined />
+      <div class="toolbar-row">
+        <a-space wrap :size="8">
+          <a-button type="primary" size="small" @click="stubAction('新增')">
+            <PlusOutlined />
+            新增
           </a-button>
-          <template #overlay>
-            <a-menu @click="({ key }) => stubAction(`批量操作：${key}`)">
-              <a-menu-item key="export">导出</a-menu-item>
-              <a-menu-item key="import">导入</a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
-        <a-button size="small" type="primary" ghost @click="handleBatchInitiateQc">
-          发起出厂质检
-        </a-button>
-      </a-space>
-      <a-space :size="4" class="toolbar-icons">
-        <a-tooltip title="刷新">
-          <a-button type="text" size="small" @click="handleSearch">
-            <ReloadOutlined />
+          <a-button size="small" @click="handleConfirmOutbound">
+            <CheckOutlined />
+            确认出库
           </a-button>
-        </a-tooltip>
-      </a-space>
-    </div>
-
-    <a-alert type="info" show-icon class="summary-bar" :banner="false">
-      <template #message>
-        <span>
-          当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
-          <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
-        </span>
-      </template>
-    </a-alert>
-
-    <div class="table-card">
-      <a-table
-        :columns="columns"
-        :data-source="pagedList"
-        row-key="id"
-        size="small"
-        bordered
-        :scroll="{ x: 2200 }"
-        :pagination="false"
-        :row-selection="rowSelection"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'docNo'">
-            <a class="link-code">{{ record.docNo }}</a>
-          </template>
-          <template v-else-if="column.key === 'sourceOrderNo'">
-            <a v-if="record.sourceOrderNo" class="link-code">{{ record.sourceOrderNo }}</a>
-            <span v-else>-</span>
-          </template>
-          <template v-else-if="column.key === 'totalWeight'">
-            {{ record.totalWeight != null ? record.totalWeight : '' }}
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space :size="0" wrap>
-              <a-button type="link" size="small" @click="stubAction('编辑')">编辑</a-button>
-              <a-button type="link" size="small" @click="stubAction('审批')">审批</a-button>
-              <a-button type="link" size="small" danger @click="confirmDelete(record)">删除</a-button>
-              <a-button
-                v-if="canInitiateFactoryQc(record)"
-                type="link"
-                size="small"
-                @click="handleInitiateQc(record)"
-              >
-                {{ initiateQcActionLabel(record) }}
-              </a-button>
-            </a-space>
-          </template>
-        </template>
-      </a-table>
-
-      <div class="table-pagination">
-        <a-pagination
-          v-model:current="pagination.current"
-          v-model:page-size="pagination.pageSize"
-          :total="filteredList.length"
-          size="small"
-          show-size-changer
-          :page-size-options="['10', '20', '50', '100']"
-          :show-total="(t) => `共 ${t} 条`"
-          show-quick-jumper
-        />
+          <a-button size="small" @click="stubAction('生成采购单')">
+            <CheckOutlined />
+            生成采购单
+          </a-button>
+          <a-button size="small" @click="handleBatchDelete">
+            <DeleteOutlined />
+            删除
+          </a-button>
+          <a-button size="small" @click="stubAction('打印')">
+            <PrinterOutlined />
+            打印
+          </a-button>
+          <a-dropdown>
+            <a-button size="small" @click.prevent>
+              批量操作
+              <DownOutlined />
+            </a-button>
+            <template #overlay>
+              <a-menu @click="({ key }) => stubAction(`批量操作：${key}`)">
+                <a-menu-item key="export">导出</a-menu-item>
+                <a-menu-item key="import">导入</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+          <a-button size="small" type="primary" ghost @click="handleBatchInitiateQc">
+            发起出厂质检
+          </a-button>
+        </a-space>
+        <a-space :size="4" class="toolbar-icons">
+          <a-tooltip title="刷新">
+            <a-button type="text" size="small" @click="handleSearch">
+              <ReloadOutlined />
+            </a-button>
+          </a-tooltip>
+        </a-space>
       </div>
-    </div>
+
+      <a-alert type="info" show-icon class="summary-bar" :banner="false">
+        <template #message>
+          <span>
+            当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
+            <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
+          </span>
+        </template>
+      </a-alert>
+
+      <div class="table-card">
+        <a-table
+          :columns="columns"
+          :data-source="pagedList"
+          row-key="id"
+          size="small"
+          bordered
+          :scroll="{ x: 2200 }"
+          :pagination="false"
+          :row-selection="rowSelection"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'docNo'">
+              <a class="link-code">{{ record.docNo }}</a>
+            </template>
+            <template v-else-if="column.key === 'sourceOrderNo'">
+              <a v-if="record.sourceOrderNo" class="link-code">{{ record.sourceOrderNo }}</a>
+              <span v-else>-</span>
+            </template>
+            <template v-else-if="column.key === 'totalWeight'">
+              {{ record.totalWeight != null ? record.totalWeight : '' }}
+            </template>
+            <template v-else-if="column.key === 'status'">
+              <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-space :size="0" wrap>
+                <a-button type="link" size="small" @click="stubAction('编辑')">编辑</a-button>
+                <a-button type="link" size="small" @click="stubAction('审批')">审批</a-button>
+                <a-button type="link" size="small" danger @click="confirmDelete(record)"
+                  >删除</a-button
+                >
+                <a-button
+                  v-if="canInitiateFactoryQc(record)"
+                  type="link"
+                  size="small"
+                  @click="handleInitiateQc(record)"
+                >
+                  {{ initiateQcActionLabel(record) }}
+                </a-button>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
+
+        <div class="table-pagination">
+          <a-pagination
+            v-model:current="pagination.current"
+            v-model:page-size="pagination.pageSize"
+            :total="filteredList.length"
+            size="small"
+            show-size-changer
+            :page-size-options="['10', '20', '50', '100']"
+            :show-total="(t) => `共 ${t} 条`"
+            show-quick-jumper
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -362,7 +379,12 @@ function handleConfirmOutbound() {
   }
   const otherBlocked = blocked.filter((b) => !b.qcBlocked)
   if (otherBlocked.length) {
-    message.warning(otherBlocked.map((b) => `${b.docNo}: ${b.message}`).slice(0, 3).join('；'))
+    message.warning(
+      otherBlocked
+        .map((b) => `${b.docNo}: ${b.message}`)
+        .slice(0, 3)
+        .join('；'),
+    )
   }
   if (count > 0) {
     message.success(`已确认出库 ${count} 条`)
@@ -412,9 +434,7 @@ function handleInitiateQc(record) {
 }
 
 function handleBatchInitiateQc() {
-  const ids = selectedRowKeys.value.length
-    ? selectedRowKeys.value
-    : []
+  const ids = selectedRowKeys.value.length ? selectedRowKeys.value : []
   if (!ids.length) {
     message.warning('请先勾选要发起出厂质检的销售出库单')
     return

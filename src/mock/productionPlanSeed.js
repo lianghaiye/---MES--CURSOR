@@ -53,8 +53,7 @@ function buildPlanFromSalesOrder(salesOrder, bomsById) {
     )
   })
 
-  const statusTags =
-    workItems.length > 1 ? ['部分下达', '待下达'] : ['待下达']
+  const statusTags = workItems.length > 1 ? ['部分下达', '待下达'] : ['待下达']
 
   return {
     id: `pp-seed-${salesOrder.id}`,

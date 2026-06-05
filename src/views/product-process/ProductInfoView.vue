@@ -4,12 +4,7 @@
       <div class="category-panel">
         <div class="category-tip">*右击可对列表项进行操作</div>
         <div class="category-search">
-          <a-input
-            v-model:value="categoryKeyword"
-            allow-clear
-            size="small"
-            placeholder="搜索类别"
-          >
+          <a-input v-model:value="categoryKeyword" allow-clear size="small" placeholder="搜索类别">
             <template #suffix>
               <SearchOutlined />
             </template>
@@ -212,11 +207,7 @@
       </div>
     </div>
 
-    <ProductFormModal
-      v-model:open="formModalOpen"
-      :edit-record="editRecord"
-      @saved="onSaved"
-    />
+    <ProductFormModal v-model:open="formModalOpen" :edit-record="editRecord" @saved="onSaved" />
   </div>
 </template>
 

@@ -323,7 +323,13 @@ const workColumns = [
   { title: '计划数量', key: 'planQty', width: 100, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56 },
   { title: '技术参数', key: 'techParams', dataIndex: 'techParams', width: 100, ellipsis: true },
-  { title: '包装形式', key: 'packagingForm', dataIndex: 'packagingForm', width: 88, ellipsis: true },
+  {
+    title: '包装形式',
+    key: 'packagingForm',
+    dataIndex: 'packagingForm',
+    width: 88,
+    ellipsis: true,
+  },
   { title: '交付日期', dataIndex: 'deliveryDate', width: 100 },
   { title: '操作', key: 'action', width: 110, fixed: 'right' },
 ]

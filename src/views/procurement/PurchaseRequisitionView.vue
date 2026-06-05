@@ -5,12 +5,22 @@
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="申请单号">
-              <a-input v-model:value="filters.reqNo" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.reqNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="销售单号">
-              <a-input v-model:value="filters.salesOrderNo" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.salesOrderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
@@ -37,12 +47,20 @@
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="订单日期">
-              <a-range-picker v-model:value="filters.orderDateRange" size="small" style="width: 100%" />
+              <a-range-picker
+                v-model:value="filters.orderDateRange"
+                size="small"
+                style="width: 100%"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="交货日期">
-              <a-range-picker v-model:value="filters.deliveryDateRange" size="small" style="width: 100%" />
+              <a-range-picker
+                v-model:value="filters.deliveryDateRange"
+                size="small"
+                style="width: 100%"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
@@ -155,7 +173,9 @@
           <template v-else-if="column.key === 'action'">
             <a-space v-if="canGeneratePO(record)" :size="0">
               <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="confirmDelete(record)">删除</a-button>
+              <a-button type="link" size="small" danger @click="confirmDelete(record)"
+                >删除</a-button
+              >
               <a-button type="link" size="small" @click="openGenerateModal(record)">
                 <CheckCircleOutlined />
                 生成采购单

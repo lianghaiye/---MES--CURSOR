@@ -740,7 +740,10 @@ function handleOk() {
     }
   }
 
-  :deep(.ant-form-item-label > label.ant-form-item-required:not(.ant-form-item-required-mark-optional)::before) {
+  :deep(
+    .ant-form-item-label
+      > label.ant-form-item-required:not(.ant-form-item-required-mark-optional)::before
+  ) {
     margin-inline-end: 4px;
   }
 

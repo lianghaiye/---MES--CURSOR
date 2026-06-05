@@ -28,7 +28,9 @@
         <template v-if="column.key === 'index'">{{ index + 1 }}</template>
         <template v-else-if="readonly">
           <template v-if="column.key === 'unitQty'">{{ formatQty(record.unitQty) }}</template>
-          <template v-else-if="column.key === 'unitPrice'">{{ formatPrice(record.unitPrice) }}</template>
+          <template v-else-if="column.key === 'unitPrice'">{{
+            formatPrice(record.unitPrice)
+          }}</template>
           <template v-else>{{ record[column.dataIndex] ?? record[column.key] ?? '—' }}</template>
         </template>
         <template v-else-if="column.key === 'unitQty'">
@@ -160,12 +162,7 @@ function formatPrice(val) {
   return Number(val).toFixed(4)
 }
 
-const emit = defineEmits([
-  'refresh',
-  'open-column-setting',
-  'delete-line',
-  'change-line',
-])
+const emit = defineEmits(['refresh', 'open-column-setting', 'delete-line', 'change-line'])
 
 const unitOpts = unitOptions.map((v) => ({ label: v, value: v }))
 const processDocOpts = processDocOptions
@@ -207,9 +204,7 @@ const tableColumns = computed(() => {
       fixed: c.frozen ? 'left' : undefined,
       ellipsis: ['itemName', 'remark', 'material'].includes(c.key),
     })),
-    ...(props.readonly
-      ? []
-      : [{ title: '操作', key: 'action', width: 140, fixed: 'right' }]),
+    ...(props.readonly ? [] : [{ title: '操作', key: 'action', width: 140, fixed: 'right' }]),
   ]
   return cols
 })

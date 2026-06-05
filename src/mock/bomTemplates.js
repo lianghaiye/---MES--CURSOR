@@ -150,14 +150,7 @@ function buildIsg50TemplateChildren() {
     { ...assemblyPumpBody, parentId: '__ROOT__' },
     { ...assemblyPumpHead, parentId: '__ROOT__' },
   ]
-  const lineItems = [
-    linePumpBody,
-    linePumpCover,
-    lineImpeller,
-    lineSeal,
-    lineShaft,
-    lineBolt,
-  ]
+  const lineItems = [linePumpBody, linePumpCover, lineImpeller, lineSeal, lineShaft, lineBolt]
 
   return { treeNodes, lineItems }
 }

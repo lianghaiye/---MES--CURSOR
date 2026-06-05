@@ -170,9 +170,7 @@ async function handleOk() {
   try {
     const rawItemId = form.itemId
     const itemId =
-      typeof rawItemId === 'string' && rawItemId.includes(':')
-        ? rawItemId.split(':')[1]
-        : rawItemId
+      typeof rawItemId === 'string' && rawItemId.includes(':') ? rawItemId.split(':')[1] : rawItemId
     const payload = {
       bomName: form.bomName,
       itemType: form.itemType,
