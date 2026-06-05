@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { buildProcessesFromRoute } from '@/mock/processRoutes'
+import { buildDisassemblyProcesses } from '@/mock/processRoutes'
 import {
   generateDisassemblyOrderCode,
   generateDisassemblyOrderName,
@@ -175,7 +175,7 @@ function createSeedOrders() {
     bom: row.ebomName,
     disassemblyQty: 1,
     remark: '',
-    processes: buildProcessesFromRoute(row.processRouteName || '装配标准路线'),
+    processes: buildDisassemblyProcesses(),
     updatedAt: row.createdAt,
     operator: row.creator,
     ...row,
@@ -215,7 +215,7 @@ export function addDisassemblyWorkOrder(payload) {
     status: '待下发',
     traceStatus: '',
     ...payload,
-    processes: buildProcessesFromRoute(payload.processRouteName || '装配标准路线'),
+    processes: buildDisassemblyProcesses(),
     creator: payload.creator || '王小虎',
     operator: payload.creator || '王小虎',
     createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
@@ -233,9 +233,7 @@ export function updateDisassemblyWorkOrder(id, patch) {
     operator: patch.operator || disassemblyWorkOrderState.orders[idx].creator,
   })
   if (patch.processRouteName) {
-    disassemblyWorkOrderState.orders[idx].processes = buildProcessesFromRoute(
-      patch.processRouteName,
-    )
+    disassemblyWorkOrderState.orders[idx].processes = buildDisassemblyProcesses()
   }
   return disassemblyWorkOrderState.orders[idx]
 }
@@ -248,21 +246,19 @@ export function deleteDisassemblyWorkOrder(id) {
   return true
 }
 
-export function dispatchDisassemblyWorkOrder(id, startAfter = false) {
+export function dispatchDisassemblyWorkOrder(id) {
   const order = disassemblyWorkOrderState.orders.find((o) => o.id === id)
   if (!order) return { ok: false, message: '工单不存在' }
   if (order.status !== '待下发') {
-    return { ok: false, message: '当前状态不可下发' }
+    return { ok: false, message: '当前状态不可下发并开始' }
   }
-  order.status = startAfter ? '执行中' : '已下发'
+  order.status = '执行中'
   order.dispatchedAt = dayjs().format('YYYY-MM-DD HH:mm')
   order.dispatchedBy = order.operator || order.creator
-  if (startAfter) {
-    order.executedAt = dayjs().format('YYYY-MM-DD HH:mm')
-    order.executedBy = order.personInCharge || order.operator
-  }
+  order.executedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  order.executedBy = order.personInCharge || order.operator
   order.updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
-  return { ok: true }
+  return { ok: true, order }
 }
 
 export function resolvePersonInCharge(workCenter) {

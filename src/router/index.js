@@ -188,6 +188,12 @@ const routes = [
       { path: 'qms/trace', ...emptyChild('qms-trace', '质量追溯') },
       { path: 'equipment/devices', ...emptyChild('equipment-devices', '设备管理') },
       { path: 'report/overview', ...emptyChild('report-overview', '报表中心') },
+      {
+        path: 'basic-config/employee-groups',
+        name: 'basic-config-employee-groups',
+        component: () => import('@/views/basic-config/EmployeeGroupView.vue'),
+        meta: { title: '员工组别' },
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/home/dashboard' },

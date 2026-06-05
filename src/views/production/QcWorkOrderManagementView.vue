@@ -198,7 +198,8 @@
           :bom-opts="bomOpts"
           @save-basic="saveBasicInfo"
           @plan-date-change="onPlanDateChange"
-          @dispatch="handleDispatch"
+          @save-dispatch="handleSaveDispatch"
+          @dispatch-and-start="handleDispatchAndStart"
           @cancel-dispatch="handleDispatchCancel"
           @detail-action="onDetailAction"
         />
@@ -245,7 +246,8 @@
           :bom-opts="bomOpts"
           @save-basic="saveBasicInfo"
           @plan-date-change="onPlanDateChange"
-          @dispatch="handleDispatch"
+          @save-dispatch="handleSaveDispatch"
+          @dispatch-and-start="handleDispatchAndStart"
           @cancel-dispatch="handleDispatchCancel"
           @detail-action="onDetailAction"
         />
@@ -290,6 +292,7 @@ import {
   cloneQcWorkOrder,
   canShowQcDispatchTab,
 } from '@/store/qcWorkOrderStore'
+import { saveDispatchDraft, dispatchAndStartWorkOrder } from '@/utils/workOrderDispatchHelpers'
 import { workCenterOptions, warehouseOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { bomOptions } from '@/mock/workOrderMaster'
 import CreateQcWorkOrderModal from './components/CreateQcWorkOrderModal.vue'
@@ -539,16 +542,23 @@ function validateProcesses(processes) {
   return true
 }
 
-function handleDispatch(startAfter) {
+function handleSaveDispatch() {
+  saveDispatchDraft(updateQcWorkOrder, selectedOrder.value)
+}
+
+function handleDispatchAndStart() {
   const wo = selectedOrder.value
   if (!wo || !validateProcesses(wo.processes)) return
-  updateQcWorkOrder(wo.id, {
-    processes: wo.processes,
-    status: startAfter ? '执行中' : '已下发',
-    execStatus: startAfter ? '执行中' : wo.execStatus,
+  const ok = dispatchAndStartWorkOrder({
+    workOrder: wo,
+    orderCategory: '质检工单',
+    updateFn: (id, patch) =>
+      updateQcWorkOrder(id, {
+        ...patch,
+        execStatus: '执行中',
+      }),
   })
-  message.success(startAfter ? '质检工单已下发并开始执行' : '质检工单已下发')
-  if (!startAfter) detailTab.value = 'detail'
+  if (ok) detailTab.value = 'detail'
 }
 
 function handleDispatchCancel() {

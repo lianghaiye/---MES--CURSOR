@@ -91,7 +91,7 @@ export function canShowDisassemblyDispatchTab(status) {
 }
 
 export function canEditDisassemblyOrder(row) {
-  return row?.status === '待下发' || row?.status === '已下发'
+  return row?.status === '待下发'
 }
 
 export function canDispatchDisassemblyOrder(row) {

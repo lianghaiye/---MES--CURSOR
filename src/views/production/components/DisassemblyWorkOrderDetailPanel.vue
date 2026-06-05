@@ -5,16 +5,26 @@
         <span class="code">{{ workOrder.code }}</span>
         <span class="name">{{ workOrder.name }}</span>
       </div>
-      <a-button
-        v-if="detailTab === 'dispatch' && showDispatchTab"
-        type="link"
-        class="collapse-btn"
-        @click="detailCollapsed = !detailCollapsed"
-      >
-        {{ detailCollapsed ? '展开详情' : '收起详情' }}
-        <UpOutlined v-if="!detailCollapsed" />
-        <DownOutlined v-else />
-      </a-button>
+      <a-space :size="8">
+        <a-button
+          v-if="showDispatchTab && workOrder.status === '待下发'"
+          type="primary"
+          size="small"
+          @click="emit('dispatch-and-start')"
+        >
+          下发并开始
+        </a-button>
+        <a-button
+          v-if="detailTab === 'dispatch' && showDispatchTab"
+          type="link"
+          class="collapse-btn"
+          @click="detailCollapsed = !detailCollapsed"
+        >
+          {{ detailCollapsed ? '展开详情' : '收起详情' }}
+          <UpOutlined v-if="!detailCollapsed" />
+          <DownOutlined v-else />
+        </a-button>
+      </a-space>
     </div>
 
     <a-tabs v-model:activeKey="detailTab" class="detail-tabs">
@@ -106,8 +116,7 @@
         <WorkOrderDispatchTab
           class="dispatch-process-section"
           :work-order="workOrder"
-          @dispatch="emit('dispatch', false)"
-          @dispatch-and-start="emit('dispatch', true)"
+          @save="emit('save-dispatch')"
           @cancel="emit('cancel-dispatch')"
         />
       </a-tab-pane>
@@ -154,7 +163,8 @@ const detailCollapsed = defineModel('detailCollapsed', { type: Boolean, default:
 const emit = defineEmits([
   'save-basic',
   'plan-date-change',
-  'dispatch',
+  'save-dispatch',
+  'dispatch-and-start',
   'cancel-dispatch',
   'detail-action',
 ])

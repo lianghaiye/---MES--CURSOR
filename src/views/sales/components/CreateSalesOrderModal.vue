@@ -216,10 +216,7 @@
               <a-checkbox-group v-model:value="visibleColumnKeys" class="column-settings">
                 <a-row>
                   <a-col v-for="col in columnDefs" :key="col.key" :span="12">
-                    <a-checkbox
-                      :value="col.key"
-                      :disabled="fixedColumnKeys.includes(col.key)"
-                    >
+                    <a-checkbox :value="col.key" :disabled="fixedColumnKeys.includes(col.key)">
                       {{ col.title }}
                     </a-checkbox>
                   </a-col>
@@ -510,8 +507,22 @@ const fixedColumnKeys = ['index', 'productName', 'productCode', 'action']
 
 const columnDefs = [
   { key: 'index', title: '序号', width: 56, fixed: 'left' },
-  { key: 'productName', title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
-  { key: 'productCode', title: '产品编码', dataIndex: 'productCode', width: 130, ellipsis: true, fixed: 'left' },
+  {
+    key: 'productName',
+    title: '产品名称',
+    dataIndex: 'productName',
+    width: 140,
+    ellipsis: true,
+    fixed: 'left',
+  },
+  {
+    key: 'productCode',
+    title: '产品编码',
+    dataIndex: 'productCode',
+    width: 130,
+    ellipsis: true,
+    fixed: 'left',
+  },
   { key: 'productAttr', title: '产品属性', dataIndex: 'productAttr', width: 90 },
   { key: 'specAttr', title: '规格属性', dataIndex: 'specAttr', width: 90 },
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 100 },

@@ -9,6 +9,7 @@ export const topModules = [
   { key: 'quality', label: '质量管理', path: '/quality' },
   { key: 'procurement', label: '采购管理', path: '/procurement' },
   { key: 'after-sales', label: '售后管理', path: '/after-sales' },
+  { key: 'basic-config', label: '基础配置', path: '/basic-config' },
 ]
 
 /** 顶栏「更多」下拉模块（WMS/QMS 等扩展入口） */
@@ -69,6 +70,9 @@ export const sideMenus = {
     { key: 'service-orders', label: '服务工单', path: '/after-sales/service-orders' },
     { key: 'returns', label: '退换货', path: '/after-sales/returns' },
   ],
+  'basic-config': [
+    { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
+  ],
   wms: [{ key: 'warehouse', label: '仓库作业', path: '/wms/warehouse' }],
   qms: [{ key: 'trace', label: '质量追溯', path: '/qms/trace' }],
   equipment: [{ key: 'devices', label: '设备台账', path: '/equipment/devices' }],
@@ -125,4 +129,5 @@ export const routeTitles = {
   '/qms/trace': '质量追溯',
   '/equipment/devices': '设备管理',
   '/report/overview': '报表中心',
+  '/basic-config/employee-groups': '员工组别',
 }

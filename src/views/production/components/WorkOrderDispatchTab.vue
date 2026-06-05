@@ -21,12 +21,19 @@
         <template v-else-if="column.key === 'processCode'">
           {{ record.processCode || '-' }}
         </template>
+        <template v-else-if="column.key === 'resourceType'">
+          <a-tag :color="record.resourceType === '工人小组' ? 'blue' : 'default'">
+            {{ record.resourceType || '工人' }}
+          </a-tag>
+        </template>
         <template v-else-if="column.key === 'executors'">
-          <a class="executor-link" @click.prevent="openPersonModal(record)">
+          <a class="executor-link" @click.prevent="openExecutorModal(record)">
             <template v-if="record.executors?.length">
               {{ record.executors.join('、') }}
             </template>
-            <template v-else>请选择执行人</template>
+            <template v-else>
+              {{ record.resourceType === '工人小组' ? '请选择执行组别' : '请选择执行人' }}
+            </template>
           </a>
         </template>
         <template v-else-if="column.key === 'feeding'">
@@ -70,10 +77,7 @@
 
     <div class="dispatch-footer">
       <a-space :size="8">
-        <a-button type="primary" size="small" @click="emitDispatch('dispatch')">下发</a-button>
-        <a-button type="primary" size="small" @click="emitDispatch('dispatchAndStart')">
-          下发并开始
-        </a-button>
+        <a-button type="primary" size="small" @click="emitSave">保存</a-button>
         <a-button size="small" @click="emit('cancel')">取消</a-button>
       </a-space>
     </div>
@@ -83,43 +87,61 @@
       :selected="editingProcess?.executors || []"
       @confirm="onPersonConfirm"
     />
+    <SelectGroupModal
+      v-model:open="groupModalOpen"
+      :selected="editingProcess?.executors || []"
+      @confirm="onGroupConfirm"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import { message } from 'ant-design-vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import SelectPersonModal from './SelectPersonModal.vue'
+import SelectGroupModal from './SelectGroupModal.vue'
 import { mockFeedingMaterials } from '@/mock/workOrderMaster'
+import { validateProcessExecutors } from '@/utils/workOrderDispatchHelpers'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
 })
 
-const emit = defineEmits(['dispatch', 'dispatch-and-start', 'cancel'])
+const emit = defineEmits(['save', 'cancel'])
 
 const columns = [
   { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
   { title: '工序名称', key: 'process', width: 120 },
   { title: '工序编码', key: 'processCode', width: 100 },
-  { title: '选择执行人', key: 'executors', width: 140 },
+  { title: '资源类型', key: 'resourceType', width: 90 },
+  { title: '选择执行人', key: 'executors', width: 160 },
   { title: '投料信息', key: 'feeding' },
 ]
 
 const personModalOpen = ref(false)
+const groupModalOpen = ref(false)
 const editingProcess = ref(null)
 
 const materialOptions = computed(() =>
   mockFeedingMaterials.map((m) => ({ label: m.name, value: m.id })),
 )
 
-function openPersonModal(process) {
+function openExecutorModal(process) {
   editingProcess.value = process
-  personModalOpen.value = true
+  if (process.resourceType === '工人小组') {
+    groupModalOpen.value = true
+  } else {
+    personModalOpen.value = true
+  }
 }
 
 function onPersonConfirm(names) {
+  if (editingProcess.value) {
+    editingProcess.value.executors = names
+  }
+}
+
+function onGroupConfirm(names) {
   if (editingProcess.value) {
     editingProcess.value.executors = names
   }
@@ -143,19 +165,9 @@ function removeFeedingRow(process, index) {
   process.feedingMaterials.splice(index, 1)
 }
 
-function validateDispatch() {
-  const missing = props.workOrder.processes.filter((p) => !p.executors?.length)
-  if (missing.length) {
-    message.error(`请为工序「${missing.map((p) => p.name).join('、')}」选择执行人`)
-    return false
-  }
-  return true
-}
-
-function emitDispatch(type) {
-  if (!validateDispatch()) return
-  if (type === 'dispatch') emit('dispatch')
-  else emit('dispatch-and-start')
+function emitSave() {
+  if (!validateProcessExecutors(props.workOrder.processes)) return
+  emit('save')
 }
 </script>
 

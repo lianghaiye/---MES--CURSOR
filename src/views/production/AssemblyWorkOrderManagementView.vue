@@ -187,7 +187,8 @@
           :bom-opts="bomOpts"
           @save-basic="saveBasicInfo"
           @plan-date-change="onPlanDateChange"
-          @dispatch="handleDispatch"
+          @save-dispatch="handleSaveDispatch"
+          @dispatch-and-start="handleDispatchAndStart"
           @cancel-dispatch="handleDispatchCancel"
           @detail-action="onDetailAction"
         />
@@ -234,7 +235,8 @@
           :bom-opts="bomOpts"
           @save-basic="saveBasicInfo"
           @plan-date-change="onPlanDateChange"
-          @dispatch="handleDispatch"
+          @save-dispatch="handleSaveDispatch"
+          @dispatch-and-start="handleDispatchAndStart"
           @cancel-dispatch="handleDispatchCancel"
           @detail-action="onDetailAction"
         />
@@ -279,6 +281,11 @@ import {
   cloneAssemblyWorkOrder,
   canShowAssemblyDispatchTab,
 } from '@/store/assemblyWorkOrderStore'
+import {
+  saveDispatchDraft,
+  dispatchAndStartWorkOrder,
+  canEditWorkOrder,
+} from '@/utils/workOrderDispatchHelpers'
 import { workCenterOptions, warehouseOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { bomOptions } from '@/mock/workOrderMaster'
 import CreateAssemblyWorkOrderModal from './components/CreateAssemblyWorkOrderModal.vue'
@@ -516,15 +523,17 @@ function validateProcesses(processes) {
   return true
 }
 
-function handleDispatch(startAfter) {
-  const wo = selectedOrder.value
-  if (!wo || !validateProcesses(wo.processes)) return
-  updateAssemblyWorkOrder(wo.id, {
-    processes: wo.processes,
-    status: startAfter ? '执行中' : '已下发',
+function handleSaveDispatch() {
+  saveDispatchDraft(updateAssemblyWorkOrder, selectedOrder.value)
+}
+
+function handleDispatchAndStart() {
+  const ok = dispatchAndStartWorkOrder({
+    workOrder: selectedOrder.value,
+    orderCategory: '总装工单',
+    updateFn: updateAssemblyWorkOrder,
   })
-  message.success(startAfter ? '工单已下发并开始执行' : '工单已下发')
-  if (!startAfter) detailTab.value = 'detail'
+  if (ok) detailTab.value = 'detail'
 }
 
 function handleDispatchCancel() {
@@ -533,7 +542,7 @@ function handleDispatchCancel() {
 
 function handleBatchDispatch() {
   if (!selectedIds.value.length) {
-    message.warning('请勾选要下发的工单')
+    message.warning('请勾选要下发并开始的工单')
     return
   }
   const targets = assemblyWorkOrderState.orders.filter(
@@ -543,11 +552,20 @@ function handleBatchDispatch() {
     message.warning('所选工单中没有状态为「待下发」的可下发项')
     return
   }
+  let count = 0
   for (const wo of targets) {
     if (!validateProcesses(wo.processes)) return
-    updateAssemblyWorkOrder(wo.id, { status: '已下发' })
+    if (
+      dispatchAndStartWorkOrder({
+        workOrder: wo,
+        orderCategory: '总装工单',
+        updateFn: updateAssemblyWorkOrder,
+      })
+    ) {
+      count += 1
+    }
   }
-  message.success(`已批量下发 ${targets.length} 条工单`)
+  if (count) message.success(`已批量下发并开始 ${count} 条工单`)
   selectedIds.value = []
 }
 
@@ -574,11 +592,19 @@ function onBatchMenu({ key }) {
 
 function onCardAction(key, wo) {
   if (key === 'edit') {
+    if (!canEditWorkOrder(wo)) {
+      message.warning('执行中的工单不可编辑')
+      return
+    }
     editRecord.value = wo
     createModalOpen.value = true
     return
   }
   if (key === 'delete') {
+    if (!canEditWorkOrder(wo)) {
+      message.warning('执行中的工单不可删除')
+      return
+    }
     Modal.confirm({
       title: '确认删除',
       content: `确定删除工单「${wo.code}」吗？此操作不可恢复。`,

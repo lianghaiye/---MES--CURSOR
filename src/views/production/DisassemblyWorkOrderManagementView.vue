@@ -176,7 +176,8 @@
           :person-opts="personOpts"
           @save-basic="saveBasicInfo"
           @plan-date-change="onPlanDateChange"
-          @dispatch="handleDispatch"
+          @save-dispatch="handleSaveDispatch"
+          @dispatch-and-start="handleDispatchAndStart"
           @cancel-dispatch="handleDispatchCancel"
           @detail-action="onDetailAction"
         />
@@ -222,7 +223,8 @@
           :person-opts="personOpts"
           @save-basic="saveBasicInfo"
           @plan-date-change="onPlanDateChange"
-          @dispatch="handleDispatch"
+          @save-dispatch="handleSaveDispatch"
+          @dispatch-and-start="handleDispatchAndStart"
           @cancel-dispatch="handleDispatchCancel"
           @detail-action="onDetailAction"
         />
@@ -263,7 +265,6 @@ import {
   disassemblyWorkOrderState,
   updateDisassemblyWorkOrder,
   deleteDisassemblyWorkOrder,
-  dispatchDisassemblyWorkOrder,
 } from '@/store/disassemblyWorkOrderStore'
 import {
   DISASSEMBLY_STATUS_OPTIONS,
@@ -275,6 +276,7 @@ import {
   canEditDisassemblyOrder,
   canDeleteDisassemblyOrder,
 } from '@/utils/disassemblyWorkOrder'
+import { saveDispatchDraft, dispatchAndStartWorkOrder } from '@/utils/workOrderDispatchHelpers'
 import { useTabs } from '@/composables/useTabs'
 import CreateDisassemblyWorkOrderModal from './components/CreateDisassemblyWorkOrderModal.vue'
 import DisassemblyWorkOrderDetailPanel from './components/DisassemblyWorkOrderDetailPanel.vue'
@@ -495,17 +497,17 @@ function validateProcesses(processes) {
   return true
 }
 
-function handleDispatch(startAfter) {
-  const wo = selectedOrder.value
-  if (!wo || !validateProcesses(wo.processes)) return
-  updateDisassemblyWorkOrder(wo.id, { processes: wo.processes })
-  const res = dispatchDisassemblyWorkOrder(wo.id, startAfter)
-  if (res.ok) {
-    message.success(startAfter ? '工单已下发并开始执行' : '工单已下发')
-    if (!startAfter) detailTab.value = 'detail'
-  } else {
-    message.warning(res.message)
-  }
+function handleSaveDispatch() {
+  saveDispatchDraft(updateDisassemblyWorkOrder, selectedOrder.value)
+}
+
+function handleDispatchAndStart() {
+  const ok = dispatchAndStartWorkOrder({
+    workOrder: selectedOrder.value,
+    orderCategory: '拆解工单',
+    updateFn: updateDisassemblyWorkOrder,
+  })
+  if (ok) detailTab.value = 'detail'
 }
 
 function handleDispatchCancel() {
@@ -514,7 +516,7 @@ function handleDispatchCancel() {
 
 function handleBatchDispatch() {
   if (!selectedIds.value.length) {
-    message.warning('请勾选要下发的工单')
+    message.warning('请勾选要下发并开始的工单')
     return
   }
   const targets = disassemblyWorkOrderState.orders.filter(
@@ -524,11 +526,20 @@ function handleBatchDispatch() {
     message.warning('所选工单中没有状态为「待下发」的可下发项')
     return
   }
+  let count = 0
   for (const wo of targets) {
     if (!validateProcesses(wo.processes)) return
-    dispatchDisassemblyWorkOrder(wo.id, false)
+    if (
+      dispatchAndStartWorkOrder({
+        workOrder: wo,
+        orderCategory: '拆解工单',
+        updateFn: updateDisassemblyWorkOrder,
+      })
+    ) {
+      count += 1
+    }
   }
-  message.success(`已批量下发 ${targets.length} 条工单`)
+  if (count) message.success(`已批量下发并开始 ${count} 条工单`)
   selectedIds.value = []
 }
 

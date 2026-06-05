@@ -32,9 +32,9 @@
               v-if="canDispatchDisassemblyOrder(order)"
               type="primary"
               size="small"
-              @click="handleDispatch"
+              @click="handleDispatchAndStart"
             >
-              下发任务
+              下发并开始
             </a-button>
           </a-space>
         </div>
@@ -228,8 +228,9 @@ import { tabStore, useTabs } from '@/composables/useTabs'
 import {
   getDisassemblyWorkOrderById,
   deleteDisassemblyWorkOrder,
-  dispatchDisassemblyWorkOrder,
+  updateDisassemblyWorkOrder,
 } from '@/store/disassemblyWorkOrderStore'
+import { dispatchAndStartWorkOrder } from '@/utils/workOrderDispatchHelpers'
 import { buildDisassemblyWorkOrderDetail } from '@/utils/disassemblyWorkOrderDetail'
 import {
   statusColor,
@@ -357,14 +358,13 @@ function onSaved() {
   loadOrder()
 }
 
-function handleDispatch() {
-  const res = dispatchDisassemblyWorkOrder(order.value.id)
-  if (res.ok) {
-    message.success('工单已下发')
-    loadOrder()
-  } else {
-    message.warning(res.message)
-  }
+function handleDispatchAndStart() {
+  const ok = dispatchAndStartWorkOrder({
+    workOrder: order.value,
+    orderCategory: '拆解工单',
+    updateFn: updateDisassemblyWorkOrder,
+  })
+  if (ok) loadOrder()
 }
 
 function confirmDelete() {
