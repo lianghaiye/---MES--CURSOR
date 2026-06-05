@@ -107,6 +107,7 @@
           class="dispatch-process-section"
           :work-order="workOrder"
           @save="emit('save-dispatch')"
+          @dispatch-and-start="emit('dispatch-and-start')"
           @cancel="emit('cancel-dispatch')"
         />
       </a-tab-pane>

@@ -77,7 +77,8 @@
 
     <div class="dispatch-footer">
       <a-space :size="8">
-        <a-button type="primary" size="small" @click="emitSave">保存</a-button>
+        <a-button size="small" @click="emitSave">保存</a-button>
+        <a-button type="primary" size="small" @click="emitDispatchAndStart">下发并开始</a-button>
         <a-button size="small" @click="emit('cancel')">取消</a-button>
       </a-space>
     </div>
@@ -107,7 +108,7 @@ const props = defineProps({
   workOrder: { type: Object, required: true },
 })
 
-const emit = defineEmits(['save', 'cancel'])
+const emit = defineEmits(['save', 'dispatch-and-start', 'cancel'])
 
 const columns = [
   { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
@@ -168,6 +169,11 @@ function removeFeedingRow(process, index) {
 function emitSave() {
   if (!validateProcessExecutors(props.workOrder.processes)) return
   emit('save')
+}
+
+function emitDispatchAndStart() {
+  if (!validateProcessExecutors(props.workOrder.processes)) return
+  emit('dispatch-and-start')
 }
 </script>
 
