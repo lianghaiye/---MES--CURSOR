@@ -180,6 +180,17 @@ export function createAssemblyWorkOrderPayload(partial) {
   }
 }
 
+/** 按销售单号 + 产品名称匹配总装工单 */
+export function findAssemblyOrdersBySalesProduct(salesOrderNo, productName) {
+  if (!salesOrderNo || !productName) return []
+  return assemblyWorkOrderState.orders.filter((wo) => {
+    const source = wo.sourceOrderNo || ''
+    const orderMatched =
+      source === salesOrderNo || source.includes(salesOrderNo) || salesOrderNo.includes(source)
+    return orderMatched && wo.productName === productName
+  })
+}
+
 export function filterAssemblyWorkOrders(list, filters) {
   return list.filter((wo) => {
     if (filters.code && !wo.code.includes(filters.code)) return false

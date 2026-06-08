@@ -116,6 +116,7 @@
           <FileTextOutlined />
           申请发货
         </a-button>
+        <a-button size="small" @click="openChangeDeliveryModeModal"> 变更交付方式 </a-button>
         <a-button size="small" @click="stubAction('打印')">
           <PrinterOutlined />
           打印
@@ -234,6 +235,12 @@
       :sales-order="deliveryOrder"
       @confirmed="onDeliveryConfirmed"
     />
+
+    <ChangeDeliveryModeModal
+      v-model:open="changeDeliveryModeOpen"
+      :sales-order="changeDeliveryModeOrder"
+      @saved="onChangeDeliveryModeSaved"
+    />
   </div>
 </template>
 
@@ -268,6 +275,7 @@ import {
   recalcOrderAmounts,
   approveSalesOrder,
   canEditSalesOrder,
+  canChangeDeliveryMode,
   addDeliveryApplication,
 } from '@/store/salesOrderStore'
 import { sumSelectedShipQty } from '@/utils/shipEbom'
@@ -279,6 +287,8 @@ import {
 } from '@/mock/salesOrderOptions'
 import CreateSalesOrderModal from './components/CreateSalesOrderModal.vue'
 import ApplyDeliveryModal from './components/ApplyDeliveryModal.vue'
+import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
+import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -296,8 +306,10 @@ const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const createModalOpen = ref(false)
 const deliveryModalOpen = ref(false)
+const changeDeliveryModeOpen = ref(false)
 const editRecord = ref(null)
 const deliveryOrder = ref(null)
+const changeDeliveryModeOrder = ref(null)
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
@@ -478,6 +490,32 @@ function openDeliveryModal() {
     return
   }
   deliveryModalOpen.value = true
+}
+
+function openChangeDeliveryModeModal() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条销售订单后再变更交付方式')
+    return
+  }
+  const order = salesOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
+    message.warning('未找到所选订单')
+    return
+  }
+  if (!canChangeDeliveryMode(order)) {
+    message.warning('仅已审核的自产销售订单可变更交付方式')
+    return
+  }
+  if (!buildEligibleDeliveryModeLines(order).length) {
+    message.warning('当前订单没有可变更的产品（均已发完或未发货数量为 0）')
+    return
+  }
+  changeDeliveryModeOrder.value = order
+  changeDeliveryModeOpen.value = true
+}
+
+function onChangeDeliveryModeSaved() {
+  changeDeliveryModeOrder.value = null
 }
 
 function onOrderSaved({ isEdit, id, data }) {

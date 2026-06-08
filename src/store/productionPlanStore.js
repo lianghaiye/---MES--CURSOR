@@ -163,6 +163,55 @@ export function createProductionPlanFromSalesOrder(salesOrder) {
   return plan
 }
 
+function cloneWorkItem(wi) {
+  return JSON.parse(JSON.stringify(wi))
+}
+
+/** 同步生产计划工作项交付方式（支持拆行） */
+export function syncProductionPlanDeliveryMode(salesOrderNo, planOps) {
+  const plan = findPlanBySalesOrderNo(salesOrderNo)
+  if (!plan?.workItems?.length || !planOps?.length) return
+
+  planOps.forEach((op) => {
+    if (op.type === 'update') {
+      const wi = plan.workItems.find((w) => w.salesLineId === op.lineId)
+      if (!wi) return
+      wi.deliveryMode = op.deliveryMode
+      wi.salesQty = op.qty
+      wi.orderQty = op.qty
+      enrichWorkItem(wi)
+      return
+    }
+
+    if (op.type === 'create') {
+      const sourceWi = plan.workItems.find((w) => w.salesLineId === op.sourceLineId)
+      const newWi = sourceWi
+        ? cloneWorkItem(sourceWi)
+        : enrichWorkItem(
+            {
+              id: `wi-${op.lineId}`,
+              salesLineId: op.lineId,
+              status: '待下达',
+              productName: op.line?.productName,
+              productCode: op.line?.productCode,
+              model: op.line?.specModel,
+              materials: op.line?.ebomSnapshot?.materials || [],
+              ebomSnapshot: op.line?.ebomSnapshot,
+            },
+            op.line,
+          )
+      newWi.id = `wi-${op.lineId}`
+      newWi.salesLineId = op.lineId
+      newWi.deliveryMode = op.deliveryMode
+      newWi.salesQty = op.qty
+      newWi.orderQty = op.qty
+      newWi.shippedQty = 0
+      enrichWorkItem(newWi, op.line)
+      plan.workItems.push(newWi)
+    }
+  })
+}
+
 export function filterProductionPlans(list, filters) {
   return list.filter((order) => {
     if (filters.orderNo && !order.orderNo.includes(filters.orderNo)) return false

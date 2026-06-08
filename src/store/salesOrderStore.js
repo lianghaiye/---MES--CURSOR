@@ -12,6 +12,8 @@ import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { buildLineAccessoryKits, buildOrderAccessoryKits } from '@/mock/accessoryPacks'
 import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
 import { hydrateApprovedSelfProdOrders } from '@/utils/hydrateSalesLines'
+import { validateChangeDeliveryRows, applyDeliveryModeChanges } from '@/utils/changeDeliveryMode'
+import { syncProductionPlanDeliveryMode } from '@/store/productionPlanStore'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
 const DATA_VERSION = 3
@@ -125,6 +127,28 @@ export function recalcOrderAmounts(order) {
 
 export function canEditSalesOrder(order) {
   return order?.progressStatus === '未审'
+}
+
+export function canChangeDeliveryMode(order) {
+  return order?.progressStatus === '已审' && order?.businessType === '自产销售'
+}
+
+/** 变更销售明细交付方式，并同步生产计划 */
+export function changeSalesOrderDeliveryMode(orderId, rows) {
+  const order = salesOrderState.orders.find((o) => o.id === orderId)
+  if (!order) return { ok: false, message: '销售订单不存在' }
+  if (!canChangeDeliveryMode(order)) {
+    return { ok: false, message: '仅已审核的自产销售订单可变更交付方式' }
+  }
+
+  const check = validateChangeDeliveryRows(order, rows)
+  if (!check.ok) return check
+
+  const planOps = applyDeliveryModeChanges(order, rows)
+  syncProductionPlanDeliveryMode(order.orderNo, planOps)
+  recalcOrderAmounts(order)
+
+  return { ok: true, message: '交付方式变更成功' }
 }
 
 /**
