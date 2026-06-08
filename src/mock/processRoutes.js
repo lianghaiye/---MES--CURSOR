@@ -1,4 +1,7 @@
-/** 工艺路线主数据：工序、资源类型及是否配置投料 */
+import { getProcessRouteByName, getActiveRouteOptions } from '@/store/processRouteStore'
+import { buildWorkOrderProcessesFromGrid } from '@/utils/processRouteGrid'
+
+/** @deprecated 兼容旧工单种子数据 */
 export const processRouteMaster = {
   机加标准路线: {
     id: 'route-machining',
@@ -82,108 +85,6 @@ export const processRouteMaster = {
       },
     ],
   },
-  热处理路线: {
-    id: 'route-heat',
-    name: '热处理路线',
-    steps: [
-      {
-        name: '入炉',
-        code: 'OP-RL-01',
-        icon: 'FireOutlined',
-        hasFeeding: false,
-        resourceType: '工人',
-      },
-      {
-        name: '加热',
-        code: 'OP-JR-02',
-        icon: 'HeatMapOutlined',
-        hasFeeding: true,
-        resourceType: '工人小组',
-      },
-      {
-        name: '冷却',
-        code: 'OP-LQ-03',
-        icon: 'CloudOutlined',
-        hasFeeding: false,
-        resourceType: '工人',
-      },
-      {
-        name: '质检',
-        code: 'OP-ZJ-04',
-        icon: 'AuditOutlined',
-        hasFeeding: false,
-        resourceType: '工人',
-      },
-    ],
-  },
-  焊接标准路线: {
-    id: 'route-welding',
-    name: '焊接标准路线',
-    steps: [
-      {
-        name: '下料',
-        code: 'OP-XL-01',
-        icon: 'ScissorOutlined',
-        hasFeeding: true,
-        resourceType: '工人',
-      },
-      {
-        name: '组对',
-        code: 'OP-ZD-02',
-        icon: 'BlockOutlined',
-        hasFeeding: false,
-        resourceType: '工人',
-      },
-      {
-        name: '焊接',
-        code: 'OP-HJ-03',
-        icon: 'ThunderboltOutlined',
-        hasFeeding: true,
-        resourceType: '工人小组',
-      },
-      {
-        name: '探伤',
-        code: 'OP-TS-04',
-        icon: 'ScanOutlined',
-        hasFeeding: false,
-        resourceType: '工人',
-      },
-    ],
-  },
-  蒸馏生产路线: {
-    id: 'route-distill',
-    name: '蒸馏生产路线',
-    steps: [
-      {
-        name: '配比',
-        code: 'OP-PB-01',
-        icon: 'ExperimentOutlined',
-        hasFeeding: true,
-        resourceType: '工人小组',
-      },
-      {
-        name: '蒸馏冷却',
-        code: 'OP-ZL-02',
-        icon: 'CloudOutlined',
-        hasFeeding: false,
-        resourceType: '工人',
-      },
-      {
-        name: '质检',
-        code: 'OP-ZJ-03',
-        icon: 'AuditOutlined',
-        hasFeeding: false,
-        resourceType: '工人',
-      },
-      {
-        name: '入库',
-        code: 'OP-RK-04',
-        icon: 'InboxOutlined',
-        hasFeeding: false,
-        resourceType: '工人',
-      },
-    ],
-  },
 }
 
 /** 拆解工单工序（与小程序待办流程对齐） */
@@ -212,9 +113,14 @@ export const disassemblyProcessDefs = [
 ]
 
 export function buildProcessesFromRoute(routeName) {
-  const route = processRouteMaster[routeName] || processRouteMaster['机加标准路线']
-  return route.steps.map((step, index) => ({
-    id: `${route.id}-step-${index + 1}`,
+  const route = getProcessRouteByName(routeName)
+  if (route?.grid) {
+    return buildWorkOrderProcessesFromGrid(route.grid, route.id)
+  }
+
+  const legacy = processRouteMaster[routeName] || processRouteMaster['机加标准路线']
+  return legacy.steps.map((step, index) => ({
+    id: `${legacy.id}-step-${index + 1}`,
     index: index + 1,
     name: step.name,
     processCode: step.code,
@@ -243,7 +149,10 @@ export function buildDisassemblyProcesses() {
 }
 
 export function getDefaultProductRoute(productName) {
-  if (productName?.includes('电机') || productName?.includes('装配')) return '装配标准路线'
-  if (productName?.includes('热处理') || productName?.includes('模')) return '热处理路线'
-  return '机加标准路线'
+  if (productName?.includes('电机') || productName?.includes('装配')) return '离心泵标准装配路线'
+  if (productName?.includes('泵体') || productName?.includes('机加')) return '泵体机加路线'
+  const opts = getActiveRouteOptions({ productName })
+  return opts[0] || '离心泵标准装配路线'
 }
+
+export { getActiveRouteOptions }

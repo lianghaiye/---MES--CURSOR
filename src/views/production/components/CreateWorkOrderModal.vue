@@ -93,16 +93,11 @@
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import {
-  processRouteOptions,
-  workCenterOptions,
-  warehouseOptions,
-  urgencyOptions,
-} from '@/mock/workOrderOptions'
+import { workCenterOptions, warehouseOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { bomOptions } from '@/mock/workOrderMaster'
 import { createWorkOrderPayload, workOrderState } from '@/store/workOrderStore'
 import { isDuplicateOrderCode, generateProductionWorkOrderName } from '@/utils/workOrderNaming'
-import { buildProcessesFromRoute } from '@/mock/processRoutes'
+import { buildProcessesFromRoute, getActiveRouteOptions } from '@/mock/processRoutes'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -128,7 +123,10 @@ const form = reactive({
   remark: '',
 })
 
-const routeOptions = computed(() => processRouteOptions.map((v) => ({ label: v, value: v })))
+const routeOptions = computed(() => {
+  const names = getActiveRouteOptions({ productName: form.productName })
+  return names.map((v) => ({ label: v, value: v }))
+})
 const bomSelectOptions = computed(() => bomOptions.map((v) => ({ label: v, value: v })))
 const workCenterOpts = computed(() => workCenterOptions.map((v) => ({ label: v, value: v })))
 const warehouseOpts = computed(() => warehouseOptions.map((v) => ({ label: v, value: v })))
@@ -160,7 +158,7 @@ watch(
     form.code = ''
     form.name = ''
     form.productName = ''
-    form.processRouteName = processRouteOptions[0]
+    form.processRouteName = getActiveRouteOptions({})[0]
     form.planQty = 1
     form.scheduleQty = 1
     form.workCenter = '默认工厂'
