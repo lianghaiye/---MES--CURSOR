@@ -1,53 +1,27 @@
-/** 报废单演示数据（拆解工单关联） */
-export const mockScrapOrders = [
-  {
-    id: 'scrap-1',
-    scrapNo: 'BF20260528001',
-    itemName: '污水泵',
-    itemCode: 'CP2610002',
-    specModel: 'ISG80-160(I)A',
-    material: '铸铁',
-    processMethod: '拆解',
-    createdAt: '2026-05-28',
-  },
-  {
-    id: 'scrap-2',
-    scrapNo: 'BF20260529002',
-    itemName: '清水离心泵',
-    itemCode: 'CP2610001',
-    specModel: 'ISG50-160',
-    material: '不锈钢',
-    processMethod: '拆解',
-    createdAt: '2026-05-29',
-  },
-  {
-    id: 'scrap-3',
-    scrapNo: 'BF20260601003',
-    itemName: '立式多级泵',
-    itemCode: 'CP2610003',
-    specModel: 'CDL4-40',
-    material: '铸铁',
-    processMethod: '拆解',
-    createdAt: '2026-06-01',
-  },
-  {
-    id: 'scrap-4',
-    scrapNo: 'BF20260602004',
-    itemName: '深井潜水泵',
-    itemCode: 'CP2610004',
-    specModel: 'QJ200-50/4',
-    material: '不锈钢',
-    processMethod: '拆解',
-    createdAt: '2026-06-02',
-  },
-  {
-    id: 'scrap-5',
-    scrapNo: 'BF20260515005',
-    itemName: '污水泵',
-    itemCode: 'CP2610002',
-    specModel: 'ISG80-160(I)A',
-    material: '铸铁',
-    processMethod: '返修',
-    createdAt: '2026-05-15',
-  },
-]
+import { scrapOrderState, getApprovedScrapOrders } from '@/store/scrapOrderStore'
+
+/** 拆解工单关联报废单（仅审核通过） */
+export function getMockScrapOrdersForDisassembly() {
+  return getApprovedScrapOrders().map((o) => ({
+    id: o.id,
+    scrapNo: o.scrapNo,
+    scrapSource: o.scrapSource,
+    itemName: o.itemName,
+    itemCode: o.itemCode,
+    specModel: o.specModel,
+    material: o.material,
+    processMethod: o.processMethod,
+    relatedWorkOrderNo: o.relatedWorkOrderNo || o.workOrderNo,
+    createdAt: o.createdAt,
+  }))
+}
+
+/** @deprecated 使用 getMockScrapOrdersForDisassembly */
+export const mockScrapOrders = getMockScrapOrdersForDisassembly()
+
+export function refreshMockScrapOrders() {
+  return getMockScrapOrdersForDisassembly()
+}
+
+// 触发 store 初始化
+void scrapOrderState.orders

@@ -64,7 +64,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { SearchOutlined, DeleteOutlined } from '@ant-design/icons-vue'
-import { mockScrapOrders } from '@/mock/disassemblyScrapOrders'
+import { getMockScrapOrdersForDisassembly } from '@/mock/disassemblyScrapOrders'
 
 const props = defineProps({
   open: Boolean,
@@ -78,7 +78,7 @@ const applied = reactive({ scrapNo: '', itemName: '', processMethod: undefined }
 const selectedRowKeys = ref([])
 const selectedRow = ref(null)
 
-const processMethodOpts = ['拆解', '返修', '报废'].map((v) => ({ label: v, value: v }))
+const processMethodOpts = ['退库', '报废', '拆解'].map((v) => ({ label: v, value: v }))
 
 const columns = [
   { title: '报废单号', dataIndex: 'scrapNo', width: 140 },
@@ -90,8 +90,10 @@ const columns = [
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
 ]
 
+const scrapList = computed(() => getMockScrapOrdersForDisassembly())
+
 const filteredList = computed(() =>
-  mockScrapOrders.filter((row) => {
+  scrapList.value.filter((row) => {
     if (applied.scrapNo && !row.scrapNo.includes(applied.scrapNo)) return false
     if (applied.itemName && !row.itemName.includes(applied.itemName)) return false
     if (applied.processMethod && row.processMethod !== applied.processMethod) return false
@@ -113,7 +115,7 @@ watch(
   (v) => {
     if (!v) return
     selectedRowKeys.value = props.selectedId ? [props.selectedId] : []
-    selectedRow.value = mockScrapOrders.find((r) => r.id === props.selectedId) || null
+    selectedRow.value = scrapList.value.find((r) => r.id === props.selectedId) || null
     handleClear()
   },
 )

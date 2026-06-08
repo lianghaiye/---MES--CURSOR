@@ -1,6 +1,11 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { buildProcessesFromRoute, getDefaultProductRoute } from '@/mock/processRoutes'
+import {
+  resolveOrderField,
+  generateQcWorkOrderCode,
+  generateQcWorkOrderName,
+} from '@/utils/workOrderNaming'
 
 const STORAGE_KEY = 'i_doms_qc_work_orders'
 let codeSeq = 1
@@ -150,10 +155,13 @@ export function updateQcWorkOrder(id, patch) {
 export function createQcWorkOrderPayload(partial) {
   const routeName = partial.processRouteName || getDefaultProductRoute(partial.productName)
   const productName = partial.productName?.trim() || ''
+  const existingCodes = qcWorkOrderState.orders.map((o) => o.code)
+  const code = resolveOrderField(partial.code, () => generateQcWorkOrderCode(existingCodes))
+  const name = resolveOrderField(partial.name, () => generateQcWorkOrderName(productName))
   return {
     id: `qc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    code: generateQcCode(),
-    name: `${productName}质检工单`,
+    code,
+    name,
     productName,
     orderCategory: '质检工单',
     status: '待下发',

@@ -159,7 +159,19 @@ const routes = [
         meta: { title: '出厂质检详情' },
       },
       { path: 'quality/inspection', redirect: '/quality/factory-qc' },
-      { path: 'quality/defect', ...emptyChild('quality-defect', '不良品') },
+      { path: 'quality/defect', redirect: '/quality/scrap-orders' },
+      {
+        path: 'quality/scrap-orders',
+        name: 'quality-scrap-orders',
+        component: () => import('@/views/quality/ScrapManagementView.vue'),
+        meta: { title: '报废品管理' },
+      },
+      {
+        path: 'quality/scrap-orders/:id',
+        name: 'quality-scrap-order-detail',
+        component: () => import('@/views/quality/ScrapOrderDetailView.vue'),
+        meta: { title: '报废品详情' },
+      },
       {
         path: 'procurement/purchase-req',
         name: 'procurement-purchase-req',
@@ -193,6 +205,12 @@ const routes = [
         name: 'basic-config-employee-groups',
         component: () => import('@/views/basic-config/EmployeeGroupView.vue'),
         meta: { title: '员工组别' },
+      },
+      {
+        path: 'system/dict',
+        name: 'system-dict',
+        component: () => import('@/views/system/SystemDictView.vue'),
+        meta: { title: '系统字典' },
       },
     ],
   },

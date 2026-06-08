@@ -6,6 +6,7 @@ import {
   generateDisassemblyOrderName,
   WORK_CENTER_MANAGERS,
 } from '@/utils/disassemblyWorkOrder'
+import { resolveOrderField } from '@/utils/workOrderNaming'
 
 const STORAGE_KEY = 'i_doms_disassembly_work_orders'
 const DATA_VERSION = 2
@@ -203,9 +204,12 @@ export function countPendingDisassemblyOrders() {
 export function addDisassemblyWorkOrder(payload) {
   const codes = disassemblyWorkOrderState.orders.map((o) => o.code)
   const names = disassemblyWorkOrderState.orders.map((o) => o.name)
-  const code = payload.code?.trim() || generateDisassemblyOrderCode(codes)
-  const name = payload.name?.trim() || generateDisassemblyOrderName(payload.itemName, names)
+  const code = resolveOrderField(payload.code, () => generateDisassemblyOrderCode(codes))
+  const name = resolveOrderField(payload.name, () =>
+    generateDisassemblyOrderName(payload.itemName, names),
+  )
   const row = {
+    ...payload,
     id: `dwo-${Date.now()}`,
     code,
     name,
@@ -214,7 +218,6 @@ export function addDisassemblyWorkOrder(payload) {
     orderSource: '生产报废',
     status: '待下发',
     traceStatus: '',
-    ...payload,
     processes: buildDisassemblyProcesses(),
     creator: payload.creator || '王小虎',
     operator: payload.creator || '王小虎',

@@ -9,16 +9,26 @@
     @ok="handleOk"
   >
     <div class="section-title">基础信息</div>
-    <a-form :model="form" layout="vertical">
-      <a-row :gutter="12">
+    <a-form :model="form" layout="inline" class="disassembly-form horizontal-form">
+      <a-row :gutter="[12, 12]" style="width: 100%">
         <a-col :span="8">
           <a-form-item label="工单编号">
-            <a-input v-model:value="form.code" size="small" placeholder="自动生成规则" />
+            <a-input
+              v-model:value="form.code"
+              allow-clear
+              size="small"
+              placeholder="留空则按规则自动生成"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="工单名称">
-            <a-input v-model:value="form.name" size="small" placeholder="名称自动生成规则" />
+            <a-input
+              v-model:value="form.name"
+              allow-clear
+              size="small"
+              placeholder="留空则按规则自动生成"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
@@ -150,8 +160,8 @@
           </a-form-item>
         </a-col>
         <a-col :span="24">
-          <a-form-item label="备注">
-            <a-textarea v-model:value="form.remark" :rows="2" placeholder="请输入" />
+          <a-form-item label="备注" class="remark-item">
+            <a-textarea v-model:value="form.remark" :rows="2" size="small" placeholder="请输入" />
           </a-form-item>
         </a-col>
       </a-row>
@@ -183,10 +193,8 @@ import {
   updateDisassemblyWorkOrder,
   resolvePersonInCharge,
 } from '@/store/disassemblyWorkOrderStore'
-import {
-  generateDisassemblyOrderCode,
-  generateDisassemblyOrderName,
-} from '@/utils/disassemblyWorkOrder'
+import { generateDisassemblyOrderName } from '@/utils/disassemblyWorkOrder'
+import { isDuplicateOrderCode } from '@/utils/workOrderNaming'
 import SelectScrapOrderModal from './SelectScrapOrderModal.vue'
 
 const props = defineProps({
@@ -283,9 +291,8 @@ watch(
 )
 
 function resetForm() {
-  const codes = disassemblyWorkOrderState.orders.map((o) => o.code)
   Object.assign(form, {
-    code: generateDisassemblyOrderCode(codes),
+    code: '',
     name: '',
     itemId: undefined,
     itemName: '',
@@ -384,6 +391,16 @@ function buildPayload() {
 }
 
 function handleOk() {
+  const customCode = form.code?.trim()
+  const existingCodes = disassemblyWorkOrderState.orders.map((o) => o.code)
+  if (
+    customCode &&
+    isDuplicateOrderCode(customCode, existingCodes, isEdit.value ? props.editRecord.code : '')
+  ) {
+    message.warning('工单编号已存在，请更换')
+    return
+  }
+
   if (!form.itemName) {
     message.warning('请选择物品名称')
     return
@@ -415,7 +432,18 @@ function handleOk() {
 
   const payload = buildPayload()
   if (isEdit.value) {
-    updateDisassemblyWorkOrder(props.editRecord.id, payload)
+    updateDisassemblyWorkOrder(props.editRecord.id, {
+      ...payload,
+      code: customCode || props.editRecord.code,
+      name:
+        form.name?.trim() ||
+        generateDisassemblyOrderName(
+          form.itemName,
+          disassemblyWorkOrderState.orders
+            .filter((o) => o.id !== props.editRecord.id)
+            .map((o) => o.name),
+        ),
+    })
     message.success('已保存')
   } else {
     addDisassemblyWorkOrder(payload)
@@ -435,5 +463,20 @@ export default { name: 'CreateDisassemblyWorkOrderModal' }
   font-weight: 600;
   margin-bottom: 12px;
   font-size: 14px;
+}
+
+.disassembly-form {
+  :deep(.ant-form-item) {
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    min-width: 84px;
+    justify-content: flex-end;
+  }
+
+  :deep(.remark-item .ant-form-item-label) {
+    flex: 0 0 84px;
+  }
 }
 </style>

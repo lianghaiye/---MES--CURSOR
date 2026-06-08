@@ -1,6 +1,11 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { buildProcessesFromRoute, getDefaultProductRoute } from '@/mock/processRoutes'
+import {
+  resolveOrderField,
+  generateAssemblyWorkOrderCode,
+  generateAssemblyWorkOrderName,
+} from '@/utils/workOrderNaming'
 
 const STORAGE_KEY = 'i_doms_assembly_work_orders'
 let codeSeq = 1
@@ -146,10 +151,13 @@ export function updateAssemblyWorkOrder(id, patch) {
 export function createAssemblyWorkOrderPayload(partial) {
   const routeName = partial.processRouteName || getDefaultProductRoute(partial.productName)
   const productName = partial.productName?.trim() || ''
+  const existingCodes = assemblyWorkOrderState.orders.map((o) => o.code)
+  const code = resolveOrderField(partial.code, () => generateAssemblyWorkOrderCode(existingCodes))
+  const name = resolveOrderField(partial.name, () => generateAssemblyWorkOrderName(productName))
   return {
     id: `asm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    code: generateAssemblyCode(),
-    name: `${productName}总装工单`,
+    code,
+    name,
     productName,
     orderCategory: '总装工单',
     status: '待下发',

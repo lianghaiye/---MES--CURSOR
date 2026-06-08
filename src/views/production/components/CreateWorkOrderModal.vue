@@ -10,6 +10,16 @@
     <a-form :model="form" layout="vertical">
       <a-row :gutter="16">
         <a-col :span="12">
+          <a-form-item label="工单编号">
+            <a-input v-model:value="form.code" allow-clear placeholder="留空则按规则自动生成" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="工单名称">
+            <a-input v-model:value="form.name" allow-clear placeholder="留空则按规则自动生成" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
           <a-form-item label="产品名称" required>
             <a-input v-model:value="form.productName" placeholder="请输入产品名称" />
           </a-form-item>
@@ -90,7 +100,8 @@ import {
   urgencyOptions,
 } from '@/mock/workOrderOptions'
 import { bomOptions } from '@/mock/workOrderMaster'
-import { createWorkOrderPayload } from '@/store/workOrderStore'
+import { createWorkOrderPayload, workOrderState } from '@/store/workOrderStore'
+import { isDuplicateOrderCode, generateProductionWorkOrderName } from '@/utils/workOrderNaming'
 import { buildProcessesFromRoute } from '@/mock/processRoutes'
 
 const props = defineProps({
@@ -103,6 +114,8 @@ const emit = defineEmits(['update:open', 'created', 'updated'])
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 
 const form = reactive({
+  code: '',
+  name: '',
   productName: '',
   processRouteName: undefined,
   planQty: 1,
@@ -127,6 +140,8 @@ watch(
     if (!val) return
     if (props.editRecord) {
       const wo = props.editRecord
+      form.code = wo.code || ''
+      form.name = wo.name || ''
       form.productName = wo.productName
       form.processRouteName = wo.processRouteName
       form.planQty = wo.planQty
@@ -142,6 +157,8 @@ watch(
           : null
       return
     }
+    form.code = ''
+    form.name = ''
     form.productName = ''
     form.processRouteName = processRouteOptions[0]
     form.planQty = 1
@@ -174,13 +191,29 @@ function handleSubmit() {
       ? [form.planDateRange[0].format('YYYY-MM-DD'), form.planDateRange[1].format('YYYY-MM-DD')]
       : []
 
+  const productName = form.productName.trim()
+  const category = props.editRecord?.orderCategory || '生产工单'
+  const customCode = form.code?.trim()
+  if (
+    customCode &&
+    isDuplicateOrderCode(
+      customCode,
+      workOrderState.orders.map((o) => o.code),
+      isEdit.value ? props.editRecord.code : '',
+    )
+  ) {
+    message.warning('工单编号已存在，请更换')
+    return
+  }
+
   if (isEdit.value) {
     const routeChanged = props.editRecord.processRouteName !== form.processRouteName
     emit('updated', {
       id: props.editRecord.id,
       patch: {
-        productName: form.productName.trim(),
-        name: `${form.productName.trim()}${props.editRecord.orderCategory || '生产工单'}`,
+        code: customCode || props.editRecord.code,
+        productName,
+        name: form.name?.trim() || generateProductionWorkOrderName(productName, category),
         processRouteName: form.processRouteName,
         planQty: form.planQty,
         scheduleQty: form.scheduleQty,
@@ -199,7 +232,9 @@ function handleSubmit() {
   }
 
   const wo = createWorkOrderPayload({
-    productName: form.productName.trim(),
+    code: customCode,
+    name: form.name?.trim(),
+    productName,
     processRouteName: form.processRouteName,
     planQty: form.planQty,
     scheduleQty: form.scheduleQty,

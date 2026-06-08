@@ -10,6 +10,7 @@ export const topModules = [
   { key: 'procurement', label: '采购管理', path: '/procurement' },
   { key: 'after-sales', label: '售后管理', path: '/after-sales' },
   { key: 'basic-config', label: '基础配置', path: '/basic-config' },
+  { key: 'system', label: '系统管理', path: '/system' },
 ]
 
 /** 顶栏「更多」下拉模块（WMS/QMS 等扩展入口） */
@@ -59,7 +60,7 @@ export const sideMenus = {
   ],
   quality: [
     { key: 'factory-qc', label: '出厂质检', path: '/quality/factory-qc' },
-    { key: 'defect', label: '不良品', path: '/quality/defect' },
+    { key: 'scrap-orders', label: '报废品管理', path: '/quality/scrap-orders' },
   ],
   procurement: [
     { key: 'purchase-req', label: '采购申请', path: '/procurement/purchase-req' },
@@ -73,6 +74,7 @@ export const sideMenus = {
   'basic-config': [
     { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
   ],
+  system: [{ key: 'dict', label: '系统字典', path: '/system/dict' }],
   wms: [{ key: 'warehouse', label: '仓库作业', path: '/wms/warehouse' }],
   qms: [{ key: 'trace', label: '质量追溯', path: '/qms/trace' }],
   equipment: [{ key: 'devices', label: '设备台账', path: '/equipment/devices' }],
@@ -119,7 +121,9 @@ export const routeTitles = {
   '/inventory/sales-outbound': '出库管理',
   '/inventory/in-out': '出入库',
   '/quality/factory-qc': '出厂质检',
-  '/quality/defect': '不良品',
+  '/quality/scrap-orders': '报废品管理',
+  '/quality/scrap-orders/:id': '报废品详情',
+  '/system/dict': '系统字典',
   '/procurement/purchase-req': '采购申请',
   '/procurement/purchase-orders': '采购订单',
   '/procurement/suppliers': '供应商',

@@ -1,6 +1,11 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { buildProcessesFromRoute, getDefaultProductRoute } from '@/mock/processRoutes'
+import {
+  resolveOrderField,
+  generateProductionWorkOrderCode,
+  generateProductionWorkOrderName,
+} from '@/utils/workOrderNaming'
 
 const STORAGE_KEY = 'i_doms_work_orders'
 let codeSeq = 1
@@ -193,11 +198,18 @@ export function updateWorkOrder(id, patch) {
 
 export function createWorkOrderPayload(partial) {
   const routeName = partial.processRouteName || getDefaultProductRoute(partial.productName)
+  const existingCodes = workOrderState.orders.map((o) => o.code)
+  const category = partial.orderCategory || '生产工单'
+  const productName = partial.productName?.trim() || ''
+  const code = resolveOrderField(partial.code, () => generateProductionWorkOrderCode(existingCodes))
+  const name = resolveOrderField(partial.name, () =>
+    generateProductionWorkOrderName(productName, category),
+  )
   return {
     id: `wo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    code: generateCode(),
-    name: `${partial.productName}${partial.orderCategory || '生产工单'}`,
-    productName: partial.productName,
+    code,
+    name,
+    productName,
     orderCategory: partial.orderCategory || '生产工单',
     status: '待下发',
     scheduleQty: partial.scheduleQty ?? partial.planQty ?? 0,

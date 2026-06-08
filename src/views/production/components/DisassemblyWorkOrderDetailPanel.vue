@@ -5,26 +5,16 @@
         <span class="code">{{ workOrder.code }}</span>
         <span class="name">{{ workOrder.name }}</span>
       </div>
-      <a-space :size="8">
-        <a-button
-          v-if="showDispatchTab && workOrder.status === '待下发'"
-          type="primary"
-          size="small"
-          @click="emit('dispatch-and-start')"
-        >
-          下发并开始
-        </a-button>
-        <a-button
-          v-if="detailTab === 'dispatch' && showDispatchTab"
-          type="link"
-          class="collapse-btn"
-          @click="detailCollapsed = !detailCollapsed"
-        >
-          {{ detailCollapsed ? '展开详情' : '收起详情' }}
-          <UpOutlined v-if="!detailCollapsed" />
-          <DownOutlined v-else />
-        </a-button>
-      </a-space>
+      <a-button
+        v-if="detailTab === 'dispatch' && showDispatchTab"
+        type="link"
+        class="collapse-btn"
+        @click="detailCollapsed = !detailCollapsed"
+      >
+        {{ detailCollapsed ? '展开详情' : '收起详情' }}
+        <UpOutlined v-if="!detailCollapsed" />
+        <DownOutlined v-else />
+      </a-button>
     </div>
 
     <a-tabs v-model:activeKey="detailTab" class="detail-tabs">
