@@ -432,7 +432,6 @@ import {
   inboundQcOptions,
   workCenterOpts,
   processRouteOpts,
-  warehouseOpts,
   supplierOpts,
   processOpts,
   createDefaultLaborRow,
@@ -440,6 +439,7 @@ import {
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
 import { generateMaterialCode } from '@/store/materialInfoStore'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -467,6 +467,10 @@ const productCategoryOpts = flatProductCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
 }))
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 
 const collapseKeys = ref(['basic', 'labor', 'production', 'alert'])
 const isEdit = computed(() => Boolean(props.editRecord?.id))

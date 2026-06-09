@@ -1,6 +1,7 @@
 /** 物料树工具函数 */
 
 import dayjs from 'dayjs'
+import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 
 export function flattenMaterials(materials, list = []) {
   if (!materials?.length) return list
@@ -103,7 +104,7 @@ export function buildWorkOrderRows(materials, order) {
       planQty: m.planQty ?? gapQty,
       planDateRange: m.planDateRange?.length === 2 ? [...m.planDateRange] : [startDate, endDate],
       unit: m.unit || '件',
-      warehouse: m.warehouse || '半成品仓',
+      warehouse: m.warehouse || resolveDefaultWarehouseByMaterialCode(m.code) || '',
       urgency: m.urgency || order.urgency || '普通',
       remark: m.workOrderRemark || m.remark || '',
     }

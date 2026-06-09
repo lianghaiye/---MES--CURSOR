@@ -38,6 +38,16 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
+          <a-form-item label="默认执行人/工组">
+            <ExecutorTagPicker
+              :executors="form.defaultExecutors"
+              :resource-type="form.resourceType"
+              placeholder="请选择默认执行人/工组"
+              @update:executors="(v) => (form.defaultExecutors = v)"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
           <a-form-item label="岗位" name="position" required>
             <a-select
               v-model:value="form.position"
@@ -107,6 +117,7 @@ import {
   MOCK_POSITIONS,
 } from '@/store/processConfigStore'
 import { getActiveCategoryOptions } from '@/store/processCategoryStore'
+import ExecutorTagPicker from '@/views/production/components/ExecutorTagPicker.vue'
 
 const MOCK_IMAGE =
   'data:image/svg+xml,' +
@@ -134,6 +145,7 @@ const form = reactive({
   position: undefined,
   image: '',
   remark: '',
+  defaultExecutors: [],
   operations: defaultOps(),
 })
 
@@ -161,7 +173,18 @@ watch(
     form.position = r?.position
     form.image = r?.image || ''
     form.remark = r?.remark || ''
+    form.defaultExecutors = [...(r?.defaultExecutors || [])]
     form.operations = { ...defaultOps(), ...(r?.operations || {}) }
+  },
+)
+
+watch(
+  () => form.resourceType,
+  (val, oldVal) => {
+    if (!props.open) return
+    if (oldVal !== undefined && oldVal !== val) {
+      form.defaultExecutors = []
+    }
   },
 )
 

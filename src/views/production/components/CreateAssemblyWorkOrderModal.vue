@@ -93,7 +93,9 @@
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { workCenterOptions, warehouseOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { bomOptions } from '@/mock/workOrderMaster'
 import {
   createAssemblyWorkOrderPayload,
@@ -120,7 +122,7 @@ const form = reactive({
   scheduleQty: 1,
   workCenter: '总装车间',
   bom: undefined,
-  warehouse: '半成品仓',
+  warehouse: undefined,
   urgency: '普通',
   planDateRange: null,
   remark: '',
@@ -132,8 +134,19 @@ const routeOptions = computed(() => {
 })
 const bomSelectOptions = computed(() => bomOptions.map((v) => ({ label: v, value: v })))
 const workCenterOpts = computed(() => workCenterOptions.map((v) => ({ label: v, value: v })))
-const warehouseOpts = computed(() => warehouseOptions.map((v) => ({ label: v, value: v })))
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 const urgencyOpts = computed(() => urgencyOptions.map((v) => ({ label: v, value: v })))
+
+watch(
+  () => form.productName,
+  (name) => {
+    if (!props.open || props.editRecord) return
+    form.warehouse = resolveDefaultWarehouseByProductName(name?.trim()) || undefined
+  },
+)
 
 watch(
   () => props.open,
@@ -166,7 +179,7 @@ watch(
     form.scheduleQty = 1
     form.workCenter = '默认工厂'
     form.bom = undefined
-    form.warehouse = '半成品仓'
+    form.warehouse = undefined
     form.urgency = '普通'
     form.planDateRange = [dayjs(), dayjs().add(14, 'day')]
     form.remark = ''

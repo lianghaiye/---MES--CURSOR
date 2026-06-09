@@ -24,6 +24,19 @@
             <a-descriptions-item label="工序分类">{{ record.category }}</a-descriptions-item>
             <a-descriptions-item label="资源类型">{{ record.resourceType }}</a-descriptions-item>
             <a-descriptions-item label="岗位">{{ record.position }}</a-descriptions-item>
+            <a-descriptions-item label="默认执行人/工组" :span="2">
+              <template v-if="record.defaultExecutors?.length">
+                <a-tag
+                  v-for="name in record.defaultExecutors"
+                  :key="name"
+                  color="processing"
+                  class="default-executor-tag"
+                >
+                  {{ name }}
+                </a-tag>
+              </template>
+              <span v-else>—</span>
+            </a-descriptions-item>
             <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
             <a-descriptions-item label="图片">
               <img v-if="record.image" :src="record.image" class="detail-thumb" alt="" />
@@ -145,6 +158,10 @@ function openEdit() {
 
   .empty-ops {
     color: #999;
+  }
+
+  .default-executor-tag {
+    margin-bottom: 4px;
   }
 }
 </style>

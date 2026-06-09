@@ -255,17 +255,13 @@ import {
   ReloadOutlined,
   TableOutlined,
 } from '@ant-design/icons-vue'
-import {
-  workCenterOptions,
-  warehouseOptions,
-  urgencyOptions,
-  personInChargeOptions,
-} from '@/mock/workOrderOptions'
+import { workCenterOptions, urgencyOptions, personInChargeOptions } from '@/mock/workOrderOptions'
 import {
   disassemblyWorkOrderState,
   updateDisassemblyWorkOrder,
   deleteDisassemblyWorkOrder,
 } from '@/store/disassemblyWorkOrderStore'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
   DISASSEMBLY_STATUS_OPTIONS,
   filterDisassemblyWorkOrders,
@@ -308,7 +304,10 @@ const pagination = reactive({ current: 1, pageSize: 12 })
 
 const statusOpts = DISASSEMBLY_STATUS_OPTIONS.map((v) => ({ label: v, value: v }))
 const workCenterOpts = workCenterOptions.map((v) => ({ label: v, value: v }))
-const warehouseOpts = warehouseOptions.map((v) => ({ label: v, value: v }))
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const urgencyFilterOpts = [
   { label: '全部', value: '全部' },

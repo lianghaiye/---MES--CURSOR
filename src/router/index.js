@@ -233,6 +233,24 @@ const routes = [
         meta: { title: '员工组别' },
       },
       {
+        path: 'basic-config/warehouse-categories',
+        name: 'basic-config-warehouse-categories',
+        component: () => import('@/views/basic-config/WarehouseCategoryView.vue'),
+        meta: { title: '仓库分类' },
+      },
+      {
+        path: 'basic-config/warehouses',
+        name: 'basic-config-warehouses',
+        component: () => import('@/views/basic-config/WarehouseView.vue'),
+        meta: { title: '仓库列表' },
+      },
+      {
+        path: 'basic-config/warehouses/:id',
+        name: 'basic-config-warehouse-detail',
+        component: () => import('@/views/basic-config/WarehouseDetailView.vue'),
+        meta: { title: '仓库详情' },
+      },
+      {
         path: 'system/dict',
         name: 'system-dict',
         component: () => import('@/views/system/SystemDictView.vue'),

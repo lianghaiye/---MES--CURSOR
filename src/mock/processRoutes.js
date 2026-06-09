@@ -1,4 +1,5 @@
 import { getProcessRouteByName, getActiveRouteOptions } from '@/store/processRouteStore'
+import { getProcessByName, resolveDefaultExecutors } from '@/store/processConfigStore'
 import { buildWorkOrderProcessesFromGrid } from '@/utils/processRouteGrid'
 
 /** @deprecated 兼容旧工单种子数据 */
@@ -119,33 +120,48 @@ export function buildProcessesFromRoute(routeName) {
   }
 
   const legacy = processRouteMaster[routeName] || processRouteMaster['机加标准路线']
-  return legacy.steps.map((step, index) => ({
-    id: `${legacy.id}-step-${index + 1}`,
-    index: index + 1,
-    name: step.name,
-    processCode: step.code,
-    icon: step.icon,
-    hasFeeding: step.hasFeeding,
-    resourceType: step.resourceType || '工人',
-    executors: [],
-    feedingMaterials: step.hasFeeding
-      ? [{ id: `feed-${Date.now()}-${index}`, materialId: undefined, materialName: '', qty: null }]
-      : [],
-  }))
+  return legacy.steps.map((step, index) => {
+    const proc = getProcessByName(step.name)
+    return {
+      id: `${legacy.id}-step-${index + 1}`,
+      index: index + 1,
+      name: step.name,
+      processCode: proc?.code || step.code,
+      processId: proc?.id,
+      icon: step.icon,
+      hasFeeding: step.hasFeeding,
+      resourceType: proc?.resourceType || step.resourceType || '工人',
+      executors: resolveDefaultExecutors(proc),
+      feedingMaterials: step.hasFeeding
+        ? [
+            {
+              id: `feed-${Date.now()}-${index}`,
+              materialId: undefined,
+              materialName: '',
+              qty: null,
+            },
+          ]
+        : [],
+    }
+  })
 }
 
 export function buildDisassemblyProcesses() {
-  return disassemblyProcessDefs.map((step, index) => ({
-    id: `route-disassembly-step-${index + 1}`,
-    index: index + 1,
-    name: step.name,
-    processCode: step.code,
-    icon: step.icon,
-    hasFeeding: step.hasFeeding,
-    resourceType: step.resourceType,
-    executors: [],
-    feedingMaterials: [],
-  }))
+  return disassemblyProcessDefs.map((step, index) => {
+    const proc = getProcessByName(step.name)
+    return {
+      id: `route-disassembly-step-${index + 1}`,
+      index: index + 1,
+      name: step.name,
+      processCode: proc?.code || step.code,
+      processId: proc?.id,
+      icon: step.icon,
+      hasFeeding: step.hasFeeding,
+      resourceType: proc?.resourceType || step.resourceType,
+      executors: resolveDefaultExecutors(proc),
+      feedingMaterials: [],
+    }
+  })
 }
 
 export function getDefaultProductRoute(productName) {

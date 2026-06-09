@@ -1,4 +1,4 @@
-import { getProcessById } from '@/store/processConfigStore'
+import { getProcessById, resolveDefaultExecutors } from '@/store/processConfigStore'
 import { getProcessDocById } from '@/store/processDocStore'
 
 export const MAX_ROUTE_STEPS = 150
@@ -87,7 +87,7 @@ export function buildWorkOrderProcessesFromGrid(grid, routeId = '') {
     resourceType: step.resourceType,
     processFileId: step.processFileId,
     processFileName: step.processFileName,
-    executors: [],
+    executors: resolveDefaultExecutors(getProcessById(step.processId)),
     feedingMaterials: step.hasFeeding
       ? [{ id: `feed-${Date.now()}-${index}`, materialId: undefined, materialName: '', qty: null }]
       : [],

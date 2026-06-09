@@ -1,5 +1,6 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
+import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { buildProcessesFromRoute, getDefaultProductRoute } from '@/mock/processRoutes'
 import {
   resolveOrderField,
@@ -216,7 +217,7 @@ export function createWorkOrderPayload(partial) {
     planQty: partial.planQty ?? 0,
     workCenter: partial.workCenter || '默认工厂',
     bom: partial.bom || partial.productName,
-    warehouse: partial.warehouse || '半成品仓',
+    warehouse: partial.warehouse || resolveDefaultWarehouseByProductName(productName) || '',
     urgency: partial.urgency || '普通',
     planDateRange: partial.planDateRange || [
       dayjs().format('YYYY-MM-DD'),

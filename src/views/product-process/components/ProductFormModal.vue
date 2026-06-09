@@ -416,7 +416,6 @@ import {
   salaryMethodOptions,
   workCenterOpts,
   processRouteOpts,
-  warehouseOpts,
   supplierOpts,
   processOpts,
   createDefaultLaborRow,
@@ -426,6 +425,7 @@ import {
   createDefaultProductAlert,
 } from '@/mock/productInfoOptions'
 import { generateProductCode } from '@/store/productInfoStore'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -453,6 +453,10 @@ const categoryOpts = flatCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
 }))
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 
 const collapseKeys = ref(['basic', 'labor', 'production', 'alert'])
 const fileList = ref([])

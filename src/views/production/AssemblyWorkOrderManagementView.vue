@@ -286,7 +286,8 @@ import {
   dispatchAndStartWorkOrder,
   canEditWorkOrder,
 } from '@/utils/workOrderDispatchHelpers'
-import { workCenterOptions, warehouseOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { bomOptions } from '@/mock/workOrderMaster'
 import CreateAssemblyWorkOrderModal from './components/CreateAssemblyWorkOrderModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
@@ -323,7 +324,10 @@ const pagination = reactive({ current: 1, pageSize: 12 })
 const statusOpts = statusOptions.map((v) => ({ label: v, value: v }))
 const categoryOpts = categoryOptions.map((v) => ({ label: v, value: v }))
 const workCenterOpts = workCenterOptions.map((v) => ({ label: v, value: v }))
-const warehouseOpts = warehouseOptions.map((v) => ({ label: v, value: v }))
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const bomOpts = bomOptions.map((v) => ({ label: v, value: v }))
 

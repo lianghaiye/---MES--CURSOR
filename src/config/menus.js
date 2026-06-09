@@ -73,6 +73,18 @@ export const sideMenus = {
   ],
   'basic-config': [
     { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
+    {
+      key: 'warehouse-mgmt',
+      label: '仓库管理',
+      children: [
+        { key: 'warehouses', label: '仓库列表', path: '/basic-config/warehouses' },
+        {
+          key: 'warehouse-categories',
+          label: '仓库分类',
+          path: '/basic-config/warehouse-categories',
+        },
+      ],
+    },
   ],
   system: [{ key: 'dict', label: '系统字典', path: '/system/dict' }],
   wms: [{ key: 'warehouse', label: '仓库作业', path: '/wms/warehouse' }],
@@ -136,4 +148,11 @@ export const routeTitles = {
   '/equipment/devices': '设备管理',
   '/report/overview': '报表中心',
   '/basic-config/employee-groups': '员工组别',
+  '/basic-config/warehouse-categories': '仓库分类',
+  '/basic-config/warehouses': '仓库列表',
 }
+
+/** 动态路径标题（含 :id 等参数） */
+export const dynamicRouteTitles = [
+  { pattern: /^\/basic-config\/warehouses\/[^/]+$/, title: '仓库详情' },
+]

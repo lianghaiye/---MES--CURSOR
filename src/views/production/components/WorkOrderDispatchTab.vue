@@ -27,14 +27,11 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'executors'">
-          <a class="executor-link" @click.prevent="openExecutorModal(record)">
-            <template v-if="record.executors?.length">
-              {{ record.executors.join('、') }}
-            </template>
-            <template v-else>
-              {{ record.resourceType === '工人小组' ? '请选择执行组别' : '请选择执行人' }}
-            </template>
-          </a>
+          <ExecutorTagPicker
+            :executors="record.executors || []"
+            :resource-type="record.resourceType || '工人'"
+            @update:executors="(v) => (record.executors = v)"
+          />
         </template>
         <template v-else-if="column.key === 'feeding'">
           <div v-if="record.hasFeeding" class="feeding-cell">
@@ -82,25 +79,13 @@
         <a-button size="small" @click="emit('cancel')">取消</a-button>
       </a-space>
     </div>
-
-    <SelectPersonModal
-      v-model:open="personModalOpen"
-      :selected="editingProcess?.executors || []"
-      @confirm="onPersonConfirm"
-    />
-    <SelectGroupModal
-      v-model:open="groupModalOpen"
-      :selected="editingProcess?.executors || []"
-      @confirm="onGroupConfirm"
-    />
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
-import SelectPersonModal from './SelectPersonModal.vue'
-import SelectGroupModal from './SelectGroupModal.vue'
+import ExecutorTagPicker from './ExecutorTagPicker.vue'
 import { mockFeedingMaterials } from '@/mock/workOrderMaster'
 import { validateProcessExecutors } from '@/utils/workOrderDispatchHelpers'
 
@@ -115,38 +100,13 @@ const columns = [
   { title: '工序名称', key: 'process', width: 120 },
   { title: '工序编码', key: 'processCode', width: 100 },
   { title: '资源类型', key: 'resourceType', width: 90 },
-  { title: '选择执行人', key: 'executors', width: 160 },
+  { title: '选择执行人', key: 'executors', width: 220 },
   { title: '投料信息', key: 'feeding' },
 ]
-
-const personModalOpen = ref(false)
-const groupModalOpen = ref(false)
-const editingProcess = ref(null)
 
 const materialOptions = computed(() =>
   mockFeedingMaterials.map((m) => ({ label: m.name, value: m.id })),
 )
-
-function openExecutorModal(process) {
-  editingProcess.value = process
-  if (process.resourceType === '工人小组') {
-    groupModalOpen.value = true
-  } else {
-    personModalOpen.value = true
-  }
-}
-
-function onPersonConfirm(names) {
-  if (editingProcess.value) {
-    editingProcess.value.executors = names
-  }
-}
-
-function onGroupConfirm(names) {
-  if (editingProcess.value) {
-    editingProcess.value.executors = names
-  }
-}
 
 function onMaterialChange(item, materialId) {
   const mat = mockFeedingMaterials.find((m) => m.id === materialId)
@@ -208,10 +168,6 @@ function emitDispatchAndStart() {
     color: #1677ff;
     font-size: 12px;
   }
-}
-
-.executor-link {
-  color: #1677ff;
 }
 
 .feeding-cell {

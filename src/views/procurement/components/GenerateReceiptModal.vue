@@ -112,11 +112,13 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { submitReceipt, updatePurchaseOrder } from '@/store/purchaseOrderStore'
-import { receivingModeOptions, warehouseOptions } from '@/mock/purchaseOrderOptions'
+import { receivingModeOptions } from '@/mock/purchaseOrderOptions'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -129,7 +131,10 @@ const form = reactive({ contractNo: '', remark: '自动审批' })
 const receiptLines = ref([])
 
 const receivingModeOpts = receivingModeOptions.map((v) => ({ label: v, value: v }))
-const warehouseOpts = warehouseOptions
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 
 const columns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
@@ -167,7 +172,10 @@ watch(
           purchaseQty: l.purchaseQty,
           unit: l.unit,
           receivingMode: l.receivingMode || '正常收货',
-          receivingWarehouse: l.receivingWarehouse || '原材料仓',
+          receivingWarehouse:
+            l.receivingWarehouse ||
+            resolveDefaultWarehouseByMaterialCode(l.materialCode || l.inventoryCode) ||
+            undefined,
           receiptQty: remaining,
           remainingQty: remaining,
           productionDate: '',

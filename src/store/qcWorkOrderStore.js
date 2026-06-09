@@ -6,6 +6,7 @@ import {
   generateQcWorkOrderCode,
   generateQcWorkOrderName,
 } from '@/utils/workOrderNaming'
+import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 
 const STORAGE_KEY = 'i_doms_qc_work_orders'
 let codeSeq = 1
@@ -170,7 +171,7 @@ export function createQcWorkOrderPayload(partial) {
     planQty: partial.planQty ?? 0,
     workCenter: partial.workCenter || '质检中心',
     bom: partial.bom || productName,
-    warehouse: partial.warehouse || '半成品仓',
+    warehouse: partial.warehouse || resolveDefaultWarehouseByProductName(productName) || '',
     urgency: partial.urgency || '普通',
     planDateRange: partial.planDateRange || [
       dayjs().format('YYYY-MM-DD'),

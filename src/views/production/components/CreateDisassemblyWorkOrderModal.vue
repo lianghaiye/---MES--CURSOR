@@ -182,10 +182,11 @@ import dayjs from 'dayjs'
 import {
   processRouteOptions,
   workCenterOptions,
-  warehouseOptions,
   urgencyOptions,
   personInChargeOptions,
 } from '@/mock/workOrderOptions'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { resolveDefaultWarehouseByItemCode } from '@/utils/warehouseResolver'
 import { productInfoState } from '@/store/productInfoStore'
 import {
   disassemblyWorkOrderState,
@@ -209,7 +210,10 @@ const scrapModalOpen = ref(false)
 
 const routeOpts = processRouteOptions.map((v) => ({ label: v, value: v }))
 const workCenterOpts = workCenterOptions.map((v) => ({ label: v, value: v }))
-const warehouseOpts = warehouseOptions.map((v) => ({ label: v, value: v }))
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const personOpts = personInChargeOptions.map((v) => ({ label: v, value: v }))
 
@@ -243,7 +247,7 @@ const form = reactive({
   processRouteName: undefined,
   relatedScrapId: '',
   relatedScrapNo: '',
-  warehouse: '半成品仓',
+  warehouse: undefined,
   standardCycleDays: 3,
   workCenter: undefined,
   personInCharge: undefined,
@@ -304,7 +308,7 @@ function resetForm() {
     processRouteName: undefined,
     relatedScrapId: '',
     relatedScrapNo: '',
-    warehouse: '半成品仓',
+    warehouse: undefined,
     standardCycleDays: 3,
     workCenter: undefined,
     personInCharge: undefined,
@@ -325,6 +329,7 @@ function onItemChange(itemId) {
   form.bom = item.bom
   form.ebomName = item.bom
   form.standardCycleDays = item.standardCycleDays || 3
+  form.warehouse = resolveDefaultWarehouseByItemCode(form.itemCode) || undefined
   if (!form.name) {
     form.name = generateDisassemblyOrderName(
       form.itemName,
@@ -354,6 +359,7 @@ function onScrapSelected(scrap) {
       form.material = scrap.material
       form.bom = `${scrap.itemName} EBOM V1.0`
       form.ebomName = form.bom
+      form.warehouse = resolveDefaultWarehouseByItemCode(form.itemCode) || undefined
       form.name = generateDisassemblyOrderName(
         scrap.itemName,
         disassemblyWorkOrderState.orders.map((o) => o.name),

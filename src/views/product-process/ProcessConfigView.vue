@@ -85,7 +85,7 @@
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 1200 }"
+        :scroll="{ x: 1380 }"
         :pagination="{
           pageSize: 10,
           size: 'small',
@@ -97,6 +97,19 @@
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
           <template v-else-if="column.key === 'code'">
             <a class="link-code" @click="goDetail(record)">{{ record.code }}</a>
+          </template>
+          <template v-else-if="column.key === 'defaultExecutors'">
+            <div v-if="record.defaultExecutors?.length" class="executor-tags">
+              <a-tag
+                v-for="name in record.defaultExecutors"
+                :key="name"
+                color="processing"
+                class="executor-tag"
+              >
+                {{ name }}
+              </a-tag>
+            </div>
+            <span v-else class="muted">—</span>
           </template>
           <template v-else-if="column.key === 'image'">
             <img v-if="record.image" :src="record.image" class="thumb" alt="" />
@@ -166,6 +179,7 @@ const columns = [
   { title: '工序名称', dataIndex: 'name', width: 140 },
   { title: '工序分类', dataIndex: 'category', width: 100 },
   { title: '资源类型', dataIndex: 'resourceType', width: 100 },
+  { title: '默认执行人/工组', key: 'defaultExecutors', width: 180, ellipsis: true },
   { title: '图片', key: 'image', width: 72 },
   { title: '状态', key: 'status', width: 90 },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
@@ -255,6 +269,20 @@ function confirmDelete(record) {
   }
 
   .thumb-placeholder {
+    color: #bbb;
+  }
+
+  .executor-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .executor-tag {
+    margin: 0;
+  }
+
+  .muted {
     color: #bbb;
   }
 }

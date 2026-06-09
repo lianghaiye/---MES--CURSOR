@@ -146,9 +146,9 @@ import {
   workCenterOptions,
   personInChargeOptions,
   unitOptions,
-  warehouseOptions,
   urgencyOptions,
 } from '@/mock/workOrderOptions'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { buildWorkOrderRows } from '@/utils/material'
 
 const props = defineProps({
@@ -194,14 +194,17 @@ const tableWrapRef = ref(null)
 const selectOpen = ref(false)
 const planDatePickerOpen = ref(false)
 
-const selectOptions = {
-  processRoute: processRouteOptions.map((v) => ({ label: v, value: v })),
-  workCenter: workCenterOptions.map((v) => ({ label: v, value: v })),
-  personInCharge: personInChargeOptions.map((v) => ({ label: v, value: v })),
-  unit: unitOptions.map((v) => ({ label: v, value: v })),
-  warehouse: warehouseOptions.map((v) => ({ label: v, value: v })),
-  urgency: urgencyOptions.map((v) => ({ label: v, value: v })),
-}
+const selectOptions = computed(() => {
+  void warehouseState.warehouses
+  return {
+    processRoute: processRouteOptions.map((v) => ({ label: v, value: v })),
+    workCenter: workCenterOptions.map((v) => ({ label: v, value: v })),
+    personInCharge: personInChargeOptions.map((v) => ({ label: v, value: v })),
+    unit: unitOptions.map((v) => ({ label: v, value: v })),
+    warehouse: getWarehouseSelectOptions(),
+    urgency: urgencyOptions.map((v) => ({ label: v, value: v })),
+  }
+})
 
 const displayColumns = computed(() =>
   columnDefs
@@ -254,7 +257,7 @@ function startEdit(record, field) {
   nextTick(() => {
     if (field === 'planDateRange') {
       planDatePickerOpen.value = true
-    } else if (selectOptions[field]) {
+    } else if (selectOptions.value[field]) {
       selectOpen.value = true
     }
   })

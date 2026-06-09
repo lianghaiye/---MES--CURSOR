@@ -10,7 +10,7 @@ import { getActiveCategoryNames } from '@/store/processCategoryStore'
 
 const STORAGE_KEY = 'i_doms_process_config'
 const SEED_VERSION_KEY = 'i_doms_process_config_seed_v'
-const CURRENT_SEED_VERSION = '2'
+const CURRENT_SEED_VERSION = '3'
 
 export { PROCESS_OPERATION_DEFS, RESOURCE_TYPES, MOCK_POSITIONS }
 
@@ -43,10 +43,17 @@ function normalizeOperations(ops = {}) {
   return { ...base, ...ops }
 }
 
+function normalizeProcessList(list) {
+  return (list || []).map((p) => ({
+    ...p,
+    defaultExecutors: Array.isArray(p.defaultExecutors) ? [...p.defaultExecutors] : [],
+  }))
+}
+
 export const processConfigState = reactive({
-  processes: shouldReseed()
-    ? createProcessConfigSeed()
-    : loadFromStorage() || createProcessConfigSeed(),
+  processes: normalizeProcessList(
+    shouldReseed() ? createProcessConfigSeed() : loadFromStorage() || createProcessConfigSeed(),
+  ),
 })
 
 watch(
@@ -70,6 +77,17 @@ export function getProcessById(id) {
 
 export function getProcessByCode(code) {
   return processConfigState.processes.find((p) => p.code === code) || null
+}
+
+export function getProcessByName(name) {
+  return processConfigState.processes.find((p) => p.name === name) || null
+}
+
+/** 读取工序默认执行人/工组（复制数组，避免引用污染） */
+export function resolveDefaultExecutors(process) {
+  if (!process) return []
+  const list = process.defaultExecutors
+  return Array.isArray(list) && list.length ? [...list] : []
 }
 
 export function countProcessesByCategory(categoryName) {
@@ -157,6 +175,7 @@ export function addProcessConfig(payload) {
     remark: payload.remark?.trim() || '',
     status: '使用中',
     operations: normalizeOperations(payload.operations),
+    defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
     createdAt: dayjs().format('YYYY-MM-DD'),
     updatedAt: dayjs().format('YYYY-MM-DD'),
   }
@@ -181,6 +200,7 @@ export function updateProcessConfig(id, payload) {
     image: payload.image ?? row.image,
     remark: payload.remark?.trim() ?? row.remark,
     operations: normalizeOperations(payload.operations),
+    defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
     updatedAt: dayjs().format('YYYY-MM-DD'),
   })
   return { ok: true, process: row }

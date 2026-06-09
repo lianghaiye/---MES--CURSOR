@@ -293,7 +293,8 @@ import {
   canShowQcDispatchTab,
 } from '@/store/qcWorkOrderStore'
 import { saveDispatchDraft, dispatchAndStartWorkOrder } from '@/utils/workOrderDispatchHelpers'
-import { workCenterOptions, warehouseOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { bomOptions } from '@/mock/workOrderMaster'
 import CreateQcWorkOrderModal from './components/CreateQcWorkOrderModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
@@ -333,7 +334,10 @@ const statusOpts = statusOptions.map((v) => ({ label: v, value: v }))
 const execStatusOpts = execStatusOptions.map((v) => ({ label: v, value: v }))
 const categoryOpts = categoryOptions.map((v) => ({ label: v, value: v }))
 const workCenterOpts = workCenterOptions.map((v) => ({ label: v, value: v }))
-const warehouseOpts = warehouseOptions.map((v) => ({ label: v, value: v }))
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const bomOpts = bomOptions.map((v) => ({ label: v, value: v }))
 

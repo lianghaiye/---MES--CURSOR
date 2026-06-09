@@ -9,6 +9,7 @@
   >
     <a-menu
       v-model:selectedKeys="selectedKeys"
+      v-model:openKeys="openKeys"
       mode="inline"
       :items="menuItems"
       @click="onMenuClick"
@@ -17,7 +18,7 @@
 </template>
 
 <script setup>
-import { computed, h, ref } from 'vue'
+import { computed, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge } from 'ant-design-vue'
 import { sideMenus, resolveModuleKey } from '@/config/menus'
@@ -29,35 +30,67 @@ const router = useRouter()
 const { openTab } = useTabs()
 const collapsed = ref(false)
 const { badges } = useWorkOrderMenuBadges()
+const openKeys = ref([])
 
 const moduleKey = computed(() => resolveModuleKey(route.path))
 
-const menuItems = computed(() =>
-  (sideMenus[moduleKey.value] || []).map((item) => {
-    const count = badges.value[item.path] || 0
+function renderLabel(item) {
+  const count = badges.value[item.path] || 0
+  if (count > 0) {
+    return h('span', { class: 'menu-label-with-badge' }, [
+      item.label,
+      h(Badge, {
+        count,
+        size: 'small',
+        overflowCount: 99,
+        class: 'menu-badge',
+      }),
+    ])
+  }
+  return item.label
+}
+
+function mapMenuItem(item) {
+  if (item.children?.length) {
     return {
-      key: item.path,
-      label:
-        count > 0
-          ? h('span', { class: 'menu-label-with-badge' }, [
-              item.label,
-              h(Badge, {
-                count,
-                size: 'small',
-                overflowCount: 99,
-                class: 'menu-badge',
-              }),
-            ])
-          : item.label,
+      key: item.key,
+      label: item.label,
+      children: item.children.map(mapMenuItem),
     }
-  }),
-)
+  }
+  return {
+    key: item.path,
+    label: renderLabel(item),
+  }
+}
+
+const menuItems = computed(() => (sideMenus[moduleKey.value] || []).map(mapMenuItem))
+
+function flattenMenuPaths(menus) {
+  const paths = []
+  for (const m of menus) {
+    if (m.path) paths.push(m.path)
+    if (m.children?.length) paths.push(...flattenMenuPaths(m.children))
+  }
+  return paths
+}
+
+function resolveParentOpenKey(path) {
+  const menus = sideMenus[moduleKey.value] || []
+  for (const m of menus) {
+    if (m.children?.some((c) => path === c.path || path.startsWith(`${c.path}/`))) {
+      return m.key
+    }
+  }
+  return null
+}
 
 function resolveActiveMenuPath(path) {
   const menus = sideMenus[moduleKey.value] || []
-  if (menus.some((m) => m.path === path)) return path
-  const matched = menus.find((m) => path.startsWith(`${m.path}/`))
-  return matched?.path || path
+  const allPaths = flattenMenuPaths(menus)
+  if (allPaths.includes(path)) return path
+  const matched = allPaths.find((p) => path.startsWith(`${p}/`))
+  return matched || path
 }
 
 const selectedKeys = computed({
@@ -65,7 +98,19 @@ const selectedKeys = computed({
   set: () => {},
 })
 
+watch(
+  () => route.path,
+  (path) => {
+    const parentKey = resolveParentOpenKey(path)
+    if (parentKey && !openKeys.value.includes(parentKey)) {
+      openKeys.value = [...openKeys.value, parentKey]
+    }
+  },
+  { immediate: true },
+)
+
 function onMenuClick({ key }) {
+  if (!key.startsWith('/')) return
   openTab(key)
   router.push(key)
 }

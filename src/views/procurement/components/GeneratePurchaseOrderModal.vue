@@ -231,9 +231,10 @@ import {
   supplierOptions,
   settlementTypeOptions,
   receivingModeOptions,
-  warehouseOptions,
   designatedSupplierOptions,
 } from '@/mock/purchaseRequisitionOptions'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -279,7 +280,11 @@ const batchEditMeta = {
   },
   leadTimeDays: { label: '供货期/天', type: 'number', precision: 0 },
   deliveryDate: { label: '交货日期', type: 'date' },
-  receivingWarehouse: { label: '收货仓库', type: 'select', options: warehouseOptions },
+  receivingWarehouse: {
+    label: '收货仓库',
+    type: 'select',
+    options: getWarehouseSelectOptions(),
+  },
   remark: { label: '备注', type: 'text' },
 }
 
@@ -326,14 +331,21 @@ const columns = [
 const supplierOpts = supplierOptions
 const settlementOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const receivingModeOpts = receivingModeOptions.map((v) => ({ label: v, value: v }))
-const warehouseOpts = warehouseOptions
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 const designatedOpts = designatedSupplierOptions
 
 const tableScrollX = computed(() => columns.reduce((s, c) => s + (c.width || 100), 0))
 
 const batchEditLabel = computed(() => batchEditMeta[batchEditKey.value]?.label || '')
 const batchEditType = computed(() => batchEditMeta[batchEditKey.value]?.type || 'text')
-const batchEditOptions = computed(() => batchEditMeta[batchEditKey.value]?.options || [])
+const batchEditOptions = computed(() => {
+  const key = batchEditKey.value
+  if (key === 'receivingWarehouse') return warehouseOpts.value
+  return batchEditMeta[key]?.options || []
+})
 const batchEditPrecision = computed(() => batchEditMeta[batchEditKey.value]?.precision ?? 2)
 const batchEditDateValue = computed(() =>
   batchEditValue.value ? dayjs(batchEditValue.value) : null,
@@ -375,7 +387,15 @@ watch(
   () => props.open,
   (val) => {
     if (!val) return
-    rows.value = mergeRequisitionLines(props.requisitions).map((r) => ({ ...r }))
+    rows.value = mergeRequisitionLines(props.requisitions).map((r) => {
+      const row = { ...r }
+      recalcMergedLine(row)
+      if (!row.receivingWarehouse) {
+        row.receivingWarehouse =
+          resolveDefaultWarehouseByMaterialCode(row.materialCode) || undefined
+      }
+      return row
+    })
   },
 )
 
