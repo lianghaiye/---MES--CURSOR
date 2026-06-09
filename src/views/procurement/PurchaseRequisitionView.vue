@@ -125,6 +125,7 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
@@ -140,12 +141,12 @@
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 2000 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="false"
         :row-selection="rowSelection"
       >
@@ -211,6 +212,12 @@
       :requisitions="generateTargets"
       @generated="onGenerated"
     />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -248,6 +255,9 @@ import {
 } from '@/mock/purchaseRequisitionOptions'
 import CreatePurchaseRequisitionModal from './components/CreatePurchaseRequisitionModal.vue'
 import GeneratePurchaseOrderModal from './components/GeneratePurchaseOrderModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
 
@@ -274,7 +284,7 @@ const docStatusOpts = docStatusOptions.map((v) => ({ label: v, value: v }))
 const overdueOpts = overdueStatusOptions.map((v) => ({ label: v, value: v }))
 const operatorOpts = operatorOptions.map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '单据状态', key: 'docStatus', width: 90, fixed: 'left' },
   { title: '申请单号', key: 'reqNo', dataIndex: 'reqNo', width: 160, fixed: 'left' },
@@ -293,6 +303,9 @@ const columns = [
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('purchase-req-list', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }

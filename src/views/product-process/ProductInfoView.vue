@@ -131,17 +131,18 @@
                 <ReloadOutlined />
               </a-button>
             </a-tooltip>
+            <TableColumnSettingButton @click="columnDrawerOpen = true" />
           </a-space>
         </div>
 
         <div class="table-card">
           <a-table
-            :columns="columns"
+            :columns="displayColumns"
             :data-source="pagedList"
             row-key="id"
             size="small"
             bordered
-            :scroll="{ x: 2200 }"
+            :scroll="{ x: tableScrollX }"
             :pagination="false"
             :row-selection="rowSelection"
           >
@@ -208,6 +209,12 @@
     </div>
 
     <ProductFormModal v-model:open="formModalOpen" :edit-record="editRecord" @saved="onSaved" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -243,6 +250,9 @@ import {
   cloneProduct,
 } from '@/store/productInfoStore'
 import ProductFormModal from './components/ProductFormModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const categoryKeyword = ref('')
 const selectedCategoryKey = ref('pcat-004')
@@ -303,7 +313,7 @@ const rowSelection = computed(() => ({
   },
 }))
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
   { title: '产品编号', dataIndex: 'code', width: 128, fixed: 'left', ellipsis: true },
   { title: '产品名称', dataIndex: 'name', width: 200, fixed: 'left', ellipsis: true },
@@ -324,6 +334,9 @@ const columns = [
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
   { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('product-info-list', baseColumns, { minScrollX: 2200 })
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1

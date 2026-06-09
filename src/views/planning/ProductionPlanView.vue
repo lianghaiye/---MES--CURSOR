@@ -134,14 +134,19 @@
         </a-tabs>
 
         <template v-if="detailTab === 'work'">
+          <div class="table-mini-toolbar">
+            <a-space :size="4" class="toolbar-icons">
+              <TableColumnSettingButton @click="workColumnDrawerOpen = true" />
+            </a-space>
+          </div>
           <a-table
-            :columns="workColumns"
+            :columns="workDisplayColumns"
             :data-source="selectedOrder.workItems"
             :pagination="false"
             row-key="id"
             size="small"
             bordered
-            :scroll="{ x: 1680 }"
+            :scroll="{ x: workTableScrollX }"
             :row-class-name="workItemRowClassName"
             :custom-row="workItemCustomRow"
           >
@@ -222,33 +227,39 @@
             description="请点击产品明细行查看 EBOM 物料树"
             class="ebom-empty"
           />
-          <a-table
-            v-else
-            :columns="materialColumns"
-            :data-source="materialTree"
-            :pagination="false"
-            row-key="id"
-            size="small"
-            bordered
-            :scroll="{ x: 3200 }"
-            :default-expand-all-rows="true"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'status'">
-                <a-tag :color="materialStatusColor(record.status)">{{ record.status }}</a-tag>
+          <template v-else>
+            <div class="table-mini-toolbar">
+              <a-space :size="4" class="toolbar-icons">
+                <TableColumnSettingButton @click="materialColumnDrawerOpen = true" />
+              </a-space>
+            </div>
+            <a-table
+              :columns="materialDisplayColumns"
+              :data-source="materialTree"
+              :pagination="false"
+              row-key="id"
+              size="small"
+              bordered
+              :scroll="{ x: materialTableScrollX }"
+              :default-expand-all-rows="true"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <a-tag :color="materialStatusColor(record.status)">{{ record.status }}</a-tag>
+                </template>
+                <template v-else-if="column.key === 'joinPlan'">
+                  <a-tag :color="record.joinPlan === '是' ? 'success' : 'default'">
+                    {{ record.joinPlan }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'supplyType'">
+                  <a-tag :color="record.supplyType === '自制件' ? 'blue' : 'default'">
+                    {{ record.supplyType }}
+                  </a-tag>
+                </template>
               </template>
-              <template v-else-if="column.key === 'joinPlan'">
-                <a-tag :color="record.joinPlan === '是' ? 'success' : 'default'">
-                  {{ record.joinPlan }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'supplyType'">
-                <a-tag :color="record.supplyType === '自制件' ? 'blue' : 'default'">
-                  {{ record.supplyType }}
-                </a-tag>
-              </template>
-            </template>
-          </a-table>
+            </a-table>
+          </template>
         </template>
         <a-empty v-else description="该 Tab 为占位，后续扩展" style="margin: 48px 0" />
       </div>
@@ -260,6 +271,17 @@
       :order="selectedOrder"
       :materials="selfMadeMaterials"
       @save="handleWorkOrderSave"
+    />
+
+    <TableColumnSettingDrawer
+      v-model:open="workColumnDrawerOpen"
+      v-model:settings="workColumnSettings"
+      :default-settings="workDefaultColumnSettings"
+    />
+    <TableColumnSettingDrawer
+      v-model:open="materialColumnDrawerOpen"
+      v-model:settings="materialColumnSettings"
+      :default-settings="materialDefaultColumnSettings"
     />
   </div>
 </template>
@@ -276,6 +298,9 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { addWorkOrdersFromPlanRows } from '@/store/workOrderStore'
 import {
   getSelfMadeMaterials,
@@ -312,7 +337,7 @@ const pagination = reactive({
   pageSize: 5,
 })
 
-const workColumns = [
+const workBaseColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 80, fixed: 'left' },
   { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
   { title: '产品编码', dataIndex: 'productCode', width: 120, ellipsis: true },
@@ -334,7 +359,15 @@ const workColumns = [
   { title: '操作', key: 'action', width: 110, fixed: 'right' },
 ]
 
-const materialColumns = [
+const {
+  columnSettings: workColumnSettings,
+  columnDrawerOpen: workColumnDrawerOpen,
+  displayColumns: workDisplayColumns,
+  tableScrollX: workTableScrollX,
+  defaultColumnSettings: workDefaultColumnSettings,
+} = useTableColumnSettings('production-plan-work-items', workBaseColumns, { minScrollX: 1680 })
+
+const materialBaseColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 90, fixed: 'left' },
   { title: '物料名称', dataIndex: 'name', width: 140, ellipsis: true, fixed: 'left' },
   { title: '物料编码', dataIndex: 'code', width: 120 },
@@ -359,6 +392,16 @@ const materialColumns = [
   { title: '最晚处理时间', dataIndex: 'latestProcessTime', width: 120 },
   { title: '补充说明', dataIndex: 'remark', width: 120, ellipsis: true },
 ]
+
+const {
+  columnSettings: materialColumnSettings,
+  columnDrawerOpen: materialColumnDrawerOpen,
+  displayColumns: materialDisplayColumns,
+  tableScrollX: materialTableScrollX,
+  defaultColumnSettings: materialDefaultColumnSettings,
+} = useTableColumnSettings('production-plan-material-tree', materialBaseColumns, {
+  minScrollX: 3200,
+})
 
 const filteredOrders = computed(() => {
   const f = { ...appliedFilters.value }
@@ -583,6 +626,12 @@ function handleReset() {
 </script>
 
 <style lang="less" scoped>
+.table-mini-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 .production-plan {
   .filter-form {
     margin-bottom: 12px;

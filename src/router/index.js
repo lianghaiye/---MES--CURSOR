@@ -171,7 +171,19 @@ const routes = [
         meta: { title: '出库管理' },
       },
       { path: 'inventory/sales-outbound', redirect: '/inventory/outbound' },
-      { path: 'inventory/in-out', ...emptyChild('inventory-in-out', '出入库') },
+      {
+        path: 'inventory/inbound',
+        name: 'inventory-inbound',
+        component: () => import('@/views/inventory/InboundManagementView.vue'),
+        meta: { title: '入库管理' },
+      },
+      {
+        path: 'inventory/inbound/:id',
+        name: 'inventory-inbound-detail',
+        component: () => import('@/views/inventory/InboundOrderDetailView.vue'),
+        meta: { title: '入库单详情' },
+      },
+      { path: 'inventory/in-out', redirect: '/inventory/inbound' },
       {
         path: 'quality/factory-qc',
         name: 'quality-factory-qc',

@@ -75,17 +75,18 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="filteredList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 1380 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="{
           pageSize: 10,
           size: 'small',
@@ -131,6 +132,12 @@
     </div>
 
     <ProcessConfigFormModal v-model:open="modalOpen" :record="editRecord" @saved="handleSearch" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -144,6 +151,9 @@ import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import ProcessConfigFormModal from './components/ProcessConfigFormModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import {
   processConfigState,
   filterProcessConfig,
@@ -173,7 +183,7 @@ const categoryOpts = computed(() => getActiveCategoryOptions())
 const resourceTypeOpts = RESOURCE_TYPES.map((v) => ({ label: v, value: v }))
 const statusOpts = PROCESS_STATUS.map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
   { title: '工序编码', key: 'code', width: 130 },
   { title: '工序名称', dataIndex: 'name', width: 140 },
@@ -186,6 +196,9 @@ const columns = [
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
   { title: '操作', key: 'actions', width: 120, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('process-config-list', baseColumns)
 
 const filteredList = computed(() => filterProcessConfig(processConfigState.processes, applied))
 

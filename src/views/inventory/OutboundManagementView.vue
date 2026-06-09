@@ -160,6 +160,7 @@
               <ReloadOutlined />
             </a-button>
           </a-tooltip>
+          <TableColumnSettingButton @click="columnDrawerOpen = true" />
         </a-space>
       </div>
 
@@ -174,12 +175,12 @@
 
       <div class="table-card">
         <a-table
-          :columns="columns"
+          :columns="displayColumns"
           :data-source="pagedList"
           row-key="id"
           size="small"
           bordered
-          :scroll="{ x: 2200 }"
+          :scroll="{ x: tableScrollX }"
           :pagination="false"
           :row-selection="rowSelection"
         >
@@ -231,6 +232,12 @@
         </div>
       </div>
     </div>
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -267,6 +274,9 @@ import {
   canInitiateFactoryQc,
 } from '@/store/outboundStore'
 import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const filters = reactive({
   projectNo: '',
@@ -290,7 +300,7 @@ const warehouseOpts = warehouseOptions.map((w) => ({ label: w.label, value: w.va
 const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
 const requisitionDeptOpts = requisitionDeptOptions.map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '出库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
   { title: '出库类型', dataIndex: 'outboundType', width: 100 },
   { title: '出库仓库', dataIndex: 'warehouse', width: 90 },
@@ -308,6 +318,9 @@ const columns = [
   { title: '创建人', dataIndex: 'creator', width: 80 },
   { title: '操作', key: 'action', width: 280, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('outbound-list', baseColumns, { minScrollX: 2200 })
 
 const filteredList = computed(() =>
   filterOutboundOrders(outboundState.orders, appliedFilters.value),

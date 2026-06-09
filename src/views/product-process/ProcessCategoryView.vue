@@ -42,16 +42,18 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="filteredList"
         row-key="id"
         size="small"
         bordered
+        :scroll="{ x: tableScrollX }"
         :pagination="{
           pageSize: 10,
           size: 'small',
@@ -82,6 +84,12 @@
     </div>
 
     <ProcessCategoryFormModal v-model:open="modalOpen" :record="editRecord" @saved="handleSearch" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -101,6 +109,9 @@ import {
   SearchOutlined,
 } from '@ant-design/icons-vue'
 import ProcessCategoryFormModal from './components/ProcessCategoryFormModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import {
   processCategoryState,
   filterProcessCategories,
@@ -114,7 +125,7 @@ const applied = reactive({ name: '' })
 const modalOpen = ref(false)
 const editRecord = ref(null)
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
   { title: '工序分类名称', dataIndex: 'name', width: 160 },
   { title: '状态', key: 'status', width: 100 },
@@ -122,6 +133,9 @@ const columns = [
   { title: '备注', dataIndex: 'remark', ellipsis: true },
   { title: '操作', key: 'actions', width: 180, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('process-category-list', baseColumns)
 
 const filteredList = computed(() =>
   filterProcessCategories(processCategoryState.categories, applied),

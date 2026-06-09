@@ -135,6 +135,7 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
@@ -154,12 +155,12 @@
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 3200 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="false"
         :row-selection="rowSelection"
       >
@@ -238,6 +239,12 @@
       :purchase-order="receiptOrder"
       @confirmed="onReceiptConfirmed"
     />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -273,6 +280,9 @@ import {
 import { poStatusOptions, poSourceOptions, supplierOptions } from '@/mock/purchaseOrderOptions'
 import CreatePurchaseOrderModal from './components/CreatePurchaseOrderModal.vue'
 import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const filters = reactive({
   orderNo: '',
@@ -295,7 +305,7 @@ const supplierOpts = supplierOptions
 const statusOpts = poStatusOptions.map((v) => ({ label: v, value: v }))
 const sourceOpts = poSourceOptions.map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '采购单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
   { title: '采购申请单号', dataIndex: 'reqNo', width: 150, ellipsis: true },
@@ -321,6 +331,9 @@ const columns = [
   { title: '审批人姓名', dataIndex: 'approverName', width: 100 },
   { title: '操作', key: 'action', width: 180, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('purchase-order-list', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }

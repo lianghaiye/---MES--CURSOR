@@ -127,17 +127,18 @@
                 <ReloadOutlined />
               </a-button>
             </a-tooltip>
+            <TableColumnSettingButton @click="columnDrawerOpen = true" />
           </a-space>
         </div>
 
         <div class="table-card">
           <a-table
-            :columns="columns"
+            :columns="displayColumns"
             :data-source="pagedList"
             row-key="id"
             size="small"
             bordered
-            :scroll="{ x: 1800 }"
+            :scroll="{ x: tableScrollX }"
             :pagination="false"
             :row-selection="rowSelection"
           >
@@ -196,6 +197,12 @@
     </div>
 
     <MaterialFormModal v-model:open="formModalOpen" :edit-record="editRecord" @saved="onSaved" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -230,6 +237,9 @@ import {
   cloneMaterial,
 } from '@/store/materialInfoStore'
 import MaterialFormModal from './components/MaterialFormModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const categoryKeyword = ref('')
 const selectedCategoryKey = ref(null)
@@ -290,7 +300,7 @@ const rowSelection = computed(() => ({
   },
 }))
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
   { title: '物料编号', dataIndex: 'code', width: 128, fixed: 'left', ellipsis: true },
   { title: '物料名称', dataIndex: 'name', width: 180, fixed: 'left', ellipsis: true },
@@ -307,6 +317,9 @@ const columns = [
   { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
   { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('material-info-list', baseColumns, { minScrollX: 2200 })
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1

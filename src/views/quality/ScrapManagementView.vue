@@ -78,6 +78,7 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
@@ -93,12 +94,12 @@
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 3200 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="pagination"
         :row-selection="rowSelection"
         @change="onTableChange"
@@ -158,6 +159,12 @@
 
     <ScrapAuditModal v-model:open="auditOpen" :record="currentRecord" @saved="onSaved" />
     <ScrapReplenishModal v-model:open="replenishOpen" :record="currentRecord" @saved="onSaved" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -182,6 +189,9 @@ import {
 } from '@/utils/scrapOrderUtils'
 import ScrapAuditModal from './components/ScrapAuditModal.vue'
 import ScrapReplenishModal from './components/ScrapReplenishModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
 
@@ -211,7 +221,7 @@ const auditStatusOpts = ['待审核', '已审核'].map((v) => ({ label: v, value
 const scrapSourceOpts = ['报废申请', '拆解报废'].map((v) => ({ label: v, value: v }))
 const replenishStatusOpts = ['未补料', '已补料', '不需补料'].map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '审核状态', key: 'auditStatus', width: 90, fixed: 'left' },
   { title: '报废来源', dataIndex: 'scrapSource', width: 100, fixed: 'left' },
   { title: '报废单号', key: 'scrapNo', width: 150, fixed: 'left' },
@@ -235,6 +245,9 @@ const columns = [
   { title: '审核时间', dataIndex: 'auditedAt', width: 150 },
   { title: '操作', key: 'action', width: 110, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('scrap-list', baseColumns)
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,

@@ -243,7 +243,12 @@ const disposalRows = computed(() => {
           ? '自动创建拆解工单'
           : '—',
     status: link.type === 'disassembly' ? '待下发' : '待处理',
-    route: link.type === 'disassembly' ? `/production/disassembly-work-orders/${link.id}` : null,
+    route:
+      link.type === 'inbound'
+        ? `/inventory/inbound/${link.id}`
+        : link.type === 'disassembly'
+          ? `/production/disassembly-work-orders/${link.id}`
+          : null,
   }))
 })
 

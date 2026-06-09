@@ -10,16 +10,28 @@
         </a-form-item>
       </a-form>
     </div>
+    <div class="table-toolbar">
+      <a-space :size="4" class="toolbar-icons">
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
+      </a-space>
+    </div>
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="filteredList"
         row-key="id"
         size="small"
         bordered
+        :scroll="{ x: tableScrollX }"
         :pagination="{ pageSize: 15, size: 'small' }"
       />
     </div>
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -30,11 +42,14 @@ export default { name: 'ProcessDocView' }
 <script setup>
 import { computed, reactive } from 'vue'
 import { processDocState, filterProcessDocs } from '@/store/processDocStore'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const filters = reactive({ name: '' })
 const applied = reactive({ name: '' })
 
-const columns = [
+const baseColumns = [
   { title: '文件编号', dataIndex: 'code', width: 120 },
   { title: '文件名称', dataIndex: 'name', width: 200 },
   { title: '版本', dataIndex: 'version', width: 80 },
@@ -42,9 +57,20 @@ const columns = [
   { title: '状态', dataIndex: 'status', width: 80 },
 ]
 
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('process-doc-list', baseColumns)
+
 const filteredList = computed(() => filterProcessDocs(processDocState.docs, applied))
 
 function handleSearch() {
   applied.name = filters.name.trim()
 }
 </script>
+
+<style scoped>
+.table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+</style>

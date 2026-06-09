@@ -50,17 +50,18 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="filteredList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 1400 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="{ pageSize: 10, size: 'small', showSizeChanger: true }"
       >
         <template #bodyCell="{ column, record, index }">
@@ -107,6 +108,12 @@
     </div>
 
     <ProcessRouteEditorModal v-model:open="editorOpen" :edit-record="editRecord" @saved="onSaved" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -129,6 +136,9 @@ import {
   ROUTE_STATUS,
 } from '@/store/processRouteStore'
 import ProcessRouteEditorModal from './components/ProcessRouteEditorModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
 const filters = reactive({ code: '', name: '', status: undefined })
@@ -138,7 +148,7 @@ const editRecord = ref(null)
 
 const statusOpts = ROUTE_STATUS.map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
   { title: '工艺路线编号', key: 'code', width: 120 },
   { title: '名称', dataIndex: 'name', width: 160 },
@@ -150,6 +160,9 @@ const columns = [
   { title: '更新日期', dataIndex: 'updatedAt', width: 160 },
   { title: '操作', key: 'actions', width: 220, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('process-route-list', baseColumns)
 
 const filteredList = computed(() => filterProcessRoutes(processRouteState.routes, applied))
 

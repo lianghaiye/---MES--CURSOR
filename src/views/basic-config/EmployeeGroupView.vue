@@ -59,17 +59,18 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="filteredList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 1400 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="{ pageSize: 10, size: 'small', showSizeChanger: true }"
         :row-selection="rowSelection"
       >
@@ -108,6 +109,12 @@
     </div>
 
     <EmployeeGroupModal v-model:open="modalOpen" :record="editRecord" @saved="handleSearch" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -121,6 +128,9 @@ import {
   deleteEmployeeGroups,
   positionOptions,
 } from '@/store/employeeGroupStore'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const filters = reactive({ name: '', position: undefined })
 const applied = reactive({ name: '', position: undefined })
@@ -130,7 +140,7 @@ const editRecord = ref(null)
 
 const positionOpts = positionOptions.map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '编码', key: 'code', dataIndex: 'code', width: 140 },
   { title: '名称', dataIndex: 'name', width: 120 },
   { title: '工作中心', dataIndex: 'workCenter', width: 100 },
@@ -142,6 +152,9 @@ const columns = [
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '操作', key: 'actions', width: 120, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('employee-group-list', baseColumns)
 
 const filteredList = computed(() =>
   employeeGroupState.groups.filter((g) => {

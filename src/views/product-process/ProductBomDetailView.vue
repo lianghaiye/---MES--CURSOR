@@ -134,7 +134,7 @@ import BomMaterialTable from './components/BomMaterialTable.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { openTab } = useTabs()
+const { openTab, closeTab } = useTabs()
 
 const loading = ref(false)
 const record = ref(null)
@@ -239,7 +239,11 @@ function handleArchive() {
 }
 
 function handleBack() {
-  router.push('/product-process/bom')
+  const detailPath = route.path
+  const listPath = '/product-process/bom'
+  const closingActive = tabStore.activePath === detailPath
+  closeTab(detailPath)
+  router.push(closingActive ? tabStore.activePath || listPath : listPath)
 }
 </script>
 

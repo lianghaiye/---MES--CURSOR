@@ -52,17 +52,18 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="filteredList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 1000 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="{
           pageSize: 10,
           size: 'small',
@@ -89,6 +90,12 @@
       :record="editRecord"
       @saved="handleSearch"
     />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -107,13 +114,16 @@ import {
   deleteWarehouseCategory,
 } from '@/store/warehouseCategoryStore'
 import { countWarehousesByCategoryId } from '@/store/warehouseStore'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const filters = reactive({ code: '', name: '' })
 const applied = reactive({ code: '', name: '' })
 const modalOpen = ref(false)
 const editRecord = ref(null)
 
-const columns = [
+const baseColumns = [
   { title: '分类编码', key: 'code', width: 120 },
   { title: '分类名称', dataIndex: 'name', width: 140 },
   { title: '创建人', dataIndex: 'creator', width: 100 },
@@ -121,6 +131,9 @@ const columns = [
   { title: '创建日期', dataIndex: 'createdAt', width: 170 },
   { title: '操作', key: 'actions', width: 120, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('warehouse-category-list', baseColumns)
 
 const filteredList = computed(() =>
   filterWarehouseCategories(warehouseCategoryState.categories, applied),

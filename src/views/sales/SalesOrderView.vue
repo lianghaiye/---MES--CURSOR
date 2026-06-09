@@ -145,11 +145,7 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
-        <a-tooltip title="列设置">
-          <a-button type="text" size="small" @click="stubAction('列设置')">
-            <SettingOutlined />
-          </a-button>
-        </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
@@ -171,12 +167,12 @@
     <!-- 表格 -->
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="pagedOrders"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 2200 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="false"
         :row-selection="rowSelection"
       >
@@ -241,6 +237,12 @@
       :sales-order="changeDeliveryModeOrder"
       @saved="onChangeDeliveryModeSaved"
     />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -257,7 +259,6 @@ import {
   PlusOutlined,
   SearchOutlined,
   ReloadOutlined,
-  SettingOutlined,
   DownOutlined,
   CheckOutlined,
   CheckCircleOutlined,
@@ -289,6 +290,9 @@ import CreateSalesOrderModal from './components/CreateSalesOrderModal.vue'
 import ApplyDeliveryModal from './components/ApplyDeliveryModal.vue'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -317,7 +321,7 @@ const orderSourceOpts = orderSourceOptions.map((v) => ({ label: v, value: v }))
 const deliveryStatusOpts = deliveryStatusOptions.map((v) => ({ label: v, value: v }))
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '销售单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
   { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
@@ -342,6 +346,9 @@ const columns = [
   { title: '首付/定金金额', dataIndex: 'downPaymentAmount', width: 120, align: 'right' },
   { title: '操作', key: 'action', width: 120, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('sales-order-list', baseColumns, { minScrollX: 2200 })
 
 const filteredOrders = computed(() => {
   const f = { ...appliedFilters.value }

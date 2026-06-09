@@ -96,17 +96,18 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 1600 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="false"
         :row-selection="rowSelection"
       >
@@ -179,6 +180,12 @@
     </div>
 
     <ProductBomVersionDrawer v-model:open="versionOpen" :record="versionRecord" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -217,6 +224,9 @@ import {
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import ProductBomVersionDrawer from './components/ProductBomVersionDrawer.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -265,7 +275,7 @@ const rowSelection = computed(() => ({
   },
 }))
 
-const columns = [
+const baseColumns = [
   { title: 'BOM状态', key: 'status', width: 92, fixed: 'left' },
   { title: 'BOM名称', key: 'bomName', width: 160, fixed: 'left', ellipsis: true },
   { title: 'BOM编号', dataIndex: 'bomNo', width: 140, ellipsis: true },
@@ -276,6 +286,9 @@ const columns = [
   { title: '失效日期', dataIndex: 'expiredAt', width: 150 },
   { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('product-bom-list', baseColumns, { minScrollX: 1600 })
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1

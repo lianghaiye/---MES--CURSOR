@@ -77,6 +77,7 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
@@ -92,12 +93,12 @@
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 1600 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="false"
         :row-selection="rowSelection"
       >
@@ -153,6 +154,12 @@
       :record="inspectRecord"
       @saved="onInspectSaved"
     />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -176,6 +183,9 @@ import { qcStatusOptions, qcResultOptions } from '@/mock/factoryQcOptions'
 import CreateFactoryQcModal from './components/CreateFactoryQcModal.vue'
 import FactoryQcInspectModal from './components/FactoryQcInspectModal.vue'
 import { useTabs } from '@/composables/useTabs'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -196,7 +206,7 @@ const pagination = reactive({ current: 1, pageSize: 10 })
 const statusOpts = qcStatusOptions.map((v) => ({ label: v, value: v }))
 const resultOpts = qcResultOptions.map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '质检状态', key: 'qcStatus', width: 90, fixed: 'left' },
   { title: '质检结果', key: 'qcResult', width: 100, fixed: 'left' },
@@ -207,6 +217,9 @@ const columns = [
   { title: '质检时间', dataIndex: 'inspectedAt', width: 140 },
   { title: '操作', key: 'action', width: 80, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('factory-qc-list', baseColumns)
 
 const filteredList = computed(() =>
   filterFactoryQcRecords(factoryQcState.records, appliedFilters.value),

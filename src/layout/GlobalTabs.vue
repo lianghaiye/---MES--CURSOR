@@ -31,9 +31,11 @@ function onTabChange(key) {
 
 function onTabEdit(targetKey, action) {
   if (action === 'remove') {
+    const closingActive = tabState.activePath === targetKey
     closeTab(targetKey)
-    if (tabState.activePath !== targetKey) return
-    router.push(tabState.activePath)
+    if (closingActive) {
+      router.push(tabState.activePath)
+    }
   }
 }
 </script>

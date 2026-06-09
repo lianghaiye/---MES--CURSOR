@@ -63,17 +63,18 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="filteredList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 1400 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="{
           pageSize: 10,
           size: 'small',
@@ -109,6 +110,12 @@
       :warehouse="storageRecord"
       @saved="handleSearch"
     />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -125,6 +132,9 @@ import WarehouseFormModal from './components/WarehouseFormModal.vue'
 import WarehouseStorageModal from './components/WarehouseStorageModal.vue'
 import { warehouseState, filterWarehouses, deleteWarehouse } from '@/store/warehouseStore'
 import { getWarehouseCategoryOptions } from '@/store/warehouseCategoryStore'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
 const filters = reactive({ code: '', name: '', categoryId: undefined })
@@ -136,7 +146,7 @@ const storageRecord = ref(null)
 
 const categoryOpts = computed(() => getWarehouseCategoryOptions())
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
   { title: '仓库编号', key: 'code', width: 160, ellipsis: true },
   { title: '仓库名称', dataIndex: 'name', width: 140 },
@@ -148,6 +158,9 @@ const columns = [
   { title: '创建日期', dataIndex: 'createdAt', width: 170 },
   { title: '操作', key: 'actions', width: 180, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('warehouse-list', baseColumns)
 
 const filteredList = computed(() => filterWarehouses(warehouseState.warehouses, applied))
 

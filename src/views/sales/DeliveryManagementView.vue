@@ -112,6 +112,9 @@
           刷新
         </a-button>
       </a-space>
+      <a-space :size="4" class="toolbar-icons">
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
+      </a-space>
     </div>
 
     <a-alert
@@ -128,12 +131,12 @@
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 2100 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="false"
         :row-selection="rowSelection"
       >
@@ -188,6 +191,12 @@
     </div>
 
     <DeliveryFormModal v-model:open="formOpen" :record="editingRecord" @saved="onFormSaved" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -228,6 +237,9 @@ import {
 } from '@/utils/deliveryOrder'
 import DeliveryStatsPanel from './components/DeliveryStatsPanel.vue'
 import DeliveryFormModal from './components/DeliveryFormModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -251,7 +263,7 @@ const editingRecord = ref(null)
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 
-const columns = [
+const baseColumns = [
   { title: '序号', key: 'index', width: 56, fixed: 'left' },
   { title: '发货状态', key: 'deliveryStatus', width: 96, fixed: 'left' },
   { title: '发货单号', key: 'deliveryCode', dataIndex: 'deliveryCode', width: 140, fixed: 'left' },
@@ -271,6 +283,9 @@ const columns = [
   { title: '车牌号', dataIndex: 'plateNo', width: 100 },
   { title: '操作', key: 'action', width: 120, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('delivery-list', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -417,6 +432,7 @@ function stubBatch() {
 .toolbar-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 12px 8px;
 }
 

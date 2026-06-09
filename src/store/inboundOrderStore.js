@@ -1,7 +1,12 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
+import { cloneInboundSeedOrders, createInboundOrder } from '@/mock/inboundOrders'
+import { warehouseState } from '@/store/warehouseStore'
+import { applyInboundToStock } from '@/store/stockStore'
 
 const STORAGE_KEY = 'i_doms_inbound_orders'
+const SEED_VERSION_KEY = 'i_doms_inbound_orders_seed_v'
+const CURRENT_SEED_VERSION = '2'
 
 function loadFromStorage() {
   try {
@@ -13,20 +18,61 @@ function loadFromStorage() {
   } catch {
     /* ignore */
   }
-  return []
+  return null
+}
+
+function shouldReseed() {
+  return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
 }
 
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: inboundOrderState.orders }))
+  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+}
+
+function normalizeLegacyOrder(order) {
+  const row = { ...order }
+  if (!row.inboundDate)
+    row.inboundDate = row.createdAt?.slice(0, 10) || dayjs().format('YYYY-MM-DD')
+  if (!row.itemType) row.itemType = '物料'
+  if (!row.handler) row.handler = row.creator || 'admin1'
+  if (!row.invoiceNo) row.invoiceNo = ''
+  if (!row.sourceWorkshop) row.sourceWorkshop = ''
+  if (!row.confirmer) row.confirmer = ''
+  if (!row.confirmedAt) row.confirmedAt = ''
+  if (!row.approver) row.approver = ''
+  if (!row.approvedAt) row.approvedAt = ''
+  if (!row.miniProgramTaskId) row.miniProgramTaskId = ''
+  if (row.inboundType === '生产退库') row.inboundType = '半成品入库'
+  if (row.status === '待处理' && row.inboundType === '成品入库' && row.miniProgramTaskId) {
+    row.status = '待审批'
+  }
+  if (!Array.isArray(row.lineItems)) row.lineItems = []
+  return row
+}
+
+function initOrders() {
+  const stored = loadFromStorage()
+  if (shouldReseed() || !stored?.length) {
+    return cloneInboundSeedOrders().map(normalizeLegacyOrder)
+  }
+  return stored.map(normalizeLegacyOrder)
 }
 
 export function generateInboundNo() {
-  const seq = inboundOrderState.orders.length + 1
-  return `IN${dayjs().format('YYYYMMDD')}${String(seq).padStart(4, '0')}`
+  const ymd = dayjs().format('YYYYMMDD')
+  const prefix = `1-${ymd}-`
+  const max = inboundOrderState.orders.reduce((m, o) => {
+    const str = String(o.docNo || '')
+    if (!str.startsWith(prefix)) return m
+    const seq = Number(str.slice(prefix.length)) || 0
+    return Math.max(m, seq)
+  }, 0)
+  return `${prefix}${String(max + 1).padStart(5, '0')}`
 }
 
 export const inboundOrderState = reactive({
-  orders: loadFromStorage(),
+  orders: initOrders(),
 })
 
 watch(
@@ -34,11 +80,6 @@ watch(
   () => persist(),
   { deep: true },
 )
-
-export function addInboundOrder(order) {
-  inboundOrderState.orders.unshift(order)
-  return order
-}
 
 export function getInboundOrderById(id) {
   return inboundOrderState.orders.find((o) => o.id === id) || null
@@ -48,19 +89,141 @@ export function getInboundOrdersBySource(sourceOrderNo) {
   return inboundOrderState.orders.filter((o) => o.sourceOrderNo === sourceOrderNo)
 }
 
+export function resolveWarehouseKeeper(warehouseName) {
+  const wh = warehouseState.warehouses.find((w) => w.name === warehouseName)
+  return wh?.managerName || ''
+}
+
+function canDeleteInbound(order) {
+  return order && order.status !== '已完成'
+}
+
+function canEditInbound(order) {
+  return order && ['待处理', '待审批', '已拒绝'].includes(order.status)
+}
+
+function canConfirmInbound(order) {
+  return order?.status === '待处理'
+}
+
+function canApproveInbound(order) {
+  return order?.status === '待审批' && order?.inboundType === '成品入库'
+}
+
+export function addInboundOrder(payload) {
+  const whKeeper = resolveWarehouseKeeper(payload.warehouse)
+  const row = normalizeLegacyOrder(
+    createInboundOrder({
+      ...payload,
+      id: payload.id || `ib-${Date.now()}`,
+      docNo: payload.docNo || generateInboundNo(),
+      warehouseKeeper: payload.warehouseKeeper || whKeeper,
+      status:
+        payload.status ||
+        (payload.inboundType === '成品入库' && payload.miniProgramTaskId ? '待审批' : '待处理'),
+      createdAt: payload.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    }),
+  )
+  inboundOrderState.orders.unshift(row)
+  return row
+}
+
+export function updateInboundOrder(id, patch) {
+  const idx = inboundOrderState.orders.findIndex((o) => o.id === id)
+  if (idx === -1) return { ok: false, message: '入库单不存在' }
+  const row = inboundOrderState.orders[idx]
+  if (!canEditInbound(row)) return { ok: false, message: '当前状态不可编辑' }
+  if (patch.warehouse) {
+    patch.warehouseKeeper = resolveWarehouseKeeper(patch.warehouse)
+  }
+  Object.assign(row, patch)
+  return { ok: true, order: row }
+}
+
+export function deleteInboundOrder(id) {
+  const idx = inboundOrderState.orders.findIndex((o) => o.id === id)
+  if (idx === -1) return false
+  if (!canDeleteInbound(inboundOrderState.orders[idx])) return false
+  inboundOrderState.orders.splice(idx, 1)
+  return true
+}
+
+export function confirmInboundOrders(ids, operator = 'admin1') {
+  let count = 0
+  const blocked = []
+  ids.forEach((id) => {
+    const order = inboundOrderState.orders.find((o) => o.id === id)
+    if (!canConfirmInbound(order)) {
+      blocked.push({ docNo: order?.docNo || id, message: '仅待处理状态可确认入库' })
+      return
+    }
+    const stockRes = applyInboundToStock(order)
+    if (!stockRes.ok) {
+      blocked.push({ docNo: order.docNo, message: stockRes.message })
+      return
+    }
+    order.status = '已完成'
+    order.confirmer = operator
+    order.confirmedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    count += 1
+  })
+  return { count, blocked }
+}
+
+export function approveInboundOrder(id, operator = 'admin1') {
+  const order = inboundOrderState.orders.find((o) => o.id === id)
+  if (!canApproveInbound(order)) {
+    return { ok: false, message: '仅成品入库待审批单据可审批' }
+  }
+  order.status = '待处理'
+  order.approver = operator
+  order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  return { ok: true, order }
+}
+
+export function rejectInboundOrder(id, operator = 'admin1') {
+  const order = inboundOrderState.orders.find((o) => o.id === id)
+  if (!canApproveInbound(order)) {
+    return { ok: false, message: '仅成品入库待审批单据可拒绝' }
+  }
+  order.status = '已拒绝'
+  order.approver = operator
+  order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  resetMiniProgramInboundTask(order.miniProgramTaskId)
+  return { ok: true, order }
+}
+
+/** 拒绝后小程序入库任务恢复为待开始（占位，后续对接小程序） */
+export function resetMiniProgramInboundTask(taskId) {
+  if (!taskId) return
+  try {
+    const key = 'i_doms_mp_inbound_tasks'
+    const raw = localStorage.getItem(key)
+    const tasks = raw ? JSON.parse(raw) : []
+    const idx = tasks.findIndex((t) => t.id === taskId)
+    if (idx >= 0) {
+      tasks[idx].status = '待开始'
+      localStorage.setItem(key, JSON.stringify(tasks))
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export function createInboundFromScrap(scrap, partial = {}) {
-  const order = {
-    id: `ib-scrap-${Date.now()}`,
-    docNo: generateInboundNo(),
-    inboundType: partial.inboundType || '生产退库',
+  const inboundType =
+    partial.inboundType === '生产退库' ? '半成品入库' : partial.inboundType || '报废入库'
+  const order = addInboundOrder({
+    inboundType,
     status: '待处理',
     warehouse: partial.warehouse || scrap.warehouse || '半成品仓',
-    warehouseKeeper: partial.warehouseKeeper || scrap.warehouseKeeper || '张三',
     sourceOrderNo: scrap.scrapNo,
     sourceType: '报废单',
+    itemType: '物料',
+    handler: partial.creator || '管理员',
     creator: partial.creator || '管理员',
-    createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
-    remark: partial.remark || '',
+    remark: partial.remark || `报废单 ${scrap.scrapNo}`,
+    inboundDate: dayjs().format('YYYY-MM-DD'),
     lineItems: [
       {
         id: `ib-line-${Date.now()}`,
@@ -73,7 +236,8 @@ export function createInboundFromScrap(scrap, partial = {}) {
       },
     ],
     ...partial,
-  }
-  addInboundOrder(order)
+  })
   return order
 }
+
+export { canDeleteInbound, canEditInbound, canConfirmInbound, canApproveInbound }

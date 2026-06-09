@@ -15,15 +15,19 @@
           删除
         </a-button>
       </a-space>
+      <a-space :size="4" class="toolbar-icons">
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
+      </a-space>
     </div>
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="tableData"
         row-key="value"
         size="small"
         bordered
+        :scroll="{ x: tableScrollX }"
         :pagination="{ pageSize: 10, size: 'small' }"
         :row-selection="rowSelection"
       >
@@ -51,6 +55,12 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -69,6 +79,9 @@ import {
   updateDictItem,
   deleteDictItem,
 } from '@/store/systemDictStore'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const activeType = ref(DICT_TYPES[0].key)
 const selectedRowKeys = ref([])
@@ -82,10 +95,13 @@ const tableData = computed(() =>
   (systemDictState.dicts[activeType.value] || []).map((value) => ({ value })),
 )
 
-const columns = [
+const baseColumns = [
   { title: '序号', key: 'index', width: 70, align: 'center' },
   { title: '字典值', key: 'value', dataIndex: 'value' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('system-dict-list', baseColumns)
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -148,6 +164,7 @@ function handleDelete() {
 }
 .toolbar-row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   margin: 12px 0;
 }

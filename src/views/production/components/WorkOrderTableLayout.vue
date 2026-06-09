@@ -8,6 +8,7 @@
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
         <a-tooltip title="切换为卡片视图">
           <a-button
             type="text"
@@ -22,12 +23,12 @@
     </div>
 
     <a-table
-      :columns="columns"
+      :columns="displayColumns"
       :data-source="dataSource"
       row-key="id"
       size="small"
       bordered
-      :scroll="{ x: 1200 }"
+      :scroll="{ x: tableScrollX }"
       :pagination="false"
       :row-selection="rowSelection"
       :custom-row="customRow"
@@ -87,12 +88,21 @@
         @showSizeChange="onPageSizeChange"
       />
     </div>
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { AppstoreOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const props = defineProps({
   dataSource: { type: Array, default: () => [] },
@@ -100,6 +110,7 @@ const props = defineProps({
   pagination: { type: Object, required: true },
   selectedIds: { type: Array, default: () => [] },
   activeId: { type: String, default: null },
+  columnSettingsKey: { type: String, default: 'work-order-list' },
 })
 
 const emit = defineEmits([
@@ -111,7 +122,7 @@ const emit = defineEmits([
   'update:selectedIds',
 ])
 
-const columns = [
+const baseColumns = [
   { title: '#', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '工单编号', dataIndex: 'code', key: 'code', width: 150, ellipsis: true },
   { title: '工单名称', dataIndex: 'name', key: 'name', width: 180, ellipsis: true },
@@ -122,6 +133,9 @@ const columns = [
   { title: '工单类别', dataIndex: 'orderCategory', key: 'orderCategory', width: 100 },
   { title: '操作', key: 'action', width: 240, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings(props.columnSettingsKey, baseColumns, { minScrollX: 1200 })
 
 const rowSelection = computed(() => ({
   selectedRowKeys: props.selectedIds,

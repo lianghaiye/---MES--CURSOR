@@ -56,7 +56,7 @@ export const sideMenus = {
   inventory: [
     { key: 'stock', label: '库存查询', path: '/inventory/stock' },
     { key: 'outbound', label: '出库管理', path: '/inventory/outbound' },
-    { key: 'in-out', label: '出入库', path: '/inventory/in-out' },
+    { key: 'inbound', label: '入库管理', path: '/inventory/inbound' },
   ],
   quality: [
     { key: 'factory-qc', label: '出厂质检', path: '/quality/factory-qc' },
@@ -133,7 +133,8 @@ export const routeTitles = {
   '/inventory/stock': '库存查询',
   '/inventory/outbound': '出库管理',
   '/inventory/sales-outbound': '出库管理',
-  '/inventory/in-out': '出入库',
+  '/inventory/inbound': '入库管理',
+  '/inventory/inbound/:id': '入库单详情',
   '/quality/factory-qc': '出厂质检',
   '/quality/scrap-orders': '报废品管理',
   '/quality/scrap-orders/:id': '报废品详情',
@@ -155,4 +156,5 @@ export const routeTitles = {
 /** 动态路径标题（含 :id 等参数） */
 export const dynamicRouteTitles = [
   { pattern: /^\/basic-config\/warehouses\/[^/]+$/, title: '仓库详情' },
+  { pattern: /^\/inventory\/inbound\/[^/]+$/, title: '入库单详情' },
 ]
