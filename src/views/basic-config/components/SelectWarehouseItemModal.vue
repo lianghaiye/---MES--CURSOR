@@ -34,7 +34,7 @@
 
       <div class="main-panel">
         <a-form :model="search" class="search-form horizontal-form">
-          <a-row :gutter="[8, 0]" align="middle" class="search-row">
+          <a-row :gutter="[8, 8]" align="middle" class="search-row">
             <a-col flex="200px">
               <a-form-item label="物品编码">
                 <a-input
@@ -65,6 +65,39 @@
                 />
               </a-form-item>
             </a-col>
+            <a-col flex="180px">
+              <a-form-item label="产品属性">
+                <a-select
+                  v-model:value="search.productAttribute"
+                  allow-clear
+                  size="small"
+                  placeholder="请选择"
+                  :options="productAttrOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col flex="160px">
+              <a-form-item label="物料类型">
+                <a-select
+                  v-model:value="search.materialType"
+                  allow-clear
+                  size="small"
+                  placeholder="请选择"
+                  :options="materialTypeOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col flex="160px">
+              <a-form-item label="供应型态">
+                <a-select
+                  v-model:value="search.supplyForm"
+                  allow-clear
+                  size="small"
+                  placeholder="请选择"
+                  :options="supplyFormOpts"
+                />
+              </a-form-item>
+            </a-col>
             <a-col flex="none">
               <a-form-item class="search-actions-item">
                 <a-space :size="8">
@@ -82,7 +115,11 @@
         <a-alert type="info" show-icon class="selection-bar" :banner="false">
           <template #message>
             <span>
-              当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
+              当前已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
+              <template v-if="multiple">
+                （当前筛选共 {{ filteredList.length }} 项）
+                <a-button type="link" size="small" @click="selectAllFiltered">全选结果</a-button>
+              </template>
               <a-button type="link" size="small" @click="clearSelection">清空</a-button>
             </span>
           </template>
@@ -95,7 +132,7 @@
           row-key="rowKey"
           size="small"
           bordered
-          :scroll="{ x: 1100, y: 360 }"
+          :scroll="{ x: tableScrollX, y: 360 }"
           :pagination="pagination"
           @change="onTableChange"
         >
@@ -125,15 +162,20 @@ import { SearchOutlined } from '@ant-design/icons-vue'
 import { filterCategoryTree } from '@/mock/materialCategories'
 import { productCategoryTree } from '@/mock/productCategories'
 import { materialCategoryTree } from '@/mock/materialCategories'
+import { productAttributeOptions } from '@/mock/productInfoOptions'
+import { materialTypeOptions, supplyFormOptions } from '@/mock/materialInfoOptions'
 import {
   buildWarehouseItemCategoryTree,
   buildWarehousePickableItems,
   filterWarehousePickableItems,
+  resolveWarehouseItemCategoryScope,
 } from '@/utils/warehouseItemPicker'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   selectedItems: { type: Array, default: () => [] },
+  /** 多选（存放管理）/ 单选（工单选品） */
+  multiple: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -141,24 +183,61 @@ const emit = defineEmits(['update:open', 'confirm'])
 const categoryKeyword = ref('')
 const selectedCategoryKey = ref('')
 const expandedKeys = ref(['root-material', 'root-product', 'cat-004', 'pcat-004'])
-const search = reactive({ code: '', name: '', specModel: '' })
-const applied = reactive({ code: '', name: '', specModel: '' })
+const search = reactive({
+  code: '',
+  name: '',
+  specModel: '',
+  productAttribute: undefined,
+  materialType: undefined,
+  supplyForm: undefined,
+})
+const applied = reactive({
+  code: '',
+  name: '',
+  specModel: '',
+  productAttribute: undefined,
+  materialType: undefined,
+  supplyForm: undefined,
+})
 const selectedRowKeys = ref([])
 const selectedRows = ref([])
 const page = ref(1)
 const pageSize = ref(10)
 
-const columns = [
+const productAttrOpts = productAttributeOptions.map((v) => ({ label: v, value: v }))
+const materialTypeOpts = materialTypeOptions.map((v) => ({ label: v, value: v }))
+const supplyFormOpts = supplyFormOptions.map((v) => ({ label: v, value: v }))
+
+const BASE_COLUMNS = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '物品编码', dataIndex: 'code', width: 110 },
   { title: '物品名称', key: 'name', dataIndex: 'name', width: 120 },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
   { title: '类别', dataIndex: 'categoryName', width: 90 },
+]
+
+const TAIL_COLUMNS = [
   { title: '材质', dataIndex: 'material', width: 70 },
   { title: '单价', dataIndex: 'unitPrice', width: 80 },
   { title: '条码类型', dataIndex: 'barcodeType', width: 90 },
   { title: '库存单位', dataIndex: 'inventoryUnit', width: 80 },
 ]
+
+const categoryScope = computed(() => resolveWarehouseItemCategoryScope(selectedCategoryKey.value))
+
+const columns = computed(() => {
+  const cols = [...BASE_COLUMNS]
+  if (categoryScope.value === 'product') {
+    cols.push({ title: '产品属性', dataIndex: 'productAttribute', width: 120, ellipsis: true })
+  } else if (categoryScope.value === 'material') {
+    cols.push({ title: '物料类型', dataIndex: 'materialType', width: 90 })
+    cols.push({ title: '供应型态', dataIndex: 'supplyForm', width: 90 })
+  }
+  cols.push(...TAIL_COLUMNS)
+  return cols
+})
+
+const tableScrollX = computed(() => columns.value.reduce((s, c) => s + (c.width || 90), 0))
 
 const allItems = computed(() => buildWarehousePickableItems())
 
@@ -197,13 +276,61 @@ const pagedList = computed(() => {
   return filteredList.value.slice(start, start + pageSize.value)
 })
 
-const rowSelection = computed(() => ({
-  selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys, rows) => {
-    selectedRowKeys.value = keys
-    selectedRows.value = rows
-  },
-}))
+function buildItemLookup() {
+  const map = new Map()
+  allItems.value.forEach((i) => map.set(i.rowKey, i))
+  filteredList.value.forEach((i) => map.set(i.rowKey, i))
+  selectedRows.value.forEach((r) => map.set(r.rowKey, r))
+  return map
+}
+
+function syncSelectedRowsFromKeys(keys) {
+  const map = buildItemLookup()
+  selectedRows.value = keys.map((k) => map.get(k)).filter(Boolean)
+}
+
+function applySelectedKeys(keys) {
+  selectedRowKeys.value = [...keys]
+  syncSelectedRowsFromKeys(selectedRowKeys.value)
+}
+
+function selectAllFiltered() {
+  const merged = new Set([...selectedRowKeys.value, ...filteredList.value.map((r) => r.rowKey)])
+  applySelectedKeys([...merged])
+}
+
+const rowSelection = computed(() => {
+  if (!props.multiple) {
+    return {
+      type: 'radio',
+      selectedRowKeys: selectedRowKeys.value,
+      onChange: (keys, rows) => {
+        selectedRowKeys.value = keys.slice(-1)
+        selectedRows.value = rows.slice(-1)
+      },
+    }
+  }
+  return {
+    selectedRowKeys: selectedRowKeys.value,
+    preserveSelectedRowKeys: true,
+    onSelect: (record, selected) => {
+      const set = new Set(selectedRowKeys.value)
+      if (selected) set.add(record.rowKey)
+      else set.delete(record.rowKey)
+      applySelectedKeys([...set])
+    },
+    onSelectAll: (selected) => {
+      const set = new Set(selectedRowKeys.value)
+      const filteredKeys = filteredList.value.map((r) => r.rowKey)
+      if (selected) {
+        filteredKeys.forEach((k) => set.add(k))
+      } else {
+        filteredKeys.forEach((k) => set.delete(k))
+      }
+      applySelectedKeys([...set])
+    },
+  }
+})
 
 watch(
   () => props.open,
@@ -214,9 +341,15 @@ watch(
     search.code = ''
     search.name = ''
     search.specModel = ''
+    search.productAttribute = undefined
+    search.materialType = undefined
+    search.supplyForm = undefined
     applied.code = ''
     applied.name = ''
     applied.specModel = ''
+    applied.productAttribute = undefined
+    applied.materialType = undefined
+    applied.supplyForm = undefined
     page.value = 1
     const preset = props.selectedItems || []
     selectedRowKeys.value = preset.map((it) => `${it.itemType}-${it.itemId}`)
@@ -236,6 +369,9 @@ function handleSearch() {
   applied.code = search.code.trim()
   applied.name = search.name.trim()
   applied.specModel = search.specModel.trim()
+  applied.productAttribute = search.productAttribute
+  applied.materialType = search.materialType
+  applied.supplyForm = search.supplyForm
   page.value = 1
 }
 
@@ -243,6 +379,9 @@ function handleReset() {
   search.code = ''
   search.name = ''
   search.specModel = ''
+  search.productAttribute = undefined
+  search.materialType = undefined
+  search.supplyForm = undefined
   selectedCategoryKey.value = ''
   handleSearch()
 }
@@ -263,7 +402,7 @@ function handleCancel() {
 
 function handleConfirm() {
   if (!selectedRows.value.length) {
-    message.warning('请至少选择一项物品')
+    message.warning(props.multiple ? '请至少选择一项物品' : '请选择一项物品')
     return
   }
   emit(
@@ -327,7 +466,7 @@ function handleConfirm() {
 }
 
 .search-row {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .search-actions-item {

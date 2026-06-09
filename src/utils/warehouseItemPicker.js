@@ -55,6 +55,14 @@ function collectDescendantKeys(nodes, rootKey) {
   return keys
 }
 
+/** 根据左侧分类判断列表展示范围：product | material | all */
+export function resolveWarehouseItemCategoryScope(categoryKey) {
+  if (!categoryKey) return 'all'
+  if (categoryKey === 'root-product' || categoryKey.startsWith('pcat-')) return 'product'
+  if (categoryKey === 'root-material' || categoryKey.startsWith('cat-')) return 'material'
+  return 'all'
+}
+
 export function buildWarehousePickableItems() {
   const products = (productInfoState.products || []).map((p) => ({
     rowKey: `产品-${p.id}`,
@@ -66,6 +74,9 @@ export function buildWarehousePickableItems() {
     categoryName: p.categoryName || '',
     categoryKey: p.categoryKey || '',
     material: p.material || '',
+    productAttribute: p.productAttribute || '',
+    materialType: '',
+    supplyForm: '',
     unitPrice: p.unitPrice ?? '',
     standardSpec: p.standardSpec || '',
     standardCycleDays: p.production?.standardCycleDays ?? '',
@@ -84,6 +95,9 @@ export function buildWarehousePickableItems() {
     categoryName: m.categoryName || '',
     categoryKey: m.categoryKey || '',
     material: m.material || '',
+    productAttribute: m.productAttribute || '',
+    materialType: m.materialType || '',
+    supplyForm: m.supplyForm || '',
     unitPrice: m.unitPrice ?? '',
     standardSpec: m.standardSpec || '',
     standardCycleDays: m.production?.standardCycleDays ?? '',
@@ -115,6 +129,15 @@ export function filterWarehousePickableItems(list, filters = {}, categoryKey) {
   if (filters.code) rows = rows.filter((r) => r.code?.includes(filters.code))
   if (filters.name) rows = rows.filter((r) => r.name?.includes(filters.name))
   if (filters.specModel) rows = rows.filter((r) => r.specModel?.includes(filters.specModel))
+  if (filters.productAttribute) {
+    rows = rows.filter((r) => r.productAttribute === filters.productAttribute)
+  }
+  if (filters.materialType) {
+    rows = rows.filter((r) => r.materialType === filters.materialType)
+  }
+  if (filters.supplyForm) {
+    rows = rows.filter((r) => r.supplyForm === filters.supplyForm)
+  }
 
   return rows
 }

@@ -2,32 +2,48 @@
   <a-modal
     :open="open"
     :title="isEdit ? '编辑工单' : '新增工单'"
-    width="720px"
+    width="840px"
     :mask-closable="false"
     destroy-on-close
+    class="create-work-order-modal"
     @cancel="handleCancel"
   >
-    <a-form :model="form" layout="vertical">
-      <a-row :gutter="16">
+    <a-form :model="form" layout="inline" class="work-order-form horizontal-form">
+      <a-row :gutter="[12, 12]" style="width: 100%">
         <a-col :span="12">
           <a-form-item label="工单编号">
-            <a-input v-model:value="form.code" allow-clear placeholder="留空则按规则自动生成" />
+            <a-input
+              v-model:value="form.code"
+              allow-clear
+              size="small"
+              placeholder="留空则按规则自动生成"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="12">
           <a-form-item label="工单名称">
-            <a-input v-model:value="form.name" allow-clear placeholder="留空则按规则自动生成" />
+            <a-input
+              v-model:value="form.name"
+              allow-clear
+              size="small"
+              placeholder="留空则按规则自动生成"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="12">
-          <a-form-item label="产品名称" required>
-            <a-input v-model:value="form.productName" placeholder="请输入产品名称" />
+          <a-form-item label="生产品名" required>
+            <ProductMaterialSelect
+              v-model="form.productName"
+              placeholder="请选择 产品"
+              @select="onProductSelect"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="12">
           <a-form-item label="工艺路线" required>
             <a-select
               v-model:value="form.processRouteName"
+              size="small"
               placeholder="请选择工艺路线"
               :options="routeOptions"
             />
@@ -35,17 +51,27 @@
         </a-col>
         <a-col :span="12">
           <a-form-item label="计划数量">
-            <a-input-number v-model:value="form.planQty" :min="0" style="width: 100%" />
+            <a-input-number
+              v-model:value="form.planQty"
+              :min="0"
+              size="small"
+              style="width: 100%"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="12">
           <a-form-item label="排产数量">
-            <a-input-number v-model:value="form.scheduleQty" :min="0" style="width: 100%" />
+            <a-input-number
+              v-model:value="form.scheduleQty"
+              :min="0"
+              size="small"
+              style="width: 100%"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="12">
           <a-form-item label="工作中心">
-            <a-select v-model:value="form.workCenter" :options="workCenterOpts" />
+            <a-select v-model:value="form.workCenter" size="small" :options="workCenterOpts" />
           </a-form-item>
         </a-col>
         <a-col :span="12">
@@ -54,6 +80,7 @@
               v-model:value="form.bom"
               show-search
               allow-clear
+              size="small"
               placeholder="请选择 BOM"
               :options="bomSelectOptions"
             />
@@ -61,22 +88,27 @@
         </a-col>
         <a-col :span="12">
           <a-form-item label="预入仓库">
-            <a-select v-model:value="form.warehouse" :options="warehouseOpts" />
+            <a-select v-model:value="form.warehouse" size="small" :options="warehouseOpts" />
           </a-form-item>
         </a-col>
         <a-col :span="12">
           <a-form-item label="紧急度">
-            <a-select v-model:value="form.urgency" :options="urgencyOpts" />
+            <a-select v-model:value="form.urgency" size="small" :options="urgencyOpts" />
           </a-form-item>
         </a-col>
         <a-col :span="24">
           <a-form-item label="计划日期">
-            <a-range-picker v-model:value="form.planDateRange" style="width: 100%" />
+            <a-range-picker v-model:value="form.planDateRange" size="small" style="width: 100%" />
           </a-form-item>
         </a-col>
         <a-col :span="24">
-          <a-form-item label="备注">
-            <a-textarea v-model:value="form.remark" :rows="3" placeholder="请输入备注" />
+          <a-form-item label="备注" class="remark-item">
+            <a-textarea
+              v-model:value="form.remark"
+              :rows="3"
+              size="small"
+              placeholder="请输入备注"
+            />
           </a-form-item>
         </a-col>
       </a-row>
@@ -100,6 +132,7 @@ import { bomOptions } from '@/mock/workOrderMaster'
 import { createWorkOrderPayload, workOrderState } from '@/store/workOrderStore'
 import { isDuplicateOrderCode, generateProductionWorkOrderName } from '@/utils/workOrderNaming'
 import { buildProcessesFromRoute, getActiveRouteOptions } from '@/mock/processRoutes'
+import ProductMaterialSelect from './ProductMaterialSelect.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -136,6 +169,16 @@ const warehouseOpts = computed(() => {
   return getWarehouseSelectOptions()
 })
 const urgencyOpts = computed(() => urgencyOptions.map((v) => ({ label: v, value: v })))
+
+function onProductSelect() {
+  if (!form.bom && form.productName) {
+    form.bom = form.productName
+  }
+  const routes = getActiveRouteOptions({ productName: form.productName })
+  if (routes.length && !routes.includes(form.processRouteName)) {
+    form.processRouteName = routes[0]
+  }
+}
 
 watch(
   () => form.productName,
@@ -189,7 +232,7 @@ function handleCancel() {
 
 function handleSubmit() {
   if (!form.productName?.trim()) {
-    message.warning('请输入产品名称')
+    message.warning('请选择生产品名')
     return
   }
   if (!form.processRouteName) {
@@ -263,3 +306,31 @@ function handleSubmit() {
   emit('update:open', false)
 }
 </script>
+
+<script>
+export default { name: 'CreateWorkOrderModal' }
+</script>
+
+<style lang="less" scoped>
+.work-order-form {
+  :deep(.ant-form-item) {
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    min-width: 72px;
+    justify-content: flex-end;
+  }
+
+  :deep(.remark-item .ant-form-item-label) {
+    flex: 0 0 72px;
+    align-self: flex-start;
+
+    > label {
+      height: auto;
+      line-height: 22px;
+      padding-top: 4px;
+    }
+  }
+}
+</style>
