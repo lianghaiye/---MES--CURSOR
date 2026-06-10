@@ -101,6 +101,10 @@
           <CheckCircleOutlined />
           生成收货单
         </a-button>
+        <a-button size="small" @click="openInboundModal">
+          <InboxOutlined />
+          生成入库单
+        </a-button>
         <a-button size="small" @click="handleComplete">
           <CheckOutlined />
           完成
@@ -240,6 +244,12 @@
       @confirmed="onReceiptConfirmed"
     />
 
+    <GenerateInboundOrderModal
+      v-model:open="inboundModalOpen"
+      :purchase-order="inboundOrder"
+      @saved="onInboundSaved"
+    />
+
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -262,6 +272,7 @@ import {
   DownOutlined,
   CheckOutlined,
   CheckCircleOutlined,
+  InboxOutlined,
 } from '@ant-design/icons-vue'
 import { filterPurchaseOrders } from '@/mock/purchaseOrders'
 import {
@@ -274,12 +285,14 @@ import {
   canEditPurchaseOrder,
   canApprovePurchaseOrder,
   canGenerateReceipt,
+  canGenerateInbound,
   canCompletePurchaseOrder,
   getPurchaseOrdersByIds,
 } from '@/store/purchaseOrderStore'
 import { poStatusOptions, poSourceOptions, supplierOptions } from '@/mock/purchaseOrderOptions'
 import CreatePurchaseOrderModal from './components/CreatePurchaseOrderModal.vue'
 import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
+import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -297,8 +310,10 @@ const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const createModalOpen = ref(false)
 const receiptModalOpen = ref(false)
+const inboundModalOpen = ref(false)
 const editRecord = ref(null)
 const receiptOrder = ref(null)
+const inboundOrder = ref(null)
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const supplierOpts = supplierOptions
@@ -445,6 +460,24 @@ function openReceiptModal() {
   receiptModalOpen.value = true
 }
 
+function openInboundModal() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条采购单后再生成入库单')
+    return
+  }
+  const order = purchaseOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
+    message.warning('未找到所选采购单')
+    return
+  }
+  if (!canGenerateInbound(order)) {
+    message.warning('仅进行中且未完全入库的采购单可生成入库单')
+    return
+  }
+  inboundOrder.value = order
+  inboundModalOpen.value = true
+}
+
 function handleApprove(record) {
   Modal.confirm({
     title: '确认审批',
@@ -495,6 +528,10 @@ function onSaved({ isEdit, id, data }) {
 }
 
 function onReceiptConfirmed() {
+  selectedRowKeys.value = []
+}
+
+function onInboundSaved() {
   selectedRowKeys.value = []
 }
 

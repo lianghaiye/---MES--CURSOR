@@ -79,6 +79,10 @@ export function canGenerateReceipt(order) {
   return order?.status === '进行中' && order?.inboundStatus !== '已入库'
 }
 
+export function canGenerateInbound(order) {
+  return canGenerateReceipt(order)
+}
+
 export function canCompletePurchaseOrder(order) {
   return order?.status === '进行中'
 }

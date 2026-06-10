@@ -16,6 +16,8 @@ export function createInboundLine(partial = {}) {
     productionDate: '',
     expiryDate: '',
     lineRemark: '',
+    warehouse: '',
+    poLineId: '',
     ...partial,
   }
 }
@@ -46,6 +48,7 @@ export function createInboundOrder(partial = {}) {
     approvedAt: '',
     remark: '',
     miniProgramTaskId: '',
+    purchaseOrderId: '',
     lineItems: [],
     ...partial,
   }

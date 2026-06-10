@@ -1,0 +1,295 @@
+<template>
+  <a-modal
+    :open="open"
+    title="新增入库单"
+    width="1000px"
+    :mask-closable="false"
+    destroy-on-close
+    class="generate-inbound-modal"
+    @cancel="handleCancel"
+  >
+    <a-form layout="inline" class="header-form horizontal-form">
+      <a-row :gutter="[12, 12]" style="width: 100%">
+        <a-col :span="8">
+          <a-form-item label="采购单号" required>
+            <a-input :value="purchaseOrder?.orderNo" disabled size="small" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="供应商" required>
+            <a-input :value="purchaseOrder?.supplier" disabled size="small" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="收货日期" required>
+            <a-date-picker
+              v-model:value="form.receiptDate"
+              size="small"
+              style="width: 100%"
+              placeholder="请选择收货日期"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="发票号码">
+            <a-input
+              v-model:value="form.invoiceNo"
+              size="small"
+              :maxlength="30"
+              placeholder="请输入发票号码"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="24">
+          <a-form-item label="备注" class="remark-item">
+            <a-textarea
+              v-model:value="form.remark"
+              :rows="2"
+              :maxlength="200"
+              show-count
+              placeholder="请输入备注"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
+    </a-form>
+
+    <a-table
+      :columns="columns"
+      :data-source="inboundLines"
+      row-key="id"
+      size="small"
+      bordered
+      :pagination="false"
+      :scroll="{ x: 1100 }"
+    >
+      <template #bodyCell="{ column, record, index }">
+        <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+        <template v-else-if="column.key === 'warehouse'">
+          <a-select
+            v-model:value="record.warehouse"
+            size="small"
+            placeholder="请选择"
+            style="width: 100%"
+            :options="warehouseOpts"
+          />
+        </template>
+        <template v-else-if="column.key === 'qty'">
+          <a-input-number
+            v-model:value="record.qty"
+            size="small"
+            :min="0"
+            :max="record.remainingQty"
+            :precision="2"
+            style="width: 100%"
+          />
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
+        </template>
+        <template v-else>
+          {{ record[column.dataIndex] ?? '—' }}
+        </template>
+      </template>
+      <template #emptyText>
+        <a-empty :image="false" description="没有可入库的明细" />
+      </template>
+    </a-table>
+
+    <div class="line-summary">
+      合计数量：<strong>{{ totalQty.toLocaleString() }}</strong>
+    </div>
+
+    <template #footer>
+      <a-button @click="handleCancel">取消</a-button>
+      <a-button type="primary" :loading="saving" @click="handleSave">
+        <CheckOutlined />
+        保存
+      </a-button>
+    </template>
+  </a-modal>
+</template>
+
+<script setup>
+import { computed, reactive, ref, watch } from 'vue'
+import { message } from 'ant-design-vue'
+import dayjs from 'dayjs'
+import { CheckOutlined } from '@ant-design/icons-vue'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { createInboundFromPurchaseOrder } from '@/store/inboundOrderStore'
+import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
+
+const props = defineProps({
+  open: { type: Boolean, default: false },
+  purchaseOrder: { type: Object, default: null },
+})
+
+const emit = defineEmits(['update:open', 'saved'])
+
+const saving = ref(false)
+const inboundLines = ref([])
+
+const form = reactive({
+  receiptDate: dayjs(),
+  invoiceNo: '',
+  remark: '',
+})
+
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
+
+const columns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '物品名称', dataIndex: 'itemName', width: 130, ellipsis: true },
+  { title: '物品编码', dataIndex: 'itemCode', width: 120 },
+  { title: '规格型号', dataIndex: 'specModel', width: 100 },
+  { title: '规格属性', dataIndex: 'specAttr', width: 90 },
+  { title: '入库仓库', key: 'warehouse', width: 120 },
+  { title: '入库数量', key: 'qty', width: 110 },
+  { title: '单位', dataIndex: 'unit', width: 70 },
+  { title: '操作', key: 'action', width: 70 },
+]
+
+const totalQty = computed(() =>
+  inboundLines.value.reduce((sum, line) => sum + (Number(line.qty) || 0), 0),
+)
+
+watch(
+  () => props.open,
+  (visible) => {
+    if (!visible || !props.purchaseOrder) return
+    form.receiptDate = dayjs()
+    form.invoiceNo = ''
+    form.remark = props.purchaseOrder.remark || ''
+    inboundLines.value = buildLinesFromPurchaseOrder(props.purchaseOrder)
+  },
+)
+
+function buildLinesFromPurchaseOrder(order) {
+  return (order.lineItems || [])
+    .filter((line) => {
+      const remaining = (Number(line.purchaseQty) || 0) - (Number(line.receivedQty) || 0)
+      return remaining > 0
+    })
+    .map((line) => {
+      const remaining = (Number(line.purchaseQty) || 0) - (Number(line.receivedQty) || 0)
+      return {
+        id: line.id,
+        poLineId: line.id,
+        itemCode: line.itemCode,
+        itemName: line.itemName,
+        itemType: line.itemType || '物料',
+        specModel: line.specModel || '',
+        specAttr: line.specAttr || '',
+        material: line.material || '',
+        unit: line.unit || '个',
+        unitPrice: line.unitPriceInTax ?? line.unitPriceExTax ?? null,
+        warehouse:
+          line.receivingWarehouse ||
+          resolveDefaultWarehouseByMaterialCode(line.itemCode) ||
+          undefined,
+        qty: remaining,
+        remainingQty: remaining,
+        purchaseQty: line.purchaseQty,
+      }
+    })
+}
+
+function removeLine(index) {
+  inboundLines.value.splice(index, 1)
+}
+
+function handleCancel() {
+  emit('update:open', false)
+}
+
+function handleSave() {
+  if (!props.purchaseOrder) return
+  if (!form.receiptDate) {
+    message.warning('请选择收货日期')
+    return
+  }
+  if (!inboundLines.value.length) {
+    message.warning('没有可入库的明细')
+    return
+  }
+  const invalidWarehouse = inboundLines.value.find((line) => !line.warehouse)
+  if (invalidWarehouse) {
+    message.warning(`请为「${invalidWarehouse.itemName}」选择入库仓库`)
+    return
+  }
+  const invalidQty = inboundLines.value.find((line) => !line.qty || Number(line.qty) <= 0)
+  if (invalidQty) {
+    message.warning(`请填写「${invalidQty.itemName}」的入库数量`)
+    return
+  }
+
+  saving.value = true
+  const result = createInboundFromPurchaseOrder(props.purchaseOrder.id, {
+    deliveryDate: form.receiptDate.format('YYYY-MM-DD'),
+    invoiceNo: form.invoiceNo?.trim(),
+    remark: form.remark?.trim(),
+    lineItems: inboundLines.value.map((line) => ({
+      poLineId: line.poLineId,
+      itemCode: line.itemCode,
+      itemName: line.itemName,
+      itemType: line.itemType,
+      specModel: line.specModel,
+      specAttr: line.specAttr,
+      material: line.material,
+      unit: line.unit,
+      unitPrice: line.unitPrice,
+      warehouse: line.warehouse,
+      qty: Number(line.qty),
+    })),
+  })
+  saving.value = false
+
+  if (!result.ok) {
+    message.warning(result.message)
+    return
+  }
+
+  message.success('入库单已创建')
+  emit('saved', result.order)
+  emit('update:open', false)
+}
+</script>
+
+<style lang="less" scoped>
+.header-form {
+  margin-bottom: 12px;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .remark-item {
+    :deep(.ant-form-item-label) {
+      flex: 0 0 68px;
+      align-self: flex-start;
+    }
+  }
+}
+
+.line-summary {
+  margin-top: 10px;
+  text-align: right;
+  font-size: 13px;
+  color: #595959;
+
+  strong {
+    color: #1677ff;
+    font-size: 15px;
+    margin-left: 4px;
+  }
+}
+</style>

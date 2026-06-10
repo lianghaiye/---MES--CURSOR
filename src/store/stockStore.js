@@ -44,26 +44,31 @@ export function getStockQty(warehouse, itemCode) {
 
 /** 入库确认后增加库存 */
 export function applyInboundToStock(order) {
-  if (!order?.warehouse) return { ok: false, message: '缺少入库仓库' }
   const lines = order.lineItems || []
   if (!lines.length) return { ok: false, message: '入库单无明细行' }
 
+  const hasWarehouse = lines.some((line) => line.warehouse || order.warehouse)
+  if (!hasWarehouse) return { ok: false, message: '缺少入库仓库' }
+
   lines.forEach((line) => {
+    const warehouse = line.warehouse || order.warehouse
+    if (!warehouse) return
+
     const code = line.itemCode?.trim()
     if (!code) return
     const qty = Number(line.qty) || 0
     if (qty <= 0) return
 
-    const key = stockKey(order.warehouse, code)
+    const key = stockKey(warehouse, code)
     let row = stockState.records.find((r) => r.key === key)
     if (!row) {
       row = {
         id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         key,
-        warehouse: order.warehouse,
+        warehouse,
         itemCode: code,
         itemName: line.itemName || '',
-        itemType: order.itemType || '',
+        itemType: order.itemType || line.itemType || '',
         unit: line.unit || '件',
         qty: 0,
       }

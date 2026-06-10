@@ -133,6 +133,7 @@ const productCols = [
   { title: '规格属性', dataIndex: 'specAttr', width: 90 },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
   { title: '材质', dataIndex: 'material', width: 80 },
+  { title: '入库仓库', dataIndex: 'warehouse', width: 100 },
   { title: '数量', dataIndex: 'qty', width: 80 },
   { title: '重量(kg)', dataIndex: 'weight', width: 90 },
   { title: '单位', dataIndex: 'unit', width: 70 },
@@ -140,7 +141,7 @@ const productCols = [
 ]
 
 const materialCols = [
-  ...productCols.slice(0, 10),
+  ...productCols.slice(0, 11),
   { title: '条码/批次', dataIndex: 'barcodeBatchNo', width: 120 },
   { title: '生产日期', dataIndex: 'productionDate', width: 110 },
   { title: '过期日期', dataIndex: 'expiryDate', width: 110 },

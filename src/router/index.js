@@ -162,6 +162,18 @@ const routes = [
         component: () => import('@/views/production/QcWorkOrderManagementView.vue'),
         meta: { title: '质检工单' },
       },
+      {
+        path: 'production/report-work',
+        name: 'production-report-work',
+        component: () => import('@/views/production/ReportWorkManagementView.vue'),
+        meta: { title: '报工管理' },
+      },
+      {
+        path: 'production/report-work/:id',
+        name: 'production-report-work-detail',
+        component: () => import('@/views/production/ReportWorkDetailView.vue'),
+        meta: { title: '报工详情' },
+      },
       { path: 'production/shop-floor', redirect: '/production/qc-work-orders' },
       { path: 'inventory/stock', ...emptyChild('inventory-stock', '库存查询') },
       {

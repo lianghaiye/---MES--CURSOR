@@ -52,6 +52,7 @@ export const sideMenus = {
       path: '/production/disassembly-work-orders',
     },
     { key: 'qc-work-orders', label: '质检工单', path: '/production/qc-work-orders' },
+    { key: 'report-work', label: '报工管理', path: '/production/report-work' },
   ],
   inventory: [
     { key: 'stock', label: '库存查询', path: '/inventory/stock' },
@@ -130,6 +131,8 @@ export const routeTitles = {
   '/production/disassembly-work-orders': '拆解工单',
   '/production/disassembly-work-orders/:id': '拆解工单详情',
   '/production/qc-work-orders': '质检工单',
+  '/production/report-work': '报工管理',
+  '/production/report-work/:id': '报工详情',
   '/inventory/stock': '库存查询',
   '/inventory/outbound': '出库管理',
   '/inventory/sales-outbound': '出库管理',
@@ -157,4 +160,5 @@ export const routeTitles = {
 export const dynamicRouteTitles = [
   { pattern: /^\/basic-config\/warehouses\/[^/]+$/, title: '仓库详情' },
   { pattern: /^\/inventory\/inbound\/[^/]+$/, title: '入库单详情' },
+  { pattern: /^\/production\/report-work\/[^/]+$/, title: '报工详情' },
 ]

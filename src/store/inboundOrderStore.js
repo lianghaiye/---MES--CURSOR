@@ -1,6 +1,7 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { cloneInboundSeedOrders, createInboundOrder } from '@/mock/inboundOrders'
+import { cloneInboundSeedOrders, createInboundLine, createInboundOrder } from '@/mock/inboundOrders'
+import { purchaseOrderState } from '@/store/purchaseOrderStore'
 import { warehouseState } from '@/store/warehouseStore'
 import { applyInboundToStock } from '@/store/stockStore'
 
@@ -43,6 +44,7 @@ function normalizeLegacyOrder(order) {
   if (!row.approver) row.approver = ''
   if (!row.approvedAt) row.approvedAt = ''
   if (!row.miniProgramTaskId) row.miniProgramTaskId = ''
+  if (!row.purchaseOrderId) row.purchaseOrderId = ''
   if (row.inboundType === '生产退库') row.inboundType = '半成品入库'
   if (row.status === '待处理' && row.inboundType === '成品入库' && row.miniProgramTaskId) {
     row.status = '待审批'
@@ -208,6 +210,61 @@ export function resetMiniProgramInboundTask(taskId) {
   } catch {
     /* ignore */
   }
+}
+
+/** 采购订单生成采购入库单（待处理） */
+export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
+  const po = purchaseOrderState.orders.find((o) => o.id === purchaseOrderId)
+  if (!po) return { ok: false, message: '采购单不存在' }
+
+  const lines = payload.lineItems || []
+  if (!lines.length) return { ok: false, message: '请至少添加一条入库明细' }
+
+  const invalid = lines.find((line) => !line.warehouse || !line.qty || Number(line.qty) <= 0)
+  if (invalid) {
+    return { ok: false, message: '请完善入库仓库和入库数量' }
+  }
+
+  const itemTypes = [...new Set(lines.map((line) => line.itemType).filter(Boolean))]
+  const itemType = itemTypes.length === 1 ? itemTypes[0] : '物料'
+  const warehouses = [...new Set(lines.map((line) => line.warehouse).filter(Boolean))]
+  const headerWarehouse = warehouses.length === 1 ? warehouses[0] : warehouses[0] || ''
+
+  const lineItems = lines.map((line) =>
+    createInboundLine({
+      poLineId: line.poLineId || '',
+      itemCode: line.itemCode,
+      itemName: line.itemName,
+      specModel: line.specModel || '',
+      specAttr: line.specAttr || '',
+      material: line.material || '',
+      unit: line.unit || '个',
+      unitPrice: line.unitPrice ?? null,
+      warehouse: line.warehouse,
+      qty: Number(line.qty),
+    }),
+  )
+
+  const order = addInboundOrder({
+    inboundType: '采购入库',
+    status: '待处理',
+    warehouse: headerWarehouse,
+    warehouseKeeper: resolveWarehouseKeeper(headerWarehouse),
+    inboundDate: payload.inboundDate || dayjs().format('YYYY-MM-DD'),
+    deliveryDate: payload.deliveryDate || dayjs().format('YYYY-MM-DD'),
+    itemType,
+    supplier: po.supplier,
+    sourceOrderNo: po.orderNo,
+    sourceType: '采购订单',
+    purchaseOrderId: po.id,
+    invoiceNo: payload.invoiceNo || '',
+    remark: payload.remark || `采购单 ${po.orderNo} 生成`,
+    handler: payload.handler || 'admin1',
+    creator: payload.creator || 'admin1',
+    lineItems,
+  })
+
+  return { ok: true, order }
 }
 
 export function createInboundFromScrap(scrap, partial = {}) {

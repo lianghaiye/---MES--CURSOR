@@ -89,7 +89,7 @@
         />
       </div>
 
-      <div v-if="selectedOrder" class="detail-panel">
+      <div v-if="selectedOrder" class="detail-panel" :class="{ 'is-fullscreen': detailFullscreen }">
         <div class="detail-header">
           <div>
             <h3>{{ selectedOrder.orderNo }} · {{ selectedOrder.customerName }}</h3>
@@ -100,9 +100,14 @@
               </a-tag>
             </a-space>
           </div>
-          <a-button type="link" @click="detailCollapsed = !detailCollapsed">
-            {{ detailCollapsed ? '展开详情' : '收起详情' }}
-          </a-button>
+          <a-space :size="0" class="detail-header-actions">
+            <a-button type="link" @click="detailCollapsed = !detailCollapsed">
+              {{ detailCollapsed ? '展开详情' : '收起详情' }}
+            </a-button>
+            <a-button type="link" @click="toggleDetailFullscreen">
+              {{ detailFullscreen ? '退出全屏' : '全屏' }}
+            </a-button>
+          </a-space>
         </div>
 
         <a-descriptions
@@ -293,7 +298,7 @@ export default {
 </script>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
@@ -329,6 +334,7 @@ const appliedFilters = ref({ ...filters })
 const selectedId = ref(productionPlanState.plans[0]?.id || null)
 const expandedWorkItemId = ref(null)
 const detailCollapsed = ref(false)
+const detailFullscreen = ref(false)
 const detailTab = ref('work')
 const workOrderModalOpen = ref(false)
 
@@ -608,6 +614,24 @@ function selectOrder(id) {
   expandedWorkItemId.value = null
 }
 
+function toggleDetailFullscreen() {
+  detailFullscreen.value = !detailFullscreen.value
+}
+
+function onFullscreenKeydown(event) {
+  if (event.key === 'Escape' && detailFullscreen.value) {
+    detailFullscreen.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onFullscreenKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onFullscreenKeydown)
+})
+
 function handleSearch() {
   appliedFilters.value = { ...filters }
   pagination.current = 1
@@ -695,6 +719,20 @@ function handleReset() {
   flex: 1;
   min-width: 0;
   overflow: auto;
+
+  &.is-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: #fff;
+    padding: 16px 20px 20px;
+    overflow: auto;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.detail-header-actions {
+  flex-shrink: 0;
 }
 
 .detail-header {
