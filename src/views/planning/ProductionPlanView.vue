@@ -90,46 +90,54 @@
       </div>
 
       <div v-if="selectedOrder" class="detail-panel" :class="{ 'is-fullscreen': detailFullscreen }">
-        <div class="detail-header">
-          <div>
-            <h3>{{ selectedOrder.orderNo }} · {{ selectedOrder.customerName }}</h3>
-            <a-space>
-              <a-tag color="blue">距离交付还剩 {{ selectedOrder.daysToDelivery }} 天</a-tag>
-              <a-tag v-for="tag in selectedOrder.tags" :key="tag" :color="tagColor(tag)">
-                {{ tag }}
-              </a-tag>
+        <template v-if="!detailFullscreen">
+          <div class="detail-header">
+            <div>
+              <h3>{{ selectedOrder.orderNo }} · {{ selectedOrder.customerName }}</h3>
+              <a-space>
+                <a-tag color="blue">距离交付还剩 {{ selectedOrder.daysToDelivery }} 天</a-tag>
+                <a-tag v-for="tag in selectedOrder.tags" :key="tag" :color="tagColor(tag)">
+                  {{ tag }}
+                </a-tag>
+              </a-space>
+            </div>
+            <a-space :size="0" class="detail-header-actions">
+              <a-button type="link" @click="detailCollapsed = !detailCollapsed">
+                {{ detailCollapsed ? '展开详情' : '收起详情' }}
+              </a-button>
+              <a-button type="link" @click="toggleDetailFullscreen">全屏</a-button>
             </a-space>
           </div>
-          <a-space :size="0" class="detail-header-actions">
-            <a-button type="link" @click="detailCollapsed = !detailCollapsed">
-              {{ detailCollapsed ? '展开详情' : '收起详情' }}
-            </a-button>
-            <a-button type="link" @click="toggleDetailFullscreen">
-              {{ detailFullscreen ? '退出全屏' : '全屏' }}
-            </a-button>
-          </a-space>
-        </div>
 
-        <a-descriptions
-          v-show="!detailCollapsed"
-          :column="4"
-          size="small"
-          bordered
-          class="info-grid"
-        >
-          <a-descriptions-item label="所属区域">{{ selectedOrder.region }}</a-descriptions-item>
-          <a-descriptions-item label="结算类型">{{
-            selectedOrder.settlementType
-          }}</a-descriptions-item>
-          <a-descriptions-item label="送货方式">{{
-            selectedOrder.deliveryMethod
-          }}</a-descriptions-item>
-          <a-descriptions-item label="业务员">{{ selectedOrder.salesperson }}</a-descriptions-item>
-          <a-descriptions-item label="订单日期">{{ selectedOrder.orderDate }}</a-descriptions-item>
-          <a-descriptions-item label="备注" :span="3">{{
-            selectedOrder.remark || '-'
-          }}</a-descriptions-item>
-        </a-descriptions>
+          <a-descriptions
+            v-show="!detailCollapsed"
+            :column="4"
+            size="small"
+            bordered
+            class="info-grid"
+          >
+            <a-descriptions-item label="所属区域">{{ selectedOrder.region }}</a-descriptions-item>
+            <a-descriptions-item label="结算类型">{{
+              selectedOrder.settlementType
+            }}</a-descriptions-item>
+            <a-descriptions-item label="送货方式">{{
+              selectedOrder.deliveryMethod
+            }}</a-descriptions-item>
+            <a-descriptions-item label="业务员">{{
+              selectedOrder.salesperson
+            }}</a-descriptions-item>
+            <a-descriptions-item label="订单日期">{{
+              selectedOrder.orderDate
+            }}</a-descriptions-item>
+            <a-descriptions-item label="备注" :span="3">{{
+              selectedOrder.remark || '-'
+            }}</a-descriptions-item>
+          </a-descriptions>
+        </template>
+
+        <div v-else class="fullscreen-toolbar">
+          <a-button type="link" @click="toggleDetailFullscreen">退出全屏</a-button>
+        </div>
 
         <a-tabs v-model:activeKey="detailTab">
           <a-tab-pane key="work" tab="工作项" />
@@ -139,13 +147,8 @@
         </a-tabs>
 
         <template v-if="detailTab === 'work'">
-          <div class="table-mini-toolbar">
-            <a-space :size="4" class="toolbar-icons">
-              <TableColumnSettingButton @click="workColumnDrawerOpen = true" />
-            </a-space>
-          </div>
           <a-table
-            :columns="workDisplayColumns"
+            :columns="workColumns"
             :data-source="selectedOrder.workItems"
             :pagination="false"
             row-key="id"
@@ -193,7 +196,13 @@
                   <a-button type="link" size="small" danger>终止</a-button>
                 </a-space>
               </template>
-              <template v-else-if="column.key === 'techParams' || column.key === 'packagingForm'">
+              <template
+                v-else-if="
+                  column.key === 'specModel' ||
+                  column.key === 'techParams' ||
+                  column.key === 'packagingForm'
+                "
+              >
                 <span class="ellipsis-cell">{{ record[column.dataIndex] || '—' }}</span>
               </template>
             </template>
@@ -279,11 +288,6 @@
     />
 
     <TableColumnSettingDrawer
-      v-model:open="workColumnDrawerOpen"
-      v-model:settings="workColumnSettings"
-      :default-settings="workDefaultColumnSettings"
-    />
-    <TableColumnSettingDrawer
       v-model:open="materialColumnDrawerOpen"
       v-model:settings="materialColumnSettings"
       :default-settings="materialDefaultColumnSettings"
@@ -343,35 +347,32 @@ const pagination = reactive({
   pageSize: 5,
 })
 
-const workBaseColumns = [
+const workColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 80, fixed: 'left' },
   { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
-  { title: '产品编码', dataIndex: 'productCode', width: 120, ellipsis: true },
-  { title: '订单数量', dataIndex: 'orderQty', width: 88, align: 'right' },
+  { title: '产品编号', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 110, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', dataIndex: 'deliveryMode', width: 88 },
-  { title: '已发货数量', dataIndex: 'shippedQty', width: 96, align: 'right' },
+  { title: '订单数量', dataIndex: 'orderQty', width: 88, align: 'right' },
   { title: '库存数量', key: 'stockQty', width: 100, align: 'right' },
   { title: '计划数量', key: 'planQty', width: 100, align: 'right' },
+  { title: '已发货数量', dataIndex: 'shippedQty', width: 96, align: 'right' },
+  { title: '交付日期', dataIndex: 'deliveryDate', width: 100 },
   { title: '单位', dataIndex: 'unit', width: 56 },
   { title: '技术参数', key: 'techParams', dataIndex: 'techParams', width: 100, ellipsis: true },
   {
-    title: '包装形式',
+    title: '包装方式',
     key: 'packagingForm',
     dataIndex: 'packagingForm',
     width: 88,
     ellipsis: true,
   },
-  { title: '交付日期', dataIndex: 'deliveryDate', width: 100 },
   { title: '操作', key: 'action', width: 110, fixed: 'right' },
 ]
 
-const {
-  columnSettings: workColumnSettings,
-  columnDrawerOpen: workColumnDrawerOpen,
-  displayColumns: workDisplayColumns,
-  tableScrollX: workTableScrollX,
-  defaultColumnSettings: workDefaultColumnSettings,
-} = useTableColumnSettings('production-plan-work-items', workBaseColumns, { minScrollX: 1680 })
+const workTableScrollX = computed(() =>
+  workColumns.reduce((sum, col) => sum + (col.width || 80), 0),
+)
 
 const materialBaseColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 90, fixed: 'left' },
@@ -733,6 +734,12 @@ function handleReset() {
 
 .detail-header-actions {
   flex-shrink: 0;
+}
+
+.fullscreen-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
 }
 
 .detail-header {

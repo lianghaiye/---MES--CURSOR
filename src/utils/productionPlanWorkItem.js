@@ -37,6 +37,7 @@ export function enrichWorkItem(wi, salesLine = null, index = 0) {
     unit: wi.unit || line.unit || '件',
     techParams: wi.techParams ?? line.techParams ?? '',
     packagingForm: wi.packagingForm ?? line.packagingForm ?? '',
+    specModel: wi.specModel ?? wi.model ?? line.specModel ?? '',
   }
 }
 
