@@ -21,7 +21,13 @@
               record.productCode || '—'
             }}</a-descriptions-item>
             <a-descriptions-item label="报工日期">{{ record.reportDate }}</a-descriptions-item>
-            <a-descriptions-item label="完工数量">{{ record.finishedQty }} 件</a-descriptions-item>
+            <a-descriptions-item label="良品数"
+              >{{ record.goodQty ?? record.finishedQty }} 件</a-descriptions-item
+            >
+            <a-descriptions-item label="不良品数"
+              >{{ record.defectQty || 0 }} 件</a-descriptions-item
+            >
+            <a-descriptions-item label="合计完工">{{ record.finishedQty }} 件</a-descriptions-item>
             <a-descriptions-item label="工艺路线">{{
               record.routeName || '—'
             }}</a-descriptions-item>

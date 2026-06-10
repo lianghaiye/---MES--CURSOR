@@ -97,8 +97,11 @@
               <div class="product-code">{{ record.productCode || '—' }}</div>
             </div>
           </template>
-          <template v-else-if="column.key === 'finishedQty'">
-            <span class="qty-text">{{ record.finishedQty }} 件</span>
+          <template v-else-if="column.key === 'goodQty'">
+            <span class="qty-text">{{ record.goodQty ?? record.finishedQty }} 件</span>
+          </template>
+          <template v-else-if="column.key === 'defectQty'">
+            <span class="qty-text defect">{{ record.defectQty || 0 }} 件</span>
           </template>
           <template v-else-if="column.key === 'processes'">
             <a-space v-if="activeProcesses(record).length" :size="4" wrap>
@@ -184,7 +187,8 @@ const baseColumns = [
   { title: '工单号', key: 'workOrderNo', width: 150, fixed: 'left' },
   { title: '产品信息', key: 'productInfo', width: 180 },
   { title: '报工日期', dataIndex: 'reportDate', width: 110 },
-  { title: '完工数量', key: 'finishedQty', width: 100 },
+  { title: '良品数', key: 'goodQty', width: 88, align: 'right' },
+  { title: '不良品数', key: 'defectQty', width: 88, align: 'right' },
   { title: '工序', key: 'processes', width: 220 },
   { title: '人员指定方式', key: 'operatorAssignMode', width: 110, align: 'center' },
   { title: '操作人员', key: 'operators', width: 140, ellipsis: true },
@@ -290,6 +294,10 @@ onMounted(() => {
   .qty-text {
     color: #1677ff;
     font-weight: 500;
+
+    &.defect {
+      color: #ff4d4f;
+    }
   }
 
   .process-tag {

@@ -50,6 +50,25 @@ export function generateReqNo() {
   return `CGSQ-${dayjs().format('YYYYMMDD')}-${String(reqSeq).padStart(4, '0')}`
 }
 
+/** 生产计划生成：CGSQ + 6位年月 + 流水 */
+export function generatePlanReqNo() {
+  const prefix = `CGSQ${dayjs().format('YYYYMM')}`
+  const seqs = purchaseRequisitionState.requisitions
+    .map((r) => r.reqNo)
+    .filter((no) => no?.startsWith(prefix))
+    .map((no) => parseInt(no.slice(prefix.length), 10) || 0)
+  const next = (seqs.length ? Math.max(...seqs) : 0) + 1
+  return `${prefix}${String(next).padStart(4, '0')}`
+}
+
+export function isReqNoTaken(reqNo, excludeId) {
+  const normalized = (reqNo || '').trim()
+  if (!normalized) return false
+  return purchaseRequisitionState.requisitions.some(
+    (r) => r.reqNo === normalized && r.id !== excludeId,
+  )
+}
+
 export { generatePurchaseOrderNo } from '@/store/purchaseOrderStore'
 
 export const purchaseRequisitionState = reactive({
@@ -96,33 +115,49 @@ export function getPurchaseRequisitionById(id) {
   return purchaseRequisitionState.requisitions.find((r) => r.id === id) || null
 }
 
+function mapPlanMaterialToLineItem(m, deliveryDate, estimatedArrivalDate, receivingWarehouse) {
+  const demandQty = m.demandQty ?? m.gapQty ?? m.planQty ?? 0
+  return createLineItem({
+    inventoryName: m.name,
+    inventoryCode: m.code,
+    specModel: m.spec,
+    specAttr: m.specAttr || '',
+    material: m.material || '',
+    materialType: m.type || '零部件',
+    supplyType: m.supplyType,
+    unit: m.unit || '件',
+    stockQty: m.stockQty ?? 0,
+    availableStock: m.availableStock ?? 0,
+    inTransitQty: m.inTransitQty ?? 0,
+    demandQty,
+    planPurchaseQty: demandQty,
+    supplierName: m.supplier || '',
+    designatedSupplier: Boolean(m.designateSupplier || m.supplier),
+    expectedArrivalDate: estimatedArrivalDate,
+    deliveryDate,
+    receivingWarehouse,
+  })
+}
+
 /** 从生产计划物料生成采购申请 */
-export function buildRequisitionFromMaterials(materials, sourceOrder) {
+export function buildRequisitionFromMaterials(materials, sourceOrder, form = {}) {
   const now = dayjs()
   const deliveryDate =
-    sourceOrder.planAssemblyDate || sourceOrder.deliveryDate || now.format('YYYY-MM-DD')
-  const lineItems = materials.map((m) =>
-    createLineItem({
-      inventoryName: m.name,
-      inventoryCode: m.code,
-      specModel: m.spec,
-      material: m.material,
-      materialType: m.type || '零部件',
-      supplyType: m.supplyType,
-      unit: m.unit || '件',
-      stockQty: m.stockQty ?? 0,
-      demandQty: m.gapQty ?? m.planQty ?? 0,
-      planPurchaseQty: m.gapQty ?? m.planQty ?? 0,
-      supplierName: m.supplier || '',
-      designatedSupplier: Boolean(m.supplier),
-      expectedArrivalDate: deliveryDate,
-      deliveryDate,
-    }),
+    form.deliveryDate ||
+    sourceOrder.planAssemblyDate ||
+    sourceOrder.deliveryDate ||
+    now.format('YYYY-MM-DD')
+  const estimatedArrivalDate = form.estimatedArrivalDate || deliveryDate
+  const receivingWarehouse = form.receivingWarehouse || ''
+  const lineItems = (form.lineItems || materials).map((m) =>
+    m.inventoryCode
+      ? { ...m, receivingWarehouse: m.receivingWarehouse || receivingWarehouse }
+      : mapPlanMaterialToLineItem(m, deliveryDate, estimatedArrivalDate, receivingWarehouse),
   )
 
   return {
     id: `pr-${Date.now()}`,
-    reqNo: generateReqNo(),
+    reqNo: form.reqNo?.trim() || generatePlanReqNo(),
     salesOrderNo: sourceOrder.orderNo || '',
     docStatus: '待处理',
     overdueStatus: '未逾期',
@@ -130,13 +165,14 @@ export function buildRequisitionFromMaterials(materials, sourceOrder) {
       sourceOrder.urgency === '紧急' ? '紧急' : sourceOrder.urgency === '加急' ? '特急' : '正常',
     orderDate: now.format('YYYY-MM-DD'),
     deliveryDate,
-    estimatedArrivalDate: deliveryDate,
+    estimatedArrivalDate,
+    receivingWarehouse,
     source: '生产计划',
     operator: '管理员',
     creator: '管理员',
     createdAt: now.format('YYYY-MM-DD HH:mm'),
     updatedAt: now.format('YYYY-MM-DD HH:mm'),
-    remark: sourceOrder.remark || '',
+    remark: form.remark ?? sourceOrder.remark ?? '',
     purchaseOrderNo: '',
     lineItems,
   }

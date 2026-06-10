@@ -27,15 +27,29 @@
               @change="onProductChange"
             />
           </a-col>
-          <a-col :xs="24" :md="12">
-            <div class="field-label required">完工数量</div>
+          <a-col :xs="24" :md="8">
+            <div class="field-label required">良品数</div>
             <a-input-number
-              v-model:value="form.finishedQty"
-              :min="1"
+              v-model:value="form.goodQty"
+              :min="0"
               style="width: 100%"
               addon-after="件"
-              @change="onFinishedQtyChange"
+              @change="onReportQtyChange"
             />
+          </a-col>
+          <a-col :xs="24" :md="8">
+            <div class="field-label required">不良品数</div>
+            <a-input-number
+              v-model:value="form.defectQty"
+              :min="0"
+              style="width: 100%"
+              addon-after="件"
+              @change="onReportQtyChange"
+            />
+          </a-col>
+          <a-col :xs="24" :md="8">
+            <div class="field-label">合计完工</div>
+            <a-input :value="`${totalReportQty} 件`" disabled />
           </a-col>
           <a-col :xs="24" :md="12">
             <div class="field-label required">生产日期</div>
@@ -220,7 +234,8 @@ const form = reactive({
   productName: '',
   productCode: '',
   reportDate: formatReportDate(),
-  finishedQty: null,
+  goodQty: null,
+  defectQty: 0,
   routeId: undefined,
   routeName: '',
   perProcessMode: false,
@@ -241,6 +256,8 @@ const reportDateValue = computed({
     dateChip.value = 'custom'
   },
 })
+
+const totalReportQty = computed(() => (Number(form.goodQty) || 0) + (Number(form.defectQty) || 0))
 
 const excludeProcessIds = computed(() =>
   form.processes.filter((p) => !p.deleted && p.processConfigId).map((p) => p.processConfigId),
@@ -274,7 +291,8 @@ function resetForm() {
   form.productName = ''
   form.productCode = ''
   form.reportDate = formatReportDate()
-  form.finishedQty = null
+  form.goodQty = null
+  form.defectQty = 0
   form.routeId = undefined
   form.routeName = ''
   form.perProcessMode = false
@@ -306,7 +324,7 @@ function onProductChange(productId) {
 function applyRoute(route) {
   form.routeId = route.id
   form.routeName = route.name
-  form.processes = buildProcessesFromRoute(route, form.finishedQty)
+  form.processes = buildProcessesFromRoute(route, totalReportQty.value)
 }
 
 function onRouteChange(routeId) {
@@ -323,8 +341,8 @@ function onDateChipChange() {
   }
 }
 
-function onFinishedQtyChange() {
-  const qty = Number(form.finishedQty) || 0
+function onReportQtyChange() {
+  const qty = totalReportQty.value
   form.processes.forEach((p) => {
     if (!p.deleted) p.qty = qty
   })
@@ -343,7 +361,7 @@ function openProcessSelect() {
 }
 
 function onProcessesSelected(rows) {
-  const qty = Number(form.finishedQty) || 0
+  const qty = totalReportQty.value
   rows.forEach((proc) => {
     form.processes.push({
       id: `cfg-${proc.id}-${Date.now()}`,
@@ -370,7 +388,8 @@ function handleSubmit() {
     productName: form.productName,
     productCode: form.productCode,
     reportDate: form.reportDate,
-    finishedQty: form.finishedQty,
+    goodQty: form.goodQty,
+    defectQty: form.defectQty,
     routeId: form.routeId,
     routeName: form.routeName,
     perProcessMode: form.perProcessMode,

@@ -26,6 +26,7 @@ function createMaterial(partial) {
     demandQty,
     planQty: partial.planQty ?? gapQty,
     joinPlan: '否',
+    designateSupplier: false,
     supplier: '',
     processRoute: '',
     processFile: '',

@@ -12,6 +12,7 @@ function nextMaterialId() {
 function mapSupplyType(supplyForm) {
   if (supplyForm === '自制件') return '自制件'
   if (supplyForm === '外购件') return '外购件'
+  if (supplyForm === '外协件') return '外协件'
   if (supplyForm === '组装' || supplyForm === '组装件') return '组装'
   if (supplyForm === '其他') return '其他'
   return supplyForm || '其他'
@@ -39,6 +40,7 @@ export function createPlanMaterial(partial = {}) {
     demandQty,
     planQty: partial.planQty ?? Math.max(0, demandQty - availableStock),
     joinPlan: '否',
+    designateSupplier: false,
     supplier: '',
     processRoute: '',
     processFile: '',

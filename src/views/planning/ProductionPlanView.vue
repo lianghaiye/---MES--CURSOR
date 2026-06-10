@@ -1,66 +1,88 @@
 <template>
   <div class="production-plan">
-    <a-form :model="filters" class="filter-form" layout="inline">
-      <a-row :gutter="[12, 12]" style="width: 100%">
-        <a-col :xs="24" :sm="12" :md="6" :lg="5">
-          <a-form-item label="订单编号">
-            <a-input v-model:value="filters.orderNo" allow-clear placeholder="请输入" />
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="12" :md="6" :lg="5">
-          <a-form-item label="客户名称">
-            <a-input v-model:value="filters.customerName" allow-clear placeholder="请输入" />
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="12" :md="6" :lg="4">
-          <a-form-item label="紧急度">
-            <a-select
-              v-model:value="filters.urgency"
-              allow-clear
-              placeholder="全部"
-              style="width: 100%"
-            >
-              <a-select-option value="紧急">紧急</a-select-option>
-              <a-select-option value="加急">加急</a-select-option>
-              <a-select-option value="普通">普通</a-select-option>
-            </a-select>
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="12" :md="6" :lg="4">
-          <a-form-item label="订单状态">
-            <a-select
-              v-model:value="filters.orderStatus"
-              allow-clear
-              placeholder="全部"
-              style="width: 100%"
-            >
-              <a-select-option value="部分下达">部分下达</a-select-option>
-              <a-select-option value="待下达">待下达</a-select-option>
-              <a-select-option value="执行中">执行中</a-select-option>
-              <a-select-option value="已完成">已完成</a-select-option>
-            </a-select>
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="12" :md="6" :lg="6">
-          <a-form-item>
-            <a-space>
-              <a-button type="primary" @click="handleSearch">查询</a-button>
-              <a-button @click="handleReset">重置</a-button>
-            </a-space>
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="12" :md="8" :lg="8">
-          <a-form-item label="订单日期">
-            <a-range-picker v-model:value="filters.orderDateRange" style="width: 100%" />
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="12" :md="8" :lg="8">
-          <a-form-item label="交付日期">
-            <a-range-picker v-model:value="filters.deliveryDateRange" style="width: 100%" />
-          </a-form-item>
-        </a-col>
-      </a-row>
-    </a-form>
+    <div class="filter-card">
+      <a-form :model="filters" class="filter-form horizontal-form" layout="inline">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+            <a-form-item label="订单编号">
+              <a-input
+                v-model:value="filters.orderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+            <a-form-item label="客户名称">
+              <a-input
+                v-model:value="filters.customerName"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+            <a-form-item label="紧急度">
+              <a-select
+                v-model:value="filters.urgency"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                style="width: 100%"
+              >
+                <a-select-option value="紧急">紧急</a-select-option>
+                <a-select-option value="加急">加急</a-select-option>
+                <a-select-option value="普通">普通</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+            <a-form-item label="订单状态">
+              <a-select
+                v-model:value="filters.orderStatus"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                style="width: 100%"
+              >
+                <a-select-option value="部分下达">部分下达</a-select-option>
+                <a-select-option value="待下达">待下达</a-select-option>
+                <a-select-option value="执行中">执行中</a-select-option>
+                <a-select-option value="已完成">已完成</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6" :lg="6">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="handleSearch">查询</a-button>
+                <a-button size="small" @click="handleReset">重置</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8" :lg="8">
+            <a-form-item label="订单日期">
+              <a-range-picker
+                v-model:value="filters.orderDateRange"
+                size="small"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8" :lg="8">
+            <a-form-item label="交付日期">
+              <a-range-picker
+                v-model:value="filters.deliveryDateRange"
+                size="small"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </div>
 
     <div class="master-detail">
       <div class="order-list-panel">
@@ -242,13 +264,8 @@
             class="ebom-empty"
           />
           <template v-else>
-            <div class="table-mini-toolbar">
-              <a-space :size="4" class="toolbar-icons">
-                <TableColumnSettingButton @click="materialColumnDrawerOpen = true" />
-              </a-space>
-            </div>
             <a-table
-              :columns="materialDisplayColumns"
+              :columns="materialColumns"
               :data-source="materialTree"
               :pagination="false"
               row-key="id"
@@ -261,15 +278,109 @@
                 <template v-if="column.key === 'status'">
                   <a-tag :color="materialStatusColor(record.status)">{{ record.status }}</a-tag>
                 </template>
-                <template v-else-if="column.key === 'joinPlan'">
-                  <a-tag :color="record.joinPlan === '是' ? 'success' : 'default'">
-                    {{ record.joinPlan }}
-                  </a-tag>
-                </template>
                 <template v-else-if="column.key === 'supplyType'">
-                  <a-tag :color="record.supplyType === '自制件' ? 'blue' : 'default'">
-                    {{ record.supplyType }}
-                  </a-tag>
+                  <a-select
+                    v-model:value="record.supplyType"
+                    size="small"
+                    :options="supplyTypeOptions"
+                    style="width: 100%"
+                    @change="onMaterialSupplyTypeChange(record)"
+                  />
+                </template>
+                <template v-else-if="column.key === 'planQty'">
+                  <a-input-number
+                    v-model:value="record.planQty"
+                    :min="0"
+                    :precision="3"
+                    size="small"
+                    style="width: 100%"
+                  />
+                </template>
+                <template v-else-if="column.key === 'joinPlan'">
+                  <a-switch
+                    :checked="record.joinPlan === '是'"
+                    size="small"
+                    @change="(checked) => (record.joinPlan = checked ? '是' : '否')"
+                  />
+                </template>
+                <template v-else-if="column.key === 'designateSupplier'">
+                  <a-switch
+                    v-if="isPurchasedOrOutsourced(record.supplyType)"
+                    :checked="!!record.designateSupplier"
+                    size="small"
+                    @change="(checked) => onMaterialDesignateSupplierChange(record, checked)"
+                  />
+                  <span v-else class="muted">—</span>
+                </template>
+                <template v-else-if="column.key === 'supplier'">
+                  <a-select
+                    v-model:value="record.supplier"
+                    show-search
+                    allow-clear
+                    size="small"
+                    placeholder="请选择"
+                    :options="planSupplierOptions"
+                    :disabled="!isPurchasedOrOutsourced(record.supplyType)"
+                    :status="
+                      record.designateSupplier &&
+                      isPurchasedOrOutsourced(record.supplyType) &&
+                      !record.supplier
+                        ? 'error'
+                        : undefined
+                    "
+                    style="width: 100%"
+                    :filter-option="filterSelectOption"
+                  />
+                </template>
+                <template v-else-if="column.key === 'processRoute'">
+                  <a-select
+                    v-model:value="record.processRoute"
+                    show-search
+                    allow-clear
+                    size="small"
+                    placeholder="请选择"
+                    :options="processRouteOpts"
+                    style="width: 100%"
+                    :filter-option="filterSelectOption"
+                  />
+                </template>
+                <template v-else-if="column.key === 'processFile'">
+                  <a-select
+                    v-model:value="record.processFile"
+                    show-search
+                    allow-clear
+                    size="small"
+                    placeholder="暂未配置"
+                    :options="processFileOptions"
+                    style="width: 100%"
+                    :filter-option="filterSelectOption"
+                  />
+                </template>
+                <template v-else-if="column.key === 'standardCycle'">
+                  <a-input
+                    v-model:value="record.standardCycle"
+                    size="small"
+                    placeholder="天"
+                    allow-clear
+                    @change="onMaterialStandardCycleChange(record, selectedOrder)"
+                  />
+                </template>
+                <template v-else-if="column.key === 'latestProcessTime'">
+                  <a-date-picker
+                    :value="materialDateValue(record.latestProcessTime)"
+                    size="small"
+                    allow-clear
+                    style="width: 100%"
+                    @change="(d) => onMaterialLatestDateChange(record, d)"
+                  />
+                </template>
+                <template v-else-if="column.key === 'remark'">
+                  <a-input
+                    v-model:value="record.remark"
+                    size="small"
+                    placeholder="补充说明"
+                    allow-clear
+                  />
                 </template>
               </template>
             </a-table>
@@ -287,10 +398,11 @@
       @save="handleWorkOrderSave"
     />
 
-    <TableColumnSettingDrawer
-      v-model:open="materialColumnDrawerOpen"
-      v-model:settings="materialColumnSettings"
-      :default-settings="materialDefaultColumnSettings"
+    <GeneratePurchaseRequisitionModal
+      v-model:open="purchaseReqModalOpen"
+      :order="selectedOrder"
+      :materials="purchasedMaterialsForReq"
+      @saved="handlePurchaseReqSave"
     />
   </div>
 </template>
@@ -307,23 +419,31 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
-import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
-import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
-import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import GeneratePurchaseRequisitionModal from './components/GeneratePurchaseRequisitionModal.vue'
 import { addWorkOrdersFromPlanRows } from '@/store/workOrderStore'
 import {
   getSelfMadeMaterials,
-  getPurchasedMaterials,
+  getPurchasedMaterialsFromWorkItem,
   updateMaterialInOrder,
   patchMaterialFromWorkOrderRow,
   calcDemandQty,
   calcGapQty,
 } from '@/utils/material'
 import { calcDefaultPlanQty } from '@/utils/productionPlanWorkItem'
+import { addPurchaseRequisition } from '@/store/purchaseRequisitionStore'
 import {
-  addPurchaseRequisition,
-  buildRequisitionFromMaterials,
-} from '@/store/purchaseRequisitionStore'
+  enrichPlanMaterialTree,
+  getProcessRouteSelectOptions,
+  isPurchasedOrOutsourced,
+  onMaterialDesignateSupplierChange,
+  onMaterialStandardCycleChange,
+  onMaterialSupplyTypeChange,
+  planSupplierOptions,
+  processFileOptions,
+  recalcMaterialLatestProcessTimes,
+  supplyTypeOptions,
+  validateDesignatedSuppliers,
+} from '@/utils/productionPlanMaterial'
 
 const filters = reactive({
   orderNo: '',
@@ -341,6 +461,7 @@ const detailCollapsed = ref(false)
 const detailFullscreen = ref(false)
 const detailTab = ref('work')
 const workOrderModalOpen = ref(false)
+const purchaseReqModalOpen = ref(false)
 
 const pagination = reactive({
   current: 1,
@@ -374,7 +495,7 @@ const workTableScrollX = computed(() =>
   workColumns.reduce((sum, col) => sum + (col.width || 80), 0),
 )
 
-const materialBaseColumns = [
+const materialColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 90, fixed: 'left' },
   { title: '物料名称', dataIndex: 'name', width: 140, ellipsis: true, fixed: 'left' },
   { title: '物料编码', dataIndex: 'code', width: 120 },
@@ -390,25 +511,22 @@ const materialBaseColumns = [
   { title: '在途库存', dataIndex: 'inTransitQty', width: 90 },
   { title: '需求数', dataIndex: 'demandQty', width: 80 },
   { title: '缺口数', dataIndex: 'gapQty', width: 80 },
-  { title: '计划数', dataIndex: 'planQty', width: 80 },
-  { title: '参与计划', key: 'joinPlan', dataIndex: 'joinPlan', width: 90 },
-  { title: '供方单位', dataIndex: 'supplier', width: 100, ellipsis: true },
-  { title: '工艺路线', dataIndex: 'processRoute', width: 110, ellipsis: true },
-  { title: '工艺文件', dataIndex: 'processFile', width: 100, ellipsis: true },
-  { title: '标准生产周期', dataIndex: 'standardCycle', width: 110 },
-  { title: '最晚处理时间', dataIndex: 'latestProcessTime', width: 120 },
-  { title: '补充说明', dataIndex: 'remark', width: 120, ellipsis: true },
+  { title: '计划数', key: 'planQty', dataIndex: 'planQty', width: 96 },
+  { title: '参与计划', key: 'joinPlan', width: 88 },
+  { title: '指定供应商', key: 'designateSupplier', width: 96 },
+  { title: '供方单位', key: 'supplier', width: 140 },
+  { title: '工艺路线', key: 'processRoute', width: 140 },
+  { title: '工艺文件', key: 'processFile', width: 130 },
+  { title: '标准生产周期', key: 'standardCycle', width: 110 },
+  { title: '最晚处理时间', key: 'latestProcessTime', width: 130 },
+  { title: '补充说明', key: 'remark', width: 140 },
 ]
 
-const {
-  columnSettings: materialColumnSettings,
-  columnDrawerOpen: materialColumnDrawerOpen,
-  displayColumns: materialDisplayColumns,
-  tableScrollX: materialTableScrollX,
-  defaultColumnSettings: materialDefaultColumnSettings,
-} = useTableColumnSettings('production-plan-material-tree', materialBaseColumns, {
-  minScrollX: 3200,
-})
+const processRouteOpts = computed(() => getProcessRouteSelectOptions())
+
+const materialTableScrollX = computed(() =>
+  materialColumns.reduce((sum, col) => sum + (col.width || 80), 0),
+)
 
 const filteredOrders = computed(() => {
   const f = { ...appliedFilters.value }
@@ -446,9 +564,10 @@ const selfMadeMaterials = computed(() =>
   selectedOrder.value ? getSelfMadeMaterials(selectedOrder.value) : [],
 )
 
-const purchasedMaterials = computed(() =>
-  selectedOrder.value ? getPurchasedMaterials(selectedOrder.value) : [],
-)
+const purchasedMaterialsForReq = computed(() => {
+  if (!selectedOrder.value || !activeWorkItem.value) return []
+  return getPurchasedMaterialsFromWorkItem(activeWorkItem.value, selectedOrder.value)
+})
 
 const planAssemblyDateValue = computed(() => {
   const order = selectedOrder.value
@@ -467,6 +586,9 @@ const planCompleteDateValue = computed(() => {
 function onPlanAssemblyDateChange(date) {
   if (!selectedOrder.value) return
   selectedOrder.value.planAssemblyDate = date ? date.format('YYYY-MM-DD') : ''
+  if (activeWorkItem.value?.materials?.length) {
+    recalcMaterialLatestProcessTimes(activeWorkItem.value.materials, selectedOrder.value)
+  }
 }
 
 function onPlanCompleteDateChange(date) {
@@ -485,6 +607,19 @@ function refreshWorkItemMaterials(wi, order) {
     })
   }
   walk(wi.materials)
+  enrichPlanMaterialTree(wi.materials, order)
+}
+
+function filterSelectOption(input, option) {
+  return (option?.label || '').toLowerCase().includes(input.toLowerCase())
+}
+
+function materialDateValue(val) {
+  return val ? dayjs(val) : null
+}
+
+function onMaterialLatestDateChange(record, date) {
+  record.latestProcessTime = date ? date.format('YYYY-MM-DD') : ''
 }
 
 function selectWorkItem(record) {
@@ -581,14 +716,29 @@ function generatePurchaseReq() {
     message.warning('请先选择订单')
     return
   }
-  const materials = purchasedMaterials.value
-  if (!materials.length) {
-    message.info('当前订单没有需要采购的外购件（缺口为 0）')
+  if (!activeWorkItem.value) {
+    message.warning('请先选择工作项')
     return
   }
-  const requisition = buildRequisitionFromMaterials(materials, selectedOrder.value)
+  if (activeWorkItem.value.materials?.length) {
+    const supplierCheck = validateDesignatedSuppliers(activeWorkItem.value.materials)
+    if (!supplierCheck.ok) {
+      message.warning(supplierCheck.message)
+      return
+    }
+  }
+  if (!purchasedMaterialsForReq.value.length) {
+    message.info('当前工作项没有需要采购的外购件（缺口为 0）')
+    return
+  }
+  purchaseReqModalOpen.value = true
+}
+
+function handlePurchaseReqSave(requisition) {
   addPurchaseRequisition(requisition)
-  message.success(`已生成采购申请 ${requisition.reqNo}，共 ${materials.length} 条物料`)
+  message.success(
+    `已生成采购申请 ${requisition.reqNo}，共 ${requisition.lineItems.length} 条物料`,
+  )
 }
 
 function handleWorkOrderSave(savedRows) {
@@ -651,17 +801,44 @@ function handleReset() {
 </script>
 
 <style lang="less" scoped>
-.table-mini-toolbar {
-  display: flex;
-  justify-content: flex-end;
+.production-plan {
+  margin: -12px;
+  padding: 0;
+  background: #f5f6f8;
+  min-height: calc(100vh - 112px);
+}
+
+.filter-card {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 10px 12px 6px;
   margin-bottom: 8px;
 }
 
-.production-plan {
-  .filter-form {
-    margin-bottom: 12px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid #f0f0f0;
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    height: 24px;
+    line-height: 24px;
+    font-size: 13px;
+  }
+
+  .filter-actions-item {
+    :deep(.ant-form-item-label) {
+      display: none;
+    }
   }
 }
 
@@ -669,6 +846,7 @@ function handleReset() {
   display: flex;
   gap: 12px;
   min-height: 520px;
+  padding: 0 0 12px;
 }
 
 .order-list-panel {
@@ -807,6 +985,10 @@ function handleReset() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.muted {
+  color: #bfbfbf;
 }
 
 @media (max-width: 992px) {

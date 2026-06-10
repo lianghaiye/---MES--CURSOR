@@ -18,6 +18,39 @@ function calcFinishedQty(processes, fallback) {
   return Math.max(...active.map((p) => Number(p.qty) || 0))
 }
 
+/** 解析良品/不良品/完工合计，兼容旧数据仅含 finishedQty */
+export function resolveReportQuantities(row = {}) {
+  const legacyFinished = Number(row.finishedQty) || 0
+  const hasSplit =
+    (row.goodQty != null && row.goodQty !== '') || (row.defectQty != null && row.defectQty !== '')
+  if (!hasSplit) {
+    return {
+      goodQty: legacyFinished,
+      defectQty: 0,
+      finishedQty: legacyFinished,
+    }
+  }
+  const goodQty = Math.max(0, Number(row.goodQty) || 0)
+  const defectQty = Math.max(0, Number(row.defectQty) || 0)
+  return {
+    goodQty,
+    defectQty,
+    finishedQty: goodQty + defectQty,
+  }
+}
+
+export function parseSubmitQuantities(payload = {}) {
+  const goodQty = Number(payload.goodQty) || 0
+  const defectQty = Number(payload.defectQty) || 0
+  if (goodQty < 0 || defectQty < 0) {
+    return { ok: false, message: '数量不能为负数' }
+  }
+  if (goodQty + defectQty <= 0) {
+    return { ok: false, message: '请填写良品数或不良品数' }
+  }
+  return { ok: true, goodQty, defectQty, finishedQty: goodQty + defectQty }
+}
+
 function flattenOperators(processes, overallOperators, perProcessMode) {
   if (!perProcessMode) return overallOperators || []
   const set = new Set()
@@ -36,11 +69,15 @@ export function normalizeQuickReport(row) {
   const operators = row.operators?.length
     ? row.operators
     : flattenOperators(processes, [], row.perProcessMode)
+  const qty = resolveReportQuantities({
+    ...row,
+    finishedQty: row.finishedQty ?? calcFinishedQty(processes, row.finishedQty),
+  })
   return {
     ...row,
     processes,
     processCount: processes.filter((p) => !p.deleted).length,
-    finishedQty: row.finishedQty ?? calcFinishedQty(processes, row.finishedQty),
+    ...qty,
     operators,
     workOrderStatus: row.workOrderStatus || '已报工',
     displayStatus: row.workOrderStatus || '已报工',
@@ -78,6 +115,8 @@ export function createQuickReportSeed() {
       productCode: 'DJ-2024-B',
       reportDate: today,
       finishedQty: 18,
+      goodQty: 16,
+      defectQty: 2,
       routeId: 'route-2a',
       routeName: '冲压工艺 v1',
       perProcessMode: false,

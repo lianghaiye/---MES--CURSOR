@@ -6,6 +6,7 @@ import {
   createQuickReportSeed,
   normalizeQuickReport,
   formatReportDate,
+  parseSubmitQuantities,
 } from '@/mock/quickReports'
 import { calcMaterialList, getProductByCode, getProductById } from '@/mock/quickReportProducts'
 
@@ -78,10 +79,8 @@ function validateSubmit(payload) {
   if (!payload.productId && !payload.productName?.trim()) {
     return '请选择产品'
   }
-  const finishedQty = Number(payload.finishedQty)
-  if (!finishedQty || finishedQty <= 0) {
-    return '请填写完工数量'
-  }
+  const qtyCheck = parseSubmitQuantities(payload)
+  if (!qtyCheck.ok) return qtyCheck.message
   if (!payload.reportDate) {
     return '请选择报工日期'
   }
@@ -138,8 +137,11 @@ export function submitQuickReport(payload) {
     ? flattenOperators(activeProcesses, [], true)
     : payload.operators
 
+  const qtyCheck = parseSubmitQuantities(payload)
+  const { goodQty, defectQty, finishedQty } = qtyCheck
+
   const product = getProductById(payload.productId) || getProductByCode(payload.productCode)
-  const materialItems = product ? calcMaterialList(product, payload.finishedQty) : []
+  const materialItems = product ? calcMaterialList(product, finishedQty) : []
 
   const workOrderNo = generateWorkOrderNo(payload.reportDate)
   const now = dayjs().format('YYYY-MM-DD HH:mm')
@@ -150,7 +152,9 @@ export function submitQuickReport(payload) {
     productName: payload.productName.trim(),
     productCode: payload.productCode?.trim() || '',
     reportDate: payload.reportDate,
-    finishedQty: Number(payload.finishedQty),
+    goodQty,
+    defectQty,
+    finishedQty,
     routeId: payload.routeId,
     routeName: payload.routeName,
     perProcessMode: !!payload.perProcessMode,
@@ -172,6 +176,8 @@ export function submitQuickReport(payload) {
     workOrderNo: record.workOrderNo,
     productName: record.productName,
     productCode: record.productCode,
+    goodQty: record.goodQty,
+    defectQty: record.defectQty,
     finishedQty: record.finishedQty,
     items: materialItems,
     createdAt: record.createdAt,
