@@ -50,7 +50,7 @@ export function buildLaborHourRecord(partial) {
   )
   const now = dayjs().format('YYYY-MM-DD HH:mm')
   return {
-    id: partial.id || `lh-${Date.now()}`,
+    id: partial.id || (partial.workOrderId ? `lh-${partial.workOrderId}` : `lh-${Date.now()}`),
     workOrderId: partial.workOrderId || '',
     workOrderType: partial.workOrderType || 'production',
     workOrderCode: partial.workOrderCode || '',

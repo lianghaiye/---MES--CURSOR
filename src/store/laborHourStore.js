@@ -87,6 +87,7 @@ function mapWorkOrderToLaborCandidate(wo, workOrderType) {
     taskEndTime: wo.createdAt ? `${wo.createdAt} 18:00` : '',
   }))
   return buildLaborHourRecord({
+    id: `lh-${wo.id}`,
     workOrderId: wo.id,
     workOrderType,
     workOrderCode: wo.code,
@@ -150,7 +151,9 @@ export function getLaborHourOrders(filters = {}) {
 }
 
 export function getLaborHourById(id) {
-  const order = laborHourState.orders.find((o) => o.id === id)
+  const order =
+    laborHourState.orders.find((o) => o.id === id) ||
+    laborHourState.orders.find((o) => o.workOrderId === id)
   return order ? recalcOrder(order) : null
 }
 

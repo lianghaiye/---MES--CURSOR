@@ -228,11 +228,8 @@ function reload() {
 watch(() => route.params.id, reload, { immediate: true })
 
 function handleBack() {
-  const detailPath = route.path
-  const listPath = '/labor-salary/labor-hour'
-  const closingActive = tabStore.activePath === detailPath
-  closeTab(detailPath)
-  router.push(closingActive ? tabStore.activePath || listPath : listPath)
+  closeTab(route.path)
+  router.push('/labor-salary/labor-hour')
 }
 
 function openAdjust(line) {

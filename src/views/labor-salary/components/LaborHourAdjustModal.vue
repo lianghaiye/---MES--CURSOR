@@ -13,7 +13,7 @@
       <a-descriptions-item label="工序名称">{{ line?.processName || '—' }}</a-descriptions-item>
       <a-descriptions-item label="报工数量">{{ line?.reportQty ?? '—' }}</a-descriptions-item>
       <a-descriptions-item v-if="showDuration" label="报工时长" :span="2">
-        {{ line?.reportDuration ?? 0 }} 小时
+        {{ displayReportDuration }} 小时
       </a-descriptions-item>
     </a-descriptions>
 
@@ -26,14 +26,17 @@
           style="width: 100%"
         />
       </a-form-item>
-      <a-form-item v-if="showAdjustDuration" label="调整报工时长" required>
+      <a-form-item v-if="showAdjustDuration" label="调整报工时长" :required="!isBatchPieceHourly">
+        <div v-if="isBatchPieceHourly" class="readonly-duration">
+          {{ displayAdjustedDuration }} 小时
+        </div>
         <a-input-number
+          v-else
           v-model:value="form.adjustedDuration"
           :min="0"
           :precision="2"
           style="width: 100%"
           addon-after="小时"
-          :disabled="durationReadonly"
         />
       </a-form-item>
       <a-form-item label="调整原因">
@@ -82,13 +85,29 @@ const showDuration = computed(
   () => props.config?.reportType === '时长报工' || props.config?.salaryMethod === '计时工资',
 )
 
-const showAdjustDuration = computed(
-  () => props.config?.reportType === '时长报工' && props.config?.salaryMethod === '计时工资',
-)
-
-const durationReadonly = computed(
+const isBatchPieceHourly = computed(
   () => props.config?.reportType === '批量计件' && props.config?.salaryMethod === '计时工资',
 )
+
+const showAdjustDuration = computed(
+  () =>
+    (props.config?.reportType === '时长报工' && props.config?.salaryMethod === '计时工资') ||
+    isBatchPieceHourly.value,
+)
+
+const displayReportDuration = computed(() => {
+  if (isBatchPieceHourly.value && props.config) {
+    return calcAutoDurationHours(props.config, props.line?.reportQty ?? 0)
+  }
+  return props.line?.reportDuration ?? 0
+})
+
+const displayAdjustedDuration = computed(() => {
+  if (isBatchPieceHourly.value && props.config) {
+    return calcAutoDurationHours(props.config, form.adjustedReportQty ?? 0)
+  }
+  return form.adjustedDuration ?? 0
+})
 
 watch(
   () => props.open,
@@ -97,7 +116,7 @@ watch(
     form.adjustedReportQty = props.line.adjustedReportQty ?? props.line.reportQty ?? 0
     form.adjustedDuration = props.line.adjustedDuration ?? props.line.reportDuration ?? 0
     form.adjustReason = props.line.adjustReason || ''
-    if (durationReadonly.value) {
+    if (isBatchPieceHourly.value) {
       form.adjustedDuration = calcAutoDurationHours(props.config, form.adjustedReportQty)
     }
   },
@@ -106,7 +125,7 @@ watch(
 watch(
   () => form.adjustedReportQty,
   (qty) => {
-    if (!durationReadonly.value || !props.config) return
+    if (!isBatchPieceHourly.value || !props.config) return
     form.adjustedDuration = calcAutoDurationHours(props.config, qty)
   },
 )
@@ -128,5 +147,10 @@ function handleOk() {
 
 .form-block {
   margin-top: 8px;
+}
+
+.readonly-duration {
+  line-height: 32px;
+  color: rgba(0, 0, 0, 0.88);
 }
 </style>

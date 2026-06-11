@@ -152,10 +152,11 @@ function baseWorkOrderFields(def, partial) {
   }
 }
 
-/** 生产工单：演示 批量计件+计件、时长报工+计件 */
+/** 生产工单：演示 批量计件+计件、时长报工+计件、时长报工+计时 */
 export function createLaborDemoProductionOrders() {
   const d1 = DEMO_MATERIAL_DEFS[0]
   const d3 = DEMO_MATERIAL_DEFS[2]
+  const d4 = DEMO_MATERIAL_DEFS[3]
   return [
     baseWorkOrderFields(d1, {
       id: 'wo-lh-demo-1',
@@ -179,6 +180,18 @@ export function createLaborDemoProductionOrders() {
       scheduleQty: 6,
       processes: [demoProcess(d3.processName, '李四', 3.5)],
     }),
+    baseWorkOrderFields(d4, {
+      id: 'wo-lh-demo-4',
+      code: 'WO202605270-LH04',
+      name: `${d4.name}生产工单`,
+      orderCategory: '生产工单',
+      status: '执行中',
+      workCenter: '质检中心',
+      processRouteName: '机加标准路线',
+      sourceOrderNo: 'SO-LH-004',
+      scheduleQty: 5,
+      processes: [demoProcess(d4.processName, '王检验', 2.5)],
+    }),
   ]
 }
 
@@ -201,24 +214,9 @@ export function createLaborDemoAssemblyOrders() {
   ]
 }
 
-/** 质检工单：演示 时长报工+计时 */
+/** 质检工单演示数据（时长报工+计时已放在生产工单 wo-lh-demo-4） */
 export function createLaborDemoQcOrders() {
-  const d4 = DEMO_MATERIAL_DEFS[3]
-  return [
-    baseWorkOrderFields(d4, {
-      id: 'wo-lh-demo-4',
-      code: 'ZJGD202605270-LH04',
-      name: `${d4.name}质检工单`,
-      orderCategory: '质检工单',
-      status: '执行中',
-      execStatus: '执行中',
-      workCenter: '质检中心',
-      processRouteName: '机加标准路线',
-      sourceOrderNo: 'SO-LH-004',
-      scheduleQty: 5,
-      processes: [demoProcess(d4.processName, '王检验', 1.8)],
-    }),
-  ]
+  return []
 }
 
 export function isLaborDemoWorkOrder(id) {
