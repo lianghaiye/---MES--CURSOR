@@ -7,6 +7,7 @@ import {
   generateQcWorkOrderName,
 } from '@/utils/workOrderNaming'
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
+import { createLaborDemoQcOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
 
 const STORAGE_KEY = 'i_doms_qc_work_orders'
 let codeSeq = 1
@@ -33,9 +34,15 @@ function generateQcCode() {
   return `ZJGD${dayjs().format('YYYYMMDD')}${String(codeSeq++).padStart(3, '0')}`
 }
 
+function ensureLaborDemoQcOrders(orders) {
+  const demos = createLaborDemoQcOrders()
+  const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
+  return [...demos, ...rest]
+}
+
 function createInitialOrders() {
   const routeName = '机加标准路线'
-  return [
+  return ensureLaborDemoQcOrders([
     {
       id: 'qc-init-1',
       code: 'ZJGD20250528001',
@@ -107,11 +114,11 @@ function createInitialOrders() {
       })),
       createdAt: '2025-05-20',
     },
-  ]
+  ])
 }
 
 export const qcWorkOrderState = reactive({
-  orders: loadFromStorage() || createInitialOrders(),
+  orders: ensureLaborDemoQcOrders(loadFromStorage() || createInitialOrders()),
 })
 
 watch(

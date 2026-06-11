@@ -8,7 +8,8 @@ import {
   formatReportDate,
   parseSubmitQuantities,
 } from '@/mock/quickReports'
-import { calcMaterialList, getProductByCode, getProductById } from '@/mock/quickReportProducts'
+import { calcMaterialList, getProductByCode, getProductById, getProductByName } from '@/mock/quickReportProducts'
+import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
 
 function loadReports() {
   try {
@@ -122,16 +123,13 @@ export function submitQuickReport(payload) {
 
   const activeProcesses = payload.processes
     .filter((p) => !p.deleted && p.name?.trim())
-    .map((p) => ({
-      id: p.id || `proc-${Date.now()}-${Math.random()}`,
-      processConfigId: p.processConfigId || '',
-      name: p.name.trim(),
-      code: p.code || '',
-      qty: Number(p.qty) || 0,
-      deleted: false,
-      manual: !!p.manual,
-      operators: p.operators || [],
-    }))
+    .map((p) =>
+      normalizeQuickReportProcess({
+        ...p,
+        name: p.name.trim(),
+        deleted: false,
+      }),
+    )
 
   const operators = payload.perProcessMode
     ? flattenOperators(activeProcesses, [], true)
@@ -140,7 +138,10 @@ export function submitQuickReport(payload) {
   const qtyCheck = parseSubmitQuantities(payload)
   const { goodQty, defectQty, finishedQty } = qtyCheck
 
-  const product = getProductById(payload.productId) || getProductByCode(payload.productCode)
+  const product =
+    getProductById(payload.productId) ||
+    getProductByCode(payload.productCode) ||
+    getProductByName(payload.productName)
   const materialItems = product ? calcMaterialList(product, finishedQty) : []
 
   const workOrderNo = generateWorkOrderNo(payload.reportDate)

@@ -7,9 +7,10 @@ import {
   syncAfterMaterialSave,
   removeLinkedProduct,
 } from '@/utils/productMaterialSync'
+import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 
 const STORAGE_KEY = 'i_doms_material_info'
-const DATA_VERSION = 5
+const DATA_VERSION = 8
 let codeSeq = 100048
 
 function loadFromStorage() {
@@ -17,8 +18,9 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed.version === DATA_VERSION && Array.isArray(parsed.materials)) {
-        return migrateMaterialList(parsed.materials)
+      if (Array.isArray(parsed.materials)) {
+        const force = parsed.version !== DATA_VERSION
+        return applyLaborConfigSeed(migrateMaterialList(parsed.materials), { force })
       }
     }
   } catch {

@@ -174,7 +174,7 @@
                 {{ record.production?.standardCycleDays ?? '—' }}
               </template>
               <template v-else-if="column.key === 'action'">
-                <a-space :size="0" wrap>
+                <a-space :size="0" class="action-btns">
                   <a-button type="link" size="small" @click="openEdit(record)">
                     <EditOutlined />
                     编辑
@@ -208,7 +208,12 @@
       </div>
     </div>
 
-    <ProductFormModal v-model:open="formModalOpen" :edit-record="editRecord" @saved="onSaved" />
+    <ProductFormModal
+      v-model:open="formModalOpen"
+      :edit-record="editRecord"
+      :view-only="viewOnly"
+      @saved="onSaved"
+    />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -223,7 +228,7 @@ export default { name: 'ProductInfoView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, h, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -272,6 +277,10 @@ const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const formModalOpen = ref(false)
 const editRecord = ref(null)
+const viewOnly = ref(false)
+watch(formModalOpen, (open) => {
+  if (!open) viewOnly.value = false
+})
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const flatCats = flattenCategoryNodes(productCategoryTree)
@@ -313,9 +322,55 @@ const rowSelection = computed(() => ({
   },
 }))
 
+function resolveProductRecord(record) {
+  if (!record?.id) return record
+  return productInfoState.products.find((p) => p.id === record.id) || record
+}
+
+function openFormModal({ record = null, readOnly = false } = {}) {
+  viewOnly.value = readOnly
+  editRecord.value = record ? resolveProductRecord(record) : null
+  formModalOpen.value = true
+}
+
+function openCreate() {
+  openFormModal()
+}
+
+function openEdit(record) {
+  openFormModal({ record })
+}
+
+function openDetail(record) {
+  openFormModal({ record, readOnly: true })
+}
+
+function renderProductCodeLink({ text, record }) {
+  return h(
+    'a',
+    {
+      class: 'link-code',
+      onClick: (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        openDetail(record)
+      },
+    },
+    text ?? record?.code ?? '',
+  )
+}
+
 const baseColumns = [
   { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
-  { title: '产品编号', dataIndex: 'code', width: 128, fixed: 'left', ellipsis: true },
+  {
+    title: '产品编号',
+    key: 'code',
+    dataIndex: 'code',
+    width: 128,
+    fixed: 'left',
+    ellipsis: true,
+    customRender: renderProductCodeLink,
+  },
   { title: '产品名称', dataIndex: 'name', width: 200, fixed: 'left', ellipsis: true },
   { title: '条码类型', dataIndex: 'barcodeType', width: 100, fixed: 'left' },
   { title: '产品属性', key: 'productAttribute', width: 110, ellipsis: true },
@@ -332,7 +387,7 @@ const baseColumns = [
   { title: '标准制造周期(天)', key: 'standardCycleDays', width: 120, align: 'right' },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
-  { title: '操作', key: 'action', width: 200, fixed: 'right' },
+  { title: '操作', key: 'action', width: 240, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -374,16 +429,6 @@ function handleReset() {
   filters.specModel = ''
   appliedFilters.value = { ...filters }
   pagination.current = 1
-}
-
-function openCreate() {
-  editRecord.value = null
-  formModalOpen.value = true
-}
-
-function openEdit(record) {
-  editRecord.value = record
-  formModalOpen.value = true
 }
 
 function onSaved({ isEdit, id, data }) {
@@ -569,6 +614,16 @@ function onAddCategory() {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .link-code {
+    color: #1677ff;
+    cursor: pointer;
+  }
+
+  .action-btns {
+    flex-wrap: nowrap;
     white-space: nowrap;
   }
 }

@@ -11,9 +11,26 @@ export {
 
 export const inventoryUnitOptions = ['个', '件', '套', 'kg', 'm', '台']
 
-export const reportTypeOptions = ['工序报工', '批次报工', '扫码报工']
+export const reportTypeOptions = ['批量计件', '时长报工']
 
-export const salaryMethodOptions = ['计时', '计件', '计时+计件']
+export const salaryMethodOptions = ['计件工资', '计时工资']
+
+/** 兼容旧配置值 */
+export const legacyReportTypeMap = {
+  工序报工: '批量计件',
+  批次报工: '批量计件',
+  扫码报工: '批量计件',
+  批量计件: '批量计件',
+  时长报工: '时长报工',
+}
+
+export const legacySalaryMethodMap = {
+  计时: '计时工资',
+  计件: '计件工资',
+  '计时+计件': '计时工资',
+  计件工资: '计件工资',
+  计时工资: '计时工资',
+}
 
 export const inboundQcOptions = ['免检', '抽检', '全检']
 

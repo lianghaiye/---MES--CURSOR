@@ -43,6 +43,10 @@ function resolveResourceType(category, name) {
   return '工人'
 }
 
+import { PROCESS_DEFECT_ITEM_MAP, PROCESS_REPORT_MODE_MAP } from '@/mock/defectItemSeed'
+
+export const REPORT_MODES = ['按件数', '按时长']
+
 /** 机泵行业常用工序 */
 export function createProcessConfigSeed() {
   const defs = [
@@ -87,6 +91,11 @@ export function createProcessConfigSeed() {
     ['系统工序', '外协收货', { opStart: true, opFinish: true, opOutsource: true, opInbound: true }],
     ['系统工序', '报废', { opStart: true, opScrap: true }],
     ['系统工序', '配比', { opStart: true, opFinish: true, opFeeding: true, opAttrModify: true }],
+    ['机械', '点焊', { opStart: true, opFinish: true }],
+    ['机械', '打磨', { opStart: true, opFinish: true }],
+    ['机械', '车削', { opStart: true, opFinish: true }],
+    ['机械', '铣削', { opStart: true, opFinish: true }],
+    ['组装', '装配', { opStart: true, opFinish: true }],
   ]
 
   return defs.map(([category, name, ops, defaultExecutors = []], index) => ({
@@ -101,6 +110,8 @@ export function createProcessConfigSeed() {
     status: '使用中',
     operations: defaultOperations(ops),
     defaultExecutors: [...defaultExecutors],
+    reportMode: PROCESS_REPORT_MODE_MAP[name] || '按件数',
+    defectItemIds: [...(PROCESS_DEFECT_ITEM_MAP[name] || [])],
     createdAt: '2026-05-01',
     updatedAt: '2026-06-01',
   }))

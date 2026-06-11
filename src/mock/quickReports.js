@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
 
 export const QUICK_REPORT_STORAGE_KEY = 'i_doms_mobile_quick_reports'
 export const QUICK_REPORT_MATERIAL_KEY = 'i_doms_mobile_quick_material_lists'
@@ -61,11 +62,7 @@ function flattenOperators(processes, overallOperators, perProcessMode) {
 }
 
 export function normalizeQuickReport(row) {
-  const processes = (row.processes || []).map((p) => ({
-    ...p,
-    deleted: !!p.deleted,
-    operators: p.operators || [],
-  }))
+  const processes = (row.processes || []).map((p) => normalizeQuickReportProcess(p))
   const operators = row.operators?.length
     ? row.operators
     : flattenOperators(processes, [], row.perProcessMode)

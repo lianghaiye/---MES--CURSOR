@@ -7,6 +7,10 @@ import {
   generateProductionWorkOrderCode,
   generateProductionWorkOrderName,
 } from '@/utils/workOrderNaming'
+import {
+  createLaborDemoProductionOrders,
+  isLaborDemoWorkOrder,
+} from '@/mock/laborHourDemoSeed'
 
 const STORAGE_KEY = 'i_doms_work_orders'
 let codeSeq = 1
@@ -76,9 +80,15 @@ function ensureDemoWorkOrder(orders) {
   return orders
 }
 
+function ensureLaborDemoProductionOrders(orders) {
+  const demos = createLaborDemoProductionOrders()
+  const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
+  return [...demos, ...rest]
+}
+
 function createInitialOrders() {
   const routeName = '机加标准路线'
-  return ensureDemoWorkOrder([
+  return ensureDemoWorkOrder(ensureLaborDemoProductionOrders([
     {
       id: 'wo-init-1',
       code: 'WO202505280-001',
@@ -147,12 +157,14 @@ function createInitialOrders() {
       })),
       createdAt: '2025-05-20',
     },
-  ])
+  ]))
 }
 
 const loadedOrders = loadFromStorage()
 export const workOrderState = reactive({
-  orders: loadedOrders ? ensureDemoWorkOrder(loadedOrders) : createInitialOrders(),
+  orders: loadedOrders
+    ? ensureDemoWorkOrder(ensureLaborDemoProductionOrders(loadedOrders))
+    : createInitialOrders(),
 })
 
 watch(

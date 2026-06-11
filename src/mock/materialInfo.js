@@ -4,6 +4,8 @@ import { pumpMaterialNames, barcodeTypesCycle } from '@/mock/pumpIndustryNames'
 import { linkProductMaterialRows, migrateMaterialList } from '@/utils/masterDataMigrate'
 import { buildMaterialFromProduct } from '@/utils/productMaterialMap'
 import { mockProducts } from '@/mock/productInfo'
+import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
+import { laborDemoBomMaterials } from '@/mock/laborHourDemoSeed'
 
 const flatCats = flattenCategoryNodes(materialCategoryTree)
 const leafCats = flatCats.filter((c) => !c.children?.length)
@@ -44,16 +46,20 @@ function createMaterial(index) {
 }
 
 const rawMockMaterials = [
+  ...laborDemoBomMaterials,
   ...bomTemplateMaterials,
   ...Array.from({ length: 194 }, (_, i) => createMaterial(i)),
 ]
 
-export const mockMaterials = migrateMaterialList(
-  linkProductMaterialRows(
-    JSON.parse(JSON.stringify(mockProducts)),
-    migrateMaterialList(rawMockMaterials),
-    buildMaterialFromProduct,
+export const mockMaterials = applyLaborConfigSeed(
+  migrateMaterialList(
+    linkProductMaterialRows(
+      JSON.parse(JSON.stringify(mockProducts)),
+      migrateMaterialList(rawMockMaterials),
+      buildMaterialFromProduct,
+    ),
   ),
+  { force: true },
 )
 
 export function filterMaterials(list, filters, selectedCategoryKey) {

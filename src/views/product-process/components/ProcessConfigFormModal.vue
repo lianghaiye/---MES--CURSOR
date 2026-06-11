@@ -58,6 +58,28 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
+          <a-form-item label="报工方式" name="reportMode" required>
+            <a-select
+              v-model:value="form.reportMode"
+              placeholder="请选择报工方式"
+              :options="reportModeOpts"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="16">
+          <a-form-item label="不良品项">
+            <a-select
+              v-model:value="form.defectItemIds"
+              mode="multiple"
+              show-search
+              allow-clear
+              placeholder="请选择不良品项（支持搜索）"
+              :options="defectItemOpts"
+              :filter-option="filterDefectOption"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
           <a-form-item label="图片">
             <div class="image-upload-mock">
               <div v-if="form.image" class="image-preview">
@@ -113,10 +135,12 @@ import {
   addProcessConfig,
   updateProcessConfig,
   PROCESS_OPERATION_DEFS,
+  REPORT_MODES,
   RESOURCE_TYPES,
   MOCK_POSITIONS,
 } from '@/store/processConfigStore'
 import { getActiveCategoryOptions } from '@/store/processCategoryStore'
+import { getDefectItemOptions } from '@/store/defectItemStore'
 import ExecutorTagPicker from '@/views/production/components/ExecutorTagPicker.vue'
 
 const MOCK_IMAGE =
@@ -146,6 +170,8 @@ const form = reactive({
   image: '',
   remark: '',
   defaultExecutors: [],
+  reportMode: '按件数',
+  defectItemIds: [],
   operations: defaultOps(),
 })
 
@@ -153,12 +179,23 @@ const isEdit = computed(() => Boolean(props.record?.id))
 const categoryOpts = computed(() => getActiveCategoryOptions())
 const resourceTypeOpts = RESOURCE_TYPES.map((v) => ({ label: v, value: v }))
 const positionOpts = MOCK_POSITIONS.map((v) => ({ label: v, value: v }))
+const reportModeOpts = REPORT_MODES.map((v) => ({ label: v, value: v }))
+const defectItemOpts = computed(() => getDefectItemOptions())
 
 const rules = {
   name: [{ required: true, message: '请输入工序名称', trigger: 'blur' }],
   category: [{ required: true, message: '请选择工序分类', trigger: 'change' }],
   position: [{ required: true, message: '请选择岗位', trigger: 'change' }],
   resourceType: [{ required: true, message: '请选择资源类型', trigger: 'change' }],
+  reportMode: [{ required: true, message: '请选择报工方式', trigger: 'change' }],
+}
+
+function filterDefectOption(input, option) {
+  const kw = input.trim().toLowerCase()
+  if (!kw) return true
+  const label = String(option?.label || '').toLowerCase()
+  const code = String(option?.code || '').toLowerCase()
+  return label.includes(kw) || code.includes(kw)
 }
 
 watch(
@@ -174,6 +211,8 @@ watch(
     form.image = r?.image || ''
     form.remark = r?.remark || ''
     form.defaultExecutors = [...(r?.defaultExecutors || [])]
+    form.reportMode = r?.reportMode || '按件数'
+    form.defectItemIds = [...(r?.defectItemIds || [])]
     form.operations = { ...defaultOps(), ...(r?.operations || {}) }
   },
 )

@@ -1,3 +1,5 @@
+import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
+
 /** 快速报工 - 产品与工艺路线 mock（与小程序数据结构一致） */
 
 export const productList = [
@@ -88,12 +90,38 @@ export function searchProducts(keyword = '') {
   )
 }
 
+function mapPickableToProduct(item) {
+  if (!item) return null
+  return {
+    id: item.itemId,
+    name: item.name,
+    code: item.code,
+    spec: item.specModel || '',
+    itemType: item.itemType,
+    routes: [],
+    bom: [],
+  }
+}
+
 export function getProductById(id) {
-  return productList.find((p) => p.id === id) || null
+  const fromMock = productList.find((p) => p.id === id)
+  if (fromMock) return fromMock
+  const item = buildWarehousePickableItems().find((it) => it.itemId === id)
+  return mapPickableToProduct(item)
 }
 
 export function getProductByCode(code) {
-  return productList.find((p) => p.code === code) || null
+  const fromMock = productList.find((p) => p.code === code)
+  if (fromMock) return fromMock
+  const item = buildWarehousePickableItems().find((it) => it.code === code)
+  return mapPickableToProduct(item)
+}
+
+export function getProductByName(name) {
+  const fromMock = productList.find((p) => p.name === name)
+  if (fromMock) return fromMock
+  const item = buildWarehousePickableItems().find((it) => it.name === name)
+  return mapPickableToProduct(item)
 }
 
 export function getRouteById(product, routeId) {

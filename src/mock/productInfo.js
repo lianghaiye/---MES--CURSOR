@@ -2,6 +2,7 @@ import dayjs from 'dayjs'
 import { productCategoryTree, flattenCategoryNodes } from '@/mock/productCategories'
 import { pumpProductNames, barcodeTypesCycle } from '@/mock/pumpIndustryNames'
 import { migrateProductList } from '@/utils/masterDataMigrate'
+import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 
 const flatCats = flattenCategoryNodes(productCategoryTree)
 const leafCats = flatCats.filter((c) => !c.children?.length)
@@ -52,15 +53,14 @@ function createProduct(index) {
       defectRateThreshold: undefined,
       attachments: [],
     },
-    laborEnabled: false,
-    laborRows: [],
     createdAt: created.format('YYYY-MM-DD'),
     updatedAt: updated.format('YYYY-MM-DD'),
   }
 }
 
-export const mockProducts = migrateProductList(
-  Array.from({ length: 793 }, (_, i) => createProduct(i)),
+export const mockProducts = applyLaborConfigSeed(
+  migrateProductList(Array.from({ length: 793 }, (_, i) => createProduct(i))),
+  { force: true },
 )
 
 export function getCategoryFilterKeys(selectedKey) {

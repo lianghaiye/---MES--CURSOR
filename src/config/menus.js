@@ -5,6 +5,7 @@ export const topModules = [
   { key: 'sales', label: '销售管理', path: '/sales' },
   { key: 'planning', label: '计划排产', path: '/planning' },
   { key: 'production', label: '生产管理', path: '/production' },
+  { key: 'labor-salary', label: '工时工资', path: '/labor-salary' },
   { key: 'inventory', label: '库存管理', path: '/inventory' },
   { key: 'quality', label: '质量管理', path: '/quality' },
   { key: 'procurement', label: '采购管理', path: '/procurement' },
@@ -43,6 +44,10 @@ export const sideMenus = {
     { key: 'production-plan', label: '生产计划', path: '/planning/production-plan' },
     { key: 'design-task', label: '设计任务', path: '/planning/design-task' },
   ],
+  'labor-salary': [
+    { key: 'labor-hour', label: '工时管理', path: '/labor-salary/labor-hour' },
+    { key: 'salary-stats', label: '工资统计', path: '/labor-salary/salary-stats' },
+  ],
   production: [
     { key: 'work-orders', label: '生产工单', path: '/production/work-orders' },
     { key: 'assembly-work-orders', label: '总装工单', path: '/production/assembly-work-orders' },
@@ -74,6 +79,7 @@ export const sideMenus = {
   ],
   'basic-config': [
     { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
+    { key: 'defect-items', label: '不良品项', path: '/basic-config/defect-items' },
     {
       key: 'warehouse-mgmt',
       label: '仓库管理',
@@ -133,6 +139,8 @@ export const routeTitles = {
   '/production/qc-work-orders': '质检工单',
   '/production/report-work': '报工管理',
   '/production/report-work/:id': '报工详情',
+  '/labor-salary/labor-hour': '工时管理',
+  '/labor-salary/salary-stats': '工资统计',
   '/inventory/stock': '库存查询',
   '/inventory/outbound': '出库管理',
   '/inventory/sales-outbound': '出库管理',
@@ -152,6 +160,7 @@ export const routeTitles = {
   '/equipment/devices': '设备管理',
   '/report/overview': '报表中心',
   '/basic-config/employee-groups': '员工组别',
+  '/basic-config/defect-items': '不良品项',
   '/basic-config/warehouse-categories': '仓库分类',
   '/basic-config/warehouses': '仓库列表',
 }
@@ -161,4 +170,5 @@ export const dynamicRouteTitles = [
   { pattern: /^\/basic-config\/warehouses\/[^/]+$/, title: '仓库详情' },
   { pattern: /^\/inventory\/inbound\/[^/]+$/, title: '入库单详情' },
   { pattern: /^\/production\/report-work\/[^/]+$/, title: '报工详情' },
+  { pattern: /^\/labor-salary\/labor-hour\/[^/]+$/, title: '工时详情' },
 ]

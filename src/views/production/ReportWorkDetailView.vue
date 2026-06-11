@@ -85,7 +85,9 @@ const record = ref(null)
 const processColumns = [
   { title: '#', key: 'index', width: 56, align: 'center' },
   { title: '工序名称', dataIndex: 'name', width: 160 },
-  { title: '数量', dataIndex: 'qty', width: 100 },
+  { title: '良品数', dataIndex: 'goodQty', width: 96, align: 'right' },
+  { title: '不良品数', dataIndex: 'defectQty', width: 96, align: 'right' },
+  { title: '合计', dataIndex: 'qty', width: 88, align: 'right' },
 ]
 
 const activeProcesses = computed(() => (record.value?.processes || []).filter((p) => !p.deleted))

@@ -1,5 +1,7 @@
 export {
   barcodeTypeOptions,
+  materialTypeOptions,
+  supplyFormOptions,
   inventoryUnitOptions,
   reportTypeOptions,
   salaryMethodOptions,

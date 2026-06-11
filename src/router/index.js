@@ -174,6 +174,24 @@ const routes = [
         component: () => import('@/views/production/ReportWorkDetailView.vue'),
         meta: { title: '报工详情' },
       },
+      {
+        path: 'labor-salary/labor-hour',
+        name: 'labor-salary-labor-hour',
+        component: () => import('@/views/labor-salary/LaborHourManagementView.vue'),
+        meta: { title: '工时管理' },
+      },
+      {
+        path: 'labor-salary/labor-hour/:id',
+        name: 'labor-salary-labor-hour-detail',
+        component: () => import('@/views/labor-salary/LaborHourDetailView.vue'),
+        meta: { title: '工时详情' },
+      },
+      {
+        path: 'labor-salary/salary-stats',
+        name: 'labor-salary-salary-stats',
+        component: () => import('@/views/placeholder/EmptyPage.vue'),
+        meta: { title: '工资统计' },
+      },
       { path: 'production/shop-floor', redirect: '/production/qc-work-orders' },
       { path: 'inventory/stock', ...emptyChild('inventory-stock', '库存查询') },
       {
@@ -255,6 +273,12 @@ const routes = [
         name: 'basic-config-employee-groups',
         component: () => import('@/views/basic-config/EmployeeGroupView.vue'),
         meta: { title: '员工组别' },
+      },
+      {
+        path: 'basic-config/defect-items',
+        name: 'basic-config-defect-items',
+        component: () => import('@/views/basic-config/DefectItemView.vue'),
+        meta: { title: '不良品项' },
       },
       {
         path: 'basic-config/warehouse-categories',

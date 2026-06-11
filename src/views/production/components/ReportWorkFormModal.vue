@@ -17,14 +17,10 @@
         <a-row :gutter="[16, 12]">
           <a-col :span="24">
             <div class="field-label required">产品</div>
-            <a-select
-              v-model:value="form.productId"
-              show-search
+            <ProductMaterialSelect
+              v-model="form.productName"
               placeholder="请选择产品"
-              :filter-option="filterProduct"
-              :options="productOptions"
-              style="width: 100%"
-              @change="onProductChange"
+              @select="onProductSelect"
             />
           </a-col>
           <a-col :xs="24" :md="8">
@@ -90,7 +86,7 @@
             <div class="field-label">工艺路线</div>
             <a-select
               v-if="routeOptions.length > 1"
-              v-model:value="form.routeId"
+              v-model:value="form.routeName"
               :options="routeOptions"
               style="width: 100%"
               @change="onRouteChange"
@@ -121,13 +117,24 @@
                     <span>{{ record.name }}</span>
                   </template>
                 </template>
-                <template v-else-if="column.key === 'qty'">
+                <template v-else-if="column.key === 'goodQty'">
                   <a-input-number
                     v-if="!record.deleted"
-                    v-model:value="record.qty"
+                    v-model:value="record.goodQty"
                     :min="0"
                     size="small"
                     style="width: 100%"
+                    @change="onProcessQtyChange(record)"
+                  />
+                </template>
+                <template v-else-if="column.key === 'defectQty'">
+                  <a-input-number
+                    v-if="!record.deleted"
+                    v-model:value="record.defectQty"
+                    :min="0"
+                    size="small"
+                    style="width: 100%"
+                    @change="onProcessQtyChange(record)"
                   />
                 </template>
                 <template v-else-if="column.key === 'operators'">
@@ -205,17 +212,18 @@
 import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
-import {
-  productList,
-  buildProcessesFromRoute,
-  getProductById,
-  getRouteById,
-} from '@/mock/quickReportProducts'
 import { personnelOptions } from '@/mock/personnel'
 import { formatReportDate } from '@/mock/quickReports'
+import { getActiveRouteOptions } from '@/mock/processRoutes'
 import { getLastOperators, submitQuickReport } from '@/store/quickReportStore'
 import { resolveDefaultExecutors } from '@/store/processConfigStore'
+import {
+  buildQuickReportProcessesFromRoute,
+  normalizeQuickReportProcess,
+  resolveProcessQuantities,
+} from '@/utils/quickReportProcess'
 import ProcessSelectModal from './ProcessSelectModal.vue'
+import ProductMaterialSelect from './ProductMaterialSelect.vue'
 
 const props = defineProps({
   open: Boolean,
@@ -244,11 +252,6 @@ const form = reactive({
   remark: '',
 })
 
-const productOptions = productList.map((p) => ({
-  label: `${p.name} · ${p.code}${p.spec ? ` · ${p.spec}` : ''}`,
-  value: p.id,
-}))
-
 const reportDateValue = computed({
   get: () => (form.reportDate ? dayjs(form.reportDate) : null),
   set: (v) => {
@@ -269,8 +272,9 @@ const excludeProcessNames = computed(() =>
 
 const processColumns = computed(() => {
   const cols = [
-    { title: '工序名称', key: 'name', width: form.perProcessMode ? 160 : 220 },
-    { title: '数量', key: 'qty', width: 100 },
+    { title: '工序名称', key: 'name', width: form.perProcessMode ? 140 : 180 },
+    { title: '良品数', key: 'goodQty', width: 96, align: 'right' },
+    { title: '不良品数', key: 'defectQty', width: 96, align: 'right' },
   ]
   if (form.perProcessMode) {
     cols.push({ title: '操作人员', key: 'operators', width: 220 })
@@ -304,33 +308,33 @@ function resetForm() {
   processCollapse.value = ['process']
 }
 
-function filterProduct(input, option) {
-  return (option?.label || '').toLowerCase().includes(input.toLowerCase())
+function onProductSelect(item) {
+  if (!item) return
+  form.productId = item.itemId
+  form.productCode = item.code
+  form.productName = item.name
+  const routes = getActiveRouteOptions({ productName: item.name })
+  routeOptions.value = routes.map((name) => ({ label: name, value: name }))
+  if (routes.length) applyRoute(routes[0])
+  else {
+    form.routeId = undefined
+    form.routeName = ''
+    form.processes = []
+  }
 }
 
-function onProductChange(productId) {
-  const product = getProductById(productId)
-  if (!product) return
-  form.productName = product.name
-  form.productCode = product.code
-  routeOptions.value = (product.routes || []).map((r) => ({
-    label: r.name,
-    value: r.id,
-  }))
-  const firstRoute = product.routes?.[0]
-  if (firstRoute) applyRoute(firstRoute)
+function applyRoute(routeName) {
+  form.routeName = routeName
+  form.routeId = routeName
+  form.processes = buildQuickReportProcessesFromRoute(routeName, {
+    goodQty: form.goodQty,
+    defectQty: form.defectQty,
+    finishedQty: totalReportQty.value,
+  })
 }
 
-function applyRoute(route) {
-  form.routeId = route.id
-  form.routeName = route.name
-  form.processes = buildProcessesFromRoute(route, totalReportQty.value)
-}
-
-function onRouteChange(routeId) {
-  const product = getProductById(form.productId)
-  const route = getRouteById(product, routeId)
-  if (route) applyRoute(route)
+function onRouteChange(routeName) {
+  if (routeName) applyRoute(routeName)
 }
 
 function onDateChipChange() {
@@ -342,10 +346,14 @@ function onDateChipChange() {
 }
 
 function onReportQtyChange() {
-  const qty = totalReportQty.value
+  const qtys = { goodQty: form.goodQty, defectQty: form.defectQty }
   form.processes.forEach((p) => {
-    if (!p.deleted) p.qty = qty
+    if (!p.deleted) Object.assign(p, resolveProcessQuantities(qtys))
   })
+}
+
+function onProcessQtyChange(record) {
+  Object.assign(record, resolveProcessQuantities(record))
 }
 
 function softDeleteProcess(index) {
@@ -361,18 +369,26 @@ function openProcessSelect() {
 }
 
 function onProcessesSelected(rows) {
-  const qty = totalReportQty.value
+  const qtys = resolveProcessQuantities({
+    goodQty: form.goodQty,
+    defectQty: form.defectQty,
+    finishedQty: totalReportQty.value,
+  })
   rows.forEach((proc) => {
-    form.processes.push({
-      id: `cfg-${proc.id}-${Date.now()}`,
-      processConfigId: proc.id,
-      name: proc.name,
-      code: proc.code,
-      qty,
-      deleted: false,
-      manual: true,
-      operators: [...resolveDefaultExecutors(proc)],
-    })
+    form.processes.push(
+      normalizeQuickReportProcess({
+        id: `cfg-${proc.id}-${Date.now()}`,
+        processConfigId: proc.id,
+        name: proc.name,
+        code: proc.code,
+        goodQty: qtys.goodQty,
+        defectQty: qtys.defectQty,
+        qty: qtys.qty,
+        deleted: false,
+        manual: true,
+        operators: [...resolveDefaultExecutors(proc)],
+      }),
+    )
   })
   processCollapse.value = ['process']
 }

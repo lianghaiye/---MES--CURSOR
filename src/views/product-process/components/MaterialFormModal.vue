@@ -1,14 +1,18 @@
 <template>
   <a-modal
-    :open="open"
-    :title="isEdit ? '编辑物料' : '新增物料'"
+    v-model:open="openModel"
+    :title="modalTitle"
     width="92%"
     :mask-closable="false"
-    destroy-on-close
     class="material-form-modal"
     @cancel="handleCancel"
   >
-    <a-collapse v-model:activeKey="collapseKeys" :bordered="false" class="form-sections">
+    <a-collapse
+      v-model:activeKey="collapseKeys"
+      :bordered="false"
+      class="form-sections"
+      :class="{ 'is-view-only': viewOnly }"
+    >
       <a-collapse-panel key="basic" header="基础信息">
         <a-form layout="inline" class="horizontal-form">
           <a-row :gutter="[12, 12]" style="width: 100%">
@@ -139,13 +143,11 @@
         </a-form>
       </a-collapse-panel>
 
-      <a-collapse-panel key="labor">
-        <template #header>
-          <div class="panel-header-with-switch">
-            <span>工时配置</span>
-            <a-switch v-model:checked="form.laborEnabled" size="small" @click.stop />
-          </div>
-        </template>
+      <a-collapse-panel key="labor" header="工时配置">
+        <div class="labor-enable-row" :class="{ 'is-only': !form.laborEnabled }">
+          <span class="labor-enable-label">启用工时配置</span>
+          <a-switch v-model:checked="form.laborEnabled" size="small" :disabled="viewOnly" />
+        </div>
         <div v-if="form.laborEnabled" class="labor-block">
           <div v-for="(row, index) in form.laborRows" :key="row.id" class="labor-row-card">
             <a-form layout="inline" class="horizontal-form">
@@ -169,7 +171,9 @@
                   <a-form-item required>
                     <template #label>
                       <span>报工类型</span>
-                      <a-tooltip title="选择本工序的报工方式">
+                      <a-tooltip
+                        title="批量计件：工时=整批准备工时+合格报工数量×单件标准工时；时长报工：工时=准备工时+员工填报总时长（审核后）"
+                      >
                         <InfoCircleOutlined class="info-icon" />
                       </a-tooltip>
                     </template>
@@ -210,7 +214,9 @@
                   <a-form-item required>
                     <template #label>
                       <span>计薪方式</span>
-                      <a-tooltip title="计时、计件或组合计薪">
+                      <a-tooltip
+                        title="计件工资=合格数量×单件计件单价+补贴报工数量；计时工资按标准工时单价核算（详见工时管理）"
+                      >
                         <InfoCircleOutlined class="info-icon" />
                       </a-tooltip>
                     </template>
@@ -247,7 +253,11 @@
                     />
                   </a-form-item>
                 </a-col>
-                <a-col v-if="form.laborRows.length > 1" :span="24" class="row-remove-col">
+                <a-col
+                  v-if="!viewOnly && form.laborRows.length > 1"
+                  :span="24"
+                  class="row-remove-col"
+                >
                   <a-button type="link" danger size="small" @click="removeLaborRow(index)">
                     删除本行
                   </a-button>
@@ -255,11 +265,16 @@
               </a-row>
             </a-form>
           </div>
-          <a-button type="dashed" block class="add-labor-row-btn" @click="addLaborRow">
+          <a-button
+            v-if="!viewOnly"
+            type="dashed"
+            block
+            class="add-labor-row-btn"
+            @click="addLaborRow"
+          >
             新增一行
           </a-button>
         </div>
-        <a-empty v-else :image="false" description="开启开关后可配置工时" />
       </a-collapse-panel>
 
       <a-collapse-panel key="production" header="生产控制">
@@ -403,20 +418,25 @@
     </a-collapse>
 
     <template #footer>
-      <a-button @click="handleCancel">
-        <CloseOutlined />
-        取消
-      </a-button>
-      <a-button type="primary" @click="handleOk">
-        <PlusOutlined />
-        保存
-      </a-button>
+      <template v-if="viewOnly">
+        <a-button type="primary" @click="handleCancel">关闭</a-button>
+      </template>
+      <template v-else>
+        <a-button @click="handleCancel">
+          <CloseOutlined />
+          取消
+        </a-button>
+        <a-button type="primary" @click="handleOk">
+          <PlusOutlined />
+          保存
+        </a-button>
+      </template>
     </template>
   </a-modal>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { flattenCategoryNodes, materialCategoryTree } from '@/mock/materialCategories'
@@ -444,9 +464,15 @@ import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStor
 const props = defineProps({
   open: { type: Boolean, default: false },
   editRecord: { type: Object, default: null },
+  viewOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
+
+const openModel = computed({
+  get: () => props.open,
+  set: (val) => emit('update:open', val),
+})
 
 const flatCats = flattenCategoryNodes(materialCategoryTree).filter((c) => !c.children?.length)
 const flatProductCats = flattenCategoryNodes(productCategoryTree).filter((c) => !c.children?.length)
@@ -474,6 +500,10 @@ const warehouseOpts = computed(() => {
 
 const collapseKeys = ref(['basic', 'labor', 'production', 'alert'])
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+const modalTitle = computed(() => {
+  if (props.viewOnly) return '物料详情'
+  return isEdit.value ? '编辑物料' : '新增物料'
+})
 
 const form = reactive({
   code: '',
@@ -521,49 +551,61 @@ function resetForm() {
 }
 
 function loadEditRecord(record) {
+  const source = JSON.parse(JSON.stringify(record))
   resetForm()
-  form.code = record.code
-  form.name = record.name
-  form.barcodeType = record.barcodeType
-  form.materialType = record.materialType
-  form.supplyForm = record.supplyForm
-  form.categoryKey = record.categoryKey
-  form.specModel = record.specModel || ''
-  form.material = record.material || ''
-  form.weight = record.weight || ''
-  form.inventoryUnit = record.inventoryUnit
-  form.unitPrice = record.unitPrice
-  form.isProductMaterial = Boolean(record.isProductMaterial)
-  form.productAttribute = record.productAttribute || '标准产品'
-  form.productCategoryKey = record.productCategoryKey
-  form.remark = record.remark || ''
-  form.laborEnabled = record.laborEnabled ?? false
+  form.code = source.code
+  form.name = source.name
+  form.barcodeType = source.barcodeType
+  form.materialType = source.materialType
+  form.supplyForm = source.supplyForm
+  form.categoryKey = source.categoryKey
+  form.specModel = source.specModel || ''
+  form.material = source.material || ''
+  form.weight = source.weight || ''
+  form.inventoryUnit = source.inventoryUnit
+  form.unitPrice = source.unitPrice
+  form.isProductMaterial = Boolean(source.isProductMaterial)
+  form.productAttribute = source.productAttribute || '标准产品'
+  form.productCategoryKey = source.productCategoryKey
+  form.remark = source.remark || ''
+  form.laborEnabled = source.laborEnabled ?? false
   form.laborRows =
-    record.laborRows?.length > 0
-      ? JSON.parse(JSON.stringify(record.laborRows))
+    source.laborRows?.length > 0
+      ? JSON.parse(JSON.stringify(source.laborRows))
       : [createDefaultLaborRow()]
   form.production = {
     ...createDefaultProductionControl(),
-    ...(record.production || {}),
+    ...(source.production || {}),
   }
   form.alert = {
     ...createDefaultAlertConfig(),
-    ...(record.alert || {}),
+    ...(source.alert || {}),
   }
-  if (record.requisitionAttr !== undefined && record.requisitionAttr !== '') {
-    form.production.requisitionEnabled = Boolean(Number(record.requisitionAttr))
+  if (source.requisitionAttr !== undefined && source.requisitionAttr !== '') {
+    form.production.requisitionEnabled = Boolean(Number(source.requisitionAttr))
   }
 }
 
+function syncFormOnOpen() {
+  if (!props.open) return
+  if (props.editRecord) loadEditRecord(props.editRecord)
+  else resetForm()
+}
+
 watch(
-  () => props.open,
-  (val) => {
-    if (!val) return
-    if (props.editRecord) {
-      loadEditRecord(props.editRecord)
-      return
+  () => (props.open ? props.editRecord?.id || props.editRecord?.code || '__new__' : ''),
+  () => syncFormOnOpen(),
+  { immediate: true },
+)
+
+onMounted(() => syncFormOnOpen())
+
+watch(
+  () => form.laborEnabled,
+  (enabled) => {
+    if (enabled && !collapseKeys.value.includes('labor')) {
+      collapseKeys.value = [...collapseKeys.value, 'labor']
     }
-    resetForm()
   },
 )
 
@@ -667,7 +709,7 @@ function buildPayload() {
 }
 
 function handleCancel() {
-  emit('update:open', false)
+  openModel.value = false
 }
 
 function handleOk() {
@@ -678,7 +720,7 @@ function handleOk() {
     data: buildPayload(),
   })
   message.success(isEdit.value ? '物料已更新' : '物料已保存')
-  emit('update:open', false)
+  openModel.value = false
 }
 </script>
 
@@ -688,6 +730,17 @@ function handleOk() {
     max-height: calc(100vh - 200px);
     overflow-y: auto;
     padding-top: 8px;
+  }
+}
+
+.form-sections.is-view-only {
+  :deep(.ant-input),
+  :deep(.ant-input-number),
+  :deep(.ant-select),
+  :deep(.ant-switch),
+  :deep(.ant-upload),
+  :deep(.ant-btn) {
+    pointer-events: none;
   }
 }
 
@@ -711,12 +764,23 @@ function handleOk() {
   }
 }
 
-.panel-header-with-switch {
+.labor-enable-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  padding-right: 24px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #fafafa;
+  border-radius: 4px;
+}
+
+.labor-enable-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.labor-enable-row.is-only {
+  margin-bottom: 0;
 }
 
 .horizontal-form {

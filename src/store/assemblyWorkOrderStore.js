@@ -7,6 +7,10 @@ import {
   generateAssemblyWorkOrderName,
 } from '@/utils/workOrderNaming'
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
+import {
+  createLaborDemoAssemblyOrders,
+  isLaborDemoWorkOrder,
+} from '@/mock/laborHourDemoSeed'
 
 const STORAGE_KEY = 'i_doms_assembly_work_orders'
 let codeSeq = 1
@@ -33,9 +37,15 @@ function generateAssemblyCode() {
   return `ZZGD${dayjs().format('YYYYMMDD')}${String(codeSeq++).padStart(3, '0')}`
 }
 
+function ensureLaborDemoAssemblyOrders(orders) {
+  const demos = createLaborDemoAssemblyOrders()
+  const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
+  return [...demos, ...rest]
+}
+
 function createInitialOrders() {
   const routeName = '装配标准路线'
-  return [
+  return ensureLaborDemoAssemblyOrders([
     {
       id: 'asm-init-1',
       code: 'ZZGD20250528001',
@@ -104,11 +114,11 @@ function createInitialOrders() {
       })),
       createdAt: '2025-05-20',
     },
-  ]
+  ])
 }
 
 export const assemblyWorkOrderState = reactive({
-  orders: loadFromStorage() || createInitialOrders(),
+  orders: ensureLaborDemoAssemblyOrders(loadFromStorage() || createInitialOrders()),
 })
 
 watch(

@@ -146,6 +146,9 @@
               <template v-if="column.key === 'index'">
                 {{ rowIndex(index) }}
               </template>
+              <template v-else-if="column.key === 'code' || column.dataIndex === 'code'">
+                <a class="link-code" @click.prevent="openDetail(record)">{{ record.code }}</a>
+              </template>
               <template v-else-if="column.key === 'inventoryUnit'">
                 <a-tag color="blue" class="unit-tag">{{ record.inventoryUnit || '—' }}</a-tag>
               </template>
@@ -196,7 +199,13 @@
       </div>
     </div>
 
-    <MaterialFormModal v-model:open="formModalOpen" :edit-record="editRecord" @saved="onSaved" />
+    <MaterialFormModal
+      :key="modalSessionKey"
+      v-model:open="formModalOpen"
+      :edit-record="editRecord"
+      :view-only="viewOnly"
+      @saved="onSaved"
+    />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -211,7 +220,7 @@ export default { name: 'MaterialInfoView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -259,6 +268,12 @@ const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const formModalOpen = ref(false)
 const editRecord = ref(null)
+const viewOnly = ref(false)
+const modalSessionKey = ref(0)
+
+watch(formModalOpen, (open) => {
+  if (!open) viewOnly.value = false
+})
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const flatCats = flattenCategoryNodes(materialCategoryTree)
@@ -302,7 +317,7 @@ const rowSelection = computed(() => ({
 
 const baseColumns = [
   { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
-  { title: '物料编号', dataIndex: 'code', width: 128, fixed: 'left', ellipsis: true },
+  { title: '物料编号', key: 'code', dataIndex: 'code', width: 128, fixed: 'left', ellipsis: true },
   { title: '物料名称', dataIndex: 'name', width: 180, fixed: 'left', ellipsis: true },
   { title: '条码类型', dataIndex: 'barcodeType', width: 100, fixed: 'left' },
   { title: '物料类型', dataIndex: 'materialType', width: 90 },
@@ -354,14 +369,28 @@ function handleReset() {
   pagination.current = 1
 }
 
-function openCreate() {
-  editRecord.value = null
+function resolveMaterialRecord(record) {
+  if (!record?.id) return record
+  return materialInfoState.materials.find((m) => m.id === record.id) || record
+}
+
+function openFormModal({ record = null, readOnly = false } = {}) {
+  viewOnly.value = readOnly
+  editRecord.value = record ? resolveMaterialRecord(record) : null
+  modalSessionKey.value += 1
   formModalOpen.value = true
 }
 
+function openCreate() {
+  openFormModal()
+}
+
 function openEdit(record) {
-  editRecord.value = record
-  formModalOpen.value = true
+  openFormModal({ record })
+}
+
+function openDetail(record) {
+  openFormModal({ record, readOnly: true })
 }
 
 function onSaved({ isEdit, id, data }) {
@@ -539,6 +568,11 @@ function onAddCategory() {
     margin: 0;
     line-height: 20px;
     font-size: 12px;
+  }
+
+  .link-code {
+    color: #1677ff;
+    cursor: pointer;
   }
 }
 
