@@ -47,6 +47,10 @@
           <PlusOutlined />
           创建不良品项
         </a-button>
+        <a-button size="small" @click="companySettingsOpen = true">
+          <SettingOutlined />
+          公司级不良品折扣率设置
+        </a-button>
         <a-button size="small" disabled>
           <ExportOutlined />
           导出
@@ -65,6 +69,8 @@
       </a-space>
     </div>
 
+    <CompanyDefectWageSettingsPanel />
+
     <div class="table-card">
       <a-table
         :columns="columns"
@@ -73,21 +79,43 @@
         size="small"
         bordered
         :pagination="{ pageSize: 10, size: 'small', showSizeChanger: true }"
+        :scroll="{ x: 1320 }"
         :row-selection="rowSelection"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'affectWageDiscount'">
+            <a-tag :color="record.affectWageDiscount ? 'blue' : 'default'">
+              {{ record.affectWageDiscount ? '是' : '否' }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'wageCalculationMethod'">
+            {{ record.affectWageDiscount && record.wageCalculationMethod ? record.wageCalculationMethod : '—' }}
+          </template>
+          <template v-else-if="column.key === 'wageDiscountRate'">
+            {{
+              record.affectWageDiscount &&
+              record.wageCalculationMethod === '打折计工资' &&
+              record.wageDiscountRate != null
+                ? `${record.wageDiscountRate}%`
+                : '—'
+            }}
+          </template>
           <template v-else-if="column.key === 'actions'">
             <a-space :size="8">
               <a @click="openEdit(record)">编辑</a>
               <a class="danger-link" @click="handleDelete(record)">删除</a>
             </a-space>
           </template>
+          <template v-else-if="column.dataIndex">
+            {{ formatCell(record, column.dataIndex) }}
+          </template>
         </template>
       </a-table>
     </div>
 
     <DefectItemFormModal v-model:open="modalOpen" :record="editRecord" @saved="handleSearch" />
+    <CompanyDefectWageSettingsModal v-model:open="companySettingsOpen" />
   </div>
 </template>
 
@@ -101,20 +129,29 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  SettingOutlined,
 } from '@ant-design/icons-vue'
 import DefectItemFormModal from './components/DefectItemFormModal.vue'
+import CompanyDefectWageSettingsModal from './components/CompanyDefectWageSettingsModal.vue'
+import CompanyDefectWageSettingsPanel from './components/CompanyDefectWageSettingsPanel.vue'
 import { defectItemState, deleteDefectItem, filterDefectItems } from '@/store/defectItemStore'
 
 const filters = reactive({ code: '', name: '' })
 const applied = reactive({ code: '', name: '' })
 const selectedRowKeys = ref([])
 const modalOpen = ref(false)
+const companySettingsOpen = ref(false)
 const editRecord = ref(null)
 
 const columns = [
-  { title: '#', key: 'index', width: 56 },
-  { title: '不良品项编号', dataIndex: 'code', width: 180 },
-  { title: '不良品项名称', dataIndex: 'name' },
+  { title: '#', key: 'index', width: 56, fixed: 'left' },
+  { title: '不良品项编号', dataIndex: 'code', width: 150, fixed: 'left' },
+  { title: '不良品项名称', dataIndex: 'name', width: 140 },
+  { title: '责任归属', dataIndex: 'responsibility', width: 110 },
+  { title: '不良原因影响折扣率', key: 'affectWageDiscount', width: 150, align: 'center' },
+  { title: '工资计算方式', key: 'wageCalculationMethod', width: 120 },
+  { title: '工资折扣率', key: 'wageDiscountRate', width: 100, align: 'right' },
+  { title: '说明', dataIndex: 'description', width: 180, ellipsis: true },
   { title: '操作', key: 'actions', width: 120, fixed: 'right' },
 ]
 
@@ -128,6 +165,11 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys
   },
 }))
+
+function formatCell(record, key) {
+  const val = record[key]
+  return val != null && val !== '' ? val : '—'
+}
 
 function handleSearch() {
   applied.code = filters.code

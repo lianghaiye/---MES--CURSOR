@@ -1,7 +1,7 @@
 <template>
   <a-modal
     :open="open"
-    title="新增报工"
+    :title="modalTitle"
     width="920px"
     :mask-closable="false"
     destroy-on-close
@@ -9,13 +9,48 @@
     @cancel="handleCancel"
   >
     <div class="modal-body">
-      <section class="form-section">
+      <section v-if="isWorkOrderMode" class="form-section wo-section">
         <div class="section-head">
-          <span class="section-title">产品信息</span>
+          <span class="section-title">工单信息</span>
           <a-tag color="error">必填</a-tag>
         </div>
         <a-row :gutter="[16, 12]">
           <a-col :span="24">
+            <div class="field-label required">生产工单</div>
+            <a-select
+              v-model:value="form.workOrderId"
+              show-search
+              placeholder="请选择已下发的生产工单"
+              :options="workOrderOptions"
+              :filter-option="filterWorkOrder"
+              style="width: 100%"
+              @change="onWorkOrderChange"
+            />
+          </a-col>
+          <template v-if="selectedWorkOrder">
+            <a-col :xs="24" :md="8">
+              <div class="field-label">工单编号</div>
+              <a-input :value="selectedWorkOrder.code" disabled />
+            </a-col>
+            <a-col :xs="24" :md="8">
+              <div class="field-label">产品</div>
+              <a-input :value="selectedWorkOrder.productName" disabled />
+            </a-col>
+            <a-col :xs="24" :md="8">
+              <div class="field-label">排产数量</div>
+              <a-input :value="`${selectedWorkOrder.scheduleQty ?? selectedWorkOrder.planQty ?? 0} 件`" disabled />
+            </a-col>
+          </template>
+        </a-row>
+      </section>
+
+      <section class="form-section">
+        <div class="section-head">
+          <span class="section-title">{{ isWorkOrderMode ? '登记数量' : '产品信息' }}</span>
+          <a-tag color="error">必填</a-tag>
+        </div>
+        <a-row :gutter="[16, 12]">
+          <a-col v-if="!isWorkOrderMode" :span="24">
             <div class="field-label required">产品</div>
             <ProductMaterialSelect
               v-model="form.productName"
@@ -196,7 +231,7 @@
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :loading="submitting" @click="handleSubmit">提交报工</a-button>
+      <a-button type="primary" :loading="submitting" @click="handleSubmit">提交登记</a-button>
     </template>
   </a-modal>
 
@@ -216,6 +251,8 @@ import { personnelOptions } from '@/mock/personnel'
 import { formatReportDate } from '@/mock/quickReports'
 import { getActiveRouteOptions } from '@/mock/processRoutes'
 import { getLastOperators, submitQuickReport } from '@/store/quickReportStore'
+import { getDispatchedProductionWorkOrders } from '@/store/workOrderStore'
+import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
 import { resolveDefaultExecutors } from '@/store/processConfigStore'
 import {
   buildQuickReportProcessesFromRoute,
@@ -227,6 +264,8 @@ import ProductMaterialSelect from './ProductMaterialSelect.vue'
 
 const props = defineProps({
   open: Boolean,
+  /** workorder | quick */
+  mode: { type: String, default: 'quick' },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -237,7 +276,25 @@ const processCollapse = ref(['process'])
 const routeOptions = ref([])
 const processSelectOpen = ref(false)
 
+const isWorkOrderMode = computed(() => props.mode === 'workorder')
+const modalTitle = computed(() => (isWorkOrderMode.value ? '工单登记' : '快速登记'))
+
+const dispatchedWorkOrders = computed(() => getDispatchedProductionWorkOrders())
+
+const workOrderOptions = computed(() =>
+  dispatchedWorkOrders.value.map((wo) => ({
+    label: `${wo.code} · ${wo.productName}`,
+    value: wo.id,
+    wo,
+  })),
+)
+
+const selectedWorkOrder = computed(() =>
+  dispatchedWorkOrders.value.find((wo) => wo.id === form.workOrderId) || null,
+)
+
 const form = reactive({
+  workOrderId: undefined,
   productId: undefined,
   productName: '',
   productCode: '',
@@ -290,7 +347,13 @@ watch(
   },
 )
 
+function filterWorkOrder(input, option) {
+  const label = (option?.label || '').toLowerCase()
+  return label.includes((input || '').toLowerCase())
+}
+
 function resetForm() {
+  form.workOrderId = undefined
   form.productId = undefined
   form.productName = ''
   form.productCode = ''
@@ -306,6 +369,22 @@ function resetForm() {
   dateChip.value = 'today'
   routeOptions.value = []
   processCollapse.value = ['process']
+}
+
+function onWorkOrderChange(workOrderId) {
+  const wo = dispatchedWorkOrders.value.find((o) => o.id === workOrderId)
+  if (!wo) return
+  const pickable = buildWarehousePickableItems().find(
+    (it) => it.name === wo.productName || it.code === wo.materialCode,
+  )
+  form.productId = pickable?.itemId
+  form.productCode = pickable?.code || wo.materialCode || ''
+  form.productName = wo.productName || ''
+  const routeName = wo.processRouteName || ''
+  if (routeName) {
+    routeOptions.value = [{ label: routeName, value: routeName }]
+    applyRoute(routeName)
+  }
 }
 
 function onProductSelect(item) {
@@ -398,8 +477,16 @@ function handleCancel() {
 }
 
 function handleSubmit() {
+  if (isWorkOrderMode.value && !form.workOrderId) {
+    message.warning('请选择生产工单')
+    return
+  }
   submitting.value = true
+  const wo = selectedWorkOrder.value
   const res = submitQuickReport({
+    registrationMode: isWorkOrderMode.value ? '工单登记' : '快速登记',
+    workOrderId: isWorkOrderMode.value ? form.workOrderId : '',
+    sourceWorkOrderNo: wo?.code || '',
     productId: form.productId,
     productName: form.productName,
     productCode: form.productCode,
@@ -421,7 +508,7 @@ function handleSubmit() {
     return
   }
 
-  message.success('报工成功')
+  message.success('登记成功')
   emit('saved', res.record)
   emit('update:open', false)
 }

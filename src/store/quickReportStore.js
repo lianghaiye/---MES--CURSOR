@@ -3,6 +3,8 @@ import dayjs from 'dayjs'
 import {
   QUICK_REPORT_STORAGE_KEY,
   QUICK_REPORT_MATERIAL_KEY,
+  QUICK_REPORT_SEED_VERSION_KEY,
+  QUICK_REPORT_SEED_VERSION,
   createQuickReportSeed,
   normalizeQuickReport,
   formatReportDate,
@@ -11,7 +13,17 @@ import {
 import { calcMaterialList, getProductByCode, getProductById, getProductByName } from '@/mock/quickReportProducts'
 import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
 
+function shouldReseedReports() {
+  return localStorage.getItem(QUICK_REPORT_SEED_VERSION_KEY) !== QUICK_REPORT_SEED_VERSION
+}
+
 function loadReports() {
+  if (shouldReseedReports()) {
+    const seed = createQuickReportSeed()
+    localStorage.setItem(QUICK_REPORT_STORAGE_KEY, JSON.stringify(seed))
+    localStorage.setItem(QUICK_REPORT_SEED_VERSION_KEY, QUICK_REPORT_SEED_VERSION)
+    return seed
+  }
   try {
     const raw = localStorage.getItem(QUICK_REPORT_STORAGE_KEY)
     if (raw) {
@@ -25,6 +37,7 @@ function loadReports() {
   }
   const seed = createQuickReportSeed()
   localStorage.setItem(QUICK_REPORT_STORAGE_KEY, JSON.stringify(seed))
+  localStorage.setItem(QUICK_REPORT_SEED_VERSION_KEY, QUICK_REPORT_SEED_VERSION)
   return seed
 }
 
@@ -144,7 +157,10 @@ export function submitQuickReport(payload) {
     getProductByName(payload.productName)
   const materialItems = product ? calcMaterialList(product, finishedQty) : []
 
-  const workOrderNo = generateWorkOrderNo(payload.reportDate)
+  const isWorkOrderMode = payload.registrationMode === '工单登记'
+  const workOrderNo = isWorkOrderMode
+    ? payload.sourceWorkOrderNo || payload.workOrderNo
+    : generateWorkOrderNo(payload.reportDate)
   const now = dayjs().format('YYYY-MM-DD HH:mm')
 
   const record = normalizeQuickReport({
@@ -162,6 +178,8 @@ export function submitQuickReport(payload) {
     processes: activeProcesses,
     operators,
     workOrderNo,
+    workOrderId: isWorkOrderMode ? payload.workOrderId || '' : '',
+    registrationMode: isWorkOrderMode ? '工单登记' : '快速登记',
     workOrderStatus: '已报工',
     reporter: payload.reporter || 'admin1',
     remark: payload.remark || '',

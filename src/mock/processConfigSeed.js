@@ -45,7 +45,7 @@ function resolveResourceType(category, name) {
 
 import { PROCESS_DEFECT_ITEM_MAP, PROCESS_REPORT_MODE_MAP } from '@/mock/defectItemSeed'
 
-export const REPORT_MODES = ['按件数', '按时长']
+export const REPORT_MODES = ['批量计件', '时长报工']
 
 /** 机泵行业常用工序 */
 export function createProcessConfigSeed() {
@@ -110,7 +110,7 @@ export function createProcessConfigSeed() {
     status: '使用中',
     operations: defaultOperations(ops),
     defaultExecutors: [...defaultExecutors],
-    reportMode: PROCESS_REPORT_MODE_MAP[name] || '按件数',
+    reportMode: PROCESS_REPORT_MODE_MAP[name] || '',
     defectItemIds: [...(PROCESS_DEFECT_ITEM_MAP[name] || [])],
     createdAt: '2026-05-01',
     updatedAt: '2026-06-01',

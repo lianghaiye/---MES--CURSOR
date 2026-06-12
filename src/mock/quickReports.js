@@ -1,8 +1,11 @@
 import dayjs from 'dayjs'
 import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
+import { createWorkOrderLinkedQuickReportSeed } from '@/mock/quickReportWorkOrderSeed'
 
 export const QUICK_REPORT_STORAGE_KEY = 'i_doms_mobile_quick_reports'
 export const QUICK_REPORT_MATERIAL_KEY = 'i_doms_mobile_quick_material_lists'
+export const QUICK_REPORT_SEED_VERSION_KEY = 'i_doms_quick_reports_seed_v'
+export const QUICK_REPORT_SEED_VERSION = '2'
 
 export function formatReportDate(d = new Date()) {
   return dayjs(d).format('YYYY-MM-DD')
@@ -61,6 +64,15 @@ function flattenOperators(processes, overallOperators, perProcessMode) {
   return [...set]
 }
 
+/** 登记方式：关联已下发工单 → 工单登记，否则快速登记 */
+export function resolveRegistrationMode(row = {}) {
+  if (row.registrationMode) return row.registrationMode
+  if (row.workOrderId) return '工单登记'
+  const no = row.workOrderNo || ''
+  if (no && !no.startsWith('QK-')) return '工单登记'
+  return '快速登记'
+}
+
 export function normalizeQuickReport(row) {
   const processes = (row.processes || []).map((p) => normalizeQuickReportProcess(p))
   const operators = row.operators?.length
@@ -76,6 +88,7 @@ export function normalizeQuickReport(row) {
     processCount: processes.filter((p) => !p.deleted).length,
     ...qty,
     operators,
+    registrationMode: resolveRegistrationMode(row),
     workOrderStatus: row.workOrderStatus || '已报工',
     displayStatus: row.workOrderStatus || '已报工',
   }
@@ -83,7 +96,7 @@ export function normalizeQuickReport(row) {
 
 export function createQuickReportSeed() {
   const today = formatReportDate()
-  return [
+  const legacy = [
     normalizeQuickReport({
       id: 'qr-1',
       productId: 'prod-1',
@@ -168,6 +181,7 @@ export function createQuickReportSeed() {
       remark: '',
     }),
   ]
+  return [...createWorkOrderLinkedQuickReportSeed(), ...legacy]
 }
 
 export function filterQuickReports(list, filters = {}) {

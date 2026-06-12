@@ -177,6 +177,11 @@ export function getWorkOrders() {
   return workOrderState.orders
 }
 
+/** 已下发（非待下发）的生产工单，供登记产出-工单登记选择 */
+export function getDispatchedProductionWorkOrders() {
+  return workOrderState.orders.filter((o) => o.status && o.status !== '待下发')
+}
+
 export function addWorkOrder(order) {
   workOrderState.orders.unshift(order)
 }

@@ -166,13 +166,31 @@ const routes = [
         path: 'production/report-work',
         name: 'production-report-work',
         component: () => import('@/views/production/ReportWorkManagementView.vue'),
-        meta: { title: '报工管理' },
+        meta: { title: '登记产出' },
       },
       {
         path: 'production/report-work/:id',
         name: 'production-report-work-detail',
         component: () => import('@/views/production/ReportWorkDetailView.vue'),
-        meta: { title: '报工详情' },
+        meta: { title: '登记详情' },
+      },
+      {
+        path: 'production/process-report',
+        name: 'production-process-report',
+        component: () => import('@/views/production/ProcessReportManagementView.vue'),
+        meta: { title: '工序报工' },
+      },
+      {
+        path: 'production/process-report/wo/:workOrderId',
+        name: 'production-process-report-wo-detail',
+        component: () => import('@/views/production/ProcessReportWorkOrderDetailView.vue'),
+        meta: { title: '任务报工详情' },
+      },
+      {
+        path: 'production/process-report/:id',
+        name: 'production-process-report-detail',
+        component: () => import('@/views/production/ProcessReportDetailView.vue'),
+        meta: { title: '工序报工详情' },
       },
       {
         path: 'labor-salary/labor-hour',

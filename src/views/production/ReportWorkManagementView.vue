@@ -62,9 +62,13 @@
     <div class="toolbar-row">
       <a-space wrap :size="8">
         <a-button size="small" @click="stubExport">导出 Excel</a-button>
-        <a-button type="primary" size="small" @click="openCreate">
+        <a-button type="primary" size="small" @click="openWorkOrderCreate">
           <PlusOutlined />
-          新增报工
+          工单登记
+        </a-button>
+        <a-button size="small" @click="openQuickCreate">
+          <PlusOutlined />
+          快速登记
         </a-button>
       </a-space>
       <a-space :size="4" class="toolbar-icons">
@@ -148,7 +152,7 @@
       :default-settings="defaultColumnSettings"
     />
 
-    <ReportWorkFormModal v-model:open="formOpen" @saved="onFormSaved" />
+    <ReportWorkFormModal v-model:open="formOpen" :mode="formMode" @saved="onFormSaved" />
   </div>
 </template>
 
@@ -182,9 +186,11 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters, reportDateRange: null })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const formOpen = ref(false)
+const formMode = ref('quick')
 
 const baseColumns = [
   { title: '工单号', key: 'workOrderNo', width: 150, fixed: 'left' },
+  { title: '登记方式', dataIndex: 'registrationMode', width: 100 },
   { title: '产品信息', key: 'productInfo', width: 180 },
   { title: '报工日期', dataIndex: 'reportDate', width: 110 },
   { title: '良品数', key: 'goodQty', width: 88, align: 'right' },
@@ -197,7 +203,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('report-work-list', baseColumns, { minScrollX: 1320 })
+  useTableColumnSettings('report-work-list', baseColumns, { minScrollX: 1420 })
 
 const filteredList = computed(() =>
   filterQuickReports(quickReportState.reports, appliedFilters.value),
@@ -249,11 +255,17 @@ function onQuickRange() {
 
 function openDetail(record) {
   const path = `/production/report-work/${record.id}`
-  openTab(path, record.workOrderNo || '报工详情')
+  openTab(path, record.workOrderNo || '登记详情')
   router.push(path)
 }
 
-function openCreate() {
+function openWorkOrderCreate() {
+  formMode.value = 'workorder'
+  formOpen.value = true
+}
+
+function openQuickCreate() {
+  formMode.value = 'quick'
   formOpen.value = true
 }
 

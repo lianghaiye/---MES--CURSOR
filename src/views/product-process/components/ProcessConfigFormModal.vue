@@ -58,10 +58,11 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="报工方式" name="reportMode" required>
+          <a-form-item label="报工类型" name="reportMode">
             <a-select
               v-model:value="form.reportMode"
-              placeholder="请选择报工方式"
+              allow-clear
+              placeholder="请选择报工类型（选填）"
               :options="reportModeOpts"
             />
           </a-form-item>
@@ -170,7 +171,7 @@ const form = reactive({
   image: '',
   remark: '',
   defaultExecutors: [],
-  reportMode: '按件数',
+  reportMode: undefined,
   defectItemIds: [],
   operations: defaultOps(),
 })
@@ -187,7 +188,6 @@ const rules = {
   category: [{ required: true, message: '请选择工序分类', trigger: 'change' }],
   position: [{ required: true, message: '请选择岗位', trigger: 'change' }],
   resourceType: [{ required: true, message: '请选择资源类型', trigger: 'change' }],
-  reportMode: [{ required: true, message: '请选择报工方式', trigger: 'change' }],
 }
 
 function filterDefectOption(input, option) {
@@ -211,7 +211,7 @@ watch(
     form.image = r?.image || ''
     form.remark = r?.remark || ''
     form.defaultExecutors = [...(r?.defaultExecutors || [])]
-    form.reportMode = r?.reportMode || '按件数'
+    form.reportMode = r?.reportMode || undefined
     form.defectItemIds = [...(r?.defectItemIds || [])]
     form.operations = { ...defaultOps(), ...(r?.operations || {}) }
   },

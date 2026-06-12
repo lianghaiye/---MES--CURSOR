@@ -8,10 +8,11 @@ import {
   MOCK_POSITIONS,
 } from '@/mock/processConfigSeed'
 import { getActiveCategoryNames } from '@/store/processCategoryStore'
+import { normalizeReportMode } from '@/utils/reportMode'
 
 const STORAGE_KEY = 'i_doms_process_config'
 const SEED_VERSION_KEY = 'i_doms_process_config_seed_v'
-const CURRENT_SEED_VERSION = '4'
+const CURRENT_SEED_VERSION = '5'
 
 export { PROCESS_OPERATION_DEFS, REPORT_MODES, RESOURCE_TYPES, MOCK_POSITIONS }
 
@@ -48,7 +49,7 @@ function normalizeProcessList(list) {
   return (list || []).map((p) => ({
     ...p,
     defaultExecutors: Array.isArray(p.defaultExecutors) ? [...p.defaultExecutors] : [],
-    reportMode: p.reportMode || '按件数',
+    reportMode: normalizeReportMode(p.reportMode),
     defectItemIds: Array.isArray(p.defectItemIds) ? [...p.defectItemIds] : [],
   }))
 }
@@ -179,7 +180,7 @@ export function addProcessConfig(payload) {
     status: '使用中',
     operations: normalizeOperations(payload.operations),
     defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
-    reportMode: payload.reportMode || '按件数',
+    reportMode: payload.reportMode ? normalizeReportMode(payload.reportMode) : '',
     defectItemIds: Array.isArray(payload.defectItemIds) ? [...payload.defectItemIds] : [],
     createdAt: dayjs().format('YYYY-MM-DD'),
     updatedAt: dayjs().format('YYYY-MM-DD'),
@@ -206,7 +207,7 @@ export function updateProcessConfig(id, payload) {
     remark: payload.remark?.trim() ?? row.remark,
     operations: normalizeOperations(payload.operations),
     defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
-    reportMode: payload.reportMode || row.reportMode || '按件数',
+    reportMode: payload.reportMode ? normalizeReportMode(payload.reportMode) : normalizeReportMode(row.reportMode),
     defectItemIds: Array.isArray(payload.defectItemIds) ? [...payload.defectItemIds] : [],
     updatedAt: dayjs().format('YYYY-MM-DD'),
   })

@@ -209,6 +209,7 @@
     </div>
 
     <ProductFormModal
+      :key="modalSessionKey"
       v-model:open="formModalOpen"
       :edit-record="editRecord"
       :view-only="viewOnly"
@@ -278,6 +279,7 @@ const selectedRowKeys = ref([])
 const formModalOpen = ref(false)
 const editRecord = ref(null)
 const viewOnly = ref(false)
+const modalSessionKey = ref(0)
 watch(formModalOpen, (open) => {
   if (!open) viewOnly.value = false
 })
@@ -330,6 +332,7 @@ function resolveProductRecord(record) {
 function openFormModal({ record = null, readOnly = false } = {}) {
   viewOnly.value = readOnly
   editRecord.value = record ? resolveProductRecord(record) : null
+  modalSessionKey.value += 1
   formModalOpen.value = true
 }
 
