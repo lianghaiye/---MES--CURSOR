@@ -27,7 +27,9 @@
             <a-descriptions-item label="排产数量">{{ bundle.scheduleQty }}</a-descriptions-item>
             <a-descriptions-item label="工作中心">{{ bundle.workCenter }}</a-descriptions-item>
             <a-descriptions-item label="负责人">{{ bundle.owner }}</a-descriptions-item>
-            <a-descriptions-item label="工艺路线">{{ bundle.processRouteName }}</a-descriptions-item>
+            <a-descriptions-item label="工艺路线">{{
+              bundle.processRouteName
+            }}</a-descriptions-item>
             <a-descriptions-item label="EBOM" :span="3">{{ bundle.ebomLabel }}</a-descriptions-item>
           </a-descriptions>
         </div>
@@ -67,8 +69,12 @@
                 </template>
                 <template v-else-if="column.key === 'action'">
                   <a-space v-if="line.status === '待审核'" :size="0">
-                    <a-button type="link" size="small" @click="handleApproveOne(line)">通过</a-button>
-                    <a-button type="link" size="small" danger @click="openReject(line)">拒绝</a-button>
+                    <a-button type="link" size="small" @click="handleApproveOne(line)"
+                      >通过</a-button
+                    >
+                    <a-button type="link" size="small" danger @click="openReject(line)"
+                      >拒绝</a-button
+                    >
                   </a-space>
                   <span v-else class="locked-text">已处理</span>
                 </template>
@@ -80,9 +86,15 @@
                 <a-table-summary>
                   <a-table-summary-row>
                     <a-table-summary-cell :index="0" :col-span="7">合计</a-table-summary-cell>
-                    <a-table-summary-cell :index="7" align="right">{{ summary.goodQty }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="8" align="right">{{ summary.defectQty }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="9" align="right">{{ summary.workHours }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="7" align="right">{{
+                      summary.goodQty
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="8" align="right">{{
+                      summary.defectQty
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="9" align="right">{{
+                      summary.workHours
+                    }}</a-table-summary-cell>
                     <a-table-summary-cell :index="10" :col-span="5" />
                   </a-table-summary-row>
                 </a-table-summary>
@@ -164,7 +176,9 @@ const logColumns = [
 ]
 
 const summary = computed(() =>
-  bundle.value ? summarizeProcessReportLines(bundle.value.lines) : { goodQty: 0, defectQty: 0, workHours: 0 },
+  bundle.value
+    ? summarizeProcessReportLines(bundle.value.lines)
+    : { goodQty: 0, defectQty: 0, workHours: 0 },
 )
 
 const rowSelection = computed(() => ({

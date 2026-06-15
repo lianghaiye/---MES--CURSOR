@@ -7,10 +7,7 @@ import {
   generateAssemblyWorkOrderName,
 } from '@/utils/workOrderNaming'
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
-import {
-  createLaborDemoAssemblyOrders,
-  isLaborDemoWorkOrder,
-} from '@/mock/laborHourDemoSeed'
+import { createLaborDemoAssemblyOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
 
 const STORAGE_KEY = 'i_doms_assembly_work_orders'
 let codeSeq = 1

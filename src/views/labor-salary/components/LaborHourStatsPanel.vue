@@ -41,7 +41,13 @@ const cards = computed(() => {
   const s = props.stats
   const c = s.compare || {}
   return [
-    { key: 'totalHours', title: '总工时', value: s.totalHours ?? 0, unit: '小时', compare: c.totalHours },
+    {
+      key: 'totalHours',
+      title: '总工时',
+      value: s.totalHours ?? 0,
+      unit: '小时',
+      compare: c.totalHours,
+    },
     {
       key: 'batchPieceHours',
       title: '批量计件总时长',

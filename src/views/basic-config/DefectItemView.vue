@@ -90,7 +90,11 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'wageCalculationMethod'">
-            {{ record.affectWageDiscount && record.wageCalculationMethod ? record.wageCalculationMethod : '—' }}
+            {{
+              record.affectWageDiscount && record.wageCalculationMethod
+                ? record.wageCalculationMethod
+                : '—'
+            }}
           </template>
           <template v-else-if="column.key === 'wageDiscountRate'">
             {{
@@ -155,9 +159,7 @@ const columns = [
   { title: '操作', key: 'actions', width: 120, fixed: 'right' },
 ]
 
-const filteredList = computed(() =>
-  filterDefectItems(defectItemState.items, applied),
-)
+const filteredList = computed(() => filterDefectItems(defectItemState.items, applied))
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,

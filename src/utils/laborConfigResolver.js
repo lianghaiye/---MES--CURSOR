@@ -19,8 +19,7 @@ function findInList(list, materialCode, processName) {
   if (!materialCode) return null
   const item = list.find((row) => row.code === materialCode)
   if (!item?.laborEnabled || !item.laborRows?.length) return null
-  const hit =
-    item.laborRows.find((r) => r.processName === processName) || item.laborRows[0]
+  const hit = item.laborRows.find((r) => r.processName === processName) || item.laborRows[0]
   return normalizeLaborRow(hit)
 }
 

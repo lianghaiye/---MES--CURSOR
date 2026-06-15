@@ -95,17 +95,23 @@
           <template v-if="column.key === 'workOrderNo'">
             <a class="link-code" @click="openDetail(record)">{{ record.workOrderNo }}</a>
           </template>
-          <template v-else-if="column.key === 'productInfo'">
-            <div class="product-cell">
-              <div class="product-name">{{ record.productName }}</div>
-              <div class="product-code">{{ record.productCode || '—' }}</div>
-            </div>
+          <template v-else-if="column.key === 'productName'">
+            {{ record.productName || '—' }}
+          </template>
+          <template v-else-if="column.key === 'productCode'">
+            {{ record.productCode || '—' }}
           </template>
           <template v-else-if="column.key === 'goodQty'">
             <span class="qty-text">{{ record.goodQty ?? record.finishedQty }} 件</span>
           </template>
           <template v-else-if="column.key === 'defectQty'">
             <span class="qty-text defect">{{ record.defectQty || 0 }} 件</span>
+          </template>
+          <template v-else-if="column.key === 'defectReasons'">
+            <span v-if="record.defectReasonLabel && record.defectReasonLabel !== '—'">
+              {{ record.defectReasonLabel }}
+            </span>
+            <span v-else class="muted">—</span>
           </template>
           <template v-else-if="column.key === 'processes'">
             <a-space v-if="activeProcesses(record).length" :size="4" wrap>
@@ -115,17 +121,21 @@
             </a-space>
             <span v-else class="muted">未填写</span>
           </template>
-          <template v-else-if="column.key === 'operatorAssignMode'">
-            <a-tag :color="record.perProcessMode ? 'blue' : 'default'">
-              {{ operatorAssignLabel(record) }}
-            </a-tag>
-          </template>
           <template v-else-if="column.key === 'operators'">
             <span v-if="record.operators?.length">{{ record.operators.join('、') }}</span>
             <span v-else class="muted">未指定</span>
           </template>
           <template v-else-if="column.key === 'displayStatus'">
             <a-tag color="success">{{ record.displayStatus }}</a-tag>
+          </template>
+          <template v-else-if="column.dataIndex === 'reporter'">
+            {{ record.reporter || '—' }}
+          </template>
+          <template v-else-if="column.dataIndex === 'productionDate'">
+            {{ record.productionDate || record.reportDate || '—' }}
+          </template>
+          <template v-else-if="column.dataIndex === 'registeredDate'">
+            {{ record.registeredDate || '—' }}
           </template>
           <template v-else-if="column.key === 'action'">
             <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
@@ -190,20 +200,24 @@ const formMode = ref('quick')
 
 const baseColumns = [
   { title: '工单号', key: 'workOrderNo', width: 150, fixed: 'left' },
-  { title: '登记方式', dataIndex: 'registrationMode', width: 100 },
-  { title: '产品信息', key: 'productInfo', width: 180 },
-  { title: '报工日期', dataIndex: 'reportDate', width: 110 },
+  { title: '登记类型', dataIndex: 'registrationType', width: 100 },
+  { title: '登记方式', dataIndex: 'registerMode', width: 110 },
+  { title: '产品名称', key: 'productName', width: 140 },
+  { title: '产品编码', key: 'productCode', width: 120 },
+  { title: '生产日期', dataIndex: 'productionDate', width: 110 },
   { title: '良品数', key: 'goodQty', width: 88, align: 'right' },
   { title: '不良品数', key: 'defectQty', width: 88, align: 'right' },
+  { title: '不良原因', key: 'defectReasons', width: 180, ellipsis: true },
   { title: '工序', key: 'processes', width: 220 },
-  { title: '人员指定方式', key: 'operatorAssignMode', width: 110, align: 'center' },
   { title: '操作人员', key: 'operators', width: 140, ellipsis: true },
   { title: '状态', key: 'displayStatus', width: 90 },
+  { title: '登记人', dataIndex: 'reporter', width: 100, ellipsis: true },
+  { title: '登记日期', dataIndex: 'registeredDate', width: 110 },
   { title: '操作', key: 'action', width: 80, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('report-work-list', baseColumns, { minScrollX: 1420 })
+  useTableColumnSettings('report-work-list', baseColumns, { minScrollX: 1860 })
 
 const filteredList = computed(() =>
   filterQuickReports(quickReportState.reports, appliedFilters.value),
@@ -218,10 +232,6 @@ const stats = computed(() => calcQuickReportStats(quickReportState.reports))
 
 function activeProcesses(record) {
   return (record.processes || []).filter((p) => !p.deleted)
-}
-
-function operatorAssignLabel(record) {
-  return record.perProcessMode ? '按工序指定' : '整体指定'
 }
 
 function handleSearch() {
@@ -289,18 +299,6 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
-  }
-
-  .product-cell {
-    .product-name {
-      font-weight: 500;
-      color: #262626;
-    }
-    .product-code {
-      font-size: 12px;
-      color: #8c8c8c;
-      margin-top: 2px;
-    }
   }
 
   .qty-text {

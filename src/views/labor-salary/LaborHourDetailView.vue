@@ -15,14 +15,24 @@
           <div class="section-title">基础信息</div>
           <a-descriptions bordered size="small" :column="3">
             <a-descriptions-item label="工单编号">{{ record.workOrderCode }}</a-descriptions-item>
-            <a-descriptions-item label="物品编码">{{ record.materialCode || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="物品名称">{{ record.materialName || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="规格型号">{{ record.specModel || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="销售单号">{{ record.salesOrderNo || '—' }}</a-descriptions-item>
+            <a-descriptions-item label="物品编码">{{
+              record.materialCode || '—'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="物品名称">{{
+              record.materialName || '—'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="规格型号">{{
+              record.specModel || '—'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="销售单号">{{
+              record.salesOrderNo || '—'
+            }}</a-descriptions-item>
             <a-descriptions-item label="排产数量">{{ record.scheduleQty }}</a-descriptions-item>
             <a-descriptions-item label="工作中心">{{ record.workCenter }}</a-descriptions-item>
             <a-descriptions-item label="负责人">{{ record.owner }}</a-descriptions-item>
-            <a-descriptions-item label="工艺路线">{{ record.processRouteName || '—' }}</a-descriptions-item>
+            <a-descriptions-item label="工艺路线">{{
+              record.processRouteName || '—'
+            }}</a-descriptions-item>
           </a-descriptions>
         </div>
 
@@ -57,7 +67,10 @@
               <template #bodyCell="{ column, record: line, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'auditStatus'">
-                  <a-badge :status="line.auditStatus === '已审核' ? 'success' : 'processing'" :text="line.auditStatus" />
+                  <a-badge
+                    :status="line.auditStatus === '已审核' ? 'success' : 'processing'"
+                    :text="line.auditStatus"
+                  />
                 </template>
                 <template v-else-if="column.key === 'action'">
                   <a-space v-if="line.auditStatus !== '已审核'" :size="0">
@@ -75,15 +88,33 @@
                 <a-table-summary>
                   <a-table-summary-row>
                     <a-table-summary-cell :index="0" :col-span="7">工时总计</a-table-summary-cell>
-                    <a-table-summary-cell :index="7" align="right">{{ summary.reportQty }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="8" align="right">{{ summary.reportDuration }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="9" align="right">{{ summary.adjustedReportQty }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="10" align="right">{{ summary.adjustedDuration }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="11" align="right">{{ summary.subsidyReportQty }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="12" align="right">{{ summary.subsidyHours }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="13" align="right">{{ summary.finalPieceQty }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="14" align="right">{{ summary.accountHours }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="15" align="right">{{ summary.salaryAmount }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="7" align="right">{{
+                      summary.reportQty
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="8" align="right">{{
+                      summary.reportDuration
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="9" align="right">{{
+                      summary.adjustedReportQty
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="10" align="right">{{
+                      summary.adjustedDuration
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="11" align="right">{{
+                      summary.subsidyReportQty
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="12" align="right">{{
+                      summary.subsidyHours
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="13" align="right">{{
+                      summary.finalPieceQty
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="14" align="right">{{
+                      summary.accountHours
+                    }}</a-table-summary-cell>
+                    <a-table-summary-cell :index="15" align="right">{{
+                      summary.salaryAmount
+                    }}</a-table-summary-cell>
                     <a-table-summary-cell :index="16" :col-span="8" />
                   </a-table-summary-row>
                 </a-table-summary>

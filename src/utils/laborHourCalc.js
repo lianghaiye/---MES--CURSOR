@@ -6,9 +6,13 @@ function round2(val) {
 
 export function getApprovedReportQty(line) {
   if (line.auditStatus === '已审核') {
-    return line.adjustedReportQty != null ? Number(line.adjustedReportQty) : Number(line.reportQty) || 0
+    return line.adjustedReportQty != null
+      ? Number(line.adjustedReportQty)
+      : Number(line.reportQty) || 0
   }
-  return line.adjustedReportQty != null ? Number(line.adjustedReportQty) : Number(line.reportQty) || 0
+  return line.adjustedReportQty != null
+    ? Number(line.adjustedReportQty)
+    : Number(line.reportQty) || 0
 }
 
 export function getApprovedDuration(line) {

@@ -88,7 +88,9 @@ export function normalizeCompanyWageSettings(settings = {}) {
   }
   return {
     enabled:
-      settings.enabled === undefined ? DEFAULT_COMPANY_WAGE_SETTINGS.enabled : Boolean(settings.enabled),
+      settings.enabled === undefined
+        ? DEFAULT_COMPANY_WAGE_SETTINGS.enabled
+        : Boolean(settings.enabled),
     rules,
   }
 }

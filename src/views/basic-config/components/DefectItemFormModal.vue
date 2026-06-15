@@ -35,7 +35,12 @@
         </div>
 
         <template v-if="form.affectWageDiscount">
-          <a-form-item label="工资计算方式" name="wageCalculationMethod" required class="section-field">
+          <a-form-item
+            label="工资计算方式"
+            name="wageCalculationMethod"
+            required
+            class="section-field"
+          >
             <a-select
               v-model:value="form.wageCalculationMethod"
               placeholder="请选择工资计算方式"
@@ -185,9 +190,7 @@ async function handleSave() {
         : null,
     description: form.description,
   }
-  const res = isEdit.value
-    ? updateDefectItem(props.record.id, payload)
-    : addDefectItem(payload)
+  const res = isEdit.value ? updateDefectItem(props.record.id, payload) : addDefectItem(payload)
   saving.value = false
   if (!res.ok) {
     message.warning(res.message)

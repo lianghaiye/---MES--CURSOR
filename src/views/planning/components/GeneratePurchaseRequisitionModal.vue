@@ -14,12 +14,7 @@
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :span="8">
             <a-form-item label="申请单号">
-              <a-input
-                v-model:value="form.reqNo"
-                placeholder="系统生成"
-                allow-clear
-                size="small"
-              />
+              <a-input v-model:value="form.reqNo" placeholder="系统生成" allow-clear size="small" />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -211,9 +206,7 @@ const lineColumns = [
   { title: '操作', key: 'action', width: 70, fixed: 'right' },
 ]
 
-const tableScrollX = computed(() =>
-  lineColumns.reduce((sum, col) => sum + (col.width || 80), 0),
-)
+const tableScrollX = computed(() => lineColumns.reduce((sum, col) => sum + (col.width || 80), 0))
 
 const form = reactive({
   reqNo: '',

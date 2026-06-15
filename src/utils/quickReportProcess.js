@@ -1,5 +1,7 @@
 import { buildProcessesFromRoute as buildRouteSteps } from '@/mock/processRoutes'
 import { getProcessByName, resolveDefaultExecutors } from '@/store/processConfigStore'
+import { resolveDefectItemsByIds } from '@/store/defectItemStore'
+import { breakdownToLegacy, ensureDefectBreakdown } from '@/utils/defectBreakdown'
 
 /** 解析工序级良品/不良品，qty 为合计 */
 export function resolveProcessQuantities(qtys = {}) {
@@ -18,8 +20,17 @@ export function resolveProcessQuantities(qtys = {}) {
   return { goodQty, defectQty, qty: goodQty + defectQty }
 }
 
+function getProcessDefectItems(processName) {
+  const proc = getProcessByName(processName)
+  if (!proc?.defectItemIds?.length) return []
+  return resolveDefectItemsByIds(proc.defectItemIds)
+}
+
 export function normalizeQuickReportProcess(partial = {}) {
   const qty = resolveProcessQuantities(partial)
+  const items = getProcessDefectItems(partial.name)
+  const defectBreakdown = ensureDefectBreakdown(partial, items)
+  const legacy = breakdownToLegacy(defectBreakdown)
   return {
     id: partial.id || `proc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     processConfigId: partial.processConfigId || '',
@@ -31,6 +42,11 @@ export function normalizeQuickReportProcess(partial = {}) {
     deleted: !!partial.deleted,
     manual: !!partial.manual,
     operators: partial.operators || [],
+    reportMode: partial.reportMode || partial.reportType || '',
+    workHours: partial.workHours ?? null,
+    startTime: partial.startTime || '',
+    endTime: partial.endTime || '',
+    ...legacy,
   }
 }
 
@@ -40,9 +56,7 @@ export function buildQuickReportProcessesFromRoute(routeName, qtys = {}) {
   const steps = buildRouteSteps(routeName)
   return steps.map((step, index) => {
     const proc = getProcessByName(step.name)
-    const executors = step.executors?.length
-      ? step.executors
-      : resolveDefaultExecutors(proc)
+    const executors = step.executors?.length ? step.executors : resolveDefaultExecutors(proc)
     return normalizeQuickReportProcess({
       id: step.id || `proc-${index}-${Date.now()}`,
       processConfigId: step.processId || proc?.id || '',

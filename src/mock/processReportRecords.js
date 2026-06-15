@@ -1,8 +1,9 @@
-/** 工序报工记录（与小程序共用 localStorage） */
+import { breakdownToLegacy, ensureDefectBreakdown } from '@/utils/defectBreakdown'
+import { resolveDefectItemsByIds } from '@/store/defectItemStore'
 
 export const PROCESS_REPORT_STORAGE_KEY = 'i_doms_mobile_process_report_records'
 export const PROCESS_REPORT_SEED_VERSION_KEY = 'i_doms_process_report_seed_v'
-export const PROCESS_REPORT_SEED_VERSION = '2'
+export const PROCESS_REPORT_SEED_VERSION = '3'
 export const PROCESS_REPORT_WO_LOG_KEY = 'i_doms_process_report_wo_logs'
 
 export const RECORD_STATUS = ['待审核', '已审核', '已拒绝']
@@ -35,9 +36,11 @@ function createSeed() {
       endTime: '10:15',
       taskStartTime: `${today} 08:30`,
       taskEndTime: `${today} 10:15`,
+      defectBreakdown: [{ id: 'di-2', name: '有气孔', qty: 2 }],
       defectItemIds: ['di-2'],
       defectItemNames: ['有气孔'],
-      defectReason: '有气孔',
+      defectReason: '有气孔×2',
+      defectReasonLabel: '有气孔×2',
       team: '装配一组',
       remark: '',
       status: '待审核',
@@ -118,9 +121,11 @@ function createSeed() {
       endTime: '11:30',
       taskStartTime: '2026-06-10 09:00',
       taskEndTime: '2026-06-10 11:30',
+      defectBreakdown: [{ id: 'di-6', name: '尺寸超差', qty: 1 }],
       defectItemIds: ['di-6'],
       defectItemNames: ['尺寸超差'],
-      defectReason: '尺寸超差',
+      defectReason: '尺寸超差×1',
+      defectReasonLabel: '尺寸超差×1',
       team: '加工小组',
       remark: '',
       status: '已审核',
@@ -158,13 +163,16 @@ function createSeed() {
 }
 
 export function normalizeProcessReport(row) {
+  const items = resolveDefectItemsByIds(row.defectItemIds || [])
+  const defectBreakdown = ensureDefectBreakdown(row, items)
+  const legacy = breakdownToLegacy(defectBreakdown)
   return {
     ...row,
     source: row.source || 'quick',
     status: row.status || '待审核',
     rejectReason: row.rejectReason || '',
-    defectItemIds: row.defectItemIds || [],
-    defectItemNames: row.defectItemNames || [],
+    ...legacy,
+    defectReason: row.defectReason || legacy.defectReasonLabel,
   }
 }
 

@@ -1,11 +1,13 @@
 import dayjs from 'dayjs'
 import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
+import { aggregateProcessesDefectLabel } from '@/utils/defectBreakdown'
+import { enrichQuickReportForList } from '@/utils/quickReportEnrich'
 import { createWorkOrderLinkedQuickReportSeed } from '@/mock/quickReportWorkOrderSeed'
 
 export const QUICK_REPORT_STORAGE_KEY = 'i_doms_mobile_quick_reports'
 export const QUICK_REPORT_MATERIAL_KEY = 'i_doms_mobile_quick_material_lists'
 export const QUICK_REPORT_SEED_VERSION_KEY = 'i_doms_quick_reports_seed_v'
-export const QUICK_REPORT_SEED_VERSION = '2'
+export const QUICK_REPORT_SEED_VERSION = '4'
 
 export function formatReportDate(d = new Date()) {
   return dayjs(d).format('YYYY-MM-DD')
@@ -64,8 +66,9 @@ function flattenOperators(processes, overallOperators, perProcessMode) {
   return [...set]
 }
 
-/** 登记方式：关联已下发工单 → 工单登记，否则快速登记 */
-export function resolveRegistrationMode(row = {}) {
+/** 登记类型：关联已下发工单 → 工单登记，否则快速登记 */
+export function resolveRegistrationType(row = {}) {
+  if (row.registrationType) return row.registrationType
   if (row.registrationMode) return row.registrationMode
   if (row.workOrderId) return '工单登记'
   const no = row.workOrderNo || ''
@@ -73,25 +76,65 @@ export function resolveRegistrationMode(row = {}) {
   return '快速登记'
 }
 
+/** @deprecated 使用 resolveRegistrationType */
+export function resolveRegistrationMode(row = {}) {
+  return resolveRegistrationType(row)
+}
+
+/** 是否按工序登记（与小程序 perProcessRegister 一致） */
+export function resolvePerProcessRegister(row = {}) {
+  if (row.perProcessRegister !== undefined) return row.perProcessRegister !== false
+  const activeProcesses = (row.processes || []).filter((p) => !p.deleted)
+  if (!activeProcesses.length) return false
+  return row.perProcessMode !== false
+}
+
+/** 登记方式展示：按工序登记 / 整体登记 */
+export function resolveRegisterModeLabel(row = {}) {
+  if (row.registerMode) return row.registerMode
+  return resolvePerProcessRegister(row) ? '按工序登记' : '整体登记'
+}
+
+/** 登记日期：取记录创建时间日期部分 */
+export function resolveRegisteredDate(row = {}) {
+  if (row.registeredDate) return row.registeredDate
+  if (row.createdAt) {
+    const datePart = String(row.createdAt).split(' ')[0]
+    if (datePart) return datePart
+  }
+  return row.reportDate || ''
+}
+
 export function normalizeQuickReport(row) {
   const processes = (row.processes || []).map((p) => normalizeQuickReportProcess(p))
+  const perProcessRegister = resolvePerProcessRegister(row)
   const operators = row.operators?.length
     ? row.operators
-    : flattenOperators(processes, [], row.perProcessMode)
+    : flattenOperators(processes, [], perProcessRegister)
   const qty = resolveReportQuantities({
     ...row,
     finishedQty: row.finishedQty ?? calcFinishedQty(processes, row.finishedQty),
   })
-  return {
+  const registrationType = resolveRegistrationType(row)
+  const enriched = enrichQuickReportForList({
     ...row,
     processes,
     processCount: processes.filter((p) => !p.deleted).length,
     ...qty,
     operators,
-    registrationMode: resolveRegistrationMode(row),
+    perProcessRegister,
+    perProcessMode: perProcessRegister,
+    registrationType,
+    registrationMode: registrationType,
+    registerMode: resolveRegisterModeLabel({ ...row, perProcessRegister }),
+    productionDate: row.reportDate || '',
+    registeredDate: resolveRegisteredDate(row),
+    reporter: row.reporter || '',
     workOrderStatus: row.workOrderStatus || '已报工',
     displayStatus: row.workOrderStatus || '已报工',
-  }
+    defectReasonLabel: row.defectReasonLabel || aggregateProcessesDefectLabel(processes),
+  })
+  return enriched
 }
 
 export function createQuickReportSeed() {

@@ -53,10 +53,7 @@ export function getSelfMadeMaterials(order) {
 function filterPurchasedWithGap(materials, productQty) {
   return materials.filter((m) => {
     if (m.supplyType !== '外购件') return false
-    const gap = calcGapQty(
-      m.demandQty ?? calcDemandQty(m.unitUsage, productQty),
-      m.availableStock,
-    )
+    const gap = calcGapQty(m.demandQty ?? calcDemandQty(m.unitUsage, productQty), m.availableStock)
     return gap > 0
   })
 }

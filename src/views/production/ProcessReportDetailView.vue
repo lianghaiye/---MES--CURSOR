@@ -17,18 +17,24 @@
         <div class="section-card">
           <div class="section-title">报工信息</div>
           <a-descriptions bordered size="small" :column="3">
-            <a-descriptions-item label="报工方式">{{ record.reportSourceLabel }}</a-descriptions-item>
+            <a-descriptions-item label="报工方式">{{
+              record.reportSourceLabel
+            }}</a-descriptions-item>
             <a-descriptions-item label="报工类型">{{ record.reportType }}</a-descriptions-item>
             <a-descriptions-item label="报工日期">{{ record.reportDate }}</a-descriptions-item>
-            <a-descriptions-item label="工单号">{{ record.workOrderNo || '—' }}</a-descriptions-item>
+            <a-descriptions-item label="工单号">{{
+              record.workOrderNo || '—'
+            }}</a-descriptions-item>
             <a-descriptions-item label="产品名称">{{ record.productName }}</a-descriptions-item>
-            <a-descriptions-item label="产品编码">{{ record.productCode || '—' }}</a-descriptions-item>
+            <a-descriptions-item label="产品编码">{{
+              record.productCode || '—'
+            }}</a-descriptions-item>
             <a-descriptions-item label="规格型号">{{ record.specModel }}</a-descriptions-item>
             <a-descriptions-item label="材质">{{ record.material }}</a-descriptions-item>
             <a-descriptions-item label="工序">{{ record.processName }}</a-descriptions-item>
             <a-descriptions-item label="良品数">{{ record.goodQty }} 件</a-descriptions-item>
             <a-descriptions-item label="不良品数">{{ record.defectQty }} 件</a-descriptions-item>
-            <a-descriptions-item label="不良项">{{ record.defectItems }}</a-descriptions-item>
+            <a-descriptions-item label="不良原因">{{ record.defectItems }}</a-descriptions-item>
             <a-descriptions-item v-if="record.workHours" label="工作时长">
               {{ record.workHours }} 小时
             </a-descriptions-item>
@@ -38,12 +44,18 @@
             <a-descriptions-item label="执行人">{{ record.reporter }}</a-descriptions-item>
             <a-descriptions-item label="工作中心">{{ record.workCenter }}</a-descriptions-item>
             <a-descriptions-item label="提交时间">{{ record.createdAt }}</a-descriptions-item>
-            <a-descriptions-item label="备注" :span="3">{{ record.remark || '—' }}</a-descriptions-item>
+            <a-descriptions-item label="备注" :span="3">{{
+              record.remark || '—'
+            }}</a-descriptions-item>
             <a-descriptions-item v-if="record.status === '已拒绝'" label="拒绝原因" :span="3">
               {{ record.rejectReason }}
             </a-descriptions-item>
-            <a-descriptions-item v-if="record.auditor" label="审核人">{{ record.auditor }}</a-descriptions-item>
-            <a-descriptions-item v-if="record.auditedAt" label="审核时间">{{ record.auditedAt }}</a-descriptions-item>
+            <a-descriptions-item v-if="record.auditor" label="审核人">{{
+              record.auditor
+            }}</a-descriptions-item>
+            <a-descriptions-item v-if="record.auditedAt" label="审核时间">{{
+              record.auditedAt
+            }}</a-descriptions-item>
           </a-descriptions>
         </div>
       </template>

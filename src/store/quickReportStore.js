@@ -10,7 +10,12 @@ import {
   formatReportDate,
   parseSubmitQuantities,
 } from '@/mock/quickReports'
-import { calcMaterialList, getProductByCode, getProductById, getProductByName } from '@/mock/quickReportProducts'
+import {
+  calcMaterialList,
+  getProductByCode,
+  getProductById,
+  getProductByName,
+} from '@/mock/quickReportProducts'
 import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
 
 function shouldReseedReports() {
@@ -96,17 +101,14 @@ function validateSubmit(payload) {
   const qtyCheck = parseSubmitQuantities(payload)
   if (!qtyCheck.ok) return qtyCheck.message
   if (!payload.reportDate) {
-    return '请选择报工日期'
+    return '请选择生产日期'
   }
-  const activeProcesses = (payload.processes || []).filter((p) => !p.deleted && p.name?.trim())
-  if (!activeProcesses.length) {
-    return '请至少保留一道工序'
-  }
-  if (payload.perProcessMode) {
-    const missing = activeProcesses.find((p) => !p.operators?.length)
-    if (missing) return `请为「${missing.name}」指定操作人员`
-  } else if (!payload.operators?.length) {
-    return '请选择操作人员'
+  const perProcessRegister = payload.perProcessRegister !== false
+  if (perProcessRegister) {
+    const activeProcesses = (payload.processes || []).filter((p) => !p.deleted && p.name?.trim())
+    if (!activeProcesses.length) {
+      return '请至少保留一道工序'
+    }
   }
   return null
 }
@@ -134,19 +136,22 @@ export function submitQuickReport(payload) {
   const err = validateSubmit(payload)
   if (err) return { ok: false, message: err }
 
-  const activeProcesses = payload.processes
-    .filter((p) => !p.deleted && p.name?.trim())
-    .map((p) =>
-      normalizeQuickReportProcess({
-        ...p,
-        name: p.name.trim(),
-        deleted: false,
-      }),
-    )
+  const perProcessRegister = payload.perProcessRegister !== false
+  const activeProcesses = perProcessRegister
+    ? payload.processes
+        .filter((p) => !p.deleted && p.name?.trim())
+        .map((p) =>
+          normalizeQuickReportProcess({
+            ...p,
+            name: p.name.trim(),
+            deleted: false,
+          }),
+        )
+    : []
 
-  const operators = payload.perProcessMode
+  const operators = perProcessRegister
     ? flattenOperators(activeProcesses, [], true)
-    : payload.operators
+    : payload.operators || []
 
   const qtyCheck = parseSubmitQuantities(payload)
   const { goodQty, defectQty, finishedQty } = qtyCheck
@@ -157,7 +162,10 @@ export function submitQuickReport(payload) {
     getProductByName(payload.productName)
   const materialItems = product ? calcMaterialList(product, finishedQty) : []
 
-  const isWorkOrderMode = payload.registrationMode === '工单登记'
+  const registrationType =
+    payload.registrationType ||
+    (payload.registrationMode === '工单登记' || payload.workOrderId ? '工单登记' : '快速登记')
+  const isWorkOrderMode = registrationType === '工单登记'
   const workOrderNo = isWorkOrderMode
     ? payload.sourceWorkOrderNo || payload.workOrderNo
     : generateWorkOrderNo(payload.reportDate)
@@ -174,12 +182,14 @@ export function submitQuickReport(payload) {
     finishedQty,
     routeId: payload.routeId,
     routeName: payload.routeName,
-    perProcessMode: !!payload.perProcessMode,
+    perProcessRegister,
+    perProcessMode: perProcessRegister,
     processes: activeProcesses,
     operators,
     workOrderNo,
     workOrderId: isWorkOrderMode ? payload.workOrderId || '' : '',
-    registrationMode: isWorkOrderMode ? '工单登记' : '快速登记',
+    registrationType,
+    registrationMode: registrationType,
     workOrderStatus: '已报工',
     reporter: payload.reporter || 'admin1',
     remark: payload.remark || '',

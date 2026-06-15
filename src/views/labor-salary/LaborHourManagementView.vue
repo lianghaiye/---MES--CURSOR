@@ -28,11 +28,7 @@
           </a-col>
           <a-col :xs="24" :sm="12" :md="8" :xl="8">
             <a-form-item label="工单日期">
-              <a-range-picker
-                v-model:value="dateRangeValue"
-                size="small"
-                style="width: 100%"
-              />
+              <a-range-picker v-model:value="dateRangeValue" size="small" style="width: 100%" />
             </a-form-item>
           </a-col>
           <a-col :span="24">
@@ -57,10 +53,7 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'auditStatus'">
-          <a-badge
-            :status="statusBadge(record.auditStatus)"
-            :text="record.auditStatus"
-          />
+          <a-badge :status="statusBadge(record.auditStatus)" :text="record.auditStatus" />
         </template>
         <template v-else-if="column.key === 'workOrderCode'">
           <a @click="openDetail(record)">{{ record.workOrderCode }}</a>
@@ -110,13 +103,20 @@ const dateRangeValue = computed({
     return [dayjs(r[0]), dayjs(r[1])]
   },
   set(val) {
-    filters.dateRange = val?.length === 2 ? [val[0].format('YYYY-MM-DD'), val[1].format('YYYY-MM-DD')] : null
+    filters.dateRange =
+      val?.length === 2 ? [val[0].format('YYYY-MM-DD'), val[1].format('YYYY-MM-DD')] : null
   },
 })
 
 const columns = [
   { title: '状态', key: 'auditStatus', dataIndex: 'auditStatus', width: 100, fixed: 'left' },
-  { title: '工单编号', key: 'workOrderCode', dataIndex: 'workOrderCode', width: 170, fixed: 'left' },
+  {
+    title: '工单编号',
+    key: 'workOrderCode',
+    dataIndex: 'workOrderCode',
+    width: 170,
+    fixed: 'left',
+  },
   { title: '工单名称', dataIndex: 'workOrderName', width: 180, ellipsis: true },
   { title: '销售单号', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '物品名称', dataIndex: 'materialName', width: 140, ellipsis: true },

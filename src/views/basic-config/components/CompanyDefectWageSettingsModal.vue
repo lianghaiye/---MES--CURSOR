@@ -72,16 +72,8 @@
           </template>
         </template>
       </a-table>
-      <div class="rate-hint">
-        折扣率越高，工人承担的责任越少；折扣率越低，工人承担的责任越多。
-      </div>
-      <a-button
-        type="dashed"
-        block
-        class="add-row-btn"
-        :disabled="!canAddRow"
-        @click="addRow"
-      >
+      <div class="rate-hint">折扣率越高，工人承担的责任越少；折扣率越低，工人承担的责任越多。</div>
+      <a-button type="dashed" block class="add-row-btn" :disabled="!canAddRow" @click="addRow">
         <PlusOutlined />
         新增一行
       </a-button>
@@ -130,7 +122,10 @@ const tableColumns = [
 
 const canAddRow = computed(() => {
   const used = new Set(form.rules.map((r) => r.responsibility).filter(Boolean))
-  return form.rules.length < defectResponsibilityOptions.length && used.size < defectResponsibilityOptions.length
+  return (
+    form.rules.length < defectResponsibilityOptions.length &&
+    used.size < defectResponsibilityOptions.length
+  )
 })
 
 watch(
@@ -145,7 +140,10 @@ watch(
 
 function getResponsibilityOptions(record) {
   const used = new Set(
-    form.rules.filter((r) => r.id !== record.id).map((r) => r.responsibility).filter(Boolean),
+    form.rules
+      .filter((r) => r.id !== record.id)
+      .map((r) => r.responsibility)
+      .filter(Boolean),
   )
   return defectResponsibilitySelectOptions.map((opt) => ({
     ...opt,

@@ -736,9 +736,7 @@ function generatePurchaseReq() {
 
 function handlePurchaseReqSave(requisition) {
   addPurchaseRequisition(requisition)
-  message.success(
-    `已生成采购申请 ${requisition.reqNo}，共 ${requisition.lineItems.length} 条物料`,
-  )
+  message.success(`已生成采购申请 ${requisition.reqNo}，共 ${requisition.lineItems.length} 条物料`)
 }
 
 function handleWorkOrderSave(savedRows) {

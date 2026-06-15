@@ -22,9 +22,7 @@ function resolveTeam(reporter) {
   if (!reporter) return '—'
   void employeeGroupState.groups
   const hit = employeeGroupState.groups.find(
-    (g) =>
-      g.leaderName === reporter ||
-      (g.workers || []).some((w) => w.name === reporter),
+    (g) => g.leaderName === reporter || (g.workers || []).some((w) => w.name === reporter),
   )
   return hit?.name || '—'
 }
@@ -32,9 +30,7 @@ function resolveTeam(reporter) {
 function resolveEbomLabel(productName, bomName) {
   void productBomState.boms
   const hit = productBomState.boms.find(
-    (b) =>
-      b.status === '使用中' &&
-      (b.productName === productName || b.bomName === bomName),
+    (b) => b.status === '使用中' && (b.productName === productName || b.bomName === bomName),
   )
   if (hit) return `${hit.bomName} ${hit.version}`
   if (bomName) return `${bomName} —`
@@ -65,8 +61,10 @@ function mapRecordToLine(record, index) {
     taskNo: buildTaskNo(record, index),
     team: record.team || resolveTeam(record.reporter),
     defectReason: record.defectReason || enriched.defectItems || '—',
-    taskStartTime: record.taskStartTime || (datePrefix ? `${datePrefix} ${record.startTime || '08:00'}` : '—'),
-    taskEndTime: record.taskEndTime || (datePrefix ? `${datePrefix} ${record.endTime || '18:00'}` : '—'),
+    taskStartTime:
+      record.taskStartTime || (datePrefix ? `${datePrefix} ${record.startTime || '08:00'}` : '—'),
+    taskEndTime:
+      record.taskEndTime || (datePrefix ? `${datePrefix} ${record.endTime || '18:00'}` : '—'),
     workHours: record.workHours ?? '—',
   }
 }
@@ -93,8 +91,7 @@ export function calcProcessReportStats(records = []) {
 }
 
 export function summarizeProcessReportLines(lines = []) {
-  const sum = (key) =>
-    lines.reduce((s, l) => s + (Number(l[key]) || 0), 0)
+  const sum = (key) => lines.reduce((s, l) => s + (Number(l[key]) || 0), 0)
   const workHours = lines.reduce((s, l) => {
     const h = Number(l.workHours)
     return s + (Number.isFinite(h) ? h : 0)

@@ -186,7 +186,7 @@ const columns = [
   { title: '良品数', dataIndex: 'goodQty', width: 80, align: 'right' },
   { title: '不良品数', dataIndex: 'defectQty', width: 88, align: 'right' },
   { title: '工序', dataIndex: 'processName', width: 100 },
-  { title: '不良项', dataIndex: 'defectItems', width: 120, ellipsis: true },
+  { title: '不良原因', dataIndex: 'defectItems', width: 160, ellipsis: true },
   { title: '执行人', dataIndex: 'reporter', width: 90 },
   { title: '工作中心', dataIndex: 'workCenter', width: 110 },
   { title: '报工类型', dataIndex: 'reportType', width: 100 },

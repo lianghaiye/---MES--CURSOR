@@ -8,8 +8,7 @@ export function normalizeDefectItem(item = {}) {
       : null
 
   if (affectWageDiscount && !wageCalculationMethod) {
-    wageCalculationMethod =
-      wageDiscountRate != null ? '打折计工资' : '全额计工资'
+    wageCalculationMethod = wageDiscountRate != null ? '打折计工资' : '全额计工资'
   }
   if (!affectWageDiscount) {
     wageCalculationMethod = ''

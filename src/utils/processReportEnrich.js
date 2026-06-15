@@ -1,6 +1,13 @@
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { personnelList } from '@/mock/personnel'
+import {
+  breakdownToLegacy,
+  ensureDefectBreakdown,
+  resolveDefectReasonLabel,
+} from '@/utils/defectBreakdown'
+import { resolveDefectItemsByIds } from '@/store/defectItemStore'
+import { resolveReportMode } from '@/utils/reportMode'
 
 function findMasterByCode(code) {
   if (!code) return null
@@ -23,14 +30,19 @@ function resolveReporterWorkCenter(reporter) {
 export function enrichProcessReportRecord(record) {
   if (!record) return null
   const master = findMasterByCode(record.productCode)
+  const items = resolveDefectItemsByIds(record.defectItemIds || [])
+  const defectBreakdown = ensureDefectBreakdown(record, items)
+  const legacy = breakdownToLegacy(defectBreakdown)
   return {
     ...record,
+    ...legacy,
     reportSourceLabel: record.source === 'workorder' ? '任务报工' : '快速报工',
     reportDate: (record.createdAt || '').slice(0, 10) || '—',
     specModel: master?.specModel || '—',
     material: master?.material || '—',
     workCenter: resolveReporterWorkCenter(record.reporter),
-    defectItems: record.defectItemNames?.length ? record.defectItemNames.join('、') : '—',
-    reportType: record.reportMode || '—',
+    defectItems: resolveDefectReasonLabel({ ...record, ...legacy }, items),
+    defectReason: legacy.defectReasonLabel,
+    reportType: resolveReportMode(record.reportMode) || record.reportMode || '—',
   }
 }

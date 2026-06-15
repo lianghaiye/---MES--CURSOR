@@ -38,17 +38,34 @@
             </a-col>
             <a-col :xs="24" :md="8">
               <div class="field-label">排产数量</div>
-              <a-input :value="`${selectedWorkOrder.scheduleQty ?? selectedWorkOrder.planQty ?? 0} 件`" disabled />
+              <a-input
+                :value="`${selectedWorkOrder.scheduleQty ?? selectedWorkOrder.planQty ?? 0} 件`"
+                disabled
+              />
             </a-col>
           </template>
         </a-row>
       </section>
 
       <section class="form-section">
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-title">按工序登记</div>
+            <div class="toggle-hint">
+              {{ form.perProcessRegister ? '各工序分别登记数量与人员' : '整体登记完工数量' }}
+            </div>
+          </div>
+          <a-switch
+            v-model:checked="form.perProcessRegister"
+            @change="onPerProcessRegisterChange"
+          />
+        </div>
+
         <div class="section-head">
           <span class="section-title">{{ isWorkOrderMode ? '登记数量' : '产品信息' }}</span>
           <a-tag color="error">必填</a-tag>
         </div>
+
         <a-row :gutter="[16, 12]">
           <a-col v-if="!isWorkOrderMode" :span="24">
             <div class="field-label required">产品</div>
@@ -58,31 +75,58 @@
               @select="onProductSelect"
             />
           </a-col>
-          <a-col :xs="24" :md="8">
-            <div class="field-label required">良品数</div>
-            <a-input-number
-              v-model:value="form.goodQty"
-              :min="0"
-              style="width: 100%"
-              addon-after="件"
-              @change="onReportQtyChange"
+
+          <a-col v-if="!form.perProcessRegister" :span="24">
+            <a-alert
+              type="warning"
+              show-icon
+              message="整体登记不支持工时工资的核算"
+              class="overall-warning"
             />
           </a-col>
-          <a-col :xs="24" :md="8">
-            <div class="field-label required">不良品数</div>
-            <a-input-number
-              v-model:value="form.defectQty"
-              :min="0"
-              style="width: 100%"
-              addon-after="件"
-              @change="onReportQtyChange"
-            />
+
+          <a-col v-if="isWorkOrderMode && !form.perProcessRegister" :span="24">
+            <div class="qty-hint">报工数量可小于排产数量</div>
           </a-col>
-          <a-col :xs="24" :md="8">
-            <div class="field-label">合计完工</div>
-            <a-input :value="`${totalReportQty} 件`" disabled />
-          </a-col>
-          <a-col :xs="24" :md="12">
+
+          <template v-if="!form.perProcessRegister">
+            <a-col :xs="24" :md="8">
+              <div class="field-label required">良品数</div>
+              <a-input-number
+                v-model:value="form.goodQty"
+                :min="0"
+                style="width: 100%"
+                addon-after="件"
+                @change="normalizeFormQty"
+              />
+            </a-col>
+            <a-col :xs="24" :md="8">
+              <div class="field-label">不良品数</div>
+              <a-input-number
+                v-model:value="form.defectQty"
+                :min="0"
+                style="width: 100%"
+                addon-after="件"
+                @change="normalizeFormQty"
+              />
+            </a-col>
+            <a-col :xs="24" :md="8">
+              <div class="field-label">合计完工</div>
+              <a-input :value="`${totalReportQty} 件`" disabled />
+            </a-col>
+            <a-col :span="24">
+              <div class="field-label">操作人员（选填）</div>
+              <a-select
+                v-model:value="form.operators"
+                mode="multiple"
+                placeholder="请选择操作人员"
+                :options="personnelOptions"
+                style="width: 100%"
+              />
+            </a-col>
+          </template>
+
+          <a-col :span="24">
             <div class="field-label required">生产日期</div>
             <a-space wrap :size="8">
               <a-radio-group v-model:value="dateChip" size="small" @change="onDateChipChange">
@@ -102,18 +146,10 @@
         </a-row>
       </section>
 
-      <section class="form-section">
+      <section v-if="form.perProcessRegister" class="form-section">
         <div class="section-head">
           <span class="section-title">生产详情</span>
           <a-tag>可选</a-tag>
-        </div>
-
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-title">按工序指定人员</div>
-            <div class="toggle-hint">关闭：所有工序统一人员 · 打开：每道工序单独指定</div>
-          </div>
-          <a-switch v-model:checked="form.perProcessMode" />
         </div>
 
         <a-row v-if="form.routeName" :gutter="16" class="route-row">
@@ -174,7 +210,7 @@
                 </template>
                 <template v-else-if="column.key === 'operators'">
                   <a-select
-                    v-if="!record.deleted && form.perProcessMode"
+                    v-if="!record.deleted"
                     v-model:value="record.operators"
                     mode="multiple"
                     size="small"
@@ -201,18 +237,13 @@
             </a-button>
           </a-collapse-panel>
         </a-collapse>
-
-        <div v-if="!form.perProcessMode" class="operator-block">
-          <div class="field-label required">操作人员（整体）</div>
-          <a-select
-            v-model:value="form.operators"
-            mode="multiple"
-            placeholder="请选择操作人员"
-            :options="personnelOptions"
-            style="width: 100%"
-          />
-        </div>
       </section>
+
+      <div v-if="form.perProcessRegister" class="qty-summary-bar">
+        良品 <span class="qty-good">{{ form.goodQty ?? 0 }}</span> · 不良
+        <span class="qty-defect">{{ form.defectQty ?? 0 }}</span> · 合计
+        <span class="qty-total">{{ totalReportQty }}</span> 件
+      </div>
 
       <section class="form-section">
         <div class="section-head">
@@ -289,8 +320,8 @@ const workOrderOptions = computed(() =>
   })),
 )
 
-const selectedWorkOrder = computed(() =>
-  dispatchedWorkOrders.value.find((wo) => wo.id === form.workOrderId) || null,
+const selectedWorkOrder = computed(
+  () => dispatchedWorkOrders.value.find((wo) => wo.id === form.workOrderId) || null,
 )
 
 const form = reactive({
@@ -303,7 +334,7 @@ const form = reactive({
   defectQty: 0,
   routeId: undefined,
   routeName: '',
-  perProcessMode: false,
+  perProcessRegister: true,
   processes: [],
   operators: [],
   remark: '',
@@ -327,18 +358,13 @@ const excludeProcessNames = computed(() =>
   form.processes.filter((p) => !p.deleted).map((p) => p.name),
 )
 
-const processColumns = computed(() => {
-  const cols = [
-    { title: '工序名称', key: 'name', width: form.perProcessMode ? 140 : 180 },
-    { title: '良品数', key: 'goodQty', width: 96, align: 'right' },
-    { title: '不良品数', key: 'defectQty', width: 96, align: 'right' },
-  ]
-  if (form.perProcessMode) {
-    cols.push({ title: '操作人员', key: 'operators', width: 220 })
-  }
-  cols.push({ title: '操作', key: 'action', width: 80 })
-  return cols
-})
+const processColumns = [
+  { title: '工序名称', key: 'name', width: 140 },
+  { title: '良品数', key: 'goodQty', width: 96, align: 'right' },
+  { title: '不良品数', key: 'defectQty', width: 96, align: 'right' },
+  { title: '操作人员', key: 'operators', width: 220 },
+  { title: '操作', key: 'action', width: 80 },
+]
 
 watch(
   () => props.open,
@@ -362,13 +388,50 @@ function resetForm() {
   form.defectQty = 0
   form.routeId = undefined
   form.routeName = ''
-  form.perProcessMode = false
+  form.perProcessRegister = true
   form.processes = []
   form.operators = [...getLastOperators()]
   form.remark = ''
   dateChip.value = 'today'
   routeOptions.value = []
   processCollapse.value = ['process']
+}
+
+function normalizeFormQty() {
+  form.goodQty = Math.max(0, Number(form.goodQty) || 0)
+  form.defectQty = Math.max(0, Number(form.defectQty) || 0)
+}
+
+function syncFormQtyFromProcesses() {
+  const active = form.processes.filter((p) => !p.deleted)
+  if (!active.length) {
+    normalizeFormQty()
+    return
+  }
+  form.goodQty = Math.max(...active.map((p) => Number(p.goodQty) || 0), 0)
+  form.defectQty = Math.max(...active.map((p) => Number(p.defectQty) || 0), 0)
+}
+
+function syncProcessQtyFromForm() {
+  normalizeFormQty()
+  const qtys = { goodQty: form.goodQty, defectQty: form.defectQty }
+  form.processes.forEach((p) => {
+    if (!p.deleted) Object.assign(p, resolveProcessQuantities(qtys))
+  })
+}
+
+function onPerProcessRegisterChange(checked) {
+  if (checked) {
+    if (!form.processes.length && form.routeName) {
+      applyRoute(form.routeName)
+    } else if (form.processes.length) {
+      syncProcessQtyFromForm()
+    }
+    syncFormQtyFromProcesses()
+  } else {
+    syncFormQtyFromProcesses()
+    if (!form.operators.length) form.operators = [...getLastOperators()]
+  }
 }
 
 function onWorkOrderChange(workOrderId) {
@@ -405,11 +468,16 @@ function onProductSelect(item) {
 function applyRoute(routeName) {
   form.routeName = routeName
   form.routeId = routeName
+  const lastOps = getLastOperators()
   form.processes = buildQuickReportProcessesFromRoute(routeName, {
     goodQty: form.goodQty,
     defectQty: form.defectQty,
     finishedQty: totalReportQty.value,
-  })
+  }).map((p) => ({
+    ...p,
+    operators: p.operators?.length ? p.operators : [...lastOps],
+  }))
+  if (form.perProcessRegister) syncFormQtyFromProcesses()
 }
 
 function onRouteChange(routeName) {
@@ -424,23 +492,19 @@ function onDateChipChange() {
   }
 }
 
-function onReportQtyChange() {
-  const qtys = { goodQty: form.goodQty, defectQty: form.defectQty }
-  form.processes.forEach((p) => {
-    if (!p.deleted) Object.assign(p, resolveProcessQuantities(qtys))
-  })
-}
-
 function onProcessQtyChange(record) {
   Object.assign(record, resolveProcessQuantities(record))
+  syncFormQtyFromProcesses()
 }
 
 function softDeleteProcess(index) {
   form.processes[index].deleted = true
+  syncFormQtyFromProcesses()
 }
 
 function undoDeleteProcess(index) {
   form.processes[index].deleted = false
+  syncFormQtyFromProcesses()
 }
 
 function openProcessSelect() {
@@ -470,6 +534,7 @@ function onProcessesSelected(rows) {
     )
   })
   processCollapse.value = ['process']
+  syncFormQtyFromProcesses()
 }
 
 function handleCancel() {
@@ -481,10 +546,16 @@ function handleSubmit() {
     message.warning('请选择生产工单')
     return
   }
+  if (form.perProcessRegister) {
+    syncFormQtyFromProcesses()
+  } else {
+    normalizeFormQty()
+  }
+
   submitting.value = true
   const wo = selectedWorkOrder.value
   const res = submitQuickReport({
-    registrationMode: isWorkOrderMode.value ? '工单登记' : '快速登记',
+    registrationType: isWorkOrderMode.value ? '工单登记' : '快速登记',
     workOrderId: isWorkOrderMode.value ? form.workOrderId : '',
     sourceWorkOrderNo: wo?.code || '',
     productId: form.productId,
@@ -495,9 +566,9 @@ function handleSubmit() {
     defectQty: form.defectQty,
     routeId: form.routeId,
     routeName: form.routeName,
-    perProcessMode: form.perProcessMode,
-    processes: form.processes,
-    operators: form.operators,
+    perProcessRegister: form.perProcessRegister,
+    processes: form.perProcessRegister ? form.processes : [],
+    operators: form.perProcessRegister ? [] : form.operators,
     remark: form.remark,
     reporter: 'admin1',
   })
@@ -582,6 +653,16 @@ function handleSubmit() {
     color: #8c8c8c;
   }
 
+  .overall-warning {
+    margin-bottom: 4px;
+  }
+
+  .qty-hint {
+    font-size: 12px;
+    color: #8c8c8c;
+    margin-bottom: 4px;
+  }
+
   .route-row {
     margin-bottom: 12px;
   }
@@ -610,10 +691,32 @@ function handleSubmit() {
     margin-right: 8px;
   }
 
-  .operator-block {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #f0f0f0;
+  .qty-summary-bar {
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #595959;
+  }
+
+  .qty-good {
+    margin: 0 4px;
+    font-weight: 600;
+    color: #52c41a;
+  }
+
+  .qty-defect {
+    margin: 0 4px;
+    font-weight: 600;
+    color: #ff4d4f;
+  }
+
+  .qty-total {
+    margin: 0 4px;
+    font-weight: 600;
+    color: #1677ff;
   }
 }
 </style>

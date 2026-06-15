@@ -1,6 +1,10 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { buildLaborHourRecord, filterLaborHourOrders, getPreviousPeriodRange } from '@/mock/laborHourManagement'
+import {
+  buildLaborHourRecord,
+  filterLaborHourOrders,
+  getPreviousPeriodRange,
+} from '@/mock/laborHourManagement'
 import { LABOR_DEMO_WORK_ORDER_IDS } from '@/mock/laborHourDemoSeed'
 import { calcAutoDurationHours, enrichLaborLine, summarizeLaborLines } from '@/utils/laborHourCalc'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
@@ -101,7 +105,8 @@ function mapWorkOrderToLaborCandidate(wo, workOrderType) {
     owner: wo.owner || 'admin1',
     scheduleQty: wo.scheduleQty ?? wo.planQty ?? 0,
     createdAt: wo.createdAt ? `${wo.createdAt} 09:00:00` : dayjs().format('YYYY-MM-DD HH:mm'),
-    completedAt: wo.status === '完成' ? `${wo.createdAt || dayjs().format('YYYY-MM-DD')} 18:00:00` : '',
+    completedAt:
+      wo.status === '完成' ? `${wo.createdAt || dayjs().format('YYYY-MM-DD')} 18:00:00` : '',
     latestSubmitAt: dayjs().format('YYYY-MM-DD HH:mm'),
     lines,
   })

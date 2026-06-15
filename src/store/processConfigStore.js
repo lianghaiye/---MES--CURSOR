@@ -207,7 +207,9 @@ export function updateProcessConfig(id, payload) {
     remark: payload.remark?.trim() ?? row.remark,
     operations: normalizeOperations(payload.operations),
     defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
-    reportMode: payload.reportMode ? normalizeReportMode(payload.reportMode) : normalizeReportMode(row.reportMode),
+    reportMode: payload.reportMode
+      ? normalizeReportMode(payload.reportMode)
+      : normalizeReportMode(row.reportMode),
     defectItemIds: Array.isArray(payload.defectItemIds) ? [...payload.defectItemIds] : [],
     updatedAt: dayjs().format('YYYY-MM-DD'),
   })
