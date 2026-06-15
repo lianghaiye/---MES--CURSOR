@@ -8,6 +8,8 @@ import {
 } from '@/utils/defectBreakdown'
 import { resolveDefectItemsByIds } from '@/store/defectItemStore'
 import { resolveReportMode } from '@/utils/reportMode'
+import { resolveLaborConfig } from '@/utils/laborConfigResolver'
+import { calcProcessReportWage } from '@/utils/processReportWageCalc'
 
 function findMasterByCode(code) {
   if (!code) return null
@@ -33,6 +35,9 @@ export function enrichProcessReportRecord(record) {
   const items = resolveDefectItemsByIds(record.defectItemIds || [])
   const defectBreakdown = ensureDefectBreakdown(record, items)
   const legacy = breakdownToLegacy(defectBreakdown)
+  const config = resolveLaborConfig(record.productCode, record.processName)
+  const wageLine = { ...record, ...legacy, defectBreakdown: legacy.defectBreakdown }
+  const wage = calcProcessReportWage(config, wageLine)
   return {
     ...record,
     ...legacy,
@@ -43,6 +48,12 @@ export function enrichProcessReportRecord(record) {
     workCenter: resolveReporterWorkCenter(record.reporter),
     defectItems: resolveDefectReasonLabel({ ...record, ...legacy }, items),
     defectReason: legacy.defectReasonLabel,
-    reportType: resolveReportMode(record.reportMode) || record.reportMode || '—',
+    reportType: config?.reportType || resolveReportMode(record.reportMode) || record.reportMode || '—',
+    salaryMethod: config?.salaryMethod || '—',
+    calcMethod:
+      config?.reportType && config?.salaryMethod
+        ? `${config.reportType}+${config.salaryMethod}`
+        : '—',
+    salaryAmount: wage.salaryAmount,
   }
 }

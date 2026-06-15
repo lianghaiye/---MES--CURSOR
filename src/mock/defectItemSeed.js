@@ -6,6 +6,10 @@ export function normalizeDefectItem(item = {}) {
     item.wageDiscountRate != null && item.wageDiscountRate !== ''
       ? Number(item.wageDiscountRate)
       : null
+  const fixedDeductionAmount =
+    item.fixedDeductionAmount != null && item.fixedDeductionAmount !== ''
+      ? Number(item.fixedDeductionAmount)
+      : null
 
   if (affectWageDiscount && !wageCalculationMethod) {
     wageCalculationMethod = wageDiscountRate != null ? '打折计工资' : '全额计工资'
@@ -23,6 +27,10 @@ export function normalizeDefectItem(item = {}) {
     wageCalculationMethod,
     wageDiscountRate:
       affectWageDiscount && wageCalculationMethod === '打折计工资' ? wageDiscountRate : null,
+    fixedDeductionAmount:
+      affectWageDiscount && wageCalculationMethod === '固定扣款金额'
+        ? fixedDeductionAmount
+        : null,
     description: item.description || '',
     createdAt: item.createdAt || '',
   }
@@ -106,6 +114,17 @@ export function createDefectItemSeed() {
       responsibility: '非工人责任',
       createdAt: '2026-01-10',
     }),
+    normalizeDefectItem({
+      id: 'di-9',
+      code: 'BL202512310008',
+      name: '裂纹',
+      affectWageDiscount: true,
+      responsibility: '工人责任',
+      wageCalculationMethod: '固定扣款金额',
+      fixedDeductionAmount: 5,
+      description: '铸件裂纹，按固定金额扣款',
+      createdAt: '2026-01-12',
+    }),
   ]
 }
 
@@ -117,9 +136,16 @@ export const PROCESS_DEFECT_ITEM_MAP = {
   车削: ['di-2', 'di-3', 'di-6'],
   铣削: ['di-3', 'di-6'],
   热处理: ['di-8', 'di-1'],
-  粗车: ['di-2', 'di-3'],
+  粗车: ['di-2', 'di-3', 'di-9'],
   精车: ['di-6', 'di-7'],
   焊接: ['di-4', 'di-5'],
+  领料: ['di-2', 'di-3', 'di-1'],
+  机加工: ['di-2', 'di-6'],
+  轴承装配: ['di-7', 'di-1'],
+  检验: ['di-8', 'di-1', 'di-6'],
+  调试: ['di-1', 'di-7'],
+  预装: ['di-4', 'di-7'],
+  入库: ['di-1', 'di-8'],
 }
 
 export const PROCESS_REPORT_MODE_MAP = {
@@ -136,4 +162,6 @@ export const PROCESS_REPORT_MODE_MAP = {
   调试: '时长报工',
   检验: '时长报工',
   领料: '批量计件',
+  预装: '批量计件',
+  入库: '时长报工',
 }

@@ -1,6 +1,7 @@
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { legacyReportTypeMap, legacySalaryMethodMap } from '@/mock/materialInfoOptions'
+import { PROCESS_REPORT_LABOR_BY_CODE } from '@/mock/processReportLaborConfig'
 
 function normalizeLaborRow(row = {}) {
   if (!row) return null
@@ -27,11 +28,16 @@ function findInList(list, materialCode, processName) {
 export function resolveLaborConfig(materialCode, processName) {
   void productInfoState.products
   void materialInfoState.materials
-  return (
+  const fromMaster =
     findInList(productInfoState.products, materialCode, processName) ||
-    findInList(materialInfoState.materials, materialCode, processName) ||
-    null
-  )
+    findInList(materialInfoState.materials, materialCode, processName)
+  if (fromMaster) return fromMaster
+
+  const fallback = PROCESS_REPORT_LABOR_BY_CODE[materialCode]
+  if (!fallback?.laborEnabled || !fallback.laborRows?.length) return null
+  const hit =
+    fallback.laborRows.find((r) => r.processName === processName) || fallback.laborRows[0]
+  return normalizeLaborRow(hit)
 }
 
 export function laborCalcMethodLabel(reportType, salaryMethod) {

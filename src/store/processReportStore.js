@@ -8,12 +8,16 @@ import {
   createProcessReportSeed,
   filterProcessReports,
   normalizeProcessReport,
+  createProcessReportWoLogSeed,
 } from '@/mock/processReportRecords'
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import {
   buildProcessReportWorkOrderBundle,
   calcProcessReportStats,
 } from '@/utils/processReportWorkOrder'
+import { calcAutoDurationHours } from '@/utils/laborHourCalc'
+import { resolveLaborConfig } from '@/utils/laborConfigResolver'
+import { breakdownToLegacy } from '@/utils/defectBreakdown'
 
 function shouldReseed() {
   return localStorage.getItem(PROCESS_REPORT_SEED_VERSION_KEY) !== PROCESS_REPORT_SEED_VERSION
@@ -24,6 +28,10 @@ function loadRecords() {
     const seed = createProcessReportSeed()
     localStorage.setItem(PROCESS_REPORT_STORAGE_KEY, JSON.stringify(seed))
     localStorage.setItem(PROCESS_REPORT_SEED_VERSION_KEY, PROCESS_REPORT_SEED_VERSION)
+    localStorage.setItem(
+      PROCESS_REPORT_WO_LOG_KEY,
+      JSON.stringify(createProcessReportWoLogSeed()),
+    )
     return seed
   }
   try {
@@ -40,6 +48,7 @@ function loadRecords() {
   const seed = createProcessReportSeed()
   localStorage.setItem(PROCESS_REPORT_STORAGE_KEY, JSON.stringify(seed))
   localStorage.setItem(PROCESS_REPORT_SEED_VERSION_KEY, PROCESS_REPORT_SEED_VERSION)
+  localStorage.setItem(PROCESS_REPORT_WO_LOG_KEY, JSON.stringify(createProcessReportWoLogSeed()))
   return seed
 }
 
@@ -175,4 +184,68 @@ export function batchRejectProcessReports(ids, reason, operator = 'admin1') {
   if (!pending.length) return { ok: false, message: '请选择待审核记录' }
   pending.forEach((id) => rejectProcessReport(id, reason, operator))
   return { ok: true, message: `已拒绝 ${pending.length} 条` }
+}
+
+export function adjustProcessReportLine(recordId, payload = {}) {
+  const row = processReportState.records.find((r) => r.id === recordId)
+  if (!row) return { ok: false, message: '记录不存在' }
+  if (row.status === '已审核') return { ok: false, message: '已审核数据不可调整' }
+
+  const patch = {}
+  if (payload.adjustedGoodQty != null) patch.adjustedGoodQty = payload.adjustedGoodQty
+  if (payload.adjustedDefectQty != null) patch.adjustedDefectQty = payload.adjustedDefectQty
+  if (payload.adjustedWorkHours != null) patch.adjustedWorkHours = payload.adjustedWorkHours
+  if (payload.adjustReason != null) patch.adjustReason = payload.adjustReason
+  if (payload.adjustedDefectBreakdown != null) {
+    const legacy = breakdownToLegacy(payload.adjustedDefectBreakdown)
+    patch.adjustedDefectBreakdown = legacy.defectBreakdown
+  }
+
+  const config = resolveLaborConfig(row.productCode, row.processName)
+  if (config?.reportType === '批量计件' && config?.salaryMethod === '计时工资') {
+    const qty = patch.adjustedGoodQty ?? row.adjustedGoodQty ?? row.goodQty ?? 0
+    patch.adjustedWorkHours = calcAutoDurationHours(config, qty)
+  }
+
+  updateRecord(recordId, patch)
+  if (row.workOrderId) {
+    appendWorkOrderLog(row.workOrderId, {
+      action: '调整',
+      target: row.taskNo || row.processName,
+      remark: payload.adjustReason || '',
+    })
+  }
+  return { ok: true }
+}
+
+export function subsidyProcessReportLine(recordId, payload = {}) {
+  const row = processReportState.records.find((r) => r.id === recordId)
+  if (!row) return { ok: false, message: '记录不存在' }
+  if (row.status === '已审核') return { ok: false, message: '已审核数据不可补贴' }
+
+  const config = resolveLaborConfig(row.productCode, row.processName)
+  const patch = {}
+  if (config?.salaryMethod === '计件工资') {
+    patch.subsidyReportQty = Number(payload.subsidyReportQty) || 0
+  } else {
+    patch.subsidyHours = Number(payload.subsidyHours) || 0
+  }
+  if (payload.subsidyReason != null) patch.subsidyReason = payload.subsidyReason
+
+  updateRecord(recordId, patch)
+  if (row.workOrderId) {
+    appendWorkOrderLog(row.workOrderId, {
+      action: '补贴',
+      target: row.taskNo || row.processName,
+      remark: payload.subsidyReason || '',
+    })
+  }
+  return { ok: true }
+}
+
+export function auditProcessReportLine(recordId, result, reason = '', operator = 'admin1') {
+  if (result === 'reject') {
+    return rejectProcessReport(recordId, reason, operator)
+  }
+  return approveProcessReport(recordId, operator)
 }

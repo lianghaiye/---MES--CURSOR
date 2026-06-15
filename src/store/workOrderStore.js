@@ -7,7 +7,7 @@ import {
   generateProductionWorkOrderCode,
   generateProductionWorkOrderName,
 } from '@/utils/workOrderNaming'
-import { createLaborDemoProductionOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
+import { createLaborDemoProductionOrders, createLaborDemoAssemblyOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
 
 const STORAGE_KEY = 'i_doms_work_orders'
 let codeSeq = 1
@@ -78,7 +78,7 @@ function ensureDemoWorkOrder(orders) {
 }
 
 function ensureLaborDemoProductionOrders(orders) {
-  const demos = createLaborDemoProductionOrders()
+  const demos = [...createLaborDemoProductionOrders(), ...createLaborDemoAssemblyOrders()]
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
   return [...demos, ...rest]
 }
@@ -92,6 +92,7 @@ function createInitialOrders() {
         code: 'WO202505280-001',
         name: '下导轴承座毛坯生产工单',
         productName: '下导轴承座毛坯',
+        materialCode: 'CP2510001',
         orderCategory: '生产工单',
         status: '待下发',
         scheduleQty: 12,
@@ -113,6 +114,7 @@ function createInitialOrders() {
         code: 'WO202505280-002',
         name: '上导轴承座生产工单',
         productName: '上导轴承座',
+        materialCode: 'CP2510002',
         orderCategory: '生产工单',
         status: '执行中',
         scheduleQty: 24,
@@ -136,6 +138,7 @@ function createInitialOrders() {
         code: 'WO202505280-003',
         name: '定子铁芯组件生产工单',
         productName: '定子铁芯组件',
+        materialCode: 'CP2510003',
         orderCategory: '生产工单',
         status: '完成',
         scheduleQty: 18,

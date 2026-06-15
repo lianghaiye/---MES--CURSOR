@@ -102,7 +102,11 @@
               record.wageCalculationMethod === '打折计工资' &&
               record.wageDiscountRate != null
                 ? `${record.wageDiscountRate}%`
-                : '—'
+                : record.affectWageDiscount &&
+                    record.wageCalculationMethod === '固定扣款金额' &&
+                    record.fixedDeductionAmount != null
+                  ? `${record.fixedDeductionAmount}元`
+                  : '—'
             }}
           </template>
           <template v-else-if="column.key === 'actions'">
@@ -154,7 +158,7 @@ const columns = [
   { title: '责任归属', dataIndex: 'responsibility', width: 110 },
   { title: '不良原因影响折扣率', key: 'affectWageDiscount', width: 150, align: 'center' },
   { title: '工资计算方式', key: 'wageCalculationMethod', width: 120 },
-  { title: '工资折扣率', key: 'wageDiscountRate', width: 100, align: 'right' },
+  { title: '折扣率/扣款金额', key: 'wageDiscountRate', width: 120, align: 'right' },
   { title: '说明', dataIndex: 'description', width: 180, ellipsis: true },
   { title: '操作', key: 'actions', width: 120, fixed: 'right' },
 ]

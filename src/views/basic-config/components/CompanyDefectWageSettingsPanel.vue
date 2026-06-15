@@ -28,7 +28,10 @@
           {{
             record.wageCalculationMethod === '打折计工资' && record.defaultDiscountRate != null
               ? `${record.defaultDiscountRate}%`
-              : '—'
+              : record.wageCalculationMethod === '固定扣款金额' &&
+                  record.fixedDeductionAmount != null
+                ? `${record.fixedDeductionAmount}元`
+                : '—'
           }}
         </template>
       </template>
@@ -45,7 +48,7 @@ const settings = computed(() => defectItemState.companyWageSettings)
 const columns = [
   { title: '责任归属', dataIndex: 'responsibility', width: 140 },
   { title: '不良品工资计算方式', dataIndex: 'wageCalculationMethod', width: 160 },
-  { title: '默认折扣率', key: 'defaultDiscountRate', width: 120, align: 'right' },
+  { title: '默认折扣率/扣款金额', key: 'defaultDiscountRate', width: 140, align: 'right' },
 ]
 </script>
 

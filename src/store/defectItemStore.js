@@ -4,7 +4,7 @@ import { createDefectItemSeed, normalizeDefectItem } from '@/mock/defectItemSeed
 
 const STORAGE_KEY = 'i_doms_defect_items'
 const SEED_VERSION_KEY = 'i_doms_defect_items_seed_v'
-const CURRENT_SEED_VERSION = '3'
+const CURRENT_SEED_VERSION = '4'
 const COMPANY_WAGE_SETTINGS_KEY = 'i_doms_defect_company_wage_settings'
 
 const DEFAULT_COMPANY_WAGE_SETTINGS = {
@@ -54,6 +54,7 @@ export function normalizeCompanyWageRule(rule = {}, index = 0) {
   const wageCalculationMethod =
     rule.wageCalculationMethod || DEFAULT_COMPANY_WAGE_SETTINGS.rules[0].wageCalculationMethod
   const rate = Number(rule.defaultDiscountRate)
+  const fixedAmount = Number(rule.fixedDeductionAmount)
   return {
     id: rule.id || `rule-${index + 1}`,
     responsibility: rule.responsibility || '',
@@ -61,6 +62,10 @@ export function normalizeCompanyWageRule(rule = {}, index = 0) {
     defaultDiscountRate:
       wageCalculationMethod === '打折计工资' && Number.isFinite(rate)
         ? Math.min(100, Math.max(0, Math.round(rate)))
+        : null,
+    fixedDeductionAmount:
+      wageCalculationMethod === '固定扣款金额' && Number.isFinite(fixedAmount)
+        ? Math.max(0, fixedAmount)
         : null,
   }
 }
@@ -162,6 +167,7 @@ export function addDefectItem(payload) {
     responsibility: payload.responsibility,
     wageCalculationMethod: payload.wageCalculationMethod,
     wageDiscountRate: payload.wageDiscountRate,
+    fixedDeductionAmount: payload.fixedDeductionAmount,
     description: payload.description,
     createdAt: dayjs().format('YYYY-MM-DD'),
   })
@@ -187,6 +193,7 @@ export function updateDefectItem(id, payload) {
       responsibility: payload.responsibility,
       wageCalculationMethod: payload.wageCalculationMethod,
       wageDiscountRate: payload.wageDiscountRate,
+      fixedDeductionAmount: payload.fixedDeductionAmount,
       description: payload.description,
     }),
   )

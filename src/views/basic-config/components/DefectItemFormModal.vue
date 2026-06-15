@@ -67,6 +67,23 @@
               折扣率越高，工人承担的责任越少；折扣率越低，工人承担的责任越多。
             </div>
           </a-form-item>
+          <a-form-item
+            v-if="form.wageCalculationMethod === '固定扣款金额'"
+            label="固定扣款金额"
+            name="fixedDeductionAmount"
+            required
+            class="section-field"
+          >
+            <a-input-number
+              v-model:value="form.fixedDeductionAmount"
+              :min="0"
+              :precision="2"
+              style="width: 100%"
+              addon-after="元"
+              placeholder="请输入扣款金额"
+            />
+            <div class="field-hint">每件不良品按固定金额从工资中扣减。</div>
+          </a-form-item>
         </template>
       </div>
 
@@ -117,6 +134,7 @@ const form = reactive({
   affectWageDiscount: false,
   wageCalculationMethod: undefined,
   wageDiscountRate: null,
+  fixedDeductionAmount: null,
   description: '',
 })
 
@@ -132,6 +150,10 @@ const rules = computed(() => ({
     form.affectWageDiscount && form.wageCalculationMethod === '打折计工资'
       ? [{ required: true, message: '请输入工资折扣率', trigger: 'change' }]
       : [],
+  fixedDeductionAmount:
+    form.affectWageDiscount && form.wageCalculationMethod === '固定扣款金额'
+      ? [{ required: true, message: '请输入固定扣款金额', trigger: 'change' }]
+      : [],
 }))
 
 watch(
@@ -144,6 +166,7 @@ watch(
     form.affectWageDiscount = Boolean(props.record?.affectWageDiscount)
     form.wageCalculationMethod = props.record?.wageCalculationMethod || undefined
     form.wageDiscountRate = props.record?.wageDiscountRate ?? null
+    form.fixedDeductionAmount = props.record?.fixedDeductionAmount ?? null
     form.description = props.record?.description || ''
   },
 )
@@ -154,6 +177,7 @@ watch(
     if (!enabled) {
       form.wageCalculationMethod = undefined
       form.wageDiscountRate = null
+      form.fixedDeductionAmount = null
     }
   },
 )
@@ -161,9 +185,16 @@ watch(
 watch(
   () => form.wageCalculationMethod,
   (method) => {
-    if (method !== '打折计工资') {
-      form.wageDiscountRate = null
+    if (method === '打折计工资') {
+      form.fixedDeductionAmount = null
+      return
     }
+    if (method === '固定扣款金额') {
+      form.wageDiscountRate = null
+      return
+    }
+    form.wageDiscountRate = null
+    form.fixedDeductionAmount = null
   },
 )
 
@@ -187,6 +218,10 @@ async function handleSave() {
     wageDiscountRate:
       form.affectWageDiscount && form.wageCalculationMethod === '打折计工资'
         ? form.wageDiscountRate
+        : null,
+    fixedDeductionAmount:
+      form.affectWageDiscount && form.wageCalculationMethod === '固定扣款金额'
+        ? form.fixedDeductionAmount
         : null,
     description: form.description,
   }

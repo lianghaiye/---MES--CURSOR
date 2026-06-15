@@ -6,6 +6,12 @@ import { employeeGroupState } from '@/store/employeeGroupStore'
 import { workOrderState } from '@/store/workOrderStore'
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import { formatReportDate } from '@/mock/processReportRecords'
+import { resolveLaborConfig } from '@/utils/laborConfigResolver'
+import { enrichProcessReportLine } from '@/utils/processReportWageCalc'
+import {
+  formatBreakdownLabel,
+  getApprovedDefectBreakdown,
+} from '@/utils/defectBreakdown'
 
 function findMasterByCode(code) {
   if (!code) return null
@@ -52,10 +58,11 @@ function buildTaskNo(record, index) {
   return `T${date}${String(index + 1).padStart(3, '0')}`
 }
 
-function mapRecordToLine(record, index) {
+function mapRecordToLine(record, index, materialCode) {
   const enriched = enrichProcessReportRecord(record)
   const datePrefix = (record.createdAt || '').slice(0, 10)
-  return {
+  const config = resolveLaborConfig(materialCode || record.productCode, record.processName)
+  const base = {
     ...enriched,
     seq: index + 1,
     taskNo: buildTaskNo(record, index),
@@ -66,6 +73,27 @@ function mapRecordToLine(record, index) {
     taskEndTime:
       record.taskEndTime || (datePrefix ? `${datePrefix} ${record.endTime || '18:00'}` : '—'),
     workHours: record.workHours ?? '—',
+    adjustedGoodQty: record.adjustedGoodQty,
+    adjustedDefectQty: record.adjustedDefectQty,
+    adjustedDefectBreakdown: record.adjustedDefectBreakdown,
+    adjustedWorkHours: record.adjustedWorkHours,
+    adjustReason: record.adjustReason || '',
+    subsidyReportQty: record.subsidyReportQty,
+    subsidyHours: record.subsidyHours,
+    subsidyReason: record.subsidyReason || '',
+    auditStatus: record.status,
+  }
+  const line = enrichProcessReportLine(base, config)
+  const effectiveBreakdown = getApprovedDefectBreakdown({
+    ...enriched,
+    ...base,
+    defectBreakdown: enriched.defectBreakdown,
+    adjustedDefectBreakdown: record.adjustedDefectBreakdown,
+  })
+  return {
+    ...line,
+    defectBreakdown: effectiveBreakdown,
+    defectReason: formatBreakdownLabel(effectiveBreakdown) || enriched.defectItems || '—',
   }
 }
 
@@ -113,9 +141,9 @@ export function buildProcessReportWorkOrderBundle(workOrderId, records, logs = [
     .filter((r) => r.source === 'workorder' && r.workOrderId === workOrderId)
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
 
-  const lines = taskRecords.map((r, i) => mapRecordToLine(r, i))
   const master = findMasterByCode(wo.materialCode || taskRecords[0]?.productCode)
   const productCode = wo.materialCode || master?.code || taskRecords[0]?.productCode || '—'
+  const lines = taskRecords.map((r, i) => mapRecordToLine(r, i, productCode))
 
   return {
     id: `pr-wo-${workOrderId}`,

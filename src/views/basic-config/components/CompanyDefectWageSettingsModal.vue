@@ -49,6 +49,7 @@
           </template>
           <template v-else-if="column.key === 'defaultDiscountRate'">
             <a-input-number
+              v-if="record.wageCalculationMethod === '打折计工资'"
               v-model:value="record.defaultDiscountRate"
               :min="0"
               :max="100"
@@ -56,8 +57,17 @@
               style="width: 100%"
               addon-after="%"
               placeholder="请输入"
-              :disabled="record.wageCalculationMethod !== '打折计工资'"
             />
+            <a-input-number
+              v-else-if="record.wageCalculationMethod === '固定扣款金额'"
+              v-model:value="record.fixedDeductionAmount"
+              :min="0"
+              :precision="2"
+              style="width: 100%"
+              addon-after="元"
+              placeholder="请输入"
+            />
+            <span v-else class="value-placeholder">—</span>
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-button
@@ -116,7 +126,7 @@ const form = reactive({
 const tableColumns = [
   { title: '责任归属', key: 'responsibility', width: 150 },
   { title: '不良品工资计算方式', key: 'wageCalculationMethod', width: 160 },
-  { title: '默认折扣率', key: 'defaultDiscountRate', width: 140 },
+  { title: '默认折扣率/扣款金额', key: 'defaultDiscountRate', width: 160 },
   { title: '操作', key: 'actions', width: 72, align: 'center' },
 ]
 
@@ -159,6 +169,7 @@ function createEmptyRule() {
     responsibility: nextResponsibility,
     wageCalculationMethod: '打折计工资',
     defaultDiscountRate: 50,
+    fixedDeductionAmount: null,
   }
 }
 
@@ -174,12 +185,18 @@ function removeRow(id) {
 }
 
 function handleMethodChange(record, method) {
-  if (method === '打折计工资' && record.defaultDiscountRate == null) {
-    record.defaultDiscountRate = 50
+  if (method === '打折计工资') {
+    if (record.defaultDiscountRate == null) record.defaultDiscountRate = 50
+    record.fixedDeductionAmount = null
+    return
   }
-  if (method !== '打折计工资') {
+  if (method === '固定扣款金额') {
+    if (record.fixedDeductionAmount == null) record.fixedDeductionAmount = 0
     record.defaultDiscountRate = null
+    return
   }
+  record.defaultDiscountRate = null
+  record.fixedDeductionAmount = null
 }
 
 function validateRules() {
@@ -205,6 +222,13 @@ function validateRules() {
       message.warning('请输入默认折扣率')
       return false
     }
+    if (
+      rule.wageCalculationMethod === '固定扣款金额' &&
+      (rule.fixedDeductionAmount == null || rule.fixedDeductionAmount === '')
+    ) {
+      message.warning('请输入固定扣款金额')
+      return false
+    }
   }
   return true
 }
@@ -224,6 +248,8 @@ function handleSave() {
       wageCalculationMethod: rule.wageCalculationMethod,
       defaultDiscountRate:
         rule.wageCalculationMethod === '打折计工资' ? rule.defaultDiscountRate : null,
+      fixedDeductionAmount:
+        rule.wageCalculationMethod === '固定扣款金额' ? rule.fixedDeductionAmount : null,
     })),
   })
   saving.value = false
@@ -275,5 +301,9 @@ function handleSave() {
 
 .add-row-btn {
   margin-top: 12px;
+}
+
+.value-placeholder {
+  color: rgba(0, 0, 0, 0.25);
 }
 </style>

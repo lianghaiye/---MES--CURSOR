@@ -26,7 +26,7 @@ export const LABOR_DEMO_WORK_ORDER_IDS = [
   'wo-lh-demo-4',
 ]
 
-const DEMO_MATERIAL_DEFS = [
+export const DEMO_MATERIAL_DEFS = [
   {
     code: 'LH-MAT-01',
     name: '工时演示-批量计件计件',

@@ -1,7 +1,36 @@
-import { resolveDefectItemsByIds } from '@/store/defectItemStore'
+import { resolveDefectItemsByIds, defectItemState } from '@/store/defectItemStore'
+import { getProcessByName } from '@/store/processConfigStore'
 
 export function sumBreakdownQty(breakdown = []) {
   return breakdown.reduce((sum, row) => sum + (Number(row.qty) || 0), 0)
+}
+
+export function getBreakdownQty(breakdown = [], itemId) {
+  const row = breakdown.find((b) => b.id === itemId)
+  return Number(row?.qty) || 0
+}
+
+export function setBreakdownQty(breakdown = [], item, qty) {
+  const list = [...breakdown]
+  const nextQty = Math.max(0, Number(qty) || 0)
+  const index = list.findIndex((b) => b.id === item.id)
+  if (nextQty <= 0) {
+    if (index >= 0) list.splice(index, 1)
+    return list
+  }
+  const row = { id: item.id, name: item.name, qty: nextQty }
+  if (index >= 0) list[index] = row
+  else list.push(row)
+  return list
+}
+
+export function changeBreakdownQty(breakdown = [], item, delta, defectQty = 0) {
+  const max = Number(defectQty) || 0
+  const current = getBreakdownQty(breakdown, item.id)
+  const allocated = sumBreakdownQty(breakdown)
+  const next = current + delta
+  if (delta > 0 && allocated >= max) return breakdown
+  return setBreakdownQty(breakdown, item, next)
 }
 
 export function formatBreakdownLabel(breakdown = []) {
@@ -42,6 +71,50 @@ export function migrateLegacyDefects(target = {}, items = []) {
 
 export function ensureDefectBreakdown(target = {}, items = []) {
   return migrateLegacyDefects(target, items)
+}
+
+export function autoFillSingleReason(process = {}, items = []) {
+  const defectQty = Number(process.defectQty) || 0
+  if (defectQty <= 0) return []
+  if (items.length !== 1) return process.defectBreakdown || []
+  const allocated = sumBreakdownQty(process.defectBreakdown)
+  if (allocated === defectQty) return process.defectBreakdown || []
+  return [{ id: items[0].id, name: items[0].name, qty: defectQty }]
+}
+
+export function syncDefectBreakdownOnQtyChange(process = {}, items = []) {
+  const defectQty = Number(process.defectQty) || 0
+  if (defectQty <= 0) return []
+  return autoFillSingleReason(process, items)
+}
+
+export function validateDefectBreakdown(defectQty, breakdown = [], items = []) {
+  const qty = Number(defectQty) || 0
+  if (qty <= 0 || !items.length) return null
+  const allocated = sumBreakdownQty(breakdown)
+  if (allocated !== qty) {
+    return `请分配全部 ${qty} 件不良原因（已分配 ${allocated} 件）`
+  }
+  return null
+}
+
+/** 工序可选不良品项：工序配置 + 当前已选原因 */
+export function resolveProcessDefectItems(processName, currentBreakdown = []) {
+  void defectItemState.items
+  const proc = getProcessByName(processName)
+  const ids = new Set([
+    ...(proc?.defectItemIds || []),
+    ...currentBreakdown.map((row) => row.id).filter(Boolean),
+  ])
+  if (!ids.size) return [...defectItemState.items]
+  return resolveDefectItemsByIds([...ids])
+}
+
+export function getApprovedDefectBreakdown(line = {}) {
+  if (line.adjustedDefectBreakdown?.length) {
+    return line.adjustedDefectBreakdown.filter((row) => Number(row.qty) > 0)
+  }
+  return (line.defectBreakdown || []).filter((row) => Number(row.qty) > 0)
 }
 
 export function resolveDefectReasonLabel(target = {}, items = []) {
