@@ -174,20 +174,12 @@
                 {{ record.production?.standardCycleDays ?? '—' }}
               </template>
               <template v-else-if="column.key === 'action'">
-                <a-space :size="0" class="action-btns">
-                  <a-button type="link" size="small" @click="openEdit(record)">
-                    <EditOutlined />
-                    编辑
-                  </a-button>
-                  <a-button type="link" size="small" danger @click="confirmDelete(record)">
-                    <DeleteOutlined />
-                    删除
-                  </a-button>
-                  <a-button type="link" size="small" @click="handleClone(record)">
-                    <CopyOutlined />
-                    克隆
-                  </a-button>
-                </a-space>
+                <MasterInfoRowActions
+                  @edit="openEdit(record)"
+                  @bom="openBomMaintenance(record)"
+                  @delete="confirmDelete(record)"
+                  @clone="handleClone(record)"
+                />
               </template>
             </template>
           </a-table>
@@ -230,6 +222,7 @@ export default { name: 'ProductInfoView' }
 
 <script setup>
 import { computed, h, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -237,8 +230,6 @@ import {
   ReloadOutlined,
   DeleteOutlined,
   DownOutlined,
-  EditOutlined,
-  CopyOutlined,
   SyncOutlined,
 } from '@ant-design/icons-vue'
 import {
@@ -256,9 +247,15 @@ import {
   cloneProduct,
 } from '@/store/productInfoStore'
 import ProductFormModal from './components/ProductFormModal.vue'
+import MasterInfoRowActions from './components/MasterInfoRowActions.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useTabs } from '@/composables/useTabs'
+import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const categoryKeyword = ref('')
 const selectedCategoryKey = ref('pcat-004')
@@ -390,7 +387,7 @@ const baseColumns = [
   { title: '标准制造周期(天)', key: 'standardCycleDays', width: 120, align: 'right' },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
-  { title: '操作', key: 'action', width: 240, fixed: 'right' },
+  { title: '操作', key: 'action', width: 180, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -472,6 +469,12 @@ function handleBatchDelete() {
 function handleClone(record) {
   const cloned = cloneProduct(record.id)
   if (cloned) message.success('已克隆')
+}
+
+function openBomMaintenance(record) {
+  const nav = resolveItemBomNavigation('product', record.id)
+  openTab(nav.path, nav.title)
+  router.push(nav.query ? { path: nav.path, query: nav.query } : nav.path)
 }
 
 function handleSyncSpec() {
@@ -623,11 +626,6 @@ function onAddCategory() {
   .link-code {
     color: #1677ff;
     cursor: pointer;
-  }
-
-  .action-btns {
-    flex-wrap: nowrap;
-    white-space: nowrap;
   }
 }
 

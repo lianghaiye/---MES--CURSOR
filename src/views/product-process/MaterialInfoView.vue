@@ -164,20 +164,12 @@
                 </a-tag>
               </template>
               <template v-else-if="column.key === 'action'">
-                <a-space :size="0" wrap>
-                  <a-button type="link" size="small" @click="openEdit(record)">
-                    <EditOutlined />
-                    编辑
-                  </a-button>
-                  <a-button type="link" size="small" danger @click="confirmDelete(record)">
-                    <DeleteOutlined />
-                    删除
-                  </a-button>
-                  <a-button type="link" size="small" @click="handleClone(record)">
-                    <CopyOutlined />
-                    克隆
-                  </a-button>
-                </a-space>
+                <MasterInfoRowActions
+                  @edit="openEdit(record)"
+                  @bom="openBomMaintenance(record)"
+                  @delete="confirmDelete(record)"
+                  @clone="handleClone(record)"
+                />
               </template>
             </template>
           </a-table>
@@ -221,6 +213,7 @@ export default { name: 'MaterialInfoView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -228,8 +221,6 @@ import {
   ReloadOutlined,
   DeleteOutlined,
   DownOutlined,
-  EditOutlined,
-  CopyOutlined,
 } from '@ant-design/icons-vue'
 import {
   materialCategoryTree,
@@ -246,9 +237,15 @@ import {
   cloneMaterial,
 } from '@/store/materialInfoStore'
 import MaterialFormModal from './components/MaterialFormModal.vue'
+import MasterInfoRowActions from './components/MasterInfoRowActions.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useTabs } from '@/composables/useTabs'
+import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const categoryKeyword = ref('')
 const selectedCategoryKey = ref(null)
@@ -330,7 +327,7 @@ const baseColumns = [
   { title: '领料属性', key: 'requisitionAttr', width: 90, align: 'center' },
   { title: '产品物料', key: 'isProductMaterial', width: 90, align: 'center' },
   { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
-  { title: '操作', key: 'action', width: 200, fixed: 'right' },
+  { title: '操作', key: 'action', width: 180, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -434,6 +431,12 @@ function handleBatchDelete() {
 function handleClone(record) {
   const cloned = cloneMaterial(record.id)
   if (cloned) message.success('已克隆')
+}
+
+function openBomMaintenance(record) {
+  const nav = resolveItemBomNavigation('material', record.id)
+  openTab(nav.path, nav.title)
+  router.push(nav.query ? { path: nav.path, query: nav.query } : nav.path)
 }
 
 function onBatchMenu({ key }) {

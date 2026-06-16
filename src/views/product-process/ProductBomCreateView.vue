@@ -373,6 +373,20 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => [route.name, route.query.itemType, route.query.itemId],
+  () => {
+    if (route.name !== 'product-process-bom-new') return
+    const { itemType, itemId } = route.query
+    if (!itemType || !itemId) return
+    const val = `${itemType}:${itemId}`
+    if (form.itemId === val) return
+    form.itemId = val
+    onItemChange(val)
+  },
+  { immediate: true },
+)
+
 async function handleSave() {
   try {
     await formRef.value.validate()
