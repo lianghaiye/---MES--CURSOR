@@ -1,7 +1,34 @@
+import { workOrderState } from '@/store/workOrderStore'
+
 /** 工单/任务按工序登记：排产数量默认值 + 不良增加则良品相应减少 */
 
 export function resolveScheduleQty(source = {}) {
   return Math.max(0, Number(source.scheduleQty ?? source.targetQty ?? source.planQty) || 0)
+}
+
+export function findWorkOrderForRecord(record = {}) {
+  void workOrderState.orders
+  const id = record.workOrderId
+  const code = record.workOrderNo || record.workOrderCode
+  if (id) {
+    const byId = workOrderState.orders.find((o) => o.id === id)
+    if (byId) return byId
+  }
+  if (code && !String(code).startsWith('QK-')) {
+    return workOrderState.orders.find((o) => o.code === code) || null
+  }
+  return null
+}
+
+/** 列表「排产数」：有关联工单时取排产数量，否则为 null（展示 —） */
+export function resolveListScheduleQty(record = {}, hasLinkedWorkOrder = false) {
+  if (!hasLinkedWorkOrder) return null
+  const fromRecord = resolveScheduleQty(record)
+  if (fromRecord > 0) return fromRecord
+  const wo = findWorkOrderForRecord(record)
+  if (!wo) return null
+  const qty = resolveScheduleQty(wo)
+  return qty > 0 ? qty : null
 }
 
 export function createScheduledProcessQuantities(scheduleQty) {

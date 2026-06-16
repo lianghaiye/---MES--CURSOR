@@ -10,6 +10,7 @@ import { resolveDefectItemsByIds } from '@/store/defectItemStore'
 import { resolveReportMode } from '@/utils/reportMode'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { calcProcessReportWage } from '@/utils/processReportWageCalc'
+import { resolveListScheduleQty } from '@/utils/processReportQuantities'
 
 function findMasterByCode(code) {
   if (!code) return null
@@ -55,5 +56,6 @@ export function enrichProcessReportRecord(record) {
         ? `${config.reportType}+${config.salaryMethod}`
         : '—',
     salaryAmount: wage.salaryAmount,
+    scheduleQty: resolveListScheduleQty(record, record.source === 'workorder'),
   }
 }

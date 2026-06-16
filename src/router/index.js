@@ -205,11 +205,18 @@ const routes = [
         meta: { title: '工时详情' },
       },
       {
-        path: 'labor-salary/salary-stats',
-        name: 'labor-salary-salary-stats',
-        component: () => import('@/views/placeholder/EmptyPage.vue'),
-        meta: { title: '工资统计' },
+        path: 'labor-salary/salary-summary',
+        name: 'labor-salary-salary-summary',
+        component: () => import('@/views/labor-salary/SalarySummaryView.vue'),
+        meta: { title: '工资合计' },
       },
+      {
+        path: 'labor-salary/salary-detail',
+        name: 'labor-salary-salary-detail',
+        component: () => import('@/views/labor-salary/SalaryDetailView.vue'),
+        meta: { title: '工资详情' },
+      },
+      { path: 'labor-salary/salary-stats', redirect: '/labor-salary/salary-summary' },
       { path: 'production/shop-floor', redirect: '/production/qc-work-orders' },
       { path: 'inventory/stock', ...emptyChild('inventory-stock', '库存查询') },
       {

@@ -20,7 +20,8 @@ import {
 import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
 import { buildReportWorkPerProcessBundle } from '@/utils/reportWorkPerProcess'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
-import { validateDefectBreakdown, getProcessDefectItemsForForm } from '@/utils/defectBreakdown'
+import { validateDefectBreakdown, getProcessDefectItemsForForm, resolveOverallDefectItems } from '@/utils/defectBreakdown'
+import { buildQuickReportProcessesFromRoute } from '@/utils/quickReportProcess'
 import { isDurationReportMode } from '@/utils/reportMode'
 
 function shouldReseedReports() {
@@ -179,6 +180,16 @@ export function deleteQuickReport(id) {
   return { ok: true, message: '已删除' }
 }
 
+function resolveOverallDefectItemsForPayload(payload = {}) {
+  const names = (payload.processes || []).filter((p) => !p.deleted).map((p) => p.name)
+  if (names.length) return resolveOverallDefectItems(names)
+  if (payload.routeName) {
+    const procs = buildQuickReportProcessesFromRoute(payload.routeName, {})
+    return resolveOverallDefectItems(procs.map((p) => p.name))
+  }
+  return resolveOverallDefectItems([])
+}
+
 function validateSubmit(payload) {
   if (!payload.productId && !payload.productName?.trim()) {
     return '请选择产品'
@@ -189,6 +200,11 @@ function validateSubmit(payload) {
     return '请选择生产日期'
   }
   const perProcessRegister = payload.perProcessRegister !== false
+  if (!perProcessRegister) {
+    const items = resolveOverallDefectItemsForPayload(payload)
+    const defectErr = validateDefectBreakdown(payload.defectQty, payload.defectBreakdown, items)
+    if (defectErr) return defectErr
+  }
   if (perProcessRegister) {
     const activeProcesses = (payload.processes || []).filter((p) => !p.deleted && p.name?.trim())
     if (!activeProcesses.length) {
@@ -288,6 +304,10 @@ export function submitQuickReport(payload) {
     perProcessMode: perProcessRegister,
     processes: activeProcesses,
     operators,
+    defectBreakdown: perProcessRegister ? [] : payload.defectBreakdown || [],
+    defectItemIds: perProcessRegister ? [] : payload.defectItemIds || [],
+    defectItemNames: perProcessRegister ? [] : payload.defectItemNames || [],
+    defectReasonLabel: perProcessRegister ? '' : payload.defectReasonLabel || '',
     workOrderNo: isEdit ? existing?.workOrderNo || workOrderNo : workOrderNo,
     workOrderId: isEdit ? existing?.workOrderId || (isWorkOrderMode ? payload.workOrderId || '' : '') : isWorkOrderMode ? payload.workOrderId || '' : '',
     registrationType: isEdit ? existing?.registrationType || registrationType : registrationType,

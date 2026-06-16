@@ -97,7 +97,7 @@
                 :min="0"
                 style="width: 100%"
                 addon-after="件"
-                @change="normalizeFormQty"
+                @change="onOverallGoodQtyChange"
               />
             </a-col>
             <a-col :xs="24" :md="8">
@@ -107,31 +107,30 @@
                 :min="0"
                 style="width: 100%"
                 addon-after="件"
-                @change="normalizeFormQty"
+                @focus="onOverallDefectFocus"
+                @change="onOverallDefectQtyChange"
               />
             </a-col>
             <a-col :xs="24" :md="8">
               <div class="field-label">合计完工</div>
               <a-input :value="`${totalReportQty} 件`" disabled />
             </a-col>
+            <a-col v-if="!form.perProcessRegister" :span="24">
+              <DefectBreakdownField
+                :defect-qty="Number(form.defectQty) || 0"
+                :items="overallDefectItems"
+                :model-value="form.defectBreakdown || []"
+                @update:model-value="onOverallDefectBreakdownChange"
+              />
+            </a-col>
             <a-col :span="24">
               <div class="field-label">操作人员（选填）</div>
               <a-select
-                v-if="isWorkOrderMode"
                 v-model:value="form.operators"
                 mode="multiple"
                 placeholder="请选择操作人员"
                 :options="personnelOptions"
                 style="width: 100%"
-              />
-              <a-select
-                v-else
-                :value="form.operators[0]"
-                allow-clear
-                placeholder="请选择操作人员"
-                :options="personnelOptions"
-                style="width: 100%"
-                @change="setOverallOperator"
               />
             </a-col>
           </template>
@@ -374,10 +373,12 @@ import {
   breakdownToLegacy,
   ensureDefectBreakdown,
   getProcessDefectItemsForForm,
+  resolveOverallDefectItems,
   syncDefectBreakdownOnQtyChange,
 } from '@/utils/defectBreakdown'
 import {
   applyLinkedProcessQtyChange,
+  applyLinkedSingleQtyFromDefect,
   createScheduledProcessQuantities,
   snapshotProcessQty,
 } from '@/utils/processReportQuantities'
@@ -410,6 +411,12 @@ const isWorkOrderMode = computed(() => props.mode === 'workorder')
 const useLinkedProcessQty = computed(
   () => isWorkOrderMode.value && form.perProcessRegister,
 )
+
+const useLinkedOverallQty = computed(
+  () => isWorkOrderMode.value && !form.perProcessRegister,
+)
+
+const overallQtySnapshot = reactive({ goodQty: 0, defectQty: 0 })
 const modalTitle = computed(() => {
   if (props.editId) return '编辑登记'
   return isWorkOrderMode.value ? '工单登记' : '快速登记'
@@ -442,6 +449,10 @@ const form = reactive({
   perProcessRegister: true,
   processes: [],
   operators: [],
+  defectBreakdown: [],
+  defectItemIds: [],
+  defectItemNames: [],
+  defectReasonLabel: '',
   remark: '',
 })
 
@@ -462,6 +473,16 @@ const excludeProcessIds = computed(() =>
 const excludeProcessNames = computed(() =>
   form.processes.filter((p) => !p.deleted).map((p) => p.name),
 )
+
+const overallDefectItems = computed(() => {
+  const names = form.processes.filter((p) => !p.deleted).map((p) => p.name)
+  if (names.length) return resolveOverallDefectItems(names)
+  if (form.routeName) {
+    const procs = buildQuickReportProcessesFromRoute(form.routeName, {})
+    return resolveOverallDefectItems(procs.map((p) => p.name))
+  }
+  return resolveOverallDefectItems([])
+})
 
 watch(
   () => props.open,
@@ -489,12 +510,16 @@ function loadFromRecord(id) {
   form.routeId = row.routeId
   form.routeName = row.routeName || ''
   form.perProcessRegister = row.perProcessRegister !== false
-  const isWoRecord = row.registrationType === '工单登记'
-  form.operators = form.perProcessRegister
-    ? []
-    : isWoRecord
-      ? [...(row.operators || [])]
-      : (row.operators || []).slice(0, 1)
+  form.operators = form.perProcessRegister ? [] : [...(row.operators || [])]
+  if (!form.perProcessRegister && row.defectBreakdown?.length) {
+    form.defectBreakdown = [...row.defectBreakdown]
+    applyOverallDefectLegacy()
+  } else {
+    form.defectBreakdown = []
+    form.defectItemIds = []
+    form.defectItemNames = []
+    form.defectReasonLabel = ''
+  }
   form.processes = (row.processes || []).map((p) => {
     const items = getProcessDefectItemsForForm(p.name)
     const defectBreakdown = ensureDefectBreakdown(p, items)
@@ -538,7 +563,11 @@ function resetForm() {
   form.routeName = ''
   form.perProcessRegister = true
   form.processes = []
-  form.operators = getLastOperators().slice(0, 1)
+  form.operators = getLastOperators()
+  form.defectBreakdown = []
+  form.defectItemIds = []
+  form.defectItemNames = []
+  form.defectReasonLabel = ''
   form.remark = ''
   dateChip.value = 'today'
   routeOptions.value = []
@@ -548,6 +577,59 @@ function resetForm() {
 function normalizeFormQty() {
   form.goodQty = Math.max(0, Number(form.goodQty) || 0)
   form.defectQty = Math.max(0, Number(form.defectQty) || 0)
+}
+
+function initOverallScheduleDefault() {
+  if (!useLinkedOverallQty.value || props.editId) return
+  const wo = selectedWorkOrder.value
+  if (!wo) return
+  const scheduleQty = wo.scheduleQty ?? wo.planQty ?? 0
+  if (scheduleQty > 0) {
+    form.goodQty = scheduleQty
+    form.defectQty = 0
+  }
+}
+
+function onOverallDefectFocus() {
+  if (!useLinkedOverallQty.value) return
+  overallQtySnapshot.goodQty = Math.max(0, Number(form.goodQty) || 0)
+  overallQtySnapshot.defectQty = Math.max(0, Number(form.defectQty) || 0)
+}
+
+function onOverallGoodQtyChange() {
+  normalizeFormQty()
+}
+
+function onOverallDefectQtyChange() {
+  if (useLinkedOverallQty.value) {
+    applyLinkedSingleQtyFromDefect(form, overallQtySnapshot)
+  } else {
+    normalizeFormQty()
+  }
+  syncOverallDefectBreakdown()
+}
+
+function syncOverallDefectBreakdown() {
+  if (form.perProcessRegister) return
+  const items = overallDefectItems.value
+  if (Number(form.defectQty) <= 0) {
+    form.defectBreakdown = []
+  } else {
+    form.defectBreakdown = syncDefectBreakdownOnQtyChange(
+      { defectQty: form.defectQty, defectBreakdown: form.defectBreakdown },
+      items,
+    )
+  }
+  applyOverallDefectLegacy()
+}
+
+function onOverallDefectBreakdownChange(breakdown) {
+  form.defectBreakdown = breakdown
+  applyOverallDefectLegacy()
+}
+
+function applyOverallDefectLegacy() {
+  Object.assign(form, breakdownToLegacy(form.defectBreakdown || []))
 }
 
 function syncFormQtyFromProcesses() {
@@ -582,8 +664,9 @@ function onPerProcessRegisterChange(checked) {
   } else {
     syncFormQtyFromProcesses()
     if (!form.operators.length) {
-      form.operators = isWorkOrderMode.value ? [...getLastOperators()] : getLastOperators().slice(0, 1)
+      form.operators = [...getLastOperators()]
     }
+    initOverallScheduleDefault()
   }
 }
 
@@ -601,6 +684,7 @@ function onWorkOrderChange(workOrderId) {
     routeOptions.value = [{ label: routeName, value: routeName }]
     applyRoute(routeName)
   }
+  initOverallScheduleDefault()
 }
 
 function onProductSelect(item) {
@@ -688,10 +772,6 @@ function onDefectBreakdownChange(record, breakdown) {
   applyDefectLegacy(record)
 }
 
-function setOverallOperator(name) {
-  form.operators = name ? [name] : []
-}
-
 function setProcessOperator(record, name) {
   record.operators = name ? [name] : []
 }
@@ -768,6 +848,8 @@ function handleSubmit() {
     syncFormQtyFromProcesses()
   } else {
     normalizeFormQty()
+    if (useLinkedOverallQty.value) onOverallDefectQtyChange()
+    else syncOverallDefectBreakdown()
   }
 
   submitting.value = true
@@ -783,6 +865,10 @@ function handleSubmit() {
     reportDate: form.reportDate,
     goodQty: form.goodQty,
     defectQty: form.defectQty,
+    defectBreakdown: form.perProcessRegister ? [] : form.defectBreakdown,
+    defectItemIds: form.perProcessRegister ? [] : form.defectItemIds,
+    defectItemNames: form.perProcessRegister ? [] : form.defectItemNames,
+    defectReasonLabel: form.perProcessRegister ? '' : form.defectReasonLabel,
     routeId: form.routeId,
     routeName: form.routeName,
     perProcessRegister: form.perProcessRegister,

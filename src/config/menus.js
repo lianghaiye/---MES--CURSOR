@@ -46,7 +46,8 @@ export const sideMenus = {
   ],
   'labor-salary': [
     { key: 'labor-hour', label: '工时管理', path: '/labor-salary/labor-hour' },
-    { key: 'salary-stats', label: '工资统计', path: '/labor-salary/salary-stats' },
+    { key: 'salary-summary', label: '工资合计', path: '/labor-salary/salary-summary' },
+    { key: 'salary-detail', label: '工资详情', path: '/labor-salary/salary-detail' },
   ],
   production: [
     { key: 'work-orders', label: '生产工单', path: '/production/work-orders' },
@@ -147,7 +148,8 @@ export const routeTitles = {
   '/production/process-report/wo/:workOrderId': '任务报工详情',
   '/production/process-report/:id': '工序报工详情',
   '/labor-salary/labor-hour': '工时管理',
-  '/labor-salary/salary-stats': '工资统计',
+  '/labor-salary/salary-summary': '工资合计',
+  '/labor-salary/salary-detail': '工资详情',
   '/inventory/stock': '库存查询',
   '/inventory/outbound': '出库管理',
   '/inventory/sales-outbound': '出库管理',

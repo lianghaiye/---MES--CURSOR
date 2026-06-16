@@ -34,6 +34,7 @@
           :precision="0"
           style="width: 100%"
           addon-after="件"
+          @change="onAdjustedGoodQtyChange"
         />
       </a-form-item>
       <a-form-item label="调整不良品数" required>
@@ -43,6 +44,8 @@
           :precision="0"
           style="width: 100%"
           addon-after="件"
+          @focus="onAdjustedDefectFocus"
+          @change="onAdjustedDefectQtyChange"
         />
       </a-form-item>
       <a-form-item
@@ -97,6 +100,7 @@ import {
   syncDefectBreakdownOnQtyChange,
   validateDefectBreakdown,
 } from '@/utils/defectBreakdown'
+import { applyLinkedSingleQtyFromDefect } from '@/utils/processReportQuantities'
 import DefectBreakdownField from './DefectBreakdownField.vue'
 
 const props = defineProps({
@@ -116,6 +120,8 @@ const form = reactive({
   adjustedDefectBreakdown: [],
   adjustReason: '',
 })
+
+const qtySnapshot = reactive({ goodQty: 0, defectQty: 0 })
 
 const modalTitle = computed(() => {
   const c = props.config
@@ -175,31 +181,48 @@ watch(
     form.adjustedWorkHours = props.line.adjustedWorkHours ?? props.line.workHours ?? 0
     form.adjustReason = props.line.adjustReason || ''
     form.adjustedDefectBreakdown = initBreakdown(props.line)
+    qtySnapshot.goodQty = Math.max(0, Number(form.adjustedGoodQty) || 0)
+    qtySnapshot.defectQty = Math.max(0, Number(form.adjustedDefectQty) || 0)
     if (isBatchPieceHourly.value) {
       form.adjustedWorkHours = calcAutoDurationHours(props.config, form.adjustedGoodQty)
     }
   },
 )
 
+function onAdjustedDefectFocus() {
+  qtySnapshot.goodQty = Math.max(0, Number(form.adjustedGoodQty) || 0)
+  qtySnapshot.defectQty = Math.max(0, Number(form.adjustedDefectQty) || 0)
+}
+
+function onAdjustedGoodQtyChange() {
+  form.adjustedGoodQty = Math.max(0, Number(form.adjustedGoodQty) || 0)
+}
+
+function onAdjustedDefectQtyChange() {
+  const wrapper = {
+    goodQty: form.adjustedGoodQty,
+    defectQty: form.adjustedDefectQty,
+  }
+  applyLinkedSingleQtyFromDefect(wrapper, qtySnapshot)
+  form.adjustedGoodQty = wrapper.goodQty
+  form.adjustedDefectQty = wrapper.defectQty
+
+  const qty = Number(form.adjustedDefectQty) || 0
+  if (qty <= 0) {
+    form.adjustedDefectBreakdown = []
+    return
+  }
+  form.adjustedDefectBreakdown = syncDefectBreakdownOnQtyChange(
+    { defectQty: qty, defectBreakdown: form.adjustedDefectBreakdown },
+    defectItems.value,
+  )
+}
+
 watch(
   () => form.adjustedGoodQty,
   (qty) => {
     if (!isBatchPieceHourly.value || !props.config) return
     form.adjustedWorkHours = calcAutoDurationHours(props.config, qty)
-  },
-)
-
-watch(
-  () => form.adjustedDefectQty,
-  (qty) => {
-    if (qty <= 0) {
-      form.adjustedDefectBreakdown = []
-      return
-    }
-    form.adjustedDefectBreakdown = syncDefectBreakdownOnQtyChange(
-      { defectQty: qty, defectBreakdown: form.adjustedDefectBreakdown },
-      defectItems.value,
-    )
   },
 )
 

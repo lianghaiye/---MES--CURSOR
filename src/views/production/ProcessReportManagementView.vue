@@ -89,6 +89,9 @@
           <template v-if="column.key === 'status'">
             <a-badge :status="statusBadge(record.status)" :text="record.status" />
           </template>
+          <template v-else-if="column.key === 'scheduleQty'">
+            {{ formatScheduleQty(record.scheduleQty) }}
+          </template>
           <template v-else-if="column.key === 'salaryAmount'">
             {{ formatSalaryAmount(record.salaryAmount) }}
           </template>
@@ -195,6 +198,7 @@ const baseColumns = [
   { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 110 },
   { title: '材质', key: 'material', dataIndex: 'material', width: 90 },
   { title: '报工日期', key: 'reportDate', dataIndex: 'reportDate', width: 110 },
+  { title: '排产数', key: 'scheduleQty', dataIndex: 'scheduleQty', width: 88, align: 'right' },
   { title: '良品数', key: 'goodQty', dataIndex: 'goodQty', width: 80, align: 'right' },
   { title: '不良品数', key: 'defectQty', dataIndex: 'defectQty', width: 88, align: 'right' },
   { title: '工序', key: 'processName', dataIndex: 'processName', width: 100 },
@@ -263,6 +267,11 @@ function formatCell(record, column) {
   const val = record[key]
   if (val === 0) return '0'
   return val || '—'
+}
+
+function formatScheduleQty(val) {
+  if (val == null || val === '') return '—'
+  return val
 }
 
 function formatSalaryAmount(val) {

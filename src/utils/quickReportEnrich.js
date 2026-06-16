@@ -9,6 +9,8 @@ import {
   ensureDefectBreakdown,
   resolveDefectReasonLabel,
 } from '@/utils/defectBreakdown'
+import { resolveListScheduleQty } from '@/utils/processReportQuantities'
+import { resolveRegistrationType } from '@/mock/quickReports'
 
 function resolveProcessReportType(process = {}) {
   const fromProcess = process.reportMode || process.reportType
@@ -69,5 +71,6 @@ export function enrichQuickReportForList(row = {}) {
     defectReasonLabel,
     specModel: row.specModel || master?.specModel || '—',
     material: row.material || master?.material || '—',
+    scheduleQty: resolveListScheduleQty(row, resolveRegistrationType(row) === '工单登记'),
   }
 }

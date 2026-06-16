@@ -149,6 +149,9 @@
           <template v-else-if="column.key === 'material'">
             {{ record.material || '—' }}
           </template>
+          <template v-else-if="column.key === 'scheduleQty'">
+            {{ formatScheduleQty(record.scheduleQty) }}
+          </template>
           <template v-else-if="column.key === 'goodQty'">
             <span class="qty-text">{{ record.goodQty ?? record.finishedQty }} 件</span>
           </template>
@@ -301,6 +304,7 @@ const baseColumns = [
   { title: '规格型号', key: 'specModel', width: 110, ellipsis: true },
   { title: '材质', key: 'material', width: 88, ellipsis: true },
   { title: '生产日期', dataIndex: 'productionDate', width: 110 },
+  { title: '排产数', key: 'scheduleQty', dataIndex: 'scheduleQty', width: 88, align: 'right' },
   { title: '良品数', key: 'goodQty', width: 88, align: 'right' },
   { title: '不良品数', key: 'defectQty', width: 88, align: 'right' },
   { title: '不良原因', key: 'defectReasons', width: 180, ellipsis: true },
@@ -345,6 +349,11 @@ const rowSelection = computed(() => ({
 
 function activeProcesses(record) {
   return (record.processes || []).filter((p) => !p.deleted)
+}
+
+function formatScheduleQty(val) {
+  if (val == null || val === '') return '—'
+  return val
 }
 
 function handleSearch() {

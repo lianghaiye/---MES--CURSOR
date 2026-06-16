@@ -127,6 +127,19 @@ export function getApprovedDefectBreakdown(line = {}) {
   return (line.defectBreakdown || []).filter((row) => Number(row.qty) > 0)
 }
 
+/** 整体登记：合并工艺路线各工序可选不良项 */
+export function resolveOverallDefectItems(processNames = []) {
+  void defectItemState.items
+  const map = new Map()
+  ;(processNames || []).forEach((name) => {
+    getProcessDefectItemsForForm(name).forEach((item) => {
+      if (item?.id) map.set(item.id, item)
+    })
+  })
+  if (map.size) return [...map.values()]
+  return [...defectItemState.items]
+}
+
 export function resolveDefectReasonLabel(target = {}, items = []) {
   if (target.defectReasonLabel && target.defectReasonLabel !== '—') {
     return target.defectReasonLabel
