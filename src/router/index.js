@@ -322,6 +322,12 @@ const routes = [
         component: () => import('@/views/system/SystemDictView.vue'),
         meta: { title: '系统字典' },
       },
+      {
+        path: 'system/business-rules',
+        name: 'system-business-rules',
+        component: () => import('@/views/system/BusinessRuleView.vue'),
+        meta: { title: '业务规则' },
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/home/dashboard' },

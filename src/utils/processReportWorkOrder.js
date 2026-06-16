@@ -131,6 +131,30 @@ export function summarizeProcessReportLines(lines = []) {
   }
 }
 
+/** 快速报工详情聚合（单条报工，结构对齐任务报工详情） */
+export function buildProcessReportQuickBundle(recordId, records = []) {
+  const record = records.find((r) => r.id === recordId && r.source === 'quick')
+  if (!record) return null
+
+  const master = findMasterByCode(record.productCode)
+  const productCode = record.productCode || master?.code || '—'
+  const line = mapRecordToLine(record, 0, productCode)
+
+  return {
+    id: `pr-quick-${recordId}`,
+    recordId,
+    materialCode: productCode,
+    materialName: record.productName || master?.name || '—',
+    specModel: master?.specModel || record.specModel || '—',
+    workCenter: record.workCenter || '—',
+    owner: '—',
+    processRouteName: '—',
+    ebomLabel: resolveEbomLabel(record.productName, master?.bomName || ''),
+    auditStatus: record.status,
+    lines: [line],
+  }
+}
+
 /** 按生产工单聚合任务报工详情（对齐工时管理详情结构） */
 export function buildProcessReportWorkOrderBundle(workOrderId, records, logs = []) {
   void workOrderState.orders

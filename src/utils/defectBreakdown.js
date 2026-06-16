@@ -98,7 +98,7 @@ export function validateDefectBreakdown(defectQty, breakdown = [], items = []) {
   return null
 }
 
-/** 工序可选不良品项：工序配置 + 当前已选原因 */
+/** 工序可选不良品项：工序配置 + 当前已选原因（审核调整等场景） */
 export function resolveProcessDefectItems(processName, currentBreakdown = []) {
   void defectItemState.items
   const proc = getProcessByName(processName)
@@ -108,6 +108,16 @@ export function resolveProcessDefectItems(processName, currentBreakdown = []) {
   ])
   if (!ids.size) return [...defectItemState.items]
   return resolveDefectItemsByIds([...ids])
+}
+
+/** 登记表单：始终展示工序配置的全部不良项；未配置时展示全部字典项 */
+export function getProcessDefectItemsForForm(processName) {
+  void defectItemState.items
+  const proc = getProcessByName(processName)
+  if (proc?.defectItemIds?.length) {
+    return resolveDefectItemsByIds(proc.defectItemIds)
+  }
+  return [...defectItemState.items]
 }
 
 export function getApprovedDefectBreakdown(line = {}) {

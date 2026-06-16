@@ -65,19 +65,22 @@
           批量拒绝
         </a-button>
       </a-space>
-      <a-button type="text" size="small" @click="handleSearch">
-        <ReloadOutlined />
-      </a-button>
+      <a-space :size="4" class="toolbar-icons">
+        <a-button type="text" size="small" @click="handleSearch">
+          <ReloadOutlined />
+        </a-button>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
+      </a-space>
     </div>
 
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 2000 }"
+        :scroll="{ x: tableScrollX }"
         :pagination="false"
         :row-selection="rowSelection"
         :custom-row="customRow"
@@ -85,6 +88,9 @@
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-badge :status="statusBadge(record.status)" :text="record.status" />
+          </template>
+          <template v-else-if="column.key === 'salaryAmount'">
+            {{ formatSalaryAmount(record.salaryAmount) }}
           </template>
           <template v-else-if="column.key === 'action'">
             <a-button
@@ -96,15 +102,12 @@
               详情
             </a-button>
             <a-button
-              v-else-if="record.status === '待审核'"
+              v-else
               type="link"
               size="small"
               @click.stop="openQuickDetail(record)"
             >
-              审核
-            </a-button>
-            <a-button v-else type="link" size="small" @click.stop="openQuickDetail(record)">
-              查看
+              详情
             </a-button>
           </template>
           <template v-else>
@@ -126,6 +129,12 @@
     </div>
 
     <ProcessReportRejectModal v-model:open="rejectOpen" @confirm="onRejectConfirm" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
   </div>
 </template>
 
@@ -138,6 +147,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { ReloadOutlined } from '@ant-design/icons-vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import {
   batchApproveProcessReports,
   batchRejectProcessReports,
@@ -174,25 +186,30 @@ const sourceOptions = [
   { label: '快速报工', value: 'quick' },
 ]
 
-const columns = [
+const baseColumns = [
   { title: '状态', key: 'status', width: 90, fixed: 'left' },
-  { title: '报工方式', dataIndex: 'reportSourceLabel', width: 100 },
-  { title: '工单号', dataIndex: 'workOrderNo', width: 150, ellipsis: true },
-  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true },
-  { title: '产品编码', dataIndex: 'productCode', width: 120 },
-  { title: '规格型号', dataIndex: 'specModel', width: 110 },
-  { title: '材质', dataIndex: 'material', width: 90 },
-  { title: '报工日期', dataIndex: 'reportDate', width: 110 },
-  { title: '良品数', dataIndex: 'goodQty', width: 80, align: 'right' },
-  { title: '不良品数', dataIndex: 'defectQty', width: 88, align: 'right' },
-  { title: '工序', dataIndex: 'processName', width: 100 },
-  { title: '不良原因', dataIndex: 'defectItems', width: 160, ellipsis: true },
-  { title: '执行人', dataIndex: 'reporter', width: 90 },
-  { title: '工作中心', dataIndex: 'workCenter', width: 110 },
-  { title: '报工类型', dataIndex: 'reportType', width: 100 },
-  { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
+  { title: '报工方式', key: 'reportSourceLabel', dataIndex: 'reportSourceLabel', width: 100 },
+  { title: '工单号', key: 'workOrderNo', dataIndex: 'workOrderNo', width: 150, ellipsis: true },
+  { title: '产品名称', key: 'productName', dataIndex: 'productName', width: 140, ellipsis: true },
+  { title: '产品编码', key: 'productCode', dataIndex: 'productCode', width: 120 },
+  { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 110 },
+  { title: '材质', key: 'material', dataIndex: 'material', width: 90 },
+  { title: '报工日期', key: 'reportDate', dataIndex: 'reportDate', width: 110 },
+  { title: '良品数', key: 'goodQty', dataIndex: 'goodQty', width: 80, align: 'right' },
+  { title: '不良品数', key: 'defectQty', dataIndex: 'defectQty', width: 88, align: 'right' },
+  { title: '工序', key: 'processName', dataIndex: 'processName', width: 100 },
+  { title: '不良原因', key: 'defectItems', dataIndex: 'defectItems', width: 160, ellipsis: true },
+  { title: '执行人', key: 'reporter', dataIndex: 'reporter', width: 90 },
+  { title: '工作中心', key: 'workCenter', dataIndex: 'workCenter', width: 110 },
+  { title: '报工类型', key: 'reportType', dataIndex: 'reportType', width: 100 },
+  { title: '计薪方式', key: 'salaryMethod', dataIndex: 'salaryMethod', width: 100 },
+  { title: '计薪(元)', key: 'salaryAmount', dataIndex: 'salaryAmount', width: 100, align: 'right' },
+  { title: '备注', key: 'remark', dataIndex: 'remark', width: 120, ellipsis: true },
   { title: '操作', key: 'action', width: 80, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('process-report-list', baseColumns, { minScrollX: 2000 })
 
 const stats = computed(() => {
   void processReportState.records
@@ -242,10 +259,16 @@ function statusBadge(status) {
 }
 
 function formatCell(record, column) {
-  const key = column.dataIndex
+  const key = column.dataIndex || column.key
   const val = record[key]
   if (val === 0) return '0'
   return val || '—'
+}
+
+function formatSalaryAmount(val) {
+  const num = Number(val)
+  if (!Number.isFinite(num)) return '—'
+  return `¥${num.toFixed(2)}`
 }
 
 function handleSearch() {
@@ -318,6 +341,10 @@ function onRejectConfirm(reason) {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
+  }
+
+  .toolbar-icons {
+    flex-shrink: 0;
   }
 
   .table-pagination {

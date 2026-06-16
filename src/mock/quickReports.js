@@ -2,19 +2,15 @@ import dayjs from 'dayjs'
 import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
 import { aggregateProcessesDefectLabel } from '@/utils/defectBreakdown'
 import { enrichQuickReportForList } from '@/utils/quickReportEnrich'
-import { createWorkOrderLinkedQuickReportSeed } from '@/mock/quickReportWorkOrderSeed'
+import { createQuickReportSeedData } from '@/mock/quickReportSeed'
 
 export const QUICK_REPORT_STORAGE_KEY = 'i_doms_mobile_quick_reports'
 export const QUICK_REPORT_MATERIAL_KEY = 'i_doms_mobile_quick_material_lists'
 export const QUICK_REPORT_SEED_VERSION_KEY = 'i_doms_quick_reports_seed_v'
-export const QUICK_REPORT_SEED_VERSION = '4'
+export const QUICK_REPORT_SEED_VERSION = '6'
 
 export function formatReportDate(d = new Date()) {
   return dayjs(d).format('YYYY-MM-DD')
-}
-
-function daysAgo(n) {
-  return dayjs().subtract(n, 'day').format('YYYY-MM-DD')
 }
 
 function calcFinishedQty(processes, fallback) {
@@ -105,6 +101,16 @@ export function resolveRegisteredDate(row = {}) {
   return row.reportDate || ''
 }
 
+/** 登记确认状态：待确认 / 已确认 */
+export function resolveConfirmStatus(row = {}) {
+  if (row.status === '已确认' || row.materialConfirmed) return '已确认'
+  return '待确认'
+}
+
+export function isQuickReportConfirmed(row = {}) {
+  return resolveConfirmStatus(row) === '已确认'
+}
+
 export function normalizeQuickReport(row) {
   const processes = (row.processes || []).map((p) => normalizeQuickReportProcess(p))
   const perProcessRegister = resolvePerProcessRegister(row)
@@ -116,6 +122,7 @@ export function normalizeQuickReport(row) {
     finishedQty: row.finishedQty ?? calcFinishedQty(processes, row.finishedQty),
   })
   const registrationType = resolveRegistrationType(row)
+  const confirmStatus = resolveConfirmStatus(row)
   const enriched = enrichQuickReportForList({
     ...row,
     processes,
@@ -131,104 +138,32 @@ export function normalizeQuickReport(row) {
     registeredDate: resolveRegisteredDate(row),
     reporter: row.reporter || '',
     workOrderStatus: row.workOrderStatus || '已报工',
-    displayStatus: row.workOrderStatus || '已报工',
+    status: confirmStatus,
+    confirmStatus,
+    materialConfirmed: confirmStatus === '已确认',
+    displayStatus: confirmStatus,
     defectReasonLabel: row.defectReasonLabel || aggregateProcessesDefectLabel(processes),
   })
   return enriched
 }
 
 export function createQuickReportSeed() {
-  const today = formatReportDate()
-  const legacy = [
-    normalizeQuickReport({
-      id: 'qr-1',
-      productId: 'prod-1',
-      productName: '货架支架',
-      productCode: 'SJ-2024-A',
-      reportDate: today,
-      finishedQty: 25,
-      routeId: 'route-1',
-      routeName: '标准焊接工艺 v2',
-      perProcessMode: false,
-      processes: [
-        { id: 'p1', name: '点焊', qty: 25, deleted: false, operators: [] },
-        { id: 'p2', name: '打磨', qty: 20, deleted: false, operators: [] },
-      ],
-      operators: ['张三', '李四'],
-      workOrderNo: `QK-${today.replace(/-/g, '')}-001`,
-      workOrderStatus: '已报工',
-      reporter: '张三',
-      createdAt: `${today} 09:30`,
-      remark: '',
-    }),
-    normalizeQuickReport({
-      id: 'qr-2',
-      productId: 'prod-2',
-      productName: '电机外壳',
-      productCode: 'DJ-2024-B',
-      reportDate: today,
-      finishedQty: 18,
-      goodQty: 16,
-      defectQty: 2,
-      routeId: 'route-2a',
-      routeName: '冲压工艺 v1',
-      perProcessMode: false,
-      processes: [
-        { id: 'p3', name: '冲压', qty: 18, deleted: false, operators: [] },
-        { id: 'p4', name: '去毛刺', qty: 18, deleted: false, operators: [] },
-      ],
-      operators: ['王五'],
-      workOrderNo: `QK-${today.replace(/-/g, '')}-002`,
-      workOrderStatus: '已报工',
-      reporter: '王五',
-      createdAt: `${today} 11:20`,
-      remark: '',
-    }),
-    normalizeQuickReport({
-      id: 'qr-3',
-      productId: 'prod-3',
-      productName: '法兰盘',
-      productCode: 'FL-2024-C',
-      reportDate: daysAgo(3),
-      finishedQty: 12,
-      routeId: 'route-3',
-      routeName: '机加标准路线',
-      perProcessMode: false,
-      processes: [{ id: 'p5', name: '机加工', qty: 12, deleted: false, operators: [] }],
-      operators: ['赵六', '钱七'],
-      workOrderNo: `QK-${daysAgo(3).replace(/-/g, '')}-001`,
-      workOrderStatus: '已报工',
-      reporter: '赵六',
-      createdAt: `${daysAgo(3)} 15:00`,
-      remark: '',
-    }),
-    normalizeQuickReport({
-      id: 'qr-4',
-      productId: 'prod-4',
-      productName: '密封圈',
-      productCode: 'SEAL-2024-D',
-      reportDate: daysAgo(10),
-      finishedQty: 200,
-      routeId: 'route-4',
-      routeName: '硫化成型路线',
-      perProcessMode: false,
-      processes: [
-        { id: 'p6', name: '硫化', qty: 200, deleted: false, operators: [] },
-        { id: 'p7', name: '检验', qty: 200, deleted: false, operators: [] },
-      ],
-      operators: ['孙八'],
-      workOrderNo: `QK-${daysAgo(10).replace(/-/g, '')}-003`,
-      workOrderStatus: '已报工',
-      reporter: '孙八',
-      createdAt: `${daysAgo(10)} 08:45`,
-      remark: '',
-    }),
-  ]
-  return [...createWorkOrderLinkedQuickReportSeed(), ...legacy]
+  return createQuickReportSeedData()
 }
 
 export function filterQuickReports(list, filters = {}) {
-  const { productName = '', workOrderNo = '', reportDateRange = null, quickRange = null } = filters
+  const {
+    productName = '',
+    workOrderNo = '',
+    registrationType = '',
+    registerMode = '',
+    productionDateRange = null,
+    registeredDateRange = null,
+    reportDateRange = null,
+    quickRange = null,
+  } = filters
+
+  const dateRange = productionDateRange || reportDateRange
 
   let result = [...list]
 
@@ -254,12 +189,32 @@ export function filterQuickReports(list, filters = {}) {
     })
   }
 
-  if (reportDateRange?.length === 2) {
-    const [start, end] = reportDateRange
+  if (dateRange?.length === 2) {
+    const [start, end] = dateRange
     result = result.filter((r) => {
-      const d = dayjs(r.reportDate)
+      const d = dayjs(r.reportDate || r.productionDate)
       return !d.isBefore(dayjs(start).startOf('day')) && !d.isAfter(dayjs(end).endOf('day'))
     })
+  }
+
+  if (registeredDateRange?.length === 2) {
+    const [start, end] = registeredDateRange
+    result = result.filter((r) => {
+      const d = dayjs(r.createdAt || r.registeredDate)
+      return (
+        d.isValid() &&
+        !d.isBefore(dayjs(start).startOf('day')) &&
+        !d.isAfter(dayjs(end).endOf('day'))
+      )
+    })
+  }
+
+  if (registrationType) {
+    result = result.filter((r) => r.registrationType === registrationType)
+  }
+
+  if (registerMode) {
+    result = result.filter((r) => r.registerMode === registerMode)
   }
 
   const nameKw = productName.trim()

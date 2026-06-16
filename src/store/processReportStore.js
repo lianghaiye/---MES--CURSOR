@@ -12,6 +12,7 @@ import {
 } from '@/mock/processReportRecords'
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import {
+  buildProcessReportQuickBundle,
   buildProcessReportWorkOrderBundle,
   calcProcessReportStats,
 } from '@/utils/processReportWorkOrder'
@@ -100,6 +101,11 @@ export function getProcessReportWorkOrderBundle(workOrderId) {
   )
 }
 
+export function getProcessReportQuickBundle(recordId) {
+  void processReportState.records
+  return buildProcessReportQuickBundle(recordId, processReportState.records)
+}
+
 function appendWorkOrderLog(workOrderId, entry) {
   const logsMap = loadWoLogs()
   const list = logsMap[workOrderId] || []
@@ -186,12 +192,15 @@ export function batchRejectProcessReports(ids, reason, operator = 'admin1') {
   return { ok: true, message: `已拒绝 ${pending.length} 条` }
 }
 
-export function adjustProcessReportLine(recordId, payload = {}) {
+export function adjustProcessReportLine(recordId, payload = {}, operator = 'admin1') {
   const row = processReportState.records.find((r) => r.id === recordId)
   if (!row) return { ok: false, message: '记录不存在' }
   if (row.status === '已审核') return { ok: false, message: '已审核数据不可调整' }
 
-  const patch = {}
+  const patch = {
+    adjustedBy: operator,
+    adjustedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+  }
   if (payload.adjustedGoodQty != null) patch.adjustedGoodQty = payload.adjustedGoodQty
   if (payload.adjustedDefectQty != null) patch.adjustedDefectQty = payload.adjustedDefectQty
   if (payload.adjustedWorkHours != null) patch.adjustedWorkHours = payload.adjustedWorkHours
@@ -210,6 +219,7 @@ export function adjustProcessReportLine(recordId, payload = {}) {
   updateRecord(recordId, patch)
   if (row.workOrderId) {
     appendWorkOrderLog(row.workOrderId, {
+      operator,
       action: '调整',
       target: row.taskNo || row.processName,
       remark: payload.adjustReason || '',

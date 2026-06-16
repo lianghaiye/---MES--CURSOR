@@ -9,6 +9,7 @@ import {
   normalizeQuickReport,
   formatReportDate,
   parseSubmitQuantities,
+  isQuickReportConfirmed,
 } from '@/mock/quickReports'
 import {
   calcMaterialList,
@@ -17,6 +18,10 @@ import {
   getProductByName,
 } from '@/mock/quickReportProducts'
 import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
+import { buildReportWorkPerProcessBundle } from '@/utils/reportWorkPerProcess'
+import { resolveLaborConfig } from '@/utils/laborConfigResolver'
+import { validateDefectBreakdown, getProcessDefectItemsForForm } from '@/utils/defectBreakdown'
+import { isDurationReportMode } from '@/utils/reportMode'
 
 function shouldReseedReports() {
   return localStorage.getItem(QUICK_REPORT_SEED_VERSION_KEY) !== QUICK_REPORT_SEED_VERSION
@@ -78,6 +83,35 @@ export function getQuickReportById(id) {
   return row ? normalizeQuickReport(row) : null
 }
 
+export function getReportWorkPerProcessBundle(id) {
+  const row = getQuickReportById(id)
+  if (!row) return null
+  return buildReportWorkPerProcessBundle(row)
+}
+
+export function subsidyQuickReportProcess(reportId, processId, payload = {}) {
+  reloadQuickReports()
+  const report = quickReportState.reports.find((r) => r.id === reportId)
+  if (!report) return { ok: false, message: '记录不存在' }
+  const process = (report.processes || []).find((p) => p.id === processId && !p.deleted)
+  if (!process) return { ok: false, message: '工序不存在' }
+
+  const config = resolveLaborConfig(report.productCode, process.name)
+  if (config?.salaryMethod === '计件工资') {
+    process.subsidyReportQty = Number(payload.subsidyReportQty) || 0
+  } else {
+    process.subsidyHours = Number(payload.subsidyHours) || 0
+  }
+  if (payload.subsidyReason != null) process.subsidyReason = payload.subsidyReason
+
+  const idx = report.processes.findIndex((p) => p.id === processId)
+  if (idx >= 0) {
+    report.processes[idx] = normalizeQuickReportProcess(process)
+  }
+  saveReports(quickReportState.reports)
+  return { ok: true }
+}
+
 export function generateWorkOrderNo(reportDate) {
   const datePart = (reportDate || formatReportDate()).replace(/-/g, '')
   const key = `qr_wo_seq_${datePart}`
@@ -94,6 +128,57 @@ function flattenOperators(processes, overallOperators, perProcessMode) {
   return [...set]
 }
 
+function getProcessDefectItems(processName) {
+  return getProcessDefectItemsForForm(processName)
+}
+
+export function confirmQuickReport(id) {
+  reloadQuickReports()
+  const report = quickReportState.reports.find((r) => r.id === id)
+  if (!report) return { ok: false, message: '记录不存在' }
+  if (isQuickReportConfirmed(report)) return { ok: false, message: '该记录已确认' }
+  report.status = '已确认'
+  report.materialConfirmed = true
+  const idx = quickReportState.reports.findIndex((r) => r.id === id)
+  quickReportState.reports[idx] = normalizeQuickReport(report)
+  saveReports(quickReportState.reports)
+  const materialLists = loadMaterialLists()
+  if (materialLists[id]) {
+    materialLists[id].status = '已确认'
+    saveMaterialLists(materialLists)
+  }
+  return { ok: true, message: '已确认' }
+}
+
+export function batchConfirmQuickReports(ids = []) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))]
+  if (!uniqueIds.length) return { ok: false, message: '请选择待确认记录' }
+  let count = 0
+  uniqueIds.forEach((id) => {
+    const res = confirmQuickReport(id)
+    if (res.ok) count += 1
+  })
+  if (!count) return { ok: false, message: '没有可确认的记录' }
+  return { ok: true, message: `已确认 ${count} 条记录`, count }
+}
+
+export function deleteQuickReport(id) {
+  reloadQuickReports()
+  const idx = quickReportState.reports.findIndex((r) => r.id === id)
+  if (idx === -1) return { ok: false, message: '记录不存在' }
+  if (isQuickReportConfirmed(quickReportState.reports[idx])) {
+    return { ok: false, message: '已确认记录不可删除' }
+  }
+  quickReportState.reports.splice(idx, 1)
+  saveReports(quickReportState.reports)
+  const materialLists = loadMaterialLists()
+  if (materialLists[id]) {
+    delete materialLists[id]
+    saveMaterialLists(materialLists)
+  }
+  return { ok: true, message: '已删除' }
+}
+
 function validateSubmit(payload) {
   if (!payload.productId && !payload.productName?.trim()) {
     return '请选择产品'
@@ -108,6 +193,15 @@ function validateSubmit(payload) {
     const activeProcesses = (payload.processes || []).filter((p) => !p.deleted && p.name?.trim())
     if (!activeProcesses.length) {
       return '请至少保留一道工序'
+    }
+    for (const p of activeProcesses) {
+      if (isDurationReportMode(p.reportMode)) {
+        const hours = Number(p.workHours)
+        if (!hours || hours <= 0) return `${p.name}：请填写工作时长`
+      }
+      const items = getProcessDefectItems(p.name)
+      const defectErr = validateDefectBreakdown(p.defectQty, p.defectBreakdown, items)
+      if (defectErr) return `${p.name}：${defectErr}`
     }
   }
   return null
@@ -135,6 +229,13 @@ export function submitQuickReport(payload) {
   reloadQuickReports()
   const err = validateSubmit(payload)
   if (err) return { ok: false, message: err }
+
+  const isEdit = !!payload.id
+  const existingIdx = isEdit ? quickReportState.reports.findIndex((r) => r.id === payload.id) : -1
+  if (isEdit && existingIdx === -1) return { ok: false, message: '记录不存在' }
+  if (isEdit && isQuickReportConfirmed(quickReportState.reports[existingIdx])) {
+    return { ok: false, message: '已确认记录不可修改' }
+  }
 
   const perProcessRegister = payload.perProcessRegister !== false
   const activeProcesses = perProcessRegister
@@ -170,9 +271,10 @@ export function submitQuickReport(payload) {
     ? payload.sourceWorkOrderNo || payload.workOrderNo
     : generateWorkOrderNo(payload.reportDate)
   const now = dayjs().format('YYYY-MM-DD HH:mm')
+  const existing = isEdit ? quickReportState.reports[existingIdx] : null
 
   const record = normalizeQuickReport({
-    id: `qr-${Date.now()}`,
+    id: payload.id || `qr-${Date.now()}`,
     productId: payload.productId,
     productName: payload.productName.trim(),
     productCode: payload.productCode?.trim() || '',
@@ -186,17 +288,23 @@ export function submitQuickReport(payload) {
     perProcessMode: perProcessRegister,
     processes: activeProcesses,
     operators,
-    workOrderNo,
-    workOrderId: isWorkOrderMode ? payload.workOrderId || '' : '',
-    registrationType,
-    registrationMode: registrationType,
-    workOrderStatus: '已报工',
-    reporter: payload.reporter || 'admin1',
+    workOrderNo: isEdit ? existing?.workOrderNo || workOrderNo : workOrderNo,
+    workOrderId: isEdit ? existing?.workOrderId || (isWorkOrderMode ? payload.workOrderId || '' : '') : isWorkOrderMode ? payload.workOrderId || '' : '',
+    registrationType: isEdit ? existing?.registrationType || registrationType : registrationType,
+    registrationMode: isEdit ? existing?.registrationMode || registrationType : registrationType,
+    workOrderStatus: existing?.workOrderStatus || '已报工',
+    status: existing?.status || '待确认',
+    materialConfirmed: existing?.materialConfirmed || false,
+    reporter: payload.reporter || existing?.reporter || 'admin1',
     remark: payload.remark || '',
-    createdAt: now,
+    createdAt: existing?.createdAt || now,
   })
 
-  quickReportState.reports.unshift(record)
+  if (isEdit) {
+    quickReportState.reports[existingIdx] = record
+  } else {
+    quickReportState.reports.unshift(record)
+  }
   saveReports(quickReportState.reports)
 
   const materialLists = loadMaterialLists()
@@ -210,9 +318,10 @@ export function submitQuickReport(payload) {
     finishedQty: record.finishedQty,
     items: materialItems,
     createdAt: record.createdAt,
+    status: record.confirmStatus,
   }
   saveMaterialLists(materialLists)
   saveLastOperators(operators)
 
-  return { ok: true, message: '报工成功', record }
+  return { ok: true, message: isEdit ? '登记已更新' : '报工成功', record }
 }

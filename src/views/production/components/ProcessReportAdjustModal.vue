@@ -8,9 +8,14 @@
     @cancel="handleCancel"
   >
     <a-descriptions bordered size="small" :column="2" class="info-desc">
-      <a-descriptions-item label="任务编号">{{ line?.taskNo || '—' }}</a-descriptions-item>
+      <a-descriptions-item v-if="variant === 'task'" label="任务编号">{{
+        line?.taskNo || '—'
+      }}</a-descriptions-item>
       <a-descriptions-item label="执行人">{{ line?.reporter || '—' }}</a-descriptions-item>
       <a-descriptions-item label="工序名称">{{ line?.processName || '—' }}</a-descriptions-item>
+      <a-descriptions-item v-if="variant === 'quick'" label="报工类型">{{
+        line?.reportType || '—'
+      }}</a-descriptions-item>
       <a-descriptions-item label="报工良品数">{{ line?.goodQty ?? '—' }}</a-descriptions-item>
       <a-descriptions-item label="报工不良品数">{{ line?.defectQty ?? '—' }}</a-descriptions-item>
       <a-descriptions-item v-if="line?.defectReason && line.defectReason !== '—'" label="报工不良原因">
@@ -98,6 +103,8 @@ const props = defineProps({
   open: Boolean,
   line: { type: Object, default: null },
   config: { type: Object, default: null },
+  /** task=任务报工详情；quick=快速报工详情（仅记录调整结果） */
+  variant: { type: String, default: 'task' },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])

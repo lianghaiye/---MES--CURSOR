@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     :title="modalTitle"
-    width="920px"
+    width="960px"
     :mask-closable="false"
     destroy-on-close
     class="report-work-form-modal"
@@ -117,11 +117,21 @@
             <a-col :span="24">
               <div class="field-label">操作人员（选填）</div>
               <a-select
+                v-if="isWorkOrderMode"
                 v-model:value="form.operators"
                 mode="multiple"
                 placeholder="请选择操作人员"
                 :options="personnelOptions"
                 style="width: 100%"
+              />
+              <a-select
+                v-else
+                :value="form.operators[0]"
+                allow-clear
+                placeholder="请选择操作人员"
+                :options="personnelOptions"
+                style="width: 100%"
+                @change="setOverallOperator"
               />
             </a-col>
           </template>
@@ -168,70 +178,140 @@
 
         <a-collapse v-model:active-key="processCollapse" ghost class="process-collapse">
           <a-collapse-panel key="process" header="当前工序">
-            <a-table
-              :columns="processColumns"
-              :data-source="form.processes"
-              row-key="id"
-              size="small"
-              bordered
-              :pagination="false"
+            <div
+              v-for="(record, index) in form.processes"
+              :key="record.id"
+              class="process-block"
+              :class="{ deleted: record.deleted }"
             >
-              <template #bodyCell="{ column, record, index }">
-                <template v-if="column.key === 'name'">
-                  <template v-if="record.deleted">
-                    <span class="deleted-name">{{ record.name }}</span>
-                    <a-button type="link" size="small" @click="undoDeleteProcess(index)">
-                      撤销删除
-                    </a-button>
-                  </template>
-                  <template v-else>
-                    <span>{{ record.name }}</span>
-                  </template>
-                </template>
-                <template v-else-if="column.key === 'goodQty'">
-                  <a-input-number
-                    v-if="!record.deleted"
-                    v-model:value="record.goodQty"
-                    :min="0"
-                    size="small"
-                    style="width: 100%"
-                    @change="onProcessQtyChange(record)"
-                  />
-                </template>
-                <template v-else-if="column.key === 'defectQty'">
-                  <a-input-number
-                    v-if="!record.deleted"
-                    v-model:value="record.defectQty"
-                    :min="0"
-                    size="small"
-                    style="width: 100%"
-                    @change="onProcessQtyChange(record)"
-                  />
-                </template>
-                <template v-else-if="column.key === 'operators'">
-                  <a-select
-                    v-if="!record.deleted"
-                    v-model:value="record.operators"
-                    mode="multiple"
-                    size="small"
-                    placeholder="指定人员"
-                    :options="personnelOptions"
-                    style="width: 100%"
-                  />
-                </template>
-                <template v-else-if="column.key === 'action'">
-                  <a-button
-                    v-if="!record.deleted"
-                    type="link"
-                    size="small"
-                    danger
-                    @click="softDeleteProcess(index)"
-                  >
+              <template v-if="record.deleted">
+                <span class="deleted-name">{{ record.name }}</span>
+                <a-button type="link" size="small" @click="undoDeleteProcess(index)">
+                  撤销删除
+                </a-button>
+              </template>
+              <template v-else>
+                <div class="proc-header">
+                  <div class="proc-title-wrap">
+                    <span class="proc-name">{{ record.name }}</span>
+                    <a-tag
+                      size="small"
+                      :color="isDurationReportMode(record.reportMode) ? 'orange' : 'green'"
+                    >
+                      {{ displayReportMode(record.reportMode) }}
+                    </a-tag>
+                  </div>
+                  <a-button type="link" size="small" danger @click="softDeleteProcess(index)">
                     删除
                   </a-button>
+                </div>
+
+                <template v-if="!isDurationReportMode(record.reportMode)">
+                  <a-row :gutter="12" class="proc-fields">
+                    <a-col :xs="24" :md="8">
+                      <div class="field-label required">良品数量</div>
+                      <a-input-number
+                        v-model:value="record.goodQty"
+                        :min="0"
+                        size="small"
+                        style="width: 100%"
+                        addon-after="件"
+                        @focus="onProcessQtyFocus(record)"
+                        @change="onProcessGoodQtyChange(record)"
+                      />
+                    </a-col>
+                    <a-col :xs="24" :md="8">
+                      <div class="field-label">不良品数量</div>
+                      <a-input-number
+                        v-model:value="record.defectQty"
+                        :min="0"
+                        size="small"
+                        style="width: 100%"
+                        addon-after="件"
+                        @focus="onProcessQtyFocus(record)"
+                        @change="onProcessDefectQtyChange(record)"
+                      />
+                    </a-col>
+                  </a-row>
                 </template>
+
+                <template v-else>
+                  <a-row :gutter="12" class="proc-fields">
+                    <a-col :xs="24" :md="8">
+                      <div class="field-label required">工作时长（小时）</div>
+                      <a-input-number
+                        v-model:value="record.workHours"
+                        :min="0"
+                        :step="0.5"
+                        size="small"
+                        style="width: 100%"
+                        addon-after="小时"
+                      />
+                    </a-col>
+                    <a-col :xs="24" :md="8">
+                      <div class="field-label required">良品数量</div>
+                      <a-input-number
+                        v-model:value="record.goodQty"
+                        :min="0"
+                        size="small"
+                        style="width: 100%"
+                        addon-after="件"
+                        @focus="onProcessQtyFocus(record)"
+                        @change="onProcessGoodQtyChange(record)"
+                      />
+                    </a-col>
+                    <a-col :xs="24" :md="8">
+                      <div class="field-label">不良品数量</div>
+                      <a-input-number
+                        v-model:value="record.defectQty"
+                        :min="0"
+                        size="small"
+                        style="width: 100%"
+                        addon-after="件"
+                        @focus="onProcessQtyFocus(record)"
+                        @change="onProcessDefectQtyChange(record)"
+                      />
+                    </a-col>
+                    <a-col :xs="24" :md="12">
+                      <div class="field-label">开始时间</div>
+                      <a-input
+                        v-model:value="record.startTime"
+                        placeholder="HH:mm"
+                        size="small"
+                      />
+                    </a-col>
+                    <a-col :xs="24" :md="12">
+                      <div class="field-label">结束时间</div>
+                      <a-input
+                        v-model:value="record.endTime"
+                        placeholder="HH:mm"
+                        size="small"
+                      />
+                    </a-col>
+                  </a-row>
+                </template>
+
+                <DefectBreakdownField
+                  :defect-qty="Number(record.defectQty) || 0"
+                  :items="getDefectItemsForProcess(record.name)"
+                  :model-value="record.defectBreakdown || []"
+                  @update:model-value="(val) => onDefectBreakdownChange(record, val)"
+                />
+
+                <div class="proc-operator-row">
+                  <div class="field-label">操作人员（选填）</div>
+                  <a-select
+                    :value="record.operators?.[0]"
+                    allow-clear
+                    placeholder="指定人员"
+                    :options="personnelOptions"
+                    size="small"
+                    style="width: 240px"
+                    @change="(val) => setProcessOperator(record, val)"
+                  />
+                </div>
               </template>
-            </a-table>
+            </div>
             <a-button type="link" size="small" class="add-process-btn" @click="openProcessSelect">
               + 添加工序
             </a-button>
@@ -281,7 +361,7 @@ import { message } from 'ant-design-vue'
 import { personnelOptions } from '@/mock/personnel'
 import { formatReportDate } from '@/mock/quickReports'
 import { getActiveRouteOptions } from '@/mock/processRoutes'
-import { getLastOperators, submitQuickReport } from '@/store/quickReportStore'
+import { getLastOperators, submitQuickReport, getQuickReportById } from '@/store/quickReportStore'
 import { getDispatchedProductionWorkOrders } from '@/store/workOrderStore'
 import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
 import { resolveDefaultExecutors } from '@/store/processConfigStore'
@@ -290,13 +370,31 @@ import {
   normalizeQuickReportProcess,
   resolveProcessQuantities,
 } from '@/utils/quickReportProcess'
+import {
+  breakdownToLegacy,
+  ensureDefectBreakdown,
+  getProcessDefectItemsForForm,
+  syncDefectBreakdownOnQtyChange,
+} from '@/utils/defectBreakdown'
+import {
+  applyLinkedProcessQtyChange,
+  createScheduledProcessQuantities,
+  snapshotProcessQty,
+} from '@/utils/processReportQuantities'
+import { isDurationReportMode, resolveReportMode } from '@/utils/reportMode'
 import ProcessSelectModal from './ProcessSelectModal.vue'
 import ProductMaterialSelect from './ProductMaterialSelect.vue'
+import DefectBreakdownField from './DefectBreakdownField.vue'
+
+function displayReportMode(mode) {
+  return resolveReportMode(mode)
+}
 
 const props = defineProps({
   open: Boolean,
   /** workorder | quick */
   mode: { type: String, default: 'quick' },
+  editId: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -308,7 +406,14 @@ const routeOptions = ref([])
 const processSelectOpen = ref(false)
 
 const isWorkOrderMode = computed(() => props.mode === 'workorder')
-const modalTitle = computed(() => (isWorkOrderMode.value ? '工单登记' : '快速登记'))
+
+const useLinkedProcessQty = computed(
+  () => isWorkOrderMode.value && form.perProcessRegister,
+)
+const modalTitle = computed(() => {
+  if (props.editId) return '编辑登记'
+  return isWorkOrderMode.value ? '工单登记' : '快速登记'
+})
 
 const dispatchedWorkOrders = computed(() => getDispatchedProductionWorkOrders())
 
@@ -358,20 +463,63 @@ const excludeProcessNames = computed(() =>
   form.processes.filter((p) => !p.deleted).map((p) => p.name),
 )
 
-const processColumns = [
-  { title: '工序名称', key: 'name', width: 140 },
-  { title: '良品数', key: 'goodQty', width: 96, align: 'right' },
-  { title: '不良品数', key: 'defectQty', width: 96, align: 'right' },
-  { title: '操作人员', key: 'operators', width: 220 },
-  { title: '操作', key: 'action', width: 80 },
-]
-
 watch(
   () => props.open,
   (visible) => {
-    if (visible) resetForm()
+    if (visible) {
+      if (props.editId) loadFromRecord(props.editId)
+      else resetForm()
+    }
   },
 )
+
+function loadFromRecord(id) {
+  const row = getQuickReportById(id)
+  if (!row) {
+    resetForm()
+    return
+  }
+  form.workOrderId = row.workOrderId || undefined
+  form.productId = row.productId
+  form.productName = row.productName
+  form.productCode = row.productCode || ''
+  form.reportDate = row.reportDate
+  form.goodQty = row.goodQty ?? row.finishedQty ?? 0
+  form.defectQty = row.defectQty || 0
+  form.routeId = row.routeId
+  form.routeName = row.routeName || ''
+  form.perProcessRegister = row.perProcessRegister !== false
+  const isWoRecord = row.registrationType === '工单登记'
+  form.operators = form.perProcessRegister
+    ? []
+    : isWoRecord
+      ? [...(row.operators || [])]
+      : (row.operators || []).slice(0, 1)
+  form.processes = (row.processes || []).map((p) => {
+    const items = getProcessDefectItemsForForm(p.name)
+    const defectBreakdown = ensureDefectBreakdown(p, items)
+    return normalizeQuickReportProcess({
+      ...p,
+      ...breakdownToLegacy(defectBreakdown),
+    })
+  })
+  form.remark = row.remark || ''
+
+  if (row.productName) {
+    routeOptions.value = getActiveRouteOptions({ productName: row.productName }).map((name) => ({
+      label: name,
+      value: name,
+    }))
+  } else {
+    routeOptions.value = []
+  }
+
+  const today = formatReportDate()
+  const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
+  if (row.reportDate === today) dateChip.value = 'today'
+  else if (row.reportDate === yesterday) dateChip.value = 'yesterday'
+  else dateChip.value = 'custom'
+}
 
 function filterWorkOrder(input, option) {
   const label = (option?.label || '').toLowerCase()
@@ -390,7 +538,7 @@ function resetForm() {
   form.routeName = ''
   form.perProcessRegister = true
   form.processes = []
-  form.operators = [...getLastOperators()]
+  form.operators = getLastOperators().slice(0, 1)
   form.remark = ''
   dateChip.value = 'today'
   routeOptions.value = []
@@ -416,7 +564,10 @@ function syncProcessQtyFromForm() {
   normalizeFormQty()
   const qtys = { goodQty: form.goodQty, defectQty: form.defectQty }
   form.processes.forEach((p) => {
-    if (!p.deleted) Object.assign(p, resolveProcessQuantities(qtys))
+    if (!p.deleted) {
+      Object.assign(p, resolveProcessQuantities(qtys))
+      onProcessQtyChange(p)
+    }
   })
 }
 
@@ -430,7 +581,9 @@ function onPerProcessRegisterChange(checked) {
     syncFormQtyFromProcesses()
   } else {
     syncFormQtyFromProcesses()
-    if (!form.operators.length) form.operators = [...getLastOperators()]
+    if (!form.operators.length) {
+      form.operators = isWorkOrderMode.value ? [...getLastOperators()] : getLastOperators().slice(0, 1)
+    }
   }
 }
 
@@ -465,19 +618,82 @@ function onProductSelect(item) {
   }
 }
 
+function buildRouteQtyOptions() {
+  const wo = selectedWorkOrder.value
+  if (useLinkedProcessQty.value && wo) {
+    const scheduleQty = wo.scheduleQty ?? wo.planQty ?? 0
+    if (scheduleQty > 0) {
+      return { scheduleQty, useScheduleDefault: true }
+    }
+  }
+  return {
+    goodQty: form.goodQty,
+    defectQty: form.defectQty,
+    finishedQty: totalReportQty.value,
+    useScheduleDefault: false,
+  }
+}
+
 function applyRoute(routeName) {
   form.routeName = routeName
   form.routeId = routeName
   const lastOps = getLastOperators()
-  form.processes = buildQuickReportProcessesFromRoute(routeName, {
-    goodQty: form.goodQty,
-    defectQty: form.defectQty,
-    finishedQty: totalReportQty.value,
-  }).map((p) => ({
-    ...p,
-    operators: p.operators?.length ? p.operators : [...lastOps],
-  }))
+  form.processes = buildQuickReportProcessesFromRoute(routeName, buildRouteQtyOptions()).map(
+    (p) => ({
+      ...p,
+      operators: p.operators?.length ? p.operators : lastOps.slice(0, 1),
+    }),
+  )
   if (form.perProcessRegister) syncFormQtyFromProcesses()
+}
+
+function getDefectItemsForProcess(processName) {
+  return getProcessDefectItemsForForm(processName)
+}
+
+function applyDefectLegacy(record) {
+  Object.assign(record, breakdownToLegacy(record.defectBreakdown || []))
+}
+
+function onProcessQtyFocus(record) {
+  if (useLinkedProcessQty.value) snapshotProcessQty(record)
+}
+
+function onProcessGoodQtyChange(record) {
+  onProcessQtyChange(record, 'good')
+}
+
+function onProcessDefectQtyChange(record) {
+  onProcessQtyChange(record, 'defect')
+}
+
+function onProcessQtyChange(record, changedField = 'good') {
+  if (useLinkedProcessQty.value) {
+    applyLinkedProcessQtyChange(record, changedField, record._qtySnapshot)
+  } else {
+    Object.assign(record, resolveProcessQuantities(record))
+  }
+  const items = getDefectItemsForProcess(record.name)
+  if (Number(record.defectQty) <= 0) {
+    record.defectBreakdown = []
+  } else {
+    record.defectBreakdown = syncDefectBreakdownOnQtyChange(record, items)
+  }
+  applyDefectLegacy(record)
+  syncFormQtyFromProcesses()
+}
+
+function onDefectBreakdownChange(record, breakdown) {
+  record.defectBreakdown = breakdown
+  applyDefectLegacy(record)
+}
+
+function setOverallOperator(name) {
+  form.operators = name ? [name] : []
+}
+
+function setProcessOperator(record, name) {
+  record.operators = name ? [name] : []
 }
 
 function onRouteChange(routeName) {
@@ -490,11 +706,6 @@ function onDateChipChange() {
   } else if (dateChip.value === 'yesterday') {
     form.reportDate = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
   }
-}
-
-function onProcessQtyChange(record) {
-  Object.assign(record, resolveProcessQuantities(record))
-  syncFormQtyFromProcesses()
 }
 
 function softDeleteProcess(index) {
@@ -512,11 +723,16 @@ function openProcessSelect() {
 }
 
 function onProcessesSelected(rows) {
-  const qtys = resolveProcessQuantities({
-    goodQty: form.goodQty,
-    defectQty: form.defectQty,
-    finishedQty: totalReportQty.value,
-  })
+  const wo = selectedWorkOrder.value
+  const scheduleQty = wo?.scheduleQty ?? wo?.planQty ?? 0
+  const qtys =
+    useLinkedProcessQty.value && scheduleQty > 0
+      ? createScheduledProcessQuantities(scheduleQty)
+      : resolveProcessQuantities({
+          goodQty: form.goodQty,
+          defectQty: form.defectQty,
+          finishedQty: totalReportQty.value,
+        })
   rows.forEach((proc) => {
     form.processes.push(
       normalizeQuickReportProcess({
@@ -524,12 +740,14 @@ function onProcessesSelected(rows) {
         processConfigId: proc.id,
         name: proc.name,
         code: proc.code,
+        reportMode: proc.reportMode,
         goodQty: qtys.goodQty,
         defectQty: qtys.defectQty,
         qty: qtys.qty,
         deleted: false,
         manual: true,
-        operators: [...resolveDefaultExecutors(proc)],
+        operators: resolveDefaultExecutors(proc).slice(0, 1),
+        defectBreakdown: [],
       }),
     )
   })
@@ -555,6 +773,7 @@ function handleSubmit() {
   submitting.value = true
   const wo = selectedWorkOrder.value
   const res = submitQuickReport({
+    id: props.editId || undefined,
     registrationType: isWorkOrderMode.value ? '工单登记' : '快速登记',
     workOrderId: isWorkOrderMode.value ? form.workOrderId : '',
     sourceWorkOrderNo: wo?.code || '',
@@ -683,6 +902,47 @@ function handleSubmit() {
   .add-process-btn {
     margin-top: 8px;
     padding-left: 0;
+  }
+
+  .process-block {
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+
+  .process-block.deleted {
+    background: #fff1f0;
+    border-color: #ffccc7;
+  }
+
+  .proc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .proc-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .proc-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #262626;
+  }
+
+  .proc-fields {
+    margin-bottom: 8px;
+  }
+
+  .proc-operator-row {
+    margin-top: 8px;
   }
 
   .deleted-name {
