@@ -146,6 +146,7 @@ export function generateMobileTasksFromWorkOrder(workOrder, orderCategory) {
       executors: [...(process.executors || [])],
       orderCategory,
       orderSource: workOrder.orderSource || workOrder.source || '',
+      salesOrderNo: workOrder.sourceOrderNo || '',
       workOrderRemark: workOrder.remark || '',
       laborCalcMethod: '时长报工+计时工资',
       nextProcess: getNextProcessName(processes, process.name),

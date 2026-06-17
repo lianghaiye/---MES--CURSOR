@@ -62,7 +62,15 @@
             </a-col>
             <a-col :span="8">
               <a-form-item label="材质">
-                <a-input v-model:value="form.material" size="small" placeholder="请输入 材质" />
+                <a-select
+                  v-model:value="form.material"
+                  size="small"
+                  allow-clear
+                  show-search
+                  :options="materialGradeOpts"
+                  placeholder="请选择 材质"
+                  :filter-option="filterMaterialGrade"
+                />
               </a-form-item>
             </a-col>
             <a-col :span="8">
@@ -446,6 +454,7 @@ import {
   createDefaultProductProduction,
   createDefaultProductAlert,
 } from '@/mock/productInfoOptions'
+import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
 import { generateProductCode } from '@/store/productInfoStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 
@@ -475,6 +484,10 @@ const materialCategoryOpts = flatMatCats.map((c) => ({
 const unitOpts = inventoryUnitOptions.map((v) => ({ label: v, value: v }))
 const productAttrOpts = productAttributeOptions.map((v) => ({ label: v, value: v }))
 const standardSpecOpts = standardSpecOptions.map((v) => ({ label: v, value: v }))
+const materialGradeOpts = computed(() => {
+  void materialGradeState.items
+  return getMaterialGradeOptions()
+})
 const reportTypeOpts = reportTypeOptions.map((v) => ({ label: v, value: v }))
 const salaryMethodOpts = salaryMethodOptions.map((v) => ({ label: v, value: v }))
 const categoryOpts = flatCats.map((c) => ({
@@ -684,6 +697,10 @@ function validate() {
     }
   }
   return true
+}
+
+function filterMaterialGrade(input, option) {
+  return (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
 }
 
 function buildPayload() {

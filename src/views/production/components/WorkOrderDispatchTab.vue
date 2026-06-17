@@ -87,7 +87,7 @@ import { computed } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import ExecutorTagPicker from './ExecutorTagPicker.vue'
 import { mockFeedingMaterials } from '@/mock/workOrderMaster'
-import { validateProcessExecutors } from '@/utils/workOrderDispatchHelpers'
+import { validateWorkOrderDispatchReady } from '@/utils/workOrderDispatchHelpers'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -127,12 +127,12 @@ function removeFeedingRow(process, index) {
 }
 
 function emitSave() {
-  if (!validateProcessExecutors(props.workOrder.processes)) return
+  if (!validateWorkOrderDispatchReady(props.workOrder)) return
   emit('save')
 }
 
 function emitDispatchAndStart() {
-  if (!validateProcessExecutors(props.workOrder.processes)) return
+  if (!validateWorkOrderDispatchReady(props.workOrder)) return
   emit('dispatch-and-start')
 }
 </script>

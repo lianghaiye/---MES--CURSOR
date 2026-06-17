@@ -21,11 +21,6 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="业务类型">
-            <a-select v-model:value="form.businessType" size="small" :options="businessTypeOpts" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
           <a-form-item label="紧急度" required>
             <a-select v-model:value="form.urgency" size="small" :options="urgencyOpts" />
           </a-form-item>
@@ -205,6 +200,10 @@
               <PlusOutlined />
               选择产品
             </a-button>
+            <a-button @click="addManualProductLine">
+              <PlusOutlined />
+              添加产品
+            </a-button>
             <a-button class="tax-toggle-btn" @click="toggleTaxMode">
               切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
             </a-button>
@@ -241,6 +240,57 @@
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+
+            <template v-else-if="column.key === 'businessType'">
+              <a-select
+                v-model:value="record.businessType"
+                size="small"
+                style="width: 100%"
+                :options="lineBusinessTypeOpts(record)"
+              />
+            </template>
+
+            <template v-else-if="column.key === 'productName'">
+              <a-input
+                v-if="record.isManualLine"
+                v-model:value="record.productName"
+                size="small"
+                placeholder="请输入产品名称"
+              />
+              <span v-else class="readonly-cell">{{ record.productName || '—' }}</span>
+            </template>
+
+            <template v-else-if="column.key === 'productCode'">
+              <a-input
+                v-if="record.isManualLine"
+                v-model:value="record.productCode"
+                size="small"
+                placeholder="请输入产品编码"
+              />
+              <span v-else class="readonly-cell">{{ record.productCode || '—' }}</span>
+            </template>
+
+            <template v-else-if="column.key === 'productAttr'">
+              <span>{{ record.productAttr || '—' }}</span>
+            </template>
+
+            <template v-else-if="column.key === 'specModel'">
+              <a-input
+                v-if="record.isManualLine"
+                v-model:value="record.specModel"
+                size="small"
+              />
+              <span v-else>{{ record.specModel || '—' }}</span>
+            </template>
+
+            <template v-else-if="column.key === 'material'">
+              <a-input
+                v-if="record.isManualLine"
+                v-model:value="record.material"
+                size="small"
+              />
+              <span v-else>{{ record.material || '—' }}</span>
+            </template>
 
             <template v-else-if="column.key === 'salesQty'">
               <a-input-number
@@ -445,7 +495,6 @@ import { message, Upload } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { PlusOutlined, DownOutlined, AppstoreOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import {
-  businessTypeOptions,
   urgencyOptions,
   contractTypeOptions,
   settlementCurrencyOptions,
@@ -463,6 +512,7 @@ import { productCategoryTree, flattenCategoryNodes } from '@/mock/productCategor
 import { productInfoState } from '@/store/productInfoStore'
 import { getActiveBomForItem } from '@/store/productBomStore'
 import { generateSalesOrderNo } from '@/store/salesOrderStore'
+import { deriveOrderBusinessType, normalizeSalesLineBusiness } from '@/utils/salesOrderBusiness'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -523,6 +573,7 @@ const columnDefs = [
     ellipsis: true,
     fixed: 'left',
   },
+  { key: 'businessType', title: '业务类型', width: 100 },
   { key: 'productAttr', title: '产品属性', dataIndex: 'productAttr', width: 90 },
   { key: 'specAttr', title: '规格属性', dataIndex: 'specAttr', width: 90 },
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 100 },
@@ -642,7 +693,6 @@ const taxModeHint = computed(() =>
 
 const form = reactive({
   orderNo: '',
-  businessType: '自产销售',
   urgency: '正常',
   contractType: '标准合同',
   contractNo: '',
@@ -663,7 +713,13 @@ const form = reactive({
   lineItems: [],
 })
 
-const businessTypeOpts = businessTypeOptions.map((v) => ({ label: v, value: v }))
+const catalogBusinessTypeOpts = ['自产销售', '外购销售'].map((v) => ({ label: v, value: v }))
+const manualBusinessTypeOpts = ['外协销售', '质检服务'].map((v) => ({ label: v, value: v }))
+
+function lineBusinessTypeOpts(record) {
+  return record.isManualLine ? manualBusinessTypeOpts : catalogBusinessTypeOpts
+}
+
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const contractTypeOpts = contractTypeOptions.map((v) => ({ label: v, value: v }))
 const currencyOpts = settlementCurrencyOptions.map((v) => ({ label: v, value: v }))
@@ -693,7 +749,6 @@ watch(
       const r = props.editRecord
       Object.assign(form, {
         orderNo: r.orderNo,
-        businessType: r.businessType,
         urgency: r.urgency,
         contractType: r.contractType,
         contractNo: r.contractNo || '',
@@ -711,7 +766,9 @@ watch(
         paymentRatio: r.paymentRatio || undefined,
         downPaymentAmount: r.downPaymentAmount,
         remark: r.remark || '',
-        lineItems: JSON.parse(JSON.stringify(r.lineItems || [])).map(normalizeLineItem),
+        lineItems: JSON.parse(JSON.stringify(r.lineItems || [])).map((line) =>
+          normalizeLineItem(line, r.businessType),
+        ),
       })
       form.lineItems.forEach(recalcLine)
       fileList.value = (r.attachments || []).map((file) => ({
@@ -726,22 +783,25 @@ watch(
   },
 )
 
-function normalizeLineItem(item) {
-  return {
-    ...item,
-    salesQty: item.salesQty ?? item.qty ?? 1,
-    qty: item.qty ?? item.salesQty ?? 1,
-    taxRate: item.taxRate ?? 13,
-    issueQty: item.issueQty ?? 0,
-    unit: item.unit || '件',
-    productAttr: item.productAttr || '',
-    deliveryMode: item.deliveryMode || '整机',
-  }
+function normalizeLineItem(item, orderBusinessType = '自产销售') {
+  return normalizeSalesLineBusiness(
+    {
+      ...item,
+      salesQty: item.salesQty ?? item.qty ?? 1,
+      qty: item.qty ?? item.salesQty ?? 1,
+      taxRate: item.taxRate ?? 13,
+      issueQty: item.issueQty ?? 0,
+      unit: item.unit || '件',
+      productAttr: item.productAttr || '',
+      deliveryMode: item.deliveryMode || '整机',
+      businessType: item.businessType || orderBusinessType || '自产销售',
+    },
+    { businessType: orderBusinessType },
+  )
 }
 
 function resetForm() {
   form.orderNo = ''
-  form.businessType = '自产销售'
   form.urgency = '正常'
   form.contractType = '标准合同'
   form.contractNo = ''
@@ -841,6 +901,19 @@ function applyProductPickerSearch() {
   productPickerPage.current = 1
 }
 
+function addManualProductLine() {
+  const line = createLineItem({
+    businessType: '外协销售',
+    isManualLine: true,
+    deliveryMode: '整机',
+    salesQty: 1,
+    taxRate: 13,
+    unit: '件',
+  })
+  recalcLine(line)
+  form.lineItems.push(line)
+}
+
 function openProductPicker() {
   pickedProductKeys.value = []
   resetProductPickerSearch()
@@ -848,18 +921,19 @@ function openProductPicker() {
 }
 
 function confirmProductPick() {
-  const skipped = []
+  const noBomProducts = []
   pickedProductKeys.value.forEach((productId) => {
     const p = productInfoState.products.find((m) => m.id === productId)
     if (!p) return
     const bom = getActiveBomForItem('product', p.id)
     if (!bom) {
-      skipped.push(p.name)
-      return
+      noBomProducts.push(p.name)
     }
     const line = createLineItem({
       productId: p.id,
-      bomId: bom.id,
+      bomId: bom?.id || '',
+      businessType: '自产销售',
+      isManualLine: false,
       deliveryMode: '整机',
       productAttr: p.productAttribute,
       productName: p.name,
@@ -869,8 +943,8 @@ function confirmProductPick() {
       material: p.material,
       category: p.categoryName,
       unit: p.inventoryUnit || '件',
-      bomName: bom.bomName,
-      bomVersion: bom.version,
+      bomName: bom?.bomName || '',
+      bomVersion: bom?.version || '',
       salesQty: 1,
       taxRate: 13,
       unitPriceExTax: Number(p.unitPrice) || 0,
@@ -879,9 +953,9 @@ function confirmProductPick() {
     recalcLine(line)
     form.lineItems.push(line)
   })
-  if (skipped.length) {
+  if (noBomProducts.length) {
     message.warning(
-      `以下产品无使用中的 BOM，已跳过：${skipped.join('、')}。请先在产品 BOM 中维护并启用。`,
+      `以下产品无使用中的 BOM，已添加至明细：${noBomProducts.join('、')}。请尽快在产品 BOM 中维护并启用，审核前需完成 BOM 配置。`,
     )
   }
   productPickerOpen.value = false
@@ -915,8 +989,14 @@ function handleSave() {
 
   const orderNo = form.orderNo?.trim() || generateSalesOrderNo()
 
+  if (!form.lineItems.length) {
+    message.warning('请至少添加一条销售明细')
+    return
+  }
+
   const payload = {
     ...JSON.parse(JSON.stringify(form)),
+    businessType: deriveOrderBusinessType(form.lineItems),
     orderNo,
     reminderDate: form.reminderDate ? form.reminderDate.format('YYYY-MM-DD') : '',
     documentDate: dayjs().format('YYYY-MM-DD'),

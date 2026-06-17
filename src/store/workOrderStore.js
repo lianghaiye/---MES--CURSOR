@@ -217,7 +217,9 @@ export function updateWorkOrder(id, patch) {
 }
 
 export function createWorkOrderPayload(partial) {
-  const routeName = partial.processRouteName || getDefaultProductRoute(partial.productName)
+  const isOutsource = partial.orderCategory === '外协工单'
+  const routeName = partial.processRouteName
+    || (isOutsource ? '' : getDefaultProductRoute(partial.productName))
   const existingCodes = workOrderState.orders.map((o) => o.code)
   const category = partial.orderCategory || '生产工单'
   const productName = partial.productName?.trim() || ''
@@ -235,7 +237,7 @@ export function createWorkOrderPayload(partial) {
     scheduleQty: partial.scheduleQty ?? partial.planQty ?? 0,
     planQty: partial.planQty ?? 0,
     workCenter: partial.workCenter || '默认工厂',
-    bom: partial.bom || partial.productName,
+    bom: isOutsource ? '' : partial.bom || partial.productName,
     warehouse: partial.warehouse || resolveDefaultWarehouseByProductName(productName) || '',
     urgency: partial.urgency || '普通',
     planDateRange: partial.planDateRange || [
@@ -246,8 +248,11 @@ export function createWorkOrderPayload(partial) {
     processRouteName: routeName,
     source: partial.source || 'manual',
     sourceOrderNo: partial.sourceOrderNo || '',
+    salesLineId: partial.salesLineId || '',
+    salesOrderId: partial.salesOrderId || '',
     materialCode: partial.materialCode || '',
-    processes: buildProcessesFromRoute(routeName),
+    skipEbom: Boolean(partial.skipEbom || isOutsource),
+    processes: routeName ? buildProcessesFromRoute(routeName) : [],
     createdAt: dayjs().format('YYYY-MM-DD'),
   }
 }

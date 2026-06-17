@@ -3,10 +3,53 @@ import { getApprovedDefectBreakdown } from '@/utils/defectBreakdown'
 import { getDefectItemById } from '@/store/defectItemStore'
 import { resolveBreakdownWageRules } from '@/utils/defectWageResolver'
 import { resolveWageFormulaKeys } from '@/constants/processReportWageFormulas'
+import {
+  resolveEffectiveLaborConfig,
+  resolveWageRateDisplayMode,
+} from '@/utils/laborConfigResolver'
 
 function round2(val) {
   return Math.round((Number(val) || 0) * 100) / 100
 }
+
+const DEFAULT_SUBSIDY_UNIT_PRICE = 3
+
+export function getSubsidyUnitPrice(config = {}) {
+  return Number(config.subsidyUnitPrice) || DEFAULT_SUBSIDY_UNIT_PRICE
+}
+
+export function resolveSubsidyMethod(line = {}) {
+  if (line.subsidyMethod === 'qty' || line.subsidyMethod === 'fixed') return line.subsidyMethod
+  if (Number(line.subsidyFixedAmount) > 0) return 'fixed'
+  if (Number(line.subsidyReportQty) > 0 || Number(line.subsidyHours) > 0) return 'qty'
+  return 'fixed'
+}
+
+/** 补贴金额：补贴工数×单价 或 固定金额 */
+export function resolveSubsidyWage(line = {}, config = {}, salaryMethod = '', pieceRate = 0, hourlyRate = 0) {
+  const method = resolveSubsidyMethod(line)
+  if (method === 'fixed') {
+    return round2(Number(line.subsidyFixedAmount) || 0)
+  }
+  const unitPrice = getSubsidyUnitPrice(config)
+  const qty = Number(line.subsidyReportQty) || 0
+  if (qty > 0) {
+    return round2(qty * unitPrice)
+  }
+  const subsidyHours = Number(line.subsidyHours) || 0
+  if (subsidyHours > 0 && salaryMethod !== '计件工资') {
+    return round2(subsidyHours * hourlyRate)
+  }
+  if (qty > 0 && salaryMethod === '计件工资') {
+    return round2(qty * pieceRate)
+  }
+  return 0
+}
+
+export function resolveManualQualityDeduction(line = {}) {
+  return round2(Number(line.manualQualityDeduction) || 0)
+}
+
 
 /** 公式中数量/单价展示：去掉多余尾零 */
 export function formatFormulaNum(val) {
@@ -39,10 +82,17 @@ export function getApprovedWorkHours(line = {}, config = null) {
   return Number(line.workHours) || 0
 }
 
+export function getSubsidyPieceQty(line = {}) {
+  const method = resolveSubsidyMethod(line)
+  if (method === 'fixed') return 0
+  return Number(line.subsidyReportQty) || 0
+}
+
+/** 最终计件数 = 良品数 + 不良品数 + 补贴数（均优先取调整值） */
 export function calcFinalPieceQty(line = {}) {
-  const approvedGood = getApprovedGoodQty(line)
-  const subsidyQty = Number(line.subsidyReportQty) || 0
-  return round2(approvedGood + subsidyQty)
+  return round2(
+    getApprovedGoodQty(line) + getApprovedDefectQty(line) + getSubsidyPieceQty(line),
+  )
 }
 
 /** 单件折算单价：计件=件单价；计时+批量=标准工时折算单价 */
@@ -200,13 +250,13 @@ export function calcProcessReportWage(config, line = {}) {
   const stdMin = Number(config?.standardMinutesPerPiece) || 0
   const prepMin = Number(config?.setupMinutesPerBatch) || 0
   const prepHours = round2(prepMin / 60)
-  const subsidyQty = Number(line.subsidyReportQty) || 0
-  const subsidyHours = Number(line.subsidyHours) || 0
+  const reportType = config?.reportType || line.reportType || ''
+  const salaryMethod = config?.salaryMethod || line.salaryMethod || ''
+  const subsidyWage = resolveSubsidyWage(line, config, salaryMethod, pieceRate, hourlyRate)
+  const manualQualityDeduction = resolveManualQualityDeduction(line)
   const breakdownRules = resolveBreakdownWageRules(getApprovedDefectBreakdown(line))
   const defectWageDetails = buildDefectWageDetails(config, breakdownRules)
 
-  const reportType = config?.reportType || line.reportType || ''
-  const salaryMethod = config?.salaryMethod || line.salaryMethod || ''
   const unitWage = getUnitWage(config)
 
   let defectWage = 0
@@ -244,17 +294,15 @@ export function calcProcessReportWage(config, line = {}) {
   let goodWage = 0
   let salaryAmount = 0
   let accountHours = 0
-  let subsidyWage = 0
   let prepWage = 0
   let fixedDefectWage = 0
+  const subsidyHours = Number(line.subsidyHours) || 0
 
   if (salaryMethod === '计件工资' && reportType === '批量计件') {
     goodWage = round2(goodQty * pieceRate)
-    subsidyWage = round2(subsidyQty * pieceRate)
-    salaryAmount = round2(goodWage + defectWage + subsidyWage)
+    salaryAmount = round2(goodWage + defectWage + subsidyWage - manualQualityDeduction)
   } else if (salaryMethod === '计时工资' && reportType === '批量计件') {
     goodWage = round2(goodQty * unitWage)
-    subsidyWage = round2(subsidyHours * hourlyRate)
     prepWage = round2(prepHours * hourlyRate)
 
     let equivalentQty = goodQty
@@ -278,21 +326,20 @@ export function calcProcessReportWage(config, line = {}) {
     accountHours = round2(prepHours + subsidyHours + (equivalentQty * stdMin) / 60)
     defectWage = round2(discountWeightedDefect * unitWage)
     salaryAmount = round2(
-      prepWage + subsidyWage + goodWage + defectWage + fixedDefectWage - qualityDeduction,
+      prepWage + subsidyWage + goodWage + defectWage + fixedDefectWage - qualityDeduction - manualQualityDeduction,
     )
   } else if (salaryMethod === '计时工资' && reportType === '时长报工') {
     const approvedHours = getApprovedWorkHours(line, config)
     accountHours = round2(prepHours + approvedHours + subsidyHours)
-    subsidyWage = round2(subsidyHours * hourlyRate)
     goodWage = round2((prepHours + approvedHours) * hourlyRate)
-    salaryAmount = round2(accountHours * hourlyRate)
+    salaryAmount = round2(goodWage + subsidyWage - manualQualityDeduction)
     defectWage = 0
     defectWageDetails.length = 0
   }
 
   defectWage = round2(defectWage)
   defectWageOriginal = round2(defectWageOriginal)
-  qualityDeduction = round2(qualityDeduction)
+  qualityDeduction = round2(qualityDeduction + manualQualityDeduction)
 
   const goodWageFormula =
     salaryMethod === '计件工资' && reportType === '批量计件'
@@ -335,7 +382,13 @@ export function calcProcessReportWage(config, line = {}) {
 }
 
 export function enrichProcessReportLine(line, config) {
-  const wage = calcProcessReportWage(config, line)
+  const effectiveConfig = resolveEffectiveLaborConfig(config, line)
+  const wage = calcProcessReportWage(effectiveConfig, line)
+  const wageRateMode = resolveWageRateDisplayMode(config)
+  const pieceOverridden =
+    line.overridePieceRate != null && line.overridePieceRate !== ''
+  const hourlyOverridden =
+    line.overrideStandardHourlyRate != null && line.overrideStandardHourlyRate !== ''
   return {
     ...line,
     reportType: config?.reportType || line.reportType || '—',
@@ -344,6 +397,15 @@ export function enrichProcessReportLine(line, config) {
       config?.reportType && config?.salaryMethod
         ? `${config.reportType}+${config.salaryMethod}`
         : line.calcMethod || '—',
+    wageRateMode,
+    masterPieceRate: config?.pieceRate ?? 0,
+    masterStandardHourlyRate: config?.standardHourlyRate ?? 0,
+    effectivePieceRate: effectiveConfig?.pieceRate ?? 0,
+    effectiveStandardHourlyRate: effectiveConfig?.standardHourlyRate ?? 0,
+    isPieceRateOverridden: pieceOverridden,
+    isStandardHourlyRateOverridden: hourlyOverridden,
+    overridePieceRate: line.overridePieceRate,
+    overrideStandardHourlyRate: line.overrideStandardHourlyRate,
     adjustedGoodQty: wage.adjustedGoodQty,
     adjustedDefectQty: wage.adjustedDefectQty,
     adjustedWorkHours: wage.adjustedWorkHours,

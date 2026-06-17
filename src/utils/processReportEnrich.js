@@ -8,7 +8,7 @@ import {
 } from '@/utils/defectBreakdown'
 import { resolveDefectItemsByIds } from '@/store/defectItemStore'
 import { resolveReportMode } from '@/utils/reportMode'
-import { resolveLaborConfig } from '@/utils/laborConfigResolver'
+import { resolveLaborConfig, resolveEffectiveLaborConfig } from '@/utils/laborConfigResolver'
 import { calcProcessReportWage } from '@/utils/processReportWageCalc'
 import { resolveListScheduleQty } from '@/utils/processReportQuantities'
 
@@ -37,8 +37,9 @@ export function enrichProcessReportRecord(record) {
   const defectBreakdown = ensureDefectBreakdown(record, items)
   const legacy = breakdownToLegacy(defectBreakdown)
   const config = resolveLaborConfig(record.productCode, record.processName)
+  const effectiveConfig = resolveEffectiveLaborConfig(config, record)
   const wageLine = { ...record, ...legacy, defectBreakdown: legacy.defectBreakdown }
-  const wage = calcProcessReportWage(config, wageLine)
+  const wage = calcProcessReportWage(effectiveConfig, wageLine)
   return {
     ...record,
     ...legacy,

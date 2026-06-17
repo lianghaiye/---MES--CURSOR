@@ -5,6 +5,7 @@ export const topModules = [
   { key: 'sales', label: '销售管理', path: '/sales' },
   { key: 'planning', label: '计划排产', path: '/planning' },
   { key: 'production', label: '生产管理', path: '/production' },
+  { key: 'report-management', label: '报工管理', path: '/report-management' },
   { key: 'labor-salary', label: '工时工资', path: '/labor-salary' },
   { key: 'inventory', label: '库存管理', path: '/inventory' },
   { key: 'quality', label: '质量管理', path: '/quality' },
@@ -58,8 +59,10 @@ export const sideMenus = {
       path: '/production/disassembly-work-orders',
     },
     { key: 'qc-work-orders', label: '质检工单', path: '/production/qc-work-orders' },
-    { key: 'report-work', label: '登记产出', path: '/production/report-work' },
-    { key: 'process-report', label: '工序报工', path: '/production/process-report' },
+  ],
+  'report-management': [
+    { key: 'report-work', label: '报工确认', path: '/report-management/report-work' },
+    { key: 'process-report', label: '工序报工', path: '/report-management/process-report' },
   ],
   inventory: [
     { key: 'stock', label: '库存查询', path: '/inventory/stock' },
@@ -82,6 +85,7 @@ export const sideMenus = {
   'basic-config': [
     { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
     { key: 'defect-items', label: '不良品项', path: '/basic-config/defect-items' },
+    { key: 'material-grades', label: '材质管理', path: '/basic-config/material-grades' },
     {
       key: 'warehouse-mgmt',
       label: '仓库管理',
@@ -142,11 +146,11 @@ export const routeTitles = {
   '/production/disassembly-work-orders': '拆解工单',
   '/production/disassembly-work-orders/:id': '拆解工单详情',
   '/production/qc-work-orders': '质检工单',
-  '/production/report-work': '登记产出',
-  '/production/report-work/:id': '登记详情',
-  '/production/process-report': '工序报工',
-  '/production/process-report/wo/:workOrderId': '任务报工详情',
-  '/production/process-report/:id': '工序报工详情',
+  '/report-management/report-work': '报工确认',
+  '/report-management/report-work/:id': '报工确认详情',
+  '/report-management/process-report': '工序报工',
+  '/report-management/process-report/wo/:workOrderId': '任务报工详情',
+  '/report-management/process-report/:id': '工序报工详情',
   '/labor-salary/labor-hour': '工时管理',
   '/labor-salary/salary-summary': '工资合计',
   '/labor-salary/salary-detail': '工资详情',
@@ -171,6 +175,7 @@ export const routeTitles = {
   '/report/overview': '报表中心',
   '/basic-config/employee-groups': '员工组别',
   '/basic-config/defect-items': '不良品项',
+  '/basic-config/material-grades': '材质管理',
   '/basic-config/warehouse-categories': '仓库分类',
   '/basic-config/warehouses': '仓库列表',
 }
@@ -179,8 +184,8 @@ export const routeTitles = {
 export const dynamicRouteTitles = [
   { pattern: /^\/basic-config\/warehouses\/[^/]+$/, title: '仓库详情' },
   { pattern: /^\/inventory\/inbound\/[^/]+$/, title: '入库单详情' },
-  { pattern: /^\/production\/report-work\/[^/]+$/, title: '登记详情' },
-  { pattern: /^\/production\/process-report\/wo\/[^/]+$/, title: '任务报工详情' },
-  { pattern: /^\/production\/process-report\/[^/]+$/, title: '工序报工详情' },
+  { pattern: /^\/report-management\/report-work\/[^/]+$/, title: '报工确认详情' },
+  { pattern: /^\/report-management\/process-report\/wo\/[^/]+$/, title: '任务报工详情' },
+  { pattern: /^\/report-management\/process-report\/[^/]+$/, title: '工序报工详情' },
   { pattern: /^\/labor-salary\/labor-hour\/[^/]+$/, title: '工时详情' },
 ]

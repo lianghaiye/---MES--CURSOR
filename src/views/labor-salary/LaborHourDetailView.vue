@@ -4,11 +4,13 @@
       <template v-if="record">
         <div class="page-header">
           <div class="header-left">
-            <a-button size="small" @click="handleBack">返回</a-button>
             <span class="page-title">【{{ record.workOrderName }}】</span>
             <a-tag :color="statusColor(record.auditStatus)">{{ record.auditStatus }}</a-tag>
           </div>
-          <a-button size="small" @click="reload">刷新</a-button>
+          <a-space>
+            <a-button size="small" @click="reload">刷新</a-button>
+            <a-button size="small" @click="handleBack">返回列表</a-button>
+          </a-space>
         </div>
 
         <div class="section-card">

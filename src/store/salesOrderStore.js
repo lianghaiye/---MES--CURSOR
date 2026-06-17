@@ -14,6 +14,15 @@ import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
 import { hydrateApprovedSelfProdOrders } from '@/utils/hydrateSalesLines'
 import { validateChangeDeliveryRows, applyDeliveryModeChanges } from '@/utils/changeDeliveryMode'
 import { syncProductionPlanDeliveryMode } from '@/store/productionPlanStore'
+import {
+  deriveOrderBusinessType,
+  isOutsourcingBusinessType,
+  isPurchasedBusinessType,
+  isSelfMadeBusinessType,
+  normalizeSalesLineBusiness,
+  resolveLineBusinessType,
+} from '@/utils/salesOrderBusiness'
+import { createOutsourcingWorkOrdersFromSalesOrder } from '@/utils/salesOrderOutsourceWorkOrder'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
 const DATA_VERSION = 3
@@ -130,7 +139,10 @@ export function canEditSalesOrder(order) {
 }
 
 export function canChangeDeliveryMode(order) {
-  return order?.progressStatus === '已审' && order?.businessType === '自产销售'
+  if (order?.progressStatus !== '已审') return false
+  return (order.lineItems || []).some((line) =>
+    isSelfMadeBusinessType(resolveLineBusinessType(line, order)),
+  )
 }
 
 /** 变更销售明细交付方式，并同步生产计划 */
@@ -165,11 +177,24 @@ export function approveSalesOrder(id) {
     return { ok: false, message: `订单「${order.orderNo}」请先添加销售明细后再审核` }
   }
 
+  order.lineItems = (order.lineItems || []).map((line) => normalizeSalesLineBusiness(line, order))
+
+  const selfMadeLines = order.lineItems.filter((line) =>
+    isSelfMadeBusinessType(resolveLineBusinessType(line, order)),
+  )
+  const purchaseLines = order.lineItems.filter((line) =>
+    isPurchasedBusinessType(resolveLineBusinessType(line, order)),
+  )
+  const outsourcingLines = order.lineItems.filter((line) =>
+    isOutsourcingBusinessType(resolveLineBusinessType(line, order)),
+  )
+
   let purchaseReqNo
   let planOrderNo
+  let outsourceWorkOrderCodes = []
 
-  if (order.businessType === '自产销售') {
-    for (const line of order.lineItems) {
+  if (selfMadeLines.length) {
+    for (const line of selfMadeLines) {
       if (!line.productId) {
         return {
           ok: false,
@@ -198,21 +223,35 @@ export function approveSalesOrder(id) {
     if (!order.orderAccessoryKits?.length) {
       order.orderAccessoryKits = buildOrderAccessoryKits(order)
     }
-    const plan = createProductionPlanFromSalesOrder(order)
+    const plan = createProductionPlanFromSalesOrder({ ...order, lineItems: selfMadeLines })
     planOrderNo = plan.orderNo
   }
 
-  if (order.businessType === '外购销售') {
+  if (purchaseLines.length) {
     if (order.purchaseRequisitionNo) {
       return { ok: false, message: `订单「${order.orderNo}」已关联采购申请` }
     }
-    const requisition = buildRequisitionFromSalesOrder(order)
+    const requisition = buildRequisitionFromSalesOrder({ ...order, lineItems: purchaseLines })
     addPurchaseRequisition(requisition)
     order.purchaseRequisitionNo = requisition.reqNo
     order.purchaseRequisitionId = requisition.id
     purchaseReqNo = requisition.reqNo
   }
 
+  if (outsourcingLines.length) {
+    for (const line of outsourcingLines) {
+      if (!line.productName?.trim()) {
+        return {
+          ok: false,
+          message: `订单「${order.orderNo}」外协明细请填写产品名称`,
+        }
+      }
+    }
+    const created = createOutsourcingWorkOrdersFromSalesOrder(order, outsourcingLines)
+    outsourceWorkOrderCodes = created.map((wo) => wo.code)
+  }
+
+  order.businessType = deriveOrderBusinessType(order.lineItems, order.businessType)
   order.progressStatus = '已审'
 
   if (purchaseReqNo) {
@@ -222,11 +261,26 @@ export function approveSalesOrder(id) {
       purchaseReqNo,
     }
   }
+  if (planOrderNo && outsourceWorkOrderCodes.length) {
+    return {
+      ok: true,
+      message: `订单「${order.orderNo}」审核通过，已生成生产计划 ${planOrderNo}，外协工单 ${outsourceWorkOrderCodes.join('、')}`,
+      planOrderNo,
+      outsourceWorkOrderCodes,
+    }
+  }
   if (planOrderNo) {
     return {
       ok: true,
       message: `订单「${order.orderNo}」审核通过，已自动生成生产计划任务（待下达）`,
       planOrderNo,
+    }
+  }
+  if (outsourceWorkOrderCodes.length) {
+    return {
+      ok: true,
+      message: `订单「${order.orderNo}」审核通过，已自动生成外协工单 ${outsourceWorkOrderCodes.join('、')}`,
+      outsourceWorkOrderCodes,
     }
   }
   return { ok: true, message: `订单「${order.orderNo}」审核通过` }

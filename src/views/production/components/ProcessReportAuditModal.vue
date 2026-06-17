@@ -21,7 +21,7 @@
         </a-radio-group>
       </a-form-item>
       <a-form-item v-if="form.result === 'approve'" label="说明">
-        <div class="audit-hint">审核通过后，报工数据将锁定，无法再进行调整或补贴。</div>
+        <div class="audit-hint">审核通过后，报工数据将锁定，无法再进行调整。</div>
       </a-form-item>
       <a-form-item v-else label="拒绝原因" required>
         <a-textarea

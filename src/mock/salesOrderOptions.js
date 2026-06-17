@@ -1,4 +1,4 @@
-export const businessTypeOptions = ['自产销售', '外购销售', '质检服务']
+export const businessTypeOptions = ['自产销售', '外购销售', '外协销售', '质检服务']
 export const urgencyOptions = ['正常', '紧急', '加急']
 export const contractTypeOptions = ['标准合同', '框架合同', '临时合同']
 export const settlementCurrencyOptions = ['人民币', '美元', '欧元']

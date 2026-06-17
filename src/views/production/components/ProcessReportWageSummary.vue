@@ -20,6 +20,36 @@
       <a-descriptions-item label="报工类型">{{ line.reportType || '—' }}</a-descriptions-item>
       <a-descriptions-item label="计薪方式">{{ line.salaryMethod || '—' }}</a-descriptions-item>
       <a-descriptions-item label="计薪(元)">{{ formatMoney(line.salaryAmount) }}</a-descriptions-item>
+      <a-descriptions-item v-if="line.wageRateMode === 'piece'" label="单件计价单价">
+        <span class="rate-cell">
+          {{ formatMoney(line.effectivePieceRate) }}
+          <a-tag v-if="line.isPieceRateOverridden" color="orange" class="rate-tag">已修改</a-tag>
+          <a-button
+            v-if="editable"
+            type="link"
+            size="small"
+            class="rate-edit-btn"
+            @click="openRateModal"
+          >
+            修改
+          </a-button>
+        </span>
+      </a-descriptions-item>
+      <a-descriptions-item v-if="line.wageRateMode === 'hourly'" label="标准计时单价">
+        <span class="rate-cell">
+          {{ formatMoney(line.effectiveStandardHourlyRate) }}/时
+          <a-tag v-if="line.isStandardHourlyRateOverridden" color="orange" class="rate-tag">已修改</a-tag>
+          <a-button
+            v-if="editable"
+            type="link"
+            size="small"
+            class="rate-edit-btn"
+            @click="openRateModal"
+          >
+            修改
+          </a-button>
+        </span>
+      </a-descriptions-item>
       <a-descriptions-item label="调整良品数">{{ formatQty(line.adjustedGoodQty) }}</a-descriptions-item>
       <a-descriptions-item label="调整不良品数">{{ formatQty(line.adjustedDefectQty) }}</a-descriptions-item>
       <a-descriptions-item label="调整工时">{{ formatHours(line.adjustedWorkHours) }}</a-descriptions-item>
@@ -69,17 +99,97 @@
         <div v-if="card.formula" class="wage-card-sub">{{ card.formula }}</div>
       </div>
     </div>
+
+    <a-modal
+      v-model:open="rateModalOpen"
+      :title="rateModalTitle"
+      width="420px"
+      :mask-closable="false"
+      destroy-on-close
+      @cancel="rateModalOpen = false"
+    >
+      <a-form layout="vertical">
+        <a-form-item v-if="line?.wageRateMode === 'piece'" label="单件计价单价（元/件）" required>
+          <a-input-number
+            v-model:value="rateForm.value"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+            placeholder="请输入单件计价单价"
+          />
+          <div v-if="line?.masterPieceRate != null" class="rate-master-hint">
+            主数据配置：¥{{ formatMoney(line.masterPieceRate) }}/件
+          </div>
+        </a-form-item>
+        <a-form-item v-else-if="line?.wageRateMode === 'hourly'" label="标准计时单价（元/时）" required>
+          <a-input-number
+            v-model:value="rateForm.value"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+            placeholder="请输入标准计时单价"
+          />
+          <div v-if="line?.masterStandardHourlyRate != null" class="rate-master-hint">
+            主数据配置：¥{{ formatMoney(line.masterStandardHourlyRate) }}/时
+          </div>
+        </a-form-item>
+      </a-form>
+      <template #footer>
+        <a-button @click="rateModalOpen = false">取消</a-button>
+        <a-button type="primary" :loading="rateSaving" @click="handleRateSave">确定</a-button>
+      </template>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
 import { PROCESS_REPORT_WAGE_FORMULAS } from '@/constants/processReportWageFormulas'
+import { updateProcessReportWageRate } from '@/store/processReportStore'
 
 const props = defineProps({
   line: { type: Object, default: null },
+  editable: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['updated'])
+
+const rateModalOpen = ref(false)
+const rateSaving = ref(false)
+const rateForm = reactive({ value: null })
+
+const rateModalTitle = computed(() =>
+  props.line?.wageRateMode === 'piece' ? '修改单件计价单价' : '修改标准计时单价',
+)
+
+function openRateModal() {
+  if (!props.line) return
+  if (props.line.wageRateMode === 'piece') {
+    rateForm.value = Number(props.line.effectivePieceRate) || 0
+  } else {
+    rateForm.value = Number(props.line.effectiveStandardHourlyRate) || 0
+  }
+  rateModalOpen.value = true
+}
+
+async function handleRateSave() {
+  if (!props.line?.id) return
+  rateSaving.value = true
+  try {
+    const res = updateProcessReportWageRate(props.line.id, { rate: rateForm.value })
+    if (!res.ok) {
+      message.warning(res.message)
+      return
+    }
+    message.success('单价已更新，工资已重新计算')
+    rateModalOpen.value = false
+    emit('updated')
+  } finally {
+    rateSaving.value = false
+  }
+}
 
 const activeWageFormulas = computed(() => {
   const keys = props.line?.formulaKeys || []
@@ -193,6 +303,30 @@ function formatHours(val) {
 
 .wage-desc {
   margin-bottom: 16px;
+}
+
+.rate-cell {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.rate-tag {
+  margin: 0;
+  line-height: 18px;
+  font-size: 12px;
+}
+
+.rate-edit-btn {
+  padding: 0 4px;
+  height: 22px;
+}
+
+.rate-master-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .defect-wage-details {

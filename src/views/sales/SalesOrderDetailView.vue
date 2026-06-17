@@ -3,17 +3,14 @@
     <a-spin :spinning="loading">
       <template v-if="order">
         <div class="page-header">
-          <a-space>
-            <a-button size="small" @click="handleBack">
-              <ArrowLeftOutlined />
-              返回列表
-            </a-button>
+          <div class="header-left">
+            <span class="order-no">{{ order.orderNo }}</span>
             <a-tag :color="progressColor(order.progressStatus)">{{ order.progressStatus }}</a-tag>
             <a-tag :color="order.deliveryStatus === '未发货' ? 'default' : 'processing'">
               {{ order.deliveryStatus || '未发货' }}
             </a-tag>
-          </a-space>
-          <span class="order-no">{{ order.orderNo }}</span>
+          </div>
+          <a-button size="small" @click="handleBack">返回列表</a-button>
         </div>
 
         <a-tabs v-model:active-key="activeTab" class="detail-tabs">
@@ -149,6 +146,9 @@
               >
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'businessType'">
+                    {{ resolveLineBusinessType(line, order) }}
+                  </template>
                   <template v-else-if="column.key === 'deliveryMode'">
                     <a-tag :color="line.deliveryMode === '散件' ? 'orange' : 'blue'">
                       {{ line.deliveryMode || '整机' }}
@@ -417,9 +417,9 @@ export default { name: 'SalesOrderDetailView' }
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { getSalesOrderById, resolveSalesOrderRelations } from '@/utils/salesOrderDetail'
+import { resolveLineBusinessType } from '@/utils/salesOrderBusiness'
 const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
@@ -445,6 +445,7 @@ const lineColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '产品名称', dataIndex: 'productName', width: 160, ellipsis: true },
   { title: '产品编码', dataIndex: 'productCode', width: 120 },
+  { title: '业务类型', key: 'businessType', width: 96 },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
   { title: '销售数量', dataIndex: 'salesQty', width: 80, align: 'right' },
@@ -636,6 +637,13 @@ function goDeliveryDetail(row) {
   padding: 10px 12px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .order-no {

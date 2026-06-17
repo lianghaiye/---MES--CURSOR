@@ -17,7 +17,7 @@ import {
   calcProcessReportStats,
 } from '@/utils/processReportWorkOrder'
 import { calcAutoDurationHours } from '@/utils/laborHourCalc'
-import { resolveLaborConfig } from '@/utils/laborConfigResolver'
+import { resolveLaborConfig, resolveWageRateDisplayMode } from '@/utils/laborConfigResolver'
 import { breakdownToLegacy } from '@/utils/defectBreakdown'
 
 function shouldReseed() {
@@ -209,6 +209,20 @@ export function adjustProcessReportLine(recordId, payload = {}, operator = 'admi
     const legacy = breakdownToLegacy(payload.adjustedDefectBreakdown)
     patch.adjustedDefectBreakdown = legacy.defectBreakdown
   }
+  if (payload.subsidyMethod != null) patch.subsidyMethod = payload.subsidyMethod
+  if (payload.subsidyReportQty != null) patch.subsidyReportQty = Number(payload.subsidyReportQty) || 0
+  if (payload.subsidyFixedAmount != null) {
+    patch.subsidyFixedAmount = Number(payload.subsidyFixedAmount) || 0
+  }
+  if (payload.manualQualityDeduction != null) {
+    patch.manualQualityDeduction = Number(payload.manualQualityDeduction) || 0
+  }
+  if (payload.subsidyMethod === 'fixed') {
+    patch.subsidyReportQty = 0
+    patch.subsidyHours = 0
+  } else if (payload.subsidyMethod === 'qty') {
+    patch.subsidyFixedAmount = 0
+  }
 
   const config = resolveLaborConfig(row.productCode, row.processName)
   if (config?.reportType === '批量计件' && config?.salaryMethod === '计时工资') {
@@ -217,10 +231,13 @@ export function adjustProcessReportLine(recordId, payload = {}, operator = 'admi
   }
 
   updateRecord(recordId, patch)
+  const hasSubsidy =
+    (payload.subsidyMethod === 'fixed' && Number(payload.subsidyFixedAmount) > 0) ||
+    (payload.subsidyMethod === 'qty' && Number(payload.subsidyReportQty) > 0)
   if (row.workOrderId) {
     appendWorkOrderLog(row.workOrderId, {
       operator,
-      action: '调整',
+      action: hasSubsidy ? '调整/补贴' : '调整',
       target: row.taskNo || row.processName,
       remark: payload.adjustReason || '',
     })
@@ -229,25 +246,45 @@ export function adjustProcessReportLine(recordId, payload = {}, operator = 'admi
 }
 
 export function subsidyProcessReportLine(recordId, payload = {}) {
+  return adjustProcessReportLine(recordId, {
+    subsidyMethod: Number(payload.subsidyReportQty) > 0 ? 'qty' : 'fixed',
+    subsidyReportQty: payload.subsidyReportQty,
+    subsidyHours: payload.subsidyHours,
+    adjustReason: payload.subsidyReason,
+  })
+}
+
+/** 修改任务计薪单价（仅影响当前报工记录，不写回主数据） */
+export function updateProcessReportWageRate(recordId, payload = {}, operator = 'admin1') {
   const row = processReportState.records.find((r) => r.id === recordId)
   if (!row) return { ok: false, message: '记录不存在' }
-  if (row.status === '已审核') return { ok: false, message: '已审核数据不可补贴' }
+  if (row.status === '已审核') return { ok: false, message: '已审核数据不可修改单价' }
 
   const config = resolveLaborConfig(row.productCode, row.processName)
-  const patch = {}
-  if (config?.salaryMethod === '计件工资') {
-    patch.subsidyReportQty = Number(payload.subsidyReportQty) || 0
+  const mode = resolveWageRateDisplayMode(config)
+  if (!mode) return { ok: false, message: '当前计薪方式不支持修改单价' }
+
+  const patch = { adjustedBy: operator, adjustedAt: dayjs().format('YYYY-MM-DD HH:mm') }
+  if (mode === 'piece') {
+    const val = Number(payload.rate)
+    if (!Number.isFinite(val) || val < 0) return { ok: false, message: '请输入有效的单件计价单价' }
+    patch.overridePieceRate = val
   } else {
-    patch.subsidyHours = Number(payload.subsidyHours) || 0
+    const val = Number(payload.rate)
+    if (!Number.isFinite(val) || val < 0) return { ok: false, message: '请输入有效的标准计时单价' }
+    patch.overrideStandardHourlyRate = val
   }
-  if (payload.subsidyReason != null) patch.subsidyReason = payload.subsidyReason
 
   updateRecord(recordId, patch)
   if (row.workOrderId) {
     appendWorkOrderLog(row.workOrderId, {
-      action: '补贴',
+      operator,
+      action: '修改单价',
       target: row.taskNo || row.processName,
-      remark: payload.subsidyReason || '',
+      remark:
+        mode === 'piece'
+          ? `单件计价单价调整为 ¥${patch.overridePieceRate}`
+          : `标准计时单价调整为 ¥${patch.overrideStandardHourlyRate}`,
     })
   }
   return { ok: true }

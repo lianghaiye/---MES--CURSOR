@@ -81,6 +81,13 @@ function mapRecordToLine(record, index, materialCode) {
     subsidyReportQty: record.subsidyReportQty,
     subsidyHours: record.subsidyHours,
     subsidyReason: record.subsidyReason || '',
+    subsidyMethod: record.subsidyMethod,
+    subsidyFixedAmount: record.subsidyFixedAmount,
+    manualQualityDeduction: record.manualQualityDeduction,
+    overridePieceRate: record.overridePieceRate,
+    overrideStandardHourlyRate: record.overrideStandardHourlyRate,
+    id: record.id,
+    status: record.status,
     auditStatus: record.status,
   }
   const line = enrichProcessReportLine(base, config)

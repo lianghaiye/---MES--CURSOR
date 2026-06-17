@@ -4,7 +4,6 @@
       <template v-if="bundle">
         <div class="page-header">
           <div class="header-left">
-            <a-button size="small" @click="handleBack">返回</a-button>
             <span class="page-title">【{{ bundle.materialName }}】</span>
             <a-tag>{{ bundle.registerMode }}</a-tag>
             <a-tag :color="record?.confirmStatus === '已确认' ? 'success' : 'warning'">
@@ -18,6 +17,7 @@
               <a-button type="primary" size="small" @click="handleConfirm">确认</a-button>
             </template>
             <a-button size="small" @click="reload">刷新</a-button>
+            <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
 
@@ -333,7 +333,7 @@ watch(() => route.params.id, reload, { immediate: true })
 
 function handleBack() {
   const detailPath = route.path
-  const listPath = '/production/report-work'
+  const listPath = '/report-management/report-work'
   const closingActive = tabStore.activePath === detailPath
   closeTab(detailPath)
   router.push(closingActive ? tabStore.activePath || listPath : listPath)

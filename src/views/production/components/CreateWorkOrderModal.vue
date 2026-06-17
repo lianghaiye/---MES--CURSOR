@@ -31,6 +31,20 @@
           </a-form-item>
         </a-col>
         <a-col :span="12">
+          <a-form-item label="销售订单">
+            <a-input-group compact>
+              <a-input
+                :value="form.salesOrderNo"
+                readonly
+                size="small"
+                style="width: calc(100% - 72px)"
+                placeholder="请选择销售订单"
+              />
+              <a-button size="small" @click="salesOrderPickerOpen = true">选择</a-button>
+            </a-input-group>
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
           <a-form-item label="生产品名" required>
             <ProductMaterialSelect
               v-model="form.productName"
@@ -119,10 +133,12 @@
       <a-button type="primary" @click="handleSubmit">确定</a-button>
     </template>
   </a-modal>
+
+  <SalesOrderSelectModal v-model:open="salesOrderPickerOpen" @confirm="onSalesOrderPicked" />
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
@@ -133,6 +149,7 @@ import { createWorkOrderPayload, workOrderState } from '@/store/workOrderStore'
 import { isDuplicateOrderCode, generateProductionWorkOrderName } from '@/utils/workOrderNaming'
 import { buildProcessesFromRoute, getActiveRouteOptions } from '@/mock/processRoutes'
 import ProductMaterialSelect from './ProductMaterialSelect.vue'
+import SalesOrderSelectModal from './SalesOrderSelectModal.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -143,9 +160,13 @@ const emit = defineEmits(['update:open', 'created', 'updated'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 
+const salesOrderPickerOpen = ref(false)
+
 const form = reactive({
   code: '',
   name: '',
+  salesOrderId: '',
+  salesOrderNo: '',
   productName: '',
   processRouteName: undefined,
   planQty: 1,
@@ -180,6 +201,11 @@ function onProductSelect() {
   }
 }
 
+function onSalesOrderPicked(order) {
+  form.salesOrderId = order.id
+  form.salesOrderNo = order.orderNo
+}
+
 watch(
   () => form.productName,
   (name) => {
@@ -196,6 +222,8 @@ watch(
       const wo = props.editRecord
       form.code = wo.code || ''
       form.name = wo.name || ''
+      form.salesOrderId = wo.salesOrderId || ''
+      form.salesOrderNo = wo.sourceOrderNo || ''
       form.productName = wo.productName
       form.processRouteName = wo.processRouteName
       form.planQty = wo.planQty
@@ -213,6 +241,8 @@ watch(
     }
     form.code = ''
     form.name = ''
+    form.salesOrderId = ''
+    form.salesOrderNo = ''
     form.productName = ''
     form.processRouteName = getActiveRouteOptions({})[0]
     form.planQty = 1
@@ -277,6 +307,8 @@ function handleSubmit() {
         urgency: form.urgency,
         planDateRange,
         remark: form.remark,
+        salesOrderId: form.salesOrderId,
+        sourceOrderNo: form.salesOrderNo,
         ...(routeChanged ? { processes: buildProcessesFromRoute(form.processRouteName) } : {}),
       },
     })
@@ -298,7 +330,9 @@ function handleSubmit() {
     urgency: form.urgency,
     planDateRange,
     remark: form.remark,
-    source: 'manual',
+    source: form.salesOrderId ? 'sales-order' : 'manual',
+    salesOrderId: form.salesOrderId,
+    sourceOrderNo: form.salesOrderNo,
   })
 
   emit('created', wo)

@@ -4,11 +4,13 @@
       <template v-if="bundle">
         <div class="page-header">
           <div class="header-left">
-            <a-button size="small" @click="handleBack">返回</a-button>
             <span class="page-title">【{{ bundle.materialName }}】</span>
             <a-tag :color="statusColor(bundle.auditStatus)">{{ bundle.auditStatus }}</a-tag>
           </div>
-          <a-button size="small" @click="reload">刷新</a-button>
+          <a-space>
+            <a-button size="small" @click="reload">刷新</a-button>
+            <a-button size="small" @click="handleBack">返回列表</a-button>
+          </a-space>
         </div>
 
         <div class="section-card">
@@ -47,7 +49,6 @@
               <template v-else-if="column.key === 'action'">
                 <a-space v-if="line.status !== '已审核'" :size="0">
                   <a-button type="link" size="small" @click.stop="openAdjust(line)">调整</a-button>
-                  <a-button type="link" size="small" @click.stop="openSubsidy(line)">补贴</a-button>
                   <a-button type="link" size="small" @click.stop="openAudit(line)">审核</a-button>
                 </a-space>
                 <span v-else class="locked-text">已锁定</span>
@@ -58,7 +59,11 @@
             </template>
           </a-table>
 
-          <ProcessReportWageSummary :line="summaryLine" />
+          <ProcessReportWageSummary
+            :line="summaryLine"
+            :editable="summaryLine?.status !== '已审核'"
+            @updated="reload"
+          />
         </div>
       </template>
       <a-empty v-else-if="!loading" description="未找到工序报工记录" />
@@ -70,12 +75,6 @@
       :line="modalLine"
       :config="modalConfig"
       @confirm="onAdjustConfirm"
-    />
-    <LaborHourSubsidyModal
-      v-model:open="subsidyOpen"
-      :line="modalLine"
-      :config="modalConfig"
-      @confirm="onSubsidyConfirm"
     />
     <ProcessReportAuditModal
       v-model:open="auditOpen"
@@ -97,14 +96,12 @@ import {
   adjustProcessReportLine,
   auditProcessReportLine,
   getProcessReportQuickBundle,
-  subsidyProcessReportLine,
 } from '@/store/processReportStore'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { useTabs } from '@/composables/useTabs'
 import ProcessReportAdjustModal from './components/ProcessReportAdjustModal.vue'
 import ProcessReportAuditModal from './components/ProcessReportAuditModal.vue'
 import ProcessReportWageSummary from './components/ProcessReportWageSummary.vue'
-import LaborHourSubsidyModal from '@/views/labor-salary/components/LaborHourSubsidyModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -113,7 +110,6 @@ const { closeTab } = useTabs()
 const loading = ref(false)
 const bundle = ref(null)
 const adjustOpen = ref(false)
-const subsidyOpen = ref(false)
 const auditOpen = ref(false)
 const modalLine = ref(null)
 const modalConfig = ref(null)
@@ -135,7 +131,7 @@ const lineColumns = [
   { title: '任务开始时间', dataIndex: 'taskStartTime', width: 150 },
   { title: '任务结束时间', dataIndex: 'taskEndTime', width: 150 },
   { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
-  { title: '操作', key: 'action', width: 160, fixed: 'right' },
+  { title: '操作', key: 'action', width: 120, fixed: 'right' },
 ]
 
 const summaryLine = computed(() => bundle.value?.lines?.[0] || null)
@@ -178,7 +174,7 @@ watch(() => route.params.id, reload, { immediate: true })
 
 function handleBack() {
   closeTab(route.path)
-  router.push('/production/process-report')
+  router.push('/report-management/process-report')
 }
 
 function resolveConfig(line) {
@@ -189,12 +185,6 @@ function openAdjust(line) {
   modalLine.value = line
   modalConfig.value = resolveConfig(line)
   adjustOpen.value = true
-}
-
-function openSubsidy(line) {
-  modalLine.value = line
-  modalConfig.value = resolveConfig(line)
-  subsidyOpen.value = true
 }
 
 function openAudit(line) {
@@ -209,16 +199,6 @@ function onAdjustConfirm(payload) {
     return
   }
   message.success('调整已保存')
-  reload()
-}
-
-function onSubsidyConfirm(payload) {
-  const res = subsidyProcessReportLine(modalLine.value.id, payload)
-  if (!res.ok) {
-    message.warning(res.message)
-    return
-  }
-  message.success('补贴已保存')
   reload()
 }
 

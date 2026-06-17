@@ -1,13 +1,15 @@
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { buildLineAccessoryKits, buildOrderAccessoryKits } from '@/mock/accessoryPacks'
 import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
+import { isSelfMadeBusinessType, resolveLineBusinessType } from '@/utils/salesOrderBusiness'
 import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
 
 /** 为已审自产订单行补齐 EBOM 快照与配件包（演示数据 / 升级迁移） */
 export function hydrateApprovedSelfProdOrder(order) {
-  if (!order || order.businessType !== '自产销售' || order.progressStatus !== '已审') return order
+  if (!order || order.progressStatus !== '已审') return order
 
   for (const line of order.lineItems || []) {
+    if (!isSelfMadeBusinessType(resolveLineBusinessType(line, order))) continue
     line.deliveryMode = normalizeDeliveryMode(line, order)
 
     if (!line.productId) continue

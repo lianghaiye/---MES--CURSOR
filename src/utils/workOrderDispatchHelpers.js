@@ -1,6 +1,7 @@
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { dispatchWorkOrderToMobile } from '@/utils/mobileTaskDispatch'
+import { generateLinesFromWorkOrder } from '@/store/reportConfirmStore'
 
 export function validateProcessExecutors(processes) {
   const missing = (processes || []).filter((p) => !p.executors?.length)
@@ -12,11 +13,28 @@ export function validateProcessExecutors(processes) {
   return true
 }
 
+export function validateWorkOrderDispatchReady(workOrder) {
+  if (!workOrder) return false
+  if (
+    workOrder.orderCategory === '外协工单' &&
+    (!workOrder.processRouteName || !String(workOrder.processRouteName).trim())
+  ) {
+    message.error('外协工单下发前请选择工艺路线')
+    return false
+  }
+  if (!workOrder.processes?.length) {
+    message.error('请先选择工艺路线以生成工序')
+    return false
+  }
+  return validateProcessExecutors(workOrder.processes)
+}
+
 /** 保存工序与执行人配置，工单保持待下发 */
 export function saveDispatchDraft(updateFn, workOrder) {
-  if (!workOrder || !validateProcessExecutors(workOrder.processes)) return false
+  if (!workOrder || !validateWorkOrderDispatchReady(workOrder)) return false
   updateFn(workOrder.id, {
     processes: workOrder.processes,
+    processRouteName: workOrder.processRouteName,
     status: '待下发',
   })
   message.success('工序配置已保存')
@@ -25,22 +43,27 @@ export function saveDispatchDraft(updateFn, workOrder) {
 
 /** 下发并开始：推送小程序任务，工单变更为执行中 */
 export function dispatchAndStartWorkOrder({ workOrder, orderCategory, updateFn }) {
-  if (!workOrder || !validateProcessExecutors(workOrder.processes)) return false
+  if (!workOrder || !validateWorkOrderDispatchReady(workOrder)) return false
   if (workOrder.status !== '待下发') {
     message.warning('仅待下发状态工单可下发并开始')
     return false
   }
-  const mobileCategories = ['生产工单', '总装工单', '拆解工单']
+  const mobileCategories = ['生产工单', '总装工单', '拆解工单', '外协工单']
   const tasks = mobileCategories.includes(orderCategory)
     ? dispatchWorkOrderToMobile(workOrder, orderCategory)
     : []
+  const confirmLines = generateLinesFromWorkOrder(workOrder, orderCategory)
   updateFn(workOrder.id, {
     processes: workOrder.processes,
+    processRouteName: workOrder.processRouteName,
     status: '执行中',
     dispatchedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     executedAt: dayjs().format('YYYY-MM-DD HH:mm'),
   })
-  const suffix = tasks.length ? `，已生成 ${tasks.length} 条小程序任务（演示同步）` : ''
+  const parts = []
+  if (tasks.length) parts.push(`已生成 ${tasks.length} 条小程序任务`)
+  if (confirmLines.length) parts.push(`已生成 ${confirmLines.length} 条报工确认数据`)
+  const suffix = parts.length ? `（${parts.join('，')}）` : ''
   message.success(`工单已下发并开始执行${suffix}`)
   return true
 }

@@ -43,3 +43,28 @@ export function resolveLaborConfig(materialCode, processName) {
 export function laborCalcMethodLabel(reportType, salaryMethod) {
   return `${reportType || '—'}+${salaryMethod || '—'}`
 }
+
+/** 工资汇总应展示的单价类型 */
+export function resolveWageRateDisplayMode(config = {}) {
+  if (!config) return null
+  const reportType = config.reportType || ''
+  const salaryMethod = config.salaryMethod || ''
+  if (reportType === '批量计件' && salaryMethod === '计件工资') return 'piece'
+  if (salaryMethod === '计时工资' && (reportType === '批量计件' || reportType === '时长报工')) {
+    return 'hourly'
+  }
+  return null
+}
+
+/** 合并任务级单价覆盖（不影响主数据工时配置） */
+export function resolveEffectiveLaborConfig(config, line = {}) {
+  if (!config) return null
+  const effective = { ...config }
+  if (line.overridePieceRate != null && line.overridePieceRate !== '') {
+    effective.pieceRate = Number(line.overridePieceRate) || 0
+  }
+  if (line.overrideStandardHourlyRate != null && line.overrideStandardHourlyRate !== '') {
+    effective.standardHourlyRate = Number(line.overrideStandardHourlyRate) || 0
+  }
+  return effective
+}

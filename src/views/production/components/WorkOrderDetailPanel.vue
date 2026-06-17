@@ -40,7 +40,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
+            <a-col v-if="workOrder.orderCategory !== '外协工单'" :xs="24" :sm="12" :md="8">
               <a-form-item label="BOM">
                 <a-select
                   v-model:value="workOrder.bom"
@@ -48,6 +48,23 @@
                   size="small"
                   :options="bomOpts"
                   @change="emit('save-basic')"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :xs="24" :sm="12" :md="8">
+              <a-form-item
+                :label="workOrder.orderCategory === '外协工单' ? '工艺路线（必填）' : '工艺路线'"
+                :required="workOrder.orderCategory === '外协工单'"
+              >
+                <a-select
+                  v-model:value="workOrder.processRouteName"
+                  show-search
+                  allow-clear
+                  size="small"
+                  :options="processRouteOpts"
+                  placeholder="请选择工艺路线"
+                  :filter-option="filterProcessRoute"
+                  @change="onProcessRouteChange"
                 />
               </a-form-item>
             </a-col>
@@ -105,10 +122,14 @@
         <WorkOrderDetailTab :work-order="workOrder" @action="emit('detail-action', $event)" />
       </a-tab-pane>
       <template v-if="variant === 'production' || variant === 'assembly'">
-        <a-tab-pane key="ebom" tab="EBOM">
+        <a-tab-pane v-if="workOrder.orderCategory !== '外协工单'" key="ebom" tab="EBOM">
           <WorkOrderEbomTreeTab :work-order="workOrder" :variant="variant" />
         </a-tab-pane>
-        <a-tab-pane v-if="variant === 'production'" key="current-bom" tab="当前BOM">
+        <a-tab-pane
+          v-if="variant === 'production' && workOrder.orderCategory !== '外协工单'"
+          key="current-bom"
+          tab="当前BOM"
+        >
           <WorkOrderCurrentBomTab :work-order="workOrder" />
         </a-tab-pane>
         <a-tab-pane key="tasks" tab="任务列表">
@@ -120,11 +141,19 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { DownOutlined, UpOutlined } from '@ant-design/icons-vue'
 import { workOrderState } from '@/store/workOrderStore'
 import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
+import { productInfoState } from '@/store/productInfoStore'
+import { materialInfoState } from '@/store/materialInfoStore'
+import { processRouteState } from '@/store/processRouteStore'
+import { buildProcessesFromRoute } from '@/mock/processRoutes'
+import {
+  ensureWorkOrderProcessRoute,
+  getWorkOrderRouteSelectOptions,
+} from '@/utils/workOrderProcessRoute'
 import WorkOrderDispatchTab from './WorkOrderDispatchTab.vue'
 import WorkOrderDetailTab from './WorkOrderDetailTab.vue'
 import WorkOrderEbomTreeTab from './WorkOrderEbomTreeTab.vue'
@@ -163,6 +192,35 @@ const emit = defineEmits([
   'cancel-dispatch',
   'detail-action',
 ])
+
+const processRouteOpts = computed(() => {
+  if (!workOrder.value) return []
+  void productInfoState.products
+  void materialInfoState.materials
+  void processRouteState.routes
+  return getWorkOrderRouteSelectOptions(workOrder.value)
+})
+
+watch(
+  [() => workOrder.value?.id, () => props.showDispatchTab],
+  () => {
+    if (!workOrder.value || !props.showDispatchTab) return
+    if (ensureWorkOrderProcessRoute(workOrder.value)) {
+      emit('save-basic')
+    }
+  },
+  { immediate: true },
+)
+
+function filterProcessRoute(input, option) {
+  return (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+}
+
+function onProcessRouteChange(routeName) {
+  if (!workOrder.value || !routeName) return
+  workOrder.value.processes = buildProcessesFromRoute(routeName)
+  emit('save-basic')
+}
 </script>
 
 <style lang="less" scoped>

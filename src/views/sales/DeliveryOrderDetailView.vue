@@ -3,16 +3,13 @@
     <a-spin :spinning="loading">
       <template v-if="record">
         <div class="page-header">
-          <a-space>
-            <a-button size="small" @click="handleBack">
-              <ArrowLeftOutlined />
-              返回列表
-            </a-button>
+          <div class="header-left">
+            <span class="doc-no">{{ record.deliveryCode }}</span>
             <a-tag :color="deliveryStatusColor(record.deliveryStatus)">{{
               record.deliveryStatus
             }}</a-tag>
-          </a-space>
-          <span class="doc-no">{{ record.deliveryCode }}</span>
+          </div>
+          <a-button size="small" @click="handleBack">返回列表</a-button>
         </div>
 
         <a-tabs v-model:active-key="activeTab" class="detail-tabs">
@@ -163,7 +160,6 @@ export default { name: 'DeliveryOrderDetailView' }
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
 import { getDeliveryOrderById, refreshOutboundQtyAll } from '@/store/deliveryOrderStore'
@@ -260,6 +256,13 @@ function goSalesOrder() {
   padding: 10px 12px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .doc-no {

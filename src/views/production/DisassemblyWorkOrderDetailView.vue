@@ -4,10 +4,6 @@
       <template v-if="order">
         <div class="page-header">
           <div class="header-left">
-            <a-button size="small" @click="handleBack">
-              <ArrowLeftOutlined />
-              返回列表
-            </a-button>
             <span class="order-name">{{ order.name }}</span>
             <a-tag :color="urgencyColor(order.urgency)">{{ order.urgency || '普通' }}</a-tag>
             <a-tag :color="statusColor(order.status)">{{ order.status }}</a-tag>
@@ -36,6 +32,7 @@
             >
               下发并开始
             </a-button>
+            <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
 
@@ -223,7 +220,7 @@ export default { name: 'DisassemblyWorkOrderDetailView' }
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { ArrowLeftOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
+import { EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import {
   getDisassemblyWorkOrderById,

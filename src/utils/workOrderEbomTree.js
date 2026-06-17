@@ -177,7 +177,9 @@ const EMPTY = {
 
 /** 完整 EBOM 树（成品根 + 全部子件） */
 export function buildWorkOrderEbomTree(workOrder, variant = 'production') {
-  if (!workOrder) return { ...EMPTY }
+  if (!workOrder || workOrder.orderCategory === '外协工单' || workOrder.skipEbom) {
+    return { ...EMPTY }
+  }
 
   const bom = resolveWorkOrderParentBom(workOrder, variant)
   const rootProduct = buildRootProduct(workOrder, bom, variant)

@@ -294,7 +294,7 @@ import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
 const LAYOUT_STORAGE_KEY = 'i_doms_wo_layout'
 
 const statusOptions = ['待下发', '已下发', '执行中', '完成', '暂停', '终止']
-const categoryOptions = ['生产工单', '返修工单', '试制工单']
+const categoryOptions = ['生产工单', '返修工单', '试制工单', '外协工单']
 
 const filters = reactive({
   code: '',

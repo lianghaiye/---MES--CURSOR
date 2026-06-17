@@ -4,7 +4,7 @@ import { processReportState } from '@/store/processReportStore'
 import { quickReportState } from '@/store/quickReportStore'
 import { isQuickReportConfirmed } from '@/mock/quickReports'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
-import { enrichProcessReportLine } from '@/utils/processReportWageCalc'
+import { enrichProcessReportLine, calcFinalPieceQty } from '@/utils/processReportWageCalc'
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import { buildReportWorkPerProcessBundle } from '@/utils/reportWorkPerProcess'
 import { resolveEmployeeProfile } from '@/utils/employeeProfileResolver'
@@ -73,16 +73,7 @@ function resolveSourceLabel(source = '') {
 }
 
 function computeFinalPieceQtyFromLine(line = {}) {
-  const good =
-    line.adjustedGoodQty != null && line.adjustedGoodQty !== ''
-      ? Number(line.adjustedGoodQty) || 0
-      : Number(line.goodQty) || 0
-  const defect =
-    line.adjustedDefectQty != null && line.adjustedDefectQty !== ''
-      ? Number(line.adjustedDefectQty) || 0
-      : Number(line.defectQty) || 0
-  const subsidy = Number(line.subsidyReportQty) || 0
-  return round2(good + defect + subsidy)
+  return calcFinalPieceQty(line)
 }
 
 function computeAccountHoursFromLine(line = {}) {

@@ -299,13 +299,13 @@ function openWorkOrderDetail(record) {
     message.warning('缺少工单关联')
     return
   }
-  const path = `/production/process-report/wo/${record.workOrderId}`
+  const path = `/report-management/process-report/wo/${record.workOrderId}`
   openTab(path, record.workOrderNo || '任务报工详情')
   router.push(path)
 }
 
 function openQuickDetail(record) {
-  const path = `/production/process-report/${record.id}`
+  const path = `/report-management/process-report/${record.id}`
   openTab(path, `${record.processName} · ${record.productName}`)
   router.push(path)
 }
