@@ -29,7 +29,7 @@
             </a-radio-group>
           </template>
           <template v-else-if="column.key === 'description'">
-            <span class="desc-text">{{ record.description }}</span>
+            <span v-if="record.description" class="desc-text">{{ record.description }}</span>
           </template>
         </template>
       </a-table>

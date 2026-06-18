@@ -3,16 +3,16 @@ import { reactive, watch } from 'vue'
 const STORAGE_KEY = 'i_doms_business_rules'
 
 export const PRODUCTION_MODE_OPTIONS = [
-  { value: 'standard', label: '标准生产' },
-  { value: 'minimal', label: '极简生产' },
-  { value: 'minimal_salary', label: '极简工资核算' },
+  { value: 'standard', label: '标准模式' },
+  { value: 'minimal', label: '极简报工' },
+  { value: 'minimal_salary', label: '下发即报工' },
 ]
 
 export const BUSINESS_RULE_ROWS = [
   {
     key: 'productionMode',
     scenario: '生产模式',
-    description: '极简工资核算模式下，工单下发仅可指定一人/一组',
+    description: '',
   },
 ]
 
@@ -61,5 +61,5 @@ export function isMinimalSalaryMode() {
 }
 
 export function getProductionModeLabel(mode = getProductionMode()) {
-  return PRODUCTION_MODE_OPTIONS.find((item) => item.value === mode)?.label || '标准生产'
+  return PRODUCTION_MODE_OPTIONS.find((item) => item.value === mode)?.label || '标准模式'
 }
