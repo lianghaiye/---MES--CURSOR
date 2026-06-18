@@ -17,7 +17,7 @@ import {
   calcProcessReportStats,
 } from '@/utils/processReportWorkOrder'
 import { calcAutoDurationHours } from '@/utils/laborHourCalc'
-import { resolveLaborConfig, resolveWageRateDisplayMode } from '@/utils/laborConfigResolver'
+import { resolveLaborConfig, resolveWageRateDisplayMode, resolveSalaryMethodOptions } from '@/utils/laborConfigResolver'
 import { breakdownToLegacy } from '@/utils/defectBreakdown'
 
 function shouldReseed() {
@@ -285,6 +285,44 @@ export function updateProcessReportWageRate(recordId, payload = {}, operator = '
         mode === 'piece'
           ? `单件计价单价调整为 ¥${patch.overridePieceRate}`
           : `标准计时单价调整为 ¥${patch.overrideStandardHourlyRate}`,
+    })
+  }
+  return { ok: true }
+}
+
+/** 修改任务计薪方式（仅影响当前报工记录，不写回主数据） */
+export function updateProcessReportSalaryMethod(recordId, payload = {}, operator = 'admin1') {
+  const row = processReportState.records.find((r) => r.id === recordId)
+  if (!row) return { ok: false, message: '记录不存在' }
+  if (row.status === '已审核') return { ok: false, message: '已审核数据不可修改计薪方式' }
+
+  const config = resolveLaborConfig(row.productCode, row.processName)
+  if (!config) return { ok: false, message: '未找到工时配置' }
+
+  const options = resolveSalaryMethodOptions(config.reportType)
+  if (options.length <= 1) {
+    return { ok: false, message: '当前报工类型不支持修改计薪方式' }
+  }
+
+  const next = payload.salaryMethod
+  if (!next || !options.includes(next)) {
+    return { ok: false, message: '请选择有效的计薪方式' }
+  }
+
+  const patch = { adjustedBy: operator, adjustedAt: dayjs().format('YYYY-MM-DD HH:mm') }
+  if (next === config.salaryMethod) {
+    patch.overrideSalaryMethod = null
+  } else {
+    patch.overrideSalaryMethod = next
+  }
+
+  updateRecord(recordId, patch)
+  if (row.workOrderId) {
+    appendWorkOrderLog(row.workOrderId, {
+      operator,
+      action: '修改计薪方式',
+      target: row.taskNo || row.processName,
+      remark: `计薪方式调整为 ${next}`,
     })
   }
   return { ok: true }

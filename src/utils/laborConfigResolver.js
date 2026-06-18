@@ -60,6 +60,9 @@ export function resolveWageRateDisplayMode(config = {}) {
 export function resolveEffectiveLaborConfig(config, line = {}) {
   if (!config) return null
   const effective = { ...config }
+  if (line.overrideSalaryMethod) {
+    effective.salaryMethod = line.overrideSalaryMethod
+  }
   if (line.overridePieceRate != null && line.overridePieceRate !== '') {
     effective.pieceRate = Number(line.overridePieceRate) || 0
   }
@@ -67,4 +70,14 @@ export function resolveEffectiveLaborConfig(config, line = {}) {
     effective.standardHourlyRate = Number(line.overrideStandardHourlyRate) || 0
   }
   return effective
+}
+
+/** 当前报工类型下可选的计薪方式 */
+export function resolveSalaryMethodOptions(reportType = '') {
+  if (reportType === '时长报工') return ['计时工资']
+  return ['计件工资', '计时工资']
+}
+
+export function canEditSalaryMethod(config = {}) {
+  return resolveSalaryMethodOptions(config.reportType).length > 1
 }

@@ -86,6 +86,7 @@ function mapRecordToLine(record, index, materialCode) {
     manualQualityDeduction: record.manualQualityDeduction,
     overridePieceRate: record.overridePieceRate,
     overrideStandardHourlyRate: record.overrideStandardHourlyRate,
+    overrideSalaryMethod: record.overrideSalaryMethod,
     id: record.id,
     status: record.status,
     auditStatus: record.status,

@@ -18,7 +18,21 @@
     <a-descriptions bordered size="small" :column="4" class="wage-desc">
       <a-descriptions-item label="任务编号">{{ line.taskNo || '—' }}</a-descriptions-item>
       <a-descriptions-item label="报工类型">{{ line.reportType || '—' }}</a-descriptions-item>
-      <a-descriptions-item label="计薪方式">{{ line.salaryMethod || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="计薪方式">
+        <span class="rate-cell">
+          {{ line.salaryMethod || '—' }}
+          <a-tag v-if="line.isSalaryMethodOverridden" color="orange" class="rate-tag">已修改</a-tag>
+          <a-button
+            v-if="editable && canEditSalaryMethod"
+            type="link"
+            size="small"
+            class="rate-edit-btn"
+            @click="openSalaryMethodModal"
+          >
+            修改
+          </a-button>
+        </span>
+      </a-descriptions-item>
       <a-descriptions-item label="计薪(元)">{{ formatMoney(line.salaryAmount) }}</a-descriptions-item>
       <a-descriptions-item v-if="line.wageRateMode === 'piece'" label="单件计价单价">
         <span class="rate-cell">
@@ -101,6 +115,34 @@
     </div>
 
     <a-modal
+      v-model:open="salaryMethodModalOpen"
+      title="修改计薪方式"
+      width="420px"
+      :mask-closable="false"
+      destroy-on-close
+      @cancel="salaryMethodModalOpen = false"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="计薪方式" required>
+          <a-select
+            v-model:value="salaryMethodForm.value"
+            :options="salaryMethodOptions"
+            placeholder="请选择计薪方式"
+          />
+          <div v-if="line?.masterSalaryMethod" class="rate-master-hint">
+            主数据配置：{{ line.masterSalaryMethod }}
+          </div>
+        </a-form-item>
+      </a-form>
+      <template #footer>
+        <a-button @click="salaryMethodModalOpen = false">取消</a-button>
+        <a-button type="primary" :loading="salaryMethodSaving" @click="handleSalaryMethodSave">
+          确定
+        </a-button>
+      </template>
+    </a-modal>
+
+    <a-modal
       v-model:open="rateModalOpen"
       :title="rateModalTitle"
       width="420px"
@@ -147,7 +189,14 @@ import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
 import { PROCESS_REPORT_WAGE_FORMULAS } from '@/constants/processReportWageFormulas'
-import { updateProcessReportWageRate } from '@/store/processReportStore'
+import {
+  updateProcessReportWageRate,
+  updateProcessReportSalaryMethod,
+} from '@/store/processReportStore'
+import {
+  canEditSalaryMethod as checkCanEditSalaryMethod,
+  resolveSalaryMethodOptions,
+} from '@/utils/laborConfigResolver'
 
 const props = defineProps({
   line: { type: Object, default: null },
@@ -159,6 +208,19 @@ const emit = defineEmits(['updated'])
 const rateModalOpen = ref(false)
 const rateSaving = ref(false)
 const rateForm = reactive({ value: null })
+
+const salaryMethodModalOpen = ref(false)
+const salaryMethodSaving = ref(false)
+const salaryMethodForm = reactive({ value: null })
+
+const canEditSalaryMethod = computed(() => {
+  if (!props.line) return false
+  return checkCanEditSalaryMethod({ reportType: props.line.reportType })
+})
+
+const salaryMethodOptions = computed(() =>
+  resolveSalaryMethodOptions(props.line?.reportType).map((v) => ({ label: v, value: v })),
+)
 
 const rateModalTitle = computed(() =>
   props.line?.wageRateMode === 'piece' ? '修改单件计价单价' : '修改标准计时单价',
@@ -172,6 +234,35 @@ function openRateModal() {
     rateForm.value = Number(props.line.effectiveStandardHourlyRate) || 0
   }
   rateModalOpen.value = true
+}
+
+function openSalaryMethodModal() {
+  if (!props.line) return
+  salaryMethodForm.value = props.line.salaryMethod || props.line.masterSalaryMethod || null
+  salaryMethodModalOpen.value = true
+}
+
+async function handleSalaryMethodSave() {
+  if (!props.line?.id) return
+  if (!salaryMethodForm.value) {
+    message.warning('请选择计薪方式')
+    return
+  }
+  salaryMethodSaving.value = true
+  try {
+    const res = updateProcessReportSalaryMethod(props.line.id, {
+      salaryMethod: salaryMethodForm.value,
+    })
+    if (!res.ok) {
+      message.warning(res.message)
+      return
+    }
+    message.success('计薪方式已更新，工资已重新计算')
+    salaryMethodModalOpen.value = false
+    emit('updated')
+  } finally {
+    salaryMethodSaving.value = false
+  }
 }
 
 async function handleRateSave() {

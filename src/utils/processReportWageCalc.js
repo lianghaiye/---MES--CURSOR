@@ -384,18 +384,23 @@ export function calcProcessReportWage(config, line = {}) {
 export function enrichProcessReportLine(line, config) {
   const effectiveConfig = resolveEffectiveLaborConfig(config, line)
   const wage = calcProcessReportWage(effectiveConfig, line)
-  const wageRateMode = resolveWageRateDisplayMode(config)
+  const wageRateMode = resolveWageRateDisplayMode(effectiveConfig)
   const pieceOverridden =
     line.overridePieceRate != null && line.overridePieceRate !== ''
   const hourlyOverridden =
     line.overrideStandardHourlyRate != null && line.overrideStandardHourlyRate !== ''
+  const salaryMethodOverridden = !!line.overrideSalaryMethod
+  const effectiveSalaryMethod = effectiveConfig?.salaryMethod || line.salaryMethod || '—'
+  const masterSalaryMethod = config?.salaryMethod || '—'
+  const effectiveReportType = effectiveConfig?.reportType || config?.reportType || line.reportType || '—'
   return {
     ...line,
-    reportType: config?.reportType || line.reportType || '—',
-    salaryMethod: config?.salaryMethod || line.salaryMethod || '—',
+    reportType: effectiveReportType,
+    salaryMethod: effectiveSalaryMethod,
+    masterSalaryMethod,
     calcMethod:
-      config?.reportType && config?.salaryMethod
-        ? `${config.reportType}+${config.salaryMethod}`
+      effectiveReportType && effectiveSalaryMethod
+        ? `${effectiveReportType}+${effectiveSalaryMethod}`
         : line.calcMethod || '—',
     wageRateMode,
     masterPieceRate: config?.pieceRate ?? 0,
@@ -404,8 +409,10 @@ export function enrichProcessReportLine(line, config) {
     effectiveStandardHourlyRate: effectiveConfig?.standardHourlyRate ?? 0,
     isPieceRateOverridden: pieceOverridden,
     isStandardHourlyRateOverridden: hourlyOverridden,
+    isSalaryMethodOverridden: salaryMethodOverridden,
     overridePieceRate: line.overridePieceRate,
     overrideStandardHourlyRate: line.overrideStandardHourlyRate,
+    overrideSalaryMethod: line.overrideSalaryMethod,
     adjustedGoodQty: wage.adjustedGoodQty,
     adjustedDefectQty: wage.adjustedDefectQty,
     adjustedWorkHours: wage.adjustedWorkHours,
