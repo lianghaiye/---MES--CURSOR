@@ -1,18 +1,18 @@
 <template>
   <div class="salary-stats-nav">
     <router-link
-      to="/labor-salary/salary-summary"
+      to="/report-management/salary-summary"
       class="nav-tab"
       :class="{ active: active === 'summary' }"
     >
-      工资合计
+      工资核算
     </router-link>
     <router-link
-      to="/labor-salary/salary-detail"
+      to="/report-management/salary-detail"
       class="nav-tab"
       :class="{ active: active === 'detail' }"
     >
-      工资详情
+      核算详情
     </router-link>
   </div>
 </template>

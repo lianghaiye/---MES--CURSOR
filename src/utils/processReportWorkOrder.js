@@ -1,4 +1,10 @@
 import dayjs from 'dayjs'
+import {
+  PUSH_STATUS,
+  TASK_STATUS,
+  isPushedToMobile,
+  upsertMobileWageItemFromProcessReport,
+} from '@/utils/mobileLaborWagePush'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productBomState } from '@/store/productBomStore'
@@ -43,6 +49,14 @@ function resolveEbomLabel(productName, bomName) {
   return '—'
 }
 
+function resolveOrderTaskStatus(lines) {
+  const active = lines.filter((l) => l.taskStatus !== '已作废')
+  if (!active.length) return TASK_STATUS.REPORTED
+  if (active.every((l) => l.taskStatus === TASK_STATUS.AUDITED)) return TASK_STATUS.AUDITED
+  if (active.some((l) => l.taskStatus === TASK_STATUS.AUDITED)) return '部分审核'
+  return TASK_STATUS.REPORTED
+}
+
 function resolveOrderAuditStatus(lines) {
   const active = lines.filter((l) => l.status !== '已作废')
   if (!active.length) return '待审核'
@@ -58,7 +72,24 @@ function buildTaskNo(record, index) {
   return `T${date}${String(index + 1).padStart(3, '0')}`
 }
 
+function migrateLineFields(record) {
+  let taskStatus = record.taskStatus
+  if (!taskStatus) {
+    taskStatus = record.status === '已审核' ? TASK_STATUS.AUDITED : TASK_STATUS.REPORTED
+  }
+  let pushStatus = record.pushStatus
+  if (!pushStatus) {
+    pushStatus = record.pushedAt ? PUSH_STATUS.PUSHED : PUSH_STATUS.NOT_PUSHED
+  }
+  return {
+    taskStatus,
+    pushStatus,
+    operator: record.operator || record.reporter || '',
+  }
+}
+
 function mapRecordToLine(record, index, materialCode) {
+  const migrated = migrateLineFields(record)
   const enriched = enrichProcessReportRecord(record)
   const datePrefix = (record.createdAt || '').slice(0, 10)
   const config = resolveLaborConfig(materialCode || record.productCode, record.processName)
@@ -90,6 +121,7 @@ function mapRecordToLine(record, index, materialCode) {
     id: record.id,
     status: record.status,
     auditStatus: record.status,
+    ...migrated,
   }
   const line = enrichProcessReportLine(base, config)
   const effectiveBreakdown = getApprovedDefectBreakdown({
@@ -177,7 +209,7 @@ export function buildProcessReportWorkOrderBundle(workOrderId, records, logs = [
   const productCode = wo.materialCode || master?.code || taskRecords[0]?.productCode || '—'
   const lines = taskRecords.map((r, i) => mapRecordToLine(r, i, productCode))
 
-  return {
+  const bundle = {
     id: `pr-wo-${workOrderId}`,
     workOrderId,
     workOrderCode: wo.code,
@@ -191,9 +223,18 @@ export function buildProcessReportWorkOrderBundle(workOrderId, records, logs = [
     owner: wo.owner || 'admin1',
     processRouteName: wo.processRouteName || '—',
     ebomLabel: resolveEbomLabel(wo.productName, wo.bom),
+    taskStatus: resolveOrderTaskStatus(lines),
     auditStatus: resolveOrderAuditStatus(lines),
     lines,
     logs,
     summary: summarizeProcessReportLines(lines),
   }
+
+  lines.forEach((line) => {
+    if (isPushedToMobile(line.pushStatus)) {
+      upsertMobileWageItemFromProcessReport(bundle, line)
+    }
+  })
+
+  return bundle
 }

@@ -5,7 +5,7 @@
         <div class="page-header">
           <div class="header-left">
             <span class="page-title">【{{ bundle.workOrderName }}】</span>
-            <a-tag :color="statusColor(bundle.auditStatus)">{{ bundle.auditStatus }}</a-tag>
+            <a-tag :color="statusColor(bundle.taskStatus)">{{ bundle.taskStatus }}</a-tag>
           </div>
           <a-space>
             <a-button size="small" @click="reload">刷新</a-button>
@@ -42,15 +42,24 @@
               <a-radio-button value="report">报工详情</a-radio-button>
               <a-radio-button value="log">操作日志</a-radio-button>
             </a-radio-group>
-            <a-button
-              v-if="activeTab === 'report'"
-              type="primary"
-              size="small"
-              :disabled="!selectedLineIds.length"
-              @click="handleBatchApprove"
-            >
-              批量审核
-            </a-button>
+            <a-space v-if="activeTab === 'report'">
+              <a-button
+                v-if="manualPushMode"
+                size="small"
+                :disabled="!selectedPushableIds.length"
+                @click="handleBatchPush"
+              >
+                批量推送
+              </a-button>
+              <a-button
+                type="primary"
+                size="small"
+                :disabled="!selectedAuditableIds.length"
+                @click="handleBatchApprove"
+              >
+                批量审核
+              </a-button>
+            </a-space>
           </div>
 
           <template v-if="activeTab === 'report'">
@@ -68,15 +77,24 @@
             >
               <template #bodyCell="{ column, record: line, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-                <template v-else-if="column.key === 'status'">
-                  <a-badge :status="lineStatusBadge(line.status)" :text="line.status" />
+                <template v-else-if="column.key === 'taskStatus'">
+                  <a-badge :status="taskStatusBadge(line.taskStatus)" :text="line.taskStatus" />
+                </template>
+                <template v-else-if="column.key === 'pushStatus'">
+                  <a-tag :color="pushStatusColor(line.pushStatus)">{{ line.pushStatus }}</a-tag>
                 </template>
                 <template v-else-if="column.key === 'salaryAmount'">
                   {{ formatMoney(line.salaryAmount) }}
                 </template>
                 <template v-else-if="column.key === 'action'">
-                  <a-space v-if="line.status !== '已审核'" :size="0">
+                  <a-space v-if="line.taskStatus !== TASK_STATUS.AUDITED" :size="0">
                     <a-button type="link" size="small" @click.stop="openAdjust(line)">调整</a-button>
+                    <a-button
+                      v-if="manualPushMode && canPush(line)"
+                      type="link"
+                      size="small"
+                      @click.stop="handlePushOne(line)"
+                    >推送</a-button>
                     <a-button type="link" size="small" @click.stop="openAudit(line)">审核</a-button>
                   </a-space>
                   <span v-else class="locked-text">已锁定</span>
@@ -105,7 +123,7 @@
             <div v-if="summaryLine" class="wage-summary-wrap">
               <ProcessReportWageSummary
                 :line="summaryLine"
-                :editable="summaryLine?.status !== '已审核'"
+                :editable="summaryLine?.taskStatus !== TASK_STATUS.AUDITED"
                 @updated="reload"
               />
             </div>
@@ -152,7 +170,10 @@ import {
   auditProcessReportLine,
   batchApproveProcessReports,
   getProcessReportWorkOrderBundle,
+  pushProcessReportLines,
 } from '@/store/processReportStore'
+import { isManualSalaryPush } from '@/store/functionParamStore'
+import { PUSH_STATUS, TASK_STATUS } from '@/utils/mobileLaborWagePush'
 import { summarizeProcessReportLines } from '@/utils/processReportWorkOrder'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { useTabs } from '@/composables/useTabs'
@@ -176,10 +197,12 @@ const modalConfig = ref(null)
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
-  { title: '状态', key: 'status', width: 90, fixed: 'left' },
+  { title: '任务状态', key: 'taskStatus', width: 90, fixed: 'left' },
+  { title: '推送状态', key: 'pushStatus', width: 100, fixed: 'left' },
   { title: '任务编号', dataIndex: 'taskNo', width: 130 },
   { title: '工序名称', dataIndex: 'processName', width: 110 },
   { title: '执行人', dataIndex: 'reporter', width: 90 },
+  { title: '操作人', dataIndex: 'operator', width: 90 },
   { title: '班组', dataIndex: 'team', width: 100 },
   { title: '报工类型', dataIndex: 'reportType', width: 100 },
   { title: '良品数', dataIndex: 'goodQty', width: 80, align: 'right' },
@@ -191,7 +214,7 @@ const lineColumns = [
   { title: '任务开始时间', dataIndex: 'taskStartTime', width: 150 },
   { title: '任务结束时间', dataIndex: 'taskEndTime', width: 150 },
   { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
-  { title: '操作', key: 'action', width: 120, fixed: 'right' },
+  { title: '操作', key: 'action', width: 160, fixed: 'right' },
 ]
 
 const logColumns = [
@@ -223,16 +246,32 @@ const summaryCells = computed(() => {
     align: undefined,
   }))
   cells[1].content = '合计'
-  cells[8].content = String(summary.value.goodQty)
-  cells[8].align = 'right'
-  cells[9].content = String(summary.value.defectQty)
+  cells[9].content = String(summary.value.goodQty)
   cells[9].align = 'right'
-  cells[10].content = String(summary.value.workHours)
+  cells[10].content = String(summary.value.defectQty)
   cells[10].align = 'right'
-  cells[13].content = formatMoney(summary.value.salaryAmount)
-  cells[13].align = 'right'
+  cells[11].content = String(summary.value.workHours)
+  cells[11].align = 'right'
+  cells[14].content = formatMoney(summary.value.salaryAmount)
+  cells[14].align = 'right'
   return cells
 })
+
+const manualPushMode = computed(() => isManualSalaryPush())
+
+const selectedPushableIds = computed(() =>
+  selectedLineIds.value.filter((id) => {
+    const line = bundle.value?.lines?.find((l) => l.id === id)
+    return line && canPush(line)
+  }),
+)
+
+const selectedAuditableIds = computed(() =>
+  selectedLineIds.value.filter((id) => {
+    const line = bundle.value?.lines?.find((l) => l.id === id)
+    return line && canAudit(line)
+  }),
+)
 
 const summaryLine = computed(() => {
   if (!highlightedLineId.value || !bundle.value?.lines) return null
@@ -245,21 +284,33 @@ const rowSelection = computed(() => ({
     selectedLineIds.value = keys
   },
   getCheckboxProps: (record) => ({
-    disabled: record.status !== '待审核',
+    disabled: record.taskStatus === TASK_STATUS.AUDITED,
   }),
 }))
 
 function statusColor(status) {
-  if (status === '已审核') return 'success'
+  if (status === TASK_STATUS.AUDITED) return 'success'
   if (status === '部分审核') return 'warning'
-  if (status === '已拒绝') return 'error'
   return 'default'
 }
 
-function lineStatusBadge(status) {
-  if (status === '已审核') return 'success'
-  if (status === '已拒绝') return 'error'
+function taskStatusBadge(status) {
+  if (status === TASK_STATUS.AUDITED) return 'success'
   return 'processing'
+}
+
+function pushStatusColor(status) {
+  if (status === PUSH_STATUS.AUTO_PUSHED) return 'green'
+  if (status === PUSH_STATUS.PUSHED) return 'blue'
+  return 'default'
+}
+
+function canPush(line) {
+  return line.pushStatus === PUSH_STATUS.NOT_PUSHED
+}
+
+function canAudit(line) {
+  return line.taskStatus === TASK_STATUS.REPORTED
 }
 
 function formatMoney(val) {
@@ -358,12 +409,45 @@ function handleBatchApprove() {
     title: '批量审核',
     content: '审核通过后，报工数据将锁定，无法再进行调整，是否确认审核？',
     onOk: () => {
-      const res = batchApproveProcessReports(selectedLineIds.value)
+      const res = batchApproveProcessReports(selectedAuditableIds.value)
       if (!res.ok) {
         message.warning(res.message)
         return
       }
       message.success(res.message)
+      reload()
+    },
+  })
+}
+
+function handlePushOne(line) {
+  Modal.confirm({
+    title: '推送确认',
+    content: `确认将任务 ${line.taskNo} 推送至小程序「工时工资」列表？`,
+    onOk: () => {
+      const res = pushProcessReportLines([line.id])
+      if (!res.ok) {
+        message.warning(res.message)
+        return
+      }
+      message.success('推送成功')
+      reload()
+    },
+  })
+}
+
+function handleBatchPush() {
+  Modal.confirm({
+    title: '批量推送',
+    content: `确认将选中的 ${selectedPushableIds.value.length} 条任务推送至小程序「工时工资」列表？`,
+    onOk: () => {
+      const res = pushProcessReportLines(selectedPushableIds.value)
+      if (!res.ok) {
+        message.warning(res.message)
+        return
+      }
+      message.success(res.message)
+      selectedLineIds.value = []
       reload()
     },
   })

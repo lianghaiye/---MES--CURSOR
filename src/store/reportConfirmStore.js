@@ -338,6 +338,9 @@ export function syncConfirmLineToLaborHour(line) {
     subsidyReason: line.subsidyReason || '',
     remark: line.remark || '',
     auditStatus: '待审核',
+    taskStatus: '已报工',
+    pushStatus: '',
+    operator: line.executor || '',
     taskStartTime: line.reportTime,
     taskEndTime: line.workerConfirmedAt || line.reportTime,
   }

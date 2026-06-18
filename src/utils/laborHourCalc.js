@@ -5,7 +5,8 @@ function round2(val) {
 }
 
 export function getApprovedReportQty(line) {
-  if (line.auditStatus === '已审核') {
+  const locked = line.auditStatus === '已审核' || line.taskStatus === '已审核'
+  if (locked) {
     return line.adjustedReportQty != null
       ? Number(line.adjustedReportQty)
       : Number(line.reportQty) || 0
@@ -110,7 +111,7 @@ export function enrichLaborLine(line, config) {
 export function summarizeLaborLines(lines = []) {
   const active = lines.filter((l) => l.auditStatus !== '已作废')
   const sum = (key) => round2(active.reduce((s, l) => s + (Number(l[key]) || 0), 0))
-  const audited = active.filter((l) => l.auditStatus === '已审核')
+  const audited = active.filter((l) => l.taskStatus === '已审核' || l.auditStatus === '已审核')
 
   return {
     reportQty: sum('reportQty'),

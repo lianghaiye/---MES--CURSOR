@@ -8,6 +8,14 @@ import {
 import { LABOR_DEMO_WORK_ORDER_IDS } from '@/mock/laborHourDemoSeed'
 import { calcAutoDurationHours, enrichLaborLine, summarizeLaborLines } from '@/utils/laborHourCalc'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
+import { isAutoSalaryPush } from '@/store/functionParamStore'
+import {
+  isPushedToMobile,
+  PUSH_STATUS,
+  TASK_STATUS,
+  updateMobileWageStatus,
+  upsertMobileWageItem,
+} from '@/utils/mobileLaborWagePush'
 import { workOrderState } from '@/store/workOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
@@ -43,9 +51,56 @@ function persist() {
   )
 }
 
-/** 按产品/物料最新工时配置重算全部工时记录 */
 export function refreshAllLaborHourOrders() {
   laborHourState.orders = laborHourState.orders.map((o) => recalcOrder(o))
+}
+
+function migrateLine(line) {
+  const oldTaskStatus = line.taskStatus
+  if (!line.pushStatus) {
+    if (['待工人确认', '已确认', '有异议'].includes(oldTaskStatus) || line.pushedAt) {
+      line.pushStatus = PUSH_STATUS.PUSHED
+    } else if (oldTaskStatus === '待推送') {
+      line.pushStatus = PUSH_STATUS.NOT_PUSHED
+    } else {
+      line.pushStatus = PUSH_STATUS.NOT_PUSHED
+    }
+  }
+  if (
+    !line.taskStatus ||
+    ['待推送', '待工人确认', '已确认', '有异议'].includes(line.taskStatus)
+  ) {
+    line.taskStatus =
+      line.auditStatus === '已审核' || line.taskStatus === '已审核'
+        ? TASK_STATUS.AUDITED
+        : TASK_STATUS.REPORTED
+  }
+  if (!line.operator) line.operator = line.executor || ''
+  return line
+}
+
+function applyPushPolicy(order, line) {
+  if (line.pushStatus) return line
+  if (isAutoSalaryPush()) {
+    line.pushStatus = PUSH_STATUS.AUTO_PUSHED
+    line.pushedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  } else {
+    line.pushStatus = PUSH_STATUS.NOT_PUSHED
+  }
+  return line
+}
+
+function syncLineToMobileIfNeeded(order, line) {
+  if (!isPushedToMobile(line.pushStatus)) return
+  upsertMobileWageItem(order, line)
+}
+
+function resolveOrderTaskStatus(lines) {
+  const active = lines.filter((l) => l.taskStatus !== '已作废')
+  if (!active.length) return TASK_STATUS.REPORTED
+  if (active.every((l) => l.taskStatus === TASK_STATUS.AUDITED)) return TASK_STATUS.AUDITED
+  if (active.some((l) => l.taskStatus === TASK_STATUS.AUDITED)) return '部分审核'
+  return TASK_STATUS.REPORTED
 }
 
 function resolveOrderAuditStatus(lines) {
@@ -58,14 +113,22 @@ function resolveOrderAuditStatus(lines) {
 }
 
 export function recalcOrder(order) {
-  const lines = (order.lines || []).map((line) =>
-    enrichLaborLine(line, resolveLaborConfig(order.materialCode, line.processName)),
-  )
+  const lines = (order.lines || []).map((line) => {
+    const migrated = migrateLine({ ...line })
+    applyPushPolicy(order, migrated)
+    const enriched = enrichLaborLine(
+      migrated,
+      resolveLaborConfig(order.materialCode, migrated.processName),
+    )
+    syncLineToMobileIfNeeded(order, enriched)
+    return enriched
+  })
   const summary = summarizeLaborLines(lines)
   return {
     ...order,
     lines,
-    auditStatus: order.auditStatus || resolveOrderAuditStatus(lines),
+    taskStatus: resolveOrderTaskStatus(lines),
+    auditStatus: resolveOrderAuditStatus(lines),
     ...summary,
     auditedTotalHours: summary.auditedHours,
     auditedReportCount: summary.auditedReportQty,
@@ -85,6 +148,8 @@ function mapWorkOrderToLaborCandidate(wo, workOrderType) {
     seq: i + 1,
     processName: p.name,
     executor: p.executors?.[0] || 'admin',
+    operator: p.operators?.[0] || p.executors?.[0] || 'admin',
+    taskStatus: TASK_STATUS.REPORTED,
     reportQty: wo.scheduleQty || wo.planQty || 1,
     reportDuration: p.reportDuration ?? 0,
     taskStartTime: wo.createdAt ? `${wo.createdAt} 08:00` : '',
@@ -155,7 +220,15 @@ export function getLaborHourOrders(filters = {}) {
   return filterLaborHourOrders(laborHourState.orders, filters).map(recalcOrder)
 }
 
+function refreshStateFromStorage() {
+  const stored = loadFromStorage()
+  if (stored?.orders) {
+    laborHourState.orders = stored.orders.map((o) => recalcOrder(o))
+  }
+}
+
 export function getLaborHourById(id) {
+  refreshStateFromStorage()
   const order =
     laborHourState.orders.find((o) => o.id === id) ||
     laborHourState.orders.find((o) => o.workOrderId === id)
@@ -174,12 +247,24 @@ function appendLog(order, entry) {
   })
 }
 
+function isLineLocked(line) {
+  return line.taskStatus === TASK_STATUS.AUDITED || line.auditStatus === '已审核'
+}
+
+function canPushLine(line) {
+  return line.pushStatus === PUSH_STATUS.NOT_PUSHED
+}
+
+function canAuditLine(line) {
+  return line.taskStatus === TASK_STATUS.REPORTED
+}
+
 export function adjustLaborLine(orderId, lineId, payload) {
   const order = laborHourState.orders.find((o) => o.id === orderId)
   if (!order) return { ok: false, message: '记录不存在' }
   const line = order.lines.find((l) => l.id === lineId)
   if (!line) return { ok: false, message: '明细不存在' }
-  if (line.auditStatus === '已审核') return { ok: false, message: '已审核数据不可调整' }
+  if (isLineLocked(line)) return { ok: false, message: '已审核数据不可调整' }
 
   if (payload.adjustedReportQty != null) line.adjustedReportQty = payload.adjustedReportQty
   if (payload.adjustedDuration != null) line.adjustedDuration = payload.adjustedDuration
@@ -191,8 +276,8 @@ export function adjustLaborLine(orderId, lineId, payload) {
     line.adjustedDuration = calcAutoDurationHours(config, qty)
   }
 
-  const recalculated = recalcOrder(order)
-  Object.assign(order, recalculated)
+  Object.assign(order, recalcOrder(order))
+  syncLineToMobileIfNeeded(order, order.lines.find((l) => l.id === lineId))
   appendLog(order, {
     action: '调整',
     target: `任务 ${line.taskNo}`,
@@ -206,7 +291,7 @@ export function subsidyLaborLine(orderId, lineId, payload) {
   if (!order) return { ok: false, message: '记录不存在' }
   const line = order.lines.find((l) => l.id === lineId)
   if (!line) return { ok: false, message: '明细不存在' }
-  if (line.auditStatus === '已审核') return { ok: false, message: '已审核数据不可补贴' }
+  if (isLineLocked(line)) return { ok: false, message: '已审核数据不可补贴' }
 
   const config = resolveLaborConfig(order.materialCode, line.processName)
   if (config?.salaryMethod === '计件工资') {
@@ -217,6 +302,7 @@ export function subsidyLaborLine(orderId, lineId, payload) {
   if (payload.subsidyReason != null) line.subsidyReason = payload.subsidyReason
 
   Object.assign(order, recalcOrder(order))
+  syncLineToMobileIfNeeded(order, order.lines.find((l) => l.id === lineId))
   appendLog(order, {
     action: '补贴',
     target: `任务 ${line.taskNo}`,
@@ -225,16 +311,44 @@ export function subsidyLaborLine(orderId, lineId, payload) {
   return { ok: true, order: recalcOrder(order) }
 }
 
+export function pushLaborLines(orderId, lineIds, operator = 'admin1') {
+  const order = laborHourState.orders.find((o) => o.id === orderId)
+  if (!order) return { ok: false, message: '记录不存在' }
+  const targets = order.lines.filter((l) => lineIds.includes(l.id))
+  if (!targets.length) return { ok: false, message: '请选择待推送明细' }
+  const pushable = targets.filter((l) => canPushLine(l))
+  if (!pushable.length) return { ok: false, message: '所选明细当前状态不可推送' }
+
+  pushable.forEach((line) => {
+    line.pushStatus = PUSH_STATUS.PUSHED
+    line.pushedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const recalculated = enrichLaborLine(line, resolveLaborConfig(order.materialCode, line.processName))
+    Object.assign(line, recalculated)
+    upsertMobileWageItem(order, line)
+  })
+
+  Object.assign(order, recalcOrder(order))
+  appendLog(order, {
+    action: '推送',
+    operator,
+    target: pushable.map((l) => l.taskNo).join('、'),
+    remark: '推送至小程序工时工资',
+  })
+  return { ok: true, order: recalcOrder(order), count: pushable.length }
+}
+
 export function auditLaborLines(orderId, lineIds, operator = 'admin1') {
   const order = laborHourState.orders.find((o) => o.id === orderId)
   if (!order) return { ok: false, message: '记录不存在' }
   const targets = order.lines.filter((l) => lineIds.includes(l.id))
   if (!targets.length) return { ok: false, message: '请选择待审核明细' }
-  const pending = targets.filter((l) => l.auditStatus !== '已审核')
-  if (!pending.length) return { ok: false, message: '所选明细均已审核' }
+  const pending = targets.filter((l) => canAuditLine(l))
+  if (!pending.length) return { ok: false, message: '仅已报工数据可审核' }
 
   pending.forEach((line) => {
+    line.taskStatus = TASK_STATUS.AUDITED
     line.auditStatus = '已审核'
+    updateMobileWageStatus(line.id, { taskStatus: TASK_STATUS.AUDITED })
   })
   order.auditStatus = resolveOrderAuditStatus(order.lines)
   Object.assign(order, recalcOrder(order))

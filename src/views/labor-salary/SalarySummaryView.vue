@@ -289,7 +289,7 @@ function openDetail(record) {
   if (record.employeeName && record.employeeName !== '—') {
     query.employee = record.employeeName
   }
-  router.push({ path: '/labor-salary/salary-detail', query })
+  router.push({ path: '/report-management/salary-detail', query })
 }
 
 function onBatchAction({ key }) {

@@ -17,8 +17,31 @@ import {
   calcProcessReportStats,
 } from '@/utils/processReportWorkOrder'
 import { calcAutoDurationHours } from '@/utils/laborHourCalc'
-import { resolveLaborConfig, resolveWageRateDisplayMode, resolveSalaryMethodOptions } from '@/utils/laborConfigResolver'
+import {
+  resolveLaborConfig,
+  resolveWageRateDisplayMode,
+  resolveSalaryMethodOptions,
+} from '@/utils/laborConfigResolver'
 import { breakdownToLegacy } from '@/utils/defectBreakdown'
+import {
+  isPushedToMobile,
+  PUSH_STATUS,
+  TASK_STATUS,
+  updateMobileWageStatus,
+  upsertMobileWageItemFromProcessReport,
+} from '@/utils/mobileLaborWagePush'
+
+function syncRecordToMobile(record) {
+  if (!record.workOrderId || !isPushedToMobile(record.pushStatus)) return
+  const bundle = buildProcessReportWorkOrderBundle(
+    record.workOrderId,
+    processReportState.records,
+    loadWoLogs()[record.workOrderId] || [],
+  )
+  if (!bundle) return
+  const line = bundle.lines.find((l) => l.id === record.id)
+  if (line) upsertMobileWageItemFromProcessReport(bundle, line)
+}
 
 function shouldReseed() {
   return localStorage.getItem(PROCESS_REPORT_SEED_VERSION_KEY) !== PROCESS_REPORT_SEED_VERSION
@@ -93,6 +116,7 @@ export function getProcessReportById(id) {
 }
 
 export function getProcessReportWorkOrderBundle(workOrderId) {
+  processReportState.records = processReportState.records.map(normalizeProcessReport)
   const logsMap = loadWoLogs()
   return buildProcessReportWorkOrderBundle(
     workOrderId,
@@ -126,18 +150,24 @@ function updateRecord(id, patch) {
   if (idx === -1) return null
   Object.assign(processReportState.records[idx], patch)
   saveRecords(processReportState.records)
-  return enrichProcessReportRecord(processReportState.records[idx])
+  const updated = enrichProcessReportRecord(processReportState.records[idx])
+  syncRecordToMobile(processReportState.records[idx])
+  return updated
 }
 
 export function approveProcessReport(id, operator = 'admin1') {
   const row = processReportState.records.find((r) => r.id === id)
   if (!row) return { ok: false, message: '记录不存在' }
-  if (row.status !== '待审核') return { ok: false, message: '仅待审核记录可审核' }
+  if (row.taskStatus === TASK_STATUS.AUDITED || row.status === '已审核') {
+    return { ok: false, message: '该记录已审核' }
+  }
   const updated = updateRecord(id, {
     status: '已审核',
+    taskStatus: TASK_STATUS.AUDITED,
     auditedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     auditor: operator,
   })
+  updateMobileWageStatus(id, { taskStatus: TASK_STATUS.AUDITED })
   if (row.workOrderId) {
     appendWorkOrderLog(row.workOrderId, {
       operator,
@@ -152,7 +182,9 @@ export function approveProcessReport(id, operator = 'admin1') {
 export function rejectProcessReport(id, reason, operator = 'admin1') {
   const row = processReportState.records.find((r) => r.id === id)
   if (!row) return { ok: false, message: '记录不存在' }
-  if (row.status !== '待审核') return { ok: false, message: '仅待审核记录可拒绝' }
+  if (row.taskStatus === TASK_STATUS.AUDITED || row.status === '已审核') {
+    return { ok: false, message: '已审核记录不可拒绝' }
+  }
   if (!reason?.trim()) return { ok: false, message: '请填写拒绝原因' }
   const updated = updateRecord(id, {
     status: '已拒绝',
@@ -174,7 +206,7 @@ export function rejectProcessReport(id, reason, operator = 'admin1') {
 export function batchApproveProcessReports(ids, operator = 'admin1') {
   const pending = ids.filter((id) => {
     const row = processReportState.records.find((r) => r.id === id)
-    return row?.status === '待审核'
+    return row?.taskStatus === TASK_STATUS.REPORTED && row?.status !== '已审核'
   })
   if (!pending.length) return { ok: false, message: '请选择待审核记录' }
   pending.forEach((id) => approveProcessReport(id, operator))
@@ -185,7 +217,7 @@ export function batchRejectProcessReports(ids, reason, operator = 'admin1') {
   if (!reason?.trim()) return { ok: false, message: '请填写拒绝原因' }
   const pending = ids.filter((id) => {
     const row = processReportState.records.find((r) => r.id === id)
-    return row?.status === '待审核'
+    return row?.taskStatus === TASK_STATUS.REPORTED && row?.status !== '已审核'
   })
   if (!pending.length) return { ok: false, message: '请选择待审核记录' }
   pending.forEach((id) => rejectProcessReport(id, reason, operator))
@@ -195,7 +227,9 @@ export function batchRejectProcessReports(ids, reason, operator = 'admin1') {
 export function adjustProcessReportLine(recordId, payload = {}, operator = 'admin1') {
   const row = processReportState.records.find((r) => r.id === recordId)
   if (!row) return { ok: false, message: '记录不存在' }
-  if (row.status === '已审核') return { ok: false, message: '已审核数据不可调整' }
+  if (row.taskStatus === TASK_STATUS.AUDITED || row.status === '已审核') {
+    return { ok: false, message: '已审核数据不可调整' }
+  }
 
   const patch = {
     adjustedBy: operator,
@@ -258,7 +292,9 @@ export function subsidyProcessReportLine(recordId, payload = {}) {
 export function updateProcessReportWageRate(recordId, payload = {}, operator = 'admin1') {
   const row = processReportState.records.find((r) => r.id === recordId)
   if (!row) return { ok: false, message: '记录不存在' }
-  if (row.status === '已审核') return { ok: false, message: '已审核数据不可修改单价' }
+  if (row.taskStatus === TASK_STATUS.AUDITED || row.status === '已审核') {
+    return { ok: false, message: '已审核数据不可修改单价' }
+  }
 
   const config = resolveLaborConfig(row.productCode, row.processName)
   const mode = resolveWageRateDisplayMode(config)
@@ -294,7 +330,9 @@ export function updateProcessReportWageRate(recordId, payload = {}, operator = '
 export function updateProcessReportSalaryMethod(recordId, payload = {}, operator = 'admin1') {
   const row = processReportState.records.find((r) => r.id === recordId)
   if (!row) return { ok: false, message: '记录不存在' }
-  if (row.status === '已审核') return { ok: false, message: '已审核数据不可修改计薪方式' }
+  if (row.taskStatus === TASK_STATUS.AUDITED || row.status === '已审核') {
+    return { ok: false, message: '已审核数据不可修改计薪方式' }
+  }
 
   const config = resolveLaborConfig(row.productCode, row.processName)
   if (!config) return { ok: false, message: '未找到工时配置' }
@@ -333,4 +371,30 @@ export function auditProcessReportLine(recordId, result, reason = '', operator =
     return rejectProcessReport(recordId, reason, operator)
   }
   return approveProcessReport(recordId, operator)
+}
+
+export function pushProcessReportLines(ids, operator = 'admin1') {
+  const rows = ids
+    .map((id) => processReportState.records.find((r) => r.id === id))
+    .filter(Boolean)
+  if (!rows.length) return { ok: false, message: '请选择待推送明细' }
+  const pushable = rows.filter((r) => r.pushStatus === PUSH_STATUS.NOT_PUSHED)
+  if (!pushable.length) return { ok: false, message: '所选明细当前状态不可推送' }
+
+  pushable.forEach((row) => {
+    updateRecord(row.id, {
+      pushStatus: PUSH_STATUS.PUSHED,
+      pushedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    })
+    if (row.workOrderId) {
+      appendWorkOrderLog(row.workOrderId, {
+        operator,
+        action: '推送',
+        target: row.taskNo || row.processName,
+        remark: '推送至小程序工时工资',
+      })
+    }
+  })
+
+  return { ok: true, count: pushable.length, message: `已推送 ${pushable.length} 条` }
 }

@@ -5,7 +5,7 @@
         <div class="page-header">
           <div class="header-left">
             <span class="page-title">【{{ record.workOrderName }}】</span>
-            <a-tag :color="statusColor(record.auditStatus)">{{ record.auditStatus }}</a-tag>
+            <a-tag :color="statusColor(record.taskStatus)">{{ record.taskStatus }}</a-tag>
           </div>
           <a-space>
             <a-button size="small" @click="reload">刷新</a-button>
@@ -44,15 +44,24 @@
               <a-radio-button value="account">核算详情</a-radio-button>
               <a-radio-button value="log">操作日志</a-radio-button>
             </a-radio-group>
-            <a-button
-              v-if="activeTab === 'account'"
-              type="primary"
-              size="small"
-              :disabled="!selectedLineIds.length"
-              @click="handleBatchAudit"
-            >
-              批量审核
-            </a-button>
+            <a-space v-if="activeTab === 'account'">
+              <a-button
+                v-if="manualPushMode"
+                size="small"
+                :disabled="!selectedPushableIds.length"
+                @click="handleBatchPush"
+              >
+                批量推送
+              </a-button>
+              <a-button
+                type="primary"
+                size="small"
+                :disabled="!selectedAuditableIds.length"
+                @click="handleBatchAudit"
+              >
+                批量审核
+              </a-button>
+            </a-space>
           </div>
 
           <template v-if="activeTab === 'account'">
@@ -68,17 +77,31 @@
             >
               <template #bodyCell="{ column, record: line, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-                <template v-else-if="column.key === 'auditStatus'">
+                <template v-else-if="column.key === 'taskStatus'">
                   <a-badge
-                    :status="line.auditStatus === '已审核' ? 'success' : 'processing'"
-                    :text="line.auditStatus"
+                    :status="taskStatusBadge(line.taskStatus)"
+                    :text="line.taskStatus"
                   />
                 </template>
+                <template v-else-if="column.key === 'pushStatus'">
+                  <a-tag :color="pushStatusColor(line.pushStatus)">{{ line.pushStatus }}</a-tag>
+                </template>
                 <template v-else-if="column.key === 'action'">
-                  <a-space v-if="line.auditStatus !== '已审核'" :size="0">
+                  <a-space v-if="line.taskStatus !== TASK_STATUS.AUDITED" :size="0">
                     <a-button type="link" size="small" @click="openAdjust(line)">调整</a-button>
                     <a-button type="link" size="small" @click="openSubsidy(line)">补贴</a-button>
-                    <a-button type="link" size="small" @click="handleAuditOne(line)">审核</a-button>
+                    <a-button
+                      v-if="manualPushMode && canPush(line)"
+                      type="link"
+                      size="small"
+                      @click="handlePushOne(line)"
+                    >推送</a-button>
+                    <a-button
+                      v-if="canAudit(line)"
+                      type="link"
+                      size="small"
+                      @click="handleAuditOne(line)"
+                    >审核</a-button>
                   </a-space>
                   <span v-else class="locked-text">已锁定</span>
                 </template>
@@ -89,35 +112,35 @@
               <template #summary>
                 <a-table-summary>
                   <a-table-summary-row>
-                    <a-table-summary-cell :index="0" :col-span="7">工时总计</a-table-summary-cell>
-                    <a-table-summary-cell :index="7" align="right">{{
+                    <a-table-summary-cell :index="0" :col-span="9">工时总计</a-table-summary-cell>
+                    <a-table-summary-cell :index="9" align="right">{{
                       summary.reportQty
                     }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="8" align="right">{{
+                    <a-table-summary-cell :index="10" align="right">{{
                       summary.reportDuration
                     }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="9" align="right">{{
+                    <a-table-summary-cell :index="11" align="right">{{
                       summary.adjustedReportQty
                     }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="10" align="right">{{
+                    <a-table-summary-cell :index="12" align="right">{{
                       summary.adjustedDuration
                     }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="11" align="right">{{
+                    <a-table-summary-cell :index="13" align="right">{{
                       summary.subsidyReportQty
                     }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="12" align="right">{{
+                    <a-table-summary-cell :index="14" align="right">{{
                       summary.subsidyHours
                     }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="13" align="right">{{
+                    <a-table-summary-cell :index="15" align="right">{{
                       summary.finalPieceQty
                     }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="14" align="right">{{
+                    <a-table-summary-cell :index="16" align="right">{{
                       summary.accountHours
                     }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="15" align="right">{{
+                    <a-table-summary-cell :index="17" align="right">{{
                       summary.salaryAmount
                     }}</a-table-summary-cell>
-                    <a-table-summary-cell :index="16" :col-span="8" />
+                    <a-table-summary-cell :index="18" :col-span="8" />
                   </a-table-summary-row>
                 </a-table-summary>
               </template>
@@ -165,8 +188,11 @@ import {
   adjustLaborLine,
   auditLaborLines,
   getLaborHourById,
+  pushLaborLines,
   subsidyLaborLine,
 } from '@/store/laborHourStore'
+import { isManualSalaryPush } from '@/store/functionParamStore'
+import { PUSH_STATUS, TASK_STATUS } from '@/utils/mobileLaborWagePush'
 import { summarizeLaborLines } from '@/utils/laborHourCalc'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { tabStore, useTabs } from '@/composables/useTabs'
@@ -188,8 +214,10 @@ const activeConfig = ref(null)
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
-  { title: '状态', key: 'auditStatus', width: 90, fixed: 'left' },
+  { title: '任务状态', key: 'taskStatus', width: 90, fixed: 'left' },
+  { title: '推送状态', key: 'pushStatus', width: 100, fixed: 'left' },
   { title: '执行人', dataIndex: 'executor', width: 90 },
+  { title: '操作人', dataIndex: 'operator', width: 90 },
   { title: '班组', dataIndex: 'team', width: 80 },
   { title: '工序名称', dataIndex: 'processName', width: 130 },
   { title: '任务编号', dataIndex: 'taskNo', width: 130 },
@@ -209,7 +237,7 @@ const lineColumns = [
   { title: '报工备注', dataIndex: 'remark', width: 120, ellipsis: true },
   { title: '任务开工时间', dataIndex: 'taskStartTime', width: 140 },
   { title: '任务完工时间', dataIndex: 'taskEndTime', width: 140 },
-  { title: '操作', key: 'action', width: 160, fixed: 'right' },
+  { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
 
 const logColumns = [
@@ -222,18 +250,55 @@ const logColumns = [
 
 const summary = computed(() => summarizeLaborLines(record.value?.lines || []))
 
+const manualPushMode = computed(() => isManualSalaryPush())
+
+const selectedPushableIds = computed(() =>
+  selectedLineIds.value.filter((id) => {
+    const line = record.value?.lines?.find((l) => l.id === id)
+    return line && canPush(line)
+  }),
+)
+
+const selectedAuditableIds = computed(() =>
+  selectedLineIds.value.filter((id) => {
+    const line = record.value?.lines?.find((l) => l.id === id)
+    return line && canAudit(line)
+  }),
+)
+
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedLineIds.value,
   onChange: (keys) => {
     selectedLineIds.value = keys
   },
-  getCheckboxProps: (line) => ({ disabled: line.auditStatus === '已审核' }),
+  getCheckboxProps: (line) => ({
+    disabled: line.taskStatus === TASK_STATUS.AUDITED,
+  }),
 }))
 
 function statusColor(status) {
-  if (status === '已审核') return 'success'
+  if (status === TASK_STATUS.AUDITED) return 'success'
   if (status === '部分审核') return 'warning'
   return 'default'
+}
+
+function taskStatusBadge(status) {
+  if (status === TASK_STATUS.AUDITED) return 'success'
+  return 'processing'
+}
+
+function pushStatusColor(status) {
+  if (status === PUSH_STATUS.AUTO_PUSHED) return 'green'
+  if (status === PUSH_STATUS.PUSHED) return 'blue'
+  return 'default'
+}
+
+function canPush(line) {
+  return line.pushStatus === PUSH_STATUS.NOT_PUSHED
+}
+
+function canAudit(line) {
+  return line.taskStatus === TASK_STATUS.REPORTED
 }
 
 function formatLineCell(line, column) {
@@ -313,12 +378,45 @@ function handleAuditOne(line) {
   })
 }
 
+function handlePushOne(line) {
+  Modal.confirm({
+    title: '推送确认',
+    content: `确认将任务 ${line.taskNo} 推送至小程序「工时工资」列表，供工人确认？`,
+    onOk: () => {
+      const res = pushLaborLines(record.value.id, [line.id])
+      if (!res.ok) {
+        message.warning(res.message)
+        return
+      }
+      record.value = res.order
+      message.success('推送成功')
+    },
+  })
+}
+
+function handleBatchPush() {
+  Modal.confirm({
+    title: '批量推送',
+    content: `确认将选中的 ${selectedPushableIds.value.length} 条任务推送至小程序「工时工资」列表？`,
+    onOk: () => {
+      const res = pushLaborLines(record.value.id, selectedPushableIds.value)
+      if (!res.ok) {
+        message.warning(res.message)
+        return
+      }
+      record.value = res.order
+      selectedLineIds.value = []
+      message.success(`已推送 ${res.count} 条任务`)
+    },
+  })
+}
+
 function handleBatchAudit() {
   Modal.confirm({
     title: '提示',
     content: '审核通过后，报工数据将锁定，无法再进行调整或补贴，是否确认审核？',
     onOk: () => {
-      const res = auditLaborLines(record.value.id, selectedLineIds.value)
+      const res = auditLaborLines(record.value.id, selectedAuditableIds.value)
       if (!res.ok) {
         message.warning(res.message)
         return

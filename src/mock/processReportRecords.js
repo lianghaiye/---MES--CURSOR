@@ -1,5 +1,8 @@
 import { breakdownToLegacy, ensureDefectBreakdown } from '@/utils/defectBreakdown'
 import { resolveDefectItemsByIds } from '@/store/defectItemStore'
+import { isAutoSalaryPush } from '@/store/functionParamStore'
+import { PUSH_STATUS, TASK_STATUS } from '@/utils/mobileLaborWagePush'
+import dayjs from 'dayjs'
 import {
   createProcessReportTaskSeed,
   createProcessReportWoLogSeed,
@@ -24,18 +27,38 @@ function createSeed() {
   return [...createProcessReportTaskSeed(), ...createProcessReportQuickSeed()]
 }
 
+export function migrateRecordFields(row) {
+  const next = { ...row }
+  if (!next.taskStatus) {
+    next.taskStatus = next.status === '已审核' ? TASK_STATUS.AUDITED : TASK_STATUS.REPORTED
+  }
+  if (!next.operator) next.operator = next.reporter || ''
+  if (!next.pushStatus) {
+    next.pushStatus = next.pushedAt ? PUSH_STATUS.PUSHED : PUSH_STATUS.NOT_PUSHED
+  }
+  if (
+    isAutoSalaryPush() &&
+    next.pushStatus === PUSH_STATUS.NOT_PUSHED &&
+    next.source === 'workorder'
+  ) {
+    next.pushStatus = PUSH_STATUS.AUTO_PUSHED
+    next.pushedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  }
+  return next
+}
+
 export function normalizeProcessReport(row) {
   const items = resolveDefectItemsByIds(row.defectItemIds || [])
   const defectBreakdown = ensureDefectBreakdown(row, items)
   const legacy = breakdownToLegacy(defectBreakdown)
-  return {
+  return migrateRecordFields({
     ...row,
     source: row.source || 'quick',
     status: row.status || '待审核',
     rejectReason: row.rejectReason || '',
     ...legacy,
     defectReason: row.defectReason || legacy.defectReasonLabel,
-  }
+  })
 }
 
 export function createProcessReportSeed() {

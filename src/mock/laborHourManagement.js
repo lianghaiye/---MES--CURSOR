@@ -4,6 +4,9 @@ import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 
 export const laborAuditStatusOptions = ['待审核', '部分审核', '已审核']
 
+export const laborTaskStatusOptions = ['已报工', '已审核']
+export const laborPushStatusOptions = ['未推送', '已推送', '已自动推送']
+
 export const periodOptions = [
   { label: '本周', value: 'week' },
   { label: '本月', value: 'month' },
@@ -15,7 +18,10 @@ function createLine(partial, materialCode) {
   const base = {
     id: `lhl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     auditStatus: '待审核',
+    taskStatus: '已报工',
+    pushStatus: '',
     executor: 'admin',
+    operator: '',
     team: '',
     processName: '',
     taskNo: `T${dayjs().format('YYYYMMDD')}${String(Math.floor(Math.random() * 900) + 100)}`,
@@ -32,6 +38,7 @@ function createLine(partial, materialCode) {
     taskEndTime: dayjs().format('YYYY-MM-DD HH:mm'),
     ...partial,
   }
+  if (!base.operator) base.operator = base.executor || ''
   return enrichLaborLine(base, config)
 }
 

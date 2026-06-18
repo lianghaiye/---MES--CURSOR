@@ -45,11 +45,7 @@ export const sideMenus = {
     { key: 'production-plan', label: '生产计划', path: '/planning/production-plan' },
     { key: 'design-task', label: '设计任务', path: '/planning/design-task' },
   ],
-  'labor-salary': [
-    { key: 'labor-hour', label: '工时管理', path: '/labor-salary/labor-hour' },
-    { key: 'salary-summary', label: '工资合计', path: '/labor-salary/salary-summary' },
-    { key: 'salary-detail', label: '工资详情', path: '/labor-salary/salary-detail' },
-  ],
+  'labor-salary': [{ key: 'labor-hour', label: '工时管理', path: '/labor-salary/labor-hour' }],
   production: [
     { key: 'work-orders', label: '生产工单', path: '/production/work-orders' },
     { key: 'assembly-work-orders', label: '总装工单', path: '/production/assembly-work-orders' },
@@ -63,6 +59,8 @@ export const sideMenus = {
   'report-management': [
     { key: 'report-work', label: '报工确认', path: '/report-management/report-work' },
     { key: 'process-report', label: '工序报工', path: '/report-management/process-report' },
+    { key: 'salary-summary', label: '工资核算', path: '/report-management/salary-summary' },
+    { key: 'salary-detail', label: '核算详情', path: '/report-management/salary-detail' },
   ],
   inventory: [
     { key: 'stock', label: '库存查询', path: '/inventory/stock' },
@@ -86,6 +84,7 @@ export const sideMenus = {
     { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
     { key: 'defect-items', label: '不良品项', path: '/basic-config/defect-items' },
     { key: 'material-grades', label: '材质管理', path: '/basic-config/material-grades' },
+    { key: 'function-params', label: '功能参数', path: '/basic-config/function-params' },
     {
       key: 'warehouse-mgmt',
       label: '仓库管理',
@@ -152,8 +151,8 @@ export const routeTitles = {
   '/report-management/process-report/wo/:workOrderId': '任务报工详情',
   '/report-management/process-report/:id': '工序报工详情',
   '/labor-salary/labor-hour': '工时管理',
-  '/labor-salary/salary-summary': '工资合计',
-  '/labor-salary/salary-detail': '工资详情',
+  '/report-management/salary-summary': '工资核算',
+  '/report-management/salary-detail': '核算详情',
   '/inventory/stock': '库存查询',
   '/inventory/outbound': '出库管理',
   '/inventory/sales-outbound': '出库管理',
@@ -176,6 +175,7 @@ export const routeTitles = {
   '/basic-config/employee-groups': '员工组别',
   '/basic-config/defect-items': '不良品项',
   '/basic-config/material-grades': '材质管理',
+  '/basic-config/function-params': '功能参数',
   '/basic-config/warehouse-categories': '仓库分类',
   '/basic-config/warehouses': '仓库列表',
 }
