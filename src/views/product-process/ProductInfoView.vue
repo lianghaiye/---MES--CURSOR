@@ -376,6 +376,7 @@ const baseColumns = [
   { title: '产品属性', key: 'productAttribute', width: 110, ellipsis: true },
   { title: '类别', dataIndex: 'categoryName', width: 88 },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80 },
   { title: '重量(kg)', key: 'weight', width: 88, align: 'right' },
   { title: '库存单位', key: 'inventoryUnit', width: 88, align: 'center' },

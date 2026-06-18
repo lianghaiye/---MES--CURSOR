@@ -71,6 +71,16 @@
               </a-form-item>
             </a-col>
             <a-col :span="8">
+              <a-form-item label="图号">
+                <a-input
+                  v-model:value="form.drawingNo"
+                  size="small"
+                  placeholder="请输入 图号"
+                  allow-clear
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
               <a-form-item label="材质">
                 <a-select
                   v-model:value="form.material"
@@ -526,6 +536,7 @@ const form = reactive({
   supplyForm: undefined,
   categoryKey: undefined,
   specModel: '',
+  drawingNo: '',
   material: '',
   weight: '',
   inventoryUnit: undefined,
@@ -548,6 +559,7 @@ function resetForm() {
   form.supplyForm = undefined
   form.categoryKey = undefined
   form.specModel = ''
+  form.drawingNo = ''
   form.material = ''
   form.weight = ''
   form.inventoryUnit = undefined
@@ -573,6 +585,7 @@ function loadEditRecord(record) {
   form.supplyForm = source.supplyForm
   form.categoryKey = source.categoryKey
   form.specModel = source.specModel || ''
+  form.drawingNo = source.drawingNo || ''
   form.material = source.material || ''
   form.weight = source.weight || ''
   form.inventoryUnit = source.inventoryUnit
@@ -709,6 +722,7 @@ function buildPayload() {
     categoryName: parent ? parent.title : cat?.title || '',
     parentCategoryKey: cat?.parentKey || cat?.key || '',
     specModel: form.specModel,
+    drawingNo: form.drawingNo?.trim() || '',
     material: form.material,
     weight: form.weight,
     inventoryUnit: form.inventoryUnit,

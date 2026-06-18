@@ -158,7 +158,10 @@
         </template>
 
         <div v-else class="fullscreen-toolbar">
-          <a-button type="link" @click="toggleDetailFullscreen">退出全屏</a-button>
+          <a-space>
+            <TableColumnSettingButton @click="workColumnDrawerOpen = true" />
+            <a-button type="link" @click="toggleDetailFullscreen">退出全屏</a-button>
+          </a-space>
         </div>
 
         <a-tabs v-model:activeKey="detailTab">
@@ -170,7 +173,7 @@
 
         <template v-if="detailTab === 'work'">
           <a-table
-            :columns="workColumns"
+            :columns="displayWorkColumns"
             :data-source="selectedOrder.workItems"
             :pagination="false"
             row-key="id"
@@ -255,8 +258,14 @@
           </div>
 
           <div v-if="activeWorkItem && materialTree.length" class="ebom-panel-title">
-            物料树 · {{ activeWorkItem.productName }}
-            <span class="ebom-sub">{{ activeWorkItem.productCode }}</span>
+            <span>
+              物料树 · {{ activeWorkItem.productName }}
+              <span class="ebom-sub">{{ activeWorkItem.productCode }}</span>
+            </span>
+            <TableColumnSettingButton
+              v-if="detailFullscreen"
+              @click="materialColumnDrawerOpen = true"
+            />
           </div>
           <a-empty
             v-if="!materialTree.length"
@@ -265,7 +274,7 @@
           />
           <template v-else>
             <a-table
-              :columns="materialColumns"
+              :columns="displayMaterialColumns"
               :data-source="materialTree"
               :pagination="false"
               row-key="id"
@@ -404,6 +413,18 @@
       :materials="purchasedMaterialsForReq"
       @saved="handlePurchaseReqSave"
     />
+
+    <TableColumnSettingDrawer
+      v-model:open="workColumnDrawerOpen"
+      v-model:settings="workColumnSettings"
+      :default-settings="defaultWorkColumnSettings"
+    />
+
+    <TableColumnSettingDrawer
+      v-model:open="materialColumnDrawerOpen"
+      v-model:settings="materialColumnSettings"
+      :default-settings="defaultMaterialColumnSettings"
+    />
   </div>
 </template>
 
@@ -444,6 +465,9 @@ import {
   supplyTypeOptions,
   validateDesignatedSuppliers,
 } from '@/utils/productionPlanMaterial'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 
 const filters = reactive({
   orderNo: '',
@@ -468,7 +492,7 @@ const pagination = reactive({
   pageSize: 5,
 })
 
-const workColumns = [
+const baseWorkColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 80, fixed: 'left' },
   { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
   { title: '产品编号', dataIndex: 'productCode', width: 120, ellipsis: true },
@@ -491,11 +515,15 @@ const workColumns = [
   { title: '操作', key: 'action', width: 110, fixed: 'right' },
 ]
 
-const workTableScrollX = computed(() =>
-  workColumns.reduce((sum, col) => sum + (col.width || 80), 0),
-)
+const {
+  columnSettings: workColumnSettings,
+  columnDrawerOpen: workColumnDrawerOpen,
+  displayColumns: displayWorkColumns,
+  tableScrollX: workTableScrollX,
+  defaultColumnSettings: defaultWorkColumnSettings,
+} = useTableColumnSettings('production-plan-work-list', baseWorkColumns, { minScrollX: 1400 })
 
-const materialColumns = [
+const baseMaterialColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 90, fixed: 'left' },
   { title: '物料名称', dataIndex: 'name', width: 140, ellipsis: true, fixed: 'left' },
   { title: '物料编码', dataIndex: 'code', width: 120 },
@@ -522,11 +550,15 @@ const materialColumns = [
   { title: '补充说明', key: 'remark', width: 140 },
 ]
 
-const processRouteOpts = computed(() => getProcessRouteSelectOptions())
+const {
+  columnSettings: materialColumnSettings,
+  columnDrawerOpen: materialColumnDrawerOpen,
+  displayColumns: displayMaterialColumns,
+  tableScrollX: materialTableScrollX,
+  defaultColumnSettings: defaultMaterialColumnSettings,
+} = useTableColumnSettings('production-plan-material-list', baseMaterialColumns, { minScrollX: 2400 })
 
-const materialTableScrollX = computed(() =>
-  materialColumns.reduce((sum, col) => sum + (col.width || 80), 0),
-)
+const processRouteOpts = computed(() => getProcessRouteSelectOptions())
 
 const filteredOrders = computed(() => {
   const f = { ...appliedFilters.value }
@@ -949,6 +981,9 @@ function handleReset() {
 }
 
 .ebom-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin: 12px 0 8px;
   font-weight: 600;
   font-size: 13px;

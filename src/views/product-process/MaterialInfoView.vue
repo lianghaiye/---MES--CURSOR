@@ -321,6 +321,7 @@ const baseColumns = [
   { title: '供应形态', dataIndex: 'supplyForm', width: 90 },
   { title: '类别', dataIndex: 'categoryName', width: 90 },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80 },
   { title: '库存单位', key: 'inventoryUnit', width: 90, align: 'center' },
   { title: '单价', key: 'unitPrice', width: 90, align: 'right' },
