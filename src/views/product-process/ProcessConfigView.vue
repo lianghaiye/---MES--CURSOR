@@ -124,6 +124,7 @@
           <template v-else-if="column.key === 'actions'">
             <a-space :size="8">
               <a @click="openEdit(record)">编辑</a>
+              <a @click="openLaborConfig(record)">工时配置</a>
               <a class="danger-link" @click="confirmDelete(record)">删除</a>
             </a-space>
           </template>
@@ -132,6 +133,12 @@
     </div>
 
     <ProcessConfigFormModal v-model:open="modalOpen" :record="editRecord" @saved="handleSearch" />
+
+    <ProcessLaborConfigModal
+      v-model:open="laborModalOpen"
+      :process="laborProcess"
+      @saved="handleSearch"
+    />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -151,6 +158,7 @@ import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import ProcessConfigFormModal from './components/ProcessConfigFormModal.vue'
+import ProcessLaborConfigModal from './components/ProcessLaborConfigModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -178,6 +186,8 @@ const applied = reactive({
 })
 const modalOpen = ref(false)
 const editRecord = ref(null)
+const laborModalOpen = ref(false)
+const laborProcess = ref(null)
 
 const categoryOpts = computed(() => getActiveCategoryOptions())
 const resourceTypeOpts = RESOURCE_TYPES.map((v) => ({ label: v, value: v }))
@@ -194,7 +204,7 @@ const baseColumns = [
   { title: '状态', key: 'status', width: 90 },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
-  { title: '操作', key: 'actions', width: 120, fixed: 'right' },
+  { title: '操作', key: 'actions', width: 180, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -225,6 +235,11 @@ function openCreate() {
 function openEdit(record) {
   editRecord.value = record
   modalOpen.value = true
+}
+
+function openLaborConfig(record) {
+  laborProcess.value = record
+  laborModalOpen.value = true
 }
 
 function goDetail(record) {
