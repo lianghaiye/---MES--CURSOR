@@ -25,7 +25,14 @@ export const moreModules = [
 
 /** 各模块左侧子菜单 */
 export const sideMenus = {
-  home: [{ key: 'dashboard', label: '工作台', path: '/home/dashboard' }],
+  home: [
+    { key: 'dashboard', label: '工作台', path: '/home/dashboard' },
+    {
+      key: 'prd',
+      label: 'PRD',
+      children: [{ key: 'prd-v15', label: '1.5版本迭代', path: '/home/prd/v15' }],
+    },
+  ],
   'product-process': [
     { key: 'materials', label: '物料信息', path: '/product-process/materials' },
     { key: 'products', label: '产品信息', path: '/product-process/products' },
@@ -120,6 +127,7 @@ export function resolveModuleKey(path) {
 /** 路由 meta.title 映射 */
 export const routeTitles = {
   '/home/dashboard': '首页',
+  '/home/prd/v15': '1.5版本迭代',
   '/product-process/materials': '物料信息',
   '/product-process/products': '产品信息',
   '/product-process/bom': '产品BOM',

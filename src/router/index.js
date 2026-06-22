@@ -25,6 +25,12 @@ const routes = [
     children: [
       { path: 'home/dashboard', ...emptyChild('home-dashboard', '首页') },
       {
+        path: 'home/prd/v15',
+        name: 'home-prd-v15',
+        component: () => import('@/views/prd/PrdV15View.vue'),
+        meta: { title: '1.5版本迭代' },
+      },
+      {
         path: 'product-process/materials',
         name: 'product-process-materials',
         component: () => import('@/views/product-process/MaterialInfoView.vue'),
