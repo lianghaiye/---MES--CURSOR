@@ -83,6 +83,9 @@
                 <template v-else-if="column.key === 'pushStatus'">
                   <a-tag :color="pushStatusColor(line.pushStatus)">{{ line.pushStatus }}</a-tag>
                 </template>
+                <template v-else-if="column.key === 'listAccountHours'">
+                  {{ formatAccountHours(line.listAccountHours) }}
+                </template>
                 <template v-else-if="column.key === 'salaryAmount'">
                   {{ formatMoney(line.salaryAmount) }}
                 </template>
@@ -207,7 +210,7 @@ const lineColumns = [
   { title: '报工类型', dataIndex: 'reportType', width: 100 },
   { title: '良品数', dataIndex: 'goodQty', width: 80, align: 'right' },
   { title: '不良品数', dataIndex: 'defectQty', width: 88, align: 'right' },
-  { title: '工作时长', dataIndex: 'workHours', width: 90, align: 'right' },
+  { title: '核算工时', key: 'listAccountHours', width: 90, align: 'right' },
   { title: '不良原因', dataIndex: 'defectReason', width: 120, ellipsis: true },
   { title: '计薪方式', dataIndex: 'salaryMethod', width: 100 },
   { title: '计薪(元)', key: 'salaryAmount', width: 100, align: 'right' },
@@ -227,7 +230,7 @@ const logColumns = [
 
 const summary = computed(() => {
   if (!bundle.value?.lines?.length) {
-    return { goodQty: 0, defectQty: 0, workHours: 0, salaryAmount: 0 }
+    return { goodQty: 0, defectQty: 0, accountHours: 0, salaryAmount: 0 }
   }
   const base = summarizeProcessReportLines(bundle.value.lines)
   const salaryAmount = bundle.value.lines.reduce(
@@ -250,7 +253,7 @@ const summaryCells = computed(() => {
   cells[9].align = 'right'
   cells[10].content = String(summary.value.defectQty)
   cells[10].align = 'right'
-  cells[11].content = String(summary.value.workHours)
+  cells[11].content = formatAccountHours(summary.value.accountHours, true)
   cells[11].align = 'right'
   cells[14].content = formatMoney(summary.value.salaryAmount)
   cells[14].align = 'right'
@@ -317,6 +320,14 @@ function formatMoney(val) {
   const num = Number(val)
   if (!Number.isFinite(num)) return '—'
   return `¥${num.toFixed(2)}`
+}
+
+function formatAccountHours(val, allowZero = false) {
+  if (val == null || val === '') return '—'
+  const num = Number(val)
+  if (!Number.isFinite(num)) return '—'
+  if (!allowZero && num === 0) return '—'
+  return String(num)
 }
 
 function formatLineCell(line, column) {

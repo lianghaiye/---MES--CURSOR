@@ -253,6 +253,7 @@ export function adjustProcessReportLine(recordId, payload = {}, operator = 'admi
   }
   if (payload.subsidyMethod != null) patch.subsidyMethod = payload.subsidyMethod
   if (payload.subsidyReportQty != null) patch.subsidyReportQty = Number(payload.subsidyReportQty) || 0
+  if (payload.subsidyHours != null) patch.subsidyHours = Number(payload.subsidyHours) || 0
   if (payload.subsidyFixedAmount != null) {
     patch.subsidyFixedAmount = Number(payload.subsidyFixedAmount) || 0
   }
@@ -275,7 +276,8 @@ export function adjustProcessReportLine(recordId, payload = {}, operator = 'admi
   updateRecord(recordId, patch)
   const hasSubsidy =
     (payload.subsidyMethod === 'fixed' && Number(payload.subsidyFixedAmount) > 0) ||
-    (payload.subsidyMethod === 'qty' && Number(payload.subsidyReportQty) > 0)
+    (payload.subsidyMethod === 'qty' &&
+      (Number(payload.subsidyReportQty) > 0 || Number(payload.subsidyHours) > 0))
   if (row.workOrderId) {
     appendWorkOrderLog(row.workOrderId, {
       operator,

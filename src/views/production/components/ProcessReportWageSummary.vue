@@ -33,7 +33,6 @@
           </a-button>
         </span>
       </a-descriptions-item>
-      <a-descriptions-item label="计薪(元)">{{ formatMoney(line.salaryAmount) }}</a-descriptions-item>
       <a-descriptions-item v-if="line.wageRateMode === 'piece'" label="单件计价单价">
         <span class="rate-cell">
           {{ formatMoney(line.effectivePieceRate) }}
@@ -67,10 +66,9 @@
       <a-descriptions-item label="调整良品数">{{ formatQty(line.adjustedGoodQty) }}</a-descriptions-item>
       <a-descriptions-item label="调整不良品数">{{ formatQty(line.adjustedDefectQty) }}</a-descriptions-item>
       <a-descriptions-item label="调整工时">{{ formatHours(line.adjustedWorkHours) }}</a-descriptions-item>
-      <a-descriptions-item label="补贴报工数">{{ formatQty(line.subsidyReportQty) }}</a-descriptions-item>
-      <a-descriptions-item label="补贴工时">{{ formatHours(line.subsidyHours) }}</a-descriptions-item>
+      <a-descriptions-item label="补贴金额">{{ formatSubsidyAmount(displaySubsidyAmount) }}</a-descriptions-item>
       <a-descriptions-item label="最终计件数">{{ formatQty(line.finalPieceQty) }}</a-descriptions-item>
-      <a-descriptions-item label="初步核算工时(时)">{{ formatHours(line.accountHours) }}</a-descriptions-item>
+      <a-descriptions-item label="最终核算工时">{{ formatHours(line.accountHours) }}</a-descriptions-item>
       <a-descriptions-item label="不良品折算工资">{{
         formatMoney(line.defectConvertedWage)
       }}</a-descriptions-item>
@@ -78,7 +76,6 @@
         -{{ formatMoney(line.qualityDeduction) }}
       </a-descriptions-item>
       <a-descriptions-item label="调整原因" :span="2">{{ line.adjustReason || '—' }}</a-descriptions-item>
-      <a-descriptions-item label="补贴原因" :span="2">{{ line.subsidyReason || '—' }}</a-descriptions-item>
     </a-descriptions>
 
     <div v-if="line.defectWageDetails?.length" class="defect-wage-details">
@@ -189,6 +186,7 @@ import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
 import { PROCESS_REPORT_WAGE_FORMULAS } from '@/constants/processReportWageFormulas'
+import { resolveSubsidyAmount } from '@/utils/processReportWageCalc'
 import {
   updateProcessReportWageRate,
   updateProcessReportSalaryMethod,
@@ -288,6 +286,19 @@ const activeWageFormulas = computed(() => {
   return PROCESS_REPORT_WAGE_FORMULAS.filter((item) => keys.includes(item.key))
 })
 
+const displaySubsidyAmount = computed(() => {
+  const line = props.line
+  if (!line) return 0
+  if (line.subsidyAmount != null && line.subsidyAmount !== '') {
+    return Number(line.subsidyAmount) || 0
+  }
+  return resolveSubsidyAmount(line, {
+    reportType: line.reportType,
+    salaryMethod: line.salaryMethod,
+    standardHourlyRate: line.effectiveStandardHourlyRate ?? line.masterStandardHourlyRate ?? 0,
+  })
+})
+
 const wageSummaryCards = computed(() => {
   const line = props.line
   if (!line) return []
@@ -301,8 +312,12 @@ const wageSummaryCards = computed(() => {
       formula: line.prepWageFormula ? `${line.prepWageFormula}=${formatMoney(line.prepWage)}` : '',
     })
   }
-  if (Number(line.subsidyWage) > 0) {
-    cards.push({ key: 'subsidy', label: '补贴工资', value: formatMoney(line.subsidyWage) })
+  if (displaySubsidyAmount.value > 0) {
+    cards.push({
+      key: 'subsidy',
+      label: '补贴工资',
+      value: formatMoney(displaySubsidyAmount.value),
+    })
   }
   cards.push({
     key: 'good',
@@ -359,6 +374,12 @@ function formatHours(val) {
   if (val === 0) return '0'
   if (val == null || val === '' || val === '—') return '—'
   return `${val}`
+}
+
+function formatSubsidyAmount(val) {
+  const num = Number(val)
+  if (!Number.isFinite(num) || num <= 0) return '—'
+  return formatMoney(num)
 }
 </script>
 

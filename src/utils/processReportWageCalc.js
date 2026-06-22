@@ -12,6 +12,27 @@ function round2(val) {
   return Math.round((Number(val) || 0) * 100) / 100
 }
 
+/** 任务报工列表「核算工时」：批量计件+计时按原报工数折算；时长报工+计时取工人填报时长 */
+export function resolveListAccountHours(line = {}, config = {}) {
+  const reportType = line.reportType || config.reportType || ''
+  const salaryMethod = line.salaryMethod || config.salaryMethod || ''
+  if (salaryMethod !== '计时工资') return null
+
+  if (reportType === '时长报工') {
+    const hours = line.workHours
+    if (hours == null || hours === '' || hours === '—') return null
+    const n = Number(hours)
+    return Number.isFinite(n) ? round2(n) : null
+  }
+
+  if (reportType === '批量计件') {
+    const totalQty = (Number(line.goodQty) || 0) + (Number(line.defectQty) || 0)
+    return calcAutoDurationHours(config, totalQty)
+  }
+
+  return null
+}
+
 const DEFAULT_SUBSIDY_UNIT_PRICE = 3
 
 export function getSubsidyUnitPrice(config = {}) {
@@ -25,11 +46,24 @@ export function resolveSubsidyMethod(line = {}) {
   return 'fixed'
 }
 
-/** 补贴工资：补贴工数 = 补贴工数 × 补贴单价；固定金额 = 固定金额 */
+/** 补贴金额：补贴工数=工数单价×补贴工数（时长+计时时单位为时）；固定金额=固定金额（二者互斥） */
+export function resolveSubsidyAmount(line = {}, config = {}) {
+  return resolveSubsidyWage(line, config)
+}
+
+/** 补贴工资：批量/计件按补贴工数×补贴单价；时长+计时按补贴工时×标准计时单价；固定金额=固定金额 */
 export function resolveSubsidyWage(line = {}, config = {}) {
   const method = resolveSubsidyMethod(line)
   if (method === 'fixed') {
     return round2(Number(line.subsidyFixedAmount) || 0)
+  }
+  const reportType = config.reportType || line.reportType || ''
+  const salaryMethod = config.salaryMethod || line.salaryMethod || ''
+  if (salaryMethod === '计时工资' && reportType === '时长报工') {
+    const hourlyRate =
+      Number(line.effectiveStandardHourlyRate) || Number(config.standardHourlyRate) || 0
+    const hours = Number(line.subsidyHours) || 0
+    return round2(hours * hourlyRate)
   }
   const unitPrice = getSubsidyUnitPrice(config)
   const qty = getSubsidyPieceQty(line)
@@ -320,10 +354,7 @@ export function calcProcessReportWage(config, line = {}) {
     const innerHours = round2(prepHours + subsidyHourlyComponent + processHours)
     accountHours = innerHours
     goodWage = round2(innerHours * hourlyRate)
-    subsidyWage =
-      subsidyMethod === 'qty'
-        ? round2(subsidyHourlyComponent * hourlyRate)
-        : subsidyFixedAmount
+    subsidyWage = resolveSubsidyWage(line, config)
     unitDeductionSum = round2(unitDeductionSum)
     qualityDeduction = unitDeductionSum
     defectWage = useHourlyDeductionMode
@@ -463,6 +494,7 @@ export function enrichProcessReportLine(line, config) {
     prepWageFormula: wage.prepWageFormula,
     fixedDefectWage: wage.fixedDefectWage,
     subsidyWage: wage.subsidyWage,
+    subsidyAmount: resolveSubsidyAmount(line, effectiveConfig),
     formulaKeys: wage.formulaKeys,
     reportQty: line.goodQty,
     executor: line.reporter,

@@ -103,10 +103,18 @@
               class="subsidy-segmented"
             />
             <div v-if="form.subsidyMethod === 'qty'" class="subsidy-inline">
-              <span class="subsidy-formula">
-                补贴工数 × ¥{{ formatMoney(subsidyUnitPrice) }}/件
-              </span>
+              <span class="subsidy-formula">{{ subsidyFormulaText }}</span>
               <a-input-number
+                v-if="isDurationHourly"
+                v-model:value="form.subsidyHours"
+                :min="0"
+                :precision="2"
+                size="small"
+                addon-after="时"
+                class="subsidy-input"
+              />
+              <a-input-number
+                v-else
                 v-model:value="form.subsidyReportQty"
                 :min="0"
                 :precision="0"
@@ -203,6 +211,7 @@ const form = reactive({
   adjustReason: '',
   subsidyMethod: 'fixed',
   subsidyReportQty: 0,
+  subsidyHours: 0,
   subsidyFixedAmount: 0,
   manualQualityDeduction: 0,
 })
@@ -228,6 +237,10 @@ const isBatchPieceHourly = computed(
   () => props.config?.reportType === '批量计件' && props.config?.salaryMethod === '计时工资',
 )
 
+const isDurationHourly = computed(
+  () => props.config?.reportType === '时长报工' && props.config?.salaryMethod === '计时工资',
+)
+
 const showAdjustDuration = computed(
   () =>
     (props.config?.reportType === '时长报工' && props.config?.salaryMethod === '计时工资') ||
@@ -250,9 +263,25 @@ const displayAdjustedDuration = computed(() => {
 
 const subsidyUnitPrice = computed(() => getSubsidyUnitPrice(props.config))
 
+const subsidyHourlyRate = computed(() => {
+  const fromLine = Number(props.line?.effectiveStandardHourlyRate)
+  if (Number.isFinite(fromLine) && fromLine > 0) return fromLine
+  return Number(props.config?.standardHourlyRate) || 0
+})
+
+const subsidyFormulaText = computed(() => {
+  if (isDurationHourly.value) {
+    return `补贴工数 × ¥${formatMoney(subsidyHourlyRate.value)}/时`
+  }
+  return `补贴工数 × ¥${formatMoney(subsidyUnitPrice.value)}/件`
+})
+
 const previewSubsidyAmount = computed(() => {
   if (form.subsidyMethod === 'fixed') {
     return Number(form.subsidyFixedAmount) || 0
+  }
+  if (isDurationHourly.value) {
+    return (Number(form.subsidyHours) || 0) * subsidyHourlyRate.value
   }
   return (Number(form.subsidyReportQty) || 0) * subsidyUnitPrice.value
 })
@@ -282,6 +311,7 @@ watch(
     form.adjustedDefectBreakdown = initBreakdown(props.line)
     form.subsidyMethod = resolveSubsidyMethod(props.line)
     form.subsidyReportQty = props.line.subsidyReportQty ?? 0
+    form.subsidyHours = props.line.subsidyHours ?? 0
     form.subsidyFixedAmount = props.line.subsidyFixedAmount ?? 0
     form.manualQualityDeduction = props.line.manualQualityDeduction ?? 0
     qtySnapshot.goodQty = Math.max(0, Number(form.adjustedGoodQty) || 0)
@@ -354,7 +384,14 @@ function handleOk() {
     adjustedDefectBreakdown: defectQty > 0 ? [...form.adjustedDefectBreakdown] : [],
     adjustReason: form.adjustReason,
     subsidyMethod: form.subsidyMethod,
-    subsidyReportQty: form.subsidyMethod === 'qty' ? Number(form.subsidyReportQty) || 0 : 0,
+    subsidyReportQty:
+      form.subsidyMethod === 'qty' && !isDurationHourly.value
+        ? Number(form.subsidyReportQty) || 0
+        : 0,
+    subsidyHours:
+      form.subsidyMethod === 'qty' && isDurationHourly.value
+        ? Number(form.subsidyHours) || 0
+        : 0,
     subsidyFixedAmount: form.subsidyMethod === 'fixed' ? Number(form.subsidyFixedAmount) || 0 : 0,
     manualQualityDeduction: Number(form.manualQualityDeduction) || 0,
   })

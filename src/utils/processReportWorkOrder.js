@@ -13,7 +13,7 @@ import { workOrderState } from '@/store/workOrderStore'
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import { formatReportDate } from '@/mock/processReportRecords'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
-import { enrichProcessReportLine } from '@/utils/processReportWageCalc'
+import { enrichProcessReportLine, resolveListAccountHours } from '@/utils/processReportWageCalc'
 import {
   formatBreakdownLabel,
   getApprovedDefectBreakdown,
@@ -132,6 +132,7 @@ function mapRecordToLine(record, index, materialCode) {
   })
   return {
     ...line,
+    listAccountHours: resolveListAccountHours(line, config),
     defectBreakdown: effectiveBreakdown,
     defectReason: formatBreakdownLabel(effectiveBreakdown) || enriched.defectItems || '—',
   }
@@ -160,14 +161,15 @@ export function calcProcessReportStats(records = []) {
 
 export function summarizeProcessReportLines(lines = []) {
   const sum = (key) => lines.reduce((s, l) => s + (Number(l[key]) || 0), 0)
-  const workHours = lines.reduce((s, l) => {
-    const h = Number(l.workHours)
+  const accountHours = lines.reduce((s, l) => {
+    const h = Number(l.listAccountHours)
     return s + (Number.isFinite(h) ? h : 0)
   }, 0)
   return {
     goodQty: sum('goodQty'),
     defectQty: sum('defectQty'),
-    workHours: Math.round(workHours * 100) / 100,
+    accountHours: Math.round(accountHours * 100) / 100,
+    workHours: Math.round(accountHours * 100) / 100,
   }
 }
 
