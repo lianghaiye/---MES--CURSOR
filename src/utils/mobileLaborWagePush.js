@@ -76,7 +76,12 @@ export function buildMobileWageItem(order, line) {
 
 export function buildMobileWageItemFromProcessReport(bundle, line) {
   const goodQty = line.adjustedGoodQty ?? line.goodQty ?? 0
+  const defectQty = line.adjustedDefectQty ?? line.defectQty ?? 0
   const workHours = line.adjustedWorkHours ?? line.workHours ?? 0
+  const accountHours =
+    line.listAccountHours != null && Number.isFinite(Number(line.listAccountHours))
+      ? Number(line.listAccountHours)
+      : line.accountHours ?? workHours
   return {
     id: line.id,
     source: 'process-report',
@@ -86,19 +91,28 @@ export function buildMobileWageItemFromProcessReport(bundle, line) {
     workOrderName: bundle.workOrderName,
     materialCode: bundle.materialCode,
     materialName: bundle.materialName,
+    salesOrderNo: bundle.salesOrderNo,
     taskNo: line.taskNo,
     processName: line.processName,
     executor: line.reporter,
     operator: line.operator || line.reporter || '',
     taskStatus: line.taskStatus || TASK_STATUS.REPORTED,
     pushStatus: line.pushStatus || PUSH_STATUS.NOT_PUSHED,
+    goodQty,
+    defectQty,
     reportQty: goodQty,
     reportDuration: workHours,
+    adjustedGoodQty: line.adjustedGoodQty,
+    adjustedDefectQty: line.adjustedDefectQty,
     adjustedReportQty: line.adjustedGoodQty,
     adjustedDuration: line.adjustedWorkHours,
     subsidyReportQty: line.subsidyReportQty || 0,
     subsidyHours: line.subsidyHours || 0,
-    accountHours: workHours,
+    subsidyAmount: line.subsidyAmount,
+    accountHours,
+    goodWage: line.goodWage,
+    defectWage: line.defectWage,
+    manualQualityDeduction: line.manualQualityDeduction,
     salaryAmount: line.salaryAmount,
     reportType: line.reportType,
     salaryMethod: line.salaryMethod,

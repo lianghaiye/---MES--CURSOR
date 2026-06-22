@@ -197,7 +197,7 @@ const props = defineProps({
   open: Boolean,
   line: { type: Object, default: null },
   config: { type: Object, default: null },
-  /** task=任务报工详情；quick=快速报工详情（仅记录调整结果） */
+  /** task=任务报工详情；quick=快速报工详情（核算/调整/推送逻辑与任务报工一致） */
   variant: { type: String, default: 'task' },
 })
 

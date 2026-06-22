@@ -9,6 +9,8 @@ import {
   filterProcessReports,
   normalizeProcessReport,
   createProcessReportWoLogSeed,
+  createProcessReportQuickLogSeed,
+  PROCESS_REPORT_QUICK_LOG_KEY,
 } from '@/mock/processReportRecords'
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import {
@@ -33,7 +35,20 @@ import {
 } from '@/utils/mobileLaborWagePush'
 
 function syncRecordToMobile(record) {
-  if (!record.workOrderId || !isPushedToMobile(record.pushStatus)) return
+  if (!isPushedToMobile(record.pushStatus)) return
+  if (record.source === 'quick') {
+    const logsMap = loadQuickLogs()
+    const bundle = buildProcessReportQuickBundle(
+      record.id,
+      processReportState.records,
+      logsMap[record.id] || [],
+    )
+    if (!bundle) return
+    const line = bundle.lines.find((l) => l.id === record.id)
+    if (line) upsertMobileWageItemFromProcessReport(bundle, line)
+    return
+  }
+  if (!record.workOrderId) return
   const bundle = buildProcessReportWorkOrderBundle(
     record.workOrderId,
     processReportState.records,
@@ -57,6 +72,10 @@ function loadRecords() {
       PROCESS_REPORT_WO_LOG_KEY,
       JSON.stringify(createProcessReportWoLogSeed()),
     )
+    localStorage.setItem(
+      PROCESS_REPORT_QUICK_LOG_KEY,
+      JSON.stringify(createProcessReportQuickLogSeed()),
+    )
     return seed
   }
   try {
@@ -74,7 +93,25 @@ function loadRecords() {
   localStorage.setItem(PROCESS_REPORT_STORAGE_KEY, JSON.stringify(seed))
   localStorage.setItem(PROCESS_REPORT_SEED_VERSION_KEY, PROCESS_REPORT_SEED_VERSION)
   localStorage.setItem(PROCESS_REPORT_WO_LOG_KEY, JSON.stringify(createProcessReportWoLogSeed()))
+  localStorage.setItem(
+    PROCESS_REPORT_QUICK_LOG_KEY,
+    JSON.stringify(createProcessReportQuickLogSeed()),
+  )
   return seed
+}
+
+function loadQuickLogs() {
+  try {
+    const raw = localStorage.getItem(PROCESS_REPORT_QUICK_LOG_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {
+    /* ignore */
+  }
+  return {}
+}
+
+function saveQuickLogs(map) {
+  localStorage.setItem(PROCESS_REPORT_QUICK_LOG_KEY, JSON.stringify(map))
 }
 
 function loadWoLogs() {
@@ -127,8 +164,38 @@ export function getProcessReportWorkOrderBundle(workOrderId) {
 }
 
 export function getProcessReportQuickBundle(recordId) {
-  void processReportState.records
-  return buildProcessReportQuickBundle(recordId, processReportState.records)
+  processReportState.records = processReportState.records.map(normalizeProcessReport)
+  const logsMap = loadQuickLogs()
+  return buildProcessReportQuickBundle(
+    recordId,
+    processReportState.records,
+    logsMap[recordId] || [],
+  )
+}
+
+function appendQuickReportLog(recordId, entry) {
+  const logsMap = loadQuickLogs()
+  const list = logsMap[recordId] || []
+  list.unshift({
+    id: `pr-qlog-${Date.now()}`,
+    time: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    operator: entry.operator || 'admin1',
+    action: entry.action,
+    target: entry.target || '',
+    remark: entry.remark || '',
+  })
+  logsMap[recordId] = list
+  saveQuickLogs(logsMap)
+}
+
+function appendRecordLog(row, entry) {
+  if (row.source === 'quick') {
+    appendQuickReportLog(row.id, entry)
+    return
+  }
+  if (row.workOrderId) {
+    appendWorkOrderLog(row.workOrderId, entry)
+  }
 }
 
 function appendWorkOrderLog(workOrderId, entry) {
@@ -176,14 +243,12 @@ export function approveProcessReport(id, operator = 'admin1') {
   if (!isAuditSalaryPush() || row.pushStatus !== PUSH_STATUS.NOT_PUSHED) {
     updateMobileWageStatus(id, { taskStatus: TASK_STATUS.AUDITED })
   }
-  if (row.workOrderId) {
-    appendWorkOrderLog(row.workOrderId, {
-      operator,
-      action: '通过',
-      target: row.taskNo || row.processName,
-      remark: '审核通过',
-    })
-  }
+  appendRecordLog(row, {
+    operator,
+    action: '通过',
+    target: row.taskNo || row.processName,
+    remark: '审核通过',
+  })
   return { ok: true, record: updated }
 }
 
@@ -200,14 +265,12 @@ export function rejectProcessReport(id, reason, operator = 'admin1') {
     auditedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     auditor: operator,
   })
-  if (row.workOrderId) {
-    appendWorkOrderLog(row.workOrderId, {
-      operator,
-      action: '拒绝',
-      target: row.taskNo || row.processName,
-      remark: reason.trim(),
-    })
-  }
+  appendRecordLog(row, {
+    operator,
+    action: '拒绝',
+    target: row.taskNo || row.processName,
+    remark: reason.trim(),
+  })
   return { ok: true, record: updated }
 }
 
@@ -278,14 +341,12 @@ export function adjustProcessReportLine(recordId, payload = {}, operator = 'admi
     (payload.subsidyMethod === 'fixed' && Number(payload.subsidyFixedAmount) > 0) ||
     (payload.subsidyMethod === 'qty' &&
       (Number(payload.subsidyReportQty) > 0 || Number(payload.subsidyHours) > 0))
-  if (row.workOrderId) {
-    appendWorkOrderLog(row.workOrderId, {
-      operator,
-      action: hasSubsidy ? '调整/补贴' : '调整',
-      target: row.taskNo || row.processName,
-      remark: payload.adjustReason || '',
-    })
-  }
+  appendRecordLog(row, {
+    operator,
+    action: hasSubsidy ? '调整/补贴' : '调整',
+    target: row.taskNo || row.processName,
+    remark: payload.adjustReason || '',
+  })
   return { ok: true }
 }
 
@@ -322,17 +383,15 @@ export function updateProcessReportWageRate(recordId, payload = {}, operator = '
   }
 
   updateRecord(recordId, patch)
-  if (row.workOrderId) {
-    appendWorkOrderLog(row.workOrderId, {
-      operator,
-      action: '修改单价',
-      target: row.taskNo || row.processName,
-      remark:
-        mode === 'piece'
-          ? `单件计价单价调整为 ¥${patch.overridePieceRate}`
-          : `标准计时单价调整为 ¥${patch.overrideStandardHourlyRate}`,
-    })
-  }
+  appendRecordLog(row, {
+    operator,
+    action: '修改单价',
+    target: row.taskNo || row.processName,
+    remark:
+      mode === 'piece'
+        ? `单件计价单价调整为 ¥${patch.overridePieceRate}`
+        : `标准计时单价调整为 ¥${patch.overrideStandardHourlyRate}`,
+  })
   return { ok: true }
 }
 
@@ -365,14 +424,12 @@ export function updateProcessReportSalaryMethod(recordId, payload = {}, operator
   }
 
   updateRecord(recordId, patch)
-  if (row.workOrderId) {
-    appendWorkOrderLog(row.workOrderId, {
-      operator,
-      action: '修改计薪方式',
-      target: row.taskNo || row.processName,
-      remark: `计薪方式调整为 ${next}`,
-    })
-  }
+  appendRecordLog(row, {
+    operator,
+    action: '修改计薪方式',
+    target: row.taskNo || row.processName,
+    remark: `计薪方式调整为 ${next}`,
+  })
   return { ok: true }
 }
 
@@ -396,14 +453,12 @@ export function pushProcessReportLines(ids, operator = 'admin1') {
       pushStatus: PUSH_STATUS.PUSHED,
       pushedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     })
-    if (row.workOrderId) {
-      appendWorkOrderLog(row.workOrderId, {
-        operator,
-        action: '推送',
-        target: row.taskNo || row.processName,
-        remark: '推送至小程序工时工资',
-      })
-    }
+    appendRecordLog(row, {
+      operator,
+      action: '推送',
+      target: row.taskNo || row.processName,
+      remark: '推送至小程序工时工资',
+    })
   })
 
   return { ok: true, count: pushable.length, message: `已推送 ${pushable.length} 条` }

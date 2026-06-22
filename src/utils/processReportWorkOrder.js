@@ -174,27 +174,40 @@ export function summarizeProcessReportLines(lines = []) {
 }
 
 /** 快速报工详情聚合（单条报工，结构对齐任务报工详情） */
-export function buildProcessReportQuickBundle(recordId, records = []) {
+export function buildProcessReportQuickBundle(recordId, records = [], logs = []) {
   const record = records.find((r) => r.id === recordId && r.source === 'quick')
   if (!record) return null
 
   const master = findMasterByCode(record.productCode)
   const productCode = record.productCode || master?.code || '—'
   const line = mapRecordToLine(record, 0, productCode)
+  const lines = [line]
 
-  return {
+  const bundle = {
     id: `pr-quick-${recordId}`,
     recordId,
+    workOrderCode: line.taskNo || record.taskNo || '—',
+    workOrderName: `${record.processName || '快速报工'}`,
     materialCode: productCode,
     materialName: record.productName || master?.name || '—',
     specModel: master?.specModel || record.specModel || '—',
+    salesOrderNo: record.salesOrderNo || '—',
     workCenter: record.workCenter || '—',
-    owner: '—',
+    owner: record.reporter || '—',
     processRouteName: '—',
     ebomLabel: resolveEbomLabel(record.productName, master?.bomName || ''),
+    taskStatus: line.taskStatus,
     auditStatus: record.status,
-    lines: [line],
+    lines,
+    logs,
+    summary: summarizeProcessReportLines(lines),
   }
+
+  if (isPushedToMobile(line.pushStatus)) {
+    upsertMobileWageItemFromProcessReport(bundle, line)
+  }
+
+  return bundle
 }
 
 /** 按生产工单聚合任务报工详情（对齐工时管理详情结构） */
