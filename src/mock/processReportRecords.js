@@ -1,6 +1,6 @@
 import { breakdownToLegacy, ensureDefectBreakdown } from '@/utils/defectBreakdown'
 import { resolveDefectItemsByIds } from '@/store/defectItemStore'
-import { isAutoSalaryPush } from '@/store/functionParamStore'
+import { isReportSalaryPush } from '@/store/functionParamStore'
 import { PUSH_STATUS, TASK_STATUS } from '@/utils/mobileLaborWagePush'
 import dayjs from 'dayjs'
 import {
@@ -37,7 +37,7 @@ export function migrateRecordFields(row) {
     next.pushStatus = next.pushedAt ? PUSH_STATUS.PUSHED : PUSH_STATUS.NOT_PUSHED
   }
   if (
-    isAutoSalaryPush() &&
+    isReportSalaryPush() &&
     next.pushStatus === PUSH_STATUS.NOT_PUSHED &&
     next.source === 'workorder'
   ) {

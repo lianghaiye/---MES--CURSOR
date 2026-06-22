@@ -23,6 +23,7 @@ import {
   resolveSalaryMethodOptions,
 } from '@/utils/laborConfigResolver'
 import { breakdownToLegacy } from '@/utils/defectBreakdown'
+import { isAuditSalaryPush } from '@/store/functionParamStore'
 import {
   isPushedToMobile,
   PUSH_STATUS,
@@ -161,13 +162,20 @@ export function approveProcessReport(id, operator = 'admin1') {
   if (row.taskStatus === TASK_STATUS.AUDITED || row.status === '已审核') {
     return { ok: false, message: '该记录已审核' }
   }
-  const updated = updateRecord(id, {
+  const patch = {
     status: '已审核',
     taskStatus: TASK_STATUS.AUDITED,
     auditedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     auditor: operator,
-  })
-  updateMobileWageStatus(id, { taskStatus: TASK_STATUS.AUDITED })
+  }
+  if (isAuditSalaryPush() && row.pushStatus === PUSH_STATUS.NOT_PUSHED) {
+    patch.pushStatus = PUSH_STATUS.PUSHED
+    patch.pushedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  }
+  const updated = updateRecord(id, patch)
+  if (!isAuditSalaryPush() || row.pushStatus !== PUSH_STATUS.NOT_PUSHED) {
+    updateMobileWageStatus(id, { taskStatus: TASK_STATUS.AUDITED })
+  }
   if (row.workOrderId) {
     appendWorkOrderLog(row.workOrderId, {
       operator,

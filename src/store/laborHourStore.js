@@ -8,7 +8,7 @@ import {
 import { LABOR_DEMO_WORK_ORDER_IDS } from '@/mock/laborHourDemoSeed'
 import { calcAutoDurationHours, enrichLaborLine, summarizeLaborLines } from '@/utils/laborHourCalc'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
-import { isAutoSalaryPush } from '@/store/functionParamStore'
+import { isAuditSalaryPush, isReportSalaryPush } from '@/store/functionParamStore'
 import {
   isPushedToMobile,
   PUSH_STATUS,
@@ -81,7 +81,7 @@ function migrateLine(line) {
 
 function applyPushPolicy(order, line) {
   if (line.pushStatus) return line
-  if (isAutoSalaryPush()) {
+  if (isReportSalaryPush()) {
     line.pushStatus = PUSH_STATUS.AUTO_PUSHED
     line.pushedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   } else {
@@ -348,7 +348,15 @@ export function auditLaborLines(orderId, lineIds, operator = 'admin1') {
   pending.forEach((line) => {
     line.taskStatus = TASK_STATUS.AUDITED
     line.auditStatus = '已审核'
-    updateMobileWageStatus(line.id, { taskStatus: TASK_STATUS.AUDITED })
+    if (isAuditSalaryPush() && line.pushStatus === PUSH_STATUS.NOT_PUSHED) {
+      line.pushStatus = PUSH_STATUS.PUSHED
+      line.pushedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+      const enriched = enrichLaborLine(line, resolveLaborConfig(order.materialCode, line.processName))
+      Object.assign(line, enriched)
+      upsertMobileWageItem(order, line)
+    } else {
+      updateMobileWageStatus(line.id, { taskStatus: TASK_STATUS.AUDITED })
+    }
   })
   order.auditStatus = resolveOrderAuditStatus(order.lines)
   Object.assign(order, recalcOrder(order))

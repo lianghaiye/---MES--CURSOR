@@ -74,15 +74,15 @@
       row-key="id"
       size="small"
       bordered
-      :scroll="{ x: 1500 }"
+      :scroll="{ x: 1580 }"
       :pagination="false"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'positions'">
           <span class="positions-text" :title="record.positions">{{ record.positions }}</span>
         </template>
-        <template v-else-if="column.key === 'salaryAmount'">
-          {{ formatMoney(record.salaryAmount) }}
+        <template v-else-if="column.key === 'salaryAmount' || column.key === 'subsidyAmount' || column.key === 'qualityDeduction'">
+          {{ formatMoney(record[column.dataIndex]) }}
         </template>
         <template v-else-if="column.key === 'action'">
           <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
@@ -193,9 +193,9 @@ const columns = [
   { title: '完成任务数', dataIndex: 'taskCount', width: 110, align: 'right' },
   { title: '报工总数', dataIndex: 'reportQty', width: 100, align: 'right' },
   { title: '总工时', dataIndex: 'workHours', width: 100, align: 'right' },
-  { title: '补贴报工数', dataIndex: 'subsidyReportQty', width: 110, align: 'right' },
-  { title: '补贴工时', dataIndex: 'subsidyHours', width: 100, align: 'right' },
-  { title: '计薪(元)', key: 'salaryAmount', width: 110, align: 'right' },
+  { title: '补贴金额', key: 'subsidyAmount', dataIndex: 'subsidyAmount', width: 110, align: 'right' },
+  { title: '质量扣款', key: 'qualityDeduction', dataIndex: 'qualityDeduction', width: 100, align: 'right' },
+  { title: '计薪(元)', key: 'salaryAmount', dataIndex: 'salaryAmount', width: 110, align: 'right' },
   { title: '操作', key: 'action', width: 80, fixed: 'right' },
 ]
 
@@ -207,6 +207,8 @@ const statsResult = ref({
     workHours: 0,
     subsidyReportQty: 0,
     subsidyHours: 0,
+    subsidyAmount: 0,
+    qualityDeduction: 0,
     salaryAmount: 0,
   },
 })
@@ -233,9 +235,9 @@ const summaryCells = computed(() => {
   cells[5].align = 'right'
   cells[6].content = formatNum(totals.value.workHours)
   cells[6].align = 'right'
-  cells[7].content = formatNum(totals.value.subsidyReportQty)
+  cells[7].content = formatMoney(totals.value.subsidyAmount)
   cells[7].align = 'right'
-  cells[8].content = formatNum(totals.value.subsidyHours)
+  cells[8].content = formatMoney(totals.value.qualityDeduction)
   cells[8].align = 'right'
   cells[9].content = formatMoney(totals.value.salaryAmount)
   cells[9].align = 'right'

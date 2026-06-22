@@ -248,10 +248,11 @@ const baseColumns = [
   { title: '补贴报工数', key: 'subsidyReportQty', dataIndex: 'subsidyReportQty', width: 100, align: 'right' },
   { title: '补贴工时', key: 'subsidyHours', dataIndex: 'subsidyHours', width: 88, align: 'right' },
   { title: '最终计件数', key: 'finalPieceQty', dataIndex: 'finalPieceQty', width: 100, align: 'right' },
-  { title: '核算工时', key: 'accountHours', dataIndex: 'accountHours', width: 88, align: 'right' },
+  { title: '最终核算工时', key: 'accountHours', dataIndex: 'accountHours', width: 110, align: 'right' },
   { title: '计薪方式', key: 'salaryMethod', dataIndex: 'salaryMethod', width: 100 },
   { title: '良品工资', key: 'goodWage', dataIndex: 'goodWage', width: 100, align: 'right' },
   { title: '不良品工资', key: 'defectWage', dataIndex: 'defectWage', width: 100, align: 'right' },
+  { title: '补贴金额', key: 'subsidyAmount', dataIndex: 'subsidyAmount', width: 100, align: 'right' },
   { title: '质量扣款', key: 'qualityDeduction', dataIndex: 'qualityDeduction', width: 100, align: 'right' },
   { title: '计薪(元)', key: 'salaryAmount', dataIndex: 'salaryAmount', width: 100, align: 'right', fixed: 'right' },
 ]
@@ -271,7 +272,7 @@ const NUMERIC_KEYS = new Set([
 
 const OPTIONAL_NUM_KEYS = new Set(['adjustedGoodQty', 'adjustedDefectQty', 'adjustedWorkHours'])
 
-const MONEY_KEYS = new Set(['goodWage', 'defectWage', 'qualityDeduction', 'salaryAmount'])
+const MONEY_KEYS = new Set(['goodWage', 'defectWage', 'subsidyAmount', 'qualityDeduction', 'salaryAmount'])
 
 const SUMMARY_NUMERIC_KEYS = new Set([
   ...NUMERIC_KEYS,

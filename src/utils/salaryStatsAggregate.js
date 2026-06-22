@@ -4,7 +4,7 @@ import { processReportState } from '@/store/processReportStore'
 import { quickReportState } from '@/store/quickReportStore'
 import { isQuickReportConfirmed } from '@/mock/quickReports'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
-import { enrichProcessReportLine, calcFinalPieceQty } from '@/utils/processReportWageCalc'
+import { enrichProcessReportLine, calcFinalPieceQty, resolveSubsidyWage } from '@/utils/processReportWageCalc'
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import { buildReportWorkPerProcessBundle } from '@/utils/reportWorkPerProcess'
 import { resolveEmployeeProfile } from '@/utils/employeeProfileResolver'
@@ -85,6 +85,34 @@ function computeAccountHoursFromLine(line = {}) {
   return round2(hours + subsidy)
 }
 
+function computeSubsidyAmount(line = {}, config = null) {
+  if (line.subsidyAmount != null && line.subsidyAmount !== '') {
+    return round2(line.subsidyAmount)
+  }
+  if (line.subsidyWage != null && line.subsidyWage !== '') {
+    return round2(line.subsidyWage)
+  }
+  if (!config) return 0
+  const subsidyLine = {
+    subsidyMethod: line.subsidyMethod,
+    subsidyFixedAmount: line.subsidyFixedAmount,
+    subsidyReportQty: line.subsidyReportQty,
+    subsidyHours: line.subsidyHours,
+  }
+  if (
+    line.subsidyMethod ||
+    Number(line.subsidyFixedAmount) > 0 ||
+    Number(line.subsidyReportQty) > 0 ||
+    Number(line.subsidyHours) > 0
+  ) {
+    return resolveSubsidyWage(subsidyLine, config)
+  }
+  if (config.salaryMethod === '计件工资') {
+    return round2((Number(line.subsidyReportQty) || 0) * (Number(config.pieceRate) || 0))
+  }
+  return round2((Number(line.subsidyHours) || 0) * (Number(config.standardHourlyRate) || 0))
+}
+
 function buildDetailLine(partial) {
   const profile = resolveEmployeeProfile(partial.employeeName)
   const line = {
@@ -104,6 +132,7 @@ function buildDetailLine(partial) {
     adjustedWorkHours: partial.adjustedWorkHours ?? null,
     subsidyReportQty: round2(partial.subsidyReportQty),
     subsidyHours: round2(partial.subsidyHours),
+    subsidyAmount: round2(partial.subsidyAmount ?? 0),
     goodWage: round2(partial.goodWage),
     defectWage: round2(partial.defectWage),
     qualityDeduction: round2(partial.qualityDeduction),
@@ -119,6 +148,7 @@ function collectLaborHourLines() {
   getLaborHourOrders().forEach((order) => {
     ;(order.lines || []).forEach((line) => {
       if (line.auditStatus !== '已审核') return
+      const config = resolveLaborConfig(order.materialCode, line.processName)
       lines.push(
         buildDetailLine({
           id: `lh-${order.id}-${line.id}`,
@@ -146,6 +176,7 @@ function collectLaborHourLines() {
               : null,
           subsidyReportQty: line.subsidyReportQty,
           subsidyHours: line.subsidyHours,
+          subsidyAmount: computeSubsidyAmount(line, config),
           salaryMethod: line.salaryMethod || '—',
           goodWage: line.salaryAmount,
           defectWage: 0,
@@ -215,6 +246,9 @@ function collectProcessReportLines() {
               : null,
           subsidyReportQty: record.subsidyReportQty,
           subsidyHours: record.subsidyHours,
+          subsidyMethod: record.subsidyMethod,
+          subsidyFixedAmount: record.subsidyFixedAmount,
+          subsidyAmount: wageLine.subsidyWage,
           salaryMethod: wageLine.salaryMethod || '—',
           goodWage: wageLine.goodWage,
           defectWage: wageLine.defectWage,
@@ -255,6 +289,9 @@ function collectQuickReportLines() {
           adjustedWorkHours: null,
           subsidyReportQty: line.subsidyReportQty,
           subsidyHours: line.subsidyHours,
+          subsidyMethod: line.subsidyMethod,
+          subsidyFixedAmount: line.subsidyFixedAmount,
+          subsidyAmount: line.subsidyWage,
           salaryMethod: line.salaryMethod || '—',
           goodWage: line.goodWage,
           defectWage: line.defectWage,
@@ -302,6 +339,8 @@ export function summarizeSalaryByEmployee(lines = []) {
         workHours: 0,
         subsidyReportQty: 0,
         subsidyHours: 0,
+        subsidyAmount: 0,
+        qualityDeduction: 0,
         salaryAmount: 0,
       })
     }
@@ -311,6 +350,8 @@ export function summarizeSalaryByEmployee(lines = []) {
     row.workHours = round2(row.workHours + effectiveWorkHours(line))
     row.subsidyReportQty = round2(row.subsidyReportQty + (Number(line.subsidyReportQty) || 0))
     row.subsidyHours = round2(row.subsidyHours + (Number(line.subsidyHours) || 0))
+    row.subsidyAmount = round2(row.subsidyAmount + (Number(line.subsidyAmount) || 0))
+    row.qualityDeduction = round2(row.qualityDeduction + (Number(line.qualityDeduction) || 0))
     row.salaryAmount = round2(row.salaryAmount + (Number(line.salaryAmount) || 0))
   })
   return [...map.values()].sort((a, b) => a.employeeName.localeCompare(b.employeeName, 'zh-CN'))
@@ -331,6 +372,7 @@ export function summarizeSalaryDetailTotals(lines = []) {
     adjustedWorkHours: sumOptional('adjustedWorkHours'),
     subsidyReportQty: sum('subsidyReportQty'),
     subsidyHours: sum('subsidyHours'),
+    subsidyAmount: sum('subsidyAmount'),
     finalPieceQty: sum('finalPieceQty'),
     accountHours: sum('accountHours'),
     goodWage: sum('goodWage'),
@@ -347,6 +389,8 @@ export function summarizeSalarySummaryTotals(rows = []) {
     workHours: round2(rows.reduce((s, r) => s + (Number(r.workHours) || 0), 0)),
     subsidyReportQty: round2(rows.reduce((s, r) => s + (Number(r.subsidyReportQty) || 0), 0)),
     subsidyHours: round2(rows.reduce((s, r) => s + (Number(r.subsidyHours) || 0), 0)),
+    subsidyAmount: round2(rows.reduce((s, r) => s + (Number(r.subsidyAmount) || 0), 0)),
+    qualityDeduction: round2(rows.reduce((s, r) => s + (Number(r.qualityDeduction) || 0), 0)),
     salaryAmount: round2(rows.reduce((s, r) => s + (Number(r.salaryAmount) || 0), 0)),
   }
 }
