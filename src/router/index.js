@@ -371,6 +371,14 @@ const router = createRouter({
   routes,
 })
 
+router.onError((error, to) => {
+  const message = error?.message || String(error)
+  if (/Loading chunk .* failed|Failed to fetch dynamically imported module/i.test(message)) {
+    console.error('[router] lazy chunk load failed, reloading:', message)
+    window.location.assign(to.fullPath)
+  }
+})
+
 router.beforeEach((to, from, next) => {
   if (to.meta.public) {
     if (to.name === 'login' && isLoggedIn()) {

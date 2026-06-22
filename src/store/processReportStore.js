@@ -64,6 +64,19 @@ function shouldReseed() {
 }
 
 function loadRecords() {
+  try {
+    return loadRecordsInner()
+  } catch (err) {
+    console.error('[process-report] load records failed, reseeding', err)
+    localStorage.removeItem(PROCESS_REPORT_STORAGE_KEY)
+    localStorage.removeItem(PROCESS_REPORT_SEED_VERSION_KEY)
+    localStorage.removeItem(PROCESS_REPORT_WO_LOG_KEY)
+    localStorage.removeItem(PROCESS_REPORT_QUICK_LOG_KEY)
+    return loadRecordsInner()
+  }
+}
+
+function loadRecordsInner() {
   if (shouldReseed()) {
     const seed = createProcessReportSeed()
     localStorage.setItem(PROCESS_REPORT_STORAGE_KEY, JSON.stringify(seed))
@@ -137,6 +150,15 @@ export const processReportState = reactive({
 })
 
 export function reloadProcessReports() {
+  processReportState.records = loadRecords()
+}
+
+/** 重置工序报工本地演示数据（localStorage 损坏或页面空白时可调用） */
+export function resetProcessReportMockData() {
+  localStorage.removeItem(PROCESS_REPORT_STORAGE_KEY)
+  localStorage.removeItem(PROCESS_REPORT_SEED_VERSION_KEY)
+  localStorage.removeItem(PROCESS_REPORT_WO_LOG_KEY)
+  localStorage.removeItem(PROCESS_REPORT_QUICK_LOG_KEY)
   processReportState.records = loadRecords()
 }
 

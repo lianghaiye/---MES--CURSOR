@@ -1,5 +1,18 @@
 <template>
   <div class="process-report-page">
+    <a-alert
+      v-if="pageError"
+      type="error"
+      show-icon
+      class="page-error-alert"
+      :message="'工序报工数据加载异常'"
+      :description="pageError"
+    >
+      <template #action>
+        <a-button size="small" type="primary" @click="handleResetData">重置演示数据</a-button>
+      </template>
+    </a-alert>
+
     <ProcessReportStatsPanel :stats="stats" />
 
     <div class="filter-card">
@@ -160,6 +173,7 @@ import {
   getProcessReports,
   processReportState,
   reloadProcessReports,
+  resetProcessReportMockData,
 } from '@/store/processReportStore'
 import { useTabs } from '@/composables/useTabs'
 import ProcessReportStatsPanel from './components/ProcessReportStatsPanel.vue'
@@ -177,6 +191,7 @@ const appliedFilters = ref({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const selectedIds = ref([])
 const rejectOpen = ref(false)
+const pageError = ref('')
 
 const statusOptions = [
   { label: '待审核', value: '待审核' },
@@ -225,7 +240,23 @@ const filteredList = computed(() => {
   return getProcessReports(appliedFilters.value)
 })
 
-onMounted(() => reloadProcessReports())
+function safeReload() {
+  try {
+    pageError.value = ''
+    reloadProcessReports()
+  } catch (err) {
+    console.error(err)
+    pageError.value = err?.message || '本地报工数据解析失败，可尝试重置演示数据'
+  }
+}
+
+function handleResetData() {
+  resetProcessReportMockData()
+  safeReload()
+  message.success('已重置工序报工演示数据')
+}
+
+onMounted(() => safeReload())
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -281,7 +312,7 @@ function formatSalaryAmount(val) {
 }
 
 function handleSearch() {
-  reloadProcessReports()
+  safeReload()
   appliedFilters.value = { ...filters }
   pagination.current = 1
   selectedIds.value = []
@@ -345,6 +376,10 @@ function onRejectConfirm(reason) {
 
 <style lang="less" scoped>
 .process-report-page {
+  .page-error-alert {
+    margin-bottom: 12px;
+  }
+
   .toolbar-row {
     display: flex;
     justify-content: space-between;
