@@ -94,6 +94,16 @@
               </a-form-item>
             </a-col>
             <a-col :span="8">
+              <a-form-item label="技术参数">
+                <a-input
+                  v-model:value="form.techParams"
+                  size="small"
+                  placeholder="请输入 技术参数"
+                  allow-clear
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
               <a-form-item label="重量">
                 <a-input v-model:value="form.weight" size="small" placeholder="请输入 重量" />
               </a-form-item>
@@ -538,6 +548,7 @@ const form = reactive({
   specModel: '',
   drawingNo: '',
   material: '',
+  techParams: '',
   weight: '',
   inventoryUnit: undefined,
   unitPrice: undefined,
@@ -561,6 +572,7 @@ function resetForm() {
   form.specModel = ''
   form.drawingNo = ''
   form.material = ''
+  form.techParams = ''
   form.weight = ''
   form.inventoryUnit = undefined
   form.unitPrice = undefined
@@ -587,6 +599,7 @@ function loadEditRecord(record) {
   form.specModel = source.specModel || ''
   form.drawingNo = source.drawingNo || ''
   form.material = source.material || ''
+  form.techParams = source.techParams || ''
   form.weight = source.weight || ''
   form.inventoryUnit = source.inventoryUnit
   form.unitPrice = source.unitPrice
@@ -724,6 +737,7 @@ function buildPayload() {
     specModel: form.specModel,
     drawingNo: form.drawingNo?.trim() || '',
     material: form.material,
+    techParams: form.techParams?.trim() || '',
     weight: form.weight,
     inventoryUnit: form.inventoryUnit,
     unitPrice: form.unitPrice ?? 0,

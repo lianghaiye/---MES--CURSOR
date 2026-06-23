@@ -30,6 +30,7 @@ function createProduct(index) {
     categoryName: parent ? parent.title : cat.title,
     specModel: specs[index % specs.length],
     material: index % 4 === 0 ? '钢' : '',
+    techParams: index % 5 === 0 ? 'Q=50m³/h H=32m' : '',
     weight: index % 5 === 0 ? 12.5 : 0,
     inventoryUnit: ['个', '件', '台'][index % 3],
     standardSpec: index % 3 === 0 ? '国标' : '',

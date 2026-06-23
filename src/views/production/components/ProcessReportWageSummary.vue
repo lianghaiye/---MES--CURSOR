@@ -65,6 +65,7 @@
       </a-descriptions-item>
       <a-descriptions-item label="调整良品数">{{ formatQty(line.adjustedGoodQty) }}</a-descriptions-item>
       <a-descriptions-item label="调整不良品数">{{ formatQty(line.adjustedDefectQty) }}</a-descriptions-item>
+      <a-descriptions-item label="调整不良品项">{{ adjustedDefectItemsLabel }}</a-descriptions-item>
       <a-descriptions-item label="调整工时">{{ formatHours(line.adjustedWorkHours) }}</a-descriptions-item>
       <a-descriptions-item label="补贴金额">{{ formatSubsidyAmount(displaySubsidyAmount) }}</a-descriptions-item>
       <a-descriptions-item label="最终计件数">{{ formatQty(line.finalPieceQty) }}</a-descriptions-item>
@@ -187,6 +188,7 @@ import { message } from 'ant-design-vue'
 import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
 import { PROCESS_REPORT_WAGE_FORMULAS } from '@/constants/processReportWageFormulas'
 import { resolveSubsidyAmount } from '@/utils/processReportWageCalc'
+import { formatBreakdownLabel } from '@/utils/defectBreakdown'
 import {
   updateProcessReportWageRate,
   updateProcessReportSalaryMethod,
@@ -297,6 +299,15 @@ const displaySubsidyAmount = computed(() => {
     salaryMethod: line.salaryMethod,
     standardHourlyRate: line.effectiveStandardHourlyRate ?? line.masterStandardHourlyRate ?? 0,
   })
+})
+
+const adjustedDefectItemsLabel = computed(() => {
+  const line = props.line
+  if (!line) return '—'
+  if (line.adjustedDefectQty == null && !line.adjustedDefectBreakdown?.length) return '—'
+  const breakdown = (line.adjustedDefectBreakdown || []).filter((row) => Number(row.qty) > 0)
+  if (breakdown.length) return formatBreakdownLabel(breakdown)
+  return '—'
 })
 
 const wageSummaryCards = computed(() => {

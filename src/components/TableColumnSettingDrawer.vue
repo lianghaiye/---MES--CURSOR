@@ -1,13 +1,20 @@
 <template>
   <a-drawer
     :open="open"
-    title="列显隐"
+    :title="title"
     width="520"
     destroy-on-close
     @close="emit('update:open', false)"
   >
+    <a-alert
+      v-if="hint"
+      type="info"
+      :message="hint"
+      show-icon
+      class="setting-hint"
+    />
     <a-table
-      :columns="settingColumns"
+      :columns="displaySettingColumns"
       :data-source="localSettings"
       row-key="key"
       size="small"
@@ -16,7 +23,10 @@
     >
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'hidden'">
-          <a-checkbox v-model:checked="record.hidden" />
+          <a-checkbox
+            :checked="isFieldShown(record)"
+            @update:checked="(checked) => onVisibilityChange(record, checked)"
+          />
         </template>
         <template v-else-if="column.key === 'frozen'">
           <a-checkbox v-model:checked="record.frozen" />
@@ -49,13 +59,20 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { message } from 'ant-design-vue'
 import { UpOutlined, DownOutlined } from '@ant-design/icons-vue'
 
 const props = defineProps({
   open: Boolean,
   settings: { type: Array, default: () => [] },
   defaultSettings: { type: Array, default: () => [] },
+  title: { type: String, default: '列显隐' },
+  hint: { type: String, default: '' },
+  maxVisible: { type: Number, default: 0 },
+  showFrozen: { type: Boolean, default: true },
+  /** hide: 勾选表示隐藏；show: 勾选表示显示（BOM 树字段配置） */
+  displayMode: { type: String, default: 'hide' },
 })
 
 const emit = defineEmits(['update:open', 'update:settings'])
@@ -68,6 +85,29 @@ const settingColumns = [
   { title: '冻结', key: 'frozen', width: 64, align: 'center' },
   { title: '排序', key: 'sort', width: 80, align: 'center' },
 ]
+
+const displaySettingColumns = computed(() => {
+  const cols = props.showFrozen ? settingColumns : settingColumns.filter((c) => c.key !== 'frozen')
+  if (props.displayMode !== 'show') return cols
+  return cols.map((col) => (col.key === 'hidden' ? { ...col, title: '显示' } : col))
+})
+
+function countVisible() {
+  return localSettings.value.filter((item) => !item.hidden).length
+}
+
+function isFieldShown(record) {
+  return props.displayMode === 'show' ? !record.hidden : record.hidden
+}
+
+function onVisibilityChange(record, checked) {
+  const willShow = props.displayMode === 'show' ? checked : !checked
+  if (willShow && props.maxVisible > 0 && countVisible() >= props.maxVisible) {
+    message.warning(`最多支持显示${props.maxVisible}个字段`)
+    return
+  }
+  record.hidden = !willShow
+}
 
 watch(
   () => props.open,
@@ -103,6 +143,10 @@ function resetDefault() {
 }
 
 function apply() {
+  if (props.maxVisible > 0 && countVisible() > props.maxVisible) {
+    message.warning(`最多支持显示${props.maxVisible}个字段`)
+    return
+  }
   localSettings.value.forEach((c, i) => {
     c.order = i
   })
@@ -110,3 +154,9 @@ function apply() {
   emit('update:open', false)
 }
 </script>
+
+<style scoped>
+.setting-hint {
+  margin-bottom: 12px;
+}
+</style>

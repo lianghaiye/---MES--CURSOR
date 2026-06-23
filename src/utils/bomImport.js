@@ -1,6 +1,8 @@
 import dayjs from 'dayjs'
 import { importTemplateChildren, bomTemplateCatalog } from '@/mock/bomTemplates'
-import { createRootTreeNode, mergeTemplateIntoRoot } from '@/utils/bomTree'
+import { createRootTreeNode, mergeTemplateIntoRoot, mergeTemplateIntoParent, addChildMaterial } from '@/utils/bomTree'
+import { getActiveBomForItem } from '@/store/productBomStore'
+import { toBomSubItemPayload } from '@/utils/bomSubItemPicker'
 
 function reIdStructure(raw, templateRef) {
   const idMap = new Map([['__ROOT__', '__ROOT__']])
@@ -177,5 +179,100 @@ export function loadBomDetailStructure(bom) {
   return {
     flatNodes: merged.flatNodes,
     lineItems: merged.lineItems,
+  }
+}
+
+function scaleUnitQty(baseQty, coefficient) {
+  return Math.round((Number(baseQty) || 1) * (Number(coefficient) || 1) * 100) / 100
+}
+
+/** 引用 BOM 时去掉其根节点，仅保留下级（本级已由 addChildMaterial 添加） */
+export function extractBomChildrenStructure(structure) {
+  if (!structure?.treeNodes?.length) return structure
+
+  const topNodes = structure.treeNodes.filter((n) => n.parentId === '__ROOT__')
+  if (topNodes.length !== 1) return structure
+
+  const bomRootId = topNodes[0].id
+  const treeNodes = structure.treeNodes
+    .filter((n) => n.id !== bomRootId)
+    .map((n) => (n.parentId === bomRootId ? { ...n, parentId: '__ROOT__' } : n))
+
+  const lineItems = (structure.lineItems || []).map((line) => ({
+    ...line,
+    parentTreeId: line.parentTreeId === bomRootId ? '__ROOT__' : line.parentTreeId,
+  }))
+
+  return { ...structure, treeNodes, lineItems }
+}
+
+/** 按 BOM 引用：在当前父节点下添加所选物品（本级）及其 BOM 下级结构 */
+export function importBomByReference(
+  parentTreeId,
+  pickerRow,
+  flatNodes,
+  lineItems,
+  usageCoefficient = 1,
+) {
+  if (!parentTreeId || !pickerRow?.itemId) return null
+
+  const coef = Number(usageCoefficient)
+  const coefficient = Number.isNaN(coef) || coef < 0 ? 1 : coef
+
+  const itemType = pickerRow.itemType === '产品' ? 'product' : 'material'
+  const bom = getActiveBomForItem(itemType, pickerRow.itemId)
+  if (!bom) return null
+
+  const structure = extractBomChildrenStructure(resolveBomStructure(bom))
+  const material = toBomSubItemPayload(pickerRow)
+  const added = addChildMaterial(flatNodes, lineItems, parentTreeId, material)
+  if (!added.newNodeId) return null
+
+  let nextFlat = added.flatNodes.map((n) =>
+    n.id === added.newNodeId ? { ...n, quantity: coefficient } : n,
+  )
+  let nextLines = added.lineItems.map((l) =>
+    l.treeNodeId === added.newNodeId
+      ? {
+          ...l,
+          unitQty: coefficient,
+          childBom: bom.bomName || bom.bomNo || '',
+          childBomVersion: bom.version || '',
+        }
+      : l,
+  )
+
+  if (!structure?.treeNodes?.length) {
+    return {
+      flatNodes: nextFlat,
+      lineItems: nextLines,
+      newNodeId: added.newNodeId,
+    }
+  }
+
+  const scaledStructure = {
+    ...structure,
+    treeNodes: structure.treeNodes.map((node) => ({
+      ...node,
+      quantity: scaleUnitQty(node.quantity ?? 1, coefficient),
+    })),
+    lineItems: (structure.lineItems || []).map((line) => ({
+      ...line,
+      unitQty: scaleUnitQty(line.unitQty ?? 1, coefficient),
+    })),
+    templateRef: {
+      bomId: bom.id,
+      bomNo: bom.bomNo,
+      version: bom.version,
+      effectiveAt: bom.effectiveAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    },
+  }
+
+  const merged = mergeTemplateIntoParent(nextFlat, nextLines, added.newNodeId, scaledStructure)
+
+  return {
+    flatNodes: merged.flatNodes,
+    lineItems: merged.lineItems,
+    newNodeId: added.newNodeId,
   }
 }

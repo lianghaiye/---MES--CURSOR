@@ -1,0 +1,21 @@
+/** 添加子项弹窗 — 列显隐配置 */
+export const defaultBomSubItemPickerColumns = [
+  { key: 'name', title: '产品名称', hidden: false, frozen: true, order: 0 },
+  { key: 'code', title: '产品编号', hidden: false, frozen: false, order: 1 },
+  { key: 'specModel', title: '规格型号', hidden: false, frozen: false, order: 2 },
+  { key: 'itemType', title: '类型', hidden: false, frozen: false, order: 3 },
+  { key: 'categoryName', title: '类别', hidden: false, frozen: false, order: 4 },
+  { key: 'material', title: '材质', hidden: false, frozen: false, order: 5 },
+  { key: 'drawingNo', title: '图号', hidden: false, frozen: false, order: 6 },
+  { key: 'inventoryUnit', title: '单位', hidden: false, frozen: false, order: 7 },
+  { key: 'subItemCount', title: '子件项数', hidden: false, frozen: false, order: 8 },
+  { key: 'productAttribute', title: '产品属性', hidden: true, frozen: false, order: 9 },
+  { key: 'supplyForm', title: '供应型态', hidden: true, frozen: false, order: 10 },
+  { key: 'weight', title: '重量', hidden: true, frozen: false, order: 11 },
+  { key: 'processRoute', title: '工艺路线', hidden: true, frozen: false, order: 12 },
+  { key: 'defaultWarehouse', title: '默认仓库', hidden: true, frozen: false, order: 13 },
+  { key: 'defaultSupplier', title: '默认供应商', hidden: true, frozen: false, order: 14 },
+  { key: 'defaultWorkCenter', title: '默认加工中心', hidden: true, frozen: false, order: 15 },
+  { key: 'createdAt', title: '创建时间', hidden: true, frozen: false, order: 16 },
+  { key: 'creator', title: '创建人', hidden: true, frozen: false, order: 17 },
+]

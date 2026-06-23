@@ -36,6 +36,7 @@ function createMaterial(index) {
     categoryName: categoryLabels[index % categoryLabels.length] || categoryName,
     specModel: specs[index % specs.length],
     material: index % 3 === 0 ? '钢' : '',
+    techParams: index % 6 === 0 ? 'φ25×180mm' : '',
     inventoryUnit: ['个', '件', '套'][index % 3],
     unitPrice: [0, 98.68, 666.66, 569.63, 0][index % 5],
     requisitionAttr: index % 4 === 0 ? 0 : '',

@@ -27,13 +27,44 @@ export function isRootNode(nodeId, flatNodes) {
   return nodeId === rootId
 }
 
-/** 扁平树节点转 ant-design treeData */
-export function buildAntTreeData(flatNodes) {
+/** 按物料清单顺序获取父节点下子树节点 id 列表 */
+export function getOrderedChildNodeIds(parentId, flatNodes, lineItems = []) {
+  const childNodes = flatNodes.filter((n) => n.parentId === parentId && !n.isRoot)
+  if (!childNodes.length) return []
+
+  const lines = getLinesForTreeNode(lineItems, parentId, flatNodes)
+  const ordered = []
+  const seen = new Set()
+
+  lines.forEach((line) => {
+    const nodeId = line.treeNodeId
+    if (!nodeId || nodeId === parentId || seen.has(nodeId)) return
+    const node = flatNodes.find((n) => n.id === nodeId)
+    if (!node || node.parentId !== parentId || node.isRoot) return
+    ordered.push(nodeId)
+    seen.add(nodeId)
+  })
+
+  childNodes.forEach((node) => {
+    if (!seen.has(node.id)) {
+      ordered.push(node.id)
+      seen.add(node.id)
+    }
+  })
+
+  return ordered
+}
+
+/** 扁平树节点转 ant-design treeData（子节点顺序与物料清单一致） */
+export function buildAntTreeData(flatNodes, lineItems = []) {
   const root = flatNodes.find((n) => n.isRoot)
   if (!root) return []
 
   function mapNode(node) {
-    const children = flatNodes.filter((n) => n.parentId === node.id && !n.isRoot)
+    const childIds = getOrderedChildNodeIds(node.id, flatNodes, lineItems)
+    const children = childIds
+      .map((id) => flatNodes.find((n) => n.id === id))
+      .filter(Boolean)
     return {
       key: node.id,
       title: node.title,
@@ -61,16 +92,60 @@ export function getChildTreeNodes(flatNodes, parentId) {
   return flatNodes.filter((n) => n.parentId === parentId)
 }
 
-/** 当前选中节点下展示的物料行（直属子级） */
+/** 当前选中节点下展示的物料行（直属子级，保持 lineItems 中的顺序） */
 export function getLinesForTreeNode(lineItems, treeNodeId, flatNodes = []) {
   const rootId = getRootTreeId(flatNodes)
   const pid = !treeNodeId || isRootNode(treeNodeId, flatNodes) ? rootId : treeNodeId
-  return lineItems.filter(
-    (l) =>
-      l.parentTreeId === pid ||
-      l.treeNodeId === pid ||
-      (l.parentTreeId === '__ROOT__' && (pid === rootId || pid === ROOT_ID)),
+  return lineItems.filter((l) => {
+    if (l.parentTreeId === pid) return true
+    if (l.parentTreeId === '__ROOT__' && (pid === rootId || pid === ROOT_ID)) return true
+    return false
+  })
+}
+
+/** 调整当前节点下物料行顺序，并同步同级树节点顺序 */
+export function reorderLinesForTreeNode(lineItems, flatNodes, treeNodeId, fromIndex, toIndex) {
+  if (fromIndex === toIndex) return { lineItems, flatNodes }
+
+  const displayed = getLinesForTreeNode(lineItems, treeNodeId, flatNodes)
+  if (
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= displayed.length ||
+    toIndex >= displayed.length
+  ) {
+    return { lineItems, flatNodes }
+  }
+
+  const ids = displayed.map((l) => l.id)
+  const reorderedIds = [...ids]
+  const [moved] = reorderedIds.splice(fromIndex, 1)
+  reorderedIds.splice(toIndex, 0, moved)
+
+  const idSet = new Set(ids)
+  const sortedLines = reorderedIds.map((id) => lineItems.find((l) => l.id === id))
+  const firstIdx = lineItems.findIndex((l) => idSet.has(l.id))
+  const nextLines = lineItems.filter((l) => !idSet.has(l.id))
+  nextLines.splice(firstIdx >= 0 ? firstIdx : nextLines.length, 0, ...sortedLines)
+
+  const rootId = getRootTreeId(flatNodes)
+  const pid = !treeNodeId || isRootNode(treeNodeId, flatNodes) ? rootId : treeNodeId
+  const nodeOrderMap = new Map(
+    sortedLines.map((line, idx) => [line.treeNodeId, idx]).filter(([nodeId]) => nodeId),
   )
+  const siblingIds = new Set(
+    flatNodes.filter((n) => n.parentId === pid && !n.isRoot).map((n) => n.id),
+  )
+  if (!siblingIds.size) return { lineItems: nextLines, flatNodes }
+
+  const sortedSiblings = flatNodes
+    .filter((n) => siblingIds.has(n.id))
+    .sort((a, b) => (nodeOrderMap.get(a.id) ?? 999) - (nodeOrderMap.get(b.id) ?? 999))
+  const firstSiblingIdx = flatNodes.findIndex((n) => siblingIds.has(n.id))
+  const nextFlat = flatNodes.filter((n) => !siblingIds.has(n.id))
+  nextFlat.splice(firstSiblingIdx >= 0 ? firstSiblingIdx : nextFlat.length, 0, ...sortedSiblings)
+
+  return { lineItems: nextLines, flatNodes: nextFlat }
 }
 
 export function addChildMaterial(flatNodes, lineItems, parentId, material) {
@@ -87,6 +162,7 @@ export function addChildMaterial(flatNodes, lineItems, parentId, material) {
     materialType: material.materialType || '零部件',
     supplyForm: material.supplyForm || '外购件',
     material: material.material || '',
+    drawingNo: material.drawingNo || '',
     unit: material.inventoryUnit || '件',
     unitPrice: material.unitPrice || 0,
   })
@@ -152,6 +228,45 @@ export function mergeTemplateIntoRoot(flatNodes, lineItems, imported) {
     id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     parentTreeId:
       line.parentTreeId === '__ROOT__' ? ROOT_ID : idMap.get(line.parentTreeId) || ROOT_ID,
+    treeNodeId: line.treeNodeId ? idMap.get(line.treeNodeId) || '' : '',
+  }))
+
+  newNodes.forEach((n) => {
+    const line = newLines.find((l) => l.id === n.lineId || l.treeNodeId === n.id)
+    if (line) n.lineId = line.id
+  })
+
+  return {
+    flatNodes: [...flatNodes, ...newNodes],
+    lineItems: [...lineItems, ...newLines],
+    templateRef: imported.templateRef,
+  }
+}
+
+/** 将模板/引用 BOM 的子级结构挂到指定树节点下（本级节点需已存在） */
+export function mergeTemplateIntoParent(flatNodes, lineItems, parentId, imported) {
+  if (!parentId || !imported?.treeNodes?.length) {
+    return { flatNodes, lineItems, templateRef: imported?.templateRef }
+  }
+
+  const idMap = new Map([['__ROOT__', parentId]])
+  imported.treeNodes.forEach((n, idx) => {
+    const newId = `node-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 8)}`
+    idMap.set(n.id, newId)
+  })
+
+  const newNodes = imported.treeNodes.map((n) => ({
+    ...n,
+    id: idMap.get(n.id),
+    parentId: n.parentId === '__ROOT__' ? parentId : idMap.get(n.parentId) || parentId,
+    isRoot: false,
+  }))
+
+  const newLines = (imported.lineItems || []).map((line, idx) => ({
+    ...line,
+    id: `line-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 8)}`,
+    parentTreeId:
+      line.parentTreeId === '__ROOT__' ? parentId : idMap.get(line.parentTreeId) || parentId,
     treeNodeId: line.treeNodeId ? idMap.get(line.treeNodeId) || '' : '',
   }))
 

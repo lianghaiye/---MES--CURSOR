@@ -10,6 +10,21 @@
 import dayjs from 'dayjs'
 import { DEMO_MATERIAL_DEFS } from '@/mock/laborHourDemoSeed'
 
+/** 小程序现场图片 MOCK（WEB 详情展示/预览/下载） */
+export const MOCK_SCENE_IMAGES = {
+  welding: [
+    'https://picsum.photos/seed/pr-weld-1/480/360',
+    'https://picsum.photos/seed/pr-weld-2/480/360',
+  ],
+  machining: ['https://picsum.photos/seed/pr-mach-1/480/360'],
+  assembly: [
+    'https://picsum.photos/seed/pr-asm-1/480/360',
+    'https://picsum.photos/seed/pr-asm-2/480/360',
+    'https://picsum.photos/seed/pr-asm-3/480/360',
+  ],
+  duration: ['https://picsum.photos/seed/pr-time-1/480/360'],
+}
+
 function formatReportDate(d = new Date()) {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -82,6 +97,7 @@ export function createProcessReportTaskSeed() {
       createdAt: dateTime(today, '11:45'),
       timeLabel: '今天 11:45',
       remark: '铸件气孔+尺寸超差，多原因不良',
+      images: MOCK_SCENE_IMAGES.welding,
     }),
     createTask({
       id: 'pr-lh-01c',
@@ -109,6 +125,7 @@ export function createProcessReportTaskSeed() {
       createdAt: dateTime(today, '17:40'),
       timeLabel: '今天 17:40',
       remark: '机加工-三种不良原因',
+      images: MOCK_SCENE_IMAGES.machining,
     }),
     createTask({
       id: 'pr-lh-01b',
@@ -156,6 +173,7 @@ export function createProcessReportTaskSeed() {
       status: '待审核',
       createdAt: dateTime(today, '10:45'),
       timeLabel: '今天 10:45',
+      images: MOCK_SCENE_IMAGES.machining,
     }),
     createTask({
       id: 'pr-lh-02b',
@@ -209,6 +227,7 @@ export function createProcessReportTaskSeed() {
       createdAt: dateTime(yesterday, '12:15'),
       timeLabel: '昨天 12:15',
       remark: '整机调试完成',
+      images: MOCK_SCENE_IMAGES.duration,
     }),
     createTask({
       id: 'pr-lh-03b',
@@ -262,6 +281,7 @@ export function createProcessReportTaskSeed() {
       status: '待审核',
       createdAt: dateTime(today, '11:40'),
       timeLabel: '今天 11:40',
+      images: MOCK_SCENE_IMAGES.duration,
     }),
     createTask({
       id: 'pr-lh-04b',
@@ -394,6 +414,7 @@ export function createProcessReportTaskSeed() {
       createdAt: dateTime(today, '15:10'),
       timeLabel: '今天 15:10',
       remark: '第二批装配',
+      images: MOCK_SCENE_IMAGES.assembly,
     }),
     createTask({
       id: 'pr-init-2c',

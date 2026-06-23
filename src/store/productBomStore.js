@@ -171,9 +171,14 @@ export function addProductBom(payload) {
     creator: 'admin',
     createdAt: ts,
     updatedAt: ts,
-    remark: payload.remark || '',
+    remark: payload.matchingRequirements || payload.remark || '',
+    matchingRequirements: payload.matchingRequirements || payload.remark || '',
     bomType: payload.bomType || '基础BOM',
     specModel: payload.specModel || '',
+    material: payload.material || '',
+    drawingNo: payload.drawingNo || '',
+    techParams: payload.techParams || '',
+    processRoute: payload.processRoute || '',
     treeNodes: payload.treeNodes || [],
     lineItems: payload.lineItems || [],
     templateRef: payload.templateRef || null,
@@ -187,8 +192,29 @@ export function updateProductBom(id, patch) {
   const idx = productBomState.boms.findIndex((b) => b.id === id)
   if (idx === -1) return null
   const row = productBomState.boms[idx]
-  if (row.status !== '待启用') {
-    return { error: '仅待启用状态的 BOM 可编辑' }
+  if (!['待启用', '使用中'].includes(row.status)) {
+    return { error: '当前状态的 BOM 不可编辑' }
+  }
+  if (row.status === '使用中') {
+    Object.assign(row, {
+      bomName: patch.bomName,
+      bomType: patch.bomType,
+      material: patch.material ?? row.material,
+      drawingNo: patch.drawingNo ?? row.drawingNo,
+      techParams: patch.techParams ?? row.techParams,
+      processRoute: patch.processRoute ?? row.processRoute,
+      matchingRequirements:
+        patch.matchingRequirements ?? patch.remark ?? row.matchingRequirements ?? row.remark,
+      remark:
+        patch.matchingRequirements ?? patch.remark ?? row.matchingRequirements ?? row.remark,
+      treeNodes: patch.treeNodes ?? row.treeNodes,
+      lineItems: patch.lineItems ?? row.lineItems,
+      templateRef: patch.templateRef ?? row.templateRef,
+      columnSettings: patch.columnSettings ?? row.columnSettings,
+      updatedAt: nowStr(),
+      operator: 'admin',
+    })
+    return row
   }
   Object.assign(row, patch, { updatedAt: nowStr(), operator: 'admin' })
   return row

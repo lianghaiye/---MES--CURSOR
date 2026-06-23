@@ -47,6 +47,36 @@
               />
             </a-form-item>
           </a-col>
+          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+            <a-form-item label="规格型号">
+              <a-input
+                v-model:value="filters.specModel"
+                allow-clear
+                size="small"
+                placeholder="请输入规格型号"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+            <a-form-item label="材质">
+              <a-input
+                v-model:value="filters.material"
+                allow-clear
+                size="small"
+                placeholder="请输入材质"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+            <a-form-item label="图号">
+              <a-input
+                v-model:value="filters.drawingNo"
+                allow-clear
+                size="small"
+                placeholder="请输入图号"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :xs="24" :sm="12" :md="6" :lg="4">
             <a-form-item class="filter-actions-item">
               <a-space>
@@ -129,6 +159,20 @@
               {{ record.isDefault ? '是' : '否' }}
             </a-tag>
           </template>
+          <template v-else-if="column.key === 'levelCount'">
+            {{ record.levelCount ?? '—' }}
+          </template>
+          <template v-else-if="column.key === 'materialCount'">
+            {{ record.materialCount ?? '—' }}
+          </template>
+          <template v-else-if="column.key === 'matchingRequirements'">
+            {{ record.matchingRequirements || record.remark || '—' }}
+          </template>
+          <template
+            v-else-if="['specModel', 'material', 'drawingNo'].includes(column.dataIndex)"
+          >
+            {{ record[column.dataIndex] || '—' }}
+          </template>
           <template v-else-if="column.key === 'action'">
             <a-space v-if="record.status === '待启用'" :size="0" wrap>
               <a-button type="link" size="small" @click="openEdit(record)">
@@ -145,6 +189,10 @@
               </a-button>
             </a-space>
             <a-space v-else-if="record.status === '使用中'" :size="0" wrap>
+              <a-button type="link" size="small" @click="openEdit(record)">
+                <EditOutlined />
+                编辑
+              </a-button>
               <a-button type="link" size="small" @click="handleArchive(record)">
                 <InboxOutlined />
                 归档
@@ -227,6 +275,10 @@ import ProductBomVersionDrawer from './components/ProductBomVersionDrawer.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import {
+  buildMasterLookup,
+  enrichProductBomList,
+} from '@/utils/productBomListEnrich'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -236,6 +288,9 @@ const filters = reactive({
   bomName: '',
   itemId: undefined,
   status: undefined,
+  specModel: '',
+  material: '',
+  drawingNo: '',
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
@@ -259,7 +314,15 @@ function filterItem(input, option) {
   return (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
 }
 
-const filteredList = computed(() => filterProductBoms(productBomState.boms, appliedFilters.value))
+const masterLookup = computed(() =>
+  buildMasterLookup(productInfoState.products, materialInfoState.materials),
+)
+
+const enrichedList = computed(() =>
+  enrichProductBomList(productBomState.boms, masterLookup.value),
+)
+
+const filteredList = computed(() => filterProductBoms(enrichedList.value, appliedFilters.value))
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -279,16 +342,22 @@ const baseColumns = [
   { title: 'BOM状态', key: 'status', width: 92, fixed: 'left' },
   { title: 'BOM名称', key: 'bomName', width: 160, fixed: 'left', ellipsis: true },
   { title: 'BOM编号', dataIndex: 'bomNo', width: 140, ellipsis: true },
-  { title: '物品名称', dataIndex: 'itemName', width: 180, ellipsis: true },
-  { title: 'BOM版本', dataIndex: 'version', width: 100 },
+  { title: '物品名称', dataIndex: 'itemName', width: 160, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: 'BOM版本', key: 'version', dataIndex: 'version', width: 100 },
+  { title: '层级数', key: 'levelCount', width: 72, align: 'center' },
+  { title: '物料数', key: 'materialCount', width: 72, align: 'center' },
   { title: '是否默认', key: 'isDefault', width: 88, align: 'center' },
   { title: '生效日期', dataIndex: 'effectiveAt', width: 150 },
   { title: '失效日期', dataIndex: 'expiredAt', width: 150 },
-  { title: '操作', key: 'action', width: 200, fixed: 'right' },
+  { title: '配套要求', key: 'matchingRequirements', width: 140, ellipsis: true },
+  { title: '操作', key: 'action', width: 240, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('product-bom-list', baseColumns, { minScrollX: 1600 })
+  useTableColumnSettings('product-bom-list', baseColumns, { minScrollX: 2200 })
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
@@ -304,6 +373,9 @@ function handleReset() {
   filters.bomName = ''
   filters.itemId = undefined
   filters.status = undefined
+  filters.specModel = ''
+  filters.material = ''
+  filters.drawingNo = ''
   handleSearch()
 }
 
@@ -323,8 +395,8 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  if (record.status !== '待启用') {
-    message.warning('仅待启用状态的 BOM 可编辑')
+  if (!['待启用', '使用中'].includes(record.status)) {
+    message.warning('当前状态的 BOM 不可编辑')
     return
   }
   const path = `/product-process/bom/${record.id}/edit`

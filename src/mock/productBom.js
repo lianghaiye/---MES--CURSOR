@@ -65,6 +65,9 @@ export function filterProductBoms(list, filters) {
     if (filters.bomName && !item.bomName.includes(filters.bomName)) return false
     if (filters.itemId && item.itemId !== filters.itemId) return false
     if (filters.status && item.status !== filters.status) return false
+    if (filters.specModel && !(item.specModel || '').includes(filters.specModel)) return false
+    if (filters.material && !(item.material || '').includes(filters.material)) return false
+    if (filters.drawingNo && !(item.drawingNo || '').includes(filters.drawingNo)) return false
     return true
   })
 }

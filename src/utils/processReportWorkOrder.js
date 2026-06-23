@@ -118,6 +118,7 @@ function mapRecordToLine(record, index, materialCode) {
     overridePieceRate: record.overridePieceRate,
     overrideStandardHourlyRate: record.overrideStandardHourlyRate,
     overrideSalaryMethod: record.overrideSalaryMethod,
+    images: Array.isArray(record.images) ? [...record.images] : [],
     id: record.id,
     status: record.status,
     auditStatus: record.status,

@@ -14,8 +14,10 @@
               <BomTreePanel
                 readonly
                 :flat-nodes="flatNodes"
+                :line-items="lineItems"
                 :selected-node-id="selectedNodeId"
                 :version-info="versionInfo"
+                :root-meta="detailRootMeta"
                 @select-node="selectedNodeId = $event"
               />
             </aside>
@@ -33,6 +35,18 @@
                     {{ record.specModel || '—' }}
                   </a-descriptions-item>
                   <a-descriptions-item label="BOM版本">{{ record.version }}</a-descriptions-item>
+                  <a-descriptions-item label="材质">
+                    {{ record.material || '—' }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="图号">
+                    {{ record.drawingNo || '—' }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="技术参数">
+                    {{ record.techParams || '—' }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="工艺路线">
+                    {{ record.processRoute || '—' }}
+                  </a-descriptions-item>
                   <a-descriptions-item label="BOM状态">
                     <a-tag :color="bomStatusColor(record.status)">{{ record.status }}</a-tag>
                   </a-descriptions-item>
@@ -42,8 +56,8 @@
                   <a-descriptions-item label="失效日期">
                     {{ formatDisplayDate(record.expiredAt) }}
                   </a-descriptions-item>
-                  <a-descriptions-item label="备注" :span="3">
-                    {{ record.remark || '—' }}
+                  <a-descriptions-item label="配套要求" :span="3">
+                    {{ record.matchingRequirements || record.remark || '—' }}
                   </a-descriptions-item>
                 </a-descriptions>
               </div>
@@ -127,7 +141,7 @@ import { defaultBomColumnSettings } from '@/mock/bomMaterialColumns'
 import { bomStatusColor } from '@/mock/productBomOptions'
 import { getProductBomById, archiveProductBom, productBomState } from '@/store/productBomStore'
 import { loadBomDetailStructure } from '@/utils/bomImport'
-import { getLinesForTreeNode, ROOT_ID } from '@/utils/bomTree'
+import { getLinesForTreeNode, ROOT_ID, getRootTreeId } from '@/utils/bomTree'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import BomTreePanel from './components/BomTreePanel.vue'
 import BomMaterialTable from './components/BomMaterialTable.vue'
@@ -174,6 +188,19 @@ const displayLines = computed(() =>
   getLinesForTreeNode(lineItems.value, selectedNodeId.value, flatNodes.value),
 )
 
+const detailRootMeta = computed(() => {
+  const bom = record.value
+  if (!bom) return { code: '', name: '', specModel: '', supplyForm: '', subItemCount: 0 }
+  const rootId = getRootTreeId(flatNodes.value)
+  return {
+    code: bom.itemCode,
+    name: bom.itemName,
+    specModel: bom.specModel,
+    supplyForm: '',
+    subItemCount: lineItems.value.filter((l) => l.parentTreeId === rootId).length,
+  }
+})
+
 const versionList = computed(() => {
   if (!record.value?.versionGroupId) return record.value ? [record.value] : []
   return getVersionsInGroup(productBomState.boms, record.value.versionGroupId)
@@ -181,7 +208,7 @@ const versionList = computed(() => {
 
 const operationLogs = computed(() => buildBomOperationLogs(record.value))
 
-const canEdit = computed(() => record.value?.status === '待启用')
+const canEdit = computed(() => ['待启用', '使用中'].includes(record.value?.status))
 
 function formatDisplayDate(val) {
   if (!val) return '—'
@@ -218,11 +245,13 @@ function openBomDetail(row) {
 }
 
 function handleEdit() {
-  if (!canEdit.value) {
-    message.info('仅待启用状态的 BOM 可编辑')
+  if (!canEdit.value || !record.value) {
+    message.info('当前状态的 BOM 不可编辑')
     return
   }
-  message.info('编辑功能：请返回列表使用编辑操作')
+  const path = `/product-process/bom/${record.value.id}/edit`
+  openTab(path, `编辑BOM·${record.value.bomName || ''}`)
+  router.push(path)
 }
 
 function handleArchive() {

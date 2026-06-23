@@ -25,6 +25,7 @@ export function createBomLineItem(partial = {}) {
     materialType: '零部件',
     supplyForm: '自制件',
     material: '',
+    drawingNo: '',
     unitQty: 1,
     unit: '件',
     childBom: '',

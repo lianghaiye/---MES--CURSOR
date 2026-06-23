@@ -61,7 +61,7 @@
               size="small"
               bordered
               :pagination="false"
-              :scroll="{ x: 1900 }"
+              :scroll="{ x: 2080 }"
               :row-selection="rowSelection"
               :custom-row="customRow"
               :row-class-name="rowClassName"
@@ -79,6 +79,12 @@
                 </template>
                 <template v-else-if="column.key === 'salaryAmount'">
                   {{ formatMoney(line.salaryAmount) }}
+                </template>
+                <template v-else-if="column.key === 'sceneImages'">
+                  <ProcessReportSceneImages
+                    :images="line.images"
+                    :file-prefix="`${line.taskNo || '现场图片'}`"
+                  />
                 </template>
                 <template v-else-if="column.key === 'action'">
                   <a-space v-if="line.taskStatus !== TASK_STATUS.AUDITED" :size="0">
@@ -174,6 +180,7 @@ import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { useTabs } from '@/composables/useTabs'
 import ProcessReportAdjustModal from './components/ProcessReportAdjustModal.vue'
 import ProcessReportAuditModal from './components/ProcessReportAuditModal.vue'
+import ProcessReportSceneImages from './components/ProcessReportSceneImages.vue'
 import ProcessReportWageSummary from './components/ProcessReportWageSummary.vue'
 
 const route = useRoute()
@@ -209,6 +216,7 @@ const lineColumns = [
   { title: '任务开始时间', dataIndex: 'taskStartTime', width: 150 },
   { title: '任务结束时间', dataIndex: 'taskEndTime', width: 150 },
   { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
+  { title: '现场图片', key: 'sceneImages', width: 140 },
   { title: '操作', key: 'action', width: 160, fixed: 'right' },
 ]
 

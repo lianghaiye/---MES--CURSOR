@@ -122,6 +122,16 @@
               </a-form-item>
             </a-col>
             <a-col :span="8">
+              <a-form-item label="技术参数">
+                <a-input
+                  v-model:value="form.techParams"
+                  size="small"
+                  placeholder="请输入 技术参数"
+                  allow-clear
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
               <a-form-item label="产品物料">
                 <a-switch v-model:checked="form.isProductMaterial" />
               </a-form-item>
@@ -530,6 +540,7 @@ const form = reactive({
   inventoryUnit: undefined,
   unitPrice: undefined,
   standardSpec: undefined,
+  techParams: '',
   isProductMaterial: true,
   materialType: '零部件',
   materialCategoryKey: undefined,
@@ -554,6 +565,7 @@ function resetForm() {
   form.inventoryUnit = undefined
   form.unitPrice = undefined
   form.standardSpec = undefined
+  form.techParams = ''
   form.isProductMaterial = true
   form.materialType = '零部件'
   form.materialCategoryKey = undefined
@@ -592,6 +604,7 @@ function loadEditRecord(record) {
     inventoryUnit: source.inventoryUnit,
     unitPrice: source.unitPrice,
     standardSpec: source.standardSpec,
+    techParams: source.techParams || '',
     isProductMaterial: source.isProductMaterial !== false,
     materialType: source.materialType || '零部件',
     materialCategoryKey: source.materialCategoryKey,
@@ -737,6 +750,7 @@ function buildPayload() {
     weight: Number(form.weight) || 0,
     inventoryUnit: form.inventoryUnit,
     standardSpec: form.standardSpec || '',
+    techParams: form.techParams?.trim() || '',
     unitPrice: form.unitPrice ?? 0,
     isProductMaterial: form.isProductMaterial,
     materialType: form.isProductMaterial ? form.materialType : undefined,
