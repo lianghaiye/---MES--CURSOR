@@ -31,12 +31,9 @@ export const sideMenus = {
       key: 'prd',
       label: 'PRD',
       children: [
+        { key: 'prd-index', label: 'IDOMS PRD', path: '/home/prd' },
         { key: 'prd-v15', label: '1.5版本迭代', path: '/home/prd/v15' },
-        {
-          key: 'prd-v151-bom',
-          label: '1.5.1·产品BOM',
-          path: '/home/prd/v151/product-bom',
-        },
+        { key: 'prd-v151', label: '1.5.1版本迭代', path: '/home/prd/v151' },
       ],
     },
   ],
@@ -58,6 +55,7 @@ export const sideMenus = {
   planning: [
     { key: 'production-plan', label: '生产计划', path: '/planning/production-plan' },
     { key: 'design-task', label: '设计任务', path: '/planning/design-task' },
+    { key: 'ebom', label: 'EBOM管理', path: '/planning/ebom' },
   ],
   'labor-salary': [{ key: 'labor-hour', label: '工时管理', path: '/labor-salary/labor-hour' }],
   production: [
@@ -134,8 +132,9 @@ export function resolveModuleKey(path) {
 /** 路由 meta.title 映射 */
 export const routeTitles = {
   '/home/dashboard': '首页',
+  '/home/prd': 'IDOMS PRD',
   '/home/prd/v15': '1.5版本迭代',
-  '/home/prd/v151/product-bom': '1.5.1·产品BOM需求',
+  '/home/prd/v151': '1.5.1版本迭代',
   '/product-process/materials': '物料信息',
   '/product-process/products': '产品信息',
   '/product-process/bom': '产品BOM',
@@ -156,6 +155,7 @@ export const routeTitles = {
   '/sales/customers': '客户档案',
   '/planning/production-plan': '生产计划',
   '/planning/design-task': '设计任务',
+  '/planning/ebom': 'EBOM管理',
   '/production/work-orders': '生产工单',
   '/production/assembly-work-orders': '总装工单',
   '/production/disassembly-work-orders': '拆解工单',

@@ -31,16 +31,26 @@ const routes = [
     children: [
       { path: 'home/dashboard', ...emptyChild('home-dashboard', '首页') },
       {
+        path: 'home/prd',
+        name: 'home-prd-index',
+        component: () => import('@/views/prd/PrdIndexView.vue'),
+        meta: { title: 'IDOMS PRD' },
+      },
+      {
         path: 'home/prd/v15',
         name: 'home-prd-v15',
         component: () => import('@/views/prd/PrdV15View.vue'),
         meta: { title: '1.5版本迭代' },
       },
       {
+        path: 'home/prd/v151',
+        name: 'home-prd-v151',
+        component: () => import('@/views/prd/PrdV151View.vue'),
+        meta: { title: '1.5.1版本迭代' },
+      },
+      {
         path: 'home/prd/v151/product-bom',
-        name: 'home-prd-v151-product-bom',
-        component: () => import('@/views/prd/PrdV151ProductBomView.vue'),
-        meta: { title: '1.5.1·产品BOM需求' },
+        redirect: '/home/prd/v151',
       },
       {
         path: 'product-process/materials',
@@ -149,7 +159,24 @@ const routes = [
         component: () => import('@/views/planning/ProductionPlanView.vue'),
         meta: { title: '生产计划' },
       },
-      { path: 'planning/design-task', ...emptyChild('planning-design-task', '设计任务') },
+      {
+        path: 'planning/design-task',
+        name: 'planning-design-task',
+        component: () => import('@/views/planning/DesignTaskView.vue'),
+        meta: { title: '设计任务' },
+      },
+      {
+        path: 'planning/design-task/:taskId/ebom',
+        name: 'planning-ebom-design',
+        component: () => import('@/views/planning/EbomDesignView.vue'),
+        meta: { title: 'EBOM设计' },
+      },
+      {
+        path: 'planning/ebom',
+        name: 'planning-ebom',
+        component: () => import('@/views/planning/EbomManagementView.vue'),
+        meta: { title: 'EBOM管理' },
+      },
       {
         path: 'production/work-orders',
         name: 'production-work-orders',

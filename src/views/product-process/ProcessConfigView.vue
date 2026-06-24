@@ -112,6 +112,19 @@
             </div>
             <span v-else class="muted">—</span>
           </template>
+          <template v-else-if="column.key === 'operations'">
+            <div v-if="getOperationLabels(record).length" class="executor-tags">
+              <a-tag
+                v-for="label in getOperationLabels(record)"
+                :key="label"
+                color="blue"
+                class="executor-tag"
+              >
+                {{ label }}
+              </a-tag>
+            </div>
+            <span v-else class="muted">—</span>
+          </template>
           <template v-else-if="column.key === 'image'">
             <img v-if="record.image" :src="record.image" class="thumb" alt="" />
             <span v-else class="thumb-placeholder">—</span>
@@ -166,6 +179,7 @@ import {
   processConfigState,
   filterProcessConfig,
   deleteProcessConfig,
+  getOperationLabels,
   PROCESS_STATUS,
   RESOURCE_TYPES,
 } from '@/store/processConfigStore'
@@ -200,6 +214,7 @@ const baseColumns = [
   { title: '工序分类', dataIndex: 'category', width: 100 },
   { title: '资源类型', dataIndex: 'resourceType', width: 100 },
   { title: '默认执行人/工组', key: 'defaultExecutors', width: 180, ellipsis: true },
+  { title: '工序操作', key: 'operations', width: 220, ellipsis: true },
   { title: '图片', key: 'image', width: 72 },
   { title: '状态', key: 'status', width: 90 },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },

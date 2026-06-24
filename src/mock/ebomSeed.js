@@ -1,0 +1,61 @@
+import dayjs from 'dayjs'
+import { EBOM_STATUS } from '@/constants/ebom'
+
+/** EBOM 管理演示数据 */
+export function buildMockEbomRecords() {
+  const now = dayjs()
+  return [
+    {
+      id: 'ebom-seed-001',
+      ebomNo: 'EBOM-2026-0201',
+      ebomName: '立式多级离心泵 EBOM',
+      status: EBOM_STATUS.DRAFT,
+      version: 'V1.0',
+      designTaskId: 'dt-seed-001',
+      designTaskNo: 'SJ-2026-0001',
+      productId: 'prod-00001',
+      productCode: 'CP26010001',
+      productName: '立式多级离心泵',
+      productAttr: '定制产品',
+      salesOrderNo: '',
+      customerName: '华北水务装备有限公司',
+      baselineBomId: '',
+      baselineBomNo: '',
+      baselineBomVersion: '',
+      treeNodes: [],
+      lineItems: [],
+      templateRef: null,
+      columnSettings: [],
+      designer: '',
+      createdAt: now.subtract(10, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      updatedAt: now.subtract(2, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      finalizedAt: '',
+    },
+    {
+      id: 'ebom-seed-002',
+      ebomNo: 'EBOM-2026-0202',
+      ebomName: '耐腐蚀磁力驱动泵 EBOM',
+      status: EBOM_STATUS.FINALIZED,
+      version: 'V1.0',
+      designTaskId: 'dt-seed-003',
+      designTaskNo: 'SJ-2026-0003',
+      productId: 'prod-00003',
+      productCode: 'CP26010003',
+      productName: '深井潜水泵总成',
+      productAttr: '定制产品',
+      salesOrderNo: '',
+      customerName: '西北油田设备公司',
+      baselineBomId: 'bom-mock-baseline',
+      baselineBomNo: 'BOM-BASE-003',
+      baselineBomVersion: 'V2026.1',
+      treeNodes: [],
+      lineItems: [],
+      templateRef: null,
+      columnSettings: [],
+      designer: '赵设计',
+      createdAt: now.subtract(5, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      updatedAt: now.subtract(2, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      finalizedAt: now.subtract(2, 'day').format('YYYY-MM-DD HH:mm:ss'),
+    },
+  ]
+}

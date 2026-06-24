@@ -134,6 +134,19 @@ export function getActiveBomForItem(itemType, itemId) {
   return row ? ensureBomStructure(row) : null
 }
 
+/** 定制产品设计用：取产品关联的基准 BOM 骨架（优先生效版） */
+export function getBaselineBomForProduct(productId) {
+  const candidates = productBomState.boms
+    .filter(
+      (b) =>
+        b.itemType === 'product' &&
+        String(b.itemId) === String(productId) &&
+        (b.bomType === '基准BOM' || b.bomType === '基础BOM'),
+    )
+    .map(ensureBomStructure)
+  return candidates.find(isBomActive) || candidates.find(isBomPending) || candidates[0] || null
+}
+
 function archiveActiveForItem(itemType, itemId, exceptId) {
   const ts = nowStr()
   productBomState.boms.forEach((b) => {

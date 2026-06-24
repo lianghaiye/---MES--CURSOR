@@ -185,7 +185,15 @@
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
-                <a-tag :color="record.status === '进行中' ? 'processing' : 'default'">
+                <a-tag
+                  :color="
+                    record.status === '进行中'
+                      ? 'processing'
+                      : record.status === '设计中'
+                        ? 'orange'
+                        : 'default'
+                  "
+                >
                   {{ record.status }}
                 </a-tag>
               </template>
@@ -269,7 +277,11 @@
           </div>
           <a-empty
             v-if="!materialTree.length"
-            description="请点击产品明细行查看 EBOM 物料树"
+            :description="
+              activeWorkItem?.status === '设计中'
+                ? '定制产品 BOM 设计中，请完成设计任务审核后再查看 EBOM'
+                : '请点击产品明细行查看 EBOM 物料树'
+            "
             class="ebom-empty"
           />
           <template v-else>
@@ -737,6 +749,10 @@ function materialStatusColor(status) {
 function openWorkOrderModal() {
   if (!selectedOrder.value) {
     message.warning('请先选择订单')
+    return
+  }
+  if (activeWorkItem.value?.status === '设计中') {
+    message.warning('当前工作项处于「设计中」，请先完成设计任务审核')
     return
   }
   if (!selfMadeMaterials.value.length) {

@@ -97,14 +97,50 @@ function mapUrgencyToPlan(urgency) {
 
 /**
  * 自产销售订单审核通过后生成生产计划任务
+ * @param {object} salesOrder
+ * @param {{ lineItemsOverride?: object[], designingLineIds?: Set<string>, designTasksByLineId?: Map<string, object> }} [options]
  */
-export function createProductionPlanFromSalesOrder(salesOrder) {
-  const lineItems = salesOrder.lineItems || []
+export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
+  const lineItems = options.lineItemsOverride || salesOrder.lineItems || []
+  const designingLineIds = options.designingLineIds || new Set()
+  const designTasksByLineId = options.designTasksByLineId || new Map()
+
   const totalQty = lineItems.reduce((s, i) => s + (Number(i.salesQty) || 0), 0)
   const deliveryDate = resolveDeliveryDate(lineItems, salesOrder.documentDate)
   const daysToDelivery = Math.max(0, dayjs(deliveryDate).diff(dayjs(), 'day'))
 
   const workItems = lineItems.map((line, index) => {
+    const isDesigning = designingLineIds.has(line.id)
+    const designTask = designTasksByLineId.get?.(line.id)
+
+    if (isDesigning) {
+      return enrichWorkItem(
+        {
+          id: `wi-${line.id}`,
+          salesLineId: line.id,
+          designTaskId: designTask?.id || '',
+          status: '设计中',
+          expanded: index === 0,
+          salesQty: Number(line.salesQty) || 1,
+          productName: line.productName,
+          productCode: line.productCode,
+          productAttr: line.productAttr,
+          productType: line.category || line.productAttr || '',
+          model: line.specModel,
+          spec: line.specAttr,
+          techParams: line.techParams || '',
+          deliveryDate: line.deliveryDate || deliveryDate,
+          bomId: '',
+          bomName: '',
+          bomVersion: '',
+          ebomSnapshot: { materials: [] },
+          materials: [],
+        },
+        line,
+        index,
+      )
+    }
+
     const bom =
       (line.bomId ? getProductBomById(line.bomId) : null) ||
       getActiveBomForItem('product', line.productId)

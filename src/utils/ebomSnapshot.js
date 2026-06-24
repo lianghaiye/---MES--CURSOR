@@ -171,6 +171,28 @@ function explodeToMaterials(flatNodes, lineItems, salesQty) {
 }
 
 /**
+ * 基于 EBOM 记录与销售数量生成生产计划物料快照
+ */
+export function buildEbomSnapshotFromEbomRecord(ebom, salesQty) {
+  materialSeq = 0
+  const flatNodes = ebom.treeNodes || []
+  const lineItems = ebom.lineItems || []
+  const materials = explodeToMaterials(flatNodes, lineItems, salesQty)
+
+  return {
+    snapshotId: `ebom-snap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    ebomId: ebom.id,
+    ebomNo: ebom.ebomNo,
+    ebomName: ebom.ebomName,
+    bomVersion: ebom.version || '',
+    snapshotAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    treeNodes: JSON.parse(JSON.stringify(flatNodes)),
+    lineItems: JSON.parse(JSON.stringify(lineItems)),
+    materials,
+  }
+}
+
+/**
  * 基于使用中 BOM 与销售数量生成 EBOM 快照（含展开物料树）
  * @param {object} bom 产品 BOM 记录
  * @param {number} salesQty 销售数量

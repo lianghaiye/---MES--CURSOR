@@ -23,6 +23,9 @@ import {
   resolveLineBusinessType,
 } from '@/utils/salesOrderBusiness'
 import { createOutsourcingWorkOrdersFromSalesOrder } from '@/utils/salesOrderOutsourceWorkOrder'
+import { createDesignTaskFromSalesLine } from '@/store/designTaskStore'
+import { isCustomProductAttribute } from '@/constants/designTask'
+import { productInfoState } from '@/store/productInfoStore'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
 const DATA_VERSION = 3
@@ -192,8 +195,13 @@ export function approveSalesOrder(id) {
   let purchaseReqNo
   let planOrderNo
   let outsourceWorkOrderCodes = []
+  let designTaskCount = 0
 
   if (selfMadeLines.length) {
+    const standardLines = []
+    const customLines = []
+    const designTasksByLineId = new Map()
+
     for (const line of selfMadeLines) {
       if (!line.productId) {
         return {
@@ -201,6 +209,17 @@ export function approveSalesOrder(id) {
           message: `订单「${order.orderNo}」明细「${line.productName || '未命名'}」未关联产品，请重新选择产品`,
         }
       }
+      const product = productInfoState.products.find((p) => p.id === line.productId)
+      const productAttr = line.productAttr || product?.productAttribute || ''
+      if (isCustomProductAttribute(productAttr)) {
+        line.productAttr = productAttr
+        customLines.push(line)
+        continue
+      }
+      standardLines.push(line)
+    }
+
+    for (const line of standardLines) {
       const bom = getActiveBomForItem('product', line.productId)
       if (!bom) {
         return {
@@ -220,11 +239,29 @@ export function approveSalesOrder(id) {
         line.lineAccessoryKits = buildLineAccessoryKits(line)
       }
     }
-    if (!order.orderAccessoryKits?.length) {
-      order.orderAccessoryKits = buildOrderAccessoryKits(order)
+
+    for (const line of customLines) {
+      line.deliveryMode = normalizeDeliveryMode(line, order)
+      const task = createDesignTaskFromSalesLine(order, line)
+      designTasksByLineId.set(line.id, task)
+      designTaskCount += 1
     }
-    const plan = createProductionPlanFromSalesOrder({ ...order, lineItems: selfMadeLines })
-    planOrderNo = plan.orderNo
+
+    const planLines = [...standardLines, ...customLines]
+    if (planLines.length) {
+      if (!order.orderAccessoryKits?.length && standardLines.length) {
+        order.orderAccessoryKits = buildOrderAccessoryKits(order)
+      }
+      const plan = createProductionPlanFromSalesOrder(
+        { ...order, lineItems: planLines },
+        {
+          lineItemsOverride: planLines,
+          designingLineIds: new Set(customLines.map((l) => l.id)),
+          designTasksByLineId,
+        },
+      )
+      planOrderNo = plan.orderNo
+    }
   }
 
   if (purchaseLines.length) {
@@ -270,10 +307,13 @@ export function approveSalesOrder(id) {
     }
   }
   if (planOrderNo) {
+    const designHint =
+      designTaskCount > 0 ? `，已生成 ${designTaskCount} 条设计任务（明细状态：设计中）` : ''
     return {
       ok: true,
-      message: `订单「${order.orderNo}」审核通过，已自动生成生产计划任务（待下达）`,
+      message: `订单「${order.orderNo}」审核通过，已自动生成生产计划任务${designHint}`,
       planOrderNo,
+      designTaskCount,
     }
   }
   if (outsourceWorkOrderCodes.length) {
