@@ -1,6 +1,7 @@
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productBomState } from '@/store/productBomStore'
+import { isBomActive } from '@/mock/productBomOptions'
 import { employeeGroupState } from '@/store/employeeGroupStore'
 import { workOrderState } from '@/store/workOrderStore'
 import { personnelList } from '@/mock/personnel'
@@ -33,7 +34,7 @@ function resolveTeam(reporter) {
 function resolveEbomLabel(productName, bomName) {
   void productBomState.boms
   const hit = productBomState.boms.find(
-    (b) => b.status === '使用中' && (b.productName === productName || b.bomName === bomName),
+    (b) => isBomActive(b) && (b.productName === productName || b.bomName === bomName),
   )
   if (hit) return `${hit.bomName} ${hit.version}`
   if (bomName) return `${bomName} —`

@@ -1,24 +1,31 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
-import { buildCatalogProductBoms, hydrateCatalogBom, isCatalogSeedBom } from '@/mock/productBomSeed'
+import { buildPagedMockBoms, hydrateCatalogBom, isCatalogSeedBom } from '@/mock/productBomSeed'
+import { mockMaterials } from '@/mock/materialInfo'
 import { safeRemoveItem, safeSetItem } from '@/utils/safeStorage'
-import { isBomProductionReady } from '@/mock/productBomOptions'
-import { formatBomVersion, getBomVersionYear, nextSubVersionForYear } from '@/utils/bomVersion'
+import {
+  BOM_STATUS,
+  isBomActive,
+  isBomArchived,
+  isBomEditable,
+  isBomPending,
+  isBomProductionReady,
+  normalizeBomStatusValue,
+} from '@/mock/productBomOptions'
+import { formatBomVersion, getBomVersionYear, nextSubVersionForYear, normalizeVersionDisplay } from '@/utils/bomVersion'
+import { upgradeParentBomReferences } from '@/utils/bomVersionReference'
 
 const STORAGE_KEY = 'i_doms_product_bom'
-const DATA_VERSION = 5
+const DATA_VERSION = 7
 let bomNoSeq = 31000
 
-const VALID_STATUSES = ['待启用', '使用中', '已归档']
-
-function normalizeBomStatus(status) {
-  if (status === '待发布') return '待启用'
-  return VALID_STATUSES.includes(status) ? status : '待启用'
-}
-
 function normalizeBoms(boms) {
-  return boms.map((b) => ({ ...b, status: normalizeBomStatus(b.status) }))
+  return boms.map((b) => ({
+    ...b,
+    status: normalizeBomStatusValue(b.status),
+    version: normalizeVersionDisplay(b.version),
+  }))
 }
 
 function loadFromStorage() {
@@ -36,8 +43,9 @@ function loadFromStorage() {
   return null
 }
 
-/** 目录种子 BOM 不落库树结构，避免撑爆 localStorage */
+/** 种子 BOM：旧 catalog 不落库树结构；paged-mock 仅 40 条可全量落库 */
 function serializeBomForStorage(bom) {
+  if (bom?.seedSource === 'paged-mock') return bom
   if (!isCatalogSeedBom(bom)) return bom
   return {
     ...bom,
@@ -65,6 +73,7 @@ function persist() {
 
 function ensureBomStructure(bom) {
   if (!bom) return bom
+  if (bom.treeNodes?.length && bom.lineItems?.length) return bom
   if (isCatalogSeedBom(bom)) return hydrateCatalogBom(bom, mockProducts)
   return bom
 }
@@ -72,7 +81,7 @@ function ensureBomStructure(bom) {
 function loadInitialBoms() {
   const stored = loadFromStorage()
   if (stored) return stored
-  return buildCatalogProductBoms(mockProducts)
+  return normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials))
 }
 
 export const productBomState = reactive({
@@ -85,7 +94,7 @@ watch(
   { deep: true },
 )
 
-export { isBomProductionReady }
+export { isBomProductionReady, isBomActive, isBomPending, isBomArchived, isBomEditable, BOM_STATUS }
 
 function nowStr() {
   return dayjs().format('YYYY-MM-DD HH:mm')
@@ -115,7 +124,7 @@ export function getProductBomById(id) {
 
 export function getActiveBomForItem(itemType, itemId) {
   const row = productBomState.boms.find(
-    (b) => b.itemType === itemType && b.itemId === itemId && b.status === '使用中',
+    (b) => b.itemType === itemType && b.itemId === itemId && isBomActive(b),
   )
   return row ? ensureBomStructure(row) : null
 }
@@ -127,9 +136,9 @@ function archiveActiveForItem(itemType, itemId, exceptId) {
       b.itemType === itemType &&
       b.itemId === itemId &&
       b.id !== exceptId &&
-      b.status === '使用中'
+      isBomActive(b)
     ) {
-      b.status = '已归档'
+      b.status = BOM_STATUS.ARCHIVED
       b.isDefault = false
       b.expiredAt = ts
       b.updatedAt = ts
@@ -149,12 +158,10 @@ function buildVersion(itemType, itemId, versionGroupId) {
   }
 }
 
-export function addProductBom(payload) {
+function buildBomRecord(payload, { versionGroupId, ver, status, source }) {
   const ts = nowStr()
-  const versionGroupId = payload.versionGroupId || `bom-grp-${Date.now()}`
-  const ver = buildVersion(payload.itemType, payload.itemId, versionGroupId)
-  const record = {
-    id: `bom-${Date.now()}`,
+  return {
+    id: `bom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     versionGroupId,
     bomNo: payload.bomNo || generateBomNo(),
     bomName: payload.bomName,
@@ -163,17 +170,17 @@ export function addProductBom(payload) {
     itemName: payload.itemName,
     itemCode: payload.itemCode,
     ...ver,
-    status: '待启用',
-    isDefault: false,
-    effectiveAt: '',
+    status,
+    isDefault: status === BOM_STATUS.ACTIVE,
+    effectiveAt: status === BOM_STATUS.ACTIVE ? ts : '',
     expiredAt: '',
     operator: 'admin',
-    creator: 'admin',
-    createdAt: ts,
+    creator: source?.creator || 'admin',
+    createdAt: source?.createdAt || ts,
     updatedAt: ts,
     remark: payload.matchingRequirements || payload.remark || '',
     matchingRequirements: payload.matchingRequirements || payload.remark || '',
-    bomType: payload.bomType || '基础BOM',
+    bomType: payload.bomType || '基准BOM',
     specModel: payload.specModel || '',
     material: payload.material || '',
     drawingNo: payload.drawingNo || '',
@@ -184,6 +191,20 @@ export function addProductBom(payload) {
     templateRef: payload.templateRef || null,
     columnSettings: payload.columnSettings || [],
   }
+}
+
+export function addProductBom(payload) {
+  const active = getActiveBomForItem(payload.itemType, payload.itemId)
+  const versionGroupId = active?.versionGroupId || `bom-grp-${Date.now()}`
+  if (active) {
+    archiveProductBom(active.id)
+  }
+  const ver = buildVersion(payload.itemType, payload.itemId, versionGroupId)
+  const record = buildBomRecord(payload, {
+    versionGroupId,
+    ver,
+    status: BOM_STATUS.PENDING,
+  })
   productBomState.boms.unshift(record)
   return record
 }
@@ -192,35 +213,55 @@ export function updateProductBom(id, patch) {
   const idx = productBomState.boms.findIndex((b) => b.id === id)
   if (idx === -1) return null
   const row = productBomState.boms[idx]
-  if (!['待启用', '使用中'].includes(row.status)) {
+  if (!isBomEditable(row)) {
     return { error: '当前状态的 BOM 不可编辑' }
-  }
-  if (row.status === '使用中') {
-    Object.assign(row, {
-      bomName: patch.bomName,
-      bomType: patch.bomType,
-      material: patch.material ?? row.material,
-      drawingNo: patch.drawingNo ?? row.drawingNo,
-      techParams: patch.techParams ?? row.techParams,
-      processRoute: patch.processRoute ?? row.processRoute,
-      matchingRequirements:
-        patch.matchingRequirements ?? patch.remark ?? row.matchingRequirements ?? row.remark,
-      remark:
-        patch.matchingRequirements ?? patch.remark ?? row.matchingRequirements ?? row.remark,
-      treeNodes: patch.treeNodes ?? row.treeNodes,
-      lineItems: patch.lineItems ?? row.lineItems,
-      templateRef: patch.templateRef ?? row.templateRef,
-      columnSettings: patch.columnSettings ?? row.columnSettings,
-      updatedAt: nowStr(),
-      operator: 'admin',
-    })
-    return row
   }
   Object.assign(row, patch, { updatedAt: nowStr(), operator: 'admin' })
   return row
 }
 
-/** 基于当前记录生成次版本+1 的待启用新版本 */
+/**
+ * 保存 BOM：待发布原地更新；生效中保存则归档旧版并生成待发布新版本
+ */
+export function saveProductBom(id, payload) {
+  if (!id) {
+    const hadActive = Boolean(getActiveBomForItem(payload.itemType, payload.itemId))
+    const record = addProductBom(payload)
+    return { record, created: true, versionUpgraded: hadActive }
+  }
+
+  const row = productBomState.boms.find((b) => b.id === id)
+  if (!row) return { error: '记录不存在' }
+  if (isBomArchived(row)) return { error: '已归档的 BOM 不可编辑' }
+
+  if (isBomPending(row)) {
+    const updated = updateProductBom(id, payload)
+    if (updated?.error) return updated
+    return { record: updated, created: false, versionUpgraded: false }
+  }
+
+  if (isBomActive(row)) {
+    const ts = nowStr()
+    row.status = BOM_STATUS.ARCHIVED
+    row.isDefault = false
+    row.expiredAt = ts
+    row.updatedAt = ts
+
+    const ver = buildVersion(row.itemType, row.itemId, row.versionGroupId)
+    const record = buildBomRecord(payload, {
+      versionGroupId: row.versionGroupId,
+      ver,
+      status: BOM_STATUS.PENDING,
+      source: row,
+    })
+    productBomState.boms.unshift(record)
+    return { record, created: true, versionUpgraded: true, archivedId: row.id }
+  }
+
+  return { error: '当前状态的 BOM 不可保存' }
+}
+
+/** 基于当前记录生成次版本+1 的待发布新版本 */
 export function createBomNewVersion(sourceId) {
   const source = productBomState.boms.find((b) => b.id === sourceId)
   if (!source) return null
@@ -231,7 +272,7 @@ export function createBomNewVersion(sourceId) {
     id: `bom-${Date.now()}`,
     bomNo: generateBomNo(),
     ...ver,
-    status: '待启用',
+    status: BOM_STATUS.PENDING,
     isDefault: false,
     effectiveAt: '',
     expiredAt: '',
@@ -244,17 +285,10 @@ export function createBomNewVersion(sourceId) {
   return record
 }
 
-export function enableProductBom(id) {
+export function enableProductBom(id, { upgradeParentRefs = false, parentRefs = [] } = {}) {
   const row = productBomState.boms.find((b) => b.id === id)
   if (!row) return { error: '记录不存在' }
-  if (row.status !== '待启用') return { error: '仅待启用状态可启用' }
-
-  const active = getActiveBomForItem(row.itemType, row.itemId)
-  if (active && active.id !== row.id) {
-    return {
-      error: `该物品已有生效 BOM（${active.bomNo}），请先归档后再启用`,
-    }
-  }
+  if (!isBomPending(row)) return { error: '仅待发布状态可审核发布' }
 
   const ts = nowStr()
   archiveActiveForItem(row.itemType, row.itemId, row.id)
@@ -263,20 +297,25 @@ export function enableProductBom(id) {
       b.isDefault = b.id === row.id
     }
   })
-  row.status = '使用中'
+  row.status = BOM_STATUS.ACTIVE
   row.isDefault = true
   row.effectiveAt = row.effectiveAt || ts
   row.expiredAt = ''
   row.updatedAt = ts
+
+  if (upgradeParentRefs && parentRefs.length) {
+    upgradeParentBomReferences(row, parentRefs)
+  }
+
   return row
 }
 
 export function archiveProductBom(id) {
   const row = productBomState.boms.find((b) => b.id === id)
   if (!row) return false
-  if (row.status === '已归档') return true
+  if (isBomArchived(row)) return true
   const ts = nowStr()
-  row.status = '已归档'
+  row.status = BOM_STATUS.ARCHIVED
   row.isDefault = false
   row.expiredAt = ts
   row.updatedAt = ts
@@ -287,8 +326,8 @@ export function deleteProductBom(id) {
   const idx = productBomState.boms.findIndex((b) => b.id === id)
   if (idx === -1) return false
   const row = productBomState.boms[idx]
-  if (row.status === '使用中') {
-    return { error: '使用中的 BOM 不可删除，请先归档' }
+  if (isBomActive(row)) {
+    return { error: '生效中的 BOM 不可删除，请先归档' }
   }
   productBomState.boms.splice(idx, 1)
   return true
@@ -306,7 +345,7 @@ export function cloneProductBom(id) {
     bomNo: generateBomNo(),
     bomName: `${source.bomName}-克隆`,
     ...ver,
-    status: '待启用',
+    status: BOM_STATUS.PENDING,
     isDefault: false,
     effectiveAt: '',
     expiredAt: '',
@@ -323,7 +362,7 @@ export function batchArchiveProductBom(ids) {
   let count = 0
   ids.forEach((id) => {
     const row = productBomState.boms.find((b) => b.id === id)
-    if (!row || row.status === '已归档') return
+    if (!row || isBomArchived(row)) return
     if (archiveProductBom(id)) count += 1
   })
   return count
@@ -334,7 +373,7 @@ export function batchEnableProductBom(ids) {
   const errors = []
   ids.forEach((id) => {
     const row = productBomState.boms.find((b) => b.id === id)
-    if (!row || row.status !== '待启用') return
+    if (!row || !isBomPending(row)) return
     const res = enableProductBom(id)
     if (res?.error) errors.push(`${row.bomNo}: ${res.error}`)
     else ok += 1

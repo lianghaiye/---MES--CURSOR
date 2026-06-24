@@ -46,7 +46,7 @@
     <div class="batch-tips">
       <div>1. 通过批量修改可快速修改相同字段的数据内容</div>
       <div>2. 仅支持批量修改单位用量与备注</div>
-      <div>3. 数据修改后不可恢复，请谨慎操作</div>
+      <div>3. 每次最多修改200条数据。</div>
     </div>
 
     <template #footer>
@@ -59,6 +59,8 @@
 <script setup>
 import { reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
+
+const MAX_BATCH_SIZE = 200
 
 const props = defineProps({
   open: Boolean,
@@ -100,6 +102,10 @@ function handleCancel() {
 }
 
 function handleConfirm() {
+  if (props.count > MAX_BATCH_SIZE) {
+    message.warning(`每次最多修改 ${MAX_BATCH_SIZE} 条数据`)
+    return
+  }
   if (form.field === 'unitQty') {
     const val = Number(form.unitQty)
     if (Number.isNaN(val) || val < 0) {

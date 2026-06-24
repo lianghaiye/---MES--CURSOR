@@ -19,6 +19,12 @@ const routes = [
     meta: { public: true, title: '登录' },
   },
   {
+    path: '/product-process/bom/preview',
+    name: 'product-process-bom-preview',
+    component: () => import('@/views/product-process/BomPrintPreviewView.vue'),
+    meta: { title: 'BOM预览', standalone: true },
+  },
+  {
     path: '/',
     component: MainLayout,
     redirect: '/home/dashboard',
@@ -397,6 +403,11 @@ router.beforeEach((to, from, next) => {
 
   if (!isLoggedIn()) {
     next({ name: 'login', query: { redirect: to.fullPath } })
+    return
+  }
+
+  if (to.meta?.standalone) {
+    next()
     return
   }
 

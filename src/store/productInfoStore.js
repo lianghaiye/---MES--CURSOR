@@ -10,7 +10,7 @@ import {
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 
 const STORAGE_KEY = 'i_doms_product_info'
-const DATA_VERSION = 6
+const DATA_VERSION = 7
 let codeSeq = 20000
 
 function loadFromStorage() {

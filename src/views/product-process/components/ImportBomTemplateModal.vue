@@ -99,6 +99,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { productBomState } from '@/store/productBomStore'
+import { isBomActive } from '@/mock/productBomOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { applyBomTemplateImport } from '@/utils/bomImport'
@@ -130,7 +131,7 @@ const columns = [
   { title: '失效日期', dataIndex: 'expiredAt', width: 150 },
 ]
 
-const activeBomList = computed(() => productBomState.boms.filter((b) => b.status === '使用中'))
+const activeBomList = computed(() => productBomState.boms.filter((b) => isBomActive(b)))
 
 const itemFilterOptions = computed(() => {
   const products = productInfoState.products.slice(0, 150).map((p) => ({

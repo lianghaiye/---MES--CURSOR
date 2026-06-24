@@ -1,7 +1,8 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
-import { buildCatalogProductBoms } from '@/mock/productBomSeed'
+import { buildPagedMockBoms } from '@/mock/productBomSeed'
+import { mockMaterials } from '@/mock/materialInfo'
 import { buildMockSalesOrders } from '@/mock/salesOrderSeed'
 import { buildInitialProductionPlans } from '@/mock/productionPlanSeed'
 import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
@@ -52,7 +53,7 @@ function persist() {
 function loadInitialPlans() {
   const stored = loadFromStorage()
   if (stored) return stored
-  const boms = buildCatalogProductBoms(mockProducts)
+  const boms = buildPagedMockBoms(mockProducts, mockMaterials)
   const salesOrders = buildMockSalesOrders(mockProducts)
   return normalizePlanStatuses(buildInitialProductionPlans(boms, salesOrders))
 }

@@ -30,7 +30,9 @@ export function formatChildBomLabel(line) {
   return name || version || ''
 }
 
-export const bomTypeOptions = ['基础BOM', '订单BOM', '配置BOM']
+export const bomTypeOptions = ['基准BOM', '订单BOM', '配置BOM']
+
+export const bomTypeSelectOptions = bomTypeOptions.map((v) => ({ label: v, value: v }))
 
 export const unitOptions = ['个', '件', '套', '根', '台']
 

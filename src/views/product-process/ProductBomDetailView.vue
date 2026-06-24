@@ -2,15 +2,33 @@
   <div class="product-bom-detail-page">
     <a-spin :spinning="loading">
       <template v-if="record">
-        <a-tabs v-model:active-key="activeTab" class="detail-tabs">
-          <a-tab-pane key="detail" tab="BOM明细" />
-          <a-tab-pane key="versions" tab="历史版本" />
-          <a-tab-pane key="logs" tab="操作记录" />
-        </a-tabs>
+        <div class="detail-page-head">
+          <a-tabs v-model:active-key="activeTab" class="detail-tabs">
+            <a-tab-pane key="detail" tab="BOM明细" />
+            <a-tab-pane key="versions" tab="历史版本" />
+            <a-tab-pane key="logs" tab="操作记录" />
+          </a-tabs>
+          <a-space class="head-actions">
+            <a-button
+              v-if="activeTab === 'detail'"
+              type="primary"
+              @click="overviewModalOpen = true"
+            >
+              概览
+            </a-button>
+            <a-button v-if="activeTab === 'detail'" @click="printModalOpen = true">
+              <PrinterOutlined />
+              打印
+            </a-button>
+            <a-button :disabled="!canEdit" @click="handleEdit">编辑</a-button>
+            <a-button :disabled="record.status === '已归档'" @click="handleArchive">归档</a-button>
+            <a-button @click="handleBack">返回列表</a-button>
+          </a-space>
+        </div>
 
         <template v-if="activeTab === 'detail'">
           <div class="page-body">
-            <aside class="left-panel">
+            <aside class="left-panel" :style="{ width: `${leftPanelWidth}px` }">
               <BomTreePanel
                 readonly
                 :flat-nodes="flatNodes"
@@ -21,6 +39,7 @@
                 @select-node="selectedNodeId = $event"
               />
             </aside>
+            <div class="panel-resizer" @mousedown.prevent="onResizeMouseDown" />
             <main class="right-panel">
               <div class="section-card">
                 <div class="section-title">基础信息</div>
@@ -28,7 +47,7 @@
                   <a-descriptions-item label="BOM编码">{{ record.bomNo }}</a-descriptions-item>
                   <a-descriptions-item label="BOM名称">{{ record.bomName }}</a-descriptions-item>
                   <a-descriptions-item label="BOM类型">
-                    {{ record.bomType || '基础BOM' }}
+                    {{ record.bomType === '基础BOM' ? '基准BOM' : record.bomType || '基准BOM' }}
                   </a-descriptions-item>
                   <a-descriptions-item label="物品名称">{{ record.itemName }}</a-descriptions-item>
                   <a-descriptions-item label="规格型号">
@@ -66,6 +85,7 @@
                   readonly
                   :lines="displayLines"
                   :column-settings="columnSettings"
+                  empty-variant="no-children"
                 />
               </div>
             </main>
@@ -112,15 +132,21 @@
           </div>
         </template>
 
-        <div class="page-footer">
-          <a-space>
-            <a-button :disabled="!canEdit" @click="handleEdit">编辑</a-button>
-            <a-button :disabled="record.status === '已归档'" @click="handleArchive">
-              归档
-            </a-button>
-            <a-button @click="handleBack">返回</a-button>
-          </a-space>
-        </div>
+        <BomOverviewModal
+          v-model:open="overviewModalOpen"
+          :flat-nodes="flatNodes"
+          :line-items="lineItems"
+          :root-item-name="record.itemName"
+          :overview-info="overviewInfo"
+        />
+        <BomPrintModal
+          v-model:open="printModalOpen"
+          :flat-nodes="flatNodes"
+          :line-items="lineItems"
+          :root-item-name="record.itemName"
+          :overview-info="overviewInfo"
+          :column-settings="overviewColumnSettings"
+        />
       </template>
       <a-empty v-else-if="!loading" description="未找到该 BOM" />
     </a-spin>
@@ -132,19 +158,24 @@ export default { name: 'ProductBomDetailView' }
 </script>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
+import { PrinterOutlined } from '@ant-design/icons-vue'
 import { getVersionsInGroup } from '@/mock/productBom'
 import { buildBomOperationLogs } from '@/mock/bomOperationLogs'
 import { defaultBomColumnSettings } from '@/mock/bomMaterialColumns'
-import { bomStatusColor } from '@/mock/productBomOptions'
+import { defaultBomOverviewColumnSettings } from '@/mock/bomOverviewColumns'
+import { mergeColumnSettings } from '@/utils/tableColumnSettings'
+import { bomStatusColor, isBomEditable } from '@/mock/productBomOptions'
 import { getProductBomById, archiveProductBom, productBomState } from '@/store/productBomStore'
 import { loadBomDetailStructure } from '@/utils/bomImport'
 import { getLinesForTreeNode, ROOT_ID, getRootTreeId } from '@/utils/bomTree'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import BomTreePanel from './components/BomTreePanel.vue'
 import BomMaterialTable from './components/BomMaterialTable.vue'
+import BomOverviewModal from './components/BomOverviewModal.vue'
+import BomPrintModal from './components/BomPrintModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -156,7 +187,28 @@ const flatNodes = ref([])
 const lineItems = ref([])
 const selectedNodeId = ref(ROOT_ID)
 const activeTab = ref('detail')
+const overviewModalOpen = ref(false)
+const printModalOpen = ref(false)
 const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
+const overviewColumnSettings = ref(loadOverviewColumnSettings())
+
+function loadOverviewColumnSettings() {
+  try {
+    const raw = localStorage.getItem('i_doms_table_col_bom-overview-list')
+    if (raw) {
+      return mergeColumnSettings(defaultBomOverviewColumnSettings, JSON.parse(raw))
+    }
+  } catch {
+    /* ignore */
+  }
+  return JSON.parse(JSON.stringify(defaultBomOverviewColumnSettings))
+}
+const leftPanelWidth = ref(280)
+const MIN_LEFT_WIDTH = 200
+const MAX_LEFT_WIDTH = 520
+let resizing = false
+let resizeStartX = 0
+let resizeStartWidth = 0
 
 const versionColumns = [
   { title: 'BOM状态', key: 'status', width: 90 },
@@ -208,7 +260,31 @@ const versionList = computed(() => {
 
 const operationLogs = computed(() => buildBomOperationLogs(record.value))
 
-const canEdit = computed(() => ['待启用', '使用中'].includes(record.value?.status))
+const overviewInfo = computed(() => {
+  const bom = record.value
+  if (!bom) {
+    return {
+      bomNo: '—',
+      specModel: '—',
+      version: '—',
+      material: '—',
+      drawingNo: '—',
+      techParams: '—',
+      matchingRequirements: '—',
+    }
+  }
+  return {
+    bomNo: bom.bomNo || '—',
+    specModel: bom.specModel || '—',
+    version: bom.version || '—',
+    material: bom.material || '—',
+    drawingNo: bom.drawingNo || '—',
+    techParams: bom.techParams || '—',
+    matchingRequirements: bom.matchingRequirements || bom.remark || '—',
+  }
+})
+
+const canEdit = computed(() => isBomEditable(record.value))
 
 function formatDisplayDate(val) {
   if (!val) return '—'
@@ -274,6 +350,37 @@ function handleBack() {
   closeTab(detailPath)
   router.push(closingActive ? tabStore.activePath || listPath : listPath)
 }
+
+function onResizeMouseDown(e) {
+  resizing = true
+  resizeStartX = e.clientX
+  resizeStartWidth = leftPanelWidth.value
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+
+function onResizeMouseMove(e) {
+  if (!resizing) return
+  const next = resizeStartWidth + (e.clientX - resizeStartX)
+  leftPanelWidth.value = Math.min(MAX_LEFT_WIDTH, Math.max(MIN_LEFT_WIDTH, next))
+}
+
+function onResizeMouseUp() {
+  if (!resizing) return
+  resizing = false
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+}
+
+onMounted(() => {
+  document.addEventListener('mousemove', onResizeMouseMove)
+  document.addEventListener('mouseup', onResizeMouseUp)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', onResizeMouseMove)
+  document.removeEventListener('mouseup', onResizeMouseUp)
+})
 </script>
 
 <style lang="less" scoped>
@@ -285,11 +392,30 @@ function handleBack() {
   background: #f5f6f8;
 }
 
-.detail-tabs {
+.detail-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   background: #fff;
   padding: 0 12px;
   margin-bottom: 8px;
-  border-radius: 6px 6px 0 0;
+  border-radius: 6px;
+  flex-shrink: 0;
+
+  .head-actions {
+    flex-shrink: 0;
+    padding: 8px 0;
+  }
+}
+
+.detail-tabs {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 0;
+  border-radius: 0;
 
   :deep(.ant-tabs-nav) {
     margin-bottom: 0;
@@ -299,17 +425,53 @@ function handleBack() {
 .page-body {
   flex: 1;
   display: flex;
-  gap: 8px;
+  gap: 0;
   padding: 0 8px 8px;
   min-height: 0;
 }
 
 .left-panel {
-  flex: 0 0 280px;
+  flex: 0 0 auto;
+  min-width: 200px;
+  max-width: 520px;
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  :deep(.bom-tree-panel) {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+}
+
+.panel-resizer {
+  flex: 0 0 6px;
+  margin: 0 2px;
+  cursor: col-resize;
+  border-radius: 3px;
+  position: relative;
+
+  &:hover,
+  &:active {
+    background: rgba(22, 119, 255, 0.12);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 36px;
+    border-radius: 1px;
+    background: #d9d9d9;
+  }
 }
 
 .right-panel {
@@ -343,17 +505,6 @@ function handleBack() {
     width: 100px;
     color: rgba(0, 0, 0, 0.45);
   }
-}
-
-.page-footer {
-  flex-shrink: 0;
-  padding: 10px 16px;
-  background: #fff;
-  border-top: 1px solid #f0f0f0;
-  display: flex;
-  justify-content: flex-end;
-  margin: 0 8px 8px;
-  border-radius: 0 0 6px 6px;
 }
 
 .link {

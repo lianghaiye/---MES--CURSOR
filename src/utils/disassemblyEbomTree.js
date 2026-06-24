@@ -1,8 +1,9 @@
 import { productBomState, getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
+import { isBomActive } from '@/mock/productBomOptions'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { materialToTreeNode, collectExpandableKeys } from '@/utils/ebomTreeView'
 
-/** 按拆解工单解析当前物品的使用中 BOM */
+/** 按拆解工单解析当前物品的生效 BOM */
 export function resolveDisassemblyBom(workOrder) {
   if (!workOrder) return null
 
@@ -18,7 +19,7 @@ export function resolveDisassemblyBom(workOrder) {
 
   const code = workOrder.itemCode
   const name = workOrder.itemName
-  const activeList = productBomState.boms.filter((b) => b.status === '使用中')
+  const activeList = productBomState.boms.filter((b) => isBomActive(b))
   if (code) {
     const byCode = activeList.find((b) => b.itemCode === code)
     if (byCode) return getProductBomById(byCode.id)

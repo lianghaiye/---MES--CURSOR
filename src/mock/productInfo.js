@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import { productCategoryTree, flattenCategoryNodes } from '@/mock/productCategories'
 import { pumpProductNames, barcodeTypesCycle } from '@/mock/pumpIndustryNames'
+import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
 import { migrateProductList } from '@/utils/masterDataMigrate'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 
@@ -17,6 +18,7 @@ function createProduct(index) {
   const created = dayjs('2025-11-14').add(index % 200, 'day')
   const updated = dayjs('2026-05-01').add(index % 30, 'day')
   const baseName = pumpProductNames[index % pumpProductNames.length]
+  const supplyForm = ['自制件', '外购件', '外协件', '组装', '其他'][index % 5]
 
   return {
     id: `prod-${String(index + 1).padStart(5, '0')}`,
@@ -37,7 +39,7 @@ function createProduct(index) {
     unitPrice: [0, 98.68, 666.66, 569.63][index % 4],
     isProductMaterial: true,
     materialType: ['零部件', '半成品', '虚拟件'][index % 3],
-    supplyForm: ['自制件', '外购件', '组装', '其他'][index % 4],
+    supplyForm,
     materialCategoryKey: cat.key,
     remark: '',
     expiryAlertEnabled: index % 7 === 0,
@@ -45,7 +47,10 @@ function createProduct(index) {
       defaultWorkCenter: workCenters[index % workCenters.length],
       standardCycleDays: index % 10,
       defaultProcessRoute: index % 2 === 0 ? '机加标准路线' : undefined,
-      defaultSupplier: undefined,
+      defaultSupplier:
+        supplyForm === '外购件' || supplyForm === '外协件'
+          ? supplierOptions[index % supplierOptions.length].value
+          : undefined,
       defaultWarehouse: '半成品仓',
     },
     alert: {

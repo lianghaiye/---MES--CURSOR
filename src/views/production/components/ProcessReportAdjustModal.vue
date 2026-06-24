@@ -9,21 +9,21 @@
     @cancel="handleCancel"
   >
     <a-descriptions bordered size="small" :column="3" class="info-desc">
-      <a-descriptions-item v-if="variant === 'task'" label="任务编号">{{
-        line?.taskNo || '—'
-      }}</a-descriptions-item>
+      <a-descriptions-item label="任务编号">{{ line?.taskNo || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="工序">{{ line?.processName || '—' }}</a-descriptions-item>
       <a-descriptions-item label="执行人">{{ line?.reporter || '—' }}</a-descriptions-item>
-      <a-descriptions-item label="工序名称">{{ line?.processName || '—' }}</a-descriptions-item>
-      <a-descriptions-item v-if="variant === 'quick'" label="报工类型">{{
-        line?.reportType || '—'
-      }}</a-descriptions-item>
-      <a-descriptions-item label="报工良品数">{{ line?.goodQty ?? '—' }}</a-descriptions-item>
-      <a-descriptions-item label="报工不良品数">{{ line?.defectQty ?? '—' }}</a-descriptions-item>
-      <a-descriptions-item v-if="line?.defectReason && line.defectReason !== '—'" label="报工不良原因" :span="3">
-        {{ line.defectReason }}
+      <a-descriptions-item label="报工类型">{{ displayReportType }}</a-descriptions-item>
+      <a-descriptions-item label="计薪方式">{{ displaySalaryMethod }}</a-descriptions-item>
+      <a-descriptions-item label="报工良品数">{{ formatReportQty(line?.goodQty) }}</a-descriptions-item>
+      <a-descriptions-item label="报工不良品数">{{ formatReportQty(line?.defectQty) }}</a-descriptions-item>
+      <a-descriptions-item v-if="showReportDuration" label="报工时长">
+        {{ displayReportDuration }}
       </a-descriptions-item>
-      <a-descriptions-item v-if="showDuration" label="报工时长">
-        {{ displayReportDuration }} 小时
+      <a-descriptions-item label="报工不良原因" :span="3">
+        {{ displayDefectReason }}
+      </a-descriptions-item>
+      <a-descriptions-item label="报工备注" :span="3">
+        {{ displayReportRemark }}
       </a-descriptions-item>
     </a-descriptions>
 
@@ -229,9 +229,27 @@ const defectItems = computed(() => {
   return resolveProcessDefectItems(props.line.processName, form.adjustedDefectBreakdown)
 })
 
-const showDuration = computed(
-  () => props.config?.reportType === '时长报工' || props.config?.salaryMethod === '计时工资',
+const showReportDuration = computed(() => props.config?.reportType === '时长报工')
+
+const displayReportType = computed(
+  () => props.line?.reportType || props.config?.reportType || '—',
 )
+
+const displaySalaryMethod = computed(
+  () => props.line?.salaryMethod || props.config?.salaryMethod || '—',
+)
+
+const displayDefectReason = computed(() => {
+  const reason = props.line?.defectReason
+  if (reason == null || reason === '' || reason === '—') return '—'
+  return reason
+})
+
+const displayReportRemark = computed(() => {
+  const remark = props.line?.remark
+  if (remark == null || remark === '') return '—'
+  return remark
+})
 
 const isBatchPieceHourly = computed(
   () => props.config?.reportType === '批量计件' && props.config?.salaryMethod === '计时工资',
@@ -248,10 +266,9 @@ const showAdjustDuration = computed(
 )
 
 const displayReportDuration = computed(() => {
-  if (isBatchPieceHourly.value && props.config) {
-    return calcAutoDurationHours(props.config, props.line?.goodQty ?? 0)
-  }
-  return props.line?.workHours ?? 0
+  const hours = props.line?.workHours
+  if (hours == null || hours === '' || hours === '—') return '—'
+  return `${hours} 小时`
 })
 
 const displayAdjustedDuration = computed(() => {
@@ -288,6 +305,12 @@ const previewSubsidyAmount = computed(() => {
 
 function formatMoney(val) {
   return (Number(val) || 0).toFixed(2)
+}
+
+function formatReportQty(val) {
+  if (val === 0) return '0'
+  if (val == null || val === '') return '—'
+  return val
 }
 
 function initBreakdown(line) {

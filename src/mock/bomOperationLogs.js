@@ -1,3 +1,5 @@
+import { isBomActive } from '@/mock/productBomOptions'
+
 export function buildBomOperationLogs(bom) {
   if (!bom) return []
   return [
@@ -12,7 +14,7 @@ export function buildBomOperationLogs(bom) {
       id: 'log-2',
       operatedAt: bom.createdAt,
       operator: bom.creator || 'admin',
-      action: bom.status === '使用中' ? '启用' : '创建',
+      action: isBomActive(bom) ? '审核发布' : '创建',
       remark: `版本 ${bom.version || '—'}`,
     },
   ]

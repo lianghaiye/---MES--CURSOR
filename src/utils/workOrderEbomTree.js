@@ -1,4 +1,5 @@
 import { productBomState, getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
+import { isBomActive } from '@/mock/productBomOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { materialToTreeNode, collectExpandableKeys } from '@/utils/ebomTreeView'
@@ -41,7 +42,7 @@ function resolveBomByName(name) {
   if (!name) return null
   const resolved = resolveAliasProductName(name)
   const n = normalizeName(resolved)
-  const activeList = productBomState.boms.filter((b) => b.status === '使用中')
+  const activeList = productBomState.boms.filter((b) => isBomActive(b))
   const row =
     activeList.find(
       (b) =>
@@ -81,9 +82,9 @@ export function findMaterialNodeInTree(materials, workOrder) {
   return walk(materials)
 }
 
-/** 从所有使用中 BOM 中反查包含该子件的父级 EBOM */
+/** 从所有生效 BOM 中反查包含该子件的父级 EBOM */
 function resolveParentBomByChildProduct(workOrder) {
-  const activeList = productBomState.boms.filter((b) => b.status === '使用中')
+  const activeList = productBomState.boms.filter((b) => isBomActive(b))
   for (const bom of activeList) {
     const hydrated = getProductBomById(bom.id)
     if (!hydrated) continue

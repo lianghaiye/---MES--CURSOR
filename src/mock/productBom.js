@@ -2,7 +2,7 @@ import dayjs from 'dayjs'
 import { pumpProductNames, pumpMaterialNames } from '@/mock/pumpIndustryNames'
 import { formatBomVersion, getBomVersionYear } from '@/utils/bomVersion'
 
-const statuses = ['使用中', '待启用', '已归档']
+const statuses = ['生效', '待发布', '已归档']
 const operators = ['admin', '张三', '李四']
 
 function pickItem(index) {
@@ -31,7 +31,7 @@ function createBom(index) {
   const status = statuses[index % statuses.length]
   const created = dayjs('2026-01-10').add(index % 120, 'day')
   const effective =
-    status === '使用中' || status === '待启用'
+    status === '生效' || status === '待发布'
       ? created.add(1, 'day').format('YYYY-MM-DD HH:mm')
       : ''
   const groupId = `bom-grp-${Math.floor(index / 3)}`
@@ -46,7 +46,7 @@ function createBom(index) {
     versionYear: year,
     versionSub: sub,
     status,
-    isDefault: status === '使用中' && index % 3 !== 1,
+    isDefault: status === '生效' && index % 3 !== 1,
     effectiveAt: effective,
     expiredAt: status === '已归档' ? created.add(60, 'day').format('YYYY-MM-DD HH:mm') : '',
     operator: operators[index % operators.length],

@@ -100,7 +100,7 @@
         </a-button>
         <a-button size="small" @click="handleBatchEnable">
           <CheckOutlined />
-          启用
+          审核发布
         </a-button>
         <a-button size="small" @click="handleBatchArchive">
           <InboxOutlined />
@@ -174,7 +174,7 @@
             {{ record[column.dataIndex] || '—' }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space v-if="record.status === '待启用'" :size="0" wrap>
+            <a-space v-if="isBomPending(record)" :size="0" wrap>
               <a-button type="link" size="small" @click="openEdit(record)">
                 <EditOutlined />
                 编辑
@@ -185,10 +185,10 @@
               </a-button>
               <a-button type="link" size="small" @click="handleEnable(record)">
                 <CheckOutlined />
-                启用
+                审核发布
               </a-button>
             </a-space>
-            <a-space v-else-if="record.status === '使用中'" :size="0" wrap>
+            <a-space v-else-if="isBomActive(record)" :size="0" wrap>
               <a-button type="link" size="small" @click="openEdit(record)">
                 <EditOutlined />
                 编辑
@@ -202,7 +202,7 @@
                 克隆
               </a-button>
             </a-space>
-            <a-space v-else-if="record.status === '已归档'" :size="0" wrap>
+            <a-space v-else-if="isBomArchived(record)" :size="0" wrap>
               <a-button type="link" size="small" @click="handleClone(record)">
                 <CopyOutlined />
                 克隆
@@ -228,6 +228,13 @@
     </div>
 
     <ProductBomVersionDrawer v-model:open="versionOpen" :record="versionRecord" />
+
+    <BomEnableReferenceModal
+      v-model:open="enableRefOpen"
+      :bom-name="enableTarget?.itemName || enableTarget?.bomName || ''"
+      :refs="enableParentRefs"
+      @confirm="onEnableRefConfirm"
+    />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -259,7 +266,7 @@ import {
   CheckOutlined,
 } from '@ant-design/icons-vue'
 import { filterProductBoms } from '@/mock/productBom'
-import { bomStatusOptions, bomStatusColor } from '@/mock/productBomOptions'
+import { bomStatusOptions, bomStatusColor, isBomPending, isBomActive, isBomArchived } from '@/mock/productBomOptions'
 import { productBomState } from '@/store/productBomStore'
 import {
   deleteProductBom,
@@ -269,9 +276,11 @@ import {
   batchEnableProductBom,
   enableProductBom,
 } from '@/store/productBomStore'
+import { findParentRefsForBomUpgrade } from '@/utils/bomVersionReference'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import ProductBomVersionDrawer from './components/ProductBomVersionDrawer.vue'
+import BomEnableReferenceModal from './components/BomEnableReferenceModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -297,6 +306,9 @@ const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 const versionOpen = ref(false)
 const versionRecord = ref(null)
+const enableRefOpen = ref(false)
+const enableTarget = ref(null)
+const enableParentRefs = ref([])
 
 const itemFilterOptions = computed(() => {
   const products = productInfoState.products.slice(0, 150).map((p) => ({
@@ -395,7 +407,7 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  if (!['待启用', '使用中'].includes(record.status)) {
+  if (!isBomPending(record) && !isBomActive(record)) {
     message.warning('当前状态的 BOM 不可编辑')
     return
   }
@@ -437,19 +449,19 @@ function handleBatchEnable() {
     return
   }
   const targets = productBomState.boms.filter(
-    (r) => selectedRowKeys.value.includes(r.id) && r.status === '待启用',
+    (r) => selectedRowKeys.value.includes(r.id) && isBomPending(r),
   )
   if (!targets.length) {
-    message.warning('所选记录中没有「待启用」状态的 BOM')
+    message.warning('所选记录中没有「待发布」状态的 BOM')
     return
   }
   Modal.confirm({
-    title: '批量启用',
-    content: `确定启用选中的 ${targets.length} 条待启用 BOM 吗？同物品仅允许一个使用中版本。`,
+    title: '批量审核发布',
+    content: `确定审核发布选中的 ${targets.length} 条待发布 BOM 吗？同物品仅允许一个生效版本。`,
     onOk: () => {
       const { ok, errors } = batchEnableProductBom(selectedRowKeys.value)
       selectedRowKeys.value = []
-      if (ok) message.success(`已成功启用 ${ok} 条`)
+      if (ok) message.success(`已成功发布 ${ok} 条`)
       if (errors.length) {
         message.warning(errors.slice(0, 3).join('；') + (errors.length > 3 ? '…' : ''))
       }
@@ -482,16 +494,34 @@ function handleBatchArchive() {
 
 function handleClone(record) {
   const cloned = cloneProductBom(record.id)
-  if (cloned) message.success('已克隆为待启用版本')
+  if (cloned) message.success('已克隆为待发布版本')
 }
 
-function handleEnable(record) {
-  const res = enableProductBom(record.id)
+function doEnable(record, upgradeParentRefs = false, parentRefs = []) {
+  const res = enableProductBom(record.id, { upgradeParentRefs, parentRefs })
   if (res?.error) {
     message.warning(res.error)
     return
   }
-  message.success('已启用，当前版本可用于生产')
+  message.success('审核发布成功，当前版本已生效可用于生产')
+}
+
+function handleEnable(record) {
+  const refs = findParentRefsForBomUpgrade(record)
+  if (refs.length) {
+    enableTarget.value = record
+    enableParentRefs.value = refs
+    enableRefOpen.value = true
+    return
+  }
+  doEnable(record)
+}
+
+function onEnableRefConfirm(upgrade) {
+  if (!enableTarget.value) return
+  doEnable(enableTarget.value, upgrade, enableParentRefs.value)
+  enableTarget.value = null
+  enableParentRefs.value = []
 }
 
 function onExportMenu({ key }) {

@@ -36,7 +36,7 @@
       </a-form-item>
       <a-form-item v-if="isEdit" label="BOM版本">
         <span>{{ editRecord?.version }}</span>
-        <span class="version-hint">（待启用状态保存后不自动升版）</span>
+        <span class="version-hint">（待发布状态保存后不自动升版）</span>
       </a-form-item>
       <a-form-item v-else label="初始版本">
         <span>{{ previewVersion }}</span>
@@ -47,7 +47,7 @@
       <a-alert
         type="info"
         show-icon
-        message="保存后状态为「待启用」，需手动启用后方可用于生产；同一产品/物料同时仅允许一个「使用中」版本。"
+        message="保存后状态为「待发布」，需审核发布后方可用于生产；同一产品/物料同时仅允许一个「生效」版本。"
         class="form-tip"
       />
     </a-form>
@@ -63,7 +63,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { addProductBom, updateProductBom } from '@/store/productBomStore'
+import { saveProductBom } from '@/store/productBomStore'
 import { formatBomVersion, getBomVersionYear, nextSubVersionForYear } from '@/utils/bomVersion'
 
 const props = defineProps({
@@ -179,16 +179,15 @@ async function handleOk() {
       itemCode: form.itemCode,
       remark: form.remark,
     }
-    if (isEdit.value) {
-      const res = updateProductBom(props.editRecord.id, payload)
-      if (res?.error) {
-        message.warning(res.error)
-        return
-      }
-      message.success('已保存')
+    const res = saveProductBom(isEdit.value ? props.editRecord.id : null, payload)
+    if (res?.error) {
+      message.warning(res.error)
+      return
+    }
+    if (res.versionUpgraded) {
+      message.success(`已生成新版本 ${res.record.version}（待发布）`)
     } else {
-      addProductBom(payload)
-      message.success('已创建，状态为待启用，可在列表中启用')
+      message.success(isEdit.value ? '已保存' : '已创建，状态为待发布，可在列表中审核发布')
     }
     emit('saved')
     emit('update:open', false)

@@ -1,4 +1,5 @@
 import { productBomState } from '@/store/productBomStore'
+import { isBomActive, isBomPending } from '@/mock/productBomOptions'
 
 /** 解析产品/物料对应的 BOM 维护入口 */
 export function resolveItemBomNavigation(itemType, itemId) {
@@ -6,14 +7,14 @@ export function resolveItemBomNavigation(itemType, itemId) {
   const boms = productBomState.boms.filter(
     (b) => b.itemType === itemType && b.itemId === itemId,
   )
-  const draft = boms.find((b) => b.status === '待启用')
+  const draft = boms.find((b) => isBomPending(b))
   if (draft) {
     return {
       path: `/product-process/bom/${draft.id}/edit`,
       title: `编辑BOM·${draft.bomName || ''}`,
     }
   }
-  const active = boms.find((b) => b.status === '使用中') || boms[0]
+  const active = boms.find((b) => isBomActive(b)) || boms[0]
   if (active) {
     return {
       path: `/product-process/bom/${active.id}`,

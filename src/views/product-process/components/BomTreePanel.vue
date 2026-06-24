@@ -98,7 +98,7 @@
           </div>
         </template>
       </a-tree>
-      <a-empty v-else :image="false" description="请选择产品/物料作为根节点" />
+      <a-empty v-else description="请选择产品/物料作为根节点" />
     </div>
 
     <div v-if="versionInfo?.version || templateRef?.version" class="tree-footer">

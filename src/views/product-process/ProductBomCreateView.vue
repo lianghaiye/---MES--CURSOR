@@ -32,13 +32,13 @@
             <span v-if="!basicInfoExpanded" class="basic-summary">{{ basicInfoSummary }}</span>
           </div>
           <a-space class="head-actions">
-            <a-button size="small" :disabled="!hasRoot" @click="overviewModalOpen = true">
-              概览
-            </a-button>
             <a-button type="link" size="small" class="toggle-btn" @click="toggleBasicInfo">
               {{ basicInfoExpanded ? '收起信息' : '展开信息' }}
               <UpOutlined v-if="basicInfoExpanded" />
               <DownOutlined v-else />
+            </a-button>
+            <a-button type="primary" :disabled="!hasRoot" @click="overviewModalOpen = true">
+              概览
             </a-button>
             <a-button type="primary" :loading="saving" @click="handleSave">
               <SaveOutlined />
@@ -78,6 +78,13 @@
                     style="width: 220px"
                   />
                 </a-form-item>
+                <a-form-item label="BOM类型" name="bomType">
+                  <a-select
+                    v-model:value="form.bomType"
+                    style="width: 140px"
+                    :options="bomTypeSelectOptions"
+                  />
+                </a-form-item>
               </a-form>
             </div>
 
@@ -99,21 +106,6 @@
                 <a-form-item label="图号">
                   <a-input :value="selectedParentInfo.drawingNo || '—'" disabled style="width: 140px" />
                 </a-form-item>
-                <a-form-item label="技术参数">
-                  <a-input
-                    v-if="isSelectedRoot"
-                    v-model:value="form.techParams"
-                    placeholder="选择物品后带出，可修改"
-                    allow-clear
-                    style="width: 160px"
-                  />
-                  <a-input
-                    v-else
-                    :value="selectedParentInfo.techParams || '—'"
-                    disabled
-                    style="width: 160px"
-                  />
-                </a-form-item>
                 <a-form-item label="工艺路线">
                   <a-select
                     v-if="isSelectedRoot"
@@ -130,6 +122,23 @@
                     :value="selectedParentInfo.processRoute || '—'"
                     disabled
                     style="width: 180px"
+                  />
+                </a-form-item>
+                <a-form-item label="技术参数" class="full-row-item">
+                  <a-textarea
+                    v-if="isSelectedRoot"
+                    v-model:value="form.techParams"
+                    placeholder="选择物品后带出，可修改"
+                    allow-clear
+                    :rows="3"
+                    style="width: 420px"
+                  />
+                  <a-textarea
+                    v-else
+                    :value="selectedParentInfo.techParams || '—'"
+                    disabled
+                    :rows="3"
+                    style="width: 420px"
                   />
                 </a-form-item>
                 <a-form-item label="配套要求" class="full-row-item">
@@ -185,6 +194,7 @@
       :flat-nodes="flatNodes"
       :line-items="lineItems"
       :root-item-name="form.itemName"
+      :overview-info="overviewInfo"
     />
   </div>
 </template>
@@ -201,13 +211,13 @@ import { SaveOutlined, CloseOutlined, UpOutlined, DownOutlined, MenuUnfoldOutlin
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import {
-  addProductBom,
   generateBomNo,
   getProductBomById,
-  updateProductBom,
+  saveProductBom,
 } from '@/store/productBomStore'
+import { isBomEditable } from '@/mock/productBomOptions'
 import { loadBomDetailStructure, importBomByReference } from '@/utils/bomImport'
-import { defaultBomColumnSettings } from '@/mock/bomMaterialColumns'
+import { defaultBomColumnSettings, bomTypeSelectOptions } from '@/mock/bomMaterialColumns'
 import { processRouteState } from '@/store/processRouteStore'
 import { applyMaterialToLine, createEmptySubLine } from '@/utils/bomLineMaterial'
 import {
@@ -272,7 +282,7 @@ const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
 const form = reactive({
   bomNo: generateBomNo(),
   bomName: '',
-  bomType: '基础BOM',
+  bomType: '基准BOM',
   itemId: undefined,
   itemType: 'product',
   itemName: '',
@@ -311,6 +321,16 @@ const basicInfoSummary = computed(() => {
   const parts = [form.bomName, form.itemName].filter(Boolean)
   return parts.length ? parts.join(' · ') : '请填写 BOM 基础信息'
 })
+
+const overviewInfo = computed(() => ({
+  bomNo: form.bomNo || '—',
+  specModel: form.specModel || '—',
+  version: editVersion.value || '—',
+  material: form.material || '—',
+  drawingNo: form.drawingNo || '—',
+  techParams: form.techParams || '—',
+  matchingRequirements: form.matchingRequirements || '—',
+}))
 
 const processRouteOpts = computed(() =>
   (processRouteState.routes || [])
@@ -510,7 +530,7 @@ function onAddByBomConfirm({ pickerRow, usageCoefficient }) {
     usageCoefficient,
   )
   if (!result) {
-    message.error('导入失败，请确认所选物品已关联使用中的 BOM')
+    message.error('导入失败，请确认所选物品已关联生效的 BOM')
     return
   }
   flatNodes.value = result.flatNodes
@@ -657,7 +677,7 @@ function loadEditBom(id) {
     router.push('/product-process/bom')
     return
   }
-  if (!['待启用', '使用中'].includes(bom.status)) {
+  if (!isBomEditable(bom)) {
     message.warning('当前状态的 BOM 不可编辑')
     router.push('/product-process/bom')
     return
@@ -675,7 +695,7 @@ function loadEditBom(id) {
   editVersion.value = bom.version || ''
   form.bomNo = bom.bomNo
   form.bomName = bom.bomName
-  form.bomType = bom.bomType || '基础BOM'
+  form.bomType = bom.bomType === '基础BOM' ? '基准BOM' : bom.bomType || '基准BOM'
   form.itemId = `${bom.itemType}:${bom.itemId}`
   form.itemType = bom.itemType
   form.itemName = bom.itemName
@@ -765,16 +785,18 @@ async function handleSave() {
 
   saving.value = true
   try {
-    if (isEditMode.value) {
-      const res = updateProductBom(editBomId.value, payload)
-      if (res?.error) {
-        message.warning(res.error)
-        return
-      }
+    const bomId = isEditMode.value ? editBomId.value : null
+    const res = saveProductBom(bomId, payload)
+    if (res?.error) {
+      message.warning(res.error)
+      return
+    }
+    if (res.versionUpgraded) {
+      message.success(`已生成新版本 ${res.record.version}（待发布），旧版本已归档`)
+    } else if (isEditMode.value) {
       message.success('BOM 已更新')
     } else {
-      addProductBom(payload)
-      message.success('BOM 已保存，状态为待启用，可在列表中启用')
+      message.success('BOM 已保存，状态为待发布，审核发布后方可用于生产')
     }
     closeTab(pageTabPath.value)
     router.push('/product-process/bom')

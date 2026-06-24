@@ -156,7 +156,7 @@ function onAdvancedSelected(items) {
   const rowKey = `${row.itemType}-${row.id}`
   const hit = findBomLinkedPickerRow(rowKey)
   if (!hit) {
-    message.warning('所选物品未关联使用中的 BOM')
+    message.warning('所选物品未关联生效的 BOM')
     return
   }
   selectedRowKey.value = rowKey

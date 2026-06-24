@@ -4,7 +4,7 @@
       <a-space :size="8">
         <span class="toolbar-title">物料清单</span>
         <template v-if="!readonly && hasSelection">
-          <a-button size="small" @click="batchEditOpen = true">修改</a-button>
+          <a-button size="small" @click="openBatchEdit">修改</a-button>
           <a-button size="small" danger @click="handleBatchDelete">删除</a-button>
         </template>
         <template v-else-if="!readonly">
@@ -59,7 +59,7 @@
       <template #emptyText>
         <div class="add-detail-empty">
           <a-empty v-if="emptyVariant === 'no-children'" description="暂无子项" />
-          <a-button v-if="!readonly" type="link" size="small" @click="emit('add-detail-line')">
+          <a-button v-if="!readonly && emptyVariant !== 'no-children'" type="link" size="small" @click="emit('add-detail-line')">
             添加明细行
           </a-button>
         </div>
@@ -108,16 +108,10 @@
           <template v-else>{{ formatCell(record[column.dataIndex]) }}</template>
         </template>
         <template v-else-if="column.key === 'itemName'">
-          <a-select
-            :value="record.materialCode || undefined"
-            show-search
-            allow-clear
-            size="small"
-            placeholder="搜索编码/名称"
-            style="width: 100%"
-            :filter-option="filterMaterialOption"
-            :options="getLineMaterialOptions(record)"
-            @change="(val) => onMaterialChange(record, val)"
+          <BomSubItemMaterialSelect
+            :value="record.materialCode"
+            :fallback-name="record.itemName"
+            @select="(material) => emit('material-change', { lineId: record.id, material })"
           />
         </template>
         <template v-else-if="column.key === 'unitQty'">
@@ -247,8 +241,8 @@ import {
   HolderOutlined,
 } from '@ant-design/icons-vue'
 import { unitOptions, processDocOptions, processRouteOptions, formatChildBomLabel } from '@/mock/bomMaterialColumns'
-import { getBomPickableMaterials } from '@/utils/bomMaterialPicker'
 import BomMaterialBatchEditModal from './BomMaterialBatchEditModal.vue'
+import BomSubItemMaterialSelect from './BomSubItemMaterialSelect.vue'
 
 const props = defineProps({
   lines: { type: Array, default: () => [] },
@@ -293,40 +287,6 @@ const unitOpts = unitOptions.map((v) => ({ label: v, value: v }))
 const processDocOpts = processDocOptions
 const processRouteOpts = processRouteOptions
 
-const materialSelectOptions = computed(() =>
-  getBomPickableMaterials().map((m) => ({
-    label: m.name,
-    value: m.code,
-    searchText: `${m.code} ${m.name}`,
-    material: m,
-  })),
-)
-
-function getLineMaterialOptions(record) {
-  const opts = materialSelectOptions.value
-  if (!record?.materialCode) return opts
-  if (opts.some((o) => o.value === record.materialCode)) return opts
-  return [
-    {
-      label: record.itemName || record.materialCode,
-      value: record.materialCode,
-      searchText: `${record.materialCode} ${record.itemName || ''}`,
-      material: null,
-    },
-    ...opts,
-  ]
-}
-
-function filterMaterialOption(input, option) {
-  const text = (option?.searchText ?? option?.label ?? '').toLowerCase()
-  return text.includes(input.toLowerCase())
-}
-
-function onMaterialChange(record, code) {
-  if (!code) return
-  const hit = getBomPickableMaterials().find((m) => m.code === code)
-  if (hit) emit('material-change', { lineId: record.id, material: hit })
-}
 
 const widthMap = {
   materialCode: 120,
@@ -429,6 +389,14 @@ function toggleRowSelect(id, checked) {
   } else {
     selectedRowKeys.value = selectedRowKeys.value.filter((key) => key !== id)
   }
+}
+
+function openBatchEdit() {
+  if (selectedRowKeys.value.length > 200) {
+    message.warning('每次最多修改 200 条数据')
+    return
+  }
+  batchEditOpen.value = true
 }
 
 function handleBatchDelete() {

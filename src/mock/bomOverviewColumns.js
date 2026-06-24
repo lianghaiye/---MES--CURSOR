@@ -1,0 +1,35 @@
+/** BOM 概览弹窗列配置 */
+export const defaultBomOverviewColumnSettings = [
+  { key: 'itemName', title: '产品名称', hidden: false, frozen: true, order: 0 },
+  { key: 'materialCode', title: '产品编码', hidden: false, frozen: false, order: 1 },
+  { key: 'specModel', title: '规格型号', hidden: false, frozen: false, order: 2 },
+  { key: 'material', title: '材质', hidden: false, frozen: false, order: 3 },
+  { key: 'drawingNo', title: '图号', hidden: false, frozen: false, order: 4 },
+  { key: 'unitQty', title: '单位用量', hidden: false, frozen: false, order: 5 },
+  { key: 'unit', title: '单位', hidden: false, frozen: false, order: 6 },
+  { key: 'materialType', title: '物料类型', hidden: false, frozen: false, order: 7 },
+  { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 8 },
+  { key: 'supplyForm', title: '供应型态', hidden: false, frozen: false, order: 9 },
+  { key: 'supplyUnit', title: '供应单位', hidden: false, frozen: false, order: 10 },
+  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 11 },
+  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 12 },
+  { key: 'remark', title: '备注', hidden: false, frozen: false, order: 13 },
+]
+
+export const bomOverviewBaseColumns = [
+  { title: '序号', dataIndex: 'index', key: 'index', width: 96, fixed: 'left' },
+  { title: '产品名称', dataIndex: 'itemName', key: 'itemName', width: 180, ellipsis: true },
+  { title: '产品编码', dataIndex: 'materialCode', key: 'materialCode', width: 120 },
+  { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 120, ellipsis: true },
+  { title: '材质', dataIndex: 'material', key: 'material', width: 90 },
+  { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 100, ellipsis: true },
+  { title: '单位用量', dataIndex: 'unitQty', key: 'unitQty', width: 90, align: 'right' },
+  { title: '单位', dataIndex: 'unit', key: 'unit', width: 72 },
+  { title: '物料类型', dataIndex: 'materialType', key: 'materialType', width: 90 },
+  { title: '物料类别', dataIndex: 'categoryName', key: 'categoryName', width: 90 },
+  { title: '供应型态', dataIndex: 'supplyForm', key: 'supplyForm', width: 90 },
+  { title: '供应单位', dataIndex: 'supplyUnit', key: 'supplyUnit', width: 140, ellipsis: true },
+  { title: '工艺文件', dataIndex: 'processDocName', key: 'processDocName', width: 110, ellipsis: true },
+  { title: '工艺路线', dataIndex: 'processRoute', key: 'processRoute', width: 120, ellipsis: true },
+  { title: '备注', dataIndex: 'remark', key: 'remark', width: 120, ellipsis: true },
+]

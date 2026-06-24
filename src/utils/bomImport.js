@@ -90,7 +90,7 @@ export function clearBomChildren(flatNodes) {
 export function buildBasicInfoFromBom(bom) {
   return {
     bomName: bom.bomName || '',
-    bomType: bom.bomType || '基础BOM',
+    bomType: bom.bomType === '基础BOM' ? '基准BOM' : bom.bomType || '基准BOM',
     itemId: `${bom.itemType}:${bom.itemId}`,
     itemType: bom.itemType,
     itemName: bom.itemName,
@@ -238,6 +238,9 @@ export function importBomByReference(
           unitQty: coefficient,
           childBom: bom.bomName || bom.bomNo || '',
           childBomVersion: bom.version || '',
+          childBomId: bom.id,
+          referencedItemId: bom.itemId,
+          referencedItemType: bom.itemType,
         }
       : l,
   )
