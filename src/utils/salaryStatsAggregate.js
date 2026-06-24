@@ -4,7 +4,11 @@ import { processReportState } from '@/store/processReportStore'
 import { quickReportState } from '@/store/quickReportStore'
 import { isQuickReportConfirmed } from '@/mock/quickReports'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
-import { enrichProcessReportLine, calcFinalPieceQty, resolveSubsidyWage } from '@/utils/processReportWageCalc'
+import {
+  enrichProcessReportLine,
+  calcFinalPieceQty,
+  resolveSubsidyWage,
+} from '@/utils/processReportWageCalc'
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import { buildReportWorkPerProcessBundle } from '@/utils/reportWorkPerProcess'
 import { resolveEmployeeProfile } from '@/utils/employeeProfileResolver'
@@ -39,9 +43,7 @@ function matchProcess(processName, keyword) {
 
 function resolveAdjustedReportQty(record = {}) {
   if (record.adjustedGoodQty != null || record.adjustedDefectQty != null) {
-    return round2(
-      (Number(record.adjustedGoodQty) || 0) + (Number(record.adjustedDefectQty) || 0),
-    )
+    return round2((Number(record.adjustedGoodQty) || 0) + (Number(record.adjustedDefectQty) || 0))
   }
   if (record.adjustedReportQty != null && record.adjustedReportQty !== '') {
     return round2(record.adjustedReportQty)
@@ -305,11 +307,7 @@ function collectQuickReportLines() {
 }
 
 export function collectAllSalaryDetailLines() {
-  return [
-    ...collectLaborHourLines(),
-    ...collectProcessReportLines(),
-    ...collectQuickReportLines(),
-  ]
+  return [...collectLaborHourLines(), ...collectProcessReportLines(), ...collectQuickReportLines()]
 }
 
 export function filterSalaryDetailLines(lines = [], filters = {}) {
@@ -360,7 +358,9 @@ export function summarizeSalaryByEmployee(lines = []) {
 export function summarizeSalaryDetailTotals(lines = []) {
   const sum = (key) => round2(lines.reduce((s, l) => s + (Number(l[key]) || 0), 0))
   const sumOptional = (key) =>
-    round2(lines.reduce((s, l) => s + (l[key] != null && l[key] !== '' ? Number(l[key]) || 0 : 0), 0))
+    round2(
+      lines.reduce((s, l) => s + (l[key] != null && l[key] !== '' ? Number(l[key]) || 0 : 0), 0),
+    )
   return {
     goodQty: sum('goodQty'),
     defectQty: sum('defectQty'),

@@ -2,8 +2,14 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getActiveBomForItem } from '@/store/productBomStore'
 import { resolveWarehouseItemCategoryScope } from '@/utils/warehouseItemPicker'
-import { materialCategoryTree, flattenCategoryNodes as flattenMatCats } from '@/mock/materialCategories'
-import { productCategoryTree, flattenCategoryNodes as flattenProdCats } from '@/mock/productCategories'
+import {
+  materialCategoryTree,
+  flattenCategoryNodes as flattenMatCats,
+} from '@/mock/materialCategories'
+import {
+  productCategoryTree,
+  flattenCategoryNodes as flattenProdCats,
+} from '@/mock/productCategories'
 
 function resolveBomItemType(itemType) {
   return itemType === '产品' ? 'product' : 'material'
@@ -16,9 +22,7 @@ export function calcLinkedBomSubItemCount(itemType, itemId) {
   const rootId = bom.treeNodes?.find((n) => n.isRoot)?.id || 'bom-root'
   return (bom.lineItems || []).filter(
     (l) =>
-      l.parentTreeId === rootId ||
-      l.parentTreeId === '__ROOT__' ||
-      l.parentTreeId === 'bom-root',
+      l.parentTreeId === rootId || l.parentTreeId === '__ROOT__' || l.parentTreeId === 'bom-root',
   ).length
 }
 

@@ -8,12 +8,7 @@
     @cancel="emit('update:open', false)"
     @ok="handleOk"
   >
-    <a-alert
-      type="info"
-      show-icon
-      :message="topAlertMessage"
-      class="top-alert"
-    />
+    <a-alert type="info" show-icon :message="topAlertMessage" class="top-alert" />
 
     <div class="section-label">{{ isFillMode ? '填写工时参数' : '填写要批量修改的字段' }}</div>
     <a-form layout="vertical" class="fill-form">
@@ -165,8 +160,7 @@ function resetFillForm(row = {}) {
     row.standardHourlyRate != null && row.standardHourlyRate !== ''
       ? Number(row.standardHourlyRate)
       : undefined
-  form.pieceRate =
-    row.pieceRate != null && row.pieceRate !== '' ? Number(row.pieceRate) : undefined
+  form.pieceRate = row.pieceRate != null && row.pieceRate !== '' ? Number(row.pieceRate) : undefined
 }
 
 watch(

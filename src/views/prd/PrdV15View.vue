@@ -36,12 +36,7 @@
           未找到匹配的模块或功能
         </section>
 
-        <section
-          v-for="mod in filteredModules"
-          :id="mod.key"
-          :key="mod.key"
-          class="module-section"
-        >
+        <section v-for="mod in filteredModules" :id="mod.key" :key="mod.key" class="module-section">
           <h2 class="module-title">{{ mod.label }}</h2>
 
           <div
@@ -106,11 +101,7 @@
         <section id="wage-formulas" class="module-section">
           <h2 class="module-title">附录：工资核算公式</h2>
           <div class="feature-card">
-            <div
-              v-for="item in wageFormulas"
-              :key="item.title"
-              class="formula-item"
-            >
+            <div v-for="item in wageFormulas" :key="item.title" class="formula-item">
               <div class="formula-title">{{ item.title }}</div>
               <div class="formula-text">{{ item.formula }}</div>
             </div>
@@ -127,11 +118,7 @@ export default { name: 'PrdV15View' }
 
 <script setup>
 import { computed, ref } from 'vue'
-import {
-  PRD_V15_META,
-  PRD_V15_MODULES,
-  PRD_V15_WAGE_FORMULAS,
-} from '@/data/prdV15'
+import { PRD_V15_META, PRD_V15_MODULES, PRD_V15_WAGE_FORMULAS } from '@/data/prdV15'
 
 const meta = PRD_V15_META
 const wageFormulas = PRD_V15_WAGE_FORMULAS

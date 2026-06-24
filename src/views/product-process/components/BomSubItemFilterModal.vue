@@ -71,7 +71,13 @@
         </template>
         <span v-else class="value-placeholder">—</span>
 
-        <a-button type="text" size="small" danger class="remove-btn" @click="removeCondition(cond.id)">
+        <a-button
+          type="text"
+          size="small"
+          danger
+          class="remove-btn"
+          @click="removeCondition(cond.id)"
+        >
           <DeleteOutlined />
         </a-button>
       </div>

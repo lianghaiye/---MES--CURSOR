@@ -16,6 +16,9 @@
             >
               概览
             </a-button>
+            <a-button v-if="activeTab === 'detail'" @click="relationOpen = true">
+              查看关联BOM
+            </a-button>
             <a-button v-if="activeTab === 'detail'" @click="printModalOpen = true">
               <PrinterOutlined />
               打印
@@ -147,6 +150,7 @@
           :overview-info="overviewInfo"
           :column-settings="overviewColumnSettings"
         />
+        <BomRelationDrawer v-model:open="relationOpen" :bom="record" :line-items="lineItems" />
       </template>
       <a-empty v-else-if="!loading" description="未找到该 BOM" />
     </a-spin>
@@ -176,6 +180,7 @@ import BomTreePanel from './components/BomTreePanel.vue'
 import BomMaterialTable from './components/BomMaterialTable.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
 import BomPrintModal from './components/BomPrintModal.vue'
+import BomRelationDrawer from './components/BomRelationDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -189,6 +194,7 @@ const selectedNodeId = ref(ROOT_ID)
 const activeTab = ref('detail')
 const overviewModalOpen = ref(false)
 const printModalOpen = ref(false)
+const relationOpen = ref(false)
 const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
 const overviewColumnSettings = ref(loadOverviewColumnSettings())
 

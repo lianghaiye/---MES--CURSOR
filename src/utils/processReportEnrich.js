@@ -69,7 +69,8 @@ export function enrichProcessReportRecord(record) {
       workCenter: resolveReporterWorkCenter(record.reporter),
       defectItems: resolveDefectReasonLabel({ ...record, ...legacy }, items),
       defectReason: legacy.defectReasonLabel,
-      reportType: config?.reportType || resolveReportMode(record.reportMode) || record.reportMode || '—',
+      reportType:
+        config?.reportType || resolveReportMode(record.reportMode) || record.reportMode || '—',
       salaryMethod: config?.salaryMethod || '—',
       calcMethod:
         config?.reportType && config?.salaryMethod

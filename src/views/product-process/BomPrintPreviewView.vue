@@ -61,11 +61,7 @@
             <div class="table-wrap">
               <table class="sheet-table" :class="tableDensityClass">
                 <colgroup>
-                  <col
-                    v-for="col in payload.columns"
-                    :key="col.key"
-                    :class="`col-${col.key}`"
-                  />
+                  <col v-for="col in payload.columns" :key="col.key" :class="`col-${col.key}`" />
                 </colgroup>
                 <thead>
                   <tr>
@@ -92,7 +88,9 @@
                       >
                         {{ row.itemName ?? '—' }}
                       </span>
-                      <span v-else-if="col.key === 'unitQty'">{{ formatPrintQty(row.unitQty) }}</span>
+                      <span v-else-if="col.key === 'unitQty'">{{
+                        formatPrintQty(row.unitQty)
+                      }}</span>
                       <span v-else class="cell-text">{{ row[col.dataIndex] ?? '—' }}</span>
                     </td>
                   </tr>
@@ -126,7 +124,10 @@ const sheetRef = ref(null)
 
 const pageClass = computed(() => {
   if (!payload.value) return ''
-  return [`paper-${payload.value.paper || 'A4'}`, `orient-${payload.value.orientation || 'portrait'}`]
+  return [
+    `paper-${payload.value.paper || 'A4'}`,
+    `orient-${payload.value.orientation || 'portrait'}`,
+  ]
 })
 
 const tableDensityClass = computed(() => {

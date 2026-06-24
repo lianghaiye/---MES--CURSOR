@@ -24,11 +24,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import {
-  getBreakdownQty,
-  setBreakdownQty,
-  sumBreakdownQty,
-} from '@/utils/defectBreakdown'
+import { getBreakdownQty, setBreakdownQty, sumBreakdownQty } from '@/utils/defectBreakdown'
 
 const props = defineProps({
   defectQty: { type: Number, default: 0 },

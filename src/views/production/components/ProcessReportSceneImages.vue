@@ -3,7 +3,12 @@
     <a-image-preview-group>
       <div v-for="(url, idx) in list" :key="`${url}-${idx}`" class="scene-image-item">
         <a-image :src="url" :width="36" :height="36" class="scene-thumb" />
-        <a-button type="link" size="small" class="scene-download" @click.stop="downloadOne(url, idx)">
+        <a-button
+          type="link"
+          size="small"
+          class="scene-download"
+          @click.stop="downloadOne(url, idx)"
+        >
           下载
         </a-button>
       </div>

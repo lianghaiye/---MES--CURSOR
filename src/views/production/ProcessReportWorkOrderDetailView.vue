@@ -97,13 +97,16 @@
                 </template>
                 <template v-else-if="column.key === 'action'">
                   <a-space v-if="line.taskStatus !== TASK_STATUS.AUDITED" :size="0">
-                    <a-button type="link" size="small" @click.stop="openAdjust(line)">调整</a-button>
+                    <a-button type="link" size="small" @click.stop="openAdjust(line)"
+                      >调整</a-button
+                    >
                     <a-button
                       v-if="manualPushMode && canPush(line)"
                       type="link"
                       size="small"
                       @click.stop="handlePushOne(line)"
-                    >推送</a-button>
+                      >推送</a-button
+                    >
                     <a-button type="link" size="small" @click.stop="openAudit(line)">审核</a-button>
                   </a-space>
                   <span v-else class="locked-text">已锁定</span>
@@ -158,11 +161,7 @@
       :config="modalConfig"
       @confirm="onAdjustConfirm"
     />
-    <ProcessReportAuditModal
-      v-model:open="auditOpen"
-      :line="modalLine"
-      @confirm="onAuditConfirm"
-    />
+    <ProcessReportAuditModal v-model:open="auditOpen" :line="modalLine" @confirm="onAuditConfirm" />
   </div>
 </template>
 
@@ -241,10 +240,7 @@ const summary = computed(() => {
     return { goodQty: 0, defectQty: 0, accountHours: 0, salaryAmount: 0 }
   }
   const base = summarizeProcessReportLines(bundle.value.lines)
-  const salaryAmount = bundle.value.lines.reduce(
-    (s, l) => s + (Number(l.salaryAmount) || 0),
-    0,
-  )
+  const salaryAmount = bundle.value.lines.reduce((s, l) => s + (Number(l.salaryAmount) || 0), 0)
   return { ...base, salaryAmount: Math.round(salaryAmount * 100) / 100 }
 })
 

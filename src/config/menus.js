@@ -30,7 +30,14 @@ export const sideMenus = {
     {
       key: 'prd',
       label: 'PRD',
-      children: [{ key: 'prd-v15', label: '1.5版本迭代', path: '/home/prd/v15' }],
+      children: [
+        { key: 'prd-v15', label: '1.5版本迭代', path: '/home/prd/v15' },
+        {
+          key: 'prd-v151-bom',
+          label: '1.5.1·产品BOM',
+          path: '/home/prd/v151/product-bom',
+        },
+      ],
     },
   ],
   'product-process': [
@@ -128,6 +135,7 @@ export function resolveModuleKey(path) {
 export const routeTitles = {
   '/home/dashboard': '首页',
   '/home/prd/v15': '1.5版本迭代',
+  '/home/prd/v151/product-bom': '1.5.1·产品BOM需求',
   '/product-process/materials': '物料信息',
   '/product-process/products': '产品信息',
   '/product-process/bom': '产品BOM',

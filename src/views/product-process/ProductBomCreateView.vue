@@ -1,7 +1,11 @@
 <template>
   <div class="product-bom-create-page">
     <div class="page-body">
-      <aside v-show="!leftSidebarCollapsed" class="left-panel" :style="{ width: `${leftPanelWidth}px` }">
+      <aside
+        v-show="!leftSidebarCollapsed"
+        class="left-panel"
+        :style="{ width: `${leftPanelWidth}px` }"
+      >
         <BomTreePanel
           :flat-nodes="flatNodes"
           :line-items="lineItems"
@@ -40,6 +44,7 @@
             <a-button type="primary" :disabled="!hasRoot" @click="overviewModalOpen = true">
               概览
             </a-button>
+            <a-button :disabled="!hasRoot" @click="relationOpen = true"> 查看关联BOM </a-button>
             <a-button type="primary" :loading="saving" @click="handleSave">
               <SaveOutlined />
               保存
@@ -92,19 +97,35 @@
               <div class="info-block-title">父项产品信息</div>
               <a-form layout="inline" size="small" class="inline-info-form">
                 <a-form-item label="物品名称">
-                  <a-input :value="selectedParentInfo.itemName || '—'" disabled style="width: 180px" />
+                  <a-input
+                    :value="selectedParentInfo.itemName || '—'"
+                    disabled
+                    style="width: 180px"
+                  />
                 </a-form-item>
                 <a-form-item v-if="isEditMode" label="BOM版本">
                   <a-input :value="editVersion" disabled style="width: 120px" />
                 </a-form-item>
                 <a-form-item label="规格型号">
-                  <a-input :value="selectedParentInfo.specModel || '—'" disabled style="width: 140px" />
+                  <a-input
+                    :value="selectedParentInfo.specModel || '—'"
+                    disabled
+                    style="width: 140px"
+                  />
                 </a-form-item>
                 <a-form-item label="材质">
-                  <a-input :value="selectedParentInfo.material || '—'" disabled style="width: 120px" />
+                  <a-input
+                    :value="selectedParentInfo.material || '—'"
+                    disabled
+                    style="width: 120px"
+                  />
                 </a-form-item>
                 <a-form-item label="图号">
-                  <a-input :value="selectedParentInfo.drawingNo || '—'" disabled style="width: 140px" />
+                  <a-input
+                    :value="selectedParentInfo.drawingNo || '—'"
+                    disabled
+                    style="width: 140px"
+                  />
                 </a-form-item>
                 <a-form-item label="工艺路线">
                   <a-select
@@ -196,6 +217,11 @@
       :root-item-name="form.itemName"
       :overview-info="overviewInfo"
     />
+    <BomRelationDrawer
+      v-model:open="relationOpen"
+      :bom="relationBomContext"
+      :line-items="lineItems"
+    />
   </div>
 </template>
 
@@ -207,14 +233,16 @@ export default { name: 'ProductBomCreateView' }
 import { computed, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { SaveOutlined, CloseOutlined, UpOutlined, DownOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue'
+import {
+  SaveOutlined,
+  CloseOutlined,
+  UpOutlined,
+  DownOutlined,
+  MenuUnfoldOutlined,
+} from '@ant-design/icons-vue'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import {
-  generateBomNo,
-  getProductBomById,
-  saveProductBom,
-} from '@/store/productBomStore'
+import { generateBomNo, getProductBomById, saveProductBom } from '@/store/productBomStore'
 import { isBomEditable } from '@/mock/productBomOptions'
 import { loadBomDetailStructure, importBomByReference } from '@/utils/bomImport'
 import { defaultBomColumnSettings, bomTypeSelectOptions } from '@/mock/bomMaterialColumns'
@@ -240,6 +268,7 @@ import AddByBomModal from './components/AddByBomModal.vue'
 import SelectProductMaterialModal from './components/SelectProductMaterialModal.vue'
 import BomColumnSettingDrawer from './components/BomColumnSettingDrawer.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
+import BomRelationDrawer from './components/BomRelationDrawer.vue'
 import { validateAllBomParentChildLines, validateParentChildNotSame } from '@/utils/bomValidation'
 import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
 
@@ -277,6 +306,7 @@ const addByBomModalOpen = ref(false)
 const addChildParentId = ref('')
 const columnDrawerOpen = ref(false)
 const overviewModalOpen = ref(false)
+const relationOpen = ref(false)
 const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
 
 const form = reactive({
@@ -331,6 +361,32 @@ const overviewInfo = computed(() => ({
   techParams: form.techParams || '—',
   matchingRequirements: form.matchingRequirements || '—',
 }))
+
+const relationBomContext = computed(() => {
+  if (isEditMode.value && editBomId.value) {
+    return (
+      getProductBomById(editBomId.value) || {
+        id: editBomId.value,
+        bomName: form.bomName,
+        bomNo: form.bomNo,
+        itemName: form.itemName,
+        itemType: form.itemType,
+        itemId: switchSelectedId.value,
+        lineItems: lineItems.value,
+        treeNodes: flatNodes.value,
+      }
+    )
+  }
+  return {
+    bomName: form.bomName,
+    bomNo: form.bomNo,
+    itemName: form.itemName,
+    itemType: form.itemType,
+    itemId: switchSelectedId.value,
+    lineItems: lineItems.value,
+    treeNodes: flatNodes.value,
+  }
+})
 
 const processRouteOpts = computed(() =>
   (processRouteState.routes || [])
@@ -562,7 +618,8 @@ function onReorderLines({ fromIndex, toIndex }) {
 
 function onMaterialChange({ lineId, material }) {
   const line = lineItems.value.find((l) => l.id === lineId)
-  const parentId = line?.parentTreeId || selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
+  const parentId =
+    line?.parentTreeId || selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
   const check = validateParentChildNotSame(
     parentId,
     material.code,
@@ -745,11 +802,7 @@ async function handleSave() {
     message.warning('请为所有子项选择物料')
     return
   }
-  const parentChildCheck = validateAllBomParentChildLines(
-    lineItems.value,
-    flatNodes.value,
-    form,
-  )
+  const parentChildCheck = validateAllBomParentChildLines(lineItems.value, flatNodes.value, form)
   if (!parentChildCheck.ok) {
     message.warning(parentChildCheck.message)
     return

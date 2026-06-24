@@ -140,10 +140,7 @@ function createBomMeta(item, itemType, index, structure) {
 /**
  * 为产品/物料列表前两页（各 20 条）生成结构一致的生效 BOM
  */
-export function buildPagedMockBoms(
-  products = mockProducts,
-  materials = mockMaterials,
-) {
+export function buildPagedMockBoms(products = mockProducts, materials = mockMaterials) {
   const pagedProducts = pickPagedItems(products)
   const pagedMaterials = pickPagedItems(materials)
   const allMaterials = materials

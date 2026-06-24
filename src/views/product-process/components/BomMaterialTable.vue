@@ -59,7 +59,12 @@
       <template #emptyText>
         <div class="add-detail-empty">
           <a-empty v-if="emptyVariant === 'no-children'" description="暂无子项" />
-          <a-button v-if="!readonly && emptyVariant !== 'no-children'" type="link" size="small" @click="emit('add-detail-line')">
+          <a-button
+            v-if="!readonly && emptyVariant !== 'no-children'"
+            type="link"
+            size="small"
+            @click="emit('add-detail-line')"
+          >
             添加明细行
           </a-button>
         </div>
@@ -209,7 +214,12 @@
       <template #summary>
         <a-table-summary-row v-if="!readonly && lines.length">
           <a-table-summary-cell :index="0" :col-span="tableColumns.length">
-            <a-button type="link" size="small" class="add-detail-link" @click="emit('add-detail-line')">
+            <a-button
+              type="link"
+              size="small"
+              class="add-detail-link"
+              @click="emit('add-detail-line')"
+            >
               添加明细行
             </a-button>
           </a-table-summary-cell>
@@ -240,7 +250,12 @@ import {
   PlusOutlined,
   HolderOutlined,
 } from '@ant-design/icons-vue'
-import { unitOptions, processDocOptions, processRouteOptions, formatChildBomLabel } from '@/mock/bomMaterialColumns'
+import {
+  unitOptions,
+  processDocOptions,
+  processRouteOptions,
+  formatChildBomLabel,
+} from '@/mock/bomMaterialColumns'
 import BomMaterialBatchEditModal from './BomMaterialBatchEditModal.vue'
 import BomSubItemMaterialSelect from './BomSubItemMaterialSelect.vue'
 
@@ -286,7 +301,6 @@ const emit = defineEmits([
 const unitOpts = unitOptions.map((v) => ({ label: v, value: v }))
 const processDocOpts = processDocOptions
 const processRouteOpts = processRouteOptions
-
 
 const widthMap = {
   materialCode: 120,
@@ -353,13 +367,9 @@ const allSelected = computed(
     allLineIds.value.every((id) => selectedRowKeys.value.includes(id)),
 )
 
-const indeterminate = computed(
-  () => selectedRowKeys.value.length > 0 && !allSelected.value,
-)
+const indeterminate = computed(() => selectedRowKeys.value.length > 0 && !allSelected.value)
 
-const shouldShowHeaderCheckbox = computed(
-  () => headerIndexHover.value || hasSelection.value,
-)
+const shouldShowHeaderCheckbox = computed(() => headerIndexHover.value || hasSelection.value)
 
 watch(
   () => props.lines.map((l) => l.id).join(','),

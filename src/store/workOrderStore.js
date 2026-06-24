@@ -7,7 +7,11 @@ import {
   generateProductionWorkOrderCode,
   generateProductionWorkOrderName,
 } from '@/utils/workOrderNaming'
-import { createLaborDemoProductionOrders, createLaborDemoAssemblyOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
+import {
+  createLaborDemoProductionOrders,
+  createLaborDemoAssemblyOrders,
+  isLaborDemoWorkOrder,
+} from '@/mock/laborHourDemoSeed'
 
 const STORAGE_KEY = 'i_doms_work_orders'
 let codeSeq = 1
@@ -218,8 +222,8 @@ export function updateWorkOrder(id, patch) {
 
 export function createWorkOrderPayload(partial) {
   const isOutsource = partial.orderCategory === '外协工单'
-  const routeName = partial.processRouteName
-    || (isOutsource ? '' : getDefaultProductRoute(partial.productName))
+  const routeName =
+    partial.processRouteName || (isOutsource ? '' : getDefaultProductRoute(partial.productName))
   const existingCodes = workOrderState.orders.map((o) => o.code)
   const category = partial.orderCategory || '生产工单'
   const productName = partial.productName?.trim() || ''

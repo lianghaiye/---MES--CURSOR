@@ -6,13 +6,7 @@
     destroy-on-close
     @close="emit('update:open', false)"
   >
-    <a-alert
-      v-if="hint"
-      type="info"
-      :message="hint"
-      show-icon
-      class="setting-hint"
-    />
+    <a-alert v-if="hint" type="info" :message="hint" show-icon class="setting-hint" />
     <a-table
       :columns="displaySettingColumns"
       :data-source="localSettings"

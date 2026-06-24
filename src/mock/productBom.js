@@ -31,9 +31,7 @@ function createBom(index) {
   const status = statuses[index % statuses.length]
   const created = dayjs('2026-01-10').add(index % 120, 'day')
   const effective =
-    status === '生效' || status === '待发布'
-      ? created.add(1, 'day').format('YYYY-MM-DD HH:mm')
-      : ''
+    status === '生效' || status === '待发布' ? created.add(1, 'day').format('YYYY-MM-DD HH:mm') : ''
   const groupId = `bom-grp-${Math.floor(index / 3)}`
 
   return {

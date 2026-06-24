@@ -78,10 +78,7 @@
               <template #bodyCell="{ column, record: line, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'taskStatus'">
-                  <a-badge
-                    :status="taskStatusBadge(line.taskStatus)"
-                    :text="line.taskStatus"
-                  />
+                  <a-badge :status="taskStatusBadge(line.taskStatus)" :text="line.taskStatus" />
                 </template>
                 <template v-else-if="column.key === 'pushStatus'">
                   <a-tag :color="pushStatusColor(line.pushStatus)">{{ line.pushStatus }}</a-tag>
@@ -95,13 +92,15 @@
                       type="link"
                       size="small"
                       @click="handlePushOne(line)"
-                    >推送</a-button>
+                      >推送</a-button
+                    >
                     <a-button
                       v-if="canAudit(line)"
                       type="link"
                       size="small"
                       @click="handleAuditOne(line)"
-                    >审核</a-button>
+                      >审核</a-button
+                    >
                   </a-space>
                   <span v-else class="locked-text">已锁定</span>
                 </template>

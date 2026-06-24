@@ -62,7 +62,10 @@ function matchCondition(row, condition) {
 /** 按动态筛选条件过滤行（支持且/或） */
 export function applyBomSubItemFilterConditions(rows, conditions = []) {
   const active = (conditions || []).filter(
-    (c) => c.field && c.operator && (c.operator === 'empty' || c.operator === 'notEmpty' || normalizeValue(c.value) !== ''),
+    (c) =>
+      c.field &&
+      c.operator &&
+      (c.operator === 'empty' || c.operator === 'notEmpty' || normalizeValue(c.value) !== ''),
   )
   if (!active.length) return rows
 

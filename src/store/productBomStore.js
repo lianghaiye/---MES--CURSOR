@@ -13,7 +13,12 @@ import {
   isBomProductionReady,
   normalizeBomStatusValue,
 } from '@/mock/productBomOptions'
-import { formatBomVersion, getBomVersionYear, nextSubVersionForYear, normalizeVersionDisplay } from '@/utils/bomVersion'
+import {
+  formatBomVersion,
+  getBomVersionYear,
+  nextSubVersionForYear,
+  normalizeVersionDisplay,
+} from '@/utils/bomVersion'
 import { upgradeParentBomReferences } from '@/utils/bomVersionReference'
 
 const STORAGE_KEY = 'i_doms_product_bom'
@@ -132,12 +137,7 @@ export function getActiveBomForItem(itemType, itemId) {
 function archiveActiveForItem(itemType, itemId, exceptId) {
   const ts = nowStr()
   productBomState.boms.forEach((b) => {
-    if (
-      b.itemType === itemType &&
-      b.itemId === itemId &&
-      b.id !== exceptId &&
-      isBomActive(b)
-    ) {
+    if (b.itemType === itemType && b.itemId === itemId && b.id !== exceptId && isBomActive(b)) {
       b.status = BOM_STATUS.ARCHIVED
       b.isDefault = false
       b.expiredAt = ts

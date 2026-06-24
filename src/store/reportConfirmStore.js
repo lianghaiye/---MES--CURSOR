@@ -82,8 +82,7 @@ function enrichLine(line) {
     reportType: labor.reportType,
     salaryMethod: labor.salaryMethod,
     reportTypeLabel: `${labor.reportType}+${labor.salaryMethod}`,
-    calculatedSalary:
-      line.confirmStatus === CONFIRM_STATUS.CONFIRMED ? calcSalary(line) : null,
+    calculatedSalary: line.confirmStatus === CONFIRM_STATUS.CONFIRMED ? calcSalary(line) : null,
   }
 }
 
@@ -267,8 +266,10 @@ export function adjustConfirmLine(id, payload = {}) {
     return { ok: false, message: '仅待确认数据可调整' }
   }
   if (payload.goodQty != null) line.adjustedGoodQty = Math.max(0, Number(payload.goodQty) || 0)
-  if (payload.defectQty != null) line.adjustedDefectQty = Math.max(0, Number(payload.defectQty) || 0)
-  if (payload.reportDuration != null) line.adjustedDuration = Math.max(0, Number(payload.reportDuration) || 0)
+  if (payload.defectQty != null)
+    line.adjustedDefectQty = Math.max(0, Number(payload.defectQty) || 0)
+  if (payload.reportDuration != null)
+    line.adjustedDuration = Math.max(0, Number(payload.reportDuration) || 0)
   if (payload.remark != null) line.remark = payload.remark
   if (payload.adjustReason != null) line.adjustReason = payload.adjustReason
   Object.assign(line, enrichLine(line))
@@ -321,7 +322,9 @@ export function workerConfirmLine(id) {
 /** 工人确认后写入工时工资模块 */
 export function syncConfirmLineToLaborHour(line) {
   const orderId = `lh-${line.workOrderId}`
-  let order = laborHourState.orders.find((o) => o.id === orderId || o.workOrderId === line.workOrderId)
+  let order = laborHourState.orders.find(
+    (o) => o.id === orderId || o.workOrderId === line.workOrderId,
+  )
   const laborLine = {
     id: `lhl-rc-${line.id}`,
     confirmLineId: line.id,

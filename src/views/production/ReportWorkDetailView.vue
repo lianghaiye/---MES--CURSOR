@@ -35,7 +35,9 @@
             <a-descriptions-item label="规格型号">{{ bundle.specModel }}</a-descriptions-item>
             <a-descriptions-item label="工作中心">{{ bundle.workCenter }}</a-descriptions-item>
             <a-descriptions-item label="负责人">{{ bundle.owner }}</a-descriptions-item>
-            <a-descriptions-item label="工艺路线">{{ bundle.processRouteName }}</a-descriptions-item>
+            <a-descriptions-item label="工艺路线">{{
+              bundle.processRouteName
+            }}</a-descriptions-item>
             <a-descriptions-item label="EBOM" :span="3">{{ bundle.ebomLabel }}</a-descriptions-item>
           </a-descriptions>
         </div>
@@ -252,10 +254,7 @@ const summary = computed(() => {
     return { goodQty: 0, defectQty: 0, workHours: 0, salaryAmount: 0 }
   }
   const base = summarizeProcessReportLines(bundle.value.lines)
-  const salaryAmount = bundle.value.lines.reduce(
-    (s, l) => s + (Number(l.salaryAmount) || 0),
-    0,
-  )
+  const salaryAmount = bundle.value.lines.reduce((s, l) => s + (Number(l.salaryAmount) || 0), 0)
   return { ...base, salaryAmount: Math.round(salaryAmount * 100) / 100 }
 })
 
@@ -323,7 +322,9 @@ function reload() {
     const tab = tabStore.tabs.find((t) => t.path === route.path)
     if (tab) {
       tab.title =
-        row.perProcessRegister !== false ? row.productName || '登记详情' : row.workOrderNo || '登记详情'
+        row.perProcessRegister !== false
+          ? row.productName || '登记详情'
+          : row.workOrderNo || '登记详情'
     }
   }
   loading.value = false

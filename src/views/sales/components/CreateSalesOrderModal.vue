@@ -275,20 +275,12 @@
             </template>
 
             <template v-else-if="column.key === 'specModel'">
-              <a-input
-                v-if="record.isManualLine"
-                v-model:value="record.specModel"
-                size="small"
-              />
+              <a-input v-if="record.isManualLine" v-model:value="record.specModel" size="small" />
               <span v-else>{{ record.specModel || '—' }}</span>
             </template>
 
             <template v-else-if="column.key === 'material'">
-              <a-input
-                v-if="record.isManualLine"
-                v-model:value="record.material"
-                size="small"
-              />
+              <a-input v-if="record.isManualLine" v-model:value="record.material" size="small" />
               <span v-else>{{ record.material || '—' }}</span>
             </template>
 

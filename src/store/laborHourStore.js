@@ -66,10 +66,7 @@ function migrateLine(line) {
       line.pushStatus = PUSH_STATUS.NOT_PUSHED
     }
   }
-  if (
-    !line.taskStatus ||
-    ['待推送', '待工人确认', '已确认', '有异议'].includes(line.taskStatus)
-  ) {
+  if (!line.taskStatus || ['待推送', '待工人确认', '已确认', '有异议'].includes(line.taskStatus)) {
     line.taskStatus =
       line.auditStatus === '已审核' || line.taskStatus === '已审核'
         ? TASK_STATUS.AUDITED
@@ -277,7 +274,10 @@ export function adjustLaborLine(orderId, lineId, payload) {
   }
 
   Object.assign(order, recalcOrder(order))
-  syncLineToMobileIfNeeded(order, order.lines.find((l) => l.id === lineId))
+  syncLineToMobileIfNeeded(
+    order,
+    order.lines.find((l) => l.id === lineId),
+  )
   appendLog(order, {
     action: '调整',
     target: `任务 ${line.taskNo}`,
@@ -302,7 +302,10 @@ export function subsidyLaborLine(orderId, lineId, payload) {
   if (payload.subsidyReason != null) line.subsidyReason = payload.subsidyReason
 
   Object.assign(order, recalcOrder(order))
-  syncLineToMobileIfNeeded(order, order.lines.find((l) => l.id === lineId))
+  syncLineToMobileIfNeeded(
+    order,
+    order.lines.find((l) => l.id === lineId),
+  )
   appendLog(order, {
     action: '补贴',
     target: `任务 ${line.taskNo}`,
@@ -322,7 +325,10 @@ export function pushLaborLines(orderId, lineIds, operator = 'admin1') {
   pushable.forEach((line) => {
     line.pushStatus = PUSH_STATUS.PUSHED
     line.pushedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-    const recalculated = enrichLaborLine(line, resolveLaborConfig(order.materialCode, line.processName))
+    const recalculated = enrichLaborLine(
+      line,
+      resolveLaborConfig(order.materialCode, line.processName),
+    )
     Object.assign(line, recalculated)
     upsertMobileWageItem(order, line)
   })
@@ -351,7 +357,10 @@ export function auditLaborLines(orderId, lineIds, operator = 'admin1') {
     if (isAuditSalaryPush() && line.pushStatus === PUSH_STATUS.NOT_PUSHED) {
       line.pushStatus = PUSH_STATUS.PUSHED
       line.pushedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-      const enriched = enrichLaborLine(line, resolveLaborConfig(order.materialCode, line.processName))
+      const enriched = enrichLaborLine(
+        line,
+        resolveLaborConfig(order.materialCode, line.processName),
+      )
       Object.assign(line, enriched)
       upsertMobileWageItem(order, line)
     } else {

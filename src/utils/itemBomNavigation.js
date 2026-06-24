@@ -4,9 +4,7 @@ import { isBomActive, isBomPending } from '@/mock/productBomOptions'
 /** 解析产品/物料对应的 BOM 维护入口 */
 export function resolveItemBomNavigation(itemType, itemId) {
   void productBomState.boms
-  const boms = productBomState.boms.filter(
-    (b) => b.itemType === itemType && b.itemId === itemId,
-  )
+  const boms = productBomState.boms.filter((b) => b.itemType === itemType && b.itemId === itemId)
   const draft = boms.find((b) => isBomPending(b))
   if (draft) {
     return {

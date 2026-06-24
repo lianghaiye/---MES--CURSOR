@@ -15,9 +15,7 @@ export function calcBomLevelCount(treeNodes = []) {
   if (!startNodes.length) return treeNodes.length ? 1 : 0
 
   function maxDepth(nodeId, currentDepth) {
-    const children = treeNodes.filter(
-      (n) => n.parentId === nodeId && n.id !== nodeId && !n.isRoot,
-    )
+    const children = treeNodes.filter((n) => n.parentId === nodeId && n.id !== nodeId && !n.isRoot)
     if (!children.length) return currentDepth
     return Math.max(...children.map((child) => maxDepth(child.id, currentDepth + 1)))
   }

@@ -86,10 +86,14 @@ export function getBomTreeLevelNo(nodeId, flatNodes, lineItems = []) {
 }
 
 /** 按字段配置格式化树节点标题 */
-export function formatBomTreeNodeTitle(node, flatNodes, lineItems, fieldSettings = [], rootMeta = {}) {
-  const visible = [...fieldSettings]
-    .filter((f) => !f.hidden)
-    .sort((a, b) => a.order - b.order)
+export function formatBomTreeNodeTitle(
+  node,
+  flatNodes,
+  lineItems,
+  fieldSettings = [],
+  rootMeta = {},
+) {
+  const visible = [...fieldSettings].filter((f) => !f.hidden).sort((a, b) => a.order - b.order)
 
   const line = resolveNodeLine(node, lineItems)
   const levelNoMap = buildBomTreeLevelNoMap(flatNodes, lineItems)
@@ -104,7 +108,7 @@ export function formatBomTreeNodeTitle(node, flatNodes, lineItems, fieldSettings
   const spec = line?.specModel || (node.isRoot ? rootMeta.specModel : '') || ''
   const supply = line?.supplyForm || (node.isRoot ? rootMeta.supplyForm : '') || ''
   const childCount = countDirectChildren(flatNodes, node.id)
-  const qtySuffix = node.isRoot ? rootMeta.subItemCount ?? childCount : childCount
+  const qtySuffix = node.isRoot ? (rootMeta.subItemCount ?? childCount) : childCount
 
   const valueMap = {
     levelNo,
@@ -135,13 +139,7 @@ export function filterTreeNodesByKeyword(flatNodes, keyword, rootMeta = {}) {
 
   const matchedIds = new Set()
   flatNodes.forEach((n) => {
-    const text = [
-      n.title,
-      n.materialCode,
-      rootMeta.code,
-      rootMeta.name,
-      rootMeta.specModel,
-    ]
+    const text = [n.title, n.materialCode, rootMeta.code, rootMeta.name, rootMeta.specModel]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()

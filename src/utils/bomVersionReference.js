@@ -5,7 +5,7 @@ import { isCatalogSeedBom, hydrateCatalogBom } from '@/mock/productBomSeed'
 import { mockProducts } from '@/mock/productInfo'
 import { isBomArchived, isBomPending } from '@/mock/productBomOptions'
 
-function getBomLineItems(bom) {
+export function getBomLineItems(bom) {
   if (!bom) return []
   if (bom.lineItems?.length) return bom.lineItems
   if (isCatalogSeedBom(bom)) {

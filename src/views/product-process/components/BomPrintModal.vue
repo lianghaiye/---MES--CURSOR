@@ -37,7 +37,8 @@
     </a-form>
 
     <div class="print-tip">
-      将按列设置中<strong>已显示</strong>的字段输出（当前 {{ visibleColumnCount }} 列），隐藏列不会打印。
+      将按列设置中<strong>已显示</strong>的字段输出（当前
+      {{ visibleColumnCount }} 列），隐藏列不会打印。
     </div>
 
     <div class="action-list">

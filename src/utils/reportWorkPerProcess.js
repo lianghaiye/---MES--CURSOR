@@ -66,7 +66,8 @@ function mapQuickReportProcessToLine(record, process, index, materialCode) {
     goodQty: process.goodQty,
     defectQty: process.defectQty,
     defectBreakdown: enriched.defectBreakdown,
-    defectReason: formatBreakdownLabel(enriched.defectBreakdown) || enriched.defectReasonLabel || '—',
+    defectReason:
+      formatBreakdownLabel(enriched.defectBreakdown) || enriched.defectReasonLabel || '—',
     workHours: process.workHours ?? '—',
     taskStartTime: resolveTaskTime(datePrefix, process.startTime, '08:00'),
     taskEndTime: resolveTaskTime(datePrefix, process.endTime, '18:00'),
@@ -93,7 +94,9 @@ export function buildReportWorkPerProcessBundle(record) {
   const materialCode = record.productCode || master?.code || wo?.materialCode || '—'
   const materialName = record.productName || master?.name || wo?.productName || '—'
   const activeProcesses = (record.processes || []).filter((p) => !p.deleted)
-  const lines = activeProcesses.map((p, i) => mapQuickReportProcessToLine(record, p, i, materialCode))
+  const lines = activeProcesses.map((p, i) =>
+    mapQuickReportProcessToLine(record, p, i, materialCode),
+  )
 
   const firstReporter = lines[0]?.reporter || record.reporter
 

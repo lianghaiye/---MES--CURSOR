@@ -12,10 +12,20 @@
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form">
         <a-form-item label="工单号">
-          <a-input v-model:value="filters.workOrderNo" allow-clear size="small" placeholder="工单号" />
+          <a-input
+            v-model:value="filters.workOrderNo"
+            allow-clear
+            size="small"
+            placeholder="工单号"
+          />
         </a-form-item>
         <a-form-item label="产品名称">
-          <a-input v-model:value="filters.productName" allow-clear size="small" placeholder="产品名称" />
+          <a-input
+            v-model:value="filters.productName"
+            allow-clear
+            size="small"
+            placeholder="产品名称"
+          />
         </a-form-item>
         <a-form-item label="执行人">
           <a-input v-model:value="filters.executor" allow-clear size="small" placeholder="执行人" />

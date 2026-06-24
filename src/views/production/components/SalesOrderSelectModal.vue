@@ -113,11 +113,13 @@ const columns = [
 ]
 
 const filteredList = computed(() =>
-  filterSalesOrdersForPicker(salesOrderState.orders, applied).slice().sort((a, b) => {
-    const ta = resolveSalesOrderCreatedAt(a)
-    const tb = resolveSalesOrderCreatedAt(b)
-    return tb.localeCompare(ta)
-  }),
+  filterSalesOrdersForPicker(salesOrderState.orders, applied)
+    .slice()
+    .sort((a, b) => {
+      const ta = resolveSalesOrderCreatedAt(a)
+      const tb = resolveSalesOrderCreatedAt(b)
+      return tb.localeCompare(ta)
+    }),
 )
 
 const rowSelection = computed(() => ({

@@ -1,5 +1,9 @@
 import { productAttributeOptions } from '@/mock/productInfoOptions'
-import { materialTypeOptions, supplyFormOptions, inventoryUnitOptions } from '@/mock/materialInfoOptions'
+import {
+  materialTypeOptions,
+  supplyFormOptions,
+  inventoryUnitOptions,
+} from '@/mock/materialInfoOptions'
 
 export const bomSubItemFilterLogicOptions = [
   { label: '且', value: 'and' },

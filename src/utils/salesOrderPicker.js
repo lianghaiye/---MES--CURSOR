@@ -1,6 +1,8 @@
 /** 销售订单选择弹窗：产品名称汇总（多个逗号分隔） */
 export function formatSalesOrderProductNames(order) {
-  const names = [...new Set((order?.lineItems || []).map((line) => line.productName).filter(Boolean))]
+  const names = [
+    ...new Set((order?.lineItems || []).map((line) => line.productName).filter(Boolean)),
+  ]
   return names.length ? names.join('，') : '—'
 }
 

@@ -14,8 +14,12 @@
       <a-descriptions-item label="执行人">{{ line?.reporter || '—' }}</a-descriptions-item>
       <a-descriptions-item label="报工类型">{{ displayReportType }}</a-descriptions-item>
       <a-descriptions-item label="计薪方式">{{ displaySalaryMethod }}</a-descriptions-item>
-      <a-descriptions-item label="报工良品数">{{ formatReportQty(line?.goodQty) }}</a-descriptions-item>
-      <a-descriptions-item label="报工不良品数">{{ formatReportQty(line?.defectQty) }}</a-descriptions-item>
+      <a-descriptions-item label="报工良品数">{{
+        formatReportQty(line?.goodQty)
+      }}</a-descriptions-item>
+      <a-descriptions-item label="报工不良品数">{{
+        formatReportQty(line?.defectQty)
+      }}</a-descriptions-item>
       <a-descriptions-item v-if="showReportDuration" label="报工时长">
         {{ displayReportDuration }}
       </a-descriptions-item>
@@ -231,9 +235,7 @@ const defectItems = computed(() => {
 
 const showReportDuration = computed(() => props.config?.reportType === '时长报工')
 
-const displayReportType = computed(
-  () => props.line?.reportType || props.config?.reportType || '—',
-)
+const displayReportType = computed(() => props.line?.reportType || props.config?.reportType || '—')
 
 const displaySalaryMethod = computed(
   () => props.line?.salaryMethod || props.config?.salaryMethod || '—',
@@ -389,11 +391,7 @@ function handleCancel() {
 function handleOk() {
   const defectQty = Number(form.adjustedDefectQty) || 0
   if (defectQty > 0 && defectItems.value.length) {
-    const err = validateDefectBreakdown(
-      defectQty,
-      form.adjustedDefectBreakdown,
-      defectItems.value,
-    )
+    const err = validateDefectBreakdown(defectQty, form.adjustedDefectBreakdown, defectItems.value)
     if (err) {
       message.warning(err)
       return
@@ -412,9 +410,7 @@ function handleOk() {
         ? Number(form.subsidyReportQty) || 0
         : 0,
     subsidyHours:
-      form.subsidyMethod === 'qty' && isDurationHourly.value
-        ? Number(form.subsidyHours) || 0
-        : 0,
+      form.subsidyMethod === 'qty' && isDurationHourly.value ? Number(form.subsidyHours) || 0 : 0,
     subsidyFixedAmount: form.subsidyMethod === 'fixed' ? Number(form.subsidyFixedAmount) || 0 : 0,
     manualQualityDeduction: Number(form.manualQualityDeduction) || 0,
   })

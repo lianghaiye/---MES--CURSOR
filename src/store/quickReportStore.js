@@ -20,7 +20,11 @@ import {
 import { normalizeQuickReportProcess } from '@/utils/quickReportProcess'
 import { buildReportWorkPerProcessBundle } from '@/utils/reportWorkPerProcess'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
-import { validateDefectBreakdown, getProcessDefectItemsForForm, resolveOverallDefectItems } from '@/utils/defectBreakdown'
+import {
+  validateDefectBreakdown,
+  getProcessDefectItemsForForm,
+  resolveOverallDefectItems,
+} from '@/utils/defectBreakdown'
 import { buildQuickReportProcessesFromRoute } from '@/utils/quickReportProcess'
 import { isDurationReportMode } from '@/utils/reportMode'
 
@@ -309,7 +313,11 @@ export function submitQuickReport(payload) {
     defectItemNames: perProcessRegister ? [] : payload.defectItemNames || [],
     defectReasonLabel: perProcessRegister ? '' : payload.defectReasonLabel || '',
     workOrderNo: isEdit ? existing?.workOrderNo || workOrderNo : workOrderNo,
-    workOrderId: isEdit ? existing?.workOrderId || (isWorkOrderMode ? payload.workOrderId || '' : '') : isWorkOrderMode ? payload.workOrderId || '' : '',
+    workOrderId: isEdit
+      ? existing?.workOrderId || (isWorkOrderMode ? payload.workOrderId || '' : '')
+      : isWorkOrderMode
+        ? payload.workOrderId || ''
+        : '',
     registrationType: isEdit ? existing?.registrationType || registrationType : registrationType,
     registrationMode: isEdit ? existing?.registrationMode || registrationType : registrationType,
     workOrderStatus: existing?.workOrderStatus || '已报工',

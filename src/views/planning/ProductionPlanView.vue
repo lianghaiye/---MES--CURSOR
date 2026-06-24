@@ -556,7 +556,9 @@ const {
   displayColumns: displayMaterialColumns,
   tableScrollX: materialTableScrollX,
   defaultColumnSettings: defaultMaterialColumnSettings,
-} = useTableColumnSettings('production-plan-material-list', baseMaterialColumns, { minScrollX: 2400 })
+} = useTableColumnSettings('production-plan-material-list', baseMaterialColumns, {
+  minScrollX: 2400,
+})
 
 const processRouteOpts = computed(() => getProcessRouteSelectOptions())
 

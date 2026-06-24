@@ -91,10 +91,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import {
-  buildBomLinkedPickerRows,
-  findBomLinkedPickerRow,
-} from '@/utils/bomWithBomPicker'
+import { buildBomLinkedPickerRows, findBomLinkedPickerRow } from '@/utils/bomWithBomPicker'
 import SelectBomMaterialModal from './SelectBomMaterialModal.vue'
 
 const props = defineProps({

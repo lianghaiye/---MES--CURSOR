@@ -28,9 +28,7 @@ export function normalizeDefectItem(item = {}) {
     wageDiscountRate:
       affectWageDiscount && wageCalculationMethod === '打折计工资' ? wageDiscountRate : null,
     fixedDeductionAmount:
-      affectWageDiscount && wageCalculationMethod === '固定扣款金额'
-        ? fixedDeductionAmount
-        : null,
+      affectWageDiscount && wageCalculationMethod === '固定扣款金额' ? fixedDeductionAmount : null,
     description: item.description || '',
     createdAt: item.createdAt || '',
   }

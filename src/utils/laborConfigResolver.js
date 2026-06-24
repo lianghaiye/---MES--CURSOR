@@ -35,8 +35,7 @@ export function resolveLaborConfig(materialCode, processName) {
 
   const fallback = PROCESS_REPORT_LABOR_BY_CODE[materialCode]
   if (!fallback?.laborEnabled || !fallback.laborRows?.length) return null
-  const hit =
-    fallback.laborRows.find((r) => r.processName === processName) || fallback.laborRows[0]
+  const hit = fallback.laborRows.find((r) => r.processName === processName) || fallback.laborRows[0]
   return normalizeLaborRow(hit)
 }
 

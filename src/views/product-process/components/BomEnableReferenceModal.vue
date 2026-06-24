@@ -3,16 +3,16 @@
     :open="open"
     title="审核发布确认"
     :width="520"
-    ok-text="是，同步升级"
-    cancel-text="否，仅发布"
+    ok-text="是"
+    cancel-text="否"
     @update:open="emit('update:open', $event)"
     @ok="handleConfirm(true)"
     @cancel="handleConfirm(false)"
   >
     <p class="ref-tip">
-      检测到【{{ bomName }}】BOM 版本存在
+      检测到【{{ displayProductName }}】BOM 版本存在
       <strong>{{ refCount }}</strong>
-      个父级 BOM 引用关联，确认生效前是否同步升级引用版本？
+      个父级 BOM 引用关联，确认生效前是否将所有父级同步升级引用版本？
     </p>
     <ul v-if="refs.length" class="ref-list">
       <li v-for="ref in refs.slice(0, 8)" :key="ref.parentBomId">
@@ -29,12 +29,14 @@ import { computed } from 'vue'
 const props = defineProps({
   open: { type: Boolean, default: false },
   bomName: { type: String, default: '' },
+  productName: { type: String, default: '' },
   refs: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
 
 const refCount = computed(() => props.refs.length)
+const displayProductName = computed(() => props.productName || props.bomName || '—')
 
 function handleConfirm(upgrade) {
   emit('update:open', false)

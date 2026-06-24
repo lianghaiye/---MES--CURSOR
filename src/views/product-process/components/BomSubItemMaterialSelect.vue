@@ -17,9 +17,7 @@
       <div>
         <component :is="menu" />
         <a-divider style="margin: 4px 0" />
-        <div class="search-more-row" @mousedown.prevent @click="openPicker">
-          搜索更多...
-        </div>
+        <div class="search-more-row" @mousedown.prevent @click="openPicker">搜索更多...</div>
       </div>
     </template>
   </a-select>

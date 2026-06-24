@@ -168,12 +168,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
-import {
-  ClearOutlined,
-  DownOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-} from '@ant-design/icons-vue'
+import { ClearOutlined, DownOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import SalaryStatsNav from './components/SalaryStatsNav.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -242,19 +237,74 @@ const baseColumns = [
   { title: '不良品数', key: 'defectQty', dataIndex: 'defectQty', width: 88, align: 'right' },
   { title: '不良原因', key: 'defectReason', dataIndex: 'defectReason', width: 140, ellipsis: true },
   { title: '报工工时', key: 'workHours', dataIndex: 'workHours', width: 88, align: 'right' },
-  { title: '调整良品数', key: 'adjustedGoodQty', dataIndex: 'adjustedGoodQty', width: 100, align: 'right' },
-  { title: '调整不良品数', key: 'adjustedDefectQty', dataIndex: 'adjustedDefectQty', width: 110, align: 'right' },
-  { title: '调整工时', key: 'adjustedWorkHours', dataIndex: 'adjustedWorkHours', width: 88, align: 'right' },
-  { title: '补贴报工数', key: 'subsidyReportQty', dataIndex: 'subsidyReportQty', width: 100, align: 'right' },
+  {
+    title: '调整良品数',
+    key: 'adjustedGoodQty',
+    dataIndex: 'adjustedGoodQty',
+    width: 100,
+    align: 'right',
+  },
+  {
+    title: '调整不良品数',
+    key: 'adjustedDefectQty',
+    dataIndex: 'adjustedDefectQty',
+    width: 110,
+    align: 'right',
+  },
+  {
+    title: '调整工时',
+    key: 'adjustedWorkHours',
+    dataIndex: 'adjustedWorkHours',
+    width: 88,
+    align: 'right',
+  },
+  {
+    title: '补贴报工数',
+    key: 'subsidyReportQty',
+    dataIndex: 'subsidyReportQty',
+    width: 100,
+    align: 'right',
+  },
   { title: '补贴工时', key: 'subsidyHours', dataIndex: 'subsidyHours', width: 88, align: 'right' },
-  { title: '最终计件数', key: 'finalPieceQty', dataIndex: 'finalPieceQty', width: 100, align: 'right' },
-  { title: '最终核算工时', key: 'accountHours', dataIndex: 'accountHours', width: 110, align: 'right' },
+  {
+    title: '最终计件数',
+    key: 'finalPieceQty',
+    dataIndex: 'finalPieceQty',
+    width: 100,
+    align: 'right',
+  },
+  {
+    title: '最终核算工时',
+    key: 'accountHours',
+    dataIndex: 'accountHours',
+    width: 110,
+    align: 'right',
+  },
   { title: '计薪方式', key: 'salaryMethod', dataIndex: 'salaryMethod', width: 100 },
   { title: '良品工资', key: 'goodWage', dataIndex: 'goodWage', width: 100, align: 'right' },
   { title: '不良品工资', key: 'defectWage', dataIndex: 'defectWage', width: 100, align: 'right' },
-  { title: '补贴金额', key: 'subsidyAmount', dataIndex: 'subsidyAmount', width: 100, align: 'right' },
-  { title: '质量扣款', key: 'qualityDeduction', dataIndex: 'qualityDeduction', width: 100, align: 'right' },
-  { title: '计薪(元)', key: 'salaryAmount', dataIndex: 'salaryAmount', width: 100, align: 'right', fixed: 'right' },
+  {
+    title: '补贴金额',
+    key: 'subsidyAmount',
+    dataIndex: 'subsidyAmount',
+    width: 100,
+    align: 'right',
+  },
+  {
+    title: '质量扣款',
+    key: 'qualityDeduction',
+    dataIndex: 'qualityDeduction',
+    width: 100,
+    align: 'right',
+  },
+  {
+    title: '计薪(元)',
+    key: 'salaryAmount',
+    dataIndex: 'salaryAmount',
+    width: 100,
+    align: 'right',
+    fixed: 'right',
+  },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -272,13 +322,15 @@ const NUMERIC_KEYS = new Set([
 
 const OPTIONAL_NUM_KEYS = new Set(['adjustedGoodQty', 'adjustedDefectQty', 'adjustedWorkHours'])
 
-const MONEY_KEYS = new Set(['goodWage', 'defectWage', 'subsidyAmount', 'qualityDeduction', 'salaryAmount'])
-
-const SUMMARY_NUMERIC_KEYS = new Set([
-  ...NUMERIC_KEYS,
-  ...OPTIONAL_NUM_KEYS,
-  ...MONEY_KEYS,
+const MONEY_KEYS = new Set([
+  'goodWage',
+  'defectWage',
+  'subsidyAmount',
+  'qualityDeduction',
+  'salaryAmount',
 ])
+
+const SUMMARY_NUMERIC_KEYS = new Set([...NUMERIC_KEYS, ...OPTIONAL_NUM_KEYS, ...MONEY_KEYS])
 
 const statsResult = ref({
   lines: [],

@@ -273,19 +273,11 @@
                     </a-col>
                     <a-col :xs="24" :md="12">
                       <div class="field-label">开始时间</div>
-                      <a-input
-                        v-model:value="record.startTime"
-                        placeholder="HH:mm"
-                        size="small"
-                      />
+                      <a-input v-model:value="record.startTime" placeholder="HH:mm" size="small" />
                     </a-col>
                     <a-col :xs="24" :md="12">
                       <div class="field-label">结束时间</div>
-                      <a-input
-                        v-model:value="record.endTime"
-                        placeholder="HH:mm"
-                        size="small"
-                      />
+                      <a-input v-model:value="record.endTime" placeholder="HH:mm" size="small" />
                     </a-col>
                   </a-row>
                 </template>
@@ -408,13 +400,9 @@ const processSelectOpen = ref(false)
 
 const isWorkOrderMode = computed(() => props.mode === 'workorder')
 
-const useLinkedProcessQty = computed(
-  () => isWorkOrderMode.value && form.perProcessRegister,
-)
+const useLinkedProcessQty = computed(() => isWorkOrderMode.value && form.perProcessRegister)
 
-const useLinkedOverallQty = computed(
-  () => isWorkOrderMode.value && !form.perProcessRegister,
-)
+const useLinkedOverallQty = computed(() => isWorkOrderMode.value && !form.perProcessRegister)
 
 const overallQtySnapshot = reactive({ goodQty: 0, defectQty: 0 })
 const modalTitle = computed(() => {

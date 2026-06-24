@@ -15,10 +15,7 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'config'">
-            <a-radio-group
-              :value="productionMode"
-              @change="(e) => onModeChange(e.target.value)"
-            >
+            <a-radio-group :value="productionMode" @change="(e) => onModeChange(e.target.value)">
               <a-radio
                 v-for="option in PRODUCTION_MODE_OPTIONS"
                 :key="option.value"

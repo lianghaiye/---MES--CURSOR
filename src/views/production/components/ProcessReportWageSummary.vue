@@ -51,7 +51,9 @@
       <a-descriptions-item v-if="line.wageRateMode === 'hourly'" label="标准计时单价">
         <span class="rate-cell">
           {{ formatMoney(line.effectiveStandardHourlyRate) }}/时
-          <a-tag v-if="line.isStandardHourlyRateOverridden" color="orange" class="rate-tag">已修改</a-tag>
+          <a-tag v-if="line.isStandardHourlyRateOverridden" color="orange" class="rate-tag"
+            >已修改</a-tag
+          >
           <a-button
             v-if="editable"
             type="link"
@@ -63,20 +65,34 @@
           </a-button>
         </span>
       </a-descriptions-item>
-      <a-descriptions-item label="调整良品数">{{ formatQty(line.adjustedGoodQty) }}</a-descriptions-item>
-      <a-descriptions-item label="调整不良品数">{{ formatQty(line.adjustedDefectQty) }}</a-descriptions-item>
+      <a-descriptions-item label="调整良品数">{{
+        formatQty(line.adjustedGoodQty)
+      }}</a-descriptions-item>
+      <a-descriptions-item label="调整不良品数">{{
+        formatQty(line.adjustedDefectQty)
+      }}</a-descriptions-item>
       <a-descriptions-item label="调整不良品项">{{ adjustedDefectItemsLabel }}</a-descriptions-item>
-      <a-descriptions-item label="调整工时">{{ formatHours(line.adjustedWorkHours) }}</a-descriptions-item>
-      <a-descriptions-item label="补贴金额">{{ formatSubsidyAmount(displaySubsidyAmount) }}</a-descriptions-item>
-      <a-descriptions-item label="最终计件数">{{ formatQty(line.finalPieceQty) }}</a-descriptions-item>
-      <a-descriptions-item label="最终核算工时">{{ formatHours(line.accountHours) }}</a-descriptions-item>
+      <a-descriptions-item label="调整工时">{{
+        formatHours(line.adjustedWorkHours)
+      }}</a-descriptions-item>
+      <a-descriptions-item label="补贴金额">{{
+        formatSubsidyAmount(displaySubsidyAmount)
+      }}</a-descriptions-item>
+      <a-descriptions-item label="最终计件数">{{
+        formatQty(line.finalPieceQty)
+      }}</a-descriptions-item>
+      <a-descriptions-item label="最终核算工时">{{
+        formatHours(line.accountHours)
+      }}</a-descriptions-item>
       <a-descriptions-item label="不良品折算工资">{{
         formatMoney(line.defectConvertedWage)
       }}</a-descriptions-item>
       <a-descriptions-item v-if="line.qualityDeduction > 0" label="质量扣款">
         -{{ formatMoney(line.qualityDeduction) }}
       </a-descriptions-item>
-      <a-descriptions-item label="调整原因" :span="2">{{ line.adjustReason || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="调整原因" :span="2">{{
+        line.adjustReason || '—'
+      }}</a-descriptions-item>
     </a-descriptions>
 
     <div v-if="line.defectWageDetails?.length" class="defect-wage-details">
@@ -88,13 +104,18 @@
           <template v-if="detail.rowType === 'hourly-deduction'">
             {{ detail.formula }}=-{{ formatMoney(Math.abs(detail.amount)) }}
           </template>
-          <template v-else> 折算工资：{{ detail.formula }}={{ formatMoney(detail.amount) }} </template>
+          <template v-else>
+            折算工资：{{ detail.formula }}={{ formatMoney(detail.amount) }}
+          </template>
         </span>
         <span v-else class="defect-wage-detail-calc muted">不折算</span>
       </div>
     </div>
 
-    <div class="wage-cards" :style="{ gridTemplateColumns: `repeat(${wageSummaryCards.length}, 1fr)` }">
+    <div
+      class="wage-cards"
+      :style="{ gridTemplateColumns: `repeat(${wageSummaryCards.length}, 1fr)` }"
+    >
       <div
         v-for="card in wageSummaryCards"
         :key="card.key"
@@ -161,7 +182,11 @@
             主数据配置：¥{{ formatMoney(line.masterPieceRate) }}/件
           </div>
         </a-form-item>
-        <a-form-item v-else-if="line?.wageRateMode === 'hourly'" label="标准计时单价（元/时）" required>
+        <a-form-item
+          v-else-if="line?.wageRateMode === 'hourly'"
+          label="标准计时单价（元/时）"
+          required
+        >
           <a-input-number
             v-model:value="rateForm.value"
             :min="0"

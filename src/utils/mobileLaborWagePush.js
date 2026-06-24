@@ -81,7 +81,7 @@ export function buildMobileWageItemFromProcessReport(bundle, line) {
   const accountHours =
     line.listAccountHours != null && Number.isFinite(Number(line.listAccountHours))
       ? Number(line.listAccountHours)
-      : line.accountHours ?? workHours
+      : (line.accountHours ?? workHours)
   return {
     id: line.id,
     source: 'process-report',
@@ -116,8 +116,7 @@ export function buildMobileWageItemFromProcessReport(bundle, line) {
     salaryAmount: line.salaryAmount,
     reportType: line.reportType,
     salaryMethod: line.salaryMethod,
-    reportTypeLabel:
-      line.calcMethod || `${line.reportType || ''}+${line.salaryMethod || ''}`,
+    reportTypeLabel: line.calcMethod || `${line.reportType || ''}+${line.salaryMethod || ''}`,
     adjustReason: line.adjustReason || '',
     subsidyReason: line.subsidyReason || '',
     remark: line.remark || '',

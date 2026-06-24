@@ -1,6 +1,11 @@
 import dayjs from 'dayjs'
 import { importTemplateChildren, bomTemplateCatalog } from '@/mock/bomTemplates'
-import { createRootTreeNode, mergeTemplateIntoRoot, mergeTemplateIntoParent, addChildMaterial } from '@/utils/bomTree'
+import {
+  createRootTreeNode,
+  mergeTemplateIntoRoot,
+  mergeTemplateIntoParent,
+  addChildMaterial,
+} from '@/utils/bomTree'
 import { getActiveBomForItem } from '@/store/productBomStore'
 import { toBomSubItemPayload } from '@/utils/bomSubItemPicker'
 

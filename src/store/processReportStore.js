@@ -81,10 +81,7 @@ function loadRecordsInner() {
     const seed = createProcessReportSeed()
     localStorage.setItem(PROCESS_REPORT_STORAGE_KEY, JSON.stringify(seed))
     localStorage.setItem(PROCESS_REPORT_SEED_VERSION_KEY, PROCESS_REPORT_SEED_VERSION)
-    localStorage.setItem(
-      PROCESS_REPORT_WO_LOG_KEY,
-      JSON.stringify(createProcessReportWoLogSeed()),
-    )
+    localStorage.setItem(PROCESS_REPORT_WO_LOG_KEY, JSON.stringify(createProcessReportWoLogSeed()))
     localStorage.setItem(
       PROCESS_REPORT_QUICK_LOG_KEY,
       JSON.stringify(createProcessReportQuickLogSeed()),
@@ -337,7 +334,8 @@ export function adjustProcessReportLine(recordId, payload = {}, operator = 'admi
     patch.adjustedDefectBreakdown = legacy.defectBreakdown
   }
   if (payload.subsidyMethod != null) patch.subsidyMethod = payload.subsidyMethod
-  if (payload.subsidyReportQty != null) patch.subsidyReportQty = Number(payload.subsidyReportQty) || 0
+  if (payload.subsidyReportQty != null)
+    patch.subsidyReportQty = Number(payload.subsidyReportQty) || 0
   if (payload.subsidyHours != null) patch.subsidyHours = Number(payload.subsidyHours) || 0
   if (payload.subsidyFixedAmount != null) {
     patch.subsidyFixedAmount = Number(payload.subsidyFixedAmount) || 0
@@ -463,9 +461,7 @@ export function auditProcessReportLine(recordId, result, reason = '', operator =
 }
 
 export function pushProcessReportLines(ids, operator = 'admin1') {
-  const rows = ids
-    .map((id) => processReportState.records.find((r) => r.id === id))
-    .filter(Boolean)
+  const rows = ids.map((id) => processReportState.records.find((r) => r.id === id)).filter(Boolean)
   if (!rows.length) return { ok: false, message: '请选择待推送明细' }
   const pushable = rows.filter((r) => r.pushStatus === PUSH_STATUS.NOT_PUSHED)
   if (!pushable.length) return { ok: false, message: '所选明细当前状态不可推送' }

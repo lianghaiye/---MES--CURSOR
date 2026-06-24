@@ -168,39 +168,64 @@
           <template v-else-if="column.key === 'matchingRequirements'">
             {{ record.matchingRequirements || record.remark || '—' }}
           </template>
-          <template
-            v-else-if="['specModel', 'material', 'drawingNo'].includes(column.dataIndex)"
-          >
+          <template v-else-if="['specModel', 'material', 'drawingNo'].includes(column.dataIndex)">
             {{ record[column.dataIndex] || '—' }}
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space v-if="isBomPending(record)" :size="0" wrap>
+              <a-button type="link" size="small" @click="handleEnable(record)">
+                <CheckOutlined />
+                启用
+              </a-button>
               <a-button type="link" size="small" @click="openEdit(record)">
                 <EditOutlined />
                 编辑
               </a-button>
-              <a-button type="link" size="small" danger @click="confirmDelete(record)">
-                <DeleteOutlined />
-                删除
-              </a-button>
-              <a-button type="link" size="small" @click="handleEnable(record)">
-                <CheckOutlined />
-                审核发布
-              </a-button>
+              <a-dropdown>
+                <a-button type="link" size="small">
+                  操作
+                  <DownOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu @click="({ key }) => onPendingAction(key, record)">
+                    <a-menu-item key="delete">
+                      <DeleteOutlined />
+                      删除
+                    </a-menu-item>
+                    <a-menu-item key="clone">
+                      <CopyOutlined />
+                      克隆
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </a-space>
             <a-space v-else-if="isBomActive(record)" :size="0" wrap>
               <a-button type="link" size="small" @click="openEdit(record)">
                 <EditOutlined />
                 编辑
               </a-button>
-              <a-button type="link" size="small" @click="handleArchive(record)">
-                <InboxOutlined />
-                归档
+              <a-button type="link" size="small" @click="openRelationDrawer(record)">
+                查看关联BOM
               </a-button>
-              <a-button type="link" size="small" @click="handleClone(record)">
-                <CopyOutlined />
-                克隆
-              </a-button>
+              <a-dropdown>
+                <a-button type="link" size="small">
+                  操作
+                  <DownOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu @click="({ key }) => onActiveAction(key, record)">
+                    <a-menu-item key="archive">
+                      <InboxOutlined />
+                      归档
+                    </a-menu-item>
+                    <a-menu-item key="clone">
+                      <CopyOutlined />
+                      克隆
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </a-space>
             <a-space v-else-if="isBomArchived(record)" :size="0" wrap>
               <a-button type="link" size="small" @click="handleClone(record)">
@@ -231,10 +256,13 @@
 
     <BomEnableReferenceModal
       v-model:open="enableRefOpen"
-      :bom-name="enableTarget?.itemName || enableTarget?.bomName || ''"
+      :product-name="enableTarget?.itemName || ''"
+      :bom-name="enableTarget?.bomName || ''"
       :refs="enableParentRefs"
       @confirm="onEnableRefConfirm"
     />
+
+    <BomRelationDrawer v-model:open="relationOpen" :bom="relationBom" />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -266,7 +294,13 @@ import {
   CheckOutlined,
 } from '@ant-design/icons-vue'
 import { filterProductBoms } from '@/mock/productBom'
-import { bomStatusOptions, bomStatusColor, isBomPending, isBomActive, isBomArchived } from '@/mock/productBomOptions'
+import {
+  bomStatusOptions,
+  bomStatusColor,
+  isBomPending,
+  isBomActive,
+  isBomArchived,
+} from '@/mock/productBomOptions'
 import { productBomState } from '@/store/productBomStore'
 import {
   deleteProductBom,
@@ -281,13 +315,11 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import ProductBomVersionDrawer from './components/ProductBomVersionDrawer.vue'
 import BomEnableReferenceModal from './components/BomEnableReferenceModal.vue'
+import BomRelationDrawer from './components/BomRelationDrawer.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
-import {
-  buildMasterLookup,
-  enrichProductBomList,
-} from '@/utils/productBomListEnrich'
+import { buildMasterLookup, enrichProductBomList } from '@/utils/productBomListEnrich'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -309,6 +341,8 @@ const versionRecord = ref(null)
 const enableRefOpen = ref(false)
 const enableTarget = ref(null)
 const enableParentRefs = ref([])
+const relationOpen = ref(false)
+const relationBom = ref(null)
 
 const itemFilterOptions = computed(() => {
   const products = productInfoState.products.slice(0, 150).map((p) => ({
@@ -330,9 +364,7 @@ const masterLookup = computed(() =>
   buildMasterLookup(productInfoState.products, materialInfoState.materials),
 )
 
-const enrichedList = computed(() =>
-  enrichProductBomList(productBomState.boms, masterLookup.value),
-)
+const enrichedList = computed(() => enrichProductBomList(productBomState.boms, masterLookup.value))
 
 const filteredList = computed(() => filterProductBoms(enrichedList.value, appliedFilters.value))
 
@@ -365,7 +397,7 @@ const baseColumns = [
   { title: '生效日期', dataIndex: 'effectiveAt', width: 150 },
   { title: '失效日期', dataIndex: 'expiredAt', width: 150 },
   { title: '配套要求', key: 'matchingRequirements', width: 140, ellipsis: true },
-  { title: '操作', key: 'action', width: 240, fixed: 'right' },
+  { title: '操作', key: 'action', width: 260, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -421,26 +453,39 @@ function openVersionDrawer(record) {
   versionOpen.value = true
 }
 
-function confirmDelete(record) {
-  Modal.confirm({
-    title: '确认删除',
-    content: `确定删除 BOM「${record.bomName}」吗？`,
-    okType: 'danger',
-    onOk: () => {
-      const res = deleteProductBom(record.id)
-      if (res?.error) {
-        message.warning(res.error)
-        return
-      }
-      message.success('已删除')
-      selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== record.id)
-    },
-  })
+function openRelationDrawer(record) {
+  relationBom.value = record
+  relationOpen.value = true
 }
 
-function handleArchive(record) {
-  archiveProductBom(record.id)
-  message.success('已归档')
+function onPendingAction(key, record) {
+  if (key === 'delete') {
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定删除 BOM「${record.bomName}」吗？`,
+      okType: 'danger',
+      onOk: () => {
+        const res = deleteProductBom(record.id)
+        if (res?.error) {
+          message.warning(res.error)
+          return
+        }
+        message.success('已删除')
+        selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== record.id)
+      },
+    })
+    return
+  }
+  if (key === 'clone') handleClone(record)
+}
+
+function onActiveAction(key, record) {
+  if (key === 'archive') {
+    archiveProductBom(record.id)
+    message.success('已归档')
+    return
+  }
+  if (key === 'clone') handleClone(record)
 }
 
 function handleBatchEnable() {

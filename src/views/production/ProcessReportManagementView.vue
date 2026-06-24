@@ -117,12 +117,7 @@
             >
               详情
             </a-button>
-            <a-button
-              v-else
-              type="link"
-              size="small"
-              @click.stop="openQuickDetail(record)"
-            >
+            <a-button v-else type="link" size="small" @click.stop="openQuickDetail(record)">
               详情
             </a-button>
           </template>

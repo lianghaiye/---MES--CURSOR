@@ -62,9 +62,7 @@ export function buildAntTreeData(flatNodes, lineItems = []) {
 
   function mapNode(node) {
     const childIds = getOrderedChildNodeIds(node.id, flatNodes, lineItems)
-    const children = childIds
-      .map((id) => flatNodes.find((n) => n.id === id))
-      .filter(Boolean)
+    const children = childIds.map((id) => flatNodes.find((n) => n.id === id)).filter(Boolean)
     return {
       key: node.id,
       title: node.title,

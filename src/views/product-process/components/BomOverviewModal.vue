@@ -59,7 +59,9 @@
         </div>
         <div class="meta-item">
           <span class="meta-label">技术参数</span>
-          <span class="meta-value" :title="displayInfo.techParams">{{ displayInfo.techParams }}</span>
+          <span class="meta-value" :title="displayInfo.techParams">{{
+            displayInfo.techParams
+          }}</span>
         </div>
         <div class="meta-item meta-item-wide">
           <span class="meta-label">配置要求</span>
@@ -152,13 +154,8 @@ const quantity = ref(1)
 const expandedKeys = ref([])
 const printModalOpen = ref(false)
 
-const {
-  columnSettings,
-  columnDrawerOpen,
-  displayColumns,
-  tableScrollX,
-  defaultColumnSettings,
-} = useTableColumnSettings('bom-overview-list', bomOverviewBaseColumns, { minScrollX: 1400 })
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('bom-overview-list', bomOverviewBaseColumns, { minScrollX: 1400 })
 
 const displayInfo = computed(() => ({
   bomNo: props.overviewInfo?.bomNo || '—',

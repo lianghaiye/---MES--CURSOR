@@ -29,7 +29,13 @@ export const bomOverviewBaseColumns = [
   { title: '物料类别', dataIndex: 'categoryName', key: 'categoryName', width: 90 },
   { title: '供应型态', dataIndex: 'supplyForm', key: 'supplyForm', width: 90 },
   { title: '供应单位', dataIndex: 'supplyUnit', key: 'supplyUnit', width: 140, ellipsis: true },
-  { title: '工艺文件', dataIndex: 'processDocName', key: 'processDocName', width: 110, ellipsis: true },
+  {
+    title: '工艺文件',
+    dataIndex: 'processDocName',
+    key: 'processDocName',
+    width: 110,
+    ellipsis: true,
+  },
   { title: '工艺路线', dataIndex: 'processRoute', key: 'processRoute', width: 120, ellipsis: true },
   { title: '备注', dataIndex: 'remark', key: 'remark', width: 120, ellipsis: true },
 ]

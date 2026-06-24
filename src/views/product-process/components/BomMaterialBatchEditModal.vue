@@ -33,13 +33,7 @@
           placeholder="请输入"
           style="width: 100%"
         />
-        <a-textarea
-          v-else
-          v-model:value="form.remark"
-          :rows="4"
-          placeholder="请输入"
-          allow-clear
-        />
+        <a-textarea v-else v-model:value="form.remark" :rows="4" placeholder="请输入" allow-clear />
       </a-form-item>
     </a-form>
 

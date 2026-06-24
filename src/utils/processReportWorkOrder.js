@@ -15,10 +15,7 @@ import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import { formatReportDate } from '@/mock/processReportRecords'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { enrichProcessReportLine, resolveListAccountHours } from '@/utils/processReportWageCalc'
-import {
-  formatBreakdownLabel,
-  getApprovedDefectBreakdown,
-} from '@/utils/defectBreakdown'
+import { formatBreakdownLabel, getApprovedDefectBreakdown } from '@/utils/defectBreakdown'
 
 function findMasterByCode(code) {
   if (!code) return null

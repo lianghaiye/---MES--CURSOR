@@ -104,7 +104,12 @@
               <span class="selected-code">{{ item.code }}</span>
               <span class="selected-name" :title="item.name">{{ item.name }}</span>
             </div>
-            <a-button type="text" size="small" class="remove-btn" @click="removeSelected(item.rowKey)">
+            <a-button
+              type="text"
+              size="small"
+              class="remove-btn"
+              @click="removeSelected(item.rowKey)"
+            >
               <CloseOutlined />
             </a-button>
           </div>
@@ -120,7 +125,11 @@
       </a-button>
     </template>
 
-    <MaterialFormModal v-if="!onlyWithBom" v-model:open="materialFormOpen" @saved="onMaterialSaved" />
+    <MaterialFormModal
+      v-if="!onlyWithBom"
+      v-model:open="materialFormOpen"
+      @saved="onMaterialSaved"
+    />
     <BomSubItemColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -143,7 +152,11 @@ import {
   CloseOutlined,
   FilterOutlined,
 } from '@ant-design/icons-vue'
-import { buildBomSubItemPickerRows, filterBomSubItemPickerRows, toBomSubItemPayload } from '@/utils/bomSubItemPicker'
+import {
+  buildBomSubItemPickerRows,
+  filterBomSubItemPickerRows,
+  toBomSubItemPayload,
+} from '@/utils/bomSubItemPicker'
 import { buildBomLinkedPickerRows } from '@/utils/bomWithBomPicker'
 import { applyBomSubItemFilterConditions } from '@/utils/bomSubItemFilter'
 import {
@@ -220,15 +233,16 @@ const filteredRows = computed(() => {
   return filterBomSubItemPickerRows(rows, keyword.value)
 })
 
-const activeFilterCount = computed(() =>
-  appliedFilterConditions.value.filter(
-    (c) =>
-      c.field &&
-      c.operator &&
-      (c.operator === 'empty' ||
-        c.operator === 'notEmpty' ||
-        String(c.value ?? '').trim() !== ''),
-  ).length,
+const activeFilterCount = computed(
+  () =>
+    appliedFilterConditions.value.filter(
+      (c) =>
+        c.field &&
+        c.operator &&
+        (c.operator === 'empty' ||
+          c.operator === 'notEmpty' ||
+          String(c.value ?? '').trim() !== ''),
+    ).length,
 )
 
 const filterTags = computed(() =>

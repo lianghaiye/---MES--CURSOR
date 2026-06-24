@@ -88,7 +88,6 @@ export function resolveManualQualityDeduction(line = {}) {
   return round2(Number(line.manualQualityDeduction) || 0)
 }
 
-
 /** 公式中数量/单价展示：去掉多余尾零 */
 export function formatFormulaNum(val) {
   const num = Number(val)
@@ -97,7 +96,9 @@ export function formatFormulaNum(val) {
 }
 
 export function getApprovedGoodQty(line = {}) {
-  return line.adjustedGoodQty != null ? Number(line.adjustedGoodQty) || 0 : Number(line.goodQty) || 0
+  return line.adjustedGoodQty != null
+    ? Number(line.adjustedGoodQty) || 0
+    : Number(line.goodQty) || 0
 }
 
 export function getApprovedDefectQty(line = {}) {
@@ -128,9 +129,7 @@ export function getSubsidyPieceQty(line = {}) {
 
 /** 最终计件数 = 良品数 + 不良品数 + 补贴数（均优先取调整值） */
 export function calcFinalPieceQty(line = {}) {
-  return round2(
-    getApprovedGoodQty(line) + getApprovedDefectQty(line) + getSubsidyPieceQty(line),
-  )
+  return round2(getApprovedGoodQty(line) + getApprovedDefectQty(line) + getSubsidyPieceQty(line))
 }
 
 /** 单件折算单价：计件=件单价；计时+批量=标准工时折算单价 */
@@ -244,7 +243,16 @@ export function buildDefectWageDetails(config, breakdownRules = []) {
     let rowType = 'none'
 
     if (!row.rule?.apply) {
-      return { id: row.id, name, qty: Number(row.qty) || 0, methodLabel, formula, amount: 0, applied: false, rowType }
+      return {
+        id: row.id,
+        name,
+        qty: Number(row.qty) || 0,
+        methodLabel,
+        formula,
+        amount: 0,
+        applied: false,
+        rowType,
+      }
     }
 
     if (isPieceBatch) {
@@ -318,7 +326,8 @@ export function calcProcessReportWage(config, line = {}) {
         defectDiscountRateDisplay = Math.round(row.rule.discountRate * 100)
       }
     } else if (row.rule.mode === 'deduction') {
-      unitDeductionSum += (Number(row.qty) || 0) * getUnitDeductionAmount(row.rule.deductionAmount, stdMin)
+      unitDeductionSum +=
+        (Number(row.qty) || 0) * getUnitDeductionAmount(row.rule.deductionAmount, stdMin)
     }
   })
 
@@ -347,9 +356,7 @@ export function calcProcessReportWage(config, line = {}) {
     salaryAmount = round2(goodWage + defectWage + subsidyWage - manualQualityDeduction)
   } else if (salaryMethod === '计时工资' && reportType === '批量计件') {
     prepWage = round2(prepHours * hourlyRate)
-    const hoursQty = useHourlyDeductionMode
-      ? totalQty
-      : round2(goodQty + discountWeightedDefect)
+    const hoursQty = useHourlyDeductionMode ? totalQty : round2(goodQty + discountWeightedDefect)
     const processHours = round2((hoursQty * stdMin) / 60)
     const innerHours = round2(prepHours + subsidyHourlyComponent + processHours)
     accountHours = innerHours
@@ -447,14 +454,14 @@ export function enrichProcessReportLine(line, config) {
   const effectiveConfig = resolveEffectiveLaborConfig(config, line)
   const wage = calcProcessReportWage(effectiveConfig, line)
   const wageRateMode = resolveWageRateDisplayMode(effectiveConfig)
-  const pieceOverridden =
-    line.overridePieceRate != null && line.overridePieceRate !== ''
+  const pieceOverridden = line.overridePieceRate != null && line.overridePieceRate !== ''
   const hourlyOverridden =
     line.overrideStandardHourlyRate != null && line.overrideStandardHourlyRate !== ''
   const salaryMethodOverridden = !!line.overrideSalaryMethod
   const effectiveSalaryMethod = effectiveConfig?.salaryMethod || line.salaryMethod || '—'
   const masterSalaryMethod = config?.salaryMethod || '—'
-  const effectiveReportType = effectiveConfig?.reportType || config?.reportType || line.reportType || '—'
+  const effectiveReportType =
+    effectiveConfig?.reportType || config?.reportType || line.reportType || '—'
   return {
     ...line,
     reportType: effectiveReportType,

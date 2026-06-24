@@ -7,12 +7,7 @@ export const defectResponsibilitySelectOptions = defectResponsibilityOptions.map
 }))
 
 /** 公司级 - 不良品工资计算方式 */
-export const defectWageCalculationOptions = [
-  '打折计工资',
-  '固定扣款金额',
-  '不计工资',
-  '全额计工资',
-]
+export const defectWageCalculationOptions = ['打折计工资', '固定扣款金额', '不计工资', '全额计工资']
 
 export const defectWageCalculationSelectOptions = defectWageCalculationOptions.map((v) => ({
   label: v,

@@ -37,6 +37,12 @@ const routes = [
         meta: { title: '1.5版本迭代' },
       },
       {
+        path: 'home/prd/v151/product-bom',
+        name: 'home-prd-v151-product-bom',
+        component: () => import('@/views/prd/PrdV151ProductBomView.vue'),
+        meta: { title: '1.5.1·产品BOM需求' },
+      },
+      {
         path: 'product-process/materials',
         name: 'product-process-materials',
         component: () => import('@/views/product-process/MaterialInfoView.vue'),
@@ -218,7 +224,10 @@ const routes = [
       },
       { path: 'report-management', redirect: '/report-management/report-work' },
       { path: 'production/report-work', redirect: '/report-management/report-work' },
-      { path: 'production/report-work/:id', redirect: (to) => `/report-management/report-work/${to.params.id}` },
+      {
+        path: 'production/report-work/:id',
+        redirect: (to) => `/report-management/report-work/${to.params.id}`,
+      },
       { path: 'production/process-report', redirect: '/report-management/process-report' },
       {
         path: 'production/process-report/wo/:workOrderId',

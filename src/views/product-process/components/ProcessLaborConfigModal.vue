@@ -25,7 +25,12 @@
           <PlusOutlined />
           新增产品
         </a-button>
-        <a-button type="primary" size="small" :disabled="!selectedRowKeys.length" @click="openBatchFill">
+        <a-button
+          type="primary"
+          size="small"
+          :disabled="!selectedRowKeys.length"
+          @click="openBatchFill"
+        >
           批量填充
         </a-button>
         <a-button size="small" danger :disabled="!selectedRowKeys.length" @click="batchDelete">
@@ -140,11 +145,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
-import {
-  CheckCircleFilled,
-  PlusOutlined,
-  WarningFilled,
-} from '@ant-design/icons-vue'
+import { CheckCircleFilled, PlusOutlined, WarningFilled } from '@ant-design/icons-vue'
 import ProcessLaborAddProductModal from './ProcessLaborAddProductModal.vue'
 import ProcessLaborBatchFillModal from './ProcessLaborBatchFillModal.vue'
 import {

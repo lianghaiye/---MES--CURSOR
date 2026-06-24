@@ -81,7 +81,13 @@
         <template v-if="column.key === 'positions'">
           <span class="positions-text" :title="record.positions">{{ record.positions }}</span>
         </template>
-        <template v-else-if="column.key === 'salaryAmount' || column.key === 'subsidyAmount' || column.key === 'qualityDeduction'">
+        <template
+          v-else-if="
+            column.key === 'salaryAmount' ||
+            column.key === 'subsidyAmount' ||
+            column.key === 'qualityDeduction'
+          "
+        >
           {{ formatMoney(record[column.dataIndex]) }}
         </template>
         <template v-else-if="column.key === 'action'">
@@ -131,12 +137,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
-import {
-  ClearOutlined,
-  DownOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-} from '@ant-design/icons-vue'
+import { ClearOutlined, DownOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import SalaryStatsNav from './components/SalaryStatsNav.vue'
 import { employeeNameOptions } from '@/utils/employeeProfileResolver'
 import { querySalaryStats } from '@/utils/salaryStatsAggregate'
@@ -193,8 +194,20 @@ const columns = [
   { title: '完成任务数', dataIndex: 'taskCount', width: 110, align: 'right' },
   { title: '报工总数', dataIndex: 'reportQty', width: 100, align: 'right' },
   { title: '总工时', dataIndex: 'workHours', width: 100, align: 'right' },
-  { title: '补贴金额', key: 'subsidyAmount', dataIndex: 'subsidyAmount', width: 110, align: 'right' },
-  { title: '质量扣款', key: 'qualityDeduction', dataIndex: 'qualityDeduction', width: 100, align: 'right' },
+  {
+    title: '补贴金额',
+    key: 'subsidyAmount',
+    dataIndex: 'subsidyAmount',
+    width: 110,
+    align: 'right',
+  },
+  {
+    title: '质量扣款',
+    key: 'qualityDeduction',
+    dataIndex: 'qualityDeduction',
+    width: 100,
+    align: 'right',
+  },
   { title: '计薪(元)', key: 'salaryAmount', dataIndex: 'salaryAmount', width: 110, align: 'right' },
   { title: '操作', key: 'action', width: 80, fixed: 'right' },
 ]
