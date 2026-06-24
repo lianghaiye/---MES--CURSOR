@@ -1,7 +1,7 @@
 <template>
   <div class="bom-material-table">
     <div class="table-toolbar">
-      <a-space :size="8">
+      <a-space :size="8" wrap class="toolbar-left">
         <span class="toolbar-title">物料清单</span>
         <template v-if="!readonly && hasSelection">
           <a-button size="small" @click="openBatchEdit">修改</a-button>
@@ -28,6 +28,19 @@
         </a-tooltip>
       </a-space>
     </div>
+
+    <div v-if="lines.length" class="list-summary-bar">
+      <span class="summary-item">合计 <strong>{{ summaryTotals.count }}</strong> 项</span>
+      <span class="summary-sep">·</span>
+      <span class="summary-item"
+        >单位用量合计 <strong>{{ formatQty(summaryTotals.unitQtySum) }}</strong></span
+      >
+      <span class="summary-sep">·</span>
+      <span class="summary-item"
+        >BOM成本 <strong>{{ formatPrice(summaryTotals.unitPriceSum) }}</strong></span
+      >
+    </div>
+
     <a-table
       :columns="tableColumns"
       :data-source="lines"
@@ -213,7 +226,7 @@
       </template>
       <template #summary>
         <a-table-summary-row v-if="!readonly && lines.length">
-          <a-table-summary-cell :index="0" :col-span="tableColumns.length">
+          <a-table-summary-cell :index="0" :col-span="tableColumns.length" align="left">
             <a-button
               type="link"
               size="small"
@@ -222,11 +235,6 @@
             >
               添加明细行
             </a-button>
-          </a-table-summary-cell>
-        </a-table-summary-row>
-        <a-table-summary-row v-if="lines.length">
-          <a-table-summary-cell :index="0" :col-span="tableColumns.length" align="right">
-            合计 {{ lines.length }}
           </a-table-summary-cell>
         </a-table-summary-row>
       </template>
@@ -349,6 +357,13 @@ const tableColumns = computed(() => {
 const scrollX = computed(() => {
   const sum = tableColumns.value.reduce((s, c) => s + (c.width || 100), 0)
   return Math.max(sum, 1400)
+})
+
+const summaryTotals = computed(() => {
+  const count = props.lines.length
+  const unitQtySum = props.lines.reduce((s, line) => s + (Number(line.unitQty) || 0), 0)
+  const unitPriceSum = props.lines.reduce((s, line) => s + (Number(line.unitPrice) || 0), 0)
+  return { count, unitQtySum, unitPriceSum }
 })
 
 const dragFromIndex = ref(-1)
@@ -488,10 +503,42 @@ function customRow(_record, index) {
     justify-content: space-between;
     margin-bottom: 8px;
     flex-shrink: 0;
+    gap: 8px;
+
+    .toolbar-left {
+      flex: 1;
+      min-width: 0;
+    }
 
     .toolbar-title {
       font-weight: 600;
       font-size: 14px;
+      flex-shrink: 0;
+    }
+  }
+
+  .list-summary-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 6px 12px;
+    background: #fafafa;
+    border: 1px solid #f0f0f0;
+    border-radius: 4px;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.65);
+    line-height: 1.5;
+    flex-shrink: 0;
+
+    strong {
+      color: rgba(0, 0, 0, 0.88);
+      font-weight: 600;
+    }
+
+    .summary-sep {
+      color: rgba(0, 0, 0, 0.25);
     }
   }
 
