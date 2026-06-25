@@ -209,21 +209,14 @@ const baseColumns = [
   { title: '材质', key: 'material', dataIndex: 'material', width: 90 },
   { title: '报工日期', key: 'reportDate', dataIndex: 'reportDate', width: 110 },
   { title: '排产数', key: 'scheduleQty', dataIndex: 'scheduleQty', width: 88, align: 'right' },
-  { title: '良品数', key: 'goodQty', dataIndex: 'goodQty', width: 80, align: 'right' },
-  { title: '不良品数', key: 'defectQty', dataIndex: 'defectQty', width: 88, align: 'right' },
-  { title: '工序', key: 'processName', dataIndex: 'processName', width: 100 },
-  { title: '不良原因', key: 'defectItems', dataIndex: 'defectItems', width: 160, ellipsis: true },
-  { title: '执行人', key: 'reporter', dataIndex: 'reporter', width: 90 },
   { title: '工作中心', key: 'workCenter', dataIndex: 'workCenter', width: 110 },
-  { title: '报工类型', key: 'reportType', dataIndex: 'reportType', width: 100 },
-  { title: '计薪方式', key: 'salaryMethod', dataIndex: 'salaryMethod', width: 100 },
   { title: '计薪(元)', key: 'salaryAmount', dataIndex: 'salaryAmount', width: 100, align: 'right' },
   { title: '备注', key: 'remark', dataIndex: 'remark', width: 120, ellipsis: true },
   { title: '操作', key: 'action', width: 80, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('process-report-list', baseColumns, { minScrollX: 2000 })
+  useTableColumnSettings('process-report-list', baseColumns, { minScrollX: 1400 })
 
 const stats = computed(() => {
   void processReportState.records
