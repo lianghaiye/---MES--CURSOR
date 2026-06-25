@@ -28,16 +28,8 @@
           class="prd-search"
         />
         <div class="sider-tree">
-          <div
-            v-for="mod in displayModules"
-            :key="mod.key"
-            class="tree-module"
-          >
-            <a
-              href="#"
-              class="tree-module-title"
-              @click.prevent="scrollTo(`#${mod.key}`)"
-            >
+          <div v-for="mod in displayModules" :key="mod.key" class="tree-module">
+            <a href="#" class="tree-module-title" @click.prevent="scrollTo(`#${mod.key}`)">
               {{ mod.label }}
               <span v-if="mod.features.length" class="tree-count">{{ mod.features.length }}</span>
             </a>
@@ -79,18 +71,10 @@
           未找到匹配的模块或功能
         </section>
 
-        <section
-          v-for="mod in filteredModules"
-          :id="mod.key"
-          :key="mod.key"
-          class="module-section"
-        >
+        <section v-for="mod in filteredModules" :id="mod.key" :key="mod.key" class="module-section">
           <h2 class="module-title">{{ mod.label }}</h2>
 
-          <div
-            v-if="!mod.features.length"
-            class="feature-card feature-empty"
-          >
+          <div v-if="!mod.features.length" class="feature-card feature-empty">
             本迭代该模块暂无需求条目，后续迭代补充后将在此展示。
           </div>
 

@@ -18,6 +18,7 @@ import {
   deriveOrderBusinessType,
   isOutsourcingBusinessType,
   isPurchasedBusinessType,
+  isCustomSalesBusinessType,
   isSelfMadeBusinessType,
   normalizeSalesLineBusiness,
   resolveLineBusinessType,
@@ -203,16 +204,28 @@ export function approveSalesOrder(id) {
     const designTasksByLineId = new Map()
 
     for (const line of selfMadeLines) {
-      if (!line.productId) {
+      const lineBusinessType = resolveLineBusinessType(line, order)
+      if (!line.productId && !isCustomSalesBusinessType(lineBusinessType)) {
         return {
           ok: false,
           message: `订单「${order.orderNo}」明细「${line.productName || '未命名'}」未关联产品，请重新选择产品`,
         }
       }
-      const product = productInfoState.products.find((p) => p.id === line.productId)
+      if (isCustomSalesBusinessType(lineBusinessType) && !line.productName?.trim()) {
+        return {
+          ok: false,
+          message: `订单「${order.orderNo}」定制销售明细请填写产品名称`,
+        }
+      }
+      const product = line.productId
+        ? productInfoState.products.find((p) => p.id === line.productId)
+        : null
       const productAttr = line.productAttr || product?.productAttribute || ''
-      if (isCustomProductAttribute(productAttr)) {
-        line.productAttr = productAttr
+      if (isCustomSalesBusinessType(lineBusinessType) || isCustomProductAttribute(productAttr)) {
+        line.productAttr = '定制产品'
+        line.bomId = ''
+        line.bomName = ''
+        line.bomVersion = ''
         customLines.push(line)
         continue
       }

@@ -11,14 +11,15 @@ export const defaultBomColumnSettings = [
   { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 8 },
   { key: 'materialType', title: '物料类型', hidden: false, frozen: false, order: 9 },
   { key: 'remark', title: '备注', hidden: false, frozen: false, order: 10 },
-  { key: 'childBom', title: '子件BOM', hidden: false, frozen: false, order: 11 },
-  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 12 },
-  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 13 },
-  { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 14 },
-  { key: 'childBomVersion', title: '子件BOM版本', hidden: true, frozen: false, order: 15 },
-  { key: 'lossRate', title: '子件损耗率(%)', hidden: true, frozen: false, order: 16 },
-  { key: 'effectiveStart', title: '有效开始日期', hidden: true, frozen: false, order: 17 },
-  { key: 'effectiveEnd', title: '有效结束日期', hidden: true, frozen: false, order: 18 },
+  { key: 'substitutePart', title: '替代件', hidden: false, frozen: false, order: 11 },
+  { key: 'childBom', title: '子件BOM', hidden: false, frozen: false, order: 12 },
+  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 13 },
+  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 14 },
+  { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 15 },
+  { key: 'childBomVersion', title: '子件BOM版本', hidden: true, frozen: false, order: 16 },
+  { key: 'lossRate', title: '子件损耗率(%)', hidden: true, frozen: false, order: 17 },
+  { key: 'effectiveStart', title: '有效开始日期', hidden: true, frozen: false, order: 18 },
+  { key: 'effectiveEnd', title: '有效结束日期', hidden: true, frozen: false, order: 19 },
 ]
 
 /** 子件 BOM 展示：BOM 名称 + 版本号 */
@@ -28,6 +29,15 @@ export function formatChildBomLabel(line) {
   const version = String(line.childBomVersion || '').trim()
   if (name && version) return `${name} ${version}`
   return name || version || ''
+}
+
+/** 替代件展示：编码 + 名称 */
+export function formatSubstitutePartLabel(line) {
+  if (!line) return ''
+  const code = String(line.substituteCode || '').trim()
+  const name = String(line.substituteName || '').trim()
+  if (code && name) return `[${code}] ${name}`
+  return name || code || ''
 }
 
 export const bomTypeOptions = ['基准BOM', '订单BOM', '配置BOM']

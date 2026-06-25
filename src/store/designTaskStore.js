@@ -79,9 +79,12 @@ function buildTaskBase(salesOrder, line, product, source) {
   return {
     status: DESIGN_TASK_STATUS.PENDING,
     source,
-    salesOrderNo: salesOrder?.orderNo || '',
+    salesOrderNo: line?.salesOrderNo || salesOrder?.orderNo || '',
     salesLineId: line?.id || '',
-    customerName: salesOrder?.customerName || line?.customerName || '',
+    customerName: line?.customerName || salesOrder?.customerName || '',
+    contractNo: line?.contractNo || salesOrder?.contractNo || '',
+    remark: line?.remark || '',
+    quantity: Number(line?.quantity ?? line?.salesQty) || 1,
     orderType: salesOrder?.orderType || line?.orderType || '标准订单',
     orderDate: salesOrder?.documentDate || line?.orderDate || dayjs().format('YYYY-MM-DD'),
     urgency: salesOrder?.urgency || line?.urgency || '普通',
@@ -125,21 +128,32 @@ export function createDesignTaskFromSalesLine(salesOrder, line) {
 }
 
 export function createManualDesignTask(payload) {
-  const product = resolveProduct(payload.productId)
+  const taskNo = (payload.taskNo || '').trim() || generateDesignTaskNo()
+  if (designTaskState.tasks.some((t) => t.taskNo === taskNo)) {
+    return { ok: false, message: `设计单号「${taskNo}」已存在` }
+  }
+
+  const product = payload.productId ? resolveProduct(payload.productId) : null
   const task = {
     id: `dt-${Date.now()}`,
-    taskNo: generateDesignTaskNo(),
+    taskNo,
     ...buildTaskBase(null, payload, product, DESIGN_TASK_SOURCE.MANUAL),
+    productName: payload.productName?.trim() || product?.name || '',
+    productCode: payload.productCode || product?.code || '',
+    productAttr: payload.productAttr || product?.productAttribute || '',
+    specModel: payload.specModel || product?.specModel || '',
+    material: payload.material || product?.material || '',
     customerName: payload.customerName || '',
-    orderType: payload.orderType || '标准订单',
+    salesOrderNo: payload.salesOrderNo || '',
+    contractNo: payload.contractNo || '',
+    remark: payload.remark || '',
+    quantity: Number(payload.quantity) || 1,
     orderDate: payload.orderDate || dayjs().format('YYYY-MM-DD'),
     deliveryDate: payload.deliveryDate || '',
     techParams: payload.techParams || product?.techParams || '',
-    processFile: payload.processFile || '',
-    salesperson: payload.salesperson || '',
   }
   designTaskState.tasks.unshift(task)
-  return task
+  return { ok: true, task }
 }
 
 /** 设计页：保存 EBOM 草稿 */

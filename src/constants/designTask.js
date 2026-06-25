@@ -30,3 +30,10 @@ export function designTaskStatusColor(status) {
   }
   return map[status] || 'default'
 }
+
+/** 列表展示用来源文案 */
+export function designTaskSourceLabel(source) {
+  if (source === DESIGN_TASK_SOURCE.SALES_ORDER) return '销售订单'
+  if (source === DESIGN_TASK_SOURCE.MANUAL) return '新增'
+  return source || '—'
+}

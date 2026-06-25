@@ -2,63 +2,78 @@
   <a-modal
     v-model:open="open"
     title="新增设计任务"
-    width="720px"
+    width="640px"
     :confirm-loading="submitting"
     ok-text="保存"
     cancel-text="取消"
+    destroy-on-close
     @ok="handleOk"
     @cancel="handleCancel"
   >
     <a-form ref="formRef" :model="form" :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+      <a-form-item label="设计单号" name="taskNo">
+        <a-input v-model:value="form.taskNo" allow-clear placeholder="留空则系统自动生成" />
+      </a-form-item>
       <a-form-item
-        label="产品"
-        name="productId"
-        :rules="[{ required: true, message: '请选择定制类产品' }]"
+        label="产品名称"
+        name="productName"
+        :rules="[{ required: true, message: '请输入产品名称' }]"
       >
-        <a-select
-          v-model:value="form.productId"
-          show-search
-          placeholder="请选择定制类产品"
-          :options="productOpts"
-          :filter-option="filterProduct"
-          @change="onProductChange"
+        <a-input-group compact class="product-name-group">
+          <a-input
+            v-model:value="form.productName"
+            placeholder="请输入产品名称"
+            allow-clear
+            style="width: calc(100% - 88px)"
+          />
+          <a-button style="width: 88px" @click="pickerOpen = true">选择产品</a-button>
+        </a-input-group>
+      </a-form-item>
+      <a-form-item
+        label="数量"
+        name="quantity"
+        :rules="[{ required: true, message: '请输入数量' }]"
+      >
+        <a-input-number
+          v-model:value="form.quantity"
+          :min="1"
+          :precision="0"
+          style="width: 100%"
         />
       </a-form-item>
-      <a-form-item label="客户名称" name="customerName">
-        <a-input v-model:value="form.customerName" placeholder="请输入" />
+      <a-form-item label="销售单号" name="salesOrderNo">
+        <a-input v-model:value="form.salesOrderNo" allow-clear placeholder="选填" />
       </a-form-item>
-      <a-form-item label="订单类型" name="orderType">
-        <a-select v-model:value="form.orderType" :options="orderTypeOpts" />
+      <a-form-item label="客户" name="customerName">
+        <a-select
+          v-model:value="form.customerName"
+          allow-clear
+          show-search
+          placeholder="请选择客户"
+          :options="customerOpts"
+          :filter-option="filterCustomer"
+        />
       </a-form-item>
-      <a-form-item label="紧急度" name="urgency">
-        <a-select v-model:value="form.urgency" :options="urgencyOpts" />
+      <a-form-item label="合同号" name="contractNo">
+        <a-input v-model:value="form.contractNo" allow-clear placeholder="选填" />
       </a-form-item>
-      <a-form-item label="订单日期" name="orderDate">
-        <a-date-picker v-model:value="form.orderDate" style="width: 100%" />
-      </a-form-item>
-      <a-form-item label="交货日期" name="deliveryDate">
-        <a-date-picker v-model:value="form.deliveryDate" style="width: 100%" />
-      </a-form-item>
-      <a-form-item label="技术参数" name="techParams">
-        <a-textarea v-model:value="form.techParams" :rows="3" placeholder="请输入" />
-      </a-form-item>
-      <a-form-item label="工艺文件" name="processFile">
-        <a-input v-model:value="form.processFile" placeholder="工艺文件名称或链接（选填）" />
-      </a-form-item>
-      <a-form-item label="业务员" name="salesperson">
-        <a-input v-model:value="form.salesperson" placeholder="请输入" />
+      <a-form-item label="备注" name="remark">
+        <a-textarea v-model:value="form.remark" :rows="3" placeholder="选填" allow-clear />
       </a-form-item>
     </a-form>
+
+    <SelectProductMaterialModal v-model:open="pickerOpen" @confirm="onItemPicked" />
   </a-modal>
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
+import { customerOptions } from '@/mock/salesOrderOptions'
 import { productInfoState } from '@/store/productInfoStore'
-import { isCustomProductAttribute } from '@/constants/designTask'
+import { materialInfoState } from '@/store/materialInfoStore'
 import { createManualDesignTask } from '@/store/designTaskStore'
+import SelectProductMaterialModal from '@/views/product-process/components/SelectProductMaterialModal.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -73,50 +88,44 @@ const open = computed({
 
 const formRef = ref()
 const submitting = ref(false)
+const pickerOpen = ref(false)
 
 const form = reactive({
-  productId: undefined,
-  customerName: '',
-  orderType: '标准订单',
-  urgency: '普通',
-  orderDate: dayjs(),
-  deliveryDate: undefined,
+  taskNo: '',
+  productId: '',
+  productCode: '',
+  productName: '',
+  productAttr: '',
+  specModel: '',
+  material: '',
   techParams: '',
-  processFile: '',
-  salesperson: '',
+  quantity: 1,
+  salesOrderNo: '',
+  customerName: undefined,
+  contractNo: '',
+  remark: '',
 })
 
-const orderTypeOpts = ['标准订单', '项目订单', '备件订单'].map((v) => ({ label: v, value: v }))
-const urgencyOpts = ['紧急', '加急', '普通'].map((v) => ({ label: v, value: v }))
+const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 
-const productOpts = computed(() =>
-  productInfoState.products
-    .filter((p) => isCustomProductAttribute(p.productAttribute))
-    .map((p) => ({
-      label: `[${p.code}] ${p.name}（${p.productAttribute}）`,
-      value: p.id,
-    })),
-)
-
-function filterProduct(input, option) {
-  return option.label.toLowerCase().includes(input.toLowerCase())
-}
-
-function onProductChange(productId) {
-  const p = productInfoState.products.find((x) => x.id === productId)
-  if (p?.techParams && !form.techParams) form.techParams = p.techParams
+function filterCustomer(input, option) {
+  return (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
 }
 
 function resetForm() {
-  form.productId = undefined
-  form.customerName = ''
-  form.orderType = '标准订单'
-  form.urgency = '普通'
-  form.orderDate = dayjs()
-  form.deliveryDate = undefined
+  form.taskNo = ''
+  form.productId = ''
+  form.productCode = ''
+  form.productName = ''
+  form.productAttr = ''
+  form.specModel = ''
+  form.material = ''
   form.techParams = ''
-  form.processFile = ''
-  form.salesperson = ''
+  form.quantity = 1
+  form.salesOrderNo = ''
+  form.customerName = undefined
+  form.contractNo = ''
+  form.remark = ''
 }
 
 watch(
@@ -126,6 +135,27 @@ watch(
   },
 )
 
+function onItemPicked(row) {
+  form.productName = row.name || ''
+  form.productCode = row.code || ''
+  form.specModel = row.specModel || ''
+
+  if (row.itemType === '物料') {
+    form.productId = ''
+    const material = materialInfoState.materials.find((m) => m.id === row.id)
+    form.productAttr = material?.productAttribute || material?.materialType || ''
+    form.material = material?.material || ''
+    form.techParams = material?.techParams || ''
+    return
+  }
+
+  form.productId = row.id
+  const product = productInfoState.products.find((p) => p.id === row.id)
+  form.productAttr = product?.productAttribute || ''
+  form.material = product?.material || ''
+  form.techParams = product?.techParams || ''
+}
+
 async function handleOk() {
   try {
     await formRef.value.validate()
@@ -134,19 +164,27 @@ async function handleOk() {
   }
   submitting.value = true
   try {
-    const task = createManualDesignTask({
-      productId: form.productId,
-      customerName: form.customerName,
-      orderType: form.orderType,
-      urgency: form.urgency,
-      orderDate: form.orderDate ? form.orderDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
-      deliveryDate: form.deliveryDate ? form.deliveryDate.format('YYYY-MM-DD') : '',
+    const result = createManualDesignTask({
+      taskNo: form.taskNo?.trim(),
+      productId: form.productId || undefined,
+      productCode: form.productCode,
+      productName: form.productName?.trim(),
+      productAttr: form.productAttr,
+      specModel: form.specModel,
+      material: form.material,
       techParams: form.techParams,
-      processFile: form.processFile,
-      salesperson: form.salesperson,
+      quantity: form.quantity,
+      salesOrderNo: form.salesOrderNo?.trim(),
+      customerName: form.customerName || '',
+      contractNo: form.contractNo?.trim(),
+      remark: form.remark?.trim(),
     })
-    message.success(`设计任务 ${task.taskNo} 已创建`)
-    emit('saved', task)
+    if (!result.ok) {
+      message.warning(result.message)
+      return
+    }
+    message.success(`设计任务 ${result.task.taskNo} 已创建`)
+    emit('saved', result.task)
     open.value = false
   } finally {
     submitting.value = false
@@ -157,3 +195,10 @@ function handleCancel() {
   open.value = false
 }
 </script>
+
+<style lang="less" scoped>
+.product-name-group {
+  display: flex;
+  width: 100%;
+}
+</style>

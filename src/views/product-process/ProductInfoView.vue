@@ -167,6 +167,12 @@
                   {{ record.expiryAlertEnabled ? '是' : '否' }}
                 </a-tag>
               </template>
+              <template v-else-if="column.key === 'matchingRequirements'">
+                {{ record.matchingRequirements || record.remark || '—' }}
+              </template>
+              <template v-else-if="column.dataIndex === 'techParams'">
+                {{ record.techParams || '—' }}
+              </template>
               <template v-else-if="column.key === 'defaultWorkCenter'">
                 {{ record.production?.defaultWorkCenter || '—' }}
               </template>
@@ -378,12 +384,13 @@ const baseColumns = [
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80 },
+  { title: '技术参数', dataIndex: 'techParams', width: 120, ellipsis: true },
+  { title: '配套要求', key: 'matchingRequirements', width: 120, ellipsis: true },
   { title: '重量(kg)', key: 'weight', width: 88, align: 'right' },
   { title: '库存单位', key: 'inventoryUnit', width: 88, align: 'center' },
   { title: '标准规范', dataIndex: 'standardSpec', width: 90 },
   { title: '单价', key: 'unitPrice', width: 88, align: 'right' },
   { title: '过期预警', key: 'expiryAlert', width: 88, align: 'center' },
-  { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
   { title: '默认工作中心', key: 'defaultWorkCenter', width: 110 },
   { title: '标准制造周期(天)', key: 'standardCycleDays', width: 120, align: 'right' },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },

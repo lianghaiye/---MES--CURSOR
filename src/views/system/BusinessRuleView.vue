@@ -13,7 +13,7 @@
         bordered
         :pagination="false"
       >
-        <template #bodyCell="{ column, record }">
+        <template #bodyCell="{ column }">
           <template v-if="column.key === 'config'">
             <a-radio-group :value="productionMode" @change="(e) => onModeChange(e.target.value)">
               <a-radio
@@ -24,9 +24,23 @@
                 {{ option.label }}
               </a-radio>
             </a-radio-group>
+            <div v-if="productionMode === 'minimal'" class="sub-config">
+              <a-radio-group
+                :value="minimalReportType"
+                @change="(e) => onMinimalReportTypeChange(e.target.value)"
+              >
+                <a-radio
+                  v-for="option in MINIMAL_REPORT_TYPE_OPTIONS"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </a-radio>
+              </a-radio-group>
+            </div>
           </template>
           <template v-else-if="column.key === 'description'">
-            <span v-if="record.description" class="desc-text">{{ record.description }}</span>
+            <span v-if="activeDescription" class="desc-text">{{ activeDescription }}</span>
           </template>
         </template>
       </a-table>
@@ -44,8 +58,12 @@ import { message } from 'ant-design-vue'
 import {
   BUSINESS_RULE_ROWS,
   PRODUCTION_MODE_OPTIONS,
+  MINIMAL_REPORT_TYPE_OPTIONS,
+  PRODUCTION_MODE_DESCRIPTIONS,
+  MINIMAL_REPORT_TYPE_DESCRIPTIONS,
   businessRuleState,
   setProductionMode,
+  setMinimalReportType,
 } from '@/store/businessRuleStore'
 
 const columns = [
@@ -57,9 +75,27 @@ const columns = [
 const tableData = BUSINESS_RULE_ROWS
 
 const productionMode = computed(() => businessRuleState.rules.productionMode)
+const minimalReportType = computed(() => businessRuleState.rules.minimalReportType || 'task')
+
+const activeDescription = computed(() => {
+  const mode = productionMode.value
+  if (mode === 'minimal') {
+    return MINIMAL_REPORT_TYPE_DESCRIPTIONS[minimalReportType.value] || ''
+  }
+  return PRODUCTION_MODE_DESCRIPTIONS[mode] || ''
+})
 
 function onModeChange(mode) {
   const res = setProductionMode(mode)
+  if (!res.ok) {
+    message.warning(res.message)
+    return
+  }
+  message.success('已保存')
+}
+
+function onMinimalReportTypeChange(type) {
+  const res = setMinimalReportType(type)
   if (!res.ok) {
     message.warning(res.message)
     return
@@ -86,6 +122,12 @@ function onModeChange(mode) {
 .table-card {
   background: #fff;
   border-radius: 4px;
+}
+
+.sub-config {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #f0f0f0;
 }
 
 .desc-text {

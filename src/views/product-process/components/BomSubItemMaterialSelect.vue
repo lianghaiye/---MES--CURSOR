@@ -4,7 +4,7 @@
     show-search
     allow-clear
     size="small"
-    placeholder="搜索编码/名称"
+    :placeholder="placeholder"
     style="width: 100%"
     :filter-option="false"
     :options="displayOptions"
@@ -34,9 +34,10 @@ import SelectBomMaterialModal from './SelectBomMaterialModal.vue'
 const props = defineProps({
   value: { type: String, default: '' },
   fallbackName: { type: String, default: '' },
+  placeholder: { type: String, default: '搜索编码/名称' },
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'clear'])
 
 const pickerOpen = ref(false)
 const searchKeyword = ref('')
@@ -76,7 +77,10 @@ function onDropdownVisibleChange(open) {
 }
 
 function onSelectChange(code) {
-  if (!code) return
+  if (!code) {
+    emit('clear')
+    return
+  }
   const hit = getBomPickableMaterials().find((m) => m.code === code)
   if (hit) emit('select', hit)
 }

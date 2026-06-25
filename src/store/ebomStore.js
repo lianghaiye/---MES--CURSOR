@@ -59,8 +59,8 @@ export function findEbomByDesignTaskId(designTaskId) {
 
 function emptyStructureForProduct(product) {
   const root = createRootTreeNode({
-    code: product?.code || '',
-    name: product?.name || '产品',
+    itemCode: product?.code || '',
+    itemName: product?.name || '产品',
     specModel: product?.specModel || '',
   })
   return {

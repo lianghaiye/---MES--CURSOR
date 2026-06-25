@@ -220,11 +220,6 @@ function confirm() {
 
   emit('imported', result)
   emit('update:open', false)
-  message.success(
-    result.mode === 'full'
-      ? '已带入完整 BOM（含物品与下级物料）'
-      : '已带入所选 BOM 的下级物料（保留当前根节点）',
-  )
 }
 </script>
 

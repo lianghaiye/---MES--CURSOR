@@ -7,23 +7,35 @@
     class="material-form-modal"
     @cancel="handleCancel"
   >
-    <a-collapse
-      v-model:activeKey="collapseKeys"
-      :bordered="false"
-      class="form-sections"
+    <div class="entity-name-header">
+      <div class="entity-name-label">物料名称</div>
+      <a-input
+        v-model:value="form.name"
+        class="entity-name-input"
+        placeholder="请输入物料名称"
+        allow-clear
+      />
+      <div class="entity-capability-row">
+        <a-checkbox v-model:checked="form.canSell" :disabled="viewOnly">可销售</a-checkbox>
+        <a-checkbox v-model:checked="form.canProduce" :disabled="viewOnly">可生产</a-checkbox>
+        <a-checkbox v-model:checked="form.canPurchase" :disabled="viewOnly">可采购</a-checkbox>
+        <a-checkbox v-model:checked="form.canOutsource" :disabled="viewOnly">可外协</a-checkbox>
+      </div>
+    </div>
+
+    <a-tabs
+      v-model:activeKey="activeTabKey"
+      type="card"
+      class="form-tabs"
       :class="{ 'is-view-only': viewOnly }"
     >
-      <a-collapse-panel key="basic" header="基础信息">
+      <a-tab-pane key="basic" tab="基本信息">
+        <div class="tab-pane-body">
         <a-form layout="inline" class="horizontal-form">
           <a-row :gutter="[12, 12]" style="width: 100%">
             <a-col :span="8">
               <a-form-item label="物料编号">
                 <a-input v-model:value="form.code" size="small" placeholder="请输入" allow-clear />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="物料名称" required>
-                <a-input v-model:value="form.name" size="small" placeholder="请输入" />
               </a-form-item>
             </a-col>
             <a-col :span="8">
@@ -94,16 +106,6 @@
               </a-form-item>
             </a-col>
             <a-col :span="8">
-              <a-form-item label="技术参数">
-                <a-input
-                  v-model:value="form.techParams"
-                  size="small"
-                  placeholder="请输入 技术参数"
-                  allow-clear
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
               <a-form-item label="重量">
                 <a-input v-model:value="form.weight" size="small" placeholder="请输入 重量" />
               </a-form-item>
@@ -115,18 +117,6 @@
                   size="small"
                   :options="unitOpts"
                   placeholder="请选择 库存单位"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="单价">
-                <a-input-number
-                  v-model:value="form.unitPrice"
-                  size="small"
-                  :min="0"
-                  :precision="2"
-                  placeholder="请输入 单价"
-                  style="width: 100%"
                 />
               </a-form-item>
             </a-col>
@@ -158,20 +148,203 @@
               </a-col>
             </template>
             <a-col :span="24">
-              <a-form-item label="备注" class="remark-item">
+              <a-form-item label="技术参数" class="remark-item">
                 <a-textarea
-                  v-model:value="form.remark"
+                  v-model:value="form.techParams"
+                  :rows="3"
+                  size="small"
+                  placeholder="请输入技术参数"
+                  allow-clear
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="24">
+              <a-form-item label="配套要求" class="remark-item">
+                <a-textarea
+                  v-model:value="form.matchingRequirements"
                   :rows="2"
                   size="small"
-                  placeholder="请输入 备注"
+                  placeholder="请输入配套要求"
+                  :maxlength="200"
+                  show-count
                 />
               </a-form-item>
             </a-col>
           </a-row>
         </a-form>
-      </a-collapse-panel>
+        </div>
+      </a-tab-pane>
 
-      <a-collapse-panel key="labor" header="工时配置">
+      <a-tab-pane key="sales" tab="销售">
+        <div class="tab-pane-body">
+        <a-form layout="inline" class="horizontal-form">
+          <a-row :gutter="[12, 12]" style="width: 100%">
+            <a-col :span="8">
+              <a-form-item label="单价">
+                <a-input-number
+                  v-model:value="form.unitPrice"
+                  size="small"
+                  :min="0"
+                  :precision="2"
+                  placeholder="请输入单价"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="销项税">
+                <a-input-number
+                  v-model:value="form.outputTaxRate"
+                  size="small"
+                  :min="0"
+                  :max="100"
+                  :precision="2"
+                  placeholder="请输入销项税率"
+                  style="width: 100%"
+                  addon-after="%"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-form>
+        </div>
+      </a-tab-pane>
+
+      <a-tab-pane key="purchase" tab="采购">
+        <div class="tab-pane-body">
+        <a-form layout="inline" class="horizontal-form">
+          <a-row :gutter="[12, 12]" style="width: 100%">
+            <a-col :span="8">
+              <a-form-item label="进项税">
+                <a-input-number
+                  v-model:value="form.inputTaxRate"
+                  size="small"
+                  :min="0"
+                  :max="100"
+                  :precision="2"
+                  placeholder="请输入进项税率"
+                  style="width: 100%"
+                  addon-after="%"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="默认供应商">
+                <a-select
+                  v-model:value="form.production.defaultSupplier"
+                  size="small"
+                  allow-clear
+                  show-search
+                  :options="supplierOpts"
+                  placeholder="请选择供应商"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-form>
+        </div>
+      </a-tab-pane>
+
+      <a-tab-pane key="production" tab="生产控制">
+        <div class="tab-pane-body">
+        <a-form layout="inline" class="horizontal-form">
+          <a-row :gutter="[12, 12]" style="width: 100%">
+            <a-col :span="8">
+              <a-form-item label="默认工作中心">
+                <a-select
+                  v-model:value="form.production.defaultWorkCenter"
+                  size="small"
+                  allow-clear
+                  :options="workCenterOpts"
+                  placeholder="请选择 默认工作中心"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="标准制造周期">
+                <a-input-number
+                  v-model:value="form.production.standardCycleDays"
+                  size="small"
+                  :min="0"
+                  placeholder="请输入"
+                  style="width: 100%"
+                  addon-after="天"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item>
+                <template #label>
+                  <span>领料属性</span>
+                  <a-tooltip title="启用后参与领料计划">
+                    <InfoCircleOutlined class="info-icon" />
+                  </a-tooltip>
+                </template>
+                <a-switch v-model:checked="form.production.requisitionEnabled" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="默认工艺路线">
+                <a-select
+                  v-model:value="form.production.defaultProcessRoute"
+                  size="small"
+                  allow-clear
+                  show-search
+                  :options="processRouteOpts"
+                  placeholder="请选择 工艺路线"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="默认存放仓库">
+                <a-select
+                  v-model:value="form.production.defaultWarehouse"
+                  size="small"
+                  allow-clear
+                  :options="warehouseOpts"
+                  placeholder="请选择 默认存放仓库"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="关键件标识">
+                <a-switch v-model:checked="form.production.isKeyPart" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="辅料标识">
+                <a-switch v-model:checked="form.production.isAuxiliary" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="危险品标识">
+                <a-switch v-model:checked="form.production.isHazardous" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item>
+                <template #label>
+                  <span>入库质检要求</span>
+                  <a-tooltip title="入库时的质检策略">
+                    <InfoCircleOutlined class="info-icon" />
+                  </a-tooltip>
+                </template>
+                <a-select
+                  v-model:value="form.production.inboundQcRequirement"
+                  size="small"
+                  allow-clear
+                  :options="inboundQcOpts"
+                  placeholder="请选择"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-form>
+        </div>
+      </a-tab-pane>
+
+      <a-tab-pane key="labor" tab="工时配置">
+        <div class="tab-pane-body">
         <div class="labor-enable-row" :class="{ 'is-only': !form.laborEnabled }">
           <span class="labor-enable-label">启用工时配置</span>
           <a-switch v-model:checked="form.laborEnabled" size="small" :disabled="viewOnly" />
@@ -303,117 +476,11 @@
             新增一行
           </a-button>
         </div>
-      </a-collapse-panel>
+        </div>
+      </a-tab-pane>
 
-      <a-collapse-panel key="production" header="生产控制">
-        <a-form layout="inline" class="horizontal-form">
-          <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :span="8">
-              <a-form-item label="默认工作中心">
-                <a-select
-                  v-model:value="form.production.defaultWorkCenter"
-                  size="small"
-                  allow-clear
-                  :options="workCenterOpts"
-                  placeholder="请选择 默认工作中心"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="标准制造周期">
-                <a-input-number
-                  v-model:value="form.production.standardCycleDays"
-                  size="small"
-                  :min="0"
-                  placeholder="请输入"
-                  style="width: 100%"
-                  addon-after="天"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item>
-                <template #label>
-                  <span>领料属性</span>
-                  <a-tooltip title="启用后参与领料计划">
-                    <InfoCircleOutlined class="info-icon" />
-                  </a-tooltip>
-                </template>
-                <a-switch v-model:checked="form.production.requisitionEnabled" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="默认工艺路线">
-                <a-select
-                  v-model:value="form.production.defaultProcessRoute"
-                  size="small"
-                  allow-clear
-                  show-search
-                  :options="processRouteOpts"
-                  placeholder="请选择 工艺路线"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="默认供应商">
-                <a-select
-                  v-model:value="form.production.defaultSupplier"
-                  size="small"
-                  allow-clear
-                  show-search
-                  :options="supplierOpts"
-                  placeholder="请选择 供应商"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="默认存放仓库">
-                <a-select
-                  v-model:value="form.production.defaultWarehouse"
-                  size="small"
-                  allow-clear
-                  :options="warehouseOpts"
-                  placeholder="请选择 默认存放仓库"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="关键件标识">
-                <a-switch v-model:checked="form.production.isKeyPart" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="辅料标识">
-                <a-switch v-model:checked="form.production.isAuxiliary" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="危险品标识">
-                <a-switch v-model:checked="form.production.isHazardous" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item>
-                <template #label>
-                  <span>入库质检要求</span>
-                  <a-tooltip title="入库时的质检策略">
-                    <InfoCircleOutlined class="info-icon" />
-                  </a-tooltip>
-                </template>
-                <a-select
-                  v-model:value="form.production.inboundQcRequirement"
-                  size="small"
-                  allow-clear
-                  :options="inboundQcOpts"
-                  placeholder="请选择 入库质检要求"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
-      </a-collapse-panel>
-
-      <a-collapse-panel key="alert" header="预警信息">
+      <a-tab-pane key="alert" tab="预警信息">
+        <div class="tab-pane-body">
         <a-form layout="inline" class="horizontal-form">
           <a-row :gutter="[12, 12]" style="width: 100%">
             <a-col :span="8">
@@ -442,8 +509,9 @@
             </a-col>
           </a-row>
         </a-form>
-      </a-collapse-panel>
-    </a-collapse>
+        </div>
+      </a-tab-pane>
+    </a-tabs>
 
     <template #footer>
       <template v-if="viewOnly">
@@ -531,7 +599,7 @@ const warehouseOpts = computed(() => {
   return getWarehouseSelectOptions()
 })
 
-const collapseKeys = ref(['basic', 'labor', 'production', 'alert'])
+const activeTabKey = ref('basic')
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 const modalTitle = computed(() => {
   if (props.viewOnly) return '物料详情'
@@ -552,10 +620,16 @@ const form = reactive({
   weight: '',
   inventoryUnit: undefined,
   unitPrice: undefined,
+  canSell: false,
+  canProduce: true,
+  canPurchase: false,
+  canOutsource: false,
   isProductMaterial: false,
   productAttribute: '标准产品',
   productCategoryKey: undefined,
-  remark: '',
+  matchingRequirements: '',
+  outputTaxRate: undefined,
+  inputTaxRate: undefined,
   laborEnabled: true,
   laborRows: [createDefaultLaborRow()],
   production: createDefaultProductionControl(),
@@ -576,15 +650,21 @@ function resetForm() {
   form.weight = ''
   form.inventoryUnit = undefined
   form.unitPrice = undefined
+  form.canSell = false
+  form.canProduce = true
+  form.canPurchase = false
+  form.canOutsource = false
   form.isProductMaterial = false
   form.productAttribute = '标准产品'
   form.productCategoryKey = undefined
-  form.remark = ''
+  form.matchingRequirements = ''
+  form.outputTaxRate = undefined
+  form.inputTaxRate = undefined
   form.laborEnabled = true
   form.laborRows = [createDefaultLaborRow()]
   form.production = createDefaultProductionControl()
   form.alert = createDefaultAlertConfig()
-  collapseKeys.value = ['basic', 'labor', 'production', 'alert']
+  activeTabKey.value = 'basic'
 }
 
 function loadEditRecord(record) {
@@ -603,10 +683,16 @@ function loadEditRecord(record) {
   form.weight = source.weight || ''
   form.inventoryUnit = source.inventoryUnit
   form.unitPrice = source.unitPrice
-  form.isProductMaterial = Boolean(source.isProductMaterial)
+  form.canSell = Boolean(source.canSell || source.isProductMaterial)
+  form.canProduce = source.canProduce !== false
+  form.canPurchase = Boolean(source.canPurchase)
+  form.canOutsource = Boolean(source.canOutsource)
+  form.isProductMaterial = form.canSell
   form.productAttribute = source.productAttribute || '标准产品'
   form.productCategoryKey = source.productCategoryKey
-  form.remark = source.remark || ''
+  form.matchingRequirements = source.matchingRequirements || source.remark || ''
+  form.outputTaxRate = source.outputTaxRate
+  form.inputTaxRate = source.inputTaxRate
   form.laborEnabled = source.laborEnabled ?? false
   form.laborRows =
     source.laborRows?.length > 0
@@ -642,9 +728,29 @@ onMounted(() => syncFormOnOpen())
 watch(
   () => form.laborEnabled,
   (enabled) => {
-    if (enabled && !collapseKeys.value.includes('labor')) {
-      collapseKeys.value = [...collapseKeys.value, 'labor']
-    }
+    if (enabled) activeTabKey.value = 'labor'
+  },
+)
+
+let syncingMaterialSellPair = false
+
+watch(
+  () => form.canSell,
+  (val) => {
+    if (syncingMaterialSellPair || form.isProductMaterial === val) return
+    syncingMaterialSellPair = true
+    form.isProductMaterial = val
+    syncingMaterialSellPair = false
+  },
+)
+
+watch(
+  () => form.isProductMaterial,
+  (val) => {
+    if (syncingMaterialSellPair || form.canSell === val) return
+    syncingMaterialSellPair = true
+    form.canSell = val
+    syncingMaterialSellPair = false
   },
 )
 
@@ -741,10 +847,17 @@ function buildPayload() {
     weight: form.weight,
     inventoryUnit: form.inventoryUnit,
     unitPrice: form.unitPrice ?? 0,
+    canSell: form.canSell,
+    canProduce: form.canProduce,
+    canPurchase: form.canPurchase,
+    canOutsource: form.canOutsource,
     isProductMaterial: form.isProductMaterial,
     productAttribute: form.isProductMaterial ? form.productAttribute : undefined,
     productCategoryKey: form.isProductMaterial ? form.productCategoryKey : undefined,
-    remark: form.remark,
+    matchingRequirements: form.matchingRequirements?.trim() || '',
+    remark: form.matchingRequirements?.trim() || '',
+    outputTaxRate: form.outputTaxRate,
+    inputTaxRate: form.inputTaxRate,
     requisitionAttr: form.production.requisitionEnabled ? 1 : 0,
     laborEnabled: form.laborEnabled,
     laborRows,
@@ -778,7 +891,70 @@ function handleOk() {
   }
 }
 
-.form-sections.is-view-only {
+.entity-name-header {
+  margin-bottom: 0;
+  padding: 12px 16px 8px;
+  background: #fff;
+}
+
+.entity-name-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-bottom: 4px;
+}
+
+.entity-name-input {
+  font-size: 18px;
+  font-weight: 600;
+  padding: 4px 0;
+  border: none;
+  box-shadow: none;
+
+  &:focus {
+    box-shadow: none;
+  }
+}
+
+.entity-capability-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.form-tabs {
+  :deep(.ant-tabs-nav) {
+    margin-bottom: 0;
+    padding: 0 8px;
+    background: #f5f5f5;
+  }
+
+  :deep(.ant-tabs-tab) {
+    padding: 8px 20px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+  }
+
+  :deep(.ant-tabs-tab-active) {
+    background: #fff;
+    border-color: #f0f0f0;
+  }
+
+  :deep(.ant-tabs-content-holder) {
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-top: none;
+  }
+}
+
+.tab-pane-body {
+  padding: 16px;
+  min-height: 200px;
+}
+
+.form-tabs.is-view-only {
   :deep(.ant-input),
   :deep(.ant-input-number),
   :deep(.ant-select),
@@ -786,26 +962,6 @@ function handleOk() {
   :deep(.ant-upload),
   :deep(.ant-btn) {
     pointer-events: none;
-  }
-}
-
-.form-sections {
-  :deep(.ant-collapse-item) {
-    margin-bottom: 8px;
-    border: 1px solid #f0f0f0 !important;
-    border-radius: 6px;
-    overflow: hidden;
-    background: #fff;
-  }
-
-  :deep(.ant-collapse-header) {
-    font-weight: 600;
-    padding: 10px 16px !important;
-    background: #fafafa;
-  }
-
-  :deep(.ant-collapse-content-box) {
-    padding: 12px 16px 16px !important;
   }
 }
 

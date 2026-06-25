@@ -6,9 +6,9 @@
       <a-layout class="content-wrap">
         <GlobalTabs />
         <a-layout-content class="page-content">
-          <router-view v-slot="{ Component }">
+          <router-view v-slot="{ Component, route: currentRoute }">
             <keep-alive :include="cachedViews">
-              <component :is="Component" />
+              <component :is="Component" :key="currentRoute.fullPath" />
             </keep-alive>
           </router-view>
         </a-layout-content>
@@ -30,7 +30,7 @@ const route = useRoute()
 const moduleKey = computed(() => resolveModuleKey(route.path))
 const sideItems = computed(() => sideMenus[moduleKey.value] || [])
 
-const cachedViews = ['ProductionPlanView']
+const cachedViews = ['ProductionPlanView', 'ProductBomCreateView', 'EbomDesignView']
 </script>
 
 <style lang="less" scoped>

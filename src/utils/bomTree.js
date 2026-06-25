@@ -20,6 +20,19 @@ export function getRootTreeId(flatNodes) {
   return flatNodes?.find((n) => n.isRoot)?.id || ROOT_ID
 }
 
+/** 确保 flatNodes 含 isRoot 根节点（基准 BOM 导入的结构可能缺少根） */
+export function normalizeFlatNodesWithRoot(flatNodes, rootMeta = {}) {
+  const nodes = Array.isArray(flatNodes) ? flatNodes.map((n) => ({ ...n })) : []
+  if (nodes.some((n) => n.isRoot)) return nodes
+  const root = createRootTreeNode({
+    itemCode: rootMeta.itemCode || '',
+    itemName: rootMeta.itemName || '',
+    specModel: rootMeta.specModel || '',
+    bomName: rootMeta.bomName || '',
+  })
+  return [root, ...nodes]
+}
+
 export function isRootNode(nodeId, flatNodes) {
   if (!nodeId) return true
   if (nodeId === ROOT_ID) return true

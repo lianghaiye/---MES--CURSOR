@@ -11,9 +11,10 @@ export const defaultBomOverviewColumnSettings = [
   { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 8 },
   { key: 'supplyForm', title: '供应型态', hidden: false, frozen: false, order: 9 },
   { key: 'supplyUnit', title: '供应单位', hidden: false, frozen: false, order: 10 },
-  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 11 },
-  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 12 },
-  { key: 'remark', title: '备注', hidden: false, frozen: false, order: 13 },
+  { key: 'substitutePart', title: '替代件', hidden: false, frozen: false, order: 11 },
+  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 12 },
+  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 13 },
+  { key: 'remark', title: '备注', hidden: false, frozen: false, order: 14 },
 ]
 
 export const bomOverviewBaseColumns = [
@@ -29,6 +30,13 @@ export const bomOverviewBaseColumns = [
   { title: '物料类别', dataIndex: 'categoryName', key: 'categoryName', width: 90 },
   { title: '供应型态', dataIndex: 'supplyForm', key: 'supplyForm', width: 90 },
   { title: '供应单位', dataIndex: 'supplyUnit', key: 'supplyUnit', width: 140, ellipsis: true },
+  {
+    title: '替代件',
+    dataIndex: 'substitutePart',
+    key: 'substitutePart',
+    width: 160,
+    ellipsis: true,
+  },
   {
     title: '工艺文件',
     dataIndex: 'processDocName',

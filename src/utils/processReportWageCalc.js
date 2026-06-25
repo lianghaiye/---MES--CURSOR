@@ -345,8 +345,7 @@ export function calcProcessReportWage(config, line = {}) {
     const grossWage = round2(bucket * pieceRate)
     goodWage = round2(goodQty * pieceRate)
     defectWage = round2((discountWeighted + fixedDeductionQty) * pieceRate)
-    subsidyWage =
-      subsidyMethod === 'fixed' ? subsidyFixedAmount : round2(subsidyQty * pieceRate)
+    subsidyWage = subsidyMethod === 'fixed' ? subsidyFixedAmount : round2(subsidyQty * pieceRate)
     qualityDeduction = round2(fixedDeductionSum + manualQualityDeduction)
     salaryAmount = round2(
       grossWage -

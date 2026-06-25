@@ -301,12 +301,12 @@ function collapseAll() {
 
   .tree-wrap {
     flex: 1;
+    min-height: 0;
     overflow: auto;
     border: 1px solid #f0f0f0;
     border-radius: 4px;
     padding: 8px;
     background: #fafafa;
-    min-height: 200px;
   }
 
   .tree-node-row {

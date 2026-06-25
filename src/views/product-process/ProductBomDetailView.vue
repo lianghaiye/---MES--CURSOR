@@ -30,68 +30,72 @@
         </div>
 
         <template v-if="activeTab === 'detail'">
-          <div class="page-body">
-            <aside class="left-panel" :style="{ width: `${leftPanelWidth}px` }">
-              <BomTreePanel
-                readonly
-                :flat-nodes="flatNodes"
-                :line-items="lineItems"
-                :selected-node-id="selectedNodeId"
-                :version-info="versionInfo"
-                :root-meta="detailRootMeta"
-                @select-node="selectedNodeId = $event"
-              />
-            </aside>
-            <div class="panel-resizer" @mousedown.prevent="onResizeMouseDown" />
-            <main class="right-panel">
-              <div class="section-card">
-                <div class="section-title">基础信息</div>
-                <a-descriptions :column="3" size="small" bordered class="basic-desc">
-                  <a-descriptions-item label="BOM编码">{{ record.bomNo }}</a-descriptions-item>
-                  <a-descriptions-item label="BOM名称">{{ record.bomName }}</a-descriptions-item>
-                  <a-descriptions-item label="BOM类型">
-                    {{ record.bomType === '基础BOM' ? '基准BOM' : record.bomType || '基准BOM' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="物品名称">{{ record.itemName }}</a-descriptions-item>
-                  <a-descriptions-item label="规格型号">
-                    {{ record.specModel || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="BOM版本">{{ record.version }}</a-descriptions-item>
-                  <a-descriptions-item label="材质">
-                    {{ record.material || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="图号">
-                    {{ record.drawingNo || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="技术参数">
-                    {{ record.techParams || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="工艺路线">
-                    {{ record.processRoute || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="BOM状态">
-                    <a-tag :color="bomStatusColor(record.status)">{{ record.status }}</a-tag>
-                  </a-descriptions-item>
-                  <a-descriptions-item label="生效日期">
-                    {{ formatDisplayDate(record.effectiveAt) }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="失效日期">
-                    {{ formatDisplayDate(record.expiredAt) }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="配套要求" :span="3">
-                    {{ record.matchingRequirements || record.remark || '—' }}
-                  </a-descriptions-item>
-                </a-descriptions>
-              </div>
-              <div class="section-card table-section">
-                <BomMaterialTable
+          <div class="detail-tab-body">
+            <div class="page-body">
+              <aside class="left-panel" :style="{ width: `${leftPanelWidth}px` }">
+                <BomTreePanel
                   readonly
-                  :lines="displayLines"
-                  :column-settings="columnSettings"
-                  empty-variant="no-children"
+                  :flat-nodes="flatNodes"
+                  :line-items="lineItems"
+                  :selected-node-id="selectedNodeId"
+                  :version-info="versionInfo"
+                  :root-meta="detailRootMeta"
+                  @select-node="selectedNodeId = $event"
                 />
-              </div>
-            </main>
+              </aside>
+              <div class="panel-resizer" @mousedown.prevent="onResizeMouseDown" />
+              <main class="right-panel">
+                <div class="section-card">
+                  <div class="section-title">基础信息</div>
+                  <a-descriptions :column="3" size="small" bordered class="basic-desc">
+                    <a-descriptions-item label="BOM编码">{{ record.bomNo }}</a-descriptions-item>
+                    <a-descriptions-item label="BOM名称">{{ record.bomName }}</a-descriptions-item>
+                    <a-descriptions-item label="BOM类型">
+                      {{ record.bomType === '基础BOM' ? '基准BOM' : record.bomType || '基准BOM' }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="物品名称">{{
+                      record.itemName
+                    }}</a-descriptions-item>
+                    <a-descriptions-item label="规格型号">
+                      {{ record.specModel || '—' }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="BOM版本">{{ record.version }}</a-descriptions-item>
+                    <a-descriptions-item label="材质">
+                      {{ record.material || '—' }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="图号">
+                      {{ record.drawingNo || '—' }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="技术参数">
+                      {{ record.techParams || '—' }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="工艺路线">
+                      {{ record.processRoute || '—' }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="BOM状态">
+                      <a-tag :color="bomStatusColor(record.status)">{{ record.status }}</a-tag>
+                    </a-descriptions-item>
+                    <a-descriptions-item label="生效日期">
+                      {{ formatDisplayDate(record.effectiveAt) }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="失效日期">
+                      {{ formatDisplayDate(record.expiredAt) }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="配套要求" :span="3">
+                      {{ record.matchingRequirements || record.remark || '—' }}
+                    </a-descriptions-item>
+                  </a-descriptions>
+                </div>
+                <div class="section-card table-section">
+                  <BomMaterialTable
+                    readonly
+                    :lines="displayLines"
+                    :column-settings="columnSettings"
+                    empty-variant="no-children"
+                  />
+                </div>
+              </main>
+            </div>
           </div>
         </template>
 
@@ -394,8 +398,26 @@ onUnmounted(() => {
   margin: -12px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 112px);
+  height: calc(100vh - 112px);
+  overflow: hidden;
   background: #f5f6f8;
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+}
+
+.detail-tab-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .detail-page-head {
@@ -434,12 +456,14 @@ onUnmounted(() => {
   gap: 0;
   padding: 0 8px 8px;
   min-height: 0;
+  overflow: hidden;
 }
 
 .left-panel {
   flex: 0 0 auto;
   min-width: 200px;
   max-width: 520px;
+  height: 100%;
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -483,9 +507,11 @@ onUnmounted(() => {
 .right-panel {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow: hidden;
 }
 
 .section-card {
@@ -493,6 +519,7 @@ onUnmounted(() => {
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 12px 16px;
+  flex-shrink: 0;
 
   .section-title {
     font-weight: 600;
@@ -503,7 +530,14 @@ onUnmounted(() => {
 
 .table-section {
   flex: 1;
-  min-height: 280px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  :deep(.bom-material-table) {
+    height: 100%;
+  }
 }
 
 .basic-desc {

@@ -126,6 +126,9 @@
           <template v-if="column.key === 'status'">
             <a-tag :color="designTaskStatusColor(record.status)">{{ record.status }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'source'">
+            <span>{{ designTaskSourceLabel(record.source) }}</span>
+          </template>
           <template v-else-if="column.key === 'taskNo'">
             <a class="link-code" @click.prevent="openDetail(record)">{{ record.taskNo }}</a>
           </template>
@@ -185,7 +188,9 @@
               detailRecord.status
             }}</a-tag>
           </a-descriptions-item>
-          <a-descriptions-item label="来源">{{ detailRecord.source }}</a-descriptions-item>
+          <a-descriptions-item label="来源">{{
+            designTaskSourceLabel(detailRecord.source)
+          }}</a-descriptions-item>
           <a-descriptions-item label="销售订单">{{
             detailRecord.salesOrderNo || '—'
           }}</a-descriptions-item>
@@ -202,11 +207,15 @@
           <a-descriptions-item label="EBOM编码">{{
             detailRecord.ebomCode || '—'
           }}</a-descriptions-item>
-          <a-descriptions-item label="设计人">{{ detailRecord.designer || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="设计人">{{
+            detailRecord.designer || '—'
+          }}</a-descriptions-item>
           <a-descriptions-item label="设计时间">{{
             detailRecord.designTime || '—'
           }}</a-descriptions-item>
-          <a-descriptions-item label="校核人">{{ detailRecord.checker || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="校核人">{{
+            detailRecord.checker || '—'
+          }}</a-descriptions-item>
           <a-descriptions-item label="校核时间">{{
             detailRecord.checkTime || '—'
           }}</a-descriptions-item>
@@ -238,6 +247,7 @@ import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import {
   DESIGN_TASK_STATUS,
   designTaskStatusColor,
+  designTaskSourceLabel,
 } from '@/constants/designTask'
 import {
   designTaskState,
@@ -272,6 +282,7 @@ const orderTypeOpts = ['标准订单', '项目订单', '备件订单'].map((v) =
 const allColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 88, fixed: 'left' },
   { title: '设计任务编号', key: 'taskNo', dataIndex: 'taskNo', width: 130 },
+  { title: '来源', key: 'source', dataIndex: 'source', width: 88 },
   { title: '产品名称', key: 'productName', dataIndex: 'productName', width: 160, ellipsis: true },
   { title: '型号规格', key: 'specModel', dataIndex: 'specModel', width: 110 },
   { title: '规格属性', key: 'specAttr', dataIndex: 'specAttr', width: 90 },
@@ -336,9 +347,7 @@ function canStartDesign(record) {
 
 function canOpenDraft(record) {
   return (
-    record.hasEbomDraft &&
-    canOpenEbomDesign(record) &&
-    record.status !== DESIGN_TASK_STATUS.PENDING
+    record.hasEbomDraft && canOpenEbomDesign(record) && record.status !== DESIGN_TASK_STATUS.PENDING
   )
 }
 

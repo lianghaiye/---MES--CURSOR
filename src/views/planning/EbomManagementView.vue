@@ -17,7 +17,12 @@
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="EBOM编码">
-              <a-input v-model:value="filters.ebomNo" allow-clear placeholder="请输入" size="small" />
+              <a-input
+                v-model:value="filters.ebomNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
@@ -150,14 +155,18 @@
           <a-descriptions-item label="产品">{{ detailRecord.productName }}</a-descriptions-item>
           <a-descriptions-item label="产品编码">{{ detailRecord.productCode }}</a-descriptions-item>
           <a-descriptions-item label="产品属性">{{ detailRecord.productAttr }}</a-descriptions-item>
-          <a-descriptions-item label="客户">{{ detailRecord.customerName || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="客户">{{
+            detailRecord.customerName || '—'
+          }}</a-descriptions-item>
           <a-descriptions-item label="销售订单">{{
             detailRecord.salesOrderNo || '—'
           }}</a-descriptions-item>
           <a-descriptions-item label="基准BOM">{{
             detailRecord.baselineBomNo || '无（从零设计）'
           }}</a-descriptions-item>
-          <a-descriptions-item label="设计人">{{ detailRecord.designer || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="设计人">{{
+            detailRecord.designer || '—'
+          }}</a-descriptions-item>
           <a-descriptions-item label="创建时间">{{ detailRecord.createdAt }}</a-descriptions-item>
           <a-descriptions-item label="更新时间">{{ detailRecord.updatedAt }}</a-descriptions-item>
           <a-descriptions-item label="定稿时间">{{

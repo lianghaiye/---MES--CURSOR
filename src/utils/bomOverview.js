@@ -1,6 +1,7 @@
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { getLinesForTreeNode, getRootTreeId } from '@/utils/bomTree'
+import { formatSubstitutePartLabel } from '@/mock/bomMaterialColumns'
 import { normalizeSupplyForm } from '@/utils/masterDataMigrate'
 
 function roundQty(val) {
@@ -65,6 +66,7 @@ function lineToOverviewRow(line, scale) {
     categoryName: line.categoryName || '—',
     supplyForm: line.supplyForm || '—',
     supplyUnit: lookupSupplyUnit(line),
+    substitutePart: formatSubstitutePartLabel(line) || '—',
     processDocName: line.processDocName || '—',
     processRoute: line.processRoute || '—',
     remark: line.remark || '—',

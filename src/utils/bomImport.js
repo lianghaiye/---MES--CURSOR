@@ -45,11 +45,86 @@ function reIdStructure(raw, templateRef) {
   }
 }
 
+/** 去掉 BOM 根节点，子级挂到虚拟 __ROOT__ */
+function normalizeToVirtualRoot(structure) {
+  if (!structure?.treeNodes?.length) return structure
+
+  const rootNode = structure.treeNodes.find((n) => n.isRoot)
+  if (!rootNode) return structure
+
+  const rootId = rootNode.id
+  const treeNodes = structure.treeNodes
+    .filter((n) => n.id !== rootId)
+    .map((n) => ({
+      ...n,
+      parentId: n.parentId === rootId ? '__ROOT__' : n.parentId,
+      isRoot: false,
+    }))
+
+  const lineItems = (structure.lineItems || []).map((line) => ({
+    ...line,
+    parentTreeId: line.parentTreeId === rootId ? '__ROOT__' : line.parentTreeId,
+  }))
+
+  return { ...structure, treeNodes, lineItems }
+}
+
+/**
+ * 模板导入：仅保留下级物料，不带入顶级物料
+ * - 去掉 parentId 为 __ROOT__ 的树节点
+ * - 去掉 parentTreeId 为 __ROOT__ 的物料行
+ * - 原挂在顶级节点下的子级提升到 __ROOT__
+ */
+export function stripTopLevelMaterials(structure) {
+  if (!structure) return structure
+
+  const topNodeIds = new Set(
+    (structure.treeNodes || [])
+      .filter((n) => n.parentId === '__ROOT__' || n.parentId == null)
+      .map((n) => n.id),
+  )
+
+  if (!topNodeIds.size && !(structure.lineItems || []).some((l) => l.parentTreeId === '__ROOT__')) {
+    return structure
+  }
+
+  const treeNodes = (structure.treeNodes || [])
+    .filter((n) => !topNodeIds.has(n.id))
+    .map((n) => ({
+      ...n,
+      parentId: topNodeIds.has(n.parentId) ? '__ROOT__' : n.parentId,
+    }))
+
+  const lineItems = (structure.lineItems || [])
+    .filter((line) => line.parentTreeId !== '__ROOT__' && line.parentTreeId != null)
+    .map((line) => ({
+      ...line,
+      parentTreeId: topNodeIds.has(line.parentTreeId) ? '__ROOT__' : line.parentTreeId,
+      treeNodeId: topNodeIds.has(line.treeNodeId) ? '' : line.treeNodeId,
+    }))
+
+  return { ...structure, treeNodes, lineItems }
+}
+
+/** 解析模板/BOM 可导入的子级结构（不含顶级物料） */
+export function resolveTemplateImportStructure(bom) {
+  const raw = resolveBomStructure(bom)
+  if (!raw) return null
+
+  let structure = normalizeToVirtualRoot(raw)
+  structure = extractBomChildrenStructure(structure) || structure
+  structure = stripTopLevelMaterials(structure)
+  if (structure.templateRef) {
+    structure = { ...structure, templateRef: raw.templateRef || structure.templateRef }
+  }
+  return structure
+}
+
 /** 从 BOM 记录或模板目录解析可导入的结构 */
 export function resolveBomStructure(bom) {
-  if (bom?.treeNodes?.length && bom?.lineItems?.length) {
+  if (bom?.treeNodes?.length) {
     return reIdStructure(
-      { treeNodes: bom.treeNodes, lineItems: bom.lineItems },
+      { treeNodes: bom.treeNodes, lineItems: bom.lineItems || [] },
       {
         bomId: bom.id,
         bomNo: bom.bomNo,
@@ -112,12 +187,17 @@ export function buildBasicInfoFromBom(bom) {
  * @param {array} lineItems
  */
 export function applyBomTemplateImport(bom, hasExistingRoot, flatNodes) {
-  const structure = resolveBomStructure(bom)
+  const structure = resolveTemplateImportStructure(bom)
   if (!structure) return null
+  if (!structure.lineItems?.length && !structure.treeNodes?.length) return null
 
-  if (hasExistingRoot) {
+  const hasRoot = flatNodes.some((n) => n.isRoot)
+  if (hasExistingRoot && hasRoot) {
     const cleared = clearBomChildren(flatNodes)
     const merged = mergeTemplateIntoRoot(cleared.flatNodes, cleared.lineItems, structure)
+    if (!merged.lineItems.length && !(merged.flatNodes.length > cleared.flatNodes.length)) {
+      return null
+    }
     return {
       mode: 'children',
       flatNodes: merged.flatNodes,

@@ -163,6 +163,12 @@
                   {{ record.isProductMaterial ? '是' : '否' }}
                 </a-tag>
               </template>
+              <template v-else-if="column.key === 'matchingRequirements'">
+                {{ record.matchingRequirements || record.remark || '—' }}
+              </template>
+              <template v-else-if="column.dataIndex === 'techParams'">
+                {{ record.techParams || '—' }}
+              </template>
               <template v-else-if="column.key === 'action'">
                 <MasterInfoRowActions
                   @edit="openEdit(record)"
@@ -321,13 +327,14 @@ const baseColumns = [
   { title: '供应形态', dataIndex: 'supplyForm', width: 90 },
   { title: '类别', dataIndex: 'categoryName', width: 90 },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
+  { title: '库存单位', key: 'inventoryUnit', width: 90, align: 'center' },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80 },
-  { title: '库存单位', key: 'inventoryUnit', width: 90, align: 'center' },
+  { title: '技术参数', dataIndex: 'techParams', width: 120, ellipsis: true },
+  { title: '配套要求', key: 'matchingRequirements', width: 120, ellipsis: true },
   { title: '单价', key: 'unitPrice', width: 90, align: 'right' },
   { title: '领料属性', key: 'requisitionAttr', width: 90, align: 'center' },
   { title: '产品物料', key: 'isProductMaterial', width: 90, align: 'center' },
-  { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
   { title: '操作', key: 'action', width: 180, fixed: 'right' },
 ]
 

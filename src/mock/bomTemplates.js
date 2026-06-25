@@ -37,6 +37,8 @@ export function createBomLineItem(partial = {}) {
     effectiveStart: '',
     effectiveEnd: '',
     remark: '',
+    substituteCode: '',
+    substituteName: '',
     isKeyPart: false,
     ...partial,
   }

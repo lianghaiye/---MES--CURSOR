@@ -236,8 +236,20 @@
           bordered
           :pagination="false"
           :scroll="{ x: tableScrollX }"
+          class="sales-line-table"
           locale="{ emptyText: '暂无数据' }"
         >
+          <template #headerCell="{ column }">
+            <div class="header-cell">
+              <span class="header-title">{{ column.title }}</span>
+              <span
+                v-if="column.key !== 'index'"
+                class="resize-handle"
+                @mousedown.prevent="(e) => startColumnResize(e, column.key)"
+              />
+            </div>
+          </template>
+
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
 
@@ -247,6 +259,7 @@
                 size="small"
                 style="width: 100%"
                 :options="lineBusinessTypeOpts(record)"
+                @change="(val) => onBusinessTypeChange(record, val)"
               />
             </template>
 
@@ -282,6 +295,22 @@
             <template v-else-if="column.key === 'material'">
               <a-input v-if="record.isManualLine" v-model:value="record.material" size="small" />
               <span v-else>{{ record.material || '—' }}</span>
+            </template>
+
+            <template v-else-if="column.key === 'drawingNo'">
+              <a-input v-model:value="record.drawingNo" size="small" placeholder="图号" />
+            </template>
+
+            <template v-else-if="column.key === 'techParams'">
+              <a-input v-model:value="record.techParams" size="small" placeholder="技术参数" />
+            </template>
+
+            <template v-else-if="column.key === 'matchingRequirements'">
+              <a-input
+                v-model:value="record.matchingRequirements"
+                size="small"
+                placeholder="配套要求"
+              />
             </template>
 
             <template v-else-if="column.key === 'salesQty'">
@@ -366,10 +395,6 @@
 
             <template v-else-if="column.key === 'totalPriceInTax'">
               {{ formatMoney(record.totalPriceInTax) }}
-            </template>
-
-            <template v-else-if="column.key === 'techParams'">
-              <a-input v-model:value="record.techParams" size="small" />
             </template>
 
             <template v-else-if="column.key === 'packagingForm'">
@@ -504,7 +529,11 @@ import { productCategoryTree, flattenCategoryNodes } from '@/mock/productCategor
 import { productInfoState } from '@/store/productInfoStore'
 import { getActiveBomForItem } from '@/store/productBomStore'
 import { generateSalesOrderNo } from '@/store/salesOrderStore'
-import { deriveOrderBusinessType, normalizeSalesLineBusiness } from '@/utils/salesOrderBusiness'
+import {
+  deriveOrderBusinessType,
+  normalizeSalesLineBusiness,
+  CUSTOM_SALES_BUSINESS_TYPE,
+} from '@/utils/salesOrderBusiness'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -565,11 +594,14 @@ const columnDefs = [
     ellipsis: true,
     fixed: 'left',
   },
-  { key: 'businessType', title: '业务类型', width: 100 },
+  { key: 'businessType', title: '业务类型', width: 130 },
   { key: 'productAttr', title: '产品属性', dataIndex: 'productAttr', width: 90 },
   { key: 'specAttr', title: '规格属性', dataIndex: 'specAttr', width: 90 },
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 100 },
   { key: 'material', title: '材质', dataIndex: 'material', width: 80 },
+  { key: 'drawingNo', title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { key: 'techParams', title: '技术参数', width: 120, ellipsis: true },
+  { key: 'matchingRequirements', title: '配套要求', width: 120, ellipsis: true },
   { key: 'salesQty', title: '销售数量', width: 90 },
   { key: 'deliveryMode', title: '交付方式', width: 100 },
   { key: 'deliveryDate', title: '交货日期', width: 120 },
@@ -581,13 +613,13 @@ const columnDefs = [
   { key: 'unitPriceInTax', title: '含税单价', width: 100 },
   { key: 'totalPriceExTax', title: '总价（不含税）', width: 110 },
   { key: 'totalPriceInTax', title: '总价（含税）', width: 100 },
-  { key: 'techParams', title: '技术参数', width: 100 },
   { key: 'packagingForm', title: '包装形式', width: 90 },
   { key: 'supplementDesc', title: '补充说明', width: 90 },
   { key: 'action', title: '操作', width: 110, fixed: 'right' },
 ]
 
 const visibleColumnKeys = ref(columnDefs.map((c) => c.key))
+const columnWidths = reactive(Object.fromEntries(columnDefs.map((c) => [c.key, c.width])))
 
 const allProductPickerRows = computed(() =>
   productInfoState.products.map((p) => ({
@@ -658,7 +690,7 @@ const displayColumns = computed(() =>
       title: c.title,
       key: c.key,
       dataIndex: c.dataIndex,
-      width: c.width,
+      width: columnWidths[c.key] ?? c.width,
       ellipsis: c.ellipsis,
       align: c.key === 'index' ? 'center' : undefined,
       fixed: c.fixed,
@@ -706,7 +738,54 @@ const form = reactive({
 })
 
 const catalogBusinessTypeOpts = ['自产销售', '外购销售'].map((v) => ({ label: v, value: v }))
-const manualBusinessTypeOpts = ['外协销售', '质检服务'].map((v) => ({ label: v, value: v }))
+const manualBusinessTypeOpts = ['外协销售', '质检服务', CUSTOM_SALES_BUSINESS_TYPE].map((v) => ({
+  label: v,
+  value: v,
+}))
+
+function onBusinessTypeChange(record, businessType) {
+  record.businessType = businessType
+  if (businessType === CUSTOM_SALES_BUSINESS_TYPE) {
+    record.productAttr = '定制产品'
+    record.bomId = ''
+    record.bomName = ''
+    record.bomVersion = ''
+    return
+  }
+  if (record.isManualLine) {
+    record.productAttr = ''
+    return
+  }
+  const product = productInfoState.products.find((p) => p.id === record.productId)
+  if (product) {
+    record.productAttr = product.productAttribute || ''
+  }
+  if (businessType === '自产销售' || businessType === '外购销售') {
+    const bom = getActiveBomForItem('product', record.productId)
+    record.bomId = bom?.id || ''
+    record.bomName = bom?.bomName || ''
+    record.bomVersion = bom?.version || ''
+  }
+}
+
+function startColumnResize(e, key) {
+  const startX = e.clientX
+  const startWidth = columnWidths[key] ?? 100
+
+  const onMove = (ev) => {
+    columnWidths[key] = Math.max(60, startWidth + ev.clientX - startX)
+  }
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
 
 function lineBusinessTypeOpts(record) {
   return record.isManualLine ? manualBusinessTypeOpts : catalogBusinessTypeOpts
@@ -933,12 +1012,15 @@ function confirmProductPick() {
       specAttr: p.standardSpec || '',
       specModel: p.specModel,
       material: p.material,
+      drawingNo: p.drawingNo || '',
+      techParams: p.techParams || '',
+      matchingRequirements: p.matchingRequirements || p.remark || '',
       category: p.categoryName,
       unit: p.inventoryUnit || '件',
       bomName: bom?.bomName || '',
       bomVersion: bom?.version || '',
       salesQty: 1,
-      taxRate: 13,
+      taxRate: p.outputTaxRate ?? 13,
       unitPriceExTax: Number(p.unitPrice) || 0,
       unitPriceInTax: 0,
     })
@@ -947,7 +1029,7 @@ function confirmProductPick() {
   })
   if (noBomProducts.length) {
     message.warning(
-      `以下产品无使用中的 BOM，已添加至明细：${noBomProducts.join('、')}。请尽快在产品 BOM 中维护并启用，审核前需完成 BOM 配置。`,
+      `以下产品无使用中的 BOM，已添加至明细：${noBomProducts.join('、')}。请尽快在产品 BOM 中维护并启用，自产销售审核前需完成 BOM 配置。`,
     )
   }
   productPickerOpen.value = false
@@ -1139,6 +1221,31 @@ function handleSave() {
 
   :deep(.ant-table-wrapper) {
     padding: 0 12px 12px;
+  }
+
+  :deep(.sales-line-table .ant-table-thead > tr > th) {
+    padding: 8px !important;
+    position: relative;
+  }
+}
+
+.header-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+
+  .resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+
+    &:hover {
+      background: rgba(22, 119, 255, 0.25);
+    }
   }
 }
 

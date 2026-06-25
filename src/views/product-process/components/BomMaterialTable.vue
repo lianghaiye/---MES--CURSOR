@@ -29,8 +29,10 @@
       </a-space>
     </div>
 
-    <div v-if="lines.length" class="list-summary-bar">
-      <span class="summary-item">合计 <strong>{{ summaryTotals.count }}</strong> 项</span>
+    <div v-if="showSummaryBar" class="list-summary-bar">
+      <span class="summary-item"
+        >合计 <strong>{{ summaryTotals.count }}</strong> 项</span
+      >
       <span class="summary-sep">·</span>
       <span class="summary-item"
         >单位用量合计 <strong>{{ formatQty(summaryTotals.unitQtySum) }}</strong></span
@@ -41,204 +43,214 @@
       >
     </div>
 
-    <a-table
-      :columns="tableColumns"
-      :data-source="lines"
-      row-key="id"
-      size="small"
-      bordered
-      :pagination="false"
-      :scroll="lines.length ? { x: scrollX } : undefined"
-      :custom-row="customRow"
-    >
-      <template #headerCell="{ column }">
-        <template v-if="column.key === 'index' && !readonly">
-          <div
-            class="header-index-cell"
-            @mouseenter="headerIndexHover = true"
-            @mouseleave="headerIndexHover = false"
-          >
-            <span v-show="!shouldShowHeaderCheckbox" class="index-num">#</span>
-            <a-checkbox
-              v-show="shouldShowHeaderCheckbox"
-              :checked="allSelected"
-              :indeterminate="indeterminate"
-              @change="toggleSelectAll"
-              @click.stop
-            />
-          </div>
-        </template>
-      </template>
-      <template #emptyText>
-        <div class="add-detail-empty">
-          <a-empty v-if="emptyVariant === 'no-children'" description="暂无子项" />
-          <a-button
-            v-if="!readonly && emptyVariant !== 'no-children'"
-            type="link"
-            size="small"
-            @click="emit('add-detail-line')"
-          >
-            添加明细行
-          </a-button>
-        </div>
-      </template>
-      <template #bodyCell="{ column, record, index }">
-        <template v-if="column.key === 'drag'">
-          <a-tooltip title="拖动">
-            <span
-              class="drag-handle"
-              draggable="true"
-              @dragstart="onDragStart(index, $event)"
-              @dragend="onDragEnd"
-            >
-              <HolderOutlined />
-            </span>
-          </a-tooltip>
-        </template>
-        <template v-else-if="column.key === 'index'">
-          <span v-if="readonly">{{ index + 1 }}</span>
-          <div
-            v-else
-            class="row-index-cell"
-            @mouseenter="hoverRowId = record.id"
-            @mouseleave="hoverRowId = ''"
-          >
-            <span v-show="!shouldShowRowCheckbox(record)" class="index-num">{{ index + 1 }}</span>
-            <a-checkbox
-              v-show="shouldShowRowCheckbox(record)"
-              :checked="selectedRowKeys.includes(record.id)"
-              @change="(e) => toggleRowSelect(record.id, e.target.checked)"
-              @click.stop
-            />
-          </div>
-        </template>
-        <template v-else-if="readonly">
-          <template v-if="column.key === 'unitQty'">{{ formatQty(record.unitQty) }}</template>
-          <template v-else-if="column.key === 'unitPrice'">{{
-            formatPrice(record.unitPrice)
-          }}</template>
-          <template v-else-if="column.key === 'itemName'">
-            {{ formatCell(record.itemName) }}
+    <div ref="tableListPanelRef" class="table-list-panel">
+      <div ref="tableScrollWrapRef" class="table-scroll-wrap">
+        <a-table
+          :columns="tableColumns"
+          :data-source="lines"
+          row-key="id"
+          size="small"
+          bordered
+          :pagination="false"
+          :scroll="tableScroll"
+          :custom-row="customRow"
+        >
+          <template #headerCell="{ column }">
+            <template v-if="column.key === 'index' && !readonly">
+              <div
+                class="header-index-cell"
+                @mouseenter="headerIndexHover = true"
+                @mouseleave="headerIndexHover = false"
+              >
+                <span v-show="!shouldShowHeaderCheckbox" class="index-num">#</span>
+                <a-checkbox
+                  v-show="shouldShowHeaderCheckbox"
+                  :checked="allSelected"
+                  :indeterminate="indeterminate"
+                  @change="toggleSelectAll"
+                  @click.stop
+                />
+              </div>
+            </template>
           </template>
-          <template v-else-if="column.key === 'childBom'">
-            {{ formatChildBom(record) }}
+          <template #emptyText>
+            <div class="add-detail-empty">
+              <a-empty v-if="emptyVariant === 'no-children'" description="暂无子项" />
+              <a-button
+                v-if="!readonly && emptyVariant !== 'no-children'"
+                type="link"
+                size="small"
+                @click="emit('add-detail-line')"
+              >
+                添加明细行
+              </a-button>
+            </div>
           </template>
-          <template v-else>{{ formatCell(record[column.dataIndex]) }}</template>
-        </template>
-        <template v-else-if="column.key === 'itemName'">
-          <BomSubItemMaterialSelect
-            :value="record.materialCode"
-            :fallback-name="record.itemName"
-            @select="(material) => emit('material-change', { lineId: record.id, material })"
-          />
-        </template>
-        <template v-else-if="column.key === 'unitQty'">
-          <a-input-number
-            v-model:value="record.unitQty"
-            size="small"
-            :min="0"
-            :precision="2"
-            style="width: 100%"
-          />
-        </template>
-        <template v-else-if="column.key === 'unit'">
-          <a-select
-            v-model:value="record.unit"
-            size="small"
-            style="width: 100%"
-            :options="unitOpts"
-          />
-        </template>
-        <template v-else-if="column.key === 'processDocName'">
-          <a-select
-            v-model:value="record.processDocName"
-            allow-clear
-            size="small"
-            placeholder="请选择"
-            style="width: 100%"
-            :options="processDocOpts"
-          />
-        </template>
-        <template v-else-if="column.key === 'processRoute'">
-          <a-select
-            v-model:value="record.processRoute"
-            allow-clear
-            size="small"
-            placeholder="请选择"
-            style="width: 100%"
-            :options="processRouteOpts"
-          />
-        </template>
-        <template v-else-if="column.key === 'lossRate'">
-          <a-input-number
-            v-model:value="record.lossRate"
-            size="small"
-            :min="0"
-            :max="100"
-            placeholder="请输入"
-            style="width: 100%"
-          />
-        </template>
-        <template v-else-if="column.key === 'unitPrice'">
-          <a-input-number
-            v-model:value="record.unitPrice"
-            size="small"
-            :min="0"
-            :precision="4"
-            style="width: 100%"
-          />
-        </template>
-        <template v-else-if="column.key === 'effectiveStart'">
-          <a-date-picker
-            v-model:value="record._effectiveStart"
-            size="small"
-            style="width: 100%"
-            value-format="YYYY-MM-DD"
-            @change="(v) => (record.effectiveStart = v || '')"
-          />
-        </template>
-        <template v-else-if="column.key === 'effectiveEnd'">
-          <a-date-picker
-            v-model:value="record._effectiveEnd"
-            size="small"
-            style="width: 100%"
-            value-format="YYYY-MM-DD"
-            @change="(v) => (record.effectiveEnd = v || '')"
-          />
-        </template>
-        <template v-else-if="column.key === 'remark'">
-          <a-input v-model:value="record.remark" size="small" placeholder="请输入备注" />
-        </template>
-        <template v-else-if="column.key === 'childBom'">
-          <span class="child-bom-text" :title="formatChildBom(record)">
-            {{ formatChildBom(record) }}
-          </span>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-button type="link" size="small" danger @click="emit('delete-line', record.id)">
-            <DeleteOutlined />
-            删除
-          </a-button>
-        </template>
-        <template v-else>
-          {{ formatCell(record[column.dataIndex]) }}
-        </template>
-      </template>
-      <template #summary>
-        <a-table-summary-row v-if="!readonly && lines.length">
-          <a-table-summary-cell :index="0" :col-span="tableColumns.length" align="left">
-            <a-button
-              type="link"
-              size="small"
-              class="add-detail-link"
-              @click="emit('add-detail-line')"
-            >
-              添加明细行
-            </a-button>
-          </a-table-summary-cell>
-        </a-table-summary-row>
-      </template>
-    </a-table>
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'drag'">
+              <a-tooltip title="拖动">
+                <span
+                  class="drag-handle"
+                  draggable="true"
+                  @dragstart="onDragStart(index, $event)"
+                  @dragend="onDragEnd"
+                >
+                  <HolderOutlined />
+                </span>
+              </a-tooltip>
+            </template>
+            <template v-else-if="column.key === 'index'">
+              <span v-if="readonly">{{ index + 1 }}</span>
+              <div
+                v-else
+                class="row-index-cell"
+                @mouseenter="hoverRowId = record.id"
+                @mouseleave="hoverRowId = ''"
+              >
+                <span v-show="!shouldShowRowCheckbox(record)" class="index-num">{{
+                  index + 1
+                }}</span>
+                <a-checkbox
+                  v-show="shouldShowRowCheckbox(record)"
+                  :checked="selectedRowKeys.includes(record.id)"
+                  @change="(e) => toggleRowSelect(record.id, e.target.checked)"
+                  @click.stop
+                />
+              </div>
+            </template>
+            <template v-else-if="readonly">
+              <template v-if="column.key === 'unitQty'">{{ formatQty(record.unitQty) }}</template>
+              <template v-else-if="column.key === 'unitPrice'">{{
+                formatPrice(record.unitPrice)
+              }}</template>
+              <template v-else-if="column.key === 'itemName'">
+                {{ formatCell(record.itemName) }}
+              </template>
+              <template v-else-if="column.key === 'childBom'">
+                {{ formatChildBom(record) }}
+              </template>
+              <template v-else-if="column.key === 'substitutePart'">
+                {{ formatSubstitute(record) }}
+              </template>
+              <template v-else>{{ formatCell(record[column.dataIndex]) }}</template>
+            </template>
+            <template v-else-if="column.key === 'itemName'">
+              <BomSubItemMaterialSelect
+                :value="record.materialCode"
+                :fallback-name="record.itemName"
+                @select="(material) => emit('material-change', { lineId: record.id, material })"
+              />
+            </template>
+            <template v-else-if="column.key === 'unitQty'">
+              <a-input-number
+                v-model:value="record.unitQty"
+                size="small"
+                :min="0"
+                :precision="2"
+                style="width: 100%"
+              />
+            </template>
+            <template v-else-if="column.key === 'unit'">
+              <a-select
+                v-model:value="record.unit"
+                size="small"
+                style="width: 100%"
+                :options="unitOpts"
+              />
+            </template>
+            <template v-else-if="column.key === 'processDocName'">
+              <a-select
+                v-model:value="record.processDocName"
+                allow-clear
+                size="small"
+                placeholder="请选择"
+                style="width: 100%"
+                :options="processDocOpts"
+              />
+            </template>
+            <template v-else-if="column.key === 'processRoute'">
+              <a-select
+                v-model:value="record.processRoute"
+                allow-clear
+                size="small"
+                placeholder="请选择"
+                style="width: 100%"
+                :options="processRouteOpts"
+              />
+            </template>
+            <template v-else-if="column.key === 'lossRate'">
+              <a-input-number
+                v-model:value="record.lossRate"
+                size="small"
+                :min="0"
+                :max="100"
+                placeholder="请输入"
+                style="width: 100%"
+              />
+            </template>
+            <template v-else-if="column.key === 'unitPrice'">
+              <a-input-number
+                v-model:value="record.unitPrice"
+                size="small"
+                :min="0"
+                :precision="4"
+                style="width: 100%"
+              />
+            </template>
+            <template v-else-if="column.key === 'effectiveStart'">
+              <a-date-picker
+                v-model:value="record._effectiveStart"
+                size="small"
+                style="width: 100%"
+                value-format="YYYY-MM-DD"
+                @change="(v) => (record.effectiveStart = v || '')"
+              />
+            </template>
+            <template v-else-if="column.key === 'effectiveEnd'">
+              <a-date-picker
+                v-model:value="record._effectiveEnd"
+                size="small"
+                style="width: 100%"
+                value-format="YYYY-MM-DD"
+                @change="(v) => (record.effectiveEnd = v || '')"
+              />
+            </template>
+            <template v-else-if="column.key === 'remark'">
+              <a-input v-model:value="record.remark" size="small" placeholder="请输入备注" />
+            </template>
+            <template v-else-if="column.key === 'substitutePart'">
+              <BomSubItemMaterialSelect
+                :value="record.substituteCode"
+                :fallback-name="record.substituteName"
+                placeholder="请选择替代件（选填）"
+                @select="(material) => onSubstituteSelect(record, material)"
+                @clear="onSubstituteClear(record)"
+              />
+            </template>
+            <template v-else-if="column.key === 'childBom'">
+              <span class="child-bom-text" :title="formatChildBom(record)">
+                {{ formatChildBom(record) }}
+              </span>
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-button type="link" size="small" danger @click="emit('delete-line', record.id)">
+                <DeleteOutlined />
+                删除
+              </a-button>
+            </template>
+            <template v-else>
+              {{ formatCell(record[column.dataIndex]) }}
+            </template>
+          </template>
+        </a-table>
+      </div>
+
+      <div v-if="!readonly" class="table-list-footer">
+        <a-button type="link" size="small" class="add-detail-link" @click="emit('add-detail-line')">
+          添加明细行
+        </a-button>
+      </div>
+    </div>
 
     <BomMaterialBatchEditModal
       v-model:open="batchEditOpen"
@@ -249,7 +261,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import {
   ReloadOutlined,
@@ -263,6 +275,7 @@ import {
   processDocOptions,
   processRouteOptions,
   formatChildBomLabel,
+  formatSubstitutePartLabel,
 } from '@/mock/bomMaterialColumns'
 import BomMaterialBatchEditModal from './BomMaterialBatchEditModal.vue'
 import BomSubItemMaterialSelect from './BomSubItemMaterialSelect.vue'
@@ -292,6 +305,22 @@ function formatPrice(val) {
 function formatChildBom(record) {
   const text = formatChildBomLabel(record)
   return text || '—'
+}
+
+function formatSubstitute(record) {
+  const text = formatSubstitutePartLabel(record)
+  return text || '—'
+}
+
+function onSubstituteSelect(record, material) {
+  if (!material) return
+  record.substituteCode = material.code || ''
+  record.substituteName = material.name || ''
+}
+
+function onSubstituteClear(record) {
+  record.substituteCode = ''
+  record.substituteName = ''
 }
 
 const emit = defineEmits([
@@ -329,6 +358,7 @@ const widthMap = {
   effectiveStart: 130,
   effectiveEnd: 130,
   remark: 120,
+  substitutePart: 180,
 }
 
 const tableColumns = computed(() => {
@@ -347,7 +377,14 @@ const tableColumns = computed(() => {
       dataIndex: c.key,
       width: widthMap[c.key] || 100,
       fixed: c.frozen ? 'left' : undefined,
-      ellipsis: ['itemName', 'remark', 'material', 'childBom', 'drawingNo'].includes(c.key),
+      ellipsis: [
+        'itemName',
+        'remark',
+        'material',
+        'childBom',
+        'drawingNo',
+        'substitutePart',
+      ].includes(c.key),
     })),
     ...(props.readonly ? [] : [{ title: '操作', key: 'action', width: 80, fixed: 'right' }]),
   ]
@@ -365,6 +402,49 @@ const summaryTotals = computed(() => {
   const unitPriceSum = props.lines.reduce((s, line) => s + (Number(line.unitPrice) || 0), 0)
   return { count, unitQtySum, unitPriceSum }
 })
+
+const showSummaryBar = computed(() => (props.readonly ? props.lines.length > 0 : true))
+
+const tableListPanelRef = ref(null)
+const tableScrollWrapRef = ref(null)
+const tableBodyHeight = ref(280)
+let tableResizeObserver = null
+
+const TABLE_HEADER_HEIGHT = 39
+
+function updateTableBodyHeight() {
+  const wrap = tableScrollWrapRef.value
+  if (!wrap) return
+  tableBodyHeight.value = Math.max(120, wrap.clientHeight - TABLE_HEADER_HEIGHT)
+}
+
+onMounted(() => {
+  nextTick(() => {
+    updateTableBodyHeight()
+    const observeTarget = tableListPanelRef.value || tableScrollWrapRef.value
+    if (observeTarget && typeof ResizeObserver !== 'undefined') {
+      tableResizeObserver = new ResizeObserver(() => updateTableBodyHeight())
+      tableResizeObserver.observe(observeTarget)
+    }
+  })
+})
+
+onUnmounted(() => {
+  tableResizeObserver?.disconnect()
+  tableResizeObserver = null
+})
+
+const tableScroll = computed(() => ({
+  x: scrollX.value,
+  y: tableBodyHeight.value,
+}))
+
+watch(
+  () => [props.lines.length, props.readonly],
+  () => {
+    nextTick(() => updateTableBodyHeight())
+  },
+)
 
 const dragFromIndex = ref(-1)
 const hoverRowId = ref('')
@@ -612,9 +692,43 @@ function customRow(_record, index) {
     background: #e6f4ff !important;
   }
 
-  :deep(.ant-table-wrapper) {
+  .table-list-panel {
     flex: 1;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .table-scroll-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+
+    :deep(.ant-table-wrapper) {
+      height: auto;
+    }
+
+    :deep(.ant-table) {
+      margin-bottom: 0 !important;
+    }
+
+    :deep(.ant-table-container) {
+      border-bottom: none !important;
+    }
+  }
+
+  .table-list-footer {
+    flex-shrink: 0;
+    padding: 2px 12px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    border-top: 1px solid #f0f0f0;
+    background: #fafafa;
   }
 }
 </style>

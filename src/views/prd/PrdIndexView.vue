@@ -54,11 +54,7 @@ export default { name: 'PrdIndexView' }
 </script>
 
 <script setup>
-import {
-  PRD_INDEX_META,
-  PRD_ITERATIONS,
-  PRD_DOC_SECTIONS,
-} from '@/data/prdIndex'
+import { PRD_INDEX_META, PRD_ITERATIONS, PRD_DOC_SECTIONS } from '@/data/prdIndex'
 
 const meta = PRD_INDEX_META
 const iterations = PRD_ITERATIONS
@@ -127,7 +123,9 @@ function statusColor(status) {
   text-decoration: none;
   color: inherit;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition:
+    box-shadow 0.2s,
+    transform 0.2s;
 
   &:hover {
     box-shadow: 0 4px 12px rgba(22, 119, 255, 0.12);
