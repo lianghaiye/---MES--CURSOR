@@ -20,106 +20,31 @@
 
     <a-collapse v-model:activeKey="collapseKeys" :bordered="false" class="detail-sections">
       <a-collapse-panel key="basic" header="工单基本信息">
-        <a-descriptions :column="3" size="small" class="basic-desc">
-          <a-descriptions-item label="工单编号">{{ detail.basic.code }}</a-descriptions-item>
-          <a-descriptions-item label="工单名称">{{ detail.basic.name }}</a-descriptions-item>
-          <a-descriptions-item label="产品名称">{{ detail.basic.productName }}</a-descriptions-item>
-          <a-descriptions-item label="工艺路线">{{
-            detail.basic.processRoute || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="物料BOM">{{ detail.basic.bom || '—' }}</a-descriptions-item>
-          <a-descriptions-item label="产品仓库">{{
-            detail.basic.warehouse || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="工作中心">{{ detail.basic.workCenter }}</a-descriptions-item>
-          <a-descriptions-item label="紧急程度">{{ detail.basic.urgency }}</a-descriptions-item>
-          <a-descriptions-item label="进度">{{ detail.basic.progress }}</a-descriptions-item>
-          <a-descriptions-item label="状态">{{ detail.basic.taskStatus }}</a-descriptions-item>
-          <a-descriptions-item label="计划生产">{{ detail.basic.planQty }}</a-descriptions-item>
-          <a-descriptions-item label="排产数量">{{ detail.basic.scheduleQty }}</a-descriptions-item>
-          <a-descriptions-item label="报废数量">{{
-            detail.basic.scrapQty || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="计划开始日期">{{
-            detail.basic.planStartDate
-          }}</a-descriptions-item>
-          <a-descriptions-item label="计划结束日期">{{
-            detail.basic.planEndDate
-          }}</a-descriptions-item>
-          <a-descriptions-item label="创建日期">{{ detail.basic.createdAt }}</a-descriptions-item>
-          <a-descriptions-item label="负责人">{{ detail.basic.owner }}</a-descriptions-item>
-          <a-descriptions-item label="销售订单号" :span="2">
-            <a
-              v-if="detail.basic.salesOrderNo"
-              class="link"
-              @click.prevent="onAction('sales-order')"
-            >
-              {{ detail.basic.salesOrderNo }}
-            </a>
-            <span v-else>—</span>
-          </a-descriptions-item>
-        </a-descriptions>
+        <WorkOrderProductionSections :work-order="workOrder" show-meta-bar />
       </a-collapse-panel>
 
       <a-collapse-panel key="process-config" header="工序配置">
-        <div class="process-config-layout">
-          <div class="process-grid-wrap">
-            <table class="process-grid">
-              <thead>
-                <tr>
-                  <th class="corner" />
-                  <th v-for="n in detail.processGridCols" :key="n">第{{ n }}步</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in 2" :key="row">
-                  <td class="row-label">{{ row }}</td>
-                  <td
-                    v-for="col in detail.processGridCols"
-                    :key="`${row}-${col}`"
-                    class="grid-cell"
-                    :class="{ active: isCellSelected(row, col) }"
-                    @click="selectGridCell(row, col)"
-                  >
-                    <template v-if="getGridProcess(row, col)">
-                      <div class="cell-icon">
-                        <CloudOutlined />
-                      </div>
-                      <div class="cell-name">{{ getGridProcess(row, col).name }}</div>
-                    </template>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-if="selectedProcessDetail" class="process-side-panel">
-            <div class="side-field">
-              <span class="label">工序名称</span>
-              <span class="value">{{ selectedProcessDetail.name }}</span>
-            </div>
-            <div class="side-field">
-              <span class="label">计划开始日期</span>
-              <span class="value">{{ selectedProcessDetail.planStartDate || '—' }}</span>
-            </div>
-            <div class="side-field">
-              <span class="label">实际执行者</span>
-              <span class="value">{{ selectedProcessDetail.executor }}</span>
-            </div>
-            <div class="side-field">
-              <span class="label">计划结束日期</span>
-              <span class="value">{{ selectedProcessDetail.planEndDate || '—' }}</span>
-            </div>
-            <a-table
-              v-if="selectedProcessDetail.materials.length"
-              size="small"
-              :pagination="false"
-              :columns="materialCols"
-              :data-source="selectedProcessDetail.materials"
-              row-key="name"
-              class="material-table"
-            />
-          </div>
-        </div>
+        <a-table
+          size="small"
+          :columns="processConfigCols"
+          :data-source="processConfigList"
+          row-key="id"
+          :pagination="false"
+          :scroll="{ x: 700 }"
+          bordered
+        >
+          <template #bodyCell="{ column, record, text }">
+            <template v-if="column.key === 'feeding'">
+              {{ formatProcessFeedingSummary(record) }}
+            </template>
+            <template v-else-if="column.key === 'executors'">
+              {{ formatProcessExecutors(record) }}
+            </template>
+            <template v-else-if="column.dataIndex">
+              {{ displayProcessCell(text) }}
+            </template>
+          </template>
+        </a-table>
       </a-collapse-panel>
 
       <a-collapse-panel key="process-exec" header="工序执行详情">
@@ -197,10 +122,15 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { CheckOutlined, CloudOutlined, EditOutlined } from '@ant-design/icons-vue'
-import { buildWorkOrderDetail, getProcessDetail } from '@/mock/workOrderDetail'
+import { CheckOutlined, EditOutlined } from '@ant-design/icons-vue'
+import { buildWorkOrderDetail } from '@/mock/workOrderDetail'
+import {
+  formatProcessExecutors,
+  formatProcessFeedingSummary,
+} from '@/utils/workOrderProcessDisplay'
+import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -220,15 +150,20 @@ const collapseKeys = ref([
 
 const detail = computed(() => buildWorkOrderDetail(props.workOrder))
 
-const selectedProcessId = ref(null)
+const processConfigList = computed(() => props.workOrder?.processes || [])
 
-watch(
-  () => props.workOrder?.id,
-  () => {
-    selectedProcessId.value = detail.value?.defaultProcessId ?? null
-  },
-  { immediate: true },
-)
+const processConfigCols = [
+  { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
+  { title: '工序名称', dataIndex: 'name', width: 100 },
+  { title: '工序内容', dataIndex: 'processContent', width: 140, ellipsis: true },
+  { title: '投料', key: 'feeding', width: 160, ellipsis: true },
+  { title: '执行者', key: 'executors', width: 100 },
+]
+
+function displayProcessCell(value) {
+  const text = String(value ?? '').trim()
+  return text || '—'
+}
 
 const timelineCurrent = computed(() => {
   const steps = detail.value?.timeline || []
@@ -238,38 +173,6 @@ const timelineCurrent = computed(() => {
   if (lastFinish >= 0) return steps.length - 1 - lastFinish
   return 0
 })
-
-const selectedProcess = computed(() => {
-  const procs = detail.value?.processes || []
-  return procs.find((p) => p.id === selectedProcessId.value) || procs[0]
-})
-
-const selectedProcessDetail = computed(() => {
-  const p = selectedProcess.value
-  if (!p) return null
-  const qty = detail.value?.basic?.scheduleQty ?? 10
-  return getProcessDetail(p, qty)
-})
-
-function getGridProcess(row, col) {
-  const idx = (row - 1) * detail.value.processGridCols + (col - 1)
-  return detail.value.processes[idx] || null
-}
-
-function isCellSelected(row, col) {
-  const p = getGridProcess(row, col)
-  return p && p.id === selectedProcessId.value
-}
-
-function selectGridCell(row, col) {
-  const p = getGridProcess(row, col)
-  if (p) selectedProcessId.value = p.id
-}
-
-const materialCols = [
-  { title: '物料', dataIndex: 'name', key: 'name' },
-  { title: '数量', dataIndex: 'qty', key: 'qty', width: 80 },
-]
 
 const execCols = [
   { title: '顺序', dataIndex: 'seq', width: 72 },
@@ -416,121 +319,6 @@ function onAction(key) {
 
     :deep(.ant-collapse-content-box) {
       padding: 12px 16px 16px !important;
-    }
-  }
-
-  .basic-desc {
-    :deep(.ant-descriptions-item-label) {
-      color: rgba(0, 0, 0, 0.45);
-    }
-
-    .link {
-      color: #1677ff;
-    }
-  }
-
-  .process-config-layout {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-
-    @media (max-width: 992px) {
-      flex-direction: column;
-    }
-  }
-
-  .process-grid-wrap {
-    flex: 1;
-    min-width: 0;
-    overflow-x: auto;
-  }
-
-  .process-grid {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-
-    th,
-    td {
-      border: 1px solid #f0f0f0;
-      text-align: center;
-      padding: 8px 4px;
-    }
-
-    .corner {
-      width: 32px;
-      background: #fafafa;
-    }
-
-    th {
-      background: #fafafa;
-      font-weight: 500;
-      color: rgba(0, 0, 0, 0.65);
-    }
-
-    .row-label {
-      background: #fafafa;
-      font-weight: 500;
-      width: 32px;
-    }
-
-    .grid-cell {
-      min-width: 72px;
-      height: 72px;
-      vertical-align: middle;
-      cursor: pointer;
-      transition: border-color 0.2s;
-
-      &.active {
-        border: 2px solid #1677ff;
-        background: #e6f4ff;
-      }
-
-      .cell-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 36px;
-        height: 36px;
-        margin: 0 auto 4px;
-        border-radius: 6px;
-        background: #1677ff;
-        color: #fff;
-        font-size: 18px;
-      }
-
-      .cell-name {
-        font-size: 12px;
-        color: rgba(0, 0, 0, 0.88);
-      }
-    }
-  }
-
-  .process-side-panel {
-    flex: 0 0 280px;
-    padding: 12px;
-    border: 1px solid #f0f0f0;
-    border-radius: 8px;
-    background: #fafafa;
-
-    .side-field {
-      display: flex;
-      margin-bottom: 10px;
-      font-size: 13px;
-
-      .label {
-        flex: 0 0 96px;
-        color: rgba(0, 0, 0, 0.45);
-      }
-
-      .value {
-        flex: 1;
-        color: rgba(0, 0, 0, 0.88);
-      }
-    }
-
-    .material-table {
-      margin-top: 8px;
     }
   }
 

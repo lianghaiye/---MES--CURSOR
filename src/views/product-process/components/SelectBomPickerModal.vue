@@ -1,11 +1,11 @@
 <template>
   <a-modal
     :open="open"
-    title="请选择BOM模板"
+    :title="title"
     width="1120px"
     :mask-closable="false"
     destroy-on-close
-    class="bom-template-modal"
+    class="select-bom-picker-modal"
     @cancel="emit('update:open', false)"
   >
     <div class="filter-card">
@@ -102,7 +102,9 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
-          <a-tag color="success">{{ record.status }}</a-tag>
+          <a-tag :color="record.status === '生效' ? 'success' : 'processing'">{{
+            record.status
+          }}</a-tag>
         </template>
       </template>
     </a-table>
@@ -134,8 +136,6 @@ import { SearchOutlined } from '@ant-design/icons-vue'
 import { productBomState } from '@/store/productBomStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { isBomActive } from '@/mock/productBomOptions'
-import { applyBomTemplateImport } from '@/utils/bomImport'
 import {
   BOM_PICKER_TABLE_COLUMNS,
   createEmptyBomPickerFilters,
@@ -145,26 +145,35 @@ import {
 
 const props = defineProps({
   open: Boolean,
-  hasRoot: Boolean,
-  flatNodes: { type: Array, default: () => [] },
-  lineItems: { type: Array, default: () => [] },
+  title: { type: String, default: '选择BOM' },
+  productId: { type: String, default: '' },
+  /** (bom) => boolean */
+  rowFilter: { type: Function, default: null },
 })
-const emit = defineEmits(['update:open', 'imported'])
+
+const emit = defineEmits(['update:open', 'confirm'])
 
 const filters = reactive(createEmptyBomPickerFilters())
 const appliedFilters = ref(createEmptyBomPickerFilters())
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 
-const activeBomList = computed(() => {
+const sourceList = computed(() => {
   void productInfoState.products
   void materialInfoState.materials
-  return productBomState.boms.filter((b) => isBomActive(b))
+  let rows = productBomState.boms
+  if (props.rowFilter) {
+    rows = rows.filter((b) => props.rowFilter(b))
+  }
+  return rows
 })
 
-const filteredList = computed(() =>
-  filterBomPickerRows(activeBomList.value, appliedFilters.value).map(enrichBomPickerRow),
-)
+const filteredList = computed(() => {
+  const rows = filterBomPickerRows(sourceList.value, appliedFilters.value, {
+    productId: props.productId || undefined,
+  })
+  return rows.map(enrichBomPickerRow)
+})
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -172,7 +181,7 @@ const pagedList = computed(() => {
 })
 
 const selectedBom = computed(() =>
-  activeBomList.value.find((b) => b.id === selectedRowKeys.value[0]),
+  filteredList.value.find((b) => b.id === selectedRowKeys.value[0]),
 )
 
 const rowSelection = computed(() => ({
@@ -204,28 +213,24 @@ function handleReset() {
 watch(
   () => props.open,
   (v) => {
-    if (v) {
-      selectedRowKeys.value = []
-      handleReset()
-    }
+    if (!v) return
+    selectedRowKeys.value = []
+    handleReset()
   },
 )
 
 function confirm() {
   if (!selectedBom.value) {
-    message.warning('请选择一条 BOM 模板')
+    message.warning('请选择 BOM')
     return
   }
-
-  const result = applyBomTemplateImport(selectedBom.value, props.hasRoot, props.flatNodes)
-  if (!result) {
-    message.error('无法加载该 BOM 结构')
-    return
-  }
-
-  emit('imported', result)
+  emit('confirm', selectedBom.value)
   emit('update:open', false)
 }
+</script>
+
+<script>
+export default { name: 'SelectBomPickerModal' }
 </script>
 
 <style lang="less" scoped>

@@ -25,6 +25,12 @@ const routes = [
     meta: { title: 'BOM预览', standalone: true },
   },
   {
+    path: '/production/work-orders/preview',
+    name: 'production-work-order-preview',
+    component: () => import('@/views/production/WorkOrderPrintPreviewView.vue'),
+    meta: { title: '工单预览', standalone: true },
+  },
+  {
     path: '/',
     component: MainLayout,
     redirect: '/home/dashboard',

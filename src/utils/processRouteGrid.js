@@ -1,5 +1,6 @@
 import { getProcessById, resolveDefaultExecutors } from '@/store/processConfigStore'
 import { getProcessDocById } from '@/store/processDocStore'
+import { createEmptyWorkOrderProcessExtras } from '@/utils/workOrderProcessDisplay'
 
 export const MAX_ROUTE_STEPS = 150
 export const MAX_ROUTE_PARALLEL = 50
@@ -88,6 +89,7 @@ export function buildWorkOrderProcessesFromGrid(grid, routeId = '') {
     processFileId: step.processFileId,
     processFileName: step.processFileName,
     executors: resolveDefaultExecutors(getProcessById(step.processId)),
+    ...createEmptyWorkOrderProcessExtras(),
     feedingMaterials: step.hasFeeding
       ? [{ id: `feed-${Date.now()}-${index}`, materialId: undefined, materialName: '', qty: null }]
       : [],

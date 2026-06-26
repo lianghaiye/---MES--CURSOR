@@ -73,6 +73,7 @@ const innerKey = computed({
   set(key) {
     if (!key) {
       emit('update:modelValue', '')
+      emit('select', null)
       return
     }
     const item = allItems.value.find((it) => it.rowKey === key)

@@ -405,6 +405,21 @@
               <a-input v-model:value="record.supplementDesc" size="small" />
             </template>
 
+            <template v-else-if="column.key === 'lineAttachment'">
+              <a-upload
+                class="line-attachment-upload"
+                :file-list="lineUploadFileList(record)"
+                :before-upload="(file) => beforeLineUpload(record, file)"
+                multiple
+                @remove="(file) => onLineFileRemove(record, file)"
+              >
+                <a-button type="link" size="small" class="line-upload-btn">
+                  <UploadOutlined />
+                  上传附件
+                </a-button>
+              </a-upload>
+            </template>
+
             <template v-else-if="column.key === 'action'">
               <a-space :size="0">
                 <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
@@ -615,6 +630,7 @@ const columnDefs = [
   { key: 'totalPriceInTax', title: '总价（含税）', width: 100 },
   { key: 'packagingForm', title: '包装形式', width: 90 },
   { key: 'supplementDesc', title: '补充说明', width: 90 },
+  { key: 'lineAttachment', title: '上传附件', width: 120 },
   { key: 'action', title: '操作', width: 110, fixed: 'right' },
 ]
 
@@ -855,7 +871,7 @@ watch(
 )
 
 function normalizeLineItem(item, orderBusinessType = '自产销售') {
-  return normalizeSalesLineBusiness(
+  const line = normalizeSalesLineBusiness(
     {
       ...item,
       salesQty: item.salesQty ?? item.qty ?? 1,
@@ -866,9 +882,29 @@ function normalizeLineItem(item, orderBusinessType = '自产销售') {
       productAttr: item.productAttr || '',
       deliveryMode: item.deliveryMode || '整机',
       businessType: item.businessType || orderBusinessType || '自产销售',
+      lineAttachments: Array.isArray(item.lineAttachments) ? [...item.lineAttachments] : [],
     },
     { businessType: orderBusinessType },
   )
+  if (!line.lineAttachments.length && line.attachment) {
+    line.lineAttachments = [
+      {
+        uid: `legacy-${line.id}`,
+        name: line.attachment,
+        type: '明细附件',
+        uploadedAt: '',
+      },
+    ]
+  }
+  syncLineAttachmentSummary(line)
+  return line
+}
+
+function syncLineAttachmentSummary(line) {
+  line.attachment = (line.lineAttachments || [])
+    .map((file) => file.name)
+    .filter(Boolean)
+    .join('、')
 }
 
 function resetForm() {
@@ -901,6 +937,36 @@ function beforeUpload(file) {
     return Upload.LIST_IGNORE
   }
   return false
+}
+
+function lineUploadFileList(record) {
+  return (record.lineAttachments || []).map((file) => ({
+    uid: file.uid,
+    name: file.name,
+    status: 'done',
+  }))
+}
+
+function beforeLineUpload(record, file) {
+  if (file.size > MAX_FILE_SIZE) {
+    message.error('文件大小不能超过 200MB')
+    return Upload.LIST_IGNORE
+  }
+  if (!record.lineAttachments) record.lineAttachments = []
+  record.lineAttachments.push({
+    uid: file.uid || `line-${Date.now()}-${file.name}`,
+    name: file.name,
+    size: file.size,
+    type: file.type || '',
+    uploadedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+  })
+  syncLineAttachmentSummary(record)
+  return false
+}
+
+function onLineFileRemove(record, file) {
+  record.lineAttachments = (record.lineAttachments || []).filter((item) => item.uid !== file.uid)
+  syncLineAttachmentSummary(record)
 }
 
 function round2(n) {
@@ -1253,6 +1319,22 @@ function handleSave() {
   width: 280px;
   max-height: 320px;
   overflow-y: auto;
+}
+
+.line-attachment-upload {
+  :deep(.ant-upload-list) {
+    max-width: 100%;
+  }
+
+  :deep(.ant-upload-list-item) {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  .line-upload-btn {
+    padding-inline: 0;
+    height: auto;
+  }
 }
 
 .attachment-section {

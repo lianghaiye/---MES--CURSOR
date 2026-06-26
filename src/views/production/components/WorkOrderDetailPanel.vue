@@ -1,114 +1,60 @@
 <template>
   <div v-if="workOrder" class="detail-panel">
     <div class="detail-header">
-      <div class="detail-title" :class="{ 'title-bold': variant === 'qc' }">
-        <span class="code">{{ workOrder.code }}</span>
-        <span class="name">{{ workOrder.name }}</span>
+      <div class="header-main">
+        <div class="detail-title" :class="{ 'title-bold': variant === 'qc' }">
+          <span class="code">{{ workOrder.code }}</span>
+          <span class="name">{{ workOrder.name }}</span>
+        </div>
+        <a-space :size="6" class="header-tags">
+          <a-tag :color="statusTagColor(workOrder.status)">
+            {{ workOrder.orderCategory || '生产工单' }}
+          </a-tag>
+          <a-tag :color="statusTagColor(workOrder.status)">{{ workOrder.status }}</a-tag>
+          <a-tag v-if="workOrder.taskStatus && workOrder.taskStatus !== '正常'">
+            {{ workOrder.taskStatus }}
+          </a-tag>
+          <a-tag v-if="workOrder.urgency && workOrder.urgency !== '普通'" color="orange">
+            {{ workOrder.urgency }}
+          </a-tag>
+        </a-space>
       </div>
-      <a-button
-        v-if="detailTab === 'dispatch' && showDispatchTab"
-        type="link"
-        class="collapse-btn"
-        @click="detailCollapsed = !detailCollapsed"
-      >
-        {{ detailCollapsed ? '展开详情' : '收起详情' }}
-        <UpOutlined v-if="!detailCollapsed" />
-        <DownOutlined v-else />
-      </a-button>
+      <a-space :size="4" class="header-actions">
+        <a-button type="link" size="small" class="header-action-btn" @click="printModalOpen = true">
+          <PrinterOutlined />
+          打印
+        </a-button>
+        <a-button
+          v-if="detailTab === 'dispatch' && showDispatchTab"
+          type="link"
+          class="collapse-btn"
+          @click="detailCollapsed = !detailCollapsed"
+        >
+          {{ detailCollapsed ? '展开详情' : '收起详情' }}
+          <UpOutlined v-if="!detailCollapsed" />
+          <DownOutlined v-else />
+        </a-button>
+      </a-space>
     </div>
+
+    <WorkOrderPrintModal v-model:open="printModalOpen" :work-order="workOrder" />
 
     <a-tabs v-model:activeKey="detailTab" class="detail-tabs">
       <a-tab-pane v-if="showDispatchTab" key="dispatch" tab="工单下发">
-        <a-form
+        <WorkOrderProductionSections
           v-show="!detailCollapsed"
-          layout="inline"
-          class="basic-form horizontal-form dispatch-basic-form"
-        >
-          <a-row :gutter="[16, 12]" style="width: 100%">
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="产品名称">
-                <a-input :value="workOrder.productName" disabled size="small" />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="工作中心">
-                <a-select
-                  v-model:value="workOrder.workCenter"
-                  size="small"
-                  :options="workCenterOpts"
-                  @change="emit('save-basic')"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col v-if="workOrder.orderCategory !== '外协工单'" :xs="24" :sm="12" :md="8">
-              <a-form-item label="BOM">
-                <a-select
-                  v-model:value="workOrder.bom"
-                  show-search
-                  size="small"
-                  :options="bomOpts"
-                  @change="emit('save-basic')"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item
-                :label="workOrder.orderCategory === '外协工单' ? '工艺路线（必填）' : '工艺路线'"
-                :required="workOrder.orderCategory === '外协工单'"
-              >
-                <a-select
-                  v-model:value="workOrder.processRouteName"
-                  show-search
-                  allow-clear
-                  size="small"
-                  :options="processRouteOpts"
-                  placeholder="请选择工艺路线"
-                  :filter-option="filterProcessRoute"
-                  @change="onProcessRouteChange"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="预入仓库">
-                <a-select
-                  v-model:value="workOrder.warehouse"
-                  size="small"
-                  :options="warehouseOpts"
-                  @change="emit('save-basic')"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="紧急度">
-                <a-select
-                  v-model:value="workOrder.urgency"
-                  size="small"
-                  :options="urgencyOpts"
-                  @change="emit('save-basic')"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :xs="24" :sm="12" :md="8">
-              <a-form-item label="计划日期">
-                <a-range-picker
-                  :value="planDateValue"
-                  size="small"
-                  @change="(dates) => emit('plan-date-change', dates)"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="24">
-              <a-form-item label="备注" class="remark-item">
-                <a-input
-                  v-model:value="workOrder.remark"
-                  size="small"
-                  placeholder="请输入备注"
-                  @blur="emit('save-basic')"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
+          editable
+          :work-order="workOrder"
+          :plan-date-value="planDateValue"
+          :work-center-opts="workCenterOpts"
+          :warehouse-opts="warehouseOpts"
+          :urgency-opts="urgencyOpts"
+          :process-route-opts="processRouteOpts"
+          @update-field="onWorkOrderFieldUpdate"
+          @change="emit('save-basic')"
+          @plan-date-change="(dates) => emit('plan-date-change', dates)"
+          @process-route-change="onProcessRouteChange"
+        />
 
         <WorkOrderDispatchTab
           class="dispatch-process-section"
@@ -141,8 +87,8 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
-import { DownOutlined, UpOutlined } from '@ant-design/icons-vue'
+import { computed, ref, watch } from 'vue'
+import { DownOutlined, PrinterOutlined, UpOutlined } from '@ant-design/icons-vue'
 import { workOrderState } from '@/store/workOrderStore'
 import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
@@ -158,6 +104,10 @@ import WorkOrderDispatchTab from './WorkOrderDispatchTab.vue'
 import WorkOrderDetailTab from './WorkOrderDetailTab.vue'
 import WorkOrderEbomTreeTab from './WorkOrderEbomTreeTab.vue'
 import WorkOrderCurrentBomTab from './WorkOrderCurrentBomTab.vue'
+import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
+import WorkOrderPrintModal from './WorkOrderPrintModal.vue'
+
+const printModalOpen = ref(false)
 
 const props = defineProps({
   workOrderId: { type: String, default: null },
@@ -212,14 +162,27 @@ watch(
   { immediate: true },
 )
 
-function filterProcessRoute(input, option) {
-  return (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+function onWorkOrderFieldUpdate({ key, value }) {
+  if (!workOrder.value) return
+  workOrder.value[key] = value
 }
 
 function onProcessRouteChange(routeName) {
   if (!workOrder.value || !routeName) return
   workOrder.value.processes = buildProcessesFromRoute(routeName)
   emit('save-basic')
+}
+
+function statusTagColor(status) {
+  const map = {
+    待下发: 'warning',
+    已下发: 'processing',
+    执行中: 'processing',
+    完成: 'success',
+    暂停: 'default',
+    终止: 'error',
+  }
+  return map[status] || 'default'
 }
 </script>
 
@@ -228,8 +191,27 @@ function onProcessRouteChange(routeName) {
   .detail-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    gap: 12px;
+
+    .header-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .header-tags {
+      margin-top: 6px;
+    }
+
+    .header-actions {
+      flex-shrink: 0;
+    }
+
+    .header-action-btn,
+    .collapse-btn {
+      padding-inline: 4px;
+    }
 
     .detail-title {
       min-width: 0;
@@ -280,50 +262,10 @@ function onProcessRouteChange(routeName) {
     }
   }
 
-  .dispatch-basic-form {
-    padding-bottom: 16px;
-    border-bottom: 1px solid #f0f0f0;
-  }
-
   .dispatch-process-section {
-    margin-top: 20px;
-  }
-
-  .horizontal-form {
-    width: 100%;
-
-    :deep(.ant-form-item) {
-      width: 100%;
-      margin-bottom: 0;
-    }
-
-    :deep(.ant-form-item-row) {
-      flex-wrap: nowrap;
-      align-items: center;
-    }
-
-    :deep(.ant-form-item-label) {
-      flex: 0 0 auto;
-      padding-bottom: 0;
-
-      > label {
-        height: 24px;
-        line-height: 24px;
-        font-size: 13px;
-        white-space: nowrap;
-      }
-    }
-
-    :deep(.ant-form-item-control) {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .remark-item {
-      :deep(.ant-form-item-label) {
-        flex: 0 0 68px;
-      }
-    }
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #f0f0f0;
   }
 
   .tab-empty {

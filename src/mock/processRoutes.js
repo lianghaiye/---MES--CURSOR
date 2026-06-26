@@ -1,6 +1,7 @@
 import { getProcessRouteByName, getActiveRouteOptions } from '@/store/processRouteStore'
 import { getProcessByName, resolveDefaultExecutors } from '@/store/processConfigStore'
 import { buildWorkOrderProcessesFromGrid } from '@/utils/processRouteGrid'
+import { createEmptyWorkOrderProcessExtras } from '@/utils/workOrderProcessDisplay'
 
 /** @deprecated 兼容旧工单种子数据 */
 export const processRouteMaster = {
@@ -132,6 +133,7 @@ export function buildProcessesFromRoute(routeName) {
       hasFeeding: step.hasFeeding,
       resourceType: proc?.resourceType || step.resourceType || '工人',
       executors: resolveDefaultExecutors(proc),
+      ...createEmptyWorkOrderProcessExtras(),
       feedingMaterials: step.hasFeeding
         ? [
             {
@@ -159,6 +161,7 @@ export function buildDisassemblyProcesses() {
       hasFeeding: step.hasFeeding,
       resourceType: proc?.resourceType || step.resourceType,
       executors: resolveDefaultExecutors(proc),
+      ...createEmptyWorkOrderProcessExtras(),
       feedingMaterials: [],
     }
   })

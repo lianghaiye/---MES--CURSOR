@@ -33,6 +33,14 @@
             @update:executors="(v) => (record.executors = v)"
           />
         </template>
+        <template v-else-if="column.key === 'processContent'">
+          <a-input
+            v-model:value="record.processContent"
+            size="small"
+            allow-clear
+            placeholder="请输入工序内容"
+          />
+        </template>
         <template v-else-if="column.key === 'feeding'">
           <div v-if="record.hasFeeding" class="feeding-cell">
             <div v-for="(item, idx) in record.feedingMaterials" :key="item.id" class="feeding-row">
@@ -101,6 +109,7 @@ const columns = [
   { title: '工序编码', key: 'processCode', width: 100 },
   { title: '资源类型', key: 'resourceType', width: 90 },
   { title: '选择执行人', key: 'executors', width: 220 },
+  { title: '工序内容', key: 'processContent', width: 180 },
   { title: '投料信息', key: 'feeding' },
 ]
 

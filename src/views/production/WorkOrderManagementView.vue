@@ -74,6 +74,10 @@
                   <PlusOutlined />
                   新增工单
                 </a-button>
+                <a-button size="small" @click="openBatchPrint">
+                  <PrinterOutlined />
+                  批量打印
+                </a-button>
                 <a-dropdown>
                   <a-button size="small">
                     批量操作
@@ -251,6 +255,8 @@
     <a-modal v-model:open="urgencyModalOpen" title="调整紧急度" width="400px" @ok="confirmUrgency">
       <a-select v-model:value="urgencyDraft" style="width: 100%" :options="urgencyOpts" />
     </a-modal>
+
+    <WorkOrderPrintModal v-model:open="batchPrintOpen" :work-orders="batchPrintOrders" />
   </div>
 </template>
 
@@ -266,6 +272,7 @@ import {
   DownOutlined,
   EllipsisOutlined,
   PlusOutlined,
+  PrinterOutlined,
   SearchOutlined,
   ReloadOutlined,
   TableOutlined,
@@ -289,6 +296,7 @@ import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStor
 import { bomOptions } from '@/mock/workOrderMaster'
 import CreateWorkOrderModal from './components/CreateWorkOrderModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
+import WorkOrderPrintModal from './components/WorkOrderPrintModal.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
 
 const LAYOUT_STORAGE_KEY = 'i_doms_wo_layout'
@@ -316,6 +324,8 @@ const urgencyDraft = ref('普通')
 const urgencyTargetId = ref(null)
 const layoutMode = ref(localStorage.getItem(LAYOUT_STORAGE_KEY) || 'split')
 const detailDrawerOpen = ref(false)
+const batchPrintOpen = ref(false)
+const batchPrintOrders = ref([])
 
 const pagination = reactive({ current: 1, pageSize: 12 })
 
@@ -362,14 +372,18 @@ const planDateValue = computed({
   set() {},
 })
 
-watch(selectedOrder, (wo) => {
-  if (!wo) return
-  if (!canShowDispatchTab(wo.status) && detailTab.value === 'dispatch') {
-    detailTab.value = 'detail'
-  } else if (canShowDispatchTab(wo.status)) {
-    detailTab.value = 'dispatch'
-  }
-})
+watch(
+  selectedOrder,
+  (wo) => {
+    if (!wo) return
+    if (!canShowDispatchTab(wo.status) && detailTab.value === 'dispatch') {
+      detailTab.value = 'detail'
+    } else if (canShowDispatchTab(wo.status)) {
+      detailTab.value = 'dispatch'
+    }
+  },
+  { immediate: true },
+)
 
 watch(filteredOrders, (list) => {
   if (!list.find((o) => o.id === selectedId.value)) {
@@ -460,6 +474,15 @@ function onToggleSelectAllPage(e) {
 function openCreateModal() {
   editRecord.value = null
   createModalOpen.value = true
+}
+
+function openBatchPrint() {
+  if (!selectedIds.value.length) {
+    message.warning('请先勾选要打印的工单')
+    return
+  }
+  batchPrintOrders.value = workOrderState.orders.filter((o) => selectedIds.value.includes(o.id))
+  batchPrintOpen.value = true
 }
 
 function handleSearch() {

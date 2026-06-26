@@ -368,14 +368,18 @@ const planDateValue = computed({
   set() {},
 })
 
-watch(selectedOrder, (wo) => {
-  if (!wo) return
-  if (!canShowAssemblyDispatchTab(wo.status) && detailTab.value === 'dispatch') {
-    detailTab.value = 'detail'
-  } else if (canShowAssemblyDispatchTab(wo.status)) {
-    detailTab.value = 'dispatch'
-  }
-})
+watch(
+  selectedOrder,
+  (wo) => {
+    if (!wo) return
+    if (!canShowAssemblyDispatchTab(wo.status) && detailTab.value === 'dispatch') {
+      detailTab.value = 'detail'
+    } else if (canShowAssemblyDispatchTab(wo.status)) {
+      detailTab.value = 'dispatch'
+    }
+  },
+  { immediate: true },
+)
 
 watch(filteredOrders, (list) => {
   if (!list.find((o) => o.id === selectedId.value)) {

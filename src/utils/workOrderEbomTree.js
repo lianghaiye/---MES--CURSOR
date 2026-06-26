@@ -59,6 +59,16 @@ function resolveBomByProductId(itemId) {
   return getActiveBomForItem('product', itemId)
 }
 
+/** 工单保存时绑定的 BOM（优先 bomId，避免重新匹配到其它 BOM） */
+export function resolveWorkOrderLinkedBom(workOrder, variant = 'production') {
+  if (!workOrder) return null
+  if (workOrder.bomId) {
+    const saved = getProductBomById(workOrder.bomId)
+    if (saved) return saved
+  }
+  return resolveWorkOrderParentBom(workOrder, variant)
+}
+
 /** 在已展开物料树中查找与工单制品匹配的节点 */
 export function findMaterialNodeInTree(materials, workOrder) {
   const productName = normalizeName(workOrder?.productName)
@@ -118,7 +128,6 @@ export function resolveWorkOrderParentBom(workOrder, variant = 'production') {
     return resolveBomByName(workOrder.productName) || resolveBomByName(workOrder.bom)
   }
 
-  // 生产工单：bom 字段为所属成品
   if (workOrder.bom) {
     const product = findProductByName(workOrder.bom)
     if (product) {
@@ -138,18 +147,33 @@ export function resolveWorkOrderParentBom(workOrder, variant = 'production') {
   return resolveParentBomByChildProduct(workOrder) || resolveBomByName(workOrder.productName)
 }
 
+/** 工单生产的产品是否为 BOM 顶级父项 */
+export function isWorkOrderProductBomRoot(workOrder, bom) {
+  if (!workOrder || !bom) return false
+  const product = findProductByName(workOrder.productName)
+  if (product && bom.itemType === 'product' && String(bom.itemId) === String(product.id)) {
+    return true
+  }
+  const code = workOrder.materialCode || product?.code || ''
+  if (code && bom.itemCode && code === bom.itemCode) return true
+  return normalizeName(bom.itemName) === normalizeName(workOrder.productName)
+}
+
 function buildRootProduct(workOrder, bom, variant) {
-  if (variant === 'assembly') {
+  const qty = workOrder.scheduleQty ?? workOrder.planQty ?? 1
+  if (variant === 'assembly' || isWorkOrderProductBomRoot(workOrder, bom)) {
     return {
       name: workOrder.productName || bom?.itemName || '—',
       code: workOrder.materialCode || bom?.itemCode || '—',
-      qty: workOrder.scheduleQty ?? workOrder.planQty ?? 1,
+      qty,
+      spec: workOrder.specModel || bom?.specModel || '',
     }
   }
   return {
     name: bom?.itemName || workOrder.bom || workOrder.productName || '—',
     code: bom?.itemCode || '—',
     qty: 1,
+    spec: bom?.specModel || '',
   }
 }
 
@@ -176,26 +200,28 @@ const EMPTY = {
   matchedNode: null,
 }
 
-/** 完整 EBOM 树（成品根 + 全部子件） */
-export function buildWorkOrderEbomTree(workOrder, variant = 'production') {
-  if (!workOrder || workOrder.orderCategory === '外协工单' || workOrder.skipEbom) {
-    return { ...EMPTY }
+function buildFullTreeFromSnapshot(snapshot, workOrder) {
+  const bom = snapshot
+    ? {
+        bomName: snapshot.bomName,
+        version: snapshot.bomVersion,
+        bomNo: snapshot.bomNo,
+        specModel: workOrder?.specModel || '',
+      }
+    : null
+  const rootProduct = {
+    name: workOrder?.productName || snapshot?.bomName || '—',
+    code: workOrder?.materialCode || '—',
+    qty: workOrder?.scheduleQty ?? workOrder?.planQty ?? 1,
+    spec: workOrder?.specModel || '',
   }
-
-  const bom = resolveWorkOrderParentBom(workOrder, variant)
-  const rootProduct = buildRootProduct(workOrder, bom, variant)
-  if (!bom) return { ...EMPTY, rootProduct }
-
-  const qty = variant === 'assembly' ? rootProduct.qty : 1
-  const snapshot = buildEbomSnapshotFromBom(bom, qty)
-  const childNodes = (snapshot.materials || []).map((m) => materialToTreeNode(m))
-
+  const childNodes = (snapshot?.materials || []).map((m) => materialToTreeNode(m))
   const rootNode = materialToTreeNode(
     {
       id: 'ebom-root',
       name: rootProduct.name,
       code: rootProduct.code,
-      spec: bom.specModel || '',
+      spec: rootProduct.spec,
       type: '成品',
       unitUsage: rootProduct.qty,
       unit: '台',
@@ -207,7 +233,40 @@ export function buildWorkOrderEbomTree(workOrder, variant = 'production') {
   )
   rootNode.children = childNodes
   const treeData = [rootNode]
+  return {
+    ...packTreeBundle(treeData, bom, {
+      bomName: snapshot?.bomName,
+      bomVersion: snapshot?.bomVersion,
+      bomNo: snapshot?.bomNo,
+      snapshotAt: snapshot?.snapshotAt,
+    }),
+    rootProduct,
+  }
+}
 
+function buildFullTreeFromBom(bom, workOrder, variant = 'production') {
+  const rootProduct = buildRootProduct(workOrder, bom, variant)
+  const qty =
+    variant === 'assembly' || isWorkOrderProductBomRoot(workOrder, bom) ? rootProduct.qty : 1
+  const snapshot = buildEbomSnapshotFromBom(bom, qty)
+  const childNodes = (snapshot.materials || []).map((m) => materialToTreeNode(m))
+  const rootNode = materialToTreeNode(
+    {
+      id: 'ebom-root',
+      name: rootProduct.name,
+      code: rootProduct.code,
+      spec: rootProduct.spec,
+      type: '成品',
+      unitUsage: rootProduct.qty,
+      unit: '台',
+      demandQty: rootProduct.qty,
+      supplyType: '自制件',
+      children: [],
+    },
+    { isRoot: true },
+  )
+  rootNode.children = childNodes
+  const treeData = [rootNode]
   return {
     ...packTreeBundle(treeData, bom, {
       bomName: snapshot.bomName || bom.bomName,
@@ -218,15 +277,46 @@ export function buildWorkOrderEbomTree(workOrder, variant = 'production') {
   }
 }
 
-/** 当前 BOM：生产工单制品在父级 EBOM 中所处子节点及其下级 */
+/** 完整 EBOM 树（成品根 + 全部子件） */
+export function buildWorkOrderEbomTree(workOrder, variant = 'production') {
+  if (!workOrder || workOrder.orderCategory === '外协工单' || workOrder.skipEbom) {
+    return { ...EMPTY }
+  }
+
+  if (workOrder.ebomSnapshot?.materials?.length) {
+    return buildFullTreeFromSnapshot(workOrder.ebomSnapshot, workOrder)
+  }
+
+  const bom = resolveWorkOrderLinkedBom(workOrder, variant)
+  if (!bom) {
+    return { ...EMPTY, rootProduct: buildRootProduct(workOrder, null, variant) }
+  }
+
+  return buildFullTreeFromBom(bom, workOrder, variant)
+}
+
+/** 当前 BOM：顶级物料显示完整 BOM，否则显示制品在父级 EBOM 中的子树 */
 export function buildWorkOrderCurrentBomTree(workOrder) {
   if (!workOrder) return { ...EMPTY, hint: '' }
 
-  const bom = resolveWorkOrderParentBom(workOrder, 'production')
+  const bom = resolveWorkOrderLinkedBom(workOrder, 'production')
   if (!bom) {
     return {
       ...EMPTY,
-      hint: '未找到关联的成品 EBOM',
+      hint: '未找到关联的产品 BOM',
+    }
+  }
+
+  if (isWorkOrderProductBomRoot(workOrder, bom)) {
+    if (workOrder.ebomSnapshot?.materials?.length) {
+      return {
+        ...buildFullTreeFromSnapshot(workOrder.ebomSnapshot, workOrder),
+        hint: '',
+      }
+    }
+    return {
+      ...buildFullTreeFromBom(bom, workOrder, 'production'),
+      hint: '',
     }
   }
 
@@ -264,4 +354,13 @@ export function buildWorkOrderCurrentBomTree(workOrder) {
     matchedNode: matched,
     hint: '',
   }
+}
+
+/** 下发时冻结 EBOM 快照 */
+export function buildWorkOrderDispatchEbomSnapshot(workOrder) {
+  if (!workOrder || workOrder.skipEbom || workOrder.orderCategory === '外协工单') return null
+  const bom = resolveWorkOrderLinkedBom(workOrder, 'production')
+  if (!bom) return null
+  const qty = workOrder.scheduleQty ?? workOrder.planQty ?? 1
+  return buildEbomSnapshotFromBom(bom, qty)
 }

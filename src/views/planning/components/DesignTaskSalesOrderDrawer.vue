@@ -15,6 +15,9 @@
         <a-descriptions-item label="业务员">{{
           order.salesperson || task?.salesperson || '—'
         }}</a-descriptions-item>
+        <a-descriptions-item label="初始关联BOM" :span="2">{{
+          initialBomLabel
+        }}</a-descriptions-item>
       </a-descriptions>
 
       <div class="section-title section-gap">销售明细</div>
@@ -106,6 +109,13 @@ const lineBusinessType = computed(() => {
   return resolveLineBusinessType(salesLine.value, order.value)
 })
 
+const initialBomLabel = computed(() => {
+  const line = salesLine.value
+  if (!line) return '—'
+  const label = `${line.bomName || ''}${line.bomVersion || ''}`.trim()
+  return label || '—'
+})
+
 const attachmentRows = computed(() => {
   const rows = []
   const orderFiles = order.value?.attachments || []
@@ -118,16 +128,20 @@ const attachmentRows = computed(() => {
       uploadedAt: file.uploadedAt || '—',
     })
   })
-  const lineAttachment = salesLine.value?.attachment
-  if (lineAttachment) {
+  const lineFiles = salesLine.value?.lineAttachments?.length
+    ? salesLine.value.lineAttachments
+    : salesLine.value?.attachment
+      ? [{ name: salesLine.value.attachment, type: '明细附件', uploadedAt: '—' }]
+      : []
+  lineFiles.forEach((file, index) => {
     rows.push({
-      key: 'line-attachment',
+      key: `line-${file.uid || index}`,
       scope: '明细',
-      name: lineAttachment,
-      type: '明细附件',
-      uploadedAt: '—',
+      name: file.name || '—',
+      type: file.type || '明细附件',
+      uploadedAt: file.uploadedAt || '—',
     })
-  }
+  })
   return rows
 })
 

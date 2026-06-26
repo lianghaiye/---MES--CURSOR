@@ -95,24 +95,9 @@
 
             <div class="info-block">
               <div class="info-block-head">
-                <div class="head-left">
-                  <div class="info-block-title">父项产品信息</div>
-                  <span v-if="!parentInfoExpanded" class="parent-info-summary">{{
-                    parentInfoSummary
-                  }}</span>
-                </div>
-                <a-button type="link" size="small" class="toggle-btn" @click="toggleParentInfo">
-                  {{ parentInfoExpanded ? '收起信息' : '展开信息' }}
-                  <UpOutlined v-if="parentInfoExpanded" />
-                  <DownOutlined v-else />
-                </a-button>
+                <div class="info-block-title">父项产品信息</div>
               </div>
-              <a-form
-                v-show="parentInfoExpanded"
-                layout="inline"
-                size="small"
-                class="inline-info-form"
-              >
+              <a-form layout="inline" size="small" class="inline-info-form">
                 <a-form-item label="物品名称">
                   <a-input
                     :value="selectedParentInfo.itemName || '—'"
@@ -305,7 +290,6 @@ const pageTabPath = computed(() =>
 )
 const editVersion = ref('')
 const basicInfoExpanded = ref(true)
-const parentInfoExpanded = ref(true)
 const leftSidebarCollapsed = ref(false)
 const leftPanelWidth = ref(280)
 const switchProductOpen = ref(false)
@@ -371,12 +355,6 @@ const rootMeta = computed(() => {
 const basicInfoSummary = computed(() => {
   const parts = [form.bomName, form.itemName].filter(Boolean)
   return parts.length ? parts.join(' · ') : '请填写 BOM 基础信息'
-})
-
-const parentInfoSummary = computed(() => {
-  const info = selectedParentInfo.value
-  const parts = [info?.itemName, info?.specModel].filter(Boolean)
-  return parts.length ? parts.join(' · ') : '—'
 })
 
 const overviewInfo = computed(() => ({
@@ -490,10 +468,6 @@ function applyEditableMasterFields(itemType, itemId) {
 
 function toggleBasicInfo() {
   basicInfoExpanded.value = !basicInfoExpanded.value
-}
-
-function toggleParentInfo() {
-  parentInfoExpanded.value = !parentInfoExpanded.value
 }
 
 function onResizeMouseDown(e) {

@@ -32,6 +32,7 @@ function createLineItem(partial = {}) {
     lineRemark: '',
     supplementDesc: '',
     attachment: '',
+    lineAttachments: [],
     deliveryMode: '整机',
     lineAccessoryKits: [],
     ebomSnapshot: null,

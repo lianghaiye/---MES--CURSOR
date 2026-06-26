@@ -66,6 +66,7 @@ export const PRD_DOC_SECTIONS = [
       '1.5.1 产品 BOM 云效 Markdown：docs/yunxiao/淄博泵产业互联网平台-1.5.1-产品BOM需求.md',
       '1.5.1 产品/物料信息 云效 Markdown：docs/yunxiao/淄博泵产业互联网平台-1.5.1-产品物料需求.md',
       '1.5.1 生产计划 云效 Markdown：docs/yunxiao/淄博泵产业互联网平台-1.5.1-生产计划需求.md',
+      '1.5.1 设计任务 云效 Markdown：docs/yunxiao/淄博泵产业互联网平台-1.5.1-设计任务需求.md',
       '1.5.1 产品/物料需求清单页：/home/prd/v151/product-material',
     ],
   },
