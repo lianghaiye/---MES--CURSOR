@@ -6,6 +6,10 @@ import { buildMaterialFromProduct } from '@/utils/productMaterialMap'
 import { mockProducts } from '@/mock/productInfo'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { laborDemoBomMaterials } from '@/mock/laborHourDemoSeed'
+import {
+  matchesBusinessTypeFilter,
+  MATERIAL_BUSINESS_TYPE_OPTIONS,
+} from '@/utils/businessTypeLabel'
 
 const flatCats = flattenCategoryNodes(materialCategoryTree)
 const leafCats = flatCats.filter((c) => !c.children?.length)
@@ -84,6 +88,17 @@ export function filterMaterials(list, filters, selectedCategoryKey) {
     if (filters.barcodeType && item.barcodeType !== filters.barcodeType) return false
     if (filters.categoryKey && item.categoryKey !== filters.categoryKey) return false
     if (filters.specModel && !item.specModel.includes(filters.specModel)) return false
+    if (filters.material && !(item.material || '').includes(filters.material)) return false
+    if (filters.drawingNo && !(item.drawingNo || '').includes(filters.drawingNo)) return false
+    if (
+      filters.businessType &&
+      !matchesBusinessTypeFilter(item, filters.businessType, MATERIAL_BUSINESS_TYPE_OPTIONS)
+    ) {
+      return false
+    }
+    if (filters.workCenter && item.production?.defaultWorkCenter !== filters.workCenter) {
+      return false
+    }
     return true
   })
 }

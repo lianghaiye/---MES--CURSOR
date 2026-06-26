@@ -20,6 +20,7 @@ export const productAttributeOptions = [
   '定制产品',
   '标准-成品零部件',
   '定制-成品零部件',
+  '服务',
 ]
 
 export const standardSpecOptions = ['国标', '行标', '企标', 'ISO标准']

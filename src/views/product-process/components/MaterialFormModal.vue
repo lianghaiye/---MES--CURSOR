@@ -31,485 +31,494 @@
     >
       <a-tab-pane key="basic" tab="基本信息">
         <div class="tab-pane-body">
-        <a-form layout="inline" class="horizontal-form">
-          <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :span="8">
-              <a-form-item label="物料编号">
-                <a-input v-model:value="form.code" size="small" placeholder="请输入" allow-clear />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="条码类型">
-                <a-select v-model:value="form.barcodeType" size="small" :options="barcodeOpts" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="类别" required>
-                <a-select
-                  v-model:value="form.categoryKey"
-                  size="small"
-                  :options="categoryOpts"
-                  placeholder="请选择 类别"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="物料类型" required>
-                <a-select
-                  v-model:value="form.materialType"
-                  size="small"
-                  :options="materialTypeOpts"
-                  placeholder="请选择 物料类型"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="供应型态" required>
-                <a-select
-                  v-model:value="form.supplyForm"
-                  size="small"
-                  :options="supplyFormOpts"
-                  placeholder="请选择 供应型态"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="规格型号" required>
-                <a-input
-                  v-model:value="form.specModel"
-                  size="small"
-                  placeholder="请输入 规格型号"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="图号">
-                <a-input
-                  v-model:value="form.drawingNo"
-                  size="small"
-                  placeholder="请输入 图号"
-                  allow-clear
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="材质">
-                <a-select
-                  v-model:value="form.material"
-                  size="small"
-                  allow-clear
-                  show-search
-                  :options="materialGradeOpts"
-                  placeholder="请选择 材质"
-                  :filter-option="filterMaterialGrade"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="重量">
-                <a-input v-model:value="form.weight" size="small" placeholder="请输入 重量" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="库存单位" required>
-                <a-select
-                  v-model:value="form.inventoryUnit"
-                  size="small"
-                  :options="unitOpts"
-                  placeholder="请选择 库存单位"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="产品物料">
-                <a-switch v-model:checked="form.isProductMaterial" />
-              </a-form-item>
-            </a-col>
-            <template v-if="form.isProductMaterial">
+          <a-form layout="inline" class="horizontal-form">
+            <a-row :gutter="[12, 12]" style="width: 100%">
               <a-col :span="8">
-                <a-form-item label="产品属性" required>
-                  <a-select
-                    v-model:value="form.productAttribute"
+                <a-form-item label="物料编号">
+                  <a-input
+                    v-model:value="form.code"
                     size="small"
-                    :options="productAttrOpts"
-                    placeholder="请选择 产品属性"
+                    placeholder="请输入"
+                    allow-clear
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="8">
-                <a-form-item label="产品类别" required>
+                <a-form-item label="条码类型">
+                  <a-select v-model:value="form.barcodeType" size="small" :options="barcodeOpts" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="类别" required>
                   <a-select
-                    v-model:value="form.productCategoryKey"
+                    v-model:value="form.categoryKey"
                     size="small"
-                    :options="productCategoryOpts"
-                    placeholder="请选择 产品类别"
+                    :options="categoryOpts"
+                    placeholder="请选择 类别"
                   />
                 </a-form-item>
               </a-col>
-            </template>
-            <a-col :span="24">
-              <a-form-item label="技术参数" class="remark-item">
-                <a-textarea
-                  v-model:value="form.techParams"
-                  :rows="3"
-                  size="small"
-                  placeholder="请输入技术参数"
-                  allow-clear
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="24">
-              <a-form-item label="配套要求" class="remark-item">
-                <a-textarea
-                  v-model:value="form.matchingRequirements"
-                  :rows="2"
-                  size="small"
-                  placeholder="请输入配套要求"
-                  :maxlength="200"
-                  show-count
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
+              <a-col :span="8">
+                <a-form-item label="物料类型" required>
+                  <a-select
+                    v-model:value="form.materialType"
+                    size="small"
+                    :options="materialTypeOpts"
+                    placeholder="请选择 物料类型"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="供应型态" required>
+                  <a-select
+                    v-model:value="form.supplyForm"
+                    size="small"
+                    :options="supplyFormOpts"
+                    placeholder="请选择 供应型态"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="规格型号" required>
+                  <a-input
+                    v-model:value="form.specModel"
+                    size="small"
+                    placeholder="请输入 规格型号"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="图号">
+                  <a-input
+                    v-model:value="form.drawingNo"
+                    size="small"
+                    placeholder="请输入 图号"
+                    allow-clear
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="材质">
+                  <a-select
+                    v-model:value="form.material"
+                    size="small"
+                    allow-clear
+                    show-search
+                    :options="materialGradeOpts"
+                    placeholder="请选择 材质"
+                    :filter-option="filterMaterialGrade"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="重量">
+                  <a-input v-model:value="form.weight" size="small" placeholder="请输入 重量" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="库存单位" required>
+                  <a-select
+                    v-model:value="form.inventoryUnit"
+                    size="small"
+                    :options="unitOpts"
+                    placeholder="请选择 库存单位"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="产品物料">
+                  <a-switch v-model:checked="form.isProductMaterial" />
+                </a-form-item>
+              </a-col>
+              <template v-if="form.isProductMaterial">
+                <a-col :span="8">
+                  <a-form-item label="产品属性" required>
+                    <a-select
+                      v-model:value="form.productAttribute"
+                      size="small"
+                      :options="productAttrOpts"
+                      placeholder="请选择 产品属性"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="产品类别" required>
+                    <a-select
+                      v-model:value="form.productCategoryKey"
+                      size="small"
+                      :options="productCategoryOpts"
+                      placeholder="请选择 产品类别"
+                    />
+                  </a-form-item>
+                </a-col>
+              </template>
+              <a-col :span="24">
+                <a-form-item label="技术参数" class="remark-item">
+                  <a-textarea
+                    v-model:value="form.techParams"
+                    :rows="3"
+                    size="small"
+                    placeholder="请输入技术参数"
+                    allow-clear
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="24">
+                <a-form-item label="配套要求" class="remark-item">
+                  <a-textarea
+                    v-model:value="form.matchingRequirements"
+                    :rows="2"
+                    size="small"
+                    placeholder="请输入配套要求"
+                    :maxlength="200"
+                    show-count
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
         </div>
       </a-tab-pane>
 
       <a-tab-pane key="sales" tab="销售">
         <div class="tab-pane-body">
-        <a-form layout="inline" class="horizontal-form">
-          <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :span="8">
-              <a-form-item label="单价">
-                <a-input-number
-                  v-model:value="form.unitPrice"
-                  size="small"
-                  :min="0"
-                  :precision="2"
-                  placeholder="请输入单价"
-                  style="width: 100%"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="销项税">
-                <a-input-number
-                  v-model:value="form.outputTaxRate"
-                  size="small"
-                  :min="0"
-                  :max="100"
-                  :precision="2"
-                  placeholder="请输入销项税率"
-                  style="width: 100%"
-                  addon-after="%"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
+          <a-form layout="inline" class="horizontal-form">
+            <a-row :gutter="[12, 12]" style="width: 100%">
+              <a-col :span="8">
+                <a-form-item label="单价">
+                  <a-input-number
+                    v-model:value="form.unitPrice"
+                    size="small"
+                    :min="0"
+                    :precision="2"
+                    placeholder="请输入单价"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="销项税">
+                  <a-input-number
+                    v-model:value="form.outputTaxRate"
+                    size="small"
+                    :min="0"
+                    :max="100"
+                    :precision="2"
+                    placeholder="请输入销项税率"
+                    style="width: 100%"
+                    addon-after="%"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
         </div>
       </a-tab-pane>
 
       <a-tab-pane key="purchase" tab="采购">
         <div class="tab-pane-body">
-        <a-form layout="inline" class="horizontal-form">
-          <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :span="8">
-              <a-form-item label="进项税">
-                <a-input-number
-                  v-model:value="form.inputTaxRate"
-                  size="small"
-                  :min="0"
-                  :max="100"
-                  :precision="2"
-                  placeholder="请输入进项税率"
-                  style="width: 100%"
-                  addon-after="%"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="默认供应商">
-                <a-select
-                  v-model:value="form.production.defaultSupplier"
-                  size="small"
-                  allow-clear
-                  show-search
-                  :options="supplierOpts"
-                  placeholder="请选择供应商"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
+          <a-form layout="inline" class="horizontal-form">
+            <a-row :gutter="[12, 12]" style="width: 100%">
+              <a-col :span="8">
+                <a-form-item label="进项税">
+                  <a-input-number
+                    v-model:value="form.inputTaxRate"
+                    size="small"
+                    :min="0"
+                    :max="100"
+                    :precision="2"
+                    placeholder="请输入进项税率"
+                    style="width: 100%"
+                    addon-after="%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="默认供应商">
+                  <a-select
+                    v-model:value="form.production.defaultSupplier"
+                    size="small"
+                    allow-clear
+                    show-search
+                    :options="supplierOpts"
+                    placeholder="请选择供应商"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
         </div>
       </a-tab-pane>
 
       <a-tab-pane key="production" tab="生产控制">
         <div class="tab-pane-body">
-        <a-form layout="inline" class="horizontal-form">
-          <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :span="8">
-              <a-form-item label="默认工作中心">
-                <a-select
-                  v-model:value="form.production.defaultWorkCenter"
-                  size="small"
-                  allow-clear
-                  :options="workCenterOpts"
-                  placeholder="请选择 默认工作中心"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="标准制造周期">
-                <a-input-number
-                  v-model:value="form.production.standardCycleDays"
-                  size="small"
-                  :min="0"
-                  placeholder="请输入"
-                  style="width: 100%"
-                  addon-after="天"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item>
-                <template #label>
-                  <span>领料属性</span>
-                  <a-tooltip title="启用后参与领料计划">
-                    <InfoCircleOutlined class="info-icon" />
-                  </a-tooltip>
-                </template>
-                <a-switch v-model:checked="form.production.requisitionEnabled" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="默认工艺路线">
-                <a-select
-                  v-model:value="form.production.defaultProcessRoute"
-                  size="small"
-                  allow-clear
-                  show-search
-                  :options="processRouteOpts"
-                  placeholder="请选择 工艺路线"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="默认存放仓库">
-                <a-select
-                  v-model:value="form.production.defaultWarehouse"
-                  size="small"
-                  allow-clear
-                  :options="warehouseOpts"
-                  placeholder="请选择 默认存放仓库"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="关键件标识">
-                <a-switch v-model:checked="form.production.isKeyPart" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="辅料标识">
-                <a-switch v-model:checked="form.production.isAuxiliary" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="危险品标识">
-                <a-switch v-model:checked="form.production.isHazardous" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item>
-                <template #label>
-                  <span>入库质检要求</span>
-                  <a-tooltip title="入库时的质检策略">
-                    <InfoCircleOutlined class="info-icon" />
-                  </a-tooltip>
-                </template>
-                <a-select
-                  v-model:value="form.production.inboundQcRequirement"
-                  size="small"
-                  allow-clear
-                  :options="inboundQcOpts"
-                  placeholder="请选择"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
+          <a-form layout="inline" class="horizontal-form">
+            <a-row :gutter="[12, 12]" style="width: 100%">
+              <a-col :span="8">
+                <a-form-item label="默认工作中心">
+                  <a-select
+                    v-model:value="form.production.defaultWorkCenter"
+                    size="small"
+                    allow-clear
+                    :options="workCenterOpts"
+                    placeholder="请选择 默认工作中心"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="标准制造周期">
+                  <a-input-number
+                    v-model:value="form.production.standardCycleDays"
+                    size="small"
+                    :min="0"
+                    placeholder="请输入"
+                    style="width: 100%"
+                    addon-after="天"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item>
+                  <template #label>
+                    <span>领料属性</span>
+                    <a-tooltip title="启用后参与领料计划">
+                      <InfoCircleOutlined class="info-icon" />
+                    </a-tooltip>
+                  </template>
+                  <a-switch v-model:checked="form.production.requisitionEnabled" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="默认工艺路线">
+                  <a-select
+                    v-model:value="form.production.defaultProcessRoute"
+                    size="small"
+                    allow-clear
+                    show-search
+                    :options="processRouteOpts"
+                    placeholder="请选择 工艺路线"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="默认存放仓库">
+                  <a-select
+                    v-model:value="form.production.defaultWarehouse"
+                    size="small"
+                    allow-clear
+                    :options="warehouseOpts"
+                    placeholder="请选择 默认存放仓库"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="关键件标识">
+                  <a-switch v-model:checked="form.production.isKeyPart" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="辅料标识">
+                  <a-switch v-model:checked="form.production.isAuxiliary" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="危险品标识">
+                  <a-switch v-model:checked="form.production.isHazardous" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item>
+                  <template #label>
+                    <span>入库质检要求</span>
+                    <a-tooltip title="入库时的质检策略">
+                      <InfoCircleOutlined class="info-icon" />
+                    </a-tooltip>
+                  </template>
+                  <a-select
+                    v-model:value="form.production.inboundQcRequirement"
+                    size="small"
+                    allow-clear
+                    :options="inboundQcOpts"
+                    placeholder="请选择"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
         </div>
       </a-tab-pane>
 
       <a-tab-pane key="labor" tab="工时配置">
         <div class="tab-pane-body">
-        <div class="labor-enable-row" :class="{ 'is-only': !form.laborEnabled }">
-          <span class="labor-enable-label">启用工时配置</span>
-          <a-switch v-model:checked="form.laborEnabled" size="small" :disabled="viewOnly" />
-        </div>
-        <div v-if="form.laborEnabled" class="labor-block">
-          <div v-for="(row, index) in form.laborRows" :key="row.id" class="labor-row-card">
-            <a-form layout="inline" class="horizontal-form">
-              <a-row :gutter="[12, 12]" style="width: 100%">
-                <a-col :span="8">
-                  <a-form-item required>
-                    <template #label>
-                      <span class="required-label">工序</span>
-                    </template>
-                    <a-select
-                      v-model:value="row.processName"
-                      size="small"
-                      show-search
-                      :options="processOpts"
-                      placeholder="请选择工序"
-                      style="width: 100%"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col :span="8">
-                  <a-form-item required>
-                    <template #label>
-                      <span>报工类型</span>
-                      <a-tooltip
-                        title="批量计件：工时=整批准备工时+合格报工数量×单件标准工时；时长报工：工时=准备工时+员工填报总时长（审核后）"
-                      >
-                        <InfoCircleOutlined class="info-icon" />
-                      </a-tooltip>
-                    </template>
-                    <a-select
-                      v-model:value="row.reportType"
-                      size="small"
-                      :options="reportTypeOpts"
-                      placeholder="请选择报工类型"
-                      style="width: 100%"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col :span="8">
-                  <a-form-item label="单件标准工时" required>
-                    <a-input-number
-                      v-model:value="row.standardMinutesPerPiece"
-                      size="small"
-                      :min="0"
-                      :precision="0"
-                      style="width: 100%"
-                      addon-after="分钟"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col :span="8">
-                  <a-form-item label="整批准备工时" required>
-                    <a-input-number
-                      v-model:value="row.setupMinutesPerBatch"
-                      size="small"
-                      :min="0"
-                      :precision="0"
-                      style="width: 100%"
-                      addon-after="分钟"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col :span="8">
-                  <a-form-item required>
-                    <template #label>
-                      <span>计薪方式</span>
-                      <a-tooltip
-                        title="计件工资=合格数量×单件计件单价+补贴报工数量；计时工资按标准工时单价核算（详见工时管理）"
-                      >
-                        <InfoCircleOutlined class="info-icon" />
-                      </a-tooltip>
-                    </template>
-                    <a-select
-                      v-model:value="row.salaryMethod"
-                      size="small"
-                      :options="salaryMethodOpts"
-                      placeholder="请选择计薪方式"
-                      style="width: 100%"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col :span="8">
-                  <a-form-item label="标准工时单价" required>
-                    <a-input-number
-                      v-model:value="row.standardHourlyRate"
-                      size="small"
-                      :min="0"
-                      :precision="2"
-                      style="width: 100%"
-                      addon-after="元/小时"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col :span="8">
-                  <a-form-item label="单件计件单价" required>
-                    <a-input-number
-                      v-model:value="row.pieceRate"
-                      size="small"
-                      :min="0"
-                      :precision="2"
-                      style="width: 100%"
-                      addon-after="元/件"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col
-                  v-if="!viewOnly && form.laborRows.length > 1"
-                  :span="24"
-                  class="row-remove-col"
-                >
-                  <a-button type="link" danger size="small" @click="removeLaborRow(index)">
-                    删除本行
-                  </a-button>
-                </a-col>
-              </a-row>
-            </a-form>
+          <div class="labor-enable-row" :class="{ 'is-only': !form.laborEnabled }">
+            <span class="labor-enable-label">启用工时配置</span>
+            <a-switch v-model:checked="form.laborEnabled" size="small" :disabled="viewOnly" />
           </div>
-          <a-button
-            v-if="!viewOnly"
-            type="dashed"
-            block
-            class="add-labor-row-btn"
-            @click="addLaborRow"
-          >
-            新增一行
-          </a-button>
-        </div>
+          <div v-if="form.laborEnabled" class="labor-block">
+            <div v-for="(row, index) in form.laborRows" :key="row.id" class="labor-row-card">
+              <a-form layout="inline" class="horizontal-form">
+                <a-row :gutter="[12, 12]" style="width: 100%">
+                  <a-col :span="8">
+                    <a-form-item required>
+                      <template #label>
+                        <span class="required-label">工序</span>
+                      </template>
+                      <a-select
+                        v-model:value="row.processName"
+                        size="small"
+                        show-search
+                        :options="processOpts"
+                        placeholder="请选择工序"
+                        style="width: 100%"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item required>
+                      <template #label>
+                        <span>报工类型</span>
+                        <a-tooltip
+                          title="批量计件：工时=整批准备工时+合格报工数量×单件标准工时；时长报工：工时=准备工时+员工填报总时长（审核后）"
+                        >
+                          <InfoCircleOutlined class="info-icon" />
+                        </a-tooltip>
+                      </template>
+                      <a-select
+                        v-model:value="row.reportType"
+                        size="small"
+                        :options="reportTypeOpts"
+                        placeholder="请选择报工类型"
+                        style="width: 100%"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="单件标准工时" required>
+                      <a-input-number
+                        v-model:value="row.standardMinutesPerPiece"
+                        size="small"
+                        :min="0"
+                        :precision="0"
+                        style="width: 100%"
+                        addon-after="分钟"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="整批准备工时" required>
+                      <a-input-number
+                        v-model:value="row.setupMinutesPerBatch"
+                        size="small"
+                        :min="0"
+                        :precision="0"
+                        style="width: 100%"
+                        addon-after="分钟"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item required>
+                      <template #label>
+                        <span>计薪方式</span>
+                        <a-tooltip
+                          title="计件工资=合格数量×单件计件单价+补贴报工数量；计时工资按标准工时单价核算（详见工时管理）"
+                        >
+                          <InfoCircleOutlined class="info-icon" />
+                        </a-tooltip>
+                      </template>
+                      <a-select
+                        v-model:value="row.salaryMethod"
+                        size="small"
+                        :options="salaryMethodOpts"
+                        placeholder="请选择计薪方式"
+                        style="width: 100%"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="标准工时单价" required>
+                      <a-input-number
+                        v-model:value="row.standardHourlyRate"
+                        size="small"
+                        :min="0"
+                        :precision="2"
+                        style="width: 100%"
+                        addon-after="元/小时"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="单件计件单价" required>
+                      <a-input-number
+                        v-model:value="row.pieceRate"
+                        size="small"
+                        :min="0"
+                        :precision="2"
+                        style="width: 100%"
+                        addon-after="元/件"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col
+                    v-if="!viewOnly && form.laborRows.length > 1"
+                    :span="24"
+                    class="row-remove-col"
+                  >
+                    <a-button type="link" danger size="small" @click="removeLaborRow(index)">
+                      删除本行
+                    </a-button>
+                  </a-col>
+                </a-row>
+              </a-form>
+            </div>
+            <a-button
+              v-if="!viewOnly"
+              type="dashed"
+              block
+              class="add-labor-row-btn"
+              @click="addLaborRow"
+            >
+              新增一行
+            </a-button>
+          </div>
         </div>
       </a-tab-pane>
 
       <a-tab-pane key="alert" tab="预警信息">
         <div class="tab-pane-body">
-        <a-form layout="inline" class="horizontal-form">
-          <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :span="8">
-              <a-form-item label="库存预警">
-                <a-switch v-model:checked="form.alert.stockAlertEnabled" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="过期预警">
-                <a-switch v-model:checked="form.alert.expiryAlertEnabled" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="不良率预警阈值">
-                <a-input-number
-                  v-model:value="form.alert.defectRateThreshold"
-                  size="small"
-                  :min="0"
-                  :max="100"
-                  :precision="2"
-                  placeholder="请输入"
-                  style="width: 100%"
-                  addon-after="%"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
+          <a-form layout="inline" class="horizontal-form">
+            <a-row :gutter="[12, 12]" style="width: 100%">
+              <a-col :span="8">
+                <a-form-item label="库存预警">
+                  <a-switch v-model:checked="form.alert.stockAlertEnabled" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="过期预警">
+                  <a-switch v-model:checked="form.alert.expiryAlertEnabled" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="不良率预警阈值">
+                  <a-input-number
+                    v-model:value="form.alert.defectRateThreshold"
+                    size="small"
+                    :min="0"
+                    :max="100"
+                    :precision="2"
+                    placeholder="请输入"
+                    style="width: 100%"
+                    addon-after="%"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
         </div>
+      </a-tab-pane>
+
+      <a-tab-pane v-if="isEdit" key="bom" tab="BOM信息">
+        <ItemBomInfoTab item-type="material" :item-id="editRecord?.id || ''" />
       </a-tab-pane>
     </a-tabs>
 
@@ -557,6 +566,7 @@ import {
 import { generateMaterialCode } from '@/store/materialInfoStore'
 import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import ItemBomInfoTab from '@/views/product-process/components/ItemBomInfoTab.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },

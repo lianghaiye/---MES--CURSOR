@@ -34,12 +34,7 @@
         name="quantity"
         :rules="[{ required: true, message: '请输入数量' }]"
       >
-        <a-input-number
-          v-model:value="form.quantity"
-          :min="1"
-          :precision="0"
-          style="width: 100%"
-        />
+        <a-input-number v-model:value="form.quantity" :min="1" :precision="0" style="width: 100%" />
       </a-form-item>
       <a-form-item label="销售单号" name="salesOrderNo">
         <a-input v-model:value="form.salesOrderNo" allow-clear placeholder="选填" />

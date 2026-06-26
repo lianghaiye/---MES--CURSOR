@@ -53,6 +53,12 @@ const routes = [
         redirect: '/home/prd/v151',
       },
       {
+        path: 'home/prd/v151/product-material',
+        name: 'home-prd-v151-product-material',
+        component: () => import('@/views/prd/PrdV151ProductMaterialView.vue'),
+        meta: { title: '1.5.1 · 产品物料需求' },
+      },
+      {
         path: 'product-process/materials',
         name: 'product-process-materials',
         component: () => import('@/views/product-process/MaterialInfoView.vue'),
@@ -287,6 +293,12 @@ const routes = [
         component: () => import('@/views/inventory/OutboundManagementView.vue'),
         meta: { title: '出库管理' },
       },
+      {
+        path: 'inventory/outbound/:id',
+        name: 'inventory-outbound-detail',
+        component: () => import('@/views/inventory/OutboundOrderDetailView.vue'),
+        meta: { title: '出库单详情' },
+      },
       { path: 'inventory/sales-outbound', redirect: '/inventory/outbound' },
       {
         path: 'inventory/inbound',
@@ -300,7 +312,13 @@ const routes = [
         component: () => import('@/views/inventory/InboundOrderDetailView.vue'),
         meta: { title: '入库单详情' },
       },
-      { path: 'inventory/in-out', redirect: '/inventory/inbound' },
+      {
+        path: 'inventory/in-out-detail',
+        name: 'inventory-in-out-detail',
+        component: () => import('@/views/inventory/InOutDetailView.vue'),
+        meta: { title: '出入库详情' },
+      },
+      { path: 'inventory/in-out', redirect: '/inventory/in-out-detail' },
       {
         path: 'quality/factory-qc',
         name: 'quality-factory-qc',

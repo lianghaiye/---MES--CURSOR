@@ -22,7 +22,7 @@
     <div class="action-row">
       <div class="action-row-left">
         <a-button
-          v-if="!readonly"
+          v-if="!readonly && !hideSwitchProduct"
           type="text"
           size="small"
           class="action-text-btn"
@@ -139,6 +139,7 @@ const props = defineProps({
     type: Object,
     default: () => ({ code: '', name: '', specModel: '', supplyForm: '', subItemCount: 0 }),
   },
+  hideSwitchProduct: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([

@@ -255,6 +255,7 @@ export function createWorkOrderPayload(partial) {
     salesLineId: partial.salesLineId || '',
     salesOrderId: partial.salesOrderId || '',
     materialCode: partial.materialCode || '',
+    supplier: partial.supplier || '',
     skipEbom: Boolean(partial.skipEbom || isOutsource),
     processes: routeName ? buildProcessesFromRoute(routeName) : [],
     createdAt: dayjs().format('YYYY-MM-DD'),
@@ -288,6 +289,42 @@ export function addWorkOrdersFromPlanRows(rows, sourceOrder) {
       source: 'production-plan',
       sourceOrderNo: sourceOrder.orderNo,
       materialCode: row.code,
+    })
+    addWorkOrder(wo)
+    created.push(wo)
+  })
+  return created
+}
+
+/** 生产计划保存外协工单后同步创建工单 */
+export function addOutsourceWorkOrdersFromPlanRows(rows, sourceOrder) {
+  const created = []
+  rows.forEach((row) => {
+    const exists = workOrderState.orders.some(
+      (o) =>
+        o.orderCategory === '外协工单' &&
+        o.source === 'production-plan' &&
+        o.materialCode === row.code &&
+        o.sourceOrderNo === sourceOrder.orderNo,
+    )
+    if (exists) return
+
+    const wo = createWorkOrderPayload({
+      productName: row.productName,
+      orderCategory: '外协工单',
+      scheduleQty: row.planQty,
+      planQty: row.planQty,
+      warehouse: row.warehouse,
+      urgency: row.urgency,
+      remark: row.remark,
+      planDateRange: row.expectedArrivalDate
+        ? [row.expectedArrivalDate, row.expectedArrivalDate]
+        : undefined,
+      supplier: row.supplier,
+      source: 'production-plan',
+      sourceOrderNo: sourceOrder.orderNo,
+      materialCode: row.code,
+      skipEbom: true,
     })
     addWorkOrder(wo)
     created.push(wo)

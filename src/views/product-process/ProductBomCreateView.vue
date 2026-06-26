@@ -107,7 +107,12 @@
                   <DownOutlined v-else />
                 </a-button>
               </div>
-              <a-form v-show="parentInfoExpanded" layout="inline" size="small" class="inline-info-form">
+              <a-form
+                v-show="parentInfoExpanded"
+                layout="inline"
+                size="small"
+                class="inline-info-form"
+              >
                 <a-form-item label="物品名称">
                   <a-input
                     :value="selectedParentInfo.itemName || '—'"

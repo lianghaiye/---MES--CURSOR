@@ -4,16 +4,17 @@
  */
 
 import { PRD_V151_PRODUCT_BOM_REQUIREMENTS } from './prdV151ProductBom'
+import { PRD_V151_PRODUCT_MATERIAL_REQUIREMENTS } from './prdV151ProductMaterial'
 
 export const PRD_V151_META = {
   version: '1.5.1',
   title: '机泵1.5.1版本迭代',
   project: '淄博泵产业互联网平台（I-DOMS）',
   sprint: '淄博泵产业互联网平台-1.5.1',
-  updatedAt: '2026-06-24',
+  updatedAt: '2026-06-25',
   scope: 'Web 端增量需求',
   requirementOwner: '邓利佳',
-  acceptanceOwner: '欧阳宏汉',
+  acceptanceOwner: '梁海曳',
 }
 
 /** 1.5.1 固定模块树（与系统顶栏模块一致，便于跨版本对照） */
@@ -34,8 +35,8 @@ export const PRD_V151_MODULE_SKELETON = [
   { key: 'extension', label: '扩展模块' },
 ]
 
-function bomFeatures() {
-  return PRD_V151_PRODUCT_BOM_REQUIREMENTS.map((req) => ({
+function mapRequirements(requirements) {
+  return requirements.map((req) => ({
     id: req.id,
     name: req.title,
     status: req.status,
@@ -49,12 +50,19 @@ function bomFeatures() {
   }))
 }
 
+function productProcessFeatures() {
+  return [
+    ...mapRequirements(PRD_V151_PRODUCT_BOM_REQUIREMENTS),
+    ...mapRequirements(PRD_V151_PRODUCT_MATERIAL_REQUIREMENTS),
+  ]
+}
+
 /** @type {{ key: string, label: string, features: object[] }[]} */
 export const PRD_V151_MODULES = PRD_V151_MODULE_SKELETON.map((mod) => {
   if (mod.key === 'product-process') {
-    return { ...mod, features: bomFeatures() }
+    return { ...mod, features: productProcessFeatures() }
   }
   return { ...mod, features: [] }
 })
 
-export { PRD_V151_PRODUCT_BOM_REQUIREMENTS }
+export { PRD_V151_PRODUCT_BOM_REQUIREMENTS, PRD_V151_PRODUCT_MATERIAL_REQUIREMENTS }

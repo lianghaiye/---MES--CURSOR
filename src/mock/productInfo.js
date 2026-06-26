@@ -4,6 +4,7 @@ import { pumpProductNames, barcodeTypesCycle } from '@/mock/pumpIndustryNames'
 import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
 import { migrateProductList } from '@/utils/masterDataMigrate'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
+import { matchesBusinessTypeFilter, PRODUCT_BUSINESS_TYPE_OPTIONS } from '@/utils/businessTypeLabel'
 
 const flatCats = flattenCategoryNodes(productCategoryTree)
 const leafCats = flatCats.filter((c) => !c.children?.length)
@@ -101,6 +102,17 @@ export function filterProducts(list, filters, selectedCategoryKey) {
     if (filters.barcodeType && item.barcodeType !== filters.barcodeType) return false
     if (filters.categoryKey && item.categoryKey !== filters.categoryKey) return false
     if (filters.specModel && !item.specModel.includes(filters.specModel)) return false
+    if (filters.material && !(item.material || '').includes(filters.material)) return false
+    if (filters.drawingNo && !(item.drawingNo || '').includes(filters.drawingNo)) return false
+    if (
+      filters.businessType &&
+      !matchesBusinessTypeFilter(item, filters.businessType, PRODUCT_BUSINESS_TYPE_OPTIONS)
+    ) {
+      return false
+    }
+    if (filters.workCenter && item.production?.defaultWorkCenter !== filters.workCenter) {
+      return false
+    }
     return true
   })
 }

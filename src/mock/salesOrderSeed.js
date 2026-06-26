@@ -52,15 +52,16 @@ export function buildMockSalesOrders(products) {
   const p = (i) => products[i % products.length]
   const customers = customerOptions.map((c) => c.value)
   const salespeople = salespersonOptions
+  const now = dayjs()
 
   const orders = [
     createSalesOrder({
       id: 'so-seed-1',
       orderNo: '1-20260512-005',
       contractNo: 'HT-20260512-005',
-      customerName: customers[0] || '测试人员',
+      customerName: '山东化工泵业集团',
       region: '华北',
-      salesperson: salespeople[0],
+      salesperson: '王芳',
       progressStatus: '已审',
       businessType: '自产销售',
       documentDate: '2026-05-12',
@@ -92,8 +93,24 @@ export function buildMockSalesOrders(products) {
         },
       ],
       lineItems: [
-        lineFromProduct(p(0), { id: 'line-seed-1a', salesQty: 3, deliveryMode: '整机' }),
-        lineFromProduct(p(1), { id: 'line-seed-1b', salesQty: 2, deliveryMode: '散件' }),
+        lineFromProduct(p(0), {
+          id: 'line-seed-1a',
+          salesQty: 3,
+          deliveryMode: '整机',
+          techParams: 'Q=50m³/h H=32m，介质：清水',
+          matchingRequirements: '含联轴器护罩及地脚螺栓',
+          supplementDesc: '首批试制，需附出厂检验报告',
+          attachment: '明细附件-清水泵选型表.pdf',
+        }),
+        lineFromProduct(p(1), {
+          id: 'line-seed-1b',
+          salesQty: 2,
+          deliveryMode: '散件',
+          techParams: '介质：盐酸 30%，温度 65℃，需耐腐蚀材质',
+          matchingRequirements: '散件交付，含密封组件及安装说明书',
+          supplementDesc: '316L 材质，客户现场自行组装',
+          attachment: '明细附件-化工泵工况说明.pdf',
+        }),
         lineFromProduct(p(2), { id: 'line-seed-1c', salesQty: 1, deliveryMode: '整机' }),
       ],
     }),
@@ -109,9 +126,71 @@ export function buildMockSalesOrders(products) {
       documentDate: '2026-05-20',
       urgency: '紧急',
       remark: '双产品紧急自产',
+      attachments: [
+        {
+          uid: 'att-seed-2',
+          name: '华东机械-紧急订单合同.pdf',
+          type: '合同',
+          uploadedAt: '2026-05-20 08:30',
+        },
+      ],
       lineItems: [
-        lineFromProduct(p(5), { id: 'line-seed-2a', salesQty: 8 }),
+        lineFromProduct(p(5), {
+          id: 'line-seed-2a',
+          salesQty: 8,
+          techParams: 'Q=100m³/h H=50m，变频调速',
+          matchingRequirements: '配套变频控制柜',
+          supplementDesc: '交期紧急，优先排产',
+          deliveryMode: '整机',
+        }),
         lineFromProduct(p(6), { id: 'line-seed-2b', salesQty: 4 }),
+      ],
+    }),
+    createSalesOrder({
+      id: 'so-seed-custom-qj',
+      orderNo: '1-20260601-018',
+      contractNo: 'HT-20260601-018',
+      customerName: '西北油田设备公司',
+      region: '西北',
+      salesperson: '陈磊',
+      progressStatus: '已审',
+      businessType: '自产销售',
+      documentDate: '2026-06-01',
+      urgency: '普通',
+      remark: '定制潜水电泵项目（已生成设计任务）',
+      contactPerson: '刘工',
+      contactPhone: '13900001234',
+      attachments: [
+        {
+          uid: 'att-qj-1',
+          name: '西北油田-潜水电泵技术协议.pdf',
+          type: '技术协议',
+          uploadedAt: '2026-06-01 09:30',
+        },
+        {
+          uid: 'att-qj-2',
+          name: '现场井位照片.zip',
+          type: '图片',
+          uploadedAt: '2026-06-01 10:00',
+        },
+      ],
+      lineItems: [
+        lineFromProduct(p(3), {
+          id: 'line-seed-custom-qj',
+          productCode: 'CP2610004',
+          productName: '潜水电泵 QJ200-40/3',
+          productAttr: '定制-成品零部件',
+          specModel: 'QJ200-40/3',
+          material: '不锈钢316L',
+          techParams: '井径 200mm，扬程 120m，流量 40m³/h',
+          matchingRequirements: '配套控制柜、电缆及排水软管，含现场安装指导',
+          supplementDesc: '叶轮材质要求不锈钢316L，客户指定品牌电机',
+          deliveryMode: '整机',
+          deliveryDate: now.add(60, 'day').format('YYYY-MM-DD'),
+          salesQty: 2,
+          unitPriceExTax: 8500,
+          attachment: '明细附件-井位参数表.pdf',
+        }),
       ],
     }),
     createSalesOrder({
@@ -184,7 +263,26 @@ export function buildMockSalesOrders(products) {
       businessType: '自产销售',
       documentDate: '2026-05-01',
       urgency: '正常',
-      lineItems: [lineFromProduct(p(50), { id: 'line-seed-7a', salesQty: 3 })],
+      contractNo: 'HT-20260501-001',
+      attachments: [
+        {
+          uid: 'att-seed-7',
+          name: '武汉重工-采购合同.pdf',
+          type: '合同',
+          uploadedAt: '2026-05-01 11:00',
+        },
+      ],
+      lineItems: [
+        lineFromProduct(p(50), {
+          id: 'line-seed-7a',
+          salesQty: 3,
+          techParams: '通过颗粒 25mm，自吸高度 5m',
+          matchingRequirements: '整机交付，含进出口法兰及密封垫',
+          supplementDesc: '已审核通过，EBOM 已定稿',
+          deliveryMode: '整机',
+          attachment: '明细附件-污水泵工况表.pdf',
+        }),
+      ],
     }),
     createSalesOrder({
       id: 'so-seed-8',

@@ -36,9 +36,20 @@
       </a-row>
     </a-form>
 
-    <div class="print-tip">
-      将按列设置中<strong>已显示</strong>的字段输出（当前
-      {{ visibleColumnCount }} 列），隐藏列不会打印。
+    <div class="print-tip-row">
+      <div class="print-tip">
+        将按列设置中<strong>已显示</strong>的字段输出（当前
+        {{ visibleColumnCount }} 列），隐藏列不会打印。
+      </div>
+      <a-button
+        v-if="isProductionPlanPrint"
+        size="small"
+        class="print-column-btn"
+        @click="printColumnDrawerOpen = true"
+      >
+        <SettingOutlined />
+        设置打印项
+      </a-button>
     </div>
 
     <div class="action-list">
@@ -56,7 +67,7 @@
           <span class="action-desc">功能预留，即将上线</span>
         </span>
       </button>
-      <button type="button" class="action-item action-item-primary" @click="handlePrint">
+      <button type="button" class="action-item" @click="handlePrint">
         <PrinterOutlined class="action-icon" />
         <span class="action-text">
           <span class="action-title">直接打印</span>
@@ -68,6 +79,16 @@
     <template #footer>
       <a-button @click="handleClose">取消</a-button>
     </template>
+
+    <TableColumnSettingDrawer
+      v-if="isProductionPlanPrint"
+      v-model:open="printColumnDrawerOpen"
+      v-model:settings="effectiveColumnSettings"
+      :default-settings="printDefaultColumnSettings"
+      title="设置打印项"
+      hint="调整打印清单中显示的字段；隐藏列不会出现在预览与打印输出中。"
+      :show-frozen="false"
+    />
   </a-modal>
 </template>
 
@@ -75,10 +96,22 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { EyeOutlined, FilePdfOutlined, PrinterOutlined } from '@ant-design/icons-vue'
+import {
+  EyeOutlined,
+  FilePdfOutlined,
+  PrinterOutlined,
+  SettingOutlined,
+} from '@ant-design/icons-vue'
 import { defaultBomOverviewColumnSettings } from '@/mock/bomOverviewColumns'
+import {
+  PRODUCTION_PLAN_PRINT_COLUMN_STORAGE_KEY,
+  productionPlanPrintColumnSettings,
+} from '@/mock/productionPlanPrintColumns'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
 import { buildBomPrintPayload, openBomPrintPreview } from '@/utils/bomPrintPreview'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+
+const COLUMN_STORAGE_PREFIX = 'i_doms_table_col_'
 
 const props = defineProps({
   open: Boolean,
@@ -88,12 +121,26 @@ const props = defineProps({
   overviewInfo: { type: Object, default: () => ({}) },
   quantity: { type: Number, default: 1 },
   columnSettings: { type: Array, default: () => [] },
+  /** 生产计划打印：固定列配置，不读取 BOM 概览 localStorage */
+  fixedColumnSettings: { type: Array, default: () => [] },
+  printBaseColumns: { type: Array, default: () => [] },
+  materialQtyByCode: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open'])
 
 const router = useRouter()
 const effectiveColumnSettings = ref([])
+const printColumnDrawerOpen = ref(false)
+
+const isProductionPlanPrint = computed(() => props.printBaseColumns?.length > 0)
+
+const printDefaultColumnSettings = computed(() => {
+  if (props.fixedColumnSettings?.length) {
+    return JSON.parse(JSON.stringify(props.fixedColumnSettings))
+  }
+  return JSON.parse(JSON.stringify(productionPlanPrintColumnSettings))
+})
 
 const form = reactive({
   paper: 'A4',
@@ -122,6 +169,23 @@ watch(
 )
 
 function loadLatestColumnSettings() {
+  if (isProductionPlanPrint.value) {
+    const defaults = printDefaultColumnSettings.value
+    try {
+      const raw = localStorage.getItem(
+        COLUMN_STORAGE_PREFIX + PRODUCTION_PLAN_PRINT_COLUMN_STORAGE_KEY,
+      )
+      if (raw) {
+        return mergeColumnSettings(defaults, JSON.parse(raw))
+      }
+    } catch {
+      /* ignore */
+    }
+    return JSON.parse(JSON.stringify(defaults))
+  }
+  if (props.fixedColumnSettings?.length) {
+    return JSON.parse(JSON.stringify(props.fixedColumnSettings))
+  }
   try {
     const raw = localStorage.getItem('i_doms_table_col_bom-overview-list')
     if (raw) {
@@ -144,10 +208,25 @@ function buildPayload() {
     overviewInfo: props.overviewInfo,
     quantity: form.quantity,
     columnSettings: effectiveColumnSettings.value,
+    baseColumns: props.printBaseColumns?.length ? props.printBaseColumns : undefined,
     paper: form.paper,
     orientation: form.orientation,
+    materialQtyByCode: props.materialQtyByCode,
+    printScene: isProductionPlanPrint.value ? 'production-plan' : null,
   })
 }
+
+watch(
+  effectiveColumnSettings,
+  (value) => {
+    if (!isProductionPlanPrint.value) return
+    localStorage.setItem(
+      COLUMN_STORAGE_PREFIX + PRODUCTION_PLAN_PRINT_COLUMN_STORAGE_KEY,
+      JSON.stringify(value),
+    )
+  },
+  { deep: true },
+)
 
 function handlePreview() {
   openBomPrintPreview(router, buildPayload())
@@ -174,8 +253,17 @@ function handleClose() {
     margin-bottom: 4px;
   }
 
-  .print-tip {
+  .print-tip-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
     margin-bottom: 16px;
+  }
+
+  .print-tip {
+    flex: 1;
+    min-width: 0;
     padding: 8px 12px;
     font-size: 12px;
     color: rgba(0, 0, 0, 0.65);
@@ -183,6 +271,10 @@ function handleClose() {
     border: 1px solid #f0f0f0;
     border-radius: 4px;
     line-height: 1.6;
+  }
+
+  .print-column-btn {
+    flex-shrink: 0;
   }
 
   .action-list {
@@ -207,16 +299,6 @@ function handleClose() {
     &:hover {
       border-color: #1677ff;
       background: #f0f7ff;
-    }
-  }
-
-  .action-item-primary {
-    border-color: #91caff;
-    background: #f0f7ff;
-
-    &:hover {
-      border-color: #1677ff;
-      background: #e6f4ff;
     }
   }
 

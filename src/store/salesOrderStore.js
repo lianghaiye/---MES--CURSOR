@@ -29,7 +29,7 @@ import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 3
+const DATA_VERSION = 4
 let orderSeq = 20
 let deliverySeq = 113
 
@@ -101,6 +101,11 @@ export function deleteSalesOrder(id) {
 
 export function getSalesOrderById(id) {
   return salesOrderState.orders.find((o) => o.id === id) || null
+}
+
+export function findSalesOrderByOrderNo(orderNo) {
+  if (!orderNo) return null
+  return salesOrderState.orders.find((o) => o.orderNo === orderNo) || null
 }
 
 /** 记录一次发货申请 */

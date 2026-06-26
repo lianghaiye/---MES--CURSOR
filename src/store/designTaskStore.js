@@ -11,7 +11,7 @@ import { enrichWorkItem } from '@/utils/productionPlanWorkItem'
 import { productInfoState } from '@/store/productInfoStore'
 
 const STORAGE_KEY = 'i_doms_design_tasks'
-const DATA_VERSION = 2
+const DATA_VERSION = 3
 let taskSeq = 100
 
 function loadFromStorage() {

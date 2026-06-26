@@ -139,6 +139,71 @@ function mapPlanMaterialToLineItem(m, deliveryDate, estimatedArrivalDate, receiv
   })
 }
 
+/** 从生产计划弹窗行生成一张采购申请（多明细合一单） */
+export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
+  const now = dayjs()
+  const deliveryDate =
+    form.deliveryDate ||
+    sourceOrder.planAssemblyDate ||
+    sourceOrder.deliveryDate ||
+    now.format('YYYY-MM-DD')
+  const lineItems = rows.map((row) =>
+    createLineItem({
+      inventoryName: row.productName,
+      inventoryCode: row.code,
+      specModel: row.spec,
+      specAttr: row.specAttr || '',
+      material: row.material || '',
+      materialType: row.materialType || '零部件',
+      supplyType: '外购件',
+      unit: row.unit || '件',
+      stockQty: row.stockQty ?? 0,
+      availableStock: row.availableStock ?? 0,
+      inTransitQty: row.inTransitQty ?? 0,
+      demandQty: row.demandQty ?? 0,
+      gapQty: row.gapQty ?? 0,
+      planPurchaseQty: row.planQty,
+      designatedSupplier: Boolean(row.designatedSupplier),
+      supplierName: row.supplier || '',
+      expectedArrivalDate: row.expectedArrivalDate || deliveryDate,
+      deliveryDate,
+      receivingWarehouse: row.warehouse || form.receivingWarehouse || '',
+      remark: row.remark || '',
+    }),
+  )
+  const estimatedArrivalDate =
+    form.estimatedArrivalDate ||
+    lineItems
+      .map((l) => l.expectedArrivalDate)
+      .filter(Boolean)
+      .sort()[0] ||
+    deliveryDate
+  const receivingWarehouse =
+    form.receivingWarehouse || lineItems.find((l) => l.receivingWarehouse)?.receivingWarehouse || ''
+
+  return {
+    id: `pr-${Date.now()}`,
+    reqNo: form.reqNo?.trim() || generatePlanReqNo(),
+    salesOrderNo: sourceOrder.orderNo || '',
+    docStatus: '待处理',
+    overdueStatus: '未逾期',
+    urgency:
+      sourceOrder.urgency === '紧急' ? '紧急' : sourceOrder.urgency === '加急' ? '特急' : '正常',
+    orderDate: now.format('YYYY-MM-DD'),
+    deliveryDate,
+    estimatedArrivalDate,
+    receivingWarehouse,
+    source: '生产计划',
+    operator: '管理员',
+    creator: '管理员',
+    createdAt: now.format('YYYY-MM-DD HH:mm'),
+    updatedAt: now.format('YYYY-MM-DD HH:mm'),
+    remark: form.remark ?? sourceOrder.remark ?? '',
+    purchaseOrderNo: '',
+    lineItems,
+  }
+}
+
 /** 从生产计划物料生成采购申请 */
 export function buildRequisitionFromMaterials(materials, sourceOrder, form = {}) {
   const now = dayjs()

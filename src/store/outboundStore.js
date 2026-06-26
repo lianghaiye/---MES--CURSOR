@@ -63,6 +63,16 @@ watch(
   { deep: true },
 )
 
+export function getOutboundOrderById(id) {
+  if (!id) return null
+  return outboundState.orders.find((o) => o.id === id) || null
+}
+
+export function getOutboundOrderByDocNo(docNo) {
+  if (!docNo) return null
+  return outboundState.orders.find((o) => o.docNo === docNo) || null
+}
+
 export function deleteOutboundOrder(id) {
   const idx = outboundState.orders.findIndex((o) => o.id === id)
   if (idx === -1) return false

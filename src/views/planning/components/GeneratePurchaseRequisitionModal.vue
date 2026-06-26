@@ -1,94 +1,62 @@
 <template>
   <a-modal
     :open="open"
-    title="生成采购申请单"
+    :title="`生成采购申请 (${rows.length}条)`"
     width="90%"
     :mask-closable="false"
     destroy-on-close
+    class="work-order-modal"
     @cancel="handleCancel"
   >
-    <div class="section-block">
-      <div class="section-title">基础信息</div>
-      <a-divider class="section-divider" />
-      <a-form layout="inline" class="header-form horizontal-form">
-        <a-row :gutter="[12, 8]" style="width: 100%">
-          <a-col :span="8">
-            <a-form-item label="申请单号">
-              <a-input v-model:value="form.reqNo" placeholder="系统生成" allow-clear size="small" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="销售单号">
-              <a-input :value="order?.orderNo || ''" disabled size="small" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="期望到货日期" required>
-              <a-date-picker
-                v-model:value="form.estimatedArrivalDate"
-                size="small"
-                style="width: 100%"
-                placeholder="请选择"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="收货仓库" required>
-              <a-select
-                v-model:value="form.receivingWarehouse"
-                size="small"
-                placeholder="请选择"
-                :options="warehouseOpts"
-                style="width: 100%"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="交货日期">
-              <a-date-picker
-                v-model:value="form.deliveryDate"
-                size="small"
-                style="width: 100%"
-                placeholder="请选择"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="24">
-            <a-form-item label="备注" class="remark-item">
-              <a-textarea
-                v-model:value="form.remark"
-                :rows="2"
-                :maxlength="500"
-                placeholder="请输入"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </a-form>
+    <div class="modal-toolbar">
+      <span class="hint"
+        >提示：拖动表头右侧边线可调整列宽，单击可编辑单元格进行编辑；多明细合并生成一张采购申请单</span
+      >
+      <a-popover trigger="click" placement="bottomRight">
+        <template #title>列设置</template>
+        <template #content>
+          <a-checkbox-group v-model:value="visibleKeys" class="column-settings">
+            <a-row>
+              <a-col v-for="col in columnDefs" :key="col.key" :span="12">
+                <a-checkbox :value="col.key" :disabled="col.key === 'index'">
+                  {{ col.title }}
+                </a-checkbox>
+              </a-col>
+            </a-row>
+          </a-checkbox-group>
+        </template>
+        <a-button type="text">
+          <SettingOutlined />
+          列设置
+        </a-button>
+      </a-popover>
     </div>
 
-    <div class="section-block">
-      <div class="section-title">采购清单</div>
-      <a-divider class="section-divider" />
+    <div ref="tableWrapRef" class="table-wrap">
       <a-table
-        :columns="lineColumns"
-        :data-source="form.lineItems"
-        row-key="id"
+        :columns="displayColumns"
+        :data-source="rows"
+        :pagination="false"
+        row-key="key"
         size="small"
         bordered
-        :pagination="false"
-        :scroll="{ x: tableScrollX }"
-        locale="{ emptyText: '暂无数据' }"
+        :scroll="{ x: tableScrollX, y: 420 }"
+        class="work-order-table"
       >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'planPurchaseQty'">
-            <a-input-number
-              v-model:value="record.planPurchaseQty"
-              size="small"
-              :min="0"
-              :precision="3"
-              style="width: 100%"
+        <template #headerCell="{ column }">
+          <div class="header-cell">
+            <span class="header-title">{{ column.title }}</span>
+            <span
+              v-if="column.key !== 'index' && column.key !== 'action'"
+              class="resize-handle"
+              @mousedown.prevent="(e) => startResize(e, column.key)"
             />
+          </div>
+        </template>
+
+        <template #bodyCell="{ column, record, text }">
+          <template v-if="column.key === 'action'">
+            <a-button type="link" size="small" danger @click="removeRow(record.key)">删除</a-button>
           </template>
           <template v-else-if="column.key === 'designatedSupplier'">
             <a-switch
@@ -97,51 +65,86 @@
               @change="(checked) => onDesignatedSupplierChange(record, checked)"
             />
           </template>
-          <template v-else-if="column.key === 'supplierName'">
-            <a-select
-              v-model:value="record.supplierName"
-              size="small"
-              allow-clear
-              show-search
-              placeholder="请选择"
-              :disabled="!record.designatedSupplier"
-              :options="supplierOpts"
-              :filter-option="filterSelectOption"
-              style="width: 100%"
-            />
-          </template>
-          <template v-else-if="column.key === 'receivingWarehouse'">
-            <a-select
-              v-model:value="record.receivingWarehouse"
-              size="small"
-              allow-clear
-              placeholder="请选择"
-              :options="warehouseOpts"
-              style="width: 100%"
-            />
-          </template>
-          <template v-else-if="column.key === 'remark'">
-            <a-input v-model:value="record.remark" size="small" placeholder="请输入" />
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
-          </template>
-          <template v-else>
-            {{ formatCell(record, column) }}
-          </template>
+          <div
+            v-else
+            class="body-cell"
+            :class="{
+              editable: isEditable(column.key),
+              editing: isEditing(record.key, column.key),
+            }"
+            @click="startEdit(record, column.key)"
+          >
+            <div v-if="isEditing(record.key, column.key)" class="edit-wrap" @click.stop>
+              <a-date-picker
+                v-if="column.key === 'expectedArrivalDate'"
+                :value="expectedArrivalDayjs(record)"
+                size="small"
+                style="width: 100%"
+                :open="datePickerOpen"
+                @change="(date) => onExpectedArrivalChange(record, date)"
+                @openChange="onDatePickerOpenChange"
+              />
+              <a-select
+                v-else-if="column.key === 'supplier'"
+                v-model:value="record.supplier"
+                size="small"
+                show-search
+                allow-clear
+                placeholder="请选择"
+                style="width: 100%"
+                :open="selectOpen"
+                :options="supplierOpts"
+                :filter-option="filterSelectOption"
+                @dropdownVisibleChange="onSelectOpenChange"
+                @change="endEdit"
+              />
+              <a-select
+                v-else-if="selectOptions[column.key]"
+                v-model:value="record[column.key]"
+                size="small"
+                style="width: 100%"
+                :open="selectOpen"
+                :options="selectOptions[column.key]"
+                @dropdownVisibleChange="onSelectOpenChange"
+                @change="endEdit"
+              />
+              <a-input-number
+                v-else-if="column.key === 'planQty'"
+                v-model:value="record.planQty"
+                size="small"
+                :min="0"
+                style="width: 100%"
+                autofocus
+                @blur="endEdit"
+                @pressEnter="endEdit"
+              />
+              <a-input
+                v-else
+                v-model:value="record.remark"
+                size="small"
+                autofocus
+                @blur="endEdit"
+                @pressEnter="endEdit"
+              />
+            </div>
+            <template v-else>
+              <span :class="{ placeholder: isEditable(column.key) && !text && text !== 0 }">
+                {{ formatCell(record, column.key, text) }}
+              </span>
+            </template>
+          </div>
         </template>
+
         <template #summary>
-          <a-table-summary v-if="form.lineItems.length">
+          <a-table-summary v-if="rows.length">
             <a-table-summary-row>
               <a-table-summary-cell
-                v-for="(col, colIndex) in lineColumns"
-                :key="col.key || col.dataIndex"
-                :index="colIndex"
+                v-for="col in displayColumns"
+                :key="col.key"
+                :index="col.key === 'index' ? 0 : undefined"
               >
-                <template v-if="colIndex === 0">合计</template>
-                <template v-else-if="col.key === 'planPurchaseQty'">
-                  {{ formatQty(totalPlanQty) }}
-                </template>
+                <template v-if="col.key === 'index'">总计</template>
+                <template v-else-if="col.total">{{ summary[col.key] }}</template>
               </a-table-summary-cell>
             </a-table-summary-row>
           </a-table-summary>
@@ -149,9 +152,13 @@
       </a-table>
     </div>
 
+    <a-empty v-if="!rows.length" description="当前物料清单无供应型态为「外购件」的物料" />
+
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" @click="handleSave">保存</a-button>
+      <a-button type="primary" :disabled="!rows.length" @click="handleSave">
+        保存 ({{ rows.length }}条)
+      </a-button>
     </template>
   </a-modal>
 </template>
@@ -161,17 +168,15 @@ export default { name: 'GeneratePurchaseRequisitionModal' }
 </script>
 
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch, nextTick } from 'vue'
+import { SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { warehouseOptions } from '@/mock/purchaseRequisitionOptions'
-import { createLineItem } from '@/mock/purchaseRequisitions'
+import { unitOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { planSupplierOptions } from '@/utils/productionPlanMaterial'
-import {
-  buildRequisitionFromMaterials,
-  generatePlanReqNo,
-  isReqNoTaken,
-} from '@/store/purchaseRequisitionStore'
+import { buildPurchaseRequisitionRows } from '@/utils/material'
+import { buildRequisitionFromPlanRows } from '@/store/purchaseRequisitionStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -181,133 +186,185 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'saved'])
 
-const warehouseOpts = warehouseOptions
-const supplierOpts = planSupplierOptions
-
-const lineColumns = [
-  { title: '物料名称', dataIndex: 'inventoryName', width: 140, ellipsis: true, fixed: 'left' },
-  { title: '物料编码', dataIndex: 'inventoryCode', width: 120, fixed: 'left' },
-  { title: '型号规格', dataIndex: 'specModel', width: 100 },
-  { title: '规格属性', dataIndex: 'specAttr', width: 90 },
-  { title: '材质', dataIndex: 'material', width: 80 },
-  { title: '物料类型', dataIndex: 'materialType', width: 90 },
-  { title: '计量单位', dataIndex: 'unit', width: 80 },
-  { title: '供方类型', dataIndex: 'supplyType', width: 90 },
-  { title: '库存数量', dataIndex: 'stockQty', width: 90, align: 'right' },
-  { title: '可用库存', dataIndex: 'availableStock', width: 90, align: 'right' },
-  { title: '在途库存', dataIndex: 'inTransitQty', width: 90, align: 'right' },
-  { title: '需求数', dataIndex: 'demandQty', width: 90, align: 'right' },
-  { title: '缺口数', dataIndex: 'gapQty', width: 90, align: 'right' },
-  { title: '计划数量', key: 'planPurchaseQty', width: 100, align: 'right' },
-  { title: '指定供应商', key: 'designatedSupplier', width: 96, align: 'center' },
-  { title: '供应商名称', key: 'supplierName', width: 140 },
-  { title: '收货仓库', key: 'receivingWarehouse', width: 120 },
-  { title: '补充说明', key: 'remark', width: 120 },
-  { title: '操作', key: 'action', width: 70, fixed: 'right' },
+const columnDefs = [
+  { key: 'index', title: '序号', width: 56, total: false },
+  { key: 'productName', title: '物品名称', width: 130, total: false },
+  { key: 'code', title: '物品编码', width: 120, total: false },
+  { key: 'spec', title: '规格型号', width: 130, total: false },
+  { key: 'material', title: '材质', width: 70, total: false },
+  { key: 'drawingNo', title: '图号', width: 100, total: false },
+  { key: 'specAttr', title: '规格属性', width: 90, total: false },
+  { key: 'materialType', title: '物料类型', width: 90, total: false },
+  { key: 'designatedSupplier', title: '指定供应商', width: 96, total: false },
+  { key: 'supplier', title: '供应商', width: 140, editable: true, total: false },
+  { key: 'stockQty', title: '库存数量', width: 90, total: true, numeric: true },
+  { key: 'availableStock', title: '可用库存', width: 90, total: true, numeric: true },
+  { key: 'inTransitQty', title: '在途数量', width: 90, total: true, numeric: true },
+  { key: 'demandQty', title: '需求数', width: 80, total: true, numeric: true },
+  { key: 'gapQty', title: '缺口数', width: 80, total: true, numeric: true },
+  { key: 'planQty', title: '计划数量', width: 90, editable: true, total: true, numeric: true },
+  { key: 'unit', title: '计量单位', width: 90, total: false },
+  { key: 'expectedArrivalDate', title: '期望到货时间', width: 130, editable: true, total: false },
+  { key: 'warehouse', title: '预入仓库', width: 100, total: false },
+  { key: 'urgency', title: '紧急度', width: 80, total: false },
+  { key: 'remark', title: '备注', width: 120, editable: true, total: false },
+  { key: 'action', title: '操作', width: 72, total: false },
 ]
 
-const tableScrollX = computed(() => lineColumns.reduce((sum, col) => sum + (col.width || 80), 0))
+const editableKeys = columnDefs.filter((c) => c.editable).map((c) => c.key)
+const defaultVisibleKeys = columnDefs.map((c) => c.key)
 
-const form = reactive({
-  reqNo: '',
-  estimatedArrivalDate: null,
-  deliveryDate: null,
-  receivingWarehouse: undefined,
-  remark: '',
-  lineItems: [],
+const visibleKeys = ref([...defaultVisibleKeys])
+const columnWidths = reactive(Object.fromEntries(columnDefs.map((c) => [c.key, c.width])))
+const rows = ref([])
+const editingCell = ref(null)
+const tableWrapRef = ref(null)
+const selectOpen = ref(false)
+const datePickerOpen = ref(false)
+
+const supplierOpts = planSupplierOptions
+
+const selectOptions = computed(() => {
+  void warehouseState.warehouses
+  return {
+    unit: unitOptions.map((v) => ({ label: v, value: v })),
+    warehouse: getWarehouseSelectOptions(),
+    urgency: urgencyOptions.map((v) => ({ label: v, value: v })),
+  }
 })
 
-function defaultDeliveryDate() {
-  const order = props.order
-  if (!order) return null
-  const date = order.planAssemblyDate || order.deliveryDate
-  return date ? dayjs(date) : null
-}
-
-const totalPlanQty = computed(() =>
-  form.lineItems.reduce((sum, line) => sum + (Number(line.planPurchaseQty) || 0), 0),
+const displayColumns = computed(() =>
+  columnDefs
+    .filter((c) => visibleKeys.value.includes(c.key))
+    .map((c) => ({
+      title: c.title,
+      dataIndex: c.key,
+      key: c.key,
+      width: columnWidths[c.key],
+      ellipsis: !c.editable && c.key !== 'action' && c.key !== 'designatedSupplier',
+      total: c.total,
+      fixed:
+        c.key === 'action'
+          ? 'right'
+          : ['index', 'productName', 'code'].includes(c.key)
+            ? 'left'
+            : undefined,
+      align: c.key === 'designatedSupplier' ? 'center' : undefined,
+    })),
 )
+
+const tableScrollX = computed(() =>
+  displayColumns.value.reduce((sum, c) => sum + (c.width || 100), 0),
+)
+
+const summary = computed(() => {
+  const totals = {}
+  columnDefs
+    .filter((c) => c.total)
+    .forEach((col) => {
+      totals[col.key] = rows.value.reduce((sum, row) => sum + (Number(row[col.key]) || 0), 0)
+    })
+  return totals
+})
 
 watch(
   () => props.open,
   (val) => {
-    if (!val) return
-    resetForm()
-    initLineItems()
+    if (val && props.order) {
+      rows.value = buildPurchaseRequisitionRows(props.materials, props.order)
+      editingCell.value = null
+    }
   },
 )
 
-watch(
-  () => form.receivingWarehouse,
-  (wh) => {
-    if (!wh) return
-    form.lineItems.forEach((line) => {
-      if (!line.receivingWarehouse) line.receivingWarehouse = wh
-    })
-  },
-)
-
-function resetForm() {
-  form.reqNo = ''
-  form.estimatedArrivalDate = null
-  form.deliveryDate = defaultDeliveryDate()
-  form.receivingWarehouse = undefined
-  form.remark = props.order?.remark || ''
-  form.lineItems = []
+function isEditable(key) {
+  return editableKeys.includes(key)
 }
 
-function initLineItems() {
-  const deliveryDate = form.deliveryDate?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')
-  form.lineItems = props.materials.map((m) => {
-    const demandQty = m.demandQty ?? 0
-    const gapQty = m.gapQty ?? Math.max(0, demandQty - (m.availableStock ?? 0))
-    return createLineItem({
-      inventoryName: m.name,
-      inventoryCode: m.code,
-      specModel: m.spec,
-      specAttr: m.specAttr || '',
-      material: m.material || '',
-      materialType: m.type || '零部件',
-      supplyType: m.supplyType,
-      unit: m.unit || '件',
-      stockQty: m.stockQty ?? 0,
-      availableStock: m.availableStock ?? 0,
-      inTransitQty: m.inTransitQty ?? 0,
-      demandQty,
-      gapQty,
-      planPurchaseQty: gapQty || m.planQty || 0,
-      supplierName: m.supplier || '',
-      designatedSupplier: Boolean(m.designateSupplier || m.supplier),
-      receivingWarehouse: form.receivingWarehouse || '',
-      remark: m.remark || '',
-      deliveryDate,
-      expectedArrivalDate: deliveryDate,
-    })
+function isEditing(rowKey, field) {
+  return editingCell.value?.rowKey === rowKey && editingCell.value?.field === field
+}
+
+function startEdit(record, field) {
+  if (!isEditable(field)) return
+  editingCell.value = { rowKey: record.key, field }
+  nextTick(() => {
+    if (field === 'expectedArrivalDate') {
+      datePickerOpen.value = true
+    } else if (field === 'supplier' || selectOptions.value[field]) {
+      selectOpen.value = true
+    }
   })
 }
 
-function formatQty(val) {
-  const num = Number(val)
-  if (Number.isNaN(num)) return '0'
-  return Number.isInteger(num) ? String(num) : num.toFixed(3).replace(/\.?0+$/, '')
+function endEdit() {
+  editingCell.value = null
+  selectOpen.value = false
+  datePickerOpen.value = false
 }
 
-function formatCell(record, column) {
-  const val = record[column.dataIndex]
-  if (val === 0) return '0'
-  return val ?? '-'
+function onSelectOpenChange(open) {
+  selectOpen.value = open
+  if (!open) endEdit()
+}
+
+function onDatePickerOpenChange(open) {
+  datePickerOpen.value = open
+  if (!open) endEdit()
 }
 
 function filterSelectOption(input, option) {
   return (option?.label || '').toLowerCase().includes(input.toLowerCase())
 }
 
-function onDesignatedSupplierChange(record, checked) {
-  if (!checked) record.supplierName = ''
+function expectedArrivalDayjs(record) {
+  return record.expectedArrivalDate ? dayjs(record.expectedArrivalDate) : null
 }
 
-function removeLine(index) {
-  form.lineItems.splice(index, 1)
+function onExpectedArrivalChange(record, date) {
+  record.expectedArrivalDate = date ? date.format('YYYY-MM-DD') : ''
+}
+
+function onDesignatedSupplierChange(record, checked) {
+  if (!checked) return
+  if (!record.supplier && supplierOpts.length) {
+    record.supplier = supplierOpts[0].value
+  }
+}
+
+function formatCell(record, key, text) {
+  if (key === 'expectedArrivalDate') {
+    return record.expectedArrivalDate || '请选择'
+  }
+  if (key === 'supplier' && !text) return '请选择'
+  if (isEditable(key) && (text === '' || text == null)) return '-'
+  return text ?? '-'
+}
+
+function reindexRows() {
+  rows.value.forEach((row, idx) => {
+    row.index = idx + 1
+  })
+}
+
+function removeRow(key) {
+  rows.value = rows.value.filter((row) => row.key !== key)
+  reindexRows()
+}
+
+function startResize(e, key) {
+  const startX = e.clientX
+  const startWidth = columnWidths[key]
+
+  const onMove = (ev) => {
+    columnWidths[key] = Math.max(60, startWidth + ev.clientX - startX)
+  }
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
 }
 
 function handleCancel() {
@@ -315,112 +372,109 @@ function handleCancel() {
 }
 
 function handleSave() {
-  if (!form.estimatedArrivalDate) {
-    message.warning('请选择期望到货日期')
-    return
-  }
-  if (!form.receivingWarehouse) {
-    message.warning('请选择收货仓库')
-    return
-  }
-  if (!form.lineItems.length) {
+  if (!rows.value.length) {
     message.warning('请至少保留一条采购明细')
     return
   }
-  const invalidQty = form.lineItems.some((l) => !l.planPurchaseQty || l.planPurchaseQty <= 0)
+  const invalidQty = rows.value.some((r) => !r.planQty || r.planQty <= 0)
   if (invalidQty) {
     message.warning('计划数量须大于 0')
     return
   }
-  const missingSupplier = form.lineItems.find(
-    (l) => l.designatedSupplier && !String(l.supplierName || '').trim(),
+  const missingSupplier = rows.value.find(
+    (r) => r.designatedSupplier && !String(r.supplier || '').trim(),
   )
   if (missingSupplier) {
-    message.warning(`「${missingSupplier.inventoryName}」已指定供应商，请填写供应商名称`)
+    message.warning(`「${missingSupplier.productName}」已指定供应商，请填写供应商`)
     return
   }
-  const missingWarehouse = form.lineItems.find((l) => !l.receivingWarehouse)
-  if (missingWarehouse) {
-    message.warning(`请为「${missingWarehouse.inventoryName}」选择收货仓库`)
-    return
-  }
-
-  const reqNo = form.reqNo?.trim() || generatePlanReqNo()
-  if (isReqNoTaken(reqNo)) {
-    message.warning(`申请单号「${reqNo}」已存在，请更换`)
+  const missingArrival = rows.value.find((r) => !r.expectedArrivalDate)
+  if (missingArrival) {
+    message.warning(`请为「${missingArrival.productName}」选择期望到货时间`)
     return
   }
 
-  const deliveryDate = form.deliveryDate?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')
-  const estimatedArrivalDate = form.estimatedArrivalDate.format('YYYY-MM-DD')
-  const lineItems = form.lineItems.map((line) => ({
-    ...line,
-    deliveryDate,
-    expectedArrivalDate: estimatedArrivalDate,
-    receivingWarehouse: line.receivingWarehouse || form.receivingWarehouse,
-  }))
-
-  const requisition = buildRequisitionFromMaterials(props.materials, props.order, {
-    reqNo,
-    remark: form.remark,
-    receivingWarehouse: form.receivingWarehouse,
-    deliveryDate,
-    estimatedArrivalDate,
-    lineItems,
-  })
-
+  const requisition = buildRequisitionFromPlanRows(rows.value, props.order)
   emit('saved', requisition)
+  message.success(
+    `已成功生成采购申请 ${requisition.reqNo}，共 ${requisition.lineItems.length} 条明细`,
+  )
   emit('update:open', false)
 }
 </script>
 
 <style lang="less" scoped>
-.section-block {
-  margin-bottom: 12px;
+.modal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 
-  .section-title {
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .section-divider {
-    margin: 8px 0 12px;
+  .hint {
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 12px;
   }
 }
 
-.header-form {
-  :deep(.ant-form-item) {
+.column-settings {
+  width: 280px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.table-wrap {
+  :deep(.ant-table-thead > tr > th) {
+    padding: 8px !important;
+    position: relative;
+  }
+
+  :deep(.ant-table-tbody > tr > td) {
+    padding: 4px 8px !important;
+  }
+}
+
+.header-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+
+  .resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+
+    &:hover {
+      background: rgba(22, 119, 255, 0.25);
+    }
+  }
+}
+
+.body-cell {
+  min-height: 28px;
+  line-height: 28px;
+
+  &.editable {
+    cursor: pointer;
+
+    &:hover {
+      background: #fafafa;
+    }
+  }
+
+  &.editing {
+    padding: 0;
+  }
+
+  .edit-wrap {
     width: 100%;
-    margin-bottom: 0;
-    margin-inline-end: 0;
   }
 
-  :deep(.ant-form-item-row) {
-    flex-wrap: nowrap;
-    align-items: center;
-  }
-
-  :deep(.ant-form-item-label) {
-    flex: 0 0 auto;
-    padding-bottom: 0;
-
-    > label {
-      height: 24px;
-      line-height: 24px;
-      font-size: 13px;
-      white-space: nowrap;
-    }
-  }
-
-  :deep(.ant-form-item-control) {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .remark-item {
-    :deep(.ant-form-item-label) {
-      flex: 0 0 68px;
-    }
+  .placeholder {
+    color: rgba(0, 0, 0, 0.35);
   }
 }
 </style>

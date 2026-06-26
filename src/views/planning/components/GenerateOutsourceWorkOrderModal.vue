@@ -1,7 +1,7 @@
 <template>
   <a-modal
     :open="open"
-    :title="`生成加工工单 (${rows.length}条)`"
+    :title="`生成外协工单 (${rows.length}条)`"
     width="90%"
     :mask-closable="false"
     destroy-on-close
@@ -66,14 +66,28 @@
             @click="startEdit(record, column.key)"
           >
             <div v-if="isEditing(record.key, column.key)" class="edit-wrap" @click.stop>
-              <a-range-picker
-                v-if="column.key === 'planDateRange'"
-                :value="planDateDayjs(record)"
+              <a-date-picker
+                v-if="column.key === 'expectedArrivalDate'"
+                :value="expectedArrivalDayjs(record)"
                 size="small"
                 style="width: 100%"
-                :open="planDatePickerOpen"
-                @change="(dates) => onPlanDateChange(record, dates)"
-                @openChange="onPlanDateOpenChange"
+                :open="datePickerOpen"
+                @change="(date) => onExpectedArrivalChange(record, date)"
+                @openChange="onDatePickerOpenChange"
+              />
+              <a-select
+                v-else-if="column.key === 'supplier'"
+                v-model:value="record.supplier"
+                size="small"
+                show-search
+                allow-clear
+                placeholder="请选择"
+                style="width: 100%"
+                :open="selectOpen"
+                :options="supplierOpts"
+                :filter-option="filterSelectOption"
+                @dropdownVisibleChange="onSelectOpenChange"
+                @change="endEdit"
               />
               <a-select
                 v-else-if="selectOptions[column.key]"
@@ -129,7 +143,7 @@
       </a-table>
     </div>
 
-    <a-empty v-if="!rows.length" description="当前订单无供应型态为「自制件」的物料" />
+    <a-empty v-if="!rows.length" description="当前物料清单无供应型态为「外协件」的物料" />
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
@@ -145,15 +159,10 @@ import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import {
-  processRouteOptions,
-  workCenterOptions,
-  personInChargeOptions,
-  unitOptions,
-  urgencyOptions,
-} from '@/mock/workOrderOptions'
+import { unitOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
-import { buildWorkOrderRows } from '@/utils/material'
+import { planSupplierOptions } from '@/utils/productionPlanMaterial'
+import { buildOutsourceWorkOrderRows } from '@/utils/material'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -165,24 +174,22 @@ const emit = defineEmits(['update:open', 'save'])
 
 const columnDefs = [
   { key: 'index', title: '序号', width: 56, total: false },
-  { key: 'productName', title: '生产品名', width: 130, total: false },
-  { key: 'code', title: '编码', width: 120, total: false },
+  { key: 'productName', title: '物品名称', width: 130, total: false },
+  { key: 'code', title: '物品编码', width: 120, total: false },
   { key: 'spec', title: '规格型号', width: 130, total: false },
-  { key: 'specAttr', title: '规格属性', width: 90, total: false },
   { key: 'material', title: '材质', width: 70, total: false },
   { key: 'drawingNo', title: '图号', width: 100, total: false },
-  { key: 'bom', title: 'BOM', width: 100, total: false },
-  { key: 'processRoute', title: '工艺路线', width: 120, editable: true, total: false },
-  { key: 'workCenter', title: '工作中心', width: 100, editable: true, total: false },
-  { key: 'personInCharge', title: '负责人', width: 90, editable: true, total: false },
+  { key: 'specAttr', title: '规格属性', width: 90, total: false },
+  { key: 'materialType', title: '物料类型', width: 90, total: false },
+  { key: 'supplier', title: '供应商', width: 140, editable: true, total: false },
   { key: 'stockQty', title: '库存数量', width: 90, total: true, numeric: true },
   { key: 'availableStock', title: '可用库存', width: 90, total: true, numeric: true },
   { key: 'inTransitQty', title: '在途数量', width: 90, total: true, numeric: true },
   { key: 'demandQty', title: '需求数', width: 80, total: true, numeric: true },
   { key: 'gapQty', title: '缺口数', width: 80, total: true, numeric: true },
   { key: 'planQty', title: '计划数量', width: 90, editable: true, total: true, numeric: true },
-  { key: 'planDateRange', title: '计划时间', width: 220, editable: true, total: false },
   { key: 'unit', title: '计量单位', width: 90, editable: true, total: false },
+  { key: 'expectedArrivalDate', title: '期望到货时间', width: 130, editable: true, total: false },
   { key: 'warehouse', title: '预入仓库', width: 100, editable: true, total: false },
   { key: 'urgency', title: '紧急度', width: 80, editable: true, total: false },
   { key: 'remark', title: '备注', width: 120, editable: true, total: false },
@@ -198,14 +205,13 @@ const rows = ref([])
 const editingCell = ref(null)
 const tableWrapRef = ref(null)
 const selectOpen = ref(false)
-const planDatePickerOpen = ref(false)
+const datePickerOpen = ref(false)
+
+const supplierOpts = planSupplierOptions
 
 const selectOptions = computed(() => {
   void warehouseState.warehouses
   return {
-    processRoute: processRouteOptions.map((v) => ({ label: v, value: v })),
-    workCenter: workCenterOptions.map((v) => ({ label: v, value: v })),
-    personInCharge: personInChargeOptions.map((v) => ({ label: v, value: v })),
     unit: unitOptions.map((v) => ({ label: v, value: v })),
     warehouse: getWarehouseSelectOptions(),
     urgency: urgencyOptions.map((v) => ({ label: v, value: v })),
@@ -249,7 +255,7 @@ watch(
   () => props.open,
   (val) => {
     if (val && props.order) {
-      rows.value = buildWorkOrderRows(props.materials, props.order)
+      rows.value = buildOutsourceWorkOrderRows(props.materials, props.order)
       editingCell.value = null
     }
   },
@@ -267,9 +273,9 @@ function startEdit(record, field) {
   if (!isEditable(field)) return
   editingCell.value = { rowKey: record.key, field }
   nextTick(() => {
-    if (field === 'planDateRange') {
-      planDatePickerOpen.value = true
-    } else if (selectOptions.value[field]) {
+    if (field === 'expectedArrivalDate') {
+      datePickerOpen.value = true
+    } else if (field === 'supplier' || selectOptions.value[field]) {
       selectOpen.value = true
     }
   })
@@ -278,7 +284,7 @@ function startEdit(record, field) {
 function endEdit() {
   editingCell.value = null
   selectOpen.value = false
-  planDatePickerOpen.value = false
+  datePickerOpen.value = false
 }
 
 function onSelectOpenChange(open) {
@@ -286,36 +292,43 @@ function onSelectOpenChange(open) {
   if (!open) endEdit()
 }
 
-function planDateDayjs(record) {
-  const range = record.planDateRange
-  if (range?.length === 2) return [dayjs(range[0]), dayjs(range[1])]
-  return null
+function filterSelectOption(input, option) {
+  return (option?.label || '').toLowerCase().includes(input.toLowerCase())
 }
 
-function onPlanDateChange(record, dates) {
-  if (dates?.length === 2) {
-    record.planDateRange = [dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')]
-  } else {
-    record.planDateRange = []
-  }
+function expectedArrivalDayjs(record) {
+  return record.expectedArrivalDate ? dayjs(record.expectedArrivalDate) : null
 }
 
-function onPlanDateOpenChange(open) {
-  planDatePickerOpen.value = open
+function onExpectedArrivalChange(record, date) {
+  record.expectedArrivalDate = date ? date.format('YYYY-MM-DD') : ''
+}
+
+function onDatePickerOpenChange(open) {
+  datePickerOpen.value = open
   if (!open) endEdit()
 }
 
 function formatCell(record, key, text) {
-  if (key === 'planDateRange') {
-    const range = record.planDateRange
-    if (range?.length === 2) return `${range[0]} ~ ${range[1]}`
-    return '请选择'
+  if (key === 'expectedArrivalDate') {
+    return record.expectedArrivalDate || '请选择'
   }
+  if (key === 'supplier' && !text) return '请选择'
   if (isEditable(key) && (text === '' || text == null)) {
-    if (['processRoute', 'workCenter', 'personInCharge'].includes(key)) return '请选择'
     return '-'
   }
   return text ?? '-'
+}
+
+function reindexRows() {
+  rows.value.forEach((row, idx) => {
+    row.index = idx + 1
+  })
+}
+
+function removeRow(key) {
+  rows.value = rows.value.filter((row) => row.key !== key)
+  reindexRows()
 }
 
 function startResize(e, key) {
@@ -333,31 +346,30 @@ function startResize(e, key) {
   document.addEventListener('mouseup', onUp)
 }
 
-function reindexRows() {
-  rows.value.forEach((row, idx) => {
-    row.index = idx + 1
-  })
-}
-
-function removeRow(key) {
-  rows.value = rows.value.filter((row) => row.key !== key)
-  reindexRows()
-}
-
 function handleCancel() {
   emit('update:open', false)
 }
 
 function handleSave() {
   if (!rows.value.length) {
-    message.warning('请至少保留一条加工明细')
+    message.warning('请至少保留一条外协明细')
+    return
+  }
+  const invalidQty = rows.value.some((r) => !r.planQty || r.planQty <= 0)
+  if (invalidQty) {
+    message.warning('计划数量须大于 0')
+    return
+  }
+  const missingArrival = rows.value.find((r) => !r.expectedArrivalDate)
+  if (missingArrival) {
+    message.warning(`请为「${missingArrival.productName}」选择期望到货时间`)
     return
   }
   emit(
     'save',
     rows.value.map((r) => ({ ...r })),
   )
-  message.success(`已成功生成 ${rows.value.length} 条加工工单`)
+  message.success(`已成功生成 ${rows.value.length} 条外协工单`)
   emit('update:open', false)
 }
 </script>

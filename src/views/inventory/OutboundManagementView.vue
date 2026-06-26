@@ -186,7 +186,7 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'docNo'">
-              <a class="link-code">{{ record.docNo }}</a>
+              <a class="link-code" @click="goDetail(record)">{{ record.docNo }}</a>
             </template>
             <template v-else-if="column.key === 'sourceOrderNo'">
               <a v-if="record.sourceOrderNo" class="link-code">{{ record.sourceOrderNo }}</a>
@@ -247,6 +247,7 @@ export default { name: 'OutboundManagementView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -277,6 +278,10 @@ import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useTabs } from '@/composables/useTabs'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({
   projectNo: '',
@@ -367,6 +372,12 @@ function handleReset() {
 
 function stubAction(name) {
   message.info(`${name}功能开发中`)
+}
+
+function goDetail(record) {
+  const path = `/inventory/outbound/${record.id}`
+  openTab(path, record.docNo || '出库单详情')
+  router.push(path)
 }
 
 function initiateQcActionLabel(record) {

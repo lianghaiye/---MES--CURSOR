@@ -50,9 +50,11 @@ function lookupSupplyUnit(line) {
   return formatSupplyUnitDisplay(supplyForm, master.production)
 }
 
-function lineToOverviewRow(line, scale) {
+function lineToOverviewRow(line, scale, materialQtyByCode) {
   const baseQty = Number(line.unitQty) || 1
-  return {
+  const code = line.materialCode || ''
+  const qtyInfo = materialQtyByCode?.[code]
+  const row = {
     key: line.id,
     itemName: line.itemName || '—',
     materialCode: line.materialCode || '—',
@@ -71,14 +73,27 @@ function lineToOverviewRow(line, scale) {
     processRoute: line.processRoute || '—',
     remark: line.remark || '—',
   }
+  if (materialQtyByCode) {
+    row.stockQty =
+      qtyInfo?.stockQty != null && qtyInfo.stockQty !== '' ? roundQty(qtyInfo.stockQty) : '—'
+    row.demandQty =
+      qtyInfo?.demandQty != null && qtyInfo.demandQty !== '' ? roundQty(qtyInfo.demandQty) : '—'
+  }
+  return row
 }
 
-function buildChildren(parentNodeId, flatNodes, lineItems, scale) {
+function buildChildren(parentNodeId, flatNodes, lineItems, scale, materialQtyByCode) {
   const lines = getLinesForTreeNode(lineItems, parentNodeId, flatNodes)
   return lines.map((line) => {
-    const row = lineToOverviewRow(line, scale)
+    const row = lineToOverviewRow(line, scale, materialQtyByCode)
     if (line.treeNodeId) {
-      const children = buildChildren(line.treeNodeId, flatNodes, lineItems, scale)
+      const children = buildChildren(
+        line.treeNodeId,
+        flatNodes,
+        lineItems,
+        scale,
+        materialQtyByCode,
+      )
       if (children.length) row.children = children
     }
     return row
@@ -86,9 +101,9 @@ function buildChildren(parentNodeId, flatNodes, lineItems, scale) {
 }
 
 /** 构建 BOM 概览树形表格数据 */
-export function buildBomOverviewTree(flatNodes, lineItems, scale = 1) {
+export function buildBomOverviewTree(flatNodes, lineItems, scale = 1, materialQtyByCode = null) {
   const rootId = getRootTreeId(flatNodes)
-  return buildChildren(rootId, flatNodes, lineItems, scale)
+  return buildChildren(rootId, flatNodes, lineItems, scale, materialQtyByCode)
 }
 
 /** 为树形行分配序号（1、1.1、1.2…） */

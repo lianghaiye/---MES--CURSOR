@@ -2,6 +2,9 @@
 
 import dayjs from 'dayjs'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
+import { getMasterDefaults } from '@/utils/productionPlanMaterial'
+import { materialInfoState } from '@/store/materialInfoStore'
+import { productInfoState } from '@/store/productInfoStore'
 
 export function flattenMaterials(materials, list = []) {
   if (!materials?.length) return list
@@ -50,6 +53,24 @@ export function getSelfMadeMaterials(order) {
   return all.filter((m) => m.supplyType === '自制件')
 }
 
+/** 筛选供应型态为「外协件」的物料（扁平；优先当前工作项，否则整单） */
+export function getOutsourcedMaterials(order, workItem = null) {
+  const all = []
+  if (workItem?.materials?.length) {
+    flattenMaterials(workItem.materials, all)
+  } else {
+    order?.workItems?.forEach((wi) => flattenMaterials(wi.materials, all))
+  }
+  return all.filter((m) => m.supplyType === '外协件')
+}
+
+/** 从单个工作项筛选外协件 */
+export function getOutsourcedMaterialsFromWorkItem(workItem) {
+  const all = []
+  flattenMaterials(workItem?.materials, all)
+  return all.filter((m) => m.supplyType === '外协件')
+}
+
 function filterPurchasedWithGap(materials, productQty) {
   return materials.filter((m) => {
     if (m.supplyType !== '外购件') return false
@@ -67,12 +88,11 @@ export function getPurchasedMaterials(order) {
   return filterPurchasedWithGap(all, order?.productQty)
 }
 
-/** 从单个工作项筛选需采购的外购件 */
-export function getPurchasedMaterialsFromWorkItem(workItem, order) {
+/** 从单个工作项筛选外购件（全部外购件，不限缺口） */
+export function getPurchasedMaterialsFromWorkItem(workItem) {
   const all = []
   flattenMaterials(workItem?.materials, all)
-  const productQty = workItem?.orderQty ?? order?.productQty
-  return filterPurchasedWithGap(all, productQty)
+  return all.filter((m) => m.supplyType === '外购件')
 }
 
 /** 解析订单计划总装日期 */
@@ -101,6 +121,7 @@ export function buildWorkOrderRows(materials, order) {
       spec: m.spec,
       specAttr: m.specAttr,
       material: m.material,
+      drawingNo: m.drawingNo || resolveMasterDrawingNo(m.code),
       bom: m.bom || m.name,
       processRoute: m.processRoute || '机加标准路线',
       workCenter: m.workCenter || '默认工厂',
@@ -133,6 +154,135 @@ export function patchMaterialFromWorkOrderRow(row) {
     urgency: row.urgency,
     workOrderRemark: row.remark,
     planCount: row.planQty,
+    status: '进行中',
+    joinPlan: '是',
+  }
+}
+
+function resolveMasterDrawingNo(code) {
+  if (!code) return ''
+  const material = materialInfoState.materials.find((m) => m.code === code)
+  if (material?.drawingNo) return material.drawingNo
+  const product = productInfoState.products.find((p) => p.code === code)
+  return product?.drawingNo || ''
+}
+
+function resolveMasterMaterialType(code, fallback = '') {
+  if (!code) return fallback
+  const material = materialInfoState.materials.find((m) => m.code === code)
+  if (material?.materialType) return material.materialType
+  const product = productInfoState.products.find((p) => p.code === code)
+  return product?.materialType || fallback
+}
+
+function resolveDefaultWarehouse(code, material) {
+  const production =
+    materialInfoState.materials.find((m) => m.code === code)?.production ||
+    productInfoState.products.find((p) => p.code === code)?.production
+  return (
+    material?.warehouse ||
+    production?.defaultWarehouse ||
+    resolveDefaultWarehouseByMaterialCode(code) ||
+    ''
+  )
+}
+
+/** 构建外协工单弹窗行数据 */
+export function buildOutsourceWorkOrderRows(materials, order) {
+  const defaultArrival = resolveAssemblyDate(order) || dayjs().add(14, 'day').format('YYYY-MM-DD')
+
+  return materials.map((m, index) => {
+    const demandQty = m.demandQty ?? calcDemandQty(m.unitUsage, order?.productQty)
+    const gapQty = m.gapQty ?? calcGapQty(demandQty, m.availableStock)
+    const defaults = getMasterDefaults(m.code)
+    return {
+      key: m.id,
+      materialId: m.id,
+      index: index + 1,
+      productName: m.name,
+      code: m.code,
+      spec: m.spec,
+      material: m.material || '',
+      drawingNo: m.drawingNo || resolveMasterDrawingNo(m.code),
+      specAttr: m.specAttr || '',
+      materialType: m.type || resolveMasterMaterialType(m.code, '零部件'),
+      supplier: m.supplier || defaults.supplier || '',
+      stockQty: m.stockQty ?? 0,
+      availableStock: m.availableStock ?? 0,
+      inTransitQty: m.inTransitQty ?? 0,
+      demandQty,
+      gapQty,
+      planQty: m.planQty ?? gapQty,
+      unit: m.unit || '件',
+      expectedArrivalDate:
+        m.expectedArrivalDate || (m.planDateRange?.[0] ? m.planDateRange[0] : '') || defaultArrival,
+      warehouse: resolveDefaultWarehouse(m.code, m),
+      urgency: m.urgency || order?.urgency || '普通',
+      remark: m.workOrderRemark || m.remark || '',
+    }
+  })
+}
+
+/** 外协工单保存后回写物料 */
+export function patchMaterialFromOutsourceWorkOrderRow(row) {
+  return {
+    supplier: row.supplier,
+    planQty: row.planQty,
+    expectedArrivalDate: row.expectedArrivalDate,
+    unit: row.unit,
+    warehouse: row.warehouse,
+    urgency: row.urgency,
+    workOrderRemark: row.remark,
+    planCount: row.planQty,
+    status: '进行中',
+    joinPlan: '是',
+  }
+}
+
+/** 构建采购申请弹窗行数据 */
+export function buildPurchaseRequisitionRows(materials, order) {
+  const defaultArrival = resolveAssemblyDate(order) || dayjs().add(14, 'day').format('YYYY-MM-DD')
+
+  return materials.map((m, index) => {
+    const demandQty = m.demandQty ?? calcDemandQty(m.unitUsage, order?.productQty)
+    const gapQty = m.gapQty ?? calcGapQty(demandQty, m.availableStock)
+    const defaults = getMasterDefaults(m.code)
+    const defaultSupplier = m.supplier || defaults.supplier || ''
+    return {
+      key: m.id,
+      materialId: m.id,
+      index: index + 1,
+      productName: m.name,
+      code: m.code,
+      spec: m.spec,
+      material: m.material || '',
+      drawingNo: m.drawingNo || resolveMasterDrawingNo(m.code),
+      specAttr: m.specAttr || '',
+      materialType: m.type || resolveMasterMaterialType(m.code, '零部件'),
+      designatedSupplier: Boolean(m.designateSupplier || defaultSupplier),
+      supplier: defaultSupplier,
+      stockQty: m.stockQty ?? 0,
+      availableStock: m.availableStock ?? 0,
+      inTransitQty: m.inTransitQty ?? 0,
+      demandQty,
+      gapQty,
+      planQty: m.planQty ?? gapQty,
+      unit: m.unit || '件',
+      expectedArrivalDate: m.expectedArrivalDate || defaultArrival,
+      warehouse: resolveDefaultWarehouse(m.code, m),
+      urgency: m.urgency || order?.urgency || '普通',
+      remark: m.remark || '',
+    }
+  })
+}
+
+/** 采购申请保存后回写物料 */
+export function patchMaterialFromPurchaseRequisitionRow(row) {
+  return {
+    designateSupplier: row.designatedSupplier,
+    supplier: row.supplier,
+    planQty: row.planQty,
+    remark: row.remark,
     status: '进行中',
     joinPlan: '是',
   }

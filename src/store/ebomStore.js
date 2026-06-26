@@ -8,7 +8,7 @@ import { defaultBomColumnSettings } from '@/mock/bomMaterialColumns'
 import { buildMockEbomRecords } from '@/mock/ebomSeed'
 
 const STORAGE_KEY = 'i_doms_ebom'
-const DATA_VERSION = 1
+const DATA_VERSION = 2
 let ebomSeq = 200
 
 function loadFromStorage() {
@@ -102,6 +102,7 @@ export function ensureEbomDraftForDesignTask(task, product) {
     id: `ebom-${Date.now()}`,
     ebomNo: generateEbomNo(),
     ebomName: `${task.productName || product?.name || '定制产品'} EBOM`,
+    bomType: 'EBOM',
     status: EBOM_STATUS.DRAFT,
     version: 'V1.0',
     designTaskId: task.id,

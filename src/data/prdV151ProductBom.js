@@ -11,7 +11,7 @@ export const PRD_V151_META = {
   module: '产品工艺 / 产品 BOM',
   updatedAt: '2026-06-24',
   requirementOwner: '邓利佳',
-  acceptanceOwner: '欧阳宏汉',
+  acceptanceOwner: '梁海曳',
 }
 
 /**
@@ -36,7 +36,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P0',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background:
       '泵类产品 BOM 需版本化管理，支撑生产计划、工单投料与 EBOM 快照；同一物品仅允许一个生效版本。',
     description: [
@@ -61,7 +61,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P0',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: 'BOM 数量多，需高效检索与自定义列表字段。',
     description: [
       '筛选：BOM 编号、名称、物品、状态、规格型号、材质、图号。',
@@ -77,7 +77,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P0',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '不同生命周期状态的 BOM 需差异化操作，避免误删误归档。',
     description: [
       '生效：编辑、查看关联 BOM、操作 ▼（归档、克隆）。',
@@ -93,7 +93,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P0',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '编辑页需同时维护树结构、父项信息与物料清单，布局需清晰可扩展。',
     description: [
       '左侧 BOM 树可拖拽调宽；支持收起/展开基础信息区。',
@@ -110,7 +110,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P0',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '多级 BOM 结构是核心数据，需树节点与明细行一致。',
     description: [
       '树：选节点展示其下级物料清单；添加子项、按 BOM 添加、导入模板、切换物品。',
@@ -126,7 +126,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P0',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '添加明细行时需快速检索物料/产品，并支持打开完整选择弹窗。',
     description: [
       '子项名称列使用搜索选择器：边输边搜，选项格式 [编码] 名称。',
@@ -142,7 +142,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P0',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '子件若已有 BOM，应引用其结构并记录 childBomId/版本，供关联查询与升版同步。',
     description: [
       '按 BOM 添加：添加本级物品并展开所选 BOM 下级结构。',
@@ -157,7 +157,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P1',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '只读查看 BOM 结构与版本历史，操作集中在页头。',
     description: [
       'Tab：BOM 明细、历史版本、操作记录。',
@@ -173,7 +173,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P1',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '需整体查看 BOM 层级与用量，支持数量缩放与打印入口。',
     description: [
       '标题 BOM 概览；顶部物品名、数量缩放、打印、展开/收起、列设置。',
@@ -189,7 +189,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P1',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '供应型态不同，供方信息来源不同，需在概览与打印中展示。',
     description: [
       '新增列「供应单位」：外协→外协：【默认供应商】；外购→采购：【默认供应商】；自制→自制：【默认加工中心】。',
@@ -204,7 +204,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P1',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '车间与计划需纸质或 PDF 化 BOM 清单，字段需与列设置一致。',
     description: [
       '打印弹窗：预览 / 下载 PDF（预留）/ 直接打印；纸张 A4/A3、方向、数量。',
@@ -220,7 +220,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P1',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '需追溯 BOM 间引用关系，便于升版影响分析。',
     description: [
       '列表/详情/编辑页「查看关联 BOM」；右侧抽屉。',
@@ -236,7 +236,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P0',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '子 BOM 升版生效后，引用它的父级 BOM 需可选同步升级引用版本。',
     description: [
       '审核发布（启用）时检测父级 BOM 引用。',
@@ -252,7 +252,7 @@ export const PRD_V151_PRODUCT_BOM_REQUIREMENTS = [
     status: 'done',
     priority: 'P2',
     requirementOwner: '邓利佳',
-    acceptanceOwner: '欧阳宏汉',
+    acceptanceOwner: '梁海曳',
     background: '本地 MOCK 需支撑分页演示且树与明细一致，避免旧模板数据错乱。',
     description: [
       'productBomSeed 分页 MOCK；DATA_VERSION 迁移。',

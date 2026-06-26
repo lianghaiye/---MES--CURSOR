@@ -44,6 +44,9 @@ export const bomTypeOptions = ['基准BOM', '订单BOM', '配置BOM']
 
 export const bomTypeSelectOptions = bomTypeOptions.map((v) => ({ label: v, value: v }))
 
+/** EBOM 设计专用，产品 BOM 新增/编辑不展示此选项 */
+export const EBOM_TYPE_VALUE = 'EBOM'
+
 export const unitOptions = ['个', '件', '套', '根', '台']
 
 export const processDocOptions = [

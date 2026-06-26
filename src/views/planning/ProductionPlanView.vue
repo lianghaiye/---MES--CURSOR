@@ -127,6 +127,10 @@
               <a-button type="link" @click="detailCollapsed = !detailCollapsed">
                 {{ detailCollapsed ? '展开详情' : '收起详情' }}
               </a-button>
+              <a-button type="link" @click="openEbomPrint">
+                <PrinterOutlined />
+                打印
+              </a-button>
               <a-button type="link" @click="toggleDetailFullscreen">全屏</a-button>
             </a-space>
           </div>
@@ -160,6 +164,10 @@
         <div v-else class="fullscreen-toolbar">
           <a-space>
             <TableColumnSettingButton @click="workColumnDrawerOpen = true" />
+            <a-button type="link" @click="openEbomPrint">
+              <PrinterOutlined />
+              打印
+            </a-button>
             <a-button type="link" @click="toggleDetailFullscreen">退出全屏</a-button>
           </a-space>
         </div>
@@ -232,7 +240,10 @@
               <template
                 v-else-if="
                   column.key === 'specModel' ||
+                  column.key === 'drawingNo' ||
+                  column.key === 'material' ||
                   column.key === 'techParams' ||
+                  column.key === 'matchingRequirements' ||
                   column.key === 'packagingForm'
                 "
               >
@@ -261,15 +272,12 @@
               <a-select style="width: 100px" placeholder="选择" />
               <a-button type="primary" @click="generatePurchaseReq">生成采购申请</a-button>
               <a-button type="primary" @click="openWorkOrderModal">生成加工工单</a-button>
-              <a-button type="primary">生成外协工单</a-button>
+              <a-button type="primary" @click="openOutsourceWorkOrderModal">生成外协工单</a-button>
             </a-space>
           </div>
 
           <div v-if="activeWorkItem && materialTree.length" class="ebom-panel-title">
-            <span>
-              物料树 · {{ activeWorkItem.productName }}
-              <span class="ebom-sub">{{ activeWorkItem.productCode }}</span>
-            </span>
+            <span>BOM名称：{{ activeWorkItemBomTitle }}</span>
             <TableColumnSettingButton
               v-if="detailFullscreen"
               @click="materialColumnDrawerOpen = true"
@@ -419,6 +427,13 @@
       @save="handleWorkOrderSave"
     />
 
+    <GenerateOutsourceWorkOrderModal
+      v-model:open="outsourceWorkOrderModalOpen"
+      :order="selectedOrder"
+      :materials="outsourcedMaterials"
+      @save="handleOutsourceWorkOrderSave"
+    />
+
     <GeneratePurchaseRequisitionModal
       v-model:open="purchaseReqModalOpen"
       :order="selectedOrder"
@@ -437,6 +452,18 @@
       v-model:settings="materialColumnSettings"
       :default-settings="defaultMaterialColumnSettings"
     />
+
+    <BomPrintModal
+      v-model:open="ebomPrintModalOpen"
+      :flat-nodes="printEbomFlatNodes"
+      :line-items="printEbomLineItems"
+      :root-item-name="printEbomRootName"
+      :overview-info="printEbomOverviewInfo"
+      :quantity="printEbomQuantity"
+      :fixed-column-settings="productionPlanPrintColumnSettings"
+      :print-base-columns="productionPlanPrintBaseColumns"
+      :material-qty-by-code="printEbomMaterialQtyMap"
+    />
   </div>
 </template>
 
@@ -449,18 +476,26 @@ export default {
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { PrinterOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
+import GenerateOutsourceWorkOrderModal from './components/GenerateOutsourceWorkOrderModal.vue'
 import GeneratePurchaseRequisitionModal from './components/GeneratePurchaseRequisitionModal.vue'
-import { addWorkOrdersFromPlanRows } from '@/store/workOrderStore'
+import {
+  addWorkOrdersFromPlanRows,
+  addOutsourceWorkOrdersFromPlanRows,
+} from '@/store/workOrderStore'
 import {
   getSelfMadeMaterials,
+  getOutsourcedMaterialsFromWorkItem,
   getPurchasedMaterialsFromWorkItem,
   updateMaterialInOrder,
   patchMaterialFromWorkOrderRow,
+  patchMaterialFromOutsourceWorkOrderRow,
   calcDemandQty,
   calcGapQty,
+  flattenMaterials,
 } from '@/utils/material'
 import { calcDefaultPlanQty } from '@/utils/productionPlanWorkItem'
 import { addPurchaseRequisition } from '@/store/purchaseRequisitionStore'
@@ -475,11 +510,15 @@ import {
   processFileOptions,
   recalcMaterialLatestProcessTimes,
   supplyTypeOptions,
-  validateDesignatedSuppliers,
 } from '@/utils/productionPlanMaterial'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import BomPrintModal from '@/views/product-process/components/BomPrintModal.vue'
+import {
+  productionPlanPrintBaseColumns,
+  productionPlanPrintColumnSettings,
+} from '@/mock/productionPlanPrintColumns'
 
 const filters = reactive({
   orderNo: '',
@@ -497,7 +536,9 @@ const detailCollapsed = ref(false)
 const detailFullscreen = ref(false)
 const detailTab = ref('work')
 const workOrderModalOpen = ref(false)
+const outsourceWorkOrderModalOpen = ref(false)
 const purchaseReqModalOpen = ref(false)
+const ebomPrintModalOpen = ref(false)
 
 const pagination = reactive({
   current: 1,
@@ -509,14 +550,23 @@ const baseWorkColumns = [
   { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
   { title: '产品编号', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '交付方式', key: 'deliveryMode', dataIndex: 'deliveryMode', width: 88 },
+  { title: '图号', key: 'drawingNo', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '材质', key: 'material', dataIndex: 'material', width: 80, ellipsis: true },
   { title: '订单数量', dataIndex: 'orderQty', width: 88, align: 'right' },
   { title: '库存数量', key: 'stockQty', width: 100, align: 'right' },
   { title: '计划数量', key: 'planQty', width: 100, align: 'right' },
+  { title: '交付方式', key: 'deliveryMode', dataIndex: 'deliveryMode', width: 88 },
   { title: '已发货数量', dataIndex: 'shippedQty', width: 96, align: 'right' },
   { title: '交付日期', dataIndex: 'deliveryDate', width: 100 },
   { title: '单位', dataIndex: 'unit', width: 56 },
   { title: '技术参数', key: 'techParams', dataIndex: 'techParams', width: 100, ellipsis: true },
+  {
+    title: '配套要求',
+    key: 'matchingRequirements',
+    dataIndex: 'matchingRequirements',
+    width: 120,
+    ellipsis: true,
+  },
   {
     title: '包装方式',
     key: 'packagingForm',
@@ -533,7 +583,7 @@ const {
   displayColumns: displayWorkColumns,
   tableScrollX: workTableScrollX,
   defaultColumnSettings: defaultWorkColumnSettings,
-} = useTableColumnSettings('production-plan-work-list', baseWorkColumns, { minScrollX: 1400 })
+} = useTableColumnSettings('production-plan-work-list', baseWorkColumns, { minScrollX: 1680 })
 
 const baseMaterialColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 90, fixed: 'left' },
@@ -606,13 +656,75 @@ const activeWorkItem = computed(() => {
 
 const materialTree = computed(() => activeWorkItem.value?.materials || [])
 
+const activeWorkItemBomTitle = computed(() => {
+  const wi = activeWorkItem.value
+  if (!wi) return '—'
+  const name = wi.bomName || wi.ebomSnapshot?.bomName || ''
+  const version = wi.bomVersion || wi.ebomSnapshot?.bomVersion || ''
+  const label = `${name}${version}`
+  return label || '—'
+})
+
 const selfMadeMaterials = computed(() =>
   selectedOrder.value ? getSelfMadeMaterials(selectedOrder.value) : [],
 )
 
-const purchasedMaterialsForReq = computed(() => {
+const outsourcedMaterials = computed(() => {
   if (!selectedOrder.value || !activeWorkItem.value) return []
-  return getPurchasedMaterialsFromWorkItem(activeWorkItem.value, selectedOrder.value)
+  return getOutsourcedMaterialsFromWorkItem(activeWorkItem.value)
+})
+
+const purchasedMaterialsForReq = computed(() => {
+  if (!activeWorkItem.value) return []
+  return getPurchasedMaterialsFromWorkItem(activeWorkItem.value)
+})
+
+const printEbomFlatNodes = computed(() => activeWorkItem.value?.ebomSnapshot?.treeNodes || [])
+const printEbomLineItems = computed(() => activeWorkItem.value?.ebomSnapshot?.lineItems || [])
+const printEbomRootName = computed(() => activeWorkItem.value?.productName || '—')
+const printEbomQuantity = computed(() => {
+  const wi = activeWorkItem.value
+  if (!wi) return 1
+  return wi.orderQty ?? wi.salesQty ?? selectedOrder.value?.productQty ?? 1
+})
+const printEbomOverviewInfo = computed(() => {
+  const wi = activeWorkItem.value
+  if (!wi) {
+    return {
+      bomNo: '—',
+      specModel: '—',
+      version: '—',
+      material: '—',
+      drawingNo: '—',
+      techParams: '—',
+      matchingRequirements: '—',
+    }
+  }
+  const snap = wi.ebomSnapshot || {}
+  return {
+    bomNo: snap.bomNo || wi.bomNo || '—',
+    specModel: wi.specModel || '—',
+    version: wi.bomVersion || snap.bomVersion || '—',
+    material: wi.material || '—',
+    drawingNo: wi.drawingNo || '—',
+    techParams: wi.techParams || '—',
+    matchingRequirements: wi.matchingRequirements || '—',
+  }
+})
+
+/** 打印组件清单：按物料编码匹配 EBOM 行的库存数、需求数 */
+const printEbomMaterialQtyMap = computed(() => {
+  const map = {}
+  const all = []
+  flattenMaterials(activeWorkItem.value?.materials, all)
+  all.forEach((m) => {
+    if (!m.code) return
+    map[m.code] = {
+      stockQty: m.stockQty ?? 0,
+      demandQty: m.demandQty ?? 0,
+    }
+  })
+  return map
 })
 
 const planAssemblyDateValue = computed(() => {
@@ -757,8 +869,49 @@ function openWorkOrderModal() {
   }
   if (!selfMadeMaterials.value.length) {
     message.info('当前订单没有供应型态为「自制件」的物料')
+    return
   }
   workOrderModalOpen.value = true
+}
+
+function openEbomPrint() {
+  if (!selectedOrder.value) {
+    message.warning('请先选择订单')
+    return
+  }
+  if (!activeWorkItem.value) {
+    message.warning('请先展开工作项查看 EBOM 清单')
+    return
+  }
+  if (activeWorkItem.value.status === '设计中') {
+    message.warning('当前工作项处于「设计中」，暂无 EBOM 可打印')
+    return
+  }
+  if (!printEbomFlatNodes.value.length || !printEbomLineItems.value.length) {
+    message.info('当前工作项暂无 EBOM 清单可打印')
+    return
+  }
+  ebomPrintModalOpen.value = true
+}
+
+function openOutsourceWorkOrderModal() {
+  if (!selectedOrder.value) {
+    message.warning('请先选择订单')
+    return
+  }
+  if (!activeWorkItem.value) {
+    message.warning('请先展开工作项查看物料清单')
+    return
+  }
+  if (activeWorkItem.value.status === '设计中') {
+    message.warning('当前工作项处于「设计中」，请先完成设计任务审核')
+    return
+  }
+  if (!outsourcedMaterials.value.length) {
+    message.info('当前物料清单没有供应型态为「外协件」的物料')
+    return
+  }
+  outsourceWorkOrderModalOpen.value = true
 }
 
 function generatePurchaseReq() {
@@ -767,25 +920,37 @@ function generatePurchaseReq() {
     return
   }
   if (!activeWorkItem.value) {
-    message.warning('请先选择工作项')
+    message.warning('请先展开工作项查看物料清单')
     return
   }
-  if (activeWorkItem.value.materials?.length) {
-    const supplierCheck = validateDesignatedSuppliers(activeWorkItem.value.materials)
-    if (!supplierCheck.ok) {
-      message.warning(supplierCheck.message)
-      return
-    }
+  if (activeWorkItem.value.status === '设计中') {
+    message.warning('当前工作项处于「设计中」，请先完成设计任务审核')
+    return
   }
   if (!purchasedMaterialsForReq.value.length) {
-    message.info('当前工作项没有需要采购的外购件（缺口为 0）')
+    message.info('当前物料清单没有供应型态为「外购件」的物料')
     return
   }
   purchaseReqModalOpen.value = true
 }
 
 function handlePurchaseReqSave(requisition) {
+  const order = productionPlanState.plans.find((o) => o.id === selectedId.value)
   addPurchaseRequisition(requisition)
+  if (order && requisition.lineItems?.length) {
+    requisition.lineItems.forEach((line) => {
+      const material = purchasedMaterialsForReq.value.find((m) => m.code === line.inventoryCode)
+      if (!material) return
+      updateMaterialInOrder(order, material.id, {
+        designateSupplier: line.designatedSupplier,
+        supplier: line.supplierName,
+        planQty: line.planPurchaseQty,
+        remark: line.remark,
+        status: '进行中',
+        joinPlan: '是',
+      })
+    })
+  }
   message.success(`已生成采购申请 ${requisition.reqNo}，共 ${requisition.lineItems.length} 条物料`)
 }
 
@@ -798,6 +963,18 @@ function handleWorkOrderSave(savedRows) {
   const created = addWorkOrdersFromPlanRows(savedRows, order)
   if (created.length) {
     message.success(`已同步 ${created.length} 条工单至生产工单`)
+  }
+}
+
+function handleOutsourceWorkOrderSave(savedRows) {
+  const order = productionPlanState.plans.find((o) => o.id === selectedId.value)
+  if (!order) return
+  savedRows.forEach((row) => {
+    updateMaterialInOrder(order, row.materialId, patchMaterialFromOutsourceWorkOrderRow(row))
+  })
+  const created = addOutsourceWorkOrdersFromPlanRows(savedRows, order)
+  if (created.length) {
+    message.success(`已同步 ${created.length} 条外协工单至生产工单`)
   }
 }
 

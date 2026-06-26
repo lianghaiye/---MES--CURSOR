@@ -10,6 +10,10 @@
             <PrinterOutlined />
             打印
           </a-button>
+          <a-button v-if="isProductionPlanPrint" @click="printColumnDrawerOpen = true">
+            <SettingOutlined />
+            设置打印项
+          </a-button>
           <a-button @click="handleClose">关闭</a-button>
         </a-space>
       </div>
@@ -91,6 +95,9 @@
                       <span v-else-if="col.key === 'unitQty'">{{
                         formatPrintQty(row.unitQty)
                       }}</span>
+                      <span v-else-if="col.key === 'stockQty' || col.key === 'demandQty'">{{
+                        formatPrintQty(row[col.key])
+                      }}</span>
                       <span v-else class="cell-text">{{ row[col.dataIndex] ?? '—' }}</span>
                     </td>
                   </tr>
@@ -105,6 +112,17 @@
         </article>
       </div>
     </template>
+
+    <TableColumnSettingDrawer
+      v-if="isProductionPlanPrint"
+      v-model:open="printColumnDrawerOpen"
+      v-model:settings="printColumnSettings"
+      :default-settings="printDefaultColumnSettings"
+      title="设置打印项"
+      hint="调整打印清单中显示的字段；隐藏列不会出现在预览与打印输出中。"
+      :show-frozen="false"
+      @update:settings="applyPrintColumnSettings"
+    />
   </div>
 </template>
 
@@ -115,12 +133,34 @@ export default { name: 'BomPrintPreviewView' }
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { PrinterOutlined } from '@ant-design/icons-vue'
-import { formatPrintQty, loadBomPrintPayload } from '@/utils/bomPrintPreview'
+import { PrinterOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import {
+  buildBomPrintPayload,
+  formatPrintQty,
+  loadBomPrintPayload,
+  updateBomPrintPayload,
+} from '@/utils/bomPrintPreview'
+import {
+  PRODUCTION_PLAN_PRINT_COLUMN_STORAGE_KEY,
+  productionPlanPrintColumnSettings,
+} from '@/mock/productionPlanPrintColumns'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+
+const COLUMN_STORAGE_PREFIX = 'i_doms_table_col_'
 
 const route = useRoute()
 const payload = ref(null)
 const sheetRef = ref(null)
+const printColumnDrawerOpen = ref(false)
+const printColumnSettings = ref([])
+
+const isProductionPlanPrint = computed(
+  () => payload.value?.printConfig?.scene === 'production-plan',
+)
+
+const printDefaultColumnSettings = computed(() =>
+  JSON.parse(JSON.stringify(productionPlanPrintColumnSettings)),
+)
 
 const pageClass = computed(() => {
   if (!payload.value) return ''
@@ -157,10 +197,45 @@ const printedAtText = computed(() => {
 
 onMounted(() => {
   payload.value = loadBomPrintPayload(route.query.key)
+  initPrintColumnSettings()
   if (route.query.autoPrint === '1') {
     window.setTimeout(() => window.print(), 300)
   }
 })
+
+function initPrintColumnSettings() {
+  if (!isProductionPlanPrint.value) return
+  const cfg = payload.value?.printConfig
+  printColumnSettings.value = cfg?.columnSettings?.length
+    ? JSON.parse(JSON.stringify(cfg.columnSettings))
+    : JSON.parse(JSON.stringify(printDefaultColumnSettings.value))
+}
+
+function applyPrintColumnSettings(settings) {
+  const cfg = payload.value?.printConfig
+  if (!cfg) return
+  const nextSettings = JSON.parse(JSON.stringify(settings))
+  printColumnSettings.value = nextSettings
+  localStorage.setItem(
+    COLUMN_STORAGE_PREFIX + PRODUCTION_PLAN_PRINT_COLUMN_STORAGE_KEY,
+    JSON.stringify(nextSettings),
+  )
+  const nextPayload = buildBomPrintPayload({
+    flatNodes: cfg.flatNodes,
+    lineItems: cfg.lineItems,
+    rootItemName: cfg.rootItemName,
+    overviewInfo: cfg.overviewInfo,
+    quantity: cfg.quantity,
+    columnSettings: nextSettings,
+    baseColumns: cfg.baseColumns,
+    paper: cfg.paper,
+    orientation: cfg.orientation,
+    materialQtyByCode: cfg.materialQtyByCode,
+    printScene: cfg.scene,
+  })
+  payload.value = nextPayload
+  updateBomPrintPayload(route.query.key, nextPayload)
+}
 
 function handlePrint() {
   window.print()

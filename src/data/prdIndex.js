@@ -29,13 +29,13 @@ export const PRD_ITERATIONS = [
     title: '机泵1.5.1版本迭代',
     sprint: '淄博泵产业互联网平台-1.5.1',
     path: '/home/prd/v151',
-    updatedAt: '2026-06-24',
-    scope: 'Web 端增量需求（含产品 BOM 等）',
+    updatedAt: '2026-06-25',
+    scope: 'Web 端增量需求（含产品 BOM、产品/物料信息等）',
     moduleCount: 14,
-    featureCount: 14,
+    featureCount: 22,
     status: 'active',
     summary:
-      '在 1.5 基础上的增量迭代。当前已录入产品 BOM 14 条需求；销售、计划等模块需求将随迭代推进补充。',
+      '在 1.5 基础上的增量迭代。已录入产品 BOM 14 条、产品/物料信息 8 条需求；销售、计划等模块需求将随迭代推进补充。',
   },
 ]
 
@@ -54,7 +54,7 @@ export const PRD_DOC_SECTIONS = [
     title: '角色与责任',
     items: [
       '需求负责人：邓利佳 — 需求定义、方案确认。',
-      '验收负责人：欧阳宏汉 — 功能验收、业务规则确认。',
+      '验收负责人：梁海曳 — 功能验收、业务规则确认。',
       '云效迭代与系统 PRD 文档保持同步，工作项描述可复制 PRD 对应章节。',
     ],
   },
@@ -64,6 +64,9 @@ export const PRD_DOC_SECTIONS = [
     items: [
       '飞书 PRD 原文：https://iipcloud.feishu.cn/wiki/VNJCwfZBMivZoxkOPygcRxqRn8d',
       '1.5.1 产品 BOM 云效 Markdown：docs/yunxiao/淄博泵产业互联网平台-1.5.1-产品BOM需求.md',
+      '1.5.1 产品/物料信息 云效 Markdown：docs/yunxiao/淄博泵产业互联网平台-1.5.1-产品物料需求.md',
+      '1.5.1 生产计划 云效 Markdown：docs/yunxiao/淄博泵产业互联网平台-1.5.1-生产计划需求.md',
+      '1.5.1 产品/物料需求清单页：/home/prd/v151/product-material',
     ],
   },
 ]

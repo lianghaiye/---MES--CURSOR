@@ -1,22 +1,5 @@
 <template>
   <div class="ebom-design-page">
-    <div class="page-head">
-      <div class="head-info">
-        <h2 class="page-title">EBOM 设计 · {{ task?.taskNo }}</h2>
-        <p class="page-sub">
-          {{ task?.productName }}（{{ task?.productCode }}）
-          <a-tag v-if="baselineLabel" color="blue">{{ baselineLabel }}</a-tag>
-        </p>
-      </div>
-      <a-space>
-        <a-button @click="handleCancel">取消</a-button>
-        <a-button :loading="saving" @click="handleSaveDraft">保存为草稿</a-button>
-        <a-button type="primary" :loading="saving" @click="handleSaveAndSubmit">
-          保存并提交
-        </a-button>
-      </a-space>
-    </div>
-
     <div class="page-body">
       <aside class="left-panel" :style="{ width: `${leftPanelWidth}px` }">
         <BomTreePanel
@@ -25,6 +8,7 @@
           :selected-node-id="selectedNodeId"
           :template-ref="templateRef"
           :root-meta="rootMeta"
+          hide-switch-product
           @import-template="templateModalOpen = true"
           @add-child="onAddChild"
           @delete-node="onDeleteNode"
@@ -33,135 +17,184 @@
       </aside>
       <div class="panel-resizer" @mousedown.prevent="onResizeMouseDown" />
       <main class="right-panel">
-        <div class="parent-info-section">
-          <div class="parent-info-head">
-            <div class="head-left">
-              <span class="info-block-title">父项产品信息</span>
-              <span v-if="!parentInfoExpanded" class="parent-info-summary">{{
-                parentInfoSummary
-              }}</span>
-            </div>
-            <a-button type="link" size="small" class="toggle-btn" @click="toggleParentInfo">
-              {{ parentInfoExpanded ? '收起信息' : '展开信息' }}
-              <UpOutlined v-if="parentInfoExpanded" />
+        <div class="right-panel-head">
+          <div class="head-left">
+            <span v-if="!basicInfoExpanded" class="basic-summary">{{ basicInfoSummary }}</span>
+          </div>
+          <a-space class="head-actions" wrap>
+            <a-button type="link" size="small" class="toggle-btn" @click="toggleBasicInfo">
+              {{ basicInfoExpanded ? '收起信息' : '展开信息' }}
+              <UpOutlined v-if="basicInfoExpanded" />
               <DownOutlined v-else />
             </a-button>
-          </div>
-          <a-form v-show="parentInfoExpanded" layout="inline" size="small" class="inline-info-form">
-            <a-form-item label="物品名称">
-              <a-input
-                v-if="isSelectedRoot"
-                v-model:value="parentForm.itemName"
-                allow-clear
-                style="width: 180px"
-              />
-              <a-input
-                v-else
-                :value="selectedParentInfo.itemName || '—'"
-                disabled
-                style="width: 180px"
-              />
-            </a-form-item>
-            <a-form-item label="规格型号">
-              <a-input
-                v-if="isSelectedRoot"
-                v-model:value="parentForm.specModel"
-                allow-clear
-                style="width: 140px"
-              />
-              <a-input
-                v-else
-                :value="selectedParentInfo.specModel || '—'"
-                disabled
-                style="width: 140px"
-              />
-            </a-form-item>
-            <a-form-item label="材质">
-              <a-input
-                v-if="isSelectedRoot"
-                v-model:value="parentForm.material"
-                allow-clear
-                style="width: 120px"
-              />
-              <a-input
-                v-else
-                :value="selectedParentInfo.material || '—'"
-                disabled
-                style="width: 120px"
-              />
-            </a-form-item>
-            <a-form-item label="图号">
-              <a-input
-                v-if="isSelectedRoot"
-                v-model:value="parentForm.drawingNo"
-                allow-clear
-                style="width: 140px"
-              />
-              <a-input
-                v-else
-                :value="selectedParentInfo.drawingNo || '—'"
-                disabled
-                style="width: 140px"
-              />
-            </a-form-item>
-            <a-form-item label="工艺路线">
-              <a-select
-                v-if="isSelectedRoot"
-                v-model:value="parentForm.processRoute"
-                allow-clear
-                show-search
-                placeholder="选择物品后带出，可修改"
-                :filter-option="filterRoute"
-                :options="processRouteOpts"
-                style="width: 180px"
-              />
-              <a-input
-                v-else
-                :value="selectedParentInfo.processRoute || '—'"
-                disabled
-                style="width: 180px"
-              />
-            </a-form-item>
-            <div class="params-pair-row">
-              <a-form-item label="技术参数" class="pair-item">
-                <a-textarea
-                  v-if="isSelectedRoot"
-                  v-model:value="parentForm.techParams"
-                  placeholder="选择物品后带出，可修改"
-                  allow-clear
-                  :rows="3"
-                  style="width: 100%"
-                />
-                <a-textarea
-                  v-else
-                  :value="selectedParentInfo.techParams || '—'"
-                  disabled
-                  :rows="3"
-                  style="width: 100%"
-                />
-              </a-form-item>
-              <a-form-item label="配套要求" class="pair-item">
-                <a-textarea
-                  v-if="isSelectedRoot"
-                  v-model:value="parentForm.matchingRequirements"
-                  placeholder="请输入配套要求"
-                  allow-clear
-                  :rows="3"
-                  style="width: 100%"
-                />
-                <a-textarea
-                  v-else
-                  :value="selectedParentInfo.matchingRequirements || '—'"
-                  disabled
-                  :rows="3"
-                  style="width: 100%"
-                />
-              </a-form-item>
-            </div>
-          </a-form>
+            <a-button v-if="showSalesOrderButton" size="small" @click="salesOrderDrawerOpen = true">
+              查看销售订单
+            </a-button>
+            <a-button
+              type="primary"
+              :disabled="!hasRoot"
+              size="small"
+              @click="overviewModalOpen = true"
+            >
+              概览
+            </a-button>
+            <a-button :disabled="!hasRoot" size="small" @click="printModalOpen = true">
+              <PrinterOutlined />
+              打印
+            </a-button>
+            <a-button size="small" @click="handleCancel">取消</a-button>
+            <a-button size="small" :loading="saving" @click="handleSaveDraft">保存为草稿</a-button>
+            <a-button type="primary" size="small" :loading="saving" @click="handleSaveAndSubmit">
+              保存并提交
+            </a-button>
+          </a-space>
         </div>
 
-        <div class="table-section">
+        <div v-show="basicInfoExpanded" class="section-card info-card">
+          <div class="info-body">
+            <div class="info-block">
+              <a-form layout="inline" size="small" class="inline-info-form">
+                <a-form-item label="EBOM编码">
+                  <a-input
+                    v-model:value="ebomForm.ebomNo"
+                    placeholder="不填则保存时自动生成"
+                    allow-clear
+                    style="width: 180px"
+                  />
+                </a-form-item>
+                <a-form-item label="EBOM名称">
+                  <a-input
+                    v-model:value="ebomForm.ebomName"
+                    placeholder="请输入 EBOM 名称"
+                    allow-clear
+                    style="width: 220px"
+                  />
+                </a-form-item>
+                <a-form-item label="BOM类型">
+                  <a-input :value="EBOM_TYPE_VALUE" disabled style="width: 140px" />
+                </a-form-item>
+              </a-form>
+            </div>
+
+            <div class="info-block">
+              <div class="info-block-title">父项产品信息</div>
+              <a-form layout="inline" size="small" class="inline-info-form">
+                <a-form-item label="物品名称">
+                  <a-input
+                    v-if="isSelectedRoot"
+                    v-model:value="parentForm.itemName"
+                    allow-clear
+                    style="width: 180px"
+                  />
+                  <a-input
+                    v-else
+                    :value="selectedParentInfo.itemName || '—'"
+                    disabled
+                    style="width: 180px"
+                  />
+                </a-form-item>
+                <a-form-item label="规格型号">
+                  <a-input
+                    v-if="isSelectedRoot"
+                    v-model:value="parentForm.specModel"
+                    allow-clear
+                    style="width: 140px"
+                  />
+                  <a-input
+                    v-else
+                    :value="selectedParentInfo.specModel || '—'"
+                    disabled
+                    style="width: 140px"
+                  />
+                </a-form-item>
+                <a-form-item label="材质">
+                  <a-input
+                    v-if="isSelectedRoot"
+                    v-model:value="parentForm.material"
+                    allow-clear
+                    style="width: 120px"
+                  />
+                  <a-input
+                    v-else
+                    :value="selectedParentInfo.material || '—'"
+                    disabled
+                    style="width: 120px"
+                  />
+                </a-form-item>
+                <a-form-item label="图号">
+                  <a-input
+                    v-if="isSelectedRoot"
+                    v-model:value="parentForm.drawingNo"
+                    allow-clear
+                    style="width: 140px"
+                  />
+                  <a-input
+                    v-else
+                    :value="selectedParentInfo.drawingNo || '—'"
+                    disabled
+                    style="width: 140px"
+                  />
+                </a-form-item>
+                <a-form-item label="工艺路线">
+                  <a-select
+                    v-if="isSelectedRoot"
+                    v-model:value="parentForm.processRoute"
+                    allow-clear
+                    show-search
+                    placeholder="选择物品后带出，可修改"
+                    :filter-option="filterRoute"
+                    :options="processRouteOpts"
+                    style="width: 180px"
+                  />
+                  <a-input
+                    v-else
+                    :value="selectedParentInfo.processRoute || '—'"
+                    disabled
+                    style="width: 180px"
+                  />
+                </a-form-item>
+                <div class="params-pair-row">
+                  <a-form-item label="技术参数" class="pair-item">
+                    <a-textarea
+                      v-if="isSelectedRoot"
+                      v-model:value="parentForm.techParams"
+                      placeholder="选择物品后带出，可修改"
+                      allow-clear
+                      :rows="3"
+                      style="width: 100%"
+                    />
+                    <a-textarea
+                      v-else
+                      :value="selectedParentInfo.techParams || '—'"
+                      disabled
+                      :rows="3"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                  <a-form-item label="配套要求" class="pair-item">
+                    <a-textarea
+                      v-if="isSelectedRoot"
+                      v-model:value="parentForm.matchingRequirements"
+                      placeholder="请输入配套要求"
+                      allow-clear
+                      :rows="3"
+                      style="width: 100%"
+                    />
+                    <a-textarea
+                      v-else
+                      :value="selectedParentInfo.matchingRequirements || '—'"
+                      disabled
+                      :rows="3"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </div>
+              </a-form>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card table-section">
           <BomMaterialTable
             :lines="displayLines"
             :column-settings="columnSettings"
@@ -189,6 +222,21 @@
     <SelectBomMaterialModal v-model:open="materialModalOpen" @selected="onMaterialSelected" />
     <AddByBomModal v-model:open="addByBomModalOpen" @confirm="onAddByBomConfirm" />
     <BomColumnSettingDrawer v-model:open="columnDrawerOpen" v-model:settings="columnSettings" />
+    <BomOverviewModal
+      v-model:open="overviewModalOpen"
+      :flat-nodes="flatNodes"
+      :line-items="lineItems"
+      :root-item-name="parentForm.itemName"
+      :overview-info="overviewInfo"
+    />
+    <BomPrintModal
+      v-model:open="printModalOpen"
+      :flat-nodes="flatNodes"
+      :line-items="lineItems"
+      :root-item-name="parentForm.itemName"
+      :overview-info="overviewInfo"
+    />
+    <DesignTaskSalesOrderDrawer v-model:open="salesOrderDrawerOpen" :task="task" />
   </div>
 </template>
 
@@ -197,11 +245,12 @@ export default { name: 'EbomDesignView' }
 </script>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { UpOutlined, DownOutlined } from '@ant-design/icons-vue'
-import { defaultBomColumnSettings } from '@/mock/bomMaterialColumns'
+import { UpOutlined, DownOutlined, PrinterOutlined } from '@ant-design/icons-vue'
+import { defaultBomColumnSettings, EBOM_TYPE_VALUE } from '@/mock/bomMaterialColumns'
+import { DESIGN_TASK_SOURCE } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
 import { processRouteState } from '@/store/processRouteStore'
 import {
@@ -210,7 +259,12 @@ import {
   onDesignTaskEbomSubmitted,
   canOpenEbomDesign,
 } from '@/store/designTaskStore'
-import { ensureEbomDraftForDesignTask, saveEbomDraft, finalizeEbom } from '@/store/ebomStore'
+import {
+  ensureEbomDraftForDesignTask,
+  saveEbomDraft,
+  finalizeEbom,
+  generateEbomNo,
+} from '@/store/ebomStore'
 import { getBaselineBomForProduct } from '@/store/productBomStore'
 import { useTabs } from '@/composables/useTabs'
 import { applyMaterialToLine, createEmptySubLine } from '@/utils/bomLineMaterial'
@@ -232,6 +286,9 @@ import ImportBomTemplateModal from '@/views/product-process/components/ImportBom
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import BomColumnSettingDrawer from '@/views/product-process/components/BomColumnSettingDrawer.vue'
+import BomOverviewModal from '@/views/product-process/components/BomOverviewModal.vue'
+import BomPrintModal from '@/views/product-process/components/BomPrintModal.vue'
+import DesignTaskSalesOrderDrawer from '@/views/planning/components/DesignTaskSalesOrderDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -252,8 +309,16 @@ const materialModalOpen = ref(false)
 const addByBomModalOpen = ref(false)
 const addChildParentId = ref('')
 const columnDrawerOpen = ref(false)
+const overviewModalOpen = ref(false)
+const printModalOpen = ref(false)
+const salesOrderDrawerOpen = ref(false)
 const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
-const parentInfoExpanded = ref(true)
+const basicInfoExpanded = ref(true)
+
+const ebomForm = reactive({
+  ebomNo: '',
+  ebomName: '',
+})
 
 const parentForm = reactive({
   itemName: '',
@@ -278,12 +343,33 @@ const baselineLabel = computed(() => {
   return `基准骨架 ${ebomRecord.value.baselineBomNo || ebomRecord.value.baselineBomId}`
 })
 
+const showSalesOrderButton = computed(() => {
+  const t = task.value
+  if (!t?.salesOrderNo) return false
+  return t.source !== DESIGN_TASK_SOURCE.MANUAL
+})
+
+const basicInfoSummary = computed(() => {
+  const parts = [ebomForm.ebomName, parentForm.itemName, baselineLabel.value].filter(Boolean)
+  return parts.length ? parts.join(' · ') : '请填写 EBOM 基础信息'
+})
+
+const overviewInfo = computed(() => ({
+  bomNo: ebomForm.ebomNo || '—',
+  specModel: parentForm.specModel || '—',
+  version: ebomRecord.value?.version || 'V1.0',
+  material: parentForm.material || '—',
+  drawingNo: parentForm.drawingNo || '—',
+  techParams: parentForm.techParams || '—',
+  matchingRequirements: parentForm.matchingRequirements || '—',
+}))
+
 const rootMeta = computed(() => {
   const rootId = getRootTreeId(flatNodes.value)
   return {
-    code: task.value?.productCode || '',
-    name: task.value?.productName || '',
-    specModel: task.value?.specModel || '',
+    code: parentForm.itemCode || task.value?.productCode || '',
+    name: parentForm.itemName || task.value?.productName || '',
+    specModel: parentForm.specModel || task.value?.specModel || '',
     supplyForm: '',
     subItemCount: lineItems.value.filter((l) => l.parentTreeId === rootId).length,
   }
@@ -306,15 +392,25 @@ const selectedParentInfo = computed(() =>
   resolveBomNodeItemInfo(selectedNode.value, lineItems.value, parentForm),
 )
 
-const parentInfoSummary = computed(() => {
-  const info = selectedParentInfo.value
-  const parts = [info?.itemName, info?.specModel].filter(Boolean)
-  return parts.length ? parts.join(' · ') : '—'
-})
-
-function toggleParentInfo() {
-  parentInfoExpanded.value = !parentInfoExpanded.value
+function resolveEbomNoForSave() {
+  const trimmed = String(ebomForm.ebomNo || '').trim()
+  if (trimmed) return trimmed
+  const generated = generateEbomNo()
+  ebomForm.ebomNo = generated
+  return generated
 }
+
+function toggleBasicInfo() {
+  basicInfoExpanded.value = !basicInfoExpanded.value
+}
+
+watch(
+  () => [parentForm.itemName, parentForm.itemCode, parentForm.specModel],
+  () => {
+    if (!hasRoot.value) return
+    syncRootFromParentForm()
+  },
+)
 
 const processRouteOpts = computed(() =>
   (processRouteState.routes || [])
@@ -362,6 +458,8 @@ function loadPage() {
   }
   const ebom = ensureEbomDraftForDesignTask(t, product)
   ebomRecord.value = ebom
+  ebomForm.ebomNo = ebom.ebomNo || ''
+  ebomForm.ebomName = ebom.ebomName || `${t.productName || product?.name || '定制产品'} EBOM`
   applyParentFormFromProduct(t, product, ebom)
   flatNodes.value = normalizeFlatNodesWithRoot(JSON.parse(JSON.stringify(ebom.treeNodes || [])), {
     itemCode: parentForm.itemCode || t.productCode,
@@ -402,7 +500,9 @@ function syncRootFromParentForm() {
 function buildPayload() {
   syncRootFromParentForm()
   return {
-    ebomName: ebomRecord.value?.ebomName || `${task.value?.productName} EBOM`,
+    ebomNo: resolveEbomNoForSave(),
+    ebomName: ebomForm.ebomName,
+    bomType: EBOM_TYPE_VALUE,
     material: parentForm.material,
     drawingNo: parentForm.drawingNo,
     techParams: parentForm.techParams,
@@ -672,39 +772,26 @@ onUnmounted(() => {
   background: #f5f6f8;
 }
 
-.page-head {
+.right-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 12px 16px;
+  flex-direction: column;
+  gap: 8px;
   background: #fff;
-  border-bottom: 1px solid #eee;
+  border-radius: 4px;
+  padding: 12px 16px;
+  overflow: hidden;
 }
 
-.page-title {
-  margin: 0;
-  font-size: 18px;
-}
-
-.page-sub {
-  margin: 4px 0 0;
-  color: rgba(0, 0, 0, 0.55);
-  font-size: 13px;
-}
-
-.parent-info-section {
-  flex-shrink: 0;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px dashed #f0f0f0;
-}
-
-.parent-info-head {
+.right-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
+  flex-shrink: 0;
+  padding: 4px 4px 0;
 
   .head-left {
     display: flex;
@@ -714,9 +801,13 @@ onUnmounted(() => {
     flex: 1;
   }
 
-  .parent-info-summary {
+  .head-actions {
+    flex-shrink: 0;
+  }
+
+  .basic-summary {
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.45);
+    color: #888;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -729,10 +820,69 @@ onUnmounted(() => {
   }
 }
 
-.info-block-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
+.section-card {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 12px 16px;
+}
+
+.info-card {
+  flex-shrink: 0;
+  padding: 10px 16px;
+
+  .info-body {
+    padding-top: 0;
+  }
+
+  .info-block + .info-block {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #f0f0f0;
+  }
+
+  .info-block-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .info-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+
+    .head-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .parent-info-summary {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .toggle-btn {
+      padding: 0 4px;
+      height: auto;
+      flex-shrink: 0;
+    }
+  }
+}
+
+.parent-info-section {
+  flex-shrink: 0;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px dashed #f0f0f0;
 }
 
 .inline-info-form {
@@ -809,17 +959,5 @@ onUnmounted(() => {
   width: 6px;
   cursor: col-resize;
   flex-shrink: 0;
-}
-
-.right-panel {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  background: #fff;
-  border-radius: 4px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  padding: 12px 16px;
 }
 </style>

@@ -20,6 +20,7 @@ import {
   normalizeVersionDisplay,
 } from '@/utils/bomVersion'
 import { upgradeParentBomReferences } from '@/utils/bomVersionReference'
+import { formatBomInfoLabel, sortBomsForDisplay } from '@/utils/itemBomInfo'
 
 const STORAGE_KEY = 'i_doms_product_bom'
 const DATA_VERSION = 7
@@ -129,9 +130,29 @@ export function getProductBomById(id) {
 
 export function getActiveBomForItem(itemType, itemId) {
   const row = productBomState.boms.find(
-    (b) => b.itemType === itemType && b.itemId === itemId && isBomActive(b),
+    (b) => b.itemType === itemType && String(b.itemId) === String(itemId) && isBomActive(b),
   )
   return row ? ensureBomStructure(row) : null
+}
+
+/** 产品/物料关联的全部 BOM 版本（含生效、待发布、已归档） */
+export function getBomsForItem(itemType, itemId) {
+  if (!itemType || itemId == null || itemId === '') return []
+  const id = String(itemId)
+  const rows = productBomState.boms.filter(
+    (b) => b.itemType === itemType && String(b.itemId) === id,
+  )
+  return sortBomsForDisplay(rows.map(ensureBomStructure))
+}
+
+/** 列表「BOM信息」列：优先生效版，其次待发布，再取最新关联版本 */
+export function getBomInfoLabelForItem(itemType, itemId) {
+  const active = getActiveBomForItem(itemType, itemId)
+  if (active) return formatBomInfoLabel(active)
+  const all = getBomsForItem(itemType, itemId)
+  const pending = all.find(isBomPending)
+  if (pending) return formatBomInfoLabel(pending)
+  return all[0] ? formatBomInfoLabel(all[0]) : ''
 }
 
 /** 定制产品设计用：取产品关联的基准 BOM 骨架（优先生效版） */

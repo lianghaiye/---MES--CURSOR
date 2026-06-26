@@ -84,6 +84,48 @@
                 </a-form-item>
               </a-col>
               <a-col :xs="24" :sm="12" :md="8" :lg="4">
+                <a-form-item label="材质">
+                  <a-input
+                    v-model:value="filters.material"
+                    allow-clear
+                    size="small"
+                    placeholder="请输入 材质"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="8" :lg="4">
+                <a-form-item label="图号">
+                  <a-input
+                    v-model:value="filters.drawingNo"
+                    allow-clear
+                    size="small"
+                    placeholder="请输入 图号"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="8" :lg="4">
+                <a-form-item label="业务类型">
+                  <a-select
+                    v-model:value="filters.businessType"
+                    allow-clear
+                    size="small"
+                    placeholder="请选择 业务类型"
+                    :options="businessTypeFilterOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="8" :lg="4">
+                <a-form-item label="工作中心">
+                  <a-select
+                    v-model:value="filters.workCenter"
+                    allow-clear
+                    size="small"
+                    placeholder="请选择 工作中心"
+                    :options="workCenterFilterOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="8" :lg="4">
                 <a-form-item class="filter-actions-item">
                   <a-space>
                     <a-button type="primary" size="small" @click="handleSearch">
@@ -150,6 +192,12 @@
               <template v-if="column.key === 'index'">
                 {{ rowIndex(index) }}
               </template>
+              <template v-else-if="column.key === 'businessType'">
+                <span class="attr-ellipsis">{{ formatProductBusinessType(record) }}</span>
+              </template>
+              <template v-else-if="column.key === 'bomInfo'">
+                <span class="attr-ellipsis">{{ formatProductBomInfo(record) }}</span>
+              </template>
               <template v-else-if="column.key === 'productAttribute'">
                 <span class="attr-ellipsis">{{ record.productAttribute }}</span>
               </template>
@@ -162,11 +210,6 @@
               <template v-else-if="column.key === 'unitPrice'">
                 {{ formatPrice(record.unitPrice) }}
               </template>
-              <template v-else-if="column.key === 'expiryAlert'">
-                <a-tag :color="record.expiryAlertEnabled ? 'success' : 'error'">
-                  {{ record.expiryAlertEnabled ? '是' : '否' }}
-                </a-tag>
-              </template>
               <template v-else-if="column.key === 'matchingRequirements'">
                 {{ record.matchingRequirements || record.remark || '—' }}
               </template>
@@ -176,8 +219,16 @@
               <template v-else-if="column.key === 'defaultWorkCenter'">
                 {{ record.production?.defaultWorkCenter || '—' }}
               </template>
-              <template v-else-if="column.key === 'standardCycleDays'">
-                {{ record.production?.standardCycleDays ?? '—' }}
+              <template v-else-if="column.key === 'defaultSupplier'">
+                {{ record.production?.defaultSupplier || '—' }}
+              </template>
+              <template v-else-if="column.key === 'isProductMaterial'">
+                <a-tag :color="record.isProductMaterial ? 'success' : 'error'">
+                  {{ record.isProductMaterial ? '是' : '否' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'creator'">
+                {{ record.creator || '—' }}
               </template>
               <template v-else-if="column.key === 'action'">
                 <MasterInfoRowActions
@@ -244,7 +295,7 @@ import {
   flattenCategoryNodes,
 } from '@/mock/productCategories'
 import { filterProducts } from '@/mock/productInfo'
-import { barcodeTypeOptions } from '@/mock/materialInfoOptions'
+import { barcodeTypeOptions, workCenterOpts } from '@/mock/materialInfoOptions'
 import {
   productInfoState,
   addProduct,
@@ -259,6 +310,8 @@ import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
+import { formatBusinessTypeLabels, PRODUCT_BUSINESS_TYPE_OPTIONS } from '@/utils/businessTypeLabel'
+import { productBomState, getBomInfoLabelForItem } from '@/store/productBomStore'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -276,6 +329,10 @@ const filters = reactive({
   barcodeType: undefined,
   categoryKey: undefined,
   specModel: '',
+  material: '',
+  drawingNo: '',
+  businessType: undefined,
+  workCenter: undefined,
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
@@ -292,6 +349,11 @@ const flatCats = flattenCategoryNodes(productCategoryTree)
 const leafCats = flatCats.filter((c) => !c.children?.length)
 
 const barcodeOpts = barcodeTypeOptions.map((v) => ({ label: v, value: v }))
+const businessTypeFilterOpts = PRODUCT_BUSINESS_TYPE_OPTIONS.map((o) => ({
+  label: o.label,
+  value: o.key,
+}))
+const workCenterFilterOpts = workCenterOpts
 const categoryFilterOpts = leafCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
@@ -378,28 +440,38 @@ const baseColumns = [
     customRender: renderProductCodeLink,
   },
   { title: '产品名称', dataIndex: 'name', width: 200, fixed: 'left', ellipsis: true },
-  { title: '条码类型', dataIndex: 'barcodeType', width: 100, fixed: 'left' },
-  { title: '产品属性', key: 'productAttribute', width: 110, ellipsis: true },
-  { title: '类别', dataIndex: 'categoryName', width: 88 },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
-  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80 },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '业务类型', key: 'businessType', width: 140, ellipsis: true },
+  { title: '类别', dataIndex: 'categoryName', width: 88 },
+  { title: '产品属性', key: 'productAttribute', width: 110, ellipsis: true },
   { title: '技术参数', dataIndex: 'techParams', width: 120, ellipsis: true },
   { title: '配套要求', key: 'matchingRequirements', width: 120, ellipsis: true },
-  { title: '重量(kg)', key: 'weight', width: 88, align: 'right' },
+  { title: '重量', key: 'weight', width: 88, align: 'right' },
   { title: '库存单位', key: 'inventoryUnit', width: 88, align: 'center' },
-  { title: '标准规范', dataIndex: 'standardSpec', width: 90 },
   { title: '单价', key: 'unitPrice', width: 88, align: 'right' },
-  { title: '过期预警', key: 'expiryAlert', width: 88, align: 'center' },
+  { title: 'BOM信息', key: 'bomInfo', width: 200, ellipsis: true },
   { title: '默认工作中心', key: 'defaultWorkCenter', width: 110 },
-  { title: '标准制造周期(天)', key: 'standardCycleDays', width: 120, align: 'right' },
+  { title: '默认供应商', key: 'defaultSupplier', width: 110, ellipsis: true },
+  { title: '产品物料', key: 'isProductMaterial', width: 90, align: 'center' },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
+  { title: '创建人', key: 'creator', width: 88 },
   { title: '操作', key: 'action', width: 180, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('product-info-list', baseColumns, { minScrollX: 2200 })
+  useTableColumnSettings('product-info-list-v2', baseColumns, { minScrollX: 2480 })
+
+function formatProductBusinessType(record) {
+  return formatBusinessTypeLabels(record)
+}
+
+function formatProductBomInfo(record) {
+  void productBomState.boms
+  return getBomInfoLabelForItem('product', record.id) || '—'
+}
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
@@ -435,6 +507,10 @@ function handleReset() {
   filters.barcodeType = undefined
   filters.categoryKey = undefined
   filters.specModel = ''
+  filters.material = ''
+  filters.drawingNo = ''
+  filters.businessType = undefined
+  filters.workCenter = undefined
   appliedFilters.value = { ...filters }
   pagination.current = 1
 }

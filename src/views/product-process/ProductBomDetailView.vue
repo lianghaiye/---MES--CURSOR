@@ -50,7 +50,9 @@
                     <div class="section-title">基础信息</div>
                     <a-descriptions :column="3" size="small" bordered class="basic-desc">
                       <a-descriptions-item label="BOM编码">{{ record.bomNo }}</a-descriptions-item>
-                      <a-descriptions-item label="BOM名称">{{ record.bomName }}</a-descriptions-item>
+                      <a-descriptions-item label="BOM名称">{{
+                        record.bomName
+                      }}</a-descriptions-item>
                       <a-descriptions-item label="BOM类型">
                         {{ record.bomType === '基础BOM' ? '基准BOM' : record.bomType || '基准BOM' }}
                       </a-descriptions-item>

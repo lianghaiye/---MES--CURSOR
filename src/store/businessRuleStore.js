@@ -25,8 +25,7 @@ export const PRODUCTION_MODE_DESCRIPTIONS = {
 export const MINIMAL_REPORT_TYPE_DESCRIPTIONS = {
   quick:
     '适用于无固定工单或临时加工场景。工人无需领取工单任务，直接选择产品与工序即可提交报工，流程最短，适合小批量、零散生产。',
-  task:
-    '适用于按工单有序生产的场景。工人须先领取工单下发的工序任务，再按任务报工，报工数据与工单进度、工序计划自动关联，便于追溯与统计。',
+  task: '适用于按工单有序生产的场景。工人须先领取工单下发的工序任务，再按任务报工，报工数据与工单进度、工序计划自动关联，便于追溯与统计。',
 }
 
 export const BUSINESS_RULE_ROWS = [
