@@ -313,6 +313,9 @@ const rowSelection = computed(() => {
   return {
     selectedRowKeys: selectedRowKeys.value,
     preserveSelectedRowKeys: true,
+    onChange: (keys) => {
+      applySelectedKeys(keys)
+    },
     onSelect: (record, selected) => {
       const set = new Set(selectedRowKeys.value)
       if (selected) set.add(record.rowKey)
@@ -352,11 +355,31 @@ watch(
     applied.supplyForm = undefined
     page.value = 1
     const preset = props.selectedItems || []
-    selectedRowKeys.value = preset.map((it) => `${it.itemType}-${it.itemId}`)
-    selectedRows.value = preset.map((it) => ({
-      rowKey: `${it.itemType}-${it.itemId}`,
-      ...it,
-    }))
+    selectedRowKeys.value = preset
+      .map((it) => {
+        if (it.itemId != null && it.itemType) return `${it.itemType}-${it.itemId}`
+        return ''
+      })
+      .filter(Boolean)
+    syncSelectedRowsFromKeys(selectedRowKeys.value)
+    if (selectedRows.value.length < preset.length) {
+      selectedRows.value = preset.map((it) => ({
+        rowKey: it.itemId != null ? `${it.itemType}-${it.itemId}` : '',
+        itemType: it.itemType,
+        itemId: it.itemId,
+        code: it.code,
+        name: it.name,
+        specModel: it.specModel,
+        categoryName: it.categoryName,
+        material: it.material,
+        inventoryUnit: it.inventoryUnit,
+        unitPrice: it.unitPrice,
+        barcodeType: it.barcodeType,
+        productAttribute: it.productAttribute,
+        materialType: it.materialType,
+      }))
+      selectedRowKeys.value = selectedRows.value.map((r) => r.rowKey).filter(Boolean)
+    }
   },
 )
 
@@ -401,13 +424,15 @@ function handleCancel() {
 }
 
 function handleConfirm() {
-  if (!selectedRows.value.length) {
+  syncSelectedRowsFromKeys(selectedRowKeys.value)
+  const rows = selectedRows.value.filter((r) => r?.code)
+  if (!rows.length) {
     message.warning(props.multiple ? '请至少选择一项物品' : '请选择一项物品')
     return
   }
   emit(
     'confirm',
-    selectedRows.value.map((r) => ({
+    rows.map((r) => ({
       itemType: r.itemType,
       itemId: r.itemId,
       code: r.code,
@@ -418,6 +443,8 @@ function handleConfirm() {
       inventoryUnit: r.inventoryUnit,
       unitPrice: r.unitPrice,
       barcodeType: r.barcodeType,
+      productAttribute: r.productAttribute,
+      materialType: r.materialType,
     })),
   )
   emit('update:open', false)

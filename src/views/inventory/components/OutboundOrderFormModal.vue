@@ -1,76 +1,57 @@
 <template>
   <a-modal
     :open="open"
-    :title="isEdit ? '编辑入库单' : '新增入库单'"
+    :title="isEdit ? '编辑出库单' : '新增出库单'"
     width="1400px"
     :mask-closable="false"
     destroy-on-close
-    class="inbound-form-modal"
+    class="outbound-form-modal"
     @cancel="handleCancel"
   >
     <a-form :model="form" layout="inline" class="header-form horizontal-form">
       <a-row :gutter="[12, 12]" style="width: 100%">
         <a-col :span="8">
-          <a-form-item label="入库单号">
+          <a-form-item label="出库单号" required>
             <a-input
               v-model:value="form.docNo"
               size="small"
-              placeholder="不填则系统自动生成"
+              placeholder="请输入出库单号"
               :disabled="isEdit"
             />
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="入库类型" required>
+          <a-form-item label="出库类型" required>
             <a-select
-              v-model:value="form.inboundType"
+              v-model:value="form.outboundType"
               size="small"
-              placeholder="请选择"
-              :options="inboundTypeOpts"
+              placeholder="请选择 出库类型"
+              :options="outboundTypeOpts"
             />
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="入库日期">
+          <a-form-item label="出库时间">
             <a-date-picker
-              v-model:value="form.inboundDate"
+              v-model:value="outboundTimeValue"
+              show-time
               size="small"
+              format="YYYY-MM-DD HH:mm:ss"
+              value-format="YYYY-MM-DD HH:mm:ss"
               style="width: 100%"
-              placeholder="请选择入库日期"
+              placeholder="请选择出库时间"
             />
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="入库仓库">
+          <a-form-item label="出库仓库">
             <a-select
               v-model:value="form.warehouse"
               allow-clear
               size="small"
-              placeholder="请选择 入库仓库"
+              placeholder="请选择 出库仓库"
               :options="warehouseOpts"
               @change="onHeaderWarehouseChange"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="供应商">
-            <a-select
-              v-model:value="form.supplier"
-              allow-clear
-              show-search
-              size="small"
-              placeholder="请选择 供应商"
-              :options="supplierOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="送货日期">
-            <a-date-picker
-              v-model:value="form.deliveryDate"
-              size="small"
-              style="width: 100%"
-              placeholder="请选择送货日期"
             />
           </a-form-item>
         </a-col>
@@ -85,13 +66,24 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="发票号码">
-            <a-input
-              v-model:value="form.invoiceNo"
+          <a-form-item label="领用部门">
+            <a-select
+              v-model:value="form.requisitionDept"
+              allow-clear
               size="small"
-              :maxlength="30"
-              show-count
-              placeholder="请输入发票号码"
+              placeholder="请选择 领用部门"
+              :options="requisitionDeptOpts"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="出库总重量(kg)">
+            <a-input-number
+              v-model:value="form.totalWeight"
+              :min="0"
+              :precision="3"
+              size="small"
+              style="width: 100%"
             />
           </a-form-item>
         </a-col>
@@ -138,9 +130,9 @@
         <template v-else-if="column.key === 'warehouseStockQty'">
           {{ formatQty(record.warehouseStockQty) }}
         </template>
-        <template v-else-if="column.key === 'warehouse'">
+        <template v-else-if="column.key === 'shipWarehouse'">
           <a-select
-            v-model:value="record.warehouse"
+            v-model:value="record.shipWarehouse"
             allow-clear
             size="small"
             placeholder="请选择"
@@ -149,14 +141,14 @@
             @change="() => refreshLine(record)"
           />
         </template>
-        <template v-else-if="column.key === 'qty'">
+        <template v-else-if="column.key === 'shipQty'">
           <a-input-number
-            v-model:value="record.qty"
+            v-model:value="record.shipQty"
             :min="0"
             :precision="3"
             size="small"
             style="width: 100%"
-            @change="() => onLineQtyChange(record)"
+            @change="() => onLineShipQtyChange(record)"
           />
         </template>
         <template v-else-if="column.key === 'weight'">
@@ -166,7 +158,12 @@
             :precision="3"
             size="small"
             style="width: 100%"
+            placeholder="请输入"
+            @change="syncTotalWeight"
           />
+        </template>
+        <template v-else-if="column.key === 'barcodeBatchNo'">
+          <span>{{ record.barcodeBatchNo || '—' }}</span>
         </template>
         <template v-else-if="column.key === 'unitPrice'">
           <a-input-number
@@ -189,17 +186,10 @@
           />
         </template>
         <template v-else-if="column.key === 'lineSource'">
-          <a-select
-            v-model:value="record.lineSource"
-            allow-clear
-            size="small"
-            placeholder="请选择"
-            :options="lineSourceOpts"
-            style="width: 100%"
-          />
+          <span>{{ record.lineSource || '—' }}</span>
         </template>
         <template v-else-if="column.key === 'sourceDocNo'">
-          <a-input v-model:value="record.sourceDocNo" size="small" allow-clear placeholder="请输入" />
+          <span>{{ record.sourceDocNo || '—' }}</span>
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4">
@@ -233,14 +223,14 @@
   <AddByBomModal
     v-if="open"
     v-model:open="bomModalOpen"
-    qty-label="入库数量"
-    qty-hint="子项入库数量 = 入库数量 × 子件原单位用量"
+    qty-label="出库数量"
+    qty-hint="子项出库数量 = 出库数量 × 子件原单位用量"
     preview-tip="确定后将添加所选物品 BOM的 下级结构"
     modal-width="720px"
     @confirm="onBomAdded"
   />
 
-  <InboundLineEditModal
+  <OutboundLineEditModal
     v-if="open"
     v-model:open="lineEditOpen"
     :line="lineEditTarget"
@@ -252,7 +242,7 @@
     v-model:open="columnDrawerOpen"
     v-model:settings="columnSettings"
     :default-settings="defaultColumnSettings"
-    title="入库明细列设置"
+    title="出库明细列设置"
   />
 </template>
 
@@ -260,32 +250,31 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { PlusOutlined, CheckOutlined } from '@ant-design/icons-vue'
+import { CheckOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import SelectWarehouseItemModal from '@/views/basic-config/components/SelectWarehouseItemModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
-import InboundLineEditModal from './InboundLineEditModal.vue'
-import { inboundTypeOptions, inboundLineSourceOptions, handlerOptions } from '@/mock/inboundOptions'
-import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
+import OutboundLineEditModal from './OutboundLineEditModal.vue'
+import {
+  outboundTypeOptions,
+  handlerOptions,
+  requisitionDeptOptions,
+} from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
-import {
-  addInboundOrder,
-  updateInboundOrder,
-  resolveWarehouseKeeper,
-} from '@/store/inboundOrderStore'
+import { addOutboundOrder, generateOutboundNo, updateOutboundOrder } from '@/store/outboundStore'
 import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
-import { inboundFormLineColumns } from '@/utils/inboundLineColumns'
+import { outboundFormLineColumns } from '@/utils/outboundLineColumns'
 import {
-  buildInboundLineFromPickerItem,
-  buildInboundLinesFromBom,
-  cloneInboundLine,
-  enrichInboundLine,
-  mergeInboundLines,
-  syncInboundLineTotalFromUnit,
-  syncInboundLineUnitFromTotal,
-} from '@/utils/inboundLineHelpers'
+  buildOutboundLineFromPickerItem,
+  buildOutboundLinesFromBom,
+  cloneOutboundLine,
+  enrichOutboundLine,
+  mergeOutboundLines,
+  syncLineTotalFromUnit,
+  syncLineUnitFromTotal,
+} from '@/utils/outboundLineHelpers'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -294,6 +283,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'saved'])
 
+const isEdit = computed(() => Boolean(props.editRecord?.id))
+
 const saving = ref(false)
 const pickerOpen = ref(false)
 const bomModalOpen = ref(false)
@@ -301,14 +292,12 @@ const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
 const lineEditMode = ref('edit')
 const lineEditSourceId = ref(null)
+const totalWeightManual = ref(false)
 const prevHeaderWarehouse = ref(undefined)
 
-const isEdit = computed(() => Boolean(props.editRecord?.id))
-
-const inboundTypeOpts = inboundTypeOptions.map((v) => ({ label: v, value: v }))
-const lineSourceOpts = inboundLineSourceOptions.map((v) => ({ label: v, value: v }))
+const outboundTypeOpts = outboundTypeOptions.map((v) => ({ label: v, value: v }))
 const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
-const supplierOpts = supplierOptions
+const requisitionDeptOpts = requisitionDeptOptions.map((v) => ({ label: v, value: v }))
 
 const warehouseOpts = computed(() => {
   void warehouseState.warehouses
@@ -317,19 +306,27 @@ const warehouseOpts = computed(() => {
 
 const form = reactive({
   docNo: '',
-  inboundType: '其他入库',
+  outboundType: '其他出库',
+  outboundTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   warehouse: undefined,
-  inboundDate: dayjs(),
-  supplier: undefined,
-  deliveryDate: undefined,
   handler: 'admin1',
-  invoiceNo: '',
+  requisitionDept: '默认工厂',
+  totalWeight: 0,
   remark: '',
   lineItems: [],
 })
 
+const outboundTimeValue = computed({
+  get: () => form.outboundTime,
+  set: (val) => {
+    form.outboundTime = val || dayjs().format('YYYY-MM-DD HH:mm:ss')
+  },
+})
+
+const baseLineColumns = outboundFormLineColumns
+
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inbound-form-lines', inboundFormLineColumns, { minScrollX: 2000 })
+  useTableColumnSettings('outbound-form-lines', baseLineColumns, { minScrollX: 1800 })
 
 const lineScrollX = tableScrollX
 
@@ -351,42 +348,43 @@ const pickerPreset = computed(() => {
 watch(
   () => [props.open, props.editRecord?.id],
   ([visible]) => {
-    if (!visible) return
-    if (props.editRecord) loadEditForm(props.editRecord)
-    else resetForm()
+    if (visible) {
+      if (props.editRecord) loadEditForm(props.editRecord)
+      else resetForm()
+    }
   },
 )
 
-function resetForm() {
+function loadEditForm(record) {
+  totalWeightManual.value = true
+  prevHeaderWarehouse.value = record.warehouse || undefined
   Object.assign(form, {
-    docNo: '',
-    inboundType: '其他入库',
+    docNo: record.docNo,
+    outboundType: record.outboundType,
+    outboundTime: record.outboundTime || record.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    warehouse: record.warehouse || undefined,
+    handler: record.handler || 'admin1',
+    requisitionDept: record.requisitionDept || '默认工厂',
+    totalWeight: record.totalWeight ?? 0,
+    remark: record.remark || '',
+    lineItems: (record.lineItems || []).map((l) => enrichOutboundLine({ ...l })),
+  })
+}
+
+function resetForm() {
+  totalWeightManual.value = false
+  Object.assign(form, {
+    docNo: generateOutboundNo(),
+    outboundType: '其他出库',
+    outboundTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     warehouse: undefined,
-    inboundDate: dayjs(),
-    supplier: undefined,
-    deliveryDate: undefined,
     handler: 'admin1',
-    invoiceNo: '',
+    requisitionDept: '默认工厂',
+    totalWeight: 0,
     remark: '',
     lineItems: [],
   })
   prevHeaderWarehouse.value = undefined
-}
-
-function loadEditForm(record) {
-  prevHeaderWarehouse.value = record.warehouse || undefined
-  Object.assign(form, {
-    docNo: record.docNo,
-    inboundType: record.inboundType,
-    warehouse: record.warehouse || undefined,
-    inboundDate: record.inboundDate ? dayjs(record.inboundDate) : dayjs(),
-    supplier: record.supplier,
-    deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : undefined,
-    handler: record.handler || 'admin1',
-    invoiceNo: record.invoiceNo || '',
-    remark: record.remark || '',
-    lineItems: (record.lineItems || []).map((l) => enrichInboundLine({ ...l })),
-  })
 }
 
 function formatQty(val) {
@@ -395,39 +393,52 @@ function formatQty(val) {
 }
 
 function refreshLine(line) {
-  Object.assign(line, enrichInboundLine(line))
+  Object.assign(line, enrichOutboundLine(line))
 }
 
-function onLineQtyChange(line) {
-  syncInboundLineTotalFromUnit(line)
+function onLineShipQtyChange(line) {
+  syncLineTotalFromUnit(line)
+  syncTotalWeight()
 }
 
 function onLineUnitPriceChange(line) {
-  syncInboundLineTotalFromUnit(line)
+  syncLineTotalFromUnit(line)
 }
 
 function onLineTotalPriceChange(line) {
-  syncInboundLineUnitFromTotal(line)
+  syncLineUnitFromTotal(line)
 }
 
 function onHeaderWarehouseChange(newVal) {
   const oldVal = prevHeaderWarehouse.value
   const changed = newVal !== oldVal
+
   prevHeaderWarehouse.value = newVal
 
-  if (!changed || !newVal || !form.lineItems.length) return
+  if (!changed || !newVal || !form.lineItems.length) {
+    return
+  }
 
   Modal.confirm({
-    title: '入库仓库已修改，是否同步修改明细仓库？',
+    title: '出库仓库已修改，是否同步修改明细仓库？',
     okText: '是',
     cancelText: '否',
     onOk: () => {
       form.lineItems.forEach((line) => {
-        line.warehouse = newVal
+        line.shipWarehouse = newVal
         refreshLine(line)
       })
     },
   })
+}
+
+function calcLineWeightTotal() {
+  return form.lineItems.reduce((sum, line) => sum + (Number(line.weight) || 0), 0)
+}
+
+function syncTotalWeight() {
+  if (totalWeightManual.value) return
+  form.totalWeight = Math.round(calcLineWeightTotal() * 1000) / 1000
 }
 
 function onItemsPicked(items) {
@@ -438,19 +449,23 @@ function onItemsPicked(items) {
   const before = form.lineItems.length
   const incoming = items
     .filter((it) => it?.code)
-    .map((it) => buildInboundLineFromPickerItem(it, form.warehouse || ''))
+    .map((it) => buildOutboundLineFromPickerItem(it, form.warehouse || ''))
   if (!incoming.length) {
     message.warning('所选物品无效，请重新选择')
     return
   }
-  form.lineItems = mergeInboundLines(form.lineItems, incoming)
+  form.lineItems = mergeOutboundLines(form.lineItems, incoming)
+  syncTotalWeight()
   const added = form.lineItems.length - before
-  if (added > 0) message.success(`已添加 ${added} 条明细`)
-  else message.info('所选物品已在明细中')
+  if (added > 0) {
+    message.success(`已添加 ${added} 条明细`)
+  } else {
+    message.info('所选物品已在明细中')
+  }
 }
 
 function onBomAdded({ pickerRow, usageCoefficient }) {
-  const incoming = buildInboundLinesFromBom(
+  const incoming = buildOutboundLinesFromBom(
     pickerRow,
     usageCoefficient,
     form.warehouse || '',
@@ -460,7 +475,8 @@ function onBomAdded({ pickerRow, usageCoefficient }) {
     message.warning('未找到可添加的 BOM 明细')
     return
   }
-  form.lineItems = mergeInboundLines(form.lineItems, incoming)
+  form.lineItems = mergeOutboundLines(form.lineItems, incoming)
+  syncTotalWeight()
   message.success(`已添加 ${incoming.length} 条明细`)
 }
 
@@ -472,32 +488,35 @@ function openLineEdit(record, mode) {
 }
 
 function onLineEditConfirm(updated) {
-  const enriched = enrichInboundLine(updated)
+  const enriched = enrichOutboundLine(updated)
   if (lineEditMode.value === 'copy') {
-    form.lineItems.push(cloneInboundLine(enriched))
+    form.lineItems.push(cloneOutboundLine(enriched))
+    syncTotalWeight()
     return
   }
   const idx = form.lineItems.findIndex((l) => l.id === lineEditSourceId.value)
-  if (idx !== -1) form.lineItems[idx] = { ...form.lineItems[idx], ...enriched }
+  if (idx !== -1) {
+    form.lineItems[idx] = { ...form.lineItems[idx], ...enriched }
+  }
+  syncTotalWeight()
 }
 
 function removeLine(id) {
   form.lineItems = form.lineItems.filter((l) => l.id !== id)
+  syncTotalWeight()
 }
 
 function buildPayload() {
   return {
     docNo: form.docNo?.trim(),
-    inboundType: form.inboundType,
+    outboundType: form.outboundType,
+    outboundTime: form.outboundTime,
     warehouse: form.warehouse || '',
-    warehouseKeeper: resolveWarehouseKeeper(form.warehouse),
-    inboundDate: form.inboundDate?.format?.('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
-    deliveryDate: form.deliveryDate?.format?.('YYYY-MM-DD') || '',
-    supplier: form.supplier,
     handler: form.handler,
-    invoiceNo: form.invoiceNo?.trim(),
+    requisitionDept: form.requisitionDept || '',
+    totalWeight: form.totalWeight,
     remark: form.remark?.trim(),
-    lineItems: form.lineItems.map((l) => enrichInboundLine({ ...l })),
+    lineItems: form.lineItems.map((l) => enrichOutboundLine({ ...l })),
   }
 }
 
@@ -506,8 +525,12 @@ function handleCancel() {
 }
 
 function handleSave() {
-  if (!form.inboundType) {
-    message.warning('请选择入库类型')
+  if (!form.outboundType) {
+    message.warning('请选择出库类型')
+    return
+  }
+  if (!form.docNo?.trim()) {
+    message.warning('请输入出库单号')
     return
   }
   if (!form.lineItems.length) {
@@ -516,23 +539,16 @@ function handleSave() {
   }
 
   saving.value = true
-  const payload = buildPayload()
-
-  if (isEdit.value) {
-    const res = updateInboundOrder(props.editRecord.id, payload)
-    saving.value = false
-    if (!res.ok) {
-      message.warning(res.message)
-      return
-    }
-    message.success('入库单已更新')
-  } else {
-    addInboundOrder(payload)
-    saving.value = false
-    message.success('入库单已创建')
+  const res = isEdit.value
+    ? updateOutboundOrder(props.editRecord.id, buildPayload())
+    : addOutboundOrder(buildPayload())
+  saving.value = false
+  if (!res.ok) {
+    message.warning(res.message)
+    return
   }
-
-  emit('saved')
+  message.success(isEdit.value ? '出库单已更新' : '出库单已创建')
+  emit('saved', res.order)
   emit('update:open', false)
 }
 </script>
@@ -546,8 +562,13 @@ function handleSave() {
     width: 100%;
   }
 
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
   :deep(.remark-item .ant-form-item-label) {
-    flex: 0 0 72px;
+    flex: 0 0 88px;
     align-self: flex-start;
   }
 }

@@ -9,21 +9,19 @@
             <span class="sub-type">{{ record.inboundType }}</span>
           </div>
           <a-space>
-            <a-button v-if="canEditInbound(record)" type="primary" size="small" @click="openEdit">
-              编辑
-            </a-button>
-            <a-button v-if="canApproveInbound(record)" size="small" @click="handleApprovePass">
-              通过
-            </a-button>
-            <a-button
-              v-if="canApproveInbound(record)"
-              size="small"
-              danger
-              @click="handleApproveReject"
-            >
-              拒绝
-            </a-button>
-            <a-button size="small" @click="goBack">返回列表</a-button>
+            <template v-if="record.status === '待审批'">
+              <a-button type="primary" size="small" @click="handleApprovePass">通过</a-button>
+              <a-button size="small" danger @click="handleApproveReject">拒绝</a-button>
+              <a-button size="small" @click="goBack">返回列表</a-button>
+            </template>
+            <template v-else-if="record.status === '待处理'">
+              <a-button type="primary" size="small" @click="handleConfirmInbound">确认入库</a-button>
+              <a-button size="small" @click="openEdit">编辑</a-button>
+              <a-button size="small" danger @click="handleDelete">删除</a-button>
+            </template>
+            <template v-else>
+              <a-button size="small" @click="goBack">返回列表</a-button>
+            </template>
           </a-space>
         </div>
 
@@ -87,10 +85,25 @@
             size="small"
             bordered
             :pagination="false"
-            :scroll="{ x: 1200 }"
+            :scroll="{ x: lineScrollX }"
           >
-            <template #bodyCell="{ column, index }">
+            <template #bodyCell="{ column, record: line, index }">
               <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'stockQty'">
+                {{ formatQty(line.stockQty) }}
+              </template>
+              <template v-else-if="column.key === 'warehouseStockQty'">
+                {{ formatQty(line.warehouseStockQty) }}
+              </template>
+              <template v-else-if="column.key === 'qty'">
+                {{ formatQty(line.qty) }}
+              </template>
+              <template v-else-if="column.key === 'lineSource'">
+                {{ line.lineSource || '—' }}
+              </template>
+              <template v-else-if="column.key === 'sourceDocNo'">
+                {{ line.sourceDocNo || '—' }}
+              </template>
             </template>
           </a-table>
         </div>
@@ -114,10 +127,12 @@ import {
   getInboundOrderById,
   approveInboundOrder,
   rejectInboundOrder,
-  canEditInbound,
-  canApproveInbound,
+  confirmInboundOrders,
+  deleteInboundOrder,
 } from '@/store/inboundOrderStore'
 import { resolveInboundSourceRoute } from '@/utils/inboundSourceLink'
+import { inboundDetailLineColumns } from '@/utils/inboundLineColumns'
+import { enrichInboundLine } from '@/utils/inboundLineHelpers'
 import InboundOrderFormModal from './components/InboundOrderFormModal.vue'
 
 const route = useRoute()
@@ -126,39 +141,29 @@ const loading = ref(false)
 const record = ref(null)
 const formOpen = ref(false)
 
-const productCols = [
-  { title: '#', key: 'index', width: 48 },
-  { title: '物品编码', dataIndex: 'itemCode', width: 110 },
-  { title: '物品名称', dataIndex: 'itemName', width: 140 },
-  { title: '规格属性', dataIndex: 'specAttr', width: 90 },
-  { title: '规格型号', dataIndex: 'specModel', width: 100 },
-  { title: '材质', dataIndex: 'material', width: 80 },
-  { title: '入库仓库', dataIndex: 'warehouse', width: 100 },
-  { title: '数量', dataIndex: 'qty', width: 80 },
-  { title: '重量(kg)', dataIndex: 'weight', width: 90 },
-  { title: '单位', dataIndex: 'unit', width: 70 },
-  { title: '单价', dataIndex: 'unitPrice', width: 80 },
-]
+const lineColumns = inboundDetailLineColumns
+const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 80), 0))
 
-const materialCols = [
-  ...productCols.slice(0, 11),
-  { title: '条码/批次', dataIndex: 'barcodeBatchNo', width: 120 },
-  { title: '生产日期', dataIndex: 'productionDate', width: 110 },
-  { title: '过期日期', dataIndex: 'expiryDate', width: 110 },
-  { title: '备注', dataIndex: 'lineRemark', width: 100 },
-]
+function formatQty(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
 
-const lineColumns = computed(() => (record.value?.itemType === '物料' ? materialCols : productCols))
+function reload() {
+  const row = getInboundOrderById(route.params.id)
+  record.value = row
+    ? {
+        ...row,
+        lineItems: (row.lineItems || []).map((l) => enrichInboundLine({ ...l })),
+      }
+    : null
+}
 
 function statusColor(status) {
   if (status === '已完成') return 'success'
   if (status === '已拒绝') return 'error'
   if (status === '待审批') return 'warning'
   return 'processing'
-}
-
-function reload() {
-  record.value = getInboundOrderById(route.params.id)
 }
 
 watch(
@@ -187,6 +192,7 @@ function openEdit() {
 function handleApprovePass() {
   Modal.confirm({
     title: `通过审批 ${record.value.docNo}？`,
+    content: '通过后状态变为「待处理」，可进行确认入库。',
     onOk: () => {
       const res = approveInboundOrder(record.value.id)
       if (res.ok) {
@@ -207,6 +213,40 @@ function handleApproveReject() {
         message.success('已拒绝')
         reload()
       } else message.warning(res.message)
+    },
+  })
+}
+
+function handleConfirmInbound() {
+  Modal.confirm({
+    title: `确认入库 ${record.value.docNo}？`,
+    onOk: () => {
+      const { count, blocked } = confirmInboundOrders([record.value.id])
+      if (blocked.length) {
+        message.warning(blocked.map((b) => b.message).join('；'))
+        return
+      }
+      if (count > 0) {
+        message.success('已确认入库')
+        reload()
+      } else {
+        message.warning('确认入库失败')
+      }
+    },
+  })
+}
+
+function handleDelete() {
+  Modal.confirm({
+    title: `确认删除入库单 ${record.value.docNo}？`,
+    okType: 'danger',
+    onOk: () => {
+      if (deleteInboundOrder(record.value.id)) {
+        message.success('已删除')
+        goBack()
+      } else {
+        message.warning('当前状态不可删除')
+      }
     },
   })
 }

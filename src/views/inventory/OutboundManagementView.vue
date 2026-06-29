@@ -25,17 +25,6 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="物品类型">
-              <a-select
-                v-model:value="filters.itemType"
-                allow-clear
-                placeholder="请选择 物品类型"
-                size="small"
-                :options="itemTypeOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="出库仓库">
               <a-select
                 v-model:value="filters.warehouse"
@@ -44,6 +33,25 @@
                 size="small"
                 :options="warehouseOpts"
               />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="出库时间">
+              <a-input-group compact class="outbound-time-filter">
+                <a-select
+                  v-model:value="filters.outboundTimeUnit"
+                  size="small"
+                  :options="outboundTimeUnitOpts"
+                  style="width: 64px"
+                />
+                <a-range-picker
+                  v-model:value="filters.outboundTimeRange"
+                  size="small"
+                  style="flex: 1; min-width: 0"
+                  :picker="outboundTimePicker"
+                  :placeholder="['开始日期', '结束日期']"
+                />
+              </a-input-group>
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
@@ -108,7 +116,7 @@
     <div class="list-panel">
       <div class="toolbar-row">
         <a-space wrap :size="8">
-          <a-button type="primary" size="small" @click="stubAction('新增')">
+          <a-button type="primary" size="small" @click="openCreate">
             <PlusOutlined />
             新增
           </a-button>
@@ -185,16 +193,47 @@
             <template v-else-if="column.key === 'totalWeight'">
               {{ record.totalWeight != null ? record.totalWeight : '' }}
             </template>
+            <template v-else-if="column.key === 'shipQtyTotal'">
+              {{ formatQty(calcOutboundShipQty(record)) }}
+            </template>
             <template v-else-if="column.key === 'status'">
-              <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+              <a-tag :color="outboundStatusColor(record.status)">{{ record.status }}</a-tag>
             </template>
             <template v-else-if="column.key === 'action'">
               <a-space :size="0" wrap>
-                <a-button type="link" size="small" @click="stubAction('编辑')">编辑</a-button>
-                <a-button type="link" size="small" @click="stubAction('审批')">审批</a-button>
-                <a-button type="link" size="small" danger @click="confirmDelete(record)"
-                  >删除</a-button
+                <a-button
+                  v-if="canApproveOutbound(record)"
+                  type="link"
+                  size="small"
+                  @click="handleApprove(record)"
                 >
+                  审批
+                </a-button>
+                <a-button
+                  v-if="canEditOutbound(record)"
+                  type="link"
+                  size="small"
+                  @click="openEdit(record)"
+                >
+                  编辑
+                </a-button>
+                <a-button
+                  v-if="canConfirm(record)"
+                  type="link"
+                  size="small"
+                  @click="handleConfirmOne(record)"
+                >
+                  确认出库
+                </a-button>
+                <a-button
+                  v-if="canDeleteOutbound(record)"
+                  type="link"
+                  size="small"
+                  danger
+                  @click="confirmDelete(record)"
+                >
+                  删除
+                </a-button>
                 <a-button
                   v-if="canInitiateFactoryQc(record)"
                   type="link"
@@ -228,6 +267,12 @@
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
     />
+
+    <OutboundOrderFormModal
+      v-model:open="formOpen"
+      :edit-record="editRecord"
+      @saved="onFormSaved"
+    />
   </div>
 </template>
 
@@ -248,11 +293,12 @@ import {
   PrinterOutlined,
   DownOutlined,
 } from '@ant-design/icons-vue'
-import { filterOutboundOrders } from '@/mock/outboundOrders'
+import { filterOutboundOrders, calcOutboundShipQty } from '@/mock/outboundOrders'
 import {
   outboundTypeOptions,
-  itemTypeOptions,
   outboundStatusOptions,
+  outboundStatusColor,
+  outboundTimeUnitOptions,
   warehouseOptions,
   handlerOptions,
   requisitionDeptOptions,
@@ -263,10 +309,16 @@ import {
   deleteOutboundOrder,
   initiateFactoryQcFromOutbound,
   canInitiateFactoryQc,
+  approveOutboundOrder,
+  canApproveOutbound,
+  canEditOutbound,
+  canDeleteOutbound,
+  validateOutboundForConfirm,
 } from '@/store/outboundStore'
 import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import OutboundOrderFormModal from './components/OutboundOrderFormModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 
@@ -276,41 +328,52 @@ const { openTab } = useTabs()
 const filters = reactive({
   docNo: '',
   outboundType: undefined,
-  itemType: undefined,
   warehouse: undefined,
   handler: undefined,
   requisitionDept: undefined,
   sourceOrderNo: '',
   status: undefined,
+  outboundTimeUnit: 'day',
+  outboundTimeRange: null,
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
+const formOpen = ref(false)
+const editRecord = ref(null)
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const outboundTypeOpts = outboundTypeOptions.map((v) => ({ label: v, value: v }))
-const itemTypeOpts = itemTypeOptions.map((v) => ({ label: v, value: v }))
 const statusOpts = outboundStatusOptions.map((v) => ({ label: v, value: v }))
+const outboundTimeUnitOpts = outboundTimeUnitOptions
 const warehouseOpts = warehouseOptions.map((w) => ({ label: w.label, value: w.value }))
 const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
 const requisitionDeptOpts = requisitionDeptOptions.map((v) => ({ label: v, value: v }))
 
+const outboundTimePicker = computed(() => {
+  if (filters.outboundTimeUnit === 'month') return 'month'
+  if (filters.outboundTimeUnit === 'year') return 'year'
+  return 'date'
+})
+
 const baseColumns = [
+  { title: '状态', key: 'status', width: 110 },
   { title: '出库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
   { title: '出库类型', dataIndex: 'outboundType', width: 100 },
   { title: '出库仓库', dataIndex: 'warehouse', width: 90 },
-  { title: '经手人', dataIndex: 'handler', width: 80 },
+  { title: '出库数量', key: 'shipQtyTotal', width: 90, align: 'right' },
+  { title: '源单号', key: 'sourceOrderNo', width: 140 },
   { title: '领用部门', dataIndex: 'requisitionDept', width: 100, ellipsis: true },
-  { title: '源单编号', key: 'sourceOrderNo', width: 140 },
-  { title: '出库总重量(kg)', key: 'totalWeight', width: 120, align: 'right' },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '创建日期', dataIndex: 'createdAt', width: 110 },
-  { title: '完成日期', dataIndex: 'completedAt', width: 110 },
-  { title: '审核日期', dataIndex: 'auditDate', width: 110 },
+  { title: '经手人', dataIndex: 'handler', width: 80 },
+  { title: '出库总重量', key: 'totalWeight', width: 110, align: 'right' },
+  { title: '出库时间', dataIndex: 'outboundTime', width: 160 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+  { title: '创建人', dataIndex: 'creator', width: 80 },
+  { title: '审核时间', dataIndex: 'auditDate', width: 160 },
+  { title: '审核人', dataIndex: 'auditor', width: 80 },
   { title: '仓管员', dataIndex: 'warehouseKeeper', width: 80 },
   { title: '所在车间', dataIndex: 'workshop', width: 100 },
   { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
-  { title: '创建人', dataIndex: 'creator', width: 80 },
-  { title: '操作', key: 'action', width: 280, fixed: 'right' },
+  { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -333,9 +396,13 @@ const rowSelection = computed(() => ({
   },
 }))
 
-function statusColor(status) {
-  if (status === '已出库') return 'success'
-  return 'processing'
+function formatQty(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
+
+function canConfirm(record) {
+  return validateOutboundForConfirm(record).ok
 }
 
 function handleSearch() {
@@ -347,12 +414,13 @@ function handleReset() {
   Object.assign(filters, {
     docNo: '',
     outboundType: undefined,
-    itemType: undefined,
     warehouse: undefined,
     handler: undefined,
     requisitionDept: undefined,
     sourceOrderNo: '',
     status: undefined,
+    outboundTimeUnit: 'day',
+    outboundTimeRange: null,
   })
   appliedFilters.value = { ...filters }
   pagination.current = 1
@@ -360,6 +428,54 @@ function handleReset() {
 
 function stubAction(name) {
   message.info(`${name}功能开发中`)
+}
+
+function openCreate() {
+  editRecord.value = null
+  formOpen.value = true
+}
+
+function openEdit(record) {
+  editRecord.value = record
+  formOpen.value = true
+}
+
+function onFormSaved() {
+  editRecord.value = null
+  handleSearch()
+}
+
+function handleApprove(record) {
+  Modal.confirm({
+    title: `审批通过出库单 ${record.docNo}？`,
+    okText: '审批',
+    onOk: () => {
+      const res = approveOutboundOrder(record.id)
+      if (!res.ok) {
+        message.warning(res.message)
+        return
+      }
+      message.success('审批已通过')
+      handleSearch()
+    },
+  })
+}
+
+function handleConfirmOne(record) {
+  Modal.confirm({
+    title: `确认出库 ${record.docNo}？`,
+    onOk: () => {
+      const { count, blocked } = confirmOutbound([record.id])
+      if (blocked.length) {
+        message.warning(blocked.map((b) => b.message).join('；'))
+        return
+      }
+      if (count > 0) {
+        message.success('已确认出库')
+        handleSearch()
+      }
+    },
+  })
 }
 
 function goDetail(record) {
@@ -425,6 +541,10 @@ function handleBatchDelete() {
 }
 
 function confirmDelete(record) {
+  if (!canDeleteOutbound(record)) {
+    message.warning('当前状态不可删除')
+    return
+  }
   Modal.confirm({
     title: `确认删除出库单 ${record.docNo}？`,
     onOk: () => {
@@ -606,5 +726,15 @@ function handleBatchInitiateQc() {
 :deep(.ant-table-wrapper .ant-btn-link) {
   padding: 0 4px;
   height: auto;
+}
+
+.outbound-time-filter {
+  display: flex;
+  width: 100%;
+
+  :deep(.ant-picker) {
+    flex: 1;
+    min-width: 0;
+  }
 }
 </style>

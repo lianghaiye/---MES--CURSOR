@@ -6,15 +6,30 @@ export function createOutboundLine(partial = {}) {
     itemName: '',
     itemCode: '',
     itemType: '物料',
+    specAttr: '',
     specModel: '',
-    shipQty: 0,
-    shipWarehouse: '成品仓',
+    material: '',
+    drawingNo: '',
+    barcodeBatchNo: '',
+    shipQty: 1,
+    weight: null,
+    shipWarehouse: '',
     unit: '件',
+    unitPrice: null,
+    totalPrice: null,
+    lineSource: '',
+    costAmount: null,
+    costUnitPrice: null,
+    purpose: '',
+    sourceDocNo: '',
+    itemId: '',
+    stockQty: null,
+    warehouseStockQty: null,
     ...partial,
   }
 }
 
-function createOutboundOrder(partial) {
+export function createOutboundOrder(partial) {
   return {
     projectNo: '',
     outboundType: '销售出库',
@@ -31,9 +46,11 @@ function createOutboundOrder(partial) {
     createdAt: dayjs().format('YYYY-MM-DD'),
     completedAt: '',
     auditDate: '',
+    auditor: '',
     warehouseKeeper: 'admin1',
     workshop: '默认工厂',
     remark: '',
+    outboundTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     creator: 'admin1',
     lineItems: [],
     factoryQcId: '',
@@ -201,20 +218,43 @@ export function cloneOutboundOrders() {
   return JSON.parse(JSON.stringify(mockOutboundOrders))
 }
 
+export function calcOutboundShipQty(order) {
+  return (order?.lineItems || []).reduce((sum, line) => sum + (Number(line.shipQty) || 0), 0)
+}
+
+function matchOutboundTimeRange(item, filters) {
+  const range = filters.outboundTimeRange
+  if (!range?.length || !range[0] || !range[1]) return true
+  const raw = item.outboundTime || item.createdAt
+  if (!raw) return false
+  const d = dayjs(raw)
+  if (!d.isValid()) return false
+  const unit = filters.outboundTimeUnit || 'day'
+  const start =
+    unit === 'month'
+      ? dayjs(range[0]).startOf('month')
+      : unit === 'year'
+        ? dayjs(range[0]).startOf('year')
+        : dayjs(range[0]).startOf('day')
+  const end =
+    unit === 'month'
+      ? dayjs(range[1]).endOf('month')
+      : unit === 'year'
+        ? dayjs(range[1]).endOf('year')
+        : dayjs(range[1]).endOf('day')
+  return !d.isBefore(start) && !d.isAfter(end)
+}
+
 export function filterOutboundOrders(list, filters) {
   return list.filter((item) => {
     if (filters.docNo && !item.docNo.includes(filters.docNo)) return false
     if (filters.outboundType && item.outboundType !== filters.outboundType) return false
-    if (filters.itemType) {
-      const matchHeader = item.itemType === filters.itemType
-      const matchLine = item.lineItems?.some((l) => l.itemType === filters.itemType)
-      if (!matchHeader && !matchLine) return false
-    }
     if (filters.warehouse && item.warehouse !== filters.warehouse) return false
     if (filters.handler && item.handler !== filters.handler) return false
     if (filters.requisitionDept && item.requisitionDept !== filters.requisitionDept) return false
     if (filters.sourceOrderNo && !item.sourceOrderNo?.includes(filters.sourceOrderNo)) return false
     if (filters.status && item.status !== filters.status) return false
+    if (!matchOutboundTimeRange(item, filters)) return false
     return true
   })
 }

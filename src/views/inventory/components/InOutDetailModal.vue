@@ -13,7 +13,9 @@
         <a-descriptions-item label="业务类型">{{ record.businessType }}</a-descriptions-item>
         <a-descriptions-item label="单据类型">{{ record.docType }}</a-descriptions-item>
         <a-descriptions-item label="单据状态">
-          <a-tag :color="docStatusColor(record.docStatus)">{{ record.docStatus || '—' }}</a-tag>
+          <a-tag :color="inOutDocStatusColor(resolvedDocStatus)">{{
+            resolvedDocStatus || '—'
+          }}</a-tag>
         </a-descriptions-item>
         <a-descriptions-item label="出入库状态">
           <a-tag v-if="record.ioStatus" :color="ioStatusColor(record.ioStatus)">
@@ -50,6 +52,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { resolveInOutDocStatus, inOutDocStatusColor } from '@/utils/inOutDetailHelpers'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -68,10 +71,7 @@ const modalTitle = computed(() => {
   return `${props.record.businessType}详情 · ${props.record.docNo}`
 })
 
-function docStatusColor(status) {
-  const map = { 草稿: 'default', 待审核: 'processing', 已审核: 'blue', 已过账: 'success' }
-  return map[status] || 'default'
-}
+const resolvedDocStatus = computed(() => resolveInOutDocStatus(props.record))
 
 function ioStatusColor(status) {
   const map = { 待入库: 'warning', 部分入库: 'processing', 全部入库: 'success' }

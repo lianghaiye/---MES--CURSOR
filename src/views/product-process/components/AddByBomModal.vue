@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     title="按BOM添加"
-    width="640px"
+    :width="modalWidth"
     :mask-closable="false"
     destroy-on-close
     class="add-by-bom-modal"
@@ -28,7 +28,7 @@
         </div>
       </a-form-item>
 
-      <a-form-item label="用量系数" required>
+      <a-form-item :label="qtyLabel" required>
         <a-input-number
           v-model:value="usageCoefficient"
           size="small"
@@ -37,7 +37,7 @@
           placeholder="请输入"
           class="usage-coef-input"
         />
-        <div class="field-hint">等于本级单位用量；子项单位用量 = 用量系数 × 子件原单位用量</div>
+        <div v-if="qtyHint" class="field-hint">{{ qtyHint }}</div>
       </a-form-item>
 
       <div v-if="selectedRow" class="selected-preview">
@@ -69,7 +69,7 @@
           <span class="preview-label">子件项数</span>
           <span>{{ selectedRow.subItemCount ?? 0 }}</span>
         </div>
-        <div class="preview-tip">确定后将添加所选物品及其 BOM 下级结构</div>
+        <div class="preview-tip">{{ previewTip }}</div>
       </div>
     </a-form>
 
@@ -96,6 +96,13 @@ import SelectBomMaterialModal from './SelectBomMaterialModal.vue'
 
 const props = defineProps({
   open: Boolean,
+  qtyLabel: { type: String, default: '用量系数' },
+  qtyHint: {
+    type: String,
+    default: '等于本级单位用量；子项单位用量 = 用量系数 × 子件原单位用量',
+  },
+  previewTip: { type: String, default: '确定后将添加所选物品及其 BOM 下级结构' },
+  modalWidth: { type: [String, Number], default: '640px' },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -179,7 +186,7 @@ function handleConfirm() {
   }
   const coef = Number(usageCoefficient.value)
   if (Number.isNaN(coef) || coef < 0) {
-    message.warning('请输入有效的用量系数')
+    message.warning(`请输入有效的${props.qtyLabel}`)
     return
   }
   emit('confirm', {

@@ -13,4 +13,6 @@ export const inboundStatusOptions = ['待审批', '待处理', '已完成', '已
 
 export const inboundItemTypeOptions = ['产品', '物料']
 
+export const inboundLineSourceOptions = ['采购', '生产', '外协']
+
 export const handlerOptions = ['admin1', '张三', '李四', '管理员']

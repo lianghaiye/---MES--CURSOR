@@ -112,13 +112,28 @@ function canApproveInbound(order) {
   return order?.status === '待审批' && order?.inboundType === '成品入库'
 }
 
+function buildInboundLineItems(payload, headerWarehouse = '') {
+  return (payload.lineItems || []).map((line) =>
+    createInboundLine({
+      ...line,
+      warehouse: line.warehouse || headerWarehouse || payload.warehouse || '',
+    }),
+  )
+}
+
 export function addInboundOrder(payload) {
-  const whKeeper = resolveWarehouseKeeper(payload.warehouse)
+  const docNo = String(payload.docNo || '').trim() || generateInboundNo()
+  const lineItems = buildInboundLineItems(payload, payload.warehouse || '')
+  const headerWarehouse =
+    payload.warehouse || lineItems.find((line) => line.warehouse)?.warehouse || ''
+  const whKeeper = resolveWarehouseKeeper(headerWarehouse)
   const row = normalizeLegacyOrder(
     createInboundOrder({
       ...payload,
       id: payload.id || `ib-${Date.now()}`,
-      docNo: payload.docNo || generateInboundNo(),
+      docNo,
+      warehouse: headerWarehouse || undefined,
+      lineItems,
       warehouseKeeper: payload.warehouseKeeper || whKeeper,
       status:
         payload.status ||
@@ -135,8 +150,16 @@ export function updateInboundOrder(id, patch) {
   if (idx === -1) return { ok: false, message: '入库单不存在' }
   const row = inboundOrderState.orders[idx]
   if (!canEditInbound(row)) return { ok: false, message: '当前状态不可编辑' }
-  if (patch.warehouse) {
-    patch.warehouseKeeper = resolveWarehouseKeeper(patch.warehouse)
+  const headerWarehouse = patch.warehouse ?? row.warehouse
+  if (patch.lineItems) {
+    patch.lineItems = buildInboundLineItems({ ...patch, warehouse: headerWarehouse }, headerWarehouse)
+  }
+  if (patch.warehouse !== undefined) {
+    patch.warehouse = headerWarehouse || undefined
+    patch.warehouseKeeper = resolveWarehouseKeeper(headerWarehouse)
+  }
+  if (patch.docNo !== undefined) {
+    patch.docNo = String(patch.docNo || '').trim() || row.docNo
   }
   Object.assign(row, patch)
   return { ok: true, order: row }

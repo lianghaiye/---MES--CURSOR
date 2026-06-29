@@ -157,7 +157,9 @@
               <a class="link-code" @click="navigateOrderDetail(record)">{{ record.docNo }}</a>
             </template>
             <template v-else-if="column.key === 'docStatus'">
-              <a-tag :color="docStatusColor(record.docStatus)">{{ record.docStatus || '—' }}</a-tag>
+              <a-tag :color="inOutDocStatusColor(record.docStatus)">{{
+                record.docStatus || '—'
+              }}</a-tag>
             </template>
             <template v-else-if="column.key === 'ioStatus'">
               <a-tag v-if="record.ioStatus" :color="ioStatusColor(record.ioStatus)">
@@ -237,6 +239,7 @@ import {
   inOutDocStatusOptions,
   inOutIoStatusOptions,
 } from '@/mock/inOutDetailOptions'
+import { enrichInOutDetailRow, inOutDocStatusColor } from '@/utils/inOutDetailHelpers'
 import { getInboundOrderById } from '@/store/inboundOrderStore'
 import InboundOrderFormModal from './components/InboundOrderFormModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
@@ -316,7 +319,9 @@ const baseColumns = [
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings('inventory-in-out-detail-list', baseColumns, { minScrollX: 2200 })
 
-const filteredList = computed(() => filterInOutDetails(detailList.value, appliedFilters.value))
+const enrichedList = computed(() => detailList.value.map(enrichInOutDetailRow))
+
+const filteredList = computed(() => filterInOutDetails(enrichedList.value, appliedFilters.value))
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -334,11 +339,6 @@ const rowSelection = computed(() => ({
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
-}
-
-function docStatusColor(status) {
-  const map = { 草稿: 'default', 待审核: 'processing', 已审核: 'blue', 已过账: 'success' }
-  return map[status] || 'default'
 }
 
 function ioStatusColor(status) {

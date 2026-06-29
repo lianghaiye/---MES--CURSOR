@@ -13,6 +13,6 @@ export const inOutDocTypeOptions = [
 
 export const inOutItemTypeOptions = ['物料', '产成品', '产品']
 
-export const inOutDocStatusOptions = ['草稿', '待审核', '已审核', '已过账']
+export { inOutDocStatusOptions } from '@/utils/inOutDetailHelpers'
 
 export const inOutIoStatusOptions = ['待入库', '部分入库', '全部入库']

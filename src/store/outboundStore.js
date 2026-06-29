@@ -1,6 +1,7 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { cloneOutboundOrders } from '@/mock/outboundOrders'
+import { cloneOutboundOrders, createOutboundLine, createOutboundOrder } from '@/mock/outboundOrders'
+import { needsOutboundApproval } from '@/mock/outboundOptions'
 import {
   createFactoryQcFromOutbound,
   getFactoryQcById,
@@ -80,6 +81,128 @@ export function deleteOutboundOrder(id) {
   return true
 }
 
+export function canEditOutbound(order) {
+  return ['待处理', '待出库'].includes(order?.status)
+}
+
+export function canDeleteOutbound(order) {
+  return ['待处理', '待出库'].includes(order?.status)
+}
+
+export function canApproveOutbound(order) {
+  return order?.status === '待处理' && needsOutboundApproval(order.outboundType)
+}
+
+function resolveInitialOutboundStatus(outboundType) {
+  if (needsOutboundApproval(outboundType)) return '待处理'
+  return '待出库'
+}
+
+function buildLineItems(payload) {
+  return payload.lineItems.map((line) =>
+    createOutboundLine({
+      ...line,
+      itemType: line.itemType || payload.itemType || '物料',
+      shipWarehouse: line.shipWarehouse || payload.warehouse || '',
+    }),
+  )
+}
+
+function applyOutboundHeaderFields(order, payload) {
+  const lineItems = buildLineItems(payload)
+  const headerWarehouse =
+    payload.warehouse || lineItems.find((line) => line.shipWarehouse)?.shipWarehouse || ''
+  Object.assign(order, {
+    ...payload,
+    warehouse: headerWarehouse,
+    lineItems,
+    warehouseKeeper: payload.warehouseKeeper || payload.handler || order.warehouseKeeper || 'admin1',
+    workshop: payload.workshop || payload.requisitionDept || order.workshop || '默认工厂',
+    outboundTime: payload.outboundTime || order.outboundTime || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    remark: payload.remark?.trim?.() ?? payload.remark ?? order.remark,
+  })
+  return order
+}
+
+export function addOutboundOrder(payload) {
+  const docNo = String(payload.docNo || '').trim()
+  if (!docNo) {
+    return { ok: false, message: '请输入出库单号' }
+  }
+  if (getOutboundOrderByDocNo(docNo)) {
+    return { ok: false, message: '出库单号已存在' }
+  }
+  if (!payload.outboundType) {
+    return { ok: false, message: '请选择出库类型' }
+  }
+  if (!payload.lineItems?.length) {
+    return { ok: false, message: '请至少添加一条明细' }
+  }
+
+  const lineItems = buildLineItems(payload)
+
+  const headerWarehouse =
+    payload.warehouse ||
+    lineItems.find((line) => line.shipWarehouse)?.shipWarehouse ||
+    ''
+
+  const row = createOutboundOrder({
+    ...payload,
+    id: payload.id || `ob-${Date.now()}`,
+    docNo,
+    warehouse: headerWarehouse,
+    lineItems,
+    status: payload.status || resolveInitialOutboundStatus(payload.outboundType),
+    createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    outboundTime: payload.outboundTime || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    creator: payload.creator || 'admin1',
+    warehouseKeeper: payload.warehouseKeeper || payload.handler || 'admin1',
+    workshop: payload.workshop || payload.requisitionDept || '默认工厂',
+  })
+  outboundState.orders.unshift(row)
+  return { ok: true, order: row }
+}
+
+export function updateOutboundOrder(id, payload) {
+  const order = getOutboundOrderById(id)
+  if (!order) {
+    return { ok: false, message: '出库单不存在' }
+  }
+  if (!canEditOutbound(order)) {
+    return { ok: false, message: '当前状态不可编辑' }
+  }
+  const docNo = String(payload.docNo || order.docNo || '').trim()
+  if (!docNo) {
+    return { ok: false, message: '请输入出库单号' }
+  }
+  const duplicate = getOutboundOrderByDocNo(docNo)
+  if (duplicate && duplicate.id !== id) {
+    return { ok: false, message: '出库单号已存在' }
+  }
+  if (!payload.outboundType) {
+    return { ok: false, message: '请选择出库类型' }
+  }
+  if (!payload.lineItems?.length) {
+    return { ok: false, message: '请至少添加一条明细' }
+  }
+  applyOutboundHeaderFields(order, { ...payload, docNo })
+  return { ok: true, order }
+}
+
+export function approveOutboundOrder(id, operator = 'admin1') {
+  const order = getOutboundOrderById(id)
+  if (!order) {
+    return { ok: false, message: '出库单不存在' }
+  }
+  if (!canApproveOutbound(order)) {
+    return { ok: false, message: '当前出库单不可审批' }
+  }
+  order.status = '待出库'
+  order.auditor = operator
+  order.auditDate = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  return { ok: true, order }
+}
+
 export function confirmOutbound(ids) {
   const blocked = []
   let count = 0
@@ -113,13 +236,12 @@ export function confirmOutbound(ids) {
 export function validateOutboundForConfirm(order) {
   if (!order) return { ok: false, message: '出库单不存在' }
   if (order.status === '已出库') return { ok: false, code: 'already_done', message: '已出库' }
+  if (order.status !== '待出库') {
+    return { ok: false, message: '仅「待出库」状态可确认出库' }
+  }
 
   if (order.outboundType !== '销售出库') {
     return { ok: true }
-  }
-
-  if (order.status !== '待出库') {
-    return { ok: false, message: '销售出库单需为「待出库」状态方可确认出库' }
   }
 
   // 未发起出厂质检：无需校验，可直接确认出库
