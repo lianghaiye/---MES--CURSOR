@@ -11,6 +11,7 @@ export const topModules = [
   { key: 'quality', label: '质量管理', path: '/quality' },
   { key: 'procurement', label: '采购管理', path: '/procurement' },
   { key: 'after-sales', label: '售后管理', path: '/after-sales' },
+  { key: 'industrial-id', label: '工业标识', path: '/industrial-id' },
   { key: 'basic-config', label: '基础配置', path: '/basic-config' },
   { key: 'system', label: '系统管理', path: '/system' },
 ]
@@ -92,6 +93,31 @@ export const sideMenus = {
   'after-sales': [
     { key: 'service-orders', label: '服务工单', path: '/after-sales/service-orders' },
     { key: 'returns', label: '退换货', path: '/after-sales/returns' },
+  ],
+  'industrial-id': [
+    {
+      key: 'base-config',
+      label: '基础配置',
+      children: [
+        {
+          key: 'enterprise-info',
+          label: '企业信息',
+          path: '/industrial-id/base-config/enterprise-info',
+        },
+        {
+          key: 'product-template',
+          label: '配置产品信息更新模板',
+          path: '/industrial-id/base-config/product-template',
+        },
+        {
+          key: 'nameplate-template',
+          label: '配置铭牌模板',
+          path: '/industrial-id/base-config/nameplate-template',
+        },
+      ],
+    },
+    { key: 'label-request', label: '标识申请', path: '/industrial-id/label-request' },
+    { key: 'label-management', label: '标识管理', path: '/industrial-id/label-management' },
   ],
   'basic-config': [
     { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
@@ -188,6 +214,11 @@ export const routeTitles = {
   '/procurement/suppliers': '供应商',
   '/after-sales/service-orders': '服务工单',
   '/after-sales/returns': '退换货',
+  '/industrial-id/base-config/enterprise-info': '企业信息',
+  '/industrial-id/base-config/product-template': '配置产品信息更新模板',
+  '/industrial-id/base-config/nameplate-template': '配置铭牌模板',
+  '/industrial-id/label-request': '标识申请',
+  '/industrial-id/label-management': '标识管理',
   '/wms/warehouse': '仓储管理',
   '/qms/trace': '质量追溯',
   '/equipment/devices': '设备管理',
