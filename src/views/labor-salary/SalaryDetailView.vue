@@ -283,6 +283,7 @@ const baseColumns = [
   { title: '计薪方式', key: 'salaryMethod', dataIndex: 'salaryMethod', width: 100 },
   { title: '良品工资', key: 'goodWage', dataIndex: 'goodWage', width: 100, align: 'right' },
   { title: '不良品工资', key: 'defectWage', dataIndex: 'defectWage', width: 100, align: 'right' },
+  { title: '准备工时工资', key: 'prepWage', dataIndex: 'prepWage', width: 110, align: 'right' },
   {
     title: '补贴金额',
     key: 'subsidyAmount',
@@ -325,6 +326,7 @@ const OPTIONAL_NUM_KEYS = new Set(['adjustedGoodQty', 'adjustedDefectQty', 'adju
 const MONEY_KEYS = new Set([
   'goodWage',
   'defectWage',
+  'prepWage',
   'subsidyAmount',
   'qualityDeduction',
   'salaryAmount',

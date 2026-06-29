@@ -203,7 +203,6 @@ export function cloneOutboundOrders() {
 
 export function filterOutboundOrders(list, filters) {
   return list.filter((item) => {
-    if (filters.projectNo && !item.projectNo?.includes(filters.projectNo)) return false
     if (filters.docNo && !item.docNo.includes(filters.docNo)) return false
     if (filters.outboundType && item.outboundType !== filters.outboundType) return false
     if (filters.itemType) {

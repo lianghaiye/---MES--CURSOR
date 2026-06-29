@@ -4,16 +4,6 @@
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="项目编号">
-              <a-input
-                v-model:value="filters.projectNo"
-                allow-clear
-                placeholder="请输入 项目编号"
-                size="small"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="出库单号">
               <a-input
                 v-model:value="filters.docNo"
@@ -284,7 +274,6 @@ const router = useRouter()
 const { openTab } = useTabs()
 
 const filters = reactive({
-  projectNo: '',
   docNo: '',
   outboundType: undefined,
   itemType: undefined,
@@ -356,7 +345,6 @@ function handleSearch() {
 
 function handleReset() {
   Object.assign(filters, {
-    projectNo: '',
     docNo: '',
     outboundType: undefined,
     itemType: undefined,
