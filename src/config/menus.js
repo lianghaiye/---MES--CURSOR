@@ -240,6 +240,8 @@ export const routeTitles = {
 
 /** 动态路径标题（含 :id 等参数） */
 export const dynamicRouteTitles = [
+  { pattern: /^\/engineering-change\/ecn\/[^/]+\/detail$/, title: 'ECN详情' },
+  { pattern: /^\/engineering-change\/ecr\/[^/]+\/detail$/, title: 'ECR详情' },
   { pattern: /^\/engineering-change\/ecn\/[^/]+\/approve$/, title: '审批工程变更' },
   { pattern: /^\/engineering-change\/ecn\/[^/]+\/execute$/, title: '执行工程变更' },
   { pattern: /^\/engineering-change\/ecr\/[^/]+\/approve$/, title: '审批工程变更' },

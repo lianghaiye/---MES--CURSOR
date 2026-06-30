@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { ECN_STATUS } from '@/constants/ecn'
+import { ECN_STATUS, ECN_WIP_HANDLING } from '@/constants/ecn'
 
 export function createChangeRequestStore(options) {
   const {
@@ -100,7 +100,7 @@ export function createChangeRequestStore(options) {
       ],
       approvalRecords: [],
       updateItems: payload.updateItems || [],
-      wipHandling: payload.wipHandling || 'continue_old',
+      wipHandling: payload.wipHandling || ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
       rejectReason: '',
       impact: payload.impact || { products: 1, bomLines: 3, wipOrders: 12, inventoryWarnings: 2 },
       attachments: payload.attachments || [],
@@ -210,7 +210,8 @@ export function createChangeRequestStore(options) {
   function completeExecution(id) {
     const row = findById(id)
     if (!row) return { ok: false, message: '变更单不存在' }
-    row.status = ECN_STATUS.COMPLETED
+    row.status = ECN_STATUS.EXECUTED
+    row.executedAt = dayjs().format('YYYY-MM-DD HH:mm')
     return { ok: true }
   }
 

@@ -79,6 +79,12 @@ function createSalesOrder(partial) {
     purchaseRequisitionId: '',
     deliveryApplications: [],
     attachments: [],
+    creator: 'admin1',
+    createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    approver: '',
+    approvedAt: '',
+    deliveryAddress: '',
+    techSpecCode: '',
     ...partial,
   }
 }

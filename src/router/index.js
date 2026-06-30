@@ -31,6 +31,12 @@ const routes = [
     meta: { title: '工单预览', standalone: true },
   },
   {
+    path: '/engineering-change/ecn/print',
+    name: 'engineering-change-ecn-print',
+    component: () => import('@/views/engineering-change/EcnPrintPreviewView.vue'),
+    meta: { title: 'ECN打印', standalone: true },
+  },
+  {
     path: '/',
     component: MainLayout,
     redirect: '/home/dashboard',
@@ -393,6 +399,12 @@ const routes = [
         meta: { title: '执行工程变更', changeModule: 'ecn' },
       },
       {
+        path: 'engineering-change/ecn/:id/detail',
+        name: 'engineering-change-ecn-detail',
+        component: () => import('@/views/engineering-change/EcnDetailView.vue'),
+        meta: { title: 'ECN详情', changeModule: 'ecn' },
+      },
+      {
         path: 'engineering-change/ecr-request',
         name: 'engineering-change-ecr-request',
         component: () => import('@/views/engineering-change/EcnListView.vue'),
@@ -415,6 +427,12 @@ const routes = [
         name: 'engineering-change-ecr-execute',
         component: () => import('@/views/engineering-change/EcnExecuteView.vue'),
         meta: { title: '执行工程变更', changeModule: 'ecr' },
+      },
+      {
+        path: 'engineering-change/ecr/:id/detail',
+        name: 'engineering-change-ecr-detail',
+        component: () => import('@/views/engineering-change/EcnDetailView.vue'),
+        meta: { title: 'ECR详情', changeModule: 'ecr' },
       },
       {
         path: 'engineering-change/ecr-change',

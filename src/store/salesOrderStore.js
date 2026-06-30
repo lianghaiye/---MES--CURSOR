@@ -29,7 +29,7 @@ import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 4
+const DATA_VERSION = 5
 let orderSeq = 20
 let deliverySeq = 113
 
@@ -308,6 +308,8 @@ export function approveSalesOrder(id) {
 
   order.businessType = deriveOrderBusinessType(order.lineItems, order.businessType)
   order.progressStatus = '已审'
+  order.approver = order.approver || 'admin1'
+  order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
 
   if (purchaseReqNo) {
     return {

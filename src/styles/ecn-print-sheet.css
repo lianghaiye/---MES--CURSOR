@@ -1,0 +1,433 @@
+/* ECN 打印内容样式（黑白、紧凑，适配非彩印） */
+
+.ecn-print-preview-page .print-sheet {
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ecn-print-preview-page.paper-A4.orient-portrait .print-sheet {
+  width: 210mm;
+}
+
+.ecn-print-preview-page.paper-A4.orient-landscape .print-sheet {
+  width: 297mm;
+}
+
+.ecn-print-preview-page.paper-A3.orient-portrait .print-sheet {
+  width: 297mm;
+}
+
+.ecn-print-preview-page.paper-A3.orient-landscape .print-sheet {
+  width: 420mm;
+}
+
+.ecn-print-preview-page .preview-canvas .print-sheet {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 18mm 14mm 16mm;
+}
+
+.ecn-print-iframe-body .print-sheet {
+  width: 100%;
+  padding: 10mm 8mm;
+}
+
+.ecn-print-preview-page .sheet-header,
+.ecn-print-iframe-body .sheet-header {
+  text-align: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #000;
+  padding-bottom: 8px;
+}
+
+.ecn-print-preview-page .sheet-title,
+.ecn-print-iframe-body .sheet-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #000;
+}
+
+.ecn-print-preview-page .sheet-subtitle,
+.ecn-print-iframe-body .sheet-subtitle {
+  margin-top: 2px;
+  font-size: 9px;
+  color: #000;
+}
+
+.ecn-print-preview-page .sheet-doc-row,
+.ecn-print-iframe-body .sheet-doc-row {
+  margin-top: 8px;
+  font-size: 10px;
+  overflow: hidden;
+  color: #000;
+}
+
+.ecn-print-preview-page .sheet-doc-row::after,
+.ecn-print-iframe-body .sheet-doc-row::after {
+  content: '';
+  display: table;
+  clear: both;
+}
+
+.ecn-print-preview-page .sheet-doc-row > span:first-child,
+.ecn-print-iframe-body .sheet-doc-row > span:first-child {
+  float: left;
+}
+
+.ecn-print-preview-page .sheet-doc-row > span:last-child,
+.ecn-print-iframe-body .sheet-doc-row > span:last-child {
+  float: right;
+}
+
+.ecn-print-preview-page .status-tag,
+.ecn-print-iframe-body .status-tag {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #000;
+  border-radius: 0;
+  font-weight: 400;
+}
+
+.ecn-print-preview-page .print-section,
+.ecn-print-iframe-body .print-section {
+  margin-bottom: 10px;
+}
+
+.ecn-print-preview-page .section-heading,
+.ecn-print-iframe-body .section-heading {
+  font-size: 10px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  padding-left: 6px;
+  border-left: 2px solid #000;
+  color: #000;
+}
+
+.ecn-print-preview-page .info-grid,
+.ecn-print-iframe-body .info-grid,
+.ecn-print-preview-page .change-meta-table,
+.ecn-print-iframe-body .change-meta-table,
+.ecn-print-preview-page .change-field-table,
+.ecn-print-iframe-body .change-field-table,
+.ecn-print-preview-page .data-table,
+.ecn-print-iframe-body .data-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ecn-print-preview-page .info-grid th,
+.ecn-print-preview-page .info-grid td,
+.ecn-print-iframe-body .info-grid th,
+.ecn-print-iframe-body .info-grid td,
+.ecn-print-preview-page .change-meta-table th,
+.ecn-print-preview-page .change-meta-table td,
+.ecn-print-iframe-body .change-meta-table th,
+.ecn-print-iframe-body .change-meta-table td,
+.ecn-print-preview-page .change-field-table th,
+.ecn-print-preview-page .change-field-table td,
+.ecn-print-iframe-body .change-field-table th,
+.ecn-print-iframe-body .change-field-table td,
+.ecn-print-preview-page .data-table th,
+.ecn-print-preview-page .data-table td,
+.ecn-print-iframe-body .data-table th,
+.ecn-print-iframe-body .data-table td {
+  border: 1px solid #000;
+  padding: 3px 5px;
+  font-size: 9px;
+  vertical-align: middle;
+  word-break: break-word;
+  background: #fff;
+  color: #000;
+}
+
+.ecn-print-preview-page .info-grid th,
+.ecn-print-iframe-body .info-grid th,
+.ecn-print-preview-page .change-meta-table th,
+.ecn-print-iframe-body .change-meta-table th,
+.ecn-print-preview-page .change-field-table thead th,
+.ecn-print-iframe-body .change-field-table thead th,
+.ecn-print-preview-page .change-field-table .field-label,
+.ecn-print-iframe-body .change-field-table .field-label,
+.ecn-print-preview-page .data-table th,
+.ecn-print-iframe-body .data-table th {
+  background: #fff;
+  font-weight: 600;
+  text-align: center;
+  color: #000;
+}
+
+.ecn-print-preview-page .desc-box,
+.ecn-print-iframe-body .desc-box {
+  border: 1px solid #000;
+  padding: 6px 8px;
+  min-height: 36px;
+  background: #fff;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 9px;
+  color: #000;
+}
+
+.ecn-print-preview-page .change-item-list,
+.ecn-print-iframe-body .change-item-list {
+  display: block;
+}
+
+.ecn-print-preview-page .change-item-card,
+.ecn-print-iframe-body .change-item-card {
+  border: 1px solid #000;
+  margin-bottom: 8px;
+}
+
+.ecn-print-preview-page .change-item-card:last-child,
+.ecn-print-iframe-body .change-item-card:last-child {
+  margin-bottom: 0;
+}
+
+.ecn-print-preview-page .change-field-table,
+.ecn-print-iframe-body .change-field-table {
+  border-top: 1px solid #000;
+}
+
+.ecn-print-preview-page .value-changed-before,
+.ecn-print-iframe-body .value-changed-before,
+.ecn-print-preview-page .value-changed-after,
+.ecn-print-iframe-body .value-changed-after {
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+}
+
+.ecn-print-preview-page .change-note-row,
+.ecn-print-iframe-body .change-note-row {
+  padding: 5px 8px;
+  border-top: 1px solid #000;
+  background: #fff;
+  font-size: 9px;
+  line-height: 1.45;
+  word-break: break-word;
+  color: #000;
+}
+
+.ecn-print-preview-page .note-label,
+.ecn-print-iframe-body .note-label {
+  font-weight: 600;
+  color: #000;
+  margin-right: 6px;
+}
+
+.ecn-print-preview-page .empty-change,
+.ecn-print-iframe-body .empty-change {
+  border: 1px dashed #000;
+  padding: 10px;
+  text-align: center;
+  color: #000;
+  font-size: 9px;
+}
+
+.ecn-print-preview-page .center,
+.ecn-print-iframe-body .center {
+  text-align: center;
+}
+
+.ecn-print-preview-page .impact-grid,
+.ecn-print-iframe-body .impact-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ecn-print-preview-page .impact-grid td.impact-card,
+.ecn-print-iframe-body .impact-grid td.impact-card {
+  width: 50%;
+  border: 1px solid #000;
+  padding: 6px 8px;
+  background: #fff;
+  vertical-align: top;
+  color: #000;
+}
+
+.ecn-print-preview-page .impact-grid td.impact-card + td.impact-card,
+.ecn-print-iframe-body .impact-grid td.impact-card + td.impact-card {
+  border-left: none;
+}
+
+.ecn-print-preview-page .impact-label,
+.ecn-print-iframe-body .impact-label {
+  font-size: 9px;
+  color: #000;
+  margin-bottom: 2px;
+}
+
+.ecn-print-preview-page .impact-value-sm,
+.ecn-print-iframe-body .impact-value-sm {
+  font-size: 9px;
+  font-weight: 600;
+  color: #000;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.ecn-print-preview-page .impact-sub,
+.ecn-print-iframe-body .impact-sub {
+  margin-top: 2px;
+  font-size: 9px;
+  color: #000;
+  word-break: break-word;
+}
+
+.ecn-print-preview-page .sign-footer,
+.ecn-print-iframe-body .sign-footer {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid #000;
+}
+
+.ecn-print-preview-page .sign-row,
+.ecn-print-iframe-body .sign-row {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-bottom: 14px;
+}
+
+.ecn-print-preview-page .sign-row td.sign-col,
+.ecn-print-iframe-body .sign-row td.sign-col {
+  text-align: center;
+  vertical-align: bottom;
+  width: 33.33%;
+}
+
+.ecn-print-preview-page .sign-label,
+.ecn-print-iframe-body .sign-label {
+  font-size: 9px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #000;
+}
+
+.ecn-print-preview-page .sign-line,
+.ecn-print-iframe-body .sign-line {
+  border-bottom: 1px solid #000;
+  margin: 0 10px;
+  min-height: 24px;
+}
+
+.ecn-print-preview-page .page-meta,
+.ecn-print-iframe-body .page-meta {
+  font-size: 8px;
+  color: #000;
+  border-top: 1px solid #000;
+  padding-top: 6px;
+  overflow: hidden;
+}
+
+.ecn-print-preview-page .page-meta::after,
+.ecn-print-iframe-body .page-meta::after {
+  content: '';
+  display: table;
+  clear: both;
+}
+
+.ecn-print-preview-page .page-meta > span:first-child,
+.ecn-print-iframe-body .page-meta > span:first-child {
+  float: left;
+}
+
+.ecn-print-preview-page .page-meta > span:last-child,
+.ecn-print-iframe-body .page-meta > span:last-child {
+  float: right;
+}
+
+@media print {
+  .ecn-print-preview-page .no-print {
+    display: none !important;
+  }
+
+  .ecn-print-preview-page,
+  .ecn-print-iframe-body {
+    background: #fff !important;
+  }
+
+  .ecn-print-preview-page .preview-canvas,
+  .ecn-print-iframe-body {
+    padding: 0 !important;
+  }
+
+  .ecn-print-preview-page .print-sheet,
+  .ecn-print-iframe-body .print-sheet {
+    width: 100% !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    padding: 10mm 8mm !important;
+  }
+
+  .ecn-print-preview-page .change-item-list,
+  .ecn-print-iframe-body .change-item-list,
+  .ecn-print-preview-page .change-item-card,
+  .ecn-print-iframe-body .change-item-card,
+  .ecn-print-preview-page .print-section,
+  .ecn-print-iframe-body .print-section {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  .ecn-print-preview-page .impact-grid,
+  .ecn-print-iframe-body .impact-grid {
+    display: table !important;
+    width: 100% !important;
+  }
+
+  .ecn-print-preview-page .impact-grid td.impact-card,
+  .ecn-print-iframe-body .impact-grid td.impact-card {
+    display: table-cell !important;
+    background: #fff !important;
+  }
+
+  .ecn-print-preview-page .sign-row,
+  .ecn-print-iframe-body .sign-row {
+    display: table !important;
+    width: 100% !important;
+  }
+
+  .ecn-print-preview-page .sign-row td.sign-col,
+  .ecn-print-iframe-body .sign-row td.sign-col {
+    display: table-cell !important;
+  }
+
+  .ecn-print-preview-page .info-grid th,
+  .ecn-print-preview-page .info-grid td,
+  .ecn-print-iframe-body .info-grid th,
+  .ecn-print-iframe-body .info-grid td,
+  .ecn-print-preview-page .change-meta-table th,
+  .ecn-print-preview-page .change-meta-table td,
+  .ecn-print-iframe-body .change-meta-table th,
+  .ecn-print-iframe-body .change-meta-table td,
+  .ecn-print-preview-page .change-field-table th,
+  .ecn-print-preview-page .change-field-table td,
+  .ecn-print-iframe-body .change-field-table th,
+  .ecn-print-iframe-body .change-field-table td,
+  .ecn-print-preview-page .data-table th,
+  .ecn-print-preview-page .data-table td,
+  .ecn-print-iframe-body .data-table th,
+  .ecn-print-iframe-body .data-table td,
+  .ecn-print-preview-page .desc-box,
+  .ecn-print-iframe-body .desc-box,
+  .ecn-print-preview-page .change-note-row,
+  .ecn-print-iframe-body .change-note-row,
+  .ecn-print-preview-page .value-changed-before,
+  .ecn-print-iframe-body .value-changed-before,
+  .ecn-print-preview-page .value-changed-after,
+  .ecn-print-iframe-body .value-changed-after {
+    background: #fff !important;
+    color: #000 !important;
+  }
+}

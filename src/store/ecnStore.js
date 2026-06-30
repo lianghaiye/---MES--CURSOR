@@ -1,10 +1,12 @@
 import { ECN_STATUS } from '@/constants/ecn'
 import { buildMockEcnRecords } from '@/mock/ecnSeed'
 import { createChangeRequestStore } from '@/store/changeRequestStore'
+import { executeEcnBomVersionUpgrade } from '@/utils/ecnBomExecution'
+import { buildBomVersionHistoryFromGroup } from '@/utils/ecnBomVersionHistory'
 
 const api = createChangeRequestStore({
   storageKey: 'i_doms_ecn',
-  dataVersion: 5,
+  dataVersion: 9,
   buildMockRecords: buildMockEcnRecords,
   docNoField: 'ecnNo',
   docNoPrefix: 'ECN',
@@ -21,7 +23,26 @@ export const deleteEcn = api.deleteById
 export const submitEcnForApproval = api.submitForApproval
 export const approveEcn = api.approve
 export const startEcnExecution = api.startExecution
-export const completeEcnExecution = api.completeExecution
+
+export function completeEcnExecution(id, operator = '张工') {
+  const row = findEcnById(id)
+  if (!row) return { ok: false, message: '变更单不存在' }
+
+  const bomRes = executeEcnBomVersionUpgrade(row, operator)
+  const res = api.completeExecution(id)
+  if (!res.ok) return res
+
+  if (bomRes.ok) {
+    row.bomId = bomRes.newBomId
+    row.bomVersion = bomRes.newVersion
+    row.versionGroupId = bomRes.versionGroupId
+    row.previousBomVersion = bomRes.oldVersion
+    row.bomVersionHistory = buildBomVersionHistoryFromGroup(bomRes.versionGroupId)
+    row.executor = operator
+  }
+
+  return { ...res, bomUpgrade: bomRes }
+}
 
 export function cancelEcn(id) {
   const row = findEcnById(id)
@@ -44,4 +65,7 @@ export function archiveEcn(id) {
   return { ok: true, message: '已归档' }
 }
 
-export const ecnStoreApi = api
+export const ecnStoreApi = {
+  ...api,
+  completeExecution: completeEcnExecution,
+}

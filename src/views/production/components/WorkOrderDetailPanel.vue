@@ -78,6 +78,17 @@
         >
           <WorkOrderCurrentBomTab :work-order="workOrder" />
         </a-tab-pane>
+        <a-tab-pane
+          v-if="workOrder.orderCategory !== '外协工单'"
+          key="bom-versions"
+          tab="BOM版本"
+        >
+          <BomVersionInfoSection
+            :product-id="workOrderProductId"
+            :bom-id="workOrder.bomId"
+            :bound-version="workOrderBoundVersion"
+          />
+        </a-tab-pane>
         <a-tab-pane key="tasks" tab="任务列表">
           <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
         </a-tab-pane>
@@ -106,6 +117,7 @@ import WorkOrderEbomTreeTab from './WorkOrderEbomTreeTab.vue'
 import WorkOrderCurrentBomTab from './WorkOrderCurrentBomTab.vue'
 import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
 import WorkOrderPrintModal from './WorkOrderPrintModal.vue'
+import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
 
 const printModalOpen = ref(false)
 
@@ -130,6 +142,18 @@ const workOrder = computed(() => {
         : workOrderState.orders
   return list.find((o) => o.id === props.workOrderId)
 })
+
+const workOrderProductId = computed(() => {
+  const wo = workOrder.value
+  if (!wo) return ''
+  if (wo.productId) return wo.productId
+  const name = wo.productName
+  return productInfoState.products.find((p) => p.name === name)?.id || ''
+})
+
+const workOrderBoundVersion = computed(
+  () => workOrder.value?.ebomSnapshot?.bomVersion || '',
+)
 
 const detailTab = defineModel('detailTab', { type: String, default: 'dispatch' })
 const detailCollapsed = defineModel('detailCollapsed', { type: Boolean, default: false })

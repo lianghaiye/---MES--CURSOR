@@ -413,6 +413,13 @@
                 </template>
               </template>
             </a-table>
+            <div v-if="activeWorkItem?.bomId" class="bom-version-section">
+              <div class="ebom-panel-title">BOM 版本信息</div>
+              <BomVersionInfoSection
+                :bom-id="activeWorkItem.bomId"
+                :bound-version="activeWorkItem.bomVersion"
+              />
+            </div>
           </template>
         </template>
         <a-empty v-else description="该 Tab 为占位，后续扩展" style="margin: 48px 0" />
@@ -515,6 +522,7 @@ import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import BomPrintModal from '@/views/product-process/components/BomPrintModal.vue'
+import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
 import {
   productionPlanPrintBaseColumns,
   productionPlanPrintColumnSettings,
@@ -1192,6 +1200,12 @@ function handleReset() {
 
 .ebom-empty {
   margin: 16px 0 8px;
+}
+
+.bom-version-section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
 }
 
 :deep(.work-item-row) {

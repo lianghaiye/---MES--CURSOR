@@ -260,10 +260,18 @@
           <span class="section-title">执行配置</span>
           <span class="section-sub">审批通过后生效</span>
         </div>
-        <div class="exec-label">变更执行时，影响范围：</div>
-        <a-radio-group v-model:value="form.execScope" class="exec-radio-group">
-          <a-radio v-for="opt in execScopeOpts" :key="opt.value" :value="opt.value">
-            <div class="radio-main">{{ opt.label }}</div>
+        <div class="exec-label">BOM 执行方式：</div>
+        <a-radio-group v-model:value="form.wipHandling" class="exec-radio-group">
+          <a-radio
+            v-for="opt in ecnExecConfigOptions"
+            :key="opt.value"
+            :value="opt.value"
+            class="exec-radio-item"
+          >
+            <div class="radio-row">
+              <span class="radio-main">{{ opt.label }}</span>
+              <a-tag v-if="opt.recommended" color="blue" class="rec-tag">常用</a-tag>
+            </div>
             <div class="radio-sub">{{ opt.sub }}</div>
           </a-radio>
         </a-radio-group>
@@ -325,13 +333,14 @@ import {
 import {
   ECN_TYPE,
   ECN_URGENCY,
-  ECN_EXEC_SCOPE,
   ECN_STATUS,
   ECN_ORIGIN_TYPE,
   ECN_CHANGE_REASON,
+  ECN_WIP_HANDLING,
   ecnOriginOptions,
   ecnCreateTypeOptions,
   ecnChangeReasonOptions,
+  ecnExecConfigOptions,
   ECN_CHANGE_ITEM_TYPE,
 } from '@/constants/ecn'
 import { resolveChangeRequestModule } from '@/constants/changeRequestModule'
@@ -392,28 +401,6 @@ const addedBomLineIds = computed(() =>
 const typeOpts = ecnCreateTypeOptions
 const changeReasonOpts = ecnChangeReasonOptions
 const urgencyOpts = Object.values(ECN_URGENCY).map((v) => ({ label: v, value: v }))
-const execScopeOpts = [
-  {
-    value: ECN_EXEC_SCOPE.RECORD_ONLY,
-    label: ECN_EXEC_SCOPE.RECORD_ONLY,
-    sub: '审批通过后仅归档记录，不驱动工单切换',
-  },
-  {
-    value: ECN_EXEC_SCOPE.NEW_ONLY,
-    label: ECN_EXEC_SCOPE.NEW_ONLY,
-    sub: '已在生产的工单继续按旧版执行',
-  },
-  {
-    value: ECN_EXEC_SCOPE.NEW_AND_WIP,
-    label: ECN_EXEC_SCOPE.NEW_AND_WIP,
-    sub: '在制工单将切换新版',
-  },
-  {
-    value: ECN_EXEC_SCOPE.ALL,
-    label: ECN_EXEC_SCOPE.ALL,
-    sub: '将重新计算已完工工单成本',
-  },
-]
 
 const form = reactive({
   originType: ECN_ORIGIN_TYPE.SALES_ORDER,
@@ -437,7 +424,7 @@ const form = reactive({
   description: '',
   beforeChange: '',
   afterChange: '',
-  execScope: ECN_EXEC_SCOPE.RECORD_ONLY,
+  wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
   notifyDepartments: false,
   impact: { products: 1, bomLines: 3, wipOrders: 12, inventoryWarnings: 2 },
   attachments: [],
@@ -979,16 +966,84 @@ function submit() {
   margin-bottom: 8px;
 }
 
+.exec-type-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #e6f4ff;
+  border: 1px solid #91caff;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #0958d9;
+  line-height: 1.6;
+}
+
+.exec-scope-group {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.exec-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.exec-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.exec-group-hint {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.exec-group-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .exec-radio-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   width: 100%;
 
   :deep(.ant-radio-wrapper) {
     align-items: flex-start;
     margin-inline-end: 0;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+    transition: border-color 0.2s, background 0.2s;
   }
+
+  :deep(.ant-radio-wrapper-checked) {
+    border-color: #91caff;
+    background: #f0f7ff;
+  }
+}
+
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rec-tag {
+  margin: 0;
+  line-height: 18px;
+  font-size: 11px;
 }
 
 .radio-main {

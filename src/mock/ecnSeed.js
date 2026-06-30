@@ -3,11 +3,12 @@ import {
   ECN_STATUS,
   ECN_TYPE,
   ECN_URGENCY,
-  ECN_EXEC_SCOPE,
+  ECN_WIP_HANDLING,
   ECN_CHANGE_REASON,
   ECN_ORIGIN_TYPE,
   ECN_CHANGE_ITEM_TYPE,
 } from '@/constants/ecn'
+import { getActiveBomForItem } from '@/store/productBomStore'
 
 function productByKeyword(keyword) {
   return mockProducts.find((p) => p.name.includes(keyword)) || mockProducts[0]
@@ -234,6 +235,7 @@ function enrichRecord(record, index = 0) {
     approvalRecords,
     record.status,
   )
+  const activeBom = record.productId ? getActiveBomForItem('product', record.productId) : null
   return {
     salesOrderNo: salesOrders[index % salesOrders.length],
     customerName: customers[index % customers.length],
@@ -241,6 +243,7 @@ function enrichRecord(record, index = 0) {
     reviewer: record.reviewer ?? reviewer,
     reviewTime: record.reviewTime ?? reviewTime,
     approvalRecords,
+    bomId: record.bomId || activeBom?.id || '',
     ...record,
   }
 }
@@ -270,7 +273,7 @@ export function buildMockEcnRecords() {
       changeReason: ECN_CHANGE_REASON.CUSTOMER,
       originType: ECN_ORIGIN_TYPE.SALES_ORDER,
       description: '客户要求将叶轮材质从铸铁改为不锈钢，提高耐腐蚀性',
-      execScope: ECN_EXEC_SCOPE.NEW_ONLY,
+      wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
       changeItems: buildChangeItems(p1, 'modify-impeller'),
       approvalFlow: [
         { role: '工艺主管', name: '王工艺', status: '审批中', opinion: '', time: '' },
@@ -293,7 +296,7 @@ export function buildMockEcnRecords() {
       changeReason: ECN_CHANGE_REASON.DESIGN,
       originType: ECN_ORIGIN_TYPE.WORK_ORDER,
       description: '多级泵泵轴精加工工艺优化，提升表面粗糙度要求',
-      execScope: ECN_EXEC_SCOPE.NEW_ONLY,
+      wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
       changeItems: buildChangeItems(p2, 'process-route'),
       approvalFlow: [
         { role: '工艺主管', name: '王工艺', status: '已通过', opinion: '同意，请同步更新工艺卡片', time: '2026-06-24 10:00' },
@@ -324,7 +327,7 @@ export function buildMockEcnRecords() {
       changeReason: ECN_CHANGE_REASON.DESIGN,
       originType: ECN_ORIGIN_TYPE.SALES_ORDER,
       description: '轴承升级为进口 SKF 件，降低故障率',
-      execScope: ECN_EXEC_SCOPE.NEW_AND_WIP,
+      wipHandling: ECN_WIP_HANDLING.SWITCH_NOW,
       changeItems: buildChangeItems(p3, 'material-sub'),
       approvalFlow: [
         { role: '工艺主管', name: '王工艺', status: '已通过', opinion: '同意', time: '2026-06-23 09:30' },
@@ -353,7 +356,7 @@ export function buildMockEcnRecords() {
       changeReason: ECN_CHANGE_REASON.DESIGN,
       originType: ECN_ORIGIN_TYPE.WORK_ORDER,
       description: '潜水电泵泵体流道优化，更新铸造图纸',
-      execScope: ECN_EXEC_SCOPE.RECORD_ONLY,
+      wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
       changeItems: buildChangeItems(p4, 'drawing'),
       approvalFlow: [
         { role: '工艺主管', name: '王工艺', status: '已通过', opinion: '同意', time: '2026-06-22 17:00' },
@@ -382,7 +385,7 @@ export function buildMockEcnRecords() {
       changeReason: ECN_CHANGE_REASON.DESIGN,
       originType: ECN_ORIGIN_TYPE.SALES_ORDER,
       description: '取消联轴器调整垫片，简化装配结构',
-      execScope: ECN_EXEC_SCOPE.NEW_ONLY,
+      wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
       changeItems: buildChangeItems(p5, 'remove-part'),
       approvalFlow: [
         { role: '工艺主管', name: '王工艺', status: '已驳回', opinion: '强度不足，不建议取消垫片', time: '2026-06-21 16:00' },
@@ -414,7 +417,7 @@ export function buildMockEcnRecords() {
       changeReason: ECN_CHANGE_REASON.CUSTOMER,
       originType: ECN_ORIGIN_TYPE.SALES_ORDER,
       description: '客户要求增加温度监测功能',
-      execScope: ECN_EXEC_SCOPE.RECORD_ONLY,
+      wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
       changeItems: buildChangeItems(p6, 'add-part'),
       approvalFlow: [],
       approvalRecords: [],
@@ -433,7 +436,7 @@ export function buildMockEcnRecords() {
       changeReason: ECN_CHANGE_REASON.DESIGN,
       originType: ECN_ORIGIN_TYPE.WORK_ORDER,
       description: '消防泵试压工序增加保压时间记录',
-      execScope: ECN_EXEC_SCOPE.NEW_ONLY,
+      wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
       changeItems: buildChangeItems(p7, 'process-route'),
       approvalFlow: [],
       approvalRecords: [],
@@ -452,7 +455,7 @@ export function buildMockEcnRecords() {
       changeReason: ECN_CHANGE_REASON.CUSTOMER,
       originType: ECN_ORIGIN_TYPE.SALES_ORDER,
       description: '耐腐蚀泵叶轮材质升级，满足化工介质要求',
-      execScope: ECN_EXEC_SCOPE.NEW_ONLY,
+      wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
       changeItems: buildChangeItems(p8, 'modify-impeller'),
       approvalFlow: [
         { role: '工艺主管', name: '王工艺', status: '已通过', opinion: '同意', time: '2026-06-20 09:00' },
@@ -467,6 +470,37 @@ export function buildMockEcnRecords() {
       reviewer: '赵质量',
       reviewTime: '2026-06-20 15:00',
     },
+    {
+      id: 'ecn-009',
+      ecnNo: 'ECN-2024009',
+      type: ECN_TYPE.BOM,
+      productId: p1.id,
+      productCode: p1.code,
+      productName: p1.name,
+      applicant: '张工',
+      status: ECN_STATUS.EXECUTED,
+      createdAt: '2026-06-18 10:00',
+      executedAt: '2026-06-19 16:30',
+      executor: '张工',
+      urgency: ECN_URGENCY.NORMAL,
+      changeReason: ECN_CHANGE_REASON.CUSTOMER,
+      originType: ECN_ORIGIN_TYPE.SALES_ORDER,
+      description: '叶轮材质 HT200 升级为 304不锈钢，机加工切削参数同步调整',
+      wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
+      changeItems: buildChangeItems(p1, 'modify-impeller'),
+      approvalFlow: [
+        { role: '工艺主管', name: '王工艺', status: '已通过', opinion: '同意', time: '2026-06-18 11:00' },
+        { role: '生产主管', name: '李生产', status: '已通过', opinion: '同意', time: '2026-06-18 14:00' },
+        { role: '质量主管', name: '赵质量', status: '已通过', opinion: '同意', time: '2026-06-18 16:00' },
+      ],
+      approvalRecords: [
+        { role: '工艺主管', name: '王工艺', result: '已通过', opinion: '同意', time: '2026-06-18 11:00' },
+        { role: '生产主管', name: '李生产', result: '已通过', opinion: '同意', time: '2026-06-18 14:00' },
+        { role: '质量主管', name: '赵质量', result: '已通过', opinion: '同意', time: '2026-06-18 16:00' },
+      ],
+      reviewer: '赵质量',
+      reviewTime: '2026-06-18 16:00',
+    },
   ]
 
   return raw.map((row, index) =>
@@ -480,7 +514,7 @@ export function buildMockEcnRecords() {
         impact: { products: 1, bomLines: row.changeItems?.length || 1, wipOrders: 2, inventoryWarnings: 0 },
         attachments: [],
         updateItems: [],
-        wipHandling: 'continue_old',
+        wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
         rejectReason: '',
         ...row,
       },

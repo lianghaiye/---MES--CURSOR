@@ -15,102 +15,20 @@
 
         <a-tabs v-model:active-key="activeTab" class="detail-tabs">
           <a-tab-pane key="overview" tab="概览" />
-          <a-tab-pane key="lines" tab="订单明细" />
           <a-tab-pane key="delivery" :tab="`发货申请 (${relations.deliveryApplications.length})`" />
           <a-tab-pane key="outbound" :tab="`出库单 (${relations.outboundOrders.length})`" />
           <a-tab-pane key="purchase" :tab="`采购 (${purchaseTabCount})`" />
           <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
           <a-tab-pane key="outsourcing" :tab="`外协 (${relations.outsourcingOrders.length})`" />
           <a-tab-pane key="attachments" :tab="`附件 (${relations.attachments.length})`" />
+          <a-tab-pane key="bom-version" tab="BOM版本" />
         </a-tabs>
 
         <div class="tab-body">
           <template v-if="activeTab === 'overview'">
             <div class="section-card">
               <div class="section-title">基本信息</div>
-              <a-descriptions :column="3" size="small" bordered>
-                <a-descriptions-item label="销售单号">{{ order.orderNo }}</a-descriptions-item>
-                <a-descriptions-item label="合同编号">{{
-                  order.contractNo || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="客户名称">{{ order.customerName }}</a-descriptions-item>
-                <a-descriptions-item label="订单来源">{{
-                  order.orderSource || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="所属区域">{{
-                  order.region || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="业务员">{{
-                  order.salesperson || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="业务类型">{{
-                  order.businessType || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="履约方式">{{
-                  order.fulfillmentMethod || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="发货状态">{{
-                  order.deliveryStatus || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="进度状态">{{
-                  order.progressStatus
-                }}</a-descriptions-item>
-                <a-descriptions-item label="库存状态">{{
-                  order.inventoryStatus || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="紧急度">{{ order.urgency || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="单据日期">{{
-                  order.documentDate || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="提醒日期">{{
-                  order.reminderDate || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="结算币种">{{
-                  order.settlementCurrency || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="结算类型">{{
-                  order.settlementType || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="付款比例">{{
-                  order.paymentRatio || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="销售渠道">{{
-                  order.salesChannel || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="交货方式">{{
-                  order.deliveryMethod || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="联系人">{{
-                  order.contactPerson || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="联系电话">{{
-                  order.contactPhone || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="采购申请单号">
-                  <a
-                    v-if="order.purchaseRequisitionId"
-                    @click="goPurchaseReq(order.purchaseRequisitionId)"
-                  >
-                    {{ order.purchaseRequisitionNo }}
-                  </a>
-                  <span v-else>{{ order.purchaseRequisitionNo || '—' }}</span>
-                </a-descriptions-item>
-                <a-descriptions-item label="销售数量合计">{{
-                  order.totalQty ?? '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="含税金额"
-                  >￥{{ formatMoney(order.amountInTax) }}</a-descriptions-item
-                >
-                <a-descriptions-item label="不含税金额"
-                  >￥{{ formatMoney(order.amountExTax) }}</a-descriptions-item
-                >
-                <a-descriptions-item label="已发数量">{{
-                  order.totalIssuedQty ?? 0
-                }}</a-descriptions-item>
-                <a-descriptions-item label="备注" :span="3">{{
-                  order.remark || '—'
-                }}</a-descriptions-item>
-              </a-descriptions>
+              <SalesOrderBasicInfoSection :order="order" />
             </div>
 
             <div class="section-card">
@@ -130,11 +48,9 @@
                 </a-col>
               </a-row>
             </div>
-          </template>
 
-          <template v-else-if="activeTab === 'lines'">
             <div class="section-card">
-              <div class="section-title">订单明细</div>
+              <div class="section-title">销售明细</div>
               <a-table
                 :columns="lineColumns"
                 :data-source="order.lineItems || []"
@@ -142,7 +58,7 @@
                 size="small"
                 bordered
                 :pagination="false"
-                :scroll="{ x: 2000 }"
+                :scroll="{ x: lineTableScrollX }"
               >
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -154,14 +70,79 @@
                       {{ line.deliveryMode || '整机' }}
                     </a-tag>
                   </template>
-                  <template v-else-if="column.key === 'amount'">
-                    ￥{{ formatMoney(line.totalPriceInTax) }}
+                  <template v-else-if="isMoneyColumn(column.key)">
+                    {{ formatMoneyCell(line, column) }}
                   </template>
                   <template v-else>
                     {{ displayCell(line, column) }}
                   </template>
                 </template>
               </a-table>
+            </div>
+          </template>
+
+          <template v-else-if="activeTab === 'bom-version'">
+            <div class="section-card">
+              <div class="section-title">BOM 信息</div>
+              <a-table
+                :columns="bomColumns"
+                :data-source="salesOrderBomRows"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: bomTableScrollX }"
+                :locale="{ emptyText: '暂无销售明细' }"
+              >
+                <template #bodyCell="{ column, record: row }">
+                  <template v-if="column.key === 'index'">{{ row.index }}</template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag v-if="row.status !== '—'" :color="bomStatusColor(row.status)">
+                      {{ row.status }}
+                    </a-tag>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'bomName'">
+                    <a
+                      v-if="row.bomId"
+                      class="link-code"
+                      @click.prevent="openBomDetail(row.bomId, row.bomName)"
+                    >
+                      {{ row.bomName }}
+                    </a>
+                    <span v-else>{{ row.bomName }}</span>
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] ?? '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </div>
+
+            <div v-if="bomChangedLines.length" class="section-card">
+              <div class="section-title">BOM 版本变更</div>
+              <a-alert
+                type="info"
+                show-icon
+                class="bom-version-hint"
+                message="以下销售明细绑定的 BOM 版本与当前生效版本不一致，可查看变更记录与 BOM 详情。"
+              />
+              <div
+                v-for="line in bomChangedLines"
+                :key="line.id"
+                class="bom-product-block"
+              >
+                <div class="bom-line-head">
+                  <span class="bom-product-name">{{ line.productName }}</span>
+                  <span class="bom-product-code">{{ line.productCode }}</span>
+                  <a-tag color="orange">绑定 {{ line.bomVersion || '—' }}</a-tag>
+                </div>
+                <BomVersionInfoSection
+                  :product-id="line.productId"
+                  :bom-id="line.bomId"
+                  :bound-version="line.bomVersion"
+                />
+              </div>
             </div>
           </template>
 
@@ -420,6 +401,12 @@ import { message } from 'ant-design-vue'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { getSalesOrderById, resolveSalesOrderRelations } from '@/utils/salesOrderDetail'
 import { resolveLineBusinessType } from '@/utils/salesOrderBusiness'
+import { getActiveBomForItem } from '@/store/productBomStore'
+import { bomStatusColor } from '@/mock/productBomOptions'
+import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
+import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
+import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
+import { buildSalesOrderBomRows } from '@/utils/salesOrderBomRows'
 const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
@@ -441,23 +428,62 @@ const productionTabCount = computed(
     relations.value.assemblyWorkOrders.length,
 )
 
-const lineColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
-  { title: '产品名称', dataIndex: 'productName', width: 160, ellipsis: true },
-  { title: '产品编码', dataIndex: 'productCode', width: 120 },
-  { title: '业务类型', key: 'businessType', width: 96 },
-  { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
-  { title: '规格型号', dataIndex: 'specModel', width: 100 },
-  { title: '销售数量', dataIndex: 'salesQty', width: 80, align: 'right' },
-  { title: '已发数量', dataIndex: 'shippedQty', width: 80, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 56 },
-  { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
-  { title: 'BOM', dataIndex: 'bomName', width: 140, ellipsis: true },
-  { title: 'BOM版本', dataIndex: 'bomVersion', width: 90 },
-  { title: '含税单价', dataIndex: 'unitPriceInTax', width: 90, align: 'right' },
-  { title: '含税总额', key: 'amount', width: 100, align: 'right' },
-  { title: '行备注', dataIndex: 'lineRemark', width: 120, ellipsis: true },
+const bomChangedLines = computed(() =>
+  (order.value?.lineItems || []).filter(
+    (line) => line.productId && lineBomVersionHint(line),
+  ),
+)
+
+const salesOrderBomRows = computed(() => buildSalesOrderBomRows(order.value?.lineItems || []))
+
+const bomColumns = [
+  { key: 'index', title: '序号', width: 56, align: 'center', fixed: 'left' },
+  { key: 'status', title: 'BOM状态', width: 92, fixed: 'left' },
+  { key: 'bomName', title: 'BOM名称', dataIndex: 'bomName', width: 160, ellipsis: true, fixed: 'left' },
+  { key: 'bomNo', title: 'BOM编码', dataIndex: 'bomNo', width: 130, ellipsis: true },
+  { key: 'itemName', title: '物品名称', dataIndex: 'itemName', width: 140, ellipsis: true },
+  { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { key: 'material', title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
+  { key: 'drawingNo', title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { key: 'version', title: 'BOM版本', dataIndex: 'version', width: 100 },
+  { key: 'levelCount', title: '层级数', dataIndex: 'levelCount', width: 72, align: 'center' },
+  { key: 'materialCount', title: '物料数', dataIndex: 'materialCount', width: 72, align: 'center' },
+  { key: 'effectiveAt', title: '生效日期', dataIndex: 'effectiveAt', width: 150 },
+  { key: 'expiredAt', title: '失效日期', dataIndex: 'expiredAt', width: 150 },
+  { key: 'creator', title: '创建人', dataIndex: 'creator', width: 88 },
 ]
+
+const bomTableScrollX = computed(() =>
+  bomColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+const lineColumns = salesOrderDetailLineColumns
+
+const lineTableScrollX = computed(() =>
+  lineColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+function lineBomVersionHint(line) {
+  const active = getActiveBomForItem('product', line.productId)
+  return Boolean(active?.version && line.bomVersion && active.version !== line.bomVersion)
+}
+
+const moneyColumnKeys = new Set([
+  'unitPriceExTax',
+  'unitPriceInTax',
+  'totalPriceExTax',
+  'totalPriceInTax',
+])
+
+function isMoneyColumn(key) {
+  return moneyColumnKeys.has(key)
+}
+
+function formatMoneyCell(line, column) {
+  const val = line[column.dataIndex]
+  if (val === undefined || val === null || val === '') return '—'
+  return `￥${formatMoney(val)}`
+}
 
 const deliveryColumns = [
   { title: '发货单号', key: 'deliveryCode', width: 130 },
@@ -614,6 +640,13 @@ function goDeliveryDetail(row) {
   openTab(path, `发货单 ${row.deliveryCode}`)
   router.push({ name: 'sales-delivery-detail', params: { id: row.deliveryOrderId } })
 }
+
+function openBomDetail(bomId, bomName) {
+  if (!bomId) return
+  const path = `/product-process/bom/${bomId}`
+  openTab(path, bomName || 'BOM详情')
+  router.push(path)
+}
 </script>
 
 <style lang="less" scoped>
@@ -676,6 +709,41 @@ function goDeliveryDetail(row) {
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 10px;
+}
+
+.bom-version-hint {
+  margin-bottom: 12px;
+}
+
+.bom-line-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.bom-product-block {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed #f0f0f0;
+
+  &:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+}
+
+.bom-product-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.bom-product-code {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .sub-table {

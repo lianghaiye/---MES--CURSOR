@@ -8,7 +8,7 @@
               <a-input
                 v-model:value="filters.documentNo"
                 allow-clear
-                :placeholder="mod.docNoFilterPlaceholder"
+                :placeholder="moduleConfig.docNoFilterPlaceholder"
                 size="small"
               />
             </a-form-item>
@@ -82,7 +82,7 @@
     <div class="toolbar-row">
       <a-button type="primary" size="small" @click="goCreate">
         <PlusOutlined />
-        新增变更
+        {{ moduleConfig.createButtonLabel || '新增变更' }}
       </a-button>
       <a-space :size="4" class="toolbar-icons">
         <a-tooltip title="刷新">
@@ -128,11 +128,13 @@
             {{ record.urgency || '—' }}
           </template>
           <template v-else-if="column.key === 'docNo'">
-            <a class="link-code" @click.prevent="openDetail(record)">{{ getDocNo(record, moduleConfig) }}</a>
+            <a class="link-code" @click.prevent="openDetailInNewTab(record)">{{
+              getDocNo(record, moduleConfig)
+            }}</a>
           </template>
           <template v-else-if="column.key === 'execScope'">
-            <a-tooltip :title="record.execScope">
-              <span class="ellipsis-cell">{{ record.execScope || '—' }}</span>
+            <a-tooltip :title="resolveExecConfigLabel(record.wipHandling)">
+              <span class="ellipsis-cell">{{ resolveExecConfigLabel(record.wipHandling) }}</span>
             </a-tooltip>
           </template>
           <template v-else-if="column.key === 'reviewer'">
@@ -149,20 +151,13 @@
                 <a-button type="link" size="small" @click="handleSubmitApproval(record)">提交审批</a-button>
               </template>
               <template v-else-if="record.status === ECN_STATUS.APPROVING">
-                <a-button type="link" size="small" @click="openDetail(record)">审批</a-button>
+                <a-button type="link" size="small" @click="openApprove(record)">审批</a-button>
               </template>
               <template v-else-if="record.status === ECN_STATUS.APPROVED">
-                <a-button
-                  v-if="isRecordOnlyExec(record)"
-                  type="link"
-                  size="small"
-                  @click="openDetail(record)"
-                >
-                  详情
-                </a-button>
-                <a-button v-else type="link" size="small" @click="openExecute(record)">
-                  执行情况
-                </a-button>
+                <a-button type="link" size="small" @click="openExecute(record)">执行</a-button>
+              </template>
+              <template v-else-if="record.status === ECN_STATUS.EXECUTED">
+                <a-button type="link" size="small" @click="openDetailInNewTab(record)">详情</a-button>
               </template>
               <template v-else-if="record.status === ECN_STATUS.REJECTED">
                 <a-button type="link" size="small" @click="goEdit(record)">编辑</a-button>
@@ -209,17 +204,19 @@ import {
   ecnStatusOptions,
   ecnTypeOptions,
   ecnStatusColor,
-  isEcnRecordOnlyExecScope,
   formatEcnOriginDoc,
   resolveEcnChangeReason,
+  resolveExecConfigLabel,
 } from '@/constants/ecn'
 import { resolveChangeRequestModule, getDocNo } from '@/constants/changeRequestModule'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useTabs } from '@/composables/useTabs'
 
 const route = useRoute()
 const router = useRouter()
+const { openTab } = useTabs()
 const moduleConfig = resolveChangeRequestModule(route)
 
 const defaultFilters = () => ({
@@ -293,7 +290,13 @@ function goCreate() {
   router.push(moduleConfig.newPath)
 }
 
-function openDetail(record) {
+function openDetailInNewTab(record) {
+  const path = moduleConfig.detailPath(record.id)
+  openTab(path, `${getDocNo(record, moduleConfig)} 详情`)
+  router.push(path)
+}
+
+function openApprove(record) {
   router.push(moduleConfig.approvePath(record.id))
 }
 
@@ -311,10 +314,6 @@ function handleSubmitApproval(record) {
       else message.warning(res.message)
     },
   })
-}
-
-function isRecordOnlyExec(record) {
-  return isEcnRecordOnlyExecScope(record.execScope)
 }
 
 function goEdit(record) {

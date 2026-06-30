@@ -31,15 +31,15 @@
 
           <a-divider />
 
-          <div v-if="selectedExecScope" class="subsection exec-config">
+          <div v-if="selectedExecConfig" class="subsection exec-config">
             <div class="section-title-row">
               <span class="section-title">执行配置</span>
               <span class="section-sub">审批通过后生效</span>
             </div>
-            <div class="exec-label">变更执行时，影响范围：</div>
+            <div class="exec-label">BOM 执行方式：</div>
             <div class="exec-scope-item">
-              <div class="radio-main">{{ selectedExecScope.label }}</div>
-              <div class="radio-sub">{{ selectedExecScope.sub }}</div>
+              <div class="radio-main">{{ selectedExecConfig.label }}</div>
+              <div class="radio-sub">{{ selectedExecConfig.sub }}</div>
             </div>
           </div>
         </div>
@@ -90,7 +90,7 @@ import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
-import { ECN_STATUS, ECN_EXEC_SCOPE, ecnStatusColor, resolveEcnChangeReason } from '@/constants/ecn'
+import { ECN_STATUS, findExecConfigOption, ecnStatusColor, resolveEcnChangeReason } from '@/constants/ecn'
 import { resolveChangeRequestModule, getDocNo } from '@/constants/changeRequestModule'
 import EcnChangeItemsReadonlyTable from './components/EcnChangeItemsReadonlyTable.vue'
 
@@ -99,36 +99,11 @@ const router = useRouter()
 const moduleConfig = resolveChangeRequestModule(route)
 const opinion = ref('')
 
-const execScopeOpts = [
-  {
-    value: ECN_EXEC_SCOPE.RECORD_ONLY,
-    label: ECN_EXEC_SCOPE.RECORD_ONLY,
-    sub: '审批通过后仅归档记录，不驱动工单切换',
-  },
-  {
-    value: ECN_EXEC_SCOPE.NEW_ONLY,
-    label: ECN_EXEC_SCOPE.NEW_ONLY,
-    sub: '已在生产的工单继续按旧版执行',
-  },
-  {
-    value: ECN_EXEC_SCOPE.NEW_AND_WIP,
-    label: ECN_EXEC_SCOPE.NEW_AND_WIP,
-    sub: '在制工单将切换新版',
-  },
-  {
-    value: ECN_EXEC_SCOPE.ALL,
-    label: ECN_EXEC_SCOPE.ALL,
-    sub: '将重新计算已完工工单成本',
-  },
-]
-
 const record = computed(() => moduleConfig.store.findById(route.params.id))
 
 const changeItems = computed(() => record.value?.changeItems || [])
 
-const selectedExecScope = computed(() =>
-  execScopeOpts.find((opt) => opt.value === record.value?.execScope),
-)
+const selectedExecConfig = computed(() => findExecConfigOption(record.value?.wipHandling))
 
 const changeReasonText = computed(() => {
   const row = record.value

@@ -3,6 +3,7 @@ export const ECN_STATUS = {
   APPROVING: '审批中',
   APPROVED: '已通过',
   EXECUTING: '执行中',
+  EXECUTED: '已执行',
   REJECTED: '已驳回',
   COMPLETED: '已完成',
   CANCELLED: '已撤销',
@@ -76,20 +77,44 @@ export const ecnOriginOptions = [
   { label: '根据产品', value: ECN_ORIGIN_TYPE.PRODUCT, disabled: true },
 ]
 
-export const ECN_EXEC_SCOPE = {
-  RECORD_ONLY: '不影响任何工单、仅做记录',
-  NEW_ONLY: '仅影响新工单（推荐）',
-  NEW_AND_WIP: '影响新工单 + 未完工工单',
-  ALL: '全部切换（含已完工）',
-}
-
 export const ECN_WIP_HANDLING = {
-  KEEP_OLD: '继续按旧版执行（推荐，不影响生产）',
-  SWITCH_NOW: '立即切换新版（将在下一个工序开始生效）',
+  /** 升版 BOM 档案，已下发计划/工单不变；新建工单可关联新版 */
+  ARCHIVE_UPGRADE: 'archive_upgrade',
+  /** 在制工单下一工序起切换新版 */
+  SWITCH_NOW: 'switch_now',
 }
 
-export function isEcnRecordOnlyExecScope(execScope) {
-  return execScope === ECN_EXEC_SCOPE.RECORD_ONLY
+/** 执行配置（新建 / 审批 / 执行共用） */
+export const ecnExecConfigOptions = [
+  {
+    value: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
+    label: '仅升级 BOM 档案',
+    sub: '归档旧版并发布新版供售后/销售查阅；已下发计划与工单保持原绑定版本',
+    recommended: true,
+  },
+  {
+    value: ECN_WIP_HANDLING.SWITCH_NOW,
+    label: '在制工单切换新版',
+    sub: '在制工单将在下一工序起切换至新版 BOM',
+    recommended: false,
+  },
+]
+
+/** 兼容旧值 continue_old / record_only */
+export function normalizeWipHandling(wipHandling) {
+  if (wipHandling === 'continue_old' || wipHandling === 'record_only') {
+    return ECN_WIP_HANDLING.ARCHIVE_UPGRADE
+  }
+  return wipHandling
+}
+
+export function findExecConfigOption(wipHandling) {
+  const value = normalizeWipHandling(wipHandling)
+  return ecnExecConfigOptions.find((o) => o.value === value) || null
+}
+
+export function resolveExecConfigLabel(wipHandling) {
+  return findExecConfigOption(wipHandling)?.label || '—'
 }
 
 export const ecnStatusOptions = [
@@ -97,6 +122,7 @@ export const ecnStatusOptions = [
   { label: ECN_STATUS.DRAFT, value: ECN_STATUS.DRAFT },
   { label: ECN_STATUS.APPROVING, value: ECN_STATUS.APPROVING },
   { label: ECN_STATUS.APPROVED, value: ECN_STATUS.APPROVED },
+  { label: ECN_STATUS.EXECUTED, value: ECN_STATUS.EXECUTED },
   { label: ECN_STATUS.REJECTED, value: ECN_STATUS.REJECTED },
 ]
 
@@ -134,8 +160,9 @@ export function ecnStatusColor(status) {
   const map = {
     [ECN_STATUS.PENDING]: 'orange',
     [ECN_STATUS.APPROVING]: 'processing',
-    [ECN_STATUS.APPROVED]: 'success',
+    [ECN_STATUS.APPROVED]: 'blue',
     [ECN_STATUS.EXECUTING]: 'cyan',
+    [ECN_STATUS.EXECUTED]: 'success',
     [ECN_STATUS.REJECTED]: 'error',
     [ECN_STATUS.CANCELLED]: 'default',
     [ECN_STATUS.COMPLETED]: 'default',

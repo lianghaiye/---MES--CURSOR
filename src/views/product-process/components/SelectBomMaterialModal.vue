@@ -311,6 +311,7 @@ const props = defineProps({
   onlyWithBom: { type: Boolean, default: false },
   hideAddMaterial: { type: Boolean, default: false },
   ecnNewMaterialMode: { type: Boolean, default: false },
+  pickerDefaultItemType: { type: String, default: '' },
   multiple: { type: Boolean, default: true },
   title: { type: String, default: '添加子项' },
 })
@@ -481,7 +482,7 @@ watch(
     keyword.value = ''
     Object.assign(ecnFilters, emptyEcnFilters())
     Object.assign(appliedEcnFilters, emptyEcnFilters())
-    quickItemType.value = props.ecnNewMaterialMode ? '物料' : undefined
+    quickItemType.value = props.pickerDefaultItemType || (props.ecnNewMaterialMode ? '物料' : undefined)
     page.value = 1
     appliedFilterConditions.value = []
     selectedRowKeys.value = []
