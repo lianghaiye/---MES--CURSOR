@@ -85,12 +85,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined, WarningOutlined } from '@ant-design/icons-vue'
 import { ECN_STATUS } from '@/constants/ecn'
-import { useChangeRequestModule } from '@/composables/useChangeRequestModule'
+import { resolveChangeRequestModule } from '@/constants/changeRequestModule'
 
 const route = useRoute()
 const router = useRouter()
-const mod = useChangeRequestModule()
-const moduleConfig = mod.value
+const moduleConfig = resolveChangeRequestModule(route)
 const submitting = ref(false)
 const wipHandling = ref('continue_old')
 const updateItems = ref([])

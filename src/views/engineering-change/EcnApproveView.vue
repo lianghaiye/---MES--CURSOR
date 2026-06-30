@@ -91,13 +91,12 @@ import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { ECN_STATUS, ECN_EXEC_SCOPE, ecnStatusColor, resolveEcnChangeReason } from '@/constants/ecn'
-import { useChangeRequestModule, getDocNo } from '@/composables/useChangeRequestModule'
+import { resolveChangeRequestModule, getDocNo } from '@/constants/changeRequestModule'
 import EcnChangeItemsReadonlyTable from './components/EcnChangeItemsReadonlyTable.vue'
 
 const route = useRoute()
 const router = useRouter()
-const mod = useChangeRequestModule()
-const moduleConfig = mod.value
+const moduleConfig = resolveChangeRequestModule(route)
 const opinion = ref('')
 
 const execScopeOpts = [

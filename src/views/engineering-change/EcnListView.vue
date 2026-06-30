@@ -201,7 +201,7 @@ export default { name: 'EcnListView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
@@ -213,14 +213,14 @@ import {
   formatEcnOriginDoc,
   resolveEcnChangeReason,
 } from '@/constants/ecn'
-import { useChangeRequestModule, getDocNo } from '@/composables/useChangeRequestModule'
+import { resolveChangeRequestModule, getDocNo } from '@/constants/changeRequestModule'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
+const route = useRoute()
 const router = useRouter()
-const mod = useChangeRequestModule()
-const moduleConfig = mod.value
+const moduleConfig = resolveChangeRequestModule(route)
 
 const defaultFilters = () => ({
   documentNo: '',

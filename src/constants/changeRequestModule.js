@@ -44,3 +44,16 @@ export const CHANGE_REQUEST_MODULES = {
     store: ecrStoreApi,
   },
 }
+
+export function resolveChangeRequestModule(routeOrKind) {
+  const kind =
+    typeof routeOrKind === 'string'
+      ? routeOrKind
+      : routeOrKind?.meta?.changeModule || CHANGE_MODULE.ECN
+  return CHANGE_REQUEST_MODULES[kind] || CHANGE_REQUEST_MODULES[CHANGE_MODULE.ECN]
+}
+
+export function getDocNo(record, moduleConfig) {
+  if (!record) return '—'
+  return record[moduleConfig.docNoField] || '—'
+}

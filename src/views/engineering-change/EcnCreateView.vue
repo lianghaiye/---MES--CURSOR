@@ -314,7 +314,7 @@ export default { name: 'EcnCreateView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
   ArrowLeftOutlined,
@@ -334,7 +334,7 @@ import {
   ecnChangeReasonOptions,
   ECN_CHANGE_ITEM_TYPE,
 } from '@/constants/ecn'
-import { useChangeRequestModule } from '@/composables/useChangeRequestModule'
+import { resolveChangeRequestModule } from '@/constants/changeRequestModule'
 import { salesOrderState, getSalesOrderById, findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import { workOrderState } from '@/store/workOrderStore'
 import { filterSalesOrdersForPicker } from '@/utils/salesOrderPicker'
@@ -355,9 +355,9 @@ import EcnChangeItemsTable from './components/EcnChangeItemsTable.vue'
 import EcnChangeItemEditModal from './components/EcnChangeItemEditModal.vue'
 import BomOverviewModal from '@/views/product-process/components/BomOverviewModal.vue'
 
+const route = useRoute()
 const router = useRouter()
-const mod = useChangeRequestModule()
-const moduleConfig = mod.value
+const moduleConfig = resolveChangeRequestModule(route)
 const fileList = ref([])
 const salesOrderModalOpen = ref(false)
 const workOrderModalOpen = ref(false)
