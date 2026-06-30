@@ -137,6 +137,20 @@ function mapRecordToLine(record, index, materialCode) {
   }
 }
 
+function resolveRecordReportQty(record = {}) {
+  return (Number(record.goodQty) || 0) + (Number(record.defectQty) || 0)
+}
+
+function resolveRecordAdjustedReportQty(record = {}) {
+  if (record.adjustedGoodQty != null || record.adjustedDefectQty != null) {
+    return (Number(record.adjustedGoodQty) || 0) + (Number(record.adjustedDefectQty) || 0)
+  }
+  if (record.adjustedReportQty != null && record.adjustedReportQty !== '') {
+    return Number(record.adjustedReportQty) || 0
+  }
+  return resolveRecordReportQty(record)
+}
+
 export function calcProcessReportStats(records = []) {
   const today = formatReportDate()
   const monthStart = dayjs().startOf('month')
@@ -148,11 +162,13 @@ export function calcProcessReportStats(records = []) {
     return d.isValid() && !d.isBefore(monthStart) && !d.isAfter(monthEnd)
   })
 
-  const sumQty = (list) =>
-    list.reduce((s, r) => s + (Number(r.goodQty) || 0) + (Number(r.defectQty) || 0), 0)
+  const sumQty = (list) => list.reduce((s, r) => s + resolveRecordReportQty(r), 0)
+  const sumAdjustedQty = (list) =>
+    list.reduce((s, r) => s + resolveRecordAdjustedReportQty(r), 0)
 
   return {
     todayQty: sumQty(todayList),
+    todayAdjustedQty: sumAdjustedQty(todayList),
     todayTaskCount: todayList.length,
     monthQty: sumQty(monthList),
   }

@@ -13,7 +13,7 @@
       <div class="overview-toolbar">
         <div class="toolbar-left">
           <div class="root-name">{{ rootItemName }}</div>
-          <div class="qty-row">
+          <div v-if="!simpleToolbar" class="qty-row">
             <span class="qty-label">数量</span>
             <a-input-number
               v-model:value="quantity"
@@ -25,7 +25,7 @@
           </div>
         </div>
         <div class="toolbar-right">
-          <a-button size="small" @click="handlePrint">
+          <a-button v-if="!simpleToolbar" size="small" @click="handlePrint">
             <PrinterOutlined />
             打印
           </a-button>
@@ -112,6 +112,7 @@
     />
 
     <BomPrintModal
+      v-if="!simpleToolbar"
       v-model:open="printModalOpen"
       :flat-nodes="flatNodes"
       :line-items="lineItems"
@@ -146,6 +147,8 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  /** ECN 等只读查看：隐藏数量与打印 */
+  simpleToolbar: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open'])
@@ -323,10 +326,29 @@ function handleClose() {
   }
 
   .overview-index-cell {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     white-space: nowrap;
     min-width: 56px;
     font-variant-numeric: tabular-nums;
+    line-height: 22px;
+    vertical-align: middle;
+  }
+
+  :deep(.ant-table-cell-with-append) {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  :deep(.ant-table-row-expand-icon) {
+    margin-top: 0;
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+
+  :deep(.ant-table-row-indent) {
+    flex-shrink: 0;
   }
 
   :deep(.ant-table-cell) {

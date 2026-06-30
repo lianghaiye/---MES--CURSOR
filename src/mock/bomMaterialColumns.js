@@ -16,10 +16,6 @@ export const defaultBomColumnSettings = [
   { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 13 },
   { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 14 },
   { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 15 },
-  { key: 'childBomVersion', title: '子件BOM版本', hidden: true, frozen: false, order: 16 },
-  { key: 'lossRate', title: '子件损耗率(%)', hidden: true, frozen: false, order: 17 },
-  { key: 'effectiveStart', title: '有效开始日期', hidden: true, frozen: false, order: 18 },
-  { key: 'effectiveEnd', title: '有效结束日期', hidden: true, frozen: false, order: 19 },
 ]
 
 /** 子件 BOM 展示：BOM 名称 + 版本号 */

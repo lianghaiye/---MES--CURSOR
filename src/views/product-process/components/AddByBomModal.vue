@@ -78,12 +78,11 @@
       <a-button type="primary" :disabled="!selectedRow" @click="handleConfirm">确定</a-button>
     </template>
 
-    <SelectBomMaterialModal
+    <SelectBomPickerModal
       v-model:open="advancedOpen"
-      title="选择产品/物料"
-      :only-with-bom="true"
-      :multiple="false"
-      @selected="onAdvancedSelected"
+      title="选择BOM"
+      :row-filter="activeBomRowFilter"
+      @confirm="onAdvancedBomSelected"
     />
   </a-modal>
 </template>
@@ -91,8 +90,10 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { buildBomLinkedPickerRows, findBomLinkedPickerRow } from '@/utils/bomWithBomPicker'
-import SelectBomMaterialModal from './SelectBomMaterialModal.vue'
+import { buildBomLinkedPickerRows, findBomLinkedPickerRow, findBomLinkedPickerRowByBom } from '@/utils/bomWithBomPicker'
+import { isBomActive } from '@/mock/productBomOptions'
+import { resolveBomLinkedMaster } from '@/utils/bomPickerTable'
+import SelectBomPickerModal from './SelectBomPickerModal.vue'
 
 const props = defineProps({
   open: Boolean,
@@ -154,16 +155,30 @@ function onSelectChange(rowKey) {
   selectedRow.value = rowKey ? findBomLinkedPickerRow(rowKey) : null
 }
 
-function onAdvancedSelected(items) {
-  const row = Array.isArray(items) ? items[0] : items
-  if (!row?.code) return
-  const rowKey = `${row.itemType}-${row.id}`
-  const hit = findBomLinkedPickerRow(rowKey)
+const activeBomRowFilter = (bom) => isBomActive(bom)
+
+function onAdvancedBomSelected(bom) {
+  let hit = findBomLinkedPickerRowByBom(bom)
   if (!hit) {
-    message.warning('所选物品未关联生效的 BOM')
-    return
+    const master = resolveBomLinkedMaster(bom)
+    if (!master) {
+      message.warning('所选 BOM 未关联有效物品')
+      return
+    }
+    const itemType = bom.itemType === 'material' ? '物料' : '产品'
+    hit = {
+      rowKey: `${itemType}-${bom.itemId}`,
+      itemType,
+      itemId: bom.itemId,
+      code: master.code,
+      name: master.name || bom.itemName,
+      specModel: master.specModel || bom.specModel || '',
+      bomName: bom.bomName || '',
+      bomNo: bom.bomNo || '',
+      bomVersion: bom.version || '',
+    }
   }
-  selectedRowKey.value = rowKey
+  selectedRowKey.value = hit.rowKey
   selectedRow.value = hit
 }
 

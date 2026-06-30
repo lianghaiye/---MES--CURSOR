@@ -1,6 +1,11 @@
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
-import { getLinesForTreeNode, getRootTreeId } from '@/utils/bomTree'
+import {
+  getLinesForTreeNode,
+  getOrderedChildNodeIds,
+  getRootTreeId,
+  parseMaterialCodeFromNodeTitle,
+} from '@/utils/bomTree'
 import { formatSubstitutePartLabel } from '@/mock/bomMaterialColumns'
 import { normalizeSupplyForm } from '@/utils/masterDataMigrate'
 
@@ -82,22 +87,73 @@ function lineToOverviewRow(line, scale, materialQtyByCode) {
   return row
 }
 
+function parseNodeTitle(title) {
+  const t = String(title || '').trim()
+  const code = parseMaterialCodeFromNodeTitle(t)
+  if (code) {
+    return { materialCode: code, itemName: t.slice(code.length).trim() || t }
+  }
+  return { materialCode: '—', itemName: t || '—' }
+}
+
+function nodeToOverviewRow(node, scale, materialQtyByCode, children) {
+  const parsed = parseNodeTitle(node.title)
+  const code = node.materialCode || parsed.materialCode
+  const master = lookupMasterProduction(code !== '—' ? code : '')
+  const baseQty = Number(node.quantity) || 1
+  const row = {
+    key: `node-${node.id}`,
+    itemName: parsed.itemName,
+    materialCode: code || '—',
+    specModel: '—',
+    material: '—',
+    drawingNo: '—',
+    baseUnitQty: baseQty,
+    unitQty: roundQty(baseQty * scale),
+    unit: '件',
+    materialType: node.nodeType === 'assembly' ? '部件' : '—',
+    categoryName: '—',
+    supplyForm: master.supplyForm || '—',
+    supplyUnit: formatSupplyUnitDisplay(master.supplyForm, master.production),
+    substitutePart: '—',
+    processDocName: '—',
+    processRoute: '—',
+    remark: '—',
+  }
+  if (children?.length) row.children = children
+  if (materialQtyByCode) {
+    row.stockQty = '—'
+    row.demandQty = '—'
+  }
+  return row
+}
+
 function buildChildren(parentNodeId, flatNodes, lineItems, scale, materialQtyByCode) {
   const lines = getLinesForTreeNode(lineItems, parentNodeId, flatNodes)
-  return lines.map((line) => {
+  const result = []
+  const linkedNodeIds = new Set()
+
+  lines.forEach((line) => {
     const row = lineToOverviewRow(line, scale, materialQtyByCode)
-    if (line.treeNodeId) {
-      const children = buildChildren(
-        line.treeNodeId,
-        flatNodes,
-        lineItems,
-        scale,
-        materialQtyByCode,
-      )
+    const subNodeId = line.treeNodeId
+    if (subNodeId && subNodeId !== parentNodeId) {
+      linkedNodeIds.add(subNodeId)
+      const children = buildChildren(subNodeId, flatNodes, lineItems, scale, materialQtyByCode)
       if (children.length) row.children = children
     }
-    return row
+    result.push(row)
   })
+
+  getOrderedChildNodeIds(parentNodeId, flatNodes, lineItems).forEach((childNodeId) => {
+    if (linkedNodeIds.has(childNodeId)) return
+    const node = flatNodes.find((n) => n.id === childNodeId)
+    if (!node) return
+    const nodeChildren = buildChildren(childNodeId, flatNodes, lineItems, scale, materialQtyByCode)
+    if (!nodeChildren.length) return
+    result.push(nodeToOverviewRow(node, scale, materialQtyByCode, nodeChildren))
+  })
+
+  return result
 }
 
 /** 构建 BOM 概览树形表格数据 */

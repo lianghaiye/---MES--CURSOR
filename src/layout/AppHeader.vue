@@ -82,8 +82,10 @@ const moreMenuItems = computed(() =>
 )
 
 function navigateToModule(mod) {
-  const first = sideMenus[mod.key]?.[0]
-  const path = first?.path || mod.path
+  const firstSide = sideMenus[mod.key]?.[0]?.path
+  const bare = `/${mod.key}`
+  const path = mod.path && mod.path !== bare ? mod.path : firstSide || mod.path
+  if (!path) return
   openTab(path)
   router.push(path)
 }

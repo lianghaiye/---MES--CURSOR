@@ -25,6 +25,12 @@ export function findBomLinkedPickerRow(rowKey) {
   return buildBomLinkedPickerRows().find((r) => r.rowKey === rowKey)
 }
 
+export function findBomLinkedPickerRowByBom(bom) {
+  if (!bom?.itemId) return null
+  const itemType = bom.itemType === 'material' ? '物料' : '产品'
+  return findBomLinkedPickerRow(`${itemType}-${bom.itemId}`)
+}
+
 export function filterBomLinkedPickerRows(rows, keyword) {
   const kw = (keyword || '').trim().toLowerCase()
   if (!kw) return rows

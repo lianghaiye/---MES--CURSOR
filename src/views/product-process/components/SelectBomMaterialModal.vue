@@ -9,52 +9,190 @@
     @cancel="handleCancel"
   >
     <div class="picker-toolbar">
-      <a-space :size="8" wrap class="toolbar-left">
-        <a-button v-if="!onlyWithBom" type="primary" size="small" @click="materialFormOpen = true">
-          <PlusOutlined />
-          添加产品/物料
-        </a-button>
-        <a-input
-          v-model:value="keyword"
-          allow-clear
-          size="small"
-          placeholder="搜索产品/物料编号、名称、规格型号"
-          class="search-input"
-          @press-enter="handleQuickSearch"
-        >
-          <template #prefix>
-            <SearchOutlined />
-          </template>
-        </a-input>
-        <a-select
-          v-model:value="quickItemType"
-          allow-clear
-          size="small"
-          placeholder="类型"
-          class="type-select"
-          :options="itemTypeOpts"
-          @change="handleQuickSearch"
-        />
-        <a-badge :count="activeFilterCount" :offset="[-4, 4]">
-          <a-button
+      <a-form v-if="ecnNewMaterialMode" layout="inline" class="ecn-filter-form toolbar-left">
+        <a-form-item label="类型">
+          <a-select
+            v-model:value="quickItemType"
             size="small"
-            :type="activeFilterCount ? 'primary' : 'default'"
-            :ghost="!!activeFilterCount"
-            @click="filterModalOpen = true"
-          >
-            <FilterOutlined />
-            筛选
+            class="type-select"
+            :options="itemTypeOpts"
+          />
+        </a-form-item>
+        <a-form-item label="物品名称">
+          <a-input
+            v-model:value="ecnFilters.itemName"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 110px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="编码">
+          <a-input
+            v-model:value="ecnFilters.materialCode"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 110px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="规格型号">
+          <a-input
+            v-model:value="ecnFilters.specModel"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 100px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="类别">
+          <a-input
+            v-model:value="ecnFilters.categoryName"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 90px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="材质">
+          <a-input
+            v-model:value="ecnFilters.material"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 90px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="图号">
+          <a-input
+            v-model:value="ecnFilters.drawingNo"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 100px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item>
+          <a-space :size="8">
+            <a-button type="primary" size="small" @click="handleEcnSearch">搜索</a-button>
+            <a-button size="small" @click="handleEcnClear">清空</a-button>
+          </a-space>
+        </a-form-item>
+      </a-form>
+      <a-form v-else layout="inline" class="ecn-filter-form toolbar-left">
+        <a-form-item v-if="!onlyWithBom && !hideAddMaterial">
+          <a-button type="primary" size="small" @click="materialFormOpen = true">
+            <PlusOutlined />
+            添加产品/物料
           </a-button>
-        </a-badge>
-      </a-space>
-      <a-tooltip title="列显隐">
+        </a-form-item>
+        <a-form-item label="类型">
+          <a-select
+            v-model:value="quickItemType"
+            allow-clear
+            size="small"
+            placeholder="全部"
+            class="type-select"
+            :options="itemTypeOpts"
+          />
+        </a-form-item>
+        <a-form-item label="物品名称">
+          <a-input
+            v-model:value="ecnFilters.itemName"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 110px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="编码">
+          <a-input
+            v-model:value="ecnFilters.materialCode"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 110px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="规格型号">
+          <a-input
+            v-model:value="ecnFilters.specModel"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 100px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="类别">
+          <a-input
+            v-model:value="ecnFilters.categoryName"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 90px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="材质">
+          <a-input
+            v-model:value="ecnFilters.material"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 90px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item label="图号">
+          <a-input
+            v-model:value="ecnFilters.drawingNo"
+            allow-clear
+            size="small"
+            placeholder="请输入"
+            style="width: 100px"
+            @press-enter="handleEcnSearch"
+          />
+        </a-form-item>
+        <a-form-item>
+          <a-space :size="8">
+            <a-button type="primary" size="small" @click="handleEcnSearch">搜索</a-button>
+            <a-button size="small" @click="handleEcnClear">清空</a-button>
+            <a-badge :count="activeFilterCount" :offset="[-4, 4]">
+              <a-button
+                size="small"
+                :type="activeFilterCount ? 'primary' : 'default'"
+                :ghost="!!activeFilterCount"
+                @click="filterModalOpen = true"
+              >
+                <FilterOutlined />
+                筛选
+              </a-button>
+            </a-badge>
+          </a-space>
+        </a-form-item>
+      </a-form>
+      <a-tooltip v-if="!ecnNewMaterialMode" title="列显隐">
+        <a-button type="text" size="small" @click="columnDrawerOpen = true">
+          <SettingOutlined />
+        </a-button>
+      </a-tooltip>
+      <a-tooltip v-if="ecnNewMaterialMode" title="列显隐">
         <a-button type="text" size="small" @click="columnDrawerOpen = true">
           <SettingOutlined />
         </a-button>
       </a-tooltip>
     </div>
 
-    <div v-if="activeFilterCount" class="filter-tags">
+    <div v-if="!ecnNewMaterialMode && activeFilterCount" class="filter-tags">
       <span class="filter-tags-label">已设筛选：</span>
       <a-tag
         v-for="tag in filterTags"
@@ -126,7 +264,7 @@
     </template>
 
     <MaterialFormModal
-      v-if="!onlyWithBom"
+      v-if="!onlyWithBom && !hideAddMaterial"
       v-model:open="materialFormOpen"
       @saved="onMaterialSaved"
     />
@@ -143,10 +281,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import {
-  SearchOutlined,
   SettingOutlined,
   PlusOutlined,
   CloseOutlined,
@@ -154,7 +291,7 @@ import {
 } from '@ant-design/icons-vue'
 import {
   buildBomSubItemPickerRows,
-  filterBomSubItemPickerRows,
+  filterEcnNewMaterialRows,
   toBomSubItemPayload,
 } from '@/utils/bomSubItemPicker'
 import { buildBomLinkedPickerRows } from '@/utils/bomWithBomPicker'
@@ -172,6 +309,8 @@ import BomSubItemFilterModal from './BomSubItemFilterModal.vue'
 const props = defineProps({
   open: Boolean,
   onlyWithBom: { type: Boolean, default: false },
+  hideAddMaterial: { type: Boolean, default: false },
+  ecnNewMaterialMode: { type: Boolean, default: false },
   multiple: { type: Boolean, default: true },
   title: { type: String, default: '添加子项' },
 })
@@ -186,7 +325,24 @@ const pageSize = ref(20)
 const materialFormOpen = ref(false)
 const columnDrawerOpen = ref(false)
 const filterModalOpen = ref(false)
-const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomSubItemPickerColumns)))
+
+const emptyEcnFilters = () => ({
+  itemName: '',
+  materialCode: '',
+  specModel: '',
+  categoryName: '',
+  material: '',
+  drawingNo: '',
+})
+
+const ecnFilters = reactive(emptyEcnFilters())
+const appliedEcnFilters = reactive(emptyEcnFilters())
+
+function buildDefaultColumnSettings() {
+  return defaultBomSubItemPickerColumns.filter((c) => c.key !== 'subItemCount')
+}
+
+const columnSettings = ref(JSON.parse(JSON.stringify(buildDefaultColumnSettings())))
 const selectedRowKeys = ref([])
 const selectedRows = ref([])
 const listVersion = ref(0)
@@ -229,8 +385,11 @@ const filteredRows = computed(() => {
   if (quickItemType.value) {
     rows = rows.filter((r) => r.itemType === quickItemType.value)
   }
+  if (props.ecnNewMaterialMode) {
+    return filterEcnNewMaterialRows(rows, appliedEcnFilters)
+  }
   rows = applyBomSubItemFilterConditions(rows, appliedFilterConditions.value)
-  return filterBomSubItemPickerRows(rows, keyword.value)
+  return filterEcnNewMaterialRows(rows, appliedEcnFilters)
 })
 
 const activeFilterCount = computed(
@@ -311,37 +470,38 @@ const rowSelection = computed(() => ({
   },
 }))
 
-watch(keyword, () => {
-  page.value = 1
-})
-
 watch(quickItemType, () => {
   page.value = 1
 })
-
-watch(
-  () => keyword.value,
-  () => {
-    loading.value = true
-    requestAnimationFrame(() => {
-      loading.value = false
-    })
-  },
-)
 
 watch(
   () => props.open,
   (visible) => {
     if (!visible) return
     keyword.value = ''
-    quickItemType.value = undefined
+    Object.assign(ecnFilters, emptyEcnFilters())
+    Object.assign(appliedEcnFilters, emptyEcnFilters())
+    quickItemType.value = props.ecnNewMaterialMode ? '物料' : undefined
     page.value = 1
     appliedFilterConditions.value = []
     selectedRowKeys.value = []
     selectedRows.value = []
+    columnSettings.value = JSON.parse(JSON.stringify(buildDefaultColumnSettings()))
     listVersion.value += 1
   },
 )
+
+function handleEcnSearch() {
+  Object.assign(appliedEcnFilters, { ...ecnFilters })
+  page.value = 1
+}
+
+function handleEcnClear() {
+  Object.assign(ecnFilters, emptyEcnFilters())
+  Object.assign(appliedEcnFilters, emptyEcnFilters())
+  appliedFilterConditions.value = []
+  page.value = 1
+}
 
 function formatFilterTag(condition) {
   const field = bomSubItemFilterFields.find((f) => f.key === condition.field)
@@ -354,10 +514,6 @@ function formatFilterTag(condition) {
     return `${fieldLabel} ${operator}`
   }
   return `${fieldLabel} ${operator} ${condition.value ?? ''}`
-}
-
-function handleQuickSearch() {
-  page.value = 1
 }
 
 function onFilterConfirm(conditions) {
@@ -448,6 +604,15 @@ function onMaterialSaved({ isEdit, data }) {
 
     .type-select {
       width: 120px;
+    }
+
+    .ecn-filter-form {
+      flex: 1;
+      min-width: 0;
+
+      :deep(.ant-form-item) {
+        margin-bottom: 8px;
+      }
     }
   }
 

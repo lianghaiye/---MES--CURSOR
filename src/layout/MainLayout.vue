@@ -30,7 +30,7 @@ const route = useRoute()
 const moduleKey = computed(() => resolveModuleKey(route.path))
 const sideItems = computed(() => sideMenus[moduleKey.value] || [])
 
-const cachedViews = ['ProductionPlanView', 'ProductBomCreateView', 'EbomDesignView']
+const cachedViews = ['ProductionPlanView', 'ProductBomCreateView', 'EbomDesignView', 'EcnCreateView']
 </script>
 
 <style lang="less" scoped>

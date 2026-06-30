@@ -184,12 +184,6 @@ const routes = [
         meta: { title: 'EBOM设计' },
       },
       {
-        path: 'planning/ebom',
-        name: 'planning-ebom',
-        component: () => import('@/views/planning/EbomManagementView.vue'),
-        meta: { title: 'EBOM管理' },
-      },
-      {
         path: 'production/work-orders',
         name: 'production-work-orders',
         component: () => import('@/views/production/WorkOrderManagementView.vue'),
@@ -370,6 +364,62 @@ const routes = [
         meta: { title: '采购订单' },
       },
       { path: 'procurement/suppliers', ...emptyChild('procurement-suppliers', '供应商') },
+      {
+        path: 'engineering-change',
+        redirect: '/engineering-change/ecn-list',
+      },
+      {
+        path: 'engineering-change/ecn-list',
+        name: 'engineering-change-ecn-list',
+        component: () => import('@/views/engineering-change/EcnListView.vue'),
+        meta: { title: 'ECN列表', changeModule: 'ecn' },
+      },
+      {
+        path: 'engineering-change/ecn/new',
+        name: 'engineering-change-ecn-new',
+        component: () => import('@/views/engineering-change/EcnCreateView.vue'),
+        meta: { title: '提交工程变更申请', changeModule: 'ecn' },
+      },
+      {
+        path: 'engineering-change/ecn/:id/approve',
+        name: 'engineering-change-ecn-approve',
+        component: () => import('@/views/engineering-change/EcnApproveView.vue'),
+        meta: { title: '审批工程变更', changeModule: 'ecn' },
+      },
+      {
+        path: 'engineering-change/ecn/:id/execute',
+        name: 'engineering-change-ecn-execute',
+        component: () => import('@/views/engineering-change/EcnExecuteView.vue'),
+        meta: { title: '执行工程变更', changeModule: 'ecn' },
+      },
+      {
+        path: 'engineering-change/ecr-request',
+        name: 'engineering-change-ecr-request',
+        component: () => import('@/views/engineering-change/EcnListView.vue'),
+        meta: { title: 'ECR申请', changeModule: 'ecr' },
+      },
+      {
+        path: 'engineering-change/ecr/new',
+        name: 'engineering-change-ecr-new',
+        component: () => import('@/views/engineering-change/EcnCreateView.vue'),
+        meta: { title: '提交工程变更申请', changeModule: 'ecr' },
+      },
+      {
+        path: 'engineering-change/ecr/:id/approve',
+        name: 'engineering-change-ecr-approve',
+        component: () => import('@/views/engineering-change/EcnApproveView.vue'),
+        meta: { title: '审批工程变更', changeModule: 'ecr' },
+      },
+      {
+        path: 'engineering-change/ecr/:id/execute',
+        name: 'engineering-change-ecr-execute',
+        component: () => import('@/views/engineering-change/EcnExecuteView.vue'),
+        meta: { title: '执行工程变更', changeModule: 'ecr' },
+      },
+      {
+        path: 'engineering-change/ecr-change',
+        ...emptyChild('engineering-change-ecr-change', 'ECR变更'),
+      },
       {
         path: 'after-sales/service-orders',
         ...emptyChild('after-sales-service-orders', '服务工单'),

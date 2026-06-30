@@ -83,6 +83,33 @@ export function filterBomSubItemPickerRows(rows, keyword) {
   )
 }
 
+/** ECN 选择新物料：多字段模糊筛选 */
+export function filterEcnNewMaterialRows(rows, filters = {}) {
+  const f = {
+    itemName: String(filters.itemName || '').trim().toLowerCase(),
+    materialCode: String(filters.materialCode || '').trim().toLowerCase(),
+    specModel: String(filters.specModel || '').trim().toLowerCase(),
+    categoryName: String(filters.categoryName || '').trim().toLowerCase(),
+    material: String(filters.material || '').trim().toLowerCase(),
+    drawingNo: String(filters.drawingNo || '').trim().toLowerCase(),
+  }
+  const hasFilter = Object.values(f).some(Boolean)
+  if (!hasFilter) return rows
+  return rows.filter((row) => {
+    if (f.itemName && !String(row.name || '').toLowerCase().includes(f.itemName)) return false
+    if (f.materialCode && !String(row.code || '').toLowerCase().includes(f.materialCode)) {
+      return false
+    }
+    if (f.specModel && !String(row.specModel || '').toLowerCase().includes(f.specModel)) return false
+    if (f.categoryName && !String(row.categoryName || '').toLowerCase().includes(f.categoryName)) {
+      return false
+    }
+    if (f.material && !String(row.material || '').toLowerCase().includes(f.material)) return false
+    if (f.drawingNo && !String(row.drawingNo || '').toLowerCase().includes(f.drawingNo)) return false
+    return true
+  })
+}
+
 function collectCategoryKeys(categoryKey) {
   if (!categoryKey) return null
   const matFlat = flattenMatCats(materialCategoryTree)

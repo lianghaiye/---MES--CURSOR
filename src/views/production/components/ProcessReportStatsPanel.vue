@@ -20,15 +20,21 @@ import { computed } from 'vue'
 const props = defineProps({
   stats: {
     type: Object,
-    default: () => ({ todayQty: 0, todayTaskCount: 0, monthQty: 0 }),
+    default: () => ({ todayQty: 0, todayAdjustedQty: 0, todayTaskCount: 0, monthQty: 0 }),
   },
 })
+
+function formatTodayQtyValue(stats = {}) {
+  const original = stats.todayQty ?? 0
+  const adjusted = stats.todayAdjustedQty ?? original
+  return `${original}/${adjusted}（调整后）`
+}
 
 const cards = computed(() => [
   {
     key: 'todayQty',
     title: '今日报工数量（件）',
-    value: String(props.stats.todayQty ?? 0),
+    value: formatTodayQtyValue(props.stats),
     iconClass: 'icon-blue',
   },
   {
@@ -78,10 +84,11 @@ export default { name: 'ProcessReportStatsPanel' }
 }
 
 .stat-value {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
-  line-height: 1.2;
+  line-height: 1.3;
+  word-break: break-all;
 }
 
 .stat-icon {

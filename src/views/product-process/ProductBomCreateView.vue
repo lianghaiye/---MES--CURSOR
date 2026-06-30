@@ -207,11 +207,13 @@
     />
     <SelectBomMaterialModal v-model:open="materialModalOpen" @selected="onMaterialSelected" />
     <AddByBomModal v-model:open="addByBomModalOpen" @confirm="onAddByBomConfirm" />
-    <SelectProductMaterialModal
+    <SelectBomMaterialModal
       v-model:open="switchProductOpen"
-      :item-type="form.itemType === 'material' ? '物料' : '产品'"
-      :selected-id="switchSelectedId"
-      @confirm="onSwitchProductConfirm"
+      title="选择物品"
+      ecn-new-material-mode
+      hide-add-material
+      :multiple="false"
+      @selected="onSwitchProductSelected"
     />
     <BomColumnSettingDrawer v-model:open="columnDrawerOpen" v-model:settings="columnSettings" />
     <BomOverviewModal
@@ -246,7 +248,7 @@ import {
 } from '@ant-design/icons-vue'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { generateBomNo, getProductBomById, saveProductBom } from '@/store/productBomStore'
+import { generateBomNo, getProductBomById, saveProductBom, isBomPending } from '@/store/productBomStore'
 import { isBomEditable } from '@/mock/productBomOptions'
 import { loadBomDetailStructure, importBomByReference } from '@/utils/bomImport'
 import { defaultBomColumnSettings, bomTypeSelectOptions } from '@/mock/bomMaterialColumns'
@@ -270,7 +272,6 @@ import BomMaterialTable from './components/BomMaterialTable.vue'
 import ImportBomTemplateModal from './components/ImportBomTemplateModal.vue'
 import SelectBomMaterialModal from './components/SelectBomMaterialModal.vue'
 import AddByBomModal from './components/AddByBomModal.vue'
-import SelectProductMaterialModal from './components/SelectProductMaterialModal.vue'
 import BomColumnSettingDrawer from './components/BomColumnSettingDrawer.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
 import BomRelationDrawer from './components/BomRelationDrawer.vue'
@@ -289,6 +290,11 @@ const pageTabPath = computed(() =>
     : '/product-process/bom/new',
 )
 const editVersion = ref('')
+const editBomStatus = ref('')
+const canSwitchProduct = computed(() => {
+  if (!isEditMode.value) return true
+  return isBomPending({ status: editBomStatus.value })
+})
 const basicInfoExpanded = ref(true)
 const leftSidebarCollapsed = ref(false)
 const leftPanelWidth = ref(280)
@@ -512,6 +518,7 @@ function resetNewBomState() {
   selectedNodeId.value = ROOT_ID
   templateRef.value = null
   editVersion.value = ''
+  editBomStatus.value = ''
   columnSettings.value = JSON.parse(JSON.stringify(defaultBomColumnSettings))
 }
 
@@ -546,9 +553,7 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', onResizeMouseUp)
 })
 
-function onItemChange(val) {
-  const opt = itemOptions.value.find((o) => o.value === val)
-  if (!opt) return
+function applySelectedItem(opt, { preserveChildren = false } = {}) {
   form.itemType = opt.itemType
   form.itemName = opt.itemName
   form.itemCode = opt.itemCode
@@ -565,7 +570,9 @@ function onItemChange(val) {
       specModel: opt.specModel,
       bomName: form.bomName,
     })
-    lineItems.value = []
+    if (!preserveChildren) {
+      lineItems.value = []
+    }
     selectedNodeId.value = ROOT_ID
   } else {
     const root = createRootTreeNode({
@@ -578,21 +585,49 @@ function onItemChange(val) {
     lineItems.value = []
     selectedNodeId.value = ROOT_ID
   }
-  templateRef.value = null
+  if (!preserveChildren) {
+    templateRef.value = null
+  }
+}
+
+function onItemChange(val, { preserveChildren = false } = {}) {
+  const opt = itemOptions.value.find((o) => o.value === val)
+  if (!opt) return
+  form.itemId = val
+  applySelectedItem(opt, { preserveChildren })
 }
 
 function openSwitchProduct() {
-  if (isEditMode.value) {
-    message.info('编辑模式下不可切换物品')
+  if (isEditMode.value && !canSwitchProduct.value) {
+    message.info('仅待发布状态的 BOM 可切换产品')
     return
   }
   switchProductOpen.value = true
 }
 
+function onSwitchProductSelected(items) {
+  const row = Array.isArray(items) ? items[0] : items
+  if (!row) return
+  onSwitchProductConfirm(row)
+}
+
 function onSwitchProductConfirm(row) {
-  const val = `${row.itemType === '物料' ? 'material' : 'product'}:${row.id}`
-  form.itemId = val
-  onItemChange(val)
+  const itemType = row.itemType === '物料' ? 'material' : 'product'
+  const preserveChildren = isEditMode.value && canSwitchProduct.value && hasRoot.value
+  form.itemId = `${itemType}:${row.id}`
+  applySelectedItem(
+    {
+      itemType,
+      itemId: row.id,
+      itemName: row.name,
+      itemCode: row.code,
+      specModel: row.specModel || '',
+    },
+    { preserveChildren },
+  )
+  if (preserveChildren) {
+    message.success('已切换产品，仅更新顶级物料，子级结构已保留')
+  }
 }
 
 function onAddSubItem() {
@@ -802,6 +837,7 @@ function loadEditBom(id) {
     : JSON.parse(JSON.stringify(defaultBomColumnSettings))
 
   editVersion.value = bom.version || ''
+  editBomStatus.value = bom.status || ''
   form.bomNo = bom.bomNo
   form.bomName = bom.bomName
   form.bomType = bom.bomType === '基础BOM' ? '基准BOM' : bom.bomType || '基准BOM'

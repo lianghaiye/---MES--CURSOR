@@ -10,6 +10,7 @@ export const topModules = [
   { key: 'inventory', label: '库存管理', path: '/inventory' },
   { key: 'quality', label: '质量管理', path: '/quality' },
   { key: 'procurement', label: '采购管理', path: '/procurement' },
+  { key: 'engineering-change', label: '工程变更', path: '/engineering-change/ecn-list' },
   { key: 'after-sales', label: '售后管理', path: '/after-sales' },
   { key: 'industrial-id', label: '工业标识', path: '/industrial-id' },
   { key: 'basic-config', label: '基础配置', path: '/basic-config' },
@@ -56,7 +57,6 @@ export const sideMenus = {
   planning: [
     { key: 'production-plan', label: '生产计划', path: '/planning/production-plan' },
     { key: 'design-task', label: '设计任务', path: '/planning/design-task' },
-    { key: 'ebom', label: 'EBOM管理', path: '/planning/ebom' },
   ],
   'labor-salary': [{ key: 'labor-hour', label: '工时管理', path: '/labor-salary/labor-hour' }],
   production: [
@@ -89,6 +89,10 @@ export const sideMenus = {
     { key: 'purchase-req', label: '采购申请', path: '/procurement/purchase-req' },
     { key: 'purchase-orders', label: '采购订单', path: '/procurement/purchase-orders' },
     { key: 'suppliers', label: '供应商', path: '/procurement/suppliers' },
+  ],
+  'engineering-change': [
+    { key: 'ecn-list', label: 'ECN列表', path: '/engineering-change/ecn-list' },
+    { key: 'ecr-request', label: 'ECR申请', path: '/engineering-change/ecr-request' },
   ],
   'after-sales': [
     { key: 'service-orders', label: '服务工单', path: '/after-sales/service-orders' },
@@ -183,7 +187,6 @@ export const routeTitles = {
   '/sales/customers': '客户档案',
   '/planning/production-plan': '生产计划',
   '/planning/design-task': '设计任务',
-  '/planning/ebom': 'EBOM管理',
   '/production/work-orders': '生产工单',
   '/production/assembly-work-orders': '总装工单',
   '/production/disassembly-work-orders': '拆解工单',
@@ -212,6 +215,10 @@ export const routeTitles = {
   '/procurement/purchase-req': '采购申请',
   '/procurement/purchase-orders': '采购订单',
   '/procurement/suppliers': '供应商',
+  '/engineering-change/ecn/new': '提交工程变更申请',
+  '/engineering-change/ecn-list': 'ECN列表',
+  '/engineering-change/ecr-request': 'ECR申请',
+  '/engineering-change/ecr/new': '提交工程变更申请',
   '/after-sales/service-orders': '服务工单',
   '/after-sales/returns': '退换货',
   '/industrial-id/base-config/enterprise-info': '企业信息',
@@ -233,6 +240,10 @@ export const routeTitles = {
 
 /** 动态路径标题（含 :id 等参数） */
 export const dynamicRouteTitles = [
+  { pattern: /^\/engineering-change\/ecn\/[^/]+\/approve$/, title: '审批工程变更' },
+  { pattern: /^\/engineering-change\/ecn\/[^/]+\/execute$/, title: '执行工程变更' },
+  { pattern: /^\/engineering-change\/ecr\/[^/]+\/approve$/, title: '审批工程变更' },
+  { pattern: /^\/engineering-change\/ecr\/[^/]+\/execute$/, title: '执行工程变更' },
   { pattern: /^\/basic-config\/warehouses\/[^/]+$/, title: '仓库详情' },
   { pattern: /^\/inventory\/inbound\/[^/]+$/, title: '入库单详情' },
   { pattern: /^\/inventory\/outbound\/[^/]+$/, title: '出库单详情' },
