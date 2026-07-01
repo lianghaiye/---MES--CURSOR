@@ -3,6 +3,11 @@ import { customerOptions, salespersonOptions } from '@/mock/salesOrderOptions'
 import { createLineItem, createSalesOrder } from '@/mock/salesOrders'
 import { catalogBomIdForProduct } from '@/mock/productBomSeed'
 import { formatBomVersion, getBomVersionYear } from '@/utils/bomVersion'
+import {
+  buildEcnBoundLine,
+  buildEcnDemoSalesOrder,
+  findEcnDemoProduct,
+} from '@/mock/ecnDemoBootstrap'
 
 function bomMetaForProduct(product) {
   const year = getBomVersionYear()
@@ -97,16 +102,18 @@ export function buildMockSalesOrders(products) {
         },
       ],
       lineItems: [
-        lineFromProduct(p(0), {
-          id: 'line-seed-1a',
-          salesQty: 3,
-          deliveryMode: '整机',
-          bomVersion: 'V2025.1',
-          techParams: 'Q=50m³/h H=32m，介质：清水',
-          matchingRequirements: '含联轴器护罩及地脚螺栓',
-          supplementDesc: '首批试制，需附出厂检验报告',
-          attachment: '明细附件-清水泵选型表.pdf',
-        }),
+        (() => {
+          const isgProduct = findEcnDemoProduct('ISG50-160') || p(0)
+          return buildEcnBoundLine(isgProduct, {
+            id: 'line-seed-1a',
+            salesQty: 3,
+            deliveryMode: '整机',
+            techParams: 'Q=50m³/h H=32m，介质：清水',
+            matchingRequirements: '含联轴器护罩及地脚螺栓',
+            supplementDesc: '首批试制，需附出厂检验报告（绑定 ECN 升版前 BOM）',
+            attachment: '明细附件-清水泵选型表.pdf',
+          })
+        })(),
         lineFromProduct(p(1), {
           id: 'line-seed-1b',
           salesQty: 2,
@@ -301,6 +308,11 @@ export function buildMockSalesOrders(products) {
       lineItems: [lineFromProduct(p(60), { id: 'line-seed-8a', salesQty: 1 })],
     }),
   ]
+
+  const ecnDemoOrder = buildEcnDemoSalesOrder()
+  if (ecnDemoOrder) {
+    orders.unshift(createSalesOrder(ecnDemoOrder))
+  }
 
   return orders
 }

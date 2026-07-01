@@ -21,7 +21,16 @@
           <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
           <a-tab-pane key="outsourcing" :tab="`外协 (${relations.outsourcingOrders.length})`" />
           <a-tab-pane key="attachments" :tab="`附件 (${relations.attachments.length})`" />
-          <a-tab-pane key="bom-version" tab="BOM版本" />
+          <a-tab-pane key="ebom-info">
+            <template #tab>
+              <span>EBOM信息</span>
+              <a-badge
+                v-if="bomChangedCount"
+                :count="bomChangedCount"
+                :number-style="{ backgroundColor: '#fa8c16', marginLeft: '6px' }"
+              />
+            </template>
+          </a-tab-pane>
         </a-tabs>
 
         <div class="tab-body">
@@ -81,26 +90,24 @@
             </div>
           </template>
 
-          <template v-else-if="activeTab === 'bom-version'">
+          <template v-else-if="activeTab === 'ebom-info'">
             <div class="section-card">
-              <div class="section-title">BOM 信息</div>
+              <div class="section-title">EBOM 信息</div>
+              <div class="section-hint">展示各明细行现行 EBOM（始终为最新版本）；「初始版本」为订单审核通过时生成的快照版本。</div>
               <a-table
-                :columns="bomColumns"
-                :data-source="salesOrderBomRows"
+                :columns="ebomColumns"
+                :data-source="salesOrderEbomRows"
                 row-key="id"
                 size="small"
                 bordered
                 :pagination="false"
-                :scroll="{ x: bomTableScrollX }"
+                :scroll="{ x: ebomTableScrollX }"
                 :locale="{ emptyText: '暂无销售明细' }"
               >
                 <template #bodyCell="{ column, record: row }">
                   <template v-if="column.key === 'index'">{{ row.index }}</template>
-                  <template v-else-if="column.key === 'status'">
-                    <a-tag v-if="row.status !== '—'" :color="bomStatusColor(row.status)">
-                      {{ row.status }}
-                    </a-tag>
-                    <span v-else>—</span>
+                  <template v-else-if="column.key === 'ebomStatus'">
+                    <a-tag :color="row.ebomStatusColor">{{ row.ebomStatus }}</a-tag>
                   </template>
                   <template v-else-if="column.key === 'bomName'">
                     <a
@@ -112,6 +119,9 @@
                     </a>
                     <span v-else>{{ row.bomName }}</span>
                   </template>
+                  <template v-else-if="column.key === 'boundVersion'">
+                    <span>{{ row.boundVersion }}</span>
+                  </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
                   </template>
@@ -120,13 +130,7 @@
             </div>
 
             <div v-if="bomChangedLines.length" class="section-card">
-              <div class="section-title">BOM 版本变更</div>
-              <a-alert
-                type="info"
-                show-icon
-                class="bom-version-hint"
-                message="以下销售明细绑定的 BOM 版本与当前生效版本不一致，可查看变更记录与 BOM 详情。"
-              />
+              <div class="section-title">EBOM 版本变更</div>
               <div
                 v-for="line in bomChangedLines"
                 :key="line.id"
@@ -135,13 +139,18 @@
                 <div class="bom-line-head">
                   <span class="bom-product-name">{{ line.productName }}</span>
                   <span class="bom-product-code">{{ line.productCode }}</span>
-                  <a-tag color="orange">绑定 {{ line.bomVersion || '—' }}</a-tag>
+                  <a-tag color="orange">初始版本 {{ line.bomVersion || '—' }}</a-tag>
+                  <a-tag v-if="lineActiveVersion(line)" color="blue">
+                    现行版本 {{ lineActiveVersion(line) }}
+                  </a-tag>
                 </div>
                 <BomVersionInfoSection
                   :product-id="line.productId"
                   :bom-id="line.bomId"
                   :bound-version="line.bomVersion"
+                  :compare-quantity="Number(line.salesQty ?? line.qty) || 1"
                 />
+                <SalesOrderEbomDiffSection :line="line" />
               </div>
             </div>
           </template>
@@ -156,23 +165,32 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: deliveryTableScrollX }"
                 :locale="{ emptyText: '暂无发货申请' }"
               >
                 <template #bodyCell="{ column, record: row }">
-                  <template v-if="column.key === 'deliveryCode'">
+                  <template v-if="column.key === 'deliveryStatus'">
+                    <a-tag :color="deliveryStatusColor(row.deliveryStatus)">
+                      {{ row.deliveryStatus || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'deliveryCode'">
                     <a v-if="row.deliveryOrderId" class="link-code" @click="goDeliveryDetail(row)">
                       {{ row.deliveryCode }}
                     </a>
                     <span v-else>{{ row.deliveryCode || '—' }}</span>
                   </template>
-                  <template v-else-if="column.key === 'wholeSummary'">
-                    {{ (row.lineItems || []).length }} 行 / {{ sumWholeShipQty(row) }} 件
+                  <template v-else-if="column.key === 'applyShipQty'">
+                    {{ formatOutboundQtyInt(row.applyShipQty) }}
                   </template>
-                  <template v-else-if="column.key === 'scatterSummary'">
-                    {{ (row.scatterShipments || []).length }} 行
+                  <template v-else-if="column.key === 'actualOutboundQty'">
+                    {{ formatOutboundQtyInt(row.actualOutboundQty) }}
                   </template>
-                  <template v-else-if="column.key === 'status'">
-                    <a-tag color="blue">{{ row.status || '已提交' }}</a-tag>
+                  <template v-else-if="column.key === 'shipWeight'">
+                    {{ formatShipWeight(row.shipWeight) }}
+                  </template>
+                  <template v-else-if="column.key === 'totalAmountExTax'">
+                    {{ formatAmountExTax(row.totalAmountExTax) }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -184,7 +202,7 @@
 
           <template v-else-if="activeTab === 'outbound'">
             <div class="section-card">
-              <div class="section-title">关联出库单</div>
+              <div class="section-title">出库单</div>
               <a-table
                 :columns="outboundColumns"
                 :data-source="relations.outboundOrders"
@@ -192,14 +210,21 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: outboundTableScrollX }"
                 :locale="{ emptyText: '暂无关联出库单' }"
               >
                 <template #bodyCell="{ column, record: row }">
                   <template v-if="column.key === 'status'">
-                    <a-tag>{{ row.status }}</a-tag>
+                    <a-tag :color="outboundStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
                   </template>
-                  <template v-else-if="column.key === 'action'">
-                    <a-button type="link" size="small" @click="goOutbound">查看出库管理</a-button>
+                  <template v-else-if="column.key === 'docNo'">
+                    <a class="link-code" @click="goOutboundDetail(row)">{{ row.docNo || '—' }}</a>
+                  </template>
+                  <template v-else-if="column.key === 'shipQtyTotal'">
+                    {{ formatOutboundQty(calcOutboundShipQty(row)) }}
+                  </template>
+                  <template v-else-if="column.key === 'operator'">
+                    {{ row.creator || '—' }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -219,14 +244,24 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: purchaseReqTableScrollX }"
                 class="sub-table"
                 :locale="{ emptyText: '暂无采购申请' }"
               >
                 <template #bodyCell="{ column, record: row }">
-                  <template v-if="column.key === 'action'">
-                    <a-button type="link" size="small" @click="goPurchaseReq(row.id)"
-                      >详情</a-button
-                    >
+                  <template v-if="column.key === 'docStatus'">
+                    <a-tag :color="purchaseReqStatusColor(row.docStatus)">
+                      {{ row.docStatus || row.status || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'reqNo'">
+                    <a class="link-code" @click.prevent="goPurchaseReq(row.id)">{{ row.reqNo || '—' }}</a>
+                  </template>
+                  <template v-else-if="column.key === 'planItemCount'">
+                    {{ purchaseReqPlanItemCount(row) }}
+                  </template>
+                  <template v-else-if="column.key === 'plannedQty'">
+                    {{ formatPurchaseQty(row.plannedQty) }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -243,16 +278,23 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: purchaseOrderTableScrollX }"
                 :locale="{ emptyText: '暂无采购订单' }"
               >
                 <template #bodyCell="{ column, record: row }">
-                  <template v-if="column.key === 'amount'">
-                    ￥{{ formatMoney(row.totalAmountInTax ?? row.totalAmount) }}
+                  <template v-if="column.key === 'status'">
+                    <a-tag :color="purchaseOrderStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
                   </template>
-                  <template v-else-if="column.key === 'action'">
-                    <a-button type="link" size="small" @click="goPurchaseOrders"
-                      >查看采购订单</a-button
-                    >
+                  <template v-else-if="column.key === 'inboundStatus'">
+                    <a-tag :color="purchaseInboundStatusColor(row.inboundStatus)">
+                      {{ row.inboundStatus || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'orderNo'">
+                    <span class="link-code">{{ row.orderNo || '—' }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'supplier'">
+                    {{ row.supplier || row.supplierName || '—' }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -272,14 +314,21 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: planTableScrollX }"
                 class="sub-table"
                 :locale="{ emptyText: '暂无生产计划（自产订单审核后生成）' }"
               >
                 <template #bodyCell="{ column, record: row }">
-                  <template v-if="column.key === 'action'">
-                    <a-button type="link" size="small" @click="goProductionPlan"
-                      >查看生产计划</a-button
-                    >
+                  <template v-if="column.key === 'orderStatus'">
+                    <a-tag :color="productionPlanStatusColor(row.orderStatus)">
+                      {{ row.orderStatus || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'scheduleQty'">
+                    {{ formatProductionQty(productionPlanScheduleQty(row)) }}
+                  </template>
+                  <template v-else-if="column.key === 'productQty'">
+                    {{ formatProductionQty(row.productQty) }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -290,21 +339,34 @@
             <div class="section-card">
               <div class="section-title">生产工单</div>
               <a-table
-                :columns="workOrderColumns"
+                :columns="productionWorkOrderColumns"
                 :data-source="relations.workOrders"
                 row-key="id"
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: productionWorkOrderTableScrollX }"
                 class="sub-table"
                 :locale="{ emptyText: '暂无生产工单' }"
               >
                 <template #bodyCell="{ column, record: row }">
-                  <template v-if="column.key === 'action'">
-                    <a-button type="link" size="small" @click="goWorkOrders">查看工单</a-button>
+                  <template v-if="column.key === 'status'">
+                    <a-tag :color="workOrderStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'progress'">
+                    {{ row.progressLabel || row.status || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'orderType'">
+                    {{ row.orderCategory || row.orderType || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'scheduleQty'">
+                    {{ formatProductionQty(row.scheduleQty ?? row.planQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'owner'">
+                    {{ row.owner || row.personInCharge || '—' }}
                   </template>
                   <template v-else>
-                    {{ row[column.dataIndex] ?? '—' }}
+                    {{ productionWorkOrderCell(row, column) }}
                   </template>
                 </template>
               </a-table>
@@ -312,22 +374,33 @@
             <div class="section-card">
               <div class="section-title">总装工单</div>
               <a-table
-                :columns="assemblyColumns"
+                :columns="assemblyWorkOrderColumns"
                 :data-source="relations.assemblyWorkOrders"
                 row-key="id"
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: assemblyWorkOrderTableScrollX }"
                 :locale="{ emptyText: '暂无总装工单' }"
               >
                 <template #bodyCell="{ column, record: row }">
-                  <template v-if="column.key === 'action'">
-                    <a-button type="link" size="small" @click="goAssemblyWorkOrders"
-                      >查看总装工单</a-button
-                    >
+                  <template v-if="column.key === 'status'">
+                    <a-tag :color="workOrderStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'progress'">
+                    {{ row.progressLabel || row.status || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'orderType'">
+                    {{ row.orderCategory || row.orderType || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'scheduleQty'">
+                    {{ formatProductionQty(row.scheduleQty ?? row.planQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'owner'">
+                    {{ row.owner || row.personInCharge || '—' }}
                   </template>
                   <template v-else>
-                    {{ row[column.dataIndex] ?? '—' }}
+                    {{ productionWorkOrderCell(row, column) }}
                   </template>
                 </template>
               </a-table>
@@ -344,11 +417,23 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: outsourcingTableScrollX }"
                 :locale="{ emptyText: '暂无外协订单' }"
               >
                 <template #bodyCell="{ column, record: row }">
                   <template v-if="column.key === 'status'">
-                    <a-tag>{{ row.status }}</a-tag>
+                    <a-tag :color="outsourcingStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'inboundStatus'">
+                    <a-tag :color="purchaseInboundStatusColor(row.inboundStatus)">
+                      {{ row.inboundStatus || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'outsourceQty'">
+                    {{ formatProductionQty(row.outsourceQty ?? row.qty) }}
+                  </template>
+                  <template v-else-if="column.key === 'planTime'">
+                    {{ row.planTime || row.planCompleteDate || '—' }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -395,25 +480,44 @@ export default { name: 'SalesOrderDetailView' }
 </script>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onActivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { getSalesOrderById, resolveSalesOrderRelations } from '@/utils/salesOrderDetail'
+import {
+  deliveryStatusColor,
+  formatAmountExTax,
+  formatOutboundQtyInt,
+  formatShipWeight,
+} from '@/utils/deliveryOrder'
+import { calcOutboundShipQty } from '@/mock/outboundOrders'
+import { outboundStatusColor } from '@/mock/outboundOptions'
 import { resolveLineBusinessType } from '@/utils/salesOrderBusiness'
 import { getActiveBomForItem } from '@/store/productBomStore'
-import { bomStatusColor } from '@/mock/productBomOptions'
 import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
+import SalesOrderEbomDiffSection from './components/SalesOrderEbomDiffSection.vue'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
-import { buildSalesOrderBomRows } from '@/utils/salesOrderBomRows'
+import { buildSalesOrderEbomRows } from '@/utils/salesOrderBomRows'
+import {
+  normalizeSalesOrderDetailTab,
+  persistSalesOrderDetailTab,
+  readSalesOrderDetailTab,
+} from '@/utils/salesOrderDetailTab'
+
 const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
 const loading = ref(false)
 const order = ref(null)
-const activeTab = ref('overview')
+
+function initActiveTab() {
+  return readSalesOrderDetailTab(route.params.id, route.query.tab)
+}
+
+const activeTab = ref(initActiveTab())
 
 const relations = computed(() => resolveSalesOrderRelations(order.value))
 
@@ -434,27 +538,28 @@ const bomChangedLines = computed(() =>
   ),
 )
 
-const salesOrderBomRows = computed(() => buildSalesOrderBomRows(order.value?.lineItems || []))
+const bomChangedCount = computed(() => bomChangedLines.value.length)
 
-const bomColumns = [
+const salesOrderEbomRows = computed(() => buildSalesOrderEbomRows(order.value?.lineItems || []))
+
+const ebomColumns = [
   { key: 'index', title: '序号', width: 56, align: 'center', fixed: 'left' },
-  { key: 'status', title: 'BOM状态', width: 92, fixed: 'left' },
-  { key: 'bomName', title: 'BOM名称', dataIndex: 'bomName', width: 160, ellipsis: true, fixed: 'left' },
-  { key: 'bomNo', title: 'BOM编码', dataIndex: 'bomNo', width: 130, ellipsis: true },
-  { key: 'itemName', title: '物品名称', dataIndex: 'itemName', width: 140, ellipsis: true },
+  { key: 'ebomStatus', title: 'EBOM状态', width: 100, fixed: 'left' },
+  { key: 'bomName', title: 'EBOM名称', dataIndex: 'bomName', width: 160, ellipsis: true, fixed: 'left' },
+  { key: 'bomNo', title: 'EBOM编码', dataIndex: 'bomNo', width: 130, ellipsis: true },
+  { key: 'itemName', title: '产品名称', dataIndex: 'itemName', width: 140, ellipsis: true },
+  { key: 'initialVersion', title: '初始版本', dataIndex: 'initialVersion', width: 96 },
+  { key: 'boundVersion', title: '订单绑定版本', dataIndex: 'boundVersion', width: 120 },
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
   { key: 'material', title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
   { key: 'drawingNo', title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-  { key: 'version', title: 'BOM版本', dataIndex: 'version', width: 100 },
   { key: 'levelCount', title: '层级数', dataIndex: 'levelCount', width: 72, align: 'center' },
   { key: 'materialCount', title: '物料数', dataIndex: 'materialCount', width: 72, align: 'center' },
-  { key: 'effectiveAt', title: '生效日期', dataIndex: 'effectiveAt', width: 150 },
-  { key: 'expiredAt', title: '失效日期', dataIndex: 'expiredAt', width: 150 },
-  { key: 'creator', title: '创建人', dataIndex: 'creator', width: 88 },
+  { key: 'snapshotAt', title: '快照时间', dataIndex: 'snapshotAt', width: 150 },
 ]
 
-const bomTableScrollX = computed(() =>
-  bomColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+const ebomTableScrollX = computed(() =>
+  ebomColumns.reduce((sum, col) => sum + (col.width || 100), 0),
 )
 
 const lineColumns = salesOrderDetailLineColumns
@@ -466,6 +571,10 @@ const lineTableScrollX = computed(() =>
 function lineBomVersionHint(line) {
   const active = getActiveBomForItem('product', line.productId)
   return Boolean(active?.version && line.bomVersion && active.version !== line.bomVersion)
+}
+
+function lineActiveVersion(line) {
+  return getActiveBomForItem('product', line.productId)?.version || ''
 }
 
 const moneyColumnKeys = new Set([
@@ -486,75 +595,211 @@ function formatMoneyCell(line, column) {
 }
 
 const deliveryColumns = [
-  { title: '发货单号', key: 'deliveryCode', width: 130 },
-  { title: '申请时间', dataIndex: 'createdAt', width: 150 },
-  { title: '发货日期', dataIndex: 'deliveryDate', width: 110 },
-  { title: '发货方式', dataIndex: 'shipmentMethod', width: 90 },
-  { title: '出库仓库', dataIndex: 'outboundWarehouse', width: 100 },
-  { title: '整机发运', key: 'wholeSummary', width: 120 },
-  { title: '散件发运', key: 'scatterSummary', width: 100 },
-  { title: '状态', key: 'status', width: 88 },
-  { title: '备注', dataIndex: 'remark', ellipsis: true },
+  { title: '发货状态', key: 'deliveryStatus', width: 96, fixed: 'left' },
+  { title: '发货单号', key: 'deliveryCode', width: 140, fixed: 'left' },
+  { title: '申请发货数量', key: 'applyShipQty', width: 110, align: 'right' },
+  { title: '实际出库数量', key: 'actualOutboundQty', width: 110, align: 'right' },
+  { title: '发货重量', key: 'shipWeight', width: 96, align: 'right' },
+  { title: '发货总金额（不含税）', key: 'totalAmountExTax', width: 140, align: 'right' },
+  { title: '发货方式', dataIndex: 'shipmentMethod', width: 88 },
+  { title: '物流单号', dataIndex: 'logisticsNo', width: 130, ellipsis: true },
+  { title: '客户联系人', dataIndex: 'contactPerson', width: 100 },
+  { title: '联系方式', dataIndex: 'contactPhone', width: 120 },
+  { title: '交货地址', dataIndex: 'deliveryAddress', width: 180, ellipsis: true },
+  { title: '司机姓名', dataIndex: 'driverName', width: 90 },
+  { title: '司机联系方式', dataIndex: 'driverPhone', width: 120 },
+  { title: '车牌号', dataIndex: 'plateNo', width: 100 },
 ]
+
+const deliveryTableScrollX = computed(() =>
+  deliveryColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
 
 const outboundColumns = [
-  { title: '出库单号', dataIndex: 'docNo', width: 140 },
+  { title: '出库状态', key: 'status', width: 96, fixed: 'left' },
+  { title: '出库单号', key: 'docNo', width: 150, fixed: 'left' },
   { title: '出库类型', dataIndex: 'outboundType', width: 100 },
-  { title: '仓库', dataIndex: 'warehouse', width: 100 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '创建日期', dataIndex: 'createdAt', width: 110 },
-  { title: '操作', key: 'action', width: 120 },
+  { title: '仓库', dataIndex: 'warehouse', width: 90 },
+  { title: '出库数量', key: 'shipQtyTotal', width: 96, align: 'right' },
+  { title: '出库时间', dataIndex: 'outboundTime', width: 160 },
+  { title: '经手人', dataIndex: 'handler', width: 88 },
+  { title: '操作人', key: 'operator', width: 88 },
 ]
+
+const outboundTableScrollX = computed(() =>
+  outboundColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+function formatOutboundQty(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
 
 const purchaseReqColumns = [
-  { title: '申请单号', dataIndex: 'reqNo', width: 140 },
-  { title: '状态', dataIndex: 'status', width: 90 },
-  { title: '来源', dataIndex: 'source', width: 100 },
-  { title: '期望到货', dataIndex: 'estimatedArrivalDate', width: 110 },
-  { title: '操作', key: 'action', width: 80 },
+  { title: '状态', key: 'docStatus', width: 90, fixed: 'left' },
+  { title: '申请单号', key: 'reqNo', width: 160, fixed: 'left' },
+  { title: '计划项数', key: 'planItemCount', width: 88, align: 'right' },
+  { title: '计划数量', key: 'plannedQty', width: 100, align: 'right' },
+  { title: '期望到货时间', dataIndex: 'estimatedArrivalDate', width: 120 },
+  { title: '预入仓库', dataIndex: 'receivingWarehouse', width: 100, ellipsis: true },
+  { title: '创建人', dataIndex: 'creator', width: 88 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
 ]
+
+const purchaseReqTableScrollX = computed(() =>
+  purchaseReqColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
 
 const purchaseOrderColumns = [
-  { title: '采购单号', dataIndex: 'orderNo', width: 130 },
-  { title: '供应商', dataIndex: 'supplierName', width: 140, ellipsis: true },
-  { title: '状态', dataIndex: 'status', width: 90 },
-  { title: '含税总额', key: 'amount', width: 110, align: 'right' },
-  { title: '操作', key: 'action', width: 120 },
+  { title: '状态', key: 'status', width: 90, fixed: 'left' },
+  { title: '入库状态', key: 'inboundStatus', width: 96, fixed: 'left' },
+  { title: '采购单号', key: 'orderNo', width: 140 },
+  { title: '供应商', key: 'supplier', width: 140, ellipsis: true },
+  { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
+  { title: '采购员', dataIndex: 'purchaser', width: 88 },
+  { title: '送货日期', dataIndex: 'shippingDate', width: 110 },
+  { title: '创建人', dataIndex: 'creator', width: 88 },
+  { title: '创建日期', dataIndex: 'documentDate', width: 110 },
 ]
+
+const purchaseOrderTableScrollX = computed(() =>
+  purchaseOrderColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+function purchaseReqPlanItemCount(row) {
+  return (row.lineItems || []).length
+}
+
+function formatPurchaseQty(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toFixed(4)
+}
+
+function purchaseReqStatusColor(status) {
+  const map = {
+    待处理: 'processing',
+    处理中: 'warning',
+    处理完成: 'success',
+    已作废: 'default',
+  }
+  return map[status] || 'default'
+}
+
+function purchaseOrderStatusColor(status) {
+  const map = { 待审批: 'default', 进行中: 'processing', 已完成: 'success' }
+  return map[status] || 'default'
+}
+
+function purchaseInboundStatusColor(status) {
+  const map = { 未入库: 'default', 部分入库: 'warning', 已入库: 'success' }
+  return map[status] || 'default'
+}
 
 const planColumns = [
-  { title: '计划单号', dataIndex: 'orderNo', width: 140 },
-  { title: '状态', dataIndex: 'orderStatus', width: 90 },
-  { title: '产品数量', dataIndex: 'productQty', width: 90, align: 'right' },
-  { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
-  { title: '操作', key: 'action', width: 120 },
+  { title: '状态', key: 'orderStatus', width: 96, fixed: 'left' },
+  { title: '计划单号', dataIndex: 'orderNo', width: 140, fixed: 'left' },
+  { title: '产品数量', key: 'productQty', width: 96, align: 'right' },
+  { title: '排产数量', key: 'scheduleQty', width: 96, align: 'right' },
 ]
 
-const workOrderColumns = [
-  { title: '工单号', dataIndex: 'code', width: 160 },
-  { title: '工单名称', dataIndex: 'name', width: 180, ellipsis: true },
-  { title: '状态', dataIndex: 'status', width: 90 },
-  { title: '计划数量', dataIndex: 'planQty', width: 90, align: 'right' },
-  { title: '操作', key: 'action', width: 100 },
+const planTableScrollX = computed(() =>
+  planColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+const productionWorkOrderSharedColumns = [
+  { title: '状态', key: 'status', width: 88, fixed: 'left' },
+  { title: '进度', key: 'progress', width: 88 },
+  { title: '工单编号', dataIndex: 'code', width: 150, ellipsis: true, fixed: 'left' },
+  { title: '工单名称', dataIndex: 'name', width: 160, ellipsis: true },
+  { title: '工单类型', key: 'orderType', width: 96 },
+  { title: '产品名称', dataIndex: 'productName', width: 130, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '排产数量', key: 'scheduleQty', width: 96, align: 'right' },
+  { title: '工作中心', dataIndex: 'workCenter', width: 100, ellipsis: true },
+  { title: '负责人', key: 'owner', width: 88 },
+  { title: '工艺路线', dataIndex: 'processRouteName', width: 120, ellipsis: true },
 ]
 
-const assemblyColumns = [
-  { title: '工单号', dataIndex: 'code', width: 160 },
-  { title: '产品', dataIndex: 'productName', width: 140 },
-  { title: '状态', dataIndex: 'status', width: 90 },
-  { title: '操作', key: 'action', width: 120 },
+const productionWorkOrderColumns = [
+  ...productionWorkOrderSharedColumns,
+  { title: '创建日期', dataIndex: 'createdAt', width: 110 },
 ]
+
+const assemblyWorkOrderColumns = [...productionWorkOrderSharedColumns]
+
+const productionWorkOrderTableScrollX = computed(() =>
+  productionWorkOrderColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+const assemblyWorkOrderTableScrollX = computed(() =>
+  assemblyWorkOrderColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+function productionPlanScheduleQty(plan) {
+  const items = plan?.workItems || []
+  if (!items.length) return plan?.scheduleQty
+  return items.reduce((sum, item) => sum + (Number(item.planQty) || 0), 0)
+}
+
+function formatProductionQty(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
+
+function productionPlanStatusColor(status) {
+  const text = String(status || '')
+  if (text.includes('完成')) return 'success'
+  if (text.includes('执行') || text.includes('生产')) return 'processing'
+  if (text.includes('部分')) return 'warning'
+  return 'default'
+}
+
+function workOrderStatusColor(status) {
+  const map = {
+    待下发: 'warning',
+    已下发: 'processing',
+    执行中: 'blue',
+    完成: 'success',
+    暂停: 'default',
+    终止: 'error',
+  }
+  return map[status] || 'default'
+}
+
+function productionWorkOrderCell(row, column) {
+  if (column.dataIndex === 'specModel') {
+    return row.specModel || row.model || '—'
+  }
+  const val = row[column.dataIndex]
+  return val !== undefined && val !== null && val !== '' ? val : '—'
+}
 
 const outsourcingColumns = [
-  { title: '外协单号', dataIndex: 'orderNo', width: 130 },
+  { title: '状态', key: 'status', width: 88, fixed: 'left' },
+  { title: '入库状态', key: 'inboundStatus', width: 96 },
+  { title: '外协单号', dataIndex: 'orderNo', width: 130, fixed: 'left' },
   { title: '供应商', dataIndex: 'supplierName', width: 140, ellipsis: true },
-  { title: '物料', dataIndex: 'itemName', width: 140, ellipsis: true },
-  { title: '编码', dataIndex: 'itemCode', width: 110 },
-  { title: '数量', dataIndex: 'qty', width: 72, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 56 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '计划完成', dataIndex: 'planCompleteDate', width: 110 },
+  { title: '外协数量', key: 'outsourceQty', width: 96, align: 'right' },
+  { title: '计划时间', key: 'planTime', width: 110 },
+  { title: '创建人', dataIndex: 'creator', width: 88 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
 ]
+
+const outsourcingTableScrollX = computed(() =>
+  outsourcingColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+function outsourcingStatusColor(status) {
+  const map = {
+    待下达: 'default',
+    进行中: 'processing',
+    已完成: 'success',
+    已关闭: 'default',
+  }
+  return map[status] || 'default'
+}
 
 const attachmentColumns = [
   { title: '文件名', dataIndex: 'name', ellipsis: true },
@@ -574,6 +819,61 @@ function loadOrder() {
   }
 }
 
+function syncTabToRoute(tab) {
+  const normalized = normalizeSalesOrderDetailTab(tab)
+  persistSalesOrderDetailTab(route.params.id, normalized)
+  const current = route.query.tab
+  const queryTab = normalized === 'overview' ? undefined : normalized
+  if ((current || undefined) === queryTab) return
+  const query = { ...route.query }
+  if (queryTab) query.tab = queryTab
+  else delete query.tab
+  router.replace({ path: route.path, query })
+}
+
+function restoreActiveTab() {
+  if (route.query.tab) {
+    const next = normalizeSalesOrderDetailTab(route.query.tab)
+    if (activeTab.value !== next) activeTab.value = next
+    return
+  }
+  const stored = readSalesOrderDetailTab(route.params.id)
+  if (stored !== 'overview') {
+    if (activeTab.value !== stored) activeTab.value = stored
+    return
+  }
+  if (activeTab.value !== 'overview') {
+    persistSalesOrderDetailTab(route.params.id, activeTab.value)
+  }
+}
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (tab) {
+      const next = normalizeSalesOrderDetailTab(tab)
+      if (activeTab.value !== next) activeTab.value = next
+      return
+    }
+    restoreActiveTab()
+  },
+)
+
+watch(
+  () => route.params.id,
+  () => {
+    restoreActiveTab()
+  },
+)
+
+watch(activeTab, (tab) => {
+  syncTabToRoute(tab)
+})
+
+onActivated(() => {
+  restoreActiveTab()
+})
+
 watch(() => route.params.id, loadOrder, { immediate: true })
 
 function formatMoney(val) {
@@ -591,10 +891,6 @@ function displayCell(line, column) {
   return val !== undefined && val !== null && val !== '' ? val : '—'
 }
 
-function sumWholeShipQty(row) {
-  return (row.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
-}
-
 function previewFile(file) {
   message.info(`预览：${file.name || '附件'}`)
 }
@@ -609,29 +905,11 @@ function goPurchaseReq(id) {
   router.push(path)
 }
 
-function goOutbound() {
-  openTab('/inventory/outbound', '出库管理')
-  router.push('/inventory/outbound')
-}
-
-function goPurchaseOrders() {
-  openTab('/procurement/purchase-orders', '采购订单')
-  router.push('/procurement/purchase-orders')
-}
-
-function goProductionPlan() {
-  openTab('/planning/production-plan', '生产计划')
-  router.push('/planning/production-plan')
-}
-
-function goWorkOrders() {
-  openTab('/production/work-orders', '生产工单')
-  router.push('/production/work-orders')
-}
-
-function goAssemblyWorkOrders() {
-  openTab('/production/assembly-work-orders', '总装工单')
-  router.push('/production/assembly-work-orders')
+function goOutboundDetail(row) {
+  if (!row?.id) return
+  const path = `/inventory/outbound/${row.id}`
+  openTab(path, row.docNo || '出库单详情')
+  router.push({ name: 'inventory-outbound-detail', params: { id: row.id } })
 }
 
 function goDeliveryDetail(row) {
@@ -711,8 +989,11 @@ function openBomDetail(bomId, bomName) {
   margin-bottom: 10px;
 }
 
-.bom-version-hint {
-  margin-bottom: 12px;
+.section-hint {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
 }
 
 .bom-line-head {

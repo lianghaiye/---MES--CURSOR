@@ -14,7 +14,7 @@
         </a-space>
       </div>
 
-      <div class="preview-canvas">
+      <div ref="printAreaRef" class="preview-canvas">
         <article
           v-for="(sheet, index) in printSheets"
           :key="index"
@@ -82,12 +82,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { PrinterOutlined } from '@ant-design/icons-vue'
 import { loadWorkOrderPrintPayload } from '@/utils/workOrderPrintPreview'
+import { printElement } from '@/utils/browserPrint'
 
 const route = useRoute()
+const printAreaRef = ref(null)
 
 const payload = computed(() => loadWorkOrderPrintPayload(route.query.key))
 
@@ -112,7 +114,12 @@ const printedAtText = computed(() => {
 })
 
 function handlePrint() {
-  window.print()
+  if (!printAreaRef.value) return
+  printElement(printAreaRef.value, {
+    title: printSheets.value[0]?.productName || '生产工单',
+    paper: payload.value?.paper,
+    orientation: payload.value?.orientation,
+  })
 }
 
 function handleClose() {
@@ -121,7 +128,7 @@ function handleClose() {
 
 onMounted(() => {
   if (route.query.autoPrint === '1' && payload.value) {
-    window.setTimeout(() => window.print(), 300)
+    window.setTimeout(() => handlePrint(), 300)
   }
 })
 </script>

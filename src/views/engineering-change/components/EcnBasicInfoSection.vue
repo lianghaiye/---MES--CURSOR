@@ -1,0 +1,166 @@
+<template>
+  <div class="ecn-basic-section">
+    <div class="meta-bar">
+      <div v-for="item in metaItems" :key="item.key" class="meta-item">
+        <span class="field-label">{{ item.label }}</span>
+        <span class="field-value" :title="item.value">{{ item.value }}</span>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div
+        v-for="field in fields"
+        :key="field.key"
+        class="info-item"
+        :class="{ 'info-item-full': field.fullRow }"
+      >
+        <span class="field-label">{{ field.label }}</span>
+        <span class="field-value" :title="fieldText(field)">{{ fieldText(field) }}</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import { formatEcnOriginDoc, resolveEcnChangeReason, resolveExecConfigLabel } from '@/constants/ecn'
+import { getDocNo } from '@/constants/changeRequestModule'
+
+const props = defineProps({
+  record: { type: Object, required: true },
+  moduleConfig: { type: Object, required: true },
+})
+
+function display(val) {
+  return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '—'
+}
+
+function fieldText(field) {
+  if (field.format) return field.format(props.record)
+  return display(props.record[field.key])
+}
+
+const metaItems = computed(() => {
+  const row = props.record
+  return [
+    { key: 'status', label: '状态', value: display(row.status) },
+    { key: 'type', label: '变更类型', value: display(row.type) },
+    { key: 'applicant', label: '申请人', value: display(row.applicant) },
+    { key: 'createdAt', label: '创建时间', value: display(row.createdAt) },
+    { key: 'reviewer', label: '审核人', value: display(row.reviewer) },
+    { key: 'reviewTime', label: '审核时间', value: display(row.reviewTime) },
+  ]
+})
+
+const fields = computed(() => {
+  const { moduleConfig } = props
+  return [
+    {
+      key: 'docNo',
+      label: moduleConfig.docNoLabel,
+      format: (row) => getDocNo(row, moduleConfig),
+    },
+    { key: 'urgency', label: '紧急度' },
+    { key: 'productName', label: '产品名称' },
+    { key: 'customerName', label: '客户名称' },
+    { key: 'salesOrderNo', label: '销售单号' },
+    { key: 'workOrderNo', label: '工单编号' },
+    {
+      key: 'originDoc',
+      label: '关联单据',
+      format: (row) => formatEcnOriginDoc(row),
+    },
+    {
+      key: 'changeReason',
+      label: '变更原因',
+      format: (row) => resolveEcnChangeReason(row),
+    },
+    {
+      key: 'wipHandling',
+      label: '执行配置',
+      format: (row) => resolveExecConfigLabel(row.wipHandling),
+    },
+    { key: 'description', label: '变更说明', fullRow: true },
+  ]
+})
+</script>
+
+<script>
+export default { name: 'EcnBasicInfoSection' }
+</script>
+
+<style lang="less" scoped>
+@label-width: 96px;
+
+.ecn-basic-section {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.field-label {
+  flex: 0 0 @label-width;
+  width: @label-width;
+  padding-right: 8px;
+  text-align: right;
+  font-size: 13px;
+  line-height: 22px;
+  color: rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.field-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 22px;
+  color: rgba(0, 0, 0, 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e8e8e8;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 20px;
+  row-gap: 10px;
+}
+
+.info-item {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.info-item-full {
+  grid-column: 1 / -1;
+
+  .field-value {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 1200px) {
+  .info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

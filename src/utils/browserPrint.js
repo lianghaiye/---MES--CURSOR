@@ -3,6 +3,18 @@
  */
 import '@/styles/ecn-print-sheet.css'
 
+const PRINT_STYLE_MARKERS = [
+  'print-sheet',
+  'ecn-print-preview',
+  'ecn-print-sheet',
+  'work-order-print-preview',
+  'bom-print-preview',
+  'preview-sheet',
+  'sheet-page-break',
+  'sheet-table',
+  'no-print',
+]
+
 const BASE_PRINT_CSS = `
 html,
 body {
@@ -20,6 +32,37 @@ body {
   print-color-adjust: exact;
 }
 
+.print-iframe-body,
+.ecn-print-iframe-body {
+  margin: 0;
+  padding: 0;
+  background: #fff;
+}
+
+.print-iframe-body .preview-sheet,
+.print-iframe-body .print-sheet,
+.ecn-print-iframe-body .preview-sheet,
+.ecn-print-iframe-body .print-sheet {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10mm 8mm;
+  box-shadow: none;
+  background: #fff;
+  color: #262626;
+}
+
+.print-iframe-body .sheet-page-break,
+.ecn-print-iframe-body .sheet-page-break {
+  page-break-before: always;
+  margin-top: 0;
+}
+
+.print-iframe-body .preview-canvas,
+.ecn-print-iframe-body .preview-canvas {
+  padding: 0;
+  display: block;
+}
+
 @media print {
   @page {
     size: auto;
@@ -28,15 +71,35 @@ body {
 }
 `
 
+function matchesPrintStyle(text) {
+  return PRINT_STYLE_MARKERS.some((marker) => text.includes(marker))
+}
+
+function buildPageStyles(paper = 'A4', orientation = 'portrait') {
+  const landscape = orientation === 'landscape'
+  const size =
+    paper === 'A3'
+      ? landscape
+        ? 'A3 landscape'
+        : 'A3 portrait'
+      : landscape
+        ? 'A4 landscape'
+        : 'A4 portrait'
+  return `
+@media print {
+  @page {
+    size: ${size};
+    margin: 10mm;
+  }
+}
+`
+}
+
 function collectStyleText() {
   let css = BASE_PRINT_CSS
   document.querySelectorAll('style').forEach((tag) => {
     const text = tag.textContent || ''
-    if (
-      text.includes('print-sheet') ||
-      text.includes('ecn-print-preview') ||
-      text.includes('ecn-print-sheet')
-    ) {
+    if (matchesPrintStyle(text)) {
       css += `\n${text}`
     }
   })
@@ -45,11 +108,7 @@ function collectStyleText() {
     try {
       Array.from(sheet.cssRules || []).forEach((rule) => {
         const text = rule.cssText || ''
-        if (
-          text.includes('print-sheet') ||
-          text.includes('ecn-print-preview') ||
-          text.includes('ecn-print-sheet')
-        ) {
+        if (matchesPrintStyle(text)) {
           css += `\n${text}`
         }
       })
@@ -63,8 +122,10 @@ function collectStyleText() {
 
 /**
  * 在独立 iframe 中打印，避免 Safari 切换打印机时主页面布局被清空。
+ * @param {HTMLElement} element 要打印的 DOM 节点
+ * @param {{ title?: string, styles?: string, paper?: string, orientation?: string }} options
  */
-export function printElement(element, { title = 'Print', styles = '' } = {}) {
+export function printElement(element, { title = 'Print', styles = '', paper, orientation } = {}) {
   if (!element) return
 
   const iframe = document.createElement('iframe')
@@ -79,7 +140,8 @@ export function printElement(element, { title = 'Print', styles = '' } = {}) {
     return
   }
 
-  const mergedStyles = `${collectStyleText()}\n${styles}`
+  const pageStyles = paper || orientation ? buildPageStyles(paper, orientation) : ''
+  const mergedStyles = `${collectStyleText()}\n${pageStyles}\n${styles}`
   const safeTitle = String(title).replace(/[<>&"]/g, '')
 
   doc.open()
@@ -91,7 +153,7 @@ export function printElement(element, { title = 'Print', styles = '' } = {}) {
 <title>${safeTitle}</title>
 <style>${mergedStyles}</style>
 </head>
-<body class="ecn-print-iframe-body">
+<body class="print-iframe-body">
 ${element.outerHTML}
 </body>
 </html>`)

@@ -5,8 +5,8 @@
         <span class="label">最新 BOM</span>
         <span class="name">{{ latestBom.bomName }}</span>
         <a-tag color="blue">{{ latestBom.version }}</a-tag>
-        <a-tag v-if="latestBom.status" :color="latestBom.status === '生效' ? 'success' : 'default'">
-          {{ latestBom.status }}
+        <a-tag v-if="latestBomStatusLabel" :color="latestBomStatusColor">
+          {{ latestBomStatusLabel }}
         </a-tag>
       </div>
       <div v-if="showBoundHint" class="bound-hint">
@@ -23,6 +23,14 @@
         @compare="handleCompare"
       />
     </template>
+
+    <BomVersionCompareModal
+      v-model:open="compareOpen"
+      :old-bom="compareOldBom"
+      :new-bom="compareNewBom"
+      :quantity="compareQuantity"
+      :title="compareTitle"
+    />
   </div>
 </template>
 
@@ -31,23 +39,34 @@ export default { name: 'BomVersionInfoSection' }
 </script>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
+import {
+  getActiveBomForItem,
+  getBomsForItem,
+  getProductBomById,
+} from '@/store/productBomStore'
 import { buildBomVersionHistoryFromGroup, buildBomVersionHistoryForProduct } from '@/utils/ecnBomVersionHistory'
 import { useTabs } from '@/composables/useTabs'
 import EcnBomVersionTimeline from '@/views/engineering-change/components/EcnBomVersionTimeline.vue'
+import BomVersionCompareModal from '@/components/BomVersionCompareModal.vue'
 
 const props = defineProps({
   productId: { type: [String, Number], default: '' },
   bomId: { type: String, default: '' },
   boundVersion: { type: String, default: '' },
   versionGroupId: { type: String, default: '' },
+  /** EBOM 展开数量（销售订单行销售数量） */
+  compareQuantity: { type: Number, default: 1 },
 })
 
 const router = useRouter()
 const { openTab } = useTabs()
+const compareOpen = ref(false)
+const compareOldBom = ref(null)
+const compareNewBom = ref(null)
+const compareTitle = ref('')
 
 const latestBom = computed(() => {
   if (props.productId) return getActiveBomForItem('product', props.productId)
@@ -78,6 +97,18 @@ const showBoundHint = computed(() => {
   return props.boundVersion !== latestBom.value.version
 })
 
+const latestBomStatusLabel = computed(() => {
+  const status = latestBom.value?.status
+  if (status === '生效') return '现行'
+  return status || ''
+})
+
+const latestBomStatusColor = computed(() => {
+  const status = latestBom.value?.status
+  if (status === '生效' || status === '现行') return 'success'
+  return 'default'
+})
+
 function handleViewBom(item) {
   const bomId = item.bomId || latestBom.value?.id
   if (!bomId) {
@@ -89,8 +120,31 @@ function handleViewBom(item) {
   router.push(path)
 }
 
+function resolveBomsForCompare() {
+  if (props.productId) return getBomsForItem('product', props.productId)
+  const seed = props.bomId ? getProductBomById(props.bomId) : latestBom.value
+  if (seed) return getBomsForItem(seed.itemType, seed.itemId)
+  return []
+}
+
 function handleCompare(item) {
-  message.info(`对比 ${item.version} 与 ${item.compareVersion}（演示）`)
+  const newBom = getProductBomById(item.bomId)
+  if (!newBom) {
+    message.warning('未找到当前版本 BOM')
+    return
+  }
+
+  const allBoms = resolveBomsForCompare()
+  const oldBom = allBoms.find((bom) => bom.version === item.compareVersion)
+  if (!oldBom) {
+    message.warning(`未找到对比版本 ${item.compareVersion || ''}`)
+    return
+  }
+
+  compareOldBom.value = oldBom
+  compareNewBom.value = newBom
+  compareTitle.value = `${newBom.bomName || 'BOM'} · ${oldBom.version} → ${newBom.version}`
+  compareOpen.value = true
 }
 </script>
 

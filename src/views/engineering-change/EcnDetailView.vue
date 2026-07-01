@@ -19,26 +19,7 @@
 
         <div class="section-card">
           <div class="section-title">基本信息</div>
-          <a-descriptions bordered size="small" :column="3">
-            <a-descriptions-item :label="moduleConfig.docNoLabel">
-              {{ getDocNo(record, moduleConfig) }}
-            </a-descriptions-item>
-            <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
-            <a-descriptions-item label="变更类型">{{ record.type || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="产品名称">{{ record.productName || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="客户名称">{{ record.customerName || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="销售单号">{{ record.salesOrderNo || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="工单编号">{{ record.workOrderNo || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="申请人">{{ record.applicant || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="紧急度">{{ record.urgency || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="创建时间">{{ record.createdAt || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="审核人">{{ record.reviewer || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="审核时间">{{ record.reviewTime || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="变更原因" :span="3">{{ changeReasonText }}</a-descriptions-item>
-            <a-descriptions-item label="执行配置" :span="3">
-              {{ resolveExecConfigLabel(record.wipHandling) }}
-            </a-descriptions-item>
-          </a-descriptions>
+          <EcnBasicInfoSection :record="record" :module-config="moduleConfig" />
         </div>
 
         <div class="section-card">
@@ -91,15 +72,11 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { PrinterOutlined } from '@ant-design/icons-vue'
-import {
-  ECN_STATUS,
-  ecnStatusColor,
-  resolveEcnChangeReason,
-  resolveExecConfigLabel,
-} from '@/constants/ecn'
+import { ECN_STATUS, ecnStatusColor } from '@/constants/ecn'
 import { resolveChangeRequestModule, getDocNo } from '@/constants/changeRequestModule'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { buildBomVersionHistory } from '@/utils/ecnBomVersionHistory'
+import EcnBasicInfoSection from './components/EcnBasicInfoSection.vue'
 import EcnChangeItemsReadonlyTable from './components/EcnChangeItemsReadonlyTable.vue'
 import EcnBomVersionTimeline from './components/EcnBomVersionTimeline.vue'
 import EcnPrintModal from './components/EcnPrintModal.vue'
@@ -122,13 +99,6 @@ const bomVersionHistory = computed(() =>
 const showPostApprovalSections = computed(() => {
   const status = record.value?.status
   return status && status !== ECN_STATUS.DRAFT && status !== ECN_STATUS.APPROVING
-})
-
-const changeReasonText = computed(() => {
-  const row = record.value
-  if (!row) return '—'
-  if (row.description) return row.description
-  return resolveEcnChangeReason(row)
 })
 
 watch(

@@ -11,6 +11,7 @@ import { createProductionPlanFromSalesOrder } from '@/store/productionPlanStore'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { buildLineAccessoryKits, buildOrderAccessoryKits } from '@/mock/accessoryPacks'
 import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
+import { ensureEcnDemoBootstrap } from '@/mock/ecnDemoBootstrap'
 import { hydrateApprovedSelfProdOrders } from '@/utils/hydrateSalesLines'
 import { validateChangeDeliveryRows, applyDeliveryModeChanges } from '@/utils/changeDeliveryMode'
 import { syncProductionPlanDeliveryMode } from '@/store/productionPlanStore'
@@ -29,7 +30,7 @@ import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 5
+const DATA_VERSION = 7
 let orderSeq = 20
 let deliverySeq = 113
 
@@ -56,6 +57,7 @@ function persist() {
 }
 
 function loadInitialSalesOrders() {
+  ensureEcnDemoBootstrap()
   const orders = loadFromStorage() || buildMockSalesOrders(mockProducts)
   return hydrateApprovedSelfProdOrders(orders)
 }

@@ -140,6 +140,7 @@ import {
   loadBomPrintPayload,
   updateBomPrintPayload,
 } from '@/utils/bomPrintPreview'
+import { printElement } from '@/utils/browserPrint'
 import {
   PRODUCTION_PLAN_PRINT_COLUMN_STORAGE_KEY,
   productionPlanPrintColumnSettings,
@@ -199,7 +200,7 @@ onMounted(() => {
   payload.value = loadBomPrintPayload(route.query.key)
   initPrintColumnSettings()
   if (route.query.autoPrint === '1') {
-    window.setTimeout(() => window.print(), 300)
+    window.setTimeout(() => handlePrint(), 300)
   }
 })
 
@@ -238,7 +239,12 @@ function applyPrintColumnSettings(settings) {
 }
 
 function handlePrint() {
-  window.print()
+  if (!sheetRef.value) return
+  printElement(sheetRef.value, {
+    title: payload.value?.rootItemName || 'BOM清单',
+    paper: payload.value?.paper,
+    orientation: payload.value?.orientation,
+  })
 }
 
 function handleClose() {

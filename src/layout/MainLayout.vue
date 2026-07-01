@@ -8,7 +8,7 @@
         <a-layout-content class="page-content">
           <router-view v-slot="{ Component, route: currentRoute }">
             <keep-alive :include="cachedViews">
-              <component :is="Component" :key="currentRoute.fullPath" />
+              <component :is="Component" :key="currentRoute.path" />
             </keep-alive>
           </router-view>
         </a-layout-content>
@@ -30,7 +30,13 @@ const route = useRoute()
 const moduleKey = computed(() => resolveModuleKey(route.path))
 const sideItems = computed(() => sideMenus[moduleKey.value] || [])
 
-const cachedViews = ['ProductionPlanView', 'ProductBomCreateView', 'EbomDesignView', 'EcnCreateView']
+const cachedViews = [
+  'ProductionPlanView',
+  'ProductBomCreateView',
+  'EbomDesignView',
+  'EcnCreateView',
+  'SalesOrderDetailView',
+]
 </script>
 
 <style lang="less" scoped>
