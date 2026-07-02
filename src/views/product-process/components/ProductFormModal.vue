@@ -127,10 +127,17 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
-                <a-form-item label="产品物料">
-                  <a-switch v-model:checked="form.isProductMaterial" />
-                </a-form-item>
+              <a-col :span="24">
+                <div class="form-option-row">
+                  <div v-if="showAssemblyPartSwitch" class="form-option-item">
+                    <span class="form-option-label">是否组装件</span>
+                    <a-switch v-model:checked="form.isAssemblyPart" :disabled="viewOnly" />
+                  </div>
+                  <div class="form-option-item">
+                    <span class="form-option-label">产品物料</span>
+                    <a-switch v-model:checked="form.isProductMaterial" :disabled="viewOnly" />
+                  </div>
+                </div>
               </a-col>
               <template v-if="form.isProductMaterial">
                 <a-col :span="8">
@@ -549,6 +556,7 @@ import {
   standardSpecOptions,
   createDefaultProductProduction,
   createDefaultProductAlert,
+  isPartProductAttribute,
 } from '@/mock/productInfoOptions'
 import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
 import { generateProductCode } from '@/store/productInfoStore'
@@ -604,6 +612,8 @@ const modalTitle = computed(() => {
   return isEdit.value ? '编辑产品' : '新增产品'
 })
 
+const showAssemblyPartSwitch = computed(() => isPartProductAttribute(form.productAttribute))
+
 const form = reactive({
   code: '',
   name: '',
@@ -623,6 +633,7 @@ const form = reactive({
   isPart: false,
   canPurchase: false,
   canOutsource: false,
+  isAssemblyPart: false,
   isProductMaterial: false,
   materialType: '零部件',
   materialCategoryKey: undefined,
@@ -655,6 +666,7 @@ function resetForm() {
   form.isPart = false
   form.canPurchase = false
   form.canOutsource = false
+  form.isAssemblyPart = false
   form.isProductMaterial = false
   form.materialType = '零部件'
   form.materialCategoryKey = undefined
@@ -701,6 +713,7 @@ function loadEditRecord(record) {
     isPart: Boolean(source.isPart || source.isProductMaterial),
     canPurchase: Boolean(source.canPurchase),
     canOutsource: Boolean(source.canOutsource),
+    isAssemblyPart: Boolean(source.isAssemblyPart),
     materialType: source.materialType || '零部件',
     materialCategoryKey: source.materialCategoryKey,
     supplyForm: source.supplyForm || '自制件',
@@ -786,6 +799,13 @@ watch(
   () => form.canSell,
   (val) => {
     if (!val) form.canSell = true
+  },
+)
+
+watch(
+  () => form.productAttribute,
+  (val) => {
+    if (!isPartProductAttribute(val)) form.isAssemblyPart = false
   },
 )
 
@@ -900,6 +920,7 @@ function buildPayload() {
     isPart: form.isPart,
     canPurchase: form.canPurchase,
     canOutsource: form.canOutsource,
+    isAssemblyPart: showAssemblyPartSwitch.value ? form.isAssemblyPart : false,
     isProductMaterial: form.isProductMaterial,
     materialType: form.isProductMaterial ? form.materialType : undefined,
     materialCategoryKey: form.isProductMaterial ? form.materialCategoryKey : undefined,
@@ -1050,6 +1071,11 @@ function handleOk() {
     align-items: center;
   }
 
+  :deep(.ant-form-item-label) {
+    flex: 0 0 84px;
+    max-width: 84px;
+  }
+
   :deep(.ant-form-item-label > label) {
     height: 24px;
     line-height: 24px;
@@ -1065,8 +1091,33 @@ function handleOk() {
   .remark-item {
     :deep(.ant-form-item-label) {
       flex: 0 0 96px;
+      max-width: 96px;
     }
   }
+}
+
+.form-option-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 48px;
+  min-height: 32px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border-radius: 6px;
+}
+
+.form-option-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-option-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+  white-space: nowrap;
 }
 
 .required-label::before {

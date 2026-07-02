@@ -23,6 +23,13 @@ export const productAttributeOptions = [
   '服务',
 ]
 
+/** 标准/定制零部件（成品零部件） */
+export const PART_PRODUCT_ATTRIBUTES = ['标准-成品零部件', '定制-成品零部件']
+
+export function isPartProductAttribute(productAttribute) {
+  return PART_PRODUCT_ATTRIBUTES.includes(productAttribute)
+}
+
 export const standardSpecOptions = ['国标', '行标', '企标', 'ISO标准']
 
 export function createDefaultProductProduction() {
