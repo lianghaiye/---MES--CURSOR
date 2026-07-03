@@ -1,11 +1,12 @@
 <template>
-  <a-modal
-    v-model:open="openModel"
-    :title="modalTitle"
+  <FormCreateShell
+    :page-mode="pageMode"
+    :open="open"
+    :title="shellTitle"
     width="92%"
-    :mask-closable="false"
     class="product-form-modal"
-    @cancel="handleCancel"
+    @cancel="onShellCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <div class="entity-name-header">
       <div class="entity-name-label">产品名称</div>
@@ -65,6 +66,7 @@
                     v-model:value="form.productAttribute"
                     size="small"
                     :options="productAttrOpts"
+                    :disabled="viewOnly"
                     placeholder="请选择 产品属性"
                   />
                 </a-form-item>
@@ -133,7 +135,7 @@
                     <span class="form-option-label">是否组装件</span>
                     <a-switch v-model:checked="form.isAssemblyPart" :disabled="viewOnly" />
                   </div>
-                  <div class="form-option-item">
+                  <div v-if="!form.isPart" class="form-option-item">
                     <span class="form-option-label">产品物料</span>
                     <a-switch v-model:checked="form.isProductMaterial" :disabled="viewOnly" />
                   </div>
@@ -515,10 +517,10 @@
 
     <template #footer>
       <template v-if="viewOnly">
-        <a-button type="primary" @click="handleCancel">关闭</a-button>
+        <a-button type="primary" @click="onShellCancel">关闭</a-button>
       </template>
       <template v-else>
-        <a-button @click="handleCancel">
+        <a-button @click="onShellCancel">
           <CloseOutlined />
           取消
         </a-button>
@@ -528,13 +530,15 @@
         </a-button>
       </template>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { flattenCategoryNodes, productCategoryTree } from '@/mock/productCategories'
 import {
   flattenCategoryNodes as flattenMatCats,
@@ -557,23 +561,36 @@ import {
   createDefaultProductProduction,
   createDefaultProductAlert,
   isPartProductAttribute,
+  partProductAttributeOptions,
+  PART_PRODUCT_ATTRIBUTES,
+  normalizePartProductAttribute,
 } from '@/mock/productInfoOptions'
 import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
-import { generateProductCode } from '@/store/productInfoStore'
+import { generateProductCode, addProduct, updateProduct } from '@/store/productInfoStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import ItemBomInfoTab from '@/views/product-process/components/ItemBomInfoTab.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
   viewOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
-const openModel = computed({
-  get: () => props.open,
-  set: (val) => emit('update:open', val),
+const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+const { isActive, shellTitle, handleCancel: onShellCancel, closeAfterSave } = useFormCreateModal(
+  props,
+  emit,
+  {
+  listPath: '/product-process/products',
+  getTitle: () => {
+    if (props.viewOnly) return '产品详情'
+    return isEdit.value ? '编辑产品' : '新增产品'
+  },
 })
 
 const flatCats = flattenCategoryNodes(productCategoryTree).filter((c) => !c.children?.length)
@@ -587,7 +604,12 @@ const materialCategoryOpts = flatMatCats.map((c) => ({
   value: c.key,
 }))
 const unitOpts = inventoryUnitOptions.map((v) => ({ label: v, value: v }))
-const productAttrOpts = productAttributeOptions.map((v) => ({ label: v, value: v }))
+const productAttrOpts = computed(() => {
+  const options = form.isPart
+    ? partProductAttributeOptions
+    : productAttributeOptions.filter((v) => !PART_PRODUCT_ATTRIBUTES.includes(v))
+  return options.map((v) => ({ label: v, value: v }))
+})
 const standardSpecOpts = standardSpecOptions.map((v) => ({ label: v, value: v }))
 const materialGradeOpts = computed(() => {
   void materialGradeState.items
@@ -606,13 +628,10 @@ const warehouseOpts = computed(() => {
 
 const activeTabKey = ref('basic')
 const fileList = ref([])
-const isEdit = computed(() => Boolean(props.editRecord?.id))
-const modalTitle = computed(() => {
-  if (props.viewOnly) return '产品详情'
-  return isEdit.value ? '编辑产品' : '新增产品'
-})
 
-const showAssemblyPartSwitch = computed(() => isPartProductAttribute(form.productAttribute))
+const showAssemblyPartSwitch = computed(
+  () => form.isPart || isPartProductAttribute(form.productAttribute),
+)
 
 const form = reactive({
   code: '',
@@ -698,7 +717,7 @@ function loadEditRecord(record) {
     code: source.code,
     name: source.name,
     barcodeType: source.barcodeType,
-    productAttribute: source.productAttribute,
+    productAttribute: normalizePartProductAttribute(source.productAttribute),
     categoryKey: source.categoryKey,
     specModel: source.specModel || '',
     drawingNo: source.drawingNo || '',
@@ -739,13 +758,13 @@ function loadEditRecord(record) {
 }
 
 function syncFormOnOpen() {
-  if (!props.open) return
+  if (!isActive.value) return
   if (props.editRecord) loadEditRecord(props.editRecord)
   else resetForm()
 }
 
 watch(
-  () => [props.open, props.editRecord?.id, props.editRecord?.code],
+  () => [isActive.value, props.editRecord?.id, props.editRecord?.code],
   () => syncFormOnOpen(),
   { immediate: true },
 )
@@ -782,6 +801,12 @@ watch(
     syncingProductPartPair = true
     form.isProductMaterial = val
     syncingProductPartPair = false
+    if (val) {
+      form.productAttribute = normalizePartProductAttribute(form.productAttribute)
+    } else if (isPartProductAttribute(form.productAttribute)) {
+      form.productAttribute = '标准产品'
+      form.isAssemblyPart = false
+    }
   },
 )
 
@@ -940,19 +965,21 @@ function buildPayload() {
   }
 }
 
-function handleCancel() {
-  openModel.value = false
-}
-
 function handleOk() {
   if (!validate()) return
-  emit('saved', {
+  const payload = {
     isEdit: isEdit.value,
     id: props.editRecord?.id,
     data: buildPayload(),
-  })
+  }
+  if (props.pageMode) {
+    if (isEdit.value) updateProduct(payload.id, payload.data)
+    else addProduct(payload.data)
+  } else {
+    emit('saved', payload)
+  }
   message.success(isEdit.value ? '产品已更新' : '产品已保存')
-  openModel.value = false
+  closeAfterSave()
 }
 </script>
 

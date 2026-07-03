@@ -25,9 +25,6 @@ const subtitle = computed(() => {
   if (props.workOrder?.ebomSnapshot?.snapshotAt) {
     return `EBOM 快照 · ${props.workOrder.ebomSnapshot.snapshotAt}`
   }
-  if (props.workOrder?.status === '待下发') {
-    return '未下发：展示保存时关联的产品 BOM'
-  }
   const parent = props.workOrder?.bom
   if (parent && parent !== props.workOrder?.productName) {
     return `所属成品 EBOM：${parent}（当前制品：${props.workOrder?.productName || '—'}）`

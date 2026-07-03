@@ -7,6 +7,8 @@ export function createPoLineItem(partial = {}) {
   const inTax = Math.round(ex * (1 + rate / 100) * 100) / 100
   return {
     id: `po-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    productName: '',
+    productCode: '',
     itemCode: '',
     itemName: '',
     itemType: '物料',
@@ -14,6 +16,8 @@ export function createPoLineItem(partial = {}) {
     specModel: '',
     specAttr: '',
     material: '',
+    drawingNo: '',
+    stockQty: 0,
     purchaseQty,
     unit: '个',
     unitPriceExTax: ex,
@@ -21,6 +25,7 @@ export function createPoLineItem(partial = {}) {
     unitPriceInTax: inTax,
     totalPriceExTax: Math.round(purchaseQty * ex * 100) / 100,
     totalPriceInTax: Math.round(purchaseQty * inTax * 100) / 100,
+    deliveryDate: '',
     receivingMode: '正常收货',
     receivingWarehouse: '',
     receivedQty: 0,
@@ -58,6 +63,7 @@ function createPurchaseOrder(partial) {
     contactPerson: '',
     contactPhone: '',
     shippingAddress: '',
+    receivingWarehouse: '',
     logisticsNo: '',
     reminderDate: '',
     shippingDate: '',

@@ -24,6 +24,7 @@ import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 import GlobalTabs from './GlobalTabs.vue'
 import { sideMenus, resolveModuleKey } from '@/config/menus'
+import { createPageRegistry } from '@/config/createPages'
 
 const route = useRoute()
 
@@ -36,6 +37,7 @@ const cachedViews = [
   'EbomDesignView',
   'EcnCreateView',
   'SalesOrderDetailView',
+  ...createPageRegistry.map((page) => page.keepAlive),
 ]
 </script>
 

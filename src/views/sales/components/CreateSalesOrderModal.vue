@@ -1,12 +1,14 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑销售订单' : '新增销售订单'"
+    :title="shellTitle"
     width="96%"
     :mask-closable="false"
     destroy-on-close
     class="create-sales-order-modal"
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form layout="inline" class="header-form horizontal-form">
       <a-row :gutter="[12, 8]" style="width: 100%">
@@ -455,70 +457,18 @@
       </a-form>
     </div>
 
-    <a-modal
+    <SelectBomMaterialModal
       v-model:open="productPickerOpen"
-      title="选择产品"
-      width="880px"
-      :mask-closable="false"
-      @ok="confirmProductPick"
-    >
-      <a-form layout="inline" class="product-picker-search">
-        <a-form-item label="产品类别">
-          <a-select
-            v-model:value="productPickerFilters.categoryKey"
-            allow-clear
-            show-search
-            option-filter-prop="label"
-            placeholder="请选择"
-            size="small"
-            style="width: 200px"
-            :options="productCategoryOpts"
-          />
-        </a-form-item>
-        <a-form-item label="产品编号">
-          <a-input
-            v-model:value="productPickerFilters.code"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 160px"
-            @press-enter="applyProductPickerSearch"
-          />
-        </a-form-item>
-        <a-form-item label="产品名称">
-          <a-input
-            v-model:value="productPickerFilters.name"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 160px"
-            @press-enter="applyProductPickerSearch"
-          />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" size="small" @click="applyProductPickerSearch">查询</a-button>
-            <a-button size="small" @click="resetProductPickerSearch">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
-      <a-table
-        :columns="productPickerColumns"
-        :data-source="pagedProductPickerRows"
-        row-key="id"
-        size="small"
-        bordered
-        :row-selection="productPickerRowSelection"
-        :pagination="productPickerPagination"
-        :scroll="{ y: 360 }"
-      />
-    </a-modal>
+      title="添加产品/物料"
+      picker-default-item-type="产品"
+      @selected="onProductsSelected"
+    />
 
     <template #footer>
-      <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" @click="handleSave">保存</a-button>
+      <a-button size="small" @click="handleCancel">取消</a-button>
+      <a-button type="primary" size="small" @click="handleSave">保存</a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
@@ -539,52 +489,44 @@ import {
   salespersonOptions,
 } from '@/mock/salesOrderOptions'
 import { createLineItem } from '@/mock/salesOrders'
-import { filterProducts } from '@/mock/productInfo'
-import { productCategoryTree, flattenCategoryNodes } from '@/mock/productCategories'
 import { productInfoState } from '@/store/productInfoStore'
+import { materialInfoState } from '@/store/materialInfoStore'
 import { getActiveBomForItem } from '@/store/productBomStore'
-import { generateSalesOrderNo } from '@/store/salesOrderStore'
+import {
+  addSalesOrder,
+  generateSalesOrderNo,
+  recalcOrderAmounts,
+  salesOrderState,
+  updateSalesOrder,
+} from '@/store/salesOrderStore'
+import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 import {
   deriveOrderBusinessType,
   normalizeSalesLineBusiness,
   CUSTOM_SALES_BUSINESS_TYPE,
+  MAINTENANCE_SERVICE_BUSINESS_TYPE,
 } from '@/utils/salesOrderBusiness'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/sales/orders',
+  getTitle: () => (isEdit.value ? '编辑销售订单' : '新增销售订单'),
+})
 const taxModeExcluding = ref(true)
 const detailCollapsed = ref(false)
 const productPickerOpen = ref(false)
-const pickedProductKeys = ref([])
 const fileList = ref([])
-
-const productPickerFilters = reactive({
-  categoryKey: undefined,
-  code: '',
-  name: '',
-})
-const appliedProductPickerFilters = ref({
-  categoryKey: undefined,
-  code: '',
-  name: '',
-})
-const productPickerPage = reactive({
-  current: 1,
-  pageSize: 10,
-})
-
-const flatProductCats = flattenCategoryNodes(productCategoryTree)
-const leafProductCats = flatProductCats.filter((c) => !c.children?.length)
-const productCategoryOpts = leafProductCats.map((c) => ({
-  label: `(${c.code}) ${c.title}`,
-  value: c.key,
-}))
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024
 
@@ -636,68 +578,6 @@ const columnDefs = [
 
 const visibleColumnKeys = ref(columnDefs.map((c) => c.key))
 const columnWidths = reactive(Object.fromEntries(columnDefs.map((c) => [c.key, c.width])))
-
-const allProductPickerRows = computed(() =>
-  productInfoState.products.map((p) => ({
-    id: p.id,
-    code: p.code,
-    name: p.name,
-    productAttr: p.productAttribute,
-    specModel: p.specModel,
-    material: p.material,
-    unit: p.inventoryUnit,
-    unitPrice: p.unitPrice,
-    categoryName: p.categoryName,
-    categoryKey: p.categoryKey,
-  })),
-)
-
-const filteredProductPickerRows = computed(() => {
-  const f = appliedProductPickerFilters.value
-  const ids = new Set(filterProducts(productInfoState.products, f, null).map((p) => p.id))
-  return allProductPickerRows.value.filter((row) => ids.has(row.id))
-})
-
-const pagedProductPickerRows = computed(() => {
-  const list = filteredProductPickerRows.value
-  const start = (productPickerPage.current - 1) * productPickerPage.pageSize
-  return list.slice(start, start + productPickerPage.pageSize)
-})
-
-const productPickerPagination = computed(() => ({
-  current: productPickerPage.current,
-  pageSize: productPickerPage.pageSize,
-  total: filteredProductPickerRows.value.length,
-  showSizeChanger: true,
-  showTotal: (total) => `共 ${total} 条`,
-  pageSizeOptions: ['10', '20', '50'],
-  onChange: (page, pageSize) => {
-    productPickerPage.current = page
-    productPickerPage.pageSize = pageSize
-  },
-}))
-
-watch(filteredProductPickerRows, (list) => {
-  const maxPage = Math.max(1, Math.ceil(list.length / productPickerPage.pageSize) || 1)
-  if (productPickerPage.current > maxPage) productPickerPage.current = 1
-})
-
-const productPickerRowSelection = computed(() => ({
-  type: 'checkbox',
-  selectedRowKeys: pickedProductKeys.value,
-  preserveSelectedRowKeys: true,
-  onChange: (keys) => {
-    pickedProductKeys.value = keys
-  },
-}))
-
-const productPickerColumns = [
-  { title: '产品编码', dataIndex: 'code', width: 130, ellipsis: true },
-  { title: '产品名称', dataIndex: 'name', width: 180, ellipsis: true },
-  { title: '产品类别', dataIndex: 'categoryName', width: 100, ellipsis: true },
-  { title: '产品属性', dataIndex: 'productAttr', width: 96 },
-  { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
-]
 
 const displayColumns = computed(() =>
   columnDefs
@@ -753,14 +633,28 @@ const form = reactive({
   lineItems: [],
 })
 
-const catalogBusinessTypeOpts = ['自产销售', '外购销售'].map((v) => ({ label: v, value: v }))
-const manualBusinessTypeOpts = ['外协销售', '质检服务', CUSTOM_SALES_BUSINESS_TYPE].map((v) => ({
+const catalogBusinessTypeOpts = ['自产销售', '外购销售', CUSTOM_SALES_BUSINESS_TYPE].map((v) => ({
   label: v,
   value: v,
 }))
+const manualBusinessTypeOpts = [
+  '外协销售',
+  '质检服务',
+  MAINTENANCE_SERVICE_BUSINESS_TYPE,
+  CUSTOM_SALES_BUSINESS_TYPE,
+].map((v) => ({ label: v, value: v }))
 
 function onBusinessTypeChange(record, businessType) {
   record.businessType = businessType
+  if (businessType === MAINTENANCE_SERVICE_BUSINESS_TYPE) {
+    record.isManualLine = true
+    record.productId = ''
+    record.bomId = ''
+    record.bomName = ''
+    record.bomVersion = ''
+    record.productAttr = ''
+    return
+  }
   if (businessType === CUSTOM_SALES_BUSINESS_TYPE) {
     record.productAttr = '定制产品'
     record.bomId = ''
@@ -804,7 +698,11 @@ function startColumnResize(e, key) {
 }
 
 function lineBusinessTypeOpts(record) {
-  return record.isManualLine ? manualBusinessTypeOpts : catalogBusinessTypeOpts
+  const base = record.isManualLine ? manualBusinessTypeOpts : catalogBusinessTypeOpts
+  if (record.businessType && !base.some((opt) => opt.value === record.businessType)) {
+    return [{ label: record.businessType, value: record.businessType }, ...base]
+  }
+  return base
 }
 
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
@@ -828,7 +726,7 @@ const orderAmount = computed(() =>
 )
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (val) => {
     if (!val) return
     detailCollapsed.value = false
@@ -868,6 +766,7 @@ watch(
     }
     resetForm()
   },
+  { immediate: true },
 )
 
 function normalizeLineItem(item, orderBusinessType = '自产销售') {
@@ -1017,25 +916,73 @@ function onContactChange(name) {
   if (contact?.phone) form.contactPhone = contact.phone
 }
 
-function resetProductPickerSearch() {
-  productPickerFilters.categoryKey = undefined
-  productPickerFilters.code = ''
-  productPickerFilters.name = ''
-  appliedProductPickerFilters.value = {
-    categoryKey: undefined,
-    code: '',
-    name: '',
-  }
-  productPickerPage.current = 1
+function openProductPicker() {
+  productPickerOpen.value = true
 }
 
-function applyProductPickerSearch() {
-  appliedProductPickerFilters.value = {
-    categoryKey: productPickerFilters.categoryKey,
-    code: (productPickerFilters.code || '').trim(),
-    name: (productPickerFilters.name || '').trim(),
+function resolveMasterRecord(payload) {
+  if (payload.itemType === '产品') {
+    return productInfoState.products.find((p) => p.id === payload.id) || null
   }
-  productPickerPage.current = 1
+  return materialInfoState.materials.find((m) => m.id === payload.id) || null
+}
+
+function mapPickerToSalesLine(payload) {
+  const bomItemType = payload.itemType === '产品' ? 'product' : 'material'
+  const bom = getActiveBomForItem(bomItemType, payload.id)
+  const master = resolveMasterRecord(payload)
+  const unitPrice = master?.unitPrice ?? payload.unitPrice ?? 0
+  const taxRate = master?.outputTaxRate ?? 13
+
+  return createLineItem({
+    productId: payload.id,
+    bomId: bom?.id || '',
+    businessType: '自产销售',
+    isManualLine: false,
+    deliveryMode: '整机',
+    productAttr: master?.productAttribute || payload.materialType || '',
+    productName: payload.name,
+    productCode: payload.code,
+    specAttr: master?.standardSpec || '',
+    specModel: payload.specModel,
+    material: payload.material,
+    drawingNo: payload.drawingNo || '',
+    techParams: master?.techParams || '',
+    matchingRequirements: master?.matchingRequirements || master?.remark || '',
+    category: payload.categoryName || master?.categoryName || '',
+    unit: payload.inventoryUnit || master?.inventoryUnit || '件',
+    bomName: bom?.bomName || '',
+    bomVersion: bom?.version || '',
+    salesQty: 1,
+    taxRate,
+    unitPriceExTax: Number(unitPrice) || 0,
+    unitPriceInTax: 0,
+  })
+}
+
+function onProductsSelected(rows) {
+  const noBomProducts = []
+  rows.forEach((payload) => {
+    const code = payload.code || ''
+    if (!code) return
+    if (form.lineItems.some((line) => line.productCode === code && !line.isManualLine)) return
+
+    const bomItemType = payload.itemType === '产品' ? 'product' : 'material'
+    const bom = getActiveBomForItem(bomItemType, payload.id)
+    if (!bom) {
+      noBomProducts.push(payload.name)
+    }
+
+    const line = mapPickerToSalesLine(payload)
+    recalcLine(line)
+    form.lineItems.push(line)
+  })
+
+  if (noBomProducts.length) {
+    message.warning(
+      `以下产品无使用中的 BOM，已添加至明细：${noBomProducts.join('、')}。请尽快在产品 BOM 中维护并启用，自产销售审核前需完成 BOM 配置。`,
+    )
+  }
 }
 
 function addManualProductLine() {
@@ -1051,56 +998,6 @@ function addManualProductLine() {
   form.lineItems.push(line)
 }
 
-function openProductPicker() {
-  pickedProductKeys.value = []
-  resetProductPickerSearch()
-  productPickerOpen.value = true
-}
-
-function confirmProductPick() {
-  const noBomProducts = []
-  pickedProductKeys.value.forEach((productId) => {
-    const p = productInfoState.products.find((m) => m.id === productId)
-    if (!p) return
-    const bom = getActiveBomForItem('product', p.id)
-    if (!bom) {
-      noBomProducts.push(p.name)
-    }
-    const line = createLineItem({
-      productId: p.id,
-      bomId: bom?.id || '',
-      businessType: '自产销售',
-      isManualLine: false,
-      deliveryMode: '整机',
-      productAttr: p.productAttribute,
-      productName: p.name,
-      productCode: p.code,
-      specAttr: p.standardSpec || '',
-      specModel: p.specModel,
-      material: p.material,
-      drawingNo: p.drawingNo || '',
-      techParams: p.techParams || '',
-      matchingRequirements: p.matchingRequirements || p.remark || '',
-      category: p.categoryName,
-      unit: p.inventoryUnit || '件',
-      bomName: bom?.bomName || '',
-      bomVersion: bom?.version || '',
-      salesQty: 1,
-      taxRate: p.outputTaxRate ?? 13,
-      unitPriceExTax: Number(p.unitPrice) || 0,
-      unitPriceInTax: 0,
-    })
-    recalcLine(line)
-    form.lineItems.push(line)
-  })
-  if (noBomProducts.length) {
-    message.warning(
-      `以下产品无使用中的 BOM，已添加至明细：${noBomProducts.join('、')}。请尽快在产品 BOM 中维护并启用，自产销售审核前需完成 BOM 配置。`,
-    )
-  }
-  productPickerOpen.value = false
-}
-
 function removeLine(index) {
   form.lineItems.splice(index, 1)
 }
@@ -1114,10 +1011,6 @@ function cloneLine(index) {
 
 function formatMoney(val) {
   return Number(val || 0).toFixed(2)
-}
-
-function handleCancel() {
-  emit('update:open', false)
 }
 
 function handleSave() {
@@ -1165,28 +1058,22 @@ function handleSave() {
     })),
   }
 
-  emit('saved', { isEdit: isEdit.value, id: props.editRecord?.id, data: payload })
+  if (props.pageMode) {
+    if (isEdit.value) {
+      updateSalesOrder(props.editRecord.id, payload)
+    } else {
+      addSalesOrder({ ...payload, id: `so-${Date.now()}` })
+      recalcOrderAmounts(salesOrderState.orders[0])
+    }
+  } else {
+    emit('saved', { isEdit: isEdit.value, id: props.editRecord?.id, data: payload })
+  }
   message.success(isEdit.value ? '销售订单已更新' : '销售订单已保存')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 
 <style lang="less" scoped>
-.product-picker-search {
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
-
-  :deep(.ant-form-item) {
-    margin-bottom: 8px;
-    margin-inline-end: 12px;
-  }
-
-  :deep(.ant-form-item-label > label) {
-    font-size: 13px;
-  }
-}
-
 .header-form {
   :deep(.ant-form-item) {
     width: 100%;

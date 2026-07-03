@@ -240,6 +240,8 @@ import DeliveryFormModal from './components/DeliveryFormModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -353,8 +355,9 @@ function handleRefresh() {
 }
 
 function openCreate() {
-  editingRecord.value = null
-  formOpen.value = true
+  const page = findCreatePageByListPath('/sales/delivery')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openEdit(record) {

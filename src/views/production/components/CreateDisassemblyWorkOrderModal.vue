@@ -1,12 +1,13 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑拆解工单' : '新增拆解工单'"
+    :title="shellTitle"
     width="960px"
     :mask-closable="false"
     destroy-on-close
-    @cancel="emit('update:open', false)"
-    @ok="handleOk"
+    @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <div class="section-title">基础信息</div>
     <a-form :model="form" layout="inline" class="disassembly-form horizontal-form">
@@ -172,7 +173,12 @@
       :selected-id="form.relatedScrapId"
       @confirm="onScrapSelected"
     />
-  </a-modal>
+
+    <template #footer>
+      <a-button size="small" @click="handleCancel">取消</a-button>
+      <a-button type="primary" size="small" @click="handleOk">确定</a-button>
+    </template>
+  </FormCreateShell>
 </template>
 
 <script setup>
@@ -197,15 +203,24 @@ import {
 import { generateDisassemblyOrderName } from '@/utils/disassemblyWorkOrder'
 import { isDuplicateOrderCode } from '@/utils/workOrderNaming'
 import SelectScrapOrderModal from './SelectScrapOrderModal.vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
 const props = defineProps({
-  open: Boolean,
+  open: { type: Boolean, default: false },
   editRecord: { type: Object, default: null },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/production/disassembly-work-orders',
+  getTitle: () => (isEdit.value ? '编辑拆解工单' : '新增拆解工单'),
+})
 const scrapModalOpen = ref(false)
 
 const routeOpts = processRouteOptions.map((v) => ({ label: v, value: v }))
@@ -258,7 +273,7 @@ const form = reactive({
 })
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (v) => {
     if (!v) return
     if (props.editRecord) {
@@ -292,6 +307,7 @@ watch(
     }
     resetForm()
   },
+  { immediate: true },
 )
 
 function resetForm() {
@@ -456,7 +472,7 @@ function handleOk() {
     message.success('拆解工单已创建')
   }
   emit('saved')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 

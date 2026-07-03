@@ -99,6 +99,7 @@ export default { name: 'ProcessCategoryView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   DeleteOutlined,
@@ -112,6 +113,9 @@ import ProcessCategoryFormModal from './components/ProcessCategoryFormModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useTabs } from '@/composables/useTabs'
+import { findCreatePageByListPath } from '@/config/createPages'
+import { openCreateTab } from '@/utils/openCreateTab'
 import {
   processCategoryState,
   filterProcessCategories,
@@ -119,6 +123,10 @@ import {
   unarchiveProcessCategory,
 } from '@/store/processCategoryStore'
 import { countProcessesByCategory } from '@/store/processConfigStore'
+
+const router = useRouter()
+const { openTab } = useTabs()
+const processCategoryCreatePage = findCreatePageByListPath('/product-process/process-category')
 
 const filters = reactive({ name: '' })
 const applied = reactive({ name: '' })
@@ -157,8 +165,10 @@ function handleReset() {
 }
 
 function openCreate() {
-  editRecord.value = null
-  modalOpen.value = true
+  openCreateTab(router, openTab, {
+    path: processCategoryCreatePage.newPath,
+    title: processCategoryCreatePage.title,
+  })
 }
 
 function openEdit(record) {

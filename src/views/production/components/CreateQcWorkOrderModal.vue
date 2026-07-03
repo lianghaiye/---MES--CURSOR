@@ -1,11 +1,13 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑质检工单' : '新增质检工单'"
+    :title="shellTitle"
     width="720px"
     :mask-closable="false"
     destroy-on-close
-    @cancel="handleCancel"
+    @cancel="onShellCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form :model="form" layout="vertical">
       <a-row :gutter="16">
@@ -83,10 +85,10 @@
     </a-form>
 
     <template #footer>
-      <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" @click="handleSubmit">确定</a-button>
+      <a-button size="small" @click="onShellCancel">取消</a-button>
+      <a-button type="primary" size="small" @click="handleSubmit">确定</a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
@@ -100,15 +102,36 @@ import { bomOptions } from '@/mock/workOrderMaster'
 import { createQcWorkOrderPayload, qcWorkOrderState } from '@/store/qcWorkOrderStore'
 import { isDuplicateOrderCode, generateQcWorkOrderName } from '@/utils/workOrderNaming'
 import { buildProcessesFromRoute, getActiveRouteOptions } from '@/mock/processRoutes'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   editRecord: { type: Object, default: null },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'created', 'updated'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+const { isActive, shellTitle, handleCancel: onShellCancel, goBack } = useFormCreateModal(
+  props,
+  emit,
+  {
+    listPath: '/production/qc-work-orders',
+    getTitle: () => (isEdit.value ? '编辑质检工单' : '新增质检工单'),
+  },
+)
+
+function finishSave() {
+  if (props.pageMode) {
+    goBack()
+    return
+  }
+  emit('update:open', false)
+}
 
 const form = reactive({
   code: '',
@@ -140,13 +163,13 @@ const urgencyOpts = computed(() => urgencyOptions.map((v) => ({ label: v, value:
 watch(
   () => form.productName,
   (name) => {
-    if (!props.open || props.editRecord) return
+    if (!isActive.value || props.editRecord) return
     form.warehouse = resolveDefaultWarehouseByProductName(name?.trim()) || undefined
   },
 )
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (val) => {
     if (!val) return
     if (props.editRecord) {
@@ -181,11 +204,8 @@ watch(
     form.planDateRange = [dayjs(), dayjs().add(14, 'day')]
     form.remark = ''
   },
+  { immediate: true },
 )
-
-function handleCancel() {
-  emit('update:open', false)
-}
 
 function handleSubmit() {
   if (!form.productName?.trim()) {
@@ -238,7 +258,7 @@ function handleSubmit() {
       },
     })
     message.success('质检工单已更新')
-    emit('update:open', false)
+    finishSave()
     return
   }
 
@@ -261,6 +281,6 @@ function handleSubmit() {
 
   emit('created', wo)
   message.success('质检工单创建成功')
-  emit('update:open', false)
+  finishSave()
 }
 </script>

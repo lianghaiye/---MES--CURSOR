@@ -9,7 +9,7 @@ import { matchesBusinessTypeFilter, PRODUCT_BUSINESS_TYPE_OPTIONS } from '@/util
 const flatCats = flattenCategoryNodes(productCategoryTree)
 const leafCats = flatCats.filter((c) => !c.children?.length)
 
-const attrs = ['标准产品', '定制产品', '标准-成品零部件', '定制-成品零部件']
+const attrs = ['标准产品', '定制产品', '标准零部件', '定制零部件']
 const specs = ['50*30', 'ISG50-160', '80-65-200', 'DN100', 'QJ200-40', '65-160A', '32-25']
 const workCenters = ['默认工厂', '机械中心', '机加车间']
 

@@ -238,6 +238,12 @@ export function buildProcessReportWorkOrderBundle(workOrderId, records, logs = [
   const master = findMasterByCode(wo.materialCode || taskRecords[0]?.productCode)
   const productCode = wo.materialCode || master?.code || taskRecords[0]?.productCode || '—'
   const lines = taskRecords.map((r, i) => mapRecordToLine(r, i, productCode))
+  const scheduleQty = wo.scheduleQty ?? wo.planQty ?? 0
+  lines.forEach((line) => {
+    if (line.scheduleQty == null || line.scheduleQty === '') {
+      line.scheduleQty = scheduleQty
+    }
+  })
 
   const bundle = {
     id: `pr-wo-${workOrderId}`,

@@ -274,6 +274,8 @@ import {
 } from '@/utils/disassemblyWorkOrder'
 import { saveDispatchDraft, dispatchAndStartWorkOrder } from '@/utils/workOrderDispatchHelpers'
 import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 import CreateDisassemblyWorkOrderModal from './components/CreateDisassemblyWorkOrderModal.vue'
 import DisassemblyWorkOrderDetailPanel from './components/DisassemblyWorkOrderDetailPanel.vue'
 import DisassemblyWorkOrderTableLayout from './components/DisassemblyWorkOrderTableLayout.vue'
@@ -445,8 +447,9 @@ function onToggleSelectAllPage(e) {
 }
 
 function openCreate() {
-  editingRecord.value = null
-  formOpen.value = true
+  const page = findCreatePageByListPath('/production/disassembly-work-orders')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function handleSearch() {

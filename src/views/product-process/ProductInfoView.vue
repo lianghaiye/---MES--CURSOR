@@ -309,12 +309,15 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
+import { findCreatePageByListPath } from '@/config/createPages'
+import { openCreateTab } from '@/utils/openCreateTab'
 import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
 import { formatBusinessTypeLabels, PRODUCT_BUSINESS_TYPE_OPTIONS } from '@/utils/businessTypeLabel'
 import { productBomState, getBomInfoLabelForItem } from '@/store/productBomStore'
 
 const router = useRouter()
 const { openTab } = useTabs()
+const productCreatePage = findCreatePageByListPath('/product-process/products')
 
 const categoryKeyword = ref('')
 const selectedCategoryKey = ref('pcat-004')
@@ -402,7 +405,10 @@ function openFormModal({ record = null, readOnly = false } = {}) {
 }
 
 function openCreate() {
-  openFormModal()
+  openCreateTab(router, openTab, {
+    path: productCreatePage.newPath,
+    title: productCreatePage.title,
+  })
 }
 
 function openEdit(record) {

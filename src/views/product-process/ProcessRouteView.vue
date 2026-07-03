@@ -139,8 +139,13 @@ import ProcessRouteEditorModal from './components/ProcessRouteEditorModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useTabs } from '@/composables/useTabs'
+import { findCreatePageByListPath } from '@/config/createPages'
+import { openCreateTab } from '@/utils/openCreateTab'
 
 const router = useRouter()
+const { openTab } = useTabs()
+const processRouteCreatePage = findCreatePageByListPath('/product-process/routing')
 const filters = reactive({ code: '', name: '', status: undefined })
 const applied = reactive({ code: '', name: '', status: undefined })
 const editorOpen = ref(false)
@@ -186,8 +191,10 @@ function handleReset() {
 }
 
 function openCreate() {
-  editRecord.value = null
-  editorOpen.value = true
+  openCreateTab(router, openTab, {
+    path: processRouteCreatePage.newPath,
+    title: processRouteCreatePage.title,
+  })
 }
 
 function openEdit(record) {

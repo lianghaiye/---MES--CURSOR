@@ -1,11 +1,11 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑' : '新增'"
+    :title="shellTitle"
     width="900px"
-    :mask-closable="false"
-    destroy-on-close
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" class="group-form">
       <a-row :gutter="16">
@@ -118,23 +118,24 @@
       </a-table>
     </div>
 
-    <SelectPersonModal
-      v-model:open="workerPickerOpen"
-      :selected="form.workers.map((w) => w.name)"
-      @confirm="onWorkersSelected"
-    />
-
     <template #footer>
-      <a-button @click="handleCancel">
+      <a-button :size="pageMode ? 'small' : 'middle'" @click="handleCancel">
         <CloseOutlined />
         取消
       </a-button>
-      <a-button type="primary" @click="handleSave">
+      <a-button type="primary" :size="pageMode ? 'small' : 'middle'" @click="handleSave">
         <SaveOutlined />
         保存
       </a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
+
+  <SelectPersonModal
+    v-if="isActive"
+    v-model:open="workerPickerOpen"
+    :selected="form.workers.map((w) => w.name)"
+    @confirm="onWorkersSelected"
+  />
 </template>
 
 <script setup>
@@ -142,6 +143,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import SelectPersonModal from '@/views/production/components/SelectPersonModal.vue'
 import { mockEmployees } from '@/mock/workOrderMaster'
 import {
@@ -153,6 +156,8 @@ import {
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   record: { type: Object, default: null },
 })
 
@@ -176,6 +181,13 @@ const form = reactive({
   workers: [],
 })
 
+const isEdit = computed(() => !!props.record?.id)
+
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/basic-config/employee-groups',
+  getTitle: () => (isEdit.value ? '编辑' : '新增'),
+})
+
 const rules = {
   code: [{ required: true, message: '请输入编码' }],
   name: [{ required: true, message: '请输入名称' }],
@@ -184,7 +196,6 @@ const rules = {
   leaderId: [{ required: true, message: '请选择组长' }],
 }
 
-const isEdit = computed(() => !!props.record?.id)
 const workCenterOpts = workCenterOptions.map((v) => ({ label: v, value: v }))
 const positionOpts = positionOptions.map((v) => ({ label: v, value: v }))
 const employeeOpts = mockEmployees.map((e) => ({ label: e.name, value: e.id }))
@@ -204,7 +215,7 @@ const workerCols = [
 ]
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (val) => {
     if (!val) return
     if (props.record) {
@@ -239,6 +250,7 @@ watch(
       })
     }
   },
+  { immediate: true },
 )
 
 function genCode() {
@@ -281,10 +293,6 @@ function removeWorker(id) {
   form.workers = form.workers.filter((w) => w.id !== id)
 }
 
-function handleCancel() {
-  emit('update:open', false)
-}
-
 async function handleSave() {
   try {
     await formRef.value?.validate()
@@ -304,7 +312,7 @@ async function handleSave() {
     message.success('员工组别已创建')
   }
   emit('saved')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 

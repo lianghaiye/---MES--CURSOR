@@ -12,6 +12,7 @@ import {
   createLaborDemoAssemblyOrders,
   isLaborDemoWorkOrder,
 } from '@/mock/laborHourDemoSeed'
+import { ensureProductionPlanOrderTreeDemoWorkOrders } from '@/mock/productionPlanOrderTreeSeed'
 
 const STORAGE_KEY = 'i_doms_work_orders'
 let codeSeq = 1
@@ -84,7 +85,7 @@ function ensureDemoWorkOrder(orders) {
 function ensureLaborDemoProductionOrders(orders) {
   const demos = [...createLaborDemoProductionOrders(), ...createLaborDemoAssemblyOrders()]
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
-  return [...demos, ...rest]
+  return ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest])
 }
 
 function createInitialOrders() {
@@ -222,8 +223,10 @@ export function updateWorkOrder(id, patch) {
 
 export function createWorkOrderPayload(partial) {
   const isOutsource = partial.orderCategory === '外协工单'
+  const isMaintenance = partial.orderCategory === '维修工单'
+  const skipEbomCategory = isOutsource || isMaintenance
   const routeName =
-    partial.processRouteName || (isOutsource ? '' : getDefaultProductRoute(partial.productName))
+    partial.processRouteName || (skipEbomCategory ? '' : getDefaultProductRoute(partial.productName))
   const existingCodes = workOrderState.orders.map((o) => o.code)
   const category = partial.orderCategory || '生产工单'
   const productName = partial.productName?.trim() || ''
@@ -242,7 +245,7 @@ export function createWorkOrderPayload(partial) {
     planQty: partial.planQty ?? 0,
     workCenter: partial.workCenter || '默认工厂',
     owner: partial.owner || '',
-    bom: isOutsource ? '' : partial.bom || partial.productName,
+    bom: skipEbomCategory ? '' : partial.bom || partial.productName,
     bomId: partial.bomId || '',
     warehouse: partial.warehouse || resolveDefaultWarehouseByProductName(productName) || '',
     urgency: partial.urgency || '普通',
@@ -269,7 +272,7 @@ export function createWorkOrderPayload(partial) {
     componentLines: partial.componentLines || [],
     ebomSnapshot: partial.ebomSnapshot || null,
     supplier: partial.supplier || '',
-    skipEbom: Boolean(partial.skipEbom || isOutsource),
+    skipEbom: Boolean(partial.skipEbom || skipEbomCategory),
     processes: routeName ? buildProcessesFromRoute(routeName) : [],
     createdAt: dayjs().format('YYYY-MM-DD'),
   }

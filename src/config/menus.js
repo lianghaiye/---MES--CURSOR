@@ -161,6 +161,12 @@ export function resolveModuleKey(path) {
 }
 
 /** 路由 meta.title 映射 */
+import { createPageRegistry } from './createPages'
+
+const createPageRouteTitles = Object.fromEntries(
+  createPageRegistry.map((page) => [page.newPath, page.title]),
+)
+
 export const routeTitles = {
   '/home/dashboard': '首页',
   '/home/prd': 'IDOMS PRD',
@@ -236,6 +242,7 @@ export const routeTitles = {
   '/basic-config/function-params': '功能参数',
   '/basic-config/warehouse-categories': '仓库分类',
   '/basic-config/warehouses': '仓库列表',
+  ...createPageRouteTitles,
 }
 
 /** 动态路径标题（含 :id 等参数） */

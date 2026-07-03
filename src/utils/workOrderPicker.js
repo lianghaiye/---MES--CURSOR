@@ -22,6 +22,7 @@ export const workOrderCategoryOptions = [
   '生产工单',
   '总装工单',
   '外协工单',
+  '维修工单',
   '质检工单',
   '拆解工单',
 ]

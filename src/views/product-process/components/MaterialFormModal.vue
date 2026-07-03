@@ -1,11 +1,12 @@
 <template>
-  <a-modal
-    v-model:open="openModel"
-    :title="modalTitle"
+  <FormCreateShell
+    :page-mode="pageMode"
+    :open="open"
+    :title="shellTitle"
     width="92%"
-    :mask-closable="false"
     class="material-form-modal"
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <div class="entity-name-header">
       <div class="entity-name-label">物料名称</div>
@@ -17,7 +18,7 @@
       />
       <div class="entity-capability-row">
         <a-checkbox v-model:checked="form.canSell" :disabled="viewOnly">可销售</a-checkbox>
-        <a-checkbox v-model:checked="form.canProduce" :disabled="viewOnly">可生产</a-checkbox>
+        <a-checkbox v-model:checked="form.canProduce" disabled>可生产</a-checkbox>
         <a-checkbox v-model:checked="form.canPurchase" :disabled="viewOnly">可采购</a-checkbox>
         <a-checkbox v-model:checked="form.canOutsource" :disabled="viewOnly">可外协</a-checkbox>
       </div>
@@ -125,31 +126,48 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
-                <a-form-item label="产品物料">
-                  <a-switch v-model:checked="form.isProductMaterial" />
-                </a-form-item>
+              <a-col :span="24">
+                <div class="form-option-row">
+                  <div class="form-option-item">
+                    <span class="form-option-label">产品物料</span>
+                    <a-switch v-model:checked="form.isProductMaterial" :disabled="viewOnly" />
+                  </div>
+                </div>
               </a-col>
               <template v-if="form.isProductMaterial">
-                <a-col :span="8">
-                  <a-form-item label="产品属性" required>
-                    <a-select
-                      v-model:value="form.productAttribute"
-                      size="small"
-                      :options="productAttrOpts"
-                      placeholder="请选择 产品属性"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col :span="8">
-                  <a-form-item label="产品类别" required>
-                    <a-select
-                      v-model:value="form.productCategoryKey"
-                      size="small"
-                      :options="productCategoryOpts"
-                      placeholder="请选择 产品类别"
-                    />
-                  </a-form-item>
+                <a-col :span="24">
+                  <div class="form-product-material-section">
+                    <div class="section-label">产品物料信息</div>
+                    <a-row :gutter="[12, 12]">
+                      <a-col :span="8">
+                        <a-form-item label="产品属性" required>
+                          <a-select
+                            v-model:value="form.productAttribute"
+                            size="small"
+                            :options="productAttrOpts"
+                            :disabled="viewOnly"
+                            placeholder="请选择 产品属性"
+                          />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="8">
+                        <a-form-item label="产品类别" required>
+                          <a-select
+                            v-model:value="form.productCategoryKey"
+                            size="small"
+                            :options="productCategoryOpts"
+                            :disabled="viewOnly"
+                            placeholder="请选择 产品类别"
+                          />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="8">
+                        <a-form-item label="是否组装件">
+                          <a-switch v-model:checked="form.isAssemblyPart" :disabled="viewOnly" />
+                        </a-form-item>
+                      </a-col>
+                    </a-row>
+                  </div>
                 </a-col>
               </template>
               <a-col :span="24">
@@ -537,16 +555,18 @@
         </a-button>
       </template>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { flattenCategoryNodes, materialCategoryTree } from '@/mock/materialCategories'
 import { productCategoryTree } from '@/mock/productCategories'
-import { productAttributeOptions } from '@/mock/productInfoOptions'
+import { partProductAttributeOptions, normalizePartProductAttribute, STANDARD_PART_ATTRIBUTE } from '@/mock/productInfoOptions'
 import {
   barcodeTypeOptions,
   materialTypeOptions,
@@ -563,22 +583,29 @@ import {
   createDefaultProductionControl,
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
-import { generateMaterialCode } from '@/store/materialInfoStore'
+import { generateMaterialCode, addMaterial, updateMaterial } from '@/store/materialInfoStore'
 import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import ItemBomInfoTab from '@/views/product-process/components/ItemBomInfoTab.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
   viewOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
-const openModel = computed({
-  get: () => props.open,
-  set: (val) => emit('update:open', val),
+const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/product-process/materials',
+  getTitle: () => {
+    if (props.viewOnly) return '物料详情'
+    return isEdit.value ? '编辑物料' : '新增物料'
+  },
 })
 
 const flatCats = flattenCategoryNodes(materialCategoryTree).filter((c) => !c.children?.length)
@@ -599,7 +626,9 @@ const categoryOpts = flatCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
 }))
-const productAttrOpts = productAttributeOptions.map((v) => ({ label: v, value: v }))
+const productAttrOpts = computed(() =>
+  partProductAttributeOptions.map((v) => ({ label: v, value: v })),
+)
 const productCategoryOpts = flatProductCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
@@ -610,11 +639,6 @@ const warehouseOpts = computed(() => {
 })
 
 const activeTabKey = ref('basic')
-const isEdit = computed(() => Boolean(props.editRecord?.id))
-const modalTitle = computed(() => {
-  if (props.viewOnly) return '物料详情'
-  return isEdit.value ? '编辑物料' : '新增物料'
-})
 
 const form = reactive({
   code: '',
@@ -635,8 +659,9 @@ const form = reactive({
   canPurchase: false,
   canOutsource: false,
   isProductMaterial: false,
-  productAttribute: '标准产品',
+  productAttribute: STANDARD_PART_ATTRIBUTE,
   productCategoryKey: undefined,
+  isAssemblyPart: false,
   matchingRequirements: '',
   outputTaxRate: undefined,
   inputTaxRate: undefined,
@@ -665,8 +690,9 @@ function resetForm() {
   form.canPurchase = false
   form.canOutsource = false
   form.isProductMaterial = false
-  form.productAttribute = '标准产品'
+  form.productAttribute = STANDARD_PART_ATTRIBUTE
   form.productCategoryKey = undefined
+  form.isAssemblyPart = false
   form.matchingRequirements = ''
   form.outputTaxRate = undefined
   form.inputTaxRate = undefined
@@ -694,12 +720,13 @@ function loadEditRecord(record) {
   form.inventoryUnit = source.inventoryUnit
   form.unitPrice = source.unitPrice
   form.canSell = Boolean(source.canSell || source.isProductMaterial)
-  form.canProduce = source.canProduce !== false
+  form.canProduce = true
   form.canPurchase = Boolean(source.canPurchase)
   form.canOutsource = Boolean(source.canOutsource)
   form.isProductMaterial = form.canSell
-  form.productAttribute = source.productAttribute || '标准产品'
+  form.productAttribute = normalizePartProductAttribute(source.productAttribute)
   form.productCategoryKey = source.productCategoryKey
+  form.isAssemblyPart = Boolean(source.isAssemblyPart)
   form.matchingRequirements = source.matchingRequirements || source.remark || ''
   form.outputTaxRate = source.outputTaxRate
   form.inputTaxRate = source.inputTaxRate
@@ -722,23 +749,29 @@ function loadEditRecord(record) {
 }
 
 function syncFormOnOpen() {
-  if (!props.open) return
+  if (!isActive.value) return
   if (props.editRecord) loadEditRecord(props.editRecord)
   else resetForm()
 }
 
 watch(
-  () => (props.open ? props.editRecord?.id || props.editRecord?.code || '__new__' : ''),
+  () =>
+    isActive.value ? props.editRecord?.id || props.editRecord?.code || '__new__' : '',
   () => syncFormOnOpen(),
   { immediate: true },
 )
-
-onMounted(() => syncFormOnOpen())
 
 watch(
   () => form.laborEnabled,
   (enabled) => {
     if (enabled) activeTabKey.value = 'labor'
+  },
+)
+
+watch(
+  () => form.canProduce,
+  (val) => {
+    if (!val) form.canProduce = true
   },
 )
 
@@ -761,6 +794,11 @@ watch(
     syncingMaterialSellPair = true
     form.canSell = val
     syncingMaterialSellPair = false
+    if (val) {
+      form.productAttribute = normalizePartProductAttribute(form.productAttribute)
+    } else {
+      form.isAssemblyPart = false
+    }
   },
 )
 
@@ -858,12 +896,13 @@ function buildPayload() {
     inventoryUnit: form.inventoryUnit,
     unitPrice: form.unitPrice ?? 0,
     canSell: form.canSell,
-    canProduce: form.canProduce,
+    canProduce: true,
     canPurchase: form.canPurchase,
     canOutsource: form.canOutsource,
     isProductMaterial: form.isProductMaterial,
     productAttribute: form.isProductMaterial ? form.productAttribute : undefined,
     productCategoryKey: form.isProductMaterial ? form.productCategoryKey : undefined,
+    isAssemblyPart: form.isProductMaterial ? form.isAssemblyPart : false,
     matchingRequirements: form.matchingRequirements?.trim() || '',
     remark: form.matchingRequirements?.trim() || '',
     outputTaxRate: form.outputTaxRate,
@@ -876,19 +915,21 @@ function buildPayload() {
   }
 }
 
-function handleCancel() {
-  openModel.value = false
-}
-
 function handleOk() {
   if (!validate()) return
-  emit('saved', {
+  const payload = {
     isEdit: isEdit.value,
     id: props.editRecord?.id,
     data: buildPayload(),
-  })
+  }
+  if (props.pageMode) {
+    if (isEdit.value) updateMaterial(payload.id, payload.data)
+    else addMaterial(payload.data)
+  } else {
+    emit('saved', payload)
+  }
   message.success(isEdit.value ? '物料已更新' : '物料已保存')
-  openModel.value = false
+  closeAfterSave()
 }
 </script>
 
@@ -1008,15 +1049,15 @@ function handleOk() {
   }
 
   :deep(.ant-form-item-label) {
-    flex: 0 0 auto;
-    padding-bottom: 0;
+    flex: 0 0 84px;
+    max-width: 84px;
+  }
 
-    > label {
-      height: 24px;
-      line-height: 24px;
-      font-size: 13px;
-      white-space: nowrap;
-    }
+  :deep(.ant-form-item-label > label) {
+    height: 24px;
+    line-height: 24px;
+    font-size: 13px;
+    white-space: nowrap;
   }
 
   :deep(
@@ -1034,8 +1075,47 @@ function handleOk() {
   .remark-item {
     :deep(.ant-form-item-label) {
       flex: 0 0 96px;
+      max-width: 96px;
     }
   }
+}
+
+.form-option-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 48px;
+  min-height: 32px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border-radius: 6px;
+}
+
+.form-option-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-option-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+  white-space: nowrap;
+}
+
+.form-product-material-section {
+  padding: 12px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+}
+
+.section-label {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
 }
 
 .required-label::before {

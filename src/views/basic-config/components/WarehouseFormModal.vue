@@ -1,11 +1,11 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑仓库' : '新增仓库'"
+    :title="shellTitle"
     width="960px"
-    :mask-closable="false"
-    destroy-on-close
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" class="warehouse-form">
       <a-row :gutter="16">
@@ -93,35 +93,40 @@
 
     <template #footer>
       <a-space>
-        <a-button @click="handleCancel">
+        <a-button :size="pageMode ? 'small' : 'middle'" @click="handleCancel">
           <CloseCircleOutlined />
           取消
         </a-button>
-        <a-button type="primary" :loading="saving" @click="handleSave">
+        <a-button type="primary" :size="pageMode ? 'small' : 'middle'" :loading="saving" @click="handleSave">
           <PlusCircleOutlined />
           保存
         </a-button>
       </a-space>
     </template>
+  </FormCreateShell>
 
-    <SelectPersonModal
-      v-model:open="personModalOpen"
-      :selected="form.managerName ? [form.managerName] : []"
-      @confirm="onManagerConfirm"
-    />
-  </a-modal>
+  <SelectPersonModal
+    v-if="isActive"
+    v-model:open="personModalOpen"
+    :selected="form.managerName ? [form.managerName] : []"
+    @confirm="onManagerConfirm"
+  />
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseCircleOutlined, PlusCircleOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { addWarehouse, updateWarehouse, WAREHOUSE_WORK_CENTERS } from '@/store/warehouseStore'
 import { getWarehouseCategoryOptions } from '@/store/warehouseCategoryStore'
 import SelectPersonModal from '@/views/production/components/SelectPersonModal.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   record: { type: Object, default: null },
 })
 
@@ -144,6 +149,12 @@ const form = reactive({
 })
 
 const isEdit = computed(() => Boolean(props.record?.id))
+
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/basic-config/warehouses',
+  getTitle: () => (isEdit.value ? '编辑仓库' : '新增仓库'),
+})
+
 const categoryOpts = computed(() => getWarehouseCategoryOptions())
 const workCenterOpts = WAREHOUSE_WORK_CENTERS.map((v) => ({ label: v, value: v }))
 
@@ -155,7 +166,7 @@ const rules = {
 }
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (v) => {
     if (!v) return
     const r = props.record
@@ -169,15 +180,12 @@ watch(
     form.address = r?.address || ''
     form.remark = r?.remark || ''
   },
+  { immediate: true },
 )
 
 function onManagerConfirm(names) {
   form.managerName = names?.[0] || ''
   formRef.value?.validateFields(['managerName']).catch(() => {})
-}
-
-function handleCancel() {
-  emit('update:open', false)
 }
 
 async function handleSave() {
@@ -197,7 +205,7 @@ async function handleSave() {
   }
   message.success(isEdit.value ? '已保存' : '已新增')
   emit('saved')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 

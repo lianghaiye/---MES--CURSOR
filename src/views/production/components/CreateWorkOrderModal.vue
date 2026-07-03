@@ -1,12 +1,14 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑工单' : '新增工单'"
+    :title="shellTitle"
     width="1280px"
     :mask-closable="false"
     destroy-on-close
     class="create-work-order-modal"
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form :model="form" class="work-order-form" :required-mark="true">
       <div class="header-fields">
@@ -246,10 +248,10 @@
     </a-tabs>
 
     <template #footer>
-      <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" @click="handleSubmit">确定</a-button>
+      <a-button size="small" @click="handleCancel">取消</a-button>
+      <a-button type="primary" size="small" @click="handleSubmit">确定</a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 
   <SalesOrderSelectModal v-model:open="salesOrderPickerOpen" @confirm="onSalesOrderPicked" />
 </template>
@@ -279,15 +281,24 @@ import ProductMaterialSelect from './ProductMaterialSelect.vue'
 import WorkOrderBomSelect from './WorkOrderBomSelect.vue'
 import WorkOrderOwnerSelect from './WorkOrderOwnerSelect.vue'
 import SalesOrderSelectModal from './SalesOrderSelectModal.vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   editRecord: { type: Object, default: null },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'created', 'updated'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/production/work-orders',
+  getTitle: () => (isEdit.value ? '编辑工单' : '新增工单'),
+})
 
 const salesOrderPickerOpen = ref(false)
 const activeTab = ref('components')
@@ -583,7 +594,7 @@ watch(
 )
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (val) => {
     if (!val) return
     if (props.editRecord) {
@@ -592,11 +603,8 @@ watch(
     }
     resetForm()
   },
+  { immediate: true },
 )
-
-function handleCancel() {
-  emit('update:open', false)
-}
 
 function handleSubmit() {
   if (!form.productName?.trim()) {
@@ -670,7 +678,7 @@ function handleSubmit() {
       },
     })
     message.success('工单已更新')
-    emit('update:open', false)
+    closeAfterSave()
     return
   }
 
@@ -697,7 +705,7 @@ function handleSubmit() {
 
   emit('created', wo)
   message.success('工单创建成功')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 

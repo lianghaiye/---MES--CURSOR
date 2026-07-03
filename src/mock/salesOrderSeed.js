@@ -3,6 +3,7 @@ import { customerOptions, salespersonOptions } from '@/mock/salesOrderOptions'
 import { createLineItem, createSalesOrder } from '@/mock/salesOrders'
 import { catalogBomIdForProduct } from '@/mock/productBomSeed'
 import { formatBomVersion, getBomVersionYear } from '@/utils/bomVersion'
+import { MAINTENANCE_SERVICE_BUSINESS_TYPE } from '@/utils/salesOrderBusiness'
 import {
   buildEcnBoundLine,
   buildEcnDemoSalesOrder,
@@ -306,6 +307,32 @@ export function buildMockSalesOrders(products) {
       businessType: '质检服务',
       documentDate: '2026-04-15',
       lineItems: [lineFromProduct(p(60), { id: 'line-seed-8a', salesQty: 1 })],
+    }),
+    createSalesOrder({
+      id: 'so-seed-9',
+      orderNo: '1-20260602-001',
+      customerName: '华东机械制造有限公司',
+      region: '华东',
+      salesperson: '王芳',
+      progressStatus: '未审',
+      businessType: MAINTENANCE_SERVICE_BUSINESS_TYPE,
+      documentDate: '2026-06-02',
+      createdAt: '2026-06-02 09:00',
+      creator: '王芳',
+      remark: '维修服务演示订单（审核通过后自动生成维修工单）',
+      lineItems: [
+        lineFromProduct(p(2), {
+          id: 'line-seed-9a',
+          businessType: MAINTENANCE_SERVICE_BUSINESS_TYPE,
+          salesQty: 1,
+          bomId: '',
+          bomName: '',
+          bomVersion: '',
+          techParams: '叶轮磨损，需返厂维修',
+          matchingRequirements: '维修后需附出厂检验报告',
+          supplementDesc: '客户现场拆检后发回',
+        }),
+      ],
     }),
   ]
 

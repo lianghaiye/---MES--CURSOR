@@ -1,12 +1,12 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑入库单' : '新增入库单'"
+    :title="shellTitle"
     width="1400px"
-    :mask-closable="false"
-    destroy-on-close
     class="inbound-form-modal"
-    @cancel="handleCancel"
+    @cancel="onShellCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form :model="form" layout="inline" class="header-form horizontal-form">
       <a-row :gutter="[12, 12]" style="width: 100%">
@@ -215,23 +215,23 @@
     </a-table>
 
     <template #footer>
-      <a-button @click="handleCancel">取消</a-button>
+      <a-button @click="onShellCancel">取消</a-button>
       <a-button type="primary" :loading="saving" @click="handleSave">
         <CheckOutlined />
         保存
       </a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 
   <SelectWarehouseItemModal
-    v-if="open"
+    v-if="isActive"
     v-model:open="pickerOpen"
     :selected-items="pickerPreset"
     @confirm="onItemsPicked"
   />
 
   <AddByBomModal
-    v-if="open"
+    v-if="isActive"
     v-model:open="bomModalOpen"
     qty-label="入库数量"
     qty-hint="子项入库数量 = 入库数量 × 子件原单位用量"
@@ -241,7 +241,7 @@
   />
 
   <InboundLineEditModal
-    v-if="open"
+    v-if="isActive"
     v-model:open="lineEditOpen"
     :line="lineEditTarget"
     :mode="lineEditMode"
@@ -261,8 +261,10 @@ import { computed, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { PlusOutlined, CheckOutlined } from '@ant-design/icons-vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import SelectWarehouseItemModal from '@/views/basic-config/components/SelectWarehouseItemModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
@@ -289,10 +291,22 @@ import {
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
+
+const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+const { isActive, shellTitle, handleCancel: onShellCancel, closeAfterSave } = useFormCreateModal(
+  props,
+  emit,
+  {
+  listPath: '/inventory/inbound',
+  getTitle: () => (isEdit.value ? '编辑入库单' : '新增入库单'),
+})
 
 const saving = ref(false)
 const pickerOpen = ref(false)
@@ -302,8 +316,6 @@ const lineEditTarget = ref(null)
 const lineEditMode = ref('edit')
 const lineEditSourceId = ref(null)
 const prevHeaderWarehouse = ref(undefined)
-
-const isEdit = computed(() => Boolean(props.editRecord?.id))
 
 const inboundTypeOpts = inboundTypeOptions.map((v) => ({ label: v, value: v }))
 const lineSourceOpts = inboundLineSourceOptions.map((v) => ({ label: v, value: v }))
@@ -349,12 +361,13 @@ const pickerPreset = computed(() => {
 })
 
 watch(
-  () => [props.open, props.editRecord?.id],
+  () => [isActive.value, props.editRecord?.id],
   ([visible]) => {
     if (!visible) return
     if (props.editRecord) loadEditForm(props.editRecord)
     else resetForm()
   },
+  { immediate: true },
 )
 
 function resetForm() {
@@ -501,10 +514,6 @@ function buildPayload() {
   }
 }
 
-function handleCancel() {
-  emit('update:open', false)
-}
-
 function handleSave() {
   if (!form.inboundType) {
     message.warning('请选择入库类型')
@@ -533,7 +542,7 @@ function handleSave() {
   }
 
   emit('saved')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 

@@ -93,7 +93,7 @@
 
     <div class="toolbar-row">
       <a-space wrap :size="8">
-        <a-button type="primary" size="small" @click="openCreateModal">
+        <a-button type="primary" size="small" @click="openCreate">
           <PlusOutlined />
           新增
         </a-button>
@@ -264,6 +264,7 @@ export default { name: 'PurchaseOrderView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -296,6 +297,12 @@ import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vu
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({
   orderNo: '',
@@ -428,9 +435,10 @@ function onBatchMenuClick({ key }) {
   stubAction(key)
 }
 
-function openCreateModal() {
-  editRecord.value = null
-  createModalOpen.value = true
+function openCreate() {
+  const page = findCreatePageByListPath('/procurement/purchase-orders')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openEditModal(record) {

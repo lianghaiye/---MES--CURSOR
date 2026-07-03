@@ -1,11 +1,13 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑采购单' : '新增采购单'"
+    :title="shellTitle"
     width="96%"
     :mask-closable="false"
     destroy-on-close
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <div class="section-block">
       <div class="section-title">基本信息</div>
@@ -72,7 +74,12 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="交货日期" required>
-              <a-date-picker v-model:value="form.deliveryDate" size="small" style="width: 100%" />
+              <a-date-picker
+                v-model:value="form.deliveryDate"
+                size="small"
+                style="width: 100%"
+                @change="onHeaderDeliveryDateChange"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -147,12 +154,24 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="16">
+          <a-col :span="8">
             <a-form-item label="收货地址">
               <a-input
                 v-model:value="form.shippingAddress"
                 size="small"
                 placeholder="请输入 收货地址"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="收货仓库">
+              <a-select
+                v-model:value="form.receivingWarehouse"
+                size="small"
+                allow-clear
+                placeholder="请选择 收货仓库"
+                :options="warehouseOpts"
+                @change="onHeaderReceivingWarehouseChange"
               />
             </a-form-item>
           </a-col>
@@ -186,9 +205,9 @@
       <a-divider class="section-divider" />
       <div class="detail-toolbar">
         <a-space wrap>
-          <a-button type="primary" size="small" @click="openItemPicker">
+          <a-button type="primary" size="small" @click="openProductPicker">
             <PlusOutlined />
-            选择物品
+            选择产品
           </a-button>
           <a-button class="tax-toggle-btn" size="small" @click="toggleTaxMode">
             切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
@@ -203,7 +222,7 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 1400 }"
+        :scroll="{ x: 2200 }"
         locale="{ emptyText: '暂无数据' }"
       >
         <template #bodyCell="{ column, record, index }">
@@ -257,47 +276,65 @@
           <template v-else-if="column.key === 'totalPriceInTax'">
             {{ formatMoney(record.totalPriceInTax) }}
           </template>
+          <template v-else-if="column.key === 'deliveryDate'">
+            <a-date-picker
+              :value="lineDeliveryDateValue(record.deliveryDate)"
+              size="small"
+              style="width: 100%"
+              @change="(date) => onLineDeliveryDateChange(record, date)"
+            />
+          </template>
+          <template v-else-if="column.key === 'receivingWarehouse'">
+            <a-select
+              v-model:value="record.receivingWarehouse"
+              size="small"
+              allow-clear
+              style="width: 100%"
+              placeholder="请选择"
+              :options="warehouseOpts"
+            />
+          </template>
+          <template v-else-if="column.key === 'remark'">
+            <a-input
+              v-model:value="record.remark"
+              size="small"
+              allow-clear
+              placeholder="请输入备注"
+            />
+          </template>
           <template v-else-if="column.key === 'action'">
             <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
           </template>
           <template v-else>
-            {{ record[column.dataIndex] ?? '-' }}
+            {{ record[column.dataIndex] ?? '—' }}
           </template>
         </template>
       </a-table>
     </div>
 
-    <a-modal v-model:open="itemPickerOpen" title="选择物品" width="800px" @ok="confirmItemPick">
-      <a-table
-        :columns="itemPickerColumns"
-        :data-source="mockInventory"
-        row-key="code"
-        size="small"
-        :row-selection="{
-          type: 'checkbox',
-          selectedRowKeys: pickedItemKeys,
-          onChange: (keys) => (pickedItemKeys = keys),
-        }"
-        :pagination="false"
-      />
-    </a-modal>
+    <SelectBomMaterialModal
+      v-model:open="productPickerOpen"
+      title="添加产品/物料"
+      picker-default-item-type="产品"
+      @selected="onProductsSelected"
+    />
 
     <template #footer>
-      <a-button @click="handleCancel">
+      <a-button size="small" @click="handleCancel">
         <CloseOutlined />
         取消
       </a-button>
-      <a-button type="primary" @click="handleSave">
+      <a-button type="primary" size="small" @click="handleSave">
         <CheckOutlined />
         保存
       </a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import {
@@ -308,22 +345,40 @@ import {
   deliveryMethodOptions,
   contactOptions,
   purchaserOptions,
+  warehouseOptions,
 } from '@/mock/purchaseOrderOptions'
 import { mockInventory } from '@/mock/inventory'
 import { createPoLineItem } from '@/mock/purchaseOrders'
-import { generatePurchaseOrderNo, recalcPoLine } from '@/store/purchaseOrderStore'
+import { productInfoState } from '@/store/productInfoStore'
+import { materialInfoState } from '@/store/materialInfoStore'
+import {
+  addPurchaseOrder,
+  generatePurchaseOrderNo,
+  recalcPoLine,
+  updatePurchaseOrder,
+} from '@/store/purchaseOrderStore'
+import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/procurement/purchase-orders',
+  getTitle: () => (isEdit.value ? '编辑采购单' : '新增采购单'),
+})
 const taxModeExcluding = ref(true)
-const itemPickerOpen = ref(false)
-const pickedItemKeys = ref([])
+const productPickerOpen = ref(false)
+const prevHeaderDeliveryDate = ref('')
+const prevHeaderReceivingWarehouse = ref(undefined)
 
 const supplierOpts = supplierOptions
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
@@ -332,6 +387,7 @@ const settlementMethodOpts = settlementMethodOptions.map((v) => ({ label: v, val
 const deliveryMethodOpts = deliveryMethodOptions.map((v) => ({ label: v, value: v }))
 const purchaserOpts = purchaserOptions.map((v) => ({ label: v, value: v }))
 const contactOpts = contactOptions.map((c) => ({ label: c.label, value: c.value, phone: c.phone }))
+const warehouseOpts = warehouseOptions
 
 const taxModeHint = computed(() =>
   taxModeExcluding.value
@@ -340,13 +396,14 @@ const taxModeHint = computed(() =>
 )
 
 const lineColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center' },
-  { title: '物品编码', dataIndex: 'itemCode', width: 120 },
-  { title: '物品名称', dataIndex: 'itemName', width: 120, ellipsis: true },
-  { title: '物品类型', dataIndex: 'itemType', width: 90 },
-  { title: '类别', dataIndex: 'category', width: 80 },
-  { title: '规格型号', dataIndex: 'specModel', width: 100 },
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
+  { title: '产品编号', dataIndex: 'productCode', width: 120 },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
   { title: '规格属性', dataIndex: 'specAttr', width: 90 },
+  { title: '材质', dataIndex: 'material', width: 80 },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '库存数量', dataIndex: 'stockQty', width: 90, align: 'right' },
   { title: '采购数量', key: 'purchaseQty', width: 100 },
   { title: '单位', dataIndex: 'unit', width: 70 },
   { title: '不含税单价', key: 'unitPriceExTax', width: 100 },
@@ -354,14 +411,10 @@ const lineColumns = [
   { title: '含税单价', key: 'unitPriceInTax', width: 100 },
   { title: '总价（不含税）', key: 'totalPriceExTax', width: 110, align: 'right' },
   { title: '总价（含税）', key: 'totalPriceInTax', width: 100, align: 'right' },
+  { title: '交货日期', key: 'deliveryDate', width: 120 },
+  { title: '收货仓库', key: 'receivingWarehouse', width: 110 },
+  { title: '备注', key: 'remark', width: 120 },
   { title: '操作', key: 'action', width: 70, fixed: 'right' },
-]
-
-const itemPickerColumns = [
-  { title: '物品编码', dataIndex: 'code', width: 130 },
-  { title: '物品名称', dataIndex: 'name', width: 120 },
-  { title: '型号规格', dataIndex: 'specModel', width: 100 },
-  { title: '材质', dataIndex: 'material', width: 80 },
 ]
 
 const form = reactive({
@@ -382,13 +435,14 @@ const form = reactive({
   contractNo: '',
   salesOrderNo: '',
   shippingAddress: '',
+  receivingWarehouse: undefined,
   purchaser: 'admin1',
   remark: '',
   lineItems: [],
 })
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (val) => {
     if (!val) return
     taxModeExcluding.value = true
@@ -411,14 +465,39 @@ watch(
       form.contractNo = r.contractNo || ''
       form.salesOrderNo = r.salesOrderNo || ''
       form.shippingAddress = r.shippingAddress || ''
+      form.receivingWarehouse = r.receivingWarehouse || undefined
       form.purchaser = r.purchaser
       form.remark = r.remark || ''
-      form.lineItems = JSON.parse(JSON.stringify(r.lineItems || []))
+      form.lineItems = normalizeLineItems(r.lineItems || [])
+      syncHeaderTrackers()
       return
     }
     resetForm()
   },
+  { immediate: true },
 )
+
+function normalizeLineItems(items) {
+  return items.map((line) => ({
+    ...line,
+    productName: line.productName || line.itemName || '',
+    productCode: line.productCode || line.itemCode || '',
+    itemName: line.itemName || line.productName || '',
+    itemCode: line.itemCode || line.productCode || '',
+    drawingNo: line.drawingNo || '',
+    stockQty: line.stockQty ?? 0,
+    deliveryDate: line.deliveryDate || '',
+    receivingWarehouse: line.receivingWarehouse || '',
+    remark: line.remark || '',
+  }))
+}
+
+function syncHeaderTrackers() {
+  prevHeaderDeliveryDate.value = form.deliveryDate
+    ? form.deliveryDate.format('YYYY-MM-DD')
+    : ''
+  prevHeaderReceivingWarehouse.value = form.receivingWarehouse
+}
 
 function resetForm() {
   form.orderNo = ''
@@ -438,9 +517,11 @@ function resetForm() {
   form.contractNo = ''
   form.salesOrderNo = ''
   form.shippingAddress = ''
+  form.receivingWarehouse = undefined
   form.purchaser = 'admin1'
   form.remark = ''
   form.lineItems = []
+  syncHeaderTrackers()
 }
 
 function onSupplierChange() {
@@ -452,31 +533,145 @@ function onContactChange(name) {
   if (c?.phone) form.contactPhone = c.phone
 }
 
-function openItemPicker() {
-  pickedItemKeys.value = []
-  itemPickerOpen.value = true
+function resolveStockQty(code) {
+  const inv = mockInventory.find((m) => m.code === code)
+  return inv?.stockQty ?? 0
 }
 
-function confirmItemPick() {
-  pickedItemKeys.value.forEach((code) => {
-    const item = mockInventory.find((m) => m.code === code)
-    if (!item) return
-    if (form.lineItems.some((l) => l.itemCode === code)) return
-    const line = createPoLineItem({
-      itemCode: item.code,
-      itemName: item.name,
-      itemType: item.materialType || '物料',
-      category: item.supplyType,
-      specModel: item.specModel,
-      material: item.material,
-      purchaseQty: 1,
-      unit: item.unit || '个',
-      taxRate: 13,
-    })
-    recalcLineWithMode(line)
-    form.lineItems.push(line)
+function resolveMasterRecord(payload) {
+  if (payload.itemType === '产品') {
+    return productInfoState.products.find((p) => p.id === payload.id) || null
+  }
+  return materialInfoState.materials.find((m) => m.id === payload.id) || null
+}
+
+function headerDeliveryDateStr() {
+  return form.deliveryDate ? form.deliveryDate.format('YYYY-MM-DD') : ''
+}
+
+function mapPickerToPoLine(payload) {
+  const master = resolveMasterRecord(payload)
+  const code = payload.code || ''
+  const unitPrice = Number(master?.unitPrice ?? payload.unitPrice ?? 0)
+  const taxRate = Number(master?.inputTaxRate ?? 13)
+
+  const line = createPoLineItem({
+    productName: payload.name,
+    productCode: code,
+    itemName: payload.name,
+    itemCode: code,
+    itemType: payload.itemType || '物料',
+    category: payload.categoryName || master?.categoryName || '',
+    specModel: payload.specModel || '',
+    specAttr: master?.standardSpec || '',
+    material: payload.material || '',
+    drawingNo: payload.drawingNo || '',
+    stockQty: resolveStockQty(code),
+    purchaseQty: 1,
+    unit: payload.inventoryUnit || master?.inventoryUnit || '件',
+    unitPriceExTax: unitPrice,
+    taxRate,
+    deliveryDate: headerDeliveryDateStr(),
+    receivingWarehouse: form.receivingWarehouse || '',
+    remark: '',
   })
-  itemPickerOpen.value = false
+  recalcLineWithMode(line)
+  return line
+}
+
+function lineItemCode(line) {
+  return line.productCode || line.itemCode || ''
+}
+
+function openProductPicker() {
+  productPickerOpen.value = true
+}
+
+function onProductsSelected(rows) {
+  rows.forEach((payload) => {
+    const code = payload.code || ''
+    if (!code) return
+    if (form.lineItems.some((l) => lineItemCode(l) === code)) return
+    form.lineItems.push(mapPickerToPoLine(payload))
+  })
+}
+
+function syncLineDeliveryDates(dateStr) {
+  form.lineItems.forEach((line) => {
+    line.deliveryDate = dateStr
+  })
+}
+
+function onHeaderDeliveryDateChange(date) {
+  const newStr = date ? date.format('YYYY-MM-DD') : ''
+  const oldStr = prevHeaderDeliveryDate.value
+  prevHeaderDeliveryDate.value = newStr
+
+  if (newStr === oldStr || !form.lineItems.length) {
+    return
+  }
+
+  // 先加明细、后填头交货日期：明细仍为空时直接同步
+  if (!oldStr && newStr) {
+    syncLineDeliveryDates(newStr)
+    return
+  }
+
+  if (!newStr) {
+    return
+  }
+
+  Modal.confirm({
+    title: '交货日期已修改，是否同步修改明细交货日期？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => syncLineDeliveryDates(newStr),
+  })
+}
+
+function syncLineReceivingWarehouses(warehouse) {
+  form.lineItems.forEach((line) => {
+    line.receivingWarehouse = warehouse || ''
+  })
+}
+
+function onHeaderReceivingWarehouseChange(newVal) {
+  const oldVal = prevHeaderReceivingWarehouse.value
+  const changed = newVal !== oldVal
+  prevHeaderReceivingWarehouse.value = newVal
+
+  if (!changed || !form.lineItems.length) {
+    return
+  }
+
+  // 先加明细、后选头收货仓库：明细仍为空时直接同步
+  if (!oldVal && newVal) {
+    form.lineItems.forEach((line) => {
+      if (!line.receivingWarehouse) {
+        line.receivingWarehouse = newVal
+      }
+    })
+    return
+  }
+
+  if (!newVal) {
+    return
+  }
+
+  Modal.confirm({
+    title: '收货仓库已修改，是否同步修改明细收货仓库？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => syncLineReceivingWarehouses(newVal),
+  })
+}
+
+function lineDeliveryDateValue(value) {
+  return value ? dayjs(value) : null
+}
+
+function onLineDeliveryDateChange(record, date) {
+  record.deliveryDate = date ? date.format('YYYY-MM-DD') : ''
 }
 
 function recalcLineWithMode(record) {
@@ -510,10 +705,6 @@ function formatMoney(val) {
   return Number(val || 0).toFixed(2)
 }
 
-function handleCancel() {
-  emit('update:open', false)
-}
-
 function handleSave() {
   if (!form.supplier) {
     message.warning('请选择供应商')
@@ -528,7 +719,30 @@ function handleSave() {
     return
   }
 
-  form.lineItems.forEach(recalcLineWithMode)
+  const missingQty = form.lineItems.find(
+    (line) => line.purchaseQty == null || Number(line.purchaseQty) <= 0,
+  )
+  if (missingQty) {
+    message.warning(
+      `请填写「${missingQty.productName || missingQty.itemName || '明细'}」的采购数量`,
+    )
+    return
+  }
+
+  form.lineItems.forEach((line) => {
+    recalcLineWithMode(line)
+    line.productName = line.productName || line.itemName || ''
+    line.productCode = line.productCode || line.itemCode || ''
+    line.itemName = line.productName
+    line.itemCode = line.productCode
+    if (!line.deliveryDate) {
+      line.deliveryDate = headerDeliveryDateStr()
+    }
+    if (!line.receivingWarehouse && form.receivingWarehouse) {
+      line.receivingWarehouse = form.receivingWarehouse
+    }
+  })
+
   const orderNo = form.orderNo?.trim() || generatePurchaseOrderNo()
 
   const payload = {
@@ -536,6 +750,7 @@ function handleSave() {
     orderNo,
     deliveryDate: form.deliveryDate.format('YYYY-MM-DD'),
     reminderDate: form.reminderDate ? form.reminderDate.format('YYYY-MM-DD') : '',
+    receivingWarehouse: form.receivingWarehouse || '',
     documentDate: props.editRecord?.documentDate || dayjs().format('YYYY-MM-DD'),
     orderSource: props.editRecord?.orderSource || '新增',
     applyType: props.editRecord?.applyType || '日常采购申请',
@@ -550,9 +765,17 @@ function handleSave() {
     amountInTax: form.lineItems.reduce((s, i) => s + (Number(i.totalPriceInTax) || 0), 0),
   }
 
-  emit('saved', { isEdit: isEdit.value, id: props.editRecord?.id, data: payload })
+  if (props.pageMode) {
+    if (isEdit.value) {
+      updatePurchaseOrder(props.editRecord.id, payload)
+    } else {
+      addPurchaseOrder({ ...payload, id: `po-${Date.now()}` })
+    }
+  } else {
+    emit('saved', { isEdit: isEdit.value, id: props.editRecord?.id, data: payload })
+  }
   message.success(isEdit.value ? '采购单已更新' : '采购单已保存')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 

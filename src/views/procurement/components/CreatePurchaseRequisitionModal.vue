@@ -1,11 +1,13 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑采购申请单' : '新增采购申请单'"
+    :title="shellTitle"
     width="90%"
     :mask-closable="false"
     destroy-on-close
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <div class="section-block">
       <div class="section-title">基本信息</div>
@@ -28,7 +30,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="交货日期" required>
+            <a-form-item label="交货日期">
               <a-date-picker
                 v-model:value="form.deliveryDate"
                 size="small"
@@ -38,12 +40,12 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="预计到货日期">
+            <a-form-item label="期望到货日期" required>
               <a-date-picker
                 v-model:value="form.estimatedArrivalDate"
                 size="small"
                 style="width: 100%"
-                placeholder="请选择预计到货日期"
+                placeholder="请选择期望到货日期"
               />
             </a-form-item>
           </a-col>
@@ -66,9 +68,9 @@
       <div class="section-title">采购清单</div>
       <a-divider class="section-divider" />
       <div class="detail-toolbar">
-        <a-button type="primary" size="small" @click="openInventoryPicker">
+        <a-button type="primary" size="small" @click="openProductPicker">
           <PlusOutlined />
-          选择库存
+          添加产品
         </a-button>
       </div>
       <a-table
@@ -78,7 +80,7 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 1200 }"
+        :scroll="{ x: 1400 }"
         locale="{ emptyText: '暂无数据' }"
       >
         <template #bodyCell="{ column, record, index }">
@@ -103,47 +105,41 @@
               :options="supplierOpts"
             />
           </template>
+          <template v-else-if="column.key === 'remark'">
+            <a-input
+              v-model:value="record.remark"
+              size="small"
+              allow-clear
+              placeholder="请输入备注"
+            />
+          </template>
           <template v-else-if="column.key === 'action'">
             <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
           </template>
           <template v-else>
-            {{ record[column.dataIndex] ?? '-' }}
+            {{ record[column.dataIndex] ?? '—' }}
           </template>
         </template>
       </a-table>
     </div>
 
-    <a-modal
-      v-model:open="inventoryPickerOpen"
-      title="选择库存"
-      width="800px"
-      @ok="confirmInventoryPick"
-    >
-      <a-table
-        :columns="inventoryPickerColumns"
-        :data-source="mockInventory"
-        row-key="code"
-        size="small"
-        :row-selection="{
-          type: 'checkbox',
-          selectedRowKeys: pickedInventoryKeys,
-          onChange: (keys) => (pickedInventoryKeys = keys),
-        }"
-        :pagination="false"
-      />
-    </a-modal>
+    <SelectBomMaterialModal
+      v-model:open="productPickerOpen"
+      title="添加产品/物料"
+      @selected="onProductsSelected"
+    />
 
     <template #footer>
-      <a-button @click="handleCancel">
+      <a-button size="small" @click="handleCancel">
         <CloseOutlined />
         取消
       </a-button>
-      <a-button type="primary" @click="handleSave">
+      <a-button type="primary" size="small" @click="handleSave">
         <CheckOutlined />
         保存
       </a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
@@ -155,44 +151,47 @@ import { urgencyOptions } from '@/mock/purchaseRequisitionOptions'
 import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
 import { mockInventory } from '@/mock/inventory'
 import { createLineItem } from '@/mock/purchaseRequisitions'
-import { generateReqNo } from '@/store/purchaseRequisitionStore'
+import {
+  addPurchaseRequisition,
+  generateReqNo,
+  updatePurchaseRequisition,
+} from '@/store/purchaseRequisitionStore'
+import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
-const inventoryPickerOpen = ref(false)
-const pickedInventoryKeys = ref([])
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/procurement/purchase-req',
+  getTitle: () => (isEdit.value ? '编辑采购申请单' : '新增采购申请单'),
+})
+const productPickerOpen = ref(false)
 
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const supplierOpts = supplierOptions
 
 const lineColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center' },
-  { title: '库存名称', dataIndex: 'inventoryName', width: 120, ellipsis: true },
-  { title: '库存编码', dataIndex: 'inventoryCode', width: 120 },
-  { title: '型号规格', dataIndex: 'specModel', width: 100 },
-  { title: '材质', dataIndex: 'material', width: 80 },
-  { title: '供货类型', dataIndex: 'supplyType', width: 90 },
-  { title: '计量单位', dataIndex: 'unit', width: 80 },
-  { title: '包装方式', dataIndex: 'packagingMethod', width: 90 },
-  { title: '供方类型', dataIndex: 'supplierType', width: 90 },
-  { title: '库存数量', dataIndex: 'stockQty', width: 90, align: 'right' },
-  { title: '计划采购量', key: 'planPurchaseQty', width: 100 },
-  { title: '供应商', key: 'supplierName', width: 120 },
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true },
+  { title: '产品编码', dataIndex: 'productCode', width: 120 },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 90 },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '单位', dataIndex: 'unit', width: 72 },
+  { title: '库存数', dataIndex: 'stockQty', width: 90, align: 'right' },
+  { title: '计划采购数', key: 'planPurchaseQty', width: 110 },
+  { title: '供应商', key: 'supplierName', width: 130 },
+  { title: '备注', key: 'remark', width: 140 },
   { title: '操作', key: 'action', width: 70, fixed: 'right' },
-]
-
-const inventoryPickerColumns = [
-  { title: '库存编码', dataIndex: 'code', width: 130 },
-  { title: '库存名称', dataIndex: 'name', width: 120 },
-  { title: '型号规格', dataIndex: 'specModel', width: 100 },
-  { title: '材质', dataIndex: 'material', width: 80 },
-  { title: '库存数量', dataIndex: 'stockQty', width: 90, align: 'right' },
 ]
 
 const form = reactive({
@@ -205,7 +204,7 @@ const form = reactive({
 })
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (val) => {
     if (!val) return
     if (props.editRecord) {
@@ -215,12 +214,25 @@ watch(
       form.deliveryDate = r.deliveryDate ? dayjs(r.deliveryDate) : null
       form.estimatedArrivalDate = r.estimatedArrivalDate ? dayjs(r.estimatedArrivalDate) : null
       form.remark = r.remark || ''
-      form.lineItems = JSON.parse(JSON.stringify(r.lineItems || []))
+      form.lineItems = normalizeLineItems(r.lineItems || [])
       return
     }
     resetForm()
   },
+  { immediate: true },
 )
+
+function normalizeLineItems(items) {
+  return items.map((line) => ({
+    ...line,
+    productName: line.productName || line.inventoryName || '',
+    productCode: line.productCode || line.inventoryCode || '',
+    inventoryName: line.inventoryName || line.productName || '',
+    inventoryCode: line.inventoryCode || line.productCode || '',
+    drawingNo: line.drawingNo || '',
+    remark: line.remark || '',
+  }))
+}
 
 function resetForm() {
   form.reqNo = ''
@@ -231,36 +243,49 @@ function resetForm() {
   form.lineItems = []
 }
 
-function openInventoryPicker() {
-  pickedInventoryKeys.value = []
-  inventoryPickerOpen.value = true
+function resolveStockQty(code) {
+  const inv = mockInventory.find((m) => m.code === code)
+  return inv?.stockQty ?? 0
 }
 
-function confirmInventoryPick() {
-  pickedInventoryKeys.value.forEach((code) => {
-    const item = mockInventory.find((m) => m.code === code)
-    if (!item) return
-    if (form.lineItems.some((l) => l.inventoryCode === code)) return
-    form.lineItems.push(
-      createLineItem({
-        inventoryName: item.name,
-        inventoryCode: item.code,
-        specModel: item.specModel,
-        material: item.material,
-        materialType: item.materialType,
-        supplyType: item.supplyType,
-        unit: item.unit,
-        packagingMethod: item.packagingMethod,
-        supplierType: item.supplierType,
-        stockQty: item.stockQty,
-        demandQty: 1,
-        planPurchaseQty: 1,
-        supplierName: item.defaultSupplier || '',
-        designatedSupplier: Boolean(item.defaultSupplier),
-      }),
-    )
+function lineItemCode(line) {
+  return line.productCode || line.inventoryCode || ''
+}
+
+function openProductPicker() {
+  productPickerOpen.value = true
+}
+
+function mapPickerToLineItem(payload) {
+  const code = payload.code || ''
+  const name = payload.name || ''
+  return createLineItem({
+    productName: name,
+    productCode: code,
+    inventoryName: name,
+    inventoryCode: code,
+    specModel: payload.specModel || '',
+    material: payload.material || '',
+    drawingNo: payload.drawingNo || '',
+    materialType: payload.materialType || '零部件',
+    supplyType: payload.supplyForm || '',
+    unit: payload.inventoryUnit || '件',
+    stockQty: resolveStockQty(code),
+    demandQty: 1,
+    planPurchaseQty: 1,
+    supplierName: payload.defaultSupplier || '',
+    designatedSupplier: Boolean(payload.defaultSupplier),
+    remark: '',
   })
-  inventoryPickerOpen.value = false
+}
+
+function onProductsSelected(rows) {
+  rows.forEach((payload) => {
+    const code = payload.code || ''
+    if (!code) return
+    if (form.lineItems.some((l) => lineItemCode(l) === code)) return
+    form.lineItems.push(mapPickerToLineItem(payload))
+  })
 }
 
 function onQtyChange(record) {
@@ -271,13 +296,9 @@ function removeLine(index) {
   form.lineItems.splice(index, 1)
 }
 
-function handleCancel() {
-  emit('update:open', false)
-}
-
 function handleSave() {
-  if (!form.deliveryDate) {
-    message.warning('请选择交货日期')
+  if (!form.estimatedArrivalDate) {
+    message.warning('请选择期望到货日期')
     return
   }
   if (!form.lineItems.length) {
@@ -285,16 +306,28 @@ function handleSave() {
     return
   }
 
+  const missingQty = form.lineItems.find(
+    (line) => line.planPurchaseQty == null || Number(line.planPurchaseQty) <= 0,
+  )
+  if (missingQty) {
+    message.warning(
+      `请填写「${missingQty.productName || missingQty.inventoryName || '明细'}」的计划采购数`,
+    )
+    return
+  }
+
   const reqNo = form.reqNo?.trim() || generateReqNo()
-  const deliveryDate = form.deliveryDate.format('YYYY-MM-DD')
-  const estimatedArrivalDate = form.estimatedArrivalDate
-    ? form.estimatedArrivalDate.format('YYYY-MM-DD')
-    : deliveryDate
+  const deliveryDate = form.deliveryDate ? form.deliveryDate.format('YYYY-MM-DD') : ''
+  const estimatedArrivalDate = form.estimatedArrivalDate.format('YYYY-MM-DD')
 
   form.lineItems.forEach((line) => {
     line.demandQty = line.planPurchaseQty
     line.deliveryDate = deliveryDate
     line.expectedArrivalDate = estimatedArrivalDate
+    line.productName = line.productName || line.inventoryName || ''
+    line.productCode = line.productCode || line.inventoryCode || ''
+    line.inventoryName = line.productName
+    line.inventoryCode = line.productCode
   })
 
   const payload = {
@@ -314,9 +347,17 @@ function handleSave() {
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
   }
 
-  emit('saved', { isEdit: isEdit.value, id: props.editRecord?.id, data: payload })
+  if (props.pageMode) {
+    if (isEdit.value) {
+      updatePurchaseRequisition(props.editRecord.id, payload)
+    } else {
+      addPurchaseRequisition({ ...payload, id: `pr-${Date.now()}` })
+    }
+  } else {
+    emit('saved', { isEdit: isEdit.value, id: props.editRecord?.id, data: payload })
+  }
   message.success(isEdit.value ? '采购申请已更新' : '采购申请已保存')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 

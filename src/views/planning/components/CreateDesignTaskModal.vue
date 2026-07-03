@@ -1,14 +1,13 @@
 <template>
-  <a-modal
-    v-model:open="open"
-    title="新增设计任务"
+  <FormCreateShell
+    :page-mode="pageMode"
+    :open="open"
+    :title="shellTitle"
     width="640px"
-    :confirm-loading="submitting"
-    ok-text="保存"
-    cancel-text="取消"
+    :mask-closable="false"
     destroy-on-close
-    @ok="handleOk"
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form ref="formRef" :model="form" :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
       <a-form-item label="设计单号" name="taskNo">
@@ -58,27 +57,36 @@
     </a-form>
 
     <SelectProductMaterialModal v-model:open="pickerOpen" @confirm="onItemPicked" />
-  </a-modal>
+
+    <template #footer>
+      <a-button size="small" :loading="submitting" @click="handleCancel">取消</a-button>
+      <a-button type="primary" size="small" :loading="submitting" @click="handleOk">保存</a-button>
+    </template>
+  </FormCreateShell>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { customerOptions } from '@/mock/salesOrderOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { createManualDesignTask } from '@/store/designTaskStore'
 import SelectProductMaterialModal from '@/views/product-process/components/SelectProductMaterialModal.vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
-const open = computed({
-  get: () => props.open,
-  set: (v) => emit('update:open', v),
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/planning/design-task',
+  getTitle: () => '新增设计任务',
 })
 
 const formRef = ref()
@@ -124,10 +132,11 @@ function resetForm() {
 }
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (val) => {
     if (val) resetForm()
   },
+  { immediate: true },
 )
 
 function onItemPicked(row) {
@@ -180,14 +189,10 @@ async function handleOk() {
     }
     message.success(`设计任务 ${result.task.taskNo} 已创建`)
     emit('saved', result.task)
-    open.value = false
+    closeAfterSave()
   } finally {
     submitting.value = false
   }
-}
-
-function handleCancel() {
-  open.value = false
 }
 </script>
 

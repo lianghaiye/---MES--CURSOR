@@ -21,16 +21,18 @@ import {
   isPurchasedBusinessType,
   isCustomSalesBusinessType,
   isSelfMadeBusinessType,
+  isMaintenanceServiceBusinessType,
   normalizeSalesLineBusiness,
   resolveLineBusinessType,
 } from '@/utils/salesOrderBusiness'
 import { createOutsourcingWorkOrdersFromSalesOrder } from '@/utils/salesOrderOutsourceWorkOrder'
+import { createMaintenanceWorkOrdersFromSalesOrder } from '@/utils/salesOrderMaintenanceWorkOrder'
 import { createDesignTaskFromSalesLine } from '@/store/designTaskStore'
 import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 7
+const DATA_VERSION = 8
 let orderSeq = 20
 let deliverySeq = 113
 
@@ -199,10 +201,14 @@ export function approveSalesOrder(id) {
   const outsourcingLines = order.lineItems.filter((line) =>
     isOutsourcingBusinessType(resolveLineBusinessType(line, order)),
   )
+  const maintenanceLines = order.lineItems.filter((line) =>
+    isMaintenanceServiceBusinessType(resolveLineBusinessType(line, order)),
+  )
 
   let purchaseReqNo
   let planOrderNo
   let outsourceWorkOrderCodes = []
+  let maintenanceWorkOrderCodes = []
   let designTaskCount = 0
 
   if (selfMadeLines.length) {
@@ -308,42 +314,51 @@ export function approveSalesOrder(id) {
     outsourceWorkOrderCodes = created.map((wo) => wo.code)
   }
 
+  if (maintenanceLines.length) {
+    for (const line of maintenanceLines) {
+      if (!line.productName?.trim()) {
+        return {
+          ok: false,
+          message: `订单「${order.orderNo}」维修服务明细请填写产品名称`,
+        }
+      }
+    }
+    const created = createMaintenanceWorkOrdersFromSalesOrder(order, maintenanceLines)
+    maintenanceWorkOrderCodes = created.map((wo) => wo.code)
+  }
+
   order.businessType = deriveOrderBusinessType(order.lineItems, order.businessType)
   order.progressStatus = '已审'
   order.approver = order.approver || 'admin1'
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
 
-  if (purchaseReqNo) {
-    return {
-      ok: true,
-      message: `订单「${order.orderNo}」审核通过，已自动生成采购申请 ${purchaseReqNo}`,
-      purchaseReqNo,
-    }
-  }
-  if (planOrderNo && outsourceWorkOrderCodes.length) {
-    return {
-      ok: true,
-      message: `订单「${order.orderNo}」审核通过，已生成生产计划 ${planOrderNo}，外协工单 ${outsourceWorkOrderCodes.join('、')}`,
-      planOrderNo,
-      outsourceWorkOrderCodes,
-    }
-  }
+  const hints = []
+  if (purchaseReqNo) hints.push(`已自动生成采购申请 ${purchaseReqNo}`)
   if (planOrderNo) {
-    const designHint =
-      designTaskCount > 0 ? `，已生成 ${designTaskCount} 条设计任务（明细状态：设计中）` : ''
-    return {
-      ok: true,
-      message: `订单「${order.orderNo}」审核通过，已自动生成生产计划任务${designHint}`,
-      planOrderNo,
-      designTaskCount,
+    let planHint = `已自动生成生产计划 ${planOrderNo}`
+    if (designTaskCount > 0) {
+      planHint += `，已生成 ${designTaskCount} 条设计任务（明细状态：设计中）`
     }
+    hints.push(planHint)
   }
   if (outsourceWorkOrderCodes.length) {
-    return {
-      ok: true,
-      message: `订单「${order.orderNo}」审核通过，已自动生成外协工单 ${outsourceWorkOrderCodes.join('、')}`,
-      outsourceWorkOrderCodes,
-    }
+    hints.push(`外协工单 ${outsourceWorkOrderCodes.join('、')}`)
   }
-  return { ok: true, message: `订单「${order.orderNo}」审核通过` }
+  if (maintenanceWorkOrderCodes.length) {
+    hints.push(`维修工单 ${maintenanceWorkOrderCodes.join('、')}`)
+  }
+
+  const message = hints.length
+    ? `订单「${order.orderNo}」审核通过，${hints.join('，')}`
+    : `订单「${order.orderNo}」审核通过`
+
+  return {
+    ok: true,
+    message,
+    purchaseReqNo,
+    planOrderNo,
+    designTaskCount,
+    outsourceWorkOrderCodes,
+    maintenanceWorkOrderCodes,
+  }
 }

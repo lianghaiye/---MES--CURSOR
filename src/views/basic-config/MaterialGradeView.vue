@@ -97,6 +97,7 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   DeleteOutlined,
@@ -112,6 +113,12 @@ import {
   filterMaterialGrades,
   materialGradeState,
 } from '@/store/materialGradeStore'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({ code: '', name: '' })
 const applied = reactive({ code: '', name: '' })
@@ -154,8 +161,9 @@ function handleReset() {
 }
 
 function openCreate() {
-  editRecord.value = null
-  modalOpen.value = true
+  const page = findCreatePageByListPath('/basic-config/material-grades')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openEdit(record) {

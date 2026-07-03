@@ -1,11 +1,11 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑' : '新增'"
+    :title="shellTitle"
     width="480px"
-    :mask-closable="false"
-    destroy-on-close
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
       <a-form-item label="工序分类名称" name="name" required>
@@ -28,45 +28,51 @@
         </a-button>
       </a-space>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseCircleOutlined, PlusCircleOutlined } from '@ant-design/icons-vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { addProcessCategory, updateProcessCategory } from '@/store/processCategoryStore'
 import { renameProcessCategory } from '@/store/processConfigStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   record: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
+const isEdit = computed(() => Boolean(props.record?.id))
+
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/product-process/process-category',
+  getTitle: () => (isEdit.value ? '编辑' : '新增'),
+})
+
 const formRef = ref()
 const saving = ref(false)
 const form = reactive({ name: '', remark: '' })
-
-const isEdit = computed(() => Boolean(props.record?.id))
 
 const rules = {
   name: [{ required: true, message: '请输入工序分类名称', trigger: 'blur' }],
 }
 
 watch(
-  () => props.open,
-  (v) => {
-    if (!v) return
+  () => [isActive.value, props.record?.id],
+  ([visible]) => {
+    if (!visible) return
     form.name = props.record?.name || ''
     form.remark = props.record?.remark || ''
   },
+  { immediate: true },
 )
-
-function handleCancel() {
-  emit('update:open', false)
-}
 
 async function handleSave() {
   try {
@@ -87,6 +93,6 @@ async function handleSave() {
   if (res.renamedFrom) renameProcessCategory(res.renamedFrom, res.category.name)
   message.success(isEdit.value ? '已保存' : '已新增')
   emit('saved')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>

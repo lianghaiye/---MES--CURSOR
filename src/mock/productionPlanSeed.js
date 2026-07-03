@@ -1,6 +1,5 @@
 import dayjs from 'dayjs'
-import { cloneOrders } from '@/mock/orders'
-import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
+import { buildEbomSnapshotFromBom, resolveMaterialsFromEbomSnapshot } from '@/utils/ebomSnapshot'
 import { enrichWorkItem } from '@/utils/productionPlanWorkItem'
 import { catalogBomIdForProduct, hydrateCatalogBom } from '@/mock/productBomSeed'
 
@@ -15,7 +14,15 @@ function resolveDeliveryDate(lineItems, fallback) {
   return dates.sort()[0]
 }
 
-function buildPlanFromSalesOrder(salesOrder, bomsById) {
+function cloneSnapshotWithMaterials(bom, salesQty) {
+  const snapshot = bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [], treeNodes: [], lineItems: [] }
+  const cloned = JSON.parse(JSON.stringify(snapshot))
+  const materials = resolveMaterialsFromEbomSnapshot(cloned, salesQty)
+  cloned.materials = JSON.parse(JSON.stringify(materials))
+  return cloned
+}
+
+function buildPlanFromSalesOrder(salesOrder, bomsById, planIndex = 0) {
   const lineItems = salesOrder.lineItems || []
   const totalQty = lineItems.reduce((s, i) => s + (Number(i.salesQty) || 0), 0)
   const deliveryDate = resolveDeliveryDate(lineItems, salesOrder.documentDate)
@@ -26,22 +33,32 @@ function buildPlanFromSalesOrder(salesOrder, bomsById) {
     const bomRaw = bomsById.get(bomId)
     const bom = bomRaw ? hydrateCatalogBom(bomRaw) : null
     const salesQty = Number(line.salesQty) || 1
-    const snapshot = bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [] }
+    const snapshot = cloneSnapshotWithMaterials(bom, salesQty)
+
+    let status = '待下达'
+    if (planIndex === 0 && index === 0 && lineItems.length > 1) {
+      status = '进行中'
+    }
 
     return enrichWorkItem(
       {
         id: `wi-${line.id}`,
         salesLineId: line.id,
-        status: index === 0 ? '进行中' : '待下达',
+        status,
         expanded: index === 0,
         salesQty,
         productName: line.productName,
         productCode: line.productCode,
+        productId: line.productId,
         productAttr: line.productAttr,
         productType: line.category || line.productAttr || '',
         model: line.specModel,
         spec: line.specAttr,
+        specModel: line.specModel,
+        techParams: line.techParams || '',
+        matchingRequirements: line.matchingRequirements || '',
         deliveryDate: line.deliveryDate || deliveryDate,
+        deliveryMode: line.deliveryMode,
         bomId,
         bomName: line.bomName,
         bomVersion: line.bomVersion,
@@ -53,7 +70,9 @@ function buildPlanFromSalesOrder(salesOrder, bomsById) {
     )
   })
 
-  const statusTags = workItems.length > 1 ? ['部分下达', '待下达'] : ['待下达']
+  const hasInProgress = workItems.some((wi) => wi.status === '进行中')
+  const orderStatus = hasInProgress ? '部分下达' : '待下达'
+  const statusTags = hasInProgress ? ['部分下达', '待下达'] : ['待下达']
 
   return {
     id: `pp-seed-${salesOrder.id}`,
@@ -63,7 +82,7 @@ function buildPlanFromSalesOrder(salesOrder, bomsById) {
     productQty: totalQty,
     salesperson: salesOrder.salesperson || '',
     urgency: mapUrgencyToPlan(salesOrder.urgency),
-    orderStatus: workItems.length > 1 ? '部分下达' : '待下达',
+    orderStatus,
     orderDate: salesOrder.documentDate || dayjs().format('YYYY-MM-DD'),
     deliveryDate,
     region: salesOrder.region || '',
@@ -79,34 +98,25 @@ function buildPlanFromSalesOrder(salesOrder, bomsById) {
 }
 
 /**
- * 合并原 orders mock + 已审自产销售订单对应的生产计划
+ * 仅基于已审自产销售订单 + 产品 BOM 生成生产计划演示数据
  */
 export function buildInitialProductionPlans(boms, salesOrders) {
   const bomsById = new Map(boms.map((b) => [b.id, b]))
-  const base = cloneOrders()
 
-  const approvedSelfMade = (salesOrders || []).filter(
-    (o) => o.businessType === '自产销售' && o.progressStatus === '已审',
-  )
+  const approvedSelfMade = (salesOrders || [])
+    .filter((o) => o.businessType === '自产销售' && o.progressStatus === '已审')
+    .sort((a, b) => dayjs(b.documentDate).valueOf() - dayjs(a.documentDate).valueOf())
 
-  approvedSelfMade.forEach((order) => {
-    if (base.some((p) => p.salesOrderNo === order.orderNo || p.orderNo === order.orderNo)) {
-      return
-    }
-    base.unshift(buildPlanFromSalesOrder(order, bomsById))
+  return approvedSelfMade.map((order, planIndex) => {
+    const plan = buildPlanFromSalesOrder(order, bomsById, planIndex)
+    normalizePlanWorkItems(plan)
+    return plan
   })
+}
 
-  return base.map((plan) => {
-    const normalized = { ...plan }
-    if (normalized.orderStatus === '待排产') normalized.orderStatus = '待下达'
-    if (normalized.orderStatus === '生产中') normalized.orderStatus = '执行中'
-    normalized.workItems?.forEach((wi, wiIdx) => {
-      Object.assign(wi, enrichWorkItem(wi, null, wiIdx))
-      if (wi.expanded == null) wi.expanded = wiIdx === 0
-    })
-    if (!normalized.salesOrderNo && normalized.orderNo?.startsWith('1-')) {
-      normalized.salesOrderNo = normalized.orderNo
-    }
-    return normalized
+function normalizePlanWorkItems(plan) {
+  plan.workItems?.forEach((wi, wiIdx) => {
+    Object.assign(wi, enrichWorkItem(wi, null, wiIdx))
+    if (wi.expanded == null) wi.expanded = wiIdx === 0
   })
 }

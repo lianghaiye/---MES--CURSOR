@@ -120,6 +120,7 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import EmployeeGroupModal from './components/EmployeeGroupModal.vue'
@@ -128,9 +129,15 @@ import {
   deleteEmployeeGroups,
   positionOptions,
 } from '@/store/employeeGroupStore'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({ name: '', position: undefined })
 const applied = reactive({ name: '', position: undefined })
@@ -184,8 +191,9 @@ function handleReset() {
 }
 
 function openCreate() {
-  editRecord.value = null
-  modalOpen.value = true
+  const page = findCreatePageByListPath('/basic-config/employee-groups')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openEdit(record) {

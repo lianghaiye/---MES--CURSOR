@@ -108,3 +108,30 @@ export function applyLinkedSingleQtyFromDefect(target, prev = {}) {
   }
   return target
 }
+
+/** 报工详情行：报工数量 = 良品数 + 不良品数（优先取调整值） */
+export function resolveLineReportQty(line = {}) {
+  const good =
+    line.adjustedGoodQty != null && line.adjustedGoodQty !== ''
+      ? Number(line.adjustedGoodQty)
+      : Number(line.goodQty)
+  const defect =
+    line.adjustedDefectQty != null && line.adjustedDefectQty !== ''
+      ? Number(line.adjustedDefectQty)
+      : Number(line.defectQty)
+  return Math.max(0, good || 0) + Math.max(0, defect || 0)
+}
+
+export function formatScheduleQtyDisplay(val) {
+  if (val == null || val === '') return '—'
+  return val
+}
+
+/** 报工数量是否超过排产数 */
+export function isLineReportQtyOverSchedule(line = {}, fallbackScheduleQty = null) {
+  const scheduleQty = resolveScheduleQty({
+    scheduleQty: line.scheduleQty ?? fallbackScheduleQty,
+  })
+  if (scheduleQty <= 0) return false
+  return resolveLineReportQty(line) > scheduleQty
+}

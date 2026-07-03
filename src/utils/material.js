@@ -28,6 +28,21 @@ export function calcGapQty(demandQty, availableStock) {
 /** 在订单工作项中按 id 查找并更新物料 */
 export function updateMaterialInOrder(order, materialId, patch) {
   if (!order?.workItems) return false
+  const topPrefix = 'top-'
+  if (String(materialId).startsWith(topPrefix)) {
+    const wiId = String(materialId).slice(topPrefix.length)
+    const wi = order.workItems.find((w) => w.id === wiId)
+    if (!wi) return false
+    if (patch.planQty != null) wi.planQty = patch.planQty
+    if (patch.processRoute != null) wi.processRoute = patch.processRoute
+    if (patch.workCenter != null) wi.workCenter = patch.workCenter
+    if (patch.personInCharge != null) wi.personInCharge = patch.personInCharge
+    if (patch.warehouse != null) wi.warehouse = patch.warehouse
+    if (patch.urgency != null) wi.urgency = patch.urgency
+    if (patch.workOrderRemark != null) wi.workOrderRemark = patch.workOrderRemark
+    if (patch.status != null) wi.status = patch.status
+    return true
+  }
   let found = false
   const walk = (nodes) => {
     if (!nodes?.length) return
@@ -50,7 +65,7 @@ export function getSelfMadeMaterials(order) {
   order?.workItems?.forEach((wi) => {
     flattenMaterials(wi.materials, all)
   })
-  return all.filter((m) => m.supplyType === '自制件')
+  return all.filter((m) => m.supplyType === '自制件' || m.supplyType === '自制')
 }
 
 /** 筛选供应型态为「外协件」的物料（扁平；优先当前工作项，否则整单） */
@@ -110,7 +125,9 @@ export function buildWorkOrderRows(materials, order) {
   const endDate = assemblyDate || dayjs().add(14, 'day').format('YYYY-MM-DD')
 
   return materials.map((m, index) => {
-    const demandQty = calcDemandQty(m.unitUsage, order.productQty)
+    const demandQty = m.isTopLevel
+      ? (m.demandQty ?? calcDemandQty(1, order.productQty))
+      : calcDemandQty(m.unitUsage, order.productQty)
     const gapQty = calcGapQty(demandQty, m.availableStock)
     return {
       key: m.id,

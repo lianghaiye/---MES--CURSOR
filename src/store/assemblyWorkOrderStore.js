@@ -8,6 +8,7 @@ import {
 } from '@/utils/workOrderNaming'
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { createLaborDemoAssemblyOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
+import { ensureProductionPlanOrderTreeDemoAssemblyOrders } from '@/mock/productionPlanOrderTreeSeed'
 
 const STORAGE_KEY = 'i_doms_assembly_work_orders'
 let codeSeq = 1
@@ -37,7 +38,7 @@ function generateAssemblyCode() {
 function ensureLaborDemoAssemblyOrders(orders) {
   const demos = createLaborDemoAssemblyOrders()
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
-  return [...demos, ...rest]
+  return ensureProductionPlanOrderTreeDemoAssemblyOrders([...demos, ...rest])
 }
 
 function createInitialOrders() {
@@ -115,7 +116,9 @@ function createInitialOrders() {
 }
 
 export const assemblyWorkOrderState = reactive({
-  orders: ensureLaborDemoAssemblyOrders(loadFromStorage() || createInitialOrders()),
+  orders: ensureProductionPlanOrderTreeDemoAssemblyOrders(
+    ensureLaborDemoAssemblyOrders(loadFromStorage() || createInitialOrders()),
+  ),
 })
 
 watch(

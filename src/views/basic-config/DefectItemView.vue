@@ -129,6 +129,7 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   DeleteOutlined,
@@ -143,6 +144,12 @@ import DefectItemFormModal from './components/DefectItemFormModal.vue'
 import CompanyDefectWageSettingsModal from './components/CompanyDefectWageSettingsModal.vue'
 import CompanyDefectWageSettingsPanel from './components/CompanyDefectWageSettingsPanel.vue'
 import { defectItemState, deleteDefectItem, filterDefectItems } from '@/store/defectItemStore'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({ code: '', name: '' })
 const applied = reactive({ code: '', name: '' })
@@ -190,8 +197,9 @@ function handleReset() {
 }
 
 function openCreate() {
-  editRecord.value = null
-  modalOpen.value = true
+  const page = findCreatePageByListPath('/basic-config/defect-items')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openEdit(record) {

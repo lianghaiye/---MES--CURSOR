@@ -143,6 +143,7 @@ import { employeeNameOptions } from '@/utils/employeeProfileResolver'
 import { querySalaryStats } from '@/utils/salaryStatsAggregate'
 import { reloadProcessReports } from '@/store/processReportStore'
 import { reloadQuickReports } from '@/store/quickReportStore'
+import { ensureSalaryStatsDemoData } from '@/store/laborHourStore'
 
 const router = useRouter()
 
@@ -276,6 +277,7 @@ function filterEmployee(input, option) {
 function loadData() {
   reloadProcessReports()
   reloadQuickReports()
+  ensureSalaryStatsDemoData()
   statsResult.value = querySalaryStats(appliedFilters.value)
 }
 

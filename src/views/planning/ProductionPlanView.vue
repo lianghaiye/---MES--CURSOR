@@ -172,14 +172,9 @@
           </a-space>
         </div>
 
-        <a-tabs v-model:activeKey="detailTab">
-          <a-tab-pane key="work" tab="工作项" />
-          <a-tab-pane key="stats" tab="合并统计" />
-          <a-tab-pane key="orders" tab="所有工单" />
-          <a-tab-pane key="log" tab="操作日志" />
-        </a-tabs>
-
-        <template v-if="detailTab === 'work'">
+        <a-tabs v-model:activeKey="detailTab" class="detail-tabs">
+          <a-tab-pane key="work" tab="工作项">
+            <div class="detail-tab-body">
           <a-table
             :columns="displayWorkColumns"
             :data-source="selectedOrder.workItems"
@@ -211,14 +206,9 @@
                 </a-tag>
               </template>
               <template v-else-if="column.key === 'stockQty'">
-                <a-input-number
-                  v-model:value="record.stockQty"
-                  size="small"
-                  :min="0"
-                  :precision="3"
-                  style="width: 100%"
-                  @change="onWorkItemStockChange(record)"
-                />
+                <span>{{
+                  record.stockQty != null && record.stockQty !== '' ? record.stockQty : '—'
+                }}</span>
               </template>
               <template v-else-if="column.key === 'planQty'">
                 <a-input-number
@@ -227,6 +217,8 @@
                   :min="0"
                   :precision="3"
                   style="width: 100%"
+                  :disabled="isPlanQtyLocked"
+                  @change="onWorkItemPlanQtyChange(record)"
                 />
               </template>
               <template v-else-if="column.key === 'action'">
@@ -284,15 +276,11 @@
             />
           </div>
           <a-empty
-            v-if="!materialTree.length"
-            :description="
-              activeWorkItem?.status === '设计中'
-                ? '定制产品 BOM 设计中，请完成设计任务审核后再查看 EBOM'
-                : '请点击产品明细行查看 EBOM 物料树'
-            "
+            v-if="!activeWorkItem"
+            description="请点击产品明细行查看 EBOM 物料树"
             class="ebom-empty"
           />
-          <template v-else>
+          <div v-else-if="activeWorkItem" class="material-tree-wrap">
             <a-table
               :columns="displayMaterialColumns"
               :data-source="materialTree"
@@ -301,6 +289,7 @@
               size="small"
               bordered
               :scroll="{ x: materialTableScrollX }"
+              v-model:expanded-row-keys="materialExpandedRowKeys"
               :default-expand-all-rows="true"
             >
               <template #bodyCell="{ column, record }">
@@ -309,6 +298,15 @@
                 </template>
                 <template v-else-if="column.key === 'supplyType'">
                   <a-select
+                    v-if="record.isTopLevel"
+                    v-model:value="record.supplyType"
+                    size="small"
+                    :options="topLevelSupplyTypeOptions"
+                    style="width: 100%"
+                    @change="onTopLevelSupplyTypeChange(record)"
+                  />
+                  <a-select
+                    v-else
                     v-model:value="record.supplyType"
                     size="small"
                     :options="supplyTypeOptions"
@@ -318,11 +316,24 @@
                 </template>
                 <template v-else-if="column.key === 'planQty'">
                   <a-input-number
+                    v-if="record.isTopLevel"
+                    :value="activeWorkItem.planQty"
+                    :min="0"
+                    :precision="3"
+                    size="small"
+                    style="width: 100%"
+                    :disabled="isPlanQtyLocked"
+                    @change="(val) => onTopLevelPlanQtyChange(val)"
+                  />
+                  <a-input-number
+                    v-else
                     v-model:value="record.planQty"
                     :min="0"
                     :precision="3"
                     size="small"
                     style="width: 100%"
+                    :disabled="isPlanQtyLocked"
+                    @change="onMaterialPlanQtyChange(record)"
                   />
                 </template>
                 <template v-else-if="column.key === 'joinPlan'">
@@ -413,16 +424,105 @@
                 </template>
               </template>
             </a-table>
-            <div v-if="activeWorkItem?.bomId" class="bom-version-section">
-              <div class="ebom-panel-title">BOM 版本信息</div>
-              <BomVersionInfoSection
-                :bom-id="activeWorkItem.bomId"
-                :bound-version="activeWorkItem.bomVersion"
-              />
+          </div>
             </div>
-          </template>
-        </template>
-        <a-empty v-else description="该 Tab 为占位，后续扩展" style="margin: 48px 0" />
+          </a-tab-pane>
+
+          <a-tab-pane key="stats" tab="合并统计">
+            <div class="detail-tab-body">
+              <a-empty description="该 Tab 为占位，后续扩展" />
+            </div>
+          </a-tab-pane>
+
+          <a-tab-pane key="orders" tab="所有工单">
+            <div class="detail-tab-body">
+              <ProductionPlanOrderTree
+                v-if="selectedOrder.workItems?.length"
+                :tree-data="planOrderTreeData"
+              />
+              <a-empty v-else description="暂无工作项" />
+            </div>
+          </a-tab-pane>
+
+          <a-tab-pane key="ebom-info">
+            <template #tab>
+              <span>EBOM信息</span>
+              <a-badge
+                v-if="ebomChangedCount"
+                :count="ebomChangedCount"
+                :number-style="{ backgroundColor: '#fa8c16', marginLeft: '6px' }"
+              />
+            </template>
+            <div class="detail-tab-body">
+          <div class="section-card">
+            <div class="section-title">EBOM 信息</div>
+            <div class="section-hint">
+              展示各工作项现行 EBOM（始终为最新版本）；「初始版本」为订单审核通过时生成的快照版本。
+            </div>
+            <a-table
+              :columns="ebomColumns"
+              :data-source="productionPlanEbomRows"
+              row-key="id"
+              size="small"
+              bordered
+              :pagination="false"
+              :scroll="{ x: ebomTableScrollX }"
+              :locale="{ emptyText: '暂无工作项' }"
+            >
+              <template #bodyCell="{ column, record: row }">
+                <template v-if="column.key === 'index'">{{ row.index }}</template>
+                <template v-else-if="column.key === 'ebomStatus'">
+                  <a-tag :color="row.ebomStatusColor">{{ row.ebomStatus }}</a-tag>
+                </template>
+                <template v-else-if="column.key === 'bomName'">
+                  <a
+                    v-if="row.bomId"
+                    class="link-code"
+                    @click.prevent="openBomDetail(row.bomId, row.bomName)"
+                  >
+                    {{ row.bomName }}
+                  </a>
+                  <span v-else>{{ row.bomName }}</span>
+                </template>
+                <template v-else-if="column.key === 'boundVersion'">
+                  <span>{{ row.boundVersion }}</span>
+                </template>
+                <template v-else>
+                  {{ row[column.dataIndex] ?? '—' }}
+                </template>
+              </template>
+            </a-table>
+          </div>
+
+          <div v-if="bomChangedWorkItems.length" class="section-card">
+            <div class="section-title">EBOM 版本变更</div>
+            <div v-for="wi in bomChangedWorkItems" :key="wi.id" class="bom-product-block">
+              <div class="bom-line-head">
+                <span class="bom-product-name">{{ wi.productName }}</span>
+                <span class="bom-product-code">{{ wi.productCode }}</span>
+                <a-tag color="orange">初始版本 {{ wi.bomVersion || '—' }}</a-tag>
+                <a-tag v-if="workItemActiveVersion(wi)" color="blue">
+                  现行版本 {{ workItemActiveVersion(wi) }}
+                </a-tag>
+              </div>
+              <BomVersionInfoSection
+                :product-id="wi.productId"
+                :bom-id="wi.bomId"
+                :bound-version="wi.bomVersion"
+                :compare-quantity="Number(wi.salesQty ?? wi.orderQty) || 1"
+              />
+              <SalesOrderEbomDiffSection :line="workItemToEbomLine(wi)" />
+            </div>
+          </div>
+            </div>
+          </a-tab-pane>
+
+          <a-tab-pane key="log" tab="操作日志">
+            <div class="detail-tab-body">
+              <a-empty description="该 Tab 为占位，后续扩展" />
+            </div>
+          </a-tab-pane>
+        </a-tabs>
       </div>
       <a-empty v-else class="detail-empty" description="请选择左侧订单" />
     </div>
@@ -481,11 +581,14 @@ export default {
 </script>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
 import { PrinterOutlined } from '@ant-design/icons-vue'
+import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
+import { getActiveBomForItem } from '@/store/productBomStore'
+import { useTabs } from '@/composables/useTabs'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
 import GenerateOutsourceWorkOrderModal from './components/GenerateOutsourceWorkOrderModal.vue'
 import GeneratePurchaseRequisitionModal from './components/GeneratePurchaseRequisitionModal.vue'
@@ -494,7 +597,6 @@ import {
   addOutsourceWorkOrdersFromPlanRows,
 } from '@/store/workOrderStore'
 import {
-  getSelfMadeMaterials,
   getOutsourcedMaterialsFromWorkItem,
   getPurchasedMaterialsFromWorkItem,
   updateMaterialInOrder,
@@ -504,11 +606,19 @@ import {
   calcGapQty,
   flattenMaterials,
 } from '@/utils/material'
-import { calcDefaultPlanQty } from '@/utils/productionPlanWorkItem'
+import { buildProductionPlanEbomRows } from '@/utils/salesOrderBomRows'
 import { addPurchaseRequisition } from '@/store/purchaseRequisitionStore'
 import {
   enrichPlanMaterialTree,
   getProcessRouteSelectOptions,
+  getSelfMadeMaterialsForPlan,
+  buildDisplayMaterialTree,
+  cascadeMaterialPlanQtyFromParent,
+  collectAllMaterialRowKeys,
+  isOrderPlanQtyLocked,
+  lockOrderPlanQty,
+  resolveWorkItemMaterials,
+  syncWorkItemMaterialPlanQty,
   isPurchasedOrOutsourced,
   onMaterialDesignateSupplierChange,
   onMaterialStandardCycleChange,
@@ -517,16 +627,26 @@ import {
   processFileOptions,
   recalcMaterialLatestProcessTimes,
   supplyTypeOptions,
+  topLevelSupplyTypeOptions,
 } from '@/utils/productionPlanMaterial'
+import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
+import SalesOrderEbomDiffSection from '@/views/sales/components/SalesOrderEbomDiffSection.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import BomPrintModal from '@/views/product-process/components/BomPrintModal.vue'
-import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
+import ProductionPlanOrderTree from '@/views/planning/components/ProductionPlanOrderTree.vue'
 import {
   productionPlanPrintBaseColumns,
   productionPlanPrintColumnSettings,
 } from '@/mock/productionPlanPrintColumns'
+import { workOrderState } from '@/store/workOrderStore'
+import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
+import { purchaseRequisitionState } from '@/store/purchaseRequisitionStore'
+import { buildProductionPlanOrderTree } from '@/utils/productionPlanOrderTree'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({
   orderNo: '',
@@ -656,13 +776,112 @@ const pagedOrders = computed(() => {
 
 const selectedOrder = computed(() => filteredOrders.value.find((o) => o.id === selectedId.value))
 
+const planOrderTreeData = computed(() => {
+  if (!selectedOrder.value) return []
+  return buildProductionPlanOrderTree(selectedOrder.value, {
+    workOrders: workOrderState.orders,
+    assemblyWorkOrders: assemblyWorkOrderState.orders,
+    purchaseRequisitions: purchaseRequisitionState.requisitions,
+  })
+})
+
+const isPlanQtyLocked = computed(() => isOrderPlanQtyLocked(selectedOrder.value))
+
 const activeWorkItem = computed(() => {
   const order = selectedOrder.value
   if (!order?.workItems?.length || !expandedWorkItemId.value) return null
   return order.workItems.find((w) => w.id === expandedWorkItemId.value) || null
 })
 
-const materialTree = computed(() => activeWorkItem.value?.materials || [])
+const materialExpandedRowKeys = ref([])
+
+const materialTree = computed(() => {
+  if (!activeWorkItem.value) return []
+  return buildDisplayMaterialTree(activeWorkItem.value, selectedOrder.value)
+})
+
+watch(
+  materialTree,
+  (tree) => {
+    nextTick(() => {
+      materialExpandedRowKeys.value = collectAllMaterialRowKeys(tree)
+    })
+  },
+  { immediate: true, deep: true },
+)
+
+const productionPlanEbomRows = computed(() =>
+  buildProductionPlanEbomRows(selectedOrder.value?.workItems || []),
+)
+
+const ebomColumns = [
+  { key: 'index', title: '序号', width: 56, align: 'center', fixed: 'left' },
+  { key: 'ebomStatus', title: 'EBOM状态', width: 100, fixed: 'left' },
+  {
+    key: 'bomName',
+    title: 'EBOM名称',
+    dataIndex: 'bomName',
+    width: 160,
+    ellipsis: true,
+    fixed: 'left',
+  },
+  { key: 'bomNo', title: 'EBOM编码', dataIndex: 'bomNo', width: 130, ellipsis: true },
+  { key: 'itemName', title: '产品名称', dataIndex: 'itemName', width: 140, ellipsis: true },
+  { key: 'initialVersion', title: '初始版本', dataIndex: 'initialVersion', width: 96 },
+  { key: 'boundVersion', title: '订单绑定版本', dataIndex: 'boundVersion', width: 120 },
+  { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { key: 'material', title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
+  { key: 'drawingNo', title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { key: 'levelCount', title: '层级数', dataIndex: 'levelCount', width: 72, align: 'center' },
+  { key: 'materialCount', title: '物料数', dataIndex: 'materialCount', width: 72, align: 'center' },
+  { key: 'snapshotAt', title: '快照时间', dataIndex: 'snapshotAt', width: 150 },
+]
+
+const ebomTableScrollX = computed(() =>
+  ebomColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+function workItemBomVersionHint(wi) {
+  if (!wi?.productId) return false
+  const active = getActiveBomForItem('product', wi.productId)
+  return Boolean(active?.version && wi.bomVersion && active.version !== wi.bomVersion)
+}
+
+const bomChangedWorkItems = computed(() =>
+  (selectedOrder.value?.workItems || []).filter((wi) => workItemBomVersionHint(wi)),
+)
+
+const ebomChangedCount = computed(() => bomChangedWorkItems.value.length)
+
+function workItemActiveVersion(wi) {
+  return getActiveBomForItem('product', wi.productId)?.version || ''
+}
+
+function workItemToEbomLine(wi) {
+  return {
+    id: wi.id,
+    productId: wi.productId,
+    productName: wi.productName,
+    productCode: wi.productCode,
+    bomId: wi.bomId,
+    bomName: wi.bomName,
+    bomVersion: wi.bomVersion,
+    ebomSnapshot: wi.ebomSnapshot,
+    salesQty: wi.salesQty ?? wi.orderQty,
+    ebomStatus: wi.ebomStatus,
+  }
+}
+
+function openBomDetail(bomId, bomName) {
+  if (!bomId) return
+  const path = `/product-process/bom/${bomId}`
+  openTab(path, bomName || 'BOM详情')
+  router.push(path)
+}
+
+const selfMadeMaterials = computed(() =>
+  selectedOrder.value ? getSelfMadeMaterialsForPlan(selectedOrder.value) : [],
+)
 
 const activeWorkItemBomTitle = computed(() => {
   const wi = activeWorkItem.value
@@ -672,10 +891,6 @@ const activeWorkItemBomTitle = computed(() => {
   const label = `${name}${version}`
   return label || '—'
 })
-
-const selfMadeMaterials = computed(() =>
-  selectedOrder.value ? getSelfMadeMaterials(selectedOrder.value) : [],
-)
 
 const outsourcedMaterials = computed(() => {
   if (!selectedOrder.value || !activeWorkItem.value) return []
@@ -724,7 +939,7 @@ const printEbomOverviewInfo = computed(() => {
 const printEbomMaterialQtyMap = computed(() => {
   const map = {}
   const all = []
-  flattenMaterials(activeWorkItem.value?.materials, all)
+  flattenMaterials(materialTree.value, all)
   all.forEach((m) => {
     if (!m.code) return
     map[m.code] = {
@@ -764,16 +979,46 @@ function onPlanCompleteDateChange(date) {
 
 function refreshWorkItemMaterials(wi, order) {
   const baseQty = wi.orderQty ?? wi.salesQty ?? order?.productQty ?? 0
+  const materials = resolveWorkItemMaterials(wi)
   const walk = (nodes) => {
     nodes?.forEach((m) => {
       m.demandQty = calcDemandQty(m.unitUsage, baseQty)
       m.gapQty = calcGapQty(m.demandQty, m.availableStock)
-      if (m.planQty == null) m.planQty = m.gapQty
       if (m.children?.length) walk(m.children)
     })
   }
-  walk(wi.materials)
-  enrichPlanMaterialTree(wi.materials, order)
+  walk(materials)
+  syncWorkItemMaterialPlanQty(wi)
+  enrichPlanMaterialTree(materials, order)
+}
+
+function onWorkItemPlanQtyChange(record) {
+  if (isPlanQtyLocked.value) return
+  cascadeMaterialPlanQtyFromParent(record.planQty, record.materials)
+}
+
+function onTopLevelPlanQtyChange(val) {
+  if (isPlanQtyLocked.value) return
+  const wi = activeWorkItem.value
+  if (!wi) return
+  wi.planQty = val
+  cascadeMaterialPlanQtyFromParent(val, wi.materials)
+}
+
+function onMaterialPlanQtyChange(record) {
+  if (isPlanQtyLocked.value) return
+  if (record.children?.length) {
+    cascadeMaterialPlanQtyFromParent(record.planQty, record.children)
+  }
+}
+
+function onTopLevelSupplyTypeChange(record) {
+  const wi = activeWorkItem.value
+  if (wi && record.isTopLevel) {
+    wi.topLevelSupplyType = record.supplyType
+    record.joinPlan = record.supplyType === '自制件' ? '是' : '否'
+  }
+  onMaterialSupplyTypeChange(record)
 }
 
 function filterSelectOption(input, option) {
@@ -815,32 +1060,28 @@ function workItemCustomRow(record) {
   }
 }
 
-function onWorkItemStockChange(record) {
-  record.planQty = calcDefaultPlanQty(record.orderQty, record.stockQty)
-  const order = selectedOrder.value
-  if (order && expandedWorkItemId.value === record.id) {
-    refreshWorkItemMaterials(record, order)
-  }
-}
-
-watch(selectedOrder, (order) => {
-  if (!order) {
-    expandedWorkItemId.value = null
-    return
-  }
-  const items = order.workItems || []
-  if (!items.length) {
-    expandedWorkItemId.value = null
-    return
-  }
-  const current = items.find((w) => w.id === expandedWorkItemId.value)
-  if (!current) {
-    const preferred = items.find((w) => w.expanded) || items[0]
-    if (preferred) selectWorkItem(preferred)
-    return
-  }
-  selectWorkItem(current)
-})
+watch(
+  selectedOrder,
+  (order) => {
+    if (!order) {
+      expandedWorkItemId.value = null
+      return
+    }
+    const items = order.workItems || []
+    if (!items.length) {
+      expandedWorkItemId.value = null
+      return
+    }
+    const current = items.find((w) => w.id === expandedWorkItemId.value)
+    if (!current) {
+      const preferred = items.find((w) => w.expanded) || items[0]
+      if (preferred) selectWorkItem(preferred)
+      return
+    }
+    selectWorkItem(current)
+  },
+  { immediate: true },
+)
 
 function toggleWorkItemExpand(record) {
   if (expandedWorkItemId.value === record.id) {
@@ -876,7 +1117,7 @@ function openWorkOrderModal() {
     return
   }
   if (!selfMadeMaterials.value.length) {
-    message.info('当前订单没有供应型态为「自制件」的物料')
+    message.info('当前订单没有供应型态为「自制件」的物料，或顶级物料未设为「自制件」')
     return
   }
   workOrderModalOpen.value = true
@@ -946,6 +1187,7 @@ function handlePurchaseReqSave(requisition) {
   const order = productionPlanState.plans.find((o) => o.id === selectedId.value)
   addPurchaseRequisition(requisition)
   if (order && requisition.lineItems?.length) {
+    lockOrderPlanQty(order)
     requisition.lineItems.forEach((line) => {
       const material = purchasedMaterialsForReq.value.find((m) => m.code === line.inventoryCode)
       if (!material) return
@@ -965,6 +1207,7 @@ function handlePurchaseReqSave(requisition) {
 function handleWorkOrderSave(savedRows) {
   const order = productionPlanState.plans.find((o) => o.id === selectedId.value)
   if (!order) return
+  lockOrderPlanQty(order)
   savedRows.forEach((row) => {
     updateMaterialInOrder(order, row.materialId, patchMaterialFromWorkOrderRow(row))
   })
@@ -977,6 +1220,7 @@ function handleWorkOrderSave(savedRows) {
 function handleOutsourceWorkOrderSave(savedRows) {
   const order = productionPlanState.plans.find((o) => o.id === selectedId.value)
   if (!order) return
+  lockOrderPlanQty(order)
   savedRows.forEach((row) => {
     updateMaterialInOrder(order, row.materialId, patchMaterialFromOutsourceWorkOrderRow(row))
   })
@@ -996,6 +1240,9 @@ function tagColor(tag) {
 function selectOrder(id) {
   selectedId.value = id
   expandedWorkItemId.value = null
+  const order = filteredOrders.value.find((o) => o.id === id)
+  const first = order?.workItems?.[0]
+  if (first) selectWorkItem(first)
 }
 
 function toggleDetailFullscreen() {
@@ -1010,6 +1257,9 @@ function onFullscreenKeydown(event) {
 
 onMounted(() => {
   window.addEventListener('keydown', onFullscreenKeydown)
+  if (!selectedId.value && filteredOrders.value[0]) {
+    selectedId.value = filteredOrders.value[0].id
+  }
 })
 
 onUnmounted(() => {
@@ -1035,13 +1285,19 @@ function handleReset() {
 
 <style lang="less" scoped>
 .production-plan {
+  display: flex;
+  flex-direction: column;
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
-  min-height: calc(100vh - 112px);
+  height: calc(100vh - 56px - 40px - 24px);
+  min-height: calc(100vh - 56px - 40px - 24px);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .filter-card {
+  flex-shrink: 0;
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -1076,10 +1332,11 @@ function handleReset() {
 }
 
 .master-detail {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: 12px;
-  min-height: 520px;
-  padding: 0 0 12px;
+  align-items: stretch;
 }
 
 .order-list-panel {
@@ -1088,8 +1345,12 @@ function handleReset() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: calc(100vh - 220px);
+  height: 100%;
   overflow-y: auto;
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .order-card {
@@ -1130,7 +1391,32 @@ function handleReset() {
 .detail-panel {
   flex: 1;
   min-width: 0;
-  overflow: auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+
+  :deep(.detail-tabs.ant-tabs) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.detail-tabs .ant-tabs-content-holder) {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  :deep(.detail-tabs .ant-tabs-tabpane) {
+    height: 100%;
+  }
 
   &.is-fullscreen {
     position: fixed;
@@ -1141,6 +1427,10 @@ function handleReset() {
     overflow: auto;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   }
+}
+
+.detail-tab-body {
+  min-height: 100%;
 }
 
 .detail-header-actions {
@@ -1178,9 +1468,22 @@ function handleReset() {
 
 .detail-empty {
   flex: 1;
+  min-height: 0;
+  height: 100%;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.material-tree-wrap {
+  margin-bottom: 0;
+}
+
+.ebom-empty {
+  margin: 12px 0;
 }
 
 .ebom-panel-title {
@@ -1198,14 +1501,61 @@ function handleReset() {
   }
 }
 
-.ebom-empty {
-  margin: 16px 0 8px;
+.section-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.bom-version-section {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+.section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.section-hint {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
+}
+
+.bom-line-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.bom-product-block {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed #f0f0f0;
+
+  &:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+}
+
+.bom-product-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.bom-product-code {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.link-code {
+  color: #1677ff;
+  cursor: pointer;
 }
 
 :deep(.work-item-row) {
@@ -1234,13 +1584,21 @@ function handleReset() {
 }
 
 @media (max-width: 992px) {
+  .production-plan {
+    height: auto;
+    min-height: calc(100vh - 56px - 40px - 24px);
+    overflow: visible;
+  }
+
   .master-detail {
     flex-direction: column;
+    flex: none;
   }
 
   .order-list-panel {
     width: 100%;
-    max-height: 240px;
+    height: auto;
+    max-height: 280px;
     flex-direction: row;
     flex-wrap: wrap;
   }

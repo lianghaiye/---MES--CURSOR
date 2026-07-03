@@ -4,10 +4,13 @@ export function createLineItem(partial = {}) {
   const planPurchaseQty = partial.planPurchaseQty ?? partial.demandQty ?? 1
   return {
     id: `pr-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    productName: '',
+    productCode: '',
     inventoryName: '',
     inventoryCode: '',
     specModel: '',
     material: '',
+    drawingNo: '',
     materialType: '零部件',
     supplyType: '',
     unit: '件',

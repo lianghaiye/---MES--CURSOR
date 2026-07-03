@@ -132,11 +132,15 @@ import WarehouseFormModal from './components/WarehouseFormModal.vue'
 import WarehouseStorageModal from './components/WarehouseStorageModal.vue'
 import { warehouseState, filterWarehouses, deleteWarehouse } from '@/store/warehouseStore'
 import { getWarehouseCategoryOptions } from '@/store/warehouseCategoryStore'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
+const { openTab } = useTabs()
 const filters = reactive({ code: '', name: '', categoryId: undefined })
 const applied = reactive({ code: '', name: '', categoryId: undefined })
 const modalOpen = ref(false)
@@ -178,8 +182,9 @@ function handleReset() {
 }
 
 function openCreate() {
-  editRecord.value = null
-  modalOpen.value = true
+  const page = findCreatePageByListPath('/basic-config/warehouses')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function goDetail(record) {

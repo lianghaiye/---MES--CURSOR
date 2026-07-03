@@ -62,7 +62,7 @@
 
     <div class="toolbar-row">
       <a-space wrap :size="8">
-        <a-button type="primary" size="small" @click="createModalOpen = true">
+        <a-button type="primary" size="small" @click="openCreate">
           <PlusOutlined />
           新增
         </a-button>
@@ -147,8 +147,6 @@
       </div>
     </div>
 
-    <CreateFactoryQcModal v-model:open="createModalOpen" @saved="handleSearch" />
-
     <FactoryQcInspectModal
       v-model:open="inspectModalOpen"
       :record="inspectRecord"
@@ -180,7 +178,8 @@ import {
   terminateFactoryQc,
 } from '@/store/factoryQcStore'
 import { qcStatusOptions, qcResultOptions } from '@/mock/factoryQcOptions'
-import CreateFactoryQcModal from './components/CreateFactoryQcModal.vue'
+import { findCreatePageByListPath } from '@/config/createPages'
+import { openCreateTab } from '@/utils/openCreateTab'
 import FactoryQcInspectModal from './components/FactoryQcInspectModal.vue'
 import { useTabs } from '@/composables/useTabs'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
@@ -198,7 +197,6 @@ const filters = reactive({
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
-const createModalOpen = ref(false)
 const inspectModalOpen = ref(false)
 const inspectRecord = ref(null)
 const pagination = reactive({ current: 1, pageSize: 10 })
@@ -250,6 +248,12 @@ function statusColor(status) {
 function resultColor(result) {
   const map = { 质检通过: 'success', 质检不通过: 'error', 部分通过: 'warning' }
   return map[result] || 'default'
+}
+
+function openCreate() {
+  const page = findCreatePageByListPath('/quality/factory-qc')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openDetail(record) {

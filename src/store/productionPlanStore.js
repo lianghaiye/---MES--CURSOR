@@ -8,8 +8,9 @@ import { buildInitialProductionPlans } from '@/mock/productionPlanSeed'
 import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { enrichWorkItem, normalizePlanWorkItems } from '@/utils/productionPlanWorkItem'
+import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
 const STORAGE_KEY = 'i_doms_production_plans'
-const DATA_VERSION = 3
+const DATA_VERSION = 6
 
 function normalizePlanStatuses(orders) {
   return orders.map((o) => {
@@ -24,6 +25,7 @@ function normalizePlanStatuses(orders) {
       })
     }
     normalizePlanWorkItems(plan)
+    plan.workItems?.forEach((wi) => resolveWorkItemMaterials(wi))
     return plan
   })
 }
@@ -158,6 +160,7 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
         salesQty,
         productName: line.productName,
         productCode: line.productCode,
+        productId: line.productId,
         productAttr: line.productAttr,
         productType: line.category || line.productAttr || '',
         model: line.specModel,

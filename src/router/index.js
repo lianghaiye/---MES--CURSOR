@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isLoggedIn } from '@/utils/auth'
 import { routeTitles } from '@/config/menus'
+import { createPageRegistry } from '@/config/createPages'
 import { tabStore } from '@/composables/useTabs'
 
 const MainLayout = () => import('@/layout/MainLayout.vue')
@@ -535,6 +536,12 @@ const routes = [
         component: () => import('@/views/industrial-id/LabelManagementView.vue'),
         meta: { title: '标识管理' },
       },
+      ...createPageRegistry.map((page) => ({
+        path: page.newPath.slice(1),
+        name: page.name,
+        component: page.view,
+        meta: { title: page.title, listPath: page.listPath },
+      })),
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/home/dashboard' },

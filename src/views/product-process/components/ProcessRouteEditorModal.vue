@@ -1,13 +1,12 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑工艺路线' : '新增工艺路线'"
+    :title="shellTitle"
     width="96%"
-    :mask-closable="false"
-    destroy-on-close
-    wrap-class-name="process-route-editor-modal"
-    :body-style="{ padding: '0' }"
+    class="process-route-editor-modal"
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <ProcessRouteGridEditor
       v-model:grid="form.grid"
@@ -96,6 +95,7 @@
     </ProcessRouteGridEditor>
 
     <SelectProductMaterialModal
+      v-if="isActive"
       v-model:open="itemPickerOpen"
       :item-type="form.itemType"
       :selected-id="form.itemId"
@@ -106,12 +106,14 @@
       <a-button @click="handleCancel">取消</a-button>
       <a-button type="primary" @click="handleSave">保存</a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { createEmptyGrid } from '@/utils/processRouteGrid'
 import { addProcessRoute, updateProcessRoute } from '@/store/processRouteStore'
 import { productCategoryTree } from '@/mock/productCategories'
@@ -120,13 +122,20 @@ import ProcessRouteGridEditor from './ProcessRouteGridEditor.vue'
 import SelectProductMaterialModal from './SelectProductMaterialModal.vue'
 
 const props = defineProps({
-  open: Boolean,
+  open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/product-process/routing',
+  getTitle: () => (isEdit.value ? '编辑工艺路线' : '新增工艺路线'),
+})
 const itemPickerOpen = ref(false)
 const selectedStep = ref(-1)
 const selectedRow = ref(-1)
@@ -232,10 +241,6 @@ function onItemSelected(row) {
   form.categoryKey = row.categoryKey
 }
 
-function handleCancel() {
-  emit('update:open', false)
-}
-
 function handleSave() {
   const payload = {
     ...form,
@@ -250,14 +255,15 @@ function handleSave() {
   }
   message.success('保存成功')
   emit('saved', res.route)
-  emit('update:open', false)
+  closeAfterSave()
 }
 
 watch(
-  () => props.open,
-  (v) => {
-    if (v) resetForm()
+  () => [isActive.value, props.editRecord?.id],
+  ([visible]) => {
+    if (visible) resetForm()
   },
+  { immediate: true },
 )
 </script>
 
@@ -295,5 +301,6 @@ watch(
 .process-route-editor-modal .ant-modal-body {
   max-height: calc(100vh - 160px);
   overflow: auto;
+  padding: 0;
 }
 </style>

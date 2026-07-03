@@ -1,11 +1,11 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑仓库分类' : '新增仓库分类'"
+    :title="shellTitle"
     width="480px"
-    :mask-closable="false"
-    destroy-on-close
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
       <a-form-item label="分类编码" name="code" required>
@@ -18,28 +18,32 @@
 
     <template #footer>
       <a-space>
-        <a-button @click="handleCancel">
+        <a-button :size="pageMode ? 'small' : 'middle'" @click="handleCancel">
           <CloseCircleOutlined />
           取消
         </a-button>
-        <a-button type="primary" :loading="saving" @click="handleSave">
+        <a-button type="primary" :size="pageMode ? 'small' : 'middle'" :loading="saving" @click="handleSave">
           <PlusCircleOutlined />
           保存
         </a-button>
       </a-space>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseCircleOutlined, PlusCircleOutlined } from '@ant-design/icons-vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { addWarehouseCategory, updateWarehouseCategory } from '@/store/warehouseCategoryStore'
 import { syncWarehouseCategoryName } from '@/store/warehouseStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   record: { type: Object, default: null },
 })
 
@@ -51,23 +55,25 @@ const form = reactive({ code: '', name: '' })
 
 const isEdit = computed(() => Boolean(props.record?.id))
 
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/basic-config/warehouse-categories',
+  getTitle: () => (isEdit.value ? '编辑仓库分类' : '新增仓库分类'),
+})
+
 const rules = {
   code: [{ required: true, message: '请输入分类编码', trigger: 'blur' }],
   name: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
 }
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (v) => {
     if (!v) return
     form.code = props.record?.code || ''
     form.name = props.record?.name || ''
   },
+  { immediate: true },
 )
-
-function handleCancel() {
-  emit('update:open', false)
-}
 
 async function handleSave() {
   try {
@@ -91,6 +97,6 @@ async function handleSave() {
   }
   message.success(isEdit.value ? '已保存' : '已新增')
   emit('saved')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>

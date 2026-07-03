@@ -7,6 +7,7 @@ import {
 } from '@/mock/purchaseRequisitions'
 import { round2 } from '@/utils/purchaseMerge'
 import { createPurchaseOrdersFromMergedLines } from '@/store/purchaseOrderStore'
+import { ensureProductionPlanOrderTreeDemoRequisitions } from '@/mock/productionPlanOrderTreeSeed'
 
 function mapSalesUrgency(urgency) {
   if (urgency === '紧急') return '紧急'
@@ -72,7 +73,9 @@ export function isReqNoTaken(reqNo, excludeId) {
 export { generatePurchaseOrderNo } from '@/store/purchaseOrderStore'
 
 export const purchaseRequisitionState = reactive({
-  requisitions: loadFromStorage() || clonePurchaseRequisitions(),
+  requisitions: ensureProductionPlanOrderTreeDemoRequisitions(
+    loadFromStorage() || clonePurchaseRequisitions(),
+  ),
 })
 
 watch(

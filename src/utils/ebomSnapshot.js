@@ -170,6 +170,15 @@ function explodeToMaterials(flatNodes, lineItems, salesQty) {
   return topNodes.flatMap((node) => buildSubtreeFromNode(node, flatNodes, lineItems, qty))
 }
 
+/** 从 EBOM 快照解析物料树（优先 materials，否则按 treeNodes 重新展开） */
+export function resolveMaterialsFromEbomSnapshot(snapshot, salesQty) {
+  if (!snapshot) return []
+  if (snapshot.materials?.length) return snapshot.materials
+  if (!snapshot.treeNodes?.length) return []
+  materialSeq = 0
+  return explodeToMaterials(snapshot.treeNodes, snapshot.lineItems || [], salesQty)
+}
+
 /**
  * 基于 EBOM 记录与销售数量生成生产计划物料快照
  */

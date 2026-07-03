@@ -279,7 +279,12 @@ function buildFullTreeFromBom(bom, workOrder, variant = 'production') {
 
 /** 完整 EBOM 树（成品根 + 全部子件） */
 export function buildWorkOrderEbomTree(workOrder, variant = 'production') {
-  if (!workOrder || workOrder.orderCategory === '外协工单' || workOrder.skipEbom) {
+  if (
+    !workOrder ||
+    workOrder.orderCategory === '外协工单' ||
+    workOrder.orderCategory === '维修工单' ||
+    workOrder.skipEbom
+  ) {
     return { ...EMPTY }
   }
 
@@ -358,7 +363,14 @@ export function buildWorkOrderCurrentBomTree(workOrder) {
 
 /** 下发时冻结 EBOM 快照 */
 export function buildWorkOrderDispatchEbomSnapshot(workOrder) {
-  if (!workOrder || workOrder.skipEbom || workOrder.orderCategory === '外协工单') return null
+  if (
+    !workOrder ||
+    workOrder.skipEbom ||
+    workOrder.orderCategory === '外协工单' ||
+    workOrder.orderCategory === '维修工单'
+  ) {
+    return null
+  }
   const bom = resolveWorkOrderLinkedBom(workOrder, 'production')
   if (!bom) return null
   const qty = workOrder.scheduleQty ?? workOrder.planQty ?? 1

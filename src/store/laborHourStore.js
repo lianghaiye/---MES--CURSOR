@@ -22,6 +22,8 @@ import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
 import { LABOR_CONFIG_VERSION } from '@/mock/laborConfigSeed'
 
 const STORAGE_KEY = 'i_doms_labor_hour_orders'
+const SALARY_STATS_DEMO_VERSION_KEY = 'i_doms_salary_stats_demo_v'
+const SALARY_STATS_DEMO_VERSION = '1'
 
 function loadFromStorage() {
   try {
@@ -141,17 +143,22 @@ function mapWorkOrderToLaborCandidate(wo, workOrderType) {
   if (!wo?.processes?.length) return null
   const reported = wo.processes.filter((p) => p.executors?.length)
   if (!reported.length) return null
-  const lines = reported.map((p, i) => ({
-    seq: i + 1,
-    processName: p.name,
-    executor: p.executors?.[0] || 'admin',
-    operator: p.operators?.[0] || p.executors?.[0] || 'admin',
-    taskStatus: TASK_STATUS.REPORTED,
-    reportQty: wo.scheduleQty || wo.planQty || 1,
-    reportDuration: p.reportDuration ?? 0,
-    taskStartTime: wo.createdAt ? `${wo.createdAt} 08:00` : '',
-    taskEndTime: wo.createdAt ? `${wo.createdAt} 18:00` : '',
-  }))
+  const lines = reported.map((p, i) => {
+    const reportDay = dayjs().subtract(i, 'day')
+    return {
+      seq: i + 1,
+      processName: p.name,
+      executor: p.executors?.[0] || 'admin',
+      operator: p.operators?.[0] || p.executors?.[0] || 'admin',
+      auditStatus: '已审核',
+      taskStatus: TASK_STATUS.AUDITED,
+      reportQty: wo.scheduleQty || wo.planQty || 1,
+      reportDuration: p.reportDuration ?? 0,
+      taskStartTime: reportDay.hour(8).minute(0).format('YYYY-MM-DD HH:mm'),
+      taskEndTime: reportDay.hour(17).minute(0).format('YYYY-MM-DD HH:mm'),
+    }
+  })
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
   return buildLaborHourRecord({
     id: `lh-${wo.id}`,
     workOrderId: wo.id,
@@ -166,12 +173,38 @@ function mapWorkOrderToLaborCandidate(wo, workOrderType) {
     workCenter: wo.workCenter || '默认工厂',
     owner: wo.owner || 'admin1',
     scheduleQty: wo.scheduleQty ?? wo.planQty ?? 0,
-    createdAt: wo.createdAt ? `${wo.createdAt} 09:00:00` : dayjs().format('YYYY-MM-DD HH:mm'),
-    completedAt:
-      wo.status === '完成' ? `${wo.createdAt || dayjs().format('YYYY-MM-DD')} 18:00:00` : '',
-    latestSubmitAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    auditStatus: '已审核',
+    createdAt: now,
+    completedAt: wo.status === '完成' ? now : '',
+    latestSubmitAt: now,
     lines,
   })
+}
+
+function patchSalaryStatsDemoLaborHours(orders = []) {
+  const demoIds = new Set(LABOR_DEMO_WORK_ORDER_IDS)
+  return orders.map((order) => {
+    if (!demoIds.has(order.workOrderId)) return recalcOrder(order)
+    const next = { ...order, lines: (order.lines || []).map((line) => ({ ...line })) }
+    next.lines.forEach((line, idx) => {
+      const reportDay = dayjs().subtract(idx, 'day')
+      line.auditStatus = '已审核'
+      line.taskStatus = TASK_STATUS.AUDITED
+      line.taskStartTime = reportDay.hour(8).minute(0).format('YYYY-MM-DD HH:mm')
+      line.taskEndTime = reportDay.hour(17).minute(0).format('YYYY-MM-DD HH:mm')
+    })
+    next.createdAt = dayjs().format('YYYY-MM-DD HH:mm')
+    next.latestSubmitAt = next.createdAt
+    return recalcOrder(next)
+  })
+}
+
+/** 工资核算页：确保演示工单存在已审核、当月内的工时明细 */
+export function ensureSalaryStatsDemoData() {
+  laborHourState.orders = patchSalaryStatsDemoLaborHours(laborHourState.orders)
+  if (localStorage.getItem(SALARY_STATS_DEMO_VERSION_KEY) !== SALARY_STATS_DEMO_VERSION) {
+    localStorage.setItem(SALARY_STATS_DEMO_VERSION_KEY, SALARY_STATS_DEMO_VERSION)
+  }
 }
 
 function buildInitialLaborHourOrders() {
@@ -200,11 +233,15 @@ function buildInitialLaborHourOrders() {
 const stored = loadFromStorage()
 
 export const laborHourState = reactive({
-  orders: stored?.orders || buildInitialLaborHourOrders(),
+  orders: patchSalaryStatsDemoLaborHours(stored?.orders || buildInitialLaborHourOrders()),
 })
 
 if (!stored || stored.laborConfigVersion !== LABOR_CONFIG_VERSION) {
-  laborHourState.orders = buildInitialLaborHourOrders()
+  laborHourState.orders = patchSalaryStatsDemoLaborHours(buildInitialLaborHourOrders())
+}
+
+if (localStorage.getItem(SALARY_STATS_DEMO_VERSION_KEY) !== SALARY_STATS_DEMO_VERSION) {
+  ensureSalaryStatsDemoData()
 }
 
 watch(

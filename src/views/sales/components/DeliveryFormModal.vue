@@ -1,13 +1,14 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑发货单' : '新增发货单'"
+    :title="shellTitle"
     width="96%"
     :mask-closable="false"
     destroy-on-close
     class="apply-delivery-modal"
-    :confirm-loading="saving"
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <div class="section-block">
       <div class="section-title">发货信息</div>
@@ -330,10 +331,10 @@
     />
 
     <template #footer>
-      <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :loading="saving" @click="handleOk">确定</a-button>
+      <a-button size="small" @click="handleCancel">取消</a-button>
+      <a-button type="primary" size="small" :loading="saving" @click="handleOk">确定</a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
@@ -363,15 +364,23 @@ import {
   removeMaterialPickFromShipment,
 } from '@/utils/shipEbom'
 import ScatterShipDrawer from './ScatterShipDrawer.vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
 const props = defineProps({
   open: Boolean,
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   record: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.record?.id))
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/sales/delivery',
+  getTitle: () => (isEdit.value ? '编辑发货单' : '新增发货单'),
+})
 const saving = ref(false)
 const scatterDrawerOpen = ref(false)
 const activeScatterShipment = ref(null)
@@ -456,7 +465,7 @@ const contactOpts = computed(() => {
 })
 
 watch(
-  () => props.open,
+  () => isActive.value,
   (v) => {
     if (!v) return
     if (props.record) {
@@ -465,6 +474,7 @@ watch(
       resetForm()
     }
   },
+  { immediate: true },
 )
 
 function resetForm() {
@@ -587,10 +597,6 @@ function onContactChange(name) {
   if (contact?.phone) form.contactPhone = contact.phone
 }
 
-function handleCancel() {
-  emit('update:open', false)
-}
-
 function validateWholeMachineLines() {
   for (const line of form.lineItems) {
     const shipQty = Number(line.shipQty)
@@ -689,7 +695,7 @@ function handleOk() {
       message.success('发货单已创建')
     }
     emit('saved')
-    emit('update:open', false)
+    closeAfterSave()
   } finally {
     saving.value = false
   }

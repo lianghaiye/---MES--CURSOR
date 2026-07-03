@@ -81,7 +81,7 @@
                 </a-button>
               </a-space>
               <a-space :size="8">
-                <a-button type="primary" size="small" @click="openCreateModal">
+                <a-button type="primary" size="small" @click="openCreate">
                   <PlusOutlined />
                   新增工单
                 </a-button>
@@ -273,6 +273,7 @@ export default { name: 'QcWorkOrderManagementView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import {
@@ -299,6 +300,12 @@ import { bomOptions } from '@/mock/workOrderMaster'
 import CreateQcWorkOrderModal from './components/CreateQcWorkOrderModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const LAYOUT_STORAGE_KEY = 'i_doms_qc_wo_layout'
 
@@ -485,9 +492,10 @@ function onToggleSelectAllPage(e) {
   }
 }
 
-function openCreateModal() {
-  editRecord.value = null
-  createModalOpen.value = true
+function openCreate() {
+  const page = findCreatePageByListPath('/production/qc-work-orders')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function handleSearch() {

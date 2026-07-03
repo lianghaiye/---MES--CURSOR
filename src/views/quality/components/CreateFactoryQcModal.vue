@@ -1,11 +1,11 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    title="新增出厂质检"
+    :title="shellTitle"
     width="720px"
-    :mask-closable="false"
-    destroy-on-close
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form layout="inline" class="horizontal-form">
       <a-row :gutter="[12, 8]" style="width: 100%">
@@ -34,22 +34,31 @@
       <a-button @click="handleCancel">取消</a-button>
       <a-button type="primary" @click="handleSave">确定</a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { salesOrderState } from '@/store/salesOrderStore'
 import { addFactoryQc, findQcBySalesOrderNo, generateFactoryQcNo } from '@/store/factoryQcStore'
 import { createQcLineItem } from '@/mock/factoryQcRecords'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
+
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/quality/factory-qc',
+  getTitle: () => '新增出厂质检',
+})
 
 const selectedSalesOrderId = ref(undefined)
 
@@ -66,18 +75,15 @@ const selectedOrder = computed(() =>
 const customerName = computed(() => selectedOrder.value?.customerName || '')
 
 watch(
-  () => props.open,
+  isActive,
   (val) => {
     if (val) selectedSalesOrderId.value = undefined
   },
+  { immediate: true },
 )
 
 function onSalesOrderChange() {
   /* reactive via computed */
-}
-
-function handleCancel() {
-  emit('update:open', false)
 }
 
 function handleSave() {
@@ -126,7 +132,7 @@ function handleSave() {
   addFactoryQc(record)
   message.success('已新增待质检任务')
   emit('saved')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 

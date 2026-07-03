@@ -70,7 +70,7 @@
               size="small"
               bordered
               :pagination="false"
-              :scroll="{ x: 2080 }"
+              :scroll="{ x: 2200 }"
               :row-selection="rowSelection"
               :custom-row="customRow"
               :row-class-name="rowClassName"
@@ -82,6 +82,14 @@
                 </template>
                 <template v-else-if="column.key === 'pushStatus'">
                   <a-tag :color="pushStatusColor(line.pushStatus)">{{ line.pushStatus }}</a-tag>
+                </template>
+                <template v-else-if="column.key === 'scheduleQty'">
+                  <span class="schedule-qty-cell">
+                    <a-tooltip v-if="isLineOverSchedule(line)" title="报工数量超过排产数">
+                      <ExclamationCircleOutlined class="schedule-qty-warn" />
+                    </a-tooltip>
+                    <span>{{ formatScheduleQty(line.scheduleQty) }}</span>
+                  </span>
                 </template>
                 <template v-else-if="column.key === 'listAccountHours'">
                   {{ formatAccountHours(line.listAccountHours) }}
@@ -173,6 +181,7 @@ export default { name: 'ProcessReportWorkOrderDetailView' }
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
+import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
 import {
   adjustProcessReportLine,
   auditProcessReportLine,
@@ -183,6 +192,14 @@ import {
 import { isManualSalaryPush } from '@/store/functionParamStore'
 import { PUSH_STATUS, TASK_STATUS } from '@/utils/mobileLaborWagePush'
 import { summarizeProcessReportLines } from '@/utils/processReportWorkOrder'
+import {
+  formatScheduleQtyDisplay,
+  isLineReportQtyOverSchedule,
+} from '@/utils/processReportQuantities'
+import {
+  buildProcessReportDetailSummaryCells,
+  processReportDetailLineColumns,
+} from '@/utils/processReportDetailTable'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { useTabs } from '@/composables/useTabs'
 import ProcessReportAdjustModal from './components/ProcessReportAdjustModal.vue'
@@ -204,28 +221,7 @@ const auditOpen = ref(false)
 const modalLine = ref(null)
 const modalConfig = ref(null)
 
-const lineColumns = [
-  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
-  { title: '任务状态', key: 'taskStatus', width: 90, fixed: 'left' },
-  { title: '推送状态', key: 'pushStatus', width: 100, fixed: 'left' },
-  { title: '任务编号', dataIndex: 'taskNo', width: 130 },
-  { title: '工序名称', dataIndex: 'processName', width: 110 },
-  { title: '执行人', dataIndex: 'reporter', width: 90 },
-  { title: '操作人', dataIndex: 'operator', width: 90 },
-  { title: '班组', dataIndex: 'team', width: 100 },
-  { title: '报工类型', dataIndex: 'reportType', width: 100 },
-  { title: '良品数', dataIndex: 'goodQty', width: 80, align: 'right' },
-  { title: '不良品数', dataIndex: 'defectQty', width: 88, align: 'right' },
-  { title: '核算工时', key: 'listAccountHours', width: 90, align: 'right' },
-  { title: '不良原因', dataIndex: 'defectReason', width: 120, ellipsis: true },
-  { title: '计薪方式', dataIndex: 'salaryMethod', width: 100 },
-  { title: '计薪(元)', key: 'salaryAmount', width: 100, align: 'right' },
-  { title: '任务开始时间', dataIndex: 'taskStartTime', width: 150 },
-  { title: '任务结束时间', dataIndex: 'taskEndTime', width: 150 },
-  { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
-  { title: '现场图片', key: 'sceneImages', width: 140 },
-  { title: '操作', key: 'action', width: 160, fixed: 'right' },
-]
+const lineColumns = processReportDetailLineColumns
 
 const logColumns = [
   { title: '时间', dataIndex: 'time', width: 170 },
@@ -245,24 +241,9 @@ const summary = computed(() => {
 })
 
 /** 合计行：逐列渲染，避免 col-span 与固定列/滚动条列错位 */
-const summaryCells = computed(() => {
-  const totalCols = 1 + lineColumns.length + 1
-  const cells = Array.from({ length: totalCols }, (_, index) => ({
-    index,
-    content: '',
-    align: undefined,
-  }))
-  cells[1].content = '合计'
-  cells[9].content = String(summary.value.goodQty)
-  cells[9].align = 'right'
-  cells[10].content = String(summary.value.defectQty)
-  cells[10].align = 'right'
-  cells[11].content = formatAccountHours(summary.value.accountHours, true)
-  cells[11].align = 'right'
-  cells[14].content = formatMoney(summary.value.salaryAmount)
-  cells[14].align = 'right'
-  return cells
-})
+const summaryCells = computed(() =>
+  buildProcessReportDetailSummaryCells(summary.value, formatAccountHours, formatMoney),
+)
 
 const manualPushMode = computed(() => isManualSalaryPush())
 
@@ -338,6 +319,14 @@ function formatLineCell(line, column) {
   const val = line[column.dataIndex]
   if (val === 0) return '0'
   return val ?? '—'
+}
+
+function formatScheduleQty(val) {
+  return formatScheduleQtyDisplay(val ?? bundle.value?.scheduleQty)
+}
+
+function isLineOverSchedule(line) {
+  return isLineReportQtyOverSchedule(line, bundle.value?.scheduleQty)
 }
 
 function customRow(record) {
@@ -522,6 +511,20 @@ function handleBatchPush() {
     td {
       background: #e6f4ff !important;
     }
+  }
+
+  .schedule-qty-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .schedule-qty-warn {
+    color: #fa8c16;
+    font-size: 14px;
+    flex-shrink: 0;
   }
 }
 </style>

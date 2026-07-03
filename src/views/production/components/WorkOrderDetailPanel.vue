@@ -68,26 +68,18 @@
         <WorkOrderDetailTab :work-order="workOrder" @action="emit('detail-action', $event)" />
       </a-tab-pane>
       <template v-if="variant === 'production' || variant === 'assembly'">
-        <a-tab-pane v-if="workOrder.orderCategory !== '外协工单'" key="ebom" tab="EBOM">
+        <a-tab-pane v-if="!hideBomRelatedTabs" key="ebom" tab="EBOM">
           <WorkOrderEbomTreeTab :work-order="workOrder" :variant="variant" />
         </a-tab-pane>
         <a-tab-pane
-          v-if="variant === 'production' && workOrder.orderCategory !== '外协工单'"
+          v-if="variant === 'production' && !hideBomRelatedTabs"
           key="current-bom"
           tab="当前BOM"
         >
           <WorkOrderCurrentBomTab :work-order="workOrder" />
         </a-tab-pane>
-        <a-tab-pane
-          v-if="workOrder.orderCategory !== '外协工单'"
-          key="bom-versions"
-          tab="BOM版本"
-        >
-          <BomVersionInfoSection
-            :product-id="workOrderProductId"
-            :bom-id="workOrder.bomId"
-            :bound-version="workOrderBoundVersion"
-          />
+        <a-tab-pane v-if="!hideBomRelatedTabs" key="bom-versions" tab="BOM版本">
+          <WorkOrderBomVersionTab :work-order="workOrder" :variant="variant" />
         </a-tab-pane>
         <a-tab-pane key="tasks" tab="任务列表">
           <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
@@ -115,9 +107,9 @@ import WorkOrderDispatchTab from './WorkOrderDispatchTab.vue'
 import WorkOrderDetailTab from './WorkOrderDetailTab.vue'
 import WorkOrderEbomTreeTab from './WorkOrderEbomTreeTab.vue'
 import WorkOrderCurrentBomTab from './WorkOrderCurrentBomTab.vue'
+import WorkOrderBomVersionTab from './WorkOrderBomVersionTab.vue'
 import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
 import WorkOrderPrintModal from './WorkOrderPrintModal.vue'
-import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
 
 const printModalOpen = ref(false)
 
@@ -143,17 +135,10 @@ const workOrder = computed(() => {
   return list.find((o) => o.id === props.workOrderId)
 })
 
-const workOrderProductId = computed(() => {
-  const wo = workOrder.value
-  if (!wo) return ''
-  if (wo.productId) return wo.productId
-  const name = wo.productName
-  return productInfoState.products.find((p) => p.name === name)?.id || ''
+const hideBomRelatedTabs = computed(() => {
+  const category = workOrder.value?.orderCategory
+  return category === '外协工单' || category === '维修工单'
 })
-
-const workOrderBoundVersion = computed(
-  () => workOrder.value?.ebomSnapshot?.bomVersion || '',
-)
 
 const detailTab = defineModel('detailTab', { type: String, default: 'dispatch' })
 const detailCollapsed = defineModel('detailCollapsed', { type: Boolean, default: false })

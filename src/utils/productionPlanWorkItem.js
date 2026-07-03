@@ -1,4 +1,13 @@
 import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
+import { productInfoState } from '@/store/productInfoStore'
+
+export function resolveWorkItemProductId(wi, salesLine = null) {
+  if (wi?.productId) return wi.productId
+  if (salesLine?.productId) return salesLine.productId
+  if (!wi?.productCode) return ''
+  const product = productInfoState.products.find((p) => p.code === wi.productCode)
+  return product?.id || ''
+}
 
 /** 计划数量默认：订单数量 − 库存数量，小于 0 取 0 */
 export function calcDefaultPlanQty(orderQty, stockQty) {
@@ -28,6 +37,7 @@ export function enrichWorkItem(wi, salesLine = null, index = 0) {
 
   return {
     ...wi,
+    productId: resolveWorkItemProductId(wi, line),
     salesQty: orderQty,
     orderQty,
     deliveryMode: wi.deliveryMode || normalizeDeliveryMode(line, {}),

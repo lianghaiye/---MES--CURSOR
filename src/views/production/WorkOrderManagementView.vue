@@ -70,7 +70,7 @@
                 </a-button>
               </a-space>
               <a-space :size="8">
-                <a-button type="primary" size="small" @click="openCreateModal">
+                <a-button type="primary" size="small" @click="openCreate">
                   <PlusOutlined />
                   新增工单
                 </a-button>
@@ -266,6 +266,7 @@ export default { name: 'WorkOrderManagementView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import {
@@ -298,11 +299,17 @@ import CreateWorkOrderModal from './components/CreateWorkOrderModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderPrintModal from './components/WorkOrderPrintModal.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const LAYOUT_STORAGE_KEY = 'i_doms_wo_layout'
 
 const statusOptions = ['待下发', '已下发', '执行中', '完成', '暂停', '终止']
-const categoryOptions = ['生产工单', '返修工单', '试制工单', '外协工单']
+const categoryOptions = ['生产工单', '返修工单', '维修工单', '试制工单', '外协工单']
 
 const filters = reactive({
   code: '',
@@ -471,8 +478,18 @@ function onToggleSelectAllPage(e) {
   }
 }
 
-function openCreateModal() {
-  editRecord.value = null
+function openCreate() {
+  const page = findCreatePageByListPath('/production/work-orders')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
+}
+
+function openEditModal(wo) {
+  if (!canEditWorkOrder(wo)) {
+    message.warning('执行中的工单不可编辑')
+    return
+  }
+  editRecord.value = wo
   createModalOpen.value = true
 }
 
@@ -613,12 +630,7 @@ function onBatchMenu({ key }) {
 
 function onCardAction(key, wo) {
   if (key === 'edit') {
-    if (!canEditWorkOrder(wo)) {
-      message.warning('执行中的工单不可编辑')
-      return
-    }
-    editRecord.value = wo
-    createModalOpen.value = true
+    openEditModal(wo)
     return
   }
   if (key === 'delete') {

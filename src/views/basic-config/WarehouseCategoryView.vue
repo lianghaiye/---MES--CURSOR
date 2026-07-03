@@ -105,6 +105,7 @@ export default { name: 'WarehouseCategoryView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import WarehouseCategoryFormModal from './components/WarehouseCategoryFormModal.vue'
@@ -114,9 +115,15 @@ import {
   deleteWarehouseCategory,
 } from '@/store/warehouseCategoryStore'
 import { countWarehousesByCategoryId } from '@/store/warehouseStore'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({ code: '', name: '' })
 const applied = reactive({ code: '', name: '' })
@@ -151,8 +158,9 @@ function handleReset() {
 }
 
 function openCreate() {
-  editRecord.value = null
-  modalOpen.value = true
+  const page = findCreatePageByListPath('/basic-config/warehouse-categories')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openEdit(record) {

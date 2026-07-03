@@ -96,7 +96,7 @@
     <!-- 操作栏 -->
     <div class="toolbar-row">
       <a-space wrap :size="8">
-        <a-button type="primary" size="small" @click="openCreateModal">
+        <a-button type="primary" size="small" @click="openCreate">
           <PlusOutlined />
           新增
         </a-button>
@@ -293,6 +293,8 @@ import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -472,9 +474,10 @@ function handleApprove() {
   })
 }
 
-function openCreateModal() {
-  editRecord.value = null
-  createModalOpen.value = true
+function openCreate() {
+  const page = findCreatePageByListPath('/sales/orders')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openEditModal(record) {

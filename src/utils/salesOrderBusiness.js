@@ -1,4 +1,5 @@
 export const CUSTOM_SALES_BUSINESS_TYPE = '定制销售'
+export const MAINTENANCE_SERVICE_BUSINESS_TYPE = '维修服务'
 
 /** 销售明细行业务类型（兼容旧订单头字段） */
 export function resolveLineBusinessType(line = {}, order = {}) {
@@ -32,12 +33,19 @@ export function isPurchasedBusinessType(type) {
   return type === '外购销售'
 }
 
+export function isMaintenanceServiceBusinessType(type) {
+  return type === MAINTENANCE_SERVICE_BUSINESS_TYPE
+}
+
 export function isManualSalesLine(line = {}) {
   if (line.isManualLine === true || line.isOutsourcingLine === true) return true
   const type = line.businessType
   return (
     !line.productId &&
-    (type === '外协销售' || type === '质检服务' || type === CUSTOM_SALES_BUSINESS_TYPE)
+    (type === '外协销售' ||
+      type === '质检服务' ||
+      type === CUSTOM_SALES_BUSINESS_TYPE ||
+      type === MAINTENANCE_SERVICE_BUSINESS_TYPE)
   )
 }
 

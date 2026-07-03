@@ -247,12 +247,16 @@ import {
   canApproveInbound,
 } from '@/store/inboundOrderStore'
 import { resolveInboundSourceRoute } from '@/utils/inboundSourceLink'
+import { findCreatePageByListPath } from '@/config/createPages'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { useTabs } from '@/composables/useTabs'
 import InboundOrderFormModal from './components/InboundOrderFormModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
 const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({
   status: undefined,
@@ -349,8 +353,9 @@ function stubAction(name) {
 }
 
 function openCreate() {
-  editRecord.value = null
-  formOpen.value = true
+  const page = findCreatePageByListPath('/inventory/inbound')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openEdit(record) {

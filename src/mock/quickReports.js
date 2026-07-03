@@ -7,7 +7,7 @@ import { createQuickReportSeedData } from '@/mock/quickReportSeed'
 export const QUICK_REPORT_STORAGE_KEY = 'i_doms_mobile_quick_reports'
 export const QUICK_REPORT_MATERIAL_KEY = 'i_doms_mobile_quick_material_lists'
 export const QUICK_REPORT_SEED_VERSION_KEY = 'i_doms_quick_reports_seed_v'
-export const QUICK_REPORT_SEED_VERSION = '6'
+export const QUICK_REPORT_SEED_VERSION = '7'
 
 export function formatReportDate(d = new Date()) {
   return dayjs(d).format('YYYY-MM-DD')

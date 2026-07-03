@@ -12,6 +12,7 @@ import {
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import { buildReportWorkPerProcessBundle } from '@/utils/reportWorkPerProcess'
 import { resolveEmployeeProfile } from '@/utils/employeeProfileResolver'
+import { ensureSalaryStatsDemoData } from '@/store/laborHourStore'
 
 function round2(val) {
   return Math.round((Number(val) || 0) * 100) / 100
@@ -401,6 +402,7 @@ export function summarizeSalarySummaryTotals(rows = []) {
 }
 
 export function querySalaryStats(filters = {}) {
+  ensureSalaryStatsDemoData()
   const lines = filterSalaryDetailLines(collectAllSalaryDetailLines(), filters)
   const summaryRows = summarizeSalaryByEmployee(lines)
   return {

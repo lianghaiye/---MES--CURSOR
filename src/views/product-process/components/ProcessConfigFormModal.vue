@@ -1,11 +1,11 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="isEdit ? '编辑工序' : '新增工序'"
+    :title="shellTitle"
     width="960px"
-    :mask-closable="false"
-    destroy-on-close
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" class="process-form">
       <a-row :gutter="16">
@@ -125,13 +125,15 @@
         </a-button>
       </a-space>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseCircleOutlined, PlusCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import {
   addProcessConfig,
   updateProcessConfig,
@@ -152,10 +154,19 @@ const MOCK_IMAGE =
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
   record: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
+
+const isEdit = computed(() => Boolean(props.record?.id))
+
+const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
+  listPath: '/product-process/process-config',
+  getTitle: () => (isEdit.value ? '编辑工序' : '新增工序'),
+})
 
 const formRef = ref()
 const saving = ref(false)
@@ -176,7 +187,6 @@ const form = reactive({
   operations: defaultOps(),
 })
 
-const isEdit = computed(() => Boolean(props.record?.id))
 const categoryOpts = computed(() => getActiveCategoryOptions())
 const resourceTypeOpts = RESOURCE_TYPES.map((v) => ({ label: v, value: v }))
 const positionOpts = MOCK_POSITIONS.map((v) => ({ label: v, value: v }))
@@ -199,9 +209,9 @@ function filterDefectOption(input, option) {
 }
 
 watch(
-  () => props.open,
-  (v) => {
-    if (!v) return
+  () => [isActive.value, props.record?.id],
+  ([visible]) => {
+    if (!visible) return
     const r = props.record
     form.code = r?.code || ''
     form.name = r?.name || ''
@@ -215,12 +225,13 @@ watch(
     form.defectItemIds = [...(r?.defectItemIds || [])]
     form.operations = { ...defaultOps(), ...(r?.operations || {}) }
   },
+  { immediate: true },
 )
 
 watch(
   () => form.resourceType,
   (val, oldVal) => {
-    if (!props.open) return
+    if (!isActive.value) return
     if (oldVal !== undefined && oldVal !== val) {
       form.defaultExecutors = []
     }
@@ -229,10 +240,6 @@ watch(
 
 function setMockImage() {
   form.image = MOCK_IMAGE
-}
-
-function handleCancel() {
-  emit('update:open', false)
 }
 
 async function handleSave() {
@@ -253,7 +260,7 @@ async function handleSave() {
   }
   message.success(isEdit.value ? '已保存' : '已新增')
   emit('saved')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 

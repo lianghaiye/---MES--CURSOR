@@ -96,7 +96,7 @@
           <RollbackOutlined />
           撤回申请
         </a-button>
-        <a-button type="primary" size="small" @click="createModalOpen = true">
+        <a-button type="primary" size="small" @click="openCreate">
           <PlusOutlined />
           新增
         </a-button>
@@ -177,8 +177,6 @@
       :default-settings="defaultColumnSettings"
     />
 
-    <CreateDesignTaskModal v-model:open="createModalOpen" @saved="handleSearch" />
-
     <a-drawer v-model:open="detailOpen" title="设计任务详情" width="640">
       <template v-if="detailRecord">
         <a-descriptions bordered size="small" :column="2">
@@ -256,9 +254,12 @@ import {
   withdrawDesignTaskAudit,
   canOpenEbomDesign,
 } from '@/store/designTaskStore'
-import CreateDesignTaskModal from './components/CreateDesignTaskModal.vue'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 
 const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({
   status: undefined,
@@ -271,7 +272,6 @@ const filters = reactive({
 
 const pagination = reactive({ current: 1, pageSize: 20 })
 const selectedRowKeys = ref([])
-const createModalOpen = ref(false)
 const detailOpen = ref(false)
 const detailRecord = ref(null)
 
@@ -326,6 +326,12 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys
   },
 }))
+
+function openCreate() {
+  const page = findCreatePageByListPath('/planning/design-task')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
+}
 
 function handleSearch() {
   pagination.current = 1

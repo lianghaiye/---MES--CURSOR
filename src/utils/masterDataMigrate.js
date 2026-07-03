@@ -89,8 +89,10 @@ export function migrateProductList(list) {
 }
 
 const LEGACY_PRODUCT_ATTR_MAP = {
-  '标准-成品': '标准-成品零部件',
-  试制产品: '定制-成品零部件',
+  '标准-成品': '标准零部件',
+  '标准-成品零部件': '标准零部件',
+  '定制-成品零部件': '定制零部件',
+  试制产品: '定制零部件',
 }
 
 export function normalizeProductAttribute(value) {

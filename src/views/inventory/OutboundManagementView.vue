@@ -318,6 +318,8 @@ import {
 import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { findCreatePageByListPath } from '@/config/createPages'
+import { openCreateTab } from '@/utils/openCreateTab'
 import OutboundOrderFormModal from './components/OutboundOrderFormModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
@@ -431,8 +433,9 @@ function stubAction(name) {
 }
 
 function openCreate() {
-  editRecord.value = null
-  formOpen.value = true
+  const page = findCreatePageByListPath('/inventory/outbound')
+  if (!page) return
+  openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
 function openEdit(record) {
