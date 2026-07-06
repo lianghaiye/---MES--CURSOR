@@ -23,7 +23,11 @@
             <template v-if="node.nodeType === 'workItem'">
               <span class="node-name">{{ node.productName || '—' }}</span>
               <span v-if="node.productCode" class="node-code">{{ node.productCode }}</span>
-              <a-tag v-if="node.status" :color="workItemStatusColor(node.status)" class="status-tag">
+              <a-tag
+                v-if="node.status"
+                :color="workItemStatusColor(node.status)"
+                class="status-tag"
+              >
                 {{ node.status }}
               </a-tag>
             </template>

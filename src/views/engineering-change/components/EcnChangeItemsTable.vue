@@ -46,7 +46,11 @@
         </template>
 
         <template v-else-if="column.key === 'origCodeSpec'">
-          <span v-if="isOrigActive(record)" class="cell-readonly" :title="formatOrigDetailRow(record)">
+          <span
+            v-if="isOrigActive(record)"
+            class="cell-readonly"
+            :title="formatOrigDetailRow(record)"
+          >
             {{ formatOrigDetailRow(record) }}
           </span>
           <span v-else class="cell-muted">—</span>
@@ -79,7 +83,11 @@
         </template>
 
         <template v-else-if="column.key === 'newMaterialDetail'">
-          <span v-if="isNewActive(record)" class="cell-readonly" :title="formatNewDetailRow(record)">
+          <span
+            v-if="isNewActive(record)"
+            class="cell-readonly"
+            :title="formatNewDetailRow(record)"
+          >
             {{ formatNewDetailRow(record) }}
           </span>
           <span v-else class="cell-muted">—</span>
@@ -198,7 +206,9 @@
         <template v-else-if="column.key === 'action'">
           <a-space :size="0">
             <a-button type="link" size="small" @click="emit('edit', record)">编辑</a-button>
-            <a-button type="link" size="small" danger @click="emit('remove', record.id)">删除</a-button>
+            <a-button type="link" size="small" danger @click="emit('remove', record.id)"
+              >删除</a-button
+            >
           </a-space>
         </template>
       </template>

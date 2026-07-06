@@ -117,12 +117,7 @@
           </a-col>
         </a-row>
       </template>
-      <a-alert
-        v-else
-        type="warning"
-        show-icon
-        message="取消物料：新物料信息置空，单位用量为 0"
-      />
+      <a-alert v-else type="warning" show-icon message="取消物料：新物料信息置空，单位用量为 0" />
 
       <a-divider orientation="left" plain>挂载与工序</a-divider>
       <a-row :gutter="12">

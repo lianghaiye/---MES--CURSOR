@@ -152,7 +152,10 @@ export function updateInboundOrder(id, patch) {
   if (!canEditInbound(row)) return { ok: false, message: '当前状态不可编辑' }
   const headerWarehouse = patch.warehouse ?? row.warehouse
   if (patch.lineItems) {
-    patch.lineItems = buildInboundLineItems({ ...patch, warehouse: headerWarehouse }, headerWarehouse)
+    patch.lineItems = buildInboundLineItems(
+      { ...patch, warehouse: headerWarehouse },
+      headerWarehouse,
+    )
   }
   if (patch.warehouse !== undefined) {
     patch.warehouse = headerWarehouse || undefined

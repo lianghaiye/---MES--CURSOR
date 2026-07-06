@@ -21,12 +21,7 @@
               <a-button v-if="canEditOutbound(record)" size="small" @click="openEdit">
                 编辑
               </a-button>
-              <a-button
-                v-if="canDeleteOutbound(record)"
-                size="small"
-                danger
-                @click="handleDelete"
-              >
+              <a-button v-if="canDeleteOutbound(record)" size="small" danger @click="handleDelete">
                 删除
               </a-button>
               <a-button size="small" @click="goBack">返回列表</a-button>
@@ -43,12 +38,7 @@
               <a-button v-if="canEditOutbound(record)" size="small" @click="openEdit">
                 编辑
               </a-button>
-              <a-button
-                v-if="canDeleteOutbound(record)"
-                size="small"
-                danger
-                @click="handleDelete"
-              >
+              <a-button v-if="canDeleteOutbound(record)" size="small" danger @click="handleDelete">
                 删除
               </a-button>
               <a-button v-if="canInitiateFactoryQc(record)" size="small" @click="handleInitiateQc">
@@ -187,11 +177,7 @@
       <a-empty v-else-if="!loading" description="未找到该出库单" />
     </a-spin>
 
-    <OutboundOrderFormModal
-      v-model:open="formOpen"
-      :edit-record="record"
-      @saved="onFormSaved"
-    />
+    <OutboundOrderFormModal v-model:open="formOpen" :edit-record="record" @saved="onFormSaved" />
   </div>
 </template>
 

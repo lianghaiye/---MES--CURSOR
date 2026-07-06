@@ -179,9 +179,7 @@ const { displayColumns, tableScrollX } = useTableColumnSettings(
 
 const sourceTree = computed(() => buildBomOverviewPickTree(props.flatNodes, props.lineItems))
 
-const filteredTree = computed(() =>
-  filterBomOverviewPickTree(sourceTree.value, appliedFilters),
-)
+const filteredTree = computed(() => filterBomOverviewPickTree(sourceTree.value, appliedFilters))
 
 const flatParentRows = computed(() =>
   flattenBomOverviewPickerRows(props.flatNodes, props.lineItems, props.rootLabel),
@@ -322,9 +320,7 @@ function handleConfirm() {
         message.warning('请选择需要变更的 BOM 行')
         return
       }
-      const lines = selectedRows.value
-        .map((row) => resolveLine(row))
-        .filter(Boolean)
+      const lines = selectedRows.value.map((row) => resolveLine(row)).filter(Boolean)
       if (!lines.length) {
         message.warning('未找到对应 BOM 物料行')
         return

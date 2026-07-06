@@ -10,6 +10,7 @@ export const inboundFormLineColumns = [
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 90, ellipsis: true },
   { title: '入库数量', key: 'qty', width: 96 },
   { title: '入库仓库', key: 'warehouse', width: 120 },
+  { title: '货位号', key: 'locationNo', dataIndex: 'locationNo', width: 110, ellipsis: true },
   { title: '重量', key: 'weight', width: 88 },
   { title: '单位', dataIndex: 'unit', key: 'unit', width: 64 },
   { title: '单价', key: 'unitPrice', width: 96, align: 'right' },

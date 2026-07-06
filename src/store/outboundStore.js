@@ -116,9 +116,11 @@ function applyOutboundHeaderFields(order, payload) {
     ...payload,
     warehouse: headerWarehouse,
     lineItems,
-    warehouseKeeper: payload.warehouseKeeper || payload.handler || order.warehouseKeeper || 'admin1',
+    warehouseKeeper:
+      payload.warehouseKeeper || payload.handler || order.warehouseKeeper || 'admin1',
     workshop: payload.workshop || payload.requisitionDept || order.workshop || '默认工厂',
-    outboundTime: payload.outboundTime || order.outboundTime || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    outboundTime:
+      payload.outboundTime || order.outboundTime || dayjs().format('YYYY-MM-DD HH:mm:ss'),
     remark: payload.remark?.trim?.() ?? payload.remark ?? order.remark,
   })
   return order
@@ -142,9 +144,7 @@ export function addOutboundOrder(payload) {
   const lineItems = buildLineItems(payload)
 
   const headerWarehouse =
-    payload.warehouse ||
-    lineItems.find((line) => line.shipWarehouse)?.shipWarehouse ||
-    ''
+    payload.warehouse || lineItems.find((line) => line.shipWarehouse)?.shipWarehouse || ''
 
   const row = createOutboundOrder({
     ...payload,

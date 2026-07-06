@@ -75,10 +75,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import {
-  EBOM_DIFF_CHANGE_TYPE,
-  ebomDiffChangeTypeColor,
-} from '@/utils/ebomSnapshotDiff'
+import { EBOM_DIFF_CHANGE_TYPE, ebomDiffChangeTypeColor } from '@/utils/ebomSnapshotDiff'
 
 defineProps({
   diff: { type: Object, required: true },

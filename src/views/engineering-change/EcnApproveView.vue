@@ -36,7 +36,7 @@
               <span class="section-title">执行配置</span>
               <span class="section-sub">审批通过后生效</span>
             </div>
-            <div class="exec-label">BOM 执行方式：</div>
+            <div class="exec-label">EBOM 执行方式：</div>
             <div class="exec-scope-item">
               <div class="radio-main">{{ selectedExecConfig.label }}</div>
               <div class="radio-sub">{{ selectedExecConfig.sub }}</div>
@@ -90,7 +90,12 @@ import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
-import { ECN_STATUS, findExecConfigOption, ecnStatusColor, resolveEcnChangeReason } from '@/constants/ecn'
+import {
+  ECN_STATUS,
+  findExecConfigOption,
+  ecnStatusColor,
+  resolveEcnChangeReason,
+} from '@/constants/ecn'
 import { resolveChangeRequestModule, getDocNo } from '@/constants/changeRequestModule'
 import EcnChangeItemsReadonlyTable from './components/EcnChangeItemsReadonlyTable.vue'
 

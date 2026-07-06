@@ -28,7 +28,9 @@
 
     <div class="print-tip">
       <template v-if="isBatch">
-        已选择 {{ targetOrders.length }} 条工单。预览包含工单基本信息与工序配置，可在预览页再次调起浏览器打印。
+        已选择
+        {{ targetOrders.length }}
+        条工单。预览包含工单基本信息与工序配置，可在预览页再次调起浏览器打印。
       </template>
       <template v-else>预览包含工单基本信息与工序配置，可在预览页再次调起浏览器打印。</template>
     </div>

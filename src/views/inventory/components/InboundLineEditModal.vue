@@ -31,13 +31,28 @@
           </a-form-item>
         </a-col>
         <a-col :span="12">
+          <a-form-item label="货位号">
+            <a-input v-model:value="draft.locationNo" allow-clear placeholder="请输入货位号" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
           <a-form-item label="入库数量" required>
-            <a-input-number v-model:value="draft.qty" :min="0" style="width: 100%" @change="onQtyChange" />
+            <a-input-number
+              v-model:value="draft.qty"
+              :min="0"
+              style="width: 100%"
+              @change="onQtyChange"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="12">
           <a-form-item label="重量">
-            <a-input-number v-model:value="draft.weight" :min="0" :precision="3" style="width: 100%" />
+            <a-input-number
+              v-model:value="draft.weight"
+              :min="0"
+              :precision="3"
+              style="width: 100%"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="12">
@@ -74,7 +89,11 @@
         </a-col>
         <a-col :span="24">
           <a-form-item label="关联业务单据">
-            <a-input v-model:value="draft.sourceDocNo" allow-clear placeholder="请输入关联业务单据" />
+            <a-input
+              v-model:value="draft.sourceDocNo"
+              allow-clear
+              placeholder="请输入关联业务单据"
+            />
           </a-form-item>
         </a-col>
       </a-row>

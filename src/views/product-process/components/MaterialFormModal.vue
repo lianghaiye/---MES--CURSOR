@@ -566,7 +566,11 @@ import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { flattenCategoryNodes, materialCategoryTree } from '@/mock/materialCategories'
 import { productCategoryTree } from '@/mock/productCategories'
-import { partProductAttributeOptions, normalizePartProductAttribute, STANDARD_PART_ATTRIBUTE } from '@/mock/productInfoOptions'
+import {
+  partProductAttributeOptions,
+  normalizePartProductAttribute,
+  STANDARD_PART_ATTRIBUTE,
+} from '@/mock/productInfoOptions'
 import {
   barcodeTypeOptions,
   materialTypeOptions,
@@ -755,8 +759,7 @@ function syncFormOnOpen() {
 }
 
 watch(
-  () =>
-    isActive.value ? props.editRecord?.id || props.editRecord?.code || '__new__' : '',
+  () => (isActive.value ? props.editRecord?.id || props.editRecord?.code || '__new__' : ''),
   () => syncFormOnOpen(),
   { immediate: true },
 )

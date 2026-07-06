@@ -259,11 +259,7 @@ import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import SelectWarehouseItemModal from '@/views/basic-config/components/SelectWarehouseItemModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import OutboundLineEditModal from './OutboundLineEditModal.vue'
-import {
-  outboundTypeOptions,
-  handlerOptions,
-  requisitionDeptOptions,
-} from '@/mock/outboundOptions'
+import { outboundTypeOptions, handlerOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { addOutboundOrder, generateOutboundNo, updateOutboundOrder } from '@/store/outboundStore'
 import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'

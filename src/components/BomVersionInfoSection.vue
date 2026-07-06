@@ -42,12 +42,11 @@ export default { name: 'BomVersionInfoSection' }
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { getActiveBomForItem, getBomsForItem, getProductBomById } from '@/store/productBomStore'
 import {
-  getActiveBomForItem,
-  getBomsForItem,
-  getProductBomById,
-} from '@/store/productBomStore'
-import { buildBomVersionHistoryFromGroup, buildBomVersionHistoryForProduct } from '@/utils/ecnBomVersionHistory'
+  buildBomVersionHistoryFromGroup,
+  buildBomVersionHistoryForProduct,
+} from '@/utils/ecnBomVersionHistory'
 import { useTabs } from '@/composables/useTabs'
 import EcnBomVersionTimeline from '@/views/engineering-change/components/EcnBomVersionTimeline.vue'
 import BomVersionCompareModal from '@/components/BomVersionCompareModal.vue'

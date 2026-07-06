@@ -283,12 +283,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import {
-  SettingOutlined,
-  PlusOutlined,
-  CloseOutlined,
-  FilterOutlined,
-} from '@ant-design/icons-vue'
+import { SettingOutlined, PlusOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons-vue'
 import {
   buildBomSubItemPickerRows,
   filterEcnNewMaterialRows,
@@ -482,7 +477,8 @@ watch(
     keyword.value = ''
     Object.assign(ecnFilters, emptyEcnFilters())
     Object.assign(appliedEcnFilters, emptyEcnFilters())
-    quickItemType.value = props.pickerDefaultItemType || (props.ecnNewMaterialMode ? '物料' : undefined)
+    quickItemType.value =
+      props.pickerDefaultItemType || (props.ecnNewMaterialMode ? '物料' : undefined)
     page.value = 1
     appliedFilterConditions.value = []
     selectedRowKeys.value = []

@@ -1,9 +1,6 @@
 import { mockProducts } from '@/mock/productInfo'
 import { ebomSnapshotStatusColor, resolveEbomSnapshotStatus } from '@/constants/ebom'
-import {
-  getActiveBomForItem,
-  getProductBomById,
-} from '@/store/productBomStore'
+import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
 import { resolveMaterialsFromEbomSnapshot } from '@/utils/ebomSnapshot'
 import { flattenMaterials } from '@/utils/material'
 import {
@@ -105,7 +102,10 @@ export function buildSalesOrderEbomRows(lineItems = []) {
       boundVersion: displayValue(enriched?.version || latestBom?.version),
       levelCount: enriched?.levelCount ?? snapshotMetrics?.levelCount ?? '—',
       materialCount:
-        enriched?.materialCount ?? snapshotMetrics?.materialCount ?? line.ebomSnapshot?.materials?.length ?? '—',
+        enriched?.materialCount ??
+        snapshotMetrics?.materialCount ??
+        line.ebomSnapshot?.materials?.length ??
+        '—',
       snapshotAt: displayValue(snapshotAt),
       bomId: enriched?.id || latestBom?.id || line.bomId || '',
       productId: line.productId || '',

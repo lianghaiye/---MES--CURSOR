@@ -15,7 +15,9 @@ function resolveDeliveryDate(lineItems, fallback) {
 }
 
 function cloneSnapshotWithMaterials(bom, salesQty) {
-  const snapshot = bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [], treeNodes: [], lineItems: [] }
+  const snapshot = bom
+    ? buildEbomSnapshotFromBom(bom, salesQty)
+    : { materials: [], treeNodes: [], lineItems: [] }
   const cloned = JSON.parse(JSON.stringify(snapshot))
   const materials = resolveMaterialsFromEbomSnapshot(cloned, salesQty)
   cloned.materials = JSON.parse(JSON.stringify(materials))

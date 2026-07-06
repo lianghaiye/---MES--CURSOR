@@ -4,6 +4,7 @@ import {
   formatEcnOriginDoc,
   resolveEcnChangeReason,
   resolveExecConfigLabel,
+  resolveExecConfigNote,
 } from '@/constants/ecn'
 import { buildBomVersionHistory } from '@/utils/ecnBomVersionHistory'
 
@@ -136,14 +137,12 @@ export function buildEcnPrintPayload(record, moduleConfig = {}, options = {}) {
     changeRows: buildPrintChangeRows(record.changeItems || []),
     impact: {
       bomVersionAction:
-        resolveVersionBefore(record, history) !== '—' && resolveVersionAfter(record, history) !== '—'
+        resolveVersionBefore(record, history) !== '—' &&
+        resolveVersionAfter(record, history) !== '—'
           ? `生成新版本 ${resolveVersionAfter(record, history)}`
           : '—',
       execConfig: resolveExecConfigLabel(record.wipHandling),
-      execConfigNote:
-        record.wipHandling === 'switch_now'
-          ? '在制工单将在下一工序切换新版'
-          : '已下发计划/工单保持原绑定版本',
+      execConfigNote: resolveExecConfigNote(record.wipHandling),
     },
     paper: options.paper || 'A4',
     orientation: options.orientation || 'portrait',

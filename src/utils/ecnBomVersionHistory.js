@@ -58,9 +58,7 @@ export function buildBomVersionHistory(record = {}) {
     if (history.length) return history
   }
   const changeSummary =
-    summarizeChangeItems(record.changeItems) ||
-    record.description ||
-    '工程变更已执行'
+    summarizeChangeItems(record.changeItems) || record.description || '工程变更已执行'
   return [
     {
       version: record.bomVersion || '—',

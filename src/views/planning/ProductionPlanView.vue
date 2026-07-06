@@ -175,256 +175,258 @@
         <a-tabs v-model:activeKey="detailTab" class="detail-tabs">
           <a-tab-pane key="work" tab="工作项">
             <div class="detail-tab-body">
-          <a-table
-            :columns="displayWorkColumns"
-            :data-source="selectedOrder.workItems"
-            :pagination="false"
-            row-key="id"
-            size="small"
-            bordered
-            :scroll="{ x: workTableScrollX }"
-            :row-class-name="workItemRowClassName"
-            :custom-row="workItemCustomRow"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'status'">
-                <a-tag
-                  :color="
-                    record.status === '进行中'
-                      ? 'processing'
-                      : record.status === '设计中'
-                        ? 'orange'
-                        : 'default'
-                  "
-                >
-                  {{ record.status }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'deliveryMode'">
-                <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
-                  {{ record.deliveryMode || '整机' }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'stockQty'">
-                <span>{{
-                  record.stockQty != null && record.stockQty !== '' ? record.stockQty : '—'
-                }}</span>
-              </template>
-              <template v-else-if="column.key === 'planQty'">
-                <a-input-number
-                  v-model:value="record.planQty"
-                  size="small"
-                  :min="0"
-                  :precision="3"
-                  style="width: 100%"
-                  :disabled="isPlanQtyLocked"
-                  @change="onWorkItemPlanQtyChange(record)"
-                />
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <a-space @click.stop>
-                  <a-button type="link" size="small" @click="toggleWorkItemExpand(record)">
-                    {{ expandedWorkItemId === record.id ? '收起' : '展开' }}
-                  </a-button>
-                  <a-button type="link" size="small" danger>终止</a-button>
-                </a-space>
-              </template>
-              <template
-                v-else-if="
-                  column.key === 'specModel' ||
-                  column.key === 'drawingNo' ||
-                  column.key === 'material' ||
-                  column.key === 'techParams' ||
-                  column.key === 'matchingRequirements' ||
-                  column.key === 'packagingForm'
-                "
+              <a-table
+                :columns="displayWorkColumns"
+                :data-source="selectedOrder.workItems"
+                :pagination="false"
+                row-key="id"
+                size="small"
+                bordered
+                :scroll="{ x: workTableScrollX }"
+                :row-class-name="workItemRowClassName"
+                :custom-row="workItemCustomRow"
               >
-                <span class="ellipsis-cell">{{ record[column.dataIndex] || '—' }}</span>
-              </template>
-            </template>
-          </a-table>
-
-          <div class="action-row">
-            <a-space wrap>
-              <span>计划总装日期</span>
-              <a-date-picker
-                :value="planAssemblyDateValue"
-                size="small"
-                allow-clear
-                @change="onPlanAssemblyDateChange"
-              />
-              <span>计划完成日期</span>
-              <a-date-picker
-                :value="planCompleteDateValue"
-                size="small"
-                allow-clear
-                @change="onPlanCompleteDateChange"
-              />
-              <span>调整紧急度</span>
-              <a-select style="width: 100px" placeholder="选择" />
-              <a-button type="primary" @click="generatePurchaseReq">生成采购申请</a-button>
-              <a-button type="primary" @click="openWorkOrderModal">生成加工工单</a-button>
-              <a-button type="primary" @click="openOutsourceWorkOrderModal">生成外协工单</a-button>
-            </a-space>
-          </div>
-
-          <div v-if="activeWorkItem && materialTree.length" class="ebom-panel-title">
-            <span>BOM名称：{{ activeWorkItemBomTitle }}</span>
-            <TableColumnSettingButton
-              v-if="detailFullscreen"
-              @click="materialColumnDrawerOpen = true"
-            />
-          </div>
-          <a-empty
-            v-if="!activeWorkItem"
-            description="请点击产品明细行查看 EBOM 物料树"
-            class="ebom-empty"
-          />
-          <div v-else-if="activeWorkItem" class="material-tree-wrap">
-            <a-table
-              :columns="displayMaterialColumns"
-              :data-source="materialTree"
-              :pagination="false"
-              row-key="id"
-              size="small"
-              bordered
-              :scroll="{ x: materialTableScrollX }"
-              v-model:expanded-row-keys="materialExpandedRowKeys"
-              :default-expand-all-rows="true"
-            >
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'status'">
-                  <a-tag :color="materialStatusColor(record.status)">{{ record.status }}</a-tag>
-                </template>
-                <template v-else-if="column.key === 'supplyType'">
-                  <a-select
-                    v-if="record.isTopLevel"
-                    v-model:value="record.supplyType"
-                    size="small"
-                    :options="topLevelSupplyTypeOptions"
-                    style="width: 100%"
-                    @change="onTopLevelSupplyTypeChange(record)"
-                  />
-                  <a-select
-                    v-else
-                    v-model:value="record.supplyType"
-                    size="small"
-                    :options="supplyTypeOptions"
-                    style="width: 100%"
-                    @change="onMaterialSupplyTypeChange(record)"
-                  />
-                </template>
-                <template v-else-if="column.key === 'planQty'">
-                  <a-input-number
-                    v-if="record.isTopLevel"
-                    :value="activeWorkItem.planQty"
-                    :min="0"
-                    :precision="3"
-                    size="small"
-                    style="width: 100%"
-                    :disabled="isPlanQtyLocked"
-                    @change="(val) => onTopLevelPlanQtyChange(val)"
-                  />
-                  <a-input-number
-                    v-else
-                    v-model:value="record.planQty"
-                    :min="0"
-                    :precision="3"
-                    size="small"
-                    style="width: 100%"
-                    :disabled="isPlanQtyLocked"
-                    @change="onMaterialPlanQtyChange(record)"
-                  />
-                </template>
-                <template v-else-if="column.key === 'joinPlan'">
-                  <a-switch
-                    :checked="record.joinPlan === '是'"
-                    size="small"
-                    @change="(checked) => (record.joinPlan = checked ? '是' : '否')"
-                  />
-                </template>
-                <template v-else-if="column.key === 'designateSupplier'">
-                  <a-switch
-                    v-if="isPurchasedOrOutsourced(record.supplyType)"
-                    :checked="!!record.designateSupplier"
-                    size="small"
-                    @change="(checked) => onMaterialDesignateSupplierChange(record, checked)"
-                  />
-                  <span v-else class="muted">—</span>
-                </template>
-                <template v-else-if="column.key === 'supplier'">
-                  <a-select
-                    v-model:value="record.supplier"
-                    show-search
-                    allow-clear
-                    size="small"
-                    placeholder="请选择"
-                    :options="planSupplierOptions"
-                    :disabled="!isPurchasedOrOutsourced(record.supplyType)"
-                    :status="
-                      record.designateSupplier &&
-                      isPurchasedOrOutsourced(record.supplyType) &&
-                      !record.supplier
-                        ? 'error'
-                        : undefined
+                <template #bodyCell="{ column, record }">
+                  <template v-if="column.key === 'status'">
+                    <a-tag
+                      :color="
+                        record.status === '进行中'
+                          ? 'processing'
+                          : record.status === '设计中'
+                            ? 'orange'
+                            : 'default'
+                      "
+                    >
+                      {{ record.status }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'deliveryMode'">
+                    <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
+                      {{ record.deliveryMode || '整机' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'stockQty'">
+                    <span>{{
+                      record.stockQty != null && record.stockQty !== '' ? record.stockQty : '—'
+                    }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'planQty'">
+                    <a-input-number
+                      v-model:value="record.planQty"
+                      size="small"
+                      :min="0"
+                      :precision="3"
+                      style="width: 100%"
+                      :disabled="isPlanQtyLocked"
+                      @change="onWorkItemPlanQtyChange(record)"
+                    />
+                  </template>
+                  <template v-else-if="column.key === 'action'">
+                    <a-space @click.stop>
+                      <a-button type="link" size="small" @click="toggleWorkItemExpand(record)">
+                        {{ expandedWorkItemId === record.id ? '收起' : '展开' }}
+                      </a-button>
+                      <a-button type="link" size="small" danger>终止</a-button>
+                    </a-space>
+                  </template>
+                  <template
+                    v-else-if="
+                      column.key === 'specModel' ||
+                      column.key === 'drawingNo' ||
+                      column.key === 'material' ||
+                      column.key === 'techParams' ||
+                      column.key === 'matchingRequirements' ||
+                      column.key === 'packagingForm'
                     "
-                    style="width: 100%"
-                    :filter-option="filterSelectOption"
-                  />
+                  >
+                    <span class="ellipsis-cell">{{ record[column.dataIndex] || '—' }}</span>
+                  </template>
                 </template>
-                <template v-else-if="column.key === 'processRoute'">
-                  <a-select
-                    v-model:value="record.processRoute"
-                    show-search
-                    allow-clear
-                    size="small"
-                    placeholder="请选择"
-                    :options="processRouteOpts"
-                    style="width: 100%"
-                    :filter-option="filterSelectOption"
-                  />
-                </template>
-                <template v-else-if="column.key === 'processFile'">
-                  <a-select
-                    v-model:value="record.processFile"
-                    show-search
-                    allow-clear
-                    size="small"
-                    placeholder="暂未配置"
-                    :options="processFileOptions"
-                    style="width: 100%"
-                    :filter-option="filterSelectOption"
-                  />
-                </template>
-                <template v-else-if="column.key === 'standardCycle'">
-                  <a-input
-                    v-model:value="record.standardCycle"
-                    size="small"
-                    placeholder="天"
-                    allow-clear
-                    @change="onMaterialStandardCycleChange(record, selectedOrder)"
-                  />
-                </template>
-                <template v-else-if="column.key === 'latestProcessTime'">
+              </a-table>
+
+              <div class="action-row">
+                <a-space wrap>
+                  <span>计划总装日期</span>
                   <a-date-picker
-                    :value="materialDateValue(record.latestProcessTime)"
+                    :value="planAssemblyDateValue"
                     size="small"
                     allow-clear
-                    style="width: 100%"
-                    @change="(d) => onMaterialLatestDateChange(record, d)"
+                    @change="onPlanAssemblyDateChange"
                   />
-                </template>
-                <template v-else-if="column.key === 'remark'">
-                  <a-input
-                    v-model:value="record.remark"
+                  <span>计划完成日期</span>
+                  <a-date-picker
+                    :value="planCompleteDateValue"
                     size="small"
-                    placeholder="补充说明"
                     allow-clear
+                    @change="onPlanCompleteDateChange"
                   />
-                </template>
-              </template>
-            </a-table>
-          </div>
+                  <span>调整紧急度</span>
+                  <a-select style="width: 100px" placeholder="选择" />
+                  <a-button type="primary" @click="generatePurchaseReq">生成采购申请</a-button>
+                  <a-button type="primary" @click="openWorkOrderModal">生成加工工单</a-button>
+                  <a-button type="primary" @click="openOutsourceWorkOrderModal"
+                    >生成外协工单</a-button
+                  >
+                </a-space>
+              </div>
+
+              <div v-if="activeWorkItem && materialTree.length" class="ebom-panel-title">
+                <span>BOM名称：{{ activeWorkItemBomTitle }}</span>
+                <TableColumnSettingButton
+                  v-if="detailFullscreen"
+                  @click="materialColumnDrawerOpen = true"
+                />
+              </div>
+              <a-empty
+                v-if="!activeWorkItem"
+                description="请点击产品明细行查看 EBOM 物料树"
+                class="ebom-empty"
+              />
+              <div v-else-if="activeWorkItem" class="material-tree-wrap">
+                <a-table
+                  :columns="displayMaterialColumns"
+                  :data-source="materialTree"
+                  :pagination="false"
+                  row-key="id"
+                  size="small"
+                  bordered
+                  :scroll="{ x: materialTableScrollX }"
+                  v-model:expanded-row-keys="materialExpandedRowKeys"
+                  :default-expand-all-rows="true"
+                >
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'status'">
+                      <a-tag :color="materialStatusColor(record.status)">{{ record.status }}</a-tag>
+                    </template>
+                    <template v-else-if="column.key === 'supplyType'">
+                      <a-select
+                        v-if="record.isTopLevel"
+                        v-model:value="record.supplyType"
+                        size="small"
+                        :options="topLevelSupplyTypeOptions"
+                        style="width: 100%"
+                        @change="onTopLevelSupplyTypeChange(record)"
+                      />
+                      <a-select
+                        v-else
+                        v-model:value="record.supplyType"
+                        size="small"
+                        :options="supplyTypeOptions"
+                        style="width: 100%"
+                        @change="onMaterialSupplyTypeChange(record)"
+                      />
+                    </template>
+                    <template v-else-if="column.key === 'planQty'">
+                      <a-input-number
+                        v-if="record.isTopLevel"
+                        :value="activeWorkItem.planQty"
+                        :min="0"
+                        :precision="3"
+                        size="small"
+                        style="width: 100%"
+                        :disabled="isPlanQtyLocked"
+                        @change="(val) => onTopLevelPlanQtyChange(val)"
+                      />
+                      <a-input-number
+                        v-else
+                        v-model:value="record.planQty"
+                        :min="0"
+                        :precision="3"
+                        size="small"
+                        style="width: 100%"
+                        :disabled="isPlanQtyLocked"
+                        @change="onMaterialPlanQtyChange(record)"
+                      />
+                    </template>
+                    <template v-else-if="column.key === 'joinPlan'">
+                      <a-switch
+                        :checked="record.joinPlan === '是'"
+                        size="small"
+                        @change="(checked) => (record.joinPlan = checked ? '是' : '否')"
+                      />
+                    </template>
+                    <template v-else-if="column.key === 'designateSupplier'">
+                      <a-switch
+                        v-if="isPurchasedOrOutsourced(record.supplyType)"
+                        :checked="!!record.designateSupplier"
+                        size="small"
+                        @change="(checked) => onMaterialDesignateSupplierChange(record, checked)"
+                      />
+                      <span v-else class="muted">—</span>
+                    </template>
+                    <template v-else-if="column.key === 'supplier'">
+                      <a-select
+                        v-model:value="record.supplier"
+                        show-search
+                        allow-clear
+                        size="small"
+                        placeholder="请选择"
+                        :options="planSupplierOptions"
+                        :disabled="!isPurchasedOrOutsourced(record.supplyType)"
+                        :status="
+                          record.designateSupplier &&
+                          isPurchasedOrOutsourced(record.supplyType) &&
+                          !record.supplier
+                            ? 'error'
+                            : undefined
+                        "
+                        style="width: 100%"
+                        :filter-option="filterSelectOption"
+                      />
+                    </template>
+                    <template v-else-if="column.key === 'processRoute'">
+                      <a-select
+                        v-model:value="record.processRoute"
+                        show-search
+                        allow-clear
+                        size="small"
+                        placeholder="请选择"
+                        :options="processRouteOpts"
+                        style="width: 100%"
+                        :filter-option="filterSelectOption"
+                      />
+                    </template>
+                    <template v-else-if="column.key === 'processFile'">
+                      <a-select
+                        v-model:value="record.processFile"
+                        show-search
+                        allow-clear
+                        size="small"
+                        placeholder="暂未配置"
+                        :options="processFileOptions"
+                        style="width: 100%"
+                        :filter-option="filterSelectOption"
+                      />
+                    </template>
+                    <template v-else-if="column.key === 'standardCycle'">
+                      <a-input
+                        v-model:value="record.standardCycle"
+                        size="small"
+                        placeholder="天"
+                        allow-clear
+                        @change="onMaterialStandardCycleChange(record, selectedOrder)"
+                      />
+                    </template>
+                    <template v-else-if="column.key === 'latestProcessTime'">
+                      <a-date-picker
+                        :value="materialDateValue(record.latestProcessTime)"
+                        size="small"
+                        allow-clear
+                        style="width: 100%"
+                        @change="(d) => onMaterialLatestDateChange(record, d)"
+                      />
+                    </template>
+                    <template v-else-if="column.key === 'remark'">
+                      <a-input
+                        v-model:value="record.remark"
+                        size="small"
+                        placeholder="补充说明"
+                        allow-clear
+                      />
+                    </template>
+                  </template>
+                </a-table>
+              </div>
             </div>
           </a-tab-pane>
 
@@ -454,66 +456,67 @@
               />
             </template>
             <div class="detail-tab-body">
-          <div class="section-card">
-            <div class="section-title">EBOM 信息</div>
-            <div class="section-hint">
-              展示各工作项现行 EBOM（始终为最新版本）；「初始版本」为订单审核通过时生成的快照版本。
-            </div>
-            <a-table
-              :columns="ebomColumns"
-              :data-source="productionPlanEbomRows"
-              row-key="id"
-              size="small"
-              bordered
-              :pagination="false"
-              :scroll="{ x: ebomTableScrollX }"
-              :locale="{ emptyText: '暂无工作项' }"
-            >
-              <template #bodyCell="{ column, record: row }">
-                <template v-if="column.key === 'index'">{{ row.index }}</template>
-                <template v-else-if="column.key === 'ebomStatus'">
-                  <a-tag :color="row.ebomStatusColor">{{ row.ebomStatus }}</a-tag>
-                </template>
-                <template v-else-if="column.key === 'bomName'">
-                  <a
-                    v-if="row.bomId"
-                    class="link-code"
-                    @click.prevent="openBomDetail(row.bomId, row.bomName)"
-                  >
-                    {{ row.bomName }}
-                  </a>
-                  <span v-else>{{ row.bomName }}</span>
-                </template>
-                <template v-else-if="column.key === 'boundVersion'">
-                  <span>{{ row.boundVersion }}</span>
-                </template>
-                <template v-else>
-                  {{ row[column.dataIndex] ?? '—' }}
-                </template>
-              </template>
-            </a-table>
-          </div>
-
-          <div v-if="bomChangedWorkItems.length" class="section-card">
-            <div class="section-title">EBOM 版本变更</div>
-            <div v-for="wi in bomChangedWorkItems" :key="wi.id" class="bom-product-block">
-              <div class="bom-line-head">
-                <span class="bom-product-name">{{ wi.productName }}</span>
-                <span class="bom-product-code">{{ wi.productCode }}</span>
-                <a-tag color="orange">初始版本 {{ wi.bomVersion || '—' }}</a-tag>
-                <a-tag v-if="workItemActiveVersion(wi)" color="blue">
-                  现行版本 {{ workItemActiveVersion(wi) }}
-                </a-tag>
+              <div class="section-card">
+                <div class="section-title">EBOM 信息</div>
+                <div class="section-hint">
+                  展示各工作项现行
+                  EBOM（始终为最新版本）；「初始版本」为订单审核通过时生成的快照版本。
+                </div>
+                <a-table
+                  :columns="ebomColumns"
+                  :data-source="productionPlanEbomRows"
+                  row-key="id"
+                  size="small"
+                  bordered
+                  :pagination="false"
+                  :scroll="{ x: ebomTableScrollX }"
+                  :locale="{ emptyText: '暂无工作项' }"
+                >
+                  <template #bodyCell="{ column, record: row }">
+                    <template v-if="column.key === 'index'">{{ row.index }}</template>
+                    <template v-else-if="column.key === 'ebomStatus'">
+                      <a-tag :color="row.ebomStatusColor">{{ row.ebomStatus }}</a-tag>
+                    </template>
+                    <template v-else-if="column.key === 'bomName'">
+                      <a
+                        v-if="row.bomId"
+                        class="link-code"
+                        @click.prevent="openBomDetail(row.bomId, row.bomName)"
+                      >
+                        {{ row.bomName }}
+                      </a>
+                      <span v-else>{{ row.bomName }}</span>
+                    </template>
+                    <template v-else-if="column.key === 'boundVersion'">
+                      <span>{{ row.boundVersion }}</span>
+                    </template>
+                    <template v-else>
+                      {{ row[column.dataIndex] ?? '—' }}
+                    </template>
+                  </template>
+                </a-table>
               </div>
-              <BomVersionInfoSection
-                :product-id="wi.productId"
-                :bom-id="wi.bomId"
-                :bound-version="wi.bomVersion"
-                :compare-quantity="Number(wi.salesQty ?? wi.orderQty) || 1"
-              />
-              <SalesOrderEbomDiffSection :line="workItemToEbomLine(wi)" />
-            </div>
-          </div>
+
+              <div v-if="bomChangedWorkItems.length" class="section-card">
+                <div class="section-title">EBOM 版本变更</div>
+                <div v-for="wi in bomChangedWorkItems" :key="wi.id" class="bom-product-block">
+                  <div class="bom-line-head">
+                    <span class="bom-product-name">{{ wi.productName }}</span>
+                    <span class="bom-product-code">{{ wi.productCode }}</span>
+                    <a-tag color="orange">初始版本 {{ wi.bomVersion || '—' }}</a-tag>
+                    <a-tag v-if="workItemActiveVersion(wi)" color="blue">
+                      现行版本 {{ workItemActiveVersion(wi) }}
+                    </a-tag>
+                  </div>
+                  <BomVersionInfoSection
+                    :product-id="wi.productId"
+                    :bom-id="wi.bomId"
+                    :bound-version="wi.bomVersion"
+                    :compare-quantity="Number(wi.salesQty ?? wi.orderQty) || 1"
+                  />
+                  <SalesOrderEbomDiffSection :line="workItemToEbomLine(wi)" />
+                </div>
+              </div>
             </div>
           </a-tab-pane>
 

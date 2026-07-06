@@ -248,7 +248,12 @@ import {
 } from '@ant-design/icons-vue'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { generateBomNo, getProductBomById, saveProductBom, isBomPending } from '@/store/productBomStore'
+import {
+  generateBomNo,
+  getProductBomById,
+  saveProductBom,
+  isBomPending,
+} from '@/store/productBomStore'
 import { isBomEditable } from '@/mock/productBomOptions'
 import { loadBomDetailStructure, importBomByReference } from '@/utils/bomImport'
 import { defaultBomColumnSettings, bomTypeSelectOptions } from '@/mock/bomMaterialColumns'

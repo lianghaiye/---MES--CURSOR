@@ -35,10 +35,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import {
-  buildBomSubItemPickerRows,
-  filterBomSubItemPickerRows,
-} from '@/utils/bomSubItemPicker'
+import { buildBomSubItemPickerRows, filterBomSubItemPickerRows } from '@/utils/bomSubItemPicker'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 
 const props = defineProps({

@@ -93,7 +93,10 @@
           <template v-else-if="activeTab === 'ebom-info'">
             <div class="section-card">
               <div class="section-title">EBOM 信息</div>
-              <div class="section-hint">展示各明细行现行 EBOM（始终为最新版本）；「初始版本」为订单审核通过时生成的快照版本。</div>
+              <div class="section-hint">
+                展示各明细行现行
+                EBOM（始终为最新版本）；「初始版本」为订单审核通过时生成的快照版本。
+              </div>
               <a-table
                 :columns="ebomColumns"
                 :data-source="salesOrderEbomRows"
@@ -131,11 +134,7 @@
 
             <div v-if="bomChangedLines.length" class="section-card">
               <div class="section-title">EBOM 版本变更</div>
-              <div
-                v-for="line in bomChangedLines"
-                :key="line.id"
-                class="bom-product-block"
-              >
+              <div v-for="line in bomChangedLines" :key="line.id" class="bom-product-block">
                 <div class="bom-line-head">
                   <span class="bom-product-name">{{ line.productName }}</span>
                   <span class="bom-product-code">{{ line.productCode }}</span>
@@ -255,7 +254,9 @@
                     </a-tag>
                   </template>
                   <template v-else-if="column.key === 'reqNo'">
-                    <a class="link-code" @click.prevent="goPurchaseReq(row.id)">{{ row.reqNo || '—' }}</a>
+                    <a class="link-code" @click.prevent="goPurchaseReq(row.id)">{{
+                      row.reqNo || '—'
+                    }}</a>
                   </template>
                   <template v-else-if="column.key === 'planItemCount'">
                     {{ purchaseReqPlanItemCount(row) }}
@@ -283,7 +284,9 @@
               >
                 <template #bodyCell="{ column, record: row }">
                   <template v-if="column.key === 'status'">
-                    <a-tag :color="purchaseOrderStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                    <a-tag :color="purchaseOrderStatusColor(row.status)">{{
+                      row.status || '—'
+                    }}</a-tag>
                   </template>
                   <template v-else-if="column.key === 'inboundStatus'">
                     <a-tag :color="purchaseInboundStatusColor(row.inboundStatus)">
@@ -422,7 +425,9 @@
               >
                 <template #bodyCell="{ column, record: row }">
                   <template v-if="column.key === 'status'">
-                    <a-tag :color="outsourcingStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                    <a-tag :color="outsourcingStatusColor(row.status)">{{
+                      row.status || '—'
+                    }}</a-tag>
                   </template>
                   <template v-else-if="column.key === 'inboundStatus'">
                     <a-tag :color="purchaseInboundStatusColor(row.inboundStatus)">
@@ -533,9 +538,7 @@ const productionTabCount = computed(
 )
 
 const bomChangedLines = computed(() =>
-  (order.value?.lineItems || []).filter(
-    (line) => line.productId && lineBomVersionHint(line),
-  ),
+  (order.value?.lineItems || []).filter((line) => line.productId && lineBomVersionHint(line)),
 )
 
 const bomChangedCount = computed(() => bomChangedLines.value.length)
@@ -545,7 +548,14 @@ const salesOrderEbomRows = computed(() => buildSalesOrderEbomRows(order.value?.l
 const ebomColumns = [
   { key: 'index', title: '序号', width: 56, align: 'center', fixed: 'left' },
   { key: 'ebomStatus', title: 'EBOM状态', width: 100, fixed: 'left' },
-  { key: 'bomName', title: 'EBOM名称', dataIndex: 'bomName', width: 160, ellipsis: true, fixed: 'left' },
+  {
+    key: 'bomName',
+    title: 'EBOM名称',
+    dataIndex: 'bomName',
+    width: 160,
+    ellipsis: true,
+    fixed: 'left',
+  },
   { key: 'bomNo', title: 'EBOM编码', dataIndex: 'bomNo', width: 130, ellipsis: true },
   { key: 'itemName', title: '产品名称', dataIndex: 'itemName', width: 140, ellipsis: true },
   { key: 'initialVersion', title: '初始版本', dataIndex: 'initialVersion', width: 96 },

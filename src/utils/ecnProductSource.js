@@ -7,15 +7,8 @@ import { productInfoState } from '@/store/productInfoStore'
 import { getProductBomById } from '@/store/productBomStore'
 import { findProductMasterByName, resolveProductActiveBom } from '@/utils/workOrderFormHelpers'
 import { loadBomDetailStructure, resolveBomStructure } from '@/utils/bomImport'
-import {
-  getRootTreeId,
-  getOrderedChildNodeIds,
-  getLinesForTreeNode,
-} from '@/utils/bomTree'
-import {
-  assignOverviewIndexes,
-  buildBomOverviewTree,
-} from '@/utils/bomOverview'
+import { getRootTreeId, getOrderedChildNodeIds, getLinesForTreeNode } from '@/utils/bomTree'
+import { assignOverviewIndexes, buildBomOverviewTree } from '@/utils/bomOverview'
 import { buildProcessesFromRoute } from '@/mock/processRoutes'
 
 function normalizeName(value) {
@@ -162,10 +155,7 @@ export function resolveProductEbomRef(options = {}) {
   const ebomHit = pickEbomForProduct(productName, productId)
   if (ebomHit?.record) {
     let structure = loadBomDetailStructure(ebomHit.record)
-    if (
-      !(structure.lineItems?.length) &&
-      ebomHit.record.baselineBomId
-    ) {
+    if (!structure.lineItems?.length && ebomHit.record.baselineBomId) {
       const baseline = getProductBomById(ebomHit.record.baselineBomId)
       if (baseline) structure = loadBomDetailStructure(baseline)
     }
@@ -247,13 +237,17 @@ export function buildBomParentPickerOptions(flatNodes = [], bomPickerLines = [],
 }
 
 export function filterBomParentOptions(options, keyword) {
-  const kw = String(keyword || '').trim().toLowerCase()
+  const kw = String(keyword || '')
+    .trim()
+    .toLowerCase()
   if (!kw) return options.slice(0, 20)
   return options.filter((opt) => opt.label.toLowerCase().includes(kw)).slice(0, 50)
 }
 
 export function filterBomLineOptions(lines, keyword) {
-  const kw = String(keyword || '').trim().toLowerCase()
+  const kw = String(keyword || '')
+    .trim()
+    .toLowerCase()
   if (!kw) return lines.slice(0, 8)
   return lines.filter(
     (line) =>
@@ -284,7 +278,9 @@ export function resolveDefaultProcessesForMaterial(materialCode, bomLine = null)
       ''
   }
   if (!routeName) return []
-  return buildProcessesFromRoute(routeName).map((p) => p.name).filter(Boolean)
+  return buildProcessesFromRoute(routeName)
+    .map((p) => p.name)
+    .filter(Boolean)
 }
 
 export function applyDefaultRelatedProcesses(item, materialCode, bomLine = null) {
@@ -341,26 +337,72 @@ export function buildBomOverviewPickTree(flatNodes = [], lineItems = []) {
 
 function normalizeOverviewPickFilters(filters = {}) {
   return {
-    itemName: String(filters.itemName || '').trim().toLowerCase(),
-    materialCode: String(filters.materialCode || '').trim().toLowerCase(),
-    specModel: String(filters.specModel || '').trim().toLowerCase(),
-    categoryName: String(filters.categoryName || '').trim().toLowerCase(),
-    material: String(filters.material || '').trim().toLowerCase(),
-    drawingNo: String(filters.drawingNo || '').trim().toLowerCase(),
+    itemName: String(filters.itemName || '')
+      .trim()
+      .toLowerCase(),
+    materialCode: String(filters.materialCode || '')
+      .trim()
+      .toLowerCase(),
+    specModel: String(filters.specModel || '')
+      .trim()
+      .toLowerCase(),
+    categoryName: String(filters.categoryName || '')
+      .trim()
+      .toLowerCase(),
+    material: String(filters.material || '')
+      .trim()
+      .toLowerCase(),
+    drawingNo: String(filters.drawingNo || '')
+      .trim()
+      .toLowerCase(),
   }
 }
 
 function rowMatchesOverviewPickFilters(row, f) {
-  if (f.itemName && !String(row.itemName || '').toLowerCase().includes(f.itemName)) return false
-  if (f.materialCode && !String(row.materialCode || '').toLowerCase().includes(f.materialCode)) {
+  if (
+    f.itemName &&
+    !String(row.itemName || '')
+      .toLowerCase()
+      .includes(f.itemName)
+  )
+    return false
+  if (
+    f.materialCode &&
+    !String(row.materialCode || '')
+      .toLowerCase()
+      .includes(f.materialCode)
+  ) {
     return false
   }
-  if (f.specModel && !String(row.specModel || '').toLowerCase().includes(f.specModel)) return false
-  if (f.categoryName && !String(row.categoryName || '').toLowerCase().includes(f.categoryName)) {
+  if (
+    f.specModel &&
+    !String(row.specModel || '')
+      .toLowerCase()
+      .includes(f.specModel)
+  )
+    return false
+  if (
+    f.categoryName &&
+    !String(row.categoryName || '')
+      .toLowerCase()
+      .includes(f.categoryName)
+  ) {
     return false
   }
-  if (f.material && !String(row.material || '').toLowerCase().includes(f.material)) return false
-  if (f.drawingNo && !String(row.drawingNo || '').toLowerCase().includes(f.drawingNo)) return false
+  if (
+    f.material &&
+    !String(row.material || '')
+      .toLowerCase()
+      .includes(f.material)
+  )
+    return false
+  if (
+    f.drawingNo &&
+    !String(row.drawingNo || '')
+      .toLowerCase()
+      .includes(f.drawingNo)
+  )
+    return false
   return true
 }
 
@@ -400,7 +442,12 @@ export function countBomOverviewPickTreeRows(rows = []) {
   return count
 }
 
-export function resolveBomLineFromPickRow(row, bomPickerLines = [], lineItems = [], flatNodes = []) {
+export function resolveBomLineFromPickRow(
+  row,
+  bomPickerLines = [],
+  lineItems = [],
+  flatNodes = [],
+) {
   if (!row?.key) return null
   const key = String(row.key)
 
@@ -409,7 +456,10 @@ export function resolveBomLineFromPickRow(row, bomPickerLines = [], lineItems = 
 
   const fromLine = lineItems.find((l) => l.id === key)
   if (fromLine) {
-    return bomPickerLines.find((l) => l.id === fromLine.id) || pickerLineFromLineItem(fromLine, flatNodes, lineItems)
+    return (
+      bomPickerLines.find((l) => l.id === fromLine.id) ||
+      pickerLineFromLineItem(fromLine, flatNodes, lineItems)
+    )
   }
 
   if (key.startsWith('node-')) {
@@ -442,7 +492,12 @@ export function filterBomOverviewPickerRows(rows, filters = {}) {
 }
 
 /** @deprecated 使用 buildBomOverviewPickTree */
-export function buildBomMaterialPickRows(flatNodes = [], lineItems = [], rootLabel = '', bomPickerLines = []) {
+export function buildBomMaterialPickRows(
+  flatNodes = [],
+  lineItems = [],
+  rootLabel = '',
+  bomPickerLines = [],
+) {
   void rootLabel
   const tree = buildBomOverviewPickTree(flatNodes, lineItems)
   if (tree.length) return flattenOverviewPickTreeRows(tree)

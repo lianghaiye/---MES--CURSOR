@@ -163,8 +163,7 @@ export function calcProcessReportStats(records = []) {
   })
 
   const sumQty = (list) => list.reduce((s, r) => s + resolveRecordReportQty(r), 0)
-  const sumAdjustedQty = (list) =>
-    list.reduce((s, r) => s + resolveRecordAdjustedReportQty(r), 0)
+  const sumAdjustedQty = (list) => list.reduce((s, r) => s + resolveRecordAdjustedReportQty(r), 0)
 
   return {
     todayQty: sumQty(todayList),

@@ -90,7 +90,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { buildBomLinkedPickerRows, findBomLinkedPickerRow, findBomLinkedPickerRowByBom } from '@/utils/bomWithBomPicker'
+import {
+  buildBomLinkedPickerRows,
+  findBomLinkedPickerRow,
+  findBomLinkedPickerRowByBom,
+} from '@/utils/bomWithBomPicker'
 import { isBomActive } from '@/mock/productBomOptions'
 import { resolveBomLinkedMaster } from '@/utils/bomPickerTable'
 import SelectBomPickerModal from './SelectBomPickerModal.vue'

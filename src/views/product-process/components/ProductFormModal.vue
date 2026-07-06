@@ -582,10 +582,12 @@ const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 
-const { isActive, shellTitle, handleCancel: onShellCancel, closeAfterSave } = useFormCreateModal(
-  props,
-  emit,
-  {
+const {
+  isActive,
+  shellTitle,
+  handleCancel: onShellCancel,
+  closeAfterSave,
+} = useFormCreateModal(props, emit, {
   listPath: '/product-process/products',
   getTitle: () => {
     if (props.viewOnly) return '产品详情'

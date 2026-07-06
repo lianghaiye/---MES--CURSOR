@@ -97,7 +97,12 @@
           <CloseCircleOutlined />
           取消
         </a-button>
-        <a-button type="primary" :size="pageMode ? 'small' : 'middle'" :loading="saving" @click="handleSave">
+        <a-button
+          type="primary"
+          :size="pageMode ? 'small' : 'middle'"
+          :loading="saving"
+          @click="handleSave"
+        >
           <PlusCircleOutlined />
           保存
         </a-button>

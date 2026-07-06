@@ -6,19 +6,40 @@
         <small>管理企业注册、产品模板与铭牌模板</small>
       </div>
       <div class="sub-tabs">
-        <router-link to="/industrial-id/base-config/enterprise-info" class="sub-tab" exact-active-class="active">企业信息</router-link>
-        <router-link to="/industrial-id/base-config/product-template" class="sub-tab" active-class="active">配置产品信息更新模板</router-link>
-        <router-link to="/industrial-id/base-config/nameplate-template" class="sub-tab" active-class="active">配置铭牌模板</router-link>
+        <router-link
+          to="/industrial-id/base-config/enterprise-info"
+          class="sub-tab"
+          exact-active-class="active"
+          >企业信息</router-link
+        >
+        <router-link
+          to="/industrial-id/base-config/product-template"
+          class="sub-tab"
+          active-class="active"
+          >配置产品信息更新模板</router-link
+        >
+        <router-link
+          to="/industrial-id/base-config/nameplate-template"
+          class="sub-tab"
+          active-class="active"
+          >配置铭牌模板</router-link
+        >
       </div>
 
       <div v-if="!submitted" class="banner">
         <div class="banner-content">
           <div class="banner-title-row">
             <span class="tenant-badge">【{{ form.enterpriseShortName || '租户名称' }}】</span>
-            <span class="review-badge" :class="{ 'status-pending': submitted }">【{{ submitted ? '待审核' : (form.reviewStatus || '审核状态') }}】</span>
+            <span class="review-badge" :class="{ 'status-pending': submitted }"
+              >【{{ submitted ? '待审核' : form.reviewStatus || '审核状态' }}】</span
+            >
           </div>
-          <p v-if="!submitted" class="banner-desc">企业注册是工业互联标识体系中的基础环节，请准确填写以下信息完成入驻申请。审核通过后您将获得唯一的工业互联标识节点编码。</p>
-          <p v-else class="banner-desc">您的入驻申请已成功提交，请耐心等待平台审核。审核通过后将为您开通工业互联标识服务。</p>
+          <p v-if="!submitted" class="banner-desc">
+            企业注册是工业互联标识体系中的基础环节，请准确填写以下信息完成入驻申请。审核通过后您将获得唯一的工业互联标识节点编码。
+          </p>
+          <p v-else class="banner-desc">
+            您的入驻申请已成功提交，请耐心等待平台审核。审核通过后将为您开通工业互联标识服务。
+          </p>
         </div>
       </div>
 
@@ -29,7 +50,11 @@
           <div class="form-grid">
             <div class="form-item required">
               <label>企业全称</label>
-              <input v-model="form.enterpriseFullName" placeholder="默认认入用户名称" :disabled="submitted" />
+              <input
+                v-model="form.enterpriseFullName"
+                placeholder="默认认入用户名称"
+                :disabled="submitted"
+              />
             </div>
             <div class="form-item required">
               <label>统一信用代码</label>
@@ -37,7 +62,11 @@
             </div>
             <div class="form-item required">
               <label>企业简称</label>
-              <input v-model="form.enterpriseShortName" placeholder="请输入" :disabled="submitted" />
+              <input
+                v-model="form.enterpriseShortName"
+                placeholder="请输入"
+                :disabled="submitted"
+              />
             </div>
             <div class="form-item required">
               <label>所属行业</label>
@@ -54,7 +83,12 @@
             <div class="form-item required full-width">
               <label>注册地址</label>
               <div class="address-row">
-                <select v-model="form.province" class="addr-select" :disabled="submitted" @change="onProvinceChange">
+                <select
+                  v-model="form.province"
+                  class="addr-select"
+                  :disabled="submitted"
+                  @change="onProvinceChange"
+                >
                   <option value="">请选择省</option>
                   <option value="北京市">北京市</option>
                   <option value="广东省">广东省</option>
@@ -125,10 +159,19 @@
           <div class="upload-grid">
             <div class="upload-item required">
               <label>营业执照</label>
-              <div class="upload-area" :class="{ disabled: submitted }" @click="submitted ? null : triggerUpload('businessLicense')">
+              <div
+                class="upload-area"
+                :class="{ disabled: submitted }"
+                @click="submitted ? null : triggerUpload('businessLicense')"
+              >
                 <div v-if="form.businessLicense" class="upload-preview">
                   <span class="file-name">{{ form.businessLicense }}</span>
-                  <span v-if="!submitted" class="file-remove" @click.stop="removeFile('businessLicense')">✕</span>
+                  <span
+                    v-if="!submitted"
+                    class="file-remove"
+                    @click.stop="removeFile('businessLicense')"
+                    >✕</span
+                  >
                 </div>
                 <div v-else class="upload-placeholder">
                   <span class="upload-icon">+</span>
@@ -138,10 +181,19 @@
             </div>
             <div class="upload-item required">
               <label>法人身份证正照</label>
-              <div class="upload-area" :class="{ disabled: submitted }" @click="submitted ? null : triggerUpload('legalIdFront')">
+              <div
+                class="upload-area"
+                :class="{ disabled: submitted }"
+                @click="submitted ? null : triggerUpload('legalIdFront')"
+              >
                 <div v-if="form.legalIdFront" class="upload-preview">
                   <span class="file-name">{{ form.legalIdFront }}</span>
-                  <span v-if="!submitted" class="file-remove" @click.stop="removeFile('legalIdFront')">✕</span>
+                  <span
+                    v-if="!submitted"
+                    class="file-remove"
+                    @click.stop="removeFile('legalIdFront')"
+                    >✕</span
+                  >
                 </div>
                 <div v-else class="upload-placeholder">
                   <span class="upload-icon">+</span>
@@ -151,10 +203,19 @@
             </div>
             <div class="upload-item required">
               <label>法人身份证反照</label>
-              <div class="upload-area" :class="{ disabled: submitted }" @click="submitted ? null : triggerUpload('legalIdBack')">
+              <div
+                class="upload-area"
+                :class="{ disabled: submitted }"
+                @click="submitted ? null : triggerUpload('legalIdBack')"
+              >
                 <div v-if="form.legalIdBack" class="upload-preview">
                   <span class="file-name">{{ form.legalIdBack }}</span>
-                  <span v-if="!submitted" class="file-remove" @click.stop="removeFile('legalIdBack')">✕</span>
+                  <span
+                    v-if="!submitted"
+                    class="file-remove"
+                    @click.stop="removeFile('legalIdBack')"
+                    >✕</span
+                  >
                 </div>
                 <div v-else class="upload-placeholder">
                   <span class="upload-icon">+</span>
@@ -216,7 +277,9 @@
             <h3>{{ form.enterpriseFullName }}</h3>
             <span class="review-status-tag">待审核</span>
           </div>
-          <p class="review-tip">您的入驻申请已提交，请耐心等待平台审核。审核通过后将为您开通工业互联标识服务。</p>
+          <p class="review-tip">
+            您的入驻申请已提交，请耐心等待平台审核。审核通过后将为您开通工业互联标识服务。
+          </p>
         </div>
 
         <div class="review-cols">
@@ -338,14 +401,14 @@
 </template>
 
 <script>
-import { updateEnterpriseForm } from '@/store/industrialIdStore';
+import { updateEnterpriseForm } from '@/store/industrialIdStore'
 
 export default {
   computed: {
     addressDisplay() {
-      const parts = [this.form.province, this.form.city, this.form.district].filter(Boolean);
-      return parts.join(' ');
-    }
+      const parts = [this.form.province, this.form.city, this.form.district].filter(Boolean)
+      return parts.join(' ')
+    },
   },
   data() {
     return {
@@ -371,37 +434,37 @@ export default {
         legalIdBack: '',
         introduction: '',
         reviewStatus: '待审核',
-        agreed: false
-      }
-    };
+        agreed: false,
+      },
+    }
   },
   methods: {
     updateEnterpriseForm,
     onProvinceChange() {
-      this.form.city = '';
-      this.form.district = '';
+      this.form.city = ''
+      this.form.district = ''
     },
     triggerUpload(field) {
-      const fakeName = `${field}_${Date.now()}.pdf`;
-      this.form[field] = fakeName;
+      const fakeName = `${field}_${Date.now()}.pdf`
+      this.form[field] = fakeName
     },
     removeFile(field) {
-      this.form[field] = '';
+      this.form[field] = ''
     },
     saveDraft() {
-      this.updateEnterpriseForm({ ...this.form, reviewStatus: '草稿' });
-      alert('草稿已保存（示例）');
+      this.updateEnterpriseForm({ ...this.form, reviewStatus: '草稿' })
+      alert('草稿已保存（示例）')
     },
     submitApplication() {
-      this.form.reviewStatus = '待审核';
-      this.showModal = true;
+      this.form.reviewStatus = '待审核'
+      this.showModal = true
     },
     closeModal() {
-      this.showModal = false;
-      this.submitted = true;
-    }
-  }
-};
+      this.showModal = false
+      this.submitted = true
+    },
+  },
+}
 </script>
 
 <style scoped>
@@ -522,7 +585,7 @@ export default {
 .form-item select:focus {
   outline: none;
   border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24,144,255,0.1);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
 }
 .form-item input::placeholder,
 .form-item select {
@@ -621,7 +684,7 @@ export default {
 .intro-textarea:focus {
   outline: none;
   border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24,144,255,0.1);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
 }
 
 .notice-box {
@@ -654,7 +717,7 @@ export default {
   cursor: pointer;
   font-size: 14px;
 }
-.agreement-check input[type="checkbox"] {
+.agreement-check input[type='checkbox'] {
   width: 16px;
   height: 16px;
   cursor: pointer;
@@ -897,11 +960,21 @@ textarea:disabled {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 </style>

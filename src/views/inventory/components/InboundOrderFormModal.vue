@@ -149,6 +149,14 @@
             @change="() => refreshLine(record)"
           />
         </template>
+        <template v-else-if="column.key === 'locationNo'">
+          <a-input
+            v-model:value="record.locationNo"
+            size="small"
+            allow-clear
+            placeholder="请输入货位号"
+          />
+        </template>
         <template v-else-if="column.key === 'qty'">
           <a-input-number
             v-model:value="record.qty"
@@ -199,7 +207,12 @@
           />
         </template>
         <template v-else-if="column.key === 'sourceDocNo'">
-          <a-input v-model:value="record.sourceDocNo" size="small" allow-clear placeholder="请输入" />
+          <a-input
+            v-model:value="record.sourceDocNo"
+            size="small"
+            allow-clear
+            placeholder="请输入"
+          />
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4">
@@ -300,10 +313,12 @@ const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 
-const { isActive, shellTitle, handleCancel: onShellCancel, closeAfterSave } = useFormCreateModal(
-  props,
-  emit,
-  {
+const {
+  isActive,
+  shellTitle,
+  handleCancel: onShellCancel,
+  closeAfterSave,
+} = useFormCreateModal(props, emit, {
   listPath: '/inventory/inbound',
   getTitle: () => (isEdit.value ? '编辑入库单' : '新增入库单'),
 })
@@ -341,7 +356,7 @@ const form = reactive({
 })
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inbound-form-lines', inboundFormLineColumns, { minScrollX: 2000 })
+  useTableColumnSettings('inbound-form-lines', inboundFormLineColumns, { minScrollX: 2100 })
 
 const lineScrollX = tableScrollX
 

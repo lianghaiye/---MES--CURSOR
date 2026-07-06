@@ -78,32 +78,47 @@ export const ecnOriginOptions = [
 ]
 
 export const ECN_WIP_HANDLING = {
-  /** 升版 BOM 档案，已下发计划/工单不变；新建工单可关联新版 */
-  ARCHIVE_UPGRADE: 'archive_upgrade',
-  /** 在制工单下一工序起切换新版 */
-  SWITCH_NOW: 'switch_now',
+  /** 仅升版 EBOM 档案，已下发计划/工单不变 */
+  EBOM_ONLY: 'ebom_only',
+  /** 同步升版 EBOM 与产品 BOM */
+  EBOM_AND_PRODUCT_BOM: 'ebom_and_product_bom',
+  /** 升版 EBOM，在线工单下一工序起切换新版 */
+  EBOM_WITH_ONLINE_WO_SWITCH: 'ebom_with_online_wo_switch',
 }
 
 /** 执行配置（新建 / 审批 / 执行共用） */
 export const ecnExecConfigOptions = [
   {
-    value: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
-    label: '仅升级 BOM 档案',
-    sub: '归档旧版并发布新版供售后/销售查阅；已下发计划与工单保持原绑定版本',
+    value: ECN_WIP_HANDLING.EBOM_ONLY,
+    label: '仅升级EBOM档案',
+    sub: '归档旧版 EBOM 并发布新版；已下发计划与工单保持原绑定版本',
     recommended: true,
   },
   {
-    value: ECN_WIP_HANDLING.SWITCH_NOW,
-    label: '在制工单切换新版',
-    sub: '在制工单将在下一工序起切换至新版 BOM',
+    value: ECN_WIP_HANDLING.EBOM_AND_PRODUCT_BOM,
+    label: '同时升级EBOM与产品BOM',
+    sub: '同步升版 EBOM 档案与产品 BOM，供计划与生产引用最新结构',
+    recommended: false,
+  },
+  {
+    value: ECN_WIP_HANDLING.EBOM_WITH_ONLINE_WO_SWITCH,
+    label: '升级EBOM同时，在线工单切换新版',
+    sub: '升版 EBOM 后，在线工单将在下一工序起切换至新版',
     recommended: false,
   },
 ]
 
-/** 兼容旧值 continue_old / record_only */
+/** 兼容旧值 archive_upgrade / switch_now / continue_old / record_only */
 export function normalizeWipHandling(wipHandling) {
-  if (wipHandling === 'continue_old' || wipHandling === 'record_only') {
-    return ECN_WIP_HANDLING.ARCHIVE_UPGRADE
+  if (
+    wipHandling === 'continue_old' ||
+    wipHandling === 'record_only' ||
+    wipHandling === 'archive_upgrade'
+  ) {
+    return ECN_WIP_HANDLING.EBOM_ONLY
+  }
+  if (wipHandling === 'switch_now') {
+    return ECN_WIP_HANDLING.EBOM_WITH_ONLINE_WO_SWITCH
   }
   return wipHandling
 }
@@ -115,6 +130,10 @@ export function findExecConfigOption(wipHandling) {
 
 export function resolveExecConfigLabel(wipHandling) {
   return findExecConfigOption(wipHandling)?.label || '—'
+}
+
+export function resolveExecConfigNote(wipHandling) {
+  return findExecConfigOption(wipHandling)?.sub || '—'
 }
 
 export const ecnStatusOptions = [

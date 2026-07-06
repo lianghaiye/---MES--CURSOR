@@ -493,9 +493,7 @@ function normalizeLineItems(items) {
 }
 
 function syncHeaderTrackers() {
-  prevHeaderDeliveryDate.value = form.deliveryDate
-    ? form.deliveryDate.format('YYYY-MM-DD')
-    : ''
+  prevHeaderDeliveryDate.value = form.deliveryDate ? form.deliveryDate.format('YYYY-MM-DD') : ''
   prevHeaderReceivingWarehouse.value = form.receivingWarehouse
 }
 

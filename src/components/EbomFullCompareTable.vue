@@ -7,12 +7,7 @@
       <div class="head-cell side-col">{{ rightVersion }}</div>
     </div>
 
-    <div
-      v-for="row in rows"
-      :key="row.id"
-      class="compare-row"
-      :class="rowClass(row.changeType)"
-    >
+    <div v-for="row in rows" :key="row.id" class="compare-row" :class="rowClass(row.changeType)">
       <div class="row-cell change-col">
         <a-tag :color="changeTypeColor(row.changeType)">{{ row.changeType }}</a-tag>
       </div>
@@ -55,7 +50,10 @@
               <span :class="{ highlight: row.changedKeys.has('supplyType') }">
                 供应 {{ formatValue(row.right.supplyType) }}
               </span>
-              <span v-if="row.right.material" :class="{ highlight: row.changedKeys.has('material') }">
+              <span
+                v-if="row.right.material"
+                :class="{ highlight: row.changedKeys.has('material') }"
+              >
                 材质 {{ row.right.material }}
               </span>
             </div>

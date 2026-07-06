@@ -1,6 +1,10 @@
 import dayjs from 'dayjs'
 
 export function createInboundLine(partial = {}) {
+  const locationNo =
+    partial.locationNo ||
+    [partial.shelf, partial.binLocation].filter(Boolean).join('-') ||
+    ''
   return {
     id: `ib-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     itemCode: '',
@@ -25,6 +29,7 @@ export function createInboundLine(partial = {}) {
     warehouse: '',
     poLineId: '',
     ...partial,
+    locationNo,
   }
 }
 
@@ -89,6 +94,8 @@ export function cloneInboundSeedOrders() {
           qty: 50,
           unit: '件',
           unitPrice: 120,
+          warehouse: '原料仓',
+          locationNo: 'A-01-03',
           barcodeBatchNo: 'BC20260608001',
           productionDate: '2026-06-01',
           expiryDate: '2028-06-01',

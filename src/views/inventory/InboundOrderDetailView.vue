@@ -15,7 +15,9 @@
               <a-button size="small" @click="goBack">返回列表</a-button>
             </template>
             <template v-else-if="record.status === '待处理'">
-              <a-button type="primary" size="small" @click="handleConfirmInbound">确认入库</a-button>
+              <a-button type="primary" size="small" @click="handleConfirmInbound"
+                >确认入库</a-button
+              >
               <a-button size="small" @click="openEdit">编辑</a-button>
               <a-button size="small" danger @click="handleDelete">删除</a-button>
             </template>
@@ -100,6 +102,9 @@
               </template>
               <template v-else-if="column.key === 'lineSource'">
                 {{ line.lineSource || '—' }}
+              </template>
+              <template v-else-if="column.key === 'locationNo'">
+                {{ line.locationNo || '—' }}
               </template>
               <template v-else-if="column.key === 'sourceDocNo'">
                 {{ line.sourceDocNo || '—' }}

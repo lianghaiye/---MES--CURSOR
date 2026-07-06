@@ -45,7 +45,9 @@
       <div class="bom-product-block">
         <div class="bom-line-head">
           <span class="bom-product-name">{{ ebomLine?.productName }}</span>
-          <span v-if="ebomLine?.productCode" class="bom-product-code">{{ ebomLine.productCode }}</span>
+          <span v-if="ebomLine?.productCode" class="bom-product-code">{{
+            ebomLine.productCode
+          }}</span>
           <a-tag color="orange">初始版本 {{ ebomLine?.bomVersion || '—' }}</a-tag>
           <a-tag v-if="activeVersion" color="blue">现行版本 {{ activeVersion }}</a-tag>
         </div>

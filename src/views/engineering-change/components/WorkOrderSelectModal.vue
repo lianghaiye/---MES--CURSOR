@@ -118,10 +118,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { workOrderState } from '@/store/workOrderStore'
 import { workCenterOptions } from '@/mock/workOrderOptions'
-import {
-  filterWorkOrdersForPicker,
-  workOrderCategoryOptions,
-} from '@/utils/workOrderPicker'
+import { filterWorkOrdersForPicker, workOrderCategoryOptions } from '@/utils/workOrderPicker'
 
 const props = defineProps({
   open: { type: Boolean, default: false },

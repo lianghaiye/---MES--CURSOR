@@ -129,7 +129,10 @@
       </a-table>
     </div>
 
-    <a-empty v-if="!rows.length" description="当前订单无供应型态为「自制件」的物料，或顶级物料未设为「自制件」" />
+    <a-empty
+      v-if="!rows.length"
+      description="当前订单无供应型态为「自制件」的物料，或顶级物料未设为「自制件」"
+    />
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>

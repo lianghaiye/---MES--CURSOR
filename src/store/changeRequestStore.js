@@ -3,14 +3,7 @@ import dayjs from 'dayjs'
 import { ECN_STATUS, ECN_WIP_HANDLING } from '@/constants/ecn'
 
 export function createChangeRequestStore(options) {
-  const {
-    storageKey,
-    dataVersion,
-    buildMockRecords,
-    docNoField,
-    docNoPrefix,
-    idPrefix,
-  } = options
+  const { storageKey, dataVersion, buildMockRecords, docNoField, docNoPrefix, idPrefix } = options
 
   let docSeq = 400
 
@@ -72,7 +65,10 @@ export function createChangeRequestStore(options) {
       if (filters.createdRange?.length === 2) {
         const [start, end] = filters.createdRange
         const created = dayjs(row.createdAt)
-        if (created.isBefore(dayjs(start).startOf('day')) || created.isAfter(dayjs(end).endOf('day'))) {
+        if (
+          created.isBefore(dayjs(start).startOf('day')) ||
+          created.isAfter(dayjs(end).endOf('day'))
+        ) {
           return false
         }
       }
@@ -100,7 +96,7 @@ export function createChangeRequestStore(options) {
       ],
       approvalRecords: [],
       updateItems: payload.updateItems || [],
-      wipHandling: payload.wipHandling || ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
+      wipHandling: payload.wipHandling || ECN_WIP_HANDLING.EBOM_ONLY,
       rejectReason: '',
       impact: payload.impact || { products: 1, bomLines: 3, wipOrders: 12, inventoryWarnings: 2 },
       attachments: payload.attachments || [],

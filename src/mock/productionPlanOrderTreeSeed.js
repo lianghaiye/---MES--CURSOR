@@ -16,7 +16,9 @@ export const PRODUCTION_PLAN_ORDER_TREE_DEMO_ASSEMBLY_IDS = ['asm-pp-tree-demo-1
 export const PRODUCTION_PLAN_ORDER_TREE_DEMO_REQ_IDS = ['pr-pp-tree-demo-1']
 
 function findDemoPlan() {
-  return productionPlanState.plans.find((p) => p.orderNo === PRODUCTION_PLAN_ORDER_TREE_DEMO_PLAN_NO)
+  return productionPlanState.plans.find(
+    (p) => p.orderNo === PRODUCTION_PLAN_ORDER_TREE_DEMO_PLAN_NO,
+  )
 }
 
 function collectMaterialsBySupply(plan) {
@@ -67,7 +69,10 @@ export function createProductionPlanOrderTreeDemoWorkOrders() {
       bom: plan.workItems?.[0]?.bomName || '',
       warehouse: '半成品仓',
       urgency: plan.urgency || '普通',
-      planDateRange: [dayjs().format('YYYY-MM-DD'), plan.deliveryDate || dayjs().add(14, 'day').format('YYYY-MM-DD')],
+      planDateRange: [
+        dayjs().format('YYYY-MM-DD'),
+        plan.deliveryDate || dayjs().add(14, 'day').format('YYYY-MM-DD'),
+      ],
       remark: '生产计划演示工单',
       processRouteName: routeName,
       source: 'production-plan',
@@ -94,7 +99,10 @@ export function createProductionPlanOrderTreeDemoWorkOrders() {
       bom: '',
       warehouse: '半成品仓',
       urgency: plan.urgency || '普通',
-      planDateRange: [dayjs().format('YYYY-MM-DD'), plan.deliveryDate || dayjs().add(14, 'day').format('YYYY-MM-DD')],
+      planDateRange: [
+        dayjs().format('YYYY-MM-DD'),
+        plan.deliveryDate || dayjs().add(14, 'day').format('YYYY-MM-DD'),
+      ],
       remark: '生产计划演示外协工单',
       source: 'production-plan',
       sourceOrderNo: plan.orderNo,
@@ -129,7 +137,10 @@ export function createProductionPlanOrderTreeDemoAssemblyOrders() {
       bom: wi.bomName || wi.productName,
       warehouse: '成品仓',
       urgency: plan.urgency || '普通',
-      planDateRange: [dayjs().format('YYYY-MM-DD'), plan.deliveryDate || dayjs().add(14, 'day').format('YYYY-MM-DD')],
+      planDateRange: [
+        dayjs().format('YYYY-MM-DD'),
+        plan.deliveryDate || dayjs().add(14, 'day').format('YYYY-MM-DD'),
+      ],
       remark: '生产计划演示总装工单',
       processRouteName: routeName,
       source: 'production-plan',

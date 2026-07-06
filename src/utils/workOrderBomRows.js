@@ -9,9 +9,7 @@ export function buildWorkOrderEbomLine(workOrder, variant = 'production') {
   const linkedBom = resolveWorkOrderLinkedBom(workOrder, variant)
   const savedBom = workOrder.bomId ? getProductBomById(workOrder.bomId) : null
   const productId =
-    workOrder.productId ||
-    (linkedBom?.itemType === 'product' ? linkedBom.itemId : '') ||
-    ''
+    workOrder.productId || (linkedBom?.itemType === 'product' ? linkedBom.itemId : '') || ''
 
   return {
     id: workOrder.id,

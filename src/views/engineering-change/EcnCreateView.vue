@@ -10,7 +10,9 @@
       <a-space>
         <a-button size="small" @click="goBack">取消</a-button>
         <a-button size="small" @click="saveDraft">存草稿</a-button>
-        <a-button type="primary" size="small" @click="submit">{{ moduleConfig.submitButtonLabel }}</a-button>
+        <a-button type="primary" size="small" @click="submit">{{
+          moduleConfig.submitButtonLabel
+        }}</a-button>
       </a-space>
     </div>
 
@@ -35,7 +37,11 @@
             </a-col>
             <a-col :span="6">
               <a-form-item label="紧急程度" required>
-                <a-select v-model:value="form.urgency" :options="urgencyOpts" placeholder="请选择" />
+                <a-select
+                  v-model:value="form.urgency"
+                  :options="urgencyOpts"
+                  placeholder="请选择"
+                />
               </a-form-item>
             </a-col>
           </a-row>
@@ -44,7 +50,11 @@
 
       <div class="section-card">
         <div class="section-title">关联单据</div>
-        <a-radio-group v-model:value="form.originType" class="origin-radio" @change="onOriginTypeChange">
+        <a-radio-group
+          v-model:value="form.originType"
+          class="origin-radio"
+          @change="onOriginTypeChange"
+        >
           <a-radio
             v-for="opt in ecnOriginOptions"
             :key="opt.value"
@@ -99,7 +109,11 @@
                     placeholder="选择关联产品后自动带出"
                     class="ebom-input"
                   />
-                  <a-button size="small" :disabled="!bomFlatNodes.length" @click="bomOverviewOpen = true">
+                  <a-button
+                    size="small"
+                    :disabled="!bomFlatNodes.length"
+                    @click="bomOverviewOpen = true"
+                  >
                     查看BOM
                   </a-button>
                 </div>
@@ -144,7 +158,11 @@
                     placeholder="选择关联产品后自动带出"
                     class="ebom-input"
                   />
-                  <a-button size="small" :disabled="!bomFlatNodes.length" @click="bomOverviewOpen = true">
+                  <a-button
+                    size="small"
+                    :disabled="!bomFlatNodes.length"
+                    @click="bomOverviewOpen = true"
+                  >
                     查看BOM
                   </a-button>
                 </div>
@@ -161,7 +179,12 @@
         </div>
         <div class="tech-toolbar">
           <a-space>
-            <a-button type="primary" size="small" :disabled="!bomPickerLines.length" @click="openBomPick">
+            <a-button
+              type="primary"
+              size="small"
+              :disabled="!bomPickerLines.length"
+              @click="openBomPick"
+            >
               从 BOM 添加变更项
             </a-button>
             <a-button size="small" :disabled="!form.productName" @click="addEmptyChangeRow">
@@ -169,7 +192,9 @@
             </a-button>
           </a-space>
           <span v-if="!form.productName" class="tech-hint">请先选择关联产品</span>
-          <span v-else-if="!bomPickerLines.length" class="tech-hint">当前产品未关联可选取的 BOM 物料</span>
+          <span v-else-if="!bomPickerLines.length" class="tech-hint"
+            >当前产品未关联可选取的 BOM 物料</span
+          >
         </div>
         <EcnChangeItemsTable
           :items="changeItems"
@@ -187,11 +212,7 @@
         <div class="section-title">变更说明</div>
         <a-form layout="vertical" size="small">
           <a-form-item label="变更说明">
-            <a-textarea
-              v-model:value="form.description"
-              :rows="3"
-              placeholder="简述变更原由"
-            />
+            <a-textarea v-model:value="form.description" :rows="3" placeholder="简述变更原由" />
           </a-form-item>
         </a-form>
       </div>
@@ -260,7 +281,7 @@
           <span class="section-title">执行配置</span>
           <span class="section-sub">审批通过后生效</span>
         </div>
-        <div class="exec-label">BOM 执行方式：</div>
+        <div class="exec-label">EBOM 执行方式：</div>
         <a-radio-group v-model:value="form.wipHandling" class="exec-radio-group">
           <a-radio
             v-for="opt in ecnExecConfigOptions"
@@ -344,7 +365,11 @@ import {
   ECN_CHANGE_ITEM_TYPE,
 } from '@/constants/ecn'
 import { resolveChangeRequestModule } from '@/constants/changeRequestModule'
-import { salesOrderState, getSalesOrderById, findSalesOrderByOrderNo } from '@/store/salesOrderStore'
+import {
+  salesOrderState,
+  getSalesOrderById,
+  findSalesOrderByOrderNo,
+} from '@/store/salesOrderStore'
 import { workOrderState } from '@/store/workOrderStore'
 import { filterSalesOrdersForPicker } from '@/utils/salesOrderPicker'
 import { filterWorkOrdersForPicker } from '@/utils/workOrderPicker'
@@ -424,7 +449,7 @@ const form = reactive({
   description: '',
   beforeChange: '',
   afterChange: '',
-  wipHandling: ECN_WIP_HANDLING.ARCHIVE_UPGRADE,
+  wipHandling: ECN_WIP_HANDLING.EBOM_ONLY,
   notifyDepartments: false,
   impact: { products: 1, bomLines: 3, wipOrders: 12, inventoryWarnings: 2 },
   attachments: [],
@@ -449,7 +474,8 @@ const workOrderSelectOpts = computed(() =>
 const productLineOpts = computed(() => {
   const lines = selectedSalesOrder.value?.lineItems || []
   return lines.map((line) => ({
-    label: [line.productName, line.specModel].filter(Boolean).join(' · ') || line.productCode || '—',
+    label:
+      [line.productName, line.specModel].filter(Boolean).join(' · ') || line.productCode || '—',
     value: line.id,
   }))
 })
@@ -724,7 +750,10 @@ function validateForm() {
       message.warning('请填写父级物料')
       return false
     }
-    if (item.changeType !== ECN_CHANGE_ITEM_TYPE.REMOVE && (item.newUnitQty == null || item.newUnitQty === '')) {
+    if (
+      item.changeType !== ECN_CHANGE_ITEM_TYPE.REMOVE &&
+      (item.newUnitQty == null || item.newUnitQty === '')
+    ) {
       message.warning('请填写新单位用量')
       return false
     }
@@ -745,7 +774,9 @@ function validateForm() {
 function buildPayload(status) {
   const order =
     selectedSalesOrder.value ||
-    (form.salesOrderId ? getSalesOrderById(form.salesOrderId) : findSalesOrderByOrderNo(form.salesOrderNo))
+    (form.salesOrderId
+      ? getSalesOrderById(form.salesOrderId)
+      : findSalesOrderByOrderNo(form.salesOrderNo))
   const allProcesses = [
     ...new Set(changeItems.value.flatMap((item) => item.relatedProcesses || [])),
   ]
@@ -756,7 +787,8 @@ function buildPayload(status) {
     reason: form.changeReason,
     changeReason: form.changeReason,
     productName: form.productName,
-    salesOrderNo: form.salesOrderNo || order?.orderNo || selectedWorkOrder.value?.sourceOrderNo || '',
+    salesOrderNo:
+      form.salesOrderNo || order?.orderNo || selectedWorkOrder.value?.sourceOrderNo || '',
     customerName: order?.customerName || '',
     workOrderNo: form.workOrderCode || '',
     ebomLabel: form.ebomLabel,
@@ -786,18 +818,22 @@ function submit() {
 <style lang="less" scoped>
 .ecn-create-page {
   margin: -12px;
-  padding: 0 0 24px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 112px);
+  overflow: hidden;
   background: #f5f6f8;
-  min-height: calc(100vh - 112px);
 }
 
 .page-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .header-left {
@@ -816,7 +852,11 @@ function submit() {
 }
 
 .form-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 12px;
+  padding-bottom: 24px;
 }
 
 .section-card {
@@ -1024,7 +1064,9 @@ function submit() {
     padding: 10px 12px;
     border: 1px solid #f0f0f0;
     border-radius: 6px;
-    transition: border-color 0.2s, background 0.2s;
+    transition:
+      border-color 0.2s,
+      background 0.2s;
   }
 
   :deep(.ant-radio-wrapper-checked) {

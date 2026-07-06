@@ -7,11 +7,7 @@ import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { salesOrderState } from '@/store/salesOrderStore'
 import { mockOutsourcingOrders } from '@/mock/outsourcingOrders'
 import { getDeliveryOrderByCode } from '@/store/deliveryOrderStore'
-import {
-  calcApplyShipQty,
-  calcDeliveryAmountExTax,
-  calcShipWeight,
-} from '@/utils/deliveryOrder'
+import { calcApplyShipQty, calcDeliveryAmountExTax, calcShipWeight } from '@/utils/deliveryOrder'
 
 /** 销售订单详情 — 发货申请行（合并关联发货单指标） */
 export function enrichDeliveryApplicationRow(app = {}) {
@@ -37,7 +33,8 @@ export function enrichDeliveryApplicationRow(app = {}) {
   }
   return {
     ...app,
-    deliveryStatus: app.deliveryStatus || (app.status === '已提交' ? '待发货' : app.status || '待发货'),
+    deliveryStatus:
+      app.deliveryStatus || (app.status === '已提交' ? '待发货' : app.status || '待发货'),
     applyShipQty: calcApplyShipQty(app),
     actualOutboundQty: Number(app.actualOutboundQty) || 0,
     shipWeight: calcShipWeight(app),

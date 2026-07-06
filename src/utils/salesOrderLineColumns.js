@@ -37,9 +37,21 @@ export const salesOrderDetailLineColumns = [
   { key: 'unit', title: '单位', dataIndex: 'unit', width: 70 },
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 110, ellipsis: true },
   { key: 'bomVersion', title: 'Bom版本', dataIndex: 'bomVersion', width: 90 },
-  { key: 'unitPriceExTax', title: '不含税单价', dataIndex: 'unitPriceExTax', width: 100, align: 'right' },
+  {
+    key: 'unitPriceExTax',
+    title: '不含税单价',
+    dataIndex: 'unitPriceExTax',
+    width: 100,
+    align: 'right',
+  },
   { key: 'taxRate', title: '税率(%)', dataIndex: 'taxRate', width: 80, align: 'right' },
-  { key: 'unitPriceInTax', title: '含税单价', dataIndex: 'unitPriceInTax', width: 100, align: 'right' },
+  {
+    key: 'unitPriceInTax',
+    title: '含税单价',
+    dataIndex: 'unitPriceInTax',
+    width: 100,
+    align: 'right',
+  },
   {
     key: 'totalPriceExTax',
     title: '总价（不含税）',
@@ -55,5 +67,11 @@ export const salesOrderDetailLineColumns = [
     align: 'right',
   },
   { key: 'packagingForm', title: '包装形式', dataIndex: 'packagingForm', width: 90 },
-  { key: 'supplementDesc', title: '补充说明', dataIndex: 'supplementDesc', width: 100, ellipsis: true },
+  {
+    key: 'supplementDesc',
+    title: '补充说明',
+    dataIndex: 'supplementDesc',
+    width: 100,
+    ellipsis: true,
+  },
 ]

@@ -15,13 +15,7 @@ export {
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
 
-export const productAttributeOptions = [
-  '标准产品',
-  '定制产品',
-  '标准零部件',
-  '定制零部件',
-  '服务',
-]
+export const productAttributeOptions = ['标准产品', '定制产品', '标准零部件', '定制零部件', '服务']
 
 export const STANDARD_PART_ATTRIBUTE = '标准零部件'
 export const CUSTOM_PART_ATTRIBUTE = '定制零部件'

@@ -68,8 +68,7 @@ const execConfig = computed(() => findExecConfigOption(record.value?.wipHandling
 
 const isReadonly = computed(
   () =>
-    record.value?.status === ECN_STATUS.EXECUTING ||
-    record.value?.status === ECN_STATUS.EXECUTED,
+    record.value?.status === ECN_STATUS.EXECUTING || record.value?.status === ECN_STATUS.EXECUTED,
 )
 
 function goBack() {

@@ -79,8 +79,15 @@ function filterAssemblyForWorkItem(assemblyWorkOrders, planOrderNo, workItem) {
 }
 
 function appendDocumentNodes(children, context) {
-  const { plan, material, workItem, isTopLevel, workOrders, assemblyWorkOrders, purchaseRequisitions } =
-    context
+  const {
+    plan,
+    material,
+    workItem,
+    isTopLevel,
+    workOrders,
+    assemblyWorkOrders,
+    purchaseRequisitions,
+  } = context
   const planOrderNo = plan.orderNo
 
   filterProductionWorkOrders(workOrders, planOrderNo, material.code).forEach((wo) => {
@@ -109,18 +116,20 @@ function appendDocumentNodes(children, context) {
     )
   })
 
-  filterPurchaseReqLines(purchaseRequisitions, planOrderNo, material.code).forEach(({ req, line }) => {
-    children.push(
-      createDocumentNode({
-        docType: '采购申请',
-        docId: req.id,
-        docNo: req.reqNo,
-        productName: line.inventoryName || line.name || material.name,
-        status: resolveDocStatus(req),
-        raw: { req, line },
-      }),
-    )
-  })
+  filterPurchaseReqLines(purchaseRequisitions, planOrderNo, material.code).forEach(
+    ({ req, line }) => {
+      children.push(
+        createDocumentNode({
+          docType: '采购申请',
+          docId: req.id,
+          docNo: req.reqNo,
+          productName: line.inventoryName || line.name || material.name,
+          status: resolveDocStatus(req),
+          raw: { req, line },
+        }),
+      )
+    },
+  )
 
   if (isTopLevel) {
     filterAssemblyForWorkItem(assemblyWorkOrders, planOrderNo, workItem).forEach((asm) => {

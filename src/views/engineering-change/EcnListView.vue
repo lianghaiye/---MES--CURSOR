@@ -147,8 +147,12 @@
             <a-space :size="0" wrap>
               <template v-if="record.status === ECN_STATUS.DRAFT">
                 <a-button type="link" size="small" @click="goEdit(record)">编辑</a-button>
-                <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
-                <a-button type="link" size="small" @click="handleSubmitApproval(record)">提交审批</a-button>
+                <a-button type="link" size="small" danger @click="handleDelete(record)"
+                  >删除</a-button
+                >
+                <a-button type="link" size="small" @click="handleSubmitApproval(record)"
+                  >提交审批</a-button
+                >
               </template>
               <template v-else-if="record.status === ECN_STATUS.APPROVING">
                 <a-button type="link" size="small" @click="openApprove(record)">审批</a-button>
@@ -157,7 +161,9 @@
                 <a-button type="link" size="small" @click="openExecute(record)">执行</a-button>
               </template>
               <template v-else-if="record.status === ECN_STATUS.EXECUTED">
-                <a-button type="link" size="small" @click="openDetailInNewTab(record)">详情</a-button>
+                <a-button type="link" size="small" @click="openDetailInNewTab(record)"
+                  >详情</a-button
+                >
               </template>
               <template v-else-if="record.status === ECN_STATUS.REJECTED">
                 <a-button type="link" size="small" @click="goEdit(record)">编辑</a-button>
@@ -256,7 +262,9 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings(moduleConfig.columnSettingsKey, baseColumns, { excludeKeys: ['index', 'action'] })
+  useTableColumnSettings(moduleConfig.columnSettingsKey, baseColumns, {
+    excludeKeys: ['index', 'action'],
+  })
 
 const filteredList = computed(() => moduleConfig.store.filterList(appliedFilters.value))
 

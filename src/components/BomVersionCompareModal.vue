@@ -24,7 +24,9 @@
           <EbomDiffTable :diff="comparePayload.diff" />
         </a-tab-pane>
         <a-tab-pane key="full" tab="并排对比">
-          <div class="full-hint">按 BOM 树结构位置左右对照；整项换料（编码与名称均变）在同一行以「原物料 ⇄ 新物料」展示。</div>
+          <div class="full-hint">
+            按 BOM 树结构位置左右对照；整项换料（编码与名称均变）在同一行以「原物料 ⇄ 新物料」展示。
+          </div>
           <EbomFullCompareTable
             :rows="comparePayload.fullRows"
             :left-version="comparePayload.leftVersion"
@@ -61,7 +63,9 @@ const comparePayload = computed(() => {
 })
 
 const modalTitle = computed(
-  () => props.title || `BOM 版本对比 · ${comparePayload.value?.leftVersion || ''} → ${comparePayload.value?.rightVersion || ''}`,
+  () =>
+    props.title ||
+    `BOM 版本对比 · ${comparePayload.value?.leftVersion || ''} → ${comparePayload.value?.rightVersion || ''}`,
 )
 </script>
 

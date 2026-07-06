@@ -27,7 +27,12 @@
     <template #footer>
       <a-space>
         <a-button :size="pageMode ? 'small' : 'middle'" @click="handleCancel">取消</a-button>
-        <a-button type="primary" :size="pageMode ? 'small' : 'middle'" :loading="saving" @click="handleSave">
+        <a-button
+          type="primary"
+          :size="pageMode ? 'small' : 'middle'"
+          :loading="saving"
+          @click="handleSave"
+        >
           确定
         </a-button>
       </a-space>

@@ -107,7 +107,9 @@
                 <tr>
                   <td class="impact-card">
                     <div class="impact-label">BOM 版本</div>
-                    <div class="impact-value impact-value-sm">{{ payload.impact.bomVersionAction }}</div>
+                    <div class="impact-value impact-value-sm">
+                      {{ payload.impact.bomVersionAction }}
+                    </div>
                     <div class="impact-sub">
                       {{ payload.affectedProduct.versionBefore }} →
                       {{ payload.affectedProduct.versionAfter }}

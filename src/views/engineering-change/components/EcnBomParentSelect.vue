@@ -33,10 +33,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import {
-  flattenBomOverviewPickerRows,
-  filterBomOverviewPickerRows,
-} from '@/utils/ecnProductSource'
+import { flattenBomOverviewPickerRows, filterBomOverviewPickerRows } from '@/utils/ecnProductSource'
 import EcnBomParentPickModal from './EcnBomParentPickModal.vue'
 
 const props = defineProps({

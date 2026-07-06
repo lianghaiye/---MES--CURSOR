@@ -116,14 +116,15 @@ const emit = defineEmits(['update:open', 'created', 'updated'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 
-const { isActive, shellTitle, handleCancel: onShellCancel, goBack } = useFormCreateModal(
-  props,
-  emit,
-  {
-    listPath: '/production/qc-work-orders',
-    getTitle: () => (isEdit.value ? '编辑质检工单' : '新增质检工单'),
-  },
-)
+const {
+  isActive,
+  shellTitle,
+  handleCancel: onShellCancel,
+  goBack,
+} = useFormCreateModal(props, emit, {
+  listPath: '/production/qc-work-orders',
+  getTitle: () => (isEdit.value ? '编辑质检工单' : '新增质检工单'),
+})
 
 function finishSave() {
   if (props.pageMode) {

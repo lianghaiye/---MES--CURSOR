@@ -4,11 +4,7 @@ import { buildMockEcnRecords } from '@/mock/ecnSeed'
 import { createLineItem } from '@/mock/salesOrders'
 import { isBomArchived } from '@/mock/productBomOptions'
 import { ECN_CHANGE_ITEM_TYPE } from '@/constants/ecn'
-import {
-  getActiveBomForItem,
-  getBomsForItem,
-  getProductBomById,
-} from '@/store/productBomStore'
+import { getActiveBomForItem, getBomsForItem, getProductBomById } from '@/store/productBomStore'
 import { executeEcnBomVersionUpgrade } from '@/utils/ecnBomExecution'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { buildBomVersionComparePayload } from '@/utils/ebomSnapshotDiff'
@@ -149,7 +145,11 @@ function applyDirectDemoPatchToBom(bom, keyword) {
     if (lines[1]) lines[1].material = '碳化硅/石墨（耐腐型）'
   } else if (keyword === 'CQ32-25-145') {
     if (lines[0]) lines[0].material = '316L 不锈钢'
-    if (lines[1]) lines[1].specModel = `${lines[1].specModel || ''}（加强型）`.replace(/（加强型）（加强型）/, '（加强型）')
+    if (lines[1])
+      lines[1].specModel = `${lines[1].specModel || ''}（加强型）`.replace(
+        /（加强型）（加强型）/,
+        '（加强型）',
+      )
   }
 
   bom.updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
@@ -242,7 +242,9 @@ export function buildEcnBoundLine(product, partial = {}) {
     deliveryDate: partial.deliveryDate || dayjs().add(21, 'day').format('YYYY-MM-DD'),
     taxRate,
     unitPriceExTax: partial.unitPriceExTax ?? unitPrice,
-    unitPriceInTax: Number(((partial.unitPriceExTax ?? unitPrice) * (1 + taxRate / 100)).toFixed(2)),
+    unitPriceInTax: Number(
+      ((partial.unitPriceExTax ?? unitPrice) * (1 + taxRate / 100)).toFixed(2),
+    ),
     totalPriceExTax: Number(totalEx.toFixed(2)),
     totalPriceInTax: Number((totalEx * (1 + taxRate / 100)).toFixed(2)),
     bomId: resolvedBom.id,

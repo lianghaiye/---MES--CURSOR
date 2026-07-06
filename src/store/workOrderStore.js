@@ -226,7 +226,8 @@ export function createWorkOrderPayload(partial) {
   const isMaintenance = partial.orderCategory === '维修工单'
   const skipEbomCategory = isOutsource || isMaintenance
   const routeName =
-    partial.processRouteName || (skipEbomCategory ? '' : getDefaultProductRoute(partial.productName))
+    partial.processRouteName ||
+    (skipEbomCategory ? '' : getDefaultProductRoute(partial.productName))
   const existingCodes = workOrderState.orders.map((o) => o.code)
   const category = partial.orderCategory || '生产工单'
   const productName = partial.productName?.trim() || ''
