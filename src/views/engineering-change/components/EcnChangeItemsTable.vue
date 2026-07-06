@@ -8,7 +8,7 @@
       bordered
       :pagination="false"
       :locale="{ emptyText: emptyText }"
-      :scroll="{ x: 2800 }"
+      :scroll="{ x: 2980 }"
     >
       <template #headerCell="{ column }">
         <template v-if="column.required">
@@ -119,6 +119,17 @@
           <span v-else class="cell-readonly" :title="record.parentPath">{{
             record.parentPath || '—'
           }}</span>
+        </template>
+
+        <template v-else-if="column.key === 'replaceBom'">
+          <span
+            v-if="record.changeType === ECN_CHANGE_ITEM_TYPE.REPLACE"
+            class="cell-readonly"
+            :title="record.replaceBomLabel"
+          >
+            {{ record.replaceBomLabel || '—' }}
+          </span>
+          <span v-else class="cell-muted">—</span>
         </template>
 
         <template v-else-if="column.key === 'relatedProcesses'">
@@ -254,7 +265,7 @@ const emit = defineEmits(['remove', 'edit'])
 
 const changeTypeOpts = ecnChangeItemTypeOptions
 
-const supplyFormOpts = ['自制件', '外购件', '外协件', '虚拟件'].map((v) => ({
+const supplyFormOpts = ['自制件', '外购件'].map((v) => ({
   label: v,
   value: v,
 }))
@@ -270,6 +281,7 @@ const columns = [
   { title: '新物料编码/规格/材质/图号', key: 'newMaterialDetail', width: 200, ellipsis: true },
   { title: '新单位用量', key: 'newUnitQty', width: 110, required: true },
   { title: '父级物料', key: 'parentMaterial', width: 150, required: true },
+  { title: '替换BOM', key: 'replaceBom', width: 180, ellipsis: true },
   { title: '关联工序', key: 'relatedProcesses', width: 140 },
   { title: '当前库存', key: 'currentStock', width: 88, align: 'right' },
   { title: '是否补料', key: 'needReplenish', width: 88, align: 'center' },
@@ -367,6 +379,10 @@ function onNewMaterialClear(record) {
   record.newMaterial = ''
   record.newDrawingNo = ''
   record.currentStock = null
+  record.replaceBomLabel = ''
+  record.newMaterialItemType = ''
+  record.newMaterialItemId = ''
+  record.replaceBomId = ''
   syncLegacy(record)
 }
 

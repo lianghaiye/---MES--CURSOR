@@ -190,6 +190,9 @@
             <a-button size="small" :disabled="!form.productName" @click="addEmptyChangeRow">
               新增行
             </a-button>
+            <a-button size="small" :disabled="!canPreviewChangedBom" @click="openChangedBomPreview">
+              预览变更后的BOM
+            </a-button>
           </a-space>
           <span v-if="!form.productName" class="tech-hint">请先选择关联产品</span>
           <span v-else-if="!bomPickerLines.length" class="tech-hint"
@@ -334,6 +337,15 @@
       :root-item-name="form.productName"
       :overview-info="bomOverviewInfo"
     />
+    <BomOverviewModal
+      v-model:open="changedBomPreviewOpen"
+      simple-toolbar
+      title="变更后BOM预览"
+      :flat-nodes="previewFlatNodes"
+      :line-items="previewLineItems"
+      :root-item-name="form.productName"
+      :overview-info="changedBomPreviewInfo"
+    />
   </div>
 </template>
 
@@ -388,6 +400,7 @@ import EcnBomParentPickModal from './components/EcnBomParentPickModal.vue'
 import EcnChangeItemsTable from './components/EcnChangeItemsTable.vue'
 import EcnChangeItemEditModal from './components/EcnChangeItemEditModal.vue'
 import BomOverviewModal from '@/views/product-process/components/BomOverviewModal.vue'
+import { buildEcnPreviewBomStructure } from '@/utils/ecnBomPreview'
 
 const route = useRoute()
 const router = useRouter()
@@ -403,6 +416,9 @@ const selectedProductLine = ref(null)
 const bomPickOpen = ref(false)
 const changeEditOpen = ref(false)
 const bomOverviewOpen = ref(false)
+const changedBomPreviewOpen = ref(false)
+const previewFlatNodes = ref([])
+const previewLineItems = ref([])
 const editingChangeItem = ref(null)
 const changeItems = ref([])
 const bomPickerLines = ref([])
@@ -422,6 +438,15 @@ const bomOverviewInfo = computed(() => ({
 const addedBomLineIds = computed(() =>
   changeItems.value.map((item) => item.bomLineId).filter(Boolean),
 )
+
+const canPreviewChangedBom = computed(
+  () => Boolean(form.productName) && bomFlatNodes.value.length > 0 && changeItems.value.length > 0,
+)
+
+const changedBomPreviewInfo = computed(() => ({
+  ...bomOverviewInfo.value,
+  version: `${form.ebomLabel || '—'}（变更预览）`,
+}))
 
 const typeOpts = ecnCreateTypeOptions
 const changeReasonOpts = ecnChangeReasonOptions
@@ -652,6 +677,22 @@ function onWorkOrderSelectChange(code) {
 
 function onWorkOrderPicked(wo) {
   applyWorkOrder(wo)
+}
+
+function openChangedBomPreview() {
+  if (!changeItems.value.length) {
+    message.warning('请先添加变更项')
+    return
+  }
+  const preview = buildEcnPreviewBomStructure(
+    bomFlatNodes.value,
+    bomLineItems.value,
+    changeItems.value,
+    form.productName,
+  )
+  previewFlatNodes.value = preview.flatNodes
+  previewLineItems.value = preview.lineItems
+  changedBomPreviewOpen.value = true
 }
 
 function openBomPick() {

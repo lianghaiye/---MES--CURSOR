@@ -134,6 +134,11 @@
             <a-input v-else :value="form.parentPath || '—'" readonly />
           </a-form-item>
         </a-col>
+        <a-col v-if="form.changeType === ECN_CHANGE_ITEM_TYPE.REPLACE" :span="12">
+          <a-form-item label="替换BOM">
+            <a-input :value="form.replaceBomLabel || '—'" readonly placeholder="选择新物料后自动带出" />
+          </a-form-item>
+        </a-col>
         <a-col :span="12">
           <a-form-item label="关联工序">
             <a-select
@@ -230,7 +235,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'save'])
 
-const supplyFormOpts = ['自制件', '外购件', '外协件', '虚拟件'].map((v) => ({
+const supplyFormOpts = ['自制件', '外购件'].map((v) => ({
   label: v,
   value: v,
 }))

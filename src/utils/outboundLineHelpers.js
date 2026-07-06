@@ -190,18 +190,70 @@ export function buildOutboundLinesFromBom(
 }
 
 export function mergeOutboundLines(existing = [], incoming = []) {
-  const map = new Map(existing.map((l) => [l.itemCode, { ...l }]))
+  const result = existing.map((l) => ({ ...l }))
   incoming.forEach((line) => {
-    const hit = map.get(line.itemCode)
+    const code = line.itemCode
+    if (!code) {
+      result.push(enrichOutboundLine({ ...line }))
+      return
+    }
+    const hit = result.find((l) => l.itemCode === code)
     if (hit) {
       hit.shipQty = roundQty((Number(hit.shipQty) || 0) + (Number(line.shipQty) || 0))
       if (!hit.sourceDocNo && line.sourceDocNo) hit.sourceDocNo = line.sourceDocNo
       Object.assign(hit, enrichOutboundLinePricing(hit))
       return
     }
-    map.set(line.itemCode, enrichOutboundLine({ ...line }))
+    result.push(enrichOutboundLine({ ...line }))
   })
-  return [...map.values()]
+  return result
+}
+
+export function createBlankOutboundLine(defaultWarehouse = '') {
+  return enrichOutboundLine(
+    createOutboundLine({
+      itemCode: '',
+      itemName: '',
+      shipQty: 1,
+      shipWarehouse: defaultWarehouse || '',
+    }),
+  )
+}
+
+export function applyPickerItemToOutboundLine(line, item, defaultWarehouse = '') {
+  const normalized = {
+    itemId: item.itemId ?? item.id,
+    itemType: item.itemType,
+    code: item.code,
+    name: item.name,
+    specModel: item.specModel,
+    material: item.material,
+    drawingNo: item.drawingNo,
+    inventoryUnit: item.inventoryUnit,
+    unitPrice: item.unitPrice,
+    productAttribute: item.productAttribute || item.materialType,
+    materialType: item.materialType,
+  }
+  const fresh = buildOutboundLineFromPickerItem(
+    normalized,
+    line.shipWarehouse || defaultWarehouse || '',
+  )
+  return enrichOutboundLine({
+    ...line,
+    itemId: fresh.itemId,
+    itemCode: fresh.itemCode,
+    itemName: fresh.itemName,
+    itemType: fresh.itemType,
+    specAttr: fresh.specAttr,
+    specModel: fresh.specModel,
+    material: fresh.material,
+    drawingNo: fresh.drawingNo,
+    unit: fresh.unit,
+    unitPrice: fresh.unitPrice ?? line.unitPrice,
+    stockQty: fresh.stockQty,
+    warehouseStockQty: fresh.warehouseStockQty,
+    totalPrice: calcLineTotalPrice({ ...line, unitPrice: fresh.unitPrice ?? line.unitPrice }),
+  })
 }
 
 export function cloneOutboundLine(line) {

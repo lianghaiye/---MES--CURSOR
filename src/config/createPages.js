@@ -93,16 +93,8 @@ export const createPageRegistry = [
     newPath: '/product-process/products/new',
     title: '新增产品',
     name: 'product-process-products-new',
-    view: () => import('@/views/product-process/ProductCreateView.vue'),
-    keepAlive: 'ProductCreateView',
-  },
-  {
-    listPath: '/product-process/materials',
-    newPath: '/product-process/materials/new',
-    title: '新增物料',
-    name: 'product-process-materials-new',
-    view: () => import('@/views/product-process/MaterialCreateView.vue'),
-    keepAlive: 'MaterialCreateView',
+    view: () => import('@/views/product-process/MasterItemCreateView.vue'),
+    keepAlive: 'MasterItemCreateView',
   },
   {
     listPath: '/product-process/process-config',

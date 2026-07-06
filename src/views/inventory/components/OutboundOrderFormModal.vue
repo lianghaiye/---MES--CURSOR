@@ -8,6 +8,7 @@
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
+    <div class="form-layout">
     <a-form :model="form" layout="inline" class="header-form horizontal-form">
       <a-row :gutter="[12, 12]" style="width: 100%">
         <a-col :span="8">
@@ -113,17 +114,27 @@
       </a-space>
     </div>
 
-    <a-table
-      :columns="displayColumns"
-      :data-source="form.lineItems"
-      row-key="id"
-      size="small"
-      bordered
-      :pagination="false"
-      :scroll="{ x: lineScrollX, y: 320 }"
-    >
+    <div ref="lineTablePanelRef" class="line-table-panel" :style="lineTablePanelStyle">
+      <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
+        <a-table
+          :columns="displayColumns"
+          :data-source="form.lineItems"
+          row-key="id"
+          size="small"
+          bordered
+          :pagination="false"
+          :scroll="lineTableScroll"
+        >
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+        <template v-else-if="column.key === 'itemName'">
+          <InventoryLineItemSelect
+            :value="record.itemCode"
+            :fallback-name="record.itemName"
+            @select="(item) => onLineItemSelect(record, item)"
+            @clear="onLineItemClear(record)"
+          />
+        </template>
         <template v-else-if="column.key === 'stockQty'">
           {{ formatQty(record.stockQty) }}
         </template>
@@ -200,9 +211,31 @@
         </template>
       </template>
       <template #emptyText>
-        <a-empty :image="false" description="暂无数据" />
+        <div class="line-empty-placeholder">暂无数据</div>
       </template>
-    </a-table>
+        </a-table>
+      </div>
+      <InventoryLineTableFooter
+        :columns="displayColumns"
+        :scroll-x="lineScrollX"
+        @add-line="addBlankLine"
+      >
+        <template #cell="{ column }">
+          <template v-if="column.key === 'index'">合计</template>
+          <template v-else-if="column.key === 'itemCode'">项数 {{ lineSummary.lineCount }}</template>
+          <template v-else-if="column.key === 'shipQty'">
+            {{ formatQty(lineSummary.shipQtyTotal) }}
+          </template>
+          <template v-else-if="column.key === 'weight'">
+            {{ formatQty(lineSummary.weightTotal) }}
+          </template>
+          <template v-else-if="column.key === 'totalPrice'">
+            {{ formatMoney(lineSummary.totalPrice) }}
+          </template>
+        </template>
+      </InventoryLineTableFooter>
+    </div>
+    </div>
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
@@ -213,11 +246,13 @@
     </template>
   </FormCreateShell>
 
-  <SelectWarehouseItemModal
+  <SelectBomMaterialModal
     v-if="isActive"
     v-model:open="pickerOpen"
-    :selected-items="pickerPreset"
-    @confirm="onItemsPicked"
+    title="选择产品"
+    hide-add-material
+    ecn-new-material-mode
+    @selected="onItemsPicked"
   />
 
   <AddByBomModal
@@ -247,7 +282,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { CheckOutlined, PlusOutlined } from '@ant-design/icons-vue'
@@ -255,19 +290,24 @@ import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
+import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTableScroll'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
-import SelectWarehouseItemModal from '@/views/basic-config/components/SelectWarehouseItemModal.vue'
+import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import OutboundLineEditModal from './OutboundLineEditModal.vue'
+import InventoryLineItemSelect from './InventoryLineItemSelect.vue'
+import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
 import { outboundTypeOptions, handlerOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { addOutboundOrder, generateOutboundNo, updateOutboundOrder } from '@/store/outboundStore'
-import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
 import { outboundFormLineColumns } from '@/utils/outboundLineColumns'
+import { normalizeInventoryPickerItem } from '@/utils/inventoryLineItemPicker'
 import {
+  applyPickerItemToOutboundLine,
   buildOutboundLineFromPickerItem,
   buildOutboundLinesFromBom,
   cloneOutboundLine,
+  createBlankOutboundLine,
   enrichOutboundLine,
   mergeOutboundLines,
   syncLineTotalFromUnit,
@@ -335,20 +375,36 @@ const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultC
 
 const lineScrollX = tableScrollX
 
-const pickerPreset = computed(() => {
-  const lookup = new Map(
-    buildWarehousePickableItems().map((it) => [`${it.itemType}-${it.code}`, it]),
-  )
-  return form.lineItems.map((l) => {
-    const hit = lookup.get(`${l.itemType || '物料'}-${l.itemCode}`)
-    return {
-      itemType: hit?.itemType || l.itemType || '物料',
-      itemId: hit?.itemId ?? l.itemId,
-      code: l.itemCode,
-      name: l.itemName,
-    }
-  })
+const lineSummary = computed(() => {
+  const lines = form.lineItems.filter((l) => l.itemCode)
+  const shipQtyTotal = lines.reduce((sum, line) => sum + (Number(line.shipQty) || 0), 0)
+  const weightTotal = lines.reduce((sum, line) => sum + (Number(line.weight) || 0), 0)
+  const totalPrice = lines.reduce((sum, line) => sum + (Number(line.totalPrice) || 0), 0)
+  return {
+    lineCount: lines.length,
+    shipQtyTotal: Math.round(shipQtyTotal * 1000) / 1000,
+    weightTotal: Math.round(weightTotal * 1000) / 1000,
+    totalPrice: Math.round(totalPrice * 100) / 100,
+  }
 })
+
+const {
+  panelRef: lineTablePanelRef,
+  panelStyle: lineTablePanelStyle,
+  tableScroll: lineTableScroll,
+  isScrolling: isLineTableScrolling,
+  updateScrollY,
+} = useInventoryLineTableScroll({
+  scrollX: lineScrollX,
+  getRowCount: () => form.lineItems.length,
+})
+
+watch(
+  () => isActive.value,
+  (visible) => {
+    if (visible) nextTick(updateScrollY)
+  },
+)
 
 watch(
   () => [isActive.value, props.editRecord?.id],
@@ -395,6 +451,14 @@ function resetForm() {
 function formatQty(val) {
   if (val == null || val === '') return '—'
   return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
+
+function formatMoney(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 function refreshLine(line) {
@@ -447,14 +511,17 @@ function syncTotalWeight() {
 }
 
 function onItemsPicked(items) {
-  if (!items?.length) {
+  const list = Array.isArray(items) ? items : [items]
+  if (!list.length) {
     message.warning('未选择物品')
     return
   }
   const before = form.lineItems.length
-  const incoming = items
+  const incoming = list
     .filter((it) => it?.code)
-    .map((it) => buildOutboundLineFromPickerItem(it, form.warehouse || ''))
+    .map((it) =>
+      buildOutboundLineFromPickerItem(normalizeInventoryPickerItem(it), form.warehouse || ''),
+    )
   if (!incoming.length) {
     message.warning('所选物品无效，请重新选择')
     return
@@ -467,6 +534,33 @@ function onItemsPicked(items) {
   } else {
     message.info('所选物品已在明细中')
   }
+}
+
+function addBlankLine() {
+  form.lineItems.push(createBlankOutboundLine(form.warehouse || ''))
+}
+
+function onLineItemSelect(record, item) {
+  if (!item?.code) return
+  const duplicate = form.lineItems.find((l) => l.id !== record.id && l.itemCode === item.code)
+  if (duplicate) {
+    message.warning('该物品已在明细中')
+    return
+  }
+  Object.assign(record, applyPickerItemToOutboundLine(record, item, form.warehouse || ''))
+}
+
+function onLineItemClear(record) {
+  record.itemCode = ''
+  record.itemName = ''
+  record.itemId = ''
+  record.itemType = ''
+  record.specAttr = ''
+  record.specModel = ''
+  record.material = ''
+  record.drawingNo = ''
+  record.stockQty = null
+  record.warehouseStockQty = null
 }
 
 function onBomAdded({ pickerRow, usageCoefficient }) {
@@ -521,7 +615,7 @@ function buildPayload() {
     requisitionDept: form.requisitionDept || '',
     totalWeight: form.totalWeight,
     remark: form.remark?.trim(),
-    lineItems: form.lineItems.map((l) => enrichOutboundLine({ ...l })),
+    lineItems: form.lineItems.filter((l) => l.itemCode).map((l) => enrichOutboundLine({ ...l })),
   }
 }
 
@@ -534,8 +628,8 @@ function handleSave() {
     message.warning('请输入出库单号')
     return
   }
-  if (!form.lineItems.length) {
-    message.warning('请至少添加一条明细')
+  if (!form.lineItems.filter((l) => l.itemCode).length) {
+    message.warning('请至少添加一条有效明细')
     return
   }
 
@@ -555,7 +649,34 @@ function handleSave() {
 </script>
 
 <style lang="less" scoped>
+:deep(.form-create-page.outbound-form-modal) {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+
+  .form-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 12px;
+  }
+}
+
+.form-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .header-form {
+  flex-shrink: 0;
   margin-bottom: 12px;
 
   :deep(.ant-form-item) {
@@ -575,7 +696,46 @@ function handleSave() {
 }
 
 .line-toolbar {
+  flex-shrink: 0;
   margin-bottom: 8px;
+}
+
+.line-table-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.line-table-body {
+  flex: 0 0 auto;
+  min-height: 0;
+
+  &.is-scrolling {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+
+    :deep(.ant-table-wrapper),
+    :deep(.ant-spin-nested-loading),
+    :deep(.ant-spin-container) {
+      height: 100%;
+    }
+  }
+
+  :deep(.ant-table) {
+    margin-bottom: 0 !important;
+  }
+}
+
+.line-empty-placeholder {
+  padding: 12px 0;
+  color: #bfbfbf;
+  font-size: 13px;
+  text-align: center;
 }
 
 .danger-link {

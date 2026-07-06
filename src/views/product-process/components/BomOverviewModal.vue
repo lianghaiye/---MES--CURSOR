@@ -1,7 +1,7 @@
 <template>
   <a-modal
     :open="open"
-    title="BOM概览"
+    :title="title"
     width="98vw"
     :style="{ maxWidth: '1680px', top: '20px' }"
     :mask-closable="false"
@@ -149,6 +149,7 @@ const props = defineProps({
   },
   /** ECN 等只读查看：隐藏数量与打印 */
   simpleToolbar: { type: Boolean, default: false },
+  title: { type: String, default: 'BOM概览' },
 })
 
 const emit = defineEmits(['update:open'])

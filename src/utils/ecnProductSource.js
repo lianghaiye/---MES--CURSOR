@@ -10,6 +10,7 @@ import { loadBomDetailStructure, resolveBomStructure } from '@/utils/bomImport'
 import { getRootTreeId, getOrderedChildNodeIds, getLinesForTreeNode } from '@/utils/bomTree'
 import { assignOverviewIndexes, buildBomOverviewTree } from '@/utils/bomOverview'
 import { buildProcessesFromRoute } from '@/mock/processRoutes'
+import { resolveMaterialBomMeta } from '@/utils/ecnBomPreview'
 
 function normalizeName(value) {
   return String(value || '')
@@ -617,6 +618,10 @@ function baseChangeItem(partial = {}) {
     afterMaterial: '',
     replaceMaterialCode: '',
     replaceMaterialName: '',
+    replaceBomLabel: '',
+    newMaterialItemType: '',
+    newMaterialItemId: '',
+    replaceBomId: '',
     ...partial,
   }
   return syncChangeItemLegacyFields(item)
@@ -683,9 +688,16 @@ export function applyMaterialToChangeItem(item, material) {
   item.newSpecModel = material.specModel || ''
   item.newMaterial = material.material || ''
   item.newDrawingNo = material.drawingNo || ''
-  item.supplyForm = material.supplyForm || item.supplyForm || '外购件'
+  item.supplyForm = ['自制件', '外购件'].includes(material.supplyForm)
+    ? material.supplyForm
+    : item.supplyForm || '外购件'
   item.currentStock = lookupMaterialStock(material.code)
   applyDefaultRelatedProcesses(item, material.code)
+  const bomMeta = resolveMaterialBomMeta(material)
+  item.replaceBomLabel = bomMeta.replaceBomLabel
+  item.newMaterialItemType = bomMeta.newMaterialItemType
+  item.newMaterialItemId = bomMeta.newMaterialItemId
+  item.replaceBomId = bomMeta.replaceBomId
   return syncChangeItemLegacyFields(item)
 }
 
@@ -723,6 +735,10 @@ export function applyChangeTypeDefaults(item) {
     item.newMaterialName = ''
     item.newSpecModel = ''
     item.newMaterial = ''
+    item.replaceBomLabel = ''
+    item.newMaterialItemType = ''
+    item.newMaterialItemId = ''
+    item.replaceBomId = ''
     if (item.newUnitQty == null) item.newUnitQty = item.origUnitQty
   }
   return syncChangeItemLegacyFields(item)

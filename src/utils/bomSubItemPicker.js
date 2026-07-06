@@ -56,11 +56,21 @@ function mapMasterRow(source, itemType) {
   }
 }
 
-/** 合并产品信息与物料信息 */
+import { isProductSyncedMirror } from '@/utils/bomMaterialPicker'
+
+/** 合并产品信息与物料信息（去重产品物料镜像） */
 export function buildBomSubItemPickerRows() {
   const products = (productInfoState.products || []).map((p) => mapMasterRow(p, '产品'))
-  const materials = (materialInfoState.materials || []).map((m) => mapMasterRow(m, '物料'))
-  return [...products, ...materials]
+  const seen = new Set(products.map((r) => r.itemId))
+  const rows = [...products]
+
+  ;(materialInfoState.materials || []).forEach((m) => {
+    if (seen.has(m.id)) return
+    if (isProductSyncedMirror(m)) return
+    rows.push(mapMasterRow(m, '物料'))
+  })
+
+  return rows
 }
 
 export function filterBomSubItemPickerRows(rows, keyword) {

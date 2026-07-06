@@ -5,7 +5,7 @@
 <script setup>
 import FormComponent from './components/MasterItemFormModal.vue'
 
-defineOptions({ name: 'ProductCreateView' })
+defineOptions({ name: 'MasterItemCreateView' })
 
 const listPath = '/product-process/products'
 </script>

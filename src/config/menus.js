@@ -40,7 +40,6 @@ export const sideMenus = {
     },
   ],
   'product-process': [
-    { key: 'materials', label: '物料信息', path: '/product-process/materials' },
     { key: 'products', label: '产品信息', path: '/product-process/products' },
     { key: 'bom', label: '产品BOM', path: '/product-process/bom' },
     { key: 'routing', label: '工艺路线', path: '/product-process/routing' },
@@ -193,7 +192,7 @@ export const routeTitles = {
   '/home/prd/v15': '1.5版本迭代',
   '/home/prd/v151': '1.5.1版本迭代',
   '/home/prd/v151/product-material': '1.5.1 · 产品物料需求',
-  '/product-process/materials': '物料信息',
+  '/product-process/materials': '产品信息',
   '/product-process/products': '产品信息',
   '/product-process/bom': '产品BOM',
   '/product-process/bom/new': '新增BOM',

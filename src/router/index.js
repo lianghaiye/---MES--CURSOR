@@ -94,14 +94,16 @@ const routes = [
       ...createPageRoutes,
       {
         path: 'product-process/materials',
-        name: 'product-process-materials',
-        component: () => import('@/views/product-process/MaterialInfoView.vue'),
-        meta: { title: '物料信息' },
+        redirect: '/product-process/products',
+      },
+      {
+        path: 'product-process/materials/new',
+        redirect: '/product-process/products/new',
       },
       {
         path: 'product-process/products',
         name: 'product-process-products',
-        component: () => import('@/views/product-process/ProductInfoView.vue'),
+        component: () => import('@/views/product-process/MasterItemInfoView.vue'),
         meta: { title: '产品信息' },
       },
       {

@@ -1,11 +1,16 @@
 <template>
-  <FormComponent page-mode :list-path="listPath" />
+  <div />
 </template>
 
 <script setup>
-import FormComponent from './components/MaterialFormModal.vue'
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
 defineOptions({ name: 'MaterialCreateView' })
 
-const listPath = '/product-process/materials'
+const router = useRouter()
+
+onMounted(() => {
+  router.replace('/product-process/products/new')
+})
 </script>
