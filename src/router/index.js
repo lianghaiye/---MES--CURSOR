@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isLoggedIn } from '@/utils/auth'
-import { topModules, moreModules, resolveModuleDefaultPath } from '@/config/menus'
+import { topModules, moreModules, resolveModuleDefaultPath, routeTitles } from '@/config/menus'
 import { createPageRegistry } from '@/config/createPages'
-import { syncRouteTab } from '@/utils/syncRouteTab'
+import { tabStore } from '@/composables/useTabs'
 
 const MainLayout = () => import('@/layout/MainLayout.vue')
 
@@ -603,11 +603,18 @@ router.beforeEach((to, from, next) => {
     return
   }
 
+  const fullPath = to.path
+  const title = routeTitles[fullPath] || to.meta?.title || '页面'
+  const exists = tabStore.tabs.find((t) => t.path === fullPath)
+  if (!exists) {
+    tabStore.tabs.push({
+      path: fullPath,
+      title,
+      closable: fullPath !== '/home/dashboard',
+    })
+  }
+  tabStore.activePath = fullPath
   next()
-})
-
-router.afterEach((to) => {
-  syncRouteTab(to)
 })
 
 export default router

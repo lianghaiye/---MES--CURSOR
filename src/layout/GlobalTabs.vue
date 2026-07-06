@@ -3,7 +3,7 @@
     <a-tabs
       type="editable-card"
       hide-add
-      :active-key="route.path"
+      :active-key="tabState.activePath"
       @change="onTabChange"
       @edit="onTabEdit"
     >
@@ -18,25 +18,23 @@
 </template>
 
 <script setup>
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useTabs } from '@/composables/useTabs'
-import { navigateTab } from '@/utils/navigateTab'
 
-const route = useRoute()
 const router = useRouter()
-const { tabState, closeTab } = useTabs()
+const { tabState, closeTab, setActive } = useTabs()
 
 function onTabChange(key) {
-  if (key === route.path) return
-  navigateTab(router, key)
+  setActive(key)
+  router.push(key)
 }
 
 function onTabEdit(targetKey, action) {
   if (action === 'remove') {
-    const closingActive = route.path === targetKey
-    const nextPath = closeTab(targetKey)
-    if (closingActive && nextPath) {
-      navigateTab(router, nextPath)
+    const closingActive = tabState.activePath === targetKey
+    closeTab(targetKey)
+    if (closingActive) {
+      router.push(tabState.activePath)
     }
   }
 }

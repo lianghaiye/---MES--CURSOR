@@ -1,3 +1,13 @@
+/** EBOM 设计稿状态（设计任务 EBOM 管理） */
+export const EBOM_STATUS = {
+  DRAFT: '草稿',
+  FINALIZED: '定稿',
+}
+
+export function ebomStatusColor(status) {
+  return status === EBOM_STATUS.FINALIZED ? 'success' : 'gold'
+}
+
 /** 销售订单 / 生产上下文中 EBOM 快照的状态（区别于产品 BOM 档案的 生效/已归档） */
 export const EBOM_SNAPSHOT_STATUS = {
   /** 尚未审核生成快照 */

@@ -39,7 +39,4 @@ app.config.errorHandler = (err) => {
 
 app.use(router)
 app.use(Antd)
-
-router.isReady().then(() => {
-  app.mount('#app')
-})
+app.mount('#app')

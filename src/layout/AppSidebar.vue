@@ -8,10 +8,11 @@
     v-model:collapsed="collapsed"
   >
     <a-menu
-      :selected-keys="selectedKeys"
+      v-model:selectedKeys="selectedKeys"
       v-model:openKeys="openKeys"
       mode="inline"
       :items="menuItems"
+      @click="onMenuClick"
     />
   </a-layout-sider>
 </template>
@@ -21,11 +22,12 @@ import { computed, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge } from 'ant-design-vue'
 import { sideMenus, resolveModuleKey } from '@/config/menus'
-import { navigateTab } from '@/utils/navigateTab'
+import { useTabs } from '@/composables/useTabs'
 import { useWorkOrderMenuBadges } from '@/composables/useWorkOrderMenuBadges'
 
 const route = useRoute()
 const router = useRouter()
+const { openTab } = useTabs()
 const collapsed = ref(false)
 const { badges } = useWorkOrderMenuBadges()
 const openKeys = ref([])
@@ -59,7 +61,6 @@ function mapMenuItem(item) {
   return {
     key: item.path,
     label: renderLabel(item),
-    onClick: () => navigateTab(router, item.path),
   }
 }
 
@@ -92,7 +93,10 @@ function resolveActiveMenuPath(path) {
   return matched || path
 }
 
-const selectedKeys = computed(() => [resolveActiveMenuPath(route.path)])
+const selectedKeys = computed({
+  get: () => [resolveActiveMenuPath(route.path)],
+  set: () => {},
+})
 
 watch(
   () => route.path,
@@ -104,6 +108,12 @@ watch(
   },
   { immediate: true },
 )
+
+function onMenuClick({ key }) {
+  if (!key.startsWith('/')) return
+  openTab(key)
+  router.push(key)
+}
 </script>
 
 <style lang="less" scoped>
