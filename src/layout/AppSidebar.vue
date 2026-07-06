@@ -12,7 +12,6 @@
       v-model:openKeys="openKeys"
       mode="inline"
       :items="menuItems"
-      @click="onMenuClick"
     />
   </a-layout-sider>
 </template>
@@ -60,6 +59,7 @@ function mapMenuItem(item) {
   return {
     key: item.path,
     label: renderLabel(item),
+    onClick: () => navigateTab(router, item.path),
   }
 }
 
@@ -104,11 +104,6 @@ watch(
   },
   { immediate: true },
 )
-
-function onMenuClick({ key }) {
-  if (!key.startsWith('/')) return
-  navigateTab(router, key)
-}
 </script>
 
 <style lang="less" scoped>
