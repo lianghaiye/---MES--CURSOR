@@ -12,6 +12,14 @@ const emptyChild = (name, title) => ({
   meta: { title },
 })
 
+/** 新增页路由须在带 :id 的动态路由之前注册，避免 /xxx/new 被当成详情 id */
+const createPageRoutes = createPageRegistry.map((page) => ({
+  path: page.newPath.slice(1),
+  name: page.name,
+  component: page.view,
+  meta: { title: page.title, listPath: page.listPath },
+}))
+
 const routes = [
   {
     path: '/login',
@@ -71,6 +79,7 @@ const routes = [
         component: () => import('@/views/prd/PrdV151ProductMaterialView.vue'),
         meta: { title: '1.5.1 · 产品物料需求' },
       },
+      ...createPageRoutes,
       {
         path: 'product-process/materials',
         name: 'product-process-materials',
@@ -146,6 +155,10 @@ const routes = [
       {
         path: 'product-process/process-form',
         ...emptyChild('product-process-form', '工序表单模板'),
+      },
+      {
+        path: 'sales',
+        redirect: '/sales/orders',
       },
       {
         path: 'sales/orders',
@@ -536,12 +549,6 @@ const routes = [
         component: () => import('@/views/industrial-id/LabelManagementView.vue'),
         meta: { title: '标识管理' },
       },
-      ...createPageRegistry.map((page) => ({
-        path: page.newPath.slice(1),
-        name: page.name,
-        component: page.view,
-        meta: { title: page.title, listPath: page.listPath },
-      })),
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/home/dashboard' },

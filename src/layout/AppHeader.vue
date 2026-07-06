@@ -43,14 +43,14 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { BellOutlined, EllipsisOutlined } from '@ant-design/icons-vue'
-import { topModules, moreModules, sideMenus, resolveModuleKey } from '@/config/menus'
+import { topModules, moreModules, resolveModuleKey, resolveModuleDefaultPath } from '@/config/menus'
 import { getUser, clearAuth } from '@/utils/auth'
 import { logout } from '@/api/auth'
 import { useTabs } from '@/composables/useTabs'
 
 const route = useRoute()
 const router = useRouter()
-const { openTab } = useTabs()
+const { openTab, setActive } = useTabs()
 
 const user = computed(() => getUser())
 const displayName = computed(() => user.value?.displayName || 'admin--admin')
@@ -82,11 +82,13 @@ const moreMenuItems = computed(() =>
 )
 
 function navigateToModule(mod) {
-  const firstSide = sideMenus[mod.key]?.[0]?.path
-  const bare = `/${mod.key}`
-  const path = mod.path && mod.path !== bare ? mod.path : firstSide || mod.path
+  const path = resolveModuleDefaultPath(mod)
   if (!path) return
   openTab(path)
+  if (route.path === path) {
+    setActive(path)
+    return
+  }
   router.push(path)
 }
 

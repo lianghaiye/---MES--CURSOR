@@ -160,6 +160,26 @@ export function resolveModuleKey(path) {
   return found ? found.key : 'home'
 }
 
+/** 取模块左侧菜单中第一个可导航路径（支持嵌套 children） */
+export function findFirstSideMenuPath(items = []) {
+  for (const item of items) {
+    if (item.path) return item.path
+    if (item.children?.length) {
+      const nested = findFirstSideMenuPath(item.children)
+      if (nested) return nested
+    }
+  }
+  return null
+}
+
+/** 顶栏模块默认落地页：优先 mod.path（非 /{key} 占位），否则取侧栏首项 */
+export function resolveModuleDefaultPath(mod) {
+  if (!mod) return null
+  const bare = `/${mod.key}`
+  if (mod.path && mod.path !== bare) return mod.path
+  return findFirstSideMenuPath(sideMenus[mod.key] || []) || mod.path || null
+}
+
 /** 路由 meta.title 映射 */
 import { createPageRegistry } from './createPages'
 
