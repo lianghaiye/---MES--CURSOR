@@ -168,7 +168,6 @@ const routes = [
         path: 'product-process/process-form',
         ...emptyChild('product-process-form', '工序表单模板'),
       },
-      { path: 'sales', redirect: '/sales/orders' },
       {
         path: 'sales/orders',
         name: 'sales-orders',
@@ -570,10 +569,18 @@ const router = createRouter({
 
 router.onError((error, to) => {
   const message = error?.message || String(error)
-  if (/Loading chunk .* failed|Failed to fetch dynamically imported module/i.test(message)) {
-    console.error('[router] lazy chunk load failed, reloading:', message)
-    window.location.assign(router.resolve(to).href)
+  if (!/Loading chunk .* failed|Failed to fetch dynamically imported module/i.test(message)) return
+
+  const reloadKey = `chunk-reload:${to.fullPath}`
+  if (sessionStorage.getItem(reloadKey)) {
+    console.error('[router] lazy chunk load failed after reload:', message)
+    sessionStorage.removeItem(reloadKey)
+    return
   }
+
+  console.error('[router] lazy chunk load failed, reloading once:', message)
+  sessionStorage.setItem(reloadKey, '1')
+  window.location.reload()
 })
 
 router.beforeEach((to, from, next) => {

@@ -7,13 +7,19 @@ export function syncRouteTab(to) {
 
   const fullPath = to.path
   const title = routeTitles[fullPath] || to.meta?.title || '页面'
-  const exists = tabStore.tabs.find((t) => t.path === fullPath)
-  if (!exists) {
+  const existing = tabStore.tabs.find((t) => t.path === fullPath)
+
+  if (existing) {
+    if (!existing.title || existing.title === '未命名') {
+      existing.title = title
+    }
+  } else {
     tabStore.tabs.push({
       path: fullPath,
       title,
       closable: fullPath !== '/home/dashboard',
     })
   }
+
   tabStore.activePath = fullPath
 }

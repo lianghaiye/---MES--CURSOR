@@ -1,12 +1,13 @@
-/** 路由跳转（标签在 afterEach 同步） */
+import { isNavigationFailure, NavigationFailureType } from 'vue-router'
+
+/** SPA 内路由跳转，标签由 afterEach 同步 */
 export function navigateTab(router, path) {
   if (!path) return Promise.resolve()
-
-  const target = router.resolve(path)
-  if (router.currentRoute.value.path === target.path) return Promise.resolve()
-
-  return router.push(target).catch((err) => {
-    console.error('[navigateTab] push failed, fallback:', path, err)
-    window.location.assign(target.href)
+  if (router.currentRoute.value.path === path) return Promise.resolve()
+  return router.push(path).catch((err) => {
+    if (isNavigationFailure(err, NavigationFailureType.duplicated)) return
+    if (isNavigationFailure(err, NavigationFailureType.cancelled)) return
+    if (isNavigationFailure(err, NavigationFailureType.aborted)) return
+    console.error('[navigateTab]', path, err)
   })
 }

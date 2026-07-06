@@ -6,14 +6,22 @@
         :selected-keys="selectedTopKeys"
         mode="horizontal"
         class="top-menu"
-        :items="topMenuItems"
-      />
+        @click="onTopMenuClick"
+      >
+        <a-menu-item v-for="m in topModules" :key="m.key">
+          {{ m.label }}
+        </a-menu-item>
+      </a-menu>
       <a-dropdown>
         <a class="more-btn" @click.prevent>
           <EllipsisOutlined />
         </a>
         <template #overlay>
-          <a-menu :items="moreMenuItems" />
+          <a-menu @click="onMoreMenuClick">
+            <a-menu-item v-for="m in moreModules" :key="m.key">
+              {{ m.label }}
+            </a-menu-item>
+          </a-menu>
         </template>
       </a-dropdown>
     </div>
@@ -40,24 +48,21 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { BellOutlined, EllipsisOutlined } from '@ant-design/icons-vue'
 import { topModules, moreModules, resolveModuleKey, resolveModuleDefaultPath } from '@/config/menus'
 import { getUser, clearAuth } from '@/utils/auth'
 import { logout } from '@/api/auth'
 import { navigateTab } from '@/utils/navigateTab'
 
-const route = useRoute()
 const router = useRouter()
 
 const user = computed(() => getUser())
 const displayName = computed(() => user.value?.displayName || 'admin--admin')
 const avatarText = computed(() => (user.value?.username || 'A').charAt(0).toUpperCase())
 
-const moduleKey = computed(() => resolveModuleKey(route.path))
-
 const selectedTopKeys = computed(() => {
-  const key = moduleKey.value
+  const key = resolveModuleKey(router.currentRoute.value.path)
   if (moreModules.some((m) => m.key === key)) return []
   return [key]
 })
@@ -68,21 +73,15 @@ function navigateToModule(mod) {
   navigateTab(router, path)
 }
 
-const topMenuItems = computed(() =>
-  topModules.map((m) => ({
-    key: m.key,
-    label: m.label,
-    onClick: () => navigateToModule(m),
-  })),
-)
+function onTopMenuClick({ key }) {
+  const mod = topModules.find((m) => m.key === key)
+  if (mod) navigateToModule(mod)
+}
 
-const moreMenuItems = computed(() =>
-  moreModules.map((m) => ({
-    key: m.key,
-    label: m.label,
-    onClick: () => navigateToModule(m),
-  })),
-)
+function onMoreMenuClick({ key }) {
+  const mod = moreModules.find((m) => m.key === key)
+  if (mod) navigateToModule(mod)
+}
 
 async function handleLogout() {
   await logout()
