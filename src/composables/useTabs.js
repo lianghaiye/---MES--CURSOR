@@ -7,30 +7,34 @@ const state = reactive({
 })
 
 export function useTabs() {
+  /** 预登记标签标题（详情页等），不切换 activePath，等路由成功后再高亮 */
   function openTab(path, title) {
+    const tabTitle = title || routeTitles[path] || '未命名'
     const exists = state.tabs.find((t) => t.path === path)
     if (!exists) {
       state.tabs.push({
         path,
-        title: title || routeTitles[path] || '未命名',
+        title: tabTitle,
         closable: path !== '/home/dashboard',
       })
+    } else if (title) {
+      exists.title = tabTitle
     }
-    state.activePath = path
   }
 
   function closeTab(path) {
     const idx = state.tabs.findIndex((t) => t.path === path)
-    if (idx === -1) return
+    if (idx === -1) return null
     const tab = state.tabs[idx]
-    if (!tab.closable) return
+    if (!tab.closable) return null
 
     state.tabs.splice(idx, 1)
 
     if (state.activePath === path) {
       const next = state.tabs[Math.min(idx, state.tabs.length - 1)]
-      state.activePath = next?.path || '/home/dashboard'
+      return next?.path || '/home/dashboard'
     }
+    return null
   }
 
   function setActive(path) {
