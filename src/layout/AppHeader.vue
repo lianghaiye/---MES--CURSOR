@@ -46,11 +46,10 @@ import { BellOutlined, EllipsisOutlined } from '@ant-design/icons-vue'
 import { topModules, moreModules, resolveModuleKey, resolveModuleDefaultPath } from '@/config/menus'
 import { getUser, clearAuth } from '@/utils/auth'
 import { logout } from '@/api/auth'
-import { useTabs } from '@/composables/useTabs'
+import { navigateTab } from '@/utils/navigateTab'
 
 const route = useRoute()
 const router = useRouter()
-const { openTab, setActive } = useTabs()
 
 const user = computed(() => getUser())
 const displayName = computed(() => user.value?.displayName || 'admin--admin')
@@ -84,12 +83,7 @@ const moreMenuItems = computed(() =>
 function navigateToModule(mod) {
   const path = resolveModuleDefaultPath(mod)
   if (!path) return
-  openTab(path)
-  if (route.path === path) {
-    setActive(path)
-    return
-  }
-  router.push(path)
+  navigateTab(router, path)
 }
 
 function onTopMenuClick({ key }) {

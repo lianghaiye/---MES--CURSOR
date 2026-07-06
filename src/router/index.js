@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isLoggedIn } from '@/utils/auth'
-import { routeTitles } from '@/config/menus'
+import { routeTitles, topModules, moreModules, resolveModuleDefaultPath } from '@/config/menus'
 import { createPageRegistry } from '@/config/createPages'
 import { tabStore } from '@/composables/useTabs'
 
@@ -11,6 +11,17 @@ const emptyChild = (name, title) => ({
   component: () => import('@/views/placeholder/EmptyPage.vue'),
   meta: { title },
 })
+
+/** 顶栏模块占位路径（如 /sales）重定向到侧栏首项，兼容旧版直接 push mod.path 的导航 */
+const moduleRedirectRoutes = [...topModules, ...moreModules]
+  .map((mod) => {
+    const target = resolveModuleDefaultPath(mod)
+    if (!target) return null
+    const bare = `/${mod.key}`
+    if (target === bare) return null
+    return { path: mod.key, redirect: target }
+  })
+  .filter(Boolean)
 
 /** 新增页路由须在带 :id 的动态路由之前注册，避免 /xxx/new 被当成详情 id */
 const createPageRoutes = createPageRegistry.map((page) => ({
@@ -79,6 +90,7 @@ const routes = [
         component: () => import('@/views/prd/PrdV151ProductMaterialView.vue'),
         meta: { title: '1.5.1 · 产品物料需求' },
       },
+      ...moduleRedirectRoutes,
       ...createPageRoutes,
       {
         path: 'product-process/materials',
@@ -155,10 +167,6 @@ const routes = [
       {
         path: 'product-process/process-form',
         ...emptyChild('product-process-form', '工序表单模板'),
-      },
-      {
-        path: 'sales',
-        redirect: '/sales/orders',
       },
       {
         path: 'sales/orders',
@@ -563,7 +571,7 @@ router.onError((error, to) => {
   const message = error?.message || String(error)
   if (/Loading chunk .* failed|Failed to fetch dynamically imported module/i.test(message)) {
     console.error('[router] lazy chunk load failed, reloading:', message)
-    window.location.assign(to.fullPath)
+    window.location.assign(router.resolve(to).href)
   }
 })
 
@@ -599,6 +607,11 @@ router.beforeEach((to, from, next) => {
   }
   tabStore.activePath = fullPath
   next()
+})
+
+router.afterEach((to) => {
+  if (to.meta.public || to.meta.standalone) return
+  tabStore.activePath = to.path
 })
 
 export default router

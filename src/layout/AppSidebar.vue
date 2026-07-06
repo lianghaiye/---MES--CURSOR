@@ -22,12 +22,11 @@ import { computed, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge } from 'ant-design-vue'
 import { sideMenus, resolveModuleKey } from '@/config/menus'
-import { useTabs } from '@/composables/useTabs'
+import { navigateTab } from '@/utils/navigateTab'
 import { useWorkOrderMenuBadges } from '@/composables/useWorkOrderMenuBadges'
 
 const route = useRoute()
 const router = useRouter()
-const { openTab } = useTabs()
 const collapsed = ref(false)
 const { badges } = useWorkOrderMenuBadges()
 const openKeys = ref([])
@@ -111,8 +110,7 @@ watch(
 
 function onMenuClick({ key }) {
   if (!key.startsWith('/')) return
-  openTab(key)
-  router.push(key)
+  navigateTab(router, key)
 }
 </script>
 
