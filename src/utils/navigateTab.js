@@ -1,5 +1,12 @@
-/** 路由跳转（标签在 afterEach 同步，避免导航中途改 Tab 导致跳转被中止） */
+/** 路由跳转（标签在 afterEach 同步） */
 export function navigateTab(router, path) {
-  if (router.currentRoute.value.path === path) return Promise.resolve()
-  return router.push(path)
+  if (!path) return Promise.resolve()
+
+  const target = router.resolve(path)
+  if (router.currentRoute.value.path === target.path) return Promise.resolve()
+
+  return router.push(target).catch((err) => {
+    console.error('[navigateTab] push failed, fallback:', path, err)
+    window.location.assign(target.href)
+  })
 }

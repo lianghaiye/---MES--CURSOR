@@ -8,11 +8,10 @@
     v-model:collapsed="collapsed"
   >
     <a-menu
-      v-model:selectedKeys="selectedKeys"
+      :selected-keys="selectedKeys"
       v-model:openKeys="openKeys"
       mode="inline"
       :items="menuItems"
-      @click="onMenuClick"
     />
   </a-layout-sider>
 </template>
@@ -60,6 +59,7 @@ function mapMenuItem(item) {
   return {
     key: item.path,
     label: renderLabel(item),
+    onClick: () => navigateTab(router, item.path),
   }
 }
 
@@ -92,10 +92,7 @@ function resolveActiveMenuPath(path) {
   return matched || path
 }
 
-const selectedKeys = computed({
-  get: () => [resolveActiveMenuPath(route.path)],
-  set: () => {},
-})
+const selectedKeys = computed(() => [resolveActiveMenuPath(route.path)])
 
 watch(
   () => route.path,
@@ -108,10 +105,6 @@ watch(
   { immediate: true },
 )
 
-function onMenuClick({ key }) {
-  if (!key.startsWith('/')) return
-  navigateTab(router, key)
-}
 </script>
 
 <style lang="less" scoped>

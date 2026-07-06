@@ -3,18 +3,17 @@
     <div class="header-left">
       <div class="logo">I-DOMS</div>
       <a-menu
-        v-model:selectedKeys="selectedTopKeys"
+        :selected-keys="selectedTopKeys"
         mode="horizontal"
         class="top-menu"
         :items="topMenuItems"
-        @click="onTopMenuClick"
       />
       <a-dropdown>
         <a class="more-btn" @click.prevent>
           <EllipsisOutlined />
         </a>
         <template #overlay>
-          <a-menu :items="moreMenuItems" @click="onMoreMenuClick" />
+          <a-menu :items="moreMenuItems" />
         </template>
       </a-dropdown>
     </div>
@@ -57,28 +56,11 @@ const avatarText = computed(() => (user.value?.username || 'A').charAt(0).toUppe
 
 const moduleKey = computed(() => resolveModuleKey(route.path))
 
-const selectedTopKeys = computed({
-  get: () => {
-    const key = moduleKey.value
-    if (moreModules.some((m) => m.key === key)) return []
-    return [key]
-  },
-  set: () => {},
+const selectedTopKeys = computed(() => {
+  const key = moduleKey.value
+  if (moreModules.some((m) => m.key === key)) return []
+  return [key]
 })
-
-const topMenuItems = computed(() =>
-  topModules.map((m) => ({
-    key: m.key,
-    label: m.label,
-  })),
-)
-
-const moreMenuItems = computed(() =>
-  moreModules.map((m) => ({
-    key: m.key,
-    label: m.label,
-  })),
-)
 
 function navigateToModule(mod) {
   const path = resolveModuleDefaultPath(mod)
@@ -86,15 +68,21 @@ function navigateToModule(mod) {
   navigateTab(router, path)
 }
 
-function onTopMenuClick({ key }) {
-  const mod = topModules.find((m) => m.key === key)
-  if (mod) navigateToModule(mod)
-}
+const topMenuItems = computed(() =>
+  topModules.map((m) => ({
+    key: m.key,
+    label: m.label,
+    onClick: () => navigateToModule(m),
+  })),
+)
 
-function onMoreMenuClick({ key }) {
-  const mod = moreModules.find((m) => m.key === key)
-  if (mod) navigateToModule(mod)
-}
+const moreMenuItems = computed(() =>
+  moreModules.map((m) => ({
+    key: m.key,
+    label: m.label,
+    onClick: () => navigateToModule(m),
+  })),
+)
 
 async function handleLogout() {
   await logout()

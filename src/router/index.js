@@ -168,6 +168,7 @@ const routes = [
         path: 'product-process/process-form',
         ...emptyChild('product-process-form', '工序表单模板'),
       },
+      { path: 'sales', redirect: '/sales/orders' },
       {
         path: 'sales/orders',
         name: 'sales-orders',

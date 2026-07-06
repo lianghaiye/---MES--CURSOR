@@ -4,7 +4,7 @@
       type="editable-card"
       hide-add
       :active-key="route.path"
-      @tabClick="onTabClick"
+      @change="onTabChange"
       @edit="onTabEdit"
     >
       <a-tab-pane
@@ -26,7 +26,7 @@ const route = useRoute()
 const router = useRouter()
 const { tabState, closeTab } = useTabs()
 
-function onTabClick(key) {
+function onTabChange(key) {
   if (key === route.path) return
   navigateTab(router, key)
 }
