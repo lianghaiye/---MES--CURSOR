@@ -50,7 +50,7 @@
           </a-descriptions>
         </div>
 
-        <div class="section-card">
+        <div v-if="showProcessOperations" class="section-card">
           <div class="section-title">工序操作（工单任务可操作项）</div>
           <div class="ops-tags">
             <a-tag v-for="label in operationLabels" :key="label" color="blue">{{ label }}</a-tag>
@@ -73,6 +73,7 @@ export default { name: 'ProcessConfigDetailView' }
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProcessById, getOperationLabels } from '@/store/processConfigStore'
+import { isMinimalReportMode } from '@/store/businessRuleStore'
 import ProcessConfigFormModal from './components/ProcessConfigFormModal.vue'
 
 const route = useRoute()
@@ -82,6 +83,7 @@ const record = ref(null)
 const modalOpen = ref(false)
 
 const operationLabels = computed(() => (record.value ? getOperationLabels(record.value) : []))
+const showProcessOperations = computed(() => !isMinimalReportMode())
 
 function reload() {
   const id = route.params.id

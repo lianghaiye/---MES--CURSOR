@@ -156,7 +156,7 @@
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
-      :default-settings="defaultColumnSettings"
+      :default-settings="filteredDefaultColumnSettings"
     />
   </div>
 </template>
@@ -187,6 +187,7 @@ import {
   RESOURCE_TYPES,
 } from '@/store/processConfigStore'
 import { getActiveCategoryOptions } from '@/store/processCategoryStore'
+import { isMinimalReportMode } from '@/store/businessRuleStore'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -211,8 +212,9 @@ const laborProcess = ref(null)
 const categoryOpts = computed(() => getActiveCategoryOptions())
 const resourceTypeOpts = RESOURCE_TYPES.map((v) => ({ label: v, value: v }))
 const statusOpts = PROCESS_STATUS.map((v) => ({ label: v, value: v }))
+const showProcessOperations = computed(() => !isMinimalReportMode())
 
-const baseColumns = [
+const allBaseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
   { title: '工序编码', key: 'code', width: 130 },
   { title: '工序名称', dataIndex: 'name', width: 140 },
@@ -227,8 +229,18 @@ const baseColumns = [
   { title: '操作', key: 'actions', width: 180, fixed: 'right' },
 ]
 
-const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('process-config-list', baseColumns)
+const { columnSettings, columnDrawerOpen, displayColumns: rawDisplayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('process-config-list', allBaseColumns)
+
+const displayColumns = computed(() => {
+  if (showProcessOperations.value) return rawDisplayColumns.value
+  return rawDisplayColumns.value.filter((col) => col.key !== 'operations')
+})
+
+const filteredDefaultColumnSettings = computed(() => {
+  if (showProcessOperations.value) return defaultColumnSettings
+  return defaultColumnSettings.filter((col) => col.key !== 'operations')
+})
 
 const filteredList = computed(() => filterProcessConfig(processConfigState.processes, applied))
 
