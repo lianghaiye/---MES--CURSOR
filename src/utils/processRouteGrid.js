@@ -1,4 +1,6 @@
 import { getProcessById, resolveDefaultExecutors } from '@/store/processConfigStore'
+import { normalizeReportMode } from '@/utils/reportMode'
+import { normalizeTaskExecutionMode } from '@/utils/taskExecutionMode'
 import { getProcessDocById } from '@/store/processDocStore'
 import { createEmptyWorkOrderProcessExtras } from '@/utils/workOrderProcessDisplay'
 
@@ -64,6 +66,8 @@ export function flattenGridToSteps(grid) {
         icon: proc?.icon || 'ToolOutlined',
         hasFeeding: proc?.hasFeeding || false,
         resourceType: proc?.resourceType || '工人',
+        reportMode: normalizeReportMode(proc?.reportMode),
+        taskExecutionMode: normalizeTaskExecutionMode(proc?.taskExecutionMode),
         processFileId: cell.processFileId || '',
         processFileName: doc?.name || cell.processFileName || '',
       })
@@ -86,6 +90,8 @@ export function buildWorkOrderProcessesFromGrid(grid, routeId = '') {
     icon: step.icon,
     hasFeeding: step.hasFeeding,
     resourceType: step.resourceType,
+    reportMode: step.reportMode || '',
+    taskExecutionMode: step.taskExecutionMode || 'single_claim',
     processFileId: step.processFileId,
     processFileName: step.processFileName,
     executors: resolveDefaultExecutors(getProcessById(step.processId)),

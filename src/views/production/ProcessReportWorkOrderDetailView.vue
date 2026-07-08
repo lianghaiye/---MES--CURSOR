@@ -75,6 +75,18 @@
               :custom-row="customRow"
               :row-class-name="rowClassName"
             >
+              <template #headerCell="{ column }">
+                <ColumnHeaderWithHint
+                  v-if="column.key === 'reporter'"
+                  :title="column.title"
+                  :hint="processReportExecutorHint"
+                />
+                <ColumnHeaderWithHint
+                  v-else-if="column.key === 'operator'"
+                  :title="column.title"
+                  :hint="processReportOperatorHint"
+                />
+              </template>
               <template #bodyCell="{ column, record: line, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'taskStatus'">
@@ -199,7 +211,10 @@ import {
 import {
   buildProcessReportDetailSummaryCells,
   processReportDetailLineColumns,
+  processReportExecutorHint,
+  processReportOperatorHint,
 } from '@/utils/processReportDetailTable'
+import ColumnHeaderWithHint from '@/components/ColumnHeaderWithHint.vue'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { useTabs } from '@/composables/useTabs'
 import ProcessReportAdjustModal from './components/ProcessReportAdjustModal.vue'

@@ -75,6 +75,18 @@
               :scroll="{ x: 2200 }"
               :row-selection="rowSelection"
             >
+              <template #headerCell="{ column }">
+                <ColumnHeaderWithHint
+                  v-if="column.key === 'executor'"
+                  :title="column.title"
+                  :hint="processReportExecutorHint"
+                />
+                <ColumnHeaderWithHint
+                  v-else-if="column.key === 'operator'"
+                  :title="column.title"
+                  :hint="processReportOperatorHint"
+                />
+              </template>
               <template #bodyCell="{ column, record: line, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'taskStatus'">
@@ -197,6 +209,11 @@ import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import LaborHourAdjustModal from './components/LaborHourAdjustModal.vue'
 import LaborHourSubsidyModal from './components/LaborHourSubsidyModal.vue'
+import ColumnHeaderWithHint from '@/components/ColumnHeaderWithHint.vue'
+import {
+  processReportExecutorHint,
+  processReportOperatorHint,
+} from '@/utils/processReportDetailTable'
 
 const route = useRoute()
 const router = useRouter()
@@ -215,8 +232,8 @@ const lineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '任务状态', key: 'taskStatus', width: 90, fixed: 'left' },
   { title: '推送状态', key: 'pushStatus', width: 100, fixed: 'left' },
-  { title: '执行人', dataIndex: 'executor', width: 90 },
-  { title: '操作人', dataIndex: 'operator', width: 90 },
+  { title: '执行人', key: 'executor', dataIndex: 'executor', width: 90 },
+  { title: '操作人', key: 'operator', dataIndex: 'operator', width: 90 },
   { title: '班组', dataIndex: 'team', width: 80 },
   { title: '工序名称', dataIndex: 'processName', width: 130 },
   { title: '任务编号', dataIndex: 'taskNo', width: 130 },

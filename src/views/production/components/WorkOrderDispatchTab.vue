@@ -32,6 +32,12 @@
             :resource-type="record.resourceType || '工人'"
             @update:executors="(v) => (record.executors = v)"
           />
+          <div v-if="collaborativeTaskHint(record)" class="task-hint">
+            {{ collaborativeTaskHint(record) }}
+          </div>
+        </template>
+        <template v-else-if="column.key === 'executionMode'">
+          {{ executionModeLabel(record) }}
         </template>
         <template v-else-if="column.key === 'processContent'">
           <a-input
@@ -96,6 +102,15 @@ import { SettingOutlined } from '@ant-design/icons-vue'
 import ExecutorTagPicker from './ExecutorTagPicker.vue'
 import { mockFeedingMaterials } from '@/mock/workOrderMaster'
 import { validateWorkOrderDispatchReady } from '@/utils/workOrderDispatchHelpers'
+import { businessRuleState } from '@/store/businessRuleStore'
+import { getProcessByName } from '@/store/processConfigStore'
+import { normalizeReportMode } from '@/utils/reportMode'
+import {
+  estimateTaskCountForProcess,
+  getTaskExecutionModeLabel,
+  resolveProcessExecutionMode,
+  shouldSplitCollaborativeTasks,
+} from '@/utils/taskExecutionMode'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -103,19 +118,55 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'dispatch-and-start', 'cancel'])
 
-const columns = [
-  { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
-  { title: '工序名称', key: 'process', width: 120 },
-  { title: '工序编码', key: 'processCode', width: 100 },
-  { title: '资源类型', key: 'resourceType', width: 90 },
-  { title: '选择执行人', key: 'executors', width: 220 },
-  { title: '工序内容', key: 'processContent', width: 180 },
-  { title: '投料信息', key: 'feeding' },
-]
+const showFeedingColumn = computed(
+  () => businessRuleState.rules.productionMode === 'standard',
+)
+
+const columns = computed(() => {
+  const base = [
+    { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
+    { title: '工序名称', key: 'process', width: 120 },
+    { title: '工序编码', key: 'processCode', width: 100 },
+    { title: '资源类型', key: 'resourceType', width: 90 },
+    { title: '选择执行人', key: 'executors', width: 220 },
+    { title: '任务模式', key: 'executionMode', width: 96 },
+    { title: '工序内容', key: 'processContent', width: 180 },
+  ]
+  if (showFeedingColumn.value) {
+    base.push({ title: '投料信息', key: 'feeding' })
+  }
+  return base
+})
 
 const materialOptions = computed(() =>
   mockFeedingMaterials.map((m) => ({ label: m.name, value: m.id })),
 )
+
+function enrichProcessRecord(record) {
+  const procConfig = getProcessByName(record.name)
+  return {
+    ...record,
+    reportMode: normalizeReportMode(record.reportMode || procConfig?.reportMode),
+    taskExecutionMode: resolveProcessExecutionMode({
+      taskExecutionMode: record.taskExecutionMode ?? procConfig?.taskExecutionMode,
+    }),
+  }
+}
+
+function executionModeLabel(record) {
+  const enriched = enrichProcessRecord(record)
+  if (enriched.reportMode !== '时长报工' || enriched.resourceType !== '工人') {
+    return '—'
+  }
+  return getTaskExecutionModeLabel(enriched.taskExecutionMode)
+}
+
+function collaborativeTaskHint(record) {
+  const enriched = enrichProcessRecord(record)
+  if (!shouldSplitCollaborativeTasks(enriched)) return ''
+  const count = estimateTaskCountForProcess(enriched)
+  return `将按 ${count} 名执行人生成 ${count} 条协作任务`
+}
 
 function onMaterialChange(item, materialId) {
   const mat = mockFeedingMaterials.find((m) => m.id === materialId)
@@ -197,6 +248,13 @@ function emitDispatchAndStart() {
 
 .muted {
   color: rgba(0, 0, 0, 0.25);
+}
+
+.task-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #1677ff;
+  line-height: 1.4;
 }
 
 .dispatch-footer {

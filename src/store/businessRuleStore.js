@@ -95,6 +95,11 @@ export function isMinimalReportMode() {
   return getProductionMode() === 'minimal'
 }
 
+/** 极简报工：工序任务并行下发，不做串行锁定 */
+export function isParallelTaskDispatch() {
+  return isMinimalReportMode()
+}
+
 export function isQuickReportEnabled() {
   if (getProductionMode() === 'standard') return true
   if (getProductionMode() === 'minimal') return getMinimalReportType() === 'quick'

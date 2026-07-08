@@ -1,6 +1,18 @@
 import dayjs from 'dayjs'
 import { getEmployeeGroupByName } from '@/store/employeeGroupStore'
 import { buildDisassemblyProcesses } from '@/mock/processRoutes'
+import { getProcessByName } from '@/store/processConfigStore'
+import { normalizeReportMode } from '@/utils/reportMode'
+import {
+  buildCollaborativeTaskId,
+  buildCollaborativeTaskNo,
+  buildStandardTaskId,
+  buildStandardTaskNo,
+  buildTaskGroupId,
+  resolveProcessExecutionMode,
+  shouldSplitCollaborativeTasks,
+} from '@/utils/taskExecutionMode'
+import { isParallelTaskDispatch } from '@/store/businessRuleStore'
 
 export const MOBILE_TASK_SYNC_KEY = 'i_doms_mobile_tasks_sync'
 
@@ -19,6 +31,15 @@ function loadSyncQueue() {
 
 function saveSyncQueue(tasks) {
   localStorage.setItem(MOBILE_TASK_SYNC_KEY, JSON.stringify(tasks))
+}
+
+function resolveDispatchControl() {
+  return isParallelTaskDispatch() ? 'parallel' : 'serial'
+}
+
+function resolveSerialLocked(processSeq, dispatchControl) {
+  if (dispatchControl === 'parallel') return false
+  return processSeq > 1
 }
 
 function resolvePlacement(process, executors) {
@@ -82,6 +103,108 @@ function resolvePlacement(process, executors) {
   }
 }
 
+function enrichProcessForTask(process) {
+  const procConfig = getProcessByName(process.name)
+  return {
+    ...process,
+    reportMode: normalizeReportMode(process.reportMode || procConfig?.reportMode),
+    taskExecutionMode: resolveProcessExecutionMode({
+      taskExecutionMode: process.taskExecutionMode ?? procConfig?.taskExecutionMode,
+    }),
+  }
+}
+
+function buildCollaborativeTasks(workOrder, process, processSeq, product, processes, ts, dateStr, dispatchControl) {
+  const executors = process.executors || []
+  const taskGroupId = buildTaskGroupId(workOrder.id, processSeq)
+  const baseTaskNo = buildStandardTaskNo(dateStr, processSeq)
+
+  return executors.map((executorName, index) => {
+    const slot = index + 1
+    return {
+      id: buildCollaborativeTaskId(workOrder.id, processSeq, slot),
+      taskGroupId,
+      taskNo: buildCollaborativeTaskNo(dateStr, processSeq, slot),
+      baseTaskNo,
+      collaborationSlot: slot,
+      collaborationTotal: executors.length,
+      taskExecutionMode: 'collaborative',
+      workOrderId: workOrder.id,
+      workOrderCode: workOrder.code,
+      workOrderName: workOrder.name,
+      processName: process.name,
+      processSeq,
+      processRoute: workOrder.processRouteName || '',
+      resourceType: process.resourceType || '工人',
+      reportMode: process.reportMode || '',
+      executors: [...executors],
+      orderCategory: workOrder.orderCategory,
+      orderSource: workOrder.orderSource || workOrder.source || '',
+      salesOrderNo: workOrder.sourceOrderNo || '',
+      workOrderRemark: workOrder.remark || '',
+      laborCalcMethod: '时长报工+计时工资',
+      nextProcess: getNextProcessName(processes, process.name),
+      createdAt: ts,
+      dispatchControl,
+      serialLocked: resolveSerialLocked(processSeq, dispatchControl),
+      placement: 'todo',
+      taskStatus: '待开始',
+      executor: executorName,
+      claimTargets: [],
+      groupId: null,
+      groupName: '',
+      groupLeader: '',
+      leaderParticipates: true,
+      ...product,
+    }
+  })
+}
+
+function buildSingleTask(
+  workOrder,
+  process,
+  processSeq,
+  product,
+  processes,
+  ts,
+  dateStr,
+  orderCategory,
+  dispatchControl,
+) {
+  const placement = resolvePlacement(process, process.executors)
+  const taskGroupId = buildTaskGroupId(workOrder.id, processSeq)
+
+  return {
+    id: buildStandardTaskId(workOrder.id, processSeq),
+    taskGroupId,
+    taskNo: buildStandardTaskNo(dateStr, processSeq),
+    baseTaskNo: buildStandardTaskNo(dateStr, processSeq),
+    collaborationSlot: 1,
+    collaborationTotal: 1,
+    taskExecutionMode: 'single_claim',
+    workOrderId: workOrder.id,
+    workOrderCode: workOrder.code,
+    workOrderName: workOrder.name,
+    processName: process.name,
+    processSeq,
+    processRoute: workOrder.processRouteName || '',
+    resourceType: process.resourceType || '工人',
+    reportMode: process.reportMode || '',
+    executors: [...(process.executors || [])],
+    orderCategory,
+    orderSource: workOrder.orderSource || workOrder.source || '',
+    salesOrderNo: workOrder.sourceOrderNo || '',
+    workOrderRemark: workOrder.remark || '',
+    laborCalcMethod: '时长报工+计时工资',
+    nextProcess: getNextProcessName(processes, process.name),
+    createdAt: ts,
+    dispatchControl,
+    serialLocked: resolveSerialLocked(processSeq, dispatchControl),
+    ...product,
+    ...placement,
+  }
+}
+
 function mapWorkOrderProduct(workOrder, orderCategory) {
   if (orderCategory === '拆解工单') {
     return {
@@ -122,39 +245,49 @@ function getNextProcessName(processes, currentName) {
 }
 
 /**
- * 根据 PC 工单生成小程序任务（含串行锁定：仅首道工序可见）
+ * 根据 PC 工单生成小程序任务（标准模式串行锁定；极简报工并行下发）
  */
 export function generateMobileTasksFromWorkOrder(workOrder, orderCategory) {
   const processes = getProcessesForOrder(workOrder, orderCategory)
   const product = mapWorkOrderProduct(workOrder, orderCategory)
   const ts = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const dateStr = dayjs().format('YYYYMMDD')
+  const dispatchControl = resolveDispatchControl()
   const tasks = []
 
-  processes.forEach((process, index) => {
-    const placement = resolvePlacement(process, process.executors)
+  processes.forEach((rawProcess, index) => {
+    const process = enrichProcessForTask(rawProcess)
     const processSeq = process.index ?? index + 1
-    tasks.push({
-      id: `mt-${workOrder.id}-${processSeq}`,
-      workOrderId: workOrder.id,
-      workOrderCode: workOrder.code,
-      workOrderName: workOrder.name,
-      taskNo: `T${dayjs().format('YYYYMMDD')}${String(processSeq).padStart(3, '0')}`,
-      processName: process.name,
-      processSeq,
-      processRoute: workOrder.processRouteName || '',
-      resourceType: process.resourceType || '工人',
-      executors: [...(process.executors || [])],
-      orderCategory,
-      orderSource: workOrder.orderSource || workOrder.source || '',
-      salesOrderNo: workOrder.sourceOrderNo || '',
-      workOrderRemark: workOrder.remark || '',
-      laborCalcMethod: '时长报工+计时工资',
-      nextProcess: getNextProcessName(processes, process.name),
-      createdAt: ts,
-      serialLocked: processSeq > 1,
-      ...product,
-      ...placement,
-    })
+
+    if (shouldSplitCollaborativeTasks(process)) {
+      tasks.push(
+        ...buildCollaborativeTasks(
+          workOrder,
+          process,
+          processSeq,
+          product,
+          processes,
+          ts,
+          dateStr,
+          dispatchControl,
+        ),
+      )
+      return
+    }
+
+    tasks.push(
+      buildSingleTask(
+        workOrder,
+        process,
+        processSeq,
+        product,
+        processes,
+        ts,
+        dateStr,
+        orderCategory,
+        dispatchControl,
+      ),
+    )
   })
 
   return tasks

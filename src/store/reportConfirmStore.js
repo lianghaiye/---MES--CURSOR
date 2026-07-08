@@ -6,7 +6,9 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
-import { resolveReportMode } from '@/utils/reportMode'
+import { resolveReportMode, normalizeReportMode } from '@/utils/reportMode'
+import { getProcessByName } from '@/store/processConfigStore'
+import { resolveProcessExecutionMode, shouldSplitCollaborativeTasks } from '@/utils/taskExecutionMode'
 import { enrichLaborLine } from '@/utils/laborHourCalc'
 import { buildLaborHourRecord } from '@/mock/laborHourManagement'
 import { laborHourState, recalcOrder } from '@/store/laborHourStore'
@@ -389,11 +391,57 @@ export function generateLinesFromWorkOrder(wo, orderCategory = '生产工单') {
   const scheduleQty = wo.scheduleQty ?? wo.planQty ?? 0
   const created = []
   wo.processes.forEach((p, i) => {
+    const processSeq = p.index ?? p.seq ?? i + 1
+    const procConfig = getProcessByName(p.name)
+    const enriched = {
+      ...p,
+      reportMode: normalizeReportMode(p.reportMode || procConfig?.reportMode),
+      taskExecutionMode: resolveProcessExecutionMode({
+        taskExecutionMode: p.taskExecutionMode ?? procConfig?.taskExecutionMode,
+      }),
+    }
+
+    if (shouldSplitCollaborativeTasks(enriched)) {
+      ;(p.executors || []).forEach((executorName, idx) => {
+        const slot = idx + 1
+        const lineId = `rc-${wo.id}-${processSeq}-${String(slot).padStart(2, '0')}`
+        const exists = reportConfirmState.lines.find((l) => l.id === lineId)
+        if (exists) return
+        const labor = resolveLabor(productCode, p.name)
+        const line = enrichLine({
+          id: lineId,
+          taskNo: `T${dayjs().format('YYYYMMDD')}${String(processSeq).padStart(3, '0')}-${String(slot).padStart(2, '0')}`,
+          workOrderId: wo.id,
+          workOrderNo: wo.code,
+          workOrderName: wo.name,
+          processName: p.name,
+          processSeq,
+          collaborationSlot: slot,
+          collaborationTotal: p.executors.length,
+          taskExecutionMode: 'collaborative',
+          productName,
+          productCode,
+          executor: executorName,
+          reportTime: formatNow(),
+          taskQty: scheduleQty,
+          goodQty: scheduleQty,
+          defectQty: 0,
+          scrapQty: 0,
+          reportDuration: labor.reportType === '时长报工' ? Math.round(scheduleQty * 0.5 * 10) / 10 : 0,
+          remark: '',
+          confirmStatus: CONFIRM_STATUS.PENDING,
+          orderCategory,
+        })
+        reportConfirmState.lines.unshift(line)
+        created.push(line)
+      })
+      return
+    }
+
     const exists = reportConfirmState.lines.find(
-      (l) => l.workOrderId === wo.id && l.processName === p.name,
+      (l) => l.workOrderId === wo.id && l.processName === p.name && !l.collaborationSlot,
     )
     if (exists) return
-    const processSeq = p.index ?? p.seq ?? i + 1
     const labor = resolveLabor(productCode, p.name)
     const line = enrichLine({
       id: `rc-${wo.id}-${processSeq}`,

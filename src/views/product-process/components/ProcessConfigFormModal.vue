@@ -67,7 +67,16 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="16">
+        <a-col v-if="showTaskExecutionMode" :span="8">
+          <a-form-item label="任务执行模式" name="taskExecutionMode">
+            <a-select
+              v-model:value="form.taskExecutionMode"
+              placeholder="请选择任务执行模式"
+              :options="taskExecutionModeOpts"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="showTaskExecutionMode ? 8 : 16">
           <a-form-item label="不良品项">
             <a-select
               v-model:value="form.defectItemIds"
@@ -102,8 +111,8 @@
         </a-col>
       </a-row>
 
-      <div class="ops-title">工序操作</div>
-      <a-row :gutter="[16, 12]" class="ops-grid">
+      <div v-if="showProcessOperations" class="ops-title">工序操作</div>
+      <a-row v-if="showProcessOperations" :gutter="[16, 12]" class="ops-grid">
         <a-col v-for="item in PROCESS_OPERATION_DEFS" :key="item.key" :span="6">
           <div class="ops-item">
             <span>{{ item.label }}</span>
@@ -139,9 +148,12 @@ import {
   updateProcessConfig,
   PROCESS_OPERATION_DEFS,
   REPORT_MODES,
+  TASK_EXECUTION_MODES,
   RESOURCE_TYPES,
   MOCK_POSITIONS,
 } from '@/store/processConfigStore'
+import { DEFAULT_TASK_EXECUTION_MODE } from '@/utils/taskExecutionMode'
+import { isMinimalReportMode } from '@/store/businessRuleStore'
 import { getActiveCategoryOptions } from '@/store/processCategoryStore'
 import { getDefectItemOptions } from '@/store/defectItemStore'
 import ExecutorTagPicker from '@/views/production/components/ExecutorTagPicker.vue'
@@ -183,6 +195,7 @@ const form = reactive({
   remark: '',
   defaultExecutors: [],
   reportMode: undefined,
+  taskExecutionMode: DEFAULT_TASK_EXECUTION_MODE,
   defectItemIds: [],
   operations: defaultOps(),
 })
@@ -191,7 +204,17 @@ const categoryOpts = computed(() => getActiveCategoryOptions())
 const resourceTypeOpts = RESOURCE_TYPES.map((v) => ({ label: v, value: v }))
 const positionOpts = MOCK_POSITIONS.map((v) => ({ label: v, value: v }))
 const reportModeOpts = REPORT_MODES.map((v) => ({ label: v, value: v }))
+const taskExecutionModeOpts = TASK_EXECUTION_MODES.map((item) => ({
+  label: item.label,
+  value: item.value,
+}))
 const defectItemOpts = computed(() => getDefectItemOptions())
+
+const showTaskExecutionMode = computed(
+  () => form.reportMode === '时长报工' && form.resourceType === '工人',
+)
+
+const showProcessOperations = computed(() => !isMinimalReportMode())
 
 const rules = {
   name: [{ required: true, message: '请输入工序名称', trigger: 'blur' }],
@@ -222,10 +245,21 @@ watch(
     form.remark = r?.remark || ''
     form.defaultExecutors = [...(r?.defaultExecutors || [])]
     form.reportMode = r?.reportMode || undefined
+    form.taskExecutionMode = r?.taskExecutionMode || DEFAULT_TASK_EXECUTION_MODE
     form.defectItemIds = [...(r?.defectItemIds || [])]
     form.operations = { ...defaultOps(), ...(r?.operations || {}) }
   },
   { immediate: true },
+)
+
+watch(
+  () => [form.reportMode, form.resourceType],
+  () => {
+    if (!isActive.value) return
+    if (!showTaskExecutionMode.value) {
+      form.taskExecutionMode = DEFAULT_TASK_EXECUTION_MODE
+    }
+  },
 )
 
 watch(
@@ -249,7 +283,10 @@ async function handleSave() {
     return
   }
   saving.value = true
-  const payload = { ...form, operations: { ...form.operations } }
+  const payload = {
+    ...form,
+    operations: showProcessOperations.value ? { ...form.operations } : defaultOps(),
+  }
   const res = isEdit.value
     ? updateProcessConfig(props.record.id, payload)
     : addProcessConfig(payload)

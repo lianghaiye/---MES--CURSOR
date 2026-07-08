@@ -3,6 +3,10 @@ import dayjs from 'dayjs'
 import { dispatchWorkOrderToMobile } from '@/utils/mobileTaskDispatch'
 import { generateLinesFromWorkOrder } from '@/store/reportConfirmStore'
 import { buildWorkOrderDispatchEbomSnapshot } from '@/utils/workOrderEbomTree'
+import { getProcessByName } from '@/store/processConfigStore'
+import { normalizeReportMode } from '@/utils/reportMode'
+import { shouldSplitCollaborativeTasks } from '@/utils/taskExecutionMode'
+import { isParallelTaskDispatch } from '@/store/businessRuleStore'
 
 export function validateProcessExecutors(processes) {
   const missing = (processes || []).filter((p) => !p.executors?.length)
@@ -11,6 +15,20 @@ export function validateProcessExecutors(processes) {
     message.error(`请为工序「${missing.map((p) => p.name).join('、')}」选择${label}`)
     return false
   }
+
+  for (const process of processes || []) {
+    const procConfig = getProcessByName(process.name)
+    const enriched = {
+      ...process,
+      reportMode: normalizeReportMode(process.reportMode || procConfig?.reportMode),
+      taskExecutionMode: process.taskExecutionMode ?? procConfig?.taskExecutionMode,
+    }
+    if (shouldSplitCollaborativeTasks(enriched) && (process.executors?.length || 0) < 2) {
+      message.error(`工序「${process.name}」为多人协作模式，请至少选择 2 名执行人`)
+      return false
+    }
+  }
+
   return true
 }
 
@@ -59,6 +77,7 @@ export function dispatchAndStartWorkOrder({ workOrder, orderCategory, updateFn }
     processes: workOrder.processes,
     processRouteName: workOrder.processRouteName,
     status: '执行中',
+    dispatchControl: isParallelTaskDispatch() ? 'parallel' : 'serial',
     dispatchedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     executedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     ...(ebomSnapshot ? { ebomSnapshot } : {}),

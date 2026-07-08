@@ -47,6 +47,14 @@ import { PROCESS_DEFECT_ITEM_MAP, PROCESS_REPORT_MODE_MAP } from '@/mock/defectI
 
 export const REPORT_MODES = ['批量计件', '时长报工']
 
+export const TASK_EXECUTION_MODES = [
+  { value: 'single_claim', label: '单人领工' },
+  { value: 'collaborative', label: '多人协作' },
+]
+
+/** 默认多人协作的时长报工工序（演示） */
+const COLLABORATIVE_DURATION_PROCESSES = new Set(['装配', '热处理', '整机调试'])
+
 /** 机泵行业常用工序 */
 export function createProcessConfigSeed() {
   const defs = [
@@ -111,6 +119,7 @@ export function createProcessConfigSeed() {
     operations: defaultOperations(ops),
     defaultExecutors: [...defaultExecutors],
     reportMode: PROCESS_REPORT_MODE_MAP[name] || '',
+    taskExecutionMode: COLLABORATIVE_DURATION_PROCESSES.has(name) ? 'collaborative' : 'single_claim',
     defectItemIds: [...(PROCESS_DEFECT_ITEM_MAP[name] || [])],
     createdAt: '2026-05-01',
     updatedAt: '2026-06-01',

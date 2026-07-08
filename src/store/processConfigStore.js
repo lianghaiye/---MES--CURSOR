@@ -4,17 +4,19 @@ import {
   createProcessConfigSeed,
   PROCESS_OPERATION_DEFS,
   REPORT_MODES,
+  TASK_EXECUTION_MODES,
   RESOURCE_TYPES,
   MOCK_POSITIONS,
 } from '@/mock/processConfigSeed'
 import { getActiveCategoryNames } from '@/store/processCategoryStore'
 import { normalizeReportMode } from '@/utils/reportMode'
+import { normalizeTaskExecutionMode } from '@/utils/taskExecutionMode'
 
 const STORAGE_KEY = 'i_doms_process_config'
 const SEED_VERSION_KEY = 'i_doms_process_config_seed_v'
-const CURRENT_SEED_VERSION = '6'
+const CURRENT_SEED_VERSION = '7'
 
-export { PROCESS_OPERATION_DEFS, REPORT_MODES, RESOURCE_TYPES, MOCK_POSITIONS }
+export { PROCESS_OPERATION_DEFS, REPORT_MODES, TASK_EXECUTION_MODES, RESOURCE_TYPES, MOCK_POSITIONS }
 
 export const PROCESS_STATUS = ['使用中', '已停用']
 
@@ -50,6 +52,7 @@ function normalizeProcessList(list) {
     ...p,
     defaultExecutors: Array.isArray(p.defaultExecutors) ? [...p.defaultExecutors] : [],
     reportMode: normalizeReportMode(p.reportMode),
+    taskExecutionMode: normalizeTaskExecutionMode(p.taskExecutionMode),
     defectItemIds: Array.isArray(p.defectItemIds) ? [...p.defectItemIds] : [],
   }))
 }
@@ -181,6 +184,7 @@ export function addProcessConfig(payload) {
     operations: normalizeOperations(payload.operations),
     defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
     reportMode: payload.reportMode ? normalizeReportMode(payload.reportMode) : '',
+    taskExecutionMode: normalizeTaskExecutionMode(payload.taskExecutionMode),
     defectItemIds: Array.isArray(payload.defectItemIds) ? [...payload.defectItemIds] : [],
     createdAt: dayjs().format('YYYY-MM-DD'),
     updatedAt: dayjs().format('YYYY-MM-DD'),
@@ -210,6 +214,9 @@ export function updateProcessConfig(id, payload) {
     reportMode: payload.reportMode
       ? normalizeReportMode(payload.reportMode)
       : normalizeReportMode(row.reportMode),
+    taskExecutionMode: normalizeTaskExecutionMode(
+      payload.taskExecutionMode ?? row.taskExecutionMode,
+    ),
     defectItemIds: Array.isArray(payload.defectItemIds) ? [...payload.defectItemIds] : [],
     updatedAt: dayjs().format('YYYY-MM-DD'),
   })
