@@ -23,7 +23,7 @@
       size="small"
       bordered
       :pagination="false"
-      :scroll="{ x: 1180 }"
+      :scroll="{ x: 1290 }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'bomStatus'">
@@ -70,6 +70,7 @@ const columns = [
   { title: 'BOM名称', dataIndex: 'bomName', key: 'bomName', width: 140, ellipsis: true },
   { title: 'BOM编码', dataIndex: 'bomNo', key: 'bomNo', width: 120, ellipsis: true },
   { title: '引用BOM版本', dataIndex: 'refBomVersion', key: 'refBomVersion', width: 110 },
+  { title: '当前生效版本', dataIndex: 'activeBomVersion', key: 'activeBomVersion', width: 110 },
   { title: '物品名称', dataIndex: 'itemName', key: 'itemName', width: 140, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 110, ellipsis: true },
   { title: '材质', dataIndex: 'material', key: 'material', width: 80, ellipsis: true },

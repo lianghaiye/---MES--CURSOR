@@ -1,6 +1,6 @@
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { getProductBomById, productBomState } from '@/store/productBomStore'
+import { getProductBomById, getActiveBomForItem, productBomState } from '@/store/productBomStore'
 import { getRootTreeId } from '@/utils/bomTree'
 import { normalizeVersionDisplay } from '@/utils/bomVersion'
 import { findParentBomReferences, getBomLineItems } from '@/utils/bomVersionReference'
@@ -35,13 +35,21 @@ function calcDirectSubItemCount(bom) {
   return lines.filter((line) => line.parentTreeId === rootId).length
 }
 
-function toRelationRow(bom, unitQty, refBomVersion) {
+function resolveActiveVersionForItem(itemType, itemId) {
+  if (!itemType || itemId == null || itemId === '') return '—'
+  const active = getActiveBomForItem(itemType, itemId)
+  if (!active?.version) return '—'
+  return normalizeVersionDisplay(active.version) || '—'
+}
+
+function toRelationRow(bom, unitQty, refBomVersion, activeVersionSourceBom) {
   const full = getProductBomById(bom.id) || bom
   const master = resolveMaster(full)
   const version =
     refBomVersion != null && String(refBomVersion).trim() !== ''
       ? normalizeVersionDisplay(refBomVersion)
       : normalizeVersionDisplay(full.version) || '—'
+  const activeSource = activeVersionSourceBom || full
   return {
     id: full.id,
     bomId: full.id,
@@ -49,6 +57,7 @@ function toRelationRow(bom, unitQty, refBomVersion) {
     bomName: full.bomName || '—',
     bomNo: full.bomNo || '—',
     refBomVersion: version,
+    activeBomVersion: resolveActiveVersionForItem(activeSource.itemType, activeSource.itemId),
     itemName: full.itemName || master?.name || '—',
     specModel: resolveField(full, master, 'specModel'),
     material: resolveField(full, master, 'material'),
@@ -127,6 +136,7 @@ export function findParentBomReferenceRows(bom) {
         parent,
         matchedLine?.unitQty,
         matchedLine?.childBomVersion || full.version,
+        full,
       )
     })
     .filter(Boolean)
