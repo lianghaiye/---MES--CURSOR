@@ -23,10 +23,13 @@
       size="small"
       bordered
       :pagination="false"
-      :scroll="{ x: 980 }"
+      :scroll="{ x: 1180 }"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'bomName'">
+        <template v-if="column.key === 'bomStatus'">
+          <a-tag :color="bomStatusColor(record.bomStatus)">{{ record.bomStatus }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'bomName'">
           <a class="link-name" @click.prevent="openBomDetail(record)">{{ record.bomName }}</a>
         </template>
         <template v-else-if="column.key === 'subItemCount'">
@@ -47,6 +50,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { findChildBomReferenceRows, findParentBomReferenceRows } from '@/utils/bomRelation'
+import { bomStatusColor } from '@/mock/productBomOptions'
 import { useTabs } from '@/composables/useTabs'
 
 const props = defineProps({
@@ -62,8 +66,10 @@ const { openTab } = useTabs()
 const activeTab = ref('child')
 
 const columns = [
+  { title: 'BOM状态', dataIndex: 'bomStatus', key: 'bomStatus', width: 88 },
   { title: 'BOM名称', dataIndex: 'bomName', key: 'bomName', width: 140, ellipsis: true },
   { title: 'BOM编码', dataIndex: 'bomNo', key: 'bomNo', width: 120, ellipsis: true },
+  { title: '引用BOM版本', dataIndex: 'refBomVersion', key: 'refBomVersion', width: 110 },
   { title: '物品名称', dataIndex: 'itemName', key: 'itemName', width: 140, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 110, ellipsis: true },
   { title: '材质', dataIndex: 'material', key: 'material', width: 80, ellipsis: true },

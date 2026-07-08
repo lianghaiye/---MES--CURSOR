@@ -4,6 +4,7 @@ import { getProductBomById, productBomState } from '@/store/productBomStore'
 import { getRootTreeId } from '@/utils/bomTree'
 import { normalizeVersionDisplay } from '@/utils/bomVersion'
 import { findParentBomReferences, getBomLineItems } from '@/utils/bomVersionReference'
+import { normalizeBomStatusValue } from '@/mock/productBomOptions'
 
 function resolveMaster(bom) {
   if (!bom?.itemId) return null
@@ -34,14 +35,20 @@ function calcDirectSubItemCount(bom) {
   return lines.filter((line) => line.parentTreeId === rootId).length
 }
 
-function toRelationRow(bom, unitQty) {
+function toRelationRow(bom, unitQty, refBomVersion) {
   const full = getProductBomById(bom.id) || bom
   const master = resolveMaster(full)
+  const version =
+    refBomVersion != null && String(refBomVersion).trim() !== ''
+      ? normalizeVersionDisplay(refBomVersion)
+      : normalizeVersionDisplay(full.version) || '—'
   return {
     id: full.id,
     bomId: full.id,
+    bomStatus: normalizeBomStatusValue(full.status),
     bomName: full.bomName || '—',
     bomNo: full.bomNo || '—',
+    refBomVersion: version,
     itemName: full.itemName || master?.name || '—',
     specModel: resolveField(full, master, 'specModel'),
     material: resolveField(full, master, 'material'),
@@ -99,7 +106,7 @@ export function findChildBomReferenceRows(bom, lineItemsOverride) {
     const childBom = resolveChildBomFromLine(line)
     if (!childBom || seen.has(childBom.id)) return
     seen.add(childBom.id)
-    rows.push(toRelationRow(childBom, line.unitQty))
+    rows.push(toRelationRow(childBom, line.unitQty, line.childBomVersion || childBom.version))
   })
 
   return rows
@@ -116,7 +123,11 @@ export function findParentBomReferenceRows(bom) {
       if (!parent) return null
       const lines = getBomLineItems(parent)
       const matchedLine = lines.find((line) => ref.lineIds.includes(line.id))
-      return toRelationRow(parent, matchedLine?.unitQty)
+      return toRelationRow(
+        parent,
+        matchedLine?.unitQty,
+        matchedLine?.childBomVersion || full.version,
+      )
     })
     .filter(Boolean)
 }
