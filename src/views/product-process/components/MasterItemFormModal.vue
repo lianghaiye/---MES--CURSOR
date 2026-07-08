@@ -591,7 +591,6 @@ import {
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
 import { generateProductCode } from '@/store/productInfoStore'
-import { generateMaterialCode } from '@/store/materialInfoStore'
 import { saveMasterItem, resolveMasterItemEditRecord } from '@/utils/masterItemSave'
 import {
   ITEM_KIND,
@@ -932,11 +931,7 @@ function buildProductPayload() {
   const parent = cat?.parentKey
     ? flattenCategoryNodes(productCategoryTree).find((c) => c.key === cat.parentKey)
     : null
-  const code =
-    form.code?.trim() ||
-    (derivedItemKind.value === ITEM_KIND.MATERIAL
-      ? generateMaterialCode()
-      : generateProductCode())
+  const code = form.code?.trim() || generateProductCode()
   const isPm = derivedItemKind.value === ITEM_KIND.PRODUCT_MATERIAL
 
   return {
@@ -983,11 +978,7 @@ function buildMaterialPayload() {
   const parent = cat?.parentKey
     ? flattenCategoryNodes(materialCategoryTree).find((c) => c.key === cat.parentKey)
     : null
-  const code =
-    form.code?.trim() ||
-    (derivedItemKind.value === ITEM_KIND.MATERIAL
-      ? generateMaterialCode()
-      : generateProductCode())
+  const code = form.code?.trim() || generateProductCode()
   const isPm = derivedItemKind.value === ITEM_KIND.PRODUCT_MATERIAL
   const laborRows = form.laborEnabled ? JSON.parse(JSON.stringify(form.laborRows)) : []
 

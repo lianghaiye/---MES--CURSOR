@@ -126,14 +126,7 @@ function applyOutboundHeaderFields(order, payload) {
   return order
 }
 
-export function addOutboundOrder(payload) {
-  const docNo = String(payload.docNo || '').trim()
-  if (!docNo) {
-    return { ok: false, message: '请输入出库单号' }
-  }
-  if (getOutboundOrderByDocNo(docNo)) {
-    return { ok: false, message: '出库单号已存在' }
-  }
+export function appendOutboundOrder(payload) {
   if (!payload.outboundType) {
     return { ok: false, message: '请选择出库类型' }
   }
@@ -141,8 +134,12 @@ export function addOutboundOrder(payload) {
     return { ok: false, message: '请至少添加一条明细' }
   }
 
-  const lineItems = buildLineItems(payload)
+  const docNo = String(payload.docNo || '').trim() || generateOutboundNo()
+  if (getOutboundOrderByDocNo(docNo)) {
+    return { ok: false, message: '出库单号已存在' }
+  }
 
+  const lineItems = buildLineItems(payload)
   const headerWarehouse =
     payload.warehouse || lineItems.find((line) => line.shipWarehouse)?.shipWarehouse || ''
 
@@ -153,14 +150,23 @@ export function addOutboundOrder(payload) {
     warehouse: headerWarehouse,
     lineItems,
     status: payload.status || resolveInitialOutboundStatus(payload.outboundType),
-    createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    createdAt: payload.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
     outboundTime: payload.outboundTime || dayjs().format('YYYY-MM-DD HH:mm:ss'),
     creator: payload.creator || 'admin1',
     warehouseKeeper: payload.warehouseKeeper || payload.handler || 'admin1',
     workshop: payload.workshop || payload.requisitionDept || '默认工厂',
+    sourceChannel: payload.sourceChannel || 'web',
   })
   outboundState.orders.unshift(row)
   return { ok: true, order: row }
+}
+
+export function addOutboundOrder(payload) {
+  const docNo = String(payload.docNo || '').trim()
+  if (!docNo) {
+    return { ok: false, message: '请输入出库单号' }
+  }
+  return appendOutboundOrder({ ...payload, docNo })
 }
 
 export function updateOutboundOrder(id, payload) {

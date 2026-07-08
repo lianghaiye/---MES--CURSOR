@@ -258,6 +258,8 @@
       v-model:open="enableRefOpen"
       :product-name="enableTarget?.itemName || ''"
       :bom-name="enableTarget?.bomName || ''"
+      :new-version="enableNewVersion"
+      :current-version="enableCurrentVersion"
       :refs="enableParentRefs"
       @confirm="onEnableRefConfirm"
     />
@@ -341,6 +343,8 @@ const versionRecord = ref(null)
 const enableRefOpen = ref(false)
 const enableTarget = ref(null)
 const enableParentRefs = ref([])
+const enableNewVersion = ref('')
+const enableCurrentVersion = ref('')
 const relationOpen = ref(false)
 const relationBom = ref(null)
 
@@ -548,7 +552,11 @@ function doEnable(record, upgradeParentRefs = false, parentRefs = []) {
     message.warning(res.error)
     return
   }
-  message.success('审核发布成功，当前版本已生效可用于生产')
+  const syncHint =
+    upgradeParentRefs && parentRefs.length
+      ? `，已同步更新 ${parentRefs.length} 个父级 BOM 的引用版本`
+      : ''
+  message.success(`审核发布成功，当前版本已生效可用于生产${syncHint}`)
 }
 
 function handleEnable(record) {
@@ -556,17 +564,37 @@ function handleEnable(record) {
   if (refs.length) {
     enableTarget.value = record
     enableParentRefs.value = refs
+    enableNewVersion.value = record.version || ''
+    const active = productBomState.boms.find(
+      (b) =>
+        b.itemType === record.itemType &&
+        b.itemId === record.itemId &&
+        b.id !== record.id &&
+        isBomActive(b),
+    )
+    enableCurrentVersion.value = active?.version || ''
     enableRefOpen.value = true
     return
   }
   doEnable(record)
 }
 
-function onEnableRefConfirm(upgrade) {
+function onEnableRefConfirm({ action, selectedRefs }) {
   if (!enableTarget.value) return
-  doEnable(enableTarget.value, upgrade, enableParentRefs.value)
+  if (action === 'reject') {
+    message.info('已取消本次审核发布')
+    enableTarget.value = null
+    enableParentRefs.value = []
+    enableNewVersion.value = ''
+    enableCurrentVersion.value = ''
+    return
+  }
+  const upgrade = action === 'upgrade'
+  doEnable(enableTarget.value, upgrade, upgrade ? selectedRefs : [])
   enableTarget.value = null
   enableParentRefs.value = []
+  enableNewVersion.value = ''
+  enableCurrentVersion.value = ''
 }
 
 function onExportMenu({ key }) {

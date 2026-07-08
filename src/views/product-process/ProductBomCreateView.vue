@@ -916,7 +916,9 @@ async function handleSave() {
       return
     }
     if (res.versionUpgraded) {
-      message.success(`已生成新版本 ${res.record.version}（待发布），旧版本已归档`)
+      message.success(
+        `已生成新版本 ${res.record.version}（待发布），当前生效版本保持不变，审核发布后新版本才生效`,
+      )
     } else if (isEditMode.value) {
       message.success('BOM 已更新')
     } else {

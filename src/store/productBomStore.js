@@ -1,7 +1,7 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
-import { buildPagedMockBoms, hydrateCatalogBom, isCatalogSeedBom } from '@/mock/productBomSeed'
+import { buildPagedMockBoms, hydrateCatalogBom, injectBomParentReferenceMocks, isCatalogSeedBom } from '@/mock/productBomSeed'
 import { mockMaterials } from '@/mock/materialInfo'
 import { safeRemoveItem, safeSetItem } from '@/utils/safeStorage'
 import {
@@ -23,7 +23,7 @@ import { upgradeParentBomReferences } from '@/utils/bomVersionReference'
 import { formatBomInfoLabel, sortBomsForDisplay } from '@/utils/itemBomInfo'
 
 const STORAGE_KEY = 'i_doms_product_bom'
-const DATA_VERSION = 7
+const DATA_VERSION = 8
 let bomNoSeq = 31000
 
 function normalizeBoms(boms) {
@@ -87,7 +87,7 @@ function ensureBomStructure(bom) {
 function loadInitialBoms() {
   const stored = loadFromStorage()
   if (stored) return stored
-  return normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials))
+  return injectBomParentReferenceMocks(normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials)))
 }
 
 export const productBomState = reactive({
@@ -230,9 +230,6 @@ function buildBomRecord(payload, { versionGroupId, ver, status, source }) {
 export function addProductBom(payload) {
   const active = getActiveBomForItem(payload.itemType, payload.itemId)
   const versionGroupId = active?.versionGroupId || `bom-grp-${Date.now()}`
-  if (active) {
-    archiveProductBom(active.id)
-  }
   const ver = buildVersion(payload.itemType, payload.itemId, versionGroupId)
   const record = buildBomRecord(payload, {
     versionGroupId,
@@ -255,7 +252,7 @@ export function updateProductBom(id, patch) {
 }
 
 /**
- * 保存 BOM：待发布原地更新；生效中保存则归档旧版并生成待发布新版本
+ * 保存 BOM：待发布原地更新；生效中保存则生成待发布新版本（旧版保持生效，审核发布后再归档）
  */
 export function saveProductBom(id, payload) {
   if (!id) {
@@ -275,12 +272,6 @@ export function saveProductBom(id, payload) {
   }
 
   if (isBomActive(row)) {
-    const ts = nowStr()
-    row.status = BOM_STATUS.ARCHIVED
-    row.isDefault = false
-    row.expiredAt = ts
-    row.updatedAt = ts
-
     const ver = buildVersion(row.itemType, row.itemId, row.versionGroupId)
     const record = buildBomRecord(payload, {
       versionGroupId: row.versionGroupId,
@@ -289,7 +280,7 @@ export function saveProductBom(id, payload) {
       source: row,
     })
     productBomState.boms.unshift(record)
-    return { record, created: true, versionUpgraded: true, archivedId: row.id }
+    return { record, created: true, versionUpgraded: true, previousActiveId: row.id }
   }
 
   return { error: '当前状态的 BOM 不可保存' }

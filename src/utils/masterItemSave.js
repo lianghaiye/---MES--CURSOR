@@ -16,7 +16,6 @@ import {
   addMaterial,
   updateMaterial,
   deleteMaterial,
-  generateMaterialCode,
   cloneMaterial,
 } from '@/store/materialInfoStore'
 import { generateSharedItemId } from '@/utils/productMaterialSync'
@@ -89,6 +88,7 @@ export function saveMasterItem({ isEdit, id, productPayload, materialPayload }) 
         addProduct({ ...data, id })
       } else if (findProduct(id)) {
         updateProduct(id, data)
+        if (findMaterial(id)) deleteMaterial(id)
       } else {
         addProduct({ ...data, id })
       }
@@ -106,6 +106,7 @@ export function saveMasterItem({ isEdit, id, productPayload, materialPayload }) 
         addMaterial({ ...data, id })
       } else if (findMaterial(id)) {
         updateMaterial(id, data)
+        if (findProduct(id)) deleteProduct(id)
       } else {
         addMaterial({ ...data, id })
       }
@@ -181,7 +182,7 @@ export function cloneMasterItem(record) {
   return cloneProduct(id)
 }
 
-export function generateMasterItemCode(kind) {
-  if (kind === ITEM_KIND.MATERIAL) return generateMaterialCode()
+/** 统一主数据编码前缀：CP */
+export function generateMasterItemCode() {
   return generateProductCode()
 }

@@ -83,3 +83,11 @@ export function resolveBomItemTypeForKind(itemKind) {
   if (itemKind === ITEM_KIND.MATERIAL) return 'material'
   return 'product'
 }
+
+/** 产品表禁止：仅可生产、不可销售（非产品物料双写） */
+export function isForbiddenProductOnlyProduce(record = {}) {
+  if (!record || record.isProductMaterial) return false
+  const canSell = record.canSell === true
+  const canProduce = Boolean(record.canProduce)
+  return canProduce && !canSell
+}

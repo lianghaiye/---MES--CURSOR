@@ -1,3 +1,5 @@
+import { isForbiddenProductOnlyProduce } from '@/utils/masterItemKind'
+
 /** 物料类型（与表单下拉一致） */
 export const MATERIAL_TYPE_OPTIONS = ['零部件', '原材料', '标准件', '毛胚', '半成品', '虚拟件']
 
@@ -85,7 +87,9 @@ export function migrateProductRecord(record) {
 }
 
 export function migrateProductList(list) {
-  return (list || []).map((row) => migrateProductRecord(row))
+  return (list || [])
+    .filter((row) => !isForbiddenProductOnlyProduce(row))
+    .map((row) => migrateProductRecord(row))
 }
 
 const LEGACY_PRODUCT_ATTR_MAP = {

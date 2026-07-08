@@ -196,6 +196,10 @@
             <template v-else-if="column.key === 'shipQtyTotal'">
               {{ formatQty(calcOutboundShipQty(record)) }}
             </template>
+            <template v-else-if="column.key === 'sourceChannel'">
+              <a-tag v-if="record.sourceChannel === 'mini-program'" color="cyan">小程序</a-tag>
+              <span v-else>WEB</span>
+            </template>
             <template v-else-if="column.key === 'status'">
               <a-tag :color="outboundStatusColor(record.status)">{{ record.status }}</a-tag>
             </template>
@@ -361,6 +365,7 @@ const baseColumns = [
   { title: '状态', key: 'status', width: 110 },
   { title: '出库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
   { title: '出库类型', dataIndex: 'outboundType', width: 100 },
+  { title: '来源', key: 'sourceChannel', width: 90 },
   { title: '出库仓库', dataIndex: 'warehouse', width: 90 },
   { title: '出库数量', key: 'shipQtyTotal', width: 90, align: 'right' },
   { title: '源单号', key: 'sourceOrderNo', width: 140 },

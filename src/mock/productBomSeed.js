@@ -176,6 +176,76 @@ export function buildPagedMockBoms(products = mockProducts, materials = mockMate
   return boms
 }
 
+/** Mock：为首个产品 BOM 注入 2 条父级引用，用于审核发布时父级同步提醒演示 */
+export function injectBomParentReferenceMocks(boms) {
+  if (!Array.isArray(boms) || boms.some((b) => b._mockParentRefsInjected)) return boms
+
+  const childBom = boms.find(
+    (b) =>
+      b.itemType === 'product' &&
+      b.itemId === 'prod-00001' &&
+      b.status === BOM_STATUS.ACTIVE &&
+      b.lineItems?.length,
+  )
+  if (!childBom) return boms
+
+  const parentSpecs = [
+    { itemId: 'prod-00002', label: '立式多级离心泵' },
+    { itemId: 'prod-00003', label: '井用潜水泵' },
+  ]
+
+  parentSpecs.forEach((spec) => {
+    const parent = boms.find(
+      (b) =>
+        b.itemType === 'product' &&
+        b.itemId === spec.itemId &&
+        b.status === BOM_STATUS.ACTIVE &&
+        b.lineItems?.length,
+    )
+    if (!parent) return
+    if (parent.lineItems.some((line) => line.childBomId === childBom.id)) return
+
+    const rootId = parent.treeNodes?.[0]?.id
+    if (!rootId) return
+
+    const refLine = createBomLineItem({
+      parentTreeId: rootId,
+      materialCode: childBom.itemCode,
+      itemName: childBom.itemName || spec.label,
+      specModel: childBom.specModel || '',
+      categoryName: '部件',
+      materialType: '零部件',
+      supplyForm: '自制件',
+      unitQty: 1,
+      unit: '件',
+      childBom: childBom.bomName,
+      childBomVersion: childBom.version,
+      childBomId: childBom.id,
+      referencedItemId: childBom.itemId,
+      referencedItemType: childBom.itemType,
+      remark: 'Mock 父级引用',
+    })
+
+    const refNode = createBomTreeNode({
+      parentId: rootId,
+      title: `${childBom.itemCode} ${childBom.itemName}`,
+      quantity: 1,
+      nodeType: 'bom-ref',
+      lineId: refLine.id,
+      materialCode: childBom.itemCode,
+    })
+    refLine.treeNodeId = refNode.id
+
+    parent.treeNodes.push(refNode)
+    parent.lineItems.push(refLine)
+    parent.updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+    parent._mockParentRefsInjected = true
+  })
+
+  childBom._mockParentRefsInjected = true
+  return boms
+}
+
 /** @deprecated 使用 buildPagedMockBoms */
 export function buildCatalogProductBoms(products) {
   return buildPagedMockBoms(products, mockMaterials)

@@ -185,7 +185,9 @@ async function handleOk() {
       return
     }
     if (res.versionUpgraded) {
-      message.success(`已生成新版本 ${res.record.version}（待发布）`)
+      message.success(
+        `已生成新版本 ${res.record.version}（待发布），当前生效版本保持不变，审核发布后新版本才生效`,
+      )
     } else {
       message.success(isEdit.value ? '已保存' : '已创建，状态为待发布，可在列表中审核发布')
     }

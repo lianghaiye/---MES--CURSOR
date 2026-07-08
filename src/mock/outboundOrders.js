@@ -54,6 +54,7 @@ export function createOutboundOrder(partial) {
     creator: 'admin1',
     lineItems: [],
     factoryQcId: '',
+    sourceChannel: '',
     ...partial,
   }
 }
