@@ -4,11 +4,31 @@
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="单据编号">
+            <a-form-item :label="moduleConfig.docNoLabel">
               <a-input
-                v-model:value="filters.documentNo"
+                v-model:value="filters.docNo"
                 allow-clear
-                :placeholder="moduleConfig.docNoFilterPlaceholder"
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="销售单号">
+              <a-input
+                v-model:value="filters.salesOrderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="工单编号">
+              <a-input
+                v-model:value="filters.workOrderNo"
+                allow-clear
+                placeholder="请输入"
                 size="small"
               />
             </a-form-item>
@@ -226,7 +246,9 @@ const { openTab } = useTabs()
 const moduleConfig = resolveChangeRequestModule(route)
 
 const defaultFilters = () => ({
-  documentNo: '',
+  docNo: '',
+  salesOrderNo: '',
+  workOrderNo: '',
   status: undefined,
   type: undefined,
   productName: '',

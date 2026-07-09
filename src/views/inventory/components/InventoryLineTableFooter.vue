@@ -5,8 +5,8 @@
         添加明细行
       </a-button>
     </div>
-    <div class="line-summary-row">
-      <table class="line-summary-table" :style="{ minWidth: `${scrollX}px` }">
+    <div class="line-summary-scroll">
+      <table class="line-summary-table" :style="summaryTableStyle">
         <colgroup>
           <col v-for="col in columns" :key="col.key" :style="colWidthStyle(col)" />
         </colgroup>
@@ -27,12 +27,19 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   columns: { type: Array, default: () => [] },
   scrollX: { type: Number, default: 900 },
 })
 
 const emit = defineEmits(['add-line'])
+
+const summaryTableStyle = computed(() => ({
+  width: `${props.scrollX}px`,
+  minWidth: `${props.scrollX}px`,
+}))
 
 function colWidthStyle(col) {
   if (col.width) return { width: `${col.width}px` }
@@ -61,13 +68,13 @@ export default { name: 'InventoryLineTableFooter' }
   height: auto;
 }
 
-.line-summary-row {
+.line-summary-scroll {
   overflow-x: auto;
+  overflow-y: hidden;
   background: #fafafa;
 }
 
 .line-summary-table {
-  width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 13px;

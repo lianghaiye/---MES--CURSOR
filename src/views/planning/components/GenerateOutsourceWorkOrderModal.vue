@@ -75,18 +75,12 @@
                 @change="(date) => onExpectedArrivalChange(record, date)"
                 @openChange="onDatePickerOpenChange"
               />
-              <a-select
+              <PlanSupplierSelect
                 v-else-if="column.key === 'supplier'"
                 v-model:value="record.supplier"
                 size="small"
-                show-search
-                allow-clear
-                placeholder="请选择"
-                style="width: 100%"
                 :open="selectOpen"
-                :options="supplierOpts"
-                :filter-option="filterSelectOption"
-                @dropdownVisibleChange="onSelectOpenChange"
+                @dropdown-visible-change="onSelectOpenChange"
                 @change="endEdit"
               />
               <a-select
@@ -161,8 +155,9 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { unitOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
-import { planSupplierOptions } from '@/utils/productionPlanMaterial'
 import { buildOutsourceWorkOrderRows } from '@/utils/material'
+import { SUPPLIER_SELECT_PLACEHOLDER } from '@/utils/supplierSelect'
+import PlanSupplierSelect from './PlanSupplierSelect.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -206,8 +201,6 @@ const editingCell = ref(null)
 const tableWrapRef = ref(null)
 const selectOpen = ref(false)
 const datePickerOpen = ref(false)
-
-const supplierOpts = planSupplierOptions
 
 const selectOptions = computed(() => {
   void warehouseState.warehouses
@@ -292,10 +285,6 @@ function onSelectOpenChange(open) {
   if (!open) endEdit()
 }
 
-function filterSelectOption(input, option) {
-  return (option?.label || '').toLowerCase().includes(input.toLowerCase())
-}
-
 function expectedArrivalDayjs(record) {
   return record.expectedArrivalDate ? dayjs(record.expectedArrivalDate) : null
 }
@@ -313,7 +302,7 @@ function formatCell(record, key, text) {
   if (key === 'expectedArrivalDate') {
     return record.expectedArrivalDate || '请选择'
   }
-  if (key === 'supplier' && !text) return '请选择'
+  if (key === 'supplier' && !text) return SUPPLIER_SELECT_PLACEHOLDER
   if (isEditable(key) && (text === '' || text == null)) {
     return '-'
   }

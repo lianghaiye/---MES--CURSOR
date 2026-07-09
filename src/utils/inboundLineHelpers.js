@@ -18,11 +18,7 @@ export function calcInboundLineTotalPrice(line = {}) {
 }
 
 export function enrichInboundLinePricing(line = {}) {
-  const totalPrice =
-    line.totalPrice != null && line.totalPrice !== ''
-      ? roundMoney(line.totalPrice)
-      : calcInboundLineTotalPrice(line)
-  return { totalPrice }
+  return { totalPrice: calcInboundLineTotalPrice(line) }
 }
 
 export function syncInboundLineTotalFromUnit(line) {

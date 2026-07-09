@@ -24,10 +24,7 @@ export function calcLineCostAmount(line = {}) {
 }
 
 export function enrichOutboundLinePricing(line = {}) {
-  const totalPrice =
-    line.totalPrice != null && line.totalPrice !== ''
-      ? roundMoney(line.totalPrice)
-      : calcLineTotalPrice(line)
+  const totalPrice = calcLineTotalPrice(line)
   const costUnitPrice =
     line.costUnitPrice != null && line.costUnitPrice !== ''
       ? roundMoney(line.costUnitPrice)

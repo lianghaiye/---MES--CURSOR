@@ -5,7 +5,7 @@
     width="720px"
     :mask-closable="false"
     destroy-on-close
-    class="outbound-line-edit-modal"
+    class="inventory-line-edit-modal"
     @cancel="handleCancel"
   >
     <a-form v-if="draft" layout="vertical" class="edit-form">
@@ -85,49 +85,28 @@
       <a-form-item>
         <template #label>
           <span class="field-label">
-            <AccountBookOutlined />
-            成本金额
+            <DollarOutlined />
+            单价
           </span>
         </template>
-        <div class="editable-field">
-          <a-input-number
-            v-model:value="draft.costAmount"
-            :min="0"
-            :precision="2"
-            :disabled="!costAmountEditable"
-            style="width: 100%"
-            @change="onCostAmountChange"
-          />
-          <a-button type="text" class="edit-btn" @click="costAmountEditable = !costAmountEditable">
-            <EditOutlined />
-          </a-button>
-        </div>
+        <a-input-number
+          v-model:value="draft.unitPrice"
+          :min="0"
+          :precision="2"
+          placeholder="请输入"
+          style="width: 100%"
+          @change="onUnitPriceChange"
+        />
       </a-form-item>
 
       <a-form-item>
         <template #label>
           <span class="field-label">
-            <DollarOutlined />
-            成本单价
+            <AccountBookOutlined />
+            总价
           </span>
         </template>
-        <div class="editable-field">
-          <a-input-number
-            v-model:value="draft.costUnitPrice"
-            :min="0"
-            :precision="2"
-            :disabled="!costUnitPriceEditable"
-            style="width: 100%"
-            @change="onCostUnitPriceChange"
-          />
-          <a-button
-            type="text"
-            class="edit-btn"
-            @click="costUnitPriceEditable = !costUnitPriceEditable"
-          >
-            <EditOutlined />
-          </a-button>
-        </div>
+        <a-input-number :value="draft.totalPrice" :precision="2" disabled style="width: 100%" />
       </a-form-item>
     </a-form>
 
@@ -144,7 +123,6 @@ import { message } from 'ant-design-vue'
 import {
   AccountBookOutlined,
   DollarOutlined,
-  EditOutlined,
   FileTextOutlined,
   HomeOutlined,
   UnorderedListOutlined,
@@ -153,8 +131,6 @@ import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStor
 import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
 import {
   enrichOutboundLine,
-  syncLineCostFromUnit,
-  syncLineCostUnitFromAmount,
   syncLineTotalFromUnit,
 } from '@/utils/outboundLineHelpers'
 
@@ -169,8 +145,6 @@ const emit = defineEmits(['update:open', 'confirm'])
 const draft = ref(null)
 const selectedItemKey = ref(undefined)
 const preview = ref(null)
-const costAmountEditable = ref(false)
-const costUnitPriceEditable = ref(false)
 
 const warehouseOpts = computed(() => {
   void warehouseState.warehouses
@@ -194,13 +168,9 @@ watch(
       draft.value = null
       preview.value = null
       selectedItemKey.value = undefined
-      costAmountEditable.value = false
-      costUnitPriceEditable.value = false
       return
     }
     draft.value = reactive(enrichOutboundLine({ ...props.line }))
-    costAmountEditable.value = false
-    costUnitPriceEditable.value = false
     syncSelectedItemKey()
     refreshPreviewStock()
   },
@@ -252,31 +222,23 @@ function onItemChange(rowKey) {
     itemType: item.itemType,
     specAttr: item.productAttribute || item.materialType || '',
     specModel: item.specModel || '',
+    material: item.material || '',
+    drawingNo: item.drawingNo || '',
     unit: item.inventoryUnit || '件',
     unitPrice: item.unitPrice ?? draft.value.unitPrice,
   })
-  if (!costUnitPriceEditable.value) {
-    draft.value.costUnitPrice = item.unitPrice ?? draft.value.costUnitPrice
-  }
   syncLineTotalFromUnit(draft.value)
-  if (!costAmountEditable.value) syncLineCostFromUnit(draft.value)
   refreshPreviewStock()
 }
 
 function onShipQtyChange() {
   if (!draft.value) return
   syncLineTotalFromUnit(draft.value)
-  if (!costAmountEditable.value) syncLineCostFromUnit(draft.value)
 }
 
-function onCostUnitPriceChange() {
-  if (!draft.value || costAmountEditable.value) return
-  syncLineCostFromUnit(draft.value)
-}
-
-function onCostAmountChange() {
-  if (!draft.value || costUnitPriceEditable.value) return
-  syncLineCostUnitFromAmount(draft.value)
+function onUnitPriceChange() {
+  if (!draft.value) return
+  syncLineTotalFromUnit(draft.value)
 }
 
 function handleCancel() {
@@ -303,77 +265,5 @@ function handleOk() {
 </script>
 
 <style lang="less" scoped>
-.outbound-line-edit-modal {
-  .field-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .item-preview {
-    display: flex;
-    gap: 12px;
-    margin-top: 8px;
-    padding: 12px;
-    background: #fafafa;
-    border: 1px solid #f0f0f0;
-    border-radius: 4px;
-  }
-
-  .preview-main {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .preview-row {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 6px;
-    font-size: 13px;
-
-    .preview-label {
-      width: 72px;
-      flex-shrink: 0;
-      color: rgba(0, 0, 0, 0.45);
-    }
-  }
-
-  .preview-stock-box {
-    width: 120px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 8px;
-    background: #fff;
-    border: 1px solid #e8e8e8;
-    border-radius: 4px;
-  }
-
-  .stock-value {
-    font-size: 28px;
-    font-weight: 600;
-    line-height: 1.2;
-    color: rgba(0, 0, 0, 0.88);
-  }
-
-  .stock-label {
-    margin-top: 4px;
-    font-size: 12px;
-    color: rgba(0, 0, 0, 0.45);
-    text-align: center;
-  }
-
-  .editable-field {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .edit-btn {
-    flex-shrink: 0;
-    color: rgba(0, 0, 0, 0.45);
-  }
-}
+@import './inventoryLineEditModal.less';
 </style>

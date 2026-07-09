@@ -17,9 +17,7 @@ export const outboundFormLineColumns = [
   { title: '单位', dataIndex: 'unit', key: 'unit', width: 64 },
   { title: '单价', key: 'unitPrice', width: 96, align: 'right' },
   { title: '总价', key: 'totalPrice', width: 96, align: 'right' },
-  { title: '来源', key: 'lineSource', width: 96 },
-  { title: '关联业务单据', key: 'sourceDocNo', width: 130, ellipsis: true },
-  { title: '操作', key: 'actions', width: 150, fixed: 'right' },
+  { title: '操作', key: 'actions', width: 150 },
 ]
 
 export const outboundDetailLineColumns = outboundFormLineColumns.filter((c) => c.key !== 'actions')

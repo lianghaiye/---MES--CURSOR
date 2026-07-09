@@ -26,8 +26,9 @@ export function calcLinkedBomSubItemCount(itemType, itemId) {
   ).length
 }
 
-function mapMasterRow(source, itemType) {
+function mapMasterRow(source, itemType, options = {}) {
   const production = source.production || {}
+  const skipSubItemCount = options.skipSubItemCount === true
   return {
     rowKey: `${itemType}-${source.id}`,
     itemType,
@@ -52,24 +53,45 @@ function mapMasterRow(source, itemType) {
     createdAt: source.createdAt || '',
     creator: source.creator || source.operator || 'admin',
     unitPrice: source.unitPrice ?? 0,
-    subItemCount: calcLinkedBomSubItemCount(itemType, source.id),
+    subItemCount: skipSubItemCount ? 0 : calcLinkedBomSubItemCount(itemType, source.id),
+    spuId: source.spuId || '',
+    spuName: source.spuName || '',
+    variantValues: source.variantValues || {},
+    materialGradeId: source.materialGradeId || '',
   }
 }
 
 import { isProductSyncedMirror } from '@/utils/bomMaterialPicker'
 
+let pickerRowsCache = null
+let pickerRowsCacheKey = ''
+
+export function invalidateBomSubItemPickerRowsCache() {
+  pickerRowsCache = null
+  pickerRowsCacheKey = ''
+}
+
 /** 合并产品信息与物料信息（去重产品物料镜像） */
-export function buildBomSubItemPickerRows() {
-  const products = (productInfoState.products || []).map((p) => mapMasterRow(p, '产品'))
+export function buildBomSubItemPickerRows(options = {}) {
+  const skipSubItemCount = options.skipSubItemCount === true
+  const cacheKey = `${productInfoState.products?.length || 0}-${materialInfoState.materials?.length || 0}-${skipSubItemCount ? 1 : 0}`
+  if (pickerRowsCache && pickerRowsCacheKey === cacheKey) {
+    return pickerRowsCache
+  }
+
+  const mapOpts = { skipSubItemCount }
+  const products = (productInfoState.products || []).map((p) => mapMasterRow(p, '产品', mapOpts))
   const seen = new Set(products.map((r) => r.itemId))
   const rows = [...products]
 
   ;(materialInfoState.materials || []).forEach((m) => {
     if (seen.has(m.id)) return
     if (isProductSyncedMirror(m)) return
-    rows.push(mapMasterRow(m, '物料'))
+    rows.push(mapMasterRow(m, '物料', mapOpts))
   })
 
+  pickerRowsCache = rows
+  pickerRowsCacheKey = cacheKey
   return rows
 }
 
@@ -261,5 +283,9 @@ export function toBomSubItemPayload(row) {
     drawingNo: row.drawingNo || '',
     inventoryUnit: row.inventoryUnit || '件',
     unitPrice: row.unitPrice ?? 0,
+    spuId: row.spuId || '',
+    spuName: row.spuName || '',
+    variantValues: row.variantValues || {},
+    materialGradeId: row.materialGradeId || '',
   }
 }

@@ -47,15 +47,15 @@ export function createChangeRequestStore(options) {
 
   function filterList(filters = {}) {
     return state.items.filter((row) => {
-      const documentNo = String(filters.documentNo || '').trim()
-      if (documentNo) {
-        const docNo = row[docNoField]
-        const matched =
-          docNo?.includes(documentNo) ||
-          row.salesOrderNo?.includes(documentNo) ||
-          row.workOrderNo?.includes(documentNo)
-        if (!matched) return false
-      }
+      const docNo = String(filters.docNo || filters.documentNo || '').trim()
+      if (docNo && !String(row[docNoField] || '').includes(docNo)) return false
+
+      const salesOrderNo = String(filters.salesOrderNo || '').trim()
+      if (salesOrderNo && !String(row.salesOrderNo || '').includes(salesOrderNo)) return false
+
+      const workOrderNo = String(filters.workOrderNo || '').trim()
+      if (workOrderNo && !String(row.workOrderNo || '').includes(workOrderNo)) return false
+
       if (filters.status && row.status !== filters.status) return false
       if (filters.type && row.type !== filters.type) return false
       const productName = String(filters.productName || '').trim()

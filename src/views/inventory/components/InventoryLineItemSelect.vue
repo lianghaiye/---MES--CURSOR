@@ -22,12 +22,10 @@
     </template>
   </a-select>
 
-  <SelectBomMaterialModal
+  <SelectSpuVariantModal
     v-model:open="pickerOpen"
-    title="选择产品"
+    title="选择产品/物料"
     :multiple="false"
-    hide-add-material
-    ecn-new-material-mode
     @selected="onPicked"
   />
 </template>
@@ -35,7 +33,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { buildBomSubItemPickerRows, filterBomSubItemPickerRows } from '@/utils/bomSubItemPicker'
-import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import SelectSpuVariantModal from '@/views/product-process/components/SelectSpuVariantModal.vue'
 
 const props = defineProps({
   value: { type: String, default: '' },
@@ -49,7 +47,7 @@ const pickerOpen = ref(false)
 const searchKeyword = ref('')
 const DROPDOWN_LIMIT = 8
 
-const allRows = computed(() => buildBomSubItemPickerRows())
+const allRows = computed(() => buildBomSubItemPickerRows({ skipSubItemCount: true }))
 
 const displayOptions = computed(() => {
   const kw = searchKeyword.value.trim()

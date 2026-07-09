@@ -357,13 +357,9 @@
                       <span v-else class="muted">—</span>
                     </template>
                     <template v-else-if="column.key === 'supplier'">
-                      <a-select
+                      <PlanSupplierSelect
                         v-model:value="record.supplier"
-                        show-search
-                        allow-clear
                         size="small"
-                        placeholder="请选择"
-                        :options="planSupplierOptions"
                         :disabled="!isPurchasedOrOutsourced(record.supplyType)"
                         :status="
                           record.designateSupplier &&
@@ -372,8 +368,6 @@
                             ? 'error'
                             : undefined
                         "
-                        style="width: 100%"
-                        :filter-option="filterSelectOption"
                       />
                     </template>
                     <template v-else-if="column.key === 'processRoute'">
@@ -628,7 +622,6 @@ import {
   onMaterialDesignateSupplierChange,
   onMaterialStandardCycleChange,
   onMaterialSupplyTypeChange,
-  planSupplierOptions,
   processFileOptions,
   recalcMaterialLatestProcessTimes,
   supplyTypeOptions,
@@ -641,6 +634,7 @@ import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import BomPrintModal from '@/views/product-process/components/BomPrintModal.vue'
 import ProductionPlanOrderTree from '@/views/planning/components/ProductionPlanOrderTree.vue'
+import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import {
   productionPlanPrintBaseColumns,
   productionPlanPrintColumnSettings,

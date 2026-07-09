@@ -125,18 +125,12 @@
             @click="startEdit(record, column.key)"
           >
             <div v-if="isEditing(record.key, column.key)" class="edit-wrap" @click.stop>
-              <a-select
+              <PlanSupplierSelect
                 v-if="column.key === 'supplier'"
                 v-model:value="record.supplier"
                 size="small"
-                show-search
-                allow-clear
-                placeholder="请选择"
-                style="width: 100%"
                 :open="selectOpen"
-                :options="supplierOpts"
-                :filter-option="filterSelectOption"
-                @dropdownVisibleChange="onSelectOpenChange"
+                @dropdown-visible-change="onSelectOpenChange"
                 @change="endEdit"
               />
               <a-input-number
@@ -197,9 +191,10 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { urgencyOptions } from '@/mock/workOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
-import { planSupplierOptions } from '@/utils/productionPlanMaterial'
+import { getAllSupplierOptions, SUPPLIER_SELECT_PLACEHOLDER } from '@/utils/supplierSelect'
 import { buildPurchaseRequisitionRows, resolveAssemblyDate } from '@/utils/material'
 import { buildRequisitionFromPlanRows } from '@/store/purchaseRequisitionStore'
+import PlanSupplierSelect from './PlanSupplierSelect.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -247,7 +242,7 @@ const editingCell = ref(null)
 const tableWrapRef = ref(null)
 const selectOpen = ref(false)
 
-const supplierOpts = planSupplierOptions
+const supplierOpts = getAllSupplierOptions()
 
 const warehouseOpts = computed(() => {
   void warehouseState.warehouses
@@ -353,7 +348,7 @@ function onDesignatedSupplierChange(record, checked) {
 }
 
 function formatCell(record, key, text) {
-  if (key === 'supplier' && !text) return '请选择'
+  if (key === 'supplier' && !text) return SUPPLIER_SELECT_PLACEHOLDER
   if (isEditable(key) && (text === '' || text == null)) return '-'
   return text ?? '-'
 }

@@ -258,7 +258,7 @@
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :disabled="!selectedRows.length" @click="handleConfirm">
+      <a-button type="primary" :loading="confirming" :disabled="!selectedRows.length" @click="handleConfirm">
         {{ multiple ? '确定' : '确定选择' }}
       </a-button>
     </template>
@@ -287,6 +287,7 @@ import { SettingOutlined, PlusOutlined, CloseOutlined, FilterOutlined } from '@a
 import {
   buildBomSubItemPickerRows,
   filterEcnNewMaterialRows,
+  invalidateBomSubItemPickerRowsCache,
   toBomSubItemPayload,
 } from '@/utils/bomSubItemPicker'
 import { buildBomLinkedPickerRows } from '@/utils/bomWithBomPicker'
@@ -316,6 +317,7 @@ const emit = defineEmits(['update:open', 'selected'])
 const keyword = ref('')
 const quickItemType = ref(undefined)
 const loading = ref(false)
+const confirming = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
 const materialFormOpen = ref(false)
@@ -373,7 +375,7 @@ const widthMap = {
 const allRows = computed(() => {
   void listVersion.value
   if (props.onlyWithBom) return buildBomLinkedPickerRows()
-  return buildBomSubItemPickerRows()
+  return buildBomSubItemPickerRows({ skipSubItemCount: props.ecnNewMaterialMode })
 })
 
 const filteredRows = computed(() => {
@@ -485,6 +487,7 @@ watch(
     selectedRows.value = []
     columnSettings.value = JSON.parse(JSON.stringify(buildDefaultColumnSettings()))
     listVersion.value += 1
+    invalidateBomSubItemPickerRowsCache()
   },
 )
 
@@ -552,22 +555,25 @@ function handleConfirm() {
     message.warning('请至少选择一项')
     return
   }
-  emit(
-    'selected',
-    selectedRows.value.map((row) => toBomSubItemPayload(row)),
-  )
-  keyword.value = ''
-  page.value = 1
-  appliedFilterConditions.value = []
-  selectedRowKeys.value = []
-  selectedRows.value = []
-  emit('update:open', false)
+  confirming.value = true
+  const payload = selectedRows.value.map((row) => toBomSubItemPayload(row))
+  requestAnimationFrame(() => {
+    emit('selected', payload)
+    keyword.value = ''
+    page.value = 1
+    appliedFilterConditions.value = []
+    selectedRowKeys.value = []
+    selectedRows.value = []
+    confirming.value = false
+    emit('update:open', false)
+  })
 }
 
 function onMaterialSaved({ isEdit, data }) {
   if (isEdit) return
   const row = addMaterial(data)
   listVersion.value += 1
+  invalidateBomSubItemPickerRowsCache()
   const picked = buildBomSubItemPickerRows().find((r) => r.rowKey === `物料-${row.id}`)
   if (picked && !selectedRowKeys.value.includes(picked.rowKey)) {
     selectedRowKeys.value = [...selectedRowKeys.value, picked.rowKey]

@@ -113,7 +113,7 @@
 
     <div class="line-toolbar">
       <a-space>
-        <a-button type="primary" size="small" @click="pickerOpen = true">
+        <a-button type="primary" size="small" :loading="addingItems" @click="pickerOpen = true">
           <PlusOutlined />
           添加物品
         </a-button>
@@ -122,7 +122,12 @@
       </a-space>
     </div>
 
-    <div ref="lineTablePanelRef" class="line-table-panel" :style="lineTablePanelStyle">
+    <div
+      ref="lineTablePanelRef"
+      class="line-table-panel"
+      :class="{ 'panel-scrolling': isLineTableScrolling }"
+      :style="lineTablePanelStyle"
+    >
       <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
         <a-table
           :columns="displayColumns"
@@ -136,7 +141,11 @@
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'index'">{{ index + 1 }}</template>
         <template v-else-if="column.key === 'itemName'">
+          <span v-if="record.itemCode" class="item-name-text" :title="record.itemName">
+            [{{ record.itemCode }}] {{ record.itemName }}
+          </span>
           <InventoryLineItemSelect
+            v-else
             :value="record.itemCode"
             :fallback-name="record.itemName"
             @select="(item) => onLineItemSelect(record, item)"
@@ -150,80 +159,125 @@
           {{ formatQty(record.warehouseStockQty) }}
         </template>
         <template v-else-if="column.key === 'warehouse'">
-          <a-select
-            v-model:value="record.warehouse"
-            allow-clear
-            size="small"
+          <InventoryLineEditableCell
+            :active="isLineCellEditing(record.id, 'warehouse')"
+            :display="lineWarehouseLabel(record.warehouse)"
+            :empty="!record.warehouse"
             placeholder="请选择"
-            :options="warehouseOpts"
-            style="width: 100%"
-            @change="() => refreshLine(record)"
-          />
+            @activate="startLineCellEdit(record.id, 'warehouse', { select: true })"
+            @end="endLineCellEdit"
+          >
+            <template #edit="{ endEdit }">
+              <a-select
+                v-model:value="record.warehouse"
+                allow-clear
+                size="small"
+                placeholder="请选择"
+                style="width: 100%"
+                :open="lineCellSelectOpen"
+                :options="warehouseOpts"
+                @dropdownVisibleChange="onLineCellSelectOpenChange"
+                @change="() => { refreshLine(record); endEdit() }"
+              />
+            </template>
+          </InventoryLineEditableCell>
         </template>
         <template v-else-if="column.key === 'locationNo'">
-          <a-input
-            v-model:value="record.locationNo"
-            size="small"
-            allow-clear
-            placeholder="请输入货位号"
-          />
+          <InventoryLineEditableCell
+            :active="isLineCellEditing(record.id, 'locationNo')"
+            :display="record.locationNo || '—'"
+            :empty="!record.locationNo"
+            placeholder="请输入"
+            @activate="startLineCellEdit(record.id, 'locationNo')"
+            @end="endLineCellEdit"
+          >
+            <template #edit="{ endEdit }">
+              <a-input
+                v-model:value="record.locationNo"
+                size="small"
+                allow-clear
+                placeholder="请输入货位号"
+                autofocus
+                @blur="endEdit"
+                @pressEnter="endEdit"
+              />
+            </template>
+          </InventoryLineEditableCell>
         </template>
         <template v-else-if="column.key === 'qty'">
-          <a-input-number
-            v-model:value="record.qty"
-            :min="0"
-            :precision="3"
-            size="small"
-            style="width: 100%"
-            @change="() => onLineQtyChange(record)"
-          />
+          <InventoryLineEditableCell
+            :active="isLineCellEditing(record.id, 'qty')"
+            :display="formatQty(record.qty)"
+            :empty="record.qty == null || record.qty === ''"
+            numeric
+            @activate="startLineCellEdit(record.id, 'qty')"
+            @end="endLineCellEdit"
+          >
+            <template #edit="{ endEdit }">
+              <a-input-number
+                v-model:value="record.qty"
+                :min="0"
+                :precision="3"
+                size="small"
+                style="width: 100%"
+                autofocus
+                @blur="endEdit"
+                @pressEnter="endEdit"
+                @change="() => onLineQtyChange(record)"
+              />
+            </template>
+          </InventoryLineEditableCell>
         </template>
         <template v-else-if="column.key === 'weight'">
-          <a-input-number
-            v-model:value="record.weight"
-            :min="0"
-            :precision="3"
-            size="small"
-            style="width: 100%"
-          />
+          <InventoryLineEditableCell
+            :active="isLineCellEditing(record.id, 'weight')"
+            :display="formatQty(record.weight)"
+            :empty="record.weight == null || record.weight === ''"
+            placeholder="请输入"
+            numeric
+            @activate="startLineCellEdit(record.id, 'weight')"
+            @end="endLineCellEdit"
+          >
+            <template #edit="{ endEdit }">
+              <a-input-number
+                v-model:value="record.weight"
+                :min="0"
+                :precision="3"
+                size="small"
+                style="width: 100%"
+                autofocus
+                @blur="endEdit"
+                @pressEnter="endEdit"
+              />
+            </template>
+          </InventoryLineEditableCell>
         </template>
         <template v-else-if="column.key === 'unitPrice'">
-          <a-input-number
-            v-model:value="record.unitPrice"
-            :min="0"
-            :precision="2"
-            size="small"
-            style="width: 100%"
-            @change="() => onLineUnitPriceChange(record)"
-          />
+          <InventoryLineEditableCell
+            :active="isLineCellEditing(record.id, 'unitPrice')"
+            :display="formatMoney(record.unitPrice)"
+            :empty="record.unitPrice == null || record.unitPrice === ''"
+            numeric
+            @activate="startLineCellEdit(record.id, 'unitPrice')"
+            @end="endLineCellEdit"
+          >
+            <template #edit="{ endEdit }">
+              <a-input-number
+                v-model:value="record.unitPrice"
+                :min="0"
+                :precision="2"
+                size="small"
+                style="width: 100%"
+                autofocus
+                @blur="endEdit"
+                @pressEnter="endEdit"
+                @change="() => onLineUnitPriceChange(record)"
+              />
+            </template>
+          </InventoryLineEditableCell>
         </template>
         <template v-else-if="column.key === 'totalPrice'">
-          <a-input-number
-            v-model:value="record.totalPrice"
-            :min="0"
-            :precision="2"
-            size="small"
-            style="width: 100%"
-            @change="() => onLineTotalPriceChange(record)"
-          />
-        </template>
-        <template v-else-if="column.key === 'lineSource'">
-          <a-select
-            v-model:value="record.lineSource"
-            allow-clear
-            size="small"
-            placeholder="请选择"
-            :options="lineSourceOpts"
-            style="width: 100%"
-          />
-        </template>
-        <template v-else-if="column.key === 'sourceDocNo'">
-          <a-input
-            v-model:value="record.sourceDocNo"
-            size="small"
-            allow-clear
-            placeholder="请输入"
-          />
+          {{ formatMoney(record.totalPrice) }}
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4">
@@ -308,13 +362,15 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTableScroll'
+import { useInventoryLineCellEdit } from '@/composables/useInventoryLineCellEdit'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import InboundLineEditModal from './InboundLineEditModal.vue'
 import InventoryLineItemSelect from './InventoryLineItemSelect.vue'
+import InventoryLineEditableCell from './InventoryLineEditableCell.vue'
 import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
-import { inboundTypeOptions, inboundLineSourceOptions, handlerOptions } from '@/mock/inboundOptions'
+import { inboundTypeOptions, handlerOptions } from '@/mock/inboundOptions'
 import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
@@ -324,6 +380,7 @@ import {
 } from '@/store/inboundOrderStore'
 import { inboundFormLineColumns } from '@/utils/inboundLineColumns'
 import { normalizeInventoryPickerItem } from '@/utils/inventoryLineItemPicker'
+import { warehouseOptionLabel } from '@/utils/inventoryFormLineDisplay'
 import {
   applyPickerItemToInboundLine,
   buildInboundLineFromPickerItem,
@@ -333,7 +390,6 @@ import {
   enrichInboundLine,
   mergeInboundLines,
   syncInboundLineTotalFromUnit,
-  syncInboundLineUnitFromTotal,
 } from '@/utils/inboundLineHelpers'
 
 const props = defineProps({
@@ -358,6 +414,7 @@ const {
 })
 
 const saving = ref(false)
+const addingItems = ref(false)
 const pickerOpen = ref(false)
 const bomModalOpen = ref(false)
 const lineEditOpen = ref(false)
@@ -367,7 +424,6 @@ const lineEditSourceId = ref(null)
 const prevHeaderWarehouse = ref(undefined)
 
 const inboundTypeOpts = inboundTypeOptions.map((v) => ({ label: v, value: v }))
-const lineSourceOpts = inboundLineSourceOptions.map((v) => ({ label: v, value: v }))
 const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
 const supplierOpts = supplierOptions
 
@@ -375,6 +431,18 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
+
+function lineWarehouseLabel(value) {
+  return warehouseOptionLabel(value, warehouseOpts.value)
+}
+
+const {
+  selectOpen: lineCellSelectOpen,
+  isEditing: isLineCellEditing,
+  startEdit: startLineCellEdit,
+  endEdit: endLineCellEdit,
+  onSelectOpenChange: onLineCellSelectOpenChange,
+} = useInventoryLineCellEdit()
 
 const form = reactive({
   docNo: '',
@@ -390,7 +458,7 @@ const form = reactive({
 })
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inbound-form-lines', inboundFormLineColumns, { minScrollX: 2100 })
+  useTableColumnSettings('inbound-form-lines-v2', inboundFormLineColumns, { minScrollX: 1850 })
 
 const lineScrollX = tableScrollX
 
@@ -436,6 +504,7 @@ watch(
 )
 
 function resetForm() {
+  endLineCellEdit()
   Object.assign(form, {
     docNo: '',
     inboundType: '其他入库',
@@ -452,6 +521,7 @@ function resetForm() {
 }
 
 function loadEditForm(record) {
+  endLineCellEdit()
   prevHeaderWarehouse.value = record.warehouse || undefined
   Object.assign(form, {
     docNo: record.docNo,
@@ -492,10 +562,6 @@ function onLineUnitPriceChange(line) {
   syncInboundLineTotalFromUnit(line)
 }
 
-function onLineTotalPriceChange(line) {
-  syncInboundLineUnitFromTotal(line)
-}
-
 function onHeaderWarehouseChange(newVal) {
   const oldVal = prevHeaderWarehouse.value
   const changed = newVal !== oldVal
@@ -522,18 +588,28 @@ function onItemsPicked(items) {
     message.warning('未选择物品')
     return
   }
-  const before = form.lineItems.length
-  const incoming = list
-    .filter((it) => it?.code)
-    .map((it) => buildInboundLineFromPickerItem(normalizeInventoryPickerItem(it), form.warehouse || ''))
-  if (!incoming.length) {
-    message.warning('所选物品无效，请重新选择')
-    return
-  }
-  form.lineItems = mergeInboundLines(form.lineItems, incoming)
-  const added = form.lineItems.length - before
-  if (added > 0) message.success(`已添加 ${added} 条明细`)
-  else message.info('所选物品已在明细中')
+  addingItems.value = true
+  pickerOpen.value = false
+  nextTick(() => {
+    try {
+      const before = form.lineItems.length
+      const incoming = list
+        .filter((it) => it?.code)
+        .map((it) =>
+          buildInboundLineFromPickerItem(normalizeInventoryPickerItem(it), form.warehouse || ''),
+        )
+      if (!incoming.length) {
+        message.warning('所选物品无效，请重新选择')
+        return
+      }
+      form.lineItems = mergeInboundLines(form.lineItems, incoming)
+      const added = form.lineItems.length - before
+      if (added > 0) message.success(`已添加 ${added} 条明细`)
+      else message.info('所选物品已在明细中')
+    } finally {
+      addingItems.value = false
+    }
+  })
 }
 
 function addBlankLine() {
@@ -703,6 +779,11 @@ function handleSave() {
   overflow: hidden;
   background: #fff;
   flex-shrink: 0;
+
+  &.panel-scrolling {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 .line-table-body {
@@ -716,7 +797,8 @@ function handleSave() {
 
     :deep(.ant-table-wrapper),
     :deep(.ant-spin-nested-loading),
-    :deep(.ant-spin-container) {
+    :deep(.ant-spin-container),
+    :deep(.ant-table) {
       height: 100%;
     }
   }
@@ -724,6 +806,30 @@ function handleSave() {
   :deep(.ant-table) {
     margin-bottom: 0 !important;
   }
+
+  :deep(.ant-table-container),
+  :deep(.ant-table-content),
+  :deep(.ant-table-header),
+  :deep(.ant-table-body) {
+    overflow-x: hidden !important;
+  }
+
+  :deep(.ant-table-body) {
+    overflow-y: auto !important;
+  }
+}
+
+.item-name-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+:deep(.ant-table-tbody > tr > td) {
+  padding: 4px 8px !important;
 }
 
 .line-empty-placeholder {

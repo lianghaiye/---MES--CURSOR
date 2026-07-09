@@ -105,7 +105,7 @@
 
     <div class="line-toolbar">
       <a-space>
-        <a-button type="primary" size="small" @click="pickerOpen = true">
+        <a-button type="primary" size="small" :loading="addingItems" @click="pickerOpen = true">
           <PlusOutlined />
           添加物品
         </a-button>
@@ -114,7 +114,12 @@
       </a-space>
     </div>
 
-    <div ref="lineTablePanelRef" class="line-table-panel" :style="lineTablePanelStyle">
+    <div
+      ref="lineTablePanelRef"
+      class="line-table-panel"
+      :class="{ 'panel-scrolling': isLineTableScrolling }"
+      :style="lineTablePanelStyle"
+    >
       <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
         <a-table
           :columns="displayColumns"
@@ -128,7 +133,11 @@
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'index'">{{ index + 1 }}</template>
         <template v-else-if="column.key === 'itemName'">
+          <span v-if="record.itemCode" class="item-name-text" :title="record.itemName">
+            [{{ record.itemCode }}] {{ record.itemName }}
+          </span>
           <InventoryLineItemSelect
+            v-else
             :value="record.itemCode"
             :fallback-name="record.itemName"
             @select="(item) => onLineItemSelect(record, item)"
@@ -142,65 +151,108 @@
           {{ formatQty(record.warehouseStockQty) }}
         </template>
         <template v-else-if="column.key === 'shipWarehouse'">
-          <a-select
-            v-model:value="record.shipWarehouse"
-            allow-clear
-            size="small"
+          <InventoryLineEditableCell
+            :active="isLineCellEditing(record.id, 'shipWarehouse')"
+            :display="lineWarehouseLabel(record.shipWarehouse)"
+            :empty="!record.shipWarehouse"
             placeholder="请选择"
-            :options="warehouseOpts"
-            style="width: 100%"
-            @change="() => refreshLine(record)"
-          />
+            @activate="startLineCellEdit(record.id, 'shipWarehouse', { select: true })"
+            @end="endLineCellEdit"
+          >
+            <template #edit="{ endEdit }">
+              <a-select
+                v-model:value="record.shipWarehouse"
+                allow-clear
+                size="small"
+                placeholder="请选择"
+                style="width: 100%"
+                :open="lineCellSelectOpen"
+                :options="warehouseOpts"
+                @dropdownVisibleChange="onLineCellSelectOpenChange"
+                @change="() => { refreshLine(record); endEdit() }"
+              />
+            </template>
+          </InventoryLineEditableCell>
         </template>
         <template v-else-if="column.key === 'shipQty'">
-          <a-input-number
-            v-model:value="record.shipQty"
-            :min="0"
-            :precision="3"
-            size="small"
-            style="width: 100%"
-            @change="() => onLineShipQtyChange(record)"
-          />
+          <InventoryLineEditableCell
+            :active="isLineCellEditing(record.id, 'shipQty')"
+            :display="formatQty(record.shipQty)"
+            :empty="record.shipQty == null || record.shipQty === ''"
+            numeric
+            @activate="startLineCellEdit(record.id, 'shipQty')"
+            @end="endLineCellEdit"
+          >
+            <template #edit="{ endEdit }">
+              <a-input-number
+                v-model:value="record.shipQty"
+                :min="0"
+                :precision="3"
+                size="small"
+                style="width: 100%"
+                autofocus
+                @blur="endEdit"
+                @pressEnter="endEdit"
+                @change="() => onLineShipQtyChange(record)"
+              />
+            </template>
+          </InventoryLineEditableCell>
         </template>
         <template v-else-if="column.key === 'weight'">
-          <a-input-number
-            v-model:value="record.weight"
-            :min="0"
-            :precision="3"
-            size="small"
-            style="width: 100%"
+          <InventoryLineEditableCell
+            :active="isLineCellEditing(record.id, 'weight')"
+            :display="formatQty(record.weight)"
+            :empty="record.weight == null || record.weight === ''"
             placeholder="请输入"
-            @change="syncTotalWeight"
-          />
+            numeric
+            @activate="startLineCellEdit(record.id, 'weight')"
+            @end="endLineCellEdit"
+          >
+            <template #edit="{ endEdit }">
+              <a-input-number
+                v-model:value="record.weight"
+                :min="0"
+                :precision="3"
+                size="small"
+                style="width: 100%"
+                placeholder="请输入"
+                autofocus
+                @blur="endEdit"
+                @pressEnter="endEdit"
+                @change="syncTotalWeight"
+              />
+            </template>
+          </InventoryLineEditableCell>
         </template>
         <template v-else-if="column.key === 'barcodeBatchNo'">
           <span>{{ record.barcodeBatchNo || '—' }}</span>
         </template>
         <template v-else-if="column.key === 'unitPrice'">
-          <a-input-number
-            v-model:value="record.unitPrice"
-            :min="0"
-            :precision="2"
-            size="small"
-            style="width: 100%"
-            @change="() => onLineUnitPriceChange(record)"
-          />
+          <InventoryLineEditableCell
+            :active="isLineCellEditing(record.id, 'unitPrice')"
+            :display="formatMoney(record.unitPrice)"
+            :empty="record.unitPrice == null || record.unitPrice === ''"
+            numeric
+            @activate="startLineCellEdit(record.id, 'unitPrice')"
+            @end="endLineCellEdit"
+          >
+            <template #edit="{ endEdit }">
+              <a-input-number
+                v-model:value="record.unitPrice"
+                :min="0"
+                :precision="2"
+                size="small"
+                style="width: 100%"
+                autofocus
+                @blur="endEdit"
+                @pressEnter="endEdit"
+                @change="() => onLineUnitPriceChange(record)"
+              />
+            </template>
+          </InventoryLineEditableCell>
         </template>
         <template v-else-if="column.key === 'totalPrice'">
-          <a-input-number
-            v-model:value="record.totalPrice"
-            :min="0"
-            :precision="2"
-            size="small"
-            style="width: 100%"
-            @change="() => onLineTotalPriceChange(record)"
-          />
-        </template>
-        <template v-else-if="column.key === 'lineSource'">
-          <span>{{ record.lineSource || '—' }}</span>
-        </template>
-        <template v-else-if="column.key === 'sourceDocNo'">
-          <span>{{ record.sourceDocNo || '—' }}</span>
+          {{ formatMoney(record.totalPrice) }}
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4">
@@ -291,17 +343,20 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTableScroll'
+import { useInventoryLineCellEdit } from '@/composables/useInventoryLineCellEdit'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import OutboundLineEditModal from './OutboundLineEditModal.vue'
 import InventoryLineItemSelect from './InventoryLineItemSelect.vue'
+import InventoryLineEditableCell from './InventoryLineEditableCell.vue'
 import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
 import { outboundTypeOptions, handlerOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { addOutboundOrder, generateOutboundNo, updateOutboundOrder } from '@/store/outboundStore'
 import { outboundFormLineColumns } from '@/utils/outboundLineColumns'
 import { normalizeInventoryPickerItem } from '@/utils/inventoryLineItemPicker'
+import { warehouseOptionLabel } from '@/utils/inventoryFormLineDisplay'
 import {
   applyPickerItemToOutboundLine,
   buildOutboundLineFromPickerItem,
@@ -311,7 +366,6 @@ import {
   enrichOutboundLine,
   mergeOutboundLines,
   syncLineTotalFromUnit,
-  syncLineUnitFromTotal,
 } from '@/utils/outboundLineHelpers'
 
 const props = defineProps({
@@ -331,6 +385,7 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 })
 
 const saving = ref(false)
+const addingItems = ref(false)
 const pickerOpen = ref(false)
 const bomModalOpen = ref(false)
 const lineEditOpen = ref(false)
@@ -348,6 +403,18 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
+
+function lineWarehouseLabel(value) {
+  return warehouseOptionLabel(value, warehouseOpts.value)
+}
+
+const {
+  selectOpen: lineCellSelectOpen,
+  isEditing: isLineCellEditing,
+  startEdit: startLineCellEdit,
+  endEdit: endLineCellEdit,
+  onSelectOpenChange: onLineCellSelectOpenChange,
+} = useInventoryLineCellEdit()
 
 const form = reactive({
   docNo: '',
@@ -371,7 +438,7 @@ const outboundTimeValue = computed({
 const baseLineColumns = outboundFormLineColumns
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outbound-form-lines', baseLineColumns, { minScrollX: 1800 })
+  useTableColumnSettings('outbound-form-lines-v2', baseLineColumns, { minScrollX: 1600 })
 
 const lineScrollX = tableScrollX
 
@@ -417,6 +484,7 @@ watch(
 )
 
 function loadEditForm(record) {
+  endLineCellEdit()
   totalWeightManual.value = true
   prevHeaderWarehouse.value = record.warehouse || undefined
   Object.assign(form, {
@@ -433,6 +501,7 @@ function loadEditForm(record) {
 }
 
 function resetForm() {
+  endLineCellEdit()
   totalWeightManual.value = false
   Object.assign(form, {
     docNo: generateOutboundNo(),
@@ -474,10 +543,6 @@ function onLineUnitPriceChange(line) {
   syncLineTotalFromUnit(line)
 }
 
-function onLineTotalPriceChange(line) {
-  syncLineUnitFromTotal(line)
-}
-
 function onHeaderWarehouseChange(newVal) {
   const oldVal = prevHeaderWarehouse.value
   const changed = newVal !== oldVal
@@ -516,24 +581,32 @@ function onItemsPicked(items) {
     message.warning('未选择物品')
     return
   }
-  const before = form.lineItems.length
-  const incoming = list
-    .filter((it) => it?.code)
-    .map((it) =>
-      buildOutboundLineFromPickerItem(normalizeInventoryPickerItem(it), form.warehouse || ''),
-    )
-  if (!incoming.length) {
-    message.warning('所选物品无效，请重新选择')
-    return
-  }
-  form.lineItems = mergeOutboundLines(form.lineItems, incoming)
-  syncTotalWeight()
-  const added = form.lineItems.length - before
-  if (added > 0) {
-    message.success(`已添加 ${added} 条明细`)
-  } else {
-    message.info('所选物品已在明细中')
-  }
+  addingItems.value = true
+  pickerOpen.value = false
+  nextTick(() => {
+    try {
+      const before = form.lineItems.length
+      const incoming = list
+        .filter((it) => it?.code)
+        .map((it) =>
+          buildOutboundLineFromPickerItem(normalizeInventoryPickerItem(it), form.warehouse || ''),
+        )
+      if (!incoming.length) {
+        message.warning('所选物品无效，请重新选择')
+        return
+      }
+      form.lineItems = mergeOutboundLines(form.lineItems, incoming)
+      syncTotalWeight()
+      const added = form.lineItems.length - before
+      if (added > 0) {
+        message.success(`已添加 ${added} 条明细`)
+      } else {
+        message.info('所选物品已在明细中')
+      }
+    } finally {
+      addingItems.value = false
+    }
+  })
 }
 
 function addBlankLine() {
@@ -708,6 +781,11 @@ function handleSave() {
   overflow: hidden;
   background: #fff;
   flex-shrink: 0;
+
+  &.panel-scrolling {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 .line-table-body {
@@ -721,7 +799,8 @@ function handleSave() {
 
     :deep(.ant-table-wrapper),
     :deep(.ant-spin-nested-loading),
-    :deep(.ant-spin-container) {
+    :deep(.ant-spin-container),
+    :deep(.ant-table) {
       height: 100%;
     }
   }
@@ -729,6 +808,30 @@ function handleSave() {
   :deep(.ant-table) {
     margin-bottom: 0 !important;
   }
+
+  :deep(.ant-table-container),
+  :deep(.ant-table-content),
+  :deep(.ant-table-header),
+  :deep(.ant-table-body) {
+    overflow-x: hidden !important;
+  }
+
+  :deep(.ant-table-body) {
+    overflow-y: auto !important;
+  }
+}
+
+.item-name-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+:deep(.ant-table-tbody > tr > td) {
+  padding: 4px 8px !important;
 }
 
 .line-empty-placeholder {
