@@ -194,7 +194,9 @@
                           ? 'processing'
                           : record.status === '设计中'
                             ? 'orange'
-                            : 'default'
+                            : record.status === '待BOM'
+                              ? 'gold'
+                              : 'default'
                       "
                     >
                       {{ record.status }}
@@ -1119,6 +1121,10 @@ function openWorkOrderModal() {
     message.warning('当前工作项处于「设计中」，请先完成设计任务审核')
     return
   }
+  if (activeWorkItem.value?.status === '待BOM') {
+    message.warning('当前工作项处于「待BOM」，请先维护产品 BOM 或改选 BOM 来源后补绑')
+    return
+  }
   if (!selfMadeMaterials.value.length) {
     message.info('当前订单没有供应型态为「自制件」的物料，或顶级物料未设为「自制件」')
     return
@@ -1137,6 +1143,10 @@ function openEbomPrint() {
   }
   if (activeWorkItem.value.status === '设计中') {
     message.warning('当前工作项处于「设计中」，暂无 EBOM 可打印')
+    return
+  }
+  if (activeWorkItem.value.status === '待BOM') {
+    message.warning('当前工作项处于「待BOM」，暂无 EBOM 可打印')
     return
   }
   if (!printEbomFlatNodes.value.length || !printEbomLineItems.value.length) {
@@ -1159,6 +1169,10 @@ function openOutsourceWorkOrderModal() {
     message.warning('当前工作项处于「设计中」，请先完成设计任务审核')
     return
   }
+  if (activeWorkItem.value.status === '待BOM') {
+    message.warning('当前工作项处于「待BOM」，请先维护产品 BOM')
+    return
+  }
   if (!outsourcedMaterials.value.length) {
     message.info('当前物料清单没有供应型态为「外协件」的物料')
     return
@@ -1177,6 +1191,10 @@ function generatePurchaseReq() {
   }
   if (activeWorkItem.value.status === '设计中') {
     message.warning('当前工作项处于「设计中」，请先完成设计任务审核')
+    return
+  }
+  if (activeWorkItem.value.status === '待BOM') {
+    message.warning('当前工作项处于「待BOM」，请先维护产品 BOM')
     return
   }
   if (!purchasedMaterialsForReq.value.length) {
@@ -1198,7 +1216,6 @@ function handlePurchaseReqSave(requisition) {
         designateSupplier: line.designatedSupplier,
         supplier: line.supplierName,
         planQty: line.planPurchaseQty,
-        remark: line.remark,
         status: '进行中',
         joinPlan: '是',
       })

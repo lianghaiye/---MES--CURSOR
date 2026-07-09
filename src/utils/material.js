@@ -258,8 +258,6 @@ export function patchMaterialFromOutsourceWorkOrderRow(row) {
 
 /** 构建采购申请弹窗行数据 */
 export function buildPurchaseRequisitionRows(materials, order) {
-  const defaultArrival = resolveAssemblyDate(order) || dayjs().add(14, 'day').format('YYYY-MM-DD')
-
   return materials.map((m, index) => {
     const demandQty = m.demandQty ?? calcDemandQty(m.unitUsage, order?.productQty)
     const gapQty = m.gapQty ?? calcGapQty(demandQty, m.availableStock)
@@ -285,10 +283,6 @@ export function buildPurchaseRequisitionRows(materials, order) {
       gapQty,
       planQty: m.planQty ?? gapQty,
       unit: m.unit || '件',
-      expectedArrivalDate: m.expectedArrivalDate || defaultArrival,
-      warehouse: resolveDefaultWarehouse(m.code, m),
-      urgency: m.urgency || order?.urgency || '普通',
-      remark: m.remark || '',
     }
   })
 }
@@ -299,7 +293,6 @@ export function patchMaterialFromPurchaseRequisitionRow(row) {
     designateSupplier: row.designatedSupplier,
     supplier: row.supplier,
     planQty: row.planQty,
-    remark: row.remark,
     status: '进行中',
     joinPlan: '是',
   }

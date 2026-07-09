@@ -32,6 +32,56 @@
       </a-popover>
     </div>
 
+    <a-form layout="inline" class="header-form">
+      <a-row :gutter="[12, 8]" style="width: 100%">
+        <a-col :span="6">
+          <a-form-item label="预入仓库" required>
+            <a-select
+              v-model:value="headerForm.receivingWarehouse"
+              size="small"
+              show-search
+              allow-clear
+              placeholder="请选择"
+              style="width: 100%"
+              :options="warehouseOpts"
+              :filter-option="filterSelectOption"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="6">
+          <a-form-item label="期望到货时间" required>
+            <a-date-picker
+              v-model:value="headerForm.expectedArrivalDate"
+              size="small"
+              style="width: 100%"
+              placeholder="请选择"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="6">
+          <a-form-item label="紧急度" required>
+            <a-select
+              v-model:value="headerForm.urgency"
+              size="small"
+              style="width: 100%"
+              :options="urgencyOpts"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="24">
+          <a-form-item label="备注" class="remark-item">
+            <a-textarea
+              v-model:value="headerForm.remark"
+              :rows="2"
+              :maxlength="500"
+              show-count
+              placeholder="请输入备注"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
+    </a-form>
+
     <div ref="tableWrapRef" class="table-wrap">
       <a-table
         :columns="displayColumns"
@@ -75,17 +125,8 @@
             @click="startEdit(record, column.key)"
           >
             <div v-if="isEditing(record.key, column.key)" class="edit-wrap" @click.stop>
-              <a-date-picker
-                v-if="column.key === 'expectedArrivalDate'"
-                :value="expectedArrivalDayjs(record)"
-                size="small"
-                style="width: 100%"
-                :open="datePickerOpen"
-                @change="(date) => onExpectedArrivalChange(record, date)"
-                @openChange="onDatePickerOpenChange"
-              />
               <a-select
-                v-else-if="column.key === 'supplier'"
+                v-if="column.key === 'supplier'"
                 v-model:value="record.supplier"
                 size="small"
                 show-search
@@ -98,30 +139,12 @@
                 @dropdownVisibleChange="onSelectOpenChange"
                 @change="endEdit"
               />
-              <a-select
-                v-else-if="selectOptions[column.key]"
-                v-model:value="record[column.key]"
-                size="small"
-                style="width: 100%"
-                :open="selectOpen"
-                :options="selectOptions[column.key]"
-                @dropdownVisibleChange="onSelectOpenChange"
-                @change="endEdit"
-              />
               <a-input-number
                 v-else-if="column.key === 'planQty'"
                 v-model:value="record.planQty"
                 size="small"
                 :min="0"
                 style="width: 100%"
-                autofocus
-                @blur="endEdit"
-                @pressEnter="endEdit"
-              />
-              <a-input
-                v-else
-                v-model:value="record.remark"
-                size="small"
                 autofocus
                 @blur="endEdit"
                 @pressEnter="endEdit"
@@ -172,10 +195,10 @@ import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { unitOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { urgencyOptions } from '@/mock/workOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { planSupplierOptions } from '@/utils/productionPlanMaterial'
-import { buildPurchaseRequisitionRows } from '@/utils/material'
+import { buildPurchaseRequisitionRows, resolveAssemblyDate } from '@/utils/material'
 import { buildRequisitionFromPlanRows } from '@/store/purchaseRequisitionStore'
 
 const props = defineProps({
@@ -204,12 +227,15 @@ const columnDefs = [
   { key: 'gapQty', title: '缺口数', width: 80, total: true, numeric: true },
   { key: 'planQty', title: '计划数量', width: 90, editable: true, total: true, numeric: true },
   { key: 'unit', title: '计量单位', width: 90, total: false },
-  { key: 'expectedArrivalDate', title: '期望到货时间', width: 130, editable: true, total: false },
-  { key: 'warehouse', title: '预入仓库', width: 100, total: false },
-  { key: 'urgency', title: '紧急度', width: 80, total: false },
-  { key: 'remark', title: '备注', width: 120, editable: true, total: false },
   { key: 'action', title: '操作', width: 72, total: false },
 ]
+
+const headerForm = reactive({
+  receivingWarehouse: undefined,
+  expectedArrivalDate: null,
+  urgency: '普通',
+  remark: '',
+})
 
 const editableKeys = columnDefs.filter((c) => c.editable).map((c) => c.key)
 const defaultVisibleKeys = columnDefs.map((c) => c.key)
@@ -220,18 +246,15 @@ const rows = ref([])
 const editingCell = ref(null)
 const tableWrapRef = ref(null)
 const selectOpen = ref(false)
-const datePickerOpen = ref(false)
 
 const supplierOpts = planSupplierOptions
 
-const selectOptions = computed(() => {
+const warehouseOpts = computed(() => {
   void warehouseState.warehouses
-  return {
-    unit: unitOptions.map((v) => ({ label: v, value: v })),
-    warehouse: getWarehouseSelectOptions(),
-    urgency: urgencyOptions.map((v) => ({ label: v, value: v })),
-  }
+  return getWarehouseSelectOptions()
 })
+
+const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 
 const displayColumns = computed(() =>
   columnDefs
@@ -267,11 +290,24 @@ const summary = computed(() => {
   return totals
 })
 
+function resetHeaderForm(order, materials) {
+  const defaultArrival = resolveAssemblyDate(order) || dayjs().add(14, 'day').format('YYYY-MM-DD')
+  const defaultWarehouse =
+    materials.map((m) => m.warehouse).find(Boolean) ||
+    warehouseOpts.value[0]?.value ||
+    undefined
+  headerForm.receivingWarehouse = defaultWarehouse
+  headerForm.expectedArrivalDate = dayjs(defaultArrival)
+  headerForm.urgency = order?.urgency || '普通'
+  headerForm.remark = order?.remark || ''
+}
+
 watch(
   () => props.open,
   (val) => {
     if (val && props.order) {
       rows.value = buildPurchaseRequisitionRows(props.materials, props.order)
+      resetHeaderForm(props.order, props.materials)
       editingCell.value = null
     }
   },
@@ -289,9 +325,7 @@ function startEdit(record, field) {
   if (!isEditable(field)) return
   editingCell.value = { rowKey: record.key, field }
   nextTick(() => {
-    if (field === 'expectedArrivalDate') {
-      datePickerOpen.value = true
-    } else if (field === 'supplier' || selectOptions.value[field]) {
+    if (field === 'supplier') {
       selectOpen.value = true
     }
   })
@@ -300,7 +334,6 @@ function startEdit(record, field) {
 function endEdit() {
   editingCell.value = null
   selectOpen.value = false
-  datePickerOpen.value = false
 }
 
 function onSelectOpenChange(open) {
@@ -308,21 +341,8 @@ function onSelectOpenChange(open) {
   if (!open) endEdit()
 }
 
-function onDatePickerOpenChange(open) {
-  datePickerOpen.value = open
-  if (!open) endEdit()
-}
-
 function filterSelectOption(input, option) {
   return (option?.label || '').toLowerCase().includes(input.toLowerCase())
-}
-
-function expectedArrivalDayjs(record) {
-  return record.expectedArrivalDate ? dayjs(record.expectedArrivalDate) : null
-}
-
-function onExpectedArrivalChange(record, date) {
-  record.expectedArrivalDate = date ? date.format('YYYY-MM-DD') : ''
 }
 
 function onDesignatedSupplierChange(record, checked) {
@@ -333,9 +353,6 @@ function onDesignatedSupplierChange(record, checked) {
 }
 
 function formatCell(record, key, text) {
-  if (key === 'expectedArrivalDate') {
-    return record.expectedArrivalDate || '请选择'
-  }
   if (key === 'supplier' && !text) return '请选择'
   if (isEditable(key) && (text === '' || text == null)) return '-'
   return text ?? '-'
@@ -388,13 +405,25 @@ function handleSave() {
     message.warning(`「${missingSupplier.productName}」已指定供应商，请填写供应商`)
     return
   }
-  const missingArrival = rows.value.find((r) => !r.expectedArrivalDate)
-  if (missingArrival) {
-    message.warning(`请为「${missingArrival.productName}」选择期望到货时间`)
+  if (!headerForm.receivingWarehouse) {
+    message.warning('请选择预入仓库')
+    return
+  }
+  if (!headerForm.expectedArrivalDate) {
+    message.warning('请选择期望到货时间')
+    return
+  }
+  if (!headerForm.urgency) {
+    message.warning('请选择紧急度')
     return
   }
 
-  const requisition = buildRequisitionFromPlanRows(rows.value, props.order)
+  const requisition = buildRequisitionFromPlanRows(rows.value, props.order, {
+    receivingWarehouse: headerForm.receivingWarehouse,
+    estimatedArrivalDate: headerForm.expectedArrivalDate.format('YYYY-MM-DD'),
+    urgency: headerForm.urgency,
+    remark: headerForm.remark,
+  })
   emit('saved', requisition)
   message.success(
     `已成功生成采购申请 ${requisition.reqNo}，共 ${requisition.lineItems.length} 条明细`,
@@ -413,6 +442,26 @@ function handleSave() {
   .hint {
     color: rgba(0, 0, 0, 0.45);
     font-size: 12px;
+  }
+}
+
+.header-form {
+  margin-bottom: 12px;
+  padding: 12px 12px 4px;
+  background: #fafafa;
+  border-radius: 6px;
+
+  :deep(.ant-form-item) {
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    font-size: 13px;
+  }
+
+  .remark-item :deep(.ant-form-item-control) {
+    flex: 1;
   }
 }
 

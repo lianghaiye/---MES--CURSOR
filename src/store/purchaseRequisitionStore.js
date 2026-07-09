@@ -150,6 +150,11 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
     sourceOrder.planAssemblyDate ||
     sourceOrder.deliveryDate ||
     now.format('YYYY-MM-DD')
+  const estimatedArrivalDate = form.estimatedArrivalDate || deliveryDate
+  const receivingWarehouse = form.receivingWarehouse || ''
+  const urgency = form.urgency
+    ? mapSalesUrgency(form.urgency)
+    : mapSalesUrgency(sourceOrder.urgency)
   const lineItems = rows.map((row) =>
     createLineItem({
       inventoryName: row.productName,
@@ -168,21 +173,12 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
       planPurchaseQty: row.planQty,
       designatedSupplier: Boolean(row.designatedSupplier),
       supplierName: row.supplier || '',
-      expectedArrivalDate: row.expectedArrivalDate || deliveryDate,
+      expectedArrivalDate: estimatedArrivalDate,
       deliveryDate,
-      receivingWarehouse: row.warehouse || form.receivingWarehouse || '',
-      remark: row.remark || '',
+      receivingWarehouse,
+      remark: '',
     }),
   )
-  const estimatedArrivalDate =
-    form.estimatedArrivalDate ||
-    lineItems
-      .map((l) => l.expectedArrivalDate)
-      .filter(Boolean)
-      .sort()[0] ||
-    deliveryDate
-  const receivingWarehouse =
-    form.receivingWarehouse || lineItems.find((l) => l.receivingWarehouse)?.receivingWarehouse || ''
 
   return {
     id: `pr-${Date.now()}`,
@@ -190,8 +186,7 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
     salesOrderNo: sourceOrder.orderNo || '',
     docStatus: '待处理',
     overdueStatus: '未逾期',
-    urgency:
-      sourceOrder.urgency === '紧急' ? '紧急' : sourceOrder.urgency === '加急' ? '特急' : '正常',
+    urgency,
     orderDate: now.format('YYYY-MM-DD'),
     deliveryDate,
     estimatedArrivalDate,
