@@ -68,10 +68,11 @@
                   </a-form-item>
                 </a-col>
                 <a-col :span="8">
-                  <a-form-item label="产品属性" required>
+                  <a-form-item label="产品属性">
                     <a-select
                       v-model:value="form.productAttribute"
                       size="small"
+                      allow-clear
                       :options="productAttrOpts"
                       placeholder="请选择 产品属性"
                     />
@@ -573,6 +574,7 @@ import {
   normalizePartProductAttribute,
   isPartProductAttribute,
   productAttributeOptions,
+  wholeMachineProductAttributeOptions,
 } from '@/mock/productInfoOptions'
 import {
   barcodeTypeOptions,
@@ -661,12 +663,13 @@ const categoryOpts = flatCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
 }))
-const productAttrOpts = computed(() =>
-  (showProductFields.value && form.canSell && !form.isPart
-    ? productAttributeOptions
-    : partProductAttributeOptions
-  ).map((v) => ({ label: v, value: v })),
-)
+const productAttrOpts = computed(() => {
+  let options = partProductAttributeOptions
+  if (showProductFields.value && form.canSell && !form.isPart) {
+    options = form.isWholeMachine ? wholeMachineProductAttributeOptions : productAttributeOptions
+  }
+  return options.map((v) => ({ label: v, value: v }))
+})
 const productCategoryOpts = flatProductCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
@@ -698,7 +701,7 @@ const form = reactive({
   isPart: false,
   canPurchase: false,
   canOutsource: false,
-  productAttribute: '标准产品',
+  productAttribute: undefined,
   productCategoryKey: undefined,
   standardSpec: '',
   isAssemblyPart: false,
@@ -731,7 +734,7 @@ function resetForm() {
   form.isPart = false
   form.canPurchase = false
   form.canOutsource = false
-  form.productAttribute = '标准产品'
+  form.productAttribute = undefined
   form.productCategoryKey = undefined
   form.standardSpec = ''
   form.isAssemblyPart = false
@@ -767,7 +770,15 @@ function loadEditRecord(record) {
   form.isPart = Boolean(source.isPart)
   form.canPurchase = Boolean(source.canPurchase)
   form.canOutsource = Boolean(source.canOutsource)
-  form.productAttribute = normalizePartProductAttribute(source.productAttribute || '标准产品')
+  if (form.isPart) {
+    form.productAttribute = normalizePartProductAttribute(source.productAttribute)
+  } else if (form.isWholeMachine) {
+    form.productAttribute = wholeMachineProductAttributeOptions.includes(source.productAttribute)
+      ? source.productAttribute
+      : undefined
+  } else {
+    form.productAttribute = source.productAttribute || undefined
+  }
   form.productCategoryKey = source.productCategoryKey
   form.standardSpec = source.standardSpec || ''
   form.isAssemblyPart = Boolean(source.isAssemblyPart)
@@ -818,10 +829,15 @@ let syncingProductTypePair = false
 watch(
   () => form.isWholeMachine,
   (val) => {
-    if (syncingProductTypePair || !val || !form.isPart) return
-    syncingProductTypePair = true
-    form.isPart = false
-    syncingProductTypePair = false
+    if (syncingProductTypePair) return
+    if (val && form.isPart) {
+      syncingProductTypePair = true
+      form.isPart = false
+      syncingProductTypePair = false
+    }
+    if (val && !form.isPart && !wholeMachineProductAttributeOptions.includes(form.productAttribute)) {
+      form.productAttribute = undefined
+    }
   },
 )
 
@@ -836,7 +852,7 @@ watch(
     if (val) {
       form.productAttribute = normalizePartProductAttribute(form.productAttribute)
     } else if (isPartProductAttribute(form.productAttribute)) {
-      form.productAttribute = '标准产品'
+      form.productAttribute = undefined
       form.isAssemblyPart = false
     }
   },
@@ -869,10 +885,6 @@ function validate() {
   if (showProductFields.value) {
     if (!form.productCategoryKey) {
       message.warning('请选择产品类别')
-      return false
-    }
-    if (!form.productAttribute) {
-      message.warning('请选择产品属性')
       return false
     }
   }

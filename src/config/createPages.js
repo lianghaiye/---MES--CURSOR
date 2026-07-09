@@ -161,6 +161,14 @@ export const createPageRegistry = [
     keepAlive: 'EmployeeGroupCreateView',
   },
   {
+    listPath: '/basic-config/customers',
+    newPath: '/basic-config/customers/new',
+    title: '新增客户',
+    name: 'basic-config-customers-new',
+    view: () => import('@/views/basic-config/customers/CustomerCreateView.vue'),
+    keepAlive: 'CustomerCreateView',
+  },
+  {
     listPath: '/quality/factory-qc',
     newPath: '/quality/factory-qc/new',
     title: '新增出厂质检',

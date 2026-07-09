@@ -194,7 +194,16 @@ const routes = [
         component: () => import('@/views/sales/DeliveryOrderDetailView.vue'),
         meta: { title: '发货单详情' },
       },
-      { path: 'sales/customers', ...emptyChild('sales-customers', '客户档案') },
+      {
+        path: 'sales/customers',
+        redirect: '/basic-config/customers',
+      },
+      {
+        path: 'sales/framework-contracts',
+        name: 'sales-framework-contracts',
+        component: () => import('@/views/sales/FrameworkContractView.vue'),
+        meta: { title: '框架合同' },
+      },
       {
         path: 'planning/production-plan',
         name: 'planning-production-plan',
@@ -512,6 +521,30 @@ const routes = [
         name: 'basic-config-warehouse-detail',
         component: () => import('@/views/basic-config/WarehouseDetailView.vue'),
         meta: { title: '仓库详情' },
+      },
+      {
+        path: 'basic-config/customer-types',
+        name: 'basic-config-customer-types',
+        component: () => import('@/views/basic-config/customers/CustomerTypeView.vue'),
+        meta: { title: '客户类型' },
+      },
+      {
+        path: 'basic-config/customers',
+        name: 'basic-config-customers',
+        component: () => import('@/views/basic-config/customers/CustomerProfileView.vue'),
+        meta: { title: '客户档案' },
+      },
+      {
+        path: 'basic-config/customers/:id/edit',
+        name: 'basic-config-customers-edit',
+        component: () => import('@/views/basic-config/customers/CustomerEditView.vue'),
+        meta: { title: '编辑客户', listPath: '/basic-config/customers' },
+      },
+      {
+        path: 'basic-config/customers/:id',
+        name: 'basic-config-customers-detail',
+        component: () => import('@/views/basic-config/customers/CustomerDetailView.vue'),
+        meta: { title: '客户详情' },
       },
       {
         path: 'system/dict',

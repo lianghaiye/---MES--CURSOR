@@ -17,6 +17,9 @@ export {
 
 export const productAttributeOptions = ['标准产品', '定制产品', '标准零部件', '定制零部件', '服务']
 
+/** 整机产品属性可选项 */
+export const wholeMachineProductAttributeOptions = ['标准产品', '定制产品']
+
 export const STANDARD_PART_ATTRIBUTE = '标准零部件'
 export const CUSTOM_PART_ATTRIBUTE = '定制零部件'
 

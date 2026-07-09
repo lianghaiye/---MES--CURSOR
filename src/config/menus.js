@@ -51,7 +51,7 @@ export const sideMenus = {
   sales: [
     { key: 'orders', label: '销售订单', path: '/sales/orders' },
     { key: 'delivery', label: '发货管理', path: '/sales/delivery' },
-    { key: 'customers', label: '客户档案', path: '/sales/customers' },
+    { key: 'framework-contracts', label: '框架合同', path: '/sales/framework-contracts' },
   ],
   planning: [
     { key: 'production-plan', label: '生产计划', path: '/planning/production-plan' },
@@ -139,6 +139,14 @@ export const sideMenus = {
         },
       ],
     },
+    {
+      key: 'customer-mgmt',
+      label: '客户管理',
+      children: [
+        { key: 'customers', label: '客户档案', path: '/basic-config/customers' },
+        { key: 'customer-types', label: '客户类型', path: '/basic-config/customer-types' },
+      ],
+    },
   ],
   system: [
     { key: 'dict', label: '系统字典', path: '/system/dict' },
@@ -209,7 +217,9 @@ export const routeTitles = {
   '/sales/orders/:id': '销售订单详情',
   '/sales/delivery': '发货管理',
   '/sales/delivery/:id': '发货单详情',
-  '/sales/customers': '客户档案',
+  '/basic-config/customers': '客户档案',
+  '/basic-config/customer-types': '客户类型',
+  '/sales/framework-contracts': '框架合同',
   '/planning/production-plan': '生产计划',
   '/planning/design-task': '设计任务',
   '/production/work-orders': '生产工单',
@@ -273,6 +283,8 @@ export const dynamicRouteTitles = [
   { pattern: /^\/engineering-change\/ecr\/[^/]+\/approve$/, title: '审批工程变更' },
   { pattern: /^\/engineering-change\/ecr\/[^/]+\/execute$/, title: '执行工程变更' },
   { pattern: /^\/basic-config\/warehouses\/[^/]+$/, title: '仓库详情' },
+  { pattern: /^\/basic-config\/customers\/[^/]+\/edit$/, title: '编辑客户' },
+  { pattern: /^\/basic-config\/customers\/[^/]+$/, title: '客户详情' },
   { pattern: /^\/inventory\/inbound\/[^/]+$/, title: '入库单详情' },
   { pattern: /^\/inventory\/outbound\/[^/]+$/, title: '出库单详情' },
   { pattern: /^\/report-management\/report-work\/[^/]+$/, title: '报工确认详情' },
