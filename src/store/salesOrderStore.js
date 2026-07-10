@@ -15,6 +15,7 @@ import { ensureEcnDemoBootstrap } from '@/mock/ecnDemoBootstrap'
 import { hydrateApprovedSelfProdOrders } from '@/utils/hydrateSalesLines'
 import { validateChangeDeliveryRows, applyDeliveryModeChanges } from '@/utils/changeDeliveryMode'
 import { syncProductionPlanDeliveryMode } from '@/store/productionPlanStore'
+import { applyOrderAmounts } from '@/utils/salesOrderPricing'
 import {
   deriveOrderBusinessType,
   isOutsourcingBusinessType,
@@ -140,11 +141,7 @@ export function addDeliveryApplication(orderId, application) {
 }
 
 export function recalcOrderAmounts(order) {
-  const lineItems = order.lineItems || []
-  order.totalQty = lineItems.reduce((s, i) => s + (Number(i.qty) || 0), 0)
-  order.amountExTax = lineItems.reduce((s, i) => s + (Number(i.totalPriceExTax) || 0), 0)
-  order.amountInTax = lineItems.reduce((s, i) => s + (Number(i.totalPriceInTax) || 0), 0)
-  order.orderAmount = order.amountInTax
+  applyOrderAmounts(order, { taxModeExcluding: true })
 }
 
 export function canEditSalesOrder(order) {

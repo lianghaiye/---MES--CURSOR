@@ -23,6 +23,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { DISCOUNT_STRATEGY_LABELS } from '@/utils/salesOrderPricing'
 
 const props = defineProps({
   order: { type: Object, required: true },
@@ -64,9 +65,31 @@ const fields = computed(() => {
     { key: 'deliveryAddress', label: '交货地址' },
     { key: 'deliveryMethod', label: '送货方式' },
     {
+      key: 'discountStrategy',
+      label: '折扣策略',
+      format: () => DISCOUNT_STRATEGY_LABELS[o.discountStrategy] || '仅明细折扣',
+    },
+    {
       key: 'orderAmount',
       label: '订单金额',
       format: () => `￥${Number(o.orderAmount ?? o.amountInTax ?? 0).toFixed(2)}`,
+    },
+    {
+      key: 'totalDiscountAmount',
+      label: '优惠合计',
+      format: () =>
+        o.totalDiscountAmount > 0 ? `￥${Number(o.totalDiscountAmount).toFixed(2)}` : '—',
+    },
+    {
+      key: 'lineDiscountTotal',
+      label: '明细优惠',
+      format: () => (o.lineDiscountTotal > 0 ? `￥${Number(o.lineDiscountTotal).toFixed(2)}` : '—'),
+    },
+    {
+      key: 'orderDiscountTotal',
+      label: '整单优惠',
+      format: () =>
+        o.orderDiscountTotal > 0 ? `￥${Number(o.orderDiscountTotal).toFixed(2)}` : '—',
     },
     { key: 'techSpecCode', label: '技术规范编码' },
     { key: 'reminderDate', label: '提醒日期' },

@@ -59,6 +59,60 @@
             </div>
 
             <div class="section-card">
+              <div class="section-title">价格汇总</div>
+              <a-row :gutter="[16, 12]" class="price-summary-grid">
+                <a-col :span="6">
+                  <div class="price-summary-item">
+                    <div class="price-label">明细不含税合计</div>
+                    <div class="price-value">￥{{ formatMoney(orderPricing.lineAmountExTax) }}</div>
+                  </div>
+                </a-col>
+                <a-col :span="6">
+                  <div class="price-summary-item">
+                    <div class="price-label">行级优惠合计</div>
+                    <div class="price-value discount">
+                      -￥{{ formatMoney(orderPricing.lineDiscountTotal) }}
+                    </div>
+                  </div>
+                </a-col>
+                <a-col :span="6">
+                  <div class="price-summary-item">
+                    <div class="price-label">整单优惠合计</div>
+                    <div class="price-value discount">
+                      -￥{{ formatMoney(orderPricing.orderDiscountTotal) }}
+                    </div>
+                  </div>
+                </a-col>
+                <a-col :span="6">
+                  <div class="price-summary-item">
+                    <div class="price-label">优惠总额</div>
+                    <div class="price-value discount">
+                      -￥{{ formatMoney(orderPricing.totalDiscountAmount) }}
+                    </div>
+                  </div>
+                </a-col>
+                <a-col :span="6">
+                  <div class="price-summary-item">
+                    <div class="price-label">订单不含税金额</div>
+                    <div class="price-value">￥{{ formatMoney(orderPricing.amountExTax) }}</div>
+                  </div>
+                </a-col>
+                <a-col :span="6">
+                  <div class="price-summary-item">
+                    <div class="price-label">订单含税金额</div>
+                    <div class="price-value">￥{{ formatMoney(orderPricing.amountInTax) }}</div>
+                  </div>
+                </a-col>
+                <a-col v-if="order.orderDiscountReason" :span="12">
+                  <div class="price-summary-item">
+                    <div class="price-label">优惠原因</div>
+                    <div class="price-value">{{ order.orderDiscountReason }}</div>
+                  </div>
+                </a-col>
+              </a-row>
+            </div>
+
+            <div class="section-card">
               <div class="section-title">销售明细</div>
               <a-table
                 :columns="lineColumns"
@@ -78,6 +132,9 @@
                     <a-tag :color="line.deliveryMode === '散件' ? 'orange' : 'blue'">
                       {{ line.deliveryMode || '整机' }}
                     </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'lineDiscountRate'">
+                    {{ formatDiscountRatePercent(line.lineDiscountRate) }}
                   </template>
                   <template v-else-if="isMoneyColumn(column.key)">
                     {{ formatMoneyCell(line, column) }}
@@ -294,7 +351,9 @@
                     </a-tag>
                   </template>
                   <template v-else-if="column.key === 'orderNo'">
-                    <span class="link-code">{{ row.orderNo || '—' }}</span>
+                    <a class="link-code" @click.prevent="goPurchaseOrder(row)">{{
+                      row.orderNo || '—'
+                    }}</a>
                   </template>
                   <template v-else-if="column.key === 'supplier'">
                     {{ row.supplier || row.supplierName || '—' }}
@@ -504,6 +563,7 @@ import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
 import SalesOrderEbomDiffSection from './components/SalesOrderEbomDiffSection.vue'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
+import { formatDiscountRatePercent, calcOrderAmounts } from '@/utils/salesOrderPricing'
 import { buildSalesOrderEbomRows } from '@/utils/salesOrderBomRows'
 import {
   normalizeSalesOrderDetailTab,
@@ -525,6 +585,20 @@ function initActiveTab() {
 const activeTab = ref(initActiveTab())
 
 const relations = computed(() => resolveSalesOrderRelations(order.value))
+
+const orderPricing = computed(() => {
+  if (!order.value) {
+    return {
+      lineAmountExTax: 0,
+      lineDiscountTotal: 0,
+      orderDiscountTotal: 0,
+      totalDiscountAmount: 0,
+      amountExTax: 0,
+      amountInTax: 0,
+    }
+  }
+  return calcOrderAmounts(order.value)
+})
 
 const purchaseTabCount = computed(
   () => relations.value.purchaseRequisitions.length + relations.value.purchaseOrders.length,
@@ -588,6 +662,8 @@ function lineActiveVersion(line) {
 }
 
 const moneyColumnKeys = new Set([
+  'listUnitPriceExTax',
+  'lineDiscountAmount',
   'unitPriceExTax',
   'unitPriceInTax',
   'totalPriceExTax',
@@ -915,6 +991,13 @@ function goPurchaseReq(id) {
   router.push(path)
 }
 
+function goPurchaseOrder(row) {
+  if (!row?.id) return
+  const path = `/procurement/purchase-orders/${row.id}`
+  openTab(path, `采购订单 ${row.orderNo}`)
+  router.push({ name: 'procurement-purchase-orders-detail', params: { id: row.id } })
+}
+
 function goOutboundDetail(row) {
   if (!row?.id) return
   const path = `/inventory/outbound/${row.id}`
@@ -997,6 +1080,24 @@ function openBomDetail(bomId, bomName) {
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 10px;
+}
+
+.price-summary-item {
+  .price-label {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+    margin-bottom: 4px;
+  }
+
+  .price-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.88);
+
+    &.discount {
+      color: #cf1322;
+    }
+  }
 }
 
 .section-hint {

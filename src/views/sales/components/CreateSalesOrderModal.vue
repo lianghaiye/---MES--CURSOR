@@ -189,6 +189,91 @@
       </a-row>
     </a-form>
 
+    <div v-if="customerDiscountHint" class="discount-hint">{{ customerDiscountHint }}</div>
+
+    <div class="price-summary-card">
+      <div class="price-summary-header" @click="priceSummaryCollapsed = !priceSummaryCollapsed">
+        <span class="section-title">价格汇总</span>
+        <span class="header-amounts">
+          <span class="header-amount-item">
+            含税
+            <strong>￥{{ formatMoney(orderAmount) }}</strong>
+          </span>
+          <span class="header-amount-item">
+            不含税
+            <strong>￥{{ formatMoney(orderPricing.amountExTax) }}</strong>
+          </span>
+        </span>
+        <DownOutlined :class="{ rotated: priceSummaryCollapsed }" class="collapse-icon" />
+      </div>
+      <div v-show="!priceSummaryCollapsed" class="price-summary-body">
+        <div class="summary-amounts-strip">
+          <span class="amount-chip">
+            明细合计
+            <strong>￥{{ formatMoney(orderPricing.lineAmountExTax) }}</strong>
+          </span>
+          <span class="amount-chip discount">
+            行优惠
+            <strong>-￥{{ formatMoney(orderPricing.lineDiscountTotal) }}</strong>
+          </span>
+          <span class="amount-chip discount">
+            整单优惠
+            <strong>-￥{{ formatMoney(orderPricing.orderDiscountTotal) }}</strong>
+          </span>
+        </div>
+        <a-form layout="inline" size="small" class="discount-inline-form">
+          <a-form-item label="折扣策略">
+            <a-radio-group
+              v-model:value="form.discountStrategy"
+              size="small"
+              @change="syncOrderDiscountRate"
+            >
+              <a-radio :value="DISCOUNT_STRATEGIES.LINE">
+                {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.LINE] }}
+              </a-radio>
+              <a-radio :value="DISCOUNT_STRATEGIES.ORDER">
+                {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.ORDER] }}
+              </a-radio>
+              <a-radio :value="DISCOUNT_STRATEGIES.STACK">
+                {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.STACK] }}
+              </a-radio>
+            </a-radio-group>
+          </a-form-item>
+          <a-form-item label="整单折扣(%)">
+            <a-input-number
+              v-model:value="form.orderDiscountPercent"
+              size="small"
+              :min="1"
+              :max="100"
+              :precision="2"
+              :disabled="form.discountStrategy === DISCOUNT_STRATEGIES.LINE"
+              style="width: 88px"
+              @change="syncOrderDiscountRate"
+            />
+          </a-form-item>
+          <a-form-item label="整单减免(元)">
+            <a-input-number
+              v-model:value="form.orderDiscountAmount"
+              size="small"
+              :min="0"
+              :precision="2"
+              :disabled="form.discountStrategy === DISCOUNT_STRATEGIES.LINE"
+              style="width: 100px"
+              @change="syncOrderDiscountRate"
+            />
+          </a-form-item>
+          <a-form-item label="优惠原因" class="discount-reason-item">
+            <a-input
+              v-model:value="form.orderDiscountReason"
+              size="small"
+              placeholder="如：老客户合作、批量采购"
+              style="width: 200px"
+            />
+          </a-form-item>
+        </a-form>
+      </div>
+    </div>
+
     <div class="detail-section">
       <div class="detail-section-header" @click="detailCollapsed = !detailCollapsed">
         <span class="section-title">销售明细</span>
@@ -355,6 +440,28 @@
               <a-input v-model:value="record.unit" size="small" />
             </template>
 
+            <template v-else-if="column.key === 'listUnitPriceExTax'">
+              {{ formatMoney(record.listUnitPriceExTax) }}
+            </template>
+
+            <template v-else-if="column.key === 'lineDiscountPercent'">
+              <a-input-number
+                v-if="showLineDiscount"
+                :value="getLineDiscountPercent(record)"
+                size="small"
+                :min="1"
+                :max="100"
+                :precision="2"
+                style="width: 100%"
+                @update:value="(v) => setLineDiscountPercent(record, v)"
+              />
+              <span v-else>—</span>
+            </template>
+
+            <template v-else-if="column.key === 'lineDiscountAmount'">
+              {{ formatMoney(record.lineDiscountAmount) }}
+            </template>
+
             <template v-else-if="column.key === 'unitPriceExTax'">
               <a-input-number
                 v-model:value="record.unitPriceExTax"
@@ -363,7 +470,7 @@
                 :precision="2"
                 style="width: 100%"
                 :disabled="!taxModeExcluding"
-                @change="onLineFieldChange(record)"
+                @change="onUnitPriceChange(record)"
               />
             </template>
 
@@ -387,7 +494,7 @@
                 :precision="2"
                 style="width: 100%"
                 :disabled="taxModeExcluding"
-                @change="onLineFieldChange(record)"
+                @change="onUnitPriceChange(record)"
               />
             </template>
 
@@ -424,6 +531,7 @@
 
             <template v-else-if="column.key === 'action'">
               <a-space :size="0">
+                <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
                 <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
                 <a-button type="link" size="small" @click="cloneLine(index)">克隆</a-button>
               </a-space>
@@ -464,6 +572,14 @@
       @selected="onProductsSelected"
     />
 
+    <SalesOrderLineEditModal
+      v-model:open="lineEditOpen"
+      :line="lineEditTarget"
+      :tax-mode-excluding="taxModeExcluding"
+      :discount-strategy="form.discountStrategy"
+      @saved="onLineEditSaved"
+    />
+
     <template #footer>
       <a-button size="small" @click="handleCancel">取消</a-button>
       <a-button type="primary" size="small" @click="handleSave">保存</a-button>
@@ -485,7 +601,6 @@ import {
   deliveryModeOptions,
   settlementTypeOptions,
   paymentRatioOptions,
-  customerOptions,
   salespersonOptions,
 } from '@/mock/salesOrderOptions'
 import { createLineItem } from '@/mock/salesOrders'
@@ -499,7 +614,21 @@ import {
   salesOrderState,
   updateSalesOrder,
 } from '@/store/salesOrderStore'
+import { getCustomerOptions, getCustomerByName } from '@/store/customerStore'
+import { getFrameworkContractByNo } from '@/store/frameworkContractStore'
+import { resolveSalesLinePrice } from '@/utils/customerPrice'
+import {
+  DISCOUNT_STRATEGIES,
+  DISCOUNT_STRATEGY_LABELS,
+  ensureLinePricingFields,
+  normalizeDiscountRate,
+  recalcSalesLinePricing,
+  applyOrderAmounts,
+  calcOrderAmounts,
+  formatDiscountRatePercent,
+} from '@/utils/salesOrderPricing'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import SalesOrderLineEditModal from './SalesOrderLineEditModal.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 import {
@@ -525,7 +654,10 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 })
 const taxModeExcluding = ref(true)
 const detailCollapsed = ref(false)
+const priceSummaryCollapsed = ref(false)
 const productPickerOpen = ref(false)
+const lineEditOpen = ref(false)
+const lineEditTarget = ref(null)
 const fileList = ref([])
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024
@@ -565,6 +697,9 @@ const columnDefs = [
   { key: 'unit', title: '单位', width: 70 },
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 100, ellipsis: true },
   { key: 'bomVersion', title: 'Bom版本', dataIndex: 'bomVersion', width: 90 },
+  { key: 'listUnitPriceExTax', title: '标准单价(不含税)', width: 110 },
+  { key: 'lineDiscountPercent', title: '行折扣(%)', width: 90 },
+  { key: 'lineDiscountAmount', title: '行优惠金额', width: 100 },
   { key: 'unitPriceExTax', title: '不含税单价', width: 100 },
   { key: 'taxRate', title: '税率(%)', width: 80 },
   { key: 'unitPriceInTax', title: '含税单价', width: 100 },
@@ -573,7 +708,7 @@ const columnDefs = [
   { key: 'packagingForm', title: '包装形式', width: 90 },
   { key: 'supplementDesc', title: '补充说明', width: 90 },
   { key: 'lineAttachment', title: '上传附件', width: 120 },
-  { key: 'action', title: '操作', width: 110, fixed: 'right' },
+  { key: 'action', title: '操作', width: 150, fixed: 'right' },
 ]
 
 const visibleColumnKeys = ref(columnDefs.map((c) => c.key))
@@ -630,6 +765,12 @@ const form = reactive({
   paymentRatio: undefined,
   downPaymentAmount: null,
   remark: '',
+  discountStrategy: DISCOUNT_STRATEGIES.LINE,
+  orderDiscountType: 'none',
+  orderDiscountPercent: 100,
+  orderDiscountRate: 1,
+  orderDiscountAmount: 0,
+  orderDiscountReason: '',
   lineItems: [],
 })
 
@@ -713,16 +854,46 @@ const deliveryMethodOpts = deliveryMethodOptions.map((v) => ({ label: v, value: 
 const deliveryModeOpts = deliveryModeOptions.map((v) => ({ label: v, value: v }))
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const paymentRatioOpts = paymentRatioOptions.map((v) => ({ label: v, value: v }))
-const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
+const customerOpts = computed(() =>
+  getCustomerOptions().map((c) => ({ label: c.label, value: c.value })),
+)
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 
+const orderPricing = computed(() =>
+  calcOrderAmounts(
+    {
+      lineItems: form.lineItems,
+      orderDiscountRate: normalizeDiscountRate(form.orderDiscountRate, 1),
+      orderDiscountAmount: form.orderDiscountAmount,
+      orderDiscountType: form.orderDiscountType,
+      orderDiscountReason: form.orderDiscountReason,
+      discountStrategy: form.discountStrategy,
+    },
+    { taxModeExcluding: taxModeExcluding.value },
+  ),
+)
+
+const orderAmount = computed(() => orderPricing.value.orderAmount)
+
+const customerDiscountHint = computed(() => {
+  const customer = getCustomerByName(form.customerName)
+  if (!customer?.defaultDiscountRate || customer.defaultDiscountRate >= 1) return ''
+  return `已应用客户默认折扣 ${formatDiscountRatePercent(customer.defaultDiscountRate)}（新加行自动带出，可改）`
+})
+
+const showLineDiscount = computed(() => form.discountStrategy !== DISCOUNT_STRATEGIES.ORDER)
+
 const contactOpts = computed(() => {
-  const customer = customerOptions.find((c) => c.value === form.customerName)
+  const customer = getCustomerOptions().find((c) => c.value === form.customerName)
   return (customer?.contacts || []).map((c) => ({ label: c.name, value: c.name, phone: c.phone }))
 })
 
-const orderAmount = computed(() =>
-  form.lineItems.reduce((s, i) => s + (Number(i.totalPriceInTax) || 0), 0),
+watch(
+  () => form.contractNo,
+  () => {
+    if (!isActive.value || !form.customerName) return
+    repriceLinesForCustomer()
+  },
 )
 
 watch(
@@ -751,11 +922,17 @@ watch(
         paymentRatio: r.paymentRatio || undefined,
         downPaymentAmount: r.downPaymentAmount,
         remark: r.remark || '',
+        discountStrategy: r.discountStrategy || DISCOUNT_STRATEGIES.LINE,
+        orderDiscountType: r.orderDiscountType || 'none',
+        orderDiscountRate: normalizeDiscountRate(r.orderDiscountRate, 1),
+        orderDiscountPercent: round2(normalizeDiscountRate(r.orderDiscountRate, 1) * 100),
+        orderDiscountAmount: r.orderDiscountAmount ?? 0,
+        orderDiscountReason: r.orderDiscountReason || '',
         lineItems: JSON.parse(JSON.stringify(r.lineItems || [])).map((line) =>
           normalizeLineItem(line, r.businessType),
         ),
       })
-      form.lineItems.forEach(recalcLine)
+      recalcAll()
       fileList.value = (r.attachments || []).map((file) => ({
         uid: file.uid || file.name,
         name: file.name,
@@ -796,6 +973,7 @@ function normalizeLineItem(item, orderBusinessType = '自产销售') {
     ]
   }
   syncLineAttachmentSummary(line)
+  ensureLinePricingFields(line)
   return line
 }
 
@@ -825,7 +1003,17 @@ function resetForm() {
   form.paymentRatio = undefined
   form.downPaymentAmount = null
   form.remark = ''
+  form.discountStrategy = DISCOUNT_STRATEGIES.LINE
+  form.orderDiscountType = 'none'
+  form.orderDiscountPercent = 100
+  form.orderDiscountRate = 1
+  form.orderDiscountAmount = 0
+  form.orderDiscountReason = ''
   form.lineItems = []
+  form.orderAmount = 0
+  form.totalDiscountAmount = 0
+  form.lineDiscountTotal = 0
+  form.orderDiscountTotal = 0
   fileList.value = []
   taxModeExcluding.value = true
 }
@@ -872,25 +1060,43 @@ function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100
 }
 
-function recalcLine(record) {
-  const qty = Number(record.salesQty) || 0
-  const rate = Number(record.taxRate) || 0
-  record.qty = qty
+function recalcLine(record, editMode = 'discount') {
+  recalcSalesLinePricing(record, { taxModeExcluding: taxModeExcluding.value, editMode })
+}
 
-  if (taxModeExcluding.value) {
-    const ex = Number(record.unitPriceExTax) || 0
-    record.unitPriceInTax = round2(ex * (1 + rate / 100))
-  } else {
-    const inc = Number(record.unitPriceInTax) || 0
-    record.unitPriceExTax = round2(inc / (1 + rate / 100))
-  }
+function recalcAll() {
+  syncOrderDiscountRate()
+  applyOrderAmounts(form, { taxModeExcluding: taxModeExcluding.value })
+}
 
-  record.totalPriceExTax = round2(qty * (Number(record.unitPriceExTax) || 0))
-  record.totalPriceInTax = round2(qty * (Number(record.unitPriceInTax) || 0))
+function syncOrderDiscountRate() {
+  form.orderDiscountRate = normalizeDiscountRate(
+    (Number(form.orderDiscountPercent) || 100) / 100,
+    1,
+  )
+  form.orderDiscountType =
+    form.orderDiscountRate < 1 || form.orderDiscountAmount > 0 ? 'rate' : 'none'
+  applyOrderAmounts(form, { taxModeExcluding: taxModeExcluding.value })
+}
+
+function getLineDiscountPercent(record) {
+  return round2(normalizeDiscountRate(record.lineDiscountRate, 1) * 100)
+}
+
+function setLineDiscountPercent(record, percent) {
+  record.lineDiscountRate = normalizeDiscountRate((Number(percent) || 100) / 100, 1)
+  recalcLine(record)
+  recalcAll()
 }
 
 function onLineFieldChange(record) {
   recalcLine(record)
+  recalcAll()
+}
+
+function onUnitPriceChange(record) {
+  recalcLine(record, 'unitPrice')
+  recalcAll()
 }
 
 function lineDateValue(val) {
@@ -903,12 +1109,38 @@ function onLineDateChange(record, date) {
 
 function toggleTaxMode() {
   taxModeExcluding.value = !taxModeExcluding.value
-  form.lineItems.forEach(recalcLine)
+  recalcAll()
+}
+
+function repriceLinesForCustomer() {
+  const customer = getCustomerByName(form.customerName)
+  const contract = form.contractNo ? getFrameworkContractByNo(form.contractNo) : null
+  form.lineItems.forEach((line) => {
+    if (line.isManualLine) return
+    const master = line.productId
+      ? productInfoState.products.find((p) => p.id === line.productId)
+      : null
+    const listPrice =
+      Number(master?.unitPrice ?? line.listUnitPriceExTax ?? line.unitPriceExTax) || 0
+    const pricing = resolveSalesLinePrice({
+      customer,
+      contract,
+      productId: line.productId,
+      productCode: line.productCode,
+      listPriceFromProduct: listPrice,
+    })
+    line.listUnitPriceExTax = pricing.listUnitPriceExTax
+    line.lineDiscountRate = pricing.lineDiscountRate
+    line.priceSource = pricing.priceSource
+    recalcLine(line)
+  })
+  recalcAll()
 }
 
 function onCustomerChange() {
   form.contactPerson = undefined
   form.contactPhone = ''
+  repriceLinesForCustomer()
 }
 
 function onContactChange(name) {
@@ -931,8 +1163,17 @@ function mapPickerToSalesLine(payload) {
   const bomItemType = payload.itemType === '产品' ? 'product' : 'material'
   const bom = getActiveBomForItem(bomItemType, payload.id)
   const master = resolveMasterRecord(payload)
-  const unitPrice = master?.unitPrice ?? payload.unitPrice ?? 0
+  const listPrice = master?.unitPrice ?? payload.unitPrice ?? 0
   const taxRate = master?.outputTaxRate ?? 13
+  const customer = getCustomerByName(form.customerName)
+  const contract = form.contractNo ? getFrameworkContractByNo(form.contractNo) : null
+  const pricing = resolveSalesLinePrice({
+    customer,
+    contract,
+    productId: payload.id,
+    productCode: payload.code,
+    listPriceFromProduct: listPrice,
+  })
 
   return createLineItem({
     productId: payload.id,
@@ -955,7 +1196,10 @@ function mapPickerToSalesLine(payload) {
     bomVersion: bom?.version || '',
     salesQty: 1,
     taxRate,
-    unitPriceExTax: Number(unitPrice) || 0,
+    listUnitPriceExTax: pricing.listUnitPriceExTax,
+    lineDiscountRate: pricing.lineDiscountRate,
+    priceSource: pricing.priceSource,
+    unitPriceExTax: 0,
     unitPriceInTax: 0,
   })
 }
@@ -978,6 +1222,8 @@ function onProductsSelected(rows) {
     form.lineItems.push(line)
   })
 
+  recalcAll()
+
   if (noBomProducts.length) {
     message.warning(
       `以下产品无使用中的 BOM，已添加至明细：${noBomProducts.join('、')}。请尽快在产品 BOM 中维护并启用，自产销售审核前需完成 BOM 配置。`,
@@ -996,10 +1242,12 @@ function addManualProductLine() {
   })
   recalcLine(line)
   form.lineItems.push(line)
+  recalcAll()
 }
 
 function removeLine(index) {
   form.lineItems.splice(index, 1)
+  recalcAll()
 }
 
 function cloneLine(index) {
@@ -1007,6 +1255,20 @@ function cloneLine(index) {
   const cloned = createLineItem({ ...JSON.parse(JSON.stringify(src)), id: undefined })
   recalcLine(cloned)
   form.lineItems.push(cloned)
+  recalcAll()
+}
+
+function openLineEdit(record) {
+  lineEditTarget.value = record
+  lineEditOpen.value = true
+}
+
+function onLineEditSaved(updated) {
+  const idx = form.lineItems.findIndex((line) => line.id === updated.id)
+  if (idx === -1) return
+  Object.assign(form.lineItems[idx], updated)
+  recalcLine(form.lineItems[idx], updated.priceSource === 'manual' ? 'unitPrice' : 'discount')
+  recalcAll()
 }
 
 function formatMoney(val) {
@@ -1018,7 +1280,7 @@ function handleSave() {
     message.warning('请选择客户名称')
     return
   }
-  form.lineItems.forEach(recalcLine)
+  recalcAll()
 
   const orderNo = form.orderNo?.trim() || generateSalesOrderNo()
 
@@ -1027,6 +1289,7 @@ function handleSave() {
     return
   }
 
+  const pricing = orderPricing.value
   const payload = {
     ...JSON.parse(JSON.stringify(form)),
     businessType: deriveOrderBusinessType(form.lineItems),
@@ -1044,10 +1307,18 @@ function handleSave() {
     createdAt: props.editRecord?.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
     approver: props.editRecord?.approver || '',
     approvedAt: props.editRecord?.approvedAt || '',
-    orderAmount: orderAmount.value,
-    amountExTax: form.lineItems.reduce((s, i) => s + (Number(i.totalPriceExTax) || 0), 0),
-    amountInTax: orderAmount.value,
-    totalQty: form.lineItems.reduce((s, i) => s + (Number(i.salesQty) || 0), 0),
+    lineItems: pricing.lineItems,
+    lineAmountExTax: pricing.lineAmountExTax,
+    lineAmountInTax: pricing.lineAmountInTax,
+    lineDiscountTotal: pricing.lineDiscountTotal,
+    orderDiscountByRate: pricing.orderDiscountByRate,
+    orderDiscountTotal: pricing.orderDiscountTotal,
+    totalDiscountAmount: pricing.totalDiscountAmount,
+    orderAmount: pricing.orderAmount,
+    amountExTax: pricing.amountExTax,
+    amountInTax: pricing.amountInTax,
+    totalQty: pricing.totalQty,
+    orderDiscountRate: normalizeDiscountRate(form.orderDiscountRate, 1),
     purchaseRequisitionNo: props.editRecord?.purchaseRequisitionNo || '',
     purchaseRequisitionId: props.editRecord?.purchaseRequisitionId || '',
     attachments: fileList.value.map((file) => ({
@@ -1057,6 +1328,7 @@ function handleSave() {
       type: file.type,
     })),
   }
+  delete payload.orderDiscountPercent
 
   if (props.pageMode) {
     if (isEdit.value) {
@@ -1118,6 +1390,122 @@ function handleSave() {
   .remark-item {
     :deep(.ant-form-item-label) {
       flex: 0 0 68px;
+    }
+  }
+}
+
+.discount-hint {
+  margin: 4px 0 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #1677ff;
+  background: #e6f4ff;
+  border-radius: 4px;
+}
+
+.price-summary-card {
+  margin-bottom: 8px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fafafa;
+
+  .price-summary-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    user-select: none;
+
+    .section-title {
+      font-weight: 600;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .header-amounts {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 0;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.65);
+
+      strong {
+        margin-left: 4px;
+        font-size: 14px;
+        color: rgba(0, 0, 0, 0.88);
+      }
+    }
+
+    .collapse-icon {
+      flex-shrink: 0;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.45);
+      transition: transform 0.2s;
+
+      &.rotated {
+        transform: rotate(-90deg);
+      }
+    }
+  }
+
+  .price-summary-body {
+    padding: 0 12px 8px;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .summary-amounts-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 8px 0 6px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.65);
+
+    .amount-chip {
+      white-space: nowrap;
+
+      strong {
+        margin-left: 4px;
+        font-size: 13px;
+        font-weight: 500;
+        color: rgba(0, 0, 0, 0.88);
+      }
+
+      &.discount strong {
+        color: #cf1322;
+      }
+    }
+  }
+
+  .discount-inline-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 0;
+    margin-bottom: 0;
+
+    :deep(.ant-form-item) {
+      margin-bottom: 0;
+      margin-right: 12px;
+    }
+
+    :deep(.ant-form-item-label > label) {
+      font-size: 12px;
+      height: 24px;
+    }
+
+    :deep(.ant-radio-wrapper) {
+      font-size: 12px;
+    }
+
+    .discount-reason-item {
+      flex: 1;
+      min-width: 220px;
     }
   }
 }
