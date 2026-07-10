@@ -36,7 +36,6 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { setToken, setUser } from '@/utils/auth'
-import { resolveUserDefaultWorkshop } from '@/constants/workshopDirector'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,7 +56,6 @@ async function onSubmit() {
     const user = {
       username: form.username,
       displayName: `${form.username}--admin`,
-      defaultWorkshop: resolveUserDefaultWorkshop({ username: form.username }),
     }
     setToken(token)
     setUser(user)
