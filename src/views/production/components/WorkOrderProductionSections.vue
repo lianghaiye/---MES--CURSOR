@@ -59,6 +59,12 @@
               :options="field.options"
               @change="(v) => updateField(field.key, v)"
             />
+            <WorkOrderOwnerSelect
+              v-else-if="field.type === 'owner-select'"
+              :model-value="workOrder[field.key]"
+              placeholder="请选择负责人"
+              @update:model-value="(v) => updateField(field.key, v)"
+            />
             <a-range-picker
               v-else-if="field.type === 'date-range'"
               :value="planDateValue"
@@ -84,12 +90,14 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import {
   formatWorkOrderFieldValue,
   formatWorkOrderPlanDateRange,
   resolveWorkOrderSalesMeta,
 } from '@/utils/workOrderBasicFields'
+import { resolveWorkCenterOwner } from '@/mock/workOrderOptions'
+import WorkOrderOwnerSelect from './WorkOrderOwnerSelect.vue'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -171,6 +179,12 @@ const arrangementFields = computed(() => {
         required: true,
         options: props.workCenterOpts,
       },
+      {
+        key: 'owner',
+        label: '负责人',
+        type: 'owner-select',
+        required: true,
+      },
       { key: 'warehouse', label: '预入仓库', type: 'select', options: props.warehouseOpts },
       { key: 'urgency', label: '紧急度', type: 'select', options: props.urgencyOpts },
       { key: 'planDateRange', label: '计划日期', type: 'date-range', required: true },
@@ -180,6 +194,7 @@ const arrangementFields = computed(() => {
 
   return [
     { key: 'workCenter', label: '工作中心', value: wo.workCenter },
+    { key: 'owner', label: '负责人', value: wo.owner },
     { key: 'warehouse', label: '预入仓库', value: wo.warehouse },
     { key: 'urgency', label: '紧急度', value: wo.urgency },
     {
@@ -197,8 +212,25 @@ function emitChange() {
 
 function updateField(key, value) {
   emit('update-field', { key, value })
+  if (key === 'workCenter' && props.editable) {
+    emit('update-field', { key: 'owner', value: resolveWorkCenterOwner(value) })
+  }
   emitChange()
 }
+
+watch(
+  () => [props.workOrder?.id, props.workOrder?.workCenter, props.workOrder?.owner, props.editable],
+  () => {
+    if (!props.editable || !props.workOrder?.workCenter) return
+    if (!props.workOrder.owner) {
+      emit('update-field', {
+        key: 'owner',
+        value: resolveWorkCenterOwner(props.workOrder.workCenter),
+      })
+    }
+  },
+  { immediate: true },
+)
 
 function onProcessRouteChange(value) {
   emit('update-field', { key: 'processRouteName', value })

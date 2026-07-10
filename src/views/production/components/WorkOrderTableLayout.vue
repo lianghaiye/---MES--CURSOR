@@ -38,8 +38,19 @@
         <template v-if="column.key === 'index'">
           {{ rowIndex(index) }}
         </template>
-        <template v-else-if="column.key === 'status'">
-          <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+        <template v-else-if="column.key === 'progress'">
+          <a-tag :color="statusColor(record.status)">
+            {{ formatCell(record.progressLabel || record.status) }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'taskStatus'">
+          {{ formatCell(record.taskStatus || '正常') }}
+        </template>
+        <template v-else-if="column.key === 'customerName'">
+          {{ formatCell(resolveWorkOrderSalesMeta(record).customerName) }}
+        </template>
+        <template v-else-if="column.key === 'planDateRange'">
+          {{ formatCell(formatWorkOrderPlanDateRange(record.planDateRange)) }}
         </template>
         <template v-else-if="column.key === 'urgency'">
           <a-tag :color="urgencyTagColor(record.urgency)">
@@ -103,6 +114,11 @@ import { AppstoreOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import {
+  formatWorkOrderFieldValue,
+  formatWorkOrderPlanDateRange,
+  resolveWorkOrderSalesMeta,
+} from '@/utils/workOrderBasicFields'
 
 const props = defineProps({
   dataSource: { type: Array, default: () => [] },
@@ -110,7 +126,7 @@ const props = defineProps({
   pagination: { type: Object, required: true },
   selectedIds: { type: Array, default: () => [] },
   activeId: { type: String, default: null },
-  columnSettingsKey: { type: String, default: 'work-order-list' },
+  columnSettingsKey: { type: String, default: 'work-order-list-v2' },
 })
 
 const emit = defineEmits([
@@ -124,18 +140,49 @@ const emit = defineEmits([
 
 const baseColumns = [
   { title: '#', key: 'index', width: 56, align: 'center', fixed: 'left' },
-  { title: '工单编号', dataIndex: 'code', key: 'code', width: 150, ellipsis: true },
+  { title: '工单编号', dataIndex: 'code', key: 'code', width: 150, ellipsis: true, fixed: 'left' },
   { title: '工单名称', dataIndex: 'name', key: 'name', width: 180, ellipsis: true },
-  { title: '销售订单号', dataIndex: 'sourceOrderNo', key: 'sourceOrderNo', width: 130 },
+  { title: '进度', key: 'progress', width: 90 },
+  { title: '状态', key: 'taskStatus', dataIndex: 'taskStatus', width: 80 },
+  {
+    title: '销售订单号',
+    dataIndex: 'sourceOrderNo',
+    key: 'sourceOrderNo',
+    width: 130,
+    ellipsis: true,
+  },
+  { title: '客户名称', key: 'customerName', width: 140, ellipsis: true },
   { title: '产品名称', dataIndex: 'productName', key: 'productName', width: 140, ellipsis: true },
-  { title: '进度', key: 'status', dataIndex: 'status', width: 90 },
-  { title: '紧急程度', key: 'urgency', dataIndex: 'urgency', width: 90 },
+  { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 120, ellipsis: true },
+  { title: '材质', dataIndex: 'material', key: 'material', width: 90, ellipsis: true },
+  { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 110, ellipsis: true },
+  { title: '技术参数', dataIndex: 'techParams', key: 'techParams', width: 120, ellipsis: true },
+  {
+    title: '工艺路线',
+    dataIndex: 'processRouteName',
+    key: 'processRouteName',
+    width: 120,
+    ellipsis: true,
+  },
+  { title: '计划数量', dataIndex: 'planQty', key: 'planQty', width: 90, align: 'right' },
+  { title: '排产数量', dataIndex: 'scheduleQty', key: 'scheduleQty', width: 90, align: 'right' },
+  { title: '工作中心', dataIndex: 'workCenter', key: 'workCenter', width: 100, ellipsis: true },
+  { title: '负责人', dataIndex: 'owner', key: 'owner', width: 90, ellipsis: true },
+  { title: '预入仓库', dataIndex: 'warehouse', key: 'warehouse', width: 100, ellipsis: true },
+  { title: '紧急度', key: 'urgency', dataIndex: 'urgency', width: 90 },
+  { title: '计划日期', key: 'planDateRange', width: 180, ellipsis: true },
+  { title: '工单备注', dataIndex: 'remark', key: 'remark', width: 160, ellipsis: true },
   { title: '工单类别', dataIndex: 'orderCategory', key: 'orderCategory', width: 100 },
+  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 110 },
   { title: '操作', key: 'action', width: 240, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings(props.columnSettingsKey, baseColumns, { minScrollX: 1200 })
+  useTableColumnSettings(props.columnSettingsKey, baseColumns, { minScrollX: 2800 })
+
+function formatCell(value) {
+  return formatWorkOrderFieldValue(value)
+}
 
 const rowSelection = computed(() => ({
   selectedRowKeys: props.selectedIds,
