@@ -1,0 +1,78 @@
+.line-table-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.line-table-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+
+  .ant-table-wrapper,
+  .ant-spin-nested-loading,
+  .ant-spin-container {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .ant-table {
+    margin-bottom: 0 !important;
+    width: 100%;
+  }
+
+  .ant-table-container {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Ant Design Vue 4：无纵向滚动时在 content，有纵向滚动时在 body */
+  .ant-table-content,
+  .ant-table-body {
+    overflow-x: auto !important;
+    max-width: 100%;
+  }
+
+  &.is-scrolling {
+    .ant-table-wrapper,
+    .ant-spin-nested-loading,
+    .ant-spin-container,
+    .ant-table {
+      height: 100%;
+    }
+
+    .ant-table-body {
+      overflow-y: auto !important;
+    }
+  }
+}
+
+.line-empty-placeholder {
+  padding: 12px 0;
+  color: #bfbfbf;
+  font-size: 13px;
+  text-align: center;
+}
+
+.danger-link {
+  color: #ff4d4f;
+}
+
+.line-table-body .ant-table-cell-fix-right {
+  background: #fff;
+}
+
+.line-table-body .ant-table-thead .ant-table-cell-fix-right {
+  background: #fafafa;
+}

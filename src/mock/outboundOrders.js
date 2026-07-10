@@ -14,6 +14,7 @@ export function createOutboundLine(partial = {}) {
     shipQty: 1,
     weight: null,
     shipWarehouse: '',
+    locationNo: '',
     unit: '件',
     unitPrice: null,
     totalPrice: null,

@@ -11,6 +11,7 @@ export const outboundFormLineColumns = [
   { title: '当前库存数', key: 'stockQty', width: 100, align: 'right' },
   { title: '当前仓库数量', key: 'warehouseStockQty', width: 110, align: 'right' },
   { title: '仓库', key: 'shipWarehouse', width: 120 },
+  { title: '货位号', key: 'locationNo', dataIndex: 'locationNo', width: 110, ellipsis: true },
   { title: '出库数量', key: 'shipQty', width: 96 },
   { title: '重量', key: 'weight', width: 88 },
   { title: '条码/批次号', key: 'barcodeBatchNo', width: 120, ellipsis: true },

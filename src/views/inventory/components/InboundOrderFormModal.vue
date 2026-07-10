@@ -9,303 +9,322 @@
     @update:open="(val) => emit('update:open', val)"
   >
     <div class="form-layout">
-    <a-form :model="form" layout="inline" class="header-form horizontal-form">
-      <a-row :gutter="[12, 12]" style="width: 100%">
-        <a-col :span="8">
-          <a-form-item label="入库单号">
-            <a-input
-              v-model:value="form.docNo"
-              size="small"
-              placeholder="不填则系统自动生成"
-              :disabled="isEdit"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="入库类型" required>
-            <a-select
-              v-model:value="form.inboundType"
-              size="small"
-              placeholder="请选择"
-              :options="inboundTypeOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="入库日期">
-            <a-date-picker
-              v-model:value="form.inboundDate"
-              size="small"
-              style="width: 100%"
-              placeholder="请选择入库日期"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="入库仓库">
-            <a-select
-              v-model:value="form.warehouse"
-              allow-clear
-              size="small"
-              placeholder="请选择 入库仓库"
-              :options="warehouseOpts"
-              @change="onHeaderWarehouseChange"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="供应商">
-            <a-select
-              v-model:value="form.supplier"
-              allow-clear
-              show-search
-              size="small"
-              placeholder="请选择 供应商"
-              :options="supplierOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="送货日期">
-            <a-date-picker
-              v-model:value="form.deliveryDate"
-              size="small"
-              style="width: 100%"
-              placeholder="请选择送货日期"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="经手人">
-            <a-select
-              v-model:value="form.handler"
-              size="small"
-              show-search
-              :options="handlerOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="发票号码">
-            <a-input
-              v-model:value="form.invoiceNo"
-              size="small"
-              :maxlength="30"
-              show-count
-              placeholder="请输入发票号码"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="24">
-          <a-form-item label="备注" class="remark-item">
-            <a-textarea
-              v-model:value="form.remark"
-              :rows="2"
-              size="small"
-              :maxlength="200"
-              show-count
-              placeholder="请输入 备注"
-            />
-          </a-form-item>
-        </a-col>
-      </a-row>
-    </a-form>
-
-    <div class="line-toolbar">
-      <a-space>
-        <a-button type="primary" size="small" :loading="addingItems" @click="pickerOpen = true">
-          <PlusOutlined />
-          添加物品
-        </a-button>
-        <a-button size="small" @click="bomModalOpen = true">按BOM添加</a-button>
-        <TableColumnSettingButton @click="columnDrawerOpen = true" />
-      </a-space>
-    </div>
-
-    <div
-      ref="lineTablePanelRef"
-      class="line-table-panel"
-      :class="{ 'panel-scrolling': isLineTableScrolling }"
-      :style="lineTablePanelStyle"
-    >
-      <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
-        <a-table
-          :columns="displayColumns"
-          :data-source="form.lineItems"
-          row-key="id"
-          size="small"
-          bordered
-          :pagination="false"
-          :scroll="lineTableScroll"
-        >
-      <template #bodyCell="{ column, record, index }">
-        <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-        <template v-else-if="column.key === 'itemName'">
-          <span v-if="record.itemCode" class="item-name-text" :title="record.itemName">
-            [{{ record.itemCode }}] {{ record.itemName }}
-          </span>
-          <InventoryLineItemSelect
-            v-else
-            :value="record.itemCode"
-            :fallback-name="record.itemName"
-            @select="(item) => onLineItemSelect(record, item)"
-            @clear="onLineItemClear(record)"
-          />
-        </template>
-        <template v-else-if="column.key === 'stockQty'">
-          {{ formatQty(record.stockQty) }}
-        </template>
-        <template v-else-if="column.key === 'warehouseStockQty'">
-          {{ formatQty(record.warehouseStockQty) }}
-        </template>
-        <template v-else-if="column.key === 'warehouse'">
-          <InventoryLineEditableCell
-            :active="isLineCellEditing(record.id, 'warehouse')"
-            :display="lineWarehouseLabel(record.warehouse)"
-            :empty="!record.warehouse"
-            placeholder="请选择"
-            @activate="startLineCellEdit(record.id, 'warehouse', { select: true })"
-            @end="endLineCellEdit"
-          >
-            <template #edit="{ endEdit }">
-              <a-select
-                v-model:value="record.warehouse"
-                allow-clear
-                size="small"
-                placeholder="请选择"
-                style="width: 100%"
-                :open="lineCellSelectOpen"
-                :options="warehouseOpts"
-                @dropdownVisibleChange="onLineCellSelectOpenChange"
-                @change="() => { refreshLine(record); endEdit() }"
-              />
-            </template>
-          </InventoryLineEditableCell>
-        </template>
-        <template v-else-if="column.key === 'locationNo'">
-          <InventoryLineEditableCell
-            :active="isLineCellEditing(record.id, 'locationNo')"
-            :display="record.locationNo || '—'"
-            :empty="!record.locationNo"
-            placeholder="请输入"
-            @activate="startLineCellEdit(record.id, 'locationNo')"
-            @end="endLineCellEdit"
-          >
-            <template #edit="{ endEdit }">
-              <a-input
-                v-model:value="record.locationNo"
-                size="small"
-                allow-clear
-                placeholder="请输入货位号"
-                autofocus
-                @blur="endEdit"
-                @pressEnter="endEdit"
-              />
-            </template>
-          </InventoryLineEditableCell>
-        </template>
-        <template v-else-if="column.key === 'qty'">
-          <InventoryLineEditableCell
-            :active="isLineCellEditing(record.id, 'qty')"
-            :display="formatQty(record.qty)"
-            :empty="record.qty == null || record.qty === ''"
-            numeric
-            @activate="startLineCellEdit(record.id, 'qty')"
-            @end="endLineCellEdit"
-          >
-            <template #edit="{ endEdit }">
-              <a-input-number
-                v-model:value="record.qty"
-                :min="0"
-                :precision="3"
-                size="small"
-                style="width: 100%"
-                autofocus
-                @blur="endEdit"
-                @pressEnter="endEdit"
-                @change="() => onLineQtyChange(record)"
-              />
-            </template>
-          </InventoryLineEditableCell>
-        </template>
-        <template v-else-if="column.key === 'weight'">
-          <InventoryLineEditableCell
-            :active="isLineCellEditing(record.id, 'weight')"
-            :display="formatQty(record.weight)"
-            :empty="record.weight == null || record.weight === ''"
-            placeholder="请输入"
-            numeric
-            @activate="startLineCellEdit(record.id, 'weight')"
-            @end="endLineCellEdit"
-          >
-            <template #edit="{ endEdit }">
-              <a-input-number
-                v-model:value="record.weight"
-                :min="0"
-                :precision="3"
-                size="small"
-                style="width: 100%"
-                autofocus
-                @blur="endEdit"
-                @pressEnter="endEdit"
-              />
-            </template>
-          </InventoryLineEditableCell>
-        </template>
-        <template v-else-if="column.key === 'unitPrice'">
-          <InventoryLineEditableCell
-            :active="isLineCellEditing(record.id, 'unitPrice')"
-            :display="formatMoney(record.unitPrice)"
-            :empty="record.unitPrice == null || record.unitPrice === ''"
-            numeric
-            @activate="startLineCellEdit(record.id, 'unitPrice')"
-            @end="endLineCellEdit"
-          >
-            <template #edit="{ endEdit }">
-              <a-input-number
-                v-model:value="record.unitPrice"
-                :min="0"
-                :precision="2"
-                size="small"
-                style="width: 100%"
-                autofocus
-                @blur="endEdit"
-                @pressEnter="endEdit"
-                @change="() => onLineUnitPriceChange(record)"
-              />
-            </template>
-          </InventoryLineEditableCell>
-        </template>
-        <template v-else-if="column.key === 'totalPrice'">
-          {{ formatMoney(record.totalPrice) }}
-        </template>
-        <template v-else-if="column.key === 'actions'">
-          <a-space :size="4">
-            <a @click="openLineEdit(record, 'edit')">编辑</a>
-            <a @click="openLineEdit(record, 'copy')">复制</a>
-            <a class="danger-link" @click="removeLine(record.id)">删除</a>
-          </a-space>
-        </template>
-      </template>
-      <template #emptyText>
-        <div class="line-empty-placeholder">暂无数据</div>
-      </template>
-        </a-table>
+      <div class="section-block">
+        <div class="section-title">基本信息</div>
+        <a-form :model="form" layout="inline" class="header-form horizontal-form">
+          <a-row :gutter="[12, 12]" style="width: 100%">
+            <a-col :span="8">
+              <a-form-item label="入库单号">
+                <a-input
+                  v-model:value="form.docNo"
+                  size="small"
+                  placeholder="不填则系统自动生成"
+                  :disabled="isEdit"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="入库类型" required>
+                <a-select
+                  v-model:value="form.inboundType"
+                  size="small"
+                  placeholder="请选择"
+                  :options="inboundTypeOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="入库日期">
+                <a-date-picker
+                  v-model:value="form.inboundDate"
+                  size="small"
+                  style="width: 100%"
+                  placeholder="请选择入库日期"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="入库仓库">
+                <a-select
+                  v-model:value="form.warehouse"
+                  allow-clear
+                  size="small"
+                  placeholder="请选择 入库仓库"
+                  :options="warehouseOpts"
+                  @change="onHeaderWarehouseChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="供应商">
+                <a-select
+                  v-model:value="form.supplier"
+                  allow-clear
+                  show-search
+                  size="small"
+                  placeholder="请选择 供应商"
+                  :options="supplierOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="送货日期">
+                <a-date-picker
+                  v-model:value="form.deliveryDate"
+                  size="small"
+                  style="width: 100%"
+                  placeholder="请选择送货日期"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="经手人">
+                <a-select
+                  v-model:value="form.handler"
+                  size="small"
+                  show-search
+                  :options="handlerOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="发票号码">
+                <a-input
+                  v-model:value="form.invoiceNo"
+                  size="small"
+                  :maxlength="30"
+                  show-count
+                  placeholder="请输入发票号码"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="24">
+              <a-form-item label="备注" class="remark-item">
+                <a-textarea
+                  v-model:value="form.remark"
+                  :rows="2"
+                  size="small"
+                  :maxlength="200"
+                  show-count
+                  placeholder="请输入 备注"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-form>
       </div>
-      <InventoryLineTableFooter
-        :columns="displayColumns"
-        :scroll-x="lineScrollX"
-        @add-line="addBlankLine"
-      >
-        <template #cell="{ column }">
-          <template v-if="column.key === 'index'">合计</template>
-          <template v-else-if="column.key === 'itemCode'">项数 {{ lineSummary.lineCount }}</template>
-          <template v-else-if="column.key === 'qty'">{{ formatQty(lineSummary.qtyTotal) }}</template>
-          <template v-else-if="column.key === 'weight'">{{ formatQty(lineSummary.weightTotal) }}</template>
-          <template v-else-if="column.key === 'totalPrice'">{{ formatMoney(lineSummary.totalPrice) }}</template>
-        </template>
-      </InventoryLineTableFooter>
-    </div>
+
+      <div class="section-block section-block--lines">
+        <div class="section-title">入库清单</div>
+        <div class="line-toolbar">
+          <a-space>
+            <a-button type="primary" size="small" :loading="addingItems" @click="pickerOpen = true">
+              <PlusOutlined />
+              添加物品
+            </a-button>
+            <a-button size="small" @click="bomModalOpen = true">按BOM添加</a-button>
+            <TableColumnSettingButton @click="columnDrawerOpen = true" />
+          </a-space>
+        </div>
+
+        <div
+          ref="lineTablePanelRef"
+          class="line-table-panel"
+          :class="{ 'panel-scrolling': isLineTableScrolling }"
+          :style="lineTablePanelStyle"
+        >
+          <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
+            <a-table
+              :columns="displayColumns"
+              :data-source="form.lineItems"
+              row-key="id"
+              size="small"
+              bordered
+              :pagination="false"
+              :scroll="lineTableScroll"
+            >
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'itemName'">
+                  <span v-if="record.itemCode" class="item-name-text" :title="record.itemName">
+                    [{{ record.itemCode }}] {{ record.itemName }}
+                  </span>
+                  <InventoryLineItemSelect
+                    v-else
+                    :value="record.itemCode"
+                    :fallback-name="record.itemName"
+                    @select="(item) => onLineItemSelect(record, item)"
+                    @clear="onLineItemClear(record)"
+                  />
+                </template>
+                <template v-else-if="column.key === 'stockQty'">
+                  {{ formatQty(record.stockQty) }}
+                </template>
+                <template v-else-if="column.key === 'warehouseStockQty'">
+                  {{ formatQty(record.warehouseStockQty) }}
+                </template>
+                <template v-else-if="column.key === 'warehouse'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'warehouse')"
+                    :display="lineWarehouseLabel(record.warehouse)"
+                    :empty="!record.warehouse"
+                    placeholder="请选择"
+                    @activate="startLineCellEdit(record.id, 'warehouse', { select: true })"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-select
+                        v-model:value="record.warehouse"
+                        allow-clear
+                        size="small"
+                        placeholder="请选择"
+                        style="width: 100%"
+                        :open="lineCellSelectOpen"
+                        :options="warehouseOpts"
+                        @dropdownVisibleChange="onLineCellSelectOpenChange"
+                        @change="
+                          () => {
+                            refreshLine(record)
+                            endEdit()
+                          }
+                        "
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'locationNo'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'locationNo')"
+                    :display="record.locationNo || '—'"
+                    :empty="!record.locationNo"
+                    placeholder="请输入"
+                    @activate="startLineCellEdit(record.id, 'locationNo')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input
+                        v-model:value="record.locationNo"
+                        size="small"
+                        allow-clear
+                        placeholder="请输入货位号"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'qty'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'qty')"
+                    :display="formatQty(record.qty)"
+                    :empty="record.qty == null || record.qty === ''"
+                    numeric
+                    @activate="startLineCellEdit(record.id, 'qty')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input-number
+                        v-model:value="record.qty"
+                        :min="0"
+                        :precision="3"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                        @change="() => onLineQtyChange(record)"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'weight'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'weight')"
+                    :display="formatQty(record.weight)"
+                    :empty="record.weight == null || record.weight === ''"
+                    placeholder="请输入"
+                    numeric
+                    @activate="startLineCellEdit(record.id, 'weight')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input-number
+                        v-model:value="record.weight"
+                        :min="0"
+                        :precision="3"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'unitPrice'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'unitPrice')"
+                    :display="formatMoney(record.unitPrice)"
+                    :empty="record.unitPrice == null || record.unitPrice === ''"
+                    numeric
+                    @activate="startLineCellEdit(record.id, 'unitPrice')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input-number
+                        v-model:value="record.unitPrice"
+                        :min="0"
+                        :precision="2"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                        @change="() => onLineUnitPriceChange(record)"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'totalPrice'">
+                  {{ formatMoney(record.totalPrice) }}
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <a-space :size="4">
+                    <a @click="openLineEdit(record, 'edit')">编辑</a>
+                    <a @click="openLineEdit(record, 'copy')">复制</a>
+                    <a class="danger-link" @click="removeLine(record.id)">删除</a>
+                  </a-space>
+                </template>
+              </template>
+              <template #emptyText>
+                <div class="line-empty-placeholder">暂无数据</div>
+              </template>
+            </a-table>
+          </div>
+          <InventoryLineTableFooter
+            :columns="displayColumns"
+            :scroll-x="lineScrollX"
+            @add-line="addBlankLine"
+          >
+            <template #cell="{ column }">
+              <template v-if="column.key === 'index'">合计</template>
+              <template v-else-if="column.key === 'itemCode'"
+                >项数 {{ lineSummary.lineCount }}</template
+              >
+              <template v-else-if="column.key === 'qty'">{{
+                formatQty(lineSummary.qtyTotal)
+              }}</template>
+              <template v-else-if="column.key === 'weight'">{{
+                formatQty(lineSummary.weightTotal)
+              }}</template>
+              <template v-else-if="column.key === 'totalPrice'">{{
+                formatMoney(lineSummary.totalPrice)
+              }}</template>
+            </template>
+          </InventoryLineTableFooter>
+        </div>
+      </div>
     </div>
 
     <template #footer>
@@ -458,7 +477,11 @@ const form = reactive({
 })
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inbound-form-lines-v2', inboundFormLineColumns, { minScrollX: 1850 })
+  useTableColumnSettings('inbound-form-lines-v2', inboundFormLineColumns, {
+    minScrollX: 1850,
+    pinEdgeColumns: false,
+    pinActionColumn: true,
+  })
 
 const lineScrollX = tableScrollX
 
@@ -724,6 +747,10 @@ function handleSave() {
 }
 </script>
 
+<style lang="less">
+@import '@/views/inventory/components/inventoryLineTablePanel.less';
+</style>
+
 <style lang="less" scoped>
 :deep(.form-create-page.inbound-form-modal) {
   display: flex;
@@ -737,6 +764,7 @@ function handleSave() {
   .form-body {
     flex: 1;
     min-height: 0;
+    min-width: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -744,16 +772,59 @@ function handleSave() {
   }
 }
 
+:deep(.ant-modal.inbound-form-modal) {
+  .ant-modal-body {
+    max-height: calc(100vh - 160px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding-bottom: 12px;
+  }
+
+  .form-layout {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+}
+
 .form-layout {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
+.section-block {
+  background: #fff;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1f1f1f;
+  }
+
+  &.section-block--lines {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+  }
+}
+
 .header-form {
   flex-shrink: 0;
-  margin-bottom: 12px;
 
   :deep(.ant-form-item) {
     margin-bottom: 0;
@@ -771,54 +842,6 @@ function handleSave() {
   margin-bottom: 8px;
 }
 
-.line-table-panel {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #f0f0f0;
-  border-radius: 4px;
-  overflow: hidden;
-  background: #fff;
-  flex-shrink: 0;
-
-  &.panel-scrolling {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-}
-
-.line-table-body {
-  flex: 0 0 auto;
-  min-height: 0;
-
-  &.is-scrolling {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
-
-    :deep(.ant-table-wrapper),
-    :deep(.ant-spin-nested-loading),
-    :deep(.ant-spin-container),
-    :deep(.ant-table) {
-      height: 100%;
-    }
-  }
-
-  :deep(.ant-table) {
-    margin-bottom: 0 !important;
-  }
-
-  :deep(.ant-table-container),
-  :deep(.ant-table-content),
-  :deep(.ant-table-header),
-  :deep(.ant-table-body) {
-    overflow-x: hidden !important;
-  }
-
-  :deep(.ant-table-body) {
-    overflow-y: auto !important;
-  }
-}
-
 .item-name-text {
   display: block;
   overflow: hidden;
@@ -830,16 +853,5 @@ function handleSave() {
 
 :deep(.ant-table-tbody > tr > td) {
   padding: 4px 8px !important;
-}
-
-.line-empty-placeholder {
-  padding: 12px 0;
-  color: #bfbfbf;
-  font-size: 13px;
-  text-align: center;
-}
-
-.danger-link {
-  color: #ff4d4f;
 }
 </style>

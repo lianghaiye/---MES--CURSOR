@@ -226,6 +226,8 @@ const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings('purchase-req-form-lines-v1', purchaseRequisitionFormLineColumns, {
     minScrollX: 1430,
+    pinEdgeColumns: false,
+    pinActionColumn: true,
   })
 
 const lineScrollX = tableScrollX
@@ -469,6 +471,10 @@ function handleSave() {
 }
 </script>
 
+<style lang="less">
+@import '@/views/inventory/components/inventoryLineTablePanel.less';
+</style>
+
 <style lang="less" scoped>
 :deep(.form-create-page.purchase-req-form-modal) {
   display: flex;
@@ -492,6 +498,7 @@ function handleSave() {
 .form-layout {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -514,6 +521,7 @@ function handleSave() {
   &.section-block--lines {
     flex: 1;
     min-height: 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     margin-bottom: 0;
@@ -539,66 +547,7 @@ function handleSave() {
   margin-bottom: 8px;
 }
 
-.line-table-panel {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #f0f0f0;
-  border-radius: 4px;
-  overflow: hidden;
-  background: #fff;
-  flex-shrink: 0;
-
-  &.panel-scrolling {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-}
-
-.line-table-body {
-  flex: 0 0 auto;
-  min-height: 0;
-
-  &.is-scrolling {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
-
-    :deep(.ant-table-wrapper),
-    :deep(.ant-spin-nested-loading),
-    :deep(.ant-spin-container),
-    :deep(.ant-table) {
-      height: 100%;
-    }
-  }
-
-  :deep(.ant-table) {
-    margin-bottom: 0 !important;
-  }
-
-  :deep(.ant-table-container),
-  :deep(.ant-table-content),
-  :deep(.ant-table-header),
-  :deep(.ant-table-body) {
-    overflow-x: hidden !important;
-  }
-
-  :deep(.ant-table-body) {
-    overflow-y: auto !important;
-  }
-}
-
 :deep(.ant-table-tbody > tr > td) {
   padding: 4px 8px !important;
-}
-
-.line-empty-placeholder {
-  padding: 12px 0;
-  color: #bfbfbf;
-  font-size: 13px;
-  text-align: center;
-}
-
-.danger-link {
-  color: #ff4d4f;
 }
 </style>

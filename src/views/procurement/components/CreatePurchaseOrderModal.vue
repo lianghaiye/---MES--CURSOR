@@ -10,437 +10,450 @@
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
-    <div class="form-layout">
-      <div class="section-block">
-        <div class="section-title">基本信息</div>
-        <a-form layout="inline" class="header-form horizontal-form">
-          <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :span="8">
-              <a-form-item label="采购单号">
-                <a-input
-                  v-model:value="form.orderNo"
-                  placeholder="留空则系统自动生成"
-                  allow-clear
-                  size="small"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="供应商" required>
-                <PlanSupplierSelect
-                  v-model:value="form.supplier"
-                  placeholder="请搜索或选择供应商"
-                  @change="onSupplierChange"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="结算类型">
-                <a-select
-                  v-model:value="form.settlementType"
-                  size="small"
-                  :options="settlementTypeOpts"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="结算周期">
-                <a-select
-                  v-model:value="form.settlementCycle"
-                  size="small"
-                  :options="settlementCycleOpts"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="结算方式">
-                <a-select
-                  v-model:value="form.settlementMethod"
-                  size="small"
-                  :options="settlementMethodOpts"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="销售订单">
-                <SalesOrderSearchSelect v-model:value="form.salesOrderNo" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="生产工单">
-                <WorkOrderSearchSelect v-model:value="form.workOrderNo" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="交货日期" required>
-                <a-date-picker
-                  v-model:value="form.deliveryDate"
-                  size="small"
-                  style="width: 100%"
-                  @change="onHeaderDeliveryDateChange"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="提醒日期">
-                <a-date-picker v-model:value="form.reminderDate" size="small" style="width: 100%" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="交货方式">
-                <a-select
-                  v-model:value="form.deliveryMethod"
-                  size="small"
-                  :options="deliveryMethodOpts"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="供货期/天">
-                <a-input-number
-                  v-model:value="form.leadTimeDays"
-                  size="small"
-                  :min="0"
-                  style="width: 100%"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="物流单号">
-                <a-input
-                  v-model:value="form.logisticsNo"
-                  size="small"
-                  placeholder="请输入 物流单号"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="联系人">
-                <a-select
-                  v-model:value="form.contactPerson"
-                  size="small"
-                  allow-clear
-                  :options="contactOpts"
-                  @change="onContactChange"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="联系方式">
-                <a-input
-                  v-model:value="form.contactPhone"
-                  size="small"
-                  placeholder="请输入 联系方式"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="合同编号">
-                <a-input
-                  v-model:value="form.contractNo"
-                  size="small"
-                  placeholder="请输入 合同编号"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="收货地址">
-                <a-input
-                  v-model:value="form.shippingAddress"
-                  size="small"
-                  placeholder="请输入 收货地址"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="收货仓库">
-                <a-select
-                  v-model:value="form.receivingWarehouse"
-                  size="small"
-                  allow-clear
-                  placeholder="请选择 收货仓库"
-                  :options="warehouseOpts"
-                  @change="onHeaderReceivingWarehouseChange"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="采购员">
-                <a-select
-                  v-model:value="form.purchaser"
-                  size="small"
-                  show-search
-                  :options="purchaserOpts"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="24">
-              <a-form-item label="备注" class="remark-item">
-                <a-textarea
-                  v-model:value="form.remark"
-                  :rows="2"
-                  :maxlength="500"
-                  show-count
-                  placeholder="请输入备注"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
-      </div>
-
-      <div class="section-block section-block--lines">
-        <div class="section-title">采购清单</div>
-        <div class="line-toolbar">
-          <a-space wrap>
-            <a-button type="primary" size="small" :loading="addingItems" @click="openProductPicker">
-              <PlusOutlined />
-              选择产品
-            </a-button>
-            <a-button class="tax-toggle-btn" size="small" @click="toggleTaxMode">
-              切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
-            </a-button>
-            <span class="tax-hint">{{ taxModeHint }}</span>
-            <TableColumnSettingButton @click="columnDrawerOpen = true" />
-          </a-space>
+    <div class="po-form-shell">
+      <div class="form-layout">
+        <div class="section-block">
+          <div class="section-title">基本信息</div>
+          <a-form layout="inline" class="header-form horizontal-form">
+            <a-row :gutter="[12, 12]" style="width: 100%">
+              <a-col :span="8">
+                <a-form-item label="采购单号">
+                  <a-input
+                    v-model:value="form.orderNo"
+                    placeholder="留空则系统自动生成"
+                    allow-clear
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="供应商" required>
+                  <PlanSupplierSelect
+                    v-model:value="form.supplier"
+                    placeholder="请搜索或选择供应商"
+                    @change="onSupplierChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="结算类型">
+                  <a-select
+                    v-model:value="form.settlementType"
+                    size="small"
+                    :options="settlementTypeOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="结算周期">
+                  <a-select
+                    v-model:value="form.settlementCycle"
+                    size="small"
+                    :options="settlementCycleOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="结算方式">
+                  <a-select
+                    v-model:value="form.settlementMethod"
+                    size="small"
+                    :options="settlementMethodOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="销售订单">
+                  <SalesOrderSearchSelect v-model:value="form.salesOrderNo" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="生产工单">
+                  <WorkOrderSearchSelect v-model:value="form.workOrderNo" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="交货日期" required>
+                  <a-date-picker
+                    v-model:value="form.deliveryDate"
+                    size="small"
+                    style="width: 100%"
+                    @change="onHeaderDeliveryDateChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="提醒日期">
+                  <a-date-picker
+                    v-model:value="form.reminderDate"
+                    size="small"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="交货方式">
+                  <a-select
+                    v-model:value="form.deliveryMethod"
+                    size="small"
+                    :options="deliveryMethodOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="供货期/天">
+                  <a-input-number
+                    v-model:value="form.leadTimeDays"
+                    size="small"
+                    :min="0"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="物流单号">
+                  <a-input
+                    v-model:value="form.logisticsNo"
+                    size="small"
+                    placeholder="请输入 物流单号"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="联系人">
+                  <a-select
+                    v-model:value="form.contactPerson"
+                    size="small"
+                    allow-clear
+                    :options="contactOpts"
+                    @change="onContactChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="联系方式">
+                  <a-input
+                    v-model:value="form.contactPhone"
+                    size="small"
+                    placeholder="请输入 联系方式"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="合同编号">
+                  <a-input
+                    v-model:value="form.contractNo"
+                    size="small"
+                    placeholder="请输入 合同编号"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="收货地址">
+                  <a-input
+                    v-model:value="form.shippingAddress"
+                    size="small"
+                    placeholder="请输入 收货地址"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="收货仓库">
+                  <a-select
+                    v-model:value="form.receivingWarehouse"
+                    size="small"
+                    allow-clear
+                    placeholder="请选择 收货仓库"
+                    :options="warehouseOpts"
+                    @change="onHeaderReceivingWarehouseChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="采购员">
+                  <a-select
+                    v-model:value="form.purchaser"
+                    size="small"
+                    show-search
+                    :options="purchaserOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="24">
+                <a-form-item label="备注" class="remark-item">
+                  <a-textarea
+                    v-model:value="form.remark"
+                    :rows="2"
+                    :maxlength="500"
+                    show-count
+                    placeholder="请输入备注"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
         </div>
 
-        <div
-          ref="lineTablePanelRef"
-          class="line-table-panel"
-          :class="{ 'panel-scrolling': isLineTableScrolling }"
-          :style="lineTablePanelStyle"
-        >
-          <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
-            <a-table
+        <div class="section-block section-block--lines">
+          <div class="section-title">采购清单</div>
+          <div class="line-toolbar">
+            <a-space wrap>
+              <a-button
+                type="primary"
+                size="small"
+                :loading="addingItems"
+                @click="openProductPicker"
+              >
+                <PlusOutlined />
+                选择产品
+              </a-button>
+              <a-button class="tax-toggle-btn" size="small" @click="toggleTaxMode">
+                切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
+              </a-button>
+              <span class="tax-hint">{{ taxModeHint }}</span>
+              <TableColumnSettingButton @click="columnDrawerOpen = true" />
+            </a-space>
+          </div>
+
+          <div
+            ref="lineTablePanelRef"
+            class="line-table-panel"
+            :class="{ 'panel-scrolling': isLineTableScrolling }"
+            :style="lineTablePanelStyle"
+          >
+            <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
+              <a-table
+                :columns="displayColumns"
+                :data-source="form.lineItems"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="lineTableScroll"
+              >
+                <template #bodyCell="{ column, record, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'stockQty'">
+                    {{ formatQty(record.stockQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'purchaseQty'">
+                    <InventoryLineEditableCell
+                      :active="isLineCellEditing(record.id, 'purchaseQty')"
+                      :display="formatQty(record.purchaseQty)"
+                      :empty="record.purchaseQty == null || record.purchaseQty === ''"
+                      numeric
+                      @activate="startLineCellEdit(record.id, 'purchaseQty')"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-input-number
+                          v-model:value="record.purchaseQty"
+                          :min="0"
+                          :precision="2"
+                          size="small"
+                          style="width: 100%"
+                          autofocus
+                          @blur="endEdit"
+                          @pressEnter="endEdit"
+                          @change="() => onLineChange(record)"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                  </template>
+                  <template v-else-if="column.key === 'unitPriceExTax'">
+                    <InventoryLineEditableCell
+                      v-if="taxModeExcluding"
+                      :active="isLineCellEditing(record.id, 'unitPriceExTax')"
+                      :display="formatMoney(record.unitPriceExTax)"
+                      :empty="record.unitPriceExTax == null || record.unitPriceExTax === ''"
+                      numeric
+                      @activate="startLineCellEdit(record.id, 'unitPriceExTax')"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-input-number
+                          v-model:value="record.unitPriceExTax"
+                          :min="0"
+                          :precision="2"
+                          size="small"
+                          style="width: 100%"
+                          autofocus
+                          @blur="endEdit"
+                          @pressEnter="endEdit"
+                          @change="() => onLineChange(record)"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                    <span v-else>{{ formatMoney(record.unitPriceExTax) }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'taxRate'">
+                    <InventoryLineEditableCell
+                      :active="isLineCellEditing(record.id, 'taxRate')"
+                      :display="formatQty(record.taxRate)"
+                      :empty="record.taxRate == null || record.taxRate === ''"
+                      numeric
+                      @activate="startLineCellEdit(record.id, 'taxRate')"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-input-number
+                          v-model:value="record.taxRate"
+                          :min="0"
+                          :max="100"
+                          :precision="2"
+                          size="small"
+                          style="width: 100%"
+                          autofocus
+                          @blur="endEdit"
+                          @pressEnter="endEdit"
+                          @change="() => onLineChange(record)"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                  </template>
+                  <template v-else-if="column.key === 'unitPriceInTax'">
+                    <InventoryLineEditableCell
+                      v-if="!taxModeExcluding"
+                      :active="isLineCellEditing(record.id, 'unitPriceInTax')"
+                      :display="formatMoney(record.unitPriceInTax)"
+                      :empty="record.unitPriceInTax == null || record.unitPriceInTax === ''"
+                      numeric
+                      @activate="startLineCellEdit(record.id, 'unitPriceInTax')"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-input-number
+                          v-model:value="record.unitPriceInTax"
+                          :min="0"
+                          :precision="2"
+                          size="small"
+                          style="width: 100%"
+                          autofocus
+                          @blur="endEdit"
+                          @pressEnter="endEdit"
+                          @change="() => onLineChange(record)"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                    <span v-else>{{ formatMoney(record.unitPriceInTax) }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'totalPriceExTax'">
+                    {{ formatMoney(record.totalPriceExTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'totalPriceInTax'">
+                    {{ formatMoney(record.totalPriceInTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'deliveryDate'">
+                    <InventoryLineEditableCell
+                      :active="isLineCellEditing(record.id, 'deliveryDate')"
+                      :display="record.deliveryDate || '—'"
+                      :empty="!record.deliveryDate"
+                      placeholder="请选择"
+                      @activate="startLineCellEdit(record.id, 'deliveryDate', { select: true })"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-date-picker
+                          :value="lineDeliveryDateValue(record.deliveryDate)"
+                          size="small"
+                          style="width: 100%"
+                          :open="lineCellSelectOpen"
+                          @openChange="onLineCellSelectOpenChange"
+                          @change="
+                            (date) => {
+                              onLineDeliveryDateChange(record, date)
+                              endEdit()
+                            }
+                          "
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                  </template>
+                  <template v-else-if="column.key === 'receivingWarehouse'">
+                    <InventoryLineEditableCell
+                      :active="isLineCellEditing(record.id, 'receivingWarehouse')"
+                      :display="record.receivingWarehouse || '—'"
+                      :empty="!record.receivingWarehouse"
+                      placeholder="请选择"
+                      @activate="
+                        startLineCellEdit(record.id, 'receivingWarehouse', { select: true })
+                      "
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-select
+                          v-model:value="record.receivingWarehouse"
+                          allow-clear
+                          size="small"
+                          placeholder="请选择"
+                          style="width: 100%"
+                          :open="lineCellSelectOpen"
+                          :options="warehouseOpts"
+                          @dropdownVisibleChange="onLineCellSelectOpenChange"
+                          @change="endEdit"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                  </template>
+                  <template v-else-if="column.key === 'remark'">
+                    <InventoryLineEditableCell
+                      :active="isLineCellEditing(record.id, 'remark')"
+                      :display="record.remark || '—'"
+                      :empty="!record.remark"
+                      placeholder="请输入"
+                      @activate="startLineCellEdit(record.id, 'remark')"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-input
+                          v-model:value="record.remark"
+                          size="small"
+                          allow-clear
+                          placeholder="请输入备注"
+                          autofocus
+                          @blur="endEdit"
+                          @pressEnter="endEdit"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                  </template>
+                  <template v-else-if="column.key === 'actions'">
+                    <a-space :size="4">
+                      <a @click="openLineEdit(record)">编辑</a>
+                      <a class="danger-link" @click="removeLine(record.id)">删除</a>
+                    </a-space>
+                  </template>
+                  <template v-else>
+                    {{ record[column.dataIndex] ?? '—' }}
+                  </template>
+                </template>
+                <template #emptyText>
+                  <div class="line-empty-placeholder">暂无数据</div>
+                </template>
+              </a-table>
+            </div>
+            <InventoryLineTableFooter
               :columns="displayColumns"
-              :data-source="form.lineItems"
-              row-key="id"
-              size="small"
-              bordered
-              :pagination="false"
-              :scroll="lineTableScroll"
+              :scroll-x="lineScrollX"
+              @add-line="addBlankLine"
             >
-              <template #bodyCell="{ column, record, index }">
-                <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-                <template v-else-if="column.key === 'stockQty'">
-                  {{ formatQty(record.stockQty) }}
+              <template #cell="{ column }">
+                <template v-if="column.key === 'index'">合计</template>
+                <template v-else-if="column.key === 'productCode'">
+                  项数 {{ lineSummary.lineCount }}
                 </template>
                 <template v-else-if="column.key === 'purchaseQty'">
-                  <InventoryLineEditableCell
-                    :active="isLineCellEditing(record.id, 'purchaseQty')"
-                    :display="formatQty(record.purchaseQty)"
-                    :empty="record.purchaseQty == null || record.purchaseQty === ''"
-                    numeric
-                    @activate="startLineCellEdit(record.id, 'purchaseQty')"
-                    @end="endLineCellEdit"
-                  >
-                    <template #edit="{ endEdit }">
-                      <a-input-number
-                        v-model:value="record.purchaseQty"
-                        :min="0"
-                        :precision="2"
-                        size="small"
-                        style="width: 100%"
-                        autofocus
-                        @blur="endEdit"
-                        @pressEnter="endEdit"
-                        @change="() => onLineChange(record)"
-                      />
-                    </template>
-                  </InventoryLineEditableCell>
-                </template>
-                <template v-else-if="column.key === 'unitPriceExTax'">
-                  <InventoryLineEditableCell
-                    v-if="taxModeExcluding"
-                    :active="isLineCellEditing(record.id, 'unitPriceExTax')"
-                    :display="formatMoney(record.unitPriceExTax)"
-                    :empty="record.unitPriceExTax == null || record.unitPriceExTax === ''"
-                    numeric
-                    @activate="startLineCellEdit(record.id, 'unitPriceExTax')"
-                    @end="endLineCellEdit"
-                  >
-                    <template #edit="{ endEdit }">
-                      <a-input-number
-                        v-model:value="record.unitPriceExTax"
-                        :min="0"
-                        :precision="2"
-                        size="small"
-                        style="width: 100%"
-                        autofocus
-                        @blur="endEdit"
-                        @pressEnter="endEdit"
-                        @change="() => onLineChange(record)"
-                      />
-                    </template>
-                  </InventoryLineEditableCell>
-                  <span v-else>{{ formatMoney(record.unitPriceExTax) }}</span>
-                </template>
-                <template v-else-if="column.key === 'taxRate'">
-                  <InventoryLineEditableCell
-                    :active="isLineCellEditing(record.id, 'taxRate')"
-                    :display="formatQty(record.taxRate)"
-                    :empty="record.taxRate == null || record.taxRate === ''"
-                    numeric
-                    @activate="startLineCellEdit(record.id, 'taxRate')"
-                    @end="endLineCellEdit"
-                  >
-                    <template #edit="{ endEdit }">
-                      <a-input-number
-                        v-model:value="record.taxRate"
-                        :min="0"
-                        :max="100"
-                        :precision="2"
-                        size="small"
-                        style="width: 100%"
-                        autofocus
-                        @blur="endEdit"
-                        @pressEnter="endEdit"
-                        @change="() => onLineChange(record)"
-                      />
-                    </template>
-                  </InventoryLineEditableCell>
-                </template>
-                <template v-else-if="column.key === 'unitPriceInTax'">
-                  <InventoryLineEditableCell
-                    v-if="!taxModeExcluding"
-                    :active="isLineCellEditing(record.id, 'unitPriceInTax')"
-                    :display="formatMoney(record.unitPriceInTax)"
-                    :empty="record.unitPriceInTax == null || record.unitPriceInTax === ''"
-                    numeric
-                    @activate="startLineCellEdit(record.id, 'unitPriceInTax')"
-                    @end="endLineCellEdit"
-                  >
-                    <template #edit="{ endEdit }">
-                      <a-input-number
-                        v-model:value="record.unitPriceInTax"
-                        :min="0"
-                        :precision="2"
-                        size="small"
-                        style="width: 100%"
-                        autofocus
-                        @blur="endEdit"
-                        @pressEnter="endEdit"
-                        @change="() => onLineChange(record)"
-                      />
-                    </template>
-                  </InventoryLineEditableCell>
-                  <span v-else>{{ formatMoney(record.unitPriceInTax) }}</span>
+                  {{ formatQty(lineSummary.qtyTotal) }}
                 </template>
                 <template v-else-if="column.key === 'totalPriceExTax'">
-                  {{ formatMoney(record.totalPriceExTax) }}
+                  {{ formatMoney(lineSummary.amountExTax) }}
                 </template>
                 <template v-else-if="column.key === 'totalPriceInTax'">
-                  {{ formatMoney(record.totalPriceInTax) }}
-                </template>
-                <template v-else-if="column.key === 'deliveryDate'">
-                  <InventoryLineEditableCell
-                    :active="isLineCellEditing(record.id, 'deliveryDate')"
-                    :display="record.deliveryDate || '—'"
-                    :empty="!record.deliveryDate"
-                    placeholder="请选择"
-                    @activate="startLineCellEdit(record.id, 'deliveryDate', { select: true })"
-                    @end="endLineCellEdit"
-                  >
-                    <template #edit="{ endEdit }">
-                      <a-date-picker
-                        :value="lineDeliveryDateValue(record.deliveryDate)"
-                        size="small"
-                        style="width: 100%"
-                        :open="lineCellSelectOpen"
-                        @openChange="onLineCellSelectOpenChange"
-                        @change="
-                          (date) => {
-                            onLineDeliveryDateChange(record, date)
-                            endEdit()
-                          }
-                        "
-                      />
-                    </template>
-                  </InventoryLineEditableCell>
-                </template>
-                <template v-else-if="column.key === 'receivingWarehouse'">
-                  <InventoryLineEditableCell
-                    :active="isLineCellEditing(record.id, 'receivingWarehouse')"
-                    :display="record.receivingWarehouse || '—'"
-                    :empty="!record.receivingWarehouse"
-                    placeholder="请选择"
-                    @activate="startLineCellEdit(record.id, 'receivingWarehouse', { select: true })"
-                    @end="endLineCellEdit"
-                  >
-                    <template #edit="{ endEdit }">
-                      <a-select
-                        v-model:value="record.receivingWarehouse"
-                        allow-clear
-                        size="small"
-                        placeholder="请选择"
-                        style="width: 100%"
-                        :open="lineCellSelectOpen"
-                        :options="warehouseOpts"
-                        @dropdownVisibleChange="onLineCellSelectOpenChange"
-                        @change="endEdit"
-                      />
-                    </template>
-                  </InventoryLineEditableCell>
-                </template>
-                <template v-else-if="column.key === 'remark'">
-                  <InventoryLineEditableCell
-                    :active="isLineCellEditing(record.id, 'remark')"
-                    :display="record.remark || '—'"
-                    :empty="!record.remark"
-                    placeholder="请输入"
-                    @activate="startLineCellEdit(record.id, 'remark')"
-                    @end="endLineCellEdit"
-                  >
-                    <template #edit="{ endEdit }">
-                      <a-input
-                        v-model:value="record.remark"
-                        size="small"
-                        allow-clear
-                        placeholder="请输入备注"
-                        autofocus
-                        @blur="endEdit"
-                        @pressEnter="endEdit"
-                      />
-                    </template>
-                  </InventoryLineEditableCell>
-                </template>
-                <template v-else-if="column.key === 'actions'">
-                  <a-space :size="4">
-                    <a @click="openLineEdit(record)">编辑</a>
-                    <a class="danger-link" @click="removeLine(record.id)">删除</a>
-                  </a-space>
-                </template>
-                <template v-else>
-                  {{ record[column.dataIndex] ?? '—' }}
+                  {{ formatMoney(lineSummary.amountInTax) }}
                 </template>
               </template>
-              <template #emptyText>
-                <div class="line-empty-placeholder">暂无数据</div>
-              </template>
-            </a-table>
+            </InventoryLineTableFooter>
           </div>
-          <InventoryLineTableFooter
-            :columns="displayColumns"
-            :scroll-x="lineScrollX"
-            @add-line="addBlankLine"
-          >
-            <template #cell="{ column }">
-              <template v-if="column.key === 'index'">合计</template>
-              <template v-else-if="column.key === 'productCode'">
-                项数 {{ lineSummary.lineCount }}
-              </template>
-              <template v-else-if="column.key === 'purchaseQty'">
-                {{ formatQty(lineSummary.qtyTotal) }}
-              </template>
-              <template v-else-if="column.key === 'totalPriceExTax'">
-                {{ formatMoney(lineSummary.amountExTax) }}
-              </template>
-              <template v-else-if="column.key === 'totalPriceInTax'">
-                {{ formatMoney(lineSummary.amountInTax) }}
-              </template>
-            </template>
-          </InventoryLineTableFooter>
         </div>
       </div>
     </div>
@@ -562,6 +575,8 @@ const taxModeHint = computed(() =>
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings('purchase-order-form-lines-v1', purchaseOrderFormLineColumns, {
     minScrollX: 2200,
+    pinEdgeColumns: false,
+    pinActionColumn: true,
   })
 
 const lineScrollX = tableScrollX
@@ -1004,7 +1019,24 @@ function handleSave() {
 }
 </script>
 
+<style lang="less">
+@import '@/views/inventory/components/inventoryLineTablePanel.less';
+</style>
+
 <style lang="less" scoped>
+.po-form-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+:deep(.ant-modal-body) .po-form-shell {
+  max-height: calc(100vh - 200px);
+}
+
 :deep(.form-create-page.purchase-order-form-modal) {
   display: flex;
   flex-direction: column;
@@ -1037,6 +1069,7 @@ function handleSave() {
   .form-layout {
     flex: 1;
     min-height: 0;
+    min-width: 0;
     overflow: hidden;
   }
 }
@@ -1045,6 +1078,7 @@ function handleSave() {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   height: 100%;
 }
 
@@ -1066,6 +1100,7 @@ function handleSave() {
   &.section-block--lines {
     flex: 1;
     min-height: 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     margin-bottom: 0;
@@ -1125,62 +1160,7 @@ function handleSave() {
   }
 }
 
-.line-table-panel {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  border: 1px solid #f0f0f0;
-  border-radius: 4px;
-  overflow: hidden;
-  background: #fff;
-}
-
-.line-table-body {
-  flex: 0 0 auto;
-  min-height: 0;
-
-  &.is-scrolling {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
-
-    :deep(.ant-table-wrapper),
-    :deep(.ant-spin-nested-loading),
-    :deep(.ant-spin-container),
-    :deep(.ant-table) {
-      height: 100%;
-    }
-  }
-
-  :deep(.ant-table) {
-    margin-bottom: 0 !important;
-  }
-
-  :deep(.ant-table-container),
-  :deep(.ant-table-content),
-  :deep(.ant-table-header),
-  :deep(.ant-table-body) {
-    overflow-x: hidden !important;
-  }
-
-  :deep(.ant-table-body) {
-    overflow-y: auto !important;
-  }
-}
-
 :deep(.ant-table-tbody > tr > td) {
   padding: 4px 8px !important;
-}
-
-.line-empty-placeholder {
-  padding: 12px 0;
-  color: #bfbfbf;
-  font-size: 13px;
-  text-align: center;
-}
-
-.danger-link {
-  color: #ff4d4f;
 }
 </style>

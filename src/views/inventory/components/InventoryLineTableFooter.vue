@@ -54,6 +54,8 @@ export default { name: 'InventoryLineTableFooter' }
 <style lang="less" scoped>
 .line-table-foot {
   flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
   border-top: 1px solid #f0f0f0;
   background: #fff;
 }
@@ -69,10 +71,20 @@ export default { name: 'InventoryLineTableFooter' }
 }
 
 .line-summary-scroll {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   background: #fafafa;
   -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  touch-action: pan-x;
+
+  &.is-dragging,
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .line-summary-table {

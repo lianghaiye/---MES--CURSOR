@@ -78,6 +78,23 @@ export function getWarehouseStockQty(warehouse, itemCode) {
   return roundQty(demoStockQty(5, String(itemCode).length))
 }
 
+/** 根据仓库与物品编码解析货位号（只读展示） */
+export function resolveOutboundLocationNo(warehouse, itemCode) {
+  if (!warehouse || !itemCode) return ''
+  const seed = `${warehouse}::${itemCode}`
+  const zones = ['A', 'B', 'C', 'D', 'E']
+  const zone = zones[seed.length % zones.length]
+  const row = (seed.charCodeAt(0) % 12) + 1
+  const col = (seed.charCodeAt(seed.length - 1) % 20) + 1
+  return `${zone}-${String(row).padStart(2, '0')}-${String(col).padStart(2, '0')}`
+}
+
+export function enrichOutboundLineLocation(line = {}) {
+  return {
+    locationNo: resolveOutboundLocationNo(line.shipWarehouse, line.itemCode),
+  }
+}
+
 export function enrichOutboundLineStock(line = {}) {
   const itemCode = line.itemCode || ''
   const warehouse = line.shipWarehouse || ''
@@ -91,6 +108,7 @@ export function enrichOutboundLine(line = {}) {
   return {
     ...line,
     ...enrichOutboundLineStock(line),
+    ...enrichOutboundLineLocation(line),
     ...enrichOutboundLinePricing(line),
   }
 }

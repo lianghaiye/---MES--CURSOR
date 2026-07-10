@@ -44,6 +44,9 @@ export function mergeColumnSettings(defaultSettings, saved) {
 
 export function buildTableColumns(baseColumns, settings, options = {}) {
   const excludeKeys = options.excludeKeys || PINNED_COLUMN_KEYS
+  const pinEdgeColumns = options.pinEdgeColumns !== false
+  const pinIndexColumn = options.pinIndexColumn ?? pinEdgeColumns
+  const pinActionColumn = options.pinActionColumn ?? pinEdgeColumns
   const baseMap = Object.fromEntries(baseColumns.map((c) => [getColumnKey(c), c]))
   const sorted = [...settings]
     .filter((s) => !s.hidden && !excludeKeys.includes(s.key))
@@ -52,7 +55,7 @@ export function buildTableColumns(baseColumns, settings, options = {}) {
   const result = []
   const indexCol = baseColumns.find((c) => getColumnKey(c) === 'index')
   if (indexCol) {
-    result.push({ ...indexCol, fixed: 'left' })
+    result.push({ ...indexCol, fixed: pinIndexColumn ? 'left' : undefined })
   }
 
   sorted.forEach((s) => {
@@ -60,7 +63,7 @@ export function buildTableColumns(baseColumns, settings, options = {}) {
     if (!base) return
     result.push({
       ...base,
-      fixed: s.frozen ? 'left' : base.fixed === 'right' ? 'right' : undefined,
+      fixed: s.frozen ? 'left' : pinEdgeColumns && base.fixed === 'right' ? 'right' : undefined,
     })
   })
 
@@ -69,7 +72,7 @@ export function buildTableColumns(baseColumns, settings, options = {}) {
     return key === 'action' || key === 'actions'
   })
   if (actionCol) {
-    result.push({ ...actionCol, fixed: 'right' })
+    result.push({ ...actionCol, fixed: pinActionColumn ? 'right' : undefined })
   }
 
   return result

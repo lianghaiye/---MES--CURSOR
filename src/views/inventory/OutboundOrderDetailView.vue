@@ -126,6 +126,9 @@
               <template v-else-if="column.key === 'warehouseStockQty'">
                 {{ formatQty(line.warehouseStockQty) }}
               </template>
+              <template v-else-if="column.key === 'locationNo'">
+                {{ line.locationNo || '—' }}
+              </template>
               <template v-else-if="column.key === 'shipQty'">
                 {{ formatQty(line.shipQty) }}
               </template>
