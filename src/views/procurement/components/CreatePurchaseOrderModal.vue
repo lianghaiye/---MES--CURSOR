@@ -26,12 +26,9 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="供应商" required>
-              <a-select
+              <PlanSupplierSelect
                 v-model:value="form.supplier"
-                size="small"
-                show-search
-                placeholder="请选择供应商"
-                :options="supplierOpts"
+                placeholder="请搜索或选择供应商"
                 @change="onSupplierChange"
               />
             </a-form-item>
@@ -338,7 +335,6 @@ import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import {
-  supplierOptions,
   settlementTypeOptions,
   settlementCycleOptions,
   settlementMethodOptions,
@@ -358,6 +354,7 @@ import {
   updatePurchaseOrder,
 } from '@/store/purchaseOrderStore'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
@@ -380,7 +377,6 @@ const productPickerOpen = ref(false)
 const prevHeaderDeliveryDate = ref('')
 const prevHeaderReceivingWarehouse = ref(undefined)
 
-const supplierOpts = supplierOptions
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const settlementCycleOpts = settlementCycleOptions.map((v) => ({ label: v, value: v }))
 const settlementMethodOpts = settlementMethodOptions.map((v) => ({ label: v, value: v }))
@@ -419,7 +415,7 @@ const lineColumns = [
 
 const form = reactive({
   orderNo: '',
-  supplier: undefined,
+  supplier: '',
   settlementType: '先款后货',
   settlementCycle: '月结',
   settlementMethod: '现金结算',
@@ -499,7 +495,7 @@ function syncHeaderTrackers() {
 
 function resetForm() {
   form.orderNo = ''
-  form.supplier = undefined
+  form.supplier = ''
   form.settlementType = '先款后货'
   form.settlementCycle = '月结'
   form.settlementMethod = '现金结算'

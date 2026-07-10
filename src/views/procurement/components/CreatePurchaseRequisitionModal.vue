@@ -80,7 +80,7 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 1400 }"
+        :scroll="{ x: 1430 }"
         locale="{ emptyText: '暂无数据' }"
       >
         <template #bodyCell="{ column, record, index }">
@@ -96,13 +96,10 @@
             />
           </template>
           <template v-else-if="column.key === 'supplierName'">
-            <a-select
+            <PlanSupplierSelect
               v-model:value="record.supplierName"
               size="small"
-              allow-clear
-              show-search
-              style="width: 100%"
-              :options="supplierOpts"
+              placeholder="请搜索或选择供应商"
             />
           </template>
           <template v-else-if="column.key === 'remark'">
@@ -148,7 +145,6 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import { urgencyOptions } from '@/mock/purchaseRequisitionOptions'
-import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
 import { mockInventory } from '@/mock/inventory'
 import { createLineItem } from '@/mock/purchaseRequisitions'
 import {
@@ -157,6 +153,7 @@ import {
   updatePurchaseRequisition,
 } from '@/store/purchaseRequisitionStore'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
@@ -177,7 +174,6 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 const productPickerOpen = ref(false)
 
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
-const supplierOpts = supplierOptions
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
@@ -189,7 +185,7 @@ const lineColumns = [
   { title: '单位', dataIndex: 'unit', width: 72 },
   { title: '库存数', dataIndex: 'stockQty', width: 90, align: 'right' },
   { title: '计划采购数', key: 'planPurchaseQty', width: 110 },
-  { title: '供应商', key: 'supplierName', width: 130 },
+  { title: '供应商', key: 'supplierName', width: 160 },
   { title: '备注', key: 'remark', width: 140 },
   { title: '操作', key: 'action', width: 70, fixed: 'right' },
 ]
