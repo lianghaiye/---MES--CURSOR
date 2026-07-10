@@ -26,6 +26,7 @@
           登录
         </a-button>
       </a-form>
+      <p v-if="buildLabel" class="build-label">{{ buildLabel }}</p>
     </div>
   </div>
 </template>
@@ -35,10 +36,14 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { setToken, setUser } from '@/utils/auth'
+import { resolveUserDefaultWorkshop } from '@/constants/workshopDirector'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
+const buildLabel = process.env.VUE_APP_BUILD_SHA
+  ? `Build ${String(process.env.VUE_APP_BUILD_SHA).slice(0, 7)}`
+  : ''
 
 const form = reactive({
   username: 'admin',
@@ -52,6 +57,7 @@ async function onSubmit() {
     const user = {
       username: form.username,
       displayName: `${form.username}--admin`,
+      defaultWorkshop: resolveUserDefaultWorkshop({ username: form.username }),
     }
     setToken(token)
     setUser(user)
@@ -93,5 +99,12 @@ async function onSubmit() {
   text-align: center;
   color: rgba(0, 0, 0, 0.45);
   margin-bottom: 32px;
+}
+
+.build-label {
+  margin: 16px 0 0;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.35);
+  font-size: 12px;
 }
 </style>

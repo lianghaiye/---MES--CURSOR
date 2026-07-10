@@ -32,6 +32,9 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VUE_APP_BUILD_SHA: ${{ github.sha }}
+          VUE_APP_BUILD_TIME: ${{ github.run_number }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
