@@ -3,147 +3,186 @@
     :page-mode="pageMode"
     :open="open"
     :title="shellTitle"
-    width="90%"
-    :mask-closable="false"
-    destroy-on-close
+    width="1400px"
+    class="purchase-req-form-modal"
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
-    <div class="section-block">
-      <div class="section-title">基本信息</div>
-      <a-divider class="section-divider" />
-      <a-form layout="inline" class="header-form horizontal-form">
-        <a-row :gutter="[12, 8]" style="width: 100%">
-          <a-col :span="8">
-            <a-form-item label="申请单号">
-              <a-input
-                v-model:value="form.reqNo"
-                placeholder="留空则系统自动生成"
-                allow-clear
-                size="small"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="紧急度">
-              <a-select v-model:value="form.urgency" size="small" :options="urgencyOpts" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="交货日期">
-              <a-date-picker
-                v-model:value="form.deliveryDate"
-                size="small"
-                style="width: 100%"
-                placeholder="请选择交货日期"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="期望到货日期" required>
-              <a-date-picker
-                v-model:value="form.estimatedArrivalDate"
-                size="small"
-                style="width: 100%"
-                placeholder="请选择期望到货日期"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="24">
-            <a-form-item label="备注" class="remark-item">
-              <a-textarea
-                v-model:value="form.remark"
-                :rows="2"
-                :maxlength="500"
-                show-count
-                placeholder="请输入备注"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </a-form>
-    </div>
-
-    <div class="section-block">
-      <div class="section-title">采购清单</div>
-      <a-divider class="section-divider" />
-      <div class="detail-toolbar">
-        <a-button type="primary" size="small" @click="openProductPicker">
-          <PlusOutlined />
-          添加产品
-        </a-button>
+    <div class="form-layout">
+      <div class="section-block">
+        <div class="section-title">基本信息</div>
+        <a-form :model="form" layout="inline" class="header-form horizontal-form">
+          <a-row :gutter="[12, 12]" style="width: 100%">
+            <a-col :span="8">
+              <a-form-item label="申请单号">
+                <a-input
+                  v-model:value="form.reqNo"
+                  placeholder="不填则系统自动生成"
+                  allow-clear
+                  size="small"
+                  :disabled="isEdit"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="紧急度">
+                <a-select v-model:value="form.urgency" size="small" :options="urgencyOpts" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="交货日期">
+                <a-date-picker
+                  v-model:value="form.deliveryDate"
+                  size="small"
+                  style="width: 100%"
+                  placeholder="请选择交货日期"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="期望到货日期" required>
+                <a-date-picker
+                  v-model:value="form.estimatedArrivalDate"
+                  size="small"
+                  style="width: 100%"
+                  placeholder="请选择期望到货日期"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="24">
+              <a-form-item label="备注" class="remark-item">
+                <a-textarea
+                  v-model:value="form.remark"
+                  :rows="2"
+                  size="small"
+                  :maxlength="500"
+                  show-count
+                  placeholder="请输入备注"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-form>
       </div>
-      <a-table
-        :columns="lineColumns"
-        :data-source="form.lineItems"
-        row-key="id"
-        size="small"
-        bordered
-        :pagination="false"
-        :scroll="{ x: 1430 }"
-        locale="{ emptyText: '暂无数据' }"
-      >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-          <template v-else-if="column.key === 'planPurchaseQty'">
-            <a-input-number
-              v-model:value="record.planPurchaseQty"
-              size="small"
-              :min="0"
-              :precision="2"
-              style="width: 100%"
-              @change="onQtyChange(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'supplierName'">
-            <PlanSupplierSelect
-              v-model:value="record.supplierName"
-              size="small"
-              placeholder="请搜索或选择供应商"
-            />
-          </template>
-          <template v-else-if="column.key === 'remark'">
-            <a-input
-              v-model:value="record.remark"
-              size="small"
-              allow-clear
-              placeholder="请输入备注"
-            />
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
-          </template>
-          <template v-else>
-            {{ record[column.dataIndex] ?? '—' }}
-          </template>
-        </template>
-      </a-table>
-    </div>
 
-    <SelectBomMaterialModal
-      v-model:open="productPickerOpen"
-      title="添加产品/物料"
-      @selected="onProductsSelected"
-    />
+      <div class="section-block section-block--lines">
+        <div class="section-title">采购清单</div>
+        <div class="line-toolbar">
+          <a-space>
+            <a-button type="primary" size="small" :loading="addingItems" @click="openProductPicker">
+              <PlusOutlined />
+              添加物品
+            </a-button>
+            <TableColumnSettingButton @click="columnDrawerOpen = true" />
+          </a-space>
+        </div>
+
+        <div
+          ref="lineTablePanelRef"
+          class="line-table-panel"
+          :class="{ 'panel-scrolling': isLineTableScrolling }"
+          :style="lineTablePanelStyle"
+        >
+          <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
+            <a-table
+              :columns="displayColumns"
+              :data-source="form.lineItems"
+              row-key="id"
+              size="small"
+              bordered
+              :pagination="false"
+              :scroll="lineTableScroll"
+            >
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'stockQty'">
+                  {{ formatQty(record.stockQty) }}
+                </template>
+                <template v-else-if="column.key === 'planPurchaseQty'">
+                  <a-input-number
+                    v-model:value="record.planPurchaseQty"
+                    size="small"
+                    :min="0"
+                    :precision="2"
+                    style="width: 100%"
+                    @change="onQtyChange(record)"
+                  />
+                </template>
+                <template v-else-if="column.key === 'supplierName'">
+                  <PlanSupplierSelect
+                    v-model:value="record.supplierName"
+                    size="small"
+                    placeholder="请搜索或选择供应商"
+                  />
+                </template>
+                <template v-else-if="column.key === 'remark'">
+                  <a-input
+                    v-model:value="record.remark"
+                    size="small"
+                    allow-clear
+                    placeholder="请输入备注"
+                  />
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <a class="danger-link" @click="removeLine(record.id)">删除</a>
+                </template>
+                <template v-else>
+                  {{ record[column.dataIndex] ?? '—' }}
+                </template>
+              </template>
+              <template #emptyText>
+                <div class="line-empty-placeholder">暂无数据</div>
+              </template>
+            </a-table>
+          </div>
+          <InventoryLineTableFooter
+            :columns="displayColumns"
+            :scroll-x="lineScrollX"
+            @add-line="addBlankLine"
+          >
+            <template #cell="{ column }">
+              <template v-if="column.key === 'index'">合计</template>
+              <template v-else-if="column.key === 'productCode'">
+                项数 {{ lineSummary.lineCount }}
+              </template>
+              <template v-else-if="column.key === 'planPurchaseQty'">
+                {{ formatQty(lineSummary.qtyTotal) }}
+              </template>
+            </template>
+          </InventoryLineTableFooter>
+        </div>
+      </div>
+    </div>
 
     <template #footer>
-      <a-button size="small" @click="handleCancel">
-        <CloseOutlined />
-        取消
-      </a-button>
-      <a-button type="primary" size="small" @click="handleSave">
+      <a-button @click="handleCancel">取消</a-button>
+      <a-button type="primary" :loading="saving" @click="handleSave">
         <CheckOutlined />
         保存
       </a-button>
     </template>
   </FormCreateShell>
+
+  <SelectBomMaterialModal
+    v-if="isActive"
+    v-model:open="productPickerOpen"
+    title="添加产品/物料"
+    @selected="onProductsSelected"
+  />
+
+  <TableColumnSettingDrawer
+    v-model:open="columnDrawerOpen"
+    v-model:settings="columnSettings"
+    :default-settings="defaultColumnSettings"
+    title="采购清单列设置"
+  />
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, CheckOutlined } from '@ant-design/icons-vue'
 import { urgencyOptions } from '@/mock/purchaseRequisitionOptions'
 import { mockInventory } from '@/mock/inventory'
 import { createLineItem } from '@/mock/purchaseRequisitions'
@@ -154,8 +193,14 @@ import {
 } from '@/store/purchaseRequisitionStore'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
+import InventoryLineTableFooter from '@/views/inventory/components/InventoryLineTableFooter.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
+import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTableScroll'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { purchaseRequisitionFormLineColumns } from '@/utils/purchaseRequisitionLineColumns'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -171,24 +216,19 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
   listPath: '/procurement/purchase-req',
   getTitle: () => (isEdit.value ? '编辑采购申请单' : '新增采购申请单'),
 })
+
+const saving = ref(false)
+const addingItems = ref(false)
 const productPickerOpen = ref(false)
 
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 
-const lineColumns = [
-  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
-  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true },
-  { title: '产品编码', dataIndex: 'productCode', width: 120 },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '材质', dataIndex: 'material', width: 90 },
-  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-  { title: '单位', dataIndex: 'unit', width: 72 },
-  { title: '库存数', dataIndex: 'stockQty', width: 90, align: 'right' },
-  { title: '计划采购数', key: 'planPurchaseQty', width: 110 },
-  { title: '供应商', key: 'supplierName', width: 160 },
-  { title: '备注', key: 'remark', width: 140 },
-  { title: '操作', key: 'action', width: 70, fixed: 'right' },
-]
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('purchase-req-form-lines-v1', purchaseRequisitionFormLineColumns, {
+    minScrollX: 1430,
+  })
+
+const lineScrollX = tableScrollX
 
 const form = reactive({
   reqNo: '',
@@ -199,21 +239,39 @@ const form = reactive({
   lineItems: [],
 })
 
+const lineSummary = computed(() => {
+  const lines = form.lineItems.filter((line) => lineItemCode(line))
+  const qtyTotal = lines.reduce((sum, line) => sum + (Number(line.planPurchaseQty) || 0), 0)
+  return {
+    lineCount: lines.length,
+    qtyTotal: Math.round(qtyTotal * 100) / 100,
+  }
+})
+
+const {
+  panelRef: lineTablePanelRef,
+  panelStyle: lineTablePanelStyle,
+  tableScroll: lineTableScroll,
+  isScrolling: isLineTableScrolling,
+  updateScrollY,
+} = useInventoryLineTableScroll({
+  scrollX: lineScrollX,
+  getRowCount: () => form.lineItems.length,
+})
+
 watch(
   () => isActive.value,
-  (val) => {
-    if (!val) return
-    if (props.editRecord) {
-      const r = props.editRecord
-      form.reqNo = r.reqNo
-      form.urgency = r.urgency
-      form.deliveryDate = r.deliveryDate ? dayjs(r.deliveryDate) : null
-      form.estimatedArrivalDate = r.estimatedArrivalDate ? dayjs(r.estimatedArrivalDate) : null
-      form.remark = r.remark || ''
-      form.lineItems = normalizeLineItems(r.lineItems || [])
-      return
-    }
-    resetForm()
+  (visible) => {
+    if (visible) nextTick(updateScrollY)
+  },
+)
+
+watch(
+  () => [isActive.value, props.editRecord?.id],
+  ([visible]) => {
+    if (!visible) return
+    if (props.editRecord) loadEditForm(props.editRecord)
+    else resetForm()
   },
   { immediate: true },
 )
@@ -237,6 +295,22 @@ function resetForm() {
   form.estimatedArrivalDate = null
   form.remark = ''
   form.lineItems = []
+}
+
+function loadEditForm(record) {
+  form.reqNo = record.reqNo
+  form.urgency = record.urgency
+  form.deliveryDate = record.deliveryDate ? dayjs(record.deliveryDate) : null
+  form.estimatedArrivalDate = record.estimatedArrivalDate
+    ? dayjs(record.estimatedArrivalDate)
+    : null
+  form.remark = record.remark || ''
+  form.lineItems = normalizeLineItems(record.lineItems || [])
+}
+
+function formatQty(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
 function resolveStockQty(code) {
@@ -276,20 +350,49 @@ function mapPickerToLineItem(payload) {
 }
 
 function onProductsSelected(rows) {
-  rows.forEach((payload) => {
-    const code = payload.code || ''
-    if (!code) return
-    if (form.lineItems.some((l) => lineItemCode(l) === code)) return
-    form.lineItems.push(mapPickerToLineItem(payload))
+  const list = Array.isArray(rows) ? rows : [rows]
+  if (!list.length) {
+    message.warning('未选择物品')
+    return
+  }
+  addingItems.value = true
+  productPickerOpen.value = false
+  nextTick(() => {
+    try {
+      const before = form.lineItems.length
+      list.forEach((payload) => {
+        const code = payload.code || ''
+        if (!code) return
+        if (form.lineItems.some((l) => lineItemCode(l) === code)) return
+        form.lineItems.push(mapPickerToLineItem(payload))
+      })
+      const added = form.lineItems.length - before
+      if (added > 0) message.success(`已添加 ${added} 条明细`)
+      else message.info('所选物品已在明细中')
+    } finally {
+      addingItems.value = false
+    }
   })
+}
+
+function addBlankLine() {
+  form.lineItems.push(
+    createLineItem({
+      productName: '',
+      productCode: '',
+      inventoryName: '',
+      inventoryCode: '',
+      planPurchaseQty: 1,
+    }),
+  )
 }
 
 function onQtyChange(record) {
   record.demandQty = record.planPurchaseQty
 }
 
-function removeLine(index) {
-  form.lineItems.splice(index, 1)
+function removeLine(id) {
+  form.lineItems = form.lineItems.filter((line) => line.id !== id)
 }
 
 function handleSave() {
@@ -297,12 +400,14 @@ function handleSave() {
     message.warning('请选择期望到货日期')
     return
   }
-  if (!form.lineItems.length) {
-    message.warning('请至少添加一条采购清单')
+
+  const validLines = form.lineItems.filter((line) => lineItemCode(line))
+  if (!validLines.length) {
+    message.warning('请至少添加一条有效明细')
     return
   }
 
-  const missingQty = form.lineItems.find(
+  const missingQty = validLines.find(
     (line) => line.planPurchaseQty == null || Number(line.planPurchaseQty) <= 0,
   )
   if (missingQty) {
@@ -312,25 +417,30 @@ function handleSave() {
     return
   }
 
+  saving.value = true
   const reqNo = form.reqNo?.trim() || generateReqNo()
   const deliveryDate = form.deliveryDate ? form.deliveryDate.format('YYYY-MM-DD') : ''
   const estimatedArrivalDate = form.estimatedArrivalDate.format('YYYY-MM-DD')
 
-  form.lineItems.forEach((line) => {
-    line.demandQty = line.planPurchaseQty
-    line.deliveryDate = deliveryDate
-    line.expectedArrivalDate = estimatedArrivalDate
-    line.productName = line.productName || line.inventoryName || ''
-    line.productCode = line.productCode || line.inventoryCode || ''
-    line.inventoryName = line.productName
-    line.inventoryCode = line.productCode
+  const lineItems = validLines.map((line) => {
+    const next = { ...line }
+    next.demandQty = next.planPurchaseQty
+    next.deliveryDate = deliveryDate
+    next.expectedArrivalDate = estimatedArrivalDate
+    next.productName = next.productName || next.inventoryName || ''
+    next.productCode = next.productCode || next.inventoryCode || ''
+    next.inventoryName = next.productName
+    next.inventoryCode = next.productCode
+    return next
   })
 
   const payload = {
-    ...JSON.parse(JSON.stringify(form)),
     reqNo,
+    urgency: form.urgency,
     deliveryDate,
     estimatedArrivalDate,
+    remark: form.remark?.trim() || '',
+    lineItems,
     orderDate: dayjs().format('YYYY-MM-DD'),
     source: '新增',
     docStatus: '待处理',
@@ -352,62 +462,143 @@ function handleSave() {
   } else {
     emit('saved', { isEdit: isEdit.value, id: props.editRecord?.id, data: payload })
   }
+
+  saving.value = false
   message.success(isEdit.value ? '采购申请已更新' : '采购申请已保存')
   closeAfterSave()
 }
 </script>
 
 <style lang="less" scoped>
+:deep(.form-create-page.purchase-req-form-modal) {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+
+  .form-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 12px;
+  }
+}
+
+.form-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .section-block {
+  background: #fff;
+  border-radius: 6px;
+  padding: 16px;
   margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
 
   .section-title {
-    font-weight: 600;
     font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1f1f1f;
   }
 
-  .section-divider {
-    margin: 8px 0 12px;
+  &.section-block--lines {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
   }
 }
 
 .header-form {
+  flex-shrink: 0;
+
   :deep(.ant-form-item) {
-    width: 100%;
     margin-bottom: 0;
-    margin-inline-end: 0;
+    width: 100%;
   }
 
-  :deep(.ant-form-item-row) {
-    flex-wrap: nowrap;
-    align-items: center;
-  }
-
-  :deep(.ant-form-item-label) {
-    flex: 0 0 auto;
-    padding-bottom: 0;
-
-    > label {
-      height: 24px;
-      line-height: 24px;
-      font-size: 13px;
-      white-space: nowrap;
-    }
-  }
-
-  :deep(.ant-form-item-control) {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .remark-item {
-    :deep(.ant-form-item-label) {
-      flex: 0 0 68px;
-    }
+  :deep(.remark-item .ant-form-item-label) {
+    flex: 0 0 72px;
+    align-self: flex-start;
   }
 }
 
-.detail-toolbar {
+.line-toolbar {
+  flex-shrink: 0;
   margin-bottom: 8px;
+}
+
+.line-table-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+  flex-shrink: 0;
+
+  &.panel-scrolling {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
+.line-table-body {
+  flex: 0 0 auto;
+  min-height: 0;
+
+  &.is-scrolling {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+
+    :deep(.ant-table-wrapper),
+    :deep(.ant-spin-nested-loading),
+    :deep(.ant-spin-container),
+    :deep(.ant-table) {
+      height: 100%;
+    }
+  }
+
+  :deep(.ant-table) {
+    margin-bottom: 0 !important;
+  }
+
+  :deep(.ant-table-container),
+  :deep(.ant-table-content),
+  :deep(.ant-table-header),
+  :deep(.ant-table-body) {
+    overflow-x: hidden !important;
+  }
+
+  :deep(.ant-table-body) {
+    overflow-y: auto !important;
+  }
+}
+
+:deep(.ant-table-tbody > tr > td) {
+  padding: 4px 8px !important;
+}
+
+.line-empty-placeholder {
+  padding: 12px 0;
+  color: #bfbfbf;
+  font-size: 13px;
+  text-align: center;
+}
+
+.danger-link {
+  color: #ff4d4f;
 }
 </style>

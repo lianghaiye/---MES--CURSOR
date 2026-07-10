@@ -72,6 +72,7 @@ export default { name: 'InventoryLineTableFooter' }
   overflow-x: auto;
   overflow-y: hidden;
   background: #fafafa;
+  -webkit-overflow-scrolling: touch;
 }
 
 .line-summary-table {

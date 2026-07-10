@@ -40,7 +40,7 @@ function measurePanelParts(panel, rowCount) {
   const bodyH =
     rowCount > 0
       ? estimateBodyHeight(rowCount)
-      : panel.querySelector('.ant-table-tbody')?.offsetHeight ?? DEFAULT_EMPTY_BODY_HEIGHT
+      : (panel.querySelector('.ant-table-tbody')?.offsetHeight ?? DEFAULT_EMPTY_BODY_HEIGHT)
   return { headerH, bodyH, footerH, naturalTotal: headerH + bodyH + footerH }
 }
 
@@ -97,21 +97,30 @@ export function useInventoryLineTableScroll({ scrollX, getRowCount }) {
     const tableBody = panel.querySelector('.ant-table-body')
     if (!footerScroll) return
 
-    const applyScrollLeft = (left) => {
-      if (tableHeader && tableHeader.scrollLeft !== left) {
+    const syncFrom = (left, source) => {
+      if (source !== 'footer' && footerScroll.scrollLeft !== left) {
+        footerScroll.scrollLeft = left
+      }
+      if (source !== 'header' && tableHeader && tableHeader.scrollLeft !== left) {
         tableHeader.scrollLeft = left
       }
-      if (tableBody && tableBody.scrollLeft !== left) {
+      if (source !== 'body' && tableBody && tableBody.scrollLeft !== left) {
         tableBody.scrollLeft = left
       }
     }
 
-    const onFooterScroll = () => {
-      applyScrollLeft(footerScroll.scrollLeft)
-    }
+    const onFooterScroll = () => syncFrom(footerScroll.scrollLeft, 'footer')
+    const onBodyScroll = () => syncFrom(tableBody?.scrollLeft ?? 0, 'body')
+    const onHeaderScroll = () => syncFrom(tableHeader?.scrollLeft ?? 0, 'header')
 
     footerScroll.addEventListener('scroll', onFooterScroll, { passive: true })
-    teardownScrollSync = () => footerScroll.removeEventListener('scroll', onFooterScroll)
+    tableBody?.addEventListener('scroll', onBodyScroll, { passive: true })
+    tableHeader?.addEventListener('scroll', onHeaderScroll, { passive: true })
+    teardownScrollSync = () => {
+      footerScroll.removeEventListener('scroll', onFooterScroll)
+      tableBody?.removeEventListener('scroll', onBodyScroll)
+      tableHeader?.removeEventListener('scroll', onHeaderScroll)
+    }
   }
 
   async function updateScrollY() {

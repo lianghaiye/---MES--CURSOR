@@ -3,318 +3,447 @@
     :page-mode="pageMode"
     :open="open"
     :title="shellTitle"
-    width="96%"
+    width="1400px"
+    class="purchase-order-form-modal"
     :mask-closable="false"
     destroy-on-close
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
-    <div class="section-block">
-      <div class="section-title">基本信息</div>
-      <a-divider class="section-divider" />
-      <a-form layout="inline" class="header-form horizontal-form">
-        <a-row :gutter="[12, 8]" style="width: 100%">
-          <a-col :span="8">
-            <a-form-item label="采购单号">
-              <a-input
-                v-model:value="form.orderNo"
-                placeholder="留空则系统自动生成"
-                allow-clear
-                size="small"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="供应商" required>
-              <PlanSupplierSelect
-                v-model:value="form.supplier"
-                placeholder="请搜索或选择供应商"
-                @change="onSupplierChange"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="结算类型">
-              <a-select
-                v-model:value="form.settlementType"
-                size="small"
-                :options="settlementTypeOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="结算周期">
-              <a-select
-                v-model:value="form.settlementCycle"
-                size="small"
-                :options="settlementCycleOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="结算方式">
-              <a-select
-                v-model:value="form.settlementMethod"
-                size="small"
-                :options="settlementMethodOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="生产工单号">
-              <a-input
-                v-model:value="form.workOrderNo"
-                size="small"
-                placeholder="请输入 生产工单号"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="交货日期" required>
-              <a-date-picker
-                v-model:value="form.deliveryDate"
-                size="small"
-                style="width: 100%"
-                @change="onHeaderDeliveryDateChange"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="提醒日期">
-              <a-date-picker v-model:value="form.reminderDate" size="small" style="width: 100%" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="交货方式">
-              <a-select
-                v-model:value="form.deliveryMethod"
-                size="small"
-                :options="deliveryMethodOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="供货期/天">
-              <a-input-number
-                v-model:value="form.leadTimeDays"
-                size="small"
-                :min="0"
-                style="width: 100%"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="物流单号">
-              <a-input
-                v-model:value="form.logisticsNo"
-                size="small"
-                placeholder="请输入 物流单号"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="联系人">
-              <a-select
-                v-model:value="form.contactPerson"
-                size="small"
-                allow-clear
-                :options="contactOpts"
-                @change="onContactChange"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="联系方式">
-              <a-input
-                v-model:value="form.contactPhone"
-                size="small"
-                placeholder="请输入 联系方式"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="采购申请单号">
-              <a-input v-model:value="form.reqNo" size="small" placeholder="请输入 采购申请单号" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="合同编号">
-              <a-input v-model:value="form.contractNo" size="small" placeholder="请输入 合同编号" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="销售单号">
-              <a-input
-                v-model:value="form.salesOrderNo"
-                size="small"
-                placeholder="请输入 销售单号"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="收货地址">
-              <a-input
-                v-model:value="form.shippingAddress"
-                size="small"
-                placeholder="请输入 收货地址"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="收货仓库">
-              <a-select
-                v-model:value="form.receivingWarehouse"
-                size="small"
-                allow-clear
-                placeholder="请选择 收货仓库"
-                :options="warehouseOpts"
-                @change="onHeaderReceivingWarehouseChange"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="采购员">
-              <a-select
-                v-model:value="form.purchaser"
-                size="small"
-                show-search
-                :options="purchaserOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="24">
-            <a-form-item label="备注" class="remark-item">
-              <a-textarea
-                v-model:value="form.remark"
-                :rows="2"
-                :maxlength="500"
-                show-count
-                placeholder="请输入备注"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </a-form>
-    </div>
-
-    <div class="section-block">
-      <div class="section-title">采购清单</div>
-      <a-divider class="section-divider" />
-      <div class="detail-toolbar">
-        <a-space wrap>
-          <a-button type="primary" size="small" @click="openProductPicker">
-            <PlusOutlined />
-            选择产品
-          </a-button>
-          <a-button class="tax-toggle-btn" size="small" @click="toggleTaxMode">
-            切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
-          </a-button>
-          <span class="tax-hint">{{ taxModeHint }}</span>
-        </a-space>
+    <div class="form-layout">
+      <div class="section-block">
+        <div class="section-title">基本信息</div>
+        <a-form layout="inline" class="header-form horizontal-form">
+          <a-row :gutter="[12, 12]" style="width: 100%">
+            <a-col :span="8">
+              <a-form-item label="采购单号">
+                <a-input
+                  v-model:value="form.orderNo"
+                  placeholder="留空则系统自动生成"
+                  allow-clear
+                  size="small"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="供应商" required>
+                <PlanSupplierSelect
+                  v-model:value="form.supplier"
+                  placeholder="请搜索或选择供应商"
+                  @change="onSupplierChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="结算类型">
+                <a-select
+                  v-model:value="form.settlementType"
+                  size="small"
+                  :options="settlementTypeOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="结算周期">
+                <a-select
+                  v-model:value="form.settlementCycle"
+                  size="small"
+                  :options="settlementCycleOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="结算方式">
+                <a-select
+                  v-model:value="form.settlementMethod"
+                  size="small"
+                  :options="settlementMethodOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="销售订单">
+                <SalesOrderSearchSelect v-model:value="form.salesOrderNo" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="生产工单">
+                <WorkOrderSearchSelect v-model:value="form.workOrderNo" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="交货日期" required>
+                <a-date-picker
+                  v-model:value="form.deliveryDate"
+                  size="small"
+                  style="width: 100%"
+                  @change="onHeaderDeliveryDateChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="提醒日期">
+                <a-date-picker v-model:value="form.reminderDate" size="small" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="交货方式">
+                <a-select
+                  v-model:value="form.deliveryMethod"
+                  size="small"
+                  :options="deliveryMethodOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="供货期/天">
+                <a-input-number
+                  v-model:value="form.leadTimeDays"
+                  size="small"
+                  :min="0"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="物流单号">
+                <a-input
+                  v-model:value="form.logisticsNo"
+                  size="small"
+                  placeholder="请输入 物流单号"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="联系人">
+                <a-select
+                  v-model:value="form.contactPerson"
+                  size="small"
+                  allow-clear
+                  :options="contactOpts"
+                  @change="onContactChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="联系方式">
+                <a-input
+                  v-model:value="form.contactPhone"
+                  size="small"
+                  placeholder="请输入 联系方式"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="合同编号">
+                <a-input
+                  v-model:value="form.contractNo"
+                  size="small"
+                  placeholder="请输入 合同编号"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="收货地址">
+                <a-input
+                  v-model:value="form.shippingAddress"
+                  size="small"
+                  placeholder="请输入 收货地址"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="收货仓库">
+                <a-select
+                  v-model:value="form.receivingWarehouse"
+                  size="small"
+                  allow-clear
+                  placeholder="请选择 收货仓库"
+                  :options="warehouseOpts"
+                  @change="onHeaderReceivingWarehouseChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="采购员">
+                <a-select
+                  v-model:value="form.purchaser"
+                  size="small"
+                  show-search
+                  :options="purchaserOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="24">
+              <a-form-item label="备注" class="remark-item">
+                <a-textarea
+                  v-model:value="form.remark"
+                  :rows="2"
+                  :maxlength="500"
+                  show-count
+                  placeholder="请输入备注"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-form>
       </div>
-      <a-table
-        :columns="lineColumns"
-        :data-source="form.lineItems"
-        row-key="id"
-        size="small"
-        bordered
-        :pagination="false"
-        :scroll="{ x: 2200 }"
-        locale="{ emptyText: '暂无数据' }"
-      >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-          <template v-else-if="column.key === 'purchaseQty'">
-            <a-input-number
-              v-model:value="record.purchaseQty"
-              size="small"
-              :min="0"
-              :precision="2"
-              style="width: 100%"
-              @change="onLineChange(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'unitPriceExTax'">
-            <a-input-number
-              v-model:value="record.unitPriceExTax"
-              size="small"
-              :min="0"
-              :precision="2"
-              style="width: 100%"
-              :disabled="!taxModeExcluding"
-              @change="onLineChange(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'taxRate'">
-            <a-input-number
-              v-model:value="record.taxRate"
-              size="small"
-              :min="0"
-              :max="100"
-              :precision="2"
-              style="width: 100%"
-              @change="onLineChange(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'unitPriceInTax'">
-            <a-input-number
-              v-model:value="record.unitPriceInTax"
-              size="small"
-              :min="0"
-              :precision="2"
-              style="width: 100%"
-              :disabled="taxModeExcluding"
-              @change="onLineChange(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'totalPriceExTax'">
-            {{ formatMoney(record.totalPriceExTax) }}
-          </template>
-          <template v-else-if="column.key === 'totalPriceInTax'">
-            {{ formatMoney(record.totalPriceInTax) }}
-          </template>
-          <template v-else-if="column.key === 'deliveryDate'">
-            <a-date-picker
-              :value="lineDeliveryDateValue(record.deliveryDate)"
-              size="small"
-              style="width: 100%"
-              @change="(date) => onLineDeliveryDateChange(record, date)"
-            />
-          </template>
-          <template v-else-if="column.key === 'receivingWarehouse'">
-            <a-select
-              v-model:value="record.receivingWarehouse"
-              size="small"
-              allow-clear
-              style="width: 100%"
-              placeholder="请选择"
-              :options="warehouseOpts"
-            />
-          </template>
-          <template v-else-if="column.key === 'remark'">
-            <a-input
-              v-model:value="record.remark"
-              size="small"
-              allow-clear
-              placeholder="请输入备注"
-            />
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
-          </template>
-          <template v-else>
-            {{ record[column.dataIndex] ?? '—' }}
-          </template>
-        </template>
-      </a-table>
-    </div>
 
-    <SelectBomMaterialModal
-      v-model:open="productPickerOpen"
-      title="添加产品/物料"
-      picker-default-item-type="产品"
-      @selected="onProductsSelected"
-    />
+      <div class="section-block section-block--lines">
+        <div class="section-title">采购清单</div>
+        <div class="line-toolbar">
+          <a-space wrap>
+            <a-button type="primary" size="small" :loading="addingItems" @click="openProductPicker">
+              <PlusOutlined />
+              选择产品
+            </a-button>
+            <a-button class="tax-toggle-btn" size="small" @click="toggleTaxMode">
+              切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
+            </a-button>
+            <span class="tax-hint">{{ taxModeHint }}</span>
+            <TableColumnSettingButton @click="columnDrawerOpen = true" />
+          </a-space>
+        </div>
+
+        <div
+          ref="lineTablePanelRef"
+          class="line-table-panel"
+          :class="{ 'panel-scrolling': isLineTableScrolling }"
+          :style="lineTablePanelStyle"
+        >
+          <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
+            <a-table
+              :columns="displayColumns"
+              :data-source="form.lineItems"
+              row-key="id"
+              size="small"
+              bordered
+              :pagination="false"
+              :scroll="lineTableScroll"
+            >
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'stockQty'">
+                  {{ formatQty(record.stockQty) }}
+                </template>
+                <template v-else-if="column.key === 'purchaseQty'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'purchaseQty')"
+                    :display="formatQty(record.purchaseQty)"
+                    :empty="record.purchaseQty == null || record.purchaseQty === ''"
+                    numeric
+                    @activate="startLineCellEdit(record.id, 'purchaseQty')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input-number
+                        v-model:value="record.purchaseQty"
+                        :min="0"
+                        :precision="2"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                        @change="() => onLineChange(record)"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'unitPriceExTax'">
+                  <InventoryLineEditableCell
+                    v-if="taxModeExcluding"
+                    :active="isLineCellEditing(record.id, 'unitPriceExTax')"
+                    :display="formatMoney(record.unitPriceExTax)"
+                    :empty="record.unitPriceExTax == null || record.unitPriceExTax === ''"
+                    numeric
+                    @activate="startLineCellEdit(record.id, 'unitPriceExTax')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input-number
+                        v-model:value="record.unitPriceExTax"
+                        :min="0"
+                        :precision="2"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                        @change="() => onLineChange(record)"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                  <span v-else>{{ formatMoney(record.unitPriceExTax) }}</span>
+                </template>
+                <template v-else-if="column.key === 'taxRate'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'taxRate')"
+                    :display="formatQty(record.taxRate)"
+                    :empty="record.taxRate == null || record.taxRate === ''"
+                    numeric
+                    @activate="startLineCellEdit(record.id, 'taxRate')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input-number
+                        v-model:value="record.taxRate"
+                        :min="0"
+                        :max="100"
+                        :precision="2"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                        @change="() => onLineChange(record)"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'unitPriceInTax'">
+                  <InventoryLineEditableCell
+                    v-if="!taxModeExcluding"
+                    :active="isLineCellEditing(record.id, 'unitPriceInTax')"
+                    :display="formatMoney(record.unitPriceInTax)"
+                    :empty="record.unitPriceInTax == null || record.unitPriceInTax === ''"
+                    numeric
+                    @activate="startLineCellEdit(record.id, 'unitPriceInTax')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input-number
+                        v-model:value="record.unitPriceInTax"
+                        :min="0"
+                        :precision="2"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                        @change="() => onLineChange(record)"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                  <span v-else>{{ formatMoney(record.unitPriceInTax) }}</span>
+                </template>
+                <template v-else-if="column.key === 'totalPriceExTax'">
+                  {{ formatMoney(record.totalPriceExTax) }}
+                </template>
+                <template v-else-if="column.key === 'totalPriceInTax'">
+                  {{ formatMoney(record.totalPriceInTax) }}
+                </template>
+                <template v-else-if="column.key === 'deliveryDate'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'deliveryDate')"
+                    :display="record.deliveryDate || '—'"
+                    :empty="!record.deliveryDate"
+                    placeholder="请选择"
+                    @activate="startLineCellEdit(record.id, 'deliveryDate', { select: true })"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-date-picker
+                        :value="lineDeliveryDateValue(record.deliveryDate)"
+                        size="small"
+                        style="width: 100%"
+                        :open="lineCellSelectOpen"
+                        @openChange="onLineCellSelectOpenChange"
+                        @change="
+                          (date) => {
+                            onLineDeliveryDateChange(record, date)
+                            endEdit()
+                          }
+                        "
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'receivingWarehouse'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'receivingWarehouse')"
+                    :display="record.receivingWarehouse || '—'"
+                    :empty="!record.receivingWarehouse"
+                    placeholder="请选择"
+                    @activate="startLineCellEdit(record.id, 'receivingWarehouse', { select: true })"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-select
+                        v-model:value="record.receivingWarehouse"
+                        allow-clear
+                        size="small"
+                        placeholder="请选择"
+                        style="width: 100%"
+                        :open="lineCellSelectOpen"
+                        :options="warehouseOpts"
+                        @dropdownVisibleChange="onLineCellSelectOpenChange"
+                        @change="endEdit"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'remark'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'remark')"
+                    :display="record.remark || '—'"
+                    :empty="!record.remark"
+                    placeholder="请输入"
+                    @activate="startLineCellEdit(record.id, 'remark')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input
+                        v-model:value="record.remark"
+                        size="small"
+                        allow-clear
+                        placeholder="请输入备注"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <a-space :size="4">
+                    <a @click="openLineEdit(record)">编辑</a>
+                    <a class="danger-link" @click="removeLine(record.id)">删除</a>
+                  </a-space>
+                </template>
+                <template v-else>
+                  {{ record[column.dataIndex] ?? '—' }}
+                </template>
+              </template>
+              <template #emptyText>
+                <div class="line-empty-placeholder">暂无数据</div>
+              </template>
+            </a-table>
+          </div>
+          <InventoryLineTableFooter
+            :columns="displayColumns"
+            :scroll-x="lineScrollX"
+            @add-line="addBlankLine"
+          >
+            <template #cell="{ column }">
+              <template v-if="column.key === 'index'">合计</template>
+              <template v-else-if="column.key === 'productCode'">
+                项数 {{ lineSummary.lineCount }}
+              </template>
+              <template v-else-if="column.key === 'purchaseQty'">
+                {{ formatQty(lineSummary.qtyTotal) }}
+              </template>
+              <template v-else-if="column.key === 'totalPriceExTax'">
+                {{ formatMoney(lineSummary.amountExTax) }}
+              </template>
+              <template v-else-if="column.key === 'totalPriceInTax'">
+                {{ formatMoney(lineSummary.amountInTax) }}
+              </template>
+            </template>
+          </InventoryLineTableFooter>
+        </div>
+      </div>
+    </div>
 
     <template #footer>
       <a-button size="small" @click="handleCancel">
@@ -327,10 +456,33 @@
       </a-button>
     </template>
   </FormCreateShell>
+
+  <SelectBomMaterialModal
+    v-if="isActive"
+    v-model:open="productPickerOpen"
+    title="添加产品/物料"
+    picker-default-item-type="产品"
+    @selected="onProductsSelected"
+  />
+
+  <PurchaseOrderLineEditModal
+    v-model:open="lineEditOpen"
+    :line="lineEditTarget"
+    :tax-mode-excluding="taxModeExcluding"
+    :warehouse-opts="warehouseOpts"
+    @save="onLineEditSave"
+  />
+
+  <TableColumnSettingDrawer
+    v-model:open="columnDrawerOpen"
+    v-model:settings="columnSettings"
+    :default-settings="defaultColumnSettings"
+    title="采购清单列设置"
+  />
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons-vue'
@@ -355,8 +507,19 @@ import {
 } from '@/store/purchaseOrderStore'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
+import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
+import WorkOrderSearchSelect from './WorkOrderSearchSelect.vue'
+import PurchaseOrderLineEditModal from './PurchaseOrderLineEditModal.vue'
+import InventoryLineEditableCell from '@/views/inventory/components/InventoryLineEditableCell.vue'
+import InventoryLineTableFooter from '@/views/inventory/components/InventoryLineTableFooter.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
+import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTableScroll'
+import { useInventoryLineCellEdit } from '@/composables/useInventoryLineCellEdit'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { purchaseOrderFormLineColumns } from '@/utils/purchaseOrderLineColumns'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -372,10 +535,15 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
   listPath: '/procurement/purchase-orders',
   getTitle: () => (isEdit.value ? '编辑采购单' : '新增采购单'),
 })
+
 const taxModeExcluding = ref(true)
+const addingItems = ref(false)
 const productPickerOpen = ref(false)
 const prevHeaderDeliveryDate = ref('')
 const prevHeaderReceivingWarehouse = ref(undefined)
+const lineEditOpen = ref(false)
+const lineEditTarget = ref(null)
+const lineEditSourceId = ref(null)
 
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const settlementCycleOpts = settlementCycleOptions.map((v) => ({ label: v, value: v }))
@@ -391,27 +559,12 @@ const taxModeHint = computed(() =>
     : '当前：按含税单价算不含税（请填含税单价，不含税单价自动计算且不可编辑）',
 )
 
-const lineColumns = [
-  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
-  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
-  { title: '产品编号', dataIndex: 'productCode', width: 120 },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '规格属性', dataIndex: 'specAttr', width: 90 },
-  { title: '材质', dataIndex: 'material', width: 80 },
-  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-  { title: '库存数量', dataIndex: 'stockQty', width: 90, align: 'right' },
-  { title: '采购数量', key: 'purchaseQty', width: 100 },
-  { title: '单位', dataIndex: 'unit', width: 70 },
-  { title: '不含税单价', key: 'unitPriceExTax', width: 100 },
-  { title: '税率(%)', key: 'taxRate', width: 80 },
-  { title: '含税单价', key: 'unitPriceInTax', width: 100 },
-  { title: '总价（不含税）', key: 'totalPriceExTax', width: 110, align: 'right' },
-  { title: '总价（含税）', key: 'totalPriceInTax', width: 100, align: 'right' },
-  { title: '交货日期', key: 'deliveryDate', width: 120 },
-  { title: '收货仓库', key: 'receivingWarehouse', width: 110 },
-  { title: '备注', key: 'remark', width: 120 },
-  { title: '操作', key: 'action', width: 70, fixed: 'right' },
-]
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('purchase-order-form-lines-v1', purchaseOrderFormLineColumns, {
+    minScrollX: 2200,
+  })
+
+const lineScrollX = tableScrollX
 
 const form = reactive({
   orderNo: '',
@@ -419,6 +572,7 @@ const form = reactive({
   settlementType: '先款后货',
   settlementCycle: '月结',
   settlementMethod: '现金结算',
+  salesOrderNo: '',
   workOrderNo: '',
   deliveryDate: null,
   reminderDate: null,
@@ -427,9 +581,7 @@ const form = reactive({
   logisticsNo: '',
   contactPerson: undefined,
   contactPhone: '',
-  reqNo: '',
   contractNo: '',
-  salesOrderNo: '',
   shippingAddress: '',
   receivingWarehouse: undefined,
   purchaser: 'admin1',
@@ -437,38 +589,58 @@ const form = reactive({
   lineItems: [],
 })
 
+const lineSummary = computed(() => {
+  const lines = form.lineItems.filter((line) => lineItemCode(line))
+  const qtyTotal = lines.reduce((sum, line) => sum + (Number(line.purchaseQty) || 0), 0)
+  const amountExTax = lines.reduce((sum, line) => sum + (Number(line.totalPriceExTax) || 0), 0)
+  const amountInTax = lines.reduce((sum, line) => sum + (Number(line.totalPriceInTax) || 0), 0)
+  return {
+    lineCount: lines.length,
+    qtyTotal: Math.round(qtyTotal * 100) / 100,
+    amountExTax: Math.round(amountExTax * 100) / 100,
+    amountInTax: Math.round(amountInTax * 100) / 100,
+  }
+})
+
+const {
+  panelRef: lineTablePanelRef,
+  panelStyle: lineTablePanelStyle,
+  tableScroll: lineTableScroll,
+  isScrolling: isLineTableScrolling,
+  updateScrollY,
+} = useInventoryLineTableScroll({
+  scrollX: lineScrollX,
+  getRowCount: () => form.lineItems.length,
+})
+
+const {
+  selectOpen: lineCellSelectOpen,
+  isEditing: isLineCellEditing,
+  startEdit: startLineCellEdit,
+  endEdit: endLineCellEdit,
+  onSelectOpenChange: onLineCellSelectOpenChange,
+} = useInventoryLineCellEdit()
+
 watch(
   () => isActive.value,
-  (val) => {
-    if (!val) return
+  (visible) => {
+    if (!visible) return
+    nextTick(() => {
+      updateScrollY()
+      setTimeout(updateScrollY, 120)
+    })
+  },
+)
+
+watch(displayColumns, () => nextTick(updateScrollY), { deep: true })
+
+watch(
+  () => [isActive.value, props.editRecord?.id],
+  ([visible]) => {
+    if (!visible) return
     taxModeExcluding.value = true
-    if (props.editRecord) {
-      const r = props.editRecord
-      form.orderNo = r.orderNo
-      form.supplier = r.supplier
-      form.settlementType = r.settlementType
-      form.settlementCycle = r.settlementCycle
-      form.settlementMethod = r.settlementMethod
-      form.workOrderNo = r.workOrderNo || ''
-      form.deliveryDate = r.deliveryDate ? dayjs(r.deliveryDate) : null
-      form.reminderDate = r.reminderDate ? dayjs(r.reminderDate) : null
-      form.deliveryMethod = r.deliveryMethod
-      form.leadTimeDays = r.leadTimeDays
-      form.logisticsNo = r.logisticsNo || ''
-      form.contactPerson = r.contactPerson || undefined
-      form.contactPhone = r.contactPhone || ''
-      form.reqNo = r.reqNo || ''
-      form.contractNo = r.contractNo || ''
-      form.salesOrderNo = r.salesOrderNo || ''
-      form.shippingAddress = r.shippingAddress || ''
-      form.receivingWarehouse = r.receivingWarehouse || undefined
-      form.purchaser = r.purchaser
-      form.remark = r.remark || ''
-      form.lineItems = normalizeLineItems(r.lineItems || [])
-      syncHeaderTrackers()
-      return
-    }
-    resetForm()
+    if (props.editRecord) loadEditForm(props.editRecord)
+    else resetForm()
   },
   { immediate: true },
 )
@@ -499,6 +671,7 @@ function resetForm() {
   form.settlementType = '先款后货'
   form.settlementCycle = '月结'
   form.settlementMethod = '现金结算'
+  form.salesOrderNo = ''
   form.workOrderNo = ''
   form.deliveryDate = null
   form.reminderDate = null
@@ -507,14 +680,36 @@ function resetForm() {
   form.logisticsNo = ''
   form.contactPerson = undefined
   form.contactPhone = ''
-  form.reqNo = ''
   form.contractNo = ''
-  form.salesOrderNo = ''
   form.shippingAddress = ''
   form.receivingWarehouse = undefined
   form.purchaser = 'admin1'
   form.remark = ''
   form.lineItems = []
+  syncHeaderTrackers()
+}
+
+function loadEditForm(record) {
+  form.orderNo = record.orderNo
+  form.supplier = record.supplier
+  form.settlementType = record.settlementType
+  form.settlementCycle = record.settlementCycle
+  form.settlementMethod = record.settlementMethod
+  form.salesOrderNo = record.salesOrderNo || ''
+  form.workOrderNo = record.workOrderNo || ''
+  form.deliveryDate = record.deliveryDate ? dayjs(record.deliveryDate) : null
+  form.reminderDate = record.reminderDate ? dayjs(record.reminderDate) : null
+  form.deliveryMethod = record.deliveryMethod
+  form.leadTimeDays = record.leadTimeDays
+  form.logisticsNo = record.logisticsNo || ''
+  form.contactPerson = record.contactPerson || undefined
+  form.contactPhone = record.contactPhone || ''
+  form.contractNo = record.contractNo || ''
+  form.shippingAddress = record.shippingAddress || ''
+  form.receivingWarehouse = record.receivingWarehouse || undefined
+  form.purchaser = record.purchaser
+  form.remark = record.remark || ''
+  form.lineItems = normalizeLineItems(record.lineItems || [])
   syncHeaderTrackers()
 }
 
@@ -582,12 +777,38 @@ function openProductPicker() {
 }
 
 function onProductsSelected(rows) {
-  rows.forEach((payload) => {
-    const code = payload.code || ''
-    if (!code) return
-    if (form.lineItems.some((l) => lineItemCode(l) === code)) return
-    form.lineItems.push(mapPickerToPoLine(payload))
+  const list = Array.isArray(rows) ? rows : [rows]
+  if (!list.length) {
+    message.warning('未选择物品')
+    return
+  }
+  addingItems.value = true
+  productPickerOpen.value = false
+  nextTick(() => {
+    try {
+      let added = 0
+      list.forEach((payload) => {
+        const code = payload.code || ''
+        if (!code) return
+        if (form.lineItems.some((l) => lineItemCode(l) === code)) return
+        form.lineItems.push(mapPickerToPoLine(payload))
+        added += 1
+      })
+      if (added > 0) message.success(`已添加 ${added} 条明细`)
+      else message.info('所选物品已在明细中')
+    } finally {
+      addingItems.value = false
+    }
   })
+}
+
+function addBlankLine() {
+  const line = createPoLineItem({
+    deliveryDate: headerDeliveryDateStr(),
+    receivingWarehouse: form.receivingWarehouse || '',
+  })
+  recalcLineWithMode(line)
+  form.lineItems.push(line)
 }
 
 function syncLineDeliveryDates(dateStr) {
@@ -601,19 +822,14 @@ function onHeaderDeliveryDateChange(date) {
   const oldStr = prevHeaderDeliveryDate.value
   prevHeaderDeliveryDate.value = newStr
 
-  if (newStr === oldStr || !form.lineItems.length) {
-    return
-  }
+  if (newStr === oldStr || !form.lineItems.length) return
 
-  // 先加明细、后填头交货日期：明细仍为空时直接同步
   if (!oldStr && newStr) {
     syncLineDeliveryDates(newStr)
     return
   }
 
-  if (!newStr) {
-    return
-  }
+  if (!newStr) return
 
   Modal.confirm({
     title: '交货日期已修改，是否同步修改明细交货日期？',
@@ -634,23 +850,16 @@ function onHeaderReceivingWarehouseChange(newVal) {
   const changed = newVal !== oldVal
   prevHeaderReceivingWarehouse.value = newVal
 
-  if (!changed || !form.lineItems.length) {
-    return
-  }
+  if (!changed || !form.lineItems.length) return
 
-  // 先加明细、后选头收货仓库：明细仍为空时直接同步
   if (!oldVal && newVal) {
     form.lineItems.forEach((line) => {
-      if (!line.receivingWarehouse) {
-        line.receivingWarehouse = newVal
-      }
+      if (!line.receivingWarehouse) line.receivingWarehouse = newVal
     })
     return
   }
 
-  if (!newVal) {
-    return
-  }
+  if (!newVal) return
 
   Modal.confirm({
     title: '收货仓库已修改，是否同步修改明细收货仓库？',
@@ -669,7 +878,6 @@ function onLineDeliveryDateChange(record, date) {
 }
 
 function recalcLineWithMode(record) {
-  const qty = Number(record.purchaseQty) || 0
   const rate = Number(record.taxRate) || 0
   if (taxModeExcluding.value) {
     const ex = Number(record.unitPriceExTax) || 0
@@ -679,7 +887,6 @@ function recalcLineWithMode(record) {
     record.unitPriceExTax = Math.round((inc / (1 + rate / 100)) * 100) / 100
   }
   recalcPoLine(record)
-  void qty
 }
 
 function onLineChange(record) {
@@ -691,12 +898,35 @@ function toggleTaxMode() {
   form.lineItems.forEach(recalcLineWithMode)
 }
 
-function removeLine(index) {
-  form.lineItems.splice(index, 1)
+function removeLine(id) {
+  const idx = form.lineItems.findIndex((l) => l.id === id)
+  if (idx >= 0) form.lineItems.splice(idx, 1)
+}
+
+function openLineEdit(record) {
+  lineEditSourceId.value = record.id
+  lineEditTarget.value = { ...record }
+  lineEditOpen.value = true
+}
+
+function onLineEditSave(updated) {
+  const idx = form.lineItems.findIndex((l) => l.id === lineEditSourceId.value)
+  if (idx < 0) return
+  Object.assign(form.lineItems[idx], updated)
+  recalcLineWithMode(form.lineItems[idx])
+}
+
+function formatQty(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
 function formatMoney(val) {
-  return Number(val || 0).toFixed(2)
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 function handleSave() {
@@ -742,6 +972,7 @@ function handleSave() {
   const payload = {
     ...JSON.parse(JSON.stringify(form)),
     orderNo,
+    reqNo: props.editRecord?.reqNo || '',
     deliveryDate: form.deliveryDate.format('YYYY-MM-DD'),
     reminderDate: form.reminderDate ? form.reminderDate.format('YYYY-MM-DD') : '',
     receivingWarehouse: form.receivingWarehouse || '',
@@ -774,23 +1005,79 @@ function handleSave() {
 </script>
 
 <style lang="less" scoped>
-.section-block {
-  margin-bottom: 12px;
+:deep(.form-create-page.purchase-order-form-modal) {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
 
-  .section-title {
-    font-weight: 600;
-    font-size: 14px;
+  .form-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 12px;
+  }
+}
+
+:deep(.ant-modal.purchase-order-form-modal) {
+  .ant-modal-body {
+    max-height: calc(100vh - 160px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding-bottom: 12px;
   }
 
-  .section-divider {
-    margin: 8px 0 12px;
+  .form-layout {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+.form-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.section-block {
+  background: #fff;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1f1f1f;
+  }
+
+  &.section-block--lines {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
   }
 }
 
 .header-form {
+  flex-shrink: 0;
+
   :deep(.ant-form-item) {
-    width: 100%;
     margin-bottom: 0;
+    width: 100%;
     margin-inline-end: 0;
   }
 
@@ -816,14 +1103,14 @@ function handleSave() {
     min-width: 0;
   }
 
-  .remark-item {
-    :deep(.ant-form-item-label) {
-      flex: 0 0 68px;
-    }
+  :deep(.remark-item .ant-form-item-label) {
+    flex: 0 0 72px;
+    align-self: flex-start;
   }
 }
 
-.detail-toolbar {
+.line-toolbar {
+  flex-shrink: 0;
   margin-bottom: 8px;
 
   .tax-toggle-btn {
@@ -836,5 +1123,64 @@ function handleSave() {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
   }
+}
+
+.line-table-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.line-table-body {
+  flex: 0 0 auto;
+  min-height: 0;
+
+  &.is-scrolling {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+
+    :deep(.ant-table-wrapper),
+    :deep(.ant-spin-nested-loading),
+    :deep(.ant-spin-container),
+    :deep(.ant-table) {
+      height: 100%;
+    }
+  }
+
+  :deep(.ant-table) {
+    margin-bottom: 0 !important;
+  }
+
+  :deep(.ant-table-container),
+  :deep(.ant-table-content),
+  :deep(.ant-table-header),
+  :deep(.ant-table-body) {
+    overflow-x: hidden !important;
+  }
+
+  :deep(.ant-table-body) {
+    overflow-y: auto !important;
+  }
+}
+
+:deep(.ant-table-tbody > tr > td) {
+  padding: 4px 8px !important;
+}
+
+.line-empty-placeholder {
+  padding: 12px 0;
+  color: #bfbfbf;
+  font-size: 13px;
+  text-align: center;
+}
+
+.danger-link {
+  color: #ff4d4f;
 }
 </style>
