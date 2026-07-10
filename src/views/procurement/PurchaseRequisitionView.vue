@@ -368,11 +368,9 @@ function docStatusColor(status) {
 }
 
 function openDetail(record) {
-  const { href } = router.resolve({
-    name: 'procurement-purchase-req-detail',
-    params: { id: record.id },
-  })
-  window.open(href, '_blank')
+  const path = `/procurement/purchase-req/${record.id}`
+  openTab(path, `采购申请 ${record.reqNo}`)
+  router.push({ name: 'procurement-purchase-req-detail', params: { id: record.id } })
 }
 
 function handleSearch() {

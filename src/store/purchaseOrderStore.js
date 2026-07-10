@@ -67,6 +67,29 @@ export function getPurchaseOrdersByIds(ids) {
   return purchaseOrderState.orders.filter((o) => ids.includes(o.id))
 }
 
+export function getPurchaseOrderById(id) {
+  return purchaseOrderState.orders.find((o) => o.id === id) || null
+}
+
+/** 查询由采购申请单生成的采购订单 */
+export function getPurchaseOrdersByRequisition(requisition) {
+  if (!requisition) return []
+  const reqNo = (requisition.reqNo || '').trim()
+  if (!reqNo) return []
+  const linkedPoNos = (requisition.purchaseOrderNo || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return purchaseOrderState.orders.filter((order) => {
+    if (linkedPoNos.includes(order.orderNo)) return true
+    const reqNos = (order.reqNo || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    return reqNos.includes(reqNo)
+  })
+}
+
 export function canEditPurchaseOrder(order) {
   return order?.status === '待审批'
 }

@@ -2,90 +2,164 @@
   <div class="purchase-req-detail-page">
     <a-spin :spinning="loading">
       <template v-if="record">
-        <a-steps :current="timelineCurrent" class="detail-steps" size="small">
-          <a-step v-for="step in timeline" :key="step.key" :status="step.status">
-            <template #title>{{ step.title }}</template>
-            <template v-if="step.description" #description>
-              {{ step.description }}
-            </template>
-          </a-step>
-        </a-steps>
-
-        <div class="section-card">
-          <div class="section-title">订单基础信息</div>
-          <a-descriptions :column="3" size="small" bordered class="basic-desc">
-            <a-descriptions-item label="申请单号">{{ record.reqNo }}</a-descriptions-item>
-            <a-descriptions-item label="收货仓库">
-              {{ record.receivingWarehouse || defaultWarehouse }}
-            </a-descriptions-item>
-            <a-descriptions-item label="来源">{{ record.source || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="期望到货日期">
-              {{ record.estimatedArrivalDate || '—' }}
-            </a-descriptions-item>
-            <a-descriptions-item label="交货日期">{{
-              record.deliveryDate || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="最近更新时间">{{
-              record.updatedAt || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="操作人">{{ record.operator || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="创建时间">{{
-              record.createdAt || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="创建人">{{ record.creator || '—' }}</a-descriptions-item>
-          </a-descriptions>
-        </div>
-
-        <div class="section-card">
-          <div class="section-title">明细</div>
-          <a-table
-            :columns="lineColumns"
-            :data-source="record.lineItems"
-            row-key="id"
-            size="small"
-            bordered
-            :pagination="false"
-            :scroll="{ x: 1600 }"
-          >
-            <template #bodyCell="{ column, record: line, index }">
-              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-              <template v-else-if="column.key === 'salesOrderNo'">
-                {{ headerSalesOrderNo || '—' }}
-              </template>
-              <template v-else-if="column.key === 'purchaseOrderNo'">
-                {{ headerPurchaseOrderNo || '—' }}
-              </template>
-              <template v-else-if="column.key === 'planPurchaseQty'">
-                {{ formatQty(line.planPurchaseQty) }}
-              </template>
-              <template v-else-if="column.key === 'unitPrice'">
-                {{ formatQty(line.unitPriceInTax ?? line.unitPriceExTax) }}
-              </template>
-              <template v-else-if="column.key === 'designatedSupplier'">
-                {{ line.designatedSupplier ? '是' : '否' }}
-              </template>
-              <template v-else>
-                {{ line[column.dataIndex] ?? '—' }}
-              </template>
-            </template>
-          </a-table>
-
-          <div class="summary-row">
-            <span class="summary-label">总计</span>
-            <span class="summary-item">数量：{{ summary.totalQty }}</span>
-            <span class="summary-item">金额：{{ formatQty(summary.totalAmount) }}</span>
+        <div class="page-header">
+          <div class="header-left">
+            <span class="order-no">{{ record.reqNo }}</span>
+            <a-tag :color="docStatusColor(record.docStatus)">{{ record.docStatus }}</a-tag>
+            <a-tag :color="urgencyColor(record.urgency)">{{ record.urgency }}</a-tag>
+            <a-tag v-if="record.overdueStatus" :color="overdueStatusColor(record.overdueStatus)">
+              {{ record.overdueStatus }}
+            </a-tag>
           </div>
+          <a-space>
+            <a-button v-if="showActions" class="btn-void" @click="handleInvalidate">
+              <InfoCircleOutlined />
+              作废
+            </a-button>
+            <a-button v-if="showActions" type="primary" @click="openGenerateModal">
+              <CheckCircleOutlined />
+              生成采购单
+            </a-button>
+            <a-button size="small" @click="handleBack">返回列表</a-button>
+          </a-space>
         </div>
 
-        <div v-if="showActions" class="footer-actions">
-          <a-button class="btn-void" @click="handleInvalidate">
-            <InfoCircleOutlined />
-            作废
-          </a-button>
-          <a-button type="primary" @click="openGenerateModal">
-            <CheckCircleOutlined />
-            生成采购单
-          </a-button>
+        <a-tabs v-model:active-key="activeTab" class="detail-tabs">
+          <a-tab-pane key="basic" tab="基本信息" />
+          <a-tab-pane key="purchase" :tab="`采购 (${relatedPurchaseOrders.length})`" />
+        </a-tabs>
+
+        <div class="tab-body">
+          <template v-if="activeTab === 'basic'">
+            <div class="section-card">
+              <div class="section-title">基本信息</div>
+              <a-descriptions :column="3" size="small" bordered>
+                <a-descriptions-item label="申请单号">{{ record.reqNo }}</a-descriptions-item>
+                <a-descriptions-item label="单据状态">{{
+                  record.docStatus || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="紧急度">{{
+                  record.urgency || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="订单日期">{{
+                  record.orderDate || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="期望到货日期">
+                  {{ record.estimatedArrivalDate || '—' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="交货日期">{{
+                  record.deliveryDate || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="收货仓库">
+                  {{ record.receivingWarehouse || defaultWarehouse }}
+                </a-descriptions-item>
+                <a-descriptions-item label="来源">{{ record.source || '—' }}</a-descriptions-item>
+                <a-descriptions-item label="逾期状态">
+                  {{ record.overdueStatus || '—' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="销售单号">
+                  {{ record.salesOrderNo || '—' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="操作人">{{
+                  record.operator || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="创建人">{{
+                  record.creator || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="创建时间">{{
+                  record.createdAt || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="最近更新时间">{{
+                  record.updatedAt || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="备注" :span="3">{{
+                  record.remark || '—'
+                }}</a-descriptions-item>
+              </a-descriptions>
+            </div>
+
+            <div class="section-card">
+              <div class="section-title">采购清单</div>
+              <a-table
+                :columns="lineColumns"
+                :data-source="record.lineItems"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: lineTableScrollX }"
+                :locale="{ emptyText: '暂无数据' }"
+              >
+                <template #bodyCell="{ column, record: line, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'productName'">
+                    {{ lineProductName(line) }}
+                  </template>
+                  <template v-else-if="column.key === 'productCode'">
+                    {{ lineProductCode(line) }}
+                  </template>
+                  <template v-else-if="column.key === 'stockQty'">
+                    {{ formatQty(line.stockQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'planPurchaseQty'">
+                    {{ formatQty(line.planPurchaseQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'supplierName'">
+                    {{ line.supplierName || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'remark'">
+                    {{ line.remark || '—' }}
+                  </template>
+                  <template v-else>
+                    {{ line[column.dataIndex] ?? '—' }}
+                  </template>
+                </template>
+              </a-table>
+
+              <div class="summary-row">
+                <span class="summary-label">合计</span>
+                <span class="summary-item">项数 {{ summary.lineCount }}</span>
+                <span class="summary-item">数量 {{ formatQty(summary.totalQty) }}</span>
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="activeTab === 'purchase'">
+            <div class="section-card">
+              <div class="section-title">采购订单</div>
+              <a-table
+                :columns="purchaseOrderColumns"
+                :data-source="relatedPurchaseOrders"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: purchaseOrderTableScrollX }"
+                :locale="{ emptyText: '暂无采购订单' }"
+              >
+                <template #bodyCell="{ column, record: row }">
+                  <template v-if="column.key === 'status'">
+                    <a-tag :color="purchaseOrderStatusColor(row.status)">
+                      {{ row.status || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'inboundStatus'">
+                    <a-tag :color="purchaseInboundStatusColor(row.inboundStatus)">
+                      {{ row.inboundStatus || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'orderNo'">
+                    <a class="link-code" @click.prevent="goPurchaseOrder(row)">
+                      {{ row.orderNo || '—' }}
+                    </a>
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] ?? '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </div>
+          </template>
         </div>
       </template>
 
@@ -106,44 +180,51 @@ export default { name: 'PurchaseRequisitionDetailView' }
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { CheckCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
-import {
-  buildPurchaseRequisitionTimeline,
-  calcRequisitionDetailSummary,
-} from '@/mock/purchaseRequisitionDetail'
+import { calcRequisitionDetailSummary } from '@/mock/purchaseRequisitionDetail'
 import {
   getPurchaseRequisitionById,
   invalidatePurchaseRequisition,
   canGeneratePO,
 } from '@/store/purchaseRequisitionStore'
-import { tabStore } from '@/composables/useTabs'
+import { getPurchaseOrdersByRequisition } from '@/store/purchaseOrderStore'
+import { purchaseRequisitionDetailLineColumns } from '@/utils/purchaseRequisitionLineColumns'
+import { tabStore, useTabs } from '@/composables/useTabs'
 import GeneratePurchaseOrderModal from './components/GeneratePurchaseOrderModal.vue'
 
 const route = useRoute()
+const router = useRouter()
+const { openTab } = useTabs()
 
 const loading = ref(false)
 const record = ref(null)
+const activeTab = ref('basic')
 const generateModalOpen = ref(false)
 const generateTargets = ref([])
 
-const lineColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
-  { title: '物料名称', dataIndex: 'inventoryName', width: 120, ellipsis: true },
-  { title: '物料编码', dataIndex: 'inventoryCode', width: 110 },
-  { title: '型号规格', dataIndex: 'specModel', width: 100 },
-  { title: '材质', dataIndex: 'material', width: 90 },
-  { title: '销售订单号', key: 'salesOrderNo', width: 130 },
-  { title: '采购单号', key: 'purchaseOrderNo', width: 130 },
-  { title: '物料类型', dataIndex: 'materialType', width: 90 },
-  { title: '计量单位', dataIndex: 'unit', width: 80 },
-  { title: '供方类型', dataIndex: 'supplierType', width: 90 },
-  { title: '计划数量', key: 'planPurchaseQty', width: 100, align: 'right' },
-  { title: '单价', key: 'unitPrice', width: 90, align: 'right' },
-  { title: '指定供应商', key: 'designatedSupplier', width: 100 },
-  { title: '供应商', dataIndex: 'supplierName', width: 120, ellipsis: true },
+const lineColumns = purchaseRequisitionDetailLineColumns
+
+const lineTableScrollX = computed(() =>
+  lineColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
+
+const purchaseOrderColumns = [
+  { title: '状态', key: 'status', width: 90, fixed: 'left' },
+  { title: '入库状态', key: 'inboundStatus', width: 96, fixed: 'left' },
+  { title: '采购单号', key: 'orderNo', width: 140 },
+  { title: '供应商', dataIndex: 'supplier', width: 140, ellipsis: true },
+  { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
+  { title: '采购员', dataIndex: 'purchaser', width: 88 },
+  { title: '送货日期', dataIndex: 'shippingDate', width: 110 },
+  { title: '创建人', dataIndex: 'creator', width: 88 },
+  { title: '创建日期', dataIndex: 'documentDate', width: 110 },
 ]
+
+const purchaseOrderTableScrollX = computed(() =>
+  purchaseOrderColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+)
 
 function loadRecord() {
   const id = route.params.id
@@ -153,37 +234,87 @@ function loadRecord() {
 
   if (record.value) {
     const tab = tabStore.tabs.find((t) => t.path === route.path)
-    if (tab) tab.title = record.value.reqNo
+    if (tab) tab.title = `采购申请 ${record.value.reqNo}`
   }
 }
 
 watch(() => route.params.id, loadRecord, { immediate: true })
 
-const timeline = computed(() => buildPurchaseRequisitionTimeline(record.value))
-
-const timelineCurrent = computed(() => {
-  const steps = timeline.value
-  const idx = steps.findIndex((s) => s.status === 'process')
-  if (idx >= 0) return idx
-  const lastFinish = [...steps].reverse().findIndex((s) => s.status === 'finish')
-  if (lastFinish >= 0) return steps.length - 1 - lastFinish
-  return 0
+const summary = computed(() => {
+  const base = calcRequisitionDetailSummary(record.value)
+  return {
+    ...base,
+    lineCount: record.value?.lineItems?.length || 0,
+  }
 })
 
-const summary = computed(() => calcRequisitionDetailSummary(record.value))
+const relatedPurchaseOrders = computed(() => getPurchaseOrdersByRequisition(record.value))
 
 const defaultWarehouse = computed(() => {
   const line = record.value?.lineItems?.[0]
-  return line?.receivingWarehouse || '—'
+  return line?.receivingWarehouse || record.value?.receivingWarehouse || '—'
 })
-
-const headerSalesOrderNo = computed(() => record.value?.salesOrderNo || '')
-const headerPurchaseOrderNo = computed(() => record.value?.purchaseOrderNo || '')
 
 const showActions = computed(() => record.value && canGeneratePO(record.value))
 
+function lineProductName(line) {
+  return line.productName || line.inventoryName || '—'
+}
+
+function lineProductCode(line) {
+  return line.productCode || line.inventoryCode || '—'
+}
+
+function docStatusColor(status) {
+  const map = {
+    待处理: 'processing',
+    处理中: 'warning',
+    处理完成: 'success',
+    已作废: 'default',
+  }
+  return map[status] || 'default'
+}
+
+function urgencyColor(urgency) {
+  const map = {
+    紧急: 'error',
+    加急: 'warning',
+    正常: 'default',
+  }
+  return map[urgency] || 'default'
+}
+
+function overdueStatusColor(status) {
+  const map = {
+    未逾期: 'default',
+    已逾期: 'error',
+  }
+  return map[status] || 'default'
+}
+
+function purchaseOrderStatusColor(status) {
+  const map = { 待审批: 'default', 进行中: 'processing', 已完成: 'success' }
+  return map[status] || 'default'
+}
+
+function purchaseInboundStatusColor(status) {
+  const map = { 未入库: 'default', 部分入库: 'warning', 已入库: 'success' }
+  return map[status] || 'default'
+}
+
 function formatQty(val) {
   return Number(val || 0).toFixed(2)
+}
+
+function handleBack() {
+  router.push('/procurement/purchase-req')
+}
+
+function goPurchaseOrder(row) {
+  if (!row?.id) return
+  const path = `/procurement/purchase-orders/${row.id}`
+  openTab(path, `采购订单 ${row.orderNo}`)
+  router.push({ name: 'procurement-purchase-orders-detail', params: { id: row.id } })
 }
 
 function handleInvalidate() {
@@ -207,6 +338,7 @@ function openGenerateModal() {
 
 function onGenerated() {
   loadRecord()
+  activeTab.value = 'purchase'
   message.success('采购单已生成')
 }
 </script>
@@ -214,39 +346,63 @@ function onGenerated() {
 <style lang="less" scoped>
 .purchase-req-detail-page {
   margin: -12px;
-  padding: 12px 16px 24px;
-  background: #f5f6f8;
   min-height: calc(100vh - 112px);
+  background: #f5f6f8;
+  display: flex;
+  flex-direction: column;
 }
 
-.detail-steps {
-  margin-bottom: 16px;
-  padding: 12px 16px;
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
   background: #fff;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.detail-tabs {
+  background: #fff;
+  padding: 0 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.tab-body {
+  flex: 1;
+  padding: 8px 12px 16px;
+  overflow: auto;
+  background: #f5f6f8;
 }
 
 .section-card {
   background: #fff;
   border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  padding: 12px 16px 16px;
-  margin-bottom: 12px;
-
-  .section-title {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 12px;
-    color: rgba(0, 0, 0, 0.88);
-  }
 }
 
-.basic-desc {
-  :deep(.ant-descriptions-item-label) {
-    color: rgba(0, 0, 0, 0.45);
-    width: 110px;
-  }
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.order-no {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.btn-void {
+  color: #1677ff;
+  border-color: #1677ff;
+}
+
+.section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 10px;
 }
 
 .summary-row {
@@ -268,15 +424,8 @@ function onGenerated() {
   }
 }
 
-.footer-actions {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  padding: 16px 0 8px;
-
-  .btn-void {
-    color: #1677ff;
-    border-color: #1677ff;
-  }
+.link-code {
+  color: #1677ff;
+  cursor: pointer;
 }
 </style>

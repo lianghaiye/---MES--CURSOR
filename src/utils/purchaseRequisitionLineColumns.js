@@ -14,3 +14,8 @@ export const purchaseRequisitionFormLineColumns = [
   { title: '备注', key: 'remark', width: 140, ellipsis: true },
   { title: '操作', key: 'actions', width: 80 },
 ]
+
+/** 采购申请详情页明细列（与表单一致，只读，不含操作列） */
+export const purchaseRequisitionDetailLineColumns = purchaseRequisitionFormLineColumns.filter(
+  (col) => col.key !== 'actions',
+)

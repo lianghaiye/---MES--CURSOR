@@ -176,15 +176,39 @@
         :pagination="false"
         :row-selection="rowSelection"
       >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">
-            {{ rowIndex(index) }}
-          </template>
-          <template v-else-if="column.key === 'orderNo'">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'orderNo'">
             <a class="link-code" @click="openDetail(record)">{{ record.orderNo }}</a>
           </template>
           <template v-else-if="column.key === 'progressStatus'">
             <a-tag :color="progressColor(record.progressStatus)">{{ record.progressStatus }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'totalQty'">
+            {{ formatQty(record.totalQty) }}
+          </template>
+          <template v-else-if="column.key === 'totalIssuedQty'">
+            {{ formatQty(record.totalIssuedQty) }}
+          </template>
+          <template v-else-if="column.key === 'downPaymentAmount'">
+            {{ formatMoney(record.downPaymentAmount) }}
+          </template>
+          <template v-else-if="column.key === 'orderAmount'">
+            ￥{{ formatOrderMoney(record.orderAmount ?? record.amountInTax) }}
+          </template>
+          <template v-else-if="column.key === 'amountExTax'">
+            ￥{{ formatOrderMoney(record.amountExTax) }}
+          </template>
+          <template v-else-if="column.key === 'totalDiscountAmount'">
+            <span v-if="Number(record.totalDiscountAmount) > 0" class="discount-amount">
+              -￥{{ formatOrderMoney(record.totalDiscountAmount) }}
+            </span>
+            <span v-else>—</span>
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ formatDate(record.createdAt) }}
+          </template>
+          <template v-else-if="column.key === 'approvedAt'">
+            {{ formatDate(record.approvedAt) }}
           </template>
           <template v-else-if="column.key === 'urgency'">
             {{ record.urgency }}
@@ -243,6 +267,15 @@
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
     />
+
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="filteredOrders.length"
+      :selected-count="selectedRowKeys.length"
+      @export="doExport"
+    />
   </div>
 </template>
 
@@ -292,7 +325,10 @@ import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useListExport } from '@/composables/useListExport'
+import { salesOrderExportFields } from '@/utils/exportFields/salesOrderExport'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 
@@ -324,33 +360,79 @@ const deliveryStatusOpts = deliveryStatusOptions.map((v) => ({ label: v, value: 
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 
 const baseColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '销售单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
-  { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
   { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true },
-  { title: '订单来源', dataIndex: 'orderSource', width: 100 },
-  { title: '所属区域', dataIndex: 'region', width: 90 },
-  { title: '业务员', dataIndex: 'salesperson', width: 90 },
-  { title: '发货状态', dataIndex: 'deliveryStatus', width: 90 },
   { title: '进度状态', key: 'progressStatus', dataIndex: 'progressStatus', width: 90 },
-  { title: '业务类型', dataIndex: 'businessType', width: 90 },
-  { title: '采购申请单号', dataIndex: 'purchaseRequisitionNo', width: 160, ellipsis: true },
-  { title: '销售渠道', dataIndex: 'salesChannel', width: 90 },
-  { title: '状态', dataIndex: 'status', width: 70 },
-  { title: '单据日期', dataIndex: 'documentDate', width: 110 },
-  { title: '提醒日期', dataIndex: 'reminderDate', width: 110 },
+  { title: '销售数量', key: 'totalQty', dataIndex: 'totalQty', width: 90, align: 'right' },
+  { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
+  { title: '送货方式', dataIndex: 'deliveryMethod', width: 90 },
+  { title: '发货状态', dataIndex: 'deliveryStatus', width: 90 },
+  {
+    title: '发货数量',
+    key: 'totalIssuedQty',
+    dataIndex: 'totalIssuedQty',
+    width: 90,
+    align: 'right',
+  },
   { title: '紧急度', key: 'urgency', dataIndex: 'urgency', width: 80 },
-  { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
+  { title: '业务员', dataIndex: 'salesperson', width: 90 },
   { title: '库存状态', key: 'inventoryStatus', dataIndex: 'inventoryStatus', width: 90 },
-  { title: '总发数', dataIndex: 'totalIssuedQty', width: 80, align: 'right' },
   { title: '结算类型', dataIndex: 'settlementType', width: 90 },
   { title: '付款比例', dataIndex: 'paymentRatio', width: 90 },
-  { title: '首付/定金金额', dataIndex: 'downPaymentAmount', width: 120, align: 'right' },
+  {
+    title: '首付金额',
+    key: 'downPaymentAmount',
+    dataIndex: 'downPaymentAmount',
+    width: 110,
+    align: 'right',
+  },
+  { title: '销售渠道', dataIndex: 'salesChannel', width: 90 },
+  { title: '所属区域', dataIndex: 'region', width: 90 },
+  { title: '订单来源', dataIndex: 'orderSource', width: 100 },
+  {
+    title: '订单含税金额',
+    key: 'orderAmount',
+    dataIndex: 'orderAmount',
+    width: 120,
+    align: 'right',
+  },
+  {
+    title: '订单不含税金额',
+    key: 'amountExTax',
+    dataIndex: 'amountExTax',
+    width: 120,
+    align: 'right',
+  },
+  {
+    title: '优惠总额',
+    key: 'totalDiscountAmount',
+    dataIndex: 'totalDiscountAmount',
+    width: 100,
+    align: 'right',
+  },
+  { title: '创建日期', key: 'createdAt', dataIndex: 'createdAt', width: 110 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '审核日期', key: 'approvedAt', dataIndex: 'approvedAt', width: 110 },
+  { title: '审核人', dataIndex: 'approver', width: 90 },
   { title: '操作', key: 'action', width: 120, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('sales-order-list', baseColumns, { minScrollX: 2200 })
+  useTableColumnSettings('sales-order-list', baseColumns, { minScrollX: 2000 })
+
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'sales-order-list',
+  fieldDefinitions: salesOrderExportFields,
+  getFilteredRows: () => filteredOrders.value,
+  getSelectedRows: () => salesOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id)),
+  fileNamePrefix: '销售订单',
+})
 
 const filteredOrders = computed(() => {
   const f = { ...appliedFilters.value }
@@ -386,13 +468,32 @@ const rowSelection = computed(() => ({
   },
 }))
 
-function rowIndex(index) {
-  return (pagination.current - 1) * pagination.pageSize + index + 1
-}
-
 function progressColor(status) {
   const map = { 已审: 'processing', 未审: 'default', 已完成: 'success', 已终止: 'error' }
   return map[status] || 'default'
+}
+
+function formatQty(val) {
+  if (val == null || val === '') return '—'
+  const n = Number(val)
+  if (!Number.isFinite(n)) return '—'
+  return String(n)
+}
+
+function formatMoney(val) {
+  if (val == null || val === '') return '—'
+  const n = Number(val)
+  if (!Number.isFinite(n)) return '—'
+  return n.toFixed(2)
+}
+
+function formatOrderMoney(val) {
+  return formatMoney(val)
+}
+
+function formatDate(val) {
+  if (!val) return '—'
+  return String(val).slice(0, 10)
 }
 
 function handleSearch() {
@@ -419,6 +520,10 @@ function stubAction(name) {
 function onBatchMenuClick({ key }) {
   if (key === '批量审核') {
     handleApprove()
+    return
+  }
+  if (key === '批量导出') {
+    openExportModal()
     return
   }
   stubAction(key)
@@ -650,6 +755,10 @@ function confirmDelete(record) {
   :deep(.ant-alert-message) {
     font-size: 13px;
   }
+}
+
+.discount-amount {
+  color: #cf1322;
 }
 
 .table-card {

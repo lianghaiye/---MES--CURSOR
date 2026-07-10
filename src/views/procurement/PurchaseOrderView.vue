@@ -171,7 +171,7 @@
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
           <template v-else-if="column.key === 'orderNo'">
-            <a class="link-code">{{ record.orderNo }}</a>
+            <a class="link-code" @click.prevent="openDetail(record)">{{ record.orderNo }}</a>
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
@@ -400,6 +400,12 @@ function statusColor(status) {
 function inboundColor(status) {
   const map = { 未入库: 'default', 部分入库: 'warning', 已入库: 'success' }
   return map[status] || 'default'
+}
+
+function openDetail(record) {
+  const path = `/procurement/purchase-orders/${record.id}`
+  openTab(path, `采购订单 ${record.orderNo}`)
+  router.push({ name: 'procurement-purchase-orders-detail', params: { id: record.id } })
 }
 
 function handleSearch() {

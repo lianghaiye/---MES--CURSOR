@@ -402,6 +402,12 @@ const routes = [
         component: () => import('@/views/procurement/PurchaseOrderView.vue'),
         meta: { title: '采购订单' },
       },
+      {
+        path: 'procurement/purchase-orders/:id',
+        name: 'procurement-purchase-orders-detail',
+        component: () => import('@/views/procurement/PurchaseOrderDetailView.vue'),
+        meta: { title: '采购订单详情' },
+      },
       { path: 'procurement/suppliers', ...emptyChild('procurement-suppliers', '供应商') },
       {
         path: 'engineering-change',
