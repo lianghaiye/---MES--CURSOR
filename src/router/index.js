@@ -63,6 +63,12 @@ const routes = [
     children: [
       { path: 'home/dashboard', ...emptyChild('home-dashboard', '首页') },
       {
+        path: 'home/director-dashboard',
+        name: 'home-director-dashboard',
+        component: () => import('@/views/home/WorkshopDirectorDashboardView.vue'),
+        meta: { title: '车间主任工作台' },
+      },
+      {
         path: 'home/prd',
         name: 'home-prd-index',
         component: () => import('@/views/prd/PrdIndexView.vue'),
@@ -325,7 +331,16 @@ const routes = [
       { path: 'labor-salary/salary-detail', redirect: '/report-management/salary-detail' },
       { path: 'labor-salary/salary-stats', redirect: '/report-management/salary-summary' },
       { path: 'production/shop-floor', redirect: '/production/qc-work-orders' },
-      { path: 'inventory/stock', ...emptyChild('inventory-stock', '库存查询') },
+      {
+        path: 'inventory/stock-detail',
+        name: 'inventory-stock-detail',
+        component: () => import('@/views/inventory/InventoryDetailView.vue'),
+        meta: { title: '库存明细' },
+      },
+      {
+        path: 'inventory/stock',
+        redirect: '/inventory/stock-detail',
+      },
       {
         path: 'inventory/outbound',
         name: 'inventory-outbound',
@@ -408,7 +423,16 @@ const routes = [
         component: () => import('@/views/procurement/PurchaseOrderDetailView.vue'),
         meta: { title: '采购订单详情' },
       },
-      { path: 'procurement/suppliers', ...emptyChild('procurement-suppliers', '供应商') },
+      {
+        path: 'procurement/purchase-details',
+        name: 'procurement-purchase-details',
+        component: () => import('@/views/procurement/PurchaseDetailView.vue'),
+        meta: { title: '采购明细' },
+      },
+      {
+        path: 'procurement/suppliers',
+        redirect: '/procurement/purchase-details',
+      },
       {
         path: 'engineering-change',
         redirect: '/engineering-change/ecn-list',

@@ -30,6 +30,11 @@ export const sideMenus = {
   home: [
     { key: 'dashboard', label: '工作台', path: '/home/dashboard' },
     {
+      key: 'director-dashboard',
+      label: '车间主任工作台',
+      path: '/home/director-dashboard',
+    },
+    {
       key: 'prd',
       label: 'PRD',
       children: [
@@ -75,7 +80,7 @@ export const sideMenus = {
     { key: 'salary-detail', label: '核算详情', path: '/report-management/salary-detail' },
   ],
   inventory: [
-    { key: 'stock', label: '库存查询', path: '/inventory/stock' },
+    { key: 'stock-detail', label: '库存明细', path: '/inventory/stock-detail' },
     { key: 'outbound', label: '出库管理', path: '/inventory/outbound' },
     { key: 'inbound', label: '入库管理', path: '/inventory/inbound' },
     { key: 'in-out-detail', label: '出入库详情', path: '/inventory/in-out-detail' },
@@ -87,7 +92,7 @@ export const sideMenus = {
   procurement: [
     { key: 'purchase-req', label: '采购申请', path: '/procurement/purchase-req' },
     { key: 'purchase-orders', label: '采购订单', path: '/procurement/purchase-orders' },
-    { key: 'suppliers', label: '供应商', path: '/procurement/suppliers' },
+    { key: 'purchase-details', label: '采购明细', path: '/procurement/purchase-details' },
   ],
   'engineering-change': [
     { key: 'ecn-list', label: 'ECN列表', path: '/engineering-change/ecn-list' },
@@ -208,6 +213,7 @@ const createPageRouteTitles = Object.fromEntries(
 
 export const routeTitles = {
   '/home/dashboard': '首页',
+  '/home/director-dashboard': '车间主任工作台',
   '/home/prd': 'IDOMS PRD',
   '/home/prd/v15': '1.5版本迭代',
   '/home/prd/v151': '1.5.1版本迭代',
@@ -249,7 +255,7 @@ export const routeTitles = {
   '/labor-salary/labor-hour': '工时管理',
   '/report-management/salary-summary': '工资核算',
   '/report-management/salary-detail': '核算详情',
-  '/inventory/stock': '库存查询',
+  '/inventory/stock-detail': '库存明细',
   '/inventory/outbound': '出库管理',
   '/inventory/outbound/:id': '出库单详情',
   '/inventory/sales-outbound': '出库管理',
@@ -263,7 +269,7 @@ export const routeTitles = {
   '/system/business-rules': '业务规则',
   '/procurement/purchase-req': '采购申请',
   '/procurement/purchase-orders': '采购订单',
-  '/procurement/suppliers': '供应商',
+  '/procurement/purchase-details': '采购明细',
   '/engineering-change/ecn/new': '提交工程变更申请',
   '/engineering-change/ecn-list': 'ECN列表',
   '/engineering-change/ecr-request': 'ECR申请',
