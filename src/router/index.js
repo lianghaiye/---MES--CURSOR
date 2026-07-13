@@ -63,6 +63,12 @@ const routes = [
     children: [
       { path: 'home/dashboard', ...emptyChild('home-dashboard', '首页') },
       {
+        path: 'home/data-cockpit',
+        name: 'home-data-cockpit',
+        component: () => import('@/views/home/DataCockpitView.vue'),
+        meta: { title: '数据驾驶舱' },
+      },
+      {
         path: 'home/director-dashboard',
         name: 'home-director-dashboard',
         component: () => import('@/views/home/WorkshopDirectorDashboardView.vue'),

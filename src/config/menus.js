@@ -30,6 +30,11 @@ export const sideMenus = {
   home: [
     { key: 'dashboard', label: '工作台', path: '/home/dashboard' },
     {
+      key: 'data-cockpit',
+      label: '数据驾驶舱',
+      path: '/home/data-cockpit',
+    },
+    {
       key: 'director-dashboard',
       label: '车间主任工作台',
       path: '/home/director-dashboard',
@@ -213,6 +218,7 @@ const createPageRouteTitles = Object.fromEntries(
 
 export const routeTitles = {
   '/home/dashboard': '首页',
+  '/home/data-cockpit': '数据驾驶舱',
   '/home/director-dashboard': '车间主任工作台',
   '/home/prd': 'IDOMS PRD',
   '/home/prd/v15': '1.5版本迭代',
