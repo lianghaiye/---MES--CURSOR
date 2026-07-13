@@ -553,6 +553,30 @@ const routes = [
         meta: { title: '客户详情' },
       },
       {
+        path: 'basic-config/supplier-categories',
+        name: 'basic-config-supplier-categories',
+        component: () => import('@/views/basic-config/suppliers/SupplierCategoryView.vue'),
+        meta: { title: '供应商分类' },
+      },
+      {
+        path: 'basic-config/suppliers',
+        name: 'basic-config-suppliers',
+        component: () => import('@/views/basic-config/suppliers/SupplierProfileView.vue'),
+        meta: { title: '供应商档案' },
+      },
+      {
+        path: 'basic-config/suppliers/:id/edit',
+        name: 'basic-config-suppliers-edit',
+        component: () => import('@/views/basic-config/suppliers/SupplierEditView.vue'),
+        meta: { title: '编辑供应商', listPath: '/basic-config/suppliers' },
+      },
+      {
+        path: 'basic-config/suppliers/:id',
+        name: 'basic-config-suppliers-detail',
+        component: () => import('@/views/basic-config/suppliers/SupplierDetailView.vue'),
+        meta: { title: '供应商详情' },
+      },
+      {
         path: 'system/dict',
         name: 'system-dict',
         component: () => import('@/views/system/SystemDictView.vue'),

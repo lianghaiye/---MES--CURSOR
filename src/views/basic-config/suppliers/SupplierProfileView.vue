@@ -1,26 +1,26 @@
 <template>
-  <div class="customer-profile-page">
+  <div class="supplier-profile-page">
     <div class="filter-card">
       <a-form layout="inline" :model="filters" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :xs="24" :sm="12" :md="8" :lg="6">
-            <a-form-item label="客户编码">
+            <a-form-item label="供应商编码">
               <a-input v-model:value="filters.code" allow-clear size="small" placeholder="请输入" />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="8" :lg="6">
-            <a-form-item label="客户名称">
+            <a-form-item label="供应商名称">
               <a-input v-model:value="filters.name" allow-clear size="small" placeholder="请输入" />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="8" :lg="6">
-            <a-form-item label="客户类型">
+            <a-form-item label="供应商分类">
               <a-select
-                v-model:value="filters.customerTypeId"
+                v-model:value="filters.supplierCategoryId"
                 allow-clear
                 size="small"
                 placeholder="全部"
-                :options="customerTypeOpts"
+                :options="supplierCategoryOpts"
                 style="width: 100%"
               />
             </a-form-item>
@@ -41,7 +41,7 @@
       <a-space wrap :size="8">
         <a-button type="primary" size="small" @click="goCreate">
           <PlusOutlined />
-          新增客户
+          新增
         </a-button>
         <a-button size="small" :disabled="!selectedRowKeys.length" @click="handleEnable">
           启用
@@ -49,6 +49,18 @@
         <a-button size="small" :disabled="!selectedRowKeys.length" @click="handleDisable">
           停用
         </a-button>
+        <a-dropdown>
+          <a-button size="small">
+            批量操作
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onBatchMenu">
+              <a-menu-item key="import">导入</a-menu-item>
+              <a-menu-item key="export">导出</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
       </a-space>
     </div>
 
@@ -75,7 +87,7 @@
         size="small"
         bordered
         :pagination="{ pageSize: 10, size: 'small', showSizeChanger: true }"
-        :scroll="{ x: 1300 }"
+        :scroll="{ x: 1600 }"
         :row-selection="rowSelection"
       >
         <template #bodyCell="{ column, record, index }">
@@ -83,22 +95,25 @@
           <template v-else-if="column.key === 'name'">
             <a class="link-name" @click.prevent="goDetail(record)">{{ record.name }}</a>
           </template>
-          <template v-else-if="column.key === 'customerTypeId'">
-            {{ resolveTypeName(record.customerTypeId) }}
+          <template v-else-if="column.key === 'supplierRoles'">
+            <a-space :size="4" wrap>
+              <a-tag v-for="role in record.supplierRoles || []" :key="role" color="blue">{{
+                role
+              }}</a-tag>
+              <span v-if="!(record.supplierRoles || []).length">—</span>
+            </a-space>
           </template>
-          <template v-else-if="column.key === 'customerGrade'">
-            <a-tag :color="customerGradeColor(record.customerGrade)">{{
-              record.customerGrade || '—'
-            }}</a-tag>
+          <template v-else-if="column.key === 'supplierCategoryId'">
+            {{ resolveCategoryName(record.supplierCategoryId) }}
           </template>
-          <template v-else-if="column.key === 'defaultDiscountRate'">
-            {{ formatDiscount(record.defaultDiscountRate) }}
-          </template>
-          <template v-else-if="column.key === 'priceListCount'">
-            {{ (record.customerPriceList || []).length }}
+          <template v-else-if="column.key === 'supplyCycleDays'">
+            {{ formatSupplyCycle(record.supplyCycleDays) }}
           </template>
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="customerStatusColor(record.status)">{{ record.status || '—' }}</a-tag>
+            <a-tag :color="supplierStatusColor(record.status)">{{ record.status || '—' }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ formatDate(record.createdAt) }}
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space :size="8">
@@ -116,44 +131,48 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
-import { customerState, deleteCustomer, setCustomersStatus } from '@/store/customerStore'
-import { getCustomerTypeById, getCustomerTypeOptions } from '@/store/customerTypeStore'
-import { customerGradeColor, customerStatusColor } from '@/constants/customerMaster'
-import { formatDiscountRatePercent } from '@/utils/salesOrderPricing'
+import { DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { supplierState, deleteSupplier, setSuppliersStatus } from '@/store/supplierStore'
+import { getSupplierCategoryById, getSupplierCategoryOptions } from '@/store/supplierCategoryStore'
+import { supplierStatusColor } from '@/constants/supplierMaster'
 import { useTabs } from '@/composables/useTabs'
 
 const router = useRouter()
 const { openTab } = useTabs()
 
-const filters = reactive({ code: '', name: '', customerTypeId: undefined })
-const applied = reactive({ code: '', name: '', customerTypeId: undefined })
+const filters = reactive({ code: '', name: '', supplierCategoryId: undefined })
+const applied = reactive({ code: '', name: '', supplierCategoryId: undefined })
 const selectedRowKeys = ref([])
 
-const customerTypeOpts = computed(() => getCustomerTypeOptions())
+const supplierCategoryOpts = computed(() => getSupplierCategoryOptions())
 
 const columns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
-  { title: '客户编码', dataIndex: 'code', width: 120 },
-  { title: '客户名称', key: 'name', width: 180 },
-  { title: '客户简称', dataIndex: 'shortName', width: 120, ellipsis: true },
-  { title: '客户类型', key: 'customerTypeId', width: 100 },
-  { title: '客户分级', key: 'customerGrade', width: 90 },
-  { title: '价目等级', dataIndex: 'priceLevel', width: 90 },
-  { title: '默认折扣', key: 'defaultDiscountRate', width: 90 },
-  { title: '协议价条目', key: 'priceListCount', width: 100, align: 'right' },
-  { title: '业务员', dataIndex: 'salesperson', width: 90 },
+  { title: '供应商编码', dataIndex: 'code', width: 120 },
+  { title: '类型', key: 'supplierRoles', width: 120 },
+  { title: '供应商名称', key: 'name', width: 180 },
+  { title: '供应商简称', dataIndex: 'shortName', width: 120, ellipsis: true },
+  { title: '供应商分类', key: 'supplierCategoryId', width: 120 },
+  { title: '规模', dataIndex: 'enterpriseScale', width: 80 },
+  { title: '供货期', key: 'supplyCycleDays', width: 90 },
+  { title: '结算方式', dataIndex: 'settlementMethod', width: 100 },
+  { title: '结算类型', dataIndex: 'settlementType', width: 110 },
+  { title: '结算周期', dataIndex: 'settlementCycle', width: 90 },
+  { title: '付款方式', dataIndex: 'paymentMethod', width: 100 },
   { title: '状态', key: 'status', width: 80 },
-  { title: '更新时间', dataIndex: 'updatedAt', width: 150 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建日期', key: 'createdAt', width: 150 },
   { title: '操作', key: 'actions', width: 120, fixed: 'right' },
 ]
 
 const filteredList = computed(() => {
-  void customerState.customers
-  return customerState.customers.filter((item) => {
+  void supplierState.suppliers
+  return supplierState.suppliers.filter((item) => {
     if (applied.code && !String(item.code || '').includes(applied.code)) return false
     if (applied.name && !String(item.name || '').includes(applied.name)) return false
-    if (applied.customerTypeId && item.customerTypeId !== applied.customerTypeId) return false
+    if (applied.supplierCategoryId && item.supplierCategoryId !== applied.supplierCategoryId) {
+      return false
+    }
     return true
   })
 })
@@ -165,73 +184,86 @@ const rowSelection = computed(() => ({
   },
 }))
 
-function resolveTypeName(typeId) {
-  return getCustomerTypeById(typeId)?.name || '—'
+function resolveCategoryName(categoryId) {
+  return getSupplierCategoryById(categoryId)?.name || '—'
 }
 
-function formatDiscount(rate) {
-  if (!rate || rate >= 1) return '无折扣'
-  return formatDiscountRatePercent(rate)
+function formatSupplyCycle(days) {
+  if (days == null || days === '') return '—'
+  return `${days}天`
+}
+
+function formatDate(val) {
+  if (!val) return '—'
+  return String(val).slice(0, 10)
 }
 
 function handleSearch() {
   applied.code = filters.code.trim()
   applied.name = filters.name.trim()
-  applied.customerTypeId = filters.customerTypeId
+  applied.supplierCategoryId = filters.supplierCategoryId
 }
 
 function handleReset() {
   filters.code = ''
   filters.name = ''
-  filters.customerTypeId = undefined
+  filters.supplierCategoryId = undefined
   handleSearch()
 }
 
 function goCreate() {
-  const path = '/basic-config/customers/new'
-  openTab(path, '新增客户')
+  const path = '/basic-config/suppliers/new'
+  openTab(path, '新增供应商')
   router.push(path)
 }
 
 function goEdit(record) {
-  const path = `/basic-config/customers/${record.id}/edit`
-  openTab(path, '编辑客户')
+  const path = `/basic-config/suppliers/${record.id}/edit`
+  openTab(path, '编辑供应商')
   router.push(path)
 }
 
 function goDetail(record) {
-  const path = `/basic-config/customers/${record.id}`
-  openTab(path, record.name || '客户详情')
+  const path = `/basic-config/suppliers/${record.id}`
+  openTab(path, record.name || '供应商详情')
   router.push(path)
 }
 
 function handleEnable() {
-  const res = setCustomersStatus(selectedRowKeys.value, '启用')
+  const res = setSuppliersStatus(selectedRowKeys.value, '启用')
   if (!res.ok) {
     message.warning(res.message)
     return
   }
-  message.success(`已启用 ${res.count} 条客户`)
+  message.success(`已启用 ${res.count} 条供应商`)
   selectedRowKeys.value = []
 }
 
 function handleDisable() {
-  const res = setCustomersStatus(selectedRowKeys.value, '停用')
+  const res = setSuppliersStatus(selectedRowKeys.value, '停用')
   if (!res.ok) {
     message.warning(res.message)
     return
   }
-  message.success(`已停用 ${res.count} 条客户`)
+  message.success(`已停用 ${res.count} 条供应商`)
   selectedRowKeys.value = []
+}
+
+function onBatchMenu({ key }) {
+  if (key === 'export') {
+    message.info('导出功能开发中')
+    return
+  }
+  message.info('导入功能开发中')
 }
 
 function handleDelete(record) {
   Modal.confirm({
     title: '确认删除',
-    content: `确定删除客户「${record.name}」吗？`,
+    content: `确定删除供应商「${record.name}」吗？`,
     okType: 'danger',
     onOk: () => {
-      const res = deleteCustomer(record.id)
+      const res = deleteSupplier(record.id)
       if (!res.ok) {
         message.warning(res.message)
         return
@@ -244,7 +276,7 @@ function handleDelete(record) {
 </script>
 
 <style scoped>
-.customer-profile-page {
+.supplier-profile-page {
   .filter-card,
   .table-card {
     background: #fff;
@@ -252,17 +284,41 @@ function handleDelete(record) {
     padding: 12px;
     margin-bottom: 12px;
   }
+
   .toolbar-row {
     margin-bottom: 12px;
   }
+
   .selection-bar {
     margin-bottom: 12px;
   }
+
   .link-name {
     color: #1677ff;
   }
+
   .danger-link {
     color: #ff4d4f;
+  }
+}
+
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .filter-actions-item {
+    :deep(.ant-form-item-label) {
+      display: none;
+    }
   }
 }
 </style>

@@ -65,9 +65,10 @@ function beforeUpload(file) {
     ...files.value,
     {
       name: file.name,
-      size: file.size >= 1024 * 1024
-        ? `${(file.size / (1024 * 1024)).toFixed(1)}MB`
-        : `${Math.max(1, Math.round(file.size / 1024))}KB`,
+      size:
+        file.size >= 1024 * 1024
+          ? `${(file.size / (1024 * 1024)).toFixed(1)}MB`
+          : `${Math.max(1, Math.round(file.size / 1024))}KB`,
     },
   ]
   return false

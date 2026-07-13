@@ -94,3 +94,11 @@ export function customerGradeColor(grade) {
   }
   return map[grade] || 'default'
 }
+
+export function customerStatusColor(status) {
+  const map = {
+    启用: 'success',
+    停用: 'default',
+  }
+  return map[status] || 'default'
+}

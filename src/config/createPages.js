@@ -169,6 +169,14 @@ export const createPageRegistry = [
     keepAlive: 'CustomerCreateView',
   },
   {
+    listPath: '/basic-config/suppliers',
+    newPath: '/basic-config/suppliers/new',
+    title: '新增供应商',
+    name: 'basic-config-suppliers-new',
+    view: () => import('@/views/basic-config/suppliers/SupplierCreateView.vue'),
+    keepAlive: 'SupplierCreateView',
+  },
+  {
     listPath: '/quality/factory-qc',
     newPath: '/quality/factory-qc/new',
     title: '新增出厂质检',

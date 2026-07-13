@@ -49,7 +49,9 @@
         <a-empty :image="false" description="暂无协议价，点击下方添加" />
       </template>
     </a-table>
-    <a-button type="dashed" block class="add-btn" size="small" @click="addRow">+ 添加协议价</a-button>
+    <a-button type="dashed" block class="add-btn" size="small" @click="addRow"
+      >+ 添加协议价</a-button
+    >
   </div>
 </template>
 

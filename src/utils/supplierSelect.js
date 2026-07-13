@@ -1,17 +1,14 @@
 import { planSupplierOptions } from '@/utils/productionPlanMaterial'
 import { mergeSupplierMasterOptions } from '@/mock/supplierMaster'
+import { getSupplierOptions, supplierState } from '@/store/supplierStore'
 
 export const SUPPLIER_DROPDOWN_QUICK_LIMIT = 8
 export const SUPPLIER_DROPDOWN_SEARCH_LIMIT = 50
 export const SUPPLIER_SELECT_PLACEHOLDER = '请搜索或选择'
 
-let cachedOptions = null
-
 export function getAllSupplierOptions() {
-  if (!cachedOptions) {
-    cachedOptions = mergeSupplierMasterOptions(planSupplierOptions)
-  }
-  return cachedOptions
+  void supplierState.suppliers
+  return mergeSupplierMasterOptions([...getSupplierOptions(), ...planSupplierOptions])
 }
 
 export function filterSupplierOptions(options, keyword) {
@@ -20,19 +17,33 @@ export function filterSupplierOptions(options, keyword) {
   return options.filter((opt) => matchSupplierKeyword(opt, kw))
 }
 
-export function filterSupplierOptionsByFields(
-  options,
-  { code = '', name = '', type = '' } = {},
-) {
+export function filterSupplierOptionsByFields(options, { code = '', name = '', type = '' } = {}) {
   const codeKw = code.trim().toLowerCase()
   const nameKw = name.trim().toLowerCase()
   const typeKw = type.trim().toLowerCase()
   return options.filter((opt) => {
-    if (codeKw && !String(opt.code || '').toLowerCase().includes(codeKw)) return false
-    if (nameKw && !String(opt.label || opt.value || '').toLowerCase().includes(nameKw)) {
+    if (
+      codeKw &&
+      !String(opt.code || '')
+        .toLowerCase()
+        .includes(codeKw)
+    )
+      return false
+    if (
+      nameKw &&
+      !String(opt.label || opt.value || '')
+        .toLowerCase()
+        .includes(nameKw)
+    ) {
       return false
     }
-    if (typeKw && !String(opt.type || '').toLowerCase().includes(typeKw)) return false
+    if (
+      typeKw &&
+      !String(opt.type || '')
+        .toLowerCase()
+        .includes(typeKw)
+    )
+      return false
     return true
   })
 }

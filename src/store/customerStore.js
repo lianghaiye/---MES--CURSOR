@@ -292,7 +292,25 @@ export function updateCustomer(id, payload) {
 
 export function deleteCustomer(id) {
   const index = customerState.customers.findIndex((c) => c.id === id)
-  if (index < 0) return false
+  if (index < 0) return { ok: false, message: '客户不存在' }
   customerState.customers.splice(index, 1)
-  return true
+  return { ok: true }
+}
+
+export function setCustomersStatus(ids, status, operator = 'admin') {
+  if (!Array.isArray(ids) || !ids.length) {
+    return { ok: false, message: '请先选择客户' }
+  }
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
+  let count = 0
+  ids.forEach((id) => {
+    const item = customerState.customers.find((row) => row.id === id)
+    if (!item) return
+    item.status = status
+    item.updatedAt = now
+    item.lastModifier = operator
+    count += 1
+  })
+  if (!count) return { ok: false, message: '未找到可操作的客户' }
+  return { ok: true, count }
 }

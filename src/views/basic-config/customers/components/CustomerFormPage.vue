@@ -62,7 +62,11 @@
         <a-row :gutter="[12, 12]">
           <a-col :span="8">
             <div class="field-label">统一社会信用代码</div>
-            <a-input v-model:value="form.unifiedSocialCreditCode" size="small" placeholder="营业执照号/税号" />
+            <a-input
+              v-model:value="form.unifiedSocialCreditCode"
+              size="small"
+              placeholder="营业执照号/税号"
+            />
           </a-col>
           <a-col :span="8">
             <div class="field-label">法定代表人</div>
@@ -114,7 +118,12 @@
         <a-row :gutter="[12, 12]">
           <a-col :span="8">
             <div class="field-label">币种</div>
-            <a-select v-model:value="form.currency" size="small" :options="currencyOptions" style="width: 100%" />
+            <a-select
+              v-model:value="form.currency"
+              size="small"
+              :options="currencyOptions"
+              style="width: 100%"
+            />
           </a-col>
           <a-col :span="8">
             <div class="field-label">结算方式</div>
@@ -148,7 +157,12 @@
           </a-col>
           <a-col :span="8">
             <div class="field-label">信用额度</div>
-            <a-input-number v-model:value="form.creditLimit" size="small" :min="0" style="width: 100%" />
+            <a-input-number
+              v-model:value="form.creditLimit"
+              size="small"
+              :min="0"
+              style="width: 100%"
+            />
           </a-col>
           <a-col :span="8">
             <div class="field-label">信用可用余额</div>
@@ -171,7 +185,13 @@
           </a-col>
           <a-col :span="8">
             <div class="field-label">税率(%)</div>
-            <a-input-number v-model:value="form.taxRate" size="small" :min="0" :max="100" style="width: 100%" />
+            <a-input-number
+              v-model:value="form.taxRate"
+              size="small"
+              :min="0"
+              :max="100"
+              style="width: 100%"
+            />
           </a-col>
         </a-row>
       </a-tab-pane>
@@ -201,11 +221,18 @@
           </a-col>
           <a-col :span="8">
             <div class="field-label">启用状态</div>
-            <a-select v-model:value="form.status" size="small" :options="statusOpts" style="width: 100%" />
+            <a-select
+              v-model:value="form.status"
+              size="small"
+              :options="statusOpts"
+              style="width: 100%"
+            />
           </a-col>
         </a-row>
         <div class="section-subtitle">产品协议价（可选）</div>
-        <p class="section-hint">建单时选择客户/产品将自动带出默认折扣与协议价；协议单价优先于协议折扣。</p>
+        <p class="section-hint">
+          建单时选择客户/产品将自动带出默认折扣与协议价；协议单价优先于协议折扣。
+        </p>
         <CustomerPriceListTable v-model="form.customerPriceList" />
       </a-tab-pane>
 
@@ -438,9 +465,7 @@ function handleSave() {
   if (!validate()) return
   saving.value = true
   const payload = buildPayload()
-  const res = isEdit.value
-    ? updateCustomer(props.record.id, payload)
-    : addCustomer(payload)
+  const res = isEdit.value ? updateCustomer(props.record.id, payload) : addCustomer(payload)
   saving.value = false
   if (!res.ok) {
     message.warning(res.message)

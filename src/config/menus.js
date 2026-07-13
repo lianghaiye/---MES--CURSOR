@@ -147,6 +147,18 @@ export const sideMenus = {
         { key: 'customer-types', label: '客户类型', path: '/basic-config/customer-types' },
       ],
     },
+    {
+      key: 'supplier-mgmt',
+      label: '供应商管理',
+      children: [
+        { key: 'suppliers', label: '供应商档案', path: '/basic-config/suppliers' },
+        {
+          key: 'supplier-categories',
+          label: '供应商分类',
+          path: '/basic-config/supplier-categories',
+        },
+      ],
+    },
   ],
   system: [
     { key: 'dict', label: '系统字典', path: '/system/dict' },
@@ -219,6 +231,8 @@ export const routeTitles = {
   '/sales/delivery/:id': '发货单详情',
   '/basic-config/customers': '客户档案',
   '/basic-config/customer-types': '客户类型',
+  '/basic-config/suppliers': '供应商档案',
+  '/basic-config/supplier-categories': '供应商分类',
   '/sales/framework-contracts': '框架合同',
   '/planning/production-plan': '生产计划',
   '/planning/design-task': '设计任务',
@@ -285,6 +299,8 @@ export const dynamicRouteTitles = [
   { pattern: /^\/basic-config\/warehouses\/[^/]+$/, title: '仓库详情' },
   { pattern: /^\/basic-config\/customers\/[^/]+\/edit$/, title: '编辑客户' },
   { pattern: /^\/basic-config\/customers\/[^/]+$/, title: '客户详情' },
+  { pattern: /^\/basic-config\/suppliers\/[^/]+\/edit$/, title: '编辑供应商' },
+  { pattern: /^\/basic-config\/suppliers\/[^/]+$/, title: '供应商详情' },
   { pattern: /^\/inventory\/inbound\/[^/]+$/, title: '入库单详情' },
   { pattern: /^\/inventory\/outbound\/[^/]+$/, title: '出库单详情' },
   { pattern: /^\/report-management\/report-work\/[^/]+$/, title: '报工确认详情' },

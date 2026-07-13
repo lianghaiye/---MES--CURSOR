@@ -52,7 +52,11 @@
           <a-input v-model:value="record.zipCode" size="small" @change="emitChange" />
         </template>
         <template v-else-if="column.key === 'isDefault'">
-          <a-switch v-model:checked="record.isDefault" size="small" @change="onDefaultChange(index)" />
+          <a-switch
+            v-model:checked="record.isDefault"
+            size="small"
+            @change="onDefaultChange(index)"
+          />
         </template>
         <template v-else-if="column.key === 'consignee'">
           <a-input v-model:value="record.consignee" size="small" @change="emitChange" />

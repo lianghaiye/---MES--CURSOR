@@ -39,7 +39,7 @@ function normalizeLicenseFile(file) {
   return { name: file.name || '', size: file.size || '' }
 }
 
-function normalizeContactRow(row = {}) {
+export function normalizeContactRow(row = {}) {
   if (typeof row === 'string') {
     return createEmptyContact({ name: row })
   }
@@ -159,8 +159,7 @@ export function normalizeCustomerRecord(row = {}) {
     }
   }
   form.contacts = form.contacts.map(normalizeContactRow)
-  const defaultContact =
-    form.contacts.find((item) => item.isDefault) || form.contacts[0] || null
+  const defaultContact = form.contacts.find((item) => item.isDefault) || form.contacts[0] || null
   form.contactPerson = defaultContact?.name || row.contactPerson || ''
   form.contactTitle = defaultContact?.title || row.contactTitle || ''
   form.contactPhone = defaultContact?.phone || row.contactPhone || ''
@@ -168,12 +167,18 @@ export function normalizeCustomerRecord(row = {}) {
   form.contactEmail = defaultContact?.email || row.contactEmail || ''
   form.contactFax = defaultContact?.fax || row.contactFax || ''
   if (!form.customerGrade) form.customerGrade = CUSTOMER_GRADE.NORMAL
+  if (!form.status) {
+    form.status = row.dataStatus === '作废' ? '停用' : '启用'
+  }
   if (!form.dataStatus) form.dataStatus = row.status === '启用' ? '已审' : '草稿'
   if (!form.invoiceName && form.name) form.invoiceName = form.name
   if (!form.invoiceTaxNo && form.unifiedSocialCreditCode) {
     form.invoiceTaxNo = form.unifiedSocialCreditCode
   }
-  if (!form.settlementCycle && ['月结', '周结', '半月结', '季结', '无'].includes(form.settlementMethod)) {
+  if (
+    !form.settlementCycle &&
+    ['月结', '周结', '半月结', '季结', '无'].includes(form.settlementMethod)
+  ) {
     form.settlementCycle = form.settlementMethod
     form.settlementMethod = undefined
   } else if (form.settlementMethod === '现结') {
