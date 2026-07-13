@@ -158,6 +158,58 @@ export function buildWorkOrderRows(materials, order) {
   })
 }
 
+/** 保存弹窗行回写物料（总装/部装工单） */
+export function patchMaterialFromAssemblyWorkOrderRow(row) {
+  return {
+    processRoute: row.processRoute,
+    workCenter: row.workCenter,
+    planQty: row.planQty,
+    planDateRange: row.planDateRange,
+    warehouse: row.warehouse,
+    urgency: row.urgency,
+    remark: row.remark,
+    planCount: row.planQty,
+    status: '进行中',
+    joinPlan: '是',
+  }
+}
+
+/** 构建总装/部装工单弹窗行数据 */
+export function buildAssemblyWorkOrderRows(materials, order) {
+  const assemblyDate = resolveAssemblyDate(order)
+  const startDate = dayjs().format('YYYY-MM-DD')
+  const endDate = assemblyDate || dayjs().add(14, 'day').format('YYYY-MM-DD')
+
+  return materials.map((m, index) => {
+    const demandQty = m.isTopLevel
+      ? (m.demandQty ?? calcDemandQty(1, order.productQty))
+      : calcDemandQty(m.unitUsage, order.productQty)
+    const gapQty = calcGapQty(demandQty, m.availableStock)
+    const planQty = m.planQty ?? gapQty
+    return {
+      key: m.id,
+      materialId: m.id,
+      index: index + 1,
+      orderCategory: m.orderCategory || '总装工单',
+      productName: m.name,
+      code: m.code,
+      spec: m.spec,
+      specAttr: m.specAttr,
+      material: m.material,
+      drawingNo: m.drawingNo || resolveMasterDrawingNo(m.code),
+      bom: m.bom || m.name,
+      processRoute: m.processRoute || '装配标准路线',
+      workCenter: m.workCenter || '总装车间',
+      planQty,
+      scheduleQty: planQty,
+      planDateRange: m.planDateRange?.length === 2 ? [...m.planDateRange] : [startDate, endDate],
+      warehouse: m.warehouse || resolveDefaultWarehouseByMaterialCode(m.code) || '',
+      urgency: m.urgency || order.urgency || '普通',
+      remark: m.remark || '',
+    }
+  })
+}
+
 /** 保存弹窗行回写物料 */
 export function patchMaterialFromWorkOrderRow(row) {
   return {

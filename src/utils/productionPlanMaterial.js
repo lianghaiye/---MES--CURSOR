@@ -215,6 +215,24 @@ export function isTopLevelSelfMade(supplyType) {
   return supplyType === '自制件' || supplyType === '自制'
 }
 
+/** 总装/部装工单：顶级组装件 → 总装工单；子级组装件 → 部装工单 */
+export function getAssemblyMaterialsForPlan(order) {
+  const all = []
+  order?.workItems?.forEach((wi) => {
+    resolveWorkItemMaterials(wi)
+    const top = wi._topMaterial || buildTopLevelPlanMaterial(wi)
+    if (top?.supplyType === '组装') {
+      all.push({ ...top, orderCategory: '总装工单' })
+    }
+    const flat = []
+    flattenMaterials(wi.materials, flat)
+    flat
+      .filter((m) => m.supplyType === '组装')
+      .forEach((m) => all.push({ ...m, orderCategory: '部装工单' }))
+  })
+  return all
+}
+
 const supplierOptionMap = new Map()
 ;[...poSupplierOptions, ...reqSupplierOptions].forEach((opt) => {
   supplierOptionMap.set(opt.value, opt)

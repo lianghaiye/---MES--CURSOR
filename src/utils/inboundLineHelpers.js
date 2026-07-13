@@ -204,10 +204,7 @@ export function applyPickerItemToInboundLine(line, item, defaultWarehouse = '') 
     productAttribute: item.productAttribute || item.materialType,
     materialType: item.materialType,
   }
-  const fresh = buildInboundLineFromPickerItem(
-    normalized,
-    line.warehouse || defaultWarehouse || '',
-  )
+  const fresh = buildInboundLineFromPickerItem(normalized, line.warehouse || defaultWarehouse || '')
   return enrichInboundLine({
     ...line,
     itemId: fresh.itemId,
@@ -222,7 +219,10 @@ export function applyPickerItemToInboundLine(line, item, defaultWarehouse = '') 
     unitPrice: fresh.unitPrice ?? line.unitPrice,
     stockQty: fresh.stockQty,
     warehouseStockQty: fresh.warehouseStockQty,
-    totalPrice: calcInboundLineTotalPrice({ ...line, unitPrice: fresh.unitPrice ?? line.unitPrice }),
+    totalPrice: calcInboundLineTotalPrice({
+      ...line,
+      unitPrice: fresh.unitPrice ?? line.unitPrice,
+    }),
   })
 }
 

@@ -91,6 +91,22 @@ export function getInboundOrdersBySource(sourceOrderNo) {
   return inboundOrderState.orders.filter((o) => o.sourceOrderNo === sourceOrderNo)
 }
 
+/** 查询采购单关联的入库单 */
+export function getInboundOrdersByPurchaseOrder(purchaseOrder) {
+  if (!purchaseOrder) return []
+  const id = purchaseOrder.id
+  const orderNo = purchaseOrder.orderNo
+  return inboundOrderState.orders.filter((order) => {
+    if (id && order.purchaseOrderId === id) return true
+    if (!orderNo) return false
+    const isPurchaseSource =
+      order.sourceType === '采购订单' ||
+      order.sourceType === '采购单' ||
+      order.inboundType === '采购入库'
+    return isPurchaseSource && order.sourceOrderNo === orderNo
+  })
+}
+
 export function resolveWarehouseKeeper(warehouseName) {
   const wh = warehouseState.warehouses.find((w) => w.name === warehouseName)
   return wh?.managerName || ''
@@ -254,7 +270,8 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
   const itemTypes = [...new Set(lines.map((line) => line.itemType).filter(Boolean))]
   const itemType = itemTypes.length === 1 ? itemTypes[0] : '物料'
   const warehouses = [...new Set(lines.map((line) => line.warehouse).filter(Boolean))]
-  const headerWarehouse = warehouses.length === 1 ? warehouses[0] : warehouses[0] || ''
+  const headerWarehouse =
+    payload.warehouse || (warehouses.length === 1 ? warehouses[0] : warehouses[0] || '')
 
   const lineItems = lines.map((line) =>
     createInboundLine({
@@ -264,6 +281,9 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
       specModel: line.specModel || '',
       specAttr: line.specAttr || '',
       material: line.material || '',
+      drawingNo: line.drawingNo || '',
+      locationNo: line.locationNo || '',
+      weight: line.weight ?? null,
       unit: line.unit || '个',
       unitPrice: line.unitPrice ?? null,
       warehouse: line.warehouse,

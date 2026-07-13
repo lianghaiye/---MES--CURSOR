@@ -264,6 +264,9 @@
                   />
                   <span>调整紧急度</span>
                   <a-select style="width: 100px" placeholder="选择" />
+                  <a-button type="primary" @click="openAssemblyWorkOrderModal"
+                    >生成总装/部装工单</a-button
+                  >
                   <a-button type="primary" @click="generatePurchaseReq">生成采购申请</a-button>
                   <a-button type="primary" @click="openWorkOrderModal">生成加工工单</a-button>
                   <a-button type="primary" @click="openOutsourceWorkOrderModal"
@@ -526,6 +529,13 @@
       <a-empty v-else class="detail-empty" description="请选择左侧订单" />
     </div>
 
+    <GenerateAssemblyWorkOrderModal
+      v-model:open="assemblyWorkOrderModalOpen"
+      :order="selectedOrder"
+      :materials="assemblyMaterialsForPlan"
+      @save="handleAssemblyWorkOrderSave"
+    />
+
     <GenerateWorkOrderModal
       v-model:open="workOrderModalOpen"
       :order="selectedOrder"
@@ -589,6 +599,7 @@ import { productionPlanState, filterProductionPlans } from '@/store/productionPl
 import { getActiveBomForItem } from '@/store/productBomStore'
 import { useTabs } from '@/composables/useTabs'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
+import GenerateAssemblyWorkOrderModal from './components/GenerateAssemblyWorkOrderModal.vue'
 import GenerateOutsourceWorkOrderModal from './components/GenerateOutsourceWorkOrderModal.vue'
 import GeneratePurchaseRequisitionModal from './components/GeneratePurchaseRequisitionModal.vue'
 import {
@@ -601,6 +612,7 @@ import {
   updateMaterialInOrder,
   patchMaterialFromWorkOrderRow,
   patchMaterialFromOutsourceWorkOrderRow,
+  patchMaterialFromAssemblyWorkOrderRow,
   calcDemandQty,
   calcGapQty,
   flattenMaterials,
@@ -611,6 +623,7 @@ import {
   enrichPlanMaterialTree,
   getProcessRouteSelectOptions,
   getSelfMadeMaterialsForPlan,
+  getAssemblyMaterialsForPlan,
   buildDisplayMaterialTree,
   cascadeMaterialPlanQtyFromParent,
   collectAllMaterialRowKeys,
@@ -640,7 +653,10 @@ import {
   productionPlanPrintColumnSettings,
 } from '@/mock/productionPlanPrintColumns'
 import { workOrderState } from '@/store/workOrderStore'
-import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
+import {
+  assemblyWorkOrderState,
+  addAssemblyWorkOrdersFromPlanRows,
+} from '@/store/assemblyWorkOrderStore'
 import { purchaseRequisitionState } from '@/store/purchaseRequisitionStore'
 import { buildProductionPlanOrderTree } from '@/utils/productionPlanOrderTree'
 
@@ -663,6 +679,7 @@ const detailCollapsed = ref(false)
 const detailFullscreen = ref(false)
 const detailTab = ref('work')
 const workOrderModalOpen = ref(false)
+const assemblyWorkOrderModalOpen = ref(false)
 const outsourceWorkOrderModalOpen = ref(false)
 const purchaseReqModalOpen = ref(false)
 const ebomPrintModalOpen = ref(false)
@@ -880,6 +897,10 @@ function openBomDetail(bomId, bomName) {
 
 const selfMadeMaterials = computed(() =>
   selectedOrder.value ? getSelfMadeMaterialsForPlan(selectedOrder.value) : [],
+)
+
+const assemblyMaterialsForPlan = computed(() =>
+  selectedOrder.value ? getAssemblyMaterialsForPlan(selectedOrder.value) : [],
 )
 
 const activeWorkItemBomTitle = computed(() => {
@@ -1106,6 +1127,26 @@ function materialStatusColor(status) {
   return map[status] || 'default'
 }
 
+function openAssemblyWorkOrderModal() {
+  if (!selectedOrder.value) {
+    message.warning('请先选择订单')
+    return
+  }
+  if (activeWorkItem.value?.status === '设计中') {
+    message.warning('当前工作项处于「设计中」，请先完成设计任务审核')
+    return
+  }
+  if (activeWorkItem.value?.status === '待BOM') {
+    message.warning('当前工作项处于「待BOM」，请先维护产品 BOM 或改选 BOM 来源后补绑')
+    return
+  }
+  if (!assemblyMaterialsForPlan.value.length) {
+    message.info('当前订单没有供应型态为「组装」的物料，或顶级物料未设为「组装」')
+    return
+  }
+  assemblyWorkOrderModalOpen.value = true
+}
+
 function openWorkOrderModal() {
   if (!selectedOrder.value) {
     message.warning('请先选择订单')
@@ -1216,6 +1257,19 @@ function handlePurchaseReqSave(requisition) {
     })
   }
   message.success(`已生成采购申请 ${requisition.reqNo}，共 ${requisition.lineItems.length} 条物料`)
+}
+
+function handleAssemblyWorkOrderSave(savedRows) {
+  const order = productionPlanState.plans.find((o) => o.id === selectedId.value)
+  if (!order) return
+  lockOrderPlanQty(order)
+  savedRows.forEach((row) => {
+    updateMaterialInOrder(order, row.materialId, patchMaterialFromAssemblyWorkOrderRow(row))
+  })
+  const created = addAssemblyWorkOrdersFromPlanRows(savedRows, order)
+  if (created.length) {
+    message.success(`已同步 ${created.length} 条工单至总装工单`)
+  }
 }
 
 function handleWorkOrderSave(savedRows) {

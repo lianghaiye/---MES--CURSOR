@@ -164,13 +164,15 @@ export function createAssemblyWorkOrderPayload(partial) {
   const productName = partial.productName?.trim() || ''
   const existingCodes = assemblyWorkOrderState.orders.map((o) => o.code)
   const code = resolveOrderField(partial.code, () => generateAssemblyWorkOrderCode(existingCodes))
-  const name = resolveOrderField(partial.name, () => generateAssemblyWorkOrderName(productName))
+  const name = resolveOrderField(partial.name, () =>
+    generateAssemblyWorkOrderName(productName, partial.orderCategory),
+  )
   return {
     id: `asm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     code,
     name,
     productName,
-    orderCategory: '总装工单',
+    orderCategory: partial.orderCategory || '总装工单',
     status: '待下发',
     scheduleQty: partial.scheduleQty ?? partial.planQty ?? 0,
     planQty: partial.planQty ?? 0,
@@ -200,6 +202,40 @@ export function findAssemblyOrdersBySalesProduct(salesOrderNo, productName) {
       source === salesOrderNo || source.includes(salesOrderNo) || salesOrderNo.includes(source)
     return orderMatched && wo.productName === productName
   })
+}
+
+/** 生产计划保存总装/部装工单后同步创建 */
+export function addAssemblyWorkOrdersFromPlanRows(rows, sourceOrder) {
+  const created = []
+  rows.forEach((row) => {
+    const exists = assemblyWorkOrderState.orders.some(
+      (o) =>
+        o.source === 'production-plan' &&
+        o.orderCategory === row.orderCategory &&
+        o.productName === row.productName &&
+        o.sourceOrderNo === sourceOrder.orderNo,
+    )
+    if (exists) return
+
+    const wo = createAssemblyWorkOrderPayload({
+      productName: row.productName,
+      orderCategory: row.orderCategory,
+      scheduleQty: row.scheduleQty ?? row.planQty,
+      planQty: row.planQty,
+      workCenter: row.workCenter,
+      bom: row.bom,
+      warehouse: row.warehouse,
+      urgency: row.urgency,
+      remark: row.remark,
+      planDateRange: row.planDateRange,
+      processRouteName: row.processRoute,
+      source: 'production-plan',
+      sourceOrderNo: sourceOrder.orderNo,
+    })
+    addAssemblyWorkOrder(wo)
+    created.push(wo)
+  })
+  return created
 }
 
 export function filterAssemblyWorkOrders(list, filters) {

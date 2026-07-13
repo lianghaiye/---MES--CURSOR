@@ -40,8 +40,9 @@ export function generateAssemblyWorkOrderCode(existingCodes = [], refDate = dayj
   return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`
 }
 
-export function generateAssemblyWorkOrderName(productName) {
-  return `${productName || ''}总装工单`
+export function generateAssemblyWorkOrderName(productName, orderCategory = '总装工单') {
+  const suffix = orderCategory === '部装工单' ? '部装工单' : '总装工单'
+  return `${productName || ''}${suffix}`
 }
 
 /** 质检工单编号：ZJGD + 年月日 + 3位流水 */

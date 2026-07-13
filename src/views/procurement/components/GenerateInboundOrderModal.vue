@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     title="新增入库单"
-    width="1000px"
+    width="1400px"
     :mask-closable="false"
     destroy-on-close
     class="generate-inbound-modal"
@@ -27,6 +27,18 @@
               size="small"
               style="width: 100%"
               placeholder="请选择收货日期"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="入库仓库">
+            <a-select
+              v-model:value="form.warehouse"
+              allow-clear
+              size="small"
+              placeholder="请选择 入库仓库"
+              :options="warehouseOpts"
+              @change="onHeaderWarehouseChange"
             />
           </a-form-item>
         </a-col>
@@ -61,17 +73,38 @@
       size="small"
       bordered
       :pagination="false"
-      :scroll="{ x: 1100 }"
+      :scroll="{ x: tableScrollX }"
     >
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+        <template v-else-if="column.key === 'itemName'">
+          <span class="item-name-text" :title="record.itemName">
+            [{{ record.itemCode }}] {{ record.itemName }}
+          </span>
+        </template>
+        <template v-else-if="column.key === 'stockQty'">
+          {{ formatQty(record.stockQty) }}
+        </template>
+        <template v-else-if="column.key === 'warehouseStockQty'">
+          {{ formatQty(record.warehouseStockQty) }}
+        </template>
         <template v-else-if="column.key === 'warehouse'">
           <a-select
             v-model:value="record.warehouse"
+            allow-clear
             size="small"
             placeholder="请选择"
             style="width: 100%"
             :options="warehouseOpts"
+            @change="() => refreshLine(record)"
+          />
+        </template>
+        <template v-else-if="column.key === 'locationNo'">
+          <a-input
+            v-model:value="record.locationNo"
+            size="small"
+            allow-clear
+            placeholder="请输入货位号"
           />
         </template>
         <template v-else-if="column.key === 'qty'">
@@ -80,12 +113,38 @@
             size="small"
             :min="0"
             :max="record.remainingQty"
-            :precision="2"
+            :precision="3"
+            style="width: 100%"
+            @change="() => onLineQtyChange(record)"
+          />
+        </template>
+        <template v-else-if="column.key === 'weight'">
+          <a-input-number
+            v-model:value="record.weight"
+            size="small"
+            :min="0"
+            :precision="3"
             style="width: 100%"
           />
         </template>
+        <template v-else-if="column.key === 'unitPrice'">
+          <a-input-number
+            v-model:value="record.unitPrice"
+            size="small"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+            @change="() => onLineUnitPriceChange(record)"
+          />
+        </template>
+        <template v-else-if="column.key === 'totalPrice'">
+          {{ formatMoney(record.totalPrice) }}
+        </template>
         <template v-else-if="column.key === 'action'">
-          <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
+          <a-space :size="4">
+            <a @click="openLineEdit(record)">编辑</a>
+            <a class="danger-link" @click="removeLine(index)">删除</a>
+          </a-space>
         </template>
         <template v-else>
           {{ record[column.dataIndex] ?? '—' }}
@@ -108,16 +167,30 @@
       </a-button>
     </template>
   </a-modal>
+
+  <InboundLineEditModal
+    v-model:open="lineEditOpen"
+    :line="lineEditTarget"
+    mode="edit"
+    @confirm="onLineEditConfirm"
+  />
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { CheckOutlined } from '@ant-design/icons-vue'
+import InboundLineEditModal from '@/views/inventory/components/InboundLineEditModal.vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { createInboundFromPurchaseOrder } from '@/store/inboundOrderStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
+import { inboundFormLineColumns } from '@/utils/inboundLineColumns'
+import {
+  enrichInboundLine,
+  enrichInboundLineStock,
+  syncInboundLineTotalFromUnit,
+} from '@/utils/inboundLineHelpers'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -128,11 +201,16 @@ const emit = defineEmits(['update:open', 'saved'])
 
 const saving = ref(false)
 const inboundLines = ref([])
+const prevHeaderWarehouse = ref(undefined)
+const lineEditOpen = ref(false)
+const lineEditTarget = ref(null)
+const lineEditSourceId = ref(null)
 
 const form = reactive({
   receiptDate: dayjs(),
   invoiceNo: '',
   remark: '',
+  warehouse: undefined,
 })
 
 const warehouseOpts = computed(() => {
@@ -141,16 +219,11 @@ const warehouseOpts = computed(() => {
 })
 
 const columns = [
-  { title: '序号', key: 'index', width: 56, align: 'center' },
-  { title: '物品名称', dataIndex: 'itemName', width: 130, ellipsis: true },
-  { title: '物品编码', dataIndex: 'itemCode', width: 120 },
-  { title: '规格型号', dataIndex: 'specModel', width: 100 },
-  { title: '规格属性', dataIndex: 'specAttr', width: 90 },
-  { title: '入库仓库', key: 'warehouse', width: 120 },
-  { title: '入库数量', key: 'qty', width: 110 },
-  { title: '单位', dataIndex: 'unit', width: 70 },
-  { title: '操作', key: 'action', width: 70 },
+  ...inboundFormLineColumns.filter((c) => c.key !== 'actions'),
+  { title: '操作', key: 'action', width: 100, fixed: 'right' },
 ]
+
+const tableScrollX = computed(() => columns.reduce((sum, col) => sum + (col.width || 100), 0))
 
 const totalQty = computed(() =>
   inboundLines.value.reduce((sum, line) => sum + (Number(line.qty) || 0), 0),
@@ -164,6 +237,11 @@ watch(
     form.invoiceNo = ''
     form.remark = props.purchaseOrder.remark || ''
     inboundLines.value = buildLinesFromPurchaseOrder(props.purchaseOrder)
+    const warehouses = [
+      ...new Set(inboundLines.value.map((line) => line.warehouse).filter(Boolean)),
+    ]
+    form.warehouse = warehouses.length === 1 ? warehouses[0] : undefined
+    prevHeaderWarehouse.value = form.warehouse
   },
 )
 
@@ -175,7 +253,9 @@ function buildLinesFromPurchaseOrder(order) {
     })
     .map((line) => {
       const remaining = (Number(line.purchaseQty) || 0) - (Number(line.receivedQty) || 0)
-      return {
+      const warehouse =
+        line.receivingWarehouse || resolveDefaultWarehouseByMaterialCode(line.itemCode) || undefined
+      return enrichInboundLine({
         id: line.id,
         poLineId: line.id,
         itemCode: line.itemCode,
@@ -184,21 +264,92 @@ function buildLinesFromPurchaseOrder(order) {
         specModel: line.specModel || '',
         specAttr: line.specAttr || '',
         material: line.material || '',
+        drawingNo: line.drawingNo || '',
         unit: line.unit || '个',
         unitPrice: line.unitPriceInTax ?? line.unitPriceExTax ?? null,
-        warehouse:
-          line.receivingWarehouse ||
-          resolveDefaultWarehouseByMaterialCode(line.itemCode) ||
-          undefined,
+        locationNo: line.locationNo || '',
+        weight: line.weight ?? null,
+        warehouse,
         qty: remaining,
         remainingQty: remaining,
         purchaseQty: line.purchaseQty,
-      }
+      })
     })
+}
+
+function refreshLine(line) {
+  Object.assign(line, enrichInboundLineStock(line))
+  syncInboundLineTotalFromUnit(line)
+}
+
+function onLineQtyChange(line) {
+  syncInboundLineTotalFromUnit(line)
+}
+
+function onLineUnitPriceChange(line) {
+  syncInboundLineTotalFromUnit(line)
+}
+
+function onHeaderWarehouseChange(newVal) {
+  const oldVal = prevHeaderWarehouse.value
+  const changed = newVal !== oldVal
+  prevHeaderWarehouse.value = newVal
+
+  if (!changed || !newVal || !inboundLines.value.length) return
+
+  Modal.confirm({
+    title: '入库仓库已修改，是否同步修改明细仓库？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => {
+      inboundLines.value.forEach((line) => {
+        line.warehouse = newVal
+        refreshLine(line)
+      })
+    },
+  })
 }
 
 function removeLine(index) {
   inboundLines.value.splice(index, 1)
+}
+
+function openLineEdit(record) {
+  lineEditSourceId.value = record.id
+  lineEditTarget.value = { ...record }
+  lineEditOpen.value = true
+}
+
+function onLineEditConfirm(updated) {
+  const enriched = enrichInboundLine(updated)
+  const idx = inboundLines.value.findIndex((l) => l.id === lineEditSourceId.value)
+  if (idx === -1) return
+  const original = inboundLines.value[idx]
+  if (original.remainingQty != null && Number(enriched.qty) > Number(original.remainingQty)) {
+    message.warning(`入库数量不能超过剩余可入库数量 ${original.remainingQty}`)
+    enriched.qty = original.remainingQty
+  }
+  inboundLines.value[idx] = {
+    ...original,
+    ...enriched,
+    remainingQty: original.remainingQty,
+    poLineId: original.poLineId,
+    purchaseQty: original.purchaseQty,
+  }
+  refreshLine(inboundLines.value[idx])
+}
+
+function formatQty(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
+
+function formatMoney(val) {
+  if (val == null || val === '') return '—'
+  return Number(val).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 function handleCancel() {
@@ -231,6 +382,7 @@ function handleSave() {
     deliveryDate: form.receiptDate.format('YYYY-MM-DD'),
     invoiceNo: form.invoiceNo?.trim(),
     remark: form.remark?.trim(),
+    warehouse: form.warehouse || '',
     lineItems: inboundLines.value.map((line) => ({
       poLineId: line.poLineId,
       itemCode: line.itemCode,
@@ -239,8 +391,11 @@ function handleSave() {
       specModel: line.specModel,
       specAttr: line.specAttr,
       material: line.material,
+      drawingNo: line.drawingNo,
       unit: line.unit,
       unitPrice: line.unitPrice,
+      locationNo: line.locationNo,
+      weight: line.weight,
       warehouse: line.warehouse,
       qty: Number(line.qty),
     })),
@@ -280,6 +435,13 @@ function handleSave() {
   }
 }
 
+.item-name-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .line-summary {
   margin-top: 10px;
   text-align: right;
@@ -290,6 +452,14 @@ function handleSave() {
     color: #1677ff;
     font-size: 15px;
     margin-left: 4px;
+  }
+}
+
+.danger-link {
+  color: #ff4d4f;
+
+  &:hover {
+    color: #ff7875;
   }
 }
 </style>
