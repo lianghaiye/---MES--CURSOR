@@ -176,50 +176,6 @@
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
     />
-
-    <a-drawer v-model:open="detailOpen" title="设计任务详情" width="640">
-      <template v-if="detailRecord">
-        <a-descriptions bordered size="small" :column="2">
-          <a-descriptions-item label="任务编号">{{ detailRecord.taskNo }}</a-descriptions-item>
-          <a-descriptions-item label="状态">
-            <a-tag :color="designTaskStatusColor(detailRecord.status)">{{
-              detailRecord.status
-            }}</a-tag>
-          </a-descriptions-item>
-          <a-descriptions-item label="来源">{{
-            designTaskSourceLabel(detailRecord.source)
-          }}</a-descriptions-item>
-          <a-descriptions-item label="销售订单">{{
-            detailRecord.salesOrderNo || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="客户">{{ detailRecord.customerName }}</a-descriptions-item>
-          <a-descriptions-item label="业务员">{{ detailRecord.salesperson }}</a-descriptions-item>
-          <a-descriptions-item label="产品">{{ detailRecord.productName }}</a-descriptions-item>
-          <a-descriptions-item label="产品属性">{{ detailRecord.productAttr }}</a-descriptions-item>
-          <a-descriptions-item label="规格型号">{{ detailRecord.specModel }}</a-descriptions-item>
-          <a-descriptions-item label="材质">{{ detailRecord.material || '—' }}</a-descriptions-item>
-          <a-descriptions-item label="技术参数" :span="2">{{
-            detailRecord.techParams || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="EBOM">{{ detailRecord.ebomName || '—' }}</a-descriptions-item>
-          <a-descriptions-item label="EBOM编码">{{
-            detailRecord.ebomCode || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="设计人">{{
-            detailRecord.designer || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="设计时间">{{
-            detailRecord.designTime || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="校核人">{{
-            detailRecord.checker || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="校核时间">{{
-            detailRecord.checkTime || '—'
-          }}</a-descriptions-item>
-        </a-descriptions>
-      </template>
-    </a-drawer>
   </div>
 </template>
 
@@ -272,8 +228,6 @@ const filters = reactive({
 
 const pagination = reactive({ current: 1, pageSize: 20 })
 const selectedRowKeys = ref([])
-const detailOpen = ref(false)
-const detailRecord = ref(null)
 
 const statusOpts = Object.values(DESIGN_TASK_STATUS).map((v) => ({ label: v, value: v }))
 const urgencyOpts = ['紧急', '加急', '普通'].map((v) => ({ label: v, value: v }))
@@ -358,15 +312,21 @@ function canOpenDraft(record) {
 }
 
 function openDetail(record) {
-  detailRecord.value = record
-  detailOpen.value = true
+  const resolved = router.resolve({
+    name: 'planning-design-task-detail',
+    params: { id: record.id },
+  })
+  openTab(resolved.path, `设计任务·${record.taskNo || ''}`)
+  router.push(resolved)
 }
 
 function openEbomDesign(record) {
-  router.push({
+  const resolved = router.resolve({
     name: 'planning-ebom-design',
     params: { taskId: record.id },
   })
+  openTab(resolved.path, `EBOM设计·${record.taskNo || ''}`)
+  router.push(resolved)
 }
 
 function handleApprove() {

@@ -229,6 +229,12 @@ const routes = [
         meta: { title: '设计任务' },
       },
       {
+        path: 'planning/design-task/:id/detail',
+        name: 'planning-design-task-detail',
+        component: () => import('@/views/planning/DesignTaskDetailView.vue'),
+        meta: { title: '设计任务详情' },
+      },
+      {
         path: 'planning/design-task/:taskId/ebom',
         name: 'planning-ebom-design',
         component: () => import('@/views/planning/EbomDesignView.vue'),

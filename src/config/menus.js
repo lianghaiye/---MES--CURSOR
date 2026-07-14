@@ -319,4 +319,5 @@ export const dynamicRouteTitles = [
   { pattern: /^\/report-management\/process-report\/wo\/[^/]+$/, title: '任务报工详情' },
   { pattern: /^\/report-management\/process-report\/[^/]+$/, title: '工序报工详情' },
   { pattern: /^\/labor-salary\/labor-hour\/[^/]+$/, title: '工时详情' },
+  { pattern: /^\/planning\/design-task\/[^/]+\/detail$/, title: '设计任务详情' },
 ]

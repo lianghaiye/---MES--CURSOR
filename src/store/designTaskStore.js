@@ -97,6 +97,8 @@ function buildTaskBase(salesOrder, line, product, source) {
     specAttr: line?.specAttr || product?.standardSpec || '',
     material: line?.material || product?.material || '',
     techParams: line?.techParams || product?.techParams || '',
+    matchingRequirements: line?.matchingRequirements || product?.matchingRequirements || '',
+    supplementDesc: line?.supplementDesc || '',
     ebomId: '',
     ebomName: '',
     ebomCode: '',
