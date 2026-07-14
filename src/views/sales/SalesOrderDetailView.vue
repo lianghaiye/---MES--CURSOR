@@ -662,9 +662,7 @@ function lineActiveVersion(line) {
 }
 
 const moneyColumnKeys = new Set([
-  'listUnitPriceExTax',
   'lineDiscountAmount',
-  'unitPriceExTax',
   'unitPriceInTax',
   'totalPriceExTax',
   'totalPriceInTax',

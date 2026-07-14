@@ -440,40 +440,6 @@
               <a-input v-model:value="record.unit" size="small" />
             </template>
 
-            <template v-else-if="column.key === 'listUnitPriceExTax'">
-              {{ formatMoney(record.listUnitPriceExTax) }}
-            </template>
-
-            <template v-else-if="column.key === 'lineDiscountPercent'">
-              <a-input-number
-                v-if="showLineDiscount"
-                :value="getLineDiscountPercent(record)"
-                size="small"
-                :min="1"
-                :max="100"
-                :precision="2"
-                style="width: 100%"
-                @update:value="(v) => setLineDiscountPercent(record, v)"
-              />
-              <span v-else>—</span>
-            </template>
-
-            <template v-else-if="column.key === 'lineDiscountAmount'">
-              {{ formatMoney(record.lineDiscountAmount) }}
-            </template>
-
-            <template v-else-if="column.key === 'unitPriceExTax'">
-              <a-input-number
-                v-model:value="record.unitPriceExTax"
-                size="small"
-                :min="0"
-                :precision="2"
-                style="width: 100%"
-                :disabled="!taxModeExcluding"
-                @change="onUnitPriceChange(record)"
-              />
-            </template>
-
             <template v-else-if="column.key === 'taxRate'">
               <a-input-number
                 v-model:value="record.taxRate"
@@ -493,9 +459,26 @@
                 :min="0"
                 :precision="2"
                 style="width: 100%"
-                :disabled="taxModeExcluding"
                 @change="onUnitPriceChange(record)"
               />
+            </template>
+
+            <template v-else-if="column.key === 'lineDiscountPercent'">
+              <a-input-number
+                v-if="showLineDiscount"
+                :value="getLineDiscountPercent(record)"
+                size="small"
+                :min="1"
+                :max="100"
+                :precision="2"
+                style="width: 100%"
+                @update:value="(v) => setLineDiscountPercent(record, v)"
+              />
+              <span v-else>—</span>
+            </template>
+
+            <template v-else-if="column.key === 'lineDiscountAmount'">
+              {{ formatMoney(record.lineDiscountAmount) }}
             </template>
 
             <template v-else-if="column.key === 'totalPriceExTax'">
@@ -652,7 +635,8 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
   listPath: '/sales/orders',
   getTitle: () => (isEdit.value ? '编辑销售订单' : '新增销售订单'),
 })
-const taxModeExcluding = ref(true)
+/** 默认按含税单价录入（明细列「单价（含税）」） */
+const taxModeExcluding = ref(false)
 const detailCollapsed = ref(false)
 const priceSummaryCollapsed = ref(false)
 const productPickerOpen = ref(false)
@@ -697,14 +681,12 @@ const columnDefs = [
   { key: 'unit', title: '单位', width: 70 },
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 100, ellipsis: true },
   { key: 'bomVersion', title: 'Bom版本', dataIndex: 'bomVersion', width: 90 },
-  { key: 'listUnitPriceExTax', title: '标准单价(不含税)', width: 110 },
-  { key: 'lineDiscountPercent', title: '行折扣(%)', width: 90 },
-  { key: 'lineDiscountAmount', title: '行优惠金额', width: 100 },
-  { key: 'unitPriceExTax', title: '不含税单价', width: 100 },
+  { key: 'unitPriceInTax', title: '单价（含税）', width: 110 },
   { key: 'taxRate', title: '税率(%)', width: 80 },
-  { key: 'unitPriceInTax', title: '含税单价', width: 100 },
   { key: 'totalPriceExTax', title: '总价（不含税）', width: 110 },
   { key: 'totalPriceInTax', title: '总价（含税）', width: 100 },
+  { key: 'lineDiscountPercent', title: '行折扣(%)', width: 90 },
+  { key: 'lineDiscountAmount', title: '行优惠金额', width: 100 },
   { key: 'packagingForm', title: '包装形式', width: 90 },
   { key: 'supplementDesc', title: '补充说明', width: 90 },
   { key: 'lineAttachment', title: '上传附件', width: 120 },
@@ -742,8 +724,8 @@ const tableScrollX = computed(() =>
 
 const taxModeHint = computed(() =>
   taxModeExcluding.value
-    ? '当前：按不含税单价算含税（请填不含税单价，含税单价自动计算且不可编辑）'
-    : '当前：按含税单价算不含税（请填含税单价，不含税单价自动计算且不可编辑）',
+    ? '当前：按不含税口径反算（切换后请用计价逻辑；明细默认展示单价含税）'
+    : '当前：按单价（含税）录入，系统自动反算不含税金额',
 )
 
 const form = reactive({
@@ -1015,7 +997,7 @@ function resetForm() {
   form.lineDiscountTotal = 0
   form.orderDiscountTotal = 0
   fileList.value = []
-  taxModeExcluding.value = true
+  taxModeExcluding.value = false
 }
 
 function beforeUpload(file) {
@@ -1061,7 +1043,15 @@ function round2(n) {
 }
 
 function recalcLine(record, editMode = 'discount') {
-  recalcSalesLinePricing(record, { taxModeExcluding: taxModeExcluding.value, editMode })
+  // 明细「单价（含税）」录入时，始终按含税口径反算不含税
+  let excluding = taxModeExcluding.value
+  if (editMode === 'unitPrice') {
+    excluding = false
+  } else if (!(Number(record.unitPriceInTax) > 0) && Number(record.listUnitPriceExTax) > 0) {
+    // 从产品价目初始化时，用不含税价生成含税单价
+    excluding = true
+  }
+  recalcSalesLinePricing(record, { taxModeExcluding: excluding, editMode })
 }
 
 function recalcAll() {

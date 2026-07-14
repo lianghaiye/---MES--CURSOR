@@ -114,26 +114,18 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="标准单价(不含税)">
-            <a-input :value="formatMoney(draft.listUnitPriceExTax)" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item :label="taxModeExcluding ? '成交单价(不含税)' : '含税单价'" required>
+          <a-form-item label="单价（含税）" required>
             <a-input-number
-              v-if="taxModeExcluding"
-              v-model:value="draft.unitPriceExTax"
-              :min="0"
-              :precision="2"
-              style="width: 100%"
-            />
-            <a-input-number
-              v-else
               v-model:value="draft.unitPriceInTax"
               :min="0"
               :precision="2"
               style="width: 100%"
             />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="成交单价(不含税)">
+            <a-input :value="formatMoney(draft.unitPriceExTax)" disabled />
           </a-form-item>
         </a-col>
         <a-col :span="8">
@@ -157,6 +149,11 @@
               :disabled="lineDiscountReadOnly"
               style="width: 100%"
             />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="行优惠金额">
+            <a-input :value="formatMoney(lineDiscountAmountDisplay)" disabled />
           </a-form-item>
         </a-col>
         <a-col :span="24">
@@ -270,6 +267,13 @@ const linkedCatalogBom = computed(() => {
 })
 
 const lineDiscountReadOnly = computed(() => props.discountStrategy === DISCOUNT_STRATEGIES.ORDER)
+
+const lineDiscountAmountDisplay = computed(() => {
+  const list = Number(draft.listUnitPriceExTax) || 0
+  const qty = Number(draft.salesQty) || 0
+  const rate = normalizeDiscountRate((Number(draft.lineDiscountPercent) || 100) / 100, 1)
+  return round2(Math.max(0, list * qty * (1 - rate)))
+})
 
 const bomNameVersionDisplay = computed(() => {
   if (draft.bomName && draft.bomVersion) {
@@ -456,9 +460,8 @@ function validate() {
     message.warning('请填写税率')
     return false
   }
-  const unitPrice = props.taxModeExcluding ? draft.unitPriceExTax : draft.unitPriceInTax
-  if (unitPrice == null || unitPrice === '') {
-    message.warning(props.taxModeExcluding ? '请填写成交单价(不含税)' : '请填写含税单价')
+  if (draft.unitPriceInTax == null || draft.unitPriceInTax === '') {
+    message.warning('请填写单价（含税）')
     return false
   }
   if (draft.lineDiscountPercent == null || draft.lineDiscountPercent === '') {
@@ -481,9 +484,11 @@ function handleCancel() {
 
 function handleSave() {
   if (!validate()) return
-  const unitPriceChanged = props.taxModeExcluding
-    ? Number(draft.unitPriceExTax) !== Number(props.line?.unitPriceExTax)
-    : Number(draft.unitPriceInTax) !== Number(props.line?.unitPriceInTax)
+  const unitPriceChanged = Number(draft.unitPriceInTax) !== Number(props.line?.unitPriceInTax)
+  const taxRate = Number(draft.taxRate) || 0
+  const unitPriceInTax = Number(draft.unitPriceInTax) || 0
+  const unitPriceExTax =
+    taxRate >= 0 ? round2(unitPriceInTax / (1 + taxRate / 100)) : unitPriceInTax
   emit('saved', {
     ...props.line,
     businessType: draft.businessType,
@@ -499,9 +504,9 @@ function handleSave() {
     lineDiscountRate: lineDiscountReadOnly.value
       ? 1
       : normalizeDiscountRate((Number(draft.lineDiscountPercent) || 100) / 100, 1),
-    unitPriceExTax: Number(draft.unitPriceExTax) || 0,
-    unitPriceInTax: Number(draft.unitPriceInTax) || 0,
-    taxRate: Number(draft.taxRate) || 0,
+    unitPriceExTax,
+    unitPriceInTax,
+    taxRate,
     drawingNo: draft.drawingNo || '',
     techParams: draft.techParams || '',
     matchingRequirements: draft.matchingRequirements || '',

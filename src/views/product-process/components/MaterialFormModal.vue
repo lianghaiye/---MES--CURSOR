@@ -203,13 +203,25 @@
           <a-form layout="inline" class="horizontal-form">
             <a-row :gutter="[12, 12]" style="width: 100%">
               <a-col :span="8">
-                <a-form-item label="单价">
+                <a-form-item label="标准单价(不含税)">
                   <a-input-number
                     v-model:value="form.unitPrice"
                     size="small"
                     :min="0"
                     :precision="2"
-                    placeholder="请输入单价"
+                    placeholder="请输入标准单价(不含税)"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="标准单价(含税)">
+                  <a-input-number
+                    :value="unitPriceInclTax"
+                    size="small"
+                    :precision="2"
+                    disabled
+                    placeholder="自动计算"
                     style="width: 100%"
                   />
                 </a-form-item>
@@ -603,6 +615,15 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+/** 含税单价 = 不含税 × (1 + 销项税率%) */
+const unitPriceInclTax = computed(() => {
+  const ex = Number(form.unitPrice)
+  if (!Number.isFinite(ex)) return undefined
+  const rate = Number(form.outputTaxRate)
+  const r = Number.isFinite(rate) ? rate : 0
+  return Number((ex * (1 + r / 100)).toFixed(2))
+})
 
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/product-process/materials',
