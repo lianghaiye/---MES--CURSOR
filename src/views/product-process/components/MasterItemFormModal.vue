@@ -9,11 +9,11 @@
     @update:open="(val) => emit('update:open', val)"
   >
     <div class="entity-name-header">
-      <div class="entity-name-label">名称</div>
+      <div class="entity-name-label">产品名称</div>
       <a-input
         v-model:value="form.name"
         class="entity-name-input"
-        placeholder="请输入名称"
+        placeholder="请输入产品名称"
         allow-clear
       />
       <div class="entity-capability-row">
@@ -29,6 +29,18 @@
           产品类型：{{ derivedItemKindLabel }}
         </span>
       </div>
+      <div v-if="!viewOnly && !isEdit" class="master-data-mode-row">
+        <span class="mode-label">创建模式：</span>
+        <a-radio-group v-model:value="form.masterDataMode" size="small">
+          <a-radio-button value="single">单规格物料</a-radio-button>
+          <a-radio-button value="multiVariant">多规格变体</a-radio-button>
+        </a-radio-group>
+      </div>
+    </div>
+
+    <div v-if="form.spuId" class="spu-inherit-banner">
+      <a-tag color="blue">产品族：{{ form.spuName || form.spuId }}</a-tag>
+      <span class="spu-inherit-hint">变体 SKU — 规格/材质为族内区分维度</span>
     </div>
 
     <a-tabs
@@ -42,12 +54,13 @@
           <a-form layout="inline" class="horizontal-form">
             <a-row :gutter="[12, 12]" style="width: 100%">
               <a-col :span="8">
-                <a-form-item label="编号">
+                <a-form-item :label="isMultiVariantMode ? '族编码' : '编号'">
                   <a-input
                     v-model:value="form.code"
                     size="small"
-                    placeholder="请输入"
+                    :placeholder="isMultiVariantMode ? '留空则保存时自动生成，如 F0001' : '请输入'"
                     allow-clear
+                    @change="onFamilyCodeChange"
                   />
                 </a-form-item>
               </a-col>
@@ -126,7 +139,7 @@
                   </a-form-item>
                 </a-col>
               </template>
-              <a-col :span="8">
+              <a-col v-if="!isMultiVariantMode" :span="8">
                 <a-form-item label="规格型号" required>
                   <a-input
                     v-model:value="form.specModel"
@@ -145,16 +158,17 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col v-if="!isMultiVariantMode" :span="8">
                 <a-form-item label="材质">
                   <a-select
-                    v-model:value="form.material"
+                    v-model:value="form.materialGradeId"
                     size="small"
                     allow-clear
                     show-search
-                    :options="materialGradeOpts"
+                    :options="materialGradeIdOpts"
                     placeholder="请选择 材质"
                     :filter-option="filterMaterialGrade"
+                    @change="onMaterialGradeChange"
                   />
                 </a-form-item>
               </a-col>
@@ -198,6 +212,70 @@
               </a-col>
             </a-row>
           </a-form>
+        </div>
+      </a-tab-pane>
+
+      <a-tab-pane v-if="isMultiVariantMode" key="variant" tab="变体配置">
+        <div class="tab-pane-body">
+          <VariantAttributeEditor
+            v-model:variant-axes="form.variantAxes"
+            v-model:sku-code-pattern="form.skuCodePattern"
+            :spu-code="familyCodePreview"
+            :disabled="viewOnly"
+          >
+            <template #after-sku>
+              <a-form layout="inline" class="horizontal-form variant-bom-form">
+                <a-row :gutter="[12, 8]" style="width: 100%">
+                  <a-col :span="10">
+                    <a-form-item label="BOM 策略">
+                      <a-select
+                        v-model:value="form.bomStrategy"
+                        size="small"
+                        :options="bomStrategyOpts"
+                        :disabled="viewOnly"
+                        style="width: 100%"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col v-if="form.bomStrategy !== 'independent'" :span="14">
+                    <a-form-item label="族模板 BOM">
+                      <template v-if="hasSavedSpu">
+                        <a-space wrap>
+                          <span v-if="form.baseBomId" class="bom-id-text">{{
+                            form.baseBomId
+                          }}</span>
+                          <span v-else class="bom-id-text is-empty">尚未关联模板 BOM</span>
+                          <a-button
+                            size="small"
+                            type="link"
+                            :disabled="viewOnly"
+                            @click="openTemplateBom"
+                          >
+                            {{ form.baseBomId ? '编辑族模板 BOM' : '去维护族模板 BOM' }}
+                          </a-button>
+                        </a-space>
+                      </template>
+                      <span v-else class="bom-pending-hint"
+                        >先保存产品族后，再在此维护族模板 BOM</span
+                      >
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="24">
+                    <div class="bom-strategy-help">{{ bomStrategyHelp }}</div>
+                  </a-col>
+                </a-row>
+              </a-form>
+            </template>
+          </VariantAttributeEditor>
+          <VariantSkuMatrixPreview
+            ref="matrixPreviewRef"
+            :spu="spuPreviewContext"
+            :variant-axes="form.variantAxes"
+            :sku-code-pattern="form.skuCodePattern"
+            :enabled-keys="form.enabledCombinationKeys"
+            :disabled="viewOnly"
+            @update:enabled-keys="(k) => (form.enabledCombinationKeys = k)"
+          />
         </div>
       </a-tab-pane>
 
@@ -612,30 +690,53 @@ import {
   resolveBomItemTypeForKind,
   resolveItemKind,
 } from '@/utils/masterItemKind'
-import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
+import { materialGradeState, getMaterialGradeById } from '@/store/materialGradeStore'
+import { resolveMaterialGradeIdByName } from '@/utils/materialGradeResolve'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import ItemBomInfoTab from '@/views/product-process/components/ItemBomInfoTab.vue'
+import VariantAttributeEditor from '@/views/product-process/components/VariantAttributeEditor.vue'
+import VariantSkuMatrixPreview from '@/views/product-process/components/VariantSkuMatrixPreview.vue'
+import { addSpu, updateSpu, generateSpuCode } from '@/store/spuStore'
+import { batchGenerateSkus, listSkusForSpu } from '@/utils/spuSkuSave'
+import { matrixRowsToSkuCombos } from '@/utils/spuMatrix'
+import { hydrateMaterialAxisFromSkus } from '@/utils/spuVariant'
+import {
+  PRODUCT_SKU_CODE_PATTERN,
+  SPU_BOM_STRATEGY,
+  SPU_BOM_STRATEGY_HELPS,
+  SPU_BOM_STRATEGY_LABELS,
+  ensureLockedVariantAxes,
+} from '@/constants/spu'
+import { getVariantAxesForCategory } from '@/utils/variantAxisTemplate'
+import { useRouter } from 'vue-router'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   pageMode: { type: Boolean, default: false },
   listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
+  editSpu: { type: Object, default: null },
   viewOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
-const isEdit = computed(() => Boolean(props.editRecord?.id))
+const router = useRouter()
+const matrixPreviewRef = ref(null)
 
-/** 含税单价 = 不含税 × (1 + 销项税率%) */
-const unitPriceInclTax = computed(() => {
-  const ex = Number(form.unitPrice)
-  if (!Number.isFinite(ex)) return undefined
-  const rate = Number(form.outputTaxRate)
-  const r = Number.isFinite(rate) ? rate : 0
-  return Number((ex * (1 + r / 100)).toFixed(2))
-})
+const isEdit = computed(() => Boolean(props.editRecord?.id))
+const isSpuEdit = computed(() => Boolean(props.editSpu?.id))
+
+const bomStrategyOpts = Object.entries(SPU_BOM_STRATEGY_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}))
+
+const bomStrategyHelp = computed(
+  () =>
+    SPU_BOM_STRATEGY_HELPS[form.bomStrategy] ||
+    '同类变体共用结构 → 建族模板 +「继承」；特殊 SKU 再建独立 BOM。销售投产仅认 SKU 自有生效 BOM。',
+)
 
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/product-process/products',
@@ -668,17 +769,57 @@ const bomItemType = computed(() =>
   resolveBomItemTypeForKind(derivedItemKind.value || ITEM_KIND.PRODUCT),
 )
 
+const isMultiVariantMode = computed(() => form.masterDataMode === 'multiVariant' || isSpuEdit.value)
+
+/** 含税单价 = 不含税 × (1 + 销项税率%) */
+const unitPriceInclTax = computed(() => {
+  const ex = Number(form.unitPrice)
+  if (!Number.isFinite(ex)) return undefined
+  const rate = Number(form.outputTaxRate)
+  const r = Number.isFinite(rate) ? rate : 0
+  return Number((ex * (1 + r / 100)).toFixed(2))
+})
+
+/** 产品族已落库后，才允许维护族模板 BOM（需关联 spuId） */
+const hasSavedSpu = computed(() => Boolean(form.spuId || props.editSpu?.id))
+
 const flatCats = flattenCategoryNodes(materialCategoryTree).filter((c) => !c.children?.length)
 const flatProductCats = flattenCategoryNodes(productCategoryTree).filter((c) => !c.children?.length)
+
+/** 族编码：手填优先；未填时按保存规则预览自动生成码 */
+const familyCodePreview = computed(() => {
+  const typed = (form.spuCode || form.code || '').trim()
+  if (typed) return typed
+  return generateSpuCode()
+})
+
+const spuPreviewContext = computed(() => ({
+  id: props.editSpu?.id || form.spuId || '',
+  name: form.name,
+  code: familyCodePreview.value,
+  baseBomId: form.baseBomId,
+  bomStrategy: form.bomStrategy,
+  variantAxes: form.variantAxes,
+  skuCodePattern: form.skuCodePattern,
+}))
+
+function onFamilyCodeChange() {
+  form.spuCode = form.code
+}
 
 const barcodeOpts = barcodeTypeOptions.map((v) => ({ label: v, value: v }))
 const materialTypeOpts = materialTypeOptions.map((v) => ({ label: v, value: v }))
 const supplyFormOpts = supplyFormOptions.map((v) => ({ label: v, value: v }))
 const unitOpts = inventoryUnitOptions.map((v) => ({ label: v, value: v }))
-const materialGradeOpts = computed(() => {
+const materialGradeIdOpts = computed(() => {
   void materialGradeState.items
-  return getMaterialGradeOptions()
+  return materialGradeState.items.map((i) => ({ label: i.name, value: i.id }))
 })
+
+function onMaterialGradeChange(gradeId) {
+  const grade = getMaterialGradeById(gradeId)
+  form.material = grade?.name || ''
+}
 const reportTypeOpts = reportTypeOptions.map((v) => ({ label: v, value: v }))
 const salaryMethodOpts = salaryMethodOptions.map((v) => ({ label: v, value: v }))
 const inboundQcOpts = inboundQcOptions.map((v) => ({ label: v, value: v }))
@@ -714,6 +855,19 @@ const form = reactive({
   specModel: '',
   drawingNo: '',
   material: '',
+  materialGradeId: '',
+  spuId: '',
+  spuName: '',
+  isVariantSku: false,
+  variantValues: {},
+  bomOverrides: [],
+  masterDataMode: 'single',
+  spuCode: '',
+  variantAxes: [],
+  skuCodePattern: PRODUCT_SKU_CODE_PATTERN,
+  enabledCombinationKeys: [],
+  bomStrategy: SPU_BOM_STRATEGY.INHERIT,
+  baseBomId: '',
   techParams: '',
   weight: '',
   inventoryUnit: undefined,
@@ -747,6 +901,19 @@ function resetForm() {
   form.specModel = ''
   form.drawingNo = ''
   form.material = ''
+  form.materialGradeId = ''
+  form.spuId = ''
+  form.spuName = ''
+  form.isVariantSku = false
+  form.variantValues = {}
+  form.bomOverrides = []
+  form.masterDataMode = 'single'
+  form.spuCode = ''
+  form.variantAxes = []
+  form.skuCodePattern = PRODUCT_SKU_CODE_PATTERN
+  form.enabledCombinationKeys = []
+  form.bomStrategy = SPU_BOM_STRATEGY.INHERIT
+  form.baseBomId = ''
   form.techParams = ''
   form.weight = ''
   form.inventoryUnit = undefined
@@ -783,6 +950,12 @@ function loadEditRecord(record) {
   form.specModel = source.specModel || ''
   form.drawingNo = source.drawingNo || ''
   form.material = source.material || ''
+  form.materialGradeId = source.materialGradeId || resolveMaterialGradeIdByName(source.material)
+  form.spuId = source.spuId || ''
+  form.spuName = source.spuName || ''
+  form.isVariantSku = Boolean(source.isVariantSku)
+  form.variantValues = source.variantValues ? { ...source.variantValues } : {}
+  form.bomOverrides = source.bomOverrides ? [...source.bomOverrides] : []
   form.techParams = source.techParams || ''
   form.weight = source.weight || ''
   form.inventoryUnit = source.inventoryUnit
@@ -828,16 +1001,66 @@ function loadEditRecord(record) {
   else if (form.isWholeMachine) form.isPart = false
 }
 
+function loadEditSpu(spu) {
+  resetForm()
+  form.masterDataMode = 'multiVariant'
+  form.spuId = spu.id
+  form.spuName = spu.name
+  form.name = spu.name
+  form.spuCode = spu.code
+  form.code = spu.code
+  form.categoryKey = spu.categoryKey
+  form.productCategoryKey = spu.categoryKey
+  form.canSell = spu.canSell
+  form.canProduce = spu.canProduce
+  form.canPurchase = spu.canPurchase
+  form.canOutsource = spu.canOutsource
+  form.variantAxes = hydrateMaterialAxisFromSkus(
+    ensureLockedVariantAxes(spu.variantAxes || []),
+    listSkusForSpu(spu.id),
+    getMaterialGradeById,
+  )
+  form.skuCodePattern = PRODUCT_SKU_CODE_PATTERN
+  form.enabledCombinationKeys = [...(spu.enabledCombinations || [])]
+  form.bomStrategy = spu.bomStrategy || SPU_BOM_STRATEGY.INHERIT
+  form.baseBomId = spu.baseBomId || ''
+  const shared = spu.sharedFields || {}
+  form.techParams = shared.techParams || ''
+  form.materialType = shared.materialType
+  form.supplyForm = shared.supplyForm
+  form.inventoryUnit = shared.inventoryUnit
+  activeTabKey.value = 'variant'
+}
+
 function syncFormOnOpen() {
   if (!isActive.value) return
-  if (props.editRecord) loadEditRecord(props.editRecord)
+  if (props.editSpu) loadEditSpu(props.editSpu)
+  else if (props.editRecord) loadEditRecord(props.editRecord)
   else resetForm()
 }
 
 watch(
-  () => (isActive.value ? props.editRecord?.id || props.editRecord?.code || '__new__' : ''),
+  () =>
+    isActive.value
+      ? props.editSpu?.id || props.editRecord?.id || props.editRecord?.code || '__new__'
+      : '',
   () => syncFormOnOpen(),
   { immediate: true },
+)
+
+watch(
+  () => form.masterDataMode,
+  (mode) => {
+    if (mode === 'single' && activeTabKey.value === 'variant') {
+      activeTabKey.value = 'basic'
+    }
+    if (mode !== 'multiVariant' || form.variantAxes.length) return
+    const catKey = form.categoryKey || form.productCategoryKey
+    form.variantAxes = getVariantAxesForCategory(
+      catKey,
+      showProductFields.value ? 'product' : 'material',
+    )
+  },
 )
 
 watch(
@@ -906,7 +1129,7 @@ function validate() {
     return false
   }
   if (!form.name?.trim()) {
-    message.warning('请填写名称')
+    message.warning('请填写产品名称')
     return false
   }
   if (showProductFields.value) {
@@ -929,9 +1152,20 @@ function validate() {
       return false
     }
   }
-  if (!form.specModel?.trim()) {
+  if (!isMultiVariantMode.value && !form.specModel?.trim()) {
     message.warning('请填写规格型号')
     return false
+  }
+  if (isMultiVariantMode.value) {
+    if (!form.variantAxes?.length) {
+      message.warning('请至少配置一个变体属性')
+      return false
+    }
+    const missingDomain = form.variantAxes.find((a) => !a.enumValues?.length)
+    if (missingDomain) {
+      message.warning(`请为「${missingDomain.label || '变体属性'}」配置值域`)
+      return false
+    }
   }
   if (!form.inventoryUnit) {
     message.warning('请选择库存单位')
@@ -985,6 +1219,14 @@ function buildProductPayload() {
     specModel: form.specModel,
     drawingNo: form.drawingNo?.trim() || '',
     material: form.material,
+    materialGradeId: form.materialGradeId || '',
+    spuId: form.spuId || '',
+    spuName: form.spuName || '',
+    isVariantSku: form.isVariantSku,
+    variantValues: form.isVariantSku
+      ? { specModel: form.specModel, material: form.material, ...form.variantValues }
+      : form.variantValues,
+    bomOverrides: form.bomOverrides || [],
     weight: Number(form.weight) || 0,
     inventoryUnit: form.inventoryUnit,
     standardSpec: form.standardSpec || '',
@@ -1034,6 +1276,14 @@ function buildMaterialPayload() {
     specModel: form.specModel,
     drawingNo: form.drawingNo?.trim() || '',
     material: form.material,
+    materialGradeId: form.materialGradeId || '',
+    spuId: form.spuId || '',
+    spuName: form.spuName || '',
+    isVariantSku: form.isVariantSku,
+    variantValues: form.isVariantSku
+      ? { specModel: form.specModel, material: form.material, ...form.variantValues }
+      : form.variantValues,
+    bomOverrides: form.bomOverrides || [],
     techParams: form.techParams?.trim() || '',
     weight: form.weight,
     inventoryUnit: form.inventoryUnit,
@@ -1059,8 +1309,87 @@ function buildMaterialPayload() {
   }
 }
 
+function buildSpuPayloadFromForm() {
+  const catKey = form.categoryKey || form.productCategoryKey
+  const cat =
+    flatCats.find((c) => c.key === catKey) || flatProductCats.find((c) => c.key === catKey)
+  const parentKey = cat?.parentKey || catKey
+  const kind = resolveItemKind({ canSell: form.canSell, canProduce: form.canProduce })
+  return {
+    id: form.spuId || undefined,
+    code: form.spuCode?.trim() || form.code?.trim() || generateSpuCode(),
+    name: form.name.trim(),
+    categoryKey: catKey,
+    parentCategoryKey: parentKey,
+    categoryName: cat?.title || '',
+    categoryTreeMode: showProductFields.value ? 'product' : 'material',
+    itemKind:
+      kind === ITEM_KIND.PRODUCT_MATERIAL
+        ? 'productMaterial'
+        : kind === ITEM_KIND.PRODUCT
+          ? 'product'
+          : 'material',
+    canSell: form.canSell,
+    canProduce: form.canProduce,
+    canPurchase: form.canPurchase,
+    canOutsource: form.canOutsource,
+    variantAxes: JSON.parse(JSON.stringify(form.variantAxes || [])),
+    skuCodePattern: form.skuCodePattern,
+    enabledCombinations: [...(form.enabledCombinationKeys || [])],
+    bomStrategy: form.bomStrategy,
+    baseBomId: form.baseBomId,
+    mixedBomRules: null,
+    sharedFields: {
+      techParams: form.techParams?.trim() || '',
+      materialType: form.materialType,
+      supplyForm: form.supplyForm,
+      inventoryUnit: form.inventoryUnit,
+      categoryKey: catKey,
+      parentCategoryKey: parentKey,
+      categoryName: cat?.title || '',
+      production: JSON.parse(JSON.stringify(form.production)),
+    },
+  }
+}
+
+function saveMultiVariantMaster() {
+  const spuPayload = buildSpuPayloadFromForm()
+  const spu = form.spuId ? updateSpu(form.spuId, spuPayload) : addSpu(spuPayload)
+  const enabledRows = matrixPreviewRef.value?.getEnabledRows?.() || []
+  const combos = matrixRowsToSkuCombos(enabledRows)
+  if (combos.length) {
+    const results = batchGenerateSkus(spu.id, combos)
+    const created = results.filter((r) => r.created).length
+    message.success(`模板已保存，生成/更新 ${results.length} 个 SKU（新建 ${created}）`)
+  } else {
+    message.success('模板已保存')
+  }
+  emit('saved', { spu, mode: 'multiVariant' })
+  closeAfterSave()
+}
+
+function openTemplateBom() {
+  const spuId = form.spuId || props.editSpu?.id
+  if (!spuId) {
+    message.info('请先保存产品族后再维护族模板 BOM')
+    return
+  }
+  router.push({
+    path: '/product-process/bom/new',
+    query: { itemType: 'spu', itemId: spuId, itemName: form.name, bomType: '基准BOM' },
+  })
+}
+
 function handleOk() {
   if (!validate()) return
+  if (isMultiVariantMode.value && !isEdit.value) {
+    saveMultiVariantMaster()
+    return
+  }
+  if (isSpuEdit.value || (isMultiVariantMode.value && form.spuId)) {
+    saveMultiVariantMaster()
+    return
+  }
   const productPayload = showProductFields.value ? buildProductPayload() : null
   const materialPayload = showMaterialFields.value ? buildMaterialPayload() : null
   const payload = {
@@ -1089,6 +1418,35 @@ function handleOk() {
   }
 }
 
+.master-data-mode-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mode-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+}
+.spu-code-row {
+  margin-top: 6px;
+}
+
+.spu-inherit-banner {
+  margin: 0 16px 8px;
+  padding: 8px 12px;
+  background: #e6f4ff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spu-inherit-hint {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
 .entity-name-header {
   margin-bottom: 0;
   padding: 12px 16px 8px;
@@ -1104,12 +1462,23 @@ function handleOk() {
 .entity-name-input {
   font-size: 18px;
   font-weight: 600;
-  padding: 4px 0;
+  padding: 4px 0 6px;
   border: none;
+  border-bottom: 1px solid #d9d9d9;
+  border-radius: 0;
   box-shadow: none;
 
+  &:hover,
   &:focus {
+    border-bottom-color: #1677ff;
     box-shadow: none;
+  }
+
+  :deep(.ant-input) {
+    border: none;
+    box-shadow: none;
+    padding-left: 0;
+    padding-right: 0;
   }
 }
 
@@ -1203,12 +1572,13 @@ function handleOk() {
   }
 
   :deep(.ant-form-item-label) {
-    flex: 0 0 84px;
-    max-width: 84px;
+    flex: 0 0 96px;
+    max-width: 96px;
   }
 
   :deep(.ant-form-item-label > label) {
-    height: 24px;
+    height: auto;
+    min-height: 24px;
     line-height: 24px;
     font-size: 13px;
     white-space: nowrap;
@@ -1226,12 +1596,44 @@ function handleOk() {
     min-width: 0;
   }
 
+  .label-wide {
+    :deep(.ant-form-item-label) {
+      flex: 0 0 128px;
+      max-width: 128px;
+    }
+  }
+
   .remark-item {
     :deep(.ant-form-item-label) {
       flex: 0 0 96px;
       max-width: 96px;
     }
   }
+}
+
+.variant-bom-form {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+
+  :deep(.ant-form-item-label) {
+    flex: 0 0 88px;
+    max-width: 88px;
+  }
+}
+
+.bom-pending-hint,
+.bom-id-text.is-empty {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.bom-id-text {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .form-option-row {
@@ -1303,5 +1705,13 @@ function handleOk() {
 
 .row-remove-col {
   text-align: right;
+}
+
+.bom-strategy-help {
+  margin: -4px 0 8px;
+  padding: 0 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
 }
 </style>
