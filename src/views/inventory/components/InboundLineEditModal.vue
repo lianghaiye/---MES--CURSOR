@@ -16,7 +16,11 @@
             产品信息
           </span>
         </template>
+        <template v-if="lockProduct">
+          <a-input :value="lockedProductLabel" disabled placeholder="—" />
+        </template>
         <a-select
+          v-else
           v-model:value="selectedItemKey"
           show-search
           placeholder="请选择产品/物料"
@@ -140,15 +144,14 @@ import {
 } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
-import {
-  enrichInboundLine,
-  syncInboundLineTotalFromUnit,
-} from '@/utils/inboundLineHelpers'
+import { enrichInboundLine, syncInboundLineTotalFromUnit } from '@/utils/inboundLineHelpers'
 
 const props = defineProps({
   open: Boolean,
   line: { type: Object, default: null },
   mode: { type: String, default: 'edit' },
+  /** 锁定产品信息不可更换（如采购单生成入库单） */
+  lockProduct: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -171,6 +174,14 @@ const itemSelectOpts = computed(() =>
     searchText: `${it.code} ${it.name} ${it.specModel || ''}`,
   })),
 )
+
+/** 锁定产品时直接展示明细带入的编码+名称 */
+const lockedProductLabel = computed(() => {
+  const line = draft.value
+  if (!line) return ''
+  if (line.itemCode && line.itemName) return `[${line.itemCode}] ${line.itemName}`
+  return line.itemName || line.itemCode || ''
+})
 
 watch(
   () => props.open,

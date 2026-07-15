@@ -172,6 +172,7 @@
     v-model:open="lineEditOpen"
     :line="lineEditTarget"
     mode="edit"
+    lock-product
     @confirm="onLineEditConfirm"
   />
 </template>
