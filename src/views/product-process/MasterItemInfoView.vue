@@ -173,16 +173,7 @@
               </template>
             </a-dropdown>
           </a-space>
-          <a-space :size="8" class="toolbar-icons" align="center">
-            <a-radio-group
-              v-model:value="listViewMode"
-              size="small"
-              button-style="solid"
-              @change="pagination.current = 1"
-            >
-              <a-radio-button value="sku">SKU 视图</a-radio-button>
-              <a-radio-button value="template">模板视图</a-radio-button>
-            </a-radio-group>
+          <a-space :size="4" class="toolbar-icons">
             <a-tooltip title="刷新">
               <a-button type="text" size="small" @click="handleSearch">
                 <ReloadOutlined />
@@ -194,7 +185,6 @@
 
         <div class="table-card">
           <a-table
-            v-if="listViewMode === 'sku'"
             :columns="displayColumns"
             :data-source="pagedList"
             row-key="id"
@@ -266,44 +256,11 @@
             </template>
           </a-table>
 
-          <a-table
-            v-else
-            :columns="templateColumns"
-            :data-source="pagedTemplateList"
-            row-key="id"
-            size="small"
-            bordered
-            :pagination="false"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'variantAxes'">
-                {{ (record.variantAxes || []).map((a) => a.label).join(' + ') || '—' }}
-              </template>
-              <template v-else-if="column.key === 'bomStrategy'">
-                {{ bomStrategyLabel(record.bomStrategy) }}
-              </template>
-              <template v-else-if="column.key === 'skuCount'">
-                {{ listSkusForSpu(record.id).length }}
-              </template>
-              <template v-else-if="column.key === 'templateAction'">
-                <a-space :size="4">
-                  <a-button type="link" size="small" @click="openEditSpu(record)"
-                    >编辑模板</a-button
-                  >
-                  <a-button type="link" size="small" @click="openMatrix(record)">变体矩阵</a-button>
-                  <a-button type="link" size="small" @click="openTemplateBom(record)"
-                    >模板 BOM</a-button
-                  >
-                </a-space>
-              </template>
-            </template>
-          </a-table>
-
           <div class="table-pagination">
             <a-pagination
               v-model:current="pagination.current"
               v-model:page-size="pagination.pageSize"
-              :total="listViewMode === 'sku' ? filteredList.length : filteredTemplateList.length"
+              :total="filteredList.length"
               size="small"
               show-size-changer
               :page-size-options="['10', '20', '50', '100']"
@@ -319,31 +276,9 @@
       :key="modalSessionKey"
       v-model:open="formModalOpen"
       :edit-record="editRecord"
-      :edit-spu="editSpu"
       :view-only="viewOnly"
       @saved="onSaved"
     />
-
-    <a-modal
-      v-model:open="matrixOpen"
-      :title="`变体矩阵 — ${matrixSpu?.name || ''}`"
-      width="920px"
-      destroy-on-close
-      @ok="generateMatrixSkus"
-    >
-      <VariantSkuMatrixPreview
-        v-if="matrixSpu"
-        ref="matrixPreviewRef"
-        :spu="matrixSpu"
-        :variant-axes="matrixSpu.variantAxes"
-        :sku-code-pattern="matrixSpu.skuCodePattern"
-        :enabled-keys="matrixSpu.enabledCombinations"
-      />
-      <template #footer>
-        <a-button @click="matrixOpen = false">关闭</a-button>
-        <a-button type="primary" @click="generateMatrixSkus">生成 SKU</a-button>
-      </template>
-    </a-modal>
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -369,7 +304,10 @@ import {
   DownOutlined,
   SyncOutlined,
 } from '@ant-design/icons-vue'
-import { productCategoryTree, filterCategoryTree } from '@/mock/productCategories'
+import {
+  productCategoryTree,
+  filterCategoryTree,
+} from '@/mock/productCategories'
 import {
   materialCategoryTree,
   filterCategoryTree as filterMaterialCategoryTree,
@@ -387,7 +325,7 @@ import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
 import { formatBusinessTypeLabels, MASTER_BUSINESS_TYPE_OPTIONS } from '@/utils/businessTypeLabel'
-import { productBomState, getBomInfoLabelForItem, getBomsForItem } from '@/store/productBomStore'
+import { productBomState, getBomInfoLabelForItem } from '@/store/productBomStore'
 import { buildUnifiedListRows, filterUnifiedListRows } from '@/utils/masterItemList'
 import {
   CATEGORY_TREE_MODE,
@@ -401,11 +339,6 @@ import {
   cloneMasterItem,
   resolveMasterItemEditRecord,
 } from '@/utils/masterItemSave'
-import { spuState, listSpus, updateSpu } from '@/store/spuStore'
-import { listSkusForSpu, batchGenerateSkus } from '@/utils/spuSkuSave'
-import { matrixRowsToSkuCombos } from '@/utils/spuMatrix'
-import { SPU_BOM_STRATEGY_LABELS } from '@/constants/spu'
-import VariantSkuMatrixPreview from '@/views/product-process/components/VariantSkuMatrixPreview.vue'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -435,13 +368,8 @@ const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const formModalOpen = ref(false)
 const editRecord = ref(null)
-const editSpu = ref(null)
 const viewOnly = ref(false)
 const modalSessionKey = ref(0)
-const listViewMode = ref('sku')
-const matrixOpen = ref(false)
-const matrixSpu = ref(null)
-const matrixPreviewRef = ref(null)
 watch(formModalOpen, (open) => {
   if (!open) viewOnly.value = false
 })
@@ -504,30 +432,6 @@ const filteredList = computed(() =>
   ),
 )
 
-const filteredTemplateList = computed(() => {
-  void spuState.spus
-  return listSpus({ keyword: appliedFilters.value.name || appliedFilters.value.code })
-})
-
-const templateColumns = [
-  { title: '模板编码', dataIndex: 'code', width: 110 },
-  { title: '名称', dataIndex: 'name', width: 140 },
-  { title: '分类', dataIndex: 'categoryName', width: 100 },
-  { title: '变体维度', key: 'variantAxes', width: 140 },
-  { title: 'BOM策略', key: 'bomStrategy', width: 100 },
-  { title: 'SKU数', key: 'skuCount', width: 72 },
-  { title: '操作', key: 'templateAction', width: 220, fixed: 'right' },
-]
-
-const pagedTemplateList = computed(() => {
-  const start = (pagination.current - 1) * pagination.pageSize
-  return filteredTemplateList.value.slice(start, start + pagination.pageSize)
-})
-
-function bomStrategyLabel(v) {
-  return SPU_BOM_STRATEGY_LABELS[v] || v || '—'
-}
-
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
   return filteredList.value.slice(start, start + pagination.pageSize)
@@ -549,7 +453,6 @@ function resolveProductRecord(record) {
 function openFormModal({ record = null, readOnly = false } = {}) {
   viewOnly.value = readOnly
   editRecord.value = record ? resolveProductRecord(record) : null
-  editSpu.value = null
   modalSessionKey.value += 1
   formModalOpen.value = true
 }
@@ -596,7 +499,6 @@ const baseColumns = [
     customRender: renderProductCodeLink,
   },
   { title: '名称', dataIndex: 'name', width: 200, fixed: 'left', ellipsis: true },
-  { title: '产品族', dataIndex: 'spuName', width: 100, ellipsis: true },
   { title: '产品类型', key: 'itemKind', width: 96, align: 'center' },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
   { title: '材质', dataIndex: 'material', width: 80 },
@@ -604,14 +506,14 @@ const baseColumns = [
   { title: '业务类型', key: 'businessType', width: 140, ellipsis: true },
   { title: '类别', dataIndex: 'categoryName', width: 88 },
   { title: '产品属性', key: 'productAttribute', width: 110, ellipsis: true },
-  { title: '标准规范', dataIndex: 'standardSpec', width: 100, ellipsis: true },
+  { title: '标准规格', dataIndex: 'standardSpec', width: 100, ellipsis: true },
   { title: '物料类型', key: 'materialType', width: 90 },
   { title: '供应型态', key: 'supplyForm', width: 90 },
   { title: '技术参数', dataIndex: 'techParams', width: 120, ellipsis: true },
   { title: '配套要求', key: 'matchingRequirements', width: 120, ellipsis: true },
   { title: '重量', key: 'weight', width: 88, align: 'right' },
   { title: '库存单位', key: 'inventoryUnit', width: 88, align: 'center' },
-  { title: '标准单价(不含税)', key: 'unitPrice', width: 120, align: 'right' },
+  { title: '单价', key: 'unitPrice', width: 88, align: 'right' },
   { title: 'BOM信息', key: 'bomInfo', width: 200, ellipsis: true },
   { title: '默认工作中心', key: 'defaultWorkCenter', width: 110 },
   { title: '默认供应商', key: 'defaultSupplier', width: 110, ellipsis: true },
@@ -632,12 +534,7 @@ function formatProductBusinessType(record) {
 function formatProductBomInfo(record) {
   void productBomState.boms
   const itemType = resolveBomItemTypeForKind(record.itemKind)
-  const label = getBomInfoLabelForItem(itemType, record.id)
-  if (!label) return '—'
-  if (record.spuId && !getBomsForItem(itemType, record.id).length) {
-    return `${label}（继承模板）`
-  }
-  return label
+  return getBomInfoLabelForItem(itemType, record.id) || '—'
 }
 
 function rowIndex(index) {
@@ -683,50 +580,8 @@ function handleReset() {
   pagination.current = 1
 }
 
-function onSaved(payload) {
-  if (payload?.mode === 'multiVariant') {
-    message.success('模板已保存')
-    return
-  }
-  const { isEdit, id, productPayload, materialPayload } = payload
+function onSaved({ isEdit, id, productPayload, materialPayload }) {
   saveMasterItem({ isEdit, id, productPayload, materialPayload })
-}
-
-function openEditSpu(record) {
-  editRecord.value = null
-  editSpu.value = { ...record }
-  viewOnly.value = false
-  modalSessionKey.value += 1
-  formModalOpen.value = true
-}
-
-function openMatrix(record) {
-  matrixSpu.value = { ...record }
-  matrixOpen.value = true
-}
-
-function generateMatrixSkus() {
-  if (!matrixSpu.value?.id) return
-  const rows = matrixPreviewRef.value?.getEnabledRows?.() || []
-  const combos = matrixRowsToSkuCombos(rows)
-  if (!combos.length) {
-    message.warning('请至少启用一个组合')
-    return
-  }
-  const enabledKeys = rows.filter((r) => r.enabled).map((r) => r.rowKey)
-  updateSpu(matrixSpu.value.id, { enabledCombinations: enabledKeys })
-  const results = batchGenerateSkus(matrixSpu.value.id, combos)
-  const created = results.filter((r) => r.created).length
-  message.success(`已生成/更新 ${results.length} 个 SKU（新建 ${created}）`)
-  matrixSpu.value = { ...matrixSpu.value, enabledCombinations: enabledKeys }
-  matrixPreviewRef.value?.rebuildMatrix?.()
-}
-
-function openTemplateBom(record) {
-  router.push({
-    path: '/product-process/bom/new',
-    query: { itemType: 'spu', itemId: record.id, itemName: record.name, bomType: '基准BOM' },
-  })
 }
 
 function confirmDelete(record) {
@@ -891,11 +746,6 @@ function onAddCategory() {
   margin-bottom: 8px;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.toolbar-icons {
-  margin-left: auto;
-  flex-shrink: 0;
 }
 
 .table-card {
