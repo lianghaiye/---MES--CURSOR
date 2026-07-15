@@ -118,9 +118,7 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'dispatch-and-start', 'cancel'])
 
-const showFeedingColumn = computed(
-  () => businessRuleState.rules.productionMode === 'standard',
-)
+const showFeedingColumn = computed(() => businessRuleState.rules.productionMode === 'standard')
 
 const columns = computed(() => {
   const base = [
@@ -187,7 +185,7 @@ function removeFeedingRow(process, index) {
 }
 
 function emitSave() {
-  if (!validateWorkOrderDispatchReady(props.workOrder)) return
+  // 草稿保存不校验必填项（执行人等）；下发并开始时再校验
   emit('save')
 }
 

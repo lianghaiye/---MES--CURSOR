@@ -48,9 +48,9 @@ export function validateWorkOrderDispatchReady(workOrder) {
   return validateProcessExecutors(workOrder.processes)
 }
 
-/** 保存工序与执行人配置，工单保持待下发 */
+/** 保存工序与执行人配置，工单保持待下发（草稿保存不校验必填项） */
 export function saveDispatchDraft(updateFn, workOrder) {
-  if (!workOrder || !validateWorkOrderDispatchReady(workOrder)) return false
+  if (!workOrder) return false
   updateFn(workOrder.id, {
     processes: workOrder.processes,
     processRouteName: workOrder.processRouteName,
