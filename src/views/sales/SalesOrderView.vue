@@ -104,6 +104,10 @@
           <CheckOutlined />
           审核
         </a-button>
+        <a-button size="small" @click="handleRevokeApprove">
+          <RollbackOutlined />
+          反审
+        </a-button>
         <a-button size="small" @click="stubAction('完成')">
           <CheckCircleOutlined />
           完成
@@ -192,17 +196,29 @@
           <template v-else-if="column.key === 'downPaymentAmount'">
             {{ formatMoney(record.downPaymentAmount) }}
           </template>
-          <template v-else-if="column.key === 'orderAmount'">
-            ￥{{ formatOrderMoney(record.orderAmount ?? record.amountInTax) }}
+          <template v-else-if="column.key === 'lineAmountInTax'">
+            ￥{{ formatOrderMoney(resolveOrderAmounts(record).lineAmountInTax) }}
           </template>
-          <template v-else-if="column.key === 'amountExTax'">
-            ￥{{ formatOrderMoney(record.amountExTax) }}
+          <template v-else-if="column.key === 'lineAmountExTax'">
+            ￥{{ formatOrderMoney(resolveOrderAmounts(record).lineListAmountExTax) }}
+          </template>
+          <template v-else-if="column.key === 'discountStrategy'">
+            {{ formatDiscountStrategy(record.discountStrategy) }}
           </template>
           <template v-else-if="column.key === 'totalDiscountAmount'">
-            <span v-if="Number(record.totalDiscountAmount) > 0" class="discount-amount">
-              -￥{{ formatOrderMoney(record.totalDiscountAmount) }}
+            <span
+              v-if="Number(resolveOrderAmounts(record).totalDiscountAmount) > 0"
+              class="discount-amount"
+            >
+              -￥{{ formatOrderMoney(resolveOrderAmounts(record).totalDiscountAmount) }}
             </span>
             <span v-else>—</span>
+          </template>
+          <template v-else-if="column.key === 'amountInTax'">
+            ￥{{ formatOrderMoney(resolveOrderAmounts(record).amountInTax) }}
+          </template>
+          <template v-else-if="column.key === 'amountExTax'">
+            ￥{{ formatOrderMoney(resolveOrderAmounts(record).amountExTax) }}
           </template>
           <template v-else-if="column.key === 'createdAt'">
             {{ formatDate(record.createdAt) }}
@@ -243,18 +259,6 @@
         />
       </div>
     </div>
-
-    <CreateSalesOrderModal
-      v-model:open="createModalOpen"
-      :edit-record="editRecord"
-      @saved="onOrderSaved"
-    />
-
-    <ApplyDeliveryModal
-      v-model:open="deliveryModalOpen"
-      :sales-order="deliveryOrder"
-      @confirmed="onDeliveryConfirmed"
-    />
 
     <ChangeDeliveryModeModal
       v-model:open="changeDeliveryModeOpen"
@@ -299,28 +303,23 @@ import {
   FileTextOutlined,
   PrinterOutlined,
   CloseCircleOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons-vue'
 import { filterSalesOrders } from '@/mock/salesOrders'
 import {
   salesOrderState,
-  addSalesOrder,
-  updateSalesOrder,
   deleteSalesOrder,
-  recalcOrderAmounts,
   approveSalesOrder,
+  revokeSalesOrderApproval,
   canEditSalesOrder,
   canChangeDeliveryMode,
-  addDeliveryApplication,
 } from '@/store/salesOrderStore'
-import { sumSelectedShipQty } from '@/utils/shipEbom'
 import {
   customerOptions,
   orderSourceOptions,
   deliveryStatusOptions,
   salespersonOptions,
 } from '@/mock/salesOrderOptions'
-import CreateSalesOrderModal from './components/CreateSalesOrderModal.vue'
-import ApplyDeliveryModal from './components/ApplyDeliveryModal.vue'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
@@ -329,8 +328,13 @@ import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useListExport } from '@/composables/useListExport'
 import { salesOrderExportFields } from '@/utils/exportFields/salesOrderExport'
+import { DISCOUNT_STRATEGY_LABELS, calcOrderAmounts } from '@/utils/salesOrderPricing'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
+import {
+  SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
+  hasDispatchedWorkOrdersForSalesOrder,
+} from '@/utils/salesOrderRevokeApproval'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -346,11 +350,7 @@ const filters = reactive({
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
-const createModalOpen = ref(false)
-const deliveryModalOpen = ref(false)
 const changeDeliveryModeOpen = ref(false)
-const editRecord = ref(null)
-const deliveryOrder = ref(null)
 const changeDeliveryModeOrder = ref(null)
 const pagination = reactive({ current: 1, pageSize: 10 })
 
@@ -363,15 +363,62 @@ const baseColumns = [
   { title: '销售单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
   { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true },
   { title: '进度状态', key: 'progressStatus', dataIndex: 'progressStatus', width: 90 },
-  { title: '销售数量', key: 'totalQty', dataIndex: 'totalQty', width: 90, align: 'right' },
   { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
   { title: '送货方式', dataIndex: 'deliveryMethod', width: 90 },
   { title: '发货状态', dataIndex: 'deliveryStatus', width: 90 },
+  {
+    title: '销售数量',
+    key: 'totalQty',
+    dataIndex: 'totalQty',
+    width: 90,
+    align: 'right',
+  },
   {
     title: '发货数量',
     key: 'totalIssuedQty',
     dataIndex: 'totalIssuedQty',
     width: 90,
+    align: 'right',
+  },
+  {
+    title: '销售金额（不含税）',
+    key: 'lineAmountExTax',
+    dataIndex: 'lineAmountExTax',
+    width: 130,
+    align: 'right',
+  },
+  {
+    title: '销售金额（含税）',
+    key: 'lineAmountInTax',
+    dataIndex: 'lineAmountInTax',
+    width: 130,
+    align: 'right',
+  },
+  {
+    title: '优惠策略',
+    key: 'discountStrategy',
+    dataIndex: 'discountStrategy',
+    width: 100,
+  },
+  {
+    title: '优惠总额',
+    key: 'totalDiscountAmount',
+    dataIndex: 'totalDiscountAmount',
+    width: 100,
+    align: 'right',
+  },
+  {
+    title: '最终成交额（不含税）',
+    key: 'amountExTax',
+    dataIndex: 'amountExTax',
+    width: 140,
+    align: 'right',
+  },
+  {
+    title: '最终成交额（含税）',
+    key: 'amountInTax',
+    dataIndex: 'amountInTax',
+    width: 140,
     align: 'right',
   },
   { title: '紧急度', key: 'urgency', dataIndex: 'urgency', width: 80 },
@@ -389,27 +436,6 @@ const baseColumns = [
   { title: '销售渠道', dataIndex: 'salesChannel', width: 90 },
   { title: '所属区域', dataIndex: 'region', width: 90 },
   { title: '订单来源', dataIndex: 'orderSource', width: 100 },
-  {
-    title: '订单含税金额',
-    key: 'orderAmount',
-    dataIndex: 'orderAmount',
-    width: 120,
-    align: 'right',
-  },
-  {
-    title: '订单不含税金额',
-    key: 'amountExTax',
-    dataIndex: 'amountExTax',
-    width: 120,
-    align: 'right',
-  },
-  {
-    title: '优惠总额',
-    key: 'totalDiscountAmount',
-    dataIndex: 'totalDiscountAmount',
-    width: 100,
-    align: 'right',
-  },
   { title: '创建日期', key: 'createdAt', dataIndex: 'createdAt', width: 110 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '审核日期', key: 'approvedAt', dataIndex: 'approvedAt', width: 110 },
@@ -418,7 +444,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('sales-order-list', baseColumns, { minScrollX: 2000 })
+  useTableColumnSettings('sales-order-list', baseColumns, { minScrollX: 2600 })
 
 const {
   exportModalOpen,
@@ -489,6 +515,27 @@ function formatMoney(val) {
 
 function formatOrderMoney(val) {
   return formatMoney(val)
+}
+
+function resolveOrderAmounts(record) {
+  if (!record) return calcOrderAmounts({})
+  if (record.lineAmountExTax != null && record.amountExTax != null) {
+    return {
+      lineListAmountExTax:
+        record.lineListAmountExTax ??
+        Number(record.lineAmountExTax) + Number(record.lineDiscountTotal || 0),
+      lineAmountInTax: record.lineAmountInTax ?? record.orderAmount ?? 0,
+      lineAmountExTax: record.lineAmountExTax ?? 0,
+      totalDiscountAmount: record.totalDiscountAmount ?? 0,
+      amountInTax: record.amountInTax ?? record.orderAmount ?? 0,
+      amountExTax: record.amountExTax ?? 0,
+    }
+  }
+  return calcOrderAmounts(record)
+}
+
+function formatDiscountStrategy(strategy) {
+  return DISCOUNT_STRATEGY_LABELS[strategy] || DISCOUNT_STRATEGY_LABELS.line || '—'
 }
 
 function formatDate(val) {
@@ -579,6 +626,56 @@ function handleApprove() {
   })
 }
 
+function handleRevokeApprove() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择要反审的销售订单')
+    return
+  }
+
+  const targets = salesOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
+  const approved = targets.filter((o) => o.progressStatus === '已审')
+  if (!approved.length) {
+    message.warning('所选订单均未审核，无需反审')
+    return
+  }
+
+  const blockedOrders = approved.filter((o) => hasDispatchedWorkOrdersForSalesOrder(o))
+  const revokableOrders = approved.filter((o) => !hasDispatchedWorkOrdersForSalesOrder(o))
+
+  if (blockedOrders.length) {
+    const orderNos = blockedOrders.map((o) => o.orderNo).join('、')
+    Modal.warning({
+      title: '无法反审',
+      content: `${SALES_ORDER_REVOKE_BLOCKED_MESSAGE}${orderNos ? `\n\n涉及订单：${orderNos}` : ''}`,
+      okText: '知道了',
+    })
+    if (!revokableOrders.length) return
+  }
+
+  if (!revokableOrders.length) return
+
+  const count = revokableOrders.length
+  Modal.confirm({
+    title: count > 1 ? `已选择 ${count} 条可反审订单` : undefined,
+    content: blockedOrders.length
+      ? `部分订单因已下发工单无法反审。确认对其余 ${count} 条订单执行反审？`
+      : '确认反审所选销售订单？反审后订单将恢复为未审状态，可重新编辑。',
+    okText: '确认反审',
+    cancelText: '取消',
+    onOk: () => {
+      revokableOrders.forEach((order) => {
+        const result = revokeSalesOrderApproval(order.id)
+        if (result.ok) {
+          message.success(result.message)
+        } else if (!result.blocked) {
+          message.warning(result.message)
+        }
+      })
+      selectedRowKeys.value = []
+    },
+  })
+}
+
 function openCreate() {
   const page = findCreatePageByListPath('/sales/orders')
   if (!page) return
@@ -590,8 +687,11 @@ function openEditModal(record) {
     message.warning('已审核的销售订单不可编辑')
     return
   }
-  editRecord.value = record
-  createModalOpen.value = true
+  const path = `/sales/orders/${record.id}/edit`
+  openCreateTab(router, openTab, {
+    path,
+    title: `编辑销售订单 ${record.orderNo || ''}`.trim(),
+  })
 }
 
 function openDeliveryModal() {
@@ -599,12 +699,16 @@ function openDeliveryModal() {
     message.warning('请勾选一条销售订单后再申请发货')
     return
   }
-  deliveryOrder.value = salesOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
-  if (!deliveryOrder.value) {
+  const order = salesOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
     message.warning('未找到所选订单')
     return
   }
-  deliveryModalOpen.value = true
+  openCreateTab(router, openTab, {
+    path: '/sales/delivery/new',
+    title: `新增发货单 ${order.orderNo || ''}`.trim(),
+    query: { salesOrderId: order.id },
+  })
 }
 
 function openChangeDeliveryModeModal() {
@@ -631,38 +735,6 @@ function openChangeDeliveryModeModal() {
 
 function onChangeDeliveryModeSaved() {
   changeDeliveryModeOrder.value = null
-}
-
-function onOrderSaved({ isEdit, id, data }) {
-  if (isEdit) {
-    const existing = salesOrderState.orders.find((o) => o.id === id)
-    if (!canEditSalesOrder(existing)) {
-      message.warning('已审核的销售订单不可编辑')
-      return
-    }
-    updateSalesOrder(id, data)
-  } else {
-    addSalesOrder({ ...data, id: `so-${Date.now()}` })
-    recalcOrderAmounts(salesOrderState.orders[0])
-  }
-}
-
-/** 申请发货确认：仅写入销售订单，发货单由 store 内同步 */
-function onDeliveryConfirmed(payload) {
-  if (!payload?.salesOrderId) {
-    message.success('发货申请已记录')
-    return
-  }
-  const wholeQty = (payload.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
-  const scatterQty = (payload.scatterShipments || []).reduce(
-    (s, ship) => s + sumSelectedShipQty(ship),
-    0,
-  )
-  addDeliveryApplication(payload.salesOrderId, {
-    ...payload,
-    totalShipQty: wholeQty + scatterQty,
-  })
-  message.success('发货申请已记录')
 }
 
 function openDetail(record) {

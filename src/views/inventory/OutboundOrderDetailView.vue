@@ -60,7 +60,6 @@
             <a-descriptions-item label="出库仓库">{{
               record.warehouse || '—'
             }}</a-descriptions-item>
-            <a-descriptions-item label="经手人">{{ record.handler || '—' }}</a-descriptions-item>
             <a-descriptions-item label="领用部门">{{
               record.requisitionDept || '—'
             }}</a-descriptions-item>

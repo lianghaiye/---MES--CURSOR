@@ -41,49 +41,44 @@
             </div>
 
             <div class="section-card">
-              <div class="section-title">关联概览</div>
-              <a-row :gutter="[12, 12]">
-                <a-col :span="6">
-                  <a-statistic title="发货申请" :value="relations.deliveryApplications.length" />
-                </a-col>
-                <a-col :span="6">
-                  <a-statistic title="出库单" :value="relations.outboundOrders.length" />
-                </a-col>
-                <a-col :span="6">
-                  <a-statistic title="采购单" :value="relations.purchaseOrders.length" />
-                </a-col>
-                <a-col :span="6">
-                  <a-statistic title="生产工单" :value="relations.workOrders.length" />
-                </a-col>
-              </a-row>
-            </div>
+              <div class="price-summary-header">
+                <div class="section-title">价格汇总</div>
+                <div class="discount-strategy-row">
+                  <span class="strategy-label">折扣策略</span>
+                  <a-tag bordered :color="discountStrategyTagColor" class="discount-strategy-tag">
+                    {{ discountStrategyLabel }}
+                  </a-tag>
+                </div>
+              </div>
 
-            <div class="section-card">
-              <div class="section-title">价格汇总</div>
               <a-row :gutter="[16, 12]" class="price-summary-grid">
-                <a-col :span="6">
+                <a-col :span="8">
                   <div class="price-summary-item">
-                    <div class="price-label">明细不含税合计</div>
-                    <div class="price-value">￥{{ formatMoney(orderPricing.lineAmountExTax) }}</div>
-                  </div>
-                </a-col>
-                <a-col :span="6">
-                  <div class="price-summary-item">
-                    <div class="price-label">行级优惠合计</div>
+                    <div class="price-label">
+                      行级优惠合计
+                      <a-tooltip :title="lineDiscountTooltip">
+                        <QuestionCircleOutlined class="label-tip-icon" />
+                      </a-tooltip>
+                    </div>
                     <div class="price-value discount">
                       -￥{{ formatMoney(orderPricing.lineDiscountTotal) }}
                     </div>
                   </div>
                 </a-col>
-                <a-col :span="6">
+                <a-col :span="8">
                   <div class="price-summary-item">
-                    <div class="price-label">整单优惠合计</div>
+                    <div class="price-label">
+                      整单优惠合计
+                      <a-tooltip :title="orderDiscountTooltip">
+                        <QuestionCircleOutlined class="label-tip-icon" />
+                      </a-tooltip>
+                    </div>
                     <div class="price-value discount">
                       -￥{{ formatMoney(orderPricing.orderDiscountTotal) }}
                     </div>
                   </div>
                 </a-col>
-                <a-col :span="6">
+                <a-col :span="8">
                   <div class="price-summary-item">
                     <div class="price-label">优惠总额</div>
                     <div class="price-value discount">
@@ -91,25 +86,67 @@
                     </div>
                   </div>
                 </a-col>
+              </a-row>
+
+              <a-divider class="price-summary-divider" />
+
+              <a-row :gutter="[16, 12]" class="price-summary-grid">
                 <a-col :span="6">
                   <div class="price-summary-item">
-                    <div class="price-label">订单不含税金额</div>
-                    <div class="price-value">￥{{ formatMoney(orderPricing.amountExTax) }}</div>
+                    <div class="price-label">
+                      销售总额（不含税）
+                      <a-tooltip :title="lineAmountExTaxTooltip">
+                        <QuestionCircleOutlined class="label-tip-icon" />
+                      </a-tooltip>
+                    </div>
+                    <div class="price-value">
+                      ￥{{ formatMoney(orderPricing.lineListAmountExTax) }}
+                    </div>
                   </div>
                 </a-col>
                 <a-col :span="6">
                   <div class="price-summary-item">
-                    <div class="price-label">订单含税金额</div>
-                    <div class="price-value">￥{{ formatMoney(orderPricing.amountInTax) }}</div>
+                    <div class="price-label">
+                      销售总额（含税）
+                      <a-tooltip :title="lineAmountInTaxTooltip">
+                        <QuestionCircleOutlined class="label-tip-icon" />
+                      </a-tooltip>
+                    </div>
+                    <div class="price-value">￥{{ formatMoney(orderPricing.lineAmountInTax) }}</div>
                   </div>
                 </a-col>
-                <a-col v-if="order.orderDiscountReason" :span="12">
+                <a-col :span="6">
                   <div class="price-summary-item">
-                    <div class="price-label">优惠原因</div>
-                    <div class="price-value">{{ order.orderDiscountReason }}</div>
+                    <div class="price-label">
+                      最终成交额（不含税）
+                      <a-tooltip :title="finalAmountExTaxTooltip">
+                        <QuestionCircleOutlined class="label-tip-icon" />
+                      </a-tooltip>
+                    </div>
+                    <div class="price-value price-value-final">
+                      ￥{{ formatMoney(orderPricing.amountExTax) }}
+                    </div>
+                  </div>
+                </a-col>
+                <a-col :span="6">
+                  <div class="price-summary-item">
+                    <div class="price-label">
+                      最终成交额（含税）
+                      <a-tooltip :title="finalAmountInTaxTooltip">
+                        <QuestionCircleOutlined class="label-tip-icon" />
+                      </a-tooltip>
+                    </div>
+                    <div class="price-value price-value-final">
+                      ￥{{ formatMoney(orderPricing.amountInTax) }}
+                    </div>
                   </div>
                 </a-col>
               </a-row>
+
+              <div v-if="order.orderDiscountReason" class="discount-reason-row">
+                <span class="reason-label">优惠原因</span>
+                <span class="reason-text">{{ order.orderDiscountReason }}</span>
+              </div>
             </div>
 
             <div class="section-card">
@@ -563,7 +600,13 @@ import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
 import SalesOrderEbomDiffSection from './components/SalesOrderEbomDiffSection.vue'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
-import { formatDiscountRatePercent, calcOrderAmounts } from '@/utils/salesOrderPricing'
+import {
+  formatDiscountRatePercent,
+  calcOrderAmounts,
+  DISCOUNT_STRATEGY_LABELS,
+  DISCOUNT_STRATEGIES,
+} from '@/utils/salesOrderPricing'
+import { QuestionCircleOutlined } from '@ant-design/icons-vue'
 import { buildSalesOrderEbomRows } from '@/utils/salesOrderBomRows'
 import {
   normalizeSalesOrderDetailTab,
@@ -589,16 +632,46 @@ const relations = computed(() => resolveSalesOrderRelations(order.value))
 const orderPricing = computed(() => {
   if (!order.value) {
     return {
+      lineListAmountExTax: 0,
       lineAmountExTax: 0,
+      lineAmountInTax: 0,
       lineDiscountTotal: 0,
       orderDiscountTotal: 0,
       totalDiscountAmount: 0,
       amountExTax: 0,
       amountInTax: 0,
+      discountStrategy: DISCOUNT_STRATEGIES.LINE,
     }
   }
   return calcOrderAmounts(order.value)
 })
+
+const discountStrategyLabel = computed(() => {
+  const strategy = order.value?.discountStrategy || DISCOUNT_STRATEGIES.LINE
+  return DISCOUNT_STRATEGY_LABELS[strategy] || DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.LINE]
+})
+
+const discountStrategyTagColor = computed(() => {
+  const strategy = order.value?.discountStrategy || DISCOUNT_STRATEGIES.LINE
+  if (strategy === DISCOUNT_STRATEGIES.ORDER) return 'warning'
+  if (strategy === DISCOUNT_STRATEGIES.STACK) return 'processing'
+  return 'success'
+})
+
+const lineDiscountTooltip = '行级优惠合计 = Σ [标准单价(不含税) × 数量 × (1 - 行折扣率)]'
+
+const orderDiscountTooltip = '整单优惠合计 = 明细折后不含税合计 × (1 - 整单折扣率) + 整单减免(元)'
+
+const lineAmountInTaxTooltip = '销售总额（含税）= Σ 各行 [成交单价(含税) × 数量]（未扣整单优惠）'
+
+const lineAmountExTaxTooltip =
+  '销售总额（不含税）= Σ [标准单价(不含税) × 数量]（不含行级折扣，未扣整单优惠）'
+
+const finalAmountInTaxTooltip =
+  '最终成交额（含税）= 明细折后含税合计 × [最终成交额(不含税) ÷ 明细折后不含税合计]'
+
+const finalAmountExTaxTooltip =
+  '最终成交额（不含税）= (销售总额(不含税) - 行级优惠合计) × 整单折扣率 - 整单减免(元)'
 
 const purchaseTabCount = computed(
   () => relations.value.purchaseRequisitions.length + relations.value.purchaseOrders.length,
@@ -686,7 +759,7 @@ const deliveryColumns = [
   { title: '实际出库数量', key: 'actualOutboundQty', width: 110, align: 'right' },
   { title: '发货重量', key: 'shipWeight', width: 96, align: 'right' },
   { title: '发货总金额（不含税）', key: 'totalAmountExTax', width: 140, align: 'right' },
-  { title: '发货方式', dataIndex: 'shipmentMethod', width: 88 },
+  { title: '交货方式', dataIndex: 'shipmentMethod', width: 88 },
   { title: '物流单号', dataIndex: 'logisticsNo', width: 130, ellipsis: true },
   { title: '客户联系人', dataIndex: 'contactPerson', width: 100 },
   { title: '联系方式', dataIndex: 'contactPhone', width: 120 },
@@ -707,7 +780,6 @@ const outboundColumns = [
   { title: '仓库', dataIndex: 'warehouse', width: 90 },
   { title: '出库数量', key: 'shipQtyTotal', width: 96, align: 'right' },
   { title: '出库时间', dataIndex: 'outboundTime', width: 160 },
-  { title: '经手人', dataIndex: 'handler', width: 88 },
   { title: '操作人', key: 'operator', width: 88 },
 ]
 
@@ -742,7 +814,6 @@ const purchaseOrderColumns = [
   { title: '供应商', key: 'supplier', width: 140, ellipsis: true },
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { title: '采购员', dataIndex: 'purchaser', width: 88 },
-  { title: '送货日期', dataIndex: 'shippingDate', width: 110 },
   { title: '创建人', dataIndex: 'creator', width: 88 },
   { title: '创建日期', dataIndex: 'documentDate', width: 110 },
 ]
@@ -887,6 +958,7 @@ function outsourcingStatusColor(status) {
 }
 
 const attachmentColumns = [
+  { title: '范围', dataIndex: 'scope', width: 160, ellipsis: true },
   { title: '文件名', dataIndex: 'name', ellipsis: true },
   { title: '类型', dataIndex: 'type', width: 100 },
   { title: '上传时间', dataIndex: 'uploadedAt', width: 150 },
@@ -1078,14 +1150,72 @@ function openBomDetail(bomId, bomName) {
 .section-title {
   font-weight: 600;
   font-size: 14px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.price-summary-header .section-title {
+  margin-bottom: 0;
+}
+
+.price-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.discount-strategy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .strategy-label {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.65);
+  }
+}
+
+.discount-strategy-tag {
+  margin: 0;
+  font-size: 13px;
+}
+
+.price-summary-divider {
+  margin: 4px 0 14px;
+}
+
+.discount-reason-row {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #f0f0f0;
+  font-size: 13px;
+
+  .reason-label {
+    color: rgba(0, 0, 0, 0.45);
+    margin-right: 8px;
+  }
+
+  .reason-text {
+    color: rgba(0, 0, 0, 0.88);
+  }
 }
 
 .price-summary-item {
   .price-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
     margin-bottom: 4px;
+  }
+
+  .label-tip-icon {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.35);
+    cursor: help;
   }
 
   .price-value {
@@ -1095,6 +1225,12 @@ function openBomDetail(bomId, bomName) {
 
     &.discount {
       color: #cf1322;
+    }
+
+    &.price-value-final {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1677ff;
     }
   }
 }

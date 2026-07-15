@@ -24,15 +24,19 @@ export function calcDeliveryAmountExTax(application) {
   return Math.round(whole * 100) / 100
 }
 
-/** 发货重量（演示：按行重量 × 发货数量汇总） */
+/** 发货重量：明细行 shipWeight 优先，否则按件重 × 数量 */
 export function calcShipWeight(application) {
   if (!application) return 0
   const whole = (application.lineItems || []).reduce((s, l) => {
+    const explicit = Number(l.shipWeight)
+    if (Number.isFinite(explicit) && explicit > 0) {
+      return s + explicit
+    }
     const w = Number(l.itemWeightKg) || 0
     const q = Number(l.shipQty) || 0
     return s + w * q
   }, 0)
-  return Math.round(whole * 100) / 100
+  return Math.round(whole * 10000) / 10000
 }
 
 /** 实际出库数量（1:1 关联销售出库单，已出库时按明细汇总） */
@@ -72,16 +76,16 @@ export function formatOutboundQtyInt(val) {
 }
 
 /**
- * 发货重量：有小数显示小数（最多2位），无小数只显示整数
+ * 发货重量：有小数显示有效小数位（最多4位），无小数只显示整数
  */
 export function formatShipWeight(val) {
   const n = Number(val)
   if (!Number.isFinite(n)) return '0'
-  const rounded = Math.round(n * 100) / 100
-  if (Math.abs(rounded - Math.round(rounded)) < 1e-9) {
+  const rounded = Math.round(n * 10000) / 10000
+  if (Math.abs(rounded - Math.round(rounded)) < 1e-12) {
     return String(Math.round(rounded))
   }
-  let s = rounded.toFixed(2)
+  let s = rounded.toFixed(4)
   s = s.replace(/0+$/, '').replace(/\.$/, '')
   return s
 }

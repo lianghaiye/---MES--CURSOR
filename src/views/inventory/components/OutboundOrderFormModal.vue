@@ -59,16 +59,6 @@
               </a-form-item>
             </a-col>
             <a-col :span="8">
-              <a-form-item label="经手人">
-                <a-select
-                  v-model:value="form.handler"
-                  size="small"
-                  show-search
-                  :options="handlerOpts"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
               <a-form-item label="领用部门">
                 <a-select
                   v-model:value="form.requisitionDept"
@@ -89,6 +79,36 @@
                   style="width: 100%"
                 />
               </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="销售订单">
+                <a-input-group compact>
+                  <a-input
+                    :value="form.salesOrderNo"
+                    readonly
+                    size="small"
+                    style="width: calc(100% - 72px)"
+                    placeholder="请选择销售订单"
+                  />
+                  <a-button size="small" @click="salesOrderPickerOpen = true">选择</a-button>
+                </a-input-group>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="合同编号">
+                <a-input
+                  v-model:value="form.contractNo"
+                  allow-clear
+                  size="small"
+                  placeholder="请输入合同编号"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col v-if="form.salesOrderNo" :span="24">
+              <div class="sales-order-summary">
+                {{ form.salesOrderNo }} / {{ form.customerName || '-' }} /
+                {{ form.salesperson || '-' }}
+              </div>
             </a-col>
             <a-col :span="24">
               <a-form-item label="备注" class="remark-item">
@@ -326,9 +346,10 @@
   <AddByBomModal
     v-if="isActive"
     v-model:open="bomModalOpen"
+    own-active-only
     qty-label="出库数量"
     qty-hint="子项出库数量 = 出库数量 × 子件原单位用量"
-    preview-tip="确定后将添加所选物品 BOM的 下级结构"
+    preview-tip="确定后将添加所选物品自有生效 BOM 的下级结构"
     modal-width="720px"
     @confirm="onBomAdded"
   />
@@ -347,6 +368,8 @@
     :default-settings="defaultColumnSettings"
     title="出库明细列设置"
   />
+
+  <SalesOrderSelectModal v-model:open="salesOrderPickerOpen" @confirm="onSalesOrderPicked" />
 </template>
 
 <script setup>
@@ -367,7 +390,7 @@ import OutboundLineEditModal from './OutboundLineEditModal.vue'
 import InventoryLineItemSelect from './InventoryLineItemSelect.vue'
 import InventoryLineEditableCell from './InventoryLineEditableCell.vue'
 import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
-import { outboundTypeOptions, handlerOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
+import { outboundTypeOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { addOutboundOrder, generateOutboundNo, updateOutboundOrder } from '@/store/outboundStore'
 import { outboundFormLineColumns } from '@/utils/outboundLineColumns'
@@ -383,6 +406,8 @@ import {
   mergeOutboundLines,
   syncLineTotalFromUnit,
 } from '@/utils/outboundLineHelpers'
+import SalesOrderSelectModal from '@/views/production/components/SalesOrderSelectModal.vue'
+import { findSalesOrderByOrderNo, getSalesOrderById } from '@/store/salesOrderStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -410,9 +435,9 @@ const lineEditMode = ref('edit')
 const lineEditSourceId = ref(null)
 const totalWeightManual = ref(false)
 const prevHeaderWarehouse = ref(undefined)
+const salesOrderPickerOpen = ref(false)
 
 const outboundTypeOpts = outboundTypeOptions.map((v) => ({ label: v, value: v }))
-const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
 const requisitionDeptOpts = requisitionDeptOptions.map((v) => ({ label: v, value: v }))
 
 const warehouseOpts = computed(() => {
@@ -440,6 +465,11 @@ const form = reactive({
   handler: 'admin1',
   requisitionDept: '默认工厂',
   totalWeight: 0,
+  salesOrderId: '',
+  salesOrderNo: '',
+  customerName: '',
+  salesperson: '',
+  contractNo: '',
   remark: '',
   lineItems: [],
 })
@@ -503,6 +533,22 @@ watch(
   { immediate: true },
 )
 
+function syncSalesOrderMeta(orderNo, orderId) {
+  const order = (orderId && getSalesOrderById(orderId)) || findSalesOrderByOrderNo(orderNo) || null
+  form.customerName = order?.customerName || ''
+  form.salesperson = order?.salesperson || ''
+}
+
+function onSalesOrderPicked(order) {
+  form.salesOrderId = order.id
+  form.salesOrderNo = order.orderNo
+  form.customerName = order.customerName || ''
+  form.salesperson = order.salesperson || ''
+  if (!form.contractNo?.trim() && order.contractNo) {
+    form.contractNo = order.contractNo
+  }
+}
+
 function loadEditForm(record) {
   endLineCellEdit()
   totalWeightManual.value = true
@@ -515,9 +561,17 @@ function loadEditForm(record) {
     handler: record.handler || 'admin1',
     requisitionDept: record.requisitionDept || '默认工厂',
     totalWeight: record.totalWeight ?? 0,
+    salesOrderId: record.salesOrderId || '',
+    salesOrderNo: record.salesOrderNo || '',
+    customerName: record.customerName || '',
+    salesperson: record.salesperson || '',
+    contractNo: record.contractNo || '',
     remark: record.remark || '',
     lineItems: (record.lineItems || []).map((l) => enrichOutboundLine({ ...l })),
   })
+  if (form.salesOrderNo && (!form.customerName || !form.salesperson)) {
+    syncSalesOrderMeta(form.salesOrderNo, form.salesOrderId)
+  }
 }
 
 function resetForm() {
@@ -531,6 +585,11 @@ function resetForm() {
     handler: 'admin1',
     requisitionDept: '默认工厂',
     totalWeight: 0,
+    salesOrderId: '',
+    salesOrderNo: '',
+    customerName: '',
+    salesperson: '',
+    contractNo: '',
     remark: '',
     lineItems: [],
   })
@@ -664,7 +723,7 @@ function onBomAdded({ pickerRow, usageCoefficient }) {
     false,
   )
   if (!incoming.length) {
-    message.warning('未找到可添加的 BOM 明细')
+    message.warning('该物品无自有生效 BOM 明细，请先维护 SKU 产品 BOM')
     return
   }
   form.lineItems = mergeOutboundLines(form.lineItems, incoming)
@@ -707,6 +766,10 @@ function buildPayload() {
     handler: form.handler,
     requisitionDept: form.requisitionDept || '',
     totalWeight: form.totalWeight,
+    salesOrderNo: form.salesOrderNo?.trim() || '',
+    salesOrderId: form.salesOrderId || '',
+    contractNo: form.contractNo?.trim() || '',
+    customerName: form.customerName || '',
     remark: form.remark?.trim(),
     lineItems: form.lineItems.filter((l) => l.itemCode).map((l) => enrichOutboundLine({ ...l })),
   }
@@ -852,5 +915,14 @@ function handleSave() {
 
 :deep(.ant-table-tbody > tr > td) {
   padding: 4px 8px !important;
+}
+
+.sales-order-summary {
+  margin: -4px 0 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  background: #fafafa;
+  border-radius: 4px;
 }
 </style>

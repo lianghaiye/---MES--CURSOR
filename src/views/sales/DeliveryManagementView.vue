@@ -102,8 +102,8 @@
             <DownOutlined />
           </a-button>
           <template #overlay>
-            <a-menu @click="stubBatch">
-              <a-menu-item key="placeholder">功能开发中</a-menu-item>
+            <a-menu @click="onBatchMenu">
+              <a-menu-item key="export">导出 Excel</a-menu-item>
             </a-menu>
           </template>
         </a-dropdown>
@@ -197,6 +197,15 @@
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
     />
+
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="filteredList.length"
+      :selected-count="selectedRowKeys.length"
+      @export="doExport"
+    />
   </div>
 </template>
 
@@ -239,7 +248,10 @@ import DeliveryStatsPanel from './components/DeliveryStatsPanel.vue'
 import DeliveryFormModal from './components/DeliveryFormModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useListExport } from '@/composables/useListExport'
+import { deliveryExportFields } from '@/utils/exportFields/deliveryExport'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 
@@ -275,7 +287,7 @@ const baseColumns = [
   { title: '实际出库数量', key: 'actualOutboundQty', width: 110, align: 'right' },
   { title: '发货重量', key: 'shipWeight', width: 96, align: 'right' },
   { title: '发货总金额（不含税）', key: 'totalAmountExTax', width: 140, align: 'right' },
-  { title: '发货方式', dataIndex: 'shipmentMethod', width: 88 },
+  { title: '交货方式', dataIndex: 'shipmentMethod', width: 88 },
   { title: '物流单号', dataIndex: 'logisticsNo', width: 130, ellipsis: true },
   { title: '客户联系人', dataIndex: 'contactPerson', width: 100 },
   { title: '联系方式', dataIndex: 'contactPhone', width: 120 },
@@ -288,6 +300,21 @@ const baseColumns = [
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings('delivery-list', baseColumns)
+
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'delivery-list',
+  fieldDefinitions: deliveryExportFields,
+  getFilteredRows: () => filteredList.value,
+  getSelectedRows: () =>
+    deliveryOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id)),
+  fileNamePrefix: '发货管理',
+})
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -407,7 +434,11 @@ function stubAction(name) {
   message.info(`${name}功能开发中`)
 }
 
-function stubBatch() {
+function onBatchMenu({ key }) {
+  if (key === 'export') {
+    openExportModal()
+    return
+  }
   message.info('批量操作功能开发中')
 }
 </script>

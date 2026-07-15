@@ -189,6 +189,12 @@ const routes = [
         meta: { title: '销售订单' },
       },
       {
+        path: 'sales/orders/:id/edit',
+        name: 'sales-orders-edit',
+        component: () => import('@/views/sales/SalesOrderEditView.vue'),
+        meta: { title: '编辑销售订单', listPath: '/sales/orders' },
+      },
+      {
         path: 'sales/orders/:id',
         name: 'sales-orders-detail',
         component: () => import('@/views/sales/SalesOrderDetailView.vue'),
@@ -704,17 +710,24 @@ router.beforeEach((to, from, next) => {
     return
   }
 
-  const fullPath = to.path
-  const title = routeTitles[fullPath] || to.meta?.title || '页面'
-  const exists = tabStore.tabs.find((t) => t.path === fullPath)
+  const fullPath = to.fullPath
+  const pathOnly = to.path
+  const title = routeTitles[pathOnly] || routeTitles[fullPath] || to.meta?.title || '页面'
+  const exists = tabStore.tabs.find((t) => {
+    if (t.path === fullPath || t.path === pathOnly) return true
+    return t.path.split('?')[0] === pathOnly
+  })
   if (!exists) {
     tabStore.tabs.push({
-      path: fullPath,
+      path: fullPath.includes('?') ? fullPath : pathOnly,
       title,
-      closable: fullPath !== '/home/dashboard',
+      closable: pathOnly !== '/home/dashboard',
     })
+    tabStore.activePath = fullPath.includes('?') ? fullPath : pathOnly
+  } else {
+    // 优先使用已有带 query 的页签 path，避免切回丢参
+    tabStore.activePath = exists.path
   }
-  tabStore.activePath = fullPath
   next()
 })
 

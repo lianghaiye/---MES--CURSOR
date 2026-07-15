@@ -1,8 +1,8 @@
 <template>
   <FormComponent
     page-mode
+    mode="apply"
     :list-path="listPath"
-    :mode="formMode"
     :initial-sales-order-id="salesOrderId"
   />
 </template>
@@ -12,10 +12,9 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import FormComponent from './components/DeliveryFormModal.vue'
 
-defineOptions({ name: 'DeliveryCreateView' })
+defineOptions({ name: 'ApplyDeliveryCreateView' })
 
 const route = useRoute()
+const listPath = '/sales/orders'
 const salesOrderId = computed(() => String(route.query.salesOrderId || ''))
-const formMode = computed(() => (salesOrderId.value ? 'apply' : 'create'))
-const listPath = computed(() => (salesOrderId.value ? '/sales/orders' : '/sales/delivery'))
 </script>

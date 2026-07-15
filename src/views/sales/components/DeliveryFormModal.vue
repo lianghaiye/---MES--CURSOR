@@ -18,7 +18,7 @@
           <a-col :span="8">
             <a-form-item label="源销售订单" required>
               <a-select
-                v-if="!isEdit"
+                v-if="!salesOrderLocked"
                 v-model:value="form.salesOrderId"
                 show-search
                 placeholder="请选择 销售订单"
@@ -30,22 +30,13 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="发货编码" required>
-              <a-input-group compact>
-                <a-input
-                  v-model:value="form.deliveryCode"
-                  size="small"
-                  style="width: calc(100% - 80px)"
-                />
-                <a-button size="small" @click="form.deliveryCode = generateDeliveryCode()">
-                  生成编码
-                </a-button>
-              </a-input-group>
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="销售单号">
-              <a-input :value="form.salesOrderNo" disabled size="small" />
+            <a-form-item label="发货单号">
+              <a-input
+                v-model:value="form.deliveryCode"
+                size="small"
+                placeholder="可自定义，未填则按系统规则生成"
+                allow-clear
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -55,15 +46,16 @@
                 size="small"
                 placeholder="请选择 客户名称"
                 :options="customerOpts"
+                @change="onCustomerChange"
               />
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="发货方式" required>
+            <a-form-item label="交货方式" required>
               <a-select
                 v-model:value="form.shipmentMethod"
                 size="small"
-                placeholder="请选择 发货方式"
+                placeholder="请选择 交货方式"
                 :options="shipmentMethodOpts"
               />
             </a-form-item>
@@ -174,8 +166,19 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 1960 }"
+        :scroll="{ x: 2400 }"
       >
+        <template #headerCell="{ column }">
+          <template v-if="column.key === 'shipProgress'">
+            <span>
+              发货进度
+              <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
+                <QuestionCircleOutlined class="th-tip-icon" />
+              </a-tooltip>
+            </span>
+          </template>
+          <template v-else>{{ column.title }}</template>
+        </template>
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
           <template v-else-if="column.key === 'lineShipStatus'">
@@ -184,13 +187,22 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'shipProgress'">
-            {{ formatShipProgress(record.shippedQty, record.orderQty) }}
+            {{
+              formatShipProgress(
+                record.confirmedOutboundQty ?? record.shippedQty,
+                record.appliedShipQty ?? record.shippedQty,
+                record.orderQty,
+              )
+            }}
           </template>
           <template v-else-if="column.key === 'orderQty'">
             {{ formatDeliveryQty(record.orderQty) }}
           </template>
           <template v-else-if="column.key === 'unitPriceExTax'">
             {{ formatDeliveryPrice(record.unitPriceExTax) }}
+          </template>
+          <template v-else-if="column.key === 'unitPriceInTax'">
+            {{ formatDeliveryPrice(record.unitPriceInTax) }}
           </template>
           <template v-else-if="column.key === 'deliveryMode'">
             <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
@@ -202,7 +214,21 @@
               v-model:value="record.shipQty"
               size="small"
               :min="0"
-              :precision="3"
+              :precision="4"
+              :formatter="deliveryDecimalFormatter"
+              :parser="deliveryDecimalParser"
+              style="width: 100%"
+              @change="onLineCalc(record)"
+            />
+          </template>
+          <template v-else-if="column.key === 'shipWeight'">
+            <a-input-number
+              v-model:value="record.shipWeight"
+              size="small"
+              :min="0"
+              :precision="4"
+              :formatter="deliveryDecimalFormatter"
+              :parser="deliveryDecimalParser"
               style="width: 100%"
               @change="onLineCalc(record)"
             />
@@ -213,6 +239,8 @@
               size="small"
               :min="0"
               :precision="4"
+              :formatter="deliveryDecimalFormatter"
+              :parser="deliveryDecimalParser"
               style="width: 100%"
               @change="onLineCalc(record)"
             />
@@ -224,9 +252,12 @@
             <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" danger @click="form.lineItems.splice(index, 1)">
-              删除
-            </a-button>
+            <a-space :size="0">
+              <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
+              <a-button type="link" size="small" danger @click="form.lineItems.splice(index, 1)">
+                删除
+              </a-button>
+            </a-space>
           </template>
           <template v-else>{{ displayCell(record, column) }}</template>
         </template>
@@ -243,9 +274,20 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 1848 }"
+        :scroll="{ x: 2300 }"
         v-model:expanded-row-keys="expandedScatterRowKeys"
       >
+        <template #headerCell="{ column }">
+          <template v-if="column.key === 'shipProgress'">
+            <span>
+              发货进度
+              <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
+                <QuestionCircleOutlined class="th-tip-icon" />
+              </a-tooltip>
+            </span>
+          </template>
+          <template v-else>{{ column.title }}</template>
+        </template>
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
           <template v-else-if="column.key === 'lineShipStatus'">
@@ -254,7 +296,13 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'shipProgress'">
-            {{ formatScatterShipProgress(record) }}
+            {{
+              formatShipProgress(
+                record.confirmedOutboundQty ?? record.shippedQty,
+                record.appliedShipQty ?? record.shippedQty,
+                record.orderQty,
+              )
+            }}
           </template>
           <template v-else-if="column.key === 'orderQty'">
             {{ formatDeliveryQty(record.orderQty) }}
@@ -262,10 +310,25 @@
           <template v-else-if="column.key === 'unitPriceExTax'">
             {{ formatDeliveryPrice(record.unitPriceExTax) }}
           </template>
+          <template v-else-if="column.key === 'unitPriceInTax'">
+            {{ formatDeliveryPrice(record.unitPriceInTax) }}
+          </template>
           <template v-else-if="column.key === 'deliveryMode'">
             <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
               {{ record.deliveryMode || '散件' }}
             </a-tag>
+          </template>
+          <template v-else-if="column.key === 'shipWeight'">
+            <a-input-number
+              v-model:value="record.shipWeight"
+              size="small"
+              :min="0"
+              :precision="4"
+              :formatter="deliveryDecimalFormatter"
+              :parser="deliveryDecimalParser"
+              style="width: 100%"
+              @change="onScatterLinePriceChange(record)"
+            />
           </template>
           <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
             <a-input-number
@@ -273,6 +336,8 @@
               size="small"
               :min="0"
               :precision="4"
+              :formatter="deliveryDecimalFormatter"
+              :parser="deliveryDecimalParser"
               style="width: 100%"
               @change="onScatterLinePriceChange(record)"
             />
@@ -284,9 +349,14 @@
             <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
           </template>
           <template v-else-if="column.key === 'scatterAction'">
-            <a-button type="link" size="small" @click="openScatterDrawer(record)">
-              选择发运物料
-            </a-button>
+            <a-space :size="0">
+              <a-button type="link" size="small" @click="openScatterLineEdit(record)"
+                >编辑</a-button
+              >
+              <a-button type="link" size="small" @click="openScatterDrawer(record)">
+                选择发运物料
+              </a-button>
+            </a-space>
           </template>
           <template v-else>{{ displayCell(record, column) }}</template>
         </template>
@@ -330,6 +400,13 @@
       @save="onScatterDrawerSave"
     />
 
+    <DeliveryLineEditModal
+      v-model:open="lineEditOpen"
+      :line="lineEditTarget"
+      :show-ship-qty="lineEditShowShipQty"
+      @saved="onLineEditSaved"
+    />
+
     <template #footer>
       <a-button size="small" @click="handleCancel">取消</a-button>
       <a-button type="primary" size="small" :loading="saving" @click="handleOk">确定</a-button>
@@ -340,13 +417,19 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { QuestionCircleOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 import {
   customerOptions,
   shipmentMethodOptions,
   outboundWarehouseOptions,
 } from '@/mock/salesOrderOptions'
-import { generateDeliveryCode, salesOrderState } from '@/store/salesOrderStore'
+import {
+  generateDeliveryCode,
+  salesOrderState,
+  addDeliveryApplication,
+} from '@/store/salesOrderStore'
+import { getCustomerByName } from '@/store/customerStore'
 import { createDeliveryOrder, updateDeliveryOrder } from '@/store/deliveryOrderStore'
 import {
   mapSalesLineToDeliveryLine,
@@ -355,15 +438,20 @@ import {
   formatDeliveryPrice,
   formatShipProgress,
   lineShipStatusColor,
+  SHIP_PROGRESS_TOOLTIP,
+  deliveryDecimalFormatter,
+  deliveryDecimalParser,
+  roundDeliveryDecimal,
 } from '@/utils/deliveryLine'
 import {
-  formatScatterShipProgress,
   getSelectedMaterialPicks,
   initScatterShipment,
   refreshScatterShipmentMeta,
   removeMaterialPickFromShipment,
+  sumSelectedShipQty,
 } from '@/utils/shipEbom'
 import ScatterShipDrawer from './ScatterShipDrawer.vue'
+import DeliveryLineEditModal from './DeliveryLineEditModal.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
@@ -372,11 +460,19 @@ const props = defineProps({
   pageMode: { type: Boolean, default: false },
   listPath: { type: String, default: '' },
   record: { type: Object, default: null },
+  /** create=发货管理新增；apply=销售订单申请发货 */
+  mode: { type: String, default: 'create' },
+  initialSalesOrderId: { type: String, default: '' },
 })
 
-const emit = defineEmits(['update:open', 'saved'])
+const emit = defineEmits(['update:open', 'saved', 'confirmed'])
 
+const isApplyMode = computed(() => props.mode === 'apply')
 const isEdit = computed(() => Boolean(props.record?.id))
+/** 编辑或已从销售订单带入时，锁定源销售订单 */
+const salesOrderLocked = computed(
+  () => isEdit.value || isApplyMode.value || Boolean(props.initialSalesOrderId),
+)
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/sales/delivery',
   getTitle: () => (isEdit.value ? '编辑发货单' : '新增发货单'),
@@ -385,33 +481,39 @@ const saving = ref(false)
 const scatterDrawerOpen = ref(false)
 const activeScatterShipment = ref(null)
 const expandedScatterRowKeys = ref([])
+const lineEditOpen = ref(false)
+const lineEditTarget = ref(null)
+const lineEditShowShipQty = ref(true)
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
   { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
   { title: '发货状态', key: 'lineShipStatus', width: 88, align: 'center' },
-  { title: '发货进度', key: 'shipProgress', width: 110, align: 'right' },
+  { title: '发货进度', key: 'shipProgress', width: 160, align: 'right' },
   { title: '编码', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
   { title: '规格属性', dataIndex: 'specAttr', width: 88 },
   { title: '材质', dataIndex: 'material', width: 72 },
-  { title: '订单数量', key: 'orderQty', width: 88, align: 'right' },
-  { title: '单价', key: 'unitPriceExTax', width: 96, align: 'right' },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '订单数量', key: 'orderQty', width: 96, align: 'right' },
+  { title: '单价（不含税）', key: 'unitPriceExTax', width: 120, align: 'right' },
+  { title: '单价（含税）', key: 'unitPriceInTax', width: 110, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56, align: 'center' },
-  { title: '本次发货数量', key: 'shipQty', width: 112, align: 'right' },
+  { title: '本次发货数量', key: 'shipQty', width: 120, align: 'right' },
+  { title: '发货重量', key: 'shipWeight', width: 110, align: 'right' },
   { title: '本次发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 150, align: 'right' },
   { title: '发货总额', key: 'deliveryAmountExTax', width: 100, align: 'right' },
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
   { title: '备注', key: 'lineRemark', width: 120 },
-  { title: '操作', key: 'action', width: 64, fixed: 'right' },
+  { title: '操作', key: 'action', width: 110, fixed: 'right' },
 ]
 
 const scatterLineColumns = computed(() =>
   lineColumns
     .filter((c) => c.key !== 'shipQty')
     .map((c) =>
-      c.key === 'action' ? { title: '操作', key: 'scatterAction', width: 108, fixed: 'right' } : c,
+      c.key === 'action' ? { title: '操作', key: 'scatterAction', width: 180, fixed: 'right' } : c,
     ),
 )
 
@@ -432,7 +534,7 @@ const form = reactive({
   salesOrderNo: '',
   deliveryCode: '',
   customerName: undefined,
-  shipmentMethod: '物流',
+  shipmentMethod: undefined,
   logisticsNo: '',
   contactPerson: undefined,
   contactPhone: '',
@@ -452,6 +554,24 @@ const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.valu
 const shipmentMethodOpts = shipmentMethodOptions.map((v) => ({ label: v, value: v }))
 const warehouseOpts = outboundWarehouseOptions.map((v) => ({ label: v, value: v }))
 
+function normalizeShipmentMethod(value) {
+  const map = {
+    送货上门: '送货',
+    专车配送: '送货',
+  }
+  const normalized = map[value] || value
+  return shipmentMethodOptions.includes(normalized) ? normalized : undefined
+}
+
+function resolveDefaultShipmentMethod(customerName, fallback) {
+  const customer = getCustomerByName(customerName)
+  return (
+    normalizeShipmentMethod(customer?.defaultDeliveryMethod) ||
+    normalizeShipmentMethod(fallback) ||
+    '物流'
+  )
+}
+
 const salesOrderOpts = computed(() =>
   (salesOrderState.orders || []).map((o) => ({
     label: `${o.orderNo} · ${o.customerName || ''}`,
@@ -465,14 +585,39 @@ const contactOpts = computed(() => {
 })
 
 watch(
-  () => isActive.value,
-  (v) => {
-    if (!v) return
+  () => [isActive.value, props.initialSalesOrderId, props.mode, props.record?.id],
+  ([active]) => {
+    if (!active) return
     if (props.record) {
       loadFromRecord(props.record)
-    } else {
-      resetForm()
+      return
     }
+    if (isApplyMode.value) {
+      const soId = props.initialSalesOrderId
+      // 切回标签时保留用户已填内容；仅在订单变化时重载
+      if (form.salesOrderId || form.lineItems.length) {
+        if (soId && form.salesOrderId && soId !== form.salesOrderId) {
+          resetForm()
+          const so = salesOrderState.orders.find((o) => o.id === soId)
+          if (so) {
+            form.salesOrderId = so.id
+            populateFromSalesOrder(so)
+          }
+        }
+        return
+      }
+      if (!soId) return
+      resetForm()
+      const so = salesOrderState.orders.find((o) => o.id === soId)
+      if (so) {
+        form.salesOrderId = so.id
+        populateFromSalesOrder(so)
+      }
+      return
+    }
+    // 新增发货：已有编辑中内容则不重置（保活切签）
+    if (form.salesOrderId || form.lineItems.length || form.deliveryCode) return
+    resetForm()
   },
   { immediate: true },
 )
@@ -480,9 +625,9 @@ watch(
 function resetForm() {
   form.salesOrderId = undefined
   form.salesOrderNo = ''
-  form.deliveryCode = generateDeliveryCode()
+  form.deliveryCode = ''
   form.customerName = undefined
-  form.shipmentMethod = '物流'
+  form.shipmentMethod = undefined
   form.logisticsNo = ''
   form.contactPerson = undefined
   form.contactPhone = ''
@@ -504,7 +649,7 @@ function loadFromRecord(record) {
   form.salesOrderNo = record.salesOrderNo || record.sourceOrderNo || ''
   form.deliveryCode = record.deliveryCode || ''
   form.customerName = record.customerName
-  form.shipmentMethod = record.shipmentMethod || '物流'
+  form.shipmentMethod = resolveDefaultShipmentMethod(record.customerName, record.shipmentMethod)
   form.logisticsNo = record.logisticsNo || ''
   form.contactPerson = record.contactPerson || undefined
   form.contactPhone = record.contactPhone || ''
@@ -516,9 +661,17 @@ function loadFromRecord(record) {
   form.driverPhone = record.driverPhone || ''
   form.plateNo = record.plateNo || ''
   form.remark = record.remark || ''
-  form.lineItems = JSON.parse(JSON.stringify(record.lineItems || []))
+  form.lineItems = JSON.parse(JSON.stringify(record.lineItems || [])).map((line) => {
+    line.shipWeight = roundDeliveryDecimal(line.shipWeight ?? line.itemWeightKg ?? 0, 4)
+    line.unitPriceInTax = roundDeliveryDecimal(line.unitPriceInTax ?? 0, 4)
+    return line
+  })
   form.scatterShipments = JSON.parse(JSON.stringify(record.scatterShipments || []))
-  form.scatterShipments.forEach((s) => refreshScatterShipmentMeta(s))
+  form.scatterShipments.forEach((s) => {
+    s.shipWeight = roundDeliveryDecimal(s.shipWeight ?? s.itemWeightKg ?? 0, 4)
+    s.unitPriceInTax = roundDeliveryDecimal(s.unitPriceInTax ?? 0, 4)
+    refreshScatterShipmentMeta(s)
+  })
   syncExpandedScatterRows()
 }
 
@@ -529,7 +682,7 @@ function populateFromSalesOrder(so) {
   form.contactPerson = so.contactPerson || undefined
   form.contactPhone = so.contactPhone || ''
   form.deliveryAddress = so.deliveryAddress || ''
-  form.shipmentMethod = so.deliveryMethod || '物流'
+  form.shipmentMethod = resolveDefaultShipmentMethod(so.customerName, so.deliveryMethod)
   form.lineItems = (so.lineItems || [])
     .map((line) => mapSalesLineToDeliveryLine(line, so))
     .filter(Boolean)
@@ -558,6 +711,35 @@ function syncExpandedScatterRows() {
 function openScatterDrawer(ship) {
   activeScatterShipment.value = ship
   scatterDrawerOpen.value = true
+}
+
+function openLineEdit(record) {
+  lineEditTarget.value = record
+  lineEditShowShipQty.value = true
+  lineEditOpen.value = true
+}
+
+function openScatterLineEdit(record) {
+  lineEditTarget.value = record
+  lineEditShowShipQty.value = false
+  lineEditOpen.value = true
+}
+
+function onLineEditSaved(updated) {
+  const wholeIdx = form.lineItems.findIndex((line) => line.id === updated.id)
+  if (wholeIdx !== -1) {
+    Object.assign(form.lineItems[wholeIdx], updated)
+    recalcDeliveryLine(form.lineItems[wholeIdx])
+    return
+  }
+  const scatterIdx = form.scatterShipments.findIndex(
+    (ship) => ship.salesLineId === updated.salesLineId || ship.id === updated.id,
+  )
+  if (scatterIdx !== -1) {
+    Object.assign(form.scatterShipments[scatterIdx], updated)
+    recalcDeliveryLine(form.scatterShipments[scatterIdx])
+    refreshScatterShipmentMeta(form.scatterShipments[scatterIdx])
+  }
 }
 
 function onScatterLinePriceChange(record) {
@@ -597,6 +779,13 @@ function onContactChange(name) {
   if (contact?.phone) form.contactPhone = contact.phone
 }
 
+function onCustomerChange(name) {
+  form.customerName = name
+  form.shipmentMethod = resolveDefaultShipmentMethod(name, form.shipmentMethod)
+  form.contactPerson = undefined
+  form.contactPhone = ''
+}
+
 function validateWholeMachineLines() {
   for (const line of form.lineItems) {
     const shipQty = Number(line.shipQty)
@@ -608,7 +797,7 @@ function validateWholeMachineLines() {
       message.warning(`「${line.productName}」本次发货数量须大于 0`)
       return false
     }
-    const maxQty = Number(line.orderQty) - Number(line.shippedQty)
+    const maxQty = Number(line.orderQty) - Number(line.appliedShipQty ?? line.shippedQty ?? 0)
     if (shipQty > maxQty + 1e-9) {
       message.warning(
         `「${line.productName}」本次发货数量不能超过可发数量 ${formatDeliveryQty(maxQty)}`,
@@ -634,16 +823,12 @@ function handleOk() {
     message.warning('请选择源销售订单')
     return
   }
-  if (!form.deliveryCode?.trim()) {
-    message.warning('请生成发货编码')
-    return
-  }
   if (!form.customerName) {
     message.warning('请选择客户名称')
     return
   }
   if (!form.shipmentMethod) {
-    message.warning('请选择发货方式')
+    message.warning('请选择交货方式')
     return
   }
   if (form.applyOutbound && !form.outboundWarehouse) {
@@ -666,7 +851,7 @@ function handleOk() {
   const payload = {
     salesOrderId: form.salesOrderId,
     salesOrderNo: form.salesOrderNo,
-    deliveryCode: form.deliveryCode.trim(),
+    deliveryCode: form.deliveryCode?.trim() || generateDeliveryCode(),
     documentDate: form.deliveryDate ? form.deliveryDate.format('YYYY-MM-DD') : '',
     customerName: form.customerName,
     shipmentMethod: form.shipmentMethod,
@@ -690,11 +875,25 @@ function handleOk() {
       updateDeliveryOrder(props.record.id, payload)
       const synced = props.record.deliveryStatus === '待出库' ? '，关联出库单已整单更新' : ''
       message.success(`已保存${synced}`)
+      emit('saved')
+    } else if (isApplyMode.value) {
+      const wholeQty = (payload.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
+      const scatterQty = (payload.scatterShipments || []).reduce(
+        (s, ship) => s + sumSelectedShipQty(ship),
+        0,
+      )
+      addDeliveryApplication(payload.salesOrderId, {
+        ...payload,
+        totalShipQty: wholeQty + scatterQty,
+      })
+      message.success('发货申请已记录')
+      emit('confirmed', payload)
+      emit('saved')
     } else {
       createDeliveryOrder(payload)
       message.success('发货单已创建')
+      emit('saved')
     }
-    emit('saved')
     closeAfterSave()
   } finally {
     saving.value = false
@@ -755,5 +954,11 @@ export default { name: 'DeliveryFormModal' }
   .ant-input-number {
     width: 100%;
   }
+}
+
+.th-tip-icon {
+  margin-left: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  cursor: help;
 }
 </style>

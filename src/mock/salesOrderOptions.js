@@ -22,7 +22,7 @@ export const inventoryStatusOptions = ['充足', '缺货', '部分缺货']
 export const settlementTypeOptions = ['月结', '预付', '货到付款']
 export const paymentRatioOptions = ['30%', '50%', '100%']
 export const outboundWarehouseOptions = ['成品仓', '半成品仓', '备件仓']
-export const shipmentMethodOptions = ['物流', '自提', '专车配送']
+export const shipmentMethodOptions = ['送货', '物流', '自提', '快递']
 
 export const customerOptions = [
   { label: '测试人员', value: '测试人员', contacts: [{ name: 'TEST', phone: '16522033362' }] },

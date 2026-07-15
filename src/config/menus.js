@@ -239,6 +239,7 @@ export const routeTitles = {
   '/product-process/process-form': '工序表单模板',
   '/sales/orders': '销售订单',
   '/sales/orders/:id': '销售订单详情',
+  '/sales/orders/:id/edit': '编辑销售订单',
   '/sales/delivery': '发货管理',
   '/sales/delivery/:id': '发货单详情',
   '/basic-config/customers': '客户档案',

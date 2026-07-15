@@ -209,8 +209,8 @@
       <div v-show="!priceSummaryCollapsed" class="price-summary-body">
         <div class="summary-amounts-strip">
           <span class="amount-chip">
-            明细合计
-            <strong>￥{{ formatMoney(orderPricing.lineAmountExTax) }}</strong>
+            销售总额
+            <strong>￥{{ formatMoney(orderPricing.lineListAmountExTax) }}</strong>
           </span>
           <span class="amount-chip discount">
             行优惠
@@ -385,18 +385,23 @@
             </template>
 
             <template v-else-if="column.key === 'drawingNo'">
-              <a-input v-model:value="record.drawingNo" size="small" placeholder="图号" />
+              <span v-if="!record.isManualLine" class="readonly-cell">{{
+                record.drawingNo || '—'
+              }}</span>
+              <a-input v-else v-model:value="record.drawingNo" size="small" placeholder="图号" />
             </template>
 
             <template v-else-if="column.key === 'techParams'">
-              <a-input v-model:value="record.techParams" size="small" placeholder="技术参数" />
+              <SalesLineLongTextCell
+                :value="record.techParams"
+                @edit="openLongTextEdit(record, 'techParams')"
+              />
             </template>
 
             <template v-else-if="column.key === 'matchingRequirements'">
-              <a-input
-                v-model:value="record.matchingRequirements"
-                size="small"
-                placeholder="配套要求"
+              <SalesLineLongTextCell
+                :value="record.matchingRequirements"
+                @edit="openLongTextEdit(record, 'matchingRequirements')"
               />
             </template>
 
@@ -440,6 +445,24 @@
               <a-input v-model:value="record.unit" size="small" />
             </template>
 
+            <template v-else-if="column.key === 'lineDiscountPercent'">
+              <a-input-number
+                v-if="showLineDiscount"
+                :value="getLineDiscountPercent(record)"
+                size="small"
+                :min="1"
+                :max="100"
+                :precision="2"
+                style="width: 100%"
+                @update:value="(v) => setLineDiscountPercent(record, v)"
+              />
+              <span v-else>—</span>
+            </template>
+
+            <template v-else-if="column.key === 'lineDiscountAmount'">
+              {{ formatMoney(record.lineDiscountAmount) }}
+            </template>
+
             <template v-else-if="column.key === 'taxRate'">
               <a-input-number
                 v-model:value="record.taxRate"
@@ -474,24 +497,6 @@
               />
             </template>
 
-            <template v-else-if="column.key === 'lineDiscountPercent'">
-              <a-input-number
-                v-if="showLineDiscount"
-                :value="getLineDiscountPercent(record)"
-                size="small"
-                :min="1"
-                :max="100"
-                :precision="2"
-                style="width: 100%"
-                @update:value="(v) => setLineDiscountPercent(record, v)"
-              />
-              <span v-else>—</span>
-            </template>
-
-            <template v-else-if="column.key === 'lineDiscountAmount'">
-              {{ formatMoney(record.lineDiscountAmount) }}
-            </template>
-
             <template v-else-if="column.key === 'totalPriceExTax'">
               {{ formatMoney(record.totalPriceExTax) }}
             </template>
@@ -501,11 +506,17 @@
             </template>
 
             <template v-else-if="column.key === 'packagingForm'">
-              <a-input v-model:value="record.packagingForm" size="small" />
+              <SalesLineLongTextCell
+                :value="record.packagingForm"
+                @edit="openLongTextEdit(record, 'packagingForm')"
+              />
             </template>
 
             <template v-else-if="column.key === 'supplementDesc'">
-              <a-input v-model:value="record.supplementDesc" size="small" />
+              <SalesLineLongTextCell
+                :value="record.supplementDesc"
+                @edit="openLongTextEdit(record, 'supplementDesc')"
+              />
             </template>
 
             <template v-else-if="column.key === 'lineAttachment'">
@@ -566,6 +577,24 @@
       @selected="onProductsSelected"
     />
 
+    <a-modal
+      v-model:open="longTextEdit.open"
+      :title="`编辑${longTextEdit.title}`"
+      width="640px"
+      :mask-closable="false"
+      destroy-on-close
+      @ok="confirmLongTextEdit"
+      @cancel="longTextEdit.open = false"
+    >
+      <a-textarea
+        v-model:value="longTextEdit.draft"
+        :rows="10"
+        :placeholder="`请输入${longTextEdit.title}`"
+        show-count
+        :maxlength="5000"
+      />
+    </a-modal>
+
     <SalesOrderLineEditModal
       v-model:open="lineEditOpen"
       :line="lineEditTarget"
@@ -601,6 +630,7 @@ import { createLineItem } from '@/mock/salesOrders'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getActiveBomForItem } from '@/store/productBomStore'
+import { BOM_FULFILLMENT_PATH } from '@/constants/salesOrderFulfillment'
 import {
   addSalesOrder,
   generateSalesOrderNo,
@@ -622,6 +652,7 @@ import {
   formatDiscountRatePercent,
 } from '@/utils/salesOrderPricing'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import SalesLineLongTextCell from './SalesLineLongTextCell.vue'
 import SalesOrderLineEditModal from './SalesOrderLineEditModal.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
@@ -654,6 +685,21 @@ const productPickerOpen = ref(false)
 const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
 const fileList = ref([])
+
+const LONG_TEXT_FIELD_LABELS = {
+  techParams: '技术参数',
+  matchingRequirements: '配套要求',
+  packagingForm: '包装形式',
+  supplementDesc: '补充说明',
+}
+
+const longTextEdit = reactive({
+  open: false,
+  title: '',
+  fieldKey: '',
+  record: null,
+  draft: '',
+})
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024
 
@@ -891,11 +937,15 @@ watch(
 )
 
 watch(
-  () => isActive.value,
-  (val) => {
+  () => [isActive.value, props.editRecord?.id],
+  ([val]) => {
     if (!val) return
     detailCollapsed.value = false
     if (props.editRecord) {
+      // 保活切回：同一订单不重复覆盖用户未保存改动
+      if (form.orderNo && form.orderNo === props.editRecord.orderNo && form.lineItems.length) {
+        return
+      }
       const r = props.editRecord
       Object.assign(form, {
         orderNo: r.orderNo,
@@ -935,6 +985,7 @@ watch(
       }))
       return
     }
+    if (form.orderNo || form.lineItems.length) return
     resetForm()
   },
   { immediate: true },
@@ -1205,6 +1256,9 @@ function mapPickerToSalesLine(payload) {
     unit: payload.inventoryUnit || master?.inventoryUnit || '件',
     bomName: bom?.bomName || '',
     bomVersion: bom?.version || '',
+    bomFulfillmentPath: bom
+      ? BOM_FULFILLMENT_PATH.USE_CATALOG_BOM
+      : BOM_FULFILLMENT_PATH.DESIGN_REQUIRED,
     salesQty: 1,
     taxRate,
     listUnitPriceExTax: pricing.listUnitPriceExTax,
@@ -1237,7 +1291,7 @@ function onProductsSelected(rows) {
 
   if (noBomProducts.length) {
     message.warning(
-      `以下产品无使用中的 BOM，已添加至明细：${noBomProducts.join('、')}。请尽快在产品 BOM 中维护并启用，自产销售审核前需完成 BOM 配置。`,
+      `以下产品无自有生效 BOM，已默认「需设计任务」：${noBomProducts.join('、')}。审核后将进入设计；或先维护并启用产品 BOM。`,
     )
   }
 }
@@ -1272,6 +1326,21 @@ function cloneLine(index) {
 function openLineEdit(record) {
   lineEditTarget.value = record
   lineEditOpen.value = true
+}
+
+function openLongTextEdit(record, fieldKey) {
+  longTextEdit.record = record
+  longTextEdit.fieldKey = fieldKey
+  longTextEdit.title = LONG_TEXT_FIELD_LABELS[fieldKey] || '内容'
+  longTextEdit.draft = record[fieldKey] || ''
+  longTextEdit.open = true
+}
+
+function confirmLongTextEdit() {
+  if (longTextEdit.record && longTextEdit.fieldKey) {
+    longTextEdit.record[longTextEdit.fieldKey] = longTextEdit.draft || ''
+  }
+  longTextEdit.open = false
 }
 
 function onLineEditSaved(updated) {
@@ -1318,6 +1387,7 @@ function handleSave() {
     approver: props.editRecord?.approver || '',
     approvedAt: props.editRecord?.approvedAt || '',
     lineItems: pricing.lineItems,
+    lineListAmountExTax: pricing.lineListAmountExTax,
     lineAmountExTax: pricing.lineAmountExTax,
     lineAmountInTax: pricing.lineAmountInTax,
     lineDiscountTotal: pricing.lineDiscountTotal,

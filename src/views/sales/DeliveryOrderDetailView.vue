@@ -51,7 +51,7 @@
                 <a-descriptions-item label="发货总金额（不含税）">
                   ￥{{ formatAmountExTax(record.totalAmountExTax) }}
                 </a-descriptions-item>
-                <a-descriptions-item label="发货方式">{{
+                <a-descriptions-item label="交货方式">{{
                   record.shipmentMethod || '—'
                 }}</a-descriptions-item>
                 <a-descriptions-item label="物流单号">{{

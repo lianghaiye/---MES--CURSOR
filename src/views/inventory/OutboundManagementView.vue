@@ -55,18 +55,6 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="经手人">
-              <a-select
-                v-model:value="filters.handler"
-                allow-clear
-                show-search
-                placeholder="请选择 经手人"
-                size="small"
-                :options="handlerOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="领用部门">
               <a-select
                 v-model:value="filters.requisitionDept"
@@ -142,7 +130,7 @@
               <DownOutlined />
             </a-button>
             <template #overlay>
-              <a-menu @click="({ key }) => stubAction(`批量操作：${key}`)">
+              <a-menu @click="onBatchMenu">
                 <a-menu-item key="export">导出</a-menu-item>
                 <a-menu-item key="import">导入</a-menu-item>
               </a-menu>
@@ -189,6 +177,12 @@
             <template v-else-if="column.key === 'sourceOrderNo'">
               <a v-if="record.sourceOrderNo" class="link-code">{{ record.sourceOrderNo }}</a>
               <span v-else>-</span>
+            </template>
+            <template v-else-if="column.key === 'salesOrderNo'">
+              <a v-if="record.salesOrderNo" class="link-code" @click="goSalesOrder(record)">
+                {{ record.salesOrderNo }}
+              </a>
+              <span v-else>—</span>
             </template>
             <template v-else-if="column.key === 'totalWeight'">
               {{ record.totalWeight != null ? record.totalWeight : '' }}
@@ -277,6 +271,15 @@
       :edit-record="editRecord"
       @saved="onFormSaved"
     />
+
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="filteredList.length"
+      :selected-count="selectedRowKeys.length"
+      @export="doExport"
+    />
   </div>
 </template>
 
@@ -304,7 +307,6 @@ import {
   outboundStatusColor,
   outboundTimeUnitOptions,
   warehouseOptions,
-  handlerOptions,
   requisitionDeptOptions,
 } from '@/mock/outboundOptions'
 import {
@@ -325,8 +327,12 @@ import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import OutboundOrderFormModal from './components/OutboundOrderFormModal.vue'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useListExport } from '@/composables/useListExport'
+import { outboundExportFields } from '@/utils/exportFields/outboundExport'
 import { useTabs } from '@/composables/useTabs'
+import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -335,7 +341,6 @@ const filters = reactive({
   docNo: '',
   outboundType: undefined,
   warehouse: undefined,
-  handler: undefined,
   requisitionDept: undefined,
   sourceOrderNo: '',
   status: undefined,
@@ -352,7 +357,6 @@ const outboundTypeOpts = outboundTypeOptions.map((v) => ({ label: v, value: v })
 const statusOpts = outboundStatusOptions.map((v) => ({ label: v, value: v }))
 const outboundTimeUnitOpts = outboundTimeUnitOptions
 const warehouseOpts = warehouseOptions.map((w) => ({ label: w.label, value: w.value }))
-const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
 const requisitionDeptOpts = requisitionDeptOptions.map((v) => ({ label: v, value: v }))
 
 const outboundTimePicker = computed(() => {
@@ -369,8 +373,9 @@ const baseColumns = [
   { title: '出库仓库', dataIndex: 'warehouse', width: 90 },
   { title: '出库数量', key: 'shipQtyTotal', width: 90, align: 'right' },
   { title: '源单号', key: 'sourceOrderNo', width: 140 },
+  { title: '销售订单', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
+  { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
   { title: '领用部门', dataIndex: 'requisitionDept', width: 100, ellipsis: true },
-  { title: '经手人', dataIndex: 'handler', width: 80 },
   { title: '出库总重量', key: 'totalWeight', width: 110, align: 'right' },
   { title: '出库时间', dataIndex: 'outboundTime', width: 160 },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
@@ -384,11 +389,25 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outbound-list', baseColumns, { minScrollX: 2200 })
+  useTableColumnSettings('outbound-list-v2', baseColumns, { minScrollX: 2480 })
 
 const filteredList = computed(() =>
   filterOutboundOrders(outboundState.orders, appliedFilters.value),
 )
+
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'outbound-list',
+  fieldDefinitions: outboundExportFields,
+  getFilteredRows: () => filteredList.value,
+  getSelectedRows: () => outboundState.orders.filter((o) => selectedRowKeys.value.includes(o.id)),
+  fileNamePrefix: '出库管理',
+})
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -422,7 +441,6 @@ function handleReset() {
     docNo: '',
     outboundType: undefined,
     warehouse: undefined,
-    handler: undefined,
     requisitionDept: undefined,
     sourceOrderNo: '',
     status: undefined,
@@ -431,6 +449,14 @@ function handleReset() {
   })
   appliedFilters.value = { ...filters }
   pagination.current = 1
+}
+
+function onBatchMenu({ key }) {
+  if (key === 'export') {
+    openExportModal()
+    return
+  }
+  stubAction(`批量操作：${key}`)
 }
 
 function stubAction(name) {
@@ -489,6 +515,19 @@ function handleConfirmOne(record) {
 function goDetail(record) {
   const path = `/inventory/outbound/${record.id}`
   openTab(path, record.docNo || '出库单详情')
+  router.push(path)
+}
+
+function goSalesOrder(record) {
+  const no = record?.salesOrderNo
+  if (!no) return
+  const order = findSalesOrderByOrderNo(no)
+  if (!order) {
+    message.info('未找到关联销售订单')
+    return
+  }
+  const path = `/sales/orders/${order.id}`
+  openTab(path, `销售订单 ${no}`)
   router.push(path)
 }
 

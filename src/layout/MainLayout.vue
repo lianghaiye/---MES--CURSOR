@@ -37,6 +37,7 @@ const cachedViews = [
   'EbomDesignView',
   'EcnCreateView',
   'SalesOrderDetailView',
+  'SalesOrderEditView',
   ...createPageRegistry.map((page) => page.keepAlive),
 ]
 </script>
