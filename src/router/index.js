@@ -553,6 +553,12 @@ const routes = [
         meta: { title: '功能参数' },
       },
       {
+        path: 'basic-config/business-dict',
+        name: 'basic-config-business-dict',
+        component: () => import('@/views/basic-config/BusinessDictView.vue'),
+        meta: { title: '业务字典' },
+      },
+      {
         path: 'basic-config/warehouse-categories',
         name: 'basic-config-warehouse-categories',
         component: () => import('@/views/basic-config/WarehouseCategoryView.vue'),

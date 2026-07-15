@@ -113,7 +113,7 @@ export default { name: 'ScrapAuditModal' }
 <script setup>
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { getDictOptions } from '@/store/systemDictStore'
+import { getEffectiveDictOptions } from '@/utils/dictResolve'
 import { approveScrapOrder, rejectScrapOrder } from '@/store/scrapOrderStore'
 import { warehouseOptions, personInChargeOptions } from '@/mock/workOrderOptions'
 import { resolveWarehouseKeeper } from '@/utils/scrapOrderUtils'
@@ -141,10 +141,10 @@ const form = reactive({
   auditComment: '',
 })
 
-const reasonOpts = computed(() => getDictOptions('scrap_reason'))
-const replenishOpts = computed(() => getDictOptions('replenish_method'))
-const processOpts = computed(() => getDictOptions('process_method'))
-const resultOpts = computed(() => getDictOptions('process_result'))
+const reasonOpts = computed(() => getEffectiveDictOptions('scrap_reason'))
+const replenishOpts = computed(() => getEffectiveDictOptions('replenish_method'))
+const processOpts = computed(() => getEffectiveDictOptions('process_method'))
+const resultOpts = computed(() => getEffectiveDictOptions('process_result'))
 const warehouseOpts = warehouseOptions.map((v) => ({ label: v, value: v }))
 const keeperOpts = personInChargeOptions.map((v) => ({ label: v, value: v }))
 

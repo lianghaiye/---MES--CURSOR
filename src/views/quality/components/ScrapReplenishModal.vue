@@ -39,7 +39,7 @@ export default { name: 'ScrapReplenishModal' }
 <script setup>
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { getDictOptions } from '@/store/systemDictStore'
+import { getEffectiveDictOptions } from '@/utils/dictResolve'
 import { replenishScrapOrder } from '@/store/scrapOrderStore'
 
 const props = defineProps({
@@ -55,7 +55,7 @@ const visible = computed({
 })
 
 const form = reactive({ replenishMethod: undefined })
-const replenishOpts = computed(() => getDictOptions('replenish_method'))
+const replenishOpts = computed(() => getEffectiveDictOptions('replenish_method'))
 
 watch(
   () => props.open,

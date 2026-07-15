@@ -1,8 +1,43 @@
 <template>
   <div class="system-dict-page">
-    <a-tabs v-model:activeKey="activeType" size="small" type="card">
-      <a-tab-pane v-for="t in DICT_TYPES" :key="t.key" :tab="t.label" />
-    </a-tabs>
+    <div class="filter-card">
+      <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="8" :lg="6">
+            <a-form-item label="关键字">
+              <a-input
+                v-model:value="filters.keyword"
+                allow-clear
+                size="small"
+                placeholder="编号 / 名称"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8" :lg="6">
+            <a-form-item label="状态">
+              <a-select
+                v-model:value="filters.status"
+                allow-clear
+                size="small"
+                placeholder="请选择状态"
+                :options="statusOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8" :lg="6">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="handleSearch">
+                  <SearchOutlined />
+                  搜索
+                </a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </div>
 
     <div class="toolbar-row">
       <a-space wrap :size="8">
@@ -10,12 +45,13 @@
           <PlusOutlined />
           新增
         </a-button>
-        <a-button size="small" @click="handleDelete">
-          <DeleteOutlined />
-          删除
-        </a-button>
       </a-space>
       <a-space :size="4" class="toolbar-icons">
+        <a-tooltip title="刷新">
+          <a-button type="text" size="small" @click="handleSearch">
+            <ReloadOutlined />
+          </a-button>
+        </a-tooltip>
         <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
@@ -23,38 +59,84 @@
     <div class="table-card">
       <a-table
         :columns="displayColumns"
-        :data-source="tableData"
-        row-key="value"
+        :data-source="pagedList"
+        row-key="id"
         size="small"
         bordered
         :scroll="{ x: tableScrollX }"
-        :pagination="{ pageSize: 10, size: 'small' }"
-        :row-selection="rowSelection"
+        :pagination="false"
       >
         <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-          <template v-else-if="column.key === 'value'">
-            <a class="link-code" @click="openEdit(record)">{{ record.value }}</a>
+          <template v-if="column.key === 'index'">
+            {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="record.status === '启用' ? 'success' : 'default'">{{
+              record.status
+            }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'code'">
+            <a class="link-code" @click="openEdit(record)">{{ record.code }}</a>
+            <a-tag v-if="record.builtin" color="blue" class="builtin-tag">内置</a-tag>
+          </template>
+          <template v-else-if="column.key === 'actions'">
+            <a-space :size="8">
+              <a @click="openEdit(record)">编辑</a>
+              <a
+                class="danger-link"
+                :class="{ disabled: record.builtin }"
+                @click="handleDelete(record)"
+                >删除</a
+              >
+              <a @click="openItemsConfig(record)">字典配置</a>
+            </a-space>
           </template>
         </template>
       </a-table>
+      <div class="table-pagination">
+        <a-pagination
+          v-model:current="pagination.current"
+          v-model:page-size="pagination.pageSize"
+          :total="filteredList.length"
+          size="small"
+          show-size-changer
+          :page-size-options="['10', '20', '50']"
+          :show-total="(t) => `共 ${t} 条`"
+        />
+      </div>
     </div>
 
     <a-modal
-      v-model:open="modalOpen"
-      :title="editing ? '编辑字典项' : '新增字典项'"
-      width="420px"
-      @ok="handleSave"
+      v-model:open="formOpen"
+      :title="editing ? '编辑系统字典' : '新增系统字典'"
+      width="480px"
+      destroy-on-close
+      @ok="handleFormSave"
     >
       <a-form layout="horizontal" :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
-        <a-form-item label="字典类型">
-          <a-input :value="activeLabel" disabled />
+        <a-form-item label="字典编号" required>
+          <a-input
+            v-model:value="form.code"
+            placeholder="如 scrap_reason"
+            :disabled="Boolean(editing?.builtin)"
+          />
         </a-form-item>
-        <a-form-item label="字典值" required>
-          <a-input v-model:value="formValue" placeholder="请输入字典值" />
+        <a-form-item label="字典名称" required>
+          <a-input v-model:value="form.name" placeholder="请输入字典名称" />
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="form.status" :options="statusOpts" />
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <DictItemsConfigDrawer
+      v-model:open="itemsOpen"
+      :title="itemsTitle"
+      :header-hint="itemsHint"
+      :items="itemsTarget?.items || []"
+      @save="handleItemsSave"
+    />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -69,111 +151,197 @@ export default { name: 'SystemDictView' }
 </script>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import {
-  DICT_TYPES,
+  DICT_STATUS,
   systemDictState,
-  addDictItem,
-  updateDictItem,
-  deleteDictItem,
+  listSystemDicts,
+  addSystemDict,
+  updateSystemDict,
+  deleteSystemDict,
+  setSystemDictItems,
 } from '@/store/systemDictStore'
+import DictItemsConfigDrawer from './components/DictItemsConfigDrawer.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
-const activeType = ref(DICT_TYPES[0].key)
-const selectedRowKeys = ref([])
-const modalOpen = ref(false)
+const filters = reactive({ keyword: '', status: undefined })
+const applied = ref({ keyword: '', status: undefined })
+const pagination = reactive({ current: 1, pageSize: 10 })
+const formOpen = ref(false)
 const editing = ref(null)
-const formValue = ref('')
+const form = reactive({ code: '', name: '', status: DICT_STATUS.ENABLED })
+const itemsOpen = ref(false)
+const itemsTarget = ref(null)
 
-const activeLabel = computed(() => DICT_TYPES.find((t) => t.key === activeType.value)?.label || '')
+const statusOpts = [
+  { label: DICT_STATUS.ENABLED, value: DICT_STATUS.ENABLED },
+  { label: DICT_STATUS.DISABLED, value: DICT_STATUS.DISABLED },
+]
 
-const tableData = computed(() =>
-  (systemDictState.dicts[activeType.value] || []).map((value) => ({ value })),
-)
+const filteredList = computed(() => {
+  void systemDictState.dicts
+  return listSystemDicts(applied.value)
+})
+
+const pagedList = computed(() => {
+  const start = (pagination.current - 1) * pagination.pageSize
+  return filteredList.value.slice(start, start + pagination.pageSize)
+})
+
+watch(filteredList, () => {
+  const maxPage = Math.max(1, Math.ceil(filteredList.value.length / pagination.pageSize) || 1)
+  if (pagination.current > maxPage) pagination.current = 1
+})
 
 const baseColumns = [
-  { title: '序号', key: 'index', width: 70, align: 'center' },
-  { title: '字典值', key: 'value', dataIndex: 'value' },
+  { title: '序号', key: 'index', width: 64, align: 'center' },
+  { title: '状态', key: 'status', width: 80, align: 'center' },
+  { title: '字典编号', key: 'code', dataIndex: 'code', width: 180 },
+  { title: '字典名称', key: 'name', dataIndex: 'name', width: 200 },
+  { title: '操作', key: 'actions', width: 200, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('system-dict-list', baseColumns)
+  useTableColumnSettings('system-dict-master-v1', baseColumns)
 
-const rowSelection = computed(() => ({
-  selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys) => {
-    selectedRowKeys.value = keys
-  },
-}))
+const itemsTitle = computed(() =>
+  itemsTarget.value ? `字典配置 — ${itemsTarget.value.name}` : '字典配置',
+)
+const itemsHint = computed(() =>
+  itemsTarget.value
+    ? `编号：${itemsTarget.value.code}${itemsTarget.value.builtin ? '（内置字典，可编辑字典项）' : ''}`
+    : '',
+)
+
+function handleSearch() {
+  applied.value = { keyword: filters.keyword, status: filters.status }
+  pagination.current = 1
+}
+
+function handleReset() {
+  filters.keyword = ''
+  filters.status = undefined
+  handleSearch()
+}
 
 function openCreate() {
   editing.value = null
-  formValue.value = ''
-  modalOpen.value = true
+  form.code = ''
+  form.name = ''
+  form.status = DICT_STATUS.ENABLED
+  formOpen.value = true
 }
 
 function openEdit(record) {
-  editing.value = record.value
-  formValue.value = record.value
-  modalOpen.value = true
+  editing.value = record
+  form.code = record.code
+  form.name = record.name
+  form.status = record.status
+  formOpen.value = true
 }
 
-function handleSave() {
-  const type = activeType.value
-  if (editing.value) {
-    const res = updateDictItem(type, editing.value, formValue.value)
-    if (!res.ok) {
-      message.warning(res.message)
-      return
-    }
-    message.success('已更新')
-  } else {
-    const res = addDictItem(type, formValue.value)
-    if (!res.ok) {
-      message.warning(res.message)
-      return
-    }
-    message.success('已新增')
+function handleFormSave() {
+  const payload = { code: form.code, name: form.name, status: form.status }
+  const res = editing.value ? updateSystemDict(editing.value.id, payload) : addSystemDict(payload)
+  if (!res.ok) {
+    message.warning(res.message)
+    return
   }
-  modalOpen.value = false
+  message.success(editing.value ? '已更新' : '已新增')
+  formOpen.value = false
 }
 
-function handleDelete() {
-  if (!selectedRowKeys.value.length) {
-    message.warning('请选择要删除的字典项')
+function handleDelete(record) {
+  if (record.builtin) {
+    message.warning('内置字典不可删除')
     return
   }
   Modal.confirm({
-    title: '确认删除所选字典项？',
+    title: `确定删除字典「${record.name}」？`,
     onOk: () => {
-      selectedRowKeys.value.forEach((v) => deleteDictItem(activeType.value, v))
-      selectedRowKeys.value = []
+      const res = deleteSystemDict(record.id)
+      if (!res.ok) {
+        message.warning(res.message)
+        return
+      }
       message.success('已删除')
     },
   })
 }
+
+function openItemsConfig(record) {
+  itemsTarget.value = record
+  itemsOpen.value = true
+}
+
+function handleItemsSave(items) {
+  if (!itemsTarget.value) return
+  const res = setSystemDictItems(itemsTarget.value.id, items)
+  if (!res.ok) {
+    message.warning(res.message)
+    return
+  }
+  message.success('字典项已保存')
+}
 </script>
 
-<style scoped>
+<style lang="less" scoped>
 .system-dict-page {
   padding: 0;
+}
+.filter-card {
+  padding: 10px 12px 6px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+.horizontal-form {
+  width: 100%;
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+  .filter-actions-item {
+    :deep(.ant-form-item-label) {
+      display: none;
+    }
+  }
 }
 .toolbar-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 12px 0;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.toolbar-icons {
+  margin-left: auto;
 }
 .table-card {
   background: #fff;
+  padding: 8px 12px 12px;
   border-radius: 4px;
+}
+.table-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 .link-code {
   color: #1677ff;
   cursor: pointer;
+}
+.builtin-tag {
+  margin-left: 6px;
+}
+.danger-link {
+  color: #ff4d4f;
+}
+.disabled {
+  color: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
 }
 </style>
