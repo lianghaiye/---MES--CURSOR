@@ -2,13 +2,18 @@
   <a-modal
     v-model:open="visible"
     title="编辑销售明细"
-    width="880px"
+    width="1180px"
     :mask-closable="false"
     destroy-on-close
     @cancel="handleCancel"
   >
-    <a-form layout="vertical" class="line-edit-form">
-      <a-row :gutter="[16, 0]">
+    <a-form
+      layout="horizontal"
+      class="line-edit-form"
+      :label-col="{ flex: '0 0 118px' }"
+      :wrapper-col="{ flex: '1 1 0' }"
+    >
+      <a-row :gutter="[20, 8]">
         <a-col :span="8">
           <a-form-item label="业务类型" required>
             <a-select
@@ -114,18 +119,25 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
+          <a-form-item label="单价（不含税）" required>
+            <a-input-number
+              v-model:value="draft.unitPriceExTax"
+              :min="0"
+              :precision="2"
+              style="width: 100%"
+              @change="onUnitPriceExTaxEdit"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
           <a-form-item label="单价（含税）" required>
             <a-input-number
               v-model:value="draft.unitPriceInTax"
               :min="0"
               :precision="2"
               style="width: 100%"
+              @change="onUnitPriceInTaxEdit"
             />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="成交单价(不含税)">
-            <a-input :value="formatMoney(draft.unitPriceExTax)" disabled />
           </a-form-item>
         </a-col>
         <a-col :span="8">
@@ -136,11 +148,28 @@
               :max="100"
               :precision="2"
               style="width: 100%"
+              @change="onTaxRateEdit"
             />
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="行折扣(%)" required>
+          <a-form-item label="总价（不含税）">
+            <a-input :value="formatMoney(linePricingPreview.totalPriceExTax)" disabled />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="总价（含税）">
+            <a-input :value="formatMoney(linePricingPreview.totalPriceInTax)" disabled />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item required>
+            <template #label>
+              <span>行折扣(%)</span>
+              <a-tooltip :title="lineDiscountFieldTooltip">
+                <QuestionCircleOutlined class="field-tip-icon" />
+              </a-tooltip>
+            </template>
             <a-input-number
               v-model:value="draft.lineDiscountPercent"
               :min="1"
@@ -149,13 +178,21 @@
               :disabled="lineDiscountReadOnly"
               style="width: 100%"
             />
+            <div v-if="lineDiscountReadOnly" class="field-hint">
+              仅整单折扣策略下，行折扣固定 100%
+            </div>
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="行优惠金额">
-            <a-input :value="formatMoney(lineDiscountAmountDisplay)" disabled />
+            <a-input :value="formatMoney(linePricingPreview.lineDiscountAmount)" disabled />
           </a-form-item>
         </a-col>
+      </a-row>
+    </a-form>
+
+    <a-form layout="vertical" class="line-edit-form-vertical">
+      <a-row :gutter="[20, 0]">
         <a-col :span="24">
           <a-form-item label="包装形式">
             <a-input v-model:value="draft.packagingForm" placeholder="包装形式" />
@@ -183,6 +220,29 @@
       </a-row>
     </a-form>
 
+    <a-form
+      layout="horizontal"
+      class="line-edit-form"
+      :label-col="{ flex: '0 0 118px' }"
+      :wrapper-col="{ flex: '1 1 0' }"
+    >
+      <a-form-item label="明细附件">
+        <a-upload
+          class="line-attachment-upload"
+          :file-list="lineUploadFileList"
+          :before-upload="beforeLineUpload"
+          multiple
+          @remove="onLineFileRemove"
+        >
+          <a-button type="primary" size="small">
+            <UploadOutlined />
+            上传附件
+          </a-button>
+        </a-upload>
+        <div class="field-hint">支持各类型文件，单文件不超过 200MB</div>
+      </a-form-item>
+    </a-form>
+
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
       <a-button type="primary" @click="handleSave">确定</a-button>
@@ -191,9 +251,12 @@
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { message, Upload } from 'ant-design-vue'
+import { QuestionCircleOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
+
+const MAX_LINE_FILE_SIZE = 200 * 1024 * 1024
 import { deliveryModeOptions } from '@/mock/salesOrderOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { getActiveBomForItem } from '@/store/productBomStore'
@@ -210,7 +273,12 @@ import {
   suggestDefaultFulfillmentPath,
   validateFulfillmentPathForApprove,
 } from '@/constants/salesOrderFulfillment'
-import { DISCOUNT_STRATEGIES, normalizeDiscountRate, round2 } from '@/utils/salesOrderPricing'
+import {
+  DISCOUNT_STRATEGIES,
+  normalizeDiscountRate,
+  recalcSalesLinePricing,
+  round2,
+} from '@/utils/salesOrderPricing'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -268,12 +336,51 @@ const linkedCatalogBom = computed(() => {
 
 const lineDiscountReadOnly = computed(() => props.discountStrategy === DISCOUNT_STRATEGIES.ORDER)
 
-const lineDiscountAmountDisplay = computed(() => {
-  const list = Number(draft.listUnitPriceExTax) || 0
-  const qty = Number(draft.salesQty) || 0
-  const rate = normalizeDiscountRate((Number(draft.lineDiscountPercent) || 100) / 100, 1)
-  return round2(Math.max(0, list * qty * (1 - rate)))
+const lineDiscountFieldTooltip =
+  '行优惠金额 = 标准单价(不含税) × 数量 × (1 - 行折扣率)\n改单价（不含税/含税）会按税率互算，并反推行折扣'
+
+const priceEditMode = ref('unitPriceInTax')
+
+const linePricingPreview = computed(() => {
+  const taxModeExcluding = priceEditMode.value === 'unitPriceExTax'
+  const line = {
+    listUnitPriceExTax: Number(draft.listUnitPriceExTax) || 0,
+    lineDiscountRate: lineDiscountReadOnly.value
+      ? 1
+      : normalizeDiscountRate((Number(draft.lineDiscountPercent) || 100) / 100, 1),
+    salesQty: Number(draft.salesQty) || 0,
+    qty: Number(draft.salesQty) || 0,
+    taxRate: Number(draft.taxRate) || 0,
+    unitPriceExTax: Number(draft.unitPriceExTax) || 0,
+    unitPriceInTax: Number(draft.unitPriceInTax) || 0,
+  }
+  return recalcSalesLinePricing(line, {
+    taxModeExcluding,
+    editMode: 'unitPrice',
+  })
 })
+
+function onUnitPriceExTaxEdit() {
+  priceEditMode.value = 'unitPriceExTax'
+  const preview = linePricingPreview.value
+  draft.unitPriceInTax = preview.unitPriceInTax
+  draft.lineDiscountPercent = round2(normalizeDiscountRate(preview.lineDiscountRate, 1) * 100)
+}
+
+function onUnitPriceInTaxEdit() {
+  priceEditMode.value = 'unitPriceInTax'
+  const preview = linePricingPreview.value
+  draft.unitPriceExTax = preview.unitPriceExTax
+  draft.lineDiscountPercent = round2(normalizeDiscountRate(preview.lineDiscountRate, 1) * 100)
+}
+
+function onTaxRateEdit() {
+  if (priceEditMode.value === 'unitPriceExTax') {
+    onUnitPriceExTaxEdit()
+  } else {
+    onUnitPriceInTaxEdit()
+  }
+}
 
 const bomNameVersionDisplay = computed(() => {
   if (draft.bomName && draft.bomVersion) {
@@ -340,7 +447,7 @@ function createDraft(line = {}) {
     salesQty: line.salesQty ?? line.qty ?? 1,
     deliveryMode: line.deliveryMode || '整机',
     deliveryDate: line.deliveryDate || '',
-    listUnitPriceExTax: line.listUnitPriceExTax ?? 0,
+    listUnitPriceExTax: line.listUnitPriceExTax ?? line.unitPriceExTax ?? 0,
     lineDiscountPercent: round2(normalizeDiscountRate(line.lineDiscountRate, 1) * 100),
     unitPriceExTax: line.unitPriceExTax ?? 0,
     unitPriceInTax: line.unitPriceInTax ?? 0,
@@ -358,7 +465,57 @@ function createDraft(line = {}) {
     bomVersion: line.bomVersion || '',
     priceSource: line.priceSource || 'product',
     bomFulfillmentPath: line.bomFulfillmentPath || '',
+    lineAttachments: Array.isArray(line.lineAttachments)
+      ? line.lineAttachments.map((f) => ({ ...f }))
+      : line.attachment
+        ? [
+            {
+              uid: `legacy-${line.id || 'line'}`,
+              name: line.attachment,
+              type: '明细附件',
+              uploadedAt: '',
+            },
+          ]
+        : [],
+    attachment: line.attachment || '',
   }
+}
+
+const lineUploadFileList = computed(() =>
+  (draft.lineAttachments || []).map((file) => ({
+    uid: file.uid,
+    name: file.name,
+    status: 'done',
+  })),
+)
+
+function syncLineAttachmentSummary() {
+  draft.attachment = (draft.lineAttachments || [])
+    .map((f) => f.name)
+    .filter(Boolean)
+    .join('、')
+}
+
+function beforeLineUpload(file) {
+  if (file.size > MAX_LINE_FILE_SIZE) {
+    message.error('文件大小不能超过 200MB')
+    return Upload.LIST_IGNORE
+  }
+  if (!draft.lineAttachments) draft.lineAttachments = []
+  draft.lineAttachments.push({
+    uid: file.uid || `line-${Date.now()}-${file.name}`,
+    name: file.name,
+    size: file.size,
+    type: file.type || '明细附件',
+    uploadedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+  })
+  syncLineAttachmentSummary()
+  return false
+}
+
+function onLineFileRemove(file) {
+  draft.lineAttachments = (draft.lineAttachments || []).filter((item) => item.uid !== file.uid)
+  syncLineAttachmentSummary()
 }
 
 function onFulfillmentPathChange() {
@@ -460,6 +617,10 @@ function validate() {
     message.warning('请填写税率')
     return false
   }
+  if (draft.unitPriceExTax == null || draft.unitPriceExTax === '') {
+    message.warning('请填写单价（不含税）')
+    return false
+  }
   if (draft.unitPriceInTax == null || draft.unitPriceInTax === '') {
     message.warning('请填写单价（含税）')
     return false
@@ -484,12 +645,7 @@ function handleCancel() {
 
 function handleSave() {
   if (!validate()) return
-  const unitPriceChanged = Number(draft.unitPriceInTax) !== Number(props.line?.unitPriceInTax)
-  const taxRate = Number(draft.taxRate) || 0
-  const unitPriceInTax = Number(draft.unitPriceInTax) || 0
-  const unitPriceExTax =
-    taxRate >= 0 ? round2(unitPriceInTax / (1 + taxRate / 100)) : unitPriceInTax
-  emit('saved', {
+  const lineDraft = {
     ...props.line,
     businessType: draft.businessType,
     productName: draft.productName.trim(),
@@ -501,12 +657,13 @@ function handleSave() {
     qty: Number(draft.salesQty),
     deliveryMode: draft.deliveryMode,
     deliveryDate: draft.deliveryDate,
+    listUnitPriceExTax: Number(draft.listUnitPriceExTax) || 0,
     lineDiscountRate: lineDiscountReadOnly.value
       ? 1
       : normalizeDiscountRate((Number(draft.lineDiscountPercent) || 100) / 100, 1),
-    unitPriceExTax,
-    unitPriceInTax,
-    taxRate,
+    unitPriceExTax: Number(draft.unitPriceExTax) || 0,
+    unitPriceInTax: Number(draft.unitPriceInTax) || 0,
+    taxRate: Number(draft.taxRate) || 0,
     drawingNo: draft.drawingNo || '',
     techParams: draft.techParams || '',
     matchingRequirements: draft.matchingRequirements || '',
@@ -519,8 +676,58 @@ function handleSave() {
     bomName: draft.bomName,
     bomVersion: draft.bomVersion,
     bomFulfillmentPath: draft.bomFulfillmentPath || '',
-    priceSource: unitPriceChanged ? 'manual' : props.line?.priceSource || 'product',
+    lineAttachments: (draft.lineAttachments || []).map((f) => ({ ...f })),
+    attachment: draft.attachment || '',
+    priceSource: props.line?.priceSource || 'product',
+  }
+  syncLineAttachmentSummary()
+  lineDraft.attachment = draft.attachment
+  lineDraft.lineAttachments = (draft.lineAttachments || []).map((f) => ({ ...f }))
+  recalcSalesLinePricing(lineDraft, {
+    taxModeExcluding: priceEditMode.value === 'unitPriceExTax',
+    editMode: 'unitPrice',
   })
+  emit('saved', lineDraft)
   visible.value = false
 }
 </script>
+
+<style scoped>
+.line-edit-form :deep(.ant-form-item) {
+  margin-bottom: 12px;
+}
+
+.line-edit-form :deep(.ant-form-item-label) {
+  text-align: right;
+}
+
+.line-edit-form :deep(.ant-form-item-control-input) {
+  min-height: 32px;
+}
+
+.line-edit-form-vertical {
+  margin-top: 4px;
+}
+
+.line-edit-form-vertical :deep(.ant-form-item) {
+  margin-bottom: 12px;
+}
+
+.field-tip-icon {
+  margin-left: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+  cursor: help;
+}
+
+.field-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
+}
+
+.line-attachment-upload {
+  width: 100%;
+}
+</style>

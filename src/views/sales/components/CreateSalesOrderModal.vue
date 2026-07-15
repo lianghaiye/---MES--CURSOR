@@ -452,6 +452,17 @@
               />
             </template>
 
+            <template v-else-if="column.key === 'unitPriceExTax'">
+              <a-input-number
+                v-model:value="record.unitPriceExTax"
+                size="small"
+                :min="0"
+                :precision="2"
+                style="width: 100%"
+                @change="onUnitPriceExTaxChange(record)"
+              />
+            </template>
+
             <template v-else-if="column.key === 'unitPriceInTax'">
               <a-input-number
                 v-model:value="record.unitPriceInTax"
@@ -459,7 +470,7 @@
                 :min="0"
                 :precision="2"
                 style="width: 100%"
-                @change="onUnitPriceChange(record)"
+                @change="onUnitPriceInTaxChange(record)"
               />
             </template>
 
@@ -681,6 +692,7 @@ const columnDefs = [
   { key: 'unit', title: '单位', width: 70 },
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 100, ellipsis: true },
   { key: 'bomVersion', title: 'Bom版本', dataIndex: 'bomVersion', width: 90 },
+  { key: 'unitPriceExTax', title: '单价（不含税）', width: 120 },
   { key: 'unitPriceInTax', title: '单价（含税）', width: 110 },
   { key: 'taxRate', title: '税率(%)', width: 80 },
   { key: 'totalPriceExTax', title: '总价（不含税）', width: 110 },
@@ -1042,12 +1054,16 @@ function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100
 }
 
-function recalcLine(record, editMode = 'discount') {
-  // 明细「单价（含税）」录入时，始终按含税口径反算不含税
-  let excluding = taxModeExcluding.value
-  if (editMode === 'unitPrice') {
+function recalcLine(record, editMode = 'discount', taxModeOverride) {
+  let excluding = taxModeOverride != null ? taxModeOverride : taxModeExcluding.value
+  if (taxModeOverride == null && editMode === 'unitPrice') {
+    // 仅改含税单价时：按含税口径反算不含税
     excluding = false
-  } else if (!(Number(record.unitPriceInTax) > 0) && Number(record.listUnitPriceExTax) > 0) {
+  } else if (
+    taxModeOverride == null &&
+    !(Number(record.unitPriceInTax) > 0) &&
+    Number(record.listUnitPriceExTax) > 0
+  ) {
     // 从产品价目初始化时，用不含税价生成含税单价
     excluding = true
   }
@@ -1084,8 +1100,13 @@ function onLineFieldChange(record) {
   recalcAll()
 }
 
-function onUnitPriceChange(record) {
-  recalcLine(record, 'unitPrice')
+function onUnitPriceExTaxChange(record) {
+  recalcLine(record, 'unitPrice', true)
+  recalcAll()
+}
+
+function onUnitPriceInTaxChange(record) {
+  recalcLine(record, 'unitPrice', false)
   recalcAll()
 }
 
@@ -1257,7 +1278,6 @@ function onLineEditSaved(updated) {
   const idx = form.lineItems.findIndex((line) => line.id === updated.id)
   if (idx === -1) return
   Object.assign(form.lineItems[idx], updated)
-  recalcLine(form.lineItems[idx], updated.priceSource === 'manual' ? 'unitPrice' : 'discount')
   recalcAll()
 }
 

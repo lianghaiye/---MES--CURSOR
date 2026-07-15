@@ -38,6 +38,13 @@ export const salesOrderDetailLineColumns = [
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 110, ellipsis: true },
   { key: 'bomVersion', title: 'Bom版本', dataIndex: 'bomVersion', width: 90 },
   {
+    key: 'unitPriceExTax',
+    title: '单价（不含税）',
+    dataIndex: 'unitPriceExTax',
+    width: 120,
+    align: 'right',
+  },
+  {
     key: 'unitPriceInTax',
     title: '单价（含税）',
     dataIndex: 'unitPriceInTax',
