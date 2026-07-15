@@ -79,11 +79,11 @@
                   </a-form-item>
                 </a-col>
                 <a-col :span="8">
-                  <a-form-item label="标准规格">
+                  <a-form-item label="标准规范">
                     <a-input
                       v-model:value="form.standardSpec"
                       size="small"
-                      placeholder="请输入标准规格"
+                      placeholder="请输入标准规范"
                       allow-clear
                     />
                   </a-form-item>

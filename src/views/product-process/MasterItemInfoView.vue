@@ -304,10 +304,7 @@ import {
   DownOutlined,
   SyncOutlined,
 } from '@ant-design/icons-vue'
-import {
-  productCategoryTree,
-  filterCategoryTree,
-} from '@/mock/productCategories'
+import { productCategoryTree, filterCategoryTree } from '@/mock/productCategories'
 import {
   materialCategoryTree,
   filterCategoryTree as filterMaterialCategoryTree,
@@ -506,7 +503,7 @@ const baseColumns = [
   { title: '业务类型', key: 'businessType', width: 140, ellipsis: true },
   { title: '类别', dataIndex: 'categoryName', width: 88 },
   { title: '产品属性', key: 'productAttribute', width: 110, ellipsis: true },
-  { title: '标准规格', dataIndex: 'standardSpec', width: 100, ellipsis: true },
+  { title: '标准规范', dataIndex: 'standardSpec', width: 100, ellipsis: true },
   { title: '物料类型', key: 'materialType', width: 90 },
   { title: '供应型态', key: 'supplyForm', width: 90 },
   { title: '技术参数', dataIndex: 'techParams', width: 120, ellipsis: true },
