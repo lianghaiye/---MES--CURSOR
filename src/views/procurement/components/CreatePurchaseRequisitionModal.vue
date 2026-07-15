@@ -13,7 +13,7 @@
         <div class="section-title">基本信息</div>
         <a-form :model="form" layout="inline" class="header-form horizontal-form">
           <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :span="8">
+            <a-col :span="6">
               <a-form-item label="申请单号">
                 <a-input
                   v-model:value="form.reqNo"
@@ -24,28 +24,28 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
-              <a-form-item label="紧急度">
-                <a-select v-model:value="form.urgency" size="small" :options="urgencyOpts" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="交货日期">
-                <a-date-picker
-                  v-model:value="form.deliveryDate"
-                  size="small"
-                  style="width: 100%"
-                  placeholder="请选择交货日期"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
+            <a-col :span="6">
               <a-form-item label="期望到货日期" required>
                 <a-date-picker
                   v-model:value="form.estimatedArrivalDate"
                   size="small"
                   style="width: 100%"
                   placeholder="请选择期望到货日期"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="紧急度">
+                <a-select v-model:value="form.urgency" size="small" :options="urgencyOpts" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="交货日期">
+                <a-date-picker
+                  v-model:value="form.deliveryDate"
+                  size="small"
+                  style="width: 100%"
+                  placeholder="请选择交货日期"
                 />
               </a-form-item>
             </a-col>
