@@ -1,5 +1,7 @@
 import { cell, numCell } from './exportFieldHelpers'
 
+import { DISCOUNT_STRATEGY_LABELS } from '@/utils/salesOrderPricing'
+
 function formatDate(val) {
   if (!val) return ''
   return String(val).slice(0, 10)
@@ -11,12 +13,45 @@ export const salesOrderExportFields = [
   { key: 'progressStatus', title: '进度状态', getValue: (row) => cell(row, 'progressStatus') },
   { key: 'totalQty', title: '销售数量', getValue: (row) => numCell(row.totalQty, 0) },
   { key: 'contractNo', title: '合同编号', getValue: (row) => cell(row, 'contractNo') },
-  { key: 'deliveryMethod', title: '送货方式', getValue: (row) => cell(row, 'deliveryMethod') },
+  { key: 'deliveryMethod', title: '交货方式', getValue: (row) => cell(row, 'deliveryMethod') },
   { key: 'deliveryStatus', title: '发货状态', getValue: (row) => cell(row, 'deliveryStatus') },
   {
     key: 'totalIssuedQty',
     title: '发货数量',
     getValue: (row) => numCell(row.totalIssuedQty, 0),
+  },
+  {
+    key: 'lineAmountExTax',
+    title: '销售金额（不含税）',
+    getValue: (row) =>
+      numCell(
+        row.lineListAmountExTax ?? Number(row.lineAmountExTax) + Number(row.lineDiscountTotal || 0),
+      ),
+  },
+  {
+    key: 'lineAmountInTax',
+    title: '销售金额（含税）',
+    getValue: (row) => numCell(row.lineAmountInTax ?? row.orderAmount),
+  },
+  {
+    key: 'discountStrategy',
+    title: '优惠策略',
+    getValue: (row) => DISCOUNT_STRATEGY_LABELS[row.discountStrategy] || row.discountStrategy || '',
+  },
+  {
+    key: 'totalDiscountAmount',
+    title: '优惠总额',
+    getValue: (row) => numCell(row.totalDiscountAmount),
+  },
+  {
+    key: 'amountExTax',
+    title: '最终成交额（不含税）',
+    getValue: (row) => numCell(row.amountExTax),
+  },
+  {
+    key: 'amountInTax',
+    title: '最终成交额（含税）',
+    getValue: (row) => numCell(row.amountInTax ?? row.orderAmount),
   },
   { key: 'urgency', title: '紧急度', getValue: (row) => cell(row, 'urgency') },
   { key: 'salesperson', title: '业务员', getValue: (row) => cell(row, 'salesperson') },

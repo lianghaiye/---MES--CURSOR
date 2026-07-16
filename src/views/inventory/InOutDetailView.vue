@@ -114,7 +114,7 @@
             <DownOutlined />
           </a-button>
           <template #overlay>
-            <a-menu @click="({ key }) => stubAction(key)">
+            <a-menu @click="onBatchMenu">
               <a-menu-item key="export">导出</a-menu-item>
             </a-menu>
           </template>
@@ -208,16 +208,19 @@
       </div>
     </div>
 
-    <InboundOrderFormModal
-      v-model:open="inboundFormOpen"
-      :edit-record="inboundEditRecord"
-      @saved="handleSearch"
-    />
-
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
+    />
+
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="filteredList.length"
+      :selected-count="selectedRowKeys.length"
+      @export="doExport"
     />
   </div>
 </template>
@@ -240,12 +243,14 @@ import {
   inOutIoStatusOptions,
 } from '@/mock/inOutDetailOptions'
 import { enrichInOutDetailRow, inOutDocStatusColor } from '@/utils/inOutDetailHelpers'
-import { getInboundOrderById } from '@/store/inboundOrderStore'
-import InboundOrderFormModal from './components/InboundOrderFormModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useListExport } from '@/composables/useListExport'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
+import { inOutDetailExportFields } from '@/utils/exportFields/inOutDetailExport'
 import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -265,8 +270,6 @@ const filters = reactive({
 const appliedFilters = ref(emptyAppliedFilters())
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
-const inboundFormOpen = ref(false)
-const inboundEditRecord = ref(null)
 
 const businessTypeOpts = inOutBusinessTypeOptions.map((v) => ({ label: v, value: v }))
 const docTypeOpts = inOutDocTypeOptions.map((v) => ({ label: v, value: v }))
@@ -322,6 +325,20 @@ const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultC
 const enrichedList = computed(() => detailList.value.map(enrichInOutDetailRow))
 
 const filteredList = computed(() => filterInOutDetails(enrichedList.value, appliedFilters.value))
+
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'inventory-in-out-detail-list',
+  fieldDefinitions: inOutDetailExportFields,
+  getFilteredRows: () => filteredList.value,
+  getSelectedRows: () => enrichedList.value.filter((o) => selectedRowKeys.value.includes(o.id)),
+  fileNamePrefix: '出入库详情',
+})
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -395,13 +412,26 @@ function navigateOrderDetail(record) {
 }
 
 function openEdit(record) {
-  const order = getInboundOrderById(record.headerId)
-  if (!order) {
-    message.warning('未找到关联入库单，无法编辑')
+  if (!record?.headerId) {
+    message.warning('未找到关联单据，无法编辑')
     return
   }
-  inboundEditRecord.value = { ...order }
-  inboundFormOpen.value = true
+  const isOutbound = record.businessType === '出库单'
+  const path = isOutbound
+    ? `/inventory/outbound/${record.headerId}/edit`
+    : `/inventory/inbound/${record.headerId}/edit`
+  openCreateTab(router, openTab, {
+    path,
+    title: `编辑${isOutbound ? '出库' : '入库'}单 ${record.docNo || ''}`.trim(),
+  })
+}
+
+function onBatchMenu({ key }) {
+  if (key === 'export') {
+    openExportModal()
+    return
+  }
+  stubAction(key)
 }
 
 function stubAction(key) {

@@ -1,5 +1,30 @@
 import { isWholeMachineLine, isScatterLine, normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
 import { calcSalesLineAppliedShipQty, calcSalesLineShippedQty } from '@/utils/salesLineShipped'
+import { enrichOutboundLineStock } from '@/utils/outboundLineHelpers'
+import { productInfoState } from '@/store/productInfoStore'
+import { materialInfoState } from '@/store/materialInfoStore'
+import { findSpuById } from '@/store/spuStore'
+import { formatVariantSummary } from '@/utils/spuVariant'
+
+/** 展示 SKU 变体属性：优先行内摘要，其次主数据 variantValues，否则规格属性 */
+export function resolveDeliveryVariantAttr(line = {}) {
+  if (line.variantSummary) return String(line.variantSummary)
+
+  const master =
+    (line.productId && productInfoState.products.find((p) => p.id === line.productId)) ||
+    (line.productCode && productInfoState.products.find((p) => p.code === line.productCode)) ||
+    (line.productId && materialInfoState.materials.find((m) => m.id === line.productId)) ||
+    (line.productCode && materialInfoState.materials.find((m) => m.code === line.productCode)) ||
+    null
+
+  const variantValues = line.variantValues || master?.variantValues || {}
+  const spuId = line.spuId || master?.spuId
+  const axes = spuId ? findSpuById(spuId)?.variantAxes || [] : []
+  const summary = formatVariantSummary(variantValues, axes)
+  if (summary) return summary
+
+  return line.specAttr || master?.standardSpec || ''
+}
 
 /** 行级发货状态：未发货、部分发货、已发完 */
 export function calcLineShipStatus(shippedQty, orderQty) {
@@ -84,7 +109,23 @@ function buildDeliveryLineBase(line, order) {
     deliveryMode: normalizeDeliveryMode(line, order),
     packagingForm: line.packagingForm || '',
     lineRemark: line.lineRemark || '',
+    shipWarehouse: line.shipWarehouse || '',
+    stockQty: line.stockQty ?? null,
+    warehouseStockQty: line.warehouseStockQty ?? null,
+    variantAttr: resolveDeliveryVariantAttr(line),
   }
+}
+
+/** 刷新发货明细行库存（与出库明细一致） */
+export function refreshDeliveryLineStock(line) {
+  if (!line) return line
+  const stock = enrichOutboundLineStock({
+    itemCode: line.productCode || line.itemCode || '',
+    shipWarehouse: line.shipWarehouse || '',
+  })
+  line.stockQty = stock.stockQty
+  line.warehouseStockQty = stock.warehouseStockQty
+  return line
 }
 
 /** 将销售订单明细转为申请发货明细行（仅整机行） */

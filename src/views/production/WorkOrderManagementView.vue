@@ -257,6 +257,15 @@
     </a-modal>
 
     <WorkOrderPrintModal v-model:open="batchPrintOpen" :work-orders="batchPrintOrders" />
+
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="filteredOrders.length"
+      :selected-count="selectedIds.length"
+      @export="doExport"
+    />
   </div>
 </template>
 
@@ -299,7 +308,10 @@ import CreateWorkOrderModal from './components/CreateWorkOrderModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderPrintModal from './components/WorkOrderPrintModal.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTabs } from '@/composables/useTabs'
+import { useListExport } from '@/composables/useListExport'
+import { workOrderExportFields } from '@/utils/exportFields/workOrderExport'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 
@@ -347,6 +359,20 @@ const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const bomOpts = bomOptions.map((v) => ({ label: v, value: v }))
 
 const filteredOrders = computed(() => filterWorkOrders(workOrderState.orders, appliedFilters.value))
+
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'work-order-list-v2',
+  fieldDefinitions: workOrderExportFields,
+  getFilteredRows: () => filteredOrders.value,
+  getSelectedRows: () => workOrderState.orders.filter((o) => selectedIds.value.includes(o.id)),
+  fileNamePrefix: '生产工单',
+})
 
 const pagedOrders = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -607,25 +633,9 @@ function handleBatchDispatch() {
   selectedIds.value = []
 }
 
-function handleBatchExport() {
-  if (!selectedIds.value.length) {
-    message.warning('请勾选要导出的工单')
-    return
-  }
-  const data = workOrderState.orders.filter((o) => selectedIds.value.includes(o.id))
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `work-orders-${dayjs().format('YYYYMMDD-HHmmss')}.json`
-  link.click()
-  URL.revokeObjectURL(url)
-  message.success(`已导出 ${data.length} 条工单`)
-}
-
 function onBatchMenu({ key }) {
   if (key === 'import') message.info('批量导入功能开发中')
-  else if (key === 'export') handleBatchExport()
+  else if (key === 'export') openExportModal()
 }
 
 function onCardAction(key, wo) {

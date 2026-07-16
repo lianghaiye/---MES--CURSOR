@@ -125,7 +125,7 @@ function createBomMeta(item, itemType, index, structure) {
     matchingRequirements: '',
     techParams: item.techParams || '',
     processRoute: item.production?.defaultProcessRoute || '',
-    bomType: '基准BOM',
+    bomType: '产品BOM',
     specModel: item.specModel || '',
     material: item.material || '',
     drawingNo: item.drawingNo || '',

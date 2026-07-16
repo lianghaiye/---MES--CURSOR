@@ -432,6 +432,9 @@ function onProductSelect(item) {
     componentLines.value = []
     return
   }
+  if (!result.bom) {
+    message.warning('该产品无自有生效 BOM，不可按产品 BOM 建单；请先维护 SKU 产品 BOM')
+  }
   form.scheduleQty = form.planQty
   lastPlanQty.value = form.planQty
   form.warehouse = resolveDefaultWarehouseByProductName(result.master.name) || form.warehouse

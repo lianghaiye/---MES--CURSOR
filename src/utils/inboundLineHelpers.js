@@ -1,5 +1,5 @@
 import { createInboundLine } from '@/mock/inboundOrders'
-import { getActiveBomForItem } from '@/store/productBomStore'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { getStockQty, stockState } from '@/store/stockStore'
 import { demoStockQty } from '@/utils/productionPlanWorkItem'
 
@@ -91,7 +91,7 @@ export function buildInboundLinesFromBom(
   includeTopItem = false,
 ) {
   const storeType = pickerRow.itemType === '产品' ? 'product' : 'material'
-  const bom = getActiveBomForItem(storeType, pickerRow.itemId)
+  const bom = getOwnActiveBomForItem(storeType, pickerRow.itemId)
   if (!bom?.lineItems?.length) return []
 
   const qty = Number(inboundQty) || 1

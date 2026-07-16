@@ -114,7 +114,16 @@ function enrichProcessForTask(process) {
   }
 }
 
-function buildCollaborativeTasks(workOrder, process, processSeq, product, processes, ts, dateStr, dispatchControl) {
+function buildCollaborativeTasks(
+  workOrder,
+  process,
+  processSeq,
+  product,
+  processes,
+  ts,
+  dateStr,
+  dispatchControl,
+) {
   const executors = process.executors || []
   const taskGroupId = buildTaskGroupId(workOrder.id, processSeq)
   const baseTaskNo = buildStandardTaskNo(dateStr, processSeq)

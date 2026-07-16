@@ -1,7 +1,7 @@
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import {
-  getActiveBomForItem,
+  getOwnActiveBomForItem,
   getBomsForItem,
   getProductBomById,
   productBomState,
@@ -43,9 +43,10 @@ export function findMaterialMasterByName(name) {
   )
 }
 
+/** 投产口径：仅 SKU 自有生效 BOM，禁止族模板解析 */
 export function resolveProductActiveBom(product) {
   if (!product?.id) return null
-  return getActiveBomForItem('product', product.id)
+  return getOwnActiveBomForItem('product', product.id)
 }
 
 export function resolveProductDefaultRoute(product) {
@@ -182,7 +183,7 @@ export function applyPickerItemToForm(form, item) {
       materialInfoState.materials.find((m) => m.id === item.itemId) ||
       findMaterialMasterByName(item.name)
     if (!material) return null
-    const bom = getActiveBomForItem('material', material.id)
+    const bom = getOwnActiveBomForItem('material', material.id)
     applyProductMasterToForm(form, material, bom)
     return { master: material, bom }
   }

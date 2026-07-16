@@ -253,6 +253,15 @@
     <a-modal v-model:open="urgencyModalOpen" title="调整紧急度" width="400px" @ok="confirmUrgency">
       <a-select v-model:value="urgencyDraft" style="width: 100%" :options="urgencyOpts" />
     </a-modal>
+
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="filteredOrders.length"
+      :selected-count="selectedIds.length"
+      @export="doExport"
+    />
   </div>
 </template>
 
@@ -293,7 +302,10 @@ import { bomOptions } from '@/mock/workOrderMaster'
 import CreateAssemblyWorkOrderModal from './components/CreateAssemblyWorkOrderModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTabs } from '@/composables/useTabs'
+import { useListExport } from '@/composables/useListExport'
+import { workOrderExportFields } from '@/utils/exportFields/workOrderExport'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 
@@ -341,6 +353,21 @@ const bomOpts = bomOptions.map((v) => ({ label: v, value: v }))
 const filteredOrders = computed(() =>
   filterAssemblyWorkOrders(assemblyWorkOrderState.orders, appliedFilters.value),
 )
+
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'assembly-work-order-list',
+  fieldDefinitions: workOrderExportFields,
+  getFilteredRows: () => filteredOrders.value,
+  getSelectedRows: () =>
+    assemblyWorkOrderState.orders.filter((o) => selectedIds.value.includes(o.id)),
+  fileNamePrefix: '总装工单',
+})
 
 const pagedOrders = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -594,25 +621,9 @@ function handleBatchDispatch() {
   selectedIds.value = []
 }
 
-function handleBatchExport() {
-  if (!selectedIds.value.length) {
-    message.warning('请勾选要导出的工单')
-    return
-  }
-  const data = assemblyWorkOrderState.orders.filter((o) => selectedIds.value.includes(o.id))
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `assembly-work-orders-${dayjs().format('YYYYMMDD-HHmmss')}.json`
-  link.click()
-  URL.revokeObjectURL(url)
-  message.success(`已导出 ${data.length} 条工单`)
-}
-
 function onBatchMenu({ key }) {
   if (key === 'import') message.info('批量导入功能开发中')
-  else if (key === 'export') handleBatchExport()
+  else if (key === 'export') openExportModal()
 }
 
 function onCardAction(key, wo) {

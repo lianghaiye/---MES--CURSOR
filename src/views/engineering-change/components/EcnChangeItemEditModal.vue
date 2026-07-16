@@ -136,7 +136,11 @@
         </a-col>
         <a-col v-if="form.changeType === ECN_CHANGE_ITEM_TYPE.REPLACE" :span="12">
           <a-form-item label="替换BOM">
-            <a-input :value="form.replaceBomLabel || '—'" readonly placeholder="选择新物料后自动带出" />
+            <a-input
+              :value="form.replaceBomLabel || '—'"
+              readonly
+              placeholder="选择新物料后自动带出"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="12">

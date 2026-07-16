@@ -45,10 +45,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ contracts: frameworkContractState.contracts }),
-  )
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ contracts: frameworkContractState.contracts }))
 }
 
 export const frameworkContractState = reactive({

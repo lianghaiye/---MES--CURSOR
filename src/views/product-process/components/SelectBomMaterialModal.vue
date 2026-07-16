@@ -220,7 +220,19 @@
           :pagination="pagination"
           :scroll="{ x: tableScrollX, y: tableScrollY }"
           @change="onTableChange"
-        />
+        >
+          <template #bodyCell="{ column, text, record }">
+            <template v-if="column.key === 'variantSummary'">
+              <a-tooltip v-if="record.variantTooltip || text">
+                <template #title>
+                  <div class="variant-tip-title">{{ tooltipTitle(record) }}</div>
+                </template>
+                <span class="variant-summary-cell">{{ text || '—' }}</span>
+              </a-tooltip>
+              <span v-else class="variant-summary-cell is-empty">—</span>
+            </template>
+          </template>
+        </a-table>
       </div>
 
       <div class="selected-panel">
@@ -258,7 +270,12 @@
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :loading="confirming" :disabled="!selectedRows.length" @click="handleConfirm">
+      <a-button
+        type="primary"
+        :loading="confirming"
+        :disabled="!selectedRows.length"
+        @click="handleConfirm"
+      >
         {{ multiple ? '确定' : '确定选择' }}
       </a-button>
     </template>
@@ -286,6 +303,7 @@ import { message } from 'ant-design-vue'
 import { SettingOutlined, PlusOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons-vue'
 import {
   buildBomSubItemPickerRows,
+  dedupePickerRowsPreferProduct,
   filterEcnNewMaterialRows,
   invalidateBomSubItemPickerRowsCache,
   toBomSubItemPayload,
@@ -358,6 +376,7 @@ const widthMap = {
   itemType: 100,
   categoryName: 100,
   material: 80,
+  variantSummary: 180,
   drawingNo: 100,
   inventoryUnit: 72,
   subItemCount: 88,
@@ -374,14 +393,27 @@ const widthMap = {
 
 const allRows = computed(() => {
   void listVersion.value
-  if (props.onlyWithBom) return buildBomLinkedPickerRows()
-  return buildBomSubItemPickerRows({ skipSubItemCount: props.ecnNewMaterialMode })
+  if (props.onlyWithBom) {
+    return buildBomLinkedPickerRows({
+      skipSubItemCount: props.ecnNewMaterialMode,
+      dedupeProductMaterial: false,
+    })
+  }
+  // 不去重：产品物料在产品侧与物料侧各一行，便于按类型筛选
+  return buildBomSubItemPickerRows({
+    skipSubItemCount: props.ecnNewMaterialMode,
+    dedupeProductMaterial: false,
+  })
 })
 
 const filteredRows = computed(() => {
   let rows = allRows.value
   if (quickItemType.value) {
+    // 产品 → 含产品物料（产品行）；物料 → 含产品物料（物料镜像行）
     rows = rows.filter((r) => r.itemType === quickItemType.value)
+  } else {
+    // 全部 → 去掉同 ID 镜像，优先留产品行
+    rows = dedupePickerRowsPreferProduct(rows)
   }
   if (props.ecnNewMaterialMode) {
     return filterEcnNewMaterialRows(rows, appliedEcnFilters)
@@ -428,9 +460,15 @@ const tableColumns = computed(() => {
     dataIndex: c.key,
     width: widthMap[c.key] || 100,
     fixed: c.frozen ? 'left' : undefined,
-    ellipsis: ['name', 'processRoute', 'defaultSupplier'].includes(c.key),
+    ellipsis: ['name', 'processRoute', 'defaultSupplier', 'variantSummary'].includes(c.key),
   }))
 })
+
+function tooltipTitle(record) {
+  const tip = String(record?.variantTooltip || '').trim()
+  if (tip) return tip
+  return String(record?.variantSummary || '').trim() || undefined
+}
 
 const tableScrollX = computed(() => {
   const sum = tableColumns.value.reduce((s, c) => s + (c.width || 100), 0)
@@ -748,5 +786,25 @@ function onMaterialSaved({ isEdit, data }) {
     justify-content: center;
     padding: 24px 0;
   }
+
+  .variant-summary-cell {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+
+    &.is-empty {
+      color: rgba(0, 0, 0, 0.25);
+    }
+  }
+}
+</style>
+
+<style lang="less">
+.variant-tip-title {
+  white-space: pre-line;
+  max-width: 320px;
 }
 </style>

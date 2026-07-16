@@ -2,123 +2,153 @@
   <a-modal
     v-model:open="visible"
     title="编辑发货明细"
-    width="1040px"
+    width="720px"
     :mask-closable="false"
     destroy-on-close
+    class="inventory-line-edit-modal"
     @cancel="handleCancel"
   >
-    <a-form
-      layout="horizontal"
-      class="delivery-line-edit-form"
-      :label-col="{ flex: '0 0 150px' }"
-      :wrapper-col="{ flex: '1 1 0' }"
-    >
-      <a-row :gutter="[20, 8]">
-        <a-col :span="24">
-          <a-form-item label="发货进度">
-            <a-input :value="progressDisplay" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="12">
-          <a-form-item label="产品名称">
-            <a-input :value="draft.productName" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="12">
-          <a-form-item label="产品编码">
-            <a-input :value="draft.productCode" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="规格型号">
-            <a-input :value="draft.specModel || '—'" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="材质">
-            <a-input :value="draft.material || '—'" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="图号">
-            <a-input :value="draft.drawingNo || '—'" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="订单数量">
-            <a-input :value="formatDeliveryQty(draft.orderQty)" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="单价（不含税）">
-            <a-input :value="formatDeliveryPrice(draft.unitPriceExTax)" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="单价（含税）">
-            <a-input :value="formatDeliveryPrice(draft.unitPriceInTax)" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="单位">
-            <a-input :value="draft.unit || '—'" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="16">
-          <a-form-item label="包装形式">
-            <a-input :value="draft.packagingForm || '—'" disabled />
-          </a-form-item>
-        </a-col>
+    <a-form layout="vertical" class="edit-form">
+      <a-form-item>
+        <template #label>
+          <span class="field-label">
+            <FileTextOutlined />
+            发货进度
+          </span>
+        </template>
+        <a-input :value="progressDisplay" disabled />
+      </a-form-item>
 
-        <a-col v-if="showShipQty" :span="8">
-          <a-form-item label="本次发货数量" required>
-            <a-input-number
-              v-model:value="draft.shipQty"
-              :min="0"
-              :precision="4"
-              :formatter="deliveryDecimalFormatter"
-              :parser="deliveryDecimalParser"
-              style="width: 100%"
-              @change="recalcPreview"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="发货重量">
-            <a-input-number
-              v-model:value="draft.shipWeight"
-              :min="0"
-              :precision="4"
-              :formatter="deliveryDecimalFormatter"
-              :parser="deliveryDecimalParser"
-              style="width: 100%"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="发货单价(不含税)" required>
-            <a-input-number
-              v-model:value="draft.deliveryUnitPriceExTax"
-              :min="0"
-              :precision="4"
-              :formatter="deliveryDecimalFormatter"
-              :parser="deliveryDecimalParser"
-              style="width: 100%"
-              @change="recalcPreview"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="发货总额">
-            <a-input :value="formatDeliveryPrice(draft.deliveryAmountExTax)" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="24">
-          <a-form-item label="备注">
-            <a-textarea v-model:value="draft.lineRemark" :rows="2" placeholder="请输入备注" />
-          </a-form-item>
-        </a-col>
-      </a-row>
+      <a-form-item>
+        <template #label>
+          <span class="field-label">
+            <FileTextOutlined />
+            产品信息
+          </span>
+        </template>
+        <a-input :value="lockedProductLabel" disabled placeholder="—" />
+        <div class="item-preview">
+          <div class="preview-main">
+            <div class="preview-row">
+              <span class="preview-label">产品编号</span>
+              <span>{{ draft.productCode || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">产品名称</span>
+              <span>{{ draft.productName || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">规格型号</span>
+              <span>{{ draft.specModel || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">变体属性</span>
+              <span>{{ draft.variantAttr || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">订单数量</span>
+              <span>{{ formatDeliveryQty(draft.orderQty) }} {{ draft.unit || '件' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">库存数</span>
+              <span>{{ formatDeliveryQty(draft.stockQty) }} {{ draft.unit || '件' }}</span>
+            </div>
+          </div>
+          <div class="preview-stock-box">
+            <div class="stock-value">{{ formatDeliveryQty(draft.warehouseStockQty) }}</div>
+            <div class="stock-label">当前仓库数量({{ draft.unit || '件' }})</div>
+          </div>
+        </div>
+      </a-form-item>
+
+      <a-form-item>
+        <template #label>
+          <span class="field-label">
+            <HomeOutlined />
+            出库仓库
+          </span>
+        </template>
+        <a-select
+          v-model:value="draft.shipWarehouse"
+          allow-clear
+          placeholder="请选择出库仓库"
+          :options="warehouseOpts"
+          @change="refreshPreviewStock"
+        />
+      </a-form-item>
+
+      <a-form-item v-if="showShipQty" required>
+        <template #label>
+          <span class="field-label">
+            <UnorderedListOutlined />
+            本次发货数量
+          </span>
+        </template>
+        <a-input-number
+          v-model:value="draft.shipQty"
+          :min="0"
+          :precision="4"
+          :formatter="deliveryDecimalFormatter"
+          :parser="deliveryDecimalParser"
+          style="width: 100%"
+          @change="recalcPreview"
+        />
+      </a-form-item>
+
+      <a-form-item>
+        <template #label>
+          <span class="field-label">
+            <UnorderedListOutlined />
+            发货重量
+          </span>
+        </template>
+        <a-input-number
+          v-model:value="draft.shipWeight"
+          :min="0"
+          :precision="4"
+          :formatter="deliveryDecimalFormatter"
+          :parser="deliveryDecimalParser"
+          style="width: 100%"
+        />
+      </a-form-item>
+
+      <a-form-item required>
+        <template #label>
+          <span class="field-label">
+            <DollarOutlined />
+            发货单价(不含税)
+          </span>
+        </template>
+        <a-input-number
+          v-model:value="draft.deliveryUnitPriceExTax"
+          :min="0"
+          :precision="4"
+          :formatter="deliveryDecimalFormatter"
+          :parser="deliveryDecimalParser"
+          style="width: 100%"
+          @change="recalcPreview"
+        />
+      </a-form-item>
+
+      <a-form-item>
+        <template #label>
+          <span class="field-label">
+            <AccountBookOutlined />
+            发货总额
+          </span>
+        </template>
+        <a-input :value="formatDeliveryPrice(draft.deliveryAmountExTax)" disabled />
+      </a-form-item>
+
+      <a-form-item>
+        <template #label>
+          <span class="field-label">
+            <FileTextOutlined />
+            备注
+          </span>
+        </template>
+        <a-textarea v-model:value="draft.lineRemark" :rows="2" placeholder="请输入备注" />
+      </a-form-item>
     </a-form>
 
     <template #footer>
@@ -132,6 +162,13 @@
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import {
+  AccountBookOutlined,
+  DollarOutlined,
+  FileTextOutlined,
+  HomeOutlined,
+  UnorderedListOutlined,
+} from '@ant-design/icons-vue'
+import {
   formatDeliveryQty,
   formatDeliveryPrice,
   formatShipProgress,
@@ -139,7 +176,10 @@ import {
   deliveryDecimalFormatter,
   deliveryDecimalParser,
   roundDeliveryDecimal,
+  refreshDeliveryLineStock,
+  resolveDeliveryVariantAttr,
 } from '@/utils/deliveryLine'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -156,6 +196,16 @@ const visible = computed({
 })
 
 const draft = reactive(createDraft())
+
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
+
+const lockedProductLabel = computed(() => {
+  if (draft.productCode && draft.productName) return `[${draft.productCode}] ${draft.productName}`
+  return draft.productName || draft.productCode || ''
+})
 
 const progressDisplay = computed(() =>
   formatShipProgress(
@@ -180,9 +230,14 @@ watch(
 )
 
 function createDraft(line = {}) {
-  return {
+  const draftLine = {
     productName: line.productName || '',
     productCode: line.productCode || '',
+    productId: line.productId || '',
+    spuId: line.spuId || '',
+    variantValues: line.variantValues || {},
+    variantSummary: line.variantSummary || '',
+    specAttr: line.specAttr || '',
     specModel: line.specModel || '',
     material: line.material || '',
     drawingNo: line.drawingNo || '',
@@ -202,7 +257,18 @@ function createDraft(line = {}) {
     deliveryAmountExTax: roundDeliveryDecimal(line.deliveryAmountExTax ?? 0, 4),
     packagingForm: line.packagingForm || '',
     lineRemark: line.lineRemark || '',
+    shipWarehouse: line.shipWarehouse || '',
+    stockQty: line.stockQty ?? null,
+    warehouseStockQty: line.warehouseStockQty ?? null,
+    variantAttr: '',
   }
+  draftLine.variantAttr = resolveDeliveryVariantAttr(draftLine)
+  refreshDeliveryLineStock(draftLine)
+  return draftLine
+}
+
+function refreshPreviewStock() {
+  refreshDeliveryLineStock(draft)
 }
 
 function recalcPreview() {
@@ -235,6 +301,7 @@ function handleSave() {
   }
 
   recalcDeliveryLine(draft)
+  refreshDeliveryLineStock(draft)
   emit('saved', {
     ...props.line,
     shipQty: roundDeliveryDecimal(draft.shipQty, 4),
@@ -243,23 +310,15 @@ function handleSave() {
     deliveryAmountExTax: roundDeliveryDecimal(draft.deliveryAmountExTax, 4),
     packagingForm: draft.packagingForm || '',
     lineRemark: draft.lineRemark || '',
+    shipWarehouse: draft.shipWarehouse || '',
+    stockQty: draft.stockQty,
+    warehouseStockQty: draft.warehouseStockQty,
+    variantAttr: draft.variantAttr || '',
   })
   visible.value = false
 }
 </script>
 
-<style scoped>
-.delivery-line-edit-form :deep(.ant-form-item) {
-  margin-bottom: 12px;
-}
-
-.delivery-line-edit-form :deep(.ant-form-item-label) {
-  text-align: right;
-}
-
-.delivery-line-edit-form :deep(.ant-form-item-label > label) {
-  white-space: normal;
-  height: auto;
-  line-height: 1.3;
-}
+<style lang="less" scoped>
+@import '../../inventory/components/inventoryLineEditModal.less';
 </style>

@@ -8,7 +8,10 @@ import dayjs from 'dayjs'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
 import { resolveReportMode, normalizeReportMode } from '@/utils/reportMode'
 import { getProcessByName } from '@/store/processConfigStore'
-import { resolveProcessExecutionMode, shouldSplitCollaborativeTasks } from '@/utils/taskExecutionMode'
+import {
+  resolveProcessExecutionMode,
+  shouldSplitCollaborativeTasks,
+} from '@/utils/taskExecutionMode'
 import { enrichLaborLine } from '@/utils/laborHourCalc'
 import { buildLaborHourRecord } from '@/mock/laborHourManagement'
 import { laborHourState, recalcOrder } from '@/store/laborHourStore'
@@ -427,7 +430,8 @@ export function generateLinesFromWorkOrder(wo, orderCategory = '生产工单') {
           goodQty: scheduleQty,
           defectQty: 0,
           scrapQty: 0,
-          reportDuration: labor.reportType === '时长报工' ? Math.round(scheduleQty * 0.5 * 10) / 10 : 0,
+          reportDuration:
+            labor.reportType === '时长报工' ? Math.round(scheduleQty * 0.5 * 10) / 10 : 0,
           remark: '',
           confirmStatus: CONFIRM_STATUS.PENDING,
           orderCategory,

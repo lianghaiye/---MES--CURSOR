@@ -82,9 +82,7 @@ const columns = [
 
 const allOptions = computed(() => getAllSupplierOptions())
 
-const filteredList = computed(() =>
-  filterSupplierOptionsByFields(allOptions.value, appliedSearch),
-)
+const filteredList = computed(() => filterSupplierOptionsByFields(allOptions.value, appliedSearch))
 
 const rowSelection = computed(() => ({
   type: 'radio',

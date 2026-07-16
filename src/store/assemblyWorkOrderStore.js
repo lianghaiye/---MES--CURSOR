@@ -9,6 +9,19 @@ import {
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { createLaborDemoAssemblyOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
 import { ensureProductionPlanOrderTreeDemoAssemblyOrders } from '@/mock/productionPlanOrderTreeSeed'
+import { findWorkItemForPlanRow } from '@/utils/productionPlanMaterial'
+
+function resolvePlanRowBomFields(row, sourceOrder) {
+  const wi = findWorkItemForPlanRow(sourceOrder, row)
+  return {
+    productId: row.productId || wi?.productId || '',
+    bomId: row.bomId || wi?.bomId || '',
+    bomLabel: row.bomName || wi?.bomName || row.bom || '',
+    ebomSnapshot: row.ebomSnapshot || wi?.ebomSnapshot || null,
+    salesLineId: row.salesLineId || wi?.salesLineId || '',
+    bom: row.bom || wi?.bomName || row.productName,
+  }
+}
 
 const STORAGE_KEY = 'i_doms_assembly_work_orders'
 let codeSeq = 1
@@ -188,6 +201,16 @@ export function createAssemblyWorkOrderPayload(partial) {
     processRouteName: routeName,
     source: partial.source || 'manual',
     sourceOrderNo: partial.sourceOrderNo || '',
+    salesLineId: partial.salesLineId || '',
+    salesOrderId: partial.salesOrderId || '',
+    materialCode: partial.materialCode || '',
+    productId: partial.productId || '',
+    bomId: partial.bomId || '',
+    bomLabel: partial.bomLabel || '',
+    specModel: partial.specModel || '',
+    material: partial.material || '',
+    drawingNo: partial.drawingNo || '',
+    ebomSnapshot: partial.ebomSnapshot || null,
     processes: buildProcessesFromRoute(routeName),
     createdAt: dayjs().format('YYYY-MM-DD'),
   }
@@ -217,13 +240,16 @@ export function addAssemblyWorkOrdersFromPlanRows(rows, sourceOrder) {
     )
     if (exists) return
 
+    const bomFields = resolvePlanRowBomFields(row, sourceOrder)
     const wo = createAssemblyWorkOrderPayload({
       productName: row.productName,
       orderCategory: row.orderCategory,
       scheduleQty: row.scheduleQty ?? row.planQty,
       planQty: row.planQty,
       workCenter: row.workCenter,
-      bom: row.bom,
+      bom: bomFields.bom,
+      bomId: bomFields.bomId,
+      bomLabel: bomFields.bomLabel,
       warehouse: row.warehouse,
       urgency: row.urgency,
       remark: row.remark,
@@ -231,6 +257,14 @@ export function addAssemblyWorkOrdersFromPlanRows(rows, sourceOrder) {
       processRouteName: row.processRoute,
       source: 'production-plan',
       sourceOrderNo: sourceOrder.orderNo,
+      materialCode: row.code,
+      productId: bomFields.productId,
+      ebomSnapshot: bomFields.ebomSnapshot,
+      salesLineId: bomFields.salesLineId,
+      salesOrderId: sourceOrder.salesOrderId || '',
+      specModel: row.spec || '',
+      material: row.material || '',
+      drawingNo: row.drawingNo || '',
     })
     addAssemblyWorkOrder(wo)
     created.push(wo)

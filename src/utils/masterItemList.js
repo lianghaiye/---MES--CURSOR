@@ -7,10 +7,7 @@ import {
   itemKindLabel,
   normalizeCapabilityFlags,
 } from '@/utils/masterItemKind'
-import {
-  MASTER_BUSINESS_TYPE_OPTIONS,
-  matchesBusinessTypeFilter,
-} from '@/utils/businessTypeLabel'
+import { MASTER_BUSINESS_TYPE_OPTIONS, matchesBusinessTypeFilter } from '@/utils/businessTypeLabel'
 import { isProductSyncedMirror } from '@/utils/bomMaterialPicker'
 
 function pickMergedField(productRow, materialRow, key, fallback = '') {
@@ -38,8 +35,15 @@ function toUnifiedRow(source, sourceStore, productRow, materialRow) {
     canSell: caps.canSell,
     canProduce: caps.canProduce,
     productCategoryKey: productRow?.categoryKey || source.productCategoryKey,
-    materialCategoryKey: materialRow?.categoryKey || source.materialCategoryKey || source.categoryKey,
+    materialCategoryKey:
+      materialRow?.categoryKey || source.materialCategoryKey || source.categoryKey,
     categoryKey: source.categoryKey,
+    spuId: source.spuId || productRow?.spuId || materialRow?.spuId || '',
+    spuName: source.spuName || productRow?.spuName || materialRow?.spuName || '',
+    variantValues:
+      source.variantValues || productRow?.variantValues || materialRow?.variantValues || {},
+    materialGradeId:
+      source.materialGradeId || productRow?.materialGradeId || materialRow?.materialGradeId || '',
     categoryName: pickMergedField(productRow, materialRow, 'categoryName', source.categoryName),
     productAttribute: productRow?.productAttribute || source.productAttribute,
     standardSpec: productRow?.standardSpec || source.standardSpec,
@@ -162,11 +166,9 @@ export function filterUnifiedListRows(rows, filters = {}, selectedCategoryKey, t
     if (filters.name && !String(item.name || '').includes(filters.name)) return false
     if (filters.barcodeType && item.barcodeType !== filters.barcodeType) return false
     if (filters.categoryKey) {
-      const catKeys = [
-        item.categoryKey,
-        item.productCategoryKey,
-        item.materialCategoryKey,
-      ].filter(Boolean)
+      const catKeys = [item.categoryKey, item.productCategoryKey, item.materialCategoryKey].filter(
+        Boolean,
+      )
       if (!catKeys.includes(filters.categoryKey)) return false
     }
     if (filters.specModel && !String(item.specModel || '').includes(filters.specModel)) return false

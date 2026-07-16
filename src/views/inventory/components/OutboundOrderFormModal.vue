@@ -30,19 +30,21 @@
                   size="small"
                   placeholder="请选择 出库类型"
                   :options="outboundTypeOpts"
+                  :disabled="lockOutboundType"
                 />
               </a-form-item>
             </a-col>
             <a-col :span="8">
               <a-form-item label="出库时间">
                 <a-date-picker
-                  v-model:value="outboundTimeValue"
+                  v-model:value="form.outboundTime"
                   show-time
                   size="small"
                   format="YYYY-MM-DD HH:mm:ss"
                   value-format="YYYY-MM-DD HH:mm:ss"
                   style="width: 100%"
                   placeholder="请选择出库时间"
+                  allow-clear
                 />
               </a-form-item>
             </a-col>
@@ -58,7 +60,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col v-if="!isSalesOutbound" :span="8">
               <a-form-item label="领用部门">
                 <a-select
                   v-model:value="form.requisitionDept"
@@ -87,14 +89,20 @@
                     :value="form.salesOrderNo"
                     readonly
                     size="small"
-                    style="width: calc(100% - 72px)"
+                    :style="{ width: lockSalesOrder ? '100%' : 'calc(100% - 72px)' }"
                     placeholder="请选择销售订单"
                   />
-                  <a-button size="small" @click="salesOrderPickerOpen = true">选择</a-button>
+                  <a-button
+                    v-if="!lockSalesOrder"
+                    size="small"
+                    @click="salesOrderPickerOpen = true"
+                  >
+                    选择
+                  </a-button>
                 </a-input-group>
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col v-if="!isSalesOutbound" :span="8">
               <a-form-item label="合同编号">
                 <a-input
                   v-model:value="form.contractNo"
@@ -104,11 +112,34 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col v-if="form.salesOrderNo" :span="24">
+            <a-col v-if="isSalesOutbound && form.salesOrderNo" :span="24">
               <div class="sales-order-summary">
-                {{ form.salesOrderNo }} / {{ form.customerName || '-' }} /
-                {{ form.salesperson || '-' }}
+                <span>客户名称：{{ form.customerName || '—' }}</span>
+                <span class="summary-sep">/</span>
+                <span>合同编号：{{ form.contractNo || '—' }}</span>
+                <span class="summary-sep">/</span>
+                <span>交货方式：{{ form.deliveryMethod || '—' }}</span>
+                <span class="summary-sep">/</span>
+                <span>业务员：{{ form.salesperson || '—' }}</span>
               </div>
+            </a-col>
+            <a-col v-else-if="form.salesOrderNo" :span="24">
+              <div class="sales-order-summary">
+                <span>客户名称：{{ form.customerName || '—' }}</span>
+                <span class="summary-sep">/</span>
+                <span>业务员：{{ form.salesperson || '—' }}</span>
+              </div>
+            </a-col>
+            <a-col v-if="isFromDelivery" :span="24">
+              <a-form-item label="发货备注" class="remark-item">
+                <a-textarea
+                  :value="form.deliveryRemark"
+                  :rows="2"
+                  size="small"
+                  disabled
+                  placeholder="—"
+                />
+              </a-form-item>
             </a-col>
             <a-col :span="24">
               <a-form-item label="备注" class="remark-item">
@@ -260,6 +291,15 @@
                 <template v-else-if="column.key === 'barcodeBatchNo'">
                   <span>{{ record.barcodeBatchNo || '—' }}</span>
                 </template>
+                <template v-else-if="column.key === 'packagingForm'">
+                  <span :title="record.packagingForm || ''">{{ record.packagingForm || '—' }}</span>
+                </template>
+                <template v-else-if="column.key === 'deliveryRemark'">
+                  <a-tooltip v-if="record.deliveryRemark" :title="record.deliveryRemark">
+                    <span class="delivery-remark-cell">{{ record.deliveryRemark }}</span>
+                  </a-tooltip>
+                  <span v-else>—</span>
+                </template>
                 <template v-else-if="column.key === 'unitPrice'">
                   <InventoryLineEditableCell
                     :active="isLineCellEditing(record.id, 'unitPrice')"
@@ -408,6 +448,7 @@ import {
 } from '@/utils/outboundLineHelpers'
 import SalesOrderSelectModal from '@/views/production/components/SalesOrderSelectModal.vue'
 import { findSalesOrderByOrderNo, getSalesOrderById } from '@/store/salesOrderStore'
+import { getDeliveryOrderById, getDeliveryOrderByCode } from '@/store/deliveryOrderStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -419,6 +460,12 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+const isFromDelivery = computed(() =>
+  Boolean(props.editRecord?.linkedDeliveryId || props.editRecord?.linkedDeliveryCode),
+)
+const isSalesOutbound = computed(() => form.outboundType === '销售出库')
+const lockOutboundType = computed(() => isFromDelivery.value)
+const lockSalesOrder = computed(() => isFromDelivery.value)
 
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/inventory/outbound',
@@ -470,22 +517,17 @@ const form = reactive({
   customerName: '',
   salesperson: '',
   contractNo: '',
+  deliveryMethod: '',
+  deliveryRemark: '',
   remark: '',
   lineItems: [],
-})
-
-const outboundTimeValue = computed({
-  get: () => form.outboundTime,
-  set: (val) => {
-    form.outboundTime = val || dayjs().format('YYYY-MM-DD HH:mm:ss')
-  },
 })
 
 const baseLineColumns = outboundFormLineColumns
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings('outbound-form-lines-v2', baseLineColumns, {
-    minScrollX: 1710,
+    minScrollX: 1806,
     pinEdgeColumns: false,
     pinActionColumn: true,
   })
@@ -533,10 +575,30 @@ watch(
   { immediate: true },
 )
 
+function normalizeOutboundTime(value) {
+  if (!value) return dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const parsed = dayjs(value)
+  if (!parsed.isValid()) return dayjs().format('YYYY-MM-DD HH:mm:ss')
+  return parsed.format('YYYY-MM-DD HH:mm:ss')
+}
+
 function syncSalesOrderMeta(orderNo, orderId) {
   const order = (orderId && getSalesOrderById(orderId)) || findSalesOrderByOrderNo(orderNo) || null
   form.customerName = order?.customerName || ''
   form.salesperson = order?.salesperson || ''
+  form.deliveryMethod = order?.deliveryMethod || ''
+  form.contractNo = order?.contractNo || ''
+  if (order?.id) form.salesOrderId = order.id
+}
+
+function resolveLinkedDelivery(record) {
+  if (!record) return null
+  return (
+    (record.linkedDeliveryId && getDeliveryOrderById(record.linkedDeliveryId)) ||
+    (record.linkedDeliveryCode && getDeliveryOrderByCode(record.linkedDeliveryCode)) ||
+    (record.sourceOrderNo && getDeliveryOrderByCode(record.sourceOrderNo)) ||
+    null
+  )
 }
 
 function onSalesOrderPicked(order) {
@@ -544,19 +606,19 @@ function onSalesOrderPicked(order) {
   form.salesOrderNo = order.orderNo
   form.customerName = order.customerName || ''
   form.salesperson = order.salesperson || ''
-  if (!form.contractNo?.trim() && order.contractNo) {
-    form.contractNo = order.contractNo
-  }
+  form.deliveryMethod = order.deliveryMethod || ''
+  form.contractNo = order.contractNo || ''
 }
 
 function loadEditForm(record) {
   endLineCellEdit()
   totalWeightManual.value = true
   prevHeaderWarehouse.value = record.warehouse || undefined
+  const delivery = resolveLinkedDelivery(record)
   Object.assign(form, {
     docNo: record.docNo,
     outboundType: record.outboundType,
-    outboundTime: record.outboundTime || record.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    outboundTime: normalizeOutboundTime(record.outboundTime || record.createdAt),
     warehouse: record.warehouse || undefined,
     handler: record.handler || 'admin1',
     requisitionDept: record.requisitionDept || '默认工厂',
@@ -566,10 +628,12 @@ function loadEditForm(record) {
     customerName: record.customerName || '',
     salesperson: record.salesperson || '',
     contractNo: record.contractNo || '',
+    deliveryMethod: '',
+    deliveryRemark: delivery?.remark || '',
     remark: record.remark || '',
     lineItems: (record.lineItems || []).map((l) => enrichOutboundLine({ ...l })),
   })
-  if (form.salesOrderNo && (!form.customerName || !form.salesperson)) {
+  if (form.salesOrderNo) {
     syncSalesOrderMeta(form.salesOrderNo, form.salesOrderId)
   }
 }
@@ -590,6 +654,8 @@ function resetForm() {
     customerName: '',
     salesperson: '',
     contractNo: '',
+    deliveryMethod: '',
+    deliveryRemark: '',
     remark: '',
     lineItems: [],
   })
@@ -761,10 +827,10 @@ function buildPayload() {
   return {
     docNo: form.docNo?.trim(),
     outboundType: form.outboundType,
-    outboundTime: form.outboundTime,
+    outboundTime: normalizeOutboundTime(form.outboundTime),
     warehouse: form.warehouse || '',
     handler: form.handler,
-    requisitionDept: form.requisitionDept || '',
+    requisitionDept: isSalesOutbound.value ? '' : form.requisitionDept || '',
     totalWeight: form.totalWeight,
     salesOrderNo: form.salesOrderNo?.trim() || '',
     salesOrderId: form.salesOrderId || '',
@@ -913,6 +979,15 @@ function handleSave() {
   color: rgba(0, 0, 0, 0.88);
 }
 
+.delivery-remark-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 :deep(.ant-table-tbody > tr > td) {
   padding: 4px 8px !important;
 }
@@ -924,5 +999,10 @@ function handleSave() {
   color: rgba(0, 0, 0, 0.65);
   background: #fafafa;
   border-radius: 4px;
+
+  .summary-sep {
+    margin: 0 8px;
+    color: rgba(0, 0, 0, 0.25);
+  }
 }
 </style>

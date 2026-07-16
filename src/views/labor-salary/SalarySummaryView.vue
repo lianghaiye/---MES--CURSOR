@@ -125,6 +125,15 @@
         :page-size-options="['10', '20', '50']"
       />
     </div>
+
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="tableData.length"
+      :selected-count="0"
+      @export="doExport"
+    />
   </div>
 </template>
 
@@ -136,7 +145,6 @@ export default { name: 'SalarySummaryView' }
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
-import { message } from 'ant-design-vue'
 import { ClearOutlined, DownOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import SalaryStatsNav from './components/SalaryStatsNav.vue'
 import { employeeNameOptions } from '@/utils/employeeProfileResolver'
@@ -144,6 +152,9 @@ import { querySalaryStats } from '@/utils/salaryStatsAggregate'
 import { reloadProcessReports } from '@/store/processReportStore'
 import { reloadQuickReports } from '@/store/quickReportStore'
 import { ensureSalaryStatsDemoData } from '@/store/laborHourStore'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
+import { useListExport } from '@/composables/useListExport'
+import { salarySummaryExportFields } from '@/utils/exportFields/salarySummaryExport'
 
 const router = useRouter()
 
@@ -229,6 +240,20 @@ const statsResult = ref({
 
 const tableData = computed(() => statsResult.value.summaryRows)
 
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'salary-summary-list',
+  fieldDefinitions: salarySummaryExportFields,
+  getFilteredRows: () => tableData.value,
+  getSelectedRows: () => [],
+  fileNamePrefix: '工资核算',
+})
+
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
   return tableData.value.slice(start, start + pagination.pageSize)
@@ -310,7 +335,7 @@ function openDetail(record) {
 }
 
 function onBatchAction({ key }) {
-  if (key === 'export') message.info('导出 Excel 功能开发中')
+  if (key === 'export') openExportModal()
 }
 
 onMounted(() => {

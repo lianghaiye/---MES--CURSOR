@@ -16,6 +16,7 @@ export function createOutboundLine(partial = {}) {
     shipWarehouse: '',
     locationNo: '',
     unit: '件',
+    packagingForm: '',
     unitPrice: null,
     totalPrice: null,
     lineSource: '',
@@ -26,6 +27,8 @@ export function createOutboundLine(partial = {}) {
     itemId: '',
     stockQty: null,
     warehouseStockQty: null,
+    /** 来自销售发货明细备注，只读 */
+    deliveryRemark: '',
     ...partial,
   }
 }
@@ -40,6 +43,8 @@ export function createOutboundOrder(partial) {
     requisitionDept: '',
     sourceOrderNo: '',
     salesOrderNo: '',
+    salesOrderId: '',
+    contractNo: '',
     customerName: '',
     itemType: '',
     totalWeight: null,
@@ -98,6 +103,7 @@ export const mockOutboundOrders = [
         itemType: '产品',
         shipQty: 3,
         shipWarehouse: '成品仓',
+        packagingForm: '纸箱',
       }),
     ],
   }),

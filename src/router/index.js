@@ -366,6 +366,12 @@ const routes = [
         meta: { title: '出库管理' },
       },
       {
+        path: 'inventory/outbound/:id/edit',
+        name: 'inventory-outbound-edit',
+        component: () => import('@/views/inventory/OutboundOrderEditView.vue'),
+        meta: { title: '编辑出库单', listPath: '/inventory/outbound' },
+      },
+      {
         path: 'inventory/outbound/:id',
         name: 'inventory-outbound-detail',
         component: () => import('@/views/inventory/OutboundOrderDetailView.vue'),
@@ -377,6 +383,12 @@ const routes = [
         name: 'inventory-inbound',
         component: () => import('@/views/inventory/InboundManagementView.vue'),
         meta: { title: '入库管理' },
+      },
+      {
+        path: 'inventory/inbound/:id/edit',
+        name: 'inventory-inbound-edit',
+        component: () => import('@/views/inventory/InboundOrderEditView.vue'),
+        meta: { title: '编辑入库单', listPath: '/inventory/inbound' },
       },
       {
         path: 'inventory/inbound/:id',
@@ -545,6 +557,12 @@ const routes = [
         name: 'basic-config-material-grades',
         component: () => import('@/views/basic-config/MaterialGradeView.vue'),
         meta: { title: '材质管理' },
+      },
+      {
+        path: 'basic-config/packaging',
+        name: 'basic-config-packaging',
+        component: () => import('@/views/basic-config/PackagingManagementView.vue'),
+        meta: { title: '包装管理' },
       },
       {
         path: 'basic-config/function-params',

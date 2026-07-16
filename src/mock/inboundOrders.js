@@ -2,9 +2,7 @@ import dayjs from 'dayjs'
 
 export function createInboundLine(partial = {}) {
   const locationNo =
-    partial.locationNo ||
-    [partial.shelf, partial.binLocation].filter(Boolean).join('-') ||
-    ''
+    partial.locationNo || [partial.shelf, partial.binLocation].filter(Boolean).join('-') || ''
   return {
     id: `ib-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     itemCode: '',
@@ -49,6 +47,9 @@ export function createInboundOrder(partial = {}) {
     sourceOrderNo: '',
     sourceType: '',
     sourceWorkshop: '',
+    salesOrderNo: '',
+    salesOrderId: '',
+    contractNo: '',
     invoiceNo: '',
     handler: 'admin1',
     creator: 'admin1',

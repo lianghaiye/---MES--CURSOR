@@ -154,6 +154,13 @@ export function buildWorkOrderRows(materials, order) {
       warehouse: m.warehouse || resolveDefaultWarehouseByMaterialCode(m.code) || '',
       urgency: m.urgency || order.urgency || '普通',
       remark: m.workOrderRemark || m.remark || '',
+      workItemId: m.workItemId || '',
+      productId: m.productId || '',
+      bomId: m.bomId || '',
+      bomName: m.bomName || '',
+      bomVersion: m.bomVersion || '',
+      ebomSnapshot: m.ebomSnapshot || null,
+      salesLineId: m.salesLineId || '',
     }
   })
 }
@@ -206,6 +213,13 @@ export function buildAssemblyWorkOrderRows(materials, order) {
       warehouse: m.warehouse || resolveDefaultWarehouseByMaterialCode(m.code) || '',
       urgency: m.urgency || order.urgency || '普通',
       remark: m.remark || '',
+      workItemId: m.workItemId || '',
+      productId: m.productId || '',
+      bomId: m.bomId || '',
+      bomName: m.bomName || '',
+      bomVersion: m.bomVersion || '',
+      ebomSnapshot: m.ebomSnapshot || null,
+      salesLineId: m.salesLineId || '',
     }
   })
 }

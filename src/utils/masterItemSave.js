@@ -1,8 +1,4 @@
-import {
-  ITEM_KIND,
-  inferItemKindFromRecord,
-  resolveItemKind,
-} from '@/utils/masterItemKind'
+import { ITEM_KIND, inferItemKindFromRecord, resolveItemKind } from '@/utils/masterItemKind'
 import {
   productInfoState,
   addProduct,
@@ -35,22 +31,24 @@ export function resolveMasterItemEditRecord(record) {
   const materialRow = findMaterial(record.id)
   const itemKind =
     record.itemKind ||
-    inferItemKindFromRecord(record, { productRow, materialRow, source: productRow ? 'product' : 'material' })
+    inferItemKindFromRecord(record, {
+      productRow,
+      materialRow,
+      source: productRow ? 'product' : 'material',
+    })
 
   const base = productRow || materialRow || record
   return {
     ...base,
     ...record,
     itemKind,
-    canSell: Boolean(
-      record.canSell ?? productRow?.canSell ?? materialRow?.canSell ?? false,
-    ),
+    canSell: Boolean(record.canSell ?? productRow?.canSell ?? materialRow?.canSell ?? false),
     canProduce: Boolean(
       record.canProduce ??
-        productRow?.canProduce ??
-        materialRow?.canProduce ??
-        productRow?.isPart ??
-        false,
+      productRow?.canProduce ??
+      materialRow?.canProduce ??
+      productRow?.isPart ??
+      false,
     ),
     isWholeMachine: Boolean(productRow?.isWholeMachine ?? record.isWholeMachine),
     isPart: Boolean(productRow?.isPart ?? record.isPart),
@@ -118,9 +116,7 @@ export function saveMasterItem({ isEdit, id, productPayload, materialPayload }) 
 
   const sharedId = id || generateSharedItemId()
   const code =
-    productPayload?.code?.trim() ||
-    materialPayload?.code?.trim() ||
-    generateProductCode()
+    productPayload?.code?.trim() || materialPayload?.code?.trim() || generateProductCode()
   const prod = {
     ...productPayload,
     id: sharedId,

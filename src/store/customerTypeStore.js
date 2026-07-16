@@ -6,9 +6,30 @@ const STORAGE_KEY = 'i_doms_customer_types'
 function seedTypes() {
   const now = dayjs().format('YYYY-MM-DD HH:mm')
   return [
-    { id: 'ctype-1', code: 'CT001', name: '企业客户', creator: 'admin', createdAt: now, updatedAt: now },
-    { id: 'ctype-2', code: 'CT002', name: '经销商', creator: 'admin', createdAt: now, updatedAt: now },
-    { id: 'ctype-3', code: 'CT003', name: '代理商', creator: 'admin', createdAt: now, updatedAt: now },
+    {
+      id: 'ctype-1',
+      code: 'CT001',
+      name: '企业客户',
+      creator: 'admin',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'ctype-2',
+      code: 'CT002',
+      name: '经销商',
+      creator: 'admin',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'ctype-3',
+      code: 'CT003',
+      name: '代理商',
+      creator: 'admin',
+      createdAt: now,
+      updatedAt: now,
+    },
   ]
 }
 

@@ -93,7 +93,7 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="送货方式" required>
+          <a-form-item label="交货方式" required>
             <a-select
               v-model:value="form.deliveryMethod"
               size="small"
@@ -629,7 +629,7 @@ import {
 import { createLineItem } from '@/mock/salesOrders'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { getActiveBomForItem } from '@/store/productBomStore'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { BOM_FULFILLMENT_PATH } from '@/constants/salesOrderFulfillment'
 import {
   addSalesOrder,
@@ -797,7 +797,7 @@ const form = reactive({
   contactPerson: undefined,
   contactPhone: '',
   deliveryAddress: '',
-  deliveryMethod: '物流',
+  deliveryMethod: '送货',
   techSpecCode: '',
   reminderDate: null,
   salesperson: 'admin1',
@@ -852,7 +852,7 @@ function onBusinessTypeChange(record, businessType) {
     record.productAttr = product.productAttribute || ''
   }
   if (businessType === '自产销售' || businessType === '外购销售') {
-    const bom = getActiveBomForItem('product', record.productId)
+    const bom = getOwnActiveBomForItem('product', record.productId)
     record.bomId = bom?.id || ''
     record.bomName = bom?.bomName || ''
     record.bomVersion = bom?.version || ''
@@ -1040,7 +1040,7 @@ function resetForm() {
   form.contactPerson = undefined
   form.contactPhone = ''
   form.deliveryAddress = ''
-  form.deliveryMethod = '物流'
+  form.deliveryMethod = '送货'
   form.techSpecCode = ''
   form.reminderDate = null
   form.salesperson = 'admin1'
@@ -1223,7 +1223,7 @@ function resolveMasterRecord(payload) {
 
 function mapPickerToSalesLine(payload) {
   const bomItemType = payload.itemType === '产品' ? 'product' : 'material'
-  const bom = getActiveBomForItem(bomItemType, payload.id)
+  const bom = getOwnActiveBomForItem(bomItemType, payload.id)
   const master = resolveMasterRecord(payload)
   const listPrice = master?.unitPrice ?? payload.unitPrice ?? 0
   const taxRate = master?.outputTaxRate ?? 13
@@ -1277,7 +1277,7 @@ function onProductsSelected(rows) {
     if (form.lineItems.some((line) => line.productCode === code && !line.isManualLine)) return
 
     const bomItemType = payload.itemType === '产品' ? 'product' : 'material'
-    const bom = getActiveBomForItem(bomItemType, payload.id)
+    const bom = getOwnActiveBomForItem(bomItemType, payload.id)
     if (!bom) {
       noBomProducts.push(payload.name)
     }
@@ -1291,7 +1291,7 @@ function onProductsSelected(rows) {
 
   if (noBomProducts.length) {
     message.warning(
-      `以下产品无自有生效 BOM，已默认「需设计任务」：${noBomProducts.join('、')}。审核后将进入设计；或先维护并启用产品 BOM。`,
+      `以下产品无自有生效 BOM，已默认「需设计任务」：${noBomProducts.join('、')}。审核后将进入设计；或先为该 SKU 维护并启用产品 BOM。`,
     )
   }
 }

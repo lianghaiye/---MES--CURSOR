@@ -114,11 +114,22 @@ export function recalcSalesLinePricing(line, options = {}) {
 
   line.totalPriceExTax = round2(qty * (Number(line.unitPriceExTax) || 0))
   line.totalPriceInTax = round2(qty * (Number(line.unitPriceInTax) || 0))
+  line.listTotalPriceExTax = round2(listPrice * qty)
   line.lineDiscountAmount = round2(Math.max(0, listPrice * qty * (1 - discountRate)))
   return line
 }
 
 export function calcLineSubtotals(lineItems = []) {
+  const lineListAmountExTax = round2(
+    lineItems.reduce((sum, line) => {
+      const qty = Number(line.qty ?? line.salesQty) || 0
+      const listTotal =
+        line.listTotalPriceExTax != null && line.listTotalPriceExTax !== ''
+          ? Number(line.listTotalPriceExTax)
+          : (Number(line.listUnitPriceExTax) || 0) * qty
+      return sum + listTotal
+    }, 0),
+  )
   const lineAmountExTax = round2(
     lineItems.reduce((sum, line) => sum + (Number(line.totalPriceExTax) || 0), 0),
   )
@@ -128,7 +139,7 @@ export function calcLineSubtotals(lineItems = []) {
   const lineDiscountTotal = round2(
     lineItems.reduce((sum, line) => sum + (Number(line.lineDiscountAmount) || 0), 0),
   )
-  return { lineAmountExTax, lineAmountInTax, lineDiscountTotal }
+  return { lineListAmountExTax, lineAmountExTax, lineAmountInTax, lineDiscountTotal }
 }
 
 /** 整单优惠后订单金额 */
@@ -146,7 +157,8 @@ export function calcOrderAmounts(order = {}, options = {}) {
   })
 
   ensureOrderDiscountFields(order)
-  const { lineAmountExTax, lineAmountInTax, lineDiscountTotal } = calcLineSubtotals(lineItems)
+  const { lineListAmountExTax, lineAmountExTax, lineAmountInTax, lineDiscountTotal } =
+    calcLineSubtotals(lineItems)
 
   let orderDiscountRate = normalizeDiscountRate(order.orderDiscountRate, 1)
   let orderDiscountAmount = Math.max(0, round2(order.orderDiscountAmount))
@@ -166,6 +178,7 @@ export function calcOrderAmounts(order = {}, options = {}) {
 
   return {
     lineItems,
+    lineListAmountExTax,
     lineAmountExTax,
     lineAmountInTax,
     lineDiscountTotal: strategy === DISCOUNT_STRATEGIES.ORDER ? 0 : lineDiscountTotal,
@@ -185,6 +198,7 @@ export function calcOrderAmounts(order = {}, options = {}) {
 export function applyOrderAmounts(order, options = {}) {
   const result = calcOrderAmounts(order, options)
   order.lineItems = result.lineItems
+  order.lineListAmountExTax = result.lineListAmountExTax
   order.lineAmountExTax = result.lineAmountExTax
   order.lineAmountInTax = result.lineAmountInTax
   order.lineDiscountTotal = result.lineDiscountTotal

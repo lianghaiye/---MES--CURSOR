@@ -6,7 +6,12 @@ import {
   addPurchaseRequisition,
   buildRequisitionFromSalesOrder,
 } from '@/store/purchaseRequisitionStore'
-import { getActiveBomForItem } from '@/store/productBomStore'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
+import {
+  BOM_FULFILLMENT_PATH,
+  normalizeBomFulfillmentPath,
+  validateFulfillmentPathForApprove,
+} from '@/constants/salesOrderFulfillment'
 import { createProductionPlanFromSalesOrder } from '@/store/productionPlanStore'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { buildLineAccessoryKits, buildOrderAccessoryKits } from '@/mock/accessoryPacks'
@@ -31,6 +36,10 @@ import { createMaintenanceWorkOrdersFromSalesOrder } from '@/utils/salesOrderMai
 import { createDesignTaskFromSalesLine } from '@/store/designTaskStore'
 import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
+import {
+  getDispatchedWorkOrdersForSalesOrder,
+  SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
+} from '@/utils/salesOrderRevokeApproval'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
 const DATA_VERSION = 8
@@ -227,12 +236,32 @@ export function approveSalesOrder(id) {
           message: `订单「${order.orderNo}」定制销售明细请填写产品名称`,
         }
       }
-      const product = line.productId
-        ? productInfoState.products.find((p) => p.id === line.productId)
-        : null
-      const productAttr = line.productAttr || product?.productAttribute || ''
-      if (isCustomSalesBusinessType(lineBusinessType) || isCustomProductAttribute(productAttr)) {
-        line.productAttr = '定制产品'
+
+      line.bomFulfillmentPath = normalizeBomFulfillmentPath(line.bomFulfillmentPath)
+      if (!line.bomFulfillmentPath) {
+        const ownBom = line.productId ? getOwnActiveBomForItem('product', line.productId) : null
+        if (isCustomSalesBusinessType(lineBusinessType) || !ownBom) {
+          line.bomFulfillmentPath = BOM_FULFILLMENT_PATH.DESIGN_REQUIRED
+        } else {
+          line.bomFulfillmentPath = BOM_FULFILLMENT_PATH.USE_CATALOG_BOM
+        }
+      }
+
+      const pathCheck = validateFulfillmentPathForApprove(line, order)
+      if (!pathCheck.ok) {
+        return { ok: false, message: `订单「${order.orderNo}」${pathCheck.message}` }
+      }
+
+      if (line.bomFulfillmentPath === BOM_FULFILLMENT_PATH.DESIGN_REQUIRED) {
+        const product = line.productId
+          ? productInfoState.products.find((p) => p.id === line.productId)
+          : null
+        if (
+          isCustomSalesBusinessType(lineBusinessType) ||
+          isCustomProductAttribute(product?.productAttribute)
+        ) {
+          line.productAttr = line.productAttr || '定制产品'
+        }
         line.bomId = ''
         line.bomName = ''
         line.bomVersion = ''
@@ -243,18 +272,16 @@ export function approveSalesOrder(id) {
     }
 
     for (const line of standardLines) {
-      const bom = getActiveBomForItem('product', line.productId)
+      const bom = getOwnActiveBomForItem('product', line.productId)
       if (!bom) {
         return {
           ok: false,
-          message: `产品「${line.productName}」无使用中的 BOM，请先在产品 BOM 中维护并启用`,
+          message: `产品「${line.productName}」无自有生效 BOM，请改选「需设计任务」或先为该 SKU 维护并启用产品 BOM`,
         }
       }
-      if (!line.bomId) {
-        line.bomId = bom.id
-        line.bomName = bom.bomName
-        line.bomVersion = bom.version
-      }
+      line.bomId = bom.id
+      line.bomName = bom.bomName
+      line.bomVersion = bom.version
       line.deliveryMode = normalizeDeliveryMode(line, order)
       const salesQty = Number(line.salesQty ?? line.qty) || 1
       line.ebomSnapshot = buildEbomSnapshotFromBom(bom, salesQty)
@@ -358,4 +385,32 @@ export function approveSalesOrder(id) {
     outsourceWorkOrderCodes,
     maintenanceWorkOrderCodes,
   }
+}
+
+/**
+ * 反审销售订单；若已有关联工单下发则拦截
+ * @returns {{ ok: boolean, message: string, blocked?: boolean }}
+ */
+export function revokeSalesOrderApproval(id) {
+  const order = salesOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '订单不存在' }
+  if (order.progressStatus !== '已审') {
+    return { ok: false, message: `订单「${order.orderNo}」未审核，无需反审` }
+  }
+
+  const dispatched = getDispatchedWorkOrdersForSalesOrder(order)
+  if (dispatched.length) {
+    return {
+      ok: false,
+      blocked: true,
+      message: SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
+      dispatchedWorkOrders: dispatched,
+    }
+  }
+
+  order.progressStatus = '未审'
+  order.approver = ''
+  order.approvedAt = ''
+
+  return { ok: true, message: `订单「${order.orderNo}」已反审，进度状态已变更为未审` }
 }

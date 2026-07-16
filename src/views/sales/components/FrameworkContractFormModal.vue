@@ -84,7 +84,9 @@
           </template>
         </template>
       </a-table>
-      <a-button type="dashed" block class="add-price-btn" @click="addPriceRow">+ 添加协议价</a-button>
+      <a-button type="dashed" block class="add-price-btn" @click="addPriceRow"
+        >+ 添加协议价</a-button
+      >
     </a-form>
 
     <template #footer>

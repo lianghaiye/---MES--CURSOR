@@ -9,6 +9,8 @@ import { findEbomById, revertEbomToDraft } from '@/store/ebomStore'
 import { buildEbomSnapshotFromEbomRecord } from '@/utils/ebomSnapshot'
 import { enrichWorkItem } from '@/utils/productionPlanWorkItem'
 import { productInfoState } from '@/store/productInfoStore'
+import { publishEbomToProductBom } from '@/utils/publishEbomToProductBom'
+import { designTaskCanPublishProductBom } from '@/utils/designTaskProductMaster'
 
 const STORAGE_KEY = 'i_doms_design_tasks'
 const DATA_VERSION = 3
@@ -209,10 +211,22 @@ function applyEbomToPlanWorkItem(workItem, ebom, salesQty = 1) {
   enrichWorkItem(workItem)
 }
 
-function onDesignTaskApproved(task, checker = 'admin1') {
+function onDesignTaskApproved(task, checker = 'admin1', options = {}) {
   const ebom = task.ebomId ? findEbomById(task.ebomId) : null
   if (!ebom || ebom.status !== EBOM_STATUS.FINALIZED) {
     return { ok: false, message: `任务「${task.taskNo}」无已定稿 EBOM，无法审核通过` }
+  }
+
+  let publishSuffix = ''
+  if (options.publishProductBom && designTaskCanPublishProductBom(task)) {
+    const pub = publishEbomToProductBom(ebom, task.productId)
+    if (!pub.ok) {
+      return {
+        ok: false,
+        message: `任务「${task.taskNo}」发布产品/变体 SKU BOM 失败：${pub.message}`,
+      }
+    }
+    publishSuffix = `；${pub.message}`
   }
 
   task.status = DESIGN_TASK_STATUS.APPROVED
@@ -231,7 +245,11 @@ function onDesignTaskApproved(task, checker = 'admin1') {
       }
       task.productionPlanId = plan.id
     }
-    return { ok: true, message: `设计任务「${task.taskNo}」审核通过，生产计划已关联 EBOM`, task }
+    return {
+      ok: true,
+      message: `设计任务「${task.taskNo}」审核通过，生产计划已关联 EBOM${publishSuffix}`,
+      task,
+    }
   }
 
   if (task.source === DESIGN_TASK_SOURCE.MANUAL && !task.productionPlanId) {
@@ -290,23 +308,23 @@ function onDesignTaskApproved(task, checker = 'admin1') {
     task.productionPlanId = plan.id
     return {
       ok: true,
-      message: `设计任务「${task.taskNo}」审核通过，已生成生产计划 ${plan.orderNo}`,
+      message: `设计任务「${task.taskNo}」审核通过，已生成生产计划 ${plan.orderNo}${publishSuffix}`,
       task,
       planOrderNo: plan.orderNo,
     }
   }
 
-  return { ok: true, message: `设计任务「${task.taskNo}」审核通过`, task }
+  return { ok: true, message: `设计任务「${task.taskNo}」审核通过${publishSuffix}`, task }
 }
 
-export function approveDesignTasks(ids, checker = 'admin1') {
+export function approveDesignTasks(ids, checker = 'admin1', options = {}) {
   return ids.map((id) => {
     const task = findDesignTaskById(id)
     if (!task) return { ok: false, message: '设计任务不存在' }
     if (task.status !== DESIGN_TASK_STATUS.PENDING_AUDIT) {
       return { ok: false, message: `任务「${task.taskNo}」不是待审核状态` }
     }
-    return onDesignTaskApproved(task, checker)
+    return onDesignTaskApproved(task, checker, options)
   })
 }
 

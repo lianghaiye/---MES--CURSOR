@@ -9,7 +9,7 @@
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
       <a-form-item label="材质编号" name="code">
-        <a-input v-model:value="form.code" placeholder="请输入，忽略将自动生成" />
+        <a-input v-model:value="form.code" placeholder="留空自动生成，如 M001" />
       </a-form-item>
       <a-form-item label="材质名称" name="name" required>
         <a-input v-model:value="form.name" placeholder="请输入" />

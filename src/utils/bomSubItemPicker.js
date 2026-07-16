@@ -1,6 +1,6 @@
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { getActiveBomForItem } from '@/store/productBomStore'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { resolveWarehouseItemCategoryScope } from '@/utils/warehouseItemPicker'
 import {
   materialCategoryTree,
@@ -10,6 +10,9 @@ import {
   productCategoryTree,
   flattenCategoryNodes as flattenProdCats,
 } from '@/mock/productCategories'
+import { findSpuById, spuState } from '@/store/spuStore'
+import { formatVariantSummary, formatVariantTooltip } from '@/utils/spuVariant'
+import { isProductSyncedMirror } from '@/utils/bomMaterialPicker'
 
 function resolveBomItemType(itemType) {
   return itemType === '产品' ? 'product' : 'material'
@@ -17,7 +20,7 @@ function resolveBomItemType(itemType) {
 
 /** 物品关联 BOM 的直属子件项数 */
 export function calcLinkedBomSubItemCount(itemType, itemId) {
-  const bom = getActiveBomForItem(resolveBomItemType(itemType), itemId)
+  const bom = getOwnActiveBomForItem(resolveBomItemType(itemType), itemId)
   if (!bom) return 0
   const rootId = bom.treeNodes?.find((n) => n.isRoot)?.id || 'bom-root'
   return (bom.lineItems || []).filter(
@@ -29,6 +32,9 @@ export function calcLinkedBomSubItemCount(itemType, itemId) {
 function mapMasterRow(source, itemType, options = {}) {
   const production = source.production || {}
   const skipSubItemCount = options.skipSubItemCount === true
+  const variantValues = source.variantValues || {}
+  const spu = source.spuId ? findSpuById(source.spuId) : null
+  const variantAxes = spu?.variantAxes || []
   return {
     rowKey: `${itemType}-${source.id}`,
     itemType,
@@ -55,13 +61,13 @@ function mapMasterRow(source, itemType, options = {}) {
     unitPrice: source.unitPrice ?? 0,
     subItemCount: skipSubItemCount ? 0 : calcLinkedBomSubItemCount(itemType, source.id),
     spuId: source.spuId || '',
-    spuName: source.spuName || '',
-    variantValues: source.variantValues || {},
+    spuName: source.spuName || spu?.name || '',
+    variantValues,
     materialGradeId: source.materialGradeId || '',
+    variantSummary: formatVariantSummary(variantValues, variantAxes),
+    variantTooltip: formatVariantTooltip(variantValues, variantAxes),
   }
 }
-
-import { isProductSyncedMirror } from '@/utils/bomMaterialPicker'
 
 let pickerRowsCache = null
 let pickerRowsCacheKey = ''
@@ -71,10 +77,15 @@ export function invalidateBomSubItemPickerRowsCache() {
   pickerRowsCacheKey = ''
 }
 
-/** 合并产品信息与物料信息（去重产品物料镜像） */
+/** 合并产品信息与物料信息
+ * @param {{ skipSubItemCount?: boolean, dedupeProductMaterial?: boolean }} [options]
+ * - dedupeProductMaterial=true（默认）：跳过产品物料在物料表中的镜像，同 ID 只保留产品行
+ * - false：产品行 + 物料镜像均保留，供「类型=物料」筛出产品物料
+ */
 export function buildBomSubItemPickerRows(options = {}) {
   const skipSubItemCount = options.skipSubItemCount === true
-  const cacheKey = `${productInfoState.products?.length || 0}-${materialInfoState.materials?.length || 0}-${skipSubItemCount ? 1 : 0}`
+  const dedupeProductMaterial = options.dedupeProductMaterial !== false
+  const cacheKey = `${productInfoState.products?.length || 0}-${materialInfoState.materials?.length || 0}-${spuState.spus?.length || 0}-${skipSubItemCount ? 1 : 0}-${dedupeProductMaterial ? 1 : 0}`
   if (pickerRowsCache && pickerRowsCacheKey === cacheKey) {
     return pickerRowsCache
   }
@@ -85,14 +96,36 @@ export function buildBomSubItemPickerRows(options = {}) {
   const rows = [...products]
 
   ;(materialInfoState.materials || []).forEach((m) => {
-    if (seen.has(m.id)) return
-    if (isProductSyncedMirror(m)) return
+    if (dedupeProductMaterial) {
+      if (seen.has(m.id)) return
+      if (isProductSyncedMirror(m)) return
+    }
     rows.push(mapMasterRow(m, '物料', mapOpts))
   })
 
   pickerRowsCache = rows
   pickerRowsCacheKey = cacheKey
   return rows
+}
+
+/** 全部类型：按 itemId 去重，优先保留「产品」行（去掉产品物料镜像重复） */
+export function dedupePickerRowsPreferProduct(rows = []) {
+  const map = new Map()
+  rows.forEach((row) => {
+    const id = row?.itemId
+    if (id == null || id === '') return
+    const prev = map.get(id)
+    if (!prev) {
+      map.set(id, row)
+      return
+    }
+    if (row.itemType === '产品' && prev.itemType !== '产品') {
+      map.set(id, row)
+    }
+  })
+  // 保留无 itemId 的异常行
+  const extras = rows.filter((r) => r?.itemId == null || r.itemId === '')
+  return [...map.values(), ...extras]
 }
 
 export function filterBomSubItemPickerRows(rows, keyword) {
@@ -107,6 +140,15 @@ export function filterBomSubItemPickerRows(rows, keyword) {
         .toLowerCase()
         .includes(kw) ||
       String(r.specModel || '')
+        .toLowerCase()
+        .includes(kw) ||
+      String(r.material || '')
+        .toLowerCase()
+        .includes(kw) ||
+      String(r.variantSummary || '')
+        .toLowerCase()
+        .includes(kw) ||
+      String(r.variantTooltip || '')
         .toLowerCase()
         .includes(kw) ||
       String(r.categoryName || '')
@@ -140,13 +182,18 @@ export function filterEcnNewMaterialRows(rows, filters = {}) {
   const hasFilter = Object.values(f).some(Boolean)
   if (!hasFilter) return rows
   return rows.filter((row) => {
-    if (
-      f.itemName &&
-      !String(row.name || '')
+    if (f.itemName) {
+      const nameHit = String(row.name || '')
         .toLowerCase()
         .includes(f.itemName)
-    )
-      return false
+      const summaryHit = String(row.variantSummary || '')
+        .toLowerCase()
+        .includes(f.itemName)
+      const tipHit = String(row.variantTooltip || '')
+        .toLowerCase()
+        .includes(f.itemName)
+      if (!nameHit && !summaryHit && !tipHit) return false
+    }
     if (
       f.materialCode &&
       !String(row.code || '')

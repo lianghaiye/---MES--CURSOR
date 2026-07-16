@@ -1,4 +1,4 @@
-import { getActiveBomForItem } from '@/store/productBomStore'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import {
   isCustomSalesBusinessType,
   isSelfMadeBusinessType,
@@ -32,8 +32,9 @@ export function isSelfMadeFulfillmentLine(line, order) {
   return isSelfMadeBusinessType(resolveLineBusinessType(line, order))
 }
 
+/** 仅 SKU 自有生效 BOM 可作销售「使用产品BOM」；族模板解析不算 */
 export function lineHasActiveCatalogBom(line) {
-  return Boolean(line?.productId && getActiveBomForItem('product', line.productId))
+  return Boolean(line?.productId && getOwnActiveBomForItem('product', line.productId))
 }
 
 /** 历史 pending_bom → design_required；审核/迁移统一口径 */

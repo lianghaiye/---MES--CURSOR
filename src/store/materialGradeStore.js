@@ -4,9 +4,7 @@ import { createMaterialGradeSeed, normalizeMaterialGrade } from '@/mock/material
 
 const STORAGE_KEY = 'i_doms_material_grades'
 const SEED_VERSION_KEY = 'i_doms_material_grades_seed_v'
-const CURRENT_SEED_VERSION = '1'
-
-let codeSeq = 8
+const CURRENT_SEED_VERSION = '2'
 
 function loadFromStorage() {
   try {
@@ -47,8 +45,15 @@ watch(
   { deep: true },
 )
 
+/** 材质短码：M + 3 位流水（例 M001），避免日期长码拉长 SKU */
 export function generateMaterialGradeCode() {
-  return `CZ${dayjs().format('YYYYMMDD')}${String(codeSeq++).padStart(3, '0')}`
+  const existing = materialGradeState.items.map((i) => i.code).filter(Boolean)
+  let maxSeq = 0
+  existing.forEach((code) => {
+    const m = /^M(\d{1,4})$/i.exec(String(code).trim())
+    if (m) maxSeq = Math.max(maxSeq, Number(m[1]))
+  })
+  return `M${String(maxSeq + 1).padStart(3, '0')}`
 }
 
 export function getMaterialGradeById(id) {

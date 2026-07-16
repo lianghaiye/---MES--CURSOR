@@ -1,4 +1,4 @@
-import { productBomState, getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
+import { productBomState, getOwnActiveBomForItem, getProductBomById } from '@/store/productBomStore'
 import { isBomActive } from '@/mock/productBomOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
@@ -38,33 +38,21 @@ function findProductByName(name) {
   )
 }
 
-function resolveBomByName(name) {
-  if (!name) return null
-  const resolved = resolveAliasProductName(name)
-  const n = normalizeName(resolved)
-  const activeList = productBomState.boms.filter((b) => isBomActive(b))
-  const row =
-    activeList.find(
-      (b) =>
-        normalizeName(b.itemName) === n ||
-        normalizeName(b.bomName) === n ||
-        normalizeName(b.bomName).includes(n) ||
-        n.includes(normalizeName(b.itemName)),
-    ) || null
-  return row ? getProductBomById(row.id) : null
-}
-
 function resolveBomByProductId(itemId) {
   if (!itemId) return null
-  return getActiveBomForItem('product', itemId)
+  return getOwnActiveBomForItem('product', itemId)
 }
 
-/** 工单保存时绑定的 BOM（优先 bomId，避免重新匹配到其它 BOM） */
+/** 工单保存时绑定的 BOM（优先 bomId，否则仅自有生效 BOM，禁止族继承） */
 export function resolveWorkOrderLinkedBom(workOrder, variant = 'production') {
   if (!workOrder) return null
   if (workOrder.bomId) {
     const saved = getProductBomById(workOrder.bomId)
     if (saved) return saved
+  }
+  if (workOrder.productId) {
+    const own = getOwnActiveBomForItem('product', workOrder.productId)
+    if (own) return own
   }
   return resolveWorkOrderParentBom(workOrder, variant)
 }
@@ -92,11 +80,13 @@ export function findMaterialNodeInTree(materials, workOrder) {
   return walk(materials)
 }
 
-/** 从所有生效 BOM 中反查包含该子件的父级 EBOM */
+/** 从自有生效 BOM 中反查包含该子件的父级 EBOM（不含族模板解析） */
 function resolveParentBomByChildProduct(workOrder) {
   const activeList = productBomState.boms.filter((b) => isBomActive(b))
   for (const bom of activeList) {
-    const hydrated = getProductBomById(bom.id)
+    const own = getOwnActiveBomForItem(bom.itemType, bom.itemId)
+    if (!own || own.id !== bom.id) continue
+    const hydrated = getProductBomById(own.id)
     if (!hydrated) continue
     const snapshot = buildEbomSnapshotFromBom(hydrated, 1)
     if (findMaterialNodeInTree(snapshot.materials, workOrder)) {
@@ -119,13 +109,18 @@ export function resolveWorkOrderParentBom(workOrder, variant = 'production') {
     if (byId) return byId
   }
 
+  if (workOrder.productId) {
+    const own = resolveBomByProductId(workOrder.productId)
+    if (own) return own
+  }
+
   if (variant === 'assembly') {
     const product = findProductByName(workOrder.productName)
     if (product) {
       const active = resolveBomByProductId(product.id)
       if (active) return active
     }
-    return resolveBomByName(workOrder.productName) || resolveBomByName(workOrder.bom)
+    return null
   }
 
   if (workOrder.bom) {
@@ -134,8 +129,6 @@ export function resolveWorkOrderParentBom(workOrder, variant = 'production') {
       const active = resolveBomByProductId(product.id)
       if (active) return active
     }
-    const byBom = resolveBomByName(workOrder.bom)
-    if (byBom) return byBom
   }
 
   const selfProduct = findProductByName(workOrder.productName)
@@ -144,7 +137,8 @@ export function resolveWorkOrderParentBom(workOrder, variant = 'production') {
     if (active) return active
   }
 
-  return resolveParentBomByChildProduct(workOrder) || resolveBomByName(workOrder.productName)
+  // 禁止再按名称命中族模板或跨产品 BOM；子件定位仅用于已有自有生效父 BOM
+  return resolveParentBomByChildProduct(workOrder)
 }
 
 /** 工单生产的产品是否为 BOM 顶级父项 */
@@ -361,7 +355,7 @@ export function buildWorkOrderCurrentBomTree(workOrder) {
   }
 }
 
-/** 下发时冻结 EBOM 快照 */
+/** 下发时冻结 EBOM 快照（优先计划/工单已带快照，否则仅自有生效 BOM） */
 export function buildWorkOrderDispatchEbomSnapshot(workOrder) {
   if (
     !workOrder ||
@@ -370,6 +364,9 @@ export function buildWorkOrderDispatchEbomSnapshot(workOrder) {
     workOrder.orderCategory === '维修工单'
   ) {
     return null
+  }
+  if (workOrder.ebomSnapshot?.materials?.length) {
+    return workOrder.ebomSnapshot
   }
   const bom = resolveWorkOrderLinkedBom(workOrder, 'production')
   if (!bom) return null

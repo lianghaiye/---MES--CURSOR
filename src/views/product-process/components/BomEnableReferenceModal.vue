@@ -31,7 +31,10 @@
       class="ref-table"
     />
 
-    <div class="action-hint">处理方式说明：「通过并升级」仅更新已勾选的父级引用；「通过但不升级」仅发布当前 BOM；「不通过」取消本次审核发布。</div>
+    <div class="action-hint">
+      处理方式说明：「通过并升级」仅更新已勾选的父级引用；「通过但不升级」仅发布当前
+      BOM；「不通过」取消本次审核发布。
+    </div>
 
     <div class="modal-footer">
       <a-button @click="handleAction('reject')">不通过</a-button>

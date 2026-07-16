@@ -183,7 +183,7 @@ export function createDeliveryOrder(payload) {
       deliveryDate: payload.documentDate || dayjs().format('YYYY-MM-DD'),
       createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
       customerName: payload.customerName || so?.customerName,
-      shipmentMethod: payload.shipmentMethod || '物流',
+      shipmentMethod: payload.shipmentMethod || '送货',
       logisticsNo: payload.logisticsNo || '',
       contactPerson: payload.contactPerson || so?.contactPerson || '',
       contactPhone: payload.contactPhone || so?.contactPhone || '',

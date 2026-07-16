@@ -128,7 +128,7 @@ const editRecord = ref(null)
 
 const columns = [
   { title: '#', key: 'index', width: 56, fixed: 'left' },
-  { title: '材质编号', dataIndex: 'code', width: 150, fixed: 'left' },
+  { title: '材质编号', dataIndex: 'code', width: 96, fixed: 'left' },
   { title: '材质名称', dataIndex: 'name', width: 140 },
   { title: '说明', dataIndex: 'description', width: 220, ellipsis: true },
   { title: '操作', key: 'actions', width: 120, fixed: 'right' },

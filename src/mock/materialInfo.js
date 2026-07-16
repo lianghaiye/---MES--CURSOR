@@ -60,7 +60,7 @@ function createMaterial(index) {
 const rawMockMaterials = [
   ...laborDemoBomMaterials,
   ...bomTemplateMaterials,
-  ...Array.from({ length: 194 }, (_, i) => createMaterial(i)),
+  ...Array.from({ length: 24 }, (_, i) => createMaterial(i)),
 ]
 
 export const mockMaterials = applyLaborConfigSeed(

@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import { outboundState, generateOutboundNo } from '@/store/outboundStore'
 import { createOutboundLine } from '@/mock/outboundOrders'
+import { enrichOutboundLine } from '@/utils/outboundLineHelpers'
 import { getSelectedMaterialPicks } from '@/utils/shipEbom'
 /** 与发货单 1:1 关联的销售出库单 */
 export function findLinkedSalesOutbound(deliveryRow) {
@@ -24,21 +25,25 @@ export function hasLinkedSalesOutbound(deliveryRow) {
 
 /** 发货单 → 出库明细（整机行 + 散件 EBOM 勾选行） */
 export function buildOutboundLinesFromDelivery(delivery) {
-  const warehouse = delivery.outboundWarehouse || delivery.warehouse || '成品仓'
+  const headerWarehouse = delivery.outboundWarehouse || delivery.warehouse || ''
   const lines = []
   for (const li of delivery.lineItems || []) {
     const qty = Number(li.shipQty) || 0
     if (qty <= 0) continue
     lines.push(
-      createOutboundLine({
-        itemName: li.productName || li.itemName || '',
-        itemCode: li.productCode || li.itemCode || '',
-        itemType: li.itemType || '产品',
-        specModel: li.specModel || '',
-        shipQty: qty,
-        shipWarehouse: warehouse,
-        unit: li.unit || '件',
-      }),
+      enrichOutboundLine(
+        createOutboundLine({
+          itemName: li.productName || li.itemName || '',
+          itemCode: li.productCode || li.itemCode || '',
+          itemType: li.itemType || '产品',
+          specModel: li.specModel || '',
+          shipQty: qty,
+          shipWarehouse: li.shipWarehouse || headerWarehouse || '成品仓',
+          unit: li.unit || '件',
+          packagingForm: li.packagingForm || '',
+          deliveryRemark: li.lineRemark || '',
+        }),
+      ),
     )
   }
   for (const ship of delivery.scatterShipments || []) {
@@ -46,15 +51,18 @@ export function buildOutboundLinesFromDelivery(delivery) {
       const qty = Number(pick.shipQty) || 0
       if (qty <= 0) continue
       lines.push(
-        createOutboundLine({
-          itemName: pick.itemName || pick.materialName || '',
-          itemCode: pick.itemCode || pick.materialCode || '',
-          itemType: pick.itemType || '物料',
-          specModel: pick.specModel || '',
-          shipQty: qty,
-          shipWarehouse: warehouse,
-          unit: pick.unit || '件',
-        }),
+        enrichOutboundLine(
+          createOutboundLine({
+            itemName: pick.itemName || pick.materialName || pick.name || '',
+            itemCode: pick.itemCode || pick.materialCode || pick.code || '',
+            itemType: pick.itemType || '物料',
+            specModel: pick.specModel || pick.spec || '',
+            shipQty: qty,
+            shipWarehouse: ship.shipWarehouse || headerWarehouse || '成品仓',
+            unit: pick.unit || '件',
+            deliveryRemark: ship.lineRemark || '',
+          }),
+        ),
       )
     }
   }
@@ -77,7 +85,7 @@ export function upsertSalesOutboundFromDelivery(delivery, { forceNew = false } =
     const lineItems = buildOutboundLinesFromDelivery(delivery)
     if (!lineItems.length) return { ok: false, message: '无有效出库明细' }
     Object.assign(existing, {
-      warehouse: delivery.outboundWarehouse || existing.warehouse,
+      warehouse: delivery.outboundWarehouse || existing.warehouse || lineItems[0]?.shipWarehouse,
       sourceOrderNo: delivery.deliveryCode,
       salesOrderNo: delivery.salesOrderNo || delivery.sourceOrderNo || '',
       customerName: delivery.customerName || existing.customerName,
@@ -99,7 +107,7 @@ export function upsertSalesOutboundFromDelivery(delivery, { forceNew = false } =
     docNo: generateOutboundNo(),
     outboundType: '销售出库',
     status: '待出库',
-    warehouse: delivery.outboundWarehouse || '成品仓',
+    warehouse: delivery.outboundWarehouse || lineItems[0]?.shipWarehouse || '成品仓',
     handler: 'admin1',
     creator: 'admin1',
     createdAt: dayjs().format('YYYY-MM-DD'),

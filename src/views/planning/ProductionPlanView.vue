@@ -146,7 +146,7 @@
             <a-descriptions-item label="结算类型">{{
               selectedOrder.settlementType
             }}</a-descriptions-item>
-            <a-descriptions-item label="送货方式">{{
+            <a-descriptions-item label="交货方式">{{
               selectedOrder.deliveryMethod
             }}</a-descriptions-item>
             <a-descriptions-item label="业务员">{{
@@ -238,10 +238,14 @@
                       column.key === 'material' ||
                       column.key === 'techParams' ||
                       column.key === 'matchingRequirements' ||
-                      column.key === 'packagingForm'
+                      column.key === 'packagingForm' ||
+                      column.key === 'supplementDesc' ||
+                      column.key === 'attachment'
                     "
                   >
-                    <span class="ellipsis-cell">{{ record[column.dataIndex] || '—' }}</span>
+                    <span class="ellipsis-cell" :title="record[column.dataIndex] || ''">{{
+                      record[column.dataIndex] || '—'
+                    }}</span>
                   </template>
                 </template>
               </a-table>
@@ -596,7 +600,7 @@ import { PrinterOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
-import { getActiveBomForItem } from '@/store/productBomStore'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { useTabs } from '@/composables/useTabs'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
 import GenerateAssemblyWorkOrderModal from './components/GenerateAssemblyWorkOrderModal.vue'
@@ -718,6 +722,14 @@ const baseWorkColumns = [
     width: 88,
     ellipsis: true,
   },
+  {
+    title: '补充说明',
+    key: 'supplementDesc',
+    dataIndex: 'supplementDesc',
+    width: 120,
+    ellipsis: true,
+  },
+  { title: '附件', key: 'attachment', dataIndex: 'attachment', width: 160, ellipsis: true },
   { title: '操作', key: 'action', width: 110, fixed: 'right' },
 ]
 
@@ -727,7 +739,7 @@ const {
   displayColumns: displayWorkColumns,
   tableScrollX: workTableScrollX,
   defaultColumnSettings: defaultWorkColumnSettings,
-} = useTableColumnSettings('production-plan-work-list', baseWorkColumns, { minScrollX: 1680 })
+} = useTableColumnSettings('production-plan-work-list', baseWorkColumns, { minScrollX: 1960 })
 
 const baseMaterialColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 90, fixed: 'left' },
@@ -859,7 +871,7 @@ const ebomTableScrollX = computed(() =>
 
 function workItemBomVersionHint(wi) {
   if (!wi?.productId) return false
-  const active = getActiveBomForItem('product', wi.productId)
+  const active = getOwnActiveBomForItem('product', wi.productId)
   return Boolean(active?.version && wi.bomVersion && active.version !== wi.bomVersion)
 }
 
@@ -870,7 +882,7 @@ const bomChangedWorkItems = computed(() =>
 const ebomChangedCount = computed(() => bomChangedWorkItems.value.length)
 
 function workItemActiveVersion(wi) {
-  return getActiveBomForItem('product', wi.productId)?.version || ''
+  return getOwnActiveBomForItem('product', wi.productId)?.version || ''
 }
 
 function workItemToEbomLine(wi) {
@@ -1230,6 +1242,13 @@ function generatePurchaseReq() {
   }
   if (activeWorkItem.value.status === '待BOM') {
     message.warning('当前工作项处于「待BOM」，请先维护产品 BOM')
+    return
+  }
+  const wi = activeWorkItem.value
+  const hasBomId = Boolean(wi.bomId)
+  const hasSnapshot = Boolean(wi.ebomSnapshot?.materials?.length || wi.materials?.length)
+  if (!hasBomId && !hasSnapshot) {
+    message.warning('当前工作项无绑定 BOM / 有效 EBOM 快照，无法生成采购申请')
     return
   }
   if (!purchasedMaterialsForReq.value.length) {

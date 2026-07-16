@@ -137,6 +137,15 @@
               <template v-else-if="column.key === 'barcodeBatchNo'">
                 {{ line.barcodeBatchNo || '—' }}
               </template>
+              <template v-else-if="column.key === 'packagingForm'">
+                {{ line.packagingForm || '—' }}
+              </template>
+              <template v-else-if="column.key === 'deliveryRemark'">
+                <a-tooltip v-if="line.deliveryRemark" :title="line.deliveryRemark">
+                  <span class="delivery-remark-cell">{{ line.deliveryRemark }}</span>
+                </a-tooltip>
+                <span v-else>—</span>
+              </template>
               <template v-else-if="column.key === 'unitPrice'">
                 {{ line.unitPrice != null ? line.unitPrice : '—' }}
               </template>
@@ -178,8 +187,6 @@
       </template>
       <a-empty v-else-if="!loading" description="未找到该出库单" />
     </a-spin>
-
-    <OutboundOrderFormModal v-model:open="formOpen" :edit-record="record" @saved="onFormSaved" />
   </div>
 </template>
 
@@ -207,16 +214,15 @@ import {
 import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore'
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 import { outboundDetailLineColumns } from '@/utils/outboundLineColumns'
 import { enrichOutboundLine } from '@/utils/outboundLineHelpers'
-import OutboundOrderFormModal from './components/OutboundOrderFormModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
-const formOpen = ref(false)
 
 const lineColumns = outboundDetailLineColumns
 const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 80), 0))
@@ -292,11 +298,11 @@ function goBack() {
 }
 
 function openEdit() {
-  formOpen.value = true
-}
-
-function onFormSaved() {
-  reload()
+  if (!record.value?.id) return
+  openCreateTab(router, openTab, {
+    path: `/inventory/outbound/${record.value.id}/edit`,
+    title: `编辑出库单 ${record.value.docNo || ''}`.trim(),
+  })
 }
 
 function goSource() {
@@ -429,6 +435,15 @@ function handleInitiateQc() {
   .link-code {
     color: #1677ff;
     cursor: pointer;
+  }
+
+  .delivery-remark-cell {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
   }
 
   :deep(.line-summary-row .ant-table-cell) {

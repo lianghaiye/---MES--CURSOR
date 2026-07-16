@@ -145,6 +145,15 @@
       :default-settings="defaultColumnSettings"
     />
 
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="tableData.length"
+      :selected-count="0"
+      @export="doExport"
+    />
+
     <div class="table-pagination">
       <a-pagination
         v-model:current="pagination.current"
@@ -167,12 +176,14 @@ export default { name: 'SalaryDetailView' }
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
-import { message } from 'ant-design-vue'
 import { ClearOutlined, DownOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import SalaryStatsNav from './components/SalaryStatsNav.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useListExport } from '@/composables/useListExport'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
+import { salaryDetailExportFields } from '@/utils/exportFields/salaryDetailExport'
 import { employeeNameOptions } from '@/utils/employeeProfileResolver'
 import { querySalaryStats } from '@/utils/salaryStatsAggregate'
 import { reloadProcessReports } from '@/store/processReportStore'
@@ -341,6 +352,20 @@ const statsResult = ref({
 
 const tableData = computed(() => statsResult.value.lines)
 
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'salary-detail-list',
+  fieldDefinitions: salaryDetailExportFields,
+  getFilteredRows: () => tableData.value,
+  getSelectedRows: () => [],
+  fileNamePrefix: '核算详情',
+})
+
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
   return tableData.value.slice(start, start + pagination.pageSize)
@@ -435,7 +460,7 @@ function handleReset() {
 }
 
 function onBatchAction({ key }) {
-  if (key === 'export') message.info('导出 Excel 功能开发中')
+  if (key === 'export') openExportModal()
 }
 
 watch(

@@ -1,8 +1,8 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { EBOM_STATUS } from '@/constants/ebom'
-import { getBaselineBomForProduct } from '@/store/productBomStore'
 import { loadBomDetailStructure, resolveBomStructure } from '@/utils/bomImport'
+import { resolveDesignBaselineBom } from '@/utils/designBomBaseline'
 import { createRootTreeNode } from '@/utils/bomTree'
 import { defaultBomColumnSettings } from '@/mock/bomMaterialColumns'
 import { buildMockEbomRecords } from '@/mock/ebomSeed'
@@ -71,7 +71,7 @@ function emptyStructureForProduct(product) {
   }
 }
 
-function structureFromBaseline(baseline) {
+function structureFromBaseline(baseline, source = 'baseline') {
   if (!baseline) return null
   const resolved = resolveBomStructure(baseline) || loadBomDetailStructure(baseline)
   if (!resolved?.treeNodes?.length) return null
@@ -81,21 +81,22 @@ function structureFromBaseline(baseline) {
     templateRef: resolved.templateRef
       ? {
           ...resolved.templateRef,
-          source: 'baseline',
+          source,
           baselineBomId: baseline.id,
         }
-      : { source: 'baseline', baselineBomId: baseline.id, bomNo: baseline.bomNo },
+      : { source, baselineBomId: baseline.id, bomNo: baseline.bomNo },
     columnSettings: JSON.parse(JSON.stringify(defaultBomColumnSettings)),
   }
 }
 
-/** 打开设计页时：获取已有 EBOM 或从基准 BOM / 空白创建草稿 */
+/** 打开设计页时：已有草稿 → SKU 自有基准/生效 → 族模板 → 空白 */
 export function ensureEbomDraftForDesignTask(task, product) {
   const existing = findEbomByDesignTaskId(task.id)
   if (existing) return existing
 
-  const baseline = getBaselineBomForProduct(task.productId)
-  const fromBaseline = structureFromBaseline(baseline)
+  const { bom: baseline, source } = resolveDesignBaselineBom(task.productId)
+  const skeletonSource = source === 'spu_template' ? 'spu_template' : 'baseline'
+  const fromBaseline = structureFromBaseline(baseline, skeletonSource)
   const base = fromBaseline || emptyStructureForProduct(product)
 
   const ebom = {
@@ -116,6 +117,7 @@ export function ensureEbomDraftForDesignTask(task, product) {
     baselineBomId: baseline?.id || '',
     baselineBomNo: baseline?.bomNo || '',
     baselineBomVersion: baseline?.version || '',
+    baselineSource: source,
     treeNodes: base.treeNodes,
     lineItems: base.lineItems,
     templateRef: base.templateRef,

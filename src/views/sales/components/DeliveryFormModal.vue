@@ -111,13 +111,14 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="出库仓库" :required="form.applyOutbound">
+            <a-form-item label="出库仓库">
               <a-select
                 v-model:value="form.outboundWarehouse"
                 allow-clear
                 size="small"
                 placeholder="请选择 出库仓库"
                 :options="warehouseOpts"
+                @change="onHeaderWarehouseChange"
               />
             </a-form-item>
           </a-col>
@@ -166,7 +167,7 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 2400 }"
+        :scroll="{ x: 2900 }"
       >
         <template #headerCell="{ column }">
           <template v-if="column.key === 'shipProgress'">
@@ -209,6 +210,12 @@
               {{ record.deliveryMode || '整机' }}
             </a-tag>
           </template>
+          <template v-else-if="column.key === 'variantAttr'">
+            <a-tooltip v-if="record.variantAttr" :title="record.variantAttr">
+              <span>{{ record.variantAttr }}</span>
+            </a-tooltip>
+            <span v-else>—</span>
+          </template>
           <template v-else-if="column.key === 'shipQty'">
             <a-input-number
               v-model:value="record.shipQty"
@@ -248,6 +255,23 @@
           <template v-else-if="column.key === 'deliveryAmountExTax'">
             {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
           </template>
+          <template v-else-if="column.key === 'shipWarehouse'">
+            <a-select
+              v-model:value="record.shipWarehouse"
+              allow-clear
+              size="small"
+              placeholder="请选择"
+              style="width: 100%"
+              :options="warehouseOpts"
+              @change="() => onLineWarehouseChange(record)"
+            />
+          </template>
+          <template v-else-if="column.key === 'stockQty'">
+            {{ formatDeliveryQty(record.stockQty) }}
+          </template>
+          <template v-else-if="column.key === 'warehouseStockQty'">
+            {{ formatDeliveryQty(record.warehouseStockQty) }}
+          </template>
           <template v-else-if="column.key === 'lineRemark'">
             <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
           </template>
@@ -274,7 +298,7 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 2300 }"
+        :scroll="{ x: 2800 }"
         v-model:expanded-row-keys="expandedScatterRowKeys"
       >
         <template #headerCell="{ column }">
@@ -318,6 +342,12 @@
               {{ record.deliveryMode || '散件' }}
             </a-tag>
           </template>
+          <template v-else-if="column.key === 'variantAttr'">
+            <a-tooltip v-if="record.variantAttr" :title="record.variantAttr">
+              <span>{{ record.variantAttr }}</span>
+            </a-tooltip>
+            <span v-else>—</span>
+          </template>
           <template v-else-if="column.key === 'shipWeight'">
             <a-input-number
               v-model:value="record.shipWeight"
@@ -344,6 +374,23 @@
           </template>
           <template v-else-if="column.key === 'deliveryAmountExTax'">
             {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
+          </template>
+          <template v-else-if="column.key === 'shipWarehouse'">
+            <a-select
+              v-model:value="record.shipWarehouse"
+              allow-clear
+              size="small"
+              placeholder="请选择"
+              style="width: 100%"
+              :options="warehouseOpts"
+              @change="() => onLineWarehouseChange(record)"
+            />
+          </template>
+          <template v-else-if="column.key === 'stockQty'">
+            {{ formatDeliveryQty(record.stockQty) }}
+          </template>
+          <template v-else-if="column.key === 'warehouseStockQty'">
+            {{ formatDeliveryQty(record.warehouseStockQty) }}
           </template>
           <template v-else-if="column.key === 'lineRemark'">
             <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
@@ -416,20 +463,17 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { QuestionCircleOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
-import {
-  customerOptions,
-  shipmentMethodOptions,
-  outboundWarehouseOptions,
-} from '@/mock/salesOrderOptions'
+import { customerOptions, shipmentMethodOptions } from '@/mock/salesOrderOptions'
 import {
   generateDeliveryCode,
   salesOrderState,
   addDeliveryApplication,
 } from '@/store/salesOrderStore'
 import { getCustomerByName } from '@/store/customerStore'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { createDeliveryOrder, updateDeliveryOrder } from '@/store/deliveryOrderStore'
 import {
   mapSalesLineToDeliveryLine,
@@ -442,6 +486,8 @@ import {
   deliveryDecimalFormatter,
   deliveryDecimalParser,
   roundDeliveryDecimal,
+  refreshDeliveryLineStock,
+  resolveDeliveryVariantAttr,
 } from '@/utils/deliveryLine'
 import {
   getSelectedMaterialPicks,
@@ -492,13 +538,16 @@ const lineColumns = [
   { title: '发货进度', key: 'shipProgress', width: 160, align: 'right' },
   { title: '编码', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
-  { title: '规格属性', dataIndex: 'specAttr', width: 88 },
+  { title: '变体属性', key: 'variantAttr', dataIndex: 'variantAttr', width: 140, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 72 },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '订单数量', key: 'orderQty', width: 96, align: 'right' },
   { title: '单价（不含税）', key: 'unitPriceExTax', width: 120, align: 'right' },
   { title: '单价（含税）', key: 'unitPriceInTax', width: 110, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56, align: 'center' },
+  { title: '出库仓库', key: 'shipWarehouse', width: 120 },
+  { title: '库存数', key: 'stockQty', width: 100, align: 'right' },
+  { title: '当前仓库数量', key: 'warehouseStockQty', width: 110, align: 'right' },
   { title: '本次发货数量', key: 'shipQty', width: 120, align: 'right' },
   { title: '发货重量', key: 'shipWeight', width: 110, align: 'right' },
   { title: '本次发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 150, align: 'right' },
@@ -550,14 +599,20 @@ const form = reactive({
   scatterShipments: [],
 })
 
+const prevHeaderWarehouse = ref(undefined)
+
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 const shipmentMethodOpts = shipmentMethodOptions.map((v) => ({ label: v, value: v }))
-const warehouseOpts = outboundWarehouseOptions.map((v) => ({ label: v, value: v }))
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
 
 function normalizeShipmentMethod(value) {
   const map = {
     送货上门: '送货',
     专车配送: '送货',
+    物流: '物料',
   }
   const normalized = map[value] || value
   return shipmentMethodOptions.includes(normalized) ? normalized : undefined
@@ -568,7 +623,7 @@ function resolveDefaultShipmentMethod(customerName, fallback) {
   return (
     normalizeShipmentMethod(customer?.defaultDeliveryMethod) ||
     normalizeShipmentMethod(fallback) ||
-    '物流'
+    '送货'
   )
 }
 
@@ -642,6 +697,44 @@ function resetForm() {
   form.lineItems = []
   form.scatterShipments = []
   expandedScatterRowKeys.value = []
+  prevHeaderWarehouse.value = undefined
+}
+
+function applyDefaultWarehouseToLines(lines) {
+  const warehouse = form.outboundWarehouse || ''
+  ;(lines || []).forEach((line) => {
+    if (!line.shipWarehouse) line.shipWarehouse = warehouse
+    refreshDeliveryLineStock(line)
+  })
+}
+
+function onHeaderWarehouseChange(newVal) {
+  const oldVal = prevHeaderWarehouse.value
+  const changed = newVal !== oldVal
+  prevHeaderWarehouse.value = newVal
+
+  const hasLines = form.lineItems.length > 0 || form.scatterShipments.length > 0
+  if (!changed || !newVal || !hasLines) return
+
+  Modal.confirm({
+    title: '出库仓库已修改，是否同步修改明细仓库？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => {
+      form.lineItems.forEach((line) => {
+        line.shipWarehouse = newVal
+        refreshDeliveryLineStock(line)
+      })
+      form.scatterShipments.forEach((line) => {
+        line.shipWarehouse = newVal
+        refreshDeliveryLineStock(line)
+      })
+    },
+  })
+}
+
+function onLineWarehouseChange(line) {
+  refreshDeliveryLineStock(line)
 }
 
 function loadFromRecord(record) {
@@ -657,6 +750,7 @@ function loadFromRecord(record) {
   form.deliveryAddress = record.deliveryAddress || ''
   form.applyOutbound = Boolean(record.applyOutbound)
   form.outboundWarehouse = record.outboundWarehouse || undefined
+  prevHeaderWarehouse.value = form.outboundWarehouse
   form.driverName = record.driverName || ''
   form.driverPhone = record.driverPhone || ''
   form.plateNo = record.plateNo || ''
@@ -664,13 +758,19 @@ function loadFromRecord(record) {
   form.lineItems = JSON.parse(JSON.stringify(record.lineItems || [])).map((line) => {
     line.shipWeight = roundDeliveryDecimal(line.shipWeight ?? line.itemWeightKg ?? 0, 4)
     line.unitPriceInTax = roundDeliveryDecimal(line.unitPriceInTax ?? 0, 4)
+    if (!line.shipWarehouse) line.shipWarehouse = form.outboundWarehouse || ''
+    line.variantAttr = resolveDeliveryVariantAttr(line)
+    refreshDeliveryLineStock(line)
     return line
   })
   form.scatterShipments = JSON.parse(JSON.stringify(record.scatterShipments || []))
   form.scatterShipments.forEach((s) => {
     s.shipWeight = roundDeliveryDecimal(s.shipWeight ?? s.itemWeightKg ?? 0, 4)
     s.unitPriceInTax = roundDeliveryDecimal(s.unitPriceInTax ?? 0, 4)
+    if (!s.shipWarehouse) s.shipWarehouse = form.outboundWarehouse || ''
+    s.variantAttr = resolveDeliveryVariantAttr(s)
     refreshScatterShipmentMeta(s)
+    refreshDeliveryLineStock(s)
   })
   syncExpandedScatterRows()
 }
@@ -690,6 +790,8 @@ function populateFromSalesOrder(so) {
     .map((line) => initScatterShipment(line, so))
     .filter(Boolean)
   form.scatterShipments.forEach((s) => refreshScatterShipmentMeta(s))
+  applyDefaultWarehouseToLines(form.lineItems)
+  applyDefaultWarehouseToLines(form.scatterShipments)
   syncExpandedScatterRows()
 }
 
@@ -730,6 +832,7 @@ function onLineEditSaved(updated) {
   if (wholeIdx !== -1) {
     Object.assign(form.lineItems[wholeIdx], updated)
     recalcDeliveryLine(form.lineItems[wholeIdx])
+    refreshDeliveryLineStock(form.lineItems[wholeIdx])
     return
   }
   const scatterIdx = form.scatterShipments.findIndex(
@@ -739,6 +842,7 @@ function onLineEditSaved(updated) {
     Object.assign(form.scatterShipments[scatterIdx], updated)
     recalcDeliveryLine(form.scatterShipments[scatterIdx])
     refreshScatterShipmentMeta(form.scatterShipments[scatterIdx])
+    refreshDeliveryLineStock(form.scatterShipments[scatterIdx])
   }
 }
 
@@ -829,10 +933,6 @@ function handleOk() {
   }
   if (!form.shipmentMethod) {
     message.warning('请选择交货方式')
-    return
-  }
-  if (form.applyOutbound && !form.outboundWarehouse) {
-    message.warning('请选择出库仓库')
     return
   }
 

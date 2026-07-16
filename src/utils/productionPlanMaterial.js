@@ -197,6 +197,22 @@ export function collectAllMaterialRowKeys(materials = []) {
   return keys
 }
 
+/** 计划物料行附带工作项投产 BOM 身份（供工单同步透传） */
+function withWorkItemBomIdentity(material, wi, extra = {}) {
+  if (!material) return null
+  return {
+    ...material,
+    workItemId: wi?.id || material.workItemId || '',
+    productId: wi?.productId || material.productId || '',
+    bomId: wi?.bomId || material.bomId || '',
+    bomName: wi?.bomName || material.bomName || '',
+    bomVersion: wi?.bomVersion || material.bomVersion || '',
+    ebomSnapshot: wi?.ebomSnapshot || material.ebomSnapshot || null,
+    salesLineId: wi?.salesLineId || material.salesLineId || '',
+    ...extra,
+  }
+}
+
 /** 加工工单：子级自制件 + 顶级为自制件/自制的物料 */
 export function getSelfMadeMaterialsForPlan(order) {
   const all = []
@@ -204,9 +220,11 @@ export function getSelfMadeMaterialsForPlan(order) {
     resolveWorkItemMaterials(wi)
     const top = wi._topMaterial || buildTopLevelPlanMaterial(wi)
     if (top && isTopLevelSelfMade(top.supplyType)) {
-      all.push(top)
+      all.push(withWorkItemBomIdentity(top, wi))
     }
-    flattenMaterials(wi.materials, all)
+    const flat = []
+    flattenMaterials(wi.materials, flat)
+    flat.forEach((m) => all.push(withWorkItemBomIdentity(m, wi)))
   })
   return all.filter((m) => m.supplyType === '自制件' || m.supplyType === '自制')
 }
@@ -222,15 +240,32 @@ export function getAssemblyMaterialsForPlan(order) {
     resolveWorkItemMaterials(wi)
     const top = wi._topMaterial || buildTopLevelPlanMaterial(wi)
     if (top?.supplyType === '组装') {
-      all.push({ ...top, orderCategory: '总装工单' })
+      all.push(withWorkItemBomIdentity(top, wi, { orderCategory: '总装工单' }))
     }
     const flat = []
     flattenMaterials(wi.materials, flat)
     flat
       .filter((m) => m.supplyType === '组装')
-      .forEach((m) => all.push({ ...m, orderCategory: '部装工单' }))
+      .forEach((m) => all.push(withWorkItemBomIdentity(m, wi, { orderCategory: '部装工单' })))
   })
   return all
+}
+
+/** 按物料行 / 编码回找生产计划工作项 */
+export function findWorkItemForPlanRow(sourceOrder, row) {
+  const workItems = sourceOrder?.workItems || []
+  if (!workItems.length || !row) return null
+  if (row.workItemId) {
+    const byId = workItems.find((wi) => wi.id === row.workItemId)
+    if (byId) return byId
+  }
+  const code = String(row.code || row.materialCode || '').trim()
+  const name = String(row.productName || row.name || '').trim()
+  for (const wi of workItems) {
+    if (code && wi.productCode && wi.productCode === code) return wi
+    if (name && wi.productName && wi.productName === name) return wi
+  }
+  return workItems.length === 1 ? workItems[0] : null
 }
 
 const supplierOptionMap = new Map()

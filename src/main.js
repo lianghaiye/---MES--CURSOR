@@ -4,6 +4,11 @@ import App from './App.vue'
 import router from './router'
 import 'ant-design-vue/dist/reset.css'
 import './styles/global.less'
+import '@/store/productInfoStore'
+import '@/store/materialInfoStore'
+import { bootstrapSpuSkuData } from '@/utils/spuBootstrap'
+
+bootstrapSpuSkuData()
 
 const RESIZE_OBSERVER_ERR = /ResizeObserver loop/
 

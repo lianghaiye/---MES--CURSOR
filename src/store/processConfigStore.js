@@ -16,7 +16,13 @@ const STORAGE_KEY = 'i_doms_process_config'
 const SEED_VERSION_KEY = 'i_doms_process_config_seed_v'
 const CURRENT_SEED_VERSION = '7'
 
-export { PROCESS_OPERATION_DEFS, REPORT_MODES, TASK_EXECUTION_MODES, RESOURCE_TYPES, MOCK_POSITIONS }
+export {
+  PROCESS_OPERATION_DEFS,
+  REPORT_MODES,
+  TASK_EXECUTION_MODES,
+  RESOURCE_TYPES,
+  MOCK_POSITIONS,
+}
 
 export const PROCESS_STATUS = ['使用中', '已停用']
 

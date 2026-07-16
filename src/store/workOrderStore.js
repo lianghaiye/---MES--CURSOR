@@ -13,6 +13,19 @@ import {
   isLaborDemoWorkOrder,
 } from '@/mock/laborHourDemoSeed'
 import { ensureProductionPlanOrderTreeDemoWorkOrders } from '@/mock/productionPlanOrderTreeSeed'
+import { findWorkItemForPlanRow } from '@/utils/productionPlanMaterial'
+
+function resolvePlanRowBomFields(row, sourceOrder) {
+  const wi = findWorkItemForPlanRow(sourceOrder, row)
+  return {
+    productId: row.productId || wi?.productId || '',
+    bomId: row.bomId || wi?.bomId || '',
+    bomLabel: row.bomName || wi?.bomName || row.bom || '',
+    ebomSnapshot: row.ebomSnapshot || wi?.ebomSnapshot || null,
+    salesLineId: row.salesLineId || wi?.salesLineId || '',
+    bom: row.bom || wi?.bomName || row.productName,
+  }
+}
 
 const STORAGE_KEY = 'i_doms_work_orders'
 let codeSeq = 1
@@ -291,13 +304,16 @@ export function addWorkOrdersFromPlanRows(rows, sourceOrder) {
     )
     if (exists) return
 
+    const bomFields = resolvePlanRowBomFields(row, sourceOrder)
     const wo = createWorkOrderPayload({
       productName: row.productName,
       orderCategory: '生产工单',
       scheduleQty: row.planQty,
       planQty: row.planQty,
       workCenter: row.workCenter,
-      bom: row.bom,
+      bom: bomFields.bom,
+      bomId: bomFields.bomId,
+      bomLabel: bomFields.bomLabel,
       warehouse: row.warehouse,
       urgency: row.urgency,
       remark: row.remark,
@@ -306,6 +322,13 @@ export function addWorkOrdersFromPlanRows(rows, sourceOrder) {
       source: 'production-plan',
       sourceOrderNo: sourceOrder.orderNo,
       materialCode: row.code,
+      productId: bomFields.productId,
+      ebomSnapshot: bomFields.ebomSnapshot,
+      salesLineId: bomFields.salesLineId,
+      salesOrderId: sourceOrder.salesOrderId || '',
+      specModel: row.spec || '',
+      material: row.material || '',
+      drawingNo: row.drawingNo || '',
     })
     addWorkOrder(wo)
     created.push(wo)

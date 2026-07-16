@@ -115,8 +115,6 @@
       </template>
       <a-empty v-else-if="!loading" description="未找到该入库单" />
     </a-spin>
-
-    <InboundOrderFormModal v-model:open="formOpen" :edit-record="record" @saved="reload" />
   </div>
 </template>
 
@@ -127,6 +125,8 @@ export default { name: 'InboundOrderDetailView' }
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 import { Modal, message } from 'ant-design-vue'
 import {
   getInboundOrderById,
@@ -138,13 +138,12 @@ import {
 import { resolveInboundSourceRoute } from '@/utils/inboundSourceLink'
 import { inboundDetailLineColumns } from '@/utils/inboundLineColumns'
 import { enrichInboundLine } from '@/utils/inboundLineHelpers'
-import InboundOrderFormModal from './components/InboundOrderFormModal.vue'
 
 const route = useRoute()
 const router = useRouter()
+const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
-const formOpen = ref(false)
 
 const lineColumns = inboundDetailLineColumns
 const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 80), 0))
@@ -191,7 +190,11 @@ function goSource() {
 }
 
 function openEdit() {
-  formOpen.value = true
+  if (!record.value?.id) return
+  openCreateTab(router, openTab, {
+    path: `/inventory/inbound/${record.value.id}/edit`,
+    title: `编辑入库单 ${record.value.docNo || ''}`.trim(),
+  })
 }
 
 function handleApprovePass() {

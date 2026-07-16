@@ -58,12 +58,7 @@ export function resolveSalesLinePrice({
   productCode,
   listPriceFromProduct = 0,
 }) {
-  const customerPrice = resolveCustomerPrice(
-    customer,
-    productId,
-    productCode,
-    listPriceFromProduct,
-  )
+  const customerPrice = resolveCustomerPrice(customer, productId, productCode, listPriceFromProduct)
   if (!contract) return customerPrice
 
   const contractPrice = resolveFrameworkContractPrice(

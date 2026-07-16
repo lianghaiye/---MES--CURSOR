@@ -5,12 +5,12 @@ import { buildPagedMockBoms } from '@/mock/productBomSeed'
 import { mockMaterials } from '@/mock/materialInfo'
 import { buildMockSalesOrders } from '@/mock/salesOrderSeed'
 import { buildInitialProductionPlans } from '@/mock/productionPlanSeed'
-import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
+import { getOwnActiveBomForItem, getProductBomById } from '@/store/productBomStore'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
-import { enrichWorkItem, normalizePlanWorkItems } from '@/utils/productionPlanWorkItem'
+import { enrichWorkItem, resolveSalesLineForWorkItem } from '@/utils/productionPlanWorkItem'
 import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
 const STORAGE_KEY = 'i_doms_production_plans'
-const DATA_VERSION = 6
+const DATA_VERSION = 7
 
 function normalizePlanStatuses(orders) {
   return orders.map((o) => {
@@ -24,7 +24,11 @@ function normalizePlanStatuses(orders) {
         return t
       })
     }
-    normalizePlanWorkItems(plan)
+    plan.workItems?.forEach((wi, idx) => {
+      const salesLine = resolveSalesLineForWorkItem(plan, wi)
+      Object.assign(wi, enrichWorkItem(wi, salesLine, idx))
+      if (wi.expanded == null) wi.expanded = idx === 0
+    })
     plan.workItems?.forEach((wi) => resolveWorkItemMaterials(wi))
     return plan
   })
@@ -126,6 +130,7 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
           salesQty: Number(line.salesQty) || 1,
           productName: line.productName,
           productCode: line.productCode,
+          productId: line.productId || '',
           productAttr: line.productAttr,
           productType: line.category || line.productAttr || '',
           model: line.specModel,
@@ -143,9 +148,10 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
       )
     }
 
+    // 投产口径：仅 SKU 自有生效 BOM；禁止族模板解析 fallback
     const bom =
       (line.bomId ? getProductBomById(line.bomId) : null) ||
-      getActiveBomForItem('product', line.productId)
+      getOwnActiveBomForItem('product', line.productId)
 
     const salesQty = Number(line.salesQty) || 1
     const snapshot =
@@ -166,9 +172,9 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
         model: line.specModel,
         spec: line.specAttr,
         deliveryDate: line.deliveryDate || deliveryDate,
-        bomId: line.bomId,
-        bomName: line.bomName,
-        bomVersion: line.bomVersion,
+        bomId: line.bomId || bom?.id || '',
+        bomName: line.bomName || bom?.bomName || '',
+        bomVersion: line.bomVersion || bom?.version || '',
         ebomSnapshot: snapshot,
         materials: snapshot.materials || [],
       },

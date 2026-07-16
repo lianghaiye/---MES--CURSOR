@@ -265,7 +265,6 @@ import {
   finalizeEbom,
   generateEbomNo,
 } from '@/store/ebomStore'
-import { getBaselineBomForProduct } from '@/store/productBomStore'
 import { useTabs } from '@/composables/useTabs'
 import { applyMaterialToLine, createEmptySubLine } from '@/utils/bomLineMaterial'
 import {
@@ -340,7 +339,12 @@ let resizeStartWidth = 0
 
 const baselineLabel = computed(() => {
   if (!ebomRecord.value?.baselineBomId) return ''
-  return `基准骨架 ${ebomRecord.value.baselineBomNo || ebomRecord.value.baselineBomId}`
+  const src =
+    ebomRecord.value.baselineSource === 'spu_template' ||
+    ebomRecord.value.templateRef?.source === 'spu_template'
+      ? '族模板'
+      : '基准骨架'
+  return `${src} ${ebomRecord.value.baselineBomNo || ebomRecord.value.baselineBomId}`
 })
 
 const showSalesOrderButton = computed(() => {
@@ -452,11 +456,14 @@ function loadPage() {
   }
   task.value = t
   const product = productInfoState.products.find((p) => p.id === t.productId)
-  const baseline = getBaselineBomForProduct(t.productId)
-  if (!baseline && !t.hasEbomDraft) {
-    message.info('该产品未关联基准 BOM，将从空白结构开始设计')
-  }
   const ebom = ensureEbomDraftForDesignTask(t, product)
+  if (!t.hasEbomDraft) {
+    if (ebom.baselineSource === 'spu_template') {
+      message.info('已从产品族 BOM 模板带入骨架，请按本 SKU 调整后提交')
+    } else if (!ebom.baselineBomId) {
+      message.info('该产品未关联自有 BOM / 族模板，将从空白结构开始设计')
+    }
+  }
   ebomRecord.value = ebom
   ebomForm.ebomNo = ebom.ebomNo || ''
   ebomForm.ebomName = ebom.ebomName || `${t.productName || product?.name || '定制产品'} EBOM`

@@ -184,9 +184,9 @@ export default { name: 'DesignTaskView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, h, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Modal, message } from 'ant-design-vue'
+import { Checkbox, Modal, message } from 'ant-design-vue'
 import {
   SearchOutlined,
   ClearOutlined,
@@ -213,6 +213,7 @@ import {
 import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
+import { designTaskCanPublishProductBom } from '@/utils/designTaskProductMaster'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -334,13 +335,38 @@ function handleApprove() {
     message.warning('请先选择待审核的设计任务')
     return
   }
+  const selectedTasks = designTaskState.tasks.filter((t) => selectedRowKeys.value.includes(t.id))
+  const canPublishAny = selectedTasks.some((t) => designTaskCanPublishProductBom(t))
+  const publishProductBom = ref(true)
+
   Modal.confirm({
     title: '审核设计任务',
-    content: `确认审核通过已选的 ${selectedRowKeys.value.length} 条设计任务？审核通过后将更新或生成生产计划。`,
+    content: () =>
+      h('div', { style: 'line-height: 1.6' }, [
+        h(
+          'p',
+          { style: 'margin: 0 0 8px' },
+          `确认审核通过已选的 ${selectedRowKeys.value.length} 条设计任务？审核通过后将更新或生成生产计划。`,
+        ),
+        canPublishAny
+          ? h(
+              Checkbox,
+              {
+                checked: publishProductBom.value,
+                'onUpdate:checked': (v) => {
+                  publishProductBom.value = v
+                },
+              },
+              () => '将本次 EBOM 发布为该产品/变体 SKU 的产品 BOM（生效），供后续销售复用',
+            )
+          : null,
+      ]),
     okText: '通过',
     cancelText: '取消',
     onOk: () => {
-      const results = approveDesignTasks(selectedRowKeys.value)
+      const results = approveDesignTasks(selectedRowKeys.value, 'admin1', {
+        publishProductBom: canPublishAny && publishProductBom.value,
+      })
       const ok = results.filter((r) => r.ok)
       const fail = results.filter((r) => !r.ok)
       ok.forEach((r) => message.success(r.message))

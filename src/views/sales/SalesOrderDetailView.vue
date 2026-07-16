@@ -10,7 +10,22 @@
               {{ order.deliveryStatus || '未发货' }}
             </a-tag>
           </div>
-          <a-button size="small" @click="handleBack">返回列表</a-button>
+          <a-space :size="8">
+            <template v-if="order.progressStatus === '未审'">
+              <a-button type="primary" size="small" @click="handleApprove">审核</a-button>
+              <a-button size="small" @click="handleEdit">编辑</a-button>
+              <a-button size="small" danger @click="handleDelete">删除</a-button>
+            </template>
+            <template v-else-if="order.progressStatus === '已审'">
+              <a-button size="small" @click="handleRevokeApprove">反审</a-button>
+              <a-button type="primary" size="small" @click="handleApplyDelivery">申请发货</a-button>
+              <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
+              <a-button size="small" @click="stubAction('打印')">打印</a-button>
+              <a-button size="small" @click="handleComplete">完成</a-button>
+              <a-button size="small" danger @click="handleTerminate">终止</a-button>
+            </template>
+            <a-button size="small" @click="handleBack">返回列表</a-button>
+          </a-space>
         </div>
 
         <a-tabs v-model:active-key="activeTab" class="detail-tabs">
@@ -573,6 +588,12 @@
 
       <a-empty v-else-if="!loading" description="未找到该销售订单" />
     </a-spin>
+
+    <ChangeDeliveryModeModal
+      v-model:open="changeDeliveryModeOpen"
+      :sales-order="changeDeliveryModeOrder"
+      @saved="onChangeDeliveryModeSaved"
+    />
   </div>
 </template>
 
@@ -583,9 +604,23 @@ export default { name: 'SalesOrderDetailView' }
 <script setup>
 import { computed, onActivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
 import { tabStore, useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 import { getSalesOrderById, resolveSalesOrderRelations } from '@/utils/salesOrderDetail'
+import {
+  deleteSalesOrder,
+  approveSalesOrder,
+  revokeSalesOrderApproval,
+  canEditSalesOrder,
+  canChangeDeliveryMode,
+} from '@/store/salesOrderStore'
+import {
+  SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
+  hasDispatchedWorkOrdersForSalesOrder,
+} from '@/utils/salesOrderRevokeApproval'
+import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
+import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import {
   deliveryStatusColor,
   formatAmountExTax,
@@ -620,6 +655,8 @@ const { openTab } = useTabs()
 
 const loading = ref(false)
 const order = ref(null)
+const changeDeliveryModeOpen = ref(false)
+const changeDeliveryModeOrder = ref(null)
 
 function initActiveTab() {
   return readSalesOrderDetailTab(route.params.id, route.query.tab)
@@ -1050,6 +1087,144 @@ function displayCell(line, column) {
 
 function previewFile(file) {
   message.info(`预览：${file.name || '附件'}`)
+}
+
+function stubAction(name) {
+  message.info(`${name}功能开发中`)
+}
+
+function reloadOrder() {
+  order.value = getSalesOrderById(route.params.id)
+}
+
+function handleApprove() {
+  if (!order.value) return
+  Modal.confirm({
+    content: '审核通过？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => {
+      const res = approveSalesOrder(order.value.id)
+      if (res.ok) {
+        message.success(res.message)
+        reloadOrder()
+      } else {
+        message.warning(res.message)
+      }
+    },
+  })
+}
+
+function handleEdit() {
+  if (!order.value || !canEditSalesOrder(order.value)) {
+    message.warning('已审核的销售订单不可编辑')
+    return
+  }
+  openCreateTab(router, openTab, {
+    path: `/sales/orders/${order.value.id}/edit`,
+    title: `编辑销售订单 ${order.value.orderNo || ''}`.trim(),
+  })
+}
+
+function handleDelete() {
+  if (!order.value || !canEditSalesOrder(order.value)) {
+    message.warning('已审核的销售订单不可删除')
+    return
+  }
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定删除销售订单「${order.value.orderNo}」吗？`,
+    okType: 'danger',
+    onOk: () => {
+      deleteSalesOrder(order.value.id)
+      message.success('已删除')
+      handleBack()
+    },
+  })
+}
+
+function handleRevokeApprove() {
+  if (!order.value) return
+  if (hasDispatchedWorkOrdersForSalesOrder(order.value)) {
+    Modal.warning({
+      title: '无法反审',
+      content: SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
+      okText: '知道了',
+    })
+    return
+  }
+  Modal.confirm({
+    content: '确认反审该销售订单？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => {
+      const res = revokeSalesOrderApproval(order.value.id)
+      if (res.ok) {
+        message.success(res.message)
+        reloadOrder()
+      } else if (res.blocked) {
+        Modal.warning({ title: '无法反审', content: res.message, okText: '知道了' })
+      } else {
+        message.warning(res.message)
+      }
+    },
+  })
+}
+
+function handleApplyDelivery() {
+  if (!order.value) return
+  openCreateTab(router, openTab, {
+    path: '/sales/delivery/new',
+    title: `新增发货单 ${order.value.orderNo || ''}`.trim(),
+    query: { salesOrderId: order.value.id },
+  })
+}
+
+function handleChangeDeliveryMode() {
+  if (!order.value) return
+  if (!canChangeDeliveryMode(order.value)) {
+    message.warning('仅已审核的自产销售订单可变更交付方式')
+    return
+  }
+  if (!buildEligibleDeliveryModeLines(order.value).length) {
+    message.warning('当前订单没有可变更的产品（均已发完或未发货数量为 0）')
+    return
+  }
+  changeDeliveryModeOrder.value = order.value
+  changeDeliveryModeOpen.value = true
+}
+
+function onChangeDeliveryModeSaved() {
+  changeDeliveryModeOrder.value = null
+  reloadOrder()
+}
+
+function handleComplete() {
+  if (!order.value) return
+  Modal.confirm({
+    content: '确认将该销售订单标记为已完成？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => {
+      order.value.progressStatus = '已完成'
+      message.success('订单已完成')
+      reloadOrder()
+    },
+  })
+}
+
+function handleTerminate() {
+  if (!order.value) return
+  Modal.confirm({
+    title: '确认终止',
+    content: `确定终止销售订单「${order.value.orderNo}」吗？`,
+    okType: 'danger',
+    onOk: () => {
+      order.value.progressStatus = '已终止'
+      message.success('订单已终止')
+      reloadOrder()
+    },
+  })
 }
 
 function handleBack() {

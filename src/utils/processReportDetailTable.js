@@ -1,7 +1,6 @@
 /** 工序报工详情 — 报工详情 Tab 表格列与合计行 */
 
-export const processReportExecutorHint =
-  '实际完成报工的人员（小程序报工时选择的执行人）'
+export const processReportExecutorHint = '实际完成报工的人员（小程序报工时选择的执行人）'
 
 export const processReportOperatorHint =
   '在终端提交本条报工记录的人员；组长代报时为组长，自报时与执行人相同'

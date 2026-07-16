@@ -94,9 +94,13 @@
 
     <div class="toolbar-row">
       <a-space wrap :size="8">
-        <a-button type="primary" size="small" @click="openCreate">
+        <a-button type="primary" size="small" @click="openCreateProductBom">
           <PlusOutlined />
-          新增
+          新增产品BOM
+        </a-button>
+        <a-button size="small" @click="openCreateBaselineBom">
+          <PlusOutlined />
+          新增基准BOM
         </a-button>
         <a-button size="small" @click="handleBatchEnable">
           <CheckOutlined />
@@ -150,6 +154,9 @@
           </template>
           <template v-else-if="column.key === 'bomName'">
             <a class="link-name" @click.prevent="openDetail(record)">{{ record.bomName }}</a>
+          </template>
+          <template v-else-if="column.key === 'bomType'">
+            {{ normalizeBomType(record.bomType) }}
           </template>
           <template v-else-if="column.key === 'version'">
             <a class="link-name" @click.prevent="openVersionDrawer(record)">{{ record.version }}</a>
@@ -303,6 +310,7 @@ import {
   isBomActive,
   isBomArchived,
 } from '@/mock/productBomOptions'
+import { normalizeBomType } from '@/mock/bomMaterialColumns'
 import { productBomState } from '@/store/productBomStore'
 import {
   deleteProductBom,
@@ -390,6 +398,7 @@ const baseColumns = [
   { title: 'BOM状态', key: 'status', width: 92, fixed: 'left' },
   { title: 'BOM名称', key: 'bomName', width: 160, fixed: 'left', ellipsis: true },
   { title: 'BOM编号', dataIndex: 'bomNo', width: 140, ellipsis: true },
+  { title: 'BOM类型', key: 'bomType', width: 100 },
   { title: '物品名称', dataIndex: 'itemName', width: 160, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
@@ -436,10 +445,18 @@ function openDetail(record) {
   router.push(resolved)
 }
 
-function openCreate() {
+function openCreateProductBom() {
   const path = '/product-process/bom/new'
-  openTab(path, '新增BOM')
-  router.push(path)
+  const query = { bomType: '产品BOM' }
+  openTab(path, '新增产品BOM')
+  router.push({ path, query })
+}
+
+function openCreateBaselineBom() {
+  const path = '/product-process/bom/new'
+  const query = { bomType: '基准BOM' }
+  openTab(path, '新增基准BOM')
+  router.push({ path, query })
 }
 
 function openEdit(record) {

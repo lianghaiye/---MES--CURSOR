@@ -136,6 +136,7 @@ export const sideMenus = {
     { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
     { key: 'defect-items', label: '不良品项', path: '/basic-config/defect-items' },
     { key: 'material-grades', label: '材质管理', path: '/basic-config/material-grades' },
+    { key: 'packaging', label: '包装管理', path: '/basic-config/packaging' },
     { key: 'business-dict', label: '业务字典', path: '/basic-config/business-dict' },
     { key: 'function-params', label: '功能参数', path: '/basic-config/function-params' },
     {
@@ -296,8 +297,9 @@ export const routeTitles = {
   '/basic-config/employee-groups': '员工组别',
   '/basic-config/defect-items': '不良品项',
   '/basic-config/material-grades': '材质管理',
-  '/basic-config/business-dict': '业务字典',
+  '/basic-config/packaging': '包装管理',
   '/basic-config/function-params': '功能参数',
+  '/basic-config/business-dict': '业务字典',
   '/basic-config/warehouse-categories': '仓库分类',
   '/basic-config/warehouses': '仓库列表',
   ...createPageRouteTitles,

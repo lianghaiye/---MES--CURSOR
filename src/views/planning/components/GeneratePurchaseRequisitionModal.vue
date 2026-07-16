@@ -288,9 +288,7 @@ const summary = computed(() => {
 function resetHeaderForm(order, materials) {
   const defaultArrival = resolveAssemblyDate(order) || dayjs().add(14, 'day').format('YYYY-MM-DD')
   const defaultWarehouse =
-    materials.map((m) => m.warehouse).find(Boolean) ||
-    warehouseOpts.value[0]?.value ||
-    undefined
+    materials.map((m) => m.warehouse).find(Boolean) || warehouseOpts.value[0]?.value || undefined
   headerForm.receivingWarehouse = defaultWarehouse
   headerForm.expectedArrivalDate = dayjs(defaultArrival)
   headerForm.urgency = order?.urgency || '普通'
@@ -387,6 +385,21 @@ function handleSave() {
   if (!rows.value.length) {
     message.warning('请至少保留一条采购明细')
     return
+  }
+  const workItems = props.order?.workItems || []
+  const sourceWi =
+    workItems.find(
+      (wi) => wi.bomId || wi.ebomSnapshot?.materials?.length || wi.materials?.length,
+    ) || workItems[0]
+  if (sourceWi) {
+    const hasBomId = Boolean(sourceWi.bomId)
+    const hasSnapshot = Boolean(
+      sourceWi.ebomSnapshot?.materials?.length || sourceWi.materials?.length,
+    )
+    if (!hasBomId && !hasSnapshot) {
+      message.warning('来源工作项无绑定 BOM / 有效 EBOM 快照，无法生成采购申请')
+      return
+    }
   }
   const invalidQty = rows.value.some((r) => !r.planQty || r.planQty <= 0)
   if (invalidQty) {

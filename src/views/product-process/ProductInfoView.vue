@@ -270,6 +270,15 @@
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
     />
+
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="filteredList.length"
+      :selected-count="selectedRowKeys.length"
+      @export="doExport"
+    />
   </div>
 </template>
 
@@ -307,7 +316,10 @@ import ProductFormModal from './components/ProductFormModal.vue'
 import MasterInfoRowActions from './components/MasterInfoRowActions.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useListExport } from '@/composables/useListExport'
+import { productInfoExportFields } from '@/utils/exportFields/productInfoExport'
 import { useTabs } from '@/composables/useTabs'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
@@ -377,6 +389,21 @@ const displayTree = computed(() =>
 const filteredList = computed(() =>
   filterProducts(productInfoState.products, appliedFilters.value, selectedCategoryKey.value),
 )
+
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'product-info-list',
+  fieldDefinitions: productInfoExportFields,
+  getFilteredRows: () => filteredList.value,
+  getSelectedRows: () =>
+    productInfoState.products.filter((item) => selectedRowKeys.value.includes(item.id)),
+  fileNamePrefix: '产品信息',
+})
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -456,7 +483,7 @@ const baseColumns = [
   { title: '配套要求', key: 'matchingRequirements', width: 120, ellipsis: true },
   { title: '重量', key: 'weight', width: 88, align: 'right' },
   { title: '库存单位', key: 'inventoryUnit', width: 88, align: 'center' },
-  { title: '单价', key: 'unitPrice', width: 88, align: 'right' },
+  { title: '标准单价(不含税)', key: 'unitPrice', width: 120, align: 'right' },
   { title: 'BOM信息', key: 'bomInfo', width: 200, ellipsis: true },
   { title: '默认工作中心', key: 'defaultWorkCenter', width: 110 },
   { title: '默认供应商', key: 'defaultSupplier', width: 110, ellipsis: true },
@@ -572,7 +599,11 @@ function handleSyncSpec() {
 }
 
 function onBatchMenu({ key }) {
-  message.info(key === 'import' ? '批量导入功能开发中' : '批量导出功能开发中')
+  if (key === 'export') {
+    openExportModal()
+    return
+  }
+  message.info('批量导入功能开发中')
 }
 
 function onAddCategory() {

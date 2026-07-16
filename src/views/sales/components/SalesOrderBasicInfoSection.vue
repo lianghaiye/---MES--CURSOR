@@ -63,7 +63,7 @@ const fields = computed(() => {
     { key: 'contactPerson', label: '联系人' },
     { key: 'contactPhone', label: '联系人电话' },
     { key: 'deliveryAddress', label: '交货地址' },
-    { key: 'deliveryMethod', label: '送货方式' },
+    { key: 'deliveryMethod', label: '交货方式' },
     {
       key: 'discountStrategy',
       label: '折扣策略',

@@ -50,7 +50,10 @@ export function buildStandardTaskNo(dateStr, processSeq) {
 }
 
 export function getTaskExecutionModeLabel(mode) {
-  return TASK_EXECUTION_MODES.find((item) => item.value === normalizeTaskExecutionMode(mode))?.label || '单人领工'
+  return (
+    TASK_EXECUTION_MODES.find((item) => item.value === normalizeTaskExecutionMode(mode))?.label ||
+    '单人领工'
+  )
 }
 
 export function estimateTaskCountForProcess(process) {

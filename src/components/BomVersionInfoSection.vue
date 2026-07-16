@@ -42,7 +42,7 @@ export default { name: 'BomVersionInfoSection' }
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { getActiveBomForItem, getBomsForItem, getProductBomById } from '@/store/productBomStore'
+import { getOwnActiveBomForItem, getBomsForItem, getProductBomById } from '@/store/productBomStore'
 import {
   buildBomVersionHistoryFromGroup,
   buildBomVersionHistoryForProduct,
@@ -68,11 +68,12 @@ const compareNewBom = ref(null)
 const compareTitle = ref('')
 
 const latestBom = computed(() => {
-  if (props.productId) return getActiveBomForItem('product', props.productId)
+  // 投产口径：仅 SKU 自有生效 BOM，不用族模板解析
+  if (props.productId) return getOwnActiveBomForItem('product', props.productId)
   if (props.bomId) {
     const row = getProductBomById(props.bomId)
     if (!row) return null
-    return getActiveBomForItem(row.itemType, row.itemId) || row
+    return getOwnActiveBomForItem(row.itemType, row.itemId) || row
   }
   return null
 })

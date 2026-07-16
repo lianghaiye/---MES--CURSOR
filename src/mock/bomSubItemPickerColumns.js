@@ -1,14 +1,15 @@
-/** 添加子项弹窗 — 列显隐配置 */
+/** 添加子项弹窗 — 列显隐配置（规格型号紧挨材质前，便于扁平 SKU 辨识） */
 export const defaultBomSubItemPickerColumns = [
   { key: 'name', title: '产品名称', hidden: false, frozen: true, order: 0 },
   { key: 'code', title: '产品编号', hidden: false, frozen: false, order: 1 },
-  { key: 'specModel', title: '规格型号', hidden: false, frozen: false, order: 2 },
-  { key: 'itemType', title: '类型', hidden: false, frozen: false, order: 3 },
-  { key: 'categoryName', title: '类别', hidden: false, frozen: false, order: 4 },
+  { key: 'itemType', title: '类型', hidden: false, frozen: false, order: 2 },
+  { key: 'categoryName', title: '类别', hidden: false, frozen: false, order: 3 },
+  { key: 'specModel', title: '规格型号', hidden: false, frozen: false, order: 4 },
   { key: 'material', title: '材质', hidden: false, frozen: false, order: 5 },
-  { key: 'drawingNo', title: '图号', hidden: false, frozen: false, order: 6 },
-  { key: 'inventoryUnit', title: '单位', hidden: false, frozen: false, order: 7 },
-  { key: 'productAttribute', title: '产品属性', hidden: true, frozen: false, order: 8 },
+  { key: 'variantSummary', title: '变体属性', hidden: false, frozen: false, order: 6 },
+  { key: 'drawingNo', title: '图号', hidden: false, frozen: false, order: 7 },
+  { key: 'inventoryUnit', title: '单位', hidden: false, frozen: false, order: 8 },
+  { key: 'productAttribute', title: '产品属性', hidden: true, frozen: false, order: 9 },
   { key: 'supplyForm', title: '供应型态', hidden: true, frozen: false, order: 10 },
   { key: 'weight', title: '重量', hidden: true, frozen: false, order: 11 },
   { key: 'processRoute', title: '工艺路线', hidden: true, frozen: false, order: 12 },

@@ -364,7 +364,7 @@ const baseColumns = [
   { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true },
   { title: '进度状态', key: 'progressStatus', dataIndex: 'progressStatus', width: 90 },
   { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
-  { title: '送货方式', dataIndex: 'deliveryMethod', width: 90 },
+  { title: '交货方式', dataIndex: 'deliveryMethod', width: 90 },
   { title: '发货状态', dataIndex: 'deliveryStatus', width: 90 },
   {
     title: '销售数量',

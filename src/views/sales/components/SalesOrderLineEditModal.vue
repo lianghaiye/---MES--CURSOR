@@ -259,7 +259,7 @@ import dayjs from 'dayjs'
 const MAX_LINE_FILE_SIZE = 200 * 1024 * 1024
 import { deliveryModeOptions } from '@/mock/salesOrderOptions'
 import { productInfoState } from '@/store/productInfoStore'
-import { getActiveBomForItem } from '@/store/productBomStore'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import {
   CUSTOM_SALES_BUSINESS_TYPE,
   MAINTENANCE_SERVICE_BUSINESS_TYPE,
@@ -331,7 +331,7 @@ const fulfillmentPathOpts = computed(() =>
 
 const linkedCatalogBom = computed(() => {
   if (draft.isManualLine || !draft.productId) return null
-  return getActiveBomForItem('product', draft.productId)
+  return getOwnActiveBomForItem('product', draft.productId)
 })
 
 const lineDiscountReadOnly = computed(() => props.discountStrategy === DISCOUNT_STRATEGIES.ORDER)
@@ -419,7 +419,7 @@ function syncFieldsFromProduct() {
 
 function syncCatalogBomFromProduct() {
   if (draft.isManualLine || !draft.productId || !showFulfillmentPath.value) return
-  const bom = getActiveBomForItem('product', draft.productId)
+  const bom = getOwnActiveBomForItem('product', draft.productId)
   if (!draft.bomFulfillmentPath) {
     draft.bomFulfillmentPath = suggestDefaultFulfillmentPath(draft, {
       businessType: draft.businessType,
@@ -519,7 +519,7 @@ function onLineFileRemove(file) {
 }
 
 function onFulfillmentPathChange() {
-  const bom = draft.productId ? getActiveBomForItem('product', draft.productId) : null
+  const bom = draft.productId ? getOwnActiveBomForItem('product', draft.productId) : null
   if (draft.bomFulfillmentPath === 'use_catalog_bom' && bom) {
     draft.bomId = bom.id
     draft.bomName = bom.bomName
@@ -562,7 +562,7 @@ function onBusinessTypeChange(businessType) {
     draft.productAttr = product.productAttribute || ''
   }
   if (businessType === '自产销售' || businessType === '外购销售') {
-    const bom = getActiveBomForItem('product', draft.productId)
+    const bom = getOwnActiveBomForItem('product', draft.productId)
     draft.bomId = bom?.id || ''
     draft.bomName = bom?.bomName || ''
     draft.bomVersion = bom?.version || ''

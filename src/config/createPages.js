@@ -129,6 +129,14 @@ export const createPageRegistry = [
     keepAlive: 'MaterialGradeCreateView',
   },
   {
+    listPath: '/basic-config/packaging',
+    newPath: '/basic-config/packaging/new',
+    title: '新增包装族',
+    name: 'basic-config-packaging-new',
+    view: () => import('@/views/basic-config/PackagingCreateView.vue'),
+    keepAlive: 'PackagingCreateView',
+  },
+  {
     listPath: '/basic-config/defect-items',
     newPath: '/basic-config/defect-items/new',
     title: '新增不良品项',

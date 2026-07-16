@@ -1,21 +1,21 @@
 import { buildBomSubItemPickerRows } from '@/utils/bomSubItemPicker'
-import { getActiveBomForItem } from '@/store/productBomStore'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
 
 function resolveStoreItemType(itemType) {
   return itemType === '产品' ? 'product' : 'material'
 }
 
-/** 已关联使用中 BOM 的产品/物料（附带 BOM 名称等信息） */
-export function buildBomLinkedPickerRows() {
-  return buildBomSubItemPickerRows()
+/** 已关联自有生效 BOM 的产品/物料（附带 BOM 名称等信息） */
+export function buildBomLinkedPickerRows(options = {}) {
+  return buildBomSubItemPickerRows(options)
     .map((row) => {
-      const bom = getActiveBomForItem(resolveStoreItemType(row.itemType), row.itemId)
-      if (!bom) return null
+      const ownBom = getOwnActiveBomForItem(resolveStoreItemType(row.itemType), row.itemId)
+      if (!ownBom) return null
       return {
         ...row,
-        bomName: bom.bomName || '',
-        bomNo: bom.bomNo || '',
-        bomVersion: bom.version || '',
+        bomName: ownBom.bomName || '',
+        bomNo: ownBom.bomNo || '',
+        bomVersion: ownBom.version || '',
       }
     })
     .filter(Boolean)

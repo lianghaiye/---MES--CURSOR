@@ -2,7 +2,10 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { dispatchWorkOrderToMobile } from '@/utils/mobileTaskDispatch'
 import { generateLinesFromWorkOrder } from '@/store/reportConfirmStore'
-import { buildWorkOrderDispatchEbomSnapshot } from '@/utils/workOrderEbomTree'
+import {
+  buildWorkOrderDispatchEbomSnapshot,
+  resolveWorkOrderLinkedBom,
+} from '@/utils/workOrderEbomTree'
 import { getProcessByName } from '@/store/processConfigStore'
 import { normalizeReportMode } from '@/utils/reportMode'
 import { shouldSplitCollaborativeTasks } from '@/utils/taskExecutionMode'
@@ -44,6 +47,18 @@ export function validateWorkOrderDispatchReady(workOrder) {
   if (!workOrder.processes?.length) {
     message.error('请先选择工艺路线以生成工序')
     return false
+  }
+  const skipEbom =
+    workOrder.skipEbom ||
+    workOrder.orderCategory === '外协工单' ||
+    workOrder.orderCategory === '维修工单'
+  if (!skipEbom) {
+    const hasSnapshot = Boolean(workOrder.ebomSnapshot?.materials?.length)
+    const linkedBom = resolveWorkOrderLinkedBom(workOrder, 'production')
+    if (!hasSnapshot && !linkedBom) {
+      message.error('无自有生效 BOM 且无计划 EBOM 快照，不可下达（请先维护 SKU 产品 BOM）')
+      return false
+    }
   }
   return validateProcessExecutors(workOrder.processes)
 }

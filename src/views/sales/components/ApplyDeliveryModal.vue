@@ -103,7 +103,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="出库仓库" :required="form.applyOutbound">
+            <a-form-item label="出库仓库">
               <a-select
                 v-model:value="form.outboundWarehouse"
                 allow-clear
@@ -365,7 +365,7 @@ const lineColumns = [
   { title: '发货进度', key: 'shipProgress', width: 110, align: 'right' },
   { title: '编码', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
-  { title: '规格属性', dataIndex: 'specAttr', width: 88 },
+  { title: '变体属性', dataIndex: 'specAttr', width: 88 },
   { title: '材质', dataIndex: 'material', width: 72 },
   { title: '订单数量', key: 'orderQty', width: 88, align: 'right' },
   { title: '单价', key: 'unitPriceExTax', width: 96, align: 'right' },
@@ -403,7 +403,7 @@ const form = reactive({
   deliveryCode: '',
   salesOrderNo: '',
   customerName: undefined,
-  shipmentMethod: '物流',
+  shipmentMethod: '送货',
   logisticsNo: '',
   contactPerson: undefined,
   contactPhone: '',
@@ -439,7 +439,7 @@ watch(
     form.contactPerson = so.contactPerson
     form.contactPhone = so.contactPhone || ''
     form.deliveryAddress = so.deliveryAddress || ''
-    form.shipmentMethod = so.deliveryMethod || '物流'
+    form.shipmentMethod = so.deliveryMethod || '送货'
     form.deliveryDate = null
     form.applyOutbound = true
     form.outboundWarehouse = undefined
@@ -557,10 +557,6 @@ function handleConfirm() {
   }
   if (!form.shipmentMethod) {
     message.warning('请选择发货方式')
-    return
-  }
-  if (form.applyOutbound && !form.outboundWarehouse) {
-    message.warning('请选择出库仓库')
     return
   }
 

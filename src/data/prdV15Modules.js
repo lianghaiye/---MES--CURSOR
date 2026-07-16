@@ -368,7 +368,7 @@ export const PRD_V15_MODULES = [
     label: '库存管理',
     features: [
       {
-        name: '库存查询',
+        name: '库存明细',
         status: 'planned',
         background: '实时掌握物料/成品库存，支撑生产与发货。',
         description: ['按仓库、物料、批次查询库存数量与占用。'],

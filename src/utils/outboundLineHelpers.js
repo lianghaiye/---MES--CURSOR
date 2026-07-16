@@ -1,5 +1,5 @@
 import { createOutboundLine } from '@/mock/outboundOrders'
-import { getActiveBomForItem } from '@/store/productBomStore'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { getStockQty, stockState } from '@/store/stockStore'
 import { demoStockQty } from '@/utils/productionPlanWorkItem'
 
@@ -124,6 +124,7 @@ export function buildOutboundLineFromPickerItem(item, defaultWarehouse = '') {
     material: item.material || '',
     drawingNo: item.drawingNo || '',
     unit: item.inventoryUnit || '件',
+    packagingForm: item.packagingForm || '',
     unitPrice: item.unitPrice ?? null,
     shipQty: 1,
     shipWarehouse: defaultWarehouse || '',
@@ -140,7 +141,7 @@ export function buildOutboundLinesFromBom(
   includeTopItem = true,
 ) {
   const storeType = pickerRow.itemType === '产品' ? 'product' : 'material'
-  const bom = getActiveBomForItem(storeType, pickerRow.itemId)
+  const bom = getOwnActiveBomForItem(storeType, pickerRow.itemId)
   if (!bom?.lineItems?.length) return []
 
   const qty = Number(outboundQty) || 1
@@ -264,6 +265,7 @@ export function applyPickerItemToOutboundLine(line, item, defaultWarehouse = '')
     material: fresh.material,
     drawingNo: fresh.drawingNo,
     unit: fresh.unit,
+    packagingForm: fresh.packagingForm || '',
     unitPrice: fresh.unitPrice ?? line.unitPrice,
     stockQty: fresh.stockQty,
     warehouseStockQty: fresh.warehouseStockQty,

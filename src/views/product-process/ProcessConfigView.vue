@@ -229,8 +229,13 @@ const allBaseColumns = [
   { title: '操作', key: 'actions', width: 180, fixed: 'right' },
 ]
 
-const { columnSettings, columnDrawerOpen, displayColumns: rawDisplayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('process-config-list', allBaseColumns)
+const {
+  columnSettings,
+  columnDrawerOpen,
+  displayColumns: rawDisplayColumns,
+  tableScrollX,
+  defaultColumnSettings,
+} = useTableColumnSettings('process-config-list', allBaseColumns)
 
 const displayColumns = computed(() => {
   if (showProcessOperations.value) return rawDisplayColumns.value

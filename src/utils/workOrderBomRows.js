@@ -1,4 +1,4 @@
-import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
+import { getOwnActiveBomForItem, getProductBomById } from '@/store/productBomStore'
 import { buildSalesOrderEbomRows } from '@/utils/salesOrderBomRows'
 import { resolveWorkOrderLinkedBom } from '@/utils/workOrderEbomTree'
 
@@ -43,7 +43,7 @@ export function workOrderBomVersionChanged(workOrder, variant = 'production') {
   if (!line?.productId && !line?.bomId) return false
 
   const active = line.productId
-    ? getActiveBomForItem('product', line.productId)
+    ? getOwnActiveBomForItem('product', line.productId)
     : line.bomId
       ? getProductBomById(line.bomId)
       : null
@@ -55,5 +55,5 @@ export function workOrderBomVersionChanged(workOrder, variant = 'production') {
 export function workOrderActiveBomVersion(workOrder, variant = 'production') {
   const line = buildWorkOrderEbomLine(workOrder, variant)
   if (!line?.productId) return ''
-  return getActiveBomForItem('product', line.productId)?.version || ''
+  return getOwnActiveBomForItem('product', line.productId)?.version || ''
 }

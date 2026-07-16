@@ -1,7 +1,12 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
-import { buildPagedMockBoms, hydrateCatalogBom, injectBomParentReferenceMocks, isCatalogSeedBom } from '@/mock/productBomSeed'
+import {
+  buildPagedMockBoms,
+  hydrateCatalogBom,
+  injectBomParentReferenceMocks,
+  isCatalogSeedBom,
+} from '@/mock/productBomSeed'
 import { mockMaterials } from '@/mock/materialInfo'
 import { safeRemoveItem, safeSetItem } from '@/utils/safeStorage'
 import {
@@ -21,6 +26,7 @@ import {
 } from '@/utils/bomVersion'
 import { upgradeParentBomReferences } from '@/utils/bomVersionReference'
 import { formatBomInfoLabel, sortBomsForDisplay } from '@/utils/itemBomInfo'
+import { resolveActiveBomForItem } from '@/utils/spuBomResolve'
 
 const STORAGE_KEY = 'i_doms_product_bom'
 const DATA_VERSION = 8
@@ -87,7 +93,9 @@ function ensureBomStructure(bom) {
 function loadInitialBoms() {
   const stored = loadFromStorage()
   if (stored) return stored
-  return injectBomParentReferenceMocks(normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials)))
+  return injectBomParentReferenceMocks(
+    normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials)),
+  )
 }
 
 export const productBomState = reactive({
@@ -128,11 +136,23 @@ export function getProductBomById(id) {
   return row ? ensureBomStructure(row) : null
 }
 
-export function getActiveBomForItem(itemType, itemId) {
+/** 仅 SKU/物料自有生效 BOM（不含族模板解析）。销售投产与主数据「已维护 BOM」用此口径。 */
+export function getOwnActiveBomForItem(itemType, itemId) {
+  if (!itemType || itemId == null || itemId === '') return null
   const row = productBomState.boms.find(
     (b) => b.itemType === itemType && String(b.itemId) === String(itemId) && isBomActive(b),
   )
   return row ? ensureBomStructure(row) : null
+}
+
+/**
+ * 有效 BOM：自有生效优先；无则按产品族策略解析族模板（设计预览等场景）。
+ * 销售「使用产品BOM」请用 getOwnActiveBomForItem，禁止把解析结果当投产 BOM。
+ */
+export function getActiveBomForItem(itemType, itemId) {
+  const own = getOwnActiveBomForItem(itemType, itemId)
+  if (own) return own
+  return resolveActiveBomForItem(itemType, itemId)
 }
 
 /** 产品/物料关联的全部 BOM 版本（含生效、待发布、已归档） */
@@ -145,9 +165,9 @@ export function getBomsForItem(itemType, itemId) {
   return sortBomsForDisplay(rows.map(ensureBomStructure))
 }
 
-/** 列表「BOM信息」列：优先生效版，其次待发布，再取最新关联版本 */
+/** 列表「BOM信息」列：仅自有版本（不把族模板解析当成已维护） */
 export function getBomInfoLabelForItem(itemType, itemId) {
-  const active = getActiveBomForItem(itemType, itemId)
+  const active = getOwnActiveBomForItem(itemType, itemId)
   if (active) return formatBomInfoLabel(active)
   const all = getBomsForItem(itemType, itemId)
   const pending = all.find(isBomPending)
@@ -155,17 +175,15 @@ export function getBomInfoLabelForItem(itemType, itemId) {
   return all[0] ? formatBomInfoLabel(all[0]) : ''
 }
 
-/** 定制产品设计用：取产品关联的基准 BOM 骨架（优先生效版） */
+/**
+ * 设计预填用：取 SKU 自有产品 BOM 骨架（优先生效版）。
+ * 族模板请走 SPU.baseBomId，勿再把「基准BOM」挂在 SKU 上理解。
+ */
 export function getBaselineBomForProduct(productId) {
-  const candidates = productBomState.boms
-    .filter(
-      (b) =>
-        b.itemType === 'product' &&
-        String(b.itemId) === String(productId) &&
-        (b.bomType === '基准BOM' || b.bomType === '基础BOM'),
-    )
-    .map(ensureBomStructure)
-  return candidates.find(isBomActive) || candidates.find(isBomPending) || candidates[0] || null
+  const own = getOwnActiveBomForItem('product', productId)
+  if (own) return own
+  const all = getBomsForItem('product', productId)
+  return all.find(isBomPending) || all[0] || null
 }
 
 function archiveActiveForItem(itemType, itemId, exceptId) {
@@ -228,7 +246,7 @@ function buildBomRecord(payload, { versionGroupId, ver, status, source }) {
 }
 
 export function addProductBom(payload) {
-  const active = getActiveBomForItem(payload.itemType, payload.itemId)
+  const active = getOwnActiveBomForItem(payload.itemType, payload.itemId)
   const versionGroupId = active?.versionGroupId || `bom-grp-${Date.now()}`
   const ver = buildVersion(payload.itemType, payload.itemId, versionGroupId)
   const record = buildBomRecord(payload, {
@@ -256,7 +274,7 @@ export function updateProductBom(id, patch) {
  */
 export function saveProductBom(id, payload) {
   if (!id) {
-    const hadActive = Boolean(getActiveBomForItem(payload.itemType, payload.itemId))
+    const hadActive = Boolean(getOwnActiveBomForItem(payload.itemType, payload.itemId))
     const record = addProductBom(payload)
     return { record, created: true, versionUpgraded: hadActive }
   }

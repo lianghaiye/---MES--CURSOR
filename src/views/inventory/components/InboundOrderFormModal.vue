@@ -98,6 +98,36 @@
                 />
               </a-form-item>
             </a-col>
+            <a-col :span="8">
+              <a-form-item label="销售订单">
+                <a-input-group compact>
+                  <a-input
+                    :value="form.salesOrderNo"
+                    readonly
+                    size="small"
+                    style="width: calc(100% - 72px)"
+                    placeholder="请选择销售订单"
+                  />
+                  <a-button size="small" @click="salesOrderPickerOpen = true">选择</a-button>
+                </a-input-group>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="合同编号">
+                <a-input
+                  v-model:value="form.contractNo"
+                  allow-clear
+                  size="small"
+                  placeholder="请输入合同编号"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col v-if="form.salesOrderNo" :span="24">
+              <div class="sales-order-summary">
+                {{ form.salesOrderNo }} / {{ form.customerName || '-' }} /
+                {{ form.salesperson || '-' }}
+              </div>
+            </a-col>
             <a-col :span="24">
               <a-form-item label="备注" class="remark-item">
                 <a-textarea
@@ -348,9 +378,10 @@
   <AddByBomModal
     v-if="isActive"
     v-model:open="bomModalOpen"
+    own-active-only
     qty-label="入库数量"
     qty-hint="子项入库数量 = 入库数量 × 子件原单位用量"
-    preview-tip="确定后将添加所选物品 BOM的 下级结构"
+    preview-tip="确定后将添加所选物品自有生效 BOM 的下级结构"
     modal-width="720px"
     @confirm="onBomAdded"
   />
@@ -369,6 +400,8 @@
     :default-settings="defaultColumnSettings"
     title="入库明细列设置"
   />
+
+  <SalesOrderSelectModal v-model:open="salesOrderPickerOpen" @confirm="onSalesOrderPicked" />
 </template>
 
 <script setup>
@@ -410,6 +443,8 @@ import {
   mergeInboundLines,
   syncInboundLineTotalFromUnit,
 } from '@/utils/inboundLineHelpers'
+import SalesOrderSelectModal from '@/views/production/components/SalesOrderSelectModal.vue'
+import { findSalesOrderByOrderNo, getSalesOrderById } from '@/store/salesOrderStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -441,6 +476,7 @@ const lineEditTarget = ref(null)
 const lineEditMode = ref('edit')
 const lineEditSourceId = ref(null)
 const prevHeaderWarehouse = ref(undefined)
+const salesOrderPickerOpen = ref(false)
 
 const inboundTypeOpts = inboundTypeOptions.map((v) => ({ label: v, value: v }))
 const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
@@ -472,6 +508,11 @@ const form = reactive({
   deliveryDate: undefined,
   handler: 'admin1',
   invoiceNo: '',
+  salesOrderId: '',
+  salesOrderNo: '',
+  customerName: '',
+  salesperson: '',
+  contractNo: '',
   remark: '',
   lineItems: [],
 })
@@ -526,6 +567,22 @@ watch(
   { immediate: true },
 )
 
+function syncSalesOrderMeta(orderNo, orderId) {
+  const order = (orderId && getSalesOrderById(orderId)) || findSalesOrderByOrderNo(orderNo) || null
+  form.customerName = order?.customerName || ''
+  form.salesperson = order?.salesperson || ''
+}
+
+function onSalesOrderPicked(order) {
+  form.salesOrderId = order.id
+  form.salesOrderNo = order.orderNo
+  form.customerName = order.customerName || ''
+  form.salesperson = order.salesperson || ''
+  if (!form.contractNo?.trim() && order.contractNo) {
+    form.contractNo = order.contractNo
+  }
+}
+
 function resetForm() {
   endLineCellEdit()
   Object.assign(form, {
@@ -537,6 +594,11 @@ function resetForm() {
     deliveryDate: undefined,
     handler: 'admin1',
     invoiceNo: '',
+    salesOrderId: '',
+    salesOrderNo: '',
+    customerName: '',
+    salesperson: '',
+    contractNo: '',
     remark: '',
     lineItems: [],
   })
@@ -555,9 +617,17 @@ function loadEditForm(record) {
     deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : undefined,
     handler: record.handler || 'admin1',
     invoiceNo: record.invoiceNo || '',
+    salesOrderId: record.salesOrderId || '',
+    salesOrderNo: record.salesOrderNo || '',
+    customerName: record.customerName || '',
+    salesperson: record.salesperson || '',
+    contractNo: record.contractNo || '',
     remark: record.remark || '',
     lineItems: (record.lineItems || []).map((l) => enrichInboundLine({ ...l })),
   })
+  if (form.salesOrderNo && (!form.customerName || !form.salesperson)) {
+    syncSalesOrderMeta(form.salesOrderNo, form.salesOrderId)
+  }
 }
 
 function formatQty(val) {
@@ -670,7 +740,7 @@ function onBomAdded({ pickerRow, usageCoefficient }) {
     false,
   )
   if (!incoming.length) {
-    message.warning('未找到可添加的 BOM 明细')
+    message.warning('该物品无自有生效 BOM 明细，请先维护 SKU 产品 BOM')
     return
   }
   form.lineItems = mergeInboundLines(form.lineItems, incoming)
@@ -709,6 +779,10 @@ function buildPayload() {
     supplier: form.supplier,
     handler: form.handler,
     invoiceNo: form.invoiceNo?.trim(),
+    salesOrderNo: form.salesOrderNo?.trim() || '',
+    salesOrderId: form.salesOrderId || '',
+    contractNo: form.contractNo?.trim() || '',
+    customerName: form.customerName || '',
     remark: form.remark?.trim(),
     lineItems: form.lineItems.filter((l) => l.itemCode).map((l) => enrichInboundLine({ ...l })),
   }
@@ -853,5 +927,14 @@ function handleSave() {
 
 :deep(.ant-table-tbody > tr > td) {
   padding: 4px 8px !important;
+}
+
+.sales-order-summary {
+  margin: -4px 0 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  background: #fafafa;
+  border-radius: 4px;
 }
 </style>

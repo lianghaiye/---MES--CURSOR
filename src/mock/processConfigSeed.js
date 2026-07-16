@@ -119,7 +119,9 @@ export function createProcessConfigSeed() {
     operations: defaultOperations(ops),
     defaultExecutors: [...defaultExecutors],
     reportMode: PROCESS_REPORT_MODE_MAP[name] || '',
-    taskExecutionMode: COLLABORATIVE_DURATION_PROCESSES.has(name) ? 'collaborative' : 'single_claim',
+    taskExecutionMode: COLLABORATIVE_DURATION_PROCESSES.has(name)
+      ? 'collaborative'
+      : 'single_claim',
     defectItemIds: [...(PROCESS_DEFECT_ITEM_MAP[name] || [])],
     createdAt: '2026-05-01',
     updatedAt: '2026-06-01',

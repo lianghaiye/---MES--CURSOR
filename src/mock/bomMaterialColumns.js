@@ -36,9 +36,23 @@ export function formatSubstitutePartLabel(line) {
   return name || code || ''
 }
 
-export const bomTypeOptions = ['基准BOM', '订单BOM', '配置BOM']
+/** 产品 BOM：挂 SKU/单品；基准 BOM：挂产品族（族模板） */
+export const BOM_TYPE = {
+  PRODUCT: '产品BOM',
+  BASELINE: '基准BOM',
+  ORDER: '订单BOM',
+  CONFIG: '配置BOM',
+}
+
+export const bomTypeOptions = [BOM_TYPE.PRODUCT, BOM_TYPE.BASELINE, BOM_TYPE.ORDER, BOM_TYPE.CONFIG]
 
 export const bomTypeSelectOptions = bomTypeOptions.map((v) => ({ label: v, value: v }))
+
+/** 历史「基础BOM」归一为基准 BOM（族模板） */
+export function normalizeBomType(bomType) {
+  if (!bomType || bomType === '基础BOM') return BOM_TYPE.BASELINE
+  return bomType
+}
 
 /** EBOM 设计专用，产品 BOM 新增/编辑不展示此选项 */
 export const EBOM_TYPE_VALUE = 'EBOM'

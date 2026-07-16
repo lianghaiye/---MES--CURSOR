@@ -88,6 +88,7 @@
                     v-model:value="form.bomType"
                     style="width: 140px"
                     :options="bomTypeSelectOptions"
+                    :disabled="bomTypeLocked"
                   />
                 </a-form-item>
               </a-form>
@@ -208,12 +209,23 @@
     <SelectBomMaterialModal v-model:open="materialModalOpen" @selected="onMaterialSelected" />
     <AddByBomModal v-model:open="addByBomModalOpen" @confirm="onAddByBomConfirm" />
     <SelectBomMaterialModal
+      v-if="!isBaselineBomMode"
       v-model:open="switchProductOpen"
-      title="选择物品"
+      title="选择产品/物料（SKU）"
       ecn-new-material-mode
       hide-add-material
       :multiple="false"
       @selected="onSwitchProductSelected"
+    />
+    <SelectSpuOnlyModal
+      v-else
+      v-model:open="switchProductOpen"
+      title="选择产品族"
+      :multiple="false"
+      :can-sell-only="false"
+      :require-variant-axes="false"
+      :show-flat-sku-search="false"
+      @selected="onSwitchSpuSelected"
     />
     <BomColumnSettingDrawer v-model:open="columnDrawerOpen" v-model:settings="columnSettings" />
     <BomOverviewModal
@@ -236,7 +248,7 @@ export default { name: 'ProductBomCreateView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref, onMounted, onUnmounted } from 'vue'
+import { computed, reactive, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
@@ -256,7 +268,12 @@ import {
 } from '@/store/productBomStore'
 import { isBomEditable } from '@/mock/productBomOptions'
 import { loadBomDetailStructure, importBomByReference } from '@/utils/bomImport'
-import { defaultBomColumnSettings, bomTypeSelectOptions } from '@/mock/bomMaterialColumns'
+import {
+  defaultBomColumnSettings,
+  bomTypeSelectOptions,
+  BOM_TYPE,
+  normalizeBomType,
+} from '@/mock/bomMaterialColumns'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
 import { processRouteState } from '@/store/processRouteStore'
 import { applyMaterialToLine, createEmptySubLine } from '@/utils/bomLineMaterial'
@@ -272,10 +289,12 @@ import {
 } from '@/utils/bomTree'
 import { syncRootNodeFromItem } from '@/utils/bomImport'
 import { useTabs } from '@/composables/useTabs'
+import { findSpuById, updateSpu } from '@/store/spuStore'
 import BomTreePanel from './components/BomTreePanel.vue'
 import BomMaterialTable from './components/BomMaterialTable.vue'
 import ImportBomTemplateModal from './components/ImportBomTemplateModal.vue'
 import SelectBomMaterialModal from './components/SelectBomMaterialModal.vue'
+import SelectSpuOnlyModal from './components/SelectSpuOnlyModal.vue'
 import AddByBomModal from './components/AddByBomModal.vue'
 import BomColumnSettingDrawer from './components/BomColumnSettingDrawer.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
@@ -328,7 +347,7 @@ const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
 const form = reactive({
   bomNo: generateBomNo(),
   bomName: '',
-  bomType: '基准BOM',
+  bomType: BOM_TYPE.PRODUCT,
   itemId: undefined,
   itemType: 'product',
   itemName: '',
@@ -340,6 +359,11 @@ const form = reactive({
   processRoute: undefined,
   matchingRequirements: '',
 })
+
+/** 新增入口与编辑态均锁定 BOM 类型，避免产品 BOM / 基准 BOM 混用 */
+const bomTypeLocked = computed(() => true)
+
+const isBaselineBomMode = computed(() => form.bomType === BOM_TYPE.BASELINE)
 
 const rules = {
   bomName: [{ required: true, message: '请输入 BOM 名称' }],
@@ -413,28 +437,6 @@ const processRouteOpts = computed(() =>
     })),
 )
 
-const itemOptions = computed(() => {
-  const products = productInfoState.products.slice(0, 200).map((p) => ({
-    label: `[产品] ${p.code} ${p.name}`,
-    value: `product:${p.id}`,
-    itemType: 'product',
-    itemId: p.id,
-    itemName: p.name,
-    itemCode: p.code,
-    specModel: p.specModel || '',
-  }))
-  const materials = materialInfoState.materials.slice(0, 100).map((m) => ({
-    label: `[物料] ${m.code} ${m.name}`,
-    value: `material:${m.id}`,
-    itemType: 'material',
-    itemId: m.id,
-    itemName: m.name,
-    itemCode: m.code,
-    specModel: m.specModel || '',
-  }))
-  return [...products, ...materials]
-})
-
 const hasRoot = computed(() => flatNodes.value.some((n) => n.isRoot))
 
 const displayLines = computed(() =>
@@ -457,6 +459,9 @@ function filterRoute(input, option) {
 }
 
 function findMasterItem(itemType, itemId) {
+  if (itemType === 'spu') {
+    return findSpuById(itemId)
+  }
   if (itemType === 'product') {
     return productInfoState.products.find((p) => p.id === itemId)
   }
@@ -502,13 +507,57 @@ function onResizeMouseUp() {
   document.body.style.userSelect = ''
 }
 
+function resolveDefaultBomTypeFromRoute() {
+  const qType = route.query.bomType
+  if (qType) return normalizeBomType(String(qType))
+  if (route.query.itemType === 'spu') return BOM_TYPE.BASELINE
+  return BOM_TYPE.PRODUCT
+}
+
+function applyItemFromQuery(itemType, itemId, itemName) {
+  if (!itemType || !itemId) return false
+  if (itemType === 'spu') {
+    const spu = findSpuById(itemId)
+    form.itemId = `spu:${itemId}`
+    applySelectedItem({
+      itemType: 'spu',
+      itemId,
+      itemName: spu?.name || itemName || '',
+      itemCode: spu?.code || '',
+      specModel: '',
+    })
+    return true
+  }
+  const master = findMasterItem(itemType, itemId)
+  if (!master) {
+    form.itemId = `${itemType}:${itemId}`
+    applySelectedItem({
+      itemType,
+      itemId,
+      itemName: itemName || '',
+      itemCode: '',
+      specModel: '',
+    })
+    return true
+  }
+  form.itemId = `${itemType}:${itemId}`
+  applySelectedItem({
+    itemType,
+    itemId,
+    itemName: master.name,
+    itemCode: master.code,
+    specModel: master.specModel || '',
+  })
+  return true
+}
+
 function resetNewBomState() {
   Object.assign(form, {
     bomNo: generateBomNo(),
     bomName: '',
-    bomType: '基准BOM',
+    bomType: resolveDefaultBomTypeFromRoute(),
     itemId: undefined,
-    itemType: 'product',
+    itemType: resolveDefaultBomTypeFromRoute() === BOM_TYPE.BASELINE ? 'spu' : 'product',
     itemName: '',
     itemCode: '',
     specModel: '',
@@ -533,19 +582,29 @@ function initPageFromRoute() {
     return
   }
   if (route.name === 'product-process-bom-new') {
-    if (!form.itemId && !flatNodes.value.length) {
-      resetNewBomState()
-      const { itemType, itemId } = route.query
-      if (itemType && itemId) {
-        const val = `${itemType}:${itemId}`
-        form.itemId = val
-        onItemChange(val)
-      } else {
-        switchProductOpen.value = true
-      }
+    resetNewBomState()
+    const { itemType, itemId, itemName } = route.query
+    const applied = applyItemFromQuery(
+      itemType ? String(itemType) : '',
+      itemId ? String(itemId) : '',
+      itemName ? String(itemName) : '',
+    )
+    if (!applied) {
+      switchProductOpen.value = true
     }
   }
 }
+
+watch(
+  () => [
+    route.name,
+    route.params.id,
+    route.query.bomType,
+    route.query.itemType,
+    route.query.itemId,
+  ],
+  () => initPageFromRoute(),
+)
 
 onMounted(() => {
   document.addEventListener('mousemove', onResizeMouseMove)
@@ -595,13 +654,6 @@ function applySelectedItem(opt, { preserveChildren = false } = {}) {
   }
 }
 
-function onItemChange(val, { preserveChildren = false } = {}) {
-  const opt = itemOptions.value.find((o) => o.value === val)
-  if (!opt) return
-  form.itemId = val
-  applySelectedItem(opt, { preserveChildren })
-}
-
 function openSwitchProduct() {
   if (isEditMode.value && !canSwitchProduct.value) {
     message.info('仅待发布状态的 BOM 可切换产品')
@@ -614,6 +666,28 @@ function onSwitchProductSelected(items) {
   const row = Array.isArray(items) ? items[0] : items
   if (!row) return
   onSwitchProductConfirm(row)
+}
+
+function onSwitchSpuSelected(items) {
+  const row = Array.isArray(items) ? items[0] : items
+  if (!row) return
+  const id = row.spuId || row.id
+  const spu = findSpuById(id) || row
+  const preserveChildren = isEditMode.value && canSwitchProduct.value && hasRoot.value
+  form.itemId = `spu:${id}`
+  applySelectedItem(
+    {
+      itemType: 'spu',
+      itemId: id,
+      itemName: spu.name || row.name || '',
+      itemCode: spu.code || row.code || '',
+      specModel: '',
+    },
+    { preserveChildren },
+  )
+  if (preserveChildren) {
+    message.success('已切换产品族，仅更新顶级物料，子级结构已保留')
+  }
 }
 
 function onSwitchProductConfirm(row) {
@@ -845,7 +919,7 @@ function loadEditBom(id) {
   editBomStatus.value = bom.status || ''
   form.bomNo = bom.bomNo
   form.bomName = bom.bomName
-  form.bomType = bom.bomType === '基础BOM' ? '基准BOM' : bom.bomType || '基准BOM'
+  form.bomType = normalizeBomType(bom.bomType || BOM_TYPE.PRODUCT)
   form.itemId = `${bom.itemType}:${bom.itemId}`
   form.itemType = bom.itemType
   form.itemName = bom.itemName
@@ -866,7 +940,9 @@ async function handleSave() {
     return
   }
   if (!hasRoot.value || !form.itemId) {
-    message.warning('请先通过左侧树切换选择产品/物料')
+    message.warning(
+      isBaselineBomMode.value ? '请先通过左侧树切换选择产品族' : '请先通过左侧树切换选择产品/物料',
+    )
     return
   }
   if (lineItems.value.some((l) => !l.materialCode)) {
@@ -914,6 +990,9 @@ async function handleSave() {
     if (res?.error) {
       message.warning(res.error)
       return
+    }
+    if (payload.itemType === 'spu' && normalizeBomType(payload.bomType) === BOM_TYPE.BASELINE) {
+      updateSpu(payload.itemId, { baseBomId: res.record.id })
     }
     if (res.versionUpgraded) {
       message.success(

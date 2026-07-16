@@ -105,6 +105,35 @@ export function resolveSalesOrderRelations(order) {
       matchesOrderNo(wo.sourceOrderNo, orderNo),
     ),
     outsourcingOrders: mockOutsourcingOrders.filter((o) => o.salesOrderNo === orderNo),
-    attachments: order.attachments || [],
+    attachments: collectSalesOrderAttachments(order),
   }
+}
+
+/** 表头附件 + 明细附件（含产品名便于区分） */
+function collectSalesOrderAttachments(order) {
+  const header = (order.attachments || []).map((f) => ({
+    ...f,
+    scope: f.scope || '订单附件',
+  }))
+  const lineFiles = []
+  ;(order.lineItems || []).forEach((line, index) => {
+    const files = Array.isArray(line.lineAttachments) ? line.lineAttachments : []
+    if (files.length) {
+      files.forEach((f) => {
+        lineFiles.push({
+          ...f,
+          scope: `明细${index + 1}·${line.productName || line.productCode || ''}`,
+          type: f.type || '明细附件',
+        })
+      })
+    } else if (line.attachment) {
+      lineFiles.push({
+        uid: `legacy-line-${line.id || index}`,
+        name: line.attachment,
+        scope: `明细${index + 1}·${line.productName || line.productCode || ''}`,
+        type: '明细附件',
+      })
+    }
+  })
+  return [...header, ...lineFiles]
 }

@@ -27,11 +27,7 @@
     </template>
   </a-select>
 
-  <SelectSupplierModal
-    v-model:open="pickerOpen"
-    :selected="value"
-    @confirm="onPickedFromModal"
-  />
+  <SelectSupplierModal v-model:open="pickerOpen" :selected="value" @confirm="onPickedFromModal" />
 </template>
 
 <script setup>

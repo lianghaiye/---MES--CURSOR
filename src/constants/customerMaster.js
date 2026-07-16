@@ -53,9 +53,9 @@ export const currencyOptions = [
 
 export const deliveryMethodOptions = [
   { label: '送货', value: '送货' },
+  { label: '物料', value: '物料' },
   { label: '自提', value: '自提' },
   { label: '快递', value: '快递' },
-  { label: '物流', value: '物流' },
 ]
 
 export const freightBearerOptions = [

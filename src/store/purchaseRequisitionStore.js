@@ -118,6 +118,12 @@ export function getPurchaseRequisitionById(id) {
   return purchaseRequisitionState.requisitions.find((r) => r.id === id) || null
 }
 
+export function findPurchaseRequisitionByReqNo(reqNo) {
+  const normalized = String(reqNo || '').trim()
+  if (!normalized) return null
+  return purchaseRequisitionState.requisitions.find((r) => r.reqNo === normalized) || null
+}
+
 function mapPlanMaterialToLineItem(m, deliveryDate, estimatedArrivalDate, receivingWarehouse) {
   const demandQty = m.demandQty ?? m.gapQty ?? m.planQty ?? 0
   return createLineItem({

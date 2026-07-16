@@ -129,10 +129,7 @@ import {
 } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
-import {
-  enrichOutboundLine,
-  syncLineTotalFromUnit,
-} from '@/utils/outboundLineHelpers'
+import { enrichOutboundLine, syncLineTotalFromUnit } from '@/utils/outboundLineHelpers'
 
 const props = defineProps({
   open: Boolean,

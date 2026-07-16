@@ -70,7 +70,7 @@ function createSalesOrder(partial) {
     settlementCurrency: '人民币',
     contractType: '标准合同',
     orderType: '国内订单',
-    deliveryMethod: '物流',
+    deliveryMethod: '送货',
     businessType: '自产销售',
     fulfillmentMethod: '整机成品发货',
     urgency: '正常',

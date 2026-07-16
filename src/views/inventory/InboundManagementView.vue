@@ -152,6 +152,12 @@
               </a>
               <span v-else>—</span>
             </template>
+            <template v-else-if="column.key === 'salesOrderNo'">
+              <a v-if="record.salesOrderNo" class="link-code" @click="goSalesOrder(record)">
+                {{ record.salesOrderNo }}
+              </a>
+              <span v-else>—</span>
+            </template>
             <template v-else-if="column.key === 'status'">
               <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
             </template>
@@ -202,12 +208,6 @@
       </div>
     </div>
 
-    <InboundOrderFormModal
-      v-model:open="formOpen"
-      :edit-record="editRecord"
-      @saved="handleSearch"
-    />
-
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -250,10 +250,10 @@ import { resolveInboundSourceRoute } from '@/utils/inboundSourceLink'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { useTabs } from '@/composables/useTabs'
-import InboundOrderFormModal from './components/InboundOrderFormModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -269,8 +269,6 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters, inboundDateRange: null })
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
-const formOpen = ref(false)
-const editRecord = ref(null)
 
 const statusOpts = inboundStatusOptions.map((v) => ({ label: v, value: v }))
 const inboundTypeOpts = inboundTypeOptions.map((v) => ({ label: v, value: v }))
@@ -286,7 +284,8 @@ const baseColumns = [
   { title: '仓库', dataIndex: 'warehouse', width: 100 },
   { title: '入库类型', dataIndex: 'inboundType', width: 100 },
   { title: '源单号', key: 'sourceOrderNo', width: 140 },
-  { title: '物品类型', dataIndex: 'itemType', width: 90 },
+  { title: '销售订单', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
+  { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
   { title: '供应商', dataIndex: 'supplier', width: 120, ellipsis: true },
   { title: '来源车间', dataIndex: 'sourceWorkshop', width: 100 },
   { title: '发票号码', dataIndex: 'invoiceNo', width: 120 },
@@ -299,7 +298,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inbound-list', baseColumns)
+  useTableColumnSettings('inbound-list-v2', baseColumns)
 
 const filteredList = computed(() => {
   const range = appliedFilters.value.inboundDateRange
@@ -359,8 +358,11 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  editRecord.value = record
-  formOpen.value = true
+  if (!record?.id) return
+  openCreateTab(router, openTab, {
+    path: `/inventory/inbound/${record.id}/edit`,
+    title: `编辑入库单 ${record.docNo || ''}`.trim(),
+  })
 }
 
 function goDetail(record) {
@@ -374,6 +376,19 @@ function goSource(record) {
   } else {
     message.info('暂无源单跳转')
   }
+}
+
+function goSalesOrder(record) {
+  const no = record?.salesOrderNo
+  if (!no) return
+  const order = findSalesOrderByOrderNo(no)
+  if (!order) {
+    message.info('未找到关联销售订单')
+    return
+  }
+  const path = `/sales/orders/${order.id}`
+  openTab(path, `销售订单 ${no}`)
+  router.push(path)
 }
 
 function handleConfirmInbound() {

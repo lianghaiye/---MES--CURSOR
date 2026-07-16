@@ -16,7 +16,7 @@
             show-search
             allow-clear
             size="small"
-            placeholder="搜索BOM名称/编号，选择已关联BOM"
+            :placeholder="selectPlaceholder"
             class="parent-select"
             :filter-option="filterOption"
             :options="selectOptions"
@@ -96,6 +96,7 @@ import {
   findBomLinkedPickerRowByBom,
 } from '@/utils/bomWithBomPicker'
 import { isBomActive } from '@/mock/productBomOptions'
+import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { resolveBomLinkedMaster } from '@/utils/bomPickerTable'
 import SelectBomPickerModal from './SelectBomPickerModal.vue'
 
@@ -108,6 +109,8 @@ const props = defineProps({
   },
   previewTip: { type: String, default: '确定后将添加所选物品及其 BOM 下级结构' },
   modalWidth: { type: [String, Number], default: '640px' },
+  /** 出入库等投产场景：仅可选自有生效 BOM，不含族模板 */
+  ownActiveOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -129,6 +132,12 @@ const selectOptions = computed(() =>
     value: r.rowKey,
     searchText: `${r.bomName} ${r.bomNo} ${r.code} ${r.name}`,
   })),
+)
+
+const selectPlaceholder = computed(() =>
+  props.ownActiveOnly
+    ? '搜索自有生效 BOM 名称/编号（无自有 BOM 请先维护 SKU 产品 BOM）'
+    : '搜索BOM名称/编号，选择已关联BOM',
 )
 
 watch(
@@ -159,9 +168,23 @@ function onSelectChange(rowKey) {
   selectedRow.value = rowKey ? findBomLinkedPickerRow(rowKey) : null
 }
 
-const activeBomRowFilter = (bom) => isBomActive(bom)
+function isOwnActiveBomRow(bom) {
+  if (!bom?.itemId) return false
+  const ownBom = getOwnActiveBomForItem(bom.itemType, bom.itemId)
+  return Boolean(ownBom && ownBom.id === bom.id)
+}
+
+function activeBomRowFilter(bom) {
+  if (!isBomActive(bom)) return false
+  if (!props.ownActiveOnly) return true
+  return isOwnActiveBomRow(bom)
+}
 
 function onAdvancedBomSelected(bom) {
+  if (props.ownActiveOnly && !isOwnActiveBomRow(bom)) {
+    message.warning('该物品无自有生效 BOM，请先维护 SKU 产品 BOM')
+    return
+  }
   let hit = findBomLinkedPickerRowByBom(bom)
   if (!hit) {
     const master = resolveBomLinkedMaster(bom)

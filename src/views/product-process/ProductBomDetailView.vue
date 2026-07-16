@@ -54,7 +54,7 @@
                         record.bomName
                       }}</a-descriptions-item>
                       <a-descriptions-item label="BOM类型">
-                        {{ record.bomType === '基础BOM' ? '基准BOM' : record.bomType || '基准BOM' }}
+                        {{ record.bomType === '基础BOM' ? '基准BOM' : record.bomType || '产品BOM' }}
                       </a-descriptions-item>
                       <a-descriptions-item label="BOM状态">
                         <a-tag :color="bomStatusColor(record.status)">{{ record.status }}</a-tag>

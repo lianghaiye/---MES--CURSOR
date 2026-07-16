@@ -7,7 +7,7 @@ import {
   resolveLineBusinessType,
 } from '@/utils/salesOrderBusiness'
 import { isCustomProductAttribute } from '@/constants/designTask'
-import { getActiveBomForItem, getProductBomById } from '@/store/productBomStore'
+import { getOwnActiveBomForItem, getProductBomById } from '@/store/productBomStore'
 
 /** 为已审自产订单行补齐 EBOM 快照与配件包（演示数据 / 升级迁移） */
 export function hydrateApprovedSelfProdOrder(order) {
@@ -26,7 +26,7 @@ export function hydrateApprovedSelfProdOrder(order) {
 
     const bom =
       (line.bomId ? getProductBomById(line.bomId) : null) ||
-      getActiveBomForItem('product', line.productId)
+      getOwnActiveBomForItem('product', line.productId)
 
     if (bom) {
       if (!line.bomId) {

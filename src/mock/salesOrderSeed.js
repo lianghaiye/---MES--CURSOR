@@ -93,7 +93,7 @@ export function buildMockSalesOrders(products) {
           deliveryCode: 'SH20260513001',
           createdAt: '2026-05-13 14:30',
           deliveryDate: '2026-05-20',
-          shipmentMethod: '物流',
+          shipmentMethod: '物料',
           outboundWarehouse: '成品仓',
           status: '已提交',
           remark: '首批整机+散件发运',

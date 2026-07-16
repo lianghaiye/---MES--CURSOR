@@ -266,12 +266,6 @@
       :default-settings="defaultColumnSettings"
     />
 
-    <OutboundOrderFormModal
-      v-model:open="formOpen"
-      :edit-record="editRecord"
-      @saved="onFormSaved"
-    />
-
     <ExportExcelModal
       v-model:open="exportModalOpen"
       v-model:settings="exportFieldSettings"
@@ -326,7 +320,6 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
-import OutboundOrderFormModal from './components/OutboundOrderFormModal.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useListExport } from '@/composables/useListExport'
@@ -349,8 +342,6 @@ const filters = reactive({
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
-const formOpen = ref(false)
-const editRecord = ref(null)
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const outboundTypeOpts = outboundTypeOptions.map((v) => ({ label: v, value: v }))
@@ -470,13 +461,11 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  editRecord.value = record
-  formOpen.value = true
-}
-
-function onFormSaved() {
-  editRecord.value = null
-  handleSearch()
+  if (!record?.id) return
+  openCreateTab(router, openTab, {
+    path: `/inventory/outbound/${record.id}/edit`,
+    title: `编辑出库单 ${record.docNo || ''}`.trim(),
+  })
 }
 
 function handleApprove(record) {

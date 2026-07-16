@@ -42,10 +42,7 @@
 import { ref } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
-import {
-  frameworkContractState,
-  deleteFrameworkContract,
-} from '@/store/frameworkContractStore'
+import { frameworkContractState, deleteFrameworkContract } from '@/store/frameworkContractStore'
 import { formatDiscountRatePercent } from '@/utils/salesOrderPricing'
 import FrameworkContractFormModal from './components/FrameworkContractFormModal.vue'
 

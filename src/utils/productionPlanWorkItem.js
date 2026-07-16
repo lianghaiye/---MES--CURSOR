@@ -1,6 +1,25 @@
 import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
 import { productInfoState } from '@/store/productInfoStore'
 
+const SALES_ORDER_STORAGE_KEY = 'i_doms_sales_orders'
+
+/** 从 localStorage 读取销售明细，避免 productionPlanStore ↔ salesOrderStore 循环依赖 */
+export function resolveSalesLineForWorkItem(plan, workItem) {
+  if (!plan?.salesOrderNo || !workItem?.salesLineId) return null
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(SALES_ORDER_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const orders = Array.isArray(parsed?.orders) ? parsed.orders : []
+    const orderNo = plan.salesOrderNo || plan.orderNo
+    const order = orders.find((o) => o.orderNo === orderNo)
+    return order?.lineItems?.find((line) => line.id === workItem.salesLineId) || null
+  } catch {
+    return null
+  }
+}
+
 export function resolveWorkItemProductId(wi, salesLine = null) {
   if (wi?.productId) return wi.productId
   if (salesLine?.productId) return salesLine.productId
@@ -50,6 +69,8 @@ export function enrichWorkItem(wi, salesLine = null, index = 0) {
     material: wi.material ?? line.material ?? '',
     matchingRequirements: wi.matchingRequirements ?? line.matchingRequirements ?? line.remark ?? '',
     packagingForm: wi.packagingForm ?? line.packagingForm ?? '',
+    supplementDesc: wi.supplementDesc ?? line.supplementDesc ?? line.lineRemark ?? '',
+    attachment: wi.attachment ?? line.attachment ?? '',
     specModel: wi.specModel ?? wi.model ?? line.specModel ?? '',
   }
 }

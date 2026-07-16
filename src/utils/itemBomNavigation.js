@@ -21,7 +21,7 @@ export function resolveItemBomNavigation(itemType, itemId) {
   }
   return {
     path: '/product-process/bom/new',
-    query: { itemType, itemId },
-    title: '新增BOM',
+    query: { itemType, itemId, bomType: '产品BOM' },
+    title: '新增产品BOM',
   }
 }
