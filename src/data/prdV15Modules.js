@@ -426,6 +426,18 @@ export const PRD_V15_MODULES = [
         ],
         process: ['现场提交报废 → 审核 → 补料（可选）→ 处理（拆解/销毁）→ 结案'],
       },
+      {
+        name: '质检模板',
+        status: 'done',
+        background: '质检相关产品信息更新模板需在质量管理模块统一维护。',
+        description: [
+          '质检模板列表：模板编码/名称、适用范围、字段数量、启停用。',
+          '支持新增、编辑、预览、启停与删除（系统模板除外）。',
+          '由工业标识「配置产品信息更新模板」迁移至质量管理。',
+        ],
+        rules: ['旧路径 /industrial-id/base-config/product-template 重定向至本菜单。'],
+        process: ['进入质量管理 → 质检模板 → 维护模板'],
+      },
     ],
   },
   {

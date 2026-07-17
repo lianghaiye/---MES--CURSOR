@@ -5,19 +5,8 @@
       <template v-if="currentView === 'list'">
         <div class="page-card">
           <div class="page-header">
-            <h2>基础配置</h2>
-            <small>管理企业注册、产品模板与铭牌模板</small>
-          </div>
-          <div class="sub-tabs">
-            <router-link to="/industrial-id/base-config/enterprise-info" class="sub-tab"
-              >企业信息</router-link
-            >
-            <router-link to="/industrial-id/base-config/product-template" class="sub-tab active"
-              >配置产品信息更新模板</router-link
-            >
-            <router-link to="/industrial-id/base-config/nameplate-template" class="sub-tab"
-              >配置铭牌模板</router-link
-            >
+            <h2>质检模板</h2>
+            <small>管理质检产品信息更新模板</small>
           </div>
 
           <div class="toolbar">
@@ -123,19 +112,8 @@
       <template v-if="currentView === 'detail'">
         <div class="page-card">
           <div class="page-header">
-            <h2>基础配置</h2>
-            <small>管理企业注册、产品模板与铭牌模板</small>
-          </div>
-          <div class="sub-tabs">
-            <router-link to="/industrial-id/base-config/enterprise-info" class="sub-tab"
-              >企业信息</router-link
-            >
-            <router-link to="/industrial-id/base-config/product-template" class="sub-tab active"
-              >配置产品信息更新模板</router-link
-            >
-            <router-link to="/industrial-id/base-config/nameplate-template" class="sub-tab"
-              >配置铭牌模板</router-link
-            >
+            <h2>质检模板</h2>
+            <small>管理质检产品信息更新模板</small>
           </div>
 
           <div class="detail-header">

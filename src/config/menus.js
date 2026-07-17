@@ -93,6 +93,7 @@ export const sideMenus = {
   quality: [
     { key: 'factory-qc', label: '出厂质检', path: '/quality/factory-qc' },
     { key: 'scrap-orders', label: '报废品管理', path: '/quality/scrap-orders' },
+    { key: 'qc-template', label: '质检模板', path: '/quality/qc-template' },
   ],
   procurement: [
     { key: 'purchase-req', label: '采购申请', path: '/procurement/purchase-req' },
@@ -116,11 +117,6 @@ export const sideMenus = {
           key: 'enterprise-info',
           label: '企业信息',
           path: '/industrial-id/base-config/enterprise-info',
-        },
-        {
-          key: 'product-template',
-          label: '配置产品信息更新模板',
-          path: '/industrial-id/base-config/product-template',
         },
         {
           key: 'nameplate-template',
@@ -274,6 +270,7 @@ export const routeTitles = {
   '/quality/factory-qc': '出厂质检',
   '/quality/scrap-orders': '报废品管理',
   '/quality/scrap-orders/:id': '报废品详情',
+  '/quality/qc-template': '质检模板',
   '/system/dict': '系统字典',
   '/system/business-rules': '业务规则',
   '/procurement/purchase-req': '采购申请',
@@ -286,7 +283,6 @@ export const routeTitles = {
   '/after-sales/service-orders': '服务工单',
   '/after-sales/returns': '退换货',
   '/industrial-id/base-config/enterprise-info': '企业信息',
-  '/industrial-id/base-config/product-template': '配置产品信息更新模板',
   '/industrial-id/base-config/nameplate-template': '配置铭牌模板',
   '/industrial-id/label-request': '标识申请',
   '/industrial-id/label-management': '标识管理',

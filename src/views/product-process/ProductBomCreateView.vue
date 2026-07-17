@@ -203,6 +203,7 @@
             @add-detail-line="onAddDetailLine"
             @reorder-lines="onReorderLines"
             @material-change="onMaterialChange"
+            @item-name-change="onItemNameChange"
             @configure-variant="openVariantConfig"
           />
         </div>
@@ -835,6 +836,14 @@ function onMaterialChange({ lineId, material }) {
   if (material?.pickType === 'spu' || material?.isSpuTemplate) {
     message.success('已添加产品族，请点击规格型号 / 材质 / 变体属性完成配置')
   }
+}
+
+function onItemNameChange({ lineId, itemName }) {
+  const line = lineItems.value.find((l) => l.id === lineId)
+  if (!line?.treeNodeId) return
+  const title =
+    `${line.materialCode || ''} ${itemName || ''}`.trim() || line.materialCode || '未命名'
+  flatNodes.value = flatNodes.value.map((n) => (n.id === line.treeNodeId ? { ...n, title } : n))
 }
 
 function onVariantConfigConfirm(payload) {

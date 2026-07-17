@@ -430,6 +430,12 @@ const routes = [
         meta: { title: '报废品详情' },
       },
       {
+        path: 'quality/qc-template',
+        name: 'quality-qc-template',
+        component: () => import('@/views/industrial-id/ProductTemplateView.vue'),
+        meta: { title: '质检模板' },
+      },
+      {
         path: 'procurement/purchase-req',
         name: 'procurement-purchase-req',
         component: () => import('@/views/procurement/PurchaseRequisitionView.vue'),
@@ -666,9 +672,7 @@ const routes = [
       },
       {
         path: 'industrial-id/base-config/product-template',
-        name: 'industrial-id-product-template',
-        component: () => import('@/views/industrial-id/ProductTemplateView.vue'),
-        meta: { title: '配置产品信息更新模板' },
+        redirect: '/quality/qc-template',
       },
       {
         path: 'industrial-id/base-config/nameplate-template',

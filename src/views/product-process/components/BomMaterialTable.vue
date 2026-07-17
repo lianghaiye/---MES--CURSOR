@@ -138,14 +138,20 @@
               <template v-else>{{ formatCell(record[column.dataIndex]) }}</template>
             </template>
             <template v-else-if="column.key === 'itemName'">
-              <template v-if="isSpuLine(record)">
-                <span>{{ record.itemName || '—' }}</span>
-              </template>
+              <a-input
+                v-if="isSpuLine(record)"
+                v-model:value="record.itemName"
+                size="small"
+                placeholder="子项名称"
+                @update:value="(v) => onItemNameRename(record, v)"
+              />
               <BomSubItemMaterialSelect
                 v-else
                 :value="record.materialCode"
                 :fallback-name="record.itemName"
+                placeholder="子项名称"
                 @select="(material) => emit('material-change', { lineId: record.id, material })"
+                @rename="(name) => onItemNameRename(record, name)"
               />
             </template>
             <template v-else-if="column.key === 'specModel'">
@@ -259,8 +265,9 @@
               <BomSubItemMaterialSelect
                 :value="record.substituteCode"
                 :fallback-name="record.substituteName"
-                placeholder="请选择替代件（选填）"
+                placeholder="替代件名称（选填）"
                 @select="(material) => onSubstituteSelect(record, material)"
+                @rename="(name) => onSubstituteRename(record, name)"
                 @clear="onSubstituteClear(record)"
               />
             </template>
@@ -360,9 +367,18 @@ function onSubstituteSelect(record, material) {
   record.substituteName = material.name || ''
 }
 
+function onSubstituteRename(record, name) {
+  record.substituteName = name || ''
+}
+
 function onSubstituteClear(record) {
   record.substituteCode = ''
   record.substituteName = ''
+}
+
+function onItemNameRename(record, name) {
+  record.itemName = name ?? ''
+  emit('item-name-change', { lineId: record.id, itemName: String(name ?? '').trim() })
 }
 
 const emit = defineEmits([
@@ -370,6 +386,7 @@ const emit = defineEmits([
   'open-column-setting',
   'delete-line',
   'material-change',
+  'item-name-change',
   'configure-variant',
   'add-sub-item',
   'add-by-bom',

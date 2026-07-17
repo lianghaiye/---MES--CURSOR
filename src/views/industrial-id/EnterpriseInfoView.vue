@@ -3,7 +3,7 @@
     <div class="page-card">
       <div class="page-header">
         <h2>基础配置</h2>
-        <small>管理企业注册、产品模板与铭牌模板</small>
+        <small>管理企业注册与铭牌模板</small>
       </div>
       <div class="sub-tabs">
         <router-link
@@ -11,12 +11,6 @@
           class="sub-tab"
           exact-active-class="active"
           >企业信息</router-link
-        >
-        <router-link
-          to="/industrial-id/base-config/product-template"
-          class="sub-tab"
-          active-class="active"
-          >配置产品信息更新模板</router-link
         >
         <router-link
           to="/industrial-id/base-config/nameplate-template"
