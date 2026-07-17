@@ -56,8 +56,12 @@
             <a-select
               v-model:value="form.customerName"
               size="small"
-              placeholder="请选择 客户名称"
+              show-search
+              allow-clear
+              placeholder="请搜索或选择客户名称"
               :options="customerOpts"
+              :filter-option="filterCustomerOption"
+              option-filter-prop="label"
               @change="onCustomerChange"
             />
           </a-form-item>
@@ -376,12 +380,42 @@
 
             <template v-else-if="column.key === 'specModel'">
               <a-input v-if="record.isManualLine" v-model:value="record.specModel" size="small" />
+              <a
+                v-else-if="isSpuLine(record)"
+                class="variant-field-link"
+                @click.prevent="openVariantConfig(record)"
+              >
+                {{ record.specModel || '点击配置' }}
+              </a>
               <span v-else>{{ record.specModel || '—' }}</span>
             </template>
 
             <template v-else-if="column.key === 'material'">
               <a-input v-if="record.isManualLine" v-model:value="record.material" size="small" />
+              <a
+                v-else-if="isSpuLine(record)"
+                class="variant-field-link"
+                @click.prevent="openVariantConfig(record)"
+              >
+                {{ record.material || '点击配置' }}
+              </a>
               <span v-else>{{ record.material || '—' }}</span>
+            </template>
+
+            <template v-else-if="column.key === 'variantAttr'">
+              <a
+                v-if="isSpuLine(record)"
+                class="variant-field-link"
+                @click.prevent="openVariantConfig(record)"
+              >
+                {{ lineVariantDisplay(record) || '—' }}
+              </a>
+              <template v-else>
+                <a-tooltip v-if="lineVariantDisplay(record)" :title="lineVariantDisplay(record)">
+                  <span>{{ lineVariantDisplay(record) }}</span>
+                </a-tooltip>
+                <span v-else>—</span>
+              </template>
             </template>
 
             <template v-else-if="column.key === 'drawingNo'">
@@ -574,7 +608,17 @@
       v-model:open="productPickerOpen"
       title="添加产品/物料"
       picker-default-item-type="产品"
-      @selected="onProductsSelected"
+      :include-spu-templates="true"
+      @selected="onSalesProductsSelected"
+    />
+
+    <ConfigureSalesSpuVariantModal
+      v-model:open="variantConfigOpen"
+      :spu-id="variantConfigSpuId"
+      :initial-variant-values="variantConfigInitialValues"
+      :allow-back="false"
+      confirm-text="确定"
+      @confirm="onVariantConfigConfirm"
     />
 
     <a-modal
@@ -600,6 +644,8 @@
       :line="lineEditTarget"
       :tax-mode-excluding="taxModeExcluding"
       :discount-strategy="form.discountStrategy"
+      :customer-name="form.customerName"
+      :contract-no="form.contractNo"
       @saved="onLineEditSaved"
     />
 
@@ -654,6 +700,7 @@ import {
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import SalesLineLongTextCell from './SalesLineLongTextCell.vue'
 import SalesOrderLineEditModal from './SalesOrderLineEditModal.vue'
+import ConfigureSalesSpuVariantModal from './ConfigureSalesSpuVariantModal.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 import {
@@ -662,6 +709,13 @@ import {
   CUSTOM_SALES_BUSINESS_TYPE,
   MAINTENANCE_SERVICE_BUSINESS_TYPE,
 } from '@/utils/salesOrderBusiness'
+import {
+  isSpuLine,
+  lineVariantSummary,
+  createSpuLineDraft,
+  applySalesLineResolvedConfig,
+  validateSalesLinesSkuResolved,
+} from '@/utils/spuLineResolve'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -682,6 +736,10 @@ const taxModeExcluding = ref(false)
 const detailCollapsed = ref(false)
 const priceSummaryCollapsed = ref(false)
 const productPickerOpen = ref(false)
+const variantConfigOpen = ref(false)
+const variantConfigSpuId = ref('')
+const variantConfigInitialValues = ref(null)
+const variantConfigTargetLine = ref(null)
 const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
 const fileList = ref([])
@@ -726,9 +784,15 @@ const columnDefs = [
   },
   { key: 'businessType', title: '业务类型', width: 130 },
   { key: 'productAttr', title: '产品属性', dataIndex: 'productAttr', width: 90 },
-  { key: 'specAttr', title: '规格属性', dataIndex: 'specAttr', width: 90 },
-  { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 100 },
-  { key: 'material', title: '材质', dataIndex: 'material', width: 80 },
+  { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 120 },
+  { key: 'material', title: '材质', dataIndex: 'material', width: 100 },
+  {
+    key: 'variantAttr',
+    title: '变体属性',
+    dataIndex: 'variantSummary',
+    width: 160,
+    ellipsis: true,
+  },
   { key: 'drawingNo', title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { key: 'techParams', title: '技术参数', width: 120, ellipsis: true },
   { key: 'matchingRequirements', title: '配套要求', width: 120, ellipsis: true },
@@ -754,20 +818,6 @@ const columnDefs = [
 const visibleColumnKeys = ref(columnDefs.map((c) => c.key))
 const columnWidths = reactive(Object.fromEntries(columnDefs.map((c) => [c.key, c.width])))
 
-const displayColumns = computed(() =>
-  columnDefs
-    .filter((c) => visibleColumnKeys.value.includes(c.key))
-    .map((c) => ({
-      title: c.title,
-      key: c.key,
-      dataIndex: c.dataIndex,
-      width: columnWidths[c.key] ?? c.width,
-      ellipsis: c.ellipsis,
-      align: c.key === 'index' ? 'center' : undefined,
-      fixed: c.fixed,
-    })),
-)
-
 watch(visibleColumnKeys, (keys) => {
   const required = fixedColumnKeys.filter((k) => k !== 'action')
   const missing = required.filter((k) => !keys.includes(k))
@@ -775,10 +825,6 @@ watch(visibleColumnKeys, (keys) => {
     visibleColumnKeys.value = [...new Set([...keys, ...required])]
   }
 })
-
-const tableScrollX = computed(() =>
-  displayColumns.value.reduce((sum, c) => sum + (c.width || 100), 0),
-)
 
 const taxModeHint = computed(() =>
   taxModeExcluding.value
@@ -813,6 +859,24 @@ const form = reactive({
   orderDiscountReason: '',
   lineItems: [],
 })
+
+const displayColumns = computed(() =>
+  columnDefs
+    .filter((c) => visibleColumnKeys.value.includes(c.key))
+    .map((c) => ({
+      title: c.title,
+      key: c.key,
+      dataIndex: c.dataIndex,
+      width: columnWidths[c.key] ?? c.width,
+      ellipsis: c.ellipsis,
+      align: c.key === 'index' ? 'center' : undefined,
+      fixed: c.fixed,
+    })),
+)
+
+const tableScrollX = computed(() =>
+  displayColumns.value.reduce((sum, c) => sum + (c.width || 100), 0),
+)
 
 const catalogBusinessTypeOpts = ['自产销售', '外购销售', CUSTOM_SALES_BUSINESS_TYPE].map((v) => ({
   label: v,
@@ -1199,6 +1263,16 @@ function repriceLinesForCustomer() {
   recalcAll()
 }
 
+function filterCustomerOption(input, option) {
+  const kw = String(input || '')
+    .trim()
+    .toLowerCase()
+  if (!kw) return true
+  const label = String(option?.label ?? '').toLowerCase()
+  const value = String(option?.value ?? '').toLowerCase()
+  return label.includes(kw) || value.includes(kw)
+}
+
 function onCustomerChange() {
   form.contactPerson = undefined
   form.contactPhone = ''
@@ -1212,6 +1286,103 @@ function onContactChange(name) {
 
 function openProductPicker() {
   productPickerOpen.value = true
+}
+
+function openVariantConfig(record) {
+  if (!isSpuLine(record) || !record.spuId) return
+  variantConfigTargetLine.value = record
+  variantConfigSpuId.value = record.spuId
+  variantConfigInitialValues.value = { ...(record.variantValues || {}) }
+  variantConfigOpen.value = true
+}
+
+function lineVariantDisplay(record) {
+  return lineVariantSummary(record) || record.variantSummary || ''
+}
+
+function priceContext() {
+  return {
+    customerName: form.customerName,
+    contractNo: form.contractNo,
+  }
+}
+
+function onVariantConfigConfirm(payload) {
+  const { resolved, variantValues } = payload || {}
+  if (!resolved?.sku) {
+    message.warning('未匹配到 SKU')
+    return
+  }
+
+  const target = variantConfigTargetLine.value
+  if (!target) {
+    message.warning('未找到待配置的明细行')
+    return
+  }
+
+  const dupSku = form.lineItems.some(
+    (line) =>
+      line.id !== target.id && line.productCode === resolved.productCode && !line.isManualLine,
+  )
+  if (dupSku) {
+    message.warning(`产品编码「${resolved.productCode}」已在明细中`)
+    return
+  }
+
+  const result = applySalesLineResolvedConfig(target, resolved, priceContext())
+  if (!result.ok) {
+    message.warning(result.message || '更新变体失败')
+    return
+  }
+  target.variantValues = { ...(variantValues || resolved.variantValues || {}) }
+  target.variantSummary = lineVariantSummary(target)
+  recalcLine(target)
+  recalcAll()
+  message.success('变体已配置')
+}
+
+function onSalesProductsSelected(rows) {
+  const list = Array.isArray(rows) ? rows : [rows]
+  const skuRows = list.filter((r) => r.pickType !== 'spu')
+  const spuRows = list.filter((r) => r.pickType === 'spu')
+
+  if (skuRows.length) {
+    onProductsSelected(skuRows)
+  }
+  if (spuRows.length) {
+    onSpuDraftSelected(spuRows)
+  }
+}
+
+function onSpuDraftSelected(rows) {
+  let added = 0
+  rows.forEach((payload) => {
+    const spuId = payload.spuId || payload.id
+    if (!spuId) return
+    const dup = form.lineItems.some(
+      (line) => isSpuLine(line) && line.spuId === spuId && !line.productId,
+    )
+    if (dup) return
+
+    const draft = createSpuLineDraft(payload)
+    const line = createLineItem({
+      ...draft,
+      businessType: '自产销售',
+      deliveryMode: '整机',
+      salesQty: 1,
+      taxRate: 13,
+      bomFulfillmentPath: BOM_FULFILLMENT_PATH.DESIGN_REQUIRED,
+    })
+    recalcLine(line)
+    form.lineItems.push(line)
+    added += 1
+  })
+  recalcAll()
+  if (!added) {
+    message.info('所选产品族已在明细中（待配置变体），未重复添加')
+    return
+  }
+  message.success(`已添加 ${added} 个产品族，请点击规格型号 / 材质 / 变体属性完成配置`)
 }
 
 function resolveMasterRecord(payload) {
@@ -1242,11 +1413,15 @@ function mapPickerToSalesLine(payload) {
     bomId: bom?.id || '',
     businessType: '自产销售',
     isManualLine: false,
+    isSpuLine: false,
+    spuId: master?.spuId || payload.spuId || '',
+    spuName: master?.spuName || '',
+    variantValues: master?.variantValues ? { ...master.variantValues } : {},
+    variantSummary: master?.variantSummary || '',
     deliveryMode: '整机',
     productAttr: master?.productAttribute || payload.materialType || '',
     productName: payload.name,
     productCode: payload.code,
-    specAttr: master?.standardSpec || '',
     specModel: payload.specModel,
     material: payload.material,
     drawingNo: payload.drawingNo || '',
@@ -1365,6 +1540,12 @@ function handleSave() {
 
   if (!form.lineItems.length) {
     message.warning('请至少添加一条销售明细')
+    return
+  }
+
+  const skuGuard = validateSalesLinesSkuResolved(form.lineItems)
+  if (!skuGuard.ok) {
+    message.warning(skuGuard.message)
     return
   }
 
@@ -1765,6 +1946,20 @@ function handleSave() {
   .readonly-cell {
     font-size: 13px;
     color: rgba(0, 0, 0, 0.65);
+  }
+
+  .variant-field-link {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #1677ff;
+    cursor: pointer;
+
+    &:hover {
+      color: #4096ff;
+    }
   }
 }
 </style>

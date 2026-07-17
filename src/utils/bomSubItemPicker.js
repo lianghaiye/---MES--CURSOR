@@ -66,6 +66,49 @@ function mapMasterRow(source, itemType, options = {}) {
     materialGradeId: source.materialGradeId || '',
     variantSummary: formatVariantSummary(variantValues, variantAxes),
     variantTooltip: formatVariantTooltip(variantValues, variantAxes),
+    isSpuTemplate: false,
+    catalogKind: 'sku',
+  }
+}
+
+/** 产品族模板行：规格/材质/变体为空，便于识别为模板 */
+function mapSpuTemplateRow(spu) {
+  const shared = spu?.sharedFields || {}
+  const itemType = spu?.itemKind === 'material' ? '物料' : '产品'
+  return {
+    rowKey: `产品族-${spu.id}`,
+    itemType,
+    itemId: spu.id,
+    name: spu.name || '',
+    code: spu.code || '',
+    specModel: '',
+    categoryName: spu.categoryName || '',
+    categoryKey: spu.categoryKey || '',
+    parentCategoryKey: spu.parentCategoryKey || spu.categoryKey || '',
+    material: '',
+    drawingNo: shared.drawingNo || '',
+    inventoryUnit: shared.inventoryUnit || shared.unit || '件',
+    productAttribute: shared.productAttribute || '',
+    materialType: '',
+    supplyForm: '',
+    weight: '',
+    processRoute: '',
+    defaultWarehouse: '',
+    defaultSupplier: '',
+    defaultWorkCenter: '',
+    createdAt: spu.createdAt || '',
+    creator: spu.creator || 'admin',
+    unitPrice: 0,
+    subItemCount: 0,
+    spuId: spu.id,
+    spuName: spu.name || '',
+    variantValues: {},
+    materialGradeId: '',
+    variantSummary: '',
+    variantTooltip: '',
+    isSpuTemplate: true,
+    catalogKind: 'spu',
+    variantAxes: spu.variantAxes || [],
   }
 }
 
@@ -78,14 +121,17 @@ export function invalidateBomSubItemPickerRowsCache() {
 }
 
 /** 合并产品信息与物料信息
- * @param {{ skipSubItemCount?: boolean, dedupeProductMaterial?: boolean }} [options]
+ * @param {{ skipSubItemCount?: boolean, dedupeProductMaterial?: boolean, includeSpuTemplates?: boolean, spuCanSellOnly?: boolean }} [options]
  * - dedupeProductMaterial=true（默认）：跳过产品物料在物料表中的镜像，同 ID 只保留产品行
  * - false：产品行 + 物料镜像均保留，供「类型=物料」筛出产品物料
+ * - includeSpuTemplates：一并列出产品族模板（规格/材质/变体为空）
  */
 export function buildBomSubItemPickerRows(options = {}) {
   const skipSubItemCount = options.skipSubItemCount === true
   const dedupeProductMaterial = options.dedupeProductMaterial !== false
-  const cacheKey = `${productInfoState.products?.length || 0}-${materialInfoState.materials?.length || 0}-${spuState.spus?.length || 0}-${skipSubItemCount ? 1 : 0}-${dedupeProductMaterial ? 1 : 0}`
+  const includeSpuTemplates = options.includeSpuTemplates === true
+  const spuCanSellOnly = options.spuCanSellOnly !== false
+  const cacheKey = `${productInfoState.products?.length || 0}-${materialInfoState.materials?.length || 0}-${spuState.spus?.length || 0}-${skipSubItemCount ? 1 : 0}-${dedupeProductMaterial ? 1 : 0}-${includeSpuTemplates ? 1 : 0}-${spuCanSellOnly ? 1 : 0}`
   if (pickerRowsCache && pickerRowsCacheKey === cacheKey) {
     return pickerRowsCache
   }
@@ -103,15 +149,28 @@ export function buildBomSubItemPickerRows(options = {}) {
     rows.push(mapMasterRow(m, '物料', mapOpts))
   })
 
+  if (includeSpuTemplates) {
+    ;(spuState.spus || []).forEach((spu) => {
+      if (!(spu.variantAxes || []).length) return
+      if (spuCanSellOnly && !spu.canSell) return
+      rows.push(mapSpuTemplateRow(spu))
+    })
+  }
+
   pickerRowsCache = rows
   pickerRowsCacheKey = cacheKey
   return rows
 }
 
-/** 全部类型：按 itemId 去重，优先保留「产品」行（去掉产品物料镜像重复） */
+/** 全部类型：按 itemId 去重，优先保留「产品」行（去掉产品物料镜像重复）；产品族模板单独保留 */
 export function dedupePickerRowsPreferProduct(rows = []) {
   const map = new Map()
+  const spuTemplates = []
   rows.forEach((row) => {
+    if (row?.isSpuTemplate) {
+      spuTemplates.push(row)
+      return
+    }
     const id = row?.itemId
     if (id == null || id === '') return
     const prev = map.get(id)
@@ -124,8 +183,8 @@ export function dedupePickerRowsPreferProduct(rows = []) {
     }
   })
   // 保留无 itemId 的异常行
-  const extras = rows.filter((r) => r?.itemId == null || r.itemId === '')
-  return [...map.values(), ...extras]
+  const extras = rows.filter((r) => !r?.isSpuTemplate && (r?.itemId == null || r.itemId === ''))
+  return [...map.values(), ...extras, ...spuTemplates]
 }
 
 export function filterBomSubItemPickerRows(rows, keyword) {
@@ -334,5 +393,9 @@ export function toBomSubItemPayload(row) {
     spuName: row.spuName || '',
     variantValues: row.variantValues || {},
     materialGradeId: row.materialGradeId || '',
+    isSpuTemplate: Boolean(row.isSpuTemplate),
+    pickType: row.isSpuTemplate ? 'spu' : 'sku',
+    isSpuLine: Boolean(row.isSpuTemplate),
+    variantAxes: row.variantAxes || [],
   }
 }

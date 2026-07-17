@@ -229,13 +229,57 @@ watch(
 )
 
 function handlePreview() {
-  openBomPrintPreview(router, buildPayload())
-  handleClose()
+  // 必须在用户点击的同步阶段先开窗，否则易被浏览器当广告弹窗拦截
+  const previewWin = window.open('about:blank', '_blank')
+  try {
+    const result = openBomPrintPreview(router, buildPayload(), { previewWin })
+    if (result?.ok === false) {
+      try {
+        previewWin?.close()
+      } catch {
+        /* ignore */
+      }
+      message.error(result.message || '无法打开预览')
+      return
+    }
+    handleClose()
+  } catch (err) {
+    try {
+      previewWin?.close()
+    } catch {
+      /* ignore */
+    }
+    console.error('[BomPrintModal] preview failed', err)
+    message.error('预览数据生成失败，请刷新后重试')
+  }
 }
 
 function handlePrint() {
-  openBomPrintPreview(router, buildPayload(), { autoPrint: true })
-  handleClose()
+  const previewWin = window.open('about:blank', '_blank')
+  try {
+    const result = openBomPrintPreview(router, buildPayload(), {
+      autoPrint: true,
+      previewWin,
+    })
+    if (result?.ok === false) {
+      try {
+        previewWin?.close()
+      } catch {
+        /* ignore */
+      }
+      message.error(result.message || '无法打开预览')
+      return
+    }
+    handleClose()
+  } catch (err) {
+    try {
+      previewWin?.close()
+    } catch {
+      /* ignore */
+    }
+    console.error('[BomPrintModal] print failed', err)
+    message.error('打印数据生成失败，请刷新后重试')
+  }
 }
 
 function handleDownloadPdf() {

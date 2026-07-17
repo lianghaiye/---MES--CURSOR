@@ -115,6 +115,9 @@
               @change="(checked) => onDesignatedSupplierChange(record, checked)"
             />
           </template>
+          <template v-else-if="column.key === 'remark'">
+            <LongTextEditCell :value="record.remark" @edit="openRemarkEdit(record)" />
+          </template>
           <div
             v-else
             class="body-cell"
@@ -178,6 +181,24 @@
       </a-button>
     </template>
   </a-modal>
+
+  <a-modal
+    v-model:open="remarkEdit.open"
+    title="编辑备注"
+    width="640px"
+    :mask-closable="false"
+    destroy-on-close
+    @ok="confirmRemarkEdit"
+    @cancel="remarkEdit.open = false"
+  >
+    <a-textarea
+      v-model:value="remarkEdit.draft"
+      :rows="10"
+      placeholder="请输入备注"
+      show-count
+      :maxlength="5000"
+    />
+  </a-modal>
 </template>
 
 <script>
@@ -195,6 +216,7 @@ import { getAllSupplierOptions, SUPPLIER_SELECT_PLACEHOLDER } from '@/utils/supp
 import { buildPurchaseRequisitionRows, resolveAssemblyDate } from '@/utils/material'
 import { buildRequisitionFromPlanRows } from '@/store/purchaseRequisitionStore'
 import PlanSupplierSelect from './PlanSupplierSelect.vue'
+import LongTextEditCell from '@/components/LongTextEditCell.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -222,6 +244,7 @@ const columnDefs = [
   { key: 'gapQty', title: '缺口数', width: 80, total: true, numeric: true },
   { key: 'planQty', title: '计划数量', width: 90, editable: true, total: true, numeric: true },
   { key: 'unit', title: '计量单位', width: 90, total: false },
+  { key: 'remark', title: '备注', width: 140, total: false },
   { key: 'action', title: '操作', width: 72, total: false },
 ]
 
@@ -241,6 +264,7 @@ const rows = ref([])
 const editingCell = ref(null)
 const tableWrapRef = ref(null)
 const selectOpen = ref(false)
+const remarkEdit = reactive({ open: false, record: null, draft: '' })
 
 const supplierOpts = getAllSupplierOptions()
 
@@ -259,7 +283,8 @@ const displayColumns = computed(() =>
       dataIndex: c.key,
       key: c.key,
       width: columnWidths[c.key],
-      ellipsis: !c.editable && c.key !== 'action' && c.key !== 'designatedSupplier',
+      ellipsis:
+        !c.editable && c.key !== 'action' && c.key !== 'designatedSupplier' && c.key !== 'remark',
       total: c.total,
       fixed:
         c.key === 'action'
@@ -314,8 +339,21 @@ function isEditing(rowKey, field) {
   return editingCell.value?.rowKey === rowKey && editingCell.value?.field === field
 }
 
+function openRemarkEdit(record) {
+  remarkEdit.record = record
+  remarkEdit.draft = record.remark || ''
+  remarkEdit.open = true
+}
+
+function confirmRemarkEdit() {
+  if (remarkEdit.record) {
+    remarkEdit.record.remark = remarkEdit.draft || ''
+  }
+  remarkEdit.open = false
+}
+
 function startEdit(record, field) {
-  if (!isEditable(field)) return
+  if (!isEditable(field) || field === 'remark') return
   editingCell.value = { rowKey: record.key, field }
   nextTick(() => {
     if (field === 'supplier') {

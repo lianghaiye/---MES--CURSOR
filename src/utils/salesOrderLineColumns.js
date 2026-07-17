@@ -19,9 +19,15 @@ export const salesOrderDetailLineColumns = [
   },
   { key: 'businessType', title: '业务类型', width: 110 },
   { key: 'productAttr', title: '产品属性', dataIndex: 'productAttr', width: 90 },
-  { key: 'specAttr', title: '规格属性', dataIndex: 'specAttr', width: 90 },
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 100 },
   { key: 'material', title: '材质', dataIndex: 'material', width: 80 },
+  {
+    key: 'variantAttr',
+    title: '变体属性',
+    dataIndex: 'variantSummary',
+    width: 160,
+    ellipsis: true,
+  },
   { key: 'drawingNo', title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { key: 'techParams', title: '技术参数', dataIndex: 'techParams', width: 120, ellipsis: true },
   {

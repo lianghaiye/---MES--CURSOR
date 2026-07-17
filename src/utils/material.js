@@ -349,6 +349,7 @@ export function buildPurchaseRequisitionRows(materials, order) {
       gapQty,
       planQty: m.planQty ?? gapQty,
       unit: m.unit || '件',
+      remark: m.remark || '',
     }
   })
 }
@@ -359,6 +360,7 @@ export function patchMaterialFromPurchaseRequisitionRow(row) {
     designateSupplier: row.designatedSupplier,
     supplier: row.supplier,
     planQty: row.planQty,
+    remark: row.remark || '',
     status: '进行中',
     joinPlan: '是',
   }

@@ -87,7 +87,9 @@ function rebuildMatrix() {
     skuCodePattern: props.skuCodePattern,
     bomStrategy: props.spu?.bomStrategy,
   }
-  const enabledSet = props.enabledKeys ? new Set(props.enabledKeys) : null
+  // 空数组 / null：默认全部启用（新建产品族矩阵）
+  const hasExplicitKeys = Array.isArray(props.enabledKeys) && props.enabledKeys.length > 0
+  const enabledSet = hasExplicitKeys ? new Set(props.enabledKeys) : null
   const existingSkus = props.spu?.id ? listSkusForSpu(props.spu.id) : []
   const rows = previewMatrixRows(spu, {
     materialGrades: materialGradeState.items,
@@ -96,10 +98,19 @@ function rebuildMatrix() {
   })
   if (enabledSet == null) {
     rows.forEach((r) => {
-      r.enabled = r.enabled !== false
+      r.enabled = true
     })
   }
   matrixRows.value = rows
+
+  if (enabledSet == null && rows.length) {
+    const keys = rows.map((r) => r.rowKey)
+    const prev = Array.isArray(props.enabledKeys) ? props.enabledKeys : []
+    const same = prev.length === keys.length && keys.every((k) => prev.includes(k))
+    if (!same) {
+      emit('update:enabledKeys', keys)
+    }
+  }
   emitMatrixChange()
 }
 

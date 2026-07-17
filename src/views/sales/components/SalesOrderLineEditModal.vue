@@ -64,6 +64,11 @@
             <a-input v-else :value="draft.material || '—'" disabled />
           </a-form-item>
         </a-col>
+        <a-col v-if="isSpuDraft" :span="8">
+          <a-form-item label="变体属性">
+            <a-input :value="draft.variantSummary || '—'" disabled />
+          </a-form-item>
+        </a-col>
         <a-col :span="8">
           <a-form-item label="图号">
             <a-input
@@ -279,12 +284,15 @@ import {
   recalcSalesLinePricing,
   round2,
 } from '@/utils/salesOrderPricing'
+import { isSpuLine, validateSalesLinesSkuResolved } from '@/utils/spuLineResolve'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   line: { type: Object, default: null },
   taxModeExcluding: { type: Boolean, default: true },
   discountStrategy: { type: String, default: DISCOUNT_STRATEGIES.LINE },
+  customerName: { type: String, default: '' },
+  contractNo: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -308,6 +316,8 @@ const manualBusinessTypeOpts = [
 const deliveryModeOpts = deliveryModeOptions.map((v) => ({ label: v, value: v }))
 
 const draft = reactive(createDraft())
+
+const isSpuDraft = computed(() => isSpuLine(draft))
 
 const businessTypeOpts = computed(() => {
   const base = draft.isManualLine ? manualBusinessTypeOpts : catalogBusinessTypeOpts
@@ -458,6 +468,12 @@ function createDraft(line = {}) {
     packagingForm: line.packagingForm || '',
     supplementDesc: line.supplementDesc || '',
     isManualLine: Boolean(line.isManualLine),
+    isSpuLine: Boolean(line.isSpuLine),
+    spuId: line.spuId || '',
+    spuName: line.spuName || '',
+    variantValues: line.variantValues ? { ...line.variantValues } : {},
+    variantSummary: line.variantSummary || '',
+    materialGradeId: line.materialGradeId || '',
     productId: line.productId || '',
     productAttr: line.productAttr || '',
     bomId: line.bomId || '',
@@ -629,6 +645,13 @@ function validate() {
     message.warning('请填写行折扣')
     return false
   }
+  if (isSpuDraft.value) {
+    const skuGuard = validateSalesLinesSkuResolved([draft])
+    if (!skuGuard.ok) {
+      message.warning(skuGuard.message)
+      return false
+    }
+  }
   if (showFulfillmentPath.value) {
     const check = validateFulfillmentPathForApprove(draft, { businessType: draft.businessType })
     if (!check.ok) {
@@ -670,6 +693,12 @@ function handleSave() {
     packagingForm: draft.packagingForm || '',
     supplementDesc: draft.supplementDesc || '',
     isManualLine: draft.isManualLine,
+    isSpuLine: draft.isSpuLine,
+    spuId: draft.spuId || '',
+    spuName: draft.spuName || '',
+    variantValues: draft.variantValues ? { ...draft.variantValues } : {},
+    variantSummary: draft.variantSummary || '',
+    materialGradeId: draft.materialGradeId || '',
     productId: draft.productId,
     productAttr: draft.productAttr,
     bomId: draft.bomId,
@@ -678,7 +707,7 @@ function handleSave() {
     bomFulfillmentPath: draft.bomFulfillmentPath || '',
     lineAttachments: (draft.lineAttachments || []).map((f) => ({ ...f })),
     attachment: draft.attachment || '',
-    priceSource: props.line?.priceSource || 'product',
+    priceSource: draft.priceSource || props.line?.priceSource || 'product',
   }
   syncLineAttachmentSummary()
   lineDraft.attachment = draft.attachment

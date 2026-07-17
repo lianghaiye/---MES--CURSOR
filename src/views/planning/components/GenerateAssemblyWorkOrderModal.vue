@@ -56,6 +56,9 @@
           <template v-if="column.key === 'action'">
             <a-button type="link" size="small" danger @click="removeRow(record.key)">删除</a-button>
           </template>
+          <template v-else-if="column.key === 'remark'">
+            <LongTextEditCell :value="record.remark" @edit="openRemarkEdit(record)" />
+          </template>
           <div
             v-else
             class="body-cell"
@@ -80,8 +83,14 @@
                 v-model:value="record[column.key]"
                 size="small"
                 style="width: 100%"
+                show-search
+                allow-clear
                 :open="selectOpen"
+                :placeholder="selectPlaceholder(column.key)"
                 :options="selectOptions[column.key]"
+                :filter-option="filterSelectOption"
+                option-filter-prop="label"
+                :get-popup-container="getSelectPopupContainer"
                 @dropdownVisibleChange="onSelectOpenChange"
                 @change="endEdit"
               />
@@ -91,14 +100,6 @@
                 size="small"
                 :min="0"
                 style="width: 100%"
-                autofocus
-                @blur="endEdit"
-                @pressEnter="endEdit"
-              />
-              <a-input
-                v-else
-                v-model:value="record.remark"
-                size="small"
                 autofocus
                 @blur="endEdit"
                 @pressEnter="endEdit"
@@ -141,6 +142,24 @@
       </a-button>
     </template>
   </a-modal>
+
+  <a-modal
+    v-model:open="remarkEdit.open"
+    title="编辑备注"
+    width="640px"
+    :mask-closable="false"
+    destroy-on-close
+    @ok="confirmRemarkEdit"
+    @cancel="remarkEdit.open = false"
+  >
+    <a-textarea
+      v-model:value="remarkEdit.draft"
+      :rows="10"
+      placeholder="请输入备注"
+      show-count
+      :maxlength="5000"
+    />
+  </a-modal>
 </template>
 
 <script setup>
@@ -148,9 +167,14 @@ import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { processRouteOptions, workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { urgencyOptions } from '@/mock/workOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import {
+  getProcessRouteSelectOptions,
+  getWorkCenterSelectOptions,
+} from '@/utils/productionPlanMaterial'
 import { buildAssemblyWorkOrderRows } from '@/utils/material'
+import LongTextEditCell from '@/components/LongTextEditCell.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -170,14 +194,14 @@ const columnDefs = [
   { key: 'material', title: '材质', width: 70, total: false },
   { key: 'drawingNo', title: '图号', width: 100, total: false },
   { key: 'bom', title: 'BOM', width: 100, total: false },
-  { key: 'processRoute', title: '工艺路线', width: 120, editable: true, total: false },
-  { key: 'workCenter', title: '工作中心', width: 100, editable: true, total: false },
+  { key: 'processRoute', title: '工艺路线', width: 150, editable: true, total: false },
+  { key: 'workCenter', title: '工作中心', width: 130, editable: true, total: false },
   { key: 'planQty', title: '计划数量', width: 90, editable: true, total: true, numeric: true },
   { key: 'scheduleQty', title: '排产数量', width: 90, editable: true, total: true, numeric: true },
   { key: 'planDateRange', title: '计划时间', width: 220, editable: true, total: false },
   { key: 'warehouse', title: '预入仓库', width: 100, editable: true, total: false },
   { key: 'urgency', title: '紧急度', width: 80, editable: true, total: false },
-  { key: 'remark', title: '备注', width: 120, editable: true, total: false },
+  { key: 'remark', title: '备注', width: 140, total: false },
   { key: 'action', title: '操作', width: 72, total: false },
 ]
 
@@ -188,14 +212,16 @@ const visibleKeys = ref([...defaultVisibleKeys])
 const columnWidths = reactive(Object.fromEntries(columnDefs.map((c) => [c.key, c.width])))
 const rows = ref([])
 const editingCell = ref(null)
+const tableWrapRef = ref(null)
 const selectOpen = ref(false)
 const planDatePickerOpen = ref(false)
+const remarkEdit = reactive({ open: false, record: null, draft: '' })
 
 const selectOptions = computed(() => {
   void warehouseState.warehouses
   return {
-    processRoute: processRouteOptions.map((v) => ({ label: v, value: v })),
-    workCenter: workCenterOptions.map((v) => ({ label: v, value: v })),
+    processRoute: getProcessRouteSelectOptions(),
+    workCenter: getWorkCenterSelectOptions(),
     warehouse: getWarehouseSelectOptions(),
     urgency: urgencyOptions.map((v) => ({ label: v, value: v })),
   }
@@ -209,7 +235,7 @@ const displayColumns = computed(() =>
       dataIndex: c.key,
       key: c.key,
       width: columnWidths[c.key],
-      ellipsis: !c.editable && c.key !== 'action',
+      ellipsis: !c.editable && c.key !== 'action' && c.key !== 'remark',
       total: c.total,
       fixed:
         c.key === 'action'
@@ -252,14 +278,55 @@ function isEditing(rowKey, field) {
   return editingCell.value?.rowKey === rowKey && editingCell.value?.field === field
 }
 
+function filterSelectOption(input, option) {
+  const kw = String(input || '')
+    .trim()
+    .toLowerCase()
+  if (!kw) return true
+  const label = String(option?.label ?? '').toLowerCase()
+  const value = String(option?.value ?? '').toLowerCase()
+  return label.includes(kw) || value.includes(kw)
+}
+
+function selectPlaceholder(key) {
+  if (key === 'processRoute') return '请搜索工艺路线'
+  if (key === 'workCenter') return '请搜索工作中心'
+  return '请选择'
+}
+
+function getSelectPopupContainer() {
+  return document.body
+}
+
+function openRemarkEdit(record) {
+  remarkEdit.record = record
+  remarkEdit.draft = record.remark || ''
+  remarkEdit.open = true
+}
+
+function confirmRemarkEdit() {
+  if (remarkEdit.record) {
+    remarkEdit.record.remark = remarkEdit.draft || ''
+  }
+  remarkEdit.open = false
+}
+
+function focusEditingSelectSearch() {
+  const input = tableWrapRef.value?.querySelector(
+    '.body-cell.editing .ant-select-selection-search-input',
+  )
+  input?.focus?.()
+}
+
 function startEdit(record, field) {
-  if (!isEditable(field)) return
+  if (!isEditable(field) || field === 'remark') return
   editingCell.value = { rowKey: record.key, field }
   nextTick(() => {
     if (field === 'planDateRange') {
       planDatePickerOpen.value = true
     } else if (selectOptions.value[field]) {
       selectOpen.value = true
+      nextTick(focusEditingSelectSearch)
     }
   })
 }

@@ -102,6 +102,16 @@
             :options="itemTypeOpts"
           />
         </a-form-item>
+        <a-form-item v-if="includeSpuTemplates" label="产品族/SKU">
+          <a-select
+            v-model:value="catalogKindFilter"
+            allow-clear
+            size="small"
+            placeholder="全部"
+            style="width: 110px"
+            :options="catalogKindOpts"
+          />
+        </a-form-item>
         <a-form-item label="物品名称">
           <a-input
             v-model:value="ecnFilters.itemName"
@@ -213,6 +223,7 @@
           :row-selection="rowSelection"
           :columns="tableColumns"
           :data-source="pagedRows"
+          :custom-row="customRow"
           row-key="rowKey"
           size="small"
           bordered
@@ -264,7 +275,7 @@
             </a-button>
           </div>
         </div>
-        <a-empty v-else :image="false" description="请从左侧勾选" class="selected-empty" />
+        <a-empty v-else :image="false" description="请从左侧选择" class="selected-empty" />
       </div>
     </div>
 
@@ -328,12 +339,17 @@ const props = defineProps({
   pickerDefaultItemType: { type: String, default: '' },
   multiple: { type: Boolean, default: true },
   title: { type: String, default: '添加子项' },
+  /** 销售选品：列表同时展示产品族模板（规格/材质/变体为空） */
+  includeSpuTemplates: { type: Boolean, default: false },
+  /** 仅展示可销售产品族 */
+  spuCanSellOnly: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['update:open', 'selected'])
 
 const keyword = ref('')
 const quickItemType = ref(undefined)
+const catalogKindFilter = ref(undefined)
 const loading = ref(false)
 const confirming = ref(false)
 const page = ref(1)
@@ -367,6 +383,11 @@ const appliedFilterConditions = ref([])
 const itemTypeOpts = [
   { label: '产品', value: '产品' },
   { label: '物料', value: '物料' },
+]
+
+const catalogKindOpts = [
+  { label: '产品族', value: 'spu' },
+  { label: 'SKU', value: 'sku' },
 ]
 
 const widthMap = {
@@ -403,6 +424,8 @@ const allRows = computed(() => {
   return buildBomSubItemPickerRows({
     skipSubItemCount: props.ecnNewMaterialMode,
     dedupeProductMaterial: false,
+    includeSpuTemplates: props.includeSpuTemplates,
+    spuCanSellOnly: props.spuCanSellOnly,
   })
 })
 
@@ -414,6 +437,9 @@ const filteredRows = computed(() => {
   } else {
     // 全部 → 去掉同 ID 镜像，优先留产品行
     rows = dedupePickerRowsPreferProduct(rows)
+  }
+  if (props.includeSpuTemplates && catalogKindFilter.value) {
+    rows = rows.filter((r) => (r.catalogKind || 'sku') === catalogKindFilter.value)
   }
   if (props.ecnNewMaterialMode) {
     return filterEcnNewMaterialRows(rows, appliedEcnFilters)
@@ -492,21 +518,76 @@ const pagedRows = computed(() => {
   return filteredRows.value.slice(start, start + pageSize.value)
 })
 
+function syncSelectionFromKeys(keys, rows = []) {
+  selectedRowKeys.value = keys
+  const map = new Map(selectedRows.value.map((r) => [r.rowKey, r]))
+  rows.forEach((r) => map.set(r.rowKey, r))
+  selectedRows.value = keys
+    .map((key) => map.get(key) || allRows.value.find((r) => r.rowKey === key))
+    .filter(Boolean)
+}
+
+function toggleRow(record) {
+  const key = record.rowKey
+  if (!key) return
+  if (!props.multiple) {
+    if (selectedRowKeys.value.includes(key)) {
+      syncSelectionFromKeys([])
+    } else {
+      syncSelectionFromKeys([key], [record])
+    }
+    return
+  }
+  if (selectedRowKeys.value.includes(key)) {
+    syncSelectionFromKeys(
+      selectedRowKeys.value.filter((k) => k !== key),
+      [],
+    )
+  } else {
+    syncSelectionFromKeys([...selectedRowKeys.value, key], [record])
+  }
+}
+
+function isSelectionControlClick(target) {
+  return Boolean(
+    target?.closest?.('.ant-table-selection-column') ||
+    target?.closest?.('.ant-checkbox-wrapper') ||
+    target?.closest?.('.ant-checkbox') ||
+    target?.closest?.('.ant-radio-wrapper') ||
+    target?.closest?.('.ant-radio') ||
+    target?.closest?.('input') ||
+    target?.closest?.('a') ||
+    target?.closest?.('button'),
+  )
+}
+
+function customRow(record) {
+  return {
+    style: { cursor: 'pointer' },
+    onClick: (e) => {
+      if (isSelectionControlClick(e.target)) return
+      e.stopPropagation?.()
+      toggleRow(record)
+    },
+  }
+}
+
 const rowSelection = computed(() => ({
   type: props.multiple ? 'checkbox' : 'radio',
   selectedRowKeys: selectedRowKeys.value,
   preserveSelectedRowKeys: true,
-  onChange: (keys, rows) => {
-    selectedRowKeys.value = keys
-    const map = new Map(selectedRows.value.map((r) => [r.rowKey, r]))
-    rows.forEach((r) => map.set(r.rowKey, r))
-    selectedRows.value = keys
-      .map((key) => map.get(key) || allRows.value.find((r) => r.rowKey === key))
-      .filter(Boolean)
+  onChange: (keys) => {
+    // 仅用 keys 同步，避免当前页 rows 不完整时误带入脏数据
+    const uniqueKeys = [...new Set((keys || []).filter(Boolean))]
+    syncSelectionFromKeys(uniqueKeys)
   },
 }))
 
 watch(quickItemType, () => {
+  page.value = 1
+})
+
+watch(catalogKindFilter, () => {
   page.value = 1
 })
 
@@ -519,6 +600,7 @@ watch(
     Object.assign(appliedEcnFilters, emptyEcnFilters())
     quickItemType.value =
       props.pickerDefaultItemType || (props.ecnNewMaterialMode ? '物料' : undefined)
+    catalogKindFilter.value = undefined
     page.value = 1
     appliedFilterConditions.value = []
     selectedRowKeys.value = []
@@ -538,6 +620,7 @@ function handleEcnClear() {
   Object.assign(ecnFilters, emptyEcnFilters())
   Object.assign(appliedEcnFilters, emptyEcnFilters())
   appliedFilterConditions.value = []
+  catalogKindFilter.value = undefined
   page.value = 1
 }
 

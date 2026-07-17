@@ -2,7 +2,11 @@ import dayjs from 'dayjs'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { processRouteState } from '@/store/processRouteStore'
-import { processRouteOptions } from '@/mock/workOrderOptions'
+import {
+  processRouteOptions,
+  workCenterOptions as mockWorkCenterOptions,
+} from '@/mock/workOrderOptions'
+import { workCenterOptions as groupWorkCenterOptions } from '@/store/employeeGroupStore'
 import { supplierOptions as poSupplierOptions } from '@/mock/purchaseOrderOptions'
 import { supplierOptions as reqSupplierOptions } from '@/mock/purchaseRequisitionOptions'
 import { SUPPLY_FORM_OPTIONS } from '@/utils/masterDataMigrate'
@@ -286,6 +290,15 @@ export function getProcessRouteSelectOptions() {
     .forEach((r) => map.set(r.name, { label: r.name, value: r.name }))
   processRouteOptions.forEach((name) => {
     if (!map.has(name)) map.set(name, { label: name, value: name })
+  })
+  return [...map.values()]
+}
+
+/** 工作中心：合并工单 Mock 与员工组别配置中的工作中心 */
+export function getWorkCenterSelectOptions() {
+  const map = new Map()
+  ;[...mockWorkCenterOptions, ...groupWorkCenterOptions].forEach((name) => {
+    if (name && !map.has(name)) map.set(name, { label: name, value: name })
   })
   return [...map.values()]
 }

@@ -182,7 +182,7 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
       expectedArrivalDate: estimatedArrivalDate,
       deliveryDate,
       receivingWarehouse,
-      remark: '',
+      remark: row.remark || '',
     }),
   )
 

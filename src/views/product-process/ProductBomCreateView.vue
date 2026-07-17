@@ -168,6 +168,15 @@
                   </a-form-item>
                   <a-form-item label="配套要求" class="pair-item">
                     <a-textarea
+                      v-if="isSelectedRoot"
+                      v-model:value="form.matchingRequirements"
+                      placeholder="选择物品后带出，可修改"
+                      allow-clear
+                      :rows="3"
+                      style="width: 100%"
+                    />
+                    <a-textarea
+                      v-else
                       :value="selectedParentInfo.matchingRequirements || '—'"
                       disabled
                       :rows="3"
@@ -480,6 +489,7 @@ function applyEditableMasterFields(itemType, itemId) {
   if (!master) return
   form.techParams = master.techParams || ''
   form.processRoute = master.production?.defaultProcessRoute || undefined
+  form.matchingRequirements = master.matchingRequirements || master.remark || ''
 }
 
 function toggleBasicInfo() {

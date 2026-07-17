@@ -346,13 +346,11 @@
               </a-col>
               <a-col :span="8">
                 <a-form-item label="默认供应商">
-                  <a-select
+                  <PlanSupplierSelect
                     v-model:value="form.production.defaultSupplier"
                     size="small"
-                    allow-clear
-                    show-search
-                    :options="supplierOpts"
-                    placeholder="请选择供应商"
+                    :disabled="viewOnly"
+                    placeholder="请搜索或选择供应商"
                   />
                 </a-form-item>
               </a-col>
@@ -406,8 +404,10 @@
                     size="small"
                     allow-clear
                     show-search
-                    :options="processRouteOpts"
-                    placeholder="请选择 工艺路线"
+                    :options="processRouteSelectOpts"
+                    :filter-option="filterSelectOption"
+                    option-filter-prop="label"
+                    placeholder="请搜索或选择工艺路线"
                   />
                 </a-form-item>
               </a-col>
@@ -675,8 +675,6 @@ import {
   salaryMethodOptions,
   inboundQcOptions,
   workCenterOpts,
-  processRouteOpts,
-  supplierOpts,
   processOpts,
   createDefaultLaborRow,
   createDefaultProductionControl,
@@ -693,6 +691,8 @@ import {
 import { materialGradeState, getMaterialGradeById } from '@/store/materialGradeStore'
 import { resolveMaterialGradeIdByName } from '@/utils/materialGradeResolve'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { getProcessRouteSelectOptions } from '@/utils/productionPlanMaterial'
+import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import ItemBomInfoTab from '@/views/product-process/components/ItemBomInfoTab.vue'
 import VariantAttributeEditor from '@/views/product-process/components/VariantAttributeEditor.vue'
 import VariantSkuMatrixPreview from '@/views/product-process/components/VariantSkuMatrixPreview.vue'
@@ -885,11 +885,13 @@ const form = reactive({
   matchingRequirements: '',
   outputTaxRate: undefined,
   inputTaxRate: undefined,
-  laborEnabled: true,
-  laborRows: [createDefaultLaborRow()],
+  laborEnabled: false,
+  laborRows: [],
   production: createDefaultProductionControl(),
   alert: createDefaultAlertConfig(),
 })
+
+const processRouteSelectOpts = computed(() => getProcessRouteSelectOptions())
 
 function resetForm() {
   form.code = ''
@@ -931,8 +933,8 @@ function resetForm() {
   form.matchingRequirements = ''
   form.outputTaxRate = undefined
   form.inputTaxRate = undefined
-  form.laborEnabled = true
-  form.laborRows = [createDefaultLaborRow()]
+  form.laborEnabled = false
+  form.laborRows = []
   form.production = createDefaultProductionControl()
   form.alert = createDefaultAlertConfig()
   activeTabKey.value = 'basic'
@@ -1066,7 +1068,9 @@ watch(
 watch(
   () => form.laborEnabled,
   (enabled) => {
-    if (enabled) activeTabKey.value = 'labor'
+    if (!enabled) return
+    if (!form.laborRows.length) form.laborRows = [createDefaultLaborRow()]
+    activeTabKey.value = 'labor'
   },
 )
 
@@ -1171,10 +1175,6 @@ function validate() {
     message.warning('请选择库存单位')
     return false
   }
-  if (showProductFields.value && !form.production.defaultWorkCenter) {
-    message.warning('请选择默认工作中心')
-    return false
-  }
   if (form.laborEnabled) {
     for (let i = 0; i < form.laborRows.length; i += 1) {
       const row = form.laborRows[i]
@@ -1197,6 +1197,12 @@ function validate() {
 
 function filterMaterialGrade(input, option) {
   return (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+}
+
+function filterSelectOption(input, option) {
+  const kw = String(input || '').toLowerCase()
+  const label = String(option?.label ?? option?.value ?? '').toLowerCase()
+  return label.includes(kw)
 }
 
 function buildProductPayload() {

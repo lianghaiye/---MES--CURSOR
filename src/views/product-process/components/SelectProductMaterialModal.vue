@@ -21,6 +21,7 @@
     <a-table
       :columns="columns"
       :data-source="filteredList"
+      :custom-row="customRow"
       row-key="id"
       size="small"
       bordered
@@ -88,6 +89,32 @@ const filteredList = computed(() => {
       r.specModel?.toLowerCase().includes(kw),
   )
 })
+
+function toggleRow(record) {
+  const key = record.id
+  if (selectedKeys.value.includes(key)) {
+    selectedKeys.value = []
+  } else {
+    selectedKeys.value = [key]
+  }
+}
+
+function customRow(record) {
+  return {
+    style: { cursor: 'pointer' },
+    onClick: (e) => {
+      const target = e.target
+      if (
+        target?.closest?.('.ant-radio-wrapper') ||
+        target?.closest?.('.ant-radio') ||
+        target?.closest?.('input')
+      ) {
+        return
+      }
+      toggleRow(record)
+    },
+  }
+}
 
 const rowSelection = computed(() => ({
   type: 'radio',

@@ -248,6 +248,15 @@ function handlePrint() {
 }
 
 function handleClose() {
+  // 脚本打开的窗口可 close；同页打开时回退上一页
+  if (window.opener && !window.opener.closed) {
+    window.close()
+    return
+  }
+  if (window.history.length > 1) {
+    window.history.back()
+    return
+  }
   window.close()
 }
 </script>

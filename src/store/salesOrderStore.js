@@ -36,6 +36,7 @@ import { createMaintenanceWorkOrdersFromSalesOrder } from '@/utils/salesOrderMai
 import { createDesignTaskFromSalesLine } from '@/store/designTaskStore'
 import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
+import { validateSalesLinesSkuResolved } from '@/utils/spuLineResolve'
 import {
   getDispatchedWorkOrdersForSalesOrder,
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
@@ -197,6 +198,11 @@ export function approveSalesOrder(id) {
   }
 
   order.lineItems = (order.lineItems || []).map((line) => normalizeSalesLineBusiness(line, order))
+
+  const skuGuard = validateSalesLinesSkuResolved(order.lineItems)
+  if (!skuGuard.ok) {
+    return { ok: false, message: `订单「${order.orderNo}」${skuGuard.message}` }
+  }
 
   const selfMadeLines = order.lineItems.filter((line) =>
     isSelfMadeBusinessType(resolveLineBusinessType(line, order)),
