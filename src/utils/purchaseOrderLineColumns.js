@@ -7,6 +7,13 @@ export const purchaseOrderFormLineColumns = [
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 110, ellipsis: true },
   { title: '规格属性', dataIndex: 'specAttr', key: 'specAttr', width: 90, ellipsis: true },
   { title: '材质', dataIndex: 'material', key: 'material', width: 80, ellipsis: true },
+  {
+    title: '变体属性',
+    dataIndex: 'variantSummary',
+    key: 'variantAttr',
+    width: 140,
+    ellipsis: true,
+  },
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 100, ellipsis: true },
   { title: '库存数量', dataIndex: 'stockQty', key: 'stockQty', width: 90, align: 'right' },
   { title: '采购数量', key: 'purchaseQty', width: 100 },

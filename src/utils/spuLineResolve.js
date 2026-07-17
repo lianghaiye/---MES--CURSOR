@@ -245,22 +245,88 @@ function refreshSalesLineFromResolvedSku(line, resolved, priceContext = {}) {
   return { ok: true }
 }
 
-/** 保存/审核前：产品族行必须已解析到 SKU */
-export function validateSalesLinesSkuResolved(lines = []) {
+export function lineDisplayName(line = {}) {
+  return line.productName || line.itemName || line.spuName || line.inventoryName || '未命名'
+}
+
+/** 已解析到的 SKU id（销售/采购用 productId，出入库用 itemId） */
+export function resolvedSkuId(line = {}) {
+  return line.productId || line.itemId || ''
+}
+
+/** 保存前：产品族行必须已解析到 SKU */
+export function validateLinesSkuResolved(lines = []) {
   for (const line of lines) {
     if (!isSpuLine(line)) continue
+    const name = lineDisplayName(line)
     if (!areRequiredAxesFilled(line.spuId, line.variantValues || {})) {
       return {
         ok: false,
-        message: `明细「${line.productName || line.spuName || '未命名'}」请先选择完整的变体属性`,
+        message: `明细「${name}」请先选择完整的变体属性`,
       }
     }
-    if (!line.productId) {
+    if (!resolvedSkuId(line)) {
       return {
         ok: false,
-        message: `明细「${line.productName || line.spuName || '未命名'}」未找到匹配 SKU，请检查变体组合或先在主数据中生成变体`,
+        message: `明细「${name}」未找到匹配 SKU，请检查变体组合或先在主数据中生成变体`,
       }
     }
   }
   return { ok: true }
+}
+
+/** @deprecated 使用 validateLinesSkuResolved */
+export function validateSalesLinesSkuResolved(lines = []) {
+  return validateLinesSkuResolved(lines)
+}
+
+/** 采购申请/采购订单：同步库存别名字段 */
+export function applyResolvedSkuToProcurementLine(line, resolved) {
+  applyResolvedSkuToLine(line, resolved)
+  if (!line) return line
+  line.inventoryName = resolved.productName
+  line.inventoryCode = resolved.productCode
+  return line
+}
+
+/** 出入库明细草稿（itemCode / itemName） */
+export function createInventorySpuLineDraft(spuPayload) {
+  const draft = createSpuLineDraft(spuPayload)
+  return {
+    ...draft,
+    itemId: '',
+    itemCode: '',
+    itemName: draft.productName,
+  }
+}
+
+/** 出入库：绑定解析后的 SKU */
+export function applyResolvedSkuToInventoryLine(line, resolved) {
+  applyResolvedSkuToLine(line, resolved)
+  if (!line || !resolved?.sku) return line
+  line.itemId = resolved.productId
+  line.itemCode = resolved.productCode
+  line.itemName = resolved.productName
+  line.specAttr = line.specAttr || line.productAttr || ''
+  return line
+}
+
+/** BOM 明细：绑定解析后的 SKU */
+export function applyResolvedSkuToBomLine(line, resolved) {
+  applyResolvedSkuToLine(line, resolved)
+  if (!line || !resolved?.sku) return line
+  line.materialCode = resolved.productCode
+  line.itemName = resolved.productName
+  if (resolved.bomName) line.childBom = resolved.bomName
+  if (resolved.bomVersion) line.childBomVersion = resolved.bomVersion
+  const master = resolveMasterBySkuId(resolved.productId)
+  if (master) {
+    line.categoryName = master.categoryName || line.categoryName || '零件'
+    line.materialType = master.materialType || master.productAttribute || line.materialType || ''
+    line.supplyForm = master.supplyForm || line.supplyForm || ''
+    line.unit = master.inventoryUnit || line.unit || '件'
+    line.unitPrice = master.unitPrice ?? line.unitPrice ?? 0
+    line.drawingNo = master.drawingNo || line.drawingNo || ''
+  }
+  return line
 }

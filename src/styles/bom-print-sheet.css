@@ -1,0 +1,230 @@
+/* BOM 打印样式：预览页与 iframe 打印共用，避免 scoped 样式在打印时丢失 */
+
+.bom-print-preview-page .preview-sheet,
+.bom-print-iframe-body .preview-sheet {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 18mm 14mm 16mm;
+  color: #262626;
+}
+
+.bom-print-preview-page.paper-A4.orient-portrait .preview-sheet {
+  width: 210mm;
+}
+
+.bom-print-preview-page.paper-A4.orient-landscape .preview-sheet {
+  width: 297mm;
+}
+
+.bom-print-preview-page.paper-A3.orient-portrait .preview-sheet {
+  width: 297mm;
+}
+
+.bom-print-preview-page.paper-A3.orient-landscape .preview-sheet {
+  width: 420mm;
+}
+
+.bom-print-iframe-body .preview-sheet {
+  width: 100%;
+  box-shadow: none;
+  padding: 10mm 8mm;
+}
+
+.bom-print-preview-page .sheet-header,
+.bom-print-iframe-body .sheet-header {
+  text-align: center;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #262626;
+}
+
+.bom-print-preview-page .sheet-title,
+.bom-print-iframe-body .sheet-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.bom-print-preview-page .sheet-subtitle,
+.bom-print-iframe-body .sheet-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.bom-print-preview-page .sheet-meta,
+.bom-print-iframe-body .sheet-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 14px;
+  border: 1px solid #d9d9d9;
+}
+
+.bom-print-preview-page .meta-item,
+.bom-print-iframe-body .meta-item {
+  display: flex;
+  min-height: 32px;
+  border-right: 1px solid #d9d9d9;
+  border-bottom: 1px solid #d9d9d9;
+}
+
+.bom-print-preview-page .meta-item:nth-child(3n),
+.bom-print-iframe-body .meta-item:nth-child(3n) {
+  border-right: none;
+}
+
+.bom-print-preview-page .meta-item-wide,
+.bom-print-iframe-body .meta-item-wide {
+  grid-column: span 3;
+  border-right: none;
+}
+
+.bom-print-preview-page .meta-label,
+.bom-print-iframe-body .meta-label {
+  flex: 0 0 76px;
+  padding: 6px 8px;
+  background: #fafafa;
+  color: rgba(0, 0, 0, 0.65);
+  border-right: 1px solid #d9d9d9;
+  font-size: 11px;
+}
+
+.bom-print-preview-page .meta-value,
+.bom-print-iframe-body .meta-value {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.bom-print-preview-page .section-title,
+.bom-print-iframe-body .section-title {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bom-print-preview-page .table-wrap,
+.bom-print-iframe-body .table-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+
+.bom-print-preview-page .sheet-table,
+.bom-print-iframe-body .sheet-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.bom-print-preview-page .sheet-table th,
+.bom-print-preview-page .sheet-table td,
+.bom-print-iframe-body .sheet-table th,
+.bom-print-iframe-body .sheet-table td {
+  border: 1px solid #d9d9d9;
+  padding: 4px 5px;
+  vertical-align: top;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.bom-print-preview-page .sheet-table th,
+.bom-print-iframe-body .sheet-table th {
+  background: #fafafa;
+  font-weight: 600;
+  text-align: left;
+  font-size: 10px;
+}
+
+.bom-print-preview-page .sheet-table .col-index,
+.bom-print-iframe-body .sheet-table .col-index {
+  width: 8%;
+}
+
+.bom-print-preview-page .sheet-table .col-itemName,
+.bom-print-iframe-body .sheet-table .col-itemName {
+  width: 18%;
+}
+
+.bom-print-preview-page .sheet-table .col-supplyUnit,
+.bom-print-iframe-body .sheet-table .col-supplyUnit {
+  width: 14%;
+}
+
+.bom-print-preview-page .sheet-table .cell-index,
+.bom-print-iframe-body .sheet-table .cell-index {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.bom-print-preview-page .sheet-table .cell-text,
+.bom-print-preview-page .sheet-table .name-text,
+.bom-print-iframe-body .sheet-table .cell-text,
+.bom-print-iframe-body .sheet-table .name-text {
+  display: block;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.bom-print-preview-page .sheet-table .align-right,
+.bom-print-iframe-body .sheet-table .align-right {
+  text-align: right;
+}
+
+.bom-print-preview-page .sheet-table.density-normal,
+.bom-print-iframe-body .sheet-table.density-normal {
+  font-size: 9px;
+}
+
+.bom-print-preview-page .sheet-table.density-normal th,
+.bom-print-iframe-body .sheet-table.density-normal th {
+  font-size: 9px;
+}
+
+.bom-print-preview-page .sheet-table.density-compact,
+.bom-print-iframe-body .sheet-table.density-compact {
+  font-size: 8px;
+}
+
+.bom-print-preview-page .sheet-table.density-compact th,
+.bom-print-preview-page .sheet-table.density-compact td,
+.bom-print-iframe-body .sheet-table.density-compact th,
+.bom-print-iframe-body .sheet-table.density-compact td {
+  padding: 3px 4px;
+}
+
+.bom-print-preview-page .sheet-table.density-compact th,
+.bom-print-iframe-body .sheet-table.density-compact th {
+  font-size: 8px;
+}
+
+.bom-print-preview-page .sheet-footer,
+.bom-print-iframe-body .sheet-footer {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed #d9d9d9;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+@media print {
+  .bom-print-preview-page .preview-sheet,
+  .bom-print-iframe-body .preview-sheet {
+    box-shadow: none;
+    margin: 0 auto;
+  }
+}

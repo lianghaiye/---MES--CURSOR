@@ -233,6 +233,36 @@
               >
                 <template #bodyCell="{ column, record, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'specModel'">
+                    <a
+                      v-if="isSpuLine(record)"
+                      class="variant-field-link"
+                      @click.prevent="openVariantConfig(record)"
+                    >
+                      {{ record.specModel || '点击配置' }}
+                    </a>
+                    <span v-else>{{ record.specModel || '—' }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'material'">
+                    <a
+                      v-if="isSpuLine(record)"
+                      class="variant-field-link"
+                      @click.prevent="openVariantConfig(record)"
+                    >
+                      {{ record.material || '点击配置' }}
+                    </a>
+                    <span v-else>{{ record.material || '—' }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'variantAttr'">
+                    <a
+                      v-if="isSpuLine(record)"
+                      class="variant-field-link"
+                      @click.prevent="openVariantConfig(record)"
+                    >
+                      {{ lineVariantDisplay(record) || '—' }}
+                    </a>
+                    <span v-else>{{ lineVariantDisplay(record) || '—' }}</span>
+                  </template>
                   <template v-else-if="column.key === 'stockQty'">
                     {{ formatQty(record.stockQty) }}
                   </template>
@@ -475,7 +505,16 @@
     v-model:open="productPickerOpen"
     title="添加产品/物料"
     picker-default-item-type="产品"
-    @selected="onProductsSelected"
+    :include-spu-templates="true"
+    @selected="onSalesProductsSelected"
+  />
+
+  <ConfigureSalesSpuVariantModal
+    v-model:open="variantConfigOpen"
+    :spu-id="variantConfigSpuId"
+    :initial-variant-values="variantConfigInitialValues"
+    confirm-text="确定"
+    @confirm="onVariantConfigConfirm"
   />
 
   <PurchaseOrderLineEditModal
@@ -519,6 +558,7 @@ import {
   updatePurchaseOrder,
 } from '@/store/purchaseOrderStore'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
 import WorkOrderSearchSelect from './WorkOrderSearchSelect.vue'
@@ -529,6 +569,14 @@ import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
+import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
+import {
+  createSpuLineDraft,
+  isSpuLine,
+  lineVariantSummary,
+  applyResolvedSkuToProcurementLine,
+  validateLinesSkuResolved,
+} from '@/utils/spuLineResolve'
 import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTableScroll'
 import { useInventoryLineCellEdit } from '@/composables/useInventoryLineCellEdit'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -557,6 +605,14 @@ const prevHeaderReceivingWarehouse = ref(undefined)
 const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
 const lineEditSourceId = ref(null)
+const {
+  variantConfigOpen,
+  variantConfigSpuId,
+  variantConfigInitialValues,
+  variantConfigTargetLine,
+  openVariantConfig,
+  lineVariantDisplay,
+} = useSpuVariantConfig()
 
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const settlementCycleOpts = settlementCycleOptions.map((v) => ({ label: v, value: v }))
@@ -573,7 +629,7 @@ const taxModeHint = computed(() =>
 )
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-form-lines-v1', purchaseOrderFormLineColumns, {
+  useTableColumnSettings('purchase-order-form-lines-v2', purchaseOrderFormLineColumns, {
     minScrollX: 2200,
     pinEdgeColumns: false,
     pinActionColumn: true,
@@ -758,6 +814,11 @@ function mapPickerToPoLine(payload) {
   const code = payload.code || ''
   const unitPrice = Number(master?.unitPrice ?? payload.unitPrice ?? 0)
   const taxRate = Number(master?.inputTaxRate ?? 13)
+  const variantValues = master?.variantValues
+    ? { ...master.variantValues }
+    : payload.variantValues
+      ? { ...payload.variantValues }
+      : {}
 
   const line = createPoLineItem({
     productName: payload.name,
@@ -766,9 +827,9 @@ function mapPickerToPoLine(payload) {
     itemCode: code,
     itemType: payload.itemType || '物料',
     category: payload.categoryName || master?.categoryName || '',
-    specModel: payload.specModel || '',
+    specModel: payload.specModel || master?.specModel || '',
     specAttr: master?.standardSpec || '',
-    material: payload.material || '',
+    material: payload.material || master?.material || '',
     drawingNo: payload.drawingNo || '',
     stockQty: resolveStockQty(code),
     purchaseQty: 1,
@@ -778,6 +839,12 @@ function mapPickerToPoLine(payload) {
     deliveryDate: headerDeliveryDateStr(),
     receivingWarehouse: form.receivingWarehouse || '',
     remark: '',
+    isSpuLine: false,
+    spuId: master?.spuId || payload.spuId || '',
+    spuName: master?.spuName || payload.spuName || '',
+    productId: payload.id || master?.id || '',
+    variantValues,
+    variantSummary: master?.variantSummary || payload.variantSummary || '',
   })
   recalcLineWithMode(line)
   return line
@@ -789,6 +856,95 @@ function lineItemCode(line) {
 
 function openProductPicker() {
   productPickerOpen.value = true
+}
+
+function onSalesProductsSelected(rows) {
+  const list = Array.isArray(rows) ? rows : [rows]
+  const skuRows = list.filter((r) => r.pickType !== 'spu')
+  const spuRows = list.filter((r) => r.pickType === 'spu')
+  if (skuRows.length) onProductsSelected(skuRows)
+  if (spuRows.length) onSpuDraftSelected(spuRows)
+}
+
+function onSpuDraftSelected(rows) {
+  let added = 0
+  rows.forEach((payload) => {
+    const spuId = payload.spuId || payload.id
+    if (!spuId) return
+    const dup = form.lineItems.some(
+      (line) => isSpuLine(line) && line.spuId === spuId && !line.productId,
+    )
+    if (dup) return
+    const draft = createSpuLineDraft(payload)
+    const line = createPoLineItem({
+      ...draft,
+      itemName: draft.productName,
+      itemCode: '',
+      purchaseQty: 1,
+      deliveryDate: headerDeliveryDateStr(),
+      receivingWarehouse: form.receivingWarehouse || '',
+      remark: '',
+    })
+    recalcLineWithMode(line)
+    form.lineItems.push(line)
+    added += 1
+  })
+  if (!added) {
+    message.info('所选产品族已在明细中（待配置变体），未重复添加')
+    return
+  }
+  message.success(`已添加 ${added} 个产品族，请点击规格型号 / 材质 / 变体属性完成配置`)
+}
+
+function onVariantConfigConfirm(payload) {
+  const { resolved, variantValues } = payload || {}
+  if (!resolved?.sku) {
+    message.warning('未匹配到 SKU')
+    return
+  }
+  const target = variantConfigTargetLine.value
+  if (!target) {
+    message.warning('未找到待配置的明细行')
+    return
+  }
+  const dupSku = form.lineItems.some(
+    (line) => line.id !== target.id && lineItemCode(line) === resolved.productCode,
+  )
+  if (dupSku) {
+    message.warning(`产品编码「${resolved.productCode}」已在明细中`)
+    return
+  }
+  applyResolvedSkuToProcurementLine(target, resolved)
+  target.variantValues = { ...(variantValues || resolved.variantValues || {}) }
+  target.variantSummary = lineVariantSummary(target)
+  target.itemName = target.productName
+  target.itemCode = target.productCode
+  target.stockQty = resolveStockQty(resolved.productCode)
+  const master = resolveMasterBySkuId(resolved.productId)
+  if (master) {
+    const unitPrice = Number(master.unitPrice ?? 0)
+    if (taxModeExcluding.value) {
+      target.unitPriceExTax = unitPrice
+    } else {
+      target.unitPriceInTax =
+        Math.round(unitPrice * (1 + (Number(target.taxRate) || 13) / 100) * 100) / 100
+    }
+    target.taxRate = Number(master.inputTaxRate ?? target.taxRate ?? 13)
+    target.unit = master.inventoryUnit || target.unit || '件'
+    target.drawingNo = master.drawingNo || target.drawingNo || ''
+    target.category = master.categoryName || target.category || ''
+  }
+  recalcLineWithMode(target)
+  message.success('变体已配置')
+}
+
+function resolveMasterBySkuId(productId) {
+  if (!productId) return null
+  return (
+    productInfoState.products.find((p) => p.id === productId) ||
+    materialInfoState.materials.find((m) => m.id === productId) ||
+    null
+  )
 }
 
 function onProductsSelected(rows) {
@@ -955,6 +1111,12 @@ function handleSave() {
   }
   if (!form.lineItems.length) {
     message.warning('请至少添加一条采购清单')
+    return
+  }
+
+  const skuCheck = validateLinesSkuResolved(form.lineItems)
+  if (!skuCheck.ok) {
+    message.warning(skuCheck.message)
     return
   }
 
@@ -1162,5 +1324,15 @@ function handleSave() {
 
 :deep(.ant-table-tbody > tr > td) {
   padding: 4px 8px !important;
+}
+
+.variant-field-link {
+  color: #1677ff;
+  cursor: pointer;
+  word-break: break-word;
+
+  &:hover {
+    color: #4096ff;
+  }
 }
 </style>

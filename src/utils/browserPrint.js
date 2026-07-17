@@ -2,16 +2,26 @@
  * 在独立 iframe 中打印，避免 Safari 切换打印机时主页面布局被清空。
  */
 import '@/styles/ecn-print-sheet.css'
+import '@/styles/work-order-print-sheet.css'
+import '@/styles/bom-print-sheet.css'
 
 const PRINT_STYLE_MARKERS = [
   'print-sheet',
   'ecn-print-preview',
   'ecn-print-sheet',
+  'ecn-print-iframe-body',
   'work-order-print-preview',
+  'work-order-print-sheet',
+  'work-order-print-iframe-body',
   'bom-print-preview',
+  'bom-print-sheet',
+  'bom-print-iframe-body',
   'preview-sheet',
   'sheet-page-break',
   'sheet-table',
+  'sheet-meta',
+  'meta-item',
+  'meta-label',
   'no-print',
 ]
 
@@ -106,12 +116,13 @@ function collectStyleText() {
 
   Array.from(document.styleSheets).forEach((sheet) => {
     try {
-      Array.from(sheet.cssRules || []).forEach((rule) => {
-        const text = rule.cssText || ''
-        if (matchesPrintStyle(text)) {
-          css += `\n${text}`
-        }
-      })
+      const rules = Array.from(sheet.cssRules || [])
+      if (!rules.length) return
+      // 任一规则命中则整表拷贝，避免 scoped 拆条后漏掉 sheet-meta 等样式
+      const sheetText = rules.map((rule) => rule.cssText || '').join('\n')
+      if (matchesPrintStyle(sheetText)) {
+        css += `\n${sheetText}`
+      }
     } catch {
       // 跨域样式表不可读，忽略
     }
@@ -123,9 +134,12 @@ function collectStyleText() {
 /**
  * 在独立 iframe 中打印，避免 Safari 切换打印机时主页面布局被清空。
  * @param {HTMLElement} element 要打印的 DOM 节点
- * @param {{ title?: string, styles?: string, paper?: string, orientation?: string }} options
+ * @param {{ title?: string, styles?: string, paper?: string, orientation?: string, bodyClass?: string }} options
  */
-export function printElement(element, { title = 'Print', styles = '', paper, orientation } = {}) {
+export function printElement(
+  element,
+  { title = 'Print', styles = '', paper, orientation, bodyClass = '' } = {},
+) {
   if (!element) return
 
   const iframe = document.createElement('iframe')
@@ -143,6 +157,7 @@ export function printElement(element, { title = 'Print', styles = '', paper, ori
   const pageStyles = paper || orientation ? buildPageStyles(paper, orientation) : ''
   const mergedStyles = `${collectStyleText()}\n${pageStyles}\n${styles}`
   const safeTitle = String(title).replace(/[<>&"]/g, '')
+  const bodyClasses = ['print-iframe-body', bodyClass].filter(Boolean).join(' ')
 
   doc.open()
   doc.write(`<!DOCTYPE html>
@@ -153,7 +168,7 @@ export function printElement(element, { title = 'Print', styles = '', paper, ori
 <title>${safeTitle}</title>
 <style>${mergedStyles}</style>
 </head>
-<body class="print-iframe-body">
+<body class="${bodyClasses}">
 ${element.outerHTML}
 </body>
 </html>`)

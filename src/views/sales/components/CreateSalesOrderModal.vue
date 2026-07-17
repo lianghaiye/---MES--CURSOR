@@ -53,15 +53,10 @@
         </a-col>
         <a-col :span="8">
           <a-form-item label="客户名称" required>
-            <a-select
-              v-model:value="form.customerName"
+            <CustomerSelect
+              v-model="form.customerName"
               size="small"
-              show-search
-              allow-clear
               placeholder="请搜索或选择客户名称"
-              :options="customerOpts"
-              :filter-option="filterCustomerOption"
-              option-filter-prop="label"
               @change="onCustomerChange"
             />
           </a-form-item>
@@ -698,6 +693,7 @@ import {
   formatDiscountRatePercent,
 } from '@/utils/salesOrderPricing'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import CustomerSelect from './CustomerSelect.vue'
 import SalesLineLongTextCell from './SalesLineLongTextCell.vue'
 import SalesOrderLineEditModal from './SalesOrderLineEditModal.vue'
 import ConfigureSalesSpuVariantModal from './ConfigureSalesSpuVariantModal.vue'
@@ -958,9 +954,6 @@ const deliveryMethodOpts = deliveryMethodOptions.map((v) => ({ label: v, value: 
 const deliveryModeOpts = deliveryModeOptions.map((v) => ({ label: v, value: v }))
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const paymentRatioOpts = paymentRatioOptions.map((v) => ({ label: v, value: v }))
-const customerOpts = computed(() =>
-  getCustomerOptions().map((c) => ({ label: c.label, value: c.value })),
-)
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 
 const orderPricing = computed(() =>
@@ -1261,16 +1254,6 @@ function repriceLinesForCustomer() {
     recalcLine(line)
   })
   recalcAll()
-}
-
-function filterCustomerOption(input, option) {
-  const kw = String(input || '')
-    .trim()
-    .toLowerCase()
-  if (!kw) return true
-  const label = String(option?.label ?? '').toLowerCase()
-  const value = String(option?.value ?? '').toLowerCase()
-  return label.includes(kw) || value.includes(kw)
 }
 
 function onCustomerChange() {

@@ -190,7 +190,14 @@
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'itemName'">
                   <span v-if="record.itemCode" class="item-name-text" :title="record.itemName">
-                    [{{ record.itemCode }}] {{ record.itemName }}
+                    {{ record.itemName || '—' }}
+                  </span>
+                  <span
+                    v-else-if="isSpuLine(record)"
+                    class="item-name-text"
+                    :title="record.itemName || record.spuName"
+                  >
+                    {{ record.itemName || record.spuName || '—' }}
                   </span>
                   <InventoryLineItemSelect
                     v-else
@@ -199,6 +206,36 @@
                     @select="(item) => onLineItemSelect(record, item)"
                     @clear="onLineItemClear(record)"
                   />
+                </template>
+                <template v-else-if="column.key === 'specModel'">
+                  <a
+                    v-if="isSpuLine(record)"
+                    class="variant-field-link"
+                    @click.prevent="openVariantConfig(record)"
+                  >
+                    {{ record.specModel || '点击配置' }}
+                  </a>
+                  <span v-else>{{ record.specModel || '—' }}</span>
+                </template>
+                <template v-else-if="column.key === 'material'">
+                  <a
+                    v-if="isSpuLine(record)"
+                    class="variant-field-link"
+                    @click.prevent="openVariantConfig(record)"
+                  >
+                    {{ record.material || '点击配置' }}
+                  </a>
+                  <span v-else>{{ record.material || '—' }}</span>
+                </template>
+                <template v-else-if="column.key === 'variantAttr'">
+                  <a
+                    v-if="isSpuLine(record)"
+                    class="variant-field-link"
+                    @click.prevent="openVariantConfig(record)"
+                  >
+                    {{ lineVariantDisplay(record) || '—' }}
+                  </a>
+                  <span v-else>{{ lineVariantDisplay(record) || '—' }}</span>
                 </template>
                 <template v-else-if="column.key === 'stockQty'">
                   {{ formatQty(record.stockQty) }}
@@ -379,8 +416,17 @@
     v-model:open="pickerOpen"
     title="选择产品"
     hide-add-material
-    ecn-new-material-mode
-    @selected="onItemsPicked"
+    :include-spu-templates="true"
+    :spu-can-sell-only="false"
+    @selected="onSalesProductsSelected"
+  />
+
+  <ConfigureSalesSpuVariantModal
+    v-model:open="variantConfigOpen"
+    :spu-id="variantConfigSpuId"
+    :initial-variant-values="variantConfigInitialValues"
+    confirm-text="确定"
+    @confirm="onVariantConfigConfirm"
   />
 
   <AddByBomModal
@@ -425,6 +471,7 @@ import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTable
 import { useInventoryLineCellEdit } from '@/composables/useInventoryLineCellEdit'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import OutboundLineEditModal from './OutboundLineEditModal.vue'
 import InventoryLineItemSelect from './InventoryLineItemSelect.vue'
@@ -446,6 +493,15 @@ import {
   mergeOutboundLines,
   syncLineTotalFromUnit,
 } from '@/utils/outboundLineHelpers'
+import { createOutboundLine } from '@/mock/outboundOrders'
+import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
+import {
+  createInventorySpuLineDraft,
+  isSpuLine,
+  lineVariantSummary,
+  applyResolvedSkuToInventoryLine,
+  validateLinesSkuResolved,
+} from '@/utils/spuLineResolve'
 import SalesOrderSelectModal from '@/views/production/components/SalesOrderSelectModal.vue'
 import { findSalesOrderByOrderNo, getSalesOrderById } from '@/store/salesOrderStore'
 import { getDeliveryOrderById, getDeliveryOrderByCode } from '@/store/deliveryOrderStore'
@@ -475,6 +531,14 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 const saving = ref(false)
 const addingItems = ref(false)
 const pickerOpen = ref(false)
+const {
+  variantConfigOpen,
+  variantConfigSpuId,
+  variantConfigInitialValues,
+  variantConfigTargetLine,
+  openVariantConfig,
+  lineVariantDisplay,
+} = useSpuVariantConfig()
 const bomModalOpen = ref(false)
 const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
@@ -526,7 +590,7 @@ const form = reactive({
 const baseLineColumns = outboundFormLineColumns
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outbound-form-lines-v2', baseLineColumns, {
+  useTableColumnSettings('outbound-form-lines-v3', baseLineColumns, {
     minScrollX: 1806,
     pinEdgeColumns: false,
     pinActionColumn: true,
@@ -720,6 +784,68 @@ function syncTotalWeight() {
   form.totalWeight = Math.round(calcLineWeightTotal() * 1000) / 1000
 }
 
+function onSalesProductsSelected(rows) {
+  const list = Array.isArray(rows) ? rows : [rows]
+  const skuRows = list.filter((r) => r.pickType !== 'spu')
+  const spuRows = list.filter((r) => r.pickType === 'spu')
+  if (skuRows.length) onItemsPicked(skuRows)
+  if (spuRows.length) onSpuDraftSelected(spuRows)
+}
+
+function onSpuDraftSelected(rows) {
+  let added = 0
+  rows.forEach((payload) => {
+    const spuId = payload.spuId || payload.id
+    if (!spuId) return
+    const dup = form.lineItems.some(
+      (line) => isSpuLine(line) && line.spuId === spuId && !line.itemId && !line.productId,
+    )
+    if (dup) return
+    const draft = createInventorySpuLineDraft(payload)
+    form.lineItems.push(
+      enrichOutboundLine(
+        createOutboundLine({
+          ...draft,
+          shipQty: 1,
+          shipWarehouse: form.warehouse || '',
+        }),
+      ),
+    )
+    added += 1
+  })
+  syncTotalWeight()
+  if (!added) {
+    message.info('所选产品族已在明细中（待配置变体），未重复添加')
+    return
+  }
+  message.success(`已添加 ${added} 个产品族，请点击规格型号 / 材质 / 变体属性完成配置`)
+}
+
+function onVariantConfigConfirm(payload) {
+  const { resolved, variantValues } = payload || {}
+  if (!resolved?.sku) {
+    message.warning('未匹配到 SKU')
+    return
+  }
+  const target = variantConfigTargetLine.value
+  if (!target) {
+    message.warning('未找到待配置的明细行')
+    return
+  }
+  const dupSku = form.lineItems.some(
+    (line) => line.id !== target.id && line.itemCode === resolved.productCode,
+  )
+  if (dupSku) {
+    message.warning(`产品编码「${resolved.productCode}」已在明细中`)
+    return
+  }
+  applyResolvedSkuToInventoryLine(target, resolved)
+  target.variantValues = { ...(variantValues || resolved.variantValues || {}) }
+  target.variantSummary = lineVariantSummary(target)
+  Object.assign(target, enrichOutboundLine(target))
+  message.success('变体已配置')
+}
+
 function onItemsPicked(items) {
   const list = Array.isArray(items) ? items : [items]
   if (!list.length) {
@@ -759,6 +885,35 @@ function addBlankLine() {
 }
 
 function onLineItemSelect(record, item) {
+  if (item?.pickType === 'spu') {
+    const spuId = item.spuId || item.id
+    if (!spuId) return
+    const dup = form.lineItems.some(
+      (line) =>
+        line.id !== record.id &&
+        isSpuLine(line) &&
+        line.spuId === spuId &&
+        !line.itemId &&
+        !line.productId,
+    )
+    if (dup) {
+      message.warning('该产品族已在明细中（待配置变体）')
+      return
+    }
+    const draft = createInventorySpuLineDraft(item)
+    Object.assign(
+      record,
+      enrichOutboundLine(
+        createOutboundLine({
+          ...draft,
+          id: record.id,
+          shipQty: record.shipQty ?? 1,
+          shipWarehouse: record.shipWarehouse || form.warehouse || '',
+        }),
+      ),
+    )
+    return
+  }
   if (!item?.code) return
   const duplicate = form.lineItems.find((l) => l.id !== record.id && l.itemCode === item.code)
   if (duplicate) {
@@ -850,6 +1005,13 @@ function handleSave() {
     message.warning('请输入出库单号')
     return
   }
+
+  const skuCheck = validateLinesSkuResolved(form.lineItems)
+  if (!skuCheck.ok) {
+    message.warning(skuCheck.message)
+    return
+  }
+
   if (!form.lineItems.filter((l) => l.itemCode).length) {
     message.warning('请至少添加一条有效明细')
     return
@@ -990,6 +1152,16 @@ function handleSave() {
 
 :deep(.ant-table-tbody > tr > td) {
   padding: 4px 8px !important;
+}
+
+.variant-field-link {
+  color: #1677ff;
+  cursor: pointer;
+  word-break: break-word;
+
+  &:hover {
+    color: #4096ff;
+  }
 }
 
 .sales-order-summary {

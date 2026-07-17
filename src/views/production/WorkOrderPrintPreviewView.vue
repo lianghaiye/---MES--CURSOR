@@ -119,6 +119,7 @@ function handlePrint() {
     title: printSheets.value[0]?.productName || '生产工单',
     paper: payload.value?.paper,
     orientation: payload.value?.orientation,
+    bodyClass: 'work-order-print-iframe-body',
   })
 }
 
@@ -141,6 +142,8 @@ body,
   margin: 0;
 }
 </style>
+
+<style src="@/styles/work-order-print-sheet.css"></style>
 
 <style lang="less" scoped>
 .work-order-print-preview-page {
@@ -174,194 +177,6 @@ body,
   overflow-x: auto;
 }
 
-.preview-sheet {
-  box-sizing: border-box;
-  flex-shrink: 0;
-  background: #fff;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  padding: 18mm 14mm 16mm;
-  color: #262626;
-}
-
-.sheet-page-break {
-  margin-top: 8px;
-}
-
-.paper-A4.orient-portrait .preview-sheet {
-  width: 210mm;
-}
-
-.paper-A4.orient-landscape .preview-sheet {
-  width: 297mm;
-}
-
-.paper-A3.orient-portrait .preview-sheet {
-  width: 297mm;
-}
-
-.paper-A3.orient-landscape .preview-sheet {
-  width: 420mm;
-}
-
-.sheet-header {
-  text-align: center;
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #262626;
-}
-
-.sheet-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.35;
-  word-break: break-word;
-}
-
-.sheet-subtitle {
-  margin-top: 4px;
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.65);
-}
-
-.sheet-status-row {
-  margin-top: 8px;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 2px 10px;
-  border: 1px solid #1677ff;
-  border-radius: 4px;
-  color: #1677ff;
-  font-size: 12px;
-}
-
-.sheet-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin-bottom: 14px;
-  border: 1px solid #d9d9d9;
-}
-
-.meta-item {
-  display: flex;
-  min-height: 32px;
-  border-right: 1px solid #d9d9d9;
-  border-bottom: 1px solid #d9d9d9;
-
-  &:nth-child(3n) {
-    border-right: none;
-  }
-
-  &.meta-item-wide {
-    grid-column: 1 / -1;
-    border-right: none;
-  }
-}
-
-.meta-label {
-  flex: 0 0 88px;
-  padding: 6px 8px;
-  background: #fafafa;
-  border-right: 1px solid #d9d9d9;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.65);
-}
-
-.meta-value {
-  flex: 1;
-  padding: 6px 8px;
-  font-size: 12px;
-  word-break: break-word;
-}
-
-.sheet-section {
-  margin-bottom: 14px;
-}
-
-.section-title {
-  margin-bottom: 8px;
-  padding-left: 8px;
-  border-left: 3px solid #262626;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-.sheet-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 11px;
-  table-layout: fixed;
-
-  th,
-  td {
-    border: 1px solid #d9d9d9;
-    padding: 5px 6px;
-    text-align: left;
-    word-break: break-word;
-  }
-
-  th {
-    background: #fafafa;
-    font-weight: 600;
-  }
-
-  .cell-index {
-    width: 40px;
-    text-align: center;
-  }
-
-  .cell-name {
-    min-width: 100px;
-  }
-
-  .align-right {
-    text-align: right;
-  }
-}
-
-.process-table {
-  table-layout: fixed;
-  width: 100%;
-
-  th:first-child,
-  td:first-child {
-    width: 48px;
-    text-align: center;
-  }
-
-  .col-process-content {
-    width: 22%;
-    min-width: 120px;
-  }
-
-  .col-feeding {
-    width: 26%;
-    min-width: 140px;
-  }
-}
-
-.sheet-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 18px;
-  padding-top: 10px;
-  border-top: 1px dashed #d9d9d9;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.55);
-
-  .footer-sign {
-    white-space: nowrap;
-  }
-}
-
 @media print {
   .no-print {
     display: none !important;
@@ -373,17 +188,6 @@ body,
 
   .preview-canvas {
     padding: 0;
-  }
-
-  .preview-sheet {
-    box-shadow: none;
-    width: 100% !important;
-    padding: 10mm 8mm;
-  }
-
-  .sheet-page-break {
-    page-break-before: always;
-    margin-top: 0;
   }
 }
 </style>

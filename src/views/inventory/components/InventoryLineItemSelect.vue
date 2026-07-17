@@ -27,7 +27,8 @@
     title="选择产品"
     :multiple="false"
     hide-add-material
-    ecn-new-material-mode
+    :include-spu-templates="true"
+    :spu-can-sell-only="false"
     @selected="onPicked"
   />
 </template>
@@ -49,7 +50,13 @@ const pickerOpen = ref(false)
 const searchKeyword = ref('')
 const DROPDOWN_LIMIT = 8
 
-const allRows = computed(() => buildBomSubItemPickerRows({ skipSubItemCount: true }))
+const allRows = computed(() =>
+  buildBomSubItemPickerRows({
+    skipSubItemCount: true,
+    includeSpuTemplates: true,
+    spuCanSellOnly: false,
+  }),
+)
 
 const displayOptions = computed(() => {
   const kw = searchKeyword.value.trim()
@@ -99,6 +106,10 @@ function openPicker() {
 function onPicked(items) {
   const payload = Array.isArray(items) ? items[0] : items
   if (!payload) return
+  if (payload.pickType === 'spu' || payload.isSpuTemplate) {
+    emit('select', payload)
+    return
+  }
   const hit =
     allRows.value.find(
       (r) => r.itemType === payload.itemType && String(r.itemId) === String(payload.id),

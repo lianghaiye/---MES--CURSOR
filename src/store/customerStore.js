@@ -246,6 +246,7 @@ export function getCustomerOptions() {
     .map((c) => ({
       label: c.name,
       value: c.name,
+      code: c.code || '',
       contacts: c.contacts || [],
       defaultDiscountRate: c.defaultDiscountRate ?? 1,
       customerPriceList: c.customerPriceList || [],

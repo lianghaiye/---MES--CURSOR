@@ -279,7 +279,7 @@
             <a-space :size="0">
               <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
               <a-button type="link" size="small" danger @click="form.lineItems.splice(index, 1)">
-                删除
+                移出本单
               </a-button>
             </a-space>
           </template>
@@ -402,6 +402,14 @@
               >
               <a-button type="link" size="small" @click="openScatterDrawer(record)">
                 选择发运物料
+              </a-button>
+              <a-button
+                type="link"
+                size="small"
+                danger
+                @click="form.scatterShipments.splice(index, 1)"
+              >
+                移出本单
               </a-button>
             </a-space>
           </template>
@@ -555,14 +563,14 @@ const lineColumns = [
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
   { title: '备注', key: 'lineRemark', width: 120 },
-  { title: '操作', key: 'action', width: 110, fixed: 'right' },
+  { title: '操作', key: 'action', width: 140, fixed: 'right' },
 ]
 
 const scatterLineColumns = computed(() =>
   lineColumns
     .filter((c) => c.key !== 'shipQty')
     .map((c) =>
-      c.key === 'action' ? { title: '操作', key: 'scatterAction', width: 180, fixed: 'right' } : c,
+      c.key === 'action' ? { title: '操作', key: 'scatterAction', width: 240, fixed: 'right' } : c,
     ),
 )
 

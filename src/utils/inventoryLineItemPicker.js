@@ -12,5 +12,11 @@ export function normalizeInventoryPickerItem(item = {}) {
     unitPrice: item.unitPrice ?? null,
     productAttribute: item.productAttribute || item.materialType || '',
     materialType: item.materialType || '',
+    isSpuLine: item.isSpuLine === true,
+    spuId: item.spuId || '',
+    spuName: item.spuName || '',
+    productId: item.productId || '',
+    variantValues: item.variantValues ? { ...item.variantValues } : {},
+    variantSummary: item.variantSummary || '',
   }
 }

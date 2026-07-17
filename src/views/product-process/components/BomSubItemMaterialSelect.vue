@@ -22,7 +22,13 @@
     </template>
   </a-select>
 
-  <SelectBomMaterialModal v-model:open="pickerOpen" @selected="onPicked" />
+  <SelectBomMaterialModal
+    v-model:open="pickerOpen"
+    :include-spu-templates="true"
+    :multiple="false"
+    :spu-can-sell-only="false"
+    @selected="onPicked"
+  />
 </template>
 
 <script setup>

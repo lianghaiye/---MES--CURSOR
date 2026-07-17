@@ -244,6 +244,7 @@ function handlePrint() {
     title: payload.value?.rootItemName || 'BOM清单',
     paper: payload.value?.paper,
     orientation: payload.value?.orientation,
+    bodyClass: 'bom-print-iframe-body',
   })
 }
 
@@ -269,6 +270,8 @@ body,
   margin: 0;
 }
 </style>
+
+<style src="@/styles/bom-print-sheet.css"></style>
 
 <style lang="less" scoped>
 .bom-print-preview-page {
@@ -300,191 +303,6 @@ body,
   overflow-x: auto;
 }
 
-.preview-sheet {
-  box-sizing: border-box;
-  flex-shrink: 0;
-  background: #fff;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  padding: 18mm 14mm 16mm;
-  color: #262626;
-}
-
-.paper-A4.orient-portrait .preview-sheet {
-  width: 210mm;
-}
-
-.paper-A4.orient-landscape .preview-sheet {
-  width: 297mm;
-}
-
-.paper-A3.orient-portrait .preview-sheet {
-  width: 297mm;
-}
-
-.paper-A3.orient-landscape .preview-sheet {
-  width: 420mm;
-}
-
-.sheet-header {
-  text-align: center;
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #262626;
-}
-
-.sheet-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.35;
-  word-break: break-word;
-}
-
-.sheet-subtitle {
-  margin-top: 4px;
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.65);
-}
-
-.sheet-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin-bottom: 14px;
-  border: 1px solid #d9d9d9;
-}
-
-.meta-item {
-  display: flex;
-  min-height: 32px;
-  border-right: 1px solid #d9d9d9;
-  border-bottom: 1px solid #d9d9d9;
-
-  &:nth-child(3n) {
-    border-right: none;
-  }
-}
-
-.meta-item-wide {
-  grid-column: span 3;
-  border-right: none;
-}
-
-.meta-label {
-  flex: 0 0 76px;
-  padding: 6px 8px;
-  background: #fafafa;
-  color: rgba(0, 0, 0, 0.65);
-  border-right: 1px solid #d9d9d9;
-  font-size: 11px;
-}
-
-.meta-value {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
-  font-size: 11px;
-  line-height: 1.5;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.section-title {
-  margin-bottom: 6px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.table-wrap {
-  width: 100%;
-  overflow: hidden;
-}
-
-.sheet-table {
-  width: 100%;
-  max-width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  font-size: 10px;
-  line-height: 1.45;
-
-  th,
-  td {
-    border: 1px solid #d9d9d9;
-    padding: 4px 5px;
-    vertical-align: top;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
-  th {
-    background: #fafafa;
-    font-weight: 600;
-    text-align: left;
-    font-size: 10px;
-  }
-
-  .col-index {
-    width: 8%;
-  }
-
-  .col-itemName {
-    width: 18%;
-  }
-
-  .col-supplyUnit {
-    width: 14%;
-  }
-
-  .cell-index {
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .cell-text,
-  .name-text {
-    display: block;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
-  .align-right {
-    text-align: right;
-  }
-
-  &.density-normal {
-    font-size: 9px;
-
-    th {
-      font-size: 9px;
-    }
-  }
-
-  &.density-compact {
-    font-size: 8px;
-
-    th,
-    td {
-      padding: 3px 4px;
-    }
-
-    th {
-      font-size: 8px;
-    }
-  }
-}
-
-.sheet-footer {
-  margin-top: 12px;
-  padding-top: 8px;
-  border-top: 1px dashed #d9d9d9;
-  font-size: 10px;
-  color: rgba(0, 0, 0, 0.45);
-}
-
 @media print {
   .no-print {
     display: none !important;
@@ -497,11 +315,6 @@ body,
   .preview-canvas {
     padding: 0;
     overflow: visible;
-  }
-
-  .preview-sheet {
-    box-shadow: none;
-    margin: 0 auto;
   }
 
   @page {

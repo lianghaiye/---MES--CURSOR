@@ -1,4 +1,5 @@
 import { createBomLineItem, createBomTreeNode } from '@/mock/bomTemplates'
+import { createSpuLineDraft } from '@/utils/spuLineResolve'
 
 const ROOT_ID = 'bom-root'
 
@@ -163,24 +164,60 @@ export function addChildMaterial(flatNodes, lineItems, parentId, material) {
   const parent = flatNodes.find((n) => n.id === parentId)
   if (!parent) return { flatNodes, lineItems }
 
-  const line = createBomLineItem({
-    parentTreeId: parentId,
-    treeNodeId: '',
-    materialCode: material.code,
-    itemName: material.name,
-    specModel: material.specModel || '',
-    categoryName: material.categoryName || '零件',
-    materialType: material.materialType || '零部件',
-    supplyForm: material.supplyForm || '外购件',
-    material: material.material || '',
-    drawingNo: material.drawingNo || '',
-    unit: material.inventoryUnit || '件',
-    unitPrice: material.unitPrice || 0,
-  })
+  const isSpu = Boolean(material?.pickType === 'spu' || material?.isSpuTemplate)
+  let line
+  let nodeTitle
+
+  if (isSpu) {
+    const draft = createSpuLineDraft(material)
+    line = createBomLineItem({
+      parentTreeId: parentId,
+      treeNodeId: '',
+      materialCode: '',
+      itemName: draft.productName,
+      specModel: '',
+      categoryName: draft.category || '零件',
+      materialType: '零部件',
+      supplyForm: '外购件',
+      material: '',
+      drawingNo: draft.drawingNo || '',
+      unit: draft.unit || '件',
+      unitPrice: 0,
+      isSpuLine: true,
+      spuId: draft.spuId,
+      spuName: draft.spuName,
+      variantValues: { ...draft.variantValues },
+      variantSummary: '',
+      productId: '',
+    })
+    nodeTitle = draft.productName || '产品族'
+  } else {
+    line = createBomLineItem({
+      parentTreeId: parentId,
+      treeNodeId: '',
+      materialCode: material.code,
+      itemName: material.name,
+      specModel: material.specModel || '',
+      categoryName: material.categoryName || '零件',
+      materialType: material.materialType || '零部件',
+      supplyForm: material.supplyForm || '外购件',
+      material: material.material || '',
+      drawingNo: material.drawingNo || '',
+      unit: material.inventoryUnit || '件',
+      unitPrice: material.unitPrice || 0,
+      isSpuLine: false,
+      spuId: material.spuId || '',
+      spuName: material.spuName || '',
+      variantValues: material.variantValues ? { ...material.variantValues } : {},
+      variantSummary: material.variantSummary || '',
+      productId: material.itemId || material.id || '',
+    })
+    nodeTitle = `${material.code} ${material.name}`
+  }
 
   const node = createBomTreeNode({
     parentId,
-    title: `${material.code} ${material.name}`,
+    title: nodeTitle,
     quantity: 1,
     nodeType: 'material',
     lineId: line.id,

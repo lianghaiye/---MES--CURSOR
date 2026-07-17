@@ -206,6 +206,7 @@ function handlePrint() {
   if (!sheetRef.value) return
   printElement(sheetRef.value, {
     title: payload.value?.docNo ? `ECN ${payload.value.docNo}` : '工程变更通知单',
+    bodyClass: 'ecn-print-iframe-body',
   })
 }
 

@@ -80,6 +80,12 @@ export function buildInboundLineFromPickerItem(item, defaultWarehouse = '') {
     unitPrice: item.unitPrice ?? null,
     qty: 1,
     warehouse: defaultWarehouse || '',
+    isSpuLine: item.isSpuLine === true,
+    spuId: item.spuId || '',
+    spuName: item.spuName || '',
+    productId: item.productId || item.itemId || '',
+    variantValues: item.variantValues ? { ...item.variantValues } : {},
+    variantSummary: item.variantSummary || '',
   })
   return enrichInboundLine(line)
 }
@@ -203,6 +209,12 @@ export function applyPickerItemToInboundLine(line, item, defaultWarehouse = '') 
     unitPrice: item.unitPrice,
     productAttribute: item.productAttribute || item.materialType,
     materialType: item.materialType,
+    isSpuLine: item.isSpuLine === true,
+    spuId: item.spuId || '',
+    spuName: item.spuName || '',
+    productId: item.productId || '',
+    variantValues: item.variantValues ? { ...item.variantValues } : {},
+    variantSummary: item.variantSummary || '',
   }
   const fresh = buildInboundLineFromPickerItem(normalized, line.warehouse || defaultWarehouse || '')
   return enrichInboundLine({
@@ -219,6 +231,12 @@ export function applyPickerItemToInboundLine(line, item, defaultWarehouse = '') 
     unitPrice: fresh.unitPrice ?? line.unitPrice,
     stockQty: fresh.stockQty,
     warehouseStockQty: fresh.warehouseStockQty,
+    isSpuLine: fresh.isSpuLine,
+    spuId: fresh.spuId,
+    spuName: fresh.spuName,
+    productId: fresh.productId,
+    variantValues: fresh.variantValues ? { ...fresh.variantValues } : {},
+    variantSummary: fresh.variantSummary || '',
     totalPrice: calcInboundLineTotalPrice({
       ...line,
       unitPrice: fresh.unitPrice ?? line.unitPrice,

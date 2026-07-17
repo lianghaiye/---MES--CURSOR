@@ -207,6 +207,7 @@
             @add-detail-line="onAddDetailLine"
             @reorder-lines="onReorderLines"
             @material-change="onMaterialChange"
+            @configure-variant="openVariantConfig"
           />
         </div>
       </main>
@@ -219,7 +220,19 @@
       :line-items="lineItems"
       @imported="onTemplateImported"
     />
-    <SelectBomMaterialModal v-model:open="materialModalOpen" @selected="onMaterialSelected" />
+    <SelectBomMaterialModal
+      v-model:open="materialModalOpen"
+      :include-spu-templates="true"
+      :spu-can-sell-only="false"
+      @selected="onMaterialSelected"
+    />
+    <ConfigureSalesSpuVariantModal
+      v-model:open="variantConfigOpen"
+      :spu-id="variantConfigSpuId"
+      :initial-variant-values="variantConfigInitialValues"
+      confirm-text="确定"
+      @confirm="onVariantConfigConfirm"
+    />
     <AddByBomModal v-model:open="addByBomModalOpen" @confirm="onAddByBomConfirm" />
     <BomColumnSettingDrawer v-model:open="columnDrawerOpen" v-model:settings="columnSettings" />
     <BomOverviewModal
@@ -266,10 +279,16 @@ import {
   generateEbomNo,
 } from '@/store/ebomStore'
 import { useTabs } from '@/composables/useTabs'
-import { applyMaterialToLine, createEmptySubLine } from '@/utils/bomLineMaterial'
+import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
+import {
+  applyMaterialToLine,
+  createEmptySubLine,
+  applyResolvedSkuToBomLineInTree,
+} from '@/utils/bomLineMaterial'
 import {
   createRootTreeNode,
   getLinesForTreeNode,
+  addChildMaterial,
   deleteTreeNode,
   reorderLinesForTreeNode,
   ROOT_ID,
@@ -279,6 +298,7 @@ import {
 import { importBomByReference } from '@/utils/bomImport'
 import { validateParentChildNotSame } from '@/utils/bomValidation'
 import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
+import { validateLinesSkuResolved, lineVariantSummary } from '@/utils/spuLineResolve'
 import BomTreePanel from '@/views/product-process/components/BomTreePanel.vue'
 import BomMaterialTable from '@/views/product-process/components/BomMaterialTable.vue'
 import ImportBomTemplateModal from '@/views/product-process/components/ImportBomTemplateModal.vue'
@@ -288,10 +308,18 @@ import BomColumnSettingDrawer from '@/views/product-process/components/BomColumn
 import BomOverviewModal from '@/views/product-process/components/BomOverviewModal.vue'
 import BomPrintModal from '@/views/product-process/components/BomPrintModal.vue'
 import DesignTaskSalesOrderDrawer from '@/views/planning/components/DesignTaskSalesOrderDrawer.vue'
+import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { closeTab } = useTabs()
+const {
+  variantConfigOpen,
+  variantConfigSpuId,
+  variantConfigInitialValues,
+  variantConfigTargetLine,
+  openVariantConfig,
+} = useSpuVariantConfig()
 
 const designTaskId = computed(() => String(route.params.taskId || ''))
 const pageTabPath = computed(() => `/planning/design-task/${designTaskId.value}/ebom`)
@@ -529,6 +557,11 @@ function validateForSubmit() {
     message.warning('请至少添加一条子项后再提交')
     return false
   }
+  const skuCheck = validateLinesSkuResolved(lineItems.value)
+  if (!skuCheck.ok) {
+    message.warning(skuCheck.message)
+    return false
+  }
   if (lineItems.value.some((l) => !l.materialCode)) {
     message.warning('请为所有子项选择物料')
     return false
@@ -655,11 +688,65 @@ function onMaterialChange({ lineId, material }) {
   const result = applyMaterialToLine(flatNodes.value, lineItems.value, lineId, material)
   flatNodes.value = result.flatNodes
   lineItems.value = result.lineItems
+  if (material?.pickType === 'spu' || material?.isSpuTemplate) {
+    message.success('已添加产品族，请点击规格型号 / 材质 / 变体属性完成配置')
+  }
+}
+
+function onVariantConfigConfirm(payload) {
+  const { resolved, variantValues } = payload || {}
+  if (!resolved?.sku) {
+    message.warning('未匹配到 SKU')
+    return
+  }
+  const target = variantConfigTargetLine.value
+  if (!target) {
+    message.warning('未找到待配置的明细行')
+    return
+  }
+  const dup = lineItems.value.some(
+    (line) => line.id !== target.id && line.materialCode === resolved.productCode,
+  )
+  if (dup) {
+    message.warning(`子项编码「${resolved.productCode}」已在明细中`)
+    return
+  }
+  const parentId = target.parentTreeId || getRootTreeId(flatNodes.value) || ROOT_ID
+  const check = validateParentChildNotSame(
+    parentId,
+    resolved.productCode,
+    flatNodes.value,
+    lineItems.value,
+    parentForm,
+  )
+  if (!check.ok) {
+    message.warning(check.message)
+    return
+  }
+  const result = applyResolvedSkuToBomLineInTree(
+    flatNodes.value,
+    lineItems.value,
+    target.id,
+    resolved,
+  )
+  if (!result.ok) {
+    message.warning('更新变体失败')
+    return
+  }
+  flatNodes.value = result.flatNodes
+  lineItems.value = result.lineItems
+  if (result.line) {
+    result.line.variantValues = { ...(variantValues || resolved.variantValues || {}) }
+    result.line.variantSummary = lineVariantSummary(result.line)
+  }
+  message.success('变体已配置')
 }
 
 function onMaterialSelected(items) {
   const list = Array.isArray(items) ? items : [items]
+  if (!list.length) return
   const parentId = addChildParentId.value || ROOT_ID
+  const accepted = []
   list.forEach((material) => {
     const check = validateParentChildNotSame(
       parentId,
@@ -672,9 +759,27 @@ function onMaterialSelected(items) {
       message.warning(check.message)
       return
     }
-    lineItems.value = [...lineItems.value, createEmptySubLine(parentId, material)]
+    accepted.push(material)
   })
+  if (!accepted.length) return
+
+  let nodes = flatNodes.value
+  let lines = lineItems.value
+  let spuAdded = 0
+  accepted.forEach((material) => {
+    const result = addChildMaterial(nodes, lines, parentId, material)
+    nodes = result.flatNodes
+    lines = result.lineItems
+    if (material?.pickType === 'spu' || material?.isSpuTemplate) spuAdded += 1
+  })
+  flatNodes.value = nodes
+  lineItems.value = lines
   addChildParentId.value = ''
+  if (spuAdded) {
+    message.success(`已添加 ${spuAdded} 个产品族，请点击规格型号 / 材质 / 变体属性完成配置`)
+  } else if (accepted.length > 1) {
+    message.success(`已添加 ${accepted.length} 个子项`)
+  }
 }
 
 function onAddByBomConfirm({ pickerRow, usageCoefficient }) {

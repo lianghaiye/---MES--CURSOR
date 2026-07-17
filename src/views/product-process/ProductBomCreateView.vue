@@ -203,6 +203,7 @@
             @add-detail-line="onAddDetailLine"
             @reorder-lines="onReorderLines"
             @material-change="onMaterialChange"
+            @configure-variant="openVariantConfig"
           />
         </div>
       </main>
@@ -215,7 +216,19 @@
       :line-items="lineItems"
       @imported="onTemplateImported"
     />
-    <SelectBomMaterialModal v-model:open="materialModalOpen" @selected="onMaterialSelected" />
+    <SelectBomMaterialModal
+      v-model:open="materialModalOpen"
+      :include-spu-templates="true"
+      :spu-can-sell-only="false"
+      @selected="onMaterialSelected"
+    />
+    <ConfigureSalesSpuVariantModal
+      v-model:open="variantConfigOpen"
+      :spu-id="variantConfigSpuId"
+      :initial-variant-values="variantConfigInitialValues"
+      confirm-text="确定"
+      @confirm="onVariantConfigConfirm"
+    />
     <AddByBomModal v-model:open="addByBomModalOpen" @confirm="onAddByBomConfirm" />
     <SelectBomMaterialModal
       v-if="!isBaselineBomMode"
@@ -285,7 +298,11 @@ import {
 } from '@/mock/bomMaterialColumns'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
 import { processRouteState } from '@/store/processRouteStore'
-import { applyMaterialToLine, createEmptySubLine } from '@/utils/bomLineMaterial'
+import {
+  applyMaterialToLine,
+  createEmptySubLine,
+  applyResolvedSkuToBomLineInTree,
+} from '@/utils/bomLineMaterial'
 import {
   createRootTreeNode,
   getLinesForTreeNode,
@@ -298,7 +315,9 @@ import {
 } from '@/utils/bomTree'
 import { syncRootNodeFromItem } from '@/utils/bomImport'
 import { useTabs } from '@/composables/useTabs'
+import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
 import { findSpuById, updateSpu } from '@/store/spuStore'
+import { validateLinesSkuResolved, lineVariantSummary } from '@/utils/spuLineResolve'
 import BomTreePanel from './components/BomTreePanel.vue'
 import BomMaterialTable from './components/BomMaterialTable.vue'
 import ImportBomTemplateModal from './components/ImportBomTemplateModal.vue'
@@ -308,12 +327,20 @@ import AddByBomModal from './components/AddByBomModal.vue'
 import BomColumnSettingDrawer from './components/BomColumnSettingDrawer.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
 import BomRelationDrawer from './components/BomRelationDrawer.vue'
+import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import { validateAllBomParentChildLines, validateParentChildNotSame } from '@/utils/bomValidation'
 import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
 
 const route = useRoute()
 const router = useRouter()
 const { closeTab } = useTabs()
+const {
+  variantConfigOpen,
+  variantConfigSpuId,
+  variantConfigInitialValues,
+  variantConfigTargetLine,
+  openVariantConfig,
+} = useSpuVariantConfig()
 
 const isEditMode = computed(() => route.name === 'product-process-bom-edit')
 const editBomId = computed(() => route.params.id)
@@ -805,6 +832,58 @@ function onMaterialChange({ lineId, material }) {
   const result = applyMaterialToLine(flatNodes.value, lineItems.value, lineId, material)
   flatNodes.value = result.flatNodes
   lineItems.value = result.lineItems
+  if (material?.pickType === 'spu' || material?.isSpuTemplate) {
+    message.success('已添加产品族，请点击规格型号 / 材质 / 变体属性完成配置')
+  }
+}
+
+function onVariantConfigConfirm(payload) {
+  const { resolved, variantValues } = payload || {}
+  if (!resolved?.sku) {
+    message.warning('未匹配到 SKU')
+    return
+  }
+  const target = variantConfigTargetLine.value
+  if (!target) {
+    message.warning('未找到待配置的明细行')
+    return
+  }
+  const dup = lineItems.value.some(
+    (line) => line.id !== target.id && line.materialCode === resolved.productCode,
+  )
+  if (dup) {
+    message.warning(`子项编码「${resolved.productCode}」已在明细中`)
+    return
+  }
+  const parentId = target.parentTreeId || getRootTreeId(flatNodes.value) || ROOT_ID
+  const check = validateParentChildNotSame(
+    parentId,
+    resolved.productCode,
+    flatNodes.value,
+    lineItems.value,
+    form,
+  )
+  if (!check.ok) {
+    message.warning(check.message)
+    return
+  }
+  const result = applyResolvedSkuToBomLineInTree(
+    flatNodes.value,
+    lineItems.value,
+    target.id,
+    resolved,
+  )
+  if (!result.ok) {
+    message.warning('更新变体失败')
+    return
+  }
+  flatNodes.value = result.flatNodes
+  lineItems.value = result.lineItems
+  if (result.line) {
+    result.line.variantValues = { ...(variantValues || resolved.variantValues || {}) }
+    result.line.variantSummary = lineVariantSummary(result.line)
+  }
+  message.success('变体已配置')
 }
 
 function onAddChild(parentId) {
@@ -839,15 +918,19 @@ function onMaterialSelected(items) {
 
   let nodes = flatNodes.value
   let lines = lineItems.value
+  let spuAdded = 0
   accepted.forEach((material) => {
     const result = addChildMaterial(nodes, lines, parentId, material)
     nodes = result.flatNodes
     lines = result.lineItems
+    if (material?.pickType === 'spu' || material?.isSpuTemplate) spuAdded += 1
   })
   flatNodes.value = nodes
   lineItems.value = lines
   selectedNodeId.value = parentId
-  if (accepted.length > 1) {
+  if (spuAdded) {
+    message.success(`已添加 ${spuAdded} 个产品族，请点击规格型号 / 材质 / 变体属性完成配置`)
+  } else if (accepted.length > 1) {
     message.success(`已添加 ${accepted.length} 个子项`)
   }
 }
@@ -953,6 +1036,11 @@ async function handleSave() {
     message.warning(
       isBaselineBomMode.value ? '请先通过左侧树切换选择产品族' : '请先通过左侧树切换选择产品/物料',
     )
+    return
+  }
+  const skuCheck = validateLinesSkuResolved(lineItems.value)
+  if (!skuCheck.ok) {
+    message.warning(skuCheck.message)
     return
   }
   if (lineItems.value.some((l) => !l.materialCode)) {

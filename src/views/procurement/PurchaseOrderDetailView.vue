@@ -290,6 +290,13 @@ const lineColumns = [
   { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
   { title: '规格属性', dataIndex: 'specAttr', width: 90, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
+  {
+    title: '变体属性',
+    dataIndex: 'variantSummary',
+    key: 'variantAttr',
+    width: 140,
+    ellipsis: true,
+  },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '库存数量', key: 'stockQty', width: 90, align: 'right' },
   { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },

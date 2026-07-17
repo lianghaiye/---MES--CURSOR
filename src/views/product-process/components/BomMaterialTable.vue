@@ -126,6 +126,9 @@
               <template v-else-if="column.key === 'itemName'">
                 {{ formatCell(record.itemName) }}
               </template>
+              <template v-else-if="column.key === 'variantAttr'">
+                {{ lineVariantDisplay(record) || '—' }}
+              </template>
               <template v-else-if="column.key === 'childBom'">
                 {{ formatChildBom(record) }}
               </template>
@@ -135,11 +138,45 @@
               <template v-else>{{ formatCell(record[column.dataIndex]) }}</template>
             </template>
             <template v-else-if="column.key === 'itemName'">
+              <template v-if="isSpuLine(record)">
+                <span>{{ record.itemName || '—' }}</span>
+              </template>
               <BomSubItemMaterialSelect
+                v-else
                 :value="record.materialCode"
                 :fallback-name="record.itemName"
                 @select="(material) => emit('material-change', { lineId: record.id, material })"
               />
+            </template>
+            <template v-else-if="column.key === 'specModel'">
+              <a
+                v-if="isSpuLine(record)"
+                class="variant-field-link"
+                @click.prevent="emit('configure-variant', record)"
+              >
+                {{ record.specModel || '点击配置' }}
+              </a>
+              <span v-else>{{ formatCell(record.specModel) }}</span>
+            </template>
+            <template v-else-if="column.key === 'material'">
+              <a
+                v-if="isSpuLine(record)"
+                class="variant-field-link"
+                @click.prevent="emit('configure-variant', record)"
+              >
+                {{ record.material || '点击配置' }}
+              </a>
+              <span v-else>{{ formatCell(record.material) }}</span>
+            </template>
+            <template v-else-if="column.key === 'variantAttr'">
+              <a
+                v-if="isSpuLine(record)"
+                class="variant-field-link"
+                @click.prevent="emit('configure-variant', record)"
+              >
+                {{ lineVariantDisplay(record) || '—' }}
+              </a>
+              <span v-else>{{ lineVariantDisplay(record) || '—' }}</span>
             </template>
             <template v-else-if="column.key === 'unitQty'">
               <a-input-number
@@ -279,6 +316,7 @@ import {
 } from '@/mock/bomMaterialColumns'
 import BomMaterialBatchEditModal from './BomMaterialBatchEditModal.vue'
 import BomSubItemMaterialSelect from './BomSubItemMaterialSelect.vue'
+import { isSpuLine, lineVariantSummary } from '@/utils/spuLineResolve'
 
 const props = defineProps({
   lines: { type: Array, default: () => [] },
@@ -290,6 +328,10 @@ const props = defineProps({
 function formatCell(val) {
   if (val == null || val === '') return '—'
   return val
+}
+
+function lineVariantDisplay(record) {
+  return lineVariantSummary(record) || record.variantSummary || ''
 }
 
 function formatQty(val) {
@@ -328,6 +370,7 @@ const emit = defineEmits([
   'open-column-setting',
   'delete-line',
   'material-change',
+  'configure-variant',
   'add-sub-item',
   'add-by-bom',
   'add-detail-line',
@@ -347,6 +390,7 @@ const widthMap = {
   materialType: 90,
   supplyForm: 90,
   material: 90,
+  variantAttr: 140,
   drawingNo: 100,
   unitQty: 100,
   unit: 72,
@@ -381,6 +425,7 @@ const tableColumns = computed(() => {
         'itemName',
         'remark',
         'material',
+        'variantAttr',
         'childBom',
         'drawingNo',
         'substitutePart',
@@ -729,6 +774,16 @@ function customRow(_record, index) {
     align-items: center;
     border-top: 1px solid #f0f0f0;
     background: #fafafa;
+  }
+
+  .variant-field-link {
+    color: #1677ff;
+    cursor: pointer;
+    word-break: break-word;
+
+    &:hover {
+      color: #4096ff;
+    }
   }
 }
 </style>
