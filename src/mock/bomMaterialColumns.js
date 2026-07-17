@@ -1,8 +1,8 @@
 /** BOM 物料清单列配置（列显隐 / 冻结 / 排序） */
 export const defaultBomColumnSettings = [
   { key: 'itemName', title: '子项名称', hidden: false, frozen: true, order: 0 },
-  { key: 'specModel', title: '规格型号', hidden: false, frozen: true, order: 1 },
-  { key: 'materialCode', title: '子项编码', hidden: false, frozen: false, order: 2 },
+  { key: 'materialCode', title: '子项编码', hidden: false, frozen: true, order: 1 },
+  { key: 'specModel', title: '规格型号', hidden: false, frozen: false, order: 2 },
   { key: 'material', title: '材质', hidden: false, frozen: false, order: 3 },
   { key: 'variantAttr', title: '变体属性', hidden: false, frozen: false, order: 4 },
   { key: 'drawingNo', title: '图号', hidden: false, frozen: false, order: 5 },

@@ -10,7 +10,7 @@ export const urgencyOptions = ['正常', '紧急', '加急']
 export const contractTypeOptions = ['标准合同', '框架合同', '临时合同']
 export const settlementCurrencyOptions = ['人民币', '美元', '欧元']
 export const orderTypeOptions = ['国内订单', '海外订单']
-export const deliveryMethodOptions = ['送货', '物料', '自提', '快递']
+export const deliveryMethodOptions = ['送货', '物流', '自提', '快递']
 /** @deprecated 请使用行级 deliveryMode（整机 / 散件） */
 export const fulfillmentMethodOptions = ['整机成品发货', '软件零部件发货']
 export const deliveryModeOptions = ['整机', '散件']
@@ -22,7 +22,7 @@ export const inventoryStatusOptions = ['充足', '缺货', '部分缺货']
 export const settlementTypeOptions = ['月结', '预付', '货到付款']
 export const paymentRatioOptions = ['30%', '50%', '100%']
 export const outboundWarehouseOptions = ['成品仓', '半成品仓', '备件仓']
-export const shipmentMethodOptions = ['送货', '物料', '自提', '快递']
+export const shipmentMethodOptions = ['送货', '物流', '自提', '快递']
 
 export const customerOptions = [
   { label: '测试人员', value: '测试人员', contacts: [{ name: 'TEST', phone: '16522033362' }] },

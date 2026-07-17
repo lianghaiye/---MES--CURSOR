@@ -620,7 +620,7 @@ function normalizeShipmentMethod(value) {
   const map = {
     送货上门: '送货',
     专车配送: '送货',
-    物流: '物料',
+    物料: '物流',
   }
   const normalized = map[value] || value
   return shipmentMethodOptions.includes(normalized) ? normalized : undefined
