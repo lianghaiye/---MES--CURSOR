@@ -277,6 +277,24 @@ const routes = [
         meta: { title: '质检工单' },
       },
       {
+        path: 'production/material-requisition',
+        name: 'production-material-requisition',
+        component: () => import('@/views/production/MaterialRequisitionManagementView.vue'),
+        meta: { title: '领料管理' },
+      },
+      {
+        path: 'production/material-requisition/create',
+        name: 'production-material-requisition-create',
+        component: () => import('@/views/production/MaterialRequisitionCreateView.vue'),
+        meta: { title: '申请领料', listPath: '/production/material-requisition' },
+      },
+      {
+        path: 'production/material-requisition/:id',
+        name: 'production-material-requisition-detail',
+        component: () => import('@/views/production/MaterialRequisitionDetailView.vue'),
+        meta: { title: '领料申请详情', listPath: '/production/material-requisition' },
+      },
+      {
         path: 'report-management/report-work',
         name: 'report-management-report-work',
         component: () => import('@/views/production/ReportWorkManagementView.vue'),
@@ -403,6 +421,18 @@ const routes = [
         meta: { title: '出入库详情' },
       },
       { path: 'inventory/in-out', redirect: '/inventory/in-out-detail' },
+      {
+        path: 'inventory/deduct-records',
+        name: 'inventory-deduct-records',
+        component: () => import('@/views/inventory/InventoryDeductRecordView.vue'),
+        meta: { title: '库存扣减记录' },
+      },
+      {
+        path: 'inventory/deduct-records/:id',
+        name: 'inventory-deduct-record-detail',
+        component: () => import('@/views/inventory/InventoryDeductDetailView.vue'),
+        meta: { title: '扣减记录详情', listPath: '/inventory/deduct-records' },
+      },
       {
         path: 'quality/factory-qc',
         name: 'quality-factory-qc',

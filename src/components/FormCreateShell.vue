@@ -62,6 +62,9 @@ defineEmits(['cancel', 'update:open'])
   padding: 12px 16px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 
 .header-left {

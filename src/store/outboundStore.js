@@ -8,6 +8,7 @@ import {
   qcResultBlocksOutbound,
   QC_RESULT_PASS,
 } from '@/store/factoryQcStore'
+import { isMinimalReportMode } from '@/store/businessRuleStore'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 
@@ -93,7 +94,10 @@ export function canApproveOutbound(order) {
   return order?.status === '待处理' && needsOutboundApproval(order.outboundType)
 }
 
-function resolveInitialOutboundStatus(outboundType) {
+/** 领料出库在极简报工模式下免审批，直接待出库 */
+export function resolveOutboundInitialStatus(outboundType, explicitStatus) {
+  if (explicitStatus) return explicitStatus
+  if (outboundType === '领料出库' && isMinimalReportMode()) return '待出库'
   if (needsOutboundApproval(outboundType)) return '待处理'
   return '待出库'
 }
@@ -149,7 +153,7 @@ export function appendOutboundOrder(payload) {
     docNo,
     warehouse: headerWarehouse,
     lineItems,
-    status: payload.status || resolveInitialOutboundStatus(payload.outboundType),
+    status: resolveOutboundInitialStatus(payload.outboundType, payload.status),
     createdAt: payload.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
     outboundTime: payload.outboundTime || dayjs().format('YYYY-MM-DD HH:mm:ss'),
     creator: payload.creator || 'admin1',

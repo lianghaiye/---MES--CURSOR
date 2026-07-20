@@ -1287,6 +1287,9 @@ function openBomDetail(bomId, bomName) {
   padding: 10px 12px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 
 .header-left {

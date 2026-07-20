@@ -14,6 +14,7 @@ import {
 } from '@/mock/laborHourDemoSeed'
 import { ensureProductionPlanOrderTreeDemoWorkOrders } from '@/mock/productionPlanOrderTreeSeed'
 import { findWorkItemForPlanRow } from '@/utils/productionPlanMaterial'
+import { ensureMaterialReqDemoWorkOrders } from '@/mock/materialReqWorkOrderSeed'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -98,7 +99,9 @@ function ensureDemoWorkOrder(orders) {
 function ensureLaborDemoProductionOrders(orders) {
   const demos = [...createLaborDemoProductionOrders(), ...createLaborDemoAssemblyOrders()]
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
-  return ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest])
+  return ensureMaterialReqDemoWorkOrders(
+    ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+  )
 }
 
 function createInitialOrders() {

@@ -77,6 +77,11 @@ export const sideMenus = {
       path: '/production/disassembly-work-orders',
     },
     { key: 'qc-work-orders', label: '质检工单', path: '/production/qc-work-orders' },
+    {
+      key: 'material-requisition',
+      label: '领料管理',
+      path: '/production/material-requisition',
+    },
   ],
   'report-management': [
     { key: 'report-work', label: '报工确认', path: '/report-management/report-work' },
@@ -89,6 +94,11 @@ export const sideMenus = {
     { key: 'outbound', label: '出库管理', path: '/inventory/outbound' },
     { key: 'inbound', label: '入库管理', path: '/inventory/inbound' },
     { key: 'in-out-detail', label: '出入库详情', path: '/inventory/in-out-detail' },
+    {
+      key: 'deduct-records',
+      label: '库存扣减记录',
+      path: '/inventory/deduct-records',
+    },
   ],
   quality: [
     { key: 'factory-qc', label: '出厂质检', path: '/quality/factory-qc' },
@@ -252,6 +262,11 @@ export const routeTitles = {
   '/production/disassembly-work-orders': '拆解工单',
   '/production/disassembly-work-orders/:id': '拆解工单详情',
   '/production/qc-work-orders': '质检工单',
+  '/production/material-requisition': '领料管理',
+  '/production/material-requisition/create': '申请领料',
+  '/production/material-requisition/:id': '领料申请详情',
+  '/inventory/deduct-records': '库存扣减记录',
+  '/inventory/deduct-records/:id': '扣减记录详情',
   '/report-management/report-work': '报工确认',
   '/report-management/report-work/:id': '报工确认详情',
   '/report-management/process-report': '工序报工',
