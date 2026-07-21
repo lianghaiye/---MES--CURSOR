@@ -184,7 +184,7 @@
               style="width: 100%"
             />
             <div v-if="lineDiscountReadOnly" class="field-hint">
-              仅整单折扣策略下，行折扣固定 100%
+              无折扣或仅整单折扣策略下，行折扣固定 100%
             </div>
           </a-form-item>
         </a-col>
@@ -280,6 +280,7 @@ import {
 } from '@/constants/salesOrderFulfillment'
 import {
   DISCOUNT_STRATEGIES,
+  isLineDiscountDisabled,
   normalizeDiscountRate,
   recalcSalesLinePricing,
   round2,
@@ -344,7 +345,7 @@ const linkedCatalogBom = computed(() => {
   return getOwnActiveBomForItem('product', draft.productId)
 })
 
-const lineDiscountReadOnly = computed(() => props.discountStrategy === DISCOUNT_STRATEGIES.ORDER)
+const lineDiscountReadOnly = computed(() => isLineDiscountDisabled(props.discountStrategy))
 
 const lineDiscountFieldTooltip =
   '行优惠金额 = 标准单价(不含税) × 数量 × (1 - 行折扣率)\n改单价（不含税/含税）会按税率互算，并反推行折扣'

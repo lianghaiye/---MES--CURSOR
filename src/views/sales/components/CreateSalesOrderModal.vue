@@ -227,6 +227,9 @@
               size="small"
               @change="syncOrderDiscountRate"
             >
+              <a-radio :value="DISCOUNT_STRATEGIES.NONE">
+                {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.NONE] }}
+              </a-radio>
               <a-radio :value="DISCOUNT_STRATEGIES.LINE">
                 {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.LINE] }}
               </a-radio>
@@ -245,7 +248,7 @@
               :min="1"
               :max="100"
               :precision="2"
-              :disabled="form.discountStrategy === DISCOUNT_STRATEGIES.LINE"
+              :disabled="orderDiscountFieldsDisabled"
               style="width: 88px"
               @change="syncOrderDiscountRate"
             />
@@ -256,7 +259,7 @@
               size="small"
               :min="0"
               :precision="2"
-              :disabled="form.discountStrategy === DISCOUNT_STRATEGIES.LINE"
+              :disabled="orderDiscountFieldsDisabled"
               style="width: 100px"
               @change="syncOrderDiscountRate"
             />
@@ -691,6 +694,8 @@ import {
   applyOrderAmounts,
   calcOrderAmounts,
   formatDiscountRatePercent,
+  isOrderDiscountDisabled,
+  isLineDiscountDisabled,
 } from '@/utils/salesOrderPricing'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import CustomerSelect from './CustomerSelect.vue'
@@ -730,7 +735,7 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 /** 默认按含税单价录入（明细列「单价（含税）」） */
 const taxModeExcluding = ref(false)
 const detailCollapsed = ref(false)
-const priceSummaryCollapsed = ref(false)
+const priceSummaryCollapsed = ref(true)
 const productPickerOpen = ref(false)
 const variantConfigOpen = ref(false)
 const variantConfigSpuId = ref('')
@@ -847,7 +852,7 @@ const form = reactive({
   paymentRatio: undefined,
   downPaymentAmount: null,
   remark: '',
-  discountStrategy: DISCOUNT_STRATEGIES.LINE,
+  discountStrategy: DISCOUNT_STRATEGIES.NONE,
   orderDiscountType: 'none',
   orderDiscountPercent: 100,
   orderDiscountRate: 1,
@@ -973,12 +978,14 @@ const orderPricing = computed(() =>
 const orderAmount = computed(() => orderPricing.value.orderAmount)
 
 const customerDiscountHint = computed(() => {
+  if (isLineDiscountDisabled(form.discountStrategy)) return ''
   const customer = getCustomerByName(form.customerName)
   if (!customer?.defaultDiscountRate || customer.defaultDiscountRate >= 1) return ''
   return `已应用客户默认折扣 ${formatDiscountRatePercent(customer.defaultDiscountRate)}（新加行自动带出，可改）`
 })
 
-const showLineDiscount = computed(() => form.discountStrategy !== DISCOUNT_STRATEGIES.ORDER)
+const showLineDiscount = computed(() => !isLineDiscountDisabled(form.discountStrategy))
+const orderDiscountFieldsDisabled = computed(() => isOrderDiscountDisabled(form.discountStrategy))
 
 const contactOpts = computed(() => {
   const customer = getCustomerOptions().find((c) => c.value === form.customerName)
@@ -1105,7 +1112,7 @@ function resetForm() {
   form.paymentRatio = undefined
   form.downPaymentAmount = null
   form.remark = ''
-  form.discountStrategy = DISCOUNT_STRATEGIES.LINE
+  form.discountStrategy = DISCOUNT_STRATEGIES.NONE
   form.orderDiscountType = 'none'
   form.orderDiscountPercent = 100
   form.orderDiscountRate = 1
@@ -1118,6 +1125,7 @@ function resetForm() {
   form.orderDiscountTotal = 0
   fileList.value = []
   taxModeExcluding.value = false
+  priceSummaryCollapsed.value = true
 }
 
 function beforeUpload(file) {

@@ -36,19 +36,32 @@ export function ensureLinePricingFields(line = {}) {
 }
 
 export const DISCOUNT_STRATEGIES = {
+  NONE: 'none',
   LINE: 'line',
   ORDER: 'order',
   STACK: 'stack',
 }
 
 export const DISCOUNT_STRATEGY_LABELS = {
+  [DISCOUNT_STRATEGIES.NONE]: '无折扣',
   [DISCOUNT_STRATEGIES.LINE]: '仅明细折扣',
   [DISCOUNT_STRATEGIES.ORDER]: '仅整单折扣',
   [DISCOUNT_STRATEGIES.STACK]: '折上加折',
 }
 
+/** 无折扣 / 仅明细折扣：不可使用整单折扣与减免 */
+export function isOrderDiscountDisabled(strategy) {
+  return strategy === DISCOUNT_STRATEGIES.NONE || strategy === DISCOUNT_STRATEGIES.LINE
+}
+
+/** 无折扣 / 仅整单折扣：行折扣固定 100% */
+export function isLineDiscountDisabled(strategy) {
+  return strategy === DISCOUNT_STRATEGIES.NONE || strategy === DISCOUNT_STRATEGIES.ORDER
+}
+
 export function ensureDiscountStrategy(order = {}) {
   if (!order.discountStrategy) {
+    // 历史单据缺省按「仅明细折扣」兼容；新建表单默认「无折扣」
     order.discountStrategy = DISCOUNT_STRATEGIES.LINE
   }
   return order
@@ -150,7 +163,7 @@ export function calcOrderAmounts(order = {}, options = {}) {
 
   const lineItems = (order.lineItems || []).map((line) => {
     const lineCopy = { ...line }
-    if (strategy === DISCOUNT_STRATEGIES.ORDER) {
+    if (isLineDiscountDisabled(strategy)) {
       lineCopy.lineDiscountRate = 1
     }
     return recalcSalesLinePricing(lineCopy, { taxModeExcluding, editMode: 'discount' })
@@ -162,7 +175,7 @@ export function calcOrderAmounts(order = {}, options = {}) {
 
   let orderDiscountRate = normalizeDiscountRate(order.orderDiscountRate, 1)
   let orderDiscountAmount = Math.max(0, round2(order.orderDiscountAmount))
-  if (strategy === DISCOUNT_STRATEGIES.LINE) {
+  if (isOrderDiscountDisabled(strategy)) {
     orderDiscountRate = 1
     orderDiscountAmount = 0
   }
@@ -176,21 +189,21 @@ export function calcOrderAmounts(order = {}, options = {}) {
   const ratio = lineAmountExTax > 0 ? amountExTax / lineAmountExTax : 1
   const amountInTax = round2(lineAmountInTax * ratio)
 
+  const effectiveLineDiscountTotal = isLineDiscountDisabled(strategy) ? 0 : lineDiscountTotal
+
   return {
     lineItems,
     lineListAmountExTax,
     lineAmountExTax,
     lineAmountInTax,
-    lineDiscountTotal: strategy === DISCOUNT_STRATEGIES.ORDER ? 0 : lineDiscountTotal,
+    lineDiscountTotal: effectiveLineDiscountTotal,
     orderDiscountByRate,
     orderDiscountTotal,
     amountExTax,
     amountInTax,
     orderAmount: amountInTax,
     totalQty: lineItems.reduce((sum, line) => sum + (Number(line.qty) || 0), 0),
-    totalDiscountAmount: round2(
-      (strategy === DISCOUNT_STRATEGIES.ORDER ? 0 : lineDiscountTotal) + orderDiscountTotal,
-    ),
+    totalDiscountAmount: round2(effectiveLineDiscountTotal + orderDiscountTotal),
     discountStrategy: strategy,
   }
 }

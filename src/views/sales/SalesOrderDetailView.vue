@@ -690,6 +690,7 @@ const discountStrategyLabel = computed(() => {
 
 const discountStrategyTagColor = computed(() => {
   const strategy = order.value?.discountStrategy || DISCOUNT_STRATEGIES.LINE
+  if (strategy === DISCOUNT_STRATEGIES.NONE) return 'default'
   if (strategy === DISCOUNT_STRATEGIES.ORDER) return 'warning'
   if (strategy === DISCOUNT_STRATEGIES.STACK) return 'processing'
   return 'success'

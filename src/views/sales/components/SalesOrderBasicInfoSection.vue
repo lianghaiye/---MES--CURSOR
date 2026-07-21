@@ -67,7 +67,7 @@ const fields = computed(() => {
     {
       key: 'discountStrategy',
       label: '折扣策略',
-      format: () => DISCOUNT_STRATEGY_LABELS[o.discountStrategy] || '仅明细折扣',
+      format: () => DISCOUNT_STRATEGY_LABELS[o.discountStrategy] || '无折扣',
     },
     {
       key: 'orderAmount',

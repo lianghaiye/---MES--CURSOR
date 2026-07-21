@@ -56,7 +56,11 @@
               @click="moveDown(index)"
               >下移</a
             >
-            <a class="danger-link" :class="{ disabled: readonly }" @click="removeRow(index)"
+            <a
+              class="danger-link"
+              :class="{ disabled: readonly || isPresetLocked(record) }"
+              :title="isPresetLocked(record) ? '系统字典预置项不可删除' : ''"
+              @click="removeRow(index)"
               >删除</a
             >
           </a-space>
@@ -87,6 +91,10 @@ const props = defineProps({
   headerHint: { type: String, default: '' },
   items: { type: Array, default: () => [] },
   readonly: Boolean,
+  /** 为 true 时，系统预置项（preset）不可删除 */
+  protectPresetItems: { type: Boolean, default: false },
+  /** 用于补齐历史数据：与系统字典值匹配的项视为预置 */
+  systemPresetValues: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:open', 'save'])
@@ -107,13 +115,28 @@ const columns = [
   { title: '操作', key: 'actions', width: 150 },
 ]
 
+function isPresetLocked(record) {
+  return props.protectPresetItems && Boolean(record?.preset)
+}
+
 watch(
-  () => [props.open, props.items],
+  () => [props.open, props.items, props.systemPresetValues],
   ([visible]) => {
     if (!visible) return
-    draftItems.value = (props.items || []).map((it, idx) =>
-      createDictItem({ ...it, sort: typeof it.sort === 'number' ? it.sort : idx }),
+    const presetValues = new Set(
+      (props.systemPresetValues || []).map((v) => String(v || '').trim()).filter(Boolean),
     )
+    draftItems.value = (props.items || []).map((it, idx) => {
+      const preset =
+        it.preset != null
+          ? Boolean(it.preset)
+          : props.protectPresetItems && presetValues.has(String(it.value || '').trim())
+      return createDictItem({
+        ...it,
+        sort: typeof it.sort === 'number' ? it.sort : idx,
+        preset,
+      })
+    })
   },
   { immediate: true, deep: true },
 )
@@ -129,12 +152,18 @@ function addRow() {
       value: '',
       sort: draftItems.value.length,
       status: DICT_STATUS.ENABLED,
+      preset: false,
     }),
   )
 }
 
 function removeRow(index) {
   if (props.readonly) return
+  const row = draftItems.value[index]
+  if (isPresetLocked(row)) {
+    message.warning('系统字典预置项不可删除')
+    return
+  }
   draftItems.value.splice(index, 1)
 }
 
@@ -161,6 +190,7 @@ function handleSave() {
       label: String(it.label || '').trim(),
       value: String(it.value || it.label || '').trim(),
       sort: idx,
+      preset: Boolean(it.preset),
     }),
   )
   if (normalized.some((it) => !it.label || !it.value)) {

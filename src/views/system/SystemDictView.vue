@@ -14,6 +14,19 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="8" :lg="6">
+            <a-form-item label="所属模块">
+              <a-select
+                v-model:value="filters.module"
+                allow-clear
+                size="small"
+                placeholder="请选择模块"
+                :options="moduleOpts"
+                show-search
+                option-filter-prop="label"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8" :lg="6">
             <a-form-item label="状态">
               <a-select
                 v-model:value="filters.status"
@@ -124,6 +137,16 @@
         <a-form-item label="字典名称" required>
           <a-input v-model:value="form.name" placeholder="请输入字典名称" />
         </a-form-item>
+        <a-form-item label="所属模块">
+          <a-select
+            v-model:value="form.module"
+            allow-clear
+            placeholder="请选择所属模块"
+            :options="moduleOpts"
+            show-search
+            option-filter-prop="label"
+          />
+        </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOpts" />
         </a-form-item>
@@ -156,6 +179,7 @@ import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import {
   DICT_STATUS,
+  DICT_MODULE_OPTIONS,
   systemDictState,
   listSystemDicts,
   addSystemDict,
@@ -168,12 +192,12 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 
-const filters = reactive({ keyword: '', status: undefined })
-const applied = ref({ keyword: '', status: undefined })
+const filters = reactive({ keyword: '', module: undefined, status: undefined })
+const applied = ref({ keyword: '', module: undefined, status: undefined })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const formOpen = ref(false)
 const editing = ref(null)
-const form = reactive({ code: '', name: '', status: DICT_STATUS.ENABLED })
+const form = reactive({ code: '', name: '', module: undefined, status: DICT_STATUS.ENABLED })
 const itemsOpen = ref(false)
 const itemsTarget = ref(null)
 
@@ -181,6 +205,7 @@ const statusOpts = [
   { label: DICT_STATUS.ENABLED, value: DICT_STATUS.ENABLED },
   { label: DICT_STATUS.DISABLED, value: DICT_STATUS.DISABLED },
 ]
+const moduleOpts = DICT_MODULE_OPTIONS
 
 const filteredList = computed(() => {
   void systemDictState.dicts
@@ -201,12 +226,13 @@ const baseColumns = [
   { title: '序号', key: 'index', width: 64, align: 'center' },
   { title: '状态', key: 'status', width: 80, align: 'center' },
   { title: '字典编号', key: 'code', dataIndex: 'code', width: 180 },
-  { title: '字典名称', key: 'name', dataIndex: 'name', width: 200 },
+  { title: '字典名称', key: 'name', dataIndex: 'name', width: 180 },
+  { title: '所属模块', key: 'module', dataIndex: 'module', width: 120 },
   { title: '操作', key: 'actions', width: 200, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('system-dict-master-v1', baseColumns)
+  useTableColumnSettings('system-dict-master-v2', baseColumns)
 
 const itemsTitle = computed(() =>
   itemsTarget.value ? `字典配置 — ${itemsTarget.value.name}` : '字典配置',
@@ -218,12 +244,17 @@ const itemsHint = computed(() =>
 )
 
 function handleSearch() {
-  applied.value = { keyword: filters.keyword, status: filters.status }
+  applied.value = {
+    keyword: filters.keyword,
+    module: filters.module,
+    status: filters.status,
+  }
   pagination.current = 1
 }
 
 function handleReset() {
   filters.keyword = ''
+  filters.module = undefined
   filters.status = undefined
   handleSearch()
 }
@@ -232,6 +263,7 @@ function openCreate() {
   editing.value = null
   form.code = ''
   form.name = ''
+  form.module = undefined
   form.status = DICT_STATUS.ENABLED
   formOpen.value = true
 }
@@ -240,12 +272,18 @@ function openEdit(record) {
   editing.value = record
   form.code = record.code
   form.name = record.name
+  form.module = record.module || undefined
   form.status = record.status
   formOpen.value = true
 }
 
 function handleFormSave() {
-  const payload = { code: form.code, name: form.name, status: form.status }
+  const payload = {
+    code: form.code,
+    name: form.name,
+    module: form.module || '',
+    status: form.status,
+  }
   const res = editing.value ? updateSystemDict(editing.value.id, payload) : addSystemDict(payload)
   if (!res.ok) {
     message.warning(res.message)

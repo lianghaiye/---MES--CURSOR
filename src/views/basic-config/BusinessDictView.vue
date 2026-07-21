@@ -14,6 +14,19 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="8" :lg="6">
+            <a-form-item label="所属模块">
+              <a-select
+                v-model:value="filters.module"
+                allow-clear
+                size="small"
+                placeholder="请选择模块"
+                :options="moduleOpts"
+                show-search
+                option-filter-prop="label"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8" :lg="6">
             <a-form-item label="业务状态">
               <a-select
                 v-model:value="filters.bizStatus"
@@ -60,7 +73,7 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 900 }"
+        :scroll="{ x: 1000 }"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">
@@ -108,6 +121,7 @@
         <a-descriptions size="small" bordered :column="2" class="meta-desc">
           <a-descriptions-item label="系统字典编号">{{ currentSys.code }}</a-descriptions-item>
           <a-descriptions-item label="系统字典名称">{{ currentSys.name }}</a-descriptions-item>
+          <a-descriptions-item label="所属模块">{{ currentSys.module || '—' }}</a-descriptions-item>
           <a-descriptions-item label="系统状态">{{ currentSys.status }}</a-descriptions-item>
           <a-descriptions-item label="业务状态">
             {{ bizStatusLabel(currentBizStatus) }}
@@ -187,8 +201,10 @@
     <DictItemsConfigDrawer
       v-model:open="itemsOpen"
       :title="itemsTitle"
-      header-hint="编辑业务字典项；保存后若业务字典为启用，业务侧将优先使用这些值。"
+      header-hint="编辑业务字典项；保存后若业务字典为启用，业务侧将优先使用这些值。系统字典预置项不可删除。"
       :items="currentBiz?.items || []"
+      :protect-preset-items="true"
+      :system-preset-values="systemPresetValues"
       @save="handleItemsSave"
     />
   </div>
@@ -202,7 +218,12 @@ export default { name: 'BusinessDictView' }
 import { computed, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
-import { DICT_STATUS, systemDictState, listSystemDicts } from '@/store/systemDictStore'
+import {
+  DICT_STATUS,
+  DICT_MODULE_OPTIONS,
+  systemDictState,
+  listSystemDicts,
+} from '@/store/systemDictStore'
 import {
   businessDictState,
   getBusinessDictStatus,
@@ -214,8 +235,8 @@ import {
 } from '@/store/businessDictStore'
 import DictItemsConfigDrawer from '@/views/system/components/DictItemsConfigDrawer.vue'
 
-const filters = reactive({ keyword: '', bizStatus: undefined })
-const applied = ref({ keyword: '', bizStatus: undefined })
+const filters = reactive({ keyword: '', module: undefined, bizStatus: undefined })
+const applied = ref({ keyword: '', module: undefined, bizStatus: undefined })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const configOpen = ref(false)
 const currentSys = ref(null)
@@ -226,6 +247,7 @@ const statusOpts = [
   { label: DICT_STATUS.ENABLED, value: DICT_STATUS.ENABLED },
   { label: DICT_STATUS.DISABLED, value: DICT_STATUS.DISABLED },
 ]
+const moduleOpts = DICT_MODULE_OPTIONS
 
 const bizStatusFilterOpts = [
   { label: '未配置', value: 'none' },
@@ -237,7 +259,8 @@ const columns = [
   { title: '序号', key: 'index', width: 64, align: 'center' },
   { title: '系统状态', key: 'sysStatus', width: 88, align: 'center' },
   { title: '字典编号', dataIndex: 'code', key: 'code', width: 160 },
-  { title: '字典名称', dataIndex: 'name', key: 'name', width: 180 },
+  { title: '字典名称', dataIndex: 'name', key: 'name', width: 160 },
+  { title: '所属模块', dataIndex: 'module', key: 'module', width: 120 },
   { title: '系统项数', key: 'itemCount', width: 88, align: 'center' },
   { title: '业务状态', key: 'bizStatus', width: 120, align: 'center' },
   { title: '操作', key: 'actions', width: 88, fixed: 'right' },
@@ -253,7 +276,10 @@ const previewColumns = [
 const filteredList = computed(() => {
   void systemDictState.dicts
   void businessDictState.dicts
-  const list = listSystemDicts({ keyword: applied.value.keyword }).map((d) => ({
+  const list = listSystemDicts({
+    keyword: applied.value.keyword,
+    module: applied.value.module,
+  }).map((d) => ({
     ...d,
     bizStatus: getBusinessDictStatus(d.code),
   }))
@@ -289,6 +315,10 @@ const itemsTitle = computed(() =>
   currentSys.value ? `编辑业务字典项 — ${currentSys.value.name}` : '编辑业务字典项',
 )
 
+const systemPresetValues = computed(() =>
+  (currentSys.value?.items || []).map((it) => it.value).filter(Boolean),
+)
+
 function bizStatusLabel(status) {
   if (status === 'enabled') return '已配置启用'
   if (status === 'disabled') return '已配置停用'
@@ -302,12 +332,17 @@ function bizStatusColor(status) {
 }
 
 function handleSearch() {
-  applied.value = { keyword: filters.keyword, bizStatus: filters.bizStatus }
+  applied.value = {
+    keyword: filters.keyword,
+    module: filters.module,
+    bizStatus: filters.bizStatus,
+  }
   pagination.current = 1
 }
 
 function handleReset() {
   filters.keyword = ''
+  filters.module = undefined
   filters.bizStatus = undefined
   handleSearch()
 }

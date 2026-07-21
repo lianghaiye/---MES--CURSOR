@@ -84,10 +84,12 @@ export function createBusinessDictFromSystem(systemDictCode) {
     status: DICT_STATUS.ENABLED,
     items: (sys.items || []).map((it, idx) =>
       createDictItem({
+        id: it.id,
         label: it.label,
         value: it.value,
         sort: typeof it.sort === 'number' ? it.sort : idx,
         status: it.status,
+        preset: true,
       }),
     ),
   })
@@ -115,8 +117,26 @@ export function updateBusinessDict(id, patch = {}) {
 export function setBusinessDictItems(id, items = []) {
   const idx = businessDictState.dicts.findIndex((d) => d.id === id)
   if (idx < 0) return { ok: false, message: '业务字典不存在' }
+  const prev = businessDictState.dicts[idx]
+  const sys = findSystemDictByCode(prev.systemDictCode)
+  const sysValues = new Set((sys?.items || []).map((it) => String(it.value || '').trim()))
+  const lockedIds = new Set(
+    (prev.items || [])
+      .filter((it) => it.preset || sysValues.has(String(it.value || '').trim()))
+      .map((it) => it.id),
+  )
+  const nextIds = new Set((items || []).map((it) => it.id))
+  for (const lockedId of lockedIds) {
+    if (!nextIds.has(lockedId)) {
+      return { ok: false, message: '系统字典预置项不可删除' }
+    }
+  }
   businessDictState.dicts[idx].items = items.map((it, i) =>
-    createDictItem({ ...it, sort: typeof it.sort === 'number' ? it.sort : i }),
+    createDictItem({
+      ...it,
+      sort: typeof it.sort === 'number' ? it.sort : i,
+      preset: lockedIds.has(it.id) || Boolean(it.preset),
+    }),
   )
   return { ok: true, dict: businessDictState.dicts[idx] }
 }
@@ -141,10 +161,12 @@ export function syncBusinessItemsFromSystem(systemDictCode) {
   const source = findSystemDictByCode(systemDictCode)
   biz.items = (source?.items || sysItems).map((it, idx) =>
     createDictItem({
+      id: it.id,
       label: it.label,
       value: it.value,
       sort: typeof it.sort === 'number' ? it.sort : idx,
       status: it.status || DICT_STATUS.ENABLED,
+      preset: true,
     }),
   )
   return { ok: true, dict: biz }
