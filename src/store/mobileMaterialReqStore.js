@@ -9,6 +9,7 @@ import {
   MATERIAL_REQ_MODES,
   MATERIAL_REQ_AUDIT,
   MATERIAL_REQ_AUDIT_OPTIONS,
+  isMaterialReqMultiSourceMode,
 } from '@/mock/mobileMaterialReqSeed'
 import {
   appendOutboundOrder,
@@ -28,7 +29,13 @@ export const MOBILE_MATERIAL_REQ_STORAGE_KEY = 'i_doms_mobile_material_reqs'
 const SEED_VERSION_KEY = 'i_doms_mobile_material_reqs_seed_v'
 const CURRENT_SEED_VERSION = '2'
 
-export { materialReqModeLabel, MATERIAL_REQ_MODES, MATERIAL_REQ_AUDIT, MATERIAL_REQ_AUDIT_OPTIONS }
+export {
+  materialReqModeLabel,
+  MATERIAL_REQ_MODES,
+  MATERIAL_REQ_AUDIT,
+  MATERIAL_REQ_AUDIT_OPTIONS,
+  isMaterialReqMultiSourceMode,
+}
 
 function loadItems() {
   try {
@@ -183,12 +190,12 @@ function resolveLineSourceDocNo(payload, line) {
 /**
  * WEB / 小程序同逻辑：提交领料申请；审核通过后生成领料出库单
  * @param {object} payload
- * @param {'work-order'|'quick'|'batch-work-order'} payload.mode
+ * @param {'work-order'|'quick'|'batch-work-order'|'sales-order'} payload.mode
  * @param {string} [payload.sourceChannel] web | mini-program
  */
 export function submitMaterialRequisition(payload) {
-  const isBatch = payload.mode === MATERIAL_REQ_MODES.BATCH
-  const mergeFn = isBatch ? mergeMaterialLinesWithSources : mergeMaterialLines
+  const isMulti = isMaterialReqMultiSourceMode(payload.mode)
+  const mergeFn = isMulti ? mergeMaterialLinesWithSources : mergeMaterialLines
   const lines = mergeFn(payload.lines || [])
   if (!lines.length) {
     return { ok: false, message: '请至少添加一条领料明细' }
@@ -201,7 +208,9 @@ export function submitMaterialRequisition(payload) {
 
   const userName = payload.applicant || '管理员'
   const workshop = payload.workshop || payload.requisitionDept || '默认工厂'
-  const sourceOrderNo = isBatch ? resolveBatchSourceOrderNo(payload) : payload.workOrderCode || ''
+  const sourceOrderNo = isMulti
+    ? resolveBatchSourceOrderNo(payload)
+    : payload.workOrderCode || payload.salesOrderNo || ''
   const remarkBase = payload.remark
     ? `领料申请：${payload.remark}`
     : `领料申请（${materialReqModeLabel(payload.mode)}）`
@@ -272,9 +281,9 @@ function createOutboundForRequisition(record) {
       : `领料申请（${materialReqModeLabel(record.mode)}）`)
   const sourceOrderNo =
     draft.sourceOrderNo ||
-    (record.mode === MATERIAL_REQ_MODES.BATCH
+    (isMaterialReqMultiSourceMode(record.mode)
       ? resolveBatchSourceOrderNo(record)
-      : record.workOrderCode || '')
+      : record.workOrderCode || record.salesOrderNo || '')
   const channel = draft.channel || record.sourceChannel || 'web'
   const outboundStatus = resolveOutboundInitialStatus('领料出库')
 

@@ -173,7 +173,7 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space v-if="canGeneratePO(record)" :size="0">
-              <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
+              <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
               <a-button type="link" size="small" danger @click="confirmDelete(record)"
                 >删除</a-button
               >
@@ -200,12 +200,6 @@
         />
       </div>
     </div>
-
-    <CreatePurchaseRequisitionModal
-      v-model:open="createModalOpen"
-      :edit-record="editRecord"
-      @saved="onSaved"
-    />
 
     <GeneratePurchaseOrderModal
       v-model:open="generateModalOpen"
@@ -240,8 +234,6 @@ import {
 import { filterPurchaseRequisitions } from '@/mock/purchaseRequisitions'
 import {
   purchaseRequisitionState,
-  addPurchaseRequisition,
-  updatePurchaseRequisition,
   deletePurchaseRequisition,
   invalidatePurchaseRequisition,
   getRequisitionsByIds,
@@ -253,7 +245,6 @@ import {
   overdueStatusOptions,
   operatorOptions,
 } from '@/mock/purchaseRequisitionOptions'
-import CreatePurchaseRequisitionModal from './components/CreatePurchaseRequisitionModal.vue'
 import GeneratePurchaseOrderModal from './components/GeneratePurchaseOrderModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -277,9 +268,7 @@ const filters = reactive({
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
-const createModalOpen = ref(false)
 const generateModalOpen = ref(false)
-const editRecord = ref(null)
 const generateTargets = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 
@@ -397,13 +386,15 @@ function openCreate() {
   openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
-function openEditModal(record) {
+function openEdit(record) {
   if (!canGeneratePO(record)) {
     message.warning('处理完成的申请单不可编辑')
     return
   }
-  editRecord.value = record
-  createModalOpen.value = true
+  openCreateTab(router, openTab, {
+    path: `/procurement/purchase-req/${record.id}/edit`,
+    title: `编辑采购申请 ${record.reqNo || ''}`.trim(),
+  })
 }
 
 function openGenerateModal(record) {
@@ -422,14 +413,6 @@ function openGenerateModal(record) {
   }
   generateTargets.value = targets
   generateModalOpen.value = true
-}
-
-function onSaved({ isEdit, id, data }) {
-  if (isEdit) {
-    updatePurchaseRequisition(id, data)
-  } else {
-    addPurchaseRequisition({ ...data, id: `pr-${Date.now()}` })
-  }
 }
 
 function onGenerated() {

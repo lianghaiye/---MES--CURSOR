@@ -18,18 +18,22 @@
       <div class="section-card">
         <div class="section-title">领料方式</div>
         <a-radio-group v-model:value="mode" button-style="solid" @change="onModeChange">
-          <a-radio-button :value="MATERIAL_REQ_MODES.BATCH">批量领料</a-radio-button>
+          <a-radio-button :value="MATERIAL_REQ_MODES.WORK_ORDER">工单领料</a-radio-button>
+          <a-radio-button :value="MATERIAL_REQ_MODES.SALES_ORDER">订单领料</a-radio-button>
           <a-radio-button :value="MATERIAL_REQ_MODES.QUICK">快速领料</a-radio-button>
         </a-radio-group>
         <div class="mode-hint">
-          <template v-if="mode === MATERIAL_REQ_MODES.BATCH">
+          <template v-if="mode === MATERIAL_REQ_MODES.WORK_ORDER">
             选择工单自动带出关联产品；可添加工单行合并领料，按物料编码汇总并保留来源工单溯源
+          </template>
+          <template v-else-if="mode === MATERIAL_REQ_MODES.SALES_ORDER">
+            选择销售订单后自动带出关联工单及 EBOM 物料；可手工补料
           </template>
           <template v-else>无工单场景，手工添加物料领料</template>
         </div>
       </div>
 
-      <div v-if="mode === MATERIAL_REQ_MODES.BATCH" class="section-card">
+      <div v-if="mode === MATERIAL_REQ_MODES.WORK_ORDER" class="section-card">
         <div class="section-head">
           <div class="section-title">选择工单</div>
           <a-button
@@ -90,6 +94,70 @@
         </div>
       </div>
 
+      <div v-if="mode === MATERIAL_REQ_MODES.SALES_ORDER" class="section-card">
+        <div class="section-head">
+          <div class="section-title">选择销售订单</div>
+          <a-button
+            type="link"
+            size="small"
+            :disabled="!salesLinkedWorkOrders.length"
+            @click="loadEbomLines"
+          >
+            按 EBOM 刷新明细
+          </a-button>
+        </div>
+        <a-form layout="vertical" class="head-form">
+          <a-row :gutter="16">
+            <a-col :xs="24" :sm="12">
+              <a-form-item label="销售订单" required>
+                <SalesOrderSearchSelect
+                  :value="form.salesOrderNo"
+                  size="middle"
+                  placeholder="请搜索或选择销售订单"
+                  @update:value="onSalesOrderChange"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-form>
+
+        <div v-if="form.salesOrderNo" class="sales-wo-block">
+          <div class="sales-wo-title">关联工单（{{ salesLinkedWorkOrders.length }}）</div>
+          <a-table
+            :columns="salesWoColumns"
+            :data-source="salesLinkedWorkOrders"
+            row-key="id"
+            size="small"
+            bordered
+            :pagination="false"
+            :scroll="{ x: 1480 }"
+            :locale="{ emptyText: '该订单下暂无可领料工单' }"
+            class="sales-wo-table"
+          >
+            <template #bodyCell="{ column, record, index }">
+              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'status'">
+                <a-tag :color="workOrderStatusColor(record.status)">
+                  {{ record.status || '—' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'specModel'">
+                {{ record.specModel || record.productSpec || '—' }}
+              </template>
+              <template v-else-if="column.key === 'variantAttr'">
+                {{ record.variantSummary || '—' }}
+              </template>
+              <template v-else-if="column.key === 'dispatchedAt'">
+                {{ record.dispatchedAt || record.submittedAt || '—' }}
+              </template>
+              <template v-else-if="column.dataIndex">
+                {{ displayWoCell(record[column.dataIndex]) }}
+              </template>
+            </template>
+          </a-table>
+        </div>
+      </div>
+
       <div class="section-card">
         <div class="section-title">申请信息</div>
         <a-form layout="vertical" class="head-form">
@@ -106,7 +174,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col v-if="mode === MATERIAL_REQ_MODES.BATCH" :xs="24" :sm="8">
+            <a-col v-if="mode !== MATERIAL_REQ_MODES.QUICK" :xs="24" :sm="8">
               <a-form-item label="领入仓库">
                 <a-select
                   v-model:value="form.receiveWarehouse"
@@ -138,8 +206,8 @@
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1240 }"
-          :locale="{ emptyText: '请添加领料明细或从工单 EBOM 带出' }"
+          :scroll="{ x: 1480 }"
+          :locale="{ emptyText: '请添加领料明细，或从工单 / 销售订单带出 EBOM' }"
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'shipQty'">
@@ -255,6 +323,7 @@ import {
 } from '@/utils/materialReqEbom'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import WorkOrderSearchSelect from '@/views/procurement/components/WorkOrderSearchSelect.vue'
+import SalesOrderSearchSelect from '@/views/procurement/components/SalesOrderSearchSelect.vue'
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
 import {
@@ -276,7 +345,7 @@ function createEmptyWoRow() {
   }
 }
 
-const mode = ref(MATERIAL_REQ_MODES.BATCH)
+const mode = ref(MATERIAL_REQ_MODES.WORK_ORDER)
 const workOrderRows = ref([createEmptyWoRow()])
 const lines = ref([])
 const pickerOpen = ref(false)
@@ -295,6 +364,7 @@ const form = reactive({
   workshop: '装配车间',
   receiveWarehouse: '',
   remark: '',
+  salesOrderNo: '',
 })
 
 const workshopOpts = workCenterOptions.map((v) => ({ label: v, value: v }))
@@ -318,7 +388,14 @@ const allWorkOrders = computed(() =>
   getWorkOrders().filter((o) => o.status && o.status !== '待下发'),
 )
 
+const salesLinkedWorkOrders = computed(() => {
+  const so = form.salesOrderNo
+  if (!so) return []
+  return allWorkOrders.value.filter((o) => (o.sourceOrderNo || '') === so)
+})
+
 const selectedWorkOrders = computed(() => {
+  if (mode.value === MATERIAL_REQ_MODES.SALES_ORDER) return salesLinkedWorkOrders.value
   const codes = workOrderRows.value.map((r) => r.workOrderCode).filter(Boolean)
   const uniq = [...new Set(codes)]
   return uniq.map((code) => allWorkOrders.value.find((o) => o.code === code)).filter(Boolean)
@@ -329,6 +406,49 @@ const woRowColumns = [
   { title: '关联产品', key: 'product' },
   { title: '操作', key: 'action', width: 80, align: 'center' },
 ]
+
+const salesWoColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '状态', key: 'status', width: 90, fixed: 'left' },
+  { title: '工单编号', dataIndex: 'code', key: 'code', width: 150, ellipsis: true, fixed: 'left' },
+  { title: '产品名称', dataIndex: 'productName', key: 'productName', width: 130, ellipsis: true },
+  { title: '规格型号', key: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', dataIndex: 'material', key: 'material', width: 90, ellipsis: true },
+  { title: '变体属性', key: 'variantAttr', width: 120, ellipsis: true },
+  { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 110, ellipsis: true },
+  {
+    title: '排产数量',
+    dataIndex: 'scheduleQty',
+    key: 'scheduleQty',
+    width: 90,
+    align: 'right',
+  },
+  { title: '加工中心', dataIndex: 'workCenter', key: 'workCenter', width: 110, ellipsis: true },
+  {
+    title: '工艺路线',
+    dataIndex: 'processRouteName',
+    key: 'processRouteName',
+    width: 120,
+    ellipsis: true,
+  },
+  { title: '负责人', dataIndex: 'owner', key: 'owner', width: 90, ellipsis: true },
+  { title: '下发时间', key: 'dispatchedAt', width: 140 },
+]
+
+function displayWoCell(value) {
+  if (value === 0) return '0'
+  const text = String(value ?? '').trim()
+  return text || '—'
+}
+
+function workOrderStatusColor(status) {
+  if (status === '执行中') return 'processing'
+  if (status === '完成') return 'success'
+  if (status === '已下发') return 'blue'
+  if (status === '暂停') return 'warning'
+  if (status === '终止') return 'error'
+  return 'default'
+}
 
 const lineColumns = [
   { title: '物料编码', dataIndex: 'itemCode', key: 'itemCode', width: 120 },
@@ -351,7 +471,12 @@ const totalQty = computed(() =>
 watch(
   selectedWorkOrders,
   (list) => {
-    if (mode.value !== MATERIAL_REQ_MODES.BATCH) return
+    if (
+      mode.value !== MATERIAL_REQ_MODES.WORK_ORDER &&
+      mode.value !== MATERIAL_REQ_MODES.SALES_ORDER
+    ) {
+      return
+    }
     loadEbomLines()
     const first = list[0]
     if (first?.workCenter) {
@@ -365,8 +490,20 @@ watch(
 function onModeChange() {
   workOrderRows.value = [createEmptyWoRow()]
   lines.value = []
+  form.salesOrderNo = ''
   if (mode.value === MATERIAL_REQ_MODES.QUICK) {
     form.receiveWarehouse = ''
+  } else {
+    syncReceiveWarehouse()
+  }
+}
+
+function onSalesOrderChange(code) {
+  form.salesOrderNo = code || ''
+  lines.value = []
+  if (!form.salesOrderNo) return
+  if (!salesLinkedWorkOrders.value.length) {
+    message.warning('该销售订单下暂无可领料工单')
   }
 }
 
@@ -420,7 +557,7 @@ function syncReceiveWarehouse() {
 }
 
 function onWorkshopChange() {
-  if (mode.value === MATERIAL_REQ_MODES.BATCH) syncReceiveWarehouse()
+  if (mode.value !== MATERIAL_REQ_MODES.QUICK) syncReceiveWarehouse()
 }
 
 function loadEbomLines() {
@@ -509,9 +646,19 @@ function goBack() {
 
 function onSubmit() {
   if (submitting.value) return
-  if (mode.value === MATERIAL_REQ_MODES.BATCH && !selectedWorkOrders.value.length) {
+  if (mode.value === MATERIAL_REQ_MODES.WORK_ORDER && !selectedWorkOrders.value.length) {
     message.warning('请至少选择一个工单')
     return
+  }
+  if (mode.value === MATERIAL_REQ_MODES.SALES_ORDER) {
+    if (!form.salesOrderNo) {
+      message.warning('请选择销售订单')
+      return
+    }
+    if (!selectedWorkOrders.value.length) {
+      message.warning('该销售订单下暂无可领料工单')
+      return
+    }
   }
   if (!form.workshop) {
     message.warning('请选择领用车间')
@@ -535,10 +682,50 @@ function onSubmit() {
     applicant: '管理员',
   }
 
-  if (mode.value === MATERIAL_REQ_MODES.BATCH) {
-    const salesSet = [...new Set(selected.map((w) => w.sourceOrderNo).filter(Boolean))]
+  if (mode.value === MATERIAL_REQ_MODES.WORK_ORDER) {
+    if (selected.length === 1) {
+      const wo = selected[0]
+      payload = {
+        ...payload,
+        mode: MATERIAL_REQ_MODES.WORK_ORDER,
+        workOrderId: wo.id,
+        workOrderCode: wo.code,
+        workOrderName: wo.name || wo.productName || '',
+        workOrderIds: [wo.id],
+        workOrders: [
+          { id: wo.id, code: wo.code, productName: wo.productName, scheduleQty: wo.scheduleQty },
+        ],
+        salesOrderNo: wo.sourceOrderNo || '',
+        productName: wo.productName || '',
+        orderCategory: wo.orderCategory || '',
+      }
+    } else {
+      const salesSet = [...new Set(selected.map((w) => w.sourceOrderNo).filter(Boolean))]
+      payload = {
+        ...payload,
+        mode: MATERIAL_REQ_MODES.BATCH,
+        workOrderIds: selected.map((w) => w.id),
+        workOrders: selected.map((w) => ({
+          id: w.id,
+          code: w.code,
+          productName: w.productName,
+          scheduleQty: w.scheduleQty,
+        })),
+        salesOrderNo: salesSet.length === 1 ? salesSet[0] : salesSet.length > 1 ? 'MULTI' : '',
+        productName: selected
+          .map((w) => w.productName)
+          .filter(Boolean)
+          .slice(0, 2)
+          .join('、'),
+      }
+    }
+  }
+
+  if (mode.value === MATERIAL_REQ_MODES.SALES_ORDER) {
     payload = {
       ...payload,
+      mode: MATERIAL_REQ_MODES.SALES_ORDER,
+      salesOrderNo: form.salesOrderNo,
       workOrderIds: selected.map((w) => w.id),
       workOrders: selected.map((w) => ({
         id: w.id,
@@ -546,7 +733,11 @@ function onSubmit() {
         productName: w.productName,
         scheduleQty: w.scheduleQty,
       })),
-      salesOrderNo: salesSet.length === 1 ? salesSet[0] : salesSet.length > 1 ? 'MULTI' : '',
+      productName: selected
+        .map((w) => w.productName)
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('、'),
     }
   }
 
@@ -649,6 +840,21 @@ syncReceiveWarehouse()
 
 .wo-pick-table {
   margin-bottom: 8px;
+}
+
+.sales-wo-block {
+  margin-top: 4px;
+}
+
+.sales-wo-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.65);
+  margin-bottom: 8px;
+}
+
+.sales-wo-table {
+  margin-bottom: 0;
 }
 
 .add-wo-btn {

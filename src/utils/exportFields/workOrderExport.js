@@ -2,6 +2,7 @@ import {
   formatWorkOrderFieldValue,
   formatWorkOrderPlanDateRange,
   resolveWorkOrderSalesMeta,
+  resolveWorkOrderVariantSummary,
 } from '@/utils/workOrderBasicFields'
 import { cell } from './exportFieldHelpers'
 
@@ -32,6 +33,11 @@ export const workOrderExportFields = [
   { key: 'productName', title: '产品名称', getValue: (row) => cell(row, 'productName') },
   { key: 'specModel', title: '规格型号', getValue: (row) => cell(row, 'specModel') },
   { key: 'material', title: '材质', getValue: (row) => cell(row, 'material') },
+  {
+    key: 'variantAttr',
+    title: '变体属性',
+    getValue: (row) => formatWorkOrderFieldValue(resolveWorkOrderVariantSummary(row)),
+  },
   { key: 'drawingNo', title: '图号', getValue: (row) => cell(row, 'drawingNo') },
   { key: 'techParams', title: '技术参数', getValue: (row) => cell(row, 'techParams') },
   { key: 'processRouteName', title: '工艺路线', getValue: (row) => cell(row, 'processRouteName') },

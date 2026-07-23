@@ -100,6 +100,8 @@ export function applyProductMasterToForm(form, master, bom) {
   form.specModel = master.specModel || ''
   form.material = master.material || ''
   form.drawingNo = master.drawingNo || ''
+  form.variantSummary = master.variantSummary || ''
+  form.variantValues = master.variantValues ? { ...master.variantValues } : {}
   form.techParams = master.techParams || ''
   form.matchingRequirements = master.matchingRequirements || master.remark || ''
   form.bomLabel = bom ? formatBomInfoLabel(bom) : ''

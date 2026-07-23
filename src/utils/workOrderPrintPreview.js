@@ -2,6 +2,7 @@ import { buildWorkOrderDetail } from '@/mock/workOrderDetail'
 import {
   formatWorkOrderPlanDateRange,
   resolveWorkOrderDeliveryDate,
+  resolveWorkOrderVariantSummary,
 } from '@/utils/workOrderBasicFields'
 import {
   formatProcessExecutors,
@@ -56,6 +57,7 @@ export function buildWorkOrderPrintPayload(workOrder, options = {}) {
     { label: '产品名称', value: workOrder.productName },
     { label: '规格型号', value: workOrder.specModel },
     { label: '材质', value: workOrder.material },
+    { label: '变体属性', value: resolveWorkOrderVariantSummary(workOrder) },
     { label: '图号', value: workOrder.drawingNo },
     { label: '排产数量', value: workOrder.scheduleQty },
     { label: '工作中心', value: workOrder.workCenter },

@@ -39,6 +39,7 @@
                 v-model:value="form.orderCategory"
                 size="small"
                 :options="orderCategoryOpts"
+                :disabled="isAssembly"
               />
             </a-form-item>
           </a-col>
@@ -264,7 +265,15 @@ import { workCenterOptions, urgencyOptions, resolveWorkCenterOwner } from '@/moc
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { createWorkOrderPayload, workOrderState } from '@/store/workOrderStore'
-import { isDuplicateOrderCode, generateProductionWorkOrderName } from '@/utils/workOrderNaming'
+import {
+  createAssemblyWorkOrderPayload,
+  assemblyWorkOrderState,
+} from '@/store/assemblyWorkOrderStore'
+import {
+  isDuplicateOrderCode,
+  generateProductionWorkOrderName,
+  generateAssemblyWorkOrderName,
+} from '@/utils/workOrderNaming'
 import { buildProcessesFromRoute, getActiveRouteOptions } from '@/mock/processRoutes'
 import {
   applyBomSelectionToForm,
@@ -289,15 +298,22 @@ const props = defineProps({
   editRecord: { type: Object, default: null },
   pageMode: { type: Boolean, default: false },
   listPath: { type: String, default: '' },
+  /** production | assembly */
+  variant: { type: String, default: 'production' },
 })
 
 const emit = defineEmits(['update:open', 'created', 'updated'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+const isAssembly = computed(() => props.variant === 'assembly')
 
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
-  listPath: '/production/work-orders',
-  getTitle: () => (isEdit.value ? '编辑工单' : '新增工单'),
+  listPath:
+    props.variant === 'assembly' ? '/production/assembly-work-orders' : '/production/work-orders',
+  getTitle: () => {
+    if (isAssembly.value) return isEdit.value ? '编辑总装工单' : '新增总装工单'
+    return isEdit.value ? '编辑工单' : '新增工单'
+  },
 })
 
 const salesOrderPickerOpen = ref(false)
@@ -310,7 +326,7 @@ const syncingProductBom = ref(false)
 const form = reactive({
   code: '',
   name: '',
-  orderCategory: '生产工单',
+  orderCategory: props.variant === 'assembly' ? '总装工单' : '生产工单',
   salesOrderId: '',
   salesOrderNo: '',
   customerName: '',
@@ -321,6 +337,8 @@ const form = reactive({
   specModel: '',
   material: '',
   drawingNo: '',
+  variantSummary: '',
+  variantValues: {},
   techParams: '',
   matchingRequirements: '',
   bomLabel: '',
@@ -355,13 +373,19 @@ const routeOptions = computed(() => {
   const names = getActiveRouteOptions({ productName: form.productName })
   return names.map((v) => ({ label: v, value: v }))
 })
-const orderCategoryOpts = [
-  { label: '生产工单', value: '生产工单' },
-  { label: '外协工单', value: '外协工单' },
-]
+const orderCategoryOpts = computed(() => {
+  if (isAssembly.value) {
+    return [{ label: '总装工单', value: '总装工单' }]
+  }
+  return [
+    { label: '生产工单', value: '生产工单' },
+    { label: '外协工单', value: '外协工单' },
+  ]
+})
 const productCompactItems = computed(() => [
   { key: 'specModel', label: '规格型号', value: displayAutoField(form.specModel) },
   { key: 'material', label: '材质', value: displayAutoField(form.material) },
+  { key: 'variantAttr', label: '变体属性', value: displayAutoField(form.variantSummary) },
   { key: 'drawingNo', label: '图号', value: displayAutoField(form.drawingNo) },
 ])
 const showProductInfoBox = computed(() =>
@@ -412,6 +436,8 @@ function clearProductRelatedFields() {
   form.specModel = ''
   form.material = ''
   form.drawingNo = ''
+  form.variantSummary = ''
+  form.variantValues = {}
   form.techParams = ''
   form.matchingRequirements = ''
   form.bomId = ''
@@ -478,7 +504,7 @@ function resetForm() {
   productSelected.value = false
   form.code = ''
   form.name = ''
-  form.orderCategory = '生产工单'
+  form.orderCategory = isAssembly.value ? '总装工单' : '生产工单'
   form.salesOrderId = ''
   form.salesOrderNo = ''
   form.customerName = ''
@@ -489,6 +515,8 @@ function resetForm() {
   form.specModel = ''
   form.material = ''
   form.drawingNo = ''
+  form.variantSummary = ''
+  form.variantValues = {}
   form.techParams = ''
   form.matchingRequirements = ''
   form.bomLabel = ''
@@ -510,7 +538,9 @@ function resetForm() {
 function loadEditRecord(wo) {
   form.code = wo.code || ''
   form.name = wo.name || ''
-  form.orderCategory = wo.orderCategory || '生产工单'
+  form.orderCategory = isAssembly.value
+    ? wo.orderCategory || '总装工单'
+    : wo.orderCategory || '生产工单'
   form.salesOrderId = wo.salesOrderId || ''
   form.salesOrderNo = wo.sourceOrderNo || ''
   if (form.salesOrderNo) {
@@ -537,6 +567,8 @@ function loadEditRecord(wo) {
   form.specModel = wo.specModel || ''
   form.material = wo.material || ''
   form.drawingNo = wo.drawingNo || ''
+  form.variantSummary = wo.variantSummary || ''
+  form.variantValues = wo.variantValues ? { ...wo.variantValues } : {}
   form.techParams = wo.techParams || ''
   form.matchingRequirements = wo.matchingRequirements || ''
   form.bomLabel = wo.bomLabel || wo.bom || ''
@@ -637,15 +669,16 @@ function handleSubmit() {
       : []
 
   const productName = form.productName.trim()
-  const category = form.orderCategory || '生产工单'
+  const category = isAssembly.value
+    ? form.orderCategory || '总装工单'
+    : form.orderCategory || '生产工单'
   const customCode = form.code?.trim()
+  const existingCodes = (
+    isAssembly.value ? assemblyWorkOrderState.orders : workOrderState.orders
+  ).map((o) => o.code)
   if (
     customCode &&
-    isDuplicateOrderCode(
-      customCode,
-      workOrderState.orders.map((o) => o.code),
-      isEdit.value ? props.editRecord.code : '',
-    )
+    isDuplicateOrderCode(customCode, existingCodes, isEdit.value ? props.editRecord.code : '')
   ) {
     message.warning('工单编号已存在，请更换')
     return
@@ -653,6 +686,9 @@ function handleSubmit() {
 
   const bomValue = productName
   const createExtras = buildWorkOrderCreateExtras(form, componentLines.value)
+  const resolveName = isAssembly.value
+    ? generateAssemblyWorkOrderName
+    : generateProductionWorkOrderName
 
   if (isEdit.value) {
     const routeChanged = props.editRecord.processRouteName !== form.processRouteName
@@ -661,7 +697,7 @@ function handleSubmit() {
       patch: {
         code: customCode || props.editRecord.code,
         productName,
-        name: form.name?.trim() || generateProductionWorkOrderName(productName, category),
+        name: form.name?.trim() || resolveName(productName, category),
         orderCategory: category,
         skipEbom: category === '外协工单',
         processRouteName: form.processRouteName,
@@ -680,12 +716,13 @@ function handleSubmit() {
         ...(routeChanged ? { processes: buildProcessesFromRoute(form.processRouteName) } : {}),
       },
     })
-    message.success('工单已更新')
+    message.success(isAssembly.value ? '总装工单已更新' : '工单已更新')
     closeAfterSave()
     return
   }
 
-  const wo = createWorkOrderPayload({
+  const createPayload = isAssembly.value ? createAssemblyWorkOrderPayload : createWorkOrderPayload
+  const wo = createPayload({
     code: customCode,
     name: form.name?.trim(),
     productName,
@@ -707,7 +744,7 @@ function handleSubmit() {
   })
 
   emit('created', wo)
-  message.success('工单创建成功')
+  message.success(isAssembly.value ? '总装工单创建成功' : '工单创建成功')
   closeAfterSave()
 }
 </script>

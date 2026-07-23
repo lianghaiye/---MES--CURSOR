@@ -472,6 +472,12 @@ const routes = [
         meta: { title: '采购申请' },
       },
       {
+        path: 'procurement/purchase-req/:id/edit',
+        name: 'procurement-purchase-req-edit',
+        component: () => import('@/views/procurement/PurchaseRequisitionEditView.vue'),
+        meta: { title: '编辑采购申请', listPath: '/procurement/purchase-req' },
+      },
+      {
         path: 'procurement/purchase-req/:id',
         name: 'procurement-purchase-req-detail',
         component: () => import('@/views/procurement/PurchaseRequisitionDetailView.vue'),

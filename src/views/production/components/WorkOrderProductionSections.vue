@@ -31,7 +31,10 @@
           <a-form-item
             :label="field.label"
             :required="field.required"
-            :class="{ 'remark-item': field.type === 'textarea' }"
+            :class="{
+              'remark-item': field.type === 'textarea',
+              'multiline-item': field.multiline,
+            }"
           >
             <a-select
               v-if="field.type === 'route-select'"
@@ -81,7 +84,13 @@
               @update:value="(v) => updateField('remark', v)"
               @blur="emitChange"
             />
-            <span v-else class="field-text" :title="fieldText(field)">{{ fieldText(field) }}</span>
+            <span
+              v-else
+              class="field-text"
+              :class="{ 'field-text-multiline': field.multiline }"
+              :title="fieldText(field)"
+              >{{ fieldText(field) }}</span
+            >
           </a-form-item>
         </a-col>
       </a-row>
@@ -95,6 +104,7 @@ import {
   formatWorkOrderFieldValue,
   formatWorkOrderPlanDateRange,
   resolveWorkOrderSalesMeta,
+  resolveWorkOrderVariantSummary,
 } from '@/utils/workOrderBasicFields'
 import { resolveWorkCenterOwner } from '@/mock/workOrderOptions'
 import WorkOrderOwnerSelect from './WorkOrderOwnerSelect.vue'
@@ -139,9 +149,26 @@ const detailFields = computed(() => {
     { key: 'productName', label: '产品名称', value: wo.productName },
     { key: 'specModel', label: '规格型号', value: wo.specModel },
     { key: 'material', label: '材质', value: wo.material },
+    {
+      key: 'variantAttr',
+      label: '变体属性',
+      value: resolveWorkOrderVariantSummary(wo),
+    },
     { key: 'drawingNo', label: '图号', value: wo.drawingNo },
-    { key: 'techParams', label: '技术参数', value: wo.techParams },
-    { key: 'matchingRequirements', label: '配套要求', value: wo.matchingRequirements },
+    {
+      key: 'techParams',
+      label: '技术参数',
+      value: wo.techParams,
+      span: 24,
+      multiline: true,
+    },
+    {
+      key: 'matchingRequirements',
+      label: '配套要求',
+      value: wo.matchingRequirements,
+      span: 24,
+      multiline: true,
+    },
     { key: 'bom', label: '物料清单', value: wo.bomLabel || wo.bom },
   )
 
@@ -202,7 +229,7 @@ const arrangementFields = computed(() => {
       label: '计划日期',
       getValue: () => displayValue(formatWorkOrderPlanDateRange(wo.planDateRange)),
     },
-    { key: 'remark', label: '工单备注', value: wo.remark, span: 24 },
+    { key: 'remark', label: '工单备注', value: wo.remark, span: 24, multiline: true },
   ]
 })
 
@@ -309,7 +336,23 @@ function filterProcessRoute(input, option) {
     white-space: nowrap;
   }
 
+  .field-text-multiline {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 22px;
+    min-height: 24px;
+    max-height: 66px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    text-overflow: unset;
+  }
+
+  .multiline-item,
   .remark-item {
+    :deep(.ant-form-item-row) {
+      align-items: flex-start;
+    }
+
     :deep(.ant-form-item-label) {
       align-self: flex-start;
 
@@ -319,12 +362,12 @@ function filterProcessRoute(input, option) {
         padding-top: 4px;
       }
     }
+  }
 
-    .field-text {
-      white-space: pre-wrap;
-      line-height: 22px;
-      min-height: auto;
-    }
+  .remark-item .field-text {
+    white-space: pre-wrap;
+    line-height: 22px;
+    min-height: auto;
   }
 }
 </style>

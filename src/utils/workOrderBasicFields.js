@@ -60,6 +60,20 @@ function findWorkOrderSalesLine(workOrder, order) {
   return lines.length === 1 ? lines[0] : null
 }
 
+/** 工单变体属性：优先工单自身，其次销售明细 / 产品主数据 */
+export function resolveWorkOrderVariantSummary(workOrder) {
+  if (!workOrder) return ''
+  const owned = String(workOrder.variantSummary || '').trim()
+  if (owned) return owned
+  const order = resolveWorkOrderSalesOrder(workOrder)
+  const line = findWorkOrderSalesLine(workOrder, order)
+  if (line) {
+    const fromLine = String(line.variantSummary || '').trim()
+    if (fromLine) return fromLine
+  }
+  return ''
+}
+
 /** 从关联销售订单明细取交付日期 */
 export function resolveWorkOrderDeliveryDate(workOrder) {
   const order = resolveWorkOrderSalesOrder(workOrder)
@@ -89,6 +103,7 @@ export function buildWorkOrderProductionFieldGroups(workOrder) {
       { label: '产品名称', value: workOrder.productName },
       { label: '规格型号', value: workOrder.specModel },
       { label: '材质', value: workOrder.material },
+      { label: '变体属性', value: resolveWorkOrderVariantSummary(workOrder) },
       { label: '图号', value: workOrder.drawingNo },
       { label: '技术参数', value: workOrder.techParams },
       { label: '配套要求', value: workOrder.matchingRequirements },
@@ -114,6 +129,8 @@ export function buildWorkOrderCreateExtras(form, componentLines = []) {
     specModel: form.specModel || '',
     material: form.material || '',
     drawingNo: form.drawingNo || '',
+    variantSummary: form.variantSummary || '',
+    variantValues: form.variantValues ? { ...form.variantValues } : {},
     techParams: form.techParams || '',
     matchingRequirements: form.matchingRequirements || '',
     bomLabel: form.bomLabel || '',

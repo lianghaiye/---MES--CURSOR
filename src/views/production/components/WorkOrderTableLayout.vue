@@ -49,6 +49,9 @@
         <template v-else-if="column.key === 'customerName'">
           {{ formatCell(resolveWorkOrderSalesMeta(record).customerName) }}
         </template>
+        <template v-else-if="column.key === 'variantAttr'">
+          {{ formatCell(resolveWorkOrderVariantSummary(record)) }}
+        </template>
         <template v-else-if="column.key === 'planDateRange'">
           {{ formatCell(formatWorkOrderPlanDateRange(record.planDateRange)) }}
         </template>
@@ -118,6 +121,7 @@ import {
   formatWorkOrderFieldValue,
   formatWorkOrderPlanDateRange,
   resolveWorkOrderSalesMeta,
+  resolveWorkOrderVariantSummary,
 } from '@/utils/workOrderBasicFields'
 
 const props = defineProps({
@@ -155,6 +159,13 @@ const baseColumns = [
   { title: '产品名称', dataIndex: 'productName', key: 'productName', width: 140, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', key: 'material', width: 90, ellipsis: true },
+  {
+    title: '变体属性',
+    key: 'variantAttr',
+    dataIndex: 'variantSummary',
+    width: 120,
+    ellipsis: true,
+  },
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 110, ellipsis: true },
   { title: '技术参数', dataIndex: 'techParams', key: 'techParams', width: 120, ellipsis: true },
   {

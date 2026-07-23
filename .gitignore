@@ -10,3 +10,4 @@ pnpm-debug.log*
 .idea
 .vscode
 *.local
+.venv-docs/

@@ -65,10 +65,14 @@
     </div>
 
     <div class="toolbar-row">
-      <a-button type="primary" size="small" @click="openCreate">
-        <PlusOutlined />
-        新增
-      </a-button>
+      <a-space>
+        <a-button type="primary" size="small" @click="openCreate">
+          <PlusOutlined />
+          新增
+        </a-button>
+        <a-button size="small" @click="importOpen = true">导入</a-button>
+        <a-button size="small" @click="historyOpen = true">导入导出历史</a-button>
+      </a-space>
       <a-space :size="4" class="toolbar-icons">
         <a-tooltip title="刷新">
           <a-button type="text" size="small" @click="handleSearch">
@@ -158,6 +162,13 @@
       v-model:settings="columnSettings"
       :default-settings="filteredDefaultColumnSettings"
     />
+
+    <ImportExcelModal
+      v-model:open="importOpen"
+      :import-def="processRouteBundleImportDef"
+      @done="handleSearch"
+    />
+    <ImportExportHistoryModal v-model:open="historyOpen" />
   </div>
 </template>
 
@@ -188,10 +199,15 @@ import {
 } from '@/store/processConfigStore'
 import { getActiveCategoryOptions } from '@/store/processCategoryStore'
 import { isMinimalReportMode } from '@/store/businessRuleStore'
+import ImportExcelModal from '@/components/ImportExcelModal.vue'
+import ImportExportHistoryModal from '@/components/ImportExportHistoryModal.vue'
+import { processRouteBundleImportDef } from '@/utils/importDefs/processRouteBundleImport'
 
 const router = useRouter()
 const { openTab } = useTabs()
 const processConfigCreatePage = findCreatePageByListPath('/product-process/process-config')
+const importOpen = ref(false)
+const historyOpen = ref(false)
 const filters = reactive({
   name: '',
   category: undefined,

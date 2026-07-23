@@ -199,8 +199,9 @@ const pagination = reactive({
 const selectedRowKeys = ref([])
 
 const modeOptions = [
-  { label: '批量领料', value: MATERIAL_REQ_MODES.BATCH },
   { label: '工单领料', value: MATERIAL_REQ_MODES.WORK_ORDER },
+  { label: '工单领料（多工单）', value: MATERIAL_REQ_MODES.BATCH },
+  { label: '订单领料', value: MATERIAL_REQ_MODES.SALES_ORDER },
   { label: '快速领料', value: MATERIAL_REQ_MODES.QUICK },
 ]
 
@@ -396,6 +397,7 @@ function onReject(record) {
 
 function modeColor(mode) {
   if (mode === MATERIAL_REQ_MODES.QUICK) return 'purple'
+  if (mode === MATERIAL_REQ_MODES.SALES_ORDER) return 'geekblue'
   if (mode === MATERIAL_REQ_MODES.BATCH) return 'blue'
   return 'cyan'
 }

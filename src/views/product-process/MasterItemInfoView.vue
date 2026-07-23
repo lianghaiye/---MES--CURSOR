@@ -169,6 +169,7 @@
                 <a-menu @click="onBatchMenu">
                   <a-menu-item key="import">批量导入</a-menu-item>
                   <a-menu-item key="export">批量导出</a-menu-item>
+                  <a-menu-item key="history">导入导出历史</a-menu-item>
                 </a-menu>
               </template>
             </a-dropdown>
@@ -350,6 +351,13 @@
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
     />
+
+    <ImportExcelModal
+      v-model:open="importOpen"
+      :import-def="masterItemImportDef"
+      @done="handleSearch"
+    />
+    <ImportExportHistoryModal v-model:open="historyOpen" />
   </div>
 </template>
 
@@ -406,6 +414,9 @@ import { listSkusForSpu, batchGenerateSkus } from '@/utils/spuSkuSave'
 import { matrixRowsToSkuCombos } from '@/utils/spuMatrix'
 import { SPU_BOM_STRATEGY_LABELS } from '@/constants/spu'
 import VariantSkuMatrixPreview from '@/views/product-process/components/VariantSkuMatrixPreview.vue'
+import ImportExcelModal from '@/components/ImportExcelModal.vue'
+import ImportExportHistoryModal from '@/components/ImportExportHistoryModal.vue'
+import { masterItemImportDef } from '@/utils/importDefs/masterItemImport'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -776,8 +787,19 @@ function handleSyncSpec() {
   message.info('同步规格属性功能开发中')
 }
 
+const importOpen = ref(false)
+const historyOpen = ref(false)
+
 function onBatchMenu({ key }) {
-  message.info(key === 'import' ? '批量导入功能开发中' : '批量导出功能开发中')
+  if (key === 'import') {
+    importOpen.value = true
+    return
+  }
+  if (key === 'history') {
+    historyOpen.value = true
+    return
+  }
+  message.info('批量导出功能开发中')
 }
 
 function onAddCategory() {

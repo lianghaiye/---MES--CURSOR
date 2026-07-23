@@ -40,10 +40,14 @@
     </div>
 
     <div class="toolbar-row">
-      <a-button type="primary" size="small" @click="openCreate">
-        <PlusOutlined />
-        新增
-      </a-button>
+      <a-space>
+        <a-button type="primary" size="small" @click="openCreate">
+          <PlusOutlined />
+          新增
+        </a-button>
+        <a-button size="small" @click="importOpen = true">导入</a-button>
+        <a-button size="small" @click="historyOpen = true">导入导出历史</a-button>
+      </a-space>
       <a-space :size="4" class="toolbar-icons">
         <a-tooltip title="刷新">
           <a-button type="text" size="small" @click="handleSearch">
@@ -114,6 +118,13 @@
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
     />
+
+    <ImportExcelModal
+      v-model:open="importOpen"
+      :import-def="processRouteBundleImportDef"
+      @done="onSaved"
+    />
+    <ImportExportHistoryModal v-model:open="historyOpen" />
   </div>
 </template>
 
@@ -142,6 +153,9 @@ import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
+import ImportExcelModal from '@/components/ImportExcelModal.vue'
+import ImportExportHistoryModal from '@/components/ImportExportHistoryModal.vue'
+import { processRouteBundleImportDef } from '@/utils/importDefs/processRouteBundleImport'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -150,6 +164,8 @@ const filters = reactive({ code: '', name: '', status: undefined })
 const applied = reactive({ code: '', name: '', status: undefined })
 const editorOpen = ref(false)
 const editRecord = ref(null)
+const importOpen = ref(false)
+const historyOpen = ref(false)
 
 const statusOpts = ROUTE_STATUS.map((v) => ({ label: v, value: v }))
 

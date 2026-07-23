@@ -281,6 +281,8 @@ export function createWorkOrderPayload(partial) {
     specModel: partial.specModel || '',
     material: partial.material || '',
     drawingNo: partial.drawingNo || '',
+    variantSummary: partial.variantSummary || '',
+    variantValues: partial.variantValues ? { ...partial.variantValues } : {},
     techParams: partial.techParams || '',
     matchingRequirements: partial.matchingRequirements || '',
     bomLabel: partial.bomLabel || '',

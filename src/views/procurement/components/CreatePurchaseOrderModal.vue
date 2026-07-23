@@ -16,7 +16,7 @@
           <div class="section-title">基本信息</div>
           <a-form layout="inline" class="header-form horizontal-form">
             <a-row :gutter="[12, 12]" style="width: 100%">
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="采购单号">
                   <a-input
                     v-model:value="form.orderNo"
@@ -26,7 +26,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="供应商" required>
                   <PlanSupplierSelect
                     v-model:value="form.supplier"
@@ -35,7 +35,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="结算类型">
                   <a-select
                     v-model:value="form.settlementType"
@@ -44,7 +44,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="结算周期">
                   <a-select
                     v-model:value="form.settlementCycle"
@@ -53,7 +53,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="结算方式">
                   <a-select
                     v-model:value="form.settlementMethod"
@@ -62,17 +62,17 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="销售订单">
                   <SalesOrderSearchSelect v-model:value="form.salesOrderNo" />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="生产工单">
                   <WorkOrderSearchSelect v-model:value="form.workOrderNo" />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="交货日期" required>
                   <a-date-picker
                     v-model:value="form.deliveryDate"
@@ -82,7 +82,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="提醒日期">
                   <a-date-picker
                     v-model:value="form.reminderDate"
@@ -91,7 +91,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="交货方式">
                   <a-select
                     v-model:value="form.deliveryMethod"
@@ -100,7 +100,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="供货期/天">
                   <a-input-number
                     v-model:value="form.leadTimeDays"
@@ -110,7 +110,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="物流单号">
                   <a-input
                     v-model:value="form.logisticsNo"
@@ -119,7 +119,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="联系人">
                   <a-select
                     v-model:value="form.contactPerson"
@@ -130,7 +130,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="联系方式">
                   <a-input
                     v-model:value="form.contactPhone"
@@ -139,7 +139,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="合同编号">
                   <a-input
                     v-model:value="form.contractNo"
@@ -148,7 +148,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="收货地址">
                   <a-input
                     v-model:value="form.shippingAddress"
@@ -157,7 +157,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="收货仓库">
                   <a-select
                     v-model:value="form.receivingWarehouse"
@@ -169,7 +169,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
+              <a-col :span="6">
                 <a-form-item label="采购员">
                   <a-select
                     v-model:value="form.purchaser"

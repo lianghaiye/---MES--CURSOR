@@ -3,13 +3,19 @@
 export const MATERIAL_REQ_MODES = {
   WORK_ORDER: 'work-order',
   BATCH: 'batch-work-order',
+  SALES_ORDER: 'sales-order',
   QUICK: 'quick',
 }
 
 export function materialReqModeLabel(mode) {
   if (mode === MATERIAL_REQ_MODES.QUICK) return '快速领料'
-  if (mode === MATERIAL_REQ_MODES.BATCH) return '批量领料'
+  if (mode === MATERIAL_REQ_MODES.SALES_ORDER) return '订单领料'
+  if (mode === MATERIAL_REQ_MODES.BATCH) return '工单领料'
   return '工单领料'
+}
+
+export function isMaterialReqMultiSourceMode(mode) {
+  return mode === MATERIAL_REQ_MODES.BATCH || mode === MATERIAL_REQ_MODES.SALES_ORDER
 }
 
 export const MATERIAL_REQ_AUDIT = {
