@@ -70,7 +70,8 @@ async function onSubmit() {
 
 <style lang="less" scoped>
 .login-page {
-  min-height: 100vh;
+  height: 100%;
+  overflow: auto;
   display: flex;
   align-items: center;
   justify-content: center;

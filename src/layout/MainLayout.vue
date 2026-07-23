@@ -44,26 +44,42 @@ const cachedViews = [
 
 <style lang="less" scoped>
 .main-layout {
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   background: #f0f2f5;
 }
 
 .main-body {
-  min-height: calc(100vh - 56px);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .content-wrap {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #f0f2f5;
 }
 
 .page-content {
+  flex: 1;
+  min-height: 0;
   margin: 0 12px 12px;
   padding: 12px;
   background: #fff;
   border-radius: 4px;
-  min-height: calc(100vh - 56px - 40px - 24px);
   overflow: auto;
+
+  /* 各页标题操作栏随内容区顶部固定 */
+  :deep(.page-header) {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: #fff;
+  }
 }
 </style>

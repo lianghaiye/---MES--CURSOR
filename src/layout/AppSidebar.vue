@@ -120,6 +120,7 @@ function onMenuClick({ key }) {
 .app-sidebar {
   background: #fff;
   border-right: 1px solid #f0f0f0;
+  overflow: auto;
 
   :deep(.ant-layout-sider-children) {
     display: flex;

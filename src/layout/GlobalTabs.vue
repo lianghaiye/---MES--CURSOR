@@ -42,9 +42,11 @@ function onTabEdit(targetKey, action) {
 
 <style lang="less" scoped>
 .global-tabs {
+  flex-shrink: 0;
   background: #fff;
   padding: 0 12px;
   border-bottom: 1px solid #f0f0f0;
+  z-index: 40;
 
   :deep(.ant-tabs-nav) {
     margin-bottom: 0;

@@ -23,10 +23,7 @@ export const salesOrderExportFields = [
   {
     key: 'lineAmountExTax',
     title: '销售金额（不含税）',
-    getValue: (row) =>
-      numCell(
-        row.lineListAmountExTax ?? Number(row.lineAmountExTax) + Number(row.lineDiscountTotal || 0),
-      ),
+    getValue: (row) => numCell(row.lineAmountExTax),
   },
   {
     key: 'lineAmountInTax',

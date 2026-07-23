@@ -159,8 +159,10 @@ function matchesCategoryTree(row, treeMode, selectedCategoryKey) {
 
 /** 统一列表筛选 */
 export function filterUnifiedListRows(rows, filters = {}, selectedCategoryKey, treeMode) {
+  const hasCodeSearch = Boolean(String(filters.code || '').trim())
   return rows.filter((item) => {
-    if (!matchesCategoryTree(item, treeMode, selectedCategoryKey)) return false
+    // 按编码搜索时不限制左侧类别，避免找不到演示料/跨类物料
+    if (!hasCodeSearch && !matchesCategoryTree(item, treeMode, selectedCategoryKey)) return false
 
     if (filters.code && !String(item.code || '').includes(filters.code)) return false
     if (filters.name && !String(item.name || '').includes(filters.name)) return false

@@ -27,7 +27,9 @@
   >
     <slot />
     <template v-if="$slots.footer" #footer>
-      <slot name="footer" />
+      <div class="footer-actions">
+        <slot name="footer" />
+      </div>
     </template>
   </a-modal>
 </template>
@@ -74,8 +76,21 @@ defineEmits(['cancel', 'update:open'])
   min-width: 0;
 }
 
-.header-actions {
+.header-actions,
+.footer-actions {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+
+  :deep(.ant-btn + .ant-btn) {
+    margin-inline-start: 0;
+  }
+}
+
+.footer-actions {
+  justify-content: flex-end;
+  width: 100%;
 }
 
 .back-btn {

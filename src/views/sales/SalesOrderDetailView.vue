@@ -70,7 +70,7 @@
                 <a-col :span="8">
                   <div class="price-summary-item">
                     <div class="price-label">
-                      行级优惠合计
+                      行优惠（合计）
                       <a-tooltip :title="lineDiscountTooltip">
                         <QuestionCircleOutlined class="label-tip-icon" />
                       </a-tooltip>
@@ -114,9 +114,7 @@
                         <QuestionCircleOutlined class="label-tip-icon" />
                       </a-tooltip>
                     </div>
-                    <div class="price-value">
-                      ￥{{ formatMoney(orderPricing.lineListAmountExTax) }}
-                    </div>
+                    <div class="price-value">￥{{ formatMoney(orderPricing.lineAmountExTax) }}</div>
                   </div>
                 </a-col>
                 <a-col :span="6">
@@ -696,20 +694,21 @@ const discountStrategyTagColor = computed(() => {
   return 'success'
 })
 
-const lineDiscountTooltip = '行级优惠合计 = Σ [标准单价(不含税) × 数量 × (1 - 行折扣率)]'
+const lineDiscountTooltip = '行优惠（合计）= Σ [标准单价(不含税) × 数量 × (1 - 行折扣率)]'
 
-const orderDiscountTooltip = '整单优惠合计 = 明细折后不含税合计 × (1 - 整单折扣率) + 整单减免(元)'
+const orderDiscountTooltip =
+  '整单优惠合计 = Σ [各行明细折后不含税 × (1 - 整单折扣率)] + 整单减免(元)（减免按行金额占比分摊）'
 
-const lineAmountInTaxTooltip = '销售总额（含税）= Σ 各行 [成交单价(含税) × 数量]（未扣整单优惠）'
+const lineAmountInTaxTooltip =
+  '销售总额（含税）= Σ 各行明细折后含税金额（已含行折扣，未扣整单优惠）'
 
 const lineAmountExTaxTooltip =
-  '销售总额（不含税）= Σ [标准单价(不含税) × 数量]（不含行级折扣，未扣整单优惠）'
+  '销售总额（不含税）= Σ 各行明细折后不含税金额（已含行折扣，未扣整单优惠）'
 
-const finalAmountInTaxTooltip =
-  '最终成交额（含税）= 明细折后含税合计 × [最终成交额(不含税) ÷ 明细折后不含税合计]'
+const finalAmountInTaxTooltip = '最终成交额（含税）= Σ 各行折后含税金额（整单折扣已代入各行后求和）'
 
 const finalAmountExTaxTooltip =
-  '最终成交额（不含税）= (销售总额(不含税) - 行级优惠合计) × 整单折扣率 - 整单减免(元)'
+  '最终成交额（不含税）= Σ 各行折后不含税金额（整单折扣已代入各行后求和）'
 
 const purchaseTabCount = computed(
   () => relations.value.purchaseRequisitions.length + relations.value.purchaseOrders.length,

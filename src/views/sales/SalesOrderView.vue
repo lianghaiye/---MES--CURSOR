@@ -200,7 +200,7 @@
             ￥{{ formatOrderMoney(resolveOrderAmounts(record).lineAmountInTax) }}
           </template>
           <template v-else-if="column.key === 'lineAmountExTax'">
-            ￥{{ formatOrderMoney(resolveOrderAmounts(record).lineListAmountExTax) }}
+            ￥{{ formatOrderMoney(resolveOrderAmounts(record).lineAmountExTax) }}
           </template>
           <template v-else-if="column.key === 'discountStrategy'">
             {{ formatDiscountStrategy(record.discountStrategy) }}

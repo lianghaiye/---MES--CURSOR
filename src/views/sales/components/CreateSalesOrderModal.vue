@@ -12,7 +12,7 @@
   >
     <a-form layout="inline" class="header-form horizontal-form">
       <a-row :gutter="[12, 8]" style="width: 100%">
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="销售单号">
             <a-input
               v-model:value="form.orderNo"
@@ -22,22 +22,22 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="紧急度" required>
             <a-select v-model:value="form.urgency" size="small" :options="urgencyOpts" />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="合同类型" required>
             <a-select v-model:value="form.contractType" size="small" :options="contractTypeOpts" />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="合同编号">
             <a-input v-model:value="form.contractNo" size="small" placeholder="请输入 合同编号" />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="结算币种" required>
             <a-select
               v-model:value="form.settlementCurrency"
@@ -46,12 +46,12 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="订单类型" required>
             <a-select v-model:value="form.orderType" size="small" :options="orderTypeOpts" />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="客户名称" required>
             <CustomerSelect
               v-model="form.customerName"
@@ -61,7 +61,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="联系人">
             <a-select
               v-model:value="form.contactPerson"
@@ -73,7 +73,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="联系人电话">
             <a-input
               v-model:value="form.contactPhone"
@@ -82,7 +82,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="交货地址">
             <a-input
               v-model:value="form.deliveryAddress"
@@ -91,7 +91,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="交货方式" required>
             <a-select
               v-model:value="form.deliveryMethod"
@@ -100,7 +100,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="订单金额">
             <a-input-number
               :value="orderAmount"
@@ -111,7 +111,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="技术规范编码">
             <a-input
               v-model:value="form.techSpecCode"
@@ -120,7 +120,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="提醒日期">
             <a-date-picker
               v-model:value="form.reminderDate"
@@ -130,7 +130,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="业务员">
             <a-select
               v-model:value="form.salesperson"
@@ -140,7 +140,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="结算类型">
             <a-select
               v-model:value="form.settlementType"
@@ -151,7 +151,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="付款比例">
             <a-select
               v-model:value="form.paymentRatio"
@@ -162,7 +162,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="首付/定金金额">
             <a-input-number
               v-model:value="form.downPaymentAmount"
@@ -195,24 +195,28 @@
         <span class="section-title">价格汇总</span>
         <span class="header-amounts">
           <span class="header-amount-item">
-            含税
+            最终成交额（含税）
             <strong>￥{{ formatMoney(orderAmount) }}</strong>
           </span>
           <span class="header-amount-item">
-            不含税
+            最终成交额（不含税）
             <strong>￥{{ formatMoney(orderPricing.amountExTax) }}</strong>
+          </span>
+          <span class="header-amount-item">
+            销售总额（含税）
+            <strong>￥{{ formatMoney(orderPricing.lineAmountInTax) }}</strong>
+          </span>
+          <span class="header-amount-item">
+            销售总额（不含税）
+            <strong>￥{{ formatMoney(orderPricing.lineAmountExTax) }}</strong>
           </span>
         </span>
         <DownOutlined :class="{ rotated: priceSummaryCollapsed }" class="collapse-icon" />
       </div>
       <div v-show="!priceSummaryCollapsed" class="price-summary-body">
         <div class="summary-amounts-strip">
-          <span class="amount-chip">
-            销售总额
-            <strong>￥{{ formatMoney(orderPricing.lineListAmountExTax) }}</strong>
-          </span>
           <span class="amount-chip discount">
-            行优惠
+            行优惠（合计）
             <strong>-￥{{ formatMoney(orderPricing.lineDiscountTotal) }}</strong>
           </span>
           <span class="amount-chip discount">
@@ -236,7 +240,7 @@
               <a-radio :value="DISCOUNT_STRATEGIES.ORDER">
                 {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.ORDER] }}
               </a-radio>
-              <a-radio :value="DISCOUNT_STRATEGIES.STACK">
+              <a-radio :value="DISCOUNT_STRATEGIES.STACK" disabled>
                 {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.STACK] }}
               </a-radio>
             </a-radio-group>
@@ -259,9 +263,8 @@
               size="small"
               :min="0"
               :precision="2"
-              :disabled="orderDiscountFieldsDisabled"
+              disabled
               style="width: 100px"
-              @change="syncOrderDiscountRate"
             />
           </a-form-item>
           <a-form-item label="优惠原因" class="discount-reason-item">
@@ -1186,19 +1189,28 @@ function recalcLine(record, editMode = 'discount', taxModeOverride) {
   recalcSalesLinePricing(record, { taxModeExcluding: excluding, editMode })
 }
 
-function recalcAll() {
-  syncOrderDiscountRate()
-  applyOrderAmounts(form, { taxModeExcluding: taxModeExcluding.value })
-}
-
-function syncOrderDiscountRate() {
+function recalcAll(lineEditMode = 'unitPrice') {
   form.orderDiscountRate = normalizeDiscountRate(
     (Number(form.orderDiscountPercent) || 100) / 100,
     1,
   )
   form.orderDiscountType =
     form.orderDiscountRate < 1 || form.orderDiscountAmount > 0 ? 'rate' : 'none'
-  applyOrderAmounts(form, { taxModeExcluding: taxModeExcluding.value })
+  applyOrderAmounts(form, {
+    taxModeExcluding: taxModeExcluding.value,
+    lineEditMode,
+  })
+}
+
+function syncOrderDiscountRate() {
+  // 折扣策略或整单折扣变化时：按策略重建行价，再汇总（整单折扣在汇总时代入各行）
+  form.lineItems.forEach((line) => {
+    if (isLineDiscountDisabled(form.discountStrategy)) {
+      line.lineDiscountRate = 1
+    }
+    recalcLine(line, 'discount')
+  })
+  recalcAll('unitPrice')
 }
 
 function getLineDiscountPercent(record) {
@@ -1207,23 +1219,25 @@ function getLineDiscountPercent(record) {
 
 function setLineDiscountPercent(record, percent) {
   record.lineDiscountRate = normalizeDiscountRate((Number(percent) || 100) / 100, 1)
-  recalcLine(record)
-  recalcAll()
+  recalcLine(record, 'discount')
+  recalcAll('unitPrice')
 }
 
 function onLineFieldChange(record) {
-  recalcLine(record)
-  recalcAll()
+  // 数量/税率等：在允许行折扣时按折扣率重算，否则保留单价
+  const mode = isLineDiscountDisabled(form.discountStrategy) ? 'unitPrice' : 'discount'
+  recalcLine(record, mode)
+  recalcAll('unitPrice')
 }
 
 function onUnitPriceExTaxChange(record) {
   recalcLine(record, 'unitPrice', true)
-  recalcAll()
+  recalcAll('unitPrice')
 }
 
 function onUnitPriceInTaxChange(record) {
   recalcLine(record, 'unitPrice', false)
-  recalcAll()
+  recalcAll('unitPrice')
 }
 
 function lineDateValue(val) {
@@ -1679,8 +1693,9 @@ function handleSave() {
     .header-amounts {
       flex: 1;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 16px;
+      gap: 8px 16px;
       min-width: 0;
       font-size: 12px;
       color: rgba(0, 0, 0, 0.65);

@@ -195,6 +195,11 @@
               <template v-else-if="column.key === 'businessType'">
                 <span class="attr-ellipsis">{{ formatProductBusinessType(record) }}</span>
               </template>
+              <template v-else-if="column.key === 'variantSummary'">
+                <span class="attr-ellipsis" :title="formatProductVariantSummary(record)">
+                  {{ formatProductVariantSummary(record) }}
+                </span>
+              </template>
               <template v-else-if="column.key === 'bomInfo'">
                 <span class="attr-ellipsis">{{ formatProductBomInfo(record) }}</span>
               </template>
@@ -326,6 +331,9 @@ import { openCreateTab } from '@/utils/openCreateTab'
 import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
 import { formatBusinessTypeLabels, PRODUCT_BUSINESS_TYPE_OPTIONS } from '@/utils/businessTypeLabel'
 import { productBomState, getBomInfoLabelForItem } from '@/store/productBomStore'
+import { lineVariantSummary } from '@/utils/spuLineResolve'
+import { formatVariantSummary } from '@/utils/spuVariant'
+import { findSpuById } from '@/store/spuStore'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -475,6 +483,13 @@ const baseColumns = [
   { title: '产品名称', dataIndex: 'name', width: 200, fixed: 'left', ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
   { title: '材质', dataIndex: 'material', width: 80 },
+  {
+    title: '变体属性',
+    key: 'variantSummary',
+    dataIndex: 'variantSummary',
+    width: 140,
+    ellipsis: true,
+  },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '业务类型', key: 'businessType', width: 140, ellipsis: true },
   { title: '类别', dataIndex: 'categoryName', width: 88 },
@@ -495,7 +510,16 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('product-info-list-v2', baseColumns, { minScrollX: 2480 })
+  useTableColumnSettings('product-info-list-v3', baseColumns, { minScrollX: 2620 })
+
+function formatProductVariantSummary(record) {
+  const owned = String(record?.variantSummary || '').trim()
+  if (owned) return owned
+  const fromAxes = lineVariantSummary(record)
+  if (fromAxes) return fromAxes
+  const axes = record?.spuId ? findSpuById(record.spuId)?.variantAxes || [] : []
+  return formatVariantSummary(record?.variantValues || {}, axes) || '—'
+}
 
 function formatProductBusinessType(record) {
   return formatBusinessTypeLabels(record)

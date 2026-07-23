@@ -182,6 +182,7 @@
               :precision="2"
               :disabled="lineDiscountReadOnly"
               style="width: 100%"
+              @change="onDiscountPercentEdit"
             />
             <div v-if="lineDiscountReadOnly" class="field-hint">
               无折扣或仅整单折扣策略下，行折扣固定 100%
@@ -350,9 +351,10 @@ const lineDiscountReadOnly = computed(() => isLineDiscountDisabled(props.discoun
 const lineDiscountFieldTooltip =
   '行优惠金额 = 标准单价(不含税) × 数量 × (1 - 行折扣率)\n改单价（不含税/含税）会按税率互算，并反推行折扣'
 
-const priceEditMode = ref('unitPriceInTax')
+const priceEditMode = ref('unitPriceInTax') // unitPriceExTax | unitPriceInTax | discount
 
 const linePricingPreview = computed(() => {
+  const editMode = priceEditMode.value === 'discount' ? 'discount' : 'unitPrice'
   const taxModeExcluding = priceEditMode.value === 'unitPriceExTax'
   const line = {
     listUnitPriceExTax: Number(draft.listUnitPriceExTax) || 0,
@@ -367,7 +369,7 @@ const linePricingPreview = computed(() => {
   }
   return recalcSalesLinePricing(line, {
     taxModeExcluding,
-    editMode: 'unitPrice',
+    editMode,
   })
 })
 
@@ -375,18 +377,39 @@ function onUnitPriceExTaxEdit() {
   priceEditMode.value = 'unitPriceExTax'
   const preview = linePricingPreview.value
   draft.unitPriceInTax = preview.unitPriceInTax
+  draft.unitPriceExTax = preview.unitPriceExTax
   draft.lineDiscountPercent = round2(normalizeDiscountRate(preview.lineDiscountRate, 1) * 100)
+  if (!(Number(draft.listUnitPriceExTax) > 0) && Number(preview.listUnitPriceExTax) > 0) {
+    draft.listUnitPriceExTax = preview.listUnitPriceExTax
+  }
 }
 
 function onUnitPriceInTaxEdit() {
   priceEditMode.value = 'unitPriceInTax'
   const preview = linePricingPreview.value
   draft.unitPriceExTax = preview.unitPriceExTax
+  draft.unitPriceInTax = preview.unitPriceInTax
   draft.lineDiscountPercent = round2(normalizeDiscountRate(preview.lineDiscountRate, 1) * 100)
+  if (!(Number(draft.listUnitPriceExTax) > 0) && Number(preview.listUnitPriceExTax) > 0) {
+    draft.listUnitPriceExTax = preview.listUnitPriceExTax
+  }
+}
+
+function onDiscountPercentEdit() {
+  if (lineDiscountReadOnly.value) return
+  priceEditMode.value = 'discount'
+  const preview = linePricingPreview.value
+  draft.unitPriceExTax = preview.unitPriceExTax
+  draft.unitPriceInTax = preview.unitPriceInTax
+  if (!(Number(draft.listUnitPriceExTax) > 0) && Number(preview.listUnitPriceExTax) > 0) {
+    draft.listUnitPriceExTax = preview.listUnitPriceExTax
+  }
 }
 
 function onTaxRateEdit() {
-  if (priceEditMode.value === 'unitPriceExTax') {
+  if (priceEditMode.value === 'discount') {
+    onDiscountPercentEdit()
+  } else if (priceEditMode.value === 'unitPriceExTax') {
     onUnitPriceExTaxEdit()
   } else {
     onUnitPriceInTaxEdit()
@@ -408,6 +431,7 @@ watch(
   (open) => {
     if (!open || !props.line) return
     Object.assign(draft, createDraft(props.line))
+    priceEditMode.value = 'unitPriceInTax'
     draft.bomFulfillmentPath = normalizeBomFulfillmentPath(draft.bomFulfillmentPath)
     if (lineDiscountReadOnly.value) {
       draft.lineDiscountPercent = 100
@@ -713,10 +737,15 @@ function handleSave() {
   syncLineAttachmentSummary()
   lineDraft.attachment = draft.attachment
   lineDraft.lineAttachments = (draft.lineAttachments || []).map((f) => ({ ...f }))
+  const editMode = priceEditMode.value === 'discount' ? 'discount' : 'unitPrice'
   recalcSalesLinePricing(lineDraft, {
     taxModeExcluding: priceEditMode.value === 'unitPriceExTax',
-    editMode: 'unitPrice',
+    editMode,
   })
+  draft.listUnitPriceExTax = lineDraft.listUnitPriceExTax
+  draft.unitPriceExTax = lineDraft.unitPriceExTax
+  draft.unitPriceInTax = lineDraft.unitPriceInTax
+  draft.lineDiscountPercent = round2(normalizeDiscountRate(lineDraft.lineDiscountRate, 1) * 100)
   emit('saved', lineDraft)
   visible.value = false
 }

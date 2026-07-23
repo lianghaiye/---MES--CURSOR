@@ -16,6 +16,19 @@ export const productInfoExportFields = [
   { key: 'name', title: '产品名称', getValue: (row) => cell(row, 'name') },
   { key: 'specModel', title: '规格型号', getValue: (row) => cell(row, 'specModel') },
   { key: 'material', title: '材质', getValue: (row) => cell(row, 'material') },
+  {
+    key: 'variantSummary',
+    title: '变体属性',
+    getValue: (row) => {
+      const owned = String(row.variantSummary || '').trim()
+      if (owned) return owned
+      const values = row.variantValues || {}
+      return Object.entries(values)
+        .filter(([k, v]) => k !== 'specModel' && k !== 'material' && v != null && String(v).trim())
+        .map(([, v]) => String(v).trim())
+        .join(' ')
+    },
+  },
   { key: 'drawingNo', title: '图号', getValue: (row) => cell(row, 'drawingNo') },
   {
     key: 'businessType',
