@@ -152,6 +152,12 @@
           {{ (record.sourceSalesOrderNos || []).join('、') || '-' }}
         </template>
 
+        <template v-else-if="column.key === 'action'">
+          <a-button type="link" size="small" danger @click="removeFromOrder(record)">
+            移出本单
+          </a-button>
+        </template>
+
         <template v-else>
           {{ record[column.dataIndex] ?? '-' }}
         </template>
@@ -303,9 +309,11 @@ const columns = [
   { title: '型号规格', key: 'specModel', dataIndex: 'specModel', width: 100 },
   { title: '材质', key: 'material', dataIndex: 'material', width: 80 },
   { title: '需求量', key: 'demandQty', dataIndex: 'demandQty', width: 80, align: 'right' },
+  { title: '采购单位', key: 'unit', dataIndex: 'unit', width: 80 },
   { title: '计划采购量', key: 'planPurchaseQty', width: 100 },
   { title: '指定供应商', key: 'designatedSupplier', width: 100 },
   { title: '供应商名称', key: 'supplierName', width: 120 },
+  { title: '收货仓库', key: 'receivingWarehouse', width: 100 },
   { title: '结算类型', key: 'settlementType', width: 120 },
   { title: '不含税单价', key: 'unitPriceExTax', width: 100 },
   { title: '税率(%)', key: 'taxRate', width: 80 },
@@ -321,11 +329,10 @@ const columns = [
     width: 120,
   },
   { title: '交货日期', key: 'deliveryDate', width: 120 },
-  { title: '收货仓库', key: 'receivingWarehouse', width: 100 },
-  { title: '计量单位', key: 'unit', dataIndex: 'unit', width: 80 },
   { title: '采购申请单号', key: 'sourceReqNos', width: 140, ellipsis: true },
   { title: '销售单号', key: 'sourceSalesOrderNos', width: 130, ellipsis: true },
   { title: '备注', key: 'remark', width: 100 },
+  { title: '操作', key: 'action', width: 96, align: 'center', fixed: 'right' },
 ]
 
 const supplierOpts = supplierOptions
@@ -436,11 +443,22 @@ function applyBatchEdit() {
   batchEditOpen.value = false
 }
 
+function removeFromOrder(record) {
+  rows.value = rows.value.filter((r) => r.key !== record.key)
+  if (!rows.value.length) {
+    message.info('明细已全部移出，请重新选择申请单后再生成')
+  }
+}
+
 function handleCancel() {
   emit('update:open', false)
 }
 
 function handleConfirm() {
+  if (!rows.value.length) {
+    message.warning('没有可生成的明细，请先保留至少一行')
+    return
+  }
   const missingSupplier = rows.value.filter((r) => !r.supplierName)
   if (missingSupplier.length) {
     message.warning('请为所有行指定供应商名称后再生成')
