@@ -39,6 +39,11 @@ export function createOutsourcingWorkOrdersFromSalesOrder(order, lines = []) {
       sourceOrderNo: order.orderNo,
       salesLineId: line.id,
       salesOrderId: order.id,
+      specModel: line.specModel || '',
+      material: line.material || '',
+      drawingNo: line.drawingNo || '',
+      variantSummary: line.variantSummary || line.variantAttr || '',
+      variantValues: line.variantValues ? { ...line.variantValues } : {},
     }
 
     const profile = { productName, materialCode: line.productCode }

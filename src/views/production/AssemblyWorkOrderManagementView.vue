@@ -271,7 +271,7 @@ export default { name: 'AssemblyWorkOrderManagementView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import {
@@ -310,6 +310,7 @@ import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 
 const router = useRouter()
+const route = useRoute()
 const { openTab } = useTabs()
 
 const LAYOUT_STORAGE_KEY = 'i_doms_assembly_wo_layout'
@@ -420,6 +421,29 @@ watch(filteredOrders, (list) => {
     selectedId.value = list[0]?.id || null
   }
 })
+
+function applyCodeFromRouteQuery() {
+  const code = route.query.code
+  if (!code) return
+  const codeStr = String(code)
+  const wo = assemblyWorkOrderState.orders.find((o) => o.code === codeStr)
+  if (!wo) return
+  filters.code = codeStr
+  appliedFilters.value = { ...filters }
+  selectedId.value = wo.id
+  pagination.current = 1
+  if (layoutMode.value === 'table') {
+    detailDrawerOpen.value = true
+  } else {
+    detailCollapsed.value = false
+  }
+}
+
+watch(
+  () => route.query.code,
+  () => applyCodeFromRouteQuery(),
+  { immediate: true },
+)
 
 function statusColor(status) {
   const map = {

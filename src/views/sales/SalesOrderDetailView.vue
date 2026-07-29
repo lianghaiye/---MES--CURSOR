@@ -186,6 +186,9 @@
                   <template v-else-if="column.key === 'lineDiscountRate'">
                     {{ formatDiscountRatePercent(line.lineDiscountRate) }}
                   </template>
+                  <template v-else-if="column.key === 'salesQty' || column.key === 'taxRate'">
+                    {{ formatQty(line[column.dataIndex]) }}
+                  </template>
                   <template v-else-if="isMoneyColumn(column.key)">
                     {{ formatMoneyCell(line, column) }}
                   </template>
@@ -465,6 +468,11 @@
                   <template v-if="column.key === 'status'">
                     <a-tag :color="workOrderStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
                   </template>
+                  <template v-else-if="column.key === 'code'">
+                    <a class="link-code" @click.prevent="goWorkOrderDetail(row)">{{
+                      row.code || '—'
+                    }}</a>
+                  </template>
                   <template v-else-if="column.key === 'progress'">
                     {{ row.progressLabel || row.status || '—' }}
                   </template>
@@ -498,6 +506,11 @@
                 <template #bodyCell="{ column, record: row }">
                   <template v-if="column.key === 'status'">
                     <a-tag :color="workOrderStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'code'">
+                    <a class="link-code" @click.prevent="goWorkOrderDetail(row)">{{
+                      row.code || '—'
+                    }}</a>
                   </template>
                   <template v-else-if="column.key === 'progress'">
                     {{ row.progressLabel || row.status || '—' }}
@@ -542,6 +555,21 @@
                     <a-tag :color="purchaseInboundStatusColor(row.inboundStatus)">
                       {{ row.inboundStatus || '—' }}
                     </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'productName'">
+                    {{ row.productName || row.itemName || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'specModel'">
+                    {{ row.specModel || row.model || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'material'">
+                    {{ row.material || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'drawingNo'">
+                    {{ row.drawingNo || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'variantAttr'">
+                    {{ row.variantAttr || row.variantSummary || '—' }}
                   </template>
                   <template v-else-if="column.key === 'outsourceQty'">
                     {{ formatProductionQty(row.outsourceQty ?? row.qty) }}
@@ -600,12 +628,15 @@ export default { name: 'SalesOrderDetailView' }
 </script>
 
 <script setup>
+import { formatQty } from '@/utils/numberFormat'
 import { computed, onActivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { getSalesOrderById, resolveSalesOrderRelations } from '@/utils/salesOrderDetail'
+import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
+import { workOrderState } from '@/store/workOrderStore'
 import {
   deleteSalesOrder,
   approveSalesOrder,
@@ -786,6 +817,10 @@ function isMoneyColumn(key) {
 function formatMoneyCell(line, column) {
   const val = line[column.dataIndex]
   if (val === undefined || val === null || val === '') return '—'
+  // 单价按智能小数；金额类仍保留 2 位
+  if (column.key === 'unitPriceExTax' || column.key === 'unitPriceInTax') {
+    return `￥${formatQty(val)}`
+  }
   return `￥${formatMoney(val)}`
 }
 
@@ -825,8 +860,7 @@ const outboundTableScrollX = computed(() =>
 )
 
 function formatOutboundQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+  return formatQty(val)
 }
 
 const purchaseReqColumns = [
@@ -864,8 +898,7 @@ function purchaseReqPlanItemCount(row) {
 }
 
 function formatPurchaseQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toFixed(4)
+  return formatQty(val)
 }
 
 function purchaseReqStatusColor(status) {
@@ -902,7 +935,7 @@ const planTableScrollX = computed(() =>
 const productionWorkOrderSharedColumns = [
   { title: '状态', key: 'status', width: 88, fixed: 'left' },
   { title: '进度', key: 'progress', width: 88 },
-  { title: '工单编号', dataIndex: 'code', width: 150, ellipsis: true, fixed: 'left' },
+  { title: '工单编号', key: 'code', dataIndex: 'code', width: 150, ellipsis: true, fixed: 'left' },
   { title: '工单名称', dataIndex: 'name', width: 160, ellipsis: true },
   { title: '工单类型', key: 'orderType', width: 96 },
   { title: '产品名称', dataIndex: 'productName', width: 130, ellipsis: true },
@@ -937,8 +970,7 @@ function productionPlanScheduleQty(plan) {
 }
 
 function formatProductionQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+  return formatQty(val)
 }
 
 function productionPlanStatusColor(status) {
@@ -973,6 +1005,11 @@ const outsourcingColumns = [
   { title: '状态', key: 'status', width: 88, fixed: 'left' },
   { title: '入库状态', key: 'inboundStatus', width: 96 },
   { title: '外协单号', dataIndex: 'orderNo', width: 130, fixed: 'left' },
+  { title: '产品名称', key: 'productName', width: 130, ellipsis: true },
+  { title: '规格型号', key: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', key: 'material', width: 88, ellipsis: true },
+  { title: '图号', key: 'drawingNo', width: 100, ellipsis: true },
+  { title: '变体属性', key: 'variantAttr', width: 140, ellipsis: true },
   { title: '供应商', dataIndex: 'supplierName', width: 140, ellipsis: true },
   { title: '外协数量', key: 'outsourceQty', width: 96, align: 'right' },
   { title: '计划时间', key: 'planTime', width: 110 },
@@ -1256,6 +1293,21 @@ function goDeliveryDetail(row) {
   const path = `/sales/delivery/${row.deliveryOrderId}`
   openTab(path, `发货单 ${row.deliveryCode}`)
   router.push({ name: 'sales-delivery-detail', params: { id: row.deliveryOrderId } })
+}
+
+function goWorkOrderDetail(row) {
+  if (!row?.code) return
+  const code = String(row.code)
+  const inAssembly = assemblyWorkOrderState.orders.some((o) => o.id === row.id || o.code === code)
+  const inProduction = workOrderState.orders.some((o) => o.id === row.id || o.code === code)
+  if (!inAssembly && !inProduction) {
+    message.info('未找到关联工单')
+    return
+  }
+  const basePath = inAssembly ? '/production/assembly-work-orders' : '/production/work-orders'
+  const path = `${basePath}?code=${encodeURIComponent(code)}`
+  openTab(path, `工单 ${code}`)
+  router.push({ path: basePath, query: { code } })
 }
 
 function openBomDetail(bomId, bomName) {
