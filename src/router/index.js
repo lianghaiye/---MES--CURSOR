@@ -601,6 +601,12 @@ const routes = [
         meta: { title: '材质管理' },
       },
       {
+        path: 'basic-config/units',
+        name: 'basic-config-units',
+        component: () => import('@/views/basic-config/UnitManagementView.vue'),
+        meta: { title: '单位管理' },
+      },
+      {
         path: 'basic-config/packaging',
         name: 'basic-config-packaging',
         component: () => import('@/views/basic-config/PackagingManagementView.vue'),

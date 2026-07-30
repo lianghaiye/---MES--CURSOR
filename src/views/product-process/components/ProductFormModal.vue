@@ -212,6 +212,7 @@
                     size="small"
                     :min="0"
                     :precision="2"
+                    :disabled="viewOnly"
                     placeholder="请输入标准单价(不含税)"
                     style="width: 100%"
                   />
@@ -237,9 +238,24 @@
                     :min="0"
                     :max="100"
                     :precision="2"
+                    :disabled="viewOnly"
                     placeholder="请输入销项税率"
                     style="width: 100%"
                     addon-after="%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="标准包装量">
+                  <a-input-number
+                    v-model:value="form.standardPackQty"
+                    size="small"
+                    :min="0"
+                    :precision="4"
+                    :disabled="viewOnly"
+                    placeholder="请输入标准包装量"
+                    style="width: 100%"
+                    :addon-after="inventoryUnitLabel"
                   />
                 </a-form-item>
               </a-col>
@@ -260,9 +276,49 @@
                     :min="0"
                     :max="100"
                     :precision="2"
+                    :disabled="viewOnly"
                     placeholder="请输入进项税率"
                     style="width: 100%"
                     addon-after="%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="采购单价（不含税）">
+                  <a-input-number
+                    v-model:value="form.purchaseUnitPrice"
+                    size="small"
+                    :min="0"
+                    :precision="2"
+                    :disabled="viewOnly"
+                    placeholder="请输入采购单价（不含税）"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="采购单价（含税）">
+                  <a-input-number
+                    :value="purchaseUnitPriceInclTax"
+                    size="small"
+                    :precision="2"
+                    disabled
+                    placeholder="自动计算"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="包装含量">
+                  <a-input-number
+                    v-model:value="form.packContentQty"
+                    size="small"
+                    :min="0"
+                    :precision="4"
+                    :disabled="viewOnly"
+                    placeholder="请输入包装含量"
+                    style="width: 100%"
+                    :addon-after="inventoryUnitLabel"
                   />
                 </a-form-item>
               </a-col>
@@ -528,6 +584,15 @@
       </a-tab-pane>
     </a-tabs>
 
+    <div v-if="activeTabHelpItems.length" class="field-help-panel">
+      <ul class="field-help-list">
+        <li v-for="item in activeTabHelpItems" :key="item.name">
+          <span class="field-help-name">{{ item.name }}</span>
+          ：{{ item.desc }}
+        </li>
+      </ul>
+    </div>
+
     <template #footer>
       <template v-if="viewOnly">
         <a-button type="primary" @click="onShellCancel">关闭</a-button>
@@ -561,7 +626,6 @@ import {
   barcodeTypeOptions,
   materialTypeOptions,
   supplyFormOptions,
-  inventoryUnitOptions,
   reportTypeOptions,
   salaryMethodOptions,
   workCenterOpts,
@@ -576,6 +640,7 @@ import {
   PART_PRODUCT_ATTRIBUTES,
   normalizePartProductAttribute,
 } from '@/mock/productInfoOptions'
+import { unitState, getInventoryUnitOptions } from '@/store/unitStore'
 import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
 import { generateProductCode, addProduct, updateProduct } from '@/store/productInfoStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
@@ -604,6 +669,17 @@ const unitPriceInclTax = computed(() => {
   return Number((ex * (1 + r / 100)).toFixed(2))
 })
 
+/** 采购含税单价 = 不含税 × (1 + 进项税率%) */
+const purchaseUnitPriceInclTax = computed(() => {
+  const ex = Number(form.purchaseUnitPrice)
+  if (!Number.isFinite(ex)) return undefined
+  const rate = Number(form.inputTaxRate)
+  const r = Number.isFinite(rate) ? rate : 0
+  return Number((ex * (1 + r / 100)).toFixed(2))
+})
+
+const inventoryUnitLabel = computed(() => form.inventoryUnit || '件')
+
 const {
   isActive,
   shellTitle,
@@ -627,7 +703,10 @@ const materialCategoryOpts = flatMatCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
 }))
-const unitOpts = inventoryUnitOptions.map((v) => ({ label: v, value: v }))
+const unitOpts = computed(() => {
+  void unitState.units
+  return getInventoryUnitOptions()
+})
 const productAttrOpts = computed(() => {
   const options = form.isPart
     ? partProductAttributeOptions
@@ -653,6 +732,51 @@ const warehouseOpts = computed(() => {
 const activeTabKey = ref('basic')
 const fileList = ref([])
 
+const FIELD_HELP_BY_TAB = {
+  basic: [
+    {
+      name: '供应型态',
+      desc: '标识物料来源方式（外购件、自制件、外协件、组装等），影响销售订单审核后是否自动生成采购申请、生产工单或外协订单。',
+    },
+    {
+      name: '启用双单位',
+      desc: '开启后，采购/入库按「采购单位」计数（如根、盒），库存账存按「库存单位」计量（如米、个）。适用于单件规格不固定，或按包装采购、按件领用的物料。',
+    },
+    {
+      name: '库存单位',
+      desc: '库存账存、领料发料所使用的计量单位。',
+    },
+    {
+      name: '采购单位',
+      desc: '启用双单位后，采购下单与到货清点所使用的单位；未启用时与库存单位相同。',
+    },
+  ],
+  sales: [
+    {
+      name: '标准包装量',
+      desc: '销售发货或报价常用的标准包装数量，单位为库存单位（如每捆长度、每箱件数）。',
+    },
+  ],
+  purchase: [
+    {
+      name: '包装含量',
+      desc: '每个采购包装（盒/箱等）内含的库存单位数量。生成采购申请时，可按需求量 ÷ 包装含量向上取整，换算为采购包装数。',
+    },
+  ],
+  labor: [
+    {
+      name: '报工类型',
+      desc: '批量计件：工时=整批准备工时+合格报工数量×单件标准工时；时长报工：工时=准备工时+员工填报总时长（审核后）。',
+    },
+    {
+      name: '计薪方式',
+      desc: '计件工资=合格数量×单件计件单价+补贴报工数量；计时工资按标准工时单价核算（详见工时管理）。',
+    },
+  ],
+}
+
+const activeTabHelpItems = computed(() => FIELD_HELP_BY_TAB[activeTabKey.value] || [])
+
 const showAssemblyPartSwitch = computed(
   () => form.isPart || isPartProductAttribute(form.productAttribute),
 )
@@ -669,6 +793,9 @@ const form = reactive({
   weight: '',
   inventoryUnit: undefined,
   unitPrice: undefined,
+  purchaseUnitPrice: undefined,
+  packContentQty: undefined,
+  standardPackQty: undefined,
   standardSpec: undefined,
   techParams: '',
   canSell: true,
@@ -704,6 +831,9 @@ function resetForm() {
   form.weight = ''
   form.inventoryUnit = undefined
   form.unitPrice = undefined
+  form.purchaseUnitPrice = undefined
+  form.packContentQty = undefined
+  form.standardPackQty = undefined
   form.standardSpec = undefined
   form.techParams = ''
   form.canSell = true
@@ -751,6 +881,9 @@ function loadEditRecord(record) {
     weight: source.weight ?? '',
     inventoryUnit: source.inventoryUnit,
     unitPrice: source.unitPrice,
+    purchaseUnitPrice: source.purchaseUnitPrice,
+    packContentQty: source.packContentQty ?? source.minOrderQty,
+    standardPackQty: source.standardPackQty,
     standardSpec: source.standardSpec,
     techParams: source.techParams || '',
     canSell: source.canSell !== false,
@@ -970,6 +1103,9 @@ function buildPayload() {
     standardSpec: form.standardSpec || '',
     techParams: form.techParams?.trim() || '',
     unitPrice: form.unitPrice ?? 0,
+    purchaseUnitPrice: form.purchaseUnitPrice ?? 0,
+    packContentQty: form.packContentQty ?? null,
+    standardPackQty: form.standardPackQty ?? null,
     canSell: true,
     isWholeMachine: form.isWholeMachine,
     isPart: form.isPart,
@@ -1217,5 +1353,26 @@ function handleOk() {
 .upload-text {
   margin-top: 4px;
   font-size: 12px;
+}
+
+.field-help-panel {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+}
+
+.field-help-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.field-help-name {
+  color: rgba(0, 0, 0, 0.75);
+  font-weight: 500;
 }
 </style>

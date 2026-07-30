@@ -39,8 +39,13 @@ export function applyMaterialToLine(flatNodes, lineItems, lineId, material) {
     supplyForm: material.supplyForm || '外购件',
     material: material.material || '',
     drawingNo: material.drawingNo || '',
-    unit: material.inventoryUnit || line.unit || '件',
+    unit: material.isVariableLength
+      ? material.stockUnit || material.inventoryUnit || '米'
+      : material.inventoryUnit || line.unit || '件',
     unitPrice: material.unitPrice ?? line.unitPrice ?? 0,
+    isVariableLength: Boolean(material.isVariableLength),
+    blankLength: material.isVariableLength ? (line.blankLength ?? null) : null,
+    blankLossRate: material.isVariableLength ? (line.blankLossRate ?? null) : null,
     isSpuLine: false,
     spuId: material.spuId || '',
     spuName: material.spuName || '',

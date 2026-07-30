@@ -8,10 +8,29 @@ import {
   removeLinkedProduct,
 } from '@/utils/productMaterialSync'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
+import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
 
 const STORAGE_KEY = 'i_doms_material_info'
-const DATA_VERSION = 9
+const DATA_VERSION = 12
 let codeSeq = 100048
+
+function ensureDemoVariableLengthMaterials(list) {
+  const materials = Array.isArray(list) ? [...list] : []
+  const demos = createDemoDualUnitMaterials()
+  for (const demo of demos) {
+    const idx = materials.findIndex((m) => m.code === demo.code)
+    if (idx === -1) {
+      materials.unshift(demo)
+    } else {
+      materials[idx] = {
+        ...materials[idx],
+        ...demo,
+        id: materials[idx].id || demo.id,
+      }
+    }
+  }
+  return materials
+}
 
 function loadFromStorage() {
   try {
@@ -20,7 +39,9 @@ function loadFromStorage() {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed.materials)) {
         const force = parsed.version !== DATA_VERSION
-        return applyLaborConfigSeed(migrateMaterialList(parsed.materials), { force })
+        return ensureDemoVariableLengthMaterials(
+          applyLaborConfigSeed(migrateMaterialList(parsed.materials), { force }),
+        )
       }
     }
   } catch {

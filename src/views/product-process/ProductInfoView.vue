@@ -179,7 +179,7 @@
 
         <div class="table-card">
           <a-table
-            :columns="displayColumns"
+            :columns="tableColumns"
             :data-source="pagedList"
             row-key="id"
             size="small"
@@ -187,6 +187,7 @@
             :scroll="{ x: tableScrollX }"
             :pagination="false"
             :row-selection="rowSelection"
+            @change="onTableChange"
           >
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'index'">
@@ -398,6 +399,9 @@ const filteredList = computed(() =>
   filterProducts(productInfoState.products, appliedFilters.value, selectedCategoryKey.value),
 )
 
+/** 产品编号排序：ascend / descend / undefined */
+const codeSortOrder = ref()
+
 const {
   exportModalOpen,
   openExportModal,
@@ -414,8 +418,18 @@ const {
 })
 
 const pagedList = computed(() => {
+  const list = [...filteredList.value]
+  if (codeSortOrder.value === 'ascend') {
+    list.sort((a, b) =>
+      String(a.code || '').localeCompare(String(b.code || ''), 'zh-CN', { numeric: true }),
+    )
+  } else if (codeSortOrder.value === 'descend') {
+    list.sort((a, b) =>
+      String(b.code || '').localeCompare(String(a.code || ''), 'zh-CN', { numeric: true }),
+    )
+  }
   const start = (pagination.current - 1) * pagination.pageSize
-  return filteredList.value.slice(start, start + pagination.pageSize)
+  return list.slice(start, start + pagination.pageSize)
 })
 
 const rowSelection = computed(() => ({
@@ -475,9 +489,12 @@ const baseColumns = [
     title: '产品编号',
     key: 'code',
     dataIndex: 'code',
-    width: 128,
+    width: 148,
     fixed: 'left',
-    ellipsis: true,
+    // 不可与 sorter 同开 ellipsis：表头会 overflow:hidden，排序箭头被裁切看不见
+    sorter: true,
+    sortDirections: ['ascend', 'descend'],
+    showSorterTooltip: { title: '点击按产品编号排序' },
     customRender: renderProductCodeLink,
   },
   { title: '产品名称', dataIndex: 'name', width: 200, fixed: 'left', ellipsis: true },
@@ -510,7 +527,28 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('product-info-list-v3', baseColumns, { minScrollX: 2620 })
+  useTableColumnSettings('product-info-list-v4', baseColumns, { minScrollX: 2620 })
+
+const tableColumns = computed(() =>
+  displayColumns.value.map((col) => {
+    if (col.key !== 'code' && col.dataIndex !== 'code') return col
+    return {
+      ...col,
+      sorter: true,
+      sortDirections: ['ascend', 'descend'],
+      showSorterTooltip: { title: '点击按产品编号排序' },
+      sortOrder: codeSortOrder.value || null,
+    }
+  }),
+)
+
+function onTableChange(_pagination, _filters, sorter) {
+  const active = Array.isArray(sorter) ? sorter[0] : sorter
+  if (active?.columnKey === 'code' || active?.field === 'code') {
+    codeSortOrder.value = active.order || undefined
+    pagination.current = 1
+  }
+}
 
 function formatProductVariantSummary(record) {
   const owned = String(record?.variantSummary || '').trim()
@@ -747,6 +785,15 @@ function onAddCategory() {
     font-weight: 500;
     padding: 8px;
     font-size: 13px;
+  }
+
+  /* 冻结列 + ellipsis 时表头可能裁切排序图标，强制露出 */
+  :deep(.ant-table-thead th.ant-table-column-has-sorters) {
+    overflow: visible;
+  }
+
+  :deep(.ant-table-column-sorter) {
+    color: #8c8c8c;
   }
 
   :deep(.ant-table-tbody > tr > td) {

@@ -1,6 +1,7 @@
 import { processRouteMaster } from '@/mock/processRoutes'
 import { workCenterOptions, processRouteOptions, warehouseOptions } from '@/mock/workOrderOptions'
 import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
+import { getInventoryUnitNames } from '@/store/unitStore'
 
 export const barcodeTypeOptions = ['一物一码', '一类一码', '一批一码']
 
@@ -9,7 +10,36 @@ export {
   SUPPLY_FORM_OPTIONS as supplyFormOptions,
 } from '@/utils/masterDataMigrate'
 
-export const inventoryUnitOptions = ['个', '件', '套', 'kg', 'm', '台']
+const FALLBACK_INVENTORY_UNITS = ['个', '件', '套', 'kg', 'm', '米', '台', '根']
+
+/** 库存单位名称（读单位管理） */
+export function getInventoryUnitOptionsList() {
+  const list = getInventoryUnitNames()
+  return list.length ? list : FALLBACK_INVENTORY_UNITS
+}
+
+/**
+ * 兼容旧代码：优先返回单位管理中的启用库存单位。
+ * 表单请优先用 @/store/unitStore 的 getInventoryUnitOptions() + computed。
+ */
+export const inventoryUnitOptions = new Proxy([], {
+  get(_target, prop, receiver) {
+    const list = getInventoryUnitOptionsList()
+    if (prop === 'length') return list.length
+    if (prop === Symbol.iterator) return list[Symbol.iterator].bind(list)
+    if (typeof prop === 'string' && prop === 'map') return list.map.bind(list)
+    if (typeof prop === 'string' && prop === 'filter') return list.filter.bind(list)
+    if (typeof prop === 'string' && prop === 'includes') return list.includes.bind(list)
+    if (typeof prop === 'string' && prop === 'forEach') return list.forEach.bind(list)
+    if (typeof prop === 'string' && prop === 'find') return list.find.bind(list)
+    if (typeof prop === 'string' && prop === 'some') return list.some.bind(list)
+    if (typeof prop === 'string' && prop === 'every') return list.every.bind(list)
+    if (typeof prop === 'string' && prop === 'slice') return list.slice.bind(list)
+    if (typeof prop === 'string' && prop === 'concat') return list.concat.bind(list)
+    if (typeof prop === 'string' && /^\d+$/.test(prop)) return list[Number(prop)]
+    return Reflect.get(list, prop, receiver)
+  },
+})
 
 export const reportTypeOptions = ['批量计件', '时长报工']
 

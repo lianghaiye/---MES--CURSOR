@@ -7,16 +7,17 @@ export const defaultBomColumnSettings = [
   { key: 'variantAttr', title: '变体属性', hidden: false, frozen: false, order: 4 },
   { key: 'drawingNo', title: '图号', hidden: false, frozen: false, order: 5 },
   { key: 'unitQty', title: '单位用量', hidden: false, frozen: false, order: 6 },
-  { key: 'unit', title: '单位', hidden: false, frozen: false, order: 7 },
-  { key: 'supplyForm', title: '供应型态', hidden: false, frozen: false, order: 8 },
-  { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 9 },
-  { key: 'materialType', title: '物料类型', hidden: false, frozen: false, order: 10 },
-  { key: 'remark', title: '备注', hidden: false, frozen: false, order: 11 },
-  { key: 'substitutePart', title: '替代件', hidden: false, frozen: false, order: 12 },
-  { key: 'childBom', title: '子件BOM', hidden: false, frozen: false, order: 13 },
-  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 14 },
-  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 15 },
-  { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 16 },
+  { key: 'blankSizeText', title: '下料尺寸', hidden: false, frozen: false, order: 7 },
+  { key: 'unit', title: '库存单位', hidden: false, frozen: false, order: 8 },
+  { key: 'supplyForm', title: '供应型态', hidden: false, frozen: false, order: 9 },
+  { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 10 },
+  { key: 'materialType', title: '物料类型', hidden: false, frozen: false, order: 11 },
+  { key: 'remark', title: '备注', hidden: false, frozen: false, order: 12 },
+  { key: 'substitutePart', title: '替代件', hidden: false, frozen: false, order: 13 },
+  { key: 'childBom', title: '子件BOM', hidden: false, frozen: false, order: 14 },
+  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 15 },
+  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 16 },
+  { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 17 },
 ]
 
 /** 子件 BOM 展示：BOM 名称 + 版本号 */
@@ -58,7 +59,7 @@ export function normalizeBomType(bomType) {
 /** EBOM 设计专用，产品 BOM 新增/编辑不展示此选项 */
 export const EBOM_TYPE_VALUE = 'EBOM'
 
-export const unitOptions = ['个', '件', '套', '根', '台']
+export const unitOptions = ['个', '件', '套', '根', '台', '米']
 
 export const processDocOptions = [
   { label: '机加工艺-泵体', value: '机加工艺-泵体' },

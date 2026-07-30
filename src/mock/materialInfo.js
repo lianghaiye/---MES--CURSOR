@@ -6,6 +6,7 @@ import { buildMaterialFromProduct } from '@/utils/productMaterialMap'
 import { mockProducts } from '@/mock/productInfo'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { laborDemoBomMaterials } from '@/mock/laborHourDemoSeed'
+import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
 import {
   matchesBusinessTypeFilter,
   MATERIAL_BUSINESS_TYPE_OPTIONS,
@@ -58,6 +59,7 @@ function createMaterial(index) {
 }
 
 const rawMockMaterials = [
+  ...createDemoDualUnitMaterials(),
   ...laborDemoBomMaterials,
   ...bomTemplateMaterials,
   ...Array.from({ length: 24 }, (_, i) => createMaterial(i)),

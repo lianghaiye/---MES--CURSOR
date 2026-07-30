@@ -196,7 +196,7 @@
         <div class="table-card">
           <a-table
             v-if="listViewMode === 'sku'"
-            :columns="displayColumns"
+            :columns="tableColumns"
             :data-source="pagedList"
             row-key="id"
             size="small"
@@ -204,6 +204,7 @@
             :scroll="{ x: tableScrollX }"
             :pagination="false"
             :row-selection="rowSelection"
+            @change="onTableChange"
           >
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'index'">
@@ -539,9 +540,22 @@ function bomStrategyLabel(v) {
   return SPU_BOM_STRATEGY_LABELS[v] || v || '—'
 }
 
+/** 编号排序：ascend / descend / undefined */
+const codeSortOrder = ref()
+
 const pagedList = computed(() => {
+  const list = [...filteredList.value]
+  if (codeSortOrder.value === 'ascend') {
+    list.sort((a, b) =>
+      String(a.code || '').localeCompare(String(b.code || ''), 'zh-CN', { numeric: true }),
+    )
+  } else if (codeSortOrder.value === 'descend') {
+    list.sort((a, b) =>
+      String(b.code || '').localeCompare(String(a.code || ''), 'zh-CN', { numeric: true }),
+    )
+  }
   const start = (pagination.current - 1) * pagination.pageSize
-  return filteredList.value.slice(start, start + pagination.pageSize)
+  return list.slice(start, start + pagination.pageSize)
 })
 
 const rowSelection = computed(() => ({
@@ -601,9 +615,12 @@ const baseColumns = [
     title: '编号',
     key: 'code',
     dataIndex: 'code',
-    width: 128,
+    width: 148,
     fixed: 'left',
-    ellipsis: true,
+    // 不可与 sorter 同开 ellipsis：表头会 overflow:hidden，排序箭头被裁切
+    sorter: true,
+    sortDirections: ['ascend', 'descend'],
+    showSorterTooltip: { title: '点击按编号排序' },
     customRender: renderProductCodeLink,
   },
   { title: '名称', dataIndex: 'name', width: 200, fixed: 'left', ellipsis: true },
@@ -634,7 +651,28 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('master-item-list-v1', baseColumns, { minScrollX: 2780 })
+  useTableColumnSettings('master-item-list-v2', baseColumns, { minScrollX: 2780 })
+
+const tableColumns = computed(() =>
+  displayColumns.value.map((col) => {
+    if (col.key !== 'code' && col.dataIndex !== 'code') return col
+    return {
+      ...col,
+      sorter: true,
+      sortDirections: ['ascend', 'descend'],
+      showSorterTooltip: { title: '点击按编号排序' },
+      sortOrder: codeSortOrder.value || null,
+    }
+  }),
+)
+
+function onTableChange(_pagination, _filters, sorter) {
+  const active = Array.isArray(sorter) ? sorter[0] : sorter
+  if (active?.columnKey === 'code' || active?.field === 'code') {
+    codeSortOrder.value = active.order || undefined
+    pagination.current = 1
+  }
+}
 
 function formatProductBusinessType(record) {
   return formatBusinessTypeLabels(record, MASTER_BUSINESS_TYPE_OPTIONS)
@@ -928,6 +966,14 @@ function onAddCategory() {
     font-weight: 500;
     padding: 8px;
     font-size: 13px;
+  }
+
+  :deep(.ant-table-thead th.ant-table-column-has-sorters) {
+    overflow: visible;
+  }
+
+  :deep(.ant-table-column-sorter) {
+    color: #8c8c8c;
   }
 
   :deep(.ant-table-tbody > tr > td) {

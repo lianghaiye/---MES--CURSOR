@@ -187,6 +187,36 @@
                   />
                 </a-form-item>
               </a-col>
+              <a-col :span="8">
+                <a-form-item>
+                  <template #label>
+                    <span>启用双单位</span>
+                    <a-tooltip
+                      :overlay-style="{ maxWidth: '320px' }"
+                      title="启用后，采购/入库按「采购单位」计数（如根），库存账存按「库存单位」计量（如米、kg）。适用于单件规格不固定、需按实际长度或重量入账的物料。"
+                    >
+                      <InfoCircleOutlined class="info-icon" />
+                    </a-tooltip>
+                  </template>
+                  <a-switch
+                    v-model:checked="form.isVariableLength"
+                    :disabled="viewOnly"
+                    @change="onVariableLengthChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <template v-if="form.isVariableLength">
+                <a-col :span="8">
+                  <a-form-item label="采购单位" required>
+                    <a-select
+                      v-model:value="form.purchaseUnit"
+                      size="small"
+                      :options="purchaseUnitOpts"
+                      placeholder="如：根"
+                    />
+                  </a-form-item>
+                </a-col>
+              </template>
               <a-col :span="24">
                 <a-form-item label="技术参数" class="remark-item">
                   <a-textarea
@@ -321,6 +351,20 @@
                   />
                 </a-form-item>
               </a-col>
+              <a-col :span="8">
+                <a-form-item label="标准包装量">
+                  <a-input-number
+                    v-model:value="form.standardPackQty"
+                    size="small"
+                    :min="0"
+                    :precision="4"
+                    :disabled="viewOnly"
+                    placeholder="请输入标准包装量"
+                    style="width: 100%"
+                    :addon-after="inventoryUnitLabel"
+                  />
+                </a-form-item>
+              </a-col>
             </a-row>
           </a-form>
         </div>
@@ -341,6 +385,45 @@
                     placeholder="请输入进项税率"
                     style="width: 100%"
                     addon-after="%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="采购单价（不含税）" class="label-wide">
+                  <a-input-number
+                    v-model:value="form.purchaseUnitPrice"
+                    size="small"
+                    :min="0"
+                    :precision="2"
+                    :disabled="viewOnly"
+                    placeholder="请输入采购单价（不含税）"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="采购单价（含税）" class="label-wide">
+                  <a-input-number
+                    :value="purchaseUnitPriceInclTax"
+                    size="small"
+                    :precision="2"
+                    disabled
+                    placeholder="自动计算"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="包装含量">
+                  <a-input-number
+                    v-model:value="form.packContentQty"
+                    size="small"
+                    :min="0"
+                    :precision="4"
+                    :disabled="viewOnly"
+                    placeholder="请输入包装含量"
+                    style="width: 100%"
+                    :addon-after="inventoryUnitLabel"
                   />
                 </a-form-item>
               </a-col>
@@ -633,6 +716,15 @@
       </a-tab-pane>
     </a-tabs>
 
+    <div v-if="activeTabHelpItems.length" class="field-help-panel">
+      <ul class="field-help-list">
+        <li v-for="item in activeTabHelpItems" :key="item.name">
+          <span class="field-help-name">{{ item.name }}</span>
+          ：{{ item.desc }}
+        </li>
+      </ul>
+    </div>
+
     <template #footer>
       <template v-if="viewOnly">
         <a-button type="primary" @click="handleCancel">关闭</a-button>
@@ -670,7 +762,6 @@ import {
   barcodeTypeOptions,
   materialTypeOptions,
   supplyFormOptions,
-  inventoryUnitOptions,
   reportTypeOptions,
   salaryMethodOptions,
   inboundQcOptions,
@@ -680,6 +771,7 @@ import {
   createDefaultProductionControl,
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
+import { unitState, getInventoryUnitOptions, getPurchaseUnitOptions } from '@/store/unitStore'
 import { generateProductCode } from '@/store/productInfoStore'
 import { saveMasterItem, resolveMasterItemEditRecord } from '@/utils/masterItemSave'
 import {
@@ -780,6 +872,17 @@ const unitPriceInclTax = computed(() => {
   return Number((ex * (1 + r / 100)).toFixed(2))
 })
 
+/** 采购含税单价 = 不含税 × (1 + 进项税率%) */
+const purchaseUnitPriceInclTax = computed(() => {
+  const ex = Number(form.purchaseUnitPrice)
+  if (!Number.isFinite(ex)) return undefined
+  const rate = Number(form.inputTaxRate)
+  const r = Number.isFinite(rate) ? rate : 0
+  return Number((ex * (1 + r / 100)).toFixed(2))
+})
+
+const inventoryUnitLabel = computed(() => form.inventoryUnit || '件')
+
 /** 产品族已落库后，才允许维护族模板 BOM（需关联 spuId） */
 const hasSavedSpu = computed(() => Boolean(form.spuId || props.editSpu?.id))
 
@@ -810,7 +913,27 @@ function onFamilyCodeChange() {
 const barcodeOpts = barcodeTypeOptions.map((v) => ({ label: v, value: v }))
 const materialTypeOpts = materialTypeOptions.map((v) => ({ label: v, value: v }))
 const supplyFormOpts = supplyFormOptions.map((v) => ({ label: v, value: v }))
-const unitOpts = inventoryUnitOptions.map((v) => ({ label: v, value: v }))
+const unitOpts = computed(() => {
+  void unitState.units
+  return getInventoryUnitOptions()
+})
+const purchaseUnitOpts = computed(() => {
+  void unitState.units
+  return getPurchaseUnitOptions()
+})
+
+function onVariableLengthChange(checked) {
+  if (checked) {
+    form.inventoryUnit = form.inventoryUnit || '米'
+    form.stockUnit = '米'
+    form.purchaseUnit = form.purchaseUnit || '根'
+    form.uomRelation = 'per_piece_length'
+  } else {
+    form.purchaseUnit = form.inventoryUnit
+    form.stockUnit = form.inventoryUnit
+    form.uomRelation = ''
+  }
+}
 const materialGradeIdOpts = computed(() => {
   void materialGradeState.items
   return materialGradeState.items.map((i) => ({ label: i.name, value: i.id }))
@@ -845,6 +968,51 @@ const warehouseOpts = computed(() => {
 
 const activeTabKey = ref('basic')
 
+const FIELD_HELP_BY_TAB = {
+  basic: [
+    {
+      name: '供应型态',
+      desc: '标识物料来源方式（外购件、自制件、外协件、组装等），影响销售订单审核后是否自动生成采购申请、生产工单或外协订单。',
+    },
+    {
+      name: '启用双单位',
+      desc: '开启后，采购/入库按「采购单位」计数（如根、盒），库存账存按「库存单位」计量（如米、个）。适用于单件规格不固定，或按包装采购、按件领用的物料。',
+    },
+    {
+      name: '库存单位',
+      desc: '库存账存、领料发料所使用的计量单位。',
+    },
+    {
+      name: '采购单位',
+      desc: '启用双单位后，采购下单与到货清点所使用的单位；未启用时与库存单位相同。',
+    },
+  ],
+  sales: [
+    {
+      name: '标准包装量',
+      desc: '销售发货或报价常用的标准包装数量，单位为库存单位（如每捆长度、每箱件数）。',
+    },
+  ],
+  purchase: [
+    {
+      name: '包装含量',
+      desc: '每个采购包装（盒/箱等）内含的库存单位数量。生成采购申请时，可按需求量 ÷ 包装含量向上取整，换算为采购包装数。',
+    },
+  ],
+  labor: [
+    {
+      name: '报工类型',
+      desc: '批量计件：工时=整批准备工时+合格报工数量×单件标准工时；时长报工：工时=准备工时+员工填报总时长（审核后）。',
+    },
+    {
+      name: '计薪方式',
+      desc: '计件工资=合格数量×单件计件单价+补贴报工数量；计时工资按标准工时单价核算（详见工时管理）。',
+    },
+  ],
+}
+
+const activeTabHelpItems = computed(() => FIELD_HELP_BY_TAB[activeTabKey.value] || [])
+
 const form = reactive({
   code: '',
   name: '',
@@ -871,7 +1039,14 @@ const form = reactive({
   techParams: '',
   weight: '',
   inventoryUnit: undefined,
+  isVariableLength: false,
+  purchaseUnit: undefined,
+  stockUnit: undefined,
+  uomRelation: '',
   unitPrice: undefined,
+  purchaseUnitPrice: undefined,
+  packContentQty: undefined,
+  standardPackQty: undefined,
   canSell: false,
   canProduce: false,
   isWholeMachine: false,
@@ -919,7 +1094,14 @@ function resetForm() {
   form.techParams = ''
   form.weight = ''
   form.inventoryUnit = undefined
+  form.isVariableLength = false
+  form.purchaseUnit = undefined
+  form.stockUnit = undefined
+  form.uomRelation = ''
   form.unitPrice = undefined
+  form.purchaseUnitPrice = undefined
+  form.packContentQty = undefined
+  form.standardPackQty = undefined
   form.canSell = false
   form.canProduce = false
   form.isWholeMachine = false
@@ -961,7 +1143,14 @@ function loadEditRecord(record) {
   form.techParams = source.techParams || ''
   form.weight = source.weight || ''
   form.inventoryUnit = source.inventoryUnit
+  form.isVariableLength = Boolean(source.isVariableLength)
+  form.purchaseUnit = source.purchaseUnit
+  form.stockUnit = source.stockUnit || source.inventoryUnit
+  form.uomRelation = source.uomRelation || ''
   form.unitPrice = source.unitPrice
+  form.purchaseUnitPrice = source.purchaseUnitPrice
+  form.packContentQty = source.packContentQty ?? source.minOrderQty
+  form.standardPackQty = source.standardPackQty
   form.canSell = Boolean(source.canSell)
   form.canProduce = Boolean(source.canProduce)
   form.isWholeMachine = Boolean(source.isWholeMachine)
@@ -1175,6 +1364,10 @@ function validate() {
     message.warning('请选择库存单位')
     return false
   }
+  if (form.isVariableLength && !form.purchaseUnit) {
+    message.warning('启用双单位请选择采购单位（如：根）')
+    return false
+  }
   if (form.laborEnabled) {
     for (let i = 0; i < form.laborRows.length; i += 1) {
       const row = form.laborRows[i]
@@ -1235,9 +1428,16 @@ function buildProductPayload() {
     bomOverrides: form.bomOverrides || [],
     weight: Number(form.weight) || 0,
     inventoryUnit: form.inventoryUnit,
+    isVariableLength: form.isVariableLength,
+    purchaseUnit: form.isVariableLength ? form.purchaseUnit : form.inventoryUnit,
+    stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
+    uomRelation: form.isVariableLength ? 'per_piece_length' : '',
     standardSpec: form.standardSpec || '',
     techParams: form.techParams?.trim() || '',
     unitPrice: form.unitPrice ?? 0,
+    purchaseUnitPrice: form.purchaseUnitPrice ?? 0,
+    packContentQty: form.packContentQty ?? null,
+    standardPackQty: form.standardPackQty ?? null,
     canSell: form.canSell,
     canProduce: form.canProduce,
     isWholeMachine: form.isWholeMachine,
@@ -1293,7 +1493,14 @@ function buildMaterialPayload() {
     techParams: form.techParams?.trim() || '',
     weight: form.weight,
     inventoryUnit: form.inventoryUnit,
+    isVariableLength: form.isVariableLength,
+    purchaseUnit: form.isVariableLength ? form.purchaseUnit : form.inventoryUnit,
+    stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
+    uomRelation: form.isVariableLength ? 'per_piece_length' : '',
     unitPrice: form.unitPrice ?? 0,
+    purchaseUnitPrice: form.purchaseUnitPrice ?? 0,
+    packContentQty: form.packContentQty ?? null,
+    standardPackQty: form.standardPackQty ?? null,
     canSell: form.canSell,
     canProduce: form.canProduce,
     canPurchase: form.canPurchase,
@@ -1693,6 +1900,27 @@ function handleOk() {
   margin-left: 4px;
   color: #fa8c16;
   font-size: 12px;
+}
+
+.field-help-panel {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+}
+
+.field-help-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.field-help-name {
+  color: rgba(0, 0, 0, 0.75);
+  font-weight: 500;
 }
 
 .labor-row-card {

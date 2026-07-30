@@ -125,6 +125,7 @@
 </template>
 
 <script setup>
+import { formatQty } from '@/utils/numberFormat'
 import { computed, ref, watch } from 'vue'
 import { PrinterOutlined } from '@ant-design/icons-vue'
 import {
@@ -193,11 +194,6 @@ watch(
     )
   },
 )
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toFixed(2)
-}
 
 function onExpandedChange(keys) {
   expandedKeys.value = keys

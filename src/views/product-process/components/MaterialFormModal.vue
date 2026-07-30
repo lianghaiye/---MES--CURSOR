@@ -126,6 +126,36 @@
                   />
                 </a-form-item>
               </a-col>
+              <a-col :span="8">
+                <a-form-item>
+                  <template #label>
+                    <span>启用双单位</span>
+                    <a-tooltip
+                      :overlay-style="{ maxWidth: '320px' }"
+                      title="启用后，采购/入库按「采购单位」计数（如根），库存账存按「库存单位」计量（如米、kg）。适用于单件规格不固定、需按实际长度或重量入账的物料。"
+                    >
+                      <InfoCircleOutlined class="info-icon" />
+                    </a-tooltip>
+                  </template>
+                  <a-switch
+                    v-model:checked="form.isVariableLength"
+                    :disabled="viewOnly"
+                    @change="onVariableLengthChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <template v-if="form.isVariableLength">
+                <a-col :span="8">
+                  <a-form-item label="采购单位" required>
+                    <a-select
+                      v-model:value="form.purchaseUnit"
+                      size="small"
+                      :options="purchaseUnitOpts"
+                      placeholder="如：根"
+                    />
+                  </a-form-item>
+                </a-col>
+              </template>
               <a-col :span="24">
                 <div class="form-option-row">
                   <div class="form-option-item">
@@ -587,7 +617,6 @@ import {
   barcodeTypeOptions,
   materialTypeOptions,
   supplyFormOptions,
-  inventoryUnitOptions,
   reportTypeOptions,
   salaryMethodOptions,
   inboundQcOptions,
@@ -599,6 +628,7 @@ import {
   createDefaultProductionControl,
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
+import { unitState, getInventoryUnitOptions, getPurchaseUnitOptions } from '@/store/unitStore'
 import { generateMaterialCode, addMaterial, updateMaterial } from '@/store/materialInfoStore'
 import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
@@ -639,7 +669,27 @@ const flatProductCats = flattenCategoryNodes(productCategoryTree).filter((c) => 
 const barcodeOpts = barcodeTypeOptions.map((v) => ({ label: v, value: v }))
 const materialTypeOpts = materialTypeOptions.map((v) => ({ label: v, value: v }))
 const supplyFormOpts = supplyFormOptions.map((v) => ({ label: v, value: v }))
-const unitOpts = inventoryUnitOptions.map((v) => ({ label: v, value: v }))
+const unitOpts = computed(() => {
+  void unitState.units
+  return getInventoryUnitOptions()
+})
+const purchaseUnitOpts = computed(() => {
+  void unitState.units
+  return getPurchaseUnitOptions()
+})
+
+function onVariableLengthChange(checked) {
+  if (checked) {
+    form.inventoryUnit = form.inventoryUnit || '米'
+    form.stockUnit = '米'
+    form.purchaseUnit = form.purchaseUnit || '根'
+    form.uomRelation = 'per_piece_length'
+  } else {
+    form.purchaseUnit = form.inventoryUnit
+    form.stockUnit = form.inventoryUnit
+    form.uomRelation = ''
+  }
+}
 const materialGradeOpts = computed(() => {
   void materialGradeState.items
   return getMaterialGradeOptions()
@@ -678,6 +728,10 @@ const form = reactive({
   techParams: '',
   weight: '',
   inventoryUnit: undefined,
+  isVariableLength: false,
+  purchaseUnit: undefined,
+  stockUnit: undefined,
+  uomRelation: '',
   unitPrice: undefined,
   canSell: false,
   canProduce: true,
@@ -709,6 +763,10 @@ function resetForm() {
   form.techParams = ''
   form.weight = ''
   form.inventoryUnit = undefined
+  form.isVariableLength = false
+  form.purchaseUnit = undefined
+  form.stockUnit = undefined
+  form.uomRelation = ''
   form.unitPrice = undefined
   form.canSell = false
   form.canProduce = true
@@ -743,6 +801,10 @@ function loadEditRecord(record) {
   form.techParams = source.techParams || ''
   form.weight = source.weight || ''
   form.inventoryUnit = source.inventoryUnit
+  form.isVariableLength = Boolean(source.isVariableLength)
+  form.purchaseUnit = source.purchaseUnit
+  form.stockUnit = source.stockUnit || source.inventoryUnit
+  form.uomRelation = source.uomRelation || ''
   form.unitPrice = source.unitPrice
   form.canSell = Boolean(source.canSell || source.isProductMaterial)
   form.canProduce = true
@@ -859,6 +921,12 @@ function validate() {
     message.warning('请选择库存单位')
     return false
   }
+  if (form.isVariableLength) {
+    if (!form.purchaseUnit) {
+      message.warning('启用双单位请选择采购单位（如：根）')
+      return false
+    }
+  }
   if (form.isProductMaterial) {
     if (!form.productAttribute) {
       message.warning('请选择产品属性')
@@ -918,6 +986,10 @@ function buildPayload() {
     techParams: form.techParams?.trim() || '',
     weight: form.weight,
     inventoryUnit: form.inventoryUnit,
+    isVariableLength: form.isVariableLength,
+    purchaseUnit: form.isVariableLength ? form.purchaseUnit : form.inventoryUnit,
+    stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
+    uomRelation: form.isVariableLength ? 'per_piece_length' : '',
     unitPrice: form.unitPrice ?? 0,
     canSell: form.canSell,
     canProduce: true,

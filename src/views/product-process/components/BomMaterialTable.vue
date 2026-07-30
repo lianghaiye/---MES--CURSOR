@@ -1,18 +1,19 @@
 <template>
-  <div class="bom-material-table">
+  <div class="bom-material-table" :class="{ 'is-readonly': readonly }">
     <div class="table-toolbar">
       <a-space :size="8" wrap class="toolbar-left">
         <span class="toolbar-title">物料清单</span>
-        <template v-if="!readonly && hasSelection">
-          <a-button size="small" @click="openBatchEdit">修改</a-button>
-          <a-button size="small" danger @click="handleBatchDelete">删除</a-button>
-        </template>
-        <template v-else-if="!readonly">
+        <template v-if="!readonly">
           <a-button size="small" @click="emit('add-by-bom')">按BOM添加</a-button>
           <a-button type="primary" size="small" @click="emit('add-sub-item')">
             <PlusOutlined />
             添加子项
           </a-button>
+          <a-button size="small" @click="openBlankSizeFromToolbar">下料</a-button>
+          <template v-if="hasSelection">
+            <a-button size="small" @click="openBatchEdit">修改</a-button>
+            <a-button size="small" danger @click="handleBatchDelete">删除</a-button>
+          </template>
         </template>
       </a-space>
       <a-space v-if="!readonly" :size="4">
@@ -54,6 +55,7 @@
           :pagination="false"
           :scroll="tableScroll"
           :custom-row="customRow"
+          :row-class-name="(record) => (activeRowId === record.id ? 'bom-row-active' : '')"
         >
           <template #headerCell="{ column }">
             <template v-if="column.key === 'index' && !readonly">
@@ -120,6 +122,12 @@
             </template>
             <template v-else-if="readonly">
               <template v-if="column.key === 'unitQty'">{{ formatQty(record.unitQty) }}</template>
+              <template v-else-if="column.key === 'blankSizeText'">
+                {{ record.blankSizeText || '—' }}
+              </template>
+              <template v-else-if="column.key === 'unit'">{{
+                formatCell(lineStockUnit(record))
+              }}</template>
               <template v-else-if="column.key === 'unitPrice'">{{
                 formatPrice(record.unitPrice)
               }}</template>
@@ -189,17 +197,17 @@
                 v-model:value="record.unitQty"
                 size="small"
                 :min="0"
-                :precision="2"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
               />
             </template>
+            <template v-else-if="column.key === 'blankSizeText'">
+              {{ record.blankSizeText || '—' }}
+            </template>
             <template v-else-if="column.key === 'unit'">
-              <a-select
-                v-model:value="record.unit"
-                size="small"
-                style="width: 100%"
-                :options="unitOpts"
-              />
+              <span class="readonly-stock-unit">{{ lineStockUnit(record) }}</span>
             </template>
             <template v-else-if="column.key === 'processDocName'">
               <a-select
@@ -237,6 +245,8 @@
                 size="small"
                 :min="0"
                 :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
               />
             </template>
@@ -301,10 +311,21 @@
       :count="selectedRowKeys.length"
       @confirm="handleBatchEditConfirm"
     />
+    <BomBlankSizeModal
+      v-model:open="blankSizeOpen"
+      :line="blankSizeTargetLine"
+      @confirm="onBlankSizeConfirm"
+    />
   </div>
 </template>
 
 <script setup>
+import {
+  formatQty,
+  formatNumber as formatPrice,
+  inputNumberFormatter,
+  inputNumberParser,
+} from '@/utils/numberFormat'
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import {
@@ -315,15 +336,19 @@ import {
   HolderOutlined,
 } from '@ant-design/icons-vue'
 import {
-  unitOptions,
   processDocOptions,
   processRouteOptions,
   formatChildBomLabel,
   formatSubstitutePartLabel,
 } from '@/mock/bomMaterialColumns'
 import BomMaterialBatchEditModal from './BomMaterialBatchEditModal.vue'
+import BomBlankSizeModal from './BomBlankSizeModal.vue'
 import BomSubItemMaterialSelect from './BomSubItemMaterialSelect.vue'
 import { isSpuLine, lineVariantSummary } from '@/utils/spuLineResolve'
+import { applyBlankSizeToLine } from '@/utils/bomBlankSize'
+import { resolveLineStockUnit } from '@/utils/variableLengthMaterial'
+import { materialInfoState } from '@/store/materialInfoStore'
+import { productInfoState } from '@/store/productInfoStore'
 
 const props = defineProps({
   lines: { type: Array, default: () => [] },
@@ -339,16 +364,6 @@ function formatCell(val) {
 
 function lineVariantDisplay(record) {
   return lineVariantSummary(record) || record.variantSummary || ''
-}
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toFixed(2)
-}
-
-function formatPrice(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toFixed(4)
 }
 
 function formatChildBom(record) {
@@ -395,9 +410,27 @@ const emit = defineEmits([
   'delete-lines',
 ])
 
-const unitOpts = unitOptions.map((v) => ({ label: v, value: v }))
 const processDocOpts = processDocOptions
 const processRouteOpts = processRouteOptions
+
+function lookupLineMaterial(record) {
+  if (!record) return null
+  const code = record.materialCode
+  const id = record.materialId || record.productId
+  return (
+    (code && materialInfoState.materials.find((m) => m.code === code)) ||
+    (id && materialInfoState.materials.find((m) => m.id === id)) ||
+    (code && productInfoState.products.find((p) => p.code === code)) ||
+    (id && productInfoState.products.find((p) => p.id === id)) ||
+    null
+  )
+}
+
+function lineStockUnit(record) {
+  void materialInfoState.materials
+  void productInfoState.products
+  return resolveLineStockUnit(record, lookupLineMaterial(record))
+}
 
 const widthMap = {
   materialCode: 120,
@@ -410,6 +443,7 @@ const widthMap = {
   variantAttr: 140,
   drawingNo: 100,
   unitQty: 100,
+  blankSizeText: 200,
   unit: 72,
   childBom: 160,
   processDocName: 120,
@@ -446,6 +480,7 @@ const tableColumns = computed(() => {
         'childBom',
         'drawingNo',
         'substitutePart',
+        'blankSizeText',
       ].includes(c.key),
     })),
     ...(props.readonly ? [] : [{ title: '操作', key: 'action', width: 80, fixed: 'right' }]),
@@ -512,7 +547,49 @@ const dragFromIndex = ref(-1)
 const hoverRowId = ref('')
 const headerIndexHover = ref(false)
 const selectedRowKeys = ref([])
+/** 单击选中的当前行（用于下料） */
+const activeRowId = ref('')
 const batchEditOpen = ref(false)
+const blankSizeOpen = ref(false)
+const blankSizeTargetLine = ref(null)
+
+function resolveBlankSizeTargetLine() {
+  if (activeRowId.value) {
+    const byActive = props.lines.find((l) => l.id === activeRowId.value)
+    if (byActive) return byActive
+  }
+  if (selectedRowKeys.value.length === 1) {
+    return props.lines.find((l) => l.id === selectedRowKeys.value[0]) || null
+  }
+  return null
+}
+
+function openBlankSizeFromToolbar() {
+  const line = resolveBlankSizeTargetLine()
+  if (!line) {
+    message.warning(
+      selectedRowKeys.value.length > 1
+        ? '下料仅支持单行，请单击选中一条物料行'
+        : '请先单击选中一条物料行',
+    )
+    return
+  }
+  openBlankSizeForLine(line)
+}
+
+function openBlankSizeForLine(record) {
+  blankSizeTargetLine.value = record
+  activeRowId.value = record.id
+  blankSizeOpen.value = true
+}
+
+function onBlankSizeConfirm(blankSize) {
+  const line = blankSizeTargetLine.value
+  if (!line) return
+  applyBlankSizeToLine(line, blankSize)
+  line.unit = lineStockUnit(line)
+  message.success(line.blankSizeText ? '下料尺寸已更新' : '已清空下料尺寸')
+}
 
 const hasSelection = computed(() => selectedRowKeys.value.length > 0)
 
@@ -533,6 +610,9 @@ watch(
   () => {
     const ids = new Set(props.lines.map((l) => l.id))
     selectedRowKeys.value = selectedRowKeys.value.filter((id) => ids.has(id))
+    if (activeRowId.value && !ids.has(activeRowId.value)) {
+      activeRowId.value = ''
+    }
   },
 )
 
@@ -607,9 +687,17 @@ function onDragEnd() {
   clearDragOverClass()
 }
 
-function customRow(_record, index) {
+function customRow(record, index) {
   if (props.readonly) return {}
   return {
+    onClick: (event) => {
+      // 避免点输入框/按钮时抢焦点；勾选框已 stopPropagation
+      const tag = event?.target?.closest?.(
+        'input, textarea, button, .ant-select, .ant-picker, .ant-input-number, a, .drag-handle',
+      )
+      if (tag) return
+      activeRowId.value = record.id
+    },
     onDragover: (event) => {
       event.preventDefault()
       clearDragOverClass()
@@ -752,6 +840,22 @@ function customRow(_record, index) {
 
   :deep(tr.drag-over-row > td) {
     background: #e6f4ff !important;
+  }
+
+  :deep(.ant-table-tbody > tr.bom-row-active > td) {
+    background: #e6f4ff !important;
+  }
+
+  :deep(.ant-table-tbody > tr.bom-row-active:hover > td) {
+    background: #bae0ff !important;
+  }
+
+  &:not(.is-readonly) :deep(.ant-table-tbody > tr > td) {
+    cursor: pointer;
+  }
+
+  .readonly-stock-unit {
+    color: rgba(0, 0, 0, 0.88);
   }
 
   .table-list-panel {
