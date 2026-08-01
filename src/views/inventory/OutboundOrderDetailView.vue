@@ -117,25 +117,86 @@
             :pagination="false"
             :scroll="{ x: lineScrollX }"
           >
+            <template #headerCell="{ column }">
+              <template v-if="column.key === 'batchPick'">
+                <span class="col-title-with-tip">
+                  拣选批次
+                  <a-tooltip :title="batchPickTip">
+                    <InfoCircleOutlined class="col-tip-icon" />
+                  </a-tooltip>
+                </span>
+              </template>
+              <template v-else>{{ column.title }}</template>
+            </template>
             <template #bodyCell="{ column, record: line, index }">
               <template v-if="column.key === 'index'">{{ index + 1 }}</template>
               <template v-else-if="column.key === 'stockQty'">
                 {{ formatQty(line.stockQty) }}
+                <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>
               </template>
               <template v-else-if="column.key === 'warehouseStockQty'">
                 {{ formatQty(line.warehouseStockQty) }}
+                <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>
               </template>
               <template v-else-if="column.key === 'locationNo'">
                 {{ line.locationNo || '—' }}
               </template>
               <template v-else-if="column.key === 'shipQty'">
                 {{ formatQty(line.shipQty) }}
+                <div
+                  v-if="
+                    isOutboundDualUnitLine(line) &&
+                    (line.blankSizeText || line.demandMeters != null)
+                  "
+                  class="blank-size-hint"
+                >
+                  <template v-if="line.blankSizeText">下料 {{ line.blankSizeText }} → </template>
+                  需求 {{ formatQty(line.demandMeters ?? line.shipQty) }} → 实发
+                  {{ formatQty(line.shipQty) }}
+                  {{ resolveOutboundStockUnit(line) }}
+                </div>
               </template>
-              <template v-else-if="column.key === 'weight'">
-                {{ line.weight != null ? line.weight : '—' }}
+              <template v-else-if="column.key === 'blankSizeText'">
+                <template v-if="line.blankSizeText">
+                  {{ line.blankSizeText }}
+                  <div v-if="line.blankArea > 0" class="blank-size-hint">
+                    ≈ {{ formatQty(line.blankArea) }}㎡/件
+                  </div>
+                  <div v-else-if="line.blankLength > 0" class="blank-size-hint">
+                    ≈ {{ formatQty(line.blankLength) }}米/件
+                  </div>
+                </template>
+                <span v-else>—</span>
               </template>
-              <template v-else-if="column.key === 'barcodeBatchNo'">
-                {{ line.barcodeBatchNo || '—' }}
+              <template v-else-if="column.key === 'unit'">
+                {{ resolveOutboundStockUnit(line) || '—' }}
+              </template>
+              <template v-else-if="column.key === 'batchPick'">
+                <template v-if="canOutboundBatchPick(line)">
+                  <div v-if="line.manualBatchPick" class="manual-pick-tag">自主拣选</div>
+                  <span v-if="line.issuedBatchNo || line.batchAllocations?.length">
+                    {{
+                      line.issuedBatchNo ||
+                      (line.batchAllocations || []).map((a) => `${a.batchNo}×${a.qty}`).join('；')
+                    }}
+                  </span>
+                  <template v-else>
+                    {{
+                      line.pickedBatchNo ||
+                      (line.manualBatchPick ? '待选批次' : '确认时自动扣批/库存')
+                    }}
+                    <span v-if="line.pickedLength != null" class="unit-suffix">
+                      / {{ formatQty(line.pickedLength) }}{{ resolveOutboundStockUnit(line) }}
+                    </span>
+                  </template>
+                  <div v-if="line.issuedPieceSerialNos?.length" class="piece-serials">
+                    件码：{{ line.issuedPieceSerialNos.join('、') }}
+                  </div>
+                </template>
+                <span v-else>—</span>
+              </template>
+              <template v-else-if="column.key === 'barcodeType'">
+                {{ line.barcodeType || '—' }}
               </template>
               <template v-else-if="column.key === 'packagingForm'">
                 {{ line.packagingForm || '—' }}
@@ -191,6 +252,7 @@
 </template>
 
 <script>
+import { formatQty } from '@/utils/numberFormat'
 export default { name: 'OutboundOrderDetailView' }
 </script>
 
@@ -215,8 +277,18 @@ import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
-import { outboundDetailLineColumns } from '@/utils/outboundLineColumns'
-import { enrichOutboundLine } from '@/utils/outboundLineHelpers'
+import {
+  outboundDetailLineColumns,
+  OUTBOUND_BATCH_PICK_TIP_AUTO,
+  filterOutboundLineColumns,
+} from '@/utils/outboundLineColumns'
+import {
+  canOutboundBatchPick,
+  enrichOutboundLine,
+  isOutboundDualUnitLine,
+  resolveOutboundStockUnit,
+} from '@/utils/outboundLineHelpers'
+import { InfoCircleOutlined } from '@ant-design/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -224,8 +296,12 @@ const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 
-const lineColumns = outboundDetailLineColumns
-const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 80), 0))
+const lineColumns = computed(() =>
+  filterOutboundLineColumns(outboundDetailLineColumns, record.value?.outboundType),
+)
+const lineScrollX = computed(() => lineColumns.value.reduce((s, c) => s + (c.width || 80), 0))
+
+const batchPickTip = computed(() => OUTBOUND_BATCH_PICK_TIP_AUTO)
 
 const linkedQc = computed(() => {
   if (!record.value?.factoryQcId) return null
@@ -242,11 +318,6 @@ const lineSummary = computed(() => {
     totalPrice: Math.round(totalPrice * 100) / 100,
   }
 })
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
-}
 
 function formatMoney(val) {
   if (val == null || val === '') return '—'
@@ -444,6 +515,46 @@ function handleInitiateQc() {
     text-overflow: ellipsis;
     white-space: nowrap;
     vertical-align: bottom;
+  }
+
+  .col-title-with-tip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .col-tip-icon {
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 12px;
+    cursor: help;
+  }
+
+  .unit-suffix {
+    margin-left: 4px;
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 12px;
+  }
+
+  .blank-size-hint {
+    margin-top: 2px;
+    font-size: 11px;
+    color: #d46b08;
+    line-height: 1.25;
+    word-break: break-all;
+  }
+
+  .manual-pick-tag {
+    margin-bottom: 2px;
+    font-size: 11px;
+    color: #1677ff;
+  }
+
+  .piece-serials {
+    margin-top: 4px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+    line-height: 1.4;
+    word-break: break-all;
   }
 
   :deep(.line-summary-row .ant-table-cell) {

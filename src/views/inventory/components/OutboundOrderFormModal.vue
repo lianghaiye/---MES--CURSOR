@@ -186,6 +186,17 @@
               :pagination="false"
               :scroll="lineTableScroll"
             >
+              <template #headerCell="{ column }">
+                <template v-if="column.key === 'batchPick'">
+                  <span class="col-title-with-tip">
+                    拣选批次
+                    <a-tooltip :title="batchPickTip">
+                      <InfoCircleOutlined class="col-tip-icon" />
+                    </a-tooltip>
+                  </span>
+                </template>
+                <template v-else>{{ column.title }}</template>
+              </template>
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'itemName'">
@@ -237,11 +248,25 @@
                   </a>
                   <span v-else>{{ lineVariantDisplay(record) || '—' }}</span>
                 </template>
+                <template v-else-if="column.key === 'blankSizeText'">
+                  <template v-if="record.blankSizeText">
+                    {{ record.blankSizeText }}
+                    <div v-if="record.blankArea > 0" class="blank-size-hint">
+                      ≈ {{ formatQty(record.blankArea) }}㎡/件
+                    </div>
+                    <div v-else-if="record.blankLength > 0" class="blank-size-hint">
+                      ≈ {{ formatQty(record.blankLength) }}米/件
+                    </div>
+                  </template>
+                  <span v-else>—</span>
+                </template>
                 <template v-else-if="column.key === 'stockQty'">
                   {{ formatQty(record.stockQty) }}
+                  <span class="unit-suffix">{{ resolveOutboundStockUnit(record) }}</span>
                 </template>
                 <template v-else-if="column.key === 'warehouseStockQty'">
                   {{ formatQty(record.warehouseStockQty) }}
+                  <span class="unit-suffix">{{ resolveOutboundStockUnit(record) }}</span>
                 </template>
                 <template v-else-if="column.key === 'shipWarehouse'">
                   <InventoryLineEditableCell
@@ -264,7 +289,7 @@
                         @dropdownVisibleChange="onLineCellSelectOpenChange"
                         @change="
                           () => {
-                            refreshLine(record)
+                            onLineWarehouseChange(record)
                             endEdit()
                           }
                         "
@@ -280,6 +305,8 @@
                     :active="isLineCellEditing(record.id, 'shipQty')"
                     :display="formatQty(record.shipQty)"
                     :empty="record.shipQty == null || record.shipQty === ''"
+                    editable
+                    placeholder="填写数量"
                     numeric
                     @activate="startLineCellEdit(record.id, 'shipQty')"
                     @end="endLineCellEdit"
@@ -287,46 +314,73 @@
                     <template #edit="{ endEdit }">
                       <a-input-number
                         v-model:value="record.shipQty"
-                        :min="0"
-                        :precision="3"
+                        :min="isOutboundDualUnitLine(record) ? 0.001 : 0"
+                        :precision="4"
                         size="small"
                         style="width: 100%"
                         autofocus
                         @blur="endEdit"
                         @pressEnter="endEdit"
-                        @change="() => onLineShipQtyChange(record)"
+                        @change="() => onShipQtyCellChange(record)"
                       />
                     </template>
                   </InventoryLineEditableCell>
-                </template>
-                <template v-else-if="column.key === 'weight'">
-                  <InventoryLineEditableCell
-                    :active="isLineCellEditing(record.id, 'weight')"
-                    :display="formatQty(record.weight)"
-                    :empty="record.weight == null || record.weight === ''"
-                    placeholder="请输入"
-                    numeric
-                    @activate="startLineCellEdit(record.id, 'weight')"
-                    @end="endLineCellEdit"
+                  <div
+                    v-if="
+                      isOutboundDualUnitLine(record) &&
+                      (record.blankSizeText || record.demandMeters != null)
+                    "
+                    class="blank-size-hint"
                   >
-                    <template #edit="{ endEdit }">
-                      <a-input-number
-                        v-model:value="record.weight"
-                        :min="0"
-                        :precision="3"
-                        size="small"
-                        style="width: 100%"
-                        placeholder="请输入"
-                        autofocus
-                        @blur="endEdit"
-                        @pressEnter="endEdit"
-                        @change="syncTotalWeight"
-                      />
+                    <template v-if="record.blankSizeText"
+                      >下料 {{ record.blankSizeText }} →
                     </template>
-                  </InventoryLineEditableCell>
+                    需求
+                    {{ formatQty(record.demandMeters ?? record.shipQty) }} → 实发
+                    {{ formatQty(record.shipQty) }}
+                    {{ resolveOutboundStockUnit(record) }}
+                  </div>
                 </template>
-                <template v-else-if="column.key === 'barcodeBatchNo'">
-                  <span>{{ record.barcodeBatchNo || '—' }}</span>
+                <template v-else-if="column.key === 'unit'">
+                  {{ resolveOutboundStockUnit(record) || '—' }}
+                </template>
+                <template v-else-if="column.key === 'batchPick'">
+                  <template v-if="canOutboundBatchPick(record)">
+                    <template v-if="isRecordManualPick(record)">
+                      <a-select
+                        :value="manualBatchIds(record)"
+                        mode="multiple"
+                        allow-clear
+                        size="small"
+                        show-search
+                        :filter-option="filterBatchOption"
+                        placeholder="搜索并多选批次"
+                        style="width: 100%"
+                        :options="batchOptionsFor(record)"
+                        :max-tag-count="2"
+                        @change="(v) => onMultiPickBatches(record, v)"
+                      />
+                      <div class="batch-pick-actions">
+                        <a @click="openBatchSearch(record)">搜索更多</a>
+                        <a @click="restoreAutoBatchPick(record)">恢复自动</a>
+                      </div>
+                      <div v-if="manualBatchSummary(record)" class="batch-alloc-summary">
+                        {{ manualBatchSummary(record) }}
+                      </div>
+                    </template>
+                    <div v-else class="batch-pick-auto">
+                      <a-tooltip :title="autoAllocPreview(record)">
+                        <span class="cell-auto-batch">{{ autoAllocPreview(record) }}</span>
+                      </a-tooltip>
+                      <a class="manual-pick-link" @click="enableManualBatchPick(record)"
+                        >自主拣选</a
+                      >
+                    </div>
+                  </template>
+                  <span v-else class="cell-disabled">—</span>
+                </template>
+                <template v-else-if="column.key === 'barcodeType'">
+                  {{ record.barcodeType || '—' }}
                 </template>
                 <template v-else-if="column.key === 'packagingForm'">
                   <span :title="record.packagingForm || ''">{{ record.packagingForm || '—' }}</span>
@@ -389,9 +443,6 @@
               >
               <template v-else-if="column.key === 'shipQty'">
                 {{ formatQty(lineSummary.shipQtyTotal) }}
-              </template>
-              <template v-else-if="column.key === 'weight'">
-                {{ formatQty(lineSummary.weightTotal) }}
               </template>
               <template v-else-if="column.key === 'totalPrice'">
                 {{ formatMoney(lineSummary.totalPrice) }}
@@ -456,13 +507,24 @@
   />
 
   <SalesOrderSelectModal v-model:open="salesOrderPickerOpen" @confirm="onSalesOrderPicked" />
+
+  <OutboundBatchSearchModal
+    v-model:open="batchSearchOpen"
+    :warehouse="batchSearchTarget?.shipWarehouse || form.warehouse || ''"
+    :item-code="batchSearchTarget?.itemCode || ''"
+    :item-name="batchSearchTarget?.itemName || ''"
+    :unit-label="batchSearchTarget ? resolveOutboundStockUnit(batchSearchTarget) : ''"
+    :selected-ids="batchSearchTarget ? manualBatchIds(batchSearchTarget) : []"
+    @confirm="onBatchSearchConfirm"
+  />
 </template>
 
 <script setup>
+import { formatQty } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { CheckOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { CheckOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -474,13 +536,18 @@ import SelectBomMaterialModal from '@/views/product-process/components/SelectBom
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import OutboundLineEditModal from './OutboundLineEditModal.vue'
+import OutboundBatchSearchModal from './OutboundBatchSearchModal.vue'
 import InventoryLineItemSelect from './InventoryLineItemSelect.vue'
 import InventoryLineEditableCell from './InventoryLineEditableCell.vue'
 import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
 import { outboundTypeOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { addOutboundOrder, generateOutboundNo, updateOutboundOrder } from '@/store/outboundStore'
-import { outboundFormLineColumns } from '@/utils/outboundLineColumns'
+import {
+  outboundFormLineColumns,
+  OUTBOUND_BATCH_PICK_TIP_AUTO,
+  filterOutboundLineColumns,
+} from '@/utils/outboundLineColumns'
 import { normalizeInventoryPickerItem } from '@/utils/inventoryLineItemPicker'
 import { warehouseOptionLabel } from '@/utils/inventoryFormLineDisplay'
 import {
@@ -490,10 +557,31 @@ import {
   cloneOutboundLine,
   createBlankOutboundLine,
   enrichOutboundLine,
+  canOutboundBatchPick,
+  isOutboundDualUnitLine,
   mergeOutboundLines,
+  resolveOutboundStockUnit,
   syncLineTotalFromUnit,
 } from '@/utils/outboundLineHelpers'
 import { createOutboundLine } from '@/mock/outboundOrders'
+import { getBatchById, listBatches, stockBatchState } from '@/store/stockBatchStore'
+import {
+  getOutboundIssueRule,
+  OUTBOUND_ISSUE_RULE_OPTIONS,
+  functionParamState,
+} from '@/store/functionParamStore'
+import {
+  allocateFromSelectedBatches,
+  allocateOutboundBatches,
+  applyBatchAllocationsToLine,
+  formatBatchAllocationPreview,
+  getLineBatchAllocations,
+  getManualPickBatchIds,
+  getOutboundAvailableBatchQty,
+  isLineManualBatchPick,
+  syncManualPickBatchesToLine,
+  validateManualBatchAllocations,
+} from '@/utils/outboundBatchAllocate'
 import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
 import {
   createInventorySpuLineDraft,
@@ -547,6 +635,8 @@ const lineEditSourceId = ref(null)
 const totalWeightManual = ref(false)
 const prevHeaderWarehouse = ref(undefined)
 const salesOrderPickerOpen = ref(false)
+const batchSearchOpen = ref(false)
+const batchSearchTarget = ref(null)
 
 const outboundTypeOpts = outboundTypeOptions.map((v) => ({ label: v, value: v }))
 const requisitionDeptOpts = requisitionDeptOptions.map((v) => ({ label: v, value: v }))
@@ -555,6 +645,115 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
+
+const batchPickTip = computed(() => OUTBOUND_BATCH_PICK_TIP_AUTO)
+
+const issueRuleLabel = computed(() => {
+  const rule = getOutboundIssueRule()
+  return OUTBOUND_ISSUE_RULE_OPTIONS.find((o) => o.value === rule)?.label || '先进先出'
+})
+
+function isRecordManualPick(line) {
+  void functionParamState.params.outboundIssueRule
+  return isLineManualBatchPick(line)
+}
+
+function shipQtyMaxFor(line) {
+  if (isRecordManualPick(line)) return undefined
+  const wh = line.shipWarehouse || form.warehouse
+  if (!line.itemCode || !wh) return undefined
+  void stockBatchState.batches
+  const batchAvail = getOutboundAvailableBatchQty(wh, line.itemCode)
+  if (batchAvail > 0 || isOutboundDualUnitLine(line)) return batchAvail || undefined
+  return undefined
+}
+
+function enableManualBatchPick(line) {
+  if (!(Number(line.demandMeters) > 0) && Number(line.shipQty) > 0) {
+    line.demandMeters = Number(line.shipQty)
+  }
+  line.manualBatchPick = true
+  line.manualPickBatchIds = []
+  line.batchAllocations = []
+  syncLineTotalFromUnit(line)
+  refreshLine(line)
+}
+
+function restoreAutoBatchPick(line) {
+  line.manualBatchPick = false
+  line.outboundIssueRule = undefined
+  line.manualPickBatchIds = []
+  applyBatchAllocationsToLine(line, [], { syncShipQty: false })
+  line.batchAllocations = []
+  line.pickedBatchId = null
+  line.pickedBatchNo = ''
+  line.barcodeBatchNo = ''
+  syncLineTotalFromUnit(line)
+  refreshLine(line)
+}
+
+function openBatchSearch(line) {
+  batchSearchTarget.value = line
+  batchSearchOpen.value = true
+}
+
+function onBatchSearchConfirm(ids) {
+  const line = batchSearchTarget.value
+  if (!line) return
+  onMultiPickBatches(line, ids || [])
+}
+
+function filterBatchOption(input, option) {
+  const text = String(option?.label ?? option?.value ?? '').toLowerCase()
+  return text.includes(String(input || '').toLowerCase())
+}
+
+function manualBatchIds(record) {
+  return getManualPickBatchIds(record)
+}
+
+function manualBatchSummary(record) {
+  const unit = resolveOutboundStockUnit(record)
+  const ids = getManualPickBatchIds(record)
+  if (!ids.length) return ''
+  const demand = Number(record.shipQty) || 0
+  if (!(demand > 0)) {
+    return `已选 ${ids.length} 批，请填写出库数量（小批优先跨批扣减）`
+  }
+  const res = allocateFromSelectedBatches({
+    batchIds: ids,
+    demandQty: demand,
+    unit,
+  })
+  if (!res.ok) return res.message
+  return formatBatchAllocationPreview(res.allocations, unit)
+}
+
+function autoAllocPreview(record) {
+  void stockBatchState.batches
+  void functionParamState.params.outboundIssueRule
+  const rule = getOutboundIssueRule()
+  const ruleName = issueRuleLabel.value
+  const wh = record.shipWarehouse || form.warehouse
+  if (!record.itemCode || !wh) {
+    return `${ruleName}·确认时自动扣批`
+  }
+  const batchAvail = getOutboundAvailableBatchQty(wh, record.itemCode)
+  if (!(batchAvail > 0)) {
+    return '暂无在库批次，请先入库建批或更换仓库'
+  }
+  if (!(Number(record.shipQty) > 0)) {
+    return `${ruleName}·确认时自动扣批`
+  }
+  const res = allocateOutboundBatches({
+    warehouse: wh,
+    itemCode: record.itemCode,
+    demandQty: record.shipQty,
+    rule,
+  })
+  if (!res.ok) return res.message
+  return formatBatchAllocationPreview(res.allocations, resolveOutboundStockUnit(record))
+}
 
 function lineWarehouseLabel(value) {
   return warehouseOptionLabel(value, warehouseOpts.value)
@@ -589,24 +788,30 @@ const form = reactive({
 
 const baseLineColumns = outboundFormLineColumns
 
-const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outbound-form-lines-v3', baseLineColumns, {
-    minScrollX: 1806,
-    pinEdgeColumns: false,
-    pinActionColumn: true,
-  })
+const {
+  columnSettings,
+  columnDrawerOpen,
+  displayColumns: rawDisplayColumns,
+  defaultColumnSettings,
+} = useTableColumnSettings('outbound-form-lines-v7', baseLineColumns, {
+  minScrollX: 1806,
+  pinEdgeColumns: false,
+  pinActionColumn: true,
+})
 
-const lineScrollX = tableScrollX
+const displayColumns = computed(() =>
+  filterOutboundLineColumns(rawDisplayColumns.value, form.outboundType),
+)
+
+const lineScrollX = computed(() => displayColumns.value.reduce((s, c) => s + (c.width || 80), 0))
 
 const lineSummary = computed(() => {
   const lines = form.lineItems.filter((l) => l.itemCode)
   const shipQtyTotal = lines.reduce((sum, line) => sum + (Number(line.shipQty) || 0), 0)
-  const weightTotal = lines.reduce((sum, line) => sum + (Number(line.weight) || 0), 0)
   const totalPrice = lines.reduce((sum, line) => sum + (Number(line.totalPrice) || 0), 0)
   return {
     lineCount: lines.length,
     shipQtyTotal: Math.round(shipQtyTotal * 1000) / 1000,
-    weightTotal: Math.round(weightTotal * 1000) / 1000,
     totalPrice: Math.round(totalPrice * 100) / 100,
   }
 })
@@ -695,7 +900,13 @@ function loadEditForm(record) {
     deliveryMethod: '',
     deliveryRemark: delivery?.remark || '',
     remark: record.remark || '',
-    lineItems: (record.lineItems || []).map((l) => enrichOutboundLine({ ...l })),
+    lineItems: (record.lineItems || []).map((l) => {
+      const row = enrichOutboundLine({ ...l })
+      if (isOutboundDualUnitLine(row)) {
+        applyBatchAllocationsToLine(row, getLineBatchAllocations(row))
+      }
+      return row
+    }),
   })
   if (form.salesOrderNo) {
     syncSalesOrderMeta(form.salesOrderNo, form.salesOrderId)
@@ -726,11 +937,6 @@ function resetForm() {
   prevHeaderWarehouse.value = undefined
 }
 
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
-}
-
 function formatMoney(val) {
   if (val == null || val === '') return '—'
   return Number(val).toLocaleString(undefined, {
@@ -743,7 +949,88 @@ function refreshLine(line) {
   Object.assign(line, enrichOutboundLine(line))
 }
 
-function onLineShipQtyChange(line) {
+function clearBatchPick(line) {
+  line.manualPickBatchIds = []
+  applyBatchAllocationsToLine(line, [], { syncShipQty: false })
+  line.batchAllocations = []
+  line.pickedBatchId = null
+  line.pickedBatchNo = ''
+  line.barcodeBatchNo = ''
+  if (canOutboundBatchPick(line) && isRecordManualPick(line)) {
+    syncLineTotalFromUnit(line)
+  }
+}
+
+function onLineWarehouseChange(line) {
+  clearBatchPick(line)
+  refreshLine(line)
+}
+
+function batchOptionsFor(record) {
+  void stockBatchState.batches
+  const warehouse = record.shipWarehouse || ''
+  const unit = resolveOutboundStockUnit(record)
+  if (!record.itemCode || !warehouse) return []
+  return listBatches({ warehouse, itemCode: record.itemCode, inStockOnly: true })
+    .slice()
+    .sort((a, b) => {
+      const da = Number(a.currentLength) || 0
+      const db = Number(b.currentLength) || 0
+      if (da !== db) return da - db
+      return String(a.batchNo || '').localeCompare(String(b.batchNo || ''), 'zh-CN')
+    })
+    .map((b) => ({
+      label: `${b.batchNo}（当前 ${formatQty(b.currentLength)}${unit}）`,
+      value: b.id,
+    }))
+}
+
+function onMultiPickBatches(record, batchIds) {
+  syncManualPickBatchesToLine(record, batchIds || [])
+  if (!record.shipWarehouse && getManualPickBatchIds(record).length) {
+    const batch = getBatchById(getManualPickBatchIds(record)[0])
+    if (batch?.warehouse) record.shipWarehouse = batch.warehouse
+  }
+  const demand = Number(record.shipQty) || 0
+  if (demand > 0 && getManualPickBatchIds(record).length) {
+    const check = allocateFromSelectedBatches({
+      batchIds: getManualPickBatchIds(record),
+      demandQty: demand,
+      unit: resolveOutboundStockUnit(record),
+    })
+    if (!check.ok) {
+      message.warning(check.message)
+    }
+  }
+  syncLineTotalFromUnit(record)
+  refreshLine(record)
+  syncTotalWeight()
+}
+
+function onShipQtyCellChange(line) {
+  const qty = Number(line.shipQty)
+  if (isRecordManualPick(line)) {
+    if (getManualPickBatchIds(line).length && qty > 0) {
+      const check = allocateFromSelectedBatches({
+        batchIds: getManualPickBatchIds(line),
+        demandQty: qty,
+        unit: resolveOutboundStockUnit(line),
+      })
+      if (!check.ok) {
+        message.warning(check.message)
+      } else {
+        syncManualPickBatchesToLine(line, getManualPickBatchIds(line))
+      }
+    }
+    syncLineTotalFromUnit(line)
+    syncTotalWeight()
+    return
+  }
+  const max = shipQtyMaxFor(line)
+  if (max != null && Number.isFinite(qty) && qty > max) {
+    line.shipQty = max
+    message.warning(`出库数量不能超过可用库存 ${max}`)
+  }
   syncLineTotalFromUnit(line)
   syncTotalWeight()
 }
@@ -769,6 +1056,7 @@ function onHeaderWarehouseChange(newVal) {
     onOk: () => {
       form.lineItems.forEach((line) => {
         line.shipWarehouse = newVal
+        if (canOutboundBatchPick(line)) clearBatchPick(line)
         refreshLine(line)
       })
     },
@@ -992,7 +1280,20 @@ function buildPayload() {
     contractNo: form.contractNo?.trim() || '',
     customerName: form.customerName || '',
     remark: form.remark?.trim(),
-    lineItems: form.lineItems.filter((l) => l.itemCode).map((l) => enrichOutboundLine({ ...l })),
+    lineItems: form.lineItems
+      .filter((l) => l.itemCode)
+      .map((l) => {
+        const row = enrichOutboundLine({ ...l })
+        if (canOutboundBatchPick(row) && isLineManualBatchPick(row)) {
+          row.manualBatchPick = true
+          row.manualPickBatchIds = getManualPickBatchIds(row)
+          const check = validateManualBatchAllocations(row)
+          if (check.ok) {
+            applyBatchAllocationsToLine(row, check.allocations, { syncShipQty: false })
+          }
+        }
+        return row
+      }),
   }
 }
 
@@ -1014,6 +1315,30 @@ function handleSave() {
 
   if (!form.lineItems.filter((l) => l.itemCode).length) {
     message.warning('请至少添加一条有效明细')
+    return
+  }
+
+  const invalidBatchLine = form.lineItems.find((line) => {
+    if (!line.itemCode || !canOutboundBatchPick(line)) return false
+    if (isRecordManualPick(line)) {
+      return !validateManualBatchAllocations(line).ok
+    }
+    if (!(Number(line.shipQty) > 0)) return true
+    const wh = line.shipWarehouse || form.warehouse
+    if (!wh) return true
+    const available = getOutboundAvailableBatchQty(wh, line.itemCode)
+    if (isOutboundDualUnitLine(line) || available > 0) {
+      return Number(line.shipQty) > available
+    }
+    return false
+  })
+  if (invalidBatchLine) {
+    const manualMsg = validateManualBatchAllocations(invalidBatchLine).message
+    message.warning(
+      isRecordManualPick(invalidBatchLine)
+        ? `「${invalidBatchLine.itemName || invalidBatchLine.itemCode}」${manualMsg || '请多选批次并分配数量'}`
+        : `「${invalidBatchLine.itemName || invalidBatchLine.itemCode}」请填写出库数量，且不超过可用库存（${issueRuleLabel.value}）`,
+    )
     return
   }
 
@@ -1176,5 +1501,76 @@ function handleSave() {
     margin: 0 8px;
     color: rgba(0, 0, 0, 0.25);
   }
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
+}
+
+.unit-suffix {
+  margin-left: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.blank-size-hint {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #d46b08;
+  line-height: 1.25;
+  word-break: break-all;
+}
+
+.cell-disabled {
+  color: rgba(0, 0, 0, 0.25);
+}
+
+.batch-pick-auto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cell-auto-batch {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+  cursor: help;
+}
+
+.manual-pick-link,
+.batch-pick-actions a {
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.batch-pick-actions {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.batch-alloc-summary {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
+  word-break: break-all;
 }
 </style>

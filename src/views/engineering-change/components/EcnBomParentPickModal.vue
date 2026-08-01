@@ -122,6 +122,7 @@
 </template>
 
 <script setup>
+import { formatQty } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { collectOverviewRowKeys } from '@/utils/bomOverview'
@@ -269,11 +270,6 @@ watch(filteredTree, (tree) => {
   if (!props.open || !isMaterialTreeMode.value) return
   expandedKeys.value = collectOverviewRowKeys(tree)
 })
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toFixed(2)
-}
 
 function handleSearch() {
   Object.assign(appliedFilters, { ...filters })

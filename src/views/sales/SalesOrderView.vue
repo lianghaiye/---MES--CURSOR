@@ -284,6 +284,7 @@
 </template>
 
 <script>
+import { formatQty } from '@/utils/numberFormat'
 export default { name: 'SalesOrderView' }
 </script>
 
@@ -497,13 +498,6 @@ const rowSelection = computed(() => ({
 function progressColor(status) {
   const map = { 已审: 'processing', 未审: 'default', 已完成: 'success', 已终止: 'error' }
   return map[status] || 'default'
-}
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  const n = Number(val)
-  if (!Number.isFinite(n)) return '—'
-  return String(n)
 }
 
 function formatMoney(val) {

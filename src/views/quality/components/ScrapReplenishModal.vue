@@ -80,7 +80,7 @@ function handleNext() {
   if (method === '采购补料') {
     message.success('已生成采购申请单')
   } else {
-    message.success('已在相应仓库生成待处理领料出库单')
+    message.success('已在相应仓库生成待出库领料出库单')
   }
   emit('saved', res.order)
   emit('update:open', false)

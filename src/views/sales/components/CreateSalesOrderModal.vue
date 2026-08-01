@@ -445,6 +445,9 @@
                 v-model:value="record.salesQty"
                 size="small"
                 :min="0"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
                 @change="onLineFieldChange(record)"
               />
@@ -515,7 +518,9 @@
                 v-model:value="record.unitPriceExTax"
                 size="small"
                 :min="0"
-                :precision="2"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
                 @change="onUnitPriceExTaxChange(record)"
               />
@@ -526,7 +531,9 @@
                 v-model:value="record.unitPriceInTax"
                 size="small"
                 :min="0"
-                :precision="2"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
                 @change="onUnitPriceInTaxChange(record)"
               />
@@ -662,6 +669,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message, Upload } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { PlusOutlined, DownOutlined, AppstoreOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import {
   urgencyOptions,
   contractTypeOptions,

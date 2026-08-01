@@ -341,7 +341,10 @@
                 <a-form-item>
                   <template #label>
                     <span>领料属性</span>
-                    <a-tooltip title="启用后参与领料计划">
+                    <a-tooltip
+                      :overlay-style="{ maxWidth: '360px' }"
+                      title="开=参与领料；关=不进领料单，发料方式=倒冲"
+                    >
                       <InfoCircleOutlined class="info-icon" />
                     </a-tooltip>
                   </template>
@@ -680,10 +683,19 @@ const purchaseUnitOpts = computed(() => {
 
 function onVariableLengthChange(checked) {
   if (checked) {
-    form.inventoryUnit = form.inventoryUnit || '米'
-    form.stockUnit = '米'
-    form.purchaseUnit = form.purchaseUnit || '根'
-    form.uomRelation = 'per_piece_length'
+    const inv = form.inventoryUnit || '米'
+    form.inventoryUnit = inv
+    form.stockUnit = inv
+    if (inv === '㎡' || inv === 'm²' || inv === '平方米') {
+      form.purchaseUnit = form.purchaseUnit || '张'
+      form.uomRelation = 'per_piece_area'
+    } else if (String(inv).toLowerCase() === 'kg' || inv === '公斤' || inv === '千克') {
+      form.purchaseUnit = form.purchaseUnit || '件'
+      form.uomRelation = 'per_piece_weight'
+    } else {
+      form.purchaseUnit = form.purchaseUnit || '根'
+      form.uomRelation = 'per_piece_length'
+    }
   } else {
     form.purchaseUnit = form.inventoryUnit
     form.stockUnit = form.inventoryUnit
@@ -989,7 +1001,18 @@ function buildPayload() {
     isVariableLength: form.isVariableLength,
     purchaseUnit: form.isVariableLength ? form.purchaseUnit : form.inventoryUnit,
     stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
-    uomRelation: form.isVariableLength ? 'per_piece_length' : '',
+    uomRelation: form.isVariableLength
+      ? form.uomRelation ||
+        (form.inventoryUnit === '㎡' ||
+        form.inventoryUnit === 'm²' ||
+        form.inventoryUnit === '平方米'
+          ? 'per_piece_area'
+          : String(form.inventoryUnit).toLowerCase() === 'kg' ||
+              form.inventoryUnit === '公斤' ||
+              form.inventoryUnit === '千克'
+            ? 'per_piece_weight'
+            : 'per_piece_length')
+      : '',
     unitPrice: form.unitPrice ?? 0,
     canSell: form.canSell,
     canProduce: true,

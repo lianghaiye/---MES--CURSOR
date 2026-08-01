@@ -11,8 +11,8 @@
     @ok="handleSubmit"
   >
     <a-form layout="vertical" class="revoke-form">
-      <a-form-item label="工单号">
-        <a-input :value="record?.workOrderNo" disabled />
+      <a-form-item label="工单/领料单号">
+        <a-input :value="resolveInventoryDeductDocNo(record) || '—'" disabled />
       </a-form-item>
 
       <a-form-item label="撤销类型">
@@ -93,6 +93,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { resolveInventoryDeductDocNo } from '@/mock/materialRequisitionRecords'
 import {
   DEDUCT_REVOKE_REASON_OPTIONS,
   revokeMaterialDeductWithForm,

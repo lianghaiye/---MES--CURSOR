@@ -75,6 +75,17 @@
       :pagination="false"
       :scroll="{ x: tableScrollX }"
     >
+      <template #headerCell="{ column }">
+        <template v-if="column.key === 'stockUnitQty'">
+          <span class="col-title-with-tip">
+            库存单位量
+            <a-tooltip :title="STOCK_UNIT_QTY_TIP">
+              <InfoCircleOutlined class="col-tip-icon" />
+            </a-tooltip>
+          </span>
+        </template>
+        <template v-else>{{ column.title }}</template>
+      </template>
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'index'">{{ index + 1 }}</template>
         <template v-else-if="column.key === 'itemName'">
@@ -84,9 +95,11 @@
         </template>
         <template v-else-if="column.key === 'stockQty'">
           {{ formatQty(record.stockQty) }}
+          <span class="unit-suffix">{{ resolveInboundStockUnit(record) }}</span>
         </template>
         <template v-else-if="column.key === 'warehouseStockQty'">
           {{ formatQty(record.warehouseStockQty) }}
+          <span class="unit-suffix">{{ resolveInboundStockUnit(record) }}</span>
         </template>
         <template v-else-if="column.key === 'warehouse'">
           <a-select
@@ -109,6 +122,15 @@
         </template>
         <template v-else-if="column.key === 'qty'">
           <a-input-number
+            v-if="isInboundDualUnitLine(record)"
+            v-model:value="record.purchaseQty"
+            size="small"
+            :min="1"
+            :precision="0"
+            style="width: 100%"
+          />
+          <a-input-number
+            v-else
             v-model:value="record.qty"
             size="small"
             :min="0"
@@ -118,14 +140,35 @@
             @change="() => onLineQtyChange(record)"
           />
         </template>
-        <template v-else-if="column.key === 'weight'">
-          <a-input-number
-            v-model:value="record.weight"
-            size="small"
-            :min="0"
-            :precision="3"
-            style="width: 100%"
-          />
+        <template v-else-if="column.key === 'unit'">
+          {{ resolveInboundQtyUnit(record) || '—' }}
+        </template>
+        <template v-else-if="column.key === 'stockUnitQty'">
+          <template v-if="isInboundDualUnitLine(record)">
+            <a-input-number
+              v-if="allowsInboundTotalEntry(record.barcodeType)"
+              :value="getStockUnitQtyValue(record)"
+              size="small"
+              :min="0.001"
+              :precision="4"
+              style="width: 100%"
+              @update:value="(v) => onLineStockUnitQtyInput(record, v)"
+            />
+            <a-input-number
+              v-else
+              :value="getUniformPieceValue(record)"
+              size="small"
+              :min="0.001"
+              :precision="4"
+              style="width: 100%"
+              placeholder="单件数量"
+              @update:value="(v) => onLineStockUnitQtyInput(record, v)"
+            />
+          </template>
+          <span v-else class="cell-disabled">{{ formatQty(record.qty) }}</span>
+        </template>
+        <template v-else-if="column.key === 'stockUnit'">
+          {{ resolveInboundStockUnit(record) || '—' }}
         </template>
         <template v-else-if="column.key === 'unitPrice'">
           <a-input-number
@@ -178,20 +221,27 @@
 </template>
 
 <script setup>
+import { formatQty } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { CheckOutlined } from '@ant-design/icons-vue'
+import { CheckOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
 import InboundLineEditModal from '@/views/inventory/components/InboundLineEditModal.vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { createInboundFromPurchaseOrder } from '@/store/inboundOrderStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
-import { inboundFormLineColumns } from '@/utils/inboundLineColumns'
+import { inboundFormLineColumns, STOCK_UNIT_QTY_TIP } from '@/utils/inboundLineColumns'
 import {
   enrichInboundLine,
-  enrichInboundLineStock,
+  getInboundQtyValue,
+  getStockUnitQtyValue,
+  getUniformPieceValue,
+  isInboundDualUnitLine,
+  resolveInboundQtyUnit,
+  resolveInboundStockUnit,
   syncInboundLineTotalFromUnit,
 } from '@/utils/inboundLineHelpers'
+import { INBOUND_ENTRY_MODE, allowsInboundTotalEntry } from '@/utils/variableLengthMaterial'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -227,7 +277,7 @@ const columns = [
 const tableScrollX = computed(() => columns.reduce((sum, col) => sum + (col.width || 100), 0))
 
 const totalQty = computed(() =>
-  inboundLines.value.reduce((sum, line) => sum + (Number(line.qty) || 0), 0),
+  inboundLines.value.reduce((sum, line) => sum + (Number(getInboundQtyValue(line)) || 0), 0),
 )
 
 watch(
@@ -256,7 +306,7 @@ function buildLinesFromPurchaseOrder(order) {
       const remaining = (Number(line.purchaseQty) || 0) - (Number(line.receivedQty) || 0)
       const warehouse =
         line.receivingWarehouse || resolveDefaultWarehouseByMaterialCode(line.itemCode) || undefined
-      return enrichInboundLine({
+      const enriched = enrichInboundLine({
         id: line.id,
         poLineId: line.id,
         itemCode: line.itemCode,
@@ -269,21 +319,46 @@ function buildLinesFromPurchaseOrder(order) {
         unit: line.unit || '个',
         unitPrice: line.unitPriceInTax ?? line.unitPriceExTax ?? null,
         locationNo: line.locationNo || '',
-        weight: line.weight ?? null,
         warehouse,
         qty: remaining,
         remainingQty: remaining,
-        purchaseQty: line.purchaseQty,
       })
+      if (isInboundDualUnitLine(enriched)) {
+        enriched.purchaseQty = remaining
+        enriched.qty = null
+        enriched.totalValue = null
+        // 一物一码默认统一单件；一类/一批一码可直接填合计
+        enriched.inboundEntryMode = allowsInboundTotalEntry(enriched.barcodeType)
+          ? INBOUND_ENTRY_MODE.TOTAL
+          : INBOUND_ENTRY_MODE.UNIFORM
+      }
+      return enriched
     })
 }
 
 function refreshLine(line) {
-  Object.assign(line, enrichInboundLineStock(line))
-  syncInboundLineTotalFromUnit(line)
+  Object.assign(line, enrichInboundLine(line))
 }
 
 function onLineQtyChange(line) {
+  syncInboundLineTotalFromUnit(line)
+}
+
+function onLineStockUnitQtyInput(line, value) {
+  if (allowsInboundTotalEntry(line.barcodeType)) {
+    line.inboundEntryMode = INBOUND_ENTRY_MODE.TOTAL
+    line.totalValue = value
+    line.qty = value
+    line.uniformValue = undefined
+    syncInboundLineTotalFromUnit(line)
+    return
+  }
+  line.inboundEntryMode = INBOUND_ENTRY_MODE.UNIFORM
+  line.uniformValue = value
+  line.totalValue = undefined
+  const n = Number(line.purchaseQty) || 0
+  const per = Number(value) || 0
+  line.qty = n > 0 && per > 0 ? Math.round(n * per * 10000) / 10000 : null
   syncInboundLineTotalFromUnit(line)
 }
 
@@ -340,11 +415,6 @@ function onLineEditConfirm(updated) {
   refreshLine(inboundLines.value[idx])
 }
 
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
-}
-
 function formatMoney(val) {
   if (val == null || val === '') return '—'
   return Number(val).toLocaleString(undefined, {
@@ -372,9 +442,18 @@ function handleSave() {
     message.warning(`请为「${invalidWarehouse.itemName}」选择入库仓库`)
     return
   }
-  const invalidQty = inboundLines.value.find((line) => !line.qty || Number(line.qty) <= 0)
+  const invalidQty = inboundLines.value.find((line) => {
+    if (isInboundDualUnitLine(line)) {
+      return !(Number(line.purchaseQty) > 0) || !(Number(getStockUnitQtyValue(line)) > 0)
+    }
+    return !line.qty || Number(line.qty) <= 0
+  })
   if (invalidQty) {
-    message.warning(`请填写「${invalidQty.itemName}」的入库数量`)
+    message.warning(
+      isInboundDualUnitLine(invalidQty)
+        ? `请填写「${invalidQty.itemName}」的入库数量与库存单位量`
+        : `请填写「${invalidQty.itemName}」的入库数量`,
+    )
     return
   }
 
@@ -394,11 +473,16 @@ function handleSave() {
       material: line.material,
       drawingNo: line.drawingNo,
       unit: line.unit,
+      stockUnit: line.stockUnit,
+      purchaseUnit: line.purchaseUnit,
       unitPrice: line.unitPrice,
       locationNo: line.locationNo,
-      weight: line.weight,
       warehouse: line.warehouse,
-      qty: Number(line.qty),
+      qty: Number(getStockUnitQtyValue(line)),
+      purchaseQty: isInboundDualUnitLine(line) ? Number(line.purchaseQty) : undefined,
+      totalValue: isInboundDualUnitLine(line) ? Number(getStockUnitQtyValue(line)) : undefined,
+      inboundEntryMode: line.inboundEntryMode,
+      isVariableLength: Boolean(line.isVariableLength),
     })),
   })
   saving.value = false
@@ -441,6 +525,28 @@ function handleSave() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
+}
+
+.unit-suffix {
+  margin-left: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.cell-disabled {
+  color: rgba(0, 0, 0, 0.25);
 }
 
 .line-summary {

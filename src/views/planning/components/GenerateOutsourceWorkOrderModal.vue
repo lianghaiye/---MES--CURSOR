@@ -170,7 +170,8 @@ import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { unitOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { urgencyOptions } from '@/mock/workOrderOptions'
+import { unitState, getAllEnabledUnitOptions } from '@/store/unitStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { buildOutsourceWorkOrderRows } from '@/utils/material'
 import { SUPPLIER_SELECT_PLACEHOLDER } from '@/utils/supplierSelect'
@@ -224,7 +225,10 @@ const datePickerOpen = ref(false)
 const selectOptions = computed(() => {
   void warehouseState.warehouses
   return {
-    unit: unitOptions.map((v) => ({ label: v, value: v })),
+    unit: (() => {
+      void unitState.units
+      return getAllEnabledUnitOptions()
+    })(),
     warehouse: getWarehouseSelectOptions(),
     urgency: urgencyOptions.map((v) => ({ label: v, value: v })),
   }

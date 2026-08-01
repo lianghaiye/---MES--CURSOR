@@ -8,16 +8,41 @@ import {
   qcResultBlocksOutbound,
   QC_RESULT_PASS,
 } from '@/store/factoryQcStore'
-import { isMinimalReportMode } from '@/store/businessRuleStore'
+import { applyOutboundToStock } from '@/store/stockStore'
+import { issueBatchQty, getBatchById } from '@/store/stockBatchStore'
+import {
+  getOutboundIssueRule,
+  isPartialDualUnitIssue,
+  OUTBOUND_ISSUE_RULES,
+} from '@/store/functionParamStore'
+import {
+  allocateOutboundBatches,
+  getLineBatchAllocations,
+  getOutboundAvailableBatchQty,
+  isLineManualBatchPick,
+  validateManualBatchAllocations,
+} from '@/utils/outboundBatchAllocate'
+import { formatBatchAttrsText } from '@/utils/outboundLineColumns'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
+
+/** 领料/发料出库不再审批：历史「待处理」升为「待出库」 */
+function migrateSkipApprovalStatuses(orders) {
+  const skipTypes = new Set(['领料出库', '发料出库'])
+  return (orders || []).map((o) => {
+    if (skipTypes.has(o.outboundType) && o.status === '待处理') {
+      return { ...o, status: '待出库' }
+    }
+    return o
+  })
+}
 
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.orders)) return parsed.orders
+      if (Array.isArray(parsed.orders)) return migrateSkipApprovalStatuses(parsed.orders)
     }
   } catch {
     /* ignore */
@@ -27,17 +52,19 @@ function loadFromStorage() {
     try {
       const parsed = JSON.parse(legacy)
       if (Array.isArray(parsed.orders)) {
-        return parsed.orders.map((o) => ({
-          ...o,
-          outboundType: o.docType || o.outboundType || '销售出库',
-          warehouse: o.warehouse || '成品仓',
-          handler: o.handler || 'admin1',
-          sourceOrderNo: o.sourceOrderNo || o.salesOrderNo || '',
-          creator: o.creator || 'admin1',
-          createdAt: o.outboundDate || o.createdAt,
-          workshop: o.workshop || '默认工厂',
-          warehouseKeeper: o.warehouseKeeper || 'admin1',
-        }))
+        return migrateSkipApprovalStatuses(
+          parsed.orders.map((o) => ({
+            ...o,
+            outboundType: o.docType || o.outboundType || '销售出库',
+            warehouse: o.warehouse || '成品仓',
+            handler: o.handler || 'admin1',
+            sourceOrderNo: o.sourceOrderNo || o.salesOrderNo || '',
+            creator: o.creator || 'admin1',
+            createdAt: o.outboundDate || o.createdAt,
+            workshop: o.workshop || '默认工厂',
+            warehouseKeeper: o.warehouseKeeper || 'admin1',
+          })),
+        )
       }
     } catch {
       /* ignore */
@@ -94,10 +121,9 @@ export function canApproveOutbound(order) {
   return order?.status === '待处理' && needsOutboundApproval(order.outboundType)
 }
 
-/** 领料出库在极简报工模式下免审批，直接待出库 */
+/** 新建出库单初始状态：需审批类型为待处理，其余（含领料/发料）直接待出库 */
 export function resolveOutboundInitialStatus(outboundType, explicitStatus) {
   if (explicitStatus) return explicitStatus
-  if (outboundType === '领料出库' && isMinimalReportMode()) return '待出库'
   if (needsOutboundApproval(outboundType)) return '待处理'
   return '待出库'
 }
@@ -229,6 +255,13 @@ export function confirmOutbound(ids) {
       }
       return
     }
+
+    const stockCheck = applyOutboundStockMovements(order)
+    if (!stockCheck.ok) {
+      blocked.push({ docNo: order.docNo, message: stockCheck.message })
+      return
+    }
+
     order.status = '已出库'
     order.completedAt = dayjs().format('YYYY-MM-DD')
     if (!order.auditDate) order.auditDate = order.completedAt
@@ -240,6 +273,191 @@ export function confirmOutbound(ids) {
     count += 1
   })
   return { count, blocked }
+}
+
+function writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty, dualUnit }) {
+  const issuedNos = issuedAllocations.map((a) => a.batchNo).filter(Boolean)
+  const issuedTotal =
+    Math.round(issuedAllocations.reduce((s, a) => s + (Number(a.qty) || 0), 0) * 10000) / 10000
+  const issuedSerials = []
+  const remnantSerials = []
+  issuedAllocations.forEach((a) => {
+    ;(a.pieceSerialNos || []).forEach((s) => issuedSerials.push(s))
+    ;(a.remnantSerialNos || []).forEach((s) => remnantSerials.push(s))
+  })
+  line.batchAllocations = issuedAllocations
+  line.outboundIssueRule = rule
+  if (dualUnit) {
+    if (!isPartialDualUnitIssue()) {
+      if (!(Number(line.demandMeters) > 0)) line.demandMeters = demandQty
+      line.dualUnitIssueStrategy = 'whole_with_remnant'
+    } else {
+      line.dualUnitIssueStrategy = 'partial'
+    }
+  }
+  line.shipQty = issuedTotal
+  line.issuedBatchNo = issuedNos.join('、')
+  line.issuedPieceSerialNos = issuedSerials
+  line.remnantPieceSerialNos = remnantSerials
+  line.pickedBatchId = issuedAllocations[0]?.batchId
+  line.pickedBatchNo = issuedAllocations[0]?.batchNo
+  line.pickedLength = issuedTotal
+  line.barcodeBatchNo = line.issuedBatchNo
+  line.batchFullyIssued = issuedAllocations.every((a) => {
+    const b = getBatchById(a.batchId)
+    return !b || b.status === '已出库' || !(Number(b.currentLength) > 0)
+  })
+  const texts = []
+  const seen = new Set()
+  issuedAllocations.forEach((a) => {
+    const t = formatBatchAttrsText(getBatchById(a.batchId)?.attrs)
+    if (t && !seen.has(t)) {
+      seen.add(t)
+      texts.push(t)
+    }
+  })
+  const firstBatch = getBatchById(issuedAllocations[0]?.batchId)
+  line.batchAttrs = firstBatch?.attrs ? { ...firstBatch.attrs } : undefined
+  line.batchAttrsText = texts.join(' | ')
+}
+
+function applyOutboundStockMovements(order) {
+  const lines = order.lineItems || []
+  const rule = getOutboundIssueRule()
+
+  for (const line of lines) {
+    const meta = {
+      sourceDocNo: order.docNo,
+      workOrderNo: line.workOrderNo || line.sourceDocNo || order.sourceOrderNo || '',
+    }
+    const lineManual = isLineManualBatchPick(line)
+    const warehouse = line.shipWarehouse || order.warehouse
+    const batchAvail = getOutboundAvailableBatchQty(warehouse, line.itemCode)
+    const hasAlloc = getLineBatchAllocations(line).length > 0
+    const dualUnit = Boolean(line.isVariableLength)
+
+    // 自主拣选：单/双单位均按所选批次扣账
+    if (lineManual) {
+      const demandQty = Number(line.demandMeters ?? line.shipQty) || 0
+      const check = validateManualBatchAllocations(line)
+      if (!check.ok) {
+        return {
+          ok: false,
+          message: `「${line.itemName || line.itemCode}」${check.message}`,
+        }
+      }
+      const issuedAllocations = []
+      for (const a of check.allocations) {
+        const res = issueBatchQty(a.batchId, a.qty, {
+          ...meta,
+          pieceIds: a.pieceIds,
+          pieceSplit: a.pieceSplit,
+        })
+        if (!res.ok) {
+          return { ok: false, message: res.message }
+        }
+        issuedAllocations.push({
+          batchId: a.batchId,
+          batchNo: res.batch?.batchNo || a.batchNo,
+          qty: res.issuedLength,
+          unit: a.unit || line.unit || '',
+          pieceIds: a.pieceIds,
+          pieceSerialNos: res.issuedSerialNos || a.pieceSerialNos,
+          pieceSplit: Boolean(res.pieceSplit || a.pieceSplit),
+          remnantSerialNos: res.remnantSerialNos || [],
+        })
+      }
+      line.manualBatchPick = true
+      writeIssuedBatchFields(line, issuedAllocations, {
+        rule: OUTBOUND_ISSUE_RULES.MANUAL,
+        demandQty,
+        dualUnit,
+      })
+      continue
+    }
+
+    // 自动 FIFO：双单位必走批次；单单位有批次库存时走批次，否则留给汇总库存扣减
+    if (dualUnit || batchAvail > 0) {
+      if (!(Number(line.shipQty) > 0)) {
+        return {
+          ok: false,
+          message: `「${line.itemName || line.itemCode}」请填写出库数量`,
+        }
+      }
+      const demandQty = Number(line.demandMeters ?? line.shipQty) || 0
+      const alloc = allocateOutboundBatches({
+        warehouse,
+        itemCode: line.itemCode,
+        demandQty: line.shipQty,
+        rule,
+      })
+      if (!alloc.ok) {
+        return {
+          ok: false,
+          message: `「${line.itemName || line.itemCode}」${alloc.message}`,
+        }
+      }
+      const issuedAllocations = []
+      for (const a of alloc.allocations) {
+        const res = issueBatchQty(a.batchId, a.qty, {
+          ...meta,
+          pieceIds: a.pieceIds,
+          pieceSplit: a.pieceSplit,
+        })
+        if (!res.ok) {
+          return { ok: false, message: res.message }
+        }
+        issuedAllocations.push({
+          batchId: a.batchId,
+          batchNo: res.batch?.batchNo || a.batchNo,
+          qty: res.issuedLength,
+          unit: a.unit || line.unit || '',
+          pieceIds: a.pieceIds,
+          pieceSerialNos: res.issuedSerialNos || a.pieceSerialNos,
+          pieceSplit: Boolean(res.pieceSplit || a.pieceSplit),
+          remnantSerialNos: res.remnantSerialNos || [],
+        })
+      }
+      writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty, dualUnit })
+      continue
+    }
+
+    // 兼容：仅 pickedBatchId / 已有分配且无库存批次账
+    if (!line.pickedBatchId && !hasAlloc) continue
+    const legacyAlloc = getLineBatchAllocations(line)
+    if (legacyAlloc.length) {
+      for (const a of legacyAlloc) {
+        const res = issueBatchQty(a.batchId, a.qty, meta)
+        if (!res.ok) return { ok: false, message: res.message }
+      }
+      continue
+    }
+    if (!line.pickedBatchId) continue
+    const res = issueBatchQty(line.pickedBatchId, line.shipQty, meta)
+    if (!res.ok) {
+      return { ok: false, message: res.message }
+    }
+    line.pickedLength = res.issuedLength
+    line.shipQty = res.issuedLength
+    line.issuedBatchNo = res.batch?.batchNo || line.pickedBatchNo
+    line.barcodeBatchNo = line.issuedBatchNo
+    line.batchFullyIssued = Boolean(res.whole)
+    line.issuedPieceSerialNos = res.issuedSerialNos || []
+    line.remnantPieceSerialNos = res.remnantSerialNos || []
+    line.batchAllocations = [
+      {
+        batchId: line.pickedBatchId,
+        batchNo: line.issuedBatchNo,
+        qty: res.issuedLength,
+        unit: line.unit || '',
+        pieceSplit: Boolean(res.pieceSplit),
+        remnantSerialNos: res.remnantSerialNos || [],
+      },
+    ]
+    line.outboundIssueRule = OUTBOUND_ISSUE_RULES.MANUAL
+  }
+  applyOutboundToStock(order)
+  return { ok: true }
 }
 
 /** 校验是否可确认出库 */

@@ -279,7 +279,9 @@
                         <a-input-number
                           v-model:value="record.purchaseQty"
                           :min="0"
-                          :precision="2"
+                          :precision="4"
+                          :formatter="inputNumberFormatter"
+                          :parser="inputNumberParser"
                           size="small"
                           style="width: 100%"
                           autofocus
@@ -294,7 +296,7 @@
                     <InventoryLineEditableCell
                       v-if="taxModeExcluding"
                       :active="isLineCellEditing(record.id, 'unitPriceExTax')"
-                      :display="formatMoney(record.unitPriceExTax)"
+                      :display="formatQty(record.unitPriceExTax)"
                       :empty="record.unitPriceExTax == null || record.unitPriceExTax === ''"
                       numeric
                       @activate="startLineCellEdit(record.id, 'unitPriceExTax')"
@@ -304,7 +306,9 @@
                         <a-input-number
                           v-model:value="record.unitPriceExTax"
                           :min="0"
-                          :precision="2"
+                          :precision="4"
+                          :formatter="inputNumberFormatter"
+                          :parser="inputNumberParser"
                           size="small"
                           style="width: 100%"
                           autofocus
@@ -314,7 +318,7 @@
                         />
                       </template>
                     </InventoryLineEditableCell>
-                    <span v-else>{{ formatMoney(record.unitPriceExTax) }}</span>
+                    <span v-else>{{ formatQty(record.unitPriceExTax) }}</span>
                   </template>
                   <template v-else-if="column.key === 'taxRate'">
                     <InventoryLineEditableCell
@@ -345,7 +349,7 @@
                     <InventoryLineEditableCell
                       v-if="!taxModeExcluding"
                       :active="isLineCellEditing(record.id, 'unitPriceInTax')"
-                      :display="formatMoney(record.unitPriceInTax)"
+                      :display="formatQty(record.unitPriceInTax)"
                       :empty="record.unitPriceInTax == null || record.unitPriceInTax === ''"
                       numeric
                       @activate="startLineCellEdit(record.id, 'unitPriceInTax')"
@@ -355,7 +359,9 @@
                         <a-input-number
                           v-model:value="record.unitPriceInTax"
                           :min="0"
-                          :precision="2"
+                          :precision="4"
+                          :formatter="inputNumberFormatter"
+                          :parser="inputNumberParser"
                           size="small"
                           style="width: 100%"
                           autofocus
@@ -365,7 +371,7 @@
                         />
                       </template>
                     </InventoryLineEditableCell>
-                    <span v-else>{{ formatMoney(record.unitPriceInTax) }}</span>
+                    <span v-else>{{ formatQty(record.unitPriceInTax) }}</span>
                   </template>
                   <template v-else-if="column.key === 'totalPriceExTax'">
                     {{ formatMoney(record.totalPriceExTax) }}
@@ -534,6 +540,7 @@
 </template>
 
 <script setup>
+import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -1085,11 +1092,6 @@ function onLineEditSave(updated) {
   if (idx < 0) return
   Object.assign(form.lineItems[idx], updated)
   recalcLineWithMode(form.lineItems[idx])
-}
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
 function formatMoney(val) {

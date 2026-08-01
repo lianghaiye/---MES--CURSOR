@@ -1,3 +1,4 @@
+import { formatNumber } from '@/utils/numberFormat'
 import dayjs from 'dayjs'
 import { findLinkedSalesOutbound, sumOutboundLineQty } from '@/utils/deliveryOutbound'
 import { sumSelectedShipQty } from '@/utils/shipEbom'
@@ -75,19 +76,9 @@ export function formatOutboundQtyInt(val) {
   return String(Math.round(n))
 }
 
-/**
- * 发货重量：有小数显示有效小数位（最多4位），无小数只显示整数
- */
+/** 发货重量：有小数显示有效小数位（最多4位），无小数只显示整数 */
 export function formatShipWeight(val) {
-  const n = Number(val)
-  if (!Number.isFinite(n)) return '0'
-  const rounded = Math.round(n * 10000) / 10000
-  if (Math.abs(rounded - Math.round(rounded)) < 1e-12) {
-    return String(Math.round(rounded))
-  }
-  let s = rounded.toFixed(4)
-  s = s.replace(/0+$/, '').replace(/\.$/, '')
-  return s
+  return formatNumber(val, 4, { empty: '0' })
 }
 
 export function formatAmountExTax(val) {

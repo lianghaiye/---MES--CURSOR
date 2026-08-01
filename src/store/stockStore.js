@@ -42,7 +42,38 @@ export function getStockQty(warehouse, itemCode) {
   return getStockRecord(warehouse, itemCode)?.qty ?? 0
 }
 
-/** 入库确认后增加库存 */
+function ensureStockRow({ warehouse, itemCode, itemName = '', itemType = '', unit = '件' }) {
+  const key = stockKey(warehouse, itemCode)
+  let row = stockState.records.find((r) => r.key === key)
+  if (!row) {
+    row = {
+      id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      key,
+      warehouse,
+      itemCode,
+      itemName,
+      itemType,
+      unit,
+      qty: 0,
+    }
+    stockState.records.push(row)
+  }
+  return row
+}
+
+/** 增减汇总库存（出库为负） */
+export function adjustStockQty({ warehouse, itemCode, itemName, itemType, unit, delta }) {
+  if (!warehouse || !itemCode) return { ok: false, message: '缺少仓库或物料编码' }
+  const d = Number(delta)
+  if (!Number.isFinite(d) || d === 0) return { ok: true }
+  const row = ensureStockRow({ warehouse, itemCode, itemName, itemType, unit })
+  row.qty = Math.round(((Number(row.qty) || 0) + d) * 1000) / 1000
+  if (itemName) row.itemName = itemName
+  if (unit) row.unit = unit
+  return { ok: true, row }
+}
+
+/** 入库确认后增加库存（普通按件；可变长由 stockBatchStore 处理） */
 export function applyInboundToStock(order) {
   const lines = order.lineItems || []
   if (!lines.length) return { ok: false, message: '入库单无明细行' }
@@ -50,34 +81,49 @@ export function applyInboundToStock(order) {
   const hasWarehouse = lines.some((line) => line.warehouse || order.warehouse)
   if (!hasWarehouse) return { ok: false, message: '缺少入库仓库' }
 
-  lines.forEach((line) => {
+  for (const line of lines) {
+    // 已按条码类型建批的行，库存已在 createBatch 中增减，避免双计
+    if (line.isVariableLength || (Array.isArray(line.batchNos) && line.batchNos.length)) {
+      continue
+    }
     const warehouse = line.warehouse || order.warehouse
-    if (!warehouse) return
+    if (!warehouse) continue
 
     const code = line.itemCode?.trim()
-    if (!code) return
+    if (!code) continue
     const qty = Number(line.qty) || 0
-    if (qty <= 0) return
+    if (qty <= 0) continue
 
-    const key = stockKey(warehouse, code)
-    let row = stockState.records.find((r) => r.key === key)
-    if (!row) {
-      row = {
-        id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        key,
-        warehouse,
-        itemCode: code,
-        itemName: line.itemName || '',
-        itemType: order.itemType || line.itemType || '',
-        unit: line.unit || '件',
-        qty: 0,
-      }
-      stockState.records.push(row)
-    }
-    row.qty = (Number(row.qty) || 0) + qty
-    row.itemName = line.itemName || row.itemName
-    row.unit = line.unit || row.unit
-  })
+    adjustStockQty({
+      warehouse,
+      itemCode: code,
+      itemName: line.itemName || '',
+      itemType: order.itemType || line.itemType || '',
+      unit: line.unit || '件',
+      delta: qty,
+    })
+  }
 
+  return { ok: true }
+}
+
+/** 出库扣减汇总库存（普通按件行） */
+export function applyOutboundToStock(order) {
+  const lines = order.lineItems || []
+  for (const line of lines) {
+    if (line.isVariableLength || line.pickedBatchId) continue
+    const warehouse = line.shipWarehouse || line.warehouse || order.warehouse
+    const code = line.itemCode?.trim()
+    if (!warehouse || !code) continue
+    const qty = Number(line.shipQty ?? line.qty) || 0
+    if (qty <= 0) continue
+    adjustStockQty({
+      warehouse,
+      itemCode: code,
+      itemName: line.itemName || '',
+      unit: line.unit || '件',
+      delta: -qty,
+    })
+  }
   return { ok: true }
 }

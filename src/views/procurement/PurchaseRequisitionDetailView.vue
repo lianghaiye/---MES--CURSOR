@@ -175,6 +175,7 @@
 </template>
 
 <script>
+import { formatQty } from '@/utils/numberFormat'
 export default { name: 'PurchaseRequisitionDetailView' }
 </script>
 
@@ -300,10 +301,6 @@ function purchaseOrderStatusColor(status) {
 function purchaseInboundStatusColor(status) {
   const map = { 未入库: 'default', 部分入库: 'warning', 已入库: 'success' }
   return map[status] || 'default'
-}
-
-function formatQty(val) {
-  return Number(val || 0).toFixed(2)
 }
 
 function handleBack() {

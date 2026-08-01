@@ -173,6 +173,17 @@
               :pagination="false"
               :scroll="lineTableScroll"
             >
+              <template #headerCell="{ column }">
+                <template v-if="column.key === 'stockUnitQty'">
+                  <span class="col-title-with-tip">
+                    库存单位量
+                    <a-tooltip :title="STOCK_UNIT_QTY_TIP">
+                      <InfoCircleOutlined class="col-tip-icon" />
+                    </a-tooltip>
+                  </span>
+                </template>
+                <template v-else>{{ column.title }}</template>
+              </template>
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'itemName'">
@@ -214,6 +225,9 @@
                   </a>
                   <span v-else>{{ record.material || '—' }}</span>
                 </template>
+                <template v-else-if="column.key === 'barcodeType'">
+                  {{ record.barcodeType || '—' }}
+                </template>
                 <template v-else-if="column.key === 'variantAttr'">
                   <a
                     v-if="isSpuLine(record)"
@@ -226,9 +240,11 @@
                 </template>
                 <template v-else-if="column.key === 'stockQty'">
                   {{ formatQty(record.stockQty) }}
+                  <span class="unit-suffix">{{ resolveInboundStockUnit(record) }}</span>
                 </template>
                 <template v-else-if="column.key === 'warehouseStockQty'">
                   {{ formatQty(record.warehouseStockQty) }}
+                  <span class="unit-suffix">{{ resolveInboundStockUnit(record) }}</span>
                 </template>
                 <template v-else-if="column.key === 'warehouse'">
                   <InventoryLineEditableCell
@@ -284,17 +300,29 @@
                 <template v-else-if="column.key === 'qty'">
                   <InventoryLineEditableCell
                     :active="isLineCellEditing(record.id, 'qty')"
-                    :display="formatQty(record.qty)"
-                    :empty="record.qty == null || record.qty === ''"
+                    :display="formatQty(getInboundQtyValue(record))"
+                    :empty="getInboundQtyValue(record) == null || getInboundQtyValue(record) === ''"
                     numeric
                     @activate="startLineCellEdit(record.id, 'qty')"
                     @end="endLineCellEdit"
                   >
                     <template #edit="{ endEdit }">
                       <a-input-number
+                        v-if="isInboundDualUnitLine(record)"
+                        v-model:value="record.purchaseQty"
+                        :min="1"
+                        :precision="0"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                      />
+                      <a-input-number
+                        v-else
                         v-model:value="record.qty"
                         :min="0"
-                        :precision="3"
+                        :precision="4"
                         size="small"
                         style="width: 100%"
                         autofocus
@@ -305,29 +333,67 @@
                     </template>
                   </InventoryLineEditableCell>
                 </template>
-                <template v-else-if="column.key === 'weight'">
-                  <InventoryLineEditableCell
-                    :active="isLineCellEditing(record.id, 'weight')"
-                    :display="formatQty(record.weight)"
-                    :empty="record.weight == null || record.weight === ''"
-                    placeholder="请输入"
-                    numeric
-                    @activate="startLineCellEdit(record.id, 'weight')"
-                    @end="endLineCellEdit"
-                  >
-                    <template #edit="{ endEdit }">
-                      <a-input-number
-                        v-model:value="record.weight"
-                        :min="0"
-                        :precision="3"
-                        size="small"
-                        style="width: 100%"
-                        autofocus
-                        @blur="endEdit"
-                        @pressEnter="endEdit"
-                      />
-                    </template>
-                  </InventoryLineEditableCell>
+                <template v-else-if="column.key === 'unit'">
+                  {{ resolveInboundQtyUnit(record) || '—' }}
+                </template>
+                <template v-else-if="column.key === 'stockUnitQty'">
+                  <template v-if="isInboundDualUnitLine(record)">
+                    <InventoryLineEditableCell
+                      v-if="allowsLineTotalEntry(record)"
+                      :active="isLineCellEditing(record.id, 'stockUnitQty')"
+                      :display="formatQty(getStockUnitQtyValue(record))"
+                      :empty="
+                        getStockUnitQtyValue(record) == null || getStockUnitQtyValue(record) === ''
+                      "
+                      numeric
+                      @activate="startLineCellEdit(record.id, 'stockUnitQty')"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-input-number
+                          :value="getStockUnitQtyValue(record)"
+                          :min="0.001"
+                          :precision="4"
+                          size="small"
+                          style="width: 100%"
+                          autofocus
+                          @update:value="(v) => onLineStockUnitQtyInput(record, v)"
+                          @blur="endEdit"
+                          @pressEnter="endEdit"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                    <InventoryLineEditableCell
+                      v-else
+                      :active="isLineCellEditing(record.id, 'stockUnitQty')"
+                      :display="formatQty(getStockUnitQtyValue(record))"
+                      :empty="
+                        getUniformPieceValue(record) == null || getUniformPieceValue(record) === ''
+                      "
+                      numeric
+                      @activate="startLineCellEdit(record.id, 'stockUnitQty')"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-input-number
+                          :value="getUniformPieceValue(record)"
+                          :min="0.001"
+                          :precision="4"
+                          size="small"
+                          style="width: 100%"
+                          autofocus
+                          placeholder="单件数量"
+                          @update:value="(v) => onLineStockUnitQtyInput(record, v)"
+                          @blur="endEdit"
+                          @pressEnter="endEdit"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                  </template>
+                  <span v-else class="cell-disabled">{{ formatQty(record.qty) }}</span>
+                </template>
+                <template v-else-if="column.key === 'stockUnit'">
+                  {{ resolveInboundStockUnit(record) || '—' }}
                 </template>
                 <template v-else-if="column.key === 'unitPrice'">
                   <InventoryLineEditableCell
@@ -382,8 +448,8 @@
               <template v-else-if="column.key === 'qty'">{{
                 formatQty(lineSummary.qtyTotal)
               }}</template>
-              <template v-else-if="column.key === 'weight'">{{
-                formatQty(lineSummary.weightTotal)
+              <template v-else-if="column.key === 'stockUnitQty'">{{
+                formatQty(lineSummary.stockUnitQtyTotal)
               }}</template>
               <template v-else-if="column.key === 'totalPrice'">{{
                 formatMoney(lineSummary.totalPrice)
@@ -451,10 +517,11 @@
 </template>
 
 <script setup>
+import { formatQty } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { PlusOutlined, CheckOutlined } from '@ant-design/icons-vue'
+import { CheckOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -477,7 +544,7 @@ import {
   updateInboundOrder,
   resolveWarehouseKeeper,
 } from '@/store/inboundOrderStore'
-import { inboundFormLineColumns } from '@/utils/inboundLineColumns'
+import { inboundFormLineColumns, STOCK_UNIT_QTY_TIP } from '@/utils/inboundLineColumns'
 import { normalizeInventoryPickerItem } from '@/utils/inventoryLineItemPicker'
 import { warehouseOptionLabel } from '@/utils/inventoryFormLineDisplay'
 import {
@@ -487,10 +554,21 @@ import {
   cloneInboundLine,
   createBlankInboundLine,
   enrichInboundLine,
+  getInboundQtyValue,
+  getStockUnitQtyValue,
+  getUniformPieceValue,
+  isInboundDualUnitLine,
   mergeInboundLines,
+  resolveInboundQtyUnit,
+  resolveInboundStockUnit,
   syncInboundLineTotalFromUnit,
 } from '@/utils/inboundLineHelpers'
 import { createInboundLine } from '@/mock/inboundOrders'
+import {
+  INBOUND_ENTRY_MODE,
+  allowsInboundTotalEntry,
+  isOneItemOneCodeBarcode,
+} from '@/utils/variableLengthMaterial'
 import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
 import {
   createInventorySpuLineDraft,
@@ -582,8 +660,8 @@ const form = reactive({
 })
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inbound-form-lines-v3', inboundFormLineColumns, {
-    minScrollX: 1850,
+  useTableColumnSettings('inbound-form-lines-v6', inboundFormLineColumns, {
+    minScrollX: 1950,
     pinEdgeColumns: false,
     pinActionColumn: true,
   })
@@ -592,13 +670,16 @@ const lineScrollX = tableScrollX
 
 const lineSummary = computed(() => {
   const lines = form.lineItems.filter((l) => l.itemCode)
-  const qtyTotal = lines.reduce((sum, line) => sum + (Number(line.qty) || 0), 0)
-  const weightTotal = lines.reduce((sum, line) => sum + (Number(line.weight) || 0), 0)
+  const qtyTotal = lines.reduce((sum, line) => sum + (Number(getInboundQtyValue(line)) || 0), 0)
+  const stockUnitQtyTotal = lines.reduce(
+    (sum, line) => sum + (Number(getStockUnitQtyValue(line)) || 0),
+    0,
+  )
   const totalPrice = lines.reduce((sum, line) => sum + (Number(line.totalPrice) || 0), 0)
   return {
     lineCount: lines.length,
     qtyTotal: Math.round(qtyTotal * 1000) / 1000,
-    weightTotal: Math.round(weightTotal * 1000) / 1000,
+    stockUnitQtyTotal: Math.round(stockUnitQtyTotal * 1000) / 1000,
     totalPrice: Math.round(totalPrice * 100) / 100,
   }
 })
@@ -694,11 +775,6 @@ function loadEditForm(record) {
   }
 }
 
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
-}
-
 function formatMoney(val) {
   if (val == null || val === '') return '—'
   return Number(val).toLocaleString(undefined, {
@@ -712,6 +788,33 @@ function refreshLine(line) {
 }
 
 function onLineQtyChange(line) {
+  syncInboundLineTotalFromUnit(line)
+}
+
+function allowsLineTotalEntry(line) {
+  return allowsInboundTotalEntry(line?.barcodeType)
+}
+
+function isOneItemOneCodeLine(line) {
+  return isOneItemOneCodeBarcode(line?.barcodeType)
+}
+
+function onLineStockUnitQtyInput(line, value) {
+  if (allowsLineTotalEntry(line)) {
+    line.inboundEntryMode = INBOUND_ENTRY_MODE.TOTAL
+    line.totalValue = value
+    line.qty = value
+    line.uniformValue = undefined
+    syncInboundLineTotalFromUnit(line)
+    return
+  }
+  // 一物一码：列表按「统一单件数量」填写
+  line.inboundEntryMode = INBOUND_ENTRY_MODE.UNIFORM
+  line.uniformValue = value
+  line.totalValue = undefined
+  const n = Number(line.purchaseQty) || 0
+  const per = Number(value) || 0
+  line.qty = n > 0 && per > 0 ? Math.round(n * per * 10000) / 10000 : null
   syncInboundLineTotalFromUnit(line)
 }
 
@@ -960,6 +1063,30 @@ function handleSave() {
     return
   }
 
+  const invalidDual = validLines.find((line) => {
+    if (!isInboundDualUnitLine(line)) return false
+    if (allowsInboundTotalEntry(line.barcodeType)) {
+      return !(Number(line.purchaseQty) > 0) || !(Number(getStockUnitQtyValue(line)) > 0)
+    }
+    // 一物一码：须已按件展开（pieceValues / pieceLengths）或统一单件
+    const mode = line.inboundEntryMode
+    if (mode === INBOUND_ENTRY_MODE.TOTAL) return true
+    if (!(Number(line.purchaseQty) > 0)) return true
+    if (mode === INBOUND_ENTRY_MODE.UNIFORM) {
+      return !(Number(line.uniformValue ?? line.uniformLength ?? line.uniformWeight) > 0)
+    }
+    const pieces = line.pieceValues || line.pieceLengths || []
+    return !pieces.length || pieces.some((v) => !(Number(v) > 0))
+  })
+  if (invalidDual) {
+    message.warning(
+      isOneItemOneCodeLine(invalidDual)
+        ? `一物一码「${invalidDual.itemName}」请填写统一单件数量（库存单位量），或点编辑改逐件`
+        : `双物料单位「${invalidDual.itemName}」请填写入库数量与库存单位量`,
+    )
+    return
+  }
+
   saving.value = true
   const payload = buildPayload()
 
@@ -1107,5 +1234,27 @@ function handleSave() {
   color: rgba(0, 0, 0, 0.65);
   background: #fafafa;
   border-radius: 4px;
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
+}
+
+.unit-suffix {
+  margin-left: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.cell-disabled {
+  color: rgba(0, 0, 0, 0.25);
 }
 </style>

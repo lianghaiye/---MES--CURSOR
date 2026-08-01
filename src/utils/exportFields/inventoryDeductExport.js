@@ -1,5 +1,6 @@
 import { cell } from './exportFieldHelpers'
 import { lineVariantSummary } from '@/utils/spuLineResolve'
+import { resolveInventoryDeductDocNo } from '@/mock/materialRequisitionRecords'
 
 function lineVariantText(line = {}) {
   return lineVariantSummary(line) || line.variantSummary || ''
@@ -7,7 +8,11 @@ function lineVariantText(line = {}) {
 
 /** 库存扣减记录导出（含物料明细，一行一物料） */
 export const inventoryDeductExportFields = [
-  { key: 'workOrderNo', title: '工单号', getValue: (row) => cell(row, 'workOrderNo') },
+  {
+    key: 'workOrderNo',
+    title: '工单/领料单号',
+    getValue: (row) => cell(row, 'docNo') || cell(row, 'workOrderNo'),
+  },
   { key: 'deductNo', title: '扣减单号', getValue: (row) => cell(row, 'deductNo') },
   { key: 'productName', title: '产品名称', getValue: (row) => cell(row, 'productName') },
   { key: 'productSpec', title: '规格型号', getValue: (row) => cell(row, 'productSpec') },
@@ -38,10 +43,12 @@ export const inventoryDeductExportFields = [
 export function flattenInventoryDeductRows(records = []) {
   const rows = []
   records.forEach((r) => {
+    const docNo = resolveInventoryDeductDocNo(r)
     const lines = r.lines || []
     if (!lines.length) {
       rows.push({
-        workOrderNo: r.workOrderNo,
+        docNo,
+        workOrderNo: docNo,
         deductNo: r.deductNo,
         productName: r.productName,
         productSpec: r.productSpec,
@@ -67,7 +74,8 @@ export function flattenInventoryDeductRows(records = []) {
     }
     lines.forEach((l) => {
       rows.push({
-        workOrderNo: r.workOrderNo,
+        docNo,
+        workOrderNo: docNo,
         deductNo: r.deductNo,
         productName: r.productName,
         productSpec: r.productSpec,

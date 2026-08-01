@@ -248,7 +248,7 @@ export function replenishScrapOrder(id, form) {
       id: `ob-scrap-${Date.now()}`,
       docNo: generateOutboundNo(),
       outboundType: '领料出库',
-      status: '待处理',
+      status: '待出库',
       warehouse,
       handler: '管理员',
       creator: '管理员',

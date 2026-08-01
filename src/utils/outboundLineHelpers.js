@@ -1,7 +1,9 @@
 import { createOutboundLine } from '@/mock/outboundOrders'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
+import { materialInfoState } from '@/store/materialInfoStore'
 import { getStockQty, stockState } from '@/store/stockStore'
 import { demoStockQty } from '@/utils/productionPlanWorkItem'
+import { resolveVariableLengthFields } from '@/utils/variableLengthMaterial'
 
 function roundQty(val) {
   return Math.round((Number(val) || 0) * 1000) / 1000
@@ -9,6 +11,65 @@ function roundQty(val) {
 
 function roundMoney(val) {
   return Math.round((Number(val) || 0) * 100) / 100
+}
+
+export function findMaterialByCode(itemCode) {
+  if (!itemCode) return null
+  return materialInfoState.materials.find((m) => m.code === itemCode) || null
+}
+
+/** 是否双物料单位出库行 */
+export function isOutboundDualUnitLine(line = {}, material = null) {
+  const mat = material || findMaterialByCode(line.itemCode)
+  return Boolean(line.isVariableLength || mat?.isVariableLength)
+}
+
+/** 出库数量单位（双单位按库存单位） */
+export function resolveOutboundStockUnit(line = {}, material = null) {
+  const mat = material || findMaterialByCode(line.itemCode)
+  if (isOutboundDualUnitLine(line, mat)) {
+    return line.stockUnit || line.unit || mat?.stockUnit || mat?.inventoryUnit || '米'
+  }
+  return line.unit || mat?.inventoryUnit || mat?.stockUnit || '件'
+}
+
+/** 按物料档案写入双单位相关字段 */
+export function applyDualUnitFieldsToOutboundLine(line = {}, itemCode = '') {
+  const code = itemCode || line.itemCode
+  const mat = findMaterialByCode(code)
+  if (!mat) {
+    line.stockUnit = line.unit || '件'
+    return line
+  }
+  const vl = resolveVariableLengthFields(mat)
+  line.barcodeType = mat.barcodeType || vl.barcodeType || line.barcodeType || '一批一码'
+  if (vl.isVariableLength) {
+    line.isVariableLength = true
+    line.purchaseUnit = vl.purchaseUnit
+    line.stockUnit = vl.stockUnit
+    line.unit = vl.stockUnit
+    line.uomRelation = vl.uomRelation
+  } else {
+    line.isVariableLength = false
+    line.purchaseUnit = mat.inventoryUnit || line.unit || '件'
+    line.stockUnit = mat.inventoryUnit || line.unit || '件'
+    line.unit = line.stockUnit
+    // 单单位也可自主拣选；勿清空已选批次
+    if (
+      !line.manualBatchPick &&
+      !(Array.isArray(line.batchAllocations) && line.batchAllocations.length)
+    ) {
+      line.pickedBatchId = undefined
+      line.pickedBatchNo = undefined
+      line.pickedLength = undefined
+    }
+  }
+  return line
+}
+
+/** 出库明细是否展示拣选批次（有物料编码即可；无批次库存时自动扣汇总库存） */
+export function canOutboundBatchPick(line = {}) {
+  return Boolean(line?.itemCode)
 }
 
 export function calcLineTotalPrice(line = {}) {
@@ -105,11 +166,13 @@ export function enrichOutboundLineStock(line = {}) {
 }
 
 export function enrichOutboundLine(line = {}) {
+  const next = { ...line }
+  applyDualUnitFieldsToOutboundLine(next)
   return {
-    ...line,
-    ...enrichOutboundLineStock(line),
-    ...enrichOutboundLineLocation(line),
-    ...enrichOutboundLinePricing(line),
+    ...next,
+    ...enrichOutboundLineStock(next),
+    ...enrichOutboundLineLocation(next),
+    ...enrichOutboundLinePricing(next),
   }
 }
 
@@ -136,7 +199,12 @@ export function buildOutboundLineFromPickerItem(item, defaultWarehouse = '') {
     variantValues: item.variantValues ? { ...item.variantValues } : {},
     variantSummary: item.variantSummary || '',
   })
-  return enrichOutboundLine(line)
+  const enriched = enrichOutboundLine(line)
+  if (enriched.isVariableLength && !enriched.pickedBatchId) {
+    enriched.shipQty = null
+    Object.assign(enriched, enrichOutboundLinePricing(enriched))
+  }
+  return enriched
 }
 
 /** 按 BOM 添加：展开子件明细；includeTopItem=false 时不带入顶级物品 */
@@ -203,6 +271,13 @@ export function buildOutboundLinesFromBom(
         unit: line.unit || '件',
         unitPrice: line.unitPrice ?? null,
         shipWarehouse: defaultWarehouse || '',
+        isVariableLength: Boolean(line.isVariableLength),
+        blankSize: line.blankSize || null,
+        blankSizeText: line.blankSizeText || '',
+        blankSizeMode: line.blankSizeMode || '',
+        blankLength: line.blankLength ?? null,
+        blankArea: line.blankArea ?? null,
+        uomRelation: line.uomRelation || '',
       }),
       (Number(line.unitQty) || 0) * qty || demoStockQty(1, index),
     )
@@ -277,6 +352,9 @@ export function applyPickerItemToOutboundLine(line, item, defaultWarehouse = '')
     material: fresh.material,
     drawingNo: fresh.drawingNo,
     unit: fresh.unit,
+    stockUnit: fresh.stockUnit,
+    purchaseUnit: fresh.purchaseUnit,
+    isVariableLength: fresh.isVariableLength,
     packagingForm: fresh.packagingForm || '',
     unitPrice: fresh.unitPrice ?? line.unitPrice,
     stockQty: fresh.stockQty,
@@ -287,6 +365,10 @@ export function applyPickerItemToOutboundLine(line, item, defaultWarehouse = '')
     productId: fresh.productId,
     variantValues: fresh.variantValues ? { ...fresh.variantValues } : {},
     variantSummary: fresh.variantSummary || '',
+    pickedBatchId: undefined,
+    pickedBatchNo: undefined,
+    pickedLength: undefined,
+    barcodeBatchNo: '',
     totalPrice: calcLineTotalPrice({ ...line, unitPrice: fresh.unitPrice ?? line.unitPrice }),
   })
 }

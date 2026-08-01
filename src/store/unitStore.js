@@ -32,6 +32,8 @@ function seedUnits() {
     { code: 'UNIT008', name: '根', scopes: ['inventory', 'purchase'], sort: 80 },
     { code: 'UNIT009', name: '支', scopes: ['purchase'], sort: 90 },
     { code: 'UNIT010', name: '条', scopes: ['purchase'], sort: 100 },
+    { code: 'UNIT011', name: '张', scopes: ['inventory', 'purchase'], sort: 110 },
+    { code: 'UNIT012', name: '㎡', scopes: ['inventory', 'purchase'], sort: 120 },
   ]
   return rows.map((r, i) => ({
     id: `unit-${i + 1}`,
@@ -47,13 +49,37 @@ function seedUnits() {
   }))
 }
 
+/** 确保板材相关单位存在（兼容旧 localStorage） */
+function ensurePlateUnits(units) {
+  const list = Array.isArray(units) ? [...units] : []
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
+  const extras = [
+    { code: 'UNIT011', name: '张', scopes: ['inventory', 'purchase'], sort: 110 },
+    { code: 'UNIT012', name: '㎡', scopes: ['inventory', 'purchase'], sort: 120 },
+  ]
+  extras.forEach((extra, i) => {
+    if (list.some((u) => u.name === extra.name || u.code === extra.code)) return
+    list.push(
+      normalizeUnit({
+        id: `unit-plate-${i + 1}`,
+        ...extra,
+        status: UNIT_STATUS.ENABLED,
+        creator: 'admin',
+        createdAt: now,
+        updatedAt: now,
+      }),
+    )
+  })
+  return list
+}
+
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed.units) && parsed.units.length) {
-        return parsed.units.map(normalizeUnit)
+        return ensurePlateUnits(parsed.units.map(normalizeUnit))
       }
     }
   } catch {

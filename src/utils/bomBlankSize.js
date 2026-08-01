@@ -1,4 +1,9 @@
 import { formatNumber, roundNumber } from '@/utils/numberFormat'
+import {
+  calcAreaSquareMeters,
+  isAreaStockUnit,
+  UOM_RELATION_PER_PIECE_AREA,
+} from '@/utils/variableLengthMaterial'
 
 /** 下料尺寸可选单位 */
 export const BLANK_SIZE_UNITS = ['mm', 'cm', 'm']
@@ -18,6 +23,26 @@ export const BLANK_SIZE_FIELDS = [
   { key: 'thickness', label: '厚' },
   { key: 'innerDiameter', label: '内径' },
   { key: 'outerDiameter', label: '外径' },
+]
+
+/** 板材模式主填项 */
+export const PLATE_BLANK_SIZE_PRIMARY_FIELDS = [
+  { key: 'length', label: '长', required: true },
+  { key: 'width', label: '宽', required: true },
+]
+
+/** 板材模式辅填项（不参与面积） */
+export const PLATE_BLANK_SIZE_EXTRA_FIELDS = [{ key: 'thickness', label: '厚', required: false }]
+
+/** 型材/管材模式主填项 */
+export const LENGTH_BLANK_SIZE_PRIMARY_FIELDS = [{ key: 'length', label: '长', required: true }]
+
+export const LENGTH_BLANK_SIZE_EXTRA_FIELDS = [
+  { key: 'outerDiameter', label: '外径', required: false },
+  { key: 'innerDiameter', label: '内径', required: false },
+  { key: 'thickness', label: '厚', required: false },
+  { key: 'width', label: '宽', required: false },
+  { key: 'height', label: '高', required: false },
 ]
 
 export function emptyBlankSizeUnits() {
@@ -100,20 +125,150 @@ export function formatBlankSizeText(blankSize) {
   return parts.join(' ')
 }
 
+/** 下料方式：用户可手动指定；未指定时按单位关系推断初值 */
+export const BLANK_SIZE_MODE = {
+  LENGTH: 'length',
+  PLATE: 'plate',
+  GENERIC: 'generic',
+}
+
+export const BLANK_SIZE_MODE_OPTIONS = [
+  { label: '型材 · 按长度', value: BLANK_SIZE_MODE.LENGTH },
+  { label: '板材 · 长×宽→㎡', value: BLANK_SIZE_MODE.PLATE },
+  { label: '通用', value: BLANK_SIZE_MODE.GENERIC },
+]
+
+export function normalizeBlankSizeMode(mode) {
+  const m = String(mode || '').toLowerCase()
+  if (
+    m === BLANK_SIZE_MODE.PLATE ||
+    m === BLANK_SIZE_MODE.LENGTH ||
+    m === BLANK_SIZE_MODE.GENERIC
+  ) {
+    return m
+  }
+  return ''
+}
+
+/** 无手动模式时的默认推断（仅作弹窗初值建议） */
+export function inferBlankSizeMode(lineOrItem = {}) {
+  if (!lineOrItem) return BLANK_SIZE_MODE.GENERIC
+  if (lineOrItem.uomRelation === UOM_RELATION_PER_PIECE_AREA) return BLANK_SIZE_MODE.PLATE
+  const stock = lineOrItem.stockUnit || lineOrItem.inventoryUnit || lineOrItem.unit
+  if (Boolean(lineOrItem.isVariableLength) && isAreaStockUnit(stock)) return BLANK_SIZE_MODE.PLATE
+  if (lineOrItem.isVariableLength) return BLANK_SIZE_MODE.LENGTH
+  return BLANK_SIZE_MODE.GENERIC
+}
+
+/** 优先用行上 blankSizeMode，否则回退推断 */
+export function resolveBlankSizeMode(lineOrItem = {}) {
+  const explicit = normalizeBlankSizeMode(lineOrItem?.blankSizeMode)
+  if (explicit) return explicit
+  return inferBlankSizeMode(lineOrItem)
+}
+
+/** BOM 行是否按面积下料（板材）——尊重手动模式 */
+export function isPlateBlankSizeLine(lineOrItem = {}) {
+  return resolveBlankSizeMode(lineOrItem) === BLANK_SIZE_MODE.PLATE
+}
+
+export function isLengthBlankSizeLine(lineOrItem = {}) {
+  return resolveBlankSizeMode(lineOrItem) === BLANK_SIZE_MODE.LENGTH
+}
+
 /**
- * 写入 BOM 行：blankSize + blankSizeText（原地更新）；
- * 双物料单位时用「长」换算 blankLength(米) 供批次拣选。
+ * 由 blankSize 长×宽换算单件面积（㎡）
+ * 长、宽单位可不同：各自换算到米后相乘
  */
-export function applyBlankSizeToLine(line, blankSize) {
+export function calcBlankAreaSquareMeters(blankSize) {
+  const bs = normalizeBlankSize(blankSize)
+  if (bs.length == null || bs.width == null) return null
+  const lengthUnit = bs.units.length || DEFAULT_BLANK_SIZE_UNIT
+  const widthUnit = bs.units.width || DEFAULT_BLANK_SIZE_UNIT
+  if (lengthUnit === widthUnit) {
+    return calcAreaSquareMeters(bs.length, bs.width, lengthUnit)
+  }
+  const lengthM = toMillimeters(bs.length, lengthUnit)
+  const widthM = toMillimeters(bs.width, widthUnit)
+  if (lengthM == null || widthM == null) return null
+  return roundNumber((lengthM / 1000) * (widthM / 1000), 4)
+}
+
+/**
+ * 写入 BOM 行：blankSize + blankSizeText + blankSizeMode；
+ * 板材写 blankArea(㎡)；型材写 blankLength(米)
+ * @param {{ mode?: string }} [options]
+ */
+export function applyBlankSizeToLine(line, blankSize, options = {}) {
   if (!line) return line
   const bs = normalizeBlankSize(blankSize)
   line.blankSize = bs
   line.blankSizeText = formatBlankSizeText(bs)
-  if (bs.length != null) {
+
+  const mode =
+    normalizeBlankSizeMode(options.mode) ||
+    normalizeBlankSizeMode(line.blankSizeMode) ||
+    inferBlankSizeMode(line)
+  line.blankSizeMode = mode
+
+  if (mode === BLANK_SIZE_MODE.PLATE) {
+    const area = calcBlankAreaSquareMeters(bs)
+    line.blankArea = area != null && area > 0 ? area : null
+    line.blankLength = null
+  } else if (mode === BLANK_SIZE_MODE.LENGTH) {
     const lengthMm = toMillimeters(bs.length, bs.units.length)
     line.blankLength = lengthMm != null ? roundNumber(lengthMm / 1000, 4) : null
+    line.blankArea = null
+  } else if (bs.length != null) {
+    const lengthMm = toMillimeters(bs.length, bs.units.length)
+    line.blankLength = lengthMm != null ? roundNumber(lengthMm / 1000, 4) : null
+    line.blankArea = null
   } else {
     line.blankLength = null
+    line.blankArea = null
   }
   return line
+}
+
+/**
+ * 校验双单位行下料尺寸是否齐全
+ * @returns {{ ok: boolean, message?: string, line?: object }}
+ */
+export function validateVariableLengthBlankSize(line) {
+  if (!line?.isVariableLength) return { ok: true }
+  const label = line.itemName || line.materialCode || '双物料单位'
+  const mode = resolveBlankSizeMode(line)
+  if (mode === BLANK_SIZE_MODE.PLATE) {
+    const area =
+      Number(line.blankArea) > 0
+        ? Number(line.blankArea)
+        : calcBlankAreaSquareMeters(line.blankSize)
+    if (!(area > 0)) {
+      return {
+        ok: false,
+        message: `板材「${label}」请在下料尺寸中填写「长」和「宽」`,
+        line,
+      }
+    }
+    return { ok: true }
+  }
+  if (mode === BLANK_SIZE_MODE.GENERIC) return { ok: true }
+  const len = Number(line.blankSize?.length ?? line.blankLength)
+  if (!(len > 0)) {
+    return {
+      ok: false,
+      message: `型材「${label}」请在下料尺寸中填写「长」`,
+      line,
+    }
+  }
+  return { ok: true }
+}
+
+/** 批量找第一条不合格双单位下料行 */
+export function findInvalidBlankSizeLine(lines = []) {
+  for (const line of lines) {
+    const res = validateVariableLengthBlankSize(line)
+    if (!res.ok) return res
+  }
+  return { ok: true }
 }

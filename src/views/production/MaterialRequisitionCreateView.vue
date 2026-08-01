@@ -5,7 +5,7 @@
         <span class="page-title">申请领料</span>
         <span class="page-sub">提交后生成领料申请，并在出库管理生成领料出库单</span>
       </div>
-      <a-space :size="8">
+      <a-space :size="12">
         <a-button size="small" @click="goBack">取消</a-button>
         <a-button type="primary" size="small" :loading="submitting" @click="onSubmit">
           提交领料申请
@@ -174,7 +174,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col v-if="mode !== MATERIAL_REQ_MODES.QUICK" :xs="24" :sm="8">
+            <a-col :xs="24" :sm="8">
               <a-form-item label="领入仓库">
                 <a-select
                   v-model:value="form.receiveWarehouse"
@@ -214,10 +214,15 @@
               <a-input-number
                 v-model:value="record.shipQty"
                 :min="0"
-                :precision="0"
+                :precision="record.isVariableLength ? 3 : 0"
                 size="small"
                 style="width: 100%"
+                @change="() => onShipQtyChange(record)"
               />
+              <div v-if="record.isVariableLength" class="vl-hint">
+                需求({{ record.unit || '米' }})·出库时拣批
+                <template v-if="record.blankSizeText"> · 需求=下料尺寸×用量 </template>
+              </div>
             </template>
             <template v-else-if="column.key === 'shipWarehouse'">
               <a-select
@@ -268,6 +273,16 @@
             </template>
             <template v-else-if="column.key === 'drawingNo'">
               {{ record.drawingNo || '—' }}
+            </template>
+            <template v-else-if="column.key === 'blankSizeText'">
+              <template v-if="record.blankSizeText">
+                {{ record.blankSizeText }}
+                <div v-if="record.blankArea > 0" class="vl-hint">≈ {{ record.blankArea }}㎡/件</div>
+                <div v-else-if="record.blankLength > 0" class="vl-hint">
+                  ≈ {{ record.blankLength }}米/件
+                </div>
+              </template>
+              <span v-else>—</span>
             </template>
             <template v-else-if="column.key === 'source'">
               <template v-if="record.sourceWorkOrders?.length">
@@ -457,6 +472,7 @@ const lineColumns = [
   { title: '材质', key: 'material', width: 90 },
   { title: '变体属性', key: 'variantAttr', width: 140, ellipsis: true },
   { title: '图号', key: 'drawingNo', width: 110 },
+  { title: '下料尺寸', key: 'blankSizeText', width: 160, ellipsis: true },
   { title: '建议数量', key: 'suggestedQty', width: 90, align: 'right' },
   { title: '领料数量', key: 'shipQty', width: 110 },
   { title: '领料仓库', key: 'shipWarehouse', width: 130 },
@@ -491,11 +507,7 @@ function onModeChange() {
   workOrderRows.value = [createEmptyWoRow()]
   lines.value = []
   form.salesOrderNo = ''
-  if (mode.value === MATERIAL_REQ_MODES.QUICK) {
-    form.receiveWarehouse = ''
-  } else {
-    syncReceiveWarehouse()
-  }
+  syncReceiveWarehouse()
 }
 
 function onSalesOrderChange(code) {
@@ -557,7 +569,7 @@ function syncReceiveWarehouse() {
 }
 
 function onWorkshopChange() {
-  if (mode.value !== MATERIAL_REQ_MODES.QUICK) syncReceiveWarehouse()
+  syncReceiveWarehouse()
 }
 
 function loadEbomLines() {
@@ -570,6 +582,12 @@ function loadEbomLines() {
   lines.value = merged
   if (emptyWorkOrders.length) {
     message.warning(`${emptyWorkOrders.map((w) => w.code).join('、')} 无 EBOM，请手工补料`)
+  }
+}
+
+function onShipQtyChange(record) {
+  if (record.isVariableLength) {
+    record.demandMeters = Number(record.shipQty) || 0
   }
 }
 
@@ -675,7 +693,7 @@ function onSubmit() {
   let payload = {
     mode: mode.value,
     workshop: form.workshop,
-    receiveWarehouse: mode.value === MATERIAL_REQ_MODES.QUICK ? '' : form.receiveWarehouse,
+    receiveWarehouse: form.receiveWarehouse,
     remark: form.remark,
     lines: lines.value,
     sourceChannel: 'web',
@@ -870,5 +888,12 @@ syncReceiveWarehouse()
 .variant-field-link {
   color: #1677ff;
   cursor: pointer;
+}
+
+.vl-hint {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.2;
 }
 </style>

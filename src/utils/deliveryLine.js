@@ -5,6 +5,14 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { findSpuById } from '@/store/spuStore'
 import { formatVariantSummary } from '@/utils/spuVariant'
+import { formatNumber, roundNumber } from '@/utils/numberFormat'
+
+export { roundNumber as roundDeliveryDecimal, formatNumber as formatDeliveryDecimal }
+
+function roundDeliveryDecimal(val, maxDecimals = 4) {
+  const n = roundNumber(val, maxDecimals)
+  return Number.isFinite(n) ? n : 0
+}
 
 /** 展示 SKU 变体属性：优先行内摘要，其次主数据 variantValues，否则规格属性 */
 export function resolveDeliveryVariantAttr(line = {}) {
@@ -44,39 +52,16 @@ export function lineShipStatusColor(status) {
   return map[status] || 'default'
 }
 
-/** 最多保留 maxDecimals 位小数四舍五入 */
-export function roundDeliveryDecimal(val, maxDecimals = 4) {
-  const n = Number(val)
-  if (!Number.isFinite(n)) return 0
-  const factor = 10 ** maxDecimals
-  return Math.round(n * factor) / factor
-}
-
-/**
- * 数字展示：内部按 maxDecimals 四舍五入；有小数显示有效小数位，无小数不补 0
- */
-export function formatDeliveryDecimal(val, maxDecimals = 4) {
-  const n = Number(val)
-  if (!Number.isFinite(n)) return '-'
-  const rounded = roundDeliveryDecimal(n, maxDecimals)
-  if (Math.abs(rounded - Math.round(rounded)) < 1e-12) {
-    return String(Math.round(rounded))
-  }
-  let s = rounded.toFixed(maxDecimals)
-  s = s.replace(/0+$/, '').replace(/\.$/, '')
-  return s
-}
-
 /** @deprecated 使用 formatDeliveryDecimal */
 export function formatDeliveryQtyInt(val) {
-  return formatDeliveryDecimal(val, 4)
+  return formatNumber(val, 4, { empty: '-' })
 }
 
 /**
  * 发货进度：已确认出库数量 / 申请发货数量 / 订单数量
  */
 export function formatShipProgress(confirmedOutboundQty, appliedShipQty, orderQty) {
-  return `${formatDeliveryDecimal(confirmedOutboundQty, 4)} / ${formatDeliveryDecimal(appliedShipQty, 4)} / ${formatDeliveryDecimal(orderQty, 4)}`
+  return `${formatNumber(confirmedOutboundQty, 4, { empty: '-' })} / ${formatNumber(appliedShipQty, 4, { empty: '-' })} / ${formatNumber(orderQty, 4, { empty: '-' })}`
 }
 
 export const SHIP_PROGRESS_TOOLTIP = '格式：已确认出库的数量 / 申请发货的数量 / 订单数量'
@@ -157,21 +142,21 @@ export function recalcDeliveryLine(line) {
 }
 
 export function formatDeliveryQty(val) {
-  return formatDeliveryDecimal(val, 4)
+  return formatNumber(val, 4, { empty: '-' })
 }
 
 export function formatDeliveryPrice(val) {
-  return formatDeliveryDecimal(val, 4)
+  return formatNumber(val, 4, { empty: '-' })
 }
 
 export function formatDeliveryWeight(val) {
-  return formatDeliveryDecimal(val, 4)
+  return formatNumber(val, 4, { empty: '-' })
 }
 
 /** InputNumber：展示去尾 0，录入按数字解析 */
 export function deliveryDecimalFormatter(value) {
   if (value === undefined || value === null || value === '') return ''
-  return formatDeliveryDecimal(value, 4)
+  return formatNumber(value, 4, { empty: '' })
 }
 
 export function deliveryDecimalParser(value) {

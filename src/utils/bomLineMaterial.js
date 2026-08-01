@@ -1,6 +1,7 @@
 import { createBomLineItem, createBomTreeNode } from '@/mock/bomTemplates'
 import { getRootTreeId } from '@/utils/bomTree'
 import { createSpuLineDraft, applyResolvedSkuToBomLine, isSpuLine } from '@/utils/spuLineResolve'
+import { inferUomRelation } from '@/utils/variableLengthMaterial'
 
 export function createEmptySubLine(parentTreeId) {
   return createBomLineItem({
@@ -30,6 +31,10 @@ export function applyMaterialToLine(flatNodes, lineItems, lineId, material) {
   if (idx === -1) return { flatNodes, lineItems }
 
   const line = lineItems[idx]
+  const isVL = Boolean(material.isVariableLength)
+  const stockUnit = isVL
+    ? material.stockUnit || material.inventoryUnit || '米'
+    : material.inventoryUnit || line.unit || '件'
   const patch = {
     materialCode: material.code,
     itemName: material.name,
@@ -39,13 +44,13 @@ export function applyMaterialToLine(flatNodes, lineItems, lineId, material) {
     supplyForm: material.supplyForm || '外购件',
     material: material.material || '',
     drawingNo: material.drawingNo || '',
-    unit: material.isVariableLength
-      ? material.stockUnit || material.inventoryUnit || '米'
-      : material.inventoryUnit || line.unit || '件',
+    unit: stockUnit,
     unitPrice: material.unitPrice ?? line.unitPrice ?? 0,
-    isVariableLength: Boolean(material.isVariableLength),
-    blankLength: material.isVariableLength ? (line.blankLength ?? null) : null,
-    blankLossRate: material.isVariableLength ? (line.blankLossRate ?? null) : null,
+    isVariableLength: isVL,
+    uomRelation: isVL ? inferUomRelation(stockUnit, material.uomRelation) : '',
+    blankLength: isVL ? (line.blankLength ?? null) : null,
+    blankArea: isVL ? (line.blankArea ?? null) : null,
+    blankLossRate: isVL ? (line.blankLossRate ?? null) : null,
     isSpuLine: false,
     spuId: material.spuId || '',
     spuName: material.spuName || '',

@@ -11,6 +11,8 @@ export function materialToTreeNode(mat, extra = {}) {
     unit: mat.unit,
     demandQty: mat.demandQty,
     supplyType: mat.supplyType,
+    blankSizeText: mat.blankSizeText || '',
+    blankSize: mat.blankSize || null,
     childBom: mat.bom || mat.childBom || '',
     children: (mat.children || []).map((child) => materialToTreeNode(child)),
     ...extra,

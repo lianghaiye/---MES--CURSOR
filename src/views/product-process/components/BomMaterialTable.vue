@@ -9,7 +9,9 @@
             <PlusOutlined />
             添加子项
           </a-button>
-          <a-button size="small" @click="openBlankSizeFromToolbar">下料</a-button>
+          <a-button size="small" html-type="button" @click="openBlankSizeFromToolbar">
+            下料
+          </a-button>
           <template v-if="hasSelection">
             <a-button size="small" @click="openBatchEdit">修改</a-button>
             <a-button size="small" danger @click="handleBatchDelete">删除</a-button>
@@ -115,7 +117,7 @@
                 <a-checkbox
                   v-show="shouldShowRowCheckbox(record)"
                   :checked="selectedRowKeys.includes(record.id)"
-                  @change="(e) => toggleRowSelect(record.id, e.target.checked)"
+                  @change="(e) => toggleRowSelect(record.id, !!(e?.target?.checked ?? e))"
                   @click.stop
                 />
               </div>
@@ -123,7 +125,13 @@
             <template v-else-if="readonly">
               <template v-if="column.key === 'unitQty'">{{ formatQty(record.unitQty) }}</template>
               <template v-else-if="column.key === 'blankSizeText'">
-                {{ record.blankSizeText || '—' }}
+                <template v-if="record.blankSizeText">
+                  {{ record.blankSizeText }}
+                  <div v-if="record.blankArea > 0" class="blank-area-hint">
+                    ≈ {{ formatQty(record.blankArea) }}㎡/件
+                  </div>
+                </template>
+                <template v-else>—</template>
               </template>
               <template v-else-if="column.key === 'unit'">{{
                 formatCell(lineStockUnit(record))
@@ -204,7 +212,18 @@
               />
             </template>
             <template v-else-if="column.key === 'blankSizeText'">
-              {{ record.blankSizeText || '—' }}
+              <a class="blank-size-link" @click.stop="openBlankSizeForLine(record)">
+                <template v-if="record.blankSizeText">
+                  {{ record.blankSizeText }}
+                  <div v-if="record.blankArea > 0" class="blank-area-hint">
+                    ≈ {{ formatQty(record.blankArea) }}㎡/件
+                  </div>
+                  <div v-else-if="record.blankLength > 0" class="blank-area-hint">
+                    ≈ {{ formatQty(record.blankLength) }}米/件
+                  </div>
+                </template>
+                <template v-else>点击填写</template>
+              </a>
             </template>
             <template v-else-if="column.key === 'unit'">
               <span class="readonly-stock-unit">{{ lineStockUnit(record) }}</span>
@@ -346,7 +365,7 @@ import BomBlankSizeModal from './BomBlankSizeModal.vue'
 import BomSubItemMaterialSelect from './BomSubItemMaterialSelect.vue'
 import { isSpuLine, lineVariantSummary } from '@/utils/spuLineResolve'
 import { applyBlankSizeToLine } from '@/utils/bomBlankSize'
-import { resolveLineStockUnit } from '@/utils/variableLengthMaterial'
+import { resolveLineStockUnit, inferUomRelation } from '@/utils/variableLengthMaterial'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
 
@@ -554,41 +573,72 @@ const blankSizeOpen = ref(false)
 const blankSizeTargetLine = ref(null)
 
 function resolveBlankSizeTargetLine() {
-  if (activeRowId.value) {
-    const byActive = props.lines.find((l) => l.id === activeRowId.value)
-    if (byActive) return byActive
-  }
+  // 优先：恰好勾选一行（工具栏「下料」常见操作）
   if (selectedRowKeys.value.length === 1) {
-    return props.lines.find((l) => l.id === selectedRowKeys.value[0]) || null
+    const key = selectedRowKeys.value[0]
+    const byCheck = props.lines.find((l) => String(l.id) === String(key))
+    if (byCheck) return byCheck
+  }
+  // 其次：单击高亮行
+  if (activeRowId.value) {
+    const byActive = props.lines.find((l) => String(l.id) === String(activeRowId.value))
+    if (byActive) return byActive
   }
   return null
 }
 
 function openBlankSizeFromToolbar() {
+  if (selectedRowKeys.value.length > 1) {
+    message.warning('下料仅支持单行，请只勾选一条物料行，或单击选中一行后再点「下料」')
+    return
+  }
   const line = resolveBlankSizeTargetLine()
   if (!line) {
-    message.warning(
-      selectedRowKeys.value.length > 1
-        ? '下料仅支持单行，请单击选中一条物料行'
-        : '请先单击选中一条物料行',
-    )
+    message.warning('请先勾选或单击选中一条物料行')
     return
   }
   openBlankSizeForLine(line)
 }
 
 function openBlankSizeForLine(record) {
+  if (!record) {
+    message.warning('未找到物料行')
+    return
+  }
   blankSizeTargetLine.value = record
   activeRowId.value = record.id
-  blankSizeOpen.value = true
+  // 同步库存单位到行上，便于保存后识别板材/型材（弹窗内部也会再解析一次）
+  const mat = lookupLineMaterial(record)
+  const unit = lineStockUnit(record)
+  if (unit && unit !== '—') record.unit = unit
+  if (mat?.isVariableLength) {
+    record.isVariableLength = true
+    if (!record.uomRelation) {
+      record.uomRelation = inferUomRelation(
+        mat.stockUnit || mat.inventoryUnit || unit,
+        mat.uomRelation,
+      )
+    }
+  }
+  nextTick(() => {
+    blankSizeOpen.value = true
+  })
 }
 
-function onBlankSizeConfirm(blankSize) {
+function onBlankSizeConfirm(payload) {
   const line = blankSizeTargetLine.value
   if (!line) return
-  applyBlankSizeToLine(line, blankSize)
+  const blankSize = payload?.blankSize ?? payload
+  const mode = payload?.mode
+  applyBlankSizeToLine(line, blankSize, { mode })
   line.unit = lineStockUnit(line)
-  message.success(line.blankSizeText ? '下料尺寸已更新' : '已清空下料尺寸')
+  if (line.blankArea > 0) {
+    message.success(`下料尺寸已更新（单件 ${line.blankArea}㎡）`)
+  } else if (line.blankLength > 0) {
+    message.success(`下料尺寸已更新（单件 ${line.blankLength} 米）`)
+  } else {
+    message.success(line.blankSizeText ? '下料尺寸已更新' : '已清空下料尺寸')
+  }
 }
 
 const hasSelection = computed(() => selectedRowKeys.value.length > 0)
@@ -633,6 +683,7 @@ function toggleRowSelect(id, checked) {
     if (!selectedRowKeys.value.includes(id)) {
       selectedRowKeys.value = [...selectedRowKeys.value, id]
     }
+    activeRowId.value = id
   } else {
     selectedRowKeys.value = selectedRowKeys.value.filter((key) => key !== id)
   }
@@ -905,6 +956,25 @@ function customRow(record, index) {
     &:hover {
       color: #4096ff;
     }
+  }
+
+  .blank-size-link {
+    color: #1677ff;
+    cursor: pointer;
+    word-break: break-word;
+    display: inline-block;
+    max-width: 100%;
+
+    &:hover {
+      color: #4096ff;
+    }
+  }
+
+  .blank-area-hint {
+    margin-top: 2px;
+    font-size: 11px;
+    color: #d46b08;
+    line-height: 1.2;
   }
 }
 </style>

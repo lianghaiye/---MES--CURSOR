@@ -331,6 +331,7 @@ import BomRelationDrawer from './components/BomRelationDrawer.vue'
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import { validateAllBomParentChildLines, validateParentChildNotSame } from '@/utils/bomValidation'
 import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
+import { findInvalidBlankSizeLine } from '@/utils/bomBlankSize'
 
 const route = useRoute()
 const router = useRouter()
@@ -1056,15 +1057,9 @@ async function handleSave() {
     message.warning('请为所有子项选择物料')
     return
   }
-  const vlMissing = lineItems.value.find((l) => {
-    if (!l.isVariableLength) return false
-    const len = Number(l.blankSize?.length ?? l.blankLength)
-    return !(len > 0)
-  })
-  if (vlMissing) {
-    message.warning(
-      `双物料单位「${vlMissing.itemName || vlMissing.materialCode}」请在下料尺寸中填写「长」`,
-    )
+  const vlCheck = findInvalidBlankSizeLine(lineItems.value)
+  if (!vlCheck.ok) {
+    message.warning(vlCheck.message)
     return
   }
   const parentChildCheck = validateAllBomParentChildLines(lineItems.value, flatNodes.value, form)

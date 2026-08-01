@@ -34,6 +34,13 @@
                 / 需求 {{ node.demandQty }}
               </template>
             </span>
+            <span
+              v-if="node.blankSizeText && (!node.isRoot || node.isCurrent)"
+              class="node-blank-size"
+              title="下料尺寸"
+            >
+              下料 {{ node.blankSizeText }}
+            </span>
             <a-tag
               v-if="node.supplyType"
               :color="supplyTypeColor(node.supplyType)"
@@ -171,6 +178,16 @@ function onExpand(keys) {
   .node-qty {
     color: rgba(0, 0, 0, 0.65);
     font-size: 11px;
+  }
+
+  .node-blank-size {
+    color: #875400;
+    font-size: 11px;
+    background: #fff7e6;
+    border: 1px solid #ffd591;
+    border-radius: 2px;
+    padding: 0 6px;
+    line-height: 18px;
   }
 
   .child-bom {

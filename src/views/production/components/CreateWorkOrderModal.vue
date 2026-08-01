@@ -258,6 +258,7 @@
 </template>
 
 <script setup>
+import { formatNumber } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -399,9 +400,7 @@ const warehouseOpts = computed(() => {
 const urgencyOpts = computed(() => urgencyOptions.map((v) => ({ label: v, value: v })))
 
 function formatQty(val) {
-  const n = Number(val)
-  if (Number.isNaN(n)) return '-'
-  return Number.isInteger(n) ? String(n) : n.toFixed(2)
+  return formatNumber(val, 4, { empty: '-' })
 }
 
 function displayAutoField(value) {

@@ -208,6 +208,7 @@
 </template>
 
 <script setup>
+import { formatNumber } from '@/utils/numberFormat'
 import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
@@ -402,8 +403,7 @@ function formatDeduction(val) {
 }
 
 function formatQty(val) {
-  if (val === 0) return '0'
-  return val ?? '—'
+  return formatNumber(val, 4, { empty: '—' })
 }
 
 function formatHours(val) {

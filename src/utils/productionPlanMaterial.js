@@ -9,6 +9,7 @@ import {
 import { workCenterOptions as groupWorkCenterOptions } from '@/store/employeeGroupStore'
 import { supplierOptions as poSupplierOptions } from '@/mock/purchaseOrderOptions'
 import { supplierOptions as reqSupplierOptions } from '@/mock/purchaseRequisitionOptions'
+import { formatBlankSizeText } from '@/utils/bomBlankSize'
 import { SUPPLY_FORM_OPTIONS } from '@/utils/masterDataMigrate'
 import { flattenMaterials } from '@/utils/material'
 import { createPlanMaterial, resolveMaterialsFromEbomSnapshot } from '@/utils/ebomSnapshot'
@@ -175,7 +176,7 @@ export function buildDisplayMaterialTree(workItem, order) {
   if (!workItem) return []
   const materials = resolveWorkItemMaterials(workItem)
   normalizeMaterialTreeLeaves(materials)
-  enrichPlanMaterialTree(materials, order)
+  enrichPlanMaterialTree(materials, order, workItem)
 
   const topId = `top-${workItem.id}`
   if (!workItem._topMaterial || workItem._topMaterial.id !== topId) {
@@ -184,7 +185,7 @@ export function buildDisplayMaterialTree(workItem, order) {
     syncTopMaterialFromWorkItem(workItem._topMaterial, workItem)
   }
   workItem._topMaterial.children = materials
-  enrichPlanMaterial(workItem._topMaterial, order)
+  enrichPlanMaterial(workItem._topMaterial, order, workItem)
   return [workItem._topMaterial]
 }
 
@@ -322,6 +323,7 @@ export function getMasterDefaults(code) {
     supplyType: supplyForm || '',
     processRoute: production.defaultProcessRoute || master.defaultProcessRoute || '',
     processFile: '',
+    inventoryUnit: master.inventoryUnit || master.stockUnit || '',
     standardCycle:
       production.standardCycleDays != null && production.standardCycleDays !== ''
         ? String(production.standardCycleDays)
@@ -341,7 +343,30 @@ export function resolvePlanAssemblyDate(order) {
   return order?.planAssemblyDate || order?.workItems?.[0]?.deliveryDate || order?.deliveryDate || ''
 }
 
-export function enrichPlanMaterial(material, order) {
+/** 从 EBOM 行补齐下料尺寸（兼容旧快照未展开到物料行的情况） */
+function fillBlankSizeFromEbomLine(material, lineItems) {
+  if (!material || material.blankSizeText) return
+  if (!lineItems?.length || !material.code) return
+  const line = lineItems.find((l) => l.materialCode === material.code)
+  if (!line) return
+  if (line.blankSizeText) {
+    material.blankSizeText = line.blankSizeText
+    material.blankSize = line.blankSize || null
+    material.blankSizeMode = line.blankSizeMode || ''
+    material.blankLength = line.blankLength ?? null
+    material.blankArea = line.blankArea ?? null
+    return
+  }
+  if (line.blankSize) {
+    material.blankSize = line.blankSize
+    material.blankSizeText = formatBlankSizeText(line.blankSize)
+    material.blankSizeMode = line.blankSizeMode || ''
+    material.blankLength = line.blankLength ?? null
+    material.blankArea = line.blankArea ?? null
+  }
+}
+
+export function enrichPlanMaterial(material, order, workItem = null) {
   if (!material) return material
   const defaults = getMasterDefaults(material.code)
 
@@ -357,8 +382,14 @@ export function enrichPlanMaterial(material, order) {
   if (!material.supplier && defaults.supplier) {
     material.supplier = defaults.supplier
   }
+  if (defaults.inventoryUnit) {
+    material.unit = defaults.inventoryUnit
+  }
   if (material.processFile == null) material.processFile = ''
   if (material.designateSupplier == null) material.designateSupplier = false
+  if (material.blankSizeText == null) material.blankSizeText = ''
+
+  fillBlankSizeFromEbomLine(material, workItem?.ebomSnapshot?.lineItems)
 
   if (!material.latestProcessTime && material.standardCycle) {
     material.latestProcessTime = calcLatestProcessTime(
@@ -372,13 +403,13 @@ export function enrichPlanMaterial(material, order) {
   }
 
   if (material.children?.length) {
-    material.children.forEach((child) => enrichPlanMaterial(child, order))
+    material.children.forEach((child) => enrichPlanMaterial(child, order, workItem))
   }
   return material
 }
 
-export function enrichPlanMaterialTree(materials, order) {
-  ;(materials || []).forEach((node) => enrichPlanMaterial(node, order))
+export function enrichPlanMaterialTree(materials, order, workItem = null) {
+  ;(materials || []).forEach((node) => enrichPlanMaterial(node, order, workItem))
   return materials
 }
 

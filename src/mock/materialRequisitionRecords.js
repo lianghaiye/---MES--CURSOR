@@ -24,6 +24,27 @@ export function normalizeMaterialDeductStatus(status) {
   return status
 }
 
+/** 领料方式：用于库存扣减记录区分工单号 / 领料单号展示 */
+export const MATERIAL_DEDUCT_REQ_MODES = {
+  WORK_ORDER: 'work-order',
+  QUICK: 'quick',
+  SALES_ORDER: 'sales-order',
+  BATCH: 'batch-work-order',
+}
+
+export function isQuickMaterialDeduct(record) {
+  return record?.requisitionMode === MATERIAL_DEDUCT_REQ_MODES.QUICK || record?.mode === 'quick'
+}
+
+/** 列表/详情主单号：快速领料展示领料单号，其余展示工单号 */
+export function resolveInventoryDeductDocNo(record) {
+  if (!record) return ''
+  if (isQuickMaterialDeduct(record)) {
+    return record.reqNo || record.requisitionNo || record.workOrderNo || ''
+  }
+  return record.workOrderNo || record.reqNo || ''
+}
+
 function line(
   id,
   code,
@@ -388,12 +409,14 @@ export function createMaterialRequisitionSeed() {
     },
     {
       id: 'dr-008',
-      workOrderNo: 'WO-2026-0720-015',
+      workOrderNo: '',
+      reqNo: 'LL20260720015',
+      requisitionMode: 'quick',
       deductNo: 'DR-20260720-005',
-      productName: '潜水泵',
-      productSpec: 'QW65-25',
-      material: '不锈钢304',
-      drawingNo: 'DWG-QW65-25',
+      productName: '快速领料（辅料）',
+      productSpec: '—',
+      material: '—',
+      drawingNo: '',
       reportQty: 4,
       deductTime: '',
       warehouseName: '半成品仓',

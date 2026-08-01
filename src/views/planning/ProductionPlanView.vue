@@ -209,7 +209,9 @@
                   </template>
                   <template v-else-if="column.key === 'stockQty'">
                     <span>{{
-                      record.stockQty != null && record.stockQty !== '' ? record.stockQty : '—'
+                      record.stockQty != null && record.stockQty !== ''
+                        ? formatQty(record.stockQty)
+                        : '—'
                     }}</span>
                   </template>
                   <template v-else-if="column.key === 'planQty'">
@@ -217,7 +219,9 @@
                       v-model:value="record.planQty"
                       size="small"
                       :min="0"
-                      :precision="3"
+                      :precision="4"
+                      :formatter="inputNumberFormatter"
+                      :parser="inputNumberParser"
                       style="width: 100%"
                       :disabled="isPlanQtyLocked"
                       @change="onWorkItemPlanQtyChange(record)"
@@ -330,7 +334,9 @@
                         v-if="record.isTopLevel"
                         :value="activeWorkItem.planQty"
                         :min="0"
-                        :precision="3"
+                        :precision="4"
+                        :formatter="inputNumberFormatter"
+                        :parser="inputNumberParser"
                         size="small"
                         style="width: 100%"
                         :disabled="isPlanQtyLocked"
@@ -340,7 +346,9 @@
                         v-else
                         v-model:value="record.planQty"
                         :min="0"
-                        :precision="3"
+                        :precision="4"
+                        :formatter="inputNumberFormatter"
+                        :parser="inputNumberParser"
                         size="small"
                         style="width: 100%"
                         :disabled="isPlanQtyLocked"
@@ -599,6 +607,7 @@ import { message } from 'ant-design-vue'
 import { PrinterOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
+import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { useTabs } from '@/composables/useTabs'
@@ -750,7 +759,8 @@ const baseMaterialColumns = [
   { title: '材质', dataIndex: 'material', width: 80 },
   { title: '物料类型', dataIndex: 'type', width: 90 },
   { title: '单位用量', dataIndex: 'unitUsage', width: 90 },
-  { title: '计量单位', dataIndex: 'unit', width: 90 },
+  { title: '库存单位', dataIndex: 'unit', width: 90 },
+  { title: '下料尺寸', dataIndex: 'blankSizeText', width: 160, ellipsis: true },
   { title: '供应型态', key: 'supplyType', dataIndex: 'supplyType', width: 100 },
   { title: '库存数量', dataIndex: 'stockQty', width: 90 },
   { title: '可用库存', dataIndex: 'availableStock', width: 90 },
@@ -775,7 +785,7 @@ const {
   tableScrollX: materialTableScrollX,
   defaultColumnSettings: defaultMaterialColumnSettings,
 } = useTableColumnSettings('production-plan-material-list', baseMaterialColumns, {
-  minScrollX: 2400,
+  minScrollX: 2560,
 })
 
 const processRouteOpts = computed(() => getProcessRouteSelectOptions())
@@ -1021,7 +1031,7 @@ function refreshWorkItemMaterials(wi, order) {
   }
   walk(materials)
   syncWorkItemMaterialPlanQty(wi)
-  enrichPlanMaterialTree(materials, order)
+  enrichPlanMaterialTree(materials, order, wi)
 }
 
 function onWorkItemPlanQtyChange(record) {

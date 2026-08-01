@@ -71,7 +71,9 @@
         <div class="section-card">
           <div class="section-title">基本信息</div>
           <a-descriptions :column="3" size="small" bordered>
-            <a-descriptions-item label="工单号">{{ record.workOrderNo }}</a-descriptions-item>
+            <a-descriptions-item label="工单/领料单号">
+              {{ resolveInventoryDeductDocNo(record) || '—' }}
+            </a-descriptions-item>
             <a-descriptions-item label="扣减单号">{{ record.deductNo }}</a-descriptions-item>
             <a-descriptions-item label="扣减状态">
               <span class="status-tag" :class="statusClass(record.status)">{{
@@ -160,7 +162,11 @@ import { computed, createVNode, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
-import { MATERIAL_DEDUCT_STATUS } from '@/mock/materialRequisitionRecords'
+import {
+  MATERIAL_DEDUCT_STATUS,
+  resolveInventoryDeductDocNo,
+  isQuickMaterialDeduct,
+} from '@/mock/materialRequisitionRecords'
 import {
   getMaterialDeductById,
   confirmMaterialDeduct,
@@ -248,7 +254,7 @@ function onConfirm() {
   if (!row) return
   Modal.confirm({
     title: '确认扣减？',
-    content: `确认通过工单 ${row.workOrderNo} 的库存扣减？通过后将按物料执行扣减。`,
+    content: `确认通过${isQuickMaterialDeduct(row) ? '领料单' : '工单'} ${resolveInventoryDeductDocNo(row)} 的库存扣减？通过后将按物料执行扣减。`,
     okText: '确认',
     cancelText: '取消',
     onOk() {
@@ -299,7 +305,7 @@ function onVoid() {
       createVNode(
         'p',
         { style: { color: '#cf1322', marginBottom: 0 } },
-        `工单 ${row.workOrderNo} 的扣减单作废后将永久失效：预扣库存解冻退回，且不可再重新发起。如需再次扣减，请联系仓管员另行处理。`,
+        `${isQuickMaterialDeduct(row) ? '领料单' : '工单'} ${resolveInventoryDeductDocNo(row)} 的扣减单作废后将永久失效：预扣库存解冻退回，且不可再重新发起。如需再次扣减，请联系仓管员另行处理。`,
       ),
     ]),
     okText: '确认作废',

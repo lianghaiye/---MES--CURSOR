@@ -210,6 +210,7 @@ export function buildAssemblyWorkOrderRows(materials, order) {
       planQty,
       scheduleQty: planQty,
       planDateRange: m.planDateRange?.length === 2 ? [...m.planDateRange] : [startDate, endDate],
+      unit: m.unit || '件',
       warehouse: m.warehouse || resolveDefaultWarehouseByMaterialCode(m.code) || '',
       urgency: m.urgency || order.urgency || '普通',
       remark: m.remark || '',

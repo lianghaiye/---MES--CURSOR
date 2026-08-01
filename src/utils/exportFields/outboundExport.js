@@ -1,9 +1,9 @@
+import { formatNumber } from '@/utils/numberFormat'
 import { calcOutboundShipQty } from '@/mock/outboundOrders'
 import { cell } from './exportFieldHelpers'
 
 function formatQty(val) {
-  if (val == null || val === '') return ''
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+  return formatNumber(val, 4, { empty: '' })
 }
 
 function sourceChannelLabel(channel) {

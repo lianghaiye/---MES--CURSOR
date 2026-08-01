@@ -107,6 +107,7 @@
 </template>
 
 <script>
+import { formatQty } from '@/utils/numberFormat'
 export default { name: 'FactoryQcDetailView' }
 </script>
 
@@ -159,10 +160,6 @@ const summary = computed(() => {
     inspectQty: inspectQty.toFixed(2),
   }
 })
-
-function formatQty(val) {
-  return Number(val || 0).toFixed(2)
-}
 
 function statusColor(status) {
   const map = { 待质检: 'processing', 已完成: 'success', 已终止: 'default' }

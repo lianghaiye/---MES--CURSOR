@@ -176,7 +176,7 @@ export function createMobileMaterialReqSeed() {
       productName: '',
       orderCategory: '',
       workshop: '装配车间',
-      receiveWarehouse: '',
+      receiveWarehouse: '线边仓-装配',
       remark: '试制补料',
       lineCount: 2,
       totalQty: 6,

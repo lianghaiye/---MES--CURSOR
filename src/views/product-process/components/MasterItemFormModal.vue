@@ -473,7 +473,10 @@
                 <a-form-item>
                   <template #label>
                     <span>领料属性</span>
-                    <a-tooltip title="启用后参与领料计划">
+                    <a-tooltip
+                      :overlay-style="{ maxWidth: '360px' }"
+                      title="开=参与领料；关=不进领料单，发料方式=倒冲"
+                    >
                       <InfoCircleOutlined class="info-icon" />
                     </a-tooltip>
                   </template>
@@ -924,10 +927,19 @@ const purchaseUnitOpts = computed(() => {
 
 function onVariableLengthChange(checked) {
   if (checked) {
-    form.inventoryUnit = form.inventoryUnit || '米'
-    form.stockUnit = '米'
-    form.purchaseUnit = form.purchaseUnit || '根'
-    form.uomRelation = 'per_piece_length'
+    const inv = form.inventoryUnit || '米'
+    form.inventoryUnit = inv
+    form.stockUnit = inv
+    if (inv === '㎡' || inv === 'm²' || inv === '平方米') {
+      form.purchaseUnit = form.purchaseUnit || '张'
+      form.uomRelation = 'per_piece_area'
+    } else if (String(inv).toLowerCase() === 'kg' || inv === '公斤' || inv === '千克') {
+      form.purchaseUnit = form.purchaseUnit || '件'
+      form.uomRelation = 'per_piece_weight'
+    } else {
+      form.purchaseUnit = form.purchaseUnit || '根'
+      form.uomRelation = 'per_piece_length'
+    }
   } else {
     form.purchaseUnit = form.inventoryUnit
     form.stockUnit = form.inventoryUnit
@@ -976,15 +988,15 @@ const FIELD_HELP_BY_TAB = {
     },
     {
       name: '启用双单位',
-      desc: '开启后，采购/入库按「采购单位」计数（如根、盒），库存账存按「库存单位」计量（如米、个）。适用于单件规格不固定，或按包装采购、按件领用的物料。',
+      desc: '开启后，采购/入库按「采购单位」计数（如根、张、盒），库存账存按「库存单位」计量（如米、㎡、个）。钢管填单件长度；板材填长×宽自动换算面积；适用于规格不固定或包装采购的物料。',
     },
     {
       name: '库存单位',
-      desc: '库存账存、领料发料所使用的计量单位。',
+      desc: '库存账存、领料发料所使用的计量单位。板材建议用㎡。',
     },
     {
       name: '采购单位',
-      desc: '启用双单位后，采购下单与到货清点所使用的单位；未启用时与库存单位相同。',
+      desc: '启用双单位后，采购下单与到货清点所使用的单位（如根、张）；未启用时与库存单位相同。',
     },
   ],
   sales: [
@@ -997,6 +1009,12 @@ const FIELD_HELP_BY_TAB = {
     {
       name: '包装含量',
       desc: '每个采购包装（盒/箱等）内含的库存单位数量。生成采购申请时，可按需求量 ÷ 包装含量向上取整，换算为采购包装数。',
+    },
+  ],
+  production: [
+    {
+      name: '领料属性',
+      desc: '开=参与领料；关=不进领料单，发料方式=倒冲。',
     },
   ],
   labor: [
@@ -1431,7 +1449,18 @@ function buildProductPayload() {
     isVariableLength: form.isVariableLength,
     purchaseUnit: form.isVariableLength ? form.purchaseUnit : form.inventoryUnit,
     stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
-    uomRelation: form.isVariableLength ? 'per_piece_length' : '',
+    uomRelation: form.isVariableLength
+      ? form.uomRelation ||
+        (form.inventoryUnit === '㎡' ||
+        form.inventoryUnit === 'm²' ||
+        form.inventoryUnit === '平方米'
+          ? 'per_piece_area'
+          : String(form.inventoryUnit).toLowerCase() === 'kg' ||
+              form.inventoryUnit === '公斤' ||
+              form.inventoryUnit === '千克'
+            ? 'per_piece_weight'
+            : 'per_piece_length')
+      : '',
     standardSpec: form.standardSpec || '',
     techParams: form.techParams?.trim() || '',
     unitPrice: form.unitPrice ?? 0,
@@ -1496,7 +1525,18 @@ function buildMaterialPayload() {
     isVariableLength: form.isVariableLength,
     purchaseUnit: form.isVariableLength ? form.purchaseUnit : form.inventoryUnit,
     stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
-    uomRelation: form.isVariableLength ? 'per_piece_length' : '',
+    uomRelation: form.isVariableLength
+      ? form.uomRelation ||
+        (form.inventoryUnit === '㎡' ||
+        form.inventoryUnit === 'm²' ||
+        form.inventoryUnit === '平方米'
+          ? 'per_piece_area'
+          : String(form.inventoryUnit).toLowerCase() === 'kg' ||
+              form.inventoryUnit === '公斤' ||
+              form.inventoryUnit === '千克'
+            ? 'per_piece_weight'
+            : 'per_piece_length')
+      : '',
     unitPrice: form.unitPrice ?? 0,
     purchaseUnitPrice: form.purchaseUnitPrice ?? 0,
     packContentQty: form.packContentQty ?? null,

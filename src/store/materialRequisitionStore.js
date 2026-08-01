@@ -5,12 +5,14 @@ import {
   MATERIAL_DEDUCT_STATUS,
   MATERIAL_REQUISITION_STATS_SEED,
   normalizeMaterialDeductStatus,
+  resolveInventoryDeductDocNo,
+  isQuickMaterialDeduct,
 } from '@/mock/materialRequisitionRecords'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
 
 const STORAGE_KEY = 'i_doms_material_requisition'
 const SEED_VERSION_KEY = 'i_doms_material_requisition_seed_v'
-const CURRENT_SEED_VERSION = '5'
+const CURRENT_SEED_VERSION = '6'
 
 /** 确认后可撤销 / 作废 / 重试的天数，超时单据锁定 */
 export const MATERIAL_DEDUCT_OPERABLE_DAYS = 30
@@ -67,6 +69,9 @@ function normalizeRecord(row) {
     if (row.status === MATERIAL_DEDUCT_STATUS.PENDING) row.stockPhase = 'prelock'
     else if (row.status === MATERIAL_DEDUCT_STATUS.VOIDED) row.stockPhase = 'released'
     else row.stockPhase = 'actual'
+  }
+  if (!row.requisitionMode) {
+    row.requisitionMode = row.reqNo && !row.workOrderNo ? 'quick' : 'work-order'
   }
   return row
 }
@@ -416,5 +421,8 @@ export function urgeMaterialDeductAudit(id) {
   if (row.status !== MATERIAL_DEDUCT_STATUS.PENDING) {
     return { ok: false, message: '仅待确认可操作' }
   }
-  return { ok: true, message: `工单 ${row.workOrderNo} 待确认（预扣已锁定）` }
+  return {
+    ok: true,
+    message: `${isQuickMaterialDeduct(row) ? '领料单' : '工单'} ${resolveInventoryDeductDocNo(row)} 待确认（预扣已锁定）`,
+  }
 }

@@ -6,6 +6,7 @@ export const inboundTypeOptions = [
   '领料入库',
   '调拨入库',
   '报废入库',
+  '余料入库',
   '其他入库',
 ]
 

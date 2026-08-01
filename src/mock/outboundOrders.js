@@ -29,6 +29,12 @@ export function createOutboundLine(partial = {}) {
     warehouseStockQty: null,
     /** 来自销售发货明细备注，只读 */
     deliveryRemark: '',
+    /** 下料尺寸（领料/工单带出，说明核对用；扣账看 shipQty） */
+    blankSize: null,
+    blankSizeText: '',
+    blankSizeMode: '',
+    blankLength: null,
+    blankArea: null,
     ...partial,
   }
 }
@@ -73,7 +79,7 @@ export const mockOutboundOrders = [
     warehouse: '库A仓',
     requisitionDept: '机加车间',
     sourceOrderNo: 'VX-20260519-001',
-    status: '待处理',
+    status: '待出库',
     createdAt: '2026-06-02',
     lineItems: [
       createOutboundLine({

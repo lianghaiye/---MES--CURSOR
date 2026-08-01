@@ -46,7 +46,9 @@
             <a-input-number
               v-model:value="draft.purchaseQty"
               :min="0"
-              :precision="2"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
               @change="recalcDraft"
             />
@@ -69,7 +71,9 @@
             <a-input-number
               v-model:value="draft.unitPriceExTax"
               :min="0"
-              :precision="2"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
               :disabled="!taxModeExcluding"
               @change="recalcDraft"
@@ -81,7 +85,9 @@
             <a-input-number
               v-model:value="draft.unitPriceInTax"
               :min="0"
-              :precision="2"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
               :disabled="taxModeExcluding"
               @change="recalcDraft"
@@ -144,6 +150,7 @@
 </template>
 
 <script setup>
+import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -175,11 +182,6 @@ watch(
     if (draft.value) recalcDraft()
   },
 )
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 })
-}
 
 function recalcDraft() {
   if (!draft.value) return

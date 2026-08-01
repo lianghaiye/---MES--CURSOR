@@ -93,7 +93,7 @@
             size="small"
             bordered
             :pagination="false"
-            :scroll="{ x: 1240 }"
+            :scroll="{ x: 1400 }"
             :locale="{ emptyText: '暂无领料明细' }"
           >
             <template #bodyCell="{ column, record: line }">
@@ -105,6 +105,18 @@
               </template>
               <template v-else-if="column.key === 'drawingNo'">
                 {{ line.drawingNo || '—' }}
+              </template>
+              <template v-else-if="column.key === 'blankSizeText'">
+                <template v-if="line.blankSizeText">
+                  {{ line.blankSizeText }}
+                  <div v-if="line.blankArea > 0" class="blank-size-hint">
+                    ≈ {{ line.blankArea }}㎡/件
+                  </div>
+                  <div v-else-if="line.blankLength > 0" class="blank-size-hint">
+                    ≈ {{ line.blankLength }}米/件
+                  </div>
+                </template>
+                <span v-else>—</span>
               </template>
               <template v-else-if="column.key === 'source'">
                 <template v-if="line.sourceWorkOrders?.length">
@@ -124,11 +136,7 @@
 
         <div class="tip-card">
           <template v-if="record.auditStatus === MATERIAL_REQ_AUDIT.PENDING">
-            当前申请待审核。审核通过后将自动生成领料出库单
-            <template v-if="isMaterialOutboundSkipApproval()">
-              （极简报工模式：出库单直接为「待出库」，无需出库审批）。
-            </template>
-            <template v-else>（标准模式：出库单为「待处理」，需仓管审批后待出库）。</template>
+            当前申请待审核。审核通过后将自动生成领料出库单（状态为「待出库」，仓管直接确认出库）。
           </template>
           <template v-else-if="record.auditStatus === MATERIAL_REQ_AUDIT.REJECTED">
             申请已驳回，未生成出库单。
@@ -157,7 +165,6 @@ import {
   rejectMaterialRequisition,
   MATERIAL_REQ_MODES,
   MATERIAL_REQ_AUDIT,
-  isMaterialOutboundSkipApproval,
 } from '@/store/mobileMaterialReqStore'
 import { lineVariantSummary } from '@/utils/spuLineResolve'
 
@@ -179,6 +186,7 @@ const lineColumns = [
   { title: '材质', key: 'material', width: 90 },
   { title: '变体属性', key: 'variantAttr', width: 140, ellipsis: true },
   { title: '图号', key: 'drawingNo', width: 110 },
+  { title: '下料尺寸', key: 'blankSizeText', width: 160, ellipsis: true },
   { title: '领料数量', dataIndex: 'shipQty', key: 'shipQty', width: 90, align: 'right' },
   { title: '单位', dataIndex: 'unit', key: 'unit', width: 60 },
   { title: '领料仓库', dataIndex: 'shipWarehouse', key: 'shipWarehouse', width: 110 },
@@ -326,5 +334,12 @@ function statusBadge(status) {
   padding: 12px 16px;
   color: rgba(0, 0, 0, 0.65);
   font-size: 13px;
+}
+
+.blank-size-hint {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #d46b08;
+  line-height: 1.25;
 }
 </style>

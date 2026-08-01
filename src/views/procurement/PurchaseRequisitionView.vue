@@ -216,6 +216,7 @@
 </template>
 
 <script>
+import { formatQty } from '@/utils/numberFormat'
 export default { name: 'PurchaseRequisitionView' }
 </script>
 
@@ -340,10 +341,6 @@ const rowSelection = computed(() => ({
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
-}
-
-function formatQty(val) {
-  return Number(val || 0).toFixed(4)
 }
 
 function docStatusColor(status) {

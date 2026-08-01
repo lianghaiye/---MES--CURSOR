@@ -218,6 +218,7 @@
 </template>
 
 <script setup>
+import { formatQty } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -364,11 +365,6 @@ function loadEditForm(record) {
     : null
   form.remark = record.remark || ''
   form.lineItems = normalizeLineItems(record.lineItems || [])
-}
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
 function resolveStockQty(code) {

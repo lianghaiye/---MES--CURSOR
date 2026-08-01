@@ -17,7 +17,6 @@ import {
   resolveOutboundInitialStatus,
 } from '@/store/outboundStore'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
-import { isMinimalReportMode } from '@/store/businessRuleStore'
 import {
   mergeMaterialLines,
   mergeMaterialLinesWithSources,
@@ -204,6 +203,7 @@ export function submitMaterialRequisition(payload) {
     if (!Number(line.shipQty) || Number(line.shipQty) <= 0) {
       return { ok: false, message: `「${line.itemName || line.itemCode}」领料数量须大于 0` }
     }
+    // 双单位拣批在领料出库单完成，申请阶段只报需求量
   }
 
   const userName = payload.applicant || '管理员'
@@ -317,6 +317,18 @@ function createOutboundForRequisition(record) {
       sourceDocNo: resolveLineSourceDocNo(record, line),
       itemId: line.itemId || '',
       sourceWorkOrders: line.sourceWorkOrders || [],
+      isVariableLength: Boolean(line.isVariableLength),
+      demandMeters: line.demandMeters ?? (line.isVariableLength ? line.shipQty : null),
+      blankLength: line.blankLength ?? null,
+      blankArea: line.blankArea ?? null,
+      blankSize: line.blankSize || null,
+      blankSizeText: line.blankSizeText || '',
+      blankSizeMode: line.blankSizeMode || '',
+      uomRelation: line.uomRelation || '',
+      pickedBatchId: line.pickedBatchId || '',
+      pickedBatchNo: line.pickedBatchNo || '',
+      pickedLength: line.pickedLength ?? null,
+      workOrderNo: resolveLineSourceDocNo(record, line),
     })),
   })
 }
@@ -356,9 +368,9 @@ export function rejectMaterialRequisition(id, reason = '', auditor = '管理员'
   return { ok: true, record: enrich(row) }
 }
 
-/** 极简模式下领料出库是否免审批（无待处理） */
+/** @deprecated 领料出库已统一为待出库→确认出库，不再审批 */
 export function isMaterialOutboundSkipApproval() {
-  return isMinimalReportMode()
+  return true
 }
 
 if (typeof window !== 'undefined') {

@@ -81,6 +81,7 @@
 </template>
 
 <script>
+import { formatQty } from '@/utils/numberFormat'
 export default { name: 'ChangeDeliveryModeModal' }
 </script>
 
@@ -168,11 +169,6 @@ function addRow() {
 
 function removeRow(index) {
   formRows.value.splice(index, 1)
-}
-
-function formatQty(v) {
-  if (v == null || v === '') return '—'
-  return String(Math.round(Number(v)))
 }
 
 function resetForm() {

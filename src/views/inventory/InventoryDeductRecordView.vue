@@ -17,12 +17,12 @@
 
     <div class="filter-card">
       <a-form layout="inline" class="filter-form" :model="filters">
-        <a-form-item label="工单号">
+        <a-form-item label="工单/领料单号">
           <a-input
             v-model:value="filters.workOrderNo"
             allow-clear
-            placeholder="搜索工单号"
-            style="width: 160px"
+            placeholder="搜索工单号或领料单号"
+            style="width: 180px"
           />
         </a-form-item>
         <a-form-item label="扣减状态">
@@ -73,7 +73,9 @@
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'workOrderNo'">
             <div class="wo-cell">
-              <a class="wo-link" @click.prevent="openDetail(record)">{{ record.workOrderNo }}</a>
+              <a class="wo-link" @click.prevent="openDetail(record)">
+                {{ resolveDocNo(record) }}
+              </a>
               <div class="deduct-no">{{ record.deductNo }}</div>
             </div>
           </template>
@@ -167,6 +169,8 @@ import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
 import {
   MATERIAL_DEDUCT_STATUS,
   MATERIAL_DEDUCT_STATUS_OPTIONS,
+  resolveInventoryDeductDocNo,
+  isQuickMaterialDeduct,
 } from '@/mock/materialRequisitionRecords'
 import {
   materialRequisitionState,
@@ -257,7 +261,7 @@ const statCards = computed(() => [
 ])
 
 const columns = [
-  { title: '工单号', key: 'workOrderNo', width: 180 },
+  { title: '工单/领料单号', key: 'workOrderNo', width: 180 },
   { title: '产品名称', key: 'product', width: 120, ellipsis: true },
   { title: '规格型号', key: 'productSpec', width: 120, ellipsis: true },
   { title: '材质', key: 'material', width: 100, ellipsis: true },
@@ -270,10 +274,23 @@ const columns = [
   { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
+function resolveDocNo(record) {
+  return resolveInventoryDeductDocNo(record) || '—'
+}
+
+function docNoLabel(record) {
+  return isQuickMaterialDeduct(record) ? '领料单' : '工单'
+}
+
 const filteredList = computed(() => {
   const kw = filters.workOrderNo.trim().toLowerCase()
   return materialRequisitionState.records.filter((r) => {
-    if (kw && !`${r.workOrderNo} ${r.deductNo}`.toLowerCase().includes(kw)) return false
+    const docNo = resolveInventoryDeductDocNo(r)
+    if (
+      kw &&
+      !`${docNo} ${r.workOrderNo || ''} ${r.reqNo || ''} ${r.deductNo}`.toLowerCase().includes(kw)
+    )
+      return false
     if (filters.status && r.status !== filters.status) return false
     if (filters.warehouse) {
       const key = `${r.warehouseName}|${r.warehouseCode}`
@@ -285,7 +302,7 @@ const filteredList = computed(() => {
         if (day !== filters.date) return false
       } else {
         const mmdd = filters.date.slice(5).replace('-', '')
-        if (!String(r.workOrderNo || '').includes(mmdd)) return false
+        if (!String(docNo || '').includes(mmdd)) return false
       }
     }
     return true
@@ -389,7 +406,7 @@ function openEdit(record) {
 function onConfirm(record) {
   Modal.confirm({
     title: '确认扣减？',
-    content: `确认通过工单 ${record.workOrderNo} 的库存扣减？通过后将按物料执行扣减。`,
+    content: `确认通过${docNoLabel(record)} ${resolveDocNo(record)} 的库存扣减？通过后将按物料执行扣减。`,
     okText: '确认',
     cancelText: '取消',
     onOk() {
@@ -463,7 +480,7 @@ function onVoid(record) {
       createVNode(
         'p',
         { style: { color: '#cf1322', marginBottom: 0 } },
-        `工单 ${record.workOrderNo} 的扣减单作废后将永久失效：预扣库存解冻退回，且不可再重新发起。如需再次扣减，请联系仓管员另行处理。`,
+        `${docNoLabel(record)} ${resolveDocNo(record)} 的扣减单作废后将永久失效：预扣库存解冻退回，且不可再重新发起。如需再次扣减，请联系仓管员另行处理。`,
       ),
     ]),
     okText: '确认作废',

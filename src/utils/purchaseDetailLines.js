@@ -85,6 +85,9 @@ export function filterPurchaseDetailLines(rows, filters = {}) {
     if (filters.orderNo && !String(row.orderNo).includes(String(filters.orderNo).trim())) {
       return false
     }
+    if (filters.supplier && row.supplier !== filters.supplier) {
+      return false
+    }
     if (
       filters.productName &&
       !String(row.productName).includes(String(filters.productName).trim())

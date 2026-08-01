@@ -220,6 +220,7 @@
 </template>
 
 <script>
+import { formatQty } from '@/utils/numberFormat'
 export default { name: 'PurchaseOrderDetailView' }
 </script>
 
@@ -408,11 +409,6 @@ function inboundOrderStatusColor(status) {
     已完成: 'success',
   }
   return map[status] || 'default'
-}
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 4 })
 }
 
 function formatMoney(val) {

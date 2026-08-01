@@ -5,7 +5,6 @@ export const inboundFormLineColumns = [
   { title: '物品编码', dataIndex: 'itemCode', key: 'itemCode', width: 120, ellipsis: true },
   { title: '物品名称', dataIndex: 'itemName', key: 'itemName', width: 130, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 110, ellipsis: true },
-  { title: '规格属性', dataIndex: 'specAttr', key: 'specAttr', width: 90, ellipsis: true },
   { title: '材质', dataIndex: 'material', key: 'material', width: 80, ellipsis: true },
   {
     title: '变体属性',
@@ -15,16 +14,22 @@ export const inboundFormLineColumns = [
     ellipsis: true,
   },
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 90, ellipsis: true },
+  { title: '条码类型', dataIndex: 'barcodeType', key: 'barcodeType', width: 96 },
   { title: '入库数量', key: 'qty', width: 96 },
+  { title: '单位', dataIndex: 'unit', key: 'unit', width: 64 },
+  { title: '库存单位量', key: 'stockUnitQty', width: 120 },
+  { title: '库存单位', key: 'stockUnit', width: 88 },
   { title: '入库仓库', key: 'warehouse', width: 120 },
   { title: '货位号', key: 'locationNo', dataIndex: 'locationNo', width: 110, ellipsis: true },
-  { title: '重量', key: 'weight', width: 88 },
-  { title: '单位', dataIndex: 'unit', key: 'unit', width: 64 },
   { title: '单价', key: 'unitPrice', width: 96, align: 'right' },
   { title: '总价', key: 'totalPrice', width: 96, align: 'right' },
-  { title: '当前库存数', key: 'stockQty', width: 100, align: 'right' },
-  { title: '当前仓库数量', key: 'warehouseStockQty', width: 110, align: 'right' },
+  { title: '当前库存数', key: 'stockQty', width: 120, align: 'right' },
+  { title: '当前仓库数量', key: 'warehouseStockQty', width: 130, align: 'right' },
   { title: '操作', key: 'actions', width: 150 },
 ]
 
 export const inboundDetailLineColumns = inboundFormLineColumns.filter((c) => c.key !== 'actions')
+
+/** 库存单位量列提示文案 */
+export const STOCK_UNIT_QTY_TIP =
+  '一类一码/一批一码：可直接填库存合计。一物一码：填统一单件量（钢管=长度；板材请点「编辑」填长×宽换算面积）；每件不同也请点编辑逐件/逐张填写'

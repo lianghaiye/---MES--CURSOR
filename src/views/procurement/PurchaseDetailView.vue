@@ -14,6 +14,19 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="供应商">
+              <a-select
+                v-model:value="filters.supplier"
+                allow-clear
+                show-search
+                option-filter-prop="label"
+                placeholder="请选择"
+                size="small"
+                :options="supplierOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="产品名称">
               <a-input
                 v-model:value="filters.productName"
@@ -219,7 +232,7 @@ import { useRouter } from 'vue-router'
 import { SearchOutlined, ReloadOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
-import { purchaserOptions, warehouseOptions } from '@/mock/purchaseOrderOptions'
+import { purchaserOptions, warehouseOptions, supplierOptions } from '@/mock/purchaseOrderOptions'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
@@ -240,6 +253,7 @@ const { openTab } = useTabs()
 
 const filters = reactive({
   orderNo: '',
+  supplier: undefined,
   productName: '',
   specModel: '',
   material: '',
@@ -254,6 +268,7 @@ const pagination = reactive({ current: 1, pageSize: 10 })
 
 const warehouseOpts = warehouseOptions.map((w) => ({ label: w.label, value: w.value }))
 const purchaserOpts = purchaserOptions.map((v) => ({ label: v, value: v }))
+const supplierOpts = supplierOptions
 
 const allLines = computed(() =>
   buildPurchaseDetailLines(purchaseOrderState.orders, inboundOrderState.orders),
@@ -293,6 +308,7 @@ const rowSelection = computed(() => ({
 const baseColumns = [
   { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
   { title: '采购单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
+  { title: '供应商', dataIndex: 'supplier', width: 140, ellipsis: true },
   { title: '产品名称', dataIndex: 'productName', width: 160, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88 },
@@ -313,7 +329,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-detail-list-v1', baseColumns, { minScrollX: 2200 })
+  useTableColumnSettings('purchase-detail-list-v2', baseColumns, { minScrollX: 2340 })
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
@@ -327,6 +343,7 @@ function handleSearch() {
 function handleReset() {
   Object.assign(filters, {
     orderNo: '',
+    supplier: undefined,
     productName: '',
     specModel: '',
     material: '',

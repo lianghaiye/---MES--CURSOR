@@ -26,8 +26,8 @@ export const outboundStatusOptions = [
   '拒绝领料',
 ]
 
-/** 需审批的出库类型 */
-export const outboundApprovalTypes = ['领料出库', '发料出库']
+/** 需审批的出库类型（领料出库 / 发料出库本期直接「待出库」→确认出库，不再走审批） */
+export const outboundApprovalTypes = []
 
 export const outboundTimeUnitOptions = [
   { label: '日', value: 'day' },

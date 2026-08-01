@@ -191,6 +191,18 @@
       </div>
     </div>
 
+    <div class="table-card batch-card">
+      <div class="batch-title">双物料单位批次（管号 / 当前长度）</div>
+      <a-table
+        :columns="batchColumns"
+        :data-source="batchList"
+        row-key="id"
+        size="small"
+        bordered
+        :pagination="{ pageSize: 10 }"
+      />
+    </div>
+
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -216,6 +228,7 @@ export default { name: 'InventoryDetailView' }
 import { computed, reactive, ref } from 'vue'
 import { SearchOutlined, ReloadOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { stockState } from '@/store/stockStore'
+import { stockBatchState } from '@/store/stockBatchStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
@@ -265,6 +278,18 @@ const allLines = computed(() =>
 const filteredList = computed(() =>
   filterInventoryDetailLines(allLines.value, appliedFilters.value),
 )
+
+const batchList = computed(() => stockBatchState.batches)
+const batchColumns = [
+  { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 140 },
+  { title: '仓库', dataIndex: 'warehouse', key: 'warehouse', width: 100 },
+  { title: '物料编码', dataIndex: 'itemCode', key: 'itemCode', width: 140 },
+  { title: '物料名称', dataIndex: 'itemName', key: 'itemName', width: 160 },
+  { title: '当前长度(米)', dataIndex: 'currentLength', key: 'currentLength', width: 120 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 90 },
+  { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
+  { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 140 },
+]
 
 const {
   exportModalOpen,
@@ -380,5 +405,14 @@ function onBatchMenu({ key }) {
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
+}
+
+.batch-card {
+  margin-top: 0;
+}
+
+.batch-title {
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 </style>

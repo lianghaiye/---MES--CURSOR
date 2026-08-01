@@ -4,10 +4,17 @@ import { cloneInboundSeedOrders, createInboundLine, createInboundOrder } from '@
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
 import { warehouseState } from '@/store/warehouseStore'
 import { applyInboundToStock } from '@/store/stockStore'
+import { applyInboundBatchesFromRoots } from '@/store/stockBatchStore'
+import {
+  isOneItemOneCodeBarcode,
+  validateVariableLengthInboundLine,
+  sumPieceValues,
+} from '@/utils/variableLengthMaterial'
+import { materialInfoState } from '@/store/materialInfoStore'
 
 const STORAGE_KEY = 'i_doms_inbound_orders'
 const SEED_VERSION_KEY = 'i_doms_inbound_orders_seed_v'
-const CURRENT_SEED_VERSION = '2'
+const CURRENT_SEED_VERSION = '4'
 
 function loadFromStorage() {
   try {
@@ -201,6 +208,105 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
       blocked.push({ docNo: order?.docNo || id, message: '仅待处理状态可确认入库' })
       return
     }
+
+    for (const line of order.lineItems || []) {
+      const mat = materialInfoState.materials.find((m) => m.code === line.itemCode)
+      if (mat?.isVariableLength) {
+        line.isVariableLength = true
+        line.unit = mat.stockUnit || mat.inventoryUnit || line.unit || '米'
+      }
+      if (!line.isVariableLength) continue
+
+      // 兼容旧数据：仅有统一单件数量时展开
+      if (
+        (!line.pieceValues || !line.pieceValues.length) &&
+        (!line.pieceLengths || !line.pieceLengths.length) &&
+        (!line.pieceWeights || !line.pieceWeights.length) &&
+        Number(line.purchaseQty) > 0 &&
+        (Number(line.uniformValue) > 0 ||
+          Number(line.uniformLength) > 0 ||
+          Number(line.uniformWeight) > 0) &&
+        !line.inboundEntryMode
+      ) {
+        const n = Number(line.purchaseQty)
+        const per = Number(line.uniformValue ?? line.uniformLength ?? line.uniformWeight)
+        line.pieceValues = Array.from({ length: n }, () => per)
+        line.pieceLengths = line.pieceValues
+        line.inboundEntryMode = 'uniform'
+      }
+
+      if (mat?.purchaseUnit) line.purchaseUnit = mat.purchaseUnit
+
+      const check = validateVariableLengthInboundLine(line, line.unit)
+      if (!check.ok) {
+        blocked.push({
+          docNo: order.docNo,
+          message: `${line.itemName || line.itemCode}：${check.message}`,
+        })
+        return
+      }
+      const pieceValues = line.pieceValues?.length
+        ? line.pieceValues
+        : line.pieceWeights?.length
+          ? line.pieceWeights
+          : line.pieceLengths
+      line.stockQty = sumPieceValues(pieceValues)
+      line.qty = line.stockQty
+    }
+
+    for (const line of order.lineItems || []) {
+      const warehouse = line.warehouse || order.warehouse
+      const mat = materialInfoState.materials.find((m) => m.code === line.itemCode)
+      const barcodeType = line.barcodeType || mat?.barcodeType || '一批一码'
+      line.barcodeType = barcodeType
+
+      let pieceValues
+      if (line.isVariableLength) {
+        pieceValues = line.pieceValues?.length
+          ? line.pieceValues
+          : line.pieceWeights?.length
+            ? line.pieceWeights
+            : line.pieceLengths
+      } else {
+        // 单物料单位：一律按条码类型生成批次号
+        const qty = Number(line.qty ?? line.shipQty) || 0
+        if (!(qty > 0)) continue
+        if (isOneItemOneCodeBarcode(barcodeType)) {
+          const n = Math.max(1, Math.round(qty))
+          pieceValues = Array.from({ length: n }, () => 1)
+        } else {
+          pieceValues = [qty]
+        }
+      }
+      if (!pieceValues?.length) continue
+
+      const res = applyInboundBatchesFromRoots({
+        warehouse,
+        itemCode: line.itemCode,
+        itemName: line.itemName,
+        pieceValues,
+        pieceLengths: pieceValues,
+        sourceType: order.inboundType || '采购入库',
+        sourceDocNo: order.docNo,
+        unit: line.unit || (line.isVariableLength ? '米' : '件'),
+        barcodeType,
+        attrs: {
+          material: line.material,
+          inboundEntryMode: line.inboundEntryMode,
+          barcodeType: barcodeType || undefined,
+        },
+      })
+      if (!res.ok) {
+        blocked.push({ docNo: order.docNo, message: res.message })
+        return
+      }
+      line.batchNos = res.batches.map((b) => b.batchNo)
+      line.pieceSerialNos = (res.pieces || []).map((p) => p.serialNo)
+      if (res.manageByPiece) {
+        line.manageByPiece = true
+      }
+    }
+
     const stockRes = applyInboundToStock(order)
     if (!stockRes.ok) {
       blocked.push({ docNo: order.docNo, message: stockRes.message })
@@ -278,16 +384,22 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
       poLineId: line.poLineId || '',
       itemCode: line.itemCode,
       itemName: line.itemName,
+      itemType: line.itemType || '',
       specModel: line.specModel || '',
       specAttr: line.specAttr || '',
       material: line.material || '',
       drawingNo: line.drawingNo || '',
       locationNo: line.locationNo || '',
-      weight: line.weight ?? null,
       unit: line.unit || '个',
+      stockUnit: line.stockUnit,
+      purchaseUnit: line.purchaseUnit,
       unitPrice: line.unitPrice ?? null,
       warehouse: line.warehouse,
       qty: Number(line.qty),
+      purchaseQty: line.purchaseQty,
+      totalValue: line.totalValue,
+      inboundEntryMode: line.inboundEntryMode,
+      isVariableLength: Boolean(line.isVariableLength),
     }),
   )
 

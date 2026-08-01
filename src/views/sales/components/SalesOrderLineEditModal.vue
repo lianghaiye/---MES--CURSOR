@@ -89,7 +89,9 @@
             <a-input-number
               v-model:value="draft.salesQty"
               :min="0"
-              :precision="0"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
             />
           </a-form-item>
@@ -128,7 +130,9 @@
             <a-input-number
               v-model:value="draft.unitPriceExTax"
               :min="0"
-              :precision="2"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
               @change="onUnitPriceExTaxEdit"
             />
@@ -139,7 +143,9 @@
             <a-input-number
               v-model:value="draft.unitPriceInTax"
               :min="0"
-              :precision="2"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
               @change="onUnitPriceInTaxEdit"
             />
@@ -261,6 +267,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message, Upload } from 'ant-design-vue'
 import { QuestionCircleOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
+import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 
 const MAX_LINE_FILE_SIZE = 200 * 1024 * 1024
 import { deliveryModeOptions } from '@/mock/salesOrderOptions'

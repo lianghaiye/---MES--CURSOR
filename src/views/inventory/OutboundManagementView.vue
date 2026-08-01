@@ -278,6 +278,7 @@
 </template>
 
 <script>
+import { formatQty } from '@/utils/numberFormat'
 export default { name: 'OutboundManagementView' }
 </script>
 
@@ -412,11 +413,6 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys
   },
 }))
-
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
-}
 
 function canConfirm(record) {
   return validateOutboundForConfirm(record).ok

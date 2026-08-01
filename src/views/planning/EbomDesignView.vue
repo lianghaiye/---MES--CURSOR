@@ -300,6 +300,7 @@ import { importBomByReference } from '@/utils/bomImport'
 import { validateParentChildNotSame } from '@/utils/bomValidation'
 import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
 import { validateLinesSkuResolved, lineVariantSummary } from '@/utils/spuLineResolve'
+import { findInvalidBlankSizeLine } from '@/utils/bomBlankSize'
 import BomTreePanel from '@/views/product-process/components/BomTreePanel.vue'
 import BomMaterialTable from '@/views/product-process/components/BomMaterialTable.vue'
 import ImportBomTemplateModal from '@/views/product-process/components/ImportBomTemplateModal.vue'
@@ -565,6 +566,11 @@ function validateForSubmit() {
   }
   if (lineItems.value.some((l) => !l.materialCode)) {
     message.warning('请为所有子项选择物料')
+    return false
+  }
+  const vlCheck = findInvalidBlankSizeLine(lineItems.value)
+  if (!vlCheck.ok) {
+    message.warning(vlCheck.message)
     return false
   }
   return true
