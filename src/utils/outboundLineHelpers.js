@@ -2,6 +2,7 @@ import { createOutboundLine } from '@/mock/outboundOrders'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getStockQty, stockState } from '@/store/stockStore'
+import { listBatches } from '@/store/stockBatchStore'
 import { demoStockQty } from '@/utils/productionPlanWorkItem'
 import { resolveVariableLengthFields } from '@/utils/variableLengthMaterial'
 
@@ -136,7 +137,19 @@ export function getWarehouseStockQty(warehouse, itemCode) {
   void stockState.records
   const qty = getStockQty(warehouse, itemCode)
   if (qty > 0) return roundQty(qty)
-  return roundQty(demoStockQty(5, String(itemCode).length))
+  // 出库拣批依赖真实批次账；无库存时不再回落演示占位数量，避免「有库存却选不到批次」
+  return 0
+}
+
+/** 该仓在库批次可用合计（出库展示/拣选用） */
+export function getBatchStockQty(warehouse, itemCode) {
+  if (!warehouse || !itemCode) return 0
+  return roundQty(
+    listBatches({ warehouse, itemCode, inStockOnly: true }).reduce(
+      (s, b) => s + (Number(b.currentLength) || 0),
+      0,
+    ),
+  )
 }
 
 /** 根据仓库与物品编码解析货位号（只读展示） */
@@ -159,9 +172,12 @@ export function enrichOutboundLineLocation(line = {}) {
 export function enrichOutboundLineStock(line = {}) {
   const itemCode = line.itemCode || ''
   const warehouse = line.shipWarehouse || ''
+  const batchQty = getBatchStockQty(warehouse, itemCode)
+  const realWh = getWarehouseStockQty(warehouse, itemCode)
   return {
     stockQty: getTotalStockQty(itemCode),
-    warehouseStockQty: getWarehouseStockQty(warehouse, itemCode),
+    // 有批次账时以批次合计为准，避免汇总与批次不一致；无批次则为真实仓存（可为 0）
+    warehouseStockQty: batchQty > 0 ? batchQty : realWh,
   }
 }
 

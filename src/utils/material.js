@@ -5,6 +5,20 @@ import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver
 import { getMasterDefaults } from '@/utils/productionPlanMaterial'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
+import { convertStockDemandToPurchase } from '@/utils/purchaseUomConvert'
+
+function getInTransitForMaterialCode(code) {
+  return require('@/utils/planPurchaseInTransit').getInTransitForMaterialCode(code)
+}
+
+function getWoAllocatedForMaterialCode(code) {
+  return require('@/utils/planWoAllocated').getWoAllocatedForMaterialCode(code)
+}
+
+function lookupMaterialMaster(code) {
+  if (!code) return null
+  return materialInfoState.materials.find((m) => m.code === code) || null
+}
 
 export function flattenMaterials(materials, list = []) {
   if (!materials?.length) return list
@@ -20,7 +34,7 @@ export function calcDemandQty(unitUsage, productQty) {
   return (unitUsage || 0) * (productQty || 0)
 }
 
-/** 缺口数（不含在途）= max(0, 需求数 - 可用库存) */
+/** 缺口数（不含在途）= max(0, 需求数 - 可用库存)；可用库存已扣工单占用 */
 export function calcGapQty(demandQty, availableStock) {
   return Math.max(0, (demandQty || 0) - (availableStock || 0))
 }
@@ -107,7 +121,26 @@ export function getPurchasedMaterials(order) {
 export function getPurchasedMaterialsFromWorkItem(workItem) {
   const all = []
   flattenMaterials(workItem?.materials, all)
-  return all.filter((m) => m.supplyType === '外购件')
+  return all
+    .filter((m) => m.supplyType === '外购件')
+    .map((m) => {
+      const hit = getInTransitForMaterialCode(m.code)
+      const alloc = getWoAllocatedForMaterialCode(m.code)
+      const onHand = Number(m.stockQty) || 0
+      const availableStock = Math.max(0, onHand - (alloc.woAllocatedQty || 0))
+      const demandQty =
+        m.demandQty ?? calcDemandQty(m.unitUsage, workItem?.orderQty ?? workItem?.salesQty)
+      return {
+        ...m,
+        inTransitQty: hit.inTransitStockQty,
+        inTransitText: hit.inTransitText,
+        prInTransitQty: hit.prPurchaseQty,
+        poInTransitQty: hit.poPurchaseQty,
+        woAllocatedQty: alloc.woAllocatedQty,
+        availableStock,
+        gapQty: calcGapQty(demandQty, availableStock),
+      }
+    })
 }
 
 /** 解析订单计划总装日期 */
@@ -145,6 +178,7 @@ export function buildWorkOrderRows(materials, order) {
       personInCharge: m.personInCharge || '孙琴丽',
       stockQty: m.stockQty ?? 0,
       availableStock: m.availableStock ?? 0,
+      woAllocatedQty: m.woAllocatedQty ?? getWoAllocatedForMaterialCode(m.code).woAllocatedQty,
       inTransitQty: m.inTransitQty ?? 0,
       demandQty,
       gapQty,
@@ -293,6 +327,7 @@ export function buildOutsourceWorkOrderRows(materials, order) {
       supplier: m.supplier || defaults.supplier || '',
       stockQty: m.stockQty ?? 0,
       availableStock: m.availableStock ?? 0,
+      woAllocatedQty: m.woAllocatedQty ?? getWoAllocatedForMaterialCode(m.code).woAllocatedQty,
       inTransitQty: m.inTransitQty ?? 0,
       demandQty,
       gapQty,
@@ -330,6 +365,9 @@ export function buildPurchaseRequisitionRows(materials, order) {
     const gapQty = m.gapQty ?? calcGapQty(demandQty, m.availableStock)
     const defaults = getMasterDefaults(m.code)
     const defaultSupplier = m.supplier || defaults.supplier || ''
+    const master = lookupMaterialMaster(m.code) || m
+    const stockPlan = m.planQty ?? gapQty
+    const converted = convertStockDemandToPurchase(stockPlan, master)
     return {
       key: m.id,
       materialId: m.id,
@@ -345,11 +383,19 @@ export function buildPurchaseRequisitionRows(materials, order) {
       supplier: defaultSupplier,
       stockQty: m.stockQty ?? 0,
       availableStock: m.availableStock ?? 0,
+      woAllocatedQty: m.woAllocatedQty ?? getWoAllocatedForMaterialCode(m.code).woAllocatedQty,
       inTransitQty: m.inTransitQty ?? 0,
+      inTransitText: m.inTransitText || getInTransitForMaterialCode(m.code).inTransitText,
       demandQty,
       gapQty,
-      planQty: m.planQty ?? gapQty,
-      unit: m.unit || '件',
+      /** 计划数量：采购单位口径（已按包装含量向上取整） */
+      planQty: converted.planPurchaseQty,
+      stockPlanQty: stockPlan,
+      unit: converted.purchaseUnit,
+      inventoryUnit: converted.inventoryUnit,
+      purchaseUnit: converted.purchaseUnit,
+      packageContent: converted.packageContent,
+      convertHint: converted.convertHint,
       remark: m.remark || '',
     }
   })

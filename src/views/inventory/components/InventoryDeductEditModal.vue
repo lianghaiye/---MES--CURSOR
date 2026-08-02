@@ -34,11 +34,14 @@
       :pagination="false"
     >
       <template #bodyCell="{ column, record, index }">
-        <template v-if="column.key === 'planQty'">
+        <template v-if="column.key === 'blankSizeText'">
+          {{ record.blankSizeText || '—' }}
+        </template>
+        <template v-else-if="column.key === 'planQty'">
           <a-input-number
             v-model:value="record.planQty"
             :min="0"
-            :precision="0"
+            :precision="3"
             size="small"
             style="width: 100%"
           />
@@ -95,6 +98,7 @@ const columns = [
     width: 120,
     ellipsis: true,
   },
+  { title: '下料尺寸', key: 'blankSizeText', width: 150, ellipsis: true },
   { title: '扣减数量', key: 'planQty', width: 100 },
   { title: '操作', key: 'action', width: 70 },
 ]
@@ -138,6 +142,9 @@ function onMaterialsPicked(items) {
       drawingNo: item.drawingNo || '',
       variantSummary: item.variantSummary || '',
       variantValues: item.variantValues ? { ...item.variantValues } : {},
+      blankSize: item.blankSize || null,
+      blankSizeText: item.blankSizeText || '',
+      blankSizeMode: item.blankSizeMode || '',
       planQty: 1,
       actualQty: 0,
       status: '待确认',

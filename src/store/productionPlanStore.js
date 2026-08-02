@@ -9,8 +9,11 @@ import { getOwnActiveBomForItem, getProductBomById } from '@/store/productBomSto
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { enrichWorkItem, resolveSalesLineForWorkItem } from '@/utils/productionPlanWorkItem'
 import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
+import { applyCrossDemoStockToPlanMaterials } from '@/mock/crossModuleDemoSeed'
+
 const STORAGE_KEY = 'i_doms_production_plans'
-const DATA_VERSION = 7
+/** v8：跨模块演示库存写回计划物料 */
+const DATA_VERSION = 8
 
 function normalizePlanStatuses(orders) {
   return orders.map((o) => {
@@ -29,7 +32,10 @@ function normalizePlanStatuses(orders) {
       Object.assign(wi, enrichWorkItem(wi, salesLine, idx))
       if (wi.expanded == null) wi.expanded = idx === 0
     })
-    plan.workItems?.forEach((wi) => resolveWorkItemMaterials(wi))
+    plan.workItems?.forEach((wi) => {
+      resolveWorkItemMaterials(wi)
+      applyCrossDemoStockToPlanMaterials(wi.materials)
+    })
     return plan
   })
 }

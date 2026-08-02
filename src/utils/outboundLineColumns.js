@@ -64,7 +64,7 @@ export const OUTBOUND_BATCH_PICK_TIP_MANUAL =
   '自主拣选：先填写出库数量，再多选批次（或点「搜索更多」按入库时间筛选）。系统按所选批次「余量小优先」跨批扣减；出库数量大于所选批次合计时拦截。允许跨批次扣减。'
 
 export const OUTBOUND_BATCH_PICK_TIP_AUTO =
-  '默认先进先出+优先整批+余料优先：填写出库数量，确认时自动扣批。可点「自主拣选」指定批次；自主拣选时优先扣数量小的批次，并允许跨批。入库均按条码类型生成批次号。'
+  '默认先进先出+优先整批+余料优先：填写出库数量，确认时自动扣批。可点「自主拣选」指定批次；自主拣选时优先扣数量小的批次，并允许跨批。'
 
 /** @deprecated 兼容旧引用，等同自主拣选提示 */
 export const OUTBOUND_BATCH_PICK_TIP = OUTBOUND_BATCH_PICK_TIP_MANUAL

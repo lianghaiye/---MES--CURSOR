@@ -128,6 +128,19 @@
                 <template v-else-if="column.key === 'stockQty'">
                   {{ formatQty(record.stockQty) }}
                 </template>
+                <template v-else-if="column.key === 'unit'">
+                  <a-select
+                    v-model:value="record.unit"
+                    size="small"
+                    show-search
+                    allow-clear
+                    :options="purchaseUnitOpts"
+                    :filter-option="filterUnitOption"
+                    placeholder="采购单位"
+                    style="width: 100%"
+                    @change="onUnitChange(record)"
+                  />
+                </template>
                 <template v-else-if="column.key === 'planPurchaseQty'">
                   <a-input-number
                     v-model:value="record.planPurchaseQty"
@@ -231,6 +244,9 @@ import {
   generateReqNo,
   updatePurchaseRequisition,
 } from '@/store/purchaseRequisitionStore'
+import { materialInfoState } from '@/store/materialInfoStore'
+import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
+import { convertStockDemandToPurchase, purchaseQtyToStockQty } from '@/utils/purchaseUomConvert'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
@@ -383,6 +399,8 @@ function openProductPicker() {
 function mapPickerToLineItem(payload) {
   const code = payload.code || ''
   const name = payload.name || ''
+  const master = materialInfoState.materials.find((m) => m.code === code) || payload
+  const converted = convertStockDemandToPurchase(1, master)
   return createLineItem({
     productId: payload.itemId || payload.id || '',
     productName: name,
@@ -394,10 +412,14 @@ function mapPickerToLineItem(payload) {
     drawingNo: payload.drawingNo || '',
     materialType: payload.materialType || '零部件',
     supplyType: payload.supplyForm || '',
-    unit: payload.inventoryUnit || '件',
+    unit: converted.purchaseUnit,
+    inventoryUnit: converted.inventoryUnit,
+    purchaseUnit: converted.purchaseUnit,
+    packageContent: converted.packageContent,
+    convertHint: converted.convertHint,
     stockQty: resolveStockQty(code),
-    demandQty: 1,
-    planPurchaseQty: 1,
+    demandQty: converted.demandStockQty,
+    planPurchaseQty: Math.max(converted.planPurchaseQty, 1),
     supplierName: payload.defaultSupplier || '',
     designatedSupplier: Boolean(payload.defaultSupplier),
     remark: '',
@@ -510,8 +532,31 @@ function addBlankLine() {
   )
 }
 
+const purchaseUnitOpts = computed(() => {
+  void unitState.units
+  return getPurchaseUnitOptions()
+})
+
+function filterUnitOption(input, option) {
+  return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
+}
+
+function onUnitChange(record) {
+  record.purchaseUnit = record.unit || record.purchaseUnit || ''
+  if (record.unit && record.inventoryUnit && record.unit === record.inventoryUnit) {
+    record.convertHint = ''
+  }
+  onQtyChange(record)
+}
+
 function onQtyChange(record) {
-  record.demandQty = record.planPurchaseQty
+  const content = Number(record.packageContent) > 0 ? Number(record.packageContent) : 1
+  const purchaseUnit = record.unit || record.purchaseUnit
+  if (purchaseUnit && record.inventoryUnit && purchaseUnit !== record.inventoryUnit) {
+    record.demandQty = purchaseQtyToStockQty(record.planPurchaseQty, content)
+  } else {
+    record.demandQty = record.planPurchaseQty
+  }
 }
 
 function removeLine(id) {
@@ -553,13 +598,19 @@ function handleSave() {
 
   const lineItems = validLines.map((line) => {
     const next = { ...line }
-    next.demandQty = next.planPurchaseQty
+    const content = Number(next.packageContent) > 0 ? Number(next.packageContent) : 1
+    if (next.purchaseUnit && next.inventoryUnit && next.purchaseUnit !== next.inventoryUnit) {
+      next.demandQty = purchaseQtyToStockQty(next.planPurchaseQty, content)
+    } else if (next.demandQty == null) {
+      next.demandQty = next.planPurchaseQty
+    }
     next.deliveryDate = deliveryDate
     next.expectedArrivalDate = estimatedArrivalDate
     next.productName = next.productName || next.inventoryName || ''
     next.productCode = next.productCode || next.inventoryCode || ''
     next.inventoryName = next.productName
     next.inventoryCode = next.productCode
+    next.purchaseUnit = next.unit || next.purchaseUnit || ''
     return next
   })
 

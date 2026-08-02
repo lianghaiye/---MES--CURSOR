@@ -99,6 +99,11 @@ export const sideMenus = {
       label: '库存扣减记录',
       path: '/inventory/deduct-records',
     },
+    {
+      key: 'cut-settle',
+      label: '下料结算',
+      path: '/inventory/cut-settle',
+    },
   ],
   quality: [
     { key: 'factory-qc', label: '出厂质检', path: '/quality/factory-qc' },
@@ -268,6 +273,8 @@ export const routeTitles = {
   '/production/material-requisition/:id': '领料申请详情',
   '/inventory/deduct-records': '库存扣减记录',
   '/inventory/deduct-records/:id': '扣减记录详情',
+  '/inventory/cut-settle': '下料结算',
+  '/inventory/cut-settle/:id': '下料结算详情',
   '/report-management/report-work': '报工确认',
   '/report-management/report-work/:id': '报工确认详情',
   '/report-management/process-report': '工序报工',
@@ -336,6 +343,7 @@ export const dynamicRouteTitles = [
   { pattern: /^\/basic-config\/suppliers\/[^/]+$/, title: '供应商详情' },
   { pattern: /^\/inventory\/inbound\/[^/]+$/, title: '入库单详情' },
   { pattern: /^\/inventory\/outbound\/[^/]+$/, title: '出库单详情' },
+  { pattern: /^\/inventory\/cut-settle\/[^/]+$/, title: '下料结算详情' },
   { pattern: /^\/report-management\/report-work\/[^/]+$/, title: '报工确认详情' },
   { pattern: /^\/report-management\/process-report\/wo\/[^/]+$/, title: '任务报工详情' },
   { pattern: /^\/report-management\/process-report\/[^/]+$/, title: '工序报工详情' },

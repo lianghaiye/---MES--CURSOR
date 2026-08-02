@@ -292,6 +292,37 @@
                       </template>
                     </InventoryLineEditableCell>
                   </template>
+                  <template v-else-if="column.key === 'unit'">
+                    <InventoryLineEditableCell
+                      :active="isLineCellEditing(record.id, 'unit')"
+                      :display="record.unit || '—'"
+                      :empty="!record.unit"
+                      placeholder="采购单位"
+                      @activate="startLineCellEdit(record.id, 'unit', { select: true })"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-select
+                          v-model:value="record.unit"
+                          size="small"
+                          show-search
+                          allow-clear
+                          placeholder="采购单位"
+                          style="width: 100%"
+                          :open="lineCellSelectOpen"
+                          :options="purchaseUnitOpts"
+                          :filter-option="filterUnitOption"
+                          @dropdownVisibleChange="onLineCellSelectOpenChange"
+                          @change="
+                            () => {
+                              record.purchaseUnit = record.unit || record.purchaseUnit || ''
+                              endEdit()
+                            }
+                          "
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                  </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
                     <InventoryLineEditableCell
                       v-if="taxModeExcluding"
@@ -558,6 +589,8 @@ import { mockInventory } from '@/mock/inventory'
 import { createPoLineItem } from '@/mock/purchaseOrders'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
+import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
+import { resolvePurchaseUnit, resolveInventoryUnit } from '@/utils/purchaseUomConvert'
 import {
   addPurchaseOrder,
   generatePurchaseOrderNo,
@@ -635,8 +668,17 @@ const taxModeHint = computed(() =>
     : '当前：按含税单价算不含税（请填含税单价，不含税单价自动计算且不可编辑）',
 )
 
+const purchaseUnitOpts = computed(() => {
+  void unitState.units
+  return getPurchaseUnitOptions()
+})
+
+function filterUnitOption(input, option) {
+  return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
+}
+
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-form-lines-v2', purchaseOrderFormLineColumns, {
+  useTableColumnSettings('purchase-order-form-lines-v3', purchaseOrderFormLineColumns, {
     minScrollX: 2200,
     pinEdgeColumns: false,
     pinActionColumn: true,
@@ -840,7 +882,9 @@ function mapPickerToPoLine(payload) {
     drawingNo: payload.drawingNo || '',
     stockQty: resolveStockQty(code),
     purchaseQty: 1,
-    unit: payload.inventoryUnit || master?.inventoryUnit || '件',
+    unit: resolvePurchaseUnit(master || payload),
+    purchaseUnit: resolvePurchaseUnit(master || payload),
+    inventoryUnit: resolveInventoryUnit(master || payload),
     unitPriceExTax: unitPrice,
     taxRate,
     deliveryDate: headerDeliveryDateStr(),
@@ -937,7 +981,9 @@ function onVariantConfigConfirm(payload) {
         Math.round(unitPrice * (1 + (Number(target.taxRate) || 13) / 100) * 100) / 100
     }
     target.taxRate = Number(master.inputTaxRate ?? target.taxRate ?? 13)
-    target.unit = master.inventoryUnit || target.unit || '件'
+    target.unit = resolvePurchaseUnit(master)
+    target.purchaseUnit = target.unit
+    target.inventoryUnit = resolveInventoryUnit(master)
     target.drawingNo = master.drawingNo || target.drawingNo || ''
     target.category = master.categoryName || target.category || ''
   }

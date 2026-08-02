@@ -434,6 +434,18 @@ const routes = [
         meta: { title: '扣减记录详情', listPath: '/inventory/deduct-records' },
       },
       {
+        path: 'inventory/cut-settle',
+        name: 'inventory-cut-settle',
+        component: () => import('@/views/inventory/CutSettleRecordView.vue'),
+        meta: { title: '下料结算' },
+      },
+      {
+        path: 'inventory/cut-settle/:id',
+        name: 'inventory-cut-settle-detail',
+        component: () => import('@/views/inventory/CutSettleDetailView.vue'),
+        meta: { title: '下料结算详情', listPath: '/inventory/cut-settle' },
+      },
+      {
         path: 'quality/factory-qc',
         name: 'quality-factory-qc',
         component: () => import('@/views/quality/FactoryQcView.vue'),

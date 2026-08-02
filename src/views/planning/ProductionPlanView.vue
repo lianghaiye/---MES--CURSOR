@@ -307,6 +307,19 @@
                   v-model:expanded-row-keys="materialExpandedRowKeys"
                   :default-expand-all-rows="true"
                 >
+                  <template #headerCell="{ column }">
+                    <template v-if="column.key === 'inTransitQty'">
+                      <span class="col-title-with-tip">
+                        在途
+                        <a-tooltip
+                          title="申请量/订单量（采购单位）；未转单的采购申请 / 未入库的采购订单"
+                        >
+                          <InfoCircleOutlined class="col-tip-icon" />
+                        </a-tooltip>
+                      </span>
+                    </template>
+                    <template v-else>{{ column.title }}</template>
+                  </template>
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'status'">
                       <a-tag :color="materialStatusColor(record.status)">{{ record.status }}</a-tag>
@@ -434,6 +447,22 @@
                         placeholder="补充说明"
                         allow-clear
                       />
+                    </template>
+                    <template v-else-if="column.key === 'woAllocatedQty'">
+                      <a-tooltip title="开立工单 BOM 需求 − 已领料；可用库存 = 现存量 − 工单占用">
+                        <span>{{
+                          record.isTopLevel
+                            ? '—'
+                            : record.woAllocatedQty != null
+                              ? formatQty(record.woAllocatedQty)
+                              : '—'
+                        }}</span>
+                      </a-tooltip>
+                    </template>
+                    <template v-else-if="column.key === 'inTransitQty'">
+                      <a-tooltip title="未转采购单的申请量 / 未入库的采购订单量（采购单位）">
+                        <span>{{ record.inTransitText || '—' }}</span>
+                      </a-tooltip>
                     </template>
                   </template>
                 </a-table>
@@ -604,7 +633,7 @@ export default {
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
-import { PrinterOutlined } from '@ant-design/icons-vue'
+import { InfoCircleOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
@@ -616,9 +645,14 @@ import GenerateAssemblyWorkOrderModal from './components/GenerateAssemblyWorkOrd
 import GenerateOutsourceWorkOrderModal from './components/GenerateOutsourceWorkOrderModal.vue'
 import GeneratePurchaseRequisitionModal from './components/GeneratePurchaseRequisitionModal.vue'
 import {
+  workOrderState,
   addWorkOrdersFromPlanRows,
   addOutsourceWorkOrdersFromPlanRows,
 } from '@/store/workOrderStore'
+import {
+  assemblyWorkOrderState,
+  addAssemblyWorkOrdersFromPlanRows,
+} from '@/store/assemblyWorkOrderStore'
 import {
   getOutsourcedMaterialsFromWorkItem,
   getPurchasedMaterialsFromWorkItem,
@@ -631,7 +665,11 @@ import {
   flattenMaterials,
 } from '@/utils/material'
 import { buildProductionPlanEbomRows } from '@/utils/salesOrderBomRows'
-import { addPurchaseRequisition } from '@/store/purchaseRequisitionStore'
+import { addPurchaseRequisition, purchaseRequisitionState } from '@/store/purchaseRequisitionStore'
+import { purchaseOrderState } from '@/store/purchaseOrderStore'
+import { outboundState } from '@/store/outboundStore'
+import { materialRequisitionState } from '@/store/materialRequisitionStore'
+import { stockState } from '@/store/stockStore'
 import {
   enrichPlanMaterialTree,
   getProcessRouteSelectOptions,
@@ -665,12 +703,6 @@ import {
   productionPlanPrintBaseColumns,
   productionPlanPrintColumnSettings,
 } from '@/mock/productionPlanPrintColumns'
-import { workOrderState } from '@/store/workOrderStore'
-import {
-  assemblyWorkOrderState,
-  addAssemblyWorkOrdersFromPlanRows,
-} from '@/store/assemblyWorkOrderStore'
-import { purchaseRequisitionState } from '@/store/purchaseRequisitionStore'
 import { buildProductionPlanOrderTree } from '@/utils/productionPlanOrderTree'
 
 const router = useRouter()
@@ -763,8 +795,19 @@ const baseMaterialColumns = [
   { title: '下料尺寸', dataIndex: 'blankSizeText', width: 160, ellipsis: true },
   { title: '供应型态', key: 'supplyType', dataIndex: 'supplyType', width: 100 },
   { title: '库存数量', dataIndex: 'stockQty', width: 90 },
+  {
+    title: '工单占用',
+    key: 'woAllocatedQty',
+    dataIndex: 'woAllocatedQty',
+    width: 90,
+  },
   { title: '可用库存', dataIndex: 'availableStock', width: 90 },
-  { title: '在途库存', dataIndex: 'inTransitQty', width: 90 },
+  {
+    title: '在途',
+    key: 'inTransitQty',
+    dataIndex: 'inTransitText',
+    width: 110,
+  },
   { title: '需求数', dataIndex: 'demandQty', width: 80 },
   { title: '缺口数', dataIndex: 'gapQty', width: 80 },
   { title: '计划数', key: 'planQty', dataIndex: 'planQty', width: 96 },
@@ -785,7 +828,7 @@ const {
   tableScrollX: materialTableScrollX,
   defaultColumnSettings: defaultMaterialColumnSettings,
 } = useTableColumnSettings('production-plan-material-list', baseMaterialColumns, {
-  minScrollX: 2560,
+  minScrollX: 2680,
 })
 
 const processRouteOpts = computed(() => getProcessRouteSelectOptions())
@@ -834,6 +877,14 @@ const activeWorkItem = computed(() => {
 const materialExpandedRowKeys = ref([])
 
 const materialTree = computed(() => {
+  // 依赖采购/工单/领料变更，刷新在途与工单占用
+  void purchaseRequisitionState.requisitions
+  void purchaseOrderState.orders
+  void workOrderState.orders
+  void assemblyWorkOrderState.orders
+  void outboundState.orders
+  void materialRequisitionState.records
+  void stockState.records
   if (!activeWorkItem.value) return []
   return buildDisplayMaterialTree(activeWorkItem.value, selectedOrder.value)
 })
@@ -1678,6 +1729,18 @@ function handleReset() {
 
 .muted {
   color: #bfbfbf;
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
 }
 
 @media (max-width: 992px) {

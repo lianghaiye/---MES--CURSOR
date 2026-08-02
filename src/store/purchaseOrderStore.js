@@ -5,9 +5,13 @@ import {
   recalcPurchaseOrderTotals,
   createPoLineItem,
 } from '@/mock/purchaseOrders'
+import { ensureCrossDemoPurchaseOrders } from '@/mock/crossModuleDemoSeed'
 import { round2 } from '@/utils/purchaseMerge'
 
 const STORAGE_KEY = 'i_doms_purchase_orders'
+const SEED_VERSION_KEY = 'i_doms_purchase_orders_seed_v'
+/** v2：跨模块演示采购订单（垫圈在途 / 轴承部分入库） */
+const CURRENT_SEED_VERSION = '2'
 let poSeq = 3
 
 function loadFromStorage() {
@@ -23,8 +27,18 @@ function loadFromStorage() {
   return null
 }
 
+function shouldReseed() {
+  return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
+}
+
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: purchaseOrderState.orders }))
+  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+}
+
+function initPurchaseOrders() {
+  const base = shouldReseed() ? clonePurchaseOrders() : loadFromStorage() || clonePurchaseOrders()
+  return ensureCrossDemoPurchaseOrders(base)
 }
 
 export function generatePurchaseOrderNo() {
@@ -33,7 +47,7 @@ export function generatePurchaseOrderNo() {
 }
 
 export const purchaseOrderState = reactive({
-  orders: loadFromStorage() || clonePurchaseOrders(),
+  orders: initPurchaseOrders(),
 })
 
 watch(
@@ -161,7 +175,9 @@ export function createPurchaseOrdersFromMergedLines(mergedLines) {
         specModel: line.specModel,
         material: line.material,
         purchaseQty: line.planPurchaseQty,
-        unit: line.unit || '个',
+        unit: line.unit || line.purchaseUnit || '个',
+        purchaseUnit: line.purchaseUnit || line.unit || '个',
+        inventoryUnit: line.inventoryUnit || '',
         unitPriceExTax: line.unitPriceExTax,
         taxRate: line.taxRate,
         unitPriceInTax: line.unitPriceInTax,

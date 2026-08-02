@@ -38,6 +38,19 @@
           />
         </template>
 
+        <template v-else-if="column.key === 'unit'">
+          <a-select
+            v-model:value="record.unit"
+            size="small"
+            show-search
+            allow-clear
+            style="width: 100%"
+            :options="purchaseUnitOpts"
+            :filter-option="filterUnitOption"
+            @change="onUnitChange(record)"
+          />
+        </template>
+
         <template v-else-if="column.key === 'designatedSupplier'">
           <a-select
             v-model:value="record.designatedSupplier"
@@ -240,6 +253,7 @@ import {
   designatedSupplierOptions,
 } from '@/mock/purchaseRequisitionOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 
 const props = defineProps({
@@ -256,6 +270,7 @@ const batchEditValue = ref(undefined)
 
 const editableKeys = [
   'planPurchaseQty',
+  'unit',
   'designatedSupplier',
   'supplierName',
   'settlementType',
@@ -277,6 +292,7 @@ const batchEditMeta = {
     type: 'select',
     options: settlementTypeOptions.map((v) => ({ label: v, value: v })),
   },
+  unit: { label: '采购单位', type: 'select', options: [] },
   unitPriceExTax: { label: '不含税单价', type: 'number', precision: 2 },
   taxRate: { label: '税率(%)', type: 'number', precision: 2 },
   receivingMode: {
@@ -292,6 +308,29 @@ const batchEditMeta = {
     options: getWarehouseSelectOptions(),
   },
   remark: { label: '备注', type: 'text' },
+}
+
+const purchaseUnitOpts = computed(() => {
+  void unitState.units
+  return getPurchaseUnitOptions()
+})
+
+// 批量编辑下拉随单位字典刷新
+watch(
+  purchaseUnitOpts,
+  (opts) => {
+    batchEditMeta.unit.options = opts
+  },
+  { immediate: true },
+)
+
+function filterUnitOption(input, option) {
+  return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
+}
+
+function onUnitChange(record) {
+  record.purchaseUnit = record.unit || record.purchaseUnit || ''
+  onRowChange(record)
 }
 
 const columns = [

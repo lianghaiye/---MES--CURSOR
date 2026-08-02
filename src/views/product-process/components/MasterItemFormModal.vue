@@ -205,18 +205,21 @@
                   />
                 </a-form-item>
               </a-col>
-              <template v-if="form.isVariableLength">
-                <a-col :span="8">
-                  <a-form-item label="采购单位" required>
-                    <a-select
-                      v-model:value="form.purchaseUnit"
-                      size="small"
-                      :options="purchaseUnitOpts"
-                      placeholder="如：根"
-                    />
-                  </a-form-item>
-                </a-col>
-              </template>
+              <a-col :span="8">
+                <a-form-item
+                  label="采购单位"
+                  :required="form.isVariableLength || needsPackageContent"
+                >
+                  <a-select
+                    v-model:value="form.purchaseUnit"
+                    size="small"
+                    :options="purchaseUnitOpts"
+                    :placeholder="form.isVariableLength ? '如：根' : '默认同库存单位'"
+                    :disabled="viewOnly"
+                    @change="onPurchaseUnitChange"
+                  />
+                </a-form-item>
+              </a-col>
               <a-col :span="24">
                 <a-form-item label="技术参数" class="remark-item">
                   <a-textarea
@@ -414,7 +417,15 @@
                 </a-form-item>
               </a-col>
               <a-col :span="8">
-                <a-form-item label="包装含量">
+                <a-form-item :required="needsPackageContent">
+                  <template #label>
+                    <span>包装含量</span>
+                    <a-tooltip
+                      title="1 个采购单位折合多少库存单位。例：采购单位=盒、库存单位=个、含量=100 → 1 盒=100 个；采购申请按库存需求 ÷ 含量向上取整。"
+                    >
+                      <InfoCircleOutlined class="info-icon" />
+                    </a-tooltip>
+                  </template>
                   <a-input-number
                     v-model:value="form.packContentQty"
                     size="small"
@@ -925,6 +936,19 @@ const purchaseUnitOpts = computed(() => {
   return getPurchaseUnitOptions()
 })
 
+const needsPackageContent = computed(() => {
+  if (form.isVariableLength) return false
+  const purchase = form.purchaseUnit || form.inventoryUnit
+  const inventory = form.inventoryUnit
+  return Boolean(purchase && inventory && purchase !== inventory)
+})
+
+function onPurchaseUnitChange() {
+  if (needsPackageContent.value && !(Number(form.packContentQty) > 0)) {
+    form.packContentQty = form.packContentQty || 1
+  }
+}
+
 function onVariableLengthChange(checked) {
   if (checked) {
     const inv = form.inventoryUnit || '米'
@@ -941,9 +965,10 @@ function onVariableLengthChange(checked) {
       form.uomRelation = 'per_piece_length'
     }
   } else {
-    form.purchaseUnit = form.inventoryUnit
+    form.purchaseUnit = form.purchaseUnit || form.inventoryUnit
     form.stockUnit = form.inventoryUnit
     form.uomRelation = ''
+    onPurchaseUnitChange()
   }
 }
 const materialGradeIdOpts = computed(() => {
@@ -1162,12 +1187,12 @@ function loadEditRecord(record) {
   form.weight = source.weight || ''
   form.inventoryUnit = source.inventoryUnit
   form.isVariableLength = Boolean(source.isVariableLength)
-  form.purchaseUnit = source.purchaseUnit
+  form.purchaseUnit = source.purchaseUnit || source.inventoryUnit
   form.stockUnit = source.stockUnit || source.inventoryUnit
   form.uomRelation = source.uomRelation || ''
   form.unitPrice = source.unitPrice
   form.purchaseUnitPrice = source.purchaseUnitPrice
-  form.packContentQty = source.packContentQty ?? source.minOrderQty
+  form.packContentQty = source.packContentQty ?? source.packageContent ?? source.minOrderQty
   form.standardPackQty = source.standardPackQty
   form.canSell = Boolean(source.canSell)
   form.canProduce = Boolean(source.canProduce)
@@ -1386,6 +1411,18 @@ function validate() {
     message.warning('启用双单位请选择采购单位（如：根）')
     return false
   }
+  if (!form.isVariableLength && needsPackageContent.value) {
+    if (!form.purchaseUnit) {
+      message.warning('请选择采购单位')
+      return false
+    }
+    if (!(Number(form.packContentQty) > 0)) {
+      message.warning(
+        '采购单位与库存单位不同时，请在「采购」页填写包装含量（1 采购单位=多少库存单位）',
+      )
+      return false
+    }
+  }
   if (form.laborEnabled) {
     for (let i = 0; i < form.laborRows.length; i += 1) {
       const row = form.laborRows[i]
@@ -1447,7 +1484,11 @@ function buildProductPayload() {
     weight: Number(form.weight) || 0,
     inventoryUnit: form.inventoryUnit,
     isVariableLength: form.isVariableLength,
-    purchaseUnit: form.isVariableLength ? form.purchaseUnit : form.inventoryUnit,
+    purchaseUnit: form.isVariableLength
+      ? form.purchaseUnit
+      : form.purchaseUnit || form.inventoryUnit,
+    packageContent:
+      !form.isVariableLength && needsPackageContent.value ? Number(form.packContentQty) : undefined,
     stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
     uomRelation: form.isVariableLength
       ? form.uomRelation ||
@@ -1523,7 +1564,11 @@ function buildMaterialPayload() {
     weight: form.weight,
     inventoryUnit: form.inventoryUnit,
     isVariableLength: form.isVariableLength,
-    purchaseUnit: form.isVariableLength ? form.purchaseUnit : form.inventoryUnit,
+    purchaseUnit: form.isVariableLength
+      ? form.purchaseUnit
+      : form.purchaseUnit || form.inventoryUnit,
+    packageContent:
+      !form.isVariableLength && needsPackageContent.value ? Number(form.packContentQty) : undefined,
     stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
     uomRelation: form.isVariableLength
       ? form.uomRelation ||

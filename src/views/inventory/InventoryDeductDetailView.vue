@@ -75,6 +75,9 @@
               {{ resolveInventoryDeductDocNo(record) || '—' }}
             </a-descriptions-item>
             <a-descriptions-item label="扣减单号">{{ record.deductNo }}</a-descriptions-item>
+            <a-descriptions-item label="扣减来源">{{
+              resolveDeductSourceLabel(record)
+            }}</a-descriptions-item>
             <a-descriptions-item label="扣减状态">
               <span class="status-tag" :class="statusClass(record.status)">{{
                 record.status
@@ -119,7 +122,7 @@
             size="small"
             bordered
             :pagination="false"
-            :scroll="{ x: 1180 }"
+            :scroll="{ x: 1340 }"
             :locale="{ emptyText: '暂无扣减明细' }"
           >
             <template #bodyCell="{ column, record: line }">
@@ -134,6 +137,9 @@
               </template>
               <template v-else-if="column.key === 'variantAttr'">
                 {{ lineVariantText(line) || '—' }}
+              </template>
+              <template v-else-if="column.key === 'blankSizeText'">
+                {{ line.blankSizeText || '—' }}
               </template>
               <template v-else-if="column.key === 'status'">
                 <span class="status-tag sm" :class="statusClass(line.status)">{{
@@ -165,6 +171,7 @@ import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
 import {
   MATERIAL_DEDUCT_STATUS,
   resolveInventoryDeductDocNo,
+  resolveDeductSourceLabel,
   isQuickMaterialDeduct,
 } from '@/mock/materialRequisitionRecords'
 import {
@@ -196,6 +203,7 @@ const lineColumns = [
   { title: '材质', key: 'material', width: 90, ellipsis: true },
   { title: '图号', key: 'drawingNo', width: 110, ellipsis: true },
   { title: '变体属性', key: 'variantAttr', width: 140, ellipsis: true },
+  { title: '下料尺寸', key: 'blankSizeText', width: 160, ellipsis: true },
   { title: '应扣', dataIndex: 'planQty', key: 'planQty', width: 70, align: 'right' },
   { title: '实扣', dataIndex: 'actualQty', key: 'actualQty', width: 70, align: 'right' },
   { title: '状态', key: 'status', width: 80 },

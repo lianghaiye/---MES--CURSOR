@@ -1,6 +1,7 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { cloneOutboundOrders, createOutboundLine, createOutboundOrder } from '@/mock/outboundOrders'
+import { ensureCrossDemoOutboundOrders } from '@/mock/crossModuleDemoSeed'
 import { needsOutboundApproval } from '@/mock/outboundOptions'
 import {
   createFactoryQcFromOutbound,
@@ -23,8 +24,12 @@ import {
   validateManualBatchAllocations,
 } from '@/utils/outboundBatchAllocate'
 import { formatBatchAttrsText } from '@/utils/outboundLineColumns'
+import { transferOutboundToReceiveWarehouse } from '@/utils/outboundReceiveTransfer'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
+const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
+/** v3：跨模块演示领料出库（工单已领冲减占用） */
+const CURRENT_SEED_VERSION = '3'
 
 /** 领料/发料出库不再审批：历史「待处理」升为「待出库」 */
 function migrateSkipApprovalStatuses(orders) {
@@ -75,6 +80,18 @@ function loadFromStorage() {
 
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: outboundState.orders }))
+  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+}
+
+function shouldReseedOutbound() {
+  return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
+}
+
+function initOutboundOrders() {
+  const base = shouldReseedOutbound()
+    ? cloneOutboundOrders()
+    : loadFromStorage() || cloneOutboundOrders()
+  return ensureCrossDemoOutboundOrders(migrateSkipApprovalStatuses(base))
 }
 
 export function generateOutboundNo() {
@@ -83,7 +100,7 @@ export function generateOutboundNo() {
 }
 
 export const outboundState = reactive({
-  orders: loadFromStorage() || cloneOutboundOrders(),
+  orders: initOutboundOrders(),
 })
 
 watch(
@@ -259,6 +276,13 @@ export function confirmOutbound(ids) {
     const stockCheck = applyOutboundStockMovements(order)
     if (!stockCheck.ok) {
       blocked.push({ docNo: order.docNo, message: stockCheck.message })
+      return
+    }
+
+    // 领料/发料：发料仓已扣后，调入「领入仓库」（线边仓），供库存扣减/下料结算从 B 扣
+    const transfer = transferOutboundToReceiveWarehouse(order)
+    if (!transfer.ok) {
+      blocked.push({ docNo: order.docNo, message: transfer.message || '领入仓调入失败' })
       return
     }
 

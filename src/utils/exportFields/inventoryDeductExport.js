@@ -1,6 +1,9 @@
 import { cell } from './exportFieldHelpers'
 import { lineVariantSummary } from '@/utils/spuLineResolve'
-import { resolveInventoryDeductDocNo } from '@/mock/materialRequisitionRecords'
+import {
+  resolveInventoryDeductDocNo,
+  resolveDeductSourceLabel,
+} from '@/mock/materialRequisitionRecords'
 
 function lineVariantText(line = {}) {
   return lineVariantSummary(line) || line.variantSummary || ''
@@ -14,6 +17,7 @@ export const inventoryDeductExportFields = [
     getValue: (row) => cell(row, 'docNo') || cell(row, 'workOrderNo'),
   },
   { key: 'deductNo', title: '扣减单号', getValue: (row) => cell(row, 'deductNo') },
+  { key: 'deductSource', title: '扣减来源', getValue: (row) => cell(row, 'deductSource') },
   { key: 'productName', title: '产品名称', getValue: (row) => cell(row, 'productName') },
   { key: 'productSpec', title: '规格型号', getValue: (row) => cell(row, 'productSpec') },
   { key: 'material', title: '材质', getValue: (row) => cell(row, 'material') },
@@ -33,6 +37,11 @@ export const inventoryDeductExportFields = [
     title: '变体属性',
     getValue: (row) => cell(row, 'lineVariantSummary'),
   },
+  {
+    key: 'blankSizeText',
+    title: '下料尺寸',
+    getValue: (row) => cell(row, 'blankSizeText'),
+  },
   { key: 'planQty', title: '应扣数量', getValue: (row) => cell(row, 'planQty') },
   { key: 'actualQty', title: '实扣数量', getValue: (row) => cell(row, 'actualQty') },
   { key: 'lineStatus', title: '物料状态', getValue: (row) => cell(row, 'lineStatus') },
@@ -50,6 +59,7 @@ export function flattenInventoryDeductRows(records = []) {
         docNo,
         workOrderNo: docNo,
         deductNo: r.deductNo,
+        deductSource: resolveDeductSourceLabel(r),
         productName: r.productName,
         productSpec: r.productSpec,
         material: r.material || '',
@@ -65,6 +75,7 @@ export function flattenInventoryDeductRows(records = []) {
         lineMaterial: '',
         lineDrawingNo: '',
         lineVariantSummary: '',
+        blankSizeText: '',
         planQty: '',
         actualQty: '',
         lineStatus: '',
@@ -77,6 +88,7 @@ export function flattenInventoryDeductRows(records = []) {
         docNo,
         workOrderNo: docNo,
         deductNo: r.deductNo,
+        deductSource: resolveDeductSourceLabel(r),
         productName: r.productName,
         productSpec: r.productSpec,
         material: r.material || '',
@@ -92,6 +104,7 @@ export function flattenInventoryDeductRows(records = []) {
         lineMaterial: l.material || '',
         lineDrawingNo: l.drawingNo || '',
         lineVariantSummary: lineVariantText(l),
+        blankSizeText: l.blankSizeText || '',
         planQty: l.planQty,
         actualQty: l.actualQty,
         lineStatus: l.status,

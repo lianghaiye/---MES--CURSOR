@@ -15,8 +15,8 @@ import { isPartialDualUnitIssue } from '@/store/functionParamStore'
 
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
-/** v10：半成品仓全量演示批次 + 按条码入库建批 */
-const CURRENT_SEED_VERSION = '10'
+/** v13：库线边仓倒冲标准件库存 */
+const CURRENT_SEED_VERSION = '13'
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',
@@ -398,8 +398,13 @@ export function receiveRemnantBatch({
     unit: source.unit || '米',
     sourceType,
     sourceDocNo,
+    // 原批已整出离仓：余料用新批次号，但血缘挂回原批，并标识余料
     parentBatchId: source.id,
-    attrs: { ...(source.attrs || {}), remnantFrom: source.batchNo },
+    attrs: {
+      ...(source.attrs || {}),
+      remnant: true,
+      remnantFrom: source.batchNo,
+    },
   })
   return { ok: true, batch }
 }

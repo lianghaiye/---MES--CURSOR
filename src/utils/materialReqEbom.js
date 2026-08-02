@@ -8,6 +8,7 @@ import {
   toMillimeters,
   isPlateBlankSizeLine,
 } from '@/utils/bomBlankSize'
+import { isBackflushMaterial, isRequisitionEnabledMaterial } from '@/utils/backflushMaterial'
 
 function lineId() {
   return `mr-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -189,8 +190,8 @@ function flattenMaterialTree(materials = [], scheduleQty = 1, acc = []) {
   return acc
 }
 
-/** 根据工单解析 EBOM 下级物料 */
-export function resolveWorkOrderMaterialLines(workOrder) {
+/** 根据工单解析全部 BOM 下级物料（含倒冲件） */
+export function resolveWorkOrderAllMaterialLines(workOrder) {
   if (!workOrder || workOrder.skipEbom) return []
   const scheduleQty = Number(workOrder.scheduleQty) || 1
   if (workOrder.ebomSnapshot?.materials?.length) {
@@ -202,6 +203,22 @@ export function resolveWorkOrderMaterialLines(workOrder) {
   const bom = getProductBomById(workOrder.bomId)
   if (bom) return fromBomLineItems(bom, scheduleQty)
   return []
+}
+
+/** 领料用：排除领料属性关闭的倒冲件 */
+export function resolveWorkOrderMaterialLines(workOrder) {
+  return resolveWorkOrderAllMaterialLines(workOrder).filter((line) => {
+    const mat = lookupMaterial(line.itemCode || line.materialCode)
+    return isRequisitionEnabledMaterial(mat) && !isBackflushMaterial(line)
+  })
+}
+
+/** 倒冲用：仅领料属性关闭的物料 */
+export function resolveWorkOrderBackflushLines(workOrder) {
+  return resolveWorkOrderAllMaterialLines(workOrder).filter((line) => {
+    const mat = lookupMaterial(line.itemCode || line.materialCode)
+    return isBackflushMaterial(mat) || isBackflushMaterial(line)
+  })
 }
 
 export function createManualMaterialLine(item, qty = 1, warehouse = '原料仓') {

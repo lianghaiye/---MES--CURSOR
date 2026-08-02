@@ -177,6 +177,11 @@ export function buildDisplayMaterialTree(workItem, order) {
   const materials = resolveWorkItemMaterials(workItem)
   normalizeMaterialTreeLeaves(materials)
   enrichPlanMaterialTree(materials, order, workItem)
+  // 运行时加载，避免 store ↔ productionPlanMaterial 循环依赖
+  const { applyPurchaseInTransitToMaterialTree } = require('@/utils/planPurchaseInTransit')
+  const { applyWoAllocatedToMaterialTree } = require('@/utils/planWoAllocated')
+  applyPurchaseInTransitToMaterialTree(materials)
+  applyWoAllocatedToMaterialTree(materials)
 
   const topId = `top-${workItem.id}`
   if (!workItem._topMaterial || workItem._topMaterial.id !== topId) {
@@ -186,6 +191,8 @@ export function buildDisplayMaterialTree(workItem, order) {
   }
   workItem._topMaterial.children = materials
   enrichPlanMaterial(workItem._topMaterial, order, workItem)
+  applyPurchaseInTransitToMaterialTree([workItem._topMaterial])
+  applyWoAllocatedToMaterialTree([workItem._topMaterial])
   return [workItem._topMaterial]
 }
 

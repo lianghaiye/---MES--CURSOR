@@ -143,18 +143,6 @@
               </template>
               <template v-else-if="column.key === 'shipQty'">
                 {{ formatQty(line.shipQty) }}
-                <div
-                  v-if="
-                    isOutboundDualUnitLine(line) &&
-                    (line.blankSizeText || line.demandMeters != null)
-                  "
-                  class="blank-size-hint"
-                >
-                  <template v-if="line.blankSizeText">下料 {{ line.blankSizeText }} → </template>
-                  需求 {{ formatQty(line.demandMeters ?? line.shipQty) }} → 实发
-                  {{ formatQty(line.shipQty) }}
-                  {{ resolveOutboundStockUnit(line) }}
-                </div>
               </template>
               <template v-else-if="column.key === 'blankSizeText'">
                 <template v-if="line.blankSizeText">
@@ -285,7 +273,6 @@ import {
 import {
   canOutboundBatchPick,
   enrichOutboundLine,
-  isOutboundDualUnitLine,
   resolveOutboundStockUnit,
 } from '@/utils/outboundLineHelpers'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'

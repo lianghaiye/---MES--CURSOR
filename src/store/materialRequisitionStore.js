@@ -4,15 +4,20 @@ import {
   createMaterialRequisitionSeed,
   MATERIAL_DEDUCT_STATUS,
   MATERIAL_REQUISITION_STATS_SEED,
+  MATERIAL_DEDUCT_SOURCES,
   normalizeMaterialDeductStatus,
   resolveInventoryDeductDocNo,
+  resolveDeductSource,
   isQuickMaterialDeduct,
 } from '@/mock/materialRequisitionRecords'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
+import { buildBackflushDeductDraft } from '@/utils/backflushDeduct'
+import { ensureCrossDemoDeductRecords } from '@/mock/crossModuleDemoSeed'
 
 const STORAGE_KEY = 'i_doms_material_requisition'
 const SEED_VERSION_KEY = 'i_doms_material_requisition_seed_v'
-const CURRENT_SEED_VERSION = '6'
+/** v10：跨模块演示库存扣减 */
+const CURRENT_SEED_VERSION = '10'
 
 /** 确认后可撤销 / 作废 / 重试的天数，超时单据锁定 */
 export const MATERIAL_DEDUCT_OPERABLE_DAYS = 30
@@ -73,7 +78,91 @@ function normalizeRecord(row) {
   if (!row.requisitionMode) {
     row.requisitionMode = row.reqNo && !row.workOrderNo ? 'quick' : 'work-order'
   }
+  if (!row.deductSource) {
+    row.deductSource = resolveDeductSource(row)
+  }
   return row
+}
+
+export function generateMaterialDeductNo() {
+  const ymd = dayjs().format('YYYYMMDD')
+  const prefix = `DR-${ymd}-`
+  let max = 0
+  materialRequisitionState.records.forEach((r) => {
+    const no = String(r.deductNo || '')
+    if (!no.startsWith(prefix)) return
+    const seq = Number(no.slice(prefix.length).replace(/\D/g, '')) || 0
+    max = Math.max(max, seq)
+  })
+  return `${prefix}${String(max + 1).padStart(3, '0')}`
+}
+
+/**
+ * 写入一条库存扣减记录；若开启库存扣减自动审批则直接确认
+ */
+export function createMaterialDeductRecord(payload = {}) {
+  const lines = (payload.lines || []).map((l) => ({
+    ...l,
+    planQty: Number(l.planQty) || 0,
+    actualQty: 0,
+    status: MATERIAL_DEDUCT_STATUS.PENDING,
+    failReason: '',
+  }))
+  if (!lines.length) {
+    return { ok: false, message: '扣减明细不能为空' }
+  }
+  const row = normalizeRecord({
+    id: payload.id || `dr-${Date.now()}`,
+    workOrderNo: payload.workOrderNo || '',
+    workOrderId: payload.workOrderId || '',
+    reqNo: payload.reqNo || '',
+    requisitionMode: payload.requisitionMode || 'work-order',
+    deductSource: payload.deductSource || MATERIAL_DEDUCT_SOURCES.WORK_ORDER,
+    deductNo: payload.deductNo || generateMaterialDeductNo(),
+    productName: payload.productName || '',
+    productSpec: payload.productSpec || '',
+    material: payload.material || '',
+    drawingNo: payload.drawingNo || '',
+    reportQty: Number(payload.reportQty) || 0,
+    deductTime: '',
+    warehouseName: payload.warehouseName || '',
+    warehouseCode: payload.warehouseCode || '',
+    materialDone: 0,
+    materialTotal: lines.length,
+    status: MATERIAL_DEDUCT_STATUS.PENDING,
+    stockPhase: 'prelock',
+    remark: payload.remark || '',
+    lines,
+    createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+  })
+  materialRequisitionState.records.unshift(row)
+
+  if (isAutoApproveEnabled(AUTO_APPROVE_TYPES.INVENTORY_DEDUCT)) {
+    return confirmMaterialDeduct(row.id)
+  }
+  return { ok: true, record: row }
+}
+
+/**
+ * 工单完工 → 倒冲扣减单（领料属性关闭的 BOM 件）
+ * 同一工单已有倒冲待确认/成功单时不重复生成
+ */
+export function createBackflushDeductFromWorkOrder(workOrder, finishedQty) {
+  if (!workOrder) return { ok: false, message: '工单不存在' }
+  const woNo = workOrder.code || workOrder.workOrderNo || ''
+  const existed = materialRequisitionState.records.find(
+    (r) =>
+      resolveDeductSource(r) === MATERIAL_DEDUCT_SOURCES.BACKFLUSH &&
+      (r.workOrderId === workOrder.id || r.workOrderNo === woNo) &&
+      r.status !== MATERIAL_DEDUCT_STATUS.VOIDED,
+  )
+  if (existed) {
+    return { ok: true, skipped: true, record: existed, message: '该工单已有倒冲扣减单' }
+  }
+
+  const built = buildBackflushDeductDraft(workOrder, finishedQty)
+  if (!built.ok) return built
+  return createMaterialDeductRecord(built.draft)
 }
 
 function loadFromStorage() {
@@ -114,13 +203,13 @@ function createInitial() {
     const cached = loadFromStorage()
     if (cached) {
       return {
-        records: cached.records,
+        records: ensureCrossDemoDeductRecords(cached.records),
         stats: { ...MATERIAL_REQUISITION_STATS_SEED, ...(cached.stats || {}) },
       }
     }
   }
   return {
-    records: createMaterialRequisitionSeed(),
+    records: ensureCrossDemoDeductRecords(createMaterialRequisitionSeed()),
     stats: { ...MATERIAL_REQUISITION_STATS_SEED },
   }
 }

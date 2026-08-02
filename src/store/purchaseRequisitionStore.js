@@ -8,6 +8,9 @@ import {
 import { round2 } from '@/utils/purchaseMerge'
 import { createPurchaseOrdersFromMergedLines } from '@/store/purchaseOrderStore'
 import { ensureProductionPlanOrderTreeDemoRequisitions } from '@/mock/productionPlanOrderTreeSeed'
+import { ensureCrossDemoPurchaseRequisitions } from '@/mock/crossModuleDemoSeed'
+import { materialInfoState } from '@/store/materialInfoStore'
+import { convertStockDemandToPurchase } from '@/utils/purchaseUomConvert'
 
 function mapSalesUrgency(urgency) {
   if (urgency === '紧急') return '紧急'
@@ -24,6 +27,9 @@ function resolveEarliestDeliveryDate(lineItems, fallback) {
 }
 
 const STORAGE_KEY = 'i_doms_purchase_requisitions'
+const SEED_VERSION_KEY = 'i_doms_purchase_requisitions_seed_v'
+/** v2：跨模块演示（包装采购申请未转单 / 已转单） */
+const CURRENT_SEED_VERSION = '2'
 let reqSeq = 5
 
 function loadFromStorage() {
@@ -39,11 +45,23 @@ function loadFromStorage() {
   return null
 }
 
+function shouldReseed() {
+  return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
+}
+
 function persist() {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({ requisitions: purchaseRequisitionState.requisitions }),
   )
+  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+}
+
+function initRequisitions() {
+  const base = shouldReseed()
+    ? clonePurchaseRequisitions()
+    : loadFromStorage() || clonePurchaseRequisitions()
+  return ensureCrossDemoPurchaseRequisitions(ensureProductionPlanOrderTreeDemoRequisitions(base))
 }
 
 export function generateReqNo() {
@@ -73,9 +91,7 @@ export function isReqNoTaken(reqNo, excludeId) {
 export { generatePurchaseOrderNo } from '@/store/purchaseOrderStore'
 
 export const purchaseRequisitionState = reactive({
-  requisitions: ensureProductionPlanOrderTreeDemoRequisitions(
-    loadFromStorage() || clonePurchaseRequisitions(),
-  ),
+  requisitions: initRequisitions(),
 })
 
 watch(
@@ -126,6 +142,8 @@ export function findPurchaseRequisitionByReqNo(reqNo) {
 
 function mapPlanMaterialToLineItem(m, deliveryDate, estimatedArrivalDate, receivingWarehouse) {
   const demandQty = m.demandQty ?? m.gapQty ?? m.planQty ?? 0
+  const master = materialInfoState.materials.find((row) => row.code === m.code) || m
+  const converted = convertStockDemandToPurchase(m.planQty ?? m.gapQty ?? demandQty, master)
   return createLineItem({
     inventoryName: m.name,
     inventoryCode: m.code,
@@ -134,12 +152,16 @@ function mapPlanMaterialToLineItem(m, deliveryDate, estimatedArrivalDate, receiv
     material: m.material || '',
     materialType: m.type || '零部件',
     supplyType: m.supplyType,
-    unit: m.unit || '件',
+    unit: converted.purchaseUnit,
+    inventoryUnit: converted.inventoryUnit,
+    purchaseUnit: converted.purchaseUnit,
+    packageContent: converted.packageContent,
+    convertHint: converted.convertHint,
     stockQty: m.stockQty ?? 0,
     availableStock: m.availableStock ?? 0,
     inTransitQty: m.inTransitQty ?? 0,
     demandQty,
-    planPurchaseQty: demandQty,
+    planPurchaseQty: converted.planPurchaseQty,
     supplierName: m.supplier || '',
     designatedSupplier: Boolean(m.designateSupplier || m.supplier),
     expectedArrivalDate: estimatedArrivalDate,
@@ -170,7 +192,11 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
       material: row.material || '',
       materialType: row.materialType || '零部件',
       supplyType: '外购件',
-      unit: row.unit || '件',
+      unit: row.purchaseUnit || row.unit || '件',
+      inventoryUnit: row.inventoryUnit || row.unit || '件',
+      purchaseUnit: row.purchaseUnit || row.unit || '件',
+      packageContent: row.packageContent ?? 1,
+      convertHint: row.convertHint || '',
       stockQty: row.stockQty ?? 0,
       availableStock: row.availableStock ?? 0,
       inTransitQty: row.inTransitQty ?? 0,

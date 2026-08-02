@@ -76,9 +76,9 @@ export const OUTBOUND_ISSUE_RULE_DESCRIPTION =
   '本期仅开放「先进先出+优先整批+余料优先」：双物料单位出库填写出库数量，确认出库时按批次号顺序自动匹配并扣减（可跨多批）；匹配时优先整批满足需求，并优先使用余料批次。「后进先出」「自主拣选」本期置灰未开放。'
 
 /**
- * 双物料单位发料规则（管材/板材共用）
- * - partial：部分出+余料留原批（一批/一类余量留原批；一物一码核销后余料新码挂原父批）
- * - whole_with_remnant：整出+余料回（整根/整张出库，余料经下料结算回库）
+ * 双单位发料规则（管材/板材共用；单单位默认走部分出）
+ * - partial：部分出+余料留原批
+ * - whole_with_remnant：整批出+余料确认回库
  */
 export const DUAL_UNIT_ISSUE_STRATEGIES = {
   PARTIAL: 'partial',
@@ -86,16 +86,19 @@ export const DUAL_UNIT_ISSUE_STRATEGIES = {
 }
 
 export const DUAL_UNIT_ISSUE_STRATEGY_OPTIONS = [
-  { value: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL, label: '部分出+余料留原批', disabled: false },
   {
     value: DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT,
-    label: '整出+余料回',
+    label: '整批出+余料确认回库',
     disabled: false,
   },
+  { value: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL, label: '部分出+余料留原批', disabled: false },
 ]
 
 export const DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION =
-  '部分出+余料留原批：确认出库按需求数量（米/㎡）扣减；一批一码/一类一码余量留在原批次；一物一码将大于需求的整件核销后，余量自动生成余料件码挂原父批。整出+余料回：确认出库先整根/整张（整批）出库，出库数量可为大于需求的整件量；之后在「下料结算」确认耗用，余料回库生成新批次。'
+  '单单位物料默认发料规则为部分出+余料留原批。' +
+  '双单位部分出+余料留原批：确认出库按需求数量扣减；一批一码/一类一码余量留在原批次；一物一码将大于需求的整件核销后，余量自动生成余料件码挂原父批。' +
+  '双单位整批出+余料确认回库：确认出库按整批/整件离开发料仓，实发可大于需求；' +
+  '须在「下料结算」填写实耗并确认回库：余料建新批次号、标识为余料，血缘挂原批，默认回发料仓。'
 
 export const AUTO_APPROVE_TYPES = {
   PURCHASE_ORDER: 'purchaseOrder',
@@ -188,7 +191,7 @@ export const FUNCTION_PARAM_ROWS = [
   },
   {
     key: 'dualUnitIssueStrategy',
-    scenario: '发料规则',
+    scenario: '双单位发料规则',
     description: DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION,
   },
 ]
@@ -380,7 +383,7 @@ export function getDualUnitIssueStrategy() {
 export function setDualUnitIssueStrategy(mode) {
   const normalized = normalizeDualUnitIssueStrategy(mode)
   const hit = DUAL_UNIT_ISSUE_STRATEGY_OPTIONS.find((item) => item.value === normalized)
-  if (!hit || hit.disabled) return { ok: false, message: '无效的发料规则' }
+  if (!hit || hit.disabled) return { ok: false, message: '无效的双单位发料规则' }
   functionParamState.params.dualUnitIssueStrategy = normalized
   return { ok: true }
 }

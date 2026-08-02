@@ -1,11 +1,21 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { roundMeters } from '@/utils/variableLengthMaterial'
-import { getBatchById, receiveRemnantBatch, BATCH_STATUS } from '@/store/stockBatchStore'
+import {
+  getBatchById,
+  receiveRemnantBatch,
+  issueBatchQty,
+  BATCH_STATUS,
+} from '@/store/stockBatchStore'
+import { adjustStockQty } from '@/store/stockStore'
 import { getOutboundOrderById } from '@/store/outboundStore'
 import { addInboundOrder, generateInboundNo } from '@/store/inboundOrderStore'
+import { createCutSettleSeed } from '@/mock/cutSettleSeed'
 
 const STORAGE_KEY = 'i_doms_cut_settle_records'
+const SEED_VERSION_KEY = 'i_doms_cut_settle_seed_v'
+/** v2：明细列表字段（规格/图号/材质/出库仓/出库时间） */
+const CURRENT_SEED_VERSION = '2'
 
 function loadFromStorage() {
   try {
@@ -17,15 +27,27 @@ function loadFromStorage() {
   } catch {
     /* ignore */
   }
-  return []
+  return null
+}
+
+function shouldReseed() {
+  return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
 }
 
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ records: cutSettleState.records }))
+  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+}
+
+function initRecords() {
+  if (shouldReseed() || !loadFromStorage()?.length) {
+    return createCutSettleSeed()
+  }
+  return loadFromStorage()
 }
 
 export const cutSettleState = reactive({
-  records: loadFromStorage(),
+  records: initRecords(),
 })
 
 watch(
@@ -57,6 +79,9 @@ export function buildCutSettleDraftFromOutbound(outboundId) {
   if (order.status !== '已出库') {
     return { ok: false, message: '仅已出库的领料出库单可下料结算' }
   }
+  if (order.outboundType !== '领料出库' && order.outboundType !== '发料出库') {
+    return { ok: false, message: '仅领料/发料出库单可下料结算' }
+  }
   const vlLines = (order.lineItems || []).filter((l) => {
     if (!l.isVariableLength) return false
     if (l.pickedBatchId) return true
@@ -66,28 +91,44 @@ export function buildCutSettleDraftFromOutbound(outboundId) {
   if (!vlLines.length) {
     return { ok: false, message: '该出库单无可结算的双物料单位行' }
   }
+  const receiveWh = String(order.receiveWarehouse || '').trim()
+  const shipHeader = order.warehouse || ''
+  const outboundTime = order.outboundTime || order.completedAt || order.createdAt || ''
   const lines = vlLines.map((line) => {
     const demand = Number(line.demandMeters ?? line.shipQty) || 0
     const allocSum = (Array.isArray(line.batchAllocations) ? line.batchAllocations : []).reduce(
       (s, a) => s + (Number(a.qty) || 0),
       0,
     )
-    // 整出+余料回：实发量（shipQty/分配合计）作拣出量；需求量作默认耗用
+    // 整出+余料回：实发量作拣出量；需求量作默认耗用
     const picked = Number(line.pickedLength) || Number(line.shipQty) || allocSum || 0
     const firstAlloc = (line.batchAllocations || [])[0]
+    const shipWh = line.shipWarehouse || shipHeader
+    // 有领入仓时：耗用在线边 B；余料默认回发料仓 A
+    const consumeWh = line.receiveWarehouse || receiveWh || shipWh
+    const remnantReturnWh = receiveWh || line.receiveWarehouse ? shipWh : consumeWh
     return {
       id: `csl-${line.id || Date.now()}`,
       itemCode: line.itemCode,
       itemName: line.itemName,
-      warehouse: line.shipWarehouse || order.warehouse,
+      specModel: line.specModel || '',
+      drawingNo: line.drawingNo || '',
+      material: line.material || '',
+      shipWarehouse: shipWh,
+      warehouse: consumeWh,
+      remnantReturnWarehouse: remnantReturnWh,
       pickedBatchId: line.pickedBatchId || firstAlloc?.batchId,
       pickedBatchNo: line.pickedBatchNo || line.issuedBatchNo || firstAlloc?.batchNo || '',
+      receiveBatchIds: Array.isArray(line.receiveBatchIds) ? [...line.receiveBatchIds] : [],
       pickedLength: picked,
       demandMeters: demand,
       actualConsumeMeters: demand,
       remnantLength: roundMeters(Math.max(0, picked - demand)),
       workOrderNo: line.workOrderNo || line.sourceDocNo || order.sourceOrderNo || '',
       dualUnitIssueStrategy: line.dualUnitIssueStrategy || '',
+      blankSize: line.blankSize || null,
+      blankSizeText: line.blankSizeText || '',
+      blankSizeMode: line.blankSizeMode || '',
     }
   })
   return {
@@ -96,6 +137,9 @@ export function buildCutSettleDraftFromOutbound(outboundId) {
       outboundId: order.id,
       outboundDocNo: order.docNo,
       sourceOrderNo: order.sourceOrderNo || '',
+      receiveWarehouse: receiveWh,
+      shipWarehouse: shipHeader,
+      outboundTime,
       lines,
     },
   }
@@ -118,7 +162,7 @@ export function createCutSettleRecord(payload) {
     if (line.actualConsumeMeters > line.pickedLength) {
       return {
         ok: false,
-        message: `「${line.itemName || line.itemCode}」耗用不可超过出库长度 ${line.pickedLength} 米`,
+        message: `「${line.itemName || line.itemCode}」耗用不可超过出库长度 ${line.pickedLength}`,
       }
     }
   }
@@ -130,6 +174,9 @@ export function createCutSettleRecord(payload) {
     outboundId: payload.outboundId || '',
     outboundDocNo: payload.outboundDocNo || '',
     sourceOrderNo: payload.sourceOrderNo || '',
+    receiveWarehouse: payload.receiveWarehouse || '',
+    shipWarehouse: payload.shipWarehouse || '',
+    outboundTime: payload.outboundTime || '',
     remark: payload.remark || '',
     lines,
     creator: payload.creator || 'admin1',
@@ -142,6 +189,38 @@ export function createCutSettleRecord(payload) {
   return { ok: true, record: row }
 }
 
+/** 从领入仓（B）扣掉整段领入量：优先扣领入批次，否则扣汇总 */
+function consumeFromReceiveWarehouse(line, meta = {}) {
+  const wh = line.warehouse
+  const picked = roundMeters(Number(line.pickedLength) || 0)
+  if (!wh || !(picked > 0)) return { ok: true }
+
+  const receiveIds = Array.isArray(line.receiveBatchIds) ? line.receiveBatchIds.filter(Boolean) : []
+  if (receiveIds.length) {
+    for (const id of receiveIds) {
+      const batch = getBatchById(id)
+      if (!batch || batch.status !== BATCH_STATUS.IN_STOCK) continue
+      const res = issueBatchQty(id, null, meta)
+      if (!res.ok) return res
+    }
+    return { ok: true }
+  }
+
+  // 回退：按汇总从领入仓扣（演示种子线边批可直接 issue 上面分支）
+  const batch = getBatchById(line.pickedBatchId)
+  if (batch && batch.warehouse === wh && batch.status === BATCH_STATUS.IN_STOCK) {
+    return issueBatchQty(line.pickedBatchId, picked, meta)
+  }
+
+  return adjustStockQty({
+    warehouse: wh,
+    itemCode: line.itemCode,
+    itemName: line.itemName,
+    unit: '米',
+    delta: -picked,
+  })
+}
+
 export function confirmCutSettle(id, operator = 'admin1') {
   const row = getCutSettleById(id)
   if (!row) return { ok: false, message: '结算单不存在' }
@@ -149,16 +228,21 @@ export function confirmCutSettle(id, operator = 'admin1') {
 
   const remnantLines = []
   for (const line of row.lines || []) {
-    const batch = getBatchById(line.pickedBatchId)
-    if (batch && batch.status !== BATCH_STATUS.ISSUED) {
-      // 允许已出库；若状态异常仍尝试余料
-    }
+    const consumeRes = consumeFromReceiveWarehouse(line, {
+      sourceDocNo: row.docNo,
+      workOrderNo: line.workOrderNo || '',
+    })
+    if (!consumeRes.ok) return { ok: false, message: consumeRes.message }
+
     const remnant = roundMeters(Number(line.remnantLength))
     if (remnant > 0) {
+      const returnWh = line.remnantReturnWarehouse || line.warehouse || row.receiveWarehouse || ''
+      const sourceBatchId =
+        (Array.isArray(line.receiveBatchIds) && line.receiveBatchIds[0]) || line.pickedBatchId
       const res = receiveRemnantBatch({
-        sourceBatchId: line.pickedBatchId,
+        sourceBatchId,
         remnantLength: remnant,
-        warehouse: line.warehouse,
+        warehouse: returnWh,
         sourceDocNo: row.docNo,
         sourceType: '余料入库',
       })
@@ -168,7 +252,7 @@ export function confirmCutSettle(id, operator = 'admin1') {
       remnantLines.push({
         itemCode: line.itemCode,
         itemName: line.itemName,
-        warehouse: line.warehouse,
+        warehouse: returnWh,
         qty: remnant,
         unit: '米',
         isVariableLength: true,
@@ -197,7 +281,6 @@ export function confirmCutSettle(id, operator = 'admin1') {
       docNo: generateInboundNo(),
       lineItems: remnantLines,
     })
-    // 余料已在 receiveRemnantBatch 写入库存；入库单仅留痕，避免再走 applyInboundToStock 双计
     row.remnantInboundDocNo = inbound.docNo
     row.remnantInboundId = inbound.id
   }

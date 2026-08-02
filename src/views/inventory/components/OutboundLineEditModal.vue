@@ -74,7 +74,7 @@
         </template>
         <a-input-number
           v-model:value="draft.shipQty"
-          :min="isDualUnitLine ? 0.001 : 0"
+          :min="0"
           :precision="4"
           placeholder="请填写出库数量"
           style="width: 100%"
@@ -297,7 +297,7 @@ const autoAllocPreviewText = computed(() => {
   }
   const batchAvail = getOutboundAvailableBatchQty(line.shipWarehouse, line.itemCode)
   if (!(batchAvail > 0)) {
-    return '暂无在库批次，请先入库建批或更换仓库'
+    return '该仓暂无在库批次，请先入库建批或改选有批次的仓库'
   }
   if (!(Number(line.shipQty) > 0)) {
     return `${ruleName}·确认时自动扣批`
@@ -354,26 +354,32 @@ watch(
   },
 )
 
+function clearAutoBatchPickFields() {
+  if (!draft.value) return
+  draft.value.manualPickBatchIds = []
+  draft.value.batchAllocations = []
+  draft.value.pickedBatchId = null
+  draft.value.pickedBatchNo = ''
+  draft.value.pickedLength = null
+  draft.value.barcodeBatchNo = ''
+  draft.value.issuedBatchNo = undefined
+  draft.value.outboundIssueRule = undefined
+}
+
 function enableManualBatchPick() {
   if (!draft.value) return
   if (!(Number(draft.value.demandMeters) > 0) && Number(draft.value.shipQty) > 0) {
     draft.value.demandMeters = Number(draft.value.shipQty)
   }
+  clearAutoBatchPickFields()
   draft.value.manualBatchPick = true
-  draft.value.manualPickBatchIds = []
-  draft.value.batchAllocations = []
   syncLineTotalFromUnit(draft.value)
 }
 
 function restoreAutoBatchPick() {
   if (!draft.value) return
   draft.value.manualBatchPick = false
-  draft.value.outboundIssueRule = undefined
-  draft.value.manualPickBatchIds = []
-  draft.value.batchAllocations = []
-  draft.value.pickedBatchId = null
-  draft.value.pickedBatchNo = ''
-  draft.value.barcodeBatchNo = ''
+  clearAutoBatchPickFields()
   syncLineTotalFromUnit(draft.value)
 }
 
@@ -426,11 +432,7 @@ function refreshPreviewStock() {
 
 function clearBatchPick() {
   if (!draft.value) return
-  draft.value.manualPickBatchIds = []
-  draft.value.batchAllocations = []
-  draft.value.pickedBatchId = null
-  draft.value.pickedBatchNo = ''
-  draft.value.barcodeBatchNo = ''
+  clearAutoBatchPickFields()
   if (canOutboundBatchPick(draft.value) && manualPick.value) {
     syncLineTotalFromUnit(draft.value)
   }
@@ -443,23 +445,31 @@ function onWarehouseChange() {
 
 function onShipQtyFieldChange() {
   if (!draft.value) return
-  const qty = Number(draft.value.shipQty)
+  let qty = Number(draft.value.shipQty)
+  if (!Number.isFinite(qty) || qty < 0) {
+    draft.value.shipQty = 0
+    qty = 0
+  }
   if (manualPick.value) {
-    if (getManualPickBatchIds(draft.value).length && qty > 0) {
+    const ids = getManualPickBatchIds(draft.value)
+    if (ids.length && qty > 0) {
       const check = allocateFromSelectedBatches({
-        batchIds: getManualPickBatchIds(draft.value),
+        batchIds: ids,
         demandQty: qty,
         unit: stockUnitLabel.value,
       })
       if (!check.ok) {
         message.warning(check.message)
       } else {
-        syncManualPickBatchesToLine(draft.value, getManualPickBatchIds(draft.value))
+        syncManualPickBatchesToLine(draft.value, ids)
       }
+    } else if (ids.length) {
+      syncManualPickBatchesToLine(draft.value, ids)
     }
     syncLineTotalFromUnit(draft.value)
     return
   }
+  clearAutoBatchPickFields()
   const max =
     availableQty.value > 0 || isDualUnitLine.value ? availableQty.value || undefined : undefined
   if (max != null && Number.isFinite(qty) && qty > max) {
@@ -519,25 +529,30 @@ function handleOk() {
     message.warning('请选择仓库')
     return
   }
+  const qty = Number(draft.value.shipQty)
+  if (
+    draft.value.shipQty == null ||
+    draft.value.shipQty === '' ||
+    !Number.isFinite(qty) ||
+    qty < 0
+  ) {
+    message.warning('请输入出库数量（可为 0）')
+    return
+  }
   if (canOutboundBatchPick(draft.value) && manualPick.value) {
-    const check = validateManualBatchAllocations(draft.value)
-    if (!check.ok) {
-      message.warning(check.message)
-      return
+    if (qty > 0) {
+      const check = validateManualBatchAllocations(draft.value)
+      if (!check.ok) {
+        message.warning(check.message)
+        return
+      }
+      draft.value.manualBatchPick = true
+      applyBatchAllocationsToLine(draft.value, check.allocations, { syncShipQty: false })
     }
-    draft.value.manualBatchPick = true
-    applyBatchAllocationsToLine(draft.value, check.allocations, { syncShipQty: false })
     syncLineTotalFromUnit(draft.value)
-  } else {
-    if (draft.value.shipQty == null || Number(draft.value.shipQty) <= 0) {
-      message.warning('请输入出库数量')
-      return
-    }
+  } else if (qty > 0) {
     const available = getOutboundAvailableBatchQty(draft.value.shipWarehouse, draft.value.itemCode)
-    if (
-      (isOutboundDualUnitLine(draft.value) || available > 0) &&
-      Number(draft.value.shipQty) > available
-    ) {
+    if ((isOutboundDualUnitLine(draft.value) || available > 0) && qty > available) {
       message.warning(`出库数量不能超过可用库存 ${available}`)
       return
     }

@@ -198,6 +198,7 @@ const columnDefs = [
   { key: 'workCenter', title: '工作中心', width: 130, editable: true, total: false },
   { key: 'personInCharge', title: '负责人', width: 90, editable: true, total: false },
   { key: 'stockQty', title: '库存数量', width: 90, total: true, numeric: true },
+  { key: 'woAllocatedQty', title: '工单占用', width: 90, total: true, numeric: true },
   { key: 'availableStock', title: '可用库存', width: 90, total: true, numeric: true },
   { key: 'inTransitQty', title: '在途数量', width: 90, total: true, numeric: true },
   { key: 'demandQty', title: '需求数', width: 80, total: true, numeric: true },

@@ -301,7 +301,7 @@ const lineColumns = [
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '库存数量', key: 'stockQty', width: 90, align: 'right' },
   { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 70 },
+  { title: '采购单位', dataIndex: 'unit', width: 80 },
   { title: '不含税单价', key: 'unitPriceExTax', width: 100, align: 'right' },
   { title: '税率(%)', dataIndex: 'taxRate', width: 80, align: 'right' },
   { title: '含税单价', key: 'unitPriceInTax', width: 100, align: 'right' },

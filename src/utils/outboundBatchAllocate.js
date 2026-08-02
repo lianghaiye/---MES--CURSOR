@@ -12,6 +12,7 @@ import {
   OUTBOUND_ISSUE_RULES,
   isManualOutboundIssue,
   isPartialDualUnitIssue,
+  isWholeWithRemnantIssue,
 } from '@/store/functionParamStore'
 
 /** 该明细行是否走自主拣选（行级开关或全局出库规则） */
@@ -67,11 +68,13 @@ export function allocateFromSelectedBatches({ batchIds = [], demandQty, unit = '
   }
   let left = need
   const allocations = []
+  const whole = isWholeWithRemnantIssue()
   for (const b of batches) {
     if (!(left > 0)) break
     const avail = roundQty(Number(b.currentLength) || 0)
     if (!(avail > 0)) continue
-    const take = roundQty(Math.min(avail, left))
+    // 整出+余料回：整批出完（可略超需求）；部分出：按需求扣、余量留原批
+    const take = whole ? avail : roundQty(Math.min(avail, left))
     allocations.push({
       batchId: b.id,
       batchNo: b.batchNo,
@@ -81,10 +84,12 @@ export function allocateFromSelectedBatches({ batchIds = [], demandQty, unit = '
     })
     left = roundQty(left - take)
   }
-  if (left > 0 || !allocations.length) {
+  if (!(left <= 0) || !allocations.length) {
     return {
       ok: false,
-      message: `所选批次不足（需 ${need}，可用 ${available}）`,
+      message: whole
+        ? `所选批次整批出库后仍不足需求（需 ${need}，可用 ${available}），请增选批次`
+        : `所选批次不足（需 ${need}，可用 ${available}）`,
       allocations: [],
       available,
     }

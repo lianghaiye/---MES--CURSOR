@@ -60,6 +60,17 @@
                 />
               </a-form-item>
             </a-col>
+            <a-col v-if="showReceiveWarehouse" :span="8">
+              <a-form-item label="领入仓库">
+                <a-select
+                  v-model:value="form.receiveWarehouse"
+                  allow-clear
+                  size="small"
+                  placeholder="线边仓（确认后从出库仓调入）"
+                  :options="receiveWarehouseOpts"
+                />
+              </a-form-item>
+            </a-col>
             <a-col v-if="!isSalesOutbound" :span="8">
               <a-form-item label="领用部门">
                 <a-select
@@ -314,7 +325,7 @@
                     <template #edit="{ endEdit }">
                       <a-input-number
                         v-model:value="record.shipQty"
-                        :min="isOutboundDualUnitLine(record) ? 0.001 : 0"
+                        :min="0"
                         :precision="4"
                         size="small"
                         style="width: 100%"
@@ -325,21 +336,6 @@
                       />
                     </template>
                   </InventoryLineEditableCell>
-                  <div
-                    v-if="
-                      isOutboundDualUnitLine(record) &&
-                      (record.blankSizeText || record.demandMeters != null)
-                    "
-                    class="blank-size-hint"
-                  >
-                    <template v-if="record.blankSizeText"
-                      >下料 {{ record.blankSizeText }} →
-                    </template>
-                    需求
-                    {{ formatQty(record.demandMeters ?? record.shipQty) }} → 实发
-                    {{ formatQty(record.shipQty) }}
-                    {{ resolveOutboundStockUnit(record) }}
-                  </div>
                 </template>
                 <template v-else-if="column.key === 'unit'">
                   {{ resolveOutboundStockUnit(record) || '—' }}
@@ -608,6 +604,9 @@ const isFromDelivery = computed(() =>
   Boolean(props.editRecord?.linkedDeliveryId || props.editRecord?.linkedDeliveryCode),
 )
 const isSalesOutbound = computed(() => form.outboundType === '销售出库')
+const showReceiveWarehouse = computed(
+  () => form.outboundType === '领料出库' || form.outboundType === '发料出库',
+)
 const lockOutboundType = computed(() => isFromDelivery.value)
 const lockSalesOrder = computed(() => isFromDelivery.value)
 
@@ -646,6 +645,13 @@ const warehouseOpts = computed(() => {
   return getWarehouseSelectOptions()
 })
 
+const receiveWarehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return warehouseState.warehouses
+    .filter((w) => w.enabled !== false && w.categoryName === '线边仓')
+    .map((w) => ({ label: w.name, value: w.name }))
+})
+
 const batchPickTip = computed(() => OUTBOUND_BATCH_PICK_TIP_AUTO)
 
 const issueRuleLabel = computed(() => {
@@ -668,26 +674,31 @@ function shipQtyMaxFor(line) {
   return undefined
 }
 
+function clearAutoBatchPickFields(line) {
+  line.manualPickBatchIds = []
+  line.batchAllocations = []
+  line.pickedBatchId = null
+  line.pickedBatchNo = ''
+  line.pickedLength = null
+  line.barcodeBatchNo = ''
+  line.issuedBatchNo = undefined
+  line.outboundIssueRule = undefined
+}
+
 function enableManualBatchPick(line) {
   if (!(Number(line.demandMeters) > 0) && Number(line.shipQty) > 0) {
     line.demandMeters = Number(line.shipQty)
   }
+  // 进入自主拣选时清空自动规则预分配/回写的批次，避免带入 FIFO 结果
+  clearAutoBatchPickFields(line)
   line.manualBatchPick = true
-  line.manualPickBatchIds = []
-  line.batchAllocations = []
   syncLineTotalFromUnit(line)
   refreshLine(line)
 }
 
 function restoreAutoBatchPick(line) {
   line.manualBatchPick = false
-  line.outboundIssueRule = undefined
-  line.manualPickBatchIds = []
-  applyBatchAllocationsToLine(line, [], { syncShipQty: false })
-  line.batchAllocations = []
-  line.pickedBatchId = null
-  line.pickedBatchNo = ''
-  line.barcodeBatchNo = ''
+  clearAutoBatchPickFields(line)
   syncLineTotalFromUnit(line)
   refreshLine(line)
 }
@@ -740,7 +751,7 @@ function autoAllocPreview(record) {
   }
   const batchAvail = getOutboundAvailableBatchQty(wh, record.itemCode)
   if (!(batchAvail > 0)) {
-    return '暂无在库批次，请先入库建批或更换仓库'
+    return '该仓暂无在库批次（当前仓库数量为 0 时请先入库建批，或改选原料仓/半成品仓等有批次的仓库）'
   }
   if (!(Number(record.shipQty) > 0)) {
     return `${ruleName}·确认时自动扣批`
@@ -772,6 +783,7 @@ const form = reactive({
   outboundType: '其他出库',
   outboundTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   warehouse: undefined,
+  receiveWarehouse: undefined,
   handler: 'admin1',
   requisitionDept: '默认工厂',
   totalWeight: 0,
@@ -889,6 +901,7 @@ function loadEditForm(record) {
     outboundType: record.outboundType,
     outboundTime: normalizeOutboundTime(record.outboundTime || record.createdAt),
     warehouse: record.warehouse || undefined,
+    receiveWarehouse: record.receiveWarehouse || undefined,
     handler: record.handler || 'admin1',
     requisitionDept: record.requisitionDept || '默认工厂',
     totalWeight: record.totalWeight ?? 0,
@@ -921,6 +934,7 @@ function resetForm() {
     outboundType: '其他出库',
     outboundTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     warehouse: undefined,
+    receiveWarehouse: undefined,
     handler: 'admin1',
     requisitionDept: '默认工厂',
     totalWeight: 0,
@@ -950,12 +964,7 @@ function refreshLine(line) {
 }
 
 function clearBatchPick(line) {
-  line.manualPickBatchIds = []
-  applyBatchAllocationsToLine(line, [], { syncShipQty: false })
-  line.batchAllocations = []
-  line.pickedBatchId = null
-  line.pickedBatchNo = ''
-  line.barcodeBatchNo = ''
+  clearAutoBatchPickFields(line)
   if (canOutboundBatchPick(line) && isRecordManualPick(line)) {
     syncLineTotalFromUnit(line)
   }
@@ -1009,23 +1018,32 @@ function onMultiPickBatches(record, batchIds) {
 
 function onShipQtyCellChange(line) {
   const qty = Number(line.shipQty)
+  if (!Number.isFinite(qty) || qty < 0) {
+    line.shipQty = 0
+  }
   if (isRecordManualPick(line)) {
-    if (getManualPickBatchIds(line).length && qty > 0) {
+    const ids = getManualPickBatchIds(line)
+    if (ids.length && qty > 0) {
       const check = allocateFromSelectedBatches({
-        batchIds: getManualPickBatchIds(line),
+        batchIds: ids,
         demandQty: qty,
         unit: resolveOutboundStockUnit(line),
       })
       if (!check.ok) {
         message.warning(check.message)
       } else {
-        syncManualPickBatchesToLine(line, getManualPickBatchIds(line))
+        syncManualPickBatchesToLine(line, ids)
       }
+    } else if (ids.length && !(qty > 0)) {
+      // 数量改为 0：保留已选批次，清空扣减预览
+      syncManualPickBatchesToLine(line, ids)
     }
     syncLineTotalFromUnit(line)
     syncTotalWeight()
     return
   }
+  // 自动规则下改数量：清掉可能残留的自动/历史选批，确认时再按 FIFO 重算
+  clearAutoBatchPickFields(line)
   const max = shipQtyMaxFor(line)
   if (max != null && Number.isFinite(qty) && qty > max) {
     line.shipQty = max
@@ -1272,6 +1290,7 @@ function buildPayload() {
     outboundType: form.outboundType,
     outboundTime: normalizeOutboundTime(form.outboundTime),
     warehouse: form.warehouse || '',
+    receiveWarehouse: showReceiveWarehouse.value ? form.receiveWarehouse || '' : '',
     handler: form.handler,
     requisitionDept: isSalesOutbound.value ? '' : form.requisitionDept || '',
     totalWeight: form.totalWeight,
@@ -1320,24 +1339,30 @@ function handleSave() {
 
   const invalidBatchLine = form.lineItems.find((line) => {
     if (!line.itemCode || !canOutboundBatchPick(line)) return false
+    const qty = Number(line.shipQty)
+    if (line.shipQty == null || line.shipQty === '' || !Number.isFinite(qty) || qty < 0) {
+      return true
+    }
+    // 允许出库数量为 0（草稿）；有数量时再校验批次/库存
+    if (!(qty > 0)) return false
     if (isRecordManualPick(line)) {
       return !validateManualBatchAllocations(line).ok
     }
-    if (!(Number(line.shipQty) > 0)) return true
     const wh = line.shipWarehouse || form.warehouse
     if (!wh) return true
     const available = getOutboundAvailableBatchQty(wh, line.itemCode)
     if (isOutboundDualUnitLine(line) || available > 0) {
-      return Number(line.shipQty) > available
+      return qty > available
     }
     return false
   })
   if (invalidBatchLine) {
+    const qty = Number(invalidBatchLine.shipQty)
     const manualMsg = validateManualBatchAllocations(invalidBatchLine).message
     message.warning(
-      isRecordManualPick(invalidBatchLine)
+      isRecordManualPick(invalidBatchLine) && qty > 0
         ? `「${invalidBatchLine.itemName || invalidBatchLine.itemCode}」${manualMsg || '请多选批次并分配数量'}`
-        : `「${invalidBatchLine.itemName || invalidBatchLine.itemCode}」请填写出库数量，且不超过可用库存（${issueRuleLabel.value}）`,
+        : `「${invalidBatchLine.itemName || invalidBatchLine.itemCode}」请填写出库数量（可为 0），且不超过可用库存（${issueRuleLabel.value}）`,
     )
     return
   }

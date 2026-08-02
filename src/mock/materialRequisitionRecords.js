@@ -32,8 +32,46 @@ export const MATERIAL_DEDUCT_REQ_MODES = {
   BATCH: 'batch-work-order',
 }
 
+/** 扣减来源：列表筛选 / 展示 */
+export const MATERIAL_DEDUCT_SOURCES = {
+  WORK_ORDER: 'work_order',
+  QUICK: 'quick',
+  BACKFLUSH: 'backflush',
+  MANUAL: 'manual',
+}
+
+export const MATERIAL_DEDUCT_SOURCE_OPTIONS = [
+  { label: '全部', value: '' },
+  { label: '工单领料', value: MATERIAL_DEDUCT_SOURCES.WORK_ORDER },
+  { label: '快速领料', value: MATERIAL_DEDUCT_SOURCES.QUICK },
+  { label: '倒冲', value: MATERIAL_DEDUCT_SOURCES.BACKFLUSH },
+  { label: '手工', value: MATERIAL_DEDUCT_SOURCES.MANUAL },
+]
+
+export const MATERIAL_DEDUCT_SOURCE_LABELS = {
+  [MATERIAL_DEDUCT_SOURCES.WORK_ORDER]: '工单领料',
+  [MATERIAL_DEDUCT_SOURCES.QUICK]: '快速领料',
+  [MATERIAL_DEDUCT_SOURCES.BACKFLUSH]: '倒冲',
+  [MATERIAL_DEDUCT_SOURCES.MANUAL]: '手工',
+}
+
+export function resolveDeductSource(record) {
+  if (!record) return MATERIAL_DEDUCT_SOURCES.WORK_ORDER
+  if (record.deductSource) return record.deductSource
+  if (isQuickMaterialDeduct(record)) return MATERIAL_DEDUCT_SOURCES.QUICK
+  return MATERIAL_DEDUCT_SOURCES.WORK_ORDER
+}
+
+export function resolveDeductSourceLabel(record) {
+  return MATERIAL_DEDUCT_SOURCE_LABELS[resolveDeductSource(record)] || '工单领料'
+}
+
 export function isQuickMaterialDeduct(record) {
   return record?.requisitionMode === MATERIAL_DEDUCT_REQ_MODES.QUICK || record?.mode === 'quick'
+}
+
+export function isBackflushDeduct(record) {
+  return resolveDeductSource(record) === MATERIAL_DEDUCT_SOURCES.BACKFLUSH
 }
 
 /** 列表/详情主单号：快速领料展示领料单号，其余展示工单号 */
@@ -65,6 +103,10 @@ function line(
     drawingNo: extra.drawingNo ?? '',
     variantSummary: extra.variantSummary ?? '',
     variantValues: extra.variantValues ? { ...extra.variantValues } : {},
+    blankSize: extra.blankSize ?? null,
+    blankSizeText: extra.blankSizeText ?? '',
+    blankSizeMode: extra.blankSizeMode ?? '',
+    isBackflush: Boolean(extra.isBackflush),
     planQty,
     actualQty,
     status,
@@ -119,6 +161,9 @@ export function createMaterialRequisitionSeed() {
           specModel: 'φ45×480',
           material: '45#钢',
           drawingNo: 'DWG-ZHOU-005',
+          blankSizeMode: 'length',
+          blankSize: { length: 480, lengthUnit: 'mm' },
+          blankSizeText: '长 480 mm',
         }),
         line('dr-001-6', 'M-006', '联轴器', 10, 10, S.SUCCESS, '', 999, {
           specModel: 'ML3',
@@ -220,8 +265,8 @@ export function createMaterialRequisitionSeed() {
       drawingNo: 'DWG-ISG50-160',
       reportQty: 12,
       deductTime: '',
-      warehouseName: '原料仓',
-      warehouseCode: 'WH-01',
+      warehouseName: '库线边仓',
+      warehouseCode: 'CKGL#20251114#004',
       materialDone: 0,
       materialTotal: 7,
       status: S.PENDING,
@@ -237,15 +282,21 @@ export function createMaterialRequisitionSeed() {
           material: 'ZG230-450',
           drawingNo: 'DWG-ISG-032',
         }),
-        line('dr-004-3', 'M-033', '机械密封', 12, 0, S.PENDING, '', 999, {
-          specModel: 'M-033',
-          material: 'HT250',
-          drawingNo: 'DWG-M-033',
+        line('dr-004-3', 'WL-PIPE-Q235-50', '无缝钢管 Q235 φ50×3', 60, 0, S.PENDING, '', 999, {
+          specModel: 'φ50×3',
+          material: 'Q235',
+          drawingNo: '',
+          blankSizeMode: 'length',
+          blankSize: { length: 5000, lengthUnit: 'mm' },
+          blankSizeText: '长 5000 mm',
         }),
-        line('dr-004-4', 'M-034', '电机', 12, 0, S.PENDING, '', 999, {
-          specModel: 'M-034',
-          material: 'HT250',
-          drawingNo: 'DWG-M-034',
+        line('dr-004-4', 'WL-PLATE-Q235-10', '钢板 Q235 10mm', 14.4, 0, S.PENDING, '', 999, {
+          specModel: '10mm',
+          material: 'Q235',
+          drawingNo: '',
+          blankSizeMode: 'plate',
+          blankSize: { length: 1200, width: 1000, lengthUnit: 'mm', widthUnit: 'mm' },
+          blankSizeText: '长 1200 mm × 宽 1000 mm',
         }),
         line('dr-004-5', 'M-035', '底座', 12, 0, S.PENDING, '', 999, {
           specModel: 'M-035',
@@ -412,6 +463,7 @@ export function createMaterialRequisitionSeed() {
       workOrderNo: '',
       reqNo: 'LL20260720015',
       requisitionMode: 'quick',
+      deductSource: 'quick',
       deductNo: 'DR-20260720-005',
       productName: '快速领料（辅料）',
       productSpec: '—',
@@ -440,6 +492,39 @@ export function createMaterialRequisitionSeed() {
           specModel: 'M-073',
           material: 'HT250',
           drawingNo: 'DWG-M-073',
+        }),
+      ],
+    },
+    {
+      id: 'dr-bf-001',
+      workOrderNo: 'WO202505280-003',
+      workOrderId: 'wo-init-3',
+      requisitionMode: 'work-order',
+      deductSource: 'backflush',
+      deductNo: 'DR-20260728-BF01',
+      productName: '定子铁芯组件',
+      productSpec: '',
+      material: '',
+      drawingNo: '',
+      reportQty: 18,
+      deductTime: '',
+      warehouseName: '库线边仓',
+      warehouseCode: 'CKGL#20251114#004',
+      materialDone: 0,
+      materialTotal: 2,
+      status: S.PENDING,
+      stockPhase: 'prelock',
+      remark: '工单完工倒冲（报工/完工数量 18）',
+      lines: [
+        line('dr-bf-001-1', 'MAT-STD-100', '标准螺栓组', 144, 0, S.PENDING, '', 200, {
+          specModel: 'M12×40',
+          material: '钢',
+          isBackflush: true,
+        }),
+        line('dr-bf-001-2', 'MAT-STD-WASHER', '平垫圈 M12', 144, 0, S.PENDING, '', 300, {
+          specModel: 'M12',
+          material: '钢',
+          isBackflush: true,
         }),
       ],
     },

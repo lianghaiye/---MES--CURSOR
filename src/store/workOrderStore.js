@@ -15,6 +15,7 @@ import {
 import { ensureProductionPlanOrderTreeDemoWorkOrders } from '@/mock/productionPlanOrderTreeSeed'
 import { findWorkItemForPlanRow } from '@/utils/productionPlanMaterial'
 import { ensureMaterialReqDemoWorkOrders } from '@/mock/materialReqWorkOrderSeed'
+import { ensureCrossDemoWorkOrders } from '@/mock/crossModuleDemoSeed'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -99,8 +100,10 @@ function ensureDemoWorkOrder(orders) {
 function ensureLaborDemoProductionOrders(orders) {
   const demos = [...createLaborDemoProductionOrders(), ...createLaborDemoAssemblyOrders()]
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
-  return ensureMaterialReqDemoWorkOrders(
-    ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+  return ensureCrossDemoWorkOrders(
+    ensureMaterialReqDemoWorkOrders(
+      ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+    ),
   )
 }
 
@@ -167,12 +170,36 @@ function createInitialOrders() {
         workCenter: '装配车间',
         bom: '潜水电机',
         warehouse: '成品仓',
+        receiveWarehouse: '库线边仓',
         urgency: '普通',
         planDateRange: ['2026-05-01', '2026-05-20'],
         remark: '',
         processRouteName: '装配标准路线',
         source: 'manual',
         sourceOrderNo: 'SO202505003',
+        // 倒冲演示：领料属性关闭的标准件
+        componentLines: [
+          {
+            id: 'wo3-bf-bolt',
+            itemCode: 'MAT-STD-100',
+            itemName: '标准螺栓组',
+            specModel: 'M12×40',
+            material: '钢',
+            unit: '个',
+            unitQty: 8,
+            requisitionAttr: 0,
+          },
+          {
+            id: 'wo3-bf-washer',
+            itemCode: 'MAT-STD-WASHER',
+            itemName: '平垫圈 M12',
+            specModel: 'M12',
+            material: '钢',
+            unit: '个',
+            unitQty: 8,
+            requisitionAttr: 0,
+          },
+        ],
         processes: buildProcessesFromRoute('装配标准路线').map((p) => ({
           ...p,
           executors: ['李四'],
@@ -233,8 +260,22 @@ export function cloneWorkOrder(id) {
 export function updateWorkOrder(id, patch) {
   const idx = workOrderState.orders.findIndex((o) => o.id === id)
   if (idx === -1) return null
+  const prevStatus = workOrderState.orders[idx].status
   Object.assign(workOrderState.orders[idx], patch)
-  return workOrderState.orders[idx]
+  const row = workOrderState.orders[idx]
+  // 工单首次变为「完成」时生成倒冲库存扣减单（按完工/计划数量）
+  if (prevStatus !== '完成' && row.status === '完成') {
+    const finishedQty =
+      Number(row.finishedQty) || Number(row.scheduleQty) || Number(row.planQty) || 0
+    import('@/store/materialRequisitionStore')
+      .then(({ createBackflushDeductFromWorkOrder }) => {
+        createBackflushDeductFromWorkOrder(row, finishedQty)
+      })
+      .catch(() => {
+        /* ignore */
+      })
+  }
+  return row
 }
 
 export function createWorkOrderPayload(partial) {

@@ -11,12 +11,12 @@ import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
 
 const STORAGE_KEY = 'i_doms_material_info'
-const DATA_VERSION = 12
+/** v13：包装采购换算演示料（盒/个 + packageContent） */
+const DATA_VERSION = 13
 let codeSeq = 100048
 
-function ensureDemoVariableLengthMaterials(list) {
+function ensureDemoMaterialsByCodes(list, demos) {
   const materials = Array.isArray(list) ? [...list] : []
-  const demos = createDemoDualUnitMaterials()
   for (const demo of demos) {
     const idx = materials.findIndex((m) => m.code === demo.code)
     if (idx === -1) {
@@ -32,6 +32,21 @@ function ensureDemoVariableLengthMaterials(list) {
   return materials
 }
 
+function ensureDemoVariableLengthMaterials(list) {
+  return ensureDemoMaterialsByCodes(list, createDemoDualUnitMaterials())
+}
+
+function ensureDemoPackagePurchaseMaterials(list) {
+  const demos = (mockMaterials || []).filter(
+    (m) =>
+      m.packageContent > 1 &&
+      m.purchaseUnit &&
+      m.inventoryUnit &&
+      m.purchaseUnit !== m.inventoryUnit,
+  )
+  return ensureDemoMaterialsByCodes(list, demos)
+}
+
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -39,8 +54,10 @@ function loadFromStorage() {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed.materials)) {
         const force = parsed.version !== DATA_VERSION
-        return ensureDemoVariableLengthMaterials(
-          applyLaborConfigSeed(migrateMaterialList(parsed.materials), { force }),
+        return ensureDemoPackagePurchaseMaterials(
+          ensureDemoVariableLengthMaterials(
+            applyLaborConfigSeed(migrateMaterialList(parsed.materials), { force }),
+          ),
         )
       }
     }

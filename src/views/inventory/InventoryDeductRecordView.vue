@@ -33,6 +33,14 @@
             placeholder="全部"
           />
         </a-form-item>
+        <a-form-item label="扣减来源">
+          <a-select
+            v-model:value="filters.deductSource"
+            :options="sourceOptions"
+            style="width: 140px"
+            placeholder="全部"
+          />
+        </a-form-item>
         <a-form-item label="仓库">
           <a-select
             v-model:value="filters.warehouse"
@@ -96,6 +104,9 @@
           </template>
           <template v-else-if="column.key === 'warehouse'">
             {{ record.warehouseName }} ({{ record.warehouseCode }})
+          </template>
+          <template v-else-if="column.key === 'deductSource'">
+            {{ resolveDeductSourceLabel(record) }}
           </template>
           <template v-else-if="column.key === 'materialRows'">
             {{ record.materialDone }}/{{ record.materialTotal }}
@@ -169,7 +180,10 @@ import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
 import {
   MATERIAL_DEDUCT_STATUS,
   MATERIAL_DEDUCT_STATUS_OPTIONS,
+  MATERIAL_DEDUCT_SOURCE_OPTIONS,
   resolveInventoryDeductDocNo,
+  resolveDeductSource,
+  resolveDeductSourceLabel,
   isQuickMaterialDeduct,
 } from '@/mock/materialRequisitionRecords'
 import {
@@ -198,6 +212,7 @@ const STATUS = MATERIAL_DEDUCT_STATUS
 const filters = reactive({
   workOrderNo: '',
   status: '',
+  deductSource: '',
   warehouse: '',
   date: undefined,
 })
@@ -212,6 +227,7 @@ const activeRecord = ref(null)
 const selectedRowKeys = ref([])
 
 const statusOptions = MATERIAL_DEDUCT_STATUS_OPTIONS
+const sourceOptions = MATERIAL_DEDUCT_SOURCE_OPTIONS
 
 const warehouseOptions = computed(() => {
   const map = new Map()
@@ -269,6 +285,7 @@ const columns = [
   { title: '报工数量', dataIndex: 'reportQty', key: 'reportQty', width: 100, align: 'right' },
   { title: '扣减时间', key: 'deductTime', width: 170 },
   { title: '仓库', key: 'warehouse', width: 160 },
+  { title: '扣减来源', key: 'deductSource', width: 100 },
   { title: '物料行数', key: 'materialRows', width: 100, align: 'center' },
   { title: '扣减状态', key: 'status', width: 110 },
   { title: '操作', key: 'action', width: 220, fixed: 'right' },
@@ -292,6 +309,7 @@ const filteredList = computed(() => {
     )
       return false
     if (filters.status && r.status !== filters.status) return false
+    if (filters.deductSource && resolveDeductSource(r) !== filters.deductSource) return false
     if (filters.warehouse) {
       const key = `${r.warehouseName}|${r.warehouseCode}`
       if (key !== filters.warehouse) return false
@@ -310,7 +328,13 @@ const filteredList = computed(() => {
 })
 
 watch(
-  () => [filters.workOrderNo, filters.status, filters.warehouse, filters.date],
+  () => [
+    filters.workOrderNo,
+    filters.status,
+    filters.deductSource,
+    filters.warehouse,
+    filters.date,
+  ],
   () => {
     pagination.current = 1
     selectedRowKeys.value = []
@@ -353,7 +377,7 @@ const {
   defaultExportFieldSettings,
   doExport,
 } = useListExport({
-  storageKey: 'inventory-deduct-record-list-v3',
+  storageKey: 'inventory-deduct-record-list-v4',
   fieldDefinitions: inventoryDeductExportFields,
   getFilteredRows: () => exportFlatRows.value,
   getSelectedRows: () => selectedExportFlatRows.value,

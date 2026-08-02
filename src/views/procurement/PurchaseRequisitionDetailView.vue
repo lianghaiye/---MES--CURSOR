@@ -98,11 +98,18 @@
                   <template v-else-if="column.key === 'productCode'">
                     {{ lineProductCode(line) }}
                   </template>
+                  <template v-else-if="column.key === 'demandQty'">
+                    {{ formatQty(line.demandQty)
+                    }}{{ line.inventoryUnit ? ` ${line.inventoryUnit}` : '' }}
+                  </template>
+                  <template v-else-if="column.key === 'convertHint'">
+                    {{ line.convertHint || '—' }}
+                  </template>
                   <template v-else-if="column.key === 'stockQty'">
                     {{ formatQty(line.stockQty) }}
                   </template>
                   <template v-else-if="column.key === 'planPurchaseQty'">
-                    {{ formatQty(line.planPurchaseQty) }}
+                    {{ formatQty(line.planPurchaseQty) }}{{ line.unit ? ` ${line.unit}` : '' }}
                   </template>
                   <template v-else-if="column.key === 'supplierName'">
                     {{ line.supplierName || '—' }}

@@ -33,7 +33,8 @@
             <div class="preview-row">
               <span class="preview-label">库存数量</span>
               <span class="preview-value">
-                {{ formatQty(draft.stockQty) }} {{ draft.unit || '件' }}
+                {{ formatQty(draft.stockQty) }}
+                {{ draft.inventoryUnit || draft.unit || '件' }}
               </span>
             </div>
           </a-col>
@@ -51,6 +52,20 @@
               :parser="inputNumberParser"
               style="width: 100%"
               @change="recalcDraft"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="采购单位" required>
+            <a-select
+              v-model:value="draft.unit"
+              show-search
+              allow-clear
+              placeholder="请选择采购单位"
+              style="width: 100%"
+              :options="purchaseUnitOpts"
+              :filter-option="filterUnitOption"
+              @change="onUnitChange"
             />
           </a-form-item>
         </a-col>
@@ -155,6 +170,7 @@ import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { recalcPoLine } from '@/store/purchaseOrderStore'
+import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 
 const props = defineProps({
   open: Boolean,
@@ -166,6 +182,20 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'save'])
 
 const draft = ref(null)
+
+const purchaseUnitOpts = computed(() => {
+  void unitState.units
+  return getPurchaseUnitOptions()
+})
+
+function filterUnitOption(input, option) {
+  return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
+}
+
+function onUnitChange() {
+  if (!draft.value) return
+  draft.value.purchaseUnit = draft.value.unit || draft.value.purchaseUnit || ''
+}
 
 const deliveryDateValue = computed(() =>
   draft.value?.deliveryDate ? dayjs(draft.value.deliveryDate) : null,
