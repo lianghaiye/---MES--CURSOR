@@ -269,6 +269,27 @@ export function listMaterialDeductRecords() {
   return materialRequisitionState.records
 }
 
+/**
+ * 物料在待确认扣减单中的总预扣锁定量（跨所有待确认单据合计，非单张单据）
+ * @param {string} materialCode
+ * @param {{ warehouseName?: string }} [opts] 传入仓库名时仅合计该仓；不传则合计全部仓库
+ */
+export function getMaterialDeductLockedQty(materialCode, opts = {}) {
+  const code = String(materialCode || '').trim()
+  if (!code) return 0
+  const wh = opts.warehouseName != null ? String(opts.warehouseName).trim() : ''
+  let sum = 0
+  for (const row of materialRequisitionState.records) {
+    if (normalizeMaterialDeductStatus(row.status) !== MATERIAL_DEDUCT_STATUS.PENDING) continue
+    if (wh && String(row.warehouseName || '').trim() !== wh) continue
+    for (const line of row.lines || []) {
+      if (String(line.materialCode || '').trim() !== code) continue
+      sum += Number(line.planQty) || 0
+    }
+  }
+  return Math.round(sum * 1000) / 1000
+}
+
 export function getMaterialDeductById(id) {
   return findRecord(id)
 }

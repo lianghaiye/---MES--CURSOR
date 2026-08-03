@@ -16,7 +16,7 @@ import { isPartialDualUnitIssue } from '@/store/functionParamStore'
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
 /** v13：库线边仓倒冲标准件库存 */
-const CURRENT_SEED_VERSION = '13'
+const CURRENT_SEED_VERSION = '14'
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',

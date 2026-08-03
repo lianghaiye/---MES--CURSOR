@@ -43,7 +43,15 @@
       >
         <template #headerCell="{ column }">
           <div class="header-cell">
-            <span class="header-title">{{ column.title }}</span>
+            <span v-if="column.key === 'availableStock'" class="header-title col-title-with-tip">
+              可用库存
+              <a-tooltip
+                title="展示为 工单占用/可用库存；工单占用=开立工单 BOM 需求−已领，可用库存=现存量−工单占用"
+              >
+                <InfoCircleOutlined class="col-tip-icon" />
+              </a-tooltip>
+            </span>
+            <span v-else class="header-title">{{ column.title }}</span>
             <span
               v-if="column.key !== 'index' && column.key !== 'action'"
               class="resize-handle"
@@ -167,7 +175,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch, nextTick } from 'vue'
-import { SettingOutlined } from '@ant-design/icons-vue'
+import { InfoCircleOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { urgencyOptions } from '@/mock/workOrderOptions'
@@ -197,8 +205,7 @@ const columnDefs = [
   { key: 'materialType', title: '物料类型', width: 90, total: false },
   { key: 'supplier', title: '供应商', width: 140, editable: true, total: false },
   { key: 'stockQty', title: '库存数量', width: 90, total: true, numeric: true },
-  { key: 'woAllocatedQty', title: '工单占用', width: 90, total: true, numeric: true },
-  { key: 'availableStock', title: '可用库存', width: 90, total: true, numeric: true },
+  { key: 'availableStock', title: '可用库存', width: 120, total: false, numeric: false },
   { key: 'inTransitQty', title: '在途数量', width: 90, total: true, numeric: true },
   { key: 'demandQty', title: '需求数', width: 80, total: true, numeric: true },
   { key: 'gapQty', title: '缺口数', width: 80, total: true, numeric: true },
@@ -342,6 +349,11 @@ function onDatePickerOpenChange(open) {
 }
 
 function formatCell(record, key, text) {
+  if (key === 'availableStock') {
+    const allocated = Number(record.woAllocatedQty) || 0
+    const available = Number(record.availableStock) || 0
+    return `${allocated}/${available}`
+  }
   if (key === 'expectedArrivalDate') {
     return record.expectedArrivalDate || '请选择'
   }
@@ -479,5 +491,17 @@ function handleSave() {
   .placeholder {
     color: rgba(0, 0, 0, 0.35);
   }
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
 }
 </style>

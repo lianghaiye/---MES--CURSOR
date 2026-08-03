@@ -109,12 +109,64 @@ export function calcAreaSquareMeters(length, width, dimUnit = DEFAULT_PLATE_DIM_
   return roundQty(l * f * w * f, 4)
 }
 
-/** 行/物料是否按面积双单位（板材） */
+/**
+ * 双单位计量形态（入库/下料共用语义）：用户可手动指定，未指定时按库存单位推断
+ * - length：型材 · 按长度（根→米等）
+ * - plate：板材 · 长×宽→㎡
+ * - generic：通用 · 只填库存数量，不强求尺寸换算
+ */
+export const DUAL_UNIT_MEASURE_MODE = {
+  LENGTH: 'length',
+  PLATE: 'plate',
+  GENERIC: 'generic',
+}
+
+export const DUAL_UNIT_MEASURE_MODE_OPTIONS = [
+  { label: '型材 · 按长度', value: DUAL_UNIT_MEASURE_MODE.LENGTH },
+  { label: '板材 · 长×宽→㎡', value: DUAL_UNIT_MEASURE_MODE.PLATE },
+  { label: '通用', value: DUAL_UNIT_MEASURE_MODE.GENERIC },
+]
+
+export function normalizeDualUnitMeasureMode(mode) {
+  const m = String(mode || '').toLowerCase()
+  if (
+    m === DUAL_UNIT_MEASURE_MODE.PLATE ||
+    m === DUAL_UNIT_MEASURE_MODE.LENGTH ||
+    m === DUAL_UNIT_MEASURE_MODE.GENERIC
+  ) {
+    return m
+  }
+  return ''
+}
+
+/** 无手动模式时的默认推断：面积单位 → 板材；其它双单位 → 型材 */
+export function inferDualUnitMeasureMode(lineOrItem = {}) {
+  if (!lineOrItem) return DUAL_UNIT_MEASURE_MODE.GENERIC
+  if (lineOrItem.uomRelation === UOM_RELATION_PER_PIECE_AREA) {
+    return DUAL_UNIT_MEASURE_MODE.PLATE
+  }
+  const stock = lineOrItem.stockUnit || lineOrItem.inventoryUnit || lineOrItem.unit
+  if (isAreaStockUnit(stock)) return DUAL_UNIT_MEASURE_MODE.PLATE
+  if (lineOrItem.isVariableLength) return DUAL_UNIT_MEASURE_MODE.LENGTH
+  return DUAL_UNIT_MEASURE_MODE.GENERIC
+}
+
+/**
+ * 优先行上手动值（inboundMeasureMode / blankSizeMode），否则按单位推断
+ * 面积库存单位默认「板材 · 长×宽→㎡」
+ */
+export function resolveDualUnitMeasureMode(lineOrItem = {}) {
+  const explicit = normalizeDualUnitMeasureMode(
+    lineOrItem?.inboundMeasureMode || lineOrItem?.blankSizeMode,
+  )
+  if (explicit) return explicit
+  return inferDualUnitMeasureMode(lineOrItem)
+}
+
+/** 行/物料是否按面积双单位（板材）——尊重手动计量形态 */
 export function isAreaBasedDualUnit(lineOrItem = {}) {
   if (!lineOrItem) return false
-  if (lineOrItem.uomRelation === UOM_RELATION_PER_PIECE_AREA) return true
-  const stock = lineOrItem.stockUnit || lineOrItem.inventoryUnit || lineOrItem.unit
-  return Boolean(lineOrItem.isVariableLength) && isAreaStockUnit(stock)
+  return resolveDualUnitMeasureMode(lineOrItem) === DUAL_UNIT_MEASURE_MODE.PLATE
 }
 
 /** 解析 BOM 行/物料的库存单位展示值 */

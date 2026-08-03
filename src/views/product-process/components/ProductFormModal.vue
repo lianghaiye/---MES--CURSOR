@@ -247,16 +247,26 @@
               </a-col>
               <a-col :span="8">
                 <a-form-item label="标准包装量">
-                  <a-input-number
-                    v-model:value="form.standardPackQty"
-                    size="small"
-                    :min="0"
-                    :precision="4"
-                    :disabled="viewOnly"
-                    placeholder="请输入标准包装量"
-                    style="width: 100%"
-                    :addon-after="inventoryUnitLabel"
-                  />
+                  <a-input-group compact class="qty-with-unit">
+                    <a-input-number
+                      v-model:value="form.standardPackQty"
+                      size="small"
+                      :min="0"
+                      :precision="4"
+                      :disabled="viewOnly"
+                      placeholder="选填"
+                      class="qty-with-unit-input"
+                    />
+                    <a-select
+                      v-model:value="form.standardPackUnit"
+                      size="small"
+                      :options="unitOpts"
+                      :disabled="viewOnly"
+                      class="qty-with-unit-select"
+                      placeholder="单位"
+                      :get-popup-container="popupContainer"
+                    />
+                  </a-input-group>
                 </a-form-item>
               </a-col>
             </a-row>
@@ -310,16 +320,26 @@
               </a-col>
               <a-col :span="8">
                 <a-form-item label="包装含量">
-                  <a-input-number
-                    v-model:value="form.packContentQty"
-                    size="small"
-                    :min="0"
-                    :precision="4"
-                    :disabled="viewOnly"
-                    placeholder="请输入包装含量"
-                    style="width: 100%"
-                    :addon-after="inventoryUnitLabel"
-                  />
+                  <a-input-group compact class="qty-with-unit">
+                    <a-input-number
+                      v-model:value="form.packContentQty"
+                      size="small"
+                      :min="0"
+                      :precision="4"
+                      :disabled="viewOnly"
+                      placeholder="选填，不填则不换算"
+                      class="qty-with-unit-input"
+                    />
+                    <a-select
+                      v-model:value="form.packContentUnit"
+                      size="small"
+                      :options="packContentUnitOpts"
+                      :disabled="viewOnly"
+                      class="qty-with-unit-select"
+                      placeholder="单位"
+                      :get-popup-container="popupContainer"
+                    />
+                  </a-input-group>
                 </a-form-item>
               </a-col>
               <a-col :span="8">
@@ -640,7 +660,7 @@ import {
   PART_PRODUCT_ATTRIBUTES,
   normalizePartProductAttribute,
 } from '@/mock/productInfoOptions'
-import { unitState, getInventoryUnitOptions } from '@/store/unitStore'
+import { unitState, getInventoryUnitOptions, getAllEnabledUnitOptions } from '@/store/unitStore'
 import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
 import { generateProductCode, addProduct, updateProduct } from '@/store/productInfoStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
@@ -678,7 +698,28 @@ const purchaseUnitPriceInclTax = computed(() => {
   return Number((ex * (1 + r / 100)).toFixed(2))
 })
 
-const inventoryUnitLabel = computed(() => form.inventoryUnit || '件')
+function popupContainer(trigger) {
+  return trigger?.parentNode || document.body
+}
+
+watch(
+  () => form.inventoryUnit,
+  (unit) => {
+    if (!unit) return
+    if (!form.standardPackUnit) form.standardPackUnit = unit
+    // 产品表单无独立采购单位时，采购单位默认=库存单位
+    if (!form.purchaseUnit) form.purchaseUnit = unit
+    if (!form.packContentUnit) form.packContentUnit = form.purchaseUnit || unit
+  },
+)
+
+watch(
+  () => form.purchaseUnit,
+  (unit) => {
+    if (!unit) return
+    if (!form.packContentUnit) form.packContentUnit = unit
+  },
+)
 
 const {
   isActive,
@@ -706,6 +747,11 @@ const materialCategoryOpts = flatMatCats.map((c) => ({
 const unitOpts = computed(() => {
   void unitState.units
   return getInventoryUnitOptions()
+})
+/** 包装含量单位可选全部启用单位，默认值为采购单位 */
+const packContentUnitOpts = computed(() => {
+  void unitState.units
+  return getAllEnabledUnitOptions()
 })
 const productAttrOpts = computed(() => {
   const options = form.isPart
@@ -792,10 +838,13 @@ const form = reactive({
   material: '',
   weight: '',
   inventoryUnit: undefined,
+  purchaseUnit: undefined,
   unitPrice: undefined,
   purchaseUnitPrice: undefined,
   packContentQty: undefined,
+  packContentUnit: undefined,
   standardPackQty: undefined,
+  standardPackUnit: undefined,
   standardSpec: undefined,
   techParams: '',
   canSell: true,
@@ -830,10 +879,13 @@ function resetForm() {
   form.material = ''
   form.weight = ''
   form.inventoryUnit = undefined
+  form.purchaseUnit = undefined
   form.unitPrice = undefined
   form.purchaseUnitPrice = undefined
   form.packContentQty = undefined
+  form.packContentUnit = undefined
   form.standardPackQty = undefined
+  form.standardPackUnit = undefined
   form.standardSpec = undefined
   form.techParams = ''
   form.canSell = true
@@ -880,10 +932,14 @@ function loadEditRecord(record) {
     material: source.material || '',
     weight: source.weight ?? '',
     inventoryUnit: source.inventoryUnit,
+    purchaseUnit: source.purchaseUnit || source.inventoryUnit,
     unitPrice: source.unitPrice,
     purchaseUnitPrice: source.purchaseUnitPrice,
     packContentQty: source.packContentQty ?? source.minOrderQty,
+    packContentUnit:
+      source.packContentUnit || source.purchaseUnit || source.inventoryUnit || undefined,
     standardPackQty: source.standardPackQty,
+    standardPackUnit: source.standardPackUnit || source.inventoryUnit || undefined,
     standardSpec: source.standardSpec,
     techParams: source.techParams || '',
     canSell: source.canSell !== false,
@@ -1100,12 +1156,15 @@ function buildPayload() {
     material: form.material,
     weight: Number(form.weight) || 0,
     inventoryUnit: form.inventoryUnit,
+    purchaseUnit: form.purchaseUnit || form.inventoryUnit,
     standardSpec: form.standardSpec || '',
     techParams: form.techParams?.trim() || '',
     unitPrice: form.unitPrice ?? 0,
     purchaseUnitPrice: form.purchaseUnitPrice ?? 0,
     packContentQty: form.packContentQty ?? null,
+    packContentUnit: form.packContentUnit || form.purchaseUnit || form.inventoryUnit || null,
     standardPackQty: form.standardPackQty ?? null,
+    standardPackUnit: form.standardPackUnit || form.inventoryUnit || null,
     canSell: true,
     isWholeMachine: form.isWholeMachine,
     isPart: form.isPart,
@@ -1342,6 +1401,23 @@ function handleOk() {
 
 .row-remove-col {
   text-align: right;
+}
+
+.qty-with-unit {
+  display: flex;
+  width: 100%;
+}
+
+.qty-with-unit :deep(.qty-with-unit-input),
+.qty-with-unit :deep(.ant-input-number) {
+  flex: 1;
+  min-width: 0;
+  width: calc(100% - 88px);
+}
+
+.qty-with-unit-select {
+  width: 88px;
+  flex-shrink: 0;
 }
 
 .upload-hint {

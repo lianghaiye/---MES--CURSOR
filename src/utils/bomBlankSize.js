@@ -1,8 +1,10 @@
 import { formatNumber, roundNumber } from '@/utils/numberFormat'
 import {
   calcAreaSquareMeters,
-  isAreaStockUnit,
-  UOM_RELATION_PER_PIECE_AREA,
+  DUAL_UNIT_MEASURE_MODE,
+  inferDualUnitMeasureMode,
+  normalizeDualUnitMeasureMode,
+  resolveDualUnitMeasureMode,
 } from '@/utils/variableLengthMaterial'
 
 /** 下料尺寸可选单位 */
@@ -125,12 +127,8 @@ export function formatBlankSizeText(blankSize) {
   return parts.join(' ')
 }
 
-/** 下料方式：用户可手动指定；未指定时按单位关系推断初值 */
-export const BLANK_SIZE_MODE = {
-  LENGTH: 'length',
-  PLATE: 'plate',
-  GENERIC: 'generic',
-}
+/** 下料方式：与入库计量形态共用语义（length / plate / generic） */
+export const BLANK_SIZE_MODE = DUAL_UNIT_MEASURE_MODE
 
 export const BLANK_SIZE_MODE_OPTIONS = [
   { label: '型材 · 按长度', value: BLANK_SIZE_MODE.LENGTH },
@@ -139,32 +137,20 @@ export const BLANK_SIZE_MODE_OPTIONS = [
 ]
 
 export function normalizeBlankSizeMode(mode) {
-  const m = String(mode || '').toLowerCase()
-  if (
-    m === BLANK_SIZE_MODE.PLATE ||
-    m === BLANK_SIZE_MODE.LENGTH ||
-    m === BLANK_SIZE_MODE.GENERIC
-  ) {
-    return m
-  }
-  return ''
+  return normalizeDualUnitMeasureMode(mode)
 }
 
 /** 无手动模式时的默认推断（仅作弹窗初值建议） */
 export function inferBlankSizeMode(lineOrItem = {}) {
-  if (!lineOrItem) return BLANK_SIZE_MODE.GENERIC
-  if (lineOrItem.uomRelation === UOM_RELATION_PER_PIECE_AREA) return BLANK_SIZE_MODE.PLATE
-  const stock = lineOrItem.stockUnit || lineOrItem.inventoryUnit || lineOrItem.unit
-  if (Boolean(lineOrItem.isVariableLength) && isAreaStockUnit(stock)) return BLANK_SIZE_MODE.PLATE
-  if (lineOrItem.isVariableLength) return BLANK_SIZE_MODE.LENGTH
-  return BLANK_SIZE_MODE.GENERIC
+  return inferDualUnitMeasureMode(lineOrItem)
 }
 
 /** 优先用行上 blankSizeMode，否则回退推断 */
 export function resolveBlankSizeMode(lineOrItem = {}) {
-  const explicit = normalizeBlankSizeMode(lineOrItem?.blankSizeMode)
-  if (explicit) return explicit
-  return inferBlankSizeMode(lineOrItem)
+  return resolveDualUnitMeasureMode({
+    ...lineOrItem,
+    blankSizeMode: lineOrItem?.blankSizeMode,
+  })
 }
 
 /** BOM 行是否按面积下料（板材）——尊重手动模式 */

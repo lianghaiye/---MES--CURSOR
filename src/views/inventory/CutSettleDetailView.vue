@@ -62,7 +62,7 @@
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1200 }"
+          :scroll="{ x: 1340 }"
         >
           <template #bodyCell="{ column, record: line, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -83,6 +83,9 @@
             </template>
             <template v-else-if="column.key === 'pickedBatchNo'">
               {{ line.pickedBatchNo || '—' }}
+            </template>
+            <template v-else-if="column.key === 'remnantBatchNo'">
+              {{ line.remnantBatchNo || '—' }}
             </template>
           </template>
         </a-table>
@@ -123,7 +126,7 @@
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1100 }"
+          :scroll="{ x: 1240 }"
         >
           <template #bodyCell="{ column, record: line, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -154,6 +157,9 @@
             </template>
             <template v-else-if="column.key === 'pickedBatchNo'">
               {{ line.pickedBatchNo || '—' }}
+            </template>
+            <template v-else-if="column.key === 'remnantBatchNo'">
+              {{ line.remnantBatchNo || '—' }}
             </template>
           </template>
         </a-table>
@@ -207,6 +213,7 @@ const lineColumns = [
   { title: '实耗', key: 'actualConsumeMeters', width: 110 },
   { title: '余料', key: 'remnantLength', width: 80, align: 'right' },
   { title: '拣选批次', key: 'pickedBatchNo', width: 130 },
+  { title: '余料新批次', key: 'remnantBatchNo', width: 140 },
 ]
 
 function formatQty(val) {

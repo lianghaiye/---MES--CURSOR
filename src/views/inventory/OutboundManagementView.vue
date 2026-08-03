@@ -374,7 +374,7 @@ const baseColumns = [
   { title: '创建人', dataIndex: 'creator', width: 80 },
   { title: '确认时间', dataIndex: 'auditDate', width: 160 },
   { title: '确认人', dataIndex: 'auditor', width: 80 },
-  { title: '仓管员', dataIndex: 'warehouseKeeper', width: 80 },
+  { title: '确认人', dataIndex: 'warehouseKeeper', width: 80 },
   { title: '所在车间', dataIndex: 'workshop', width: 100 },
   { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
   { title: '操作', key: 'action', width: 220, fixed: 'right' },

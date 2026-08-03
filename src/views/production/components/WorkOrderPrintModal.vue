@@ -23,14 +23,18 @@
             </a-radio-group>
           </a-form-item>
         </a-col>
+        <a-col :span="24">
+          <a-form-item label="打印内容">
+            <a-radio-group v-model:value="form.printContent" :options="contentOptions" />
+          </a-form-item>
+        </a-col>
       </a-row>
     </a-form>
 
     <div class="print-tip">
-      <template v-if="isBatch">
-        已选择
-        {{ targetOrders.length }}
-        条工单。预览包含工单基本信息与工序配置，可在预览页再次调起浏览器打印。
+      <template v-if="isBatch"> 已选择 {{ targetOrders.length }} 条工单。 </template>
+      <template v-if="form.printContent === 'order_with_bom'">
+        预览包含工单基本信息、工序配置与 BOM 清单，可在预览页再次调起浏览器打印。
       </template>
       <template v-else>预览包含工单基本信息与工序配置，可在预览页再次调起浏览器打印。</template>
     </div>
@@ -59,6 +63,8 @@ import { computed, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { EyeOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 import {
+  WORK_ORDER_PRINT_CONTENT,
+  WORK_ORDER_PRINT_CONTENT_OPTIONS,
   buildWorkOrderBatchPrintPayload,
   buildWorkOrderPrintPayload,
   openWorkOrderPrintPreview,
@@ -77,12 +83,15 @@ const router = useRouter()
 const form = reactive({
   paper: 'A4',
   orientation: 'portrait',
+  printContent: WORK_ORDER_PRINT_CONTENT.ORDER_ONLY,
 })
 
 const paperOptions = [
   { label: 'A4', value: 'A4' },
   { label: 'A3', value: 'A3' },
 ]
+
+const contentOptions = WORK_ORDER_PRINT_CONTENT_OPTIONS
 
 const targetOrders = computed(() => {
   if (props.workOrders?.length) return props.workOrders
@@ -97,6 +106,7 @@ watch(
     if (!visible) return
     form.paper = 'A4'
     form.orientation = 'portrait'
+    form.printContent = WORK_ORDER_PRINT_CONTENT.ORDER_ONLY
   },
 )
 
@@ -106,6 +116,7 @@ function openPreview(autoPrint) {
   const options = {
     paper: form.paper,
     orientation: form.orientation,
+    printContent: form.printContent,
     autoPrint,
   }
   const payload =

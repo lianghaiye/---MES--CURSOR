@@ -308,7 +308,17 @@
                   :default-expand-all-rows="true"
                 >
                   <template #headerCell="{ column }">
-                    <template v-if="column.key === 'inTransitQty'">
+                    <template v-if="column.key === 'availableStock'">
+                      <span class="col-title-with-tip">
+                        可用库存
+                        <a-tooltip
+                          title="展示为 工单占用/可用库存；工单占用=开立工单 BOM 需求−已领，可用库存=现存量−工单占用"
+                        >
+                          <InfoCircleOutlined class="col-tip-icon" />
+                        </a-tooltip>
+                      </span>
+                    </template>
+                    <template v-else-if="column.key === 'inTransitQty'">
                       <span class="col-title-with-tip">
                         在途
                         <a-tooltip
@@ -448,16 +458,8 @@
                         allow-clear
                       />
                     </template>
-                    <template v-else-if="column.key === 'woAllocatedQty'">
-                      <a-tooltip title="开立工单 BOM 需求 − 已领料；可用库存 = 现存量 − 工单占用">
-                        <span>{{
-                          record.isTopLevel
-                            ? '—'
-                            : record.woAllocatedQty != null
-                              ? formatQty(record.woAllocatedQty)
-                              : '—'
-                        }}</span>
-                      </a-tooltip>
+                    <template v-else-if="column.key === 'availableStock'">
+                      <span>{{ formatAvailableStockText(record) }}</span>
                     </template>
                     <template v-else-if="column.key === 'inTransitQty'">
                       <a-tooltip title="未转采购单的申请量 / 未入库的采购订单量（采购单位）">
@@ -796,12 +798,11 @@ const baseMaterialColumns = [
   { title: '供应型态', key: 'supplyType', dataIndex: 'supplyType', width: 100 },
   { title: '库存数量', dataIndex: 'stockQty', width: 90 },
   {
-    title: '工单占用',
-    key: 'woAllocatedQty',
-    dataIndex: 'woAllocatedQty',
-    width: 90,
+    title: '可用库存',
+    key: 'availableStock',
+    dataIndex: 'availableStock',
+    width: 120,
   },
-  { title: '可用库存', dataIndex: 'availableStock', width: 90 },
   {
     title: '在途',
     key: 'inTransitQty',
@@ -828,7 +829,7 @@ const {
   tableScrollX: materialTableScrollX,
   defaultColumnSettings: defaultMaterialColumnSettings,
 } = useTableColumnSettings('production-plan-material-list', baseMaterialColumns, {
-  minScrollX: 2680,
+  minScrollX: 2600,
 })
 
 const processRouteOpts = computed(() => getProcessRouteSelectOptions())
@@ -1198,6 +1199,14 @@ function materialStatusColor(status) {
     已完成: 'success',
   }
   return map[status] || 'default'
+}
+
+/** 可用库存列：工单占用/可用库存 */
+function formatAvailableStockText(record) {
+  if (!record || record.isTopLevel) return '—'
+  const allocated = formatQty(record.woAllocatedQty ?? 0)
+  const available = formatQty(record.availableStock ?? 0)
+  return `${allocated}/${available}`
 }
 
 function openAssemblyWorkOrderModal() {

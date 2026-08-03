@@ -8,8 +8,20 @@ import {
   formatProcessExecutors,
   formatProcessFeedingSummary,
 } from '@/utils/workOrderProcessDisplay'
+import { buildWorkOrderDispatchEbomSnapshot } from '@/utils/workOrderEbomTree'
 
 const STORAGE_PREFIX = 'work-order-print-preview:'
+
+/** 打印内容：仅工单 / 工单+BOM */
+export const WORK_ORDER_PRINT_CONTENT = {
+  ORDER_ONLY: 'order_only',
+  ORDER_WITH_BOM: 'order_with_bom',
+}
+
+export const WORK_ORDER_PRINT_CONTENT_OPTIONS = [
+  { label: '仅工单', value: WORK_ORDER_PRINT_CONTENT.ORDER_ONLY },
+  { label: '工单+BOM', value: WORK_ORDER_PRINT_CONTENT.ORDER_WITH_BOM },
+]
 
 function formatPrintFieldValue(value) {
   if (value === 0) return '0'
@@ -35,9 +47,53 @@ function printProcessExecutors(process) {
   return printProcessText(formatProcessExecutors(process))
 }
 
+function formatPrintQty(val) {
+  if (val == null || val === '') return ''
+  const n = Number(val)
+  if (!Number.isFinite(n)) return String(val)
+  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n))
+  return String(Math.round(n * 10000) / 10000)
+}
+
+/** 将 EBOM 物料树展平为打印清单行（含子件层级） */
+export function flattenWorkOrderPrintBomMaterials(materials = [], out = []) {
+  for (const m of materials || []) {
+    if (!m) continue
+    out.push({
+      itemName: formatPrintFieldValue(m.name || m.itemName),
+      itemCode: formatPrintFieldValue(m.code || m.itemCode || m.materialCode),
+      specModel: formatPrintFieldValue(m.spec || m.specModel),
+      material: formatPrintFieldValue(m.material),
+      drawingNo: formatPrintFieldValue(m.drawingNo),
+      blankSizeText: formatPrintFieldValue(m.blankSizeText),
+      unitQty: formatPrintQty(m.unitUsage ?? m.unitQty),
+      unit: formatPrintFieldValue(m.unit),
+    })
+    if (Array.isArray(m.children) && m.children.length) {
+      flattenWorkOrderPrintBomMaterials(m.children, out)
+    }
+  }
+  return out
+}
+
+function buildPrintBomLines(workOrder) {
+  const snapshot = buildWorkOrderDispatchEbomSnapshot(workOrder)
+  const materials = snapshot?.materials || []
+  const flat = flattenWorkOrderPrintBomMaterials(materials)
+  return flat.map((row, index) => ({
+    seq: index + 1,
+    ...row,
+  }))
+}
+
 /** 构建工单打印/预览数据 */
 export function buildWorkOrderPrintPayload(workOrder, options = {}) {
   if (!workOrder) return null
+
+  const printContent =
+    options.printContent === WORK_ORDER_PRINT_CONTENT.ORDER_WITH_BOM
+      ? WORK_ORDER_PRINT_CONTENT.ORDER_WITH_BOM
+      : WORK_ORDER_PRINT_CONTENT.ORDER_ONLY
 
   const detail = buildWorkOrderDetail(workOrder)
   const processes = (detail?.processes || workOrder.processes || []).map((p, index) => ({
@@ -76,6 +132,9 @@ export function buildWorkOrderPrintPayload(workOrder, options = {}) {
     value: formatPrintFieldValue(field.value),
   }))
 
+  const bomLines =
+    printContent === WORK_ORDER_PRINT_CONTENT.ORDER_WITH_BOM ? buildPrintBomLines(workOrder) : []
+
   return {
     code: formatPrintFieldValue(workOrder.code),
     name: formatPrintFieldValue(workOrder.name),
@@ -83,6 +142,9 @@ export function buildWorkOrderPrintPayload(workOrder, options = {}) {
     orderCategory: formatPrintFieldValue(workOrder.orderCategory || '生产工单'),
     basicFields,
     processes,
+    bomLines,
+    printContent,
+    includeBom: printContent === WORK_ORDER_PRINT_CONTENT.ORDER_WITH_BOM,
     paper: options.paper || 'A4',
     orientation: options.orientation || 'portrait',
     printedAt: new Date().toISOString(),
@@ -97,6 +159,7 @@ export function buildWorkOrderBatchPrintPayload(workOrders, options = {}) {
   if (!sheets.length) return null
   return {
     sheets,
+    printContent: options.printContent || WORK_ORDER_PRINT_CONTENT.ORDER_ONLY,
     paper: options.paper || 'A4',
     orientation: options.orientation || 'portrait',
     printedAt: new Date().toISOString(),

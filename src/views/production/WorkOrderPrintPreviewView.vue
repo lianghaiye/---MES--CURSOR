@@ -70,6 +70,41 @@
             </div>
           </section>
 
+          <section v-if="sheet.includeBom" class="sheet-section">
+            <div class="section-title">BOM 清单</div>
+            <div v-if="sheet.bomLines?.length" class="table-wrap">
+              <table class="sheet-table bom-table">
+                <thead>
+                  <tr>
+                    <th>序号</th>
+                    <th>物料名称</th>
+                    <th>编号</th>
+                    <th>规格型号</th>
+                    <th>材质</th>
+                    <th>图号</th>
+                    <th>下料尺寸</th>
+                    <th>单位用量</th>
+                    <th>单位</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in sheet.bomLines" :key="`${index}-bom-${row.seq}`">
+                    <td class="cell-index">{{ row.seq }}</td>
+                    <td>{{ row.itemName }}</td>
+                    <td>{{ row.itemCode }}</td>
+                    <td>{{ row.specModel }}</td>
+                    <td>{{ row.material }}</td>
+                    <td>{{ row.drawingNo }}</td>
+                    <td>{{ row.blankSizeText }}</td>
+                    <td class="cell-num">{{ row.unitQty }}</td>
+                    <td>{{ row.unit }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="bom-empty">暂无 BOM 物料</div>
+          </section>
+
           <footer class="sheet-footer">
             <span>打印时间：{{ printedAtText }}</span>
             <span class="footer-sign">制单人：__________</span>

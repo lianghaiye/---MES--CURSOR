@@ -51,187 +51,233 @@
           </a-space>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基本信息</div>
-          <a-descriptions bordered size="small" :column="3">
-            <a-descriptions-item label="出库单号">{{ record.docNo }}</a-descriptions-item>
-            <a-descriptions-item label="出库类型">{{ record.outboundType }}</a-descriptions-item>
-            <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
-            <a-descriptions-item label="出库仓库">{{
-              record.warehouse || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="领用部门">{{
-              record.requisitionDept || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="出库时间">{{
-              record.outboundTime || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="源单编号">
-              <a v-if="record.sourceOrderNo" class="link-code" @click="goSource">{{
-                record.sourceOrderNo
-              }}</a>
-              <span v-else>—</span>
-            </a-descriptions-item>
-            <a-descriptions-item label="销售单号">
-              <a v-if="record.salesOrderNo" class="link-code" @click="goSalesOrder">{{
-                record.salesOrderNo
-              }}</a>
-              <span v-else>—</span>
-            </a-descriptions-item>
-            <a-descriptions-item label="出库总重量(kg)">
-              {{ record.totalWeight != null ? record.totalWeight : '—' }}
-            </a-descriptions-item>
-            <a-descriptions-item label="仓管员">{{
-              record.warehouseKeeper || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="所在车间">{{ record.workshop || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="创建人">{{ record.creator || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="创建时间">{{
-              record.createdAt || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="审核时间">{{
-              record.auditDate || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="审核人">{{ record.auditor || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="完成日期">{{
-              record.completedAt || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="出厂质检">
-              <a v-if="linkedQc" class="link-code" @click="goFactoryQc">{{ linkedQc.qcNo }}</a>
-              <span v-else>—</span>
-            </a-descriptions-item>
-            <a-descriptions-item label="备注" :span="3">{{
-              record.remark || '—'
-            }}</a-descriptions-item>
-          </a-descriptions>
-        </div>
+        <a-tabs v-if="isMaterialReqOutbound" v-model:active-key="infoTab" class="detail-tabs">
+          <a-tab-pane key="basic" tab="基本信息" />
+          <a-tab-pane key="cutSettle" :tab="`下料结算 (${relatedCutSettles.length})`" />
+        </a-tabs>
 
-        <div class="section-card">
-          <div class="section-title">出库明细</div>
-          <a-table
-            :columns="lineColumns"
-            :data-source="record.lineItems || []"
-            row-key="id"
-            size="small"
-            bordered
-            :pagination="false"
-            :scroll="{ x: lineScrollX }"
-          >
-            <template #headerCell="{ column }">
-              <template v-if="column.key === 'batchPick'">
-                <span class="col-title-with-tip">
-                  拣选批次
-                  <a-tooltip :title="batchPickTip">
-                    <InfoCircleOutlined class="col-tip-icon" />
-                  </a-tooltip>
-                </span>
-              </template>
-              <template v-else>{{ column.title }}</template>
-            </template>
-            <template #bodyCell="{ column, record: line, index }">
-              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-              <template v-else-if="column.key === 'stockQty'">
-                {{ formatQty(line.stockQty) }}
-                <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>
-              </template>
-              <template v-else-if="column.key === 'warehouseStockQty'">
-                {{ formatQty(line.warehouseStockQty) }}
-                <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>
-              </template>
-              <template v-else-if="column.key === 'locationNo'">
-                {{ line.locationNo || '—' }}
-              </template>
-              <template v-else-if="column.key === 'shipQty'">
-                {{ formatQty(line.shipQty) }}
-              </template>
-              <template v-else-if="column.key === 'blankSizeText'">
-                <template v-if="line.blankSizeText">
-                  {{ line.blankSizeText }}
-                  <div v-if="line.blankArea > 0" class="blank-size-hint">
-                    ≈ {{ formatQty(line.blankArea) }}㎡/件
-                  </div>
-                  <div v-else-if="line.blankLength > 0" class="blank-size-hint">
-                    ≈ {{ formatQty(line.blankLength) }}米/件
-                  </div>
-                </template>
-                <span v-else>—</span>
-              </template>
-              <template v-else-if="column.key === 'unit'">
-                {{ resolveOutboundStockUnit(line) || '—' }}
-              </template>
-              <template v-else-if="column.key === 'batchPick'">
-                <template v-if="canOutboundBatchPick(line)">
-                  <div v-if="line.manualBatchPick" class="manual-pick-tag">自主拣选</div>
-                  <span v-if="line.issuedBatchNo || line.batchAllocations?.length">
-                    {{
-                      line.issuedBatchNo ||
-                      (line.batchAllocations || []).map((a) => `${a.batchNo}×${a.qty}`).join('；')
-                    }}
-                  </span>
-                  <template v-else>
-                    {{
-                      line.pickedBatchNo ||
-                      (line.manualBatchPick ? '待选批次' : '确认时自动扣批/库存')
-                    }}
-                    <span v-if="line.pickedLength != null" class="unit-suffix">
-                      / {{ formatQty(line.pickedLength) }}{{ resolveOutboundStockUnit(line) }}
+        <div class="tab-body">
+          <template v-if="!isMaterialReqOutbound || infoTab === 'basic'">
+            <div class="section-card">
+              <div v-if="!isMaterialReqOutbound" class="section-title">基本信息</div>
+              <a-descriptions bordered size="small" :column="3">
+                <a-descriptions-item label="出库单号">{{ record.docNo }}</a-descriptions-item>
+                <a-descriptions-item label="出库类型">{{
+                  record.outboundType
+                }}</a-descriptions-item>
+                <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
+                <a-descriptions-item label="出库仓库">{{
+                  record.warehouse || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="领用部门">{{
+                  record.requisitionDept || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="出库时间">{{
+                  record.outboundTime || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="源单编号">
+                  <a v-if="record.sourceOrderNo" class="link-code" @click="goSource">{{
+                    record.sourceOrderNo
+                  }}</a>
+                  <span v-else>—</span>
+                </a-descriptions-item>
+                <a-descriptions-item label="销售单号">
+                  <a v-if="record.salesOrderNo" class="link-code" @click="goSalesOrder">{{
+                    record.salesOrderNo
+                  }}</a>
+                  <span v-else>—</span>
+                </a-descriptions-item>
+                <a-descriptions-item label="出库总重量(kg)">
+                  {{ record.totalWeight != null ? record.totalWeight : '—' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="确认人">{{
+                  record.warehouseKeeper || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="所在车间">{{
+                  record.workshop || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="创建人">{{
+                  record.creator || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="创建时间">{{
+                  record.createdAt || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="完成日期">{{
+                  record.completedAt || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item v-if="!isMaterialReqOutbound" label="出厂质检">
+                  <a v-if="linkedQc" class="link-code" @click="goFactoryQc">{{ linkedQc.qcNo }}</a>
+                  <span v-else>—</span>
+                </a-descriptions-item>
+                <a-descriptions-item label="备注" :span="3">{{
+                  record.remark || '—'
+                }}</a-descriptions-item>
+              </a-descriptions>
+            </div>
+
+            <div class="section-card">
+              <div class="section-title">出库明细</div>
+              <a-table
+                :columns="lineColumns"
+                :data-source="record.lineItems || []"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: lineScrollX }"
+              >
+                <template #headerCell="{ column }">
+                  <template v-if="column.key === 'batchPick'">
+                    <span class="col-title-with-tip">
+                      拣选批次
+                      <a-tooltip :title="batchPickTip">
+                        <InfoCircleOutlined class="col-tip-icon" />
+                      </a-tooltip>
                     </span>
                   </template>
-                  <div v-if="line.issuedPieceSerialNos?.length" class="piece-serials">
-                    件码：{{ line.issuedPieceSerialNos.join('、') }}
-                  </div>
+                  <template v-else>{{ column.title }}</template>
                 </template>
-                <span v-else>—</span>
-              </template>
-              <template v-else-if="column.key === 'barcodeType'">
-                {{ line.barcodeType || '—' }}
-              </template>
-              <template v-else-if="column.key === 'packagingForm'">
-                {{ line.packagingForm || '—' }}
-              </template>
-              <template v-else-if="column.key === 'deliveryRemark'">
-                <a-tooltip v-if="line.deliveryRemark" :title="line.deliveryRemark">
-                  <span class="delivery-remark-cell">{{ line.deliveryRemark }}</span>
-                </a-tooltip>
-                <span v-else>—</span>
-              </template>
-              <template v-else-if="column.key === 'unitPrice'">
-                {{ line.unitPrice != null ? line.unitPrice : '—' }}
-              </template>
-              <template v-else-if="column.key === 'totalPrice'">
-                {{ line.totalPrice != null ? line.totalPrice : '—' }}
-              </template>
-              <template v-else-if="column.key === 'lineSource'">
-                {{ line.lineSource || '—' }}
-              </template>
-              <template v-else-if="column.key === 'sourceDocNo'">
-                {{ line.sourceDocNo || '—' }}
-              </template>
-            </template>
-            <template #summary>
-              <a-table-summary v-if="record.lineItems?.length">
-                <a-table-summary-row class="line-summary-row">
-                  <a-table-summary-cell
-                    v-for="(col, colIndex) in lineColumns"
-                    :key="col.key"
-                    :index="colIndex"
-                    :align="col.align"
-                  >
-                    <template v-if="col.key === 'index'">合计</template>
-                    <template v-else-if="col.key === 'itemCode'">
-                      项数 {{ lineSummary.lineCount }}
+                <template #bodyCell="{ column, record: line, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'stockQty'">
+                    {{ formatQty(line.stockQty) }}
+                    <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'warehouseStockQty'">
+                    {{ formatQty(line.warehouseStockQty) }}
+                    <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'locationNo'">
+                    {{ line.locationNo || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'shipQty'">
+                    {{ formatQty(line.shipQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'blankSizeText'">
+                    <template v-if="line.blankSizeText">
+                      {{ line.blankSizeText }}
+                      <div v-if="line.blankArea > 0" class="blank-size-hint">
+                        ≈ {{ formatQty(line.blankArea) }}㎡/件
+                      </div>
+                      <div v-else-if="line.blankLength > 0" class="blank-size-hint">
+                        ≈ {{ formatQty(line.blankLength) }}米/件
+                      </div>
                     </template>
-                    <template v-else-if="col.key === 'shipQty'">
-                      {{ formatQty(lineSummary.shipQtyTotal) }}
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'unit'">
+                    {{ resolveOutboundStockUnit(line) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'batchPick'">
+                    <template v-if="canOutboundBatchPick(line)">
+                      <div v-if="line.manualBatchPick" class="manual-pick-tag">自主拣选</div>
+                      <span v-if="line.issuedBatchNo || line.batchAllocations?.length">
+                        {{
+                          line.issuedBatchNo ||
+                          (line.batchAllocations || [])
+                            .map((a) => `${a.batchNo}×${a.qty}`)
+                            .join('；')
+                        }}
+                      </span>
+                      <template v-else>
+                        {{
+                          line.pickedBatchNo ||
+                          (line.manualBatchPick ? '待选批次' : '确认时自动扣批/库存')
+                        }}
+                        <span v-if="line.pickedLength != null" class="unit-suffix">
+                          / {{ formatQty(line.pickedLength) }}{{ resolveOutboundStockUnit(line) }}
+                        </span>
+                      </template>
+                      <div v-if="line.issuedPieceSerialNos?.length" class="piece-serials">
+                        件码：{{ line.issuedPieceSerialNos.join('、') }}
+                      </div>
                     </template>
-                    <template v-else-if="col.key === 'totalPrice'">
-                      {{ formatMoney(lineSummary.totalPrice) }}
-                    </template>
-                  </a-table-summary-cell>
-                </a-table-summary-row>
-              </a-table-summary>
-            </template>
-          </a-table>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'barcodeType'">
+                    {{ line.barcodeType || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'packagingForm'">
+                    {{ line.packagingForm || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'deliveryRemark'">
+                    <a-tooltip v-if="line.deliveryRemark" :title="line.deliveryRemark">
+                      <span class="delivery-remark-cell">{{ line.deliveryRemark }}</span>
+                    </a-tooltip>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'unitPrice'">
+                    {{ line.unitPrice != null ? line.unitPrice : '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'totalPrice'">
+                    {{ line.totalPrice != null ? line.totalPrice : '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'lineSource'">
+                    {{ line.lineSource || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'sourceDocNo'">
+                    {{ line.sourceDocNo || '—' }}
+                  </template>
+                </template>
+                <template #summary>
+                  <a-table-summary v-if="record.lineItems?.length">
+                    <a-table-summary-row class="line-summary-row">
+                      <a-table-summary-cell
+                        v-for="(col, colIndex) in lineColumns"
+                        :key="col.key"
+                        :index="colIndex"
+                        :align="col.align"
+                      >
+                        <template v-if="col.key === 'index'">合计</template>
+                        <template v-else-if="col.key === 'itemCode'">
+                          项数 {{ lineSummary.lineCount }}
+                        </template>
+                        <template v-else-if="col.key === 'shipQty'">
+                          {{ formatQty(lineSummary.shipQtyTotal) }}
+                        </template>
+                        <template v-else-if="col.key === 'totalPrice'">
+                          {{ formatMoney(lineSummary.totalPrice) }}
+                        </template>
+                      </a-table-summary-cell>
+                    </a-table-summary-row>
+                  </a-table-summary>
+                </template>
+              </a-table>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="section-card">
+              <a-table
+                :columns="cutSettleColumns"
+                :data-source="relatedCutSettles"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :locale="{ emptyText: '暂无关联的下料结算单' }"
+              >
+                <template #bodyCell="{ column, record: settle }">
+                  <template v-if="column.key === 'status'">
+                    <a-tag :color="settle.status === '已确认' ? 'green' : 'orange'">{{
+                      settle.status || '—'
+                    }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'docNo'">
+                    <a class="link-code" @click.prevent="goCutSettle(settle)">{{
+                      settle.docNo || '—'
+                    }}</a>
+                  </template>
+                  <template v-else-if="column.key === 'lineCount'">
+                    {{ (settle.lines || []).length }}
+                  </template>
+                  <template v-else-if="column.key === 'action'">
+                    <a @click.prevent="goCutSettle(settle)">查看</a>
+                  </template>
+                </template>
+              </a-table>
+            </div>
+          </template>
         </div>
       </template>
       <a-empty v-else-if="!loading" description="未找到该出库单" />
@@ -261,6 +307,7 @@ import {
   canDeleteOutbound,
   deleteOutboundOrder,
 } from '@/store/outboundStore'
+import { cutSettleState } from '@/store/cutSettleStore'
 import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore'
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
@@ -282,6 +329,35 @@ const router = useRouter()
 const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
+const infoTab = ref('basic')
+
+const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领料出库')
+
+const relatedCutSettles = computed(() => {
+  void cutSettleState.records
+  const id = record.value?.id
+  const docNo = record.value?.docNo
+  if (!id && !docNo) return []
+  return cutSettleState.records.filter(
+    (r) => (id && r.outboundId === id) || (docNo && r.outboundDocNo === docNo),
+  )
+})
+
+const cutSettleColumns = [
+  { title: '状态', key: 'status', width: 90 },
+  { title: '结算单号', key: 'docNo', width: 140 },
+  { title: '源单编号', dataIndex: 'sourceOrderNo', key: 'sourceOrderNo', width: 140 },
+  { title: '出库仓库', dataIndex: 'shipWarehouse', key: 'shipWarehouse', width: 100 },
+  { title: '领入仓库', dataIndex: 'receiveWarehouse', key: 'receiveWarehouse', width: 100 },
+  { title: '明细行数', key: 'lineCount', width: 90, align: 'right' },
+  { title: '出库时间', dataIndex: 'outboundTime', key: 'outboundTime', width: 160 },
+  { title: '创建人', dataIndex: 'creator', key: 'creator', width: 100 },
+  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160 },
+  { title: '确认人', dataIndex: 'confirmer', key: 'confirmer', width: 100 },
+  { title: '确认时间', dataIndex: 'confirmedAt', key: 'confirmedAt', width: 160 },
+  { title: '备注', dataIndex: 'remark', key: 'remark', ellipsis: true },
+  { title: '操作', key: 'action', width: 80, fixed: 'right' },
+]
 
 const lineColumns = computed(() =>
   filterOutboundLineColumns(outboundDetailLineColumns, record.value?.outboundType),
@@ -345,6 +421,7 @@ watch(
   () => route.params.id,
   () => {
     loading.value = true
+    infoTab.value = 'basic'
     reload()
     loading.value = false
   },
@@ -353,6 +430,13 @@ watch(
 
 function goBack() {
   router.push('/inventory/outbound')
+}
+
+function goCutSettle(settle) {
+  if (!settle?.id) return
+  const path = `/inventory/cut-settle/${settle.id}`
+  openTab(path, settle.docNo || '下料结算详情')
+  router.push(path)
 }
 
 function openEdit() {
@@ -476,6 +560,17 @@ function handleInitiateQc() {
 
   .sub-type {
     color: #8c8c8c;
+  }
+
+  .detail-tabs {
+    margin-bottom: 0;
+    background: #fff;
+    padding: 0 16px;
+    border-radius: 4px 4px 0 0;
+  }
+
+  .tab-body {
+    margin-top: 0;
   }
 
   .section-card {

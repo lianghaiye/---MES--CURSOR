@@ -4,6 +4,7 @@ import { getBatchById, listBatches } from '@/store/stockBatchStore'
 import {
   getStockPieceById,
   isPieceManagedBatch,
+  listStockPieces,
   pickPiecesFifoForQty,
   pickPiecesFifoForPartialQty,
   pickPiecesFifoCoveringQty,
@@ -101,19 +102,124 @@ function roundQty(val) {
   return Math.round((Number(val) || 0) * 10000) / 10000
 }
 
-/** 按批次号（含日期）排序；FIFO 升序，LIFO 降序 */
+function isRemnantBatch(batch) {
+  return Boolean(batch?.attrs?.remnant)
+}
+
+function isRemnantPiece(piece) {
+  return Boolean(piece?.remnant)
+}
+
+/**
+ * 出库候选排序：余料优先 → 数量短优先（够用前提下）→ 批次号 FIFO/LIFO
+ * @param {{ remnant: boolean, length: number, batchNo: string, serialNo?: string }} a
+ * @param {{ remnant: boolean, length: number, batchNo: string, serialNo?: string }} b
+ */
+export function compareOutboundPickCandidates(a, b, rule) {
+  if (Boolean(a.remnant) !== Boolean(b.remnant)) {
+    return a.remnant ? -1 : 1
+  }
+  const la = Number(a.length) || 0
+  const lb = Number(b.length) || 0
+  if (la !== lb) return la - lb
+  const ka = String(a.batchNo || '')
+  const kb = String(b.batchNo || '')
+  if (ka !== kb) {
+    const cmp = ka < kb ? -1 : 1
+    return rule === OUTBOUND_ISSUE_RULES.LIFO ? -cmp : cmp
+  }
+  const sa = String(a.serialNo || '')
+  const sb = String(b.serialNo || '')
+  if (sa !== sb) return sa < sb ? -1 : 1
+  return 0
+}
+
+/** 跨批回退时的在库批排序：余料优先 → 批次号 FIFO/LIFO → 数量短优先 */
 export function sortBatchesByIssueRule(batches, rule) {
   const list = (batches || []).slice()
   list.sort((a, b) => {
+    const ra = isRemnantBatch(a)
+    const rb = isRemnantBatch(b)
+    if (ra !== rb) return ra ? -1 : 1
     const ka = String(a.batchNo || a.createdAt || '')
     const kb = String(b.batchNo || b.createdAt || '')
-    if (ka !== kb) return ka < kb ? -1 : 1
-    const la = Number(a.currentLength) || 0
-    const lb = Number(b.currentLength) || 0
-    return la - lb
+    if (ka !== kb) {
+      const cmp = ka < kb ? -1 : 1
+      return rule === OUTBOUND_ISSUE_RULES.LIFO ? -cmp : cmp
+    }
+    return (Number(a.currentLength) || 0) - (Number(b.currentLength) || 0)
   })
-  if (rule === OUTBOUND_ISSUE_RULES.LIFO) list.reverse()
   return list
+}
+
+function sortedInStockPiecesForBatch(batchId) {
+  return listStockPieces({ batchId, inStockOnly: true })
+    .slice()
+    .sort((a, b) => {
+      const sa = String(a.serialNo || '')
+      const sb = String(b.serialNo || '')
+      if (sa !== sb) return sa < sb ? -1 : 1
+      return (a.index || 0) - (b.index || 0)
+    })
+}
+
+/**
+ * 优先整批/整根：找单批或单件 ≥ 需求的最优候选
+ * 排序：余料优先 → 最短够用 → 批次号 FIFO/LIFO
+ * @returns {null | {batchId,batchNo,qty,unit,pieceIds?,pieceSerialNos?,pieceSplit?}}
+ */
+export function pickWholeSatisfyAllocation(batches, demandQty, rule) {
+  const need = roundQty(demandQty)
+  if (!(need > 0)) return null
+  const whole = isWholeWithRemnantIssue()
+  const partial = isPartialDualUnitIssue()
+  const candidates = []
+
+  for (const b of batches || []) {
+    const avail = roundQty(Number(b.currentLength) || 0)
+    if (!(avail > 0)) continue
+
+    if (isPieceManagedBatch(b)) {
+      for (const p of sortedInStockPiecesForBatch(b.id)) {
+        const pq = roundQty(Number(p.pieceQty) || 0)
+        if (pq + 0.0001 < need) continue
+        candidates.push({
+          remnant: isRemnantPiece(p) || isRemnantBatch(b),
+          length: pq,
+          batchNo: b.batchNo || '',
+          serialNo: p.serialNo || '',
+          allocation: {
+            batchId: b.id,
+            batchNo: b.batchNo,
+            qty: whole ? pq : need,
+            unit: b.unit || p.unit || '',
+            pieceIds: [p.id],
+            pieceSerialNos: [p.serialNo],
+            pieceSplit: partial && pq > need + 0.0001,
+          },
+        })
+      }
+      continue
+    }
+
+    if (avail + 0.0001 < need) continue
+    candidates.push({
+      remnant: isRemnantBatch(b),
+      length: avail,
+      batchNo: b.batchNo || '',
+      serialNo: '',
+      allocation: {
+        batchId: b.id,
+        batchNo: b.batchNo,
+        qty: whole ? avail : need,
+        unit: b.unit || '',
+      },
+    })
+  }
+
+  if (!candidates.length) return null
+  candidates.sort((a, b) => compareOutboundPickCandidates(a, b, rule))
+  return candidates[0].allocation
 }
 
 /** 仓库+物料在库批次可用合计 */
@@ -142,11 +248,8 @@ export function allocateOutboundBatches({ warehouse, itemCode, demandQty, rule }
 
   const issueRule =
     rule === OUTBOUND_ISSUE_RULES.LIFO ? OUTBOUND_ISSUE_RULES.LIFO : OUTBOUND_ISSUE_RULES.FIFO
-  const batches = sortBatchesByIssueRule(
-    listBatches({ warehouse, itemCode, inStockOnly: true }),
-    issueRule,
-  )
-  const available = roundQty(batches.reduce((s, b) => s + (Number(b.currentLength) || 0), 0))
+  const rawBatches = listBatches({ warehouse, itemCode, inStockOnly: true })
+  const available = roundQty(rawBatches.reduce((s, b) => s + (Number(b.currentLength) || 0), 0))
   if (available < need) {
     return {
       ok: false,
@@ -156,6 +259,14 @@ export function allocateOutboundBatches({ warehouse, itemCode, demandQty, rule }
     }
   }
 
+  // 1) 优先整批/整根：单批或单件 ≥ 需求（余料优先 → 最短够用 → FIFO/LIFO）
+  const wholePick = pickWholeSatisfyAllocation(rawBatches, need, issueRule)
+  if (wholePick) {
+    return { ok: true, allocations: [wholePick], available }
+  }
+
+  // 2) 无可整段满足时再跨批硬凑（余料优先 + 批次号顺序）
+  const batches = sortBatchesByIssueRule(rawBatches, issueRule)
   let left = need
   const allocations = []
   for (const b of batches) {

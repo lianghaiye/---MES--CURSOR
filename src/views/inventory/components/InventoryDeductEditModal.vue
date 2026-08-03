@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     title="编辑待确认"
-    :width="980"
+    :width="1100"
     destroy-on-close
     ok-text="保存"
     cancel-text="取消"
@@ -32,10 +32,25 @@
       size="small"
       bordered
       :pagination="false"
+      :scroll="{ x: 1080 }"
     >
+      <template #headerCell="{ column }">
+        <template v-if="column.key === 'stockDisplay'">
+          <span class="col-title-with-tip">
+            当前库存量
+            <a-tooltip :title="STOCK_DISPLAY_TIP">
+              <InfoCircleOutlined class="col-tip-icon" />
+            </a-tooltip>
+          </span>
+        </template>
+        <template v-else>{{ column.title }}</template>
+      </template>
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'blankSizeText'">
           {{ record.blankSizeText || '—' }}
+        </template>
+        <template v-else-if="column.key === 'stockDisplay'">
+          <span class="stock-display">{{ formatStockDisplay(record) }}</span>
         </template>
         <template v-else-if="column.key === 'planQty'">
           <a-input-number
@@ -64,10 +79,17 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
-import { updatePendingMaterialDeduct } from '@/store/materialRequisitionStore'
+import {
+  getMaterialDeductLockedQty,
+  materialRequisitionState,
+  updatePendingMaterialDeduct,
+} from '@/store/materialRequisitionStore'
+import { getStockQty, stockState } from '@/store/stockStore'
+import { formatNumber } from '@/utils/numberFormat'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 
 const props = defineProps({
@@ -85,6 +107,14 @@ const form = reactive({
 
 const warehouseOpts = ref([])
 
+const STOCK_DISPLAY_TIP =
+  '展示为 锁定量/库存量。锁定量=所选仓库下全部待确认扣减单对该物料的预扣合计（含本单及其他单，非仅本单）；库存量=所选仓库现存量。'
+
+const selectedWarehouseName = computed(() => {
+  if (!form.warehouseKey) return ''
+  return String(form.warehouseKey.split('|')[0] || '').trim()
+})
+
 const columns = [
   { title: '物料编码', dataIndex: 'materialCode', key: 'materialCode', width: 110 },
   { title: '物料名称', dataIndex: 'materialName', key: 'materialName', width: 120 },
@@ -95,13 +125,27 @@ const columns = [
     title: '变体属性',
     dataIndex: 'variantSummary',
     key: 'variantSummary',
-    width: 120,
+    width: 110,
     ellipsis: true,
   },
-  { title: '下料尺寸', key: 'blankSizeText', width: 150, ellipsis: true },
+  { title: '下料尺寸', key: 'blankSizeText', width: 130, ellipsis: true },
+  { title: '当前库存量', key: 'stockDisplay', width: 130 },
   { title: '扣减数量', key: 'planQty', width: 100 },
   { title: '操作', key: 'action', width: 70 },
 ]
+
+function formatStockDisplay(line) {
+  void materialRequisitionState.records
+  void stockState.records
+  const code = line?.materialCode
+  const wh = selectedWarehouseName.value
+  if (!code || !wh) return '—'
+  const locked = getMaterialDeductLockedQty(code, { warehouseName: wh })
+  const onHand = getStockQty(wh, code)
+  const a = formatNumber(locked, 3, { empty: '0' })
+  const b = formatNumber(onHand, 3, { empty: '0' })
+  return `${a} / ${b}`
+}
 
 watch(
   () => [props.open, props.record],
@@ -186,5 +230,22 @@ function handleOk() {
   align-items: center;
   margin-bottom: 8px;
   font-weight: 600;
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
+}
+
+.stock-display {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 </style>

@@ -855,7 +855,7 @@ export function cloneStockBatchSeed() {
       currentLength: 6,
       unit: '米',
       sourceDocNo: 'INIT-KA',
-      attrs: { barcodeType: '一批一码' },
+      attrs: { barcodeType: '一批一码', material: '45#', specModel: 'φ20' },
     }),
     seedBatch({
       id: 'bat-seed-ka-bar-4',
@@ -866,7 +866,19 @@ export function cloneStockBatchSeed() {
       currentLength: 4,
       unit: '米',
       sourceDocNo: 'INIT-KA',
-      attrs: { barcodeType: '一批一码' },
+      attrs: { barcodeType: '一批一码', material: '45#', specModel: 'φ20' },
+    }),
+    // 12 米整根：演示「优先整批」——需求 9 米时应命中本批，而不是 6+4 跨批硬凑
+    seedBatch({
+      id: 'bat-seed-ka-bar-12',
+      batchNo: nextNo(),
+      warehouse: '库A仓',
+      itemCode: 'WL-BAR-45-20',
+      itemName: '圆钢 45# φ20',
+      currentLength: 12,
+      unit: '米',
+      sourceDocNo: 'INIT-KA',
+      attrs: { barcodeType: '一批一码', material: '45#', specModel: 'φ20' },
     }),
     seedBatch({
       id: 'bat-seed-ka-plate-3',

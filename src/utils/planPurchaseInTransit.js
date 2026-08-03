@@ -44,7 +44,7 @@ function lineToStockQty(qty, unit, master) {
   if (!master) return n
   const purchaseUnit = resolvePurchaseUnit(master)
   const inventoryUnit = resolveInventoryUnit(master)
-  const content = resolvePackageContent(master)
+  const content = resolvePackageContent(master) ?? 1
   const lineUnit = unit || purchaseUnit || inventoryUnit
   if (lineUnit === inventoryUnit) return n
   if (lineUnit === purchaseUnit) return purchaseQtyToStockQty(n, content)

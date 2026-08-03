@@ -205,16 +205,13 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
-                <a-form-item
-                  label="采购单位"
-                  :required="form.isVariableLength || needsPackageContent"
-                >
+              <a-col v-if="form.isVariableLength" :span="8">
+                <a-form-item label="采购单位" required>
                   <a-select
                     v-model:value="form.purchaseUnit"
                     size="small"
                     :options="purchaseUnitOpts"
-                    :placeholder="form.isVariableLength ? '如：根' : '默认同库存单位'"
+                    placeholder="如：根"
                     :disabled="viewOnly"
                     @change="onPurchaseUnitChange"
                   />
@@ -356,16 +353,26 @@
               </a-col>
               <a-col :span="8">
                 <a-form-item label="标准包装量">
-                  <a-input-number
-                    v-model:value="form.standardPackQty"
-                    size="small"
-                    :min="0"
-                    :precision="4"
-                    :disabled="viewOnly"
-                    placeholder="请输入标准包装量"
-                    style="width: 100%"
-                    :addon-after="inventoryUnitLabel"
-                  />
+                  <a-input-group compact class="qty-with-unit">
+                    <a-input-number
+                      v-model:value="form.standardPackQty"
+                      size="small"
+                      :min="0"
+                      :precision="4"
+                      :disabled="viewOnly"
+                      placeholder="选填"
+                      class="qty-with-unit-input"
+                    />
+                    <a-select
+                      v-model:value="form.standardPackUnit"
+                      size="small"
+                      :options="unitOpts"
+                      :disabled="viewOnly"
+                      class="qty-with-unit-select"
+                      placeholder="单位"
+                      :get-popup-container="popupContainer"
+                    />
+                  </a-input-group>
                 </a-form-item>
               </a-col>
             </a-row>
@@ -417,25 +424,35 @@
                 </a-form-item>
               </a-col>
               <a-col :span="8">
-                <a-form-item :required="needsPackageContent">
+                <a-form-item>
                   <template #label>
                     <span>包装含量</span>
                     <a-tooltip
-                      title="1 个采购单位折合多少库存单位。例：采购单位=盒、库存单位=个、含量=100 → 1 盒=100 个；采购申请按库存需求 ÷ 含量向上取整。"
+                      title="选填。1 个采购单位折合多少库存单位。例：采购单位=盒、库存单位=个、含量=100 → 1 盒=100 个；采购申请按需求 ÷ 含量向上取整。不填则不做包装换算，采购量按库存单位计。"
                     >
                       <InfoCircleOutlined class="info-icon" />
                     </a-tooltip>
                   </template>
-                  <a-input-number
-                    v-model:value="form.packContentQty"
-                    size="small"
-                    :min="0"
-                    :precision="4"
-                    :disabled="viewOnly"
-                    placeholder="请输入包装含量"
-                    style="width: 100%"
-                    :addon-after="inventoryUnitLabel"
-                  />
+                  <a-input-group compact class="qty-with-unit">
+                    <a-input-number
+                      v-model:value="form.packContentQty"
+                      size="small"
+                      :min="0"
+                      :precision="4"
+                      :disabled="viewOnly"
+                      placeholder="选填，不填则不换算"
+                      class="qty-with-unit-input"
+                    />
+                    <a-select
+                      v-model:value="form.packContentUnit"
+                      size="small"
+                      :options="packContentUnitOpts"
+                      :disabled="viewOnly"
+                      class="qty-with-unit-select"
+                      placeholder="单位"
+                      :get-popup-container="popupContainer"
+                    />
+                  </a-input-group>
                 </a-form-item>
               </a-col>
               <a-col :span="8">
@@ -785,7 +802,12 @@ import {
   createDefaultProductionControl,
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
-import { unitState, getInventoryUnitOptions, getPurchaseUnitOptions } from '@/store/unitStore'
+import {
+  unitState,
+  getInventoryUnitOptions,
+  getPurchaseUnitOptions,
+  getAllEnabledUnitOptions,
+} from '@/store/unitStore'
 import { generateProductCode } from '@/store/productInfoStore'
 import { saveMasterItem, resolveMasterItemEditRecord } from '@/utils/masterItemSave'
 import {
@@ -895,7 +917,29 @@ const purchaseUnitPriceInclTax = computed(() => {
   return Number((ex * (1 + r / 100)).toFixed(2))
 })
 
-const inventoryUnitLabel = computed(() => form.inventoryUnit || '件')
+function popupContainer(trigger) {
+  return trigger?.parentNode || document.body
+}
+
+watch(
+  () => form.inventoryUnit,
+  (unit) => {
+    if (!unit) return
+    if (!form.standardPackUnit) form.standardPackUnit = unit
+    if (!form.isVariableLength) {
+      form.purchaseUnit = unit
+      if (!form.packContentUnit) form.packContentUnit = unit
+    }
+  },
+)
+
+watch(
+  () => form.purchaseUnit,
+  (unit) => {
+    if (!unit) return
+    if (!form.packContentUnit) form.packContentUnit = unit
+  },
+)
 
 /** 产品族已落库后，才允许维护族模板 BOM（需关联 spuId） */
 const hasSavedSpu = computed(() => Boolean(form.spuId || props.editSpu?.id))
@@ -935,17 +979,16 @@ const purchaseUnitOpts = computed(() => {
   void unitState.units
   return getPurchaseUnitOptions()
 })
-
-const needsPackageContent = computed(() => {
-  if (form.isVariableLength) return false
-  const purchase = form.purchaseUnit || form.inventoryUnit
-  const inventory = form.inventoryUnit
-  return Boolean(purchase && inventory && purchase !== inventory)
+/** 包装含量单位可选全部启用单位，默认值为采购单位 */
+const packContentUnitOpts = computed(() => {
+  void unitState.units
+  return getAllEnabledUnitOptions()
 })
 
 function onPurchaseUnitChange() {
-  if (needsPackageContent.value && !(Number(form.packContentQty) > 0)) {
-    form.packContentQty = form.packContentQty || 1
+  /* 包装含量单位默认跟采购单位 */
+  if (!form.packContentUnit) {
+    form.packContentUnit = form.purchaseUnit
   }
 }
 
@@ -954,6 +997,7 @@ function onVariableLengthChange(checked) {
     const inv = form.inventoryUnit || '米'
     form.inventoryUnit = inv
     form.stockUnit = inv
+    if (!form.standardPackUnit) form.standardPackUnit = inv
     if (inv === '㎡' || inv === 'm²' || inv === '平方米') {
       form.purchaseUnit = form.purchaseUnit || '张'
       form.uomRelation = 'per_piece_area'
@@ -964,11 +1008,13 @@ function onVariableLengthChange(checked) {
       form.purchaseUnit = form.purchaseUnit || '根'
       form.uomRelation = 'per_piece_length'
     }
+    if (!form.packContentUnit) form.packContentUnit = form.purchaseUnit
   } else {
-    form.purchaseUnit = form.purchaseUnit || form.inventoryUnit
+    // 关闭双单位：采购单位与库存单位保持一致，界面不再展示采购单位
+    form.purchaseUnit = form.inventoryUnit
     form.stockUnit = form.inventoryUnit
     form.uomRelation = ''
-    onPurchaseUnitChange()
+    if (!form.packContentUnit) form.packContentUnit = form.purchaseUnit
   }
 }
 const materialGradeIdOpts = computed(() => {
@@ -1021,19 +1067,19 @@ const FIELD_HELP_BY_TAB = {
     },
     {
       name: '采购单位',
-      desc: '启用双单位后，采购下单与到货清点所使用的单位（如根、张）；未启用时与库存单位相同。',
+      desc: '仅启用双单位时展示。采购下单与到货清点所使用的单位（如根、张）；未启用双单位时与库存单位相同，界面不展示。',
     },
   ],
   sales: [
     {
       name: '标准包装量',
-      desc: '销售发货或报价常用的标准包装数量，单位为库存单位（如每捆长度、每箱件数）。',
+      desc: '选填。销售发货或报价常用的标准包装数量，单位为库存单位（如每捆长度、每箱件数）。',
     },
   ],
   purchase: [
     {
       name: '包装含量',
-      desc: '每个采购包装（盒/箱等）内含的库存单位数量。生成采购申请时，可按需求量 ÷ 包装含量向上取整，换算为采购包装数。',
+      desc: '选填。每个采购包装内含的库存单位数量；填写后采购申请可按需求 ÷ 含量向上取整。不填则不做包装换算，采购量按库存单位计。',
     },
   ],
   production: [
@@ -1089,7 +1135,9 @@ const form = reactive({
   unitPrice: undefined,
   purchaseUnitPrice: undefined,
   packContentQty: undefined,
+  packContentUnit: undefined,
   standardPackQty: undefined,
+  standardPackUnit: undefined,
   canSell: false,
   canProduce: false,
   isWholeMachine: false,
@@ -1144,7 +1192,9 @@ function resetForm() {
   form.unitPrice = undefined
   form.purchaseUnitPrice = undefined
   form.packContentQty = undefined
+  form.packContentUnit = undefined
   form.standardPackQty = undefined
+  form.standardPackUnit = undefined
   form.canSell = false
   form.canProduce = false
   form.isWholeMachine = false
@@ -1193,7 +1243,15 @@ function loadEditRecord(record) {
   form.unitPrice = source.unitPrice
   form.purchaseUnitPrice = source.purchaseUnitPrice
   form.packContentQty = source.packContentQty ?? source.packageContent ?? source.minOrderQty
+  form.packContentUnit =
+    source.packContentUnit ||
+    source.purchaseUnit ||
+    source.inventoryUnit ||
+    source.stockUnit ||
+    undefined
   form.standardPackQty = source.standardPackQty
+  form.standardPackUnit =
+    source.standardPackUnit || source.inventoryUnit || source.stockUnit || undefined
   form.canSell = Boolean(source.canSell)
   form.canProduce = Boolean(source.canProduce)
   form.isWholeMachine = Boolean(source.isWholeMachine)
@@ -1411,17 +1469,8 @@ function validate() {
     message.warning('启用双单位请选择采购单位（如：根）')
     return false
   }
-  if (!form.isVariableLength && needsPackageContent.value) {
-    if (!form.purchaseUnit) {
-      message.warning('请选择采购单位')
-      return false
-    }
-    if (!(Number(form.packContentQty) > 0)) {
-      message.warning(
-        '采购单位与库存单位不同时，请在「采购」页填写包装含量（1 采购单位=多少库存单位）',
-      )
-      return false
-    }
+  if (!form.isVariableLength) {
+    form.purchaseUnit = form.inventoryUnit
   }
   if (form.laborEnabled) {
     for (let i = 0; i < form.laborRows.length; i += 1) {
@@ -1488,7 +1537,9 @@ function buildProductPayload() {
       ? form.purchaseUnit
       : form.purchaseUnit || form.inventoryUnit,
     packageContent:
-      !form.isVariableLength && needsPackageContent.value ? Number(form.packContentQty) : undefined,
+      !form.isVariableLength && Number(form.packContentQty) > 0
+        ? Number(form.packContentQty)
+        : undefined,
     stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
     uomRelation: form.isVariableLength
       ? form.uomRelation ||
@@ -1507,7 +1558,9 @@ function buildProductPayload() {
     unitPrice: form.unitPrice ?? 0,
     purchaseUnitPrice: form.purchaseUnitPrice ?? 0,
     packContentQty: form.packContentQty ?? null,
+    packContentUnit: form.packContentUnit || form.purchaseUnit || form.inventoryUnit || null,
     standardPackQty: form.standardPackQty ?? null,
+    standardPackUnit: form.standardPackUnit || form.inventoryUnit || null,
     canSell: form.canSell,
     canProduce: form.canProduce,
     isWholeMachine: form.isWholeMachine,
@@ -1568,7 +1621,9 @@ function buildMaterialPayload() {
       ? form.purchaseUnit
       : form.purchaseUnit || form.inventoryUnit,
     packageContent:
-      !form.isVariableLength && needsPackageContent.value ? Number(form.packContentQty) : undefined,
+      !form.isVariableLength && Number(form.packContentQty) > 0
+        ? Number(form.packContentQty)
+        : undefined,
     stockUnit: form.isVariableLength ? form.inventoryUnit || '米' : form.inventoryUnit,
     uomRelation: form.isVariableLength
       ? form.uomRelation ||
@@ -1585,7 +1640,9 @@ function buildMaterialPayload() {
     unitPrice: form.unitPrice ?? 0,
     purchaseUnitPrice: form.purchaseUnitPrice ?? 0,
     packContentQty: form.packContentQty ?? null,
+    packContentUnit: form.packContentUnit || form.purchaseUnit || form.inventoryUnit || null,
     standardPackQty: form.standardPackQty ?? null,
+    standardPackUnit: form.standardPackUnit || form.inventoryUnit || null,
     canSell: form.canSell,
     canProduce: form.canProduce,
     canPurchase: form.canPurchase,
@@ -2024,6 +2081,23 @@ function handleOk() {
 
 .row-remove-col {
   text-align: right;
+}
+
+.qty-with-unit {
+  display: flex;
+  width: 100%;
+}
+
+.qty-with-unit :deep(.qty-with-unit-input),
+.qty-with-unit :deep(.ant-input-number) {
+  flex: 1;
+  min-width: 0;
+  width: calc(100% - 88px);
+}
+
+.qty-with-unit-select {
+  width: 88px;
+  flex-shrink: 0;
 }
 
 .bom-strategy-help {

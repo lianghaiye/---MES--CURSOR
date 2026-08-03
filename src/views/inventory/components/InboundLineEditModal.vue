@@ -81,6 +81,19 @@
       </a-form-item>
 
       <template v-if="isVariableLengthLine">
+        <div class="mode-switch">
+          <div class="mode-switch-label">计量形态</div>
+          <a-radio-group
+            v-model:value="draft.inboundMeasureMode"
+            option-type="button"
+            button-style="solid"
+            size="small"
+            :options="measureModeOpts"
+            @change="onMeasureModeChange"
+          />
+          <div class="mode-switch-hint">{{ measureModeHint }}</div>
+        </div>
+
         <a-form-item required>
           <template #label>
             <span class="field-label">
@@ -449,6 +462,8 @@ import { enrichInboundLine, syncInboundLineTotalFromUnit } from '@/utils/inbound
 import { materialInfoState } from '@/store/materialInfoStore'
 import {
   DEFAULT_PLATE_DIM_UNIT,
+  DUAL_UNIT_MEASURE_MODE,
+  DUAL_UNIT_MEASURE_MODE_OPTIONS,
   INBOUND_ENTRY_MODE,
   PLATE_DIM_UNIT_OPTIONS,
   calcAreaSquareMeters,
@@ -456,8 +471,10 @@ import {
   defaultInboundEntryMode,
   expandDualUnitInboundPieces,
   getInboundEntryModeOptions,
+  inferDualUnitMeasureMode,
   isAreaBasedDualUnit,
   isOneItemOneCodeBarcode,
+  resolveDualUnitMeasureMode,
   roundQty,
   sumPieceValues,
 } from '@/utils/variableLengthMaterial'
@@ -592,15 +609,29 @@ const barcodeTypeLabel = computed(() => {
 
 const isPieceManagedBarcode = computed(() => isOneItemOneCodeBarcode(barcodeTypeLabel.value))
 
-const isAreaBasedLine = computed(() => {
+const measureModeOpts = DUAL_UNIT_MEASURE_MODE_OPTIONS
+
+const resolvedMeasureMode = computed(() => {
   const line = draft.value
-  if (!line) return false
-  return isAreaBasedDualUnit({
+  if (!line) return DUAL_UNIT_MEASURE_MODE.GENERIC
+  return resolveDualUnitMeasureMode({
     ...line,
     stockUnit: stockUnitLabel.value,
     unit: stockUnitLabel.value,
     isVariableLength: true,
   })
+})
+
+const isAreaBasedLine = computed(() => resolvedMeasureMode.value === DUAL_UNIT_MEASURE_MODE.PLATE)
+
+const measureModeHint = computed(() => {
+  if (resolvedMeasureMode.value === DUAL_UNIT_MEASURE_MODE.PLATE) {
+    return '板材：按长×宽换算单件面积，或直接填合计面积。库存单位为㎡时默认此项。'
+  }
+  if (resolvedMeasureMode.value === DUAL_UNIT_MEASURE_MODE.LENGTH) {
+    return '型材：按单件长度/逐件长度填写库存单位量（米等）。'
+  }
+  return '通用：只填库存数量，不强求尺寸换算。'
 })
 
 const entryModeOpts = computed(() =>
@@ -699,6 +730,14 @@ watch(
       next.purchaseUnit = mat?.purchaseUnit || next.purchaseUnit || '件'
       next.barcodeType = mat?.barcodeType || next.barcodeType || '一批一码'
       next.uomRelation = mat?.uomRelation || next.uomRelation
+      next.inboundMeasureMode =
+        next.inboundMeasureMode ||
+        inferDualUnitMeasureMode({
+          ...next,
+          isVariableLength: true,
+          stockUnit,
+          uomRelation: next.uomRelation,
+        })
       next.inboundEntryMode = coerceInboundEntryMode(
         next.inboundEntryMode || defaultInboundEntryMode(next.barcodeType),
         next.barcodeType,
@@ -714,6 +753,7 @@ watch(
     }
     draft.value = reactive(next)
     syncSelectedItemKey()
+    ensureMeasureModeOnDraft()
     syncPieceDraftFromLine()
     refreshPreviewStock()
   },
@@ -790,6 +830,35 @@ function onPurchaseQtyChange() {
 
 function onEntryModeChange() {
   syncPieceDraftFromLine()
+}
+
+function onMeasureModeChange() {
+  const line = draft.value
+  if (!line) return
+  line.inboundMeasureMode = resolveDualUnitMeasureMode({
+    ...line,
+    stockUnit: stockUnitLabel.value,
+    unit: stockUnitLabel.value,
+    isVariableLength: true,
+  })
+  if (isAreaBasedLine.value && !line.dimUnit) {
+    line.dimUnit = DEFAULT_PLATE_DIM_UNIT
+  }
+  syncPieceDraftFromLine()
+}
+
+function ensureMeasureModeOnDraft() {
+  const line = draft.value
+  if (!line || !isVariableLengthLine.value) return
+  if (!line.inboundMeasureMode) {
+    line.inboundMeasureMode = inferDualUnitMeasureMode({
+      ...line,
+      stockUnit: stockUnitLabel.value,
+      unit: stockUnitLabel.value,
+      isVariableLength: true,
+      uomRelation: line.uomRelation || resolvedMaterial.value?.uomRelation,
+    })
+  }
 }
 
 function onPieceEditModeChange() {
@@ -885,6 +954,7 @@ function onItemChange(rowKey) {
   const isVL = Boolean(mat?.isVariableLength || item.isVariableLength)
   const stockUnit = isVL ? mat?.stockUnit || mat?.inventoryUnit || '米' : item.inventoryUnit || '件'
   const barcodeType = isVL ? mat?.barcodeType || '一批一码' : undefined
+  const uomRelation = isVL ? mat?.uomRelation : undefined
   Object.assign(draft.value, {
     itemId: item.itemId,
     itemCode: item.code,
@@ -895,17 +965,25 @@ function onItemChange(rowKey) {
     material: item.material || '',
     drawingNo: item.drawingNo || '',
     unit: stockUnit,
+    stockUnit: isVL ? stockUnit : undefined,
     unitPrice: item.unitPrice ?? draft.value.unitPrice,
     isVariableLength: isVL,
     purchaseUnit: isVL ? mat?.purchaseUnit || '件' : undefined,
     barcodeType,
     inboundEntryMode: isVL ? defaultInboundEntryMode(barcodeType) : undefined,
+    inboundMeasureMode: isVL
+      ? inferDualUnitMeasureMode({
+          isVariableLength: true,
+          stockUnit,
+          uomRelation,
+        })
+      : undefined,
     purchaseQty: isVL ? draft.value.purchaseQty || 1 : undefined,
     uniformValue: isVL ? null : undefined,
     uniformLength: isVL ? null : undefined,
     uniformWidth: isVL ? null : undefined,
     dimUnit: isVL ? DEFAULT_PLATE_DIM_UNIT : undefined,
-    uomRelation: isVL ? mat?.uomRelation : undefined,
+    uomRelation,
     totalValue: isVL ? null : undefined,
     pieceValues: isVL ? [] : undefined,
     pieceDims: isVL ? [] : undefined,
@@ -952,6 +1030,14 @@ function handleOk() {
     )
     draft.value.uomRelation = mat?.uomRelation || draft.value.uomRelation
     draft.value.stockUnit = stockUnit
+    draft.value.inboundMeasureMode =
+      draft.value.inboundMeasureMode ||
+      inferDualUnitMeasureMode({
+        ...draft.value,
+        isVariableLength: true,
+        stockUnit,
+        uomRelation: draft.value.uomRelation,
+      })
     draft.value.dimUnit = draft.value.dimUnit || DEFAULT_PLATE_DIM_UNIT
 
     if (isAreaBasedLine.value && draft.value.inboundEntryMode === INBOUND_ENTRY_MODE.UNIFORM) {
@@ -1014,6 +1100,22 @@ function handleOk() {
 
 <style lang="less" scoped>
 @import './inventoryLineEditModal.less';
+
+.mode-switch {
+  margin-bottom: 16px;
+}
+
+.mode-switch-label {
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.mode-switch-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
 
 .vl-tip {
   margin-top: 6px;

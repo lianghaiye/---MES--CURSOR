@@ -12,23 +12,27 @@ export function resolvePurchaseUnit(material = {}) {
   return material.purchaseUnit || resolveInventoryUnit(material)
 }
 
-/** 1 采购单位折合多少库存单位；无效时按 1（兼容 packageContent / packContentQty） */
+/**
+ * 1 采购单位折合多少库存单位（兼容 packageContent / packContentQty）
+ * 未填写或无效时返回 null（表示不做包装换算）
+ */
 export function resolvePackageContent(material = {}) {
   const n = Number(material.packageContent ?? material.packContentQty)
   if (Number.isFinite(n) && n > 0) return n
-  return 1
+  return null
 }
 
 /**
  * 是否需要按包装含量做采购换算
- * 双单位（可变长）不走此路径
+ * - 双单位（可变长）不走此路径
+ * - 采购单位与库存单位相同，或不填包装含量 → 不换算，采购量按库存需求计
  */
 export function needsPackagePurchaseConvert(material = {}) {
   if (!material || material.isVariableLength) return false
   const purchaseUnit = resolvePurchaseUnit(material)
   const inventoryUnit = resolveInventoryUnit(material)
   if (purchaseUnit === inventoryUnit) return false
-  return resolvePackageContent(material) > 0
+  return resolvePackageContent(material) != null
 }
 
 /** 库存数量 → 采购数量（向上取整） */
@@ -72,7 +76,7 @@ export function convertStockDemandToPurchase(stockDemandQty, material = {}) {
       planPurchaseQty: demandStockQty,
       purchaseUnit: inventoryUnit,
       inventoryUnit,
-      packageContent: 1,
+      packageContent: packageContent ?? 1,
       needsConvert: false,
       convertHint: '',
     }

@@ -183,6 +183,21 @@
   min-width: 140px;
 }
 
+.work-order-print-preview-page .bom-table .cell-num,
+.work-order-print-iframe-body .bom-table .cell-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.work-order-print-preview-page .bom-empty,
+.work-order-print-iframe-body .bom-empty {
+  padding: 10px 12px;
+  border: 1px dashed #d9d9d9;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  background: #fafafa;
+}
+
 .work-order-print-preview-page .sheet-footer,
 .work-order-print-iframe-body .sheet-footer {
   display: flex;

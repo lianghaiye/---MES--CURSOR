@@ -232,6 +232,9 @@
             <template v-else-if="column.key === 'pickedBatchNo'">
               {{ line.pickedBatchNo || '—' }}
             </template>
+            <template v-else-if="column.key === 'remnantBatchNo'">
+              {{ line.remnantBatchNo || '—' }}
+            </template>
           </template>
         </a-table>
 
@@ -368,6 +371,7 @@ const drawerLineColumns = [
   { title: '实耗', key: 'actualConsumeMeters', width: 110 },
   { title: '余料', key: 'remnantLength', width: 80, align: 'right' },
   { title: '拣选批次', key: 'pickedBatchNo', width: 130 },
+  { title: '余料新批次', key: 'remnantBatchNo', width: 140 },
 ]
 
 function formatQty(val) {

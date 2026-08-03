@@ -170,68 +170,83 @@
           <template v-else-if="activeTab === 'batches'">
             <div class="section-card">
               <div class="section-title">批次详情</div>
-              <a-table
-                :columns="batchColumns"
-                :data-source="batchList"
-                row-key="id"
-                size="small"
-                bordered
-                :pagination="batchList.length > 10 ? { pageSize: 10 } : false"
-                :scroll="{ x: 960 }"
-                :expandable="batchExpandable"
-              >
-                <template #bodyCell="{ column, record: batch }">
-                  <template v-if="column.key === 'currentLength'">
-                    {{ formatQty(batch.currentLength) }}
-                    <span class="unit-suffix">{{ batch.unit || '' }}</span>
-                    <span v-if="batch.attrs?.manageByPiece" class="piece-hint">
-                      （{{ piecesOfBatch(batch.id).length }} 件）
-                    </span>
-                  </template>
-                  <template v-else-if="column.key === 'status'">
-                    <a-tag :color="batch.status === '在库' ? 'success' : 'default'">{{
-                      batch.status || '—'
-                    }}</a-tag>
-                  </template>
-                </template>
-                <template #expandedRowRender="{ record: batch }">
-                  <a-table
-                    v-if="batch.attrs?.manageByPiece"
-                    size="small"
-                    bordered
-                    :pagination="false"
-                    :columns="pieceColumns"
-                    :data-source="piecesOfBatch(batch.id)"
-                    row-key="id"
-                  >
-                    <template #bodyCell="{ column, record: piece }">
-                      <template v-if="column.key === 'pieceQty'">
-                        {{ formatQty(piece.pieceQty) }}
-                        <span class="unit-suffix">{{ piece.unit || '' }}</span>
-                      </template>
-                      <template v-else-if="column.key === 'status'">
-                        <a-tag :color="piece.status === '在库' ? 'success' : 'default'">{{
-                          piece.status || '—'
-                        }}</a-tag>
-                      </template>
+              <a-empty v-if="!batchGroups.length" :image="false" description="暂无入库明细" />
+              <div v-for="group in batchGroups" :key="group.key" class="batch-item-block">
+                <div class="batch-item-head">
+                  <span class="batch-item-code">{{ group.itemCode || '—' }}</span>
+                  <span class="batch-item-name">{{ group.itemName || '—' }}</span>
+                  <span v-if="group.material" class="batch-item-material">{{
+                    group.material
+                  }}</span>
+                  <a-tag v-if="group.batches.length" color="blue">
+                    {{ group.batches.length }} 批
+                  </a-tag>
+                </div>
+                <a-table
+                  :columns="batchColumns"
+                  :data-source="group.batches"
+                  row-key="id"
+                  size="small"
+                  bordered
+                  :pagination="group.batches.length > 10 ? { pageSize: 10 } : false"
+                  :scroll="{ x: 920 }"
+                  :expandable="batchExpandableFor(group.batches)"
+                >
+                  <template #bodyCell="{ column, record: batch }">
+                    <template v-if="column.key === 'currentLength'">
+                      {{ formatQty(batch.currentLength) }}
+                      <span v-if="batch.attrs?.manageByPiece" class="piece-hint">
+                        （{{ piecesOfBatch(batch.id).length }} 件）
+                      </span>
                     </template>
-                    <template #emptyText>
-                      <span class="empty-inline">暂无件码</span>
+                    <template v-else-if="column.key === 'unit'">
+                      {{ batch.unit || group.unit || '—' }}
                     </template>
-                  </a-table>
-                  <span v-else class="empty-inline">非一物一码批次</span>
-                </template>
-                <template #emptyText>
-                  <a-empty
-                    :image="false"
-                    :description="
-                      record.status === '已完成'
-                        ? '暂无批次记录'
-                        : '确认入库后生成库存批次；一物一码为 1 父批 + N 件码'
-                    "
-                  />
-                </template>
-              </a-table>
+                    <template v-else-if="column.key === 'status'">
+                      <a-tag :color="batch.status === '在库' ? 'success' : 'default'">{{
+                        batch.status || '—'
+                      }}</a-tag>
+                    </template>
+                  </template>
+                  <template #expandedRowRender="{ record: batch }">
+                    <a-table
+                      v-if="batch.attrs?.manageByPiece"
+                      size="small"
+                      bordered
+                      :pagination="false"
+                      :columns="pieceColumns"
+                      :data-source="piecesOfBatch(batch.id)"
+                      row-key="id"
+                    >
+                      <template #bodyCell="{ column, record: piece }">
+                        <template v-if="column.key === 'pieceQty'">
+                          {{ formatQty(piece.pieceQty) }}
+                          <span class="unit-suffix">{{ piece.unit || '' }}</span>
+                        </template>
+                        <template v-else-if="column.key === 'status'">
+                          <a-tag :color="piece.status === '在库' ? 'success' : 'default'">{{
+                            piece.status || '—'
+                          }}</a-tag>
+                        </template>
+                      </template>
+                      <template #emptyText>
+                        <span class="empty-inline">暂无件码</span>
+                      </template>
+                    </a-table>
+                    <span v-else class="empty-inline">非一物一码批次</span>
+                  </template>
+                  <template #emptyText>
+                    <a-empty
+                      :image="false"
+                      :description="
+                        record.status === '已完成'
+                          ? '该物品暂无批次记录'
+                          : '确认入库后生成库存批次；一物一码为 1 父批 + N 件码'
+                      "
+                    />
+                  </template>
+                </a-table>
+              </div>
             </div>
           </template>
         </div>
@@ -284,10 +299,9 @@ const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 
 
 const batchColumns = [
   { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 130 },
-  { title: '物品编码', dataIndex: 'itemCode', key: 'itemCode', width: 120, ellipsis: true },
-  { title: '物品名称', dataIndex: 'itemName', key: 'itemName', width: 140, ellipsis: true },
   { title: '仓库', dataIndex: 'warehouse', key: 'warehouse', width: 100 },
-  { title: '数量', key: 'currentLength', width: 140 },
+  { title: '数量', key: 'currentLength', width: 120 },
+  { title: '库存单位', key: 'unit', dataIndex: 'unit', width: 90 },
   { title: '状态', key: 'status', width: 88 },
   { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
   { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 140 },
@@ -315,10 +329,57 @@ const batchList = computed(() => {
   })
 })
 
-const batchExpandable = computed(() => ({
-  defaultExpandAllRows: batchList.value.some((b) => b.attrs?.manageByPiece),
-  rowExpandable: (batch) => Boolean(batch.attrs?.manageByPiece),
-}))
+/** 按入库明细分组：上方编号+名称+材质，下方该物品批次 */
+const batchGroups = computed(() => {
+  const lines = record.value?.lineItems || []
+  const allBatches = batchList.value
+  const usedBatchIds = new Set()
+
+  const groups = lines.map((line, index) => {
+    const code = line.itemCode || ''
+    const lineBatchNos = new Set((line.batchNos || []).map((no) => String(no)))
+    const batches = allBatches.filter((b) => {
+      if (usedBatchIds.has(b.id)) return false
+      const matchByNo = lineBatchNos.size && lineBatchNos.has(String(b.batchNo))
+      const matchByCode = code && b.itemCode === code
+      if (matchByNo || matchByCode) {
+        usedBatchIds.add(b.id)
+        return true
+      }
+      return false
+    })
+    return {
+      key: line.id || `${code || 'line'}-${index}`,
+      itemCode: code,
+      itemName: line.itemName || '',
+      material: line.material || '',
+      unit: line.stockUnit || line.unit || '',
+      batches,
+    }
+  })
+
+  // 未能挂到明细行的批次（兜底一组）
+  const orphanBatches = allBatches.filter((b) => !usedBatchIds.has(b.id))
+  if (orphanBatches.length) {
+    groups.push({
+      key: 'orphan-batches',
+      itemCode: '',
+      itemName: '其他批次',
+      material: '',
+      unit: '',
+      batches: orphanBatches,
+    })
+  }
+
+  return groups
+})
+
+function batchExpandableFor(batches) {
+  return {
+    defaultExpandAllRows: (batches || []).some((b) => b.attrs?.manageByPiece),
+    rowExpandable: (batch) => Boolean(batch.attrs?.manageByPiece),
+  }
+}
 
 function piecesOfBatch(batchId) {
   // 依赖 stockPieceState 以触发响应式刷新
@@ -518,6 +579,45 @@ function handleDelete() {
   .empty-inline {
     color: rgba(0, 0, 0, 0.45);
     font-size: 12px;
+  }
+
+  .batch-item-block {
+    margin-bottom: 16px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .batch-item-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    background: #fafafa;
+    border: 1px solid #f0f0f0;
+    border-radius: 4px;
+  }
+
+  .batch-item-code {
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.88);
+  }
+
+  .batch-item-name {
+    color: rgba(0, 0, 0, 0.75);
+  }
+
+  .batch-item-material {
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 12px;
+
+    &::before {
+      content: '·';
+      margin-right: 6px;
+    }
   }
 }
 </style>

@@ -38,7 +38,7 @@
               {{ field.label }}
               <span v-if="field.required" class="req-mark">*</span>
             </template>
-            <a-input-group compact class="blank-size-input-group">
+            <div class="blank-size-field">
               <a-input-number
                 v-model:value="draft[field.key]"
                 :min="0"
@@ -49,12 +49,14 @@
                 :placeholder="field.required ? '必填' : '选填'"
               />
               <a-select
-                :value="draft.units?.[field.key] || 'mm'"
+                :value="getUnit(field.key)"
                 :options="BLANK_SIZE_UNIT_OPTIONS"
                 class="blank-size-unit"
-                @change="(unit) => onUnitChange(field.key, unit)"
+                :dropdown-style="{ zIndex: 1200 }"
+                :get-popup-container="getSelectPopupContainer"
+                @update:value="(unit) => onUnitChange(field.key, unit)"
               />
-            </a-input-group>
+            </div>
           </a-form-item>
         </a-col>
       </a-row>
@@ -65,7 +67,7 @@
       <a-row v-if="extraFields.length" :gutter="[12, 8]">
         <a-col v-for="field in extraFields" :key="field.key" :span="8">
           <a-form-item :label="field.label">
-            <a-input-group compact class="blank-size-input-group">
+            <div class="blank-size-field">
               <a-input-number
                 v-model:value="draft[field.key]"
                 :min="0"
@@ -76,12 +78,14 @@
                 placeholder="选填"
               />
               <a-select
-                :value="draft.units?.[field.key] || 'mm'"
+                :value="getUnit(field.key)"
                 :options="BLANK_SIZE_UNIT_OPTIONS"
                 class="blank-size-unit"
-                @change="(unit) => onUnitChange(field.key, unit)"
+                :dropdown-style="{ zIndex: 1200 }"
+                :get-popup-container="getSelectPopupContainer"
+                @update:value="(unit) => onUnitChange(field.key, unit)"
               />
-            </a-input-group>
+            </div>
           </a-form-item>
         </a-col>
       </a-row>
@@ -115,6 +119,7 @@ import {
   LENGTH_BLANK_SIZE_PRIMARY_FIELDS,
   LENGTH_BLANK_SIZE_EXTRA_FIELDS,
   BLANK_SIZE_FIELDS,
+  DEFAULT_BLANK_SIZE_UNIT,
   emptyBlankSize,
   normalizeBlankSize,
   formatBlankSizeText,
@@ -142,12 +147,27 @@ function getModalContainer() {
   return typeof document !== 'undefined' ? document.body : false
 }
 
+function getSelectPopupContainer() {
+  return typeof document !== 'undefined' ? document.body : false
+}
+
 function closeModal() {
   emit('update:open', false)
 }
 
 function onOpenUpdate(visible) {
   emit('update:open', Boolean(visible))
+}
+
+function ensureUnits() {
+  if (!draft.units || typeof draft.units !== 'object') {
+    draft.units = emptyBlankSize().units
+  }
+}
+
+function getUnit(fieldKey) {
+  ensureUnits()
+  return draft.units[fieldKey] || DEFAULT_BLANK_SIZE_UNIT
 }
 
 function resetDraftFromLine() {
@@ -158,10 +178,7 @@ function resetDraftFromLine() {
   draft.thickness = next.thickness
   draft.innerDiameter = next.innerDiameter
   draft.outerDiameter = next.outerDiameter
-  if (!draft.units || typeof draft.units !== 'object') {
-    draft.units = emptyBlankSize().units
-  }
-  Object.assign(draft.units, next.units)
+  draft.units = { ...next.units }
 }
 
 function resolveModeSource() {
@@ -247,10 +264,8 @@ watch(
 )
 
 function onUnitChange(fieldKey, nextUnit) {
-  if (!draft.units || typeof draft.units !== 'object') {
-    draft.units = emptyBlankSize().units
-  }
-  const prevUnit = draft.units[fieldKey]
+  ensureUnits()
+  const prevUnit = draft.units[fieldKey] || DEFAULT_BLANK_SIZE_UNIT
   if (prevUnit === nextUnit) return
   if (draft[fieldKey] != null && draft[fieldKey] !== '') {
     draft[fieldKey] = convertBlankSizeValue(draft[fieldKey], prevUnit, nextUnit)
@@ -307,19 +322,40 @@ function handleOk() {
 .blank-size-form :deep(.ant-form-item) {
   margin-bottom: 8px;
 }
-.blank-size-input-group {
+.blank-size-field {
   display: flex;
   width: 100%;
+  align-items: stretch;
+  gap: 0;
 }
 .blank-size-input {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  width: auto !important;
 }
-.blank-size-input-group :deep(.blank-size-input) {
-  width: calc(100% - 72px);
+.blank-size-field :deep(.ant-input-number) {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto !important;
 }
 .blank-size-unit {
-  width: 72px;
+  flex: 0 0 78px;
+  width: 78px !important;
+  position: relative;
+  z-index: 2;
+}
+.blank-size-unit :deep(.ant-select-selector) {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  cursor: pointer;
+}
+.blank-size-field :deep(.ant-input-number .ant-input-number-input) {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+.blank-size-field :deep(.ant-input-number) {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
 }
 .preview {
   margin-top: 8px;

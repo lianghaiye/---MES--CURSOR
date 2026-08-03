@@ -95,7 +95,15 @@
       >
         <template #headerCell="{ column }">
           <div class="header-cell">
-            <span v-if="column.key === 'inTransitQty'" class="header-title col-title-with-tip">
+            <span v-if="column.key === 'availableStock'" class="header-title col-title-with-tip">
+              可用库存
+              <a-tooltip
+                title="展示为 工单占用/可用库存；工单占用=开立工单 BOM 需求−已领，可用库存=现存量−工单占用"
+              >
+                <InfoCircleOutlined class="col-tip-icon" />
+              </a-tooltip>
+            </span>
+            <span v-else-if="column.key === 'inTransitQty'" class="header-title col-title-with-tip">
               在途
               <a-tooltip title="申请量/订单量（采购单位）；未转单的采购申请 / 未入库的采购订单">
                 <InfoCircleOutlined class="col-tip-icon" />
@@ -258,8 +266,7 @@ const columnDefs = [
   { key: 'designatedSupplier', title: '指定供应商', width: 96, total: false },
   { key: 'supplier', title: '供应商', width: 140, editable: true, total: false },
   { key: 'stockQty', title: '库存数量', width: 90, total: true, numeric: true },
-  { key: 'woAllocatedQty', title: '工单占用', width: 90, total: true, numeric: true },
-  { key: 'availableStock', title: '可用库存', width: 90, total: true, numeric: true },
+  { key: 'availableStock', title: '可用库存', width: 120, total: false, numeric: false },
   { key: 'inTransitQty', title: '在途', width: 110, total: false, numeric: false },
   { key: 'demandQty', title: '需求数(库存)', width: 100, total: true, numeric: true },
   { key: 'gapQty', title: '缺口数(库存)', width: 100, total: true, numeric: true },
@@ -415,7 +422,14 @@ function onDesignatedSupplierChange(record, checked) {
   }
 }
 
+function formatAvailableStockText(record) {
+  const allocated = Number(record.woAllocatedQty) || 0
+  const available = Number(record.availableStock) || 0
+  return `${allocated}/${available}`
+}
+
 function formatCell(record, key, text) {
+  if (key === 'availableStock') return formatAvailableStockText(record)
   if (key === 'inTransitQty') return record.inTransitText || text || '—'
   if (key === 'supplier' && !text) return SUPPLIER_SELECT_PLACEHOLDER
   if (isEditable(key) && (text === '' || text == null)) return '-'

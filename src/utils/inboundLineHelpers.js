@@ -8,6 +8,7 @@ import {
   allowsInboundTotalEntry,
   calcAreaSquareMeters,
   coerceInboundEntryMode,
+  inferDualUnitMeasureMode,
   isAreaBasedDualUnit,
   resolveVariableLengthFields,
 } from '@/utils/variableLengthMaterial'
@@ -122,6 +123,15 @@ export function applyDualUnitFieldsToInboundLine(line = {}, itemCode = '') {
     line.stockUnit = vl.stockUnit
     line.unit = vl.stockUnit
     line.uomRelation = vl.uomRelation
+    // 计量形态：已选手动值保留；否则按库存单位推断（㎡ → 板材）
+    if (!line.inboundMeasureMode) {
+      line.inboundMeasureMode = inferDualUnitMeasureMode({
+        ...line,
+        isVariableLength: true,
+        stockUnit: vl.stockUnit,
+        uomRelation: vl.uomRelation,
+      })
+    }
     if (!line.dimUnit && isAreaBasedDualUnit(line)) {
       line.dimUnit = 'mm'
     }
