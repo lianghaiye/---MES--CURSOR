@@ -98,7 +98,7 @@ export function adjustStockQty({ warehouse, itemCode, itemName, itemType, unit, 
 }
 
 /** 入库确认后增加库存（普通按件；可变长由 stockBatchStore 处理） */
-export function applyInboundToStock(order) {
+export function applyInboundToStock(order, { lineIds } = {}) {
   const lines = order.lineItems || []
   if (!lines.length) return { ok: false, message: '入库单无明细行' }
 
@@ -106,6 +106,8 @@ export function applyInboundToStock(order) {
   if (!hasWarehouse) return { ok: false, message: '缺少入库仓库' }
 
   for (const line of lines) {
+    if (lineIds?.length && !lineIds.includes(line.id)) continue
+    if (line.lineStatus === '已入库') continue
     // 已按条码类型建批的行，库存已在 createBatch 中增减，避免双计
     if (line.isVariableLength || (Array.isArray(line.batchNos) && line.batchNos.length)) {
       continue
@@ -132,10 +134,12 @@ export function applyInboundToStock(order) {
 }
 
 /** 出库扣减汇总库存（普通按件行） */
-export function applyOutboundToStock(order) {
+export function applyOutboundToStock(order, { lineIds } = {}) {
   const lines = order.lineItems || []
   for (const line of lines) {
-    if (line.isVariableLength || line.pickedBatchId) continue
+    if (lineIds?.length && !lineIds.includes(line.id)) continue
+    if (line.lineStatus === '已出库') continue
+    if (line.isVariableLength || line.pickedBatchId || getLineHasBatchAlloc(line)) continue
     const warehouse = line.shipWarehouse || line.warehouse || order.warehouse
     const code = line.itemCode?.trim()
     if (!warehouse || !code) continue
@@ -150,4 +154,8 @@ export function applyOutboundToStock(order) {
     })
   }
   return { ok: true }
+}
+
+function getLineHasBatchAlloc(line) {
+  return Array.isArray(line.batchAllocations) && line.batchAllocations.length > 0
 }

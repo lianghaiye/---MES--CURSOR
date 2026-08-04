@@ -404,6 +404,13 @@ export function buildPurchaseRequisitionRows(materials, order) {
       purchaseUnit: converted.purchaseUnit,
       packageContent: converted.packageContent,
       convertHint: converted.convertHint,
+      blankSizeText: m.blankSizeText || '',
+      blankSize: m.blankSize || null,
+      blankSizeMode: m.blankSizeMode || '',
+      // 订货尺寸默认带出下料尺寸（定尺外发）；买标板/拼板可另改
+      orderSizeText: m.orderSizeText || m.blankSizeText || '',
+      orderSize: m.orderSize ?? m.blankSize ?? null,
+      orderSizeMode: m.orderSizeMode || m.blankSizeMode || '',
       remark: m.remark || '',
     }
   })

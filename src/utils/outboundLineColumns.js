@@ -8,6 +8,7 @@ export const OUTBOUND_NON_SALES_LINE_KEYS = ['blankSizeText']
 
 export const outboundFormLineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '状态', key: 'lineStatus', dataIndex: 'lineStatus', width: 88 },
   { title: '物品编码', dataIndex: 'itemCode', key: 'itemCode', width: 120, ellipsis: true },
   { title: '物品名称', dataIndex: 'itemName', key: 'itemName', width: 130, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 110, ellipsis: true },
@@ -45,7 +46,7 @@ export const outboundFormLineColumns = [
   { title: '发货备注', key: 'deliveryRemark', width: 140, ellipsis: true },
   { title: '单价', key: 'unitPrice', width: 96, align: 'right' },
   { title: '总价', key: 'totalPrice', width: 96, align: 'right' },
-  { title: '操作', key: 'actions', width: 150 },
+  { title: '操作', key: 'actions', width: 220 },
 ]
 
 export const outboundDetailLineColumns = outboundFormLineColumns.filter((c) => c.key !== 'actions')

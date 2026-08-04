@@ -139,6 +139,13 @@
                 </template>
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'lineStatus'">
+                    <a-tag
+                      :color="(line.lineStatus || '待出库') === '已出库' ? 'success' : 'processing'"
+                    >
+                      {{ line.lineStatus || '待出库' }}
+                    </a-tag>
+                  </template>
                   <template v-else-if="column.key === 'stockQty'">
                     {{ formatQty(line.stockQty) }}
                     <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>

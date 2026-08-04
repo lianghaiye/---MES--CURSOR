@@ -127,7 +127,7 @@ export function deleteOutboundOrder(id) {
 }
 
 export function canEditOutbound(order) {
-  return ['待处理', '待出库'].includes(order?.status)
+  return ['待处理', '待出库', '部分出库'].includes(order?.status)
 }
 
 export function canDeleteOutbound(order) {
@@ -273,23 +273,35 @@ export function confirmOutbound(ids) {
       return
     }
 
-    const stockCheck = applyOutboundStockMovements(order)
+    const pendingIds = (order.lineItems || [])
+      .filter((l) => (l.lineStatus || '待出库') !== '已出库')
+      .map((l) => l.id)
+    if (!pendingIds.length) {
+      order.status = '已出库'
+      order.completedAt = dayjs().format('YYYY-MM-DD')
+      count += 1
+      return
+    }
+
+    const stockCheck = applyOutboundStockMovements(order, { lineIds: pendingIds })
     if (!stockCheck.ok) {
       blocked.push({ docNo: order.docNo, message: stockCheck.message })
       return
     }
 
-    // 领料/发料：发料仓已扣后，调入「领入仓库」（线边仓），供库存扣减/下料结算从 B 扣
-    const transfer = transferOutboundToReceiveWarehouse(order)
+    pendingIds.forEach((lineId) => {
+      const line = order.lineItems.find((l) => l.id === lineId)
+      if (line) line.lineStatus = '已出库'
+    })
+
+    const transfer = transferOutboundToReceiveWarehouse(order, { lineIds: pendingIds })
     if (!transfer.ok) {
       blocked.push({ docNo: order.docNo, message: transfer.message || '领入仓调入失败' })
       return
     }
 
-    order.status = '已出库'
-    order.completedAt = dayjs().format('YYYY-MM-DD')
-    if (!order.auditDate) order.auditDate = order.completedAt
-    if (order.outboundType === '销售出库') {
+    recomputeOutboundOrderStatus(order)
+    if (order.outboundType === '销售出库' && order.status === '已出库') {
       import('@/utils/deliveryOutboundSync').then(({ syncDeliveryAfterOutboundConfirm }) => {
         syncDeliveryAfterOutboundConfirm(order)
       })
@@ -297,6 +309,57 @@ export function confirmOutbound(ids) {
     count += 1
   })
   return { count, blocked }
+}
+
+/** 按明细确认出库 */
+export function confirmOutboundLine(orderId, lineId) {
+  const order = outboundState.orders.find((o) => o.id === orderId)
+  const check = validateOutboundForConfirm(order)
+  if (!check.ok) return { ok: false, message: check.message, qcBlocked: check.qcBlocked }
+  const line = (order.lineItems || []).find((l) => l.id === lineId)
+  if (!line) return { ok: false, message: '明细不存在' }
+  if ((line.lineStatus || '待出库') === '已出库') {
+    return { ok: false, message: '该明细已出库' }
+  }
+
+  const stockCheck = applyOutboundStockMovements(order, { lineIds: [lineId] })
+  if (!stockCheck.ok) return stockCheck
+
+  line.lineStatus = '已出库'
+  const transfer = transferOutboundToReceiveWarehouse(order, { lineIds: [lineId] })
+  if (!transfer.ok) {
+    return { ok: false, message: transfer.message || '领入仓调入失败' }
+  }
+
+  recomputeOutboundOrderStatus(order)
+  if (order.outboundType === '销售出库' && order.status === '已出库') {
+    import('@/utils/deliveryOutboundSync').then(({ syncDeliveryAfterOutboundConfirm }) => {
+      syncDeliveryAfterOutboundConfirm(order)
+    })
+  }
+  return { ok: true, order, line }
+}
+
+export function recomputeOutboundOrderStatus(order) {
+  if (!order) return
+  const lines = order.lineItems || []
+  if (!lines.length) {
+    if (order.status === '部分出库') order.status = '待出库'
+    return
+  }
+  const done = lines.filter((l) => (l.lineStatus || '待出库') === '已出库').length
+  if (done === 0) {
+    if (order.status === '部分出库' || order.status === '已出库') order.status = '待出库'
+    return
+  }
+  if (done === lines.length) {
+    order.status = '已出库'
+    order.completedAt = order.completedAt || dayjs().format('YYYY-MM-DD')
+    if (!order.auditDate) order.auditDate = order.completedAt
+    return
+  }
+  order.status = '部分出库'
+  order.completedAt = ''
 }
 
 function writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty, dualUnit }) {
@@ -345,8 +408,12 @@ function writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty, dual
   line.batchAttrsText = texts.join(' | ')
 }
 
-function applyOutboundStockMovements(order) {
-  const lines = order.lineItems || []
+function applyOutboundStockMovements(order, { lineIds } = {}) {
+  const lines = (order.lineItems || []).filter((line) => {
+    if ((line.lineStatus || '待出库') === '已出库') return false
+    if (lineIds?.length && !lineIds.includes(line.id)) return false
+    return true
+  })
   const rule = getOutboundIssueRule()
 
   for (const line of lines) {
@@ -480,7 +547,7 @@ function applyOutboundStockMovements(order) {
     ]
     line.outboundIssueRule = OUTBOUND_ISSUE_RULES.MANUAL
   }
-  applyOutboundToStock(order)
+  applyOutboundToStock(order, { lineIds: lines.map((l) => l.id) })
   return { ok: true }
 }
 
@@ -488,8 +555,8 @@ function applyOutboundStockMovements(order) {
 export function validateOutboundForConfirm(order) {
   if (!order) return { ok: false, message: '出库单不存在' }
   if (order.status === '已出库') return { ok: false, code: 'already_done', message: '已出库' }
-  if (order.status !== '待出库') {
-    return { ok: false, message: '仅「待出库」状态可确认出库' }
+  if (order.status !== '待出库' && order.status !== '部分出库') {
+    return { ok: false, message: '仅「待出库 / 部分出库」状态可确认出库' }
   }
 
   if (order.outboundType !== '销售出库') {

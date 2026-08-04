@@ -323,6 +323,9 @@
                       </template>
                     </InventoryLineEditableCell>
                   </template>
+                  <template v-else-if="column.key === 'orderSizeText'">
+                    {{ record.orderSizeText || record.blankSizeText || '—' }}
+                  </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
                     <InventoryLineEditableCell
                       v-if="taxModeExcluding"
@@ -678,7 +681,7 @@ function filterUnitOption(input, option) {
 }
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-form-lines-v3', purchaseOrderFormLineColumns, {
+  useTableColumnSettings('purchase-order-form-lines-v5', purchaseOrderFormLineColumns, {
     minScrollX: 2200,
     pinEdgeColumns: false,
     pinActionColumn: true,

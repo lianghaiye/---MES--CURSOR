@@ -18,6 +18,13 @@ export const purchaseOrderFormLineColumns = [
   { title: '库存数量', dataIndex: 'stockQty', key: 'stockQty', width: 90, align: 'right' },
   { title: '采购数量', key: 'purchaseQty', width: 100 },
   { title: '采购单位', dataIndex: 'unit', key: 'unit', width: 90 },
+  {
+    title: '订货尺寸',
+    dataIndex: 'orderSizeText',
+    key: 'orderSizeText',
+    width: 160,
+    ellipsis: true,
+  },
   { title: '不含税单价', key: 'unitPriceExTax', width: 100 },
   { title: '税率(%)', key: 'taxRate', width: 80 },
   { title: '含税单价', key: 'unitPriceInTax', width: 100 },

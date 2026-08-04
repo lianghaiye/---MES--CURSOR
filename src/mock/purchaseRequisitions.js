@@ -1,8 +1,9 @@
 import dayjs from 'dayjs'
+import { ensureOrderSizeDefaults } from '@/utils/orderSize'
 
 export function createLineItem(partial = {}) {
   const planPurchaseQty = partial.planPurchaseQty ?? partial.demandQty ?? 1
-  return {
+  return ensureOrderSizeDefaults({
     id: `pr-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     productName: '',
     productCode: '',
@@ -16,6 +17,14 @@ export function createLineItem(partial = {}) {
     unit: '件',
     inventoryUnit: '',
     purchaseUnit: '',
+    /** 生产下料尺寸（来源，可空） */
+    blankSizeText: '',
+    blankSize: null,
+    blankSizeMode: '',
+    /** 订货尺寸（采购独立字段；默认可带出下料尺寸） */
+    orderSizeText: '',
+    orderSize: null,
+    orderSizeMode: '',
     packageContent: 1,
     convertHint: '',
     packagingMethod: '',
@@ -38,7 +47,7 @@ export function createLineItem(partial = {}) {
     receivingWarehouse: '',
     remark: '',
     ...partial,
-  }
+  })
 }
 
 function createRequisition(partial) {

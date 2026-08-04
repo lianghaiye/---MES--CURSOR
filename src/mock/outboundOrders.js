@@ -35,6 +35,8 @@ export function createOutboundLine(partial = {}) {
     blankSizeMode: '',
     blankLength: null,
     blankArea: null,
+    /** 明细出库状态 */
+    lineStatus: '待出库',
     ...partial,
   }
 }

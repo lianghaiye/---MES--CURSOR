@@ -210,6 +210,13 @@
               </template>
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'lineStatus'">
+                  <a-tag
+                    :color="(record.lineStatus || '待出库') === '已出库' ? 'success' : 'processing'"
+                  >
+                    {{ record.lineStatus || '待出库' }}
+                  </a-tag>
+                </template>
                 <template v-else-if="column.key === 'itemName'">
                   <span v-if="record.itemCode" class="item-name-text" :title="record.itemName">
                     {{ record.itemName || '—' }}
@@ -416,9 +423,32 @@
                 </template>
                 <template v-else-if="column.key === 'actions'">
                   <a-space :size="4">
-                    <a @click="openLineEdit(record, 'edit')">编辑</a>
-                    <a @click="openLineEdit(record, 'copy')">复制</a>
-                    <a class="danger-link" @click="removeLine(record.id)">删除</a>
+                    <a
+                      v-if="(record.lineStatus || '待出库') !== '已出库'"
+                      @click="handleConfirmLineOutbound(record)"
+                    >
+                      确认出库
+                    </a>
+                    <a
+                      v-if="(record.lineStatus || '待出库') !== '已出库'"
+                      @click="openLineEdit(record, 'edit')"
+                    >
+                      编辑
+                    </a>
+                    <a
+                      v-if="(record.lineStatus || '待出库') !== '已出库'"
+                      @click="openLineEdit(record, 'copy')"
+                    >
+                      复制
+                    </a>
+                    <a
+                      v-if="(record.lineStatus || '待出库') !== '已出库'"
+                      class="danger-link"
+                      @click="removeLine(record.id)"
+                    >
+                      删除
+                    </a>
+                    <span v-else class="muted-text">已出库</span>
                   </a-space>
                 </template>
               </template>
@@ -538,7 +568,13 @@ import InventoryLineEditableCell from './InventoryLineEditableCell.vue'
 import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
 import { outboundTypeOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
-import { addOutboundOrder, generateOutboundNo, updateOutboundOrder } from '@/store/outboundStore'
+import {
+  addOutboundOrder,
+  generateOutboundNo,
+  updateOutboundOrder,
+  confirmOutboundLine,
+  getOutboundOrderById,
+} from '@/store/outboundStore'
 import {
   outboundFormLineColumns,
   OUTBOUND_BATCH_PICK_TIP_AUTO,
@@ -805,7 +841,7 @@ const {
   columnDrawerOpen,
   displayColumns: rawDisplayColumns,
   defaultColumnSettings,
-} = useTableColumnSettings('outbound-form-lines-v7', baseLineColumns, {
+} = useTableColumnSettings('outbound-form-lines-v8', baseLineColumns, {
   minScrollX: 1806,
   pinEdgeColumns: false,
   pinActionColumn: true,
@@ -914,7 +950,10 @@ function loadEditForm(record) {
     deliveryRemark: delivery?.remark || '',
     remark: record.remark || '',
     lineItems: (record.lineItems || []).map((l) => {
-      const row = enrichOutboundLine({ ...l })
+      const row = enrichOutboundLine({
+        ...l,
+        lineStatus: l.lineStatus || '待出库',
+      })
       if (isOutboundDualUnitLine(row)) {
         applyBatchAllocationsToLine(row, getLineBatchAllocations(row))
       }
@@ -924,6 +963,35 @@ function loadEditForm(record) {
   if (form.salesOrderNo) {
     syncSalesOrderMeta(form.salesOrderNo, form.salesOrderId)
   }
+}
+
+function handleConfirmLineOutbound(record) {
+  if (!isEdit.value || !props.editRecord?.id) {
+    message.warning('请先保存出库单后再确认出库')
+    return
+  }
+  if ((record.lineStatus || '待出库') === '已出库') {
+    message.info('该明细已出库')
+    return
+  }
+  // 先落盘当前编辑内容，避免确认时扣账用到旧数据
+  const saved = updateOutboundOrder(props.editRecord.id, buildPayload())
+  if (saved && !saved.ok) {
+    message.warning(saved.message || '保存失败，无法确认出库')
+    return
+  }
+  const res = confirmOutboundLine(props.editRecord.id, record.id)
+  if (!res.ok) {
+    message.warning(res.message || '确认出库失败')
+    return
+  }
+  message.success(
+    res.order?.status === '已出库'
+      ? '明细已出库，出库单已全部出库'
+      : '明细已出库，出库单状态：部分出库',
+  )
+  const latest = getOutboundOrderById(props.editRecord.id)
+  if (latest) loadEditForm(latest)
 }
 
 function resetForm() {
@@ -1597,5 +1665,14 @@ function handleSave() {
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
   word-break: break-all;
+}
+
+.danger-link {
+  color: #ff4d4f;
+}
+
+.muted-text {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

@@ -274,6 +274,7 @@ const columnDefs = [
   { key: 'gapQty', title: '缺口数(库存单位)', width: 120, total: true, numeric: true },
   { key: 'planQty', title: '计划采购数', width: 100, editable: true, total: true, numeric: true },
   { key: 'unit', title: '采购单位', width: 100, editable: true, total: false },
+  { key: 'orderSizeText', title: '订货尺寸', width: 160, total: false },
   { key: 'convertHint', title: '换算', width: 110, total: false },
   { key: 'remark', title: '备注', width: 140, total: false },
   { key: 'action', title: '操作', width: 72, total: false },
@@ -441,6 +442,7 @@ function formatAvailableStockText(record) {
 function formatCell(record, key, text) {
   if (key === 'availableStock') return formatAvailableStockText(record)
   if (key === 'inTransitQty') return record.inTransitText || text || '—'
+  if (key === 'orderSizeText') return record.orderSizeText || record.blankSizeText || text || '—'
   if (key === 'demandQty' || key === 'gapQty') {
     const qty = Number(record[key])
     const unit = record.inventoryUnit || record.stockUnit || ''

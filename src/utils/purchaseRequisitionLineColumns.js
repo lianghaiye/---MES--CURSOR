@@ -15,6 +15,13 @@ export const purchaseRequisitionFormLineColumns = [
   },
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 100, ellipsis: true },
   { title: '采购单位', dataIndex: 'unit', key: 'unit', width: 80 },
+  {
+    title: '订货尺寸',
+    dataIndex: 'orderSizeText',
+    key: 'orderSizeText',
+    width: 160,
+    ellipsis: true,
+  },
   { title: '库存需求', dataIndex: 'demandQty', key: 'demandQty', width: 90, align: 'right' },
   { title: '换算', dataIndex: 'convertHint', key: 'convertHint', width: 110, ellipsis: true },
   { title: '库存数', dataIndex: 'stockQty', key: 'stockQty', width: 90, align: 'right' },

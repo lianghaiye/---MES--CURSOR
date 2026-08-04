@@ -127,15 +127,37 @@ function canDeleteInbound(order) {
 }
 
 function canEditInbound(order) {
-  return order && ['待处理', '待审批', '已拒绝'].includes(order.status)
+  return order && ['待处理', '待审批', '已拒绝', '部分入库'].includes(order.status)
 }
 
 function canConfirmInbound(order) {
-  return order?.status === '待处理'
+  return order?.status === '待处理' || order?.status === '部分入库'
 }
 
 function canApproveInbound(order) {
   return order?.status === '待审批' && order?.inboundType === '成品入库'
+}
+
+export function recomputeInboundOrderStatus(order, operator = 'admin1') {
+  if (!order) return
+  const lines = order.lineItems || []
+  if (!lines.length) {
+    if (order.status === '部分入库') order.status = '待处理'
+    return
+  }
+  const done = lines.filter((l) => (l.lineStatus || '待入库') === '已入库').length
+  if (done === 0) {
+    if (order.status === '部分入库' || order.status === '已完成') order.status = '待处理'
+    return
+  }
+  if (done === lines.length) {
+    order.status = '已完成'
+    order.confirmer = order.confirmer || operator
+    order.confirmedAt = order.confirmedAt || dayjs().format('YYYY-MM-DD HH:mm:ss')
+    return
+  }
+  order.status = '部分入库'
+  order.confirmedAt = ''
 }
 
 function buildInboundLineItems(payload, headerWarehouse = '') {
@@ -202,125 +224,156 @@ export function deleteInboundOrder(id) {
   return true
 }
 
+function prepareAndApplyInboundLine(order, line) {
+  const mat = materialInfoState.materials.find((m) => m.code === line.itemCode)
+  if (mat?.isVariableLength) {
+    line.isVariableLength = true
+    line.unit = mat.stockUnit || mat.inventoryUnit || line.unit || '米'
+  }
+  if (line.isVariableLength) {
+    // 兼容旧数据：仅有统一单件数量时展开
+    if (
+      (!line.pieceValues || !line.pieceValues.length) &&
+      (!line.pieceLengths || !line.pieceLengths.length) &&
+      (!line.pieceWeights || !line.pieceWeights.length) &&
+      Number(line.purchaseQty) > 0 &&
+      (Number(line.uniformValue) > 0 ||
+        Number(line.uniformLength) > 0 ||
+        Number(line.uniformWeight) > 0) &&
+      !line.inboundEntryMode
+    ) {
+      const n = Number(line.purchaseQty)
+      const per = Number(line.uniformValue ?? line.uniformLength ?? line.uniformWeight)
+      line.pieceValues = Array.from({ length: n }, () => per)
+      line.pieceLengths = line.pieceValues
+      line.inboundEntryMode = 'uniform'
+    }
+
+    if (mat?.purchaseUnit) line.purchaseUnit = mat.purchaseUnit
+
+    const check = validateVariableLengthInboundLine(line, line.unit)
+    if (!check.ok) {
+      return { ok: false, message: `${line.itemName || line.itemCode}：${check.message}` }
+    }
+    const pieceValues = line.pieceValues?.length
+      ? line.pieceValues
+      : line.pieceWeights?.length
+        ? line.pieceWeights
+        : line.pieceLengths
+    line.stockQty = sumPieceValues(pieceValues)
+    line.qty = line.stockQty
+  }
+
+  const warehouse = line.warehouse || order.warehouse
+  const barcodeType = line.barcodeType || mat?.barcodeType || '一批一码'
+  line.barcodeType = barcodeType
+
+  let pieceValues
+  if (line.isVariableLength) {
+    pieceValues = line.pieceValues?.length
+      ? line.pieceValues
+      : line.pieceWeights?.length
+        ? line.pieceWeights
+        : line.pieceLengths
+  } else {
+    const qty = Number(line.qty ?? line.shipQty) || 0
+    if (!(qty > 0)) return { ok: true, skipped: true }
+    if (isOneItemOneCodeBarcode(barcodeType)) {
+      const n = Math.max(1, Math.round(qty))
+      pieceValues = Array.from({ length: n }, () => 1)
+    } else {
+      pieceValues = [qty]
+    }
+  }
+  if (!pieceValues?.length) return { ok: true, skipped: true }
+
+  const res = applyInboundBatchesFromRoots({
+    warehouse,
+    itemCode: line.itemCode,
+    itemName: line.itemName,
+    pieceValues,
+    pieceLengths: pieceValues,
+    sourceType: order.inboundType || '采购入库',
+    sourceDocNo: order.docNo,
+    unit: line.unit || (line.isVariableLength ? '米' : '件'),
+    barcodeType,
+    attrs: {
+      material: line.material,
+      inboundEntryMode: line.inboundEntryMode,
+      barcodeType: barcodeType || undefined,
+    },
+  })
+  if (!res.ok) return { ok: false, message: res.message }
+  line.batchNos = res.batches.map((b) => b.batchNo)
+  line.pieceSerialNos = (res.pieces || []).map((p) => p.serialNo)
+  if (res.manageByPiece) {
+    line.manageByPiece = true
+  }
+  return { ok: true }
+}
+
 export function confirmInboundOrders(ids, operator = 'admin1') {
   let count = 0
   const blocked = []
   ids.forEach((id) => {
     const order = inboundOrderState.orders.find((o) => o.id === id)
     if (!canConfirmInbound(order)) {
-      blocked.push({ docNo: order?.docNo || id, message: '仅待处理状态可确认入库' })
+      blocked.push({ docNo: order?.docNo || id, message: '仅待处理/部分入库状态可确认入库' })
       return
     }
 
-    for (const line of order.lineItems || []) {
-      const mat = materialInfoState.materials.find((m) => m.code === line.itemCode)
-      if (mat?.isVariableLength) {
-        line.isVariableLength = true
-        line.unit = mat.stockUnit || mat.inventoryUnit || line.unit || '米'
-      }
-      if (!line.isVariableLength) continue
-
-      // 兼容旧数据：仅有统一单件数量时展开
-      if (
-        (!line.pieceValues || !line.pieceValues.length) &&
-        (!line.pieceLengths || !line.pieceLengths.length) &&
-        (!line.pieceWeights || !line.pieceWeights.length) &&
-        Number(line.purchaseQty) > 0 &&
-        (Number(line.uniformValue) > 0 ||
-          Number(line.uniformLength) > 0 ||
-          Number(line.uniformWeight) > 0) &&
-        !line.inboundEntryMode
-      ) {
-        const n = Number(line.purchaseQty)
-        const per = Number(line.uniformValue ?? line.uniformLength ?? line.uniformWeight)
-        line.pieceValues = Array.from({ length: n }, () => per)
-        line.pieceLengths = line.pieceValues
-        line.inboundEntryMode = 'uniform'
-      }
-
-      if (mat?.purchaseUnit) line.purchaseUnit = mat.purchaseUnit
-
-      const check = validateVariableLengthInboundLine(line, line.unit)
-      if (!check.ok) {
-        blocked.push({
-          docNo: order.docNo,
-          message: `${line.itemName || line.itemCode}：${check.message}`,
-        })
-        return
-      }
-      const pieceValues = line.pieceValues?.length
-        ? line.pieceValues
-        : line.pieceWeights?.length
-          ? line.pieceWeights
-          : line.pieceLengths
-      line.stockQty = sumPieceValues(pieceValues)
-      line.qty = line.stockQty
+    const pendingLines = (order.lineItems || []).filter(
+      (l) => (l.lineStatus || '待入库') !== '已入库',
+    )
+    if (!pendingLines.length) {
+      recomputeInboundOrderStatus(order, operator)
+      count += 1
+      return
     }
 
-    for (const line of order.lineItems || []) {
-      const warehouse = line.warehouse || order.warehouse
-      const mat = materialInfoState.materials.find((m) => m.code === line.itemCode)
-      const barcodeType = line.barcodeType || mat?.barcodeType || '一批一码'
-      line.barcodeType = barcodeType
-
-      let pieceValues
-      if (line.isVariableLength) {
-        pieceValues = line.pieceValues?.length
-          ? line.pieceValues
-          : line.pieceWeights?.length
-            ? line.pieceWeights
-            : line.pieceLengths
-      } else {
-        // 单物料单位：一律按条码类型生成批次号
-        const qty = Number(line.qty ?? line.shipQty) || 0
-        if (!(qty > 0)) continue
-        if (isOneItemOneCodeBarcode(barcodeType)) {
-          const n = Math.max(1, Math.round(qty))
-          pieceValues = Array.from({ length: n }, () => 1)
-        } else {
-          pieceValues = [qty]
-        }
-      }
-      if (!pieceValues?.length) continue
-
-      const res = applyInboundBatchesFromRoots({
-        warehouse,
-        itemCode: line.itemCode,
-        itemName: line.itemName,
-        pieceValues,
-        pieceLengths: pieceValues,
-        sourceType: order.inboundType || '采购入库',
-        sourceDocNo: order.docNo,
-        unit: line.unit || (line.isVariableLength ? '米' : '件'),
-        barcodeType,
-        attrs: {
-          material: line.material,
-          inboundEntryMode: line.inboundEntryMode,
-          barcodeType: barcodeType || undefined,
-        },
-      })
-      if (!res.ok) {
-        blocked.push({ docNo: order.docNo, message: res.message })
+    for (const line of pendingLines) {
+      const prep = prepareAndApplyInboundLine(order, line)
+      if (!prep.ok) {
+        blocked.push({ docNo: order.docNo, message: prep.message })
         return
-      }
-      line.batchNos = res.batches.map((b) => b.batchNo)
-      line.pieceSerialNos = (res.pieces || []).map((p) => p.serialNo)
-      if (res.manageByPiece) {
-        line.manageByPiece = true
       }
     }
 
-    const stockRes = applyInboundToStock(order)
+    const stockRes = applyInboundToStock(order, { lineIds: pendingLines.map((l) => l.id) })
     if (!stockRes.ok) {
       blocked.push({ docNo: order.docNo, message: stockRes.message })
       return
     }
-    order.status = '已完成'
-    order.confirmer = operator
-    order.confirmedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    pendingLines.forEach((line) => {
+      line.lineStatus = '已入库'
+    })
+    recomputeInboundOrderStatus(order, operator)
     count += 1
   })
   return { count, blocked }
+}
+
+/** 按明细确认入库 */
+export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
+  const order = inboundOrderState.orders.find((o) => o.id === orderId)
+  if (!canConfirmInbound(order)) {
+    return { ok: false, message: '仅待处理/部分入库状态可确认入库' }
+  }
+  const line = (order.lineItems || []).find((l) => l.id === lineId)
+  if (!line) return { ok: false, message: '明细不存在' }
+  if ((line.lineStatus || '待入库') === '已入库') {
+    return { ok: false, message: '该明细已入库' }
+  }
+
+  const prep = prepareAndApplyInboundLine(order, line)
+  if (!prep.ok) return prep
+
+  const stockRes = applyInboundToStock(order, { lineIds: [lineId] })
+  if (!stockRes.ok) return stockRes
+
+  line.lineStatus = '已入库'
+  recomputeInboundOrderStatus(order, operator)
+  return { ok: true, order, line }
 }
 
 export function approveInboundOrder(id, operator = 'admin1') {

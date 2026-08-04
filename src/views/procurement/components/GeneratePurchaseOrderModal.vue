@@ -51,6 +51,10 @@
           />
         </template>
 
+        <template v-else-if="column.key === 'orderSizeText'">
+          {{ record.orderSizeText || record.blankSizeText || '—' }}
+        </template>
+
         <template v-else-if="column.key === 'designatedSupplier'">
           <a-select
             v-model:value="record.designatedSupplier"
@@ -349,6 +353,13 @@ const columns = [
   { title: '材质', key: 'material', dataIndex: 'material', width: 80 },
   { title: '需求量', key: 'demandQty', dataIndex: 'demandQty', width: 80, align: 'right' },
   { title: '采购单位', key: 'unit', dataIndex: 'unit', width: 80 },
+  {
+    title: '订货尺寸',
+    key: 'orderSizeText',
+    dataIndex: 'orderSizeText',
+    width: 160,
+    ellipsis: true,
+  },
   { title: '计划采购量', key: 'planPurchaseQty', width: 100 },
   { title: '指定供应商', key: 'designatedSupplier', width: 100 },
   { title: '供应商名称', key: 'supplierName', width: 120 },

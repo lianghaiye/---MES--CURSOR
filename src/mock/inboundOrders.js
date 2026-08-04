@@ -27,6 +27,8 @@ export function createInboundLine(partial = {}) {
     lineRemark: '',
     warehouse: '',
     poLineId: '',
+    /** 明细入库状态 */
+    lineStatus: '待入库',
     ...partial,
     locationNo,
   }

@@ -10,7 +10,7 @@ export const inboundTypeOptions = [
   '其他入库',
 ]
 
-export const inboundStatusOptions = ['待审批', '待处理', '已完成', '已拒绝']
+export const inboundStatusOptions = ['待审批', '待处理', '部分入库', '已完成', '已拒绝']
 
 export const inboundItemTypeOptions = ['产品', '物料']
 

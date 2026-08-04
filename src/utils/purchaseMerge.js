@@ -58,6 +58,12 @@ export function mergeRequisitionLines(requisitions) {
           unit: line.unit || line.purchaseUnit || '件',
           purchaseUnit: line.purchaseUnit || line.unit || '件',
           inventoryUnit: line.inventoryUnit || '',
+          blankSizeText: line.blankSizeText || '',
+          blankSize: line.blankSize || null,
+          blankSizeMode: line.blankSizeMode || '',
+          orderSizeText: line.orderSizeText || line.blankSizeText || '',
+          orderSize: line.orderSize ?? line.blankSize ?? null,
+          orderSizeMode: line.orderSizeMode || line.blankSizeMode || '',
           sourceReqNos: [req.reqNo],
           sourceSalesOrderNos: req.salesOrderNo ? [req.salesOrderNo] : [],
           sourceReqIds: [req.id],
@@ -70,6 +76,16 @@ export function mergeRequisitionLines(requisitions) {
       existing.planPurchaseQty = round2(
         existing.planPurchaseQty + (Number(line.planPurchaseQty) || 0),
       )
+      if (!existing.blankSizeText && line.blankSizeText) {
+        existing.blankSizeText = line.blankSizeText
+        existing.blankSize = line.blankSize || null
+        existing.blankSizeMode = line.blankSizeMode || ''
+      }
+      if (!existing.orderSizeText && (line.orderSizeText || line.blankSizeText)) {
+        existing.orderSizeText = line.orderSizeText || line.blankSizeText || ''
+        existing.orderSize = line.orderSize ?? line.blankSize ?? null
+        existing.orderSizeMode = line.orderSizeMode || line.blankSizeMode || ''
+      }
       if (!existing.sourceReqNos.includes(req.reqNo)) {
         existing.sourceReqNos.push(req.reqNo)
         existing.sourceReqIds.push(req.id)

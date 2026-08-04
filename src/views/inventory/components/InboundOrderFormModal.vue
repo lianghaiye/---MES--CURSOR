@@ -186,6 +186,13 @@
               </template>
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'lineStatus'">
+                  <a-tag
+                    :color="(record.lineStatus || '待入库') === '已入库' ? 'success' : 'processing'"
+                  >
+                    {{ record.lineStatus || '待入库' }}
+                  </a-tag>
+                </template>
                 <template v-else-if="column.key === 'itemName'">
                   <span v-if="record.itemCode" class="item-name-text" :title="record.itemName">
                     {{ record.itemName || '—' }}
@@ -424,9 +431,32 @@
                 </template>
                 <template v-else-if="column.key === 'actions'">
                   <a-space :size="4">
-                    <a @click="openLineEdit(record, 'edit')">编辑</a>
-                    <a @click="openLineEdit(record, 'copy')">复制</a>
-                    <a class="danger-link" @click="removeLine(record.id)">删除</a>
+                    <a
+                      v-if="(record.lineStatus || '待入库') !== '已入库'"
+                      @click="handleConfirmLineInbound(record)"
+                    >
+                      确认入库
+                    </a>
+                    <a
+                      v-if="(record.lineStatus || '待入库') !== '已入库'"
+                      @click="openLineEdit(record, 'edit')"
+                    >
+                      编辑
+                    </a>
+                    <a
+                      v-if="(record.lineStatus || '待入库') !== '已入库'"
+                      @click="openLineEdit(record, 'copy')"
+                    >
+                      复制
+                    </a>
+                    <a
+                      v-if="(record.lineStatus || '待入库') !== '已入库'"
+                      class="danger-link"
+                      @click="removeLine(record.id)"
+                    >
+                      删除
+                    </a>
+                    <span v-else class="muted-text">已入库</span>
                   </a-space>
                 </template>
               </template>
@@ -543,6 +573,8 @@ import {
   addInboundOrder,
   updateInboundOrder,
   resolveWarehouseKeeper,
+  confirmInboundLine,
+  getInboundOrderById,
 } from '@/store/inboundOrderStore'
 import { inboundFormLineColumns, STOCK_UNIT_QTY_TIP } from '@/utils/inboundLineColumns'
 import { normalizeInventoryPickerItem } from '@/utils/inventoryLineItemPicker'
@@ -660,7 +692,7 @@ const form = reactive({
 })
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inbound-form-lines-v6', inboundFormLineColumns, {
+  useTableColumnSettings('inbound-form-lines-v7', inboundFormLineColumns, {
     minScrollX: 1950,
     pinEdgeColumns: false,
     pinActionColumn: true,
@@ -768,11 +800,42 @@ function loadEditForm(record) {
     salesperson: record.salesperson || '',
     contractNo: record.contractNo || '',
     remark: record.remark || '',
-    lineItems: (record.lineItems || []).map((l) => enrichInboundLine({ ...l })),
+    lineItems: (record.lineItems || []).map((l) =>
+      enrichInboundLine({ ...l, lineStatus: l.lineStatus || '待入库' }),
+    ),
   })
   if (form.salesOrderNo && (!form.customerName || !form.salesperson)) {
     syncSalesOrderMeta(form.salesOrderNo, form.salesOrderId)
   }
+}
+
+function handleConfirmLineInbound(record) {
+  if (!isEdit.value || !props.editRecord?.id) {
+    message.warning('请先保存入库单后再确认入库')
+    return
+  }
+  if ((record.lineStatus || '待入库') === '已入库') {
+    message.info('该明细已入库')
+    return
+  }
+  const payload = buildPayload()
+  const saved = updateInboundOrder(props.editRecord.id, payload)
+  if (saved && !saved.ok) {
+    message.warning(saved.message || '保存失败，无法确认入库')
+    return
+  }
+  const res = confirmInboundLine(props.editRecord.id, record.id)
+  if (!res.ok) {
+    message.warning(res.message || '确认入库失败')
+    return
+  }
+  message.success(
+    res.order?.status === '已完成'
+      ? '明细已入库，入库单已全部完成'
+      : '明细已入库，入库单状态：部分入库',
+  )
+  const latest = getInboundOrderById(props.editRecord.id)
+  if (latest) loadEditForm(latest)
 }
 
 function formatMoney(val) {
@@ -1256,5 +1319,14 @@ function handleSave() {
 
 .cell-disabled {
   color: rgba(0, 0, 0, 0.25);
+}
+
+.danger-link {
+  color: #ff4d4f;
+}
+
+.muted-text {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

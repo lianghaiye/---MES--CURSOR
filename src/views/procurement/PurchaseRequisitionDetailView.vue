@@ -111,6 +111,9 @@
                   <template v-else-if="column.key === 'planPurchaseQty'">
                     {{ formatQty(line.planPurchaseQty) }}{{ line.unit ? ` ${line.unit}` : '' }}
                   </template>
+                  <template v-else-if="column.key === 'orderSizeText'">
+                    {{ line.orderSizeText || line.blankSizeText || '—' }}
+                  </template>
                   <template v-else-if="column.key === 'supplierName'">
                     {{ line.supplierName || '—' }}
                   </template>

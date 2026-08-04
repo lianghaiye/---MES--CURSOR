@@ -2,6 +2,7 @@
 
 export const inboundFormLineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '状态', key: 'lineStatus', dataIndex: 'lineStatus', width: 88 },
   { title: '物品编码', dataIndex: 'itemCode', key: 'itemCode', width: 120, ellipsis: true },
   { title: '物品名称', dataIndex: 'itemName', key: 'itemName', width: 130, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 110, ellipsis: true },
@@ -25,7 +26,7 @@ export const inboundFormLineColumns = [
   { title: '总价', key: 'totalPrice', width: 96, align: 'right' },
   { title: '当前库存数', key: 'stockQty', width: 120, align: 'right' },
   { title: '当前仓库数量', key: 'warehouseStockQty', width: 130, align: 'right' },
-  { title: '操作', key: 'actions', width: 150 },
+  { title: '操作', key: 'actions', width: 220 },
 ]
 
 export const inboundDetailLineColumns = inboundFormLineColumns.filter((c) => c.key !== 'actions')

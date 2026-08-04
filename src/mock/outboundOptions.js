@@ -20,6 +20,7 @@ export const itemTypeOptions = ['物料', '产品']
 export const outboundStatusOptions = [
   '待处理',
   '待出库',
+  '部分出库',
   '待申领人确认',
   '已拒绝',
   '已出库',
@@ -39,6 +40,7 @@ export function outboundStatusColor(status) {
   const map = {
     待处理: 'default',
     待出库: 'processing',
+    部分出库: 'warning',
     待申领人确认: 'warning',
     已拒绝: 'error',
     已出库: 'success',

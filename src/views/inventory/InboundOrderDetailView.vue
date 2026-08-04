@@ -121,6 +121,13 @@
                 </template>
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'lineStatus'">
+                    <a-tag
+                      :color="(line.lineStatus || '待入库') === '已入库' ? 'success' : 'processing'"
+                    >
+                      {{ line.lineStatus || '待入库' }}
+                    </a-tag>
+                  </template>
                   <template v-else-if="column.key === 'barcodeType'">
                     {{ line.barcodeType || '—' }}
                   </template>
@@ -401,6 +408,7 @@ function statusColor(status) {
   if (status === '已完成') return 'success'
   if (status === '已拒绝') return 'error'
   if (status === '待审批') return 'warning'
+  if (status === '部分入库') return 'warning'
   return 'processing'
 }
 

@@ -141,6 +141,9 @@
                     @change="onUnitChange(record)"
                   />
                 </template>
+                <template v-else-if="column.key === 'orderSizeText'">
+                  {{ record.orderSizeText || record.blankSizeText || '—' }}
+                </template>
                 <template v-else-if="column.key === 'planPurchaseQty'">
                   <a-input-number
                     v-model:value="record.planPurchaseQty"
@@ -297,7 +300,7 @@ const {
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-req-form-lines-v2', purchaseRequisitionFormLineColumns, {
+  useTableColumnSettings('purchase-req-form-lines-v4', purchaseRequisitionFormLineColumns, {
     minScrollX: 1430,
     pinEdgeColumns: false,
     pinActionColumn: true,

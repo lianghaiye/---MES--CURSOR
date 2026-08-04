@@ -1,11 +1,12 @@
 import dayjs from 'dayjs'
+import { ensureOrderSizeDefaults } from '@/utils/orderSize'
 
 export function createPoLineItem(partial = {}) {
   const purchaseQty = partial.purchaseQty ?? 1
   const ex = Number(partial.unitPriceExTax) || 0
   const rate = partial.taxRate ?? 13
   const inTax = Math.round(ex * (1 + rate / 100) * 100) / 100
-  return {
+  return ensureOrderSizeDefaults({
     id: `po-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     productName: '',
     productCode: '',
@@ -20,6 +21,12 @@ export function createPoLineItem(partial = {}) {
     stockQty: 0,
     purchaseQty,
     unit: '个',
+    blankSizeText: '',
+    blankSize: null,
+    blankSizeMode: '',
+    orderSizeText: '',
+    orderSize: null,
+    orderSizeMode: '',
     unitPriceExTax: ex,
     taxRate: rate,
     unitPriceInTax: inTax,
@@ -33,7 +40,7 @@ export function createPoLineItem(partial = {}) {
     expiryDate: '',
     remark: '',
     ...partial,
-  }
+  })
 }
 
 function createPurchaseOrder(partial) {

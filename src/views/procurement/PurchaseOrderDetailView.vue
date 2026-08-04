@@ -151,6 +151,9 @@
                   <template v-else-if="column.key === 'stockQty'">
                     {{ formatQty(line.stockQty) }}
                   </template>
+                  <template v-else-if="column.key === 'orderSizeText'">
+                    {{ line.orderSizeText || line.blankSizeText || '—' }}
+                  </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
                     {{ formatMoney(line.unitPriceExTax) }}
                   </template>
@@ -302,6 +305,13 @@ const lineColumns = [
   { title: '库存数量', key: 'stockQty', width: 90, align: 'right' },
   { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
   { title: '采购单位', dataIndex: 'unit', width: 80 },
+  {
+    title: '订货尺寸',
+    key: 'orderSizeText',
+    dataIndex: 'orderSizeText',
+    width: 160,
+    ellipsis: true,
+  },
   { title: '不含税单价', key: 'unitPriceExTax', width: 100, align: 'right' },
   { title: '税率(%)', dataIndex: 'taxRate', width: 80, align: 'right' },
   { title: '含税单价', key: 'unitPriceInTax', width: 100, align: 'right' },

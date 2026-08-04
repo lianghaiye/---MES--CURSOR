@@ -11,9 +11,10 @@ const TRANSFER_TYPES = new Set(['领料出库', '发料出库'])
 
 /**
  * @param {object} order 已完成批次/汇总扣减的出库单
+ * @param {{ lineIds?: string[] }} [options]
  * @returns {{ ok: boolean, message?: string, transferred?: boolean }}
  */
-export function transferOutboundToReceiveWarehouse(order) {
+export function transferOutboundToReceiveWarehouse(order, { lineIds } = {}) {
   if (!order) return { ok: false, message: '出库单不存在' }
   if (!TRANSFER_TYPES.has(order.outboundType)) {
     return { ok: true, transferred: false }
@@ -22,11 +23,10 @@ export function transferOutboundToReceiveWarehouse(order) {
   if (!receiveWh) {
     return { ok: true, transferred: false }
   }
-  if (order.stockTransferredToReceive) {
-    return { ok: true, transferred: false }
-  }
 
   for (const line of order.lineItems || []) {
+    if (lineIds?.length && !lineIds.includes(line.id)) continue
+    if (line.stockTransferredToReceive) continue
     const shipWh = String(line.shipWarehouse || order.warehouse || '').trim()
     if (!shipWh || shipWh === receiveWh) continue
     const qty = Number(line.shipQty) || 0
@@ -82,8 +82,18 @@ export function transferOutboundToReceiveWarehouse(order) {
       })
       line.receiveWarehouse = receiveWh
     }
+    line.stockTransferredToReceive = true
   }
 
-  order.stockTransferredToReceive = true
+  const pendingTransfer = (order.lineItems || []).some((line) => {
+    if (line.lineStatus === '已出库' && !line.stockTransferredToReceive) {
+      const shipWh = String(line.shipWarehouse || order.warehouse || '').trim()
+      return shipWh && shipWh !== receiveWh && Number(line.shipQty) > 0
+    }
+    return false
+  })
+  if (!pendingTransfer) {
+    order.stockTransferredToReceive = true
+  }
   return { ok: true, transferred: true }
 }
