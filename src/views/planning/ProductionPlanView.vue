@@ -320,9 +320,9 @@
                     </template>
                     <template v-else-if="column.key === 'inTransitQty'">
                       <span class="col-title-with-tip">
-                        在途
+                        在途/在制
                         <a-tooltip
-                          title="申请量/订单量（采购单位）；未转单的采购申请 / 未入库的采购订单"
+                          title="外购：申请量/订单量（采购单位）；自制/外协/组装：待下发/执行中（库存单位）。缺口仍按需求−可用库存，不扣本列。"
                         >
                           <InfoCircleOutlined class="col-tip-icon" />
                         </a-tooltip>
@@ -462,7 +462,12 @@
                       <span>{{ formatAvailableStockText(record) }}</span>
                     </template>
                     <template v-else-if="column.key === 'inTransitQty'">
-                      <a-tooltip title="未转采购单的申请量 / 未入库的采购订单量（采购单位）">
+                      <a-tooltip
+                        :title="
+                          record.inTransitTip ||
+                          '外购为申请/订单；自制/外协/组装为待下发/执行中。不参与缺口计算。'
+                        "
+                      >
                         <span>{{ record.inTransitText || '—' }}</span>
                       </a-tooltip>
                     </template>
@@ -804,10 +809,10 @@ const baseMaterialColumns = [
     width: 120,
   },
   {
-    title: '在途',
+    title: '在途/在制',
     key: 'inTransitQty',
     dataIndex: 'inTransitText',
-    width: 110,
+    width: 140,
   },
   { title: '需求数', dataIndex: 'demandQty', width: 80 },
   { title: '缺口数', dataIndex: 'gapQty', width: 80 },

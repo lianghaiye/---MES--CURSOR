@@ -206,7 +206,7 @@ const columnDefs = [
   { key: 'supplier', title: '供应商', width: 140, editable: true, total: false },
   { key: 'stockQty', title: '库存数量', width: 90, total: true, numeric: true },
   { key: 'availableStock', title: '可用库存', width: 120, total: false, numeric: false },
-  { key: 'inTransitQty', title: '在途数量', width: 90, total: true, numeric: true },
+  { key: 'inTransitQty', title: '在途/在制', width: 130, total: false, numeric: false },
   { key: 'demandQty', title: '需求数', width: 80, total: true, numeric: true },
   { key: 'gapQty', title: '缺口数', width: 80, total: true, numeric: true },
   { key: 'planQty', title: '计划数量', width: 90, editable: true, total: true, numeric: true },
@@ -353,6 +353,9 @@ function formatCell(record, key, text) {
     const allocated = Number(record.woAllocatedQty) || 0
     const available = Number(record.availableStock) || 0
     return `${allocated}/${available}`
+  }
+  if (key === 'inTransitQty') {
+    return record.inTransitText || text || '—'
   }
   if (key === 'expectedArrivalDate') {
     return record.expectedArrivalDate || '请选择'

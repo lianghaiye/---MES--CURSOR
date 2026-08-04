@@ -122,6 +122,8 @@ export function createCrossDemoWorkOrders() {
       processRouteName: routeName,
       source: 'production-plan',
       sourceOrderNo: CROSS_DEMO.salesOrderNo,
+      salesLineId: 'line-seed-1a',
+      productId: '',
       skipEbom: false,
       componentLines: [
         {

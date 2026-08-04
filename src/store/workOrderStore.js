@@ -16,6 +16,7 @@ import { ensureProductionPlanOrderTreeDemoWorkOrders } from '@/mock/productionPl
 import { findWorkItemForPlanRow } from '@/utils/productionPlanMaterial'
 import { ensureMaterialReqDemoWorkOrders } from '@/mock/materialReqWorkOrderSeed'
 import { ensureCrossDemoWorkOrders } from '@/mock/crossModuleDemoSeed'
+import { ensureBlankSizeDemoWorkOrders } from '@/mock/blankSizeBomDemoSeed'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -100,9 +101,11 @@ function ensureDemoWorkOrder(orders) {
 function ensureLaborDemoProductionOrders(orders) {
   const demos = [...createLaborDemoProductionOrders(), ...createLaborDemoAssemblyOrders()]
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
-  return ensureCrossDemoWorkOrders(
-    ensureMaterialReqDemoWorkOrders(
-      ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+  return ensureBlankSizeDemoWorkOrders(
+    ensureCrossDemoWorkOrders(
+      ensureMaterialReqDemoWorkOrders(
+        ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+      ),
     ),
   )
 }

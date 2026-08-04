@@ -10,8 +10,33 @@ import {
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 
 const STORAGE_KEY = 'i_doms_product_info'
-const DATA_VERSION = 9
+/** v10：下料尺寸演示产品 */
+const DATA_VERSION = 10
 let codeSeq = 20000
+
+/** 内联注入，避免 import blankSizeBomDemoSeed 在启动早期拉起 BOM 循环依赖 */
+const BLANK_SIZE_DEMO_PRODUCT = {
+  id: 'prod-blank-size-demo',
+  code: 'CP-BLANK-DEMO',
+  name: '下料尺寸演示泵体组件',
+  specModel: 'DEMO-BLANK',
+  material: '组合',
+  drawingNo: 'DWG-BLANK-DEMO',
+  inventoryUnit: '台',
+  productAttribute: '标准产品',
+  canProduce: true,
+  canSell: true,
+}
+
+function ensureBlankSizeDemoProducts(products) {
+  const list = Array.isArray(products) ? [...products] : []
+  const idx = list.findIndex(
+    (p) => p.id === BLANK_SIZE_DEMO_PRODUCT.id || p.code === BLANK_SIZE_DEMO_PRODUCT.code,
+  )
+  if (idx === -1) list.unshift({ ...BLANK_SIZE_DEMO_PRODUCT })
+  else list[idx] = { ...list[idx], ...BLANK_SIZE_DEMO_PRODUCT, id: BLANK_SIZE_DEMO_PRODUCT.id }
+  return list
+}
 
 function loadFromStorage() {
   try {
@@ -20,7 +45,9 @@ function loadFromStorage() {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed.products)) {
         const force = parsed.version !== DATA_VERSION
-        return applyLaborConfigSeed(migrateProductList(parsed.products), { force })
+        return ensureBlankSizeDemoProducts(
+          applyLaborConfigSeed(migrateProductList(parsed.products), { force }),
+        )
       }
     }
   } catch {
@@ -37,7 +64,8 @@ function persist() {
 }
 
 export const productInfoState = reactive({
-  products: loadFromStorage() || JSON.parse(JSON.stringify(mockProducts)),
+  products:
+    loadFromStorage() || ensureBlankSizeDemoProducts(JSON.parse(JSON.stringify(mockProducts))),
 })
 
 watch(

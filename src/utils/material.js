@@ -7,8 +7,8 @@ import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { convertStockDemandToPurchase } from '@/utils/purchaseUomConvert'
 
-function getInTransitForMaterialCode(code) {
-  return require('@/utils/planPurchaseInTransit').getInTransitForMaterialCode(code)
+function getInTransitOrWipForPlanMaterial(m) {
+  return require('@/utils/planPurchaseInTransit').resolveInTransitOrWipForPlanNode(m)
 }
 
 function getWoAllocatedForMaterialCode(code) {
@@ -124,7 +124,7 @@ export function getPurchasedMaterialsFromWorkItem(workItem) {
   return all
     .filter((m) => m.supplyType === '外购件')
     .map((m) => {
-      const hit = getInTransitForMaterialCode(m.code)
+      const hit = getInTransitOrWipForPlanMaterial(m)
       const alloc = getWoAllocatedForMaterialCode(m.code)
       const onHand = Number(m.stockQty) || 0
       const availableStock = Math.max(0, onHand - (alloc.woAllocatedQty || 0))
@@ -132,10 +132,11 @@ export function getPurchasedMaterialsFromWorkItem(workItem) {
         m.demandQty ?? calcDemandQty(m.unitUsage, workItem?.orderQty ?? workItem?.salesQty)
       return {
         ...m,
-        inTransitQty: hit.inTransitStockQty,
+        inTransitQty: hit.inTransitQty,
         inTransitText: hit.inTransitText,
-        prInTransitQty: hit.prPurchaseQty,
-        poInTransitQty: hit.poPurchaseQty,
+        prInTransitQty: hit.prInTransitQty,
+        poInTransitQty: hit.poInTransitQty,
+        inTransitTip: hit.inTransitTip,
         woAllocatedQty: alloc.woAllocatedQty,
         availableStock,
         gapQty: calcGapQty(demandQty, availableStock),
@@ -162,6 +163,7 @@ export function buildWorkOrderRows(materials, order) {
       ? (m.demandQty ?? calcDemandQty(1, order.productQty))
       : calcDemandQty(m.unitUsage, order.productQty)
     const gapQty = calcGapQty(demandQty, m.availableStock)
+    const transit = getInTransitOrWipForPlanMaterial(m)
     return {
       key: m.id,
       materialId: m.id,
@@ -179,7 +181,8 @@ export function buildWorkOrderRows(materials, order) {
       stockQty: m.stockQty ?? 0,
       availableStock: m.availableStock ?? 0,
       woAllocatedQty: m.woAllocatedQty ?? getWoAllocatedForMaterialCode(m.code).woAllocatedQty,
-      inTransitQty: m.inTransitQty ?? 0,
+      inTransitQty: m.inTransitQty ?? transit.inTransitQty,
+      inTransitText: m.inTransitText || transit.inTransitText,
       demandQty,
       gapQty,
       planQty: m.planQty ?? gapQty,
@@ -313,6 +316,7 @@ export function buildOutsourceWorkOrderRows(materials, order) {
     const demandQty = m.demandQty ?? calcDemandQty(m.unitUsage, order?.productQty)
     const gapQty = m.gapQty ?? calcGapQty(demandQty, m.availableStock)
     const defaults = getMasterDefaults(m.code)
+    const transit = getInTransitOrWipForPlanMaterial(m)
     return {
       key: m.id,
       materialId: m.id,
@@ -328,7 +332,8 @@ export function buildOutsourceWorkOrderRows(materials, order) {
       stockQty: m.stockQty ?? 0,
       availableStock: m.availableStock ?? 0,
       woAllocatedQty: m.woAllocatedQty ?? getWoAllocatedForMaterialCode(m.code).woAllocatedQty,
-      inTransitQty: m.inTransitQty ?? 0,
+      inTransitQty: m.inTransitQty ?? transit.inTransitQty,
+      inTransitText: m.inTransitText || transit.inTransitText,
       demandQty,
       gapQty,
       planQty: m.planQty ?? gapQty,
@@ -368,6 +373,7 @@ export function buildPurchaseRequisitionRows(materials, order) {
     const master = lookupMaterialMaster(m.code) || m
     const stockPlan = m.planQty ?? gapQty
     const converted = convertStockDemandToPurchase(stockPlan, master)
+    const transit = getInTransitOrWipForPlanMaterial(m)
     return {
       key: m.id,
       materialId: m.id,
@@ -384,15 +390,17 @@ export function buildPurchaseRequisitionRows(materials, order) {
       stockQty: m.stockQty ?? 0,
       availableStock: m.availableStock ?? 0,
       woAllocatedQty: m.woAllocatedQty ?? getWoAllocatedForMaterialCode(m.code).woAllocatedQty,
-      inTransitQty: m.inTransitQty ?? 0,
-      inTransitText: m.inTransitText || getInTransitForMaterialCode(m.code).inTransitText,
+      inTransitQty: m.inTransitQty ?? transit.inTransitQty,
+      inTransitText: m.inTransitText || transit.inTransitText,
       demandQty,
       gapQty,
       /** 计划数量：采购单位口径（已按包装含量向上取整） */
       planQty: converted.planPurchaseQty,
       stockPlanQty: stockPlan,
       unit: converted.purchaseUnit,
-      inventoryUnit: converted.inventoryUnit,
+      inventoryUnit:
+        converted.inventoryUnit || master.inventoryUnit || master.stockUnit || m.unit || '件',
+      stockUnit: master.stockUnit || master.inventoryUnit || m.unit || '件',
       purchaseUnit: converted.purchaseUnit,
       packageContent: converted.packageContent,
       convertHint: converted.convertHint,

@@ -104,8 +104,10 @@
               </a-tooltip>
             </span>
             <span v-else-if="column.key === 'inTransitQty'" class="header-title col-title-with-tip">
-              在途
-              <a-tooltip title="申请量/订单量（采购单位）；未转单的采购申请 / 未入库的采购订单">
+              在途/在制
+              <a-tooltip
+                title="外购：申请量/订单量（采购单位）；自制/外协/组装：待下发/执行中（库存单位）。缺口仍按需求−可用库存，不扣本列。"
+              >
                 <InfoCircleOutlined class="col-tip-icon" />
               </a-tooltip>
             </span>
@@ -267,9 +269,9 @@ const columnDefs = [
   { key: 'supplier', title: '供应商', width: 140, editable: true, total: false },
   { key: 'stockQty', title: '库存数量', width: 90, total: true, numeric: true },
   { key: 'availableStock', title: '可用库存', width: 120, total: false, numeric: false },
-  { key: 'inTransitQty', title: '在途', width: 110, total: false, numeric: false },
-  { key: 'demandQty', title: '需求数(库存)', width: 100, total: true, numeric: true },
-  { key: 'gapQty', title: '缺口数(库存)', width: 100, total: true, numeric: true },
+  { key: 'inTransitQty', title: '在途/在制', width: 130, total: false, numeric: false },
+  { key: 'demandQty', title: '需求数(库存单位)', width: 120, total: true, numeric: true },
+  { key: 'gapQty', title: '缺口数(库存单位)', width: 120, total: true, numeric: true },
   { key: 'planQty', title: '计划采购数', width: 100, editable: true, total: true, numeric: true },
   { key: 'unit', title: '采购单位', width: 100, editable: true, total: false },
   { key: 'convertHint', title: '换算', width: 110, total: false },
@@ -339,7 +341,15 @@ const summary = computed(() => {
   columnDefs
     .filter((c) => c.total)
     .forEach((col) => {
-      totals[col.key] = rows.value.reduce((sum, row) => sum + (Number(row[col.key]) || 0), 0)
+      const sum = rows.value.reduce((acc, row) => acc + (Number(row[col.key]) || 0), 0)
+      if (col.key === 'demandQty' || col.key === 'gapQty') {
+        const units = [
+          ...new Set(rows.value.map((r) => r.inventoryUnit || r.stockUnit).filter(Boolean)),
+        ]
+        totals[col.key] = units.length === 1 ? `${sum}${units[0]}` : sum
+      } else {
+        totals[col.key] = sum
+      }
     })
   return totals
 })
@@ -431,6 +441,12 @@ function formatAvailableStockText(record) {
 function formatCell(record, key, text) {
   if (key === 'availableStock') return formatAvailableStockText(record)
   if (key === 'inTransitQty') return record.inTransitText || text || '—'
+  if (key === 'demandQty' || key === 'gapQty') {
+    const qty = Number(record[key])
+    const unit = record.inventoryUnit || record.stockUnit || ''
+    if (!Number.isFinite(qty)) return text ?? '—'
+    return unit ? `${qty}${unit}` : String(qty)
+  }
   if (key === 'supplier' && !text) return SUPPLIER_SELECT_PLACEHOLDER
   if (isEditable(key) && (text === '' || text == null)) return '-'
   return text ?? '-'

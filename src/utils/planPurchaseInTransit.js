@@ -1,6 +1,8 @@
 /**
- * 生产计划「在途」：拆成采购申请未转单量 / 采购订单未入库量
- * 展示：申请{qty}{unit} / 订单{qty}{unit}
+ * 生产计划「在途/在制」：
+ * - 外购：采购申请未转单量 / 采购订单未入库量（采购单位）
+ * - 自制/组装/外协：待下发 / 执行中（库存单位，产出工单）
+ * 缺口仍 = 需求 − 可用库存（不扣在途/在制）
  */
 
 import { purchaseRequisitionState } from '@/store/purchaseRequisitionStore'
@@ -13,6 +15,11 @@ import {
   resolvePackageContent,
   resolvePurchaseUnit,
 } from '@/utils/purchaseUomConvert'
+import {
+  buildWipInProcessMap,
+  getWipForMaterialCode,
+  usesWipInProcessDisplay,
+} from '@/utils/planWipInProcess'
 
 function isOpenPurchaseRequisition(req) {
   if (!req) return false
@@ -129,39 +136,87 @@ export function getInTransitForMaterialCode(code, transitMap) {
       inTransitText: '—',
       purchaseUnit: '',
       inventoryUnit: '',
+      displayMode: 'purchase',
+      inTransitTip: PURCHASE_IN_TRANSIT_TIP,
     }
   }
   const map = transitMap || buildPurchaseInTransitMap()
-  return (
-    map.get(code) || {
+  const hit = map.get(code)
+  if (hit) {
+    return {
+      ...hit,
+      displayMode: 'purchase',
+      inTransitTip: PURCHASE_IN_TRANSIT_TIP,
+    }
+  }
+  return {
+    prPurchaseQty: 0,
+    poPurchaseQty: 0,
+    prStockQty: 0,
+    poStockQty: 0,
+    inTransitStockQty: 0,
+    inTransitText: formatInTransitText({
       prPurchaseQty: 0,
       poPurchaseQty: 0,
-      prStockQty: 0,
-      poStockQty: 0,
-      inTransitStockQty: 0,
-      inTransitText: formatInTransitText({
-        prPurchaseQty: 0,
-        poPurchaseQty: 0,
-        purchaseUnit: '件',
-      }),
       purchaseUnit: '件',
-      inventoryUnit: '件',
-    }
-  )
+    }),
+    purchaseUnit: '件',
+    inventoryUnit: '件',
+    displayMode: 'purchase',
+    inTransitTip: PURCHASE_IN_TRANSIT_TIP,
+  }
 }
 
-/** 将在途信息写回计划物料树 */
-export function applyPurchaseInTransitToMaterialTree(materials, transitMap) {
-  const map = transitMap || buildPurchaseInTransitMap()
+export const PURCHASE_IN_TRANSIT_TIP =
+  '申请量/订单量（采购单位）：未转单的采购申请 / 未入库的采购订单'
+export const WIP_IN_PROCESS_TIP =
+  '待下发/执行中（库存单位）：已生成未完工入库的生产/外协/总装工单；不参与缺口计算'
+
+/**
+ * 按供应型态解析计划行「在途/在制」展示
+ * @param {{ code?: string, supplyType?: string }} node
+ */
+export function resolveInTransitOrWipForPlanNode(node, purchaseMap, wipMap) {
+  const code = node?.code || ''
+  if (usesWipInProcessDisplay(node?.supplyType)) {
+    const wip = getWipForMaterialCode(code, wipMap)
+    return {
+      inTransitQty: wip.wipStockQty,
+      prInTransitQty: wip.pendingQty,
+      poInTransitQty: wip.executingQty,
+      inTransitText: wip.wipText,
+      inTransitPurchaseUnit: wip.inventoryUnit,
+      displayMode: 'wip',
+      inTransitTip: WIP_IN_PROCESS_TIP,
+    }
+  }
+  const hit = getInTransitForMaterialCode(code, purchaseMap)
+  return {
+    inTransitQty: hit.inTransitStockQty,
+    prInTransitQty: hit.prPurchaseQty,
+    poInTransitQty: hit.poPurchaseQty,
+    inTransitText: hit.inTransitText,
+    inTransitPurchaseUnit: hit.purchaseUnit,
+    displayMode: 'purchase',
+    inTransitTip: PURCHASE_IN_TRANSIT_TIP,
+  }
+}
+
+/** 将在途/在制信息写回计划物料树（缺口仍不扣减本列） */
+export function applyPurchaseInTransitToMaterialTree(materials, transitMap, wipMap) {
+  const purchaseMap = transitMap || buildPurchaseInTransitMap()
+  const processMap = wipMap || buildWipInProcessMap()
   const walk = (nodes) => {
     ;(nodes || []).forEach((node) => {
-      if (node?.code && !node.isTopLevel) {
-        const hit = getInTransitForMaterialCode(node.code, map)
-        node.inTransitQty = hit.inTransitStockQty
-        node.prInTransitQty = hit.prPurchaseQty
-        node.poInTransitQty = hit.poPurchaseQty
+      if (node?.code) {
+        const hit = resolveInTransitOrWipForPlanNode(node, purchaseMap, processMap)
+        node.inTransitQty = hit.inTransitQty
+        node.prInTransitQty = hit.prInTransitQty
+        node.poInTransitQty = hit.poInTransitQty
         node.inTransitText = hit.inTransitText
-        node.inTransitPurchaseUnit = hit.purchaseUnit
+        node.inTransitPurchaseUnit = hit.inTransitPurchaseUnit
+        node.inTransitDisplayMode = hit.displayMode
+        node.inTransitTip = hit.inTransitTip
       } else if (node?.isTopLevel) {
         node.inTransitText = node.inTransitText || '—'
       }

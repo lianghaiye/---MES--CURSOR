@@ -119,9 +119,26 @@ function isAssemblyGroupNode(node) {
   return node.nodeType === 'virtual' || node.nodeType === 'assembly'
 }
 
+/** 树节点自身挂接的物料行（parentTreeId 在父级，treeNodeId/lineId 指向本节点） */
+function findLineLinkedToNode(node, lineItems) {
+  if (!node) return null
+  return (
+    (lineItems || []).find(
+      (l) => (l.treeNodeId && l.treeNodeId === node.id) || (node.lineId && l.id === node.lineId),
+    ) || null
+  )
+}
+
 function buildSubtreeFromNode(node, flatNodes, lineItems, parentDemand) {
   const nodeQty = Number(node.quantity) || 1
   const nodeDemand = parentDemand * nodeQty
+
+  // 物料树节点：行挂在父级下，通过 treeNodeId 关联本节点（演示 BOM / 常规 addChildMaterial 均如此）
+  const linkedLine = findLineLinkedToNode(node, lineItems)
+  if (linkedLine && !isAssemblyGroupNode(node)) {
+    const lineQty = Number(linkedLine.unitQty) || 1
+    return [lineToMaterial(linkedLine, flatNodes, lineItems, parentDemand * lineQty)]
+  }
 
   const lines = getLinesForTreeNode(lineItems, node.id, flatNodes)
   const fromLines = lines.map((line) => {

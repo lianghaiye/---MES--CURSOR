@@ -27,7 +27,7 @@
             选择工单自动带出关联产品；可添加工单行合并领料，按物料编码汇总并保留来源工单溯源
           </template>
           <template v-else-if="mode === MATERIAL_REQ_MODES.SALES_ORDER">
-            选择销售订单后自动带出关联工单及 EBOM 物料；可手工补料
+            选择销售订单与订单产品后，自动带出对应工单及 EBOM 物料；可手工补料
           </template>
           <template v-else>无工单场景，手工添加物料领料</template>
         </div>
@@ -115,6 +115,22 @@
                   size="middle"
                   placeholder="请搜索或选择销售订单"
                   @update:value="onSalesOrderChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :xs="24" :sm="12">
+              <a-form-item label="订单产品" required>
+                <a-select
+                  v-model:value="form.salesOrderProductIds"
+                  mode="multiple"
+                  allow-clear
+                  show-search
+                  :options="salesOrderProductOpts"
+                  :disabled="!form.salesOrderNo"
+                  :filter-option="filterProductOption"
+                  placeholder="请选择订单产品（可多选）"
+                  :max-tag-count="2"
+                  @change="onSalesOrderProductsChange"
                 />
               </a-form-item>
             </a-col>
@@ -329,6 +345,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { workCenterOptions } from '@/mock/workOrderOptions'
 import { getWorkOrders } from '@/store/workOrderStore'
+import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import { warehouseState } from '@/store/warehouseStore'
 import { MATERIAL_REQ_MODES, submitMaterialRequisition } from '@/store/mobileMaterialReqStore'
 import {
@@ -380,6 +397,8 @@ const form = reactive({
   receiveWarehouse: '',
   remark: '',
   salesOrderNo: '',
+  /** 销售订单明细行 id 列表（多选） */
+  salesOrderProductIds: [],
 })
 
 const workshopOpts = workCenterOptions.map((v) => ({ label: v, value: v }))
@@ -403,10 +422,69 @@ const allWorkOrders = computed(() =>
   getWorkOrders().filter((o) => o.status && o.status !== '待下发'),
 )
 
+/** 当前销售订单下的产品（来自订单明细，多选） */
+const salesOrderProductOpts = computed(() => {
+  const order = findSalesOrderByOrderNo(form.salesOrderNo)
+  if (!order) return []
+  return (order.lineItems || [])
+    .filter((line) => line?.id)
+    .map((line) => {
+      const code = line.productCode || ''
+      const name = line.productName || ''
+      const spec = line.specModel || ''
+      const parts = [code, name, spec].filter(Boolean)
+      return {
+        value: line.id,
+        label: parts.length ? parts.join(' / ') : `明细 ${line.id}`,
+        productId: line.productId || '',
+        productCode: code,
+        productName: name,
+      }
+    })
+})
+
+function filterProductOption(input, option) {
+  const q = String(input || '')
+    .trim()
+    .toLowerCase()
+  if (!q) return true
+  return String(option?.label || '')
+    .toLowerCase()
+    .includes(q)
+}
+
+function workOrderMatchesOrderProduct(wo, productOpt) {
+  if (!wo || !productOpt) return false
+  if (wo.salesLineId && wo.salesLineId === productOpt.value) return true
+  if (wo.productId && productOpt.productId && wo.productId === productOpt.productId) return true
+  if (wo.materialCode && productOpt.productCode && wo.materialCode === productOpt.productCode) {
+    return true
+  }
+  if (wo.productName && productOpt.productName && wo.productName === productOpt.productName) {
+    return true
+  }
+  return false
+}
+
 const salesLinkedWorkOrders = computed(() => {
   const so = form.salesOrderNo
   if (!so) return []
-  return allWorkOrders.value.filter((o) => (o.sourceOrderNo || '') === so)
+  const orderWos = allWorkOrders.value.filter((o) => (o.sourceOrderNo || '') === so)
+  const selectedIds = form.salesOrderProductIds || []
+  if (!selectedIds.length) return []
+  const selectedProducts = salesOrderProductOpts.value.filter((o) => selectedIds.includes(o.value))
+  if (!selectedProducts.length) return []
+
+  const matched = orderWos.filter((wo) =>
+    selectedProducts.some((opt) => workOrderMatchesOrderProduct(wo, opt)),
+  )
+  // 有精确关联时按产品过滤；历史/演示数据缺关联字段时回退为订单下全部工单
+  if (matched.length) return matched
+  const canFilterByProduct = orderWos.some(
+    (wo) => wo.salesLineId || wo.productId || wo.materialCode,
+  )
+  if (canFilterByProduct) return matched
+  return orderWos
 })
 
 const selectedWorkOrders = computed(() => {
@@ -507,15 +585,40 @@ function onModeChange() {
   workOrderRows.value = [createEmptyWoRow()]
   lines.value = []
   form.salesOrderNo = ''
+  form.salesOrderProductIds = []
   syncReceiveWarehouse()
 }
 
 function onSalesOrderChange(code) {
   form.salesOrderNo = code || ''
+  form.salesOrderProductIds = []
   lines.value = []
   if (!form.salesOrderNo) return
+  const order = findSalesOrderByOrderNo(form.salesOrderNo)
+  if (!order) {
+    message.warning('未找到该销售订单')
+    return
+  }
+  const productIds = (order.lineItems || []).map((line) => line.id).filter(Boolean)
+  form.salesOrderProductIds = productIds
+  if (!productIds.length) {
+    message.warning('该销售订单暂无产品明细')
+    return
+  }
   if (!salesLinkedWorkOrders.value.length) {
-    message.warning('该销售订单下暂无可领料工单')
+    message.warning('所选订单产品下暂无可领料工单')
+  }
+}
+
+function onSalesOrderProductsChange() {
+  lines.value = []
+  if (!form.salesOrderNo) return
+  if (!(form.salesOrderProductIds || []).length) {
+    message.warning('请至少选择一个订单产品')
+    return
+  }
+  if (!salesLinkedWorkOrders.value.length) {
+    message.warning('所选订单产品下暂无可领料工单')
   }
 }
 
@@ -673,8 +776,12 @@ function onSubmit() {
       message.warning('请选择销售订单')
       return
     }
+    if (!(form.salesOrderProductIds || []).length) {
+      message.warning('请至少选择一个订单产品')
+      return
+    }
     if (!selectedWorkOrders.value.length) {
-      message.warning('该销售订单下暂无可领料工单')
+      message.warning('所选订单产品下暂无可领料工单')
       return
     }
   }
@@ -740,10 +847,20 @@ function onSubmit() {
   }
 
   if (mode.value === MATERIAL_REQ_MODES.SALES_ORDER) {
+    const selectedProducts = salesOrderProductOpts.value.filter((o) =>
+      (form.salesOrderProductIds || []).includes(o.value),
+    )
     payload = {
       ...payload,
       mode: MATERIAL_REQ_MODES.SALES_ORDER,
       salesOrderNo: form.salesOrderNo,
+      salesOrderProductIds: [...(form.salesOrderProductIds || [])],
+      salesOrderProducts: selectedProducts.map((p) => ({
+        lineId: p.value,
+        productId: p.productId,
+        productCode: p.productCode,
+        productName: p.productName,
+      })),
       workOrderIds: selected.map((w) => w.id),
       workOrders: selected.map((w) => ({
         id: w.id,
@@ -751,8 +868,8 @@ function onSubmit() {
         productName: w.productName,
         scheduleQty: w.scheduleQty,
       })),
-      productName: selected
-        .map((w) => w.productName)
+      productName: selectedProducts
+        .map((p) => p.productName)
         .filter(Boolean)
         .slice(0, 2)
         .join('、'),

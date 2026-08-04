@@ -11,8 +11,8 @@ import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
 
 const STORAGE_KEY = 'i_doms_material_info'
-/** v13：包装采购换算演示料（盒/个 + packageContent） */
-const DATA_VERSION = 13
+/** v14：重量双单位演示料（根→kg） */
+const DATA_VERSION = 14
 let codeSeq = 100048
 
 function ensureDemoMaterialsByCodes(list, demos) {

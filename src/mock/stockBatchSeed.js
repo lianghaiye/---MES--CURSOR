@@ -4,6 +4,9 @@ export const STEEL_PIPE_CODE = 'WL-PIPE-Q235-50'
 export const STEEL_PIPE_NAME = '无缝钢管 Q235 φ50×3'
 export const STEEL_PLATE_CODE = 'WL-PLATE-Q235-10'
 export const STEEL_PLATE_NAME = '钢板 Q235 10mm'
+/** 重量双单位演示：采购按根，库存按 kg */
+export const STEEL_WEIGHT_BAR_CODE = 'WL-BAR-WEIGHT-40Cr'
+export const STEEL_WEIGHT_BAR_NAME = '圆钢按重 40Cr φ40'
 
 const BLANK_CAT = {
   categoryKey: 'cat-007',
@@ -69,11 +72,31 @@ export function createSteelPlateMaterial() {
   })
 }
 
-/** 全部双物料单位演示料（含钢管、板材）；条码类型覆盖一物/一类/一批一码 */
+/** 重量演示料：采购按根，库存按 kg（每根实重可不一致） */
+export function createSteelWeightBarMaterial() {
+  return baseDualUnitMaterial({
+    id: 'mat-steel-weight-bar-demo',
+    code: STEEL_WEIGHT_BAR_CODE,
+    name: STEEL_WEIGHT_BAR_NAME,
+    specModel: 'φ40',
+    material: '40Cr',
+    techParams: '调质圆钢；采购按根、库存按重量(kg)，入库逐根过磅或直接填合计重量',
+    inventoryUnit: 'kg',
+    stockUnit: 'kg',
+    purchaseUnit: '根',
+    barcodeType: '一批一码',
+    uomRelation: 'per_piece_weight',
+    unitPrice: 9.5,
+    remark: '双物料单位重量：一批一码（根→kg），库存单位为重量',
+  })
+}
+
+/** 全部双物料单位演示料（含钢管、板材、重量）；条码类型覆盖一物/一类/一批一码 */
 export function createDemoDualUnitMaterials() {
   return [
     createSteelPipeMaterial(),
     createSteelPlateMaterial(),
+    createSteelWeightBarMaterial(),
     baseDualUnitMaterial({
       id: 'mat-vl-plate-ss-304',
       code: 'WL-PLATE-304-3',
@@ -344,6 +367,57 @@ export function cloneStockBatchSeed() {
       unit: '米',
       sourceDocNo: 'INIT-SSPIPE',
       attrs: { material: '304', specModel: 'φ25×2' },
+    }),
+    seedBatch({
+      id: 'bat-seed-weight-bar-18kg',
+      batchNo: nextNo(),
+      warehouse: '原料仓',
+      itemCode: STEEL_WEIGHT_BAR_CODE,
+      itemName: STEEL_WEIGHT_BAR_NAME,
+      currentLength: 18.6,
+      unit: 'kg',
+      sourceDocNo: 'INIT-WEIGHT-BAR',
+      attrs: {
+        material: '40Cr',
+        specModel: 'φ40',
+        barcodeType: '一批一码',
+        inboundEntryMode: 'total',
+        pieceCount: 2,
+      },
+    }),
+    seedBatch({
+      id: 'bat-seed-weight-bar-12kg',
+      batchNo: nextNo(),
+      warehouse: '原料仓',
+      itemCode: STEEL_WEIGHT_BAR_CODE,
+      itemName: STEEL_WEIGHT_BAR_NAME,
+      currentLength: 12.4,
+      unit: 'kg',
+      sourceDocNo: 'INIT-WEIGHT-BAR',
+      attrs: {
+        material: '40Cr',
+        specModel: 'φ40',
+        barcodeType: '一批一码',
+        inboundEntryMode: 'total',
+        pieceCount: 1,
+      },
+    }),
+    seedBatch({
+      id: 'bat-seed-weight-bar-line-9kg',
+      batchNo: nextNo(),
+      warehouse: '库线边仓',
+      itemCode: STEEL_WEIGHT_BAR_CODE,
+      itemName: STEEL_WEIGHT_BAR_NAME,
+      currentLength: 9.8,
+      unit: 'kg',
+      sourceDocNo: 'INIT-WEIGHT-BAR-LINE',
+      attrs: {
+        material: '40Cr',
+        specModel: 'φ40',
+        barcodeType: '一批一码',
+        inboundEntryMode: 'total',
+        pieceCount: 1,
+      },
     }),
     seedBatch({
       id: 'bat-seed-flat-12kg',
@@ -732,6 +806,22 @@ export function cloneStockBatchSeed() {
         qty: 15,
         unit: 'kg',
         attrs: { barcodeType: '一物一码' },
+      },
+      {
+        id: 'bat-semi-weight-bar-20',
+        code: STEEL_WEIGHT_BAR_CODE,
+        name: STEEL_WEIGHT_BAR_NAME,
+        qty: 20.5,
+        unit: 'kg',
+        attrs: { material: '40Cr', specModel: 'φ40', barcodeType: '一批一码' },
+      },
+      {
+        id: 'bat-semi-weight-bar-14',
+        code: STEEL_WEIGHT_BAR_CODE,
+        name: STEEL_WEIGHT_BAR_NAME,
+        qty: 14.2,
+        unit: 'kg',
+        attrs: { material: '40Cr', specModel: 'φ40', barcodeType: '一批一码' },
       },
       {
         id: 'bat-semi-al-4',

@@ -27,9 +27,11 @@ import {
 import { upgradeParentBomReferences } from '@/utils/bomVersionReference'
 import { formatBomInfoLabel, sortBomsForDisplay } from '@/utils/itemBomInfo'
 import { resolveActiveBomForItem } from '@/utils/spuBomResolve'
+import { ensureBlankSizeDemoBoms } from '@/mock/blankSizeBomDemoSeed'
 
 const STORAGE_KEY = 'i_doms_product_bom'
-const DATA_VERSION = 8
+/** v9：下料尺寸演示 BOM（钢管/钢板/按重圆钢） */
+const DATA_VERSION = 9
 let bomNoSeq = 31000
 
 function normalizeBoms(boms) {
@@ -92,10 +94,10 @@ function ensureBomStructure(bom) {
 
 function loadInitialBoms() {
   const stored = loadFromStorage()
-  if (stored) return stored
-  return injectBomParentReferenceMocks(
-    normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials)),
-  )
+  const base = stored
+    ? stored
+    : injectBomParentReferenceMocks(normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials)))
+  return ensureBlankSizeDemoBoms(base)
 }
 
 export const productBomState = reactive({
