@@ -51,6 +51,12 @@ const routes = [
     meta: { title: '工单预览', standalone: true },
   },
   {
+    path: '/procurement/purchase-orders/preview',
+    name: 'procurement-purchase-order-preview',
+    component: () => import('@/views/procurement/PurchaseOrderPrintPreviewView.vue'),
+    meta: { title: '采购订单预览', standalone: true },
+  },
+  {
     path: '/engineering-change/ecn/print',
     name: 'engineering-change-ecn-print',
     component: () => import('@/views/engineering-change/EcnPrintPreviewView.vue'),
@@ -500,6 +506,18 @@ const routes = [
         name: 'procurement-purchase-orders',
         component: () => import('@/views/procurement/PurchaseOrderView.vue'),
         meta: { title: '采购订单' },
+      },
+      {
+        path: 'procurement/purchase-orders/:id/edit',
+        name: 'procurement-purchase-orders-edit',
+        component: () => import('@/views/procurement/PurchaseOrderEditView.vue'),
+        meta: { title: '编辑采购单', listPath: '/procurement/purchase-orders' },
+      },
+      {
+        path: 'procurement/purchase-orders/:id/approve',
+        name: 'procurement-purchase-orders-approve',
+        component: () => import('@/views/procurement/PurchaseOrderApproveView.vue'),
+        meta: { title: '审核采购单', listPath: '/procurement/purchase-orders' },
       },
       {
         path: 'procurement/purchase-orders/:id',

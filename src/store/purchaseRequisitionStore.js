@@ -4,6 +4,7 @@ import {
   clonePurchaseRequisitions,
   recalcRequisitionTotals,
   createLineItem,
+  stampRequisitionLineSalesOrderNos,
 } from '@/mock/purchaseRequisitions'
 import { round2 } from '@/utils/purchaseMerge'
 import { createPurchaseOrdersFromMergedLines } from '@/store/purchaseOrderStore'
@@ -28,9 +29,9 @@ function resolveEarliestDeliveryDate(lineItems, fallback) {
 
 const STORAGE_KEY = 'i_doms_purchase_requisitions'
 const SEED_VERSION_KEY = 'i_doms_purchase_requisitions_seed_v'
-/** v2：跨模块演示（包装采购申请未转单 / 已转单） */
-const CURRENT_SEED_VERSION = '2'
-let reqSeq = 5
+/** v4：采购申请明细行级销售单号 */
+const CURRENT_SEED_VERSION = '4'
+let reqSeq = 20
 
 function loadFromStorage() {
   try {
@@ -61,7 +62,11 @@ function initRequisitions() {
   const base = shouldReseed()
     ? clonePurchaseRequisitions()
     : loadFromStorage() || clonePurchaseRequisitions()
-  return ensureCrossDemoPurchaseRequisitions(ensureProductionPlanOrderTreeDemoRequisitions(base))
+  const list = ensureCrossDemoPurchaseRequisitions(
+    ensureProductionPlanOrderTreeDemoRequisitions(base),
+  )
+  list.forEach((req) => stampRequisitionLineSalesOrderNos(req))
+  return list
 }
 
 export function generateReqNo() {
@@ -101,6 +106,7 @@ watch(
 )
 
 export function addPurchaseRequisition(requisition) {
+  stampRequisitionLineSalesOrderNos(requisition)
   recalcRequisitionTotals(requisition)
   purchaseRequisitionState.requisitions.unshift(requisition)
   return requisition
@@ -110,6 +116,7 @@ export function updatePurchaseRequisition(id, patch) {
   const idx = purchaseRequisitionState.requisitions.findIndex((r) => r.id === id)
   if (idx === -1) return null
   Object.assign(purchaseRequisitionState.requisitions[idx], patch)
+  stampRequisitionLineSalesOrderNos(purchaseRequisitionState.requisitions[idx])
   recalcRequisitionTotals(purchaseRequisitionState.requisitions[idx])
   purchaseRequisitionState.requisitions[idx].updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
   return purchaseRequisitionState.requisitions[idx]
@@ -140,7 +147,13 @@ export function findPurchaseRequisitionByReqNo(reqNo) {
   return purchaseRequisitionState.requisitions.find((r) => r.reqNo === normalized) || null
 }
 
-function mapPlanMaterialToLineItem(m, deliveryDate, estimatedArrivalDate, receivingWarehouse) {
+function mapPlanMaterialToLineItem(
+  m,
+  deliveryDate,
+  estimatedArrivalDate,
+  receivingWarehouse,
+  salesOrderNo = '',
+) {
   const demandQty = m.demandQty ?? m.gapQty ?? m.planQty ?? 0
   const master = materialInfoState.materials.find((row) => row.code === m.code) || m
   const converted = convertStockDemandToPurchase(m.planQty ?? m.gapQty ?? demandQty, master)
@@ -167,6 +180,7 @@ function mapPlanMaterialToLineItem(m, deliveryDate, estimatedArrivalDate, receiv
     expectedArrivalDate: estimatedArrivalDate,
     deliveryDate,
     receivingWarehouse,
+    salesOrderNo: salesOrderNo || '',
   })
 }
 
@@ -180,6 +194,7 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
     now.format('YYYY-MM-DD')
   const estimatedArrivalDate = form.estimatedArrivalDate || deliveryDate
   const receivingWarehouse = form.receivingWarehouse || ''
+  const salesOrderNo = sourceOrder.orderNo || ''
   const urgency = form.urgency
     ? mapSalesUrgency(form.urgency)
     : mapSalesUrgency(sourceOrder.urgency)
@@ -214,6 +229,7 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
       expectedArrivalDate: estimatedArrivalDate,
       deliveryDate,
       receivingWarehouse,
+      salesOrderNo,
       remark: row.remark || '',
     }),
   )
@@ -221,7 +237,7 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
   return {
     id: `pr-${Date.now()}`,
     reqNo: form.reqNo?.trim() || generatePlanReqNo(),
-    salesOrderNo: sourceOrder.orderNo || '',
+    salesOrderNo,
     docStatus: '待处理',
     overdueStatus: '未逾期',
     urgency,
@@ -250,16 +266,27 @@ export function buildRequisitionFromMaterials(materials, sourceOrder, form = {})
     now.format('YYYY-MM-DD')
   const estimatedArrivalDate = form.estimatedArrivalDate || deliveryDate
   const receivingWarehouse = form.receivingWarehouse || ''
+  const salesOrderNo = sourceOrder.orderNo || ''
   const lineItems = (form.lineItems || materials).map((m) =>
     m.inventoryCode
-      ? { ...m, receivingWarehouse: m.receivingWarehouse || receivingWarehouse }
-      : mapPlanMaterialToLineItem(m, deliveryDate, estimatedArrivalDate, receivingWarehouse),
+      ? {
+          ...m,
+          receivingWarehouse: m.receivingWarehouse || receivingWarehouse,
+          salesOrderNo: m.salesOrderNo || salesOrderNo,
+        }
+      : mapPlanMaterialToLineItem(
+          m,
+          deliveryDate,
+          estimatedArrivalDate,
+          receivingWarehouse,
+          salesOrderNo,
+        ),
   )
 
   return {
     id: `pr-${Date.now()}`,
     reqNo: form.reqNo?.trim() || generatePlanReqNo(),
-    salesOrderNo: sourceOrder.orderNo || '',
+    salesOrderNo,
     docStatus: '待处理',
     overdueStatus: '未逾期',
     urgency:
@@ -283,6 +310,7 @@ export function buildRequisitionFromMaterials(materials, sourceOrder, form = {})
 export function buildRequisitionFromSalesOrder(salesOrder) {
   const now = dayjs()
   const deliveryDate = resolveEarliestDeliveryDate(salesOrder.lineItems, salesOrder.documentDate)
+  const salesOrderNo = salesOrder.orderNo || ''
 
   const lineItems = (salesOrder.lineItems || []).map((line) => {
     const qty = Number(line.salesQty) || Number(line.qty) || 0
@@ -309,13 +337,14 @@ export function buildRequisitionFromSalesOrder(salesOrder) {
       totalPriceInTax: round2(qty * inTax),
       deliveryDate: lineDelivery,
       expectedArrivalDate: lineDelivery,
+      salesOrderNo,
     })
   })
 
   return {
     id: `pr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     reqNo: generateReqNo(),
-    salesOrderNo: salesOrder.orderNo || '',
+    salesOrderNo,
     sourceSalesOrderId: salesOrder.id,
     docStatus: '待处理',
     overdueStatus: '未逾期',
@@ -366,6 +395,31 @@ export function confirmGeneratePurchaseOrders(mergedLines) {
 
   persist()
   return { poCount: poNos.length, poNos }
+}
+
+/** 拆单新建采购单后，把单号追加到关联采购申请 */
+export function appendPurchaseOrderNos(reqNoCsv, poNos) {
+  const reqNos = String(reqNoCsv || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const addNos = (Array.isArray(poNos) ? poNos : [poNos])
+    .map((s) => String(s || '').trim())
+    .filter(Boolean)
+  if (!reqNos.length || !addNos.length) return
+
+  purchaseRequisitionState.requisitions.forEach((req) => {
+    if (!reqNos.includes(req.reqNo)) return
+    const existing = req.purchaseOrderNo
+      ? req.purchaseOrderNo
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : []
+    req.purchaseOrderNo = [...new Set([...existing, ...addNos])].join(',')
+    req.updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  })
+  persist()
 }
 
 export function canGeneratePO(record) {

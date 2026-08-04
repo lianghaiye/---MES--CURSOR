@@ -117,6 +117,9 @@
                   <template v-else-if="column.key === 'supplierName'">
                     {{ line.supplierName || '—' }}
                   </template>
+                  <template v-else-if="column.key === 'salesOrderNo'">
+                    {{ line.salesOrderNo || '—' }}
+                  </template>
                   <template v-else-if="column.key === 'remark'">
                     {{ line.remark || '—' }}
                   </template>
@@ -304,12 +307,18 @@ function overdueStatusColor(status) {
 }
 
 function purchaseOrderStatusColor(status) {
-  const map = { 待审批: 'default', 进行中: 'processing', 已完成: 'success' }
+  const map = {
+    待审核: 'default',
+    进行中: 'processing',
+    已拒绝: 'error',
+    已完成: 'success',
+    已作废: 'default',
+  }
   return map[status] || 'default'
 }
 
 function purchaseInboundStatusColor(status) {
-  const map = { 未入库: 'default', 部分入库: 'warning', 已入库: 'success' }
+  const map = { 待入库: 'default', 部分入库: 'warning', 已入库: 'success' }
   return map[status] || 'default'
 }
 

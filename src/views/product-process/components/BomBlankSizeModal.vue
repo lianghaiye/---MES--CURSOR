@@ -18,7 +18,7 @@
     </div>
 
     <div class="mode-switch">
-      <div class="mode-switch-label">下料方式</div>
+      <div class="mode-switch-label">{{ isOrderPurpose ? '订货方式' : '下料方式' }}</div>
       <a-radio-group
         v-model:value="selectedMode"
         option-type="button"
@@ -92,14 +92,17 @@
     </a-form>
     <div class="preview">
       <div>
-        下料尺寸预览：
+        {{ isOrderPurpose ? '订货尺寸' : '下料尺寸' }}预览：
         <strong>{{ previewText || '（未填写）' }}</strong>
       </div>
-      <div v-if="plateMode" class="preview-area">
+      <div v-if="plateMode && !isOrderPurpose" class="preview-area">
         单件需求面积：
         <strong>{{ areaPreviewText }}</strong>
       </div>
-      <div v-else-if="lengthMode && lengthMetersPreview != null" class="preview-area">
+      <div
+        v-else-if="lengthMode && !isOrderPurpose && lengthMetersPreview != null"
+        class="preview-area"
+      >
         单件需求长度：
         <strong>{{ lengthMetersPreview }} 米</strong>
       </div>
@@ -136,12 +139,15 @@ const props = defineProps({
   open: Boolean,
   /** 当前编辑行 */
   line: { type: Object, default: null },
+  /** blank=下料尺寸（默认）；order=订货尺寸 */
+  purpose: { type: String, default: 'blank' },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
 
 const draft = reactive(emptyBlankSize())
 const selectedMode = ref(BLANK_SIZE_MODE.GENERIC)
+const isOrderPurpose = computed(() => props.purpose === 'order')
 
 function getModalContainer() {
   return typeof document !== 'undefined' ? document.body : false
@@ -204,12 +210,18 @@ const plateMode = computed(() => selectedMode.value === BLANK_SIZE_MODE.PLATE)
 const lengthMode = computed(() => selectedMode.value === BLANK_SIZE_MODE.LENGTH)
 
 const modalTitle = computed(() => {
-  if (plateMode.value) return '下料尺寸（板材）'
-  if (lengthMode.value) return '下料尺寸（型材）'
-  return '下料尺寸'
+  const kind = isOrderPurpose.value ? '订货尺寸' : '下料尺寸'
+  if (plateMode.value) return `${kind}（板材）`
+  if (lengthMode.value) return `${kind}（型材）`
+  return kind
 })
 
 const modeHint = computed(() => {
+  if (isOrderPurpose.value) {
+    if (plateMode.value) return '按板材长×宽记录向供应商订货的尺寸'
+    if (lengthMode.value) return '按长度记录向供应商订货的尺寸'
+    return '仅记录订货尺寸文案，可与生产下料尺寸不同'
+  }
   if (plateMode.value) return '按长×宽换算单件面积（㎡），用于板材领料需求'
   if (lengthMode.value) return '按长度换算单件需求（米），用于管材/型材领料需求'
   return '仅记录尺寸文案，不强制按长或面积换算需求'
@@ -274,14 +286,15 @@ function onUnitChange(fieldKey, nextUnit) {
 }
 
 function handleOk() {
+  const sizeLabel = isOrderPurpose.value ? '订货' : '下料'
   if (plateMode.value) {
     if (!(Number(draft.length) > 0) || !(Number(draft.width) > 0)) {
-      message.warning('板材请填写下料「长」和「宽」')
+      message.warning(`板材请填写${sizeLabel}「长」和「宽」`)
       return
     }
   } else if (lengthMode.value) {
     if (!(Number(draft.length) > 0)) {
-      message.warning('请填写下料「长」')
+      message.warning(`请填写${sizeLabel}「长」`)
       return
     }
   }

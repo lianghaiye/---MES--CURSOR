@@ -44,7 +44,7 @@
           type="info"
           show-icon
           class="phase-alert"
-          message="当前为预扣状态：系统已锁定对应库存，确认后将转为实扣。"
+          message="当前为预扣状态：倒冲件（及按报工扣模式下的领料件）已锁定库存，确认后转为实扣；自主领料件仅同单展示，确认后记为「无需扣减」。"
         />
         <a-alert
           v-else-if="locked"
@@ -122,11 +122,16 @@
             size="small"
             bordered
             :pagination="false"
-            :scroll="{ x: 1340 }"
+            :scroll="{ x: 1440 }"
             :locale="{ emptyText: '暂无扣减明细' }"
           >
             <template #bodyCell="{ column, record: line }">
-              <template v-if="column.key === 'specModel'">
+              <template v-if="column.key === 'issueMode'">
+                <a-tag :color="lineIssueMode(line) === '倒冲' ? 'orange' : 'blue'" size="small">
+                  {{ lineIssueMode(line) }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'specModel'">
                 {{ line.specModel || '—' }}
               </template>
               <template v-else-if="column.key === 'material'">
@@ -199,6 +204,7 @@ const record = computed(() => {
 const lineColumns = [
   { title: '物料编码', dataIndex: 'materialCode', key: 'materialCode', width: 110 },
   { title: '物料名称', dataIndex: 'materialName', key: 'materialName', width: 120 },
+  { title: '发料方式', key: 'issueMode', width: 88 },
   { title: '规格型号', key: 'specModel', width: 110, ellipsis: true },
   { title: '材质', key: 'material', width: 90, ellipsis: true },
   { title: '图号', key: 'drawingNo', width: 110, ellipsis: true },
@@ -206,7 +212,7 @@ const lineColumns = [
   { title: '下料尺寸', key: 'blankSizeText', width: 160, ellipsis: true },
   { title: '应扣', dataIndex: 'planQty', key: 'planQty', width: 70, align: 'right' },
   { title: '实扣', dataIndex: 'actualQty', key: 'actualQty', width: 70, align: 'right' },
-  { title: '状态', key: 'status', width: 80 },
+  { title: '状态', key: 'status', width: 88 },
   { title: '失败原因', key: 'failReason', width: 120, ellipsis: true },
 ]
 
@@ -234,6 +240,11 @@ function lineVariantText(line) {
   return lineVariantSummary(line) || line.variantSummary || ''
 }
 
+function lineIssueMode(line) {
+  if (line?.issueMode) return line.issueMode
+  return line?.isBackflush ? '倒冲' : '领料'
+}
+
 function statusClass(status) {
   const map = {
     [STATUS.SUCCESS]: 'is-success',
@@ -241,6 +252,7 @@ function statusClass(status) {
     [STATUS.PARTIAL]: 'is-partial',
     [STATUS.VOIDED]: 'is-voided',
     [STATUS.PENDING]: 'is-pending',
+    [STATUS.SKIPPED]: 'is-skipped',
   }
   return map[status] || ''
 }
@@ -441,6 +453,11 @@ function onRetry() {
     color: #d46b08;
     background: #fff7e6;
     border-color: #ffd591;
+  }
+  &.is-skipped {
+    color: #595959;
+    background: #f5f5f5;
+    border-color: #d9d9d9;
   }
 }
 </style>

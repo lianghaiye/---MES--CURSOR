@@ -11,13 +11,13 @@ import {
   isQuickMaterialDeduct,
 } from '@/mock/materialRequisitionRecords'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
-import { buildBackflushDeductDraft } from '@/utils/backflushDeduct'
+import { buildWorkOrderCompletionDeductDraft } from '@/utils/backflushDeduct'
 import { ensureCrossDemoDeductRecords } from '@/mock/crossModuleDemoSeed'
 
 const STORAGE_KEY = 'i_doms_material_requisition'
 const SEED_VERSION_KEY = 'i_doms_material_requisition_seed_v'
-/** v10：跨模块演示库存扣减 */
-const CURRENT_SEED_VERSION = '10'
+/** v12：工单完工扣减 mock（领料+倒冲同单，多状态） */
+const CURRENT_SEED_VERSION = '12'
 
 /** 确认后可撤销 / 作废 / 重试的天数，超时单据锁定 */
 export const MATERIAL_DEDUCT_OPERABLE_DAYS = 30
@@ -65,10 +65,17 @@ function normalizeRecord(row) {
   if (!row) return row
   row.status = normalizeMaterialDeductStatus(row.status)
   if (Array.isArray(row.lines)) {
-    row.lines = row.lines.map((l) => ({
-      ...l,
-      status: normalizeMaterialDeductStatus(l.status),
-    }))
+    row.lines = row.lines.map((l) => {
+      const isBackflush = Boolean(l.isBackflush || l.issueMode === '倒冲')
+      const issueMode = l.issueMode || (isBackflush ? '倒冲' : '领料')
+      return {
+        ...l,
+        isBackflush,
+        issueMode,
+        deductible: l.deductible != null ? Boolean(l.deductible) : true,
+        status: normalizeMaterialDeductStatus(l.status),
+      }
+    })
   }
   if (!row.stockPhase) {
     if (row.status === MATERIAL_DEDUCT_STATUS.PENDING) row.stockPhase = 'prelock'
@@ -135,6 +142,7 @@ export function createMaterialDeductRecord(payload = {}) {
     lines,
     createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   })
+  recalcMaterialCount(row)
   materialRequisitionState.records.unshift(row)
 
   if (isAutoApproveEnabled(AUTO_APPROVE_TYPES.INVENTORY_DEDUCT)) {
@@ -144,25 +152,31 @@ export function createMaterialDeductRecord(payload = {}) {
 }
 
 /**
- * 工单完工 → 倒冲扣减单（领料属性关闭的 BOM 件）
- * 同一工单已有倒冲待确认/成功单时不重复生成
+ * 工单完工 → 库存扣减单（BOM 领料件 + 倒冲件同单展示）
+ * 同一工单已有工单/倒冲待确认或成功单时不重复生成
  */
-export function createBackflushDeductFromWorkOrder(workOrder, finishedQty) {
+export function createWorkOrderCompletionDeduct(workOrder, finishedQty) {
   if (!workOrder) return { ok: false, message: '工单不存在' }
   const woNo = workOrder.code || workOrder.workOrderNo || ''
-  const existed = materialRequisitionState.records.find(
-    (r) =>
-      resolveDeductSource(r) === MATERIAL_DEDUCT_SOURCES.BACKFLUSH &&
-      (r.workOrderId === workOrder.id || r.workOrderNo === woNo) &&
-      r.status !== MATERIAL_DEDUCT_STATUS.VOIDED,
-  )
+  const existed = materialRequisitionState.records.find((r) => {
+    if (r.status === MATERIAL_DEDUCT_STATUS.VOIDED) return false
+    const sameWo = r.workOrderId === workOrder.id || r.workOrderNo === woNo
+    if (!sameWo) return false
+    const src = resolveDeductSource(r)
+    return src === MATERIAL_DEDUCT_SOURCES.WORK_ORDER || src === MATERIAL_DEDUCT_SOURCES.BACKFLUSH
+  })
   if (existed) {
-    return { ok: true, skipped: true, record: existed, message: '该工单已有倒冲扣减单' }
+    return { ok: true, skipped: true, record: existed, message: '该工单已有完工扣减单' }
   }
 
-  const built = buildBackflushDeductDraft(workOrder, finishedQty)
+  const built = buildWorkOrderCompletionDeductDraft(workOrder, finishedQty)
   if (!built.ok) return built
   return createMaterialDeductRecord(built.draft)
+}
+
+/** @deprecated 使用 createWorkOrderCompletionDeduct */
+export function createBackflushDeductFromWorkOrder(workOrder, finishedQty) {
+  return createWorkOrderCompletionDeduct(workOrder, finishedQty)
 }
 
 function loadFromStorage() {
@@ -228,23 +242,40 @@ function findRecord(id) {
 
 function recalcMaterialCount(row) {
   const lines = row.lines || []
-  row.materialTotal = lines.length
-  row.materialDone = lines.filter((l) => l.status === MATERIAL_DEDUCT_STATUS.SUCCESS).length
+  const deductible = lines.filter((l) => l.deductible !== false)
+  row.materialTotal = deductible.length || lines.length
+  row.materialDone = (deductible.length ? deductible : lines).filter(
+    (l) =>
+      l.status === MATERIAL_DEDUCT_STATUS.SUCCESS || l.status === MATERIAL_DEDUCT_STATUS.SKIPPED,
+  ).length
 }
 
 function resolveDeductResultStatus(lines = []) {
-  const total = lines.length
+  const actionable = lines.filter((l) => l.deductible !== false)
+  const pool = actionable.length ? actionable : lines
+  const total = pool.length
   if (!total) return MATERIAL_DEDUCT_STATUS.FAILED
-  const success = lines.filter((l) => l.status === MATERIAL_DEDUCT_STATUS.SUCCESS).length
-  const failed = lines.filter((l) => l.status === MATERIAL_DEDUCT_STATUS.FAILED).length
+  const success = pool.filter(
+    (l) =>
+      l.status === MATERIAL_DEDUCT_STATUS.SUCCESS || l.status === MATERIAL_DEDUCT_STATUS.SKIPPED,
+  ).length
+  const failed = pool.filter((l) => l.status === MATERIAL_DEDUCT_STATUS.FAILED).length
   if (failed === 0 && success === total) return MATERIAL_DEDUCT_STATUS.SUCCESS
   if (success === 0) return MATERIAL_DEDUCT_STATUS.FAILED
   return MATERIAL_DEDUCT_STATUS.PARTIAL
 }
 
-/** 模拟扣减执行：库存不足则失败 */
+/** 模拟扣减执行：库存不足则失败；领料展示行（deductible=false）记为无需扣减 */
 function executeDeductLines(lines = []) {
   return lines.map((l) => {
+    if (l.deductible === false) {
+      return {
+        ...l,
+        actualQty: 0,
+        status: MATERIAL_DEDUCT_STATUS.SKIPPED,
+        failReason: '',
+      }
+    }
     const planQty = Number(l.planQty) || 0
     const stock = l.warehouseStockQty
     const insufficient = stock != null && Number(stock) < planQty
@@ -284,6 +315,7 @@ export function getMaterialDeductLockedQty(materialCode, opts = {}) {
     if (wh && String(row.warehouseName || '').trim() !== wh) continue
     for (const line of row.lines || []) {
       if (String(line.materialCode || '').trim() !== code) continue
+      if (line.deductible === false) continue
       sum += Number(line.planQty) || 0
     }
   }
@@ -317,6 +349,9 @@ export function updatePendingMaterialDeduct(id, patch = {}) {
       actualQty: 0,
       status: MATERIAL_DEDUCT_STATUS.PENDING,
       failReason: '',
+      issueMode: l.issueMode || (l.isBackflush ? '倒冲' : '领料'),
+      isBackflush: Boolean(l.isBackflush || l.issueMode === '倒冲'),
+      deductible: l.deductible !== false,
     }))
     recalcMaterialCount(row)
     row.materialDone = 0

@@ -1,6 +1,6 @@
 export const urgencyOptions = ['正常', '紧急', '特急']
 
-export const docStatusOptions = ['待处理', '处理中', '处理完成']
+export const docStatusOptions = ['待处理', '处理中', '处理完成', '已作废']
 
 export const overdueStatusOptions = ['未逾期', '已逾期']
 

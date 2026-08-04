@@ -9,9 +9,9 @@
             <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
           </div>
           <a-space>
-            <a-button v-if="canApprove" type="primary" @click="handleApprove">
+            <a-button v-if="canApprove" type="primary" @click="openApprove">
               <CheckCircleOutlined />
-              审批
+              审核
             </a-button>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
@@ -62,7 +62,7 @@
                 <a-descriptions-item label="订单来源">{{
                   record.orderSource || '—'
                 }}</a-descriptions-item>
-                <a-descriptions-item label="申请类型">{{
+                <a-descriptions-item label="采购类型">{{
                   record.applyType || '—'
                 }}</a-descriptions-item>
                 <a-descriptions-item label="结算类型">{{
@@ -154,6 +154,9 @@
                   <template v-else-if="column.key === 'orderSizeText'">
                     {{ line.orderSizeText || line.blankSizeText || '—' }}
                   </template>
+                  <template v-else-if="column.key === 'sourceReqNo'">
+                    {{ line.sourceReqNo || (line.sourceReqNos || []).join(',') || '—' }}
+                  </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
                     {{ formatMoney(line.unitPriceExTax) }}
                   </template>
@@ -230,14 +233,10 @@ export default { name: 'PurchaseOrderDetailView' }
 <script setup>
 import { computed, defineComponent, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Modal, message } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 import { CheckCircleOutlined } from '@ant-design/icons-vue'
 import { calcPurchaseOrderDetailSummary } from '@/mock/purchaseOrderDetail'
-import {
-  getPurchaseOrderById,
-  approvePurchaseOrder,
-  canApprovePurchaseOrder,
-} from '@/store/purchaseOrderStore'
+import { getPurchaseOrderById, canApprovePurchaseOrder } from '@/store/purchaseOrderStore'
 import { findPurchaseRequisitionByReqNo } from '@/store/purchaseRequisitionStore'
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import { workOrderState } from '@/store/workOrderStore'
@@ -319,6 +318,13 @@ const lineColumns = [
   { title: '总价（含税）', key: 'totalPriceInTax', width: 100, align: 'right' },
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 110, ellipsis: true },
+  {
+    title: '来源申请单号',
+    key: 'sourceReqNo',
+    dataIndex: 'sourceReqNo',
+    width: 160,
+    ellipsis: true,
+  },
   { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
 ]
 
@@ -403,19 +409,25 @@ function lineProductCode(line) {
 }
 
 function statusColor(status) {
-  const map = { 待审批: 'default', 进行中: 'processing', 已完成: 'success' }
+  const map = {
+    待审核: 'default',
+    进行中: 'processing',
+    已拒绝: 'error',
+    已完成: 'success',
+    已作废: 'default',
+  }
   return map[status] || 'default'
 }
 
 function inboundColor(status) {
-  const map = { 未入库: 'default', 部分入库: 'warning', 已入库: 'success' }
+  const map = { 待入库: 'default', 部分入库: 'warning', 已入库: 'success' }
   return map[status] || 'default'
 }
 
 function inboundOrderStatusColor(status) {
   const map = {
     待处理: 'default',
-    待审批: 'processing',
+    待审核: 'processing',
     已完成: 'success',
   }
   return map[status] || 'default'
@@ -475,21 +487,11 @@ function goInboundDetail(row) {
   router.push({ name: 'inventory-inbound-detail', params: { id: row.id } })
 }
 
-function handleApprove() {
+function openApprove() {
   if (!record.value) return
-  Modal.confirm({
-    title: '确认审批',
-    content: `确定审批采购单「${record.value.orderNo}」吗？`,
-    onOk: () => {
-      const result = approvePurchaseOrder(record.value.id)
-      if (result.ok) {
-        loadRecord()
-        message.success(result.message)
-      } else {
-        message.warning(result.message)
-      }
-    },
-  })
+  const path = `/procurement/purchase-orders/${record.value.id}/approve`
+  openTab(path, `审核采购单 ${record.value.orderNo || ''}`.trim())
+  router.push({ name: 'procurement-purchase-orders-approve', params: { id: record.value.id } })
 }
 </script>
 

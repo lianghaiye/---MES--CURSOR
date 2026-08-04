@@ -1,0 +1,231 @@
+/* 采购订单打印样式：预览页与 iframe 打印共用（由工单打印样式改编） */
+
+.purchase-order-print-preview-page .preview-sheet,
+.purchase-order-print-iframe-body .preview-sheet {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 18mm 14mm 16mm;
+  color: #262626;
+}
+
+.purchase-order-print-preview-page.paper-A4.orient-portrait .preview-sheet {
+  width: 210mm;
+}
+
+.purchase-order-print-preview-page.paper-A4.orient-landscape .preview-sheet {
+  width: 297mm;
+}
+
+.purchase-order-print-preview-page.paper-A3.orient-portrait .preview-sheet {
+  width: 297mm;
+}
+
+.purchase-order-print-preview-page.paper-A3.orient-landscape .preview-sheet {
+  width: 420mm;
+}
+
+.purchase-order-print-iframe-body .preview-sheet {
+  width: 100%;
+  box-shadow: none;
+  padding: 10mm 8mm;
+}
+
+.purchase-order-print-preview-page .sheet-page-break,
+.purchase-order-print-iframe-body .sheet-page-break {
+  margin-top: 8px;
+}
+
+.purchase-order-print-preview-page .sheet-header,
+.purchase-order-print-iframe-body .sheet-header {
+  text-align: center;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #262626;
+}
+
+.purchase-order-print-preview-page .sheet-title,
+.purchase-order-print-iframe-body .sheet-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.purchase-order-print-preview-page .sheet-subtitle,
+.purchase-order-print-iframe-body .sheet-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.purchase-order-print-preview-page .sheet-meta,
+.purchase-order-print-iframe-body .sheet-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 14px;
+  border: 1px solid #d9d9d9;
+}
+
+.purchase-order-print-preview-page .meta-item,
+.purchase-order-print-iframe-body .meta-item {
+  display: flex;
+  min-height: 32px;
+  border-right: 1px solid #d9d9d9;
+  border-bottom: 1px solid #d9d9d9;
+}
+
+.purchase-order-print-preview-page .meta-item:nth-child(3n),
+.purchase-order-print-iframe-body .meta-item:nth-child(3n) {
+  border-right: none;
+}
+
+.purchase-order-print-preview-page .meta-item-wide,
+.purchase-order-print-iframe-body .meta-item-wide {
+  grid-column: 1 / -1;
+  border-right: none;
+}
+
+.purchase-order-print-preview-page .meta-label,
+.purchase-order-print-iframe-body .meta-label {
+  flex: 0 0 88px;
+  padding: 6px 8px;
+  background: #fafafa;
+  border-right: 1px solid #d9d9d9;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.purchase-order-print-preview-page .meta-value,
+.purchase-order-print-iframe-body .meta-value {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.purchase-order-print-preview-page .sheet-section,
+.purchase-order-print-iframe-body .sheet-section {
+  margin-bottom: 14px;
+}
+
+.purchase-order-print-preview-page .section-title,
+.purchase-order-print-iframe-body .section-title {
+  margin-bottom: 8px;
+  padding-left: 8px;
+  border-left: 3px solid #262626;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.purchase-order-print-preview-page .table-wrap,
+.purchase-order-print-iframe-body .table-wrap {
+  overflow-x: auto;
+}
+
+.purchase-order-print-preview-page .sheet-table,
+.purchase-order-print-iframe-body .sheet-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  table-layout: fixed;
+}
+
+.purchase-order-print-preview-page .sheet-table th,
+.purchase-order-print-preview-page .sheet-table td,
+.purchase-order-print-iframe-body .sheet-table th,
+.purchase-order-print-iframe-body .sheet-table td {
+  border: 1px solid #d9d9d9;
+  padding: 5px 6px;
+  text-align: left;
+  word-break: break-word;
+}
+
+.purchase-order-print-preview-page .sheet-table th,
+.purchase-order-print-iframe-body .sheet-table th {
+  background: #fafafa;
+  font-weight: 600;
+}
+
+.purchase-order-print-preview-page .sheet-table .cell-index,
+.purchase-order-print-iframe-body .sheet-table .cell-index {
+  width: 40px;
+  text-align: center;
+}
+
+.purchase-order-print-preview-page .process-table,
+.purchase-order-print-iframe-body .process-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.purchase-order-print-preview-page .process-table th:first-child,
+.purchase-order-print-preview-page .process-table td:first-child,
+.purchase-order-print-iframe-body .process-table th:first-child,
+.purchase-order-print-iframe-body .process-table td:first-child {
+  width: 48px;
+  text-align: center;
+}
+
+.purchase-order-print-preview-page .process-table .col-process-content,
+.purchase-order-print-iframe-body .process-table .col-process-content {
+  width: 22%;
+  min-width: 120px;
+}
+
+.purchase-order-print-preview-page .process-table .col-feeding,
+.purchase-order-print-iframe-body .process-table .col-feeding {
+  width: 26%;
+  min-width: 140px;
+}
+
+.purchase-order-print-preview-page .bom-table .cell-num,
+.purchase-order-print-iframe-body .bom-table .cell-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.purchase-order-print-preview-page .bom-empty,
+.purchase-order-print-iframe-body .bom-empty {
+  padding: 10px 12px;
+  border: 1px dashed #d9d9d9;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  background: #fafafa;
+}
+
+.purchase-order-print-preview-page .sheet-footer,
+.purchase-order-print-iframe-body .sheet-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 10px;
+  border-top: 1px dashed #d9d9d9;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.purchase-order-print-preview-page .sheet-footer .footer-sign,
+.purchase-order-print-iframe-body .sheet-footer .footer-sign {
+  white-space: nowrap;
+}
+
+@media print {
+  .purchase-order-print-preview-page .sheet-page-break,
+  .purchase-order-print-iframe-body .sheet-page-break {
+    page-break-before: always;
+    margin-top: 0;
+  }
+
+  .purchase-order-print-preview-page .preview-sheet,
+  .purchase-order-print-iframe-body .preview-sheet {
+    box-shadow: none;
+    width: 100% !important;
+    padding: 10mm 8mm;
+  }
+}

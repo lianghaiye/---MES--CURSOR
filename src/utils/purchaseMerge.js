@@ -14,13 +14,21 @@ export function recalcMergedLine(line) {
   return line
 }
 
-/** 物料编码 + 供应商名称 作为合并键 */
-export function mergeKey(materialCode, supplierName) {
-  return `${materialCode || ''}@@${supplierName || ''}`
+/** 解析申请明细行的销售单号（行级优先，回退单据头） */
+export function resolvePrLineSalesOrderNo(line, req) {
+  return String(line?.salesOrderNo || req?.salesOrderNo || '').trim()
 }
 
 /**
- * 从多条采购申请中抽取明细并按物料编码+供应商合并
+ * 物料编码 + 供应商 + 销售单号 作为合并键
+ * 不同销售订单的同物料不同行，避免数量与来源被打散合并
+ */
+export function mergeKey(materialCode, supplierName, salesOrderNo = '') {
+  return `${materialCode || ''}@@${supplierName || ''}@@${salesOrderNo || ''}`
+}
+
+/**
+ * 从多条采购申请中抽取明细并按物料编码+供应商+销售单号合并
  * @returns {Array} 合并后的行，含 sourceReqNos / sourceSalesOrderNos
  */
 export function mergeRequisitionLines(requisitions) {
@@ -29,7 +37,8 @@ export function mergeRequisitionLines(requisitions) {
   requisitions.forEach((req) => {
     ;(req.lineItems || []).forEach((line) => {
       const supplier = line.supplierName || ''
-      const key = mergeKey(line.inventoryCode, supplier)
+      const salesOrderNo = resolvePrLineSalesOrderNo(line, req)
+      const key = mergeKey(line.inventoryCode, supplier, salesOrderNo)
       const existing = bucket.get(key)
 
       if (!existing) {
@@ -65,7 +74,7 @@ export function mergeRequisitionLines(requisitions) {
           orderSize: line.orderSize ?? line.blankSize ?? null,
           orderSizeMode: line.orderSizeMode || line.blankSizeMode || '',
           sourceReqNos: [req.reqNo],
-          sourceSalesOrderNos: req.salesOrderNo ? [req.salesOrderNo] : [],
+          sourceSalesOrderNos: salesOrderNo ? [salesOrderNo] : [],
           sourceReqIds: [req.id],
           remark: line.remark || '',
         })
@@ -90,8 +99,8 @@ export function mergeRequisitionLines(requisitions) {
         existing.sourceReqNos.push(req.reqNo)
         existing.sourceReqIds.push(req.id)
       }
-      if (req.salesOrderNo && !existing.sourceSalesOrderNos.includes(req.salesOrderNo)) {
-        existing.sourceSalesOrderNos.push(req.salesOrderNo)
+      if (salesOrderNo && !existing.sourceSalesOrderNos.includes(salesOrderNo)) {
+        existing.sourceSalesOrderNos.push(salesOrderNo)
       }
     })
   })

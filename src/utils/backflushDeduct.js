@@ -1,19 +1,23 @@
 /**
- * 倒冲扣减：完工时按 BOM 中「领料属性=关」物料生成库存扣减明细
+ * 工单完工库存扣减：按 BOM 同时带出领料件与倒冲件（一张工单维度单据）
+ * - 领料申请仍排除倒冲件
+ * - 完工扣减单按发料方式区分；倒冲件始终参与扣减；领料件仅在「按报工数量扣」模式下参与扣减
  */
 
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getWarehouseSelectOptions } from '@/store/warehouseStore'
 import { warehouseState } from '@/store/warehouseStore'
-import { resolveWorkOrderBackflushLines } from '@/utils/materialReqEbom'
+import { resolveWorkOrderAllMaterialLines } from '@/utils/materialReqEbom'
+import { isBackflushMaterial } from '@/utils/backflushMaterial'
 import { getStockQty } from '@/store/stockStore'
+import { getInventoryDeductMode, INVENTORY_DEDUCT_MODES } from '@/store/functionParamStore'
 
 function lookupMaterial(code) {
   if (!code) return null
   return materialInfoState.materials.find((m) => m.code === code) || null
 }
 
-/** 默认倒冲仓：优先线边仓 */
+/** 默认完工扣减仓：优先线边仓 / 工单收料仓 */
 export function resolveBackflushWarehouse(workOrder = {}) {
   const preferred = workOrder.receiveWarehouse || workOrder.lineWarehouse || ''
   if (preferred) {
@@ -40,17 +44,31 @@ function resolveWarehouseCode(name) {
   return hit?.code || ''
 }
 
+export function resolveLineIssueMode(line, material) {
+  if (line?.isBackflush || line?.issueMode === '倒冲') return '倒冲'
+  if (isBackflushMaterial(material) || isBackflushMaterial(line)) return '倒冲'
+  return '领料'
+}
+
+/** 该行是否在完工扣减单中实际扣库存 */
+export function isCompletionDeductLineDeductible(line, deductMode = getInventoryDeductMode()) {
+  const mode = line?.issueMode || (line?.isBackflush ? '倒冲' : '领料')
+  if (mode === '倒冲') return true
+  // 领料件：仅「完工后按报工数量扣」时在本单扣减；自主领料已通过领料出库扣过
+  return deductMode === INVENTORY_DEDUCT_MODES.POST_COMPLETE_BY_REPORT
+}
+
 /**
- * 从工单 BOM 收集倒冲件及应扣数量
- * @returns {Array}
+ * 从工单 BOM 收集领料件 + 倒冲件及应扣数量
  */
-export function collectBackflushDeductLines(workOrder, finishedQty) {
+export function collectWorkOrderCompletionDeductLines(workOrder, finishedQty) {
   const qty =
     Number(finishedQty) || Number(workOrder?.scheduleQty) || Number(workOrder?.planQty) || 0
   if (!(qty > 0) || !workOrder) return []
 
-  // BOM 行按工单计划数量展开；倒冲按完工数量 = 单位用量 × 完工数
-  const bomLines = resolveWorkOrderBackflushLines({
+  const deductMode = getInventoryDeductMode()
+  // BOM 行按单位用量展开；完工数量 = 单位用量 × 完工数
+  const bomLines = resolveWorkOrderAllMaterialLines({
     ...workOrder,
     scheduleQty: 1,
   })
@@ -59,13 +77,17 @@ export function collectBackflushDeductLines(workOrder, finishedQty) {
   const { warehouseName } = resolveBackflushWarehouse(workOrder)
   for (const bl of bomLines) {
     const code = bl.itemCode || bl.materialCode || ''
+    if (!code) continue
     const mat = lookupMaterial(code)
+    const issueMode = resolveLineIssueMode(bl, mat)
+    const isBackflush = issueMode === '倒冲'
     const unitUsage = Number(bl.unitUsage) || Number(bl.unitQty) || Number(bl.shipQty) || 1
     const planQty = Math.round(unitUsage * qty * 1000) / 1000
     if (!(planQty > 0)) continue
+    const deductible = isCompletionDeductLineDeductible({ issueMode, isBackflush }, deductMode)
     const stock = getStockQty(warehouseName, code)
     lines.push({
-      id: `bf-line-${code}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      id: `wo-deduct-line-${code}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
       materialCode: code,
       materialName: bl.itemName || mat?.name || code,
       specModel: bl.specModel || mat?.specModel || '',
@@ -79,7 +101,9 @@ export function collectBackflushDeductLines(workOrder, finishedQty) {
       status: '待确认',
       failReason: '',
       warehouseStockQty: stock,
-      isBackflush: true,
+      issueMode,
+      isBackflush,
+      deductible,
       unit: bl.unit || mat?.inventoryUnit || mat?.stockUnit || '个',
       unitUsage,
     })
@@ -87,17 +111,24 @@ export function collectBackflushDeductLines(workOrder, finishedQty) {
   return lines
 }
 
+/** @deprecated 兼容旧调用：仅倒冲行 */
+export function collectBackflushDeductLines(workOrder, finishedQty) {
+  return collectWorkOrderCompletionDeductLines(workOrder, finishedQty).filter((l) => l.isBackflush)
+}
+
 /**
- * 构建倒冲扣减单草稿（未写入 store）
+ * 构建工单完工扣减单草稿（领料+倒冲同单，未写入 store）
  */
-export function buildBackflushDeductDraft(workOrder, finishedQty) {
+export function buildWorkOrderCompletionDeductDraft(workOrder, finishedQty) {
   const reportQty =
     Number(finishedQty) || Number(workOrder?.scheduleQty) || Number(workOrder?.planQty) || 0
-  const lines = collectBackflushDeductLines(workOrder, reportQty)
+  const lines = collectWorkOrderCompletionDeductLines(workOrder, reportQty)
   if (!lines.length) {
-    return { ok: false, message: '该工单无倒冲件（领料属性关闭的物料）', lines: [] }
+    return { ok: false, message: '该工单 BOM 无下级物料', lines: [] }
   }
   const wh = resolveBackflushWarehouse(workOrder)
+  const backflushCount = lines.filter((l) => l.isBackflush).length
+  const issueCount = lines.length - backflushCount
   return {
     ok: true,
     draft: {
@@ -110,10 +141,16 @@ export function buildBackflushDeductDraft(workOrder, finishedQty) {
       reportQty,
       warehouseName: wh.warehouseName,
       warehouseCode: wh.warehouseCode,
-      deductSource: 'backflush',
+      // 统一为工单来源，不再单独出「倒冲」单据
+      deductSource: 'work_order',
       requisitionMode: 'work-order',
       lines,
-      remark: `工单完工倒冲（报工/完工数量 ${reportQty}）`,
+      remark: `工单完工扣减（报工/完工数量 ${reportQty}；领料 ${issueCount} / 倒冲 ${backflushCount}）`,
     },
   }
+}
+
+/** @deprecated 兼容旧调用 */
+export function buildBackflushDeductDraft(workOrder, finishedQty) {
+  return buildWorkOrderCompletionDeductDraft(workOrder, finishedQty)
 }

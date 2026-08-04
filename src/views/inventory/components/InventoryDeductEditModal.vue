@@ -32,7 +32,7 @@
       size="small"
       bordered
       :pagination="false"
-      :scroll="{ x: 1080 }"
+      :scroll="{ x: 1180 }"
     >
       <template #headerCell="{ column }">
         <template v-if="column.key === 'stockDisplay'">
@@ -46,7 +46,18 @@
         <template v-else>{{ column.title }}</template>
       </template>
       <template #bodyCell="{ column, record, index }">
-        <template v-if="column.key === 'blankSizeText'">
+        <template v-if="column.key === 'issueMode'">
+          <a-tag
+            :color="
+              (record.issueMode || (record.isBackflush ? '倒冲' : '领料')) === '倒冲'
+                ? 'orange'
+                : 'blue'
+            "
+          >
+            {{ record.issueMode || (record.isBackflush ? '倒冲' : '领料') }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'blankSizeText'">
           {{ record.blankSizeText || '—' }}
         </template>
         <template v-else-if="column.key === 'stockDisplay'">
@@ -59,6 +70,7 @@
             :precision="3"
             size="small"
             style="width: 100%"
+            :disabled="record.deductible === false"
           />
         </template>
         <template v-else-if="column.key === 'action'">
@@ -118,6 +130,7 @@ const selectedWarehouseName = computed(() => {
 const columns = [
   { title: '物料编码', dataIndex: 'materialCode', key: 'materialCode', width: 110 },
   { title: '物料名称', dataIndex: 'materialName', key: 'materialName', width: 120 },
+  { title: '发料方式', key: 'issueMode', width: 88 },
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 100, ellipsis: true },
   { title: '材质', dataIndex: 'material', key: 'material', width: 80, ellipsis: true },
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 100, ellipsis: true },

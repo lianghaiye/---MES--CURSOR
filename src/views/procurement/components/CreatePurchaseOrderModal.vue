@@ -27,6 +27,11 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
+                <a-form-item label="采购类型">
+                  <a-select v-model:value="form.applyType" size="small" :options="applyTypeOpts" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
                 <a-form-item label="供应商" required>
                   <PlanSupplierSelect
                     v-model:value="form.supplier"
@@ -207,6 +212,14 @@
                 <PlusOutlined />
                 选择产品
               </a-button>
+              <a-button
+                v-if="canReassignSupplier"
+                size="small"
+                :disabled="!selectedLineKeys.length"
+                @click="openReassignSupplier"
+              >
+                更换供应商
+              </a-button>
               <a-button class="tax-toggle-btn" size="small" @click="toggleTaxMode">
                 切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
               </a-button>
@@ -230,6 +243,7 @@
                 bordered
                 :pagination="false"
                 :scroll="lineTableScroll"
+                :row-selection="lineRowSelection"
               >
                 <template #bodyCell="{ column, record, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -324,7 +338,9 @@
                     </InventoryLineEditableCell>
                   </template>
                   <template v-else-if="column.key === 'orderSizeText'">
-                    {{ record.orderSizeText || record.blankSizeText || '—' }}
+                    <a class="order-size-link" @click.prevent="openOrderSizeEdit(record)">
+                      {{ record.orderSizeText || record.blankSizeText || '填写订货尺寸' }}
+                    </a>
                   </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
                     <InventoryLineEditableCell
@@ -571,6 +587,34 @@
     :default-settings="defaultColumnSettings"
     title="采购清单列设置"
   />
+
+  <a-modal
+    v-model:open="reassignSupplierOpen"
+    title="更换供应商"
+    ok-text="确认拆出"
+    cancel-text="取消"
+    :confirm-loading="reassigning"
+    destroy-on-close
+    @ok="confirmReassignSupplier"
+  >
+    <p class="reassign-hint">
+      已选
+      {{ selectedLineKeys.length }}
+      行明细，将从当前采购单拆出；若已有同供应商「待审核」采购单则并入，否则新建。
+    </p>
+    <a-form layout="vertical">
+      <a-form-item label="新供应商" required>
+        <PlanSupplierSelect v-model:value="reassignSupplierName" placeholder="请搜索或选择供应商" />
+      </a-form-item>
+    </a-form>
+  </a-modal>
+
+  <BomBlankSizeModal
+    v-model:open="orderSizeOpen"
+    purpose="order"
+    :line="orderSizeModalLine"
+    @confirm="onOrderSizeConfirm"
+  />
 </template>
 
 <script setup>
@@ -587,6 +631,7 @@ import {
   contactOptions,
   purchaserOptions,
   warehouseOptions,
+  applyTypeOptions,
 } from '@/mock/purchaseOrderOptions'
 import { mockInventory } from '@/mock/inventory'
 import { createPoLineItem } from '@/mock/purchaseOrders'
@@ -599,8 +644,13 @@ import {
   generatePurchaseOrderNo,
   recalcPoLine,
   updatePurchaseOrder,
+  reassignPoLinesToSupplier,
+  canEditPurchaseOrder,
+  getPurchaseOrderById,
 } from '@/store/purchaseOrderStore'
+import { appendPurchaseOrderNos } from '@/store/purchaseRequisitionStore'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import BomBlankSizeModal from '@/views/product-process/components/BomBlankSizeModal.vue'
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
@@ -624,6 +674,7 @@ import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTable
 import { useInventoryLineCellEdit } from '@/composables/useInventoryLineCellEdit'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { purchaseOrderFormLineColumns } from '@/utils/purchaseOrderLineColumns'
+import { applyOrderSizeToLine, toOrderSizeModalLine } from '@/utils/orderSize'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -648,6 +699,25 @@ const prevHeaderReceivingWarehouse = ref(undefined)
 const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
 const lineEditSourceId = ref(null)
+const selectedLineKeys = ref([])
+const reassignSupplierOpen = ref(false)
+const reassignSupplierName = ref('')
+const reassigning = ref(false)
+const orderSizeOpen = ref(false)
+const orderSizeTargetLine = ref(null)
+const orderSizeModalLine = computed(() => toOrderSizeModalLine(orderSizeTargetLine.value))
+
+const canReassignSupplier = computed(() => isEdit.value && canEditPurchaseOrder(props.editRecord))
+
+const lineRowSelection = computed(() => {
+  if (!canReassignSupplier.value) return null
+  return {
+    selectedRowKeys: selectedLineKeys.value,
+    onChange: (keys) => {
+      selectedLineKeys.value = keys
+    },
+  }
+})
 const {
   variantConfigOpen,
   variantConfigSpuId,
@@ -661,6 +731,7 @@ const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: 
 const settlementCycleOpts = settlementCycleOptions.map((v) => ({ label: v, value: v }))
 const settlementMethodOpts = settlementMethodOptions.map((v) => ({ label: v, value: v }))
 const deliveryMethodOpts = deliveryMethodOptions.map((v) => ({ label: v, value: v }))
+const applyTypeOpts = applyTypeOptions.map((v) => ({ label: v, value: v }))
 const purchaserOpts = purchaserOptions.map((v) => ({ label: v, value: v }))
 const contactOpts = contactOptions.map((c) => ({ label: c.label, value: c.value, phone: c.phone }))
 const warehouseOpts = warehouseOptions
@@ -691,6 +762,7 @@ const lineScrollX = tableScrollX
 
 const form = reactive({
   orderNo: '',
+  applyType: '日常采购',
   supplier: '',
   settlementType: '先款后货',
   settlementCycle: '月结',
@@ -762,6 +834,7 @@ watch(
   ([visible]) => {
     if (!visible) return
     taxModeExcluding.value = true
+    selectedLineKeys.value = []
     if (props.editRecord) loadEditForm(props.editRecord)
     else resetForm()
   },
@@ -790,6 +863,7 @@ function syncHeaderTrackers() {
 
 function resetForm() {
   form.orderNo = ''
+  form.applyType = '日常采购'
   form.supplier = ''
   form.settlementType = '先款后货'
   form.settlementCycle = '月结'
@@ -809,11 +883,13 @@ function resetForm() {
   form.purchaser = 'admin1'
   form.remark = ''
   form.lineItems = []
+  selectedLineKeys.value = []
   syncHeaderTrackers()
 }
 
 function loadEditForm(record) {
   form.orderNo = record.orderNo
+  form.applyType = record.applyType || '日常采购'
   form.supplier = record.supplier
   form.settlementType = record.settlementType
   form.settlementCycle = record.settlementCycle
@@ -1128,12 +1204,142 @@ function toggleTaxMode() {
 function removeLine(id) {
   const idx = form.lineItems.findIndex((l) => l.id === id)
   if (idx >= 0) form.lineItems.splice(idx, 1)
+  selectedLineKeys.value = selectedLineKeys.value.filter((k) => k !== id)
+}
+
+function openReassignSupplier() {
+  if (!canReassignSupplier.value) {
+    message.warning('仅待审核 / 已拒绝的采购单可更换供应商')
+    return
+  }
+  if (!selectedLineKeys.value.length) {
+    message.warning('请先勾选要更换供应商的明细')
+    return
+  }
+  reassignSupplierName.value = ''
+  reassignSupplierOpen.value = true
+}
+
+function buildSavePayload() {
+  form.lineItems.forEach((line) => {
+    recalcLineWithMode(line)
+    line.productName = line.productName || line.itemName || ''
+    line.productCode = line.productCode || line.itemCode || ''
+    line.itemName = line.productName
+    line.itemCode = line.productCode
+    if (!line.deliveryDate) {
+      line.deliveryDate = headerDeliveryDateStr()
+    }
+    if (!line.receivingWarehouse && form.receivingWarehouse) {
+      line.receivingWarehouse = form.receivingWarehouse
+    }
+  })
+
+  const orderNo = form.orderNo?.trim() || generatePurchaseOrderNo()
+  return {
+    ...JSON.parse(JSON.stringify(form)),
+    orderNo,
+    reqNo: props.editRecord?.reqNo || '',
+    deliveryDate: form.deliveryDate ? form.deliveryDate.format('YYYY-MM-DD') : '',
+    reminderDate: form.reminderDate ? form.reminderDate.format('YYYY-MM-DD') : '',
+    receivingWarehouse: form.receivingWarehouse || '',
+    documentDate: props.editRecord?.documentDate || dayjs().format('YYYY-MM-DD'),
+    orderSource: props.editRecord?.orderSource || '新增',
+    applyType: props.editRecord?.applyType || form.applyType || '日常采购',
+    status: props.editRecord?.status || '待审核',
+    approvalResult: props.editRecord?.approvalResult || '待审核',
+    approverName: props.editRecord?.approverName || '',
+    inboundStatus: props.editRecord?.inboundStatus || '待入库',
+    creator: props.editRecord?.creator || 'admin1',
+    createdAt: props.editRecord?.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
+    totalQty: form.lineItems.reduce((s, i) => s + (Number(i.purchaseQty) || 0), 0),
+    amountExTax: form.lineItems.reduce((s, i) => s + (Number(i.totalPriceExTax) || 0), 0),
+    amountInTax: form.lineItems.reduce((s, i) => s + (Number(i.totalPriceInTax) || 0), 0),
+  }
+}
+
+function syncFormToStore() {
+  if (!props.editRecord?.id) return false
+  const payload = buildSavePayload()
+  updatePurchaseOrder(props.editRecord.id, payload)
+  return true
+}
+
+function confirmReassignSupplier() {
+  const supplier = (reassignSupplierName.value || '').trim()
+  if (!supplier) {
+    message.warning('请选择新供应商')
+    return Promise.reject()
+  }
+  if (!props.editRecord?.id) {
+    message.warning('请先保存采购单后再更换供应商')
+    return Promise.reject()
+  }
+  if (!form.deliveryDate) {
+    message.warning('请先填写交货日期并保存后再更换供应商')
+    return Promise.reject()
+  }
+
+  reassigning.value = true
+  try {
+    syncFormToStore()
+    const res = reassignPoLinesToSupplier(props.editRecord.id, selectedLineKeys.value, supplier)
+    if (!res.ok) {
+      message.warning(res.message || '更换供应商失败')
+      return Promise.reject()
+    }
+
+    if (res.created && res.target?.orderNo) {
+      appendPurchaseOrderNos(res.target.reqNo || props.editRecord.reqNo, [res.target.orderNo])
+    }
+
+    selectedLineKeys.value = []
+    reassignSupplierOpen.value = false
+    message.success(res.message)
+
+    if (res.sourceDeleted) {
+      emit('saved', {
+        isEdit: true,
+        id: props.editRecord.id,
+        data: null,
+        reassigned: true,
+        sourceDeleted: true,
+        targetOrderNo: res.target?.orderNo,
+      })
+      closeAfterSave()
+      return
+    }
+
+    const latest = getPurchaseOrderById(props.editRecord.id) || res.source
+    if (latest) loadEditForm(latest)
+    emit('saved', {
+      isEdit: true,
+      id: props.editRecord.id,
+      data: latest,
+      reassigned: true,
+      targetOrderNo: res.target?.orderNo,
+    })
+  } finally {
+    reassigning.value = false
+  }
 }
 
 function openLineEdit(record) {
   lineEditSourceId.value = record.id
   lineEditTarget.value = { ...record }
   lineEditOpen.value = true
+}
+
+function openOrderSizeEdit(record) {
+  orderSizeTargetLine.value = record
+  orderSizeOpen.value = true
+}
+
+function onOrderSizeConfirm(payload) {
+  const line = orderSizeTargetLine.value
+  if (!line) return
+  applyOrderSizeToLine(line, payload?.blankSize ?? payload, { mode: payload?.mode })
+  message.success(line.orderSizeText ? '订货尺寸已更新' : '已清空订货尺寸')
 }
 
 function onLineEditSave(updated) {
@@ -1181,42 +1387,7 @@ function handleSave() {
     return
   }
 
-  form.lineItems.forEach((line) => {
-    recalcLineWithMode(line)
-    line.productName = line.productName || line.itemName || ''
-    line.productCode = line.productCode || line.itemCode || ''
-    line.itemName = line.productName
-    line.itemCode = line.productCode
-    if (!line.deliveryDate) {
-      line.deliveryDate = headerDeliveryDateStr()
-    }
-    if (!line.receivingWarehouse && form.receivingWarehouse) {
-      line.receivingWarehouse = form.receivingWarehouse
-    }
-  })
-
-  const orderNo = form.orderNo?.trim() || generatePurchaseOrderNo()
-
-  const payload = {
-    ...JSON.parse(JSON.stringify(form)),
-    orderNo,
-    reqNo: props.editRecord?.reqNo || '',
-    deliveryDate: form.deliveryDate.format('YYYY-MM-DD'),
-    reminderDate: form.reminderDate ? form.reminderDate.format('YYYY-MM-DD') : '',
-    receivingWarehouse: form.receivingWarehouse || '',
-    documentDate: props.editRecord?.documentDate || dayjs().format('YYYY-MM-DD'),
-    orderSource: props.editRecord?.orderSource || '新增',
-    applyType: props.editRecord?.applyType || '日常采购申请',
-    status: props.editRecord?.status || '待审批',
-    approvalResult: props.editRecord?.approvalResult || '待审批',
-    approverName: props.editRecord?.approverName || '',
-    inboundStatus: props.editRecord?.inboundStatus || '未入库',
-    creator: props.editRecord?.creator || 'admin1',
-    createdAt: props.editRecord?.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
-    totalQty: form.lineItems.reduce((s, i) => s + (Number(i.purchaseQty) || 0), 0),
-    amountExTax: form.lineItems.reduce((s, i) => s + (Number(i.totalPriceExTax) || 0), 0),
-    amountInTax: form.lineItems.reduce((s, i) => s + (Number(i.totalPriceInTax) || 0), 0),
-  }
+  const payload = buildSavePayload()
 
   if (props.pageMode) {
     if (isEdit.value) {
@@ -1378,6 +1549,23 @@ function handleSave() {
 }
 
 .variant-field-link {
+  color: #1677ff;
+  cursor: pointer;
+  word-break: break-word;
+
+  &:hover {
+    color: #4096ff;
+  }
+}
+
+.reassign-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+  line-height: 1.5;
+}
+
+.order-size-link {
   color: #1677ff;
   cursor: pointer;
   word-break: break-word;

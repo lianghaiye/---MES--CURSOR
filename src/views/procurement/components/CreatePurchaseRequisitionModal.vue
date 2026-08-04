@@ -142,7 +142,9 @@
                   />
                 </template>
                 <template v-else-if="column.key === 'orderSizeText'">
-                  {{ record.orderSizeText || record.blankSizeText || '—' }}
+                  <a class="order-size-link" @click.prevent="openOrderSizeEdit(record)">
+                    {{ record.orderSizeText || record.blankSizeText || '填写订货尺寸' }}
+                  </a>
                 </template>
                 <template v-else-if="column.key === 'planPurchaseQty'">
                   <a-input-number
@@ -231,6 +233,13 @@
     :default-settings="defaultColumnSettings"
     title="采购清单列设置"
   />
+
+  <BomBlankSizeModal
+    v-model:open="orderSizeOpen"
+    purpose="order"
+    :line="orderSizeModalLine"
+    @confirm="onOrderSizeConfirm"
+  />
 </template>
 
 <script setup>
@@ -251,6 +260,7 @@ import { materialInfoState } from '@/store/materialInfoStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 import { convertStockDemandToPurchase, purchaseQtyToStockQty } from '@/utils/purchaseUomConvert'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import BomBlankSizeModal from '@/views/product-process/components/BomBlankSizeModal.vue'
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import InventoryLineTableFooter from '@/views/inventory/components/InventoryLineTableFooter.vue'
@@ -269,6 +279,7 @@ import {
 import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTableScroll'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { purchaseRequisitionFormLineColumns } from '@/utils/purchaseRequisitionLineColumns'
+import { applyOrderSizeToLine, toOrderSizeModalLine } from '@/utils/orderSize'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -288,6 +299,9 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 const saving = ref(false)
 const addingItems = ref(false)
 const productPickerOpen = ref(false)
+const orderSizeOpen = ref(false)
+const orderSizeTargetLine = ref(null)
+const orderSizeModalLine = computed(() => toOrderSizeModalLine(orderSizeTargetLine.value))
 const {
   variantConfigOpen,
   variantConfigSpuId,
@@ -566,6 +580,18 @@ function removeLine(id) {
   form.lineItems = form.lineItems.filter((line) => line.id !== id)
 }
 
+function openOrderSizeEdit(record) {
+  orderSizeTargetLine.value = record
+  orderSizeOpen.value = true
+}
+
+function onOrderSizeConfirm(payload) {
+  const line = orderSizeTargetLine.value
+  if (!line) return
+  applyOrderSizeToLine(line, payload?.blankSize ?? payload, { mode: payload?.mode })
+  message.success(line.orderSizeText ? '订货尺寸已更新' : '已清空订货尺寸')
+}
+
 function handleSave() {
   if (!form.estimatedArrivalDate) {
     message.warning('请选择期望到货日期')
@@ -733,6 +759,16 @@ function handleSave() {
 }
 
 .variant-field-link {
+  color: #1677ff;
+  cursor: pointer;
+  word-break: break-word;
+
+  &:hover {
+    color: #4096ff;
+  }
+}
+
+.order-size-link {
   color: #1677ff;
   cursor: pointer;
   word-break: break-word;

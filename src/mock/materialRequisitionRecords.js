@@ -6,6 +6,8 @@ export const MATERIAL_DEDUCT_STATUS = {
   PARTIAL: '部分成功',
   VOIDED: '已作废',
   PENDING: '待确认',
+  /** 领料展示行：同单展示但不在本单扣库存 */
+  SKIPPED: '无需扣减',
 }
 
 export const MATERIAL_DEDUCT_STATUS_OPTIONS = [
@@ -14,6 +16,7 @@ export const MATERIAL_DEDUCT_STATUS_OPTIONS = [
   { label: '成功', value: MATERIAL_DEDUCT_STATUS.SUCCESS },
   { label: '部分成功', value: MATERIAL_DEDUCT_STATUS.PARTIAL },
   { label: '失败', value: MATERIAL_DEDUCT_STATUS.FAILED },
+  { label: '无需扣减', value: MATERIAL_DEDUCT_STATUS.SKIPPED },
   { label: '已作废', value: MATERIAL_DEDUCT_STATUS.VOIDED },
 ]
 
@@ -42,14 +45,14 @@ export const MATERIAL_DEDUCT_SOURCES = {
 
 export const MATERIAL_DEDUCT_SOURCE_OPTIONS = [
   { label: '全部', value: '' },
-  { label: '工单领料', value: MATERIAL_DEDUCT_SOURCES.WORK_ORDER },
+  { label: '工单', value: MATERIAL_DEDUCT_SOURCES.WORK_ORDER },
   { label: '快速领料', value: MATERIAL_DEDUCT_SOURCES.QUICK },
-  { label: '倒冲', value: MATERIAL_DEDUCT_SOURCES.BACKFLUSH },
+  { label: '倒冲（历史）', value: MATERIAL_DEDUCT_SOURCES.BACKFLUSH },
   { label: '手工', value: MATERIAL_DEDUCT_SOURCES.MANUAL },
 ]
 
 export const MATERIAL_DEDUCT_SOURCE_LABELS = {
-  [MATERIAL_DEDUCT_SOURCES.WORK_ORDER]: '工单领料',
+  [MATERIAL_DEDUCT_SOURCES.WORK_ORDER]: '工单',
   [MATERIAL_DEDUCT_SOURCES.QUICK]: '快速领料',
   [MATERIAL_DEDUCT_SOURCES.BACKFLUSH]: '倒冲',
   [MATERIAL_DEDUCT_SOURCES.MANUAL]: '手工',
@@ -63,7 +66,7 @@ export function resolveDeductSource(record) {
 }
 
 export function resolveDeductSourceLabel(record) {
-  return MATERIAL_DEDUCT_SOURCE_LABELS[resolveDeductSource(record)] || '工单领料'
+  return MATERIAL_DEDUCT_SOURCE_LABELS[resolveDeductSource(record)] || '工单'
 }
 
 export function isQuickMaterialDeduct(record) {
@@ -94,6 +97,8 @@ function line(
   warehouseStockQty = 999,
   extra = {},
 ) {
+  const isBackflush = Boolean(extra.isBackflush || extra.issueMode === '倒冲')
+  const issueMode = extra.issueMode || (isBackflush ? '倒冲' : '领料')
   return {
     id,
     materialCode: code,
@@ -106,7 +111,9 @@ function line(
     blankSize: extra.blankSize ?? null,
     blankSizeText: extra.blankSizeText ?? '',
     blankSizeMode: extra.blankSizeMode ?? '',
-    isBackflush: Boolean(extra.isBackflush),
+    isBackflush,
+    issueMode,
+    deductible: extra.deductible != null ? Boolean(extra.deductible) : true,
     planQty,
     actualQty,
     status,
@@ -500,10 +507,10 @@ export function createMaterialRequisitionSeed() {
       workOrderNo: 'WO202505280-003',
       workOrderId: 'wo-init-3',
       requisitionMode: 'work-order',
-      deductSource: 'backflush',
+      deductSource: 'work_order',
       deductNo: 'DR-20260728-BF01',
       productName: '定子铁芯组件',
-      productSpec: '',
+      productSpec: 'CP2510003',
       material: '',
       drawingNo: '',
       reportQty: 18,
@@ -514,17 +521,135 @@ export function createMaterialRequisitionSeed() {
       materialTotal: 2,
       status: S.PENDING,
       stockPhase: 'prelock',
-      remark: '工单完工倒冲（报工/完工数量 18）',
+      remark: '工单完工扣减（报工 18；领料 3 展示 / 倒冲 2 预扣）',
       lines: [
+        line('dr-bf-001-0', 'M-061', '定子冲片', 18, 0, S.PENDING, '', 999, {
+          specModel: 'Φ180',
+          material: '硅钢',
+          issueMode: '领料',
+          deductible: false,
+        }),
+        line('dr-bf-001-0b', 'M-062', '定子线圈', 18, 0, S.PENDING, '', 999, {
+          specModel: 'QZ-2.0',
+          material: '铜',
+          issueMode: '领料',
+          deductible: false,
+        }),
+        line('dr-bf-001-0c', 'M-063', '绝缘漆', 9, 0, S.PENDING, '', 999, {
+          specModel: 'H级',
+          material: '树脂',
+          issueMode: '领料',
+          deductible: false,
+        }),
         line('dr-bf-001-1', 'MAT-STD-100', '标准螺栓组', 144, 0, S.PENDING, '', 200, {
           specModel: 'M12×40',
           material: '钢',
           isBackflush: true,
+          issueMode: '倒冲',
+          deductible: true,
         }),
         line('dr-bf-001-2', 'MAT-STD-WASHER', '平垫圈 M12', 144, 0, S.PENDING, '', 300, {
           specModel: 'M12',
           material: '钢',
           isBackflush: true,
+          issueMode: '倒冲',
+          deductible: true,
+        }),
+      ],
+    },
+    {
+      id: 'dr-wo-004',
+      workOrderNo: 'WO20260715-004',
+      workOrderId: 'wo-init-4',
+      requisitionMode: 'work-order',
+      deductSource: 'work_order',
+      deductNo: 'DR-20260715-004',
+      productName: '泵体铸件',
+      productSpec: 'CP2510004',
+      material: 'HT250',
+      drawingNo: 'DWG-PB-004',
+      reportQty: 10,
+      deductTime: '2026-07-15 16:40:12',
+      confirmedAt: '2026-07-15 16:40:12',
+      warehouseName: '库线边仓',
+      warehouseCode: 'CKGL#20251114#004',
+      materialDone: 2,
+      materialTotal: 2,
+      status: S.SUCCESS,
+      stockPhase: 'actual',
+      remark: '工单完工扣减已确认（领料无需扣减 / 倒冲实扣成功）',
+      lines: [
+        line('dr-wo-004-1', 'M-001', '泵体铸件毛坯', 10, 0, S.SKIPPED, '', 999, {
+          specModel: 'HT250',
+          material: 'HT250',
+          issueMode: '领料',
+          deductible: false,
+        }),
+        line('dr-wo-004-2', 'M-003', '机械密封', 10, 0, S.SKIPPED, '', 999, {
+          specModel: '104-55',
+          material: '碳化硅',
+          issueMode: '领料',
+          deductible: false,
+        }),
+        line('dr-wo-004-3', 'MAT-STD-100', '标准螺栓组', 60, 60, S.SUCCESS, '', 200, {
+          specModel: 'M12×40',
+          material: '钢',
+          isBackflush: true,
+          issueMode: '倒冲',
+          deductible: true,
+        }),
+        line('dr-wo-004-4', 'MAT-STD-WASHER', '平垫圈 M12', 60, 60, S.SUCCESS, '', 300, {
+          specModel: 'M12',
+          material: '钢',
+          isBackflush: true,
+          issueMode: '倒冲',
+          deductible: true,
+        }),
+      ],
+    },
+    {
+      id: 'dr-wo-005',
+      workOrderNo: 'WO20260801-005',
+      workOrderId: 'wo-init-5',
+      requisitionMode: 'work-order',
+      deductSource: 'work_order',
+      deductNo: 'DR-20260801-005',
+      productName: '叶轮组件',
+      productSpec: 'CP2510005',
+      material: '',
+      drawingNo: '',
+      reportQty: 6,
+      deductTime: '2026-08-01 11:05:44',
+      confirmedAt: '2026-08-01 11:05:44',
+      warehouseName: '原料仓',
+      warehouseCode: 'WH-01',
+      materialDone: 0,
+      materialTotal: 1,
+      status: S.PARTIAL,
+      stockPhase: 'actual',
+      remark: '工单完工扣减：倒冲螺栓库存不足失败，领料行无需扣减',
+      lines: [
+        line('dr-wo-005-1', 'M-012', '切割叶轮', 6, 0, S.SKIPPED, '', 999, {
+          specModel: 'WQ-φ220',
+          material: 'HT250',
+          issueMode: '领料',
+          deductible: false,
+        }),
+        line('dr-wo-005-2', 'M-005', '轴', 6, 0, S.SKIPPED, '', 999, {
+          specModel: 'φ45×480',
+          material: '45#钢',
+          blankSizeMode: 'length',
+          blankSize: { length: 480, lengthUnit: 'mm' },
+          blankSizeText: '长 480 mm',
+          issueMode: '领料',
+          deductible: false,
+        }),
+        line('dr-wo-005-3', 'MAT-STD-100', '标准螺栓组', 72, 0, S.FAILED, '库存不足', 20, {
+          specModel: 'M12×40',
+          material: '钢',
+          isBackflush: true,
+          issueMode: '倒冲',
+          deductible: true,
         }),
       ],
     },

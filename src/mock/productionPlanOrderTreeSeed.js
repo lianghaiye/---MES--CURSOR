@@ -190,6 +190,7 @@ export function createProductionPlanOrderTreeDemoRequisitions() {
           demandQty: m.demandQty || 1,
           planPurchaseQty: m.planQty || m.demandQty || 1,
           deliveryDate: plan.deliveryDate || '',
+          salesOrderNo: plan.orderNo || '',
         }),
       ],
     },

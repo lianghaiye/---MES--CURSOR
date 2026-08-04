@@ -95,7 +95,229 @@ function ensureDemoWorkOrder(orders) {
   if (!orders.some((o) => o.id === DEMO_ORDER_ID)) {
     orders.unshift(createDemoWorkOrder())
   }
-  return orders
+  return ensureCompletionDeductDemoWorkOrders(orders)
+}
+
+/** 完工扣减演示工单：领料+倒冲同 BOM，强制覆盖本地旧数据 */
+const COMPLETION_DEDUCT_DEMO_WO_IDS = ['wo-init-3', 'wo-init-4', 'wo-init-5']
+
+function createCompletionDeductDemoWorkOrders() {
+  const routeName = '机加标准路线'
+  return [
+    {
+      id: 'wo-init-3',
+      code: 'WO202505280-003',
+      name: '定子铁芯组件生产工单',
+      productName: '定子铁芯组件',
+      materialCode: 'CP2510003',
+      orderCategory: '生产工单',
+      status: '完成',
+      scheduleQty: 18,
+      planQty: 18,
+      finishedQty: 18,
+      workCenter: '装配车间',
+      bom: '潜水电机',
+      warehouse: '成品仓',
+      receiveWarehouse: '库线边仓',
+      urgency: '普通',
+      planDateRange: ['2026-05-01', '2026-05-20'],
+      remark: '完工扣减演示：待确认（领料展示+倒冲预扣）',
+      processRouteName: '装配标准路线',
+      source: 'manual',
+      sourceOrderNo: 'SO202505003',
+      componentLines: [
+        {
+          id: 'wo3-issue-lam',
+          itemCode: 'M-061',
+          itemName: '定子冲片',
+          specModel: 'Φ180',
+          material: '硅钢',
+          unit: '个',
+          unitQty: 1,
+          requisitionAttr: 1,
+        },
+        {
+          id: 'wo3-issue-coil',
+          itemCode: 'M-062',
+          itemName: '定子线圈',
+          specModel: 'QZ-2.0',
+          material: '铜',
+          unit: '套',
+          unitQty: 1,
+          requisitionAttr: 1,
+        },
+        {
+          id: 'wo3-issue-varnish',
+          itemCode: 'M-063',
+          itemName: '绝缘漆',
+          specModel: 'H级',
+          material: '树脂',
+          unit: 'kg',
+          unitQty: 0.5,
+          requisitionAttr: 1,
+        },
+        {
+          id: 'wo3-bf-bolt',
+          itemCode: 'MAT-STD-100',
+          itemName: '标准螺栓组',
+          specModel: 'M12×40',
+          material: '钢',
+          unit: '个',
+          unitQty: 8,
+          requisitionAttr: 0,
+        },
+        {
+          id: 'wo3-bf-washer',
+          itemCode: 'MAT-STD-WASHER',
+          itemName: '平垫圈 M12',
+          specModel: 'M12',
+          material: '钢',
+          unit: '个',
+          unitQty: 8,
+          requisitionAttr: 0,
+        },
+      ],
+      processes: buildProcessesFromRoute('装配标准路线').map((p) => ({
+        ...p,
+        executors: ['李四'],
+      })),
+      createdAt: '2025-05-20',
+    },
+    {
+      id: 'wo-init-4',
+      code: 'WO20260715-004',
+      name: '泵体铸件生产工单',
+      productName: '泵体铸件',
+      materialCode: 'CP2510004',
+      orderCategory: '生产工单',
+      status: '完成',
+      scheduleQty: 10,
+      planQty: 10,
+      finishedQty: 10,
+      workCenter: '铸造车间',
+      bom: '离心泵',
+      warehouse: '半成品仓',
+      receiveWarehouse: '库线边仓',
+      urgency: '普通',
+      planDateRange: ['2026-07-01', '2026-07-15'],
+      remark: '完工扣减演示：领料+倒冲已确认',
+      processRouteName: routeName,
+      source: 'manual',
+      sourceOrderNo: 'SO202607004',
+      componentLines: [
+        {
+          id: 'wo4-issue-cast',
+          itemCode: 'M-001',
+          itemName: '泵体铸件毛坯',
+          specModel: 'HT250',
+          material: 'HT250',
+          unit: '件',
+          unitQty: 1,
+          requisitionAttr: 1,
+        },
+        {
+          id: 'wo4-issue-seal',
+          itemCode: 'M-003',
+          itemName: '机械密封',
+          specModel: '104-55',
+          material: '碳化硅',
+          unit: '套',
+          unitQty: 1,
+          requisitionAttr: 1,
+        },
+        {
+          id: 'wo4-bf-bolt',
+          itemCode: 'MAT-STD-100',
+          itemName: '标准螺栓组',
+          specModel: 'M12×40',
+          material: '钢',
+          unit: '个',
+          unitQty: 6,
+          requisitionAttr: 0,
+        },
+        {
+          id: 'wo4-bf-washer',
+          itemCode: 'MAT-STD-WASHER',
+          itemName: '平垫圈 M12',
+          specModel: 'M12',
+          material: '钢',
+          unit: '个',
+          unitQty: 6,
+          requisitionAttr: 0,
+        },
+      ],
+      processes: buildProcessesFromRoute(routeName).map((p) => ({
+        ...p,
+        executors: ['王五'],
+      })),
+      createdAt: '2026-07-01',
+    },
+    {
+      id: 'wo-init-5',
+      code: 'WO20260801-005',
+      name: '叶轮组件生产工单',
+      productName: '叶轮组件',
+      materialCode: 'CP2510005',
+      orderCategory: '生产工单',
+      status: '完成',
+      scheduleQty: 6,
+      planQty: 6,
+      finishedQty: 6,
+      workCenter: '机加车间',
+      bom: '排污泵',
+      warehouse: '半成品仓',
+      receiveWarehouse: '原料仓',
+      urgency: '加急',
+      planDateRange: ['2026-07-20', '2026-08-01'],
+      remark: '完工扣减演示：倒冲库存不足部分失败',
+      processRouteName: routeName,
+      source: 'manual',
+      sourceOrderNo: 'SO202608005',
+      componentLines: [
+        {
+          id: 'wo5-issue-impeller',
+          itemCode: 'M-012',
+          itemName: '切割叶轮',
+          specModel: 'WQ-φ220',
+          material: 'HT250',
+          unit: '件',
+          unitQty: 1,
+          requisitionAttr: 1,
+        },
+        {
+          id: 'wo5-issue-shaft',
+          itemCode: 'M-005',
+          itemName: '轴',
+          specModel: 'φ45×480',
+          material: '45#钢',
+          unit: '根',
+          unitQty: 1,
+          requisitionAttr: 1,
+        },
+        {
+          id: 'wo5-bf-bolt',
+          itemCode: 'MAT-STD-100',
+          itemName: '标准螺栓组',
+          specModel: 'M12×40',
+          material: '钢',
+          unit: '个',
+          unitQty: 12,
+          requisitionAttr: 0,
+        },
+      ],
+      processes: buildProcessesFromRoute(routeName).map((p) => ({
+        ...p,
+        executors: ['赵六'],
+      })),
+      createdAt: '2026-07-20',
+    },
+  ]
+}
+
+function ensureCompletionDeductDemoWorkOrders(orders) {
+  const demos = createCompletionDeductDemoWorkOrders()
+  const rest = orders.filter((o) => !COMPLETION_DEDUCT_DEMO_WO_IDS.includes(o.id))
+  return [...demos, ...rest]
 }
 
 function ensureLaborDemoProductionOrders(orders) {
@@ -160,55 +382,6 @@ function createInitialOrders() {
         ),
         createdAt: '2025-05-27',
       },
-      {
-        id: 'wo-init-3',
-        code: 'WO202505280-003',
-        name: '定子铁芯组件生产工单',
-        productName: '定子铁芯组件',
-        materialCode: 'CP2510003',
-        orderCategory: '生产工单',
-        status: '完成',
-        scheduleQty: 18,
-        planQty: 18,
-        workCenter: '装配车间',
-        bom: '潜水电机',
-        warehouse: '成品仓',
-        receiveWarehouse: '库线边仓',
-        urgency: '普通',
-        planDateRange: ['2026-05-01', '2026-05-20'],
-        remark: '',
-        processRouteName: '装配标准路线',
-        source: 'manual',
-        sourceOrderNo: 'SO202505003',
-        // 倒冲演示：领料属性关闭的标准件
-        componentLines: [
-          {
-            id: 'wo3-bf-bolt',
-            itemCode: 'MAT-STD-100',
-            itemName: '标准螺栓组',
-            specModel: 'M12×40',
-            material: '钢',
-            unit: '个',
-            unitQty: 8,
-            requisitionAttr: 0,
-          },
-          {
-            id: 'wo3-bf-washer',
-            itemCode: 'MAT-STD-WASHER',
-            itemName: '平垫圈 M12',
-            specModel: 'M12',
-            material: '钢',
-            unit: '个',
-            unitQty: 8,
-            requisitionAttr: 0,
-          },
-        ],
-        processes: buildProcessesFromRoute('装配标准路线').map((p) => ({
-          ...p,
-          executors: ['李四'],
-        })),
-        createdAt: '2025-05-20',
-      },
     ]),
   )
 }
@@ -266,13 +439,13 @@ export function updateWorkOrder(id, patch) {
   const prevStatus = workOrderState.orders[idx].status
   Object.assign(workOrderState.orders[idx], patch)
   const row = workOrderState.orders[idx]
-  // 工单首次变为「完成」时生成倒冲库存扣减单（按完工/计划数量）
+  // 工单首次变为「完成」时生成完工库存扣减单（BOM 领料+倒冲同单）
   if (prevStatus !== '完成' && row.status === '完成') {
     const finishedQty =
       Number(row.finishedQty) || Number(row.scheduleQty) || Number(row.planQty) || 0
     import('@/store/materialRequisitionStore')
-      .then(({ createBackflushDeductFromWorkOrder }) => {
-        createBackflushDeductFromWorkOrder(row, finishedQty)
+      .then(({ createWorkOrderCompletionDeduct }) => {
+        createWorkOrderCompletionDeduct(row, finishedQty)
       })
       .catch(() => {
         /* ignore */

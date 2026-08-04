@@ -10,9 +10,9 @@ import { round2 } from '@/utils/purchaseMerge'
 
 const STORAGE_KEY = 'i_doms_purchase_orders'
 const SEED_VERSION_KEY = 'i_doms_purchase_orders_seed_v'
-/** v2：跨模块演示采购订单（垫圈在途 / 轴承部分入库） */
-const CURRENT_SEED_VERSION = '2'
-let poSeq = 3
+/** v3：状态待审核/已拒绝/已作废；入库待入库；采购类型；丰富 mock */
+const CURRENT_SEED_VERSION = '3'
+let poSeq = 20
 
 function loadFromStorage() {
   try {
@@ -105,11 +105,19 @@ export function getPurchaseOrdersByRequisition(requisition) {
 }
 
 export function canEditPurchaseOrder(order) {
-  return order?.status === '待审批'
+  return order?.status === '待审核' || order?.status === '已拒绝'
 }
 
 export function canApprovePurchaseOrder(order) {
-  return order?.status === '待审批'
+  return order?.status === '待审核' || order?.status === '已拒绝'
+}
+
+export function canVoidPurchaseOrder(order) {
+  return order?.status === '待审核' || order?.status === '已拒绝'
+}
+
+export function canReverseApprovePurchaseOrder(order) {
+  return order?.status === '进行中' && (order?.inboundStatus || '待入库') === '待入库'
 }
 
 export function canGenerateReceipt(order) {
@@ -124,17 +132,68 @@ export function canCompletePurchaseOrder(order) {
   return order?.status === '进行中'
 }
 
-/** 审批采购单 */
-export function approvePurchaseOrder(id) {
+function pushApprovalRecord(order, { result, opinion }) {
+  if (!Array.isArray(order.approvalRecords)) order.approvalRecords = []
+  order.approvalRecords.unshift({
+    name: 'admin1',
+    role: '采购审核',
+    result,
+    time: dayjs().format('YYYY-MM-DD HH:mm'),
+    opinion: String(opinion || '').trim(),
+  })
+}
+
+/** 审核通过 → 进行中 */
+export function approvePurchaseOrder(id, opinion = '') {
   const order = purchaseOrderState.orders.find((o) => o.id === id)
   if (!order) return { ok: false, message: '采购单不存在' }
-  if (order.status !== '待审批') {
-    return { ok: false, message: `采购单「${order.orderNo}」不可审批` }
+  if (!canApprovePurchaseOrder(order)) {
+    return { ok: false, message: `采购单「${order.orderNo}」不可审核` }
   }
   order.status = '进行中'
-  order.approvalResult = '审批通过'
+  order.approvalResult = '审核通过'
   order.approverName = 'admin1'
-  return { ok: true, message: `采购单「${order.orderNo}」审批通过` }
+  pushApprovalRecord(order, { result: '已通过', opinion })
+  return { ok: true, message: `采购单「${order.orderNo}」审核通过` }
+}
+
+/** 审核拒绝 → 已拒绝 */
+export function rejectPurchaseOrder(id, opinion = '') {
+  const order = purchaseOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '采购单不存在' }
+  if (!canApprovePurchaseOrder(order)) {
+    return { ok: false, message: `采购单「${order.orderNo}」不可审核` }
+  }
+  order.status = '已拒绝'
+  order.approvalResult = '已拒绝'
+  order.approverName = 'admin1'
+  pushApprovalRecord(order, { result: '已驳回', opinion })
+  return { ok: true, message: `采购单「${order.orderNo}」已拒绝` }
+}
+
+/** 反审：进行中且待入库 → 待审核 */
+export function reverseApprovePurchaseOrder(id) {
+  const order = purchaseOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '采购单不存在' }
+  if (!canReverseApprovePurchaseOrder(order)) {
+    return { ok: false, message: '仅「进行中」且入库状态为「待入库」的采购单可反审' }
+  }
+  order.status = '待审核'
+  order.approvalResult = '待审核'
+  order.approverName = ''
+  return { ok: true, message: `采购单「${order.orderNo}」已反审，状态回退为待审核` }
+}
+
+/** 作废 */
+export function voidPurchaseOrder(id) {
+  const order = purchaseOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '采购单不存在' }
+  if (!canVoidPurchaseOrder(order)) {
+    return { ok: false, message: '仅「待审核 / 已拒绝」状态可作废' }
+  }
+  order.status = '已作废'
+  order.approvalResult = order.approvalResult || '待审核'
+  return { ok: true, message: `采购单「${order.orderNo}」已作废` }
 }
 
 /** 完成采购单 */
@@ -191,6 +250,8 @@ export function createPurchaseOrdersFromMergedLines(mergedLines) {
         totalPriceInTax: line.totalPriceInTax,
         receivingMode: line.receivingMode || '正常收货',
         receivingWarehouse: line.receivingWarehouse || '',
+        deliveryDate: line.deliveryDate || '',
+        sourceReqNos: line.sourceReqNos || [],
       }),
     )
 
@@ -207,10 +268,10 @@ export function createPurchaseOrdersFromMergedLines(mergedLines) {
       deliveryMethod: '定时交货',
       remark: first.remark || '',
       orderSource,
-      applyType: '日常采购申请',
-      status: '待审批',
-      approvalResult: '待审批',
-      inboundStatus: '未入库',
+      applyType: '日常采购',
+      status: '待审核',
+      approvalResult: '待审核',
+      inboundStatus: '待入库',
       documentDate: dayjs().format('YYYY-MM-DD'),
       createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
       lineItems,
@@ -259,4 +320,178 @@ export function recalcPoLine(line) {
   line.totalPriceExTax = round2(qty * ex)
   line.totalPriceInTax = round2(qty * line.unitPriceInTax)
   return line
+}
+
+function mergeCsvField(a, b) {
+  return [
+    ...new Set(
+      `${a || ''},${b || ''}`
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ].join(',')
+}
+
+function lineMaterialCode(line) {
+  return (line.productCode || line.itemCode || '').trim()
+}
+
+/** 并入目标单：同物料编码合并数量，否则追加 */
+function mergeOrPushPoLines(target, lines) {
+  if (!Array.isArray(target.lineItems)) target.lineItems = []
+  lines.forEach((src) => {
+    const code = lineMaterialCode(src)
+    const existing =
+      code &&
+      target.lineItems.find(
+        (l) => lineMaterialCode(l) === code && (l.unit || '') === (src.unit || ''),
+      )
+    if (existing) {
+      existing.purchaseQty = round2(
+        (Number(existing.purchaseQty) || 0) + (Number(src.purchaseQty) || 0),
+      )
+      const mergedReqNos = [
+        ...new Set(
+          [
+            ...(existing.sourceReqNos || []),
+            ...String(existing.sourceReqNo || '')
+              .split(',')
+              .map((s) => s.trim()),
+            ...(src.sourceReqNos || []),
+            ...String(src.sourceReqNo || '')
+              .split(',')
+              .map((s) => s.trim()),
+          ].filter(Boolean),
+        ),
+      ]
+      existing.sourceReqNos = mergedReqNos
+      existing.sourceReqNo = mergedReqNos.join(',')
+      recalcPoLine(existing)
+      return
+    }
+    const cloned = JSON.parse(JSON.stringify(src))
+    cloned.id = `po-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    target.lineItems.push(cloned)
+  })
+}
+
+/**
+ * 将采购单部分明细更换供应商：从原单拆出，并入同供应商待审核单或新建单据。
+ * 若勾选全部明细且无目标单，则仅改原单头供应商。
+ * @returns {{ ok: boolean, message?: string, sourceDeleted?: boolean, source?: object, target?: object, movedCount?: number, created?: boolean, action?: string }}
+ */
+export function reassignPoLinesToSupplier(orderId, lineIds, newSupplier) {
+  const order = getPurchaseOrderById(orderId)
+  if (!order) return { ok: false, message: '采购单不存在' }
+  if (!canEditPurchaseOrder(order)) {
+    return { ok: false, message: '仅「待审核 / 已拒绝」状态可更换供应商' }
+  }
+
+  const supplier = String(newSupplier || '').trim()
+  if (!supplier) return { ok: false, message: '请选择新供应商' }
+  if (supplier === String(order.supplier || '').trim()) {
+    return { ok: false, message: '新供应商与当前供应商相同' }
+  }
+
+  const idSet = new Set(lineIds || [])
+  const moving = (order.lineItems || []).filter((l) => idSet.has(l.id))
+  if (!moving.length) return { ok: false, message: '请先勾选要更换供应商的明细' }
+
+  const remaining = (order.lineItems || []).filter((l) => !idSet.has(l.id))
+  const allMoved = remaining.length === 0
+
+  let target = purchaseOrderState.orders.find(
+    (o) =>
+      o.id !== orderId &&
+      String(o.supplier || '').trim() === supplier &&
+      (o.status === '待审核' || o.status === '已拒绝'),
+  )
+  let created = false
+
+  if (allMoved && !target) {
+    order.supplier = supplier
+    return {
+      ok: true,
+      action: 'rename',
+      sourceDeleted: false,
+      source: order,
+      target: order,
+      movedCount: moving.length,
+      created: false,
+      message: `已将采购单「${order.orderNo}」供应商更换为「${supplier}」`,
+    }
+  }
+
+  if (!target) {
+    target = {
+      id: `po-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      orderNo: generatePurchaseOrderNo(),
+      supplier,
+      reqNo: order.reqNo || '',
+      salesOrderNo: order.salesOrderNo || '',
+      workOrderNo: order.workOrderNo || '',
+      settlementType: order.settlementType || '先款后货',
+      settlementCycle: order.settlementCycle || '月结',
+      settlementMethod: order.settlementMethod || '现金结算',
+      deliveryDate: order.deliveryDate || dayjs().format('YYYY-MM-DD'),
+      reminderDate: order.reminderDate || '',
+      leadTimeDays: order.leadTimeDays ?? 12,
+      deliveryMethod: order.deliveryMethod || '定时交货',
+      remark: order.remark || '',
+      orderSource: order.orderSource || '采购申请',
+      applyType: order.applyType || '日常采购',
+      status: '待审核',
+      approvalResult: '待审核',
+      inboundStatus: '待入库',
+      documentDate: dayjs().format('YYYY-MM-DD'),
+      createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
+      purchaser: order.purchaser || 'admin1',
+      contactPerson: order.contactPerson || '',
+      contactPhone: order.contactPhone || '',
+      contractNo: order.contractNo || '',
+      shippingAddress: order.shippingAddress || '',
+      receivingWarehouse: order.receivingWarehouse || '',
+      logisticsNo: order.logisticsNo || '',
+      lineItems: [],
+    }
+    addPurchaseOrder(target)
+    created = true
+  } else {
+    target.reqNo = mergeCsvField(target.reqNo, order.reqNo)
+    target.salesOrderNo = mergeCsvField(target.salesOrderNo, order.salesOrderNo)
+  }
+
+  mergeOrPushPoLines(target, moving)
+  recalcPurchaseOrderTotals(target)
+
+  if (allMoved) {
+    deletePurchaseOrder(orderId)
+    return {
+      ok: true,
+      action: 'merged-all',
+      sourceDeleted: true,
+      target,
+      movedCount: moving.length,
+      created,
+      message: created
+        ? `已拆出全部 ${moving.length} 行，生成采购单「${target.orderNo}」（供应商：${supplier}）`
+        : `已将全部 ${moving.length} 行并入采购单「${target.orderNo}」（供应商：${supplier}）`,
+    }
+  }
+
+  order.lineItems = remaining
+  recalcPurchaseOrderTotals(order)
+  return {
+    ok: true,
+    action: 'split',
+    sourceDeleted: false,
+    source: order,
+    target,
+    movedCount: moving.length,
+    created,
+    message: created
+      ? `已拆出 ${moving.length} 行，生成采购单「${target.orderNo}」（供应商：${supplier}）`
+      : `已拆出 ${moving.length} 行，并入采购单「${target.orderNo}」（供应商：${supplier}）`,
+  }
 }
