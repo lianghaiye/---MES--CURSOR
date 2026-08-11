@@ -24,6 +24,15 @@ export function getPeriodRange(period, ref = dayjs()) {
   return [d.startOf('year').format('YYYY-MM-DD'), d.endOf('year').format('YYYY-MM-DD')]
 }
 
+/** 上一统计周期区间（用于「较上周期」） */
+export function getPreviousPeriodRange(period, ref = dayjs()) {
+  const d = ref
+  if (period === '本周') return getPeriodRange('本周', d.subtract(1, 'week'))
+  if (period === '本月') return getPeriodRange('本月', d.subtract(1, 'month'))
+  if (period === '本季') return getPeriodRange('本季', d.subtract(3, 'month'))
+  return getPeriodRange('本年', d.subtract(1, 'year'))
+}
+
 function inRange(dateStr, start, end) {
   if (!dateStr) return false
   const d = String(dateStr).slice(0, 10)

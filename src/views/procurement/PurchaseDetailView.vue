@@ -158,8 +158,14 @@
           <template v-if="column.key === 'index'">
             {{ rowIndex(index) }}
           </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="statusColor(record.status)">{{ record.status || '—' }}</a-tag>
+          </template>
           <template v-else-if="column.key === 'orderNo'">
             <a class="link-code" @click="openPurchaseOrderDetail(record)">{{ record.orderNo }}</a>
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ formatDateTimeMinute(record.createdAt) }}
           </template>
           <template v-else-if="column.key === 'purchaseQty'">
             {{ formatPurchaseDetailQty(record.purchaseQty) }}
@@ -246,6 +252,7 @@ import {
   formatPurchaseDetailMoney,
   formatPurchaseDetailQty,
 } from '@/utils/purchaseDetailLines'
+import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { useTabs } from '@/composables/useTabs'
 
 const router = useRouter()
@@ -307,8 +314,23 @@ const rowSelection = computed(() => ({
 
 const baseColumns = [
   { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
+  { title: '单据状态', key: 'status', dataIndex: 'status', width: 90, fixed: 'left' },
   { title: '采购单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
-  { title: '供应商', dataIndex: 'supplier', width: 140, ellipsis: true },
+  {
+    title: '供应商',
+    key: 'supplier',
+    dataIndex: 'supplier',
+    width: 140,
+    ellipsis: true,
+    fixed: 'left',
+  },
+  {
+    title: '入库进度',
+    key: 'inboundProgress',
+    dataIndex: 'inboundProgress',
+    width: 180,
+    ellipsis: true,
+  },
   { title: '产品名称', dataIndex: 'productName', width: 160, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88 },
@@ -320,16 +342,37 @@ const baseColumns = [
   { title: '总价（含税）', key: 'totalPriceInTax', width: 110, align: 'right' },
   { title: '总价（不含税）', key: 'totalPriceExTax', width: 120, align: 'right' },
   { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 100 },
+  {
+    title: '入库质检要求',
+    key: 'inboundQcRequirement',
+    dataIndex: 'inboundQcRequirement',
+    width: 110,
+  },
   { title: '入库数量', key: 'receivedQty', width: 96, align: 'right' },
   { title: '交货日期', key: 'deliveryDate', width: 110 },
   { title: '入库日期', key: 'inboundDate', width: 110 },
   { title: '关联工单号', dataIndex: 'workOrderNo', width: 130, ellipsis: true },
   { title: '关联销售单号', dataIndex: 'salesOrderNo', width: 130, ellipsis: true },
   { title: '采购员', dataIndex: 'purchaser', width: 88 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 140 },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-detail-list-v2', baseColumns, { minScrollX: 2340 })
+  useTableColumnSettings('purchase-detail-list-v5', baseColumns, { minScrollX: 3000 })
+
+function statusColor(status) {
+  const map = {
+    待提交: 'default',
+    待审核: 'processing',
+    进行中: 'processing',
+    已完成: 'success',
+    已拒绝: 'error',
+    已作废: 'default',
+    草稿: 'default',
+  }
+  return map[status] || 'default'
+}
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1

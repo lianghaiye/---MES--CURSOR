@@ -1,4 +1,10 @@
 import dayjs from 'dayjs'
+import {
+  calcPoLineAppliedOccupyQty,
+  calcPoLineReceivedQty,
+  formatInboundProgress,
+} from '@/utils/purchaseLineInbound'
+import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
 
 function lineProductName(line) {
   return line.productName || line.itemName || ''
@@ -43,24 +49,29 @@ export function buildPurchaseDetailLines(orders = [], inboundOrders = []) {
   for (const order of orders) {
     for (const line of order.lineItems || []) {
       const itemCode = lineProductCode(line)
+      const purchaseQty = Number(line.purchaseQty) || 0
+      const receivedQty = calcPoLineReceivedQty(order, line)
+      const appliedInboundQty = calcPoLineAppliedOccupyQty(order, line)
       rows.push({
         id: `${order.id}-${line.id}`,
         orderId: order.id,
         lineId: line.id,
         orderNo: order.orderNo,
+        inboundProgress: formatInboundProgress(receivedQty, appliedInboundQty, purchaseQty),
         productName: lineProductName(line),
         productCode: itemCode,
         specModel: line.specModel || '',
         material: line.material || '',
         drawingNo: line.drawingNo || '',
-        purchaseQty: Number(line.purchaseQty) || 0,
+        purchaseQty,
         unitPriceExTax: line.unitPriceExTax,
         taxRate: line.taxRate,
         unitPriceInTax: line.unitPriceInTax,
         totalPriceInTax: line.totalPriceInTax,
         totalPriceExTax: line.totalPriceExTax,
         receivingWarehouse: line.receivingWarehouse || order.receivingWarehouse || '',
-        receivedQty: Number(line.receivedQty) || 0,
+        inboundQcRequirement: resolveLineInboundQcRequirement(line),
+        receivedQty,
         deliveryDate: line.deliveryDate || order.deliveryDate || '',
         inboundDate: resolveInboundDatesForPoLine(
           inboundOrders,
@@ -72,8 +83,11 @@ export function buildPurchaseDetailLines(orders = [], inboundOrders = []) {
         workOrderNo: order.workOrderNo || '',
         salesOrderNo: order.salesOrderNo || '',
         purchaser: order.purchaser || '',
+        creator: order.creator || '',
+        createdAt: order.createdAt || '',
         documentDate: order.documentDate || '',
         supplier: order.supplier || '',
+        status: order.status || '',
       })
     }
   }

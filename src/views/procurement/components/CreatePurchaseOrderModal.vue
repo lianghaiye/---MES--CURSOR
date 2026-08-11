@@ -32,42 +32,6 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="供应商" required>
-                  <PlanSupplierSelect
-                    v-model:value="form.supplier"
-                    placeholder="请搜索或选择供应商"
-                    @change="onSupplierChange"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
-                <a-form-item label="结算类型">
-                  <a-select
-                    v-model:value="form.settlementType"
-                    size="small"
-                    :options="settlementTypeOpts"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
-                <a-form-item label="结算周期">
-                  <a-select
-                    v-model:value="form.settlementCycle"
-                    size="small"
-                    :options="settlementCycleOpts"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
-                <a-form-item label="结算方式">
-                  <a-select
-                    v-model:value="form.settlementMethod"
-                    size="small"
-                    :options="settlementMethodOpts"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
                 <a-form-item label="销售订单">
                   <SalesOrderSearchSelect v-model:value="form.salesOrderNo" />
                 </a-form-item>
@@ -78,49 +42,38 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="交货日期" required>
-                  <a-date-picker
-                    v-model:value="form.deliveryDate"
-                    size="small"
-                    style="width: 100%"
-                    @change="onHeaderDeliveryDateChange"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
-                <a-form-item label="提醒日期">
-                  <a-date-picker
-                    v-model:value="form.reminderDate"
-                    size="small"
-                    style="width: 100%"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
-                <a-form-item label="交货方式">
-                  <a-select
-                    v-model:value="form.deliveryMethod"
-                    size="small"
-                    :options="deliveryMethodOpts"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
-                <a-form-item label="供货期/天">
-                  <a-input-number
-                    v-model:value="form.leadTimeDays"
-                    size="small"
-                    :min="0"
-                    style="width: 100%"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
-                <a-form-item label="物流单号">
+                <a-form-item label="合同编号">
                   <a-input
-                    v-model:value="form.logisticsNo"
+                    v-model:value="form.contractNo"
                     size="small"
-                    placeholder="请输入 物流单号"
+                    placeholder="请输入 合同编号"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="采购员">
+                  <a-select
+                    v-model:value="form.purchaser"
+                    size="small"
+                    show-search
+                    :options="purchaserOpts"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
+        </div>
+
+        <div class="section-block">
+          <div class="section-title">供应商信息</div>
+          <a-form layout="inline" class="header-form horizontal-form">
+            <a-row :gutter="[12, 12]" style="width: 100%">
+              <a-col :span="6">
+                <a-form-item label="供应商" required>
+                  <PlanSupplierSelect
+                    v-model:value="form.supplier"
+                    placeholder="请搜索或选择供应商"
+                    @change="onSupplierChange"
                   />
                 </a-form-item>
               </a-col>
@@ -145,42 +98,87 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="合同编号">
-                  <a-input
-                    v-model:value="form.contractNo"
+                <a-form-item label="结算类型">
+                  <a-select
+                    v-model:value="form.settlementType"
                     size="small"
-                    placeholder="请输入 合同编号"
+                    :options="settlementTypeOpts"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="收货地址">
-                  <a-input
-                    v-model:value="form.shippingAddress"
+                <a-form-item label="结算方式">
+                  <a-select
+                    v-model:value="form.settlementMethod"
                     size="small"
-                    placeholder="请输入 收货地址"
+                    :options="settlementMethodOpts"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="收货仓库">
+                <a-form-item label="结算周期">
+                  <a-select
+                    v-model:value="form.settlementCycle"
+                    size="small"
+                    :options="settlementCycleOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="交货方式">
+                  <a-select
+                    v-model:value="form.deliveryMethod"
+                    size="small"
+                    :options="deliveryMethodOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="供货期/天">
+                  <a-input-number
+                    v-model:value="form.leadTimeDays"
+                    size="small"
+                    :min="0"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
+        </div>
+
+        <div class="section-block">
+          <div class="section-title">交付信息</div>
+          <a-form layout="inline" class="header-form horizontal-form">
+            <a-row :gutter="[12, 12]" style="width: 100%">
+              <a-col :span="6">
+                <a-form-item label="交货日期" required>
+                  <a-date-picker
+                    v-model:value="form.deliveryDate"
+                    size="small"
+                    style="width: 100%"
+                    @change="onHeaderDeliveryDateChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="交货仓库">
                   <a-select
                     v-model:value="form.receivingWarehouse"
                     size="small"
                     allow-clear
-                    placeholder="请选择 收货仓库"
+                    placeholder="请选择 交货仓库"
                     :options="warehouseOpts"
                     @change="onHeaderReceivingWarehouseChange"
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="6">
-                <a-form-item label="采购员">
-                  <a-select
-                    v-model:value="form.purchaser"
+              <a-col :span="12">
+                <a-form-item label="交货地址">
+                  <a-input
+                    v-model:value="form.shippingAddress"
                     size="small"
-                    show-search
-                    :options="purchaserOpts"
+                    placeholder="请输入 交货地址"
                   />
                 </a-form-item>
               </a-col>
@@ -773,7 +771,6 @@ const form = reactive({
   reminderDate: null,
   deliveryMethod: '定时交货',
   leadTimeDays: 12,
-  logisticsNo: '',
   contactPerson: undefined,
   contactPhone: '',
   contractNo: '',
@@ -874,7 +871,6 @@ function resetForm() {
   form.reminderDate = null
   form.deliveryMethod = '定时交货'
   form.leadTimeDays = 12
-  form.logisticsNo = ''
   form.contactPerson = undefined
   form.contactPhone = ''
   form.contractNo = ''
@@ -900,7 +896,6 @@ function loadEditForm(record) {
   form.reminderDate = record.reminderDate ? dayjs(record.reminderDate) : null
   form.deliveryMethod = record.deliveryMethod
   form.leadTimeDays = record.leadTimeDays
-  form.logisticsNo = record.logisticsNo || ''
   form.contactPerson = record.contactPerson || undefined
   form.contactPhone = record.contactPhone || ''
   form.contractNo = record.contractNo || ''
@@ -1241,17 +1236,20 @@ function buildSavePayload() {
     orderNo,
     reqNo: props.editRecord?.reqNo || '',
     deliveryDate: form.deliveryDate ? form.deliveryDate.format('YYYY-MM-DD') : '',
-    reminderDate: form.reminderDate ? form.reminderDate.format('YYYY-MM-DD') : '',
+    reminderDate: '',
     receivingWarehouse: form.receivingWarehouse || '',
     documentDate: props.editRecord?.documentDate || dayjs().format('YYYY-MM-DD'),
     orderSource: props.editRecord?.orderSource || '新增',
     applyType: props.editRecord?.applyType || form.applyType || '日常采购',
-    status: props.editRecord?.status || '待审核',
-    approvalResult: props.editRecord?.approvalResult || '待审核',
+    status: props.editRecord?.status || '待提交',
+    approvalResult: props.editRecord?.approvalResult || '',
     approverName: props.editRecord?.approverName || '',
     inboundStatus: props.editRecord?.inboundStatus || '待入库',
     creator: props.editRecord?.creator || 'admin1',
     createdAt: props.editRecord?.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
+    updater: 'admin1',
+    updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    approvedAt: props.editRecord?.approvedAt || '',
     totalQty: form.lineItems.reduce((s, i) => s + (Number(i.purchaseQty) || 0), 0),
     amountExTax: form.lineItems.reduce((s, i) => s + (Number(i.totalPriceExTax) || 0), 0),
     amountInTax: form.lineItems.reduce((s, i) => s + (Number(i.totalPriceInTax) || 0), 0),

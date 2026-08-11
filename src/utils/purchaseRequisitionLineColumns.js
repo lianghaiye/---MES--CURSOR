@@ -2,6 +2,7 @@
 
 export const purchaseRequisitionFormLineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '采购状态', dataIndex: 'poGenStatus', key: 'poGenStatus', width: 110 },
   { title: '产品名称', dataIndex: 'productName', key: 'productName', width: 140, ellipsis: true },
   { title: '产品编码', dataIndex: 'productCode', key: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 110, ellipsis: true },

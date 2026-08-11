@@ -15,62 +15,10 @@
           </div>
         </div>
 
-        <div class="summary-card">
-          <div class="summary-top">
-            <span class="doc-no">{{ record.orderNo }}</span>
-            <span class="doc-meta"
-              >{{ record.applyType || '日常采购' }} · {{ record.supplier || '—' }}</span
-            >
-          </div>
-          <div class="summary-reason">
-            采购申请：{{ record.reqNo || '—' }} · 订单来源：{{ record.orderSource || '—' }}
-          </div>
-          <div class="summary-applicant">
-            采购员：{{ record.purchaser || '—' }} · 创建人：{{ record.creator || '—' }} ·
-            {{ formatCreatedAt(record.createdAt || record.documentDate) }}
-          </div>
-        </div>
-
         <div class="section-card content-section">
           <div class="subsection">
             <div class="section-title">基本信息</div>
-            <a-descriptions :column="3" size="small" bordered>
-              <a-descriptions-item label="采购单号">{{ record.orderNo }}</a-descriptions-item>
-              <a-descriptions-item label="供应商">{{ record.supplier || '—' }}</a-descriptions-item>
-              <a-descriptions-item label="采购类型">{{
-                record.applyType || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="采购申请单号">{{
-                record.reqNo || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="销售单号">{{
-                record.salesOrderNo || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="生产工单号">{{
-                record.workOrderNo || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="结算类型">{{
-                record.settlementType || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="交货日期">{{
-                record.deliveryDate || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="收货仓库">{{
-                record.receivingWarehouse || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="交货方式">{{
-                record.deliveryMethod || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="供货期/天">{{
-                record.leadTimeDays ?? '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="合同编号">{{
-                record.contractNo || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="备注" :span="3">{{
-                record.remark || '—'
-              }}</a-descriptions-item>
-            </a-descriptions>
+            <PurchaseOrderBasicInfoSection :order="record" />
           </div>
 
           <a-divider />
@@ -84,11 +32,18 @@
               size="small"
               bordered
               :pagination="false"
-              :scroll="{ x: 1200 }"
+              :scroll="{ x: lineTableScrollX }"
               :locale="{ emptyText: '暂无采购明细' }"
             >
               <template #bodyCell="{ column, record: line, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'lineInboundStatus'">
+                  <a-tag
+                    :color="poLineInboundStatusColor(line.inboundStatus || lineInboundStatus(line))"
+                  >
+                    {{ line.inboundStatus || lineInboundStatus(line) }}
+                  </a-tag>
+                </template>
                 <template v-else-if="column.key === 'productName'">
                   {{ line.productName || line.itemName || '—' }}
                 </template>
@@ -98,14 +53,29 @@
                 <template v-else-if="column.key === 'purchaseQty'">
                   {{ formatQty(line.purchaseQty) }}
                 </template>
+                <template v-else-if="column.key === 'stockQty'">
+                  {{ formatQty(line.stockQty) }}
+                </template>
                 <template v-else-if="column.key === 'orderSizeText'">
                   {{ line.orderSizeText || line.blankSizeText || '—' }}
+                </template>
+                <template v-else-if="column.key === 'sourceReqNo'">
+                  {{ line.sourceReqNo || (line.sourceReqNos || []).join(',') || '—' }}
                 </template>
                 <template v-else-if="column.key === 'unitPriceExTax'">
                   {{ formatMoney(line.unitPriceExTax) }}
                 </template>
+                <template v-else-if="column.key === 'unitPriceInTax'">
+                  {{ formatMoney(line.unitPriceInTax) }}
+                </template>
+                <template v-else-if="column.key === 'totalPriceExTax'">
+                  {{ formatMoney(line.totalPriceExTax) }}
+                </template>
                 <template v-else-if="column.key === 'totalPriceInTax'">
                   {{ formatMoney(line.totalPriceInTax) }}
+                </template>
+                <template v-else-if="column.key === 'inboundQcRequirement'">
+                  {{ resolveLineInboundQcRequirement(line) }}
                 </template>
                 <template v-else>
                   {{ line[column.dataIndex] ?? '—' }}
@@ -165,7 +135,6 @@ export default { name: 'PurchaseOrderApproveView' }
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { formatQty } from '@/utils/numberFormat'
@@ -175,6 +144,9 @@ import {
   approvePurchaseOrder,
   rejectPurchaseOrder,
 } from '@/store/purchaseOrderStore'
+import { calcPoLineInboundStatus, poLineInboundStatusColor } from '@/utils/purchaseLineInbound'
+import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
+import PurchaseOrderBasicInfoSection from './components/PurchaseOrderBasicInfoSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -198,18 +170,56 @@ const summary = computed(() => {
   }
 })
 
+/** 与采购订单详情明细一致，不含入库/收货进度列 */
 const lineColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
+  { title: '入库状态', key: 'lineInboundStatus', width: 90 },
   { title: '产品名称', key: 'productName', width: 140, ellipsis: true },
   { title: '产品编号', key: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '规格属性', dataIndex: 'specAttr', width: 90, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
+  {
+    title: '变体属性',
+    dataIndex: 'variantSummary',
+    key: 'variantAttr',
+    width: 140,
+    ellipsis: true,
+  },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '库存数量', key: 'stockQty', width: 90, align: 'right' },
   { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 70 },
-  { title: '订货尺寸', key: 'orderSizeText', width: 140, ellipsis: true },
+  { title: '采购单位', dataIndex: 'unit', width: 80 },
+  {
+    title: '订货尺寸',
+    key: 'orderSizeText',
+    dataIndex: 'orderSizeText',
+    width: 160,
+    ellipsis: true,
+  },
   { title: '不含税单价', key: 'unitPriceExTax', width: 100, align: 'right' },
-  { title: '含税总价', key: 'totalPriceInTax', width: 100, align: 'right' },
+  { title: '税率(%)', dataIndex: 'taxRate', width: 80, align: 'right' },
+  { title: '含税单价', key: 'unitPriceInTax', width: 100, align: 'right' },
+  { title: '总价（不含税）', key: 'totalPriceExTax', width: 110, align: 'right' },
+  { title: '总价（含税）', key: 'totalPriceInTax', width: 100, align: 'right' },
+  { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
+  { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 110, ellipsis: true },
+  { title: '入库质检要求', key: 'inboundQcRequirement', width: 110 },
+  {
+    title: '来源申请单号',
+    key: 'sourceReqNo',
+    dataIndex: 'sourceReqNo',
+    width: 160,
+    ellipsis: true,
+  },
+  { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
 ]
+
+const lineTableScrollX = lineColumns.reduce((sum, col) => sum + (col.width || 100), 0)
+
+function lineInboundStatus(line) {
+  return calcPoLineInboundStatus(record.value, line)
+}
 
 function statusColor(status) {
   const map = {
@@ -231,12 +241,6 @@ function approvalResultColor(result) {
   if (result === '已通过') return 'success'
   if (result === '已驳回') return 'error'
   return 'default'
-}
-
-function formatCreatedAt(value) {
-  if (!value) return '—'
-  const parsed = dayjs(value)
-  return parsed.isValid() ? parsed.format('MM-DD HH:mm') : value
 }
 
 function formatMoney(val) {
@@ -302,38 +306,6 @@ function handleReject() {
 .page-title {
   font-size: 16px;
   font-weight: 600;
-}
-
-.summary-card {
-  background: #fafafa;
-  border-radius: 6px;
-  padding: 16px;
-  margin-bottom: 12px;
-}
-
-.summary-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  gap: 12px;
-}
-
-.doc-no {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.doc-meta {
-  font-size: 13px;
-  color: #595959;
-}
-
-.summary-reason,
-.summary-applicant {
-  font-size: 13px;
-  color: #595959;
-  line-height: 1.6;
 }
 
 .section-card {

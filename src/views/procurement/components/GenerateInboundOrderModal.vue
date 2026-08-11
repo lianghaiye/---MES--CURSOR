@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     title="新增入库单"
-    width="1400px"
+    width="1200px"
     :mask-closable="false"
     destroy-on-close
     class="generate-inbound-modal"
@@ -76,30 +76,36 @@
       :scroll="{ x: tableScrollX }"
     >
       <template #headerCell="{ column }">
-        <template v-if="column.key === 'stockUnitQty'">
+        <template v-if="column.key === 'inboundProgress'">
           <span class="col-title-with-tip">
-            库存单位量
-            <a-tooltip :title="STOCK_UNIT_QTY_TIP">
+            入库进度
+            <a-tooltip :title="INBOUND_PROGRESS_TOOLTIP">
               <InfoCircleOutlined class="col-tip-icon" />
             </a-tooltip>
+          </span>
+        </template>
+        <template v-else-if="column.key === 'qty' || column.key === 'warehouse'">
+          <span class="col-title-required">
+            <span class="required-star">*</span>{{ column.title }}
           </span>
         </template>
         <template v-else>{{ column.title }}</template>
       </template>
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+        <template v-else-if="column.key === 'inboundProgress'">
+          {{
+            formatInboundProgress(
+              record.receivedQty,
+              record.appliedInboundQty,
+              record.poPurchaseQty,
+            )
+          }}
+        </template>
         <template v-else-if="column.key === 'itemName'">
           <span class="item-name-text" :title="record.itemName">
             [{{ record.itemCode }}] {{ record.itemName }}
           </span>
-        </template>
-        <template v-else-if="column.key === 'stockQty'">
-          {{ formatQty(record.stockQty) }}
-          <span class="unit-suffix">{{ resolveInboundStockUnit(record) }}</span>
-        </template>
-        <template v-else-if="column.key === 'warehouseStockQty'">
-          {{ formatQty(record.warehouseStockQty) }}
-          <span class="unit-suffix">{{ resolveInboundStockUnit(record) }}</span>
         </template>
         <template v-else-if="column.key === 'warehouse'">
           <a-select
@@ -109,28 +115,10 @@
             placeholder="请选择"
             style="width: 100%"
             :options="warehouseOpts"
-            @change="() => refreshLine(record)"
-          />
-        </template>
-        <template v-else-if="column.key === 'locationNo'">
-          <a-input
-            v-model:value="record.locationNo"
-            size="small"
-            allow-clear
-            placeholder="请输入货位号"
           />
         </template>
         <template v-else-if="column.key === 'qty'">
           <a-input-number
-            v-if="isInboundDualUnitLine(record)"
-            v-model:value="record.purchaseQty"
-            size="small"
-            :min="1"
-            :precision="0"
-            style="width: 100%"
-          />
-          <a-input-number
-            v-else
             v-model:value="record.qty"
             size="small"
             :min="0"
@@ -141,34 +129,7 @@
           />
         </template>
         <template v-else-if="column.key === 'unit'">
-          {{ resolveInboundQtyUnit(record) || '—' }}
-        </template>
-        <template v-else-if="column.key === 'stockUnitQty'">
-          <template v-if="isInboundDualUnitLine(record)">
-            <a-input-number
-              v-if="allowsInboundTotalEntry(record.barcodeType)"
-              :value="getStockUnitQtyValue(record)"
-              size="small"
-              :min="0.001"
-              :precision="4"
-              style="width: 100%"
-              @update:value="(v) => onLineStockUnitQtyInput(record, v)"
-            />
-            <a-input-number
-              v-else
-              :value="getUniformPieceValue(record)"
-              size="small"
-              :min="0.001"
-              :precision="4"
-              style="width: 100%"
-              placeholder="单件数量"
-              @update:value="(v) => onLineStockUnitQtyInput(record, v)"
-            />
-          </template>
-          <span v-else class="cell-disabled">{{ formatQty(record.qty) }}</span>
-        </template>
-        <template v-else-if="column.key === 'stockUnit'">
-          {{ resolveInboundStockUnit(record) || '—' }}
+          {{ record.unit || '—' }}
         </template>
         <template v-else-if="column.key === 'unitPrice'">
           <a-input-number
@@ -184,10 +145,7 @@
           {{ formatMoney(record.totalPrice) }}
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space :size="4">
-            <a @click="openLineEdit(record)">编辑</a>
-            <a class="danger-link" @click="removeLine(index)">删除</a>
-          </a-space>
+          <a class="danger-link" @click="removeLine(index)">删除</a>
         </template>
         <template v-else>
           {{ record[column.dataIndex] ?? '—' }}
@@ -210,42 +168,42 @@
       </a-button>
     </template>
   </a-modal>
-
-  <InboundLineEditModal
-    v-model:open="lineEditOpen"
-    :line="lineEditTarget"
-    mode="edit"
-    lock-product
-    @confirm="onLineEditConfirm"
-  />
 </template>
 
 <script setup>
-import { formatQty } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { CheckOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
-import InboundLineEditModal from '@/views/inventory/components/InboundLineEditModal.vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { createInboundFromPurchaseOrder } from '@/store/inboundOrderStore'
+import { updatePurchaseReceipt } from '@/store/purchaseReceiptStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
-import { inboundFormLineColumns, STOCK_UNIT_QTY_TIP } from '@/utils/inboundLineColumns'
+import { inboundFormLineColumns } from '@/utils/inboundLineColumns'
+import { syncInboundLineTotalFromUnit } from '@/utils/inboundLineHelpers'
 import {
-  enrichInboundLine,
-  getInboundQtyValue,
-  getStockUnitQtyValue,
-  getUniformPieceValue,
-  isInboundDualUnitLine,
-  resolveInboundQtyUnit,
-  resolveInboundStockUnit,
-  syncInboundLineTotalFromUnit,
-} from '@/utils/inboundLineHelpers'
-import { INBOUND_ENTRY_MODE, allowsInboundTotalEntry } from '@/utils/variableLengthMaterial'
+  calcPoLineAppliedOccupyQty,
+  calcPoLineReceivedQty,
+  calcPoLineRemainInboundQty,
+  formatInboundProgress,
+  INBOUND_PROGRESS_TOOLTIP,
+} from '@/utils/purchaseLineInbound'
+
+/** 采购场景生成入库：不展示库存换算/货位相关列 */
+const HIDDEN_LINE_KEYS = new Set([
+  'actions',
+  'stockUnitQty',
+  'stockUnit',
+  'locationNo',
+  'stockQty',
+  'warehouseStockQty',
+])
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   purchaseOrder: { type: Object, default: null },
+  /** 从采购收货进入时传入，保存后由列表侧回写关联 */
+  purchaseReceipt: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -253,9 +211,6 @@ const emit = defineEmits(['update:open', 'saved'])
 const saving = ref(false)
 const inboundLines = ref([])
 const prevHeaderWarehouse = ref(undefined)
-const lineEditOpen = ref(false)
-const lineEditTarget = ref(null)
-const lineEditSourceId = ref(null)
 
 const form = reactive({
   receiptDate: dayjs(),
@@ -269,15 +224,26 @@ const warehouseOpts = computed(() => {
   return getWarehouseSelectOptions()
 })
 
-const columns = [
-  ...inboundFormLineColumns.filter((c) => c.key !== 'actions'),
-  { title: '操作', key: 'action', width: 100, fixed: 'right' },
-]
+const columns = (() => {
+  const base = inboundFormLineColumns.filter((c) => !HIDDEN_LINE_KEYS.has(c.key))
+  const itemNameIdx = base.findIndex((c) => c.key === 'itemName')
+  const progressCol = {
+    title: '入库进度',
+    key: 'inboundProgress',
+    width: 180,
+    ellipsis: true,
+  }
+  const withProgress =
+    itemNameIdx >= 0
+      ? [...base.slice(0, itemNameIdx), progressCol, ...base.slice(itemNameIdx)]
+      : [progressCol, ...base]
+  return [...withProgress, { title: '操作', key: 'action', width: 80, fixed: 'right' }]
+})()
 
 const tableScrollX = computed(() => columns.reduce((sum, col) => sum + (col.width || 100), 0))
 
 const totalQty = computed(() =>
-  inboundLines.value.reduce((sum, line) => sum + (Number(getInboundQtyValue(line)) || 0), 0),
+  inboundLines.value.reduce((sum, line) => sum + (Number(line.qty) || 0), 0),
 )
 
 watch(
@@ -296,69 +262,54 @@ watch(
   },
 )
 
-function buildLinesFromPurchaseOrder(order) {
-  return (order.lineItems || [])
-    .filter((line) => {
-      const remaining = (Number(line.purchaseQty) || 0) - (Number(line.receivedQty) || 0)
-      return remaining > 0
-    })
-    .map((line) => {
-      const remaining = (Number(line.purchaseQty) || 0) - (Number(line.receivedQty) || 0)
-      const warehouse =
-        line.receivingWarehouse || resolveDefaultWarehouseByMaterialCode(line.itemCode) || undefined
-      const enriched = enrichInboundLine({
-        id: line.id,
-        poLineId: line.id,
-        itemCode: line.itemCode,
-        itemName: line.itemName,
-        itemType: line.itemType || '物料',
-        specModel: line.specModel || '',
-        specAttr: line.specAttr || '',
-        material: line.material || '',
-        drawingNo: line.drawingNo || '',
-        unit: line.unit || '个',
-        unitPrice: line.unitPriceInTax ?? line.unitPriceExTax ?? null,
-        locationNo: line.locationNo || '',
-        warehouse,
-        qty: remaining,
-        remainingQty: remaining,
-      })
-      if (isInboundDualUnitLine(enriched)) {
-        enriched.purchaseQty = remaining
-        enriched.qty = null
-        enriched.totalValue = null
-        // 一物一码默认统一单件；一类/一批一码可直接填合计
-        enriched.inboundEntryMode = allowsInboundTotalEntry(enriched.barcodeType)
-          ? INBOUND_ENTRY_MODE.TOTAL
-          : INBOUND_ENTRY_MODE.UNIFORM
-      }
-      return enriched
-    })
+/** 按采购单位入库，不做库存单位换算、不填货位 */
+function buildPurchaseInboundLine(line, order) {
+  const remaining = calcPoLineRemainInboundQty(order, line)
+  const received = calcPoLineReceivedQty(order, line)
+  const applied = calcPoLineAppliedOccupyQty(order, line)
+  const poPurchaseQty = Number(line.purchaseQty) || 0
+  const purchaseUnit = line.unit || '个'
+  const warehouse =
+    line.receivingWarehouse || resolveDefaultWarehouseByMaterialCode(line.itemCode) || undefined
+  const next = {
+    id: line.id,
+    poLineId: line.id,
+    itemCode: line.itemCode,
+    itemName: line.itemName,
+    itemType: line.itemType || '物料',
+    specModel: line.specModel || '',
+    specAttr: line.specAttr || '',
+    material: line.material || '',
+    drawingNo: line.drawingNo || '',
+    barcodeType: line.barcodeType || '',
+    variantSummary: line.variantSummary || '',
+    unit: purchaseUnit,
+    purchaseUnit,
+    stockUnit: purchaseUnit,
+    unitPrice: line.unitPriceInTax ?? line.unitPriceExTax ?? null,
+    locationNo: '',
+    warehouse,
+    qty: remaining,
+    remainingQty: remaining,
+    receivedQty: received,
+    appliedInboundQty: applied,
+    poPurchaseQty,
+    isVariableLength: false,
+    purchaseQty: undefined,
+    totalValue: undefined,
+    inboundEntryMode: undefined,
+  }
+  syncInboundLineTotalFromUnit(next)
+  return next
 }
 
-function refreshLine(line) {
-  Object.assign(line, enrichInboundLine(line))
+function buildLinesFromPurchaseOrder(order) {
+  return (order.lineItems || [])
+    .filter((line) => calcPoLineRemainInboundQty(order, line) > 0)
+    .map((line) => buildPurchaseInboundLine(line, order))
 }
 
 function onLineQtyChange(line) {
-  syncInboundLineTotalFromUnit(line)
-}
-
-function onLineStockUnitQtyInput(line, value) {
-  if (allowsInboundTotalEntry(line.barcodeType)) {
-    line.inboundEntryMode = INBOUND_ENTRY_MODE.TOTAL
-    line.totalValue = value
-    line.qty = value
-    line.uniformValue = undefined
-    syncInboundLineTotalFromUnit(line)
-    return
-  }
-  line.inboundEntryMode = INBOUND_ENTRY_MODE.UNIFORM
-  line.uniformValue = value
-  line.totalValue = undefined
-  const n = Number(line.purchaseQty) || 0
-  const per = Number(value) || 0
-  line.qty = n > 0 && per > 0 ? Math.round(n * per * 10000) / 10000 : null
   syncInboundLineTotalFromUnit(line)
 }
 
@@ -380,7 +331,6 @@ function onHeaderWarehouseChange(newVal) {
     onOk: () => {
       inboundLines.value.forEach((line) => {
         line.warehouse = newVal
-        refreshLine(line)
       })
     },
   })
@@ -388,31 +338,6 @@ function onHeaderWarehouseChange(newVal) {
 
 function removeLine(index) {
   inboundLines.value.splice(index, 1)
-}
-
-function openLineEdit(record) {
-  lineEditSourceId.value = record.id
-  lineEditTarget.value = { ...record }
-  lineEditOpen.value = true
-}
-
-function onLineEditConfirm(updated) {
-  const enriched = enrichInboundLine(updated)
-  const idx = inboundLines.value.findIndex((l) => l.id === lineEditSourceId.value)
-  if (idx === -1) return
-  const original = inboundLines.value[idx]
-  if (original.remainingQty != null && Number(enriched.qty) > Number(original.remainingQty)) {
-    message.warning(`入库数量不能超过剩余可入库数量 ${original.remainingQty}`)
-    enriched.qty = original.remainingQty
-  }
-  inboundLines.value[idx] = {
-    ...original,
-    ...enriched,
-    remainingQty: original.remainingQty,
-    poLineId: original.poLineId,
-    purchaseQty: original.purchaseQty,
-  }
-  refreshLine(inboundLines.value[idx])
 }
 
 function formatMoney(val) {
@@ -442,27 +367,22 @@ function handleSave() {
     message.warning(`请为「${invalidWarehouse.itemName}」选择入库仓库`)
     return
   }
-  const invalidQty = inboundLines.value.find((line) => {
-    if (isInboundDualUnitLine(line)) {
-      return !(Number(line.purchaseQty) > 0) || !(Number(getStockUnitQtyValue(line)) > 0)
-    }
-    return !line.qty || Number(line.qty) <= 0
-  })
+  const invalidQty = inboundLines.value.find((line) => !line.qty || Number(line.qty) <= 0)
   if (invalidQty) {
-    message.warning(
-      isInboundDualUnitLine(invalidQty)
-        ? `请填写「${invalidQty.itemName}」的入库数量与库存单位量`
-        : `请填写「${invalidQty.itemName}」的入库数量`,
-    )
+    message.warning(`请填写「${invalidQty.itemName}」的入库数量`)
     return
   }
 
   saving.value = true
+  const receiptRemark = props.purchaseReceipt?.receiptNo
+    ? `收货单 ${props.purchaseReceipt.receiptNo} 生成`
+    : ''
   const result = createInboundFromPurchaseOrder(props.purchaseOrder.id, {
     deliveryDate: form.receiptDate.format('YYYY-MM-DD'),
     invoiceNo: form.invoiceNo?.trim(),
-    remark: form.remark?.trim(),
+    remark: form.remark?.trim() || receiptRemark,
     warehouse: form.warehouse || '',
+    purchaseReceiptId: props.purchaseReceipt?.id || '',
     lineItems: inboundLines.value.map((line) => ({
       poLineId: line.poLineId,
       itemCode: line.itemCode,
@@ -473,16 +393,13 @@ function handleSave() {
       material: line.material,
       drawingNo: line.drawingNo,
       unit: line.unit,
-      stockUnit: line.stockUnit,
-      purchaseUnit: line.purchaseUnit,
+      stockUnit: line.unit,
+      purchaseUnit: line.unit,
       unitPrice: line.unitPrice,
-      locationNo: line.locationNo,
+      locationNo: '',
       warehouse: line.warehouse,
-      qty: Number(getStockUnitQtyValue(line)),
-      purchaseQty: isInboundDualUnitLine(line) ? Number(line.purchaseQty) : undefined,
-      totalValue: isInboundDualUnitLine(line) ? Number(getStockUnitQtyValue(line)) : undefined,
-      inboundEntryMode: line.inboundEntryMode,
-      isVariableLength: Boolean(line.isVariableLength),
+      qty: Number(line.qty),
+      isVariableLength: false,
     })),
   })
   saving.value = false
@@ -490,6 +407,16 @@ function handleSave() {
   if (!result.ok) {
     message.warning(result.message)
     return
+  }
+
+  if (props.purchaseReceipt?.id && result.order) {
+    const receipt = props.purchaseReceipt
+    const ids = [...new Set([...(receipt.inboundOrderIds || []), result.order.id])]
+    updatePurchaseReceipt(receipt.id, {
+      inboundOrderIds: ids,
+      inboundOrderNo: result.order.docNo || receipt.inboundOrderNo,
+      inboundStatus: '入库中',
+    })
   }
 
   message.success('入库单已创建')
@@ -533,20 +460,16 @@ function handleSave() {
   gap: 4px;
 }
 
+.col-title-required .required-star {
+  color: #ff4d4f;
+  margin-right: 2px;
+  font-family: SimSun, sans-serif;
+}
+
 .col-tip-icon {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
   cursor: help;
-}
-
-.unit-suffix {
-  margin-left: 4px;
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
-}
-
-.cell-disabled {
-  color: rgba(0, 0, 0, 0.25);
 }
 
 .line-summary {

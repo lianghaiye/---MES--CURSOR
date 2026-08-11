@@ -1,5 +1,6 @@
 <template>
   <div class="purchase-order-page">
+    <PurchaseOrderStatsPanel />
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -29,16 +30,6 @@
             <a-form-item label="申请单号">
               <a-input
                 v-model:value="filters.reqNo"
-                allow-clear
-                placeholder="请输入"
-                size="small"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="销售单号">
-              <a-input
-                v-model:value="filters.salesOrderNo"
                 allow-clear
                 placeholder="请输入"
                 size="small"
@@ -97,6 +88,10 @@
           <PlusOutlined />
           新增
         </a-button>
+        <a-button size="small" @click="openToolbarApprove">
+          <CheckOutlined />
+          审核
+        </a-button>
         <a-button size="small" @click="openReceiptModal">
           <CheckCircleOutlined />
           生成收货单
@@ -105,7 +100,7 @@
           <InboxOutlined />
           生成入库单
         </a-button>
-        <a-button size="small" @click="handleBatchReverse">反审</a-button>
+        <a-button size="small" @click="openPurchaseReturnFromToolbar">采购退货</a-button>
         <a-button size="small" @click="handleComplete">
           <CheckOutlined />
           完成
@@ -180,8 +175,31 @@
           <template v-else-if="column.key === 'inboundStatus'">
             <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'approverName'">
+            {{ record.approverName || '—' }}
+          </template>
+          <template v-else-if="column.key === 'approvedAt'">
+            {{ resolveApprovalTime(record) }}
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ formatDateTimeMinute(record.createdAt) }}
+          </template>
+          <template v-else-if="column.key === 'updatedAt'">
+            {{ formatDateTimeMinute(record.updatedAt) }}
+          </template>
+          <template v-else-if="column.key === 'updater'">
+            {{ record.updater || '—' }}
+          </template>
           <template v-else-if="column.key === 'action'">
             <a-space :size="0">
+              <a-button
+                v-if="record.status === '草稿'"
+                type="link"
+                size="small"
+                @click="continueDraft(record)"
+              >
+                继续编辑
+              </a-button>
               <a-button
                 v-if="canEditPurchaseOrder(record)"
                 type="link"
@@ -191,13 +209,28 @@
                 编辑
               </a-button>
               <a-button
-                v-if="canApprovePurchaseOrder(record)"
+                v-if="canSubmitPurchaseOrder(record)"
                 type="link"
                 size="small"
-                @click="openApprove(record)"
+                @click="handleSubmit(record)"
               >
-                <CheckCircleOutlined />
-                审核
+                提交审核
+              </a-button>
+              <a-button
+                v-if="canWithdrawPurchaseOrder(record)"
+                type="link"
+                size="small"
+                @click="handleWithdraw(record)"
+              >
+                撤回
+              </a-button>
+              <a-button
+                v-if="canResubmitPurchaseOrder(record)"
+                type="link"
+                size="small"
+                @click="handleResubmit(record)"
+              >
+                重新提交
               </a-button>
               <a-button
                 v-if="canVoidPurchaseOrder(record)"
@@ -208,22 +241,24 @@
               >
                 作废
               </a-button>
-              <a-button
-                v-if="canCompletePurchaseOrder(record)"
-                type="link"
-                size="small"
-                @click="handleCompleteOne(record)"
-              >
-                完成
-              </a-button>
-              <a-button
-                v-if="canReverseApprovePurchaseOrder(record)"
-                type="link"
-                size="small"
-                @click="handleReverse(record)"
-              >
-                反审
-              </a-button>
+              <template v-if="record.status === '进行中'">
+                <a-button
+                  v-if="canGenerateReceipt(record)"
+                  type="link"
+                  size="small"
+                  @click="openReceiptForRow(record)"
+                >
+                  收货
+                </a-button>
+                <a-button
+                  v-if="canGenerateInbound(record)"
+                  type="link"
+                  size="small"
+                  @click="openInboundForRow(record)"
+                >
+                  入库
+                </a-button>
+              </template>
               <span v-if="!hasRowActions(record)" class="action-disabled">-</span>
             </a-space>
           </template>
@@ -274,6 +309,7 @@ export default { name: 'PurchaseOrderView' }
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
+import dayjs from 'dayjs'
 import {
   PlusOutlined,
   SearchOutlined,
@@ -287,13 +323,17 @@ import { filterPurchaseOrders } from '@/mock/purchaseOrders'
 import {
   purchaseOrderState,
   approvePurchaseOrder,
-  reverseApprovePurchaseOrder,
   voidPurchaseOrder,
   completePurchaseOrder,
   canEditPurchaseOrder,
   canApprovePurchaseOrder,
   canVoidPurchaseOrder,
-  canReverseApprovePurchaseOrder,
+  canSubmitPurchaseOrder,
+  submitPurchaseOrderForApprove,
+  canWithdrawPurchaseOrder,
+  withdrawPurchaseOrder,
+  canResubmitPurchaseOrder,
+  resubmitPurchaseOrder,
   canGenerateReceipt,
   canGenerateInbound,
   canCompletePurchaseOrder,
@@ -303,12 +343,14 @@ import { poStatusOptions, poSourceOptions, supplierOptions } from '@/mock/purcha
 import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
 import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vue'
 import PurchaseOrderPrintModal from './components/PurchaseOrderPrintModal.vue'
+import PurchaseOrderStatsPanel from './components/PurchaseOrderStatsPanel.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
+import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -317,7 +359,6 @@ const filters = reactive({
   orderNo: '',
   supplier: undefined,
   reqNo: '',
-  salesOrderNo: '',
   status: undefined,
   orderSource: undefined,
   documentDateRange: null,
@@ -339,13 +380,12 @@ const sourceOpts = poSourceOptions.map((v) => ({ label: v, value: v }))
 const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 90, fixed: 'left' },
-  { title: '入库状态', key: 'inboundStatus', width: 90, fixed: 'left' },
   { title: '采购单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
+  { title: '入库状态', key: 'inboundStatus', width: 90 },
   { title: '采购申请单号', dataIndex: 'reqNo', width: 150, ellipsis: true },
   { title: '采购类型', dataIndex: 'applyType', width: 100 },
   { title: '供应商', dataIndex: 'supplier', width: 130, ellipsis: true },
   { title: '合同编号', dataIndex: 'contractNo', width: 120, ellipsis: true },
-  { title: '销售单号', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '生产工单号', dataIndex: 'workOrderNo', width: 120, ellipsis: true },
   { title: '结算类型', dataIndex: 'settlementType', width: 110 },
   { title: '结算周期', dataIndex: 'settlementCycle', width: 90 },
@@ -355,15 +395,17 @@ const baseColumns = [
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { title: '采购员', dataIndex: 'purchaser', width: 90 },
   { title: '订单来源', dataIndex: 'orderSource', width: 100 },
-  { title: '送货日期', dataIndex: 'shippingDate', width: 110 },
+  { title: '审批人', key: 'approverName', dataIndex: 'approverName', width: 90 },
+  { title: '审批时间', key: 'approvedAt', width: 140 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
-  { title: '创建日期', dataIndex: 'documentDate', width: 110 },
-  { title: '审批人姓名', dataIndex: 'approverName', width: 100 },
-  { title: '操作', key: 'action', width: 220, fixed: 'right' },
+  { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 140 },
+  { title: '更新人', key: 'updater', dataIndex: 'updater', width: 90 },
+  { title: '更新时间', key: 'updatedAt', dataIndex: 'updatedAt', width: 140 },
+  { title: '操作', key: 'action', width: 240, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-list-v3', baseColumns)
+  useTableColumnSettings('purchase-order-list-v7', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -375,7 +417,24 @@ const filteredList = computed(() => {
   } else {
     f.documentDateRange = null
   }
+  const statusRank = {
+    待提交: 0,
+    已拒绝: 1,
+    待审核: 2,
+    进行中: 3,
+    已完成: 4,
+    已作废: 5,
+  }
   return filterPurchaseOrders(purchaseOrderState.orders, f)
+    .filter((o) => o.status !== '草稿')
+    .sort((a, b) => {
+      const ra = statusRank[a.status] ?? 99
+      const rb = statusRank[b.status] ?? 99
+      if (ra !== rb) return ra - rb
+      const ta = dayjs(a.createdAt || a.documentDate).valueOf() || 0
+      const tb = dayjs(b.createdAt || b.documentDate).valueOf() || 0
+      return tb - ta
+    })
 })
 
 const pagedList = computed(() => {
@@ -402,6 +461,8 @@ function rowIndex(index) {
 
 function statusColor(status) {
   const map = {
+    草稿: 'processing',
+    待提交: 'default',
     待审核: 'default',
     进行中: 'processing',
     已拒绝: 'error',
@@ -418,18 +479,35 @@ function inboundColor(status) {
 
 function hasRowActions(record) {
   return (
+    record.status === '草稿' ||
+    record.status === '进行中' ||
     canEditPurchaseOrder(record) ||
-    canApprovePurchaseOrder(record) ||
+    canSubmitPurchaseOrder(record) ||
+    canWithdrawPurchaseOrder(record) ||
+    canResubmitPurchaseOrder(record) ||
     canVoidPurchaseOrder(record) ||
-    canCompletePurchaseOrder(record) ||
-    canReverseApprovePurchaseOrder(record)
+    canGenerateReceipt(record) ||
+    canGenerateInbound(record)
   )
 }
 
 function openDetail(record) {
+  if (record.status === '草稿') {
+    continueDraft(record)
+    return
+  }
   const path = `/procurement/purchase-orders/${record.id}`
   openTab(path, `采购订单 ${record.orderNo}`)
   router.push({ name: 'procurement-purchase-orders-detail', params: { id: record.id } })
+}
+
+function continueDraft(record) {
+  const ids = (record.sourceReqIds || []).join(',')
+  const path = `/procurement/purchase-req/generate-po?draftId=${record.id}${
+    ids ? `&ids=${ids}` : ''
+  }`
+  openTab(path, '生成采购订单')
+  router.push(path)
 }
 
 function handleSearch() {
@@ -441,7 +519,6 @@ function handleReset() {
   filters.orderNo = ''
   filters.supplier = undefined
   filters.reqNo = ''
-  filters.salesOrderNo = ''
   filters.status = undefined
   filters.orderSource = undefined
   filters.documentDateRange = null
@@ -471,9 +548,28 @@ function openCreate() {
   openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
+function openToolbarApprove() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条待审核的采购单后再审核')
+    return
+  }
+  const order = purchaseOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
+    message.warning('未找到所选采购单')
+    return
+  }
+  if (!canApprovePurchaseOrder(order)) {
+    message.warning('仅「待审核」状态的采购单可审核')
+    return
+  }
+  const path = `/procurement/purchase-orders/${order.id}/approve`
+  openTab(path, `审核采购单 ${order.orderNo || ''}`.trim())
+  router.push({ name: 'procurement-purchase-orders-approve', params: { id: order.id } })
+}
+
 function openEdit(record) {
   if (!canEditPurchaseOrder(record)) {
-    message.warning('仅待审核 / 已拒绝的采购单可编辑')
+    message.warning('仅待提交 / 已拒绝的采购单可编辑')
     return
   }
   openCreateTab(router, openTab, {
@@ -493,7 +589,7 @@ function openReceiptModal() {
     return
   }
   if (!canGenerateReceipt(order)) {
-    message.warning('仅进行中且未完全入库的采购单可生成收货单')
+    message.warning('仅进行中且仍有可收货/入库数量的采购单可生成收货单')
     return
   }
   receiptOrder.value = order
@@ -511,21 +607,87 @@ function openInboundModal() {
     return
   }
   if (!canGenerateInbound(order)) {
-    message.warning('仅进行中且未完全入库的采购单可生成入库单')
+    message.warning('仅进行中且仍有可收货/入库数量的采购单可生成入库单')
     return
   }
   inboundOrder.value = order
   inboundModalOpen.value = true
 }
 
-function openApprove(record) {
-  if (!canApprovePurchaseOrder(record)) {
-    message.warning('当前状态不可审核')
+function openReceiptForRow(record) {
+  if (!canGenerateReceipt(record)) {
+    message.warning('仅进行中且仍有可收货/入库数量的采购单可生成收货单')
     return
   }
+  receiptOrder.value = record
+  receiptModalOpen.value = true
+}
+
+function openInboundForRow(record) {
+  if (!canGenerateInbound(record)) {
+    message.warning('仅进行中且仍有可收货/入库数量的采购单可生成入库单')
+    return
+  }
+  inboundOrder.value = record
+  inboundModalOpen.value = true
+}
+
+function openPurchaseReturnCreate(order) {
+  if (!order?.orderNo) return
   openCreateTab(router, openTab, {
-    path: `/procurement/purchase-orders/${record.id}/approve`,
-    title: `审核采购单 ${record.orderNo || ''}`.trim(),
+    path: '/procurement/purchase-returns/new',
+    title: '新增采购退货单',
+    query: { purchaseOrderNo: order.orderNo },
+  })
+}
+
+function openPurchaseReturnFromToolbar() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条进行中的采购单后再采购退货')
+    return
+  }
+  const order = purchaseOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
+    message.warning('未找到所选采购单')
+    return
+  }
+  if (order.status !== '进行中') {
+    message.warning('仅进行中的采购单可采购退货')
+    return
+  }
+  openPurchaseReturnCreate(order)
+}
+
+function handleSubmit(record) {
+  Modal.confirm({
+    title: '确认提交审核',
+    content: `确定提交采购单「${record.orderNo}」审核吗？`,
+    onOk: () => {
+      const result = submitPurchaseOrderForApprove(record.id)
+      result.ok ? message.success(result.message) : message.warning(result.message)
+    },
+  })
+}
+
+function handleWithdraw(record) {
+  Modal.confirm({
+    title: '确认撤回',
+    content: `确定撤回采购单「${record.orderNo}」吗？撤回后可继续编辑。`,
+    onOk: () => {
+      const result = withdrawPurchaseOrder(record.id)
+      result.ok ? message.success(result.message) : message.warning(result.message)
+    },
+  })
+}
+
+function handleResubmit(record) {
+  Modal.confirm({
+    title: '确认重新提交',
+    content: `确定重新提交采购单「${record.orderNo}」审核吗？`,
+    onOk: () => {
+      const result = resubmitPurchaseOrder(record.id)
+      result.ok ? message.success(result.message) : message.warning(result.message)
+    },
   })
 }
 
@@ -536,28 +698,6 @@ function handleVoid(record) {
     okType: 'danger',
     onOk: () => {
       const result = voidPurchaseOrder(record.id)
-      result.ok ? message.success(result.message) : message.warning(result.message)
-    },
-  })
-}
-
-function handleReverse(record) {
-  Modal.confirm({
-    title: '确认反审',
-    content: `确定反审采购单「${record.orderNo}」吗？反审后状态回退为待审核。`,
-    onOk: () => {
-      const result = reverseApprovePurchaseOrder(record.id)
-      result.ok ? message.success(result.message) : message.warning(result.message)
-    },
-  })
-}
-
-function handleCompleteOne(record) {
-  Modal.confirm({
-    title: '确认完成',
-    content: `确定完成采购单「${record.orderNo}」吗？`,
-    onOk: () => {
-      const result = completePurchaseOrder(record.id)
       result.ok ? message.success(result.message) : message.warning(result.message)
     },
   })
@@ -595,29 +735,6 @@ function handleBatchVoid() {
     onOk: () => {
       targets.forEach((o) => voidPurchaseOrder(o.id))
       message.success(`已作废 ${targets.length} 条采购单`)
-      selectedRowKeys.value = []
-    },
-  })
-}
-
-function handleBatchReverse() {
-  if (!selectedRowKeys.value.length) {
-    message.warning('请先选择要反审的采购单')
-    return
-  }
-  const targets = getPurchaseOrdersByIds(selectedRowKeys.value).filter(
-    canReverseApprovePurchaseOrder,
-  )
-  if (!targets.length) {
-    message.warning('仅「进行中」且入库状态为「待入库」的采购单可反审')
-    return
-  }
-  Modal.confirm({
-    title: '批量反审',
-    content: `确定反审选中的 ${targets.length} 条采购单吗？反审后状态回退为待审核。`,
-    onOk: () => {
-      targets.forEach((o) => reverseApprovePurchaseOrder(o.id))
-      message.success(`已反审 ${targets.length} 条采购单`)
       selectedRowKeys.value = []
     },
   })

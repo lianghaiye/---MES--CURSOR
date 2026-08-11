@@ -39,6 +39,12 @@ const BUILTIN_SEED = [
     module: '质量管理',
     values: ['财物变现', '直接弃用'],
   },
+  {
+    code: 'purchase_return_type',
+    name: '退货类型',
+    module: '采购管理',
+    values: ['换货', '退货'],
+  },
 ]
 
 let itemSeq = 0
@@ -141,7 +147,7 @@ function normalizeStored(parsed) {
 
 function ensureDictModules(dicts = []) {
   const seedByCode = Object.fromEntries(buildSeedDicts().map((d) => [d.code, d]))
-  return dicts.map((d) => {
+  const normalized = dicts.map((d) => {
     const seed = seedByCode[d.code]
     const items = (d.items || []).map((it) =>
       createDictItem({
@@ -155,6 +161,11 @@ function ensureDictModules(dicts = []) {
       items,
     })
   })
+  const existing = new Set(normalized.map((d) => d.code))
+  buildSeedDicts().forEach((seed) => {
+    if (!existing.has(seed.code)) normalized.push(seed)
+  })
+  return normalized
 }
 
 function loadFromStorage() {
