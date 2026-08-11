@@ -2,6 +2,8 @@
  * 采购订单打印预览：与工单打印同款 sessionStorage + 新窗口预览逻辑
  */
 
+import { computePurchaseOrderOverdueStatus } from '@/mock/purchaseOrders'
+
 const STORAGE_PREFIX = 'purchase-order-print-preview:'
 
 function formatPrintFieldValue(value) {
@@ -62,6 +64,10 @@ export function buildPurchaseOrderPrintPayload(order, options = {}) {
     { label: '订单来源', value: order.orderSource },
     { label: '状态', value: order.status },
     { label: '入库状态', value: order.inboundStatus },
+    {
+      label: '逾期状态',
+      value: order.overdueStatus || computePurchaseOrderOverdueStatus(order),
+    },
     { label: '结算类型', value: order.settlementType },
     { label: '结算周期', value: order.settlementCycle },
     { label: '结算方式', value: order.settlementMethod },

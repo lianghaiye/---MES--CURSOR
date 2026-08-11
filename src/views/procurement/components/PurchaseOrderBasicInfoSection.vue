@@ -78,7 +78,7 @@ const fields = computed(() => [
     format: (o) => (o.leadTimeDays != null && o.leadTimeDays !== '' ? String(o.leadTimeDays) : '—'),
   },
   { key: 'deliveryDate', label: '交货日期' },
-  { key: 'receivingWarehouse', label: '交货仓库' },
+  { key: 'receivingWarehouse', label: '收货仓库' },
   { key: 'shippingAddress', label: '交货地址' },
   { key: 'contactPerson', label: '联系人' },
   { key: 'contactPhone', label: '联系方式' },

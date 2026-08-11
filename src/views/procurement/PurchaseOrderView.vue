@@ -58,6 +58,17 @@
               />
             </a-form-item>
           </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="逾期状态">
+              <a-select
+                v-model:value="filters.overdueStatus"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="overdueOpts"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="单据日期">
               <a-range-picker
@@ -174,6 +185,11 @@
           </template>
           <template v-else-if="column.key === 'inboundStatus'">
             <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'overdueStatus'">
+            <a-tag :color="overdueColor(overdueStatusOf(record))">
+              {{ overdueStatusOf(record) }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'approverName'">
             {{ record.approverName || '—' }}
@@ -306,7 +322,7 @@ export default { name: 'PurchaseOrderView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -319,7 +335,7 @@ import {
   CheckCircleOutlined,
   InboxOutlined,
 } from '@ant-design/icons-vue'
-import { filterPurchaseOrders } from '@/mock/purchaseOrders'
+import { filterPurchaseOrders, computePurchaseOrderOverdueStatus } from '@/mock/purchaseOrders'
 import {
   purchaseOrderState,
   approvePurchaseOrder,
@@ -338,8 +354,14 @@ import {
   canGenerateInbound,
   canCompletePurchaseOrder,
   getPurchaseOrdersByIds,
+  refreshPurchaseOrderOverdueStatusAll,
 } from '@/store/purchaseOrderStore'
-import { poStatusOptions, poSourceOptions, supplierOptions } from '@/mock/purchaseOrderOptions'
+import {
+  poStatusOptions,
+  poSourceOptions,
+  supplierOptions,
+  overdueStatusOptions,
+} from '@/mock/purchaseOrderOptions'
 import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
 import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vue'
 import PurchaseOrderPrintModal from './components/PurchaseOrderPrintModal.vue'
@@ -361,6 +383,7 @@ const filters = reactive({
   reqNo: '',
   status: undefined,
   orderSource: undefined,
+  overdueStatus: undefined,
   documentDateRange: null,
 })
 const appliedFilters = ref({ ...filters })
@@ -376,12 +399,14 @@ const pagination = reactive({ current: 1, pageSize: 10 })
 const supplierOpts = supplierOptions
 const statusOpts = poStatusOptions.map((v) => ({ label: v, value: v }))
 const sourceOpts = poSourceOptions.map((v) => ({ label: v, value: v }))
+const overdueOpts = overdueStatusOptions.map((v) => ({ label: v, value: v }))
 
 const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 90, fixed: 'left' },
   { title: '采购单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
   { title: '入库状态', key: 'inboundStatus', width: 90 },
+  { title: '逾期状态', key: 'overdueStatus', width: 90 },
   { title: '采购申请单号', dataIndex: 'reqNo', width: 150, ellipsis: true },
   { title: '采购类型', dataIndex: 'applyType', width: 100 },
   { title: '供应商', dataIndex: 'supplier', width: 130, ellipsis: true },
@@ -405,7 +430,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-list-v7', baseColumns)
+  useTableColumnSettings('purchase-order-list-v8', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -477,6 +502,14 @@ function inboundColor(status) {
   return map[status] || 'default'
 }
 
+function overdueStatusOf(record) {
+  return record?.overdueStatus || computePurchaseOrderOverdueStatus(record)
+}
+
+function overdueColor(status) {
+  return status === '已逾期' ? 'error' : 'default'
+}
+
 function hasRowActions(record) {
   return (
     record.status === '草稿' ||
@@ -521,10 +554,15 @@ function handleReset() {
   filters.reqNo = ''
   filters.status = undefined
   filters.orderSource = undefined
+  filters.overdueStatus = undefined
   filters.documentDateRange = null
   appliedFilters.value = { ...filters }
   pagination.current = 1
 }
+
+onMounted(() => {
+  refreshPurchaseOrderOverdueStatusAll()
+})
 
 function stubAction(name) {
   message.info(`${name}功能开发中`)

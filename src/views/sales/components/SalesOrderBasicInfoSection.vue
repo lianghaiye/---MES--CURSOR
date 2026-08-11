@@ -41,7 +41,7 @@ function fieldText(field) {
 const metaItems = computed(() => {
   const o = props.order
   return [
-    { key: 'progressStatus', label: '订单状态', value: display(o.progressStatus) },
+    { key: 'progressStatus', label: '状态', value: display(o.progressStatus) },
     { key: 'deliveryStatus', label: '发货状态', value: display(o.deliveryStatus) },
     { key: 'creator', label: '创建人', value: display(o.creator) },
     { key: 'createdAt', label: '创建时间', value: display(o.createdAt) },

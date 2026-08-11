@@ -1572,7 +1572,7 @@ function handleSave() {
     orderSource: '内部新增',
     region: '华北',
     salesChannel: '直销',
-    progressStatus: '未审',
+    progressStatus: '待提交',
     deliveryStatus: '未发货',
     inventoryStatus: '充足',
     totalIssuedQty: 0,

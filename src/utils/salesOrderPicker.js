@@ -27,7 +27,7 @@ export function isSalesOrderSelectable(
 ) {
   if (!order) return false
   const set = excludeStatuses instanceof Set ? excludeStatuses : new Set(excludeStatuses || [])
-  return !set.has(order.status)
+  return !set.has(order.progressStatus || order.status)
 }
 
 export function getAllSalesOrderOptions(orders = [], { excludeStatuses } = {}) {

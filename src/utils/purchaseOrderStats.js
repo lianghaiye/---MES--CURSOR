@@ -1,8 +1,8 @@
 /**
  * 采购订单列表顶部统计（与列表筛选独立）
  */
-import dayjs from 'dayjs'
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
+import { computePurchaseOrderOverdueStatus } from '@/mock/purchaseOrders'
 import { calcPoLineReceivedQty } from '@/utils/purchaseLineInbound'
 import { getPeriodRange, getPreviousPeriodRange, STAT_PERIOD_OPTIONS } from '@/utils/deliveryStats'
 
@@ -35,7 +35,6 @@ function sumPurchaseMetrics(orders, start, end) {
   let inboundQty = 0
   let amountExTax = 0
   let overdueCount = 0
-  const today = dayjs().format('YYYY-MM-DD')
 
   for (const order of orders || []) {
     if (!isStatOrder(order)) continue
@@ -54,13 +53,10 @@ function sumPurchaseMetrics(orders, start, end) {
     purchaseQty += orderPurchase
     inboundQty += orderInbound
 
-    const deliveryDate = String(order.deliveryDate || '').slice(0, 10)
-    const unfinished =
-      order.status === '进行中' &&
-      order.inboundStatus !== '已入库' &&
-      deliveryDate &&
-      deliveryDate < today
-    if (unfinished) overdueCount += 1
+    const overdue = order.overdueStatus || computePurchaseOrderOverdueStatus(order)
+    if (order.status === '进行中' && order.inboundStatus !== '已入库' && overdue === '已逾期') {
+      overdueCount += 1
+    }
   }
 
   return {

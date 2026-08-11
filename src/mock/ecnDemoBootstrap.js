@@ -278,7 +278,7 @@ export function buildEcnDemoSalesOrder() {
     customerName: '山东化工泵业集团',
     region: '华北',
     salesperson: '王芳',
-    progressStatus: '已审',
+    progressStatus: '进行中',
     businessType: '自产销售',
     documentDate: '2026-06-10',
     createdAt: '2026-06-10 09:00',

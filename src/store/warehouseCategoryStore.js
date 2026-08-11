@@ -4,7 +4,7 @@ import { createWarehouseCategorySeed } from '@/mock/warehouseCategorySeed'
 
 const STORAGE_KEY = 'i_doms_warehouse_categories'
 const SEED_VERSION_KEY = 'i_doms_warehouse_categories_seed_v'
-const CURRENT_SEED_VERSION = '1'
+const CURRENT_SEED_VERSION = '2'
 
 function loadFromStorage() {
   try {
@@ -19,8 +19,18 @@ function loadFromStorage() {
   return null
 }
 
-function shouldReseed() {
-  return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
+function ensureSemiFinishedCategory(list) {
+  const rows = Array.isArray(list) ? [...list] : []
+  if (rows.some((c) => c.id === 'wcat-004' || c.name === '半成品仓')) return rows
+  rows.push({
+    id: 'wcat-004',
+    code: '4',
+    name: '半成品仓',
+    creator: 'admin',
+    createdDept: '生产部',
+    createdAt: '2026-08-11 13:40:00',
+  })
+  return rows
 }
 
 function persist() {
@@ -32,9 +42,7 @@ function persist() {
 }
 
 export const warehouseCategoryState = reactive({
-  categories: shouldReseed()
-    ? createWarehouseCategorySeed()
-    : loadFromStorage() || createWarehouseCategorySeed(),
+  categories: ensureSemiFinishedCategory(loadFromStorage() || createWarehouseCategorySeed()),
 })
 
 watch(

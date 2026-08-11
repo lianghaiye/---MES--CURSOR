@@ -5,48 +5,81 @@
         <div class="page-header">
           <div class="header-left">
             <span class="order-no">{{ order.orderNo }}</span>
-            <a-tag :color="progressColor(order.progressStatus)">{{ order.progressStatus }}</a-tag>
-            <a-tag :color="order.deliveryStatus === '未发货' ? 'default' : 'processing'">
+            <a-tag :color="salesOrderStatusColor(order.progressStatus)">{{
+              order.progressStatus
+            }}</a-tag>
+            <a-tag :color="salesDeliveryStatusColor(order.deliveryStatus)">
               {{ order.deliveryStatus || '未发货' }}
             </a-tag>
           </div>
           <a-space :size="8">
-            <template v-if="order.progressStatus === '未审'">
-              <a-button type="primary" size="small" @click="handleApprove">审核</a-button>
+            <template v-if="canEditSalesOrder(order)">
+              <a-button
+                v-if="canSubmitSalesOrder(order)"
+                type="primary"
+                size="small"
+                @click="handleSubmit"
+              >
+                提交审核
+              </a-button>
+              <a-button
+                v-if="canResubmitSalesOrder(order)"
+                type="primary"
+                size="small"
+                @click="handleResubmit"
+              >
+                重新提交
+              </a-button>
               <a-button size="small" @click="handleEdit">编辑</a-button>
               <a-button size="small" danger @click="handleDelete">删除</a-button>
             </template>
-            <template v-else-if="order.progressStatus === '已审'">
+            <template v-else-if="canApproveSalesOrder(order)">
+              <a-button type="primary" size="small" @click="openApprovePage">审核</a-button>
+              <a-button size="small" @click="handleWithdraw">撤回</a-button>
+            </template>
+            <template v-else-if="canRevokeSalesOrderApproval(order)">
               <a-button size="small" @click="handleRevokeApprove">反审</a-button>
               <a-button type="primary" size="small" @click="handleApplyDelivery">申请发货</a-button>
               <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
               <a-button size="small" @click="stubAction('打印')">打印</a-button>
               <a-button size="small" @click="handleComplete">完成</a-button>
-              <a-button size="small" danger @click="handleTerminate">终止</a-button>
+              <a-button size="small" danger @click="handleTerminate">作废</a-button>
+            </template>
+            <template v-else-if="order.progressStatus === '已完成'">
+              <a-button size="small" @click="stubAction('打印')">打印</a-button>
             </template>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
 
-        <a-tabs v-model:active-key="activeTab" class="detail-tabs">
-          <a-tab-pane key="overview" tab="概览" />
-          <a-tab-pane key="delivery" :tab="`发货申请 (${relations.deliveryApplications.length})`" />
-          <a-tab-pane key="outbound" :tab="`出库单 (${relations.outboundOrders.length})`" />
-          <a-tab-pane key="purchase" :tab="`采购 (${purchaseTabCount})`" />
-          <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
-          <a-tab-pane key="outsourcing" :tab="`外协 (${relations.outsourcingOrders.length})`" />
-          <a-tab-pane key="attachments" :tab="`附件 (${relations.attachments.length})`" />
-          <a-tab-pane key="ebom-info">
-            <template #tab>
-              <span>EBOM信息</span>
-              <a-badge
-                v-if="bomChangedCount"
-                :count="bomChangedCount"
-                :number-style="{ backgroundColor: '#fa8c16', marginLeft: '6px' }"
-              />
-            </template>
-          </a-tab-pane>
-        </a-tabs>
+        <div class="detail-tabs-wrap">
+          <a-tabs
+            v-model:active-key="activeTab"
+            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+          >
+            <a-tab-pane key="overview" tab="概览" />
+            <a-tab-pane
+              key="delivery"
+              :tab="`发货申请 (${relations.deliveryApplications.length})`"
+            />
+            <a-tab-pane key="outbound" :tab="`出库单 (${relations.outboundOrders.length})`" />
+            <a-tab-pane key="purchase" :tab="`采购 (${purchaseTabCount})`" />
+            <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
+            <a-tab-pane key="outsourcing" :tab="`外协 (${relations.outsourcingOrders.length})`" />
+            <a-tab-pane key="attachments" :tab="`附件 (${relations.attachments.length})`" />
+            <a-tab-pane key="ebom-info">
+              <template #tab>
+                <span>EBOM信息</span>
+                <a-badge
+                  v-if="bomChangedCount"
+                  :count="bomChangedCount"
+                  :number-style="{ backgroundColor: '#fa8c16', marginLeft: '6px' }"
+                />
+              </template>
+            </a-tab-pane>
+            <a-tab-pane key="approval" tab="审批信息" />
+          </a-tabs>
+        </div>
 
         <div class="tab-body">
           <template v-if="activeTab === 'overview'">
@@ -609,6 +642,27 @@
               <a-empty v-else description="暂无附件" />
             </div>
           </template>
+
+          <template v-else-if="activeTab === 'approval'">
+            <div class="section-card">
+              <div class="section-title">审批记录</div>
+              <a-divider style="margin: 12px 0" />
+              <div v-if="approvalRecords.length" class="history-list">
+                <div v-for="(item, idx) in approvalRecords" :key="idx" class="history-item">
+                  <div class="history-head">
+                    <span class="history-user">{{ item.name }}</span>
+                    <span class="history-role">（{{ item.role }}）</span>
+                    <a-tag :color="approvalResultColor(item.result)" size="small">
+                      {{ item.result }}
+                    </a-tag>
+                    <span class="history-time">{{ item.time }}</span>
+                  </div>
+                  <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
+                </div>
+              </div>
+              <a-empty v-else description="暂无审批记录" />
+            </div>
+          </template>
         </div>
       </template>
 
@@ -639,15 +693,22 @@ import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { workOrderState } from '@/store/workOrderStore'
 import {
   deleteSalesOrder,
-  approveSalesOrder,
   revokeSalesOrderApproval,
   canEditSalesOrder,
   canChangeDeliveryMode,
+  canApproveSalesOrder,
+  canSubmitSalesOrder,
+  canResubmitSalesOrder,
+  canRevokeSalesOrderApproval,
+  submitSalesOrderForApprove,
+  withdrawSalesOrder,
+  resubmitSalesOrder,
 } from '@/store/salesOrderStore'
 import {
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
-  hasDispatchedWorkOrdersForSalesOrder,
+  hasSalesOrderRevokeBlockers,
 } from '@/utils/salesOrderRevokeApproval'
+import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOrderStatus'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import {
@@ -694,6 +755,14 @@ function initActiveTab() {
 const activeTab = ref(initActiveTab())
 
 const relations = computed(() => resolveSalesOrderRelations(order.value))
+
+const approvalRecords = computed(() => order.value?.approvalRecords || [])
+
+function approvalResultColor(result) {
+  if (result === '已通过') return 'success'
+  if (result === '已驳回' || result === '已拒绝') return 'error'
+  return 'default'
+}
 
 const orderPricing = computed(() => {
   if (!order.value) {
@@ -1117,12 +1186,6 @@ function formatMoney(val) {
   return Number(val || 0).toFixed(2)
 }
 
-function progressColor(status) {
-  if (status === '已审') return 'success'
-  if (status === '未审') return 'warning'
-  return 'default'
-}
-
 function displayCell(line, column) {
   const val = line[column.dataIndex]
   return val !== undefined && val !== null && val !== '' ? val : '—'
@@ -1140,27 +1203,49 @@ function reloadOrder() {
   order.value = getSalesOrderById(route.params.id)
 }
 
-function handleApprove() {
+function openApprovePage() {
   if (!order.value) return
-  Modal.confirm({
-    content: '审核通过？',
-    okText: '是',
-    cancelText: '否',
-    onOk: () => {
-      const res = approveSalesOrder(order.value.id)
-      if (res.ok) {
-        message.success(res.message)
-        reloadOrder()
-      } else {
-        message.warning(res.message)
-      }
-    },
-  })
+  const path = `/sales/orders/${order.value.id}/approve`
+  openTab(path, `审核销售订单 ${order.value.orderNo || ''}`.trim())
+  router.push({ name: 'sales-orders-approve', params: { id: order.value.id } })
+}
+
+function handleSubmit() {
+  if (!order.value) return
+  const res = submitSalesOrderForApprove(order.value.id)
+  if (res.ok) {
+    message.success(res.message)
+    reloadOrder()
+  } else {
+    message.warning(res.message)
+  }
+}
+
+function handleResubmit() {
+  if (!order.value) return
+  const res = resubmitSalesOrder(order.value.id)
+  if (res.ok) {
+    message.success(res.message)
+    reloadOrder()
+  } else {
+    message.warning(res.message)
+  }
+}
+
+function handleWithdraw() {
+  if (!order.value) return
+  const res = withdrawSalesOrder(order.value.id)
+  if (res.ok) {
+    message.success(res.message)
+    reloadOrder()
+  } else {
+    message.warning(res.message)
+  }
 }
 
 function handleEdit() {
   if (!order.value || !canEditSalesOrder(order.value)) {
-    message.warning('已审核的销售订单不可编辑')
+    message.warning('当前状态不可编辑')
     return
   }
   openCreateTab(router, openTab, {
@@ -1171,7 +1256,7 @@ function handleEdit() {
 
 function handleDelete() {
   if (!order.value || !canEditSalesOrder(order.value)) {
-    message.warning('已审核的销售订单不可删除')
+    message.warning('当前状态不可删除')
     return
   }
   Modal.confirm({
@@ -1188,7 +1273,7 @@ function handleDelete() {
 
 function handleRevokeApprove() {
   if (!order.value) return
-  if (hasDispatchedWorkOrdersForSalesOrder(order.value)) {
+  if (hasSalesOrderRevokeBlockers(order.value)) {
     Modal.warning({
       title: '无法反审',
       content: SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
@@ -1197,7 +1282,7 @@ function handleRevokeApprove() {
     return
   }
   Modal.confirm({
-    content: '确认反审该销售订单？',
+    content: '确认反审该销售订单？反审后将恢复为待审核。',
     okText: '是',
     cancelText: '否',
     onOk: () => {
@@ -1226,7 +1311,7 @@ function handleApplyDelivery() {
 function handleChangeDeliveryMode() {
   if (!order.value) return
   if (!canChangeDeliveryMode(order.value)) {
-    message.warning('仅已审核的自产销售订单可变更交付方式')
+    message.warning('仅「进行中」的自产销售订单可变更交付方式')
     return
   }
   if (!buildEligibleDeliveryModeLines(order.value).length) {
@@ -1259,12 +1344,12 @@ function handleComplete() {
 function handleTerminate() {
   if (!order.value) return
   Modal.confirm({
-    title: '确认终止',
-    content: `确定终止销售订单「${order.value.orderNo}」吗？`,
+    title: '确认作废',
+    content: `确定作废销售订单「${order.value.orderNo}」吗？`,
     okType: 'danger',
     onOk: () => {
-      order.value.progressStatus = '已终止'
-      message.success('订单已终止')
+      order.value.progressStatus = '已作废'
+      message.success('订单已作废')
       reloadOrder()
     },
   })
@@ -1361,12 +1446,6 @@ function openBomDetail(bomId, bomName) {
   font-size: 16px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
-}
-
-.detail-tabs {
-  background: #fff;
-  padding: 0 12px;
-  margin: 0;
 }
 
 .tab-body {
@@ -1511,5 +1590,42 @@ function openBomDetail(bomId, bomName) {
 
 .sub-table {
   margin-bottom: 12px;
+}
+
+.history-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.history-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.history-user {
+  font-weight: 500;
+}
+
+.history-role {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.history-time {
+  margin-left: auto;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.history-opinion {
+  margin-top: 6px;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 13px;
 }
 </style>

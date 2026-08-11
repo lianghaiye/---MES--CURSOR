@@ -190,8 +190,6 @@
       </div>
     </div>
 
-    <DeliveryFormModal v-model:open="formOpen" :record="editingRecord" @saved="onFormSaved" />
-
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -245,7 +243,6 @@ import {
   DELIVERY_STATUS_OPTIONS,
 } from '@/utils/deliveryOrder'
 import DeliveryStatsPanel from './components/DeliveryStatsPanel.vue'
-import DeliveryFormModal from './components/DeliveryFormModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
@@ -271,8 +268,6 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const selectedRowKeys = ref([])
-const formOpen = ref(false)
-const editingRecord = ref(null)
 
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
@@ -388,12 +383,15 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  editingRecord.value = record
-  formOpen.value = true
-}
-
-function onFormSaved() {
-  refreshOutboundQtyAll()
+  if (!canEditDeliveryOrder(record)) {
+    message.warning('当前状态不可编辑')
+    return
+  }
+  if (!record?.id) return
+  openCreateTab(router, openTab, {
+    path: `/sales/delivery/${record.id}/edit`,
+    title: `编辑发货单 ${record.deliveryCode || ''}`.trim(),
+  })
 }
 
 function handleGenerateOutbound() {

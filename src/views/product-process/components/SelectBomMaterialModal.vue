@@ -343,6 +343,8 @@ const props = defineProps({
   includeSpuTemplates: { type: Boolean, default: false },
   /** 仅展示可销售产品族 */
   spuCanSellOnly: { type: Boolean, default: true },
+  /** 打开时预勾选的主数据 id（产品/物料），配合 multiple 回显已选 */
+  initialSelectedIds: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:open', 'selected'])
@@ -603,13 +605,44 @@ watch(
     catalogKindFilter.value = undefined
     page.value = 1
     appliedFilterConditions.value = []
-    selectedRowKeys.value = []
-    selectedRows.value = []
     columnSettings.value = JSON.parse(JSON.stringify(buildDefaultColumnSettings()))
     listVersion.value += 1
     invalidateBomSubItemPickerRowsCache()
+    seedInitialSelection()
   },
 )
+
+/** 按 initialSelectedIds 回显已选（优先匹配当前类型筛选下的行） */
+function seedInitialSelection() {
+  const ids = (props.initialSelectedIds || []).map(String).filter(Boolean)
+  if (!ids.length) {
+    selectedRowKeys.value = []
+    selectedRows.value = []
+    return
+  }
+  const idSet = new Set(ids)
+  const preferredType = props.pickerDefaultItemType || ''
+  const matches = []
+  const seen = new Set()
+  for (const row of allRows.value) {
+    const id = String(row.itemId || '')
+    if (!idSet.has(id) || seen.has(id)) continue
+    if (preferredType && row.itemType !== preferredType) continue
+    matches.push(row)
+    seen.add(id)
+  }
+  // 未命中首选类型时再兜底任意类型
+  if (matches.length < ids.length) {
+    for (const row of allRows.value) {
+      const id = String(row.itemId || '')
+      if (!idSet.has(id) || seen.has(id)) continue
+      matches.push(row)
+      seen.add(id)
+    }
+  }
+  selectedRowKeys.value = matches.map((r) => r.rowKey)
+  selectedRows.value = matches
+}
 
 function handleEcnSearch() {
   Object.assign(appliedEcnFilters, { ...ecnFilters })

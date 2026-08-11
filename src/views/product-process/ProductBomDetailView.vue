@@ -56,6 +56,9 @@
                       <a-descriptions-item label="BOM类型">
                         {{ record.bomType === '基础BOM' ? '基准BOM' : record.bomType || '产品BOM' }}
                       </a-descriptions-item>
+                      <a-descriptions-item v-if="isShipBom" label="适用产品" :span="2">
+                        {{ applicableProductsLabel }}
+                      </a-descriptions-item>
                       <a-descriptions-item label="BOM状态">
                         <a-tag :color="bomStatusColor(record.status)">{{ record.status }}</a-tag>
                       </a-descriptions-item>
@@ -67,7 +70,7 @@
                       </a-descriptions-item>
                     </a-descriptions>
                   </div>
-                  <div class="info-block">
+                  <div v-if="!isShipBom" class="info-block">
                     <div class="section-title">父项产品信息</div>
                     <a-descriptions :column="3" size="small" bordered class="basic-desc">
                       <a-descriptions-item label="物品名称">
@@ -183,7 +186,8 @@ import { Modal, message } from 'ant-design-vue'
 import { PrinterOutlined } from '@ant-design/icons-vue'
 import { getVersionsInGroup } from '@/mock/productBom'
 import { buildBomOperationLogs } from '@/mock/bomOperationLogs'
-import { defaultBomColumnSettings } from '@/mock/bomMaterialColumns'
+import { defaultBomColumnSettings, isShipBomType } from '@/mock/bomMaterialColumns'
+import { productInfoState } from '@/store/productInfoStore'
 import { defaultBomOverviewColumnSettings } from '@/mock/bomOverviewColumns'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
 import { bomStatusColor, isBomEditable } from '@/mock/productBomOptions'
@@ -283,6 +287,19 @@ const selectedNode = computed(() => {
 })
 
 const isSelectedRoot = computed(() => !selectedNode.value || selectedNode.value.isRoot)
+
+const isShipBom = computed(() => isShipBomType(record.value?.bomType))
+
+const applicableProductsLabel = computed(() => {
+  const ids = record.value?.applicableProductIds || []
+  if (!ids.length) return '未指定（可在编辑中选择适用产品）'
+  const products = productInfoState.products || []
+  const labels = ids.map((id) => {
+    const p = products.find((x) => String(x.id) === String(id))
+    return p ? [p.code, p.name].filter(Boolean).join(' ') : String(id)
+  })
+  return labels.join('、')
+})
 
 const selectedParentInfo = computed(() =>
   resolveBomNodeItemInfo(selectedNode.value, lineItems.value, rootForm.value),

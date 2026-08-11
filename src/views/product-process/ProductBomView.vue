@@ -102,6 +102,10 @@
           <PlusOutlined />
           新增基准BOM
         </a-button>
+        <a-button size="small" @click="openCreateShipBom">
+          <PlusOutlined />
+          新增发运BOM
+        </a-button>
         <a-button size="small" @click="handleBatchEnable">
           <CheckOutlined />
           审核发布
@@ -157,6 +161,12 @@
           </template>
           <template v-else-if="column.key === 'bomType'">
             {{ normalizeBomType(record.bomType) }}
+          </template>
+          <template v-else-if="column.key === 'itemName' || column.dataIndex === 'itemName'">
+            <span v-if="isShipBomType(record.bomType)">
+              {{ formatShipBomItemLabel(record) }}
+            </span>
+            <span v-else>{{ record.itemName || '—' }}</span>
           </template>
           <template v-else-if="column.key === 'version'">
             <a class="link-name" @click.prevent="openVersionDrawer(record)">{{ record.version }}</a>
@@ -310,7 +320,7 @@ import {
   isBomActive,
   isBomArchived,
 } from '@/mock/productBomOptions'
-import { normalizeBomType } from '@/mock/bomMaterialColumns'
+import { normalizeBomType, isShipBomType, SHIP_KIT_ITEM_TYPE } from '@/mock/bomMaterialColumns'
 import { productBomState } from '@/store/productBomStore'
 import {
   deleteProductBom,
@@ -399,7 +409,7 @@ const baseColumns = [
   { title: 'BOM名称', key: 'bomName', width: 160, fixed: 'left', ellipsis: true },
   { title: 'BOM编号', dataIndex: 'bomNo', width: 140, ellipsis: true },
   { title: 'BOM类型', key: 'bomType', width: 100 },
-  { title: '物品名称', dataIndex: 'itemName', width: 160, ellipsis: true },
+  { title: '物品/适用', key: 'itemName', dataIndex: 'itemName', width: 180, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
@@ -418,6 +428,14 @@ const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultC
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
+}
+
+function formatShipBomItemLabel(record) {
+  const n = Array.isArray(record.applicableProductIds) ? record.applicableProductIds.length : 0
+  if (record.itemType === SHIP_KIT_ITEM_TYPE || n > 0) {
+    return n > 0 ? `共用附件包 · 适用 ${n} 个产品` : '共用附件包 · 未指定产品'
+  }
+  return record.itemName || '—'
 }
 
 function handleSearch() {
@@ -456,6 +474,13 @@ function openCreateBaselineBom() {
   const path = '/product-process/bom/new'
   const query = { bomType: '基准BOM' }
   openTab(path, '新增基准BOM')
+  router.push({ path, query })
+}
+
+function openCreateShipBom() {
+  const path = '/product-process/bom/new'
+  const query = { bomType: '发运BOM' }
+  openTab(path, '新增发运BOM')
   router.push({ path, query })
 }
 

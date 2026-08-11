@@ -1,8 +1,10 @@
 import { workOrderState } from '@/store/workOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
+import { purchaseRequisitionState } from '@/store/purchaseRequisitionStore'
+import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
 
 export const SALES_ORDER_REVOKE_BLOCKED_MESSAGE =
-  '该销售订单已下发工单，继续操作将影响已下发的工单，如需要继续操作，请联系车间负责人手动终止生产计划与已下发的工单。'
+  '该销售订单已下达工单、采购申请或外协订单，不可反审。如需继续操作，请先处理关联单据。'
 
 function matchesSalesOrderNo(value, orderNo) {
   if (!value || !orderNo) return false
@@ -49,4 +51,48 @@ export function getDispatchedWorkOrdersForSalesOrder(order) {
 
 export function hasDispatchedWorkOrdersForSalesOrder(order) {
   return getDispatchedWorkOrdersForSalesOrder(order).length > 0
+}
+
+/** 关联采购申请 */
+export function findPurchaseRequisitionsForSalesOrder(order) {
+  if (!order) return []
+  const orderNo = order.orderNo
+  const orderId = order.id
+  return (purchaseRequisitionState.requisitions || []).filter((r) => {
+    if (order.purchaseRequisitionId && r.id === order.purchaseRequisitionId) return true
+    if (order.purchaseRequisitionNo && r.reqNo === order.purchaseRequisitionNo) return true
+    if (r.sourceSalesOrderId && r.sourceSalesOrderId === orderId) return true
+    return matchesSalesOrderNo(r.salesOrderNo, orderNo)
+  })
+}
+
+/** 关联外协订单（采购外协） */
+export function findOutsourcingOrdersForSalesOrder(order) {
+  if (!order) return []
+  const orderNo = order.orderNo
+  const orderId = order.id
+  return (outsourcingOrderState.orders || []).filter(
+    (o) => o.salesOrderId === orderId || matchesSalesOrderNo(o.salesOrderNo, orderNo),
+  )
+}
+
+/** 反审拦截：存在任意工单 / 采购申请 / 外协订单则不可反审 */
+export function getSalesOrderRevokeBlockers(order) {
+  const workOrders = findWorkOrdersForSalesOrder(order).all
+  const purchaseRequisitions = findPurchaseRequisitionsForSalesOrder(order)
+  const outsourcingOrders = findOutsourcingOrdersForSalesOrder(order)
+  return { workOrders, purchaseRequisitions, outsourcingOrders }
+}
+
+export function canRevokeSalesOrderByLinks(order) {
+  const blockers = getSalesOrderRevokeBlockers(order)
+  return (
+    blockers.workOrders.length === 0 &&
+    blockers.purchaseRequisitions.length === 0 &&
+    blockers.outsourcingOrders.length === 0
+  )
+}
+
+export function hasSalesOrderRevokeBlockers(order) {
+  return !canRevokeSalesOrderByLinks(order)
 }

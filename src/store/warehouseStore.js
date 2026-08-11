@@ -5,7 +5,7 @@ import { getWarehouseCategoryById } from '@/store/warehouseCategoryStore'
 
 const STORAGE_KEY = 'i_doms_warehouses'
 const SEED_VERSION_KEY = 'i_doms_warehouses_seed_v'
-const CURRENT_SEED_VERSION = '2'
+const CURRENT_SEED_VERSION = '3'
 
 export const WAREHOUSE_WORK_CENTERS = [
   '默认工厂',
@@ -30,8 +30,29 @@ function loadFromStorage() {
   return null
 }
 
-function shouldReseed() {
-  return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
+function ensureSemiFinishedWarehouse(list) {
+  const rows = Array.isArray(list) ? [...list] : []
+  if (rows.some((w) => w.id === 'wh-005' || w.name === '半成品仓' || w.code === 'BCP001')) {
+    return rows
+  }
+  rows.push({
+    id: 'wh-005',
+    code: 'BCP001',
+    name: '半成品仓',
+    categoryId: 'wcat-004',
+    categoryCode: '4',
+    categoryName: '半成品仓',
+    managerName: 'admin1',
+    workCenter: '机加车间',
+    enabled: true,
+    sortOrder: 5,
+    allowNegativeInventory: false,
+    address: '',
+    remark: '',
+    storedItems: [],
+    createdAt: '2026-08-11 13:40:00',
+  })
+  return rows
 }
 
 function persist() {
@@ -40,16 +61,20 @@ function persist() {
 }
 
 function normalizeWarehouseList(list) {
-  return (list || []).map((w) => ({
+  return ensureSemiFinishedWarehouse(list || []).map((w) => ({
     ...w,
     storedItems: Array.isArray(w.storedItems) ? [...w.storedItems] : [],
   }))
 }
 
+function loadInitialWarehouses() {
+  const stored = loadFromStorage()
+  // 有本地数据时只补录缺失仓，不整表重种，避免覆盖用户新增仓库
+  return normalizeWarehouseList(stored?.length ? stored : createWarehouseSeed())
+}
+
 export const warehouseState = reactive({
-  warehouses: normalizeWarehouseList(
-    shouldReseed() ? createWarehouseSeed() : loadFromStorage() || createWarehouseSeed(),
-  ),
+  warehouses: loadInitialWarehouses(),
 })
 
 watch(

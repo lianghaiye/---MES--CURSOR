@@ -2,14 +2,31 @@
   <a-drawer
     :open="open"
     :title="`选择发运物料 — ${lineLabel}`"
-    width="1120"
+    width="1180"
     class="scatter-ship-drawer"
     :mask-closable="false"
     destroy-on-close
     @close="handleClose"
   >
     <div class="drawer-section">
-      <div class="section-title">EBOM 物料</div>
+      <div class="section-title-row">
+        <div class="section-title">EBOM 物料</div>
+        <div class="ship-sets-field">
+          <span class="ship-sets-label">发货套数：</span>
+          <a-input-number
+            v-model:value="localShipSets"
+            size="small"
+            :min="0"
+            :max="maxShipSets"
+            :precision="0"
+            style="width: 120px"
+            @change="onShipSetsChange"
+          />
+          <span class="ship-sets-hint"
+            >不可大于可发套数 {{ maxShipSets }}（订单 {{ orderQty }}）</span
+          >
+        </div>
+      </div>
       <a-table
         :columns="materialColumns"
         :data-source="displayRows"
@@ -17,7 +34,7 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ y: 420 }"
+        :scroll="{ y: 420, x: 1100 }"
         table-layout="fixed"
       >
         <template #headerCell="{ column }">
@@ -41,6 +58,14 @@
                 {{ assemblyFullyExpanded ? '收起组装' : '展开组装' }}
               </a-button>
             </a-space>
+          </template>
+          <template v-else-if="column.key === 'shipProgress'">
+            <span>
+              发货进度
+              <a-tooltip title="已确认出库数量 / 已申请数量 / 订单需求数量">
+                <QuestionCircleOutlined class="th-tip-icon" />
+              </a-tooltip>
+            </span>
           </template>
         </template>
 
@@ -83,8 +108,14 @@
           <template v-else-if="column.key === 'materialType'">
             {{ record.materialType || '—' }}
           </template>
-          <template v-else-if="column.key === 'supplyType'">
-            {{ record.supplyType || '—' }}
+          <template v-else-if="column.key === 'shipProgress'">
+            {{
+              formatMaterialShipProgress(
+                record.shippedQty,
+                record.appliedQty,
+                record.orderDemandQty ?? record.demandQty,
+              )
+            }}
           </template>
           <template v-else-if="column.key === 'gapQty'">
             <span :class="{ 'gap-warn': record.gapQty > 0 }">{{ record.gapQty }}</span>
@@ -109,10 +140,10 @@
     </a-form-item>
 
     <template #footer>
-      <a-space>
+      <div class="drawer-footer-actions">
         <a-button @click="handleClose">取消</a-button>
         <a-button type="primary" @click="handleOk">确定</a-button>
-      </a-space>
+      </div>
     </template>
   </a-drawer>
 </template>
@@ -120,9 +151,15 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons-vue'
 import {
+  CaretDownOutlined,
+  CaretRightOutlined,
+  QuestionCircleOutlined,
+} from '@ant-design/icons-vue'
+import {
+  applyScatterShipSets,
   buildShipMaterialRowsFromSnapshot,
+  formatMaterialShipProgress,
   getDescendantPickRows,
   getExpandableMaterialIds,
   getVisibleMaterialPickRows,
@@ -132,10 +169,17 @@ import {
   resolveInitialExpandedMaterialIds,
   unselectDescendantPicks,
 } from '@/utils/shipEbom'
+import {
+  calcScatterMaterialAppliedQty,
+  calcScatterMaterialShippedQty,
+} from '@/utils/salesLineShipped'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   shipment: { type: Object, default: null },
+  salesOrder: { type: Object, default: null },
+  /** 编辑本单时排除自身，避免可发套数被本单占用 */
+  excludeDeliveryId: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'save'])
@@ -143,11 +187,21 @@ const emit = defineEmits(['update:open', 'save'])
 const allMaterialRows = ref([])
 const expandedMaterialIds = ref([])
 const localRemark = ref('')
+const localShipSets = ref(0)
 
 const lineLabel = computed(() => {
   const s = props.shipment
   if (!s) return ''
   return `${s.productName || ''}（${s.productCode || ''}）`
+})
+
+const orderQty = computed(() => Number(props.shipment?.orderQty) || 0)
+
+const maxShipSets = computed(() => {
+  if (props.shipment?.maxShipSets != null)
+    return Math.max(0, Number(props.shipment.maxShipSets) || 0)
+  const applied = Number(props.shipment?.appliedShipQty) || 0
+  return Math.max(0, orderQty.value - applied)
 })
 
 const expandableIds = computed(() => getExpandableMaterialIds(allMaterialRows.value))
@@ -183,10 +237,10 @@ const selectAllIndeterminate = computed(
 
 const materialColumns = [
   { title: '', key: 'selected', width: 48, align: 'center', fixed: 'left' },
-  { title: '物料名称', key: 'name', width: 240, ellipsis: true },
+  { title: '物料名称', key: 'name', width: 220, ellipsis: true },
   { title: '编码', dataIndex: 'code', width: 108, ellipsis: true },
   { title: '物料类型', key: 'materialType', width: 80 },
-  { title: '供应型态', key: 'supplyType', width: 80 },
+  { title: '发货进度', key: 'shipProgress', width: 130, align: 'right' },
   { title: '需求', dataIndex: 'demandQty', width: 64, align: 'right' },
   { title: '可用', dataIndex: 'availableStock', width: 64, align: 'right' },
   { title: '缺口', key: 'gapQty', width: 56, align: 'right' },
@@ -198,6 +252,45 @@ function applyExpandAndSelectability() {
   refreshMaterialPickSelectability(allMaterialRows.value, expandedMaterialIds.value)
 }
 
+function enrichMaterialProgress(rows) {
+  const so = props.salesOrder
+  const salesLineId = props.shipment?.salesLineId || props.shipment?.id
+  const excludeIds = props.excludeDeliveryId ? [props.excludeDeliveryId] : []
+  return (rows || []).map((row) => {
+    const appliedQty = calcScatterMaterialAppliedQty(so, salesLineId, row.materialId, {
+      excludeIds,
+    })
+    const shippedQty = calcScatterMaterialShippedQty(so, salesLineId, row.materialId, {
+      excludeIds,
+    })
+    return {
+      ...row,
+      appliedQty,
+      shippedQty,
+      orderDemandQty:
+        row.orderDemandQty != null
+          ? Number(row.orderDemandQty)
+          : Math.round((Number(row.unitDemandQty) || 0) * Math.max(1, orderQty.value) * 10000) /
+            10000,
+    }
+  })
+}
+
+function onShipSetsChange(val) {
+  const sets = Math.min(Math.max(0, Number(val) || 0), maxShipSets.value)
+  localShipSets.value = sets
+  const temp = {
+    ...props.shipment,
+    materialPicks: allMaterialRows.value,
+    shipSets: sets,
+    maxShipSets: maxShipSets.value,
+    orderQty: orderQty.value,
+  }
+  applyScatterShipSets(temp, sets)
+  allMaterialRows.value = enrichMaterialProgress(temp.materialPicks)
+  applyExpandAndSelectability()
+}
+
 watch(
   () => props.open,
   (val) => {
@@ -207,12 +300,45 @@ watch(
       (props.shipment.materials?.length ? { materials: props.shipment.materials } : null)
 
     const saved = props.shipment.materialPicks || []
+    let built
     if (snapshot?.materials?.length) {
-      const built = buildShipMaterialRowsFromSnapshot(snapshot)
+      built = buildShipMaterialRowsFromSnapshot(snapshot).map((row) => {
+        const orderDemand = Number(row.demandQty) || 0
+        const oq = Math.max(1, orderQty.value)
+        const unitDemand = Math.round((orderDemand / oq) * 10000) / 10000
+        return {
+          ...row,
+          unitDemandQty: unitDemand,
+          orderDemandQty: orderDemand,
+        }
+      })
       allMaterialRows.value = saved.length ? mergeMaterialPicksWithSaved(built, saved) : built
     } else {
       allMaterialRows.value = JSON.parse(JSON.stringify(saved))
     }
+
+    const initialSets =
+      props.shipment.shipSets != null ? Number(props.shipment.shipSets) : maxShipSets.value
+    localShipSets.value = Math.min(Math.max(0, initialSets), maxShipSets.value)
+    const temp = {
+      ...props.shipment,
+      materialPicks: allMaterialRows.value,
+      maxShipSets: maxShipSets.value,
+      orderQty: orderQty.value,
+    }
+    applyScatterShipSets(temp, localShipSets.value)
+    // 保留已保存的勾选发运量
+    if (saved.length) {
+      const savedMap = new Map(saved.map((r) => [r.materialId, r]))
+      temp.materialPicks.forEach((row) => {
+        const prev = savedMap.get(row.materialId)
+        if (prev?.selected) {
+          row.selected = true
+          row.shipQty = Number(prev.shipQty) || row.demandQty
+        }
+      })
+    }
+    allMaterialRows.value = enrichMaterialProgress(temp.materialPicks)
     expandedMaterialIds.value = resolveInitialExpandedMaterialIds(allMaterialRows.value, saved)
     localRemark.value = props.shipment.remark || ''
     applyExpandAndSelectability()
@@ -330,6 +456,10 @@ function handleClose() {
 }
 
 function validatePicks() {
+  if (localShipSets.value > maxShipSets.value + 1e-9) {
+    message.warning(`发货套数不能大于可发套数 ${maxShipSets.value}`)
+    return false
+  }
   const matOk = allMaterialRows.value.some(
     (r) => r.selectable !== false && r.selected && Number(r.shipQty) > 0,
   )
@@ -342,6 +472,15 @@ function validatePicks() {
       message.warning(`物料「${r.name}」已勾选，请填写发运数量`)
       return false
     }
+    if (r.selected) {
+      const remain = (Number(r.orderDemandQty) || 0) - (Number(r.appliedQty) || 0)
+      if (Number(r.shipQty) > remain + 1e-9) {
+        message.warning(
+          `物料「${r.name}」本次发运不能超过剩余可发 ${remain}（订单需求 ${r.orderDemandQty}，已申请 ${r.appliedQty}）`,
+        )
+        return false
+      }
+    }
   }
   return true
 }
@@ -351,6 +490,7 @@ function handleOk() {
   emit('save', {
     materialPicks: JSON.parse(JSON.stringify(allMaterialRows.value)),
     remark: localRemark.value,
+    shipSets: localShipSets.value,
   })
   emit('update:open', false)
 }
@@ -361,38 +501,62 @@ function handleOk() {
   :deep(.ant-drawer-body) {
     padding-bottom: 8px;
   }
+
+  :deep(.ant-drawer-footer) {
+    text-align: right;
+  }
+}
+
+.drawer-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 
 .drawer-section {
   margin-bottom: 20px;
 
   :deep(.ant-table-wrapper) {
-    overflow-x: visible;
+    .ant-table-thead > tr > th {
+      background: #fafafa;
+    }
   }
+}
 
-  :deep(.ant-table) {
-    min-width: 100%;
-  }
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .section-title {
   font-weight: 600;
-  margin-bottom: 8px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
-.gap-warn {
-  color: #cf1322;
+.ship-sets-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.remark-field {
-  margin-top: 8px;
+.ship-sets-label {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
 }
 
-.tree-toggle-btn {
-  padding: 0 4px;
-  height: auto;
+.ship-sets-hint {
   font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.th-tip-icon {
+  margin-left: 4px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .select-cell {
@@ -403,32 +567,28 @@ function handleOk() {
 .name-cell {
   display: inline-flex;
   align-items: center;
-  max-width: 100%;
   gap: 2px;
-}
-
-.assembly-select-all {
-  flex-shrink: 0;
-  margin-right: 2px;
-}
-
-.row-expand-btn {
-  width: 20px;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-.expand-placeholder {
-  display: inline-block;
-  width: 20px;
-  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .name-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
+}
+
+.row-expand-btn {
+  padding: 0 2px;
+  min-width: 20px;
+}
+
+.expand-placeholder {
+  display: inline-block;
+  width: 20px;
+}
+
+.assembly-select-all {
+  margin-right: 2px;
 }
 
 .supply-tag {
@@ -436,8 +596,20 @@ function handleOk() {
   flex-shrink: 0;
 }
 
+.gap-warn {
+  color: #cf1322;
+  font-weight: 600;
+}
+
 .ship-qty-input {
   width: 100%;
-  max-width: 96px;
+}
+
+.remark-field {
+  margin-bottom: 0;
+}
+
+.tree-toggle-btn {
+  padding: 0 4px;
 }
 </style>

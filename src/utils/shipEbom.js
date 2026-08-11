@@ -16,6 +16,8 @@ export function createShipMaterialPickRow(mat, depth = 0, parentMaterialId = nul
   const materialType = mat.type || mat.materialType || ''
   const hasChildren = Boolean(mat.children?.length)
   const canExpand = hasChildren && isExpandableSupplyType(supplyType)
+  /** 单套需求（订单 1 套对应用量）；初始等于快照需求/订单套数，由调用方写入 */
+  const unitDemandQty = mat.unitDemandQty != null ? Number(mat.unitDemandQty) : demandQty
 
   return {
     materialId: mat.id,
@@ -26,7 +28,10 @@ export function createShipMaterialPickRow(mat, depth = 0, parentMaterialId = nul
     unit: mat.unit || '件',
     supplyType,
     materialType,
+    unitDemandQty,
     demandQty,
+    /** 订单全量需求（计划口径第三段） */
+    orderDemandQty: mat.orderDemandQty != null ? Number(mat.orderDemandQty) : demandQty,
     availableStock,
     gapQty,
     depth,
@@ -36,6 +41,8 @@ export function createShipMaterialPickRow(mat, depth = 0, parentMaterialId = nul
     selectable: true,
     selected: false,
     shipQty: 0,
+    shippedQty: Number(mat.shippedQty) || 0,
+    appliedQty: Number(mat.appliedQty) || 0,
   }
 }
 
@@ -65,6 +72,12 @@ export function mergeMaterialPicksWithSaved(allRows, savedRows) {
       ...row,
       selected: Boolean(saved.selected),
       shipQty: Number(saved.shipQty) || 0,
+      unitDemandQty: saved.unitDemandQty != null ? Number(saved.unitDemandQty) : row.unitDemandQty,
+      orderDemandQty:
+        saved.orderDemandQty != null ? Number(saved.orderDemandQty) : row.orderDemandQty,
+      demandQty: saved.demandQty != null ? Number(saved.demandQty) : row.demandQty,
+      shippedQty: Number(saved.shippedQty) || row.shippedQty || 0,
+      appliedQty: Number(saved.appliedQty) || row.appliedQty || 0,
     }
   })
 }
@@ -234,13 +247,57 @@ export function initScatterShipment(salesLine, order) {
     salesLine.ebomSnapshot ||
     (salesLine.materials?.length ? { materials: salesLine.materials } : null)
 
+  const orderQty = Number(display.orderQty) || 1
+  const remainSets = Math.max(0, orderQty - Number(display.appliedShipQty || 0))
+  const materialPicks = buildShipMaterialRowsFromSnapshot(snapshot).map((row) => {
+    const orderDemand = Number(row.demandQty) || 0
+    const unitDemand =
+      orderQty > 0 ? Math.round((orderDemand / orderQty) * 10000) / 10000 : orderDemand
+    return {
+      ...row,
+      unitDemandQty: unitDemand,
+      orderDemandQty: orderDemand,
+      demandQty: Math.round(unitDemand * remainSets * 10000) / 10000,
+    }
+  })
+
   return {
     ...display,
     ebomSnapshot: snapshot,
     ebomSnapshotId: snapshot?.snapshotId,
-    materialPicks: buildShipMaterialRowsFromSnapshot(snapshot),
+    /** 本单散件发货套数 */
+    shipSets: remainSets > 0 ? remainSets : 0,
+    maxShipSets: remainSets,
+    shipLocked: display.shipLocked || remainSets <= 0,
+    materialPicks,
     remark: '',
   }
+}
+
+/** 按发货套数重算 EBOM 需求与已勾选项的发运数量 */
+export function applyScatterShipSets(shipment, shipSets) {
+  if (!shipment) return
+  const sets = Math.max(0, Number(shipSets) || 0)
+  const maxSets =
+    shipment.maxShipSets != null
+      ? Number(shipment.maxShipSets)
+      : Math.max(0, Number(shipment.orderQty) - Number(shipment.appliedShipQty || 0))
+  const capped = Math.min(sets, maxSets)
+  shipment.shipSets = capped
+  ;(shipment.materialPicks || []).forEach((row) => {
+    const unit = Number(row.unitDemandQty)
+    const unitDemand =
+      Number.isFinite(unit) && unit >= 0
+        ? unit
+        : Number(row.orderDemandQty || row.demandQty) / Math.max(1, Number(shipment.orderQty) || 1)
+    row.unitDemandQty = Math.round(unitDemand * 10000) / 10000
+    row.demandQty = Math.round(row.unitDemandQty * capped * 10000) / 10000
+    row.gapQty = Math.max(0, row.demandQty - (Number(row.availableStock) || 0))
+    if (row.selected) {
+      row.shipQty = row.demandQty
+    }
+  })
+  refreshScatterShipmentMeta(shipment)
 }
 
 /** 已勾选且填写发运数量的 EBOM 行 */
@@ -271,6 +328,11 @@ function formatProgressQty(val) {
   const n = Number(val) || 0
   if (Number.isInteger(n)) return String(n)
   return n.toFixed(3).replace(/\.?0+$/, '')
+}
+
+/** 物料发货进度：已发 / 已申请 / 订单需求（与整机口径一致） */
+export function formatMaterialShipProgress(shippedQty, appliedQty, orderDemandQty) {
+  return `${formatProgressQty(shippedQty)} / ${formatProgressQty(appliedQty)} / ${formatProgressQty(orderDemandQty)}`
 }
 
 /** 散件发货进度：已发物料数 / EBOM 需发物料需求数之和 */

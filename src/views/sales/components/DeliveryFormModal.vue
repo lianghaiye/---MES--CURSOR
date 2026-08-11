@@ -15,7 +15,7 @@
       <a-divider class="section-divider" />
       <a-form layout="inline" class="horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="源销售订单" required>
               <a-select
                 v-if="!salesOrderLocked"
@@ -29,7 +29,7 @@
               <a-input v-else :value="form.salesOrderNo" disabled size="small" />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="发货单号">
               <a-input
                 v-model:value="form.deliveryCode"
@@ -39,7 +39,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="客户名称" required>
               <a-select
                 v-model:value="form.customerName"
@@ -50,7 +50,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="交货方式" required>
               <a-select
                 v-model:value="form.shipmentMethod"
@@ -60,7 +60,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="物流单号">
               <a-input
                 v-model:value="form.logisticsNo"
@@ -69,7 +69,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="客户联系人">
               <a-select
                 v-model:value="form.contactPerson"
@@ -81,12 +81,12 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="客户联系方式">
               <a-input v-model:value="form.contactPhone" size="small" placeholder="请输入" />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="交货日期">
               <a-date-picker
                 v-model:value="form.deliveryDate"
@@ -96,7 +96,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="交货地址">
               <a-input
                 v-model:value="form.deliveryAddress"
@@ -105,12 +105,12 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="申请出库">
               <a-switch v-model:checked="form.applyOutbound" size="small" />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="出库仓库">
               <a-select
                 v-model:value="form.outboundWarehouse"
@@ -122,12 +122,12 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="司机姓名">
               <a-input v-model:value="form.driverName" size="small" placeholder="请输入 司机姓名" />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="司机联系方式">
               <a-input
                 v-model:value="form.driverPhone"
@@ -136,12 +136,12 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-form-item label="车牌号">
               <a-input v-model:value="form.plateNo" size="small" placeholder="请输入 车牌号" />
             </a-form-item>
           </a-col>
-          <a-col :span="24">
+          <a-col :span="12">
             <a-form-item label="备注" class="remark-item">
               <a-textarea
                 v-model:value="form.remark"
@@ -168,6 +168,7 @@
         bordered
         :pagination="false"
         :scroll="{ x: 2900 }"
+        :row-class-name="deliveryLineRowClassName"
       >
         <template #headerCell="{ column }">
           <template v-if="column.key === 'shipProgress'">
@@ -182,6 +183,16 @@
         </template>
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'productName'">
+            <span>{{ record.productName || '—' }}</span>
+            <a-tag
+              v-if="lineHasShipAttachmentHint(record)"
+              color="orange"
+              class="ship-att-hint-tag"
+            >
+              有发货附件
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'lineShipStatus'">
             <a-tag :color="lineShipStatusColor(record.lineShipStatus)">
               {{ record.lineShipStatus }}
@@ -221,10 +232,12 @@
               v-model:value="record.shipQty"
               size="small"
               :min="0"
+              :max="lineRemainShipQty(record)"
               :precision="4"
               :formatter="deliveryDecimalFormatter"
               :parser="deliveryDecimalParser"
               style="width: 100%"
+              :disabled="isDeliveryLineShipLocked(record)"
               @change="onLineCalc(record)"
             />
           </template>
@@ -237,6 +250,7 @@
               :formatter="deliveryDecimalFormatter"
               :parser="deliveryDecimalParser"
               style="width: 100%"
+              :disabled="isDeliveryLineShipLocked(record)"
               @change="onLineCalc(record)"
             />
           </template>
@@ -249,6 +263,7 @@
               :formatter="deliveryDecimalFormatter"
               :parser="deliveryDecimalParser"
               style="width: 100%"
+              :disabled="isDeliveryLineShipLocked(record)"
               @change="onLineCalc(record)"
             />
           </template>
@@ -263,6 +278,7 @@
               placeholder="请选择"
               style="width: 100%"
               :options="warehouseOpts"
+              :disabled="isDeliveryLineShipLocked(record)"
               @change="() => onLineWarehouseChange(record)"
             />
           </template>
@@ -273,15 +289,21 @@
             {{ formatDeliveryQty(record.warehouseStockQty) }}
           </template>
           <template v-else-if="column.key === 'lineRemark'">
-            <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
+            <a-input
+              v-model:value="record.lineRemark"
+              size="small"
+              placeholder="请输入"
+              :disabled="isDeliveryLineShipLocked(record)"
+            />
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space :size="0">
+            <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
               <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="form.lineItems.splice(index, 1)">
+              <a-button type="link" size="small" danger @click="removeWholeLineFromOrder(index)">
                 移出本单
               </a-button>
             </a-space>
+            <span v-else class="line-locked-hint">{{ deliveryLineLockedHint(record) }}</span>
           </template>
           <template v-else>{{ displayCell(record, column) }}</template>
         </template>
@@ -300,6 +322,7 @@
         :pagination="false"
         :scroll="{ x: 2800 }"
         v-model:expanded-row-keys="expandedScatterRowKeys"
+        :row-class-name="deliveryLineRowClassName"
       >
         <template #headerCell="{ column }">
           <template v-if="column.key === 'shipProgress'">
@@ -314,6 +337,16 @@
         </template>
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'productName'">
+            <span>{{ record.productName || '—' }}</span>
+            <a-tag
+              v-if="lineHasShipAttachmentHint(record)"
+              color="orange"
+              class="ship-att-hint-tag"
+            >
+              有发货附件
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'lineShipStatus'">
             <a-tag :color="lineShipStatusColor(record.lineShipStatus)">
               {{ record.lineShipStatus }}
@@ -357,6 +390,7 @@
               :formatter="deliveryDecimalFormatter"
               :parser="deliveryDecimalParser"
               style="width: 100%"
+              :disabled="isDeliveryLineShipLocked(record)"
               @change="onScatterLinePriceChange(record)"
             />
           </template>
@@ -369,6 +403,7 @@
               :formatter="deliveryDecimalFormatter"
               :parser="deliveryDecimalParser"
               style="width: 100%"
+              :disabled="isDeliveryLineShipLocked(record)"
               @change="onScatterLinePriceChange(record)"
             />
           </template>
@@ -383,6 +418,7 @@
               placeholder="请选择"
               style="width: 100%"
               :options="warehouseOpts"
+              :disabled="isDeliveryLineShipLocked(record)"
               @change="() => onLineWarehouseChange(record)"
             />
           </template>
@@ -393,25 +429,26 @@
             {{ formatDeliveryQty(record.warehouseStockQty) }}
           </template>
           <template v-else-if="column.key === 'lineRemark'">
-            <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
+            <a-input
+              v-model:value="record.lineRemark"
+              size="small"
+              placeholder="请输入"
+              :disabled="isDeliveryLineShipLocked(record)"
+            />
           </template>
           <template v-else-if="column.key === 'scatterAction'">
-            <a-space :size="0">
+            <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
               <a-button type="link" size="small" @click="openScatterLineEdit(record)"
                 >编辑</a-button
               >
               <a-button type="link" size="small" @click="openScatterDrawer(record)">
                 选择发运物料
               </a-button>
-              <a-button
-                type="link"
-                size="small"
-                danger
-                @click="form.scatterShipments.splice(index, 1)"
-              >
+              <a-button type="link" size="small" danger @click="removeScatterLineFromOrder(index)">
                 移出本单
               </a-button>
             </a-space>
+            <span v-else class="line-locked-hint">{{ deliveryLineLockedHint(record) }}</span>
           </template>
           <template v-else>{{ displayCell(record, column) }}</template>
         </template>
@@ -428,7 +465,16 @@
               :pagination="false"
             >
               <template #bodyCell="{ column, record: mat }">
-                <template v-if="column.key === 'pickAction'">
+                <template v-if="column.key === 'shipProgress'">
+                  {{
+                    formatMaterialShipProgress(
+                      mat.shippedQty,
+                      mat.appliedQty,
+                      mat.orderDemandQty ?? mat.demandQty,
+                    )
+                  }}
+                </template>
+                <template v-else-if="column.key === 'pickAction'">
                   <a-button
                     type="link"
                     size="small"
@@ -449,9 +495,183 @@
       </a-table>
     </div>
 
+    <div class="section-block">
+      <div class="section-title-row">
+        <div class="section-title">
+          发货附件
+          <a-tooltip
+            title="按产品分组管理发运附件包。套数展示为「已选择套数/订单套数」；可通过「从发运BOM添加」多次累加套数（可大于订单套数，用于赠送）。"
+          >
+            <QuestionCircleOutlined class="th-tip-icon" />
+          </a-tooltip>
+        </div>
+        <a-space :size="8">
+          <a-button size="small" @click="openAddFromShipBom">从发运BOM添加</a-button>
+          <a-button type="primary" size="small" @click="attachmentPickerOpen = true">
+            手工添加
+          </a-button>
+        </a-space>
+      </div>
+      <a-divider class="section-divider" />
+
+      <a-alert
+        v-if="shipAttachmentProductSummaries.length"
+        type="info"
+        show-icon
+        class="ship-att-alert"
+        :message="shipAttachmentAlertMessage"
+      />
+
+      <a-empty
+        v-if="!shipAttachmentProductSummaries.length"
+        description="暂无发货附件（选择销售订单后，有发运 BOM 的产品会按产品分组列出）"
+      />
+
+      <a-collapse
+        v-else
+        v-model:active-key="attachmentActiveKey"
+        accordion
+        class="ship-att-collapse"
+      >
+        <a-collapse-panel
+          v-for="group in shipAttachmentProductSummaries"
+          :key="group.key"
+          :header="attachmentGroupHeader(group)"
+        >
+          <template #extra>
+            <a-space :size="8" @click.stop>
+              <span class="ship-att-sets-label">
+                已选套数：{{ attachmentGroupKitSets(group) }}/{{ attachmentGroupOrderSets(group) }}
+              </span>
+              <a-input-number
+                size="small"
+                :min="0"
+                :precision="0"
+                :value="attachmentGroupKitSets(group)"
+                style="width: 88px"
+                :disabled="group.key === '__unlinked__'"
+                @change="(val) => onAttachmentGroupKitSetsChange(group, val)"
+              />
+              <a-button
+                type="link"
+                size="small"
+                @click="setProductAttachmentsSelected(group, true)"
+              >
+                全部纳入
+              </a-button>
+              <a-button
+                type="link"
+                size="small"
+                @click="setProductAttachmentsSelected(group, false)"
+              >
+                全部不纳入
+              </a-button>
+            </a-space>
+          </template>
+
+          <a-table
+            :columns="shipAttachmentColumns"
+            :data-source="attachmentsOfGroup(group)"
+            row-key="id"
+            size="small"
+            bordered
+            :pagination="false"
+            :scroll="{ x: 1200 }"
+          >
+            <template #headerCell="{ column }">
+              <template v-if="column.key === 'shipProgress'">
+                <span>
+                  发货进度
+                  <a-tooltip title="已发货数量 / 已申请数量 / 计划数量（订单套数×单位用量）">
+                    <QuestionCircleOutlined class="th-tip-icon" />
+                  </a-tooltip>
+                </span>
+              </template>
+              <template v-else>{{ column.title }}</template>
+            </template>
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'index'">
+                {{ attachmentsOfGroup(group).indexOf(record) + 1 }}
+              </template>
+              <template v-else-if="column.key === 'selected'">
+                <a-checkbox v-model:checked="record.selected" />
+              </template>
+              <template v-else-if="column.key === 'shipStatus'">
+                <a-tag :color="attachmentShipStatusColor(record.shipStatus)">
+                  {{ record.shipStatus || '未发货' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'shipProgress'">
+                {{
+                  formatAttachmentShipProgress(record.shippedQty, record.appliedQty, record.planQty)
+                }}
+              </template>
+              <template v-else-if="column.key === 'source'">
+                <a-tag :color="record.source === 'BOM' ? 'blue' : 'default'">
+                  {{ record.source || '手工' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'productName'">
+                <a-select
+                  v-if="record.source === '手工'"
+                  :value="record.productId || ''"
+                  size="small"
+                  allow-clear
+                  show-search
+                  option-filter-prop="label"
+                  placeholder="不关联"
+                  style="width: 100%"
+                  :options="shipAttachmentProductOpts"
+                  @change="(val) => onManualAttachmentProductChange(record, val)"
+                />
+                <template v-else>
+                  {{ record.productName || '—' }}
+                  <span v-if="record.productCode" class="ship-att-line-code">
+                    （{{ record.productCode }}）
+                  </span>
+                </template>
+              </template>
+              <template v-else-if="column.key === 'unitQty'">
+                {{ formatDeliveryQty(record.unitQty) }}
+              </template>
+              <template v-else-if="column.key === 'kitSets'">
+                <a-input-number
+                  v-model:value="record.kitSets"
+                  size="small"
+                  :min="0"
+                  :precision="0"
+                  style="width: 100%"
+                  :disabled="record.selected === false"
+                  @change="() => onAttachmentRowKitSetsChange(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'shipQty'">
+                <a-input-number
+                  v-model:value="record.shipQty"
+                  size="small"
+                  :min="0"
+                  :precision="4"
+                  style="width: 100%"
+                  :disabled="record.selected === false"
+                />
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <a-button type="link" size="small" danger @click="removeShipAttachment(record)">
+                  删除
+                </a-button>
+              </template>
+              <template v-else>{{ record[column.dataIndex] || '—' }}</template>
+            </template>
+          </a-table>
+        </a-collapse-panel>
+      </a-collapse>
+    </div>
+
     <ScatterShipDrawer
       v-model:open="scatterDrawerOpen"
       :shipment="activeScatterShipment"
+      :sales-order="currentSalesOrder()"
+      :exclude-delivery-id="props.record?.id || ''"
       @save="onScatterDrawerSave"
     />
 
@@ -462,9 +682,52 @@
       @saved="onLineEditSaved"
     />
 
+    <SelectBomMaterialModal
+      v-model:open="attachmentPickerOpen"
+      :multiple="true"
+      :include-spu-templates="false"
+      @selected="onAttachmentMaterialsPicked"
+    />
+
+    <a-modal
+      v-model:open="shipBomAddOpen"
+      title="从发运BOM添加"
+      ok-text="添加"
+      destroy-on-close
+      @ok="confirmAddFromShipBom"
+    >
+      <a-form layout="vertical" class="ship-bom-add-form">
+        <a-form-item label="产品" required>
+          <a-select
+            v-model:value="shipBomAddForm.productKey"
+            placeholder="请选择本单产品"
+            show-search
+            option-filter-prop="label"
+            :options="shipBomAddProductOpts"
+          />
+        </a-form-item>
+        <a-form-item label="添加套数" required>
+          <a-input-number
+            v-model:value="shipBomAddForm.addSets"
+            :min="1"
+            :precision="0"
+            style="width: 100%"
+            placeholder="支持多于订单套数（赠送）"
+          />
+        </a-form-item>
+        <a-alert
+          type="info"
+          show-icon
+          message="可多次添加。添加套数可大于订单套数，用于随机多赠送等场景；本次发运 = 套数 × 单位用量。"
+        />
+      </a-form>
+    </a-modal>
+
     <template #footer>
       <a-button size="small" @click="handleCancel">取消</a-button>
-      <a-button type="primary" size="small" :loading="saving" @click="handleOk">确定</a-button>
+      <a-button type="primary" size="small" :loading="saving" @click="handleOk">
+        {{ isEdit ? '保存' : '确定' }}
+      </a-button>
     </template>
   </FormCreateShell>
 </template>
@@ -496,6 +759,7 @@ import {
   roundDeliveryDecimal,
   refreshDeliveryLineStock,
   resolveDeliveryVariantAttr,
+  isDeliveryLineShipLocked,
 } from '@/utils/deliveryLine'
 import {
   getSelectedMaterialPicks,
@@ -503,11 +767,29 @@ import {
   refreshScatterShipmentMeta,
   removeMaterialPickFromShipment,
   sumSelectedShipQty,
+  formatMaterialShipProgress,
 } from '@/utils/shipEbom'
 import ScatterShipDrawer from './ScatterShipDrawer.vue'
 import DeliveryLineEditModal from './DeliveryLineEditModal.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
+import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import {
+  collectShipAttachmentsFromSalesLines,
+  createShipAttachmentLine,
+  mergeShipAttachmentLists,
+  productHasShipBom,
+  summarizeShipAttachmentsByProduct,
+  enrichShipAttachmentsWithShipStatus,
+  attachmentShipStatusColor,
+  formatAttachmentShipProgress,
+  applyKitSetsToAttachmentGroup,
+  calcAttachmentShipQtyBySets,
+  addShipBomAttachmentSets,
+} from '@/utils/shipBomAttachments'
+import { getActiveShipBomForProduct } from '@/store/productBomStore'
+import { calcSalesLineAvailableQty } from '@/utils/salesLineShipped'
+import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
 
 const props = defineProps({
   open: Boolean,
@@ -578,11 +860,11 @@ const scatterPickColumns = [
   { title: '物料名称', dataIndex: 'name', width: 160, ellipsis: true },
   { title: '编码', dataIndex: 'code', width: 120, ellipsis: true },
   { title: '规格', dataIndex: 'spec', width: 100, ellipsis: true },
+  { title: '发货进度', key: 'shipProgress', width: 130, align: 'right' },
   { title: '需求数量', dataIndex: 'demandQty', width: 88, align: 'right' },
   { title: '可用库存', dataIndex: 'availableStock', width: 88, align: 'right' },
   { title: '本次发运', dataIndex: 'shipQty', width: 88, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56 },
-  { title: '供应型态', dataIndex: 'supplyType', width: 88 },
   { title: '操作', key: 'pickAction', width: 64, align: 'center' },
 ]
 
@@ -605,9 +887,255 @@ const form = reactive({
   remark: '',
   lineItems: [],
   scatterShipments: [],
+  shipAttachments: [],
 })
 
 const prevHeaderWarehouse = ref(undefined)
+const attachmentPickerOpen = ref(false)
+const shipBomAddOpen = ref(false)
+const shipBomAddForm = reactive({
+  productKey: undefined,
+  addSets: 1,
+})
+
+const shipAttachmentColumns = [
+  { title: '#', key: 'index', width: 48, align: 'center' },
+  { title: '纳入本单', key: 'selected', width: 88, align: 'center' },
+  { title: '发货状态', key: 'shipStatus', width: 88, align: 'center' },
+  { title: '发货进度', key: 'shipProgress', width: 140, align: 'right' },
+  { title: '关联产品', key: 'productName', dataIndex: 'productName', width: 180, ellipsis: true },
+  { title: '来源', key: 'source', width: 72 },
+  { title: '物料编码', dataIndex: 'materialCode', width: 120, ellipsis: true },
+  { title: '物料名称', dataIndex: 'materialName', width: 140, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '单位', dataIndex: 'unit', width: 56 },
+  { title: '单位用量', key: 'unitQty', width: 88, align: 'right' },
+  { title: '发货套数', key: 'kitSets', width: 100 },
+  { title: '本次发运', key: 'shipQty', width: 110 },
+  { title: '操作', key: 'action', width: 72, align: 'center' },
+]
+
+const attachmentActiveKey = ref('')
+
+const shipAttachmentProductSummaries = computed(() =>
+  summarizeShipAttachmentsByProduct(form.shipAttachments),
+)
+
+/** 本单产品（整机+散件），供手工附件关联下拉 */
+const shipAttachmentProductOpts = computed(() => {
+  const map = new Map()
+  const push = (line) => {
+    if (!line) return
+    const id = String(line.productId || line.itemId || line.salesLineId || line.id || '')
+    if (!id || map.has(id)) return
+    const code = line.productCode || line.itemCode || ''
+    const name = line.productName || line.itemName || ''
+    map.set(id, {
+      value: id,
+      label: [name, code].filter(Boolean).join(' / ') || id,
+      productId: line.productId || line.itemId || id,
+      productCode: code,
+      productName: name,
+      salesLineId: line.salesLineId || line.id || '',
+    })
+  }
+  ;(form.lineItems || []).forEach(push)
+  ;(form.scatterShipments || []).forEach(push)
+  return [{ value: '', label: '不关联' }, ...Array.from(map.values())]
+})
+
+const shipAttachmentAlertMessage = computed(() => {
+  const groups = shipAttachmentProductSummaries.value
+  if (!groups.length) return ''
+  const names = groups.map((g) => g.productName).filter(Boolean)
+  const picked = groups.reduce((s, g) => s + g.selectedCount, 0)
+  const total = groups.reduce((s, g) => s + g.total, 0)
+  const done = (form.shipAttachments || []).filter((r) => r.shipStatus === '已发完').length
+  const doneHint = done ? `其中 ${done} 项历史已发完，后续发货可不勾选。` : ''
+  return `本单 ${groups.length} 组发货附件（${names.join('、')}），共 ${total} 项；已纳入 ${picked} 项。${doneHint}仅展示本单整机/散件产品的附件，请按产品填写发货套数并勾选是否随货发出。`
+})
+
+function excludeDeliveryIds() {
+  return props.record?.id ? [props.record.id] : []
+}
+
+function attachmentGroupHeader(group) {
+  if (group.key === '__unlinked__') {
+    const totalPcs = attachmentGroupTotalPieces(group)
+    return `${group.productName} · 附件 ${group.total} 项 · 已纳入 ${group.selectedCount}/${group.total} 共计：${formatDeliveryQty(totalPcs)} 件`
+  }
+  const selected = attachmentGroupKitSets(group)
+  const orderSets = attachmentGroupOrderSets(group)
+  const totalPcs = attachmentGroupTotalPieces(group)
+  return `${group.productName}${group.productCode ? `（${group.productCode}）` : ''} · 附件 ${group.total} 项 · 已选套数：${selected}/${orderSets} · 已纳入 ${group.selectedCount}/${group.total} 共计：${formatDeliveryQty(totalPcs)} 件`
+}
+
+/** 已纳入附件的本次发运件数合计 */
+function attachmentGroupTotalPieces(group) {
+  return attachmentsOfGroup(group)
+    .filter((r) => r.selected !== false)
+    .reduce((s, r) => s + (Number(r.shipQty) || 0), 0)
+}
+
+function attachmentsOfGroup(group) {
+  if (!group) return []
+  const pid = String(group.productId || '')
+  const code = String(group.productCode || '')
+  const name = String(group.productName || '')
+  const unlinked = group.key === '__unlinked__' || name === '不关联'
+  return (form.shipAttachments || []).filter((row) => {
+    const rowUnlinked = !row.productId && !row.productCode && !row.productName
+    if (unlinked) return rowUnlinked
+    return (
+      (pid && String(row.productId) === pid) ||
+      (!pid && code && row.productCode === code) ||
+      (!pid && !code && row.productName === name)
+    )
+  })
+}
+
+function attachmentGroupKitSets(group) {
+  const rows = attachmentsOfGroup(group)
+  const withSets = rows.find((r) => r.kitSets != null)
+  if (withSets) return Number(withSets.kitSets) || 0
+  return group?.kitSets != null ? Number(group.kitSets) : 0
+}
+
+/** 订单套数（该产品在销售订单上的数量） */
+function attachmentGroupOrderSets(group) {
+  const so = currentSalesOrder()
+  const line =
+    (so?.lineItems || []).find((l) => String(l.id) === String(group.salesLineId)) ||
+    (so?.lineItems || []).find(
+      (l) =>
+        String(l.productId || l.itemId) === String(group.productId) ||
+        (group.productCode && (l.productCode || l.itemCode) === group.productCode),
+    )
+  if (line) return Number(line.salesQty ?? line.qty ?? line.orderQty) || 0
+
+  const whole = (form.lineItems || []).find(
+    (l) =>
+      String(l.productId || l.itemId) === String(group.productId) ||
+      l.salesLineId === group.salesLineId ||
+      (group.productCode && (l.productCode || l.itemCode) === group.productCode),
+  )
+  const scatter = (form.scatterShipments || []).find(
+    (l) =>
+      String(l.productId || l.itemId) === String(group.productId) ||
+      l.salesLineId === group.salesLineId ||
+      (group.productCode && (l.productCode || l.itemCode) === group.productCode),
+  )
+  const local = whole || scatter
+  return Number(local?.orderQty) || 0
+}
+
+function onAttachmentGroupKitSetsChange(group, val) {
+  const sets = Math.max(0, Number(val) || 0)
+  form.shipAttachments = applyKitSetsToAttachmentGroup(form.shipAttachments, group.key, sets)
+}
+
+function onAttachmentRowKitSetsChange(record) {
+  if (!record) return
+  const unitQty = Number(record.unitQty) || 1
+  record.shipQty = calcAttachmentShipQtyBySets(unitQty, record.kitSets)
+}
+
+function removeShipAttachment(record) {
+  const idx = form.shipAttachments.findIndex((r) => r.id === record.id)
+  if (idx !== -1) form.shipAttachments.splice(idx, 1)
+}
+
+/** 整机本次发货数量变更时，同步同产品附件套数建议 */
+function syncAttachmentKitSetsFromWholeLines() {
+  const so = currentSalesOrder()
+  ;(form.lineItems || []).forEach((line) => {
+    if (isDeliveryLineShipLocked(line)) return
+    const pid = String(line.productId || line.itemId || '')
+    const key = pid || String(line.productCode || line.productName || '')
+    if (!key) return
+    const hasAtt = (form.shipAttachments || []).some(
+      (a) =>
+        (pid && String(a.productId) === pid) ||
+        (line.salesLineId && a.salesLineId === line.salesLineId) ||
+        (line.id && a.salesLineId === line.id),
+    )
+    if (!hasAtt) return
+    const groupKey = pid || String(line.productCode || line.productName)
+    const sets = Number(line.shipQty) || 0
+    form.shipAttachments = applyKitSetsToAttachmentGroup(form.shipAttachments, groupKey, sets)
+  })
+  if (so) refreshAttachmentShipStatus(true)
+}
+
+function currentSalesOrder() {
+  if (!form.salesOrderId) return null
+  return salesOrderState.orders.find((o) => o.id === form.salesOrderId) || null
+}
+
+function refreshAttachmentShipStatus(preserveShipQty = false) {
+  const so = currentSalesOrder()
+  form.shipAttachments = enrichShipAttachmentsWithShipStatus(form.shipAttachments, so, {
+    preserveShipQty,
+  })
+}
+
+function onManualAttachmentProductChange(record, productKey) {
+  if (!record) return
+  const key = productKey == null ? '' : String(productKey)
+  if (!key) {
+    record.productId = ''
+    record.productCode = ''
+    record.productName = ''
+    record.salesLineId = ''
+    refreshAttachmentShipStatus(true)
+    return
+  }
+  const opt = shipAttachmentProductOpts.value.find((o) => String(o.value) === key)
+  if (!opt || opt.value === '') {
+    record.productId = ''
+    record.productCode = ''
+    record.productName = ''
+    record.salesLineId = ''
+    refreshAttachmentShipStatus(true)
+    return
+  }
+  record.productId = opt.productId || ''
+  record.productCode = opt.productCode || ''
+  record.productName = opt.productName || ''
+  record.salesLineId = opt.salesLineId || ''
+  refreshAttachmentShipStatus(true)
+}
+
+function lineHasShipAttachmentHint(record) {
+  const productId = record?.productId || record?.itemId
+  if (productId && productHasShipBom(productId)) return true
+  const pid = String(productId || '')
+  const code = String(record?.productCode || '')
+  return (form.shipAttachments || []).some(
+    (a) =>
+      (pid && String(a.productId) === pid) ||
+      (code && a.productCode === code) ||
+      (record?.id && a.salesLineId === record.id) ||
+      (record?.salesLineId && a.salesLineId === record.salesLineId),
+  )
+}
+
+function setProductAttachmentsSelected(group, selected) {
+  if (!group) return
+  const pid = String(group.productId || '')
+  const code = String(group.productCode || '')
+  const name = String(group.productName || '')
+  const unlinked = group.key === '__unlinked__' || name === '不关联'
+  form.shipAttachments.forEach((row) => {
+    const rowUnlinked = !row.productId && !row.productCode && !row.productName
+    const match = unlinked
+      ? rowUnlinked
+      : (pid && String(row.productId) === pid) ||
+        (!pid && code && row.productCode === code) ||
+        (!pid && !code && row.productName === name)
+    if (match) row.selected = selected
+  })
+}
 
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 const shipmentMethodOpts = shipmentMethodOptions.map((v) => ({ label: v, value: v }))
@@ -704,6 +1232,7 @@ function resetForm() {
   form.remark = ''
   form.lineItems = []
   form.scatterShipments = []
+  form.shipAttachments = []
   expandedScatterRowKeys.value = []
   prevHeaderWarehouse.value = undefined
 }
@@ -780,6 +1309,128 @@ function loadFromRecord(record) {
     refreshScatterShipmentMeta(s)
     refreshDeliveryLineStock(s)
   })
+  form.shipAttachments = enrichShipAttachmentsWithShipStatus(
+    JSON.parse(JSON.stringify(record.shipAttachments || [])),
+    salesOrderState.orders.find((o) => o.id === record.salesOrderId) || null,
+    { preserveShipQty: true },
+  )
+  pruneShipAttachmentsToCurrentDelivery()
+  attachmentActiveKey.value = shipAttachmentProductSummaries.value[0]?.key || ''
+  syncExpandedScatterRows()
+}
+
+function currentDeliveryLinesForAttachments() {
+  const lines = []
+  const push = (row) => {
+    if (!row) return
+    // 已发完产品不再带出发货附件
+    if (isDeliveryLineShipLocked(row)) return
+    const productId = row.productId || row.itemId
+    const productCode = row.productCode || row.itemCode || ''
+    if (!productId && !productCode) return
+    lines.push({
+      id: row.salesLineId || row.id,
+      productId,
+      productCode,
+      productName: row.productName || row.itemName || '',
+      salesQty: row.orderQty ?? row.salesQty ?? row.qty,
+      qty: row.orderQty ?? row.salesQty ?? row.qty,
+      orderQty: row.orderQty,
+    })
+  }
+  ;(form.lineItems || []).forEach(push)
+  ;(form.scatterShipments || []).forEach(push)
+  return lines
+}
+
+function deliveryLineRowClassName(record) {
+  return isDeliveryLineShipLocked(record) ? 'delivery-line-locked' : ''
+}
+
+function deliveryLineLockedHint(record) {
+  const confirmed = Number(record?.confirmedOutboundQty ?? record?.shippedQty) || 0
+  const orderQty = Number(record?.orderQty) || 0
+  if (orderQty > 0 && confirmed >= orderQty - 1e-9) return '已发完'
+  return '待出库占用'
+}
+
+function lineRemainShipQty(record) {
+  if (!record) return 0
+  if (record.remainShipQty != null) return Math.max(0, Number(record.remainShipQty) || 0)
+  return Math.max(
+    0,
+    Number(record.orderQty) - Number(record.appliedShipQty ?? record.shippedQty ?? 0),
+  )
+}
+
+function savableWholeLines() {
+  return (form.lineItems || []).filter(
+    (line) => !isDeliveryLineShipLocked(line) && Number(line.shipQty) > 0,
+  )
+}
+
+function savableScatterShipments() {
+  return (form.scatterShipments || []).filter(
+    (ship) => !isDeliveryLineShipLocked(ship) && getSelectedMaterialPicks(ship).length > 0,
+  )
+}
+
+function isAttachmentOnCurrentDelivery(att) {
+  if (!att) return false
+  // 未关联产品的手工附件保留
+  if (!att.productId && !att.productCode && !att.productName && !att.salesLineId) return true
+  const lines = currentDeliveryLinesForAttachments()
+  return lines.some((line) => {
+    if (att.salesLineId && (att.salesLineId === line.id || att.salesLineId === line.salesLineId)) {
+      return true
+    }
+    if (att.productId && String(att.productId) === String(line.productId)) return true
+    if (att.productCode && att.productCode === line.productCode) return true
+    return false
+  })
+}
+
+/** 发货附件仅保留「本单整机/散件产品」对应行，避免带出订单上未纳入本单的产品附件 */
+function pruneShipAttachmentsToCurrentDelivery() {
+  form.shipAttachments = (form.shipAttachments || []).filter(isAttachmentOnCurrentDelivery)
+  if (
+    attachmentActiveKey.value &&
+    !shipAttachmentProductSummaries.value.some((g) => g.key === attachmentActiveKey.value)
+  ) {
+    attachmentActiveKey.value = shipAttachmentProductSummaries.value[0]?.key || ''
+  }
+}
+
+function rebuildShipAttachmentsFromCurrentDelivery({ merge = false } = {}) {
+  const so = currentSalesOrder()
+  const fromBom = enrichShipAttachmentsWithShipStatus(
+    collectShipAttachmentsFromSalesLines(currentDeliveryLinesForAttachments(), {
+      warehouse: form.outboundWarehouse,
+    }),
+    so,
+  )
+  if (merge) {
+    form.shipAttachments = enrichShipAttachmentsWithShipStatus(
+      mergeShipAttachmentLists(fromBom, form.shipAttachments),
+      so,
+      { preserveShipQty: true },
+    )
+  } else {
+    form.shipAttachments = fromBom
+  }
+  pruneShipAttachmentsToCurrentDelivery()
+  syncAttachmentKitSetsFromWholeLines()
+  attachmentActiveKey.value = shipAttachmentProductSummaries.value[0]?.key || ''
+}
+
+function removeWholeLineFromOrder(index) {
+  form.lineItems.splice(index, 1)
+  pruneShipAttachmentsToCurrentDelivery()
+}
+
+function removeScatterLineFromOrder(index) {
+  form.scatterShipments.splice(index, 1)
+  pruneShipAttachmentsToCurrentDelivery()
   syncExpandedScatterRows()
 }
 
@@ -791,6 +1442,7 @@ function populateFromSalesOrder(so) {
   form.contactPhone = so.contactPhone || ''
   form.deliveryAddress = so.deliveryAddress || ''
   form.shipmentMethod = resolveDefaultShipmentMethod(so.customerName, so.deliveryMethod)
+  // 再次申请：已发完产品仍展示（置灰），未发完可继续填写剩余数量
   form.lineItems = (so.lineItems || [])
     .map((line) => mapSalesLineToDeliveryLine(line, so))
     .filter(Boolean)
@@ -800,7 +1452,116 @@ function populateFromSalesOrder(so) {
   form.scatterShipments.forEach((s) => refreshScatterShipmentMeta(s))
   applyDefaultWarehouseToLines(form.lineItems)
   applyDefaultWarehouseToLines(form.scatterShipments)
+  rebuildShipAttachmentsFromCurrentDelivery({ merge: false })
   syncExpandedScatterRows()
+}
+
+const shipBomAddProductOpts = computed(() => {
+  return currentDeliveryLinesForAttachments()
+    .filter((line) => productHasShipBom(line.productId))
+    .map((line) => {
+      const key = String(line.id || line.productId || line.productCode)
+      const label = [line.productName, line.productCode].filter(Boolean).join(' / ') || key
+      return {
+        value: key,
+        label,
+        productId: line.productId,
+        productCode: line.productCode,
+        productName: line.productName,
+        salesLineId: line.id || '',
+        orderSets: Number(line.orderQty ?? line.salesQty ?? line.qty) || 0,
+      }
+    })
+})
+
+function openAddFromShipBom() {
+  if (!form.salesOrderId) {
+    message.warning('请先选择销售订单')
+    return
+  }
+  if (!shipBomAddProductOpts.value.length) {
+    message.warning('本单产品均无生效发运 BOM，请先配置或使用手工添加')
+    return
+  }
+  shipBomAddForm.productKey = shipBomAddProductOpts.value[0]?.value
+  shipBomAddForm.addSets = 1
+  shipBomAddOpen.value = true
+}
+
+function confirmAddFromShipBom() {
+  const opt = shipBomAddProductOpts.value.find((o) => o.value === shipBomAddForm.productKey)
+  if (!opt) {
+    message.warning('请选择产品')
+    return Promise.reject()
+  }
+  const addSets = Math.max(1, Number(shipBomAddForm.addSets) || 0)
+  if (!addSets) {
+    message.warning('请填写添加套数')
+    return Promise.reject()
+  }
+  const shipBom = getActiveShipBomForProduct(opt.productId)
+  if (!shipBom) {
+    message.warning(`产品「${opt.productName}」无生效发运 BOM`)
+    return Promise.reject()
+  }
+  form.shipAttachments = enrichShipAttachmentsWithShipStatus(
+    addShipBomAttachmentSets(form.shipAttachments, shipBom, {
+      addSets,
+      productId: opt.productId,
+      productCode: opt.productCode,
+      productName: opt.productName,
+      salesLineId: opt.salesLineId,
+      orderSets: opt.orderSets || addSets,
+      warehouse: form.outboundWarehouse,
+    }),
+    currentSalesOrder(),
+    { preserveShipQty: true },
+  )
+  const groupKey = String(opt.productId || opt.productCode || opt.productName)
+  attachmentActiveKey.value = groupKey
+  shipBomAddOpen.value = false
+  const curSets =
+    (form.shipAttachments || []).find(
+      (r) =>
+        (opt.productId && String(r.productId) === String(opt.productId)) ||
+        (opt.productCode && r.productCode === opt.productCode),
+    )?.kitSets ?? addSets
+  message.success(
+    `已为「${opt.productName}」添加 ${addSets} 套发运附件（当前套数：${curSets}/${opt.orderSets}）`,
+  )
+}
+
+function onAttachmentMaterialsPicked(items) {
+  const list = Array.isArray(items) ? items : [items]
+  list.forEach((item) => {
+    const code = item.code || item.itemCode || ''
+    if (!code) return
+    const exists = form.shipAttachments.find(
+      (r) => r.materialCode === code && r.source === '手工' && !r.salesLineId,
+    )
+    if (exists) {
+      exists.shipQty = (Number(exists.shipQty) || 0) + 1
+      return
+    }
+    form.shipAttachments.push(
+      createShipAttachmentLine({
+        materialCode: code,
+        materialName: item.name || item.itemName || '',
+        specModel: item.specModel || item.spec || '',
+        material: item.material || '',
+        drawingNo: item.drawingNo || '',
+        unit: item.unit || item.inventoryUnit || '件',
+        shipQty: 1,
+        source: '手工',
+        productId: '',
+        productCode: '',
+        productName: '',
+        salesLineId: '',
+        warehouse: form.outboundWarehouse,
+        selected: true,
+      }),
+    )
+  })
 }
 
 function onSalesOrderChange(id) {
@@ -819,17 +1580,29 @@ function syncExpandedScatterRows() {
 }
 
 function openScatterDrawer(ship) {
+  if (isDeliveryLineShipLocked(ship)) {
+    message.info('该产品已发完，不可再选择发运物料')
+    return
+  }
   activeScatterShipment.value = ship
   scatterDrawerOpen.value = true
 }
 
 function openLineEdit(record) {
+  if (isDeliveryLineShipLocked(record)) {
+    message.info('该产品已发完，不可编辑')
+    return
+  }
   lineEditTarget.value = record
   lineEditShowShipQty.value = true
   lineEditOpen.value = true
 }
 
 function openScatterLineEdit(record) {
+  if (isDeliveryLineShipLocked(record)) {
+    message.info('该产品已发完，不可编辑')
+    return
+  }
   lineEditTarget.value = record
   lineEditShowShipQty.value = false
   lineEditOpen.value = true
@@ -861,6 +1634,9 @@ function onScatterLinePriceChange(record) {
 function onScatterDrawerSave(payload) {
   if (!activeScatterShipment.value) return
   Object.assign(activeScatterShipment.value, payload)
+  if (payload.shipSets != null) {
+    activeScatterShipment.value.shipSets = payload.shipSets
+  }
   refreshScatterShipmentMeta(activeScatterShipment.value)
   const id = activeScatterShipment.value.salesLineId
   if (
@@ -879,6 +1655,7 @@ function removeScatterMaterialPick(shipment, mat) {
 
 function onLineCalc(record) {
   recalcDeliveryLine(record)
+  syncAttachmentKitSetsFromWholeLines()
 }
 
 function displayCell(record, column) {
@@ -899,20 +1676,28 @@ function onCustomerChange(name) {
 }
 
 function validateWholeMachineLines() {
-  for (const line of form.lineItems) {
+  const so = currentSalesOrder()
+  const lines = (form.lineItems || []).filter((line) => !isDeliveryLineShipLocked(line))
+  if (!lines.length) return true
+  for (const line of lines) {
     const shipQty = Number(line.shipQty)
     if (!shipQty && shipQty !== 0) {
       message.warning(`「${line.productName}」请填写本次发货数量`)
       return false
     }
     if (shipQty <= 0) {
-      message.warning(`「${line.productName}」本次发货数量须大于 0`)
+      message.warning(`「${line.productName}」本次发货数量须大于 0；若不发此产品请移出本单`)
       return false
     }
-    const maxQty = Number(line.orderQty) - Number(line.appliedShipQty ?? line.shippedQty ?? 0)
+    const salesLine = (so?.lineItems || []).find(
+      (l) => l.id === line.salesLineId || l.id === line.id,
+    )
+    const maxQty = salesLine
+      ? calcSalesLineAvailableQty(so, salesLine, { excludeIds: excludeDeliveryIds() })
+      : lineRemainShipQty(line)
     if (shipQty > maxQty + 1e-9) {
       message.warning(
-        `「${line.productName}」本次发货数量不能超过可发数量 ${formatDeliveryQty(maxQty)}`,
+        `「${line.productName}」本次发货数量不能超过可发数量 ${formatDeliveryQty(maxQty)}（订单 ${formatDeliveryQty(line.orderQty)}，已申请 ${formatDeliveryQty(line.appliedShipQty)}）`,
       )
       return false
     }
@@ -921,9 +1706,34 @@ function validateWholeMachineLines() {
 }
 
 function validateScatterShipments() {
-  for (const ship of form.scatterShipments) {
+  const ships = (form.scatterShipments || []).filter((ship) => !isDeliveryLineShipLocked(ship))
+  for (const ship of ships) {
     if (!getSelectedMaterialPicks(ship).length) {
-      message.warning(`散件行「${ship.productName}」请选择发运物料`)
+      message.warning(`散件行「${ship.productName}」请选择发运物料；若不发请移出本单`)
+      return false
+    }
+    const sets = Number(ship.shipSets)
+    const maxSets =
+      ship.maxShipSets != null
+        ? Number(ship.maxShipSets)
+        : Math.max(0, Number(ship.orderQty) - Number(ship.appliedShipQty || 0))
+    if (Number.isFinite(sets) && sets > maxSets + 1e-9) {
+      message.warning(`散件「${ship.productName}」发货套数不能大于可发套数 ${maxSets}`)
+      return false
+    }
+  }
+  return true
+}
+
+function validateShipAttachments() {
+  for (const group of shipAttachmentProductSummaries.value) {
+    if (group.key === '__unlinked__') continue
+    const sets = attachmentGroupKitSets(group)
+    const selected = attachmentsOfGroup(group).filter((r) => r.selected !== false)
+    if (selected.length && sets <= 0) {
+      message.warning(
+        `产品「${group.productName}」已纳入附件，请填写发货套数（可为赠送多于订单套数）`,
+      )
       return false
     }
   }
@@ -944,17 +1754,37 @@ function handleOk() {
     return
   }
 
-  const hasWhole = form.lineItems.length > 0
-  const hasScatter = form.scatterShipments.length > 0
-  if (!hasWhole && !hasScatter) {
+  const wholeLines = savableWholeLines()
+  const scatterLines = savableScatterShipments()
+  const unlockedWhole = (form.lineItems || []).filter((l) => !isDeliveryLineShipLocked(l))
+  const unlockedScatter = (form.scatterShipments || []).filter((s) => !isDeliveryLineShipLocked(s))
+
+  if (!form.lineItems.length && !form.scatterShipments.length) {
     message.warning('请选择销售订单并确认有可发运明细')
     return
   }
+  if (!unlockedWhole.length && !unlockedScatter.length) {
+    message.warning('本单产品均已发完，无法再次申请发货')
+    return
+  }
+  if (!wholeLines.length && !scatterLines.length) {
+    message.warning('请至少填写一条未发完产品的发货数量，或不发的产品请移出本单')
+    return
+  }
 
-  if (hasWhole && !validateWholeMachineLines()) return
-  if (hasScatter && !validateScatterShipments()) return
+  if (unlockedWhole.length && !validateWholeMachineLines()) return
+  if (unlockedScatter.length && !validateScatterShipments()) return
+  if (!validateShipAttachments()) return
 
-  form.lineItems.forEach(recalcDeliveryLine)
+  if (isEdit.value) {
+    const linked = findLinkedSalesOutbound(props.record)
+    if (linked && linked.status !== '待出库') {
+      message.warning('关联出库单已出库，不允许修改发货数量。请新建发货单继续发剩余数量。')
+      return
+    }
+  }
+
+  wholeLines.forEach(recalcDeliveryLine)
 
   const payload = {
     salesOrderId: form.salesOrderId,
@@ -973,18 +1803,26 @@ function handleOk() {
     driverPhone: form.driverPhone,
     plateNo: form.plateNo,
     remark: form.remark,
-    lineItems: JSON.parse(JSON.stringify(form.lineItems)),
-    scatterShipments: JSON.parse(JSON.stringify(form.scatterShipments)),
+    lineItems: JSON.parse(JSON.stringify(wholeLines)),
+    scatterShipments: JSON.parse(JSON.stringify(scatterLines)),
+    shipAttachments: JSON.parse(JSON.stringify(form.shipAttachments || [])),
   }
 
   saving.value = true
   try {
     if (isEdit.value) {
-      updateDeliveryOrder(props.record.id, payload)
-      const synced = props.record.deliveryStatus === '待出库' ? '，关联出库单已整单更新' : ''
+      const res = updateDeliveryOrder(props.record.id, payload)
+      if (res && res.ok === false) {
+        message.warning(res.message || '保存失败')
+        return
+      }
+      const synced = res?.outboundSynced ? '，关联待出库出库单已同步更新' : ''
       message.success(`已保存${synced}`)
       emit('saved')
-    } else if (isApplyMode.value) {
+      closeAfterSave()
+      return
+    }
+    if (isApplyMode.value) {
       const wholeQty = (payload.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
       const scatterQty = (payload.scatterShipments || []).reduce(
         (s, ship) => s + sumSelectedShipQty(ship),
@@ -1028,6 +1866,54 @@ export default { name: 'DeliveryFormModal' }
   color: rgba(0, 0, 0, 0.88);
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.th-tip-icon {
+  margin-left: 4px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.ship-att-hint-tag {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.ship-att-alert {
+  margin-bottom: 10px;
+}
+
+.ship-att-collapse {
+  margin-bottom: 8px;
+
+  :deep(.ant-collapse-header) {
+    align-items: center !important;
+  }
+
+  :deep(.ant-collapse-extra) {
+    margin-left: 12px;
+  }
+}
+
+.ship-att-sets-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+}
+
+.ship-bom-add-form {
+  margin-top: 8px;
+}
+
+.ship-att-line-code {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
 .section-divider {
   margin: 8px 0 12px;
 }
@@ -1064,9 +1950,20 @@ export default { name: 'DeliveryFormModal' }
   }
 }
 
-.th-tip-icon {
-  margin-left: 4px;
-  color: rgba(0, 0, 0, 0.45);
-  cursor: help;
+.line-locked-hint {
+  color: rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+}
+
+:deep(.delivery-line-locked) > td {
+  color: rgba(0, 0, 0, 0.35) !important;
+  background: #f5f5f5 !important;
+}
+
+:deep(.delivery-line-locked) .ant-input-number,
+:deep(.delivery-line-locked) .ant-select-selector,
+:deep(.delivery-line-locked) .ant-input {
+  background: #f5f5f5 !important;
+  color: rgba(0, 0, 0, 0.35);
 }
 </style>

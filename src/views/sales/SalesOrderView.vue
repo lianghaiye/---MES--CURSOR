@@ -59,6 +59,17 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="状态">
+              <a-select
+                v-model:value="filters.progressStatus"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="progressStatusOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="发货状态">
               <a-select
                 v-model:value="filters.deliveryStatus"
@@ -100,7 +111,7 @@
           <PlusOutlined />
           新增
         </a-button>
-        <a-button size="small" @click="handleApprove">
+        <a-button size="small" @click="openToolbarApprove">
           <CheckOutlined />
           审核
         </a-button>
@@ -180,12 +191,22 @@
         :pagination="false"
         :row-selection="rowSelection"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'orderNo'">
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">
+            {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
+          </template>
+          <template v-else-if="column.key === 'orderNo'">
             <a class="link-code" @click="openDetail(record)">{{ record.orderNo }}</a>
           </template>
           <template v-else-if="column.key === 'progressStatus'">
-            <a-tag :color="progressColor(record.progressStatus)">{{ record.progressStatus }}</a-tag>
+            <a-tag :color="salesOrderStatusColor(record.progressStatus)">{{
+              record.progressStatus
+            }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'deliveryStatus'">
+            <a-tag :color="salesDeliveryStatusColor(record.deliveryStatus)">{{
+              record.deliveryStatus || '未发货'
+            }}</a-tag>
           </template>
           <template v-else-if="column.key === 'totalQty'">
             {{ formatQty(record.totalQty) }}
@@ -221,10 +242,16 @@
             ￥{{ formatOrderMoney(resolveOrderAmounts(record).amountExTax) }}
           </template>
           <template v-else-if="column.key === 'createdAt'">
-            {{ formatDate(record.createdAt) }}
+            {{ formatDateTime(record.createdAt) }}
           </template>
           <template v-else-if="column.key === 'approvedAt'">
-            {{ formatDate(record.approvedAt) }}
+            {{ formatDateTime(record.approvedAt) }}
+          </template>
+          <template v-else-if="column.key === 'updatedAt'">
+            {{ formatDateTime(record.updatedAt || record.createdAt) }}
+          </template>
+          <template v-else-if="column.key === 'updater'">
+            {{ record.updater || record.creator || '—' }}
           </template>
           <template v-else-if="column.key === 'urgency'">
             {{ record.urgency }}
@@ -235,11 +262,35 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space v-if="canEditSalesOrder(record)" :size="0">
-              <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="confirmDelete(record)"
-                >删除</a-button
-              >
+            <a-space v-if="hasRowActions(record)" :size="0" wrap>
+              <template v-if="canSubmitSalesOrder(record)">
+                <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
+                <a-button type="link" size="small" @click="handleRowSubmit(record)"
+                  >提交审核</a-button
+                >
+                <a-button type="link" size="small" danger @click="confirmDelete(record)"
+                  >删除</a-button
+                >
+              </template>
+              <template v-else-if="canWithdrawSalesOrder(record)">
+                <a-button type="link" size="small" @click="handleRowWithdraw(record)"
+                  >撤回</a-button
+                >
+              </template>
+              <template v-else-if="canResubmitSalesOrder(record)">
+                <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
+                <a-button type="link" size="small" @click="handleRowResubmit(record)"
+                  >再次提交</a-button
+                >
+              </template>
+              <template v-else-if="isInProgressSalesOrder(record)">
+                <a-button type="link" size="small" @click="openDeliveryForOrder(record)"
+                  >发货</a-button
+                >
+                <a-button type="link" size="small" @click="openChangeDeliveryModeForOrder(record)"
+                  >变更交付方式</a-button
+                >
+              </template>
             </a-space>
             <span v-else class="action-disabled">-</span>
           </template>
@@ -314,12 +365,21 @@ import {
   revokeSalesOrderApproval,
   canEditSalesOrder,
   canChangeDeliveryMode,
+  canApproveSalesOrder,
+  canRevokeSalesOrderApproval,
+  canSubmitSalesOrder,
+  canWithdrawSalesOrder,
+  canResubmitSalesOrder,
+  submitSalesOrderForApprove,
+  withdrawSalesOrder,
+  resubmitSalesOrder,
 } from '@/store/salesOrderStore'
 import {
   customerOptions,
   orderSourceOptions,
   deliveryStatusOptions,
   salespersonOptions,
+  progressStatusOptions,
 } from '@/mock/salesOrderOptions'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
@@ -334,8 +394,14 @@ import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 import {
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
-  hasDispatchedWorkOrdersForSalesOrder,
+  hasSalesOrderRevokeBlockers,
 } from '@/utils/salesOrderRevokeApproval'
+import {
+  normalizeSalesOrderProgressStatus,
+  salesDeliveryStatusColor,
+  salesOrderStatusColor,
+  SALES_ORDER_STATUS,
+} from '@/utils/salesOrderStatus'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -346,6 +412,7 @@ const filters = reactive({
   customerName: undefined,
   orderSource: undefined,
   salesperson: undefined,
+  progressStatus: undefined,
   deliveryStatus: undefined,
   documentDateRange: null,
 })
@@ -358,15 +425,15 @@ const pagination = reactive({ current: 1, pageSize: 10 })
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 const orderSourceOpts = orderSourceOptions.map((v) => ({ label: v, value: v }))
 const deliveryStatusOpts = deliveryStatusOptions.map((v) => ({ label: v, value: v }))
+const progressStatusOpts = progressStatusOptions.map((v) => ({ label: v, value: v }))
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 
 const baseColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '状态', key: 'progressStatus', dataIndex: 'progressStatus', width: 90, fixed: 'left' },
   { title: '销售单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
-  { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true },
-  { title: '进度状态', key: 'progressStatus', dataIndex: 'progressStatus', width: 90 },
-  { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
-  { title: '交货方式', dataIndex: 'deliveryMethod', width: 90 },
-  { title: '发货状态', dataIndex: 'deliveryStatus', width: 90 },
+  { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true, fixed: 'left' },
+  { title: '发货状态', key: 'deliveryStatus', dataIndex: 'deliveryStatus', width: 90 },
   {
     title: '销售数量',
     key: 'totalQty',
@@ -382,19 +449,21 @@ const baseColumns = [
     align: 'right',
   },
   {
-    title: '销售金额（不含税）',
-    key: 'lineAmountExTax',
-    dataIndex: 'lineAmountExTax',
-    width: 130,
-    align: 'right',
-  },
-  {
-    title: '销售金额（含税）',
+    title: '销售总额（含税）',
     key: 'lineAmountInTax',
     dataIndex: 'lineAmountInTax',
     width: 130,
     align: 'right',
   },
+  {
+    title: '销售总额（不含税）',
+    key: 'lineAmountExTax',
+    dataIndex: 'lineAmountExTax',
+    width: 140,
+    align: 'right',
+  },
+  { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
+  { title: '交货方式', dataIndex: 'deliveryMethod', width: 90 },
   {
     title: '优惠策略',
     key: 'discountStrategy',
@@ -409,16 +478,16 @@ const baseColumns = [
     align: 'right',
   },
   {
-    title: '最终成交额（不含税）',
-    key: 'amountExTax',
-    dataIndex: 'amountExTax',
+    title: '最终成交额（含税）',
+    key: 'amountInTax',
+    dataIndex: 'amountInTax',
     width: 140,
     align: 'right',
   },
   {
-    title: '最终成交额（含税）',
-    key: 'amountInTax',
-    dataIndex: 'amountInTax',
+    title: '最终成交额（不含税）',
+    key: 'amountExTax',
+    dataIndex: 'amountExTax',
     width: 140,
     align: 'right',
   },
@@ -437,15 +506,17 @@ const baseColumns = [
   { title: '销售渠道', dataIndex: 'salesChannel', width: 90 },
   { title: '所属区域', dataIndex: 'region', width: 90 },
   { title: '订单来源', dataIndex: 'orderSource', width: 100 },
-  { title: '创建日期', key: 'createdAt', dataIndex: 'createdAt', width: 110 },
+  { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 140 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
-  { title: '审核日期', key: 'approvedAt', dataIndex: 'approvedAt', width: 110 },
+  { title: '审核时间', key: 'approvedAt', dataIndex: 'approvedAt', width: 140 },
   { title: '审核人', dataIndex: 'approver', width: 90 },
-  { title: '操作', key: 'action', width: 120, fixed: 'right' },
+  { title: '最近更新时间', key: 'updatedAt', dataIndex: 'updatedAt', width: 140 },
+  { title: '更新人', key: 'updater', dataIndex: 'updater', width: 90 },
+  { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('sales-order-list', baseColumns, { minScrollX: 2600 })
+  useTableColumnSettings('sales-order-list-v2', baseColumns, { minScrollX: 3200 })
 
 const {
   exportModalOpen,
@@ -495,11 +566,6 @@ const rowSelection = computed(() => ({
   },
 }))
 
-function progressColor(status) {
-  const map = { 已审: 'processing', 未审: 'default', 已完成: 'success', 已终止: 'error' }
-  return map[status] || 'default'
-}
-
 function formatMoney(val) {
   if (val == null || val === '') return '—'
   const n = Number(val)
@@ -532,9 +598,9 @@ function formatDiscountStrategy(strategy) {
   return DISCOUNT_STRATEGY_LABELS[strategy] || DISCOUNT_STRATEGY_LABELS.line || '—'
 }
 
-function formatDate(val) {
+function formatDateTime(val) {
   if (!val) return '—'
-  return String(val).slice(0, 10)
+  return String(val)
 }
 
 function handleSearch() {
@@ -548,6 +614,7 @@ function handleReset() {
   filters.customerName = undefined
   filters.orderSource = undefined
   filters.salesperson = undefined
+  filters.progressStatus = undefined
   filters.deliveryStatus = undefined
   filters.documentDateRange = null
   appliedFilters.value = { ...filters }
@@ -560,7 +627,7 @@ function stubAction(name) {
 
 function onBatchMenuClick({ key }) {
   if (key === '批量审核') {
-    handleApprove()
+    handleBatchApprove()
     return
   }
   if (key === '批量导出') {
@@ -570,16 +637,35 @@ function onBatchMenuClick({ key }) {
   stubAction(key)
 }
 
-function handleApprove() {
+function openToolbarApprove() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条待审核的销售订单')
+    return
+  }
+  const order = salesOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
+    message.warning('未找到所选订单')
+    return
+  }
+  if (!canApproveSalesOrder(order)) {
+    message.warning('仅「待审核」状态的销售订单可审核')
+    return
+  }
+  const path = `/sales/orders/${order.id}/approve`
+  openTab(path, `审核销售订单 ${order.orderNo || ''}`.trim())
+  router.push({ name: 'sales-orders-approve', params: { id: order.id } })
+}
+
+function handleBatchApprove() {
   if (!selectedRowKeys.value.length) {
     message.warning('请先选择要审核的销售订单')
     return
   }
 
   const targets = salesOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
-  const pending = targets.filter((o) => o.progressStatus === '未审')
+  const pending = targets.filter((o) => canApproveSalesOrder(o))
   if (!pending.length) {
-    message.warning('所选订单均已审核')
+    message.warning('所选订单均不可审核（需为待审核）')
     return
   }
 
@@ -611,7 +697,7 @@ function handleApprove() {
       } else if (succeeded.length === 1) {
         message.success(succeeded[0].message)
       } else if (succeeded.length > 1) {
-        message.success(`已成功审核 ${succeeded.length} 条销售订单，进度状态已变更为已审`)
+        message.success(`已成功审核 ${succeeded.length} 条销售订单，状态已变更为进行中`)
       }
 
       failed.forEach((r) => message.warning(r.message))
@@ -627,14 +713,14 @@ function handleRevokeApprove() {
   }
 
   const targets = salesOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
-  const approved = targets.filter((o) => o.progressStatus === '已审')
+  const approved = targets.filter((o) => canRevokeSalesOrderApproval(o))
   if (!approved.length) {
-    message.warning('所选订单均未审核，无需反审')
+    message.warning('所选订单均不可反审（需为进行中）')
     return
   }
 
-  const blockedOrders = approved.filter((o) => hasDispatchedWorkOrdersForSalesOrder(o))
-  const revokableOrders = approved.filter((o) => !hasDispatchedWorkOrdersForSalesOrder(o))
+  const blockedOrders = approved.filter((o) => hasSalesOrderRevokeBlockers(o))
+  const revokableOrders = approved.filter((o) => !hasSalesOrderRevokeBlockers(o))
 
   if (blockedOrders.length) {
     const orderNos = blockedOrders.map((o) => o.orderNo).join('、')
@@ -652,8 +738,8 @@ function handleRevokeApprove() {
   Modal.confirm({
     title: count > 1 ? `已选择 ${count} 条可反审订单` : undefined,
     content: blockedOrders.length
-      ? `部分订单因已下发工单无法反审。确认对其余 ${count} 条订单执行反审？`
-      : '确认反审所选销售订单？反审后订单将恢复为未审状态，可重新编辑。',
+      ? `部分订单因已下达关联单据无法反审。确认对其余 ${count} 条订单执行反审？`
+      : '确认反审所选销售订单？反审后订单将恢复为待审核状态。',
     okText: '确认反审',
     cancelText: '取消',
     onOk: () => {
@@ -670,6 +756,19 @@ function handleRevokeApprove() {
   })
 }
 
+function isInProgressSalesOrder(order) {
+  return normalizeSalesOrderProgressStatus(order?.progressStatus) === SALES_ORDER_STATUS.IN_PROGRESS
+}
+
+function hasRowActions(order) {
+  return (
+    canSubmitSalesOrder(order) ||
+    canWithdrawSalesOrder(order) ||
+    canResubmitSalesOrder(order) ||
+    isInProgressSalesOrder(order)
+  )
+}
+
 function openCreate() {
   const page = findCreatePageByListPath('/sales/orders')
   if (!page) return
@@ -678,7 +777,7 @@ function openCreate() {
 
 function openEditModal(record) {
   if (!canEditSalesOrder(record)) {
-    message.warning('已审核的销售订单不可编辑')
+    message.warning('当前状态不可编辑')
     return
   }
   const path = `/sales/orders/${record.id}/edit`
@@ -686,6 +785,56 @@ function openEditModal(record) {
     path,
     title: `编辑销售订单 ${record.orderNo || ''}`.trim(),
   })
+}
+
+function handleRowSubmit(record) {
+  const res = submitSalesOrderForApprove(record.id)
+  if (res.ok) message.success(res.message)
+  else message.warning(res.message)
+}
+
+function handleRowWithdraw(record) {
+  Modal.confirm({
+    content: `确认撤回销售订单「${record.orderNo}」？撤回后将回到待提交。`,
+    okText: '确认撤回',
+    cancelText: '取消',
+    onOk: () => {
+      const res = withdrawSalesOrder(record.id)
+      if (res.ok) message.success(res.message)
+      else message.warning(res.message)
+    },
+  })
+}
+
+function handleRowResubmit(record) {
+  const res = resubmitSalesOrder(record.id)
+  if (res.ok) message.success(res.message)
+  else message.warning(res.message)
+}
+
+function openDeliveryForOrder(order) {
+  if (!isInProgressSalesOrder(order)) {
+    message.warning('仅「进行中」的销售订单可申请发货')
+    return
+  }
+  openCreateTab(router, openTab, {
+    path: '/sales/delivery/new',
+    title: `新增发货单 ${order.orderNo || ''}`.trim(),
+    query: { salesOrderId: order.id },
+  })
+}
+
+function openChangeDeliveryModeForOrder(order) {
+  if (!canChangeDeliveryMode(order)) {
+    message.warning('仅「进行中」的自产销售订单可变更交付方式')
+    return
+  }
+  if (!buildEligibleDeliveryModeLines(order).length) {
+    message.warning('当前订单没有可变更的产品（均已发完或未发货数量为 0）')
+    return
+  }
+  changeDeliveryModeOrder.value = order
+  changeDeliveryModeOpen.value = true
 }
 
 function openDeliveryModal() {
@@ -698,11 +847,7 @@ function openDeliveryModal() {
     message.warning('未找到所选订单')
     return
   }
-  openCreateTab(router, openTab, {
-    path: '/sales/delivery/new',
-    title: `新增发货单 ${order.orderNo || ''}`.trim(),
-    query: { salesOrderId: order.id },
-  })
+  openDeliveryForOrder(order)
 }
 
 function openChangeDeliveryModeModal() {
@@ -715,16 +860,7 @@ function openChangeDeliveryModeModal() {
     message.warning('未找到所选订单')
     return
   }
-  if (!canChangeDeliveryMode(order)) {
-    message.warning('仅已审核的自产销售订单可变更交付方式')
-    return
-  }
-  if (!buildEligibleDeliveryModeLines(order).length) {
-    message.warning('当前订单没有可变更的产品（均已发完或未发货数量为 0）')
-    return
-  }
-  changeDeliveryModeOrder.value = order
-  changeDeliveryModeOpen.value = true
+  openChangeDeliveryModeForOrder(order)
 }
 
 function onChangeDeliveryModeSaved() {
@@ -738,8 +874,8 @@ function openDetail(record) {
 }
 
 function confirmDelete(record) {
-  if (!canEditSalesOrder(record)) {
-    message.warning('已审核的销售订单不可删除')
+  if (!canSubmitSalesOrder(record)) {
+    message.warning('仅「待提交」状态可删除')
     return
   }
   Modal.confirm({

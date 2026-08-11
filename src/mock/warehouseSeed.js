@@ -69,5 +69,22 @@ export function createWarehouseSeed() {
       storedItems: [],
       createdAt: '2025-12-01 14:20:00',
     },
+    {
+      id: 'wh-005',
+      code: 'BCP001',
+      name: '半成品仓',
+      categoryId: 'wcat-004',
+      categoryCode: '4',
+      categoryName: '半成品仓',
+      managerName: 'admin1',
+      workCenter: '机加车间',
+      enabled: true,
+      sortOrder: 5,
+      allowNegativeInventory: false,
+      address: '',
+      remark: '',
+      storedItems: [],
+      createdAt: '2026-08-11 13:40:00',
+    },
   ]
 }

@@ -11,7 +11,7 @@ import { getOwnActiveBomForItem, getProductBomById } from '@/store/productBomSto
 
 /** 为已审自产订单行补齐 EBOM 快照与配件包（演示数据 / 升级迁移） */
 export function hydrateApprovedSelfProdOrder(order) {
-  if (!order || order.progressStatus !== '已审') return order
+  if (!order || (order.progressStatus !== '已审' && order.progressStatus !== '进行中')) return order
 
   for (const line of order.lineItems || []) {
     const lineBusinessType = resolveLineBusinessType(line, order)

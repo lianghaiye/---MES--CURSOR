@@ -106,7 +106,11 @@ export function buildInitialProductionPlans(boms, salesOrders) {
   const bomsById = new Map(boms.map((b) => [b.id, b]))
 
   const approvedSelfMade = (salesOrders || [])
-    .filter((o) => o.businessType === '自产销售' && o.progressStatus === '已审')
+    .filter(
+      (o) =>
+        o.businessType === '自产销售' &&
+        (o.progressStatus === '已审' || o.progressStatus === '进行中'),
+    )
     .sort((a, b) => dayjs(b.documentDate).valueOf() - dayjs(a.documentDate).valueOf())
 
   return approvedSelfMade.map((order, planIndex) => {

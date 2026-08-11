@@ -12,6 +12,7 @@
           :selected-node-id="selectedNodeId"
           :template-ref="templateRef"
           :root-meta="rootMeta"
+          :hide-switch-product="isShipBomMode"
           @import-template="templateModalOpen = true"
           @add-child="onAddChild"
           @delete-node="onDeleteNode"
@@ -86,15 +87,47 @@
                 <a-form-item label="BOM类型" name="bomType">
                   <a-select
                     v-model:value="form.bomType"
-                    style="width: 140px"
+                    style="width: 160px"
                     :options="bomTypeSelectOptions"
                     :disabled="bomTypeLocked"
                   />
                 </a-form-item>
+                <a-form-item v-if="isShipBomMode && isEditMode" label="BOM版本">
+                  <a-input :value="editVersion" disabled style="width: 120px" />
+                </a-form-item>
+                <a-form-item v-if="isShipBomMode" label="适用产品" class="applicable-products-item">
+                  <div class="applicable-products-field">
+                    <a-button
+                      size="small"
+                      type="primary"
+                      ghost
+                      @click="applicableProductPickerOpen = true"
+                    >
+                      选择产品
+                    </a-button>
+                    <div
+                      v-if="selectedApplicableProducts.length"
+                      class="applicable-products-selected"
+                    >
+                      <a-tag
+                        v-for="p in selectedApplicableProducts"
+                        :key="p.id"
+                        closable
+                        class="applicable-product-tag"
+                        @close.prevent="removeApplicableProduct(p.id)"
+                      >
+                        <span class="tag-code">{{ p.code || '—' }}</span>
+                        <span class="tag-name">{{ p.name || '—' }}</span>
+                        <span v-if="p.specModel" class="tag-spec">{{ p.specModel }}</span>
+                      </a-tag>
+                    </div>
+                    <div v-else class="applicable-products-empty">未选择适用产品（可多选）</div>
+                  </div>
+                </a-form-item>
               </a-form>
             </div>
 
-            <div class="info-block">
+            <div v-if="!isShipBomMode" class="info-block">
               <div class="info-block-head">
                 <div class="info-block-title">父项产品信息</div>
               </div>
@@ -250,6 +283,16 @@
       :show-flat-sku-search="false"
       @selected="onSwitchSpuSelected"
     />
+    <SelectBomMaterialModal
+      v-if="isShipBomMode"
+      v-model:open="applicableProductPickerOpen"
+      title="选择适用产品"
+      hide-add-material
+      multiple
+      picker-default-item-type="产品"
+      :initial-selected-ids="form.applicableProductIds"
+      @selected="onApplicableProductsSelected"
+    />
     <BomColumnSettingDrawer v-model:open="columnDrawerOpen" v-model:settings="columnSettings" />
     <BomOverviewModal
       v-model:open="overviewModalOpen"
@@ -296,6 +339,7 @@ import {
   bomTypeSelectOptions,
   BOM_TYPE,
   normalizeBomType,
+  SHIP_KIT_ITEM_TYPE,
 } from '@/mock/bomMaterialColumns'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
 import { processRouteState } from '@/store/processRouteStore'
@@ -361,6 +405,7 @@ const basicInfoExpanded = ref(true)
 const leftSidebarCollapsed = ref(false)
 const leftPanelWidth = ref(280)
 const switchProductOpen = ref(false)
+const applicableProductPickerOpen = ref(false)
 const MIN_LEFT_WIDTH = 200
 const MAX_LEFT_WIDTH = 520
 let resizing = false
@@ -396,15 +441,51 @@ const form = reactive({
   techParams: '',
   processRoute: undefined,
   matchingRequirements: '',
+  /** 发运 BOM：适用产品 id 列表（多产品共用，不绑单一产品） */
+  applicableProductIds: [],
 })
 
-/** 新增入口与编辑态均锁定 BOM 类型，避免产品 BOM / 基准 BOM 混用 */
+/** 新增入口与编辑态均锁定 BOM 类型，避免产品 / 基准 / 发运 BOM 混用 */
 const bomTypeLocked = computed(() => true)
 
 const isBaselineBomMode = computed(() => form.bomType === BOM_TYPE.BASELINE)
+const isShipBomMode = computed(() => form.bomType === BOM_TYPE.SHIP)
 
 const rules = {
   bomName: [{ required: true, message: '请输入 BOM 名称' }],
+}
+
+const selectedApplicableProducts = computed(() => {
+  const ids = (form.applicableProductIds || []).map(String)
+  if (!ids.length) return []
+  const products = productInfoState.products || []
+  return ids.map((id) => {
+    const p = products.find((x) => String(x.id) === id)
+    return p
+      ? { id: p.id, code: p.code, name: p.name, specModel: p.specModel || '' }
+      : { id, code: '', name: id, specModel: '' }
+  })
+})
+
+function onApplicableProductsSelected(items) {
+  const rows = Array.isArray(items) ? items : [items]
+  const productIds = [
+    ...new Set(
+      rows
+        .filter((r) => r && (r.itemType === '产品' || !r.itemType))
+        .map((r) => r.id)
+        .filter(Boolean)
+        .map(String),
+    ),
+  ]
+  form.applicableProductIds = productIds
+  applicableProductPickerOpen.value = false
+}
+
+function removeApplicableProduct(id) {
+  form.applicableProductIds = (form.applicableProductIds || []).filter(
+    (x) => String(x) !== String(id),
+  )
 }
 
 const switchSelectedId = computed(() => {
@@ -415,6 +496,15 @@ const switchSelectedId = computed(() => {
 
 const rootMeta = computed(() => {
   const rootId = getRootTreeId(flatNodes.value)
+  if (isShipBomMode.value) {
+    return {
+      code: form.itemCode || '',
+      name: form.bomName || form.itemName || '发运附件包',
+      specModel: '',
+      supplyForm: '',
+      subItemCount: lineItems.value.filter((l) => l.parentTreeId === rootId).length,
+    }
+  }
   const master = form.itemId ? findMasterItem(form.itemType, switchSelectedId.value) : null
   return {
     code: form.itemCode,
@@ -426,6 +516,11 @@ const rootMeta = computed(() => {
 })
 
 const basicInfoSummary = computed(() => {
+  if (isShipBomMode.value) {
+    const n = (form.applicableProductIds || []).length
+    const parts = [form.bomName, n ? `适用 ${n} 个产品` : '未指定适用产品'].filter(Boolean)
+    return parts.join(' · ')
+  }
   const parts = [form.bomName, form.itemName].filter(Boolean)
   return parts.length ? parts.join(' · ') : '请填写 BOM 基础信息'
 })
@@ -591,12 +686,14 @@ function applyItemFromQuery(itemType, itemId, itemName) {
 }
 
 function resetNewBomState() {
+  const bomType = resolveDefaultBomTypeFromRoute()
+  const ship = bomType === BOM_TYPE.SHIP
   Object.assign(form, {
     bomNo: generateBomNo(),
-    bomName: '',
-    bomType: resolveDefaultBomTypeFromRoute(),
+    bomName: ship ? '标准随货附件包' : '',
+    bomType,
     itemId: undefined,
-    itemType: resolveDefaultBomTypeFromRoute() === BOM_TYPE.BASELINE ? 'spu' : 'product',
+    itemType: ship ? SHIP_KIT_ITEM_TYPE : bomType === BOM_TYPE.BASELINE ? 'spu' : 'product',
     itemName: '',
     itemCode: '',
     specModel: '',
@@ -605,6 +702,7 @@ function resetNewBomState() {
     techParams: '',
     processRoute: undefined,
     matchingRequirements: '',
+    applicableProductIds: [],
   })
   flatNodes.value = []
   lineItems.value = []
@@ -615,6 +713,34 @@ function resetNewBomState() {
   columnSettings.value = JSON.parse(JSON.stringify(defaultBomColumnSettings))
 }
 
+/** 发运 BOM：不绑产品，用名称作为根节点 */
+function ensureShipKitRoot() {
+  const kitName = form.bomName?.trim() || '发运附件包'
+  // 新建共用包：挂到 shipKit；编辑旧「单产品发运 BOM」保留原 itemType/itemId 以延续版本组
+  if (!form.itemId || form.itemType === SHIP_KIT_ITEM_TYPE) {
+    form.itemType = SHIP_KIT_ITEM_TYPE
+    form.itemName = kitName
+    if (!form.itemCode) form.itemCode = `KIT-${form.bomNo || 'SHIP'}`
+    if (!form.itemId) {
+      form.itemId = `${SHIP_KIT_ITEM_TYPE}:ship-kit-${Date.now().toString(36)}`
+    }
+  } else {
+    form.itemName = kitName
+  }
+  const rootPayload = {
+    itemCode: form.itemCode || '',
+    itemName: kitName,
+    specModel: '',
+    bomName: kitName,
+  }
+  if (hasRoot.value) {
+    flatNodes.value = syncRootNodeFromItem(flatNodes.value, rootPayload)
+  } else {
+    flatNodes.value = [createRootTreeNode(rootPayload)]
+    selectedNodeId.value = ROOT_ID
+  }
+}
+
 function initPageFromRoute() {
   if (isEditMode.value && editBomId.value) {
     loadEditBom(String(editBomId.value))
@@ -622,6 +748,11 @@ function initPageFromRoute() {
   }
   if (route.name === 'product-process-bom-new') {
     resetNewBomState()
+    if (isShipBomMode.value) {
+      ensureShipKitRoot()
+      switchProductOpen.value = false
+      return
+    }
     const { itemType, itemId, itemName } = route.query
     const applied = applyItemFromQuery(
       itemType ? String(itemType) : '',
@@ -645,6 +776,15 @@ watch(
   () => initPageFromRoute(),
 )
 
+watch(
+  () => form.bomName,
+  () => {
+    if (!isShipBomMode.value) return
+    if (!hasRoot.value && !form.bomName) return
+    ensureShipKitRoot()
+  },
+)
+
 onMounted(() => {
   document.addEventListener('mousemove', onResizeMouseMove)
   document.addEventListener('mouseup', onResizeMouseUp)
@@ -663,7 +803,9 @@ function applySelectedItem(opt, { preserveChildren = false } = {}) {
   form.specModel = opt.specModel
   applyReadonlyMasterFields(opt.itemType, opt.itemId)
   applyEditableMasterFields(opt.itemType, opt.itemId)
-  if (!form.bomName) form.bomName = `${opt.itemName} BOM`
+  if (!form.bomName) {
+    form.bomName = isShipBomMode.value ? `${opt.itemName}-发运附件` : `${opt.itemName} BOM`
+  }
 
   const hadRoot = hasRoot.value
   if (hadRoot) {
@@ -694,6 +836,10 @@ function applySelectedItem(opt, { preserveChildren = false } = {}) {
 }
 
 function openSwitchProduct() {
+  if (isShipBomMode.value) {
+    message.info('发运 BOM 不绑定单一产品，请在「适用产品」中多选')
+    return
+  }
   if (isEditMode.value && !canSwitchProduct.value) {
     message.info('仅待发布状态的 BOM 可切换产品')
     return
@@ -1033,7 +1179,12 @@ function loadEditBom(id) {
   form.techParams = bom.techParams || ''
   form.processRoute = bom.processRoute || undefined
   form.matchingRequirements = bom.matchingRequirements || bom.remark || ''
-  applyReadonlyMasterFields(bom.itemType, bom.itemId)
+  form.applicableProductIds = Array.isArray(bom.applicableProductIds)
+    ? [...bom.applicableProductIds]
+    : []
+  if (form.bomType !== BOM_TYPE.SHIP) {
+    applyReadonlyMasterFields(bom.itemType, bom.itemId)
+  }
 }
 
 async function handleSave() {
@@ -1042,9 +1193,16 @@ async function handleSave() {
   } catch {
     return
   }
+  if (isShipBomMode.value) {
+    ensureShipKitRoot()
+  }
   if (!hasRoot.value || !form.itemId) {
     message.warning(
-      isBaselineBomMode.value ? '请先通过左侧树切换选择产品族' : '请先通过左侧树切换选择产品/物料',
+      isShipBomMode.value
+        ? '请填写发运 BOM 名称'
+        : isBaselineBomMode.value
+          ? '请先通过左侧树切换选择产品族'
+          : '请先通过左侧树切换选择产品/物料',
     )
     return
   }
@@ -1076,20 +1234,36 @@ async function handleSave() {
   const itemId =
     typeof rawItemId === 'string' && rawItemId.includes(':') ? rawItemId.split(':')[1] : rawItemId
 
+  let applicableProductIds = isShipBomMode.value ? [...(form.applicableProductIds || [])] : []
+  // 旧数据：发运 BOM 曾绑单一产品 → 保存时并入适用列表，保持版本组 itemId 不变
+  if (
+    isShipBomMode.value &&
+    form.itemType === 'product' &&
+    itemId &&
+    !applicableProductIds.map(String).includes(String(itemId))
+  ) {
+    applicableProductIds = [...applicableProductIds, itemId]
+  }
+
   const payload = {
     bomNo: form.bomNo || generateBomNo(),
     bomName: form.bomName,
     bomType: form.bomType,
-    itemType: form.itemType,
+    itemType: isShipBomMode.value
+      ? form.itemType === SHIP_KIT_ITEM_TYPE
+        ? SHIP_KIT_ITEM_TYPE
+        : form.itemType
+      : form.itemType,
     itemId,
-    itemName: form.itemName,
+    itemName: isShipBomMode.value ? form.bomName : form.itemName,
     itemCode: form.itemCode,
-    specModel: form.specModel,
-    material: form.material || '',
-    drawingNo: form.drawingNo || '',
-    techParams: form.techParams || '',
-    processRoute: form.processRoute || '',
+    specModel: isShipBomMode.value ? '' : form.specModel,
+    material: isShipBomMode.value ? '' : form.material || '',
+    drawingNo: isShipBomMode.value ? '' : form.drawingNo || '',
+    techParams: isShipBomMode.value ? '' : form.techParams || '',
+    processRoute: isShipBomMode.value ? '' : form.processRoute || '',
     matchingRequirements: form.matchingRequirements || '',
+    applicableProductIds,
     treeNodes: flatNodes.value,
     lineItems: lineItems.value,
     templateRef: templateRef.value,
@@ -1361,6 +1535,60 @@ function handleCancel() {
 
 .basic-form {
   width: 100%;
+}
+
+.applicable-products-item {
+  :deep(.ant-form-item-control-input-content) {
+    display: block;
+  }
+}
+
+.applicable-products-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 320px;
+  max-width: 720px;
+}
+
+.applicable-products-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+}
+
+.applicable-product-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  max-width: 100%;
+  line-height: 22px;
+  white-space: normal;
+}
+
+.applicable-product-tag .tag-code {
+  color: #1677ff;
+  font-weight: 500;
+}
+
+.applicable-product-tag .tag-name {
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.applicable-product-tag .tag-spec {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.applicable-products-empty {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 
 @media (max-width: 992px) {

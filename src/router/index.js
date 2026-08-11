@@ -237,6 +237,12 @@ const routes = [
         meta: { title: '编辑销售订单', listPath: '/sales/orders' },
       },
       {
+        path: 'sales/orders/:id/approve',
+        name: 'sales-orders-approve',
+        component: () => import('@/views/sales/SalesOrderApproveView.vue'),
+        meta: { title: '审核销售订单', listPath: '/sales/orders' },
+      },
+      {
         path: 'sales/orders/:id',
         name: 'sales-orders-detail',
         component: () => import('@/views/sales/SalesOrderDetailView.vue'),
@@ -247,6 +253,18 @@ const routes = [
         name: 'sales-delivery',
         component: () => import('@/views/sales/DeliveryManagementView.vue'),
         meta: { title: '发货管理' },
+      },
+      {
+        path: 'sales/delivery/new',
+        name: 'sales-delivery-new',
+        component: () => import('@/views/sales/DeliveryCreateView.vue'),
+        meta: { title: '新增发货单', listPath: '/sales/delivery' },
+      },
+      {
+        path: 'sales/delivery/:id/edit',
+        name: 'sales-delivery-edit',
+        component: () => import('@/views/sales/DeliveryEditView.vue'),
+        meta: { title: '编辑发货单', listPath: '/sales/delivery' },
       },
       {
         path: 'sales/delivery/:id',

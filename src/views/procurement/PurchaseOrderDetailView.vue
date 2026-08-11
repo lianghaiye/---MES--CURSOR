@@ -7,6 +7,9 @@
             <span class="order-no">{{ record.orderNo }}</span>
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
             <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
+            <a-tag :color="overdueColor(overdueStatusOf(record))">
+              {{ overdueStatusOf(record) }}
+            </a-tag>
           </div>
           <a-space :size="8" wrap>
             <template v-if="record.status === '待提交'">
@@ -334,6 +337,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { calcPurchaseOrderDetailSummary } from '@/mock/purchaseOrderDetail'
+import { computePurchaseOrderOverdueStatus } from '@/mock/purchaseOrders'
 import {
   getPurchaseOrderById,
   canGenerateReceipt,
@@ -639,6 +643,14 @@ function statusColor(status) {
 function inboundColor(status) {
   const map = { 待入库: 'default', 部分入库: 'warning', 已入库: 'success' }
   return map[status] || 'default'
+}
+
+function overdueStatusOf(order) {
+  return order?.overdueStatus || computePurchaseOrderOverdueStatus(order)
+}
+
+function overdueColor(status) {
+  return status === '已逾期' ? 'error' : 'default'
 }
 
 function formatMoney(val) {

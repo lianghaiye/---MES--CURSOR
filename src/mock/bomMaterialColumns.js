@@ -38,22 +38,48 @@ export function formatSubstitutePartLabel(line) {
   return name || code || ''
 }
 
-/** 产品 BOM：挂 SKU/单品；基准 BOM：挂产品族（族模板） */
+/** 产品 BOM：挂 SKU/单品；基准 BOM：挂产品族（族模板）；发运 BOM：可共用的随货附件清单 */
 export const BOM_TYPE = {
   PRODUCT: '产品BOM',
   BASELINE: '基准BOM',
   ORDER: '订单BOM',
   CONFIG: '配置BOM',
+  /** 发运随货附件清单；可被多个产品共用，不参与生产 */
+  SHIP: '发运BOM',
 }
 
-export const bomTypeOptions = [BOM_TYPE.PRODUCT, BOM_TYPE.BASELINE, BOM_TYPE.ORDER, BOM_TYPE.CONFIG]
+/** 发运 BOM 挂载类型：不绑定单一产品，通过 applicableProductIds / 产品.shipBomId 关联 */
+export const SHIP_KIT_ITEM_TYPE = 'shipKit'
+
+export const bomTypeOptions = [
+  BOM_TYPE.PRODUCT,
+  BOM_TYPE.BASELINE,
+  BOM_TYPE.ORDER,
+  BOM_TYPE.CONFIG,
+  BOM_TYPE.SHIP,
+]
 
 export const bomTypeSelectOptions = bomTypeOptions.map((v) => ({ label: v, value: v }))
+
+/** 产品 BOM 创建页可选类型（不含订单/配置等特殊类型） */
+export const productBomCreateTypeOptions = [
+  { label: BOM_TYPE.PRODUCT, value: BOM_TYPE.PRODUCT },
+  { label: BOM_TYPE.BASELINE, value: BOM_TYPE.BASELINE },
+  { label: `${BOM_TYPE.SHIP}（可多产品共用）`, value: BOM_TYPE.SHIP },
+]
 
 /** 历史「基础BOM」归一为基准 BOM（族模板） */
 export function normalizeBomType(bomType) {
   if (!bomType || bomType === '基础BOM') return BOM_TYPE.BASELINE
   return bomType
+}
+
+export function isShipBomType(bomType) {
+  return normalizeBomType(bomType) === BOM_TYPE.SHIP
+}
+
+export function isShipKitItemType(itemType) {
+  return itemType === SHIP_KIT_ITEM_TYPE
 }
 
 /** EBOM 设计专用，产品 BOM 新增/编辑不展示此选项 */

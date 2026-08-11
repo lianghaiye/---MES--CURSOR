@@ -25,5 +25,13 @@ export function createWarehouseCategorySeed() {
       createdDept: '生产部',
       createdAt: '2026-03-25 11:54:35',
     },
+    {
+      id: 'wcat-004',
+      code: '4',
+      name: '半成品仓',
+      creator: 'admin',
+      createdDept: '生产部',
+      createdAt: '2026-08-11 13:40:00',
+    },
   ]
 }

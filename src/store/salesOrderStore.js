@@ -38,22 +38,43 @@ import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
 import { validateSalesLinesSkuResolved } from '@/utils/spuLineResolve'
 import {
-  getDispatchedWorkOrdersForSalesOrder,
+  hasSalesOrderRevokeBlockers,
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
 } from '@/utils/salesOrderRevokeApproval'
+import {
+  isSalesOrderApproved,
+  normalizeSalesOrderProgressStatus,
+  SALES_ORDER_STATUS,
+} from '@/utils/salesOrderStatus'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 8
+const DATA_VERSION = 9
 let orderSeq = 20
 let deliverySeq = 113
+
+function migrateSalesOrderStatuses(orders) {
+  return (orders || []).map((order) => {
+    const progressStatus = normalizeSalesOrderProgressStatus(order.progressStatus)
+    return {
+      ...order,
+      progressStatus,
+      approvalRecords: Array.isArray(order.approvalRecords) ? order.approvalRecords : [],
+      updatedAt: order.updatedAt || order.createdAt || '',
+      updater: order.updater || order.creator || '',
+    }
+  })
+}
 
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed.version === DATA_VERSION && Array.isArray(parsed.orders)) {
-        return parsed.orders
+      if (
+        Array.isArray(parsed.orders) &&
+        (parsed.version === DATA_VERSION || parsed.version === 8)
+      ) {
+        return migrateSalesOrderStatuses(parsed.orders)
       }
     }
   } catch {
@@ -71,8 +92,24 @@ function persist() {
 
 function loadInitialSalesOrders() {
   ensureEcnDemoBootstrap()
-  const orders = loadFromStorage() || buildMockSalesOrders(mockProducts)
+  const orders = migrateSalesOrderStatuses(loadFromStorage() || buildMockSalesOrders(mockProducts))
   return hydrateApprovedSelfProdOrders(orders)
+}
+
+function touchOrder(order) {
+  order.updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  order.updater = order.updater || 'admin1'
+}
+
+function pushApprovalRecord(order, { result, opinion }) {
+  if (!Array.isArray(order.approvalRecords)) order.approvalRecords = []
+  order.approvalRecords.unshift({
+    name: 'admin1',
+    role: '销售审核',
+    result,
+    time: dayjs().format('YYYY-MM-DD HH:mm'),
+    opinion: String(opinion || '').trim(),
+  })
 }
 
 export function generateSalesOrderNo() {
@@ -155,11 +192,34 @@ export function recalcOrderAmounts(order) {
 }
 
 export function canEditSalesOrder(order) {
-  return order?.progressStatus === '未审'
+  const status = normalizeSalesOrderProgressStatus(order?.progressStatus)
+  return status === SALES_ORDER_STATUS.DRAFT || status === SALES_ORDER_STATUS.REJECTED
+}
+
+export function canSubmitSalesOrder(order) {
+  return normalizeSalesOrderProgressStatus(order?.progressStatus) === SALES_ORDER_STATUS.DRAFT
+}
+
+export function canWithdrawSalesOrder(order) {
+  return normalizeSalesOrderProgressStatus(order?.progressStatus) === SALES_ORDER_STATUS.PENDING
+}
+
+export function canResubmitSalesOrder(order) {
+  return normalizeSalesOrderProgressStatus(order?.progressStatus) === SALES_ORDER_STATUS.REJECTED
+}
+
+export function canApproveSalesOrder(order) {
+  return normalizeSalesOrderProgressStatus(order?.progressStatus) === SALES_ORDER_STATUS.PENDING
+}
+
+export function canRevokeSalesOrderApproval(order) {
+  return normalizeSalesOrderProgressStatus(order?.progressStatus) === SALES_ORDER_STATUS.IN_PROGRESS
 }
 
 export function canChangeDeliveryMode(order) {
-  if (order?.progressStatus !== '已审') return false
+  if (normalizeSalesOrderProgressStatus(order?.progressStatus) !== SALES_ORDER_STATUS.IN_PROGRESS) {
+    return false
+  }
   return (order.lineItems || []).some((line) =>
     isSelfMadeBusinessType(resolveLineBusinessType(line, order)),
   )
@@ -183,15 +243,54 @@ export function changeSalesOrderDeliveryMode(orderId, rows) {
   return { ok: true, message: '交付方式变更成功' }
 }
 
+/** 待提交 → 待审核 */
+export function submitSalesOrderForApprove(id) {
+  const order = salesOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '订单不存在' }
+  if (!canSubmitSalesOrder(order)) {
+    return { ok: false, message: '仅「待提交」状态可提交审核' }
+  }
+  if (!order.lineItems?.length) {
+    return { ok: false, message: `订单「${order.orderNo}」请先添加销售明细后再提交` }
+  }
+  order.progressStatus = SALES_ORDER_STATUS.PENDING
+  touchOrder(order)
+  return { ok: true, message: `订单「${order.orderNo}」已提交审核` }
+}
+
+/** 待审核 → 待提交 */
+export function withdrawSalesOrder(id) {
+  const order = salesOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '订单不存在' }
+  if (!canWithdrawSalesOrder(order)) {
+    return { ok: false, message: '仅「待审核」状态可撤回' }
+  }
+  order.progressStatus = SALES_ORDER_STATUS.DRAFT
+  touchOrder(order)
+  return { ok: true, message: `订单「${order.orderNo}」已撤回` }
+}
+
+/** 已拒绝 → 待审核 */
+export function resubmitSalesOrder(id) {
+  const order = salesOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '订单不存在' }
+  if (!canResubmitSalesOrder(order)) {
+    return { ok: false, message: '仅「已拒绝」状态可重新提交' }
+  }
+  order.progressStatus = SALES_ORDER_STATUS.PENDING
+  touchOrder(order)
+  return { ok: true, message: `订单「${order.orderNo}」已重新提交审核` }
+}
+
 /**
  * 审核销售订单；外购销售审核通过时自动生成采购申请
  * @returns {{ ok: boolean, message: string, purchaseReqNo?: string }}
  */
-export function approveSalesOrder(id) {
+export function approveSalesOrder(id, opinion = '') {
   const order = salesOrderState.orders.find((o) => o.id === id)
   if (!order) return { ok: false, message: '订单不存在' }
-  if (order.progressStatus !== '未审') {
-    return { ok: false, message: `订单「${order.orderNo}」已审核，不可重复操作` }
+  if (!canApproveSalesOrder(order)) {
+    return { ok: false, message: `订单「${order.orderNo}」不可审核` }
   }
   if (!order.lineItems?.length) {
     return { ok: false, message: `订单「${order.orderNo}」请先添加销售明细后再审核` }
@@ -358,9 +457,11 @@ export function approveSalesOrder(id) {
   }
 
   order.businessType = deriveOrderBusinessType(order.lineItems, order.businessType)
-  order.progressStatus = '已审'
+  order.progressStatus = SALES_ORDER_STATUS.IN_PROGRESS
   order.approver = order.approver || 'admin1'
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  touchOrder(order)
+  pushApprovalRecord(order, { result: '已通过', opinion })
 
   const hints = []
   if (purchaseReqNo) hints.push(`已自动生成采购申请 ${purchaseReqNo}`)
@@ -393,30 +494,47 @@ export function approveSalesOrder(id) {
   }
 }
 
+/** 审核拒绝 → 已拒绝 */
+export function rejectSalesOrder(id, opinion = '') {
+  const order = salesOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '订单不存在' }
+  if (!canApproveSalesOrder(order)) {
+    return { ok: false, message: `订单「${order.orderNo}」不可审核` }
+  }
+  order.progressStatus = SALES_ORDER_STATUS.REJECTED
+  order.approver = 'admin1'
+  order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  touchOrder(order)
+  pushApprovalRecord(order, { result: '已驳回', opinion })
+  return { ok: true, message: `订单「${order.orderNo}」已拒绝` }
+}
+
 /**
- * 反审销售订单；若已有关联工单下发则拦截
+ * 反审销售订单；未下达工单/采购申请/外协订单才可反审
  * @returns {{ ok: boolean, message: string, blocked?: boolean }}
  */
 export function revokeSalesOrderApproval(id) {
   const order = salesOrderState.orders.find((o) => o.id === id)
   if (!order) return { ok: false, message: '订单不存在' }
-  if (order.progressStatus !== '已审') {
-    return { ok: false, message: `订单「${order.orderNo}」未审核，无需反审` }
+  if (!canRevokeSalesOrderApproval(order)) {
+    return { ok: false, message: `订单「${order.orderNo}」当前状态不可反审` }
   }
 
-  const dispatched = getDispatchedWorkOrdersForSalesOrder(order)
-  if (dispatched.length) {
+  if (hasSalesOrderRevokeBlockers(order)) {
     return {
       ok: false,
       blocked: true,
       message: SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
-      dispatchedWorkOrders: dispatched,
     }
   }
 
-  order.progressStatus = '未审'
+  order.progressStatus = SALES_ORDER_STATUS.PENDING
   order.approver = ''
   order.approvedAt = ''
+  touchOrder(order)
+  pushApprovalRecord(order, { result: '已反审', opinion: '' })
 
-  return { ok: true, message: `订单「${order.orderNo}」已反审，进度状态已变更为未审` }
+  return { ok: true, message: `订单「${order.orderNo}」已反审，状态已变更为待审核` }
 }
+
+export { isSalesOrderApproved, SALES_ORDER_STATUS }

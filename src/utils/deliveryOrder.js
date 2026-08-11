@@ -126,6 +126,7 @@ export function mapApplicationToDeliveryOrder(application, salesOrder) {
     createdAt: application.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
     lineItems: application.lineItems || [],
     scatterShipments: application.scatterShipments || [],
+    shipAttachments: application.shipAttachments || [],
     rawApplication: application,
   }
   row.actualOutboundQty = calcActualOutboundQty(row)

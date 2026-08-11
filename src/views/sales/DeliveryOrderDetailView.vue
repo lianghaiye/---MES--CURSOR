@@ -12,15 +12,20 @@
           <a-button size="small" @click="handleBack">返回列表</a-button>
         </div>
 
-        <a-tabs v-model:active-key="activeTab" class="detail-tabs">
-          <a-tab-pane key="basic" tab="基本信息" />
-          <a-tab-pane key="lines" tab="发货明细" />
-          <a-tab-pane key="outbound" :tab="`关联出库 (${outboundList.length})`" />
-        </a-tabs>
+        <div class="detail-tabs-wrap">
+          <a-tabs
+            v-model:active-key="activeTab"
+            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+          >
+            <a-tab-pane key="basic" tab="基本信息" />
+            <a-tab-pane key="outbound" :tab="`出库信息 (${outboundList.length})`" />
+          </a-tabs>
+        </div>
 
         <div class="tab-body">
           <template v-if="activeTab === 'basic'">
             <div class="section-card">
+              <div class="section-title">基本信息</div>
               <a-descriptions :column="3" size="small" bordered>
                 <a-descriptions-item label="发货单号">{{
                   record.deliveryCode
@@ -86,9 +91,7 @@
                 }}</a-descriptions-item>
               </a-descriptions>
             </div>
-          </template>
 
-          <template v-else-if="activeTab === 'lines'">
             <div v-if="record.lineItems?.length" class="section-card">
               <div class="section-title">整机发货明细</div>
               <a-table
@@ -127,8 +130,48 @@
                 />
               </div>
             </div>
+            <div v-if="record.shipAttachments?.length" class="section-card">
+              <div class="section-title">发货附件</div>
+              <a-table
+                :columns="shipAttachmentColumns"
+                :data-source="record.shipAttachments"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+              >
+                <template #bodyCell="{ column, record: line, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'source'">
+                    <a-tag :color="line.source === 'BOM' ? 'blue' : 'default'">
+                      {{ line.source || '手工' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'shipStatus'">
+                    <a-tag :color="attachmentShipStatusColor(line.shipStatus)">
+                      {{ line.shipStatus || '未发货' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'shipProgress'">
+                    {{
+                      formatAttachmentShipProgress(line.shippedQty, line.appliedQty, line.planQty)
+                    }}
+                  </template>
+                  <template v-else-if="column.key === 'selected'">
+                    {{ line.selected === false ? '否' : '是' }}
+                  </template>
+                  <template v-else>
+                    {{ line[column.dataIndex] ?? '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </div>
             <a-empty
-              v-if="!record.lineItems?.length && !record.scatterShipments?.length"
+              v-if="
+                !record.lineItems?.length &&
+                !record.scatterShipments?.length &&
+                !record.shipAttachments?.length
+              "
               description="无发货明细"
             />
           </template>
@@ -170,6 +213,7 @@ import {
   formatShipWeight,
   formatAmountExTax,
 } from '@/utils/deliveryOrder'
+import { attachmentShipStatusColor, formatAttachmentShipProgress } from '@/utils/shipBomAttachments'
 
 const route = useRoute()
 const router = useRouter()
@@ -192,6 +236,20 @@ const scatterPickColumns = [
   { title: '物料', dataIndex: 'name', ellipsis: true },
   { title: '编码', dataIndex: 'code', width: 110 },
   { title: '本次发运', dataIndex: 'shipQty', width: 90, align: 'right' },
+]
+
+const shipAttachmentColumns = [
+  { title: '#', key: 'index', width: 48 },
+  { title: '发货状态', key: 'shipStatus', width: 88 },
+  { title: '发货进度', key: 'shipProgress', width: 140, align: 'right' },
+  { title: '来源', key: 'source', width: 72 },
+  { title: '物料编码', dataIndex: 'materialCode', width: 120 },
+  { title: '物料名称', dataIndex: 'materialName', ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '关联产品', dataIndex: 'productName', width: 120, ellipsis: true },
+  { title: '发运数量', dataIndex: 'shipQty', width: 90, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 56 },
+  { title: '纳入本单', key: 'selected', width: 80 },
 ]
 
 const outboundColumns = [
@@ -271,11 +329,6 @@ function goSalesOrder() {
 .doc-no {
   font-size: 16px;
   font-weight: 600;
-}
-
-.detail-tabs {
-  background: #fff;
-  padding: 0 12px;
 }
 
 .tab-body {

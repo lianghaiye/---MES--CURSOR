@@ -64,7 +64,7 @@ function createSalesOrder(partial) {
   return {
     status: '',
     deliveryStatus: '未发货',
-    progressStatus: '未审',
+    progressStatus: '待提交',
     inventoryStatus: '充足',
     totalIssuedQty: 0,
     orderSource: '内部新增',
@@ -107,7 +107,7 @@ export const mockSalesOrders = [
     customerName: '测试人员',
     region: '华北',
     salesperson: 'admin1',
-    progressStatus: '已审',
+    progressStatus: '进行中',
     documentDate: '2026-05-29',
     reminderDate: '',
     urgency: '正常',
@@ -144,7 +144,7 @@ export const mockSalesOrders = [
     customerName: '人纷纷',
     region: '华东',
     salesperson: 'admin1',
-    progressStatus: '未审',
+    progressStatus: '待提交',
     documentDate: '2026-05-28',
     urgency: '正常',
     remark: '',
@@ -169,7 +169,7 @@ export const mockSalesOrders = [
     customerName: '华东机械制造有限公司',
     region: '华东',
     salesperson: '张三',
-    progressStatus: '已审',
+    progressStatus: '进行中',
     documentDate: '2026-05-27',
     urgency: '紧急',
     inventoryStatus: '充足',
@@ -205,6 +205,7 @@ export function filterSalesOrders(list, filters) {
     if (filters.customerName && order.customerName !== filters.customerName) return false
     if (filters.orderSource && order.orderSource !== filters.orderSource) return false
     if (filters.salesperson && order.salesperson !== filters.salesperson) return false
+    if (filters.progressStatus && order.progressStatus !== filters.progressStatus) return false
     if (filters.deliveryStatus && order.deliveryStatus !== filters.deliveryStatus) return false
     if (filters.documentDateRange?.length === 2) {
       const [start, end] = filters.documentDateRange

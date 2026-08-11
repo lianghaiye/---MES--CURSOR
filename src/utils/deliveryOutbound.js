@@ -66,6 +66,25 @@ export function buildOutboundLinesFromDelivery(delivery) {
       )
     }
   }
+  for (const att of delivery.shipAttachments || []) {
+    if (att.selected === false) continue
+    const qty = Number(att.shipQty) || 0
+    if (qty <= 0) continue
+    lines.push(
+      enrichOutboundLine(
+        createOutboundLine({
+          itemName: att.materialName || '',
+          itemCode: att.materialCode || '',
+          itemType: '物料',
+          specModel: att.specModel || '',
+          shipQty: qty,
+          shipWarehouse: headerWarehouse || '成品仓',
+          unit: att.unit || '件',
+          deliveryRemark: att.remark || `发运附件（${att.source || 'BOM'}）`,
+        }),
+      ),
+    )
+  }
   return lines
 }
 

@@ -1,6 +1,10 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { salesOrderState } from '@/store/salesOrderStore'
+import {
+  salesOrderState,
+  updateDeliveryApplication,
+  findDeliveryApplicationById,
+} from '@/store/salesOrderStore'
 import {
   calcApplyShipQty,
   calcDeliveryAmountExTax,
@@ -15,6 +19,7 @@ import {
   upsertSalesOutboundFromDelivery,
 } from '@/utils/deliveryOutbound'
 import { refreshDeliveryMetrics } from '@/utils/deliveryOutboundSync'
+import { sumSelectedShipQty } from '@/utils/shipEbom'
 
 const STORAGE_KEY = 'i_doms_delivery_orders'
 const DATA_VERSION = 2
@@ -176,30 +181,53 @@ export function createDeliveryOrder(payload) {
   const so = salesOrderState.orders.find(
     (o) => o.id === payload.salesOrderId || o.orderNo === payload.salesOrderNo,
   )
-  const row = mapApplicationToDeliveryOrder(
-    {
-      id: `do-${Date.now()}`,
-      deliveryCode: payload.deliveryCode || nextDeliveryCode(),
-      deliveryDate: payload.documentDate || dayjs().format('YYYY-MM-DD'),
-      createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
-      customerName: payload.customerName || so?.customerName,
-      shipmentMethod: payload.shipmentMethod || '送货',
-      logisticsNo: payload.logisticsNo || '',
-      contactPerson: payload.contactPerson || so?.contactPerson || '',
-      contactPhone: payload.contactPhone || so?.contactPhone || '',
-      deliveryAddress: payload.deliveryAddress || so?.deliveryAddress || '',
-      driverName: payload.driverName || '',
-      driverPhone: payload.driverPhone || '',
-      plateNo: payload.plateNo || '',
-      applyOutbound: Boolean(payload.applyOutbound),
-      outboundWarehouse: payload.outboundWarehouse || '成品仓',
-      remark: payload.remark || '',
-      lineItems: payload.lineItems || [],
-      scatterShipments: payload.scatterShipments || [],
-      salesOrderId: so?.id || payload.salesOrderId,
-    },
-    so,
+  const id = `do-${Date.now()}`
+  const wholeQty = (payload.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
+  const scatterQty = (payload.scatterShipments || []).reduce(
+    (s, ship) => s + sumSelectedShipQty(ship),
+    0,
   )
+  const appPayload = {
+    id,
+    deliveryCode: payload.deliveryCode || nextDeliveryCode(),
+    deliveryDate: payload.documentDate || dayjs().format('YYYY-MM-DD'),
+    createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    customerName: payload.customerName || so?.customerName,
+    shipmentMethod: payload.shipmentMethod || '送货',
+    logisticsNo: payload.logisticsNo || '',
+    contactPerson: payload.contactPerson || so?.contactPerson || '',
+    contactPhone: payload.contactPhone || so?.contactPhone || '',
+    deliveryAddress: payload.deliveryAddress || so?.deliveryAddress || '',
+    driverName: payload.driverName || '',
+    driverPhone: payload.driverPhone || '',
+    plateNo: payload.plateNo || '',
+    applyOutbound: Boolean(payload.applyOutbound),
+    outboundWarehouse: payload.outboundWarehouse || '成品仓',
+    remark: payload.remark || '',
+    lineItems: payload.lineItems || [],
+    scatterShipments: payload.scatterShipments || [],
+    shipAttachments: payload.shipAttachments || [],
+    salesOrderId: so?.id || payload.salesOrderId,
+    salesOrderNo: so?.orderNo || payload.salesOrderNo,
+    totalShipQty: wholeQty + scatterQty,
+    status: '已提交',
+  }
+
+  // 先写入销售订单发货申请，保证多次发货数量校验有据可依；发货单由 register 同步
+  if (so?.id) {
+    const existing = findDeliveryApplicationById(so.id, id)
+    if (!existing) {
+      // 直接写入，避免 addDeliveryApplication 再次异步 register 导致重复
+      if (!Array.isArray(so.deliveryApplications)) so.deliveryApplications = []
+      so.deliveryApplications.unshift({ ...appPayload })
+      if (appPayload.totalShipQty > 0) {
+        so.totalIssuedQty = (Number(so.totalIssuedQty) || 0) + appPayload.totalShipQty
+        if (so.deliveryStatus === '未发货') so.deliveryStatus = '部分发货'
+      }
+    }
+  }
+
+  const row = mapApplicationToDeliveryOrder(appPayload, so)
   deliveryOrderState.orders.unshift(row)
   if (payload.applyOutbound) {
     tryCreateOutboundForDelivery(row)
@@ -209,22 +237,73 @@ export function createDeliveryOrder(payload) {
 
 export function updateDeliveryOrder(id, patch) {
   const idx = deliveryOrderState.orders.findIndex((o) => o.id === id)
-  if (idx === -1) return null
+  if (idx === -1) return { ok: false, message: '发货单不存在' }
   const prev = deliveryOrderState.orders[idx]
+  const linked = findLinkedSalesOutbound(prev)
+  const touchingQty =
+    patch.lineItems != null ||
+    patch.scatterShipments != null ||
+    patch.shipAttachments != null ||
+    patch.applyShipQty != null
+
+  if (linked && linked.status !== '待出库' && touchingQty) {
+    return {
+      ok: false,
+      message: '关联出库单已出库，不允许再修改发货数量；请先冲销或新建发货单',
+    }
+  }
+
   Object.assign(deliveryOrderState.orders[idx], patch)
   const row = deliveryOrderState.orders[idx]
   row.applyShipQty = calcApplyShipQty(row)
   row.totalAmountExTax = calcDeliveryAmountExTax(row)
   row.shipWeight = patch.shipWeight ?? calcShipWeight(row)
   refreshRowMetrics(row)
+
+  // 同步销售订单上的发货申请，保证可发数量校验准确
+  if (row.salesOrderId && touchingQty) {
+    const appPatch = {
+      ...patch,
+      id: row.id,
+      deliveryCode: row.deliveryCode,
+      lineItems: row.lineItems,
+      scatterShipments: row.scatterShipments,
+      shipAttachments: row.shipAttachments,
+      totalShipQty: row.applyShipQty,
+    }
+    const updated = updateDeliveryApplication(row.salesOrderId, row.id, appPatch)
+    if (!updated) {
+      const so = salesOrderState.orders.find((o) => o.id === row.salesOrderId)
+      if (so) {
+        if (!Array.isArray(so.deliveryApplications)) so.deliveryApplications = []
+        so.deliveryApplications.unshift({
+          id: row.id,
+          createdAt: row.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
+          status: '已提交',
+          ...appPatch,
+        })
+      }
+    }
+  } else if (row.salesOrderId && patch.deliveryStatus) {
+    updateDeliveryApplication(row.salesOrderId, row.id, {
+      status: patch.deliveryStatus === '已发货' ? '已发货' : undefined,
+      actualShipQty: patch.actualOutboundQty,
+    })
+  }
+
   const editable = prev.deliveryStatus === '待发货' || prev.deliveryStatus === '待出库'
-  if (editable && hasLinkedSalesOutbound(row)) {
-    upsertSalesOutboundFromDelivery(row)
+  if (touchingQty && editable && hasLinkedSalesOutbound(row)) {
+    const res = upsertSalesOutboundFromDelivery(row)
+    if (!res.ok) {
+      return { ok: false, message: res.message || '同步出库单失败', delivery: row }
+    }
     row.deliveryStatus = '待出库'
-  } else if (row.applyOutbound && !hasLinkedSalesOutbound(row)) {
+    return { ok: true, delivery: row, outboundSynced: true }
+  }
+  if (touchingQty && row.applyOutbound && !hasLinkedSalesOutbound(row)) {
     tryCreateOutboundForDelivery(row)
   }
-  return row
+  return { ok: true, delivery: row }
 }
 
 export function deleteDeliveryOrder(id) {

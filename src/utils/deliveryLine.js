@@ -34,13 +34,14 @@ export function resolveDeliveryVariantAttr(line = {}) {
   return line.specAttr || master?.standardSpec || ''
 }
 
-/** 行级发货状态：未发货、部分发货、已发完 */
-export function calcLineShipStatus(shippedQty, orderQty) {
-  const shipped = Number(shippedQty) || 0
+/** 行级发货状态：已发完仅看「已确认出库 ≥ 订单」；有占用但未出满为部分发货 */
+export function calcLineShipStatus(confirmedOutboundQty, orderQty, occupiedQty) {
+  const confirmed = Number(confirmedOutboundQty) || 0
   const order = Number(orderQty) || 0
-  if (order <= 0 || shipped <= 0) return '未发货'
-  if (shipped >= order - 1e-9) return '已发完'
-  return '部分发货'
+  const occupied = occupiedQty != null ? Number(occupiedQty) || 0 : confirmed
+  if (order > 0 && confirmed >= order - 1e-9) return '已发完'
+  if (confirmed > 0 || occupied > 0) return '部分发货'
+  return '未发货'
 }
 
 export function lineShipStatusColor(status) {
@@ -58,23 +59,45 @@ export function formatDeliveryQtyInt(val) {
 }
 
 /**
- * 发货进度：已确认出库数量 / 申请发货数量 / 订单数量
+ * 发货进度：已确认出库数量 / 已占用数量（待出库申请+实际出库） / 订单数量
  */
 export function formatShipProgress(confirmedOutboundQty, appliedShipQty, orderQty) {
   return `${formatNumber(confirmedOutboundQty, 4, { empty: '-' })} / ${formatNumber(appliedShipQty, 4, { empty: '-' })} / ${formatNumber(orderQty, 4, { empty: '-' })}`
 }
 
-export const SHIP_PROGRESS_TOOLTIP = '格式：已确认出库的数量 / 申请发货的数量 / 订单数量'
+export const SHIP_PROGRESS_TOOLTIP =
+  '格式：已确认出库数量 / 已占用数量（待出库按申请量占用，已出库按实际量占用） / 订单数量'
+
+/**
+ * 是否锁定不可再申请：
+ * - 待出库申请已占满订单额度 → 锁定
+ * - 已确认出库已达订单数量 → 锁定
+ * - 实际出库 < 订单，且无待出库占用差额 → 不锁定，可再次申请
+ */
+export function isDeliveryLineShipLocked(line) {
+  if (!line) return false
+  if (line.shipLocked === true) return true
+  const orderQty = Number(line.orderQty ?? line.salesQty ?? line.qty) || 0
+  const remain =
+    line.remainShipQty != null
+      ? Number(line.remainShipQty)
+      : Math.max(
+          0,
+          orderQty - Number(line.appliedShipQty ?? line.occupiedShipQty ?? line.shippedQty ?? 0),
+        )
+  return orderQty > 0 && remain <= 1e-9
+}
 
 function buildDeliveryLineBase(line, order) {
   const orderQty = roundDeliveryDecimal(Number(line.salesQty ?? line.qty ?? 0), 4)
   const confirmedOutboundQty = roundDeliveryDecimal(calcSalesLineShippedQty(order, line), 4)
   const appliedShipQty = roundDeliveryDecimal(calcSalesLineAppliedShipQty(order, line), 4)
   const shippedQty = confirmedOutboundQty
-  const remain = Math.max(0, orderQty - appliedShipQty)
+  const remainShipQty = Math.max(0, orderQty - appliedShipQty)
+  const shipLocked = remainShipQty <= 1e-9 && orderQty > 0
   const unitPriceExTax = roundDeliveryDecimal(Number(line.unitPriceExTax ?? 0), 4)
   const unitPriceInTax = roundDeliveryDecimal(Number(line.unitPriceInTax ?? 0), 4)
-  const shipQty = remain > 0 ? remain : 0
+  const shipQty = shipLocked ? 0 : remainShipQty
   const shipWeight = roundDeliveryDecimal(Number(line.shipWeight ?? line.itemWeightKg ?? 0), 4)
 
   return {
@@ -83,7 +106,10 @@ function buildDeliveryLineBase(line, order) {
     shippedQty,
     confirmedOutboundQty,
     appliedShipQty,
-    lineShipStatus: calcLineShipStatus(confirmedOutboundQty, orderQty),
+    occupiedShipQty: appliedShipQty,
+    remainShipQty,
+    shipLocked,
+    lineShipStatus: calcLineShipStatus(confirmedOutboundQty, orderQty, appliedShipQty),
     unitPriceExTax,
     unitPriceInTax,
     drawingNo: line.drawingNo || '',

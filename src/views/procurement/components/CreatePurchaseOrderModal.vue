@@ -162,12 +162,12 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="交货仓库">
+                <a-form-item label="收货仓库">
                   <a-select
                     v-model:value="form.receivingWarehouse"
                     size="small"
                     allow-clear
-                    placeholder="请选择 交货仓库"
+                    placeholder="请选择 收货仓库"
                     :options="warehouseOpts"
                     @change="onHeaderReceivingWarehouseChange"
                   />
@@ -1245,6 +1245,7 @@ function buildSavePayload() {
     approvalResult: props.editRecord?.approvalResult || '',
     approverName: props.editRecord?.approverName || '',
     inboundStatus: props.editRecord?.inboundStatus || '待入库',
+    overdueStatus: props.editRecord?.overdueStatus || '未逾期',
     creator: props.editRecord?.creator || 'admin1',
     createdAt: props.editRecord?.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
     updater: 'admin1',

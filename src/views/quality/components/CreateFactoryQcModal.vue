@@ -64,7 +64,7 @@ const selectedSalesOrderId = ref(undefined)
 
 const salesOrderOpts = computed(() =>
   salesOrderState.orders
-    .filter((o) => o.progressStatus === '已审')
+    .filter((o) => o.progressStatus === '已审' || o.progressStatus === '进行中')
     .map((o) => ({ label: `${o.orderNo} · ${o.customerName}`, value: o.id })),
 )
 

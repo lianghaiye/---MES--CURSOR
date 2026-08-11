@@ -4,6 +4,7 @@ import {
   clonePurchaseOrders,
   recalcPurchaseOrderTotals,
   createPoLineItem,
+  computePurchaseOrderOverdueStatus,
 } from '@/mock/purchaseOrders'
 import { ensureCrossDemoPurchaseOrders } from '@/mock/crossModuleDemoSeed'
 import { round2 } from '@/utils/purchaseMerge'
@@ -59,7 +60,15 @@ function persist() {
 
 function initPurchaseOrders() {
   const base = shouldReseed() ? clonePurchaseOrders() : loadFromStorage() || clonePurchaseOrders()
-  return ensureCrossDemoPurchaseOrders(base)
+  const orders = ensureCrossDemoPurchaseOrders(base)
+  orders.forEach((order) => {
+    if (!order || order.status === '草稿') {
+      if (order) order.overdueStatus = order.overdueStatus || '未逾期'
+      return
+    }
+    order.overdueStatus = computePurchaseOrderOverdueStatus(order)
+  })
+  return orders
 }
 
 export function generatePurchaseOrderNo() {
@@ -170,7 +179,7 @@ export function canCompletePurchaseOrder(order) {
   return order?.status === '进行中' && order?.inboundStatus === '已入库'
 }
 
-/** 回写整单/明细入库状态 */
+/** 回写整单/明细入库状态与逾期状态 */
 export function syncPurchaseOrderInboundStatus(orderOrId) {
   const order =
     typeof orderOrId === 'string'
@@ -181,7 +190,19 @@ export function syncPurchaseOrderInboundStatus(orderOrId) {
     line.inboundStatus = calcPoLineInboundStatus(order, line)
   })
   order.inboundStatus = calcPoHeaderInboundStatus(order)
+  order.overdueStatus = computePurchaseOrderOverdueStatus(order)
   return order
+}
+
+/** 按交货日期刷新全部采购订单逾期状态 */
+export function refreshPurchaseOrderOverdueStatusAll() {
+  purchaseOrderState.orders.forEach((order) => {
+    if (!order || order.status === '草稿') {
+      if (order) order.overdueStatus = '未逾期'
+      return
+    }
+    order.overdueStatus = computePurchaseOrderOverdueStatus(order)
+  })
 }
 
 function pushApprovalRecord(order, { result, opinion }) {
@@ -206,6 +227,7 @@ export function approvePurchaseOrder(id, opinion = '') {
   order.approvalResult = '审核通过'
   order.approverName = 'admin1'
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  order.overdueStatus = computePurchaseOrderOverdueStatus(order)
   pushApprovalRecord(order, { result: '已通过', opinion })
   return { ok: true, message: `采购单「${order.orderNo}」审核通过` }
 }
@@ -275,6 +297,7 @@ export function voidPurchaseOrder(id) {
   }
   order.status = '已作废'
   order.approvalResult = order.approvalResult || '—'
+  order.overdueStatus = '未逾期'
   return { ok: true, message: `采购单「${order.orderNo}」已作废` }
 }
 
@@ -286,6 +309,7 @@ export function completePurchaseOrder(id) {
     return { ok: false, message: `采购单「${order.orderNo}」需入库完成后才可完成` }
   }
   order.status = '已完成'
+  order.overdueStatus = '未逾期'
   return { ok: true, message: `采购单「${order.orderNo}」已完成` }
 }
 
@@ -359,6 +383,7 @@ export function createPurchaseOrdersFromMergedLines(mergedLines, options = {}) {
       status,
       approvalResult: status === '草稿' ? '—' : '待审核',
       inboundStatus: status === '草稿' ? '—' : '待入库',
+      overdueStatus: '未逾期',
       documentDate: dayjs().format('YYYY-MM-DD'),
       createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
       draftRows: status === '草稿' ? JSON.parse(JSON.stringify(mergedLines)) : undefined,
@@ -840,6 +865,7 @@ export function reassignPoLinesToSupplier(orderId, lineIds, newSupplier) {
       status: '待提交',
       approvalResult: '',
       inboundStatus: '待入库',
+      overdueStatus: '未逾期',
       documentDate: dayjs().format('YYYY-MM-DD'),
       createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
       purchaser: order.purchaser || 'admin1',

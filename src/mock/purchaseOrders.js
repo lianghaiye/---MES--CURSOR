@@ -74,6 +74,7 @@ function createPurchaseOrder(partial) {
     orderSource: '新增',
     applyType: '日常采购',
     inboundStatus: '待入库',
+    overdueStatus: '未逾期',
     approvalResult: '',
     approverName: '',
     settlementType: '先款后货',
@@ -557,6 +558,10 @@ export function filterPurchaseOrders(list, filters) {
     if (filters.salesOrderNo && !item.salesOrderNo?.includes(filters.salesOrderNo)) return false
     if (filters.status && item.status !== filters.status) return false
     if (filters.orderSource && item.orderSource !== filters.orderSource) return false
+    if (filters.overdueStatus) {
+      const overdue = item.overdueStatus || computePurchaseOrderOverdueStatus(item)
+      if (overdue !== filters.overdueStatus) return false
+    }
     if (filters.documentDateRange?.length === 2) {
       const [start, end] = filters.documentDateRange
       if (
@@ -567,6 +572,20 @@ export function filterPurchaseOrders(list, filters) {
     }
     return true
   })
+}
+
+/**
+ * 超过交货日期且仍未完成入库 → 已逾期（仅进行中单据）
+ */
+export function computePurchaseOrderOverdueStatus(order, now = dayjs()) {
+  if (!order) return '未逾期'
+  if (order.inboundStatus === '已入库') return '未逾期'
+  if (order.status !== '进行中') return '未逾期'
+  const deliveryDate = String(order.deliveryDate || '').slice(0, 10)
+  if (!deliveryDate) return '未逾期'
+  const plan = dayjs(deliveryDate)
+  if (!plan.isValid()) return '未逾期'
+  return now.isAfter(plan, 'day') ? '已逾期' : '未逾期'
 }
 
 export function recalcPurchaseOrderTotals(order) {

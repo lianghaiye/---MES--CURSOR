@@ -28,10 +28,18 @@ import { upgradeParentBomReferences } from '@/utils/bomVersionReference'
 import { formatBomInfoLabel, sortBomsForDisplay } from '@/utils/itemBomInfo'
 import { resolveActiveBomForItem } from '@/utils/spuBomResolve'
 import { ensureBlankSizeDemoBoms } from '@/mock/blankSizeBomDemoSeed'
+import { ensureShipBomDemos } from '@/mock/shipBomDemoSeed'
+import {
+  BOM_TYPE,
+  isShipBomType,
+  normalizeBomType,
+  SHIP_KIT_ITEM_TYPE,
+} from '@/mock/bomMaterialColumns'
+import { productInfoState } from '@/store/productInfoStore'
 
 const STORAGE_KEY = 'i_doms_product_bom'
-/** v9：下料尺寸演示 BOM（钢管/钢板/按重圆钢） */
-const DATA_VERSION = 9
+/** v11：发运 BOM 改为可多产品共用 */
+const DATA_VERSION = 11
 let bomNoSeq = 31000
 
 function normalizeBoms(boms) {
@@ -97,7 +105,7 @@ function loadInitialBoms() {
   const base = stored
     ? stored
     : injectBomParentReferenceMocks(normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials)))
-  return ensureBlankSizeDemoBoms(base)
+  return ensureShipBomDemos(ensureBlankSizeDemoBoms(base))
 }
 
 export const productBomState = reactive({
@@ -138,13 +146,76 @@ export function getProductBomById(id) {
   return row ? ensureBomStructure(row) : null
 }
 
-/** 仅 SKU/物料自有生效 BOM（不含族模板解析）。销售投产与主数据「已维护 BOM」用此口径。 */
+/** 仅 SKU/物料自有生效 BOM（不含族模板解析、不含发运BOM）。销售投产与主数据「已维护 BOM」用此口径。 */
 export function getOwnActiveBomForItem(itemType, itemId) {
   if (!itemType || itemId == null || itemId === '') return null
   const row = productBomState.boms.find(
-    (b) => b.itemType === itemType && String(b.itemId) === String(itemId) && isBomActive(b),
+    (b) =>
+      b.itemType === itemType &&
+      String(b.itemId) === String(itemId) &&
+      isBomActive(b) &&
+      !isShipBomType(b.bomType),
   )
   return row ? ensureBomStructure(row) : null
+}
+
+/** 按 BOM 类型取自有生效版（发运 BOM / 产品 BOM 可并存） */
+export function getOwnActiveBomForItemByType(itemType, itemId, bomType) {
+  if (!itemType || itemId == null || itemId === '' || !bomType) return null
+  const type = normalizeBomType(bomType)
+  const row = productBomState.boms.find(
+    (b) =>
+      b.itemType === itemType &&
+      String(b.itemId) === String(itemId) &&
+      isBomActive(b) &&
+      normalizeBomType(b.bomType) === type,
+  )
+  return row ? ensureBomStructure(row) : null
+}
+
+/** 产品关联的生效发运 BOM（多产品可共用同一套） */
+export function getActiveShipBomForProduct(productId) {
+  if (productId == null || productId === '') return null
+  const pid = String(productId)
+
+  // 1) 产品主数据显式指定
+  const product = (productInfoState.products || []).find((p) => String(p.id) === pid)
+  if (product?.shipBomId) {
+    const byId = getProductBomById(product.shipBomId)
+    if (byId && isBomActive(byId) && isShipBomType(byId.bomType)) return byId
+    const groupId = byId?.versionGroupId
+    if (groupId) {
+      const activeInGroup = productBomState.boms.find(
+        (b) => b.versionGroupId === groupId && isBomActive(b) && isShipBomType(b.bomType),
+      )
+      if (activeInGroup) return ensureBomStructure(activeInGroup)
+    }
+  }
+
+  // 2) 共用发运 BOM：适用产品列表包含本产品
+  const shared = productBomState.boms.find(
+    (b) =>
+      isShipBomType(b.bomType) &&
+      isBomActive(b) &&
+      (b.itemType === SHIP_KIT_ITEM_TYPE || Array.isArray(b.applicableProductIds)) &&
+      (b.applicableProductIds || []).map(String).includes(pid),
+  )
+  if (shared) return ensureBomStructure(shared)
+
+  // 3) 兼容旧数据：发运 BOM 曾绑在单一产品上
+  return getOwnActiveBomForItemByType('product', productId, BOM_TYPE.SHIP)
+}
+
+/** 全部生效的共用发运 BOM（供产品关联下拉） */
+export function listActiveSharedShipBoms() {
+  return productBomState.boms
+    .filter(
+      (b) =>
+        isShipBomType(b.bomType) &&
+        isBomActive(b) &&
+        (b.itemType === SHIP_KIT_ITEM_TYPE || !b.itemType || b.itemType === 'product'),
+    )
+    .map(ensureBomStructure)
 }
 
 /**
@@ -188,16 +259,19 @@ export function getBaselineBomForProduct(productId) {
   return all.find(isBomPending) || all[0] || null
 }
 
-function archiveActiveForItem(itemType, itemId, exceptId) {
+function archiveActiveForItem(itemType, itemId, exceptId, bomType) {
   const ts = nowStr()
+  const type = bomType != null ? normalizeBomType(bomType) : null
   productBomState.boms.forEach((b) => {
-    if (b.itemType === itemType && b.itemId === itemId && b.id !== exceptId && isBomActive(b)) {
-      b.status = BOM_STATUS.ARCHIVED
-      b.isDefault = false
-      b.expiredAt = ts
-      b.updatedAt = ts
-      b.operator = 'admin'
+    if (b.itemType !== itemType || b.itemId !== itemId || b.id === exceptId || !isBomActive(b)) {
+      return
     }
+    if (type != null && normalizeBomType(b.bomType) !== type) return
+    b.status = BOM_STATUS.ARCHIVED
+    b.isDefault = false
+    b.expiredAt = ts
+    b.updatedAt = ts
+    b.operator = 'admin'
   })
 }
 
@@ -235,6 +309,10 @@ function buildBomRecord(payload, { versionGroupId, ver, status, source }) {
     remark: payload.matchingRequirements || payload.remark || '',
     matchingRequirements: payload.matchingRequirements || payload.remark || '',
     bomType: payload.bomType || '基准BOM',
+    /** 发运 BOM 适用产品 id 列表（多产品共用） */
+    applicableProductIds: Array.isArray(payload.applicableProductIds)
+      ? [...payload.applicableProductIds]
+      : [],
     specModel: payload.specModel || '',
     material: payload.material || '',
     drawingNo: payload.drawingNo || '',
@@ -248,14 +326,20 @@ function buildBomRecord(payload, { versionGroupId, ver, status, source }) {
 }
 
 export function addProductBom(payload) {
-  const active = getOwnActiveBomForItem(payload.itemType, payload.itemId)
-  const versionGroupId = active?.versionGroupId || `bom-grp-${Date.now()}`
+  const bomType = normalizeBomType(payload.bomType || BOM_TYPE.PRODUCT)
+  const active = getOwnActiveBomForItemByType(payload.itemType, payload.itemId, bomType)
+  const versionGroupId =
+    active?.versionGroupId ||
+    `bom-grp-${bomType}-${payload.itemType}-${payload.itemId}-${Date.now()}`
   const ver = buildVersion(payload.itemType, payload.itemId, versionGroupId)
-  const record = buildBomRecord(payload, {
-    versionGroupId,
-    ver,
-    status: BOM_STATUS.PENDING,
-  })
+  const record = buildBomRecord(
+    { ...payload, bomType },
+    {
+      versionGroupId,
+      ver,
+      status: BOM_STATUS.PENDING,
+    },
+  )
   productBomState.boms.unshift(record)
   return record
 }
@@ -276,7 +360,10 @@ export function updateProductBom(id, patch) {
  */
 export function saveProductBom(id, payload) {
   if (!id) {
-    const hadActive = Boolean(getOwnActiveBomForItem(payload.itemType, payload.itemId))
+    const bomType = normalizeBomType(payload.bomType || BOM_TYPE.PRODUCT)
+    const hadActive = Boolean(
+      getOwnActiveBomForItemByType(payload.itemType, payload.itemId, bomType),
+    )
     const record = addProductBom(payload)
     return { record, created: true, versionUpgraded: hadActive }
   }
@@ -336,9 +423,14 @@ export function enableProductBom(id, { upgradeParentRefs = false, parentRefs = [
   if (!isBomPending(row)) return { error: '仅待发布状态可审核发布' }
 
   const ts = nowStr()
-  archiveActiveForItem(row.itemType, row.itemId, row.id)
+  const bomType = normalizeBomType(row.bomType)
+  archiveActiveForItem(row.itemType, row.itemId, row.id, bomType)
   productBomState.boms.forEach((b) => {
-    if (b.itemType === row.itemType && b.itemId === row.itemId) {
+    if (
+      b.itemType === row.itemType &&
+      b.itemId === row.itemId &&
+      normalizeBomType(b.bomType) === bomType
+    ) {
       b.isDefault = b.id === row.id
     }
   })
