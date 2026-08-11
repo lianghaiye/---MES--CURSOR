@@ -7,6 +7,7 @@ import {
   productBomState,
 } from '@/store/productBomStore'
 import { formatBomInfoLabel } from '@/utils/itemBomInfo'
+import { isShipBomType } from '@/mock/bomMaterialColumns'
 import { getDefaultProductRoute, getActiveRouteOptions } from '@/mock/processRoutes'
 import { stockState } from '@/store/stockStore'
 import { demoStockQty } from '@/utils/productionPlanWorkItem'
@@ -158,14 +159,16 @@ export function buildWorkOrderBomSelectOptions(productId) {
         (b) => b.itemType === 'product' && (b.status === '生效' || b.status === '待发布'),
       )
 
-  return source.map((b) => {
-    const master = resolveMasterFromBom(b)
-    const productHint = master?.name && !productId ? ` · ${master.name}` : ''
-    return {
-      label: `${formatBomInfoLabel(b)}${productHint}`,
-      value: b.id,
-    }
-  })
+  return source
+    .filter((b) => !isShipBomType(b.bomType))
+    .map((b) => {
+      const master = resolveMasterFromBom(b)
+      const productHint = master?.name && !productId ? ` · ${master.name}` : ''
+      return {
+        label: `${formatBomInfoLabel(b)}${productHint}`,
+        value: b.id,
+      }
+    })
 }
 
 /** 从物品选择器选项回填表单 */

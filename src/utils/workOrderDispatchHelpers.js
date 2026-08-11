@@ -75,13 +75,16 @@ export function saveDispatchDraft(updateFn, workOrder) {
   return true
 }
 
-/** 下发并开始：推送小程序任务，工单变更为执行中 */
+/** 下发并开始：推送小程序任务；支持未排满时再次下发（追加排产） */
 export function dispatchAndStartWorkOrder({ workOrder, orderCategory, updateFn }) {
   if (!workOrder || !validateWorkOrderDispatchReady(workOrder)) return false
-  if (workOrder.status !== '待下发') {
-    message.warning('仅待下发状态工单可下发并开始')
+  const status = workOrder.status
+  const allowStatuses = ['待下发', '已下发', '执行中']
+  if (!allowStatuses.includes(status)) {
+    message.warning('当前状态不可下发')
     return false
   }
+  const isFirstDispatch = status === '待下发'
   const mobileCategories = ['生产工单', '总装工单', '拆解工单', '外协工单']
   const tasks = mobileCategories.includes(orderCategory)
     ? dispatchWorkOrderToMobile(workOrder, orderCategory)
@@ -93,15 +96,19 @@ export function dispatchAndStartWorkOrder({ workOrder, orderCategory, updateFn }
     processRouteName: workOrder.processRouteName,
     status: '执行中',
     dispatchControl: isParallelTaskDispatch() ? 'parallel' : 'serial',
-    dispatchedAt: dayjs().format('YYYY-MM-DD HH:mm'),
-    executedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    ...(isFirstDispatch
+      ? {
+          dispatchedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+          executedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+        }
+      : {}),
     ...(ebomSnapshot ? { ebomSnapshot } : {}),
   })
   const parts = []
   if (tasks.length) parts.push(`已生成 ${tasks.length} 条小程序任务`)
   if (confirmLines.length) parts.push(`已生成 ${confirmLines.length} 条报工确认数据`)
   const suffix = parts.length ? `（${parts.join('，')}）` : ''
-  message.success(`工单已下发并开始执行${suffix}`)
+  message.success(isFirstDispatch ? `工单已下发并开始执行${suffix}` : `已追加下发排产${suffix}`)
   return true
 }
 

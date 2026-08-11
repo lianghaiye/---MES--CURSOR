@@ -53,7 +53,8 @@
               :min="0"
               size="small"
               style="width: 100%"
-              @change="(v) => updateField(field.key, v)"
+              :disabled="field.readonly"
+              @change="(v) => !field.readonly && updateField(field.key, v)"
             />
             <a-select
               v-else-if="field.type === 'select'"
@@ -108,10 +109,13 @@ import {
 } from '@/utils/workOrderBasicFields'
 import { resolveWorkCenterOwner } from '@/mock/workOrderOptions'
 import WorkOrderOwnerSelect from './WorkOrderOwnerSelect.vue'
+import { getBatchesScheduledQty, getWorkOrderPlanQty } from '@/utils/workOrderScheduleBatch'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
   editable: { type: Boolean, default: false },
+  /** 工单下发：计划只读、展示已排产、排产数量=本批 */
+  dispatchMode: { type: Boolean, default: false },
   showMetaBar: { type: Boolean, default: false },
   planDateValue: { type: Object, default: null },
   workCenterOpts: { type: Array, default: () => [] },
@@ -178,14 +182,35 @@ const detailFields = computed(() => {
   if (props.editable) {
     fields.push(
       { key: 'processRouteName', label: routeLabel, type: 'route-select', required: true },
-      { key: 'planQty', label: '计划数量', type: 'number' },
-      { key: 'scheduleQty', label: '排产数量', type: 'number', required: true },
+      {
+        key: 'planQty',
+        label: '计划数量',
+        type: 'number',
+        readonly: props.dispatchMode,
+      },
     )
+    if (props.dispatchMode) {
+      fields.push(
+        {
+          key: 'dispatchBatchQty',
+          label: '排产数量',
+          type: 'number',
+          required: true,
+        },
+        {
+          key: 'alreadyScheduledQty',
+          label: '已排产数量',
+          getValue: () => displayValue(getBatchesScheduledQty(wo)),
+        },
+      )
+    } else {
+      fields.push({ key: 'scheduleQty', label: '排产数量', type: 'number', required: true })
+    }
   } else {
     fields.push(
       { key: 'processRouteName', label: '工艺路线', value: wo.processRouteName },
-      { key: 'planQty', label: '计划数量', value: wo.planQty },
-      { key: 'scheduleQty', label: '排产数量', value: wo.scheduleQty },
+      { key: 'planQty', label: '计划数量', value: getWorkOrderPlanQty(wo) },
+      { key: 'scheduleQty', label: '已排产数量', value: getBatchesScheduledQty(wo) },
     )
   }
 

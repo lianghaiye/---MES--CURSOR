@@ -17,6 +17,12 @@ import { findWorkItemForPlanRow } from '@/utils/productionPlanMaterial'
 import { ensureMaterialReqDemoWorkOrders } from '@/mock/materialReqWorkOrderSeed'
 import { ensureCrossDemoWorkOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureBlankSizeDemoWorkOrders } from '@/mock/blankSizeBomDemoSeed'
+import {
+  normalizeWorkOrderScheduleFields,
+  createScheduleBatch,
+  dispatchScheduleBatch,
+  removeScheduleBatch,
+} from '@/utils/workOrderScheduleBatch'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -38,7 +44,9 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.orders)) return parsed.orders
+      if (Array.isArray(parsed.orders)) {
+        return parsed.orders.map((o) => normalizeWorkOrderScheduleFields(o))
+      }
     }
   } catch {
     /* ignore */
@@ -68,15 +76,15 @@ function createDemoWorkOrder() {
     status: '待下发',
     progressLabel: '新建',
     taskStatus: '正常',
-    scheduleQty: 3,
-    planQty: 3,
+    scheduleQty: 0,
+    planQty: 20,
     actualQty: 0,
     workCenter: '默认工厂',
     bom: '',
     warehouse: '报废仓',
     urgency: '正常',
     planDateRange: ['2026-05-31', '2026-05-31'],
-    remark: '',
+    remark: '演示：计划20，可分批排产并指定不同执行人',
     processRouteName: routeName,
     source: 'manual',
     sourceOrderNo: '1-20260531-002',
@@ -85,15 +93,32 @@ function createDemoWorkOrder() {
     submittedBy: 'admin',
     processes: buildProcessesFromRoute(routeName).map((p) => ({
       ...p,
-      executors: ['admin'],
+      executors: [],
     })),
+    scheduleBatches: [],
+    activeScheduleBatchId: '',
     createdAt: '2026-05-31',
   }
 }
 
 function ensureDemoWorkOrder(orders) {
-  if (!orders.some((o) => o.id === DEMO_ORDER_ID)) {
+  const existing = orders.find((o) => o.id === DEMO_ORDER_ID)
+  if (!existing) {
     orders.unshift(createDemoWorkOrder())
+  } else {
+    const hasBatches = (existing.scheduleBatches || []).length > 0
+    if (!hasBatches && Number(existing.planQty) <= 3) {
+      existing.planQty = 20
+      existing.scheduleQty = 0
+      existing.scheduleBatches = []
+      existing.activeScheduleBatchId = ''
+      existing.remark = existing.remark || '演示：计划数量可大于排产，支持分批排产并指定不同执行人'
+      existing.processes = (existing.processes || []).map((p) => ({
+        ...p,
+        executors: [],
+      }))
+    }
+    normalizeWorkOrderScheduleFields(existing)
   }
   return ensureCompletionDeductDemoWorkOrders(orders)
 }
@@ -510,8 +535,39 @@ export function createWorkOrderPayload(partial) {
     supplier: partial.supplier || '',
     skipEbom: Boolean(partial.skipEbom || skipEbomCategory),
     processes: routeName ? buildProcessesFromRoute(routeName) : [],
+    scheduleBatches: Array.isArray(partial.scheduleBatches) ? partial.scheduleBatches : [],
+    activeScheduleBatchId: partial.activeScheduleBatchId || '',
     createdAt: dayjs().format('YYYY-MM-DD'),
   }
+}
+
+/** 新建排产批次 */
+export function addWorkOrderScheduleBatch(workOrderId, input) {
+  const wo = workOrderState.orders.find((o) => o.id === workOrderId)
+  if (!wo) return { ok: false, message: '工单不存在' }
+  normalizeWorkOrderScheduleFields(wo)
+  return createScheduleBatch(wo, input)
+}
+
+/** 下发排产批次 */
+export function dispatchWorkOrderScheduleBatch(workOrderId, batchId) {
+  const wo = workOrderState.orders.find((o) => o.id === workOrderId)
+  if (!wo) return { ok: false, message: '工单不存在' }
+  return dispatchScheduleBatch(wo, batchId)
+}
+
+/** 删除待下发排产批次 */
+export function removeWorkOrderScheduleBatch(workOrderId, batchId) {
+  const wo = workOrderState.orders.find((o) => o.id === workOrderId)
+  if (!wo) return { ok: false, message: '工单不存在' }
+  return removeScheduleBatch(wo, batchId)
+}
+
+export function setActiveWorkOrderScheduleBatch(workOrderId, batchId) {
+  const wo = workOrderState.orders.find((o) => o.id === workOrderId)
+  if (!wo) return false
+  wo.activeScheduleBatchId = batchId
+  return true
 }
 
 /** 生产计划保存加工工单后同步创建工单 */
@@ -609,4 +665,17 @@ export function filterWorkOrders(list, filters) {
 
 export function canShowDispatchTab(status) {
   return status === '待下发'
+}
+
+/** 待下发，或已排产 < 计划数量时继续展示工单下发 */
+export function shouldShowWorkOrderDispatchTab(workOrder) {
+  if (!workOrder) return false
+  if (canShowDispatchTab(workOrder.status)) return true
+  const plan = Math.max(0, Number(workOrder.planQty) || 0)
+  const scheduled = Math.max(0, Number(workOrder.scheduleQty) || 0)
+  // prefer batch sum when present
+  const batches = workOrder.scheduleBatches || []
+  const batchSum = batches.reduce((s, b) => s + Math.max(0, Number(b.qty) || 0), 0)
+  const already = batches.length ? batchSum : scheduled
+  return plan > 0 && already < plan
 }

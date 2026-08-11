@@ -10,6 +10,12 @@ import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { createLaborDemoAssemblyOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
 import { ensureProductionPlanOrderTreeDemoAssemblyOrders } from '@/mock/productionPlanOrderTreeSeed'
 import { findWorkItemForPlanRow } from '@/utils/productionPlanMaterial'
+import {
+  normalizeWorkOrderScheduleFields,
+  createScheduleBatch,
+  dispatchScheduleBatch,
+  removeScheduleBatch,
+} from '@/utils/workOrderScheduleBatch'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -31,7 +37,9 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.orders)) return parsed.orders
+      if (Array.isArray(parsed.orders)) {
+        return parsed.orders.map((o) => normalizeWorkOrderScheduleFields(o))
+      }
     }
   } catch {
     /* ignore */
@@ -51,7 +59,22 @@ function generateAssemblyCode() {
 function ensureLaborDemoAssemblyOrders(orders) {
   const demos = createLaborDemoAssemblyOrders()
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
-  return ensureProductionPlanOrderTreeDemoAssemblyOrders([...demos, ...rest])
+  const merged = ensureProductionPlanOrderTreeDemoAssemblyOrders([...demos, ...rest])
+  merged.forEach((o) => {
+    if (o.id === 'asm-init-1') {
+      const hasBatches = (o.scheduleBatches || []).length > 0
+      if (!hasBatches && Number(o.planQty) <= 8) {
+        o.planQty = 20
+        o.scheduleQty = 0
+        o.scheduleBatches = []
+        o.activeScheduleBatchId = ''
+        o.remark = o.remark || '演示：计划数量可大于排产，支持分批排产并指定不同执行人'
+        o.processes = (o.processes || []).map((p) => ({ ...p, executors: [] }))
+      }
+    }
+    normalizeWorkOrderScheduleFields(o)
+  })
+  return merged
 }
 
 function createInitialOrders() {
@@ -64,18 +87,20 @@ function createInitialOrders() {
       productName: '潜水电机',
       orderCategory: '总装工单',
       status: '待下发',
-      scheduleQty: 8,
-      planQty: 8,
+      scheduleQty: 0,
+      planQty: 20,
       workCenter: '总装车间',
       bom: '潜水电机',
       warehouse: '成品仓',
       urgency: '紧急',
       planDateRange: ['2026-05-30', '2026-06-17'],
-      remark: '',
+      remark: '演示：计划20，可分批排产并指定不同执行人',
       processRouteName: routeName,
       source: 'manual',
       sourceOrderNo: 'SO202505101',
-      processes: buildProcessesFromRoute(routeName),
+      processes: buildProcessesFromRoute(routeName).map((p) => ({ ...p, executors: [] })),
+      scheduleBatches: [],
+      activeScheduleBatchId: '',
       createdAt: '2025-05-28',
     },
     {
@@ -220,8 +245,36 @@ export function createAssemblyWorkOrderPayload(partial) {
     componentLines: partial.componentLines || [],
     ebomSnapshot: partial.ebomSnapshot || null,
     processes: routeName ? buildProcessesFromRoute(routeName) : [],
+    scheduleBatches: Array.isArray(partial.scheduleBatches) ? partial.scheduleBatches : [],
+    activeScheduleBatchId: partial.activeScheduleBatchId || '',
     createdAt: dayjs().format('YYYY-MM-DD'),
   }
+}
+
+export function addAssemblyScheduleBatch(workOrderId, input) {
+  const wo = assemblyWorkOrderState.orders.find((o) => o.id === workOrderId)
+  if (!wo) return { ok: false, message: '工单不存在' }
+  normalizeWorkOrderScheduleFields(wo)
+  return createScheduleBatch(wo, input)
+}
+
+export function dispatchAssemblyScheduleBatch(workOrderId, batchId) {
+  const wo = assemblyWorkOrderState.orders.find((o) => o.id === workOrderId)
+  if (!wo) return { ok: false, message: '工单不存在' }
+  return dispatchScheduleBatch(wo, batchId)
+}
+
+export function removeAssemblyScheduleBatch(workOrderId, batchId) {
+  const wo = assemblyWorkOrderState.orders.find((o) => o.id === workOrderId)
+  if (!wo) return { ok: false, message: '工单不存在' }
+  return removeScheduleBatch(wo, batchId)
+}
+
+export function setActiveAssemblyScheduleBatch(workOrderId, batchId) {
+  const wo = assemblyWorkOrderState.orders.find((o) => o.id === workOrderId)
+  if (!wo) return false
+  wo.activeScheduleBatchId = batchId
+  return true
 }
 
 /** 按销售单号 + 产品名称匹配总装工单 */
@@ -296,3 +349,5 @@ export function filterAssemblyWorkOrders(list, filters) {
 export function canShowAssemblyDispatchTab(status) {
   return status === '待下发'
 }
+
+export { shouldShowWorkOrderDispatchTab } from '@/store/workOrderStore'

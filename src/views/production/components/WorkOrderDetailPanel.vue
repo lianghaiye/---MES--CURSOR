@@ -44,6 +44,7 @@
         <WorkOrderProductionSections
           v-show="!detailCollapsed"
           editable
+          dispatch-mode
           :work-order="workOrder"
           :plan-date-value="planDateValue"
           :work-center-opts="workCenterOpts"
@@ -68,6 +69,21 @@
         <WorkOrderDetailTab :work-order="workOrder" @action="emit('detail-action', $event)" />
       </a-tab-pane>
       <template v-if="variant === 'production' || variant === 'assembly'">
+        <a-tab-pane key="schedule" tab="排产信息">
+          <WorkOrderScheduleInfoTab
+            :work-order="workOrder"
+            @action="emit('detail-action', $event)"
+          />
+        </a-tab-pane>
+        <a-tab-pane key="material-req" tab="领料信息">
+          <WorkOrderMaterialReqTab :work-order="workOrder" />
+        </a-tab-pane>
+        <a-tab-pane key="inbound" tab="入库信息">
+          <WorkOrderInboundInfoTab :work-order="workOrder" />
+        </a-tab-pane>
+        <a-tab-pane key="qc-info" tab="质检信息">
+          <WorkOrderQcInfoTab :work-order="workOrder" />
+        </a-tab-pane>
         <a-tab-pane v-if="!hideBomRelatedTabs" key="ebom" tab="EBOM">
           <WorkOrderEbomTreeTab :work-order="workOrder" :variant="variant" />
         </a-tab-pane>
@@ -80,9 +96,6 @@
         </a-tab-pane>
         <a-tab-pane v-if="!hideBomRelatedTabs" key="bom-versions" tab="BOM版本">
           <WorkOrderBomVersionTab :work-order="workOrder" :variant="variant" />
-        </a-tab-pane>
-        <a-tab-pane key="tasks" tab="任务列表">
-          <a-empty description="该 Tab 为占位，后续扩展" class="tab-empty" />
         </a-tab-pane>
       </template>
     </a-tabs>
@@ -105,11 +118,20 @@ import {
 } from '@/utils/workOrderProcessRoute'
 import WorkOrderDispatchTab from './WorkOrderDispatchTab.vue'
 import WorkOrderDetailTab from './WorkOrderDetailTab.vue'
+import WorkOrderScheduleInfoTab from './WorkOrderScheduleInfoTab.vue'
+import WorkOrderMaterialReqTab from './WorkOrderMaterialReqTab.vue'
+import WorkOrderInboundInfoTab from './WorkOrderInboundInfoTab.vue'
+import WorkOrderQcInfoTab from './WorkOrderQcInfoTab.vue'
 import WorkOrderEbomTreeTab from './WorkOrderEbomTreeTab.vue'
 import WorkOrderCurrentBomTab from './WorkOrderCurrentBomTab.vue'
 import WorkOrderBomVersionTab from './WorkOrderBomVersionTab.vue'
 import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
 import WorkOrderPrintModal from './WorkOrderPrintModal.vue'
+import {
+  getBatchesScheduledQty,
+  getWorkOrderPlanQty,
+  normalizeWorkOrderScheduleFields,
+} from '@/utils/workOrderScheduleBatch'
 
 const printModalOpen = ref(false)
 
@@ -164,6 +186,17 @@ watch(
   [() => workOrder.value?.id, () => props.showDispatchTab],
   () => {
     if (!workOrder.value || !props.showDispatchTab) return
+    normalizeWorkOrderScheduleFields(workOrder.value)
+    const plan = getWorkOrderPlanQty(workOrder.value)
+    const scheduled = getBatchesScheduledQty(workOrder.value)
+    const suggest = Math.max(0, plan - scheduled)
+    if (
+      workOrder.value.dispatchBatchQty == null ||
+      workOrder.value.dispatchBatchQty === '' ||
+      Number(workOrder.value.dispatchBatchQty) === Number(workOrder.value.scheduleQty)
+    ) {
+      workOrder.value.dispatchBatchQty = suggest > 0 ? suggest : plan || 1
+    }
     if (ensureWorkOrderProcessRoute(workOrder.value)) {
       emit('save-basic')
     }

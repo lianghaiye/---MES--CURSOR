@@ -151,7 +151,7 @@
               <div class="card-meta">
                 <span>订单 {{ wo.sourceOrderNo || '-' }}</span>
                 <span class="meta-divider">·</span>
-                <span>数量 {{ wo.scheduleQty }}</span>
+                <span>数量 {{ formatScheduleProgress(wo) }}</span>
               </div>
               <div class="card-tags">
                 <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
@@ -250,6 +250,12 @@
       @updated="onWorkOrderUpdated"
     />
 
+    <CreateScheduleBatchModal
+      v-model:open="scheduleBatchModalOpen"
+      :work-order="scheduleBatchTarget"
+      @submit="onScheduleBatchSubmit"
+    />
+
     <a-modal v-model:open="urgencyModalOpen" title="调整紧急度" width="400px" @ok="confirmUrgency">
       <a-select v-model:value="urgencyDraft" style="width: 100%" :options="urgencyOpts" />
     </a-modal>
@@ -290,16 +296,23 @@ import {
   deleteAssemblyWorkOrder,
   cloneAssemblyWorkOrder,
   canShowAssemblyDispatchTab,
+  shouldShowWorkOrderDispatchTab,
+  addAssemblyScheduleBatch,
+  dispatchAssemblyScheduleBatch,
+  removeAssemblyScheduleBatch,
+  setActiveAssemblyScheduleBatch,
 } from '@/store/assemblyWorkOrderStore'
 import {
   saveDispatchDraft,
   dispatchAndStartWorkOrder,
   canEditWorkOrder,
 } from '@/utils/workOrderDispatchHelpers'
+import { formatScheduleProgress } from '@/utils/workOrderScheduleBatch'
 import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { bomOptions } from '@/mock/workOrderMaster'
 import CreateAssemblyWorkOrderModal from './components/CreateAssemblyWorkOrderModal.vue'
+import CreateScheduleBatchModal from './components/CreateScheduleBatchModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
@@ -334,6 +347,8 @@ const detailCollapsed = ref(false)
 const createModalOpen = ref(false)
 const editRecord = ref(null)
 const urgencyModalOpen = ref(false)
+const scheduleBatchModalOpen = ref(false)
+const scheduleBatchTarget = ref(null)
 const urgencyDraft = ref('普通')
 const urgencyTargetId = ref(null)
 const layoutMode = ref(localStorage.getItem(LAYOUT_STORAGE_KEY) || 'split')
@@ -391,7 +406,7 @@ const selectedOrder = computed(() =>
 )
 
 const showDispatchTab = computed(() =>
-  selectedOrder.value ? canShowAssemblyDispatchTab(selectedOrder.value.status) : false,
+  selectedOrder.value ? shouldShowWorkOrderDispatchTab(selectedOrder.value) : false,
 )
 
 const planDateValue = computed({
@@ -407,9 +422,9 @@ watch(
   selectedOrder,
   (wo) => {
     if (!wo) return
-    if (!canShowAssemblyDispatchTab(wo.status) && detailTab.value === 'dispatch') {
+    if (!shouldShowWorkOrderDispatchTab(wo) && detailTab.value === 'dispatch') {
       detailTab.value = 'detail'
-    } else if (canShowAssemblyDispatchTab(wo.status)) {
+    } else if (shouldShowWorkOrderDispatchTab(wo) && canShowAssemblyDispatchTab(wo.status)) {
       detailTab.value = 'dispatch'
     }
   },
@@ -584,7 +599,7 @@ function onWorkOrderUpdated({ id, patch }) {
   updateAssemblyWorkOrder(id, patch)
   const wo = assemblyWorkOrderState.orders.find((o) => o.id === id)
   if (selectedId.value === id && wo) {
-    if (!canShowAssemblyDispatchTab(wo.status) && detailTab.value === 'dispatch') {
+    if (!shouldShowWorkOrderDispatchTab(wo) && detailTab.value === 'dispatch') {
       detailTab.value = 'detail'
     }
   }
@@ -604,12 +619,38 @@ function handleSaveDispatch() {
 }
 
 function handleDispatchAndStart() {
+  const wo = selectedOrder.value
+  if (!wo) return
+  const batchQty = Math.max(0, Number(wo.dispatchBatchQty ?? wo.scheduleQty) || 0)
+  if (batchQty <= 0) {
+    message.warning('请填写排产数量')
+    return
+  }
   const ok = dispatchAndStartWorkOrder({
-    workOrder: selectedOrder.value,
+    workOrder: wo,
     orderCategory: '总装工单',
     updateFn: updateAssemblyWorkOrder,
   })
-  if (ok) detailTab.value = 'detail'
+  if (!ok) return
+  const batchResult = addAssemblyScheduleBatch(wo.id, {
+    qty: batchQty,
+    processAssignments: (wo.processes || []).map((p) => ({
+      processId: p.id,
+      processName: p.name,
+      processCode: p.processCode,
+      resourceType: p.resourceType || '工人',
+      executors: [...(p.executors || [])],
+    })),
+    dispatchNow: true,
+  })
+  if (!batchResult.ok) {
+    message.error(batchResult.message || '记录排产批次失败')
+    return
+  }
+  const plan = Number(wo.planQty) || 0
+  const scheduled = Number(wo.scheduleQty) || 0
+  wo.dispatchBatchQty = Math.max(0, plan - scheduled)
+  detailTab.value = shouldShowWorkOrderDispatchTab(wo) ? 'dispatch' : 'schedule'
 }
 
 function handleDispatchCancel() {
@@ -705,15 +746,71 @@ function confirmUrgency() {
   urgencyModalOpen.value = false
 }
 
-function onDetailAction({ key, workOrder: wo }) {
+function onDetailAction({ key, workOrder: wo, record }) {
   if (!wo) return
   if (key === 'schedule-qty') {
-    message.info('修改排产数量功能开发中')
+    if (!wo.processes?.length) {
+      message.warning('请先维护工单工艺路线与工序')
+      return
+    }
+    scheduleBatchTarget.value = wo
+    scheduleBatchModalOpen.value = true
+    detailTab.value = 'schedule'
+    return
+  }
+  if (key === 'gen-task' || key === 'edit-executor') {
+    updateAssemblyWorkOrder(wo.id, { ...wo })
+    return
+  }
+  if (key === 'select-batch' && record?.id) {
+    setActiveAssemblyScheduleBatch(wo.id, record.id)
+    return
+  }
+  if (key === 'dispatch-batch' && record?.id) {
+    const result = dispatchAssemblyScheduleBatch(wo.id, record.id)
+    if (!result.ok) {
+      message.error(result.message || '下发失败')
+      return
+    }
+    message.success(`批次 #${result.batch.batchNo} 已下发并开始`)
+    return
+  }
+  if (key === 'remove-batch' && record?.id) {
+    Modal.confirm({
+      title: '删除排产批次',
+      content: `确定删除批次 #${record.batchNo}？删除后剩余可排将释放。`,
+      okType: 'danger',
+      onOk: () => {
+        const result = removeAssemblyScheduleBatch(wo.id, record.id)
+        if (!result.ok) {
+          message.error(result.message || '删除失败')
+          return
+        }
+        message.success('已删除排产批次')
+      },
+    })
     return
   }
   if (['urgency', 'pause', 'terminate', 'complete'].includes(key)) {
     onCardAction(key, wo)
   }
+}
+
+function onScheduleBatchSubmit(payload) {
+  const wo = scheduleBatchTarget.value
+  if (!wo) return
+  const result = addAssemblyScheduleBatch(wo.id, payload)
+  if (!result.ok) {
+    message.error(result.message || '创建批次失败')
+    return
+  }
+  scheduleBatchModalOpen.value = false
+  message.success(
+    payload.dispatchNow
+      ? `已创建并下发批次 #${result.batch.batchNo}（数量 ${result.batch.qty}）`
+      : `已保存批次 #${result.batch.batchNo}（数量 ${result.batch.qty}），可稍后下发`,
+  )
+  detailTab.value = 'schedule'
 }
 </script>
 

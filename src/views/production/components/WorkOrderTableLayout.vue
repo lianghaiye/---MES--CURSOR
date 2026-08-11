@@ -49,6 +49,12 @@
         <template v-else-if="column.key === 'customerName'">
           {{ formatCell(resolveWorkOrderSalesMeta(record).customerName) }}
         </template>
+        <template v-else-if="column.key === 'scheduleQty'">
+          <span>{{ formatScheduleProgress(record) }}</span>
+          <a-tag v-if="isPartialScheduled(record)" color="processing" class="partial-tag">
+            部分排产
+          </a-tag>
+        </template>
         <template v-else-if="column.key === 'variantAttr'">
           {{ formatCell(resolveWorkOrderVariantSummary(record)) }}
         </template>
@@ -123,6 +129,7 @@ import {
   resolveWorkOrderSalesMeta,
   resolveWorkOrderVariantSummary,
 } from '@/utils/workOrderBasicFields'
+import { formatScheduleProgress, isPartialScheduled } from '@/utils/workOrderScheduleBatch'
 
 const props = defineProps({
   dataSource: { type: Array, default: () => [] },
@@ -176,7 +183,13 @@ const baseColumns = [
     ellipsis: true,
   },
   { title: '计划数量', dataIndex: 'planQty', key: 'planQty', width: 90, align: 'right' },
-  { title: '排产数量', dataIndex: 'scheduleQty', key: 'scheduleQty', width: 90, align: 'right' },
+  {
+    title: '已排产/计划',
+    dataIndex: 'scheduleQty',
+    key: 'scheduleQty',
+    width: 130,
+    align: 'right',
+  },
   { title: '工作中心', dataIndex: 'workCenter', key: 'workCenter', width: 100, ellipsis: true },
   { title: '负责人', dataIndex: 'owner', key: 'owner', width: 90, ellipsis: true },
   { title: '预入仓库', dataIndex: 'warehouse', key: 'warehouse', width: 100, ellipsis: true },
@@ -277,6 +290,12 @@ function urgencyLabel(urgency) {
 }
 
 .work-order-table {
+  :deep(.partial-tag) {
+    margin-left: 4px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
   :deep(.ant-table-thead > tr > th) {
     background: #fafafa;
     font-weight: 500;
