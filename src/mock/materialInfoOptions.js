@@ -109,6 +109,8 @@ export function createDefaultProductionControl() {
 export function createDefaultAlertConfig() {
   return {
     stockAlertEnabled: false,
+    maxStockQty: undefined,
+    minStockQty: undefined,
     expiryAlertEnabled: false,
     defectRateThreshold: undefined,
   }

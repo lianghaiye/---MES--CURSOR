@@ -51,68 +51,41 @@
           </a-space>
         </div>
 
-        <a-tabs v-if="isMaterialReqOutbound" v-model:active-key="infoTab" class="detail-tabs">
-          <a-tab-pane key="basic" tab="基本信息" />
-          <a-tab-pane key="cutSettle" :tab="`下料结算 (${relatedCutSettles.length})`" />
-        </a-tabs>
+        <div v-if="isMaterialReqOutbound" class="detail-tabs-wrap">
+          <a-tabs
+            v-model:active-key="infoTab"
+            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+          >
+            <a-tab-pane key="basic" tab="基本信息" />
+            <a-tab-pane key="cutSettle" :tab="`下料结算 (${relatedCutSettles.length})`" />
+          </a-tabs>
+        </div>
 
         <div class="tab-body">
           <template v-if="!isMaterialReqOutbound || infoTab === 'basic'">
             <div class="section-card">
               <div v-if="!isMaterialReqOutbound" class="section-title">基本信息</div>
-              <a-descriptions bordered size="small" :column="3">
-                <a-descriptions-item label="出库单号">{{ record.docNo }}</a-descriptions-item>
-                <a-descriptions-item label="出库类型">{{
-                  record.outboundType
-                }}</a-descriptions-item>
-                <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
-                <a-descriptions-item label="出库仓库">{{
-                  record.warehouse || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="领用部门">{{
-                  record.requisitionDept || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="出库时间">{{
-                  record.outboundTime || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="源单编号">
+              <OutboundOrderBasicInfoSection
+                :record="record"
+                :is-material-req-outbound="isMaterialReqOutbound"
+              >
+                <template #sourceOrderNo>
                   <a v-if="record.sourceOrderNo" class="link-code" @click="goSource">{{
                     record.sourceOrderNo
                   }}</a>
                   <span v-else>—</span>
-                </a-descriptions-item>
-                <a-descriptions-item label="销售单号">
+                </template>
+                <template #salesOrderNo>
                   <a v-if="record.salesOrderNo" class="link-code" @click="goSalesOrder">{{
                     record.salesOrderNo
                   }}</a>
                   <span v-else>—</span>
-                </a-descriptions-item>
-                <a-descriptions-item label="出库总重量(kg)">
-                  {{ record.totalWeight != null ? record.totalWeight : '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="确认人">{{
-                  record.warehouseKeeper || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="所在车间">{{
-                  record.workshop || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="创建人">{{
-                  record.creator || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="创建时间">{{
-                  record.createdAt || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="完成日期">{{
-                  record.completedAt || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item v-if="!isMaterialReqOutbound" label="出厂质检">
+                </template>
+                <template #factoryQc>
                   <a v-if="linkedQc" class="link-code" @click="goFactoryQc">{{ linkedQc.qcNo }}</a>
                   <span v-else>—</span>
-                </a-descriptions-item>
-                <a-descriptions-item label="备注" :span="3">{{
-                  record.remark || '—'
-                }}</a-descriptions-item>
-              </a-descriptions>
+                </template>
+              </OutboundOrderBasicInfoSection>
             </div>
 
             <div class="section-card">
@@ -330,6 +303,7 @@ import {
   resolveOutboundStockUnit,
 } from '@/utils/outboundLineHelpers'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
+import OutboundOrderBasicInfoSection from './components/OutboundOrderBasicInfoSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -551,7 +525,9 @@ function handleInitiateQc() {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    padding: 10px 12px;
+    background: #fff;
+    border-bottom: 1px solid #e8e8e8;
   }
 
   .header-left {
@@ -567,13 +543,6 @@ function handleInitiateQc() {
 
   .sub-type {
     color: #8c8c8c;
-  }
-
-  .detail-tabs {
-    margin-bottom: 0;
-    background: #fff;
-    padding: 0 16px;
-    border-radius: 4px 4px 0 0;
   }
 
   .tab-body {

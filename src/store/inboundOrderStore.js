@@ -2,7 +2,8 @@ import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { cloneInboundSeedOrders, createInboundLine, createInboundOrder } from '@/mock/inboundOrders'
 import { ensureCrossDemoInboundOrders } from '@/mock/crossModuleDemoSeed'
-import { purchaseOrderState } from '@/store/purchaseOrderStore'
+import { purchaseOrderState, syncPurchaseOrderInboundStatus } from '@/store/purchaseOrderStore'
+import { calcPoLineRemainInboundQty } from '@/utils/purchaseLineInbound'
 import { warehouseState } from '@/store/warehouseStore'
 import { applyInboundToStock } from '@/store/stockStore'
 import { applyInboundBatchesFromRoots } from '@/store/stockBatchStore'
@@ -115,6 +116,34 @@ export function getInboundOrdersByPurchaseOrder(purchaseOrder) {
       order.inboundType === '采购入库'
     return isPurchaseSource && order.sourceOrderNo === orderNo
   })
+}
+
+/** 查询外协订单关联的入库单 */
+export function getInboundOrdersByOutsourcingOrder(wxOrder) {
+  if (!wxOrder) return []
+  const id = wxOrder.id
+  const orderNo = wxOrder.orderNo
+  return inboundOrderState.orders.filter((order) => {
+    if (id && (order.outsourcingOrderId === id || order.purchaseOrderId === id)) return true
+    if (!orderNo) return false
+    const isWxSource =
+      order.sourceType === '外协订单' ||
+      order.sourceType === '外协单' ||
+      order.inboundType === '外协入库'
+    return isWxSource && (order.sourceOrderNo === orderNo || order.outsourcingOrderNo === orderNo)
+  })
+}
+
+/** 查询收货单关联的入库单 */
+export function getInboundOrdersByReceipt(receipt) {
+  if (!receipt) return []
+  const idSet = new Set((receipt.inboundOrderIds || []).filter(Boolean))
+  const noSet = new Set()
+  if (receipt.inboundOrderNo) noSet.add(String(receipt.inboundOrderNo).trim())
+  if (!idSet.size && !noSet.size) return []
+  return inboundOrderState.orders.filter(
+    (order) => idSet.has(order.id) || noSet.has(String(order.docNo || '').trim()),
+  )
 }
 
 export function resolveWarehouseKeeper(warehouseName) {
@@ -416,7 +445,7 @@ export function resetMiniProgramInboundTask(taskId) {
   }
 }
 
-/** 采购订单生成采购入库单（待处理） */
+/** 采购订单生成采购入库单（待处理）——按剩余可申请量校验，支持多次入库 */
 export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
   const po = purchaseOrderState.orders.find((o) => o.id === purchaseOrderId)
   if (!po) return { ok: false, message: '采购单不存在' }
@@ -427,6 +456,18 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
   const invalid = lines.find((line) => !line.warehouse || !line.qty || Number(line.qty) <= 0)
   if (invalid) {
     return { ok: false, message: '请完善入库仓库和入库数量' }
+  }
+
+  for (const line of lines) {
+    const poLine = (po.lineItems || []).find((l) => l.id === line.poLineId)
+    if (!poLine) return { ok: false, message: '存在无效的采购明细行' }
+    const remain = calcPoLineRemainInboundQty(po, poLine)
+    if (Number(line.qty) > remain + 1e-9) {
+      return {
+        ok: false,
+        message: `物料「${poLine.productName || poLine.itemName || poLine.productCode}」可入库数量不足（剩余 ${remain}）`,
+      }
+    }
   }
 
   const itemTypes = [...new Set(lines.map((line) => line.itemType).filter(Boolean))]
@@ -477,6 +518,8 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
     creator: payload.creator || 'admin1',
     lineItems,
   })
+
+  syncPurchaseOrderInboundStatus(po)
 
   return { ok: true, order }
 }

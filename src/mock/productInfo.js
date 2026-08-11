@@ -67,7 +67,9 @@ function createProduct(index, overrides = {}) {
       defaultWarehouse: '半成品仓',
     },
     alert: {
-      stockAlertEnabled: false,
+      stockAlertEnabled: index % 5 === 0,
+      maxStockQty: index % 5 === 0 ? 200 : undefined,
+      minStockQty: index % 5 === 0 ? 20 : undefined,
       expiryAlertEnabled: index % 7 === 0,
       defectRateThreshold: undefined,
       attachments: [],

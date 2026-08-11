@@ -27,74 +27,28 @@
           </a-space>
         </div>
 
-        <a-tabs v-model:active-key="activeTab" class="detail-tabs">
-          <a-tab-pane key="basic" tab="基本信息" />
-          <a-tab-pane key="batches" :tab="`批次详情 (${batchList.length})`" />
-        </a-tabs>
+        <div class="detail-tabs-wrap">
+          <a-tabs
+            v-model:active-key="activeTab"
+            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+          >
+            <a-tab-pane key="basic" tab="基本信息" />
+            <a-tab-pane key="batches" :tab="`批次详情 (${batchList.length})`" />
+          </a-tabs>
+        </div>
 
         <div class="tab-body">
           <template v-if="activeTab === 'basic'">
             <div class="section-card">
               <div class="section-title">基本信息</div>
-              <a-descriptions bordered size="small" :column="3">
-                <a-descriptions-item label="入库单号">{{ record.docNo }}</a-descriptions-item>
-                <a-descriptions-item label="入库类型">{{ record.inboundType }}</a-descriptions-item>
-                <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
-                <a-descriptions-item label="入库日期">{{
-                  record.inboundDate || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="送货日期">{{
-                  record.deliveryDate || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="入库仓库">{{
-                  record.warehouse || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="仓管员">{{
-                  record.warehouseKeeper || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="物品类型">{{
-                  record.itemType || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="供应商">{{
-                  record.supplier || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="源单号">
+              <InboundOrderBasicInfoSection :record="record">
+                <template #sourceOrderNo>
                   <a v-if="record.sourceOrderNo" class="link-code" @click="goSource">{{
                     record.sourceOrderNo
                   }}</a>
                   <span v-else>—</span>
-                </a-descriptions-item>
-                <a-descriptions-item label="来源车间">{{
-                  record.sourceWorkshop || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="发票号码">{{
-                  record.invoiceNo || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="经手人">{{
-                  record.handler || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="创建人">{{
-                  record.creator || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="创建时间">{{
-                  record.createdAt || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="确认人">{{
-                  record.confirmer || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="确认时间">{{
-                  record.confirmedAt || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="审批人">{{
-                  record.approver || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="审批时间">{{
-                  record.approvedAt || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="备注" :span="3">{{
-                  record.remark || '—'
-                }}</a-descriptions-item>
-              </a-descriptions>
+                </template>
+              </InboundOrderBasicInfoSection>
             </div>
 
             <div class="section-card">
@@ -293,6 +247,7 @@ import {
   resolveInboundStockUnit,
 } from '@/utils/inboundLineHelpers'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
+import InboundOrderBasicInfoSection from './components/InboundOrderBasicInfoSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -512,6 +467,7 @@ function handleDelete() {
     align-items: center;
     padding: 10px 12px;
     background: #fff;
+    border-bottom: 1px solid #e8e8e8;
   }
 
   .header-left {
@@ -529,12 +485,6 @@ function handleDelete() {
 
   .sub-type {
     color: #8c8c8c;
-  }
-
-  .detail-tabs {
-    background: #fff;
-    padding: 0 12px;
-    margin: 0;
   }
 
   .tab-body {

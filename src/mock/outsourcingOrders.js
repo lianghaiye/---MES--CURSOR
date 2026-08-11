@@ -1,102 +1,464 @@
+/**
+ * 外协订单 mock / 筛选 / 单号
+ */
 import dayjs from 'dayjs'
 
-/** 外协订单演示数据（按销售单号关联） */
-export const mockOutsourcingOrders = [
-  {
-    id: 'oso-1',
-    orderNo: 'WX20260512001',
-    salesOrderNo: '1-20260512-005',
-    supplierName: '华东机加工外协厂',
-    productName: '泵体（泵壳）',
-    itemName: '泵体（泵壳）',
-    itemCode: '010050001',
-    specModel: 'ISG50-160',
-    material: 'HT250',
-    drawingNo: 'TH-BT-001',
-    variantAttr: '法兰：PN16；密封：机械密封',
-    qty: 3,
-    outsourceQty: 3,
-    unit: '件',
-    status: '进行中',
-    inboundStatus: '部分入库',
-    planCompleteDate: '2026-06-15',
-    planTime: '2026-06-15',
-    creator: 'admin1',
-    createdAt: '2026-05-13 09:20:00',
-    remark: '自产订单散件外协加工',
-  },
-  {
-    id: 'oso-2',
-    orderNo: 'WX20260512002',
-    salesOrderNo: '1-20260512-005',
-    supplierName: '精工表面处理厂',
-    productName: '叶轮',
-    itemName: '叶轮',
-    itemCode: '010050003',
-    specModel: 'Φ165',
-    material: 'ZG230-450',
-    drawingNo: 'TH-YL-003',
-    variantAttr: '动平衡：G6.3',
-    qty: 2,
-    outsourceQty: 2,
-    unit: '件',
-    status: '待下达',
-    inboundStatus: '未入库',
-    planCompleteDate: '2026-06-18',
-    planTime: '2026-06-18',
-    creator: '张三',
-    createdAt: '2026-05-14 14:05:00',
-    remark: '',
-  },
-  {
-    id: 'oso-3',
-    orderNo: 'WX20260520001',
-    salesOrderNo: '1-20260520-008',
-    supplierName: '南方外协联盟',
-    productName: '清水离心泵 ISG50-160',
-    itemName: '清水离心泵 ISG50-160',
-    itemCode: 'CP2610001',
-    specModel: 'ISG50-160',
-    material: 'HT200',
-    drawingNo: 'CP-ISG-50',
-    variantAttr: '电压：380V；防护：IP55',
-    qty: 8,
-    outsourceQty: 8,
-    unit: '台',
-    status: '已完成',
-    inboundStatus: '已入库',
-    planCompleteDate: '2026-06-01',
-    planTime: '2026-06-01',
-    creator: '李四',
-    createdAt: '2026-05-21 10:30:00',
-    remark: '紧急订单外协装配',
-  },
-]
+export const outsourcingStatusOptions = ['待提交', '待审核', '已拒绝', '进行中', '已完成', '已作废']
 
-export function createOutsourcingOrder(partial = {}) {
-  const now = dayjs()
+export const outsourcingIssueStatusOptions = ['待出库', '部分出库', '已出库']
+export const outsourcingReturnStatusOptions = ['待入库', '部分入库', '已入库']
+export const outsourcingOverdueStatusOptions = ['未逾期', '已逾期']
+export const outsourcingBillingMethodOptions = ['按重量', '按件数']
+
+export function createOutsourcingLine(partial = {}) {
+  const planQty = Number(partial.planQty) || 0
+  const unitPriceExTax = Number(partial.unitPriceExTax) || 0
+  const taxRate = partial.taxRate ?? 13
+  const unitPriceInTax =
+    partial.unitPriceInTax != null
+      ? Number(partial.unitPriceInTax)
+      : Math.round(unitPriceExTax * (1 + taxRate / 100) * 100) / 100
   return {
-    id: `oso-${Date.now()}`,
-    orderNo: `WX${now.format('YYYYMMDD')}${String(Math.floor(Math.random() * 900) + 100)}`,
-    salesOrderNo: '',
-    supplierName: '',
+    id: `wx-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     productName: '',
-    itemName: '',
+    productCode: '',
     itemCode: '',
+    itemName: '',
     specModel: '',
+    variantSummary: '',
     material: '',
     drawingNo: '',
-    variantAttr: '',
-    qty: 0,
-    outsourceQty: 0,
-    unit: '件',
-    status: '待下达',
-    inboundStatus: '未入库',
-    planCompleteDate: '',
-    planTime: '',
-    creator: 'admin1',
-    createdAt: now.format('YYYY-MM-DD HH:mm:ss'),
+    stockQty: 0,
+    planQty,
+    unit: '个',
+    purchaseUnit: '',
+    inventoryUnit: '',
+    unitOptions: [],
+    shipWarehouse: '',
+    billingMethod: '按件数',
+    taxRate,
+    unitPriceExTax,
+    unitPriceInTax,
+    totalPriceExTax: Math.round(planQty * unitPriceExTax * 100) / 100,
+    totalPriceInTax: Math.round(planQty * unitPriceInTax * 100) / 100,
+    receivedQty: 0,
+    appliedReceiptQty: 0,
+    issuedQty: 0,
+    appliedIssueQty: 0,
+    blankSizeText: '',
+    barcodeType: '',
     remark: '',
     ...partial,
   }
 }
+
+export function createOutsourcingOrder(partial = {}) {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const lineItems = partial.lineItems || []
+  const totalQty = lineItems.reduce((s, l) => s + (Number(l.planQty) || 0), 0)
+  const amountExTax = lineItems.reduce((s, l) => s + (Number(l.totalPriceExTax) || 0), 0)
+  const amountInTax = lineItems.reduce((s, l) => s + (Number(l.totalPriceInTax) || 0), 0)
+  return {
+    id: `wx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    orderNo: '',
+    workOrderName: '',
+    salesOrderNo: '',
+    salesOrderId: '',
+    supplier: '',
+    /** 兼容旧字段：结束日期 */
+    planDate: '',
+    planStartDate: '',
+    planEndDate: '',
+    /** 按仓库拆分的发料出库单 */
+    issueOrders: [],
+    contactPerson: '',
+    contactPhone: '',
+    leadTimeDays: undefined,
+    settlementType: '先款后货',
+    settlementCycle: '月结',
+    settlementMethod: '现金结算',
+    remark: '',
+    status: '待提交',
+    issueStatus: '待出库',
+    returnStatus: '待入库',
+    overdueStatus: '未逾期',
+    approvalResult: '',
+    approverName: '',
+    approvalRecords: [],
+    totalQty,
+    amountExTax,
+    amountInTax,
+    lineItems,
+    creator: 'admin1',
+    createdAt: now,
+    updater: 'admin1',
+    updatedAt: now,
+    ...partial,
+  }
+}
+
+export function recalcOutsourcingTotals(order) {
+  const lines = order.lineItems || []
+  order.totalQty = lines.reduce((s, l) => s + (Number(l.planQty) || 0), 0)
+  order.amountExTax = lines.reduce((s, l) => s + (Number(l.totalPriceExTax) || 0), 0)
+  order.amountInTax = lines.reduce((s, l) => s + (Number(l.totalPriceInTax) || 0), 0)
+  return order
+}
+
+export function recalcOutsourcingLine(line, { fromInTax = false } = {}) {
+  const qty = Number(line.planQty) || 0
+  const rate = Number(line.taxRate) || 13
+  if (fromInTax) {
+    const inTax = Number(line.unitPriceInTax) || 0
+    line.unitPriceExTax = Math.round((inTax / (1 + rate / 100)) * 100) / 100
+    line.unitPriceInTax = inTax
+  } else {
+    const ex = Number(line.unitPriceExTax) || 0
+    line.unitPriceExTax = ex
+    line.unitPriceInTax = Math.round(ex * (1 + rate / 100) * 100) / 100
+  }
+  line.totalPriceExTax = Math.round(qty * (Number(line.unitPriceExTax) || 0) * 100) / 100
+  line.totalPriceInTax = Math.round(qty * (Number(line.unitPriceInTax) || 0) * 100) / 100
+  return line
+}
+
+export function calcOutsourcingQtySummary(order) {
+  const lines = order?.lineItems || []
+  const lineCount = lines.length
+  const totalQty = lines.reduce((s, l) => s + (Number(l.planQty) || 0), 0)
+  return { lineCount, totalQty }
+}
+
+/** 发料信息 Tab：一物料一行（对齐采购退货「出库信息」） */
+export function flattenOutsourcingIssueOutboundLines(order) {
+  const orders = order?.issueOrders || []
+  const rows = []
+  orders.forEach((issueOrder) => {
+    const lines = issueOrder.lineItems || []
+    const outboundOrderNo = issueOrder.issueOrderNo || issueOrder.outboundOrderNo || ''
+    if (!lines.length) {
+      rows.push({
+        id: `${issueOrder.id}-empty`,
+        outboundOrderNo,
+        productName: '',
+        productCode: '',
+        specModel: '',
+        material: '',
+        applyQty: null,
+        actualQty: null,
+        unit: '',
+        confirmedAt: issueOrder.confirmedAt || '',
+        confirmer: issueOrder.confirmer || '',
+        createdAt: issueOrder.createdAt || '',
+        creator: issueOrder.creator || '',
+        shipWarehouse: issueOrder.shipWarehouse || '',
+      })
+      return
+    }
+    lines.forEach((line, idx) => {
+      const applyQty = line.applyQty != null ? line.applyQty : line.issueQty
+      rows.push({
+        id: line.id || `${issueOrder.id}-${idx}`,
+        outboundOrderNo,
+        productName: line.productName || '',
+        productCode: line.productCode || '',
+        specModel: line.specModel || '',
+        material: line.material || '',
+        applyQty,
+        actualQty: line.actualQty,
+        unit: line.unit || '',
+        confirmedAt: issueOrder.confirmedAt || '',
+        confirmer: issueOrder.confirmer || '',
+        createdAt: issueOrder.createdAt || '',
+        creator: issueOrder.creator || '',
+        shipWarehouse: issueOrder.shipWarehouse || '',
+      })
+    })
+  })
+  return rows
+}
+
+export function formatOutsourcingQtySummary(order) {
+  const { lineCount, totalQty } = calcOutsourcingQtySummary(order)
+  const qtyText = Number.isFinite(totalQty) ? String(Number(totalQty.toFixed(4)).toString()) : '0'
+  return `${lineCount}行/${qtyText}`
+}
+
+/** WX- + YYMMDD + 3位流水，流水按月重置 */
+export function generateOutsourcingOrderNo(existingList = [], at = dayjs()) {
+  const d = dayjs(at)
+  const ymd = d.format('YYMMDD')
+  const ym = d.format('YYMM')
+  let maxSeq = 0
+  ;(existingList || []).forEach((row) => {
+    const no = String(row?.orderNo || '')
+    const m = no.match(/^WX-(\d{6})(\d{3})$/)
+    if (!m) return
+    if (!String(m[1]).startsWith(ym)) return
+    maxSeq = Math.max(maxSeq, Number(m[2]) || 0)
+  })
+  return `WX-${ymd}${String(maxSeq + 1).padStart(3, '0')}`
+}
+
+export function formatOutsourcingPlanDateDisplay(order) {
+  const start = String(order?.planStartDate || '').trim()
+  const end = String(order?.planEndDate || order?.planDate || '').trim()
+  if (start && end) return start === end ? start : `${start} ~ ${end}`
+  return end || start || ''
+}
+
+export function computeOutsourcingOverdueStatus(order, now = dayjs()) {
+  const end = order?.planEndDate || order?.planDate
+  if (!end) return '未逾期'
+  if (order.status === '已完成' || order.status === '已作废') return '未逾期'
+  const plan = dayjs(end)
+  if (!plan.isValid()) return '未逾期'
+  return now.isAfter(plan, 'day') ? '已逾期' : '未逾期'
+}
+
+export function cloneOutsourcingOrders() {
+  return mockOutsourcingOrders.map((row) => ({
+    ...row,
+    lineItems: (row.lineItems || []).map((l) => ({ ...l })),
+    approvalRecords: (row.approvalRecords || []).map((r) => ({ ...r })),
+    issueOrders: (row.issueOrders || []).map((o) => ({
+      ...o,
+      lineItems: (o.lineItems || []).map((l) => ({ ...l })),
+    })),
+  }))
+}
+
+export function filterOutsourcingOrders(list, filters = {}) {
+  const status = filters.status
+  const orderNo = String(filters.orderNo || '').trim()
+  const salesOrderNo = String(filters.salesOrderNo || '').trim()
+  const supplier = filters.supplier
+  const issueStatus = filters.issueStatus
+  const returnStatus = filters.returnStatus
+  const overdueStatus = filters.overdueStatus
+  const operator = filters.operator
+  const range = filters.createdAtRange
+
+  return (list || []).filter((row) => {
+    if (status && row.status !== status) return false
+    if (orderNo && !String(row.orderNo || '').includes(orderNo)) return false
+    if (salesOrderNo && !String(row.salesOrderNo || '').includes(salesOrderNo)) return false
+    if (supplier && row.supplier !== supplier) return false
+    if (issueStatus && row.issueStatus !== issueStatus) return false
+    if (returnStatus && row.returnStatus !== returnStatus) return false
+    const overdue = row.overdueStatus || computeOutsourcingOverdueStatus(row)
+    if (overdueStatus && overdue !== overdueStatus) return false
+    if (operator) {
+      const ops = [row.creator, row.updater].filter(Boolean)
+      if (!ops.includes(operator)) return false
+    }
+    if (Array.isArray(range) && range.length === 2 && range[0] && range[1]) {
+      const start = dayjs(range[0]).startOf('day')
+      const end = dayjs(range[1]).endOf('day')
+      const created = dayjs(row.createdAt)
+      if (!created.isValid() || created.isBefore(start) || created.isAfter(end)) return false
+    }
+    return true
+  })
+}
+
+function line(partial) {
+  const item = createOutsourcingLine(partial)
+  item.productName = item.productName || item.itemName
+  item.productCode = item.productCode || item.itemCode
+  item.itemName = item.itemName || item.productName
+  item.itemCode = item.itemCode || item.productCode
+  return recalcOutsourcingLine(item)
+}
+
+export const mockOutsourcingOrders = [
+  createOutsourcingOrder({
+    id: 'wx-1',
+    orderNo: 'WX-260808001',
+    workOrderName: '法兰外协加工',
+    salesOrderNo: 'SO-20260801-001',
+    supplier: '多功能供应商01',
+    planDate: '2026-08-25',
+    planStartDate: '2026-08-18',
+    planEndDate: '2026-08-25',
+    contactPerson: '张经理',
+    contactPhone: '13800138001',
+    leadTimeDays: 10,
+    status: '待提交',
+    issueStatus: '待出库',
+    returnStatus: '待入库',
+    createdAt: '2026-08-08 09:10:00',
+    updatedAt: '2026-08-08 09:10:00',
+    lineItems: [
+      line({
+        productName: '碳钢法兰',
+        productCode: 'MAT-FLG-80',
+        specModel: 'DN80 PN16',
+        material: 'Q235B',
+        stockQty: 12,
+        planQty: 20,
+        unit: '片',
+        shipWarehouse: '原材料仓',
+        billingMethod: '按件数',
+        unitPriceExTax: 35,
+      }),
+      line({
+        productName: '橡胶密封垫',
+        productCode: 'MAT-SEAL-80',
+        specModel: 'DN80',
+        material: '丁腈橡胶',
+        stockQty: 40,
+        planQty: 40,
+        unit: '片',
+        shipWarehouse: '原材料仓',
+        billingMethod: '按件数',
+        unitPriceExTax: 8,
+      }),
+    ],
+  }),
+  createOutsourcingOrder({
+    id: 'wx-2',
+    orderNo: 'WX-260807001',
+    workOrderName: '轴套外协',
+    salesOrderNo: 'SO-20260801-002',
+    supplier: '采购供应商A',
+    planDate: '2026-08-12',
+    planStartDate: '2026-08-05',
+    planEndDate: '2026-08-12',
+    status: '进行中',
+    issueStatus: '部分出库',
+    returnStatus: '部分入库',
+    approvalResult: '审核通过',
+    approverName: '张三',
+    createdAt: '2026-08-07 11:00:00',
+    updatedAt: '2026-08-08 14:00:00',
+    issueOrders: [
+      {
+        id: 'wx-2-issue-1',
+        issueOrderNo: 'CKWX-260807-011',
+        shipWarehouse: '半成品仓',
+        outboundStatus: '部分出库',
+        creator: 'admin1',
+        createdAt: '2026-08-07 14:00:00',
+        confirmer: '张三',
+        confirmedAt: '2026-08-07 16:30:00',
+        lineItems: [
+          {
+            id: 'wx-2-issue-1-l1',
+            lineId: 'wx-2-line-1',
+            productName: '轴承套',
+            productCode: 'MAT-BRG-SLEEVE',
+            specModel: 'φ50',
+            material: '45#',
+            applyQty: 15,
+            actualQty: 10,
+            unit: '件',
+          },
+        ],
+      },
+    ],
+    lineItems: [
+      line({
+        id: 'wx-2-line-1',
+        productName: '轴承套',
+        productCode: 'MAT-BRG-SLEEVE',
+        specModel: 'φ50',
+        material: '45#',
+        stockQty: 8,
+        planQty: 30,
+        unit: '件',
+        shipWarehouse: '半成品仓',
+        receivedQty: 10,
+        appliedReceiptQty: 10,
+        issuedQty: 10,
+        appliedIssueQty: 15,
+        unitPriceExTax: 22,
+      }),
+    ],
+  }),
+  createOutsourcingOrder({
+    id: 'wx-3',
+    orderNo: 'WX-260806001',
+    workOrderName: '表面处理外协',
+    salesOrderNo: 'SO-20260728-001',
+    supplier: '标准件供应商',
+    planDate: '2026-08-20',
+    planStartDate: '2026-08-15',
+    planEndDate: '2026-08-20',
+    status: '待审核',
+    issueStatus: '待出库',
+    returnStatus: '待入库',
+    approvalResult: '待审核',
+    createdAt: '2026-08-06 16:20:00',
+    updatedAt: '2026-08-06 16:20:00',
+    lineItems: [
+      line({
+        productName: '钢板件',
+        productCode: 'MAT-PLATE-10',
+        specModel: '10mm',
+        material: 'Q235B',
+        planQty: 15,
+        unit: '张',
+        shipWarehouse: '原材料仓',
+        billingMethod: '按重量',
+        unitPriceExTax: 12,
+      }),
+    ],
+  }),
+  createOutsourcingOrder({
+    id: 'wx-4',
+    orderNo: 'WX-260805001',
+    workOrderName: '精加工外协',
+    supplier: '多功能供应商02',
+    planDate: '2026-08-05',
+    planStartDate: '2026-07-30',
+    planEndDate: '2026-08-05',
+    status: '已完成',
+    issueStatus: '已出库',
+    returnStatus: '已入库',
+    approvalResult: '审核通过',
+    approverName: '李四',
+    createdAt: '2026-08-05 10:00:00',
+    updatedAt: '2026-08-07 18:00:00',
+    issueOrders: [
+      {
+        id: 'wx-4-issue-1',
+        issueOrderNo: 'CKWX-260805-008',
+        shipWarehouse: '半成品仓',
+        outboundStatus: '已出库',
+        creator: 'admin1',
+        createdAt: '2026-08-05 11:00:00',
+        confirmer: '李四',
+        confirmedAt: '2026-08-05 15:00:00',
+        lineItems: [
+          {
+            id: 'wx-4-issue-1-l1',
+            lineId: 'wx-4-line-1',
+            productName: '精密轴',
+            productCode: 'SEMI-SHAFT-01',
+            specModel: '',
+            material: '',
+            applyQty: 10,
+            actualQty: 10,
+            unit: '根',
+          },
+        ],
+      },
+    ],
+    lineItems: [
+      line({
+        id: 'wx-4-line-1',
+        productName: '精密轴',
+        productCode: 'SEMI-SHAFT-01',
+        planQty: 10,
+        unit: '根',
+        shipWarehouse: '半成品仓',
+        receivedQty: 10,
+        appliedReceiptQty: 10,
+        issuedQty: 10,
+        appliedIssueQty: 10,
+        unitPriceExTax: 80,
+      }),
+    ],
+  }),
+]

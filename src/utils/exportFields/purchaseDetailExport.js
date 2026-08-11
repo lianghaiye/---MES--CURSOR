@@ -6,7 +6,9 @@ import {
 } from '@/utils/purchaseDetailLines'
 
 export const purchaseDetailExportFields = [
+  { key: 'status', title: '单据状态', getValue: (row) => cell(row, 'status') },
   { key: 'orderNo', title: '采购单号', getValue: (row) => cell(row, 'orderNo') },
+  { key: 'supplier', title: '供应商', getValue: (row) => cell(row, 'supplier') },
   { key: 'productName', title: '产品名称', getValue: (row) => cell(row, 'productName') },
   { key: 'specModel', title: '规格型号', getValue: (row) => cell(row, 'specModel') },
   { key: 'material', title: '材质', getValue: (row) => cell(row, 'material') },
@@ -64,4 +66,6 @@ export const purchaseDetailExportFields = [
   { key: 'workOrderNo', title: '关联工单号', getValue: (row) => cell(row, 'workOrderNo') },
   { key: 'salesOrderNo', title: '关联销售单号', getValue: (row) => cell(row, 'salesOrderNo') },
   { key: 'purchaser', title: '采购员', getValue: (row) => cell(row, 'purchaser') },
+  { key: 'creator', title: '创建人', getValue: (row) => cell(row, 'creator') },
+  { key: 'createdAt', title: '创建时间', getValue: (row) => cell(row, 'createdAt') },
 ]

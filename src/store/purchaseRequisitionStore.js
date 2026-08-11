@@ -7,8 +7,17 @@ import {
   stampRequisitionLineSalesOrderNos,
 } from '@/mock/purchaseRequisitions'
 import { round2 } from '@/utils/purchaseMerge'
-import { createPurchaseOrdersFromMergedLines } from '@/store/purchaseOrderStore'
-import { ensureProductionPlanOrderTreeDemoRequisitions } from '@/mock/productionPlanOrderTreeSeed'
+import {
+  createPurchaseOrdersFromMergedLines,
+  discardGeneratePurchaseOrderDraft,
+  registerPurchaseRequisitionDraftBind,
+  reconcilePurchaseRequisitionDraftStatuses,
+} from '@/store/purchaseOrderStore'
+import { writeDefaultSuppliersFromMergedLines } from '@/utils/defaultSupplierWriteback'
+import {
+  ensureProductionPlanOrderTreeDemoRequisitions,
+  createProductionPlanOrderTreeDemoRequisitions,
+} from '@/mock/productionPlanOrderTreeSeed'
 import { ensureCrossDemoPurchaseRequisitions } from '@/mock/crossModuleDemoSeed'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { convertStockDemandToPurchase } from '@/utils/purchaseUomConvert'
@@ -29,8 +38,8 @@ function resolveEarliestDeliveryDate(lineItems, fallback) {
 
 const STORAGE_KEY = 'i_doms_purchase_requisitions'
 const SEED_VERSION_KEY = 'i_doms_purchase_requisitions_seed_v'
-/** v4：采购申请明细行级销售单号 */
-const CURRENT_SEED_VERSION = '4'
+/** v7：强制确保 CGSQ2026060001 存在（修复本地缓存未注入） */
+const CURRENT_SEED_VERSION = '7'
 let reqSeq = 20
 
 function loadFromStorage() {
@@ -58,6 +67,18 @@ function persist() {
   localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
+function normalizeRequisitionLinePoStatus(requisitions) {
+  ;(requisitions || []).forEach((req) => {
+    ;(req.lineItems || []).forEach((line) => {
+      if (!line.poGenStatus) {
+        const hasPo = String(line.purchaseOrderNos || '').trim()
+        line.poGenStatus = req.docStatus === '处理完成' || hasPo ? '已生成采购' : '未生成采购'
+      }
+      if (line.purchaseOrderNos == null) line.purchaseOrderNos = ''
+    })
+  })
+}
+
 function initRequisitions() {
   const base = shouldReseed()
     ? clonePurchaseRequisitions()
@@ -66,7 +87,100 @@ function initRequisitions() {
     ensureProductionPlanOrderTreeDemoRequisitions(base),
   )
   list.forEach((req) => stampRequisitionLineSalesOrderNos(req))
-  return list
+  normalizeRequisitionLinePoStatus(list)
+  return ensureCgsq2026060001InList(list)
+}
+
+/** 保证演示单 CGSQ2026060001 始终在列表中（按单号/id 去重后置顶） */
+function buildCgsq2026060001Demo() {
+  try {
+    const demos = createProductionPlanOrderTreeDemoRequisitions()
+    if (demos?.[0]) return demos[0]
+  } catch {
+    /* ignore */
+  }
+  // 硬编码兜底，避免生产计划 store 未就绪时演示单丢失
+  return {
+    id: 'pr-pp-tree-demo-1',
+    reqNo: 'CGSQ2026060001',
+    salesOrderNo: '1-20260512-005',
+    docStatus: '待处理',
+    overdueStatus: '未逾期',
+    purchaseOrderNo: '',
+    urgency: '正常',
+    plannedQty: 2,
+    amountWan: 0,
+    deliveryDate: '2026-08-17',
+    estimatedArrivalDate: '2026-08-17',
+    orderDate: '2026-06-06',
+    source: '生产计划',
+    receivingWarehouse: '原材料仓',
+    operator: 'admin1',
+    creator: 'admin1',
+    createdAt: '2026-08-07 19:32:30',
+    updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    remark: '生产计划演示：外购件采购申请',
+    lineItems: [
+      {
+        id: 'pr-pp-tree-demo-line-1',
+        inventoryName: '立式多级离心泵',
+        inventoryCode: 'CP2610002',
+        productName: '立式多级离心泵',
+        productCode: 'CP2610002',
+        specModel: 'ISG50-160',
+        materialType: '零部件',
+        supplyType: '外购件',
+        unit: '台',
+        purchaseUnit: '台',
+        inventoryUnit: '台',
+        stockQty: 0,
+        demandQty: 2,
+        planPurchaseQty: 2,
+        supplierName: '',
+        deliveryDate: '2026-08-17',
+        expectedArrivalDate: '2026-08-17',
+        receivingWarehouse: '原材料仓',
+        salesOrderNo: '1-20260512-005',
+        poGenStatus: '未生成采购',
+        purchaseOrderNos: '',
+      },
+    ],
+  }
+}
+
+function ensureCgsq2026060001InList(list) {
+  const rows = Array.isArray(list) ? [...list] : []
+  const idx = rows.findIndex((r) => r.id === 'pr-pp-tree-demo-1' || r.reqNo === 'CGSQ2026060001')
+  const demo = buildCgsq2026060001Demo()
+  if (idx >= 0) {
+    const existing = rows[idx]
+    rows[idx] = {
+      ...demo,
+      ...existing,
+      id: 'pr-pp-tree-demo-1',
+      reqNo: 'CGSQ2026060001',
+      lineItems: existing.lineItems?.length > 0 ? existing.lineItems : demo.lineItems,
+    }
+    return rows
+  }
+  rows.unshift(demo)
+  return rows
+}
+
+/** 运行时补齐：列表页挂载时可调用 */
+export function ensureDemoPurchaseRequisitionCgsq2026060001() {
+  if (!purchaseRequisitionState?.requisitions) return null
+  const next = ensureCgsq2026060001InList(purchaseRequisitionState.requisitions)
+  const missing = !purchaseRequisitionState.requisitions.some((r) => r.reqNo === 'CGSQ2026060001')
+  if (missing || next.length !== purchaseRequisitionState.requisitions.length) {
+    purchaseRequisitionState.requisitions.splice(
+      0,
+      purchaseRequisitionState.requisitions.length,
+      ...next,
+    )
+    persist()
+  }
+  return purchaseRequisitionState.requisitions.find((r) => r.reqNo === 'CGSQ2026060001') || null
 }
 
 export function generateReqNo() {
@@ -130,7 +244,88 @@ export function deletePurchaseRequisition(id) {
 }
 
 export function invalidatePurchaseRequisition(id) {
+  const req = getPurchaseRequisitionById(id)
+  if (!req) return null
+  if (req.generatePoDraftId) return null
+  if (req.docStatus === '已作废' || req.docStatus === '处理完成') return null
   return updatePurchaseRequisition(id, { docStatus: '已作废' })
+}
+
+/** 手动完成采购申请（待处理/处理中 → 处理完成） */
+export function completePurchaseRequisition(id) {
+  const req = getPurchaseRequisitionById(id)
+  if (!req) return null
+  if (req.generatePoDraftId) return null
+  if (req.docStatus === '已作废' || req.docStatus === '处理完成') return null
+  return updatePurchaseRequisition(id, { docStatus: '处理完成' })
+}
+
+export function canCompletePurchaseRequisition(record) {
+  return Boolean(
+    record &&
+    !record.isGeneratePoDraft &&
+    ['待处理', '处理中'].includes(record.docStatus) &&
+    !record.generatePoDraftId,
+  )
+}
+
+/** 申请单是否因「生成采购订单草稿」而锁定（来源单，非草稿行本身） */
+export function isPurchaseRequisitionDraftLocked(record) {
+  return Boolean(record && !record.isGeneratePoDraft && record.generatePoDraftId)
+}
+
+/**
+ * 保存生成采购草稿后：来源申请单状态 → 处理中，并挂上草稿 id
+ * （草稿本身是独立列表行，不再把申请单改成「草稿」）
+ */
+export function bindRequisitionsToGenerateDraft(reqIds, draftId) {
+  const ids = [...new Set((reqIds || []).filter(Boolean))]
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
+  ids.forEach((id) => {
+    const req = getPurchaseRequisitionById(id)
+    if (!req || req.docStatus === '已作废') return
+    // 误标成「草稿」的历史数据纠正回申请单
+    if (req.docStatus === '草稿') {
+      req.docStatus = '处理中'
+    }
+    req.generatePoDraftId = draftId
+    if (req.docStatus !== '处理完成') {
+      req.docStatus = '处理中'
+    }
+    req.updatedAt = now
+  })
+  persist()
+}
+
+/** 按申请单号绑定草稿状态 */
+export function bindRequisitionsToGenerateDraftByReqNos(reqNos, draftId) {
+  const nos = [...new Set((reqNos || []).map((s) => String(s || '').trim()).filter(Boolean))]
+  if (!nos.length || !draftId) return
+  const ids = purchaseRequisitionState.requisitions
+    .filter((r) => nos.includes(r.reqNo))
+    .map((r) => r.id)
+  bindRequisitionsToGenerateDraft(ids, draftId)
+}
+
+/**
+ * 解除申请与生成草稿的绑定，并按明细回写单据状态
+ * @param {string[]} reqIds
+ * @param {string} [draftId] 仅清除仍指向该草稿的绑定
+ */
+export function unbindRequisitionsFromGenerateDraft(reqIds, draftId) {
+  const ids = [...new Set((reqIds || []).filter(Boolean))]
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
+  ids.forEach((id) => {
+    const req = getPurchaseRequisitionById(id)
+    if (!req) return
+    if (draftId && req.generatePoDraftId && req.generatePoDraftId !== draftId) return
+    req.generatePoDraftId = ''
+    if (req.docStatus !== '已作废') {
+      syncRequisitionDocStatus(req)
+    }
+    req.updatedAt = now
+  })
+  persist()
 }
 
 export function getRequisitionsByIds(ids) {
@@ -363,38 +558,89 @@ export function buildRequisitionFromSalesOrder(salesOrder) {
   }
 }
 
+function syncRequisitionDocStatus(req) {
+  if (!req) return
+  // 仍挂着生成采购草稿时，来源申请保持「处理中」
+  if (req.generatePoDraftId) {
+    if (req.docStatus !== '已作废' && req.docStatus !== '处理完成') {
+      req.docStatus = '处理中'
+    }
+    return
+  }
+  // 历史误标：真实申请单不应为「草稿」
+  if (req.docStatus === '草稿' && !req.isGeneratePoDraft) {
+    req.docStatus = '待处理'
+  }
+  const lines = req.lineItems || []
+  if (!lines.length) {
+    req.docStatus = '待处理'
+    return
+  }
+  const generated = lines.filter((l) => l.poGenStatus === '已生成采购').length
+  if (generated === 0) req.docStatus = req.docStatus === '已作废' ? '已作废' : '待处理'
+  else if (generated >= lines.length) req.docStatus = '处理完成'
+  else req.docStatus = '处理中'
+}
+
+/** 供草稿解绑后回写状态 */
+export function syncRequisitionDocStatusAfterDraftChange(req) {
+  syncRequisitionDocStatus(req)
+}
+
 /**
- * 确认生成采购单：按供应商拆单，回填申请单号与状态
- * @returns {{ poCount: number, poNos: string[] }}
+ * 确认生成采购单：按供应商拆单，回填申请明细行状态（支持多次生成）
+ * @returns {{ poCount: number, poNos: string[], writtenSuppliers: number }}
  */
-export function confirmGeneratePurchaseOrders(mergedLines) {
+export function confirmGeneratePurchaseOrders(mergedLines, options = {}) {
   const created = createPurchaseOrdersFromMergedLines(mergedLines)
   const poNos = created.map((o) => o.orderNo)
-  const reqPoMap = new Map()
+  const touchedReqIds = new Set()
 
   created.forEach((order) => {
-    mergedLines
-      .filter((l) => (l.supplierName || '未指定供应商') === order.supplier)
-      .forEach((line) => {
-        ;(line.sourceReqIds || []).forEach((reqId) => {
-          if (!reqPoMap.has(reqId)) reqPoMap.set(reqId, new Set())
-          reqPoMap.get(reqId).add(order.orderNo)
+    const relatedLines = mergedLines.filter(
+      (l) => (l.supplierName || '未指定供应商') === order.supplier,
+    )
+    relatedLines.forEach((mergedLine) => {
+      ;(mergedLine.sourceLineIds || []).forEach((lineId) => {
+        purchaseRequisitionState.requisitions.forEach((req) => {
+          const line = (req.lineItems || []).find((l) => l.id === lineId)
+          if (!line) return
+          line.poGenStatus = '已生成采购'
+          const nos = String(line.purchaseOrderNos || '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+          if (!nos.includes(order.orderNo)) nos.push(order.orderNo)
+          line.purchaseOrderNos = nos.join(',')
+          touchedReqIds.add(req.id)
         })
       })
+      ;(mergedLine.sourceReqIds || []).forEach((reqId) => touchedReqIds.add(reqId))
+    })
   })
 
-  reqPoMap.forEach((poSet, reqId) => {
+  const written = writeDefaultSuppliersFromMergedLines(mergedLines)
+  // 先丢弃草稿并解绑，再回写单据状态（避免仍被草稿锁为「草稿」）
+  if (options.draftId) {
+    discardGeneratePurchaseOrderDraft(options.draftId)
+  }
+
+  touchedReqIds.forEach((reqId) => {
     const req = purchaseRequisitionState.requisitions.find((r) => r.id === reqId)
     if (!req) return
-    const existing = req.purchaseOrderNo ? req.purchaseOrderNo.split(',').filter(Boolean) : []
-    const merged = [...new Set([...existing, ...poSet])]
-    req.purchaseOrderNo = merged.join(',')
-    req.docStatus = '处理完成'
+    const existing = req.purchaseOrderNo
+      ? req.purchaseOrderNo
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : []
+    req.purchaseOrderNo = [...new Set([...existing, ...poNos])].join(',')
+    syncRequisitionDocStatus(req)
     req.updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
   })
 
   persist()
-  return { poCount: poNos.length, poNos }
+  return { poCount: poNos.length, poNos, writtenSuppliers: written.length }
 }
 
 /** 拆单新建采购单后，把单号追加到关联采购申请 */
@@ -423,5 +669,20 @@ export function appendPurchaseOrderNos(reqNoCsv, poNos) {
 }
 
 export function canGeneratePO(record) {
-  return record.docStatus !== '处理完成' && record.docStatus !== '已作废'
+  if (!record || record.isGeneratePoDraft) return false
+  if (record.docStatus === '已作废') return false
+  if (record.generatePoDraftId) return false
+  if (record.docStatus === '处理完成') return false
+  return (record.lineItems || []).some((l) => (l.poGenStatus || '未生成采购') !== '已生成采购')
 }
+
+export { normalizeRequisitionLinePoStatus }
+
+registerPurchaseRequisitionDraftBind({
+  bind: bindRequisitionsToGenerateDraft,
+  unbind: unbindRequisitionsFromGenerateDraft,
+  bindByReqNos: bindRequisitionsToGenerateDraftByReqNos,
+})
+
+// 启动时把已有草稿申请回写为「草稿」状态
+reconcilePurchaseRequisitionDraftStatuses()

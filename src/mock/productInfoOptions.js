@@ -61,6 +61,8 @@ export function createDefaultProductProduction() {
 export function createDefaultProductAlert() {
   return {
     stockAlertEnabled: false,
+    maxStockQty: undefined,
+    minStockQty: undefined,
     expiryAlertEnabled: false,
     defectRateThreshold: undefined,
     attachments: [],

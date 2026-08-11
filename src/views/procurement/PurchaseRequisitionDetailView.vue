@@ -6,76 +6,52 @@
           <div class="header-left">
             <span class="order-no">{{ record.reqNo }}</span>
             <a-tag :color="docStatusColor(record.docStatus)">{{ record.docStatus }}</a-tag>
+            <a-tag v-if="activeDraft" color="purple"> 关联草稿 {{ activeDraft.orderNo }} </a-tag>
             <a-tag :color="urgencyColor(record.urgency)">{{ record.urgency }}</a-tag>
             <a-tag v-if="record.overdueStatus" :color="overdueStatusColor(record.overdueStatus)">
               {{ record.overdueStatus }}
             </a-tag>
           </div>
           <a-space>
-            <a-button v-if="showActions" class="btn-void" @click="handleInvalidate">
-              <InfoCircleOutlined />
-              作废
-            </a-button>
-            <a-button v-if="showActions" type="primary" @click="openGenerateModal">
-              <CheckCircleOutlined />
-              生成采购单
-            </a-button>
+            <template v-if="isDraftLocked">
+              <a-button type="primary" @click="continuePoDraft">继续生成草稿</a-button>
+              <a-button danger @click="handleDeleteDraft">删除草稿</a-button>
+            </template>
+            <template v-else>
+              <a-button v-if="canEdit" type="default" @click="openEdit"> 编辑 </a-button>
+              <a-button v-if="showActions" class="btn-void" @click="handleInvalidate">
+                <InfoCircleOutlined />
+                作废
+              </a-button>
+              <a-button v-if="showActions" type="primary" @click="openGenerateModal">
+                <CheckCircleOutlined />
+                生成采购单
+              </a-button>
+            </template>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
 
-        <a-tabs v-model:active-key="activeTab" class="detail-tabs">
-          <a-tab-pane key="basic" tab="基本信息" />
-          <a-tab-pane key="purchase" :tab="`采购 (${relatedPurchaseOrders.length})`" />
-        </a-tabs>
+        <div class="detail-tabs-wrap">
+          <a-tabs
+            v-model:active-key="activeTab"
+            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+          >
+            <a-tab-pane key="basic" tab="基本信息" />
+            <a-tab-pane key="purchase" :tab="`采购信息 (${relatedPurchaseOrders.length})`" />
+          </a-tabs>
+        </div>
 
         <div class="tab-body">
           <template v-if="activeTab === 'basic'">
             <div class="section-card">
               <div class="section-title">基本信息</div>
-              <a-descriptions :column="3" size="small" bordered>
-                <a-descriptions-item label="申请单号">{{ record.reqNo }}</a-descriptions-item>
-                <a-descriptions-item label="单据状态">{{
-                  record.docStatus || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="紧急度">{{
-                  record.urgency || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="订单日期">{{
-                  record.orderDate || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="期望到货日期">
-                  {{ record.estimatedArrivalDate || '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="交货日期">{{
-                  record.deliveryDate || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="收货仓库">
-                  {{ record.receivingWarehouse || defaultWarehouse }}
-                </a-descriptions-item>
-                <a-descriptions-item label="来源">{{ record.source || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="逾期状态">
-                  {{ record.overdueStatus || '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="销售单号">
-                  {{ record.salesOrderNo || '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="操作人">{{
-                  record.operator || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="创建人">{{
-                  record.creator || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="创建时间">{{
-                  record.createdAt || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="最近更新时间">{{
-                  record.updatedAt || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="备注" :span="3">{{
-                  record.remark || '—'
-                }}</a-descriptions-item>
-              </a-descriptions>
+              <PurchaseRequisitionBasicInfoSection
+                :record="record"
+                :active-draft="activeDraft"
+                :draft-source-req-nos="draftSourceReqNos"
+                :default-warehouse="defaultWarehouse"
+              />
             </div>
 
             <div class="section-card">
@@ -111,6 +87,11 @@
                   <template v-else-if="column.key === 'planPurchaseQty'">
                     {{ formatQty(line.planPurchaseQty) }}{{ line.unit ? ` ${line.unit}` : '' }}
                   </template>
+                  <template v-else-if="column.key === 'poGenStatus'">
+                    <a-tag :color="line.poGenStatus === '已生成采购' ? 'success' : 'default'">
+                      {{ line.poGenStatus || '未生成采购' }}
+                    </a-tag>
+                  </template>
                   <template v-else-if="column.key === 'orderSizeText'">
                     {{ line.orderSizeText || line.blankSizeText || '—' }}
                   </template>
@@ -139,7 +120,7 @@
 
           <template v-else-if="activeTab === 'purchase'">
             <div class="section-card">
-              <div class="section-title">采购订单</div>
+              <div class="section-title">采购信息</div>
               <a-table
                 :columns="purchaseOrderColumns"
                 :data-source="relatedPurchaseOrders"
@@ -178,12 +159,6 @@
 
       <a-empty v-else-if="!loading" description="未找到该采购申请单" />
     </a-spin>
-
-    <GeneratePurchaseOrderModal
-      v-model:open="generateModalOpen"
-      :requisitions="generateTargets"
-      @generated="onGenerated"
-    />
   </div>
 </template>
 
@@ -193,7 +168,7 @@ export default { name: 'PurchaseRequisitionDetailView' }
 </script>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { CheckCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
@@ -202,11 +177,18 @@ import {
   getPurchaseRequisitionById,
   invalidatePurchaseRequisition,
   canGeneratePO,
+  isPurchaseRequisitionDraftLocked,
 } from '@/store/purchaseRequisitionStore'
-import { getPurchaseOrdersByRequisition } from '@/store/purchaseOrderStore'
+import {
+  getPurchaseOrdersByRequisition,
+  getActiveDraftForRequisition,
+  discardGeneratePurchaseOrderDraft,
+  reconcilePurchaseRequisitionDraftStatuses,
+} from '@/store/purchaseOrderStore'
 import { purchaseRequisitionDetailLineColumns } from '@/utils/purchaseRequisitionLineColumns'
 import { tabStore, useTabs } from '@/composables/useTabs'
-import GeneratePurchaseOrderModal from './components/GeneratePurchaseOrderModal.vue'
+import { openCreateTab } from '@/utils/openCreateTab'
+import PurchaseRequisitionBasicInfoSection from './components/PurchaseRequisitionBasicInfoSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -215,8 +197,6 @@ const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 const activeTab = ref('basic')
-const generateModalOpen = ref(false)
-const generateTargets = ref([])
 
 const lineColumns = purchaseRequisitionDetailLineColumns
 
@@ -231,7 +211,6 @@ const purchaseOrderColumns = [
   { title: '供应商', dataIndex: 'supplier', width: 140, ellipsis: true },
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { title: '采购员', dataIndex: 'purchaser', width: 88 },
-  { title: '送货日期', dataIndex: 'shippingDate', width: 110 },
   { title: '创建人', dataIndex: 'creator', width: 88 },
   { title: '创建日期', dataIndex: 'documentDate', width: 110 },
 ]
@@ -264,12 +243,69 @@ const summary = computed(() => {
 
 const relatedPurchaseOrders = computed(() => getPurchaseOrdersByRequisition(record.value))
 
+const activeDraft = computed(() => getActiveDraftForRequisition(record.value))
+const draftSourceReqNos = computed(() => {
+  if (!activeDraft.value) return ''
+  return String(activeDraft.value.reqNo || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join('、')
+})
+const isDraftLocked = computed(
+  () => isPurchaseRequisitionDraftLocked(record.value) || Boolean(activeDraft.value),
+)
+
+onMounted(() => {
+  reconcilePurchaseRequisitionDraftStatuses()
+  if (record.value) loadRecord()
+})
+
 const defaultWarehouse = computed(() => {
   const line = record.value?.lineItems?.[0]
   return line?.receivingWarehouse || record.value?.receivingWarehouse || '—'
 })
 
-const showActions = computed(() => record.value && canGeneratePO(record.value))
+const showActions = computed(
+  () => record.value && canGeneratePO(record.value) && !isDraftLocked.value,
+)
+const canEdit = computed(() => record.value?.docStatus === '待处理' && !isDraftLocked.value)
+
+function openEdit() {
+  if (!record.value || !canEdit.value) return
+  openCreateTab(router, openTab, {
+    path: `/procurement/purchase-req/${record.value.id}/edit`,
+    title: `编辑采购申请 ${record.value.reqNo || ''}`.trim(),
+  })
+}
+
+function continuePoDraft() {
+  if (!activeDraft.value) {
+    message.warning('未找到关联草稿')
+    return
+  }
+  const path = `/procurement/purchase-req/generate-po?draftId=${activeDraft.value.id}`
+  openTab(path, '生成采购订单')
+  router.push(path)
+}
+
+function handleDeleteDraft() {
+  if (!record.value || !activeDraft.value) {
+    message.warning('未找到关联草稿')
+    return
+  }
+  Modal.confirm({
+    title: '删除草稿',
+    content: `确定删除申请单「${record.value.reqNo}」的生成草稿吗？删除后可重新编辑、生成采购单、作废或完成。`,
+    okText: '删除',
+    okType: 'danger',
+    onOk: () => {
+      discardGeneratePurchaseOrderDraft(activeDraft.value.id)
+      loadRecord()
+      message.success('草稿已删除')
+    },
+  })
+}
 
 function lineProductName(line) {
   return line.productName || line.inventoryName || '—'
@@ -281,6 +317,7 @@ function lineProductCode(line) {
 
 function docStatusColor(status) {
   const map = {
+    草稿: 'purple',
     待处理: 'processing',
     处理中: 'warning',
     处理完成: 'success',
@@ -348,14 +385,9 @@ function handleInvalidate() {
 
 function openGenerateModal() {
   if (!record.value || !canGeneratePO(record.value)) return
-  generateTargets.value = [record.value]
-  generateModalOpen.value = true
-}
-
-function onGenerated() {
-  loadRecord()
-  activeTab.value = 'purchase'
-  message.success('采购单已生成')
+  const path = `/procurement/purchase-req/generate-po?ids=${record.value.id}`
+  openTab(path, '生成采购订单')
+  router.push(path)
 }
 </script>
 
@@ -374,12 +406,7 @@ function onGenerated() {
   justify-content: space-between;
   padding: 10px 12px;
   background: #fff;
-}
-
-.detail-tabs {
-  background: #fff;
-  padding: 0 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #e8e8e8;
 }
 
 .tab-body {

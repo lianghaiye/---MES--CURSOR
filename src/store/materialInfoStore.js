@@ -9,10 +9,11 @@ import {
 } from '@/utils/productMaterialSync'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
+import { createStockAlertDemoMaterials } from '@/mock/stockAlertDemoMaterials'
 
 const STORAGE_KEY = 'i_doms_material_info'
-/** v14：重量双单位演示料（根→kg） */
-const DATA_VERSION = 14
+/** v15：库存预警演示物料（最高/最低库存） */
+const DATA_VERSION = 15
 let codeSeq = 100048
 
 function ensureDemoMaterialsByCodes(list, demos) {
@@ -47,6 +48,10 @@ function ensureDemoPackagePurchaseMaterials(list) {
   return ensureDemoMaterialsByCodes(list, demos)
 }
 
+function ensureStockAlertDemoMaterials(list) {
+  return ensureDemoMaterialsByCodes(list, createStockAlertDemoMaterials())
+}
+
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -54,9 +59,11 @@ function loadFromStorage() {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed.materials)) {
         const force = parsed.version !== DATA_VERSION
-        return ensureDemoPackagePurchaseMaterials(
-          ensureDemoVariableLengthMaterials(
-            applyLaborConfigSeed(migrateMaterialList(parsed.materials), { force }),
+        return ensureStockAlertDemoMaterials(
+          ensureDemoPackagePurchaseMaterials(
+            ensureDemoVariableLengthMaterials(
+              applyLaborConfigSeed(migrateMaterialList(parsed.materials), { force }),
+            ),
           ),
         )
       }
@@ -75,7 +82,9 @@ function persist() {
 }
 
 export const materialInfoState = reactive({
-  materials: loadFromStorage() || JSON.parse(JSON.stringify(mockMaterials)),
+  materials: ensureStockAlertDemoMaterials(
+    loadFromStorage() || JSON.parse(JSON.stringify(mockMaterials)),
+  ),
 })
 
 watch(

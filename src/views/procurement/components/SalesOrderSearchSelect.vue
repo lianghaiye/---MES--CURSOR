@@ -26,7 +26,11 @@
     </template>
   </a-select>
 
-  <SalesOrderSelectModal v-model:open="pickerOpen" @confirm="onPickedFromModal" />
+  <SalesOrderSelectModal
+    v-model:open="pickerOpen"
+    :exclude-statuses="excludeStatuses"
+    @confirm="onPickedFromModal"
+  />
 </template>
 
 <script setup>
@@ -47,6 +51,8 @@ const props = defineProps({
   open: { type: Boolean, default: undefined },
   autoOpen: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
+  /** 排除的销售订单状态；不传则不过滤 */
+  excludeStatuses: { type: Array, default: undefined },
 })
 
 const emit = defineEmits(['update:value', 'change', 'dropdown-visible-change'])
@@ -55,7 +61,11 @@ const pickerOpen = ref(false)
 const searchKeyword = ref('')
 const innerOpen = ref(false)
 
-const allOptions = computed(() => getAllSalesOrderOptions(salesOrderState.orders))
+const allOptions = computed(() =>
+  getAllSalesOrderOptions(salesOrderState.orders, {
+    excludeStatuses: props.excludeStatuses,
+  }),
+)
 
 const displayOptions = computed(() =>
   buildSalesOrderDisplayOptions({

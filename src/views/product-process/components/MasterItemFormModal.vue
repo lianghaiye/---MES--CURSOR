@@ -718,6 +718,30 @@
                   <a-switch v-model:checked="form.alert.stockAlertEnabled" />
                 </a-form-item>
               </a-col>
+              <a-col v-if="form.alert.stockAlertEnabled" :span="8">
+                <a-form-item label="最高库存">
+                  <a-input-number
+                    v-model:value="form.alert.maxStockQty"
+                    size="small"
+                    :min="0"
+                    :precision="2"
+                    placeholder="请输入"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col v-if="form.alert.stockAlertEnabled" :span="8">
+                <a-form-item label="最低库存">
+                  <a-input-number
+                    v-model:value="form.alert.minStockQty"
+                    size="small"
+                    :min="0"
+                    :precision="2"
+                    placeholder="请输入"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
               <a-col :span="8">
                 <a-form-item label="过期预警">
                   <a-switch v-model:checked="form.alert.expiryAlertEnabled" />
