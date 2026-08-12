@@ -109,6 +109,8 @@ export function formatBomTreeNodeTitle(
   const supply = line?.supplyForm || (node.isRoot ? rootMeta.supplyForm : '') || ''
   const childCount = countDirectChildren(flatNodes, node.id)
   const qtySuffix = node.isRoot ? (rootMeta.subItemCount ?? childCount) : childCount
+  const unitQty =
+    node.isRoot || line?.unitQty == null || line?.unitQty === '' ? '' : String(line.unitQty)
 
   const valueMap = {
     levelNo,
@@ -117,6 +119,7 @@ export function formatBomTreeNodeTitle(
     productSpec: spec,
     supplyForm: supply,
     subItemCount: String(qtySuffix),
+    unitQty,
   }
 
   const parts = visible
