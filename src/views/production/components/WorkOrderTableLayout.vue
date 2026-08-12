@@ -83,7 +83,7 @@
               克隆
             </a-button>
             <a-button
-              v-if="record.status === '待下发'"
+              v-if="record.status === '待下发' || record.status === '部分下发'"
               type="link"
               size="small"
               @click.stop="emit('action', 'dispatch', record)"
@@ -235,6 +235,7 @@ function onPageSizeChange(_current, size) {
 function statusColor(status) {
   const map = {
     待下发: 'warning',
+    部分下发: 'processing',
     已下发: 'processing',
     执行中: 'blue',
     完成: 'success',

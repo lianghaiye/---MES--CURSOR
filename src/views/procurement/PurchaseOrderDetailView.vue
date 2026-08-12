@@ -135,6 +135,9 @@
                   <template v-else-if="column.key === 'stockQty'">
                     {{ formatQty(line.stockQty) }}
                   </template>
+                  <template v-else-if="column.key === 'urgency'">
+                    <a-tag :color="urgencyColor(line.urgency)">{{ line.urgency || '正常' }}</a-tag>
+                  </template>
                   <template v-else-if="column.key === 'orderSizeText'">
                     {{ line.orderSizeText || line.blankSizeText || '—' }}
                   </template>
@@ -435,6 +438,7 @@ const lineColumns = [
   },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '库存数量', key: 'stockQty', width: 90, align: 'right' },
+  { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 110, ellipsis: true },
   { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
   { title: '采购单位', dataIndex: 'unit', width: 80 },
   {
@@ -450,7 +454,7 @@ const lineColumns = [
   { title: '总价（不含税）', key: 'totalPriceExTax', width: 110, align: 'right' },
   { title: '总价（含税）', key: 'totalPriceInTax', width: 100, align: 'right' },
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
-  { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 110, ellipsis: true },
+  { title: '紧急度', key: 'urgency', dataIndex: 'urgency', width: 90 },
   { title: '入库质检要求', key: 'inboundQcRequirement', width: 110 },
   {
     title: '来源申请单号',
@@ -651,6 +655,16 @@ function overdueStatusOf(order) {
 
 function overdueColor(status) {
   return status === '已逾期' ? 'error' : 'default'
+}
+
+function urgencyColor(urgency) {
+  const map = {
+    特急: 'error',
+    紧急: 'error',
+    加急: 'warning',
+    正常: 'default',
+  }
+  return map[urgency] || 'default'
 }
 
 function formatMoney(val) {

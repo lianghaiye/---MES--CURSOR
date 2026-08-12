@@ -28,6 +28,43 @@ export function isPartialScheduled(wo) {
   return plan > 0 && scheduled > 0 && scheduled < plan
 }
 
+/** 编辑/下发操作时间；不含小程序报工完工 */
+export function touchWorkOrderOperateUpdatedAt(workOrder, now = dayjs()) {
+  if (!workOrder) return
+  workOrder.updatedAt = now.format('YYYY-MM-DD HH:mm:ss')
+}
+
+/**
+ * 下发后回写工单状态：
+ * - 尚无已下发批次 → 待下发
+ * - 有已下发且仍有待下发批次或剩余可排 → 部分下发
+ * - 已全部下发进入生产 → 执行中
+ * 完成/暂停/终止不覆盖
+ */
+export function syncWorkOrderDispatchStatus(workOrder) {
+  if (!workOrder) return workOrder
+  const locked = ['完成', '已完成', '暂停', '终止']
+  if (locked.includes(workOrder.status)) return workOrder
+
+  const batches = workOrder.scheduleBatches || []
+  if (!batches.length) return workOrder
+
+  const hasDispatched = batches.some((b) => b.status && b.status !== '待下发')
+  if (!hasDispatched) {
+    workOrder.status = '待下发'
+    return workOrder
+  }
+
+  const hasPendingBatch = batches.some((b) => b.status === '待下发')
+  const remain = getRemainScheduleQty(workOrder)
+  if (hasPendingBatch || remain > 0) {
+    workOrder.status = '部分下发'
+  } else {
+    workOrder.status = '执行中'
+  }
+  return workOrder
+}
+
 function nextBatchId() {
   return `sb-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
@@ -103,7 +140,10 @@ export function createScheduleBatch(workOrder, input) {
 
   if (input.dispatchNow) {
     applyBatchExecutorsToWorkOrderProcesses(workOrder, batch)
-    if (workOrder.status === '待下发') workOrder.status = '执行中'
+    syncWorkOrderDispatchStatus(workOrder)
+    touchWorkOrderOperateUpdatedAt(workOrder)
+  } else {
+    touchWorkOrderOperateUpdatedAt(workOrder)
   }
 
   return { ok: true, batch }
@@ -136,7 +176,8 @@ export function dispatchScheduleBatch(workOrder, batchId) {
   batch.dispatchedAt = dayjs().format('YYYY-MM-DD HH:mm')
   workOrder.activeScheduleBatchId = batch.id
   applyBatchExecutorsToWorkOrderProcesses(workOrder, batch)
-  if (['待下发', '已下发'].includes(workOrder.status)) workOrder.status = '执行中'
+  syncWorkOrderDispatchStatus(workOrder)
+  touchWorkOrderOperateUpdatedAt(workOrder)
   return { ok: true, batch }
 }
 
@@ -167,6 +208,7 @@ export function getActiveScheduleBatch(workOrder) {
 export function batchStatusColor(status) {
   const map = {
     待下发: 'warning',
+    部分下发: 'processing',
     已下发: 'processing',
     执行中: 'blue',
     完成: 'success',

@@ -360,6 +360,7 @@ export function createPurchaseOrdersFromMergedLines(mergedLines, options = {}) {
         receivingMode: line.receivingMode || '正常收货',
         receivingWarehouse: line.receivingWarehouse || '',
         deliveryDate: line.deliveryDate || '',
+        urgency: line.urgency || '正常',
         sourceReqNos: line.sourceReqNos || [],
         sourceLineIds: line.sourceLineIds || [],
       }),

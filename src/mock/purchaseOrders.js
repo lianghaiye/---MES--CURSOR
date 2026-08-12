@@ -40,6 +40,7 @@ export function createPoLineItem(partial = {}) {
     totalPriceExTax: Math.round(purchaseQty * ex * 100) / 100,
     totalPriceInTax: Math.round(purchaseQty * inTax * 100) / 100,
     deliveryDate: '',
+    urgency: '正常',
     receivingMode: '正常收货',
     receivingWarehouse: '',
     receivedQty: 0,

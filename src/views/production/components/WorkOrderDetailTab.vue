@@ -13,7 +13,7 @@
           :data-source="processConfigList"
           row-key="id"
           :pagination="false"
-          :scroll="{ x: 700 }"
+          :scroll="{ x: showFeedingColumn ? 700 : 520 }"
           bordered
         >
           <template #bodyCell="{ column, record, index, text }">
@@ -42,6 +42,7 @@ import {
   formatProcessExecutors,
   formatProcessFeedingSummary,
 } from '@/utils/workOrderProcessDisplay'
+import { businessRuleState } from '@/store/businessRuleStore'
 import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
 
 const props = defineProps({
@@ -54,13 +55,20 @@ const collapseKeys = ref(['basic', 'process-config'])
 
 const processConfigList = computed(() => props.workOrder?.processes || [])
 
-const processConfigCols = [
-  { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
-  { title: '工序名称', dataIndex: 'name', width: 100 },
-  { title: '工序内容', dataIndex: 'processContent', width: 140, ellipsis: true },
-  { title: '投料', key: 'feeding', width: 160, ellipsis: true },
-  { title: '模板执行者', key: 'executors', width: 120 },
-]
+const showFeedingColumn = computed(() => businessRuleState.rules.productionMode === 'standard')
+
+const processConfigCols = computed(() => {
+  const cols = [
+    { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
+    { title: '工序名称', dataIndex: 'name', width: 100 },
+    { title: '工序内容', dataIndex: 'processContent', width: 140, ellipsis: true },
+  ]
+  if (showFeedingColumn.value) {
+    cols.push({ title: '投料', key: 'feeding', width: 160, ellipsis: true })
+  }
+  cols.push({ title: '执行人', key: 'executors', width: 120 })
+  return cols
+})
 
 function displayProcessCell(value) {
   const text = String(value ?? '').trim()

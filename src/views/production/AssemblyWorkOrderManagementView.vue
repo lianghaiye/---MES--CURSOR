@@ -308,6 +308,7 @@ import {
   canEditWorkOrder,
 } from '@/utils/workOrderDispatchHelpers'
 import { formatScheduleProgress } from '@/utils/workOrderScheduleBatch'
+import { sortWorkOrdersForList } from '@/utils/workOrderListSort'
 import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { bomOptions } from '@/mock/workOrderMaster'
@@ -328,7 +329,7 @@ const { openTab } = useTabs()
 
 const LAYOUT_STORAGE_KEY = 'i_doms_assembly_wo_layout'
 
-const statusOptions = ['待下发', '已下发', '执行中', '完成', '暂停', '终止']
+const statusOptions = ['待下发', '部分下发', '已下发', '执行中', '完成', '暂停', '终止']
 const categoryOptions = ['总装工单']
 
 const filters = reactive({
@@ -367,7 +368,9 @@ const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const bomOpts = bomOptions.map((v) => ({ label: v, value: v }))
 
 const filteredOrders = computed(() =>
-  filterAssemblyWorkOrders(assemblyWorkOrderState.orders, appliedFilters.value),
+  sortWorkOrdersForList(
+    filterAssemblyWorkOrders(assemblyWorkOrderState.orders, appliedFilters.value),
+  ),
 )
 
 const {
@@ -463,6 +466,7 @@ watch(
 function statusColor(status) {
   const map = {
     待下发: 'warning',
+    部分下发: 'processing',
     已下发: 'processing',
     执行中: 'blue',
     完成: 'success',
@@ -733,7 +737,7 @@ function onCardAction(key, wo) {
   }
   const map = { pause: '暂停', terminate: '终止', complete: '完成' }
   if (map[key]) {
-    updateAssemblyWorkOrder(wo.id, { status: map[key] })
+    updateAssemblyWorkOrder(wo.id, { status: map[key] }, { touchOperateUpdatedAt: false })
     message.success(`工单已${map[key]}`)
   }
 }

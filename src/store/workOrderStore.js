@@ -22,6 +22,7 @@ import {
   createScheduleBatch,
   dispatchScheduleBatch,
   removeScheduleBatch,
+  touchWorkOrderOperateUpdatedAt,
 } from '@/utils/workOrderScheduleBatch'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
@@ -458,12 +459,16 @@ export function cloneWorkOrder(id) {
   return cloned
 }
 
-export function updateWorkOrder(id, patch) {
+export function updateWorkOrder(id, patch, options = {}) {
   const idx = workOrderState.orders.findIndex((o) => o.id === id)
   if (idx === -1) return null
   const prevStatus = workOrderState.orders[idx].status
   Object.assign(workOrderState.orders[idx], patch)
   const row = workOrderState.orders[idx]
+  // 默认写入操作更新时间；报工完工等可传 touchOperateUpdatedAt: false
+  if (options.touchOperateUpdatedAt !== false) {
+    touchWorkOrderOperateUpdatedAt(row)
+  }
   // 工单首次变为「完成」时生成完工库存扣减单（BOM 领料+倒冲同单）
   if (prevStatus !== '完成' && row.status === '完成') {
     const finishedQty =
@@ -538,6 +543,7 @@ export function createWorkOrderPayload(partial) {
     scheduleBatches: Array.isArray(partial.scheduleBatches) ? partial.scheduleBatches : [],
     activeScheduleBatchId: partial.activeScheduleBatchId || '',
     createdAt: dayjs().format('YYYY-MM-DD'),
+    updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   }
 }
 
@@ -664,7 +670,7 @@ export function filterWorkOrders(list, filters) {
 }
 
 export function canShowDispatchTab(status) {
-  return status === '待下发'
+  return status === '待下发' || status === '部分下发'
 }
 
 /** 待下发，或已排产 < 计划数量时继续展示工单下发 */

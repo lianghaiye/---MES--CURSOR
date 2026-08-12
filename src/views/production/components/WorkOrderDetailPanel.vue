@@ -218,6 +218,7 @@ function onProcessRouteChange(routeName) {
 function statusTagColor(status) {
   const map = {
     待下发: 'warning',
+    部分下发: 'processing',
     已下发: 'processing',
     执行中: 'processing',
     完成: 'success',

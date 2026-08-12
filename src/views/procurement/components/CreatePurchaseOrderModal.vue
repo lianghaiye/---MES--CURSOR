@@ -453,6 +453,28 @@
                       </template>
                     </InventoryLineEditableCell>
                   </template>
+                  <template v-else-if="column.key === 'urgency'">
+                    <InventoryLineEditableCell
+                      :active="isLineCellEditing(record.id, 'urgency')"
+                      :display="record.urgency || '正常'"
+                      :empty="!record.urgency"
+                      placeholder="请选择"
+                      @activate="startLineCellEdit(record.id, 'urgency', { select: true })"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-select
+                          v-model:value="record.urgency"
+                          size="small"
+                          style="width: 100%"
+                          :options="urgencyOpts"
+                          :open="lineCellSelectOpen"
+                          @dropdownVisibleChange="onLineCellSelectOpenChange"
+                          @change="endEdit"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                  </template>
                   <template v-else-if="column.key === 'receivingWarehouse'">
                     <InventoryLineEditableCell
                       :active="isLineCellEditing(record.id, 'receivingWarehouse')"
@@ -631,6 +653,7 @@ import {
   warehouseOptions,
   applyTypeOptions,
 } from '@/mock/purchaseOrderOptions'
+import { urgencyOptions } from '@/mock/purchaseRequisitionOptions'
 import { mockInventory } from '@/mock/inventory'
 import { createPoLineItem } from '@/mock/purchaseOrders'
 import { productInfoState } from '@/store/productInfoStore'
@@ -733,6 +756,7 @@ const applyTypeOpts = applyTypeOptions.map((v) => ({ label: v, value: v }))
 const purchaserOpts = purchaserOptions.map((v) => ({ label: v, value: v }))
 const contactOpts = contactOptions.map((c) => ({ label: c.label, value: c.value, phone: c.phone }))
 const warehouseOpts = warehouseOptions
+const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 
 const taxModeHint = computed(() =>
   taxModeExcluding.value
@@ -750,7 +774,7 @@ function filterUnitOption(input, option) {
 }
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-form-lines-v5', purchaseOrderFormLineColumns, {
+  useTableColumnSettings('purchase-order-form-lines-v6', purchaseOrderFormLineColumns, {
     minScrollX: 2200,
     pinEdgeColumns: false,
     pinActionColumn: true,
@@ -848,6 +872,7 @@ function normalizeLineItems(items) {
     drawingNo: line.drawingNo || '',
     stockQty: line.stockQty ?? 0,
     deliveryDate: line.deliveryDate || '',
+    urgency: line.urgency || '正常',
     receivingWarehouse: line.receivingWarehouse || '',
     remark: line.remark || '',
   }))
@@ -963,6 +988,7 @@ function mapPickerToPoLine(payload) {
     taxRate,
     deliveryDate: headerDeliveryDateStr(),
     receivingWarehouse: form.receivingWarehouse || '',
+    urgency: '正常',
     remark: '',
     isSpuLine: false,
     spuId: master?.spuId || payload.spuId || '',

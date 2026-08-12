@@ -79,7 +79,7 @@ export function saveDispatchDraft(updateFn, workOrder) {
 export function dispatchAndStartWorkOrder({ workOrder, orderCategory, updateFn }) {
   if (!workOrder || !validateWorkOrderDispatchReady(workOrder)) return false
   const status = workOrder.status
-  const allowStatuses = ['待下发', '已下发', '执行中']
+  const allowStatuses = ['待下发', '部分下发', '已下发', '执行中']
   if (!allowStatuses.includes(status)) {
     message.warning('当前状态不可下发')
     return false

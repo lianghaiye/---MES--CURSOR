@@ -15,6 +15,7 @@ import {
   createScheduleBatch,
   dispatchScheduleBatch,
   removeScheduleBatch,
+  touchWorkOrderOperateUpdatedAt,
 } from '@/utils/workOrderScheduleBatch'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
@@ -190,11 +191,15 @@ export function cloneAssemblyWorkOrder(id) {
   return cloned
 }
 
-export function updateAssemblyWorkOrder(id, patch) {
+export function updateAssemblyWorkOrder(id, patch, options = {}) {
   const idx = assemblyWorkOrderState.orders.findIndex((o) => o.id === id)
   if (idx === -1) return null
   Object.assign(assemblyWorkOrderState.orders[idx], patch)
-  return assemblyWorkOrderState.orders[idx]
+  const row = assemblyWorkOrderState.orders[idx]
+  if (options.touchOperateUpdatedAt !== false) {
+    touchWorkOrderOperateUpdatedAt(row)
+  }
+  return row
 }
 
 export function createAssemblyWorkOrderPayload(partial) {
@@ -248,6 +253,7 @@ export function createAssemblyWorkOrderPayload(partial) {
     scheduleBatches: Array.isArray(partial.scheduleBatches) ? partial.scheduleBatches : [],
     activeScheduleBatchId: partial.activeScheduleBatchId || '',
     createdAt: dayjs().format('YYYY-MM-DD'),
+    updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   }
 }
 
@@ -347,7 +353,7 @@ export function filterAssemblyWorkOrders(list, filters) {
 }
 
 export function canShowAssemblyDispatchTab(status) {
-  return status === '待下发'
+  return status === '待下发' || status === '部分下发'
 }
 
 export { shouldShowWorkOrderDispatchTab } from '@/store/workOrderStore'
