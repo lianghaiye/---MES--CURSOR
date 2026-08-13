@@ -37,6 +37,7 @@
             >
               完成
             </a-button>
+            <a-button size="small" @click="openPrint">打印</a-button>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
@@ -170,6 +171,8 @@
       </template>
       <a-empty v-else-if="!loading" description="未找到该收货单" />
     </a-spin>
+
+    <OutsourcingReceiptPrintModal v-model:open="printModalOpen" :receipt="record" />
   </div>
 </template>
 
@@ -195,6 +198,7 @@ import { getInboundOrdersByReceipt } from '@/store/inboundOrderStore'
 import { flattenPurchaseOrderInboundLines } from '@/utils/purchaseOrderInboundLines'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import OutsourcingReceiptBasicInfoSection from './components/OutsourcingReceiptBasicInfoSection.vue'
+import OutsourcingReceiptPrintModal from './components/OutsourcingReceiptPrintModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -203,6 +207,7 @@ const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 const activeTab = ref('basic')
+const printModalOpen = ref(false)
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
@@ -312,6 +317,10 @@ function goInboundDetailById(orderId) {
   const path = `/inventory/inbound/${orderId}`
   openTab(path, `入库单 ${order?.docNo || ''}`)
   router.push({ name: 'inventory-inbound-detail', params: { id: orderId } })
+}
+
+function openPrint() {
+  printModalOpen.value = true
 }
 
 function handleBack() {

@@ -29,9 +29,21 @@ function formatPrintMoney(val) {
   })
 }
 
+function formatPrintTaxRate(val) {
+  if (val == null || val === '') return ''
+  const text = String(val).trim()
+  if (!text) return ''
+  if (text.endsWith('%')) return text
+  const n = Number(text)
+  if (!Number.isFinite(n)) return text
+  return `${n}%`
+}
+
 /** 构建单张采购订单打印数据（含明细） */
 export function buildPurchaseOrderPrintPayload(order, options = {}) {
   if (!order) return null
+
+  const headerWarehouse = formatPrintFieldValue(order.receivingWarehouse)
 
   const lineItems = (order.lineItems || []).map((line, index) => ({
     seq: index + 1,
@@ -44,17 +56,16 @@ export function buildPurchaseOrderPrintPayload(order, options = {}) {
     purchaseQty: formatPrintQty(line.purchaseQty),
     unit: formatPrintFieldValue(line.unit || line.purchaseUnit),
     unitPriceExTax: formatPrintMoney(line.unitPriceExTax),
-    taxRate: formatPrintFieldValue(line.taxRate),
+    taxRate: formatPrintTaxRate(line.taxRate),
     unitPriceInTax: formatPrintMoney(line.unitPriceInTax),
     totalPriceExTax: formatPrintMoney(line.totalPriceExTax),
     totalPriceInTax: formatPrintMoney(line.totalPriceInTax),
     deliveryDate: formatPrintFieldValue(line.deliveryDate),
-    receivingWarehouse: formatPrintFieldValue(line.receivingWarehouse),
+    receivingWarehouse: formatPrintFieldValue(line.receivingWarehouse) || headerWarehouse,
     remark: formatPrintFieldValue(line.remark),
   }))
 
   const basicFields = [
-    { label: '采购单号', value: order.orderNo },
     { label: '供应商', value: order.supplier },
     { label: '采购类型', value: order.applyType },
     { label: '采购申请单号', value: order.reqNo },
@@ -72,14 +83,13 @@ export function buildPurchaseOrderPrintPayload(order, options = {}) {
     { label: '结算周期', value: order.settlementCycle },
     { label: '结算方式', value: order.settlementMethod },
     { label: '交货方式', value: order.deliveryMethod },
-    { label: '供货期/天', value: order.leadTimeDays },
+    { label: '联系人', value: order.contactPerson },
+    { label: '联系方式', value: order.contactPhone },
     { label: '交货日期', value: order.deliveryDate },
     { label: '收货仓库', value: order.receivingWarehouse },
     { label: '采购员', value: order.purchaser },
     { label: '创建人', value: order.creator },
     { label: '创建日期', value: order.documentDate },
-    { label: '联系人', value: order.contactPerson },
-    { label: '联系方式', value: order.contactPhone },
     { label: '收货地址', value: order.shippingAddress, wide: true },
     { label: '备注', value: order.remark, wide: true },
   ].map((field) => ({
@@ -99,7 +109,6 @@ export function buildPurchaseOrderPrintPayload(order, options = {}) {
     orderNo: formatPrintFieldValue(order.orderNo),
     supplier: formatPrintFieldValue(order.supplier),
     title: '采购订单',
-    subtitle: formatPrintFieldValue(order.supplier) || '采购订单明细',
     basicFields,
     lineItems,
     summary: {

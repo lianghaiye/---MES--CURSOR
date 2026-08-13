@@ -40,6 +40,7 @@
               <a-button size="small" @click="openPurchaseReturnCreate">采购退货</a-button>
               <a-button size="small" @click="handleComplete">完成</a-button>
             </template>
+            <a-button size="small" @click="openPrint">打印</a-button>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
@@ -326,6 +327,7 @@
       :purchase-order="record"
       @saved="onInboundSaved"
     />
+    <PurchaseOrderPrintModal v-model:open="printModalOpen" :purchase-order="record" />
   </div>
 </template>
 
@@ -373,6 +375,7 @@ import { purchaseReturnState } from '@/store/purchaseReturnStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import PurchaseOrderBasicInfoSection from './components/PurchaseOrderBasicInfoSection.vue'
+import PurchaseOrderPrintModal from './components/PurchaseOrderPrintModal.vue'
 import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
 import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vue'
 
@@ -419,6 +422,7 @@ const record = ref(null)
 const activeTab = ref('basic')
 const receiptModalOpen = ref(false)
 const inboundModalOpen = ref(false)
+const printModalOpen = ref(false)
 
 const lineColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
@@ -673,6 +677,10 @@ function formatMoney(val) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+}
+
+function openPrint() {
+  printModalOpen.value = true
 }
 
 function handleBack() {

@@ -1,5 +1,5 @@
 <template>
-  <div class="purchase-order-print-preview-page" :class="pageClass">
+  <div class="purchase-order-print-preview-page sales-order-print-preview-page" :class="pageClass">
     <div v-if="!payload" class="empty-wrap">
       <a-empty description="预览数据不存在或已过期，请返回重新打开预览" />
     </div>
@@ -39,7 +39,7 @@
           </section>
 
           <section class="sheet-section">
-            <div class="section-title">采购明细</div>
+            <div class="section-title">销售明细</div>
             <div v-if="sheet.lineItems?.length" class="table-wrap">
               <table class="sheet-table bom-table">
                 <thead>
@@ -49,14 +49,12 @@
                     <th>产品编号</th>
                     <th>规格型号</th>
                     <th>材质</th>
-                    <th>订货尺寸</th>
                     <th>数量</th>
                     <th>单位</th>
-                    <th>税率</th>
-                    <th>含税单价</th>
                     <th>不含税单价</th>
+                    <th>含税总价</th>
                     <th>交货日期</th>
-                    <th>收货仓库</th>
+                    <th>交付方式</th>
                     <th>备注</th>
                   </tr>
                 </thead>
@@ -67,22 +65,21 @@
                     <td>{{ row.productCode }}</td>
                     <td>{{ row.specModel }}</td>
                     <td>{{ row.material }}</td>
-                    <td>{{ row.orderSizeText }}</td>
-                    <td class="cell-num">{{ row.purchaseQty }}</td>
+                    <td class="cell-num">{{ row.salesQty }}</td>
                     <td>{{ row.unit }}</td>
-                    <td class="cell-num">{{ row.taxRate }}</td>
-                    <td class="cell-num">{{ row.unitPriceInTax }}</td>
                     <td class="cell-num">{{ row.unitPriceExTax }}</td>
+                    <td class="cell-num">{{ row.totalPriceInTax }}</td>
                     <td>{{ row.deliveryDate }}</td>
-                    <td>{{ row.receivingWarehouse }}</td>
+                    <td>{{ row.deliveryMode }}</td>
                     <td>{{ row.remark }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div v-else class="bom-empty">暂无采购明细</div>
+            <div v-else class="bom-empty">暂无销售明细</div>
             <div v-if="sheet.summary" class="print-summary">
-              <span>合计数量：{{ sheet.summary.totalQty || '—' }}</span>
+              <span>明细行数：{{ sheet.summary.lineCount || '—' }}</span>
+              <span>数量合计：{{ sheet.summary.totalQty || '—' }}</span>
               <span>不含税合计：{{ sheet.summary.amountExTax || '—' }}</span>
               <span>含税合计：{{ sheet.summary.amountInTax || '—' }}</span>
             </div>
@@ -103,13 +100,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { PrinterOutlined } from '@ant-design/icons-vue'
-import { loadPurchaseOrderPrintPayload } from '@/utils/purchaseOrderPrintPreview'
+import { loadSalesOrderPrintPayload } from '@/utils/salesOrderPrintPreview'
 import { printElement } from '@/utils/browserPrint'
 
 const route = useRoute()
 const printAreaRef = ref(null)
 
-const payload = computed(() => loadPurchaseOrderPrintPayload(route.query.key))
+const payload = computed(() => loadSalesOrderPrintPayload(route.query.key))
 
 const printSheets = computed(() => {
   if (!payload.value) return []
@@ -134,7 +131,7 @@ const printedAtText = computed(() => {
 function handlePrint() {
   if (!printAreaRef.value) return
   printElement(printAreaRef.value, {
-    title: printSheets.value[0]?.orderNo || '采购订单',
+    title: printSheets.value[0]?.orderNo || '销售订单',
     paper: payload.value?.paper,
     orientation: payload.value?.orientation,
     bodyClass: 'purchase-order-print-iframe-body',
@@ -164,7 +161,7 @@ body,
 <style src="@/styles/purchase-order-print-sheet.css"></style>
 
 <style scoped>
-.purchase-order-print-preview-page {
+.sales-order-print-preview-page {
   min-height: 100vh;
   background: #e8e8e8;
   padding-bottom: 24px;
@@ -216,7 +213,7 @@ body,
     display: none !important;
   }
 
-  .purchase-order-print-preview-page {
+  .sales-order-print-preview-page {
     background: #fff;
     padding: 0;
   }

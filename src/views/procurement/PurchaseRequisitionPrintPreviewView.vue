@@ -23,8 +23,6 @@
         >
           <header class="sheet-header">
             <h1 class="sheet-title">{{ sheet.title }}</h1>
-            <div class="sheet-subtitle">{{ sheet.subtitle }}</div>
-            <div class="sheet-doc-no">单号：{{ sheet.reqNo }}</div>
           </header>
 
           <section class="sheet-meta">
@@ -46,16 +44,18 @@
                 <thead>
                   <tr>
                     <th>序号</th>
-                    <th>采购状态</th>
                     <th>产品名称</th>
                     <th>产品编号</th>
                     <th>规格型号</th>
                     <th>材质</th>
                     <th>订货尺寸</th>
-                    <th>库存需求</th>
                     <th>计划采购数</th>
                     <th>单位</th>
+                    <th>税率</th>
+                    <th>含税单价</th>
+                    <th>不含税单价</th>
                     <th>供应商</th>
+                    <th>收货仓库</th>
                     <th>销售单号</th>
                     <th>备注</th>
                   </tr>
@@ -63,16 +63,18 @@
                 <tbody>
                   <tr v-for="row in sheet.lineItems" :key="`${index}-line-${row.seq}`">
                     <td class="cell-index">{{ row.seq }}</td>
-                    <td>{{ row.poGenStatus }}</td>
                     <td>{{ row.productName }}</td>
                     <td>{{ row.productCode }}</td>
                     <td>{{ row.specModel }}</td>
                     <td>{{ row.material }}</td>
                     <td>{{ row.orderSizeText }}</td>
-                    <td class="cell-num">{{ row.demandQty }}</td>
                     <td class="cell-num">{{ row.planPurchaseQty }}</td>
                     <td>{{ row.unit }}</td>
+                    <td class="cell-num">{{ row.taxRate }}</td>
+                    <td class="cell-num">{{ row.unitPriceInTax }}</td>
+                    <td class="cell-num">{{ row.unitPriceExTax }}</td>
                     <td>{{ row.supplierName }}</td>
+                    <td>{{ row.receivingWarehouse }}</td>
                     <td>{{ row.salesOrderNo }}</td>
                     <td>{{ row.remark }}</td>
                   </tr>
@@ -83,6 +85,8 @@
             <div v-if="sheet.summary" class="print-summary">
               <span>明细行数：{{ sheet.summary.lineCount || '—' }}</span>
               <span>计划采购合计：{{ sheet.summary.totalPlanQty || '—' }}</span>
+              <span>不含税总计：{{ sheet.summary.amountExTax || '—' }}</span>
+              <span>含税总计：{{ sheet.summary.amountInTax || '—' }}</span>
             </div>
           </section>
 

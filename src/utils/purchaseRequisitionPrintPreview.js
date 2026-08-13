@@ -27,44 +27,55 @@ function formatPrintMoney(val) {
   })
 }
 
+function formatPrintTaxRate(val) {
+  if (val == null || val === '') return ''
+  const text = String(val).trim()
+  if (!text) return ''
+  if (text.endsWith('%')) return text
+  const n = Number(text)
+  if (!Number.isFinite(n)) return text
+  return `${n}%`
+}
+
 /** 构建单张采购申请打印数据（含明细） */
 export function buildPurchaseRequisitionPrintPayload(requisition, options = {}) {
   if (!requisition) return null
 
+  const headerWarehouse = formatPrintFieldValue(requisition.receivingWarehouse)
+
   const lineItems = (requisition.lineItems || []).map((line, index) => ({
     seq: index + 1,
-    poGenStatus: formatPrintFieldValue(line.poGenStatus || '未生成采购'),
     productName: formatPrintFieldValue(line.productName || line.inventoryName),
     productCode: formatPrintFieldValue(line.productCode || line.inventoryCode),
     specModel: formatPrintFieldValue(line.specModel),
     material: formatPrintFieldValue(line.material),
     drawingNo: formatPrintFieldValue(line.drawingNo),
     orderSizeText: formatPrintFieldValue(line.orderSizeText || line.blankSizeText),
-    demandQty: formatPrintQty(line.demandQty),
     planPurchaseQty: formatPrintQty(line.planPurchaseQty),
     unit: formatPrintFieldValue(line.unit || line.purchaseUnit),
-    stockQty: formatPrintQty(line.stockQty),
-    supplierName: formatPrintFieldValue(line.supplierName),
-    salesOrderNo: formatPrintFieldValue(line.salesOrderNo || requisition.salesOrderNo),
     unitPriceExTax: formatPrintMoney(line.unitPriceExTax),
+    taxRate: formatPrintTaxRate(line.taxRate),
+    unitPriceInTax: formatPrintMoney(line.unitPriceInTax),
+    totalPriceExTax: formatPrintMoney(line.totalPriceExTax),
     totalPriceInTax: formatPrintMoney(line.totalPriceInTax),
+    supplierName: formatPrintFieldValue(line.supplierName),
+    receivingWarehouse: formatPrintFieldValue(line.receivingWarehouse) || headerWarehouse,
+    salesOrderNo: formatPrintFieldValue(line.salesOrderNo || requisition.salesOrderNo),
     remark: formatPrintFieldValue(line.remark),
   }))
 
   const basicFields = [
-    { label: '申请单号', value: requisition.reqNo },
     { label: '单据状态', value: requisition.docStatus },
     { label: '紧急度', value: requisition.urgency },
     { label: '销售单号', value: requisition.salesOrderNo },
     { label: '采购单号', value: requisition.purchaseOrderNo },
     { label: '来源', value: requisition.source },
-    { label: '订单日期', value: requisition.orderDate },
     { label: '交货日期', value: requisition.deliveryDate },
     { label: '期望到货日期', value: requisition.estimatedArrivalDate },
     { label: '逾期状态', value: requisition.overdueStatus },
-    { label: '收货仓库', value: requisition.receivingWarehouse },
-    { label: '操作人', value: requisition.operator || requisition.creator },
+    { label: '创建人', value: requisition.creator },
     { label: '创建时间', value: requisition.createdAt },
+    { label: '更新人', value: requisition.updater || requisition.operator },
     { label: '更新时间', value: requisition.updatedAt },
     { label: '备注', value: requisition.remark, wide: true },
   ].map((field) => ({
@@ -75,16 +86,25 @@ export function buildPurchaseRequisitionPrintPayload(requisition, options = {}) 
   const totalPlanQty =
     requisition.plannedQty ??
     (requisition.lineItems || []).reduce((s, l) => s + (Number(l.planPurchaseQty) || 0), 0)
+  const amountExTax = (requisition.lineItems || []).reduce(
+    (s, l) => s + (Number(l.totalPriceExTax) || 0),
+    0,
+  )
+  const amountInTax = (requisition.lineItems || []).reduce(
+    (s, l) => s + (Number(l.totalPriceInTax) || 0),
+    0,
+  )
 
   return {
     reqNo: formatPrintFieldValue(requisition.reqNo),
     title: '采购申请明细',
-    subtitle: formatPrintFieldValue(requisition.reqNo) || '采购申请',
     basicFields,
     lineItems,
     summary: {
       lineCount: String(lineItems.length),
       totalPlanQty: formatPrintQty(totalPlanQty),
+      amountExTax: formatPrintMoney(amountExTax),
+      amountInTax: formatPrintMoney(amountInTax),
     },
     paper: options.paper || 'A4',
     orientation: options.orientation || 'portrait',

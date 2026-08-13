@@ -113,17 +113,31 @@
     </div>
 
     <div class="toolbar-row">
-      <a-dropdown>
-        <a-button size="small" @click.prevent>
-          批量操作
-          <DownOutlined />
-        </a-button>
-        <template #overlay>
-          <a-menu @click="onBatchMenu">
-            <a-menu-item key="export">导出</a-menu-item>
-          </a-menu>
-        </template>
-      </a-dropdown>
+      <a-space :size="8">
+        <a-dropdown>
+          <a-button size="small" @click.prevent>
+            批量操作
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onBatchMenu">
+              <a-menu-item key="export">导出</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+        <a-dropdown>
+          <a-button size="small">
+            打印
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onPrintMenuClick">
+              <a-menu-item key="派单工">打印派单工</a-menu-item>
+              <a-menu-item key="发料出库单">打印发料出库单</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </a-space>
       <a-space :size="4" class="toolbar-icons">
         <a-tooltip title="刷新">
           <a-button type="text" size="small" @click="handleSearch">
@@ -227,6 +241,12 @@
       :selected-count="selectedRowKeys.length"
       @export="doExport"
     />
+
+    <OutsourcingOrderPrintModal
+      v-model:open="printModalOpen"
+      :template-type="printTemplateType"
+      :outsourcing-orders="printOrders"
+    />
   </div>
 </template>
 
@@ -237,8 +257,15 @@ export default { name: 'OutsourcingDetailView' }
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import { SearchOutlined, ReloadOutlined, DownOutlined } from '@ant-design/icons-vue'
-import { outsourcingOrderState, listOutsourcingOperators } from '@/store/outsourcingOrderStore'
+import {
+  outsourcingOrderState,
+  listOutsourcingOperators,
+  getOutsourcingOrderById,
+} from '@/store/outsourcingOrderStore'
+import { OUTSOURCING_PRINT_TEMPLATE } from '@/utils/outsourcingOrderPrintPreview'
+import OutsourcingOrderPrintModal from './components/OutsourcingOrderPrintModal.vue'
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { warehouseOptions, supplierOptions } from '@/mock/purchaseOrderOptions'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
@@ -274,6 +301,9 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
+const printModalOpen = ref(false)
+const printTemplateType = ref(OUTSOURCING_PRINT_TEMPLATE.DISPATCH)
+const printOrders = ref([])
 
 const warehouseOpts = warehouseOptions.map((w) => ({ label: w.label, value: w.value }))
 const contactPersonOpts = listOutsourcingOperators()
@@ -400,6 +430,32 @@ function handleReset() {
 
 function onBatchMenu({ key }) {
   if (key === 'export') openExportModal()
+}
+
+function onPrintMenuClick({ key }) {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选要打印的外协明细')
+    return
+  }
+  const orderIdSet = new Set()
+  const orders = []
+  filteredList.value.forEach((line) => {
+    if (!selectedRowKeys.value.includes(line.id) || !line.orderId) return
+    if (orderIdSet.has(line.orderId)) return
+    orderIdSet.add(line.orderId)
+    const order = getOutsourcingOrderById(line.orderId)
+    if (order) orders.push(order)
+  })
+  if (!orders.length) {
+    message.warning('未找到可打印的外协订单')
+    return
+  }
+  printOrders.value = orders
+  printTemplateType.value =
+    key === OUTSOURCING_PRINT_TEMPLATE.ISSUE
+      ? OUTSOURCING_PRINT_TEMPLATE.ISSUE
+      : OUTSOURCING_PRINT_TEMPLATE.DISPATCH
+  printModalOpen.value = true
 }
 
 function openOutsourcingOrderDetail(record) {

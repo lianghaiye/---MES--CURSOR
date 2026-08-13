@@ -1,5 +1,8 @@
 <template>
-  <div class="purchase-order-print-preview-page" :class="pageClass">
+  <div
+    class="purchase-order-print-preview-page delivery-order-print-preview-page"
+    :class="pageClass"
+  >
     <div v-if="!payload" class="empty-wrap">
       <a-empty description="预览数据不存在或已过期，请返回重新打开预览" />
     </div>
@@ -23,7 +26,7 @@
         >
           <header class="sheet-header">
             <h1 class="sheet-title">{{ sheet.title }}</h1>
-            <div class="sheet-doc-no">单号：{{ sheet.orderNo }}</div>
+            <div class="sheet-doc-no">单号：{{ sheet.deliveryCode || sheet.orderNo }}</div>
           </header>
 
           <section class="sheet-meta">
@@ -39,24 +42,17 @@
           </section>
 
           <section class="sheet-section">
-            <div class="section-title">采购明细</div>
+            <div class="section-title">发货明细</div>
             <div v-if="sheet.lineItems?.length" class="table-wrap">
               <table class="sheet-table bom-table">
                 <thead>
                   <tr>
                     <th>序号</th>
                     <th>产品名称</th>
-                    <th>产品编号</th>
-                    <th>规格型号</th>
-                    <th>材质</th>
-                    <th>订货尺寸</th>
-                    <th>数量</th>
-                    <th>单位</th>
-                    <th>税率</th>
-                    <th>含税单价</th>
-                    <th>不含税单价</th>
-                    <th>交货日期</th>
-                    <th>收货仓库</th>
+                    <th>产品编码</th>
+                    <th>本次发货</th>
+                    <th>单价（不含税）</th>
+                    <th>金额（不含税）</th>
                     <th>备注</th>
                   </tr>
                 </thead>
@@ -65,26 +61,19 @@
                     <td class="cell-index">{{ row.seq }}</td>
                     <td>{{ row.productName }}</td>
                     <td>{{ row.productCode }}</td>
-                    <td>{{ row.specModel }}</td>
-                    <td>{{ row.material }}</td>
-                    <td>{{ row.orderSizeText }}</td>
-                    <td class="cell-num">{{ row.purchaseQty }}</td>
-                    <td>{{ row.unit }}</td>
-                    <td class="cell-num">{{ row.taxRate }}</td>
-                    <td class="cell-num">{{ row.unitPriceInTax }}</td>
+                    <td class="cell-num">{{ row.shipQty }}</td>
                     <td class="cell-num">{{ row.unitPriceExTax }}</td>
-                    <td>{{ row.deliveryDate }}</td>
-                    <td>{{ row.receivingWarehouse }}</td>
+                    <td class="cell-num">{{ row.amountExTax }}</td>
                     <td>{{ row.remark }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div v-else class="bom-empty">暂无采购明细</div>
+            <div v-else class="bom-empty">暂无发货明细</div>
             <div v-if="sheet.summary" class="print-summary">
-              <span>合计数量：{{ sheet.summary.totalQty || '—' }}</span>
+              <span>明细行数：{{ sheet.summary.lineCount || '—' }}</span>
+              <span>发货数量合计：{{ sheet.summary.totalQty || '—' }}</span>
               <span>不含税合计：{{ sheet.summary.amountExTax || '—' }}</span>
-              <span>含税合计：{{ sheet.summary.amountInTax || '—' }}</span>
             </div>
           </section>
 
@@ -103,13 +92,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { PrinterOutlined } from '@ant-design/icons-vue'
-import { loadPurchaseOrderPrintPayload } from '@/utils/purchaseOrderPrintPreview'
+import { loadDeliveryOrderPrintPayload } from '@/utils/deliveryOrderPrintPreview'
 import { printElement } from '@/utils/browserPrint'
 
 const route = useRoute()
 const printAreaRef = ref(null)
 
-const payload = computed(() => loadPurchaseOrderPrintPayload(route.query.key))
+const payload = computed(() => loadDeliveryOrderPrintPayload(route.query.key))
 
 const printSheets = computed(() => {
   if (!payload.value) return []
@@ -134,7 +123,7 @@ const printedAtText = computed(() => {
 function handlePrint() {
   if (!printAreaRef.value) return
   printElement(printAreaRef.value, {
-    title: printSheets.value[0]?.orderNo || '采购订单',
+    title: printSheets.value[0]?.deliveryCode || '发货单',
     paper: payload.value?.paper,
     orientation: payload.value?.orientation,
     bodyClass: 'purchase-order-print-iframe-body',
@@ -164,7 +153,7 @@ body,
 <style src="@/styles/purchase-order-print-sheet.css"></style>
 
 <style scoped>
-.purchase-order-print-preview-page {
+.delivery-order-print-preview-page {
   min-height: 100vh;
   background: #e8e8e8;
   padding-bottom: 24px;
@@ -216,7 +205,7 @@ body,
     display: none !important;
   }
 
-  .purchase-order-print-preview-page {
+  .delivery-order-print-preview-page {
     background: #fff;
     padding: 0;
   }

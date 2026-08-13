@@ -49,6 +49,18 @@
               <a-button size="small" @click="openExceptionCreate">异常处理</a-button>
               <a-button size="small" @click="handleComplete">完成</a-button>
             </template>
+            <a-dropdown>
+              <a-button size="small">
+                打印
+                <DownOutlined />
+              </a-button>
+              <template #overlay>
+                <a-menu @click="onPrintMenuClick">
+                  <a-menu-item key="派单工">打印派单工</a-menu-item>
+                  <a-menu-item key="发料出库单">打印发料出库单</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
@@ -304,6 +316,11 @@
           :outsourcing-order="record"
           @saved="loadRecord"
         />
+        <OutsourcingOrderPrintModal
+          v-model:open="printModalOpen"
+          :template-type="printTemplateType"
+          :outsourcing-order="record"
+        />
       </template>
       <a-empty v-else-if="!loading" description="未找到该外协订单" />
     </a-spin>
@@ -318,7 +335,9 @@ export default { name: 'OutsourcingOrderDetailView' }
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
+import { DownOutlined } from '@ant-design/icons-vue'
 import { formatQty } from '@/utils/numberFormat'
+import { OUTSOURCING_PRINT_TEMPLATE } from '@/utils/outsourcingOrderPrintPreview'
 import {
   getOutsourcingOrderById,
   canGenerateOutsourcingReceipt,
@@ -339,6 +358,7 @@ import { outsourcingReturnState } from '@/store/outsourcingReturnStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import OutsourcingOrderBasicInfoSection from './components/OutsourcingOrderBasicInfoSection.vue'
+import OutsourcingOrderPrintModal from './components/OutsourcingOrderPrintModal.vue'
 import OutsourcingGenerateIssueModal from './components/OutsourcingGenerateIssueModal.vue'
 import OutsourcingGenerateReceiptModal from './components/OutsourcingGenerateReceiptModal.vue'
 import OutsourcingGenerateInboundModal from './components/OutsourcingGenerateInboundModal.vue'
@@ -353,6 +373,8 @@ const activeTab = ref('basic')
 const issueModalOpen = ref(false)
 const receiptModalOpen = ref(false)
 const inboundModalOpen = ref(false)
+const printModalOpen = ref(false)
+const printTemplateType = ref(OUTSOURCING_PRINT_TEMPLATE.DISPATCH)
 const listPath = '/procurement/outsourcing-orders'
 
 const lineColumns = [
@@ -545,6 +567,14 @@ function openReturnDetail(row) {
   const path = `/procurement/outsourcing-returns/${row.returnId}`
   openTab(path, `外协异常处理 ${row.returnNo || ''}`.trim())
   router.push(path)
+}
+
+function onPrintMenuClick({ key }) {
+  printTemplateType.value =
+    key === OUTSOURCING_PRINT_TEMPLATE.ISSUE
+      ? OUTSOURCING_PRINT_TEMPLATE.ISSUE
+      : OUTSOURCING_PRINT_TEMPLATE.DISPATCH
+  printModalOpen.value = true
 }
 
 function handleBack() {

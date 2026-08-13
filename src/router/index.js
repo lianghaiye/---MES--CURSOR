@@ -93,6 +93,18 @@ const routes = [
     meta: { title: '采购申请明细预览', standalone: true },
   },
   {
+    path: '/sales/orders/preview',
+    name: 'sales-order-preview',
+    component: () => import('@/views/sales/SalesOrderPrintPreviewView.vue'),
+    meta: { title: '销售订单预览', standalone: true },
+  },
+  {
+    path: '/sales/delivery/preview',
+    name: 'sales-delivery-preview',
+    component: () => import('@/views/sales/DeliveryOrderPrintPreviewView.vue'),
+    meta: { title: '发货单预览', standalone: true },
+  },
+  {
     path: '/engineering-change/ecn/print',
     name: 'engineering-change-ecn-print',
     component: () => import('@/views/engineering-change/EcnPrintPreviewView.vue'),

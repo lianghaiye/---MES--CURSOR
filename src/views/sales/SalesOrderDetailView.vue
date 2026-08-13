@@ -41,13 +41,10 @@
               <a-button size="small" @click="handleRevokeApprove">反审</a-button>
               <a-button type="primary" size="small" @click="handleApplyDelivery">申请发货</a-button>
               <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
-              <a-button size="small" @click="stubAction('打印')">打印</a-button>
               <a-button size="small" @click="handleComplete">完成</a-button>
               <a-button size="small" danger @click="handleTerminate">作废</a-button>
             </template>
-            <template v-else-if="order.progressStatus === '已完成'">
-              <a-button size="small" @click="stubAction('打印')">打印</a-button>
-            </template>
+            <a-button size="small" @click="openPrint">打印</a-button>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
@@ -688,6 +685,7 @@
       :payload="stockTransferPayload"
       @done="onStockTransferDone"
     />
+    <SalesOrderPrintModal v-model:open="printModalOpen" :sales-order="order" />
   </div>
 </template>
 
@@ -740,6 +738,7 @@ import { resolveLineBusinessType } from '@/utils/salesOrderBusiness'
 import { getActiveBomForItem } from '@/store/productBomStore'
 import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
+import SalesOrderPrintModal from './components/SalesOrderPrintModal.vue'
 import SalesOrderEbomDiffSection from './components/SalesOrderEbomDiffSection.vue'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
 import {
@@ -766,6 +765,7 @@ const changeDeliveryModeOpen = ref(false)
 const changeDeliveryModeOrder = ref(null)
 const stockTransferOpen = ref(false)
 const stockTransferPayload = ref(null)
+const printModalOpen = ref(false)
 
 function initActiveTab() {
   return readSalesOrderDetailTab(route.params.id, route.query.tab)
@@ -1214,8 +1214,8 @@ function previewFile(file) {
   message.info(`预览：${file.name || '附件'}`)
 }
 
-function stubAction(name) {
-  message.info(`${name}功能开发中`)
+function openPrint() {
+  printModalOpen.value = true
 }
 
 function reloadOrder() {

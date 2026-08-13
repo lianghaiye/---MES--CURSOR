@@ -9,7 +9,10 @@
               record.deliveryStatus
             }}</a-tag>
           </div>
-          <a-button size="small" @click="handleBack">返回列表</a-button>
+          <a-space :size="8">
+            <a-button size="small" @click="openPrint">打印</a-button>
+            <a-button size="small" @click="handleBack">返回列表</a-button>
+          </a-space>
         </div>
 
         <div class="detail-tabs-wrap">
@@ -193,6 +196,8 @@
       </template>
       <a-empty v-else-if="!loading" description="未找到发货单" />
     </a-spin>
+
+    <DeliveryOrderPrintModal v-model:open="printModalOpen" :delivery-order="record" />
   </div>
 </template>
 
@@ -214,6 +219,7 @@ import {
   formatAmountExTax,
 } from '@/utils/deliveryOrder'
 import { attachmentShipStatusColor, formatAttachmentShipProgress } from '@/utils/shipBomAttachments'
+import DeliveryOrderPrintModal from './components/DeliveryOrderPrintModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -222,6 +228,7 @@ const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 const activeTab = ref('basic')
+const printModalOpen = ref(false)
 
 const wholeColumns = [
   { title: '#', key: 'index', width: 48 },
@@ -287,6 +294,10 @@ function loadRecord() {
 }
 
 watch(() => route.params.id, loadRecord, { immediate: true })
+
+function openPrint() {
+  printModalOpen.value = true
+}
 
 function handleBack() {
   router.push('/sales/delivery')

@@ -28,6 +28,7 @@
                 生成采购单
               </a-button>
             </template>
+            <a-button size="small" @click="openPrint">打印</a-button>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
@@ -162,6 +163,8 @@
 
       <a-empty v-else-if="!loading" description="未找到该采购申请单" />
     </a-spin>
+
+    <PurchaseRequisitionPrintModal v-model:open="printModalOpen" :requisition="record" />
   </div>
 </template>
 
@@ -192,6 +195,7 @@ import { purchaseRequisitionDetailLineColumns } from '@/utils/purchaseRequisitio
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import PurchaseRequisitionBasicInfoSection from './components/PurchaseRequisitionBasicInfoSection.vue'
+import PurchaseRequisitionPrintModal from './components/PurchaseRequisitionPrintModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -200,6 +204,7 @@ const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 const activeTab = ref('basic')
+const printModalOpen = ref(false)
 
 const lineColumns = purchaseRequisitionDetailLineColumns
 
@@ -364,6 +369,15 @@ function purchaseOrderStatusColor(status) {
 function purchaseInboundStatusColor(status) {
   const map = { 待入库: 'default', 部分入库: 'warning', 已入库: 'success' }
   return map[status] || 'default'
+}
+
+function openPrint() {
+  if (!record.value) return
+  if (record.value.isGeneratePoDraft) {
+    message.warning('草稿行不可打印')
+    return
+  }
+  printModalOpen.value = true
 }
 
 function handleBack() {
