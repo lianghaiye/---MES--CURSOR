@@ -77,7 +77,7 @@
 
     <WorkOrderPrintModal v-model:open="printModalOpen" :work-order="workOrder" />
 
-    <a-tabs v-model:activeKey="detailTab" class="detail-tabs">
+    <a-tabs v-model:activeKey="detailTab" class="detail-tabs detail-tabs-pill">
       <a-tab-pane v-if="showDispatchTab" key="dispatch" tab="工单下发">
         <WorkOrderProductionSections
           v-show="!detailCollapsed"
@@ -387,13 +387,10 @@ function statusTagColor(status) {
   }
 
   .detail-tabs {
-    :deep(.ant-tabs-nav) {
-      margin-bottom: 8px;
-    }
+    margin-top: 4px;
 
-    :deep(.ant-tabs-tab) {
-      padding: 6px 0;
-      font-size: 13px;
+    :deep(.ant-tabs-nav) {
+      margin-bottom: 12px !important;
     }
   }
 

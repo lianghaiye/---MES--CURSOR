@@ -12,19 +12,30 @@ function sumLineQty(lines) {
   return (lines || []).reduce((s, l) => s + (Number(l.qty ?? l.applyQty ?? l.reqQty) || 0), 0)
 }
 
-function findMobileTaskForRow(tasks, processName, executor) {
-  const byProcess = (tasks || []).filter(
-    (t) => !t.hiddenByTerminate && t.processName === processName,
-  )
-  if (!byProcess.length) return null
+function findMobileTaskForRow(tasks, processName, executor, batch) {
+  let list = (tasks || []).filter((t) => !t.hiddenByTerminate && t.processName === processName)
+  if (!list.length) return null
+
+  if (batch?.id) {
+    const linked = list.filter((t) => t.scheduleBatchId === batch.id || t.batchId === batch.id)
+    if (linked.length) list = linked
+    else {
+      const batchQty = Math.max(0, Number(batch.qty) || 0)
+      const byQty = list.filter(
+        (t) => Math.max(0, Number(t.expectedQty ?? t.targetQty) || 0) === batchQty,
+      )
+      if (byQty.length) list = byQty
+    }
+  }
+
   if (executor && executor !== '—') {
     return (
-      byProcess.find((t) => t.executor === executor || t.claimedBy === executor) ||
-      byProcess.find((t) => !t.executor) ||
-      byProcess[0]
+      list.find((t) => t.executor === executor || t.claimedBy === executor) ||
+      list.find((t) => !t.executor) ||
+      list[0]
     )
   }
-  return byProcess[0]
+  return list[0]
 }
 
 function mapMobileTaskStatus(task) {
@@ -39,14 +50,17 @@ function mapMobileTaskStatus(task) {
 
 /** 排产信息：按批次展开工序任务行 */
 export function buildWorkOrderScheduleInfoRows(workOrder) {
+  return buildWorkOrderScheduleInfoBatchGroups(workOrder).flatMap((g) => g.rows)
+}
+
+/** 排产信息：按批次分组（含批次头信息） */
+export function buildWorkOrderScheduleInfoBatchGroups(workOrder) {
   const batches = workOrder?.scheduleBatches || []
-  if (!batches.length) {
-    // 无批次时用工序模板占位一行提示
-    return []
-  }
+  if (!batches.length) return []
+
   const mobileTasks = listMobileTasksForWorkOrder(workOrder.id)
-  const rows = []
-  let seq = 0
+  const groups = []
+
   batches.forEach((batch) => {
     const assignments = batch.processAssignments?.length
       ? batch.processAssignments
@@ -55,11 +69,13 @@ export function buildWorkOrderScheduleInfoRows(workOrder) {
           processName: p.name,
           executors: p.executors || [],
         }))
+    const rows = []
+    let seq = 0
     assignments.forEach((a, ai) => {
       const executors = a.executors?.length ? a.executors : ['—']
       executors.forEach((executor, ei) => {
         seq += 1
-        const task = findMobileTaskForRow(mobileTasks, a.processName, executor)
+        const task = findMobileTaskForRow(mobileTasks, a.processName, executor, batch)
         const dispatched = batch.status !== '待下发'
         let status = '待领取'
         let reportQty = 0
@@ -76,7 +92,12 @@ export function buildWorkOrderScheduleInfoRows(workOrder) {
           badQty = Number(task.reportedBadQty || task.badQty || 0) || 0
           reportDuration = task.reportDuration ? String(task.reportDuration) : '—'
           reportedAt = task.reportedAt || '—'
-          taskNo = task.taskNo || taskNo
+          // 多批次共工序时避免任务编号串批展示
+          const taskBatchOk =
+            !task.scheduleBatchId && !task.batchId
+              ? true
+              : task.scheduleBatchId === batch.id || task.batchId === batch.id
+          taskNo = taskBatchOk && task.taskNo ? task.taskNo : taskNo
         } else if (a.reportCleared || a.scheduleTaskStatus) {
           status = a.scheduleTaskStatus || '待报工'
           reportQty = Number(a.reportQty) || 0
@@ -85,7 +106,7 @@ export function buildWorkOrderScheduleInfoRows(workOrder) {
           reportDuration = a.reportDuration || '—'
           reportedAt = a.reportedAt || '—'
         } else {
-          const reported = batch.status === '完成'
+          const reported = batch.status === '完成' || batch.status === '已完成'
           if (reported) status = '已报工'
           else if (dispatched) status = '待报工'
           reportQty = reported ? batch.qty : 0
@@ -98,6 +119,7 @@ export function buildWorkOrderScheduleInfoRows(workOrder) {
           id: `${batch.id}-${a.processId || ai}-${ei}`,
           batchId: batch.id,
           batchNo: batch.batchNo,
+          batchStatus: batch.status || '待下发',
           seq,
           processName: a.processName || '—',
           status,
@@ -113,8 +135,20 @@ export function buildWorkOrderScheduleInfoRows(workOrder) {
         })
       })
     })
+
+    groups.push({
+      batchId: batch.id,
+      batchNo: batch.batchNo,
+      status: batch.status || '待下发',
+      qty: Math.max(0, Number(batch.qty) || 0),
+      dispatchedAt: batch.dispatchedAt || '—',
+      createdAt: batch.createdAt || '—',
+      processCount: rows.length,
+      rows,
+    })
   })
-  return rows
+
+  return groups
 }
 
 export function scheduleTaskStatusColor(status) {

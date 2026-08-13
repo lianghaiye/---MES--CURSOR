@@ -1,29 +1,60 @@
 <template>
   <div class="wo-info-tab">
-    <div class="tab-title">排产信息</div>
-    <a-table
-      size="small"
-      bordered
-      row-key="id"
-      :columns="columns"
-      :data-source="rows"
-      :pagination="false"
-      :scroll="{ x: 1400 }"
-      :locale="{ emptyText: '暂无排产批次，请在「工单下发」中排产并下发' }"
+    <div class="tab-head">
+      <div class="tab-title">排产信息</div>
+      <span v-if="batchGroups.length" class="tab-summary">
+        共 {{ batchGroups.length }} 个批次 · {{ totalRowCount }} 条工序任务
+      </span>
+    </div>
+
+    <a-empty v-if="!batchGroups.length" description="暂无排产批次，请在「工单下发」中排产并下发" />
+
+    <div
+      v-for="group in batchGroups"
+      :key="group.batchId"
+      class="batch-block"
+      :class="{ 'is-active': group.batchId === activeBatchId }"
     >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="scheduleTaskStatusColor(record.status)">{{ record.status }}</a-tag>
+      <div class="batch-header">
+        <div class="batch-title">
+          <span class="batch-no">批次 #{{ group.batchNo }}</span>
+          <a-tag :color="batchStatusColor(group.status)">{{ group.status }}</a-tag>
+          <a-tag v-if="group.batchId === activeBatchId" color="blue">当前批次</a-tag>
+        </div>
+        <div class="batch-meta">
+          <span
+            >排产数量 <b>{{ group.qty }}</b></span
+          >
+          <span
+            >工序任务 <b>{{ group.processCount }}</b></span
+          >
+          <span>下发时间 {{ group.dispatchedAt }}</span>
+        </div>
+      </div>
+
+      <a-table
+        size="small"
+        bordered
+        row-key="id"
+        :columns="columns"
+        :data-source="group.rows"
+        :pagination="false"
+        :scroll="{ x: 1320 }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'status'">
+            <a-tag :color="scheduleTaskStatusColor(record.status)">{{ record.status }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'actions'">
+            <a-space :size="8" wrap>
+              <a class="action-link" @click="onGenTask(record)">生成任务</a>
+              <a class="action-link" @click="openEditExecutor(record)">修改执行人</a>
+              <a class="action-link" @click="onResetStatus(record)">重置状态</a>
+            </a-space>
+          </template>
         </template>
-        <template v-else-if="column.key === 'actions'">
-          <a-space :size="8" wrap>
-            <a class="action-link" @click="onGenTask(record)">生成任务</a>
-            <a class="action-link" @click="openEditExecutor(record)">修改执行人</a>
-            <a class="action-link" @click="onResetStatus(record)">重置状态</a>
-          </a-space>
-        </template>
-      </template>
-    </a-table>
+      </a-table>
+    </div>
 
     <a-modal
       v-model:open="executorModalOpen"
@@ -34,7 +65,9 @@
       @ok="saveExecutor"
     >
       <div v-if="editingRow" class="executor-edit">
-        <div class="executor-meta">{{ editingRow.processName }} · {{ editingRow.taskNo }}</div>
+        <div class="executor-meta">
+          批次 #{{ editingRow.batchNo }} · {{ editingRow.processName }} · {{ editingRow.taskNo }}
+        </div>
         <ExecutorTagPicker
           :executors="editingExecutors"
           :resource-type="editingResourceType"
@@ -50,9 +83,10 @@ import { computed, ref } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import ExecutorTagPicker from './ExecutorTagPicker.vue'
 import {
-  buildWorkOrderScheduleInfoRows,
+  buildWorkOrderScheduleInfoBatchGroups,
   scheduleTaskStatusColor,
 } from '@/utils/workOrderRelatedInfo'
+import { batchStatusColor } from '@/utils/workOrderScheduleBatch'
 import { resetWorkOrderScheduleTask } from '@/utils/workOrderStatus'
 
 const props = defineProps({
@@ -61,7 +95,12 @@ const props = defineProps({
 
 const emit = defineEmits(['action'])
 
-const rows = computed(() => buildWorkOrderScheduleInfoRows(props.workOrder))
+const batchGroups = computed(() => buildWorkOrderScheduleInfoBatchGroups(props.workOrder))
+const totalRowCount = computed(() =>
+  batchGroups.value.reduce((s, g) => s + (g.rows?.length || 0), 0),
+)
+const activeBatchId = computed(() => props.workOrder?.activeScheduleBatchId || '')
+
 const executorModalOpen = ref(false)
 const editingRow = ref(null)
 const editingExecutors = ref([])
@@ -78,7 +117,6 @@ const columns = [
   { title: '良品数', dataIndex: 'goodQty', width: 80, align: 'right' },
   { title: '不良品数', dataIndex: 'badQty', width: 88, align: 'right' },
   { title: '报工时长', dataIndex: 'reportDuration', width: 90 },
-  { title: '下发时间', dataIndex: 'dispatchedAt', width: 140 },
   { title: '报工时间', dataIndex: 'reportedAt', width: 140 },
   { title: '操作', key: 'actions', width: 220, fixed: 'right' },
 ]
@@ -162,13 +200,80 @@ function saveExecutor() {
 
 <style lang="less" scoped>
 .wo-info-tab {
+  .tab-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
   .tab-title {
     font-weight: 600;
-    margin-bottom: 10px;
+    font-size: 14px;
   }
+
+  .tab-summary {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+  }
+
+  .batch-block {
+    margin-bottom: 16px;
+    border: 1px solid #f0f0f0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+
+    &.is-active {
+      border-color: #91caff;
+      box-shadow: 0 0 0 1px rgba(22, 119, 255, 0.08);
+    }
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .batch-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 10px 12px;
+    background: #fafafa;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .batch-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .batch-no {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1f1f1f;
+  }
+
+  .batch-meta {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.55);
+
+    b {
+      color: rgba(0, 0, 0, 0.85);
+      font-weight: 600;
+    }
+  }
+
   .action-link {
     font-size: 12px;
   }
+
   .executor-edit {
     .executor-meta {
       margin-bottom: 12px;
