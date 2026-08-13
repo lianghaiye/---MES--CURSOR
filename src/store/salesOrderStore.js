@@ -38,6 +38,12 @@ import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
 import { validateSalesLinesSkuResolved } from '@/utils/spuLineResolve'
 import {
+  allocateStockOnSalesApprove,
+  buildLineStockReminder,
+  buildOrderInventoryStatus,
+  releaseOrderAllocations,
+} from '@/store/salesStockAllocationStore'
+import {
   hasSalesOrderRevokeBlockers,
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
 } from '@/utils/salesOrderRevokeApproval'
@@ -187,6 +193,26 @@ export function addDeliveryApplication(orderId, application) {
   return row
 }
 
+export function findDeliveryApplicationById(orderId, applicationId) {
+  const order = salesOrderState.orders.find((o) => o.id === orderId)
+  if (!order || !applicationId) return null
+  return (order.deliveryApplications || []).find((a) => a.id === applicationId) || null
+}
+
+/** 更新销售订单上的发货申请（发货单回写数量/状态） */
+export function updateDeliveryApplication(orderId, applicationId, patch = {}) {
+  const order = salesOrderState.orders.find((o) => o.id === orderId)
+  if (!order || !applicationId) return null
+  if (!Array.isArray(order.deliveryApplications)) order.deliveryApplications = []
+  const idx = order.deliveryApplications.findIndex((a) => a.id === applicationId)
+  if (idx === -1) return null
+  const prev = order.deliveryApplications[idx]
+  const next = { ...prev, ...patch, id: applicationId }
+  order.deliveryApplications[idx] = next
+  touchOrder(order)
+  return next
+}
+
 export function recalcOrderAmounts(order) {
   applyOrderAmounts(order, { taxModeExcluding: true })
 }
@@ -321,6 +347,7 @@ export function approveSalesOrder(id, opinion = '') {
   let outsourceWorkOrderCodes = []
   let maintenanceWorkOrderCodes = []
   let designTaskCount = 0
+  const stockHints = []
 
   if (selfMadeLines.length) {
     const standardLines = []
@@ -460,6 +487,32 @@ export function approveSalesOrder(id, opinion = '') {
   order.progressStatus = SALES_ORDER_STATUS.IN_PROGRESS
   order.approver = order.approver || 'admin1'
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
+
+  const allocatableLines = [...selfMadeLines, ...purchaseLines].filter((l) => l.productCode)
+  allocateStockOnSalesApprove(order, allocatableLines)
+  order.inventoryStatus = buildOrderInventoryStatus(order)
+
+  for (const line of allocatableLines) {
+    const remind = buildLineStockReminder(line, order)
+    if (remind.otherQty > 0) {
+      const nos = remind.others.map((o) => o.salesOrderNo).filter(Boolean)
+      stockHints.push(
+        `「${line.productName}」他单占用 ${remind.otherQty}${nos.length ? `（${nos.join('、')}）` : ''}，可申请跨单调拨`,
+      )
+    }
+    if (remind.myAlloc >= remind.need && remind.need > 0) {
+      stockHints.push(
+        `「${line.productName}」已软占用库存 ${remind.myAlloc}，可直接从仓库发货（可不排产或减计划数量）`,
+      )
+    } else if (remind.status !== '充足') {
+      stockHints.push(
+        `「${line.productName}」库存${remind.status}：现有 ${remind.onHand}，自由备货 ${remind.freeQty}，本单占用 ${remind.myAlloc}，需求 ${remind.need}`,
+      )
+    } else if (remind.freeQty > 0 && remind.planStrategy === 'mts') {
+      stockHints.push(`「${line.productName}」自由备货 ${remind.freeQty}（非他单占用）`)
+    }
+  }
+
   touchOrder(order)
   pushApprovalRecord(order, { result: '已通过', opinion })
 
@@ -472,6 +525,7 @@ export function approveSalesOrder(id, opinion = '') {
     }
     hints.push(planHint)
   }
+  if (stockHints.length) hints.push(...stockHints)
   if (outsourceWorkOrderCodes.length) {
     hints.push(`外协工单 ${outsourceWorkOrderCodes.join('、')}`)
   }
@@ -480,7 +534,7 @@ export function approveSalesOrder(id, opinion = '') {
   }
 
   const message = hints.length
-    ? `订单「${order.orderNo}」审核通过，${hints.join('，')}`
+    ? `订单「${order.orderNo}」审核通过，${hints.join('；')}`
     : `订单「${order.orderNo}」审核通过`
 
   return {
@@ -489,6 +543,7 @@ export function approveSalesOrder(id, opinion = '') {
     purchaseReqNo,
     planOrderNo,
     designTaskCount,
+    stockHints,
     outsourceWorkOrderCodes,
     maintenanceWorkOrderCodes,
   }
@@ -531,6 +586,8 @@ export function revokeSalesOrderApproval(id) {
   order.progressStatus = SALES_ORDER_STATUS.PENDING
   order.approver = ''
   order.approvedAt = ''
+  releaseOrderAllocations(order.id)
+  order.inventoryStatus = buildOrderInventoryStatus(order)
   touchOrder(order)
   pushApprovalRecord(order, { result: '已反审', opinion: '' })
 

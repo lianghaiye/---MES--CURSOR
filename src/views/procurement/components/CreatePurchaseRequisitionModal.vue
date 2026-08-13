@@ -9,9 +9,21 @@
     @update:open="(val) => emit('update:open', val)"
   >
     <div class="form-layout">
-      <div class="section-block">
-        <div class="section-title">基本信息</div>
-        <a-form :model="form" layout="inline" class="header-form horizontal-form">
+      <div class="section-block" :class="{ 'is-collapsed': basicInfoCollapsed }">
+        <div class="section-title-row">
+          <span class="section-title">基本信息</span>
+          <a-button type="link" size="small" class="collapse-btn" @click="toggleBasicInfo">
+            {{ basicInfoCollapsed ? '展开' : '收起' }}
+            <DownOutlined v-if="basicInfoCollapsed" />
+            <UpOutlined v-else />
+          </a-button>
+        </div>
+        <a-form
+          v-show="!basicInfoCollapsed"
+          :model="form"
+          layout="inline"
+          class="header-form horizontal-form"
+        >
           <a-row :gutter="[12, 12]" style="width: 100%">
             <a-col :span="6">
               <a-form-item label="申请单号">
@@ -49,7 +61,19 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="24">
+            <a-col :span="6">
+              <a-form-item label="收货仓库">
+                <a-select
+                  v-model:value="form.receivingWarehouse"
+                  size="small"
+                  allow-clear
+                  placeholder="请选择收货仓库"
+                  :options="warehouseOpts"
+                  @change="onHeaderReceivingWarehouseChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="18">
               <a-form-item label="备注" class="remark-item">
                 <a-textarea
                   v-model:value="form.remark"
@@ -163,6 +187,18 @@
                     placeholder="请搜索或选择供应商"
                   />
                 </template>
+                <template v-else-if="column.key === 'receivingWarehouse'">
+                  <a-select
+                    v-model:value="record.receivingWarehouse"
+                    size="small"
+                    allow-clear
+                    show-search
+                    :options="warehouseOpts"
+                    :filter-option="filterWarehouseOption"
+                    placeholder="收货仓库"
+                    style="width: 100%"
+                  />
+                </template>
                 <template v-else-if="column.key === 'remark'">
                   <a-input
                     v-model:value="record.remark"
@@ -245,9 +281,11 @@
 <script setup>
 import { formatQty } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
-import { message } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { PlusOutlined, CheckOutlined } from '@ant-design/icons-vue'
+import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
+import { PlusOutlined, CheckOutlined, UpOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { urgencyOptions } from '@/mock/purchaseRequisitionOptions'
 import { mockInventory } from '@/mock/inventory'
 import { createLineItem } from '@/mock/purchaseRequisitions'
@@ -298,6 +336,7 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 
 const saving = ref(false)
 const addingItems = ref(false)
+const basicInfoCollapsed = ref(false)
 const productPickerOpen = ref(false)
 const orderSizeOpen = ref(false)
 const orderSizeTargetLine = ref(null)
@@ -314,22 +353,30 @@ const {
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-req-form-lines-v4', purchaseRequisitionFormLineColumns, {
-    minScrollX: 1430,
+  useTableColumnSettings('purchase-req-form-lines-v5', purchaseRequisitionFormLineColumns, {
+    minScrollX: 1560,
     pinEdgeColumns: false,
     pinActionColumn: true,
   })
 
 const lineScrollX = tableScrollX
 
+const warehouseOpts = computed(() => {
+  void warehouseState.warehouses
+  return getWarehouseSelectOptions()
+})
+
 const form = reactive({
   reqNo: '',
   urgency: '正常',
   deliveryDate: null,
   estimatedArrivalDate: null,
+  receivingWarehouse: undefined,
   remark: '',
   lineItems: [],
 })
+
+const prevHeaderReceivingWarehouse = ref(undefined)
 
 const lineSummary = computed(() => {
   const lines = form.lineItems.filter((line) => lineItemCode(line))
@@ -362,11 +409,24 @@ watch(
   () => [isActive.value, props.editRecord?.id],
   ([visible]) => {
     if (!visible) return
+    basicInfoCollapsed.value = false
     if (props.editRecord) loadEditForm(props.editRecord)
     else resetForm()
+    nextTick(() => {
+      updateScrollY()
+      setTimeout(updateScrollY, 120)
+    })
   },
   { immediate: true },
 )
+
+function toggleBasicInfo() {
+  basicInfoCollapsed.value = !basicInfoCollapsed.value
+  nextTick(() => {
+    updateScrollY()
+    setTimeout(updateScrollY, 120)
+  })
+}
 
 function normalizeLineItems(items) {
   return items.map((line) => ({
@@ -385,8 +445,10 @@ function resetForm() {
   form.urgency = '正常'
   form.deliveryDate = null
   form.estimatedArrivalDate = null
+  form.receivingWarehouse = undefined
   form.remark = ''
   form.lineItems = []
+  prevHeaderReceivingWarehouse.value = undefined
 }
 
 function loadEditForm(record) {
@@ -396,8 +458,48 @@ function loadEditForm(record) {
   form.estimatedArrivalDate = record.estimatedArrivalDate
     ? dayjs(record.estimatedArrivalDate)
     : null
+  form.receivingWarehouse = record.receivingWarehouse || undefined
   form.remark = record.remark || ''
   form.lineItems = normalizeLineItems(record.lineItems || [])
+  prevHeaderReceivingWarehouse.value = form.receivingWarehouse
+}
+
+function filterWarehouseOption(input, option) {
+  return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
+}
+
+function syncLineReceivingWarehouses(warehouse) {
+  form.lineItems.forEach((line) => {
+    line.receivingWarehouse = warehouse || ''
+  })
+}
+
+function onHeaderReceivingWarehouseChange(newVal) {
+  const oldVal = prevHeaderReceivingWarehouse.value
+  const changed = newVal !== oldVal
+  prevHeaderReceivingWarehouse.value = newVal
+
+  if (!changed || !form.lineItems.length) return
+
+  if (!oldVal && newVal) {
+    form.lineItems.forEach((line) => {
+      if (!line.receivingWarehouse) line.receivingWarehouse = newVal
+    })
+    return
+  }
+
+  if (!newVal) return
+
+  Modal.confirm({
+    title: '收货仓库已修改，是否同步修改明细收货仓库？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => syncLineReceivingWarehouses(newVal),
+  })
+}
+
+function resolveLineWarehouse(code) {
+  return form.receivingWarehouse || resolveDefaultWarehouseByMaterialCode(code) || ''
 }
 
 function resolveStockQty(code) {
@@ -439,6 +541,7 @@ function mapPickerToLineItem(payload) {
     planPurchaseQty: Math.max(converted.planPurchaseQty, 1),
     supplierName: payload.defaultSupplier || '',
     designatedSupplier: Boolean(payload.defaultSupplier),
+    receivingWarehouse: resolveLineWarehouse(code),
     remark: '',
     isSpuLine: false,
     spuId: payload.spuId || '',
@@ -474,6 +577,7 @@ function onSpuDraftSelected(rows) {
         planPurchaseQty: 1,
         demandQty: 1,
         stockQty: 0,
+        receivingWarehouse: form.receivingWarehouse || '',
         remark: '',
       }),
     )
@@ -545,6 +649,7 @@ function addBlankLine() {
       inventoryName: '',
       inventoryCode: '',
       planPurchaseQty: 1,
+      receivingWarehouse: form.receivingWarehouse || '',
     }),
   )
 }
@@ -635,6 +740,7 @@ function handleSave() {
     }
     next.deliveryDate = deliveryDate
     next.expectedArrivalDate = estimatedArrivalDate
+    next.receivingWarehouse = next.receivingWarehouse || form.receivingWarehouse || ''
     next.productName = next.productName || next.inventoryName || ''
     next.productCode = next.productCode || next.inventoryCode || ''
     next.inventoryName = next.productName
@@ -648,6 +754,7 @@ function handleSave() {
     urgency: form.urgency,
     deliveryDate,
     estimatedArrivalDate,
+    receivingWarehouse: form.receivingWarehouse || '',
     remark: form.remark?.trim() || '',
     lineItems,
     orderDate: dayjs().format('YYYY-MM-DD'),
@@ -718,11 +825,34 @@ function handleSave() {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   flex-shrink: 0;
 
+  .section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
   .section-title {
     font-size: 14px;
     font-weight: 600;
-    margin-bottom: 12px;
+    margin-bottom: 0;
     color: #1f1f1f;
+  }
+
+  .collapse-btn {
+    padding-inline: 4px;
+    height: auto;
+    flex-shrink: 0;
+  }
+
+  &.is-collapsed {
+    padding-top: 10px;
+    padding-bottom: 10px;
+
+    .section-title-row {
+      margin-bottom: 0;
+    }
   }
 
   &.section-block--lines {
@@ -732,6 +862,10 @@ function handleSave() {
     display: flex;
     flex-direction: column;
     margin-bottom: 0;
+
+    .section-title {
+      margin-bottom: 12px;
+    }
   }
 }
 

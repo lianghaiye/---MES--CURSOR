@@ -100,7 +100,7 @@ export function mergeRequisitionLines(requisitions, options = {}) {
           leadTimeDays: line.leadTimeDays ?? 12,
           expectedArrivalDate: line.expectedArrivalDate || req.estimatedArrivalDate || '',
           deliveryDate: line.deliveryDate || req.deliveryDate || '',
-          receivingWarehouse: line.receivingWarehouse || '',
+          receivingWarehouse: line.receivingWarehouse || req.receivingWarehouse || '',
           urgency,
           unit: line.unit || line.purchaseUnit || '件',
           purchaseUnit: line.purchaseUnit || line.unit || '件',

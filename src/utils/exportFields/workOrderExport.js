@@ -16,13 +16,8 @@ export const workOrderExportFields = [
   { key: 'name', title: '工单名称', getValue: (row) => cell(row, 'name') },
   {
     key: 'progress',
-    title: '进度',
-    getValue: (row) => formatWorkOrderFieldValue(row.progressLabel || row.status),
-  },
-  {
-    key: 'taskStatus',
     title: '状态',
-    getValue: (row) => formatWorkOrderFieldValue(row.taskStatus || '正常'),
+    getValue: (row) => formatWorkOrderFieldValue(row.status),
   },
   { key: 'sourceOrderNo', title: '销售订单号', getValue: (row) => cell(row, 'sourceOrderNo') },
   {
@@ -48,7 +43,21 @@ export const workOrderExportFields = [
     getValue: (row) => formatWorkOrderFieldValue(row.scheduleQty),
   },
   { key: 'workCenter', title: '工作中心', getValue: (row) => cell(row, 'workCenter') },
-  { key: 'owner', title: '负责人', getValue: (row) => cell(row, 'owner') },
+  {
+    key: 'owner',
+    title: '创建人',
+    getValue: (row) => cell(row, 'creator') || cell(row, 'owner'),
+  },
+  {
+    key: 'updatedAt',
+    title: '更新时间',
+    getValue: (row) => cell(row, 'updatedAt') || cell(row, 'createdAt'),
+  },
+  {
+    key: 'updater',
+    title: '更新人',
+    getValue: (row) => cell(row, 'updater') || cell(row, 'creator') || cell(row, 'owner'),
+  },
   { key: 'warehouse', title: '预入仓库', getValue: (row) => cell(row, 'warehouse') },
   {
     key: 'urgency',

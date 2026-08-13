@@ -257,8 +257,8 @@
             {{ record.urgency }}
           </template>
           <template v-else-if="column.key === 'inventoryStatus'">
-            <a-tag :color="record.inventoryStatus === '缺货' ? 'error' : 'success'">
-              {{ record.inventoryStatus }}
+            <a-tag :color="inventoryStatusColor(resolveInventoryStatus(record))">
+              {{ resolveInventoryStatus(record) }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
@@ -358,6 +358,10 @@ import {
   RollbackOutlined,
 } from '@ant-design/icons-vue'
 import { filterSalesOrders } from '@/mock/salesOrders'
+import {
+  buildOrderInventoryStatus,
+  salesStockAllocationState,
+} from '@/store/salesStockAllocationStore'
 import {
   salesOrderState,
   deleteSalesOrder,
@@ -558,6 +562,17 @@ const summary = computed(() => {
     amountExTax: list.reduce((s, o) => s + (Number(o.amountExTax) || 0), 0),
   }
 })
+
+function resolveInventoryStatus(order) {
+  void salesStockAllocationState.allocations
+  return buildOrderInventoryStatus(order)
+}
+
+function inventoryStatusColor(status) {
+  if (status === '缺货') return 'error'
+  if (status === '部分缺货') return 'warning'
+  return 'success'
+}
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,

@@ -3,20 +3,28 @@
     <div v-if="showMetaBar" class="meta-bar">
       <a-space :size="8" wrap>
         <span class="meta-item">
-          <span class="meta-label">进度</span>
-          {{ formatWorkOrderFieldValue(workOrder.progressLabel || workOrder.status) }}
-        </span>
-        <span class="meta-item">
           <span class="meta-label">状态</span>
-          {{ formatWorkOrderFieldValue(workOrder.taskStatus || '正常') }}
+          {{ formatWorkOrderFieldValue(workOrder.status) }}
+        </span>
+        <span v-if="isScheduleIncomplete(workOrder)" class="meta-item">
+          <span class="meta-label">排产</span>
+          未排完
         </span>
         <span class="meta-item">
           <span class="meta-label">创建日期</span>
           {{ formatWorkOrderFieldValue(workOrder.createdAt) }}
         </span>
         <span class="meta-item">
-          <span class="meta-label">负责人</span>
-          {{ formatWorkOrderFieldValue(workOrder.owner) }}
+          <span class="meta-label">创建人</span>
+          {{ formatWorkOrderFieldValue(workOrder.creator || workOrder.owner) }}
+        </span>
+        <span class="meta-item">
+          <span class="meta-label">更新时间</span>
+          {{ formatWorkOrderFieldValue(workOrder.updatedAt || workOrder.createdAt) }}
+        </span>
+        <span class="meta-item">
+          <span class="meta-label">更新人</span>
+          {{ formatWorkOrderFieldValue(workOrder.updater || workOrder.creator || workOrder.owner) }}
         </span>
         <span v-if="workOrder.scrapQty != null && workOrder.scrapQty !== ''" class="meta-item">
           <span class="meta-label">报废数量</span>
@@ -51,6 +59,7 @@
               v-else-if="field.type === 'number'"
               :value="workOrder[field.key]"
               :min="0"
+              :max="field.max"
               size="small"
               style="width: 100%"
               :disabled="field.readonly"
@@ -66,7 +75,7 @@
             <WorkOrderOwnerSelect
               v-else-if="field.type === 'owner-select'"
               :model-value="workOrder[field.key]"
-              placeholder="请选择负责人"
+              placeholder="请选择创建人"
               @update:model-value="(v) => updateField(field.key, v)"
             />
             <a-range-picker
@@ -109,7 +118,11 @@ import {
 } from '@/utils/workOrderBasicFields'
 import { resolveWorkCenterOwner } from '@/mock/workOrderOptions'
 import WorkOrderOwnerSelect from './WorkOrderOwnerSelect.vue'
-import { getBatchesScheduledQty, getWorkOrderPlanQty } from '@/utils/workOrderScheduleBatch'
+import {
+  getBatchesScheduledQty,
+  getWorkOrderPlanQty,
+  isScheduleIncomplete,
+} from '@/utils/workOrderScheduleBatch'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -190,12 +203,15 @@ const detailFields = computed(() => {
       },
     )
     if (props.dispatchMode) {
+      const remain = Math.max(0, getWorkOrderPlanQty(wo) - getBatchesScheduledQty(wo))
       fields.push(
         {
           key: 'dispatchBatchQty',
           label: '排产数量',
           type: 'number',
           required: true,
+          max: remain || undefined,
+          readonly: remain <= 0,
         },
         {
           key: 'alreadyScheduledQty',
@@ -233,7 +249,7 @@ const arrangementFields = computed(() => {
       },
       {
         key: 'owner',
-        label: '负责人',
+        label: '创建人',
         type: 'owner-select',
         required: true,
       },
@@ -246,7 +262,7 @@ const arrangementFields = computed(() => {
 
   return [
     { key: 'workCenter', label: '工作中心', value: wo.workCenter },
-    { key: 'owner', label: '负责人', value: wo.owner },
+    { key: 'owner', label: '创建人', value: wo.creator || wo.owner },
     { key: 'warehouse', label: '预入仓库', value: wo.warehouse },
     { key: 'urgency', label: '紧急度', value: wo.urgency },
     {

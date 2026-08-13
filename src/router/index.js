@@ -295,6 +295,18 @@ const routes = [
         meta: { title: '设计任务' },
       },
       {
+        path: 'planning/replenish-center',
+        name: 'planning-replenish-center',
+        component: () => import('@/views/planning/ReplenishCenterView.vue'),
+        meta: { title: '库存预警' },
+      },
+      {
+        path: 'planning/replenish-ledger',
+        name: 'planning-replenish-ledger',
+        component: () => import('@/views/planning/ReplenishLedgerView.vue'),
+        meta: { title: '补货台账' },
+      },
+      {
         path: 'planning/design-task/:id/detail',
         name: 'planning-design-task-detail',
         component: () => import('@/views/planning/DesignTaskDetailView.vue'),

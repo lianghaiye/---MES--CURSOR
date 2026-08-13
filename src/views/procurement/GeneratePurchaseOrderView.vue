@@ -31,6 +31,18 @@
           style="width: 160px"
           @change="onHeaderDeliveryDateChange"
         />
+        <span class="toolbar-label">收货仓库</span>
+        <a-select
+          :value="headerReceivingWarehouse"
+          size="small"
+          allow-clear
+          show-search
+          placeholder="请选择收货仓库"
+          style="width: 180px"
+          :options="warehouseOpts"
+          :filter-option="filterWarehouseOption"
+          @change="onHeaderReceivingWarehouseChange"
+        />
         <a-button class="tax-toggle-btn" size="small" @click="toggleTaxMode">
           切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
         </a-button>
@@ -498,6 +510,8 @@ const lineEditDraft = ref(null)
 const lineEditKey = ref('')
 const headerDeliveryDate = ref(null)
 const prevHeaderDeliveryDate = ref(undefined)
+const headerReceivingWarehouse = ref(undefined)
+const prevHeaderReceivingWarehouse = ref(undefined)
 const remarkEdit = reactive({
   open: false,
   record: null,
@@ -597,6 +611,21 @@ function syncHeaderDeliveryFromRows() {
   }
 }
 
+function syncHeaderReceivingFromRows() {
+  const warehouses = [...new Set(rows.value.map((r) => r.receivingWarehouse).filter(Boolean))]
+  if (warehouses.length === 1) {
+    headerReceivingWarehouse.value = warehouses[0]
+    prevHeaderReceivingWarehouse.value = warehouses[0]
+  } else {
+    headerReceivingWarehouse.value = undefined
+    prevHeaderReceivingWarehouse.value = undefined
+  }
+}
+
+function filterWarehouseOption(input, option) {
+  return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
+}
+
 function loadFromQuery() {
   const draftQuery = String(route.query.draftId || '').trim()
   if (draftQuery) {
@@ -610,6 +639,7 @@ function loadFromQuery() {
         return row
       })
       syncHeaderDeliveryFromRows()
+      syncHeaderReceivingFromRows()
       return
     }
     message.warning('草稿不存在或已失效，已按申请单重新加载')
@@ -635,6 +665,7 @@ function loadFromQuery() {
     rows.value = []
     message.warning('未找到可生成的采购申请')
     syncHeaderDeliveryFromRows()
+    syncHeaderReceivingFromRows()
     return
   }
   rows.value = mergeRequisitionLines(requisitions, { onlyPending: true }).map((r) => {
@@ -646,6 +677,7 @@ function loadFromQuery() {
     return row
   })
   syncHeaderDeliveryFromRows()
+  syncHeaderReceivingFromRows()
   if (!rows.value.length) {
     message.info('所选申请单没有「未生成采购」的明细行')
   }
@@ -694,6 +726,28 @@ function onHeaderDeliveryDateChange(date) {
     onOk: () => {
       rows.value.forEach((row) => {
         row.deliveryDate = newVal
+      })
+    },
+  })
+}
+
+function onHeaderReceivingWarehouseChange(newVal) {
+  const next = newVal || undefined
+  const oldVal = prevHeaderReceivingWarehouse.value
+  const changed = next !== oldVal
+
+  headerReceivingWarehouse.value = next
+  prevHeaderReceivingWarehouse.value = next
+
+  if (!changed || !next || !rows.value.length) return
+
+  Modal.confirm({
+    title: '收货仓库已修改，是否同步修改明细收货仓库？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => {
+      rows.value.forEach((row) => {
+        row.receivingWarehouse = next
       })
     },
   })

@@ -196,6 +196,15 @@
             </div>
 
             <div class="section-card">
+              <div class="section-title">库存提醒</div>
+              <SalesOrderStockRemindPanel
+                :order="order"
+                :can-transfer="canRevokeSalesOrderApproval(order)"
+                @transfer="onStockTransferRequest"
+              />
+            </div>
+
+            <div class="section-card">
               <div class="section-title">销售明细</div>
               <a-table
                 :columns="lineColumns"
@@ -674,6 +683,11 @@
       :sales-order="changeDeliveryModeOrder"
       @saved="onChangeDeliveryModeSaved"
     />
+    <SalesStockTransferModal
+      v-model:open="stockTransferOpen"
+      :payload="stockTransferPayload"
+      @done="onStockTransferDone"
+    />
   </div>
 </template>
 
@@ -710,6 +724,9 @@ import {
 } from '@/utils/salesOrderRevokeApproval'
 import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOrderStatus'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
+import SalesOrderStockRemindPanel from './components/SalesOrderStockRemindPanel.vue'
+import SalesStockTransferModal from './components/SalesStockTransferModal.vue'
+import { releaseOrderAllocations } from '@/store/salesStockAllocationStore'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import {
   deliveryStatusColor,
@@ -747,6 +764,8 @@ const loading = ref(false)
 const order = ref(null)
 const changeDeliveryModeOpen = ref(false)
 const changeDeliveryModeOrder = ref(null)
+const stockTransferOpen = ref(false)
+const stockTransferPayload = ref(null)
 
 function initActiveTab() {
   return readSalesOrderDetailTab(route.params.id, route.query.tab)
@@ -1019,7 +1038,7 @@ const productionWorkOrderSharedColumns = [
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '排产数量', key: 'scheduleQty', width: 96, align: 'right' },
   { title: '工作中心', dataIndex: 'workCenter', width: 100, ellipsis: true },
-  { title: '负责人', key: 'owner', width: 88 },
+  { title: '创建人', key: 'owner', width: 88 },
   { title: '工艺路线', dataIndex: 'processRouteName', width: 120, ellipsis: true },
 ]
 
@@ -1341,6 +1360,19 @@ function handleComplete() {
   })
 }
 
+function onStockTransferRequest({ from, line }) {
+  stockTransferPayload.value = {
+    fromAlloc: from,
+    toOrder: order.value,
+    toLine: line,
+  }
+  stockTransferOpen.value = true
+}
+
+function onStockTransferDone() {
+  reloadOrder()
+}
+
 function handleTerminate() {
   if (!order.value) return
   Modal.confirm({
@@ -1349,6 +1381,7 @@ function handleTerminate() {
     okType: 'danger',
     onOk: () => {
       order.value.progressStatus = '已作废'
+      releaseOrderAllocations(order.value.id)
       message.success('订单已作废')
       reloadOrder()
     },

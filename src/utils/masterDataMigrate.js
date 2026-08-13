@@ -76,6 +76,12 @@ export function migrateMaterialList(list) {
 
 export function migrateProductRecord(record) {
   if (!record || typeof record !== 'object') return record
+  const production = {
+    planStrategy: 'mto',
+    replenishQty: undefined,
+    ...(record.production || {}),
+  }
+  if (!production.planStrategy) production.planStrategy = 'mto'
   return {
     ...record,
     materialType: record.materialType
@@ -83,6 +89,7 @@ export function migrateProductRecord(record) {
       : record.materialType,
     supplyForm: record.supplyForm ? normalizeSupplyForm(record.supplyForm) : record.supplyForm,
     productAttribute: normalizeProductAttribute(record.productAttribute),
+    production,
   }
 }
 

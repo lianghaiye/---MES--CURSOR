@@ -16,7 +16,9 @@ import {
   dispatchScheduleBatch,
   removeScheduleBatch,
   touchWorkOrderOperateUpdatedAt,
+  getWorkOrderOperatorName,
 } from '@/utils/workOrderScheduleBatch'
+import { migrateWorkOrderStatusFields, canContinueSchedule } from '@/utils/workOrderStatus'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -39,7 +41,9 @@ function loadFromStorage() {
     if (raw) {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed.orders)) {
-        return parsed.orders.map((o) => normalizeWorkOrderScheduleFields(o))
+        return parsed.orders.map((o) =>
+          migrateWorkOrderStatusFields(normalizeWorkOrderScheduleFields(o)),
+        )
       }
     }
   } catch {
@@ -133,7 +137,7 @@ function createInitialOrders() {
       name: '深井潜水泵总装工单',
       productName: '深井潜水泵',
       orderCategory: '总装工单',
-      status: '完成',
+      status: '已完成',
       scheduleQty: 10,
       planQty: 10,
       workCenter: '总装车间',
@@ -155,9 +159,11 @@ function createInitialOrders() {
 }
 
 export const assemblyWorkOrderState = reactive({
-  orders: ensureProductionPlanOrderTreeDemoAssemblyOrders(
-    ensureLaborDemoAssemblyOrders(loadFromStorage() || createInitialOrders()),
-  ),
+  orders: (
+    ensureProductionPlanOrderTreeDemoAssemblyOrders(
+      ensureLaborDemoAssemblyOrders(loadFromStorage() || createInitialOrders()),
+    ) || []
+  ).map((o) => migrateWorkOrderStatusFields(normalizeWorkOrderScheduleFields(o))),
 })
 
 watch(
@@ -221,6 +227,8 @@ export function createAssemblyWorkOrderPayload(partial) {
     planQty: partial.planQty ?? 0,
     workCenter: partial.workCenter || '总装车间',
     owner: partial.owner || '',
+    creator: partial.creator || partial.owner || getWorkOrderOperatorName(),
+    updater: partial.updater || partial.creator || partial.owner || getWorkOrderOperatorName(),
     bom: partial.bom || productName,
     bomId: partial.bomId || '',
     bomLabel: partial.bomLabel || '',
@@ -353,7 +361,7 @@ export function filterAssemblyWorkOrders(list, filters) {
 }
 
 export function canShowAssemblyDispatchTab(status) {
-  return status === '待下发' || status === '部分下发'
+  return canContinueSchedule(status)
 }
 
 export { shouldShowWorkOrderDispatchTab } from '@/store/workOrderStore'

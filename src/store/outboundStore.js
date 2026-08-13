@@ -10,6 +10,8 @@ import {
   QC_RESULT_PASS,
 } from '@/store/factoryQcStore'
 import { applyOutboundToStock } from '@/store/stockStore'
+import { releaseAllocationOnShip } from '@/store/salesStockAllocationStore'
+import { salesOrderState } from '@/store/salesOrderStore'
 import { issueBatchQty, getBatchById } from '@/store/stockBatchStore'
 import {
   getOutboundIssueRule,
@@ -548,6 +550,18 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
     line.outboundIssueRule = OUTBOUND_ISSUE_RULES.MANUAL
   }
   applyOutboundToStock(order, { lineIds: lines.map((l) => l.id) })
+  if (order.outboundType === '销售出库') {
+    const so =
+      salesOrderState.orders.find(
+        (o) => o.id === order.salesOrderId || o.orderNo === order.salesOrderNo,
+      ) || null
+    lines.forEach((line) => {
+      const shipQty = Number(line.shipQty ?? line.qty) || 0
+      const lineId = line.salesLineId || line.id
+      if (!so?.id || !lineId || shipQty <= 0) return
+      releaseAllocationOnShip(so.id, lineId, shipQty)
+    })
+  }
   return { ok: true }
 }
 

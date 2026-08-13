@@ -33,7 +33,7 @@ import SelectPersonModal from './SelectPersonModal.vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
-  placeholder: { type: String, default: '请选择负责人' },
+  placeholder: { type: String, default: '请选择创建人' },
   size: { type: String, default: 'small' },
 })
 

@@ -173,7 +173,7 @@ export function createLaborDemoProductionOrders() {
       code: 'WO202605270-LH03',
       name: `${d3.name}生产工单`,
       orderCategory: '生产工单',
-      status: '完成',
+      status: '已完成',
       workCenter: '装配车间',
       processRouteName: '装配标准路线',
       sourceOrderNo: 'SO-LH-003',

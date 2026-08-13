@@ -66,6 +66,8 @@ export const sideMenus = {
   planning: [
     { key: 'production-plan', label: '生产计划', path: '/planning/production-plan' },
     { key: 'design-task', label: '设计任务', path: '/planning/design-task' },
+    { key: 'replenish-center', label: '库存预警', path: '/planning/replenish-center' },
+    { key: 'replenish-ledger', label: '补货台账', path: '/planning/replenish-ledger' },
   ],
   'labor-salary': [{ key: 'labor-hour', label: '工时管理', path: '/labor-salary/labor-hour' }],
   production: [
@@ -272,6 +274,8 @@ export const routeTitles = {
   '/sales/framework-contracts': '框架合同',
   '/planning/production-plan': '生产计划',
   '/planning/design-task': '设计任务',
+  '/planning/replenish-center': '库存预警',
+  '/planning/replenish-ledger': '补货台账',
   '/production/work-orders': '生产工单',
   '/production/assembly-work-orders': '总装工单',
   '/production/disassembly-work-orders': '拆解工单',

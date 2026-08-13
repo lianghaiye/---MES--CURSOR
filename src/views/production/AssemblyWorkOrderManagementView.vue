@@ -110,11 +110,18 @@
           <span v-if="selectedIds.length" class="selected-count"
             >已选 {{ selectedIds.length }}</span
           >
-          <a-tooltip title="切换为列表视图">
-            <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
-              <TableOutlined />
-            </a-button>
-          </a-tooltip>
+          <div class="list-title-actions">
+            <a-tooltip title="刷新">
+              <a-button type="text" size="small" class="layout-toggle-btn" @click="handleSearch">
+                <ReloadOutlined />
+              </a-button>
+            </a-tooltip>
+            <a-tooltip title="切换为列表视图">
+              <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
+                <TableOutlined />
+              </a-button>
+            </a-tooltip>
+          </div>
         </div>
         <div class="list-body">
           <div
@@ -133,6 +140,9 @@
             <div class="card-content">
               <div class="card-head">
                 <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
+                <a-tag v-if="isScheduleIncomplete(wo)" color="processing" class="status-tag">
+                  未排完
+                </a-tag>
                 <a-dropdown :trigger="['click']">
                   <a-button type="text" size="small" class="more-btn" @click.stop>
                     <EllipsisOutlined />
@@ -142,6 +152,21 @@
                       <a-menu-item key="edit">编辑</a-menu-item>
                       <a-menu-item key="delete" danger>删除</a-menu-item>
                       <a-menu-item key="clone">克隆</a-menu-item>
+                      <a-menu-divider />
+                      <a-menu-item
+                        v-if="['待下发', '已下发', '执行中'].includes(wo.status)"
+                        key="pause"
+                      >
+                        暂停
+                      </a-menu-item>
+                      <a-menu-item v-if="wo.status === '暂停'" key="resume">恢复</a-menu-item>
+                      <a-menu-item
+                        v-if="['待下发', '已下发', '执行中', '暂停'].includes(wo.status)"
+                        key="terminate"
+                        danger
+                      >
+                        终止
+                      </a-menu-item>
                     </a-menu>
                   </template>
                 </a-dropdown>
@@ -152,6 +177,10 @@
                 <span>订单 {{ wo.sourceOrderNo || '-' }}</span>
                 <span class="meta-divider">·</span>
                 <span>数量 {{ formatScheduleProgress(wo) }}</span>
+                <template v-if="isScheduleIncomplete(wo)">
+                  <span class="meta-divider">·</span>
+                  <span>未排完</span>
+                </template>
               </div>
               <div class="card-tags">
                 <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
@@ -206,6 +235,7 @@
         :pagination="pagination"
         :selected-ids="selectedIds"
         :active-id="selectedId"
+        column-settings-key="assembly-work-order-list-v3"
         @refresh="handleSearch"
         @toggle-layout="toggleLayout"
         @select="onTableRowSelect"
@@ -250,6 +280,11 @@
       @updated="onWorkOrderUpdated"
     />
 
+    <EditScheduleQtyModal
+      v-model:open="editScheduleQtyModalOpen"
+      :work-order="editScheduleQtyTarget"
+      @submit="onEditScheduleQtySubmit"
+    />
     <CreateScheduleBatchModal
       v-model:open="scheduleBatchModalOpen"
       :work-order="scheduleBatchTarget"
@@ -307,13 +342,22 @@ import {
   dispatchAndStartWorkOrder,
   canEditWorkOrder,
 } from '@/utils/workOrderDispatchHelpers'
-import { formatScheduleProgress } from '@/utils/workOrderScheduleBatch'
+import { formatScheduleProgress, isScheduleIncomplete } from '@/utils/workOrderScheduleBatch'
+import {
+  WORK_ORDER_STATUSES,
+  workOrderStatusColor,
+  buildPauseWorkOrderResult,
+  buildResumeWorkOrderResult,
+  buildTerminateWorkOrderResult,
+  buildEditScheduleQtyResult,
+} from '@/utils/workOrderStatus'
 import { sortWorkOrdersForList } from '@/utils/workOrderListSort'
 import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { bomOptions } from '@/mock/workOrderMaster'
 import CreateAssemblyWorkOrderModal from './components/CreateAssemblyWorkOrderModal.vue'
 import CreateScheduleBatchModal from './components/CreateScheduleBatchModal.vue'
+import EditScheduleQtyModal from './components/EditScheduleQtyModal.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
@@ -329,7 +373,7 @@ const { openTab } = useTabs()
 
 const LAYOUT_STORAGE_KEY = 'i_doms_assembly_wo_layout'
 
-const statusOptions = ['待下发', '部分下发', '已下发', '执行中', '完成', '暂停', '终止']
+const statusOptions = [...WORK_ORDER_STATUSES]
 const categoryOptions = ['总装工单']
 
 const filters = reactive({
@@ -350,6 +394,8 @@ const editRecord = ref(null)
 const urgencyModalOpen = ref(false)
 const scheduleBatchModalOpen = ref(false)
 const scheduleBatchTarget = ref(null)
+const editScheduleQtyModalOpen = ref(false)
+const editScheduleQtyTarget = ref(null)
 const urgencyDraft = ref('普通')
 const urgencyTargetId = ref(null)
 const layoutMode = ref(localStorage.getItem(LAYOUT_STORAGE_KEY) || 'split')
@@ -464,16 +510,7 @@ watch(
 )
 
 function statusColor(status) {
-  const map = {
-    待下发: 'warning',
-    部分下发: 'processing',
-    已下发: 'processing',
-    执行中: 'blue',
-    完成: 'success',
-    暂停: 'default',
-    终止: 'error',
-  }
-  return map[status] || 'default'
+  return workOrderStatusColor(status)
 }
 
 function urgencyTagColor(urgency) {
@@ -735,9 +772,143 @@ function onCardAction(key, wo) {
     urgencyModalOpen.value = true
     return
   }
-  const map = { pause: '暂停', terminate: '终止', complete: '完成' }
+  const map = { pause: '暂停', terminate: '终止', complete: '已完成' }
+  if (key === 'resume') {
+    const result = buildResumeWorkOrderResult(wo)
+    if (!result.ok) {
+      message.warning(result.message || '无法恢复')
+      return
+    }
+    const row = updateAssemblyWorkOrder(wo.id, result.patch)
+    if (!row) {
+      message.error('恢复失败：找不到工单')
+      return
+    }
+    message.success(`工单已恢复为「${row.status}」`)
+    return
+  }
+  if (key === 'pause') {
+    const result = buildPauseWorkOrderResult(wo)
+    if (result.needConfirm) {
+      Modal.confirm({
+        title: '确认暂停',
+        content: result.message,
+        okText: result.confirmOkText || '确认暂停',
+        cancelText: '取消',
+        onOk: () => {
+          const confirmed = buildPauseWorkOrderResult(wo, { confirmed: true })
+          if (!confirmed.ok) {
+            message.error(confirmed.message || '暂停失败')
+            return Promise.reject()
+          }
+          const row = updateAssemblyWorkOrder(wo.id, confirmed.patch)
+          if (!row) {
+            message.error('暂停失败：找不到工单')
+            return Promise.reject()
+          }
+          message.success(`工单状态已变为「${row.status}」`)
+        },
+      })
+      return
+    }
+    if (!result.ok) {
+      message.warning(result.message || '无法暂停')
+      return
+    }
+    {
+      const row = updateAssemblyWorkOrder(wo.id, result.patch)
+      if (!row) {
+        message.error('暂停失败：找不到工单')
+        return
+      }
+      message.success(`工单状态已变为「${row.status}」`)
+    }
+    return
+  }
+  if (key === 'terminate') {
+    const result = buildTerminateWorkOrderResult(wo)
+    if (result.needChoose) {
+      Modal.confirm({
+        title: '确认终止',
+        width: 480,
+        content: `${result.message}
+处理建议：
+· 仍终止：报工数量重置为 0，小程序任务不再显示
+· 不处理：承认报工数量，不影响工时工资结算；未完成任务隐藏`,
+        okText: '仍终止（重置报工）',
+        cancelText: '不处理（保留报工）',
+        okType: 'danger',
+        onOk: () => {
+          const done = buildTerminateWorkOrderResult(wo, { mode: 'reset', confirmed: true })
+          if (!done.ok) {
+            message.error(done.message || '终止失败')
+            return Promise.reject()
+          }
+          const row = updateAssemblyWorkOrder(wo.id, done.patch)
+          if (!row) {
+            message.error('终止失败：找不到工单')
+            return Promise.reject()
+          }
+          message.success(`工单状态已变为「${row.status}」（报工已重置）`)
+        },
+        onCancel: (e) => {
+          if (e && e.triggerCancel) return
+          const done = buildTerminateWorkOrderResult(wo, { mode: 'keep', confirmed: true })
+          if (!done.ok) {
+            message.error(done.message || '终止失败')
+            return
+          }
+          const row = updateAssemblyWorkOrder(wo.id, done.patch)
+          if (!row) {
+            message.error('终止失败：找不到工单')
+            return
+          }
+          message.success(`工单状态已变为「${row.status}」（保留报工）`)
+        },
+      })
+      return
+    }
+    if (result.needConfirm) {
+      Modal.confirm({
+        title: '确认终止',
+        content: `确定终止工单「${wo.code}」吗？终止后不可恢复生产。`,
+        okType: 'danger',
+        okText: '确认终止',
+        cancelText: '取消',
+        onOk: () => {
+          const done = buildTerminateWorkOrderResult(wo, { mode: 'reset', confirmed: true })
+          if (!done.ok) {
+            message.error(done.message || '终止失败')
+            return Promise.reject()
+          }
+          const row = updateAssemblyWorkOrder(wo.id, done.patch)
+          if (!row) {
+            message.error('终止失败：找不到工单')
+            return Promise.reject()
+          }
+          message.success(`工单状态已变为「${row.status}」`)
+        },
+      })
+      return
+    }
+    if (!result.ok) {
+      message.warning(result.message || '无法终止')
+    }
+    return
+  }
   if (map[key]) {
-    updateAssemblyWorkOrder(wo.id, { status: map[key] }, { touchOperateUpdatedAt: false })
+    if (key === 'complete') {
+      Modal.confirm({
+        title: '确认完成',
+        content: `确定将工单「${wo.code}」标记为已完成？`,
+        onOk: () => {
+          updateAssemblyWorkOrder(wo.id, { status: '已完成' })
+          message.success('工单已完成')
+        },
+      })
+      return
+    }
+    updateAssemblyWorkOrder(wo.id, { status: map[key] })
     message.success(`工单已${map[key]}`)
   }
 }
@@ -750,20 +921,23 @@ function confirmUrgency() {
   urgencyModalOpen.value = false
 }
 
-function onDetailAction({ key, workOrder: wo, record }) {
+function onDetailAction({ key, workOrder: wo, record, patch }) {
   if (!wo) return
   if (key === 'schedule-qty') {
-    if (!wo.processes?.length) {
-      message.warning('请先维护工单工艺路线与工序')
+    const gate = buildEditScheduleQtyResult(wo, Math.max(1, Number(wo.scheduleQty) || 1))
+    if (gate.blocked) {
+      Modal.warning({
+        title: '无法修改排产数量',
+        content: gate.message,
+      })
       return
     }
-    scheduleBatchTarget.value = wo
-    scheduleBatchModalOpen.value = true
-    detailTab.value = 'schedule'
+    editScheduleQtyTarget.value = wo
+    editScheduleQtyModalOpen.value = true
     return
   }
-  if (key === 'gen-task' || key === 'edit-executor') {
-    updateAssemblyWorkOrder(wo.id, { ...wo })
+  if (key === 'gen-task' || key === 'edit-executor' || key === 'reset-status') {
+    updateAssemblyWorkOrder(wo.id, { ...wo, ...(patch || {}) })
     return
   }
   if (key === 'select-batch' && record?.id) {
@@ -795,9 +969,54 @@ function onDetailAction({ key, workOrder: wo, record }) {
     })
     return
   }
-  if (['urgency', 'pause', 'terminate', 'complete'].includes(key)) {
+  if (['urgency', 'pause', 'terminate', 'complete', 'resume'].includes(key)) {
     onCardAction(key, wo)
   }
+}
+
+function onEditScheduleQtySubmit({ qty, batchId }) {
+  const wo = editScheduleQtyTarget.value
+  if (!wo) return
+  const preview = buildEditScheduleQtyResult(wo, qty, { batchId })
+  if (preview.blocked) {
+    editScheduleQtyModalOpen.value = false
+    Modal.warning({
+      title: '无法修改排产数量',
+      content: preview.message,
+    })
+    return
+  }
+  if (!preview.needConfirm && !preview.ok) {
+    message.warning(preview.message || '无法修改排产数量')
+    return
+  }
+  Modal.confirm({
+    title: '确认修改排产数量',
+    content: preview.message,
+    okText: '确认',
+    cancelText: '取消',
+    onOk: () => {
+      const confirmed = buildEditScheduleQtyResult(wo, qty, {
+        confirmed: true,
+        batchId: preview.batchId || batchId,
+      })
+      if (!confirmed.ok) {
+        message.error(confirmed.message || '修改失败')
+        return Promise.reject()
+      }
+      const row = updateAssemblyWorkOrder(wo.id, confirmed.patch)
+      if (!row) {
+        message.error('修改失败：找不到工单')
+        return Promise.reject()
+      }
+      editScheduleQtyModalOpen.value = false
+      message.success(
+        confirmed.syncedTaskCount
+          ? `排产数量已改为 ${confirmed.qty}，已同步 ${confirmed.syncedTaskCount} 条小程序任务目标数`
+          : `排产数量已改为 ${confirmed.qty}`,
+      )
+    },
+  })
 }
 
 function onScheduleBatchSubmit(payload) {
@@ -958,10 +1177,16 @@ function onScheduleBatchSubmit(payload) {
       color: #1677ff;
     }
 
-    .layout-toggle-btn {
+    .list-title-actions {
       margin-left: auto;
-      color: rgba(0, 0, 0, 0.45);
+      display: inline-flex;
+      align-items: center;
       flex-shrink: 0;
+      gap: 0;
+    }
+
+    .layout-toggle-btn {
+      color: rgba(0, 0, 0, 0.45);
 
       &:hover {
         color: #1677ff;

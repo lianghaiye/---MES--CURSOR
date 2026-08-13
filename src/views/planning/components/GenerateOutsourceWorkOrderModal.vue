@@ -51,6 +51,12 @@
                 <InfoCircleOutlined class="col-tip-icon" />
               </a-tooltip>
             </span>
+            <span v-else-if="column.key === 'inTransitQty'" class="header-title col-title-with-tip">
+              在途/在制
+              <a-tooltip title="外购：申请量/订单量；自制/外协：待下发/执行中（库存单位）">
+                <InfoCircleOutlined class="col-tip-icon" />
+              </a-tooltip>
+            </span>
             <span v-else class="header-title">{{ column.title }}</span>
             <span
               v-if="column.key !== 'index' && column.key !== 'action'"
@@ -190,11 +196,13 @@ const props = defineProps({
   open: { type: Boolean, default: false },
   order: { type: Object, default: null },
   materials: { type: Array, default: () => [] },
+  /** plan：生产计划；replenish：库存预警（列改为在途/在制、最高、最低、建议） */
+  columnMode: { type: String, default: 'plan' },
 })
 
 const emit = defineEmits(['update:open', 'save'])
 
-const columnDefs = [
+const baseColumnDefsBeforeQty = [
   { key: 'index', title: '序号', width: 56, total: false },
   { key: 'productName', title: '物品名称', width: 130, total: false },
   { key: 'code', title: '物品编码', width: 120, total: false },
@@ -205,10 +213,23 @@ const columnDefs = [
   { key: 'materialType', title: '物料类型', width: 90, total: false },
   { key: 'supplier', title: '供应商', width: 140, editable: true, total: false },
   { key: 'stockQty', title: '库存数量', width: 90, total: true, numeric: true },
+]
+
+const planQtyColumns = [
   { key: 'availableStock', title: '可用库存', width: 120, total: false, numeric: false },
   { key: 'inTransitQty', title: '在途/在制', width: 130, total: false, numeric: false },
   { key: 'demandQty', title: '需求数', width: 80, total: true, numeric: true },
   { key: 'gapQty', title: '缺口数', width: 80, total: true, numeric: true },
+]
+
+const replenishQtyColumns = [
+  { key: 'inTransitQty', title: '在途/在制', width: 130, total: false, numeric: false },
+  { key: 'maxStockQty', title: '最高', width: 80, total: false, numeric: true },
+  { key: 'minStockQty', title: '最低', width: 80, total: false, numeric: true },
+  { key: 'suggestQty', title: '建议', width: 80, total: false, numeric: true },
+]
+
+const baseColumnDefsAfterQty = [
   { key: 'planQty', title: '计划数量', width: 90, editable: true, total: true, numeric: true },
   { key: 'unit', title: '计量单位', width: 90, editable: true, total: false },
   { key: 'expectedArrivalDate', title: '期望到货时间', width: 130, editable: true, total: false },
@@ -218,17 +239,37 @@ const columnDefs = [
   { key: 'action', title: '操作', width: 72, total: false },
 ]
 
-const editableKeys = columnDefs.filter((c) => c.editable).map((c) => c.key)
-const defaultVisibleKeys = columnDefs.map((c) => c.key)
+const columnDefs = computed(() => [
+  ...baseColumnDefsBeforeQty,
+  ...(props.columnMode === 'replenish' ? replenishQtyColumns : planQtyColumns),
+  ...baseColumnDefsAfterQty,
+])
 
-const visibleKeys = ref([...defaultVisibleKeys])
-const columnWidths = reactive(Object.fromEntries(columnDefs.map((c) => [c.key, c.width])))
+const editableKeys = computed(() => columnDefs.value.filter((c) => c.editable).map((c) => c.key))
+
+const visibleKeys = ref([])
+const columnWidths = reactive({})
 const rows = ref([])
 const editingCell = ref(null)
 const remarkEdit = reactive({ open: false, record: null, draft: '' })
 const tableWrapRef = ref(null)
 const selectOpen = ref(false)
 const datePickerOpen = ref(false)
+
+function syncColumnState() {
+  const defs = columnDefs.value
+  visibleKeys.value = defs.map((c) => c.key)
+  defs.forEach((c) => {
+    if (columnWidths[c.key] == null) columnWidths[c.key] = c.width
+  })
+}
+
+syncColumnState()
+
+watch(
+  () => props.columnMode,
+  () => syncColumnState(),
+)
 
 const selectOptions = computed(() => {
   void warehouseState.warehouses
@@ -243,7 +284,7 @@ const selectOptions = computed(() => {
 })
 
 const displayColumns = computed(() =>
-  columnDefs
+  columnDefs.value
     .filter((c) => visibleKeys.value.includes(c.key))
     .map((c) => ({
       title: c.title,
@@ -267,7 +308,7 @@ const tableScrollX = computed(() =>
 
 const summary = computed(() => {
   const totals = {}
-  columnDefs
+  columnDefs.value
     .filter((c) => c.total)
     .forEach((col) => {
       totals[col.key] = rows.value.reduce((sum, row) => sum + (Number(row[col.key]) || 0), 0)
@@ -286,7 +327,7 @@ watch(
 )
 
 function isEditable(key) {
-  return editableKeys.includes(key)
+  return editableKeys.value.includes(key)
 }
 
 function isEditing(rowKey, field) {
@@ -356,6 +397,12 @@ function formatCell(record, key, text) {
   }
   if (key === 'inTransitQty') {
     return record.inTransitText || text || '—'
+  }
+  if (key === 'maxStockQty' || key === 'minStockQty' || key === 'suggestQty') {
+    const qty = Number(record[key])
+    const unit = record.unit || ''
+    if (!Number.isFinite(qty)) return text ?? '—'
+    return unit ? `${qty}${unit}` : String(qty)
   }
   if (key === 'expectedArrivalDate') {
     return record.expectedArrivalDate || '请选择'

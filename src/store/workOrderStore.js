@@ -17,13 +17,20 @@ import { findWorkItemForPlanRow } from '@/utils/productionPlanMaterial'
 import { ensureMaterialReqDemoWorkOrders } from '@/mock/materialReqWorkOrderSeed'
 import { ensureCrossDemoWorkOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureBlankSizeDemoWorkOrders } from '@/mock/blankSizeBomDemoSeed'
+import { ensureWorkOrderControlDemoOrders } from '@/mock/workOrderControlDemoSeed'
 import {
   normalizeWorkOrderScheduleFields,
   createScheduleBatch,
   dispatchScheduleBatch,
   removeScheduleBatch,
   touchWorkOrderOperateUpdatedAt,
+  getWorkOrderOperatorName,
 } from '@/utils/workOrderScheduleBatch'
+import {
+  migrateWorkOrderStatusFields,
+  canContinueSchedule,
+  isScheduleIncomplete,
+} from '@/utils/workOrderStatus'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -46,7 +53,9 @@ function loadFromStorage() {
     if (raw) {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed.orders)) {
-        return parsed.orders.map((o) => normalizeWorkOrderScheduleFields(o))
+        return parsed.orders.map((o) =>
+          migrateWorkOrderStatusFields(normalizeWorkOrderScheduleFields(o)),
+        )
       }
     }
   } catch {
@@ -75,7 +84,6 @@ function createDemoWorkOrder() {
     productName: '衡环(毛坯)',
     orderCategory: '生产工单',
     status: '待下发',
-    progressLabel: '新建',
     taskStatus: '正常',
     scheduleQty: 0,
     planQty: 20,
@@ -137,7 +145,7 @@ function createCompletionDeductDemoWorkOrders() {
       productName: '定子铁芯组件',
       materialCode: 'CP2510003',
       orderCategory: '生产工单',
-      status: '完成',
+      status: '已完成',
       scheduleQty: 18,
       planQty: 18,
       finishedQty: 18,
@@ -216,7 +224,7 @@ function createCompletionDeductDemoWorkOrders() {
       productName: '泵体铸件',
       materialCode: 'CP2510004',
       orderCategory: '生产工单',
-      status: '完成',
+      status: '已完成',
       scheduleQty: 10,
       planQty: 10,
       finishedQty: 10,
@@ -285,7 +293,7 @@ function createCompletionDeductDemoWorkOrders() {
       productName: '叶轮组件',
       materialCode: 'CP2510005',
       orderCategory: '生产工单',
-      status: '完成',
+      status: '已完成',
       scheduleQty: 6,
       planQty: 6,
       finishedQty: 6,
@@ -349,10 +357,12 @@ function ensureCompletionDeductDemoWorkOrders(orders) {
 function ensureLaborDemoProductionOrders(orders) {
   const demos = [...createLaborDemoProductionOrders(), ...createLaborDemoAssemblyOrders()]
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
-  return ensureBlankSizeDemoWorkOrders(
-    ensureCrossDemoWorkOrders(
-      ensureMaterialReqDemoWorkOrders(
-        ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+  return ensureWorkOrderControlDemoOrders(
+    ensureBlankSizeDemoWorkOrders(
+      ensureCrossDemoWorkOrders(
+        ensureMaterialReqDemoWorkOrders(
+          ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+        ),
       ),
     ),
   )
@@ -413,10 +423,17 @@ function createInitialOrders() {
 }
 
 const loadedOrders = loadFromStorage()
+function finalizeOrders(orders) {
+  return (orders || []).map((o) =>
+    migrateWorkOrderStatusFields(normalizeWorkOrderScheduleFields(o)),
+  )
+}
 export const workOrderState = reactive({
-  orders: loadedOrders
-    ? ensureDemoWorkOrder(ensureLaborDemoProductionOrders(loadedOrders))
-    : createInitialOrders(),
+  orders: finalizeOrders(
+    loadedOrders
+      ? ensureDemoWorkOrder(ensureLaborDemoProductionOrders(loadedOrders))
+      : createInitialOrders(),
+  ),
 })
 
 watch(
@@ -469,8 +486,13 @@ export function updateWorkOrder(id, patch, options = {}) {
   if (options.touchOperateUpdatedAt !== false) {
     touchWorkOrderOperateUpdatedAt(row)
   }
-  // 工单首次变为「完成」时生成完工库存扣减单（BOM 领料+倒冲同单）
-  if (prevStatus !== '完成' && row.status === '完成') {
+  // 工单首次变为「已完成」时生成完工库存扣减单（BOM 领料+倒冲同单）
+  const becameComplete =
+    prevStatus !== '完成' &&
+    prevStatus !== '已完成' &&
+    (row.status === '完成' || row.status === '已完成')
+  if (becameComplete) {
+    if (row.status === '完成') row.status = '已完成'
     const finishedQty =
       Number(row.finishedQty) || Number(row.scheduleQty) || Number(row.planQty) || 0
     import('@/store/materialRequisitionStore')
@@ -509,6 +531,8 @@ export function createWorkOrderPayload(partial) {
     planQty: partial.planQty ?? 0,
     workCenter: partial.workCenter || '默认工厂',
     owner: partial.owner || '',
+    creator: partial.creator || partial.owner || getWorkOrderOperatorName(),
+    updater: partial.updater || partial.creator || partial.owner || getWorkOrderOperatorName(),
     bom: skipEbomCategory ? '' : partial.bom || partial.productName,
     bomId: partial.bomId || '',
     warehouse: partial.warehouse || resolveDefaultWarehouseByProductName(productName) || '',
@@ -521,6 +545,7 @@ export function createWorkOrderPayload(partial) {
     processRouteName: routeName,
     source: partial.source || 'manual',
     sourceOrderNo: partial.sourceOrderNo || '',
+    planSource: partial.planSource || '',
     salesLineId: partial.salesLineId || '',
     salesOrderId: partial.salesOrderId || '',
     materialCode: partial.materialCode || '',
@@ -604,11 +629,12 @@ export function addWorkOrdersFromPlanRows(rows, sourceOrder) {
       planDateRange: row.planDateRange,
       processRouteName: row.processRoute,
       source: 'production-plan',
-      sourceOrderNo: sourceOrder.orderNo,
+      sourceOrderNo: sourceOrder.orderNo || '',
+      planSource: sourceOrder.planSource || '',
       materialCode: row.code,
       productId: bomFields.productId,
       ebomSnapshot: bomFields.ebomSnapshot,
-      salesLineId: bomFields.salesLineId,
+      salesLineId: bomFields.salesLineId || '',
       salesOrderId: sourceOrder.salesOrderId || '',
       specModel: row.spec || '',
       material: row.material || '',
@@ -665,23 +691,23 @@ export function filterWorkOrders(list, filters) {
     if (filters.status && wo.status !== filters.status) return false
     if (filters.orderCategory && wo.orderCategory !== filters.orderCategory) return false
     if (filters.workCenter && wo.workCenter !== filters.workCenter) return false
+    if (filters.scheduleIncomplete && !isScheduleIncomplete(wo)) return false
     return true
   })
 }
 
+/** 可继续下发/排产的主状态 */
 export function canShowDispatchTab(status) {
-  return status === '待下发' || status === '部分下发'
+  return canContinueSchedule(status)
 }
 
-/** 待下发，或已排产 < 计划数量时继续展示工单下发 */
+/** 待下发，或执行中/已下发且未排完时继续展示工单下发 */
 export function shouldShowWorkOrderDispatchTab(workOrder) {
   if (!workOrder) return false
-  if (canShowDispatchTab(workOrder.status)) return true
-  const plan = Math.max(0, Number(workOrder.planQty) || 0)
-  const scheduled = Math.max(0, Number(workOrder.scheduleQty) || 0)
-  // prefer batch sum when present
-  const batches = workOrder.scheduleBatches || []
-  const batchSum = batches.reduce((s, b) => s + Math.max(0, Number(b.qty) || 0), 0)
-  const already = batches.length ? batchSum : scheduled
-  return plan > 0 && already < plan
+  if (workOrder.status === '暂停' || workOrder.status === '终止' || workOrder.status === '已完成') {
+    return false
+  }
+  if (workOrder.status === '待下发') return true
+  if (!canContinueSchedule(workOrder.status)) return false
+  return isScheduleIncomplete(workOrder) || workOrder.status === '待下发'
 }

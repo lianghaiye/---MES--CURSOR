@@ -362,6 +362,30 @@
           <a-form layout="inline" class="horizontal-form">
             <a-row :gutter="[12, 12]" style="width: 100%">
               <a-col :span="8">
+                <a-form-item label="计划策略" required>
+                  <a-select
+                    v-model:value="form.production.planStrategy"
+                    size="small"
+                    :options="planStrategyOpts"
+                    :disabled="viewOnly"
+                    placeholder="请选择计划策略"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col v-if="form.production.planStrategy === 'mts'" :span="8">
+                <a-form-item label="补货批量">
+                  <a-input-number
+                    v-model:value="form.production.replenishQty"
+                    size="small"
+                    :min="0"
+                    :precision="2"
+                    :disabled="viewOnly"
+                    placeholder="选填"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
                 <a-form-item label="默认工作中心">
                   <a-select
                     v-model:value="form.production.defaultWorkCenter"
@@ -410,6 +434,13 @@
                 </a-form-item>
               </a-col>
             </a-row>
+            <a-alert
+              v-if="form.production.planStrategy === 'mts'"
+              type="info"
+              show-icon
+              class="mts-hint"
+              message="以库存生产：靠最低/最高库存补货维持水位；销售审核不自动生成生产计划。请开启库存预警并维护最低/最高库存。"
+            />
           </a-form>
         </div>
       </a-tab-pane>
@@ -683,6 +714,8 @@ import {
   partProductAttributeOptions,
   PART_PRODUCT_ATTRIBUTES,
   normalizePartProductAttribute,
+  PLAN_STRATEGY_OPTIONS,
+  PLAN_STRATEGY,
 } from '@/mock/productInfoOptions'
 import { unitState, getInventoryUnitOptions, getAllEnabledUnitOptions } from '@/store/unitStore'
 import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
@@ -790,6 +823,7 @@ const materialGradeOpts = computed(() => {
 })
 const reportTypeOpts = reportTypeOptions.map((v) => ({ label: v, value: v }))
 const salaryMethodOpts = salaryMethodOptions.map((v) => ({ label: v, value: v }))
+const planStrategyOpts = PLAN_STRATEGY_OPTIONS
 const categoryOpts = flatCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
   value: c.key,
@@ -1147,6 +1181,24 @@ function validate() {
       }
     }
   }
+  if (form.production.planStrategy === PLAN_STRATEGY.MTS) {
+    if (!form.alert.stockAlertEnabled) {
+      message.warning('以库存生产请开启库存预警')
+      return false
+    }
+    if (form.alert.minStockQty == null || form.alert.minStockQty === '') {
+      message.warning('以库存生产请填写最低库存')
+      return false
+    }
+    if (form.alert.maxStockQty == null || form.alert.maxStockQty === '') {
+      message.warning('以库存生产请填写最高库存')
+      return false
+    }
+    if (Number(form.alert.maxStockQty) < Number(form.alert.minStockQty)) {
+      message.warning('最高库存不能低于最低库存')
+      return false
+    }
+  }
   return true
 }
 
@@ -1302,6 +1354,11 @@ function handleOk() {
 .tab-pane-body {
   padding: 16px;
   min-height: 200px;
+}
+
+.mts-hint {
+  width: 100%;
+  margin-top: 8px;
 }
 
 .form-tabs.is-view-only {

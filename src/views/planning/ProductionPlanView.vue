@@ -39,6 +39,18 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6" :lg="4">
+            <a-form-item label="计划来源">
+              <a-select
+                v-model:value="filters.planSource"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                style="width: 100%"
+                :options="planSourceFilterOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6" :lg="4">
             <a-form-item label="订单状态">
               <a-select
                 v-model:value="filters.orderStatus"
@@ -59,6 +71,7 @@
               <a-space>
                 <a-button type="primary" size="small" @click="handleSearch">查询</a-button>
                 <a-button size="small" @click="handleReset">重置</a-button>
+                <a-button size="small" @click="goReplenishCenter">库存预警</a-button>
               </a-space>
             </a-form-item>
           </a-col>
@@ -96,10 +109,15 @@
           <div class="card-tags">
             <a-tag v-for="tag in order.tags" :key="tag" :color="tagColor(tag)">{{ tag }}</a-tag>
           </div>
-          <div class="card-row"><span class="label">订单编号</span>{{ order.orderNo }}</div>
+          <div class="card-row"><span class="label">计划编号</span>{{ order.orderNo }}</div>
+          <div class="card-row">
+            <span class="label">计划来源</span>{{ planSourceLabel(order.planSource) }}
+          </div>
           <div class="card-row"><span class="label">客户名称</span>{{ order.customerName }}</div>
           <div class="card-row"><span class="label">产品数量</span>{{ order.productQty }}</div>
-          <div class="card-row"><span class="label">业务员</span>{{ order.salesperson }}</div>
+          <div class="card-row">
+            <span class="label">业务员</span>{{ order.salesperson || '—' }}
+          </div>
         </div>
         <a-pagination
           v-model:current="pagination.current"
@@ -142,20 +160,25 @@
             bordered
             class="info-grid"
           >
-            <a-descriptions-item label="所属区域">{{ selectedOrder.region }}</a-descriptions-item>
+            <a-descriptions-item label="计划来源">{{
+              planSourceLabel(selectedOrder.planSource)
+            }}</a-descriptions-item>
+            <a-descriptions-item label="所属区域">{{
+              selectedOrder.region || '—'
+            }}</a-descriptions-item>
             <a-descriptions-item label="结算类型">{{
-              selectedOrder.settlementType
+              selectedOrder.settlementType || '—'
             }}</a-descriptions-item>
             <a-descriptions-item label="交货方式">{{
-              selectedOrder.deliveryMethod
+              selectedOrder.deliveryMethod || '—'
             }}</a-descriptions-item>
             <a-descriptions-item label="业务员">{{
-              selectedOrder.salesperson
+              selectedOrder.salesperson || '—'
             }}</a-descriptions-item>
             <a-descriptions-item label="订单日期">{{
               selectedOrder.orderDate
             }}</a-descriptions-item>
-            <a-descriptions-item label="备注" :span="3">{{
+            <a-descriptions-item label="备注" :span="2">{{
               selectedOrder.remark || '-'
             }}</a-descriptions-item>
           </a-descriptions>
@@ -651,6 +674,7 @@ import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
 import GenerateAssemblyWorkOrderModal from './components/GenerateAssemblyWorkOrderModal.vue'
 import GenerateOutsourceWorkOrderModal from './components/GenerateOutsourceWorkOrderModal.vue'
 import GeneratePurchaseRequisitionModal from './components/GeneratePurchaseRequisitionModal.vue'
+import { PLAN_SOURCE_OPTIONS, planSourceLabel } from '@/utils/planSource'
 import {
   workOrderState,
   addWorkOrdersFromPlanRows,
@@ -720,9 +744,12 @@ const filters = reactive({
   customerName: '',
   urgency: undefined,
   orderStatus: undefined,
+  planSource: undefined,
   orderDateRange: null,
   deliveryDateRange: null,
 })
+
+const planSourceFilterOpts = PLAN_SOURCE_OPTIONS.filter((o) => o.value)
 
 const appliedFilters = ref({ ...filters })
 const selectedId = ref(productionPlanState.plans[0]?.id || null)
@@ -1433,11 +1460,17 @@ function handleSearch() {
   pagination.current = 1
 }
 
+function goReplenishCenter() {
+  openTab('/planning/replenish-center', '库存预警')
+  router.push('/planning/replenish-center')
+}
+
 function handleReset() {
   filters.orderNo = ''
   filters.customerName = ''
   filters.urgency = undefined
   filters.orderStatus = undefined
+  filters.planSource = undefined
   filters.orderDateRange = null
   filters.deliveryDateRange = null
   appliedFilters.value = { ...filters }

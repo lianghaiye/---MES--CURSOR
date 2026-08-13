@@ -10,8 +10,8 @@ import {
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 
 const STORAGE_KEY = 'i_doms_product_info'
-/** v10：下料尺寸演示产品 */
-const DATA_VERSION = 10
+/** v11：计划策略 MTS 演示产品 */
+const DATA_VERSION = 11
 let codeSeq = 20000
 
 /** 内联注入，避免 import blankSizeBomDemoSeed 在启动早期拉起 BOM 循环依赖 */
@@ -35,6 +35,31 @@ function ensureBlankSizeDemoProducts(products) {
   )
   if (idx === -1) list.unshift({ ...BLANK_SIZE_DEMO_PRODUCT })
   else list[idx] = { ...list[idx], ...BLANK_SIZE_DEMO_PRODUCT, id: BLANK_SIZE_DEMO_PRODUCT.id }
+  return ensureMtsDemoProduct(list)
+}
+
+/** 演示：首个标准产品改为以库存生产且低于最低库存，便于补货建议验收 */
+function ensureMtsDemoProduct(products) {
+  const list = Array.isArray(products) ? [...products] : []
+  const idx = list.findIndex((p) => p.id === 'prod-00001' || p.code === 'CP2610001')
+  if (idx === -1) return list
+  const row = list[idx]
+  list[idx] = {
+    ...row,
+    stockQty: 8,
+    production: {
+      ...(row.production || {}),
+      planStrategy: 'mts',
+      replenishQty: row.production?.replenishQty ?? 20,
+      defaultWarehouse: row.production?.defaultWarehouse || '成品仓',
+    },
+    alert: {
+      ...(row.alert || {}),
+      stockAlertEnabled: true,
+      minStockQty: 10,
+      maxStockQty: 50,
+    },
+  }
   return list
 }
 

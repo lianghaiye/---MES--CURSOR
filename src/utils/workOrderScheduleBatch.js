@@ -3,6 +3,7 @@
  * 一张工单多个批次，每批独立数量与工序执行人
  */
 import dayjs from 'dayjs'
+import { syncWorkOrderExecutionStatus, isScheduleIncomplete } from '@/utils/workOrderStatus'
 
 export function getWorkOrderPlanQty(wo) {
   return Math.max(0, Number(wo?.planQty) || 0)
@@ -10,8 +11,14 @@ export function getWorkOrderPlanQty(wo) {
 
 export function getBatchesScheduledQty(wo) {
   const batches = wo?.scheduleBatches || []
-  if (!batches.length) return Math.max(0, Number(wo?.scheduleQty) || 0)
-  return batches.reduce((s, b) => s + Math.max(0, Number(b.qty) || 0), 0)
+  if (batches.length) {
+    return batches.reduce((s, b) => s + Math.max(0, Number(b.qty) || 0), 0)
+  }
+  // 待下发且从未下发：创建时填写的 scheduleQty 不算「已排产」
+  if (!wo?.dispatchedAt && (!wo?.status || wo.status === '待下发')) {
+    return 0
+  }
+  return Math.max(0, Number(wo?.scheduleQty) || 0)
 }
 
 export function getRemainScheduleQty(wo) {
@@ -22,48 +29,35 @@ export function formatScheduleProgress(wo) {
   return `${getBatchesScheduledQty(wo)}/${getWorkOrderPlanQty(wo)}`
 }
 
+/** 排产未满计划（旁显用；不等于主状态） */
 export function isPartialScheduled(wo) {
-  const plan = getWorkOrderPlanQty(wo)
-  const scheduled = getBatchesScheduledQty(wo)
-  return plan > 0 && scheduled > 0 && scheduled < plan
+  return isScheduleIncomplete(wo)
 }
 
-/** 编辑/下发操作时间；不含小程序报工完工 */
-export function touchWorkOrderOperateUpdatedAt(workOrder, now = dayjs()) {
+/** 演示环境当前操作人 */
+export function getWorkOrderOperatorName() {
+  return 'admin1'
+}
+
+/** 编辑/下发等操作：写入更新时间、更新人（不含小程序报工完工） */
+export function touchWorkOrderOperateUpdatedAt(workOrder, now = dayjs(), operator) {
   if (!workOrder) return
   workOrder.updatedAt = now.format('YYYY-MM-DD HH:mm:ss')
+  workOrder.updater = operator || getWorkOrderOperatorName()
 }
 
 /**
- * 下发后回写工单状态：
- * - 尚无已下发批次 → 待下发
- * - 有已下发且仍有待下发批次或剩余可排 → 部分下发
- * - 已全部下发进入生产 → 执行中
- * 完成/暂停/终止不覆盖
+ * 下发后回写工单执行主状态：
+ * - 无已下发批次 → 待下发
+ * - 已下发且无人领取 → 已下发
+ * - 已有领取事实 → 执行中
+ * 未排完不改 status（旁显）；暂停/终止/已完成不覆盖
  */
 export function syncWorkOrderDispatchStatus(workOrder) {
-  if (!workOrder) return workOrder
-  const locked = ['完成', '已完成', '暂停', '终止']
-  if (locked.includes(workOrder.status)) return workOrder
-
-  const batches = workOrder.scheduleBatches || []
-  if (!batches.length) return workOrder
-
-  const hasDispatched = batches.some((b) => b.status && b.status !== '待下发')
-  if (!hasDispatched) {
-    workOrder.status = '待下发'
-    return workOrder
-  }
-
-  const hasPendingBatch = batches.some((b) => b.status === '待下发')
-  const remain = getRemainScheduleQty(workOrder)
-  if (hasPendingBatch || remain > 0) {
-    workOrder.status = '部分下发'
-  } else {
-    workOrder.status = '执行中'
-  }
-  return workOrder
+  return syncWorkOrderExecutionStatus(workOrder)
 }
+
+export { isScheduleIncomplete }
 
 function nextBatchId() {
   return `sb-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -100,10 +94,15 @@ export function normalizeWorkOrderScheduleFields(wo) {
  * @param {{ qty: number, processAssignments?: object[], dispatchNow?: boolean }} input
  */
 export function createScheduleBatch(workOrder, input) {
+  if (['暂停', '终止', '已完成', '完成'].includes(workOrder?.status) && input?.dispatchNow) {
+    return { ok: false, message: '当前工单状态不可下发' }
+  }
   const qty = Math.max(0, Number(input?.qty) || 0)
   if (qty <= 0) return { ok: false, message: '本批排产数量须大于 0' }
-  // 允许已排产 + 本批 > 计划数量（加急/超产）
-
+  const remain = getRemainScheduleQty(workOrder)
+  if (qty > remain) {
+    return { ok: false, message: `本批排产不可超过剩余可排 ${remain}` }
+  }
   const assignments =
     input.processAssignments?.length > 0
       ? input.processAssignments.map((a) => ({
@@ -139,6 +138,9 @@ export function createScheduleBatch(workOrder, input) {
   workOrder.scheduleQty = getBatchesScheduledQty(workOrder)
 
   if (input.dispatchNow) {
+    if (!workOrder.dispatchedAt) {
+      workOrder.dispatchedAt = dayjs().format('YYYY-MM-DD HH:mm')
+    }
     applyBatchExecutorsToWorkOrderProcesses(workOrder, batch)
     syncWorkOrderDispatchStatus(workOrder)
     touchWorkOrderOperateUpdatedAt(workOrder)
@@ -160,6 +162,9 @@ export function applyBatchExecutorsToWorkOrderProcesses(workOrder, batch) {
 }
 
 export function dispatchScheduleBatch(workOrder, batchId) {
+  if (['暂停', '终止', '已完成', '完成'].includes(workOrder?.status)) {
+    return { ok: false, message: '当前工单状态不可下发' }
+  }
   const batch = workOrder?.scheduleBatches?.find((b) => b.id === batchId)
   if (!batch) return { ok: false, message: '排产批次不存在' }
   if (batch.status !== '待下发') return { ok: false, message: '仅待下发批次可下发' }
@@ -175,6 +180,9 @@ export function dispatchScheduleBatch(workOrder, batchId) {
   batch.status = '执行中'
   batch.dispatchedAt = dayjs().format('YYYY-MM-DD HH:mm')
   workOrder.activeScheduleBatchId = batch.id
+  if (!workOrder.dispatchedAt) {
+    workOrder.dispatchedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  }
   applyBatchExecutorsToWorkOrderProcesses(workOrder, batch)
   syncWorkOrderDispatchStatus(workOrder)
   touchWorkOrderOperateUpdatedAt(workOrder)
@@ -208,10 +216,10 @@ export function getActiveScheduleBatch(workOrder) {
 export function batchStatusColor(status) {
   const map = {
     待下发: 'warning',
-    部分下发: 'processing',
     已下发: 'processing',
     执行中: 'blue',
     完成: 'success',
+    已完成: 'success',
   }
   return map[status] || 'default'
 }

@@ -6,6 +6,8 @@ import { purchaseOrderState, syncPurchaseOrderInboundStatus } from '@/store/purc
 import { calcPoLineRemainInboundQty } from '@/utils/purchaseLineInbound'
 import { warehouseState } from '@/store/warehouseStore'
 import { applyInboundToStock } from '@/store/stockStore'
+import { applyInboundToSalesAllocation } from '@/store/salesStockAllocationStore'
+import { salesOrderState } from '@/store/salesOrderStore'
 import { applyInboundBatchesFromRoots } from '@/store/stockBatchStore'
 import {
   isOneItemOneCodeBarcode,
@@ -376,6 +378,7 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
     pendingLines.forEach((line) => {
       line.lineStatus = '已入库'
     })
+    syncSalesAllocationAfterInbound(order, pendingLines)
     recomputeInboundOrderStatus(order, operator)
     count += 1
   })
@@ -401,8 +404,39 @@ export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
   if (!stockRes.ok) return stockRes
 
   line.lineStatus = '已入库'
+  syncSalesAllocationAfterInbound(order, [line])
   recomputeInboundOrderStatus(order, operator)
   return { ok: true, order, line }
+}
+
+/** 入库后：偿还调拨欠量，并按来源销售单补软占用 */
+function syncSalesAllocationAfterInbound(order, lines) {
+  const sourceOrderNo = order.sourceOrderNo || order.salesOrderNo || ''
+  const salesOrder = sourceOrderNo
+    ? salesOrderState.orders.find((o) => o.orderNo === sourceOrderNo)
+    : null
+
+  for (const line of lines) {
+    const code = String(line.itemCode || line.productCode || '').trim()
+    const qty = Number(line.qty) || 0
+    if (!code || qty <= 0) continue
+
+    let sourceSalesLineId = line.salesLineId || ''
+    if (!sourceSalesLineId && salesOrder?.lineItems?.length) {
+      const hit =
+        salesOrder.lineItems.find((l) => l.productCode === code) || salesOrder.lineItems[0]
+      sourceSalesLineId = hit?.id || ''
+    }
+
+    applyInboundToSalesAllocation({
+      itemCode: code,
+      qty,
+      sourceSalesOrderId: salesOrder?.id || '',
+      sourceSalesOrderNo: sourceOrderNo,
+      sourceSalesLineId,
+      itemName: line.itemName || line.productName || '',
+    })
+  }
 }
 
 export function approveInboundOrder(id, operator = 'admin1') {

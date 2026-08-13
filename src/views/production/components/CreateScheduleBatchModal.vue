@@ -11,12 +11,18 @@
       type="info"
       show-icon
       class="batch-alert"
-      :message="`计划数量 ${planQty} · 已排产 ${scheduledQty} · 建议剩余 ${remainQty}（允许超计划排产）`"
+      :message="`计划数量 ${planQty} · 已排产 ${scheduledQty} · 剩余可排 ${remainQty}（本批不可超过剩余可排）`"
     />
 
     <a-form layout="vertical" class="batch-form">
       <a-form-item label="本批排产数量" required>
-        <a-input-number v-model:value="form.qty" :min="1" :precision="0" style="width: 200px" />
+        <a-input-number
+          v-model:value="form.qty"
+          :min="1"
+          :max="Math.max(1, remainQty)"
+          :precision="0"
+          style="width: 200px"
+        />
       </a-form-item>
     </a-form>
 
@@ -82,7 +88,7 @@ const planQty = computed(() => getWorkOrderPlanQty(props.workOrder))
 const scheduledQty = computed(() => getBatchesScheduledQty(props.workOrder))
 const remainQty = computed(() => getRemainScheduleQty(props.workOrder))
 
-const canSubmit = computed(() => form.qty > 0)
+const canSubmit = computed(() => form.qty > 0 && form.qty <= Math.max(0, remainQty.value))
 
 const columns = [
   { title: '工序', dataIndex: 'processName', width: 140 },
@@ -110,7 +116,11 @@ function handleCancel() {
 
 function handleSave(dispatchNow) {
   if (!canSubmit.value) {
-    message.warning('请填写有效的本批排产数量')
+    message.warning(
+      remainQty.value <= 0
+        ? '计划数量已全部排产，不可再排'
+        : '本批排产数量须大于 0 且不超过剩余可排',
+    )
     return
   }
   if (dispatchNow) {

@@ -12,9 +12,16 @@
   >
     <div class="po-form-shell">
       <div class="form-layout">
-        <div class="section-block">
-          <div class="section-title">基本信息</div>
-          <a-form layout="inline" class="header-form horizontal-form">
+        <div class="section-block" :class="{ 'is-collapsed': basicInfoCollapsed }">
+          <div class="section-title-row">
+            <span class="section-title">基本信息</span>
+            <a-button type="link" size="small" class="collapse-btn" @click="toggleBasicInfo">
+              {{ basicInfoCollapsed ? '展开' : '收起' }}
+              <DownOutlined v-if="basicInfoCollapsed" />
+              <UpOutlined v-else />
+            </a-button>
+          </div>
+          <a-form v-show="!basicInfoCollapsed" layout="inline" class="header-form horizontal-form">
             <a-row :gutter="[12, 12]" style="width: 100%">
               <a-col :span="6">
                 <a-form-item label="采购单号">
@@ -64,7 +71,7 @@
           </a-form>
         </div>
 
-        <div class="section-block">
+        <div v-show="!basicInfoCollapsed" class="section-block">
           <div class="section-title">供应商信息</div>
           <a-form layout="inline" class="header-form horizontal-form">
             <a-row :gutter="[12, 12]" style="width: 100%">
@@ -147,7 +154,7 @@
           </a-form>
         </div>
 
-        <div class="section-block">
+        <div v-show="!basicInfoCollapsed" class="section-block">
           <div class="section-title">交付信息</div>
           <a-form layout="inline" class="header-form horizontal-form">
             <a-row :gutter="[12, 12]" style="width: 100%">
@@ -642,7 +649,13 @@ import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numb
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons-vue'
+import {
+  PlusOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  UpOutlined,
+  DownOutlined,
+} from '@ant-design/icons-vue'
 import {
   settlementTypeOptions,
   settlementCycleOptions,
@@ -714,6 +727,7 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 
 const taxModeExcluding = ref(true)
 const addingItems = ref(false)
+const basicInfoCollapsed = ref(false)
 const productPickerOpen = ref(false)
 const prevHeaderDeliveryDate = ref('')
 const prevHeaderReceivingWarehouse = ref(undefined)
@@ -854,13 +868,26 @@ watch(
   () => [isActive.value, props.editRecord?.id],
   ([visible]) => {
     if (!visible) return
+    basicInfoCollapsed.value = false
     taxModeExcluding.value = true
     selectedLineKeys.value = []
     if (props.editRecord) loadEditForm(props.editRecord)
     else resetForm()
+    nextTick(() => {
+      updateScrollY()
+      setTimeout(updateScrollY, 120)
+    })
   },
   { immediate: true },
 )
+
+function toggleBasicInfo() {
+  basicInfoCollapsed.value = !basicInfoCollapsed.value
+  nextTick(() => {
+    updateScrollY()
+    setTimeout(updateScrollY, 120)
+  })
+}
 
 function normalizeLineItems(items) {
   return items.map((line) => ({
@@ -1499,11 +1526,38 @@ function handleSave() {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   flex-shrink: 0;
 
+  .section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
   .section-title {
     font-size: 14px;
     font-weight: 600;
     margin-bottom: 12px;
     color: #1f1f1f;
+  }
+
+  .section-title-row .section-title {
+    margin-bottom: 0;
+  }
+
+  .collapse-btn {
+    padding-inline: 4px;
+    height: auto;
+    flex-shrink: 0;
+  }
+
+  &.is-collapsed {
+    padding-top: 10px;
+    padding-bottom: 10px;
+
+    .section-title-row {
+      margin-bottom: 0;
+    }
   }
 
   &.section-block--lines {

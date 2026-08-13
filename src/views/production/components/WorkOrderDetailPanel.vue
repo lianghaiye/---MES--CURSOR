@@ -7,14 +7,13 @@
           <span class="name">{{ workOrder.name }}</span>
         </div>
         <a-space :size="6" class="header-tags">
-          <a-tag :color="statusTagColor(workOrder.status)">
-            {{ workOrder.orderCategory || '生产工单' }}
-          </a-tag>
+          <a-tag>{{ workOrder.orderCategory || '生产工单' }}</a-tag>
           <a-tag :color="statusTagColor(workOrder.status)">{{ workOrder.status }}</a-tag>
-          <a-tag v-if="workOrder.taskStatus && workOrder.taskStatus !== '正常'">
-            {{ workOrder.taskStatus }}
-          </a-tag>
-          <a-tag v-if="workOrder.urgency && workOrder.urgency !== '普通'" color="orange">
+          <a-tag v-if="isScheduleIncomplete(workOrder)" color="processing">未排完</a-tag>
+          <a-tag
+            v-if="workOrder.urgency && workOrder.urgency !== '普通' && workOrder.urgency !== '正常'"
+            color="orange"
+          >
             {{ workOrder.urgency }}
           </a-tag>
         </a-space>
@@ -33,6 +32,45 @@
           {{ detailCollapsed ? '展开详情' : '收起详情' }}
           <UpOutlined v-if="!detailCollapsed" />
           <DownOutlined v-else />
+        </a-button>
+      </a-space>
+    </div>
+
+    <div v-if="variant === 'production' || variant === 'assembly'" class="detail-action-bar">
+      <a-space :size="8" wrap>
+        <a-button
+          v-if="canEditScheduleQty"
+          type="primary"
+          ghost
+          size="small"
+          @click="emitAction('schedule-qty')"
+        >
+          修改排产数量
+        </a-button>
+        <a-button
+          v-if="canAdjustUrgency"
+          type="primary"
+          size="small"
+          @click="emitAction('urgency')"
+        >
+          调整紧急度
+        </a-button>
+        <a-button v-if="canPause" size="small" class="btn-pause" @click="emitAction('pause')">
+          暂停
+        </a-button>
+        <a-button v-if="canResume" size="small" type="primary" @click="emitAction('resume')">
+          恢复
+        </a-button>
+        <a-button v-if="canTerminate" danger size="small" @click="emitAction('terminate')">
+          终止
+        </a-button>
+        <a-button
+          v-if="canComplete"
+          size="small"
+          class="btn-complete"
+          @click="emitAction('complete')"
+        >
+          完成
         </a-button>
       </a-space>
     </div>
@@ -131,7 +169,9 @@ import {
   getBatchesScheduledQty,
   getWorkOrderPlanQty,
   normalizeWorkOrderScheduleFields,
+  isScheduleIncomplete,
 } from '@/utils/workOrderScheduleBatch'
+import { canShowEditScheduleQty } from '@/utils/workOrderStatus'
 
 const printModalOpen = ref(false)
 
@@ -190,12 +230,15 @@ watch(
     const plan = getWorkOrderPlanQty(workOrder.value)
     const scheduled = getBatchesScheduledQty(workOrder.value)
     const suggest = Math.max(0, plan - scheduled)
+    const current = Number(workOrder.value.dispatchBatchQty)
     if (
       workOrder.value.dispatchBatchQty == null ||
       workOrder.value.dispatchBatchQty === '' ||
-      Number(workOrder.value.dispatchBatchQty) === Number(workOrder.value.scheduleQty)
+      !Number.isFinite(current) ||
+      current <= 0 ||
+      current > suggest
     ) {
-      workOrder.value.dispatchBatchQty = suggest > 0 ? suggest : plan || 1
+      workOrder.value.dispatchBatchQty = suggest > 0 ? suggest : 0
     }
     if (ensureWorkOrderProcessRoute(workOrder.value)) {
       emit('save-basic')
@@ -204,8 +247,39 @@ watch(
   { immediate: true },
 )
 
+const canEditScheduleQty = computed(() => canShowEditScheduleQty(workOrder.value))
+
+const canAdjustUrgency = computed(() => {
+  const wo = workOrder.value
+  if (!wo) return false
+  return !['终止', '已完成', '完成'].includes(wo.status)
+})
+
+const canPause = computed(() => ['待下发', '已下发', '执行中'].includes(workOrder.value?.status))
+
+const canResume = computed(() => workOrder.value?.status === '暂停')
+
+const canTerminate = computed(() =>
+  ['待下发', '已下发', '执行中', '暂停'].includes(workOrder.value?.status),
+)
+
+const canComplete = computed(() => ['已下发', '执行中'].includes(workOrder.value?.status))
+
+function emitAction(key) {
+  if (!workOrder.value) return
+  emit('detail-action', { key, workOrder: workOrder.value })
+}
+
 function onWorkOrderFieldUpdate({ key, value }) {
   if (!workOrder.value) return
+  if (key === 'dispatchBatchQty') {
+    const plan = getWorkOrderPlanQty(workOrder.value)
+    const scheduled = getBatchesScheduledQty(workOrder.value)
+    const max = Math.max(0, plan - scheduled)
+    const n = Number(value)
+    workOrder.value[key] = Number.isFinite(n) ? Math.min(Math.max(0, n), max || plan) : value
+    return
+  }
   workOrder.value[key] = value
 }
 
@@ -218,9 +292,9 @@ function onProcessRouteChange(routeName) {
 function statusTagColor(status) {
   const map = {
     待下发: 'warning',
-    部分下发: 'processing',
     已下发: 'processing',
     执行中: 'processing',
+    已完成: 'success',
     完成: 'success',
     暂停: 'default',
     终止: 'error',
@@ -291,6 +365,24 @@ function statusTagColor(status) {
       font-size: 12px;
       height: auto;
       color: rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  .detail-action-bar {
+    margin-bottom: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+
+    .btn-pause {
+      color: #d46b08;
+      border-color: #ffd591;
+      background: #fff7e6;
+    }
+
+    .btn-complete {
+      color: #389e0d;
+      border-color: #b7eb8f;
+      background: #f6ffed;
     }
   }
 

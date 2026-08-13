@@ -10,14 +10,18 @@ import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { enrichWorkItem, resolveSalesLineForWorkItem } from '@/utils/productionPlanWorkItem'
 import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
 import { applyCrossDemoStockToPlanMaterials } from '@/mock/crossModuleDemoSeed'
+import { PLAN_SOURCE } from '@/utils/planSource'
 
 const STORAGE_KEY = 'i_doms_production_plans'
-/** v8：跨模块演示库存写回计划物料 */
-const DATA_VERSION = 8
+/** v9：计划来源（销售订单 / 库存补货） */
+const DATA_VERSION = 9
 
 function normalizePlanStatuses(orders) {
   return orders.map((o) => {
     const plan = { ...o }
+    if (!plan.planSource) {
+      plan.planSource = plan.salesOrderNo ? 'sales-order' : 'manual'
+    }
     if (plan.orderStatus === '待排产') plan.orderStatus = '待下达'
     if (plan.orderStatus === '生产中') plan.orderStatus = '执行中'
     if (Array.isArray(plan.tags)) {
@@ -191,6 +195,7 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
 
   const plan = {
     id: `pp-${Date.now()}`,
+    planSource: PLAN_SOURCE.SALES_ORDER,
     salesOrderNo: salesOrder.orderNo,
     orderNo: salesOrder.orderNo,
     customerName: salesOrder.customerName,
@@ -206,6 +211,92 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
     remark: salesOrder.remark || '',
     tags: ['待下达'],
     daysToDelivery,
+    planAssemblyDate: '',
+    planCompleteDate: deliveryDate,
+    workItems,
+  }
+
+  addProductionPlan(plan)
+  return plan
+}
+
+let replenishPlanSeq = 1
+
+function nextReplenishPlanNo() {
+  const no = `BH${dayjs().format('YYYYMMDD')}${String(replenishPlanSeq).padStart(4, '0')}`
+  replenishPlanSeq += 1
+  return no
+}
+
+/**
+ * 由库存补货建议生成生产计划（无销售单号）
+ * @param {Array<object>} suggestionRows listStockReplenishSuggestions 行，可含 planQty 覆盖
+ */
+export function createProductionPlanFromStockReplenish(suggestionRows = []) {
+  const rows = (suggestionRows || []).filter(
+    (r) => (Number(r.planQty) || Number(r.suggestQty) || 0) > 0,
+  )
+  if (!rows.length) return null
+
+  const deliveryDate = dayjs().add(7, 'day').format('YYYY-MM-DD')
+  const orderNo = nextReplenishPlanNo()
+  const totalQty = rows.reduce((s, r) => s + (Number(r.planQty) || Number(r.suggestQty) || 0), 0)
+
+  const workItems = rows.map((row, index) => {
+    const planQty = Number(row.planQty) || Number(row.suggestQty) || 0
+    const bom =
+      (row.bomId ? getProductBomById(row.bomId) : null) ||
+      getOwnActiveBomForItem('product', row.productId)
+    const snapshot = bom ? buildEbomSnapshotFromBom(bom, planQty) : { materials: [] }
+
+    return enrichWorkItem(
+      {
+        id: `wi-bh-${row.productId}-${Date.now()}-${index}`,
+        salesLineId: '',
+        status: '待下达',
+        expanded: index === 0,
+        salesQty: planQty,
+        orderQty: planQty,
+        stockQty: Number(row.availableStock) || 0,
+        planQty,
+        productName: row.productName,
+        productCode: row.productCode,
+        productId: row.productId,
+        productAttr: '标准产品',
+        productType: '标准产品',
+        model: row.specModel,
+        spec: row.specModel,
+        deliveryDate,
+        bomId: row.bomId || bom?.id || '',
+        bomName: row.bomName || bom?.bomName || '',
+        bomVersion: row.bomVersion || bom?.version || '',
+        ebomSnapshot: snapshot,
+        materials: snapshot.materials || [],
+        unit: row.unit || '件',
+      },
+      null,
+      index,
+    )
+  })
+
+  const plan = {
+    id: `pp-bh-${Date.now()}`,
+    planSource: PLAN_SOURCE.STOCK_REPLENISH,
+    salesOrderNo: '',
+    orderNo,
+    customerName: '库存补货',
+    productQty: totalQty,
+    salesperson: '',
+    urgency: '普通',
+    orderStatus: '待下达',
+    orderDate: dayjs().format('YYYY-MM-DD'),
+    deliveryDate,
+    region: '',
+    settlementType: '',
+    deliveryMethod: '',
+    remark: '以库存生产 · 库存补货',
+    tags: ['待下达', '库存补货'],
+    daysToDelivery: Math.max(0, dayjs(deliveryDate).diff(dayjs(), 'day')),
     planAssemblyDate: '',
     planCompleteDate: deliveryDate,
     workItems,
@@ -266,10 +357,15 @@ export function syncProductionPlanDeliveryMode(salesOrderNo, planOps) {
 
 export function filterProductionPlans(list, filters) {
   return list.filter((order) => {
-    if (filters.orderNo && !order.orderNo.includes(filters.orderNo)) return false
-    if (filters.customerName && !order.customerName.includes(filters.customerName)) return false
+    if (filters.orderNo && !(order.orderNo || '').includes(filters.orderNo)) return false
+    if (filters.customerName && !(order.customerName || '').includes(filters.customerName))
+      return false
     if (filters.urgency && order.urgency !== filters.urgency) return false
     if (filters.orderStatus && order.orderStatus !== filters.orderStatus) return false
+    if (filters.planSource) {
+      const source = order.planSource || (order.salesOrderNo ? 'sales-order' : 'manual')
+      if (source !== filters.planSource) return false
+    }
     if (filters.orderDateRange?.length === 2) {
       const [start, end] = filters.orderDateRange
       if (

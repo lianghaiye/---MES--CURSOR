@@ -790,6 +790,7 @@ import {
 import { getActiveShipBomForProduct } from '@/store/productBomStore'
 import { calcSalesLineAvailableQty } from '@/utils/salesLineShipped'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
+import { getFreeQtyByItemCode, getLineAllocatedQty } from '@/store/salesStockAllocationStore'
 
 const props = defineProps({
   open: Boolean,
@@ -1700,6 +1701,16 @@ function validateWholeMachineLines() {
         `「${line.productName}」本次发货数量不能超过可发数量 ${formatDeliveryQty(maxQty)}（订单 ${formatDeliveryQty(line.orderQty)}，已申请 ${formatDeliveryQty(line.appliedShipQty)}）`,
       )
       return false
+    }
+    if (so?.id) {
+      const alloc = getLineAllocatedQty(so.id, salesLine?.id || line.salesLineId || line.id)
+      const free = getFreeQtyByItemCode(line.productCode)
+      const softAvail = alloc + free
+      if (shipQty > softAvail + 1e-9) {
+        message.warning(
+          `「${line.productName}」本单占用 ${alloc} + 自由备货 ${free} = ${softAvail}，本次申请 ${shipQty} 超出软占用口径（仍允许提交，建议先跨单调拨或补货）`,
+        )
+      }
     }
   }
   return true

@@ -164,8 +164,8 @@
             </a-form-item>
           </a-col>
           <a-col :span="6">
-            <a-form-item label="负责人">
-              <WorkOrderOwnerSelect v-model="form.owner" placeholder="请选择负责人" />
+            <a-form-item label="创建人">
+              <WorkOrderOwnerSelect v-model="form.owner" placeholder="请选择创建人" />
             </a-form-item>
           </a-col>
           <a-col :span="6">

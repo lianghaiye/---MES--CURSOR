@@ -57,6 +57,8 @@ function createProduct(index, overrides = {}) {
     remark: '',
     expiryAlertEnabled: index % 7 === 0,
     production: {
+      planStrategy: 'mto',
+      replenishQty: undefined,
       defaultWorkCenter: workCenters[index % workCenters.length],
       standardCycleDays: index % 10,
       defaultProcessRoute: index % 2 === 0 ? '机加标准路线' : undefined,
@@ -66,6 +68,7 @@ function createProduct(index, overrides = {}) {
           : undefined,
       defaultWarehouse: '半成品仓',
     },
+    stockQty: undefined,
     alert: {
       stockAlertEnabled: index % 5 === 0,
       maxStockQty: index % 5 === 0 ? 200 : undefined,
@@ -83,7 +86,29 @@ function createProduct(index, overrides = {}) {
 /** 少量单规格成品 + 稳定演示编码；族下 SKU 由 spuBootstrap 生成 */
 export const mockProducts = applyLaborConfigSeed(
   migrateProductList([
-    ...Array.from({ length: STABLE_DEMO_COUNT }, (_, i) => createProduct(i)),
+    ...Array.from({ length: STABLE_DEMO_COUNT }, (_, i) =>
+      i === 0
+        ? createProduct(0, {
+            stockQty: 8,
+            production: {
+              planStrategy: 'mts',
+              replenishQty: 20,
+              defaultWorkCenter: workCenters[0],
+              standardCycleDays: 0,
+              defaultProcessRoute: '机加标准路线',
+              defaultWarehouse: '成品仓',
+            },
+            alert: {
+              stockAlertEnabled: true,
+              maxStockQty: 50,
+              minStockQty: 10,
+              expiryAlertEnabled: false,
+              defectRateThreshold: undefined,
+              attachments: [],
+            },
+          })
+        : createProduct(i),
+    ),
     createProduct(8, {
       name: '隔膜计量泵 JMX-A',
       code: 'CP2610009',

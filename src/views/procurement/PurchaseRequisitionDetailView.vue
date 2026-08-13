@@ -98,6 +98,9 @@
                   <template v-else-if="column.key === 'supplierName'">
                     {{ line.supplierName || '—' }}
                   </template>
+                  <template v-else-if="column.key === 'receivingWarehouse'">
+                    {{ lineReceivingWarehouse(line) }}
+                  </template>
                   <template v-else-if="column.key === 'salesOrderNo'">
                     {{ line.salesOrderNo || '—' }}
                   </template>
@@ -265,6 +268,10 @@ const defaultWarehouse = computed(() => {
   const line = record.value?.lineItems?.[0]
   return line?.receivingWarehouse || record.value?.receivingWarehouse || '—'
 })
+
+function lineReceivingWarehouse(line) {
+  return line?.receivingWarehouse || record.value?.receivingWarehouse || '—'
+}
 
 const showActions = computed(
   () => record.value && canGeneratePO(record.value) && !isDraftLocked.value,

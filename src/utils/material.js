@@ -336,6 +336,9 @@ export function buildOutsourceWorkOrderRows(materials, order) {
       inTransitText: m.inTransitText || transit.inTransitText,
       demandQty,
       gapQty,
+      maxStockQty: Number(m.maxStockQty) || 0,
+      minStockQty: Number(m.minStockQty) || 0,
+      suggestQty: Number(m.suggestQty) || 0,
       planQty: m.planQty ?? gapQty,
       unit: m.unit || '件',
       expectedArrivalDate:
@@ -394,6 +397,9 @@ export function buildPurchaseRequisitionRows(materials, order) {
       inTransitText: m.inTransitText || transit.inTransitText,
       demandQty,
       gapQty,
+      maxStockQty: Number(m.maxStockQty) || 0,
+      minStockQty: Number(m.minStockQty) || 0,
+      suggestQty: Number(m.suggestQty) || 0,
       /** 计划数量：采购单位口径（已按包装含量向上取整） */
       planQty: converted.planPurchaseQty,
       stockPlanQty: stockPlan,

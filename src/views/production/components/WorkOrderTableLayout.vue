@@ -40,11 +40,8 @@
         </template>
         <template v-else-if="column.key === 'progress'">
           <a-tag :color="statusColor(record.status)">
-            {{ formatCell(record.progressLabel || record.status) }}
+            {{ formatCell(record.status) }}
           </a-tag>
-        </template>
-        <template v-else-if="column.key === 'taskStatus'">
-          {{ formatCell(record.taskStatus || '正常') }}
         </template>
         <template v-else-if="column.key === 'customerName'">
           {{ formatCell(resolveWorkOrderSalesMeta(record).customerName) }}
@@ -52,7 +49,7 @@
         <template v-else-if="column.key === 'scheduleQty'">
           <span>{{ formatScheduleProgress(record) }}</span>
           <a-tag v-if="isPartialScheduled(record)" color="processing" class="partial-tag">
-            部分排产
+            未排完
           </a-tag>
         </template>
         <template v-else-if="column.key === 'variantAttr'">
@@ -60,6 +57,9 @@
         </template>
         <template v-else-if="column.key === 'planDateRange'">
           {{ formatCell(formatWorkOrderPlanDateRange(record.planDateRange)) }}
+        </template>
+        <template v-else-if="column.key === 'owner'">
+          {{ formatCell(record.creator || record.owner) }}
         </template>
         <template v-else-if="column.key === 'urgency'">
           <a-tag :color="urgencyTagColor(record.urgency)">
@@ -83,7 +83,7 @@
               克隆
             </a-button>
             <a-button
-              v-if="record.status === '待下发' || record.status === '部分下发'"
+              v-if="canShowDispatchAction(record)"
               type="link"
               size="small"
               @click.stop="emit('action', 'dispatch', record)"
@@ -130,6 +130,7 @@ import {
   resolveWorkOrderVariantSummary,
 } from '@/utils/workOrderBasicFields'
 import { formatScheduleProgress, isPartialScheduled } from '@/utils/workOrderScheduleBatch'
+import { workOrderStatusColor } from '@/utils/workOrderStatus'
 
 const props = defineProps({
   dataSource: { type: Array, default: () => [] },
@@ -137,7 +138,7 @@ const props = defineProps({
   pagination: { type: Object, required: true },
   selectedIds: { type: Array, default: () => [] },
   activeId: { type: String, default: null },
-  columnSettingsKey: { type: String, default: 'work-order-list-v2' },
+  columnSettingsKey: { type: String, default: 'work-order-list-v3' },
 })
 
 const emit = defineEmits([
@@ -153,8 +154,7 @@ const baseColumns = [
   { title: '#', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '工单编号', dataIndex: 'code', key: 'code', width: 150, ellipsis: true, fixed: 'left' },
   { title: '工单名称', dataIndex: 'name', key: 'name', width: 180, ellipsis: true },
-  { title: '进度', key: 'progress', width: 90 },
-  { title: '状态', key: 'taskStatus', dataIndex: 'taskStatus', width: 80 },
+  { title: '状态', key: 'progress', width: 90 },
   {
     title: '销售订单号',
     dataIndex: 'sourceOrderNo',
@@ -191,7 +191,7 @@ const baseColumns = [
     align: 'right',
   },
   { title: '工作中心', dataIndex: 'workCenter', key: 'workCenter', width: 100, ellipsis: true },
-  { title: '负责人', dataIndex: 'owner', key: 'owner', width: 90, ellipsis: true },
+  { title: '创建人', dataIndex: 'owner', key: 'owner', width: 90, ellipsis: true },
   { title: '预入仓库', dataIndex: 'warehouse', key: 'warehouse', width: 100, ellipsis: true },
   { title: '紧急度', key: 'urgency', dataIndex: 'urgency', width: 90 },
   { title: '计划日期', key: 'planDateRange', width: 180, ellipsis: true },
@@ -233,16 +233,15 @@ function onPageSizeChange(_current, size) {
 }
 
 function statusColor(status) {
-  const map = {
-    待下发: 'warning',
-    部分下发: 'processing',
-    已下发: 'processing',
-    执行中: 'blue',
-    完成: 'success',
-    暂停: 'default',
-    终止: 'error',
-  }
-  return map[status] || 'default'
+  return workOrderStatusColor(status)
+}
+
+/** 待下发始终可下发；已下发/执行中仅未排完时可继续下发 */
+function canShowDispatchAction(record) {
+  if (!record) return false
+  if (record.status === '待下发') return true
+  if (!['已下发', '执行中'].includes(record.status)) return false
+  return isPartialScheduled(record)
 }
 
 function urgencyTagColor(urgency) {

@@ -6,9 +6,35 @@ import { getActiveScheduleBatch } from '@/utils/workOrderScheduleBatch'
 import { materialRequisitionState } from '@/store/materialRequisitionStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { outboundState } from '@/store/outboundStore'
+import { listMobileTasksForWorkOrder } from '@/utils/workOrderStatus'
 
 function sumLineQty(lines) {
   return (lines || []).reduce((s, l) => s + (Number(l.qty ?? l.applyQty ?? l.reqQty) || 0), 0)
+}
+
+function findMobileTaskForRow(tasks, processName, executor) {
+  const byProcess = (tasks || []).filter(
+    (t) => !t.hiddenByTerminate && t.processName === processName,
+  )
+  if (!byProcess.length) return null
+  if (executor && executor !== '—') {
+    return (
+      byProcess.find((t) => t.executor === executor || t.claimedBy === executor) ||
+      byProcess.find((t) => !t.executor) ||
+      byProcess[0]
+    )
+  }
+  return byProcess[0]
+}
+
+function mapMobileTaskStatus(task) {
+  if (!task) return ''
+  if (task.controlStatus === '暂停' && task.taskStatus !== '已完成') return '暂停'
+  if (task.taskStatus === '已完成') return '已报工'
+  if (Number(task.reportedFinishedQty) > 0 || Number(task.reportedGoodQty) > 0) return '已报工'
+  if (task.taskStatus === '待领取') return '待领取'
+  if (['待报工', '待开始', '执行中'].includes(task.taskStatus)) return '待报工'
+  return task.taskStatus || '待报工'
 }
 
 /** 排产信息：按批次展开工序任务行 */
@@ -18,6 +44,7 @@ export function buildWorkOrderScheduleInfoRows(workOrder) {
     // 无批次时用工序模板占位一行提示
     return []
   }
+  const mobileTasks = listMobileTasksForWorkOrder(workOrder.id)
   const rows = []
   let seq = 0
   batches.forEach((batch) => {
@@ -32,11 +59,41 @@ export function buildWorkOrderScheduleInfoRows(workOrder) {
       const executors = a.executors?.length ? a.executors : ['—']
       executors.forEach((executor, ei) => {
         seq += 1
-        const reported = batch.status === '完成'
+        const task = findMobileTaskForRow(mobileTasks, a.processName, executor)
         const dispatched = batch.status !== '待下发'
         let status = '待领取'
-        if (reported) status = '已报工'
-        else if (dispatched) status = '待报工'
+        let reportQty = 0
+        let goodQty = 0
+        let badQty = 0
+        let reportDuration = '—'
+        let reportedAt = '—'
+        let taskNo = `${workOrder.code || 'WO'}-B${batch.batchNo}-${ai + 1}-${ei + 1}`
+
+        if (task) {
+          status = mapMobileTaskStatus(task)
+          reportQty = Number(task.reportedFinishedQty || task.reportQty || 0) || 0
+          goodQty = Number(task.reportedGoodQty || 0) || 0
+          badQty = Number(task.reportedBadQty || task.badQty || 0) || 0
+          reportDuration = task.reportDuration ? String(task.reportDuration) : '—'
+          reportedAt = task.reportedAt || '—'
+          taskNo = task.taskNo || taskNo
+        } else if (a.reportCleared || a.scheduleTaskStatus) {
+          status = a.scheduleTaskStatus || '待报工'
+          reportQty = Number(a.reportQty) || 0
+          goodQty = Number(a.goodQty) || 0
+          badQty = Number(a.badQty) || 0
+          reportDuration = a.reportDuration || '—'
+          reportedAt = a.reportedAt || '—'
+        } else {
+          const reported = batch.status === '完成'
+          if (reported) status = '已报工'
+          else if (dispatched) status = '待报工'
+          reportQty = reported ? batch.qty : 0
+          goodQty = reported ? batch.qty : 0
+          reportDuration = reported ? '2.5h' : '—'
+          reportedAt = reported ? batch.dispatchedAt || '—' : '—'
+        }
+
         rows.push({
           id: `${batch.id}-${a.processId || ai}-${ei}`,
           batchId: batch.id,
@@ -44,15 +101,15 @@ export function buildWorkOrderScheduleInfoRows(workOrder) {
           seq,
           processName: a.processName || '—',
           status,
-          taskNo: `${workOrder.code || 'WO'}-B${batch.batchNo}-${ai + 1}-${ei + 1}`,
+          taskNo,
           executor,
           scheduleQty: batch.qty,
-          reportQty: reported ? batch.qty : 0,
-          goodQty: reported ? batch.qty : 0,
-          badQty: 0,
-          reportDuration: reported ? '2.5h' : '—',
+          reportQty,
+          goodQty,
+          badQty,
+          reportDuration,
           dispatchedAt: batch.dispatchedAt || '—',
-          reportedAt: reported ? batch.dispatchedAt || '—' : '—',
+          reportedAt,
         })
       })
     })
@@ -61,7 +118,12 @@ export function buildWorkOrderScheduleInfoRows(workOrder) {
 }
 
 export function scheduleTaskStatusColor(status) {
-  const map = { 待领取: 'default', 待报工: 'processing', 已报工: 'success' }
+  const map = {
+    待领取: 'default',
+    待报工: 'processing',
+    已报工: 'success',
+    暂停: 'warning',
+  }
   return map[status] || 'default'
 }
 

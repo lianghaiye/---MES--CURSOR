@@ -37,7 +37,7 @@ export function buildWorkOrderDetail(workOrder) {
       owner: workOrder.owner || 'admin1',
       productName: workOrder.productName || '',
       warehouse: workOrder.warehouse || '',
-      progress: workOrder.progressLabel || workOrder.status || '新建',
+      progress: workOrder.status || '待下发',
       scheduleQty,
       planEndDate: planEnd,
     },
