@@ -168,6 +168,10 @@
         </a-form>
       </div>
 
+      <div v-if="workOrderList.length" class="section-block">
+        <OutboundWorkOrderList :work-orders="workOrderList" />
+      </div>
+
       <div class="section-block section-block--lines">
         <div class="section-title">出库清单</div>
         <div class="line-toolbar">
@@ -563,9 +567,12 @@ import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSal
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import OutboundLineEditModal from './OutboundLineEditModal.vue'
 import OutboundBatchSearchModal from './OutboundBatchSearchModal.vue'
+import OutboundWorkOrderList from './OutboundWorkOrderList.vue'
 import InventoryLineItemSelect from './InventoryLineItemSelect.vue'
 import InventoryLineEditableCell from './InventoryLineEditableCell.vue'
 import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
+import { mobileMaterialReqState } from '@/store/mobileMaterialReqStore'
+import { resolveOutboundWorkOrders } from '@/utils/outboundWorkOrders'
 import { outboundTypeOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
@@ -643,6 +650,20 @@ const isSalesOutbound = computed(() => form.outboundType === '销售出库')
 const showReceiveWarehouse = computed(
   () => form.outboundType === '领料出库' || form.outboundType === '发料出库',
 )
+const workOrderList = computed(() => {
+  void mobileMaterialReqState.items
+  const orderLike = {
+    ...(props.editRecord || {}),
+    outboundType: form.outboundType,
+    workOrders: form.workOrders,
+    materialReqId: form.materialReqId || props.editRecord?.materialReqId,
+    materialReqNo: form.materialReqNo || props.editRecord?.materialReqNo,
+    sourceOrderNo: props.editRecord?.sourceOrderNo,
+    id: props.editRecord?.id,
+    docNo: form.docNo || props.editRecord?.docNo,
+  }
+  return resolveOutboundWorkOrders(orderLike, mobileMaterialReqState.items)
+})
 const lockOutboundType = computed(() => isFromDelivery.value)
 const lockSalesOrder = computed(() => isFromDelivery.value)
 
@@ -831,6 +852,9 @@ const form = reactive({
   deliveryMethod: '',
   deliveryRemark: '',
   remark: '',
+  workOrders: [],
+  materialReqId: '',
+  materialReqNo: '',
   lineItems: [],
 })
 
@@ -949,6 +973,9 @@ function loadEditForm(record) {
     deliveryMethod: '',
     deliveryRemark: delivery?.remark || '',
     remark: record.remark || '',
+    workOrders: Array.isArray(record.workOrders) ? [...record.workOrders] : [],
+    materialReqId: record.materialReqId || '',
+    materialReqNo: record.materialReqNo || '',
     lineItems: (record.lineItems || []).map((l) => {
       const row = enrichOutboundLine({
         ...l,
@@ -960,6 +987,9 @@ function loadEditForm(record) {
       return row
     }),
   })
+  if (!form.workOrders.length) {
+    form.workOrders = resolveOutboundWorkOrders(record, mobileMaterialReqState.items)
+  }
   if (form.salesOrderNo) {
     syncSalesOrderMeta(form.salesOrderNo, form.salesOrderId)
   }
@@ -1014,6 +1044,9 @@ function resetForm() {
     deliveryMethod: '',
     deliveryRemark: '',
     remark: '',
+    workOrders: [],
+    materialReqId: '',
+    materialReqNo: '',
     lineItems: [],
   })
   prevHeaderWarehouse.value = undefined
@@ -1367,6 +1400,9 @@ function buildPayload() {
     contractNo: form.contractNo?.trim() || '',
     customerName: form.customerName || '',
     remark: form.remark?.trim(),
+    workOrders: form.workOrders || [],
+    materialReqId: form.materialReqId || '',
+    materialReqNo: form.materialReqNo || '',
     lineItems: form.lineItems
       .filter((l) => l.itemCode)
       .map((l) => {

@@ -16,6 +16,7 @@ import {
   getOutboundOrderById,
   resolveOutboundInitialStatus,
 } from '@/store/outboundStore'
+import { snapshotWorkOrdersForOutbound } from '@/utils/outboundWorkOrders'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
 import {
   mergeMaterialLines,
@@ -287,6 +288,28 @@ function createOutboundForRequisition(record) {
   const channel = draft.channel || record.sourceChannel || 'web'
   const outboundStatus = resolveOutboundInitialStatus('领料出库')
 
+  const workOrders = snapshotWorkOrdersForOutbound(
+    record.workOrders?.length
+      ? record.workOrders
+      : record.workOrderCode || record.workOrderId
+        ? [
+            {
+              id: record.workOrderId,
+              code: record.workOrderCode,
+              productName: record.productName,
+              productCode: record.productCode,
+              specModel: record.specModel,
+              material: record.material,
+              drawingNo: record.drawingNo,
+              bom: record.bom,
+              planQty: record.planQty ?? record.scheduleQty,
+              scheduleQty: record.scheduleQty,
+              salesOrderNo: record.salesOrderNo,
+            },
+          ]
+        : [],
+  )
+
   return appendOutboundOrder({
     outboundType: '领料出库',
     status: outboundStatus,
@@ -296,10 +319,14 @@ function createOutboundForRequisition(record) {
     workshop,
     requisitionDept: workshop,
     receiveWarehouse: record.receiveWarehouse || '',
-    sourceOrderNo,
+    sourceOrderNo: sourceOrderNo || record.reqNo || '',
+    materialReqId: record.id || '',
+    materialReqNo: record.reqNo || '',
+    salesOrderNo: record.salesOrderNo || '',
     warehouse: draft.warehouse || '',
     remark: remarkBase,
     sourceChannel: channel,
+    workOrders,
     lineItems: (record.lines || []).map((line) => ({
       itemCode: line.itemCode,
       itemName: line.itemName,

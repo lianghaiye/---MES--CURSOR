@@ -2,6 +2,7 @@ import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { cloneOutboundOrders, createOutboundLine, createOutboundOrder } from '@/mock/outboundOrders'
 import { ensureCrossDemoOutboundOrders } from '@/mock/crossModuleDemoSeed'
+import { ensureMaterialReqOutboundOrders } from '@/mock/materialReqOutboundSeed'
 import { needsOutboundApproval } from '@/mock/outboundOptions'
 import {
   createFactoryQcFromOutbound,
@@ -93,7 +94,9 @@ function initOutboundOrders() {
   const base = shouldReseedOutbound()
     ? cloneOutboundOrders()
     : loadFromStorage() || cloneOutboundOrders()
-  return ensureCrossDemoOutboundOrders(migrateSkipApprovalStatuses(base))
+  return ensureMaterialReqOutboundOrders(
+    ensureCrossDemoOutboundOrders(migrateSkipApprovalStatuses(base)),
+  )
 }
 
 export function generateOutboundNo() {

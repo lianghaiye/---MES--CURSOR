@@ -88,6 +88,10 @@
               </OutboundOrderBasicInfoSection>
             </div>
 
+            <div v-if="workOrderList.length" class="section-card">
+              <OutboundWorkOrderList :work-orders="workOrderList" />
+            </div>
+
             <div class="section-card">
               <div class="section-title">出库明细</div>
               <a-table
@@ -304,6 +308,9 @@ import {
 } from '@/utils/outboundLineHelpers'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import OutboundOrderBasicInfoSection from './components/OutboundOrderBasicInfoSection.vue'
+import OutboundWorkOrderList from './components/OutboundWorkOrderList.vue'
+import { mobileMaterialReqState } from '@/store/mobileMaterialReqStore'
+import { resolveOutboundWorkOrders } from '@/utils/outboundWorkOrders'
 
 const route = useRoute()
 const router = useRouter()
@@ -313,6 +320,11 @@ const record = ref(null)
 const infoTab = ref('basic')
 
 const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领料出库')
+
+const workOrderList = computed(() => {
+  void mobileMaterialReqState.items
+  return resolveOutboundWorkOrders(record.value, mobileMaterialReqState.items)
+})
 
 const relatedCutSettles = computed(() => {
   void cutSettleState.records

@@ -72,6 +72,10 @@ export function createOutboundOrder(partial) {
     /** 领料/发料：领入仓库（线边仓）；确认出库后 A→B 调入 */
     receiveWarehouse: '',
     stockTransferredToReceive: false,
+    /** 领料出库关联工单清单（来自领料申请） */
+    workOrders: [],
+    materialReqId: '',
+    materialReqNo: '',
     ...partial,
   }
 }
