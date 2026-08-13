@@ -65,12 +65,15 @@
               />
             </template>
             <template v-else-if="column.key === 'product'">
-              <a-input
-                :value="record.productName"
-                size="small"
-                disabled
-                placeholder="选择工单后自动带出"
-              />
+              <div v-if="record.productName" class="wo-product-cell">
+                <div class="wo-product-name">{{ record.productName }}</div>
+                <div class="wo-product-meta">
+                  规格：{{ record.specModel || '—' }} 材质：{{ record.material || '—' }} 图号：{{
+                    record.drawingNo || '—'
+                  }}
+                </div>
+              </div>
+              <a-input v-else size="small" disabled placeholder="选择工单后自动带出" />
             </template>
             <template v-else-if="column.key === 'action'">
               <a-button
@@ -348,6 +351,7 @@ import { getWorkOrders } from '@/store/workOrderStore'
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import { warehouseState } from '@/store/warehouseStore'
 import { MATERIAL_REQ_MODES, submitMaterialRequisition } from '@/store/mobileMaterialReqStore'
+import { getWorkOrderPlanQty } from '@/utils/workOrderScheduleBatch'
 import {
   createManualMaterialLine,
   createMaterialReqSpuLine,
@@ -367,6 +371,22 @@ import {
 
 const router = useRouter()
 
+function toReqWorkOrderSnapshot(wo) {
+  return {
+    id: wo.id,
+    code: wo.code,
+    productName: wo.productName || '',
+    productCode: wo.productCode || wo.materialCode || '',
+    specModel: wo.specModel || '',
+    material: wo.material || '',
+    drawingNo: wo.drawingNo || '',
+    bom: wo.bomLabel || wo.bom || '',
+    planQty: getWorkOrderPlanQty(wo) || wo.scheduleQty || 0,
+    scheduleQty: wo.scheduleQty,
+    salesOrderNo: wo.sourceOrderNo || wo.salesOrderNo || '',
+  }
+}
+
 let rowSeq = 1
 function createEmptyWoRow() {
   return {
@@ -374,6 +394,9 @@ function createEmptyWoRow() {
     workOrderCode: '',
     workOrderId: '',
     productName: '',
+    specModel: '',
+    material: '',
+    drawingNo: '',
   }
 }
 
@@ -631,13 +654,20 @@ function removeWorkOrderRow(index) {
   workOrderRows.value.splice(index, 1)
 }
 
+function clearWorkOrderProductFields(row) {
+  row.productName = ''
+  row.specModel = ''
+  row.material = ''
+  row.drawingNo = ''
+}
+
 function onWorkOrderCodeChange(index, code) {
   const row = workOrderRows.value[index]
   if (!row) return
   if (!code) {
     row.workOrderCode = ''
     row.workOrderId = ''
-    row.productName = ''
+    clearWorkOrderProductFields(row)
     return
   }
   const duplicated = workOrderRows.value.some(
@@ -647,7 +677,7 @@ function onWorkOrderCodeChange(index, code) {
     message.warning('该工单已添加，请勿重复选择')
     row.workOrderCode = ''
     row.workOrderId = ''
-    row.productName = ''
+    clearWorkOrderProductFields(row)
     return
   }
   const wo = allWorkOrders.value.find((o) => o.code === code)
@@ -655,12 +685,15 @@ function onWorkOrderCodeChange(index, code) {
     message.warning('未找到该工单')
     row.workOrderCode = ''
     row.workOrderId = ''
-    row.productName = ''
+    clearWorkOrderProductFields(row)
     return
   }
   row.workOrderCode = wo.code
   row.workOrderId = wo.id
   row.productName = wo.productName || wo.name || ''
+  row.specModel = wo.specModel || ''
+  row.material = wo.material || ''
+  row.drawingNo = wo.drawingNo || ''
 }
 
 function syncReceiveWarehouse() {
@@ -817,9 +850,7 @@ function onSubmit() {
         workOrderCode: wo.code,
         workOrderName: wo.name || wo.productName || '',
         workOrderIds: [wo.id],
-        workOrders: [
-          { id: wo.id, code: wo.code, productName: wo.productName, scheduleQty: wo.scheduleQty },
-        ],
+        workOrders: [toReqWorkOrderSnapshot(wo)],
         salesOrderNo: wo.sourceOrderNo || '',
         productName: wo.productName || '',
         orderCategory: wo.orderCategory || '',
@@ -830,12 +861,7 @@ function onSubmit() {
         ...payload,
         mode: MATERIAL_REQ_MODES.BATCH,
         workOrderIds: selected.map((w) => w.id),
-        workOrders: selected.map((w) => ({
-          id: w.id,
-          code: w.code,
-          productName: w.productName,
-          scheduleQty: w.scheduleQty,
-        })),
+        workOrders: selected.map((w) => toReqWorkOrderSnapshot(w)),
         salesOrderNo: salesSet.length === 1 ? salesSet[0] : salesSet.length > 1 ? 'MULTI' : '',
         productName: selected
           .map((w) => w.productName)
@@ -862,12 +888,7 @@ function onSubmit() {
         productName: p.productName,
       })),
       workOrderIds: selected.map((w) => w.id),
-      workOrders: selected.map((w) => ({
-        id: w.id,
-        code: w.code,
-        productName: w.productName,
-        scheduleQty: w.scheduleQty,
-      })),
+      workOrders: selected.map((w) => toReqWorkOrderSnapshot(w)),
       productName: selectedProducts
         .map((p) => p.productName)
         .filter(Boolean)
@@ -1012,5 +1033,21 @@ syncReceiveWarehouse()
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.2;
+}
+
+.wo-product-cell {
+  line-height: 1.4;
+  padding: 2px 0;
+}
+
+.wo-product-name {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.wo-product-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 </style>

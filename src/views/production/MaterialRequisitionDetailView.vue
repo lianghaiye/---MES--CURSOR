@@ -67,19 +67,26 @@
           </a-descriptions>
         </div>
 
-        <div
-          v-if="record.mode === MATERIAL_REQ_MODES.BATCH && record.workOrders?.length"
-          class="section-card"
-        >
-          <div class="section-title">工单清单（{{ record.workOrders.length }}）</div>
+        <div v-if="workOrderList.length" class="section-card">
+          <div class="section-title">工单清单（{{ workOrderList.length }}）</div>
           <a-table
             :columns="woColumns"
-            :data-source="record.workOrders"
+            :data-source="workOrderList"
             :row-key="(r) => r.id || r.code"
             size="small"
             bordered
             :pagination="false"
-          />
+            :scroll="{ x: 1100 }"
+          >
+            <template #bodyCell="{ column, record: row }">
+              <template v-if="column.key === 'productCode'">{{ row.productCode || '—' }}</template>
+              <template v-else-if="column.key === 'specModel'">{{ row.specModel || '—' }}</template>
+              <template v-else-if="column.key === 'material'">{{ row.material || '—' }}</template>
+              <template v-else-if="column.key === 'drawingNo'">{{ row.drawingNo || '—' }}</template>
+              <template v-else-if="column.key === 'bom'">{{ row.bom || '—' }}</template>
+              <template v-else-if="column.key === 'planQty'">{{ row.planQty ?? '—' }}</template>
+            </template>
+          </a-table>
         </div>
 
         <div class="section-card">
@@ -166,6 +173,9 @@ import {
   MATERIAL_REQ_MODES,
   MATERIAL_REQ_AUDIT,
 } from '@/store/mobileMaterialReqStore'
+import { workOrderState } from '@/store/workOrderStore'
+import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
+import { getWorkOrderPlanQty } from '@/utils/workOrderScheduleBatch'
 import { lineVariantSummary } from '@/utils/spuLineResolve'
 
 const route = useRoute()
@@ -173,10 +183,48 @@ const router = useRouter()
 
 const record = computed(() => getMobileMaterialReqById(String(route.params.id || '')))
 
+function findLinkedWorkOrder(row = {}) {
+  const id = row.id
+  const code = row.code
+  return (
+    workOrderState.orders.find((o) => (id && o.id === id) || (code && o.code === code)) ||
+    assemblyWorkOrderState.orders.find((o) => (id && o.id === id) || (code && o.code === code)) ||
+    null
+  )
+}
+
+const workOrderList = computed(() => {
+  const list = record.value?.workOrders || []
+  return list.map((row) => {
+    const wo = findLinkedWorkOrder(row)
+    const planQty =
+      row.planQty != null && row.planQty !== ''
+        ? row.planQty
+        : wo
+          ? getWorkOrderPlanQty(wo) || wo.scheduleQty
+          : row.scheduleQty
+    return {
+      ...row,
+      productName: row.productName || wo?.productName || '—',
+      productCode: row.productCode || wo?.productCode || wo?.materialCode || '',
+      specModel: row.specModel || wo?.specModel || '',
+      material: row.material || wo?.material || '',
+      drawingNo: row.drawingNo || wo?.drawingNo || '',
+      bom: row.bom || wo?.bomLabel || wo?.bom || '',
+      planQty,
+    }
+  })
+})
+
 const woColumns = [
-  { title: '工单号', dataIndex: 'code', key: 'code', width: 180 },
-  { title: '产品', dataIndex: 'productName', key: 'productName' },
-  { title: '计划数量', dataIndex: 'scheduleQty', key: 'scheduleQty', width: 100, align: 'right' },
+  { title: '工单号', dataIndex: 'code', key: 'code', width: 150 },
+  { title: '产品', dataIndex: 'productName', key: 'productName', width: 140, ellipsis: true },
+  { title: '编号', key: 'productCode', width: 120, ellipsis: true },
+  { title: '规格型号', key: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', key: 'material', width: 90, ellipsis: true },
+  { title: '图号', key: 'drawingNo', width: 110, ellipsis: true },
+  { title: '关联BOM', key: 'bom', width: 140, ellipsis: true },
+  { title: '计划数量', key: 'planQty', width: 100, align: 'right' },
 ]
 
 const lineColumns = [

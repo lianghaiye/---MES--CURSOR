@@ -195,7 +195,7 @@
           </a-space>
         </div>
 
-        <a-tabs v-model:activeKey="detailTab" class="detail-tabs">
+        <a-tabs v-model:activeKey="detailTab" class="detail-tabs detail-tabs-pill">
           <a-tab-pane key="work" tab="工作项">
             <div class="detail-tab-body">
               <a-table

@@ -164,6 +164,11 @@ const detailFields = computed(() => {
 
   fields.push(
     { key: 'productName', label: '产品名称', value: wo.productName },
+    {
+      key: 'productCode',
+      label: '产品编码',
+      value: wo.productCode || wo.materialCode,
+    },
     { key: 'specModel', label: '规格型号', value: wo.specModel },
     { key: 'material', label: '材质', value: wo.material },
     {
