@@ -59,7 +59,7 @@
               key="delivery"
               :tab="`发货申请 (${relations.deliveryApplications.length})`"
             />
-            <a-tab-pane key="outbound" :tab="`出库单 (${relations.outboundOrders.length})`" />
+            <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
             <a-tab-pane key="purchase" :tab="`采购 (${purchaseTabCount})`" />
             <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
             <a-tab-pane key="outsourcing" :tab="`外协 (${relations.outsourcingOrders.length})`" />
@@ -350,32 +350,37 @@
 
           <template v-else-if="activeTab === 'outbound'">
             <div class="section-card">
-              <div class="section-title">出库单</div>
+              <div class="section-title">出库信息</div>
               <a-table
                 :columns="outboundColumns"
-                :data-source="relations.outboundOrders"
+                :data-source="outboundRows"
                 row-key="id"
                 size="small"
                 bordered
                 :pagination="false"
                 :scroll="{ x: outboundTableScrollX }"
-                :locale="{ emptyText: '暂无关联出库单' }"
+                :locale="{ emptyText: '暂无出库信息' }"
               >
-                <template #bodyCell="{ column, record: row }">
-                  <template v-if="column.key === 'status'">
-                    <a-tag :color="outboundStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'outboundOrderNo'">
+                    <a
+                      v-if="row.outboundId || row.outboundOrderNo"
+                      class="link-code"
+                      @click="goOutboundDetail(row)"
+                    >
+                      {{ row.outboundOrderNo || '—' }}
+                    </a>
+                    <span v-else>—</span>
                   </template>
-                  <template v-else-if="column.key === 'docNo'">
-                    <a class="link-code" @click="goOutboundDetail(row)">{{ row.docNo || '—' }}</a>
+                  <template v-else-if="column.key === 'applyQty'">
+                    {{ formatQty(row.applyQty) }}
                   </template>
-                  <template v-else-if="column.key === 'shipQtyTotal'">
-                    {{ formatOutboundQty(calcOutboundShipQty(row)) }}
-                  </template>
-                  <template v-else-if="column.key === 'operator'">
-                    {{ row.creator || '—' }}
+                  <template v-else-if="column.key === 'actualQty'">
+                    {{ formatQty(row.actualQty) }}
                   </template>
                   <template v-else>
-                    {{ row[column.dataIndex] ?? '—' }}
+                    {{ row[column.dataIndex] || '—' }}
                   </template>
                 </template>
               </a-table>
@@ -732,8 +737,7 @@ import {
   formatOutboundQtyInt,
   formatShipWeight,
 } from '@/utils/deliveryOrder'
-import { calcOutboundShipQty } from '@/mock/outboundOrders'
-import { outboundStatusColor } from '@/mock/outboundOptions'
+import { flattenOutboundOrdersToIssueLines } from '@/utils/outboundIssueLines'
 import { resolveLineBusinessType } from '@/utils/salesOrderBusiness'
 import { getActiveBomForItem } from '@/store/productBomStore'
 import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
@@ -774,6 +778,10 @@ function initActiveTab() {
 const activeTab = ref(initActiveTab())
 
 const relations = computed(() => resolveSalesOrderRelations(order.value))
+
+const outboundRows = computed(() =>
+  flattenOutboundOrdersToIssueLines(relations.value.outboundOrders || []),
+)
 
 const approvalRecords = computed(() => order.value?.approvalRecords || [])
 
@@ -934,22 +942,24 @@ const deliveryTableScrollX = computed(() =>
 )
 
 const outboundColumns = [
-  { title: '出库状态', key: 'status', width: 96, fixed: 'left' },
-  { title: '出库单号', key: 'docNo', width: 150, fixed: 'left' },
-  { title: '出库类型', dataIndex: 'outboundType', width: 100 },
-  { title: '仓库', dataIndex: 'warehouse', width: 90 },
-  { title: '出库数量', key: 'shipQtyTotal', width: 96, align: 'right' },
-  { title: '出库时间', dataIndex: 'outboundTime', width: 160 },
-  { title: '操作人', key: 'operator', width: 88 },
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '出库状态', dataIndex: 'outboundStatus', width: 90 },
+  { title: '出库单号', key: 'outboundOrderNo', dataIndex: 'outboundOrderNo', width: 150 },
+  { title: '物料名称', dataIndex: 'productName', width: 140, ellipsis: true },
+  { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 90, ellipsis: true },
+  { title: '申请出库数量', key: 'applyQty', width: 110, align: 'right' },
+  { title: '实际出库数量', key: 'actualQty', width: 110, align: 'right' },
+  { title: '出库时间', dataIndex: 'confirmedAt', width: 160 },
+  { title: '确认人', dataIndex: 'confirmer', width: 90 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
 ]
 
 const outboundTableScrollX = computed(() =>
   outboundColumns.reduce((sum, col) => sum + (col.width || 100), 0),
 )
-
-function formatOutboundQty(val) {
-  return formatQty(val)
-}
 
 const purchaseReqColumns = [
   { title: '状态', key: 'docStatus', width: 90, fixed: 'left' },
@@ -1406,10 +1416,11 @@ function goPurchaseOrder(row) {
 }
 
 function goOutboundDetail(row) {
-  if (!row?.id) return
-  const path = `/inventory/outbound/${row.id}`
-  openTab(path, row.docNo || '出库单详情')
-  router.push({ name: 'inventory-outbound-detail', params: { id: row.id } })
+  const id = row?.outboundId || row?.id
+  if (!id) return
+  const path = `/inventory/outbound/${id}`
+  openTab(path, row.outboundOrderNo || row.docNo || '出库单详情')
+  router.push({ name: 'inventory-outbound-detail', params: { id } })
 }
 
 function goDeliveryDetail(row) {

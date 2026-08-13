@@ -574,7 +574,7 @@ const lineColumns = [
   { title: '变体属性', key: 'variantAttr', width: 140, ellipsis: true },
   { title: '图号', key: 'drawingNo', width: 110 },
   { title: '下料尺寸', key: 'blankSizeText', width: 160, ellipsis: true },
-  { title: '建议数量', key: 'suggestedQty', width: 90, align: 'right' },
+  { title: 'BOM单位用量', key: 'suggestedQty', width: 110, align: 'right' },
   { title: '领料数量', key: 'shipQty', width: 110 },
   { title: '领料仓库', key: 'shipWarehouse', width: 130 },
   { title: '来源', key: 'source', width: 180 },
@@ -905,7 +905,14 @@ function onSubmit() {
   }
   message.success(
     result.record.auditStatus === '审核通过'
-      ? `已提交并自动通过 ${result.record.reqNo}，出库单 ${result.order?.docNo || ''}`
+      ? `已提交并自动通过 ${result.record.reqNo}，出库单 ${
+          result.record.outboundDocNo ||
+          result.orders
+            ?.map((o) => o.docNo)
+            .filter(Boolean)
+            .join('、') ||
+          ''
+        }`
       : `已提交 ${result.record.reqNo}，待审核`,
   )
   router.push(`/production/material-requisition/${result.record.id}`)

@@ -506,56 +506,67 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
 
   const itemTypes = [...new Set(lines.map((line) => line.itemType).filter(Boolean))]
   const itemType = itemTypes.length === 1 ? itemTypes[0] : '物料'
-  const warehouses = [...new Set(lines.map((line) => line.warehouse).filter(Boolean))]
-  const headerWarehouse =
-    payload.warehouse || (warehouses.length === 1 ? warehouses[0] : warehouses[0] || '')
 
-  const lineItems = lines.map((line) =>
-    createInboundLine({
-      poLineId: line.poLineId || '',
-      itemCode: line.itemCode,
-      itemName: line.itemName,
-      itemType: line.itemType || '',
-      specModel: line.specModel || '',
-      specAttr: line.specAttr || '',
-      material: line.material || '',
-      drawingNo: line.drawingNo || '',
-      locationNo: line.locationNo || '',
-      unit: line.unit || '个',
-      stockUnit: line.stockUnit,
-      purchaseUnit: line.purchaseUnit,
-      unitPrice: line.unitPrice ?? null,
-      warehouse: line.warehouse,
-      qty: Number(line.qty),
-      purchaseQty: line.purchaseQty,
-      totalValue: line.totalValue,
-      inboundEntryMode: line.inboundEntryMode,
-      isVariableLength: Boolean(line.isVariableLength),
-    }),
-  )
-
-  const order = addInboundOrder({
-    inboundType: '采购入库',
-    status: '待处理',
-    warehouse: headerWarehouse,
-    warehouseKeeper: resolveWarehouseKeeper(headerWarehouse),
-    inboundDate: payload.inboundDate || dayjs().format('YYYY-MM-DD'),
-    deliveryDate: payload.deliveryDate || dayjs().format('YYYY-MM-DD'),
-    itemType,
-    supplier: po.supplier,
-    sourceOrderNo: po.orderNo,
-    sourceType: '采购订单',
-    purchaseOrderId: po.id,
-    invoiceNo: payload.invoiceNo || '',
-    remark: payload.remark || `采购单 ${po.orderNo} 生成`,
-    handler: payload.handler || 'admin1',
-    creator: payload.creator || 'admin1',
-    lineItems,
+  const groups = new Map()
+  lines.forEach((line) => {
+    const wh = String(line.warehouse || '').trim()
+    if (!groups.has(wh)) groups.set(wh, [])
+    groups.get(wh).push(line)
   })
+
+  const created = []
+  let index = 0
+  for (const [warehouse, groupLines] of groups) {
+    index += 1
+    const lineItems = groupLines.map((line) =>
+      createInboundLine({
+        poLineId: line.poLineId || '',
+        itemCode: line.itemCode,
+        itemName: line.itemName,
+        itemType: line.itemType || '',
+        specModel: line.specModel || '',
+        specAttr: line.specAttr || '',
+        material: line.material || '',
+        drawingNo: line.drawingNo || '',
+        locationNo: line.locationNo || '',
+        unit: line.unit || '个',
+        stockUnit: line.stockUnit,
+        purchaseUnit: line.purchaseUnit,
+        unitPrice: line.unitPrice ?? null,
+        warehouse: line.warehouse,
+        qty: Number(line.qty),
+        purchaseQty: line.purchaseQty,
+        totalValue: line.totalValue,
+        inboundEntryMode: line.inboundEntryMode,
+        isVariableLength: Boolean(line.isVariableLength),
+      }),
+    )
+    const remarkBase = payload.remark || `采购单 ${po.orderNo} 生成`
+    const order = addInboundOrder({
+      id: `ib-po-${Date.now()}-${index}`,
+      inboundType: '采购入库',
+      status: '待处理',
+      warehouse,
+      warehouseKeeper: resolveWarehouseKeeper(warehouse),
+      inboundDate: payload.inboundDate || dayjs().format('YYYY-MM-DD'),
+      deliveryDate: payload.deliveryDate || dayjs().format('YYYY-MM-DD'),
+      itemType,
+      supplier: po.supplier,
+      sourceOrderNo: po.orderNo,
+      sourceType: '采购订单',
+      purchaseOrderId: po.id,
+      invoiceNo: payload.invoiceNo || '',
+      remark: groups.size > 1 ? `${remarkBase}（仓库：${warehouse}）` : remarkBase,
+      handler: payload.handler || 'admin1',
+      creator: payload.creator || 'admin1',
+      lineItems,
+    })
+    created.push(order)
+  }
 
   syncPurchaseOrderInboundStatus(po)
 
-  return { ok: true, order }
+  return { ok: true, order: created[0] || null, orders: created }
 }
 
 export function createInboundFromScrap(scrap, partial = {}) {

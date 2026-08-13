@@ -187,6 +187,7 @@ const lineColumns = [
 
 const outboundColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '出库状态', dataIndex: 'outboundStatus', width: 90 },
   { title: '出库单号', dataIndex: 'outboundOrderNo', width: 150 },
   { title: '物料名称', dataIndex: 'productName', width: 140, ellipsis: true },
   { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },

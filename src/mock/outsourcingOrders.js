@@ -139,6 +139,7 @@ export function flattenOutsourcingIssueOutboundLines(order) {
     if (!lines.length) {
       rows.push({
         id: `${issueOrder.id}-empty`,
+        outboundStatus: issueOrder.outboundStatus || '',
         outboundOrderNo,
         productName: '',
         productCode: '',
@@ -159,6 +160,7 @@ export function flattenOutsourcingIssueOutboundLines(order) {
       const applyQty = line.applyQty != null ? line.applyQty : line.issueQty
       rows.push({
         id: line.id || `${issueOrder.id}-${idx}`,
+        outboundStatus: issueOrder.outboundStatus || '',
         outboundOrderNo,
         productName: line.productName || '',
         productCode: line.productCode || '',

@@ -31,8 +31,8 @@ import { transferOutboundToReceiveWarehouse } from '@/utils/outboundReceiveTrans
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
-/** v3：跨模块演示领料出库（工单已领冲减占用） */
-const CURRENT_SEED_VERSION = '3'
+/** v4：多仓领料出库演示（一仓一单） */
+const CURRENT_SEED_VERSION = '4'
 
 /** 领料/发料出库不再审批：历史「待处理」升为「待出库」 */
 function migrateSkipApprovalStatuses(orders) {
@@ -141,6 +141,11 @@ export function canDeleteOutbound(order) {
 
 export function canApproveOutbound(order) {
   return order?.status === '待处理' && needsOutboundApproval(order.outboundType)
+}
+
+/** 待处理 / 待出库可拒绝出库（未实际扣账前） */
+export function canRefuseOutbound(order) {
+  return Boolean(order && ['待处理', '待出库'].includes(order.status))
 }
 
 /** 新建出库单初始状态：需审批类型为待处理，其余（含领料/发料）直接待出库 */
@@ -259,6 +264,48 @@ export function approveOutboundOrder(id, operator = 'admin1') {
   order.auditor = operator
   order.auditDate = dayjs().format('YYYY-MM-DD HH:mm:ss')
   return { ok: true, order }
+}
+
+function resolveRefuseStatus(order) {
+  if (order?.outboundType === '领料出库' || order?.outboundType === '发料出库') {
+    return '拒绝领料'
+  }
+  return '已拒绝'
+}
+
+function syncMaterialReqAfterRefuse(order) {
+  if (!order || order.outboundType !== '领料出库') return
+  // 运行时加载，避免与 mobileMaterialReqStore 循环依赖
+  import('@/store/mobileMaterialReqStore')
+    .then(({ syncMaterialReqOnOutboundRefuse }) => {
+      syncMaterialReqOnOutboundRefuse(order)
+    })
+    .catch(() => {})
+}
+
+/** 拒绝出库：未扣账单据直接置为已拒绝/拒绝领料；领料出库同步回写申请单 */
+export function refuseOutbound(ids, { reason = '', operator = 'admin1' } = {}) {
+  const blocked = []
+  const refused = []
+  let count = 0
+  ;(ids || []).forEach((id) => {
+    const order = outboundState.orders.find((o) => o.id === id)
+    if (!canRefuseOutbound(order)) {
+      blocked.push({
+        docNo: order?.docNo || id,
+        message: '当前状态不可拒绝出库',
+      })
+      return
+    }
+    order.status = resolveRefuseStatus(order)
+    order.refuseReason = String(reason || '').trim()
+    order.refusedBy = operator
+    order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    syncMaterialReqAfterRefuse(order)
+    refused.push(order)
+    count += 1
+  })
+  return { count, blocked, refused }
 }
 
 export function confirmOutbound(ids) {

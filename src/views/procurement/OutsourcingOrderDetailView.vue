@@ -399,6 +399,7 @@ const lineColumns = [
 
 const issueColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '出库状态', dataIndex: 'outboundStatus', width: 90 },
   { title: '出库单号', dataIndex: 'outboundOrderNo', width: 150 },
   { title: '物料名称', dataIndex: 'productName', width: 140, ellipsis: true },
   { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
@@ -414,6 +415,7 @@ const issueColumns = [
 
 const returnColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '入库状态', dataIndex: 'inboundStatus', width: 90 },
   { title: '入库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
   { title: '物料名称', dataIndex: 'itemName', width: 140, ellipsis: true },
   { title: '编码', dataIndex: 'itemCode', width: 120, ellipsis: true },
@@ -437,6 +439,7 @@ const qcColumns = [
 
 const goodsReturnColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '单据状态', dataIndex: 'status', width: 90 },
   { title: '异常处理单号', key: 'returnNo', dataIndex: 'returnNo', width: 150 },
   { title: '物料名称', dataIndex: 'itemName', width: 140 },
   { title: '外协数量', key: 'planQty', dataIndex: 'planQty', width: 100, align: 'right' },

@@ -112,6 +112,10 @@
             <CheckOutlined />
             确认出库
           </a-button>
+          <a-button size="small" danger @click="handleRefuseOutbound">
+            <CloseCircleOutlined />
+            拒绝出库
+          </a-button>
           <a-button size="small" @click="stubAction('生成采购单')">
             <CheckOutlined />
             生成采购单
@@ -224,6 +228,15 @@
                   确认出库
                 </a-button>
                 <a-button
+                  v-if="canRefuseOutbound(record)"
+                  type="link"
+                  size="small"
+                  danger
+                  @click="handleRefuseOne(record)"
+                >
+                  拒绝出库
+                </a-button>
+                <a-button
                   v-if="canDeleteOutbound(record)"
                   type="link"
                   size="small"
@@ -292,6 +305,7 @@ import {
   ReloadOutlined,
   DeleteOutlined,
   CheckOutlined,
+  CloseCircleOutlined,
   PrinterOutlined,
   DownOutlined,
 } from '@ant-design/icons-vue'
@@ -307,6 +321,8 @@ import {
 import {
   outboundState,
   confirmOutbound,
+  refuseOutbound,
+  canRefuseOutbound,
   deleteOutboundOrder,
   initiateFactoryQcFromOutbound,
   canInitiateFactoryQc,
@@ -316,6 +332,7 @@ import {
   canDeleteOutbound,
   validateOutboundForConfirm,
 } from '@/store/outboundStore'
+import { syncMaterialReqOnOutboundRefuse } from '@/store/mobileMaterialReqStore'
 import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -493,6 +510,54 @@ function handleConfirmOne(record) {
         message.success('已确认出库')
         handleSearch()
       }
+    },
+  })
+}
+
+function applyRefuseResult({ count, blocked, refused }) {
+  ;(refused || []).forEach((order) => syncMaterialReqOnOutboundRefuse(order))
+  if (blocked?.length) {
+    message.warning(
+      blocked
+        .map((b) => `${b.docNo}: ${b.message}`)
+        .slice(0, 3)
+        .join('；'),
+    )
+  }
+  if (count > 0) {
+    message.success(count === 1 ? '已拒绝出库' : `已拒绝出库 ${count} 条`)
+    selectedRowKeys.value = []
+    handleSearch()
+  }
+}
+
+function handleRefuseOne(record) {
+  Modal.confirm({
+    title: `拒绝出库 ${record.docNo}？`,
+    content:
+      record.outboundType === '领料出库'
+        ? '拒绝后出库单将标记为「拒绝领料」，并回写关联领料申请的出库状态。'
+        : '拒绝后出库单将标记为「已拒绝」。',
+    okText: '拒绝出库',
+    okType: 'danger',
+    onOk: () => {
+      applyRefuseResult(refuseOutbound([record.id]))
+    },
+  })
+}
+
+function handleRefuseOutbound() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择出库单')
+    return
+  }
+  Modal.confirm({
+    title: `拒绝出库所选 ${selectedRowKeys.value.length} 条单据？`,
+    content: '领料出库将被标记为「拒绝领料」并回写领料申请；其他类型标记为「已拒绝」。',
+    okText: '拒绝出库',
+    okType: 'danger',
+    onOk: () => {
+      applyRefuseResult(refuseOutbound(selectedRowKeys.value))
     },
   })
 }

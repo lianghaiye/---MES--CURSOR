@@ -18,6 +18,7 @@ export function flattenPurchaseOrderInboundLines(orders = []) {
       rows.push({
         id: `${order.id}-${line.id || idx}`,
         orderId: order.id,
+        inboundStatus: order.status || '',
         docNo: order.docNo || '',
         itemName: line.itemName || line.productName || '',
         itemCode: line.itemCode || line.productCode || '',

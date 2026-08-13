@@ -104,9 +104,16 @@
             }}</span>
           </template>
           <template v-else-if="column.key === 'outboundDocNo'">
-            <a v-if="record.outboundDocNo" @click="goOutbound(record)">
-              {{ record.outboundDocNo }}
-            </a>
+            <template v-if="outboundLinksOf(record).length">
+              <a
+                v-for="(link, idx) in outboundLinksOf(record)"
+                :key="link.id || link.docNo"
+                @click="goOutbound(link)"
+              >
+                {{ link.docNo
+                }}<template v-if="idx < outboundLinksOf(record).length - 1">、</template>
+              </a>
+            </template>
             <span v-else class="muted">—</span>
           </template>
           <template v-else-if="column.key === 'qty'">
@@ -212,6 +219,7 @@ const statusOptions = computed(() => {
     { label: '待出库', value: '待出库' },
     { label: '已出库', value: '已出库' },
     { label: '已拒绝', value: '已拒绝' },
+    { label: '拒绝领料', value: '拒绝领料' },
   ]
   if (!isMaterialOutboundSkipApproval()) {
     base.unshift({ label: '待处理', value: '待处理' })
@@ -226,7 +234,7 @@ const columns = [
   { title: '关联工单', key: 'workOrder', width: 180, ellipsis: true },
   { title: '产品/摘要', key: 'product', width: 160, ellipsis: true },
   { title: '领用车间', dataIndex: 'workshop', key: 'workshop', width: 110 },
-  { title: '出库单号', key: 'outboundDocNo', width: 150 },
+  { title: '出库单号', key: 'outboundDocNo', width: 200 },
   { title: '出库状态', key: 'outboundStatus', width: 110 },
   { title: '申请人', dataIndex: 'applicant', key: 'applicant', width: 90 },
   { title: '申请时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
@@ -356,25 +364,42 @@ function goDetail(record) {
   router.push(`/production/material-requisition/${record.id}`)
 }
 
-function goOutbound(record) {
-  if (!record.outboundId) {
+function goOutbound(linkOrRecord) {
+  const link =
+    linkOrRecord?.docNo && (linkOrRecord.id || linkOrRecord.docNo)
+      ? linkOrRecord
+      : outboundLinksOf(linkOrRecord)[0]
+  if (!link?.id) {
     message.info('暂无关联出库单')
     return
   }
-  router.push(`/inventory/outbound/${record.outboundId}`)
+  router.push(`/inventory/outbound/${link.id}`)
+}
+
+function outboundLinksOf(record) {
+  if (!record) return []
+  const list = Array.isArray(record.outboundOrders) ? record.outboundOrders : []
+  if (list.length) {
+    return list.map((o) => ({ id: o.id || '', docNo: o.docNo || '' })).filter((o) => o.docNo)
+  }
+  if (record.outboundDocNo) {
+    return [{ id: record.outboundId || '', docNo: record.outboundDocNo }]
+  }
+  return []
 }
 
 function onApprove(record) {
   Modal.confirm({
     title: '审核通过',
-    content: `确认通过申请单 ${record.reqNo}？通过后将生成领料出库单。`,
+    content: `确认通过申请单 ${record.reqNo}？通过后将按仓库生成领料出库单。`,
     onOk() {
       const res = approveMaterialRequisition(record.id)
       if (!res.ok) {
         message.warning(res.message)
         return
       }
-      message.success(`已通过，出库单 ${res.record.outboundDocNo || ''}`)
+      const nos = res.record.outboundDocNo || ''
+      message.success(nos ? `已通过，出库单 ${nos}` : '已通过')
     },
   })
 }

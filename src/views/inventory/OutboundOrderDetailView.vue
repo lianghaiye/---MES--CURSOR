@@ -18,6 +18,14 @@
               >
                 审批
               </a-button>
+              <a-button
+                v-if="canRefuseOutbound(record)"
+                size="small"
+                danger
+                @click="handleRefuseOutbound"
+              >
+                拒绝出库
+              </a-button>
               <a-button v-if="canEditOutbound(record)" size="small" @click="openEdit">
                 编辑
               </a-button>
@@ -35,6 +43,14 @@
               >
                 确认出库
               </a-button>
+              <a-button
+                v-if="canRefuseOutbound(record)"
+                size="small"
+                danger
+                @click="handleRefuseOutbound"
+              >
+                拒绝出库
+              </a-button>
               <a-button v-if="canEditOutbound(record)" size="small" @click="openEdit">
                 编辑
               </a-button>
@@ -44,6 +60,7 @@
               <a-button v-if="canInitiateFactoryQc(record)" size="small" @click="handleInitiateQc">
                 {{ initiateQcActionLabel(record) }}
               </a-button>
+              <a-button size="small" @click="goBack">返回列表</a-button>
             </template>
             <template v-else>
               <a-button size="small" @click="goBack">返回列表</a-button>
@@ -282,6 +299,8 @@ import { outboundStatusColor } from '@/mock/outboundOptions'
 import {
   getOutboundOrderById,
   confirmOutbound,
+  refuseOutbound,
+  canRefuseOutbound,
   validateOutboundForConfirm,
   initiateFactoryQcFromOutbound,
   canInitiateFactoryQc,
@@ -309,7 +328,10 @@ import {
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import OutboundOrderBasicInfoSection from './components/OutboundOrderBasicInfoSection.vue'
 import OutboundWorkOrderList from './components/OutboundWorkOrderList.vue'
-import { mobileMaterialReqState } from '@/store/mobileMaterialReqStore'
+import {
+  mobileMaterialReqState,
+  syncMaterialReqOnOutboundRefuse,
+} from '@/store/mobileMaterialReqStore'
 import { resolveOutboundWorkOrders } from '@/utils/outboundWorkOrders'
 
 const route = useRoute()
@@ -497,6 +519,36 @@ function handleConfirmOutbound() {
       }
       if (count > 0) {
         message.success('已确认出库')
+        reload()
+      }
+    },
+  })
+}
+
+function applyRefuseOutbound(orderId) {
+  const result = refuseOutbound([orderId])
+  ;(result.refused || []).forEach((order) => syncMaterialReqOnOutboundRefuse(order))
+  return result
+}
+
+function handleRefuseOutbound() {
+  if (!record.value) return
+  Modal.confirm({
+    title: `拒绝出库 ${record.value.docNo}？`,
+    content:
+      record.value.outboundType === '领料出库'
+        ? '拒绝后出库单将标记为「拒绝领料」，并回写关联领料申请的出库状态。'
+        : '拒绝后出库单将标记为「已拒绝」。',
+    okText: '拒绝出库',
+    okType: 'danger',
+    onOk: () => {
+      const { count, blocked } = applyRefuseOutbound(record.value.id)
+      if (blocked.length) {
+        message.warning(blocked.map((b) => b.message).join('；'))
+        return
+      }
+      if (count > 0) {
+        message.success('已拒绝出库')
         reload()
       }
     },

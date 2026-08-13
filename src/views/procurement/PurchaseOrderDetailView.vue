@@ -472,6 +472,7 @@ const lineColumns = [
 
 const inboundLineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '入库状态', dataIndex: 'inboundStatus', width: 90 },
   { title: '入库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
   { title: '物料名称', dataIndex: 'itemName', width: 140, ellipsis: true },
   { title: '编码', dataIndex: 'itemCode', width: 120, ellipsis: true },

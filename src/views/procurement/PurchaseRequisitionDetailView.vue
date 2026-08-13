@@ -213,7 +213,7 @@ const lineTableScrollX = computed(() =>
 )
 
 const purchaseOrderColumns = [
-  { title: '状态', key: 'status', width: 90, fixed: 'left' },
+  { title: '采购单状态', key: 'status', width: 100, fixed: 'left' },
   { title: '入库状态', key: 'inboundStatus', width: 96, fixed: 'left' },
   { title: '采购单号', key: 'orderNo', width: 140 },
   { title: '供应商', dataIndex: 'supplier', width: 140, ellipsis: true },

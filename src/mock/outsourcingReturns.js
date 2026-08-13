@@ -77,6 +77,7 @@ export function flattenReturnOutboundLines(row) {
     if (!lines.length) {
       rows.push({
         id: `${order.id}-empty`,
+        outboundStatus: order.outboundStatus || '',
         outboundOrderNo: order.outboundOrderNo || '',
         productName: '',
         productCode: '',
@@ -96,6 +97,7 @@ export function flattenReturnOutboundLines(row) {
     lines.forEach((line, idx) => {
       rows.push({
         id: line.id || `${order.id}-${idx}`,
+        outboundStatus: order.outboundStatus || '',
         outboundOrderNo: order.outboundOrderNo || '',
         productName: line.productName || '',
         productCode: line.productCode || '',

@@ -64,6 +64,7 @@ export function listReturnLinesForOutsourcingOrder(order) {
       return {
         id: `${ret.id}-${line.id || idx}`,
         returnId: ret.id,
+        status: ret.status || '',
         returnNo: ret.returnNo || '',
         itemName: line.productName || line.itemName || '',
         itemCode: line.productCode || line.itemCode || '',

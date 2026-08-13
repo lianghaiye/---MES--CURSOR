@@ -4,6 +4,7 @@
 import dayjs from 'dayjs'
 import { getActiveScheduleBatch } from '@/utils/workOrderScheduleBatch'
 import { materialRequisitionState } from '@/store/materialRequisitionStore'
+import { listMobileMaterialReqs } from '@/store/mobileMaterialReqStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { outboundState } from '@/store/outboundStore'
 import { listMobileTasksForWorkOrder } from '@/utils/workOrderStatus'
@@ -166,6 +167,48 @@ export function buildWorkOrderMaterialReqRows(workOrder) {
   if (!workOrder) return []
   const woId = String(workOrder.id || '')
   const woCode = String(workOrder.code || '')
+
+  const mobileList = listMobileMaterialReqs().filter((r) => {
+    if (woId && String(r.workOrderId || '') === woId) return true
+    if (woCode && String(r.workOrderCode || '') === woCode) return true
+    if (woId && (r.workOrderIds || []).map(String).includes(woId)) return true
+    if (woCode && (r.workOrders || []).some((w) => String(w.code || '') === woCode)) return true
+    return false
+  })
+  if (mobileList.length) {
+    return mobileList.map((r, idx) => {
+      const refs = Array.isArray(r.outboundOrders) ? r.outboundOrders.filter((o) => o.docNo) : []
+      const outboundOrders = refs.length
+        ? refs.map((ref) => ({
+            id: ref.id || '',
+            docNo: ref.docNo || '',
+          }))
+        : r.outboundId || r.outboundDocNo
+          ? [{ id: r.outboundId || '', docNo: r.outboundDocNo || '' }]
+          : []
+      return {
+        id: r.id || `mr-${idx}`,
+        index: idx + 1,
+        status: r.auditStatus || '待审核',
+        reqNo: r.reqNo || '—',
+        reqId: r.id,
+        summary: r.productName || relatedMobileSummary(r, workOrder),
+        qty: r.totalQty || sumLineQty(r.lines) || 0,
+        workshop: r.workshop || workOrder.workCenter || '—',
+        outboundNo:
+          outboundOrders
+            .map((o) => o.docNo)
+            .filter(Boolean)
+            .join('、') || '—',
+        outboundId: outboundOrders[0]?.id || '',
+        outboundOrders,
+        outboundStatus: r.outboundStatus || '—',
+        applicant: r.applicant || '—',
+        appliedAt: r.createdAt || '—',
+      }
+    })
+  }
+
   const list = (materialRequisitionState.records || []).filter(
     (r) =>
       String(r.workOrderId || '') === woId ||
@@ -181,6 +224,11 @@ export function buildWorkOrderMaterialReqRows(workOrder) {
             o.docNo === r.outboundNo ||
             (r.reqNo && String(o.sourceDocNo || '') === String(r.reqNo)),
         ) || null
+      const outboundOrders = outbound
+        ? [{ id: outbound.id, docNo: outbound.docNo }]
+        : r.outboundId || r.outboundNo
+          ? [{ id: r.outboundId || '', docNo: r.outboundNo || '' }]
+          : []
       return {
         id: r.id || `mr-${idx}`,
         index: idx + 1,
@@ -192,6 +240,7 @@ export function buildWorkOrderMaterialReqRows(workOrder) {
         workshop: r.workshop || r.receiveWorkshop || workOrder.workCenter || '—',
         outboundNo: outbound?.docNo || r.outboundNo || '—',
         outboundId: outbound?.id || r.outboundId || '',
+        outboundOrders,
         outboundStatus: outbound?.status || r.outboundStatus || '—',
         applicant: r.applicant || r.creator || r.createdBy || '—',
         appliedAt: r.appliedAt || r.createdAt || r.applyTime || '—',
@@ -212,6 +261,7 @@ export function buildWorkOrderMaterialReqRows(workOrder) {
         workshop: workOrder.workCenter || '—',
         outboundNo: '—',
         outboundId: '',
+        outboundOrders: [],
         outboundStatus: '—',
         applicant: workOrder.owner || 'admin',
         appliedAt: dayjs().format('YYYY-MM-DD HH:mm'),
@@ -219,6 +269,18 @@ export function buildWorkOrderMaterialReqRows(workOrder) {
     ]
   }
   return []
+}
+
+function relatedMobileSummary(r, workOrder) {
+  if (r.productName) return r.productName
+  if (Array.isArray(r.workOrders) && r.workOrders.length) {
+    return r.workOrders
+      .map((w) => w.productName)
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('、')
+  }
+  return workOrder.productName || '—'
 }
 
 /** 入库信息 */

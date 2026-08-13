@@ -27,7 +27,7 @@ import {
 
 export const MOBILE_MATERIAL_REQ_STORAGE_KEY = 'i_doms_mobile_material_reqs'
 const SEED_VERSION_KEY = 'i_doms_mobile_material_reqs_seed_v'
-const CURRENT_SEED_VERSION = '2'
+const CURRENT_SEED_VERSION = '3'
 
 export {
   materialReqModeLabel,
@@ -69,12 +69,33 @@ function createInitial() {
   }
   if (cached !== null) {
     localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
-    return cached.map(normalizeReq)
+    return ensureMultiWarehouseSeedReqs(cached.map(normalizeReq))
   }
   const seeded = createMobileMaterialReqSeed()
   localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
   localStorage.setItem(MOBILE_MATERIAL_REQ_STORAGE_KEY, JSON.stringify({ items: seeded }))
   return seeded
+}
+
+/** 在已有真实数据时补齐多仓演示单（不覆盖用户单据） */
+function ensureMultiWarehouseSeedReqs(items) {
+  const seeds = createMobileMaterialReqSeed().filter((r) =>
+    ['mr-seed-001', 'mr-seed-005', 'mr-seed-006'].includes(r.id),
+  )
+  const list = [...(items || [])]
+  const indexById = new Map(list.map((r, i) => [r.id, i]))
+  seeds.forEach((seed) => {
+    const idx = indexById.get(seed.id)
+    if (idx == null) {
+      list.unshift(seed)
+      return
+    }
+    // 仅覆盖仍是演示种子的行，刷新多仓字段
+    if (String(list[idx].id || '').startsWith('mr-seed-')) {
+      list[idx] = { ...seed }
+    }
+  })
+  return list
 }
 
 function allSeedIds(items) {
@@ -111,13 +132,71 @@ export function refreshMobileMaterialReqs() {
 
 function enrich(row) {
   const normalized = normalizeReq(row)
-  const outbound = normalized.outboundId ? getOutboundOrderById(normalized.outboundId) : null
+  const refs = listOutboundRefs(normalized)
+  const liveOrders = refs.map((ref) => getOutboundOrderById(ref.id)).filter(Boolean)
+  const docNos = liveOrders.length
+    ? liveOrders.map((o) => o.docNo).filter(Boolean)
+    : refs.map((r) => r.docNo).filter(Boolean)
+  const statuses = liveOrders.map((o) => o.status).filter(Boolean)
+  let outboundStatus = normalized.outboundStatus || '—'
+  if (statuses.length) {
+    outboundStatus = statuses.every((s) => s === statuses[0]) ? statuses[0] : '多单进行中'
+  }
   return {
     ...normalized,
     modeLabel: materialReqModeLabel(normalized.mode),
-    outboundStatus: outbound?.status || normalized.outboundStatus || '—',
-    outboundDocNo: outbound?.docNo || normalized.outboundDocNo || '',
+    outboundOrders: refs,
+    outboundStatus,
+    outboundDocNo: docNos.join('、') || normalized.outboundDocNo || '',
+    outboundId: refs[0]?.id || normalized.outboundId || '',
   }
+}
+
+/** 兼容旧单字段与 outboundOrders[] */
+function listOutboundRefs(row) {
+  const fromList = Array.isArray(row.outboundOrders)
+    ? row.outboundOrders
+        .map((o) => ({
+          id: o.id || '',
+          docNo: o.docNo || '',
+          warehouse: o.warehouse || '',
+          status: o.status || '',
+        }))
+        .filter((o) => o.id || o.docNo)
+    : []
+  if (fromList.length) return fromList
+  if (row.outboundId || row.outboundDocNo) {
+    return [
+      {
+        id: row.outboundId || '',
+        docNo: row.outboundDocNo || '',
+        warehouse: '',
+        status: row.outboundStatus || '',
+      },
+    ]
+  }
+  return []
+}
+
+function applyOutboundRefsToRecord(record, orders) {
+  const refs = (orders || []).map((o) => ({
+    id: o.id,
+    docNo: o.docNo,
+    warehouse: o.warehouse || '',
+    status: o.status || '',
+  }))
+  record.outboundOrders = refs
+  record.outboundId = refs[0]?.id || ''
+  record.outboundDocNo = refs
+    .map((r) => r.docNo)
+    .filter(Boolean)
+    .join('、')
+  const statuses = refs.map((r) => r.status).filter(Boolean)
+  record.outboundStatus = statuses.length
+    ? statuses.every((s) => s === statuses[0])
+      ? statuses[0]
+      : '多单进行中'
+    : '—'
 }
 
 export function listMobileMaterialReqs() {
@@ -257,20 +336,24 @@ export function submitMaterialRequisition(payload) {
   }
 
   let order = null
+  let orders = []
   if (auditStatus === MATERIAL_REQ_AUDIT.APPROVED) {
     const outboundResult = createOutboundForRequisition(record)
     if (!outboundResult.ok) return outboundResult
-    order = outboundResult.order
-    record.outboundId = order.id
-    record.outboundDocNo = order.docNo
-    record.outboundStatus = order.status
+    orders = outboundResult.orders || []
+    order = orders[0] || null
+    applyOutboundRefsToRecord(record, orders)
     delete record._outboundDraft
   }
 
   mobileMaterialReqState.items.unshift(record)
-  return { ok: true, record, order }
+  return { ok: true, record, order, orders }
 }
 
+/**
+ * 按领料仓库拆分生成领料出库单（一仓一张）
+ * @returns {{ ok: boolean, orders?: object[], order?: object, message?: string }}
+ */
 function createOutboundForRequisition(record) {
   const draft = record._outboundDraft || {}
   const userName = record.applicant || '管理员'
@@ -310,54 +393,80 @@ function createOutboundForRequisition(record) {
         : [],
   )
 
-  return appendOutboundOrder({
-    outboundType: '领料出库',
-    status: outboundStatus,
-    handler: userName,
-    creator: userName,
-    warehouseKeeper: userName,
-    workshop,
-    requisitionDept: workshop,
-    receiveWarehouse: record.receiveWarehouse || '',
-    sourceOrderNo: sourceOrderNo || record.reqNo || '',
-    materialReqId: record.id || '',
-    materialReqNo: record.reqNo || '',
-    salesOrderNo: record.salesOrderNo || '',
-    warehouse: draft.warehouse || '',
-    remark: remarkBase,
-    sourceChannel: channel,
-    workOrders,
-    lineItems: (record.lines || []).map((line) => ({
-      itemCode: line.itemCode,
-      itemName: line.itemName,
-      itemType: line.itemType || '物料',
-      specModel: line.specModel,
-      specAttr: line.specAttr || '',
-      material: line.material,
-      drawingNo: line.drawingNo,
-      shipQty: line.shipQty,
-      unit: line.unit || '件',
-      shipWarehouse: line.shipWarehouse || draft.warehouse || '',
-      stockQty: line.warehouseStockQty ?? null,
-      warehouseStockQty: line.warehouseStockQty ?? null,
-      lineSource: line.lineSource === 'EBOM' ? '工单领料' : '手工添加',
-      sourceDocNo: resolveLineSourceDocNo(record, line),
-      itemId: line.itemId || '',
-      sourceWorkOrders: line.sourceWorkOrders || [],
-      isVariableLength: Boolean(line.isVariableLength),
-      demandMeters: line.demandMeters ?? (line.isVariableLength ? line.shipQty : null),
-      blankLength: line.blankLength ?? null,
-      blankArea: line.blankArea ?? null,
-      blankSize: line.blankSize || null,
-      blankSizeText: line.blankSizeText || '',
-      blankSizeMode: line.blankSizeMode || '',
-      uomRelation: line.uomRelation || '',
-      pickedBatchId: line.pickedBatchId || '',
-      pickedBatchNo: line.pickedBatchNo || '',
-      pickedLength: line.pickedLength ?? null,
-      workOrderNo: resolveLineSourceDocNo(record, line),
-    })),
+  const mappedLines = (record.lines || []).map((line) => ({
+    itemCode: line.itemCode,
+    itemName: line.itemName,
+    itemType: line.itemType || '物料',
+    specModel: line.specModel,
+    specAttr: line.specAttr || '',
+    material: line.material,
+    drawingNo: line.drawingNo,
+    shipQty: line.shipQty,
+    unit: line.unit || '件',
+    shipWarehouse: String(line.shipWarehouse || draft.warehouse || '').trim() || '未指定仓库',
+    stockQty: line.warehouseStockQty ?? null,
+    warehouseStockQty: line.warehouseStockQty ?? null,
+    lineSource: line.lineSource === 'EBOM' ? '工单领料' : '手工添加',
+    sourceDocNo: resolveLineSourceDocNo(record, line),
+    itemId: line.itemId || '',
+    sourceWorkOrders: line.sourceWorkOrders || [],
+    isVariableLength: Boolean(line.isVariableLength),
+    demandMeters: line.demandMeters ?? (line.isVariableLength ? line.shipQty : null),
+    blankLength: line.blankLength ?? null,
+    blankArea: line.blankArea ?? null,
+    blankSize: line.blankSize || null,
+    blankSizeText: line.blankSizeText || '',
+    blankSizeMode: line.blankSizeMode || '',
+    uomRelation: line.uomRelation || '',
+    pickedBatchId: line.pickedBatchId || '',
+    pickedBatchNo: line.pickedBatchNo || '',
+    pickedLength: line.pickedLength ?? null,
+    workOrderNo: resolveLineSourceDocNo(record, line),
+  }))
+
+  if (!mappedLines.length) {
+    return { ok: false, message: '请至少添加一条领料明细' }
+  }
+
+  const groups = new Map()
+  mappedLines.forEach((line) => {
+    const wh = line.shipWarehouse
+    if (!groups.has(wh)) groups.set(wh, [])
+    groups.get(wh).push(line)
   })
+
+  const orders = []
+  let index = 0
+  for (const [warehouse, lineItems] of groups) {
+    index += 1
+    const remark = groups.size > 1 ? `${remarkBase}（仓库：${warehouse}）` : remarkBase
+    const result = appendOutboundOrder({
+      id: `ob-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 5)}`,
+      outboundType: '领料出库',
+      status: outboundStatus,
+      handler: userName,
+      creator: userName,
+      warehouseKeeper: userName,
+      workshop,
+      requisitionDept: workshop,
+      receiveWarehouse: record.receiveWarehouse || '',
+      sourceOrderNo: sourceOrderNo || record.reqNo || '',
+      materialReqId: record.id || '',
+      materialReqNo: record.reqNo || '',
+      salesOrderNo: record.salesOrderNo || '',
+      warehouse,
+      remark,
+      sourceChannel: channel,
+      workOrders,
+      lineItems,
+    })
+    if (!result.ok) {
+      return { ok: false, message: result.message || `仓库「${warehouse}」生成出库单失败` }
+    }
+    orders.push(result.order)
+  }
+
+  return { ok: true, orders, order: orders[0] || null }
 }
 
 export function approveMaterialRequisition(id, auditor = '管理员') {
@@ -366,12 +475,10 @@ export function approveMaterialRequisition(id, auditor = '管理员') {
   if (normalizeReq(row).auditStatus !== MATERIAL_REQ_AUDIT.PENDING) {
     return { ok: false, message: '仅待审核申请可审核通过' }
   }
-  if (!row.outboundId) {
+  if (!listOutboundRefs(row).length) {
     const outboundResult = createOutboundForRequisition(row)
     if (!outboundResult.ok) return outboundResult
-    row.outboundId = outboundResult.order.id
-    row.outboundDocNo = outboundResult.order.docNo
-    row.outboundStatus = outboundResult.order.status
+    applyOutboundRefsToRecord(row, outboundResult.orders || [])
   }
   row.auditStatus = MATERIAL_REQ_AUDIT.APPROVED
   row.rejectReason = ''
@@ -393,6 +500,50 @@ export function rejectMaterialRequisition(id, reason = '', auditor = '管理员'
   row.auditedAt = formatNow()
   delete row._outboundDraft
   return { ok: true, record: enrich(row) }
+}
+
+/** 出库单拒绝出库后，回写关联领料申请的出库状态 */
+export function syncMaterialReqOnOutboundRefuse(order) {
+  if (!order) return null
+  const id = order.id
+  const docNo = order.docNo
+  const reqId = order.materialReqId
+  const reqNo = order.materialReqNo
+  const row = mobileMaterialReqState.items.find((r) => {
+    if (reqId && r.id === reqId) return true
+    if (reqNo && r.reqNo === reqNo) return true
+    const refs = listOutboundRefs(r)
+    if (id && refs.some((ref) => ref.id === id)) return true
+    if (docNo && refs.some((ref) => ref.docNo === docNo)) return true
+    if (id && r.outboundId === id) return true
+    if (docNo && (r.outboundDocNo || '').includes(docNo)) return true
+    return false
+  })
+  if (!row) return null
+  const refs = listOutboundRefs(row).map((ref) => {
+    const live = getOutboundOrderById(ref.id)
+    if (live) {
+      return {
+        id: live.id,
+        docNo: live.docNo,
+        warehouse: live.warehouse || '',
+        status: live.status || '',
+      }
+    }
+    if ((id && ref.id === id) || (docNo && ref.docNo === docNo)) {
+      return { ...ref, status: order.status || '拒绝领料' }
+    }
+    return ref
+  })
+  if (refs.length) {
+    applyOutboundRefsToRecord(row, refs)
+  } else {
+    row.outboundStatus = order.status || '拒绝领料'
+    row.outboundDocNo = order.docNo || row.outboundDocNo || ''
+    row.outboundId = order.id || row.outboundId || ''
+  }
+  row.outboundRefuseReason = order.refuseReason || ''
+  return enrich(row)
 }
 
 /** @deprecated 领料出库已统一为待出库→确认出库，不再审批 */

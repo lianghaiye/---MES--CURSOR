@@ -409,18 +409,29 @@ function handleSave() {
     return
   }
 
-  if (props.purchaseReceipt?.id && result.order) {
+  if (props.purchaseReceipt?.id && (result.orders?.length || result.order)) {
     const receipt = props.purchaseReceipt
-    const ids = [...new Set([...(receipt.inboundOrderIds || []), result.order.id])]
+    const created = result.orders?.length ? result.orders : [result.order]
+    const ids = [...new Set([...(receipt.inboundOrderIds || []), ...created.map((o) => o.id)])]
+    const docNos = created.map((o) => o.docNo).filter(Boolean)
+    const prevNos = String(receipt.inboundOrderNo || '')
+      .split(/[、,，]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
     updatePurchaseReceipt(receipt.id, {
       inboundOrderIds: ids,
-      inboundOrderNo: result.order.docNo || receipt.inboundOrderNo,
+      inboundOrderNo: [...new Set([...prevNos, ...docNos])].join('、') || receipt.inboundOrderNo,
       inboundStatus: '入库中',
     })
   }
 
-  message.success('入库单已创建')
-  emit('saved', result.order)
+  const created = result.orders?.length ? result.orders : result.order ? [result.order] : []
+  const nos = created
+    .map((o) => o.docNo)
+    .filter(Boolean)
+    .join('、')
+  message.success(nos ? `已创建 ${created.length} 张入库单：${nos}` : '入库单已创建')
+  emit('saved', created[0] || null, created)
   emit('update:open', false)
 }
 </script>

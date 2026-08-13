@@ -17,9 +17,19 @@
           <span v-else>{{ record.reqNo }}</span>
         </template>
         <template v-else-if="column.key === 'outboundNo'">
-          <a v-if="record.outboundId" class="link" @click="openOutbound(record)">{{
-            record.outboundNo
-          }}</a>
+          <template v-if="(record.outboundOrders || []).length">
+            <a
+              v-for="(o, idx) in record.outboundOrders"
+              :key="o.id || o.docNo"
+              class="link"
+              @click="openOutbound(o)"
+            >
+              {{ o.docNo }}<template v-if="idx < record.outboundOrders.length - 1">、</template>
+            </a>
+          </template>
+          <template v-else-if="record.outboundId">
+            <a class="link" @click="openOutbound(record)">{{ record.outboundNo }}</a>
+          </template>
           <span v-else>{{ record.outboundNo }}</span>
         </template>
       </template>
@@ -50,7 +60,7 @@ const columns = [
   { title: '产品/摘要', dataIndex: 'summary', ellipsis: true },
   { title: '数量', dataIndex: 'qty', width: 80, align: 'right' },
   { title: '领用车间', dataIndex: 'workshop', width: 110 },
-  { title: '出库单号', key: 'outboundNo', width: 150 },
+  { title: '出库单号', key: 'outboundNo', width: 200 },
   { title: '出库状态', dataIndex: 'outboundStatus', width: 90 },
   { title: '申请人', dataIndex: 'applicant', width: 90 },
   { title: '申请时间', dataIndex: 'appliedAt', width: 150 },
@@ -67,11 +77,12 @@ function openReq(record) {
 }
 
 function openOutbound(record) {
-  if (!record.outboundId) {
+  const id = record?.id || record?.outboundId
+  if (!id) {
     message.info('暂无关联出库单')
     return
   }
-  const path = `/inventory/outbound/${record.outboundId}`
+  const path = `/inventory/outbound/${id}`
   openTab({ path, title: '出库单详情' })
   router.push(path)
 }

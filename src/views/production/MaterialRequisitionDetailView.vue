@@ -19,139 +19,213 @@
       </a-space>
     </div>
 
-    <div class="page-body">
-      <a-empty v-if="!record" description="申请单不存在或已删除" />
+    <template v-if="!record">
+      <div class="page-body">
+        <a-empty description="申请单不存在或已删除" />
+      </div>
+    </template>
 
-      <template v-else>
-        <div class="section-card">
-          <div class="section-title">申请信息</div>
-          <a-descriptions :column="3" size="small" bordered>
-            <a-descriptions-item label="申请单号">{{ record.reqNo }}</a-descriptions-item>
-            <a-descriptions-item label="申请状态">
-              <a-tag :color="auditColor(record.auditStatus)">{{ record.auditStatus }}</a-tag>
-            </a-descriptions-item>
-            <a-descriptions-item label="领料方式">{{ record.modeLabel }}</a-descriptions-item>
-            <a-descriptions-item label="申请人">{{ record.applicant || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="关联工单">
-              {{ relatedWorkOrderText(record) }}
-            </a-descriptions-item>
-            <a-descriptions-item label="产品/摘要">
-              {{ relatedProductText(record) }}
-            </a-descriptions-item>
-            <a-descriptions-item label="销售订单">
-              {{
-                record.salesOrderNo && record.salesOrderNo !== 'MULTI' ? record.salesOrderNo : '—'
-              }}
-            </a-descriptions-item>
-            <a-descriptions-item label="领用车间">{{ record.workshop || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="领入仓库">
-              {{ record.receiveWarehouse || '—' }}
-            </a-descriptions-item>
-            <a-descriptions-item label="申请时间">{{
-              record.createdAt || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="出库单号">
-              <a v-if="record.outboundDocNo" @click="goOutbound">{{ record.outboundDocNo }}</a>
-              <span v-else>—</span>
-            </a-descriptions-item>
-            <a-descriptions-item label="出库状态">{{ record.outboundStatus }}</a-descriptions-item>
-            <a-descriptions-item label="合计数量">
-              {{ record.lineCount || 0 }} 行 / {{ record.totalQty || 0 }}
-            </a-descriptions-item>
-            <a-descriptions-item v-if="record.rejectReason" label="驳回原因" :span="3">
-              {{ record.rejectReason }}
-            </a-descriptions-item>
-            <a-descriptions-item label="备注" :span="3">
-              {{ record.remark || '—' }}
-            </a-descriptions-item>
-          </a-descriptions>
-        </div>
+    <template v-else>
+      <div class="detail-tabs-wrap">
+        <a-tabs
+          v-model:active-key="activeTab"
+          class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+        >
+          <a-tab-pane key="basic" tab="基本信息" />
+          <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
+        </a-tabs>
+      </div>
 
-        <div v-if="workOrderList.length" class="section-card">
-          <div class="section-title">工单清单（{{ workOrderList.length }}）</div>
-          <a-table
-            :columns="woColumns"
-            :data-source="workOrderList"
-            :row-key="(r) => r.id || r.code"
-            size="small"
-            bordered
-            :pagination="false"
-            :scroll="{ x: 1100 }"
-          >
-            <template #bodyCell="{ column, record: row }">
-              <template v-if="column.key === 'productCode'">{{ row.productCode || '—' }}</template>
-              <template v-else-if="column.key === 'specModel'">{{ row.specModel || '—' }}</template>
-              <template v-else-if="column.key === 'material'">{{ row.material || '—' }}</template>
-              <template v-else-if="column.key === 'drawingNo'">{{ row.drawingNo || '—' }}</template>
-              <template v-else-if="column.key === 'bom'">{{ row.bom || '—' }}</template>
-              <template v-else-if="column.key === 'planQty'">{{ row.planQty ?? '—' }}</template>
-            </template>
-          </a-table>
-        </div>
-
-        <div class="section-card">
-          <div class="section-title">
-            领料明细（{{ record.lineCount || 0 }} 项 / 合计 {{ record.totalQty || 0 }}）
+      <div class="tab-body">
+        <template v-if="activeTab === 'basic'">
+          <div class="section-card">
+            <div class="section-title">申请信息</div>
+            <a-descriptions :column="3" size="small" bordered>
+              <a-descriptions-item label="申请单号">{{ record.reqNo }}</a-descriptions-item>
+              <a-descriptions-item label="申请状态">
+                <a-tag :color="auditColor(record.auditStatus)">{{ record.auditStatus }}</a-tag>
+              </a-descriptions-item>
+              <a-descriptions-item label="领料方式">{{ record.modeLabel }}</a-descriptions-item>
+              <a-descriptions-item label="申请人">{{
+                record.applicant || '—'
+              }}</a-descriptions-item>
+              <a-descriptions-item label="关联工单">
+                {{ relatedWorkOrderText(record) }}
+              </a-descriptions-item>
+              <a-descriptions-item label="产品/摘要">
+                {{ relatedProductText(record) }}
+              </a-descriptions-item>
+              <a-descriptions-item label="销售订单">
+                {{
+                  record.salesOrderNo && record.salesOrderNo !== 'MULTI' ? record.salesOrderNo : '—'
+                }}
+              </a-descriptions-item>
+              <a-descriptions-item label="领用车间">{{
+                record.workshop || '—'
+              }}</a-descriptions-item>
+              <a-descriptions-item label="领入仓库">
+                {{ record.receiveWarehouse || '—' }}
+              </a-descriptions-item>
+              <a-descriptions-item label="申请时间">{{
+                record.createdAt || '—'
+              }}</a-descriptions-item>
+              <a-descriptions-item label="合计数量">
+                {{ record.lineCount || 0 }} 行 / {{ record.totalQty || 0 }}
+              </a-descriptions-item>
+              <a-descriptions-item v-if="record.rejectReason" label="驳回原因" :span="3">
+                {{ record.rejectReason }}
+              </a-descriptions-item>
+              <a-descriptions-item
+                v-if="record.outboundRefuseReason"
+                label="拒绝出库原因"
+                :span="3"
+              >
+                {{ record.outboundRefuseReason }}
+              </a-descriptions-item>
+              <a-descriptions-item label="备注" :span="3">
+                {{ record.remark || '—' }}
+              </a-descriptions-item>
+            </a-descriptions>
           </div>
-          <a-table
-            :columns="lineColumns"
-            :data-source="record.lines || []"
-            row-key="id"
-            size="small"
-            bordered
-            :pagination="false"
-            :scroll="{ x: 1400 }"
-            :locale="{ emptyText: '暂无领料明细' }"
-          >
-            <template #bodyCell="{ column, record: line }">
-              <template v-if="column.key === 'material'">
-                {{ line.material || '—' }}
-              </template>
-              <template v-else-if="column.key === 'variantAttr'">
-                {{ lineVariantSummary(line) || line.variantSummary || '—' }}
-              </template>
-              <template v-else-if="column.key === 'drawingNo'">
-                {{ line.drawingNo || '—' }}
-              </template>
-              <template v-else-if="column.key === 'blankSizeText'">
-                <template v-if="line.blankSizeText">
-                  {{ line.blankSizeText }}
-                  <div v-if="line.blankArea > 0" class="blank-size-hint">
-                    ≈ {{ line.blankArea }}㎡/件
-                  </div>
-                  <div v-else-if="line.blankLength > 0" class="blank-size-hint">
-                    ≈ {{ line.blankLength }}米/件
-                  </div>
-                </template>
-                <span v-else>—</span>
-              </template>
-              <template v-else-if="column.key === 'source'">
-                <template v-if="line.sourceWorkOrders?.length">
-                  <a-tag
-                    v-for="source in line.sourceWorkOrders"
-                    :key="source.workOrderId || source.workOrderCode"
-                    color="blue"
-                  >
-                    {{ source.workOrderCode }} ×{{ source.qty }}
-                  </a-tag>
-                </template>
-                <span v-else>{{ line.lineSource === 'EBOM' ? '工单 EBOM' : '手工添加' }}</span>
-              </template>
-            </template>
-          </a-table>
-        </div>
 
-        <div class="tip-card">
-          <template v-if="record.auditStatus === MATERIAL_REQ_AUDIT.PENDING">
-            当前申请待审核。审核通过后将自动生成领料出库单（状态为「待出库」，仓管直接确认出库）。
-          </template>
-          <template v-else-if="record.auditStatus === MATERIAL_REQ_AUDIT.REJECTED">
-            申请已驳回，未生成出库单。
-          </template>
-          <template v-else>审核已通过。关联出库单可在「出库管理」中继续处理。</template>
-        </div>
-      </template>
-    </div>
+          <div v-if="workOrderList.length" class="section-card">
+            <div class="section-title">工单清单（{{ workOrderList.length }}）</div>
+            <a-table
+              :columns="woColumns"
+              :data-source="workOrderList"
+              :row-key="(r) => r.id || r.code"
+              size="small"
+              bordered
+              :pagination="false"
+              :scroll="{ x: 1100 }"
+            >
+              <template #bodyCell="{ column, record: row }">
+                <template v-if="column.key === 'productCode'">{{
+                  row.productCode || '—'
+                }}</template>
+                <template v-else-if="column.key === 'specModel'">{{
+                  row.specModel || '—'
+                }}</template>
+                <template v-else-if="column.key === 'material'">{{ row.material || '—' }}</template>
+                <template v-else-if="column.key === 'drawingNo'">{{
+                  row.drawingNo || '—'
+                }}</template>
+                <template v-else-if="column.key === 'bom'">{{ row.bom || '—' }}</template>
+                <template v-else-if="column.key === 'planQty'">{{ row.planQty ?? '—' }}</template>
+              </template>
+            </a-table>
+          </div>
+
+          <div class="section-card">
+            <div class="section-title">
+              领料明细（{{ record.lineCount || 0 }} 项 / 合计 {{ record.totalQty || 0 }}）
+            </div>
+            <a-table
+              :columns="lineColumns"
+              :data-source="record.lines || []"
+              row-key="id"
+              size="small"
+              bordered
+              :pagination="false"
+              :scroll="{ x: 1400 }"
+              :locale="{ emptyText: '暂无领料明细' }"
+            >
+              <template #bodyCell="{ column, record: line }">
+                <template v-if="column.key === 'material'">
+                  {{ line.material || '—' }}
+                </template>
+                <template v-else-if="column.key === 'variantAttr'">
+                  {{ lineVariantSummary(line) || line.variantSummary || '—' }}
+                </template>
+                <template v-else-if="column.key === 'drawingNo'">
+                  {{ line.drawingNo || '—' }}
+                </template>
+                <template v-else-if="column.key === 'blankSizeText'">
+                  <template v-if="line.blankSizeText">
+                    {{ line.blankSizeText }}
+                    <div v-if="line.blankArea > 0" class="blank-size-hint">
+                      ≈ {{ line.blankArea }}㎡/件
+                    </div>
+                    <div v-else-if="line.blankLength > 0" class="blank-size-hint">
+                      ≈ {{ line.blankLength }}米/件
+                    </div>
+                  </template>
+                  <span v-else>—</span>
+                </template>
+                <template v-else-if="column.key === 'source'">
+                  <template v-if="line.sourceWorkOrders?.length">
+                    <a-tag
+                      v-for="source in line.sourceWorkOrders"
+                      :key="source.workOrderId || source.workOrderCode"
+                      color="blue"
+                    >
+                      {{ source.workOrderCode }} ×{{ source.qty }}
+                    </a-tag>
+                  </template>
+                  <span v-else>{{ line.lineSource === 'EBOM' ? '工单 EBOM' : '手工添加' }}</span>
+                </template>
+              </template>
+            </a-table>
+          </div>
+
+          <div class="tip-card">
+            <template v-if="record.auditStatus === MATERIAL_REQ_AUDIT.PENDING">
+              当前申请待审核。审核通过后将按领料仓库自动生成领料出库单（一仓一张；状态为「待出库」，仓管直接确认出库）。
+            </template>
+            <template v-else-if="record.auditStatus === MATERIAL_REQ_AUDIT.REJECTED">
+              申请已驳回，未生成出库单。
+            </template>
+            <template
+              v-else-if="record.outboundStatus === '拒绝领料' || record.outboundStatus === '已拒绝'"
+            >
+              关联出库单已拒绝出库，出库状态已回写为本申请单。
+            </template>
+            <template v-else
+              >审核已通过。关联出库单可在「出库信息」或「出库管理」中继续处理。</template
+            >
+          </div>
+        </template>
+
+        <template v-else-if="activeTab === 'outbound'">
+          <div class="section-card">
+            <div class="section-title">出库信息</div>
+            <a-table
+              :columns="outboundColumns"
+              :data-source="outboundRows"
+              row-key="id"
+              size="small"
+              bordered
+              :pagination="false"
+              :scroll="{ x: outboundTableScrollX }"
+              :locale="{ emptyText: '暂无出库信息' }"
+            >
+              <template #bodyCell="{ column, record: row, index }">
+                <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'outboundOrderNo'">
+                  <a
+                    v-if="row.outboundId || row.outboundOrderNo"
+                    class="doc-link"
+                    @click="goOutbound({ id: row.outboundId, docNo: row.outboundOrderNo })"
+                  >
+                    {{ row.outboundOrderNo || '—' }}
+                  </a>
+                  <span v-else>—</span>
+                </template>
+                <template v-else-if="column.key === 'applyQty'">
+                  {{ formatQty(row.applyQty) }}
+                </template>
+                <template v-else-if="column.key === 'actualQty'">
+                  {{ formatQty(row.actualQty) }}
+                </template>
+                <template v-else>
+                  {{ row[column.dataIndex] || '—' }}
+                </template>
+              </template>
+            </a-table>
+          </div>
+        </template>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -160,7 +234,7 @@ export default { name: 'MaterialRequisitionDetailView' }
 </script>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -173,15 +247,42 @@ import {
   MATERIAL_REQ_MODES,
   MATERIAL_REQ_AUDIT,
 } from '@/store/mobileMaterialReqStore'
+import { outboundState } from '@/store/outboundStore'
 import { workOrderState } from '@/store/workOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { getWorkOrderPlanQty } from '@/utils/workOrderScheduleBatch'
 import { lineVariantSummary } from '@/utils/spuLineResolve'
+import { flattenMaterialReqOutboundLines } from '@/utils/materialReqOutboundLines'
+import { formatQty } from '@/utils/numberFormat'
 
 const route = useRoute()
 const router = useRouter()
+const activeTab = ref('basic')
 
 const record = computed(() => getMobileMaterialReqById(String(route.params.id || '')))
+
+const outboundRows = computed(() => {
+  void outboundState.orders
+  return flattenMaterialReqOutboundLines(record.value)
+})
+
+const outboundColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '出库状态', dataIndex: 'outboundStatus', width: 90 },
+  { title: '出库单号', key: 'outboundOrderNo', dataIndex: 'outboundOrderNo', width: 150 },
+  { title: '物料名称', dataIndex: 'productName', width: 140, ellipsis: true },
+  { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 90, ellipsis: true },
+  { title: '申请出库数量', key: 'applyQty', width: 110, align: 'right' },
+  { title: '实际出库数量', key: 'actualQty', width: 110, align: 'right' },
+  { title: '出库时间', dataIndex: 'confirmedAt', width: 160 },
+  { title: '确认人', dataIndex: 'confirmer', width: 90 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+]
+
+const outboundTableScrollX = outboundColumns.reduce((sum, col) => sum + (col.width || 100), 0)
 
 function findLinkedWorkOrder(row = {}) {
   const id = row.id
@@ -193,27 +294,50 @@ function findLinkedWorkOrder(row = {}) {
   )
 }
 
+function enrichWorkOrderRow(row = {}) {
+  const wo = findLinkedWorkOrder(row)
+  const planQty =
+    row.planQty != null && row.planQty !== ''
+      ? row.planQty
+      : wo
+        ? getWorkOrderPlanQty(wo) || wo.scheduleQty
+        : row.scheduleQty
+  return {
+    ...row,
+    id: row.id || row.workOrderId || wo?.id || '',
+    code: row.code || row.workOrderCode || wo?.code || '',
+    productName: row.productName || wo?.productName || '—',
+    productCode: row.productCode || wo?.productCode || wo?.materialCode || '',
+    specModel: row.specModel || wo?.specModel || wo?.productSpec || '',
+    material: row.material || wo?.material || '',
+    drawingNo: row.drawingNo || wo?.drawingNo || '',
+    bom: row.bom || wo?.bomLabel || wo?.bom || '',
+    planQty,
+  }
+}
+
 const workOrderList = computed(() => {
-  const list = record.value?.workOrders || []
-  return list.map((row) => {
-    const wo = findLinkedWorkOrder(row)
-    const planQty =
-      row.planQty != null && row.planQty !== ''
-        ? row.planQty
-        : wo
-          ? getWorkOrderPlanQty(wo) || wo.scheduleQty
-          : row.scheduleQty
-    return {
-      ...row,
-      productName: row.productName || wo?.productName || '—',
-      productCode: row.productCode || wo?.productCode || wo?.materialCode || '',
-      specModel: row.specModel || wo?.specModel || '',
-      material: row.material || wo?.material || '',
-      drawingNo: row.drawingNo || wo?.drawingNo || '',
-      bom: row.bom || wo?.bomLabel || wo?.bom || '',
-      planQty,
-    }
-  })
+  const row = record.value
+  if (!row) return []
+  const list = Array.isArray(row.workOrders) ? row.workOrders : []
+  if (list.length) return list.map(enrichWorkOrderRow)
+  if (row.workOrderCode || row.workOrderId) {
+    return [
+      enrichWorkOrderRow({
+        id: row.workOrderId,
+        code: row.workOrderCode,
+        productName: row.productName,
+        productCode: row.productCode,
+        specModel: row.specModel,
+        material: row.material,
+        drawingNo: row.drawingNo,
+        bom: row.bom,
+        planQty: row.planQty ?? row.scheduleQty,
+        scheduleQty: row.scheduleQty,
+      }),
+    ]
+  }
+  return []
 })
 
 const woColumns = [
@@ -256,23 +380,28 @@ function goBack() {
   router.push('/production/material-requisition')
 }
 
-function goOutbound() {
-  if (!record.value?.outboundId) return
-  router.push(`/inventory/outbound/${record.value.outboundId}`)
+function goOutbound(link) {
+  if (!link?.id) {
+    message.info('暂无关联出库单详情')
+    return
+  }
+  router.push(`/inventory/outbound/${link.id}`)
 }
 
 function onApprove() {
   Modal.confirm({
     title: '审核通过',
-    content: `确认通过申请单 ${record.value.reqNo}？通过后将生成领料出库单。`,
+    content: `确认通过申请单 ${record.value.reqNo}？通过后将按仓库生成领料出库单。`,
     onOk() {
       const res = approveMaterialRequisition(record.value.id)
       if (!res.ok) {
         message.warning(res.message)
         return
       }
-      message.success(`已通过，出库单 ${res.record.outboundDocNo || ''}`)
+      const nos = res.record.outboundDocNo || ''
+      message.success(nos ? `已通过，出库单 ${nos}` : '已通过')
       refreshMobileMaterialReqs()
+      activeTab.value = 'outbound'
     },
   })
 }
@@ -312,6 +441,8 @@ function statusBadge(status) {
     待出库: 'processing',
     已出库: 'success',
     已拒绝: 'error',
+    拒绝领料: 'error',
+    多单进行中: 'processing',
   }
   return map[status] || 'default'
 }
@@ -354,7 +485,8 @@ function statusBadge(status) {
   color: rgba(0, 0, 0, 0.88);
 }
 
-.page-body {
+.page-body,
+.tab-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -373,6 +505,11 @@ function statusBadge(status) {
   font-size: 15px;
   font-weight: 600;
   margin-bottom: 12px;
+}
+
+.doc-link {
+  color: #1677ff;
+  cursor: pointer;
 }
 
 .tip-card {

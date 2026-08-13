@@ -55,7 +55,16 @@ export function findMaterialReqForOutbound(order, materialReqs = []) {
     (materialReqs || []).find((r) => {
       if (reqId && r.id === reqId) return true
       if (id && r.outboundId === id) return true
+      if (id && Array.isArray(r.outboundOrders) && r.outboundOrders.some((o) => o.id === id))
+        return true
       if (docNo && r.outboundDocNo === docNo) return true
+      if (docNo && String(r.outboundDocNo || '').includes(docNo)) return true
+      if (
+        docNo &&
+        Array.isArray(r.outboundOrders) &&
+        r.outboundOrders.some((o) => o.docNo === docNo)
+      )
+        return true
       if (reqNo && r.reqNo === reqNo) return true
       return false
     }) || null
