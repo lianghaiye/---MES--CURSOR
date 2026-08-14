@@ -51,6 +51,10 @@
               </InboundOrderBasicInfoSection>
             </div>
 
+            <div v-if="workOrderList.length" class="section-card">
+              <InboundWorkOrderList :work-orders="workOrderList" />
+            </div>
+
             <div class="section-card">
               <div class="section-title">入库明细</div>
               <a-table
@@ -248,6 +252,8 @@ import {
 } from '@/utils/inboundLineHelpers'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import InboundOrderBasicInfoSection from './components/InboundOrderBasicInfoSection.vue'
+import InboundWorkOrderList from './components/InboundWorkOrderList.vue'
+import { resolveInboundWorkOrders } from '@/utils/inboundWorkOrders'
 
 const route = useRoute()
 const router = useRouter()
@@ -255,6 +261,8 @@ const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 const activeTab = ref('basic')
+
+const workOrderList = computed(() => resolveInboundWorkOrders(record.value))
 
 const lineColumns = inboundDetailLineColumns
 const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 80), 0))

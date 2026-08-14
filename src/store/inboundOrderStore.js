@@ -57,8 +57,13 @@ function normalizeLegacyOrder(order) {
   if (!row.approvedAt) row.approvedAt = ''
   if (!row.miniProgramTaskId) row.miniProgramTaskId = ''
   if (!row.purchaseOrderId) row.purchaseOrderId = ''
+  if (!Array.isArray(row.workOrders)) row.workOrders = []
   if (row.inboundType === '生产退库') row.inboundType = '半成品入库'
-  if (row.status === '待处理' && row.inboundType === '成品入库' && row.miniProgramTaskId) {
+  if (
+    row.status === '待处理' &&
+    (row.inboundType === '成品入库' || row.inboundType === '半成品入库') &&
+    row.miniProgramTaskId
+  ) {
     row.status = '待审批'
   }
   if (!Array.isArray(row.lineItems)) row.lineItems = []
@@ -166,7 +171,10 @@ function canConfirmInbound(order) {
 }
 
 function canApproveInbound(order) {
-  return order?.status === '待审批' && order?.inboundType === '成品入库'
+  return (
+    order?.status === '待审批' &&
+    (order?.inboundType === '成品入库' || order?.inboundType === '半成品入库')
+  )
 }
 
 export function recomputeInboundOrderStatus(order, operator = 'admin1') {
@@ -216,7 +224,10 @@ export function addInboundOrder(payload) {
       warehouseKeeper: payload.warehouseKeeper || whKeeper,
       status:
         payload.status ||
-        (payload.inboundType === '成品入库' && payload.miniProgramTaskId ? '待审批' : '待处理'),
+        ((payload.inboundType === '成品入库' || payload.inboundType === '半成品入库') &&
+        payload.miniProgramTaskId
+          ? '待审批'
+          : '待处理'),
       createdAt: payload.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
     }),
   )
@@ -442,7 +453,7 @@ function syncSalesAllocationAfterInbound(order, lines) {
 export function approveInboundOrder(id, operator = 'admin1') {
   const order = inboundOrderState.orders.find((o) => o.id === id)
   if (!canApproveInbound(order)) {
-    return { ok: false, message: '仅成品入库待审批单据可审批' }
+    return { ok: false, message: '仅成品/半成品入库待审批单据可审批' }
   }
   order.status = '待处理'
   order.approver = operator
@@ -453,7 +464,7 @@ export function approveInboundOrder(id, operator = 'admin1') {
 export function rejectInboundOrder(id, operator = 'admin1') {
   const order = inboundOrderState.orders.find((o) => o.id === id)
   if (!canApproveInbound(order)) {
-    return { ok: false, message: '仅成品入库待审批单据可拒绝' }
+    return { ok: false, message: '仅成品/半成品入库待审批单据可拒绝' }
   }
   order.status = '已拒绝'
   order.approver = operator

@@ -144,6 +144,10 @@
         </a-form>
       </div>
 
+      <div v-if="workOrderList.length" class="section-block">
+        <InboundWorkOrderList :work-orders="workOrderList" />
+      </div>
+
       <div class="section-block section-block--lines">
         <div class="section-title">入库清单</div>
         <div class="line-toolbar">
@@ -611,6 +615,8 @@ import {
 } from '@/utils/spuLineResolve'
 import SalesOrderSelectModal from '@/views/production/components/SalesOrderSelectModal.vue'
 import { findSalesOrderByOrderNo, getSalesOrderById } from '@/store/salesOrderStore'
+import InboundWorkOrderList from './InboundWorkOrderList.vue'
+import { resolveInboundWorkOrders } from '@/utils/inboundWorkOrders'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -622,6 +628,18 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+const workOrderList = computed(() => {
+  const orderLike = {
+    ...(props.editRecord || {}),
+    inboundType: form.inboundType,
+    workOrders: form.workOrders,
+    sourceOrderNo: props.editRecord?.sourceOrderNo,
+    sourceType: props.editRecord?.sourceType,
+    lineItems: form.lineItems,
+  }
+  return resolveInboundWorkOrders(orderLike)
+})
 
 const {
   isActive,
@@ -688,6 +706,7 @@ const form = reactive({
   salesperson: '',
   contractNo: '',
   remark: '',
+  workOrders: [],
   lineItems: [],
 })
 
@@ -777,6 +796,7 @@ function resetForm() {
     salesperson: '',
     contractNo: '',
     remark: '',
+    workOrders: [],
     lineItems: [],
   })
   prevHeaderWarehouse.value = undefined
@@ -800,10 +820,14 @@ function loadEditForm(record) {
     salesperson: record.salesperson || '',
     contractNo: record.contractNo || '',
     remark: record.remark || '',
+    workOrders: Array.isArray(record.workOrders) ? [...record.workOrders] : [],
     lineItems: (record.lineItems || []).map((l) =>
       enrichInboundLine({ ...l, lineStatus: l.lineStatus || '待入库' }),
     ),
   })
+  if (!form.workOrders.length) {
+    form.workOrders = resolveInboundWorkOrders(record)
+  }
   if (form.salesOrderNo && (!form.customerName || !form.salesperson)) {
     syncSalesOrderMeta(form.salesOrderNo, form.salesOrderId)
   }
@@ -1104,6 +1128,7 @@ function buildPayload() {
     contractNo: form.contractNo?.trim() || '',
     customerName: form.customerName || '',
     remark: form.remark?.trim(),
+    workOrders: form.workOrders || [],
     lineItems: form.lineItems.filter((l) => l.itemCode).map((l) => enrichInboundLine({ ...l })),
   }
 }
