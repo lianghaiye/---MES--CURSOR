@@ -77,7 +77,7 @@
               :options="workCenterOpts"
             />
           </a-form-item>
-          <template #toolbar>
+          <template v-if="layoutMode === 'split'" #toolbar>
             <a-button type="primary" size="small" @click="openCreate">
               <PlusOutlined />
               新增总装工单
@@ -248,7 +248,29 @@
         @action="handleTableAction"
         @update:pagination="onTablePaginationUpdate"
         @update:selected-ids="onSelectedIdsUpdate"
-      />
+      >
+        <template #toolbar>
+          <a-button type="primary" size="small" @click="openCreate">
+            <PlusOutlined />
+            新增总装工单
+          </a-button>
+          <a-dropdown>
+            <a-button size="small">
+              批量操作
+              <DownOutlined />
+            </a-button>
+            <template #overlay>
+              <a-menu @click="onBatchMenu">
+                <a-menu-item key="import">批量导入</a-menu-item>
+                <a-menu-item key="export">批量导出</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+          <a-button class="batch-dispatch-btn" size="small" @click="handleBatchDispatch">
+            批量下发
+          </a-button>
+        </template>
+      </WorkOrderTableLayout>
 
       <a-drawer
         v-model:open="detailDrawerOpen"
@@ -1079,17 +1101,17 @@ function onScheduleBatchSubmit(payload) {
   flex-wrap: wrap;
   gap: 8px;
   padding-top: 2px;
+}
 
-  .batch-dispatch-btn {
-    color: #d48806;
-    border-color: #ffd591;
-    background: #fff7e6;
+.batch-dispatch-btn {
+  color: #d48806;
+  border-color: #ffd591;
+  background: #fff7e6;
 
-    &:hover {
-      color: #fa8c16;
-      border-color: #ffc069;
-      background: #fff1d6;
-    }
+  &:hover {
+    color: #fa8c16;
+    border-color: #ffc069;
+    background: #fff1d6;
   }
 }
 

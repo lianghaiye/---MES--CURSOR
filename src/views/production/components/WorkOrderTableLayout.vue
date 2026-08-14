@@ -1,7 +1,12 @@
 <template>
   <div class="table-layout-card">
     <div class="table-toolbar">
-      <span class="table-summary">共 {{ total }} 条工单</span>
+      <div class="table-toolbar-left">
+        <div v-if="$slots.toolbar" class="table-toolbar-actions">
+          <slot name="toolbar" />
+        </div>
+        <span class="table-summary">共 {{ total }} 条工单</span>
+      </div>
       <div class="table-toolbar-right">
         <a-tooltip title="刷新">
           <a-button type="text" size="small" class="toolbar-icon-btn" @click="emit('refresh')">
@@ -267,17 +272,35 @@ function urgencyLabel(urgency) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
+
+  .table-toolbar-left {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    min-width: 0;
+  }
+
+  .table-toolbar-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 
   .table-summary {
     font-size: 13px;
     color: rgba(0, 0, 0, 0.65);
+    white-space: nowrap;
   }
 
   .table-toolbar-right {
     display: flex;
     align-items: center;
     gap: 4px;
+    flex-shrink: 0;
   }
 
   .toolbar-icon-btn {
