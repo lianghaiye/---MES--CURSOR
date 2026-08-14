@@ -18,13 +18,14 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 import GlobalTabs from './GlobalTabs.vue'
 import { sideMenus, resolveModuleKey } from '@/config/menus'
 import { createPageRegistry } from '@/config/createPages'
+import { enhanceListFilterBars, startListFilterBarObserver } from '@/utils/listFilterEnhance'
 
 const route = useRoute()
 
@@ -40,6 +41,21 @@ const cachedViews = [
   'SalesOrderEditView',
   ...createPageRegistry.map((page) => page.keepAlive),
 ]
+
+let filterObserver = null
+onMounted(() => {
+  filterObserver = startListFilterBarObserver()
+})
+onUnmounted(() => {
+  filterObserver?.disconnect?.()
+  filterObserver = null
+})
+watch(
+  () => route.fullPath,
+  () => {
+    requestAnimationFrame(() => enhanceListFilterBars(document))
+  },
+)
 </script>
 
 <style lang="less" scoped>

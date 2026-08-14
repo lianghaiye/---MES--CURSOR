@@ -59,3 +59,85 @@
     align-items: flex-start;
   }
 }
+
+/**
+ * 列表筛选：一行 5 个（覆盖各页 a-row/a-col 栅格）
+ * 已使用 ListFilterBar 的页面不受影响
+ */
+.filter-card .filter-form.horizontal-form > .ant-row.list-filter-grid-row,
+.filter-card .filter-form.horizontal-form > .ant-row {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px 8px;
+  width: 100%;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  row-gap: 6px;
+}
+
+.filter-card .filter-form.horizontal-form > .ant-row > .ant-col {
+  max-width: none !important;
+  width: auto !important;
+  flex: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.filter-card .filter-form.horizontal-form > .ant-row > .ant-col.ant-col-24,
+.filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-actions-item),
+.filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-footer) {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1199px) {
+  .filter-card .filter-form.horizontal-form > .ant-row.list-filter-grid-row,
+  .filter-card .filter-form.horizontal-form > .ant-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .filter-card .filter-form.horizontal-form > .ant-row.list-filter-grid-row,
+  .filter-card .filter-form.horizontal-form > .ant-row {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
+/* 内联筛选（无 a-row）：同样一行 5 个 */
+.filter-card .filter-form.list-filter-inline-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px 8px;
+  width: 100%;
+  align-items: center;
+}
+
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item {
+  width: 100% !important;
+  margin-inline-end: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item .ant-input,
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item .ant-select,
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item .ant-picker,
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item .ant-input-affix-wrapper {
+  width: 100% !important;
+}
+
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item:has(.ant-space),
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item:not(:has(.ant-form-item-label)) {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1199px) {
+  .filter-card .filter-form.list-filter-inline-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .filter-card .filter-form.list-filter-inline-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}

@@ -3,111 +3,115 @@
     <!-- 筛选区 -->
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
-        <a-row :gutter="[8, 6]" style="width: 100%">
-          <a-col :xs="24" :sm="12" :md="8" :xl="4">
-            <a-form-item label="工单编号">
-              <a-input v-model:value="filters.code" allow-clear placeholder="请输入" size="small" />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="8" :xl="4">
-            <a-form-item label="工单名称">
-              <a-input v-model:value="filters.name" allow-clear placeholder="请输入" size="small" />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="8" :xl="4">
-            <a-form-item label="来源单号">
-              <a-input
-                v-model:value="filters.salesOrderNo"
-                allow-clear
-                placeholder="销售单/补货计划号"
-                size="small"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="8" :xl="4">
-            <a-form-item label="状态">
-              <a-select
-                v-model:value="filters.status"
-                allow-clear
-                placeholder="全部"
-                size="small"
-                :options="statusOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="8" :xl="4">
-            <a-form-item label="排产">
-              <a-select
-                v-model:value="filters.scheduleIncomplete"
-                allow-clear
-                placeholder="全部"
-                size="small"
-                :options="scheduleFilterOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="8" :xl="4">
-            <a-form-item label="工单类别">
-              <a-select
-                v-model:value="filters.orderCategory"
-                allow-clear
-                placeholder="全部"
-                size="small"
-                :options="categoryOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="8" :xl="4">
-            <a-form-item label="工作中心">
-              <a-select
-                v-model:value="filters.workCenter"
-                allow-clear
-                placeholder="全部"
-                size="small"
-                :options="workCenterOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="24">
-            <div class="filter-footer">
-              <a-space :size="8">
-                <a-button type="primary" size="small" @click="handleSearch">
-                  <SearchOutlined />
-                  查询
-                </a-button>
-                <a-button size="small" @click="handleReset">
-                  <ReloadOutlined />
-                  重置
-                </a-button>
-              </a-space>
-              <a-space :size="8">
-                <a-button type="primary" size="small" @click="openCreate">
-                  <PlusOutlined />
-                  新增工单
-                </a-button>
-                <a-button size="small" @click="openBatchPrint">
-                  <PrinterOutlined />
-                  批量打印
-                </a-button>
-                <a-dropdown>
-                  <a-button size="small">
-                    批量操作
-                    <DownOutlined />
-                  </a-button>
-                  <template #overlay>
-                    <a-menu @click="onBatchMenu">
-                      <a-menu-item key="import">批量导入</a-menu-item>
-                      <a-menu-item key="export">批量导出</a-menu-item>
-                    </a-menu>
-                  </template>
-                </a-dropdown>
-                <a-button class="batch-dispatch-btn" size="small" @click="handleBatchDispatch">
-                  批量下发
-                </a-button>
-              </a-space>
-            </div>
-          </a-col>
-        </a-row>
+        <ListFilterBar :field-count="11" @search="handleSearch" @reset="handleReset">
+          <a-form-item label="工单编号">
+            <a-input v-model:value="filters.code" allow-clear placeholder="请输入" size="small" />
+          </a-form-item>
+          <a-form-item label="工单名称">
+            <a-input v-model:value="filters.name" allow-clear placeholder="请输入" size="small" />
+          </a-form-item>
+          <a-form-item label="来源单号">
+            <a-input
+              v-model:value="filters.salesOrderNo"
+              allow-clear
+              placeholder="销售单/补货计划号"
+              size="small"
+            />
+          </a-form-item>
+          <a-form-item label="产品名称">
+            <a-input
+              v-model:value="filters.productName"
+              allow-clear
+              placeholder="请输入"
+              size="small"
+            />
+          </a-form-item>
+          <a-form-item label="编号">
+            <a-input
+              v-model:value="filters.materialCode"
+              allow-clear
+              placeholder="请输入"
+              size="small"
+            />
+          </a-form-item>
+          <a-form-item label="规格型号">
+            <a-input
+              v-model:value="filters.specModel"
+              allow-clear
+              placeholder="请输入"
+              size="small"
+            />
+          </a-form-item>
+          <a-form-item label="图号">
+            <a-input
+              v-model:value="filters.drawingNo"
+              allow-clear
+              placeholder="请输入"
+              size="small"
+            />
+          </a-form-item>
+          <a-form-item label="状态">
+            <a-select
+              v-model:value="filters.status"
+              allow-clear
+              placeholder="全部"
+              size="small"
+              :options="statusOpts"
+            />
+          </a-form-item>
+          <a-form-item label="排产">
+            <a-select
+              v-model:value="filters.scheduleIncomplete"
+              allow-clear
+              placeholder="全部"
+              size="small"
+              :options="scheduleFilterOpts"
+            />
+          </a-form-item>
+          <a-form-item label="工单类别">
+            <a-select
+              v-model:value="filters.orderCategory"
+              allow-clear
+              placeholder="全部"
+              size="small"
+              :options="categoryOpts"
+            />
+          </a-form-item>
+          <a-form-item label="工作中心">
+            <a-select
+              v-model:value="filters.workCenter"
+              allow-clear
+              placeholder="全部"
+              size="small"
+              :options="workCenterOpts"
+            />
+          </a-form-item>
+          <template #toolbar>
+            <a-button type="primary" size="small" @click="openCreate">
+              <PlusOutlined />
+              新增工单
+            </a-button>
+            <a-button size="small" @click="openBatchPrint">
+              <PrinterOutlined />
+              批量打印
+            </a-button>
+            <a-dropdown>
+              <a-button size="small">
+                批量操作
+                <DownOutlined />
+              </a-button>
+              <template #overlay>
+                <a-menu @click="onBatchMenu">
+                  <a-menu-item key="import">批量导入</a-menu-item>
+                  <a-menu-item key="export">批量导出</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+            <a-button class="batch-dispatch-btn" size="small" @click="handleBatchDispatch">
+              批量下发
+            </a-button>
+          </template>
+        </ListFilterBar>
       </a-form>
     </div>
 
@@ -338,7 +342,6 @@ import {
   EllipsisOutlined,
   PlusOutlined,
   PrinterOutlined,
-  SearchOutlined,
   ReloadOutlined,
   TableOutlined,
 } from '@ant-design/icons-vue'
@@ -381,6 +384,7 @@ import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderPrintModal from './components/WorkOrderPrintModal.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
+import ListFilterBar from '@/components/ListFilterBar.vue'
 import { useTabs } from '@/composables/useTabs'
 import { useListExport } from '@/composables/useListExport'
 import { workOrderExportFields } from '@/utils/exportFields/workOrderExport'
@@ -400,6 +404,10 @@ const filters = reactive({
   code: '',
   name: '',
   salesOrderNo: '',
+  productName: '',
+  materialCode: '',
+  specModel: '',
+  drawingNo: '',
   status: undefined,
   scheduleIncomplete: undefined,
   orderCategory: undefined,
@@ -633,6 +641,10 @@ function handleReset() {
   filters.code = ''
   filters.name = ''
   filters.salesOrderNo = ''
+  filters.productName = ''
+  filters.materialCode = ''
+  filters.specModel = ''
+  filters.drawingNo = ''
   filters.status = undefined
   filters.scheduleIncomplete = undefined
   filters.orderCategory = undefined

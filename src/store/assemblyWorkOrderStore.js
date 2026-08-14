@@ -353,6 +353,15 @@ export function filterAssemblyWorkOrders(list, filters) {
     if (filters.name && !wo.name.includes(filters.name)) return false
     if (filters.salesOrderNo && !(wo.sourceOrderNo || '').includes(filters.salesOrderNo))
       return false
+    if (filters.productName && !(wo.productName || '').includes(filters.productName)) return false
+    if (filters.materialCode) {
+      const code = String(filters.materialCode)
+      if (!(wo.materialCode || '').includes(code) && !(wo.productCode || '').includes(code)) {
+        return false
+      }
+    }
+    if (filters.specModel && !(wo.specModel || '').includes(filters.specModel)) return false
+    if (filters.drawingNo && !(wo.drawingNo || '').includes(filters.drawingNo)) return false
     if (filters.status && wo.status !== filters.status) return false
     if (filters.orderCategory && wo.orderCategory !== filters.orderCategory) return false
     if (filters.workCenter && wo.workCenter !== filters.workCenter) return false
