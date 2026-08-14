@@ -66,14 +66,17 @@
       </a-row>
     </a-form>
 
+    <InboundLineScopeToggle v-model="lineScope" />
+
     <a-table
       :columns="columns"
-      :data-source="inboundLines"
+      :data-source="displayLines"
       row-key="id"
       size="small"
       bordered
       :pagination="false"
       :scroll="{ x: tableScrollX }"
+      :row-class-name="(record) => (isLineCompleted(record) ? 'inbound-row-locked' : '')"
     >
       <template #headerCell="{ column }">
         <template v-if="column.key === 'inboundProgress'">
@@ -115,6 +118,7 @@
             placeholder="请选择"
             style="width: 100%"
             :options="warehouseOpts"
+            :disabled="isLineCompleted(record)"
           />
         </template>
         <template v-else-if="column.key === 'qty'">
@@ -125,6 +129,7 @@
             :max="record.remainingQty"
             :precision="3"
             style="width: 100%"
+            :disabled="isLineCompleted(record)"
             @change="() => onLineQtyChange(record)"
           />
         </template>
@@ -145,7 +150,10 @@
           {{ formatMoney(record.totalPrice) }}
         </template>
         <template v-else-if="column.key === 'action'">
-          <a class="danger-link" @click="removeLine(index)">删除</a>
+          <a v-if="!isLineCompleted(record)" class="danger-link" @click="removeLine(record)">
+            删除
+          </a>
+          <span v-else class="locked-tip">已入库</span>
         </template>
         <template v-else>
           {{ record[column.dataIndex] ?? '—' }}
@@ -187,7 +195,10 @@ import {
   calcPoLineRemainInboundQty,
   formatInboundProgress,
   INBOUND_PROGRESS_TOOLTIP,
+  isPoLineOccupyFull,
 } from '@/utils/purchaseLineInbound'
+import InboundLineScopeToggle from '@/components/InboundLineScopeToggle.vue'
+import { filterInboundLinesByScope, isInboundLineCompleted } from '@/utils/inboundLineScope'
 
 /** 采购场景生成入库：不展示库存换算/货位相关列 */
 const HIDDEN_LINE_KEYS = new Set([
@@ -210,7 +221,11 @@ const emit = defineEmits(['update:open', 'saved'])
 
 const saving = ref(false)
 const inboundLines = ref([])
+const lineScope = ref('pending')
 const prevHeaderWarehouse = ref(undefined)
+
+const displayLines = computed(() => filterInboundLinesByScope(inboundLines.value, lineScope.value))
+const isLineCompleted = isInboundLineCompleted
 
 const form = reactive({
   receiptDate: dayjs(),
@@ -243,7 +258,7 @@ const columns = (() => {
 const tableScrollX = computed(() => columns.reduce((sum, col) => sum + (col.width || 100), 0))
 
 const totalQty = computed(() =>
-  inboundLines.value.reduce((sum, line) => sum + (Number(line.qty) || 0), 0),
+  displayLines.value.reduce((sum, line) => sum + (Number(line.qty) || 0), 0),
 )
 
 watch(
@@ -253,6 +268,7 @@ watch(
     form.receiptDate = dayjs()
     form.invoiceNo = ''
     form.remark = props.purchaseOrder.remark || ''
+    lineScope.value = 'pending'
     inboundLines.value = buildLinesFromPurchaseOrder(props.purchaseOrder)
     const warehouses = [
       ...new Set(inboundLines.value.map((line) => line.warehouse).filter(Boolean)),
@@ -267,6 +283,7 @@ function buildPurchaseInboundLine(line, order) {
   const remaining = calcPoLineRemainInboundQty(order, line)
   const received = calcPoLineReceivedQty(order, line)
   const applied = calcPoLineAppliedOccupyQty(order, line)
+  const locked = isPoLineOccupyFull(order, line)
   const poPurchaseQty = Number(line.purchaseQty) || 0
   const purchaseUnit = line.unit || '个'
   const warehouse =
@@ -289,11 +306,12 @@ function buildPurchaseInboundLine(line, order) {
     unitPrice: line.unitPriceInTax ?? line.unitPriceExTax ?? null,
     locationNo: '',
     warehouse,
-    qty: remaining,
+    qty: locked ? 0 : remaining,
     remainingQty: remaining,
     receivedQty: received,
     appliedInboundQty: applied,
     poPurchaseQty,
+    locked,
     isVariableLength: false,
     purchaseQty: undefined,
     totalValue: undefined,
@@ -305,7 +323,7 @@ function buildPurchaseInboundLine(line, order) {
 
 function buildLinesFromPurchaseOrder(order) {
   return (order.lineItems || [])
-    .filter((line) => calcPoLineRemainInboundQty(order, line) > 0)
+    .filter((line) => (Number(line.purchaseQty) || 0) > 0)
     .map((line) => buildPurchaseInboundLine(line, order))
 }
 
@@ -330,14 +348,16 @@ function onHeaderWarehouseChange(newVal) {
     cancelText: '否',
     onOk: () => {
       inboundLines.value.forEach((line) => {
-        line.warehouse = newVal
+        if (!isLineCompleted(line)) line.warehouse = newVal
       })
     },
   })
 }
 
-function removeLine(index) {
-  inboundLines.value.splice(index, 1)
+function removeLine(record) {
+  const id = record?.id
+  const idx = inboundLines.value.findIndex((l) => l.id === id)
+  if (idx >= 0) inboundLines.value.splice(idx, 1)
 }
 
 function formatMoney(val) {
@@ -358,18 +378,19 @@ function handleSave() {
     message.warning('请选择收货日期')
     return
   }
-  if (!inboundLines.value.length) {
+  const editableLines = inboundLines.value.filter((line) => !isInboundLineCompleted(line))
+  if (!editableLines.length) {
     message.warning('没有可入库的明细')
     return
   }
-  const invalidWarehouse = inboundLines.value.find((line) => !line.warehouse)
-  if (invalidWarehouse) {
-    message.warning(`请为「${invalidWarehouse.itemName}」选择入库仓库`)
+  const submitLines = editableLines.filter((line) => Number(line.qty) > 0)
+  if (!submitLines.length) {
+    message.warning('请至少填写一行入库数量')
     return
   }
-  const invalidQty = inboundLines.value.find((line) => !line.qty || Number(line.qty) <= 0)
-  if (invalidQty) {
-    message.warning(`请填写「${invalidQty.itemName}」的入库数量`)
+  const invalidWarehouse = submitLines.find((line) => !line.warehouse)
+  if (invalidWarehouse) {
+    message.warning(`请为「${invalidWarehouse.itemName}」选择入库仓库`)
     return
   }
 
@@ -383,7 +404,7 @@ function handleSave() {
     remark: form.remark?.trim() || receiptRemark,
     warehouse: form.warehouse || '',
     purchaseReceiptId: props.purchaseReceipt?.id || '',
-    lineItems: inboundLines.value.map((line) => ({
+    lineItems: submitLines.map((line) => ({
       poLineId: line.poLineId,
       itemCode: line.itemCode,
       itemName: line.itemName,
@@ -502,5 +523,15 @@ function handleSave() {
   &:hover {
     color: #ff7875;
   }
+}
+
+.locked-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+:deep(.inbound-row-locked) {
+  color: rgba(0, 0, 0, 0.45);
+  background: #fafafa;
 }
 </style>

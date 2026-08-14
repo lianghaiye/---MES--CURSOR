@@ -42,9 +42,11 @@
       </a-row>
     </a-form>
 
+    <InboundLineScopeToggle v-model="lineScope" />
+
     <a-table
       :columns="columns"
-      :data-source="receiptLines"
+      :data-source="displayLines"
       row-key="id"
       size="small"
       bordered
@@ -126,7 +128,7 @@
           <a-space :size="0">
             <template v-if="!record.locked">
               <a-button type="link" size="small" @click="openLineEdit(record)"> 编辑 </a-button>
-              <a-button type="link" size="small" danger @click="removeLine(index)">
+              <a-button type="link" size="small" danger @click="removeLine(record)">
                 移出本单
               </a-button>
             </template>
@@ -253,6 +255,8 @@ import {
 import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
 import { formatNumber } from '@/utils/numberFormat'
 import LongTextEditCell from '@/components/LongTextEditCell.vue'
+import InboundLineScopeToggle from '@/components/InboundLineScopeToggle.vue'
+import { filterInboundLinesByScope } from '@/utils/inboundLineScope'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -265,8 +269,11 @@ const RECEIPT_MODE_OPTIONS = ['正常收货', '直发现场']
 
 const form = reactive({ receiptNo: '', remark: '' })
 const receiptLines = ref([])
+const lineScope = ref('pending')
 const lineEditOpen = ref(false)
 const lineEditDraft = ref(null)
+
+const displayLines = computed(() => filterInboundLinesByScope(receiptLines.value, lineScope.value))
 const lineEditId = ref('')
 const remarkEdit = reactive({ open: false, record: null, draft: '' })
 
@@ -353,6 +360,7 @@ watch(
     if (!val || !props.purchaseOrder) return
     form.receiptNo = ''
     form.remark = props.purchaseOrder.remark || ''
+    lineScope.value = 'pending'
     receiptLines.value = (props.purchaseOrder.lineItems || [])
       .filter((l) => (Number(l.purchaseQty) || 0) > 0)
       .map((l) => buildLine(props.purchaseOrder, l))
@@ -369,8 +377,10 @@ function warehouseStatus(record) {
   return record.receivingWarehouse ? undefined : 'error'
 }
 
-function removeLine(index) {
-  receiptLines.value.splice(index, 1)
+function removeLine(record) {
+  const id = record?.id
+  const idx = receiptLines.value.findIndex((l) => l.id === id)
+  if (idx >= 0) receiptLines.value.splice(idx, 1)
 }
 
 function openRemarkEdit(record) {

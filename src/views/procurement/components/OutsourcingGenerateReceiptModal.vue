@@ -37,9 +37,11 @@
       </a-row>
     </a-form>
 
+    <InboundLineScopeToggle v-model="lineScope" />
+
     <a-table
       :columns="columns"
-      :data-source="receiptLines"
+      :data-source="displayLines"
       row-key="id"
       size="small"
       bordered
@@ -98,7 +100,7 @@
             type="link"
             size="small"
             danger
-            @click="removeLine(index)"
+            @click="removeLine(record)"
           >
             移出本单
           </a-button>
@@ -118,7 +120,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { submitOutsourcingReceipt } from '@/store/outsourcingOrderStore'
@@ -132,6 +134,8 @@ import {
   WX_INBOUND_PROGRESS_TOOLTIP,
 } from '@/utils/outsourcingInbound'
 import { formatNumber } from '@/utils/numberFormat'
+import InboundLineScopeToggle from '@/components/InboundLineScopeToggle.vue'
+import { filterInboundLinesByScope } from '@/utils/inboundLineScope'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -142,7 +146,10 @@ const emit = defineEmits(['update:open', 'confirmed'])
 
 const form = reactive({ receiptNo: '', remark: '' })
 const receiptLines = ref([])
+const lineScope = ref('pending')
 const warehouseOpts = warehouseOptions
+
+const displayLines = computed(() => filterInboundLinesByScope(receiptLines.value, lineScope.value))
 
 const columns = [
   { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
@@ -204,6 +211,7 @@ watch(
     if (!val || !props.outsourcingOrder) return
     form.receiptNo = ''
     form.remark = props.outsourcingOrder.remark || ''
+    lineScope.value = 'pending'
     receiptLines.value = (props.outsourcingOrder.lineItems || [])
       .filter((l) => (Number(l.planQty) || 0) > 0)
       .map((l) => buildLine(props.outsourcingOrder, l))
@@ -214,8 +222,10 @@ function rowClassName(record) {
   return record.locked ? 'receipt-row-locked' : ''
 }
 
-function removeLine(index) {
-  receiptLines.value.splice(index, 1)
+function removeLine(record) {
+  const id = record?.id
+  const idx = receiptLines.value.findIndex((l) => l.id === id)
+  if (idx >= 0) receiptLines.value.splice(idx, 1)
 }
 
 function handleCancel() {

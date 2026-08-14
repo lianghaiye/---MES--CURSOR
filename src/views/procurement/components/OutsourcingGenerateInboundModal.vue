@@ -55,14 +55,17 @@
       </a-row>
     </a-form>
 
+    <InboundLineScopeToggle v-model="lineScope" />
+
     <a-table
       :columns="columns"
-      :data-source="inboundLines"
+      :data-source="displayLines"
       row-key="id"
       size="small"
       bordered
       :pagination="false"
       :scroll="{ x: tableScrollX }"
+      :row-class-name="rowClassName"
     >
       <template #headerCell="{ column }">
         <template v-if="column.key === 'inboundProgress'">
@@ -96,6 +99,7 @@
             placeholder="请选择"
             style="width: 100%"
             :options="warehouseOpts"
+            :disabled="record.locked"
           />
         </template>
         <template v-else-if="column.key === 'qty'">
@@ -106,10 +110,12 @@
             :max="record.remainingQty"
             :precision="3"
             style="width: 100%"
+            :disabled="record.locked"
           />
         </template>
         <template v-else-if="column.key === 'action'">
-          <a class="danger-link" @click="removeLine(index)">删除</a>
+          <a v-if="!record.locked" class="danger-link" @click="removeLine(record)">删除</a>
+          <span v-else class="locked-tip">已入库</span>
         </template>
         <template v-else>
           {{ record[column.dataIndex] ?? '—' }}
@@ -147,6 +153,8 @@ import {
   WX_INBOUND_PROGRESS_TOOLTIP,
 } from '@/utils/outsourcingInbound'
 import { formatNumber } from '@/utils/numberFormat'
+import InboundLineScopeToggle from '@/components/InboundLineScopeToggle.vue'
+import { filterInboundLinesByScope } from '@/utils/inboundLineScope'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -161,8 +169,11 @@ const form = reactive({
   remark: '',
 })
 const inboundLines = ref([])
+const lineScope = ref('pending')
 const saving = ref(false)
 const warehouseOpts = warehouseOptions
+
+const displayLines = computed(() => filterInboundLinesByScope(inboundLines.value, lineScope.value))
 
 const columns = [
   { title: '序号', key: 'index', width: 52, align: 'center' },
@@ -179,7 +190,7 @@ const columns = [
 
 const tableScrollX = columns.reduce((sum, col) => sum + (col.width || 100), 0)
 
-const totalQty = computed(() => inboundLines.value.reduce((s, l) => s + (Number(l.qty) || 0), 0))
+const totalQty = computed(() => displayLines.value.reduce((s, l) => s + (Number(l.qty) || 0), 0))
 
 function formatQty(val) {
   return formatNumber(val, 4, { empty: '—' })
@@ -187,7 +198,7 @@ function formatQty(val) {
 
 function buildLine(order, line) {
   const remainingQty = calcWxLineRemainInboundQty(order, line)
-  if (remainingQty <= 1e-9 || isWxLineOccupyFull(order, line)) return null
+  const locked = isWxLineOccupyFull(order, line)
   return {
     id: line.id,
     productName: line.productName || line.itemName || '',
@@ -199,7 +210,8 @@ function buildLine(order, line) {
     appliedOccupyQty: calcWxLineAppliedOccupyQty(order, line),
     remainingQty,
     warehouse: line.shipWarehouse || form.warehouse || undefined,
-    qty: remainingQty,
+    qty: locked ? 0 : remainingQty,
+    locked,
   }
 }
 
@@ -210,20 +222,27 @@ watch(
     form.receiptDate = dayjs()
     form.warehouse = props.outsourcingOrder.lineItems?.[0]?.shipWarehouse || undefined
     form.remark = ''
+    lineScope.value = 'pending'
     inboundLines.value = (props.outsourcingOrder.lineItems || [])
+      .filter((l) => (Number(l.planQty) || 0) > 0)
       .map((l) => buildLine(props.outsourcingOrder, l))
-      .filter(Boolean)
   },
 )
 
+function rowClassName(record) {
+  return record.locked ? 'inbound-row-locked' : ''
+}
+
 function onHeaderWarehouseChange(val) {
   inboundLines.value.forEach((line) => {
-    if (!line.warehouse) line.warehouse = val
+    if (!line.locked && !line.warehouse) line.warehouse = val
   })
 }
 
-function removeLine(index) {
-  inboundLines.value.splice(index, 1)
+function removeLine(record) {
+  const id = record?.id
+  const idx = inboundLines.value.findIndex((l) => l.id === id)
+  if (idx >= 0) inboundLines.value.splice(idx, 1)
 }
 
 function handleCancel() {
@@ -235,7 +254,8 @@ function handleSave() {
     message.warning('请选择收货日期')
     return
   }
-  const submitLines = inboundLines.value.filter((l) => Number(l.qty) > 0)
+  const editableLines = inboundLines.value.filter((l) => !l.locked)
+  const submitLines = editableLines.filter((l) => Number(l.qty) > 0)
   if (!submitLines.length) {
     message.warning('请至少填写一行入库数量')
     return
@@ -312,5 +332,15 @@ export default { name: 'OutsourcingGenerateInboundModal' }
 .danger-link {
   color: #ff4d4f;
   cursor: pointer;
+}
+
+.locked-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+:deep(.inbound-row-locked) {
+  color: rgba(0, 0, 0, 0.45);
+  background: #fafafa;
 }
 </style>
