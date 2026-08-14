@@ -138,6 +138,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { formatQty } from '@/utils/numberFormat'
 import { calcReturnQtySummary, flattenReturnOutboundLines } from '@/mock/purchaseReturns'
+import {
+  createOutboundIssueLineColumns,
+  getOutboundIssueLineScrollX,
+} from '@/utils/outboundIssueLines'
 import { formatQtyWithUnit } from '@/utils/purchaseReturnLine'
 import {
   getPurchaseReturnById,
@@ -175,24 +179,10 @@ const lineColumns = [
   { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
 ]
 
-const outboundColumns = [
-  { title: '序号', key: 'index', width: 56, align: 'center' },
-  { title: '出库状态', dataIndex: 'outboundStatus', width: 90 },
-  { title: '出库单号', dataIndex: 'outboundOrderNo', width: 150 },
-  { title: '物料名称', dataIndex: 'productName', width: 140, ellipsis: true },
-  { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '材质', dataIndex: 'material', width: 90, ellipsis: true },
-  { title: '申请出库数量', key: 'applyQty', width: 110, align: 'right' },
-  { title: '实际出库数量', key: 'actualQty', width: 110, align: 'right' },
-  { title: '出库时间', dataIndex: 'confirmedAt', width: 160 },
-  { title: '确认人', dataIndex: 'confirmer', width: 90 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '创建人', dataIndex: 'creator', width: 90 },
-]
+const outboundColumns = createOutboundIssueLineColumns()
+const outboundTableScrollX = getOutboundIssueLineScrollX(outboundColumns)
 
 const lineTableScrollX = lineColumns.reduce((sum, col) => sum + (col.width || 100), 0)
-const outboundTableScrollX = outboundColumns.reduce((sum, col) => sum + (col.width || 100), 0)
 
 const lineSummary = computed(() => calcReturnQtySummary(record.value))
 

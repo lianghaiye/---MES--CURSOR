@@ -116,6 +116,9 @@
         <a-tab-pane key="material-req" tab="领料信息">
           <WorkOrderMaterialReqTab :work-order="workOrder" />
         </a-tab-pane>
+        <a-tab-pane key="outbound" tab="出库信息">
+          <WorkOrderOutboundInfoTab v-if="workOrder" :work-order="workOrder" />
+        </a-tab-pane>
         <a-tab-pane key="inbound" tab="入库信息">
           <WorkOrderInboundInfoTab :work-order="workOrder" />
         </a-tab-pane>
@@ -141,7 +144,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { DownOutlined, PrinterOutlined, UpOutlined } from '@ant-design/icons-vue'
 import { workOrderState } from '@/store/workOrderStore'
 import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
@@ -172,6 +175,10 @@ import {
   isScheduleIncomplete,
 } from '@/utils/workOrderScheduleBatch'
 import { canShowEditScheduleQty } from '@/utils/workOrderStatus'
+
+const WorkOrderOutboundInfoTab = defineAsyncComponent(
+  () => import('./WorkOrderOutboundInfoTab.vue'),
+)
 
 const printModalOpen = ref(false)
 

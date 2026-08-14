@@ -181,15 +181,40 @@
 
           <template v-else-if="activeTab === 'outbound'">
             <div class="section-card">
+              <div class="section-title">出库信息</div>
               <a-table
                 :columns="outboundColumns"
-                :data-source="outboundList"
+                :data-source="outboundRows"
                 row-key="id"
                 size="small"
                 bordered
                 :pagination="false"
-                :locale="{ emptyText: '暂无关联出库单' }"
-              />
+                :scroll="{ x: outboundTableScrollX }"
+                :locale="{ emptyText: '暂无出库信息' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'outboundOrderNo'">
+                    <a
+                      v-if="row.outboundId || row.outboundOrderNo"
+                      class="doc-link"
+                      @click="goOutboundDetail(row)"
+                    >
+                      {{ row.outboundOrderNo || '—' }}
+                    </a>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'applyQty'">
+                    {{ formatOutboundQtyInt(row.applyQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'actualQty'">
+                    {{ formatOutboundQtyInt(row.actualQty) }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
             </div>
           </template>
         </div>
@@ -210,7 +235,13 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
+import {
+  flattenOutboundOrdersToIssueLines,
+  createOutboundIssueLineColumns,
+  getOutboundIssueLineScrollX,
+} from '@/utils/outboundIssueLines'
 import { getDeliveryOrderById, refreshOutboundQtyAll } from '@/store/deliveryOrderStore'
+import { outboundState } from '@/store/outboundStore'
 import { getSelectedMaterialPicks } from '@/utils/shipEbom'
 import {
   deliveryStatusColor,
@@ -259,19 +290,25 @@ const shipAttachmentColumns = [
   { title: '纳入本单', key: 'selected', width: 80 },
 ]
 
-const outboundColumns = [
-  { title: '出库单号', dataIndex: 'docNo', width: 140 },
-  { title: '类型', dataIndex: 'outboundType', width: 100 },
-  { title: '仓库', dataIndex: 'warehouse', width: 100 },
-  { title: '状态', dataIndex: 'status', width: 90 },
-  { title: '创建日期', dataIndex: 'createdAt', width: 110 },
-]
+const outboundColumns = createOutboundIssueLineColumns()
+const outboundTableScrollX = getOutboundIssueLineScrollX(outboundColumns)
 
-const outboundList = computed(() => {
+const outboundRows = computed(() => {
+  void outboundState.orders
   if (!record.value) return []
   const ob = findLinkedSalesOutbound(record.value)
-  return ob ? [ob] : []
+  return ob ? flattenOutboundOrdersToIssueLines([ob]) : []
 })
+
+const outboundList = outboundRows
+
+function goOutboundDetail(row) {
+  const id = row?.outboundId
+  if (!id) return
+  const path = `/inventory/outbound/${id}`
+  openTab(path, '出库单详情')
+  router.push(path)
+}
 
 function scatterPicks(ship) {
   return getSelectedMaterialPicks(ship).map((p) => ({
@@ -365,5 +402,10 @@ function goSalesOrder() {
 .scatter-head {
   font-weight: 500;
   margin-bottom: 6px;
+}
+
+.doc-link {
+  color: #1677ff;
+  cursor: pointer;
 }
 </style>

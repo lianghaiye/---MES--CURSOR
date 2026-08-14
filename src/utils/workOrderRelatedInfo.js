@@ -8,6 +8,8 @@ import { listMobileMaterialReqs } from '@/store/mobileMaterialReqStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { outboundState } from '@/store/outboundStore'
 import { listMobileTasksForWorkOrder } from '@/utils/workOrderStatus'
+import { flattenMaterialReqOutboundLines } from '@/utils/materialReqOutboundLines'
+import { flattenOutboundOrdersToIssueLines } from '@/utils/outboundIssueLines'
 
 function sumLineQty(lines) {
   return (lines || []).reduce((s, l) => s + (Number(l.qty ?? l.applyQty ?? l.reqQty) || 0), 0)
@@ -269,6 +271,55 @@ export function buildWorkOrderMaterialReqRows(workOrder) {
     ]
   }
   return []
+}
+
+/**
+ * 工单详情「出库信息」：汇总关联领料申请及工单关联出库单，字段对齐领料申请出库信息
+ */
+export function buildWorkOrderOutboundIssueLines(workOrder) {
+  if (!workOrder) return []
+  void outboundState.orders
+
+  const woId = String(workOrder.id || '')
+  const woCode = String(workOrder.code || '')
+  const lineMap = new Map()
+
+  function addLines(lines) {
+    for (const line of lines || []) {
+      const key = line.id || `${line.outboundOrderNo}-${line.productCode}-${line.productName}`
+      if (!key || lineMap.has(key)) continue
+      lineMap.set(key, line)
+    }
+  }
+
+  function matchesWorkOrder(order) {
+    if (!order) return false
+    if (woCode && String(order.workOrderCode || '') === woCode) return true
+    if (woCode && String(order.sourceOrderNo || '') === woCode) return true
+    return (order.workOrders || []).some(
+      (w) =>
+        (woId && String(w.id || w.workOrderId || '') === woId) ||
+        (woCode && String(w.code || w.workOrderCode || '') === woCode),
+    )
+  }
+
+  const mobileList = listMobileMaterialReqs().filter((r) => {
+    if (woId && String(r.workOrderId || '') === woId) return true
+    if (woCode && String(r.workOrderCode || '') === woCode) return true
+    if (woId && (r.workOrderIds || []).map(String).includes(woId)) return true
+    if (woCode && (r.workOrders || []).some((w) => String(w.code || '') === woCode)) return true
+    return false
+  })
+
+  for (const r of mobileList) {
+    addLines(flattenMaterialReqOutboundLines(r))
+  }
+
+  for (const order of outboundState.orders || []) {
+    if (matchesWorkOrder(order)) addLines(flattenOutboundOrdersToIssueLines([order]))
+  }
+
+  return [...lineMap.values()]
 }
 
 function relatedMobileSummary(r, workOrder) {

@@ -49,6 +49,7 @@ export function flattenMaterialReqOutboundLines(record) {
         id: ref.id || '',
         docNo: ref.docNo || '',
         status: ref.status || '',
+        warehouse: ref.warehouse || '',
         lineItems: [],
       }
     })

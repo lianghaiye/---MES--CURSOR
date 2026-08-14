@@ -349,6 +349,10 @@ import {
   completeOutsourcingOrder,
 } from '@/store/outsourcingOrderStore'
 import { flattenOutsourcingIssueOutboundLines } from '@/mock/outsourcingOrders'
+import {
+  createOutboundIssueLineColumns,
+  getOutboundIssueLineScrollX,
+} from '@/utils/outboundIssueLines'
 import { getInboundOrdersByOutsourcingOrder } from '@/store/inboundOrderStore'
 import { flattenPurchaseOrderInboundLines } from '@/utils/purchaseOrderInboundLines'
 import { listInboundQcForOutsourcingOrder } from '@/utils/purchaseOrderQc'
@@ -397,21 +401,8 @@ const lineColumns = [
   { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
 ]
 
-const issueColumns = [
-  { title: '序号', key: 'index', width: 56, align: 'center' },
-  { title: '出库状态', dataIndex: 'outboundStatus', width: 90 },
-  { title: '出库单号', dataIndex: 'outboundOrderNo', width: 150 },
-  { title: '物料名称', dataIndex: 'productName', width: 140, ellipsis: true },
-  { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '材质', dataIndex: 'material', width: 90, ellipsis: true },
-  { title: '申请出库数量', key: 'applyQty', width: 110, align: 'right' },
-  { title: '实际出库数量', key: 'actualQty', width: 110, align: 'right' },
-  { title: '出库时间', dataIndex: 'confirmedAt', width: 160 },
-  { title: '确认人', dataIndex: 'confirmer', width: 90 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '创建人', dataIndex: 'creator', width: 90 },
-]
+const issueColumns = createOutboundIssueLineColumns()
+const issueTableScrollX = getOutboundIssueLineScrollX(issueColumns)
 
 const returnColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
@@ -459,7 +450,6 @@ const settleColumns = [
 ]
 
 const lineTableScrollX = lineColumns.reduce((sum, col) => sum + (col.width || 100), 0)
-const issueTableScrollX = issueColumns.reduce((sum, col) => sum + (col.width || 100), 0)
 const returnTableScrollX = returnColumns.reduce((sum, col) => sum + (col.width || 100), 0)
 
 const summary = computed(() => {
