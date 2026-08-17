@@ -281,6 +281,16 @@
       @confirm="onEnableRefConfirm"
     />
 
+    <BomArchiveReferenceModal
+      v-model:open="archiveRefOpen"
+      :item-name="archiveTarget?.itemName || ''"
+      :bom-name="archiveTarget?.bomName || ''"
+      :version="archiveTarget?.version || ''"
+      :refs="archiveParentRefs"
+      @confirm="onArchiveRefConfirm"
+      @cancel="onArchiveRefCancel"
+    />
+
     <BomRelationDrawer v-model:open="relationOpen" :bom="relationBom" />
 
     <TableColumnSettingDrawer
@@ -326,15 +336,15 @@ import {
   deleteProductBom,
   cloneProductBom,
   archiveProductBom,
-  batchArchiveProductBom,
   batchEnableProductBom,
   enableProductBom,
 } from '@/store/productBomStore'
-import { findParentRefsForBomUpgrade } from '@/utils/bomVersionReference'
+import { findParentBomReferences, findParentRefsForBomUpgrade } from '@/utils/bomVersionReference'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import ProductBomVersionDrawer from './components/ProductBomVersionDrawer.vue'
 import BomEnableReferenceModal from './components/BomEnableReferenceModal.vue'
+import BomArchiveReferenceModal from './components/BomArchiveReferenceModal.vue'
 import BomRelationDrawer from './components/BomRelationDrawer.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -363,6 +373,11 @@ const enableTarget = ref(null)
 const enableParentRefs = ref([])
 const enableNewVersion = ref('')
 const enableCurrentVersion = ref('')
+const archiveRefOpen = ref(false)
+const archiveTarget = ref(null)
+const archiveParentRefs = ref([])
+/** 批量归档时待处理队列（需弹窗的 BOM） */
+const archiveQueue = ref([])
 const relationOpen = ref(false)
 const relationBom = ref(null)
 
@@ -527,11 +542,74 @@ function onPendingAction(key, record) {
 
 function onActiveAction(key, record) {
   if (key === 'archive') {
-    archiveProductBom(record.id)
-    message.success('已归档')
+    requestArchive(record)
     return
   }
   if (key === 'clone') handleClone(record)
+}
+
+function archiveSuccessMessage(res) {
+  if (!res || res === true) return '已归档'
+  const parts = ['已归档']
+  if (res.removedCount) parts.push(`已从母件移除 ${res.removedCount} 处`)
+  if (res.keptCount) parts.push(`已保留本级 ${res.keptCount} 处`)
+  if (parts.length === 1 && res.parentTouched) {
+    return `已归档，并已处理 ${res.parentTouched} 处母件引用`
+  }
+  return parts.join('，')
+}
+
+function doArchive(record, options = {}) {
+  const res = archiveProductBom(record.id, options)
+  if (!res) {
+    message.warning('归档失败')
+    return false
+  }
+  message.success(archiveSuccessMessage(res))
+  return true
+}
+
+function openArchiveRefModal(record, refs) {
+  archiveTarget.value = record
+  archiveParentRefs.value = refs
+  archiveRefOpen.value = true
+}
+
+function requestArchive(record) {
+  const refs = findParentBomReferences(record)
+  if (!refs.length) {
+    doArchive(record)
+    return
+  }
+  archiveQueue.value = []
+  openArchiveRefModal(record, refs)
+}
+
+function processNextArchiveInQueue() {
+  const next = archiveQueue.value.shift()
+  if (!next) return
+  const refs = findParentBomReferences(next)
+  if (!refs.length) {
+    doArchive(next)
+    processNextArchiveInQueue()
+    return
+  }
+  openArchiveRefModal(next, refs)
+}
+
+function onArchiveRefConfirm({ removeRefs = [], keepSelfRefs = [] }) {
+  const target = archiveTarget.value
+  if (!target) return
+  doArchive(target, { removeRefs, keepSelfRefs })
+  archiveTarget.value = null
+  archiveParentRefs.value = []
+  processNextArchiveInQueue()
+}
+
+function onArchiveRefCancel() {
+  archiveTarget.value = null
+  archiveParentRefs.value = []
+  archiveQueue.value = []
 }
 
 function handleBatchEnable() {
@@ -572,13 +650,33 @@ function handleBatchArchive() {
     message.warning('所选记录均已归档或不可归档')
     return
   }
+
+  const withRefs = []
+  const withoutRefs = []
+  targets.forEach((row) => {
+    const refs = findParentBomReferences(row)
+    if (refs.length) withRefs.push(row)
+    else withoutRefs.push(row)
+  })
+
   Modal.confirm({
     title: '批量归档',
-    content: `确定归档选中的 ${targets.length} 条 BOM 吗？`,
+    content:
+      withRefs.length > 0
+        ? `将归档 ${targets.length} 条 BOM，其中 ${withRefs.length} 条被母件引用，需逐条确认如何处理母件中的子件。`
+        : `确定归档选中的 ${targets.length} 条 BOM 吗？`,
     onOk: () => {
-      const count = batchArchiveProductBom(selectedRowKeys.value)
+      withoutRefs.forEach((row) => archiveProductBom(row.id))
       selectedRowKeys.value = []
-      message.success(`已归档 ${count} 条`)
+      if (!withRefs.length) {
+        message.success(`已归档 ${withoutRefs.length} 条`)
+        return
+      }
+      if (withoutRefs.length) {
+        message.success(`已先归档 ${withoutRefs.length} 条无母件引用的 BOM`)
+      }
+      archiveQueue.value = [...withRefs]
+      processNextArchiveInQueue()
     },
   })
 }

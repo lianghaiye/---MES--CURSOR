@@ -4,6 +4,7 @@ import { mockProducts } from '@/mock/productInfo'
 import {
   buildPagedMockBoms,
   hydrateCatalogBom,
+  injectBomArchiveDemoMocks,
   injectBomParentReferenceMocks,
   isCatalogSeedBom,
 } from '@/mock/productBomSeed'
@@ -24,7 +25,11 @@ import {
   nextSubVersionForYear,
   normalizeVersionDisplay,
 } from '@/utils/bomVersion'
-import { upgradeParentBomReferences } from '@/utils/bomVersionReference'
+import {
+  detachChildBomKeepLine,
+  removeParentBomReferences,
+  upgradeParentBomReferences,
+} from '@/utils/bomVersionReference'
 import { formatBomInfoLabel, sortBomsForDisplay } from '@/utils/itemBomInfo'
 import { resolveActiveBomForItem } from '@/utils/spuBomResolve'
 import { ensureBlankSizeDemoBoms } from '@/mock/blankSizeBomDemoSeed'
@@ -38,8 +43,8 @@ import {
 import { productInfoState } from '@/store/productInfoStore'
 
 const STORAGE_KEY = 'i_doms_product_bom'
-/** v11：发运 BOM 改为可多产品共用 */
-const DATA_VERSION = 11
+/** v13：归档演示增加母件丙；弹窗改为逐行处理方式 */
+const DATA_VERSION = 13
 let bomNoSeq = 31000
 
 function normalizeBoms(boms) {
@@ -105,7 +110,7 @@ function loadInitialBoms() {
   const base = stored
     ? stored
     : injectBomParentReferenceMocks(normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials)))
-  return ensureShipBomDemos(ensureBlankSizeDemoBoms(base))
+  return ensureShipBomDemos(ensureBlankSizeDemoBoms(injectBomArchiveDemoMocks(base)))
 }
 
 export const productBomState = reactive({
@@ -447,7 +452,22 @@ export function enableProductBom(id, { upgradeParentRefs = false, parentRefs = [
   return row
 }
 
-export function archiveProductBom(id) {
+/**
+ * 归档产品 BOM（用户主动归档）。
+ * @param {string} id
+ * @param {{
+ *   parentMode?: 'removeLine'|'keepSelfClearChildren'|null,
+ *   parentRefs?: Array,
+ *   removeRefs?: Array,
+ *   keepSelfRefs?: Array,
+ * }} [options]
+ *   支持按母件分别传入 removeRefs / keepSelfRefs；旧参数 parentMode+parentRefs 仍可用。
+ *   版本更替归档请继续用 archiveActiveForItem，勿传母件处理参数。
+ */
+export function archiveProductBom(
+  id,
+  { parentMode = null, parentRefs = [], removeRefs = [], keepSelfRefs = [] } = {},
+) {
   const row = productBomState.boms.find((b) => b.id === id)
   if (!row) return false
   if (isBomArchived(row)) return true
@@ -456,7 +476,21 @@ export function archiveProductBom(id) {
   row.isDefault = false
   row.expiredAt = ts
   row.updatedAt = ts
-  return true
+
+  const toRemove = [...removeRefs]
+  const toKeep = [...keepSelfRefs]
+  if (parentMode === 'removeLine' && parentRefs.length) toRemove.push(...parentRefs)
+  if (parentMode === 'keepSelfClearChildren' && parentRefs.length) toKeep.push(...parentRefs)
+
+  const removed = toRemove.length ? removeParentBomReferences(toRemove) : 0
+  const kept = toKeep.length ? detachChildBomKeepLine(toKeep, row) : 0
+
+  return {
+    ok: true,
+    parentTouched: removed + kept,
+    removedCount: removed,
+    keptCount: kept,
+  }
 }
 
 export function deleteProductBom(id) {
@@ -495,12 +529,17 @@ export function cloneProductBom(id) {
   return cloned
 }
 
+/**
+ * 批量归档（无母件联动时）。带母件处理时请由 UI 逐条调用 archiveProductBom。
+ * @returns {number} 归档条数
+ */
 export function batchArchiveProductBom(ids) {
   let count = 0
   ids.forEach((id) => {
     const row = productBomState.boms.find((b) => b.id === id)
     if (!row || isBomArchived(row)) return
-    if (archiveProductBom(id)) count += 1
+    const res = archiveProductBom(id)
+    if (res) count += 1
   })
   return count
 }

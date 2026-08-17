@@ -208,41 +208,233 @@ export function injectBomParentReferenceMocks(boms) {
     const rootId = parent.treeNodes?.[0]?.id
     if (!rootId) return
 
-    const refLine = createBomLineItem({
-      parentTreeId: rootId,
-      materialCode: childBom.itemCode,
-      itemName: childBom.itemName || spec.label,
-      specModel: childBom.specModel || '',
-      categoryName: '部件',
-      materialType: '零部件',
-      supplyForm: '自制件',
-      unitQty: 1,
-      unit: '件',
-      childBom: childBom.bomName,
-      childBomVersion: childBom.version,
-      childBomId: childBom.id,
-      referencedItemId: childBom.itemId,
-      referencedItemType: childBom.itemType,
-      remark: 'Mock 父级引用',
+    const { refNode } = appendBomRefWithChildren(parent, rootId, childBom, {
+      remark: 'Mock 父级引用（升版同步演示）',
+      subordinateCount: 2,
     })
-
-    const refNode = createBomTreeNode({
-      parentId: rootId,
-      title: `${childBom.itemCode} ${childBom.itemName}`,
-      quantity: 1,
-      nodeType: 'bom-ref',
-      lineId: refLine.id,
-      materialCode: childBom.itemCode,
-    })
-    refLine.treeNodeId = refNode.id
-
-    parent.treeNodes.push(refNode)
-    parent.lineItems.push(refLine)
+    if (!refNode) return
     parent.updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
     parent._mockParentRefsInjected = true
   })
 
   childBom._mockParentRefsInjected = true
+  return boms
+}
+
+/**
+ * 在母件根下挂子件 BOM 引用，并可选展开若干下级物料行（便于验证「仅保留本级，移除下级」）
+ */
+function appendBomRefWithChildren(parent, rootId, childBom, options = {}) {
+  const { remark = 'Mock 子件 BOM 引用', subordinateCount = 2 } = options
+  if (!parent?.lineItems || !rootId || !childBom) return {}
+
+  const refLine = createBomLineItem({
+    parentTreeId: rootId,
+    materialCode: childBom.itemCode,
+    itemName: childBom.itemName,
+    specModel: childBom.specModel || '',
+    categoryName: '部件',
+    materialType: '零部件',
+    supplyForm: '自制件',
+    unitQty: 1,
+    unit: '件',
+    childBom: childBom.bomName,
+    childBomVersion: childBom.version,
+    childBomId: childBom.id,
+    referencedItemId: childBom.itemId,
+    referencedItemType: childBom.itemType,
+    remark,
+  })
+
+  const refNode = createBomTreeNode({
+    parentId: rootId,
+    title: `${childBom.itemCode} ${childBom.itemName}`,
+    quantity: 1,
+    nodeType: 'bom-ref',
+    lineId: refLine.id,
+    materialCode: childBom.itemCode,
+  })
+  refLine.treeNodeId = refNode.id
+
+  parent.treeNodes.push(refNode)
+  parent.lineItems.push(refLine)
+
+  const childRootId = childBom.treeNodes?.find((n) => n.isRoot)?.id || childBom.treeNodes?.[0]?.id
+  const childLines = (childBom.lineItems || []).filter((l) => l.parentTreeId === childRootId)
+  const pick = childLines.slice(0, subordinateCount)
+  if (!pick.length) {
+    const mats = pickChildMaterials(mockMaterials, childBom.itemCode, 3, subordinateCount)
+    mats.forEach((mat) => appendChildMaterial(parent.treeNodes, parent.lineItems, refNode.id, mat))
+  } else {
+    pick.forEach((src) => {
+      appendChildMaterial(
+        parent.treeNodes,
+        parent.lineItems,
+        refNode.id,
+        {
+          code: src.materialCode,
+          name: src.itemName,
+          specModel: src.specModel,
+          categoryName: src.categoryName,
+          materialType: src.materialType,
+          supplyForm: src.supplyForm || '外购件',
+          material: src.material,
+          drawingNo: src.drawingNo,
+          inventoryUnit: src.unit,
+          unitPrice: src.unitPrice,
+        },
+        Number(src.unitQty) || 1,
+      )
+    })
+  }
+
+  return { refNode, refLine }
+}
+
+/**
+ * 归档验证专用：独立子件 BOM + 两份母件 BOM（名称带「归档演示」）
+ * 列表筛 BOM 名称「归档演示」即可找到；归档子件时会弹出母件处理窗。
+ */
+export function injectBomArchiveDemoMocks(boms) {
+  if (!Array.isArray(boms)) return boms
+  if (boms.some((b) => b.id === 'bom-demo-archive-child')) return boms
+
+  const year = getBomVersionYear()
+  const version = formatBomVersion(year, 1)
+  const ts = dayjs().format('YYYY-MM-DD HH:mm')
+
+  const childItem = {
+    id: 'prod-archive-child',
+    code: 'ZJ-ARCHIVE-001',
+    name: '[归档演示]泵体组件',
+    specModel: 'BT-DEMO-A',
+    material: 'HT250',
+    drawingNo: 'TZ-ARCHIVE-C',
+  }
+  const childMats = pickChildMaterials(mockMaterials, childItem.code, 10, 4)
+  const childSubMap = {}
+  if (childMats.length > 1) {
+    childSubMap[0] = pickChildMaterials(mockMaterials, childMats[0].code, 20, 2)
+  }
+  const childStructure = buildBomStructureForItem(childItem, childMats, childSubMap)
+  const childBom = {
+    id: 'bom-demo-archive-child',
+    versionGroupId: 'bom-grp-demo-archive-child',
+    bomNo: 'BOM-ARCHIVE-C01',
+    bomName: '[归档演示]泵体组件 BOM',
+    itemType: 'product',
+    itemId: childItem.id,
+    itemName: childItem.name,
+    itemCode: childItem.code,
+    version,
+    versionYear: year,
+    versionSub: 1,
+    status: BOM_STATUS.ACTIVE,
+    isDefault: true,
+    effectiveAt: ts,
+    expiredAt: '',
+    operator: 'admin',
+    creator: 'admin',
+    createdAt: ts,
+    updatedAt: ts,
+    remark: '用于验证：归档子件 BOM 时处理母件引用',
+    matchingRequirements: '',
+    techParams: '',
+    processRoute: '',
+    bomType: '产品BOM',
+    specModel: childItem.specModel,
+    material: childItem.material,
+    drawingNo: childItem.drawingNo,
+    seedSource: 'archive-demo',
+    treeNodes: childStructure.treeNodes,
+    lineItems: childStructure.lineItems,
+    templateRef: null,
+    columnSettings: [],
+    _mockArchiveDemo: true,
+  }
+
+  const parentDefs = [
+    {
+      id: 'bom-demo-archive-parent-a',
+      itemId: 'prod-archive-parent-a',
+      code: 'ZJ-ARCHIVE-P01',
+      name: '[归档演示]母件整机-甲',
+      bomNo: 'BOM-ARCHIVE-P01',
+      bomName: '[归档演示]母件整机-甲 BOM',
+    },
+    {
+      id: 'bom-demo-archive-parent-b',
+      itemId: 'prod-archive-parent-b',
+      code: 'ZJ-ARCHIVE-P02',
+      name: '[归档演示]母件整机-乙',
+      bomNo: 'BOM-ARCHIVE-P02',
+      bomName: '[归档演示]母件整机-乙 BOM',
+    },
+    {
+      id: 'bom-demo-archive-parent-c',
+      itemId: 'prod-archive-parent-c',
+      code: 'ZJ-ARCHIVE-P03',
+      name: '[归档演示]母件整机-丙',
+      bomNo: 'BOM-ARCHIVE-P03',
+      bomName: '[归档演示]母件整机-丙 BOM',
+    },
+  ]
+
+  const parents = parentDefs.map((def, idx) => {
+    const item = {
+      id: def.itemId,
+      code: def.code,
+      name: def.name,
+      specModel: `PJ-DEMO-${idx + 1}`,
+      drawingNo: `TZ-ARCHIVE-P${idx + 1}`,
+    }
+    const ownMats = pickChildMaterials(mockMaterials, item.code, 30 + idx * 5, 2)
+    const structure = buildBomStructureForItem(item, ownMats)
+    const parent = {
+      id: def.id,
+      versionGroupId: `bom-grp-${def.id}`,
+      bomNo: def.bomNo,
+      bomName: def.bomName,
+      itemType: 'product',
+      itemId: item.id,
+      itemName: item.name,
+      itemCode: item.code,
+      version,
+      versionYear: year,
+      versionSub: 1,
+      status: BOM_STATUS.ACTIVE,
+      isDefault: true,
+      effectiveAt: ts,
+      expiredAt: '',
+      operator: 'admin',
+      creator: 'admin',
+      createdAt: ts,
+      updatedAt: ts,
+      remark: '引用 [归档演示]泵体组件 BOM，可验证归档弹窗两种处理',
+      matchingRequirements: '',
+      techParams: '',
+      processRoute: '',
+      bomType: '产品BOM',
+      specModel: item.specModel,
+      material: '',
+      drawingNo: item.drawingNo,
+      seedSource: 'archive-demo',
+      treeNodes: structure.treeNodes,
+      lineItems: structure.lineItems,
+      templateRef: null,
+      columnSettings: [],
+      _mockArchiveDemo: true,
+    }
+    const rootId = parent.treeNodes?.[0]?.id
+    appendBomRefWithChildren(parent, rootId, childBom, {
+      remark: '归档演示：子件 BOM 引用（含展开下级）',
+      subordinateCount: 2,
+    })
+    return parent
+  })
+
+  // 插到列表前部，方便在第一页看到
+  boms.unshift(...parents, childBom)
   return boms
 }
 

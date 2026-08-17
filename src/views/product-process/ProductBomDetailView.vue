@@ -169,6 +169,15 @@
           :column-settings="overviewColumnSettings"
         />
         <BomRelationDrawer v-model:open="relationOpen" :bom="record" :line-items="lineItems" />
+
+        <BomArchiveReferenceModal
+          v-model:open="archiveRefOpen"
+          :item-name="record?.itemName || ''"
+          :bom-name="record?.bomName || ''"
+          :version="record?.version || ''"
+          :refs="archiveParentRefs"
+          @confirm="onArchiveRefConfirm"
+        />
       </template>
       <a-empty v-else-if="!loading" description="未找到该 BOM" />
     </a-spin>
@@ -192,6 +201,7 @@ import { defaultBomOverviewColumnSettings } from '@/mock/bomOverviewColumns'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
 import { bomStatusColor, isBomEditable } from '@/mock/productBomOptions'
 import { getProductBomById, archiveProductBom, productBomState } from '@/store/productBomStore'
+import { findParentBomReferences } from '@/utils/bomVersionReference'
 import { loadBomDetailStructure } from '@/utils/bomImport'
 import { getLinesForTreeNode, ROOT_ID, getRootTreeId } from '@/utils/bomTree'
 import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
@@ -201,6 +211,7 @@ import BomMaterialTable from './components/BomMaterialTable.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
 import BomPrintModal from './components/BomPrintModal.vue'
 import BomRelationDrawer from './components/BomRelationDrawer.vue'
+import BomArchiveReferenceModal from './components/BomArchiveReferenceModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -215,6 +226,8 @@ const activeTab = ref('detail')
 const overviewModalOpen = ref(false)
 const printModalOpen = ref(false)
 const relationOpen = ref(false)
+const archiveRefOpen = ref(false)
+const archiveParentRefs = ref([])
 const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
 const overviewColumnSettings = ref(loadOverviewColumnSettings())
 
@@ -397,15 +410,42 @@ function handleEdit() {
 
 function handleArchive() {
   if (!record.value) return
+  const refs = findParentBomReferences(record.value)
+  if (refs.length) {
+    archiveParentRefs.value = refs
+    archiveRefOpen.value = true
+    return
+  }
   Modal.confirm({
     title: '确认归档',
     content: `确定归档 BOM「${record.value.bomName}」吗？`,
     onOk: () => {
-      archiveProductBom(record.value.id)
+      const res = archiveProductBom(record.value.id)
+      if (!res) {
+        message.warning('归档失败')
+        return
+      }
       loadDetail()
       message.success('已归档')
     },
   })
+}
+
+function onArchiveRefConfirm({ removeRefs = [], keepSelfRefs = [] }) {
+  if (!record.value) return
+  const res = archiveProductBom(record.value.id, {
+    removeRefs,
+    keepSelfRefs,
+  })
+  if (!res) {
+    message.warning('归档失败')
+    return
+  }
+  loadDetail()
+  const parts = ['已归档']
+  if (res.removedCount) parts.push(`已从母件移除 ${res.removedCount} 处`)
+  if (res.keptCount) parts.push(`已保留本级 ${res.keptCount} 处`)
+  message.success(parts.join('，'))
 }
 
 function handleBack() {
