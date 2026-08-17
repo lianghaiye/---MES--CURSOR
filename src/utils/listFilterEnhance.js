@@ -1,19 +1,22 @@
 /**
- * 列表页筛选区统一：一行 5 个；超过 10 个（两行）时在重置/清空后插入展开/收起
+ * 列表页筛选区统一：
+ * - 一行 5 个
+ * - 搜索/重置固定在第二行末尾（第 10 格）
+ * - 收起时最多展示 9 个条件；第 10 个及以后需展开
  */
 const ENHANCED = 'data-list-filter-enhanced'
 const COLLAPSED = 'is-filter-collapsed'
-const MAX_VISIBLE = 10
+/** 收起时可见条件数（第 10 格留给按钮） */
+const MAX_VISIBLE = 9
 
 function isActionItem(el) {
   if (!el || el.nodeType !== 1) return false
-  if (el.classList.contains('ant-col-24')) return true
+  if (el.classList.contains('ant-col-24') && el.querySelector?.('.filter-actions-item')) return true
   if (el.querySelector?.('.filter-actions-item, .filter-footer, .list-filter-footer')) return true
   const hasControl = el.querySelector?.(
     '.ant-input, .ant-select, .ant-picker, .ant-input-number, .ant-input-affix-wrapper, textarea, .ant-input-group',
   )
   const hasBtn = el.querySelector?.('button, .ant-btn')
-  // 表单项无 label 且只有按钮 → 操作区
   if (el.classList.contains('ant-form-item')) {
     const label = el.querySelector('.ant-form-item-label')
     if (!hasControl && hasBtn) return true

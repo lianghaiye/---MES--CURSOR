@@ -1,14 +1,8 @@
 <template>
-  <div class="list-filter-bar">
-    <div
-      ref="fieldsEl"
-      class="list-filter-fields"
-      :class="{ 'is-collapsed': !expanded && collapsible }"
-    >
+  <div class="list-filter-bar" :class="{ 'is-collapsed': !expanded && collapsible }">
+    <div ref="fieldsEl" class="list-filter-fields">
       <slot />
-    </div>
-    <div class="list-filter-footer">
-      <div class="list-filter-actions">
+      <div class="list-filter-actions-cell">
         <a-button type="primary" size="small" @click="emit('search')">
           <SearchOutlined />
           {{ searchText }}
@@ -29,9 +23,9 @@
           <DownOutlined v-else />
         </a-button>
       </div>
-      <div v-if="$slots.toolbar" class="list-filter-toolbar">
-        <slot name="toolbar" />
-      </div>
+    </div>
+    <div v-if="$slots.toolbar" class="list-filter-toolbar">
+      <slot name="toolbar" />
     </div>
   </div>
 </template>
@@ -45,8 +39,11 @@ import { computed, nextTick, onMounted, onUpdated, ref } from 'vue'
 import { SearchOutlined, ReloadOutlined, UpOutlined, DownOutlined } from '@ant-design/icons-vue'
 
 const props = defineProps({
-  /** 超过该数量（默认 2 行 × 5 列 = 10）显示展开/收起 */
-  collapseCount: { type: Number, default: 10 },
+  /**
+   * 超过该数量显示展开/收起。
+   * 默认 9：一行 5 个、第二行末尾留给按钮，第 10 个条件起需展开。
+   */
+  collapseCount: { type: Number, default: 9 },
   searchText: { type: String, default: '查询' },
   resetText: { type: String, default: '重置' },
   /** 若已知字段数可传入，避免依赖 DOM 计数 */
@@ -63,7 +60,11 @@ function measureFields() {
   const root = fieldsEl.value
   if (!root) return
   measuredCount.value = Array.from(root.children).filter(
-    (el) => el && el.nodeType === 1 && !el.classList?.contains('list-filter-skip'),
+    (el) =>
+      el &&
+      el.nodeType === 1 &&
+      !el.classList?.contains('list-filter-skip') &&
+      !el.classList?.contains('list-filter-actions-cell'),
   ).length
 }
 
@@ -77,7 +78,7 @@ const collapsible = computed(() => effectiveCount.value > props.collapseCount)
 </script>
 
 <style lang="less">
-/* 全局：列表筛选一行 5 个 */
+/* 全局：列表筛选一行 5 个；按钮固定第二行末尾 */
 .list-filter-bar {
   width: 100%;
 }
@@ -95,26 +96,30 @@ const collapsible = computed(() => effectiveCount.value > props.collapseCount)
     margin-inline-end: 0;
   }
 
-  &.is-collapsed > *:nth-child(n + 11) {
-    display: none !important;
+  > .list-filter-actions-cell {
+    grid-column: 5;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 8px;
+    align-self: end;
+    min-height: 32px;
   }
 }
 
-.list-filter-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+.list-filter-bar.is-collapsed .list-filter-fields > .ant-form-item:nth-child(n + 10),
+.list-filter-bar.is-collapsed .list-filter-fields > .list-filter-item:nth-child(n + 10) {
+  display: none !important;
 }
 
-.list-filter-actions,
 .list-filter-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 8px;
 }
 
 .list-filter-toggle {
@@ -125,17 +130,27 @@ const collapsible = computed(() => effectiveCount.value > props.collapseCount)
   .list-filter-fields {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 
-    &.is-collapsed > *:nth-child(n + 11) {
-      display: none !important;
+    > .list-filter-actions-cell {
+      grid-column: 3;
+      grid-row: 2;
     }
+  }
 
-    /* 中屏仍按「最多两行可见」：3×2=6；但产品规则以桌面 5×2 为准，收起阈值保持 10 */
+  .list-filter-bar.is-collapsed .list-filter-fields > .ant-form-item:nth-child(n + 6),
+  .list-filter-bar.is-collapsed .list-filter-fields > .list-filter-item:nth-child(n + 6) {
+    display: none !important;
   }
 }
 
 @media (max-width: 767px) {
   .list-filter-fields {
     grid-template-columns: repeat(1, minmax(0, 1fr));
+
+    > .list-filter-actions-cell {
+      grid-column: 1;
+      grid-row: auto;
+      justify-content: flex-start;
+    }
   }
 }
 </style>

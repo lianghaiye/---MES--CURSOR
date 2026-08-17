@@ -62,6 +62,7 @@
 
 /**
  * 列表筛选：一行 5 个（覆盖各页 a-row/a-col 栅格）
+ * 搜索/重置固定在第二行末尾（第 10 格）；收起时最多展示 9 个条件
  * 已使用 ListFilterBar 的页面不受影响
  */
 .filter-card .filter-form.horizontal-form > .ant-row.list-filter-grid-row,
@@ -83,16 +84,61 @@
   padding-right: 0 !important;
 }
 
-.filter-card .filter-form.horizontal-form > .ant-row > .ant-col.ant-col-24,
+/* 操作按钮：固定第二行末尾，不占满整行 */
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row
+  > .ant-col.ant-col-24:has(.filter-actions-item),
 .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-actions-item),
 .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-footer) {
-  grid-column: 1 / -1;
+  grid-column: 5;
+  grid-row: 2;
+  align-self: end;
+}
+
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row
+  > .ant-col:has(.filter-actions-item)
+  .filter-actions-item,
+.filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-footer) .filter-footer {
+  margin-bottom: 0;
+}
+
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row
+  > .ant-col:has(.filter-actions-item)
+  .ant-space,
+.filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-footer) .ant-space {
+  flex-wrap: nowrap;
+}
+
+/* 收起：隐藏第 10 个及以后的条件（按钮在第 10 格，不隐藏） */
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed
+  > .ant-col:not(:has(.filter-actions-item)):not(:has(.filter-footer)):nth-child(n + 10) {
+  display: none !important;
 }
 
 @media (max-width: 1199px) {
   .filter-card .filter-form.horizontal-form > .ant-row.list-filter-grid-row,
   .filter-card .filter-form.horizontal-form > .ant-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-actions-item),
+  .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-footer) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row.is-filter-collapsed
+    > .ant-col:not(:has(.filter-actions-item)):not(:has(.filter-footer)):nth-child(n + 6) {
+    display: none !important;
   }
 }
 
@@ -101,9 +147,22 @@
   .filter-card .filter-form.horizontal-form > .ant-row {
     grid-template-columns: repeat(1, minmax(0, 1fr));
   }
+
+  .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-actions-item),
+  .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-footer) {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row.is-filter-collapsed
+    > .ant-col:not(:has(.filter-actions-item)):not(:has(.filter-footer)):nth-child(n + 10) {
+    display: none !important;
+  }
 }
 
-/* 内联筛选（无 a-row）：同样一行 5 个 */
+/* 内联筛选（无 a-row）：同样一行 5 个，按钮在第二行末尾 */
 .filter-card .filter-form.list-filter-inline-grid {
   display: grid !important;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -126,18 +185,45 @@
 }
 
 .filter-card .filter-form.list-filter-inline-grid > .ant-form-item:has(.ant-space),
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions-item,
 .filter-card .filter-form.list-filter-inline-grid > .ant-form-item:not(:has(.ant-form-item-label)) {
-  grid-column: 1 / -1;
+  grid-column: 5;
+  grid-row: 2;
+  justify-self: stretch;
+}
+
+.filter-card
+  .filter-form.list-filter-inline-grid.is-filter-collapsed
+  > .ant-form-item:not(.filter-actions-item):not(:has(.ant-space)):nth-child(n + 10) {
+  display: none !important;
 }
 
 @media (max-width: 1199px) {
   .filter-card .filter-form.list-filter-inline-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .filter-card .filter-form.list-filter-inline-grid > .ant-form-item:has(.ant-space),
+  .filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions-item,
+  .filter-card
+    .filter-form.list-filter-inline-grid
+    > .ant-form-item:not(:has(.ant-form-item-label)) {
+    grid-column: 3;
+    grid-row: 2;
+  }
 }
 
 @media (max-width: 767px) {
   .filter-card .filter-form.list-filter-inline-grid {
     grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .filter-card .filter-form.list-filter-inline-grid > .ant-form-item:has(.ant-space),
+  .filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions-item,
+  .filter-card
+    .filter-form.list-filter-inline-grid
+    > .ant-form-item:not(:has(.ant-form-item-label)) {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
