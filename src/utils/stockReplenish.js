@@ -9,16 +9,25 @@ import { PLAN_SOURCE, PLAN_SOURCE_OPTIONS, planSourceLabel } from '@/utils/planS
 export { PLAN_SOURCE, PLAN_SOURCE_OPTIONS, planSourceLabel }
 
 export const REPLENISH_ACTION = {
+  /** 直接生成加工工单（与生产计划「生成加工工单」一致） */
+  WORK_ORDER: 'work_order',
+  /** 生成生产计划 */
   PRODUCE: 'produce',
   PURCHASE: 'purchase',
   OUTSOURCE: 'outsource',
 }
 
 export const REPLENISH_ACTION_OPTIONS = [
-  { value: REPLENISH_ACTION.PRODUCE, label: '生产' },
+  { value: REPLENISH_ACTION.WORK_ORDER, label: '生产' },
+  { value: REPLENISH_ACTION.PRODUCE, label: '生产计划' },
   { value: REPLENISH_ACTION.PURCHASE, label: '采购' },
   { value: REPLENISH_ACTION.OUTSOURCE, label: '外协' },
 ]
+
+export function replenishActionLabel(action) {
+  const hit = REPLENISH_ACTION_OPTIONS.find((o) => o.value === action)
+  return hit?.label || '—'
+}
 
 export function resolveProductPlanStrategy(product) {
   return product?.production?.planStrategy || PLAN_STRATEGY.MTO
@@ -93,7 +102,7 @@ function defaultActionBySupply(item) {
   const supply = String(item?.supplyForm || item?.supplyType || '')
   if (supply.includes('外协')) return REPLENISH_ACTION.OUTSOURCE
   if (supply.includes('外购')) return REPLENISH_ACTION.PURCHASE
-  return REPLENISH_ACTION.PRODUCE
+  return REPLENISH_ACTION.WORK_ORDER
 }
 
 function resolveVariantSummary(item) {

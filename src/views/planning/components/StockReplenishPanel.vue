@@ -4,7 +4,7 @@
       type="info"
       show-icon
       class="hint"
-      message="列出开启库存预警且现存量 ≤ 最低库存的产品/物料。也可手工添加。建议数量 = max(最高−可用, 补货批量)。自制默认生产，外购默认采购，外协默认外协，可改。生产直接生成计划；采购/外协打开与生产计划相同的生成弹窗。仅执行成功后写入补货台账。"
+      message="列出开启库存预警且现存量 ≤ 最低库存的产品/物料。也可手工添加。建议数量 = max(最高−可用, 补货批量)。自制默认生产，外购默认采购，外协默认外协，可改。「生产」打开与生产计划相同的生成加工工单弹窗；「生产计划」直接生成计划；采购/外协打开对应生成弹窗。仅执行成功后写入补货台账。"
     />
     <div class="toolbar">
       <a-space>
@@ -95,6 +95,13 @@
       @saved="onPurchaseSaved"
     />
 
+    <GenerateWorkOrderModal
+      v-model:open="workOrderModalOpen"
+      :order="modalOrder"
+      :materials="modalMaterials"
+      @save="onWorkOrderSaved"
+    />
+
     <GenerateOutsourceWorkOrderModal
       v-model:open="outsourceModalOpen"
       column-mode="replenish"
@@ -120,11 +127,15 @@ import {
 } from '@/utils/stockReplenish'
 import { createProductionPlanFromStockReplenish } from '@/store/productionPlanStore'
 import { addPurchaseRequisition } from '@/store/purchaseRequisitionStore'
-import { addOutsourceWorkOrdersFromPlanRows } from '@/store/workOrderStore'
+import {
+  addOutsourceWorkOrdersFromPlanRows,
+  addWorkOrdersFromPlanRows,
+} from '@/store/workOrderStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import GeneratePurchaseRequisitionModal from './GeneratePurchaseRequisitionModal.vue'
+import GenerateWorkOrderModal from './GenerateWorkOrderModal.vue'
 import GenerateOutsourceWorkOrderModal from './GenerateOutsourceWorkOrderModal.vue'
 import { applyReplenishExecuteToLedger } from '@/store/replenishLedgerStore'
 
@@ -141,6 +152,7 @@ const rows = ref([])
 const selectedKeys = ref([])
 const pickOpen = ref(false)
 const purchaseModalOpen = ref(false)
+const workOrderModalOpen = ref(false)
 const outsourceModalOpen = ref(false)
 const modalOrder = ref(null)
 const modalMaterials = ref([])
@@ -164,7 +176,7 @@ const columns = [
   { title: '最高', dataIndex: 'maxStockQty', width: 64, align: 'right' },
   { title: '建议', dataIndex: 'suggestQty', width: 72, align: 'right' },
   { title: '数量', key: 'planQty', width: 100 },
-  { title: '动作', key: 'action', width: 96 },
+  { title: '动作', key: 'action', width: 110 },
   { title: 'BOM', key: 'bomLabel', width: 140, ellipsis: true },
   { title: '操作', key: 'ops', width: 96, fixed: 'right' },
 ]
@@ -234,10 +246,16 @@ function onPickItems(picked) {
 }
 
 function buildSyntheticOrder(action) {
-  const label = action === REPLENISH_ACTION.PURCHASE ? '采购补货' : '外协补货'
+  const labelMap = {
+    [REPLENISH_ACTION.PURCHASE]: '采购补货',
+    [REPLENISH_ACTION.OUTSOURCE]: '外协补货',
+    [REPLENISH_ACTION.WORK_ORDER]: '生产补货',
+    [REPLENISH_ACTION.PRODUCE]: '生产计划补货',
+  }
+  const label = labelMap[action] || '库存补货'
   return {
     id: `replenish-${action}-${Date.now()}`,
-    orderNo: '',
+    orderNo: `BH${dayjs().format('YYYYMMDDHHmmss')}`,
     urgency: '普通',
     remark: `库存预警${label}`,
     productQty: 1,
@@ -270,8 +288,15 @@ function mapReplenishRowsToPlanMaterials(list, supplyType) {
       minStockQty: Number(r.minStockQty) || 0,
       suggestQty: Number(r.suggestQty) || 0,
       warehouse: r.defaultWarehouse || '',
+      workCenter: r.defaultWorkCenter || '',
       inTransitQty: Number(r.inTransitQty) || 0,
       inTransitText: r.inTransitText || '—',
+      isTopLevel: true,
+      bom: r.bomLabel && r.bomLabel !== '-' ? r.bomLabel : r.productName,
+      bomId: r.bomId || '',
+      bomName: r.bomName || '',
+      bomVersion: r.bomVersion || '',
+      productId: r.productId || '',
       remark: r.manual ? '手工补货' : '库存预警',
     }
   })
@@ -282,6 +307,24 @@ function openPurchaseModal(list) {
   modalOrder.value = buildSyntheticOrder(REPLENISH_ACTION.PURCHASE)
   modalMaterials.value = mapReplenishRowsToPlanMaterials(list, '外购件')
   purchaseModalOpen.value = true
+}
+
+function openWorkOrderModal(list) {
+  const withBom = list.filter((r) => r.hasBom)
+  const skippedNoBom = list.filter((r) => !r.hasBom)
+  if (!withBom.length) {
+    message.warning(
+      `未打开弹窗：所选「生产」行均无 BOM（${skippedNoBom.map((r) => r.productName).join('、')}），请改采购/外协/生产计划或先维护 BOM`,
+    )
+    return
+  }
+  if (skippedNoBom.length) {
+    message.info(`已跳过无 BOM 的行：${skippedNoBom.map((r) => r.productName).join('、')}`)
+  }
+  pendingReplenishRows.value = withBom.map((r) => ({ ...r }))
+  modalOrder.value = buildSyntheticOrder(REPLENISH_ACTION.WORK_ORDER)
+  modalMaterials.value = mapReplenishRowsToPlanMaterials(withBom, '自制件')
+  workOrderModalOpen.value = true
 }
 
 function openOutsourceModal(list) {
@@ -309,7 +352,7 @@ function showProduceSuccess(plan, producedRows, skippedNoBom) {
   ]
   if (skippedNoBom.length) {
     lines.push(
-      `已跳过无 BOM 的生产行：${skippedNoBom.map((r) => r.productName).join('、')}（可改动作「采购/外协」后重试）`,
+      `已跳过无 BOM 的生产计划行：${skippedNoBom.map((r) => r.productName).join('、')}（可改动作「采购/外协/生产」后重试）`,
     )
   }
   const footer = [
@@ -351,16 +394,16 @@ function showProduceSuccess(plan, producedRows, skippedNoBom) {
     ]),
     okText: '留在库存预警',
   })
-  emit('created', { plan, purchaseReq: null, outsourceOrders: [] })
+  emit('created', { plan, purchaseReq: null, outsourceOrders: [], workOrders: [] })
   afterExecuteCleanup(producedRows.map((r) => r.key))
 }
 
-function executeProduce(selected) {
+function executeProducePlan(selected) {
   const withBom = selected.filter((r) => r.hasBom)
   const skippedNoBom = selected.filter((r) => !r.hasBom)
   if (!withBom.length) {
     message.warning(
-      `未生成单据：所选「生产」行均无 BOM（${skippedNoBom.map((r) => r.productName).join('、')}），请改采购/外协或先维护 BOM`,
+      `未生成单据：所选「生产计划」行均无 BOM（${skippedNoBom.map((r) => r.productName).join('、')}），请改采购/外协/生产或先维护 BOM`,
     )
     return
   }
@@ -385,7 +428,29 @@ function onPurchaseSaved(requisition) {
   message.success(
     `已写入补货台账：采购申请 ${requisition.reqNo}（${requisition.lineItems?.length || 0} 项）`,
   )
-  emit('created', { plan: null, purchaseReq: requisition, outsourceOrders: [] })
+  emit('created', { plan: null, purchaseReq: requisition, outsourceOrders: [], workOrders: [] })
+  afterExecuteCleanup(handled.map((r) => r.key))
+}
+
+function onWorkOrderSaved(savedRows) {
+  const order = modalOrder.value || buildSyntheticOrder(REPLENISH_ACTION.WORK_ORDER)
+  const created = addWorkOrdersFromPlanRows(savedRows, order)
+  const byCode = new Map((savedRows || []).map((r) => [r.code, r]))
+  const handled = pendingReplenishRows.value
+    .filter((r) => byCode.has(r.productCode))
+    .map((r) => {
+      const saved = byCode.get(r.productCode)
+      return {
+        ...r,
+        action: REPLENISH_ACTION.WORK_ORDER,
+        planQty: Number(saved?.planQty) || Number(r.planQty) || 0,
+      }
+    })
+  applyReplenishExecuteToLedger(handled, { workOrders: created })
+  message.success(
+    `已写入补货台账：加工工单 ${created.map((o) => o.code).join('、') || '—'}（共 ${created.length} 张）`,
+  )
+  emit('created', { plan: null, purchaseReq: null, outsourceOrders: [], workOrders: created })
   afterExecuteCleanup(handled.map((r) => r.key))
 }
 
@@ -407,7 +472,7 @@ function onOutsourceSaved(savedRows) {
   message.success(
     `已写入补货台账：外协工单 ${created.map((o) => o.code).join('、') || '—'}（共 ${created.length} 张）`,
   )
-  emit('created', { plan: null, purchaseReq: null, outsourceOrders: created })
+  emit('created', { plan: null, purchaseReq: null, outsourceOrders: created, workOrders: [] })
   afterExecuteCleanup(handled.map((r) => r.key))
 }
 
@@ -431,8 +496,12 @@ function handleConfirm(onlyKeys) {
   }
 
   const action = actions[0]
+  if (action === REPLENISH_ACTION.WORK_ORDER) {
+    openWorkOrderModal(selected)
+    return
+  }
   if (action === REPLENISH_ACTION.PRODUCE) {
-    executeProduce(selected)
+    executeProducePlan(selected)
     return
   }
   if (action === REPLENISH_ACTION.PURCHASE) {

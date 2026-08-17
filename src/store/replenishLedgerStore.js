@@ -150,6 +150,7 @@ function nowStr() {
 function normalizeAction(action) {
   if (action === 'purchase') return 'purchase'
   if (action === 'outsource') return 'outsource'
+  if (action === 'work_order') return 'work_order'
   return 'produce'
 }
 
@@ -162,13 +163,14 @@ function statusForAction(action) {
 /**
  * 执行补货后追加流水（每次执行一条，不合并历史）
  * @param {object[]} handledRows 执行成功的补货行
- * @param {{ plan?: object, purchaseReq?: object, outsourceOrders?: object[] }} docs
+ * @param {{ plan?: object, purchaseReq?: object, outsourceOrders?: object[], workOrders?: object[] }} docs
  */
 export function applyReplenishExecuteToLedger(handledRows = [], docs = {}) {
   const now = nowStr()
   const plan = docs.plan
   const purchaseReq = docs.purchaseReq
   const outsourceOrders = Array.isArray(docs.outsourceOrders) ? docs.outsourceOrders : []
+  const workOrders = Array.isArray(docs.workOrders) ? docs.workOrders : []
   const created = []
 
   handledRows.forEach((row) => {
@@ -179,9 +181,12 @@ export function applyReplenishExecuteToLedger(handledRows = [], docs = {}) {
     const handleQty = Number(row.planQty) || Number(row.suggestQty) || 0
     const outsourceWo =
       action === 'outsource' ? outsourceOrders.find((o) => o.materialCode === code) || null : null
+    const processWo =
+      action === 'work_order' ? workOrders.find((o) => o.materialCode === code) || null : null
 
     const remarks = []
     if (action === 'produce' && plan) remarks.push(`关联生产计划 ${plan.orderNo}`)
+    if (action === 'work_order' && processWo) remarks.push(`关联加工工单 ${processWo.code}`)
     if (action === 'purchase' && purchaseReq) remarks.push(`关联采购申请 ${purchaseReq.reqNo}`)
     if (action === 'outsource' && outsourceWo) remarks.push(`关联外协工单 ${outsourceWo.code}`)
 
@@ -206,8 +211,14 @@ export function applyReplenishExecuteToLedger(handledRows = [], docs = {}) {
       planId: action === 'produce' && plan ? plan.id || '' : '',
       purchaseReqNo: action === 'purchase' && purchaseReq ? purchaseReq.reqNo || '' : '',
       purchaseReqId: action === 'purchase' && purchaseReq ? purchaseReq.id || '' : '',
-      workOrderNo: action === 'outsource' && outsourceWo ? outsourceWo.code || '' : '',
-      workOrderId: action === 'outsource' && outsourceWo ? outsourceWo.id || '' : '',
+      workOrderNo:
+        (action === 'outsource' && outsourceWo?.code) ||
+        (action === 'work_order' && processWo?.code) ||
+        '',
+      workOrderId:
+        (action === 'outsource' && outsourceWo?.id) ||
+        (action === 'work_order' && processWo?.id) ||
+        '',
       triggeredAt: now,
       handledAt: now,
       handledBy: 'admin1',

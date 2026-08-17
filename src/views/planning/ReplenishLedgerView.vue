@@ -109,7 +109,7 @@
                 申请 {{ record.purchaseReqNo }}
               </a>
               <a v-if="record.workOrderNo" class="link" @click.prevent="goWorkOrder(record)">
-                外协 {{ record.workOrderNo }}
+                工单 {{ record.workOrderNo }}
               </a>
             </div>
             <span v-else class="muted">—</span>
@@ -145,6 +145,7 @@ import {
   replenishLedgerStatusLabel,
   replenishLedgerStatusColor,
 } from '@/store/replenishLedgerStore'
+import { REPLENISH_ACTION_OPTIONS, replenishActionLabel } from '@/utils/stockReplenish'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -165,11 +166,7 @@ const pagination = reactive({
 })
 
 const statusOpts = REPLENISH_LEDGER_STATUS_OPTIONS.filter((o) => o.value)
-const actionOpts = [
-  { value: 'produce', label: '生产' },
-  { value: 'purchase', label: '采购' },
-  { value: 'outsource', label: '外协' },
-]
+const actionOpts = REPLENISH_ACTION_OPTIONS
 
 const columns = [
   { title: '台账号', dataIndex: 'ledgerNo', width: 140, fixed: 'left' },
@@ -183,7 +180,7 @@ const columns = [
   { title: '最高', dataIndex: 'maxStockQty', width: 72, align: 'right' },
   { title: '建议数量', dataIndex: 'suggestQty', width: 88, align: 'right' },
   { title: '处理数量', dataIndex: 'handleQty', width: 88, align: 'right' },
-  { title: '动作', key: 'action', width: 72 },
+  { title: '动作', key: 'action', width: 88 },
   { title: '关联单据', key: 'refs', width: 180 },
   { title: '触发时间', dataIndex: 'triggeredAt', width: 140 },
   { title: '处理时间', dataIndex: 'handledAt', width: 140 },
@@ -205,10 +202,7 @@ const pagedRows = computed(() => {
 })
 
 function actionLabel(action) {
-  if (action === 'produce') return '生产'
-  if (action === 'purchase') return '采购'
-  if (action === 'outsource') return '外协'
-  return '—'
+  return replenishActionLabel(action)
 }
 
 function handleSearch() {
