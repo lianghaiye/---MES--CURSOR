@@ -191,11 +191,11 @@
               @change="onLineCalc(record)"
             />
           </template>
-          <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
+          <template v-else-if="column.key === 'deliveryUnitPriceInTax'">
             <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
               <span class="price-locked-wrap">
                 <a-input-number
-                  v-model:value="record.deliveryUnitPriceExTax"
+                  v-model:value="record.deliveryUnitPriceInTax"
                   size="small"
                   :min="0"
                   :precision="4"
@@ -206,8 +206,8 @@
               </span>
             </a-tooltip>
           </template>
-          <template v-else-if="column.key === 'deliveryAmountExTax'">
-            {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
+          <template v-else-if="column.key === 'deliveryAmountInTax'">
+            {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
           </template>
           <template v-else-if="column.key === 'lineRemark'">
             <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
@@ -256,11 +256,11 @@
               {{ record.deliveryMode || '散件' }}
             </a-tag>
           </template>
-          <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
+          <template v-else-if="column.key === 'deliveryUnitPriceInTax'">
             <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
               <span class="price-locked-wrap">
                 <a-input-number
-                  v-model:value="record.deliveryUnitPriceExTax"
+                  v-model:value="record.deliveryUnitPriceInTax"
                   size="small"
                   :min="0"
                   :precision="4"
@@ -271,8 +271,8 @@
               </span>
             </a-tooltip>
           </template>
-          <template v-else-if="column.key === 'deliveryAmountExTax'">
-            {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
+          <template v-else-if="column.key === 'deliveryAmountInTax'">
+            {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
           </template>
           <template v-else-if="column.key === 'lineRemark'">
             <a-input v-model:value="record.lineRemark" size="small" placeholder="请输入" />
@@ -382,8 +382,8 @@ const lineColumns = [
   { title: '单价', key: 'unitPriceExTax', width: 96, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56, align: 'center' },
   { title: '本次发货数量', key: 'shipQty', width: 112, align: 'right' },
-  { title: '发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 168, align: 'right' },
-  { title: '发货总额', key: 'deliveryAmountExTax', width: 100, align: 'right' },
+  { title: '发货单价（含税）', key: 'deliveryUnitPriceInTax', width: 148, align: 'right' },
+  { title: '发货总额（含税）', key: 'deliveryAmountInTax', width: 124, align: 'right' },
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
   { title: '备注', key: 'lineRemark', width: 120 },

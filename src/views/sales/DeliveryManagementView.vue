@@ -89,10 +89,17 @@
           <PlusOutlined />
           新增
         </a-button>
-        <a-button size="small" @click="stubAction('打印')">
-          <PrinterOutlined />
-          打印
-        </a-button>
+        <a-dropdown>
+          <a-button size="small">
+            批量打印
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onPrintMenuClick">
+              <a-menu-item key="打印发货单">打印发货单明细</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
         <a-button size="small" :disabled="!canGenerateOutbound" @click="handleGenerateOutbound">
           生成出库单
         </a-button>
@@ -204,6 +211,8 @@
       :selected-count="selectedRowKeys.length"
       @export="doExport"
     />
+
+    <DeliveryOrderPrintModal v-model:open="printModalOpen" :delivery-orders="printOrders" />
   </div>
 </template>
 
@@ -215,13 +224,7 @@ export default { name: 'DeliveryManagementView' }
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import {
-  SearchOutlined,
-  ReloadOutlined,
-  PlusOutlined,
-  PrinterOutlined,
-  DownOutlined,
-} from '@ant-design/icons-vue'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { useTabs } from '@/composables/useTabs'
 import { customerOptions, salespersonOptions } from '@/mock/salesOrderOptions'
 import {
@@ -243,6 +246,7 @@ import {
   DELIVERY_STATUS_OPTIONS,
 } from '@/utils/deliveryOrder'
 import DeliveryStatsPanel from './components/DeliveryStatsPanel.vue'
+import DeliveryOrderPrintModal from './components/DeliveryOrderPrintModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
@@ -268,6 +272,8 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const selectedRowKeys = ref([])
+const printModalOpen = ref(false)
+const printOrders = ref([])
 
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
@@ -428,8 +434,23 @@ function openDetail(record) {
   router.push({ name: 'sales-delivery-detail', params: { id: record.id } })
 }
 
-function stubAction(name) {
-  message.info(`${name}功能开发中`)
+function onPrintMenuClick({ key }) {
+  if (key === '打印发货单') {
+    openBatchPrint()
+  }
+}
+
+function openBatchPrint() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选要打印的发货单')
+    return
+  }
+  printOrders.value = deliveryOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
+  if (!printOrders.value.length) {
+    message.warning('未找到可打印的发货单')
+    return
+  }
+  printModalOpen.value = true
 }
 
 function onBatchMenu({ key }) {

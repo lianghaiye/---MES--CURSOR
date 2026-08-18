@@ -263,11 +263,11 @@
               @change="onLineCalc(record)"
             />
           </template>
-          <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
+          <template v-else-if="column.key === 'deliveryUnitPriceInTax'">
             <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
               <span class="price-locked-wrap">
                 <a-input-number
-                  v-model:value="record.deliveryUnitPriceExTax"
+                  v-model:value="record.deliveryUnitPriceInTax"
                   size="small"
                   :min="0"
                   :precision="4"
@@ -280,8 +280,8 @@
               </span>
             </a-tooltip>
           </template>
-          <template v-else-if="column.key === 'deliveryAmountExTax'">
-            {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
+          <template v-else-if="column.key === 'deliveryAmountInTax'">
+            {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
           </template>
           <template v-else-if="column.key === 'shipWarehouse'">
             <a-select
@@ -409,11 +409,11 @@
               @change="onScatterLinePriceChange(record)"
             />
           </template>
-          <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
+          <template v-else-if="column.key === 'deliveryUnitPriceInTax'">
             <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
               <span class="price-locked-wrap">
                 <a-input-number
-                  v-model:value="record.deliveryUnitPriceExTax"
+                  v-model:value="record.deliveryUnitPriceInTax"
                   size="small"
                   :min="0"
                   :precision="4"
@@ -426,8 +426,8 @@
               </span>
             </a-tooltip>
           </template>
-          <template v-else-if="column.key === 'deliveryAmountExTax'">
-            {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
+          <template v-else-if="column.key === 'deliveryAmountInTax'">
+            {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
           </template>
           <template v-else-if="column.key === 'shipWarehouse'">
             <a-select
@@ -887,8 +887,8 @@ const lineColumns = [
   { title: '当前仓库数量', key: 'warehouseStockQty', width: 110, align: 'right' },
   { title: '本次发货数量', key: 'shipQty', width: 120, align: 'right' },
   { title: '发货重量', key: 'shipWeight', width: 110, align: 'right' },
-  { title: '发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 168, align: 'right' },
-  { title: '发货总额', key: 'deliveryAmountExTax', width: 100, align: 'right' },
+  { title: '发货单价（含税）', key: 'deliveryUnitPriceInTax', width: 148, align: 'right' },
+  { title: '发货总额（含税）', key: 'deliveryAmountInTax', width: 124, align: 'right' },
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
   { title: '备注', key: 'lineRemark', width: 140 },
@@ -1348,6 +1348,7 @@ function loadFromRecord(record) {
     line.unitPriceInTax = roundDeliveryDecimal(line.unitPriceInTax ?? 0, 4)
     if (!line.shipWarehouse) line.shipWarehouse = form.outboundWarehouse || ''
     line.variantAttr = resolveDeliveryVariantAttr(line)
+    recalcDeliveryLine(line)
     refreshDeliveryLineStock(line)
     return line
   })
@@ -1357,6 +1358,7 @@ function loadFromRecord(record) {
     s.unitPriceInTax = roundDeliveryDecimal(s.unitPriceInTax ?? 0, 4)
     if (!s.shipWarehouse) s.shipWarehouse = form.outboundWarehouse || ''
     s.variantAttr = resolveDeliveryVariantAttr(s)
+    recalcDeliveryLine(s)
     refreshScatterShipmentMeta(s)
     refreshDeliveryLineStock(s)
   })

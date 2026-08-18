@@ -2,6 +2,9 @@
  * 发货单打印预览：与采购订单打印同款 sessionStorage + 新窗口预览逻辑
  */
 
+import { getSalesOrderById } from '@/store/salesOrderStore'
+import { enrichDeliveryLineForDisplay, recalcDeliveryLine } from '@/utils/deliveryLine'
+
 const STORAGE_PREFIX = 'delivery-order-print-preview:'
 
 function formatPrintFieldValue(value) {
@@ -31,34 +34,42 @@ function formatPrintMoney(val) {
 export function buildDeliveryOrderPrintPayload(row, options = {}) {
   if (!row) return null
 
-  const lineItems = (row.lineItems || []).map((line, index) => ({
-    seq: index + 1,
-    productName: formatPrintFieldValue(line.productName || line.itemName),
-    productCode: formatPrintFieldValue(line.productCode || line.itemCode),
-    shipQty: formatPrintQty(line.shipQty),
-    unitPriceExTax: formatPrintMoney(line.deliveryUnitPriceExTax ?? line.unitPriceExTax),
-    amountExTax: formatPrintMoney(line.deliveryAmountExTax ?? line.amountExTax),
-    remark: formatPrintFieldValue(line.remark),
-  }))
+  const salesOrder = row.salesOrderId ? getSalesOrderById(row.salesOrderId) : null
+  const lineItems = (row.lineItems || []).map((line, index) => {
+    const enriched = enrichDeliveryLineForDisplay(line, salesOrder, {
+      outboundWarehouse: row.outboundWarehouse,
+    })
+    recalcDeliveryLine(enriched)
+    return {
+      seq: index + 1,
+      productName: formatPrintFieldValue(enriched.productName || enriched.itemName),
+      productCode: formatPrintFieldValue(enriched.productCode || enriched.itemCode),
+      specModel: formatPrintFieldValue(enriched.specModel),
+      material: formatPrintFieldValue(enriched.material),
+      variantAttr: formatPrintFieldValue(enriched.variantAttr || enriched.variantSummary),
+      unit: formatPrintFieldValue(enriched.unit),
+      shipQty: formatPrintQty(enriched.shipQty),
+      shipWarehouse: formatPrintFieldValue(enriched.shipWarehouse || row.outboundWarehouse),
+      packagingForm: formatPrintFieldValue(enriched.packagingForm),
+      unitPriceInTax: formatPrintMoney(enriched.deliveryUnitPriceInTax),
+      amountInTax: formatPrintMoney(enriched.deliveryAmountInTax),
+      remark: formatPrintFieldValue(enriched.lineRemark || enriched.remark),
+    }
+  })
 
   const basicFields = [
-    { label: '发货单号', value: row.deliveryCode },
     { label: '源单号', value: row.sourceOrderNo },
     { label: '发货状态', value: row.deliveryStatus },
     { label: '客户', value: row.customerName },
     { label: '业务员', value: row.salesperson },
     { label: '单据日期', value: row.documentDate },
-    { label: '申请发货数量', value: formatPrintQty(row.applyShipQty) },
-    { label: '实际出库数量', value: formatPrintQty(row.actualOutboundQty) },
-    { label: '发货重量', value: row.shipWeight },
-    { label: '发货总金额（不含税）', value: formatPrintMoney(row.totalAmountExTax) },
     { label: '交货方式', value: row.shipmentMethod },
     { label: '物流单号', value: row.logisticsNo },
-    { label: '出库仓库', value: row.outboundWarehouse },
     { label: '客户联系人', value: row.contactPerson },
     { label: '联系方式', value: row.contactPhone },
     { label: '司机姓名', value: row.driverName },
     { label: '司机联系方式', value: row.driverPhone },
+    { label: '车牌号', value: row.plateNo },
     { label: '交货地址', value: row.deliveryAddress, wide: true },
     { label: '备注', value: row.remark, wide: true },
   ].map((field) => ({
@@ -67,6 +78,13 @@ export function buildDeliveryOrderPrintPayload(row, options = {}) {
   }))
 
   const totalShipQty = (row.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
+  const amountInTax = (row.lineItems || []).reduce((s, l) => {
+    const amt = Number(l.deliveryAmountInTax)
+    if (Number.isFinite(amt)) return s + amt
+    const qty = Number(l.shipQty) || 0
+    const price = Number(l.deliveryUnitPriceInTax ?? l.unitPriceInTax) || 0
+    return s + qty * price
+  }, 0)
 
   return {
     deliveryCode: formatPrintFieldValue(row.deliveryCode),
@@ -77,7 +95,7 @@ export function buildDeliveryOrderPrintPayload(row, options = {}) {
     summary: {
       lineCount: String(lineItems.length),
       totalQty: formatPrintQty(totalShipQty),
-      amountExTax: formatPrintMoney(row.totalAmountExTax),
+      amountInTax: formatPrintMoney(amountInTax),
     },
     paper: options.paper || 'A4',
     orientation: options.orientation || 'portrait',

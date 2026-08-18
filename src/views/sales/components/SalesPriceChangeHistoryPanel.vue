@@ -8,7 +8,7 @@
       :data-source="records"
       :pagination="false"
       :locale="{ emptyText: '暂无价格变更记录' }"
-      :scroll="{ x: 1180 }"
+      :scroll="{ x: 1480 }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -103,12 +103,14 @@ const columns = [
   { title: '状态', key: 'status', width: 88 },
   { title: '原因', dataIndex: 'reasonType', width: 100 },
   { title: '说明', dataIndex: 'reason', ellipsis: true },
-  { title: '变更后（不含税）', key: 'newAmountExTax', width: 130, align: 'right' },
-  { title: '变更后（含税）', key: 'newAmountInTax', width: 120, align: 'right' },
-  { title: '差额（不含税）', key: 'deltaAmountExTax', width: 120, align: 'right' },
-  { title: '差额（含税）', key: 'deltaAmountInTax', width: 110, align: 'right' },
+  { title: '变更后（不含税）', key: 'newAmountExTax', width: 148, align: 'right' },
+  { title: '变更后（含税）', key: 'newAmountInTax', width: 136, align: 'right' },
+  { title: '差额（不含税）', key: 'deltaAmountExTax', width: 136, align: 'right' },
+  { title: '差额（含税）', key: 'deltaAmountInTax', width: 124, align: 'right' },
   { title: '申请人', dataIndex: 'creator', width: 88 },
-  { title: '申请时间', dataIndex: 'createdAt', width: 140 },
+  { title: '申请时间', dataIndex: 'createdAt', width: 148 },
+  { title: '审核人', dataIndex: 'approver', width: 88 },
+  { title: '审核时间', dataIndex: 'approvedAt', width: 148 },
 ]
 
 const lineMoneyKeys = new Set([
@@ -151,6 +153,12 @@ function deltaClass(val) {
 </script>
 
 <style lang="less" scoped>
+.price-change-history {
+  :deep(.ant-table-thead > tr > th) {
+    white-space: nowrap;
+  }
+}
+
 .delta-up {
   color: #cf1322;
 }

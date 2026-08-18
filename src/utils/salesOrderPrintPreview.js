@@ -29,6 +29,16 @@ function formatPrintMoney(val) {
   })
 }
 
+function formatPrintTaxRate(val) {
+  if (val == null || val === '') return ''
+  const text = String(val).trim()
+  if (!text) return ''
+  if (text.endsWith('%')) return text
+  const n = Number(text)
+  if (!Number.isFinite(n)) return text
+  return `${n}%`
+}
+
 /** 构建单张销售订单打印数据（含明细） */
 export function buildSalesOrderPrintPayload(order, options = {}) {
   if (!order) return null
@@ -39,23 +49,24 @@ export function buildSalesOrderPrintPayload(order, options = {}) {
     productCode: formatPrintFieldValue(line.productCode || line.itemCode),
     specModel: formatPrintFieldValue(line.specModel),
     material: formatPrintFieldValue(line.material),
+    variantAttr: formatPrintFieldValue(line.variantSummary || line.variantAttr),
     drawingNo: formatPrintFieldValue(line.drawingNo),
     salesQty: formatPrintQty(line.salesQty ?? line.qty),
     unit: formatPrintFieldValue(line.unit),
     unitPriceExTax: formatPrintMoney(line.unitPriceExTax),
-    taxRate: formatPrintFieldValue(line.taxRate),
+    unitPriceInTax: formatPrintMoney(line.unitPriceInTax),
+    taxRate: formatPrintTaxRate(line.taxRate),
+    totalPriceExTax: formatPrintMoney(line.totalPriceExTax),
     totalPriceInTax: formatPrintMoney(line.totalPriceInTax ?? line.amountInTax),
     deliveryDate: formatPrintFieldValue(line.deliveryDate),
     deliveryMode: formatPrintFieldValue(line.deliveryMode || '整机'),
-    remark: formatPrintFieldValue(line.remark),
+    remark: formatPrintFieldValue(line.supplementDesc || line.remark || line.lineRemark),
   }))
 
   const basicFields = [
-    { label: '销售单号', value: order.orderNo },
     { label: '客户名称', value: order.customerName },
     { label: '业务员', value: order.salesperson },
     { label: '订单类型', value: order.orderType },
-    { label: '合同类型', value: order.contractType },
     { label: '合同编号', value: order.contractNo },
     { label: '紧急度', value: order.urgency },
     { label: '状态', value: order.progressStatus },

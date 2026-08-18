@@ -125,10 +125,17 @@
           申请发货
         </a-button>
         <a-button size="small" @click="openChangeDeliveryModeModal">变更交付方式</a-button>
-        <a-button size="small" @click="stubAction('打印')">
-          <PrinterOutlined />
-          打印
-        </a-button>
+        <a-dropdown>
+          <a-button size="small">
+            批量打印
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onPrintMenuClick">
+              <a-menu-item key="打印销售单">打印销售订单明细</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
         <a-dropdown>
           <a-button size="small">
             更多
@@ -315,6 +322,8 @@
       @done="onPriceChangeDone"
     />
 
+    <SalesOrderPrintModal v-model:open="printModalOpen" :sales-orders="printOrders" />
+
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -349,7 +358,6 @@ import {
   DownOutlined,
   CheckOutlined,
   FileTextOutlined,
-  PrinterOutlined,
   RollbackOutlined,
 } from '@ant-design/icons-vue'
 import { filterSalesOrders } from '@/mock/salesOrders'
@@ -381,6 +389,7 @@ import {
 } from '@/mock/salesOrderOptions'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
 import SalesPriceChangeModal from './components/SalesPriceChangeModal.vue'
+import SalesOrderPrintModal from './components/SalesOrderPrintModal.vue'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -422,6 +431,8 @@ const filters = reactive({
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
+const printModalOpen = ref(false)
+const printOrders = ref([])
 const changeDeliveryModeOpen = ref(false)
 const changeDeliveryModeOrder = ref(null)
 const priceChangeOpen = ref(false)
@@ -637,6 +648,25 @@ function handleReset() {
 
 function stubAction(name) {
   message.info(`${name}功能开发中`)
+}
+
+function onPrintMenuClick({ key }) {
+  if (key === '打印销售单') {
+    openBatchPrint()
+  }
+}
+
+function openBatchPrint() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选要打印的销售订单')
+    return
+  }
+  printOrders.value = salesOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
+  if (!printOrders.value.length) {
+    message.warning('未找到可打印的销售订单')
+    return
+  }
+  printModalOpen.value = true
 }
 
 function onMoreMenuClick({ key }) {

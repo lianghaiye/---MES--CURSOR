@@ -55,12 +55,12 @@
                 <span>{{ progressDisplay }}</span>
               </div>
               <div class="preview-row">
-                <span class="preview-label">发货单价</span>
-                <span>{{ formatDeliveryPrice(draft.deliveryUnitPriceExTax) }}</span>
+                <span class="preview-label">发货单价（含税）</span>
+                <span>{{ formatDeliveryPrice(draft.deliveryUnitPriceInTax) }}</span>
               </div>
               <div class="preview-row">
-                <span class="preview-label">发货总额</span>
-                <span>{{ formatDeliveryPrice(draft.deliveryAmountExTax) }}</span>
+                <span class="preview-label">发货总额（含税）</span>
+                <span>{{ formatDeliveryPrice(draft.deliveryAmountInTax) }}</span>
               </div>
               <div class="price-lock-hint">按申请时订单有效价锁定，改价请走订单价格变更</div>
             </div>
@@ -238,6 +238,11 @@ function createDraft(line = {}) {
     shipWeight: roundDeliveryDecimal(line.shipWeight ?? 0, 4),
     deliveryUnitPriceExTax: roundDeliveryDecimal(line.deliveryUnitPriceExTax ?? 0, 4),
     deliveryAmountExTax: roundDeliveryDecimal(line.deliveryAmountExTax ?? 0, 4),
+    deliveryUnitPriceInTax: roundDeliveryDecimal(
+      line.deliveryUnitPriceInTax ?? line.unitPriceInTax ?? 0,
+      4,
+    ),
+    deliveryAmountInTax: roundDeliveryDecimal(line.deliveryAmountInTax ?? 0, 4),
     packagingForm: line.packagingForm || '',
     lineRemark: line.lineRemark || '',
     shipWarehouse: line.shipWarehouse || '',
@@ -278,8 +283,8 @@ function handleSave() {
       return
     }
   }
-  if (draft.deliveryUnitPriceExTax == null || draft.deliveryUnitPriceExTax === '') {
-    message.warning('请填写发货单价（不含税）')
+  if (draft.deliveryUnitPriceInTax == null || draft.deliveryUnitPriceInTax === '') {
+    message.warning('请填写发货单价（含税）')
     return
   }
 
@@ -291,6 +296,8 @@ function handleSave() {
     shipWeight: roundDeliveryDecimal(draft.shipWeight, 4),
     deliveryUnitPriceExTax: roundDeliveryDecimal(draft.deliveryUnitPriceExTax, 4),
     deliveryAmountExTax: roundDeliveryDecimal(draft.deliveryAmountExTax, 4),
+    deliveryUnitPriceInTax: roundDeliveryDecimal(draft.deliveryUnitPriceInTax, 4),
+    deliveryAmountInTax: roundDeliveryDecimal(draft.deliveryAmountInTax, 4),
     packagingForm: draft.packagingForm || '',
     lineRemark: draft.lineRemark || '',
     shipWarehouse: draft.shipWarehouse || '',

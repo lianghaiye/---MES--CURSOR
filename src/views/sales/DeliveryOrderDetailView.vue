@@ -76,11 +76,11 @@
                   <template v-else-if="column.key === 'shipWeight'">
                     {{ formatDeliveryWeight(line.shipWeight ?? line.itemWeightKg) }}
                   </template>
-                  <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
-                    {{ formatDeliveryPrice(line.deliveryUnitPriceExTax) }}
+                  <template v-else-if="column.key === 'deliveryUnitPriceInTax'">
+                    {{ formatDeliveryPrice(line.deliveryUnitPriceInTax) }}
                   </template>
-                  <template v-else-if="column.key === 'deliveryAmountExTax'">
-                    {{ formatDeliveryPrice(line.deliveryAmountExTax) }}
+                  <template v-else-if="column.key === 'deliveryAmountInTax'">
+                    {{ formatDeliveryPrice(line.deliveryAmountInTax) }}
                   </template>
                   <template v-else-if="column.key === 'deliveryMode'">
                     {{ line.deliveryMode || '—' }}
@@ -226,6 +226,7 @@ import {
   formatDeliveryWeight,
   formatShipProgress,
   lineShipStatusColor,
+  recalcDeliveryLine,
 } from '@/utils/deliveryLine'
 import { attachmentShipStatusColor, formatAttachmentShipProgress } from '@/utils/shipBomAttachments'
 import DeliveryOrderPrintModal from './components/DeliveryOrderPrintModal.vue'
@@ -263,8 +264,8 @@ const wholeColumns = [
   { title: '出库仓库', dataIndex: 'shipWarehouse', width: 120 },
   { title: '本次发货数量', key: 'shipQty', width: 120, align: 'right' },
   { title: '发货重量', key: 'shipWeight', width: 110, align: 'right' },
-  { title: '发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 168, align: 'right' },
-  { title: '发货总额', key: 'deliveryAmountExTax', width: 110, align: 'right' },
+  { title: '发货单价（含税）', key: 'deliveryUnitPriceInTax', width: 148, align: 'right' },
+  { title: '发货总额（含税）', key: 'deliveryAmountInTax', width: 124, align: 'right' },
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
   { title: '备注', dataIndex: 'lineRemark', width: 120, ellipsis: true },
@@ -318,9 +319,13 @@ const wholeLineRows = computed(() => {
   const order = record.value
   if (!order?.lineItems?.length) return []
   const so = sourceSalesOrder.value
-  return order.lineItems.map((line) =>
-    enrichDeliveryLineForDisplay(line, so, { outboundWarehouse: order.outboundWarehouse }),
-  )
+  return order.lineItems.map((line) => {
+    const row = enrichDeliveryLineForDisplay(line, so, {
+      outboundWarehouse: order.outboundWarehouse,
+    })
+    recalcDeliveryLine(row)
+    return row
+  })
 })
 
 function displayLineCell(line, column) {

@@ -117,6 +117,8 @@ function buildDeliveryLineBase(line, order) {
     shipWeight,
     deliveryUnitPriceExTax: unitPriceExTax,
     deliveryAmountExTax: calcDeliveryAmount(shipQty, unitPriceExTax),
+    deliveryUnitPriceInTax: unitPriceInTax,
+    deliveryAmountInTax: calcDeliveryAmount(shipQty, unitPriceInTax),
     deliveryMode: normalizeDeliveryMode(line, order),
     packagingForm: line.packagingForm || '',
     lineRemark: line.lineRemark || '',
@@ -160,11 +162,19 @@ export function calcDeliveryAmount(shipQty, unitPriceExTax) {
   return roundDeliveryDecimal((Number(shipQty) || 0) * (Number(unitPriceExTax) || 0), 4)
 }
 
+export function resolveDeliveryUnitPriceInTax(line) {
+  const locked = Number(line?.deliveryUnitPriceInTax)
+  if (Number.isFinite(locked)) return roundDeliveryDecimal(locked, 4)
+  return roundDeliveryDecimal(Number(line?.unitPriceInTax) || 0, 4)
+}
+
 export function recalcDeliveryLine(line) {
   line.shipQty = roundDeliveryDecimal(line.shipQty, 4)
   line.shipWeight = roundDeliveryDecimal(line.shipWeight, 4)
   line.deliveryUnitPriceExTax = roundDeliveryDecimal(line.deliveryUnitPriceExTax, 4)
   line.deliveryAmountExTax = calcDeliveryAmount(line.shipQty, line.deliveryUnitPriceExTax)
+  line.deliveryUnitPriceInTax = resolveDeliveryUnitPriceInTax(line)
+  line.deliveryAmountInTax = calcDeliveryAmount(line.shipQty, line.deliveryUnitPriceInTax)
 }
 
 export function formatDeliveryQty(val) {

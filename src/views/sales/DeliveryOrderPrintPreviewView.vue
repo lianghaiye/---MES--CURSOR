@@ -50,9 +50,15 @@
                     <th>序号</th>
                     <th>产品名称</th>
                     <th>产品编码</th>
+                    <th>规格型号</th>
+                    <th>材质</th>
+                    <th>变体属性</th>
+                    <th>单位</th>
                     <th>本次发货</th>
-                    <th>单价（不含税）</th>
-                    <th>金额（不含税）</th>
+                    <th>发货单价（含税）</th>
+                    <th>发货总额（含税）</th>
+                    <th>出库仓库</th>
+                    <th>包装形式</th>
                     <th>备注</th>
                   </tr>
                 </thead>
@@ -61,9 +67,15 @@
                     <td class="cell-index">{{ row.seq }}</td>
                     <td>{{ row.productName }}</td>
                     <td>{{ row.productCode }}</td>
+                    <td>{{ row.specModel }}</td>
+                    <td>{{ row.material }}</td>
+                    <td>{{ row.variantAttr }}</td>
+                    <td>{{ row.unit }}</td>
                     <td class="cell-num">{{ row.shipQty }}</td>
-                    <td class="cell-num">{{ row.unitPriceExTax }}</td>
-                    <td class="cell-num">{{ row.amountExTax }}</td>
+                    <td class="cell-num">{{ row.unitPriceInTax }}</td>
+                    <td class="cell-num">{{ row.amountInTax }}</td>
+                    <td>{{ row.shipWarehouse }}</td>
+                    <td>{{ row.packagingForm }}</td>
                     <td>{{ row.remark }}</td>
                   </tr>
                 </tbody>
@@ -73,7 +85,7 @@
             <div v-if="sheet.summary" class="print-summary">
               <span>明细行数：{{ sheet.summary.lineCount || '—' }}</span>
               <span>发货数量合计：{{ sheet.summary.totalQty || '—' }}</span>
-              <span>不含税合计：{{ sheet.summary.amountExTax || '—' }}</span>
+              <span>含税合计：{{ sheet.summary.amountInTax || '—' }}</span>
             </div>
           </section>
 

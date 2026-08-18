@@ -49,10 +49,12 @@
                     <th>产品编号</th>
                     <th>规格型号</th>
                     <th>材质</th>
+                    <th>变体属性</th>
                     <th>数量</th>
                     <th>单位</th>
+                    <th>税率</th>
                     <th>不含税单价</th>
-                    <th>含税总价</th>
+                    <th>含税单价</th>
                     <th>交货日期</th>
                     <th>交付方式</th>
                     <th>备注</th>
@@ -65,10 +67,12 @@
                     <td>{{ row.productCode }}</td>
                     <td>{{ row.specModel }}</td>
                     <td>{{ row.material }}</td>
+                    <td>{{ row.variantAttr }}</td>
                     <td class="cell-num">{{ row.salesQty }}</td>
                     <td>{{ row.unit }}</td>
+                    <td class="cell-num">{{ row.taxRate }}</td>
                     <td class="cell-num">{{ row.unitPriceExTax }}</td>
-                    <td class="cell-num">{{ row.totalPriceInTax }}</td>
+                    <td class="cell-num">{{ row.unitPriceInTax }}</td>
                     <td>{{ row.deliveryDate }}</td>
                     <td>{{ row.deliveryMode }}</td>
                     <td>{{ row.remark }}</td>
