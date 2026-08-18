@@ -12,6 +12,13 @@
   >
     <div class="section-block">
       <div class="section-title">发货信息</div>
+      <a-alert
+        v-if="pendingPriceChangeBlock"
+        type="warning"
+        show-icon
+        class="pending-price-alert"
+        :message="pendingPriceChangeBlock"
+      />
       <a-divider class="section-divider" />
       <a-form layout="inline" class="horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -172,14 +179,16 @@
       >
         <template #headerCell="{ column }">
           <template v-if="column.key === 'shipProgress'">
-            <span>
+            <span class="th-nowrap">
               发货进度
               <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
                 <QuestionCircleOutlined class="th-tip-icon" />
               </a-tooltip>
             </span>
           </template>
-          <template v-else>{{ column.title }}</template>
+          <template v-else>
+            <span class="th-nowrap">{{ column.title }}</span>
+          </template>
         </template>
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -255,17 +264,21 @@
             />
           </template>
           <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
-            <a-input-number
-              v-model:value="record.deliveryUnitPriceExTax"
-              size="small"
-              :min="0"
-              :precision="4"
-              :formatter="deliveryDecimalFormatter"
-              :parser="deliveryDecimalParser"
-              style="width: 100%"
-              :disabled="isDeliveryLineShipLocked(record)"
-              @change="onLineCalc(record)"
-            />
+            <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
+              <span class="price-locked-wrap">
+                <a-input-number
+                  v-model:value="record.deliveryUnitPriceExTax"
+                  size="small"
+                  :min="0"
+                  :precision="4"
+                  :formatter="deliveryDecimalFormatter"
+                  :parser="deliveryDecimalParser"
+                  style="width: 100%"
+                  disabled
+                  @change="onLineCalc(record)"
+                />
+              </span>
+            </a-tooltip>
           </template>
           <template v-else-if="column.key === 'deliveryAmountExTax'">
             {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
@@ -289,12 +302,12 @@
             {{ formatDeliveryQty(record.warehouseStockQty) }}
           </template>
           <template v-else-if="column.key === 'lineRemark'">
-            <a-input
-              v-model:value="record.lineRemark"
-              size="small"
-              placeholder="请输入"
-              :disabled="isDeliveryLineShipLocked(record)"
+            <SalesLineLongTextCell
+              v-if="!isDeliveryLineShipLocked(record)"
+              :value="record.lineRemark"
+              @edit="openLongTextEdit(record, 'lineRemark')"
             />
+            <span v-else>{{ record.lineRemark || '—' }}</span>
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
@@ -326,14 +339,16 @@
       >
         <template #headerCell="{ column }">
           <template v-if="column.key === 'shipProgress'">
-            <span>
+            <span class="th-nowrap">
               发货进度
               <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
                 <QuestionCircleOutlined class="th-tip-icon" />
               </a-tooltip>
             </span>
           </template>
-          <template v-else>{{ column.title }}</template>
+          <template v-else>
+            <span class="th-nowrap">{{ column.title }}</span>
+          </template>
         </template>
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -395,17 +410,21 @@
             />
           </template>
           <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
-            <a-input-number
-              v-model:value="record.deliveryUnitPriceExTax"
-              size="small"
-              :min="0"
-              :precision="4"
-              :formatter="deliveryDecimalFormatter"
-              :parser="deliveryDecimalParser"
-              style="width: 100%"
-              :disabled="isDeliveryLineShipLocked(record)"
-              @change="onScatterLinePriceChange(record)"
-            />
+            <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
+              <span class="price-locked-wrap">
+                <a-input-number
+                  v-model:value="record.deliveryUnitPriceExTax"
+                  size="small"
+                  :min="0"
+                  :precision="4"
+                  :formatter="deliveryDecimalFormatter"
+                  :parser="deliveryDecimalParser"
+                  style="width: 100%"
+                  disabled
+                  @change="onScatterLinePriceChange(record)"
+                />
+              </span>
+            </a-tooltip>
           </template>
           <template v-else-if="column.key === 'deliveryAmountExTax'">
             {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
@@ -429,12 +448,12 @@
             {{ formatDeliveryQty(record.warehouseStockQty) }}
           </template>
           <template v-else-if="column.key === 'lineRemark'">
-            <a-input
-              v-model:value="record.lineRemark"
-              size="small"
-              placeholder="请输入"
-              :disabled="isDeliveryLineShipLocked(record)"
+            <SalesLineLongTextCell
+              v-if="!isDeliveryLineShipLocked(record)"
+              :value="record.lineRemark"
+              @edit="openLongTextEdit(record, 'lineRemark')"
             />
+            <span v-else>{{ record.lineRemark || '—' }}</span>
           </template>
           <template v-else-if="column.key === 'scatterAction'">
             <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
@@ -682,6 +701,24 @@
       @saved="onLineEditSaved"
     />
 
+    <a-modal
+      v-model:open="longTextEdit.open"
+      :title="`编辑${longTextEdit.title}`"
+      width="640px"
+      :mask-closable="false"
+      destroy-on-close
+      @ok="confirmLongTextEdit"
+      @cancel="longTextEdit.open = false"
+    >
+      <a-textarea
+        v-model:value="longTextEdit.draft"
+        :rows="10"
+        :placeholder="`请输入${longTextEdit.title}`"
+        show-count
+        :maxlength="5000"
+      />
+    </a-modal>
+
     <SelectBomMaterialModal
       v-model:open="attachmentPickerOpen"
       :multiple="true"
@@ -746,6 +783,7 @@ import {
 import { getCustomerByName } from '@/store/customerStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { createDeliveryOrder, updateDeliveryOrder } from '@/store/deliveryOrderStore'
+import { getPendingPriceChangeDeliveryBlock } from '@/store/salesPriceChangeStore'
 import {
   mapSalesLineToDeliveryLine,
   recalcDeliveryLine,
@@ -771,6 +809,7 @@ import {
 } from '@/utils/shipEbom'
 import ScatterShipDrawer from './ScatterShipDrawer.vue'
 import DeliveryLineEditModal from './DeliveryLineEditModal.vue'
+import SalesLineLongTextCell from './SalesLineLongTextCell.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
@@ -821,6 +860,13 @@ const expandedScatterRowKeys = ref([])
 const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
 const lineEditShowShipQty = ref(true)
+const longTextEdit = reactive({
+  open: false,
+  title: '',
+  fieldKey: '',
+  record: null,
+  draft: '',
+})
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
@@ -829,8 +875,8 @@ const lineColumns = [
   { title: '发货进度', key: 'shipProgress', width: 160, align: 'right' },
   { title: '编码', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
-  { title: '变体属性', key: 'variantAttr', dataIndex: 'variantAttr', width: 140, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 72 },
+  { title: '变体属性', key: 'variantAttr', dataIndex: 'variantAttr', width: 140, ellipsis: true },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '订单数量', key: 'orderQty', width: 96, align: 'right' },
   { title: '单价（不含税）', key: 'unitPriceExTax', width: 120, align: 'right' },
@@ -841,11 +887,11 @@ const lineColumns = [
   { title: '当前仓库数量', key: 'warehouseStockQty', width: 110, align: 'right' },
   { title: '本次发货数量', key: 'shipQty', width: 120, align: 'right' },
   { title: '发货重量', key: 'shipWeight', width: 110, align: 'right' },
-  { title: '本次发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 150, align: 'right' },
+  { title: '发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 168, align: 'right' },
   { title: '发货总额', key: 'deliveryAmountExTax', width: 100, align: 'right' },
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
-  { title: '备注', key: 'lineRemark', width: 120 },
+  { title: '备注', key: 'lineRemark', width: 140 },
   { title: '操作', key: 'action', width: 140, fixed: 'right' },
 ]
 
@@ -1072,6 +1118,10 @@ function currentSalesOrder() {
   if (!form.salesOrderId) return null
   return salesOrderState.orders.find((o) => o.id === form.salesOrderId) || null
 }
+
+const pendingPriceChangeBlock = computed(() =>
+  isEdit.value ? '' : getPendingPriceChangeDeliveryBlock(form.salesOrderId),
+)
 
 function refreshAttachmentShipStatus(preserveShipQty = false) {
   const so = currentSalesOrder()
@@ -1599,6 +1649,21 @@ function openLineEdit(record) {
   lineEditOpen.value = true
 }
 
+function openLongTextEdit(record, fieldKey) {
+  longTextEdit.record = record
+  longTextEdit.fieldKey = fieldKey
+  longTextEdit.title = fieldKey === 'lineRemark' ? '备注' : '内容'
+  longTextEdit.draft = record[fieldKey] || ''
+  longTextEdit.open = true
+}
+
+function confirmLongTextEdit() {
+  if (longTextEdit.record && longTextEdit.fieldKey) {
+    longTextEdit.record[longTextEdit.fieldKey] = longTextEdit.draft || ''
+  }
+  longTextEdit.open = false
+}
+
 function openScatterLineEdit(record) {
   if (isDeliveryLineShipLocked(record)) {
     message.info('该产品已发完，不可编辑')
@@ -1708,7 +1773,7 @@ function validateWholeMachineLines() {
       const softAvail = alloc + free
       if (shipQty > softAvail + 1e-9) {
         message.warning(
-          `「${line.productName}」本单占用 ${alloc} + 自由备货 ${free} = ${softAvail}，本次申请 ${shipQty} 超出软占用口径（仍允许提交，建议先跨单调拨或补货）`,
+          `「${line.productName}」本单占用 ${alloc} + 自由备货 ${free} = ${softAvail}，本次申请 ${shipQty} 超出软占用口径（仍允许提交，建议补货）`,
         )
       }
     }
@@ -1754,6 +1819,10 @@ function validateShipAttachments() {
 function handleOk() {
   if (!form.salesOrderId) {
     message.warning('请选择源销售订单')
+    return
+  }
+  if (pendingPriceChangeBlock.value) {
+    message.warning(pendingPriceChangeBlock.value)
     return
   }
   if (!form.customerName) {
@@ -1889,6 +1958,11 @@ export default { name: 'DeliveryFormModal' }
   color: rgba(0, 0, 0, 0.45);
 }
 
+.th-nowrap {
+  display: inline-block;
+  white-space: nowrap;
+}
+
 .ship-att-hint-tag {
   margin-left: 6px;
   vertical-align: middle;
@@ -1964,6 +2038,15 @@ export default { name: 'DeliveryFormModal' }
 .line-locked-hint {
   color: rgba(0, 0, 0, 0.35);
   font-size: 12px;
+}
+
+.pending-price-alert {
+  margin: 8px 0 0;
+}
+
+.price-locked-wrap {
+  display: block;
+  width: 100%;
 }
 
 :deep(.delivery-line-locked) > td {

@@ -119,40 +119,29 @@
           <RollbackOutlined />
           反审
         </a-button>
-        <a-button size="small" @click="stubAction('完成')">
-          <CheckCircleOutlined />
-          完成
-        </a-button>
-        <a-button size="small" @click="stubAction('删除')">
-          <DeleteOutlined />
-          删除
-        </a-button>
+        <a-button size="small" @click="openToolbarPriceChangeApprove">审核价格变更</a-button>
         <a-button size="small" @click="openDeliveryModal">
           <FileTextOutlined />
           申请发货
         </a-button>
-        <a-button size="small" @click="openChangeDeliveryModeModal"> 变更交付方式 </a-button>
+        <a-button size="small" @click="openChangeDeliveryModeModal">变更交付方式</a-button>
         <a-button size="small" @click="stubAction('打印')">
           <PrinterOutlined />
           打印
         </a-button>
         <a-dropdown>
           <a-button size="small">
-            批量操作
+            更多
             <DownOutlined />
           </a-button>
           <template #overlay>
-            <a-menu @click="onBatchMenuClick">
-              <a-menu-item key="批量导出">批量导出</a-menu-item>
-              <a-menu-item key="批量审核">批量审核</a-menu-item>
+            <a-menu @click="onMoreMenuClick">
+              <a-menu-item key="完成">完成</a-menu-item>
+              <a-menu-item key="终止">终止</a-menu-item>
+              <a-menu-item key="需求计算">需求计算</a-menu-item>
             </a-menu>
           </template>
         </a-dropdown>
-        <a-button size="small" @click="stubAction('终止')">
-          <CloseCircleOutlined />
-          终止
-        </a-button>
-        <a-button size="small" @click="stubAction('需求计算')">需求计算</a-button>
       </a-space>
       <a-space :size="4" class="toolbar-icons">
         <a-tooltip title="刷新">
@@ -287,6 +276,9 @@
                 <a-button type="link" size="small" @click="openDeliveryForOrder(record)"
                   >发货</a-button
                 >
+                <a-button type="link" size="small" @click="openPriceChangeForOrder(record)">{{
+                  rowPriceChangeLabel(record)
+                }}</a-button>
                 <a-button type="link" size="small" @click="openChangeDeliveryModeForOrder(record)"
                   >变更交付方式</a-button
                 >
@@ -315,6 +307,12 @@
       v-model:open="changeDeliveryModeOpen"
       :sales-order="changeDeliveryModeOrder"
       @saved="onChangeDeliveryModeSaved"
+    />
+    <SalesPriceChangeModal
+      v-model:open="priceChangeOpen"
+      :sales-order="priceChangeOrder"
+      :pending-change="priceChangePending"
+      @done="onPriceChangeDone"
     />
 
     <TableColumnSettingDrawer
@@ -350,11 +348,8 @@ import {
   ReloadOutlined,
   DownOutlined,
   CheckOutlined,
-  CheckCircleOutlined,
-  DeleteOutlined,
   FileTextOutlined,
   PrinterOutlined,
-  CloseCircleOutlined,
   RollbackOutlined,
 } from '@ant-design/icons-vue'
 import { filterSalesOrders } from '@/mock/salesOrders'
@@ -365,7 +360,6 @@ import {
 import {
   salesOrderState,
   deleteSalesOrder,
-  approveSalesOrder,
   revokeSalesOrderApproval,
   canEditSalesOrder,
   canChangeDeliveryMode,
@@ -386,6 +380,7 @@ import {
   progressStatusOptions,
 } from '@/mock/salesOrderOptions'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
+import SalesPriceChangeModal from './components/SalesPriceChangeModal.vue'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -400,6 +395,11 @@ import {
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
   hasSalesOrderRevokeBlockers,
 } from '@/utils/salesOrderRevokeApproval'
+import {
+  canApplySalesPriceChange,
+  getPendingPriceChange,
+  getPendingPriceChangeDeliveryBlock,
+} from '@/store/salesPriceChangeStore'
 import {
   normalizeSalesOrderProgressStatus,
   salesDeliveryStatusColor,
@@ -424,6 +424,9 @@ const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const changeDeliveryModeOpen = ref(false)
 const changeDeliveryModeOrder = ref(null)
+const priceChangeOpen = ref(false)
+const priceChangeOrder = ref(null)
+const priceChangePending = computed(() => getPendingPriceChange(priceChangeOrder.value?.id))
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
@@ -522,19 +525,15 @@ const baseColumns = [
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings('sales-order-list-v2', baseColumns, { minScrollX: 3200 })
 
-const {
-  exportModalOpen,
-  openExportModal,
-  exportFieldSettings,
-  defaultExportFieldSettings,
-  doExport,
-} = useListExport({
-  storageKey: 'sales-order-list',
-  fieldDefinitions: salesOrderExportFields,
-  getFilteredRows: () => filteredOrders.value,
-  getSelectedRows: () => salesOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id)),
-  fileNamePrefix: '销售订单',
-})
+const { exportModalOpen, exportFieldSettings, defaultExportFieldSettings, doExport } =
+  useListExport({
+    storageKey: 'sales-order-list',
+    fieldDefinitions: salesOrderExportFields,
+    getFilteredRows: () => filteredOrders.value,
+    getSelectedRows: () =>
+      salesOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id)),
+    fileNamePrefix: '销售订单',
+  })
 
 const filteredOrders = computed(() => {
   const f = { ...appliedFilters.value }
@@ -640,15 +639,7 @@ function stubAction(name) {
   message.info(`${name}功能开发中`)
 }
 
-function onBatchMenuClick({ key }) {
-  if (key === '批量审核') {
-    handleBatchApprove()
-    return
-  }
-  if (key === '批量导出') {
-    openExportModal()
-    return
-  }
+function onMoreMenuClick({ key }) {
   stubAction(key)
 }
 
@@ -669,56 +660,6 @@ function openToolbarApprove() {
   const path = `/sales/orders/${order.id}/approve`
   openTab(path, `审核销售订单 ${order.orderNo || ''}`.trim())
   router.push({ name: 'sales-orders-approve', params: { id: order.id } })
-}
-
-function handleBatchApprove() {
-  if (!selectedRowKeys.value.length) {
-    message.warning('请先选择要审核的销售订单')
-    return
-  }
-
-  const targets = salesOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
-  const pending = targets.filter((o) => canApproveSalesOrder(o))
-  if (!pending.length) {
-    message.warning('所选订单均不可审核（需为待审核）')
-    return
-  }
-
-  const count = pending.length
-  Modal.confirm({
-    title: count > 1 ? `已选择 ${count} 条订单` : undefined,
-    content: '审核通过？',
-    okText: '是',
-    cancelText: '否',
-    onOk: () => {
-      const results = pending.map((o) => approveSalesOrder(o.id))
-      const succeeded = results.filter((r) => r.ok)
-      const failed = results.filter((r) => !r.ok)
-      const withPr = succeeded.filter((r) => r.purchaseReqNo)
-      const withPlan = succeeded.filter((r) => r.planOrderNo)
-
-      if (withPr.length === 1) {
-        message.success(withPr[0].message)
-      } else if (withPlan.length === 1) {
-        message.success(withPlan[0].message)
-      } else if (withPr.length > 1) {
-        message.success(
-          `已审核 ${succeeded.length} 条，其中 ${withPr.length} 条外购销售已自动生成采购申请`,
-        )
-      } else if (withPlan.length > 1) {
-        message.success(
-          `已审核 ${succeeded.length} 条，其中 ${withPlan.length} 条自产销售已自动生成生产计划`,
-        )
-      } else if (succeeded.length === 1) {
-        message.success(succeeded[0].message)
-      } else if (succeeded.length > 1) {
-        message.success(`已成功审核 ${succeeded.length} 条销售订单，状态已变更为进行中`)
-      }
-
-      failed.forEach((r) => message.warning(r.message))
-      selectedRowKeys.value = []
-    },
-  })
 }
 
 function handleRevokeApprove() {
@@ -832,11 +773,51 @@ function openDeliveryForOrder(order) {
     message.warning('仅「进行中」的销售订单可申请发货')
     return
   }
+  const block = getPendingPriceChangeDeliveryBlock(order.id)
+  if (block) {
+    message.warning(block)
+    return
+  }
   openCreateTab(router, openTab, {
     path: '/sales/delivery/new',
     title: `新增发货单 ${order.orderNo || ''}`.trim(),
     query: { salesOrderId: order.id },
   })
+}
+
+function rowPriceChangeLabel(order) {
+  return getPendingPriceChange(order?.id) ? '审核价格变更' : '价格变更'
+}
+
+function openPriceChangeForOrder(order) {
+  if (!canApplySalesPriceChange(order)) {
+    message.warning('仅「进行中」的销售订单可申请价格变更')
+    return
+  }
+  priceChangeOrder.value = order
+  priceChangeOpen.value = true
+}
+
+function openToolbarPriceChangeApprove() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条待审核价格变更的销售订单')
+    return
+  }
+  const order = salesOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
+    message.warning('未找到所选订单')
+    return
+  }
+  if (!getPendingPriceChange(order.id)) {
+    message.warning('当前订单没有待审核的价格变更')
+    return
+  }
+  priceChangeOrder.value = order
+  priceChangeOpen.value = true
+}
+
+function onPriceChangeDone() {
+  priceChangeOrder.value = null
 }
 
 function openChangeDeliveryModeForOrder(order) {

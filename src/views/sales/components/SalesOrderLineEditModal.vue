@@ -102,6 +102,14 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
+          <a-form-item label="库存履约" required>
+            <a-select
+              v-model:value="draft.stockFulfillmentMode"
+              :options="stockFulfillmentModeOpts"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
           <a-form-item label="交货日期" required>
             <a-date-picker
               :value="deliveryDateValue"
@@ -271,6 +279,10 @@ import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 
 const MAX_LINE_FILE_SIZE = 200 * 1024 * 1024
 import { deliveryModeOptions } from '@/mock/salesOrderOptions'
+import {
+  STOCK_FULFILLMENT_MODE_OPTIONS,
+  normalizeStockFulfillmentMode,
+} from '@/utils/salesStockFulfillment'
 import { productInfoState } from '@/store/productInfoStore'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import {
@@ -323,6 +335,7 @@ const manualBusinessTypeOpts = [
 ].map((v) => ({ label: v, value: v }))
 
 const deliveryModeOpts = deliveryModeOptions.map((v) => ({ label: v, value: v }))
+const stockFulfillmentModeOpts = STOCK_FULFILLMENT_MODE_OPTIONS
 
 const draft = reactive(createDraft())
 
@@ -488,6 +501,7 @@ function createDraft(line = {}) {
     unit: line.unit || '件',
     salesQty: line.salesQty ?? line.qty ?? 1,
     deliveryMode: line.deliveryMode || '整机',
+    stockFulfillmentMode: normalizeStockFulfillmentMode(line.stockFulfillmentMode),
     deliveryDate: line.deliveryDate || '',
     listUnitPriceExTax: line.listUnitPriceExTax ?? line.unitPriceExTax ?? 0,
     lineDiscountPercent: round2(normalizeDiscountRate(line.lineDiscountRate, 1) * 100),
@@ -711,6 +725,7 @@ function handleSave() {
     salesQty: Number(draft.salesQty),
     qty: Number(draft.salesQty),
     deliveryMode: draft.deliveryMode,
+    stockFulfillmentMode: normalizeStockFulfillmentMode(draft.stockFulfillmentMode),
     deliveryDate: draft.deliveryDate,
     listUnitPriceExTax: Number(draft.listUnitPriceExTax) || 0,
     lineDiscountRate: lineDiscountReadOnly.value

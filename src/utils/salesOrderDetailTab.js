@@ -9,6 +9,7 @@ export const SALES_ORDER_DETAIL_TABS = [
   'outsourcing',
   'attachments',
   'ebom-info',
+  'price-change',
   'approval',
 ]
 

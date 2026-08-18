@@ -179,6 +179,93 @@ export function formatDeliveryWeight(val) {
   return formatNumber(val, 4, { empty: '-' })
 }
 
+function isBlank(val) {
+  return val == null || String(val).trim() === ''
+}
+
+function fillBlank(target, key, value) {
+  if (!isBlank(target[key]) || isBlank(value)) return
+  target[key] = value
+}
+
+function findMatchingSalesLine(line, salesOrder) {
+  const lines = salesOrder?.lineItems || []
+  if (line?.salesLineId) {
+    const byId = lines.find((l) => l.id === line.salesLineId)
+    if (byId) return byId
+  }
+  if (line?.productCode) {
+    const byCode = lines.find((l) => l.productCode === line.productCode)
+    if (byCode) return byCode
+  }
+  if (line?.productName) {
+    return (
+      lines.find((l) => l.productName === line.productName) ||
+      lines.find(
+        (l) =>
+          l.productName &&
+          (String(l.productName).includes(String(line.productName)) ||
+            String(line.productName).includes(String(l.productName))),
+      )
+    )
+  }
+  return null
+}
+
+/** 详情展示：用销售行 / 产品主数据补齐发货明细缺失字段，不覆盖本次发货数量与金额 */
+export function enrichDeliveryLineForDisplay(line, salesOrder, header = {}) {
+  if (!line) return line
+  const row = { ...line }
+  const salesLine = findMatchingSalesLine(row, salesOrder)
+  const code = row.productCode || salesLine?.productCode || row.itemCode || ''
+  const product =
+    (code && productInfoState.products.find((p) => p.code === code)) ||
+    productInfoState.products.find((p) => p.name === (row.productName || salesLine?.productName)) ||
+    null
+
+  if (salesLine) {
+    fillBlank(row, 'salesLineId', salesLine.id)
+    fillBlank(row, 'productCode', salesLine.productCode)
+    fillBlank(row, 'productName', salesLine.productName)
+    fillBlank(row, 'specModel', salesLine.specModel)
+    fillBlank(row, 'material', salesLine.material)
+    fillBlank(row, 'drawingNo', salesLine.drawingNo)
+    fillBlank(row, 'unit', salesLine.unit)
+    fillBlank(row, 'unitPriceExTax', salesLine.unitPriceExTax)
+    fillBlank(row, 'unitPriceInTax', salesLine.unitPriceInTax)
+    fillBlank(row, 'deliveryMode', salesLine.deliveryMode)
+    fillBlank(row, 'packagingForm', salesLine.packagingForm)
+    fillBlank(row, 'variantSummary', salesLine.variantSummary)
+    fillBlank(row, 'orderQty', salesLine.salesQty ?? salesLine.qty)
+  }
+  if (product) {
+    fillBlank(row, 'productCode', product.code)
+    fillBlank(row, 'productName', product.name)
+    fillBlank(row, 'specModel', product.specModel)
+    fillBlank(row, 'material', product.material)
+    fillBlank(row, 'drawingNo', product.drawingNo)
+    fillBlank(row, 'unit', product.inventoryUnit)
+  }
+  fillBlank(row, 'shipWarehouse', header.outboundWarehouse)
+  if (isBlank(row.shipWeight) || Number(row.shipWeight) === 0) {
+    const unitW = Number(row.itemWeightKg) || 0
+    const qty = Number(row.shipQty) || 0
+    if (unitW > 0 && qty > 0) row.shipWeight = roundDeliveryDecimal(unitW * qty, 4)
+  }
+  row.variantAttr = resolveDeliveryVariantAttr(row)
+  if (salesLine && salesOrder) {
+    const orderQty = Number(row.orderQty ?? salesLine.salesQty ?? salesLine.qty) || 0
+    const confirmed = calcSalesLineShippedQty(salesOrder, salesLine)
+    const applied = calcSalesLineAppliedShipQty(salesOrder, salesLine)
+    row.orderQty = orderQty
+    row.confirmedOutboundQty = confirmed
+    row.appliedShipQty = applied
+    row.lineShipStatus = calcLineShipStatus(confirmed, orderQty, applied)
+  }
+  refreshDeliveryLineStock(row)
+  return row
+}
+
 /** InputNumber：展示去尾 0，录入按数字解析 */
 export function deliveryDecimalFormatter(value) {
   if (value === undefined || value === null || value === '') return ''

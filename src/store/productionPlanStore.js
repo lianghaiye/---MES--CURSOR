@@ -121,13 +121,14 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
   const designingLineIds = options.designingLineIds || new Set()
   const designTasksByLineId = options.designTasksByLineId || new Map()
 
-  const totalQty = lineItems.reduce((s, i) => s + (Number(i.salesQty) || 0), 0)
+  const totalQty = lineItems.reduce((s, i) => s + (Number(i.planProduceQty ?? i.salesQty) || 0), 0)
   const deliveryDate = resolveDeliveryDate(lineItems, salesOrder.documentDate)
   const daysToDelivery = Math.max(0, dayjs(deliveryDate).diff(dayjs(), 'day'))
 
   const workItems = lineItems.map((line, index) => {
     const isDesigning = designingLineIds.has(line.id)
     const designTask = designTasksByLineId.get?.(line.id)
+    const planQty = Math.max(0, Number(line.planProduceQty ?? line.salesQty) || 0)
 
     if (isDesigning) {
       return enrichWorkItem(
@@ -137,7 +138,7 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
           designTaskId: designTask?.id || '',
           status: '设计中',
           expanded: index === 0,
-          salesQty: Number(line.salesQty) || 1,
+          salesQty: planQty || Number(line.salesQty) || 1,
           productName: line.productName,
           productCode: line.productCode,
           productId: line.productId || '',
@@ -163,7 +164,7 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
       (line.bomId ? getProductBomById(line.bomId) : null) ||
       getOwnActiveBomForItem('product', line.productId)
 
-    const salesQty = Number(line.salesQty) || 1
+    const salesQty = planQty || Number(line.salesQty) || 1
     const snapshot =
       line.ebomSnapshot || (bom ? buildEbomSnapshotFromBom(bom, salesQty) : { materials: [] })
 

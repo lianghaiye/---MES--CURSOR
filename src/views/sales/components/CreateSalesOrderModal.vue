@@ -10,606 +10,678 @@
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
-    <a-form layout="inline" class="header-form horizontal-form">
-      <a-row :gutter="[12, 8]" style="width: 100%">
-        <a-col :span="6">
-          <a-form-item label="销售单号">
-            <a-input
-              v-model:value="form.orderNo"
-              placeholder="留空则系统自动生成"
-              allow-clear
-              size="small"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="紧急度" required>
-            <a-select v-model:value="form.urgency" size="small" :options="urgencyOpts" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="合同类型" required>
-            <a-select v-model:value="form.contractType" size="small" :options="contractTypeOpts" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="合同编号">
-            <a-input v-model:value="form.contractNo" size="small" placeholder="请输入 合同编号" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="结算币种" required>
-            <a-select
-              v-model:value="form.settlementCurrency"
-              size="small"
-              :options="currencyOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="订单类型" required>
-            <a-select v-model:value="form.orderType" size="small" :options="orderTypeOpts" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="客户名称" required>
-            <CustomerSelect
-              v-model="form.customerName"
-              size="small"
-              placeholder="请搜索或选择客户名称"
-              @change="onCustomerChange"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="联系人">
-            <a-select
-              v-model:value="form.contactPerson"
-              size="small"
-              placeholder="请选择 联系人"
-              allow-clear
-              :options="contactOpts"
-              @change="onContactChange"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="联系人电话">
-            <a-input
-              v-model:value="form.contactPhone"
-              size="small"
-              placeholder="请输入 联系人电话"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="交货地址">
-            <a-input
-              v-model:value="form.deliveryAddress"
-              size="small"
-              placeholder="请输入 交货地址"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="交货方式" required>
-            <a-select
-              v-model:value="form.deliveryMethod"
-              size="small"
-              :options="deliveryMethodOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="订单金额">
-            <a-input-number
-              :value="orderAmount"
-              :precision="2"
-              disabled
-              size="small"
-              style="width: 100%"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="技术规范编码">
-            <a-input
-              v-model:value="form.techSpecCode"
-              size="small"
-              placeholder="请输入 技术规范编码"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="提醒日期">
-            <a-date-picker
-              v-model:value="form.reminderDate"
-              size="small"
-              style="width: 100%"
-              placeholder="请选择 提醒日期"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="业务员">
-            <a-select
-              v-model:value="form.salesperson"
-              size="small"
-              :options="salespersonOpts"
-              show-search
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="结算类型">
-            <a-select
-              v-model:value="form.settlementType"
-              size="small"
-              allow-clear
-              placeholder="请选择 结算类型"
-              :options="settlementTypeOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="付款比例">
-            <a-select
-              v-model:value="form.paymentRatio"
-              size="small"
-              allow-clear
-              placeholder="请选择 付款比例"
-              :options="paymentRatioOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="首付/定金金额">
-            <a-input-number
-              v-model:value="form.downPaymentAmount"
-              size="small"
-              :min="0"
-              :precision="2"
-              style="width: 100%"
-              placeholder="请输入 首付/定金金额"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="24">
-          <a-form-item label="备注" class="remark-item">
-            <a-textarea
-              v-model:value="form.remark"
-              :rows="2"
-              :maxlength="1000"
-              show-count
-              placeholder="请输入 备注"
-            />
-          </a-form-item>
-        </a-col>
-      </a-row>
-    </a-form>
-
-    <div v-if="customerDiscountHint" class="discount-hint">{{ customerDiscountHint }}</div>
-
-    <div class="price-summary-card">
-      <div class="price-summary-header" @click="priceSummaryCollapsed = !priceSummaryCollapsed">
-        <span class="section-title">价格汇总</span>
-        <span class="header-amounts">
-          <span class="header-amount-item">
-            最终成交额（含税）
-            <strong>￥{{ formatMoney(orderAmount) }}</strong>
-          </span>
-          <span class="header-amount-item">
-            最终成交额（不含税）
-            <strong>￥{{ formatMoney(orderPricing.amountExTax) }}</strong>
-          </span>
-          <span class="header-amount-item">
-            销售总额（含税）
-            <strong>￥{{ formatMoney(orderPricing.lineAmountInTax) }}</strong>
-          </span>
-          <span class="header-amount-item">
-            销售总额（不含税）
-            <strong>￥{{ formatMoney(orderPricing.lineAmountExTax) }}</strong>
-          </span>
-        </span>
-        <DownOutlined :class="{ rotated: priceSummaryCollapsed }" class="collapse-icon" />
-      </div>
-      <div v-show="!priceSummaryCollapsed" class="price-summary-body">
-        <div class="summary-amounts-strip">
-          <span class="amount-chip discount">
-            行优惠（合计）
-            <strong>-￥{{ formatMoney(orderPricing.lineDiscountTotal) }}</strong>
-          </span>
-          <span class="amount-chip discount">
-            整单优惠
-            <strong>-￥{{ formatMoney(orderPricing.orderDiscountTotal) }}</strong>
-          </span>
-        </div>
-        <a-form layout="inline" size="small" class="discount-inline-form">
-          <a-form-item label="折扣策略">
-            <a-radio-group
-              v-model:value="form.discountStrategy"
-              size="small"
-              @change="syncOrderDiscountRate"
-            >
-              <a-radio :value="DISCOUNT_STRATEGIES.NONE">
-                {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.NONE] }}
-              </a-radio>
-              <a-radio :value="DISCOUNT_STRATEGIES.LINE">
-                {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.LINE] }}
-              </a-radio>
-              <a-radio :value="DISCOUNT_STRATEGIES.ORDER">
-                {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.ORDER] }}
-              </a-radio>
-              <a-radio :value="DISCOUNT_STRATEGIES.STACK" disabled>
-                {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.STACK] }}
-              </a-radio>
-            </a-radio-group>
-          </a-form-item>
-          <a-form-item label="整单折扣(%)">
-            <a-input-number
-              v-model:value="form.orderDiscountPercent"
-              size="small"
-              :min="1"
-              :max="100"
-              :precision="2"
-              :disabled="orderDiscountFieldsDisabled"
-              style="width: 88px"
-              @change="syncOrderDiscountRate"
-            />
-          </a-form-item>
-          <a-form-item label="整单减免(元)">
-            <a-input-number
-              v-model:value="form.orderDiscountAmount"
-              size="small"
-              :min="0"
-              :precision="2"
-              disabled
-              style="width: 100px"
-            />
-          </a-form-item>
-          <a-form-item label="优惠原因" class="discount-reason-item">
-            <a-input
-              v-model:value="form.orderDiscountReason"
-              size="small"
-              placeholder="如：老客户合作、批量采购"
-              style="width: 200px"
-            />
-          </a-form-item>
-        </a-form>
-      </div>
-    </div>
-
-    <div class="detail-section">
-      <div class="detail-section-header" @click="detailCollapsed = !detailCollapsed">
-        <span class="section-title">销售明细</span>
-        <DownOutlined :class="{ rotated: detailCollapsed }" class="collapse-icon" />
-      </div>
-
-      <div v-show="!detailCollapsed">
-        <div class="detail-toolbar">
-          <a-space wrap>
-            <a-button type="primary" @click="openProductPicker">
-              <PlusOutlined />
-              选择产品
+    <div class="so-form-shell">
+      <div class="form-layout">
+        <div class="section-block" :class="{ 'is-collapsed': basicInfoCollapsed }">
+          <div class="section-title-row">
+            <span class="section-title">基本信息</span>
+            <a-button type="link" size="small" class="collapse-btn" @click="toggleBasicInfo">
+              {{ basicInfoCollapsed ? '展开' : '收起' }}
+              <DownOutlined v-if="basicInfoCollapsed" />
+              <UpOutlined v-else />
             </a-button>
-            <a-button @click="addManualProductLine">
-              <PlusOutlined />
-              添加产品
-            </a-button>
-            <a-button class="tax-toggle-btn" @click="toggleTaxMode">
-              切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
-            </a-button>
-            <span class="tax-hint">{{ taxModeHint }}</span>
-          </a-space>
-          <a-popover trigger="click" placement="bottomRight">
-            <template #title>列设置</template>
-            <template #content>
-              <a-checkbox-group v-model:value="visibleColumnKeys" class="column-settings">
-                <a-row>
-                  <a-col v-for="col in columnDefs" :key="col.key" :span="12">
-                    <a-checkbox :value="col.key" :disabled="fixedColumnKeys.includes(col.key)">
-                      {{ col.title }}
-                    </a-checkbox>
-                  </a-col>
-                </a-row>
-              </a-checkbox-group>
-            </template>
-            <a-button type="text" class="column-setting-btn">
-              <AppstoreOutlined />
-            </a-button>
-          </a-popover>
-        </div>
-
-        <a-table
-          :columns="displayColumns"
-          :data-source="form.lineItems"
-          row-key="id"
-          size="small"
-          bordered
-          :pagination="false"
-          :scroll="{ x: tableScrollX }"
-          class="sales-line-table"
-          locale="{ emptyText: '暂无数据' }"
-        >
-          <template #headerCell="{ column }">
-            <div class="header-cell">
-              <span class="header-title">{{ column.title }}</span>
-              <span
-                v-if="column.key !== 'index'"
-                class="resize-handle"
-                @mousedown.prevent="(e) => startColumnResize(e, column.key)"
-              />
-            </div>
-          </template>
-
-          <template #bodyCell="{ column, record, index }">
-            <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-
-            <template v-else-if="column.key === 'businessType'">
-              <a-select
-                v-model:value="record.businessType"
-                size="small"
-                style="width: 100%"
-                :options="lineBusinessTypeOpts(record)"
-                @change="(val) => onBusinessTypeChange(record, val)"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'productName'">
-              <a-input
-                v-if="record.isManualLine"
-                v-model:value="record.productName"
-                size="small"
-                placeholder="请输入产品名称"
-              />
-              <span v-else class="readonly-cell">{{ record.productName || '—' }}</span>
-            </template>
-
-            <template v-else-if="column.key === 'productCode'">
-              <a-input
-                v-if="record.isManualLine"
-                v-model:value="record.productCode"
-                size="small"
-                placeholder="请输入产品编码"
-              />
-              <span v-else class="readonly-cell">{{ record.productCode || '—' }}</span>
-            </template>
-
-            <template v-else-if="column.key === 'productAttr'">
-              <span>{{ record.productAttr || '—' }}</span>
-            </template>
-
-            <template v-else-if="column.key === 'specModel'">
-              <a-input v-if="record.isManualLine" v-model:value="record.specModel" size="small" />
-              <a
-                v-else-if="isSpuLine(record)"
-                class="variant-field-link"
-                @click.prevent="openVariantConfig(record)"
-              >
-                {{ record.specModel || '点击配置' }}
-              </a>
-              <span v-else>{{ record.specModel || '—' }}</span>
-            </template>
-
-            <template v-else-if="column.key === 'material'">
-              <a-input v-if="record.isManualLine" v-model:value="record.material" size="small" />
-              <a
-                v-else-if="isSpuLine(record)"
-                class="variant-field-link"
-                @click.prevent="openVariantConfig(record)"
-              >
-                {{ record.material || '点击配置' }}
-              </a>
-              <span v-else>{{ record.material || '—' }}</span>
-            </template>
-
-            <template v-else-if="column.key === 'variantAttr'">
-              <a
-                v-if="isSpuLine(record)"
-                class="variant-field-link"
-                @click.prevent="openVariantConfig(record)"
-              >
-                {{ lineVariantDisplay(record) || '—' }}
-              </a>
-              <template v-else>
-                <a-tooltip v-if="lineVariantDisplay(record)" :title="lineVariantDisplay(record)">
-                  <span>{{ lineVariantDisplay(record) }}</span>
-                </a-tooltip>
-                <span v-else>—</span>
-              </template>
-            </template>
-
-            <template v-else-if="column.key === 'drawingNo'">
-              <span v-if="!record.isManualLine" class="readonly-cell">{{
-                record.drawingNo || '—'
-              }}</span>
-              <a-input v-else v-model:value="record.drawingNo" size="small" placeholder="图号" />
-            </template>
-
-            <template v-else-if="column.key === 'techParams'">
-              <SalesLineLongTextCell
-                :value="record.techParams"
-                @edit="openLongTextEdit(record, 'techParams')"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'matchingRequirements'">
-              <SalesLineLongTextCell
-                :value="record.matchingRequirements"
-                @edit="openLongTextEdit(record, 'matchingRequirements')"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'salesQty'">
-              <a-input-number
-                v-model:value="record.salesQty"
-                size="small"
-                :min="0"
-                :precision="4"
-                :formatter="inputNumberFormatter"
-                :parser="inputNumberParser"
-                style="width: 100%"
-                @change="onLineFieldChange(record)"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'deliveryMode'">
-              <a-select
-                v-model:value="record.deliveryMode"
-                size="small"
-                style="width: 100%"
-                :options="deliveryModeOpts"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'deliveryDate'">
-              <a-date-picker
-                :value="lineDateValue(record.deliveryDate)"
-                size="small"
-                style="width: 100%"
-                @change="(d) => onLineDateChange(record, d)"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'bomName'">
-              <span class="readonly-cell">{{ record.bomName || '—' }}</span>
-            </template>
-
-            <template v-else-if="column.key === 'bomVersion'">
-              <span class="readonly-cell">{{ record.bomVersion || '—' }}</span>
-            </template>
-
-            <template v-else-if="column.key === 'unit'">
-              <a-input v-model:value="record.unit" size="small" />
-            </template>
-
-            <template v-else-if="column.key === 'lineDiscountPercent'">
-              <a-input-number
-                v-if="showLineDiscount"
-                :value="getLineDiscountPercent(record)"
-                size="small"
-                :min="1"
-                :max="100"
-                :precision="2"
-                style="width: 100%"
-                @update:value="(v) => setLineDiscountPercent(record, v)"
-              />
-              <span v-else>—</span>
-            </template>
-
-            <template v-else-if="column.key === 'lineDiscountAmount'">
-              {{ formatMoney(record.lineDiscountAmount) }}
-            </template>
-
-            <template v-else-if="column.key === 'taxRate'">
-              <a-input-number
-                v-model:value="record.taxRate"
-                size="small"
-                :min="0"
-                :max="100"
-                :precision="2"
-                style="width: 100%"
-                @change="onLineFieldChange(record)"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'unitPriceExTax'">
-              <a-input-number
-                v-model:value="record.unitPriceExTax"
-                size="small"
-                :min="0"
-                :precision="4"
-                :formatter="inputNumberFormatter"
-                :parser="inputNumberParser"
-                style="width: 100%"
-                @change="onUnitPriceExTaxChange(record)"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'unitPriceInTax'">
-              <a-input-number
-                v-model:value="record.unitPriceInTax"
-                size="small"
-                :min="0"
-                :precision="4"
-                :formatter="inputNumberFormatter"
-                :parser="inputNumberParser"
-                style="width: 100%"
-                @change="onUnitPriceInTaxChange(record)"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'totalPriceExTax'">
-              {{ formatMoney(record.totalPriceExTax) }}
-            </template>
-
-            <template v-else-if="column.key === 'totalPriceInTax'">
-              {{ formatMoney(record.totalPriceInTax) }}
-            </template>
-
-            <template v-else-if="column.key === 'packagingForm'">
-              <SalesLineLongTextCell
-                :value="record.packagingForm"
-                @edit="openLongTextEdit(record, 'packagingForm')"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'supplementDesc'">
-              <SalesLineLongTextCell
-                :value="record.supplementDesc"
-                @edit="openLongTextEdit(record, 'supplementDesc')"
-              />
-            </template>
-
-            <template v-else-if="column.key === 'lineAttachment'">
-              <a-upload
-                class="line-attachment-upload"
-                :file-list="lineUploadFileList(record)"
-                :before-upload="(file) => beforeLineUpload(record, file)"
-                multiple
-                @remove="(file) => onLineFileRemove(record, file)"
-              >
-                <a-button type="link" size="small" class="line-upload-btn">
-                  <UploadOutlined />
-                  上传附件
-                </a-button>
-              </a-upload>
-            </template>
-
-            <template v-else-if="column.key === 'action'">
-              <a-space :size="0">
-                <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
-                <a-button type="link" size="small" danger @click="removeLine(index)">删除</a-button>
-                <a-button type="link" size="small" @click="cloneLine(index)">克隆</a-button>
-              </a-space>
-            </template>
-
-            <template v-else>
-              {{ record[column.dataIndex] ?? '-' }}
-            </template>
-          </template>
-        </a-table>
-      </div>
-    </div>
-
-    <div class="attachment-section">
-      <div class="attachment-section-header">
-        <span class="section-title">图片文档信息</span>
-      </div>
-      <a-divider class="section-divider" />
-      <a-form layout="inline" class="attachment-form horizontal-form">
-        <a-form-item label="文件上传">
-          <div class="upload-field">
-            <a-upload v-model:file-list="fileList" :before-upload="beforeUpload" multiple>
-              <a-button type="primary" size="small">
-                <UploadOutlined />
-                点击上传
-              </a-button>
-            </a-upload>
-            <div class="upload-hint">支持上传各类型文件，大小不超过 200MB</div>
           </div>
-        </a-form-item>
-      </a-form>
+          <a-form v-show="!basicInfoCollapsed" layout="inline" class="header-form horizontal-form">
+            <a-row :gutter="[12, 8]" style="width: 100%">
+              <a-col :span="6">
+                <a-form-item label="销售单号">
+                  <a-input
+                    v-model:value="form.orderNo"
+                    placeholder="留空则系统自动生成"
+                    allow-clear
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="紧急度" required>
+                  <a-select v-model:value="form.urgency" size="small" :options="urgencyOpts" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="合同类型" required>
+                  <a-select
+                    v-model:value="form.contractType"
+                    size="small"
+                    :options="contractTypeOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="合同编号">
+                  <a-input
+                    v-model:value="form.contractNo"
+                    size="small"
+                    placeholder="请输入 合同编号"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="结算币种" required>
+                  <a-select
+                    v-model:value="form.settlementCurrency"
+                    size="small"
+                    :options="currencyOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="订单类型" required>
+                  <a-select v-model:value="form.orderType" size="small" :options="orderTypeOpts" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="客户名称" required>
+                  <CustomerSelect
+                    v-model="form.customerName"
+                    size="small"
+                    placeholder="请搜索或选择客户名称"
+                    @change="onCustomerChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="联系人">
+                  <a-select
+                    v-model:value="form.contactPerson"
+                    size="small"
+                    placeholder="请选择 联系人"
+                    allow-clear
+                    :options="contactOpts"
+                    @change="onContactChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="联系人电话">
+                  <a-input
+                    v-model:value="form.contactPhone"
+                    size="small"
+                    placeholder="请输入 联系人电话"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="交货地址">
+                  <a-input
+                    v-model:value="form.deliveryAddress"
+                    size="small"
+                    placeholder="请输入 交货地址"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="交货方式" required>
+                  <a-select
+                    v-model:value="form.deliveryMethod"
+                    size="small"
+                    :options="deliveryMethodOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="订单金额">
+                  <a-input-number
+                    :value="orderAmount"
+                    :precision="2"
+                    disabled
+                    size="small"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="技术规范编码">
+                  <a-input
+                    v-model:value="form.techSpecCode"
+                    size="small"
+                    placeholder="请输入 技术规范编码"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="提醒日期">
+                  <a-date-picker
+                    v-model:value="form.reminderDate"
+                    size="small"
+                    style="width: 100%"
+                    placeholder="请选择 提醒日期"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="业务员">
+                  <a-select
+                    v-model:value="form.salesperson"
+                    size="small"
+                    :options="salespersonOpts"
+                    show-search
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="结算类型">
+                  <a-select
+                    v-model:value="form.settlementType"
+                    size="small"
+                    allow-clear
+                    placeholder="请选择 结算类型"
+                    :options="settlementTypeOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="付款比例">
+                  <a-select
+                    v-model:value="form.paymentRatio"
+                    size="small"
+                    allow-clear
+                    placeholder="请选择 付款比例"
+                    :options="paymentRatioOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="首付/定金金额">
+                  <a-input-number
+                    v-model:value="form.downPaymentAmount"
+                    size="small"
+                    :min="0"
+                    :precision="2"
+                    style="width: 100%"
+                    placeholder="请输入 首付/定金金额"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="24">
+                <a-form-item label="备注" class="remark-item">
+                  <a-textarea
+                    v-model:value="form.remark"
+                    :rows="2"
+                    :maxlength="1000"
+                    show-count
+                    placeholder="请输入 备注"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
+        </div>
+
+        <div v-if="customerDiscountHint && !basicInfoCollapsed" class="discount-hint">
+          {{ customerDiscountHint }}
+        </div>
+
+        <div class="price-summary-card">
+          <div class="price-summary-header" @click="priceSummaryCollapsed = !priceSummaryCollapsed">
+            <span class="section-title">价格汇总</span>
+            <span class="header-amounts">
+              <span class="header-amount-item">
+                最终成交额（含税）
+                <strong>￥{{ formatMoney(orderAmount) }}</strong>
+              </span>
+              <span class="header-amount-item">
+                最终成交额（不含税）
+                <strong>￥{{ formatMoney(orderPricing.amountExTax) }}</strong>
+              </span>
+              <span class="header-amount-item">
+                销售总额（含税）
+                <strong>￥{{ formatMoney(orderPricing.lineAmountInTax) }}</strong>
+              </span>
+              <span class="header-amount-item">
+                销售总额（不含税）
+                <strong>￥{{ formatMoney(orderPricing.lineAmountExTax) }}</strong>
+              </span>
+            </span>
+            <DownOutlined :class="{ rotated: priceSummaryCollapsed }" class="collapse-icon" />
+          </div>
+          <div v-show="!priceSummaryCollapsed" class="price-summary-body">
+            <div class="summary-amounts-strip">
+              <span class="amount-chip discount">
+                行优惠（合计）
+                <strong>-￥{{ formatMoney(orderPricing.lineDiscountTotal) }}</strong>
+              </span>
+              <span class="amount-chip discount">
+                整单优惠
+                <strong>-￥{{ formatMoney(orderPricing.orderDiscountTotal) }}</strong>
+              </span>
+            </div>
+            <a-form layout="inline" size="small" class="discount-inline-form">
+              <a-form-item label="折扣策略">
+                <a-radio-group
+                  v-model:value="form.discountStrategy"
+                  size="small"
+                  @change="syncOrderDiscountRate"
+                >
+                  <a-radio :value="DISCOUNT_STRATEGIES.NONE">
+                    {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.NONE] }}
+                  </a-radio>
+                  <a-radio :value="DISCOUNT_STRATEGIES.LINE">
+                    {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.LINE] }}
+                  </a-radio>
+                  <a-radio :value="DISCOUNT_STRATEGIES.ORDER">
+                    {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.ORDER] }}
+                  </a-radio>
+                  <a-radio :value="DISCOUNT_STRATEGIES.STACK" disabled>
+                    {{ DISCOUNT_STRATEGY_LABELS[DISCOUNT_STRATEGIES.STACK] }}
+                  </a-radio>
+                </a-radio-group>
+              </a-form-item>
+              <a-form-item label="整单折扣(%)">
+                <a-input-number
+                  v-model:value="form.orderDiscountPercent"
+                  size="small"
+                  :min="1"
+                  :max="100"
+                  :precision="2"
+                  :disabled="orderDiscountFieldsDisabled"
+                  style="width: 88px"
+                  @change="syncOrderDiscountRate"
+                />
+              </a-form-item>
+              <a-form-item label="整单减免(元)">
+                <a-input-number
+                  v-model:value="form.orderDiscountAmount"
+                  size="small"
+                  :min="0"
+                  :precision="2"
+                  disabled
+                  style="width: 100px"
+                />
+              </a-form-item>
+              <a-form-item label="优惠原因" class="discount-reason-item">
+                <a-input
+                  v-model:value="form.orderDiscountReason"
+                  size="small"
+                  placeholder="如：老客户合作、批量采购"
+                  style="width: 200px"
+                />
+              </a-form-item>
+            </a-form>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-header" @click="detailCollapsed = !detailCollapsed">
+            <span class="section-title">销售明细</span>
+            <DownOutlined :class="{ rotated: detailCollapsed }" class="collapse-icon" />
+          </div>
+
+          <div v-show="!detailCollapsed" class="detail-section-body">
+            <div class="detail-toolbar">
+              <a-space wrap>
+                <a-button type="primary" @click="openProductPicker">
+                  <PlusOutlined />
+                  选择产品
+                </a-button>
+                <a-button @click="addManualProductLine">
+                  <PlusOutlined />
+                  添加产品
+                </a-button>
+                <a-button class="tax-toggle-btn" @click="toggleTaxMode">
+                  切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
+                </a-button>
+                <span class="tax-hint">{{ taxModeHint }}</span>
+              </a-space>
+              <a-popover trigger="click" placement="bottomRight">
+                <template #title>列设置</template>
+                <template #content>
+                  <a-checkbox-group v-model:value="visibleColumnKeys" class="column-settings">
+                    <a-row>
+                      <a-col v-for="col in columnDefs" :key="col.key" :span="12">
+                        <a-checkbox :value="col.key" :disabled="fixedColumnKeys.includes(col.key)">
+                          {{ col.title }}
+                        </a-checkbox>
+                      </a-col>
+                    </a-row>
+                  </a-checkbox-group>
+                </template>
+                <a-button type="text" class="column-setting-btn">
+                  <AppstoreOutlined />
+                </a-button>
+              </a-popover>
+            </div>
+
+            <a-table
+              :columns="displayColumns"
+              :data-source="form.lineItems"
+              row-key="id"
+              size="small"
+              bordered
+              :pagination="false"
+              :scroll="{ x: tableScrollX }"
+              class="sales-line-table"
+              locale="{ emptyText: '暂无数据' }"
+            >
+              <template #headerCell="{ column }">
+                <div class="header-cell">
+                  <span class="header-title">{{ column.title }}</span>
+                  <span
+                    v-if="column.key !== 'index'"
+                    class="resize-handle"
+                    @mousedown.prevent="(e) => startColumnResize(e, column.key)"
+                  />
+                </div>
+              </template>
+
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+
+                <template v-else-if="column.key === 'businessType'">
+                  <a-select
+                    v-model:value="record.businessType"
+                    size="small"
+                    style="width: 100%"
+                    :options="lineBusinessTypeOpts(record)"
+                    @change="(val) => onBusinessTypeChange(record, val)"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'productName'">
+                  <a-input
+                    v-if="record.isManualLine"
+                    v-model:value="record.productName"
+                    size="small"
+                    placeholder="请输入产品名称"
+                  />
+                  <span v-else class="readonly-cell">{{ record.productName || '—' }}</span>
+                </template>
+
+                <template v-else-if="column.key === 'productCode'">
+                  <a-input
+                    v-if="record.isManualLine"
+                    v-model:value="record.productCode"
+                    size="small"
+                    placeholder="请输入产品编码"
+                  />
+                  <span v-else class="readonly-cell">{{ record.productCode || '—' }}</span>
+                </template>
+
+                <template v-else-if="column.key === 'productAttr'">
+                  <span>{{ record.productAttr || '—' }}</span>
+                </template>
+
+                <template v-else-if="column.key === 'specModel'">
+                  <a-input
+                    v-if="record.isManualLine"
+                    v-model:value="record.specModel"
+                    size="small"
+                  />
+                  <a
+                    v-else-if="isSpuLine(record)"
+                    class="variant-field-link"
+                    @click.prevent="openVariantConfig(record)"
+                  >
+                    {{ record.specModel || '点击配置' }}
+                  </a>
+                  <span v-else>{{ record.specModel || '—' }}</span>
+                </template>
+
+                <template v-else-if="column.key === 'material'">
+                  <a-input
+                    v-if="record.isManualLine"
+                    v-model:value="record.material"
+                    size="small"
+                  />
+                  <a
+                    v-else-if="isSpuLine(record)"
+                    class="variant-field-link"
+                    @click.prevent="openVariantConfig(record)"
+                  >
+                    {{ record.material || '点击配置' }}
+                  </a>
+                  <span v-else>{{ record.material || '—' }}</span>
+                </template>
+
+                <template v-else-if="column.key === 'variantAttr'">
+                  <a
+                    v-if="isSpuLine(record)"
+                    class="variant-field-link"
+                    @click.prevent="openVariantConfig(record)"
+                  >
+                    {{ lineVariantDisplay(record) || '—' }}
+                  </a>
+                  <template v-else>
+                    <a-tooltip
+                      v-if="lineVariantDisplay(record)"
+                      :title="lineVariantDisplay(record)"
+                    >
+                      <span>{{ lineVariantDisplay(record) }}</span>
+                    </a-tooltip>
+                    <span v-else>—</span>
+                  </template>
+                </template>
+
+                <template v-else-if="column.key === 'drawingNo'">
+                  <span v-if="!record.isManualLine" class="readonly-cell">{{
+                    record.drawingNo || '—'
+                  }}</span>
+                  <a-input
+                    v-else
+                    v-model:value="record.drawingNo"
+                    size="small"
+                    placeholder="图号"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'techParams'">
+                  <SalesLineLongTextCell
+                    :value="record.techParams"
+                    @edit="openLongTextEdit(record, 'techParams')"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'matchingRequirements'">
+                  <SalesLineLongTextCell
+                    :value="record.matchingRequirements"
+                    @edit="openLongTextEdit(record, 'matchingRequirements')"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'salesQty'">
+                  <a-input-number
+                    v-model:value="record.salesQty"
+                    size="small"
+                    :min="0"
+                    :precision="4"
+                    :formatter="inputNumberFormatter"
+                    :parser="inputNumberParser"
+                    style="width: 100%"
+                    @change="onLineFieldChange(record)"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'deliveryMode'">
+                  <a-select
+                    v-model:value="record.deliveryMode"
+                    size="small"
+                    style="width: 100%"
+                    :options="deliveryModeOpts"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'stockFulfillmentMode'">
+                  <a-select
+                    v-model:value="record.stockFulfillmentMode"
+                    size="small"
+                    style="width: 100%"
+                    :options="stockFulfillmentModeOpts"
+                    @change="(val) => onStockFulfillmentModeChange(record, val)"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'deliveryDate'">
+                  <a-date-picker
+                    :value="lineDateValue(record.deliveryDate)"
+                    size="small"
+                    style="width: 100%"
+                    @change="(d) => onLineDateChange(record, d)"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'bomName'">
+                  <span class="readonly-cell">{{ record.bomName || '—' }}</span>
+                </template>
+
+                <template v-else-if="column.key === 'bomVersion'">
+                  <span class="readonly-cell">{{ record.bomVersion || '—' }}</span>
+                </template>
+
+                <template v-else-if="column.key === 'unit'">
+                  <a-input v-model:value="record.unit" size="small" />
+                </template>
+
+                <template v-else-if="column.key === 'lineDiscountPercent'">
+                  <a-input-number
+                    v-if="showLineDiscount"
+                    :value="getLineDiscountPercent(record)"
+                    size="small"
+                    :min="1"
+                    :max="100"
+                    :precision="2"
+                    style="width: 100%"
+                    @update:value="(v) => setLineDiscountPercent(record, v)"
+                  />
+                  <span v-else>—</span>
+                </template>
+
+                <template v-else-if="column.key === 'lineDiscountAmount'">
+                  {{ formatMoney(record.lineDiscountAmount) }}
+                </template>
+
+                <template v-else-if="column.key === 'taxRate'">
+                  <a-input-number
+                    v-model:value="record.taxRate"
+                    size="small"
+                    :min="0"
+                    :max="100"
+                    :precision="2"
+                    style="width: 100%"
+                    @change="onLineFieldChange(record)"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'unitPriceExTax'">
+                  <a-input-number
+                    v-model:value="record.unitPriceExTax"
+                    size="small"
+                    :min="0"
+                    :precision="4"
+                    :formatter="inputNumberFormatter"
+                    :parser="inputNumberParser"
+                    style="width: 100%"
+                    @change="onUnitPriceExTaxChange(record)"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'unitPriceInTax'">
+                  <a-input-number
+                    v-model:value="record.unitPriceInTax"
+                    size="small"
+                    :min="0"
+                    :precision="4"
+                    :formatter="inputNumberFormatter"
+                    :parser="inputNumberParser"
+                    style="width: 100%"
+                    @change="onUnitPriceInTaxChange(record)"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'totalPriceExTax'">
+                  {{ formatMoney(record.totalPriceExTax) }}
+                </template>
+
+                <template v-else-if="column.key === 'totalPriceInTax'">
+                  {{ formatMoney(record.totalPriceInTax) }}
+                </template>
+
+                <template v-else-if="column.key === 'packagingForm'">
+                  <SalesLineLongTextCell
+                    :value="record.packagingForm"
+                    @edit="openLongTextEdit(record, 'packagingForm')"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'supplementDesc'">
+                  <SalesLineLongTextCell
+                    :value="record.supplementDesc"
+                    @edit="openLongTextEdit(record, 'supplementDesc')"
+                  />
+                </template>
+
+                <template v-else-if="column.key === 'lineAttachment'">
+                  <a-upload
+                    class="line-attachment-upload"
+                    :file-list="lineUploadFileList(record)"
+                    :before-upload="(file) => beforeLineUpload(record, file)"
+                    multiple
+                    @remove="(file) => onLineFileRemove(record, file)"
+                  >
+                    <a-button type="link" size="small" class="line-upload-btn">
+                      <UploadOutlined />
+                      上传附件
+                    </a-button>
+                  </a-upload>
+                </template>
+
+                <template v-else-if="column.key === 'action'">
+                  <a-space :size="0">
+                    <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
+                    <a-button type="link" size="small" danger @click="removeLine(index)"
+                      >删除</a-button
+                    >
+                    <a-button type="link" size="small" @click="cloneLine(index)">克隆</a-button>
+                  </a-space>
+                </template>
+
+                <template v-else>
+                  {{ record[column.dataIndex] ?? '-' }}
+                </template>
+              </template>
+            </a-table>
+            <div class="fulfillment-hint">
+              库存履约说明：优先现货 — 自由备货能覆盖则不排产，缺口才进生产计划；强制按单生产 —
+              全量排产且不新占自由备货；仅现货 —
+              必须被自由备货覆盖，否则无法通过审核。审核时确认占用与排产结果。
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="form.lineItems.some((l) => l.productCode)"
+          class="stock-remind-section"
+          :class="{ 'is-collapsed': stockRemindCollapsed }"
+        >
+          <div class="stock-remind-header" @click="stockRemindCollapsed = !stockRemindCollapsed">
+            <span class="section-title">库存提醒</span>
+            <DownOutlined :class="{ rotated: stockRemindCollapsed }" class="collapse-icon" />
+          </div>
+          <div v-show="!stockRemindCollapsed" class="stock-remind-body">
+            <p class="stock-remind-tip">按当前现存量与他单软占用计算，便于下单前判断是否缺货。</p>
+            <SalesOrderStockRemindPanel :order="stockRemindOrder" />
+          </div>
+        </div>
+
+        <div class="attachment-section">
+          <div class="attachment-section-header">
+            <span class="section-title">图片文档信息</span>
+          </div>
+          <a-divider class="section-divider" />
+          <a-form layout="inline" class="attachment-form horizontal-form">
+            <a-form-item label="文件上传">
+              <div class="upload-field">
+                <a-upload v-model:file-list="fileList" :before-upload="beforeUpload" multiple>
+                  <a-button type="primary" size="small">
+                    <UploadOutlined />
+                    点击上传
+                  </a-button>
+                </a-upload>
+                <div class="upload-hint">支持上传各类型文件，大小不超过 200MB</div>
+              </div>
+            </a-form-item>
+          </a-form>
+        </div>
+      </div>
     </div>
 
     <SelectBomMaterialModal
@@ -668,7 +740,13 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { message, Upload } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { PlusOutlined, DownOutlined, AppstoreOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import {
+  PlusOutlined,
+  DownOutlined,
+  UpOutlined,
+  AppstoreOutlined,
+  UploadOutlined,
+} from '@ant-design/icons-vue'
 import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import {
   urgencyOptions,
@@ -693,6 +771,11 @@ import {
   salesOrderState,
   updateSalesOrder,
 } from '@/store/salesOrderStore'
+import { ensureStockTransferDemoMocksForOrder } from '@/store/salesStockAllocationStore'
+import {
+  STOCK_FULFILLMENT_MODE_OPTIONS,
+  normalizeStockFulfillmentMode,
+} from '@/utils/salesStockFulfillment'
 import { getCustomerOptions, getCustomerByName } from '@/store/customerStore'
 import { getFrameworkContractByNo } from '@/store/frameworkContractStore'
 import { resolveSalesLinePrice } from '@/utils/customerPrice'
@@ -713,6 +796,7 @@ import CustomerSelect from './CustomerSelect.vue'
 import SalesLineLongTextCell from './SalesLineLongTextCell.vue'
 import SalesOrderLineEditModal from './SalesOrderLineEditModal.vue'
 import ConfigureSalesSpuVariantModal from './ConfigureSalesSpuVariantModal.vue'
+import SalesOrderStockRemindPanel from './SalesOrderStockRemindPanel.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 import {
@@ -745,8 +829,11 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 })
 /** 默认按含税单价录入（明细列「单价（含税）」） */
 const taxModeExcluding = ref(false)
+const basicInfoCollapsed = ref(false)
 const detailCollapsed = ref(false)
 const priceSummaryCollapsed = ref(true)
+/** 默认展开，便于录入时查看现货/他单占用 */
+const stockRemindCollapsed = ref(false)
 const productPickerOpen = ref(false)
 const variantConfigOpen = ref(false)
 const variantConfigSpuId = ref('')
@@ -810,6 +897,7 @@ const columnDefs = [
   { key: 'matchingRequirements', title: '配套要求', width: 120, ellipsis: true },
   { key: 'salesQty', title: '销售数量', width: 90 },
   { key: 'deliveryMode', title: '交付方式', width: 100 },
+  { key: 'stockFulfillmentMode', title: '库存履约', width: 130 },
   { key: 'deliveryDate', title: '交货日期', width: 120 },
   { key: 'unit', title: '单位', width: 70 },
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 100, ellipsis: true },
@@ -968,6 +1056,7 @@ const currencyOpts = settlementCurrencyOptions.map((v) => ({ label: v, value: v 
 const orderTypeOpts = orderTypeOptions.map((v) => ({ label: v, value: v }))
 const deliveryMethodOpts = deliveryMethodOptions.map((v) => ({ label: v, value: v }))
 const deliveryModeOpts = deliveryModeOptions.map((v) => ({ label: v, value: v }))
+const stockFulfillmentModeOpts = STOCK_FULFILLMENT_MODE_OPTIONS
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const paymentRatioOpts = paymentRatioOptions.map((v) => ({ label: v, value: v }))
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
@@ -985,6 +1074,35 @@ const orderPricing = computed(() =>
     { taxModeExcluding: taxModeExcluding.value },
   ),
 )
+
+/** 新建/编辑时按当前明细估算库存（编辑态带上订单 id 以排除本单占用） */
+const stockRemindOrder = computed(() => ({
+  id: props.editRecord?.id || '',
+  orderNo: form.orderNo || props.editRecord?.orderNo || '',
+  lineItems: form.lineItems,
+}))
+
+watch(
+  () =>
+    form.lineItems
+      .map((l) => l.productCode)
+      .filter(Boolean)
+      .join('|'),
+  () => {
+    if (form.lineItems.some((l) => l.productCode)) {
+      ensureStockTransferDemoMocksForOrder(stockRemindOrder.value)
+    }
+  },
+  { immediate: true },
+)
+
+function toggleBasicInfo() {
+  basicInfoCollapsed.value = !basicInfoCollapsed.value
+}
+
+function onStockFulfillmentModeChange(record, val) {
+  record.stockFulfillmentMode = normalizeStockFulfillmentMode(val)
+}
 
 const orderAmount = computed(() => orderPricing.value.orderAmount)
 
@@ -1015,6 +1133,7 @@ watch(
   () => [isActive.value, props.editRecord?.id],
   ([val]) => {
     if (!val) return
+    basicInfoCollapsed.value = false
     detailCollapsed.value = false
     if (props.editRecord) {
       // 保活切回：同一订单不重复覆盖用户未保存改动
@@ -1620,6 +1739,45 @@ function handleSave() {
 </script>
 
 <style lang="less" scoped>
+.so-form-shell {
+  min-width: 0;
+}
+
+.form-layout {
+  min-width: 0;
+}
+
+.section-block {
+  flex-shrink: 0;
+
+  .section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .section-title-row .section-title {
+    margin-bottom: 0;
+  }
+
+  .collapse-btn {
+    padding-inline: 4px;
+    height: auto;
+    flex-shrink: 0;
+  }
+
+  &.is-collapsed {
+    padding-top: 10px;
+    padding-bottom: 10px;
+
+    .section-title-row {
+      margin-bottom: 0;
+    }
+  }
+}
+
 .header-form {
   :deep(.ant-form-item) {
     width: 100%;
@@ -1843,6 +2001,11 @@ function handleSave() {
     padding: 0 12px 12px;
   }
 
+  :deep(.sales-line-table .ant-table-body) {
+    overflow-y: visible !important;
+    max-height: none !important;
+  }
+
   :deep(.sales-line-table .ant-table-thead > tr > th) {
     padding: 8px !important;
     position: relative;
@@ -1889,6 +2052,61 @@ function handleSave() {
     padding-inline: 0;
     height: auto;
   }
+}
+
+.stock-remind-section {
+  margin-top: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+
+  .stock-remind-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: #fafafa;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    user-select: none;
+
+    .section-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .collapse-icon {
+      color: rgba(0, 0, 0, 0.45);
+      transition: transform 0.2s;
+
+      &.rotated {
+        transform: rotate(-90deg);
+      }
+    }
+  }
+
+  &.is-collapsed .stock-remind-header {
+    border-bottom: none;
+  }
+
+  .stock-remind-body {
+    padding: 12px;
+  }
+
+  .stock-remind-tip {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+    line-height: 1.5;
+  }
+}
+
+.fulfillment-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #1677ff;
 }
 
 .attachment-section {

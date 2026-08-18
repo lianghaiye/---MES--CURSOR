@@ -38,6 +38,10 @@ function createLineItem(partial = {}) {
     attachment: '',
     lineAttachments: [],
     deliveryMode: '整机',
+    /** 库存履约：prefer_stock | force_mto | stock_only */
+    stockFulfillmentMode: 'prefer_stock',
+    stockTakeQty: null,
+    planProduceQty: null,
     lineAccessoryKits: [],
     ebomSnapshot: null,
     businessType: '自产销售',

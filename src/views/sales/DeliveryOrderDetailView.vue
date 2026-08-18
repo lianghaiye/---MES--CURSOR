@@ -2,119 +2,91 @@
   <div class="delivery-order-detail-page">
     <a-spin :spinning="loading">
       <template v-if="record">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="doc-no">{{ record.deliveryCode }}</span>
-            <a-tag :color="deliveryStatusColor(record.deliveryStatus)">{{
-              record.deliveryStatus
-            }}</a-tag>
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ record.deliveryCode }}</span>
+              <a-tag :color="deliveryStatusColor(record.deliveryStatus)">{{
+                record.deliveryStatus
+              }}</a-tag>
+            </div>
+            <a-space :size="8">
+              <a-button size="small" @click="openPrint">打印</a-button>
+              <a-button size="small" @click="handleBack">返回列表</a-button>
+            </a-space>
           </div>
-          <a-space :size="8">
-            <a-button size="small" @click="openPrint">打印</a-button>
-            <a-button size="small" @click="handleBack">返回列表</a-button>
-          </a-space>
-        </div>
 
-        <div class="detail-tabs-wrap">
-          <a-tabs
-            v-model:active-key="activeTab"
-            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-          >
-            <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane key="outbound" :tab="`出库信息 (${outboundList.length})`" />
-          </a-tabs>
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="activeTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="outbound" :tab="`出库信息 (${outboundList.length})`" />
+            </a-tabs>
+          </div>
         </div>
 
         <div class="tab-body">
           <template v-if="activeTab === 'basic'">
             <div class="section-card">
               <div class="section-title">基本信息</div>
-              <a-descriptions :column="3" size="small" bordered>
-                <a-descriptions-item label="发货单号">{{
-                  record.deliveryCode
-                }}</a-descriptions-item>
-                <a-descriptions-item label="源单号">
-                  <a v-if="record.salesOrderId" @click="goSalesOrder">{{ record.sourceOrderNo }}</a>
-                  <span v-else>{{ record.sourceOrderNo || '—' }}</span>
-                </a-descriptions-item>
-                <a-descriptions-item label="发货状态">{{
-                  record.deliveryStatus
-                }}</a-descriptions-item>
-                <a-descriptions-item label="客户">{{ record.customerName }}</a-descriptions-item>
-                <a-descriptions-item label="业务员">{{
-                  record.salesperson || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="单据日期">{{
-                  record.documentDate
-                }}</a-descriptions-item>
-                <a-descriptions-item label="申请发货数量">
-                  {{ formatOutboundQtyInt(record.applyShipQty) }}
-                </a-descriptions-item>
-                <a-descriptions-item label="实际出库数量">
-                  {{ formatOutboundQtyInt(record.actualOutboundQty) }}
-                </a-descriptions-item>
-                <a-descriptions-item label="发货重量">{{
-                  formatShipWeight(record.shipWeight)
-                }}</a-descriptions-item>
-                <a-descriptions-item label="发货总金额（不含税）">
-                  ￥{{ formatAmountExTax(record.totalAmountExTax) }}
-                </a-descriptions-item>
-                <a-descriptions-item label="交货方式">{{
-                  record.shipmentMethod || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="物流单号">{{
-                  record.logisticsNo || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="出库仓库">{{
-                  record.outboundWarehouse || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="客户联系人">{{
-                  record.contactPerson || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="联系方式">{{
-                  record.contactPhone || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="交货地址" :span="2">
-                  {{ record.deliveryAddress || '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="司机姓名">{{
-                  record.driverName || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="司机联系方式">{{
-                  record.driverPhone || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="车牌号">{{
-                  record.plateNo || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="创建时间">{{
-                  record.createdAt || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="备注" :span="3">{{
-                  record.remark || '—'
-                }}</a-descriptions-item>
-              </a-descriptions>
+              <DeliveryOrderBasicInfoSection :order="record" @go-sales="goSalesOrder" />
             </div>
 
             <div v-if="record.lineItems?.length" class="section-card">
               <div class="section-title">整机发货明细</div>
               <a-table
                 :columns="wholeColumns"
-                :data-source="record.lineItems"
+                :data-source="wholeLineRows"
                 row-key="id"
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: wholeTableScrollX }"
               >
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-                  <template v-else-if="column.key === 'shipQty'">
-                    {{ formatOutboundQtyInt(line.shipQty) }}
+                  <template v-else-if="column.key === 'lineShipStatus'">
+                    <a-tag :color="lineShipStatusColor(line.lineShipStatus)">
+                      {{ line.lineShipStatus || '—' }}
+                    </a-tag>
                   </template>
-                  <template v-else-if="column.key === 'amount'">
-                    {{ formatAmountExTax(line.deliveryAmountExTax) }}
+                  <template v-else-if="column.key === 'shipProgress'">
+                    {{
+                      formatShipProgress(
+                        line.confirmedOutboundQty ?? line.shippedQty,
+                        line.appliedShipQty ?? line.shippedQty,
+                        line.orderQty,
+                      )
+                    }}
+                  </template>
+                  <template v-else-if="column.key === 'orderQty'">
+                    {{ formatDeliveryQty(line.orderQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'unitPriceExTax'">
+                    {{ formatDeliveryPrice(line.unitPriceExTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'unitPriceInTax'">
+                    {{ formatDeliveryPrice(line.unitPriceInTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'shipQty'">
+                    {{ formatDeliveryQty(line.shipQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'shipWeight'">
+                    {{ formatDeliveryWeight(line.shipWeight ?? line.itemWeightKg) }}
+                  </template>
+                  <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
+                    {{ formatDeliveryPrice(line.deliveryUnitPriceExTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'deliveryAmountExTax'">
+                    {{ formatDeliveryPrice(line.deliveryAmountExTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'deliveryMode'">
+                    {{ line.deliveryMode || '—' }}
                   </template>
                   <template v-else>
-                    {{ line[column.dataIndex] ?? '—' }}
+                    {{ displayLineCell(line, column) }}
                   </template>
                 </template>
               </a-table>
@@ -130,6 +102,7 @@
                   size="small"
                   bordered
                   :pagination="false"
+                  :scroll="{ x: 720 }"
                 />
               </div>
             </div>
@@ -197,7 +170,7 @@
                   <template v-else-if="column.key === 'outboundOrderNo'">
                     <a
                       v-if="row.outboundId || row.outboundOrderNo"
-                      class="doc-link"
+                      class="link-code"
                       @click="goOutboundDetail(row)"
                     >
                       {{ row.outboundOrderNo || '—' }}
@@ -219,7 +192,7 @@
           </template>
         </div>
       </template>
-      <a-empty v-else-if="!loading" description="未找到发货单" />
+      <a-empty v-else-if="!loading" description="未找到该发货单" />
     </a-spin>
 
     <DeliveryOrderPrintModal v-model:open="printModalOpen" :delivery-order="record" />
@@ -241,16 +214,22 @@ import {
   getOutboundIssueLineScrollX,
 } from '@/utils/outboundIssueLines'
 import { getDeliveryOrderById, refreshOutboundQtyAll } from '@/store/deliveryOrderStore'
+import { getSalesOrderById, salesOrderState } from '@/store/salesOrderStore'
+import { productInfoState } from '@/store/productInfoStore'
 import { outboundState } from '@/store/outboundStore'
 import { getSelectedMaterialPicks } from '@/utils/shipEbom'
+import { deliveryStatusColor, formatOutboundQtyInt } from '@/utils/deliveryOrder'
 import {
-  deliveryStatusColor,
-  formatOutboundQtyInt,
-  formatShipWeight,
-  formatAmountExTax,
-} from '@/utils/deliveryOrder'
+  enrichDeliveryLineForDisplay,
+  formatDeliveryQty,
+  formatDeliveryPrice,
+  formatDeliveryWeight,
+  formatShipProgress,
+  lineShipStatusColor,
+} from '@/utils/deliveryLine'
 import { attachmentShipStatusColor, formatAttachmentShipProgress } from '@/utils/shipBomAttachments'
 import DeliveryOrderPrintModal from './components/DeliveryOrderPrintModal.vue'
+import DeliveryOrderBasicInfoSection from './components/DeliveryOrderBasicInfoSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -262,18 +241,44 @@ const activeTab = ref('basic')
 const printModalOpen = ref(false)
 
 const wholeColumns = [
-  { title: '#', key: 'index', width: 48 },
-  { title: '产品名称', dataIndex: 'productName', ellipsis: true },
-  { title: '产品编码', dataIndex: 'productCode', width: 120 },
-  { title: '本次发货', key: 'shipQty', width: 90, align: 'right' },
-  { title: '单价（不含税）', dataIndex: 'deliveryUnitPriceExTax', width: 110, align: 'right' },
-  { title: '金额（不含税）', key: 'amount', width: 110, align: 'right' },
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  {
+    title: '产品名称',
+    dataIndex: 'productName',
+    width: 140,
+    ellipsis: true,
+    fixed: 'left',
+  },
+  { title: '发货状态', key: 'lineShipStatus', width: 88, align: 'center' },
+  { title: '发货进度', key: 'shipProgress', width: 160, align: 'right' },
+  { title: '产品编码', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 72 },
+  { title: '变体属性', dataIndex: 'variantAttr', width: 140, ellipsis: true },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '订单数量', key: 'orderQty', width: 96, align: 'right' },
+  { title: '单价（不含税）', key: 'unitPriceExTax', width: 120, align: 'right' },
+  { title: '单价（含税）', key: 'unitPriceInTax', width: 110, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 56, align: 'center' },
+  { title: '出库仓库', dataIndex: 'shipWarehouse', width: 120 },
+  { title: '本次发货数量', key: 'shipQty', width: 120, align: 'right' },
+  { title: '发货重量', key: 'shipWeight', width: 110, align: 'right' },
+  { title: '发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 168, align: 'right' },
+  { title: '发货总额', key: 'deliveryAmountExTax', width: 110, align: 'right' },
+  { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
+  { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
+  { title: '备注', dataIndex: 'lineRemark', width: 120, ellipsis: true },
 ]
 
+const wholeTableScrollX = wholeColumns.reduce((sum, col) => sum + (col.width || 100), 0)
+
 const scatterPickColumns = [
-  { title: '物料', dataIndex: 'name', ellipsis: true },
-  { title: '编码', dataIndex: 'code', width: 110 },
-  { title: '本次发运', dataIndex: 'shipQty', width: 90, align: 'right' },
+  { title: '物料名称', dataIndex: 'name', width: 160, ellipsis: true },
+  { title: '编码', dataIndex: 'code', width: 120, ellipsis: true },
+  { title: '规格', dataIndex: 'spec', width: 100, ellipsis: true },
+  { title: '需求数量', dataIndex: 'demandQty', width: 88, align: 'right' },
+  { title: '本次发运', dataIndex: 'shipQty', width: 88, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 56 },
 ]
 
 const shipAttachmentColumns = [
@@ -302,6 +307,27 @@ const outboundRows = computed(() => {
 
 const outboundList = outboundRows
 
+const sourceSalesOrder = computed(() => {
+  if (!record.value?.salesOrderId) return null
+  return getSalesOrderById(record.value.salesOrderId)
+})
+
+const wholeLineRows = computed(() => {
+  void salesOrderState.orders
+  void productInfoState.products
+  const order = record.value
+  if (!order?.lineItems?.length) return []
+  const so = sourceSalesOrder.value
+  return order.lineItems.map((line) =>
+    enrichDeliveryLineForDisplay(line, so, { outboundWarehouse: order.outboundWarehouse }),
+  )
+})
+
+function displayLineCell(line, column) {
+  const val = column.dataIndex ? line[column.dataIndex] : line[column.key]
+  return val !== undefined && val !== null && String(val).trim() !== '' ? val : '—'
+}
+
 function goOutboundDetail(row) {
   const id = row?.outboundId
   if (!id) return
@@ -315,7 +341,10 @@ function scatterPicks(ship) {
     materialId: p.materialId,
     name: p.name,
     code: p.code,
-    shipQty: formatOutboundQtyInt(p.shipQty),
+    spec: p.spec || '—',
+    demandQty: formatDeliveryQty(p.demandQty),
+    shipQty: formatDeliveryQty(p.shipQty),
+    unit: p.unit || '件',
   }))
 }
 
@@ -349,9 +378,36 @@ function goSalesOrder() {
 </script>
 
 <style lang="less" scoped>
+.link-code {
+  color: #1677ff;
+  cursor: pointer;
+}
+
 .delivery-order-detail-page {
   margin: -12px;
-  min-height: calc(100vh - 112px);
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
+  background: #f5f6f8;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
   background: #f5f6f8;
 }
 
@@ -362,9 +418,6 @@ function goSalesOrder() {
   padding: 10px 12px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
-  position: sticky;
-  top: 0;
-  z-index: 30;
 }
 
 .header-left {
@@ -374,13 +427,21 @@ function goSalesOrder() {
   min-width: 0;
 }
 
-.doc-no {
+.order-no {
   font-size: 16px;
   font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
 }
 
 .tab-body {
+  flex: 1;
+  min-height: 0;
   padding: 8px 12px 16px;
+  overflow: auto;
 }
 
 .section-card {
@@ -388,24 +449,27 @@ function goSalesOrder() {
   border-radius: 6px;
   padding: 12px;
   margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .section-title {
   font-weight: 600;
-  margin-bottom: 8px;
+  font-size: 14px;
+  margin-bottom: 12px;
 }
 
 .scatter-block {
   margin-bottom: 12px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .scatter-head {
-  font-weight: 500;
-  margin-bottom: 6px;
-}
-
-.doc-link {
-  color: #1677ff;
-  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 10px;
 }
 </style>

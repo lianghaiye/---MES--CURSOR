@@ -48,6 +48,23 @@
                 <template v-else-if="column.key === 'deliveryMode'">
                   {{ line.deliveryMode || '—' }}
                 </template>
+                <template v-else-if="column.key === 'stockFulfillmentMode'">
+                  <a-select
+                    v-if="canApprove && isSelfMadeLine(line)"
+                    v-model:value="line.stockFulfillmentMode"
+                    size="small"
+                    style="width: 100%"
+                    :options="stockFulfillmentModeOpts"
+                    @change="(val) => onFulfillmentModeChange(line, val)"
+                  />
+                  <span v-else>{{ stockFulfillmentModeLabel(line.stockFulfillmentMode) }}</span>
+                </template>
+                <template v-else-if="column.key === 'stockTakeQty'">
+                  {{ previewTakeQty(line) }}
+                </template>
+                <template v-else-if="column.key === 'planProduceQty'">
+                  {{ previewPlanQty(line) }}
+                </template>
                 <template v-else-if="moneyKeys.has(column.key)">
                   {{ formatMoney(line[column.dataIndex]) }}
                 </template>
@@ -66,9 +83,25 @@
             <div class="summary-row">
               <span class="summary-label">总计</span>
               <span class="summary-item">数量：{{ formatQty(summary.totalQty) }}</span>
+              <span class="summary-item"
+                >预计占用现货：{{ formatQty(fulfillmentSummary.stockTake) }}</span
+              >
+              <span class="summary-item"
+                >预计排产：{{ formatQty(fulfillmentSummary.planQty) }}</span
+              >
               <span class="summary-item">不含税：{{ formatMoney(summary.amountExTax) }}</span>
               <span class="summary-item">含税：{{ formatMoney(summary.amountInTax) }}</span>
             </div>
+          </div>
+
+          <a-divider />
+
+          <div class="subsection">
+            <div class="section-title">库存提醒</div>
+            <p class="stock-remind-tip">
+              审核通过前按当前现存量与他单占用评估；通过后将按履约结果做初始软占用。
+            </p>
+            <SalesOrderStockRemindPanel :order="record" />
           </div>
         </div>
 
@@ -114,9 +147,9 @@ export default { name: 'SalesOrderApproveView' }
 </script>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { formatQty } from '@/utils/numberFormat'
 import {
@@ -128,11 +161,31 @@ import {
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
 import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOrderStatus'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
+import SalesOrderStockRemindPanel from './components/SalesOrderStockRemindPanel.vue'
+import {
+  STOCK_FULFILLMENT_MODE_OPTIONS,
+  buildLineStockFulfillmentPlan,
+  listStockOnlyShortfalls,
+  normalizeStockFulfillmentMode,
+  stockFulfillmentModeLabel,
+} from '@/utils/salesStockFulfillment'
+import {
+  ensureStockTransferDemoMocksForOrder,
+  getLineAllocatedQty,
+  salesStockAllocationState,
+} from '@/store/salesStockAllocationStore'
+import { productInfoState } from '@/store/productInfoStore'
+import { isSelfMadeBusinessType, resolveLineBusinessType } from '@/utils/salesOrderBusiness'
+import {
+  BOM_FULFILLMENT_PATH,
+  normalizeBomFulfillmentPath,
+} from '@/constants/salesOrderFulfillment'
 
 const route = useRoute()
 const router = useRouter()
 const opinion = ref('')
 const listPath = '/sales/orders'
+const stockFulfillmentModeOpts = STOCK_FULFILLMENT_MODE_OPTIONS
 
 const moneyKeys = new Set([
   'unitPriceExTax',
@@ -146,7 +199,16 @@ const record = computed(() => getSalesOrderById(route.params.id))
 const canApprove = computed(() => record.value && canApproveSalesOrder(record.value))
 const historyRecords = computed(() => record.value?.approvalRecords || [])
 
+watch(
+  record,
+  (order) => {
+    if (order) ensureStockTransferDemoMocksForOrder(order)
+  },
+  { immediate: true },
+)
+
 const lineColumns = salesOrderDetailLineColumns
+
 const lineTableScrollX = lineColumns.reduce((sum, col) => sum + (col.width || 100), 0)
 
 const summary = computed(() => {
@@ -159,6 +221,67 @@ const summary = computed(() => {
       record.value?.amountInTax ?? lines.reduce((s, l) => s + (Number(l.totalPriceInTax) || 0), 0),
   }
 })
+
+const selfMadeLinesForPreview = computed(() =>
+  (record.value?.lineItems || []).filter((line) =>
+    isSelfMadeBusinessType(resolveLineBusinessType(line, record.value)),
+  ),
+)
+
+const designLineIds = computed(() => {
+  const ids = new Set()
+  for (const line of selfMadeLinesForPreview.value) {
+    const path = normalizeBomFulfillmentPath(line.bomFulfillmentPath)
+    if (path === BOM_FULFILLMENT_PATH.DESIGN_REQUIRED) ids.add(line.id)
+  }
+  return ids
+})
+
+const fulfillmentPreviewRows = computed(() => {
+  void salesStockAllocationState.allocations
+  void productInfoState.products
+  return buildLineStockFulfillmentPlan(selfMadeLinesForPreview.value, {
+    forceFullPlanLineIds: designLineIds.value,
+    getAllocatedQty: (line) =>
+      record.value?.id ? getLineAllocatedQty(record.value.id, line.id) : 0,
+  })
+})
+
+const fulfillmentByLineId = computed(() => {
+  const map = new Map()
+  for (const row of fulfillmentPreviewRows.value) map.set(row.lineId, row)
+  return map
+})
+
+const fulfillmentSummary = computed(() => {
+  const rows = fulfillmentPreviewRows.value
+  return {
+    stockTake: rows.reduce((s, r) => s + (Number(r.stockTake) || 0), 0),
+    planQty: rows.reduce((s, r) => s + (Number(r.planQty) || 0), 0),
+  }
+})
+
+function isSelfMadeLine(line) {
+  return isSelfMadeBusinessType(resolveLineBusinessType(line, record.value))
+}
+
+function onFulfillmentModeChange(line, val) {
+  line.stockFulfillmentMode = normalizeStockFulfillmentMode(val)
+}
+
+function previewTakeQty(line) {
+  if (!isSelfMadeLine(line)) return '—'
+  const row = fulfillmentByLineId.value.get(line.id)
+  if (!row) return '—'
+  return formatQty(row.stockTake)
+}
+
+function previewPlanQty(line) {
+  if (!isSelfMadeLine(line)) return '—'
+  const row = fulfillmentByLineId.value.get(line.id)
+  if (!row) return '—'
+  return formatQty(row.planQty)
+}
 
 function displayCell(line, column) {
   const val = line[column.dataIndex]
@@ -183,15 +306,55 @@ function goBack() {
   router.push(listPath)
 }
 
+function buildApproveConfirmContent() {
+  const rows = fulfillmentPreviewRows.value
+  const stockTake = fulfillmentSummary.value.stockTake
+  const planQty = fulfillmentSummary.value.planQty
+  const stockItemCnt = rows.filter((r) => (Number(r.stockTake) || 0) > 0).length
+  const planItemCnt = rows.filter((r) => (Number(r.planQty) || 0) > 0).length
+
+  const text = [
+    '通过后将按明细「库存履约」拆分处理：',
+    `用自由备货发货：${stockItemCnt}项，共${formatQty(stockTake)}件。`,
+    `需要安排生产：${planItemCnt}项，排产数量${formatQty(planQty)}`,
+  ].join('\n')
+
+  return h(
+    'div',
+    { style: 'line-height: 1.7; white-space: pre-line; color: rgba(0,0,0,0.88)' },
+    text,
+  )
+}
+
 function handleApprove() {
-  const res = approveSalesOrder(record.value.id, opinion.value)
-  if (res.ok) {
-    message.success(res.message)
-    opinion.value = ''
-    router.push(listPath)
-  } else {
-    message.warning(res.message)
+  const shortfalls = listStockOnlyShortfalls(fulfillmentPreviewRows.value)
+  if (shortfalls.length) {
+    message.warning(
+      `「仅现货」自由备货不足：${shortfalls
+        .map((r) => `${r.productName || r.productCode} 缺 ${r.shortfall}`)
+        .join('；')}`,
+    )
+    return
   }
+
+  Modal.confirm({
+    title: '确认审核通过？',
+    content: buildApproveConfirmContent(),
+    okText: '通过',
+    cancelText: '取消',
+    width: 480,
+    onOk: () => {
+      const res = approveSalesOrder(record.value.id, opinion.value)
+      if (res.ok) {
+        message.success(res.message)
+        opinion.value = ''
+        router.push(listPath)
+      } else {
+        message.warning(res.message)
+        return Promise.reject()
+      }
+    },
+  })
 }
 
 function handleReject() {
@@ -270,6 +433,13 @@ function handleReject() {
 
 .summary-item {
   color: #595959;
+}
+
+.stock-remind-tip {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
 }
 
 .action-row {
