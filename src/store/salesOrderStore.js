@@ -41,8 +41,15 @@ import {
   allocateStockOnSalesApprove,
   buildLineStockReminder,
   buildOrderInventoryStatus,
+  getLineAllocatedQty,
   releaseOrderAllocations,
 } from '@/store/salesStockAllocationStore'
+import {
+  buildLineStockFulfillmentPlan,
+  listStockOnlyShortfalls,
+  normalizeStockFulfillmentMode,
+  stockFulfillmentModeLabel,
+} from '@/utils/salesStockFulfillment'
 import {
   hasSalesOrderRevokeBlockers,
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
@@ -415,6 +422,7 @@ export function approveSalesOrder(id, opinion = '') {
       line.bomName = bom.bomName
       line.bomVersion = bom.version
       line.deliveryMode = normalizeDeliveryMode(line, order)
+      line.stockFulfillmentMode = normalizeStockFulfillmentMode(line.stockFulfillmentMode)
       const salesQty = Number(line.salesQty ?? line.qty) || 1
       line.ebomSnapshot = buildEbomSnapshotFromBom(bom, salesQty)
       if (!line.lineAccessoryKits?.length) {
@@ -424,12 +432,43 @@ export function approveSalesOrder(id, opinion = '') {
 
     for (const line of customLines) {
       line.deliveryMode = normalizeDeliveryMode(line, order)
+      line.stockFulfillmentMode = normalizeStockFulfillmentMode(line.stockFulfillmentMode)
       const task = createDesignTaskFromSalesLine(order, line)
       designTasksByLineId.set(line.id, task)
       designTaskCount += 1
     }
 
-    const planLines = [...standardLines, ...customLines]
+    const fulfillmentRows = buildLineStockFulfillmentPlan(standardLines, {
+      forceFullPlanLineIds: new Set(),
+      getAllocatedQty: (line) => getLineAllocatedQty(order.id, line.id),
+    })
+    const shortfalls = listStockOnlyShortfalls(fulfillmentRows)
+    if (shortfalls.length) {
+      const detail = shortfalls
+        .map((r) => `「${r.productName || r.productCode}」缺 ${r.shortfall}`)
+        .join('；')
+      return {
+        ok: false,
+        message: `订单「${order.orderNo}」存在「仅现货」行但自由备货不足：${detail}。请改履约方式或补货后再审`,
+      }
+    }
+
+    const fulfillByLineId = new Map(fulfillmentRows.map((r) => [r.lineId, r]))
+    for (const line of standardLines) {
+      const row = fulfillByLineId.get(line.id)
+      line.stockTakeQty = row?.stockTake ?? 0
+      line.planProduceQty = row?.planQty ?? 0
+    }
+    for (const line of customLines) {
+      const need = Number(line.salesQty ?? line.qty) || 0
+      line.stockTakeQty = 0
+      line.planProduceQty = need
+    }
+
+    const planLines = [
+      ...standardLines.filter((l) => (Number(l.planProduceQty) || 0) > 0),
+      ...customLines,
+    ]
     if (planLines.length) {
       if (!order.orderAccessoryKits?.length && standardLines.length) {
         order.orderAccessoryKits = buildOrderAccessoryKits(order)
@@ -443,6 +482,18 @@ export function approveSalesOrder(id, opinion = '') {
         },
       )
       planOrderNo = plan.orderNo
+      const coveredOnly = standardLines.filter(
+        (l) => (Number(l.planProduceQty) || 0) <= 0 && (Number(l.stockTakeQty) || 0) > 0,
+      )
+      if (coveredOnly.length) {
+        stockHints.push(
+          `${coveredOnly.length} 行已由自由备货覆盖，未生成生产计划行（${coveredOnly
+            .map((l) => l.productName || l.productCode)
+            .join('、')}）`,
+        )
+      }
+    } else if (standardLines.length) {
+      stockHints.push('自产明细均由自由备货覆盖，未生成生产计划')
     }
   }
 
@@ -489,27 +540,39 @@ export function approveSalesOrder(id, opinion = '') {
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
 
   const allocatableLines = [...selfMadeLines, ...purchaseLines].filter((l) => l.productCode)
-  allocateStockOnSalesApprove(order, allocatableLines)
+  const selfTake = {}
+  for (const line of selfMadeLines) {
+    if (line.productCode) selfTake[line.id] = Number(line.stockTakeQty) || 0
+  }
+  allocateStockOnSalesApprove(
+    order,
+    selfMadeLines.filter((l) => l.productCode),
+    { takeByLineId: selfTake },
+  )
+  allocateStockOnSalesApprove(
+    order,
+    purchaseLines.filter((l) => l.productCode),
+  )
   order.inventoryStatus = buildOrderInventoryStatus(order)
 
   for (const line of allocatableLines) {
     const remind = buildLineStockReminder(line, order)
+    const modeLabel = stockFulfillmentModeLabel(line.stockFulfillmentMode)
     if (remind.otherQty > 0) {
-      const nos = remind.others.map((o) => o.salesOrderNo).filter(Boolean)
-      stockHints.push(
-        `「${line.productName}」他单占用 ${remind.otherQty}${nos.length ? `（${nos.join('、')}）` : ''}，可申请跨单调拨`,
-      )
+      stockHints.push(`「${line.productName}」他单占用 ${remind.otherQty}`)
     }
-    if (remind.myAlloc >= remind.need && remind.need > 0) {
+    if ((Number(line.planProduceQty) || 0) <= 0 && (Number(line.stockTakeQty) || 0) > 0) {
       stockHints.push(
-        `「${line.productName}」已软占用库存 ${remind.myAlloc}，可直接从仓库发货（可不排产或减计划数量）`,
+        `「${line.productName}」履约「${modeLabel}」：占用现货 ${line.stockTakeQty}，无需排产`,
+      )
+    } else if ((Number(line.planProduceQty) || 0) > 0 && (Number(line.stockTakeQty) || 0) > 0) {
+      stockHints.push(
+        `「${line.productName}」履约「${modeLabel}」：占用现货 ${line.stockTakeQty}，排产 ${line.planProduceQty}`,
       )
     } else if (remind.status !== '充足') {
       stockHints.push(
-        `「${line.productName}」库存${remind.status}：现有 ${remind.onHand}，自由备货 ${remind.freeQty}，本单占用 ${remind.myAlloc}，需求 ${remind.need}`,
+        `「${line.productName}」库存${remind.status}：现有 ${remind.onHand}，自由备货 ${remind.freeQty}，需求 ${remind.need}`,
       )
-    } else if (remind.freeQty > 0 && remind.planStrategy === 'mts') {
-      stockHints.push(`「${line.productName}」自由备货 ${remind.freeQty}（非他单占用）`)
     }
   }
 

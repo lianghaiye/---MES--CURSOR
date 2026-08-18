@@ -1,12 +1,5 @@
 <template>
   <div class="stock-remind">
-    <a-alert
-      type="info"
-      show-icon
-      class="stock-remind-alert"
-      :message="`订单库存状态：${orderStatus}`"
-      :description="summaryText"
-    />
     <a-table
       size="small"
       bordered
@@ -14,34 +7,32 @@
       :columns="columns"
       :data-source="rows"
       :pagination="false"
-      :scroll="{ x: 960 }"
+      :scroll="{ x: 1080 }"
     >
+      <template #headerCell="{ column }">
+        <template v-if="column.key === 'mtsWip'">
+          <span class="col-title-with-tip">
+            在途在制
+            <a-tooltip :title="MTS_WIP_COLUMN_TIP">
+              <QuestionCircleOutlined class="col-tip-icon" />
+            </a-tooltip>
+          </span>
+        </template>
+        <template v-else>{{ column.title }}</template>
+      </template>
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
         </template>
-        <template v-else-if="column.key === 'planStrategy'">
-          {{ record.planStrategy === 'mts' ? '以库存生产' : '按单生产' }}
+        <template v-else-if="column.key === 'mtsWip'">
+          <span v-if="record.isMts">{{ record.mtsWipText || '—' }}</span>
+          <span v-else class="muted">—</span>
         </template>
-        <template v-else-if="column.key === 'others'">
-          <template v-if="record.others?.length">
-            <div v-for="o in record.others" :key="o.id" class="other-row">
-              {{ o.salesOrderNo }} 占用 {{ o.qty }}
-              <a-button
-                v-if="canTransfer"
-                type="link"
-                size="small"
-                @click="emit('transfer', { from: o, line: record.line })"
-              >
-                申请调拨
-              </a-button>
-            </div>
-          </template>
-          <span v-else class="muted">无他单占用</span>
+        <template v-else-if="column.key === 'otherQty'">
+          {{ record.otherQty || 0 }}
         </template>
-        <template v-else-if="column.key === 'freeQty'">
-          {{ record.freeQty }}
-          <span v-if="record.freeQty > 0" class="muted">（自由备货）</span>
+        <template v-else-if="column.key === 'specModel' || column.key === 'material'">
+          {{ record[column.dataIndex] || '—' }}
         </template>
       </template>
     </a-table>
@@ -50,60 +41,60 @@
 
 <script setup>
 import { computed } from 'vue'
+import { QuestionCircleOutlined } from '@ant-design/icons-vue'
 import {
   buildLineStockReminder,
-  buildOrderInventoryStatus,
   salesStockAllocationState,
 } from '@/store/salesStockAllocationStore'
+import { getMtsFreeStockWipByItemCode } from '@/utils/mtsFreeStockWip'
+import { workOrderState } from '@/store/workOrderStore'
+import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
+import { productionPlanState } from '@/store/productionPlanStore'
+
+const MTS_WIP_COLUMN_TIP =
+  '当前仅展示自由备货相关数量，即计划策略为「以库存生产(MTS)」的在途/在制（待下发/执行中）。不含按销售订单排产的在制。'
 
 const props = defineProps({
   order: { type: Object, required: true },
-  canTransfer: { type: Boolean, default: true },
 })
-
-const emit = defineEmits(['transfer'])
 
 const columns = [
   { title: '产品编码', dataIndex: 'itemCode', width: 110 },
   { title: '产品名称', dataIndex: 'productName', ellipsis: true, width: 140 },
+  { title: '规格型号', key: 'specModel', dataIndex: 'specModel', ellipsis: true, width: 100 },
+  { title: '材质', key: 'material', dataIndex: 'material', ellipsis: true, width: 80 },
+  { title: '自由备货量', dataIndex: 'freeQty', width: 96, align: 'right' },
+  { title: '他单占用', key: 'otherQty', dataIndex: 'otherQty', width: 88, align: 'right' },
+  { title: '现存总量', dataIndex: 'onHand', width: 88, align: 'right' },
   { title: '需求', dataIndex: 'need', width: 72, align: 'right' },
-  { title: '现存量', dataIndex: 'onHand', width: 80, align: 'right' },
-  { title: '本单占用', dataIndex: 'myAlloc', width: 88, align: 'right' },
-  { title: '自由备货', key: 'freeQty', dataIndex: 'freeQty', width: 110, align: 'right' },
-  { title: '他单占用', key: 'others', width: 220 },
+  { title: '可用量', dataIndex: 'availableQty', width: 80, align: 'right' },
+  { title: '在途在制', key: 'mtsWip', width: 130, align: 'right' },
   { title: '库存状态', key: 'status', width: 96 },
-  { title: '计划策略', key: 'planStrategy', width: 100 },
 ]
 
 const rows = computed(() => {
   void salesStockAllocationState.allocations
+  void workOrderState.orders
+  void assemblyWorkOrderState.orders
+  void productionPlanState.orders
   const order = props.order
   return (order?.lineItems || [])
     .filter((l) => l.productCode)
     .map((line) => {
       const r = buildLineStockReminder(line, order)
+      const mtsWip = getMtsFreeStockWipByItemCode(r.itemCode)
       return {
         ...r,
         lineId: line.id,
-        line,
         productName: line.productName || '',
+        specModel: line.specModel || '',
+        material: line.material || '',
+        availableQty: Math.max(0, (Number(r.onHand) || 0) - (Number(r.otherQty) || 0)),
+        mtsWipQty: mtsWip.mtsWipQty,
+        mtsWipText: mtsWip.mtsWipText,
+        isMts: mtsWip.isMts,
       }
     })
-})
-
-const orderStatus = computed(() => {
-  void salesStockAllocationState.allocations
-  return buildOrderInventoryStatus(props.order)
-})
-
-const summaryText = computed(() => {
-  const parts = []
-  const hasOther = rows.value.some((r) => r.otherQty > 0)
-  const hasFree = rows.value.some((r) => r.freeQty > 0)
-  if (hasFree) parts.push('存在未挂单的自由备货，可直接发货')
-  if (hasOther) parts.push('存在他单占用，紧急时可申请跨单调拨（先发后偿还）')
-  if (!parts.length) parts.push('按现存量与软占用计算；发货前占用挂在销售行上')
-  return parts.join('；')
 })
 
 function statusColor(status) {
@@ -114,17 +105,27 @@ function statusColor(status) {
 </script>
 
 <style lang="less" scoped>
-.stock-remind-alert {
-  margin-bottom: 12px;
+.stock-remind {
+  :deep(.ant-table-body) {
+    overflow-y: visible !important;
+    max-height: none !important;
+  }
 }
-.other-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
+
 .muted {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
 }
 </style>

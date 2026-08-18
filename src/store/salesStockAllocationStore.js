@@ -9,7 +9,7 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 
 const STORAGE_KEY = 'i_doms_sales_stock_allocations'
-const DATA_VERSION = 1
+const DATA_VERSION = 2
 
 function loadFromStorage() {
   try {
@@ -209,11 +209,13 @@ export function releaseOrderAllocations(salesOrderId) {
 }
 
 /**
- * 审核通过时：按 freeQty 给可销行做初始软占用
+ * 审核通过时：按行写入软占用
  * @param {object} salesOrder
  * @param {object[]} lines
+ * @param {{ takeByLineId?: Record<string, number> }} [options] 指定每行占用数量；未指定则 min(需求, 自由备货)
  */
-export function allocateStockOnSalesApprove(salesOrder, lines = []) {
+export function allocateStockOnSalesApprove(salesOrder, lines = [], options = {}) {
+  const takeByLineId = options.takeByLineId || null
   const results = []
   for (const line of lines) {
     const code = String(line.productCode || '').trim()
@@ -221,7 +223,9 @@ export function allocateStockOnSalesApprove(salesOrder, lines = []) {
     const need = Number(line.salesQty ?? line.qty) || 0
     if (need <= 0) continue
     const free = getFreeQtyByItemCode(code)
-    const take = Math.min(need, free)
+    const take = takeByLineId
+      ? Math.max(0, Number(takeByLineId[line.id]) || 0)
+      : Math.min(need, free)
     if (take <= 0) continue
     const row = upsertAllocation({
       salesOrderId: salesOrder.id,
@@ -425,3 +429,151 @@ export function getOpenDebtQty(itemCode, creditorOrderId, creditorLineId) {
     )
     .reduce((s, d) => s + (Number(d.owedQty) || 0), 0)
 }
+
+/** 本单相关的跨单调拨记录（调入 + 调出） */
+export function listOrderStockTransfers(salesOrderId) {
+  if (!salesOrderId) return []
+  return (salesStockAllocationState.transfers || [])
+    .filter((t) => t.toOrderId === salesOrderId || t.fromOrderId === salesOrderId)
+    .map((t) => ({
+      ...t,
+      direction: t.toOrderId === salesOrderId ? 'in' : 'out',
+    }))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+}
+
+/** 本单相关的借调债务（作为借入方或借出方） */
+export function listOrderStockDebts(salesOrderId) {
+  if (!salesOrderId) return []
+  return (salesStockAllocationState.debts || [])
+    .filter((d) => d.debtorOrderId === salesOrderId || d.creditorOrderId === salesOrderId)
+    .map((d) => ({
+      ...d,
+      role: d.debtorOrderId === salesOrderId ? 'borrower' : 'lender',
+      remainQty: Math.max(0, (Number(d.owedQty) || 0) - (Number(d.repaidQty) || 0)),
+    }))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+}
+
+/**
+ * 跨单调拨演示：同一编码注入多张他单占用，便于库存提醒出现「更多」。
+ */
+const DEMO_OTHER_ORDERS = [
+  {
+    salesOrderId: 'so-seed-stock-donor-a',
+    salesOrderNo: '1-20260601-088',
+    customerName: '淄博水泵厂',
+  },
+  {
+    salesOrderId: 'so-seed-stock-donor-b',
+    salesOrderNo: 'XSDD2026050018',
+    customerName: '济南石化装备',
+  },
+  {
+    salesOrderId: 'so-seed-stock-donor-c',
+    salesOrderNo: 'XSDD2026060007',
+    customerName: '东营油田物资',
+  },
+]
+
+const DEMO_DONOR_ALLOCATIONS = [
+  { itemCode: 'CP2610001', itemName: '清水离心泵 ISG50-160', qty: 1 },
+  { itemCode: 'CP2610003', itemName: '单级单吸离心泵 ISW80-65-200', qty: 1 },
+  { itemCode: 'CP2610010', itemName: '磁力驱动泵 CQ32-25', qty: 1 },
+]
+
+function ensureDemoOnHand(itemCode, minQty) {
+  if (getOnHandQtyByItemCode(itemCode) >= minQty) return
+  const product = productInfoState.products.find((p) => p.code === itemCode)
+  if (product) {
+    product.stockQty = Math.max(Number(product.stockQty) || 0, minQty)
+  }
+}
+
+function upsertDemoDonorAllocation({
+  id,
+  itemCode,
+  itemName,
+  qty,
+  salesOrderId,
+  salesOrderNo,
+  customerName,
+}) {
+  const occupy = Math.max(1, Number(qty) || 1)
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
+  const existing = salesStockAllocationState.allocations.find((a) => a.id === id)
+  if (existing) {
+    if (!existing.customerName && customerName) existing.customerName = customerName
+    if (existing.status === 'active' && Number(existing.qty) > 0) return false
+    existing.qty = occupy
+    existing.status = 'active'
+    existing.updatedAt = now
+    return true
+  }
+  salesStockAllocationState.allocations.unshift({
+    id,
+    salesOrderId: salesOrderId || 'so-seed-stock-donor',
+    salesOrderNo: salesOrderNo || '1-20260601-088',
+    customerName: customerName || '',
+    salesLineId: `line-donor-${itemCode}-${salesOrderId || 'default'}`,
+    itemCode,
+    itemName: itemName || itemCode,
+    qty: occupy,
+    status: 'active',
+    urgency: '正常',
+    deliveryDate: '2026-06-20',
+    createdAt: now,
+    updatedAt: now,
+    demoSeed: true,
+  })
+  return true
+}
+
+function seedDemoDonorsForItem(itemCode, itemName, qtyEach = 1) {
+  let changed = false
+  ensureDemoOnHand(itemCode, qtyEach * DEMO_OTHER_ORDERS.length + 1)
+  DEMO_OTHER_ORDERS.forEach((donor, idx) => {
+    if (
+      upsertDemoDonorAllocation({
+        id: `ssa-demo-donor-${itemCode}-${idx + 1}`,
+        itemCode,
+        itemName,
+        qty: qtyEach,
+        ...donor,
+      })
+    ) {
+      changed = true
+    }
+  })
+  return changed
+}
+
+export function ensureStockTransferDemoMocks() {
+  let changed = false
+  for (const demo of DEMO_DONOR_ALLOCATIONS) {
+    if (seedDemoDonorsForItem(demo.itemCode, demo.itemName, demo.qty)) changed = true
+  }
+  if (changed) persist()
+}
+
+/** 按当前订单明细补齐他单占用演示数据（同一编码至少 3 张他单，出现「更多」） */
+export function ensureStockTransferDemoMocksForOrder(order) {
+  ensureStockTransferDemoMocks()
+  const status = String(order?.progressStatus || '')
+  if (status === '已完成' || status === '已作废') return
+  let changed = false
+  for (const line of order?.lineItems || []) {
+    const itemCode = String(line.productCode || '').trim()
+    if (!itemCode) continue
+    if (seedDemoDonorsForItem(itemCode, line.productName || itemCode, 1)) changed = true
+  }
+  if (changed) persist()
+}
+
+/** 已完成/已作废订单：不再展示实时库存提醒 */
+export function shouldShowLiveStockRemind(order) {
+  const status = String(order?.progressStatus || '')
+  return status !== '已完成' && status !== '已作废'
+}
+
+ensureStockTransferDemoMocks()

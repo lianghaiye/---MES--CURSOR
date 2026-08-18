@@ -43,6 +43,7 @@
             </a-checkbox-group>
             <a-checkbox-group
               v-else-if="record.key === 'autoApproveDocs'"
+              class="checkbox-wrap"
               :value="autoApproveDocKeys"
               @change="onAutoApproveDocsChange"
             >
@@ -134,7 +135,7 @@ import {
 
 const columns = [
   { title: '业务场景', dataIndex: 'scenario', key: 'scenario', width: 140 },
-  { title: '配置项', key: 'config', width: 640 },
+  { title: '配置项', key: 'config', width: 760 },
   { title: '说明', key: 'description' },
 ]
 
@@ -236,5 +237,11 @@ function onDualUnitIssueStrategyChange(mode) {
 .desc-text {
   color: rgba(0, 0, 0, 0.65);
   line-height: 1.6;
+}
+
+.checkbox-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
 }
 </style>

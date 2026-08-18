@@ -192,14 +192,19 @@
             />
           </template>
           <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
-            <a-input-number
-              v-model:value="record.deliveryUnitPriceExTax"
-              size="small"
-              :min="0"
-              :precision="4"
-              style="width: 100%"
-              @change="onLineCalc(record)"
-            />
+            <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
+              <span class="price-locked-wrap">
+                <a-input-number
+                  v-model:value="record.deliveryUnitPriceExTax"
+                  size="small"
+                  :min="0"
+                  :precision="4"
+                  style="width: 100%"
+                  disabled
+                  @change="onLineCalc(record)"
+                />
+              </span>
+            </a-tooltip>
           </template>
           <template v-else-if="column.key === 'deliveryAmountExTax'">
             {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
@@ -252,14 +257,19 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'deliveryUnitPriceExTax'">
-            <a-input-number
-              v-model:value="record.deliveryUnitPriceExTax"
-              size="small"
-              :min="0"
-              :precision="4"
-              style="width: 100%"
-              @change="onScatterLinePriceChange(record)"
-            />
+            <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
+              <span class="price-locked-wrap">
+                <a-input-number
+                  v-model:value="record.deliveryUnitPriceExTax"
+                  size="small"
+                  :min="0"
+                  :precision="4"
+                  style="width: 100%"
+                  disabled
+                  @change="onScatterLinePriceChange(record)"
+                />
+              </span>
+            </a-tooltip>
           </template>
           <template v-else-if="column.key === 'deliveryAmountExTax'">
             {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
@@ -330,6 +340,7 @@ import {
   outboundWarehouseOptions,
 } from '@/mock/salesOrderOptions'
 import { generateDeliveryCode } from '@/store/salesOrderStore'
+import { getPendingPriceChangeDeliveryBlock } from '@/store/salesPriceChangeStore'
 import {
   mapSalesLineToDeliveryLine,
   recalcDeliveryLine,
@@ -365,13 +376,13 @@ const lineColumns = [
   { title: '发货进度', key: 'shipProgress', width: 110, align: 'right' },
   { title: '编码', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
-  { title: '变体属性', dataIndex: 'specAttr', width: 88 },
   { title: '材质', dataIndex: 'material', width: 72 },
+  { title: '变体属性', dataIndex: 'specAttr', width: 88 },
   { title: '订单数量', key: 'orderQty', width: 88, align: 'right' },
   { title: '单价', key: 'unitPriceExTax', width: 96, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56, align: 'center' },
   { title: '本次发货数量', key: 'shipQty', width: 112, align: 'right' },
-  { title: '本次发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 150, align: 'right' },
+  { title: '发货单价（不含税）', key: 'deliveryUnitPriceExTax', width: 168, align: 'right' },
   { title: '发货总额', key: 'deliveryAmountExTax', width: 100, align: 'right' },
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
@@ -551,6 +562,11 @@ function handleConfirm() {
     message.warning('请生成发货编码')
     return
   }
+  const block = getPendingPriceChangeDeliveryBlock(props.salesOrder?.id)
+  if (block) {
+    message.warning(block)
+    return
+  }
   if (!form.customerName) {
     message.warning('请选择客户名称')
     return
@@ -599,6 +615,11 @@ function handleConfirm() {
 
 .section-divider {
   margin: 8px 0 12px;
+}
+
+.price-locked-wrap {
+  display: block;
+  width: 100%;
 }
 
 .scatter-picks-panel {

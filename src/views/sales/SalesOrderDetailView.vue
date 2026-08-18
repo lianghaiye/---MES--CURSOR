@@ -2,84 +2,99 @@
   <div class="sales-order-detail-page">
     <a-spin :spinning="loading">
       <template v-if="order">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="order-no">{{ order.orderNo }}</span>
-            <a-tag :color="salesOrderStatusColor(order.progressStatus)">{{
-              order.progressStatus
-            }}</a-tag>
-            <a-tag :color="salesDeliveryStatusColor(order.deliveryStatus)">
-              {{ order.deliveryStatus || '未发货' }}
-            </a-tag>
-          </div>
-          <a-space :size="8">
-            <template v-if="canEditSalesOrder(order)">
-              <a-button
-                v-if="canSubmitSalesOrder(order)"
-                type="primary"
-                size="small"
-                @click="handleSubmit"
-              >
-                提交审核
-              </a-button>
-              <a-button
-                v-if="canResubmitSalesOrder(order)"
-                type="primary"
-                size="small"
-                @click="handleResubmit"
-              >
-                重新提交
-              </a-button>
-              <a-button size="small" @click="handleEdit">编辑</a-button>
-              <a-button size="small" danger @click="handleDelete">删除</a-button>
-            </template>
-            <template v-else-if="canApproveSalesOrder(order)">
-              <a-button type="primary" size="small" @click="openApprovePage">审核</a-button>
-              <a-button size="small" @click="handleWithdraw">撤回</a-button>
-            </template>
-            <template v-else-if="canRevokeSalesOrderApproval(order)">
-              <a-button size="small" @click="handleRevokeApprove">反审</a-button>
-              <a-button type="primary" size="small" @click="handleApplyDelivery">申请发货</a-button>
-              <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
-              <a-button size="small" @click="handleComplete">完成</a-button>
-              <a-button size="small" danger @click="handleTerminate">作废</a-button>
-            </template>
-            <a-button size="small" @click="openPrint">打印</a-button>
-            <a-button size="small" @click="handleBack">返回列表</a-button>
-          </a-space>
-        </div>
-
-        <div class="detail-tabs-wrap">
-          <a-tabs
-            v-model:active-key="activeTab"
-            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-          >
-            <a-tab-pane key="overview" tab="概览" />
-            <a-tab-pane
-              key="delivery"
-              :tab="`发货申请 (${relations.deliveryApplications.length})`"
-            />
-            <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
-            <a-tab-pane key="purchase" :tab="`采购 (${purchaseTabCount})`" />
-            <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
-            <a-tab-pane key="outsourcing" :tab="`外协 (${relations.outsourcingOrders.length})`" />
-            <a-tab-pane key="attachments" :tab="`附件 (${relations.attachments.length})`" />
-            <a-tab-pane key="ebom-info">
-              <template #tab>
-                <span>EBOM信息</span>
-                <a-badge
-                  v-if="bomChangedCount"
-                  :count="bomChangedCount"
-                  :number-style="{ backgroundColor: '#fa8c16', marginLeft: '6px' }"
-                />
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ order.orderNo }}</span>
+              <a-tag :color="salesOrderStatusColor(order.progressStatus)">{{
+                order.progressStatus
+              }}</a-tag>
+              <a-tag :color="salesDeliveryStatusColor(order.deliveryStatus)">
+                {{ order.deliveryStatus || '未发货' }}
+              </a-tag>
+            </div>
+            <a-space :size="8">
+              <template v-if="canEditSalesOrder(order)">
+                <a-button
+                  v-if="canSubmitSalesOrder(order)"
+                  type="primary"
+                  size="small"
+                  @click="handleSubmit"
+                >
+                  提交审核
+                </a-button>
+                <a-button
+                  v-if="canResubmitSalesOrder(order)"
+                  type="primary"
+                  size="small"
+                  @click="handleResubmit"
+                >
+                  重新提交
+                </a-button>
+                <a-button size="small" @click="handleEdit">编辑</a-button>
+                <a-button size="small" danger @click="handleDelete">删除</a-button>
               </template>
-            </a-tab-pane>
-            <a-tab-pane key="approval" tab="审批信息" />
-          </a-tabs>
+              <template v-else-if="canApproveSalesOrder(order)">
+                <a-button type="primary" size="small" @click="openApprovePage">审核</a-button>
+                <a-button size="small" @click="handleWithdraw">撤回</a-button>
+              </template>
+              <template v-else-if="canRevokeSalesOrderApproval(order)">
+                <a-button size="small" @click="handleRevokeApprove">反审</a-button>
+                <a-button type="primary" size="small" @click="handleApplyDelivery"
+                  >申请发货</a-button
+                >
+                <a-button size="small" @click="handlePriceChange">
+                  {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
+                </a-button>
+                <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
+                <a-button size="small" @click="handleComplete">完成</a-button>
+                <a-button size="small" danger @click="handleTerminate">作废</a-button>
+              </template>
+              <a-button size="small" @click="openPrint">打印</a-button>
+              <a-button size="small" @click="handleBack">返回列表</a-button>
+            </a-space>
+          </div>
+
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="activeTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="overview" tab="概览" />
+              <a-tab-pane
+                key="delivery"
+                :tab="`发货申请 (${relations.deliveryApplications.length})`"
+              />
+              <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
+              <a-tab-pane key="purchase" :tab="`采购 (${purchaseTabCount})`" />
+              <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
+              <a-tab-pane key="outsourcing" :tab="`外协 (${relations.outsourcingOrders.length})`" />
+              <a-tab-pane key="attachments" :tab="`附件 (${relations.attachments.length})`" />
+              <a-tab-pane key="ebom-info">
+                <template #tab>
+                  <span>EBOM信息</span>
+                  <a-badge
+                    v-if="bomChangedCount"
+                    :count="bomChangedCount"
+                    :number-style="{ backgroundColor: '#fa8c16', marginLeft: '6px' }"
+                  />
+                </template>
+              </a-tab-pane>
+              <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
+              <a-tab-pane key="approval" tab="审批信息" />
+            </a-tabs>
+          </div>
         </div>
 
         <div class="tab-body">
           <template v-if="activeTab === 'overview'">
+            <a-alert
+              v-if="pendingPriceChange"
+              type="warning"
+              show-icon
+              class="pending-price-alert"
+              :message="`价格变更「${pendingPriceChange.changeNo}」待审核，通过前不可申请发货。`"
+            />
             <div class="section-card">
               <div class="section-title">基本信息</div>
               <SalesOrderBasicInfoSection :order="order" />
@@ -192,13 +207,9 @@
               </div>
             </div>
 
-            <div class="section-card">
+            <div v-if="showLiveStockRemind" class="section-card">
               <div class="section-title">库存提醒</div>
-              <SalesOrderStockRemindPanel
-                :order="order"
-                :can-transfer="canRevokeSalesOrderApproval(order)"
-                @transfer="onStockTransferRequest"
-              />
+              <SalesOrderStockRemindPanel :order="order" />
             </div>
 
             <div class="section-card">
@@ -221,6 +232,18 @@
                     <a-tag :color="line.deliveryMode === '散件' ? 'orange' : 'blue'">
                       {{ line.deliveryMode || '整机' }}
                     </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'stockFulfillmentMode'">
+                    {{ stockFulfillmentModeLabel(line.stockFulfillmentMode) }}
+                  </template>
+                  <template
+                    v-else-if="column.key === 'stockTakeQty' || column.key === 'planProduceQty'"
+                  >
+                    {{
+                      line[column.dataIndex] == null || line[column.dataIndex] === ''
+                        ? '—'
+                        : formatQty(line[column.dataIndex])
+                    }}
                   </template>
                   <template v-else-if="column.key === 'lineDiscountRate'">
                     {{ formatDiscountRatePercent(line.lineDiscountRate) }}
@@ -654,9 +677,16 @@
             </div>
           </template>
 
+          <template v-else-if="activeTab === 'price-change'">
+            <div class="section-card">
+              <div class="section-title">价格变更履历</div>
+              <SalesPriceChangeHistoryPanel :order="order" />
+            </div>
+          </template>
+
           <template v-else-if="activeTab === 'approval'">
             <div class="section-card">
-              <div class="section-title">审批记录</div>
+              <div class="section-title">销售订单审批</div>
               <a-divider style="margin: 12px 0" />
               <div v-if="approvalRecords.length" class="history-list">
                 <div v-for="(item, idx) in approvalRecords" :key="idx" class="history-item">
@@ -671,7 +701,45 @@
                   <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
                 </div>
               </div>
-              <a-empty v-else description="暂无审批记录" />
+              <a-empty v-else description="暂无销售订单审批记录" />
+            </div>
+
+            <div class="section-card">
+              <div class="section-title">价格变更审批</div>
+              <a-divider style="margin: 12px 0" />
+              <div v-if="priceChangeApprovalGroups.length" class="price-change-approval">
+                <div
+                  v-for="group in priceChangeApprovalGroups"
+                  :key="group.id"
+                  class="price-change-approval-group"
+                >
+                  <div class="group-head">
+                    <span class="group-no">{{ group.changeNo }}</span>
+                    <a-tag :color="priceChangeStatusColor(group.status)" size="small">
+                      {{ group.status }}
+                    </a-tag>
+                    <span v-if="group.reasonType" class="group-reason">{{ group.reasonType }}</span>
+                  </div>
+                  <div class="history-list">
+                    <div
+                      v-for="(item, idx) in group.items"
+                      :key="`${group.id}-${idx}`"
+                      class="history-item"
+                    >
+                      <div class="history-head">
+                        <span class="history-user">{{ item.name }}</span>
+                        <span class="history-role">（{{ item.role }}）</span>
+                        <a-tag :color="approvalResultColor(item.result)" size="small">
+                          {{ item.result }}
+                        </a-tag>
+                        <span v-if="item.time" class="history-time">{{ item.time }}</span>
+                      </div>
+                      <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <a-empty v-else description="暂无价格变更审批记录" />
             </div>
           </template>
         </div>
@@ -685,10 +753,11 @@
       :sales-order="changeDeliveryModeOrder"
       @saved="onChangeDeliveryModeSaved"
     />
-    <SalesStockTransferModal
-      v-model:open="stockTransferOpen"
-      :payload="stockTransferPayload"
-      @done="onStockTransferDone"
+    <SalesPriceChangeModal
+      v-model:open="priceChangeOpen"
+      :sales-order="priceChangeOrder"
+      :pending-change="priceChangePending"
+      @done="onPriceChangeDone"
     />
     <SalesOrderPrintModal v-model:open="printModalOpen" :sales-order="order" />
   </div>
@@ -726,10 +795,24 @@ import {
   hasSalesOrderRevokeBlockers,
 } from '@/utils/salesOrderRevokeApproval'
 import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOrderStatus'
+import { buildPriceChangeApprovalGroups, priceChangeStatusColor } from '@/utils/salesPriceChange'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
+import SalesPriceChangeModal from './components/SalesPriceChangeModal.vue'
+import SalesPriceChangeHistoryPanel from './components/SalesPriceChangeHistoryPanel.vue'
 import SalesOrderStockRemindPanel from './components/SalesOrderStockRemindPanel.vue'
-import SalesStockTransferModal from './components/SalesStockTransferModal.vue'
-import { releaseOrderAllocations } from '@/store/salesStockAllocationStore'
+import {
+  canApplySalesPriceChange,
+  getPendingPriceChange,
+  getPendingPriceChangeDeliveryBlock,
+  listPriceChangesByOrderId,
+  salesPriceChangeState,
+} from '@/store/salesPriceChangeStore'
+import {
+  releaseOrderAllocations,
+  shouldShowLiveStockRemind,
+  ensureStockTransferDemoMocksForOrder,
+} from '@/store/salesStockAllocationStore'
+import { stockFulfillmentModeLabel } from '@/utils/salesStockFulfillment'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import {
   deliveryStatusColor,
@@ -771,9 +854,25 @@ const loading = ref(false)
 const order = ref(null)
 const changeDeliveryModeOpen = ref(false)
 const changeDeliveryModeOrder = ref(null)
-const stockTransferOpen = ref(false)
-const stockTransferPayload = ref(null)
+const priceChangeOpen = ref(false)
+const priceChangeOrder = ref(null)
 const printModalOpen = ref(false)
+
+const pendingPriceChange = computed(() => {
+  void salesPriceChangeState.orders
+  return getPendingPriceChange(order.value?.id)
+})
+const priceChangePending = computed(() => getPendingPriceChange(priceChangeOrder.value?.id))
+const priceChangeRecords = computed(() => {
+  void salesPriceChangeState.orders
+  return listPriceChangesByOrderId(order.value?.id)
+})
+const priceChangeCount = computed(() => priceChangeRecords.value.length)
+const priceChangeApprovalGroups = computed(() =>
+  buildPriceChangeApprovalGroups(priceChangeRecords.value),
+)
+
+const showLiveStockRemind = computed(() => shouldShowLiveStockRemind(order.value))
 
 function initActiveTab() {
   return readSalesOrderDetailTab(route.params.id, route.query.tab)
@@ -792,6 +891,8 @@ const approvalRecords = computed(() => order.value?.approvalRecords || [])
 function approvalResultColor(result) {
   if (result === '已通过') return 'success'
   if (result === '已驳回' || result === '已拒绝') return 'error'
+  if (result === '待审核') return 'warning'
+  if (result === '已提交') return 'processing'
   return 'default'
 }
 
@@ -1217,6 +1318,7 @@ function openPrint() {
 
 function reloadOrder() {
   order.value = getSalesOrderById(route.params.id)
+  if (order.value) ensureStockTransferDemoMocksForOrder(order.value)
 }
 
 function openApprovePage() {
@@ -1228,6 +1330,10 @@ function openApprovePage() {
 
 function handleSubmit() {
   if (!order.value) return
+  doSubmitForApprove()
+}
+
+function doSubmitForApprove() {
   const res = submitSalesOrderForApprove(order.value.id)
   if (res.ok) {
     message.success(res.message)
@@ -1317,11 +1423,31 @@ function handleRevokeApprove() {
 
 function handleApplyDelivery() {
   if (!order.value) return
+  const block = getPendingPriceChangeDeliveryBlock(order.value.id)
+  if (block) {
+    message.warning(block)
+    return
+  }
   openCreateTab(router, openTab, {
     path: '/sales/delivery/new',
     title: `新增发货单 ${order.value.orderNo || ''}`.trim(),
     query: { salesOrderId: order.value.id },
   })
+}
+
+function handlePriceChange() {
+  if (!order.value) return
+  if (!canApplySalesPriceChange(order.value)) {
+    message.warning('仅「进行中」的销售订单可申请价格变更')
+    return
+  }
+  priceChangeOrder.value = order.value
+  priceChangeOpen.value = true
+}
+
+function onPriceChangeDone() {
+  priceChangeOrder.value = null
+  reloadOrder()
 }
 
 function handleChangeDeliveryMode() {
@@ -1355,19 +1481,6 @@ function handleComplete() {
       reloadOrder()
     },
   })
-}
-
-function onStockTransferRequest({ from, line }) {
-  stockTransferPayload.value = {
-    fromAlloc: from,
-    toOrder: order.value,
-    toLine: line,
-  }
-  stockTransferOpen.value = true
-}
-
-function onStockTransferDone() {
-  reloadOrder()
 }
 
 function handleTerminate() {
@@ -1448,10 +1561,30 @@ function openBomDetail(bomId, bomName) {
 
 .sales-order-detail-page {
   margin: -12px;
-  min-height: calc(100vh - 112px);
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
   background: #f5f6f8;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #f5f6f8;
 }
 
 .page-header {
@@ -1461,9 +1594,6 @@ function openBomDetail(bomId, bomName) {
   padding: 10px 12px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
-  position: sticky;
-  top: 0;
-  z-index: 30;
 }
 
 .header-left {
@@ -1479,10 +1609,19 @@ function openBomDetail(bomId, bomName) {
   color: rgba(0, 0, 0, 0.88);
 }
 
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
+
 .tab-body {
   flex: 1;
+  min-height: 0;
   padding: 8px 12px 16px;
   overflow: auto;
+}
+
+.pending-price-alert {
+  margin-bottom: 12px;
 }
 
 .section-card {
@@ -1646,6 +1785,31 @@ function openBomDetail(bomId, bomName) {
 .history-role {
   font-size: 12px;
   color: #8c8c8c;
+}
+
+.price-change-approval-group {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.group-no {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.group-reason {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .history-time {
