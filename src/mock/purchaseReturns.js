@@ -2,6 +2,7 @@
  * 采购退货单 mock / 筛选
  */
 import dayjs from 'dayjs'
+import { formatLineBarcodeBatchNo } from '@/utils/outboundIssueLines'
 
 /** 单据状态 */
 export const purchaseReturnStatusOptions = ['新建', '进行中', '已完成', '作废']
@@ -86,6 +87,7 @@ export function flattenReturnOutboundLines(row) {
         material: '',
         applyQty: null,
         actualQty: null,
+        barcodeBatchNo: '',
         unit: '',
         confirmedAt: order.confirmedAt || '',
         confirmer: order.confirmer || '',
@@ -106,6 +108,7 @@ export function flattenReturnOutboundLines(row) {
         material: line.material || '',
         applyQty: line.applyQty,
         actualQty: line.actualQty,
+        barcodeBatchNo: formatLineBarcodeBatchNo(line),
         unit: line.unit || '',
         confirmedAt: order.confirmedAt || '',
         confirmer: order.confirmer || '',
@@ -386,6 +389,8 @@ export const mockPurchaseReturns = [
             applyQty: 20,
             actualQty: 20,
             unit: '片',
+            issuedBatchNo: 'B-260805-008',
+            barcodeBatchNo: 'B-260805-008',
           }),
         ],
       }),

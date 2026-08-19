@@ -121,6 +121,9 @@
                   <template v-else-if="column.key === 'actualQty'">
                     {{ formatQty(row.actualQty) }}
                   </template>
+                  <template v-else-if="column.key === 'barcodeBatchNo'">
+                    <span :title="row.barcodeBatchNo || ''">{{ row.barcodeBatchNo || '—' }}</span>
+                  </template>
                   <template v-else>
                     {{ row[column.dataIndex] || '—' }}
                   </template>

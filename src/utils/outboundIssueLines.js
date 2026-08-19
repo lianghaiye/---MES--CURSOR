@@ -2,9 +2,35 @@
  * 出库信息列表：一物料一行（字段对齐外协订单「发料信息」/ 领料申请「出库信息」）
  */
 
+/** 出入库系统已匹配的条码号/批次号（多批用顿号拼接） */
+export function formatLineBarcodeBatchNo(line) {
+  if (!line) return ''
+  const issued = String(line.issuedBatchNo || '').trim()
+  if (issued) return issued
+  const barcode = String(line.barcodeBatchNo || '').trim()
+  if (barcode) return barcode
+  const fromNos = (Array.isArray(line.batchNos) ? line.batchNos : [])
+    .map((n) => String(n || '').trim())
+    .filter(Boolean)
+  if (fromNos.length) return [...new Set(fromNos)].join('、')
+  const fromAlloc = (Array.isArray(line.batchAllocations) ? line.batchAllocations : [])
+    .map((a) => String(a?.batchNo || '').trim())
+    .filter(Boolean)
+  if (fromAlloc.length) return [...new Set(fromAlloc)].join('、')
+  return String(line.pickedBatchNo || '').trim()
+}
+
 function isOutboundCompleted(order) {
   const status = order?.status || ''
   return status === '已出库' || status === '已完成'
+}
+
+export const BARCODE_BATCH_NO_COLUMN = {
+  title: '条码号/批次号',
+  key: 'barcodeBatchNo',
+  dataIndex: 'barcodeBatchNo',
+  width: 168,
+  ellipsis: true,
 }
 
 /** 与领料申请「出库信息」一致的表格列（每次返回新数组，避免多表共享 mutation） */
@@ -19,6 +45,7 @@ export function createOutboundIssueLineColumns() {
     { title: '材质', dataIndex: 'material', width: 90, ellipsis: true },
     { title: '申请出库数量', key: 'applyQty', width: 110, align: 'right' },
     { title: '实际出库数量', key: 'actualQty', width: 110, align: 'right' },
+    { ...BARCODE_BATCH_NO_COLUMN },
     { title: '出库仓库', dataIndex: 'shipWarehouse', width: 110, ellipsis: true },
     { title: '出库时间', dataIndex: 'confirmedAt', width: 160 },
     { title: '确认人', dataIndex: 'confirmer', width: 90 },
@@ -81,6 +108,7 @@ export function flattenOutboundOrdersToIssueLines(orders = []) {
         material: '',
         applyQty: null,
         actualQty: null,
+        barcodeBatchNo: '',
         unit: '',
         shipWarehouse: resolveShipWarehouse(order, null),
         confirmedAt,
@@ -114,6 +142,7 @@ export function flattenOutboundOrdersToIssueLines(orders = []) {
         material: line.material || '',
         applyQty,
         actualQty,
+        barcodeBatchNo: formatLineBarcodeBatchNo(line),
         unit: line.unit || '',
         shipWarehouse: resolveShipWarehouse(order, line),
         confirmedAt,

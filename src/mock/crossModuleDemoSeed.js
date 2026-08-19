@@ -382,6 +382,8 @@ export function createCrossDemoInboundOrders() {
           warehouse: CROSS_DEMO.warehouse,
           warehouseStockQty: 36,
           locationNo: 'B-02-01',
+          batchNos: ['B-260801-001'],
+          barcodeBatchNo: 'B-260801-001',
         }),
       ],
     }),

@@ -2,6 +2,7 @@
  * 外协订单 mock / 筛选 / 单号
  */
 import dayjs from 'dayjs'
+import { formatLineBarcodeBatchNo } from '@/utils/outboundIssueLines'
 
 export const outsourcingStatusOptions = ['待提交', '待审核', '已拒绝', '进行中', '已完成', '已作废']
 
@@ -147,6 +148,7 @@ export function flattenOutsourcingIssueOutboundLines(order) {
         material: '',
         applyQty: null,
         actualQty: null,
+        barcodeBatchNo: '',
         unit: '',
         confirmedAt: issueOrder.confirmedAt || '',
         confirmer: issueOrder.confirmer || '',
@@ -168,6 +170,7 @@ export function flattenOutsourcingIssueOutboundLines(order) {
         material: line.material || '',
         applyQty,
         actualQty: line.actualQty,
+        barcodeBatchNo: formatLineBarcodeBatchNo(line),
         unit: line.unit || '',
         confirmedAt: issueOrder.confirmedAt || '',
         confirmer: issueOrder.confirmer || '',
@@ -443,6 +446,8 @@ export const mockOutsourcingOrders = [
             applyQty: 10,
             actualQty: 10,
             unit: '根',
+            issuedBatchNo: 'B-260805-008',
+            barcodeBatchNo: 'B-260805-008',
           },
         ],
       },
