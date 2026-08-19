@@ -66,6 +66,7 @@
                 :tab="`发货申请 (${relations.deliveryApplications.length})`"
               />
               <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
+              <a-tab-pane key="inbound" :tab="`入库信息 (${inboundRows.length})`" />
               <a-tab-pane key="purchase" :tab="`采购 (${purchaseTabCount})`" />
               <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
               <a-tab-pane key="outsourcing" :tab="`外协 (${relations.outsourcingOrders.length})`" />
@@ -410,6 +411,40 @@
             </div>
           </template>
 
+          <template v-else-if="activeTab === 'inbound'">
+            <div class="section-card">
+              <div class="section-title">入库信息</div>
+              <a-table
+                :columns="inboundLineColumns"
+                :data-source="inboundRows"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: inboundTableScrollX }"
+                :locale="{ emptyText: '暂无入库明细' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'docNo'">
+                    <a class="link-code" @click.prevent="goInboundDetail(row)">
+                      {{ row.docNo || '—' }}
+                    </a>
+                  </template>
+                  <template v-else-if="column.key === 'applyQty'">
+                    {{ formatQty(row.applyQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'actualQty'">
+                    {{ formatQty(row.actualQty) }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </div>
+          </template>
+
           <template v-else-if="activeTab === 'purchase'">
             <div class="section-card">
               <div class="section-title">采购申请</div>
@@ -477,6 +512,12 @@
                   </template>
                   <template v-else-if="column.key === 'supplier'">
                     {{ row.supplier || row.supplierName || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'purchaseItemCount'">
+                    {{ purchaseOrderItemCount(row) }}
+                  </template>
+                  <template v-else-if="column.key === 'purchaseQty'">
+                    {{ formatPurchaseQty(purchaseOrderQty(row)) }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -825,6 +866,8 @@ import {
   createOutboundIssueLineColumns,
   getOutboundIssueLineScrollX,
 } from '@/utils/outboundIssueLines'
+import { flattenPurchaseOrderInboundLines } from '@/utils/purchaseOrderInboundLines'
+import { getInboundOrdersBySalesOrder, inboundOrderState } from '@/store/inboundOrderStore'
 import { resolveLineBusinessType } from '@/utils/salesOrderBusiness'
 import { getActiveBomForItem } from '@/store/productBomStore'
 import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
@@ -885,6 +928,17 @@ const relations = computed(() => resolveSalesOrderRelations(order.value))
 const outboundRows = computed(() =>
   flattenOutboundOrdersToIssueLines(relations.value.outboundOrders || []),
 )
+
+const inboundRows = computed(() => {
+  void inboundOrderState.orders
+  const rel = relations.value
+  const orders = getInboundOrdersBySalesOrder(order.value, {
+    purchaseOrders: rel.purchaseOrders,
+    workOrders: rel.workOrders,
+    assemblyWorkOrders: rel.assemblyWorkOrders,
+  })
+  return flattenPurchaseOrderInboundLines(orders)
+})
 
 const approvalRecords = computed(() => order.value?.approvalRecords || [])
 
@@ -1049,6 +1103,23 @@ const deliveryTableScrollX = computed(() =>
 const outboundColumns = createOutboundIssueLineColumns()
 const outboundTableScrollX = getOutboundIssueLineScrollX(outboundColumns)
 
+const inboundLineColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '入库状态', dataIndex: 'inboundStatus', width: 90 },
+  { title: '入库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
+  { title: '物料名称', dataIndex: 'itemName', width: 140, ellipsis: true },
+  { title: '编码', dataIndex: 'itemCode', width: 120, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
+  { title: '申请入库数量', key: 'applyQty', width: 110, align: 'right' },
+  { title: '实际入库数量', key: 'actualQty', width: 110, align: 'right' },
+  { title: '入库时间', dataIndex: 'inboundAt', width: 160 },
+  { title: '确认人', dataIndex: 'confirmer', width: 88 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+  { title: '创建人', dataIndex: 'creator', width: 88 },
+]
+const inboundTableScrollX = inboundLineColumns.reduce((sum, col) => sum + (col.width || 100), 0)
+
 const purchaseReqColumns = [
   { title: '状态', key: 'docStatus', width: 90, fixed: 'left' },
   { title: '申请单号', key: 'reqNo', width: 160, fixed: 'left' },
@@ -1069,6 +1140,8 @@ const purchaseOrderColumns = [
   { title: '入库状态', key: 'inboundStatus', width: 96, fixed: 'left' },
   { title: '采购单号', key: 'orderNo', width: 140 },
   { title: '供应商', key: 'supplier', width: 140, ellipsis: true },
+  { title: '采购项数', key: 'purchaseItemCount', width: 88, align: 'right' },
+  { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { title: '采购员', dataIndex: 'purchaser', width: 88 },
   { title: '创建人', dataIndex: 'creator', width: 88 },
@@ -1081,6 +1154,15 @@ const purchaseOrderTableScrollX = computed(() =>
 
 function purchaseReqPlanItemCount(row) {
   return (row.lineItems || []).length
+}
+
+function purchaseOrderItemCount(row) {
+  return (row.lineItems || []).length
+}
+
+function purchaseOrderQty(row) {
+  if (row?.totalQty != null && row.totalQty !== '') return Number(row.totalQty) || 0
+  return (row.lineItems || []).reduce((s, l) => s + (Number(l.purchaseQty) || 0), 0)
 }
 
 function formatPurchaseQty(val) {
@@ -1521,6 +1603,14 @@ function goOutboundDetail(row) {
   const path = `/inventory/outbound/${id}`
   openTab(path, row.outboundOrderNo || row.docNo || '出库单详情')
   router.push({ name: 'inventory-outbound-detail', params: { id } })
+}
+
+function goInboundDetail(row) {
+  const id = row?.orderId
+  if (!id) return
+  const path = `/inventory/inbound/${id}`
+  openTab(path, row.docNo ? `入库单 ${row.docNo}` : '入库单详情')
+  router.push({ name: 'inventory-inbound-detail', params: { id } })
 }
 
 function goDeliveryDetail(row) {

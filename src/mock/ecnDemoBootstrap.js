@@ -288,8 +288,47 @@ export function buildEcnDemoSalesOrder() {
     urgency: '正常',
     contactPerson: '李经理',
     contactPhone: '13800138000',
+    approvalRecords: buildEcnDemoSalesOrderApprovalRecords(),
     remark:
       '【ECN 演示订单】明细行绑定工程变更执行前的 BOM/EBOM 快照；对应产品已通过 ECN 升版，请在「BOM版本」Tab 查看差异对比。',
     lineItems: lines,
   }
+}
+
+export function isEcnDemoSalesOrder(order) {
+  return order?.id === 'so-seed-ecn-demo' || order?.orderNo === '1-20260615-021'
+}
+
+/** 演示订单审批履历：含提交、驳回、再提交、通过 */
+export function buildEcnDemoSalesOrderApprovalRecords() {
+  return [
+    {
+      name: 'admin1',
+      role: '销售审核',
+      result: '已通过',
+      time: '2026-06-10 10:30',
+      opinion: '交货地址与联系人已补齐，同意按当前绑定的 BOM 快照执行。',
+    },
+    {
+      name: '王芳',
+      role: '销售员',
+      result: '已提交',
+      time: '2026-06-10 10:12',
+      opinion: '已按审核意见补充交货地址、联系人，请复审。',
+    },
+    {
+      name: 'admin1',
+      role: '销售审核',
+      result: '已驳回',
+      time: '2026-06-10 09:42',
+      opinion: '交货地址不完整，联系人信息缺失，请补充后重新提交。',
+    },
+    {
+      name: '王芳',
+      role: '销售员',
+      result: '已提交',
+      time: '2026-06-10 09:08',
+      opinion: '请审核本单（ECN 演示订单）。',
+    },
+  ]
 }

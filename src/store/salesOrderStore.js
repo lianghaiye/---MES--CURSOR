@@ -16,7 +16,11 @@ import { createProductionPlanFromSalesOrder } from '@/store/productionPlanStore'
 import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { buildLineAccessoryKits, buildOrderAccessoryKits } from '@/mock/accessoryPacks'
 import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
-import { ensureEcnDemoBootstrap } from '@/mock/ecnDemoBootstrap'
+import {
+  ensureEcnDemoBootstrap,
+  isEcnDemoSalesOrder,
+  buildEcnDemoSalesOrderApprovalRecords,
+} from '@/mock/ecnDemoBootstrap'
 import { hydrateApprovedSelfProdOrders } from '@/utils/hydrateSalesLines'
 import { validateChangeDeliveryRows, applyDeliveryModeChanges } from '@/utils/changeDeliveryMode'
 import { syncProductionPlanDeliveryMode } from '@/store/productionPlanStore'
@@ -68,10 +72,18 @@ let deliverySeq = 113
 function migrateSalesOrderStatuses(orders) {
   return (orders || []).map((order) => {
     const progressStatus = normalizeSalesOrderProgressStatus(order.progressStatus)
+    let approvalRecords = Array.isArray(order.approvalRecords) ? order.approvalRecords : []
+    if (isEcnDemoSalesOrder(order)) {
+      const hasReject = approvalRecords.some((r) => r.result === '已驳回' || r.result === '已拒绝')
+      const hasPass = approvalRecords.some((r) => r.result === '已通过')
+      if (!hasReject || !hasPass) {
+        approvalRecords = buildEcnDemoSalesOrderApprovalRecords()
+      }
+    }
     return {
       ...order,
       progressStatus,
-      approvalRecords: Array.isArray(order.approvalRecords) ? order.approvalRecords : [],
+      approvalRecords,
       updatedAt: order.updatedAt || order.createdAt || '',
       updater: order.updater || order.creator || '',
     }

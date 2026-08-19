@@ -4,6 +4,7 @@ export const SALES_ORDER_DETAIL_TABS = [
   'overview',
   'delivery',
   'outbound',
+  'inbound',
   'purchase',
   'production',
   'outsourcing',

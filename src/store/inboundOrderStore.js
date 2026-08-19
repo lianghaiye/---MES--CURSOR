@@ -153,6 +153,56 @@ export function getInboundOrdersByReceipt(receipt) {
   )
 }
 
+function fieldHasOrderNo(field, orderNo) {
+  if (!orderNo) return false
+  return String(field || '')
+    .split(/[,，]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .includes(orderNo)
+}
+
+/** 查询销售订单关联的入库单（直连销售单号 / 关联采购单 / 关联工单） */
+export function getInboundOrdersBySalesOrder(salesOrder, extra = {}) {
+  if (!salesOrder) return []
+  const id = salesOrder.id
+  const orderNo = String(salesOrder.orderNo || '').trim()
+  const poIds = new Set((extra.purchaseOrders || []).map((po) => po.id).filter(Boolean))
+  const poNos = new Set(
+    (extra.purchaseOrders || []).map((po) => String(po.orderNo || '').trim()).filter(Boolean),
+  )
+  const woNos = new Set(
+    [...(extra.workOrders || []), ...(extra.assemblyWorkOrders || [])]
+      .flatMap((wo) => [wo.code, wo.orderNo, wo.id])
+      .map((v) => String(v || '').trim())
+      .filter(Boolean),
+  )
+
+  const seen = new Set()
+  const result = []
+  inboundOrderState.orders.forEach((order) => {
+    if (!order?.id || seen.has(order.id)) return
+    const hitDirect =
+      (id && (order.salesOrderId === id || order.sourceSalesOrderId === id)) ||
+      fieldHasOrderNo(order.salesOrderNo, orderNo) ||
+      fieldHasOrderNo(order.sourceSalesOrderNo, orderNo) ||
+      fieldHasOrderNo(order.sourceOrderNo, orderNo)
+    const hitPo =
+      (order.purchaseOrderId && poIds.has(order.purchaseOrderId)) ||
+      [...poNos].some((no) => fieldHasOrderNo(order.sourceOrderNo, no))
+    const srcNo = String(order.sourceOrderNo || '').trim()
+    const hitWo =
+      (srcNo && woNos.has(srcNo)) ||
+      (order.workOrders || []).some((w) =>
+        woNos.has(String(w.code || w.orderNo || w.id || '').trim()),
+      )
+    if (!hitDirect && !hitPo && !hitWo) return
+    seen.add(order.id)
+    result.push(order)
+  })
+  return result
+}
+
 export function resolveWarehouseKeeper(warehouseName) {
   const wh = warehouseState.warehouses.find((w) => w.name === warehouseName)
   return wh?.managerName || ''
