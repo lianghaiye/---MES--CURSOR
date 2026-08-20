@@ -2,6 +2,8 @@ import { formatNumber, roundNumber } from '@/utils/numberFormat'
 import {
   calcAreaSquareMeters,
   DUAL_UNIT_MEASURE_MODE,
+  DUAL_UNIT_MEASURE_MODE_OPTIONS,
+  getDualUnitMeasureModeOptions,
   inferDualUnitMeasureMode,
   normalizeDualUnitMeasureMode,
   resolveDualUnitMeasureMode,
@@ -130,11 +132,11 @@ export function formatBlankSizeText(blankSize) {
 /** 下料方式：与入库计量形态共用语义（length / plate / generic） */
 export const BLANK_SIZE_MODE = DUAL_UNIT_MEASURE_MODE
 
-export const BLANK_SIZE_MODE_OPTIONS = [
-  { label: '型材 · 按长度', value: BLANK_SIZE_MODE.LENGTH },
-  { label: '板材 · 长×宽→㎡', value: BLANK_SIZE_MODE.PLATE },
-  { label: '通用', value: BLANK_SIZE_MODE.GENERIC },
-]
+export const BLANK_SIZE_MODE_OPTIONS = DUAL_UNIT_MEASURE_MODE_OPTIONS
+
+export function getBlankSizeModeOptions(options = {}) {
+  return getDualUnitMeasureModeOptions(options)
+}
 
 export function normalizeBlankSizeMode(mode) {
   return normalizeDualUnitMeasureMode(mode)
@@ -146,16 +148,19 @@ export function inferBlankSizeMode(lineOrItem = {}) {
 }
 
 /** 优先用行上 blankSizeMode，否则回退推断 */
-export function resolveBlankSizeMode(lineOrItem = {}) {
-  return resolveDualUnitMeasureMode({
-    ...lineOrItem,
-    blankSizeMode: lineOrItem?.blankSizeMode,
-  })
+export function resolveBlankSizeMode(lineOrItem = {}, options = {}) {
+  return resolveDualUnitMeasureMode(
+    {
+      ...lineOrItem,
+      blankSizeMode: lineOrItem?.blankSizeMode,
+    },
+    options,
+  )
 }
 
 /** BOM 行是否按面积下料（板材）——尊重手动模式 */
-export function isPlateBlankSizeLine(lineOrItem = {}) {
-  return resolveBlankSizeMode(lineOrItem) === BLANK_SIZE_MODE.PLATE
+export function isPlateBlankSizeLine(lineOrItem = {}, options = {}) {
+  return resolveBlankSizeMode(lineOrItem, options) === BLANK_SIZE_MODE.PLATE
 }
 
 export function isLengthBlankSizeLine(lineOrItem = {}) {

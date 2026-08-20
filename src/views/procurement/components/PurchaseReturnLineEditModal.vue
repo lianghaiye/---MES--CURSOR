@@ -21,6 +21,16 @@
           style="width: 100%"
         />
       </a-form-item>
+      <a-form-item v-if="form.settleUnit" :label="`结算数量（${form.settleUnit}）`" required>
+        <a-input-number
+          v-model:value="form.settleQty"
+          :min="0"
+          :precision="3"
+          size="small"
+          style="width: 100%"
+          placeholder="实重/结算数量"
+        />
+      </a-form-item>
       <a-form-item label="单位" required>
         <a-select
           v-model:value="form.unit"
@@ -68,6 +78,8 @@ const emit = defineEmits(['update:open', 'saved'])
 
 const form = reactive({
   returnQty: 0,
+  settleUnit: '',
+  settleQty: undefined,
   unit: '',
   shipWarehouse: '',
   returnType: '退货',
@@ -103,6 +115,8 @@ watch(
   (visible) => {
     if (!visible || !props.line) return
     form.returnQty = Number(props.line.returnQty) || 0
+    form.settleUnit = props.line.settleUnit || ''
+    form.settleQty = props.line.settleQty
     form.unit = props.line.unit || ''
     form.shipWarehouse = props.line.shipWarehouse || ''
     form.returnType = props.line.returnType || '退货'
@@ -117,6 +131,10 @@ function handleCancel() {
 function handleOk() {
   if (!(Number(form.returnQty) > 0)) {
     message.warning('请填写退货数量')
+    return
+  }
+  if (form.settleUnit && !(Number(form.settleQty) > 0)) {
+    message.warning(`请填写结算数量（${form.settleUnit}）`)
     return
   }
   if (!form.unit) {
@@ -134,6 +152,7 @@ function handleOk() {
   emit('saved', {
     ...form,
     returnQty: Number(form.returnQty) || 0,
+    settleQty: form.settleUnit ? Number(form.settleQty) || 0 : undefined,
     remark: String(form.remark || '').trim(),
   })
   emit('update:open', false)

@@ -250,6 +250,9 @@
               @change="onLineCalc(record)"
             />
           </template>
+          <template v-else-if="column.key === 'barcodeBatchNo'">
+            <span :title="record.barcodeBatchNo || ''">{{ record.barcodeBatchNo || '—' }}</span>
+          </template>
           <template v-else-if="column.key === 'shipWeight'">
             <a-input-number
               v-model:value="record.shipWeight"
@@ -829,7 +832,10 @@ import {
 import { getActiveShipBomForProduct } from '@/store/productBomStore'
 import { calcSalesLineAvailableQty } from '@/utils/salesLineShipped'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
-import { getFreeQtyByItemCode, getLineAllocatedQty } from '@/store/salesStockAllocationStore'
+import {
+  formatAllocationsBarcode,
+  preallocateDeliveryBatches,
+} from '@/utils/salesOrderDedicatedStock'
 
 const props = defineProps({
   open: Boolean,
@@ -886,6 +892,7 @@ const lineColumns = [
   { title: '库存数', key: 'stockQty', width: 100, align: 'right' },
   { title: '当前仓库数量', key: 'warehouseStockQty', width: 110, align: 'right' },
   { title: '本次发货数量', key: 'shipQty', width: 120, align: 'right' },
+  { title: '条码号/批次号', key: 'barcodeBatchNo', width: 160, ellipsis: true },
   { title: '发货重量', key: 'shipWeight', width: 110, align: 'right' },
   { title: '发货单价（含税）', key: 'deliveryUnitPriceInTax', width: 148, align: 'right' },
   { title: '发货总额（含税）', key: 'deliveryAmountInTax', width: 124, align: 'right' },
@@ -1724,6 +1731,36 @@ function removeScatterMaterialPick(shipment, mat) {
 function onLineCalc(record) {
   recalcDeliveryLine(record)
   syncAttachmentKitSetsFromWholeLines()
+  refreshLineBatchPreview(record)
+}
+
+function refreshLineBatchPreview(line) {
+  if (isDeliveryLineShipLocked(line)) return { ok: true }
+  const so = currentSalesOrder()
+  const shipQty = Number(line.shipQty) || 0
+  if (!(shipQty > 0) || !so) {
+    line.batchAllocations = []
+    line.barcodeBatchNo = ''
+    return { ok: true }
+  }
+  const salesLine = (so.lineItems || []).find((l) => l.id === line.salesLineId || l.id === line.id)
+  const res = preallocateDeliveryBatches({
+    salesOrder: so,
+    salesLine,
+    itemCode: line.productCode,
+    warehouse: line.shipWarehouse || form.outboundWarehouse || undefined,
+    shipQty,
+    stockFulfillmentMode: salesLine?.stockFulfillmentMode,
+  })
+  if (!res.ok) {
+    line.batchAllocations = []
+    line.barcodeBatchNo = ''
+    return res
+  }
+  line.batchAllocations = res.allocations
+  line.barcodeBatchNo = formatAllocationsBarcode(res.allocations)
+  line.manualBatchPick = true
+  return res
 }
 
 function displayCell(record, column) {
@@ -1769,15 +1806,10 @@ function validateWholeMachineLines() {
       )
       return false
     }
-    if (so?.id) {
-      const alloc = getLineAllocatedQty(so.id, salesLine?.id || line.salesLineId || line.id)
-      const free = getFreeQtyByItemCode(line.productCode)
-      const softAvail = alloc + free
-      if (shipQty > softAvail + 1e-9) {
-        message.warning(
-          `「${line.productName}」本单占用 ${alloc} + 自由备货 ${free} = ${softAvail}，本次申请 ${shipQty} 超出软占用口径（仍允许提交，建议补货）`,
-        )
-      }
+    const pre = refreshLineBatchPreview(line)
+    if (!pre.ok) {
+      message.error(`「${line.productName}」${pre.message}`)
+      return false
     }
   }
   return true

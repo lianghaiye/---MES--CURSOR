@@ -127,6 +127,12 @@ export const DUAL_UNIT_MEASURE_MODE_OPTIONS = [
   { label: '通用', value: DUAL_UNIT_MEASURE_MODE.GENERIC },
 ]
 
+/** 按功能参数过滤计量形态选项（关闭「按面积管理」时不展示板材项） */
+export function getDualUnitMeasureModeOptions({ enablePlateArea = true } = {}) {
+  if (enablePlateArea) return DUAL_UNIT_MEASURE_MODE_OPTIONS
+  return DUAL_UNIT_MEASURE_MODE_OPTIONS.filter((o) => o.value !== DUAL_UNIT_MEASURE_MODE.PLATE)
+}
+
 export function normalizeDualUnitMeasureMode(mode) {
   const m = String(mode || '').toLowerCase()
   if (
@@ -154,19 +160,26 @@ export function inferDualUnitMeasureMode(lineOrItem = {}) {
 /**
  * 优先行上手动值（inboundMeasureMode / blankSizeMode），否则按单位推断
  * 面积库存单位默认「板材 · 长×宽→㎡」
+ * @param {{ enablePlateArea?: boolean }} [options] enablePlateArea=false 时板材回落为型材/通用
  */
-export function resolveDualUnitMeasureMode(lineOrItem = {}) {
+export function resolveDualUnitMeasureMode(lineOrItem = {}, options = {}) {
+  const enablePlateArea = options.enablePlateArea !== false
   const explicit = normalizeDualUnitMeasureMode(
     lineOrItem?.inboundMeasureMode || lineOrItem?.blankSizeMode,
   )
-  if (explicit) return explicit
-  return inferDualUnitMeasureMode(lineOrItem)
+  let mode = explicit || inferDualUnitMeasureMode(lineOrItem)
+  if (!enablePlateArea && mode === DUAL_UNIT_MEASURE_MODE.PLATE) {
+    mode = lineOrItem?.isVariableLength
+      ? DUAL_UNIT_MEASURE_MODE.LENGTH
+      : DUAL_UNIT_MEASURE_MODE.GENERIC
+  }
+  return mode
 }
 
-/** 行/物料是否按面积双单位（板材）——尊重手动计量形态 */
-export function isAreaBasedDualUnit(lineOrItem = {}) {
+/** 行/物料是否按面积双单位（板材）——尊重手动计量形态与功能参数 */
+export function isAreaBasedDualUnit(lineOrItem = {}, options = {}) {
   if (!lineOrItem) return false
-  return resolveDualUnitMeasureMode(lineOrItem) === DUAL_UNIT_MEASURE_MODE.PLATE
+  return resolveDualUnitMeasureMode(lineOrItem, options) === DUAL_UNIT_MEASURE_MODE.PLATE
 }
 
 /** 解析 BOM 行/物料的库存单位展示值 */

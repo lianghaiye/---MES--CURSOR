@@ -34,6 +34,7 @@ function sumOutsourcingMetrics(orders, start, end) {
   let planQty = 0
   let returnedQty = 0
   let amountExTax = 0
+  let amountInTax = 0
   let overdueCount = 0
 
   for (const order of orders || []) {
@@ -42,6 +43,7 @@ function sumOutsourcingMetrics(orders, start, end) {
 
     orderCount += 1
     amountExTax += Number(order.amountExTax) || 0
+    amountInTax += Number(order.amountInTax) || 0
 
     let orderPlan = 0
     let orderReturned = 0
@@ -64,6 +66,7 @@ function sumOutsourcingMetrics(orders, start, end) {
     returnedQty: roundQty(returnedQty),
     pendingReturnQty: roundQty(Math.max(0, planQty - returnedQty)),
     amountExTax: Math.round(amountExTax * 100) / 100,
+    amountInTax: Math.round(amountInTax * 100) / 100,
     overdueCount,
   }
 }
@@ -74,6 +77,7 @@ function diffMetrics(cur, prev) {
     returnedQty: roundQty(cur.returnedQty - prev.returnedQty),
     pendingReturnQty: roundQty(cur.pendingReturnQty - prev.pendingReturnQty),
     amountExTax: Math.round((cur.amountExTax - prev.amountExTax) * 100) / 100,
+    amountInTax: Math.round((cur.amountInTax - prev.amountInTax) * 100) / 100,
     overdueCount: cur.overdueCount - prev.overdueCount,
   }
 }

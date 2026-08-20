@@ -461,7 +461,11 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  openFormModal({ record })
+  if (!record?.id) return
+  openCreateTab(router, openTab, {
+    path: `/product-process/products/${record.id}/edit`,
+    title: `编辑产品 ${record.code || record.name || ''}`.trim(),
+  })
 }
 
 function openDetail(record) {
@@ -610,7 +614,8 @@ function handleReset() {
   pagination.current = 1
 }
 
-function onSaved({ isEdit, id, data }) {
+function onSaved({ isEdit, id, data, alreadySaved }) {
+  if (alreadySaved) return
   if (isEdit) updateProduct(id, data)
   else addProduct(data)
 }

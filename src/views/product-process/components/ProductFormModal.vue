@@ -343,12 +343,22 @@
                 </a-form-item>
               </a-col>
               <a-col :span="8">
-                <a-form-item label="默认供应商">
+                <a-form-item label="默认采购供应商">
                   <PlanSupplierSelect
                     v-model:value="form.production.defaultSupplier"
                     size="small"
                     :disabled="viewOnly"
-                    placeholder="请搜索或选择供应商"
+                    placeholder="请搜索或选择采购供应商"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="默认外协供应商">
+                  <PlanSupplierSelect
+                    v-model:value="form.production.defaultOutsourceSupplier"
+                    size="small"
+                    :disabled="viewOnly"
+                    placeholder="请搜索或选择外协供应商"
                   />
                 </a-form-item>
               </a-col>
@@ -362,17 +372,18 @@
           <a-form layout="inline" class="horizontal-form">
             <a-row :gutter="[12, 12]" style="width: 100%">
               <a-col :span="8">
-                <a-form-item label="计划策略" required>
+                <a-form-item label="计划策略">
                   <a-select
                     v-model:value="form.production.planStrategy"
                     size="small"
+                    allow-clear
                     :options="planStrategyOpts"
                     :disabled="viewOnly"
-                    placeholder="请选择计划策略"
+                    placeholder="选填"
                   />
                 </a-form-item>
               </a-col>
-              <a-col v-if="form.production.planStrategy === 'mts'" :span="8">
+              <a-col v-if="form.production.planStrategy === PLAN_STRATEGY.MTS" :span="8">
                 <a-form-item label="补货批量">
                   <a-input-number
                     v-model:value="form.production.replenishQty"
@@ -434,13 +445,6 @@
                 </a-form-item>
               </a-col>
             </a-row>
-            <a-alert
-              v-if="form.production.planStrategy === 'mts'"
-              type="info"
-              show-icon
-              class="mts-hint"
-              message="以库存生产：靠最低/最高库存补货维持水位；销售审核不自动生成生产计划。请开启库存预警并维护最低/最高库存。"
-            />
           </a-form>
         </div>
       </a-tab-pane>
@@ -582,37 +586,39 @@
           <a-form layout="inline" class="horizontal-form">
             <a-row :gutter="[12, 12]" style="width: 100%">
               <a-col :span="8">
-                <a-form-item label="库存预警" required>
-                  <a-switch v-model:checked="form.alert.stockAlertEnabled" />
+                <a-form-item label="库存预警">
+                  <a-switch v-model:checked="form.alert.stockAlertEnabled" :disabled="viewOnly" />
                 </a-form-item>
               </a-col>
               <a-col v-if="form.alert.stockAlertEnabled" :span="8">
-                <a-form-item label="最高库存" required>
+                <a-form-item label="最高库存">
                   <a-input-number
                     v-model:value="form.alert.maxStockQty"
                     size="small"
                     :min="0"
                     :precision="2"
-                    placeholder="请输入"
+                    :disabled="viewOnly"
+                    placeholder="请输入最高库存"
                     style="width: 100%"
                   />
                 </a-form-item>
               </a-col>
               <a-col v-if="form.alert.stockAlertEnabled" :span="8">
-                <a-form-item label="最低库存" required>
+                <a-form-item label="最低库存">
                   <a-input-number
                     v-model:value="form.alert.minStockQty"
                     size="small"
                     :min="0"
                     :precision="2"
-                    placeholder="请输入"
+                    :disabled="viewOnly"
+                    placeholder="请输入最低库存"
                     style="width: 100%"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="8">
-                <a-form-item label="过期预警" required>
-                  <a-switch v-model:checked="form.alert.expiryAlertEnabled" />
+                <a-form-item label="过期预警">
+                  <a-switch v-model:checked="form.alert.expiryAlertEnabled" :disabled="viewOnly" />
                 </a-form-item>
               </a-col>
               <a-col :span="8">
@@ -623,6 +629,7 @@
                     :min="0"
                     :max="100"
                     :precision="2"
+                    :disabled="viewOnly"
                     placeholder="请输入"
                     style="width: 100%"
                     addon-after="%"
@@ -677,6 +684,7 @@
           <CloseOutlined />
           取消
         </a-button>
+        <a-button @click="handleSaveAndMaintainBom">保存并维护BOM</a-button>
         <a-button type="primary" @click="handleOk">
           <PlusOutlined />
           保存
@@ -688,10 +696,13 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { CloseOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
+import { useTabs } from '@/composables/useTabs'
+import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
 import { flattenCategoryNodes, productCategoryTree } from '@/mock/productCategories'
 import {
   flattenCategoryNodes as flattenMatCats,
@@ -735,6 +746,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'saved'])
 
+const router = useRouter()
+const { openTab } = useTabs()
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 
 /** 含税单价 = 不含税 × (1 + 销项税率%) */
@@ -865,6 +878,22 @@ const FIELD_HELP_BY_TAB = {
     {
       name: '包装含量',
       desc: '每个采购包装（盒/箱等）内含的库存单位数量。生成采购申请时，可按需求量 ÷ 包装含量向上取整，换算为采购包装数。',
+    },
+  ],
+  production: [
+    {
+      name: '计划策略',
+      desc: '选填。按订单MTO：按销售订单排产；按库存MTS：靠库存补货维持水位。与库存预警无强制关联。',
+    },
+    {
+      name: '补货批量',
+      desc: '选填。一次建议最少补多少（库存单位）。库存预警算建议量时：取「补到最高库存还差多少」与「补货批量」的较大值，避免补得太碎。',
+    },
+  ],
+  alert: [
+    {
+      name: '库存预警',
+      desc: '开启后可维护最高/最低库存；与计划策略无强制关联。',
     },
   ],
   labor: [
@@ -1181,24 +1210,6 @@ function validate() {
       }
     }
   }
-  if (form.production.planStrategy === PLAN_STRATEGY.MTS) {
-    if (!form.alert.stockAlertEnabled) {
-      message.warning('以库存生产请开启库存预警')
-      return false
-    }
-    if (form.alert.minStockQty == null || form.alert.minStockQty === '') {
-      message.warning('以库存生产请填写最低库存')
-      return false
-    }
-    if (form.alert.maxStockQty == null || form.alert.maxStockQty === '') {
-      message.warning('以库存生产请填写最高库存')
-      return false
-    }
-    if (Number(form.alert.maxStockQty) < Number(form.alert.minStockQty)) {
-      message.warning('最高库存不能低于最低库存')
-      return false
-    }
-  }
   return true
 }
 
@@ -1268,19 +1279,49 @@ function buildPayload() {
 
 function handleOk() {
   if (!validate()) return
-  const payload = {
-    isEdit: isEdit.value,
-    id: props.editRecord?.id,
-    data: buildPayload(),
-  }
+  const data = buildPayload()
   if (props.pageMode) {
-    if (isEdit.value) updateProduct(payload.id, payload.data)
-    else addProduct(payload.data)
+    if (isEdit.value) updateProduct(props.editRecord.id, data)
+    else addProduct(data)
   } else {
-    emit('saved', payload)
+    emit('saved', { isEdit: isEdit.value, id: props.editRecord?.id, data })
   }
   message.success(isEdit.value ? '产品已更新' : '产品已保存')
   closeAfterSave()
+}
+
+function handleSaveAndMaintainBom() {
+  if (!validate()) return
+  const data = buildPayload()
+  let savedId = props.editRecord?.id || ''
+  if (isEdit.value && savedId) {
+    updateProduct(savedId, data)
+  } else {
+    const row = addProduct(data)
+    savedId = row?.id || ''
+  }
+  emit('saved', { isEdit: isEdit.value, id: savedId, data, alreadySaved: true })
+  if (!savedId) {
+    message.warning('保存成功，但无法定位产品，请稍后从列表维护 BOM')
+    closeAfterSave()
+    return
+  }
+  message.success(isEdit.value ? '产品已更新，正在打开 BOM' : '产品已保存，正在打开 BOM')
+  closeAfterSave()
+  navigateToMaintainBom(savedId, data.name || form.name)
+}
+
+function navigateToMaintainBom(productId, productName) {
+  const nav = resolveItemBomNavigation('product', productId)
+  const resolved = router.resolve({
+    path: nav.path,
+    query: {
+      ...(nav.query || {}),
+      itemName: productName || '',
+    },
+  })
+  openTab(resolved.fullPath || resolved.path, nav.title || '维护BOM')
+  router.push(resolved)
 }
 </script>
 

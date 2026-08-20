@@ -163,6 +163,14 @@ export function canVoidOutsourcingReturn(row) {
   return row?.status === '新建'
 }
 
+/** 新建/进行中且无进行中的出库时可手动完成 */
+export function canCompleteOutsourcingReturn(row) {
+  if (!row) return false
+  if (row.status === '作废' || row.status === '已完成') return false
+  if (row.outboundStatus === '出库中' || row.outboundStatus === '部分出库') return false
+  return row.status === '新建' || row.status === '进行中'
+}
+
 export function addOutsourcingReturn(partial = {}) {
   const returnNo =
     String(partial.returnNo || '').trim() ||
@@ -220,6 +228,21 @@ export function voidOutsourcingReturn(id) {
   row.updater = 'admin1'
   row.updatedAt = nowText()
   return { ok: true, message: '已作废' }
+}
+
+export function completeOutsourcingReturn(id) {
+  const row = getOutsourcingReturnById(id)
+  if (!row) return { ok: false, message: '异常处理单不存在' }
+  if (!canCompleteOutsourcingReturn(row)) {
+    if (row.outboundStatus === '出库中' || row.outboundStatus === '部分出库') {
+      return { ok: false, message: '存在未完成的出库单，不可完成' }
+    }
+    return { ok: false, message: `异常处理单「${row.returnNo}」不可完成` }
+  }
+  row.status = '已完成'
+  row.updater = 'admin1'
+  row.updatedAt = nowText()
+  return { ok: true, message: `异常处理单「${row.returnNo}」已完成` }
 }
 
 function nextOutboundSeq(existingNos = []) {

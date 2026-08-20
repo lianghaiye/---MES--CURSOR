@@ -48,25 +48,31 @@ export function isPartProductAttribute(productAttribute) {
 
 export const standardSpecOptions = ['国标', '行标', '企标', 'ISO标准']
 
-/** 计划策略：按单生产(MTO) / 以库存生产(MTS)，与业务规则「生产模式（报工）」无关 */
+/** 计划策略：按订单MTO / 按库存MTS，与业务规则「生产模式（报工）」无关 */
 export const PLAN_STRATEGY = {
   MTO: 'mto',
   MTS: 'mts',
 }
 
 export const PLAN_STRATEGY_OPTIONS = [
-  { value: PLAN_STRATEGY.MTO, label: '按单生产' },
-  { value: PLAN_STRATEGY.MTS, label: '以库存生产' },
+  { value: PLAN_STRATEGY.MTO, label: '按订单MTO' },
+  { value: PLAN_STRATEGY.MTS, label: '按库存MTS' },
 ]
+
+export function planStrategyLabel(value) {
+  const hit = PLAN_STRATEGY_OPTIONS.find((o) => o.value === value)
+  return hit?.label || PLAN_STRATEGY_OPTIONS[0].label
+}
 
 export function createDefaultProductProduction() {
   return {
-    planStrategy: PLAN_STRATEGY.MTO,
+    planStrategy: undefined,
     replenishQty: undefined,
     defaultWorkCenter: undefined,
     standardCycleDays: undefined,
     defaultProcessRoute: undefined,
     defaultSupplier: undefined,
+    defaultOutsourceSupplier: undefined,
     defaultWarehouse: undefined,
   }
 }

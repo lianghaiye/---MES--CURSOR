@@ -295,7 +295,7 @@ export function createProductionPlanFromStockReplenish(suggestionRows = []) {
     region: '',
     settlementType: '',
     deliveryMethod: '',
-    remark: '以库存生产 · 库存补货',
+    remark: '按库存MTS · 库存补货',
     tags: ['待下达', '库存补货'],
     daysToDelivery: Math.max(0, dayjs(deliveryDate).diff(dayjs(), 'day')),
     planAssemblyDate: '',

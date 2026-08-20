@@ -350,6 +350,7 @@ export default { name: 'SalesOrderView' }
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
+import dayjs from 'dayjs'
 import { useTabs } from '@/composables/useTabs'
 import {
   PlusOutlined,
@@ -556,8 +557,20 @@ const filteredOrders = computed(() => {
   } else {
     f.documentDateRange = null
   }
-  return filterSalesOrders(salesOrderState.orders, f)
+  const list = filterSalesOrders(salesOrderState.orders, f)
+  return [...list].sort(compareSalesOrdersDefault)
 })
+
+/** 默认：单据日期/创建时间降序，同日按销售单号降序（新单在上） */
+function compareSalesOrdersDefault(a, b) {
+  const ta = dayjs(a.documentDate || a.createdAt).valueOf() || 0
+  const tb = dayjs(b.documentDate || b.createdAt).valueOf() || 0
+  if (tb !== ta) return tb - ta
+  const ca = String(a.createdAt || '')
+  const cb = String(b.createdAt || '')
+  if (cb !== ca) return cb.localeCompare(ca)
+  return String(b.orderNo || '').localeCompare(String(a.orderNo || ''), 'zh-CN')
+}
 
 const pagedOrders = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize

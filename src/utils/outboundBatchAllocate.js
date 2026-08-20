@@ -237,7 +237,16 @@ export function getOutboundAvailableBatchQty(warehouse, itemCode) {
  * 按出库规则拆分配额
  * @returns {{ ok: boolean, message?: string, allocations: Array<{batchId,batchNo,qty,unit}>, available: number }}
  */
-export function allocateOutboundBatches({ warehouse, itemCode, demandQty, rule }) {
+export function allocateOutboundBatches({
+  warehouse,
+  itemCode,
+  demandQty,
+  rule,
+  salesOrderId,
+  salesOrderNo,
+  freeOnly = false,
+  excludeOtherDedicated = false,
+} = {}) {
   const need = roundQty(demandQty)
   if (!(need > 0)) {
     return { ok: false, message: '出库数量须大于 0', allocations: [], available: 0 }
@@ -248,7 +257,19 @@ export function allocateOutboundBatches({ warehouse, itemCode, demandQty, rule }
 
   const issueRule =
     rule === OUTBOUND_ISSUE_RULES.LIFO ? OUTBOUND_ISSUE_RULES.LIFO : OUTBOUND_ISSUE_RULES.FIFO
-  const rawBatches = listBatches({ warehouse, itemCode, inStockOnly: true })
+  let rawBatches = listBatches({ warehouse, itemCode, inStockOnly: true })
+  if (freeOnly) {
+    rawBatches = rawBatches.filter((b) => !(b.salesOrderId || b.salesOrderNo))
+  } else if (salesOrderId || salesOrderNo) {
+    rawBatches = rawBatches.filter(
+      (b) =>
+        (salesOrderId && b.salesOrderId === salesOrderId) ||
+        (!salesOrderId && salesOrderNo && String(b.salesOrderNo || '') === String(salesOrderNo)),
+    )
+  } else if (excludeOtherDedicated) {
+    // 显式开启：可扣自由备货，剔除挂了销售单的按单批（避免误扣他单）
+    rawBatches = rawBatches.filter((b) => !(b.salesOrderId || b.salesOrderNo))
+  }
   const available = roundQty(rawBatches.reduce((s, b) => s + (Number(b.currentLength) || 0), 0))
   if (available < need) {
     return {

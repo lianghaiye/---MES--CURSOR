@@ -99,14 +99,22 @@
               </a-form-item>
             </a-col>
             <a-col :span="8">
-              <a-form-item label="销售订单">
+              <a-form-item
+                label="销售订单"
+                :required="isFinishedOrSemiType"
+                :rules="
+                  isFinishedOrSemiType
+                    ? [{ required: true, message: '成品/半成品入库须选择销售订单' }]
+                    : undefined
+                "
+              >
                 <a-input-group compact>
                   <a-input
                     :value="form.salesOrderNo"
                     readonly
                     size="small"
                     style="width: calc(100% - 72px)"
-                    placeholder="请选择销售订单"
+                    :placeholder="isFinishedOrSemiType ? '必选：关联销售订单' : '请选择销售订单'"
                   />
                   <a-button size="small" @click="salesOrderPickerOpen = true">选择</a-button>
                 </a-input-group>
@@ -127,6 +135,17 @@
                 {{ form.salesOrderNo }} / {{ form.customerName || '-' }} /
                 {{ form.salesperson || '-' }}
               </div>
+            </a-col>
+            <a-col v-if="isFinishedOrSemiType && dedicatedSplitPreview.length" :span="24">
+              <a-alert type="info" show-icon class="split-preview-alert">
+                <template #message>
+                  确认入库将按销售未满足数量切开：
+                  <span v-for="(p, i) in dedicatedSplitPreview" :key="p.itemCode">
+                    <template v-if="i">；</template>
+                    {{ p.itemCode }} 本单 {{ p.dedicatedTotal }} / 自由备货 {{ p.freeTotal }}
+                  </span>
+                </template>
+              </a-alert>
             </a-col>
             <a-col :span="24">
               <a-form-item label="备注" class="remark-item">
@@ -180,8 +199,16 @@
               <template #headerCell="{ column }">
                 <template v-if="column.key === 'stockUnitQty'">
                   <span class="col-title-with-tip">
-                    库存单位量
+                    库存数量
                     <a-tooltip :title="STOCK_UNIT_QTY_TIP">
+                      <InfoCircleOutlined class="col-tip-icon" />
+                    </a-tooltip>
+                  </span>
+                </template>
+                <template v-else-if="column.key === 'settleQty'">
+                  <span class="col-title-with-tip">
+                    结算数量
+                    <a-tooltip :title="SETTLE_QTY_TIP">
                       <InfoCircleOutlined class="col-tip-icon" />
                     </a-tooltip>
                   </span>
@@ -311,7 +338,9 @@
                 <template v-else-if="column.key === 'qty'">
                   <InventoryLineEditableCell
                     :active="isLineCellEditing(record.id, 'qty')"
-                    :display="formatQty(getInboundQtyValue(record))"
+                    :display="
+                      formatQtyWithUnit(getInboundQtyValue(record), resolveInboundQtyUnit(record))
+                    "
                     :empty="getInboundQtyValue(record) == null || getInboundQtyValue(record) === ''"
                     numeric
                     @activate="startLineCellEdit(record.id, 'qty')"
@@ -344,15 +373,17 @@
                     </template>
                   </InventoryLineEditableCell>
                 </template>
-                <template v-else-if="column.key === 'unit'">
-                  {{ resolveInboundQtyUnit(record) || '—' }}
-                </template>
                 <template v-else-if="column.key === 'stockUnitQty'">
                   <template v-if="isInboundDualUnitLine(record)">
                     <InventoryLineEditableCell
                       v-if="allowsLineTotalEntry(record)"
                       :active="isLineCellEditing(record.id, 'stockUnitQty')"
-                      :display="formatQty(getStockUnitQtyValue(record))"
+                      :display="
+                        formatQtyWithUnit(
+                          getStockUnitQtyValue(record),
+                          resolveInboundStockUnit(record),
+                        )
+                      "
                       :empty="
                         getStockUnitQtyValue(record) == null || getStockUnitQtyValue(record) === ''
                       "
@@ -377,7 +408,12 @@
                     <InventoryLineEditableCell
                       v-else
                       :active="isLineCellEditing(record.id, 'stockUnitQty')"
-                      :display="formatQty(getStockUnitQtyValue(record))"
+                      :display="
+                        formatQtyWithUnit(
+                          getStockUnitQtyValue(record),
+                          resolveInboundStockUnit(record),
+                        )
+                      "
                       :empty="
                         getUniformPieceValue(record) == null || getUniformPieceValue(record) === ''
                       "
@@ -401,10 +437,36 @@
                       </template>
                     </InventoryLineEditableCell>
                   </template>
-                  <span v-else class="cell-disabled">{{ formatQty(record.qty) }}</span>
+                  <span v-else class="cell-disabled">{{
+                    formatQtyWithUnit(record.qty, resolveInboundStockUnit(record))
+                  }}</span>
                 </template>
-                <template v-else-if="column.key === 'stockUnit'">
-                  {{ resolveInboundStockUnit(record) || '—' }}
+                <template v-else-if="column.key === 'settleQty'">
+                  <InventoryLineEditableCell
+                    v-if="hasSettleUnit(record)"
+                    :active="isLineCellEditing(record.id, 'settleQty')"
+                    :display="formatQtyWithUnit(record.settleQty, record.settleUnit)"
+                    :empty="record.settleQty == null || record.settleQty === ''"
+                    numeric
+                    @activate="startLineCellEdit(record.id, 'settleQty')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input-number
+                        v-model:value="record.settleQty"
+                        :min="0"
+                        :precision="4"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        placeholder="结算数量"
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                        @change="() => onLineSettleQtyChange(record)"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                  <span v-else class="cell-disabled">—</span>
                 </template>
                 <template v-else-if="column.key === 'unitPrice'">
                   <InventoryLineEditableCell
@@ -551,7 +613,7 @@
 </template>
 
 <script setup>
-import { formatQty } from '@/utils/numberFormat'
+import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -580,7 +642,11 @@ import {
   confirmInboundLine,
   getInboundOrderById,
 } from '@/store/inboundOrderStore'
-import { inboundFormLineColumns, STOCK_UNIT_QTY_TIP } from '@/utils/inboundLineColumns'
+import {
+  inboundFormLineColumns,
+  STOCK_UNIT_QTY_TIP,
+  SETTLE_QTY_TIP,
+} from '@/utils/inboundLineColumns'
 import { normalizeInventoryPickerItem } from '@/utils/inventoryLineItemPicker'
 import { warehouseOptionLabel } from '@/utils/inventoryFormLineDisplay'
 import {
@@ -599,6 +665,7 @@ import {
   resolveInboundStockUnit,
   syncInboundLineTotalFromUnit,
 } from '@/utils/inboundLineHelpers'
+import { hasSettleUnit } from '@/utils/settleUnit'
 import { createInboundLine } from '@/mock/inboundOrders'
 import {
   INBOUND_ENTRY_MODE,
@@ -617,6 +684,10 @@ import SalesOrderSelectModal from '@/views/production/components/SalesOrderSelec
 import { findSalesOrderByOrderNo, getSalesOrderById } from '@/store/salesOrderStore'
 import InboundWorkOrderList from './InboundWorkOrderList.vue'
 import { resolveInboundWorkOrders } from '@/utils/inboundWorkOrders'
+import {
+  findSalesOrderByNoOrId,
+  previewInboundDedicatedSplit,
+} from '@/utils/salesOrderDedicatedStock'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -674,6 +745,51 @@ const inboundTypeOpts = inboundTypeOptions.map((v) => ({ label: v, value: v }))
 const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
 const supplierOpts = supplierOptions
 
+const isFinishedOrSemiType = computed(
+  () => form.inboundType === '成品入库' || form.inboundType === '半成品入库',
+)
+
+function linePieceValuesForPreview(line) {
+  if (line.isVariableLength || (line.pieceValues || line.pieceLengths || []).length) {
+    const pv = line.pieceValues?.length
+      ? line.pieceValues
+      : line.pieceWeights?.length
+        ? line.pieceWeights
+        : line.pieceLengths
+    return (pv || []).map(Number).filter((v) => v > 0)
+  }
+  const qty = Number(line.qty ?? line.stockQty ?? line.purchaseQty) || 0
+  if (!(qty > 0)) return []
+  if (isOneItemOneCodeBarcode(line.barcodeType)) {
+    const n = Math.max(1, Math.round(qty))
+    return Array.from({ length: n }, () => 1)
+  }
+  return [qty]
+}
+
+const dedicatedSplitPreview = computed(() => {
+  if (!isFinishedOrSemiType.value || !form.salesOrderNo) return []
+  return (form.lineItems || [])
+    .filter((l) => l.itemCode)
+    .map((l) => {
+      const pieceValues = linePieceValuesForPreview(l)
+      if (!pieceValues.length) return null
+      const split = previewInboundDedicatedSplit({
+        salesOrderId: form.salesOrderId,
+        salesOrderNo: form.salesOrderNo,
+        itemCode: l.itemCode,
+        pieceValues,
+        preferredSalesLineId: l.salesLineId || '',
+      })
+      return {
+        itemCode: l.itemCode,
+        dedicatedTotal: split.dedicatedTotal,
+        freeTotal: split.freeTotal,
+      }
+    })
+    .filter(Boolean)
+})
+
 const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
@@ -711,8 +827,8 @@ const form = reactive({
 })
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inbound-form-lines-v7', inboundFormLineColumns, {
-    minScrollX: 1950,
+  useTableColumnSettings('inbound-form-lines-v9', inboundFormLineColumns, {
+    minScrollX: 2150,
     pinEdgeColumns: false,
     pinActionColumn: true,
   })
@@ -777,6 +893,21 @@ function onSalesOrderPicked(order) {
   if (!form.contractNo?.trim() && order.contractNo) {
     form.contractNo = order.contractNo
   }
+  // 明细按物料编码匹配销售行（同编码取首个未填行）
+  const used = new Set()
+  ;(form.lineItems || []).forEach((line) => {
+    if (!line.itemCode) return
+    const hit = (order.lineItems || []).find(
+      (sl) =>
+        String(sl.productCode || '').trim() === String(line.itemCode).trim() && !used.has(sl.id),
+    )
+    if (hit) {
+      used.add(hit.id)
+      line.salesLineId = hit.id
+      line.salesOrderNo = order.orderNo
+      line.salesOrderId = order.id
+    }
+  })
 }
 
 function resetForm() {
@@ -906,6 +1037,10 @@ function onLineStockUnitQtyInput(line, value) {
 }
 
 function onLineUnitPriceChange(line) {
+  syncInboundLineTotalFromUnit(line)
+}
+
+function onLineSettleQtyChange(line) {
   syncInboundLineTotalFromUnit(line)
 }
 
@@ -1138,6 +1273,20 @@ function handleSave() {
     message.warning('请选择入库类型')
     return
   }
+  if (isFinishedOrSemiType.value && !String(form.salesOrderNo || '').trim()) {
+    message.warning('成品/半成品入库须选择销售订单')
+    return
+  }
+  if (isFinishedOrSemiType.value) {
+    const so = findSalesOrderByNoOrId({
+      salesOrderId: form.salesOrderId,
+      salesOrderNo: form.salesOrderNo,
+    })
+    if (!so) {
+      message.warning('销售订单无法解析，请重新选择')
+      return
+    }
+  }
 
   const skuCheck = validateLinesSkuResolved(form.lineItems)
   if (!skuCheck.ok) {
@@ -1322,6 +1471,10 @@ function handleSave() {
   color: rgba(0, 0, 0, 0.65);
   background: #fafafa;
   border-radius: 4px;
+}
+
+.split-preview-alert {
+  margin-bottom: 8px;
 }
 
 .col-title-with-tip {

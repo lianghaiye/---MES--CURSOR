@@ -61,11 +61,7 @@
               class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
             >
               <a-tab-pane key="overview" tab="概览" />
-              <a-tab-pane
-                key="delivery"
-                :tab="`发货申请 (${relations.deliveryApplications.length})`"
-              />
-              <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
+              <a-tab-pane key="shipping" :tab="`发货信息 (${shippingTabCount})`" />
               <a-tab-pane key="inbound" :tab="`入库信息 (${inboundRows.length})`" />
               <a-tab-pane key="purchase" :tab="`采购 (${purchaseTabCount})`" />
               <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
@@ -327,7 +323,7 @@
             </div>
           </template>
 
-          <template v-else-if="activeTab === 'delivery'">
+          <template v-else-if="activeTab === 'shipping'">
             <div class="section-card">
               <div class="section-title">发货申请</div>
               <a-table
@@ -370,10 +366,7 @@
                 </template>
               </a-table>
             </div>
-          </template>
-
-          <template v-else-if="activeTab === 'outbound'">
-            <div class="section-card">
+            <div class="section-card shipping-outbound-section">
               <div class="section-title">出库信息</div>
               <a-table
                 :columns="outboundColumns"
@@ -939,6 +932,10 @@ const outboundRows = computed(() =>
   flattenOutboundOrdersToIssueLines(relations.value.outboundOrders || []),
 )
 
+const shippingTabCount = computed(
+  () => (relations.value.deliveryApplications?.length || 0) + outboundRows.value.length,
+)
+
 const inboundRows = computed(() => {
   void inboundOrderState.orders
   const rel = relations.value
@@ -1113,7 +1110,10 @@ const deliveryTableScrollX = computed(() =>
 const outboundColumns = createOutboundIssueLineColumns()
 const outboundTableScrollX = getOutboundIssueLineScrollX(outboundColumns)
 
-const inboundLineColumns = createInboundInfoLineColumns()
+const inboundLineColumns = createInboundInfoLineColumns({
+  productName: true,
+  showInboundWarehouse: true,
+})
 const inboundTableScrollX = getInboundInfoLineScrollX(inboundLineColumns)
 
 const purchaseReqColumns = [

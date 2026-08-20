@@ -81,24 +81,11 @@
       </a-form-item>
 
       <template v-if="isVariableLengthLine">
-        <div class="mode-switch">
-          <div class="mode-switch-label">计量形态</div>
-          <a-radio-group
-            v-model:value="draft.inboundMeasureMode"
-            option-type="button"
-            button-style="solid"
-            size="small"
-            :options="measureModeOpts"
-            @change="onMeasureModeChange"
-          />
-          <div class="mode-switch-hint">{{ measureModeHint }}</div>
-        </div>
-
         <a-form-item required>
           <template #label>
             <span class="field-label">
               <UnorderedListOutlined />
-              入库数量（{{ purchaseUnitLabel }}）
+              到货件数（{{ purchaseUnitLabel }}）
             </span>
           </template>
           <a-input-number
@@ -115,7 +102,7 @@
           <template #label>
             <span class="field-label">
               <UnorderedListOutlined />
-              库存单位量填写
+              库存数量怎么填
             </span>
           </template>
           <a-radio-group
@@ -124,21 +111,19 @@
             @change="onEntryModeChange"
           />
           <div class="vl-tip">
-            该物料为双物料单位（采购单位：{{ purchaseUnitLabel }}，库存单位：{{
+            采购单位（{{ purchaseUnitLabel }}）与库存单位（{{
               stockUnitLabel
-            }}，条码：{{ barcodeTypeLabel }}）。 入库数量按采购单位计，下方请填写对应的库存单位量。
-            <template v-if="isAreaBasedLine">
-              板材按「长 × 宽」自动换算面积（{{
-                stockUnitLabel
-              }}）；也可在「直接填合计面积」中只填㎡。
+            }}）不同：先填到货件数，再填库存数量。
+            <template v-if="showAreaShortcut">
+              库存单位为面积时，可用「长 × 宽」换算，也可直接填合计{{ stockUnitLabel }}。
             </template>
             <template v-if="isPieceManagedBarcode">
-              一物一码默认按「统一单件」填写，须按件建批，不支持「直接填合计」。
+              一物一码须按件填写，不支持「直接填合计」。
             </template>
           </div>
         </a-form-item>
 
-        <a-form-item v-if="isAreaBasedLine && (isUniformMode || isPieceMode)" label="尺寸单位">
+        <a-form-item v-if="showAreaShortcut && (isUniformMode || isPieceMode)" label="尺寸单位">
           <a-radio-group
             v-model:value="draft.dimUnit"
             :options="plateDimUnitOpts"
@@ -147,7 +132,7 @@
           />
         </a-form-item>
 
-        <template v-if="isUniformMode && isAreaBasedLine">
+        <template v-if="isUniformMode && showAreaShortcut">
           <a-row :gutter="12">
             <a-col :span="8">
               <a-form-item required>
@@ -224,7 +209,7 @@
           <template #label>
             <span class="field-label">
               <UnorderedListOutlined />
-              {{ isAreaBasedLine ? '合计面积' : '合计数量' }}（{{ stockUnitLabel }}）
+              {{ showAreaShortcut ? '合计面积' : '合计数量' }}（{{ stockUnitLabel }}）
             </span>
           </template>
           <a-input-number
@@ -238,7 +223,7 @@
           />
         </a-form-item>
 
-        <div v-else-if="isPieceMode && isAreaBasedLine" class="piece-list">
+        <div v-else-if="isPieceMode && showAreaShortcut" class="piece-list">
           <div class="piece-list-head">
             <span>逐张尺寸（单位：{{ draft.dimUnit || 'mm' }} → {{ stockUnitLabel }}）</span>
             <span class="piece-progress">
@@ -246,7 +231,7 @@
             </span>
           </div>
           <div v-if="!pieceExpectedCount" class="vl-tip">
-            请先填写入库数量（{{ purchaseUnitLabel }}）
+            请先填写到货件数（{{ purchaseUnitLabel }}）
           </div>
           <template v-else>
             <div class="piece-quick-fill">
@@ -314,7 +299,7 @@
           </div>
 
           <div v-if="!pieceExpectedCount" class="vl-tip">
-            请先填写入库数量（{{ purchaseUnitLabel }}）
+            请先填写到货件数（{{ purchaseUnitLabel }}）
           </div>
 
           <template v-else>
@@ -395,7 +380,7 @@
         <template #label>
           <span class="field-label">
             <UnorderedListOutlined />
-            入库数量
+            库存数量（{{ stockUnitLabel }}）
           </span>
         </template>
         <a-input-number
@@ -410,11 +395,35 @@
         />
       </a-form-item>
 
+      <a-form-item v-if="hasSettleUnitLine" required>
+        <template #label>
+          <span class="field-label">
+            <UnorderedListOutlined />
+            结算数量（{{ draft.settleUnit || 'kg' }}）
+          </span>
+        </template>
+        <a-input-number
+          v-model:value="draft.settleQty"
+          :min="0"
+          :precision="4"
+          :formatter="inputNumberFormatter"
+          :parser="inputNumberParser"
+          placeholder="与供应商计价用"
+          style="width: 100%"
+          @change="onSettleQtyChange"
+        />
+        <div class="vl-tip">
+          结算单位（{{ draft.settleUnit || 'kg' }}）与库存单位（{{
+            stockUnitLabel
+          }}）不同：请再填结算数量，用于与供应商算钱。
+        </div>
+      </a-form-item>
+
       <a-form-item>
         <template #label>
           <span class="field-label">
             <DollarOutlined />
-            单价
+            单价{{ hasSettleUnitLine ? `（元/${draft.settleUnit || 'kg'}）` : '' }}
           </span>
         </template>
         <a-input-number
@@ -459,11 +468,12 @@ import {
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
 import { enrichInboundLine, syncInboundLineTotalFromUnit } from '@/utils/inboundLineHelpers'
+import { hasSettleUnit } from '@/utils/settleUnit'
+import { isPlateAreaMeasureEnabled } from '@/store/functionParamStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import {
   DEFAULT_PLATE_DIM_UNIT,
   DUAL_UNIT_MEASURE_MODE,
-  DUAL_UNIT_MEASURE_MODE_OPTIONS,
   INBOUND_ENTRY_MODE,
   PLATE_DIM_UNIT_OPTIONS,
   calcAreaSquareMeters,
@@ -471,10 +481,8 @@ import {
   defaultInboundEntryMode,
   expandDualUnitInboundPieces,
   getInboundEntryModeOptions,
-  inferDualUnitMeasureMode,
-  isAreaBasedDualUnit,
+  isAreaStockUnit,
   isOneItemOneCodeBarcode,
-  resolveDualUnitMeasureMode,
   roundQty,
   sumPieceValues,
 } from '@/utils/variableLengthMaterial'
@@ -592,6 +600,8 @@ const isVariableLengthLine = computed(() => {
   return Boolean(resolvedMaterial.value?.isVariableLength)
 })
 
+const hasSettleUnitLine = computed(() => hasSettleUnit(draft.value || {}))
+
 const stockUnitLabel = computed(() => {
   const mat = resolvedMaterial.value
   return mat?.stockUnit || mat?.inventoryUnit || draft.value?.unit || '米'
@@ -609,34 +619,28 @@ const barcodeTypeLabel = computed(() => {
 
 const isPieceManagedBarcode = computed(() => isOneItemOneCodeBarcode(barcodeTypeLabel.value))
 
-const measureModeOpts = DUAL_UNIT_MEASURE_MODE_OPTIONS
+const enablePlateAreaMeasure = computed(() => isPlateAreaMeasureEnabled())
 
-const resolvedMeasureMode = computed(() => {
-  const line = draft.value
-  if (!line) return DUAL_UNIT_MEASURE_MODE.GENERIC
-  return resolveDualUnitMeasureMode({
-    ...line,
-    stockUnit: stockUnitLabel.value,
-    unit: stockUnitLabel.value,
-    isVariableLength: true,
-  })
-})
-
-const isAreaBasedLine = computed(() => resolvedMeasureMode.value === DUAL_UNIT_MEASURE_MODE.PLATE)
-
-const measureModeHint = computed(() => {
-  if (resolvedMeasureMode.value === DUAL_UNIT_MEASURE_MODE.PLATE) {
-    return '板材：按长×宽换算单件面积，或直接填合计面积。库存单位为㎡时默认此项。'
-  }
-  if (resolvedMeasureMode.value === DUAL_UNIT_MEASURE_MODE.LENGTH) {
-    return '型材：按单件长度/逐件长度填写库存单位量（米等）。'
-  }
-  return '通用：只填库存数量，不强求尺寸换算。'
-})
+/** 仅库存为面积单位且开启「按面积计量」时，提供长×宽快捷；不再展示计量形态三选一 */
+const showAreaShortcut = computed(
+  () =>
+    isVariableLengthLine.value &&
+    enablePlateAreaMeasure.value &&
+    isAreaStockUnit(stockUnitLabel.value),
+)
 
 const entryModeOpts = computed(() =>
-  getInboundEntryModeOptions(barcodeTypeLabel.value, { areaBased: isAreaBasedLine.value }),
+  getInboundEntryModeOptions(barcodeTypeLabel.value, { areaBased: showAreaShortcut.value }),
 )
+
+/** 后台静默写入计量形态，界面不再让用户选 */
+function autoInboundMeasureMode(stockUnit, isVL) {
+  if (!isVL) return undefined
+  if (isPlateAreaMeasureEnabled() && isAreaStockUnit(stockUnit)) {
+    return DUAL_UNIT_MEASURE_MODE.PLATE
+  }
+  return DUAL_UNIT_MEASURE_MODE.LENGTH
+}
 
 const currentMode = computed(() =>
   coerceInboundEntryMode(
@@ -655,7 +659,7 @@ const stockQtyPreview = computed(() => {
   const mode = currentMode.value
   if (mode === INBOUND_ENTRY_MODE.UNIFORM) {
     let per = Number(line.uniformValue ?? line.uniformLength ?? line.uniformWeight) || 0
-    if (!(per > 0) && isAreaBasedLine.value) {
+    if (!(per > 0) && showAreaShortcut.value) {
       per = calcAreaSquareMeters(line.uniformLength, line.uniformWidth, line.dimUnit) || 0
     }
     return roundQty((Number(line.purchaseQty) || 0) * per)
@@ -664,7 +668,7 @@ const stockQtyPreview = computed(() => {
     return roundQty(Number(line.totalValue ?? line.totalWeight ?? line.qty) || 0)
   }
   if (mode === INBOUND_ENTRY_MODE.PIECE) {
-    if (isAreaBasedLine.value) {
+    if (showAreaShortcut.value) {
       return sumPieceValues(
         pieceDimDraftList.value.map((d) => calcAreaSquareMeters(d?.length, d?.width, line.dimUnit)),
       )
@@ -730,14 +734,7 @@ watch(
       next.purchaseUnit = mat?.purchaseUnit || next.purchaseUnit || '件'
       next.barcodeType = mat?.barcodeType || next.barcodeType || '一批一码'
       next.uomRelation = mat?.uomRelation || next.uomRelation
-      next.inboundMeasureMode =
-        next.inboundMeasureMode ||
-        inferDualUnitMeasureMode({
-          ...next,
-          isVariableLength: true,
-          stockUnit,
-          uomRelation: next.uomRelation,
-        })
+      next.inboundMeasureMode = autoInboundMeasureMode(stockUnit, true)
       next.inboundEntryMode = coerceInboundEntryMode(
         next.inboundEntryMode || defaultInboundEntryMode(next.barcodeType),
         next.barcodeType,
@@ -791,12 +788,7 @@ function syncPieceDraftFromLine() {
     line.barcodeType,
   )
   const n = Number(line.purchaseQty) || 0
-  const areaBased = isAreaBasedDualUnit({
-    ...line,
-    stockUnit: stockUnitLabel.value,
-    unit: stockUnitLabel.value,
-    isVariableLength: true,
-  })
+  const areaBased = showAreaShortcut.value
   if (mode === INBOUND_ENTRY_MODE.PIECE) {
     if (areaBased) {
       const src = Array.isArray(line.pieceDims) ? line.pieceDims : []
@@ -832,32 +824,12 @@ function onEntryModeChange() {
   syncPieceDraftFromLine()
 }
 
-function onMeasureModeChange() {
-  const line = draft.value
-  if (!line) return
-  line.inboundMeasureMode = resolveDualUnitMeasureMode({
-    ...line,
-    stockUnit: stockUnitLabel.value,
-    unit: stockUnitLabel.value,
-    isVariableLength: true,
-  })
-  if (isAreaBasedLine.value && !line.dimUnit) {
-    line.dimUnit = DEFAULT_PLATE_DIM_UNIT
-  }
-  syncPieceDraftFromLine()
-}
-
 function ensureMeasureModeOnDraft() {
   const line = draft.value
   if (!line || !isVariableLengthLine.value) return
-  if (!line.inboundMeasureMode) {
-    line.inboundMeasureMode = inferDualUnitMeasureMode({
-      ...line,
-      stockUnit: stockUnitLabel.value,
-      unit: stockUnitLabel.value,
-      isVariableLength: true,
-      uomRelation: line.uomRelation || resolvedMaterial.value?.uomRelation,
-    })
+  line.inboundMeasureMode = autoInboundMeasureMode(stockUnitLabel.value, true)
+  if (showAreaShortcut.value && !line.dimUnit) {
+    line.dimUnit = DEFAULT_PLATE_DIM_UNIT
   }
 }
 
@@ -870,7 +842,7 @@ function onPieceEditModeChange() {
 function applyPiecePaste() {
   const n = pieceExpectedCount.value
   if (!(n > 0)) {
-    message.warning(`请先填写入库数量（${purchaseUnitLabel.value}）`)
+    message.warning(`请先填写到货件数（${purchaseUnitLabel.value}）`)
     return
   }
   const parsed = parsePiecePasteText(piecePasteText.value)
@@ -971,13 +943,7 @@ function onItemChange(rowKey) {
     purchaseUnit: isVL ? mat?.purchaseUnit || '件' : undefined,
     barcodeType,
     inboundEntryMode: isVL ? defaultInboundEntryMode(barcodeType) : undefined,
-    inboundMeasureMode: isVL
-      ? inferDualUnitMeasureMode({
-          isVariableLength: true,
-          stockUnit,
-          uomRelation,
-        })
-      : undefined,
+    inboundMeasureMode: isVL ? autoInboundMeasureMode(stockUnit, true) : undefined,
     purchaseQty: isVL ? draft.value.purchaseQty || 1 : undefined,
     uniformValue: isVL ? null : undefined,
     uniformLength: isVL ? null : undefined,
@@ -1003,6 +969,11 @@ function onUnitPriceChange() {
   syncInboundLineTotalFromUnit(draft.value)
 }
 
+function onSettleQtyChange() {
+  if (!draft.value) return
+  syncInboundLineTotalFromUnit(draft.value)
+}
+
 function handleCancel() {
   emit('update:open', false)
 }
@@ -1015,6 +986,10 @@ function handleOk() {
   }
   if (!draft.value.warehouse) {
     message.warning('请选择入库仓库')
+    return
+  }
+  if (hasSettleUnit(draft.value) && !(Number(draft.value.settleQty) > 0)) {
+    message.warning(`请填写结算数量（${draft.value.settleUnit || 'kg'}）`)
     return
   }
   if (isVariableLengthLine.value) {
@@ -1030,22 +1005,15 @@ function handleOk() {
     )
     draft.value.uomRelation = mat?.uomRelation || draft.value.uomRelation
     draft.value.stockUnit = stockUnit
-    draft.value.inboundMeasureMode =
-      draft.value.inboundMeasureMode ||
-      inferDualUnitMeasureMode({
-        ...draft.value,
-        isVariableLength: true,
-        stockUnit,
-        uomRelation: draft.value.uomRelation,
-      })
+    draft.value.inboundMeasureMode = autoInboundMeasureMode(stockUnit, true)
     draft.value.dimUnit = draft.value.dimUnit || DEFAULT_PLATE_DIM_UNIT
 
-    if (isAreaBasedLine.value && draft.value.inboundEntryMode === INBOUND_ENTRY_MODE.UNIFORM) {
+    if (showAreaShortcut.value && draft.value.inboundEntryMode === INBOUND_ENTRY_MODE.UNIFORM) {
       syncUniformAreaFromDims()
     }
 
     if (draft.value.inboundEntryMode === INBOUND_ENTRY_MODE.PIECE) {
-      if (isAreaBasedLine.value) {
+      if (showAreaShortcut.value) {
         draft.value.pieceDims = pieceDimDraftList.value.map((d) => ({
           length: Number(d?.length) || null,
           width: Number(d?.width) || null,
@@ -1085,11 +1053,11 @@ function handleOk() {
     if (draft.value.inboundEntryMode === INBOUND_ENTRY_MODE.TOTAL) {
       draft.value.totalValue = expanded.qty
     }
-    if (draft.value.inboundEntryMode === INBOUND_ENTRY_MODE.UNIFORM && isAreaBasedLine.value) {
+    if (draft.value.inboundEntryMode === INBOUND_ENTRY_MODE.UNIFORM && showAreaShortcut.value) {
       draft.value.uniformValue = expanded.pieceValues[0]
     }
   } else if (draft.value.qty == null || Number(draft.value.qty) <= 0) {
-    message.warning('请输入入库数量')
+    message.warning('请输入库存数量')
     return
   }
   syncInboundLineTotalFromUnit(draft.value)
@@ -1100,22 +1068,6 @@ function handleOk() {
 
 <style lang="less" scoped>
 @import './inventoryLineEditModal.less';
-
-.mode-switch {
-  margin-bottom: 16px;
-}
-
-.mode-switch-label {
-  margin-bottom: 6px;
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.65);
-}
-
-.mode-switch-hint {
-  margin-top: 6px;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-}
 
 .vl-tip {
   margin-top: 6px;

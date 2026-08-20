@@ -107,6 +107,22 @@
             :disabled="record.locked"
           />
         </template>
+        <template v-else-if="column.key === 'settleUnit'">
+          {{ record.settleUnit || '—' }}
+        </template>
+        <template v-else-if="column.key === 'settleQty'">
+          <a-input-number
+            v-if="record.settleUnit"
+            v-model:value="record.settleQty"
+            size="small"
+            :min="0"
+            :precision="3"
+            style="width: 100%"
+            :disabled="record.locked"
+            placeholder="实重"
+          />
+          <span v-else>—</span>
+        </template>
         <template v-else-if="column.key === 'receivingMode'">
           <a-select
             v-model:value="record.receivingMode"
@@ -309,6 +325,8 @@ const columns = [
     dataIndex: 'inboundQcRequirement',
     width: 110,
   },
+  { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
+  { title: '结算数量', key: 'settleQty', width: 110 },
   { title: '收货模式', key: 'receivingMode', width: 120 },
   { title: '备注', key: 'remark', width: 140 },
   { title: '操作', key: 'action', width: 130, fixed: 'right' },
@@ -339,6 +357,15 @@ function buildLine(po, line) {
     drawingNo: line.drawingNo || '',
     purchaseQty,
     unit: line.unit || line.purchaseUnit || '',
+    settleUnit: String(line.settleUnit || '').trim(),
+    settleQty: String(line.settleUnit || '').trim()
+      ? Number(line.settleQty) > 0
+        ? Number(line.settleQty)
+        : remainingQty > 0 && Number(line.standardUnitWeight) > 0
+          ? Math.round(remainingQty * Number(line.standardUnitWeight) * 1000) / 1000
+          : undefined
+      : undefined,
+    standardUnitWeight: line.standardUnitWeight,
     receivingMode: line.receivingMode === '直发现场' ? '直发现场' : '正常收货',
     receivingWarehouse:
       line.receivingWarehouse ||
@@ -422,11 +449,16 @@ function applyLineEdit() {
     message.warning(`收货数量不能超过剩余可收货数量 ${draft.remainingQty}`)
     return
   }
+  if (draft.settleUnit && !(Number(draft.settleQty) > 0)) {
+    message.warning(`请填写结算数量（${draft.settleUnit}）`)
+    return
+  }
   const target = receiptLines.value.find((r) => r.id === lineEditId.value)
   if (target) {
     Object.assign(target, {
       receivingWarehouse: draft.receivingWarehouse,
       receiptQty: draft.receiptQty,
+      settleQty: draft.settleQty,
       receivingMode: draft.receivingMode,
       remark: draft.remark || '',
     })
@@ -452,6 +484,15 @@ function handleConfirm() {
   const invalid = submitLines.find((l) => !String(l.receivingWarehouse || '').trim())
   if (invalid) {
     message.warning(`「${invalid.productName || '明细'}」的收货仓库为必填项`)
+    return
+  }
+  const settleInvalid = submitLines.find(
+    (l) => String(l.settleUnit || '').trim() && !(Number(l.settleQty) > 0),
+  )
+  if (settleInvalid) {
+    message.warning(
+      `「${settleInvalid.productName || '明细'}」已启用结算单位，请填写结算数量（${settleInvalid.settleUnit}）`,
+    )
     return
   }
 

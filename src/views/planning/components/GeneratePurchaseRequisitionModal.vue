@@ -68,6 +68,18 @@
             />
           </a-form-item>
         </a-col>
+        <a-col :span="6">
+          <a-form-item label="业务员" required>
+            <a-select
+              v-model:value="headerForm.salesperson"
+              size="small"
+              style="width: 100%"
+              show-search
+              :options="salespersonOpts"
+              placeholder="请选择业务员"
+            />
+          </a-form-item>
+        </a-col>
         <a-col :span="24">
           <a-form-item label="备注" class="remark-item">
             <a-textarea
@@ -244,6 +256,7 @@ import { InfoCircleOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { urgencyOptions } from '@/mock/workOrderOptions'
+import { salespersonOptions } from '@/mock/salesOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 import { getAllSupplierOptions, SUPPLIER_SELECT_PLACEHOLDER } from '@/utils/supplierSelect'
@@ -309,6 +322,7 @@ const headerForm = reactive({
   receivingWarehouse: undefined,
   expectedArrivalDate: null,
   urgency: '普通',
+  salesperson: 'admin1',
   remark: '',
 })
 
@@ -350,6 +364,8 @@ const purchaseUnitOpts = computed(() => {
 })
 
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
+const CURRENT_USER = 'admin1'
 
 const displayColumns = computed(() =>
   columnDefs.value
@@ -401,6 +417,7 @@ function resetHeaderForm(order, materials) {
   headerForm.receivingWarehouse = defaultWarehouse
   headerForm.expectedArrivalDate = dayjs(defaultArrival)
   headerForm.urgency = order?.urgency || '普通'
+  headerForm.salesperson = order?.salesperson || CURRENT_USER
   headerForm.remark = order?.remark || ''
 }
 
@@ -573,11 +590,16 @@ function handleSave() {
     message.warning('请选择紧急度')
     return
   }
+  if (!headerForm.salesperson) {
+    message.warning('请选择业务员')
+    return
+  }
 
   const requisition = buildRequisitionFromPlanRows(rows.value, props.order, {
     receivingWarehouse: headerForm.receivingWarehouse,
     estimatedArrivalDate: headerForm.expectedArrivalDate.format('YYYY-MM-DD'),
     urgency: headerForm.urgency,
+    salesperson: headerForm.salesperson,
     remark: headerForm.remark,
   })
   emit('saved', requisition)

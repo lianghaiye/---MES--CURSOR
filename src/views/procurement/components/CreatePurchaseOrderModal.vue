@@ -342,6 +342,37 @@
                       </template>
                     </InventoryLineEditableCell>
                   </template>
+                  <template v-else-if="column.key === 'settleUnit'">
+                    {{ record.settleUnit || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'settleQty'">
+                    <InventoryLineEditableCell
+                      v-if="hasSettleUnit(record)"
+                      :active="isLineCellEditing(record.id, 'settleQty')"
+                      :display="formatQty(record.settleQty)"
+                      :empty="record.settleQty == null || record.settleQty === ''"
+                      numeric
+                      @activate="startLineCellEdit(record.id, 'settleQty')"
+                      @end="endLineCellEdit"
+                    >
+                      <template #edit="{ endEdit }">
+                        <a-input-number
+                          v-model:value="record.settleQty"
+                          :min="0"
+                          :precision="4"
+                          :formatter="inputNumberFormatter"
+                          :parser="inputNumberParser"
+                          size="small"
+                          style="width: 100%"
+                          autofocus
+                          @blur="endEdit"
+                          @pressEnter="endEdit"
+                          @change="() => onLineChange(record)"
+                        />
+                      </template>
+                    </InventoryLineEditableCell>
+                    <span v-else>—</span>
+                  </template>
                   <template v-else-if="column.key === 'orderSizeText'">
                     <a class="order-size-link" @click.prevent="openOrderSizeEdit(record)">
                       {{ record.orderSizeText || record.blankSizeText || '填写订货尺寸' }}
@@ -673,6 +704,7 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 import { resolvePurchaseUnit, resolveInventoryUnit } from '@/utils/purchaseUomConvert'
+import { applySettleFieldsFromMaterial, estimateSettleQty, hasSettleUnit } from '@/utils/settleUnit'
 import {
   addPurchaseOrder,
   generatePurchaseOrderNo,
@@ -1011,6 +1043,8 @@ function mapPickerToPoLine(payload) {
     unit: resolvePurchaseUnit(master || payload),
     purchaseUnit: resolvePurchaseUnit(master || payload),
     inventoryUnit: resolveInventoryUnit(master || payload),
+    settleUnit: master?.settleUnit || payload.settleUnit || '',
+    standardUnitWeight: master?.standardUnitWeight ?? payload.standardUnitWeight,
     unitPriceExTax: unitPrice,
     taxRate,
     deliveryDate: headerDeliveryDateStr(),
@@ -1111,6 +1145,9 @@ function onVariantConfigConfirm(payload) {
     target.unit = resolvePurchaseUnit(master)
     target.purchaseUnit = target.unit
     target.inventoryUnit = resolveInventoryUnit(master)
+    applySettleFieldsFromMaterial(target, master)
+    const est = estimateSettleQty(target, target.purchaseQty)
+    if (est != null) target.settleQty = est
     target.drawingNo = master.drawingNo || target.drawingNo || ''
     target.category = master.categoryName || target.category || ''
   }
@@ -1241,6 +1278,10 @@ function recalcLineWithMode(record) {
 }
 
 function onLineChange(record) {
+  if (hasSettleUnit(record) && Number(record.standardUnitWeight) > 0) {
+    const est = estimateSettleQty(record, record.purchaseQty)
+    if (est != null) record.settleQty = est
+  }
   recalcLineWithMode(record)
 }
 

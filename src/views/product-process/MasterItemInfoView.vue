@@ -249,6 +249,9 @@
               <template v-else-if="column.key === 'defaultSupplier'">
                 {{ record.production?.defaultSupplier || '—' }}
               </template>
+              <template v-else-if="column.key === 'defaultOutsourceSupplier'">
+                {{ record.production?.defaultOutsourceSupplier || '—' }}
+              </template>
               <template v-else-if="column.key === 'isProductMaterial'">
                 <a-tag :color="record.isProductMaterial ? 'success' : 'error'">
                   {{ record.isProductMaterial ? '是' : '否' }}
@@ -587,7 +590,11 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  openFormModal({ record })
+  if (!record?.id) return
+  openCreateTab(router, openTab, {
+    path: `/product-process/products/${record.id}/edit`,
+    title: `编辑产品 ${record.code || record.name || ''}`.trim(),
+  })
 }
 
 function openDetail(record) {
@@ -642,7 +649,8 @@ const baseColumns = [
   { title: '标准单价(不含税)', key: 'unitPrice', width: 120, align: 'right' },
   { title: 'BOM信息', key: 'bomInfo', width: 200, ellipsis: true },
   { title: '默认工作中心', key: 'defaultWorkCenter', width: 110 },
-  { title: '默认供应商', key: 'defaultSupplier', width: 110, ellipsis: true },
+  { title: '默认采购供应商', key: 'defaultSupplier', width: 120, ellipsis: true },
+  { title: '默认外协供应商', key: 'defaultOutsourceSupplier', width: 120, ellipsis: true },
   { title: '产品物料', key: 'isProductMaterial', width: 90, align: 'center' },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
@@ -737,6 +745,7 @@ function onSaved(payload) {
     message.success('模板已保存')
     return
   }
+  if (payload?.alreadySaved) return
   const { isEdit, id, productPayload, materialPayload } = payload
   saveMasterItem({ isEdit, id, productPayload, materialPayload })
 }

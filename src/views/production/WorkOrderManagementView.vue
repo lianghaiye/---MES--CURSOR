@@ -391,6 +391,7 @@ import {
   canEditWorkOrder,
 } from '@/utils/workOrderDispatchHelpers'
 import { formatScheduleProgress, isScheduleIncomplete } from '@/utils/workOrderScheduleBatch'
+import { tipMessageIfScheduleOverSales } from '@/utils/scheduleOverSalesTip'
 import {
   WORK_ORDER_STATUSES,
   workOrderStatusColor,
@@ -755,6 +756,8 @@ function handleDispatchAndStart() {
     message.error(batchResult.message || '记录排产批次失败')
     return
   }
+  const overTip = tipMessageIfScheduleOverSales(wo, batchQty)
+  if (overTip) message.info(overTip)
   const plan = Number(wo.planQty) || 0
   const scheduled = Number(wo.scheduleQty) || 0
   wo.dispatchBatchQty = Math.max(0, plan - scheduled)

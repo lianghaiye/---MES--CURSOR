@@ -29,7 +29,10 @@ export function formatSupplyUnitDisplay(supplyForm, production = {}) {
   const workCenter = String(production.defaultWorkCenter || '').trim()
 
   if (sf === '外协件') {
-    return supplier ? `外协：${supplier}` : '外协：—'
+    const outsource = String(
+      production.defaultOutsourceSupplier || production.defaultSupplier || '',
+    ).trim()
+    return outsource ? `外协：${outsource}` : '外协：—'
   }
   if (sf === '外购件') {
     return supplier ? `采购：${supplier}` : '采购：—'

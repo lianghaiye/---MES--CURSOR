@@ -71,6 +71,7 @@ export function resolveMasterItemEditRecord(record) {
 /**
  * 按推导类型写入 product / material store
  * @param {{ isEdit: boolean, id?: string, productPayload?: object, materialPayload?: object }} args
+ * @returns {{ kind: string, id: string } | null}
  */
 export function saveMasterItem({ isEdit, id, productPayload, materialPayload }) {
   const canSell = Boolean(productPayload?.canSell ?? materialPayload?.canSell)
@@ -80,38 +81,40 @@ export function saveMasterItem({ isEdit, id, productPayload, materialPayload }) 
 
   if (kind === ITEM_KIND.PRODUCT) {
     const data = { ...productPayload, canSell: true, canProduce: false, isProductMaterial: false }
+    let row = null
     if (isEdit && id) {
       if (findMaterial(id) && !findProduct(id)) {
         deleteMaterial(id)
-        addProduct({ ...data, id })
+        row = addProduct({ ...data, id })
       } else if (findProduct(id)) {
-        updateProduct(id, data)
+        row = updateProduct(id, data)
         if (findMaterial(id)) deleteMaterial(id)
       } else {
-        addProduct({ ...data, id })
+        row = addProduct({ ...data, id })
       }
     } else {
-      addProduct(data)
+      row = addProduct(data)
     }
-    return kind
+    return { kind, id: row?.id || id }
   }
 
   if (kind === ITEM_KIND.MATERIAL) {
     const data = { ...materialPayload, canSell: false, canProduce: true, isProductMaterial: false }
+    let row = null
     if (isEdit && id) {
       if (findProduct(id) && !findMaterial(id)) {
         deleteProduct(id)
-        addMaterial({ ...data, id })
+        row = addMaterial({ ...data, id })
       } else if (findMaterial(id)) {
-        updateMaterial(id, data)
+        row = updateMaterial(id, data)
         if (findProduct(id)) deleteProduct(id)
       } else {
-        addMaterial({ ...data, id })
+        row = addMaterial({ ...data, id })
       }
     } else {
-      addMaterial(data)
+      row = addMaterial(data)
     }
-    return kind
+    return { kind, id: row?.id || id }
   }
 
   const sharedId = id || generateSharedItemId()
@@ -142,7 +145,7 @@ export function saveMasterItem({ isEdit, id, productPayload, materialPayload }) 
   } else {
     addProduct(prod)
   }
-  return kind
+  return { kind, id: sharedId }
 }
 
 export function deleteMasterItem(record) {

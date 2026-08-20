@@ -69,8 +69,16 @@
                 <template #headerCell="{ column }">
                   <template v-if="column.key === 'stockUnitQty'">
                     <span class="col-title-with-tip">
-                      库存单位量
+                      库存数量
                       <a-tooltip :title="STOCK_UNIT_QTY_TIP">
+                        <InfoCircleOutlined class="col-tip-icon" />
+                      </a-tooltip>
+                    </span>
+                  </template>
+                  <template v-else-if="column.key === 'settleQty'">
+                    <span class="col-title-with-tip">
+                      结算数量
+                      <a-tooltip :title="SETTLE_QTY_TIP">
                         <InfoCircleOutlined class="col-tip-icon" />
                       </a-tooltip>
                     </span>
@@ -98,16 +106,17 @@
                     <span class="unit-suffix">{{ resolveInboundStockUnit(line) }}</span>
                   </template>
                   <template v-else-if="column.key === 'qty'">
-                    {{ formatQty(getInboundQtyValue(line)) }}
-                  </template>
-                  <template v-else-if="column.key === 'unit'">
-                    {{ resolveInboundQtyUnit(line) || '—' }}
+                    {{ formatQtyWithUnit(getInboundQtyValue(line), resolveInboundQtyUnit(line)) }}
                   </template>
                   <template v-else-if="column.key === 'stockUnitQty'">
-                    {{ formatQty(getStockUnitQtyValue(line)) }}
+                    {{
+                      formatQtyWithUnit(getStockUnitQtyValue(line), resolveInboundStockUnit(line))
+                    }}
                   </template>
-                  <template v-else-if="column.key === 'stockUnit'">
-                    {{ resolveInboundStockUnit(line) || '—' }}
+                  <template v-else-if="column.key === 'settleQty'">
+                    {{
+                      hasSettleUnit(line) ? formatQtyWithUnit(line.settleQty, line.settleUnit) : '—'
+                    }}
                   </template>
                   <template v-else-if="column.key === 'lineSource'">
                     {{ line.lineSource || '—' }}
@@ -163,6 +172,14 @@
                       <span v-if="batch.attrs?.manageByPiece" class="piece-hint">
                         （{{ piecesOfBatch(batch.id).length }} 件）
                       </span>
+                    </template>
+                    <template v-else-if="column.key === 'salesOrderNo'">
+                      {{ batch.salesOrderNo || '—' }}
+                    </template>
+                    <template v-else-if="column.key === 'ownership'">
+                      <a-tag :color="batch.salesOrderNo ? 'blue' : 'default'">
+                        {{ batch.salesOrderNo ? '按单' : '自由备货' }}
+                      </a-tag>
                     </template>
                     <template v-else-if="column.key === 'unit'">
                       {{ batch.unit || group.unit || '—' }}
@@ -222,7 +239,7 @@
 </template>
 
 <script>
-import { formatQty } from '@/utils/numberFormat'
+import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 export default { name: 'InboundOrderDetailView' }
 </script>
 
@@ -242,7 +259,11 @@ import {
 import { stockBatchState } from '@/store/stockBatchStore'
 import { listStockPieces, stockPieceState } from '@/store/stockPieceStore'
 import { resolveInboundSourceRoute } from '@/utils/inboundSourceLink'
-import { inboundDetailLineColumns, STOCK_UNIT_QTY_TIP } from '@/utils/inboundLineColumns'
+import {
+  inboundDetailLineColumns,
+  STOCK_UNIT_QTY_TIP,
+  SETTLE_QTY_TIP,
+} from '@/utils/inboundLineColumns'
 import {
   enrichInboundLine,
   getInboundQtyValue,
@@ -250,6 +271,7 @@ import {
   resolveInboundQtyUnit,
   resolveInboundStockUnit,
 } from '@/utils/inboundLineHelpers'
+import { hasSettleUnit } from '@/utils/settleUnit'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import InboundOrderBasicInfoSection from './components/InboundOrderBasicInfoSection.vue'
 import InboundWorkOrderList from './components/InboundWorkOrderList.vue'
@@ -269,6 +291,8 @@ const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 
 
 const batchColumns = [
   { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 130 },
+  { title: '销售订单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 130 },
+  { title: '归属', key: 'ownership', width: 88 },
   { title: '仓库', dataIndex: 'warehouse', key: 'warehouse', width: 100 },
   { title: '数量', key: 'currentLength', width: 120 },
   { title: '库存单位', key: 'unit', dataIndex: 'unit', width: 90 },

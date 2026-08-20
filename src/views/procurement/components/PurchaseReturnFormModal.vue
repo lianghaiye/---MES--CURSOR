@@ -126,6 +126,21 @@
               style="width: 100%"
             />
           </template>
+          <template v-else-if="column.key === 'settleUnit'">
+            {{ record.settleUnit || '—' }}
+          </template>
+          <template v-else-if="column.key === 'settleQty'">
+            <a-input-number
+              v-if="record.settleUnit"
+              v-model:value="record.settleQty"
+              :min="0"
+              :precision="3"
+              size="small"
+              style="width: 100%"
+              placeholder="实重"
+            />
+            <span v-else>—</span>
+          </template>
           <template v-else-if="column.key === 'unit'">
             <a-select
               v-model:value="record.unit"
@@ -277,6 +292,8 @@ const lineColumns = [
   { title: '已入库数量', key: 'receivedQty', width: 110 },
   { title: '退货数量', key: 'returnQty', width: 120, required: true },
   { title: '单位', key: 'unit', width: 100, required: true },
+  { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
+  { title: '结算数量', key: 'settleQty', width: 110 },
   { title: '出货仓库', key: 'shipWarehouse', width: 120, required: true },
   { title: '退货类型', key: 'returnType', width: 110, required: true },
   { title: '备注', key: 'remark', width: 140 },
@@ -438,6 +455,15 @@ function validate() {
   const invalidQty = lineItems.value.find((l) => !(Number(l.returnQty) > 0))
   if (invalidQty) {
     message.warning(`请填写「${invalidQty.productName || invalidQty.productCode}」的退货数量`)
+    return false
+  }
+  const settleInvalid = lineItems.value.find(
+    (l) => String(l.settleUnit || '').trim() && !(Number(l.settleQty) > 0),
+  )
+  if (settleInvalid) {
+    message.warning(
+      `「${settleInvalid.productName || settleInvalid.productCode}」已启用结算单位，请填写结算数量（${settleInvalid.settleUnit}）`,
+    )
     return false
   }
   const invalidUnit = lineItems.value.find((l) => !l.unit)

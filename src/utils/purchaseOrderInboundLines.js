@@ -3,24 +3,37 @@
  */
 import { BARCODE_BATCH_NO_COLUMN, formatLineBarcodeBatchNo } from '@/utils/outboundIssueLines'
 
-/** 采购/外协/收货详情「入库信息」列（每次返回新数组） */
-export function createInboundInfoLineColumns() {
-  return [
+/** 采购/外协/收货/销售订单详情「入库信息」列（每次返回新数组） */
+export function createInboundInfoLineColumns(options = {}) {
+  const itemNameTitle = options.productName ? '产品名称' : '物料名称'
+  const columns = [
     { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
     { title: '入库状态', dataIndex: 'inboundStatus', width: 90 },
     { title: '入库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
-    { title: '物料名称', dataIndex: 'itemName', width: 140, ellipsis: true },
+    { title: itemNameTitle, dataIndex: 'itemName', width: 140, ellipsis: true },
     { title: '编码', dataIndex: 'itemCode', width: 120, ellipsis: true },
     { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
     { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
     { title: '申请入库数量', key: 'applyQty', width: 110, align: 'right' },
     { title: '实际入库数量', key: 'actualQty', width: 110, align: 'right' },
+  ]
+  if (options.showInboundWarehouse) {
+    columns.push({
+      title: '入库仓库',
+      key: 'inboundWarehouse',
+      dataIndex: 'inboundWarehouse',
+      width: 100,
+      ellipsis: true,
+    })
+  }
+  columns.push(
     { ...BARCODE_BATCH_NO_COLUMN },
     { title: '入库时间', dataIndex: 'inboundAt', width: 160 },
     { title: '确认人', dataIndex: 'confirmer', width: 88 },
     { title: '创建时间', dataIndex: 'createdAt', width: 160 },
     { title: '创建人', dataIndex: 'creator', width: 88 },
-  ]
+  )
+  return columns
 }
 
 export function getInboundInfoLineScrollX(columns = createInboundInfoLineColumns()) {
@@ -52,6 +65,7 @@ export function flattenPurchaseOrderInboundLines(orders = []) {
         material: line.material || '',
         applyQty,
         actualQty,
+        inboundWarehouse: line.warehouse || order.warehouse || '',
         barcodeBatchNo: formatLineBarcodeBatchNo(line),
         inboundAt: order.confirmedAt || order.inboundDate || '',
         confirmer: order.confirmer || '',

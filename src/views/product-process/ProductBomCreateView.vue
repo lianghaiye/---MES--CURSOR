@@ -50,6 +50,9 @@
               <SaveOutlined />
               保存
             </a-button>
+            <a-button type="primary" ghost :loading="saving" @click="handleSaveAndPublish">
+              保存并发布
+            </a-button>
             <a-button @click="handleCancel">
               <CloseOutlined />
               取消
@@ -306,6 +309,15 @@
       :bom="relationBomContext"
       :line-items="lineItems"
     />
+    <BomEnableReferenceModal
+      v-model:open="enableRefOpen"
+      :product-name="enableTarget?.itemName || ''"
+      :bom-name="enableTarget?.bomName || ''"
+      :new-version="enableNewVersion"
+      :current-version="enableCurrentVersion"
+      :refs="enableParentRefs"
+      @confirm="onEnableRefConfirm"
+    />
   </div>
 </template>
 
@@ -330,9 +342,12 @@ import {
   generateBomNo,
   getProductBomById,
   saveProductBom,
+  enableProductBom,
   isBomPending,
+  productBomState,
 } from '@/store/productBomStore'
-import { isBomEditable } from '@/mock/productBomOptions'
+import { isBomEditable, isBomActive } from '@/mock/productBomOptions'
+import { findParentRefsForBomUpgrade } from '@/utils/bomVersionReference'
 import { loadBomDetailStructure, importBomByReference } from '@/utils/bomImport'
 import {
   defaultBomColumnSettings,
@@ -372,6 +387,7 @@ import AddByBomModal from './components/AddByBomModal.vue'
 import BomColumnSettingDrawer from './components/BomColumnSettingDrawer.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
 import BomRelationDrawer from './components/BomRelationDrawer.vue'
+import BomEnableReferenceModal from './components/BomEnableReferenceModal.vue'
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import { validateAllBomParentChildLines, validateParentChildNotSame } from '@/utils/bomValidation'
 import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
@@ -414,6 +430,11 @@ let resizeStartWidth = 0
 
 const formRef = ref()
 const saving = ref(false)
+const enableRefOpen = ref(false)
+const enableTarget = ref(null)
+const enableParentRefs = ref([])
+const enableNewVersion = ref('')
+const enableCurrentVersion = ref('')
 const flatNodes = ref([])
 const lineItems = ref([])
 const selectedNodeId = ref(ROOT_ID)
@@ -1187,11 +1208,11 @@ function loadEditBom(id) {
   }
 }
 
-async function handleSave() {
+async function persistBom({ closeAfter = true } = {}) {
   try {
     await formRef.value.validate()
   } catch {
-    return
+    return null
   }
   if (isShipBomMode.value) {
     ensureShipKitRoot()
@@ -1204,30 +1225,30 @@ async function handleSave() {
           ? '请先通过左侧树切换选择产品族'
           : '请先通过左侧树切换选择产品/物料',
     )
-    return
+    return null
   }
   const skuCheck = validateLinesSkuResolved(lineItems.value)
   if (!skuCheck.ok) {
     message.warning(skuCheck.message)
-    return
+    return null
   }
   if (lineItems.value.some((l) => !l.materialCode)) {
     message.warning('请为所有子项选择物料')
-    return
+    return null
   }
   const vlCheck = findInvalidBlankSizeLine(lineItems.value)
   if (!vlCheck.ok) {
     message.warning(vlCheck.message)
-    return
+    return null
   }
   const parentChildCheck = validateAllBomParentChildLines(lineItems.value, flatNodes.value, form)
   if (!parentChildCheck.ok) {
     message.warning(parentChildCheck.message)
-    return
+    return null
   }
   if (!lineItems.value.length) {
     message.warning('请至少添加一条物料明细')
-    return
+    return null
   }
 
   const rawItemId = form.itemId
@@ -1235,7 +1256,6 @@ async function handleSave() {
     typeof rawItemId === 'string' && rawItemId.includes(':') ? rawItemId.split(':')[1] : rawItemId
 
   let applicableProductIds = isShipBomMode.value ? [...(form.applicableProductIds || [])] : []
-  // 旧数据：发运 BOM 曾绑单一产品 → 保存时并入适用列表，保持版本组 itemId 不变
   if (
     isShipBomMode.value &&
     form.itemType === 'product' &&
@@ -1276,28 +1296,110 @@ async function handleSave() {
     const res = saveProductBom(bomId, payload)
     if (res?.error) {
       message.warning(res.error)
-      return
+      return null
     }
     if (payload.itemType === 'spu' && normalizeBomType(payload.bomType) === BOM_TYPE.BASELINE) {
       updateSpu(payload.itemId, { baseBomId: res.record.id })
     }
-    if (res.versionUpgraded) {
-      message.success(
-        `已生成新版本 ${res.record.version}（待发布），当前生效版本保持不变，审核发布后新版本才生效`,
-      )
-    } else if (isEditMode.value) {
-      message.success('BOM 已更新')
-    } else {
-      message.success('BOM 已保存，状态为待发布，审核发布后方可用于生产')
+    if (closeAfter) {
+      if (res.versionUpgraded) {
+        message.success(
+          `已生成新版本 ${res.record.version}（待发布），当前生效版本保持不变，审核发布后新版本才生效`,
+        )
+      } else if (isEditMode.value) {
+        message.success('BOM 已更新')
+      } else {
+        message.success('BOM 已保存，状态为待发布，审核发布后方可用于生产')
+      }
+      if (!isEditMode.value) {
+        resetNewBomState()
+      }
+      closeTab(pageTabPath.value)
+      router.push('/product-process/bom')
     }
-    if (!isEditMode.value) {
-      resetNewBomState()
-    }
-    closeTab(pageTabPath.value)
-    router.push('/product-process/bom')
+    return res
   } finally {
     saving.value = false
   }
+}
+
+async function handleSave() {
+  await persistBom({ closeAfter: true })
+}
+
+function doEnableBom(record, upgradeParentRefs = false, parentRefs = []) {
+  const res = enableProductBom(record.id, { upgradeParentRefs, parentRefs })
+  if (res?.error) {
+    message.warning(res.error)
+    return false
+  }
+  const syncHint =
+    upgradeParentRefs && parentRefs.length
+      ? `，已同步更新 ${parentRefs.length} 个父级 BOM 的引用版本`
+      : ''
+  message.success(`保存并发布成功，当前版本已生效可用于生产${syncHint}`)
+  return true
+}
+
+function startPublishFlow(record) {
+  if (!record) return
+  if (!isBomPending(record)) {
+    message.warning('仅待发布状态的 BOM 可发布')
+    return
+  }
+  const refs = findParentRefsForBomUpgrade(record)
+  if (refs.length) {
+    enableTarget.value = record
+    enableParentRefs.value = refs
+    enableNewVersion.value = record.version || ''
+    const active = productBomState.boms.find(
+      (b) =>
+        b.itemType === record.itemType &&
+        b.itemId === record.itemId &&
+        b.id !== record.id &&
+        isBomActive(b),
+    )
+    enableCurrentVersion.value = active?.version || ''
+    enableRefOpen.value = true
+    return
+  }
+  if (doEnableBom(record)) {
+    if (!isEditMode.value) resetNewBomState()
+    closeTab(pageTabPath.value)
+    router.push('/product-process/bom')
+  }
+}
+
+function onEnableRefConfirm({ action, selectedRefs }) {
+  if (!enableTarget.value) return
+  if (action === 'reject') {
+    message.info('已取消本次审核发布（BOM 已保存为待发布）')
+    enableTarget.value = null
+    enableParentRefs.value = []
+    enableNewVersion.value = ''
+    enableCurrentVersion.value = ''
+    if (!isEditMode.value) resetNewBomState()
+    closeTab(pageTabPath.value)
+    router.push('/product-process/bom')
+    return
+  }
+  const upgrade = action === 'upgrade'
+  const ok = doEnableBom(enableTarget.value, upgrade, upgrade ? selectedRefs : [])
+  enableTarget.value = null
+  enableParentRefs.value = []
+  enableNewVersion.value = ''
+  enableCurrentVersion.value = ''
+  if (ok) {
+    if (!isEditMode.value) resetNewBomState()
+    closeTab(pageTabPath.value)
+    router.push('/product-process/bom')
+  }
+}
+
+async function handleSaveAndPublish() {
+  const res = await persistBom({ closeAfter: false })
+  if (!res?.record) return
+  startPublishFlow(res.record)
 }
 
 function handleCancel() {

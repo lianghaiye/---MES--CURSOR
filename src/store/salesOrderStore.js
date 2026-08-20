@@ -63,9 +63,10 @@ import {
   normalizeSalesOrderProgressStatus,
   SALES_ORDER_STATUS,
 } from '@/utils/salesOrderStatus'
+import { ensureDedicatedShipDemoSalesOrders } from '@/mock/dedicatedShipDemoSeed'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 9
+const DATA_VERSION = 10
 let orderSeq = 20
 let deliverySeq = 113
 
@@ -97,7 +98,7 @@ function loadFromStorage() {
       const parsed = JSON.parse(raw)
       if (
         Array.isArray(parsed.orders) &&
-        (parsed.version === DATA_VERSION || parsed.version === 8)
+        (parsed.version === DATA_VERSION || parsed.version === 8 || parsed.version === 9)
       ) {
         return migrateSalesOrderStatuses(parsed.orders)
       }
@@ -118,7 +119,7 @@ function persist() {
 function loadInitialSalesOrders() {
   ensureEcnDemoBootstrap()
   const orders = migrateSalesOrderStatuses(loadFromStorage() || buildMockSalesOrders(mockProducts))
-  return hydrateApprovedSelfProdOrders(orders)
+  return ensureDedicatedShipDemoSalesOrders(hydrateApprovedSelfProdOrders(orders))
 }
 
 function touchOrder(order) {

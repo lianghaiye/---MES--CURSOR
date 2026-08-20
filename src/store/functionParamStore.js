@@ -100,6 +100,12 @@ export const DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION =
   '双单位整批出+余料确认回库：确认出库按整批/整件离开发料仓，实发可大于需求；' +
   '须在「下料结算」填写实耗并确认回库：余料建新批次号、标识为余料，血缘挂原批，默认回发料仓。'
 
+export const ENABLE_PLATE_AREA_MEASURE_DESCRIPTION =
+  '可选快捷：开启后，仅当库存单位为㎡时，入库可用「长 × 宽」辅助换算面积；关闭则直接填库存数量。默认关闭，界面更简单。不按面积管库存的客户保持关闭即可。'
+
+export const ENABLE_BOM_LEVEL_MTS_DESCRIPTION =
+  '开启后，生产计划展开 BOM 时支持子件级按库存MTS：子件主数据为按库存MTS 且库存充足时，可不下推该层生产/采购需求；关闭则生产计划仍按订单展开，仅成品级计划策略生效。默认关闭。'
+
 export const AUTO_APPROVE_TYPES = {
   PURCHASE_ORDER: 'purchaseOrder',
   SALES_ORDER: 'salesOrder',
@@ -197,6 +203,16 @@ export const FUNCTION_PARAM_ROWS = [
     scenario: '双单位发料规则',
     description: DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION,
   },
+  {
+    key: 'enablePlateAreaMeasure',
+    scenario: '面积录入快捷',
+    description: ENABLE_PLATE_AREA_MEASURE_DESCRIPTION,
+  },
+  {
+    key: 'enableBomLevelMts',
+    scenario: '生产计划启用 BOM 级 MTS',
+    description: ENABLE_BOM_LEVEL_MTS_DESCRIPTION,
+  },
 ]
 
 function normalizeSalaryPushMode(mode) {
@@ -240,6 +256,8 @@ function loadFromStorage() {
           inventoryDeductMode: normalizeInventoryDeductMode(parsed.inventoryDeductMode),
           outboundIssueRule: normalizeOutboundIssueRule(parsed.outboundIssueRule),
           dualUnitIssueStrategy: normalizeDualUnitIssueStrategy(parsed.dualUnitIssueStrategy),
+          enablePlateAreaMeasure: parsed.enablePlateAreaMeasure === true,
+          enableBomLevelMts: parsed.enableBomLevelMts === true,
         }
       }
     }
@@ -261,6 +279,8 @@ export const functionParamState = reactive({
     inventoryDeductMode: INVENTORY_DEDUCT_MODES.NO_ISSUE,
     outboundIssueRule: OUTBOUND_ISSUE_RULES.FIFO,
     dualUnitIssueStrategy: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL,
+    enablePlateAreaMeasure: false,
+    enableBomLevelMts: false,
   },
 })
 
@@ -399,6 +419,26 @@ export function isPartialDualUnitIssue() {
 /** 是否整出+余料回 */
 export function isWholeWithRemnantIssue() {
   return getDualUnitIssueStrategy() === DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT
+}
+
+/** 是否开放面积「长×宽」录入快捷（默认关） */
+export function isPlateAreaMeasureEnabled() {
+  return functionParamState.params.enablePlateAreaMeasure === true
+}
+
+export function setEnablePlateAreaMeasure(enabled) {
+  functionParamState.params.enablePlateAreaMeasure = Boolean(enabled)
+  return { ok: true }
+}
+
+/** 生产计划是否启用 BOM 级 MTS（子件可按库存跳过排产） */
+export function isBomLevelMtsEnabled() {
+  return functionParamState.params.enableBomLevelMts === true
+}
+
+export function setEnableBomLevelMts(enabled) {
+  functionParamState.params.enableBomLevelMts = Boolean(enabled)
+  return { ok: true }
 }
 
 /** @deprecated 使用 isReportSalaryPush */

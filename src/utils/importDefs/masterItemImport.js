@@ -29,7 +29,8 @@ const HEADERS = [
   '技术参数',
   '配套要求',
   '默认工作中心',
-  '默认供应商',
+  '默认采购供应商',
+  '默认外协供应商',
   '备注',
 ]
 
@@ -52,6 +53,7 @@ const SAMPLE_ROWS = [
     '',
     '默认工厂',
     '',
+    '',
     '模板示例，可删',
   ],
   [
@@ -67,6 +69,7 @@ const SAMPLE_ROWS = [
     '外购件',
     '个',
     '35',
+    '',
     '',
     '',
     '',
@@ -120,7 +123,8 @@ function buildRecord(row, kind) {
     remark: cellOf(row, '备注', 'remark'),
     production: {
       defaultWorkCenter: cellOf(row, '默认工作中心') || '默认工厂',
-      defaultSupplier: cellOf(row, '默认供应商'),
+      defaultSupplier: cellOf(row, '默认采购供应商', '默认供应商'),
+      defaultOutsourceSupplier: cellOf(row, '默认外协供应商'),
       defaultProcessRoute: '',
     },
     isProductMaterial: kind === 'both',

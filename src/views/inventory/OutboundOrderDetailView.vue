@@ -152,7 +152,7 @@
                     {{ line.locationNo || '—' }}
                   </template>
                   <template v-else-if="column.key === 'shipQty'">
-                    {{ formatQty(line.shipQty) }}
+                    {{ formatQtyWithUnit(line.shipQty, resolveOutboundStockUnit(line)) }}
                   </template>
                   <template v-else-if="column.key === 'blankSizeText'">
                     <template v-if="line.blankSizeText">
@@ -165,9 +165,6 @@
                       </div>
                     </template>
                     <span v-else>—</span>
-                  </template>
-                  <template v-else-if="column.key === 'unit'">
-                    {{ resolveOutboundStockUnit(line) || '—' }}
                   </template>
                   <template v-else-if="column.key === 'batchPick'">
                     <template v-if="canOutboundBatchPick(line)">
@@ -287,7 +284,7 @@
 </template>
 
 <script>
-import { formatQty } from '@/utils/numberFormat'
+import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 export default { name: 'OutboundOrderDetailView' }
 </script>
 

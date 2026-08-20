@@ -325,7 +325,7 @@
                 <template v-else-if="column.key === 'shipQty'">
                   <InventoryLineEditableCell
                     :active="isLineCellEditing(record.id, 'shipQty')"
-                    :display="formatQty(record.shipQty)"
+                    :display="formatQtyWithUnit(record.shipQty, resolveOutboundStockUnit(record))"
                     :empty="record.shipQty == null || record.shipQty === ''"
                     editable
                     placeholder="填写数量"
@@ -347,9 +347,6 @@
                       />
                     </template>
                   </InventoryLineEditableCell>
-                </template>
-                <template v-else-if="column.key === 'unit'">
-                  {{ resolveOutboundStockUnit(record) || '—' }}
                 </template>
                 <template v-else-if="column.key === 'batchPick'">
                   <template v-if="canOutboundBatchPick(record)">
@@ -550,7 +547,7 @@
 </template>
 
 <script setup>
-import { formatQty } from '@/utils/numberFormat'
+import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -632,6 +629,10 @@ import {
 import SalesOrderSelectModal from '@/views/production/components/SalesOrderSelectModal.vue'
 import { findSalesOrderByOrderNo, getSalesOrderById } from '@/store/salesOrderStore'
 import { getDeliveryOrderById, getDeliveryOrderByCode } from '@/store/deliveryOrderStore'
+import {
+  formatAllocationsBarcode,
+  preallocateDeliveryBatches,
+} from '@/utils/salesOrderDedicatedStock'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -813,6 +814,28 @@ function autoAllocPreview(record) {
   if (!(Number(record.shipQty) > 0)) {
     return `${ruleName}·确认时自动扣批`
   }
+  if (isSalesOutbound.value) {
+    const so =
+      (form.salesOrderId && getSalesOrderById(form.salesOrderId)) ||
+      findSalesOrderByOrderNo(form.salesOrderNo) ||
+      null
+    const salesLine =
+      (so?.lineItems || []).find((l) => l.id === record.salesLineId) ||
+      (so?.lineItems || []).find((l) => l.productCode === record.itemCode)
+    const dedicated = preallocateDeliveryBatches({
+      salesOrder: so,
+      salesLine,
+      itemCode: record.itemCode,
+      warehouse: wh,
+      shipQty: record.shipQty,
+      stockFulfillmentMode: salesLine?.stockFulfillmentMode,
+    })
+    if (!dedicated.ok) return dedicated.message
+    return (
+      formatBatchAllocationPreview(dedicated.allocations, resolveOutboundStockUnit(record)) ||
+      formatAllocationsBarcode(dedicated.allocations)
+    )
+  }
   const res = allocateOutboundBatches({
     warehouse: wh,
     itemCode: record.itemCode,
@@ -865,7 +888,7 @@ const {
   columnDrawerOpen,
   displayColumns: rawDisplayColumns,
   defaultColumnSettings,
-} = useTableColumnSettings('outbound-form-lines-v8', baseLineColumns, {
+} = useTableColumnSettings('outbound-form-lines-v9', baseLineColumns, {
   minScrollX: 1806,
   pinEdgeColumns: false,
   pinActionColumn: true,

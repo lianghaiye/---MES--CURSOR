@@ -15,11 +15,28 @@ import {
   sumPieceValues,
 } from '@/utils/variableLengthMaterial'
 import { materialInfoState } from '@/store/materialInfoStore'
+import {
+  findSalesOrderByNoOrId,
+  splitInboundPieceValuesForSalesOrder,
+  resolveWorkOrderNoFromInbound,
+} from '@/utils/salesOrderDedicatedStock'
+
+function isFinishedOrSemiInbound(order) {
+  const t = order?.inboundType || ''
+  return t === '成品入库' || t === '半成品入库'
+}
+
+function resolveInboundSalesOrder(order) {
+  return findSalesOrderByNoOrId({
+    salesOrderId: order.salesOrderId,
+    salesOrderNo: order.salesOrderNo || order.sourceOrderNo,
+  })
+}
 
 const STORAGE_KEY = 'i_doms_inbound_orders'
 const SEED_VERSION_KEY = 'i_doms_inbound_orders_seed_v'
 /** v5：跨模块演示采购入库（轴承部分入库） */
-const CURRENT_SEED_VERSION = '5'
+const CURRENT_SEED_VERSION = '6'
 
 function loadFromStorage() {
   try {
@@ -379,28 +396,93 @@ function prepareAndApplyInboundLine(order, line) {
   }
   if (!pieceValues?.length) return { ok: true, skipped: true }
 
-  const res = applyInboundBatchesFromRoots({
+  const basePayload = {
     warehouse,
     itemCode: line.itemCode,
     itemName: line.itemName,
-    pieceValues,
-    pieceLengths: pieceValues,
     sourceType: order.inboundType || '采购入库',
     sourceDocNo: order.docNo,
     unit: line.unit || (line.isVariableLength ? '米' : '件'),
     barcodeType,
+    workOrderNo: resolveWorkOrderNoFromInbound(order) || line.workOrderNo || '',
     attrs: {
       material: line.material,
       inboundEntryMode: line.inboundEntryMode,
       barcodeType: barcodeType || undefined,
     },
-  })
-  if (!res.ok) return { ok: false, message: res.message }
-  line.batchNos = res.batches.map((b) => b.batchNo)
-  line.pieceSerialNos = (res.pieces || []).map((p) => p.serialNo)
-  if (res.manageByPiece) {
-    line.manageByPiece = true
   }
+
+  const allBatches = []
+  const allPieces = []
+  let manageByPiece = false
+
+  // 成品/半成品：按销售行未满足数量切开打单 vs 自由备货
+  if (isFinishedOrSemiInbound(order)) {
+    const salesOrder = resolveInboundSalesOrder(order)
+    if (!salesOrder) {
+      return {
+        ok: false,
+        message: `「${line.itemName || line.itemCode}」成品/半成品入库须关联可解析的销售订单`,
+      }
+    }
+    const split = splitInboundPieceValuesForSalesOrder({
+      salesOrder,
+      itemCode: line.itemCode,
+      pieceValues,
+      preferredSalesLineId: line.salesLineId || '',
+    })
+    line.dedicatedInboundQty = split.dedicatedTotal
+    line.freeInboundQty = split.freeTotal
+    line.salesOrderNo = salesOrder.orderNo
+    line.salesOrderId = salesOrder.id
+
+    for (const seg of split.segments) {
+      const res = applyInboundBatchesFromRoots({
+        ...basePayload,
+        pieceValues: seg.pieceValues,
+        pieceLengths: seg.pieceValues,
+        salesOrderId: seg.salesOrderId,
+        salesOrderNo: seg.salesOrderNo,
+        salesLineId: seg.salesLineId,
+      })
+      if (!res.ok) return { ok: false, message: res.message }
+      allBatches.push(...(res.batches || []))
+      allPieces.push(...(res.pieces || []))
+      if (res.manageByPiece) manageByPiece = true
+      if (!line.salesLineId) line.salesLineId = seg.salesLineId
+    }
+    if (split.freePieceValues.length) {
+      const res = applyInboundBatchesFromRoots({
+        ...basePayload,
+        pieceValues: split.freePieceValues,
+        pieceLengths: split.freePieceValues,
+        salesOrderId: '',
+        salesOrderNo: '',
+        salesLineId: '',
+      })
+      if (!res.ok) return { ok: false, message: res.message }
+      allBatches.push(...(res.batches || []))
+      allPieces.push(...(res.pieces || []))
+      if (res.manageByPiece) manageByPiece = true
+    }
+  } else {
+    const res = applyInboundBatchesFromRoots({
+      ...basePayload,
+      pieceValues,
+      pieceLengths: pieceValues,
+      salesOrderId: line.salesOrderId || order.salesOrderId || '',
+      salesOrderNo: line.salesOrderNo || order.salesOrderNo || '',
+      salesLineId: line.salesLineId || '',
+    })
+    if (!res.ok) return { ok: false, message: res.message }
+    allBatches.push(...(res.batches || []))
+    allPieces.push(...(res.pieces || []))
+    manageByPiece = Boolean(res.manageByPiece)
+  }
+
+  line.batchNos = allBatches.map((b) => b.batchNo)
+  line.pieceSerialNos = allPieces.map((p) => p.serialNo)
+  if (manageByPiece) line.manageByPiece = true
   return { ok: true }
 }
 
@@ -479,7 +561,10 @@ function syncSalesAllocationAfterInbound(order, lines) {
 
   for (const line of lines) {
     const code = String(line.itemCode || line.productCode || '').trim()
-    const qty = Number(line.qty) || 0
+    const qty =
+      line.dedicatedInboundQty != null
+        ? Number(line.dedicatedInboundQty) || 0
+        : Number(line.qty) || 0
     if (!code || qty <= 0) continue
 
     let sourceSalesLineId = line.salesLineId || ''
@@ -552,6 +637,15 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
   if (invalid) {
     return { ok: false, message: '请完善入库仓库和入库数量' }
   }
+  const settleInvalid = lines.find(
+    (line) => String(line.settleUnit || '').trim() && !(Number(line.settleQty) > 0),
+  )
+  if (settleInvalid) {
+    return {
+      ok: false,
+      message: `「${settleInvalid.itemName || settleInvalid.itemCode || '明细'}」已启用结算单位，请填写结算数量`,
+    }
+  }
 
   for (const line of lines) {
     const poLine = (po.lineItems || []).find((l) => l.id === line.poLineId)
@@ -600,6 +694,11 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
         totalValue: line.totalValue,
         inboundEntryMode: line.inboundEntryMode,
         isVariableLength: Boolean(line.isVariableLength),
+        settleUnit: line.settleUnit || '',
+        settleQty: line.settleQty,
+        standardUnitWeight: line.standardUnitWeight,
+        settledSettleQty: Number(line.settledSettleQty) || 0,
+        totalPrice: line.totalPrice ?? null,
       }),
     )
     const remarkBase = payload.remark || `采购单 ${po.orderNo} 生成`

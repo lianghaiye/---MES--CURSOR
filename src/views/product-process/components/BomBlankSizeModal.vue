@@ -24,7 +24,7 @@
         option-type="button"
         button-style="solid"
         size="small"
-        :options="BLANK_SIZE_MODE_OPTIONS"
+        :options="blankSizeModeOpts"
       />
       <div class="mode-switch-hint">{{ modeHint }}</div>
     </div>
@@ -116,7 +116,7 @@ import { message } from 'ant-design-vue'
 import {
   BLANK_SIZE_UNIT_OPTIONS,
   BLANK_SIZE_MODE,
-  BLANK_SIZE_MODE_OPTIONS,
+  getBlankSizeModeOptions,
   PLATE_BLANK_SIZE_PRIMARY_FIELDS,
   PLATE_BLANK_SIZE_EXTRA_FIELDS,
   LENGTH_BLANK_SIZE_PRIMARY_FIELDS,
@@ -134,6 +134,7 @@ import {
 import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { inferUomRelation } from '@/utils/variableLengthMaterial'
+import { isPlateAreaMeasureEnabled } from '@/store/functionParamStore'
 
 const props = defineProps({
   open: Boolean,
@@ -147,6 +148,9 @@ const emit = defineEmits(['update:open', 'confirm'])
 
 const draft = reactive(emptyBlankSize())
 const selectedMode = ref(BLANK_SIZE_MODE.GENERIC)
+const blankSizeModeOpts = computed(() =>
+  getBlankSizeModeOptions({ enablePlateArea: isPlateAreaMeasureEnabled() }),
+)
 const isOrderPurpose = computed(() => props.purpose === 'order')
 
 function getModalContainer() {
@@ -271,7 +275,9 @@ watch(
   ([visible]) => {
     if (!visible) return
     resetDraftFromLine()
-    selectedMode.value = resolveBlankSizeMode(resolveModeSource())
+    selectedMode.value = resolveBlankSizeMode(resolveModeSource(), {
+      enablePlateArea: isPlateAreaMeasureEnabled(),
+    })
   },
 )
 

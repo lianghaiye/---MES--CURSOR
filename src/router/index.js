@@ -173,6 +173,12 @@ const routes = [
         meta: { title: '产品信息' },
       },
       {
+        path: 'product-process/products/:id/edit',
+        name: 'product-process-products-edit',
+        component: () => import('@/views/product-process/MasterItemEditView.vue'),
+        meta: { title: '编辑产品', listPath: '/product-process/products' },
+      },
+      {
         path: 'product-process/bom',
         name: 'product-process-bom',
         component: () => import('@/views/product-process/ProductBomView.vue'),
@@ -620,6 +626,18 @@ const routes = [
         name: 'procurement-purchase-receipts-detail',
         component: () => import('@/views/procurement/PurchaseReceiptDetailView.vue'),
         meta: { title: '采购收货详情' },
+      },
+      {
+        path: 'procurement/purchase-settles',
+        name: 'procurement-purchase-settles',
+        component: () => import('@/views/procurement/PurchaseSettleView.vue'),
+        meta: { title: '采购结算' },
+      },
+      {
+        path: 'procurement/purchase-settles/:id',
+        name: 'procurement-purchase-settles-detail',
+        component: () => import('@/views/procurement/PurchaseSettleDetailView.vue'),
+        meta: { title: '采购结算详情', listPath: '/procurement/purchase-settles' },
       },
       {
         path: 'procurement/purchase-returns',

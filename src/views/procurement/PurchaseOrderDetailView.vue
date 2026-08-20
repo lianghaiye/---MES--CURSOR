@@ -37,6 +37,7 @@
               <a-button v-if="canGenerateInbound(record)" size="small" @click="openInboundModal">
                 生成入库
               </a-button>
+              <a-button size="small" @click="openSettleCreate">生成结算</a-button>
               <a-button size="small" @click="openPurchaseReturnCreate">采购退货</a-button>
               <a-button size="small" @click="handleComplete">完成</a-button>
             </template>
@@ -302,7 +303,10 @@
 
           <template v-else-if="activeTab === 'settle'">
             <div class="section-card">
-              <div class="section-title">结算信息</div>
+              <div class="section-title-row">
+                <div class="section-title">结算信息</div>
+                <a-button type="link" size="small" @click="openSettleCreate">生成结算</a-button>
+              </div>
               <a-table
                 :columns="settleColumns"
                 :data-source="relatedSettleLines"
@@ -311,7 +315,20 @@
                 bordered
                 :pagination="false"
                 :locale="{ emptyText: '暂无结算信息' }"
-              />
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'settleNo'">
+                    <a class="link-code" @click.prevent="openSettleDetail(row)">{{
+                      row.settleNo
+                    }}</a>
+                  </template>
+                  <template v-else-if="column.dataIndex === 'amount'">
+                    {{ formatMoney(row.amount) }}
+                  </template>
+                  <template v-else>{{ row[column.dataIndex] || '—' }}</template>
+                </template>
+              </a-table>
             </div>
           </template>
         </div>
@@ -331,6 +348,11 @@
       @saved="onInboundSaved"
     />
     <PurchaseOrderPrintModal v-model:open="printModalOpen" :purchase-order="record" />
+    <GeneratePurchaseSettleModal
+      v-model:open="settleModalOpen"
+      :purchase-order-id="record?.id"
+      @confirmed="onSettleCreated"
+    />
   </div>
 </template>
 
@@ -379,12 +401,14 @@ import { listInboundQcForPurchaseOrder } from '@/utils/purchaseOrderQc'
 import { listReturnLinesForPurchaseOrder } from '@/utils/orderReturnLines'
 import { purchaseReceiptState } from '@/store/purchaseReceiptStore'
 import { purchaseReturnState } from '@/store/purchaseReturnStore'
+import { buildPoSettleTabRows, purchaseSettleState } from '@/store/purchaseSettleStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import PurchaseOrderBasicInfoSection from './components/PurchaseOrderBasicInfoSection.vue'
-import PurchaseOrderPrintModal from './components/PurchaseOrderPrintModal.vue'
 import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
 import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vue'
+import GeneratePurchaseSettleModal from './components/GeneratePurchaseSettleModal.vue'
+import PurchaseOrderPrintModal from './components/PurchaseOrderPrintModal.vue'
 
 const DocNoLinks = defineComponent({
   name: 'DocNoLinks',
@@ -430,6 +454,7 @@ const activeTab = ref('basic')
 const receiptModalOpen = ref(false)
 const inboundModalOpen = ref(false)
 const printModalOpen = ref(false)
+const settleModalOpen = ref(false)
 
 const lineColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
@@ -540,12 +565,32 @@ const relatedReturnLines = computed(() => {
   void purchaseReturnState.returns
   return listReturnLinesForPurchaseOrder(record.value)
 })
-const relatedSettleLines = computed(() => [])
+const relatedSettleLines = computed(() => {
+  void purchaseSettleState.settles
+  const id = record.value?.id
+  if (!id) return []
+  return buildPoSettleTabRows(id)
+})
 const approvalRecords = computed(() => record.value?.approvalRecords || [])
 const relatedQcRecords = computed(() => {
   void purchaseReceiptState.receipts
   return listInboundQcForPurchaseOrder(record.value)
 })
+
+function openSettleDetail(row) {
+  if (!row?.id) return
+  const path = `/procurement/purchase-settles/${row.id}`
+  openTab(path, `采购结算 ${row.settleNo || ''}`)
+  router.push({ name: 'procurement-purchase-settles-detail', params: { id: row.id } })
+}
+
+function openSettleCreate() {
+  settleModalOpen.value = true
+}
+
+function onSettleCreated() {
+  activeTab.value = 'settle'
+}
 
 function openReturnDetail(row) {
   if (!row?.returnId) return
@@ -905,6 +950,17 @@ function openApprove() {
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 10px;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+
+  .section-title {
+    margin-bottom: 0;
+  }
 }
 
 .summary-row {

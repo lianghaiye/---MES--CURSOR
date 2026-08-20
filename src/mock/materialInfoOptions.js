@@ -93,11 +93,14 @@ export function createDefaultLaborRow() {
 
 export function createDefaultProductionControl() {
   return {
+    planStrategy: undefined,
+    replenishQty: undefined,
     defaultWorkCenter: undefined,
     standardCycleDays: undefined,
     requisitionEnabled: false,
     defaultProcessRoute: undefined,
     defaultSupplier: undefined,
+    defaultOutsourceSupplier: undefined,
     defaultWarehouse: undefined,
     isKeyPart: false,
     isAuxiliary: false,

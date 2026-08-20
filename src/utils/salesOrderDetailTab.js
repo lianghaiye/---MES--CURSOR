@@ -2,8 +2,7 @@ const STORAGE_PREFIX = 'sales-order-detail-tab:'
 
 export const SALES_ORDER_DETAIL_TABS = [
   'overview',
-  'delivery',
-  'outbound',
+  'shipping',
   'inbound',
   'purchase',
   'production',
@@ -16,6 +15,8 @@ export const SALES_ORDER_DETAIL_TABS = [
 
 const LEGACY_TAB_MAP = {
   'bom-version': 'ebom-info',
+  delivery: 'shipping',
+  outbound: 'shipping',
 }
 
 export function normalizeSalesOrderDetailTab(tab) {

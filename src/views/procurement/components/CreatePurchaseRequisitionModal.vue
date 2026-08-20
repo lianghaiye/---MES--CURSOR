@@ -73,7 +73,19 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="18">
+            <a-col :span="6">
+              <a-form-item label="业务员">
+                <a-select
+                  v-model:value="form.salesperson"
+                  size="small"
+                  show-search
+                  allow-clear
+                  placeholder="请选择业务员"
+                  :options="salespersonOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
               <a-form-item label="备注" class="remark-item">
                 <a-textarea
                   v-model:value="form.remark"
@@ -287,6 +299,7 @@ import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStor
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import { PlusOutlined, CheckOutlined, UpOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { urgencyOptions } from '@/mock/purchaseRequisitionOptions'
+import { salespersonOptions } from '@/mock/salesOrderOptions'
 import { mockInventory } from '@/mock/inventory'
 import { createLineItem } from '@/mock/purchaseRequisitions'
 import {
@@ -351,6 +364,8 @@ const {
 } = useSpuVariantConfig()
 
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
+const CURRENT_USER = 'admin1'
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings('purchase-req-form-lines-v5', purchaseRequisitionFormLineColumns, {
@@ -372,6 +387,7 @@ const form = reactive({
   deliveryDate: null,
   estimatedArrivalDate: null,
   receivingWarehouse: undefined,
+  salesperson: CURRENT_USER,
   remark: '',
   lineItems: [],
 })
@@ -446,6 +462,7 @@ function resetForm() {
   form.deliveryDate = null
   form.estimatedArrivalDate = null
   form.receivingWarehouse = undefined
+  form.salesperson = CURRENT_USER
   form.remark = ''
   form.lineItems = []
   prevHeaderReceivingWarehouse.value = undefined
@@ -459,6 +476,7 @@ function loadEditForm(record) {
     ? dayjs(record.estimatedArrivalDate)
     : null
   form.receivingWarehouse = record.receivingWarehouse || undefined
+  form.salesperson = record.salesperson || CURRENT_USER
   form.remark = record.remark || ''
   form.lineItems = normalizeLineItems(record.lineItems || [])
   prevHeaderReceivingWarehouse.value = form.receivingWarehouse
@@ -755,6 +773,7 @@ function handleSave() {
     deliveryDate,
     estimatedArrivalDate,
     receivingWarehouse: form.receivingWarehouse || '',
+    salesperson: form.salesperson || CURRENT_USER,
     remark: form.remark?.trim() || '',
     lineItems,
     orderDate: dayjs().format('YYYY-MM-DD'),

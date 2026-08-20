@@ -36,6 +36,14 @@ export function formatQty(val, maxDecimals = 4) {
   return formatNumber(val, maxDecimals)
 }
 
+/** 数量与单位合并，如「20 个」「36 米」 */
+export function formatQtyWithUnit(val, unit, maxDecimals = 4) {
+  const q = formatQty(val, maxDecimals)
+  const u = String(unit || '').trim()
+  if (q === '—') return u ? `— ${u}` : '—'
+  return u ? `${q} ${u}` : q
+}
+
 /** a-input-number：展示时去掉尾零 */
 export function inputNumberFormatter(value) {
   if (value === '' || value == null) return ''

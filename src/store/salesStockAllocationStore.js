@@ -364,6 +364,22 @@ export function confirmStockTransfer(payload) {
     })
   }
 
+  // 物理批次所有权随软占用一并转移（不能只改数量）
+  // 函数内引用，避免与 stockBatchStore 静态互引导致打包/lint 绑定异常
+  const { listDedicatedBatches, transferBatchOwnership } = require('@/store/stockBatchStore')
+  const fromBatches = listDedicatedBatches({
+    salesOrderId: payload.fromOrderId,
+    salesLineId: payload.fromLineId,
+    itemCode: payload.itemCode,
+  })
+  transferBatchOwnership({
+    batchIds: fromBatches.map((b) => b.id),
+    toSalesOrderId: payload.toOrderId,
+    toSalesOrderNo: payload.toOrderNo,
+    toSalesLineId: payload.toLineId,
+    qty,
+  })
+
   return { ok: true, transfer }
 }
 

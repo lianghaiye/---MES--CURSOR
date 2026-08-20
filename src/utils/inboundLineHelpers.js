@@ -4,14 +4,22 @@ import { materialInfoState } from '@/store/materialInfoStore'
 import { getStockQty, stockState } from '@/store/stockStore'
 import { demoStockQty } from '@/utils/productionPlanWorkItem'
 import {
+  DUAL_UNIT_MEASURE_MODE,
   INBOUND_ENTRY_MODE,
   allowsInboundTotalEntry,
   calcAreaSquareMeters,
   coerceInboundEntryMode,
-  inferDualUnitMeasureMode,
   isAreaBasedDualUnit,
+  isAreaStockUnit,
   resolveVariableLengthFields,
 } from '@/utils/variableLengthMaterial'
+import {
+  applySettleFieldsFromMaterial,
+  estimateSettleQty,
+  hasSettleUnit,
+  resolvePricingQty,
+} from '@/utils/settleUnit'
+import { isPlateAreaMeasureEnabled } from '@/store/functionParamStore'
 
 function roundQty(val) {
   return Math.round((Number(val) || 0) * 1000) / 1000
@@ -123,16 +131,11 @@ export function applyDualUnitFieldsToInboundLine(line = {}, itemCode = '') {
     line.stockUnit = vl.stockUnit
     line.unit = vl.stockUnit
     line.uomRelation = vl.uomRelation
-    // 计量形态：已选手动值保留；否则按库存单位推断（㎡ → 板材）
-    if (!line.inboundMeasureMode) {
-      line.inboundMeasureMode = inferDualUnitMeasureMode({
-        ...line,
-        isVariableLength: true,
-        stockUnit: vl.stockUnit,
-        uomRelation: vl.uomRelation,
-      })
-    }
-    if (!line.dimUnit && isAreaBasedDualUnit(line)) {
+    // 计量形态后台静默写入：仅㎡且开启面积快捷时用 plate，否则 length
+    const useArea =
+      isPlateAreaMeasureEnabled() && isAreaStockUnit(vl.stockUnit || line.stockUnit || line.unit)
+    line.inboundMeasureMode = useArea ? DUAL_UNIT_MEASURE_MODE.PLATE : DUAL_UNIT_MEASURE_MODE.LENGTH
+    if (useArea && !line.dimUnit) {
       line.dimUnit = 'mm'
     }
     const defaultMode = allowsInboundTotalEntry(line.barcodeType)
@@ -157,11 +160,25 @@ export function applyDualUnitFieldsToInboundLine(line = {}, itemCode = '') {
     line.purchaseQty = undefined
     line.totalValue = undefined
   }
+  applySettleFieldsFromMaterial(line, mat)
+  if (hasSettleUnit(line)) {
+    const pieceQty = Number(line.purchaseQty ?? line.qty) || 0
+    if (!(Number(line.settleQty) > 0)) {
+      const est = estimateSettleQty(line, pieceQty)
+      if (est != null) line.settleQty = est
+    }
+    if (line.settledSettleQty == null) line.settledSettleQty = 0
+  } else {
+    line.settleQty = undefined
+    line.settledSettleQty = undefined
+  }
   return line
 }
 
 export function calcInboundLineTotalPrice(line = {}) {
-  const qty = Number(getStockUnitQtyValue(line)) || 0
+  const qty = hasSettleUnit(line)
+    ? resolvePricingQty(line)
+    : Number(getStockUnitQtyValue(line)) || 0
   const price = Number(line.unitPrice) || 0
   return roundMoney(qty * price)
 }

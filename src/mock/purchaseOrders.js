@@ -1,5 +1,6 @@
 import dayjs from 'dayjs'
 import { ensureOrderSizeDefaults } from '@/utils/orderSize'
+import { estimateSettleQty } from '@/utils/settleUnit'
 
 export function createPoLineItem(partial = {}) {
   const purchaseQty = partial.purchaseQty ?? 1
@@ -12,6 +13,22 @@ export function createPoLineItem(partial = {}) {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean)
+  const settleUnit = String(partial.settleUnit || '').trim()
+  let settleQty = partial.settleQty
+  if (settleUnit) {
+    const estimated = estimateSettleQty(
+      {
+        settleUnit,
+        standardUnitWeight: partial.standardUnitWeight,
+        settleQty: partial.settleQty,
+      },
+      purchaseQty,
+    )
+    settleQty = estimated != null ? estimated : Number(partial.settleQty) || 0
+  } else {
+    settleQty = undefined
+  }
+  const pricingQty = settleUnit ? Number(settleQty) || 0 : purchaseQty
   return ensureOrderSizeDefaults({
     id: `po-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     productName: '',
@@ -37,8 +54,8 @@ export function createPoLineItem(partial = {}) {
     unitPriceExTax: ex,
     taxRate: rate,
     unitPriceInTax: inTax,
-    totalPriceExTax: Math.round(purchaseQty * ex * 100) / 100,
-    totalPriceInTax: Math.round(purchaseQty * inTax * 100) / 100,
+    totalPriceExTax: Math.round(pricingQty * ex * 100) / 100,
+    totalPriceInTax: Math.round(pricingQty * inTax * 100) / 100,
     deliveryDate: '',
     urgency: '正常',
     receivingMode: '正常收货',
@@ -49,6 +66,9 @@ export function createPoLineItem(partial = {}) {
     expiryDate: '',
     remark: '',
     ...partial,
+    settleUnit: settleUnit || '',
+    settleQty: settleUnit ? settleQty : undefined,
+    standardUnitWeight: settleUnit ? partial.standardUnitWeight : undefined,
     /** 来源采购申请单号（合并生成时写入；不含销售订单关联） */
     sourceReqNos,
     sourceReqNo: sourceReqNos.join(','),

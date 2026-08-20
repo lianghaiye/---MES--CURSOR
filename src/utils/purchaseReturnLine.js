@@ -35,6 +35,7 @@ export function mapPoLineToReturnLine(po, poLine) {
   const { defaultUnit, unitOptions, purchaseUnit } = resolveReturnUnitDefaults(productCode, poLine)
   const receivedQty = calcPoLineReceivedQty(po, poLine)
   const warehouse = poLine.receivingWarehouse || po.receivingWarehouse || ''
+  const settleUnit = String(poLine.settleUnit || '').trim()
   return createPurchaseReturnLine({
     poLineId: poLine.id,
     productName,
@@ -49,6 +50,8 @@ export function mapPoLineToReturnLine(po, poLine) {
     returnQty: 0,
     unit: defaultUnit,
     unitOptions,
+    settleUnit: settleUnit || '',
+    settleQty: undefined,
     shipWarehouse: warehouse,
     returnType: '退货',
     remark: '',

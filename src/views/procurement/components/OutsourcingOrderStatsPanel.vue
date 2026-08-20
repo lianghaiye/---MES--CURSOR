@@ -21,6 +21,16 @@ function formatDeltaPlain(n) {
   return v > 0 ? `+${formatQty(v)}` : formatQty(v)
 }
 
+function formatMoney(n) {
+  return `¥${Number(n || 0).toFixed(2)}`
+}
+
+function formatMoneyDelta(n) {
+  const v = Number(n) || 0
+  const abs = Math.abs(v).toFixed(2)
+  return v > 0 ? `+${abs}` : v < 0 ? `-${abs}` : abs
+}
+
 const cards = computed(() => {
   void outsourcingOrderState.orders
   const s = calcOutsourcingOrderDashboardStats(period.value)
@@ -44,8 +54,9 @@ const cards = computed(() => {
     {
       key: 'amount',
       title: '外协费用总计',
-      value: `¥${Number(s.amountExTax || 0).toFixed(2)}`,
-      delta: c.amountExTax,
+      value: `${formatMoney(s.amountInTax)} / ${formatMoney(s.amountExTax)}`,
+      delta: c.amountInTax,
+      deltaSuffix: ` / ${formatMoneyDelta(c.amountExTax)}`,
       iconClass: 'icon-shop',
     },
     {

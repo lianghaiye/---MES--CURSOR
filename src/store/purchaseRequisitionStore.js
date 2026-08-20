@@ -443,6 +443,7 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
     source: '生产计划',
     operator: '管理员',
     creator: '管理员',
+    salesperson: form.salesperson || 'admin1',
     createdAt: now.format('YYYY-MM-DD HH:mm'),
     updatedAt: now.format('YYYY-MM-DD HH:mm'),
     remark: form.remark ?? sourceOrder.remark ?? '',

@@ -191,6 +191,11 @@
               @change="onLineCalc(record)"
             />
           </template>
+          <template v-else-if="column.key === 'barcodeBatchNo'">
+            <span class="barcode-cell" :title="record.barcodeBatchNo || ''">
+              {{ record.barcodeBatchNo || '—' }}
+            </span>
+          </template>
           <template v-else-if="column.key === 'deliveryUnitPriceInTax'">
             <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
               <span class="price-locked-wrap">
@@ -357,6 +362,10 @@ import {
   removeMaterialPickFromShipment,
 } from '@/utils/shipEbom'
 import ScatterShipDrawer from './ScatterShipDrawer.vue'
+import {
+  formatAllocationsBarcode,
+  preallocateDeliveryBatches,
+} from '@/utils/salesOrderDedicatedStock'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -382,6 +391,7 @@ const lineColumns = [
   { title: '单价', key: 'unitPriceExTax', width: 96, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56, align: 'center' },
   { title: '本次发货数量', key: 'shipQty', width: 112, align: 'right' },
+  { title: '条码号/批次号', key: 'barcodeBatchNo', width: 160, ellipsis: true },
   { title: '发货单价（含税）', key: 'deliveryUnitPriceInTax', width: 148, align: 'right' },
   { title: '发货总额（含税）', key: 'deliveryAmountInTax', width: 124, align: 'right' },
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
@@ -509,6 +519,35 @@ function removeScatterMaterialPick(shipment, mat) {
 
 function onLineCalc(record) {
   recalcDeliveryLine(record)
+  refreshLineBatchPreview(record)
+}
+
+function refreshLineBatchPreview(line) {
+  const so = props.salesOrder
+  const shipQty = Number(line.shipQty) || 0
+  if (!(shipQty > 0) || !so) {
+    line.batchAllocations = []
+    line.barcodeBatchNo = ''
+    return { ok: true }
+  }
+  const salesLine = (so.lineItems || []).find((l) => l.id === line.salesLineId || l.id === line.id)
+  const res = preallocateDeliveryBatches({
+    salesOrder: so,
+    salesLine,
+    itemCode: line.productCode,
+    warehouse: form.outboundWarehouse || line.shipWarehouse || undefined,
+    shipQty,
+    stockFulfillmentMode: salesLine?.stockFulfillmentMode,
+  })
+  if (!res.ok) {
+    line.batchAllocations = []
+    line.barcodeBatchNo = ''
+    return res
+  }
+  line.batchAllocations = res.allocations
+  line.barcodeBatchNo = formatAllocationsBarcode(res.allocations)
+  line.manualBatchPick = true
+  return res
 }
 
 function displayCell(record, column) {
@@ -541,6 +580,11 @@ function validateWholeMachineLines() {
       message.warning(
         `「${line.productName}」本次发货数量不能超过可发数量 ${formatDeliveryQty(maxQty)}`,
       )
+      return false
+    }
+    const pre = refreshLineBatchPreview(line)
+    if (!pre.ok) {
+      message.error(`「${line.productName}」${pre.message}`)
       return false
     }
   }

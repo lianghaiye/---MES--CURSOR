@@ -16,10 +16,12 @@ export const inboundFormLineColumns = [
   },
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 90, ellipsis: true },
   { title: '条码类型', dataIndex: 'barcodeType', key: 'barcodeType', width: 96 },
-  { title: '入库数量', key: 'qty', width: 96 },
-  { title: '单位', dataIndex: 'unit', key: 'unit', width: 64 },
-  { title: '库存单位量', key: 'stockUnitQty', width: 120 },
-  { title: '库存单位', key: 'stockUnit', width: 88 },
+  /** 数量与单位合并展示，如「3 根」 */
+  { title: '入库数量', key: 'qty', width: 120 },
+  /** 双单位时的库存量，如「36 米」；单单位同入库数量 */
+  { title: '库存数量', key: 'stockUnitQty', width: 130 },
+  /** 有结算单位时展示，如「55.5 kg」 */
+  { title: '结算数量', key: 'settleQty', width: 120 },
   { title: '入库仓库', key: 'warehouse', width: 120 },
   { title: '货位号', key: 'locationNo', dataIndex: 'locationNo', width: 110, ellipsis: true },
   { title: '单价', key: 'unitPrice', width: 96, align: 'right' },
@@ -31,6 +33,10 @@ export const inboundFormLineColumns = [
 
 export const inboundDetailLineColumns = inboundFormLineColumns.filter((c) => c.key !== 'actions')
 
-/** 库存单位量列提示文案 */
+/** 库存数量列提示文案 */
 export const STOCK_UNIT_QTY_TIP =
   '一类一码/一批一码：可直接填库存合计。一物一码：填统一单件量（钢管=长度；板材请点「编辑」填长×宽换算面积）；每件不同也请点编辑逐件/逐张填写'
+
+/** 结算数量列提示 */
+export const SETTLE_QTY_TIP =
+  '仅当物料结算单位与库存单位不同时填写（如库存按件/米、结算按 kg）。用于与供应商计价；未启用结算单位时本列为空。'

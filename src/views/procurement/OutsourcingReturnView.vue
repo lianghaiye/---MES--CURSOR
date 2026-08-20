@@ -89,6 +89,7 @@
           新增
         </a-button>
         <a-button size="small" @click="handleGenerateOutbound">生成出库单</a-button>
+        <a-button size="small" type="primary" @click="handleComplete">完成</a-button>
         <a-dropdown>
           <a-button size="small">
             打印
@@ -249,6 +250,8 @@ import {
   canEditOutsourcingReturn,
   canVoidOutsourcingReturn,
   voidOutsourcingReturn,
+  canCompleteOutsourcingReturn,
+  completeOutsourcingReturn,
   listOutsourcingReturnOperators,
 } from '@/store/outsourcingReturnStore'
 import { supplierOptions } from '@/mock/purchaseOrderOptions'
@@ -396,6 +399,34 @@ function handleVoid(record) {
     onOk: () => {
       const result = voidOutsourcingReturn(record.id)
       result.ok ? message.success(result.message) : message.warning(result.message)
+    },
+  })
+}
+
+function handleComplete() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择异常处理单')
+    return
+  }
+  const targets = selectedRowKeys.value
+    .map((id) => outsourcingReturnState.returns.find((r) => r.id === id))
+    .filter(Boolean)
+  const completable = targets.filter(canCompleteOutsourcingReturn)
+  if (!completable.length) {
+    message.warning('所选单据均不可完成（需为新建/进行中，且无进行中的出库单）')
+    return
+  }
+  Modal.confirm({
+    title: '确认完成',
+    content: `确定完成选中的 ${completable.length} 条异常处理单吗？`,
+    onOk: () => {
+      let okCount = 0
+      completable.forEach((row) => {
+        const result = completeOutsourcingReturn(row.id)
+        if (result.ok) okCount += 1
+      })
+      message.success(`已完成 ${okCount} 条异常处理单`)
+      selectedRowKeys.value = []
     },
   })
 }

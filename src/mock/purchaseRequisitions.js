@@ -94,6 +94,7 @@ function createRequisition(partial) {
     source: '新增',
     operator: '管理员',
     creator: '管理员',
+    salesperson: 'admin1',
     createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     remark: '',

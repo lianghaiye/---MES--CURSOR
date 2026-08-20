@@ -14,6 +14,7 @@ import {
   calcPoLineRemainInboundQty,
 } from '@/utils/purchaseLineInbound'
 import { addPurchaseReceipt } from '@/store/purchaseReceiptStore'
+import { estimateSettleQty, hasSettleUnit, resolvePricingQty } from '@/utils/settleUnit'
 
 /** 由 purchaseRequisitionStore 注册，避免循环依赖导致 bind 未生效 */
 let draftBindApi = {
@@ -735,7 +736,14 @@ export function submitReceipt(orderId, receiptLines, extra = {}) {
 }
 
 export function recalcPoLine(line) {
-  const qty = Number(line.purchaseQty) || 0
+  const purchaseQty = Number(line.purchaseQty) || 0
+  if (hasSettleUnit(line)) {
+    const estimated = estimateSettleQty(line, purchaseQty)
+    if (estimated != null && !(Number(line.settleQty) > 0)) {
+      line.settleQty = estimated
+    }
+  }
+  const qty = resolvePricingQty(line)
   const ex = Number(line.unitPriceExTax) || 0
   const rate = Number(line.taxRate) || 0
   line.unitPriceInTax = round2(ex * (1 + rate / 100))

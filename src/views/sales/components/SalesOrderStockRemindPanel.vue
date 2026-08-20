@@ -52,7 +52,7 @@ import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { productionPlanState } from '@/store/productionPlanStore'
 
 const MTS_WIP_COLUMN_TIP =
-  '当前仅展示自由备货相关数量，即计划策略为「以库存生产(MTS)」的在途/在制（待下发/执行中）。不含按销售订单排产的在制。'
+  '当前仅展示自由备货相关数量，即计划策略为「按库存MTS」的在途/在制（待下发/执行中）。不含按销售订单排产的在制。'
 
 const props = defineProps({
   order: { type: Object, required: true },

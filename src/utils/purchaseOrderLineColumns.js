@@ -19,6 +19,8 @@ export const purchaseOrderFormLineColumns = [
   { title: '收货仓库', key: 'receivingWarehouse', width: 110 },
   { title: '采购数量', key: 'purchaseQty', width: 100 },
   { title: '采购单位', dataIndex: 'unit', key: 'unit', width: 90 },
+  { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
+  { title: '预计结算数量', key: 'settleQty', width: 110 },
   {
     title: '订货尺寸',
     dataIndex: 'orderSizeText',
@@ -26,7 +28,7 @@ export const purchaseOrderFormLineColumns = [
     width: 160,
     ellipsis: true,
   },
-  { title: '不含税单价', key: 'unitPriceExTax', width: 100 },
+  { title: '不含税单价', key: 'unitPriceExTax', width: 110 },
   { title: '税率(%)', key: 'taxRate', width: 80 },
   { title: '含税单价', key: 'unitPriceInTax', width: 100 },
   { title: '总价（不含税）', key: 'totalPriceExTax', width: 110, align: 'right' },

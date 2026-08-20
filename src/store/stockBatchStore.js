@@ -12,11 +12,12 @@ import {
   splitIssueStockPiece,
 } from '@/store/stockPieceStore'
 import { isPartialDualUnitIssue } from '@/store/functionParamStore'
+import { DEDICATED_SHIP_DEMO, ensureDedicatedShipDemoBatches } from '@/mock/dedicatedShipDemoSeed'
 
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
-/** v13：库线边仓倒冲标准件库存 */
-const CURRENT_SEED_VERSION = '15'
+/** v17：按单发货验收演示批次 */
+const CURRENT_SEED_VERSION = '17'
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',
@@ -48,9 +49,9 @@ function persist() {
 function initBatches() {
   const stored = loadFromStorage()
   if (shouldReseed() || !stored?.length) {
-    return { batches: cloneStockBatchSeed(), reseeded: true }
+    return { batches: ensureDedicatedShipDemoBatches(cloneStockBatchSeed()), reseeded: true }
   }
-  return { batches: stored, reseeded: false }
+  return { batches: ensureDedicatedShipDemoBatches(stored), reseeded: false }
 }
 
 function nid(prefix = 'bat') {
@@ -103,6 +104,15 @@ function syncAllSeedBatchStock() {
 if (initialBatchLoad.reseeded) {
   syncAllSeedBatchStock()
   persist()
+} else {
+  // 幂等补演示批后对齐汇总
+  syncAggregateStockFromBatches(
+    DEDICATED_SHIP_DEMO.warehouse,
+    DEDICATED_SHIP_DEMO.productCode,
+    DEDICATED_SHIP_DEMO.productName,
+    '件',
+  )
+  persist()
 }
 
 watch(
@@ -125,8 +135,77 @@ export function listBatches(filters = {}) {
     if (filters.itemCode && b.itemCode !== filters.itemCode) return false
     if (filters.status && b.status !== filters.status) return false
     if (filters.inStockOnly && b.status !== BATCH_STATUS.IN_STOCK) return false
+    if (filters.salesOrderId && b.salesOrderId !== filters.salesOrderId) return false
+    if (filters.salesOrderNo && String(b.salesOrderNo || '') !== String(filters.salesOrderNo))
+      return false
+    if (filters.salesLineId && b.salesLineId !== filters.salesLineId) return false
+    if (filters.dedicatedOnly && !b.salesOrderId) return false
+    if (filters.freeOnly && b.salesOrderId) return false
     return true
   })
+}
+
+/** 本销售单（或销售行）在库按单批次 */
+export function listDedicatedBatches({
+  salesOrderId,
+  salesOrderNo,
+  salesLineId,
+  itemCode,
+  warehouse,
+  inStockOnly = true,
+} = {}) {
+  return listBatches({
+    warehouse,
+    itemCode,
+    inStockOnly,
+    salesOrderId: salesOrderId || undefined,
+    salesOrderNo: salesOrderId ? undefined : salesOrderNo || undefined,
+    salesLineId: salesLineId || undefined,
+    dedicatedOnly: true,
+  }).filter((b) => {
+    if (salesOrderId && b.salesOrderId !== salesOrderId) return false
+    if (!salesOrderId && salesOrderNo && String(b.salesOrderNo || '') !== String(salesOrderNo))
+      return false
+    return true
+  })
+}
+
+/** 自由备货：未挂销售单的在库批 */
+export function listFreeBatches({ warehouse, itemCode, inStockOnly = true } = {}) {
+  return listBatches({ warehouse, itemCode, inStockOnly, freeOnly: true })
+}
+
+export function sumDedicatedQty(filters = {}) {
+  return roundMeters(
+    listDedicatedBatches(filters).reduce((s, b) => s + (Number(b.currentLength) || 0), 0),
+  )
+}
+
+/** 跨单调拨：转移批次所有权 */
+export function transferBatchOwnership({
+  batchIds = [],
+  toSalesOrderId,
+  toSalesOrderNo,
+  toSalesLineId,
+  qty,
+} = {}) {
+  const need = roundMeters(Number(qty) || 0)
+  let left = need > 0 ? need : Infinity
+  const transferred = []
+  for (const id of batchIds) {
+    if (!(left > 0)) break
+    const b = getBatchById(id)
+    if (!b || b.status !== BATCH_STATUS.IN_STOCK) continue
+    const avail = roundMeters(Number(b.currentLength) || 0)
+    if (!(avail > 0)) continue
+    b.salesOrderId = toSalesOrderId || ''
+    b.salesOrderNo = toSalesOrderNo || ''
+    b.salesLineId = toSalesLineId || ''
+    b.updatedAt = new Date().toISOString()
+    transferred.push(b)
+    if (Number.isFinite(left)) left = roundMeters(left - avail)
+  }
+  return { ok: true, batches: transferred }
 }
 
 export function getBatchById(id) {
@@ -162,6 +241,10 @@ export function createBatch(partial = {}) {
     status: partial.status || BATCH_STATUS.IN_STOCK,
     sourceType: partial.sourceType || '',
     sourceDocNo: partial.sourceDocNo || '',
+    salesOrderId: partial.salesOrderId || '',
+    salesOrderNo: partial.salesOrderNo || '',
+    salesLineId: partial.salesLineId || '',
+    workOrderNo: partial.workOrderNo || '',
     attrs: partial.attrs || {},
     parentBatchId: partial.parentBatchId || '',
     createdAt: partial.createdAt || new Date().toISOString(),
@@ -193,6 +276,12 @@ export function applyInboundBatchesFromRoots(payload) {
   const unit = payload.unit || '米'
   const barcodeType = payload.barcodeType || payload.attrs?.barcodeType || ''
   const baseAttrs = { ...(payload.attrs || {}), barcodeType: barcodeType || undefined }
+  const lineage = {
+    salesOrderId: payload.salesOrderId || '',
+    salesOrderNo: payload.salesOrderNo || '',
+    salesLineId: payload.salesLineId || '',
+    workOrderNo: payload.workOrderNo || '',
+  }
 
   // 一物一码：1 个父批次（库存账）+ N 条件码（件身份）
   if (isOneItemOneCodeBarcode(barcodeType)) {
@@ -205,6 +294,7 @@ export function applyInboundBatchesFromRoots(payload) {
       unit,
       sourceType: payload.sourceType || '采购入库',
       sourceDocNo: payload.sourceDocNo || '',
+      ...lineage,
       attrs: {
         ...baseAttrs,
         manageByPiece: true,
@@ -221,6 +311,7 @@ export function applyInboundBatchesFromRoots(payload) {
       unit,
       sourceDocNo: payload.sourceDocNo || '',
       sourceType: payload.sourceType || '采购入库',
+      ...lineage,
     })
     return {
       ok: true,
@@ -241,6 +332,7 @@ export function applyInboundBatchesFromRoots(payload) {
       unit,
       sourceType: payload.sourceType || '采购入库',
       sourceDocNo: payload.sourceDocNo || '',
+      ...lineage,
       attrs: baseAttrs,
     }),
   )

@@ -95,6 +95,10 @@ export function createStockPiecesForBatch({
   unit = '米',
   sourceDocNo = '',
   sourceType = '采购入库',
+  salesOrderId = '',
+  salesOrderNo = '',
+  salesLineId = '',
+  workOrderNo = '',
 }) {
   const values = pieceValues.map(Number).filter((v) => v > 0)
   const created = values.map((qty, i) => {
@@ -111,6 +115,10 @@ export function createStockPiecesForBatch({
       status: PIECE_STATUS.IN_STOCK,
       sourceDocNo: sourceDocNo || '',
       sourceType: sourceType || '',
+      salesOrderId: salesOrderId || '',
+      salesOrderNo: salesOrderNo || '',
+      salesLineId: salesLineId || '',
+      workOrderNo: workOrderNo || '',
       index: i + 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

@@ -122,19 +122,35 @@
           />
         </template>
         <template v-else-if="column.key === 'qty'">
-          <a-input-number
-            v-model:value="record.qty"
-            size="small"
-            :min="0"
-            :max="record.remainingQty"
-            :precision="3"
-            style="width: 100%"
-            :disabled="isLineCompleted(record)"
-            @change="() => onLineQtyChange(record)"
-          />
+          <div class="qty-with-unit">
+            <a-input-number
+              v-model:value="record.qty"
+              size="small"
+              :min="0"
+              :max="record.remainingQty"
+              :precision="3"
+              style="flex: 1; min-width: 0"
+              :disabled="isLineCompleted(record)"
+              @change="() => onLineQtyChange(record)"
+            />
+            <span class="unit-suffix">{{ record.unit || '' }}</span>
+          </div>
         </template>
-        <template v-else-if="column.key === 'unit'">
-          {{ record.unit || '—' }}
+        <template v-else-if="column.key === 'settleQty'">
+          <div v-if="record.settleUnit" class="qty-with-unit">
+            <a-input-number
+              v-model:value="record.settleQty"
+              size="small"
+              :min="0"
+              :precision="3"
+              style="flex: 1; min-width: 0"
+              :disabled="isLineCompleted(record)"
+              placeholder="实重"
+              @change="() => onLineSettleQtyChange(record)"
+            />
+            <span class="unit-suffix">{{ record.settleUnit }}</span>
+          </div>
+          <span v-else>—</span>
         </template>
         <template v-else-if="column.key === 'unitPrice'">
           <a-input-number
@@ -278,7 +294,7 @@ watch(
   },
 )
 
-/** 按采购单位入库，不做库存单位换算、不填货位 */
+/** 按采购单位入库；有结算单位时带入 settleQty（实重），库存 qty 仍为件数 */
 function buildPurchaseInboundLine(line, order) {
   const remaining = calcPoLineRemainInboundQty(order, line)
   const received = calcPoLineReceivedQty(order, line)
@@ -288,6 +304,7 @@ function buildPurchaseInboundLine(line, order) {
   const purchaseUnit = line.unit || '个'
   const warehouse =
     line.receivingWarehouse || resolveDefaultWarehouseByMaterialCode(line.itemCode) || undefined
+  const settleUnit = String(line.settleUnit || '').trim()
   const next = {
     id: line.id,
     poLineId: line.id,
@@ -316,6 +333,16 @@ function buildPurchaseInboundLine(line, order) {
     purchaseQty: undefined,
     totalValue: undefined,
     inboundEntryMode: undefined,
+    settleUnit: settleUnit || '',
+    settleQty: settleUnit
+      ? Number(line.settleQty) > 0
+        ? Number(line.settleQty)
+        : remaining > 0 && Number(line.standardUnitWeight) > 0
+          ? Math.round(remaining * Number(line.standardUnitWeight) * 1000) / 1000
+          : undefined
+      : undefined,
+    standardUnitWeight: line.standardUnitWeight,
+    settledSettleQty: 0,
   }
   syncInboundLineTotalFromUnit(next)
   return next
@@ -328,6 +355,10 @@ function buildLinesFromPurchaseOrder(order) {
 }
 
 function onLineQtyChange(line) {
+  syncInboundLineTotalFromUnit(line)
+}
+
+function onLineSettleQtyChange(line) {
   syncInboundLineTotalFromUnit(line)
 }
 
@@ -393,6 +424,13 @@ function handleSave() {
     message.warning(`请为「${invalidWarehouse.itemName}」选择入库仓库`)
     return
   }
+  const settleInvalid = submitLines.find(
+    (line) => String(line.settleUnit || '').trim() && !(Number(line.settleQty) > 0),
+  )
+  if (settleInvalid) {
+    message.warning(`请为「${settleInvalid.itemName}」填写结算数量（${settleInvalid.settleUnit}）`)
+    return
+  }
 
   saving.value = true
   const receiptRemark = props.purchaseReceipt?.receiptNo
@@ -417,10 +455,15 @@ function handleSave() {
       stockUnit: line.unit,
       purchaseUnit: line.unit,
       unitPrice: line.unitPrice,
+      totalPrice: line.totalPrice,
       locationNo: '',
       warehouse: line.warehouse,
       qty: Number(line.qty),
       isVariableLength: false,
+      settleUnit: line.settleUnit || '',
+      settleQty: line.settleQty,
+      standardUnitWeight: line.standardUnitWeight,
+      settledSettleQty: 0,
     })),
   })
   saving.value = false
@@ -526,6 +569,19 @@ function handleSave() {
 }
 
 .locked-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.qty-with-unit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.unit-suffix {
+  flex-shrink: 0;
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
 }

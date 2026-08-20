@@ -332,7 +332,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="出货仓库" required>
+            <a-form-item label="预入仓库" required>
               <a-select
                 v-model:value="lineEditDraft.shipWarehouse"
                 style="width: 100%"
@@ -497,7 +497,7 @@ const lineColumns = [
   { title: '当前库存数', key: 'stockQty', width: 110, align: 'right' },
   { title: '计划数量', key: 'planQty', width: 110, required: true },
   { title: '单位', key: 'unit', width: 90, required: true },
-  { title: '出货仓库', key: 'shipWarehouse', width: 120, required: true },
+  { title: '预入仓库', key: 'shipWarehouse', width: 120, required: true },
   { title: '计费方式', key: 'billingMethod', width: 100 },
   { title: '加工单价(不含税)', key: 'unitPriceExTax', width: 120 },
   { title: '加工单价(含税)', key: 'unitPriceInTax', width: 120 },
@@ -513,7 +513,7 @@ const {
   displayColumns: baseDisplayColumns,
   tableScrollX,
   defaultColumnSettings,
-} = useTableColumnSettings('outsourcing-order-form-lines-v1', lineColumns)
+} = useTableColumnSettings('outsourcing-order-form-lines-v2', lineColumns)
 
 /** 按含税模式调整单价/总价列顺序：编辑列靠前 */
 const displayColumns = computed(() => {
@@ -737,7 +737,7 @@ function applyLineEdit() {
     return
   }
   if (!draft.shipWarehouse) {
-    message.warning('请选择出货仓库')
+    message.warning('请选择预入仓库')
     return
   }
   recalcOutsourcingLine(draft, { fromInTax: !taxModeExcluding.value })
@@ -792,7 +792,7 @@ function handleSave() {
     (l) => !(Number(l.planQty) > 0) || !l.unit || !String(l.shipWarehouse || '').trim(),
   )
   if (bad) {
-    message.warning('请完善明细的计划数量、单位、出货仓库')
+    message.warning('请完善明细的计划数量、单位、预入仓库')
     return
   }
   if (isEdit.value && !canEditOutsourcingOrder(props.editRecord)) {

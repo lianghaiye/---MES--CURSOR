@@ -28,6 +28,7 @@ import {
 } from '@/utils/outboundBatchAllocate'
 import { formatBatchAttrsText } from '@/utils/outboundLineColumns'
 import { transferOutboundToReceiveWarehouse } from '@/utils/outboundReceiveTransfer'
+import { preallocateDeliveryBatches } from '@/utils/salesOrderDedicatedStock'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
@@ -507,6 +508,61 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
           pieceIds: a.pieceIds,
           pieceSerialNos: res.issuedSerialNos || a.pieceSerialNos,
           pieceSplit: Boolean(res.pieceSplit || a.pieceSplit),
+          remnantSerialNos: res.remnantSerialNos || [],
+        })
+      }
+      line.manualBatchPick = true
+      writeIssuedBatchFields(line, issuedAllocations, {
+        rule: OUTBOUND_ISSUE_RULES.MANUAL,
+        demandQty,
+        dualUnit,
+      })
+      continue
+    }
+
+    // 销售出库：禁止全仓 FIFO；无预锁批时按销售单履约方式再分配（本单按单 → 自由备货）
+    if (order.outboundType === '销售出库') {
+      if (!(Number(line.shipQty) > 0)) {
+        return {
+          ok: false,
+          message: `「${line.itemName || line.itemCode}」请填写出库数量`,
+        }
+      }
+      const so =
+        salesOrderState.orders.find(
+          (o) =>
+            o.id === (order.salesOrderId || line.salesOrderId) ||
+            o.orderNo === (order.salesOrderNo || line.salesOrderNo),
+        ) || null
+      const salesLine =
+        (so?.lineItems || []).find((l) => l.id === line.salesLineId) ||
+        (so?.lineItems || []).find((l) => l.productCode === line.itemCode)
+      const dedicated = preallocateDeliveryBatches({
+        salesOrder: so,
+        salesLine,
+        itemCode: line.itemCode,
+        warehouse,
+        shipQty: line.shipQty,
+        stockFulfillmentMode: salesLine?.stockFulfillmentMode,
+      })
+      if (!dedicated.ok) {
+        return {
+          ok: false,
+          message: `「${line.itemName || line.itemCode}」${dedicated.message}`,
+        }
+      }
+      const demandQty = Number(line.demandMeters ?? line.shipQty) || 0
+      const issuedAllocations = []
+      for (const a of dedicated.allocations) {
+        const res = issueBatchQty(a.batchId, a.qty, meta)
+        if (!res.ok) return { ok: false, message: res.message }
+        issuedAllocations.push({
+          batchId: a.batchId,
+          batchNo: res.batch?.batchNo || a.batchNo,
+          qty: res.issuedLength,
+          unit: a.unit || line.unit || '',
+          pieceSerialNos: res.issuedSerialNos || [],
+          pieceSplit: Boolean(res.pieceSplit),
           remnantSerialNos: res.remnantSerialNos || [],
         })
       }

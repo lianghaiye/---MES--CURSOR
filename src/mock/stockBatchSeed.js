@@ -7,6 +7,15 @@ export const STEEL_PLATE_NAME = '钢板 Q235 10mm'
 /** 重量双单位演示：采购按根，库存按 kg */
 export const STEEL_WEIGHT_BAR_CODE = 'WL-BAR-WEIGHT-40Cr'
 export const STEEL_WEIGHT_BAR_NAME = '圆钢按重 40Cr φ40'
+/** 结算单位演示：采购/库存按件，与供应商按 kg 结算 */
+export const CASTING_BLANK_SETTLE_CODE = 'WL-CAST-BLANK-PUMP-01'
+export const CASTING_BLANK_SETTLE_NAME = '泵体铸件毛坯 HT250'
+/** 三口径不一致演示：采购=根，库存=米，结算=kg */
+export const PIPE_TRIPLE_UNIT_CODE = 'WL-PIPE-TRIPLE-Q235-50'
+export const PIPE_TRIPLE_UNIT_NAME = '无缝钢管 三口径 Q235 φ50'
+/** 单一单位演示：采购=库存=件，无结算单位 */
+export const SIMPLE_UNIT_DEMO_CODE = 'WL-BEARING-6205-UNIT'
+export const SIMPLE_UNIT_DEMO_NAME = '深沟球轴承 6205（单单位）'
 
 const BLANK_CAT = {
   categoryKey: 'cat-007',
@@ -91,12 +100,115 @@ export function createSteelWeightBarMaterial() {
   })
 }
 
+/**
+ * 结算单位演示料：库存/采购=件，结算=kg（浮动，入库填实重）
+ * 与 isVariableLength 正交，不启用可变长双单位。
+ */
+export function createCastingBlankSettleMaterial() {
+  return {
+    id: 'mat-casting-blank-settle-demo',
+    code: CASTING_BLANK_SETTLE_CODE,
+    name: CASTING_BLANK_SETTLE_NAME,
+    barcodeType: '一批一码',
+    materialType: '原材料',
+    supplyForm: '外购件',
+    ...BLANK_CAT,
+    canSell: false,
+    canProduce: false,
+    canPurchase: true,
+    canOutsource: false,
+    isProductMaterial: false,
+    matchingRequirements: '',
+    outputTaxRate: 13,
+    inputTaxRate: 13,
+    createdAt: '2026-07-01',
+    isVariableLength: false,
+    inventoryUnit: '件',
+    stockUnit: '件',
+    purchaseUnit: '件',
+    settleUnit: 'kg',
+    settleConvertType: 'floating',
+    standardUnitWeight: 12.5,
+    unitPrice: 8.2,
+    purchaseUnitPrice: 8.2,
+    specModel: '泵体',
+    material: 'HT250',
+    techParams: '按件采购入库与领用；与供应商按实际过磅重量(kg)结算',
+    remark: '结算单位演示：库存件、结算kg；标准单重仅供开单估算',
+  }
+}
+
+/**
+ * 三口径不一致演示：采购按根、库存按米、结算按 kg。
+ * 入库需：根数换算米数 + 结算重量。
+ */
+export function createPipeTripleUnitMaterial() {
+  return baseDualUnitMaterial({
+    id: 'mat-pipe-triple-unit-demo',
+    code: PIPE_TRIPLE_UNIT_CODE,
+    name: PIPE_TRIPLE_UNIT_NAME,
+    barcodeType: '一批一码',
+    inventoryUnit: '米',
+    stockUnit: '米',
+    purchaseUnit: '根',
+    settleUnit: 'kg',
+    settleConvertType: 'floating',
+    standardUnitWeight: 18.5,
+    uomRelation: 'per_piece_length',
+    unitPrice: 6.8,
+    purchaseUnitPrice: 6.8,
+    specModel: 'φ50×3',
+    material: 'Q235',
+    techParams: '按根采购、按米库存领用；与供应商按过磅重量(kg)结算',
+    remark: '三口径演示：采购根、库存米、结算kg',
+  })
+}
+
+/** 单一单位演示：采购/库存均为件，不启用双单位与结算单位 */
+export function createSimpleUnitDemoMaterial() {
+  return {
+    id: 'mat-simple-unit-demo',
+    code: SIMPLE_UNIT_DEMO_CODE,
+    name: SIMPLE_UNIT_DEMO_NAME,
+    barcodeType: '一批一码',
+    materialType: '标准件',
+    supplyForm: '外购件',
+    categoryKey: 'cat-001',
+    parentCategoryKey: 'cat-001',
+    categoryCode: '001',
+    categoryName: '轴承',
+    canSell: false,
+    canProduce: false,
+    canPurchase: true,
+    canOutsource: false,
+    isProductMaterial: false,
+    matchingRequirements: '',
+    outputTaxRate: 13,
+    inputTaxRate: 13,
+    createdAt: '2026-07-01',
+    isVariableLength: false,
+    inventoryUnit: '件',
+    stockUnit: '件',
+    purchaseUnit: '件',
+    settleUnit: '',
+    unitPrice: 28,
+    purchaseUnitPrice: 28,
+    specModel: '6205-2RS',
+    material: 'GCr15',
+    techParams: '单一单位：采购/库存/结算均按件',
+    remark: '单单位口径演示',
+  }
+}
+
 /** 全部双物料单位演示料（含钢管、板材、重量）；条码类型覆盖一物/一类/一批一码 */
 export function createDemoDualUnitMaterials() {
   return [
     createSteelPipeMaterial(),
     createSteelPlateMaterial(),
     createSteelWeightBarMaterial(),
+    createCastingBlankSettleMaterial(),
+    createPipeTripleUnitMaterial(),
+    createSimpleUnitDemoMaterial(),
     baseDualUnitMaterial({
       id: 'mat-vl-plate-ss-304',
       code: 'WL-PLATE-304-3',

@@ -30,6 +30,8 @@ export function buildOutboundLinesFromDelivery(delivery) {
   for (const li of delivery.lineItems || []) {
     const qty = Number(li.shipQty) || 0
     if (qty <= 0) continue
+    const allocations = Array.isArray(li.batchAllocations) ? li.batchAllocations : []
+    const hasAlloc = allocations.length > 0
     lines.push(
       enrichOutboundLine(
         createOutboundLine({
@@ -42,6 +44,15 @@ export function buildOutboundLinesFromDelivery(delivery) {
           unit: li.unit || '件',
           packagingForm: li.packagingForm || '',
           deliveryRemark: li.lineRemark || '',
+          salesLineId: li.salesLineId || li.id || '',
+          salesOrderId: delivery.salesOrderId || '',
+          salesOrderNo: delivery.salesOrderNo || delivery.sourceOrderNo || '',
+          batchAllocations: hasAlloc ? allocations.map((a) => ({ ...a })) : [],
+          manualBatchPick: hasAlloc,
+          barcodeBatchNo: li.barcodeBatchNo || '',
+          issuedBatchNo: hasAlloc
+            ? [...new Set(allocations.map((a) => a.batchNo).filter(Boolean))].join('、')
+            : '',
         }),
       ),
     )
@@ -107,6 +118,7 @@ export function upsertSalesOutboundFromDelivery(delivery, { forceNew = false } =
       warehouse: delivery.outboundWarehouse || existing.warehouse || lineItems[0]?.shipWarehouse,
       sourceOrderNo: delivery.deliveryCode,
       salesOrderNo: delivery.salesOrderNo || delivery.sourceOrderNo || '',
+      salesOrderId: delivery.salesOrderId || existing.salesOrderId || '',
       customerName: delivery.customerName || existing.customerName,
       lineItems,
       linkedDeliveryId: delivery.id,
@@ -132,6 +144,7 @@ export function upsertSalesOutboundFromDelivery(delivery, { forceNew = false } =
     createdAt: dayjs().format('YYYY-MM-DD'),
     sourceOrderNo: delivery.deliveryCode,
     salesOrderNo: delivery.salesOrderNo || delivery.sourceOrderNo || '',
+    salesOrderId: delivery.salesOrderId || '',
     customerName: delivery.customerName || '',
     linkedDeliveryId: delivery.id,
     linkedDeliveryCode: delivery.deliveryCode,
