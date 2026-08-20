@@ -211,7 +211,9 @@ const taskExecutionModeOpts = TASK_EXECUTION_MODES.map((item) => ({
 const defectItemOpts = computed(() => getDefectItemOptions())
 
 const showTaskExecutionMode = computed(
-  () => form.reportMode === '时长报工' && form.resourceType === '工人',
+  () =>
+    form.reportMode === '时长报工' &&
+    (form.resourceType === '工人' || form.resourceType === '工人小组'),
 )
 
 const showProcessOperations = computed(() => !isMinimalReportMode())
