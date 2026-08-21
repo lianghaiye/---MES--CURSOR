@@ -22,7 +22,8 @@ import { refreshDeliveryMetrics } from '@/utils/deliveryOutboundSync'
 import { sumSelectedShipQty } from '@/utils/shipEbom'
 
 const STORAGE_KEY = 'i_doms_delivery_orders'
-const DATA_VERSION = 2
+/** v3：补充未出库/已出库/自提物流等多类型发货演示单 */
+const DATA_VERSION = 3
 
 function migrateOrders(orders) {
   return (orders || []).map((o) => {
