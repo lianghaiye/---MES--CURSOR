@@ -1,9 +1,5 @@
-import {
-  formatDiscountRatePercent,
-  normalizeDiscountRate,
-  round2,
-  round4,
-} from '@/utils/salesOrderPricing'
+import { formatDiscountRatePercent, normalizeDiscountRate, round2 } from '@/utils/salesOrderPricing'
+import { formatNumber } from '@/utils/numberFormat'
 
 export const PRICE_CHANGE_STATUS = {
   PENDING: '待审核',
@@ -118,13 +114,14 @@ export function recalcPriceChangeLine(row, options = {}) {
     row.newUnitPriceExTax = round2(listPrice * rate)
     row.newUnitPriceInTax = deriveInTax(row.newUnitPriceExTax, taxRate)
   } else if (taxModeExcluding) {
+    // 改单价：互算含税/不含税，保留行折扣不反算
     row.newUnitPriceExTax = round2(Number(row.newUnitPriceExTax) || 0)
     row.newUnitPriceInTax = deriveInTax(row.newUnitPriceExTax, taxRate)
-    row.newLineDiscountRate = listPrice > 0 ? round4(row.newUnitPriceExTax / listPrice) : 1
+    row.newLineDiscountRate = normalizeDiscountRate(row.newLineDiscountRate, 1)
   } else {
     row.newUnitPriceInTax = round2(Number(row.newUnitPriceInTax) || 0)
     row.newUnitPriceExTax = deriveExTax(row.newUnitPriceInTax, taxRate)
-    row.newLineDiscountRate = listPrice > 0 ? round4(row.newUnitPriceExTax / listPrice) : 1
+    row.newLineDiscountRate = normalizeDiscountRate(row.newLineDiscountRate, 1)
   }
 
   row.newAmountExTax = lineChangeAmount(qty, row.newUnitPriceExTax)
@@ -198,6 +195,31 @@ export function formatPriceChangeDiscount(rate) {
   return formatDiscountRatePercent(rate)
 }
 
+/** 金额展示：有小数显示有效小数，无小数显示整数；带千分位 */
+function formatGroupedSmartMoney(absVal, maxDecimals = 2) {
+  const text = formatNumber(absVal, maxDecimals, { empty: '' })
+  if (!text) return '—'
+  const neg = text.startsWith('-')
+  const raw = neg ? text.slice(1) : text
+  const [intPart, dec] = raw.split('.')
+  const withSep = Number(intPart).toLocaleString('zh-CN')
+  return `${neg ? '-' : ''}${withSep}${dec != null ? `.${dec}` : ''}`
+}
+
+export function formatPriceChangeMoney(val) {
+  const n = Number(val)
+  if (!Number.isFinite(n)) return '—'
+  const prefix = n > 0 ? '+' : n < 0 ? '-' : ''
+  return `${prefix}￥${formatGroupedSmartMoney(Math.abs(n))}`
+}
+
+export function formatPriceChangeAbsMoney(val) {
+  const n = Number(val)
+  if (!Number.isFinite(n)) return '—'
+  const sign = n < 0 ? '-' : ''
+  return `${sign}￥${formatGroupedSmartMoney(Math.abs(n))}`
+}
+
 export function buildPriceChangeApprovalGroups(changes = []) {
   return (changes || []).map((change) => {
     const items = [
@@ -237,23 +259,4 @@ export function buildPriceChangeApprovalGroups(changes = []) {
       items,
     }
   })
-}
-
-export function formatPriceChangeMoney(val) {
-  const n = Number(val)
-  if (!Number.isFinite(n)) return '—'
-  const prefix = n > 0 ? '+' : ''
-  return `${prefix}￥${n.toLocaleString('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
-export function formatPriceChangeAbsMoney(val) {
-  const n = Number(val)
-  if (!Number.isFinite(n)) return '—'
-  return `￥${n.toLocaleString('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
 }

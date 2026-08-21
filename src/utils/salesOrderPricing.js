@@ -1,3 +1,5 @@
+import { formatNumber } from '@/utils/numberFormat'
+
 export const PRICE_SOURCES = ['product', 'customer_agreement', 'contract', 'manual']
 
 export function round2(n) {
@@ -19,7 +21,8 @@ export function normalizeDiscountRate(value, fallback = 1) {
 
 export function formatDiscountRatePercent(rate) {
   const normalized = normalizeDiscountRate(rate, 1)
-  return `${round2(normalized * 100)}%`
+  const pct = formatNumber(normalized * 100, 2, { empty: '0' })
+  return `${pct}%`
 }
 
 export function ensureLinePricingFields(line = {}) {

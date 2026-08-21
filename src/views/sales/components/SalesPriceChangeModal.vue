@@ -76,6 +76,8 @@
             v-model:value="record.newUnitPriceExTax"
             :min="0"
             :precision="2"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="() => onPriceChange(record, 'unitPrice')"
           />
@@ -87,6 +89,8 @@
             v-model:value="record.newUnitPriceInTax"
             :min="0"
             :precision="2"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="() => onPriceChange(record, 'unitPrice')"
           />
@@ -98,6 +102,8 @@
             v-model:value="record._newDiscountPercent"
             :min="0"
             :precision="2"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="() => onDiscountPercentChange(record)"
           />
@@ -144,7 +150,7 @@
       <span>已改 {{ summary.changedCount }} 行</span>
     </div>
     <p class="hint">
-      已发货数量仍按当时发货单价；未发货部分通过后按新单价执行。改单价会同步反算行折扣，改折扣会同步反算含税/不含税单价。
+      已发货数量仍按当时发货单价；未发货部分通过后按新单价执行。改单价仅互算含税/不含税金额，不联动行折扣；改折扣会按标准价反算含税/不含税单价。
     </p>
 
     <template #footer>
@@ -166,6 +172,7 @@ export default { name: 'SalesPriceChangeModal' }
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { isLineDiscountDisabled, normalizeDiscountRate, round2 } from '@/utils/salesOrderPricing'
+import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import {
   PRICE_CHANGE_REASON_OPTIONS,
   PRICE_CHANGE_STATUS,
@@ -218,8 +225,8 @@ const modalTitle = computed(() =>
 
 const taxModeHint = computed(() =>
   taxModeExcluding.value
-    ? '当前：按不含税单价录入，系统自动反算含税价与行折扣'
-    : '当前：按含税单价录入，系统自动反算不含税价与行折扣',
+    ? '当前：按不含税单价录入，系统自动反算含税价（不联动行折扣）'
+    : '当前：按含税单价录入，系统自动反算不含税价（不联动行折扣）',
 )
 
 const canEditDiscount = computed(

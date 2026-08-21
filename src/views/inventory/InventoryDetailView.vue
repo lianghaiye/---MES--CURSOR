@@ -173,16 +173,16 @@
               {{ formatInventoryWeight(record.weight) }}
             </template>
             <template v-else-if="column.key === 'stockQty'">
-              {{ formatInventoryQty(record.stockQty) }}
+              {{ formatInventoryQtyWithUnit(record.stockQty, record.unit) }}
             </template>
             <template v-else-if="column.key === 'softAllocated'">
-              {{ formatInventoryQty(record.softAllocated) }}
+              {{ formatInventoryQtyWithUnit(record.softAllocated, record.unit) }}
             </template>
             <template v-else-if="column.key === 'availableQty'">
-              {{ formatInventoryQty(record.availableQty) }}
+              {{ formatInventoryQtyWithUnit(record.availableQty, record.unit) }}
             </template>
             <template v-else-if="column.key === 'dedicatedQty'">
-              {{ formatInventoryQty(record.dedicatedQty) }}
+              {{ formatInventoryQtyWithUnit(record.dedicatedQty, record.unit) }}
             </template>
             <template v-else-if="column.key === 'unitPrice'">
               {{ formatInventoryMoney(record.unitPrice) }}
@@ -310,15 +310,16 @@
     >
       <div v-if="batchDrawerRow" class="batch-soft-summary">
         <span
-          >在库合计 <b>{{ formatInventoryQty(drawerBatchStockTotal) }}</b></span
+          >在库合计
+          <b>{{ formatInventoryQtyWithUnit(drawerBatchStockTotal, batchDrawerRow.unit) }}</b></span
         >
         <span class="soft-sep">|</span>
         <span>
           软占用（物料级）
           <a v-if="drawerItemSoftAllocated > 0" class="soft-link" @click="openSoftAllocDetail">
-            {{ formatInventoryQty(drawerItemSoftAllocated) }}
+            {{ formatInventoryQtyWithUnit(drawerItemSoftAllocated, batchDrawerRow.unit) }}
           </a>
-          <b v-else>{{ formatInventoryQty(0) }}</b>
+          <b v-else>{{ formatInventoryQtyWithUnit(0, batchDrawerRow.unit) }}</b>
           <a-button
             v-if="drawerItemSoftAllocated > 0"
             type="link"
@@ -331,7 +332,10 @@
         </span>
         <span class="soft-sep">|</span>
         <span
-          >可用约 <b>{{ formatInventoryQty(drawerItemAvailableApprox) }}</b></span
+          >可用约
+          <b>{{
+            formatInventoryQtyWithUnit(drawerItemAvailableApprox, batchDrawerRow.unit)
+          }}</b></span
         >
       </div>
       <a-alert
@@ -355,14 +359,14 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'currentLength'">
-            {{ formatInventoryQty(record.currentLength) }}
+            {{ formatInventoryQtyWithUnit(record.currentLength, batchDrawerRow?.unit) }}
           </template>
           <template v-else-if="column.key === 'softAllocated'">
             <a-tooltip title="本物料软占用合计（非本批独占）">
               <a v-if="drawerItemSoftAllocated > 0" class="soft-link" @click="openSoftAllocDetail">
-                {{ formatInventoryQty(drawerItemSoftAllocated) }}
+                {{ formatInventoryQtyWithUnit(drawerItemSoftAllocated, batchDrawerRow?.unit) }}
               </a>
-              <span v-else>{{ formatInventoryQty(0) }}</span>
+              <span v-else>{{ formatInventoryQtyWithUnit(0, batchDrawerRow?.unit) }}</span>
             </a-tooltip>
           </template>
         </template>
@@ -392,7 +396,7 @@
             <span v-else>{{ record.salesOrderNo || '—' }}</span>
           </template>
           <template v-else-if="column.key === 'qty'">
-            {{ formatInventoryQty(record.qty) }}
+            {{ formatInventoryQtyWithUnit(record.qty, batchDrawerRow?.unit) }}
           </template>
         </template>
       </a-table>
@@ -445,6 +449,7 @@ import {
   filterInventoryDetailLines,
   formatInventoryMoney,
   formatInventoryQty,
+  formatInventoryQtyWithUnit,
   formatInventoryWeight,
   inventoryItemTypeOptions,
 } from '@/utils/inventoryDetailLines'
@@ -654,10 +659,10 @@ const baseColumns = [
   { title: '材质', dataIndex: 'material', width: 88 },
   { title: '图号', dataIndex: 'drawingNo', width: 110, ellipsis: true },
   { title: '重量', key: 'weight', width: 88, align: 'right' },
-  { title: '现存量', key: 'stockQty', width: 88, align: 'right' },
-  { title: '软占用', key: 'softAllocated', width: 88, align: 'right' },
-  { title: '可用', key: 'availableQty', width: 88, align: 'right' },
-  { title: '按单在库', key: 'dedicatedQty', width: 96, align: 'right' },
+  { title: '现存量', key: 'stockQty', width: 110, align: 'right' },
+  { title: '软占用', key: 'softAllocated', width: 110, align: 'right' },
+  { title: '可用', key: 'availableQty', width: 110, align: 'right' },
+  { title: '按单在库', key: 'dedicatedQty', width: 110, align: 'right' },
   { title: '库位', dataIndex: 'locationNo', width: 110 },
   { title: '单价', key: 'unitPrice', width: 100, align: 'right' },
   { title: '库存总金额', key: 'totalAmount', width: 110, align: 'right' },
@@ -665,7 +670,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inventory-detail-list-v2', baseColumns, { minScrollX: 1800 })
+  useTableColumnSettings('inventory-detail-list-v3', baseColumns, { minScrollX: 1880 })
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1

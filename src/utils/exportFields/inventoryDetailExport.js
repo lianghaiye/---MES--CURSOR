@@ -1,7 +1,7 @@
 import { cell } from './exportFieldHelpers'
 import {
   formatInventoryMoney,
-  formatInventoryQty,
+  formatInventoryQtyWithUnit,
   formatInventoryWeight,
 } from '@/utils/inventoryDetailLines'
 
@@ -21,7 +21,12 @@ export const inventoryDetailExportFields = [
   {
     key: 'stockQty',
     title: '库存数量',
-    getValue: (row) => formatInventoryQty(row.stockQty),
+    getValue: (row) => formatInventoryQtyWithUnit(row.stockQty, row.unit),
+  },
+  {
+    key: 'softAllocated',
+    title: '软占用',
+    getValue: (row) => formatInventoryQtyWithUnit(row.softAllocated, row.unit),
   },
   { key: 'locationNo', title: '库位', getValue: (row) => cell(row, 'locationNo') },
   {

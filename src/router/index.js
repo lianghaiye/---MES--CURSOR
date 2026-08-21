@@ -564,7 +564,7 @@ const routes = [
       {
         path: 'quality/qc-template',
         name: 'quality-qc-template',
-        component: () => import('@/views/industrial-id/ProductTemplateView.vue'),
+        component: () => import('@/views/quality/QcTemplateView.vue'),
         meta: { title: '质检模板' },
       },
       {

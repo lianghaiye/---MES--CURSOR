@@ -29,6 +29,7 @@ function buildMasterIndex(products = [], materials = [], spus = []) {
       drawingNo: p.drawingNo || '',
       weight: p.weight ?? null,
       unitPrice: p.unitPrice ?? null,
+      unit: p.inventoryUnit || p.unit || '件',
       spuId: p.spuId || '',
       spuCode: spu?.code || '',
       isVariantSku: Boolean(p.isVariantSku || p.spuId),
@@ -46,6 +47,7 @@ function buildMasterIndex(products = [], materials = [], spus = []) {
       drawingNo: m.drawingNo || '',
       weight: m.weight ?? null,
       unitPrice: m.unitPrice ?? null,
+      unit: m.inventoryUnit || m.stockUnit || m.unit || '件',
       spuId: m.spuId || '',
       spuCode: spu?.code || '',
       isVariantSku: Boolean(m.isVariantSku || m.spuId),
@@ -74,6 +76,7 @@ function resolveMaster(byCode, itemCode, itemName, itemType) {
     drawingNo: '',
     weight: null,
     unitPrice: null,
+    unit: '件',
     spuId: '',
     spuCode: '',
     isVariantSku: false,
@@ -121,6 +124,7 @@ function enrichStockRow(row, master) {
     material: master.material,
     drawingNo: master.drawingNo,
     weight: master.weight,
+    unit: row.unit || master.unit || '件',
     stockQty: qty,
     locationNo,
     unitPrice,
@@ -202,6 +206,14 @@ export function filterInventoryDetailLines(rows, filters = {}) {
 export function formatInventoryQty(val) {
   if (val == null || val === '') return '—'
   return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
+
+/** 数量 + 单位，如「20 件」 */
+export function formatInventoryQtyWithUnit(val, unit) {
+  const q = formatInventoryQty(val)
+  if (q === '—') return '—'
+  const u = String(unit || '').trim()
+  return u ? `${q} ${u}` : q
 }
 
 export function formatInventoryMoney(val) {
