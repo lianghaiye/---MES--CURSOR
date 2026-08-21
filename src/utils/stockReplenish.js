@@ -4,9 +4,29 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { getOnHandQtyByItemCode } from '@/store/salesStockAllocationStore'
+import { productionPlanState } from '@/store/productionPlanStore'
+import { flattenMaterials } from '@/utils/material'
 import { PLAN_SOURCE, PLAN_SOURCE_OPTIONS, planSourceLabel } from '@/utils/planSource'
 
 export { PLAN_SOURCE, PLAN_SOURCE_OPTIONS, planSourceLabel }
+
+/** 预警列表「来源」：水位预警 / 生产计划关联 / 手工 */
+export const STOCK_ALERT_SOURCE = {
+  ALERT: 'alert',
+  PRODUCTION_PLAN: 'production-plan',
+  MANUAL: 'manual',
+}
+
+export const STOCK_ALERT_SOURCE_OPTIONS = [
+  { value: STOCK_ALERT_SOURCE.PRODUCTION_PLAN, label: '生产计划' },
+  { value: STOCK_ALERT_SOURCE.ALERT, label: '预警' },
+  { value: STOCK_ALERT_SOURCE.MANUAL, label: '手工' },
+]
+
+export function stockAlertSourceLabel(source) {
+  const hit = STOCK_ALERT_SOURCE_OPTIONS.find((o) => o.value === source)
+  return hit?.label || '预警'
+}
 
 export const REPLENISH_ACTION = {
   /** 直接生成加工工单（与生产计划「生成加工工单」一致） */
@@ -151,7 +171,57 @@ function buildTransitMaps() {
   }
 }
 
-function mapItemToSuggestion(item, itemKind, purchaseMap, wipMap) {
+function isActiveProductionPlan(plan) {
+  const status = String(plan?.orderStatus || '').trim()
+  if (!status) return true
+  return status !== '已完成' && status !== '已关闭' && status !== '已作废'
+}
+
+function resolvePlanDisplayNo(plan) {
+  return String(plan?.salesOrderNo || plan?.orderNo || plan?.id || '').trim()
+}
+
+function addPlanRefToMap(map, code, plan) {
+  const key = String(code || '').trim()
+  if (!key || !plan) return
+  let entry = map.get(key)
+  if (!entry) {
+    entry = { planNos: [], planIds: [], plans: [] }
+    map.set(key, entry)
+  }
+  const planId = plan.id || ''
+  const planNo = resolvePlanDisplayNo(plan)
+  if (planId && !entry.planIds.includes(planId)) {
+    entry.planIds.push(planId)
+    entry.plans.push({ id: planId, planNo })
+  }
+  if (planNo && !entry.planNos.includes(planNo)) {
+    entry.planNos.push(planNo)
+  }
+}
+
+/**
+ * 未完成生产计划中出现的物料/产品编码 → 关联计划单号
+ * （用于水位预警行标记来源为「生产计划」）
+ */
+export function buildProductionPlanItemRefMap(plans = productionPlanState.plans) {
+  const map = new Map()
+  for (const plan of plans || []) {
+    if (!isActiveProductionPlan(plan)) continue
+    for (const wi of plan.workItems || []) {
+      addPlanRefToMap(map, wi.productCode, plan)
+      const materials = []
+      flattenMaterials(wi.materials || [], materials)
+      if (wi._topMaterial) materials.push(wi._topMaterial)
+      materials.forEach((m) => {
+        addPlanRefToMap(map, m.code || m.materialCode || m.productCode, plan)
+      })
+    }
+  }
+  return map
+}
+
+function mapItemToSuggestion(item, itemKind, purchaseMap, wipMap, planRefMap) {
   const availableStock = resolveItemAvailableStock(item)
   const suggestQty = calcReplenishSuggestQty(item, availableStock)
   const bom =
@@ -162,6 +232,8 @@ function mapItemToSuggestion(item, itemKind, purchaseMap, wipMap) {
   const supplyType = item.supplyForm || item.supplyType || ''
   const transit = resolveTransitForItem(item, purchaseMap, wipMap)
   const variantSummary = resolveVariantSummary(item)
+  const planRef = planRefMap?.get(String(item.code || '').trim()) || null
+  const fromProductionPlan = Boolean(planRef?.planNos?.length)
   return {
     key: `${itemKind}-${item.id}`,
     itemKind,
@@ -193,30 +265,55 @@ function mapItemToSuggestion(item, itemKind, purchaseMap, wipMap) {
     action,
     fromAlert: true,
     manual: false,
+    fromProductionPlan,
+    alertSource: fromProductionPlan ? STOCK_ALERT_SOURCE.PRODUCTION_PLAN : STOCK_ALERT_SOURCE.ALERT,
+    planNos: planRef?.planNos || [],
+    planIds: planRef?.planIds || [],
+    productionPlans: planRef?.plans || [],
   }
+}
+
+function sortReplenishRows(rows = []) {
+  const rank = (row) => {
+    if (row.manual) return 2
+    if (row.alertSource === STOCK_ALERT_SOURCE.PRODUCTION_PLAN || row.fromProductionPlan) return 0
+    return 1
+  }
+  return [...rows].sort((a, b) => {
+    const d = rank(a) - rank(b)
+    if (d !== 0) return d
+    return String(a.productCode || '').localeCompare(String(b.productCode || ''))
+  })
 }
 
 /**
  * 列出预警触发的补货建议（产品 + 物料）
+ * 若物料同时出现在未完成生产计划中：来源标「生产计划」并置顶，合并为一行
  */
 export function listStockReplenishSuggestions() {
   const { purchaseMap, wipMap } = buildTransitMaps()
+  const planRefMap = buildProductionPlanItemRefMap()
   const products = productInfoState.products
     .filter((p) => needsStockReplenish(p))
-    .map((p) => mapItemToSuggestion(p, 'product', purchaseMap, wipMap))
+    .map((p) => mapItemToSuggestion(p, 'product', purchaseMap, wipMap, planRefMap))
   const materials = materialInfoState.materials
     .filter((m) => needsStockReplenish(m))
-    .map((m) => mapItemToSuggestion(m, 'material', purchaseMap, wipMap))
-  return [...products, ...materials].filter((row) => row.planQty > 0 || row.suggestQty > 0)
+    .map((m) => mapItemToSuggestion(m, 'material', purchaseMap, wipMap, planRefMap))
+  return sortReplenishRows(
+    [...products, ...materials].filter((row) => row.planQty > 0 || row.suggestQty > 0),
+  )
 }
 
 /** 手工添加产品/物料为补货行 */
 export function buildManualReplenishRow(item, itemKind = 'product') {
   if (!item) return null
   const { purchaseMap, wipMap } = buildTransitMaps()
-  const row = mapItemToSuggestion(item, itemKind, purchaseMap, wipMap)
+  const planRefMap = buildProductionPlanItemRefMap()
+  const row = mapItemToSuggestion(item, itemKind, purchaseMap, wipMap, planRefMap)
   row.fromAlert = false
   row.manual = true
+  row.alertSource = STOCK_ALERT_SOURCE.MANUAL
+  // 手工行仍保留计划关联信息，但不改「手工」来源展示
   if (!(Number(row.planQty) > 0)) row.planQty = 1
   return row
 }

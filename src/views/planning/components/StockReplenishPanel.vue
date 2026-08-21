@@ -1,85 +1,142 @@
 <template>
   <div class="stock-replenish-panel">
-    <a-alert
-      type="info"
-      show-icon
-      class="hint"
-      message="列出开启库存预警且现存量 ≤ 最低库存的产品/物料。也可手工添加。建议数量 = max(最高−可用, 补货批量)。自制默认生产，外购默认采购，外协默认外协，可改。「生产」打开与生产计划相同的生成加工工单弹窗；「生产计划」直接生成计划；采购/外协打开对应生成弹窗。仅执行成功后写入补货台账。"
-    />
-    <div class="toolbar">
-      <a-space>
-        <a-button size="small" @click="refreshRows">刷新预警</a-button>
-        <a-button size="small" type="dashed" @click="pickOpen = true">手工添加物料/产品</a-button>
-        <a-tooltip :title="batchDisabledTip">
-          <span class="batch-btn-wrap">
-            <a-button
-              type="primary"
-              size="small"
-              :disabled="batchExecuteDisabled"
-              @click="handleConfirm()"
-            >
-              批量执行（{{ selectedKeys.length }}）
-            </a-button>
-          </span>
-        </a-tooltip>
-      </a-space>
+    <div class="filter-card">
+      <div class="filter-row">
+        <a-form layout="inline" class="filter-form" :model="filters">
+          <a-form-item label="来源">
+            <a-select
+              v-model:value="filters.alertSource"
+              allow-clear
+              placeholder="全部"
+              :options="sourceFilterOpts"
+              style="width: 120px"
+            />
+          </a-form-item>
+          <a-form-item label="产品名称">
+            <a-input
+              v-model:value="filters.productName"
+              allow-clear
+              placeholder="搜索名称"
+              style="width: 140px"
+            />
+          </a-form-item>
+          <a-form-item label="编码">
+            <a-input
+              v-model:value="filters.productCode"
+              allow-clear
+              placeholder="搜索编码"
+              style="width: 140px"
+            />
+          </a-form-item>
+          <a-form-item label="规格型号">
+            <a-input
+              v-model:value="filters.specModel"
+              allow-clear
+              placeholder="搜索规格"
+              style="width: 140px"
+            />
+          </a-form-item>
+        </a-form>
+        <a-space class="filter-actions" :size="8">
+          <a-button type="primary" @click="applyFilters">搜索</a-button>
+          <a-button @click="resetFilters">清空</a-button>
+        </a-space>
+      </div>
     </div>
-    <a-table
-      size="small"
-      row-key="key"
-      :columns="columns"
-      :data-source="rows"
-      :pagination="false"
-      :row-selection="rowSelection"
-      :scroll="{ y: tableScrollY, x: 1680 }"
-      class="replenish-table"
-    >
-      <template #bodyCell="{ column, record, index }">
-        <template v-if="column.key === 'index'">
-          {{ index + 1 }}
-        </template>
-        <template v-else-if="column.key === 'source'">
-          <a-tag v-if="record.manual" color="blue">手工</a-tag>
-          <a-tag v-else color="orange">预警</a-tag>
-        </template>
-        <template v-else-if="column.key === 'inTransit'">
-          <a-tooltip v-if="record.inTransitTip" :title="record.inTransitTip">
-            <span>{{ record.inTransitText || '—' }}</span>
+
+    <div class="table-card">
+      <div class="table-toolbar">
+        <a-space>
+          <a-button @click="refreshRows">刷新预警</a-button>
+          <a-button type="dashed" @click="pickOpen = true">手工添加物料/产品</a-button>
+          <a-tooltip :title="batchDisabledTip">
+            <span class="batch-btn-wrap">
+              <a-button type="primary" :disabled="batchExecuteDisabled" @click="handleConfirm()">
+                批量执行（{{ selectedKeys.length }}）
+              </a-button>
+            </span>
           </a-tooltip>
-          <span v-else>{{ record.inTransitText || '—' }}</span>
+        </a-space>
+        <a-space :size="4" class="toolbar-icons">
+          <TableColumnSettingButton @click="columnDrawerOpen = true" />
+        </a-space>
+      </div>
+      <a-table
+        size="middle"
+        row-key="key"
+        :columns="displayColumns"
+        :data-source="displayRows"
+        :pagination="false"
+        :row-selection="rowSelection"
+        :scroll="{ y: tableScrollY, x: tableScrollX }"
+        class="replenish-table"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">
+            {{ index + 1 }}
+          </template>
+          <template v-else-if="column.key === 'source'">
+            <a-tag v-if="record.manual || record.alertSource === 'manual'" color="blue">手工</a-tag>
+            <a-tag
+              v-else-if="record.alertSource === 'production-plan' || record.fromProductionPlan"
+              color="purple"
+            >
+              生产计划
+            </a-tag>
+            <a-tag v-else color="orange">预警</a-tag>
+          </template>
+          <template v-else-if="column.key === 'planNos'">
+            <template v-if="(record.planNos || []).length">
+              <a
+                v-for="(no, idx) in record.planNos"
+                :key="`${record.key}-${no}`"
+                class="plan-link"
+                @click.prevent="goProductionPlan(record, no)"
+              >
+                {{ no }}<template v-if="idx < record.planNos.length - 1">、</template>
+              </a>
+            </template>
+            <span v-else class="muted">—</span>
+          </template>
+          <template v-else-if="column.key === 'inTransit'">
+            <a-tooltip v-if="record.inTransitTip" :title="record.inTransitTip">
+              <span>{{ record.inTransitText || '—' }}</span>
+            </a-tooltip>
+            <span v-else>{{ record.inTransitText || '—' }}</span>
+          </template>
+          <template v-else-if="column.key === 'planQty'">
+            <a-input-number
+              v-model:value="record.planQty"
+              size="small"
+              :min="0"
+              :precision="2"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="column.key === 'actionSelect'">
+            <a-select
+              v-model:value="record.action"
+              size="small"
+              style="width: 100%"
+              :options="actionOpts"
+            />
+          </template>
+          <template v-else-if="column.key === 'bomLabel'">
+            {{ record.bomLabel || '-' }}
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-button
+              type="link"
+              size="small"
+              :disabled="!(Number(record.planQty) > 0)"
+              @click="handleConfirm([record.key])"
+            >
+              执行补货
+            </a-button>
+          </template>
         </template>
-        <template v-else-if="column.key === 'planQty'">
-          <a-input-number
-            v-model:value="record.planQty"
-            size="small"
-            :min="0"
-            :precision="2"
-            style="width: 100%"
-          />
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-select
-            v-model:value="record.action"
-            size="small"
-            style="width: 100%"
-            :options="actionOpts"
-          />
-        </template>
-        <template v-else-if="column.key === 'bomLabel'">
-          {{ record.bomLabel || '-' }}
-        </template>
-        <template v-else-if="column.key === 'ops'">
-          <a-button
-            type="link"
-            size="small"
-            :disabled="!(Number(record.planQty) > 0)"
-            @click="handleConfirm([record.key])"
-          >
-            执行补货
-          </a-button>
-        </template>
-      </template>
-    </a-table>
+      </a-table>
+    </div>
 
     <SelectBomMaterialModal
       v-model:open="pickOpen"
@@ -109,11 +166,18 @@
       :materials="modalMaterials"
       @save="onOutsourceSaved"
     />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+      title="列显隐"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, h } from 'vue'
+import { computed, onMounted, reactive, ref, h } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
@@ -122,6 +186,8 @@ import { PLAN_SOURCE } from '@/utils/planSource'
 import {
   REPLENISH_ACTION,
   REPLENISH_ACTION_OPTIONS,
+  STOCK_ALERT_SOURCE,
+  STOCK_ALERT_SOURCE_OPTIONS,
   buildManualReplenishRow,
   listStockReplenishSuggestions,
 } from '@/utils/stockReplenish'
@@ -137,10 +203,13 @@ import SelectBomMaterialModal from '@/views/product-process/components/SelectBom
 import GeneratePurchaseRequisitionModal from './GeneratePurchaseRequisitionModal.vue'
 import GenerateWorkOrderModal from './GenerateWorkOrderModal.vue'
 import GenerateOutsourceWorkOrderModal from './GenerateOutsourceWorkOrderModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { applyReplenishExecuteToLedger } from '@/store/replenishLedgerStore'
 
 defineProps({
-  tableScrollY: { type: [Number, String], default: 'calc(100vh - 280px)' },
+  tableScrollY: { type: [Number, String], default: 'calc(100vh - 300px)' },
 })
 
 const emit = defineEmits(['created'])
@@ -159,27 +228,100 @@ const modalMaterials = ref([])
 /** 打开弹窗时对应的预警行，保存后写台账用 */
 const pendingReplenishRows = ref([])
 
-const actionOpts = REPLENISH_ACTION_OPTIONS
+const filters = reactive({
+  alertSource: undefined,
+  productName: '',
+  productCode: '',
+  specModel: '',
+})
+const appliedFilters = reactive({ ...filters })
 
-const columns = [
+const actionOpts = REPLENISH_ACTION_OPTIONS
+const sourceFilterOpts = STOCK_ALERT_SOURCE_OPTIONS
+
+const baseColumns = [
   { title: '序号', key: 'index', width: 56, fixed: 'left' },
-  { title: '来源', key: 'source', width: 72, fixed: 'left' },
-  { title: '编码', dataIndex: 'productCode', width: 110, fixed: 'left' },
-  { title: '名称', dataIndex: 'productName', ellipsis: true, width: 140 },
-  { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
-  { title: '材质', dataIndex: 'material', width: 72, ellipsis: true },
-  { title: '变体属性', dataIndex: 'variantSummary', width: 120, ellipsis: true },
-  { title: '图号', dataIndex: 'drawingNo', width: 90, ellipsis: true },
-  { title: '当前库存', dataIndex: 'availableStock', width: 88, align: 'right' },
+  { title: '来源', key: 'source', width: 88, fixed: 'left' },
+  { title: '计划单号', key: 'planNos', width: 160, ellipsis: true, fixed: 'left' },
+  { title: '编码', key: 'productCode', dataIndex: 'productCode', width: 110 },
+  { title: '名称', key: 'productName', dataIndex: 'productName', ellipsis: true, width: 140 },
+  { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 100, ellipsis: true },
+  { title: '材质', key: 'material', dataIndex: 'material', width: 72, ellipsis: true },
+  {
+    title: '变体属性',
+    key: 'variantSummary',
+    dataIndex: 'variantSummary',
+    width: 120,
+    ellipsis: true,
+  },
+  { title: '图号', key: 'drawingNo', dataIndex: 'drawingNo', width: 90, ellipsis: true },
+  {
+    title: '当前库存',
+    key: 'availableStock',
+    dataIndex: 'availableStock',
+    width: 88,
+    align: 'right',
+  },
   { title: '在途/在制', key: 'inTransit', width: 110, ellipsis: true },
-  { title: '最低', dataIndex: 'minStockQty', width: 64, align: 'right' },
-  { title: '最高', dataIndex: 'maxStockQty', width: 64, align: 'right' },
-  { title: '建议', dataIndex: 'suggestQty', width: 72, align: 'right' },
+  { title: '最低', key: 'minStockQty', dataIndex: 'minStockQty', width: 64, align: 'right' },
+  { title: '最高', key: 'maxStockQty', dataIndex: 'maxStockQty', width: 64, align: 'right' },
+  { title: '建议', key: 'suggestQty', dataIndex: 'suggestQty', width: 72, align: 'right' },
   { title: '数量', key: 'planQty', width: 100 },
-  { title: '动作', key: 'action', width: 110 },
+  { title: '动作', key: 'actionSelect', width: 110 },
   { title: 'BOM', key: 'bomLabel', width: 140, ellipsis: true },
-  { title: '操作', key: 'ops', width: 96, fixed: 'right' },
+  { title: '操作', key: 'action', width: 96, fixed: 'right' },
 ]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('planning-stock-replenish-v1', baseColumns)
+
+function resolveRowSource(row) {
+  if (row.manual || row.alertSource === STOCK_ALERT_SOURCE.MANUAL) {
+    return STOCK_ALERT_SOURCE.MANUAL
+  }
+  if (row.alertSource === STOCK_ALERT_SOURCE.PRODUCTION_PLAN || row.fromProductionPlan) {
+    return STOCK_ALERT_SOURCE.PRODUCTION_PLAN
+  }
+  return STOCK_ALERT_SOURCE.ALERT
+}
+
+const displayRows = computed(() => {
+  const name = String(appliedFilters.productName || '')
+    .trim()
+    .toLowerCase()
+  const code = String(appliedFilters.productCode || '')
+    .trim()
+    .toLowerCase()
+  const spec = String(appliedFilters.specModel || '')
+    .trim()
+    .toLowerCase()
+  const source = appliedFilters.alertSource
+  return rows.value.filter((r) => {
+    if (source && resolveRowSource(r) !== source) return false
+    if (
+      name &&
+      !String(r.productName || '')
+        .toLowerCase()
+        .includes(name)
+    )
+      return false
+    if (
+      code &&
+      !String(r.productCode || '')
+        .toLowerCase()
+        .includes(code)
+    )
+      return false
+    if (
+      spec &&
+      !String(r.specModel || '')
+        .toLowerCase()
+        .includes(spec)
+    )
+      return false
+    return true
+  })
+})
 
 const selectedRows = computed(() =>
   rows.value.filter((r) => selectedKeys.value.includes(r.key) && Number(r.planQty) > 0),
@@ -212,15 +354,46 @@ const rowSelection = computed(() => ({
   }),
 }))
 
+function applyFilters() {
+  Object.assign(appliedFilters, { ...filters })
+}
+
+function resetFilters() {
+  filters.alertSource = undefined
+  filters.productName = ''
+  filters.productCode = ''
+  filters.specModel = ''
+  Object.assign(appliedFilters, { ...filters })
+}
+
 function refreshRows() {
   const alertRows = listStockReplenishSuggestions()
   const manualKeep = rows.value.filter((r) => r.manual)
   const map = new Map()
   ;[...alertRows, ...manualKeep].forEach((r) => map.set(r.key, r))
-  rows.value = [...map.values()]
+  // 生产计划来源优先，手工靠后
+  rows.value = [...map.values()].sort((a, b) => {
+    const rank = (row) => {
+      if (row.manual) return 2
+      if (resolveRowSource(row) === STOCK_ALERT_SOURCE.PRODUCTION_PLAN) return 0
+      return 1
+    }
+    const d = rank(a) - rank(b)
+    if (d !== 0) return d
+    return String(a.productCode || '').localeCompare(String(b.productCode || ''))
+  })
   selectedKeys.value = selectedKeys.value.filter((key) =>
     rows.value.some((r) => r.key === key && Number(r.planQty) > 0),
   )
+}
+
+function goProductionPlan(_record, planNo) {
+  const path = '/planning/production-plan'
+  openTab(path, '生产计划')
+  router.push({
+    path,
+    query: planNo ? { orderNo: planNo } : undefined,
+  })
 }
 
 onMounted(() => {
@@ -297,7 +470,11 @@ function mapReplenishRowsToPlanMaterials(list, supplyType) {
       bomName: r.bomName || '',
       bomVersion: r.bomVersion || '',
       productId: r.productId || '',
-      remark: r.manual ? '手工补货' : '库存预警',
+      remark: r.manual
+        ? '手工补货'
+        : r.fromProductionPlan || r.alertSource === 'production-plan'
+          ? '生产计划关联预警'
+          : '库存预警',
     }
   })
 }
@@ -519,16 +696,79 @@ defineExpose({ refreshRows })
 </script>
 
 <style lang="less" scoped>
-.hint {
+.stock-replenish-panel {
+  padding: 0;
+}
+
+.filter-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border: 1px solid #f0f0f0;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.filter-form {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0 !important;
+
+  :deep(.ant-form-item) {
+    margin-bottom: 0 !important;
+    margin-right: 16px;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    height: 32px;
+    line-height: 32px;
+  }
+}
+
+.filter-actions {
+  flex-shrink: 0;
+}
+
+.table-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 16px 16px;
+  border: 1px solid #f0f0f0;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
 }
-.toolbar {
-  margin-bottom: 8px;
+
+.toolbar-icons {
+  flex-shrink: 0;
 }
-.replenish-table {
-  margin-top: 4px;
-}
+
 .batch-btn-wrap {
   display: inline-block;
+}
+
+.plan-link {
+  color: #1677ff;
+  cursor: pointer;
+}
+
+.muted {
+  color: rgba(0, 0, 0, 0.25);
 }
 </style>

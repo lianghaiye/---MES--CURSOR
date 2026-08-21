@@ -664,7 +664,7 @@ export default {
 import { computed, onMounted, onUnmounted, reactive, ref, watch, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
 import { InfoCircleOutlined, PrinterOutlined } from '@ant-design/icons-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
@@ -736,6 +736,7 @@ import {
 } from '@/mock/productionPlanPrintColumns'
 import { buildProductionPlanOrderTree } from '@/utils/productionPlanOrderTree'
 
+const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
@@ -1446,6 +1447,16 @@ function onFullscreenKeydown(event) {
 
 onMounted(() => {
   window.addEventListener('keydown', onFullscreenKeydown)
+  const qOrderNo = String(route.query.orderNo || '').trim()
+  if (qOrderNo) {
+    filters.orderNo = qOrderNo
+    appliedFilters.value = { ...filters }
+    pagination.current = 1
+    const hit = productionPlanState.plans.find(
+      (p) => p.salesOrderNo === qOrderNo || p.orderNo === qOrderNo || p.id === qOrderNo,
+    )
+    if (hit) selectedId.value = hit.id
+  }
   if (!selectedId.value && filteredOrders.value[0]) {
     selectedId.value = filteredOrders.value[0].id
   }

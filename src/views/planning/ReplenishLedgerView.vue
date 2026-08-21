@@ -67,7 +67,6 @@
               <a-space>
                 <a-button type="primary" size="small" @click="handleSearch">查询</a-button>
                 <a-button size="small" @click="handleReset">重置</a-button>
-                <a-button size="small" @click="goReplenishCenter">去库存预警</a-button>
               </a-space>
             </a-form-item>
           </a-col>
@@ -219,11 +218,6 @@ function handleReset() {
   filters.dateRange = null
   appliedFilters.value = { ...filters }
   pagination.current = 1
-}
-
-function goReplenishCenter() {
-  openTab('/planning/replenish-center', '库存预警')
-  router.push('/planning/replenish-center')
 }
 
 function goPlan() {
