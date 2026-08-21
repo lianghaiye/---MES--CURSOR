@@ -71,7 +71,7 @@
             class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
           >
             <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane key="issue" :tab="`发料信息 (${issueRows.length})`" />
+            <a-tab-pane key="issue" :tab="`发料信息 (${issueApplicationRows.length})`" />
             <a-tab-pane key="return" :tab="`回货信息 (${relatedInboundLines.length})`" />
             <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
             <a-tab-pane key="goodsReturn" :tab="`外协异常处理 (${relatedReturnLines.length})`" />
@@ -157,7 +157,52 @@
 
           <template v-else-if="activeTab === 'issue'">
             <div class="section-card">
-              <div class="section-title">发料信息</div>
+              <div class="section-title">发料申请（{{ issueApplicationRows.length }}）</div>
+              <a-table
+                :columns="issueApplicationColumns"
+                :data-source="issueApplicationRows"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1100 }"
+                :locale="{ emptyText: '暂无发料申请' }"
+              >
+                <template #bodyCell="{ column, record: row }">
+                  <template v-if="column.key === 'outboundStatus'">
+                    <a-badge
+                      :status="outsourcingIssueOutboundBadge(row.outboundStatus)"
+                      :text="row.outboundStatus || '—'"
+                    />
+                  </template>
+                  <template v-else-if="column.key === 'issueOrderNo'">
+                    <a
+                      v-if="row.id"
+                      class="link-code"
+                      @click.prevent="goIssueApplicationDetail(row)"
+                    >
+                      {{ row.issueOrderNo || '—' }}
+                    </a>
+                    <span v-else>{{ row.issueOrderNo || '—' }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'applyQty'">
+                    {{ formatQty(row.applyQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'actualQty'">
+                    {{ formatQty(row.actualQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'qty'">
+                    {{ row.lineCount || 0 }} 行 / {{ formatQty(row.totalQty) }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </div>
+
+            <div class="section-card">
+              <div class="section-title">出库信息（{{ issueRows.length }}）</div>
               <a-table
                 :columns="issueColumns"
                 :data-source="issueRows"
@@ -166,7 +211,7 @@
                 bordered
                 :pagination="false"
                 :scroll="{ x: issueTableScrollX }"
-                :locale="{ emptyText: '暂无发料信息' }"
+                :locale="{ emptyText: '暂无出库信息' }"
               >
                 <template #bodyCell="{ column, record: row, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -359,6 +404,10 @@ import {
   createOutboundIssueLineColumns,
   getOutboundIssueLineScrollX,
 } from '@/utils/outboundIssueLines'
+import {
+  listIssueApplicationsForOutsourcingOrder,
+  outsourcingIssueOutboundBadge,
+} from '@/utils/outsourcingIssueApplications'
 import { getInboundOrdersByOutsourcingOrder } from '@/store/inboundOrderStore'
 import {
   flattenPurchaseOrderInboundLines,
@@ -414,6 +463,17 @@ const lineColumns = [
 const issueColumns = createOutboundIssueLineColumns()
 const issueTableScrollX = getOutboundIssueLineScrollX(issueColumns)
 
+const issueApplicationColumns = [
+  { title: '出库状态', key: 'outboundStatus', width: 110 },
+  { title: '发料单号', key: 'issueOrderNo', width: 160 },
+  { title: '申请发料数量', key: 'applyQty', width: 120, align: 'right' },
+  { title: '实际发料数量', key: 'actualQty', width: 120, align: 'right' },
+  { title: '出货日期', dataIndex: 'shipDate', key: 'shipDate', width: 120 },
+  { title: '数量', key: 'qty', width: 120 },
+  { title: '申请人', dataIndex: 'creator', key: 'creator', width: 90 },
+  { title: '申请时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+]
+
 const returnColumns = createInboundInfoLineColumns()
 const returnTableScrollX = getInboundInfoLineScrollX(returnColumns)
 
@@ -461,6 +521,7 @@ const summary = computed(() => {
 
 const approvalRecords = computed(() => record.value?.approvalRecords || [])
 
+const issueApplicationRows = computed(() => listIssueApplicationsForOutsourcingOrder(record.value))
 const issueRows = computed(() => flattenOutsourcingIssueOutboundLines(record.value))
 
 const relatedInboundOrders = computed(() => getInboundOrdersByOutsourcingOrder(record.value))
@@ -549,6 +610,13 @@ function goInboundDetailById(orderId) {
   const path = `/inventory/inbound/${orderId}`
   openTab(path, `入库单 ${order?.docNo || ''}`)
   router.push({ name: 'inventory-inbound-detail', params: { id: orderId } })
+}
+
+function goIssueApplicationDetail(row) {
+  if (!row?.id) return
+  const path = `/procurement/outsourcing-issue/${row.id}`
+  openTab(path, `发料申请 ${row.issueOrderNo || ''}`.trim())
+  router.push(path)
 }
 
 function openReturnDetail(row) {

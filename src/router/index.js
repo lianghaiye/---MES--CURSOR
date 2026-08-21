@@ -682,6 +682,18 @@ const routes = [
         meta: { title: '外协订单详情' },
       },
       {
+        path: 'procurement/outsourcing-issue',
+        name: 'procurement-outsourcing-issue',
+        component: () => import('@/views/procurement/OutsourcingIssueManagementView.vue'),
+        meta: { title: '发料管理' },
+      },
+      {
+        path: 'procurement/outsourcing-issue/:id',
+        name: 'procurement-outsourcing-issue-detail',
+        component: () => import('@/views/procurement/OutsourcingIssueDetailView.vue'),
+        meta: { title: '发料申请详情', listPath: '/procurement/outsourcing-issue' },
+      },
+      {
         path: 'procurement/outsourcing-receipts',
         name: 'procurement-outsourcing-receipts',
         component: () => import('@/views/procurement/OutsourcingReceiptView.vue'),

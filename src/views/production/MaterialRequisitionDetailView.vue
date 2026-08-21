@@ -39,53 +39,8 @@
       <div class="tab-body">
         <template v-if="activeTab === 'basic'">
           <div class="section-card">
-            <div class="section-title">申请信息</div>
-            <a-descriptions :column="3" size="small" bordered>
-              <a-descriptions-item label="申请单号">{{ record.reqNo }}</a-descriptions-item>
-              <a-descriptions-item label="申请状态">
-                <a-tag :color="auditColor(record.auditStatus)">{{ record.auditStatus }}</a-tag>
-              </a-descriptions-item>
-              <a-descriptions-item label="领料方式">{{ record.modeLabel }}</a-descriptions-item>
-              <a-descriptions-item label="申请人">{{
-                record.applicant || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="关联工单">
-                {{ relatedWorkOrderText(record) }}
-              </a-descriptions-item>
-              <a-descriptions-item label="产品/摘要">
-                {{ relatedProductText(record) }}
-              </a-descriptions-item>
-              <a-descriptions-item label="销售订单">
-                {{
-                  record.salesOrderNo && record.salesOrderNo !== 'MULTI' ? record.salesOrderNo : '—'
-                }}
-              </a-descriptions-item>
-              <a-descriptions-item label="领用车间">{{
-                record.workshop || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="领入仓库">
-                {{ record.receiveWarehouse || '—' }}
-              </a-descriptions-item>
-              <a-descriptions-item label="申请时间">{{
-                record.createdAt || '—'
-              }}</a-descriptions-item>
-              <a-descriptions-item label="合计数量">
-                {{ record.lineCount || 0 }} 行 / {{ record.totalQty || 0 }}
-              </a-descriptions-item>
-              <a-descriptions-item v-if="record.rejectReason" label="驳回原因" :span="3">
-                {{ record.rejectReason }}
-              </a-descriptions-item>
-              <a-descriptions-item
-                v-if="record.outboundRefuseReason"
-                label="拒绝出库原因"
-                :span="3"
-              >
-                {{ record.outboundRefuseReason }}
-              </a-descriptions-item>
-              <a-descriptions-item label="备注" :span="3">
-                {{ record.remark || '—' }}
-              </a-descriptions-item>
-            </a-descriptions>
+            <div class="section-title">基本信息</div>
+            <MaterialRequisitionBasicInfoSection :record="record" />
           </div>
 
           <div v-if="workOrderList.length" class="section-card">
@@ -240,8 +195,6 @@ import { message, Modal } from 'ant-design-vue'
 import {
   getMobileMaterialReqById,
   refreshMobileMaterialReqs,
-  relatedWorkOrderText,
-  relatedProductText,
   approveMaterialRequisition,
   rejectMaterialRequisition,
   MATERIAL_REQ_MODES,
@@ -258,6 +211,7 @@ import {
   getOutboundIssueLineScrollX,
 } from '@/utils/outboundIssueLines'
 import { formatQty } from '@/utils/numberFormat'
+import MaterialRequisitionBasicInfoSection from './components/MaterialRequisitionBasicInfoSection.vue'
 
 const route = useRoute()
 const router = useRouter()

@@ -2,40 +2,44 @@
   <a-modal
     :open="open"
     title="发料出库"
-    width="1280px"
+    width="96%"
     :mask-closable="false"
     destroy-on-close
+    wrap-class-name="outsourcing-generate-issue-modal-wrap"
     @cancel="handleCancel"
   >
-    <a-form layout="inline" class="header-form horizontal-form">
-      <a-row :gutter="[12, 8]" style="width: 100%">
-        <a-col :span="6">
-          <a-form-item label="外协单号" required>
-            <a-input :value="outsourcingOrder?.orderNo" disabled size="small" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="供应商">
-            <a-input :value="outsourcingOrder?.supplier" disabled size="small" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="出货日期" required>
-            <a-date-picker
-              v-model:value="form.shipDate"
-              size="small"
-              style="width: 100%"
-              placeholder="请选择出货日期"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="24">
-          <a-form-item label="备注" class="remark-item">
-            <a-textarea v-model:value="form.remark" :rows="2" placeholder="请输入备注" />
-          </a-form-item>
-        </a-col>
-      </a-row>
-    </a-form>
+    <div class="section-block">
+      <div class="section-title">基本信息</div>
+      <a-form layout="inline" class="header-form horizontal-form">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :span="6">
+            <a-form-item label="外协单号" required>
+              <a-input :value="outsourcingOrder?.orderNo" disabled size="small" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="供应商">
+              <a-input :value="outsourcingOrder?.supplier" disabled size="small" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="出货日期" required>
+              <a-date-picker
+                v-model:value="form.shipDate"
+                size="small"
+                style="width: 100%"
+                placeholder="请选择出货日期"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="24">
+            <a-form-item label="备注" class="remark-item">
+              <a-textarea v-model:value="form.remark" :rows="2" placeholder="请输入备注" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </div>
 
     <a-alert
       type="info"
@@ -177,7 +181,7 @@
             {{ formatQty(record.warehouseStockQty) }}
           </template>
           <template v-else-if="column.key === 'remark'">
-            <a-input v-model:value="record.remark" size="small" allow-clear placeholder="—" />
+            <LongTextEditCell :value="record.remark" @edit="openRemarkEdit(record)" />
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space :size="0">
@@ -204,6 +208,18 @@
       :line="editingLine"
       @confirm="onEditConfirm"
     />
+
+    <a-modal
+      v-model:open="remarkOpen"
+      title="编辑备注"
+      width="520px"
+      :mask-closable="false"
+      destroy-on-close
+      @ok="saveRemark"
+      @cancel="remarkOpen = false"
+    >
+      <a-textarea v-model:value="remarkDraft" :rows="4" allow-clear placeholder="请输入备注" />
+    </a-modal>
   </a-modal>
 </template>
 
@@ -222,6 +238,7 @@ import {
   buildOutsourcingIssueProductRows,
 } from '@/utils/outsourcingIssueMaterials'
 import OutsourcingIssueLineEditModal from './OutsourcingIssueLineEditModal.vue'
+import LongTextEditCell from '@/components/LongTextEditCell.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -238,6 +255,9 @@ const productRows = ref([])
 const issueLines = ref([])
 const editOpen = ref(false)
 const editingLine = ref(null)
+const remarkOpen = ref(false)
+const remarkDraft = ref('')
+const remarkTargetId = ref('')
 const warehouseOpts = warehouseOptions
 
 const productColumns = [
@@ -259,19 +279,21 @@ const materialColumns = [
   { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
   { title: '', key: 'color', width: 36, align: 'center', fixed: 'left' },
   { title: '发货进度', key: 'issueProgress', width: 170, fixed: 'left' },
-  { title: '来源产品', key: 'sourceProduct', width: 180, fixed: 'left' },
   {
     title: '物品名称',
     key: 'itemName',
     dataIndex: 'itemName',
     width: 140,
     ellipsis: true,
+    fixed: 'left',
   },
+  { title: '来源产品', key: 'sourceProduct', width: 180, ellipsis: true },
   { title: '编号', dataIndex: 'itemCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '下料尺寸', dataIndex: 'blankSizeText', width: 110, ellipsis: true },
+  { title: '单位用量', dataIndex: 'unitUsage', key: 'unitUsage', width: 90, align: 'right' },
   { title: '条码类型', dataIndex: 'barcodeType', width: 100, ellipsis: true },
   { title: '出库数量', key: 'issueQty', width: 110 },
   { title: '单位', dataIndex: 'unit', width: 70 },
@@ -411,6 +433,18 @@ function openEdit(record) {
   editOpen.value = true
 }
 
+function openRemarkEdit(record) {
+  remarkTargetId.value = record.id
+  remarkDraft.value = record.remark || ''
+  remarkOpen.value = true
+}
+
+function saveRemark() {
+  const target = issueLines.value.find((l) => l.id === remarkTargetId.value)
+  if (target) target.remark = remarkDraft.value || ''
+  remarkOpen.value = false
+}
+
 function onEditConfirm(payload) {
   const idx = issueLines.value.findIndex((l) => l.id === payload.id)
   if (idx < 0) return
@@ -457,17 +491,23 @@ function handleConfirm() {
       materialLines: submitMaterials.map((l) => ({
         lineId: l.sourceProducts?.[0]?.lineId || '',
         sourceProductLineIds: (l.sourceProducts || []).map((s) => s.lineId),
+        sourceProductText: (l.sourceProducts || [])
+          .map((s) => s.productName || s.productCode)
+          .filter(Boolean)
+          .join('、'),
         itemName: l.itemName,
         itemCode: l.itemCode,
         productName: l.itemName,
         productCode: l.itemCode,
         specModel: l.specModel,
         material: l.material,
+        drawingNo: l.drawingNo,
         issueQty: l.issueQty,
         shipWarehouse: l.shipWarehouse,
         remark: l.remark,
         barcodeType: l.barcodeType,
         blankSizeText: l.blankSizeText,
+        unitUsage: l.unitUsage,
         unit: l.unit,
       })),
     },
@@ -580,5 +620,20 @@ export default { name: 'OutsourcingGenerateIssueModal' }
 
 :deep(.issue-row-shared) {
   /* 底色由 custom-row 橙色提供 */
+}
+</style>
+
+<style lang="less">
+.outsourcing-generate-issue-modal-wrap {
+  .ant-modal {
+    max-width: 1680px;
+    top: 24px;
+    padding-bottom: 24px;
+  }
+
+  .ant-modal-body {
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+  }
 }
 </style>

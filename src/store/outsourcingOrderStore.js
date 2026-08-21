@@ -18,8 +18,8 @@ import { addOutsourcingReceipt } from '@/store/outsourcingReceiptStore'
 
 const STORAGE_KEY = 'i_doms_outsourcing_orders'
 const SEED_VERSION_KEY = 'i_doms_outsourcing_orders_seed_v'
-/** v5：发料按产品 BOM 展开 + 多产品共用物料演示 */
-const CURRENT_SEED_VERSION = '5'
+/** v7：发料申请物料行补齐来源产品/单位用量/下料尺寸等展示字段 */
+const CURRENT_SEED_VERSION = '7'
 
 function loadFromStorage() {
   try {
@@ -477,27 +477,40 @@ export function submitOutsourcingIssue(orderId, payload = [], extra = {}) {
       id: `wx-issue-line-${code || primaryLineId}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
       lineId: primaryLineId,
       sourceProductLineIds: sourceLineIds,
+      sourceProductText: item.sourceProductText || '',
       productName: name,
       productCode: code,
       specModel: item.specModel || '',
       material: item.material || '',
+      drawingNo: item.drawingNo || '',
       applyQty: qty,
       actualQty: 0,
       issueQty: qty,
       unit: item.unit || '',
+      unitUsage: Number(item.unitUsage) || 0,
       remark: item.remark || '',
       barcodeType: item.barcodeType || '',
       blankSizeText: item.blankSizeText || '',
+      shipWarehouse: wh,
     })
   })
 
   let orderCount = 0
+  const productSetSnapshots = (productSets || []).map((p) => ({
+    lineId: p.lineId,
+    setQty: Number(p.setQty) || 0,
+  }))
+
   groups.forEach((groupLines, warehouse) => {
     seq += 1
     orderCount += 1
     order.issueOrders.push({
-      id: `wx-issue-${order.id}-${seq}`,
+      id: `wx-issue-${order.id}-${seq}-${Date.now().toString(36)}`,
       issueOrderNo: `CKWX-${stamp}-${String(seq).padStart(3, '0')}`,
+      outsourcingOrderId: order.id,
+      outsourcingOrderNo: order.orderNo || '',
+      supplier: order.supplier || '',
+      workOrderName: order.workOrderName || '',
       shipWarehouse: warehouse,
       shipDate,
       remark: extra.remark || '',
@@ -506,6 +519,7 @@ export function submitOutsourcingIssue(orderId, payload = [], extra = {}) {
       createdAt: now,
       confirmer: '',
       confirmedAt: '',
+      productSets: productSetSnapshots,
       lineItems: groupLines,
       lineIds: groupLines.map((l) => l.lineId).filter(Boolean),
     })
