@@ -164,6 +164,61 @@ export function mergeOutsourcingIssueMaterials(rows = [], productColorMap = new 
   })
 }
 
+/**
+ * 物料发货进度：计划=Σ(单位用量×产品计划)；
+ * 已申请/已出库优先取发料单累计，并与「产品套数占用×用量」取较大值，避免漏记。
+ */
+export function calcOutsourcingMaterialIssueProgress(order, itemCode) {
+  const code = String(itemCode || '').trim()
+  if (!order || !code) {
+    return { planQty: 0, appliedIssueQty: 0, issuedQty: 0, remainingQty: 0 }
+  }
+
+  let planQty = 0
+  let appliedFromSets = 0
+  let issuedFromSets = 0
+
+  for (const line of order.lineItems || []) {
+    const mats = resolveMaterialsForOutsourcingProduct(line, 1)
+    const hit = mats.find((m) => String(m.itemCode || '') === code)
+    if (!hit) continue
+    const unitUsage = Number(hit.unitUsage) || 0
+    planQty += unitUsage * (Number(line.planQty) || 0)
+    appliedFromSets += unitUsage * calcWxLineAppliedIssueQty(order, line)
+    issuedFromSets += unitUsage * calcWxLineIssuedQty(order, line)
+  }
+
+  let appliedFromOrders = 0
+  let issuedFromOrders = 0
+  for (const io of order.issueOrders || []) {
+    for (const l of io.lineItems || []) {
+      const lineCode = String(l.productCode || l.itemCode || '').trim()
+      if (lineCode !== code) continue
+      appliedFromOrders += Number(l.applyQty ?? l.issueQty) || 0
+      issuedFromOrders += Number(l.actualQty) || 0
+    }
+  }
+
+  const plan = roundQty(planQty)
+  const appliedIssueQty = roundQty(Math.max(appliedFromSets, appliedFromOrders))
+  const issuedQty = roundQty(Math.max(issuedFromSets, issuedFromOrders))
+  const remainingQty = roundQty(Math.max(0, plan - appliedIssueQty))
+  return { planQty: plan, appliedIssueQty, issuedQty, remainingQty }
+}
+
+export function enrichOutsourcingMaterialIssueProgress(order, rows = []) {
+  return (rows || []).map((row) => {
+    const progress = calcOutsourcingMaterialIssueProgress(order, row.itemCode)
+    return {
+      ...row,
+      planQty: progress.planQty,
+      appliedIssueQty: progress.appliedIssueQty,
+      issuedQty: progress.issuedQty,
+      remainingQty: progress.remainingQty,
+    }
+  })
+}
+
 /** 构建弹窗上方外协产品行 */
 export function buildOutsourcingIssueProductRows(order) {
   if (!order) return []
@@ -208,7 +263,7 @@ export function buildOutsourcingIssueProductRows(order) {
 }
 
 /** 由已选产品+套数生成物料明细 */
-export function buildOutsourcingIssueMaterialRows(productRows = []) {
+export function buildOutsourcingIssueMaterialRows(productRows = [], order = null) {
   const selected = (productRows || []).filter(
     (p) => p.selected && !p.locked && (Number(p.setQty) || 0) > 0,
   )
@@ -227,5 +282,6 @@ export function buildOutsourcingIssueMaterialRows(productRows = []) {
       })
     }
   }
-  return mergeOutsourcingIssueMaterials(raw, colorMap)
+  const merged = mergeOutsourcingIssueMaterials(raw, colorMap)
+  return enrichOutsourcingMaterialIssueProgress(order, merged)
 }

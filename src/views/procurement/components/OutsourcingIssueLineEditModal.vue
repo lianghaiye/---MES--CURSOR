@@ -29,6 +29,8 @@
           :min="0"
           :max="draft.remainingQty"
           :precision="4"
+          :formatter="inputNumberFormatter"
+          :parser="inputNumberParser"
           style="width: 100%"
         />
         <div class="hint">
@@ -58,7 +60,7 @@ import { message } from 'ant-design-vue'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import { enrichOutboundLineStock } from '@/utils/outboundLineHelpers'
 import { formatWxIssueProgress } from '@/utils/outsourcingInbound'
-import { formatNumber } from '@/utils/numberFormat'
+import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 
 const props = defineProps({
   open: { type: Boolean, default: false },

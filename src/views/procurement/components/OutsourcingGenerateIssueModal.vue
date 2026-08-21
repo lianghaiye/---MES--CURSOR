@@ -81,6 +81,8 @@
               :min="0"
               :max="record.remainQty"
               :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
               :disabled="!record.selected || record.locked"
               @change="() => onSetQtyChange(record)"
@@ -114,10 +116,24 @@
         :row-class-name="materialRowClassName"
         :custom-row="materialCustomRow"
       >
+        <template #headerCell="{ column }">
+          <template v-if="column.key === 'issueProgress'">
+            <span class="col-title-with-tip">
+              发货进度
+              <a-tooltip :title="WX_ISSUE_PROGRESS_TOOLTIP">
+                <InfoCircleOutlined class="col-tip-icon" />
+              </a-tooltip>
+            </span>
+          </template>
+          <template v-else>{{ column.title }}</template>
+        </template>
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
           <template v-else-if="column.key === 'color'">
             <span class="color-dot" :style="{ background: record.colorBar }" />
+          </template>
+          <template v-else-if="column.key === 'issueProgress'">
+            {{ formatWxIssueProgress(record.issuedQty, record.appliedIssueQty, record.planQty) }}
           </template>
           <template v-else-if="column.key === 'sourceProduct'">
             <div class="source-products">
@@ -137,7 +153,10 @@
               v-model:value="record.issueQty"
               size="small"
               :min="0"
+              :max="record.remainingQty != null ? record.remainingQty : undefined"
               :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
             />
           </template>
@@ -192,10 +211,12 @@
 import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
+import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { submitOutsourcingIssue } from '@/store/outsourcingOrderStore'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import { enrichOutboundLineStock } from '@/utils/outboundLineHelpers'
-import { formatNumber } from '@/utils/numberFormat'
+import { formatWxIssueProgress, WX_ISSUE_PROGRESS_TOOLTIP } from '@/utils/outsourcingInbound'
+import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import {
   buildOutsourcingIssueMaterialRows,
   buildOutsourcingIssueProductRows,
@@ -237,6 +258,7 @@ const productColumns = [
 const materialColumns = [
   { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
   { title: '', key: 'color', width: 36, align: 'center', fixed: 'left' },
+  { title: '发货进度', key: 'issueProgress', width: 170, fixed: 'left' },
   { title: '来源产品', key: 'sourceProduct', width: 180, fixed: 'left' },
   {
     title: '物品名称',
@@ -312,10 +334,12 @@ function refreshLineStock(line) {
 }
 
 function rebuildMaterials() {
-  const rows = buildOutsourcingIssueMaterialRows(productRows.value).map((row) => {
-    refreshLineStock(row)
-    return row
-  })
+  const rows = buildOutsourcingIssueMaterialRows(productRows.value, props.outsourcingOrder).map(
+    (row) => {
+      refreshLineStock(row)
+      return row
+    },
+  )
   issueLines.value = rows
 }
 
@@ -501,6 +525,17 @@ export default { name: 'OutsourcingGenerateIssueModal' }
   font-weight: 400;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 
 .color-dot {
