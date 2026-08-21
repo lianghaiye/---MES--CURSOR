@@ -76,6 +76,10 @@ export function createOutboundOrder(partial) {
     workOrders: [],
     materialReqId: '',
     materialReqNo: '',
+    /** 发料出库关联外协订单 */
+    outsourcingOrders: [],
+    outsourcingOrderId: '',
+    outsourcingOrderNo: '',
     ...partial,
   }
 }
@@ -220,7 +224,9 @@ export const mockOutboundOrders = [
     outboundType: '发料出库',
     warehouse: '库A仓',
     requisitionDept: '机加车间',
-    sourceOrderNo: 'VX-20260519-001',
+    sourceOrderNo: 'WX-260807001',
+    outsourcingOrderId: 'wx-2',
+    outsourcingOrderNo: 'WX-260807001',
     status: '待出库',
     createdAt: '2026-06-02',
     lineItems: [

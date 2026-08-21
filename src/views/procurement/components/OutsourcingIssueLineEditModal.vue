@@ -116,7 +116,11 @@ function handleOk() {
     message.warning('请填写出库数量')
     return
   }
-  if (Number(draft.issueQty) > Number(draft.remainingQty) + 1e-9) {
+  if (
+    draft.remainingQty != null &&
+    Number.isFinite(Number(draft.remainingQty)) &&
+    Number(draft.issueQty) > Number(draft.remainingQty) + 1e-9
+  ) {
     message.warning('出库数量不能超过剩余可出库数量')
     return
   }

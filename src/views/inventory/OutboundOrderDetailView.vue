@@ -109,6 +109,10 @@
               <OutboundWorkOrderList :work-orders="workOrderList" />
             </div>
 
+            <div v-if="outsourcingOrderList.length" class="section-card">
+              <OutboundOutsourcingOrderList :outsourcing-orders="outsourcingOrderList" />
+            </div>
+
             <div class="section-card">
               <div class="section-title">出库明细</div>
               <a-table
@@ -325,11 +329,14 @@ import {
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import OutboundOrderBasicInfoSection from './components/OutboundOrderBasicInfoSection.vue'
 import OutboundWorkOrderList from './components/OutboundWorkOrderList.vue'
+import OutboundOutsourcingOrderList from './components/OutboundOutsourcingOrderList.vue'
 import {
   mobileMaterialReqState,
   syncMaterialReqOnOutboundRefuse,
 } from '@/store/mobileMaterialReqStore'
 import { resolveOutboundWorkOrders } from '@/utils/outboundWorkOrders'
+import { resolveOutboundOutsourcingOrders } from '@/utils/outboundOutsourcingOrders'
+import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
 
 const route = useRoute()
 const router = useRouter()
@@ -343,6 +350,11 @@ const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领
 const workOrderList = computed(() => {
   void mobileMaterialReqState.items
   return resolveOutboundWorkOrders(record.value, mobileMaterialReqState.items)
+})
+
+const outsourcingOrderList = computed(() => {
+  void outsourcingOrderState.orders
+  return resolveOutboundOutsourcingOrders(record.value)
 })
 
 const relatedCutSettles = computed(() => {

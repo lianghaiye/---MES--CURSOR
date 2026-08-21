@@ -41,86 +41,139 @@
       type="info"
       show-icon
       class="issue-tip"
-      message="系统将依据产品 BOM，自动提取外协产品的下级物料生成本次发料出库明细。"
+      message="勾选上方外协产品并填写本次套数后，系统按产品 BOM 自动生成下方发料物料；改套数将覆盖重算物料数量。橙色表示多产品共用物料。"
     />
 
-    <a-table
-      :columns="columns"
-      :data-source="issueLines"
-      row-key="id"
-      size="small"
-      bordered
-      :pagination="false"
-      :scroll="{ x: tableScrollX }"
-      :row-class-name="rowClassName"
-    >
-      <template #headerCell="{ column }">
-        <template v-if="column.key === 'issueProgress'">
-          <span class="col-title-with-tip">
-            发货进度
-            <a-tooltip :title="WX_ISSUE_PROGRESS_TOOLTIP">
-              <InfoCircleOutlined class="col-tip-icon" />
-            </a-tooltip>
-          </span>
+    <div class="section-block">
+      <div class="section-title">
+        外协产品清单 ({{ productRows.length }})
+        <span class="section-hint">默认全选可发产品；取消勾选则不发该产品物料</span>
+      </div>
+      <a-table
+        :columns="productColumns"
+        :data-source="productRows"
+        row-key="id"
+        size="small"
+        bordered
+        :pagination="false"
+        :scroll="{ x: 1180 }"
+        :row-selection="productRowSelection"
+        :row-class-name="productRowClassName"
+        :custom-row="productCustomRow"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'color'">
+            <span class="color-dot" :style="{ background: record.colorBar }" />
+          </template>
+          <template v-else-if="column.key === 'appliedIssueQty'">
+            {{ formatQty(record.appliedIssueQty) }}
+          </template>
+          <template v-else-if="column.key === 'remainQty'">
+            {{ formatQty(record.remainQty) }}
+          </template>
+          <template v-else-if="column.key === 'planQty'">
+            {{ formatQty(record.planQty) }}
+          </template>
+          <template v-else-if="column.key === 'setQty'">
+            <a-input-number
+              v-model:value="record.setQty"
+              size="small"
+              :min="0"
+              :max="record.remainQty"
+              :precision="4"
+              style="width: 100%"
+              :disabled="!record.selected || record.locked"
+              @change="() => onSetQtyChange(record)"
+            />
+          </template>
+          <template v-else-if="column.key === 'bom'">
+            <span :class="{ 'bom-missing': !record.hasBom }">
+              {{ record.bom || (record.hasBom ? '—' : '无BOM') }}
+            </span>
+          </template>
+          <template v-else>
+            {{ displayCell(record, column) }}
+          </template>
         </template>
-        <template v-else>{{ column.title }}</template>
-      </template>
-      <template #bodyCell="{ column, record, index }">
-        <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-        <template v-else-if="column.key === 'issueProgress'">
-          {{ formatWxIssueProgress(record.issuedQty, record.appliedIssueQty, record.planQty) }}
+      </a-table>
+    </div>
+
+    <div class="section-block">
+      <div class="section-title">
+        发料物料明细 ({{ issueLines.length }})
+        <span class="section-hint">左侧色条与上方产品对应；共用物料为橙色</span>
+      </div>
+      <a-table
+        :columns="materialColumns"
+        :data-source="issueLines"
+        row-key="id"
+        size="small"
+        bordered
+        :pagination="false"
+        :scroll="{ x: tableScrollX }"
+        :row-class-name="materialRowClassName"
+        :custom-row="materialCustomRow"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'color'">
+            <span class="color-dot" :style="{ background: record.colorBar }" />
+          </template>
+          <template v-else-if="column.key === 'sourceProduct'">
+            <div class="source-products">
+              <span
+                v-for="src in record.sourceProducts || []"
+                :key="src.lineId"
+                class="source-chip"
+              >
+                <span class="color-dot color-dot--sm" :style="{ background: src.colorBar }" />
+                {{ src.productName || src.productCode || '—' }}
+              </span>
+              <a-tag v-if="record.shared" color="orange" class="shared-tag">共用</a-tag>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'issueQty'">
+            <a-input-number
+              v-model:value="record.issueQty"
+              size="small"
+              :min="0"
+              :precision="4"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="column.key === 'shipWarehouse'">
+            <a-select
+              v-model:value="record.shipWarehouse"
+              size="small"
+              style="width: 100%"
+              placeholder="请选择"
+              :options="warehouseOpts"
+              @change="() => refreshLineStock(record)"
+            />
+          </template>
+          <template v-else-if="column.key === 'stockQty'">
+            {{ formatQty(record.stockQty) }}
+          </template>
+          <template v-else-if="column.key === 'warehouseStockQty'">
+            {{ formatQty(record.warehouseStockQty) }}
+          </template>
+          <template v-else-if="column.key === 'remark'">
+            <a-input v-model:value="record.remark" size="small" allow-clear placeholder="—" />
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space :size="0">
+              <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+              <a-button type="link" size="small" danger @click="removeLine(record.id)">
+                移出本单
+              </a-button>
+            </a-space>
+          </template>
+          <template v-else>
+            {{ displayCell(record, column) }}
+          </template>
         </template>
-        <template v-else-if="column.key === 'issueQty'">
-          <a-input-number
-            v-model:value="record.issueQty"
-            size="small"
-            :min="0"
-            :max="record.remainingQty"
-            :precision="4"
-            style="width: 100%"
-            :disabled="record.locked"
-          />
-        </template>
-        <template v-else-if="column.key === 'shipWarehouse'">
-          <a-select
-            v-model:value="record.shipWarehouse"
-            size="small"
-            style="width: 100%"
-            placeholder="请选择"
-            :options="warehouseOpts"
-            :disabled="record.locked"
-            @change="() => refreshLineStock(record)"
-          />
-        </template>
-        <template v-else-if="column.key === 'stockQty'">
-          {{ formatQty(record.stockQty) }}
-        </template>
-        <template v-else-if="column.key === 'warehouseStockQty'">
-          {{ formatQty(record.warehouseStockQty) }}
-        </template>
-        <template v-else-if="column.key === 'remark'">
-          <a-input
-            v-model:value="record.remark"
-            size="small"
-            allow-clear
-            :disabled="record.locked"
-            placeholder="—"
-          />
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space v-if="!record.locked" :size="0">
-            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" size="small" danger @click="removeLine(index)">
-              移出本单
-            </a-button>
-          </a-space>
-          <span v-else class="locked-tip">已满不可出库</span>
-        </template>
-        <template v-else>
-          {{ displayCell(record, column) }}
-        </template>
-      </template>
-    </a-table>
+      </a-table>
+    </div>
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
@@ -136,22 +189,17 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
-import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { submitOutsourcingIssue } from '@/store/outsourcingOrderStore'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import { enrichOutboundLineStock } from '@/utils/outboundLineHelpers'
-import {
-  calcWxLineAppliedIssueQty,
-  calcWxLineIssuedQty,
-  calcWxLineRemainIssueQty,
-  formatWxIssueProgress,
-  isWxLineIssueFull,
-  WX_ISSUE_PROGRESS_TOOLTIP,
-} from '@/utils/outsourcingInbound'
 import { formatNumber } from '@/utils/numberFormat'
+import {
+  buildOutsourcingIssueMaterialRows,
+  buildOutsourcingIssueProductRows,
+} from '@/utils/outsourcingIssueMaterials'
 import OutsourcingIssueLineEditModal from './OutsourcingIssueLineEditModal.vue'
 
 const props = defineProps({
@@ -165,26 +213,41 @@ const form = reactive({
   shipDate: null,
   remark: '',
 })
+const productRows = ref([])
 const issueLines = ref([])
 const editOpen = ref(false)
 const editingLine = ref(null)
 const warehouseOpts = warehouseOptions
 
-const columns = [
-  { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
-  { title: '发货进度', key: 'issueProgress', width: 170, fixed: 'left' },
-  {
-    title: '物品名称',
-    key: 'productName',
-    dataIndex: 'productName',
-    width: 140,
-    ellipsis: true,
-    fixed: 'left',
-  },
+const productColumns = [
+  { title: '', key: 'color', width: 36, align: 'center', fixed: 'left' },
+  { title: '外协单号', dataIndex: 'orderNo', width: 140 },
+  { title: '产品', dataIndex: 'productName', width: 140, ellipsis: true },
   { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
-  { title: '变体属性', dataIndex: 'variantSummary', width: 140, ellipsis: true },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '关联BOM', key: 'bom', width: 140, ellipsis: true },
+  { title: '计划数量', key: 'planQty', width: 90, align: 'right' },
+  { title: '已申请', key: 'appliedIssueQty', width: 90, align: 'right' },
+  { title: '可发数', key: 'remainQty', width: 90, align: 'right' },
+  { title: '本次套数', key: 'setQty', width: 110 },
+]
+
+const materialColumns = [
+  { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
+  { title: '', key: 'color', width: 36, align: 'center', fixed: 'left' },
+  { title: '来源产品', key: 'sourceProduct', width: 180, fixed: 'left' },
+  {
+    title: '物品名称',
+    key: 'itemName',
+    dataIndex: 'itemName',
+    width: 140,
+    ellipsis: true,
+  },
+  { title: '编号', dataIndex: 'itemCode', width: 120, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '下料尺寸', dataIndex: 'blankSizeText', width: 110, ellipsis: true },
   { title: '条码类型', dataIndex: 'barcodeType', width: 100, ellipsis: true },
@@ -197,7 +260,37 @@ const columns = [
   { title: '操作', key: 'action', width: 130, fixed: 'right' },
 ]
 
-const tableScrollX = columns.reduce((sum, col) => sum + (col.width || 100), 0)
+const tableScrollX = materialColumns.reduce((sum, col) => sum + (col.width || 100), 0)
+
+const selectedProductKeys = computed(() =>
+  productRows.value.filter((r) => r.selected && !r.locked).map((r) => r.id),
+)
+
+const productRowSelection = computed(() => ({
+  selectedRowKeys: selectedProductKeys.value,
+  getCheckboxProps: (record) => ({
+    disabled: record.locked || record.remainQty <= 0,
+  }),
+  onChange: (keys) => {
+    const keySet = new Set(keys)
+    productRows.value.forEach((row) => {
+      if (row.locked || row.remainQty <= 0) {
+        row.selected = false
+        row.setQty = 0
+        return
+      }
+      const next = keySet.has(row.id)
+      if (next && !row.selected) {
+        row.selected = true
+        row.setQty = row.remainQty
+      } else if (!next) {
+        row.selected = false
+        row.setQty = 0
+      }
+    })
+    rebuildMaterials()
+  },
+}))
 
 function formatQty(val) {
   return formatNumber(val, 4, { empty: '—' })
@@ -211,43 +304,55 @@ function displayCell(record, column) {
 
 function refreshLineStock(line) {
   const stock = enrichOutboundLineStock({
-    itemCode: line.productCode || '',
+    itemCode: line.itemCode || line.productCode || '',
     shipWarehouse: line.shipWarehouse || '',
   })
   line.stockQty = stock.stockQty
   line.warehouseStockQty = stock.warehouseStockQty
 }
 
-function buildLine(order, line) {
-  const planQty = Number(line.planQty) || 0
-  const issuedQty = calcWxLineIssuedQty(order, line)
-  const appliedIssueQty = calcWxLineAppliedIssueQty(order, line)
-  const remainingQty = calcWxLineRemainIssueQty(order, line)
-  const locked = isWxLineIssueFull(order, line)
-  const row = {
-    id: line.id,
-    productName: line.productName || line.itemName || '',
-    productCode: line.productCode || line.itemCode || '',
-    specModel: line.specModel || '',
-    material: line.material || '',
-    variantSummary: line.variantSummary || '',
-    drawingNo: line.drawingNo || '',
-    blankSizeText: line.blankSizeText || line.orderSizeText || '',
-    barcodeType: line.barcodeType || '',
-    planQty,
-    issuedQty,
-    appliedIssueQty,
-    remainingQty,
-    unit: line.unit || '',
-    shipWarehouse: line.shipWarehouse || undefined,
-    issueQty: locked ? 0 : remainingQty,
-    remark: line.remark || '',
-    locked,
-    stockQty: null,
-    warehouseStockQty: null,
+function rebuildMaterials() {
+  const rows = buildOutsourcingIssueMaterialRows(productRows.value).map((row) => {
+    refreshLineStock(row)
+    return row
+  })
+  issueLines.value = rows
+}
+
+function onSetQtyChange(record) {
+  if (!record.selected) return
+  const max = Number(record.remainQty) || 0
+  let qty = Number(record.setQty) || 0
+  if (qty > max) qty = max
+  if (qty < 0) qty = 0
+  record.setQty = qty
+  rebuildMaterials()
+}
+
+function productRowClassName(record) {
+  return record.locked ? 'issue-row-locked' : ''
+}
+
+function materialRowClassName(record) {
+  return record.shared ? 'issue-row-shared' : ''
+}
+
+function productCustomRow(record) {
+  return {
+    style: {
+      background: record.colorBg,
+      boxShadow: `inset 3px 0 0 ${record.colorBar}`,
+    },
   }
-  refreshLineStock(row)
-  return row
+}
+
+function materialCustomRow(record) {
+  return {
+    style: {
+      background: record.colorBg,
+      boxShadow: `inset 3px 0 0 ${record.colorBar}`,
+    },
+  }
 }
 
 watch(
@@ -256,29 +361,41 @@ watch(
     if (!val || !props.outsourcingOrder) return
     form.shipDate = dayjs()
     form.remark = props.outsourcingOrder.remark || ''
-    issueLines.value = (props.outsourcingOrder.lineItems || [])
-      .filter((l) => (Number(l.planQty) || 0) > 0)
-      .map((l) => buildLine(props.outsourcingOrder, l))
+    productRows.value = buildOutsourcingIssueProductRows(props.outsourcingOrder)
+    rebuildMaterials()
   },
 )
 
-function rowClassName(record) {
-  return record.locked ? 'issue-row-locked' : ''
-}
-
-function removeLine(index) {
-  issueLines.value.splice(index, 1)
+function removeLine(id) {
+  issueLines.value = issueLines.value.filter((l) => l.id !== id)
 }
 
 function openEdit(record) {
-  editingLine.value = { ...record }
+  editingLine.value = {
+    ...record,
+    productName: record.itemName,
+    productCode: record.itemCode,
+    // 物料行不以产品可发套数封顶；编辑时允许调整数量
+    remainingQty:
+      record.remainingQty != null
+        ? record.remainingQty
+        : Math.max(Number(record.issueQty) || 0, 1) * 100,
+    issuedQty: record.issuedQty ?? 0,
+    appliedIssueQty: record.appliedIssueQty ?? 0,
+    planQty: record.planQty ?? record.issueQty,
+  }
   editOpen.value = true
 }
 
 function onEditConfirm(payload) {
   const idx = issueLines.value.findIndex((l) => l.id === payload.id)
   if (idx < 0) return
-  const next = { ...issueLines.value[idx], ...payload }
+  const next = {
+    ...issueLines.value[idx],
+    ...payload,
+    itemName: payload.productName ?? payload.itemName ?? issueLines.value[idx].itemName,
+    itemCode: payload.productCode ?? payload.itemCode ?? issueLines.value[idx].itemCode,
+  }
   refreshLineStock(next)
   issueLines.value[idx] = next
 }
@@ -292,32 +409,44 @@ function handleConfirm() {
     message.warning('请选择出货日期')
     return
   }
-  const editableLines = issueLines.value.filter((l) => !l.locked)
-  if (!editableLines.length) {
-    message.warning('没有可出库的明细')
+  const productSets = productRows.value
+    .filter((p) => p.selected && !p.locked && (Number(p.setQty) || 0) > 0)
+    .map((p) => ({ lineId: p.id, setQty: p.setQty }))
+  if (!productSets.length) {
+    message.warning('请至少勾选一个产品并填写本次套数')
     return
   }
-  const submitLines = editableLines.filter((l) => Number(l.issueQty) > 0)
-  if (!submitLines.length) {
-    message.warning('请至少填写一行出库数量')
+  const submitMaterials = issueLines.value.filter((l) => Number(l.issueQty) > 0)
+  if (!submitMaterials.length) {
+    message.warning('请至少填写一行物料出库数量')
     return
   }
-  const invalidWh = submitLines.find((l) => !String(l.shipWarehouse || '').trim())
+  const invalidWh = submitMaterials.find((l) => !String(l.shipWarehouse || '').trim())
   if (invalidWh) {
-    message.warning(`请为「${invalidWh.productName}」选择出库仓库`)
+    message.warning(`请为「${invalidWh.itemName || invalidWh.itemCode}」选择出库仓库`)
     return
   }
   const result = submitOutsourcingIssue(
     props.outsourcingOrder.id,
-    submitLines.map((l) => ({
-      lineId: l.id,
-      issueQty: l.issueQty,
-      shipWarehouse: l.shipWarehouse,
-      remark: l.remark,
-      barcodeType: l.barcodeType,
-      blankSizeText: l.blankSizeText,
-      unit: l.unit,
-    })),
+    {
+      productSets,
+      materialLines: submitMaterials.map((l) => ({
+        lineId: l.sourceProducts?.[0]?.lineId || '',
+        sourceProductLineIds: (l.sourceProducts || []).map((s) => s.lineId),
+        itemName: l.itemName,
+        itemCode: l.itemCode,
+        productName: l.itemName,
+        productCode: l.itemCode,
+        specModel: l.specModel,
+        material: l.material,
+        issueQty: l.issueQty,
+        shipWarehouse: l.shipWarehouse,
+        remark: l.remark,
+        barcodeType: l.barcodeType,
+        blankSizeText: l.blankSizeText,
+        unit: l.unit,
+      })),
+    },
     {
       shipDate: form.shipDate.format('YYYY-MM-DD'),
       remark: form.remark,
@@ -356,24 +485,65 @@ export default { name: 'OutsourcingGenerateIssueModal' }
   margin-bottom: 12px;
 }
 
-.col-title-with-tip {
+.section-block {
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.section-hint {
+  font-weight: 400;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.color-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: middle;
+
+  &--sm {
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+  }
+}
+
+.source-products {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.source-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-}
-
-.col-tip-icon {
-  color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
 }
 
-.locked-tip {
-  color: rgba(0, 0, 0, 0.25);
-  font-size: 12px;
+.shared-tag {
+  margin: 0;
+  line-height: 18px;
+}
+
+.bom-missing {
+  color: #fa8c16;
 }
 
 :deep(.issue-row-locked) {
   color: rgba(0, 0, 0, 0.35);
-  background: #fafafa;
+}
+
+:deep(.issue-row-shared) {
+  /* 底色由 custom-row 橙色提供 */
 }
 </style>

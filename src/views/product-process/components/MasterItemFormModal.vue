@@ -177,88 +177,6 @@
                   <a-input v-model:value="form.weight" size="small" placeholder="请输入 重量" />
                 </a-form-item>
               </a-col>
-              <a-col :span="8">
-                <a-form-item required>
-                  <template #label>
-                    <span>库存单位</span>
-                    <a-tooltip title="厂里记账、领料发料用这个单位。">
-                      <InfoCircleOutlined class="info-icon" />
-                    </a-tooltip>
-                  </template>
-                  <a-select
-                    v-model:value="form.inventoryUnit"
-                    size="small"
-                    :options="unitOpts"
-                    placeholder="请选择 库存单位"
-                    :disabled="viewOnly"
-                    @change="onInventoryUnitChange"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item>
-                  <template #label>
-                    <span>采购单位</span>
-                    <a-tooltip
-                      title="跟供应商下单、到货清点用这个。与库存相同即可；不同时入库要多填到货件数（如根→米、张→kg）。"
-                    >
-                      <InfoCircleOutlined class="info-icon" />
-                    </a-tooltip>
-                  </template>
-                  <a-select
-                    v-model:value="form.purchaseUnit"
-                    size="small"
-                    :options="purchaseCaliberUnitOpts"
-                    placeholder="默认与库存相同"
-                    :disabled="viewOnly"
-                    @change="onPurchaseUnitChange"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item>
-                  <template #label>
-                    <span>结算单位</span>
-                    <a-tooltip
-                      title="与供应商结算的单位。不填则与库存单位相同；若不同（如库存按件、结算按 kg），入库须同时录入结算数量。"
-                    >
-                      <InfoCircleOutlined class="info-icon" />
-                    </a-tooltip>
-                  </template>
-                  <a-select
-                    v-model:value="form.settleUnit"
-                    size="small"
-                    allow-clear
-                    :options="unitOpts"
-                    placeholder="与库存单位相同"
-                    :disabled="viewOnly"
-                    @change="onSettleUnitChange"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col v-if="hasDerivedSettleUnit" :span="8">
-                <a-form-item>
-                  <template #label>
-                    <span>标准单重</span>
-                    <a-tooltip title="选填。开采购单时估算预计结算数量用，不参与最终结算。">
-                      <InfoCircleOutlined class="info-icon" />
-                    </a-tooltip>
-                  </template>
-                  <a-input-number
-                    v-model:value="form.standardUnitWeight"
-                    size="small"
-                    :min="0"
-                    :precision="3"
-                    style="width: 100%"
-                    :addon-after="form.settleUnit || 'kg'"
-                    placeholder="如：12.5"
-                    :disabled="viewOnly"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="24">
-                <p class="unit-caliber-hint">{{ unitCaliberHint }}</p>
-              </a-col>
               <a-col :span="24">
                 <a-form-item label="技术参数" class="remark-item">
                   <a-textarea
@@ -284,6 +202,19 @@
               </a-col>
             </a-row>
           </a-form>
+        </div>
+      </a-tab-pane>
+
+      <a-tab-pane key="units" tab="单位管理">
+        <div class="tab-pane-body">
+          <UnitManageTab
+            ref="unitManageTabRef"
+            v-model:base-unit="form.inventoryUnit"
+            v-model:aux-units="form.auxUnits"
+            :unit-options="unitOpts"
+            :disabled="viewOnly"
+            @flat-change="onUnitManageFlatChange"
+          />
         </div>
       </a-tab-pane>
 
@@ -922,12 +853,7 @@ import {
   createDefaultProductionControl,
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
-import {
-  unitState,
-  getInventoryUnitOptions,
-  getPurchaseUnitOptions,
-  getAllEnabledUnitOptions,
-} from '@/store/unitStore'
+import { unitState, getInventoryUnitOptions, getAllEnabledUnitOptions } from '@/store/unitStore'
 import { generateProductCode } from '@/store/productInfoStore'
 import { saveMasterItem, resolveMasterItemEditRecord } from '@/utils/masterItemSave'
 import {
@@ -958,11 +884,16 @@ import {
 import { getVariantAxesForCategory } from '@/utils/variantAxisTemplate'
 import { validateSettleUnitOnMaster } from '@/utils/settleUnit'
 import {
-  buildUnitCaliberHint,
   deriveIsVariableLength,
   deriveSettleUnitForSave,
   resolveUomRelationByInventory,
 } from '@/utils/unitCaliber'
+import {
+  applyUnitManageToFlat,
+  hydrateUnitManageFromSource,
+  validateUnitManage,
+} from '@/utils/unitManageTab'
+import UnitManageTab from '@/views/product-process/components/UnitManageTab.vue'
 import { useRouter } from 'vue-router'
 import { useTabs } from '@/composables/useTabs'
 import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
@@ -1087,18 +1018,6 @@ const unitOpts = computed(() => {
   void unitState.units
   return getInventoryUnitOptions()
 })
-const purchaseUnitOpts = computed(() => {
-  void unitState.units
-  return getPurchaseUnitOptions()
-})
-/** 采购口径可选：采购单位 ∪ 库存单位（便于选「与库存相同」） */
-const purchaseCaliberUnitOpts = computed(() => {
-  const map = new Map()
-  for (const opt of [...purchaseUnitOpts.value, ...unitOpts.value]) {
-    if (opt?.value != null && !map.has(opt.value)) map.set(opt.value, opt)
-  }
-  return [...map.values()]
-})
 /** 包装含量单位可选全部启用单位，默认值为采购单位 */
 const packContentUnitOpts = computed(() => {
   void unitState.units
@@ -1146,17 +1065,19 @@ const FIELD_HELP_BY_TAB = {
       name: '供应型态',
       desc: '标识物料来源方式（外购件、自制件、外协件、组装等），影响销售订单审核后是否自动生成采购申请、生产工单或外协订单。',
     },
+  ],
+  units: [
     {
-      name: '库存单位',
-      desc: '厂里记账、领料发料用的单位。',
+      name: '主单位',
+      desc: '库存记账、领料发料与成本核算的基准单位。',
     },
     {
-      name: '采购单位',
-      desc: '跟供应商下单、到货清点用的单位。与库存相同即可；不同时入库要多填到货件数。',
+      name: '辅助单位 · 采购',
+      desc: '跟供应商下单、到货清点用的单位。与主单位不同时，入库要多填到货件数。',
     },
     {
-      name: '结算单位',
-      desc: '与供应商结算的单位。不填则与库存单位相同；若不同（如库存按件、结算按 kg），入库须同时录入结算数量。',
+      name: '辅助单位 · 结算',
+      desc: '与供应商结算的单位。配置后入库须同时录入结算数量（如按 kg 过磅）。',
     },
   ],
   sales: [
@@ -1237,6 +1158,7 @@ const form = reactive({
   purchaseUnit: undefined,
   settleUnit: undefined,
   standardUnitWeight: undefined,
+  auxUnits: [],
   stockUnit: undefined,
   uomRelation: '',
   unitPrice: undefined,
@@ -1264,17 +1186,20 @@ const form = reactive({
   alert: createDefaultAlertConfig(),
 })
 
-const hasDerivedSettleUnit = computed(() =>
-  Boolean(deriveSettleUnitForSave(form.inventoryUnit, form.settleUnit)),
-)
+const unitManageTabRef = ref(null)
 
-const unitCaliberHint = computed(() =>
-  buildUnitCaliberHint({
-    inventoryUnit: form.inventoryUnit,
-    purchaseUnit: form.purchaseUnit,
-    settleUnit: form.settleUnit,
-  }),
-)
+function onUnitManageFlatChange(flat) {
+  if (!flat) return
+  form.inventoryUnit = flat.inventoryUnit
+  form.purchaseUnit = flat.purchaseUnit
+  form.settleUnit = flat.settleUnit
+  form.settleConvertType = flat.settleConvertType
+  form.isVariableLength = flat.isVariableLength
+  form.stockUnit = flat.stockUnit
+  form.standardUnitWeight = flat.standardUnitWeight
+  // auxUnits 以 TAB v-model 为准，避免 flat 回写触发循环
+  syncUnitCaliberFlags()
+}
 
 function syncUnitCaliberFlags() {
   const dual = deriveIsVariableLength(form.inventoryUnit, form.purchaseUnit)
@@ -1295,37 +1220,17 @@ function syncUnitCaliberFlags() {
   }
 }
 
-function onInventoryUnitChange() {
-  syncUnitCaliberFlags()
-}
-
-function onPurchaseUnitChange() {
-  if (!form.packContentUnit) {
-    form.packContentUnit = form.purchaseUnit
-  }
-  syncUnitCaliberFlags()
-}
-
-function onSettleUnitChange() {
-  if (!deriveSettleUnitForSave(form.inventoryUnit, form.settleUnit)) {
-    form.standardUnitWeight = undefined
-  }
-  syncUnitCaliberFlags()
-}
-
 watch(
   () => form.inventoryUnit,
   (unit, oldUnit) => {
     if (!unit) return
     if (!form.standardPackUnit) form.standardPackUnit = unit
-    if (!form.purchaseUnit || form.purchaseUnit === oldUnit) {
-      form.purchaseUnit = unit
-    }
+    if (!form.packContentUnit) form.packContentUnit = form.purchaseUnit || unit
+    // 辅助单位列表由单位 TAB 维护；此处仅同步包装相关默认值
     if (form.settleUnit === oldUnit) {
       form.settleUnit = undefined
       form.standardUnitWeight = undefined
     }
-    if (!form.packContentUnit) form.packContentUnit = form.purchaseUnit || unit
     syncUnitCaliberFlags()
   },
 )
@@ -1378,6 +1283,7 @@ function resetForm() {
   form.purchaseUnit = undefined
   form.settleUnit = undefined
   form.standardUnitWeight = undefined
+  form.auxUnits = []
   form.stockUnit = undefined
   form.uomRelation = ''
   form.unitPrice = undefined
@@ -1439,9 +1345,15 @@ function loadEditRecord(record) {
     source.standardUnitWeight != null && source.standardUnitWeight !== ''
       ? Number(source.standardUnitWeight)
       : undefined
+  {
+    const hydrated = hydrateUnitManageFromSource(source)
+    form.auxUnits = hydrated.auxUnits
+    if (hydrated.baseUnit && !form.inventoryUnit) form.inventoryUnit = hydrated.baseUnit
+  }
   form.stockUnit = source.stockUnit || source.inventoryUnit
   if (!form.purchaseUnit) form.purchaseUnit = form.inventoryUnit
-  syncUnitCaliberFlags()
+  // 以 TAB 推导结果对齐扁平字段（兼容仅存扁平的历史数据）
+  onUnitManageFlatChange(applyUnitManageToFlat(form.inventoryUnit, form.auxUnits))
   form.uomRelation = source.uomRelation || form.uomRelation || ''
   form.unitPrice = source.unitPrice
   form.purchaseUnitPrice = source.purchaseUnitPrice
@@ -1524,6 +1436,17 @@ function loadEditSpu(spu) {
   form.materialType = shared.materialType
   form.supplyForm = shared.supplyForm
   form.inventoryUnit = shared.inventoryUnit
+  form.purchaseUnit = shared.purchaseUnit || shared.inventoryUnit
+  form.settleUnit = shared.settleUnit || undefined
+  form.standardUnitWeight =
+    shared.standardUnitWeight != null && shared.standardUnitWeight !== ''
+      ? Number(shared.standardUnitWeight)
+      : undefined
+  {
+    const hydrated = hydrateUnitManageFromSource(shared)
+    form.auxUnits = hydrated.auxUnits
+  }
+  onUnitManageFlatChange(applyUnitManageToFlat(form.inventoryUnit, form.auxUnits))
   activeTabKey.value = 'variant'
 }
 
@@ -1665,15 +1588,30 @@ function validate() {
     }
   }
   if (!form.inventoryUnit) {
-    message.warning('请选择库存单位')
+    message.warning('请在「单位管理」中选择主单位')
+    activeTabKey.value = 'units'
     return false
+  }
+  {
+    const unitCheck = validateUnitManage(form.inventoryUnit, form.auxUnits)
+    if (!unitCheck.ok) {
+      message.warning(unitCheck.message)
+      activeTabKey.value = 'units'
+      return false
+    }
+  }
+  {
+    const flat = applyUnitManageToFlat(form.inventoryUnit, form.auxUnits)
+    form.auxUnits = flat.auxUnits
+    onUnitManageFlatChange(flat)
   }
   if (!form.purchaseUnit) {
     form.purchaseUnit = form.inventoryUnit
   }
   syncUnitCaliberFlags()
   if (form.isVariableLength && !form.purchaseUnit) {
-    message.warning('请选择采购单位')
+    message.warning('请配置带「采购」角色的辅助单位')
+    activeTabKey.value = 'units'
     return false
   }
   // 结算与库存相同视为未启用
@@ -1685,6 +1623,7 @@ function validate() {
   const settleCheck = validateSettleUnitOnMaster(form)
   if (!settleCheck.ok) {
     message.warning(settleCheck.message)
+    activeTabKey.value = 'units'
     return false
   }
   if (form.laborEnabled) {
@@ -1757,6 +1696,7 @@ function buildProductPayload() {
       form.settleUnit && Number(form.standardUnitWeight) > 0
         ? Number(form.standardUnitWeight)
         : undefined,
+    auxUnits: Array.isArray(form.auxUnits) ? form.auxUnits : [],
     packageContent:
       !form.isVariableLength && Number(form.packContentQty) > 0
         ? Number(form.packContentQty)
@@ -1847,6 +1787,7 @@ function buildMaterialPayload() {
       form.settleUnit && Number(form.standardUnitWeight) > 0
         ? Number(form.standardUnitWeight)
         : undefined,
+    auxUnits: Array.isArray(form.auxUnits) ? form.auxUnits : [],
     packageContent:
       !form.isVariableLength && Number(form.packContentQty) > 0
         ? Number(form.packContentQty)

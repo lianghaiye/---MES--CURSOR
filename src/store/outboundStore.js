@@ -32,8 +32,8 @@ import { preallocateDeliveryBatches } from '@/utils/salesOrderDedicatedStock'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
-/** v4：多仓领料出库演示（一仓一单） */
-const CURRENT_SEED_VERSION = '4'
+/** v5：发料出库样例关联外协订单 WX-260807001 */
+const CURRENT_SEED_VERSION = '5'
 
 /** 领料/发料出库不再审批：历史「待处理」升为「待出库」 */
 function migrateSkipApprovalStatuses(orders) {

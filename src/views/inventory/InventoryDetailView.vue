@@ -302,14 +302,51 @@
       </div>
     </template>
 
-    <a-drawer v-model:open="batchDrawerOpen" :title="batchDrawerTitle" width="720" destroy-on-close>
+    <a-drawer
+      v-model:open="batchDrawerOpen"
+      :title="batchDrawerTitle"
+      width="1100"
+      destroy-on-close
+    >
+      <div v-if="batchDrawerRow" class="batch-soft-summary">
+        <span
+          >在库合计 <b>{{ formatInventoryQty(drawerBatchStockTotal) }}</b></span
+        >
+        <span class="soft-sep">|</span>
+        <span>
+          软占用（物料级）
+          <a v-if="drawerItemSoftAllocated > 0" class="soft-link" @click="openSoftAllocDetail">
+            {{ formatInventoryQty(drawerItemSoftAllocated) }}
+          </a>
+          <b v-else>{{ formatInventoryQty(0) }}</b>
+          <a-button
+            v-if="drawerItemSoftAllocated > 0"
+            type="link"
+            size="small"
+            class="soft-detail-btn"
+            @click="openSoftAllocDetail"
+          >
+            查看占用明细
+          </a-button>
+        </span>
+        <span class="soft-sep">|</span>
+        <span
+          >可用约 <b>{{ formatInventoryQty(drawerItemAvailableApprox) }}</b></span
+        >
+      </div>
+      <a-alert
+        type="info"
+        show-icon
+        class="batch-soft-tip"
+        message="软占用按物料汇总，不落到具体批次；批次行「软占用」列展示本物料合计，点击可查看占用订单。"
+      />
       <a-table
         :columns="drawerBatchColumns"
         :data-source="drawerBatches"
         row-key="id"
         size="small"
         bordered
-        :pagination="drawerBatches.length > 10 ? { pageSize: 10 } : false"
+        :pagination="false"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'ownership'">
@@ -320,9 +357,47 @@
           <template v-else-if="column.key === 'currentLength'">
             {{ formatInventoryQty(record.currentLength) }}
           </template>
+          <template v-else-if="column.key === 'softAllocated'">
+            <a-tooltip title="本物料软占用合计（非本批独占）">
+              <a v-if="drawerItemSoftAllocated > 0" class="soft-link" @click="openSoftAllocDetail">
+                {{ formatInventoryQty(drawerItemSoftAllocated) }}
+              </a>
+              <span v-else>{{ formatInventoryQty(0) }}</span>
+            </a-tooltip>
+          </template>
         </template>
       </a-table>
     </a-drawer>
+
+    <a-modal
+      v-model:open="softAllocDetailOpen"
+      :title="softAllocDetailTitle"
+      :footer="null"
+      width="860px"
+      destroy-on-close
+    >
+      <a-table
+        :columns="softAllocDetailColumns"
+        :data-source="softAllocDetailRows"
+        row-key="id"
+        size="small"
+        bordered
+        :pagination="false"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'salesOrderNo'">
+            <a v-if="record.salesOrderId" @click="goSalesOrderDetail(record.salesOrderId)">
+              {{ record.salesOrderNo || record.salesOrderId }}
+            </a>
+            <span v-else>{{ record.salesOrderNo || '—' }}</span>
+          </template>
+          <template v-else-if="column.key === 'qty'">
+            {{ formatInventoryQty(record.qty) }}
+          </template>
+        </template>
+      </a-table>
+      <a-empty v-if="!softAllocDetailRows.length" description="暂无软占用记录" />
+    </a-modal>
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -347,13 +422,17 @@ export default { name: 'InventoryDetailView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { SearchOutlined, ReloadOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { stockState } from '@/store/stockStore'
 import { listBatches, stockBatchState, BATCH_STATUS } from '@/store/stockBatchStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { getSoftAllocatedQtyByItemCode } from '@/store/salesStockAllocationStore'
+import {
+  getSoftAllocatedQtyByItemCode,
+  listSoftAllocationsByItemCode,
+  salesStockAllocationState,
+} from '@/store/salesStockAllocationStore'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -371,6 +450,7 @@ import {
 } from '@/utils/inventoryDetailLines'
 
 const route = useRoute()
+const router = useRouter()
 const viewTab = ref('ledger')
 const filters = reactive({
   warehouse: undefined,
@@ -470,13 +550,23 @@ const batchQueryColumns = [
 ]
 
 const drawerBatchColumns = [
-  { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 130 },
+  { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 140 },
   { title: '归属', key: 'ownership', width: 88 },
-  { title: '销售订单号', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 120 },
-  { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 90 },
-  { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 120 },
-  { title: '在库数量', key: 'currentLength', width: 96, align: 'right' },
+  { title: '销售订单号', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 140 },
+  { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
+  { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 140 },
+  { title: '在库数量', key: 'currentLength', width: 100, align: 'right' },
+  { title: '软占用', key: 'softAllocated', width: 100, align: 'right' },
   { title: '状态', dataIndex: 'status', key: 'status', width: 80 },
+]
+
+const softAllocDetailColumns = [
+  { title: '销售订单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 150 },
+  { title: '客户', dataIndex: 'customerName', key: 'customerName', width: 140, ellipsis: true },
+  { title: '销售行', dataIndex: 'salesLineId', key: 'salesLineId', width: 160, ellipsis: true },
+  { title: '占用数量', key: 'qty', width: 100, align: 'right' },
+  { title: '交期', dataIndex: 'deliveryDate', key: 'deliveryDate', width: 120 },
+  { title: '占用时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 150 },
 ]
 
 const batchDrawerTitle = computed(() => {
@@ -494,6 +584,35 @@ const drawerBatches = computed(() => {
     itemCode: r.itemCode,
     inStockOnly: true,
   })
+})
+
+const drawerBatchStockTotal = computed(() =>
+  drawerBatches.value.reduce((s, b) => s + (Number(b.currentLength) || 0), 0),
+)
+
+const drawerItemSoftAllocated = computed(() => {
+  const code = batchDrawerRow.value?.itemCode
+  if (!code) return 0
+  void salesStockAllocationState.allocations
+  return getSoftAllocatedQtyByItemCode(code)
+})
+
+const drawerItemAvailableApprox = computed(() =>
+  Math.max(0, drawerBatchStockTotal.value - drawerItemSoftAllocated.value),
+)
+
+const softAllocDetailTitle = computed(() => {
+  const code = batchDrawerRow.value?.itemCode || ''
+  return `软占用明细 · ${code}`
+})
+
+const softAllocDetailOpen = ref(false)
+
+const softAllocDetailRows = computed(() => {
+  const code = batchDrawerRow.value?.itemCode
+  if (!code || !softAllocDetailOpen.value) return []
+  void salesStockAllocationState.allocations
+  return listSoftAllocationsByItemCode(code)
 })
 
 const {
@@ -592,6 +711,18 @@ function handleBatchReset() {
 function openBatchDrawer(record) {
   batchDrawerRow.value = record
   batchDrawerOpen.value = true
+  softAllocDetailOpen.value = false
+}
+
+function openSoftAllocDetail() {
+  if (!(drawerItemSoftAllocated.value > 0)) return
+  softAllocDetailOpen.value = true
+}
+
+function goSalesOrderDetail(id) {
+  if (!id) return
+  softAllocDetailOpen.value = false
+  router.push(`/sales/orders/${id}`)
 }
 
 function onBatchMenu({ key }) {
@@ -651,5 +782,44 @@ watch(
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
+}
+
+.batch-soft-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #595959;
+}
+
+.batch-soft-summary b {
+  color: #262626;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.soft-sep {
+  color: #d9d9d9;
+  margin: 0 4px;
+}
+
+.soft-link {
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.soft-detail-btn {
+  padding-inline: 4px;
+  height: auto;
+}
+
+.batch-soft-tip {
+  margin-bottom: 12px;
 }
 </style>

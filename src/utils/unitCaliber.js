@@ -35,7 +35,7 @@ export function resolveUomRelationByInventory(inventoryUnit) {
  */
 export function buildUnitCaliberHint({ inventoryUnit, purchaseUnit, settleUnit } = {}) {
   const inv = normalizeUnit(inventoryUnit)
-  if (!inv) return '请先选择库存单位（厂里记账 / 领料用这个）。'
+  if (!inv) return '请先选择主单位（厂里记账 / 领料用这个）。'
 
   const pur = normalizeUnit(purchaseUnit) || inv
   const settleRaw = normalizeUnit(settleUnit)
@@ -44,13 +44,13 @@ export function buildUnitCaliberHint({ inventoryUnit, purchaseUnit, settleUnit }
   const hasSettle = settle !== inv
 
   if (!dual && !hasSettle) {
-    return `三个单位都是「${inv}」：入库只填一个数量即可。`
+    return `主单位是「${inv}」，未配置采购/结算辅助单位：入库只填一个数量即可。`
   }
   if (!dual && hasSettle) {
-    return `库存/采购按「${inv}」，结算按「${settle}」：入库填${inv}数量，并再填结算数量（${settle}）。`
+    return `主单位「${inv}」，结算辅助单位「${settle}」：入库填${inv}数量，并再填结算数量（${settle}）。`
   }
   if (dual && !hasSettle) {
-    return `采购按「${pur}」、库存按「${inv}」：入库先填到货件数（${pur}），再填库存数量（${inv}）。`
+    return `采购辅助单位「${pur}」、主单位「${inv}」：入库先填到货件数（${pur}），再填库存数量（${inv}）。`
   }
-  return `采购「${pur}」、库存「${inv}」、结算「${settle}」：入库要填到货件数、库存数量和结算数量。`
+  return `采购「${pur}」、主单位「${inv}」、结算「${settle}」：入库要填到货件数、库存数量和结算数量。`
 }

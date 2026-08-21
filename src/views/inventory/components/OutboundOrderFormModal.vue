@@ -172,6 +172,10 @@
         <OutboundWorkOrderList :work-orders="workOrderList" />
       </div>
 
+      <div v-if="outsourcingOrderList.length" class="section-block">
+        <OutboundOutsourcingOrderList :outsourcing-orders="outsourcingOrderList" />
+      </div>
+
       <div class="section-block section-block--lines">
         <div class="section-title">出库清单</div>
         <div class="line-toolbar">
@@ -565,11 +569,17 @@ import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import OutboundLineEditModal from './OutboundLineEditModal.vue'
 import OutboundBatchSearchModal from './OutboundBatchSearchModal.vue'
 import OutboundWorkOrderList from './OutboundWorkOrderList.vue'
+import OutboundOutsourcingOrderList from './OutboundOutsourcingOrderList.vue'
 import InventoryLineItemSelect from './InventoryLineItemSelect.vue'
 import InventoryLineEditableCell from './InventoryLineEditableCell.vue'
 import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
 import { mobileMaterialReqState } from '@/store/mobileMaterialReqStore'
 import { resolveOutboundWorkOrders } from '@/utils/outboundWorkOrders'
+import {
+  resolveOutboundOutsourcingOrders,
+  snapshotOutsourcingOrdersForOutbound,
+} from '@/utils/outboundOutsourcingOrders'
+import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
 import { outboundTypeOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
@@ -665,6 +675,23 @@ const workOrderList = computed(() => {
   }
   return resolveOutboundWorkOrders(orderLike, mobileMaterialReqState.items)
 })
+
+const outsourcingOrderList = computed(() => {
+  void outsourcingOrderState.orders
+  const orderLike = {
+    ...(props.editRecord || {}),
+    outboundType: form.outboundType,
+    outsourcingOrders: form.outsourcingOrders,
+    outsourcingOrderId: form.outsourcingOrderId || props.editRecord?.outsourcingOrderId,
+    outsourcingOrderNo:
+      form.outsourcingOrderNo ||
+      props.editRecord?.outsourcingOrderNo ||
+      props.editRecord?.sourceOrderNo,
+    sourceOrderNo: props.editRecord?.sourceOrderNo,
+  }
+  return resolveOutboundOutsourcingOrders(orderLike)
+})
+
 const lockOutboundType = computed(() => isFromDelivery.value)
 const lockSalesOrder = computed(() => isFromDelivery.value)
 
@@ -876,6 +903,9 @@ const form = reactive({
   deliveryRemark: '',
   remark: '',
   workOrders: [],
+  outsourcingOrders: [],
+  outsourcingOrderId: '',
+  outsourcingOrderNo: '',
   materialReqId: '',
   materialReqNo: '',
   lineItems: [],
@@ -997,6 +1027,9 @@ function loadEditForm(record) {
     deliveryRemark: delivery?.remark || '',
     remark: record.remark || '',
     workOrders: Array.isArray(record.workOrders) ? [...record.workOrders] : [],
+    outsourcingOrders: Array.isArray(record.outsourcingOrders) ? [...record.outsourcingOrders] : [],
+    outsourcingOrderId: record.outsourcingOrderId || '',
+    outsourcingOrderNo: record.outsourcingOrderNo || '',
     materialReqId: record.materialReqId || '',
     materialReqNo: record.materialReqNo || '',
     lineItems: (record.lineItems || []).map((l) => {
@@ -1012,6 +1045,15 @@ function loadEditForm(record) {
   })
   if (!form.workOrders.length) {
     form.workOrders = resolveOutboundWorkOrders(record, mobileMaterialReqState.items)
+  }
+  if (!form.outsourcingOrders.length) {
+    form.outsourcingOrders = resolveOutboundOutsourcingOrders(record)
+    if (form.outsourcingOrders.length && !form.outsourcingOrderId) {
+      form.outsourcingOrderId =
+        form.outsourcingOrders[0].outsourcingOrderId || record.outsourcingOrderId || ''
+      form.outsourcingOrderNo =
+        form.outsourcingOrders[0].orderNo || record.outsourcingOrderNo || record.sourceOrderNo || ''
+    }
   }
   if (form.salesOrderNo) {
     syncSalesOrderMeta(form.salesOrderNo, form.salesOrderId)
@@ -1068,6 +1110,9 @@ function resetForm() {
     deliveryRemark: '',
     remark: '',
     workOrders: [],
+    outsourcingOrders: [],
+    outsourcingOrderId: '',
+    outsourcingOrderNo: '',
     materialReqId: '',
     materialReqNo: '',
     lineItems: [],
@@ -1424,6 +1469,9 @@ function buildPayload() {
     customerName: form.customerName || '',
     remark: form.remark?.trim(),
     workOrders: form.workOrders || [],
+    outsourcingOrders: snapshotOutsourcingOrdersForOutbound(form.outsourcingOrders || []),
+    outsourcingOrderId: form.outsourcingOrderId || '',
+    outsourcingOrderNo: form.outsourcingOrderNo || '',
     materialReqId: form.materialReqId || '',
     materialReqNo: form.materialReqNo || '',
     lineItems: form.lineItems

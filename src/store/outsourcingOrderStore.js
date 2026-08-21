@@ -18,7 +18,8 @@ import { addOutsourcingReceipt } from '@/store/outsourcingReceiptStore'
 
 const STORAGE_KEY = 'i_doms_outsourcing_orders'
 const SEED_VERSION_KEY = 'i_doms_outsourcing_orders_seed_v'
-const CURRENT_SEED_VERSION = '3'
+/** v5：发料按产品 BOM 展开 + 多产品共用物料演示 */
+const CURRENT_SEED_VERSION = '5'
 
 function loadFromStorage() {
   try {
@@ -396,10 +397,12 @@ function nextIssueOrderSeq(existingNos = []) {
 }
 
 /**
- * 生成发料出库单（对齐销售申请发货）：
- * 占用 appliedIssueQty，按出库仓库拆分生成 issueOrders
+ * 生成发料出库单：
+ * - productSets：按套数占用外协产品 appliedIssueQty
+ * - materialLines：按仓库拆分写入 issueOrders（BOM 下级物料）
+ * 兼容旧调用：第二参为数组时，按「明细行=产品行」旧逻辑处理
  */
-export function submitOutsourcingIssue(orderId, lines = [], extra = {}) {
+export function submitOutsourcingIssue(orderId, payload = [], extra = {}) {
   const order = getOutsourcingOrderById(orderId)
   if (!order) return { ok: false, message: '外协订单不存在' }
   if (order.status !== '进行中') {
@@ -408,24 +411,41 @@ export function submitOutsourcingIssue(orderId, lines = [], extra = {}) {
   const shipDate = String(extra.shipDate || '').trim()
   if (!shipDate) return { ok: false, message: '请选择出货日期' }
 
-  const submitLines = (lines || []).filter((item) => (Number(item.issueQty) || 0) > 0)
-  if (!submitLines.length) return { ok: false, message: '请至少填写一行出库数量' }
+  const isLegacy = Array.isArray(payload)
+  const productSets = isLegacy
+    ? (payload || [])
+        .filter((item) => (Number(item.issueQty) || 0) > 0)
+        .map((item) => ({ lineId: item.lineId, setQty: item.issueQty }))
+    : (payload.productSets || []).filter((item) => (Number(item.setQty) || 0) > 0)
+  const materialLines = isLegacy
+    ? (payload || []).filter((item) => (Number(item.issueQty) || 0) > 0)
+    : (payload.materialLines || []).filter((item) => (Number(item.issueQty) || 0) > 0)
 
-  for (const item of submitLines) {
+  if (!productSets.length) {
+    return { ok: false, message: '请至少选择一个产品并填写本次套数' }
+  }
+  if (!materialLines.length) {
+    return { ok: false, message: '请至少填写一行物料出库数量' }
+  }
+
+  for (const item of productSets) {
     const line = (order.lineItems || []).find((l) => l.id === item.lineId)
-    if (!line) return { ok: false, message: '存在无效的外协明细行' }
-    const qty = Number(item.issueQty) || 0
-    if (!String(item.shipWarehouse || '').trim()) {
-      return {
-        ok: false,
-        message: `请为「${line.productName || line.itemName || '明细'}」选择出库仓库`,
-      }
-    }
+    if (!line) return { ok: false, message: '存在无效的外协产品行' }
+    const qty = Number(item.setQty) || 0
     const remain = calcWxLineRemainIssueQty(order, line)
     if (qty > remain + 1e-9) {
       return {
         ok: false,
-        message: `物料「${line.productName || line.productCode}」可出库数量不足（剩余 ${remain}）`,
+        message: `产品「${line.productName || line.productCode}」可发套数不足（剩余 ${remain}）`,
+      }
+    }
+  }
+
+  for (const item of materialLines) {
+    if (!String(item.shipWarehouse || '').trim()) {
+      return {
+        ok: false,
+        message: `请为「${item.productName || item.itemName || item.itemCode || '物料'}」选择出库仓库`,
       }
     }
   }
@@ -438,28 +458,36 @@ export function submitOutsourcingIssue(orderId, lines = [], extra = {}) {
   const now = nowText()
   const groups = new Map()
 
-  submitLines.forEach((item) => {
+  productSets.forEach((item) => {
     const line = (order.lineItems || []).find((l) => l.id === item.lineId)
     if (!line) return
-    const qty = Number(item.issueQty) || 0
+    const qty = Number(item.setQty) || 0
     line.appliedIssueQty = calcWxLineAppliedIssueQty(order, line) + qty
-    if (item.shipWarehouse) line.shipWarehouse = item.shipWarehouse
-    if (item.remark != null) line.remark = item.remark
-    if (item.barcodeType != null) line.barcodeType = item.barcodeType
-    if (item.blankSizeText != null) line.blankSizeText = item.blankSizeText
+  })
+
+  materialLines.forEach((item) => {
+    const qty = Number(item.issueQty) || 0
+    const name = item.productName || item.itemName || ''
+    const code = item.productCode || item.itemCode || ''
+    const sourceLineIds = item.sourceProductLineIds || item.sourceLineIds || []
+    const primaryLineId = item.lineId || sourceLineIds[0] || ''
     const wh = String(item.shipWarehouse || '未指定仓库').trim() || '未指定仓库'
     if (!groups.has(wh)) groups.set(wh, [])
     groups.get(wh).push({
-      id: `wx-issue-line-${line.id}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-      lineId: line.id,
-      productName: line.productName || line.itemName || '',
-      productCode: line.productCode || line.itemCode || '',
-      specModel: line.specModel || '',
-      material: line.material || '',
+      id: `wx-issue-line-${code || primaryLineId}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      lineId: primaryLineId,
+      sourceProductLineIds: sourceLineIds,
+      productName: name,
+      productCode: code,
+      specModel: item.specModel || '',
+      material: item.material || '',
       applyQty: qty,
       actualQty: 0,
       issueQty: qty,
-      unit: line.unit || item.unit || '',
+      unit: item.unit || '',
+      remark: item.remark || '',
+      barcodeType: item.barcodeType || '',
+      blankSizeText: item.blankSizeText || '',
     })
   })
 
@@ -479,7 +507,7 @@ export function submitOutsourcingIssue(orderId, lines = [], extra = {}) {
       confirmer: '',
       confirmedAt: '',
       lineItems: groupLines,
-      lineIds: groupLines.map((l) => l.lineId),
+      lineIds: groupLines.map((l) => l.lineId).filter(Boolean),
     })
   })
 
@@ -489,7 +517,7 @@ export function submitOutsourcingIssue(orderId, lines = [], extra = {}) {
   syncOutsourcingReturnStatus(order)
   return {
     ok: true,
-    message: `已生成 ${orderCount} 张发料出库单（${submitLines.length} 行）`,
+    message: `已生成 ${orderCount} 张发料出库单（${materialLines.length} 行物料，${productSets.length} 个产品）`,
   }
 }
 

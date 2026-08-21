@@ -9,7 +9,7 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 
 const STORAGE_KEY = 'i_doms_sales_stock_allocations'
-const DATA_VERSION = 2
+const DATA_VERSION = 3
 
 function loadFromStorage() {
   try {
@@ -91,6 +91,16 @@ export function getSoftAllocatedQtyByItemCode(itemCode, { excludeLineId } = {}) 
         (!excludeLineId || a.salesLineId !== excludeLineId),
     )
     .reduce((s, a) => s + (Number(a.qty) || 0), 0)
+}
+
+/** 某物料全部有效软占用明细（按更新时间倒序） */
+export function listSoftAllocationsByItemCode(itemCode) {
+  const code = String(itemCode || '').trim()
+  if (!code) return []
+  return (salesStockAllocationState.allocations || [])
+    .filter((a) => a.itemCode === code && a.status === 'active' && (Number(a.qty) || 0) > 0)
+    .map((a) => ({ ...a }))
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
 }
 
 export function getFreeQtyByItemCode(itemCode, options = {}) {
@@ -476,18 +486,18 @@ export function listOrderStockDebts(salesOrderId) {
  */
 const DEMO_OTHER_ORDERS = [
   {
-    salesOrderId: 'so-seed-stock-donor-a',
-    salesOrderNo: '1-20260601-088',
-    customerName: '淄博水泵厂',
+    salesOrderId: 'so-seed-1',
+    salesOrderNo: '1-20260512-005',
+    customerName: '山东化工泵业集团',
   },
   {
-    salesOrderId: 'so-seed-stock-donor-b',
-    salesOrderNo: 'XSDD2026050018',
-    customerName: '济南石化装备',
+    salesOrderId: 'so-seed-2',
+    salesOrderNo: '1-20260520-008',
+    customerName: '华东机械制造有限公司',
   },
   {
-    salesOrderId: 'so-seed-stock-donor-c',
-    salesOrderNo: 'XSDD2026060007',
+    salesOrderId: 'so-seed-3',
+    salesOrderNo: '1-20260525-011',
     customerName: '东营油田物资',
   },
 ]
@@ -496,6 +506,9 @@ const DEMO_DONOR_ALLOCATIONS = [
   { itemCode: 'CP2610001', itemName: '清水离心泵 ISG50-160', qty: 1 },
   { itemCode: 'CP2610003', itemName: '单级单吸离心泵 ISW80-65-200', qty: 1 },
   { itemCode: 'CP2610010', itemName: '磁力驱动泵 CQ32-25', qty: 1 },
+  { itemCode: 'WL-PIPE-Q235-50', itemName: '无缝钢管 Q235 φ50×3', qty: 5 },
+  { itemCode: 'WL-BAR-45-20', itemName: '圆钢 45# φ20', qty: 2 },
+  { itemCode: 'WL-PLATE-Q235-10', itemName: '钢板 Q235 10mm', qty: 3 },
 ]
 
 function ensureDemoOnHand(itemCode, minQty) {
