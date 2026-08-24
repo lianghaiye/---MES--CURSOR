@@ -92,30 +92,82 @@ export function resolveItemAvailableStock(item) {
 export function calcReplenishSuggestQty(item, availableStock) {
   const max = Number(item?.alert?.maxStockQty)
   const batch = Number(item?.production?.replenishQty ?? item?.replenishQty)
-  const available = Number(availableStock)
-  const toMax = Number.isFinite(max)
-    ? Math.max(0, max - (Number.isFinite(available) ? available : 0))
-    : 0
+  const available = Number.isFinite(Number(availableStock))
+    ? Number(availableStock)
+    : resolveItemAvailableStock(item)
+  const toMax = Number.isFinite(max) ? Math.max(0, max - available) : 0
   const batchQty = Number.isFinite(batch) && batch > 0 ? batch : 0
   const suggest = Math.max(toMax, batchQty)
   if (suggest > 0) return suggest
   // 无最高/批量时：至少补到最低水位以上 1
   const min = Number(item?.alert?.minStockQty)
-  if (Number.isFinite(min) && Number.isFinite(available) && available <= min) {
+  if (Number.isFinite(min) && available <= min) {
     return Math.max(1, min - available + 1)
   }
   return 0
 }
 
-/** 开启预警且可用 ≤ 最低（不强制 MTS） */
-export function needsStockReplenish(item, availableStock) {
+/** 预警类型：低于最低可补货；高于最高仅展示不可补货 */
+export const STOCK_ALERT_KIND = {
+  BELOW_MIN: 'below_min',
+  ABOVE_MAX: 'above_max',
+}
+
+export const STOCK_ALERT_KIND_OPTIONS = [
+  { value: STOCK_ALERT_KIND.BELOW_MIN, label: '超低' },
+  { value: STOCK_ALERT_KIND.ABOVE_MAX, label: '超高' },
+]
+
+export function stockAlertKindLabel(kind) {
+  const hit = STOCK_ALERT_KIND_OPTIONS.find((o) => o.value === kind)
+  return hit?.label || '—'
+}
+
+export function resolveRowAlertKind(row) {
+  if (row?.alertKind) return row.alertKind
+  if (row?.canReplenish === false) return STOCK_ALERT_KIND.ABOVE_MAX
+  return STOCK_ALERT_KIND.BELOW_MIN
+}
+
+function resolveAvailable(item, availableStock) {
+  return Number.isFinite(Number(availableStock))
+    ? Number(availableStock)
+    : resolveItemAvailableStock(item)
+}
+
+/** 开启预警且可用 ≤ 最低 */
+export function isStockBelowMin(item, availableStock) {
   if (!item?.alert?.stockAlertEnabled) return false
   const min = Number(item.alert.minStockQty)
   if (!Number.isFinite(min)) return false
-  const available = Number.isFinite(Number(availableStock))
-    ? Number(availableStock)
-    : resolveItemAvailableStock(item)
-  return available <= min
+  return resolveAvailable(item, availableStock) <= min
+}
+
+/** 开启预警且可用 > 最高 */
+export function isStockAboveMax(item, availableStock) {
+  if (!item?.alert?.stockAlertEnabled) return false
+  const max = Number(item.alert.maxStockQty)
+  if (!Number.isFinite(max)) return false
+  return resolveAvailable(item, availableStock) > max
+}
+
+/**
+ * 是否需要出现在库存预警列表（低于最低 或 高于最高）
+ * 低于最低优先：同时异常配置时按可补货处理
+ */
+export function needsStockAlert(item, availableStock) {
+  return isStockBelowMin(item, availableStock) || isStockAboveMax(item, availableStock)
+}
+
+/** @deprecated 兼容旧名：仅表示「低于最低、可补货」 */
+export function needsStockReplenish(item, availableStock) {
+  return isStockBelowMin(item, availableStock)
+}
+
+export function resolveStockAlertKind(item, availableStock) {
+  if (isStockBelowMin(item, availableStock)) return STOCK_ALERT_KIND.BELOW_MIN
+  if (isStockAboveMax(item, availableStock)) return STOCK_ALERT_KIND.ABOVE_MAX
+  return ''
 }
 
 function defaultActionBySupply(item) {
@@ -223,7 +275,10 @@ export function buildProductionPlanItemRefMap(plans = productionPlanState.plans)
 
 function mapItemToSuggestion(item, itemKind, purchaseMap, wipMap, planRefMap) {
   const availableStock = resolveItemAvailableStock(item)
-  const suggestQty = calcReplenishSuggestQty(item, availableStock)
+  const alertKind = resolveStockAlertKind(item, availableStock)
+  const aboveMax = alertKind === STOCK_ALERT_KIND.ABOVE_MAX
+  const canReplenish = !aboveMax
+  const suggestQty = aboveMax ? 0 : calcReplenishSuggestQty(item, availableStock)
   const bom =
     itemKind === 'product'
       ? getOwnActiveBomForItem('product', item.id)
@@ -254,7 +309,7 @@ function mapItemToSuggestion(item, itemKind, purchaseMap, wipMap, planRefMap) {
     maxStockQty: Number(item.alert?.maxStockQty) || 0,
     replenishQty: Number(item.production?.replenishQty ?? item.replenishQty) || 0,
     suggestQty,
-    planQty: suggestQty || 1,
+    planQty: aboveMax ? 0 : suggestQty || 1,
     hasBom: Boolean(bom),
     bomId: bom?.id || '',
     bomName: bom?.bomName || '',
@@ -267,6 +322,8 @@ function mapItemToSuggestion(item, itemKind, purchaseMap, wipMap, planRefMap) {
     manual: false,
     fromProductionPlan,
     alertSource: fromProductionPlan ? STOCK_ALERT_SOURCE.PRODUCTION_PLAN : STOCK_ALERT_SOURCE.ALERT,
+    alertKind: alertKind || STOCK_ALERT_KIND.BELOW_MIN,
+    canReplenish,
     planNos: planRef?.planNos || [],
     planIds: planRef?.planIds || [],
     productionPlans: planRef?.plans || [],
@@ -288,19 +345,24 @@ function sortReplenishRows(rows = []) {
 
 /**
  * 列出预警触发的补货建议（产品 + 物料）
- * 若物料同时出现在未完成生产计划中：来源标「生产计划」并置顶，合并为一行
+ * - 低于最低：可执行补货
+ * - 高于最高：仅展示预警，不可执行补货
+ * - 若物料同时出现在未完成生产计划中：来源标「生产计划」并置顶，合并为一行
  */
 export function listStockReplenishSuggestions() {
   const { purchaseMap, wipMap } = buildTransitMaps()
   const planRefMap = buildProductionPlanItemRefMap()
   const products = productInfoState.products
-    .filter((p) => needsStockReplenish(p))
+    .filter((p) => needsStockAlert(p))
     .map((p) => mapItemToSuggestion(p, 'product', purchaseMap, wipMap, planRefMap))
   const materials = materialInfoState.materials
-    .filter((m) => needsStockReplenish(m))
+    .filter((m) => needsStockAlert(m))
     .map((m) => mapItemToSuggestion(m, 'material', purchaseMap, wipMap, planRefMap))
   return sortReplenishRows(
-    [...products, ...materials].filter((row) => row.planQty > 0 || row.suggestQty > 0),
+    [...products, ...materials].filter(
+      (row) =>
+        row.alertKind === STOCK_ALERT_KIND.ABOVE_MAX || row.planQty > 0 || row.suggestQty > 0,
+    ),
   )
 }
 
@@ -313,6 +375,11 @@ export function buildManualReplenishRow(item, itemKind = 'product') {
   row.fromAlert = false
   row.manual = true
   row.alertSource = STOCK_ALERT_SOURCE.MANUAL
+  // 手工行允许补货（即使当前库存高于最高）
+  row.canReplenish = true
+  if (row.alertKind === STOCK_ALERT_KIND.ABOVE_MAX) {
+    row.alertKind = STOCK_ALERT_KIND.BELOW_MIN
+  }
   // 手工行仍保留计划关联信息，但不改「手工」来源展示
   if (!(Number(row.planQty) > 0)) row.planQty = 1
   return row

@@ -12,6 +12,15 @@
               style="width: 120px"
             />
           </a-form-item>
+          <a-form-item label="类型">
+            <a-select
+              v-model:value="filters.alertKind"
+              allow-clear
+              placeholder="全部"
+              :options="alertKindFilterOpts"
+              style="width: 120px"
+            />
+          </a-form-item>
           <a-form-item label="产品名称">
             <a-input
               v-model:value="filters.productName"
@@ -65,25 +74,33 @@
         size="middle"
         row-key="key"
         :columns="displayColumns"
-        :data-source="displayRows"
+        :data-source="pagedRows"
         :pagination="false"
         :row-selection="rowSelection"
         :scroll="{ y: tableScrollY, x: tableScrollX }"
         class="replenish-table"
       >
         <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">
-            {{ index + 1 }}
+          <template v-if="column.key === 'alertKind'">
+            <a-tag v-if="resolveRowAlertKind(record) === STOCK_ALERT_KIND.ABOVE_MAX" color="red">
+              超高
+            </a-tag>
+            <a-tag v-else color="gold">超低</a-tag>
+          </template>
+          <template v-else-if="column.key === 'index'">
+            {{ rowIndex(index) }}
           </template>
           <template v-else-if="column.key === 'source'">
-            <a-tag v-if="record.manual || record.alertSource === 'manual'" color="blue">手工</a-tag>
+            <a-tag v-if="record.manual || record.alertSource === 'manual'" color="geekblue">
+              手工
+            </a-tag>
             <a-tag
               v-else-if="record.alertSource === 'production-plan' || record.fromProductionPlan"
               color="purple"
             >
               生产计划
             </a-tag>
-            <a-tag v-else color="orange">预警</a-tag>
+            <a-tag v-else color="cyan">预警</a-tag>
           </template>
           <template v-else-if="column.key === 'planNos'">
             <template v-if="(record.planNos || []).length">
@@ -110,6 +127,7 @@
               size="small"
               :min="0"
               :precision="2"
+              :disabled="!canExecuteReplenish(record)"
               style="width: 100%"
             />
           </template>
@@ -119,23 +137,40 @@
               size="small"
               style="width: 100%"
               :options="actionOpts"
+              :disabled="!canExecuteReplenish(record)"
             />
           </template>
           <template v-else-if="column.key === 'bomLabel'">
             {{ record.bomLabel || '-' }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button
-              type="link"
-              size="small"
-              :disabled="!(Number(record.planQty) > 0)"
-              @click="handleConfirm([record.key])"
-            >
-              执行补货
-            </a-button>
+            <a-tooltip :title="replenishDisabledTip(record)">
+              <span class="action-btn-wrap">
+                <a-button
+                  type="link"
+                  size="small"
+                  :disabled="!canExecuteReplenish(record)"
+                  @click="handleConfirm([record.key])"
+                >
+                  执行补货
+                </a-button>
+              </span>
+            </a-tooltip>
           </template>
         </template>
       </a-table>
+      <div class="table-pagination">
+        <a-pagination
+          v-model:current="pagination.current"
+          v-model:page-size="pagination.pageSize"
+          :total="filteredRows.length"
+          size="small"
+          show-size-changer
+          :page-size-options="['10', '20', '50', '100']"
+          :show-total="(t) => `共 ${t} 条`"
+          show-quick-jumper
+        />
+      </div>
     </div>
 
     <SelectBomMaterialModal
@@ -186,10 +221,13 @@ import { PLAN_SOURCE } from '@/utils/planSource'
 import {
   REPLENISH_ACTION,
   REPLENISH_ACTION_OPTIONS,
+  STOCK_ALERT_KIND,
+  STOCK_ALERT_KIND_OPTIONS,
   STOCK_ALERT_SOURCE,
   STOCK_ALERT_SOURCE_OPTIONS,
   buildManualReplenishRow,
   listStockReplenishSuggestions,
+  resolveRowAlertKind,
 } from '@/utils/stockReplenish'
 import { createProductionPlanFromStockReplenish } from '@/store/productionPlanStore'
 import { addPurchaseRequisition } from '@/store/purchaseRequisitionStore'
@@ -230,16 +268,23 @@ const pendingReplenishRows = ref([])
 
 const filters = reactive({
   alertSource: undefined,
+  alertKind: undefined,
   productName: '',
   productCode: '',
   specModel: '',
 })
 const appliedFilters = reactive({ ...filters })
+const pagination = reactive({
+  current: 1,
+  pageSize: 10,
+})
 
 const actionOpts = REPLENISH_ACTION_OPTIONS
 const sourceFilterOpts = STOCK_ALERT_SOURCE_OPTIONS
+const alertKindFilterOpts = STOCK_ALERT_KIND_OPTIONS
 
 const baseColumns = [
+  { title: '预警类型', key: 'alertKind', width: 88, fixed: 'left' },
   { title: '序号', key: 'index', width: 56, fixed: 'left' },
   { title: '来源', key: 'source', width: 88, fixed: 'left' },
   { title: '计划单号', key: 'planNos', width: 160, ellipsis: true, fixed: 'left' },
@@ -273,7 +318,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('planning-stock-replenish-v1', baseColumns)
+  useTableColumnSettings('planning-stock-replenish-v2', baseColumns)
 
 function resolveRowSource(row) {
   if (row.manual || row.alertSource === STOCK_ALERT_SOURCE.MANUAL) {
@@ -285,7 +330,22 @@ function resolveRowSource(row) {
   return STOCK_ALERT_SOURCE.ALERT
 }
 
-const displayRows = computed(() => {
+function isAboveMaxAlert(row) {
+  return resolveRowAlertKind(row) === STOCK_ALERT_KIND.ABOVE_MAX
+}
+
+function canExecuteReplenish(row) {
+  if (!row || isAboveMaxAlert(row)) return false
+  return Number(row.planQty) > 0
+}
+
+function replenishDisabledTip(row) {
+  if (isAboveMaxAlert(row)) return '库存高于最高水位，仅预警不可执行补货'
+  if (!(Number(row?.planQty) > 0)) return '请先填写大于 0 的补货数量'
+  return ''
+}
+
+const filteredRows = computed(() => {
   const name = String(appliedFilters.productName || '')
     .trim()
     .toLowerCase()
@@ -296,8 +356,10 @@ const displayRows = computed(() => {
     .trim()
     .toLowerCase()
   const source = appliedFilters.alertSource
+  const alertKind = appliedFilters.alertKind
   return rows.value.filter((r) => {
     if (source && resolveRowSource(r) !== source) return false
+    if (alertKind && resolveRowAlertKind(r) !== alertKind) return false
     if (
       name &&
       !String(r.productName || '')
@@ -323,8 +385,17 @@ const displayRows = computed(() => {
   })
 })
 
+const pagedRows = computed(() => {
+  const start = (pagination.current - 1) * pagination.pageSize
+  return filteredRows.value.slice(start, start + pagination.pageSize)
+})
+
+function rowIndex(index) {
+  return (pagination.current - 1) * pagination.pageSize + index + 1
+}
+
 const selectedRows = computed(() =>
-  rows.value.filter((r) => selectedKeys.value.includes(r.key) && Number(r.planQty) > 0),
+  rows.value.filter((r) => selectedKeys.value.includes(r.key) && canExecuteReplenish(r)),
 )
 
 const selectedActionKinds = computed(() => {
@@ -336,10 +407,11 @@ const hasMixedActions = computed(
   () => selectedKeys.value.length > 0 && selectedActionKinds.value.length > 1,
 )
 
-const batchExecuteDisabled = computed(() => !selectedKeys.value.length || hasMixedActions.value)
+const batchExecuteDisabled = computed(() => !selectedRows.value.length || hasMixedActions.value)
 
 const batchDisabledTip = computed(() => {
   if (!selectedKeys.value.length) return '请先勾选要执行的行'
+  if (!selectedRows.value.length) return '勾选行均为超高水位预警，不可执行补货'
   if (hasMixedActions.value) return '勾选行包含不同动作，请只勾选同一动作后再批量执行'
   return ''
 })
@@ -350,20 +422,23 @@ const rowSelection = computed(() => ({
     selectedKeys.value = keys
   },
   getCheckboxProps: (record) => ({
-    disabled: !(Number(record.planQty) > 0),
+    disabled: !canExecuteReplenish(record),
   }),
 }))
 
 function applyFilters() {
   Object.assign(appliedFilters, { ...filters })
+  pagination.current = 1
 }
 
 function resetFilters() {
   filters.alertSource = undefined
+  filters.alertKind = undefined
   filters.productName = ''
   filters.productCode = ''
   filters.specModel = ''
   Object.assign(appliedFilters, { ...filters })
+  pagination.current = 1
 }
 
 function refreshRows() {
@@ -383,7 +458,7 @@ function refreshRows() {
     return String(a.productCode || '').localeCompare(String(b.productCode || ''))
   })
   selectedKeys.value = selectedKeys.value.filter((key) =>
-    rows.value.some((r) => r.key === key && Number(r.planQty) > 0),
+    rows.value.some((r) => r.key === key && canExecuteReplenish(r)),
   )
 }
 
@@ -657,12 +732,19 @@ function onOutsourceSaved(savedRows) {
 function handleConfirm(onlyKeys) {
   const keySet = Array.isArray(onlyKeys) && onlyKeys.length ? new Set(onlyKeys) : null
   const selected = rows.value.filter((r) => {
-    if (!(Number(r.planQty) > 0)) return false
+    if (!canExecuteReplenish(r)) return false
     if (keySet) return keySet.has(r.key)
     return selectedKeys.value.includes(r.key)
   })
   if (!selected.length) {
-    message.warning('请先勾选要执行的行，并确认数量大于 0')
+    const blocked = rows.value.some((r) => {
+      if (!keySet && !selectedKeys.value.includes(r.key)) return false
+      if (keySet && !keySet.has(r.key)) return false
+      return isAboveMaxAlert(r)
+    })
+    message.warning(
+      blocked ? '库存高于最高水位，仅预警不可执行补货' : '请先勾选要执行的行，并确认数量大于 0',
+    )
     return
   }
 
@@ -763,6 +845,10 @@ defineExpose({ refreshRows })
   display: inline-block;
 }
 
+.action-btn-wrap {
+  display: inline-block;
+}
+
 .plan-link {
   color: #1677ff;
   cursor: pointer;
@@ -770,5 +856,11 @@ defineExpose({ refreshRows })
 
 .muted {
   color: rgba(0, 0, 0, 0.25);
+}
+
+.table-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 </style>
