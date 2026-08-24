@@ -1,48 +1,37 @@
 <template>
   <a-modal
     :open="open"
-    :title="isEdit ? '编辑模板' : '新增模板'"
-    width="880px"
+    :title="isEdit ? '编辑质检模板' : '新增质检模板'"
+    width="720px"
     :mask-closable="false"
     destroy-on-close
+    class="qc-template-form-modal"
     @cancel="handleCancel"
   >
-    <a-form layout="vertical" class="tpl-form">
-      <a-row :gutter="16">
-        <a-col :span="12">
-          <a-form-item label="模板名称" required>
-            <a-input v-model:value="form.name" allow-clear placeholder="请输入模板名称" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="12">
-          <a-form-item label="业务范围" required>
-            <a-select v-model:value="form.bizScope" placeholder="请选择" :options="bizScopeOpts" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="24">
-          <a-form-item label="适用对象">
-            <div class="objects-row">
-              <a-select
-                v-model:value="form.objects"
-                mode="tags"
-                style="flex: 1"
-                placeholder="输入后回车添加，或从建议中选择"
-                :options="objectSuggestOpts"
-              />
-            </div>
-            <div class="form-hint">可填写产品/物料/车间等适用对象，支持多选</div>
-          </a-form-item>
-        </a-col>
-      </a-row>
+    <div class="modal-form-body">
+      <div class="form-row">
+        <label class="form-label required">模板名称</label>
+        <a-input v-model:value="form.name" allow-clear placeholder="请输入模板名称" />
+      </div>
+
+      <div class="form-row">
+        <label class="form-label required">适用范围</label>
+        <a-radio-group v-model:value="form.scopeType" class="scope-radio">
+          <a-radio v-for="opt in scopeTypeOpts" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </a-radio>
+        </a-radio-group>
+      </div>
 
       <div class="fields-section">
         <div class="fields-header">
-          <span class="fields-title">模板字段</span>
+          <h4>模板字段</h4>
           <a-button type="primary" size="small" @click="openFieldModal(null)">
             <PlusOutlined />
             添加字段
           </a-button>
         </div>
+
         <a-table
           v-if="form.fields.length"
           :columns="fieldColumns"
@@ -89,9 +78,9 @@
             </template>
           </template>
         </a-table>
-        <a-empty v-else description="暂无字段，请点击「添加字段」" :image="simpleImage" />
+        <p v-else class="empty-hint">暂无字段，请点击“添加字段”</p>
       </div>
-    </a-form>
+    </div>
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
@@ -142,9 +131,9 @@
             <a-input v-model:value="fieldForm.options[i]" placeholder="选项值" />
             <a-button type="text" danger @click="fieldForm.options.splice(i, 1)">删除</a-button>
           </div>
-          <a-button type="link" size="small" @click="fieldForm.options.push('')"
-            >+ 添加选项</a-button
-          >
+          <a-button type="link" size="small" @click="fieldForm.options.push('')">
+            + 添加选项
+          </a-button>
         </a-form-item>
         <a-form-item v-if="fieldForm.type && fieldForm.type !== 'date'" label="默认值">
           <a-input
@@ -184,9 +173,13 @@ export default { name: 'QcTemplateFormModal' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { message, Empty } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
-import { qcTemplateBizScopeOptions } from '@/mock/qcTemplates'
+import {
+  QC_TEMPLATE_SCOPE_TYPE,
+  qcTemplateScopeTypeOptions,
+  qcTemplateScopeTypeLabel,
+} from '@/mock/qcTemplates'
 import { addQcTemplate, updateQcTemplate } from '@/store/qcTemplateStore'
 
 const props = defineProps({
@@ -196,7 +189,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'saved'])
 
-const simpleImage = Empty.PRESENTED_IMAGE_SIMPLE
 const saving = ref(false)
 const fieldModalOpen = ref(false)
 const editingFieldIndex = ref(null)
@@ -211,22 +203,13 @@ const fieldTypeMap = {
 }
 
 const fieldTypeOpts = Object.entries(fieldTypeMap).map(([value, label]) => ({ label, value }))
-const bizScopeOpts = qcTemplateBizScopeOptions.map((v) => ({ label: v, value: v }))
-const objectSuggestOpts = [
-  '全部产品',
-  '全部物料',
-  '清水离心泵',
-  '多级泵',
-  '轴承套',
-  '机加车间',
-].map((v) => ({ label: v, value: v }))
+const scopeTypeOpts = qcTemplateScopeTypeOptions
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 
 const form = reactive({
   name: '',
-  bizScope: qcTemplateBizScopeOptions[0],
-  objects: [],
+  scopeType: QC_TEMPLATE_SCOPE_TYPE.SINGLE,
   fields: [],
 })
 
@@ -258,15 +241,22 @@ function emptyFieldForm() {
 
 function resetForm() {
   form.name = ''
-  form.bizScope = qcTemplateBizScopeOptions[0]
-  form.objects = []
+  form.scopeType = QC_TEMPLATE_SCOPE_TYPE.SINGLE
   form.fields = []
+}
+
+function resolveScopeType(record) {
+  if (record?.scopeType) return record.scopeType
+  // 兼容旧数据：有对象则偏单产品，否则全局
+  if (Array.isArray(record?.objects) && record.objects.length) {
+    return QC_TEMPLATE_SCOPE_TYPE.SINGLE
+  }
+  return QC_TEMPLATE_SCOPE_TYPE.GLOBAL
 }
 
 function loadEdit(record) {
   form.name = record.name || ''
-  form.bizScope = record.bizScope || qcTemplateBizScopeOptions[0]
-  form.objects = [...(record.objects || [])]
+  form.scopeType = resolveScopeType(record)
   form.fields = (record.fields || []).map((f) => ({
     ...f,
     options: f.options ? [...f.options] : [],
@@ -368,16 +358,18 @@ function handleSave() {
     message.warning('请输入模板名称')
     return
   }
-  if (!form.bizScope) {
-    message.warning('请选择业务范围')
+  if (!form.scopeType) {
+    message.warning('请选择适用范围')
     return
   }
   saving.value = true
   try {
     const payload = {
       name: String(form.name).trim(),
-      bizScope: form.bizScope,
-      objects: [...(form.objects || [])],
+      scopeType: form.scopeType,
+      // 列表兼容：业务范围展示适用范围文案；不再维护适用对象
+      bizScope: qcTemplateScopeTypeLabel(form.scopeType),
+      objects: [],
       fields: form.fields.map((f) => ({
         ...f,
         options: f.options ? [...f.options] : [],
@@ -401,31 +393,72 @@ function handleSave() {
 </script>
 
 <style lang="less" scoped>
-.form-hint {
-  margin-top: 4px;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+.modal-form-body {
+  padding: 4px 0 8px;
 }
 
-.objects-row {
+.form-row {
   display: flex;
-  gap: 8px;
-  width: 100%;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 0;
+}
+
+.form-label {
+  width: 90px;
+  flex-shrink: 0;
+  padding-top: 5px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+  line-height: 22px;
+}
+
+.form-label.required::before {
+  content: '*';
+  color: #ff4d4f;
+  margin-right: 4px;
+}
+
+.form-row > :deep(.ant-input),
+.form-row > :deep(.ant-input-affix-wrapper),
+.form-row > .scope-radio {
+  flex: 1;
+  min-width: 0;
+}
+
+.scope-radio {
+  padding-top: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 4px;
 }
 
 .fields-section {
-  margin-top: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  background: #fafbfc;
 }
 
 .fields-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
-.fields-title {
+.fields-header h4 {
+  font-size: 14px;
   font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  margin: 0;
+}
+
+.empty-hint {
+  margin: 28px 0 20px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .option-row {

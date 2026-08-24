@@ -33,14 +33,19 @@
         size="small"
         bordered
         :pagination="false"
+        :row-class-name="(record) => (record.enabled === false ? 'aux-row-disabled' : '')"
         :locale="{ emptyText: '暂无辅助单位：采购/结算与主单位相同时可不配置' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'unit'">
             <span class="unit-name">{{ record.unit || '—' }}</span>
+            <a-tag v-if="record.enabled === false" class="status-tag">已停用</a-tag>
           </template>
           <template v-else-if="column.key === 'convert'">
             {{ formatAuxConvertText(record, baseUnit) }}
+          </template>
+          <template v-else-if="column.key === 'rate'">
+            {{ formatDefaultRate(record) }}
           </template>
           <template v-else-if="column.key === 'convertType'">
             <a-tag :color="record.convertType === 'fixed' ? 'green' : 'orange'">
@@ -56,11 +61,23 @@
             </a-tag>
             <span v-if="!roleLabels(record.roles).length">—</span>
           </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="record.enabled === false ? 'default' : 'success'">
+              {{ record.enabled === false ? '停用' : '启用' }}
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'actions'">
             <template v-if="!disabled">
               <a @click="openEdit(record)">编辑</a>
               <a-divider type="vertical" />
-              <a class="danger-link" @click="removeRow(record)">删除</a>
+              <a
+                v-if="record.enabled !== false"
+                class="warn-link"
+                @click="setRowEnabled(record, false)"
+              >
+                停用
+              </a>
+              <a v-else @click="setRowEnabled(record, true)">启用</a>
             </template>
             <span v-else>—</span>
           </template>
@@ -69,7 +86,8 @@
 
       <div class="batch-tip">
         换算类型为「按批次覆盖」时，默认换算率仅作预估；入库过磅/实填后按批次实际数量记账与结算。
-        「固定」换算本版仅保存配置，单据暂不自动折算。
+        采购角色的默认换算率表示「1 采购单位 = N 主单位」，采购申请按库存需求 ÷
+        该值向上取整；不填则不做包装换算。
       </div>
       <p v-if="caliberHint" class="caliber-hint">{{ caliberHint }}</p>
     </section>
@@ -178,12 +196,14 @@ const props = defineProps({
 const emit = defineEmits(['update:baseUnit', 'update:auxUnits', 'flat-change'])
 
 const columns = [
-  { title: '单位', key: 'unit', width: 100 },
+  { title: '单位', key: 'unit', width: 120 },
   { title: '与主单位换算', key: 'convert', ellipsis: true },
+  { title: '默认换算率', key: 'rate', width: 110, align: 'right' },
   { title: '换算类型', key: 'convertType', width: 120 },
   { title: '允许小数', key: 'allowDecimal', width: 88, align: 'center' },
   { title: '业务角色', key: 'roles', width: 140 },
-  { title: '操作', key: 'actions', width: 110 },
+  { title: '状态', key: 'status', width: 72, align: 'center' },
+  { title: '操作', key: 'actions', width: 120 },
 ]
 
 const modalOpen = ref(false)
@@ -219,6 +239,12 @@ function filterUnitOption(input, option) {
   const q = String(input || '').toLowerCase()
   const label = String(option?.label ?? option?.value ?? '').toLowerCase()
   return label.includes(q)
+}
+
+function formatDefaultRate(record) {
+  const rate = Number(record?.rate)
+  if (!Number.isFinite(rate) || rate <= 0) return '—'
+  return String(rate)
 }
 
 function emitFlat() {
@@ -275,15 +301,23 @@ function openEdit(record) {
   modalOpen.value = true
 }
 
-function removeRow(record) {
+function setRowEnabled(record, enabled) {
+  const nextList = (props.auxUnits || []).map((r) =>
+    r.id === record.id ? { ...r, enabled: Boolean(enabled) } : r,
+  )
+  const check = validateUnitManage(props.baseUnit, nextList)
+  if (!check.ok) {
+    message.warning(check.message)
+    return
+  }
+  const action = enabled ? '启用' : '停用'
   Modal.confirm({
-    title: '删除辅助单位',
-    content: `确定删除「${record.unit}」？`,
+    title: `${action}辅助单位`,
+    content: enabled
+      ? `启用「${record.unit}」后，将重新参与采购/结算口径推导。`
+      : `停用「${record.unit}」后保留配置，但新单据不再使用该辅助单位。`,
     onOk: () => {
-      emit(
-        'update:auxUnits',
-        (props.auxUnits || []).filter((r) => r.id !== record.id),
-      )
+      emit('update:auxUnits', nextList)
     },
   })
 }
@@ -292,6 +326,7 @@ function submitModal() {
   const roles = (draft.roles || []).filter((r) =>
     UNIT_ROLE_OPTIONS.some((o) => o.value === r && o.enabled),
   )
+  const prev = editingId.value ? (props.auxUnits || []).find((r) => r.id === editingId.value) : null
   const row = createEmptyAuxUnit({
     id: editingId.value || undefined,
     unit: draft.unit,
@@ -299,6 +334,7 @@ function submitModal() {
     rate: draft.rate,
     allowDecimal: draft.allowDecimal,
     roles,
+    enabled: prev ? prev.enabled !== false : true,
   })
 
   const nextList = editingId.value
@@ -311,9 +347,11 @@ function submitModal() {
     return Promise.reject()
   }
 
-  // 角色唯一：若本行占用采购/结算，从其他行剥离
+  // 角色唯一：仅从其他「启用中」行剥离采购/结算
   const stripped = nextList.map((r) => {
     if (r.id === row.id) return r
+    if (r.enabled === false) return r
+    if (row.enabled === false) return r
     const nextRoles = (r.roles || []).filter((role) => {
       if (role === UNIT_ROLE.PURCHASE && roles.includes(UNIT_ROLE.PURCHASE)) return false
       if (role === UNIT_ROLE.SETTLE && roles.includes(UNIT_ROLE.SETTLE)) return false
@@ -396,6 +434,19 @@ defineExpose({
 
 .danger-link {
   color: #ff4d4f;
+}
+
+.warn-link {
+  color: #d48806;
+}
+
+.status-tag {
+  margin-left: 6px;
+}
+
+:deep(.aux-row-disabled) {
+  color: rgba(0, 0, 0, 0.35);
+  background: #fafafa;
 }
 
 .rate-row {

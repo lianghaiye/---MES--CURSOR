@@ -63,6 +63,7 @@ export function updateQcTemplate(id, payload = {}, operator = 'admin1') {
   const fields = Array.isArray(payload.fields) ? payload.fields : row.fields
   Object.assign(row, {
     name: payload.name != null ? payload.name : row.name,
+    scopeType: payload.scopeType != null ? payload.scopeType : row.scopeType,
     bizScope: payload.bizScope != null ? payload.bizScope : row.bizScope,
     objects: Array.isArray(payload.objects) ? [...payload.objects] : row.objects,
     fields: fields.map((f) => ({ ...f, options: f.options ? [...f.options] : [] })),

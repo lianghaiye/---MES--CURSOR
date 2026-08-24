@@ -37,6 +37,8 @@ export function createEmptyAuxUnit(partial = {}) {
     rate: partial.rate ?? null,
     allowDecimal: partial.allowDecimal !== false,
     roles: Array.isArray(partial.roles) ? [...partial.roles] : [],
+    /** false = 停用：保留配置，不参与采购/结算推导 */
+    enabled: partial.enabled !== false,
   }
 }
 
@@ -83,10 +85,13 @@ export function hydrateUnitManageFromSource(source = {}) {
   const settle = deriveSettleUnitForSave(baseUnit, source.settleUnit)
 
   if (purchase && baseUnit && purchase !== baseUnit) {
+    const pkg = Number(source.packageContent ?? source.packContentQty)
+    const hasPkg = Number.isFinite(pkg) && pkg > 0
     auxUnits.push(
       createEmptyAuxUnit({
         unit: purchase,
-        convertType: UNIT_CONVERT.BATCH,
+        convertType: hasPkg ? UNIT_CONVERT.FIXED : UNIT_CONVERT.BATCH,
+        rate: hasPkg ? pkg : null,
         allowDecimal: false,
         roles: [UNIT_ROLE.PURCHASE],
       }),
@@ -111,13 +116,15 @@ export function hydrateUnitManageFromSource(source = {}) {
 
 /**
  * TAB → 扁平字段（单据兼容）
+ * 仅启用中的辅助单位参与采购/结算推导
  */
 export function applyUnitManageToFlat(baseUnit, auxUnits = [], options = {}) {
   const inv = normalizeUnit(baseUnit)
   const list = Array.isArray(auxUnits) ? auxUnits : []
+  const active = list.filter((r) => r.enabled !== false)
 
-  const purchaseRow = list.find((r) => (r.roles || []).includes(UNIT_ROLE.PURCHASE))
-  const settleRow = list.find((r) => (r.roles || []).includes(UNIT_ROLE.SETTLE))
+  const purchaseRow = active.find((r) => (r.roles || []).includes(UNIT_ROLE.PURCHASE))
+  const settleRow = active.find((r) => (r.roles || []).includes(UNIT_ROLE.SETTLE))
 
   const purchaseUnit = normalizeUnit(purchaseRow?.unit) || inv
   const settleUnit = deriveSettleUnitForSave(inv, settleRow?.unit)
@@ -133,6 +140,13 @@ export function applyUnitManageToFlat(baseUnit, auxUnits = [], options = {}) {
     standardUnitWeight = undefined
   }
 
+  /** 采购辅助单位默认换算率 → 兼容旧「包装含量」（1 采购单位 = N 库存单位） */
+  let packageContent
+  if (purchaseRow) {
+    const rate = Number(purchaseRow.rate)
+    if (Number.isFinite(rate) && rate > 0) packageContent = rate
+  }
+
   return {
     inventoryUnit: inv || undefined,
     stockUnit: inv || undefined,
@@ -141,6 +155,8 @@ export function applyUnitManageToFlat(baseUnit, auxUnits = [], options = {}) {
     settleConvertType: settleUnit ? 'floating' : '',
     isVariableLength: deriveIsVariableLength(inv, purchaseUnit),
     standardUnitWeight,
+    packageContent,
+    packContentQty: packageContent ?? null,
     auxUnits: list.map((r) => ({
       id: r.id,
       unit: normalizeUnit(r.unit),
@@ -148,6 +164,7 @@ export function applyUnitManageToFlat(baseUnit, auxUnits = [], options = {}) {
       rate: r.rate == null || r.rate === '' ? null : Number(r.rate),
       allowDecimal: Boolean(r.allowDecimal),
       roles: [...(r.roles || [])],
+      enabled: r.enabled !== false,
     })),
   }
 }
@@ -160,11 +177,13 @@ export function validateUnitManage(baseUnit, auxUnits = []) {
   if (!inv) return { ok: false, message: '请先选择主单位（库存记账基准）' }
 
   const list = Array.isArray(auxUnits) ? auxUnits : []
-  const purchaseRows = list.filter((r) => (r.roles || []).includes(UNIT_ROLE.PURCHASE))
-  const settleRows = list.filter((r) => (r.roles || []).includes(UNIT_ROLE.SETTLE))
+  const active = list.filter((r) => r.enabled !== false)
+  const purchaseRows = active.filter((r) => (r.roles || []).includes(UNIT_ROLE.PURCHASE))
+  const settleRows = active.filter((r) => (r.roles || []).includes(UNIT_ROLE.SETTLE))
 
-  if (purchaseRows.length > 1) return { ok: false, message: '「采购」角色只能挂一个辅助单位' }
-  if (settleRows.length > 1) return { ok: false, message: '「结算」角色只能挂一个辅助单位' }
+  if (purchaseRows.length > 1)
+    return { ok: false, message: '「采购」角色只能挂一个启用中的辅助单位' }
+  if (settleRows.length > 1) return { ok: false, message: '「结算」角色只能挂一个启用中的辅助单位' }
 
   const seenUnits = new Set()
   for (const row of list) {
@@ -179,7 +198,7 @@ export function validateUnitManage(baseUnit, auxUnits = []) {
     )
     if (!roles.length) return { ok: false, message: `请为「${u}」勾选业务角色（采购或结算）` }
 
-    if (row.convertType === UNIT_CONVERT.FIXED) {
+    if (row.enabled !== false && row.convertType === UNIT_CONVERT.FIXED) {
       const rate = Number(row.rate)
       if (!(rate > 0)) return { ok: false, message: `固定换算请填写「${u}」相对主单位的换算率` }
     }

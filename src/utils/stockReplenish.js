@@ -1,5 +1,5 @@
 /** 库存预警 / 统一补货：产品/物料低于最低库存，或手工添加后生产/采购/外协 */
-import { PLAN_STRATEGY } from '@/mock/productInfoOptions'
+import { PLAN_STRATEGY, isPlanStrategyMts } from '@/mock/productInfoOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
@@ -54,7 +54,7 @@ export function resolveProductPlanStrategy(product) {
 }
 
 export function isMtsProduct(product) {
-  return resolveProductPlanStrategy(product) === PLAN_STRATEGY.MTS
+  return isPlanStrategyMts(resolveProductPlanStrategy(product))
 }
 
 export function findProductForSalesLine(line) {

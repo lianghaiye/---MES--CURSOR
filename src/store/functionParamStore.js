@@ -101,7 +101,10 @@ export const DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION =
   '须在「下料结算」填写实耗并确认回库：余料建新批次号、标识为余料，血缘挂原批，默认回发料仓。'
 
 export const ENABLE_PLATE_AREA_MEASURE_DESCRIPTION =
-  '可选快捷：开启后，仅当库存单位为㎡时，入库可用「长 × 宽」辅助换算面积；关闭则直接填库存数量。默认关闭，界面更简单。不按面积管库存的客户保持关闭即可。'
+  '可选快捷：开启后，仅当库存单位为㎡时，入库可用「长 × 宽」辅助换算面积；产品 BOM 下料尺寸也可选「板材 · 长×宽→㎡」。关闭则直接填库存数量。默认关闭，界面更简单。不按面积管库存的客户保持关闭即可。'
+
+export const ENABLE_BOM_WEIGHT_CALC_DESCRIPTION =
+  '可选工具：开启后，产品 BOM「下料尺寸」弹窗增加「重量计算」页签，可按型材/密度估算重量并回填尺寸。默认关闭。'
 
 export const ENABLE_BOM_LEVEL_MTS_DESCRIPTION =
   '开启后，生产计划展开 BOM 时支持子件级按库存MTS：子件主数据为按库存MTS 且库存充足时，可不下推该层生产/采购需求；关闭则生产计划仍按订单展开，仅成品级计划策略生效。默认关闭。'
@@ -209,6 +212,11 @@ export const FUNCTION_PARAM_ROWS = [
     description: ENABLE_PLATE_AREA_MEASURE_DESCRIPTION,
   },
   {
+    key: 'enableBomWeightCalc',
+    scenario: 'BOM 重量计算',
+    description: ENABLE_BOM_WEIGHT_CALC_DESCRIPTION,
+  },
+  {
     key: 'enableBomLevelMts',
     scenario: '生产计划启用 BOM 级 MTS',
     description: ENABLE_BOM_LEVEL_MTS_DESCRIPTION,
@@ -257,6 +265,7 @@ function loadFromStorage() {
           outboundIssueRule: normalizeOutboundIssueRule(parsed.outboundIssueRule),
           dualUnitIssueStrategy: normalizeDualUnitIssueStrategy(parsed.dualUnitIssueStrategy),
           enablePlateAreaMeasure: parsed.enablePlateAreaMeasure === true,
+          enableBomWeightCalc: parsed.enableBomWeightCalc === true,
           enableBomLevelMts: parsed.enableBomLevelMts === true,
         }
       }
@@ -280,6 +289,7 @@ export const functionParamState = reactive({
     outboundIssueRule: OUTBOUND_ISSUE_RULES.FIFO,
     dualUnitIssueStrategy: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL,
     enablePlateAreaMeasure: false,
+    enableBomWeightCalc: false,
     enableBomLevelMts: false,
   },
 })
@@ -428,6 +438,16 @@ export function isPlateAreaMeasureEnabled() {
 
 export function setEnablePlateAreaMeasure(enabled) {
   functionParamState.params.enablePlateAreaMeasure = Boolean(enabled)
+  return { ok: true }
+}
+
+/** 是否开放 BOM 下料尺寸「重量计算」页签（默认关） */
+export function isBomWeightCalcEnabled() {
+  return functionParamState.params.enableBomWeightCalc === true
+}
+
+export function setEnableBomWeightCalc(enabled) {
+  functionParamState.params.enableBomWeightCalc = Boolean(enabled)
   return { ok: true }
 }
 

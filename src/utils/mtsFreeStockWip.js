@@ -2,7 +2,7 @@
  * 销售库存提醒：仅统计「按库存MTS · 自由备货补货」相关在制数量
  * （不含按销售订单排产的工单）
  */
-import { PLAN_STRATEGY } from '@/mock/productInfoOptions'
+import { PLAN_STRATEGY, isPlanStrategyMts } from '@/mock/productInfoOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { productionPlanState } from '@/store/productionPlanStore'
 import { workOrderState } from '@/store/workOrderStore'
@@ -62,7 +62,7 @@ export function getMtsFreeStockWipByItemCode(itemCode) {
   if (!code) return empty
 
   const product = productInfoState.products.find((p) => p.code === code)
-  const isMts = (product?.production?.planStrategy || PLAN_STRATEGY.MTO) === PLAN_STRATEGY.MTS
+  const isMts = isPlanStrategyMts(product?.production?.planStrategy || PLAN_STRATEGY.MTO)
   if (!isMts) return empty
 
   let pendingQty = 0

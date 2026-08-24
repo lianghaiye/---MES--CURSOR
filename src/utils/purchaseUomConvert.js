@@ -1,8 +1,11 @@
 /**
  * BOM / 库存需求（库存单位）↔ 采购数量（采购单位）换算
- * - 包装含量：1 采购单位 = N 库存单位（如 1 盒 = 100 个）
- * - 双单位型材/板材走 uomRelation，不走包装含量
+ * - 默认换算率（辅助单位·采购角色）：1 采购单位 = N 库存单位（如 1 盒 = 100 个）
+ * - 兼容旧字段 packageContent / packContentQty
+ * - 双单位型材/板材无默认换算率时不走包装换算
  */
+
+import { UNIT_ROLE } from '@/utils/unitManageTab'
 
 export function resolveInventoryUnit(material = {}) {
   return material.stockUnit || material.inventoryUnit || material.unit || '件'
@@ -13,22 +16,31 @@ export function resolvePurchaseUnit(material = {}) {
 }
 
 /**
- * 1 采购单位折合多少库存单位（兼容 packageContent / packContentQty）
+ * 1 采购单位折合多少库存单位
+ * 优先取辅助单位中「采购」角色的默认换算率；否则兼容 packageContent / packContentQty
  * 未填写或无效时返回 null（表示不做包装换算）
  */
 export function resolvePackageContent(material = {}) {
+  const aux = Array.isArray(material.auxUnits) ? material.auxUnits : []
+  const purchaseRow = aux.find(
+    (r) => r.enabled !== false && (r.roles || []).includes(UNIT_ROLE.PURCHASE),
+  )
+  if (purchaseRow) {
+    const rate = Number(purchaseRow.rate)
+    if (Number.isFinite(rate) && rate > 0) return rate
+  }
   const n = Number(material.packageContent ?? material.packContentQty)
   if (Number.isFinite(n) && n > 0) return n
   return null
 }
 
 /**
- * 是否需要按包装含量做采购换算
- * - 双单位（可变长）不走此路径
- * - 采购单位与库存单位相同，或不填包装含量 → 不换算，采购量按库存需求计
+ * 是否需要按默认换算率做采购换算
+ * - 采购单位与库存单位相同，或无默认换算率 → 不换算，采购量按库存需求计
+ * - 有采购辅助单位换算率时（如 1 盒=100 个）走向上取整换算；无换算率的根/米等不走此路径
  */
 export function needsPackagePurchaseConvert(material = {}) {
-  if (!material || material.isVariableLength) return false
+  if (!material) return false
   const purchaseUnit = resolvePurchaseUnit(material)
   const inventoryUnit = resolveInventoryUnit(material)
   if (purchaseUnit === inventoryUnit) return false

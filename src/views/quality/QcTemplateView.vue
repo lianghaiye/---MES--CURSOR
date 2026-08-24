@@ -118,23 +118,8 @@
               {{ record.type || '—' }}
             </a-tag>
           </template>
-          <template v-else-if="column.key === 'bizScope'">
-            {{ record.bizScope || '—' }}
-          </template>
-          <template v-else-if="column.key === 'objects'">
-            <template v-if="(record.objects || []).length">
-              <a-tag
-                v-for="(obj, i) in (record.objects || []).slice(0, 2)"
-                :key="`${record.id}-${i}`"
-                class="obj-tag"
-              >
-                {{ obj }}
-              </a-tag>
-              <span v-if="record.objects.length > 2" class="obj-more">
-                +{{ record.objects.length - 2 }}
-              </span>
-            </template>
-            <span v-else>—</span>
+          <template v-else-if="column.key === 'scopeType'">
+            {{ qcTemplateScopeTypeLabel(record.scopeType) }}
           </template>
           <template v-else-if="column.key === 'createdAt'">
             {{ formatDateTimeMinute(record.createdAt) }}
@@ -200,6 +185,7 @@ import { Modal, message } from 'ant-design-vue'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import {
   filterQcTemplates,
+  qcTemplateScopeTypeLabel,
   qcTemplateStatusOptions,
   qcTemplateTypeOptions,
 } from '@/mock/qcTemplates'
@@ -232,8 +218,7 @@ const baseColumns = [
   { title: '模板编号', key: 'code', dataIndex: 'code', width: 140, fixed: 'left' },
   { title: '模板名称', dataIndex: 'name', width: 180, ellipsis: true },
   { title: '类型', key: 'type', width: 110 },
-  { title: '业务范围', key: 'bizScope', dataIndex: 'bizScope', width: 120 },
-  { title: '适用对象', key: 'objects', width: 180 },
+  { title: '适用范围', key: 'scopeType', width: 100 },
   { title: '字段数量', dataIndex: 'fieldCount', width: 90, align: 'right' },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
@@ -243,7 +228,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('qc-template-list-v1', baseColumns)
+  useTableColumnSettings('qc-template-list-v2', baseColumns)
 
 const filteredList = computed(() =>
   filterQcTemplates(qcTemplateState.templates, appliedFilters.value),
@@ -289,7 +274,7 @@ function handleCreate() {
 
 function handlePreview(record) {
   message.info(
-    `预览「${record.name}」：业务范围 ${record.bizScope || '—'}，字段 ${record.fieldCount || 0} 个`,
+    `预览「${record.name}」：适用范围 ${qcTemplateScopeTypeLabel(record.scopeType)}，字段 ${record.fieldCount || 0} 个`,
   )
 }
 
@@ -430,15 +415,6 @@ function handleDelete(record) {
 .link-code {
   color: #1677ff;
   cursor: pointer;
-}
-
-.obj-tag {
-  margin-inline-end: 4px;
-}
-
-.obj-more {
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
 }
 
 .table-pagination {

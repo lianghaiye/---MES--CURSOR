@@ -9,15 +9,15 @@ import {
   resolveDualUnitMeasureMode,
 } from '@/utils/variableLengthMaterial'
 
-/** 下料尺寸可选单位 */
-export const BLANK_SIZE_UNITS = ['mm', 'cm', 'm']
+/** 下料尺寸可选单位（默认 cm，选项以 cm 靠前） */
+export const BLANK_SIZE_UNITS = ['cm', 'mm', 'm']
 
 export const BLANK_SIZE_UNIT_OPTIONS = BLANK_SIZE_UNITS.map((u) => ({ label: u, value: u }))
 
 /** 换算到毫米的系数 */
 const TO_MM = { mm: 1, cm: 10, m: 1000 }
 
-export const DEFAULT_BLANK_SIZE_UNIT = 'mm'
+export const DEFAULT_BLANK_SIZE_UNIT = 'cm'
 
 /** 下料尺寸属性（通用，与物料形态无关） */
 export const BLANK_SIZE_FIELDS = [
@@ -108,7 +108,12 @@ export function normalizeBlankSize(raw) {
   for (const f of BLANK_SIZE_FIELDS) {
     const n = Number(raw[f.key])
     base[f.key] = Number.isFinite(n) && n > 0 ? roundNumber(n, 4) : null
-    base.units[f.key] = normalizeBlankSizeUnit(rawUnits[f.key] ?? raw[`${f.key}Unit`])
+    // 未填数值的字段单位一律用默认 cm；已填的保留原单位
+    if (base[f.key] != null) {
+      base.units[f.key] = normalizeBlankSizeUnit(rawUnits[f.key] ?? raw[`${f.key}Unit`])
+    } else {
+      base.units[f.key] = DEFAULT_BLANK_SIZE_UNIT
+    }
   }
   return base
 }
@@ -135,7 +140,15 @@ export const BLANK_SIZE_MODE = DUAL_UNIT_MEASURE_MODE
 export const BLANK_SIZE_MODE_OPTIONS = DUAL_UNIT_MEASURE_MODE_OPTIONS
 
 export function getBlankSizeModeOptions(options = {}) {
-  return getDualUnitMeasureModeOptions(options)
+  // BOM 下料尺寸不再提供「型材 · 按长度」；仅通用 + 可选板材面积
+  return getDualUnitMeasureModeOptions(options).filter((o) => o.value !== BLANK_SIZE_MODE.LENGTH)
+}
+
+/** 下料弹窗用：历史「按长度」回落为通用 */
+export function resolveBlankSizeModeForEditor(lineOrItem = {}, options = {}) {
+  const mode = resolveBlankSizeMode(lineOrItem, options)
+  if (mode === BLANK_SIZE_MODE.LENGTH) return BLANK_SIZE_MODE.GENERIC
+  return mode
 }
 
 export function normalizeBlankSizeMode(mode) {

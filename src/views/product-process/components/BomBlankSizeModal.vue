@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     :title="modalTitle"
-    :width="640"
+    :width="720"
     :z-index="1100"
     :mask-closable="false"
     destroy-on-close
@@ -20,93 +20,99 @@
     <div class="mode-switch">
       <div class="mode-switch-label">{{ isOrderPurpose ? '订货方式' : '下料方式' }}</div>
       <a-radio-group
-        v-model:value="selectedMode"
+        v-model:value="selectedUiTab"
         option-type="button"
         button-style="solid"
         size="small"
-        :options="blankSizeModeOpts"
+        :options="uiTabOpts"
+        @change="onUiTabChange"
       />
-      <div class="mode-switch-hint">{{ modeHint }}</div>
+      <div v-if="!weightTabActive" class="mode-switch-hint">{{ modeHint }}</div>
+      <div v-else class="mode-switch-hint">尺寸与其它页签共用；选好型材与密度后自动估算重量</div>
     </div>
 
-    <a-form layout="vertical" class="blank-size-form">
-      <div class="field-group-label">{{ plateMode ? '主尺寸（必填）' : '主尺寸' }}</div>
-      <a-row :gutter="[12, 8]">
-        <a-col v-for="field in primaryFields" :key="field.key" :span="8">
-          <a-form-item :required="field.required">
-            <template #label>
-              {{ field.label }}
-              <span v-if="field.required" class="req-mark">*</span>
-            </template>
-            <div class="blank-size-field">
-              <a-input-number
-                v-model:value="draft[field.key]"
-                :min="0"
-                :precision="4"
-                :formatter="inputNumberFormatter"
-                :parser="inputNumberParser"
-                class="blank-size-input"
-                :placeholder="field.required ? '必填' : '选填'"
-              />
-              <a-select
-                :value="getUnit(field.key)"
-                :options="BLANK_SIZE_UNIT_OPTIONS"
-                class="blank-size-unit"
-                :dropdown-style="{ zIndex: 1200 }"
-                :get-popup-container="getSelectPopupContainer"
-                @update:value="(unit) => onUnitChange(field.key, unit)"
-              />
-            </div>
-          </a-form-item>
-        </a-col>
-      </a-row>
+    <div v-show="!weightTabActive">
+      <a-form layout="vertical" class="blank-size-form">
+        <div class="field-group-label">{{ plateMode ? '主尺寸（必填）' : '主尺寸' }}</div>
+        <a-row :gutter="[12, 8]">
+          <a-col v-for="field in primaryFields" :key="field.key" :span="8">
+            <a-form-item :required="field.required">
+              <template #label>
+                {{ field.label }}
+                <span v-if="field.required" class="req-mark">*</span>
+              </template>
+              <div class="blank-size-field">
+                <a-input-number
+                  v-model:value="draft[field.key]"
+                  :min="0"
+                  :precision="4"
+                  :formatter="inputNumberFormatter"
+                  :parser="inputNumberParser"
+                  class="blank-size-input"
+                  :placeholder="field.required ? '必填' : '选填'"
+                />
+                <a-select
+                  :value="getUnit(field.key)"
+                  :options="BLANK_SIZE_UNIT_OPTIONS"
+                  class="blank-size-unit"
+                  :dropdown-style="{ zIndex: 1200 }"
+                  :get-popup-container="getSelectPopupContainer"
+                  @update:value="(unit) => onUnitChange(field.key, unit)"
+                />
+              </div>
+            </a-form-item>
+          </a-col>
+        </a-row>
 
-      <div v-if="extraFields.length" class="field-group-label">
-        {{ plateMode ? '辅尺寸（选填，不参与面积）' : '其它尺寸（选填）' }}
-      </div>
-      <a-row v-if="extraFields.length" :gutter="[12, 8]">
-        <a-col v-for="field in extraFields" :key="field.key" :span="8">
-          <a-form-item :label="field.label">
-            <div class="blank-size-field">
-              <a-input-number
-                v-model:value="draft[field.key]"
-                :min="0"
-                :precision="4"
-                :formatter="inputNumberFormatter"
-                :parser="inputNumberParser"
-                class="blank-size-input"
-                placeholder="选填"
-              />
-              <a-select
-                :value="getUnit(field.key)"
-                :options="BLANK_SIZE_UNIT_OPTIONS"
-                class="blank-size-unit"
-                :dropdown-style="{ zIndex: 1200 }"
-                :get-popup-container="getSelectPopupContainer"
-                @update:value="(unit) => onUnitChange(field.key, unit)"
-              />
-            </div>
-          </a-form-item>
-        </a-col>
-      </a-row>
-    </a-form>
-    <div class="preview">
-      <div>
-        {{ isOrderPurpose ? '订货尺寸' : '下料尺寸' }}预览：
-        <strong>{{ previewText || '（未填写）' }}</strong>
-      </div>
-      <div v-if="plateMode && !isOrderPurpose" class="preview-area">
-        单件需求面积：
-        <strong>{{ areaPreviewText }}</strong>
-      </div>
-      <div
-        v-else-if="lengthMode && !isOrderPurpose && lengthMetersPreview != null"
-        class="preview-area"
-      >
-        单件需求长度：
-        <strong>{{ lengthMetersPreview }} 米</strong>
+        <div v-if="extraFields.length" class="field-group-label">
+          {{ plateMode ? '辅尺寸（选填，不参与面积）' : '其它尺寸（选填）' }}
+        </div>
+        <a-row v-if="extraFields.length" :gutter="[12, 8]">
+          <a-col v-for="field in extraFields" :key="field.key" :span="8">
+            <a-form-item :label="field.label">
+              <div class="blank-size-field">
+                <a-input-number
+                  v-model:value="draft[field.key]"
+                  :min="0"
+                  :precision="4"
+                  :formatter="inputNumberFormatter"
+                  :parser="inputNumberParser"
+                  class="blank-size-input"
+                  placeholder="选填"
+                />
+                <a-select
+                  :value="getUnit(field.key)"
+                  :options="BLANK_SIZE_UNIT_OPTIONS"
+                  class="blank-size-unit"
+                  :dropdown-style="{ zIndex: 1200 }"
+                  :get-popup-container="getSelectPopupContainer"
+                  @update:value="(unit) => onUnitChange(field.key, unit)"
+                />
+              </div>
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+      <div class="preview">
+        <div>
+          {{ isOrderPurpose ? '订货尺寸' : '下料尺寸' }}预览：
+          <strong>{{ previewText || '（未填写）' }}</strong>
+        </div>
+        <div v-if="plateMode && !isOrderPurpose" class="preview-area">
+          单件需求面积：
+          <strong>{{ areaPreviewText }}</strong>
+        </div>
       </div>
     </div>
+
+    <BomWeightCalcPanel
+      v-show="weightTabActive"
+      class="weight-tab-panel"
+      :blank-size="draft"
+      @suggest-mode="onWeightSuggestMode"
+      @update-field="onWeightUpdateField"
+      @update-unit="onWeightUpdateUnit"
+    />
   </a-modal>
 </template>
 
@@ -117,10 +123,9 @@ import {
   BLANK_SIZE_UNIT_OPTIONS,
   BLANK_SIZE_MODE,
   getBlankSizeModeOptions,
+  resolveBlankSizeModeForEditor,
   PLATE_BLANK_SIZE_PRIMARY_FIELDS,
   PLATE_BLANK_SIZE_EXTRA_FIELDS,
-  LENGTH_BLANK_SIZE_PRIMARY_FIELDS,
-  LENGTH_BLANK_SIZE_EXTRA_FIELDS,
   BLANK_SIZE_FIELDS,
   DEFAULT_BLANK_SIZE_UNIT,
   emptyBlankSize,
@@ -128,13 +133,15 @@ import {
   formatBlankSizeText,
   convertBlankSizeValue,
   calcBlankAreaSquareMeters,
-  resolveBlankSizeMode,
-  toMillimeters,
 } from '@/utils/bomBlankSize'
 import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { inferUomRelation } from '@/utils/variableLengthMaterial'
-import { isPlateAreaMeasureEnabled } from '@/store/functionParamStore'
+import { isPlateAreaMeasureEnabled, isBomWeightCalcEnabled } from '@/store/functionParamStore'
+import BomWeightCalcPanel from '@/views/product-process/components/BomWeightCalcPanel.vue'
+
+/** 弹窗顶栏页签：尺寸模式 + 可选重量计算（非落库 blankSizeMode） */
+const UI_TAB_WEIGHT = 'weight'
 
 const props = defineProps({
   open: Boolean,
@@ -147,11 +154,26 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'confirm'])
 
 const draft = reactive(emptyBlankSize())
+/** 落库下料方式：仅通用 / 板材 */
 const selectedMode = ref(BLANK_SIZE_MODE.GENERIC)
-const blankSizeModeOpts = computed(() =>
-  getBlankSizeModeOptions({ enablePlateArea: isPlateAreaMeasureEnabled() }),
-)
+/** 顶栏当前页签：通用 / 板材 / 重量计算 */
+const selectedUiTab = ref(BLANK_SIZE_MODE.GENERIC)
+
 const isOrderPurpose = computed(() => props.purpose === 'order')
+const weightCalcEnabled = computed(() => isBomWeightCalcEnabled())
+
+const uiTabOpts = computed(() => {
+  const opts = [{ label: '通用', value: BLANK_SIZE_MODE.GENERIC }]
+  if (weightCalcEnabled.value) {
+    opts.push({ label: '重量计算', value: UI_TAB_WEIGHT })
+  }
+  if (isPlateAreaMeasureEnabled()) {
+    opts.push({ label: '面积计算', value: BLANK_SIZE_MODE.PLATE })
+  }
+  return opts
+})
+
+const weightTabActive = computed(() => selectedUiTab.value === UI_TAB_WEIGHT)
 
 function getModalContainer() {
   return typeof document !== 'undefined' ? document.body : false
@@ -211,35 +233,30 @@ function resolveModeSource() {
 }
 
 const plateMode = computed(() => selectedMode.value === BLANK_SIZE_MODE.PLATE)
-const lengthMode = computed(() => selectedMode.value === BLANK_SIZE_MODE.LENGTH)
 
 const modalTitle = computed(() => {
   const kind = isOrderPurpose.value ? '订货尺寸' : '下料尺寸'
-  if (plateMode.value) return `${kind}（板材）`
-  if (lengthMode.value) return `${kind}（型材）`
+  if (weightTabActive.value) return `${kind} · 重量计算`
+  if (plateMode.value) return `${kind}（面积计算）`
   return kind
 })
 
 const modeHint = computed(() => {
   if (isOrderPurpose.value) {
     if (plateMode.value) return '按板材长×宽记录向供应商订货的尺寸'
-    if (lengthMode.value) return '按长度记录向供应商订货的尺寸'
     return '仅记录订货尺寸文案，可与生产下料尺寸不同'
   }
   if (plateMode.value) return '按长×宽换算单件面积（㎡），用于板材领料需求'
-  if (lengthMode.value) return '按长度换算单件需求（米），用于管材/型材领料需求'
   return '仅记录尺寸文案，不强制按长或面积换算需求'
 })
 
 const primaryFields = computed(() => {
   if (plateMode.value) return PLATE_BLANK_SIZE_PRIMARY_FIELDS
-  if (lengthMode.value) return LENGTH_BLANK_SIZE_PRIMARY_FIELDS
   return BLANK_SIZE_FIELDS
 })
 
 const extraFields = computed(() => {
   if (plateMode.value) return PLATE_BLANK_SIZE_EXTRA_FIELDS
-  if (lengthMode.value) return LENGTH_BLANK_SIZE_EXTRA_FIELDS
   return []
 })
 
@@ -263,23 +280,35 @@ const areaPreviewText = computed(() => {
   return `${formatNumber(a, 4, { empty: '' })} ㎡`
 })
 
-const lengthMetersPreview = computed(() => {
-  if (!lengthMode.value || draft.length == null) return null
-  const mm = toMillimeters(draft.length, draft.units?.length)
-  if (mm == null) return null
-  return formatNumber(mm / 1000, 4, { empty: '' })
-})
+function syncModeFromUiTab(tab) {
+  if (tab === BLANK_SIZE_MODE.PLATE || tab === BLANK_SIZE_MODE.GENERIC) {
+    selectedMode.value = tab
+  }
+}
+
+function onUiTabChange(e) {
+  const tab = e?.target?.value ?? selectedUiTab.value
+  syncModeFromUiTab(tab)
+}
 
 watch(
   () => [props.open, props.line?.id],
   ([visible]) => {
     if (!visible) return
     resetDraftFromLine()
-    selectedMode.value = resolveBlankSizeMode(resolveModeSource(), {
+    const mode = resolveBlankSizeModeForEditor(resolveModeSource(), {
       enablePlateArea: isPlateAreaMeasureEnabled(),
     })
+    selectedMode.value = mode
+    selectedUiTab.value = mode
   },
 )
+
+watch(weightCalcEnabled, (enabled) => {
+  if (!enabled && selectedUiTab.value === UI_TAB_WEIGHT) {
+    selectedUiTab.value = selectedMode.value
+  }
+})
 
 function onUnitChange(fieldKey, nextUnit) {
   ensureUnits()
@@ -291,16 +320,29 @@ function onUnitChange(fieldKey, nextUnit) {
   draft.units[fieldKey] = nextUnit
 }
 
+function onWeightUpdateField({ key, value }) {
+  draft[key] = value
+}
+
+function onWeightUpdateUnit({ key, unit, value }) {
+  ensureUnits()
+  if (value !== undefined) draft[key] = value
+  draft.units[key] = unit
+}
+
+function onWeightSuggestMode(mode) {
+  const sizeOpts = getBlankSizeModeOptions({ enablePlateArea: isPlateAreaMeasureEnabled() })
+  if (mode && sizeOpts.some((o) => o.value === mode)) {
+    selectedMode.value = mode
+  }
+}
+
 function handleOk() {
   const sizeLabel = isOrderPurpose.value ? '订货' : '下料'
   if (plateMode.value) {
     if (!(Number(draft.length) > 0) || !(Number(draft.width) > 0)) {
       message.warning(`板材请填写${sizeLabel}「长」和「宽」`)
-      return
-    }
-  } else if (lengthMode.value) {
-    if (!(Number(draft.length) > 0)) {
-      message.warning(`请填写${sizeLabel}「长」`)
+      if (weightTabActive.value) selectedUiTab.value = BLANK_SIZE_MODE.PLATE
       return
     }
   }
@@ -389,5 +431,8 @@ function handleOk() {
 }
 .preview-area strong {
   color: #d46b08;
+}
+.weight-tab-panel {
+  margin-top: 0;
 }
 </style>

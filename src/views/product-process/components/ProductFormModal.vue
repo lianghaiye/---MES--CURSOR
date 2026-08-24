@@ -383,7 +383,7 @@
                   />
                 </a-form-item>
               </a-col>
-              <a-col v-if="form.production.planStrategy === PLAN_STRATEGY.MTS" :span="8">
+              <a-col v-if="isPlanStrategyMts(form.production.planStrategy)" :span="8">
                 <a-form-item label="补货批量">
                   <a-input-number
                     v-model:value="form.production.replenishQty"
@@ -726,7 +726,7 @@ import {
   PART_PRODUCT_ATTRIBUTES,
   normalizePartProductAttribute,
   PLAN_STRATEGY_OPTIONS,
-  PLAN_STRATEGY,
+  isPlanStrategyMts,
 } from '@/mock/productInfoOptions'
 import { unitState, getInventoryUnitOptions, getAllEnabledUnitOptions } from '@/store/unitStore'
 import { getMaterialGradeOptions, materialGradeState } from '@/store/materialGradeStore'
@@ -883,7 +883,7 @@ const FIELD_HELP_BY_TAB = {
   production: [
     {
       name: '计划策略',
-      desc: '选填。按订单MTO：按销售订单排产；按库存MTS：靠库存补货维持水位。与库存预警无强制关联。',
+      desc: '选填。按订单MTO：按销售订单排产；按库存MTS：靠库存补货维持水位；按订单MTO+按库存MTS：二者兼有。与库存预警无强制关联。',
     },
     {
       name: '补货批量',

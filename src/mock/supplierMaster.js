@@ -25,21 +25,31 @@ export function toSupplierSelectOption(item) {
     label: item.name,
     value: item.name,
     code: item.code,
+    /** 旧 mock 的 type 是分类文案（综合供应商等），不是外协/采购角色 */
     type: item.type,
+    supplierRoles: item.supplierRoles || [],
   }
 }
 
+/**
+ * 合并下拉选项：档案/业务侧 existing 优先覆盖 mock（避免 mock「综合供应商」盖住档案外协/采购）
+ */
 export function mergeSupplierMasterOptions(existingOptions = []) {
   const map = new Map(supplierMasterList.map((item) => [item.name, toSupplierSelectOption(item)]))
   existingOptions.forEach((opt) => {
-    if (!map.has(opt.value)) {
-      map.set(opt.value, {
-        label: opt.label || opt.value,
-        value: opt.value,
-        code: opt.code || '',
-        type: opt.type || '',
-      })
-    }
+    const key = opt.value || opt.label
+    if (!key) return
+    const prev = map.get(key)
+    map.set(key, {
+      label: opt.label || prev?.label || key,
+      value: key,
+      code: opt.code || prev?.code || '',
+      type: opt.type != null && opt.type !== '' ? opt.type : prev?.type || '',
+      supplierRoles:
+        Array.isArray(opt.supplierRoles) && opt.supplierRoles.length
+          ? opt.supplierRoles
+          : prev?.supplierRoles || [],
+    })
   })
   return [...map.values()]
 }

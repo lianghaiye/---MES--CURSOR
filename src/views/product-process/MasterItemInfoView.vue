@@ -247,7 +247,13 @@
                 {{ record.production?.defaultWorkCenter || '—' }}
               </template>
               <template v-else-if="column.key === 'defaultSupplier'">
-                {{ record.production?.defaultSupplier || '—' }}
+                {{
+                  formatPurchaseSuppliersSummary(
+                    record.purchaseSuppliers || record.production?.purchaseSuppliers,
+                  ) ||
+                  record.production?.defaultSupplier ||
+                  '—'
+                }}
               </template>
               <template v-else-if="column.key === 'defaultOutsourceSupplier'">
                 {{ record.production?.defaultOutsourceSupplier || '—' }}
@@ -398,6 +404,7 @@ import { useTabs } from '@/composables/useTabs'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
+import { formatPurchaseSuppliersSummary } from '@/utils/purchaseSuppliers'
 import { formatBusinessTypeLabels, MASTER_BUSINESS_TYPE_OPTIONS } from '@/utils/businessTypeLabel'
 import { productBomState, getBomInfoLabelForItem, getBomsForItem } from '@/store/productBomStore'
 import { buildUnifiedListRows, filterUnifiedListRows } from '@/utils/masterItemList'
