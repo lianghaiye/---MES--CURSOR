@@ -34,6 +34,18 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6" :lg="4">
+            <a-form-item label="来源">
+              <a-select
+                v-model:value="filters.source"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                style="width: 100%"
+                :options="sourceOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6" :lg="4">
             <a-form-item label="状态">
               <a-select
                 v-model:value="filters.status"
@@ -75,6 +87,9 @@
     </div>
 
     <div class="table-card">
+      <div class="table-toolbar">
+        <a-button type="primary" size="small" @click="manualModalOpen = true">手工补货</a-button>
+      </div>
       <a-table
         size="small"
         row-key="id"
@@ -94,7 +109,9 @@
             {{ actionLabel(record.action) }}
           </template>
           <template v-else-if="column.key === 'source'">
-            {{ record.source === 'manual' ? '手工' : '预警触发' }}
+            <a-tag :color="record.source === 'manual' ? 'geekblue' : 'cyan'">
+              {{ replenishLedgerSourceLabel(record.source) }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'refs'">
             <div
@@ -126,6 +143,8 @@
         />
       </div>
     </div>
+
+    <ManualReplenishModal v-model:open="manualModalOpen" @executed="onManualExecuted" />
   </div>
 </template>
 
@@ -141,18 +160,24 @@ import {
   replenishLedgerState,
   filterReplenishLedgers,
   REPLENISH_LEDGER_STATUS_OPTIONS,
+  REPLENISH_LEDGER_SOURCE_OPTIONS,
   replenishLedgerStatusLabel,
   replenishLedgerStatusColor,
+  replenishLedgerSourceLabel,
 } from '@/store/replenishLedgerStore'
 import { REPLENISH_ACTION_OPTIONS, replenishActionLabel } from '@/utils/stockReplenish'
+import ManualReplenishModal from './components/ManualReplenishModal.vue'
 
 const router = useRouter()
 const { openTab } = useTabs()
+
+const manualModalOpen = ref(false)
 
 const filters = reactive({
   ledgerNo: '',
   itemCode: '',
   itemName: '',
+  source: undefined,
   status: undefined,
   action: undefined,
   dateRange: null,
@@ -165,6 +190,7 @@ const pagination = reactive({
 })
 
 const statusOpts = REPLENISH_LEDGER_STATUS_OPTIONS.filter((o) => o.value)
+const sourceOpts = REPLENISH_LEDGER_SOURCE_OPTIONS.filter((o) => o.value)
 const actionOpts = REPLENISH_ACTION_OPTIONS
 
 const columns = [
@@ -213,10 +239,15 @@ function handleReset() {
   filters.ledgerNo = ''
   filters.itemCode = ''
   filters.itemName = ''
+  filters.source = undefined
   filters.status = undefined
   filters.action = undefined
   filters.dateRange = null
   appliedFilters.value = { ...filters }
+  pagination.current = 1
+}
+
+function onManualExecuted() {
   pagination.current = 1
 }
 
@@ -259,6 +290,10 @@ function goWorkOrder() {
   background: #fff;
   border-radius: 6px;
   padding: 12px 16px;
+}
+
+.table-toolbar {
+  margin-bottom: 12px;
 }
 
 .pager {

@@ -1,5 +1,5 @@
 /**
- * 补货台账：纯流水。仅在「库存预警」执行补货成功后追加一条记录，不做结案/合并。
+ * 补货台账：纯流水。库存预警或手工补货执行成功后追加一条记录，不做结案/合并。
  */
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
@@ -22,6 +22,17 @@ export const REPLENISH_LEDGER_STATUS_OPTIONS = [
   { value: 'purchasing', label: '已下采购' },
   { value: 'outsourcing', label: '已下外协' },
 ]
+
+export const REPLENISH_LEDGER_SOURCE_OPTIONS = [
+  { value: '', label: '全部来源' },
+  { value: 'alert', label: '预警触发' },
+  { value: 'manual', label: '手工' },
+]
+
+export function replenishLedgerSourceLabel(source) {
+  const hit = REPLENISH_LEDGER_SOURCE_OPTIONS.find((o) => o.value === source)
+  return hit?.label || '—'
+}
 
 export function replenishLedgerStatusLabel(status) {
   const hit = REPLENISH_LEDGER_STATUS_OPTIONS.find((o) => o.value === status)
@@ -127,6 +138,35 @@ function buildDemoRecords() {
       handledBy: 'admin1',
       remark: '演示：已下采购',
       updatedAt: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm'),
+    },
+    {
+      id: 'rl-demo-3',
+      ledgerNo: `BHZ${now.format('YYYYMMDD')}0003`,
+      itemKind: 'material',
+      itemId: '',
+      itemCode: 'M-MANUAL-001',
+      itemName: '手工补货演示件',
+      specModel: '—',
+      unit: '个',
+      triggerStockQty: 120,
+      minStockQty: 50,
+      maxStockQty: 200,
+      suggestQty: 30,
+      handleQty: 30,
+      action: 'work_order',
+      status: 'producing',
+      source: 'manual',
+      planOrderNo: '',
+      planId: '',
+      purchaseReqNo: '',
+      purchaseReqId: '',
+      workOrderNo: 'WO-DEMO-BH-001',
+      workOrderId: '',
+      triggeredAt: now.subtract(3, 'hour').format('YYYY-MM-DD HH:mm'),
+      handledAt: now.subtract(3, 'hour').format('YYYY-MM-DD HH:mm'),
+      handledBy: 'admin1',
+      remark: '演示：手工补货已下生产',
+      updatedAt: now.subtract(3, 'hour').format('YYYY-MM-DD HH:mm'),
     },
   ]
 }
@@ -245,6 +285,7 @@ export function filterReplenishLedgers(list, filters = {}) {
       return false
     }
     if (filters.action && row.action !== filters.action) return false
+    if (filters.source && row.source !== filters.source) return false
     if (filters.dateRange?.length === 2) {
       const [start, end] = filters.dateRange
       const t = dayjs(row.triggeredAt || row.handledAt)

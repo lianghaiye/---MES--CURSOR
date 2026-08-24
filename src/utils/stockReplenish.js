@@ -1,4 +1,4 @@
-/** 库存预警 / 统一补货：产品/物料低于最低库存，或手工添加后生产/采购/外协 */
+/** 库存预警 / 统一补货：产品/物料低于最低库存；手工补货见补货台账 */
 import { PLAN_STRATEGY, isPlanStrategyMts } from '@/mock/productInfoOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
@@ -10,17 +10,17 @@ import { PLAN_SOURCE, PLAN_SOURCE_OPTIONS, planSourceLabel } from '@/utils/planS
 
 export { PLAN_SOURCE, PLAN_SOURCE_OPTIONS, planSourceLabel }
 
-/** 预警列表「来源」：水位预警 / 生产计划关联 / 手工 */
+/** 预警列表「来源」：水位预警 / 生产计划关联（手工补货已迁至补货台账） */
 export const STOCK_ALERT_SOURCE = {
   ALERT: 'alert',
   PRODUCTION_PLAN: 'production-plan',
+  /** 仅补货台账流水使用，不出现在预警列表筛选 */
   MANUAL: 'manual',
 }
 
 export const STOCK_ALERT_SOURCE_OPTIONS = [
   { value: STOCK_ALERT_SOURCE.PRODUCTION_PLAN, label: '生产计划' },
   { value: STOCK_ALERT_SOURCE.ALERT, label: '预警' },
-  { value: STOCK_ALERT_SOURCE.MANUAL, label: '手工' },
 ]
 
 export function stockAlertSourceLabel(source) {
@@ -332,7 +332,6 @@ function mapItemToSuggestion(item, itemKind, purchaseMap, wipMap, planRefMap) {
 
 function sortReplenishRows(rows = []) {
   const rank = (row) => {
-    if (row.manual) return 2
     if (row.alertSource === STOCK_ALERT_SOURCE.PRODUCTION_PLAN || row.fromProductionPlan) return 0
     return 1
   }
@@ -366,7 +365,7 @@ export function listStockReplenishSuggestions() {
   )
 }
 
-/** 手工添加产品/物料为补货行 */
+/** 补货台账「手工补货」：由物料/产品主数据构建补货行 */
 export function buildManualReplenishRow(item, itemKind = 'product') {
   if (!item) return null
   const { purchaseMap, wipMap } = buildTransitMaps()
