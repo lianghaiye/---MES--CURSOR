@@ -201,6 +201,7 @@ import dayjs from 'dayjs'
 import { CheckOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { createInboundFromPurchaseOrder } from '@/store/inboundOrderStore'
+import { getPendingPurchasePriceChangeBlock } from '@/store/purchasePriceChangeStore'
 import { updatePurchaseReceipt } from '@/store/purchaseReceiptStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import { inboundFormLineColumns } from '@/utils/inboundLineColumns'
@@ -405,6 +406,11 @@ function handleCancel() {
 
 function handleSave() {
   if (!props.purchaseOrder) return
+  const block = getPendingPurchasePriceChangeBlock(props.purchaseOrder.id, '生成入库单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   if (!form.receiptDate) {
     message.warning('请选择收货日期')
     return

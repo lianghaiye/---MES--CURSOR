@@ -13,7 +13,7 @@
       type="warning"
       show-icon
       class="pending-alert"
-      message="待审核：通过后将回写销售订单有效单价与行折扣，后续发货按新价计算。"
+      message="待审核：通过后将回写采购订单有效单价；已入库数量仍按当时入库单价，未入库部分按新单价执行。通过前不可收货/入库/结算。"
     />
 
     <a-form layout="vertical" class="price-change-form">
@@ -22,7 +22,7 @@
           <a-form-item label="变更原因" required>
             <a-select
               v-model:value="form.reasonType"
-              :options="PRICE_CHANGE_REASON_OPTIONS"
+              :options="PURCHASE_PRICE_CHANGE_REASON_OPTIONS"
               placeholder="请选择变更原因"
               :disabled="isReview"
             />
@@ -33,7 +33,7 @@
             <a-input
               v-model:value="form.reason"
               :disabled="isReview"
-              placeholder="如：客户增配机械密封，未发货部分按新单价执行（选填）"
+              placeholder="如：供应商调价，未入库部分按新单价执行（选填）"
             />
           </a-form-item>
         </a-col>
@@ -57,7 +57,7 @@
     <a-table
       size="small"
       bordered
-      row-key="salesLineId"
+      row-key="poLineId"
       :columns="visibleColumns"
       :data-source="form.lines"
       :pagination="false"
@@ -65,10 +65,7 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="isMoneyKey(column.key)">
-          {{ formatPriceChangeAbsMoney(record[column.key]) }}
-        </template>
-        <template v-else-if="column.key === 'oldLineDiscountRate'">
-          {{ formatPriceChangeDiscount(record.oldLineDiscountRate) }}
+          {{ formatPurchasePriceChangeAbsMoney(record[column.key]) }}
         </template>
         <template v-else-if="column.key === 'newUnitPriceExTax'">
           <a-input-number
@@ -79,9 +76,9 @@
             :formatter="inputNumberFormatter"
             :parser="inputNumberParser"
             style="width: 100%"
-            @change="() => onPriceChange(record, 'unitPrice')"
+            @change="() => onPriceChange(record)"
           />
-          <span v-else>{{ formatPriceChangeAbsMoney(record.newUnitPriceExTax) }}</span>
+          <span v-else>{{ formatPurchasePriceChangeAbsMoney(record.newUnitPriceExTax) }}</span>
         </template>
         <template v-else-if="column.key === 'newUnitPriceInTax'">
           <a-input-number
@@ -92,31 +89,18 @@
             :formatter="inputNumberFormatter"
             :parser="inputNumberParser"
             style="width: 100%"
-            @change="() => onPriceChange(record, 'unitPrice')"
+            @change="() => onPriceChange(record)"
           />
-          <span v-else>{{ formatPriceChangeAbsMoney(record.newUnitPriceInTax) }}</span>
-        </template>
-        <template v-else-if="column.key === 'newLineDiscountRate'">
-          <a-input-number
-            v-if="canEditDiscount"
-            v-model:value="record._newDiscountPercent"
-            :min="0"
-            :precision="2"
-            :formatter="inputNumberFormatter"
-            :parser="inputNumberParser"
-            style="width: 100%"
-            @change="() => onDiscountPercentChange(record)"
-          />
-          <span v-else>{{ formatPriceChangeDiscount(record.newLineDiscountRate) }}</span>
+          <span v-else>{{ formatPurchasePriceChangeAbsMoney(record.newUnitPriceInTax) }}</span>
         </template>
         <template v-else-if="column.key === 'deltaAmountExTax'">
           <span :class="deltaClass(record.deltaAmountExTax)">
-            {{ formatPriceChangeMoney(record.deltaAmountExTax) }}
+            {{ formatPurchasePriceChangeMoney(record.deltaAmountExTax) }}
           </span>
         </template>
         <template v-else-if="column.key === 'deltaAmountInTax'">
           <span :class="deltaClass(record.deltaAmountInTax)">
-            {{ formatPriceChangeMoney(record.deltaAmountInTax) }}
+            {{ formatPurchasePriceChangeMoney(record.deltaAmountInTax) }}
           </span>
         </template>
         <template v-else-if="column.key === 'taxRate'">
@@ -130,27 +114,33 @@
 
     <div class="summary-bar">
       <template v-if="showExTaxColumns">
-        <span>原行金额（不含税） {{ formatPriceChangeAbsMoney(summary.oldAmountExTax) }}</span>
+        <span
+          >原行金额（不含税） {{ formatPurchasePriceChangeAbsMoney(summary.oldAmountExTax) }}</span
+        >
       </template>
       <template v-if="showInTaxColumns">
-        <span>原行金额（含税） {{ formatPriceChangeAbsMoney(summary.oldAmountInTax) }}</span>
+        <span
+          >原行金额（含税） {{ formatPurchasePriceChangeAbsMoney(summary.oldAmountInTax) }}</span
+        >
       </template>
       <template v-if="showExTaxColumns">
-        <span>变更后（不含税） {{ formatPriceChangeAbsMoney(summary.newAmountExTax) }}</span>
+        <span
+          >变更后（不含税） {{ formatPurchasePriceChangeAbsMoney(summary.newAmountExTax) }}</span
+        >
       </template>
       <template v-if="showInTaxColumns">
-        <span>变更后（含税） {{ formatPriceChangeAbsMoney(summary.newAmountInTax) }}</span>
+        <span>变更后（含税） {{ formatPurchasePriceChangeAbsMoney(summary.newAmountInTax) }}</span>
       </template>
       <span v-if="showExTaxColumns" :class="deltaClass(summary.deltaAmountExTax)">
-        差额（不含税） {{ formatPriceChangeMoney(summary.deltaAmountExTax) }}
+        差额（不含税） {{ formatPurchasePriceChangeMoney(summary.deltaAmountExTax) }}
       </span>
       <span v-if="showInTaxColumns" :class="deltaClass(summary.deltaAmountInTax)">
-        差额（含税） {{ formatPriceChangeMoney(summary.deltaAmountInTax) }}
+        差额（含税） {{ formatPurchasePriceChangeMoney(summary.deltaAmountInTax) }}
       </span>
       <span>已改 {{ summary.changedCount }} 行</span>
     </div>
     <p class="hint">
-      已发货数量仍按当时发货单价；未发货部分通过后按新单价执行。改单价仅互算含税/不含税金额，不联动行折扣；改折扣会按标准价反算含税/不含税单价。
+      已入库数量仍按当时入库单价；未入库部分通过后按新单价执行。已生成的结算单不回溯改价。改单价仅互算含税/不含税金额。
     </p>
 
     <template #footer>
@@ -165,40 +155,40 @@
 </template>
 
 <script>
-export default { name: 'SalesPriceChangeModal' }
+export default { name: 'PurchasePriceChangeModal' }
 </script>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { isLineDiscountDisabled, normalizeDiscountRate, round2 } from '@/utils/salesOrderPricing'
 import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import {
-  PRICE_CHANGE_REASON_OPTIONS,
-  PRICE_CHANGE_STATUS,
-  buildPriceChangeDraftLines,
-  formatPriceChangeAbsMoney,
-  formatPriceChangeDiscount,
-  formatPriceChangeMoney,
-  normalizePriceChangeLine,
-  recalcPriceChangeLine,
-  summarizePriceChangeLines,
-} from '@/utils/salesPriceChange'
+  PURCHASE_PRICE_CHANGE_REASON_OPTIONS,
+  PURCHASE_PRICE_CHANGE_STATUS,
+  buildPurchasePriceChangeDraftLines,
+  formatPurchasePriceChangeAbsMoney,
+  formatPurchasePriceChangeMoney,
+  normalizePurchasePriceChangeLine,
+  recalcPurchasePriceChangeLine,
+  summarizePurchasePriceChangeLines,
+} from '@/utils/purchasePriceChange'
 import {
-  approveSalesPriceChange,
-  rejectSalesPriceChange,
-  submitSalesPriceChange,
-} from '@/store/salesPriceChangeStore'
+  approvePurchasePriceChange,
+  rejectPurchasePriceChange,
+  submitPurchasePriceChange,
+} from '@/store/purchasePriceChangeStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
-  salesOrder: { type: Object, default: null },
+  purchaseOrder: { type: Object, default: null },
   pendingChange: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'done'])
 
-const isReview = computed(() => props.pendingChange?.status === PRICE_CHANGE_STATUS.PENDING)
+const isReview = computed(
+  () => props.pendingChange?.status === PURCHASE_PRICE_CHANGE_STATUS.PENDING,
+)
 
 const taxModeExcluding = ref(true)
 const columnDisplayMode = ref('all')
@@ -220,17 +210,13 @@ const inTaxColumnKeys = new Set([
 const modalTitle = computed(() =>
   isReview.value
     ? `审核价格变更 ${props.pendingChange?.changeNo || ''}`.trim()
-    : `价格变更 ${props.salesOrder?.orderNo || ''}`.trim(),
+    : `价格变更 ${props.purchaseOrder?.orderNo || ''}`.trim(),
 )
 
 const taxModeHint = computed(() =>
   taxModeExcluding.value
-    ? '当前：按不含税单价录入，系统自动反算含税价（不联动行折扣）'
-    : '当前：按含税单价录入，系统自动反算不含税价（不联动行折扣）',
-)
-
-const canEditDiscount = computed(
-  () => !isReview.value && !isLineDiscountDisabled(props.salesOrder?.discountStrategy),
+    ? '当前：按不含税单价录入，系统自动反算含税价'
+    : '当前：按含税单价录入，系统自动反算不含税价',
 )
 
 const form = reactive({
@@ -244,10 +230,8 @@ const moneyKeys = new Set([
   'oldUnitPriceInTax',
   'oldAmountExTax',
   'oldAmountInTax',
-  'oldLineDiscountAmount',
   'newAmountExTax',
   'newAmountInTax',
-  'newLineDiscountAmount',
 ])
 
 function isMoneyKey(key) {
@@ -255,24 +239,21 @@ function isMoneyKey(key) {
 }
 
 const allColumns = [
-  { title: '产品名称', dataIndex: 'productName', width: 150, ellipsis: true, fixed: 'left' },
-  { title: '产品编号', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { title: '物料名称', dataIndex: 'productName', width: 150, ellipsis: true, fixed: 'left' },
+  { title: '物料编码', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
-  { title: '数量', dataIndex: 'qty', width: 64, align: 'right' },
+  { title: '计价数量', dataIndex: 'qty', width: 88, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 64 },
   { title: '税率(%)', key: 'taxRate', width: 72, align: 'right' },
   { title: '原单价（不含税）', key: 'oldUnitPriceExTax', width: 122, align: 'right' },
   { title: '原单价（含税）', key: 'oldUnitPriceInTax', width: 110, align: 'right' },
   { title: '原金额（不含税）', key: 'oldAmountExTax', width: 122, align: 'right' },
   { title: '原金额（含税）', key: 'oldAmountInTax', width: 110, align: 'right' },
-  { title: '原行折扣(%)', key: 'oldLineDiscountRate', width: 100, align: 'right' },
-  { title: '原行优惠', key: 'oldLineDiscountAmount', width: 100, align: 'right' },
   { title: '新单价（不含税）', key: 'newUnitPriceExTax', width: 130, align: 'right' },
   { title: '新单价（含税）', key: 'newUnitPriceInTax', width: 120, align: 'right' },
   { title: '新金额（不含税）', key: 'newAmountExTax', width: 122, align: 'right' },
   { title: '新金额（含税）', key: 'newAmountInTax', width: 110, align: 'right' },
-  { title: '新行折扣(%)', key: 'newLineDiscountRate', width: 120, align: 'right' },
-  { title: '新行优惠', key: 'newLineDiscountAmount', width: 100, align: 'right' },
   { title: '差额（不含税）', key: 'deltaAmountExTax', width: 118, align: 'right' },
   { title: '差额（含税）', key: 'deltaAmountInTax', width: 110, align: 'right' },
 ]
@@ -292,18 +273,10 @@ const tableScrollX = computed(() =>
   visibleColumns.value.reduce((sum, col) => sum + (Number(col.width) || 100), 0),
 )
 
-const summary = computed(() => summarizePriceChangeLines(form.lines))
-
-function attachDiscountPercent(lines) {
-  return (lines || []).map((row) => {
-    const next = normalizePriceChangeLine(row, taxModeExcluding.value)
-    next._newDiscountPercent = round2(normalizeDiscountRate(next.newLineDiscountRate, 1) * 100)
-    return next
-  })
-}
+const summary = computed(() => summarizePurchasePriceChangeLines(form.lines))
 
 watch(
-  () => [props.open, props.salesOrder?.id, props.pendingChange?.id],
+  () => [props.open, props.purchaseOrder?.id, props.pendingChange?.id],
   ([visible]) => {
     if (!visible) return
     columnDisplayMode.value = 'all'
@@ -311,30 +284,22 @@ watch(
       form.reasonType = props.pendingChange.reasonType
       form.reason = props.pendingChange.reason || ''
       taxModeExcluding.value = props.pendingChange.taxModeExcluding !== false
-      form.lines = attachDiscountPercent(props.pendingChange.lines)
+      form.lines = (props.pendingChange.lines || []).map((row) =>
+        normalizePurchasePriceChangeLine(row, taxModeExcluding.value),
+      )
       return
     }
     form.reasonType = undefined
     form.reason = ''
     taxModeExcluding.value = true
-    form.lines = attachDiscountPercent(buildPriceChangeDraftLines(props.salesOrder))
+    form.lines = buildPurchasePriceChangeDraftLines(props.purchaseOrder)
   },
 )
 
-function onPriceChange(record, editMode = 'unitPrice') {
-  recalcPriceChangeLine(record, {
+function onPriceChange(record) {
+  recalcPurchasePriceChangeLine(record, {
     taxModeExcluding: taxModeExcluding.value,
-    editMode,
   })
-  record._newDiscountPercent = round2(normalizeDiscountRate(record.newLineDiscountRate, 1) * 100)
-}
-
-function onDiscountPercentChange(record) {
-  record.newLineDiscountRate = normalizeDiscountRate(
-    (Number(record._newDiscountPercent) || 100) / 100,
-    1,
-  )
-  onPriceChange(record, 'discount')
 }
 
 watch(columnDisplayMode, (mode) => {
@@ -358,8 +323,8 @@ function handleCancel() {
 }
 
 function handleSubmit() {
-  const res = submitSalesPriceChange({
-    salesOrder: props.salesOrder,
+  const res = submitPurchasePriceChange({
+    purchaseOrder: props.purchaseOrder,
     lines: form.lines,
     reasonType: form.reasonType,
     reason: form.reason,
@@ -375,7 +340,7 @@ function handleSubmit() {
 }
 
 function handleApprove() {
-  const res = approveSalesPriceChange(props.pendingChange.id)
+  const res = approvePurchasePriceChange(props.pendingChange.id)
   if (!res.ok) {
     message.warning(res.message)
     return
@@ -386,7 +351,7 @@ function handleApprove() {
 }
 
 function handleReject() {
-  const res = rejectSalesPriceChange(props.pendingChange.id)
+  const res = rejectPurchasePriceChange(props.pendingChange.id)
   if (!res.ok) {
     message.warning(res.message)
     return

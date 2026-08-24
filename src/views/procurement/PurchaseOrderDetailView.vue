@@ -41,6 +41,13 @@
               <a-button size="small" @click="openPurchaseReturnCreate">采购退货</a-button>
               <a-button size="small" @click="handleComplete">完成</a-button>
             </template>
+            <a-button
+              v-if="canApplyPurchasePriceChange(record)"
+              size="small"
+              @click="handlePriceChange"
+            >
+              {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
+            </a-button>
             <a-button size="small" @click="openPrint">打印</a-button>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
@@ -52,6 +59,7 @@
             class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
           >
             <a-tab-pane key="basic" tab="基本信息" />
+            <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
             <a-tab-pane key="inbound" :tab="`入库信息 (${relatedInboundLines.length})`" />
             <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
             <a-tab-pane key="return" :tab="`退货信息 (${relatedReturnLines.length})`" />
@@ -60,6 +68,14 @@
         </div>
 
         <div class="tab-body">
+          <a-alert
+            v-if="pendingPriceChange && activeTab === 'basic'"
+            type="warning"
+            show-icon
+            class="pending-price-alert"
+            :message="`价格变更「${pendingPriceChange.changeNo}」待审核，通过前不可收货 / 入库 / 结算。`"
+            style="margin-bottom: 12px"
+          />
           <template v-if="activeTab === 'basic'">
             <div class="section-card">
               <div class="section-title">基本信息</div>
@@ -194,6 +210,44 @@
                 </div>
               </div>
               <a-empty v-else description="暂无审批记录" />
+            </div>
+
+            <div v-if="priceChangeApprovalGroups.length" class="section-card">
+              <div class="section-title">价格变更审批</div>
+              <a-divider style="margin: 12px 0" />
+              <div
+                v-for="group in priceChangeApprovalGroups"
+                :key="group.id"
+                class="price-change-approval-group"
+              >
+                <div class="price-change-approval-head">
+                  <span>{{ group.changeNo }}</span>
+                  <a-tag :color="purchasePriceChangeStatusColor(group.status)" size="small">
+                    {{ group.status }}
+                  </a-tag>
+                  <span v-if="group.reasonType" class="muted">{{ group.reasonType }}</span>
+                </div>
+                <div class="history-list">
+                  <div v-for="(item, idx) in group.items" :key="idx" class="history-item">
+                    <div class="history-head">
+                      <span class="history-user">{{ item.name }}</span>
+                      <span class="history-role">（{{ item.role }}）</span>
+                      <a-tag :color="approvalResultColor(item.result)" size="small">
+                        {{ item.result }}
+                      </a-tag>
+                      <span class="history-time">{{ item.time || '—' }}</span>
+                    </div>
+                    <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="activeTab === 'price-change'">
+            <div class="section-card">
+              <div class="section-title">价格变更履历</div>
+              <PurchasePriceChangeHistoryPanel :order="record" />
             </div>
           </template>
 
@@ -353,6 +407,12 @@
       :purchase-order-id="record?.id"
       @confirmed="onSettleCreated"
     />
+    <PurchasePriceChangeModal
+      v-model:open="priceChangeOpen"
+      :purchase-order="priceChangeOrder"
+      :pending-change="priceChangePending"
+      @done="onPriceChangeDone"
+    />
   </div>
 </template>
 
@@ -409,6 +469,19 @@ import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
 import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vue'
 import GeneratePurchaseSettleModal from './components/GeneratePurchaseSettleModal.vue'
 import PurchaseOrderPrintModal from './components/PurchaseOrderPrintModal.vue'
+import PurchasePriceChangeModal from './components/PurchasePriceChangeModal.vue'
+import PurchasePriceChangeHistoryPanel from './components/PurchasePriceChangeHistoryPanel.vue'
+import {
+  buildPurchasePriceChangeApprovalGroups,
+  purchasePriceChangeStatusColor,
+} from '@/utils/purchasePriceChange'
+import {
+  canApplyPurchasePriceChange,
+  getPendingPurchasePriceChange,
+  getPendingPurchasePriceChangeBlock,
+  listPurchasePriceChangesByOrderId,
+  purchasePriceChangeState,
+} from '@/store/purchasePriceChangeStore'
 
 const DocNoLinks = defineComponent({
   name: 'DocNoLinks',
@@ -455,6 +528,22 @@ const receiptModalOpen = ref(false)
 const inboundModalOpen = ref(false)
 const printModalOpen = ref(false)
 const settleModalOpen = ref(false)
+const priceChangeOpen = ref(false)
+const priceChangeOrder = ref(null)
+
+const pendingPriceChange = computed(() => {
+  void purchasePriceChangeState.orders
+  return getPendingPurchasePriceChange(record.value?.id)
+})
+const priceChangePending = computed(() => getPendingPurchasePriceChange(priceChangeOrder.value?.id))
+const priceChangeRecords = computed(() => {
+  void purchasePriceChangeState.orders
+  return listPurchasePriceChangesByOrderId(record.value?.id)
+})
+const priceChangeCount = computed(() => priceChangeRecords.value.length)
+const priceChangeApprovalGroups = computed(() =>
+  buildPurchasePriceChangeApprovalGroups(priceChangeRecords.value),
+)
 
 const lineColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
@@ -585,11 +674,32 @@ function openSettleDetail(row) {
 }
 
 function openSettleCreate() {
+  if (!record.value?.id) return
+  const block = getPendingPurchasePriceChangeBlock(record.value.id, '生成结算')
+  if (block) {
+    message.warning(block)
+    return
+  }
   settleModalOpen.value = true
 }
 
 function onSettleCreated() {
   activeTab.value = 'settle'
+}
+
+function handlePriceChange() {
+  if (!record.value) return
+  if (!canApplyPurchasePriceChange(record.value)) {
+    message.warning('仅「进行中 / 已完成」的采购订单可申请价格变更')
+    return
+  }
+  priceChangeOrder.value = record.value
+  priceChangeOpen.value = true
+}
+
+function onPriceChangeDone() {
+  priceChangeOrder.value = null
+  loadRecord()
 }
 
 function openReturnDetail(row) {
@@ -819,12 +929,22 @@ function openReceiptModal() {
     message.warning('当前采购单不可生成收货单')
     return
   }
+  const block = getPendingPurchasePriceChangeBlock(record.value.id, '生成收货单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   receiptModalOpen.value = true
 }
 
 function openInboundModal() {
   if (!record.value || !canGenerateInbound(record.value)) {
     message.warning('当前采购单不可生成入库单')
+    return
+  }
+  const block = getPendingPurchasePriceChangeBlock(record.value.id, '生成入库单')
+  if (block) {
+    message.warning(block)
     return
   }
   inboundModalOpen.value = true
@@ -1033,5 +1153,26 @@ function openApprove() {
   margin-top: 6px;
   color: rgba(0, 0, 0, 0.65);
   font-size: 13px;
+}
+
+.price-change-approval-group {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.price-change-approval-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.muted {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

@@ -152,9 +152,6 @@ export function submitSalesPriceChange({
   if (!reasonType) {
     return { ok: false, message: '请选择变更原因' }
   }
-  if (!String(reason || '').trim()) {
-    return { ok: false, message: '请填写变更说明' }
-  }
 
   const now = dayjs().format('YYYY-MM-DD HH:mm')
   const record = {
@@ -164,7 +161,7 @@ export function submitSalesPriceChange({
     salesOrderNo: salesOrder.orderNo,
     status: PRICE_CHANGE_STATUS.PENDING,
     reasonType,
-    reason: String(reason).trim(),
+    reason: String(reason || '').trim(),
     taxModeExcluding: taxModeExcluding !== false,
     lines: prepared,
     oldAmountExTax: summary.oldAmountExTax,

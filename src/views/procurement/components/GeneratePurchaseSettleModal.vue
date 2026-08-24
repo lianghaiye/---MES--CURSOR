@@ -86,6 +86,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
+import { getPendingPurchasePriceChangeBlock } from '@/store/purchasePriceChangeStore'
 import {
   createSettleFromPurchaseOrder,
   listSettleableInboundLines,
@@ -185,6 +186,11 @@ function handleCancel() {
 function handleConfirm() {
   if (!form.purchaseOrderId) {
     message.warning('请选择采购订单')
+    return
+  }
+  const block = getPendingPurchasePriceChangeBlock(form.purchaseOrderId, '生成结算')
+  if (block) {
+    message.warning(block)
     return
   }
   const selected = settleLines.value.filter((r) => selectedKeys.value.includes(r.key))

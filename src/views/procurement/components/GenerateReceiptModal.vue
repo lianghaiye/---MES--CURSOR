@@ -258,6 +258,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { submitReceipt } from '@/store/purchaseOrderStore'
+import { getPendingPurchasePriceChangeBlock } from '@/store/purchasePriceChangeStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import {
@@ -471,6 +472,11 @@ function handleCancel() {
 }
 
 function handleConfirm() {
+  const block = getPendingPurchasePriceChangeBlock(props.purchaseOrder?.id, '生成收货单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   const editableLines = receiptLines.value.filter((l) => !l.locked)
   if (!editableLines.length) {
     message.warning('没有可收货的明细（已占满的明细不可再收货）')

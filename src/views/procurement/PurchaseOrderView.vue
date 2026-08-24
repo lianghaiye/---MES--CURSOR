@@ -103,6 +103,7 @@
           <CheckOutlined />
           审核
         </a-button>
+        <a-button size="small" @click="openToolbarPriceChangeApprove">审核价格变更</a-button>
         <a-button size="small" @click="openReceiptModal">
           <CheckCircleOutlined />
           生成收货单
@@ -275,6 +276,14 @@
                   入库
                 </a-button>
               </template>
+              <a-button
+                v-if="canApplyPurchasePriceChange(record)"
+                type="link"
+                size="small"
+                @click="openPriceChangeForOrder(record)"
+              >
+                {{ rowPriceChangeLabel(record) }}
+              </a-button>
               <span v-if="!hasRowActions(record)" class="action-disabled">-</span>
             </a-space>
           </template>
@@ -308,6 +317,13 @@
     />
 
     <PurchaseOrderPrintModal v-model:open="printModalOpen" :purchase-orders="printOrders" />
+
+    <PurchasePriceChangeModal
+      v-model:open="priceChangeOpen"
+      :purchase-order="priceChangeOrder"
+      :pending-change="priceChangePending"
+      @done="onPriceChangeDone"
+    />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -366,6 +382,7 @@ import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
 import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vue'
 import PurchaseOrderPrintModal from './components/PurchaseOrderPrintModal.vue'
 import PurchaseOrderStatsPanel from './components/PurchaseOrderStatsPanel.vue'
+import PurchasePriceChangeModal from './components/PurchasePriceChangeModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -373,6 +390,11 @@ import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
+import {
+  canApplyPurchasePriceChange,
+  getPendingPurchasePriceChange,
+  getPendingPurchasePriceChangeBlock,
+} from '@/store/purchasePriceChangeStore'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -394,6 +416,9 @@ const printModalOpen = ref(false)
 const receiptOrder = ref(null)
 const inboundOrder = ref(null)
 const printOrders = ref([])
+const priceChangeOpen = ref(false)
+const priceChangeOrder = ref(null)
+const priceChangePending = computed(() => getPendingPurchasePriceChange(priceChangeOrder.value?.id))
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const supplierOpts = supplierOptions
@@ -520,7 +545,8 @@ function hasRowActions(record) {
     canResubmitPurchaseOrder(record) ||
     canVoidPurchaseOrder(record) ||
     canGenerateReceipt(record) ||
-    canGenerateInbound(record)
+    canGenerateInbound(record) ||
+    canApplyPurchasePriceChange(record)
   )
 }
 
@@ -626,6 +652,11 @@ function openReceiptModal() {
     message.warning('未找到所选采购单')
     return
   }
+  const block = getPendingPurchasePriceChangeBlock(order.id, '生成收货单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   if (!canGenerateReceipt(order)) {
     message.warning('仅进行中且仍有可收货/入库数量的采购单可生成收货单')
     return
@@ -644,6 +675,11 @@ function openInboundModal() {
     message.warning('未找到所选采购单')
     return
   }
+  const block = getPendingPurchasePriceChangeBlock(order.id, '生成入库单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   if (!canGenerateInbound(order)) {
     message.warning('仅进行中且仍有可收货/入库数量的采购单可生成入库单')
     return
@@ -653,6 +689,11 @@ function openInboundModal() {
 }
 
 function openReceiptForRow(record) {
+  const block = getPendingPurchasePriceChangeBlock(record?.id, '生成收货单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   if (!canGenerateReceipt(record)) {
     message.warning('仅进行中且仍有可收货/入库数量的采购单可生成收货单')
     return
@@ -662,12 +703,52 @@ function openReceiptForRow(record) {
 }
 
 function openInboundForRow(record) {
+  const block = getPendingPurchasePriceChangeBlock(record?.id, '生成入库单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   if (!canGenerateInbound(record)) {
     message.warning('仅进行中且仍有可收货/入库数量的采购单可生成入库单')
     return
   }
   inboundOrder.value = record
   inboundModalOpen.value = true
+}
+
+function rowPriceChangeLabel(order) {
+  return getPendingPurchasePriceChange(order?.id) ? '审核价格变更' : '价格变更'
+}
+
+function openPriceChangeForOrder(order) {
+  if (!canApplyPurchasePriceChange(order)) {
+    message.warning('仅「进行中 / 已完成」的采购订单可申请价格变更')
+    return
+  }
+  priceChangeOrder.value = order
+  priceChangeOpen.value = true
+}
+
+function openToolbarPriceChangeApprove() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条待审核价格变更的采购订单')
+    return
+  }
+  const order = purchaseOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
+    message.warning('未找到所选采购单')
+    return
+  }
+  if (!getPendingPurchasePriceChange(order.id)) {
+    message.warning('所选采购单没有待审核的价格变更')
+    return
+  }
+  priceChangeOrder.value = order
+  priceChangeOpen.value = true
+}
+
+function onPriceChangeDone() {
+  priceChangeOrder.value = null
 }
 
 function openPurchaseReturnCreate(order) {
