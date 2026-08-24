@@ -11,6 +11,10 @@ import { adjustStockQty } from '@/store/stockStore'
 import { getOutboundOrderById } from '@/store/outboundStore'
 import { addInboundOrder, generateInboundNo } from '@/store/inboundOrderStore'
 import { createCutSettleSeed } from '@/mock/cutSettleSeed'
+import {
+  getCutSettleCandidateLines,
+  isOutboundEligibleForCutSettle,
+} from '@/utils/workOrderBlanking'
 
 const STORAGE_KEY = 'i_doms_cut_settle_records'
 const SEED_VERSION_KEY = 'i_doms_cut_settle_seed_v'
@@ -72,7 +76,7 @@ export function getCutSettleById(id) {
   return cutSettleState.records.find((r) => r.id === id) || null
 }
 
-/** 从已出库的领料出库单生成下料结算草稿行 */
+/** 从已出库的领料/发料出库单生成下料结算草稿行（认工单下料工序，不强制双单位） */
 export function buildCutSettleDraftFromOutbound(outboundId) {
   const order = getOutboundOrderById(outboundId)
   if (!order) return { ok: false, message: '出库单不存在' }
@@ -82,31 +86,38 @@ export function buildCutSettleDraftFromOutbound(outboundId) {
   if (order.outboundType !== '领料出库' && order.outboundType !== '发料出库') {
     return { ok: false, message: '仅领料/发料出库单可下料结算' }
   }
-  const vlLines = (order.lineItems || []).filter((l) => {
-    if (!l.isVariableLength) return false
-    if (l.pickedBatchId) return true
-    const allocs = Array.isArray(l.batchAllocations) ? l.batchAllocations : []
-    return allocs.some((a) => a?.batchId && Number(a.qty) > 0)
-  })
-  if (!vlLines.length) {
-    return { ok: false, message: '该出库单无可结算的双物料单位行' }
+  if (!isOutboundEligibleForCutSettle(order)) {
+    return {
+      ok: false,
+      message:
+        '该出库单不可结算：关联工单需含「下料工序」且物料勾选「需要下料结算」，或存在已拣批的双单位行（兼容）',
+    }
+  }
+  const settleLines = getCutSettleCandidateLines(order)
+  if (!settleLines.length) {
+    return {
+      ok: false,
+      message:
+        '该出库单无可结算的物料行（需已出库，且物料主数据勾选「需要下料结算」；兼容路径为双单位已拣批）',
+    }
   }
   const receiveWh = String(order.receiveWarehouse || '').trim()
   const shipHeader = order.warehouse || ''
   const outboundTime = order.outboundTime || order.completedAt || order.createdAt || ''
-  const lines = vlLines.map((line) => {
+  const lines = settleLines.map((line) => {
+    const unit = line.unit || line.stockUnit || (line.isVariableLength ? '米' : '件')
     const demand = Number(line.demandMeters ?? line.shipQty) || 0
     const allocSum = (Array.isArray(line.batchAllocations) ? line.batchAllocations : []).reduce(
       (s, a) => s + (Number(a.qty) || 0),
       0,
     )
-    // 整出+余料回：实发量作拣出量；需求量作默认耗用
+    // 拣出量：优先拣批长度/实发；单单位用出库数量
     const picked = Number(line.pickedLength) || Number(line.shipQty) || allocSum || 0
     const firstAlloc = (line.batchAllocations || [])[0]
     const shipWh = line.shipWarehouse || shipHeader
-    // 有领入仓时：耗用在线边 B；余料默认回发料仓 A
     const consumeWh = line.receiveWarehouse || receiveWh || shipWh
     const remnantReturnWh = receiveWh || line.receiveWarehouse ? shipWh : consumeWh
+    const defaultConsume = demand > 0 ? demand : picked
     return {
       id: `csl-${line.id || Date.now()}`,
       itemCode: line.itemCode,
@@ -114,6 +125,8 @@ export function buildCutSettleDraftFromOutbound(outboundId) {
       specModel: line.specModel || '',
       drawingNo: line.drawingNo || '',
       material: line.material || '',
+      unit,
+      isVariableLength: Boolean(line.isVariableLength),
       shipWarehouse: shipWh,
       warehouse: consumeWh,
       remnantReturnWarehouse: remnantReturnWh,
@@ -122,8 +135,8 @@ export function buildCutSettleDraftFromOutbound(outboundId) {
       receiveBatchIds: Array.isArray(line.receiveBatchIds) ? [...line.receiveBatchIds] : [],
       pickedLength: picked,
       demandMeters: demand,
-      actualConsumeMeters: demand,
-      remnantLength: roundMeters(Math.max(0, picked - demand)),
+      actualConsumeMeters: defaultConsume,
+      remnantLength: roundMeters(Math.max(0, picked - defaultConsume)),
       workOrderNo: line.workOrderNo || line.sourceDocNo || order.sourceOrderNo || '',
       dualUnitIssueStrategy: line.dualUnitIssueStrategy || '',
       blankSize: line.blankSize || null,
@@ -157,12 +170,12 @@ export function createCutSettleRecord(payload) {
   })
   for (const line of lines) {
     if (line.actualConsumeMeters <= 0) {
-      return { ok: false, message: `「${line.itemName || line.itemCode}」耗用长度须大于 0` }
+      return { ok: false, message: `「${line.itemName || line.itemCode}」实耗数量须大于 0` }
     }
     if (line.actualConsumeMeters > line.pickedLength) {
       return {
         ok: false,
-        message: `「${line.itemName || line.itemCode}」耗用不可超过出库长度 ${line.pickedLength}`,
+        message: `「${line.itemName || line.itemCode}」实耗不可超过出库数量 ${line.pickedLength}${line.unit ? line.unit : ''}`,
       }
     }
   }
@@ -216,7 +229,7 @@ function consumeFromReceiveWarehouse(line, meta = {}) {
     warehouse: wh,
     itemCode: line.itemCode,
     itemName: line.itemName,
-    unit: '米',
+    unit: line.unit || '米',
     delta: -picked,
   })
 }
@@ -254,10 +267,10 @@ export function confirmCutSettle(id, operator = 'admin1') {
         itemName: line.itemName,
         warehouse: returnWh,
         qty: remnant,
-        unit: '米',
-        isVariableLength: true,
-        pieceLengths: [remnant],
-        purchaseQty: 1,
+        unit: line.unit || '米',
+        isVariableLength: Boolean(line.isVariableLength),
+        pieceLengths: line.isVariableLength ? [remnant] : undefined,
+        purchaseQty: line.isVariableLength ? 1 : undefined,
         stockQty: remnant,
         remark: `余料来自 ${line.pickedBatchNo}，结算单 ${row.docNo}`,
       })

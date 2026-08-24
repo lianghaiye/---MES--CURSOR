@@ -24,6 +24,9 @@
             <a-descriptions-item label="工序分类">{{ record.category }}</a-descriptions-item>
             <a-descriptions-item label="资源类型">{{ record.resourceType }}</a-descriptions-item>
             <a-descriptions-item label="岗位">{{ record.position }}</a-descriptions-item>
+            <a-descriptions-item label="下料工序">{{
+              record.isBlanking ? '是' : '否'
+            }}</a-descriptions-item>
             <a-descriptions-item label="默认执行人/工组" :span="2">
               <template v-if="record.defaultExecutors?.length">
                 <a-tag

@@ -12,8 +12,8 @@ import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
 import { createStockAlertDemoMaterials } from '@/mock/stockAlertDemoMaterials'
 
 const STORAGE_KEY = 'i_doms_material_info'
-/** v15：库存预警演示物料（最高/最低库存） */
-const DATA_VERSION = 15
+/** v16：演示料增加 needsBlankingSettle（需要下料结算） */
+const DATA_VERSION = 16
 let codeSeq = 100048
 
 function ensureDemoMaterialsByCodes(list, demos) {

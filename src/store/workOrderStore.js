@@ -17,6 +17,7 @@ import { findWorkItemForPlanRow } from '@/utils/productionPlanMaterial'
 import { ensureMaterialReqDemoWorkOrders } from '@/mock/materialReqWorkOrderSeed'
 import { ensureCrossDemoWorkOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureBlankSizeDemoWorkOrders } from '@/mock/blankSizeBomDemoSeed'
+import { ensureBlankingDispatchDemoWorkOrders } from '@/mock/blankingDispatchDemoSeed'
 import { ensureWorkOrderControlDemoOrders } from '@/mock/workOrderControlDemoSeed'
 import {
   normalizeWorkOrderScheduleFields,
@@ -26,6 +27,7 @@ import {
   touchWorkOrderOperateUpdatedAt,
   getWorkOrderOperatorName,
 } from '@/utils/workOrderScheduleBatch'
+import { syncWorkOrderBlankingMaterials } from '@/utils/blankingSettleMaterial'
 import {
   migrateWorkOrderStatusFields,
   canContinueSchedule,
@@ -358,10 +360,12 @@ function ensureLaborDemoProductionOrders(orders) {
   const demos = [...createLaborDemoProductionOrders(), ...createLaborDemoAssemblyOrders()]
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
   return ensureWorkOrderControlDemoOrders(
-    ensureBlankSizeDemoWorkOrders(
-      ensureCrossDemoWorkOrders(
-        ensureMaterialReqDemoWorkOrders(
-          ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+    ensureBlankingDispatchDemoWorkOrders(
+      ensureBlankSizeDemoWorkOrders(
+        ensureCrossDemoWorkOrders(
+          ensureMaterialReqDemoWorkOrders(
+            ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+          ),
         ),
       ),
     ),
@@ -520,7 +524,7 @@ export function createWorkOrderPayload(partial) {
   const name = resolveOrderField(partial.name, () =>
     generateProductionWorkOrderName(productName, category),
   )
-  return {
+  const payload = {
     id: `wo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     code,
     name,
@@ -570,6 +574,9 @@ export function createWorkOrderPayload(partial) {
     createdAt: dayjs().format('YYYY-MM-DD'),
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   }
+  // 下料工序挂上 BOM 中「需要下料结算」的物料，供下发页展示
+  syncWorkOrderBlankingMaterials(payload)
+  return payload
 }
 
 /** 新建排产批次 */

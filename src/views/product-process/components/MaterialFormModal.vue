@@ -358,6 +358,20 @@
                 </a-form-item>
               </a-col>
               <a-col :span="8">
+                <a-form-item>
+                  <template #label>
+                    <span>需要下料结算</span>
+                    <a-tooltip
+                      :overlay-style="{ maxWidth: '400px' }"
+                      title="开=作为 BOM 子件领出后需做下料结算（实耗+余料回库）。工单工艺含「下料工序」时，下发页会展示本物料；单单位米/kg 也可开启。"
+                    >
+                      <InfoCircleOutlined class="info-icon" />
+                    </a-tooltip>
+                  </template>
+                  <a-switch v-model:checked="form.needsBlankingSettle" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
                 <a-form-item label="默认工艺路线">
                   <a-select
                     v-model:value="form.production.defaultProcessRoute"
@@ -757,6 +771,7 @@ const form = reactive({
   weight: '',
   inventoryUnit: undefined,
   isVariableLength: false,
+  needsBlankingSettle: false,
   purchaseUnit: undefined,
   settleUnit: undefined,
   standardUnitWeight: undefined,
@@ -842,6 +857,7 @@ function resetForm() {
   form.weight = ''
   form.inventoryUnit = undefined
   form.isVariableLength = false
+  form.needsBlankingSettle = false
   form.purchaseUnit = undefined
   form.settleUnit = undefined
   form.standardUnitWeight = undefined
@@ -884,6 +900,7 @@ function loadEditRecord(record) {
   form.weight = source.weight || ''
   form.inventoryUnit = source.inventoryUnit
   form.isVariableLength = Boolean(source.isVariableLength)
+  form.needsBlankingSettle = Boolean(source.needsBlankingSettle)
   form.purchaseUnit = source.purchaseUnit || source.inventoryUnit
   form.settleUnit = source.settleUnit || undefined
   form.standardUnitWeight =
@@ -1114,6 +1131,7 @@ function buildPayload() {
     weight: form.weight,
     inventoryUnit: form.inventoryUnit,
     isVariableLength: form.isVariableLength,
+    needsBlankingSettle: Boolean(form.needsBlankingSettle),
     purchaseUnit: form.isVariableLength ? form.purchaseUnit : form.inventoryUnit,
     settleUnit: form.settleUnit ? String(form.settleUnit).trim() : '',
     settleConvertType: form.settleUnit ? 'floating' : '',

@@ -40,6 +40,7 @@ function baseDualUnitMaterial(partial) {
     inputTaxRate: 13,
     createdAt: '2026-07-01',
     isVariableLength: true,
+    needsBlankingSettle: true,
     ...partial,
   }
 }

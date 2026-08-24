@@ -76,6 +76,10 @@ export function buildWorkOrderComponentLines(bom, scheduleQty = 1) {
     if (!stockQty && code) {
       stockQty = demoStockQty(unitQty * 10, index)
     }
+    const mat =
+      materialInfoState.materials.find((m) => m.code === code) ||
+      productInfoState.products.find((p) => p.code === code) ||
+      null
     return {
       id: line.id || `comp-${index}`,
       itemName: line.itemName || '',
@@ -89,6 +93,7 @@ export function buildWorkOrderComponentLines(bom, scheduleQty = 1) {
       stockQty,
       requiredQty: Number((unitQty * qty).toFixed(4)),
       remark: line.remark || '',
+      needsBlankingSettle: Boolean(line.needsBlankingSettle ?? mat?.needsBlankingSettle),
     }
   })
 }

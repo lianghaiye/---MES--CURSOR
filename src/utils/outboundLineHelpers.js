@@ -44,6 +44,7 @@ export function applyDualUnitFieldsToOutboundLine(line = {}, itemCode = '') {
   }
   const vl = resolveVariableLengthFields(mat)
   line.barcodeType = mat.barcodeType || vl.barcodeType || line.barcodeType || '一批一码'
+  line.needsBlankingSettle = Boolean(mat.needsBlankingSettle)
   if (vl.isVariableLength) {
     line.isVariableLength = true
     line.purchaseUnit = vl.purchaseUnit
@@ -288,6 +289,9 @@ export function buildOutboundLinesFromBom(
         unitPrice: line.unitPrice ?? null,
         shipWarehouse: defaultWarehouse || '',
         isVariableLength: Boolean(line.isVariableLength),
+        needsBlankingSettle: Boolean(
+          line.needsBlankingSettle ?? findMaterialByCode(code)?.needsBlankingSettle,
+        ),
         blankSize: line.blankSize || null,
         blankSizeText: line.blankSizeText || '',
         blankSizeMode: line.blankSizeMode || '',
@@ -371,6 +375,7 @@ export function applyPickerItemToOutboundLine(line, item, defaultWarehouse = '')
     stockUnit: fresh.stockUnit,
     purchaseUnit: fresh.purchaseUnit,
     isVariableLength: fresh.isVariableLength,
+    needsBlankingSettle: fresh.needsBlankingSettle,
     packagingForm: fresh.packagingForm || '',
     unitPrice: fresh.unitPrice ?? line.unitPrice,
     stockQty: fresh.stockQty,

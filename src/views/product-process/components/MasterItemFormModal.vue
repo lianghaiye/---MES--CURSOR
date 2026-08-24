@@ -603,6 +603,20 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
+                <a-form-item>
+                  <template #label>
+                    <span>需要下料结算</span>
+                    <a-tooltip
+                      :overlay-style="{ maxWidth: '400px' }"
+                      title="开=作为 BOM 子件领出后需做下料结算（实耗+余料回库）。工单工艺含「下料工序」时，下发页会展示本物料；单单位米/kg 也可开启。"
+                    >
+                      <InfoCircleOutlined class="info-icon" />
+                    </a-tooltip>
+                  </template>
+                  <a-switch v-model:checked="form.needsBlankingSettle" :disabled="viewOnly" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
                 <a-form-item label="关键件标识">
                   <a-switch v-model:checked="form.production.isKeyPart" :disabled="viewOnly" />
                 </a-form-item>
@@ -1185,6 +1199,10 @@ const FIELD_HELP_BY_TAB = {
       name: '领料属性',
       desc: '开=参与领料；关=不进领料单，发料方式=倒冲。',
     },
+    {
+      name: '需要下料结算',
+      desc: '开=作为 BOM 子件领出后需下料结算。工单含「下料工序」时下发页展示；结算仅针对勾选物料。',
+    },
   ],
   labor: [
     {
@@ -1227,6 +1245,7 @@ const form = reactive({
   weight: '',
   inventoryUnit: undefined,
   isVariableLength: false,
+  needsBlankingSettle: false,
   purchaseUnit: undefined,
   settleUnit: undefined,
   standardUnitWeight: undefined,
@@ -1355,6 +1374,7 @@ function resetForm() {
   form.weight = ''
   form.inventoryUnit = undefined
   form.isVariableLength = false
+  form.needsBlankingSettle = false
   form.purchaseUnit = undefined
   form.settleUnit = undefined
   form.standardUnitWeight = undefined
@@ -1416,6 +1436,7 @@ function loadEditRecord(record) {
   form.weight = source.weight || ''
   form.inventoryUnit = source.inventoryUnit
   form.isVariableLength = Boolean(source.isVariableLength)
+  form.needsBlankingSettle = Boolean(source.needsBlankingSettle)
   form.purchaseUnit = source.purchaseUnit || source.inventoryUnit
   form.settleUnit = source.settleUnit || undefined
   form.standardUnitWeight =
@@ -1768,6 +1789,7 @@ function buildProductPayload() {
     weight: Number(form.weight) || 0,
     inventoryUnit: form.inventoryUnit,
     isVariableLength: form.isVariableLength,
+    needsBlankingSettle: Boolean(form.needsBlankingSettle),
     purchaseUnit: form.isVariableLength
       ? form.purchaseUnit
       : form.purchaseUnit || form.inventoryUnit,
@@ -1860,6 +1882,7 @@ function buildMaterialPayload() {
     weight: form.weight,
     inventoryUnit: form.inventoryUnit,
     isVariableLength: form.isVariableLength,
+    needsBlankingSettle: Boolean(form.needsBlankingSettle),
     purchaseUnit: form.isVariableLength
       ? form.purchaseUnit
       : form.purchaseUnit || form.inventoryUnit,

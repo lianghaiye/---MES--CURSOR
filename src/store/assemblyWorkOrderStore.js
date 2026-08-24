@@ -1,6 +1,7 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { buildProcessesFromRoute, getDefaultProductRoute } from '@/mock/processRoutes'
+import { syncWorkOrderBlankingMaterials } from '@/utils/blankingSettleMaterial'
 import {
   resolveOrderField,
   generateAssemblyWorkOrderCode,
@@ -216,7 +217,7 @@ export function createAssemblyWorkOrderPayload(partial) {
   const name = resolveOrderField(partial.name, () =>
     generateAssemblyWorkOrderName(productName, partial.orderCategory),
   )
-  return {
+  const payload = {
     id: `asm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     code,
     name,
@@ -263,6 +264,8 @@ export function createAssemblyWorkOrderPayload(partial) {
     createdAt: dayjs().format('YYYY-MM-DD'),
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   }
+  syncWorkOrderBlankingMaterials(payload)
+  return payload
 }
 
 export function addAssemblyScheduleBatch(workOrderId, input) {

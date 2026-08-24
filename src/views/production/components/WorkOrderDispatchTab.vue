@@ -83,6 +83,25 @@
           </div>
           <span v-else class="muted">—</span>
         </template>
+        <template v-else-if="column.key === 'blankingMaterials'">
+          <div v-if="isBlankingProcess(record)" class="blanking-cell">
+            <template v-if="(record.blankingMaterials || []).length">
+              <div
+                v-for="item in record.blankingMaterials"
+                :key="item.id || item.materialCode"
+                class="blanking-row"
+              >
+                <span class="blanking-name">{{ item.materialName || item.materialCode }}</span>
+                <span v-if="item.materialCode" class="blanking-code">{{ item.materialCode }}</span>
+                <span v-if="item.requiredQty != null" class="blanking-qty">
+                  {{ item.requiredQty }}{{ item.unit || '' }}
+                </span>
+              </div>
+            </template>
+            <span v-else class="muted">本工单 BOM 无「需要下料结算」物料</span>
+          </div>
+          <span v-else class="muted">—</span>
+        </template>
       </template>
     </a-table>
 
@@ -97,7 +116,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import ExecutorTagPicker from './ExecutorTagPicker.vue'
 import { mockFeedingMaterials } from '@/mock/workOrderMaster'
@@ -111,6 +130,8 @@ import {
   resolveProcessExecutionMode,
   shouldSplitCollaborativeTasks,
 } from '@/utils/taskExecutionMode'
+import { resolveProcessIsBlanking } from '@/utils/workOrderBlanking'
+import { syncWorkOrderBlankingMaterials } from '@/utils/blankingSettleMaterial'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -119,6 +140,18 @@ const props = defineProps({
 const emit = defineEmits(['save', 'dispatch-and-start', 'cancel'])
 
 const showFeedingColumn = computed(() => businessRuleState.rules.productionMode === 'standard')
+
+const showBlankingColumn = computed(() =>
+  (props.workOrder?.processes || []).some((p) => resolveProcessIsBlanking(p)),
+)
+
+watch(
+  () => props.workOrder,
+  (wo) => {
+    if (wo) syncWorkOrderBlankingMaterials(wo)
+  },
+  { immediate: true },
+)
 
 const columns = computed(() => {
   const base = [
@@ -133,12 +166,19 @@ const columns = computed(() => {
   if (showFeedingColumn.value) {
     base.push({ title: '投料信息', key: 'feeding' })
   }
+  if (showBlankingColumn.value) {
+    base.push({ title: '下料物料', key: 'blankingMaterials', width: 220 })
+  }
   return base
 })
 
 const materialOptions = computed(() =>
   mockFeedingMaterials.map((m) => ({ label: m.name, value: m.id })),
 )
+
+function isBlankingProcess(record) {
+  return resolveProcessIsBlanking(record)
+}
 
 function enrichProcessRecord(record) {
   const procConfig = getProcessByName(record.name)
@@ -241,6 +281,30 @@ function emitDispatchAndStart() {
     padding-left: 0;
     height: 22px;
     font-size: 12px;
+  }
+}
+
+.blanking-cell {
+  .blanking-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    margin-bottom: 2px;
+    line-height: 1.4;
+  }
+
+  .blanking-name {
+    color: rgba(0, 0, 0, 0.88);
+  }
+
+  .blanking-code {
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 11px;
+  }
+
+  .blanking-qty {
+    color: rgba(0, 0, 0, 0.65);
   }
 }
 

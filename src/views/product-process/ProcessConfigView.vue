@@ -116,6 +116,10 @@
             </div>
             <span v-else class="muted">—</span>
           </template>
+          <template v-else-if="column.key === 'isBlanking'">
+            <a-tag v-if="record.isBlanking" color="orange">是</a-tag>
+            <span v-else class="muted">—</span>
+          </template>
           <template v-else-if="column.key === 'operations'">
             <div v-if="getOperationLabels(record).length" class="executor-tags">
               <a-tag
@@ -235,6 +239,7 @@ const allBaseColumns = [
   { title: '工序编码', key: 'code', width: 130 },
   { title: '工序名称', dataIndex: 'name', width: 140 },
   { title: '工序分类', dataIndex: 'category', width: 100 },
+  { title: '下料工序', key: 'isBlanking', width: 90 },
   { title: '资源类型', dataIndex: 'resourceType', width: 100 },
   { title: '默认执行人/工组', key: 'defaultExecutors', width: 180, ellipsis: true },
   { title: '工序操作', key: 'operations', width: 220, ellipsis: true },

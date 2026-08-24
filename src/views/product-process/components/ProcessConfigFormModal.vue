@@ -90,6 +90,18 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
+          <a-form-item label="下料工序">
+            <a-switch
+              v-model:checked="form.isBlanking"
+              checked-children="是"
+              un-checked-children="否"
+            />
+            <div class="field-hint">
+              开启后：工艺路线含本工序的工单可进入下料结算；具体结算哪些物料，以物料主数据「需要下料结算」为准
+            </div>
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
           <a-form-item label="图片">
             <div class="image-upload-mock">
               <div v-if="form.image" class="image-preview">
@@ -193,6 +205,7 @@ const form = reactive({
   position: undefined,
   image: '',
   remark: '',
+  isBlanking: false,
   defaultExecutors: [],
   reportMode: undefined,
   taskExecutionMode: DEFAULT_TASK_EXECUTION_MODE,
@@ -245,6 +258,7 @@ watch(
     form.position = r?.position
     form.image = r?.image || ''
     form.remark = r?.remark || ''
+    form.isBlanking = Boolean(r?.isBlanking)
     form.defaultExecutors = [...(r?.defaultExecutors || [])]
     form.reportMode = r?.reportMode || undefined
     form.taskExecutionMode = r?.taskExecutionMode || DEFAULT_TASK_EXECUTION_MODE
@@ -340,6 +354,13 @@ async function handleSave() {
       font-size: 12px;
       color: #999;
     }
+  }
+
+  .field-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+    line-height: 1.4;
   }
 }
 </style>

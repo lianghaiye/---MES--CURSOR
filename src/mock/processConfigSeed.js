@@ -116,6 +116,8 @@ export function createProcessConfigSeed() {
     image: MOCK_IMAGE,
     remark: '',
     status: '使用中',
+    /** 下料工序：路线含此工序的工单可进下料结算；具体物料看主数据「需要下料结算」 */
+    isBlanking: name === '下料',
     operations: defaultOperations(ops),
     defaultExecutors: [...defaultExecutors],
     reportMode: PROCESS_REPORT_MODE_MAP[name] || '',

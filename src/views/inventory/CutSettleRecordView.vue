@@ -11,7 +11,7 @@
       type="info"
       show-icon
       class="scene-alert"
-      message="从出库单创建：适用于「整批出+余料确认回库」。列表按结算明细展示（一单一料）。点结算单号打开详情；点确认结算在右侧填写实耗后确认回库。"
+      message="从出库单创建：工单含「下料工序」且物料勾选「需要下料结算」时可结算（单单位米/KG 亦可）。双单位整出演示单仍兼容。列表按结算明细展示；确认时填写实耗并余料回库。"
     />
 
     <div class="filter-card">
@@ -265,6 +265,7 @@ import {
 import { outboundState } from '@/store/outboundStore'
 import { roundMeters } from '@/utils/variableLengthMaterial'
 import { flattenCutSettleLines, filterCutSettleLineRows } from '@/utils/cutSettleLines'
+import { isOutboundEligibleForCutSettle } from '@/utils/workOrderBlanking'
 import { useTabs } from '@/composables/useTabs'
 
 const router = useRouter()
@@ -324,16 +325,7 @@ const pagination = computed(() => ({
 
 const outboundOpts = computed(() =>
   outboundState.orders
-    .filter(
-      (o) =>
-        o.status === '已出库' &&
-        (o.outboundType === '领料出库' || o.outboundType === '发料出库') &&
-        (o.lineItems || []).some((l) => {
-          if (!l.isVariableLength) return false
-          if (l.pickedBatchId) return true
-          return (l.batchAllocations || []).some((a) => a?.batchId && Number(a.qty) > 0)
-        }),
-    )
+    .filter((o) => isOutboundEligibleForCutSettle(o))
     .map((o) => ({
       label: `${o.docNo}（${o.receiveWarehouse ? `领入 ${o.receiveWarehouse} · ` : ''}${o.sourceOrderNo || '无来源'}）`,
       value: o.id,

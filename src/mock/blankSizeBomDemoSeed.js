@@ -17,6 +17,7 @@ import {
   createSteelPlateMaterial,
   createSteelWeightBarMaterial,
 } from '@/mock/stockBatchSeed'
+import { syncWorkOrderBlankingMaterials } from '@/utils/blankingSettleMaterial'
 
 export const BLANK_SIZE_DEMO = {
   productId: 'prod-blank-size-demo',
@@ -165,18 +166,40 @@ export function createBlankSizeDemoBom() {
   }
 }
 
-/** 轻量工序，避免 import processRoutes（会拉起 processRouteStore） */
+/** 轻量工序，含下料以便演示「下料物料」展示 */
 function createDemoProcesses() {
   return [
-    { id: 'blank-demo-step-1', index: 1, name: '裁板', processCode: 'OP-CB-01', executors: [] },
-    { id: 'blank-demo-step-2', index: 2, name: '机加工', processCode: 'OP-JG-03', executors: [] },
-    { id: 'blank-demo-step-3', index: 3, name: '入库', processCode: 'OP-RK-05', executors: [] },
+    {
+      id: 'blank-demo-step-0',
+      index: 1,
+      name: '下料',
+      processCode: 'OP-XL-01',
+      isBlanking: true,
+      executors: [],
+      blankingMaterials: [],
+    },
+    { id: 'blank-demo-step-1', index: 2, name: '裁板', processCode: 'OP-CB-01', executors: [] },
+    { id: 'blank-demo-step-2', index: 3, name: '机加工', processCode: 'OP-JG-03', executors: [] },
+    { id: 'blank-demo-step-3', index: 4, name: '入库', processCode: 'OP-RK-05', executors: [] },
   ]
 }
 
 export function createBlankSizeDemoWorkOrder() {
   const bom = createBlankSizeDemoBom()
-  return {
+  const componentLines = (bom.lineItems || []).map((line, index) => ({
+    id: line.id || `blank-comp-${index}`,
+    itemName: line.itemName || '',
+    itemCode: line.materialCode || line.itemCode || '',
+    specModel: line.specModel || '',
+    material: line.material || '',
+    drawingNo: line.drawingNo || '',
+    supplyForm: line.supplyForm || '',
+    unit: line.unit || '件',
+    unitQty: Number(line.unitQty) || 1,
+    requiredQty: Number(line.unitQty) || 1,
+    needsBlankingSettle: true,
+  }))
+  const wo = {
     id: BLANK_SIZE_DEMO.woId,
     code: BLANK_SIZE_DEMO.woCode,
     name: `${BLANK_SIZE_DEMO.productName}加工（下料尺寸演示）`,
@@ -194,7 +217,8 @@ export function createBlankSizeDemoWorkOrder() {
     warehouse: '半成品仓',
     urgency: '普通',
     planDateRange: [dayjs().format('YYYY-MM-DD'), dayjs().add(14, 'day').format('YYYY-MM-DD')],
-    remark: '打开「EBOM」「当前BOM」可查看钢管/钢板/圆钢行的下料尺寸',
+    remark:
+      '打开「EBOM」「当前BOM」可查看钢管/钢板/圆钢行的下料尺寸；下发页「下料」工序展示需下料结算物料',
     processRouteName: '机加标准路线',
     source: 'blank-size-demo',
     sourceOrderNo: '1-20260804-BLANK',
@@ -203,11 +227,13 @@ export function createBlankSizeDemoWorkOrder() {
     material: '组合',
     drawingNo: 'DWG-BLANK-DEMO',
     skipEbom: false,
-    // 按 bomId 实时展开，避免种子阶段依赖 ebomSnapshot / productBomStore
     ebomSnapshot: null,
+    componentLines,
     processes: createDemoProcesses(),
     createdAt: dayjs().format('YYYY-MM-DD'),
   }
+  syncWorkOrderBlankingMaterials(wo)
+  return wo
 }
 
 export function ensureBlankSizeDemoBoms(boms) {

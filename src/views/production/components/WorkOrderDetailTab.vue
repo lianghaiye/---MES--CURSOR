@@ -13,7 +13,7 @@
           :data-source="processConfigList"
           row-key="id"
           :pagination="false"
-          :scroll="{ x: showFeedingColumn ? 700 : 520 }"
+          :scroll="{ x: showBlankingColumn || showFeedingColumn ? 860 : 520 }"
           bordered
         >
           <template #bodyCell="{ column, record, index, text }">
@@ -22,6 +22,9 @@
             </template>
             <template v-else-if="column.key === 'feeding'">
               {{ formatProcessFeedingSummary(record) }}
+            </template>
+            <template v-else-if="column.key === 'blankingMaterials'">
+              {{ formatBlankingMaterialsSummary(record) }}
             </template>
             <template v-else-if="column.key === 'executors'">
               {{ formatProcessExecutors(record) }}
@@ -42,6 +45,8 @@ import {
   formatProcessExecutors,
   formatProcessFeedingSummary,
 } from '@/utils/workOrderProcessDisplay'
+import { formatBlankingMaterialsSummary } from '@/utils/blankingSettleMaterial'
+import { resolveProcessIsBlanking } from '@/utils/workOrderBlanking'
 import { businessRuleState } from '@/store/businessRuleStore'
 import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
 
@@ -57,6 +62,10 @@ const processConfigList = computed(() => props.workOrder?.processes || [])
 
 const showFeedingColumn = computed(() => businessRuleState.rules.productionMode === 'standard')
 
+const showBlankingColumn = computed(() =>
+  (props.workOrder?.processes || []).some((p) => resolveProcessIsBlanking(p)),
+)
+
 const processConfigCols = computed(() => {
   const cols = [
     { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
@@ -65,6 +74,9 @@ const processConfigCols = computed(() => {
   ]
   if (showFeedingColumn.value) {
     cols.push({ title: '投料', key: 'feeding', width: 160, ellipsis: true })
+  }
+  if (showBlankingColumn.value) {
+    cols.push({ title: '下料物料', key: 'blankingMaterials', width: 200, ellipsis: true })
   }
   cols.push({ title: '执行人', key: 'executors', width: 120 })
   return cols

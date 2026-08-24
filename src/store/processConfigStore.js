@@ -14,7 +14,7 @@ import { normalizeTaskExecutionMode } from '@/utils/taskExecutionMode'
 
 const STORAGE_KEY = 'i_doms_process_config'
 const SEED_VERSION_KEY = 'i_doms_process_config_seed_v'
-const CURRENT_SEED_VERSION = '7'
+const CURRENT_SEED_VERSION = '8'
 
 export {
   PROCESS_OPERATION_DEFS,
@@ -56,6 +56,7 @@ function normalizeOperations(ops = {}) {
 function normalizeProcessList(list) {
   return (list || []).map((p) => ({
     ...p,
+    isBlanking: p.isBlanking != null ? Boolean(p.isBlanking) : p.name === '下料',
     defaultExecutors: Array.isArray(p.defaultExecutors) ? [...p.defaultExecutors] : [],
     reportMode: normalizeReportMode(p.reportMode),
     taskExecutionMode: normalizeTaskExecutionMode(p.taskExecutionMode),
@@ -188,6 +189,7 @@ export function addProcessConfig(payload) {
     remark: payload.remark?.trim() || '',
     status: '使用中',
     operations: normalizeOperations(payload.operations),
+    isBlanking: Boolean(payload.isBlanking),
     defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
     reportMode: payload.reportMode ? normalizeReportMode(payload.reportMode) : '',
     taskExecutionMode: normalizeTaskExecutionMode(payload.taskExecutionMode),
@@ -216,6 +218,7 @@ export function updateProcessConfig(id, payload) {
     image: payload.image ?? row.image,
     remark: payload.remark?.trim() ?? row.remark,
     operations: normalizeOperations(payload.operations),
+    isBlanking: Boolean(payload.isBlanking),
     defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
     reportMode: payload.reportMode
       ? normalizeReportMode(payload.reportMode)
