@@ -21,6 +21,17 @@
               </a-form-item>
             </a-col>
             <a-col :xs="24" :sm="12" :md="6">
+              <a-form-item label="类型">
+                <a-select
+                  v-model:value="filters.materialType"
+                  allow-clear
+                  placeholder="请选择"
+                  size="small"
+                  :options="materialTypeOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :xs="24" :sm="12" :md="6">
               <a-form-item label="产品编码">
                 <a-input
                   v-model:value="filters.itemCode"
@@ -153,10 +164,8 @@
             <template v-if="column.key === 'index'">
               {{ rowIndex(index) }}
             </template>
-            <template v-else-if="column.key === 'itemType'">
-              <a-tag :color="record.itemType === '产品' ? 'blue' : 'green'">{{
-                record.itemType
-              }}</a-tag>
+            <template v-else-if="column.key === 'materialType'">
+              {{ record.materialType || '—' }}
             </template>
             <template v-else-if="column.key === 'weight'">
               {{ formatInventoryWeight(record.weight) }}
@@ -374,7 +383,7 @@
             type="info"
             show-icon
             class="batch-soft-tip"
-            message="本页为批次快照：按当前出库规则排序（余料优先 → 批次号先进先出/后进先出）。一物一码批次可展开查看在库件码；出入库痕迹请看「物料流水」。"
+            message="本页为批次快照：按当前出库规则排序（余料优先 → 批次号先进先出/后进先出）。一物一码批次可展开查看在库件码；有结算过磅的批次会显示件数/过磅总重/批次单重/偏差（按批次覆盖换算记录，不进主数据）。出入库痕迹请看「物料流水」。"
           />
           <a-table
             :columns="drawerBatchColumns"
@@ -383,7 +392,7 @@
             size="small"
             bordered
             :pagination="false"
-            :scroll="{ x: 1280 }"
+            :scroll="{ x: drawerBatchTableScrollX }"
             :expandable="drawerBatchExpandable"
           >
             <template #bodyCell="{ column, record, index }">
@@ -416,6 +425,27 @@
                     record.unit || batchDrawerRow?.unit,
                   )
                 }}
+              </template>
+              <template v-else-if="column.key === 'convertPieceCount'">
+                {{ formatConvertPieceCount(record) }}
+              </template>
+              <template v-else-if="column.key === 'convertSettleQty'">
+                {{ formatConvertSettleQty(record) }}
+              </template>
+              <template v-else-if="column.key === 'convertActualUnitWeight'">
+                {{ formatConvertActualUnitWeight(record) }}
+              </template>
+              <template v-else-if="column.key === 'convertDeviation'">
+                <span
+                  v-if="hasBatchUomConvert(record)"
+                  :class="[
+                    'deviation-text',
+                    `is-${deviationTone(record.uomConvert?.deviationPct)}`,
+                  ]"
+                >
+                  {{ formatDeviationPct(record.uomConvert?.deviationPct) }}
+                </span>
+                <span v-else class="muted">—</span>
               </template>
               <template v-else-if="column.key === 'status'">
                 <a-tag :color="record.status === '在库' ? 'green' : 'default'">
@@ -599,16 +629,38 @@ import {
   formatInventoryQty,
   formatInventoryQtyWithUnit,
   formatInventoryWeight,
+  inventoryMaterialTypeOptions,
 } from '@/utils/inventoryDetailLines'
+import { hasBatchUomConvert, formatDeviationPct, deviationTone } from '@/utils/batchUomConvert'
+import { formatQtyWithUnit, formatQty } from '@/utils/numberFormat'
+import {
+  CASTING_BLANK_SETTLE_CODE,
+  STEEL_PIPE_CODE,
+  STEEL_PLATE_CODE,
+  STEEL_WEIGHT_BAR_CODE,
+} from '@/mock/stockBatchSeed'
+
+/** 库存台账置顶演示料（按批次覆盖 / 双单位），方便原型验收一眼看到 */
+const DEMO_STOCK_PIN_CODES = [
+  CASTING_BLANK_SETTLE_CODE,
+  STEEL_PIPE_CODE,
+  STEEL_PLATE_CODE,
+  STEEL_WEIGHT_BAR_CODE,
+]
+
+function demoStockPinRank(itemCode) {
+  const i = DEMO_STOCK_PIN_CODES.indexOf(String(itemCode || ''))
+  return i === -1 ? DEMO_STOCK_PIN_CODES.length + 1 : i
+}
 
 const route = useRoute()
 const router = useRouter()
 const viewTab = ref('ledger')
 const filters = reactive({
   warehouse: undefined,
+  materialType: undefined,
   itemCode: '',
   itemName: '',
-  itemType: undefined,
   specModel: '',
   material: '',
   drawingNo: '',
@@ -618,6 +670,8 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
+
+const materialTypeOpts = inventoryMaterialTypeOptions.map((v) => ({ label: v, value: v }))
 
 const batchFilters = reactive({
   salesOrderNo: '',
@@ -666,7 +720,7 @@ const allLines = computed(() => {
     spus: [],
     warehouses: warehouseOptions.map((w) => w.value),
   })
-  return base.map((row) => {
+  const rows = base.map((row) => {
     const softAllocated = getSoftAllocatedQtyByItemCode(row.itemCode)
     const stockQty = Number(row.stockQty) || 0
     const dedicatedQty = sumDedicatedOnHand(row.warehouse, row.itemCode)
@@ -676,6 +730,15 @@ const allLines = computed(() => {
       availableQty: Math.max(0, stockQty - softAllocated),
       dedicatedQty,
     }
+  })
+  // 演示料置顶：结算按批次覆盖（铸件）优先，便于不搜索即可验收
+  return rows.sort((a, b) => {
+    const ra = demoStockPinRank(a.itemCode)
+    const rb = demoStockPinRank(b.itemCode)
+    if (ra !== rb) return ra - rb
+    const wh = String(a.warehouse || '').localeCompare(String(b.warehouse || ''), 'zh')
+    if (wh !== 0) return wh
+    return String(a.itemCode || '').localeCompare(String(b.itemCode || ''), 'zh')
   })
 })
 
@@ -765,20 +828,35 @@ const batchQueryColumns = [
   { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 140 },
 ]
 
-const drawerBatchColumns = [
-  { title: 'FIFO序', key: 'fifoIndex', width: 64, align: 'center', fixed: 'left' },
-  { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 140, fixed: 'left' },
-  { title: '入库时间', key: 'createdAt', width: 150 },
-  { title: '余料', key: 'remnant', width: 72 },
-  { title: '归属', key: 'ownership', width: 88 },
-  { title: '销售订单号', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 130 },
-  { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
-  { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 130 },
-  { title: '单位', dataIndex: 'unit', key: 'unit', width: 56 },
-  { title: '在库数量', key: 'currentLength', width: 100, align: 'right' },
-  { title: '件码', key: 'pieceManage', width: 110 },
-  { title: '状态', key: 'status', width: 72 },
-]
+const drawerBatchColumns = computed(() => {
+  const cols = [
+    { title: 'FIFO序', key: 'fifoIndex', width: 64, align: 'center', fixed: 'left' },
+    { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 140, fixed: 'left' },
+    { title: '入库时间', key: 'createdAt', width: 150 },
+    { title: '余料', key: 'remnant', width: 72 },
+    { title: '归属', key: 'ownership', width: 88 },
+    { title: '销售订单号', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 130 },
+    { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
+    { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 130 },
+    { title: '单位', dataIndex: 'unit', key: 'unit', width: 56 },
+    { title: '在库数量', key: 'currentLength', width: 100, align: 'right' },
+  ]
+  if (drawerHasUomConvert.value) {
+    cols.push(
+      { title: '件数', key: 'convertPieceCount', width: 72, align: 'right' },
+      { title: '过磅总重', key: 'convertSettleQty', width: 110, align: 'right' },
+      { title: '批次单重', key: 'convertActualUnitWeight', width: 110, align: 'right' },
+      { title: '偏差', key: 'convertDeviation', width: 80, align: 'right' },
+    )
+  }
+  cols.push(
+    { title: '件码', key: 'pieceManage', width: 110 },
+    { title: '状态', key: 'status', width: 72 },
+  )
+  return cols
+})
+
+const drawerBatchTableScrollX = computed(() => (drawerHasUomConvert.value ? 1680 : 1280))
 
 const drawerPieceColumns = [
   { title: '件码', dataIndex: 'serialNo', key: 'serialNo', width: 160 },
@@ -825,6 +903,25 @@ const drawerBatches = computed(() => {
   })
   return sortBatchesByIssueRule(list, getOutboundIssueRule())
 })
+
+const drawerHasUomConvert = computed(() => drawerBatches.value.some((b) => hasBatchUomConvert(b)))
+
+function formatConvertPieceCount(batch) {
+  if (!hasBatchUomConvert(batch)) return '—'
+  return formatQty(batch.uomConvert.pieceCount)
+}
+
+function formatConvertSettleQty(batch) {
+  if (!hasBatchUomConvert(batch)) return '—'
+  return formatQtyWithUnit(batch.uomConvert.settleQty, batch.uomConvert.settleUnit)
+}
+
+function formatConvertActualUnitWeight(batch) {
+  if (!hasBatchUomConvert(batch)) return '—'
+  const u = batch.uomConvert.settleUnit
+  const stockU = batch.uomConvert.stockUnit || batch.unit || '件'
+  return `${formatQty(batch.uomConvert.actualUnitWeight)} ${u}/${stockU}`
+}
 
 const drawerBatchStockTotal = computed(() =>
   drawerBatches.value
@@ -1045,7 +1142,7 @@ const baseColumns = [
   { title: '所属仓库', dataIndex: 'warehouse', width: 100, fixed: 'left' },
   { title: '产品名称', dataIndex: 'itemName', width: 160, ellipsis: true },
   { title: '产品编码', dataIndex: 'itemCode', width: 130, ellipsis: true },
-  { title: '产品类型', key: 'itemType', width: 88, align: 'center' },
+  { title: '类型', key: 'materialType', width: 88, align: 'center' },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88 },
   { title: '图号', dataIndex: 'drawingNo', width: 110, ellipsis: true },
@@ -1061,7 +1158,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inventory-detail-list-v3', baseColumns, { minScrollX: 1880 })
+  useTableColumnSettings('inventory-detail-list-v4', baseColumns, { minScrollX: 1880 })
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
@@ -1075,9 +1172,9 @@ function handleSearch() {
 function handleReset() {
   Object.assign(filters, {
     warehouse: undefined,
+    materialType: undefined,
     itemCode: '',
     itemName: '',
-    itemType: undefined,
     specModel: '',
     material: '',
     drawingNo: '',
@@ -1294,6 +1391,19 @@ watch(
 
 .muted {
   color: rgba(0, 0, 0, 0.25);
+}
+
+.deviation-text.is-success {
+  color: #389e0d;
+}
+.deviation-text.is-warning {
+  color: #d48806;
+}
+.deviation-text.is-error {
+  color: #cf1322;
+}
+.deviation-text.is-default {
+  color: rgba(0, 0, 0, 0.65);
 }
 
 .soft-detail-btn {

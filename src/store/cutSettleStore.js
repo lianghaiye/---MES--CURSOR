@@ -19,8 +19,8 @@ import {
 
 const STORAGE_KEY = 'i_doms_cut_settle_records'
 const SEED_VERSION_KEY = 'i_doms_cut_settle_seed_v'
-/** v3：多单位流程下料结算演示（整出待确认 / 部分出已确认） */
-const CURRENT_SEED_VERSION = '3'
+/** v4：结算明细需求数/实耗/余料带库存单位 */
+const CURRENT_SEED_VERSION = '4'
 
 function loadFromStorage() {
   try {

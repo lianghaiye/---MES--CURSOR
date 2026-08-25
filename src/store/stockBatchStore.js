@@ -9,6 +9,8 @@ import {
   STEEL_PLATE_NAME,
   STEEL_WEIGHT_BAR_CODE,
   STEEL_WEIGHT_BAR_NAME,
+  CASTING_BLANK_SETTLE_CODE,
+  CASTING_BLANK_SETTLE_NAME,
 } from '@/mock/stockBatchSeed'
 import {
   createStockPiecesForBatch,
@@ -21,11 +23,12 @@ import {
 } from '@/store/stockPieceStore'
 import { DEDICATED_SHIP_DEMO, ensureDedicatedShipDemoBatches } from '@/mock/dedicatedShipDemoSeed'
 import { ensureMultiUnitFlowBatches } from '@/mock/multiUnitFlowDemoSeed'
+import { allocateBatchUomConvert } from '@/utils/batchUomConvert'
 
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
-/** v20：多单位流程 FIFO/余料/线边批次 */
-const CURRENT_SEED_VERSION = '20'
+/** v22：铸件结算料批次换算演示写入库存台账 */
+const CURRENT_SEED_VERSION = '22'
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',
@@ -135,6 +138,12 @@ if (initialBatchLoad.reseeded) {
       itemCode: STEEL_WEIGHT_BAR_CODE,
       itemName: STEEL_WEIGHT_BAR_NAME,
       unit: 'kg',
+    },
+    {
+      warehouse: '原料仓',
+      itemCode: CASTING_BLANK_SETTLE_CODE,
+      itemName: CASTING_BLANK_SETTLE_NAME,
+      unit: '件',
     },
   ].forEach((row) =>
     syncAggregateStockFromBatches(row.warehouse, row.itemCode, row.itemName, row.unit),
@@ -273,6 +282,8 @@ export function createBatch(partial = {}) {
     salesLineId: partial.salesLineId || '',
     workOrderNo: partial.workOrderNo || '',
     attrs: partial.attrs || {},
+    /** 按批次覆盖：入库过磅沉淀的换算快照（库存明细展示，不进主数据） */
+    uomConvert: partial.uomConvert || null,
     parentBatchId: partial.parentBatchId || '',
     createdAt: partial.createdAt || new Date().toISOString(),
     updatedAt: partial.updatedAt || new Date().toISOString(),
@@ -309,10 +320,12 @@ export function applyInboundBatchesFromRoots(payload) {
     salesLineId: payload.salesLineId || '',
     workOrderNo: payload.workOrderNo || '',
   }
+  const lineUomConvert = payload.uomConvert || null
+  const lineStockTotal = roundMeters(values.reduce((s, l) => s + l, 0))
 
   // 一物一码：1 个父批次（库存账）+ N 条件码（件身份）
   if (isOneItemOneCodeBarcode(barcodeType)) {
-    const total = roundMeters(values.reduce((s, l) => s + l, 0))
+    const total = lineStockTotal
     const parent = createBatch({
       warehouse: payload.warehouse,
       itemCode: payload.itemCode,
@@ -322,6 +335,7 @@ export function applyInboundBatchesFromRoots(payload) {
       sourceType: payload.sourceType || '采购入库',
       sourceDocNo: payload.sourceDocNo || '',
       ...lineage,
+      uomConvert: allocateBatchUomConvert(lineUomConvert, total, lineStockTotal),
       attrs: {
         ...baseAttrs,
         manageByPiece: true,
@@ -360,6 +374,7 @@ export function applyInboundBatchesFromRoots(payload) {
       sourceType: payload.sourceType || '采购入库',
       sourceDocNo: payload.sourceDocNo || '',
       ...lineage,
+      uomConvert: allocateBatchUomConvert(lineUomConvert, val, lineStockTotal),
       attrs: baseAttrs,
     }),
   )

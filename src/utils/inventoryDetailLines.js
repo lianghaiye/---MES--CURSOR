@@ -23,6 +23,7 @@ function buildMasterIndex(products = [], materials = [], spus = []) {
     const spu = p.spuId ? spuById.get(String(p.spuId)) : null
     byCode.set(p.code, {
       itemType: PRODUCT_TYPE.PRODUCT,
+      materialType: p.materialType || '',
       name: p.name || '',
       specModel: p.specModel || '',
       material: p.material || '',
@@ -41,6 +42,7 @@ function buildMasterIndex(products = [], materials = [], spus = []) {
     const spu = m.spuId ? spuById.get(String(m.spuId)) : null
     byCode.set(m.code, {
       itemType: PRODUCT_TYPE.MATERIAL,
+      materialType: m.materialType || '',
       name: m.name || '',
       specModel: m.specModel || '',
       material: m.material || '',
@@ -70,6 +72,7 @@ function resolveMaster(byCode, itemCode, itemName, itemType) {
 
   return {
     itemType: fallbackType,
+    materialType: '',
     name: itemName || '',
     specModel: '',
     material: '',
@@ -100,6 +103,7 @@ function buildDemoStockRecords(products = [], materials = [], warehouses = []) {
       itemCode: item.code,
       itemName: item.name,
       itemType: item._kind,
+      materialType: item.materialType || '',
       unit: item.inventoryUnit || '件',
       qty: demoStockQty(20 + index * 3, index),
     })
@@ -120,6 +124,7 @@ function enrichStockRow(row, master) {
     itemCode: row.itemCode || '',
     itemName: master.name || row.itemName || '',
     itemType: master.itemType,
+    materialType: master.materialType || '',
     specModel: master.specModel,
     material: master.material,
     drawingNo: master.drawingNo,
@@ -177,7 +182,7 @@ export function filterInventoryDetailLines(rows, filters = {}) {
       return false
     }
 
-    if (filters.itemType && row.itemType !== filters.itemType) return false
+    if (filters.materialType && row.materialType !== filters.materialType) return false
 
     if (filters.specModel && !String(row.specModel).includes(String(filters.specModel).trim())) {
       return false
@@ -229,7 +234,4 @@ export function formatInventoryWeight(val) {
   return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
 }
 
-export const inventoryItemTypeOptions = [
-  { label: '产品', value: '产品' },
-  { label: '物料', value: '物料' },
-]
+export { MATERIAL_TYPE_OPTIONS as inventoryMaterialTypeOptions } from '@/utils/masterDataMigrate'

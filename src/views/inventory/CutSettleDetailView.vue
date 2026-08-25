@@ -73,13 +73,13 @@
             <template v-else-if="column.key === 'drawingNo'">{{ line.drawingNo || '—' }}</template>
             <template v-else-if="column.key === 'material'">{{ line.material || '—' }}</template>
             <template v-else-if="column.key === 'demandMeters'">
-              {{ formatQty(line.demandMeters) }}
+              {{ formatQtyWithUnit(line.demandMeters, lineUnit(line)) }}
             </template>
             <template v-else-if="column.key === 'actualConsumeMeters'">
-              {{ formatQty(line.actualConsumeMeters) }}
+              {{ formatQtyWithUnit(line.actualConsumeMeters, lineUnit(line)) }}
             </template>
             <template v-else-if="column.key === 'remnantLength'">
-              {{ formatQty(line.remnantLength) }}
+              {{ formatQtyWithUnit(line.remnantLength, lineUnit(line)) }}
             </template>
             <template v-else-if="column.key === 'pickedBatchNo'">
               {{ line.pickedBatchNo || '—' }}
@@ -120,13 +120,13 @@
 
         <div class="section-title">结算明细</div>
         <a-table
-          :columns="lineColumns"
+          :columns="confirmLineColumns"
           :data-source="record.lines || []"
           row-key="id"
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1240 }"
+          :scroll="{ x: 1300 }"
         >
           <template #bodyCell="{ column, record: line, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -137,7 +137,7 @@
             <template v-else-if="column.key === 'drawingNo'">{{ line.drawingNo || '—' }}</template>
             <template v-else-if="column.key === 'material'">{{ line.material || '—' }}</template>
             <template v-else-if="column.key === 'demandMeters'">
-              {{ formatQty(line.demandMeters) }}
+              {{ formatQtyWithUnit(line.demandMeters, lineUnit(line)) }}
             </template>
             <template v-else-if="column.key === 'actualConsumeMeters'">
               <a-input-number
@@ -148,12 +148,13 @@
                 :precision="3"
                 size="small"
                 style="width: 100%"
+                :addon-after="lineUnit(line)"
                 @change="() => recalcRemnant(line)"
               />
-              <span v-else>{{ formatQty(line.actualConsumeMeters) }}</span>
+              <span v-else>{{ formatQtyWithUnit(line.actualConsumeMeters, lineUnit(line)) }}</span>
             </template>
             <template v-else-if="column.key === 'remnantLength'">
-              {{ formatQty(line.remnantLength) }}
+              {{ formatQtyWithUnit(line.remnantLength, lineUnit(line)) }}
             </template>
             <template v-else-if="column.key === 'pickedBatchNo'">
               {{ line.pickedBatchNo || '—' }}
@@ -183,6 +184,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { confirmCutSettle, getCutSettleById, cutSettleState } from '@/store/cutSettleStore'
 import { roundMeters } from '@/utils/variableLengthMaterial'
+import { formatQtyWithUnit } from '@/utils/numberFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -201,6 +203,10 @@ const workOrderNos = computed(() => {
   return nos.join('、') || '—'
 })
 
+function lineUnit(line) {
+  return String(line?.unit || line?.stockUnit || '').trim() || '米'
+}
+
 const lineColumns = [
   { title: '序号', key: 'index', width: 60, align: 'center' },
   { title: '物料名称', dataIndex: 'itemName', key: 'itemName', width: 140, ellipsis: true },
@@ -209,17 +215,18 @@ const lineColumns = [
   { title: '图号', key: 'drawingNo', width: 100, ellipsis: true },
   { title: '材质', key: 'material', width: 80 },
   { title: '下料尺寸', key: 'blankSizeText', width: 140, ellipsis: true },
-  { title: '需求数', key: 'demandMeters', width: 80, align: 'right' },
-  { title: '实耗', key: 'actualConsumeMeters', width: 110 },
-  { title: '余料', key: 'remnantLength', width: 80, align: 'right' },
+  { title: '需求数', key: 'demandMeters', width: 100, align: 'right' },
+  { title: '实耗', key: 'actualConsumeMeters', width: 100, align: 'right' },
+  { title: '余料', key: 'remnantLength', width: 100, align: 'right' },
   { title: '拣选批次', key: 'pickedBatchNo', width: 130 },
   { title: '余料新批次', key: 'remnantBatchNo', width: 140 },
 ]
 
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val)
-}
+const confirmLineColumns = [
+  ...lineColumns.slice(0, 8),
+  { title: '实耗', key: 'actualConsumeMeters', width: 140 },
+  ...lineColumns.slice(9),
+]
 
 function recalcRemnant(line) {
   line.remnantLength = roundMeters(

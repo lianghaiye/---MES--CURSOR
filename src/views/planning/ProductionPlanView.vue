@@ -71,7 +71,6 @@
               <a-space>
                 <a-button type="primary" size="small" @click="handleSearch">查询</a-button>
                 <a-button size="small" @click="handleReset">重置</a-button>
-                <a-button size="small" @click="goReplenishCenter">库存预警</a-button>
               </a-space>
             </a-form-item>
           </a-col>
@@ -109,11 +108,18 @@
           <div class="card-tags">
             <a-tag v-for="tag in order.tags" :key="tag" :color="tagColor(tag)">{{ tag }}</a-tag>
           </div>
-          <div class="card-row"><span class="label">计划编号</span>{{ order.orderNo }}</div>
+          <div v-if="isStockReplenishPlan(order)" class="card-row">
+            <span class="label">补货单号</span>{{ order.orderNo || '—' }}
+          </div>
+          <div v-else class="card-row">
+            <span class="label">销售订单号</span>{{ order.salesOrderNo || order.orderNo || '—' }}
+          </div>
           <div class="card-row">
             <span class="label">计划来源</span>{{ planSourceLabel(order.planSource) }}
           </div>
-          <div class="card-row"><span class="label">客户名称</span>{{ order.customerName }}</div>
+          <div v-if="!isStockReplenishPlan(order)" class="card-row">
+            <span class="label">客户名称</span>{{ order.customerName || '—' }}
+          </div>
           <div class="card-row"><span class="label">产品数量</span>{{ order.productQty }}</div>
           <div class="card-row">
             <span class="label">业务员</span>{{ order.salesperson || '—' }}
@@ -674,7 +680,7 @@ import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
 import GenerateAssemblyWorkOrderModal from './components/GenerateAssemblyWorkOrderModal.vue'
 import GenerateOutsourceWorkOrderModal from './components/GenerateOutsourceWorkOrderModal.vue'
 import GeneratePurchaseRequisitionModal from './components/GeneratePurchaseRequisitionModal.vue'
-import { PLAN_SOURCE_OPTIONS, planSourceLabel } from '@/utils/planSource'
+import { PLAN_SOURCE, PLAN_SOURCE_OPTIONS, planSourceLabel } from '@/utils/planSource'
 import {
   workOrderState,
   addWorkOrdersFromPlanRows,
@@ -751,6 +757,11 @@ const filters = reactive({
 })
 
 const planSourceFilterOpts = PLAN_SOURCE_OPTIONS.filter((o) => o.value)
+
+function isStockReplenishPlan(order) {
+  const source = order?.planSource || (order?.salesOrderNo ? PLAN_SOURCE.SALES_ORDER : '')
+  return source === PLAN_SOURCE.STOCK_REPLENISH
+}
 
 const appliedFilters = ref({ ...filters })
 const selectedId = ref(productionPlanState.plans[0]?.id || null)
@@ -1469,11 +1480,6 @@ onUnmounted(() => {
 function handleSearch() {
   appliedFilters.value = { ...filters }
   pagination.current = 1
-}
-
-function goReplenishCenter() {
-  openTab('/planning/replenish-center', '库存预警')
-  router.push('/planning/replenish-center')
 }
 
 function handleReset() {

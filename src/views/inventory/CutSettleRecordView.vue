@@ -133,13 +133,13 @@
           <span v-else class="action-disabled">—</span>
         </template>
         <template v-else-if="column.key === 'demandMeters'">
-          {{ formatQty(record.demandMeters) }}
+          {{ formatQtyWithUnit(record.demandMeters, lineUnit(record)) }}
         </template>
         <template v-else-if="column.key === 'actualConsumeMeters'">
-          {{ formatQty(record.actualConsumeMeters) }}
+          {{ formatQtyWithUnit(record.actualConsumeMeters, lineUnit(record)) }}
         </template>
         <template v-else-if="column.key === 'remnantLength'">
-          {{ formatQty(record.remnantLength) }}
+          {{ formatQtyWithUnit(record.remnantLength, lineUnit(record)) }}
         </template>
       </template>
     </a-table>
@@ -200,7 +200,7 @@
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1100 }"
+          :scroll="{ x: 1240 }"
         >
           <template #bodyCell="{ column, record: line, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -211,7 +211,7 @@
             <template v-else-if="column.key === 'drawingNo'">{{ line.drawingNo || '—' }}</template>
             <template v-else-if="column.key === 'material'">{{ line.material || '—' }}</template>
             <template v-else-if="column.key === 'demandMeters'">
-              {{ formatQty(line.demandMeters) }}
+              {{ formatQtyWithUnit(line.demandMeters, lineUnit(line)) }}
             </template>
             <template v-else-if="column.key === 'actualConsumeMeters'">
               <a-input-number
@@ -222,12 +222,13 @@
                 :precision="3"
                 size="small"
                 style="width: 100%"
+                :addon-after="lineUnit(line)"
                 @change="() => recalcRemnant(line)"
               />
-              <span v-else>{{ formatQty(line.actualConsumeMeters) }}</span>
+              <span v-else>{{ formatQtyWithUnit(line.actualConsumeMeters, lineUnit(line)) }}</span>
             </template>
             <template v-else-if="column.key === 'remnantLength'">
-              {{ formatQty(line.remnantLength) }}
+              {{ formatQtyWithUnit(line.remnantLength, lineUnit(line)) }}
             </template>
             <template v-else-if="column.key === 'pickedBatchNo'">
               {{ line.pickedBatchNo || '—' }}
@@ -266,6 +267,7 @@ import { outboundState } from '@/store/outboundStore'
 import { roundMeters } from '@/utils/variableLengthMaterial'
 import { flattenCutSettleLines, filterCutSettleLineRows } from '@/utils/cutSettleLines'
 import { isOutboundEligibleForCutSettle } from '@/utils/workOrderBlanking'
+import { formatQtyWithUnit } from '@/utils/numberFormat'
 import { useTabs } from '@/composables/useTabs'
 
 const router = useRouter()
@@ -342,9 +344,9 @@ const columns = [
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 110, ellipsis: true },
   { title: '材质', dataIndex: 'material', key: 'material', width: 90 },
   { title: '下料尺寸', key: 'blankSizeText', width: 150, ellipsis: true },
-  { title: '需求数', key: 'demandMeters', width: 80, align: 'right' },
-  { title: '实耗', key: 'actualConsumeMeters', width: 80, align: 'right' },
-  { title: '余料', key: 'remnantLength', width: 80, align: 'right' },
+  { title: '需求数', key: 'demandMeters', width: 100, align: 'right' },
+  { title: '实耗', key: 'actualConsumeMeters', width: 100, align: 'right' },
+  { title: '余料', key: 'remnantLength', width: 100, align: 'right' },
   { title: '工单号', dataIndex: 'workOrderNo', key: 'workOrderNo', width: 130 },
   { title: '出库仓库', dataIndex: 'shipWarehouse', key: 'shipWarehouse', width: 100 },
   { title: '出库时间', dataIndex: 'outboundTime', key: 'outboundTime', width: 160 },
@@ -359,16 +361,15 @@ const drawerLineColumns = [
   { title: '图号', key: 'drawingNo', width: 100, ellipsis: true },
   { title: '材质', key: 'material', width: 80 },
   { title: '下料尺寸', key: 'blankSizeText', width: 140, ellipsis: true },
-  { title: '需求数', key: 'demandMeters', width: 80, align: 'right' },
-  { title: '实耗', key: 'actualConsumeMeters', width: 110 },
-  { title: '余料', key: 'remnantLength', width: 80, align: 'right' },
+  { title: '需求数', key: 'demandMeters', width: 100, align: 'right' },
+  { title: '实耗', key: 'actualConsumeMeters', width: 140 },
+  { title: '余料', key: 'remnantLength', width: 100, align: 'right' },
   { title: '拣选批次', key: 'pickedBatchNo', width: 130 },
   { title: '余料新批次', key: 'remnantBatchNo', width: 140 },
 ]
 
-function formatQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val)
+function lineUnit(line) {
+  return String(line?.unit || line?.stockUnit || '').trim() || '米'
 }
 
 function recalcRemnant(line) {

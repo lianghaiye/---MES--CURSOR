@@ -10,6 +10,7 @@ import { applyInboundToStock } from '@/store/stockStore'
 import { applyInboundToSalesAllocation } from '@/store/salesStockAllocationStore'
 import { salesOrderState } from '@/store/salesOrderStore'
 import { applyInboundBatchesFromRoots } from '@/store/stockBatchStore'
+import { buildLineUomConvert } from '@/utils/batchUomConvert'
 import {
   isOneItemOneCodeBarcode,
   validateVariableLengthInboundLine,
@@ -410,8 +411,10 @@ function prepareAndApplyInboundLine(order, line) {
       material: line.material,
       inboundEntryMode: line.inboundEntryMode,
       barcodeType: barcodeType || undefined,
+      specModel: line.specModel || undefined,
     },
   }
+  const lineUomConvert = buildLineUomConvert(line)
 
   const allBatches = []
   const allPieces = []
@@ -445,6 +448,7 @@ function prepareAndApplyInboundLine(order, line) {
         salesOrderId: seg.salesOrderId,
         salesOrderNo: seg.salesOrderNo,
         salesLineId: seg.salesLineId,
+        uomConvert: lineUomConvert,
       })
       if (!res.ok) return { ok: false, message: res.message }
       allBatches.push(...(res.batches || []))
@@ -460,6 +464,7 @@ function prepareAndApplyInboundLine(order, line) {
         salesOrderId: '',
         salesOrderNo: '',
         salesLineId: '',
+        uomConvert: lineUomConvert,
       })
       if (!res.ok) return { ok: false, message: res.message }
       allBatches.push(...(res.batches || []))
@@ -474,6 +479,7 @@ function prepareAndApplyInboundLine(order, line) {
       salesOrderId: line.salesOrderId || order.salesOrderId || '',
       salesOrderNo: line.salesOrderNo || order.salesOrderNo || '',
       salesLineId: line.salesLineId || '',
+      uomConvert: lineUomConvert,
     })
     if (!res.ok) return { ok: false, message: res.message }
     allBatches.push(...(res.batches || []))
