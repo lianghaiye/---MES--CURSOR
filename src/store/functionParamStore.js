@@ -1,6 +1,8 @@
 import { reactive, watch } from 'vue'
 
 const STORAGE_KEY = 'i_doms_function_params'
+/** 尺寸辅助默认从「全关」升级为「全开」的一次性迁移版本 */
+const BLANK_SIZE_ASSIST_DEFAULTS_VERSION = 2
 
 export const SALARY_PUSH_MODES = {
   ON_REPORT: 'on_report',
@@ -110,11 +112,22 @@ export const DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION =
   '部分出+余料留原批：确认出库按「出库数量」扣减（出库数量可改，可大于 BOM 建议量），扣批合计等于出库数量，不因整根/整批而多扣，余量留原批（适合无人填下料结算）。' +
   '整批出+下料结算回库：整批/整段离开发料仓，实发可大于出库数量；领出后由下料结算填实耗并余料回库（适合有人管实耗）。'
 
-export const ENABLE_PLATE_AREA_MEASURE_DESCRIPTION =
-  '可选快捷：开启后，仅当库存单位为㎡时，入库可用「长 × 宽」辅助换算面积；产品 BOM 下料尺寸也可选「板材 · 长×宽→㎡」。关闭则直接填库存数量。默认关闭，界面更简单。不按面积管库存的客户保持关闭即可。'
+/** 下料/订货尺寸辅助（勾选即显示对应能力，默认开启） */
+export const BLANK_SIZE_ASSIST_TYPES = {
+  PLATE_AREA_MEASURE: 'plateAreaMeasure',
+  BOM_WEIGHT_CALC: 'bomWeightCalc', // 存储键兼容；作用于 BOM 下料尺寸与采购订货尺寸
+}
 
-export const ENABLE_BOM_WEIGHT_CALC_DESCRIPTION =
-  '可选工具：开启后，产品 BOM「下料尺寸」弹窗增加「重量计算」页签，可按型材/密度估算重量并回填尺寸。默认关闭。'
+export const BLANK_SIZE_ASSIST_OPTIONS = [
+  { value: BLANK_SIZE_ASSIST_TYPES.PLATE_AREA_MEASURE, label: '面积换算' },
+  { value: BLANK_SIZE_ASSIST_TYPES.BOM_WEIGHT_CALC, label: '重量计算' },
+]
+
+export const BLANK_SIZE_ASSIST_DESCRIPTION =
+  '作用于 BOM「下料尺寸」与采购「订货尺寸」弹窗，默认开启；勾选即显示，取消勾选则不显示。' +
+  '「面积换算」：弹窗可选「面积计算」，库存单位为㎡时入库也可用「长 × 宽」换算面积。' +
+  '「重量计算」：弹窗增加「重量计算」页签，可按型材/密度估算重量并回填尺寸（BOM 下料另回填单位用量）。' +
+  '不需要面积或重量辅助的客户取消勾选即可。'
 
 export const ENABLE_BOM_LEVEL_MTS_DESCRIPTION =
   '开启后，生产计划展开 BOM 时支持子件级按库存MTS：子件主数据为按库存MTS 且库存充足时，可不下推该层生产/采购需求；关闭则生产计划仍按订单展开，仅成品级计划策略生效。默认关闭。'
@@ -188,6 +201,37 @@ function normalizeAutoApproveDocs(value) {
   }
 }
 
+function createDefaultBlankSizeAssistTools() {
+  return {
+    [BLANK_SIZE_ASSIST_TYPES.PLATE_AREA_MEASURE]: true,
+    [BLANK_SIZE_ASSIST_TYPES.BOM_WEIGHT_CALC]: true,
+  }
+}
+
+/** 兼容旧版独立开关 enablePlateAreaMeasure / enableBomWeightCalc */
+function normalizeBlankSizeAssistTools(value, legacy = {}) {
+  const defaults = createDefaultBlankSizeAssistTools()
+  if (value && typeof value === 'object') {
+    return {
+      ...defaults,
+      ...Object.fromEntries(
+        BLANK_SIZE_ASSIST_OPTIONS.map((item) => [item.value, Boolean(value[item.value])]),
+      ),
+    }
+  }
+  const hasLegacyPlate = Object.prototype.hasOwnProperty.call(legacy, 'enablePlateAreaMeasure')
+  const hasLegacyWeight = Object.prototype.hasOwnProperty.call(legacy, 'enableBomWeightCalc')
+  return {
+    ...defaults,
+    [BLANK_SIZE_ASSIST_TYPES.PLATE_AREA_MEASURE]: hasLegacyPlate
+      ? legacy.enablePlateAreaMeasure === true
+      : defaults[BLANK_SIZE_ASSIST_TYPES.PLATE_AREA_MEASURE],
+    [BLANK_SIZE_ASSIST_TYPES.BOM_WEIGHT_CALC]: hasLegacyWeight
+      ? legacy.enableBomWeightCalc === true
+      : defaults[BLANK_SIZE_ASSIST_TYPES.BOM_WEIGHT_CALC],
+  }
+}
+
 export const FUNCTION_PARAM_ROWS = [
   {
     key: 'salaryPushMode',
@@ -220,14 +264,9 @@ export const FUNCTION_PARAM_ROWS = [
     description: DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION,
   },
   {
-    key: 'enablePlateAreaMeasure',
-    scenario: '面积录入快捷',
-    description: ENABLE_PLATE_AREA_MEASURE_DESCRIPTION,
-  },
-  {
-    key: 'enableBomWeightCalc',
-    scenario: 'BOM 重量计算',
-    description: ENABLE_BOM_WEIGHT_CALC_DESCRIPTION,
+    key: 'blankSizeAssistTools',
+    scenario: '下料/订货尺寸辅助',
+    description: BLANK_SIZE_ASSIST_DESCRIPTION,
   },
   {
     key: 'enableBomLevelMts',
@@ -272,6 +311,15 @@ function loadFromStorage() {
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed && typeof parsed === 'object') {
+        const assistVersion = Number(parsed.blankSizeAssistToolsVersion) || 0
+        let blankSizeAssistTools = normalizeBlankSizeAssistTools(
+          parsed.blankSizeAssistTools,
+          parsed,
+        )
+        // 旧默认「全关」→ 新默认「全开」：仅升级一次，之后尊重用户勾选
+        if (assistVersion < BLANK_SIZE_ASSIST_DEFAULTS_VERSION) {
+          blankSizeAssistTools = createDefaultBlankSizeAssistTools()
+        }
         return {
           ...parsed,
           salaryPushMode: normalizeSalaryPushMode(parsed.salaryPushMode),
@@ -280,8 +328,8 @@ function loadFromStorage() {
           inventoryDeductMode: normalizeInventoryDeductMode(parsed.inventoryDeductMode),
           outboundIssueRule: normalizeOutboundIssueRule(parsed.outboundIssueRule),
           dualUnitIssueStrategy: normalizeDualUnitIssueStrategy(parsed.dualUnitIssueStrategy),
-          enablePlateAreaMeasure: parsed.enablePlateAreaMeasure === true,
-          enableBomWeightCalc: parsed.enableBomWeightCalc === true,
+          blankSizeAssistTools,
+          blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
           enableBomLevelMts: parsed.enableBomLevelMts === true,
         }
       }
@@ -304,8 +352,8 @@ export const functionParamState = reactive({
     inventoryDeductMode: INVENTORY_DEDUCT_MODES.NO_ISSUE,
     outboundIssueRule: OUTBOUND_ISSUE_RULES.FIFO,
     dualUnitIssueStrategy: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL,
-    enablePlateAreaMeasure: false,
-    enableBomWeightCalc: false,
+    blankSizeAssistTools: createDefaultBlankSizeAssistTools(),
+    blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
     enableBomLevelMts: false,
   },
 })
@@ -447,24 +495,58 @@ export function isWholeWithRemnantIssue() {
   return getDualUnitIssueStrategy() === DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT
 }
 
-/** 是否开放面积「长×宽」录入快捷（默认关） */
+/** 下料/订货尺寸辅助勾选项 */
+export function getBlankSizeAssistTools() {
+  return normalizeBlankSizeAssistTools(functionParamState.params.blankSizeAssistTools, {
+    enablePlateAreaMeasure: functionParamState.params.enablePlateAreaMeasure,
+    enableBomWeightCalc: functionParamState.params.enableBomWeightCalc,
+  })
+}
+
+export function setBlankSizeAssistTools(enabledKeys = []) {
+  const keys = Array.isArray(enabledKeys) ? enabledKeys : []
+  functionParamState.params.blankSizeAssistTools = normalizeBlankSizeAssistTools(
+    Object.fromEntries(
+      BLANK_SIZE_ASSIST_OPTIONS.map((item) => [item.value, keys.includes(item.value)]),
+    ),
+  )
+  functionParamState.params.blankSizeAssistToolsVersion = BLANK_SIZE_ASSIST_DEFAULTS_VERSION
+  // 清理旧字段，避免下次加载被旧值覆盖
+  delete functionParamState.params.enablePlateAreaMeasure
+  delete functionParamState.params.enableBomWeightCalc
+  return { ok: true }
+}
+
+/** 是否开放面积换算（下料尺寸 / 订货尺寸 / 入库长×宽；默认开） */
 export function isPlateAreaMeasureEnabled() {
-  return functionParamState.params.enablePlateAreaMeasure === true
+  return Boolean(getBlankSizeAssistTools()[BLANK_SIZE_ASSIST_TYPES.PLATE_AREA_MEASURE])
 }
 
 export function setEnablePlateAreaMeasure(enabled) {
-  functionParamState.params.enablePlateAreaMeasure = Boolean(enabled)
-  return { ok: true }
+  const current = getBlankSizeAssistTools()
+  const next = {
+    ...current,
+    [BLANK_SIZE_ASSIST_TYPES.PLATE_AREA_MEASURE]: Boolean(enabled),
+  }
+  return setBlankSizeAssistTools(
+    BLANK_SIZE_ASSIST_OPTIONS.filter((item) => next[item.value]).map((item) => item.value),
+  )
 }
 
-/** 是否开放 BOM 下料尺寸「重量计算」页签（默认关） */
+/** 是否开放「重量计算」页签（BOM 下料尺寸 / 采购订货尺寸；默认开） */
 export function isBomWeightCalcEnabled() {
-  return functionParamState.params.enableBomWeightCalc === true
+  return Boolean(getBlankSizeAssistTools()[BLANK_SIZE_ASSIST_TYPES.BOM_WEIGHT_CALC])
 }
 
 export function setEnableBomWeightCalc(enabled) {
-  functionParamState.params.enableBomWeightCalc = Boolean(enabled)
-  return { ok: true }
+  const current = getBlankSizeAssistTools()
+  const next = {
+    ...current,
+    [BLANK_SIZE_ASSIST_TYPES.BOM_WEIGHT_CALC]: Boolean(enabled),
+  }
+  return setBlankSizeAssistTools(
+    BLANK_SIZE_ASSIST_OPTIONS.filter((item) => next[item.value]).map((item) => item.value),
+  )
 }
 
 /** 生产计划是否启用 BOM 级 MTS（子件可按库存跳过排产） */

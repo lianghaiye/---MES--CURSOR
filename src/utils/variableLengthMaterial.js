@@ -304,19 +304,25 @@ function resolveTotalValue(line) {
  * 双单位 BOM 行：需求库存单位量
  * - 型材：blankLength(米) × 单位用量 × 排产 × (1+损耗)
  * - 板材：blankArea(㎡) × 单位用量 × 排产 × (1+损耗)
+ * - 按重：单位用量(kg/件) × 排产 × (1+损耗)
  */
 export function calcDemandStockQty({
   blankLength,
   blankArea,
   areaBased = false,
+  weightBased = false,
   unitQty = 1,
   scheduleQty = 1,
   blankLossRate = 0,
 }) {
-  const base = areaBased ? Number(blankArea) || 0 : Number(blankLength) || 0
   const uq = Number(unitQty) || 1
   const sq = Number(scheduleQty) || 1
   const loss = Number(blankLossRate) || 0
+  if (weightBased) {
+    if (!(uq > 0)) return 0
+    return roundQty(uq * sq * (1 + loss / 100))
+  }
+  const base = areaBased ? Number(blankArea) || 0 : Number(blankLength) || 0
   if (base <= 0) return 0
   return roundMeters(base * uq * sq * (1 + loss / 100))
 }

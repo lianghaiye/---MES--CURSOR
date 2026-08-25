@@ -413,6 +413,9 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
       orderSizeText: row.orderSizeText || row.blankSizeText || '',
       orderSize: row.orderSize ?? row.blankSize ?? null,
       orderSizeMode: row.orderSizeMode || row.blankSizeMode || '',
+      // 生产计划带尺寸 → 下游采购单只读
+      orderSizeFromPlan: Boolean(String(row.orderSizeText || row.blankSizeText || '').trim()),
+      orderSizeLocked: Boolean(String(row.orderSizeText || row.blankSizeText || '').trim()),
       stockQty: row.stockQty ?? 0,
       availableStock: row.availableStock ?? 0,
       inTransitQty: row.inTransitQty ?? 0,

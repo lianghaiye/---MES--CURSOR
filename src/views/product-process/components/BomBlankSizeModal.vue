@@ -107,6 +107,7 @@
 
     <BomWeightCalcPanel
       v-show="weightTabActive"
+      ref="weightPanelRef"
       class="weight-tab-panel"
       :blank-size="draft"
       @suggest-mode="onWeightSuggestMode"
@@ -154,6 +155,7 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'confirm'])
 
 const draft = reactive(emptyBlankSize())
+const weightPanelRef = ref(null)
 /** 落库下料方式：仅通用 / 板材 */
 const selectedMode = ref(BLANK_SIZE_MODE.GENERIC)
 /** 顶栏当前页签：通用 / 板材 / 重量计算 */
@@ -339,15 +341,32 @@ function onWeightSuggestMode(mode) {
 
 function handleOk() {
   const sizeLabel = isOrderPurpose.value ? '订货' : '下料'
-  if (plateMode.value) {
+  let pieceWeightKg = null
+
+  if (weightTabActive.value) {
+    const state = weightPanelRef.value?.getConfirmState?.()
+    if (!state?.calc?.ok) {
+      message.warning(state?.calc?.message || '请完善重量计算所需尺寸与密度')
+      return
+    }
+    // 订货尺寸只回填尺寸；单位用量仅 BOM 下料使用
+    if (!isOrderPurpose.value) {
+      pieceWeightKg = state.calc.pieceWeightKg
+    }
+  } else if (plateMode.value) {
     if (!(Number(draft.length) > 0) || !(Number(draft.width) > 0)) {
       message.warning(`板材请填写${sizeLabel}「长」和「宽」`)
-      if (weightTabActive.value) selectedUiTab.value = BLANK_SIZE_MODE.PLATE
       return
     }
   }
+
   const normalized = normalizeBlankSize(draft)
-  emit('confirm', { blankSize: normalized, mode: selectedMode.value })
+  emit('confirm', {
+    blankSize: normalized,
+    mode: selectedMode.value,
+    pieceWeightKg,
+    fromWeightCalc: pieceWeightKg != null,
+  })
   closeModal()
 }
 </script>

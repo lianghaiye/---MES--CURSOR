@@ -52,7 +52,12 @@
         </template>
 
         <template v-else-if="column.key === 'orderSizeText'">
-          {{ record.orderSizeText || record.blankSizeText || '—' }}
+          <span v-if="isOrderSizeReadonly(record)" title="来自生产计划的订货尺寸，不可修改">
+            {{ displayOrderSizeText(record) || '—' }}
+          </span>
+          <a v-else class="order-size-link" @click.prevent="openOrderSizeEdit(record)">
+            {{ displayOrderSizeText(record) || '填写订货尺寸' }}
+          </a>
         </template>
 
         <template v-else-if="column.key === 'designatedSupplier'">
@@ -230,6 +235,13 @@
       </a-form>
     </a-modal>
 
+    <BomBlankSizeModal
+      v-model:open="orderSizeOpen"
+      purpose="order"
+      :line="orderSizeModalLine"
+      @confirm="onOrderSizeConfirm"
+    />
+
     <template #footer>
       <a-button @click="handleCancel">
         <CloseOutlined />
@@ -249,7 +261,14 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { EditOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import { mergeRequisitionLines, recalcMergedLine } from '@/utils/purchaseMerge'
+import {
+  applyOrderSizeToLine,
+  displayOrderSizeText,
+  isOrderSizeReadonly,
+  toOrderSizeModalLine,
+} from '@/utils/orderSize'
 import { confirmGeneratePurchaseOrders } from '@/store/purchaseRequisitionStore'
+import BomBlankSizeModal from '@/views/product-process/components/BomBlankSizeModal.vue'
 import {
   supplierOptions,
   settlementTypeOptions,
@@ -271,6 +290,28 @@ const rows = ref([])
 const batchEditOpen = ref(false)
 const batchEditKey = ref('')
 const batchEditValue = ref(undefined)
+
+const orderSizeOpen = ref(false)
+const orderSizeTargetLine = ref(null)
+const orderSizeModalLine = computed(() => toOrderSizeModalLine(orderSizeTargetLine.value))
+
+function openOrderSizeEdit(record) {
+  if (isOrderSizeReadonly(record)) {
+    message.info('来自生产计划的订货尺寸不可修改')
+    return
+  }
+  orderSizeTargetLine.value = record
+  orderSizeOpen.value = true
+}
+
+function onOrderSizeConfirm(payload) {
+  const line = orderSizeTargetLine.value
+  if (!line || isOrderSizeReadonly(line)) return
+  applyOrderSizeToLine(line, payload?.blankSize ?? payload, { mode: payload?.mode })
+  line.orderSizeFromPlan = false
+  line.orderSizeLocked = false
+  message.success(line.orderSizeText ? '订货尺寸已更新' : '已清空订货尺寸')
+}
 
 const editableKeys = [
   'planPurchaseQty',
@@ -527,6 +568,11 @@ function handleConfirm() {
 .header-edit-icon {
   margin-left: 4px;
   font-size: 12px;
+  color: #1677ff;
+  cursor: pointer;
+}
+
+.order-size-link {
   color: #1677ff;
   cursor: pointer;
 }

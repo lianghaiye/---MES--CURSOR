@@ -374,8 +374,14 @@
                     <span v-else>—</span>
                   </template>
                   <template v-else-if="column.key === 'orderSizeText'">
-                    <a class="order-size-link" @click.prevent="openOrderSizeEdit(record)">
-                      {{ record.orderSizeText || record.blankSizeText || '填写订货尺寸' }}
+                    <span
+                      v-if="isOrderSizeReadonly(record)"
+                      :title="'来自生产计划的订货尺寸，不可修改'"
+                    >
+                      {{ displayOrderSizeText(record) || '—' }}
+                    </span>
+                    <a v-else class="order-size-link" @click.prevent="openOrderSizeEdit(record)">
+                      {{ displayOrderSizeText(record) || '填写订货尺寸' }}
                     </a>
                   </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
@@ -740,7 +746,12 @@ import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTable
 import { useInventoryLineCellEdit } from '@/composables/useInventoryLineCellEdit'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { purchaseOrderFormLineColumns } from '@/utils/purchaseOrderLineColumns'
-import { applyOrderSizeToLine, toOrderSizeModalLine } from '@/utils/orderSize'
+import {
+  applyOrderSizeToLine,
+  displayOrderSizeText,
+  isOrderSizeReadonly,
+  toOrderSizeModalLine,
+} from '@/utils/orderSize'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -1424,14 +1435,20 @@ function openLineEdit(record) {
 }
 
 function openOrderSizeEdit(record) {
+  if (isOrderSizeReadonly(record)) {
+    message.info('来自生产计划的订货尺寸不可修改')
+    return
+  }
   orderSizeTargetLine.value = record
   orderSizeOpen.value = true
 }
 
 function onOrderSizeConfirm(payload) {
   const line = orderSizeTargetLine.value
-  if (!line) return
+  if (!line || isOrderSizeReadonly(line)) return
   applyOrderSizeToLine(line, payload?.blankSize ?? payload, { mode: payload?.mode })
+  line.orderSizeFromPlan = false
+  line.orderSizeLocked = false
   message.success(line.orderSizeText ? '订货尺寸已更新' : '已清空订货尺寸')
 }
 

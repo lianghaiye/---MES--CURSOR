@@ -191,6 +191,27 @@ function onDensityPresetChange(preset) {
 function onDensityManualChange() {
   densityPreset.value = 'custom'
 }
+
+/** 供下料弹窗确认时校验并取单件重量 */
+function getConfirmState() {
+  const bs = props.blankSize || emptyBlankSize()
+  const values = {}
+  const units = {}
+  for (const f of currentProfile.value.fields) {
+    values[f.key] = bs[f.key]
+    units[f.key] = bs.units?.[f.key] || DEFAULT_BLANK_SIZE_UNIT
+  }
+  const calc = calcMetalWeight({
+    profile: profile.value,
+    density: density.value,
+    qty: qty.value,
+    values,
+    units,
+  })
+  return { calc, profile: profile.value, density: density.value }
+}
+
+defineExpose({ getConfirmState })
 </script>
 
 <style scoped>

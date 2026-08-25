@@ -2,7 +2,11 @@ import dayjs from 'dayjs'
 import { getProductBomById } from '@/store/productBomStore'
 import { createInventorySpuLineDraft } from '@/utils/spuLineResolve'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { calcDemandStockQty, inferUomRelation } from '@/utils/variableLengthMaterial'
+import {
+  calcDemandStockQty,
+  inferUomRelation,
+  UOM_RELATION_PER_PIECE_WEIGHT,
+} from '@/utils/variableLengthMaterial'
 import {
   calcBlankAreaSquareMeters,
   toMillimeters,
@@ -48,15 +52,18 @@ function enrichVariableLengthFields(base, bomLine, scheduleQty = 1) {
   const stockUnit = mat?.stockUnit || mat?.inventoryUnit || bomLine?.unit || base.unit || '米'
   const uomRelation = bomLine?.uomRelation || mat?.uomRelation || inferUomRelation(stockUnit, '')
   // 优先 BOM 行手动下料方式；未指定时再按单位关系推断
-  const areaBased = isPlateBlankSizeLine({
-    ...bomLine,
-    isVariableLength: true,
-    uomRelation,
-    stockUnit,
-    inventoryUnit: stockUnit,
-    unit: stockUnit,
-  })
-  const blankLength = areaBased ? null : resolveBlankLengthMeters(bomLine, base)
+  const weightBased = uomRelation === UOM_RELATION_PER_PIECE_WEIGHT
+  const areaBased =
+    !weightBased &&
+    isPlateBlankSizeLine({
+      ...bomLine,
+      isVariableLength: true,
+      uomRelation,
+      stockUnit,
+      inventoryUnit: stockUnit,
+      unit: stockUnit,
+    })
+  const blankLength = weightBased || areaBased ? null : resolveBlankLengthMeters(bomLine, base)
   const blankArea = areaBased ? resolveBlankArea(bomLine, base) : null
   const blankLossRate = Number(bomLine?.blankLossRate) || 0
   const unitQty = Number(base.unitUsage) || 1
@@ -64,6 +71,7 @@ function enrichVariableLengthFields(base, bomLine, scheduleQty = 1) {
     blankLength,
     blankArea,
     areaBased,
+    weightBased,
     unitQty,
     scheduleQty,
     blankLossRate,

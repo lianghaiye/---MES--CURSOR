@@ -352,6 +352,8 @@ export function createPurchaseOrdersFromMergedLines(mergedLines, options = {}) {
         orderSizeText: line.orderSizeText || line.blankSizeText || '',
         orderSize: line.orderSize ?? line.blankSize ?? null,
         orderSizeMode: line.orderSizeMode || line.blankSizeMode || '',
+        orderSizeFromPlan: line.orderSizeFromPlan === true,
+        orderSizeLocked: line.orderSizeLocked === true || line.orderSizeFromPlan === true,
         variantSummary: line.variantSummary || '',
         unitPriceExTax: line.unitPriceExTax,
         taxRate: line.taxRate,

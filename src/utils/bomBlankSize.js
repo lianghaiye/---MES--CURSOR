@@ -231,6 +231,15 @@ export function applyBlankSizeToLine(line, blankSize, options = {}) {
     line.blankLength = null
     line.blankArea = null
   }
+
+  const pieceWeightKg = Number(options.pieceWeightKg)
+  if (Number.isFinite(pieceWeightKg) && pieceWeightKg > 0) {
+    line.unitQty = roundNumber(pieceWeightKg, 4)
+    line.blankSizeMode = BLANK_SIZE_MODE.GENERIC
+    line.blankLength = null
+    line.blankArea = null
+  }
+
   return line
 }
 

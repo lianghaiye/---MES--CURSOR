@@ -28,6 +28,28 @@ export function displayOrderSizeText(line) {
   return line.orderSizeText || line.blankSizeText || ''
 }
 
+/** 是否已有订货尺寸（含下料尺寸回填） */
+export function hasOrderSizeValue(line) {
+  return Boolean(String(displayOrderSizeText(line) || '').trim())
+}
+
+/**
+ * 生产计划带来的尺寸：展示且不可改
+ * 手工/其它来源（含计划行原先无尺寸、后手填）：可点开填写或修改
+ */
+export function isOrderSizeReadonly(line) {
+  if (!line) return false
+  if (!hasOrderSizeValue(line)) return false
+  return line.orderSizeLocked === true || line.orderSizeFromPlan === true
+}
+
+/** 合并申请行时：来源为生产计划且带尺寸 → 锁定 */
+export function resolveOrderSizeFromPlan(reqSource, line) {
+  const fromPlan = String(reqSource || '').trim() === '生产计划'
+  const sizeText = String(line?.orderSizeText || line?.blankSizeText || '').trim()
+  return fromPlan && Boolean(sizeText)
+}
+
 /** createLineItem 等工厂：补齐订货尺寸默认 */
 export function ensureOrderSizeDefaults(line) {
   if (!line || typeof line !== 'object') return line

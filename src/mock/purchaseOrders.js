@@ -51,6 +51,8 @@ export function createPoLineItem(partial = {}) {
     orderSizeText: '',
     orderSize: null,
     orderSizeMode: '',
+    orderSizeFromPlan: false,
+    orderSizeLocked: false,
     unitPriceExTax: ex,
     taxRate: rate,
     unitPriceInTax: inTax,

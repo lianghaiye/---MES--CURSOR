@@ -630,9 +630,14 @@ function onBlankSizeConfirm(payload) {
   if (!line) return
   const blankSize = payload?.blankSize ?? payload
   const mode = payload?.mode
-  applyBlankSizeToLine(line, blankSize, { mode })
+  const pieceWeightKg = payload?.pieceWeightKg
+  applyBlankSizeToLine(line, blankSize, { mode, pieceWeightKg })
   line.unit = lineStockUnit(line)
-  if (line.blankArea > 0) {
+  if (pieceWeightKg != null && Number(pieceWeightKg) > 0) {
+    message.success(
+      `下料尺寸已更新，单位用量 ${formatQty(pieceWeightKg)} kg${line.blankSizeText ? `（${line.blankSizeText}）` : ''}`,
+    )
+  } else if (line.blankArea > 0) {
     message.success(`下料尺寸已更新（单件 ${line.blankArea}㎡）`)
   } else if (line.blankLength > 0) {
     message.success(`下料尺寸已更新（单件 ${line.blankLength} 米）`)

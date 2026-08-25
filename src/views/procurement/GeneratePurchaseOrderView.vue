@@ -112,7 +112,12 @@
         </template>
 
         <template v-else-if="column.key === 'orderSizeText'">
-          {{ record.orderSizeText || record.blankSizeText || '—' }}
+          <span v-if="isOrderSizeReadonly(record)" :title="orderSizeReadonlyTip(record)">
+            {{ displayOrderSizeText(record) || '—' }}
+          </span>
+          <a v-else class="order-size-link" @click.prevent="openOrderSizeEdit(record)">
+            {{ displayOrderSizeText(record) || '填写订货尺寸' }}
+          </a>
         </template>
 
         <template v-else-if="column.key === 'stockQty'">
@@ -458,6 +463,13 @@
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
     />
+
+    <BomBlankSizeModal
+      v-model:open="orderSizeOpen"
+      purpose="order"
+      :line="orderSizeModalLine"
+      @confirm="onOrderSizeConfirm"
+    />
   </div>
 </template>
 
@@ -487,7 +499,14 @@ import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import { resolveStockAlertHint, stockAlertClass } from '@/utils/stockAlertDisplay'
 import { generatePurchaseOrderColumns } from '@/utils/generatePurchaseOrderColumns'
+import {
+  applyOrderSizeToLine,
+  displayOrderSizeText,
+  isOrderSizeReadonly,
+  toOrderSizeModalLine,
+} from '@/utils/orderSize'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
+import BomBlankSizeModal from '@/views/product-process/components/BomBlankSizeModal.vue'
 import LongTextEditCell from '@/components/LongTextEditCell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -517,6 +536,34 @@ const remarkEdit = reactive({
   record: null,
   draft: '',
 })
+
+const orderSizeOpen = ref(false)
+const orderSizeTargetLine = ref(null)
+const orderSizeModalLine = computed(() => toOrderSizeModalLine(orderSizeTargetLine.value))
+
+function orderSizeReadonlyTip(record) {
+  if (!isOrderSizeReadonly(record)) return ''
+  return '来自生产计划的订货尺寸，不可修改'
+}
+
+function openOrderSizeEdit(record) {
+  if (isOrderSizeReadonly(record)) {
+    message.info('来自生产计划的订货尺寸不可修改')
+    return
+  }
+  orderSizeTargetLine.value = record
+  orderSizeOpen.value = true
+}
+
+function onOrderSizeConfirm(payload) {
+  const line = orderSizeTargetLine.value
+  if (!line || isOrderSizeReadonly(line)) return
+  applyOrderSizeToLine(line, payload?.blankSize ?? payload, { mode: payload?.mode })
+  // 手填不算计划带出，允许后续再改
+  line.orderSizeFromPlan = false
+  line.orderSizeLocked = false
+  message.success(line.orderSizeText ? '订货尺寸已更新' : '已清空订货尺寸')
+}
 
 const columnWidths = reactive(
   Object.fromEntries(generatePurchaseOrderColumns.map((c) => [getColumnKey(c), c.width || 100])),
@@ -1017,5 +1064,10 @@ function handleConfirm() {
 .stock-alert-above {
   color: #1677ff;
   font-weight: 500;
+}
+
+.order-size-link {
+  color: #1677ff;
+  cursor: pointer;
 }
 </style>

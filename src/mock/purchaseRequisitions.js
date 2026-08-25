@@ -23,6 +23,8 @@ export function createLineItem(partial = {}) {
     orderSizeText: '',
     orderSize: null,
     orderSizeMode: '',
+    orderSizeFromPlan: false,
+    orderSizeLocked: false,
     packageContent: 1,
     convertHint: '',
     packagingMethod: '',

@@ -1,5 +1,7 @@
 /** 采购申请合并与价格计算 */
 
+import { resolveOrderSizeFromPlan } from '@/utils/orderSize'
+
 export function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100
 }
@@ -111,6 +113,9 @@ export function mergeRequisitionLines(requisitions, options = {}) {
           orderSizeText: line.orderSizeText || line.blankSizeText || '',
           orderSize: line.orderSize ?? line.blankSize ?? null,
           orderSizeMode: line.orderSizeMode || line.blankSizeMode || '',
+          fromProductionPlan: String(req.source || '').trim() === '生产计划',
+          orderSizeFromPlan: resolveOrderSizeFromPlan(req.source, line),
+          orderSizeLocked: resolveOrderSizeFromPlan(req.source, line),
           variantSummary: line.variantSummary || '',
           sourceReqNos: [req.reqNo],
           sourceSalesOrderNos: salesOrderNo ? [salesOrderNo] : [],
@@ -127,6 +132,9 @@ export function mergeRequisitionLines(requisitions, options = {}) {
       )
       existing.stockQty = Math.min(existing.stockQty, Number(line.stockQty) || 0)
       existing.urgency = pickHighestUrgency(existing.urgency, urgency)
+      if (String(req.source || '').trim() === '生产计划') {
+        existing.fromProductionPlan = true
+      }
       if (!existing.blankSizeText && line.blankSizeText) {
         existing.blankSizeText = line.blankSizeText
         existing.blankSize = line.blankSize || null
@@ -136,6 +144,11 @@ export function mergeRequisitionLines(requisitions, options = {}) {
         existing.orderSizeText = line.orderSizeText || line.blankSizeText || ''
         existing.orderSize = line.orderSize ?? line.blankSize ?? null
         existing.orderSizeMode = line.orderSizeMode || line.blankSizeMode || ''
+        // 仅当尺寸由生产计划行写入时锁定
+        if (resolveOrderSizeFromPlan(req.source, line)) {
+          existing.orderSizeFromPlan = true
+          existing.orderSizeLocked = true
+        }
       }
       if (!existing.variantSummary && line.variantSummary) {
         existing.variantSummary = line.variantSummary
