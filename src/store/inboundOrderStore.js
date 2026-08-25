@@ -2,6 +2,7 @@ import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { cloneInboundSeedOrders, createInboundLine, createInboundOrder } from '@/mock/inboundOrders'
 import { ensureCrossDemoInboundOrders } from '@/mock/crossModuleDemoSeed'
+import { ensureMultiUnitFlowInboundOrders } from '@/mock/multiUnitFlowDemoSeed'
 import { purchaseOrderState, syncPurchaseOrderInboundStatus } from '@/store/purchaseOrderStore'
 import { calcPoLineRemainInboundQty } from '@/utils/purchaseLineInbound'
 import { warehouseState } from '@/store/warehouseStore'
@@ -35,8 +36,8 @@ function resolveInboundSalesOrder(order) {
 
 const STORAGE_KEY = 'i_doms_inbound_orders'
 const SEED_VERSION_KEY = 'i_doms_inbound_orders_seed_v'
-/** v5：跨模块演示采购入库（轴承部分入库） */
-const CURRENT_SEED_VERSION = '6'
+/** v7：多单位出入库/领料/下料结算联动演示 */
+const CURRENT_SEED_VERSION = '7'
 
 function loadFromStorage() {
   try {
@@ -93,7 +94,7 @@ function initOrders() {
     shouldReseed() || !stored?.length
       ? cloneInboundSeedOrders().map(normalizeLegacyOrder)
       : stored.map(normalizeLegacyOrder)
-  return ensureCrossDemoInboundOrders(base)
+  return ensureMultiUnitFlowInboundOrders(ensureCrossDemoInboundOrders(base))
 }
 
 export function generateInboundNo() {

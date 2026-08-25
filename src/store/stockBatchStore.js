@@ -1,7 +1,15 @@
 import { reactive, watch } from 'vue'
 import { isOneItemOneCodeBarcode, roundMeters } from '@/utils/variableLengthMaterial'
 import { adjustStockQty, getStockQty } from '@/store/stockStore'
-import { cloneStockBatchSeed } from '@/mock/stockBatchSeed'
+import {
+  cloneStockBatchSeed,
+  STEEL_PIPE_CODE,
+  STEEL_PIPE_NAME,
+  STEEL_PLATE_CODE,
+  STEEL_PLATE_NAME,
+  STEEL_WEIGHT_BAR_CODE,
+  STEEL_WEIGHT_BAR_NAME,
+} from '@/mock/stockBatchSeed'
 import {
   createStockPiecesForBatch,
   getStockPieceById,
@@ -11,13 +19,13 @@ import {
   pickPiecesFifoForPartialQty,
   splitIssueStockPiece,
 } from '@/store/stockPieceStore'
-import { isPartialDualUnitIssue } from '@/store/functionParamStore'
 import { DEDICATED_SHIP_DEMO, ensureDedicatedShipDemoBatches } from '@/mock/dedicatedShipDemoSeed'
+import { ensureMultiUnitFlowBatches } from '@/mock/multiUnitFlowDemoSeed'
 
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
-/** v17：按单发货验收演示批次 */
-const CURRENT_SEED_VERSION = '17'
+/** v20：多单位流程 FIFO/余料/线边批次 */
+const CURRENT_SEED_VERSION = '20'
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',
@@ -49,9 +57,15 @@ function persist() {
 function initBatches() {
   const stored = loadFromStorage()
   if (shouldReseed() || !stored?.length) {
-    return { batches: ensureDedicatedShipDemoBatches(cloneStockBatchSeed()), reseeded: true }
+    return {
+      batches: ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(cloneStockBatchSeed())),
+      reseeded: true,
+    }
   }
-  return { batches: ensureDedicatedShipDemoBatches(stored), reseeded: false }
+  return {
+    batches: ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(stored)),
+    reseeded: false,
+  }
 }
 
 function nid(prefix = 'bat') {
@@ -111,6 +125,19 @@ if (initialBatchLoad.reseeded) {
     DEDICATED_SHIP_DEMO.productCode,
     DEDICATED_SHIP_DEMO.productName,
     '件',
+  )
+  ;[
+    { warehouse: '原料仓', itemCode: STEEL_PIPE_CODE, itemName: STEEL_PIPE_NAME, unit: '米' },
+    { warehouse: '库线边仓', itemCode: STEEL_PIPE_CODE, itemName: STEEL_PIPE_NAME, unit: '米' },
+    { warehouse: '原料仓', itemCode: STEEL_PLATE_CODE, itemName: STEEL_PLATE_NAME, unit: '㎡' },
+    {
+      warehouse: '原料仓',
+      itemCode: STEEL_WEIGHT_BAR_CODE,
+      itemName: STEEL_WEIGHT_BAR_NAME,
+      unit: 'kg',
+    },
+  ].forEach((row) =>
+    syncAggregateStockFromBatches(row.warehouse, row.itemCode, row.itemName, row.unit),
   )
   persist()
 }
@@ -376,7 +403,8 @@ export function issueBatchQty(batchId, qty, meta = {}) {
     }
   }
 
-  const allowSplit = meta.allowPieceSplit !== false && isPartialDualUnitIssue()
+  // 默认按需求扣可拆件；整出（需要下料结算）由调用方传 allowPieceSplit: false
+  const allowSplit = meta.allowPieceSplit !== false
   let issuedPieces = []
   let remnantPieces = []
   let pieceSplit = false

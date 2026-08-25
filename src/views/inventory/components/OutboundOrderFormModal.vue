@@ -746,6 +746,7 @@ const issueRuleLabel = computed(() => {
 
 function isRecordManualPick(line) {
   void functionParamState.params.outboundIssueRule
+  void functionParamState.params.dualUnitIssueStrategy
   return isLineManualBatchPick(line)
 }
 
@@ -820,6 +821,7 @@ function manualBatchSummary(record) {
     batchIds: ids,
     demandQty: demand,
     unit,
+    line: record,
   })
   if (!res.ok) return res.message
   return formatBatchAllocationPreview(res.allocations, unit)
@@ -828,6 +830,7 @@ function manualBatchSummary(record) {
 function autoAllocPreview(record) {
   void stockBatchState.batches
   void functionParamState.params.outboundIssueRule
+  void functionParamState.params.dualUnitIssueStrategy
   const rule = getOutboundIssueRule()
   const ruleName = issueRuleLabel.value
   const wh = record.shipWarehouse || form.warehouse
@@ -868,6 +871,7 @@ function autoAllocPreview(record) {
     itemCode: record.itemCode,
     demandQty: record.shipQty,
     rule,
+    line: record,
   })
   if (!res.ok) return res.message
   return formatBatchAllocationPreview(res.allocations, resolveOutboundStockUnit(record))
@@ -1175,6 +1179,7 @@ function onMultiPickBatches(record, batchIds) {
       batchIds: getManualPickBatchIds(record),
       demandQty: demand,
       unit: resolveOutboundStockUnit(record),
+      line: record,
     })
     if (!check.ok) {
       message.warning(check.message)
@@ -1197,6 +1202,7 @@ function onShipQtyCellChange(line) {
         batchIds: ids,
         demandQty: qty,
         unit: resolveOutboundStockUnit(line),
+        line,
       })
       if (!check.ok) {
         message.warning(check.message)

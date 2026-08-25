@@ -82,19 +82,24 @@ import { computed } from 'vue'
 import { formatNumber } from '@/utils/numberFormat'
 import { getBatchById } from '@/store/stockBatchStore'
 import { isPieceManagedBatch, listStockPieces } from '@/store/stockPieceStore'
-import { buildAllocationsFromBatchIds, sumBatchAllocations } from '@/utils/outboundBatchAllocate'
-import { isPartialDualUnitIssue } from '@/store/functionParamStore'
+import {
+  buildAllocationsFromBatchIds,
+  sumBatchAllocations,
+  isLinePartialBatchIssue,
+} from '@/utils/outboundBatchAllocate'
 
 const props = defineProps({
   allocations: { type: Array, default: () => [] },
   options: { type: Array, default: () => [] },
   unitLabel: { type: String, default: '' },
   tip: { type: String, default: '' },
+  /** 出库行：用于按「需要下料结算」判断是否允许拆件 */
+  line: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:allocations'])
 
-const allowPieceSplit = computed(() => isPartialDualUnitIssue())
+const allowPieceSplit = computed(() => (props.line ? isLinePartialBatchIssue(props.line) : true))
 
 function formatQty(val) {
   return formatNumber(val, 4, { empty: '0' })

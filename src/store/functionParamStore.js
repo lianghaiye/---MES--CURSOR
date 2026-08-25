@@ -55,7 +55,7 @@ export const INVENTORY_DEDUCT_OPTIONS = [
 export const INVENTORY_DEDUCT_DESCRIPTION =
   '不领料：生产过程不扣减库存。完工后预扣+确认（按报工数量扣）：完工时按报工数量预扣，确认后正式扣减。自主领料+完工后预扣+确认（按领料数量扣）：支持自主领料，完工后按领料数量预扣，确认后正式扣减。'
 
-/** 出库规则：双物料单位批次匹配顺序（命名含规划中的整批/余料优先） */
+/** 出库规则：拣批顺序（普通料 / 需下料结算料语义不同，见 DESCRIPTION） */
 export const OUTBOUND_ISSUE_RULES = {
   FIFO: 'fifo',
   LIFO: 'lifo',
@@ -63,22 +63,29 @@ export const OUTBOUND_ISSUE_RULES = {
 }
 
 export const OUTBOUND_ISSUE_RULE_OPTIONS = [
-  { value: OUTBOUND_ISSUE_RULES.FIFO, label: '先进先出+优先整批+余料优先', disabled: false },
+  {
+    value: OUTBOUND_ISSUE_RULES.FIFO,
+    label: '先进先出（普通料）/ FIFO+优先整批+余料优先（需下料结算）',
+    disabled: false,
+  },
   {
     value: OUTBOUND_ISSUE_RULES.LIFO,
-    label: '后进先出+优先整批+余料优先',
+    label: '后进先出',
     disabled: true,
   },
   { value: OUTBOUND_ISSUE_RULES.MANUAL, label: '自主拣选', disabled: true },
 ]
 
 export const OUTBOUND_ISSUE_RULE_DESCRIPTION =
-  '本期仅开放「先进先出+优先整批+余料优先」：填写出库数量后，确认出库时按以下顺序自动匹配——①优先找单批/单件长度≥需求（整根/整批满足）；②候选中余料优先、其次最短够用；③同条件再按批次号先进先出。仅当没有单根/单批够用时，才允许跨批硬凑。「后进先出」「自主拣选」本期置灰未开放。'
+  '本期仅开放先进先出，按物料类型自动区分拣批细节：' +
+  '①普通物料（未勾「需要下料结算」）：按批次号先进先出，按出库数量扣减，余量留原批；' +
+  '②需下料结算物料：FIFO + 优先找单批/单件能满足出库数量的批，候选中余料优先、其次最短够用，没有单批够用才跨批。' +
+  '扣批是「整出」还是「部分出」见下方「下料结算发料方式」。「后进先出」「自主拣选」本期置灰未开放。'
 
 /**
- * 双单位发料规则（管材/板材共用；单单位默认走部分出）
- * - partial：部分出+余料留原批
- * - whole_with_remnant：整批出+余料确认回库
+ * 下料结算物料的发料方式（仅作用于勾选「需要下料结算」的物料；普通料固定按出库数量扣）
+ * - partial：部分出+余料留原批（按出库数量扣，不因整批多扣；无人填下料结算时常用）
+ * - whole_with_remnant：整批出+下料结算回库（实发可大于出库数量；有人填实耗时用）
  */
 export const DUAL_UNIT_ISSUE_STRATEGIES = {
   PARTIAL: 'partial',
@@ -87,18 +94,21 @@ export const DUAL_UNIT_ISSUE_STRATEGIES = {
 
 export const DUAL_UNIT_ISSUE_STRATEGY_OPTIONS = [
   {
-    value: DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT,
-    label: '整批出+余料确认回库',
+    value: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL,
+    label: '部分出+余料留原批',
     disabled: false,
   },
-  { value: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL, label: '部分出+余料留原批', disabled: false },
+  {
+    value: DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT,
+    label: '整批出+下料结算回库',
+    disabled: false,
+  },
 ]
 
 export const DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION =
-  '单单位物料默认发料规则为部分出+余料留原批。' +
-  '双单位部分出+余料留原批：确认出库按需求数量扣减；一批一码/一类一码余量留在原批次；一物一码将大于需求的整件核销后，余量自动生成余料件码挂原父批。' +
-  '双单位整批出+余料确认回库：确认出库按整批/整件离开发料仓，实发可大于需求。' +
-  '下料结算准入：工单含「下料工序」且物料主数据勾选「需要下料结算」（单单位米/KG 亦可）；双单位整出演示单仍兼容旧路径。'
+  '仅对主数据勾选「需要下料结算」的物料生效；普通物料始终按出库数量扣、余量留原批，不受本项影响。' +
+  '部分出+余料留原批：确认出库按「出库数量」扣减（出库数量可改，可大于 BOM 建议量），扣批合计等于出库数量，不因整根/整批而多扣，余量留原批（适合无人填下料结算）。' +
+  '整批出+下料结算回库：整批/整段离开发料仓，实发可大于出库数量；领出后由下料结算填实耗并余料回库（适合有人管实耗）。'
 
 export const ENABLE_PLATE_AREA_MEASURE_DESCRIPTION =
   '可选快捷：开启后，仅当库存单位为㎡时，入库可用「长 × 宽」辅助换算面积；产品 BOM 下料尺寸也可选「板材 · 长×宽→㎡」。关闭则直接填库存数量。默认关闭，界面更简单。不按面积管库存的客户保持关闭即可。'
@@ -206,7 +216,7 @@ export const FUNCTION_PARAM_ROWS = [
   },
   {
     key: 'dualUnitIssueStrategy',
-    scenario: '双单位发料规则',
+    scenario: '下料结算发料方式',
     description: DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION,
   },
   {
@@ -247,7 +257,10 @@ function normalizeOutboundIssueRule(mode) {
 }
 
 function normalizeDualUnitIssueStrategy(mode) {
-  if (DUAL_UNIT_ISSUE_STRATEGY_OPTIONS.some((item) => item.value === mode && !item.disabled)) {
+  if (
+    mode === DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL ||
+    mode === DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT
+  ) {
     return mode
   }
   return DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL
@@ -419,17 +432,17 @@ export function getDualUnitIssueStrategy() {
 export function setDualUnitIssueStrategy(mode) {
   const normalized = normalizeDualUnitIssueStrategy(mode)
   const hit = DUAL_UNIT_ISSUE_STRATEGY_OPTIONS.find((item) => item.value === normalized)
-  if (!hit || hit.disabled) return { ok: false, message: '无效的双单位发料规则' }
+  if (!hit || hit.disabled) return { ok: false, message: '无效的下料结算发料方式' }
   functionParamState.params.dualUnitIssueStrategy = normalized
   return { ok: true }
 }
 
-/** 是否按需求数量部分出（双物料单位默认） */
+/** 全局「下料结算发料方式」是否为部分出（仅作用于需下料结算物料） */
 export function isPartialDualUnitIssue() {
   return getDualUnitIssueStrategy() === DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL
 }
 
-/** 是否整出+余料回 */
+/** 全局「下料结算发料方式」是否为整出+余料回（仅作用于需下料结算物料） */
 export function isWholeWithRemnantIssue() {
   return getDualUnitIssueStrategy() === DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT
 }

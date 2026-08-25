@@ -2,10 +2,12 @@
 
 import { reactive, watch } from 'vue'
 import { roundMeters } from '@/utils/variableLengthMaterial'
+import { cloneStockPieceSeed } from '@/mock/stockPieceSeed'
 
 const STORAGE_KEY = 'i_doms_stock_pieces'
 const SEED_VERSION_KEY = 'i_doms_stock_pieces_seed_v'
-const CURRENT_SEED_VERSION = '1'
+/** v2：库存明细轴承一物一码演示件 */
+const CURRENT_SEED_VERSION = '2'
 
 export const PIECE_STATUS = {
   IN_STOCK: '在库',
@@ -40,7 +42,7 @@ function nid() {
 
 function initPieces() {
   if (shouldReseed() || !loadFromStorage()?.length) {
-    return []
+    return cloneStockPieceSeed()
   }
   return loadFromStorage() || []
 }

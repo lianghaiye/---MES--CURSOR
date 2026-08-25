@@ -248,6 +248,7 @@ const canBatchPick = computed(() => canOutboundBatchPick(draft.value || {}))
 
 const manualPick = computed(() => {
   void functionParamState.params.outboundIssueRule
+  void functionParamState.params.dualUnitIssueStrategy
   void draft.value?.manualBatchPick
   void draft.value?.outboundIssueRule
   return isLineManualBatchPick(draft.value || {})
@@ -280,6 +281,7 @@ const manualAllocPreview = computed(() => {
     batchIds: ids,
     demandQty: demand,
     unit: stockUnitLabel.value,
+    line,
   })
   if (!res.ok) return res.message
   return formatBatchAllocationPreview(res.allocations, stockUnitLabel.value)
@@ -288,6 +290,7 @@ const manualAllocPreview = computed(() => {
 const autoAllocPreviewText = computed(() => {
   void stockBatchState.batches
   void functionParamState.params.outboundIssueRule
+  void functionParamState.params.dualUnitIssueStrategy
   const line = draft.value
   if (!line) return ''
   const rule = getOutboundIssueRule()
@@ -307,6 +310,7 @@ const autoAllocPreviewText = computed(() => {
     itemCode: line.itemCode,
     demandQty: line.shipQty,
     rule,
+    line,
   })
   if (!res.ok) return res.message
   return formatBatchAllocationPreview(res.allocations, stockUnitLabel.value)
@@ -392,6 +396,7 @@ function onManualPickIdsChange(ids) {
       batchIds: getManualPickBatchIds(draft.value),
       demandQty: demand,
       unit: stockUnitLabel.value,
+      line: draft.value,
     })
     if (!check.ok) message.warning(check.message)
   }
@@ -457,6 +462,7 @@ function onShipQtyFieldChange() {
         batchIds: ids,
         demandQty: qty,
         unit: stockUnitLabel.value,
+        line: draft.value,
       })
       if (!check.ok) {
         message.warning(check.message)

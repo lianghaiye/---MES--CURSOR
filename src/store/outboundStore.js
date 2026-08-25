@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { cloneOutboundOrders, createOutboundLine, createOutboundOrder } from '@/mock/outboundOrders'
 import { ensureCrossDemoOutboundOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureMaterialReqOutboundOrders } from '@/mock/materialReqOutboundSeed'
+import { ensureMultiUnitFlowOutboundOrders } from '@/mock/multiUnitFlowDemoSeed'
 import { needsOutboundApproval } from '@/mock/outboundOptions'
 import {
   createFactoryQcFromOutbound,
@@ -14,16 +15,15 @@ import { applyOutboundToStock } from '@/store/stockStore'
 import { releaseAllocationOnShip } from '@/store/salesStockAllocationStore'
 import { salesOrderState } from '@/store/salesOrderStore'
 import { issueBatchQty, getBatchById } from '@/store/stockBatchStore'
-import {
-  getOutboundIssueRule,
-  isPartialDualUnitIssue,
-  OUTBOUND_ISSUE_RULES,
-} from '@/store/functionParamStore'
+import { getOutboundIssueRule, OUTBOUND_ISSUE_RULES } from '@/store/functionParamStore'
 import {
   allocateOutboundBatches,
   getLineBatchAllocations,
   getOutboundAvailableBatchQty,
   isLineManualBatchPick,
+  isLinePartialBatchIssue,
+  isLineWholeWithRemnantBatchIssue,
+  resolveLineBatchIssueStrategy,
   validateManualBatchAllocations,
 } from '@/utils/outboundBatchAllocate'
 import { formatBatchAttrsText } from '@/utils/outboundLineColumns'
@@ -32,8 +32,8 @@ import { preallocateDeliveryBatches } from '@/utils/salesOrderDedicatedStock'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
-/** v6：销售出库样例补齐发货单关联（含已出库→已发货） */
-const CURRENT_SEED_VERSION = '6'
+/** v7：多单位出入库/领料/下料结算联动演示 */
+const CURRENT_SEED_VERSION = '7'
 
 /** 领料/发料出库不再审批：历史「待处理」升为「待出库」 */
 function migrateSkipApprovalStatuses(orders) {
@@ -95,8 +95,10 @@ function initOutboundOrders() {
   const base = shouldReseedOutbound()
     ? cloneOutboundOrders()
     : loadFromStorage() || cloneOutboundOrders()
-  return ensureMaterialReqOutboundOrders(
-    ensureCrossDemoOutboundOrders(migrateSkipApprovalStatuses(base)),
+  return ensureMultiUnitFlowOutboundOrders(
+    ensureMaterialReqOutboundOrders(
+      ensureCrossDemoOutboundOrders(migrateSkipApprovalStatuses(base)),
+    ),
   )
 }
 
@@ -415,7 +417,7 @@ export function recomputeOutboundOrderStatus(order) {
   order.completedAt = ''
 }
 
-function writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty, dualUnit }) {
+function writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty }) {
   const issuedNos = issuedAllocations.map((a) => a.batchNo).filter(Boolean)
   const issuedTotal =
     Math.round(issuedAllocations.reduce((s, a) => s + (Number(a.qty) || 0), 0) * 10000) / 10000
@@ -427,13 +429,10 @@ function writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty, dual
   })
   line.batchAllocations = issuedAllocations
   line.outboundIssueRule = rule
-  if (dualUnit) {
-    if (!isPartialDualUnitIssue()) {
-      if (!(Number(line.demandMeters) > 0)) line.demandMeters = demandQty
-      line.dualUnitIssueStrategy = 'whole_with_remnant'
-    } else {
-      line.dualUnitIssueStrategy = 'partial'
-    }
+  const strategy = resolveLineBatchIssueStrategy(line)
+  line.dualUnitIssueStrategy = strategy
+  if (isLineWholeWithRemnantBatchIssue(line) && !(Number(line.demandMeters) > 0)) {
+    line.demandMeters = demandQty
   }
   line.shipQty = issuedTotal
   line.issuedBatchNo = issuedNos.join('、')
@@ -473,14 +472,14 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
     const meta = {
       sourceDocNo: order.docNo,
       workOrderNo: line.workOrderNo || line.sourceDocNo || order.sourceOrderNo || '',
+      allowPieceSplit: isLinePartialBatchIssue(line),
     }
     const lineManual = isLineManualBatchPick(line)
     const warehouse = line.shipWarehouse || order.warehouse
     const batchAvail = getOutboundAvailableBatchQty(warehouse, line.itemCode)
     const hasAlloc = getLineBatchAllocations(line).length > 0
-    const dualUnit = Boolean(line.isVariableLength)
 
-    // 自主拣选：单/双单位均按所选批次扣账
+    // 自主拣选：有批次即可（与是否双单位无关）
     if (lineManual) {
       const demandQty = Number(line.demandMeters ?? line.shipQty) || 0
       const check = validateManualBatchAllocations(line)
@@ -515,7 +514,6 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
       writeIssuedBatchFields(line, issuedAllocations, {
         rule: OUTBOUND_ISSUE_RULES.MANUAL,
         demandQty,
-        dualUnit,
       })
       continue
     }
@@ -570,13 +568,12 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
       writeIssuedBatchFields(line, issuedAllocations, {
         rule: OUTBOUND_ISSUE_RULES.MANUAL,
         demandQty,
-        dualUnit,
       })
       continue
     }
 
-    // 自动 FIFO：双单位必走批次；单单位有批次库存时走批次，否则留给汇总库存扣减
-    if (dualUnit || batchAvail > 0) {
+    // 自动 FIFO：有批次库存则走批次（单/双单位均可）；无批次则留给汇总库存扣减
+    if (batchAvail > 0) {
       if (!(Number(line.shipQty) > 0)) {
         return {
           ok: false,
@@ -589,6 +586,7 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
         itemCode: line.itemCode,
         demandQty: line.shipQty,
         rule,
+        line,
       })
       if (!alloc.ok) {
         return {
@@ -617,7 +615,7 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
           remnantSerialNos: res.remnantSerialNos || [],
         })
       }
-      writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty, dualUnit })
+      writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty })
       continue
     }
 
@@ -654,6 +652,7 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
       },
     ]
     line.outboundIssueRule = OUTBOUND_ISSUE_RULES.MANUAL
+    line.dualUnitIssueStrategy = resolveLineBatchIssueStrategy(line)
   }
   applyOutboundToStock(order, { lineIds: lines.map((l) => l.id) })
   if (order.outboundType === '销售出库') {
