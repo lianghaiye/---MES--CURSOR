@@ -121,7 +121,10 @@
             <span class="label">客户名称</span>{{ order.customerName || '—' }}
           </div>
           <div class="card-row"><span class="label">产品数量</span>{{ order.productQty }}</div>
-          <div class="card-row">
+          <div v-if="isStockReplenishPlan(order)" class="card-row">
+            <span class="label">操作人</span>{{ planOperatorName(order) }}
+          </div>
+          <div v-else class="card-row">
             <span class="label">业务员</span>{{ order.salesperson || '—' }}
           </div>
         </div>
@@ -178,9 +181,13 @@
             <a-descriptions-item label="交货方式">{{
               selectedOrder.deliveryMethod || '—'
             }}</a-descriptions-item>
-            <a-descriptions-item label="业务员">{{
-              selectedOrder.salesperson || '—'
-            }}</a-descriptions-item>
+            <a-descriptions-item :label="isStockReplenishPlan(selectedOrder) ? '操作人' : '业务员'">
+              {{
+                isStockReplenishPlan(selectedOrder)
+                  ? planOperatorName(selectedOrder)
+                  : selectedOrder.salesperson || '—'
+              }}
+            </a-descriptions-item>
             <a-descriptions-item label="订单日期">{{
               selectedOrder.orderDate
             }}</a-descriptions-item>
@@ -761,6 +768,10 @@ const planSourceFilterOpts = PLAN_SOURCE_OPTIONS.filter((o) => o.value)
 function isStockReplenishPlan(order) {
   const source = order?.planSource || (order?.salesOrderNo ? PLAN_SOURCE.SALES_ORDER : '')
   return source === PLAN_SOURCE.STOCK_REPLENISH
+}
+
+function planOperatorName(order) {
+  return order?.operator || order?.creator || '—'
 }
 
 const appliedFilters = ref({ ...filters })

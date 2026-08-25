@@ -22,6 +22,10 @@ function normalizePlanStatuses(orders) {
     if (!plan.planSource) {
       plan.planSource = plan.salesOrderNo ? 'sales-order' : 'manual'
     }
+    // 库存补货：操作人为生成计划的人（兼容旧数据）
+    if (plan.planSource === PLAN_SOURCE.STOCK_REPLENISH && !plan.operator) {
+      plan.operator = plan.creator || plan.salesperson || 'admin1'
+    }
     if (plan.orderStatus === '待排产') plan.orderStatus = '待下达'
     if (plan.orderStatus === '生产中') plan.orderStatus = '执行中'
     if (Array.isArray(plan.tags)) {
@@ -232,13 +236,15 @@ function nextReplenishPlanNo() {
 /**
  * 由库存补货建议生成生产计划（无销售单号）
  * @param {Array<object>} suggestionRows listStockReplenishSuggestions 行，可含 planQty 覆盖
+ * @param {{ operator?: string }} [options]
  */
-export function createProductionPlanFromStockReplenish(suggestionRows = []) {
+export function createProductionPlanFromStockReplenish(suggestionRows = [], options = {}) {
   const rows = (suggestionRows || []).filter(
     (r) => (Number(r.planQty) || Number(r.suggestQty) || 0) > 0,
   )
   if (!rows.length) return null
 
+  const operator = String(options.operator || '').trim() || 'admin1'
   const deliveryDate = dayjs().add(7, 'day').format('YYYY-MM-DD')
   const orderNo = nextReplenishPlanNo()
   const totalQty = rows.reduce((s, r) => s + (Number(r.planQty) || Number(r.suggestQty) || 0), 0)
@@ -288,6 +294,8 @@ export function createProductionPlanFromStockReplenish(suggestionRows = []) {
     customerName: '库存补货',
     productQty: totalQty,
     salesperson: '',
+    operator,
+    creator: operator,
     urgency: '普通',
     orderStatus: '待下达',
     orderDate: dayjs().format('YYYY-MM-DD'),
