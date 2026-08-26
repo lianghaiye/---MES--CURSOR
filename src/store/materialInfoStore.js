@@ -10,10 +10,11 @@ import {
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
 import { createStockAlertDemoMaterials } from '@/mock/stockAlertDemoMaterials'
+import { createPackageConvertDemoMaterial } from '@/mock/packageConvertPurchaseDemoSeed'
 
 const STORAGE_KEY = 'i_doms_material_info'
-/** v17：无默认率结算演示料 WL-CAST-NORATE-DEMO */
-const DATA_VERSION = 17
+/** v18：包装换算演示料 WL-PKG-BOX-100（个/盒=100） */
+const DATA_VERSION = 18
 let codeSeq = 100048
 
 function ensureDemoMaterialsByCodes(list, demos) {
@@ -38,14 +39,14 @@ function ensureDemoVariableLengthMaterials(list) {
 }
 
 function ensureDemoPackagePurchaseMaterials(list) {
-  const demos = (mockMaterials || []).filter(
+  const fromMock = (mockMaterials || []).filter(
     (m) =>
       m.packageContent > 1 &&
       m.purchaseUnit &&
       m.inventoryUnit &&
       m.purchaseUnit !== m.inventoryUnit,
   )
-  return ensureDemoMaterialsByCodes(list, demos)
+  return ensureDemoMaterialsByCodes(list, [...fromMock, createPackageConvertDemoMaterial()])
 }
 
 function ensureStockAlertDemoMaterials(list) {

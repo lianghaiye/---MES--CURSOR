@@ -2,126 +2,218 @@
   <a-modal
     :open="open"
     :title="mode === 'copy' ? '复制入库明细' : '编辑入库明细'"
-    width="720px"
+    width="820px"
     :mask-closable="false"
     destroy-on-close
     class="inventory-line-edit-modal"
     @cancel="handleCancel"
   >
     <a-form v-if="draft" layout="vertical" class="edit-form">
-      <a-form-item required>
+      <a-form-item>
         <template #label>
           <span class="field-label">
             <FileTextOutlined />
             产品信息
           </span>
         </template>
-        <template v-if="lockProduct">
-          <a-input :value="lockedProductLabel" disabled placeholder="—" />
-        </template>
-        <a-select
-          v-else
-          v-model:value="selectedItemKey"
-          show-search
-          placeholder="请选择产品/物料"
-          :filter-option="filterItemOption"
-          :options="itemSelectOpts"
-          @change="onItemChange"
-        />
-        <div v-if="preview" class="item-preview">
-          <div class="preview-main">
+        <div class="item-preview">
+          <div class="preview-grid">
             <div class="preview-row">
               <span class="preview-label">产品编号</span>
-              <span>{{ preview.itemCode || '—' }}</span>
+              <span>{{ preview?.itemCode || draft.itemCode || '—' }}</span>
             </div>
             <div class="preview-row">
               <span class="preview-label">产品名称</span>
-              <span>{{ preview.itemName || '—' }}</span>
+              <span>{{ preview?.itemName || draft.itemName || '—' }}</span>
             </div>
             <div class="preview-row">
-              <span class="preview-label">产品规格</span>
-              <span>{{ preview.specModel || '—' }}</span>
+              <span class="preview-label">规格型号</span>
+              <span>{{ preview?.specModel || draft.specModel || '—' }}</span>
             </div>
             <div class="preview-row">
-              <span class="preview-label">库存数量</span>
-              <span>{{ formatQty(preview.stockQty) }} {{ preview.unit || '件' }}</span>
+              <span class="preview-label">材质</span>
+              <span>{{ draft.material || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">图号</span>
+              <span>{{ draft.drawingNo || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">变体属性</span>
+              <span>{{ draft.variantSummary || draft.variantAttr || draft.specAttr || '—' }}</span>
             </div>
           </div>
-          <div class="preview-stock-box">
-            <div class="stock-value">{{ formatQty(preview.warehouseStockQty) }}</div>
-            <div class="stock-label">当前仓库数量({{ preview.unit || '件' }})</div>
+          <div class="preview-bottom">
+            <div class="preview-row">
+              <span class="preview-label">库存数量</span>
+              <span>
+                {{ formatQty(preview?.stockQty ?? draft.stockQty) }}
+                {{ preview?.unit || draft.unit || '件' }}
+              </span>
+            </div>
+            <div class="preview-bottom-spacer" />
+            <div class="preview-stock-box">
+              <div class="stock-value">
+                {{ formatQty(preview?.warehouseStockQty ?? draft.warehouseStockQty) }}
+              </div>
+              <div class="stock-label">当前仓库数量({{ preview?.unit || draft.unit || '件' }})</div>
+            </div>
           </div>
         </div>
       </a-form-item>
 
-      <a-form-item required>
-        <template #label>
-          <span class="field-label">
-            <HomeOutlined />
-            入库仓库
-          </span>
-        </template>
-        <a-select
-          v-model:value="draft.warehouse"
-          allow-clear
-          placeholder="请选择仓库"
-          :options="warehouseOpts"
-          @change="refreshPreviewStock"
-        />
-      </a-form-item>
-
-      <a-form-item>
-        <template #label>
-          <span class="field-label">
-            <HomeOutlined />
-            货位号
-          </span>
-        </template>
-        <a-input v-model:value="draft.locationNo" allow-clear placeholder="请输入货位号" />
-      </a-form-item>
+      <a-row :gutter="16">
+        <a-col :span="8">
+          <a-form-item required>
+            <template #label>
+              <span class="field-label">
+                <HomeOutlined />
+                入库仓库
+              </span>
+            </template>
+            <a-select
+              v-model:value="draft.warehouse"
+              allow-clear
+              placeholder="请选择仓库"
+              :options="warehouseOpts"
+              @change="refreshPreviewStock"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item>
+            <template #label>
+              <span class="field-label">
+                <HomeOutlined />
+                货位号
+              </span>
+            </template>
+            <a-input v-model:value="draft.locationNo" allow-clear placeholder="请输入货位号" />
+          </a-form-item>
+        </a-col>
+        <a-col v-if="!isVariableLengthLine" :span="8">
+          <a-form-item required>
+            <template #label>
+              <span class="field-label">
+                <UnorderedListOutlined />
+                库存数量（{{ stockUnitLabel }}）
+              </span>
+            </template>
+            <a-input-number
+              v-model:value="draft.qty"
+              :min="0"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
+              placeholder="请输入"
+              style="width: 100%"
+              @change="onQtyChange"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col v-if="!isVariableLengthLine && hasSettleUnitLine" :span="8">
+          <a-form-item required>
+            <template #label>
+              <span class="field-label">
+                <UnorderedListOutlined />
+                结算数量（{{ draft.settleUnit || 'kg' }}）
+              </span>
+            </template>
+            <a-input-number
+              v-model:value="draft.settleQty"
+              :min="0"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
+              placeholder="与供应商计价用"
+              style="width: 100%"
+              @change="onSettleQtyChange"
+            />
+            <div class="vl-tip">
+              结算单位（{{ draft.settleUnit || 'kg' }}）与库存单位（{{
+                stockUnitLabel
+              }}）不同：请再填结算数量，用于与供应商算钱。
+            </div>
+          </a-form-item>
+        </a-col>
+        <a-col v-if="!isVariableLengthLine" :span="8">
+          <a-form-item>
+            <template #label>
+              <span class="field-label">
+                <DollarOutlined />
+                单价{{ hasSettleUnitLine ? `（元/${draft.settleUnit || 'kg'}）` : '' }}
+              </span>
+            </template>
+            <a-input-number
+              v-model:value="draft.unitPrice"
+              :min="0"
+              :precision="2"
+              placeholder="请输入"
+              style="width: 100%"
+              @change="onUnitPriceChange"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col v-if="!isVariableLengthLine" :span="8">
+          <a-form-item>
+            <template #label>
+              <span class="field-label">
+                <AccountBookOutlined />
+                总价
+              </span>
+            </template>
+            <a-input-number :value="draft.totalPrice" :precision="2" disabled style="width: 100%" />
+          </a-form-item>
+        </a-col>
+      </a-row>
 
       <template v-if="isVariableLengthLine">
-        <a-form-item required>
-          <template #label>
-            <span class="field-label">
-              <UnorderedListOutlined />
-              到货件数（{{ purchaseUnitLabel }}）
-            </span>
-          </template>
-          <a-input-number
-            v-model:value="draft.purchaseQty"
-            :min="1"
-            :precision="0"
-            :placeholder="`按${purchaseUnitLabel}计`"
-            style="width: 100%"
-            @change="onPurchaseQtyChange"
-          />
-        </a-form-item>
-
-        <a-form-item required>
-          <template #label>
-            <span class="field-label">
-              <UnorderedListOutlined />
-              库存数量怎么填
-            </span>
-          </template>
-          <a-radio-group
-            v-model:value="draft.inboundEntryMode"
-            :options="entryModeOpts"
-            @change="onEntryModeChange"
-          />
-          <div class="vl-tip">
-            采购单位（{{ purchaseUnitLabel }}）与库存单位（{{
-              stockUnitLabel
-            }}）不同：先填到货件数，再填库存数量。
-            <template v-if="showAreaShortcut">
-              库存单位为面积时，可用「长 × 宽」换算，也可直接填合计{{ stockUnitLabel }}。
-            </template>
-            <template v-if="isPieceManagedBarcode">
-              一物一码须按件填写，不支持「直接填合计」。
-            </template>
-          </div>
-        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="8">
+            <a-form-item required>
+              <template #label>
+                <span class="field-label">
+                  <UnorderedListOutlined />
+                  到货件数（{{ purchaseUnitLabel }}）
+                </span>
+              </template>
+              <a-input-number
+                v-model:value="draft.purchaseQty"
+                :min="1"
+                :precision="0"
+                :placeholder="`按${purchaseUnitLabel}计`"
+                style="width: 100%"
+                @change="onPurchaseQtyChange"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="16">
+            <a-form-item required>
+              <template #label>
+                <span class="field-label">
+                  <UnorderedListOutlined />
+                  库存数量怎么填
+                </span>
+              </template>
+              <a-radio-group
+                v-model:value="draft.inboundEntryMode"
+                :options="entryModeOpts"
+                @change="onEntryModeChange"
+              />
+              <div class="vl-tip">
+                采购单位（{{ purchaseUnitLabel }}）与库存单位（{{
+                  stockUnitLabel
+                }}）不同：先填到货件数，再填库存数量。
+                <template v-if="showAreaShortcut">
+                  库存单位为面积时，可用「长 × 宽」换算，也可直接填合计{{ stockUnitLabel }}。
+                </template>
+                <template v-if="isPieceManagedBarcode">
+                  一物一码须按件填写，不支持「直接填合计」。
+                </template>
+              </div>
+            </a-form-item>
+          </a-col>
+        </a-row>
 
         <a-form-item v-if="showAreaShortcut && (isUniformMode || isPieceMode)" label="尺寸单位">
           <a-radio-group
@@ -374,77 +466,69 @@
         <div class="vl-tip preview-sum">
           入库合计预览：<strong>{{ formatQty(stockQtyPreview) }}</strong> {{ stockUnitLabel }}
         </div>
+
+        <a-row :gutter="16">
+          <a-col v-if="hasSettleUnitLine" :span="8">
+            <a-form-item required>
+              <template #label>
+                <span class="field-label">
+                  <UnorderedListOutlined />
+                  结算数量（{{ draft.settleUnit || 'kg' }}）
+                </span>
+              </template>
+              <a-input-number
+                v-model:value="draft.settleQty"
+                :min="0"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
+                placeholder="与供应商计价用"
+                style="width: 100%"
+                @change="onSettleQtyChange"
+              />
+              <div class="vl-tip">
+                结算单位（{{ draft.settleUnit || 'kg' }}）与库存单位（{{
+                  stockUnitLabel
+                }}）不同：请再填结算数量，用于与供应商算钱。
+              </div>
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item>
+              <template #label>
+                <span class="field-label">
+                  <DollarOutlined />
+                  单价{{ hasSettleUnitLine ? `（元/${draft.settleUnit || 'kg'}）` : '' }}
+                </span>
+              </template>
+              <a-input-number
+                v-model:value="draft.unitPrice"
+                :min="0"
+                :precision="2"
+                placeholder="请输入"
+                style="width: 100%"
+                @change="onUnitPriceChange"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item>
+              <template #label>
+                <span class="field-label">
+                  <AccountBookOutlined />
+                  总价
+                </span>
+              </template>
+              <a-input-number
+                :value="draft.totalPrice"
+                :precision="2"
+                disabled
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
       </template>
-
-      <a-form-item v-else required>
-        <template #label>
-          <span class="field-label">
-            <UnorderedListOutlined />
-            库存数量（{{ stockUnitLabel }}）
-          </span>
-        </template>
-        <a-input-number
-          v-model:value="draft.qty"
-          :min="0"
-          :precision="4"
-          :formatter="inputNumberFormatter"
-          :parser="inputNumberParser"
-          placeholder="请输入"
-          style="width: 100%"
-          @change="onQtyChange"
-        />
-      </a-form-item>
-
-      <a-form-item v-if="hasSettleUnitLine" required>
-        <template #label>
-          <span class="field-label">
-            <UnorderedListOutlined />
-            结算数量（{{ draft.settleUnit || 'kg' }}）
-          </span>
-        </template>
-        <a-input-number
-          v-model:value="draft.settleQty"
-          :min="0"
-          :precision="4"
-          :formatter="inputNumberFormatter"
-          :parser="inputNumberParser"
-          placeholder="与供应商计价用"
-          style="width: 100%"
-          @change="onSettleQtyChange"
-        />
-        <div class="vl-tip">
-          结算单位（{{ draft.settleUnit || 'kg' }}）与库存单位（{{
-            stockUnitLabel
-          }}）不同：请再填结算数量，用于与供应商算钱。
-        </div>
-      </a-form-item>
-
-      <a-form-item>
-        <template #label>
-          <span class="field-label">
-            <DollarOutlined />
-            单价{{ hasSettleUnitLine ? `（元/${draft.settleUnit || 'kg'}）` : '' }}
-          </span>
-        </template>
-        <a-input-number
-          v-model:value="draft.unitPrice"
-          :min="0"
-          :precision="2"
-          placeholder="请输入"
-          style="width: 100%"
-          @change="onUnitPriceChange"
-        />
-      </a-form-item>
-
-      <a-form-item>
-        <template #label>
-          <span class="field-label">
-            <AccountBookOutlined />
-            总价
-          </span>
-        </template>
-        <a-input-number :value="draft.totalPrice" :precision="2" disabled style="width: 100%" />
-      </a-form-item>
     </a-form>
 
     <template #footer>
@@ -466,7 +550,6 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
-import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
 import { enrichInboundLine, syncInboundLineTotalFromUnit } from '@/utils/inboundLineHelpers'
 import { hasSettleUnit } from '@/utils/settleUnit'
 import { isPlateAreaMeasureEnabled } from '@/store/functionParamStore'
@@ -495,13 +578,11 @@ const props = defineProps({
   open: Boolean,
   line: { type: Object, default: null },
   mode: { type: String, default: 'edit' },
-  lockProduct: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
 
 const draft = ref(null)
-const selectedItemKey = ref(undefined)
 const preview = ref(null)
 const pieceDraftList = ref([])
 const pieceDimDraftList = ref([])
@@ -568,23 +649,6 @@ function syncPasteTextFromList() {
 const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
-})
-
-const pickableItems = computed(() => buildWarehousePickableItems())
-
-const itemSelectOpts = computed(() =>
-  pickableItems.value.map((it) => ({
-    label: `${it.code} - ${it.name}`,
-    value: it.rowKey,
-    searchText: `${it.code} ${it.name} ${it.specModel || ''}`,
-  })),
-)
-
-const lockedProductLabel = computed(() => {
-  const line = draft.value
-  if (!line) return ''
-  if (line.itemCode && line.itemName) return `[${line.itemCode}] ${line.itemName}`
-  return line.itemName || line.itemCode || ''
 })
 
 const resolvedMaterial = computed(() => {
@@ -713,7 +777,6 @@ watch(
     if (!visible || !props.line) {
       draft.value = null
       preview.value = null
-      selectedItemKey.value = undefined
       pieceDraftList.value = []
       pieceDimDraftList.value = []
       piecePasteText.value = ''
@@ -749,30 +812,11 @@ watch(
       next.pieceDims = Array.isArray(next.pieceDims) ? [...next.pieceDims] : []
     }
     draft.value = reactive(next)
-    syncSelectedItemKey()
     ensureMeasureModeOnDraft()
     syncPieceDraftFromLine()
     refreshPreviewStock()
   },
 )
-
-function filterItemOption(input, option) {
-  const text = (option?.searchText ?? option?.label ?? '').toLowerCase()
-  return text.includes(String(input || '').toLowerCase())
-}
-
-function syncSelectedItemKey() {
-  if (!draft.value?.itemCode) {
-    selectedItemKey.value = undefined
-    return
-  }
-  const hit = pickableItems.value.find(
-    (it) =>
-      it.code === draft.value.itemCode &&
-      (draft.value.itemId ? it.itemId === draft.value.itemId : true),
-  )
-  selectedItemKey.value = hit?.rowKey
-}
 
 function syncPieceDraftFromLine() {
   const line = draft.value
@@ -919,46 +963,6 @@ function refreshPreviewStock() {
   }
 }
 
-function onItemChange(rowKey) {
-  const item = pickableItems.value.find((it) => it.rowKey === rowKey)
-  if (!item || !draft.value) return
-  const mat = materialInfoState.materials.find((m) => m.code === item.code)
-  const isVL = Boolean(mat?.isVariableLength || item.isVariableLength)
-  const stockUnit = isVL ? mat?.stockUnit || mat?.inventoryUnit || '米' : item.inventoryUnit || '件'
-  const barcodeType = isVL ? mat?.barcodeType || '一批一码' : undefined
-  const uomRelation = isVL ? mat?.uomRelation : undefined
-  Object.assign(draft.value, {
-    itemId: item.itemId,
-    itemCode: item.code,
-    itemName: item.name,
-    itemType: item.itemType,
-    specAttr: item.productAttribute || item.materialType || '',
-    specModel: item.specModel || '',
-    material: item.material || '',
-    drawingNo: item.drawingNo || '',
-    unit: stockUnit,
-    stockUnit: isVL ? stockUnit : undefined,
-    unitPrice: item.unitPrice ?? draft.value.unitPrice,
-    isVariableLength: isVL,
-    purchaseUnit: isVL ? mat?.purchaseUnit || '件' : undefined,
-    barcodeType,
-    inboundEntryMode: isVL ? defaultInboundEntryMode(barcodeType) : undefined,
-    inboundMeasureMode: isVL ? autoInboundMeasureMode(stockUnit, true) : undefined,
-    purchaseQty: isVL ? draft.value.purchaseQty || 1 : undefined,
-    uniformValue: isVL ? null : undefined,
-    uniformLength: isVL ? null : undefined,
-    uniformWidth: isVL ? null : undefined,
-    dimUnit: isVL ? DEFAULT_PLATE_DIM_UNIT : undefined,
-    uomRelation,
-    totalValue: isVL ? null : undefined,
-    pieceValues: isVL ? [] : undefined,
-    pieceDims: isVL ? [] : undefined,
-  })
-  syncInboundLineTotalFromUnit(draft.value)
-  syncPieceDraftFromLine()
-  refreshPreviewStock()
-}
-
 function onQtyChange() {
   if (!draft.value) return
   syncInboundLineTotalFromUnit(draft.value)
@@ -981,7 +985,7 @@ function handleCancel() {
 function handleOk() {
   if (!draft.value) return
   if (!draft.value.itemCode) {
-    message.warning('请选择产品信息')
+    message.warning('产品信息缺失')
     return
   }
   if (!draft.value.warehouse) {

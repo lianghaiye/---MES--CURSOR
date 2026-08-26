@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     title="编辑采购明细"
-    width="720px"
+    width="800px"
     :mask-closable="false"
     destroy-on-close
     class="purchase-order-line-edit-modal"
@@ -11,25 +11,25 @@
     <a-form v-if="draft" layout="vertical" class="edit-form">
       <div class="item-preview">
         <a-row :gutter="[16, 8]">
-          <a-col :span="12">
+          <a-col :span="8">
             <div class="preview-row">
               <span class="preview-label">产品编号</span>
               <span class="preview-value">{{ draft.productCode || draft.itemCode || '—' }}</span>
             </div>
           </a-col>
-          <a-col :span="12">
+          <a-col :span="8">
             <div class="preview-row">
               <span class="preview-label">产品名称</span>
               <span class="preview-value">{{ draft.productName || draft.itemName || '—' }}</span>
             </div>
           </a-col>
-          <a-col :span="12">
+          <a-col :span="8">
             <div class="preview-row">
               <span class="preview-label">规格型号</span>
               <span class="preview-value">{{ draft.specModel || '—' }}</span>
             </div>
           </a-col>
-          <a-col :span="12">
+          <a-col :span="8">
             <div class="preview-row">
               <span class="preview-label">库存数量</span>
               <span class="preview-value">
@@ -42,7 +42,7 @@
       </div>
 
       <a-row :gutter="16">
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="采购数量" required>
             <a-input-number
               v-model:value="draft.purchaseQty"
@@ -55,7 +55,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="采购单位" required>
             <a-select
               v-model:value="draft.unit"
@@ -69,7 +69,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="税率(%)">
             <a-input-number
               v-model:value="draft.taxRate"
@@ -81,7 +81,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="不含税单价">
             <a-input-number
               v-model:value="draft.unitPriceExTax"
@@ -95,7 +95,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="含税单价">
             <a-input-number
               v-model:value="draft.unitPriceInTax"
@@ -109,7 +109,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="总价（不含税）">
             <a-input-number
               :value="draft.totalPriceExTax"
@@ -119,7 +119,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="总价（含税）">
             <a-input-number
               :value="draft.totalPriceInTax"
@@ -129,7 +129,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="交货日期">
             <a-date-picker
               :value="deliveryDateValue"
@@ -139,7 +139,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="收货仓库">
             <a-select
               v-model:value="draft.receivingWarehouse"

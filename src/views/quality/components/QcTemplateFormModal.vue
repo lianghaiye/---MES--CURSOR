@@ -15,6 +15,17 @@
       </div>
 
       <div class="form-row">
+        <label class="form-label required">业务类型</label>
+        <a-select
+          v-model:value="form.bizScope"
+          allow-clear
+          placeholder="请选择业务类型"
+          style="flex: 1; min-width: 0"
+          :options="bizScopeOpts"
+        />
+      </div>
+
+      <div class="form-row">
         <label class="form-label required">适用范围</label>
         <a-radio-group v-model:value="form.scopeType" class="scope-radio">
           <a-radio v-for="opt in scopeTypeOpts" :key="opt.value" :value="opt.value">
@@ -177,8 +188,8 @@ import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import {
   QC_TEMPLATE_SCOPE_TYPE,
+  qcTemplateBizScopeOptions,
   qcTemplateScopeTypeOptions,
-  qcTemplateScopeTypeLabel,
 } from '@/mock/qcTemplates'
 import { addQcTemplate, updateQcTemplate } from '@/store/qcTemplateStore'
 
@@ -204,11 +215,13 @@ const fieldTypeMap = {
 
 const fieldTypeOpts = Object.entries(fieldTypeMap).map(([value, label]) => ({ label, value }))
 const scopeTypeOpts = qcTemplateScopeTypeOptions
+const bizScopeOpts = qcTemplateBizScopeOptions.map((v) => ({ label: v, value: v }))
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 
 const form = reactive({
   name: '',
+  bizScope: '成品检',
   scopeType: QC_TEMPLATE_SCOPE_TYPE.SINGLE,
   fields: [],
 })
@@ -241,6 +254,7 @@ function emptyFieldForm() {
 
 function resetForm() {
   form.name = ''
+  form.bizScope = '成品检'
   form.scopeType = QC_TEMPLATE_SCOPE_TYPE.SINGLE
   form.fields = []
 }
@@ -254,8 +268,15 @@ function resolveScopeType(record) {
   return QC_TEMPLATE_SCOPE_TYPE.GLOBAL
 }
 
+function resolveBizScope(record) {
+  const val = String(record?.bizScope || '').trim()
+  if (qcTemplateBizScopeOptions.includes(val)) return val
+  return '成品检'
+}
+
 function loadEdit(record) {
   form.name = record.name || ''
+  form.bizScope = resolveBizScope(record)
   form.scopeType = resolveScopeType(record)
   form.fields = (record.fields || []).map((f) => ({
     ...f,
@@ -358,6 +379,10 @@ function handleSave() {
     message.warning('请输入模板名称')
     return
   }
+  if (!form.bizScope) {
+    message.warning('请选择业务类型')
+    return
+  }
   if (!form.scopeType) {
     message.warning('请选择适用范围')
     return
@@ -366,9 +391,8 @@ function handleSave() {
   try {
     const payload = {
       name: String(form.name).trim(),
+      bizScope: form.bizScope,
       scopeType: form.scopeType,
-      // 列表兼容：业务范围展示适用范围文案；不再维护适用对象
-      bizScope: qcTemplateScopeTypeLabel(form.scopeType),
       objects: [],
       fields: form.fields.map((f) => ({
         ...f,

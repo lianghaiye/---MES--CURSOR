@@ -69,9 +69,9 @@ export function applyDualUnitFieldsToOutboundLine(line = {}, itemCode = '') {
   return line
 }
 
-/** 出库明细是否展示拣选批次（有物料编码即可；无批次库存时自动扣汇总库存） */
+/** 出库明细是否展示拣选批次 */
 export function canOutboundBatchPick(line = {}) {
-  return Boolean(line?.itemCode)
+  return Boolean(line?.itemCode || line?.materialCode || line?.productCode)
 }
 
 export function calcLineTotalPrice(line = {}) {

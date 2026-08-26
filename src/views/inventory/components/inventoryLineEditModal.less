@@ -1,62 +1,106 @@
-.inventory-line-edit-modal {
-  .field-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
-  .item-preview {
-    display: flex;
-    gap: 12px;
-    margin-top: 8px;
-    padding: 12px;
-    background: #fafafa;
-    border: 1px solid #f0f0f0;
-    border-radius: 4px;
-  }
+.item-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 8px;
+  padding: 12px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+}
 
-  .preview-main {
-    flex: 1;
-    min-width: 0;
-  }
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 16px;
+  margin-bottom: 8px;
+}
 
-  .preview-row {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 6px;
-    font-size: 13px;
+/* 与上方三列网格同宽，第三格放「当前仓库数量」小盒并左对齐 */
+.preview-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 16px;
+  align-items: start;
+}
 
-    .preview-label {
-      width: 72px;
-      flex-shrink: 0;
-      color: rgba(0, 0, 0, 0.45);
-    }
-  }
+.preview-bottom-spacer {
+  min-width: 0;
+}
 
-  .preview-stock-box {
-    width: 120px;
+.preview-rest {
+  grid-column: 1 / span 2;
+  min-width: 0;
+}
+
+.preview-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  min-width: 0;
+
+  .preview-label {
     flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 8px;
-    background: #fff;
-    border: 1px solid #e8e8e8;
-    border-radius: 4px;
-  }
-
-  .stock-value {
-    font-size: 28px;
-    font-weight: 600;
-    line-height: 1.2;
-    color: rgba(0, 0, 0, 0.88);
-  }
-
-  .stock-label {
-    margin-top: 4px;
-    font-size: 12px;
+    width: 4em;
     color: rgba(0, 0, 0, 0.45);
-    text-align: center;
+    white-space: nowrap;
   }
+
+  > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.preview-grid .preview-row,
+.preview-bottom .preview-row {
+  margin-bottom: 0;
+}
+
+.preview-stock-box {
+  justify-self: start;
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+}
+
+.stock-value {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(0, 0, 0, 0.88);
+  white-space: nowrap;
+}
+
+.stock-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  text-align: center;
+  white-space: nowrap;
 }

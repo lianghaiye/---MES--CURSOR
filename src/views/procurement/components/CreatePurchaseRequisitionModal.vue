@@ -164,6 +164,17 @@
                 <template v-else-if="column.key === 'stockQty'">
                   {{ formatQty(record.stockQty) }}
                 </template>
+                <template v-else-if="column.key === 'demandQty'">
+                  {{ formatQty(record.demandQty)
+                  }}{{
+                    record.inventoryUnit || record.stockUnit
+                      ? ` ${record.inventoryUnit || record.stockUnit}`
+                      : ''
+                  }}
+                </template>
+                <template v-else-if="column.key === 'convertHint'">
+                  {{ formatConvertHint(record) }}
+                </template>
                 <template v-else-if="column.key === 'unit'">
                   <a-select
                     v-model:value="record.unit"
@@ -186,14 +197,19 @@
                   </a>
                 </template>
                 <template v-else-if="column.key === 'planPurchaseQty'">
-                  <a-input-number
-                    v-model:value="record.planPurchaseQty"
-                    size="small"
-                    :min="0"
-                    :precision="2"
-                    style="width: 100%"
-                    @change="onQtyChange(record)"
-                  />
+                  <div class="qty-with-unit-edit">
+                    <a-input-number
+                      v-model:value="record.planPurchaseQty"
+                      size="small"
+                      :min="0"
+                      :precision="2"
+                      style="width: 100%"
+                      @change="onQtyChange(record)"
+                    />
+                    <span v-if="record.unit || record.purchaseUnit" class="unit-suffix">{{
+                      record.unit || record.purchaseUnit
+                    }}</span>
+                  </div>
                 </template>
                 <template v-else-if="column.key === 'supplierName'">
                   <PlanSupplierSelect
@@ -380,7 +396,7 @@ const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 const CURRENT_USER = 'admin1'
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-req-form-lines-v6', purchaseRequisitionFormLineColumns, {
+  useTableColumnSettings('purchase-req-form-lines-v7', purchaseRequisitionFormLineColumns, {
     minScrollX: 1560,
     pinEdgeColumns: false,
     pinActionColumn: true,
@@ -694,6 +710,16 @@ function filterUnitOption(input, option) {
   return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
 }
 
+function formatConvertHint(record = {}) {
+  const hint = String(record.convertHint || '').trim()
+  if (hint) return hint
+  const purchaseUnit = String(record.unit || record.purchaseUnit || '').trim()
+  const inventoryUnit = String(record.inventoryUnit || record.stockUnit || '').trim()
+  if (purchaseUnit && inventoryUnit && purchaseUnit === inventoryUnit) return '无需换算'
+  if (purchaseUnit && inventoryUnit && purchaseUnit !== inventoryUnit) return '未配置换算率'
+  return '—'
+}
+
 function resolveLineMaster(record) {
   const code = record?.productCode || record?.inventoryCode || record?.itemCode || ''
   if (!code) return null
@@ -967,6 +993,19 @@ function handleSave() {
 
   &:hover {
     color: #4096ff;
+  }
+}
+
+.qty-with-unit-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+
+  .unit-suffix {
+    flex-shrink: 0;
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 12px;
   }
 }
 </style>

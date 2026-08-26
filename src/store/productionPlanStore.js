@@ -10,14 +10,15 @@ import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
 import { enrichWorkItem, resolveSalesLineForWorkItem } from '@/utils/productionPlanWorkItem'
 import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
 import { applyCrossDemoStockToPlanMaterials } from '@/mock/crossModuleDemoSeed'
+import { ensurePackageConvertDemoOnPlans } from '@/mock/packageConvertPurchaseDemoSeed'
 import { PLAN_SOURCE } from '@/utils/planSource'
 
 const STORAGE_KEY = 'i_doms_production_plans'
-/** v9：计划来源（销售订单 / 库存补货） */
-const DATA_VERSION = 9
+/** v10：包装换算演示物料挂到计划（105个→2盒） */
+const DATA_VERSION = 10
 
 function normalizePlanStatuses(orders) {
-  return orders.map((o) => {
+  const normalized = (orders || []).map((o) => {
     const plan = { ...o }
     if (!plan.planSource) {
       plan.planSource = plan.salesOrderNo ? 'sales-order' : 'manual'
@@ -46,6 +47,7 @@ function normalizePlanStatuses(orders) {
     })
     return plan
   })
+  return ensurePackageConvertDemoOnPlans(normalized)
 }
 
 function loadFromStorage() {

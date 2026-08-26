@@ -20,6 +20,7 @@ import {
 } from '@/mock/productionPlanOrderTreeSeed'
 import { ensureCrossDemoPurchaseRequisitions } from '@/mock/crossModuleDemoSeed'
 import { ensureSettleUnitDemoPurchaseRequisitions } from '@/mock/settleUnitPurchaseDemoSeed'
+import { ensurePackageConvertDemoPurchaseRequisitions } from '@/mock/packageConvertPurchaseDemoSeed'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { convertStockDemandToPurchase } from '@/utils/purchaseUomConvert'
 
@@ -39,8 +40,8 @@ function resolveEarliestDeliveryDate(lineItems, fallback) {
 
 const STORAGE_KEY = 'i_doms_purchase_requisitions'
 const SEED_VERSION_KEY = 'i_doms_purchase_requisitions_seed_v'
-/** v8：结算单位演示申请单（铸件/三口径/无单重） */
-const CURRENT_SEED_VERSION = '8'
+/** v9：包装换算演示申请单 CGSQ-PKG-CONVERT-001（105个→2盒） */
+const CURRENT_SEED_VERSION = '9'
 let reqSeq = 20
 
 function loadFromStorage() {
@@ -84,8 +85,10 @@ function initRequisitions() {
   const base = shouldReseed()
     ? clonePurchaseRequisitions()
     : loadFromStorage() || clonePurchaseRequisitions()
-  const list = ensureSettleUnitDemoPurchaseRequisitions(
-    ensureCrossDemoPurchaseRequisitions(ensureProductionPlanOrderTreeDemoRequisitions(base)),
+  const list = ensurePackageConvertDemoPurchaseRequisitions(
+    ensureSettleUnitDemoPurchaseRequisitions(
+      ensureCrossDemoPurchaseRequisitions(ensureProductionPlanOrderTreeDemoRequisitions(base)),
+    ),
   )
   list.forEach((req) => stampRequisitionLineSalesOrderNos(req))
   normalizeRequisitionLinePoStatus(list)
@@ -352,7 +355,10 @@ function mapPlanMaterialToLineItem(
 ) {
   const demandQty = m.demandQty ?? m.gapQty ?? m.planQty ?? 0
   const master = materialInfoState.materials.find((row) => row.code === m.code) || m
-  const converted = convertStockDemandToPurchase(m.planQty ?? m.gapQty ?? demandQty, master)
+  const gapQty = Number(m.gapQty)
+  const stockBase =
+    Number.isFinite(gapQty) && gapQty >= 0 ? gapQty : Number(m.planQty ?? demandQty) || 0
+  const converted = convertStockDemandToPurchase(stockBase, master)
   return createLineItem({
     inventoryName: m.name,
     inventoryCode: m.code,

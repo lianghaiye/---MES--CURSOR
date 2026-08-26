@@ -10,7 +10,8 @@
   >
     <div class="modal-toolbar">
       <span class="hint"
-        >提示：拖动表头右侧边线可调整列宽，单击可编辑单元格进行编辑；多明细合并生成一张采购申请单</span
+        >提示：需求/缺口为库存单位；计划采购数为采购单位（有换算率时按「库存缺口 ÷
+        换算率」向上取整）。拖动表头可调列宽；多明细合并生成一张采购申请单</span
       >
       <a-popover trigger="click" placement="bottomRight">
         <template #title>列设置</template>
@@ -127,6 +128,22 @@
                 <InfoCircleOutlined class="col-tip-icon" />
               </a-tooltip>
             </span>
+            <span v-else-if="column.key === 'planQty'" class="header-title col-title-with-tip">
+              计划采购数
+              <a-tooltip
+                title="按采购单位填写。若采购单位与库存单位不同且已配置换算率，默认=库存缺口÷换算率并向上取整（例：缺口105个、1盒=100个 → 计划2盒）"
+              >
+                <InfoCircleOutlined class="col-tip-icon" />
+              </a-tooltip>
+            </span>
+            <span v-else-if="column.key === 'convertHint'" class="header-title col-title-with-tip">
+              换算说明
+              <a-tooltip
+                title="说明「1个采购单位等于多少库存单位」。无需换算或未配置换算率时显示对应提示，不是手工填写项"
+              >
+                <InfoCircleOutlined class="col-tip-icon" />
+              </a-tooltip>
+            </span>
             <span v-else class="header-title">{{ column.title }}</span>
             <span
               v-if="column.key !== 'index' && column.key !== 'action'"
@@ -168,16 +185,20 @@
                 @dropdown-visible-change="onSelectOpenChange"
                 @change="endEdit"
               />
-              <a-input-number
-                v-else-if="column.key === 'planQty'"
-                v-model:value="record.planQty"
-                size="small"
-                :min="0"
-                style="width: 100%"
-                autofocus
-                @blur="endEdit"
-                @pressEnter="endEdit"
-              />
+              <div v-else-if="column.key === 'planQty'" class="qty-with-unit-edit" @click.stop>
+                <a-input-number
+                  v-model:value="record.planQty"
+                  size="small"
+                  :min="0"
+                  style="width: 100%"
+                  autofocus
+                  @blur="endEdit"
+                  @pressEnter="endEdit"
+                />
+                <span v-if="record.unit || record.purchaseUnit" class="unit-suffix">{{
+                  record.unit || record.purchaseUnit
+                }}</span>
+              </div>
               <a-select
                 v-else-if="column.key === 'unit'"
                 v-model:value="record.unit"
@@ -304,10 +325,10 @@ const replenishQtyColumns = [
 ]
 
 const baseColumnDefsAfterQty = [
-  { key: 'planQty', title: '计划采购数', width: 100, editable: true, total: true, numeric: true },
+  { key: 'planQty', title: '计划采购数', width: 120, editable: true, total: true, numeric: true },
   { key: 'unit', title: '采购单位', width: 100, editable: true, total: false },
   { key: 'orderSizeText', title: '订货尺寸', width: 160, total: false },
-  { key: 'convertHint', title: '换算', width: 110, total: false },
+  { key: 'convertHint', title: '换算说明', width: 130, total: false },
   { key: 'remark', title: '备注', width: 140, total: false },
   { key: 'action', title: '操作', width: 72, total: false },
 ]
@@ -403,6 +424,9 @@ const summary = computed(() => {
           ...new Set(rows.value.map((r) => r.inventoryUnit || r.stockUnit).filter(Boolean)),
         ]
         totals[col.key] = units.length === 1 ? `${sum}${units[0]}` : sum
+      } else if (col.key === 'planQty') {
+        const units = [...new Set(rows.value.map((r) => r.unit || r.purchaseUnit).filter(Boolean))]
+        totals[col.key] = units.length === 1 ? `${sum}${units[0]}` : sum
       } else {
         totals[col.key] = sum
       }
@@ -495,10 +519,27 @@ function formatAvailableStockText(record) {
   return `${allocated}/${available}`
 }
 
+function formatConvertHint(record) {
+  const hint = String(record.convertHint || '').trim()
+  if (hint) return hint
+  const purchaseUnit = String(record.unit || record.purchaseUnit || '').trim()
+  const inventoryUnit = String(record.inventoryUnit || record.stockUnit || '').trim()
+  if (purchaseUnit && inventoryUnit && purchaseUnit === inventoryUnit) return '无需换算'
+  if (purchaseUnit && inventoryUnit && purchaseUnit !== inventoryUnit) return '未配置换算率'
+  return '—'
+}
+
 function formatCell(record, key, text) {
   if (key === 'availableStock') return formatAvailableStockText(record)
   if (key === 'inTransitQty') return record.inTransitText || text || '—'
   if (key === 'orderSizeText') return record.orderSizeText || record.blankSizeText || text || '—'
+  if (key === 'convertHint') return formatConvertHint(record)
+  if (key === 'planQty') {
+    const qty = Number(record.planQty)
+    const unit = record.unit || record.purchaseUnit || ''
+    if (!Number.isFinite(qty)) return text ?? '—'
+    return unit ? `${qty} ${unit}` : String(qty)
+  }
   if (
     key === 'demandQty' ||
     key === 'gapQty' ||
@@ -507,9 +548,9 @@ function formatCell(record, key, text) {
     key === 'suggestQty'
   ) {
     const qty = Number(record[key])
-    const unit = record.inventoryUnit || record.stockUnit || record.unit || ''
+    const unit = record.inventoryUnit || record.stockUnit || ''
     if (!Number.isFinite(qty)) return text ?? '—'
-    return unit ? `${qty}${unit}` : String(qty)
+    return unit ? `${qty} ${unit}` : String(qty)
   }
   if (key === 'supplier' && !text) return SUPPLIER_SELECT_PLACEHOLDER
   if (isEditable(key) && (text === '' || text == null)) return '-'
@@ -698,6 +739,20 @@ function handleSave() {
 
   .edit-wrap {
     width: 100%;
+  }
+
+  .qty-with-unit-edit {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    padding: 0 4px;
+
+    .unit-suffix {
+      flex-shrink: 0;
+      color: rgba(0, 0, 0, 0.45);
+      font-size: 12px;
+    }
   }
 
   .placeholder {

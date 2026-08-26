@@ -218,6 +218,7 @@ const baseColumns = [
   { title: '模板编号', key: 'code', dataIndex: 'code', width: 140, fixed: 'left' },
   { title: '模板名称', dataIndex: 'name', width: 180, ellipsis: true },
   { title: '类型', key: 'type', width: 110 },
+  { title: '业务类型', key: 'bizScope', dataIndex: 'bizScope', width: 110 },
   { title: '适用范围', key: 'scopeType', width: 100 },
   { title: '字段数量', dataIndex: 'fieldCount', width: 90, align: 'right' },
   { title: '创建人', dataIndex: 'creator', width: 90 },
@@ -228,7 +229,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('qc-template-list-v2', baseColumns)
+  useTableColumnSettings('qc-template-list-v3', baseColumns)
 
 const filteredList = computed(() =>
   filterQcTemplates(qcTemplateState.templates, appliedFilters.value),
@@ -274,7 +275,7 @@ function handleCreate() {
 
 function handlePreview(record) {
   message.info(
-    `预览「${record.name}」：适用范围 ${qcTemplateScopeTypeLabel(record.scopeType)}，字段 ${record.fieldCount || 0} 个`,
+    `预览「${record.name}」：业务类型 ${record.bizScope || '—'}，适用范围 ${qcTemplateScopeTypeLabel(record.scopeType)}，字段 ${record.fieldCount || 0} 个`,
   )
 }
 

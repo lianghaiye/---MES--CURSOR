@@ -9,144 +9,172 @@
     @cancel="handleCancel"
   >
     <a-form v-if="draft" layout="vertical" class="edit-form">
-      <a-form-item required>
+      <a-form-item>
         <template #label>
           <span class="field-label">
             <FileTextOutlined />
             产品信息
           </span>
         </template>
-        <a-select
-          v-model:value="selectedItemKey"
-          show-search
-          placeholder="请选择产品/物料"
-          :filter-option="filterItemOption"
-          :options="itemSelectOpts"
-          @change="onItemChange"
-        />
-        <div v-if="preview" class="item-preview">
-          <div class="preview-main">
+        <div class="item-preview">
+          <div class="preview-grid">
             <div class="preview-row">
               <span class="preview-label">产品编号</span>
-              <span>{{ preview.itemCode || '—' }}</span>
+              <span>{{ preview?.itemCode || draft.itemCode || '—' }}</span>
             </div>
             <div class="preview-row">
               <span class="preview-label">产品名称</span>
-              <span>{{ preview.itemName || '—' }}</span>
+              <span>{{ preview?.itemName || draft.itemName || '—' }}</span>
             </div>
             <div class="preview-row">
-              <span class="preview-label">产品规格</span>
-              <span>{{ preview.specModel || '—' }}</span>
+              <span class="preview-label">规格型号</span>
+              <span>{{ preview?.specModel || draft.specModel || '—' }}</span>
             </div>
+            <div class="preview-row">
+              <span class="preview-label">材质</span>
+              <span>{{ draft.material || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">图号</span>
+              <span>{{ draft.drawingNo || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">变体属性</span>
+              <span>{{ draft.variantSummary || draft.variantAttr || draft.specAttr || '—' }}</span>
+            </div>
+          </div>
+          <div class="preview-bottom">
             <div class="preview-row">
               <span class="preview-label">库存数量</span>
-              <span>{{ formatQty(preview.stockQty) }} {{ preview.unit || '件' }}</span>
+              <span>
+                {{ formatQty(preview?.stockQty ?? draft.stockQty) }}
+                {{ preview?.unit || draft.unit || '件' }}
+              </span>
+            </div>
+            <div class="preview-bottom-spacer" />
+            <div class="preview-stock-box">
+              <div class="stock-value">
+                {{ formatQty(preview?.warehouseStockQty ?? draft.warehouseStockQty) }}
+              </div>
+              <div class="stock-label">当前仓库数量({{ preview?.unit || draft.unit || '件' }})</div>
             </div>
           </div>
-          <div class="preview-stock-box">
-            <div class="stock-value">{{ formatQty(preview.warehouseStockQty) }}</div>
-            <div class="stock-label">当前仓库数量({{ preview.unit || '件' }})</div>
-          </div>
         </div>
       </a-form-item>
 
-      <a-form-item required>
-        <template #label>
-          <span class="field-label">
-            <HomeOutlined />
-            仓库
-          </span>
-        </template>
-        <a-select
-          v-model:value="draft.shipWarehouse"
-          placeholder="请选择仓库"
-          :options="warehouseOpts"
-          @change="onWarehouseChange"
-        />
-      </a-form-item>
+      <a-row :gutter="16">
+        <a-col :span="8">
+          <a-form-item required>
+            <template #label>
+              <span class="field-label">
+                <HomeOutlined />
+                仓库
+              </span>
+            </template>
+            <a-select
+              v-model:value="draft.shipWarehouse"
+              placeholder="请选择仓库"
+              :options="warehouseOpts"
+              @change="onWarehouseChange"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item required>
+            <template #label>
+              <span class="field-label">
+                <UnorderedListOutlined />
+                出库数量（{{ stockUnitLabel }}）
+              </span>
+            </template>
+            <a-input-number
+              v-model:value="draft.shipQty"
+              :min="0"
+              :precision="4"
+              placeholder="请填写出库数量"
+              style="width: 100%"
+              @change="onShipQtyFieldChange"
+            />
+            <div v-if="canBatchPick" class="vl-tip">
+              可用批次库存：{{ formatQty(availableQty) }} {{ stockUnitLabel }}（{{
+                issueRuleLabel
+              }}）
+            </div>
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item>
+            <template #label>
+              <span class="field-label">
+                <DollarOutlined />
+                单价
+              </span>
+            </template>
+            <a-input-number
+              v-model:value="draft.unitPrice"
+              :min="0"
+              :precision="2"
+              placeholder="请输入"
+              style="width: 100%"
+              @change="onUnitPriceChange"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
 
-      <a-form-item required>
-        <template #label>
-          <span class="field-label">
-            <UnorderedListOutlined />
-            出库数量（{{ stockUnitLabel }}）
-          </span>
-        </template>
-        <a-input-number
-          v-model:value="draft.shipQty"
-          :min="0"
-          :precision="4"
-          placeholder="请填写出库数量"
-          style="width: 100%"
-          @change="onShipQtyFieldChange"
-        />
-        <div v-if="canBatchPick" class="vl-tip">
-          可用批次库存：{{ formatQty(availableQty) }} {{ stockUnitLabel }}（{{ issueRuleLabel }}）
-        </div>
-      </a-form-item>
+      <a-row v-if="canBatchPick" :gutter="16">
+        <a-col :span="24">
+          <a-form-item :required="manualPick">
+            <template #label>
+              <span class="field-label">
+                <UnorderedListOutlined />
+                拣选批次
+              </span>
+            </template>
+            <template v-if="manualPick">
+              <a-select
+                :value="manualPickIds"
+                mode="multiple"
+                allow-clear
+                show-search
+                option-filter-prop="label"
+                placeholder="搜索并多选批次"
+                style="width: 100%"
+                :options="batchOpts"
+                :max-tag-count="3"
+                @change="onManualPickIdsChange"
+              />
+              <div class="vl-tip">
+                {{ OUTBOUND_BATCH_PICK_TIP_MANUAL }}
+                <a class="manual-pick-inline" @click="batchSearchOpen = true">搜索更多</a>
+                <a class="manual-pick-inline" @click="restoreAutoBatchPick">恢复自动</a>
+              </div>
+              <div v-if="manualAllocPreview" class="vl-tip">{{ manualAllocPreview }}</div>
+            </template>
+            <template v-else>
+              <a-input :value="autoAllocPreviewText" disabled />
+              <div class="vl-tip">
+                {{ OUTBOUND_BATCH_PICK_TIP_AUTO }}
+                <a class="manual-pick-inline" @click="enableManualBatchPick">自主拣选</a>
+              </div>
+            </template>
+          </a-form-item>
+        </a-col>
+      </a-row>
 
-      <a-form-item v-if="canBatchPick" :required="manualPick">
-        <template #label>
-          <span class="field-label">
-            <UnorderedListOutlined />
-            拣选批次
-          </span>
-        </template>
-        <template v-if="manualPick">
-          <a-select
-            :value="manualPickIds"
-            mode="multiple"
-            allow-clear
-            show-search
-            option-filter-prop="label"
-            placeholder="搜索并多选批次"
-            style="width: 100%"
-            :options="batchOpts"
-            :max-tag-count="3"
-            @change="onManualPickIdsChange"
-          />
-          <div class="vl-tip">
-            {{ OUTBOUND_BATCH_PICK_TIP_MANUAL }}
-            <a class="manual-pick-inline" @click="batchSearchOpen = true">搜索更多</a>
-            <a class="manual-pick-inline" @click="restoreAutoBatchPick">恢复自动</a>
-          </div>
-          <div v-if="manualAllocPreview" class="vl-tip">{{ manualAllocPreview }}</div>
-        </template>
-        <template v-else>
-          <a-input :value="autoAllocPreviewText" disabled />
-          <div class="vl-tip">
-            {{ OUTBOUND_BATCH_PICK_TIP_AUTO }}
-            <a class="manual-pick-inline" @click="enableManualBatchPick">自主拣选</a>
-          </div>
-        </template>
-      </a-form-item>
-
-      <a-form-item>
-        <template #label>
-          <span class="field-label">
-            <DollarOutlined />
-            单价
-          </span>
-        </template>
-        <a-input-number
-          v-model:value="draft.unitPrice"
-          :min="0"
-          :precision="2"
-          placeholder="请输入"
-          style="width: 100%"
-          @change="onUnitPriceChange"
-        />
-      </a-form-item>
-
-      <a-form-item>
-        <template #label>
-          <span class="field-label">
-            <AccountBookOutlined />
-            总价
-          </span>
-        </template>
-        <a-input-number :value="draft.totalPrice" :precision="2" disabled style="width: 100%" />
-      </a-form-item>
+      <a-row :gutter="16">
+        <a-col :span="8">
+          <a-form-item>
+            <template #label>
+              <span class="field-label">
+                <AccountBookOutlined />
+                总价
+              </span>
+            </template>
+            <a-input-number :value="draft.totalPrice" :precision="2" disabled style="width: 100%" />
+          </a-form-item>
+        </a-col>
+      </a-row>
     </a-form>
 
     <OutboundBatchSearchModal
@@ -178,7 +206,6 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
-import { buildWarehousePickableItems } from '@/utils/warehouseItemPicker'
 import {
   canOutboundBatchPick,
   enrichOutboundLine,
@@ -187,7 +214,6 @@ import {
   syncLineTotalFromUnit,
 } from '@/utils/outboundLineHelpers'
 import { listBatches, stockBatchState } from '@/store/stockBatchStore'
-import { materialInfoState } from '@/store/materialInfoStore'
 import {
   OUTBOUND_BATCH_PICK_TIP_AUTO,
   OUTBOUND_BATCH_PICK_TIP_MANUAL,
@@ -224,7 +250,6 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'confirm'])
 
 const draft = ref(null)
-const selectedItemKey = ref(undefined)
 const preview = ref(null)
 const batchSearchOpen = ref(false)
 
@@ -232,16 +257,6 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
-
-const pickableItems = computed(() => buildWarehousePickableItems())
-
-const itemSelectOpts = computed(() =>
-  pickableItems.value.map((it) => ({
-    label: `${it.code} - ${it.name}`,
-    value: it.rowKey,
-    searchText: `${it.code} ${it.name} ${it.specModel || ''}`,
-  })),
-)
 
 const isDualUnitLine = computed(() => isOutboundDualUnitLine(draft.value || {}))
 const canBatchPick = computed(() => canOutboundBatchPick(draft.value || {}))
@@ -345,7 +360,6 @@ watch(
     if (!visible || !props.line) {
       draft.value = null
       preview.value = null
-      selectedItemKey.value = undefined
       return
     }
     draft.value = reactive(enrichOutboundLine({ ...props.line }))
@@ -353,7 +367,6 @@ watch(
       draft.value.manualBatchPick = true
       applyBatchAllocationsToLine(draft.value, getLineBatchAllocations(draft.value))
     }
-    syncSelectedItemKey()
     refreshPreviewStock()
   },
 )
@@ -401,24 +414,6 @@ function onManualPickIdsChange(ids) {
     if (!check.ok) message.warning(check.message)
   }
   syncLineTotalFromUnit(draft.value)
-}
-
-function filterItemOption(input, option) {
-  const text = (option?.searchText ?? option?.label ?? '').toLowerCase()
-  return text.includes(String(input || '').toLowerCase())
-}
-
-function syncSelectedItemKey() {
-  if (!draft.value?.itemCode) {
-    selectedItemKey.value = undefined
-    return
-  }
-  const hit = pickableItems.value.find(
-    (it) =>
-      it.code === draft.value.itemCode &&
-      (draft.value.itemId ? it.itemId === draft.value.itemId : true),
-  )
-  selectedItemKey.value = hit?.rowKey
 }
 
 function refreshPreviewStock() {
@@ -485,37 +480,6 @@ function onShipQtyFieldChange() {
   syncLineTotalFromUnit(draft.value)
 }
 
-function onItemChange(rowKey) {
-  const item = pickableItems.value.find((it) => it.rowKey === rowKey)
-  if (!item || !draft.value) return
-  const mat = materialInfoState.materials.find((m) => m.code === item.code)
-  const isVL = Boolean(mat?.isVariableLength || item.isVariableLength)
-  const stockUnit = isVL ? mat?.stockUnit || mat?.inventoryUnit || '米' : item.inventoryUnit || '件'
-  Object.assign(draft.value, {
-    itemId: item.itemId,
-    itemCode: item.code,
-    itemName: item.name,
-    itemType: item.itemType,
-    specAttr: item.productAttribute || item.materialType || '',
-    specModel: item.specModel || '',
-    material: item.material || '',
-    drawingNo: item.drawingNo || '',
-    unit: stockUnit,
-    unitPrice: item.unitPrice ?? draft.value.unitPrice,
-    isVariableLength: isVL,
-    pickedBatchId: undefined,
-    pickedBatchNo: undefined,
-    pickedLength: undefined,
-    barcodeBatchNo: '',
-    batchAllocations: [],
-    manualBatchPick: false,
-    shipQty: isVL ? null : draft.value.shipQty || 1,
-  })
-  Object.assign(draft.value, enrichOutboundLine(draft.value))
-  syncLineTotalFromUnit(draft.value)
-  refreshPreviewStock()
-}
-
 function onUnitPriceChange() {
   if (!draft.value) return
   syncLineTotalFromUnit(draft.value)
@@ -528,7 +492,7 @@ function handleCancel() {
 function handleOk() {
   if (!draft.value) return
   if (!draft.value.itemCode) {
-    message.warning('请选择产品信息')
+    message.warning('产品信息缺失')
     return
   }
   if (!draft.value.shipWarehouse) {

@@ -5,7 +5,7 @@ import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver
 import { getMasterDefaults } from '@/utils/productionPlanMaterial'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
-import { convertStockDemandToPurchase } from '@/utils/purchaseUomConvert'
+import { convertStockDemandToPurchase, purchaseQtyToStockQty } from '@/utils/purchaseUomConvert'
 
 function getInTransitOrWipForPlanMaterial(m) {
   return require('@/utils/planPurchaseInTransit').resolveInTransitOrWipForPlanNode(m)
@@ -374,7 +374,8 @@ export function buildPurchaseRequisitionRows(materials, order) {
     const defaults = getMasterDefaults(m.code)
     const defaultSupplier = m.supplier || defaults.supplier || ''
     const master = lookupMaterialMaster(m.code) || m
-    const stockPlan = m.planQty ?? gapQty
+    // 提示口径：计划采购数 = 库存缺口 ÷ 换算率 向上取整（不用 planQty，避免被采购单位回写污染）
+    const stockPlan = gapQty
     const converted = convertStockDemandToPurchase(stockPlan, master)
     const transit = getInTransitOrWipForPlanMaterial(m)
     return {
@@ -409,6 +410,7 @@ export function buildPurchaseRequisitionRows(materials, order) {
       stockUnit: master.stockUnit || master.inventoryUnit || m.unit || '件',
       purchaseUnit: converted.purchaseUnit,
       packageContent: converted.packageContent,
+      purchaseConvertRate: converted.purchaseConvertRate,
       convertHint: converted.convertHint,
       blankSizeText: m.blankSizeText || '',
       blankSize: m.blankSize || null,
@@ -422,12 +424,20 @@ export function buildPurchaseRequisitionRows(materials, order) {
   })
 }
 
-/** 采购申请保存后回写物料 */
+/** 采购申请保存后回写物料（planQty 保持库存单位，与缺口/需求同口径） */
 export function patchMaterialFromPurchaseRequisitionRow(row) {
+  const rate = Number(row.purchaseConvertRate ?? row.packageContent)
+  const purchaseQty = Number(row.planQty) || 0
+  const stockPlan =
+    Number(row.stockPlanQty) > 0
+      ? Number(row.stockPlanQty)
+      : rate > 0
+        ? purchaseQtyToStockQty(purchaseQty, rate)
+        : purchaseQty
   return {
     designateSupplier: row.designatedSupplier,
     supplier: row.supplier,
-    planQty: row.planQty,
+    planQty: stockPlan,
     remark: row.remark || '',
     status: '进行中',
     joinPlan: '是',

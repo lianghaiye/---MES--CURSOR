@@ -33,7 +33,7 @@ export function createEmptyAuxUnit(partial = {}) {
   return {
     id: partial.id || `aux-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     unit: partial.unit || '',
-    convertType: partial.convertType || UNIT_CONVERT.BATCH,
+    convertType: partial.convertType || UNIT_CONVERT.FIXED,
     rate: partial.rate ?? null,
     allowDecimal: partial.allowDecimal !== false,
     roles: Array.isArray(partial.roles) ? [...partial.roles] : [],
@@ -47,25 +47,34 @@ export function roleLabels(roles = []) {
   return (roles || []).map((r) => map[r] || r).filter(Boolean)
 }
 
+/** 含结算角色才允许「按批次覆盖」（过磅实填）；纯采购只支持固定换算率 */
+export function auxUnitAllowsBatchConvert(roles = []) {
+  return (roles || []).includes(UNIT_ROLE.SETTLE)
+}
+
+/** 按角色收敛换算类型：无结算 → 强制固定 */
+export function resolveAuxConvertType(roles = [], convertType) {
+  if (!auxUnitAllowsBatchConvert(roles)) return UNIT_CONVERT.FIXED
+  return convertType === UNIT_CONVERT.FIXED ? UNIT_CONVERT.FIXED : UNIT_CONVERT.BATCH
+}
+
 /** 辅助单位与主单位换算说明文案 */
 export function formatAuxConvertText(row, baseUnit) {
   const unit = normalizeUnit(row?.unit)
   const base = normalizeUnit(baseUnit) || '主单位'
   if (!unit) return '—'
-  if (row.convertType === UNIT_CONVERT.FIXED) {
+  const convertType = resolveAuxConvertType(row?.roles, row?.convertType)
+  if (convertType === UNIT_CONVERT.FIXED) {
     const rate = Number(row.rate)
     if (Number.isFinite(rate) && rate > 0) return `1 ${unit} = ${rate} ${base}`
     return `1 ${unit} = ? ${base}（请填换算率）`
   }
-  // batch
-  if (row.roles?.includes(UNIT_ROLE.SETTLE)) {
-    const rate = Number(row.rate)
-    if (Number.isFinite(rate) && rate > 0) {
-      return `1 ${base} ≈ ${rate} ${unit}（默认估；入库实填为准）`
-    }
-    return `按批次实填 ${unit}（默认换算率仅估）`
+  // batch（仅结算）
+  const rate = Number(row.rate)
+  if (Number.isFinite(rate) && rate > 0) {
+    return `1 ${base} ≈ ${rate} ${unit}（默认估；入库实填为准）`
   }
-  return `点货按 ${unit}，入库存按 ${base}（批次实填）`
+  return `按批次实填 ${unit}（默认换算率仅估）`
 }
 
 /**
@@ -160,7 +169,7 @@ export function applyUnitManageToFlat(baseUnit, auxUnits = [], options = {}) {
     auxUnits: list.map((r) => ({
       id: r.id,
       unit: normalizeUnit(r.unit),
-      convertType: r.convertType === UNIT_CONVERT.FIXED ? UNIT_CONVERT.FIXED : UNIT_CONVERT.BATCH,
+      convertType: resolveAuxConvertType(r.roles, r.convertType),
       rate: r.rate == null || r.rate === '' ? null : Number(r.rate),
       allowDecimal: Boolean(r.allowDecimal),
       roles: [...(r.roles || [])],
@@ -197,10 +206,11 @@ export function validateUnitManage(baseUnit, auxUnits = []) {
       UNIT_ROLE_OPTIONS.some((o) => o.value === r && o.enabled),
     )
     if (!roles.length) return { ok: false, message: `请为「${u}」勾选业务角色（采购或结算）` }
-
-    if (row.enabled !== false && row.convertType === UNIT_CONVERT.FIXED) {
-      const rate = Number(row.rate)
-      if (!(rate > 0)) return { ok: false, message: `固定换算请填写「${u}」相对主单位的换算率` }
+    if (roles.includes(UNIT_ROLE.PURCHASE) && roles.includes(UNIT_ROLE.SETTLE)) {
+      return {
+        ok: false,
+        message: `「${u}」不能同时挂采购与结算`,
+      }
     }
   }
 

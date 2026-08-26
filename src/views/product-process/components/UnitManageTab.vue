@@ -48,8 +48,8 @@
             {{ formatDefaultRate(record) }}
           </template>
           <template v-else-if="column.key === 'convertType'">
-            <a-tag :color="record.convertType === 'fixed' ? 'green' : 'orange'">
-              {{ record.convertType === 'fixed' ? '固定' : '按批次覆盖' }}
+            <a-tag :color="displayConvertType(record) === 'fixed' ? 'green' : 'orange'">
+              {{ displayConvertType(record) === 'fixed' ? '固定' : '按批次覆盖' }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'allowDecimal'">
@@ -85,10 +85,14 @@
       </a-table>
 
       <div class="batch-tip">
-        换算类型为「按批次覆盖」时，默认换算率仅作预估；入库过磅/实填后按批次实际数量记账与结算。
-        有结算单位且主数据未填默认换算率时，开单预计结算数量可回退用该物料最近一批的批次单量估算。
-        采购角色的默认换算率表示「1 采购单位 = N 主单位」，采购申请/采购订单按库存需求 ÷
-        该值向上取整；不填则不做包装换算。
+        <p>
+          <b>采购</b>：仅支持「固定」换算。默认换算率表示 1 采购单位 = N
+          主单位；填写后采购申请按库存需求除以换算率向上取整，未填则不做包装换算。
+        </p>
+        <p>
+          <b>结算</b
+          >：可选「按批次覆盖」。默认换算率仅开单预估；入库过磅实填后批次单量写入库存明细。主数据未填默认率时，可回退最近一批的批次单量估算。
+        </p>
       </div>
       <p v-if="caliberHint" class="caliber-hint">{{ caliberHint }}</p>
     </section>
@@ -111,9 +115,38 @@
             :filter-option="filterUnitOption"
           />
         </a-form-item>
+        <a-form-item label="业务角色" required>
+          <div class="role-check-row">
+            <a-checkbox
+              v-for="opt in UNIT_ROLE_OPTIONS"
+              :key="opt.value"
+              :checked="draft.roles?.includes(opt.value)"
+              :disabled="!opt.enabled"
+              @change="(e) => toggleRole(opt.value, e.target.checked)"
+            >
+              {{ opt.label }}
+              <span v-if="!opt.enabled" class="role-soon">（暂未开放）</span>
+            </a-checkbox>
+          </div>
+        </a-form-item>
+        <a-form-item label="换算类型" required>
+          <a-radio-group v-model:value="draft.convertType" :disabled="!draftAllowsBatch">
+            <a-radio
+              v-for="opt in UNIT_CONVERT_OPTIONS"
+              :key="opt.value"
+              :value="opt.value"
+              :disabled="opt.value === UNIT_CONVERT.BATCH && !draftAllowsBatch"
+            >
+              {{ opt.label }}
+            </a-radio>
+          </a-radio-group>
+          <div v-if="draftAllowsBatch && draft.convertType === 'batch'" class="field-extra">
+            入库过磅后按批次实际数量记账与结算，默认换算率仅作开单预估
+          </div>
+        </a-form-item>
         <a-form-item label="默认换算率">
           <div class="rate-row">
-            <template v-if="draft.roles?.includes('settle') && !draft.roles?.includes('purchase')">
+            <template v-if="draft.roles?.includes('settle')">
               <span class="rate-prefix">1 {{ baseUnit || '主单位' }} ≈</span>
               <a-input-number
                 v-model:value="draft.rate"
@@ -133,18 +166,8 @@
                 style="width: 140px"
                 placeholder="选填"
               />
-              <span class="rate-suffix">{{ baseUnit || '主单位' }}（预估）</span>
+              <span class="rate-suffix">{{ baseUnit || '主单位' }}（包装换算）</span>
             </template>
-          </div>
-        </a-form-item>
-        <a-form-item label="换算类型" required>
-          <a-radio-group v-model:value="draft.convertType">
-            <a-radio v-for="opt in UNIT_CONVERT_OPTIONS" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </a-radio>
-          </a-radio-group>
-          <div v-if="draft.convertType === 'batch'" class="field-extra">
-            入库过磅后按批次实际数量记账，默认换算率仅作预估
           </div>
         </a-form-item>
         <a-form-item label="允许小数" required>
@@ -152,19 +175,6 @@
             <a-radio :value="true">是</a-radio>
             <a-radio :value="false">否</a-radio>
           </a-radio-group>
-        </a-form-item>
-        <a-form-item label="业务角色" required>
-          <a-checkbox-group v-model:value="draft.roles">
-            <a-checkbox
-              v-for="opt in UNIT_ROLE_OPTIONS"
-              :key="opt.value"
-              :value="opt.value"
-              :disabled="!opt.enabled"
-            >
-              {{ opt.label }}
-              <span v-if="!opt.enabled" class="role-soon">（暂未开放）</span>
-            </a-checkbox>
-          </a-checkbox-group>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -181,8 +191,10 @@ import {
   UNIT_ROLE,
   UNIT_ROLE_OPTIONS,
   applyUnitManageToFlat,
+  auxUnitAllowsBatchConvert,
   createEmptyAuxUnit,
   formatAuxConvertText,
+  resolveAuxConvertType,
   roleLabels,
   validateUnitManage,
 } from '@/utils/unitManageTab'
@@ -211,6 +223,9 @@ const modalOpen = ref(false)
 const editingId = ref(null)
 const draft = reactive(createEmptyAuxUnit())
 
+/** 勾选结算才允许「按批次覆盖」 */
+const draftAllowsBatch = computed(() => auxUnitAllowsBatchConvert(draft.roles))
+
 const caliberHint = computed(() => {
   const flat = applyUnitManageToFlat(props.baseUnit, props.auxUnits)
   return buildUnitCaliberHint({
@@ -219,6 +234,35 @@ const caliberHint = computed(() => {
     settleUnit: flat.settleUnit,
   })
 })
+
+function displayConvertType(record) {
+  return resolveAuxConvertType(record?.roles, record?.convertType)
+}
+
+/** 采购 / 结算互斥：同一辅助单位只允许一个业务角色 */
+function toggleRole(role, checked) {
+  if (!UNIT_ROLE_OPTIONS.some((o) => o.value === role && o.enabled)) return
+  let roles = [...(draft.roles || [])].filter((r) =>
+    UNIT_ROLE_OPTIONS.some((o) => o.value === r && o.enabled),
+  )
+  if (checked) {
+    if (role === UNIT_ROLE.PURCHASE || role === UNIT_ROLE.SETTLE) {
+      const other = role === UNIT_ROLE.PURCHASE ? UNIT_ROLE.SETTLE : UNIT_ROLE.PURCHASE
+      roles = roles.filter((r) => r !== other)
+    }
+    if (!roles.includes(role)) roles.push(role)
+  } else {
+    roles = roles.filter((r) => r !== role)
+  }
+  draft.roles = roles
+}
+
+watch(
+  () => [...(draft.roles || [])],
+  (roles) => {
+    draft.convertType = resolveAuxConvertType(roles, draft.convertType)
+  },
+)
 
 const auxUnitSelectOpts = computed(() => {
   const base = String(props.baseUnit || '').trim()
@@ -292,13 +336,17 @@ function openCreate() {
     return
   }
   editingId.value = null
-  resetDraft({ convertType: UNIT_CONVERT.BATCH, allowDecimal: true, roles: [] })
+  // 默认固定；勾选结算后才可改「按批次覆盖」
+  resetDraft({ convertType: UNIT_CONVERT.FIXED, allowDecimal: true, roles: [] })
   modalOpen.value = true
 }
 
 function openEdit(record) {
   editingId.value = record.id
-  resetDraft(record)
+  resetDraft({
+    ...record,
+    convertType: resolveAuxConvertType(record.roles, record.convertType),
+  })
   modalOpen.value = true
 }
 
@@ -327,11 +375,12 @@ function submitModal() {
   const roles = (draft.roles || []).filter((r) =>
     UNIT_ROLE_OPTIONS.some((o) => o.value === r && o.enabled),
   )
+  const convertType = resolveAuxConvertType(roles, draft.convertType)
   const prev = editingId.value ? (props.auxUnits || []).find((r) => r.id === editingId.value) : null
   const row = createEmptyAuxUnit({
     id: editingId.value || undefined,
     unit: draft.unit,
-    convertType: draft.convertType,
+    convertType,
     rate: draft.rate,
     allowDecimal: draft.allowDecimal,
     roles,
@@ -358,7 +407,11 @@ function submitModal() {
       if (role === UNIT_ROLE.SETTLE && roles.includes(UNIT_ROLE.SETTLE)) return false
       return true
     })
-    return { ...r, roles: nextRoles }
+    return {
+      ...r,
+      roles: nextRoles,
+      convertType: resolveAuxConvertType(nextRoles, r.convertType),
+    }
   })
 
   emit('update:auxUnits', stripped)
@@ -425,6 +478,14 @@ defineExpose({
   color: rgba(0, 0, 0, 0.65);
   font-size: 12px;
   line-height: 1.6;
+
+  p {
+    margin: 0;
+
+    & + p {
+      margin-top: 6px;
+    }
+  }
 }
 
 .caliber-hint {
@@ -472,6 +533,12 @@ defineExpose({
 .role-soon {
   color: rgba(0, 0, 0, 0.35);
   font-size: 12px;
+}
+
+.role-check-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
 .is-view-only {

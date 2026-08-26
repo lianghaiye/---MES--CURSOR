@@ -7,7 +7,7 @@ export const qcTemplateStatusOptions = ['启用', '停用']
 
 export const qcTemplateTypeOptions = ['系统模板', '自定义模板']
 
-/** 业务范围（历史字段，列表兼容） */
+/** 业务类型（质检场景） */
 export const qcTemplateBizScopeOptions = [
   '成品检',
   '来料质检',
@@ -48,7 +48,7 @@ export function createQcTemplate(partial = {}) {
     status: partial.status || '停用',
     type: partial.type || '自定义模板',
     isSystem: Boolean(partial.isSystem),
-    bizScope: partial.bizScope || qcTemplateScopeTypeLabel(resolvedScopeType),
+    bizScope: partial.bizScope || '成品检',
     objects: Array.isArray(partial.objects) ? partial.objects : [],
     fieldCount: partial.fieldCount != null ? partial.fieldCount : fields.length,
     fields,
@@ -70,7 +70,7 @@ export const mockQcTemplates = [
     type: '系统模板',
     isSystem: true,
     scopeType: QC_TEMPLATE_SCOPE_TYPE.GLOBAL,
-    bizScope: '全局',
+    bizScope: '来料质检',
     objects: [],
     fieldCount: 4,
     creator: '系统管理员',
@@ -86,7 +86,7 @@ export const mockQcTemplates = [
     type: '系统模板',
     isSystem: true,
     scopeType: QC_TEMPLATE_SCOPE_TYPE.GLOBAL,
-    bizScope: '全局',
+    bizScope: '出厂质检',
     objects: [],
     fieldCount: 5,
     creator: '系统管理员',
@@ -102,7 +102,7 @@ export const mockQcTemplates = [
     type: '自定义模板',
     isSystem: false,
     scopeType: QC_TEMPLATE_SCOPE_TYPE.SINGLE,
-    bizScope: '单产品',
+    bizScope: '成品检',
     objects: [],
     fieldCount: 6,
     creator: '张三',
@@ -118,7 +118,7 @@ export const mockQcTemplates = [
     type: '自定义模板',
     isSystem: false,
     scopeType: QC_TEMPLATE_SCOPE_TYPE.CATEGORY,
-    bizScope: '产品类别',
+    bizScope: '生产过程检',
     objects: [],
     fieldCount: 3,
     creator: '王五',
@@ -134,7 +134,7 @@ export const mockQcTemplates = [
     type: '自定义模板',
     isSystem: false,
     scopeType: QC_TEMPLATE_SCOPE_TYPE.SINGLE,
-    bizScope: '单产品',
+    bizScope: '外协回货检',
     objects: [],
     fieldCount: 4,
     creator: '赵六',

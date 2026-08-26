@@ -36,16 +36,20 @@
               <span>{{ draft.material || '—' }}</span>
             </div>
             <div class="preview-row">
-              <span class="preview-label">变体属性</span>
-              <span>{{ draft.variantAttr || '—' }}</span>
+              <span class="preview-label">图号</span>
+              <span>{{ draft.drawingNo || '—' }}</span>
             </div>
             <div class="preview-row">
-              <span class="preview-label">订单数量</span>
-              <span>{{ formatDeliveryQty(draft.orderQty) }} {{ draft.unit || '件' }}</span>
+              <span class="preview-label">变体属性</span>
+              <span>{{ draft.variantAttr || '—' }}</span>
             </div>
           </div>
           <div class="preview-bottom">
             <div class="preview-rest">
+              <div class="preview-row">
+                <span class="preview-label">订单数量</span>
+                <span>{{ formatDeliveryQty(draft.orderQty) }} {{ draft.unit || '件' }}</span>
+              </div>
               <div class="preview-row">
                 <span class="preview-label">库存数</span>
                 <span>{{ formatDeliveryQty(draft.stockQty) }} {{ draft.unit || '件' }}</span>
@@ -312,50 +316,15 @@ function handleSave() {
 <style lang="less" scoped>
 @import '../../inventory/components/inventoryLineEditModal.less';
 
-.item-preview {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.preview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px 16px;
-  margin-bottom: 8px;
-
-  .preview-row {
-    margin-bottom: 0;
-    min-width: 0;
-
-    > span:last-child {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
-}
-
-.preview-bottom {
-  display: flex;
-  align-items: stretch;
-  gap: 12px;
-}
-
-.preview-rest {
-  flex: 1;
-  min-width: 0;
-}
-
-.preview-stock-box {
-  width: 148px;
-  min-height: 96px;
-}
-
 .price-lock-hint {
   margin-top: 4px;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
+  white-space: nowrap;
+}
+
+.preview-row .preview-label {
+  min-width: 7em;
 }
 </style>

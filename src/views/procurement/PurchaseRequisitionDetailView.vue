@@ -80,7 +80,14 @@
                     }}{{ line.inventoryUnit ? ` ${line.inventoryUnit}` : '' }}
                   </template>
                   <template v-else-if="column.key === 'convertHint'">
-                    {{ line.convertHint || '—' }}
+                    {{
+                      line.convertHint ||
+                      (line.unit && line.inventoryUnit && line.unit === line.inventoryUnit
+                        ? '无需换算'
+                        : line.unit && line.inventoryUnit && line.unit !== line.inventoryUnit
+                          ? '未配置换算率'
+                          : '—')
+                    }}
                   </template>
                   <template v-else-if="column.key === 'stockQty'">
                     {{ formatQty(line.stockQty) }}
