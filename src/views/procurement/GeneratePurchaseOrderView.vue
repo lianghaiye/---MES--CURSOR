@@ -94,7 +94,7 @@
 
         <template v-else-if="column.key === 'stockAlert'">
           <span :class="stockAlertClass(record._stockAlert?.type)">
-            {{ record._stockAlert?.text || '—' }}
+            {{ formatStockAlertDisplay(record._stockAlert) }}
           </span>
         </template>
 
@@ -109,6 +109,26 @@
             :filter-option="filterUnitOption"
             @change="onUnitChange(record)"
           />
+        </template>
+
+        <template v-else-if="column.key === 'settleUnit'">
+          {{ record.settleUnit || '—' }}
+        </template>
+
+        <template v-else-if="column.key === 'settleQty'">
+          <div v-if="hasSettleUnit(record)" class="settle-qty-cell">
+            <a-input-number
+              v-model:value="record.settleQty"
+              size="small"
+              :min="0"
+              :precision="3"
+              style="width: 100%"
+              placeholder="选填预估"
+              @change="onSettleQtyChange(record)"
+            />
+            <span v-if="record.settleUnit" class="unit-suffix">{{ record.settleUnit }}</span>
+          </div>
+          <span v-else>—</span>
         </template>
 
         <template v-else-if="column.key === 'orderSizeText'">
@@ -317,7 +337,7 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="库存预警信息">
-              <a-input :value="lineEditDraft._stockAlert?.text || '—'" disabled />
+              <a-input :value="formatStockAlertDisplay(lineEditDraft._stockAlert)" disabled />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -344,6 +364,22 @@
                 style="width: 100%"
                 :options="purchaseUnitOpts"
                 :filter-option="filterUnitOption"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="hasSettleUnit(lineEditDraft)" :span="8">
+            <a-form-item label="结算单位">
+              <a-input :value="lineEditDraft.settleUnit" disabled />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="hasSettleUnit(lineEditDraft)" :span="8">
+            <a-form-item :label="`预计结算数量（${lineEditDraft.settleUnit || '结算'}）`">
+              <a-input-number
+                v-model:value="lineEditDraft.settleQty"
+                :min="0"
+                :precision="3"
+                style="width: 100%"
+                placeholder="有标准单重时可自动预估"
               />
             </a-form-item>
           </a-col>
@@ -480,6 +516,12 @@ import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { mergeRequisitionLines, recalcMergedLine } from '@/utils/purchaseMerge'
 import {
+  hasSettleUnit,
+  applySettleFieldsFromMaterial,
+  resolveSettleEstimateRate,
+} from '@/utils/settleUnit'
+import { materialInfoState } from '@/store/materialInfoStore'
+import {
   confirmGeneratePurchaseOrders,
   getRequisitionsByIds,
 } from '@/store/purchaseRequisitionStore'
@@ -497,7 +539,11 @@ import {
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
-import { resolveStockAlertHint, stockAlertClass } from '@/utils/stockAlertDisplay'
+import {
+  resolveStockAlertHint,
+  stockAlertClass,
+  formatStockAlertDisplay,
+} from '@/utils/stockAlertDisplay'
 import { generatePurchaseOrderColumns } from '@/utils/generatePurchaseOrderColumns'
 import {
   applyOrderSizeToLine,
@@ -577,9 +623,10 @@ const purchaseUnitOpts = computed(() => {
 })
 
 const { columnSettings, columnDrawerOpen, displayColumns, defaultColumnSettings } =
-  useTableColumnSettings('generate-purchase-order-lines-v6', generatePurchaseOrderColumns, {
+  useTableColumnSettings('generate-purchase-order-lines-v7', generatePurchaseOrderColumns, {
     minScrollX: 3200,
     pinEdgeColumns: false,
+    pinIndexColumn: true,
     pinActionColumn: true,
   })
 
@@ -635,16 +682,27 @@ function decorateRow(row) {
     materialCode: row.materialCode,
     stockQty: row.stockQty,
   })
-  return {
+  const next = {
     ...row,
     urgency: row.urgency || '正常',
     variantSummary: row.variantSummary || '',
     _stockAlert: hint,
   }
+  if (!String(next.settleUnit || '').trim()) {
+    const master = materialInfoState.materials.find((m) => m.code === next.materialCode)
+    if (master) applySettleFieldsFromMaterial(next, master)
+  } else if (!(Number(next.standardUnitWeight) > 0)) {
+    const { rate, source } = resolveSettleEstimateRate(next)
+    if (rate != null) {
+      next.standardUnitWeight = rate
+      next.settleEstimateRateSource = source
+    }
+  }
+  return next
 }
 
-function recalcRow(record) {
-  recalcMergedLine(record, taxModeExcluding.value)
+function recalcRow(record, options = {}) {
+  recalcMergedLine(record, taxModeExcluding.value, options)
 }
 
 function syncHeaderDeliveryFromRows() {
@@ -804,6 +862,10 @@ function onRowChange(record) {
   recalcRow(record)
 }
 
+function onSettleQtyChange(record) {
+  recalcRow(record, { refreshSettleEstimate: false })
+}
+
 function filterUnitOption(input, option) {
   return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
 }
@@ -847,7 +909,11 @@ function applyLineEdit() {
   if (target) {
     Object.assign(target, draft)
     target.purchaseUnit = target.unit || target.purchaseUnit || ''
-    recalcRow(target)
+    if (hasSettleUnit(target) && !(Number(target.settleQty) > 0)) {
+      recalcRow(target)
+    } else {
+      recalcRow(target, { refreshSettleEstimate: false })
+    }
     target._stockAlert = resolveStockAlertHint({
       materialCode: target.materialCode,
       stockQty: target.stockQty,
@@ -1016,6 +1082,18 @@ function handleConfirm() {
 
   :deep(.ant-table-thead > tr > th .ant-table-column-sorters) {
     white-space: nowrap;
+  }
+}
+
+.settle-qty-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .unit-suffix {
+    flex-shrink: 0;
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 12px;
   }
 }
 

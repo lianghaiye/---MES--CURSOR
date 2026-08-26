@@ -358,7 +358,7 @@ const baseColumns = [
   { title: '万元', key: 'amountWan', width: 90, align: 'right' },
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { title: '预计到货日期', dataIndex: 'estimatedArrivalDate', width: 120 },
-  { title: '业务员', dataIndex: 'salesperson', width: 100 },
+  { title: '采购员', dataIndex: 'salesperson', width: 100 },
   { title: '来源', dataIndex: 'source', width: 110 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 140 },

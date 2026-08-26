@@ -1297,12 +1297,11 @@ function onUnitManageFlatChange(flat) {
 
 function syncUnitCaliberFlags() {
   const dual = deriveIsVariableLength(form.inventoryUnit, form.purchaseUnit)
-  const wasDual = form.isVariableLength
   form.isVariableLength = dual
   form.stockUnit = form.inventoryUnit
   if (dual) {
     form.uomRelation = resolveUomRelationByInventory(form.inventoryUnit)
-    if (!wasDual) form.packContentQty = undefined
+    // 采购≠库存时换算率来自辅助单位「采购」默认换算率，勿清空
   } else {
     form.uomRelation = ''
     if (!form.purchaseUnit && form.inventoryUnit) {
@@ -1711,6 +1710,12 @@ function validate() {
     form.purchaseUnit = form.inventoryUnit
   }
   syncUnitCaliberFlags()
+  // 同步后再用辅助单位换算率回填（避免 sync 影响）
+  {
+    const flat = applyUnitManageToFlat(form.inventoryUnit, form.auxUnits)
+    form.packContentQty = flat.packContentQty
+    form.standardUnitWeight = flat.standardUnitWeight
+  }
   if (form.isVariableLength && !form.purchaseUnit) {
     message.warning('请配置带「采购」角色的辅助单位')
     activeTabKey.value = 'units'

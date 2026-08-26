@@ -88,6 +88,15 @@
                   <template v-else-if="column.key === 'planPurchaseQty'">
                     {{ formatQty(line.planPurchaseQty) }}{{ line.unit ? ` ${line.unit}` : '' }}
                   </template>
+                  <template v-else-if="column.key === 'settleQty'">
+                    {{
+                      line.settleUnit
+                        ? line.settleQty != null && line.settleQty !== ''
+                          ? `${formatQty(line.settleQty)} ${line.settleUnit}`
+                          : '—'
+                        : '—'
+                    }}
+                  </template>
                   <template v-else-if="column.key === 'poGenStatus'">
                     <a-tag :color="line.poGenStatus === '已生成采购' ? 'success' : 'default'">
                       {{ line.poGenStatus || '未生成采购' }}

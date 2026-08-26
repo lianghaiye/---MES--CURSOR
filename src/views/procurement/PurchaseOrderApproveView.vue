@@ -194,6 +194,8 @@ const lineColumns = [
   { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 110, ellipsis: true },
   { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
   { title: '采购单位', dataIndex: 'unit', width: 80 },
+  { title: '结算单位', dataIndex: 'settleUnit', width: 80 },
+  { title: '预计结算数量', dataIndex: 'settleQty', key: 'settleQty', width: 110, align: 'right' },
   {
     title: '订货尺寸',
     key: 'orderSizeText',

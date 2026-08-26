@@ -27,6 +27,8 @@ export const purchaseRequisitionFormLineColumns = [
   { title: '换算', dataIndex: 'convertHint', key: 'convertHint', width: 110, ellipsis: true },
   { title: '库存数', dataIndex: 'stockQty', key: 'stockQty', width: 90, align: 'right' },
   { title: '计划采购数', key: 'planPurchaseQty', width: 110 },
+  { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
+  { title: '预计结算数量', dataIndex: 'settleQty', key: 'settleQty', width: 110, align: 'right' },
   { title: '供应商', key: 'supplierName', width: 160 },
   { title: '收货仓库', key: 'receivingWarehouse', width: 130 },
   { title: '销售单号', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 140, ellipsis: true },

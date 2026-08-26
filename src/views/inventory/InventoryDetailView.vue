@@ -383,7 +383,7 @@
             type="info"
             show-icon
             class="batch-soft-tip"
-            message="本页为批次快照：按当前出库规则排序（余料优先 → 批次号先进先出/后进先出）。一物一码批次可展开查看在库件码；有结算过磅的批次会显示件数/过磅总重/批次单重/偏差（按批次覆盖换算记录，不进主数据）。出入库痕迹请看「物料流水」。"
+            message="本页为批次快照：按当前出库规则排序（余料优先 → 批次号先进先出/后进先出）。一物一码批次可展开查看在库件码；有结算过磅的批次会显示件数/过磅总重/批次单重（按批次覆盖换算记录，不进主数据）。出入库痕迹请看「物料流水」。"
           />
           <a-table
             :columns="drawerBatchColumns"
@@ -434,18 +434,6 @@
               </template>
               <template v-else-if="column.key === 'convertActualUnitWeight'">
                 {{ formatConvertActualUnitWeight(record) }}
-              </template>
-              <template v-else-if="column.key === 'convertDeviation'">
-                <span
-                  v-if="hasBatchUomConvert(record)"
-                  :class="[
-                    'deviation-text',
-                    `is-${deviationTone(record.uomConvert?.deviationPct)}`,
-                  ]"
-                >
-                  {{ formatDeviationPct(record.uomConvert?.deviationPct) }}
-                </span>
-                <span v-else class="muted">—</span>
               </template>
               <template v-else-if="column.key === 'status'">
                 <a-tag :color="record.status === '在库' ? 'green' : 'default'">
@@ -631,7 +619,7 @@ import {
   formatInventoryWeight,
   inventoryMaterialTypeOptions,
 } from '@/utils/inventoryDetailLines'
-import { hasBatchUomConvert, formatDeviationPct, deviationTone } from '@/utils/batchUomConvert'
+import { hasBatchUomConvert } from '@/utils/batchUomConvert'
 import { formatQtyWithUnit, formatQty } from '@/utils/numberFormat'
 import {
   CASTING_BLANK_SETTLE_CODE,
@@ -846,7 +834,6 @@ const drawerBatchColumns = computed(() => {
       { title: '件数', key: 'convertPieceCount', width: 72, align: 'right' },
       { title: '过磅总重', key: 'convertSettleQty', width: 110, align: 'right' },
       { title: '批次单重', key: 'convertActualUnitWeight', width: 110, align: 'right' },
-      { title: '偏差', key: 'convertDeviation', width: 80, align: 'right' },
     )
   }
   cols.push(
@@ -856,7 +843,7 @@ const drawerBatchColumns = computed(() => {
   return cols
 })
 
-const drawerBatchTableScrollX = computed(() => (drawerHasUomConvert.value ? 1680 : 1280))
+const drawerBatchTableScrollX = computed(() => (drawerHasUomConvert.value ? 1600 : 1280))
 
 const drawerPieceColumns = [
   { title: '件码', dataIndex: 'serialNo', key: 'serialNo', width: 160 },
@@ -1391,19 +1378,6 @@ watch(
 
 .muted {
   color: rgba(0, 0, 0, 0.25);
-}
-
-.deviation-text.is-success {
-  color: #389e0d;
-}
-.deviation-text.is-warning {
-  color: #d48806;
-}
-.deviation-text.is-error {
-  color: #cf1322;
-}
-.deviation-text.is-default {
-  color: rgba(0, 0, 0, 0.65);
 }
 
 .soft-detail-btn {

@@ -24,7 +24,9 @@ export function createPoLineItem(partial = {}) {
       },
       purchaseQty,
     )
-    settleQty = estimated != null ? estimated : Number(partial.settleQty) || 0
+    if (estimated != null) settleQty = estimated
+    else if (Number(partial.settleQty) > 0) settleQty = Number(partial.settleQty)
+    else settleQty = undefined
   } else {
     settleQty = undefined
   }

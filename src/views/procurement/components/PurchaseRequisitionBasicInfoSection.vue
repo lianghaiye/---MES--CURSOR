@@ -79,7 +79,7 @@ const fields = computed(() => {
       label: '收货仓库',
       format: () => display(r.receivingWarehouse || props.defaultWarehouse),
     },
-    { key: 'salesperson', label: '业务员' },
+    { key: 'salesperson', label: '采购员' },
     { key: 'source', label: '来源' },
     { key: 'salesOrderNo', label: '销售单号' },
     { key: 'remark', label: '备注', fullRow: true },

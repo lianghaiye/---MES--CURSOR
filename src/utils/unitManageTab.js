@@ -140,7 +140,7 @@ export function applyUnitManageToFlat(baseUnit, auxUnits = [], options = {}) {
     standardUnitWeight = undefined
   }
 
-  /** 采购辅助单位默认换算率 → 兼容旧「包装含量」（1 采购单位 = N 库存单位） */
+  /** 采购辅助单位默认换算率 → 同步到扁平字段（兼容旧 packageContent 读取方） */
   let packageContent
   if (purchaseRow) {
     const rate = Number(purchaseRow.rate)

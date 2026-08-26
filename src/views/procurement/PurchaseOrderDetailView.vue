@@ -150,6 +150,15 @@
                   <template v-else-if="column.key === 'purchaseQty'">
                     {{ formatQty(line.purchaseQty) }}
                   </template>
+                  <template v-else-if="column.key === 'settleQty'">
+                    {{
+                      line.settleUnit
+                        ? line.settleQty != null && line.settleQty !== ''
+                          ? `${formatQty(line.settleQty)} ${line.settleUnit}`
+                          : '—'
+                        : '—'
+                    }}
+                  </template>
                   <template v-else-if="column.key === 'stockQty'">
                     {{ formatQty(line.stockQty) }}
                   </template>
@@ -566,6 +575,8 @@ const lineColumns = [
   { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 110, ellipsis: true },
   { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
   { title: '采购单位', dataIndex: 'unit', width: 80 },
+  { title: '结算单位', dataIndex: 'settleUnit', width: 80 },
+  { title: '预计结算数量', dataIndex: 'settleQty', key: 'settleQty', width: 110, align: 'right' },
   {
     title: '订货尺寸',
     key: 'orderSizeText',

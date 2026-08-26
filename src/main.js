@@ -6,6 +6,7 @@ import 'ant-design-vue/dist/reset.css'
 import './styles/global.less'
 import '@/store/productInfoStore'
 import '@/store/materialInfoStore'
+import '@/store/stockBatchStore'
 import { bootstrapSpuSkuData } from '@/utils/spuBootstrap'
 
 bootstrapSpuSkuData()

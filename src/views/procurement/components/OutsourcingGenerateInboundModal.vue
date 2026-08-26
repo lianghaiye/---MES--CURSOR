@@ -11,12 +11,12 @@
       <a-row :gutter="[12, 12]" style="width: 100%">
         <a-col :span="8">
           <a-form-item label="外协单号" required>
-            <a-input :value="outsourcingOrder?.orderNo" disabled size="small" />
+            <a-input :value="headerOrderNo" disabled size="small" :title="headerOrderNo" />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="供应商">
-            <a-input :value="outsourcingOrder?.supplier" disabled size="small" />
+            <a-input :value="headerSupplier" disabled size="small" :title="headerSupplier" />
           </a-form-item>
         </a-col>
         <a-col :span="8">
@@ -60,7 +60,7 @@
     <a-table
       :columns="columns"
       :data-source="displayLines"
-      row-key="id"
+      row-key="rowKey"
       size="small"
       bordered
       :pagination="false"
@@ -159,6 +159,7 @@ import { filterInboundLinesByScope } from '@/utils/inboundLineScope'
 const props = defineProps({
   open: { type: Boolean, default: false },
   outsourcingOrder: { type: Object, default: null },
+  outsourcingOrders: { type: Array, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -173,22 +174,55 @@ const lineScope = ref('pending')
 const saving = ref(false)
 const warehouseOpts = warehouseOptions
 
+const sourceOrders = computed(() => {
+  if (Array.isArray(props.outsourcingOrders) && props.outsourcingOrders.length) {
+    return props.outsourcingOrders.filter(Boolean)
+  }
+  return props.outsourcingOrder ? [props.outsourcingOrder] : []
+})
+const isMultiOrder = computed(() => sourceOrders.value.length > 1)
+const headerOrderNo = computed(() => {
+  const nos = sourceOrders.value.map((o) => o.orderNo).filter(Boolean)
+  if (!nos.length) return ''
+  if (nos.length === 1) return nos[0]
+  return nos.length <= 3 ? nos.join('、') : `${nos.slice(0, 2).join('、')} 等 ${nos.length} 单`
+})
+const headerSupplier = computed(() => {
+  const list = [...new Set(sourceOrders.value.map((o) => o.supplier).filter(Boolean))]
+  if (!list.length) return ''
+  return list.length === 1 ? list[0] : list.join('、')
+})
+
 const displayLines = computed(() => filterInboundLinesByScope(inboundLines.value, lineScope.value))
 
-const columns = [
-  { title: '序号', key: 'index', width: 52, align: 'center' },
-  { title: '入库进度', key: 'inboundProgress', width: 180 },
-  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true },
-  { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '单位', dataIndex: 'unit', width: 80 },
-  { title: '剩余可入', key: 'remainQty', width: 100, align: 'right' },
-  { title: '入库仓库', key: 'warehouse', width: 120 },
-  { title: '入库数量', key: 'qty', width: 110 },
-  { title: '操作', key: 'action', width: 80 },
-]
+const columns = computed(() => {
+  const cols = [
+    { title: '序号', key: 'index', width: 52, align: 'center' },
+    { title: '入库进度', key: 'inboundProgress', width: 180 },
+  ]
+  if (isMultiOrder.value) {
+    cols.push({
+      title: '外协单号',
+      key: 'outsourcingOrderNo',
+      dataIndex: 'outsourcingOrderNo',
+      width: 140,
+      ellipsis: true,
+    })
+  }
+  cols.push(
+    { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true },
+    { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
+    { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+    { title: '单位', dataIndex: 'unit', width: 80 },
+    { title: '剩余可入', key: 'remainQty', width: 100, align: 'right' },
+    { title: '入库仓库', key: 'warehouse', width: 120 },
+    { title: '入库数量', key: 'qty', width: 110 },
+    { title: '操作', key: 'action', width: 80 },
+  )
+  return cols
+})
 
-const tableScrollX = columns.reduce((sum, col) => sum + (col.width || 100), 0)
+const tableScrollX = computed(() => columns.value.reduce((sum, col) => sum + (col.width || 100), 0))
 
 const totalQty = computed(() => displayLines.value.reduce((s, l) => s + (Number(l.qty) || 0), 0))
 
@@ -200,7 +234,10 @@ function buildLine(order, line) {
   const remainingQty = calcWxLineRemainInboundQty(order, line)
   const locked = isWxLineOccupyFull(order, line)
   return {
+    rowKey: `${order.id}__${line.id}`,
     id: line.id,
+    outsourcingOrderId: order.id,
+    outsourcingOrderNo: order.orderNo || '',
     productName: line.productName || line.itemName || '',
     productCode: line.productCode || line.itemCode || '',
     specModel: line.specModel || '',
@@ -218,14 +255,22 @@ function buildLine(order, line) {
 watch(
   () => props.open,
   (val) => {
-    if (!val || !props.outsourcingOrder) return
+    if (!val || !sourceOrders.value.length) return
     form.receiptDate = dayjs()
-    form.warehouse = props.outsourcingOrder.lineItems?.[0]?.shipWarehouse || undefined
-    form.remark = ''
+    form.warehouse = sourceOrders.value[0]?.lineItems?.[0]?.shipWarehouse || undefined
+    form.remark =
+      sourceOrders.value.length === 1
+        ? ''
+        : `批量入库：${sourceOrders.value
+            .map((o) => o.orderNo)
+            .filter(Boolean)
+            .join('、')}`
     lineScope.value = 'pending'
-    inboundLines.value = (props.outsourcingOrder.lineItems || [])
-      .filter((l) => (Number(l.planQty) || 0) > 0)
-      .map((l) => buildLine(props.outsourcingOrder, l))
+    inboundLines.value = sourceOrders.value.flatMap((order) =>
+      (order.lineItems || [])
+        .filter((l) => (Number(l.planQty) || 0) > 0)
+        .map((l) => buildLine(order, l)),
+    )
   },
 )
 
@@ -240,8 +285,8 @@ function onHeaderWarehouseChange(val) {
 }
 
 function removeLine(record) {
-  const id = record?.id
-  const idx = inboundLines.value.findIndex((l) => l.id === id)
+  const key = record?.rowKey
+  const idx = inboundLines.value.findIndex((l) => l.rowKey === key)
   if (idx >= 0) inboundLines.value.splice(idx, 1)
 }
 
@@ -267,20 +312,35 @@ function handleSave() {
   }
   saving.value = true
   try {
-    const result = submitOutsourcingInbound(
-      props.outsourcingOrder.id,
-      submitLines.map((l) => ({
-        lineId: l.id,
-        qty: l.qty,
-        warehouse: l.warehouse,
-      })),
-    )
-    if (result.ok) {
-      message.success(result.message)
+    const byOrder = new Map()
+    submitLines.forEach((line) => {
+      const oid = line.outsourcingOrderId
+      if (!byOrder.has(oid)) byOrder.set(oid, [])
+      byOrder.get(oid).push(line)
+    })
+    let okCount = 0
+    const errors = []
+    for (const [orderId, lines] of byOrder) {
+      const order = sourceOrders.value.find((o) => o.id === orderId)
+      const result = submitOutsourcingInbound(
+        orderId,
+        lines.map((l) => ({
+          lineId: l.id,
+          qty: l.qty,
+          warehouse: l.warehouse,
+        })),
+      )
+      if (result.ok) okCount += 1
+      else errors.push(result.message || `外协单「${order?.orderNo || orderId}」生成失败`)
+    }
+    if (okCount) {
+      message.success(`已生成 ${okCount} 张外协入库单`)
       emit('saved')
       emit('update:open', false)
-    } else {
-      message.warning(result.message)
+    }
+    if (errors.length) {
+      const preview = errors.slice(0, 3).join('；')
+      message.warning(errors.length > 3 ? `${preview}…等 ${errors.length} 条失败` : preview)
     }
   } finally {
     saving.value = false

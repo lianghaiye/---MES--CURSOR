@@ -19,6 +19,7 @@ import {
   createProductionPlanOrderTreeDemoRequisitions,
 } from '@/mock/productionPlanOrderTreeSeed'
 import { ensureCrossDemoPurchaseRequisitions } from '@/mock/crossModuleDemoSeed'
+import { ensureSettleUnitDemoPurchaseRequisitions } from '@/mock/settleUnitPurchaseDemoSeed'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { convertStockDemandToPurchase } from '@/utils/purchaseUomConvert'
 
@@ -38,8 +39,8 @@ function resolveEarliestDeliveryDate(lineItems, fallback) {
 
 const STORAGE_KEY = 'i_doms_purchase_requisitions'
 const SEED_VERSION_KEY = 'i_doms_purchase_requisitions_seed_v'
-/** v7：强制确保 CGSQ2026060001 存在（修复本地缓存未注入） */
-const CURRENT_SEED_VERSION = '7'
+/** v8：结算单位演示申请单（铸件/三口径/无单重） */
+const CURRENT_SEED_VERSION = '8'
 let reqSeq = 20
 
 function loadFromStorage() {
@@ -83,8 +84,8 @@ function initRequisitions() {
   const base = shouldReseed()
     ? clonePurchaseRequisitions()
     : loadFromStorage() || clonePurchaseRequisitions()
-  const list = ensureCrossDemoPurchaseRequisitions(
-    ensureProductionPlanOrderTreeDemoRequisitions(base),
+  const list = ensureSettleUnitDemoPurchaseRequisitions(
+    ensureCrossDemoPurchaseRequisitions(ensureProductionPlanOrderTreeDemoRequisitions(base)),
   )
   list.forEach((req) => stampRequisitionLineSalesOrderNos(req))
   normalizeRequisitionLinePoStatus(list)
@@ -364,6 +365,7 @@ function mapPlanMaterialToLineItem(
     inventoryUnit: converted.inventoryUnit,
     purchaseUnit: converted.purchaseUnit,
     packageContent: converted.packageContent,
+    purchaseConvertRate: converted.purchaseConvertRate,
     convertHint: converted.convertHint,
     stockQty: m.stockQty ?? 0,
     availableStock: m.availableStock ?? 0,
@@ -393,8 +395,11 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
   const urgency = form.urgency
     ? mapSalesUrgency(form.urgency)
     : mapSalesUrgency(sourceOrder.urgency)
-  const lineItems = rows.map((row) =>
-    createLineItem({
+  const lineItems = rows.map((row) => {
+    const master = materialInfoState.materials.find((m) => m.code === row.code) || null
+    const stockDemand = Number(row.demandQty ?? row.planQty ?? row.gapQty) || 0
+    const converted = convertStockDemandToPurchase(stockDemand || 1, master || row)
+    return createLineItem({
       inventoryName: row.productName,
       inventoryCode: row.code,
       specModel: row.spec,
@@ -402,11 +407,12 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
       material: row.material || '',
       materialType: row.materialType || '零部件',
       supplyType: '外购件',
-      unit: row.purchaseUnit || row.unit || '件',
-      inventoryUnit: row.inventoryUnit || row.unit || '件',
-      purchaseUnit: row.purchaseUnit || row.unit || '件',
-      packageContent: row.packageContent ?? 1,
-      convertHint: row.convertHint || '',
+      unit: converted.purchaseUnit || row.purchaseUnit || row.unit || '件',
+      inventoryUnit: converted.inventoryUnit || row.inventoryUnit || row.unit || '件',
+      purchaseUnit: converted.purchaseUnit || row.purchaseUnit || row.unit || '件',
+      packageContent: converted.purchaseConvertRate,
+      purchaseConvertRate: converted.purchaseConvertRate,
+      convertHint: converted.convertHint || row.convertHint || '',
       blankSizeText: row.blankSizeText || '',
       blankSize: row.blankSize || null,
       blankSizeMode: row.blankSizeMode || '',
@@ -419,9 +425,13 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
       stockQty: row.stockQty ?? 0,
       availableStock: row.availableStock ?? 0,
       inTransitQty: row.inTransitQty ?? 0,
-      demandQty: row.demandQty ?? 0,
+      demandQty: stockDemand || Number(row.demandQty) || 0,
       gapQty: row.gapQty ?? 0,
-      planPurchaseQty: row.planQty,
+      planPurchaseQty: converted.needsConvert
+        ? converted.planPurchaseQty
+        : Number(row.planQty) > 0
+          ? Number(row.planQty)
+          : converted.planPurchaseQty,
       designatedSupplier: Boolean(row.designatedSupplier),
       supplierName: row.supplier || '',
       expectedArrivalDate: estimatedArrivalDate,
@@ -429,8 +439,8 @@ export function buildRequisitionFromPlanRows(rows, sourceOrder, form = {}) {
       receivingWarehouse,
       salesOrderNo,
       remark: row.remark || '',
-    }),
-  )
+    })
+  })
 
   return {
     id: `pr-${Date.now()}`,
@@ -688,5 +698,11 @@ registerPurchaseRequisitionDraftBind({
   bindByReqNos: bindRequisitionsToGenerateDraftByReqNos,
 })
 
-// 启动时把已有草稿申请回写为「草稿」状态
-reconcilePurchaseRequisitionDraftStatuses()
+// 延后到微任务：避免与 purchaseOrderStore 循环依赖时 state 尚未就绪
+queueMicrotask(() => {
+  try {
+    reconcilePurchaseRequisitionDraftStatuses()
+  } catch (e) {
+    console.warn('[purchaseRequisitionStore] reconcile draft statuses failed', e)
+  }
+})

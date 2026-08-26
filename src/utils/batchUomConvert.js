@@ -1,10 +1,12 @@
 /**
  * 批次换算记录：入库过磅实填沉淀到库存批次（不进主数据）
- * 主数据「按批次覆盖」仅声明规则；批次单重/偏差看库存明细 · 批次明细。
+ * 主数据「按批次覆盖」仅声明规则；批次单重看库存明细 · 批次明细。
+ *
+ * 注意：本文件不 import settleUnit / stockBatchStore，避免
+ * settleUnit → stockBatchStore → batchUomConvert → settleUnit 循环依赖导致白屏。
  */
 
 import { roundNumber } from '@/utils/numberFormat'
-import { hasSettleUnit, resolveSettleUnit, resolveStandardUnitWeight } from '@/utils/settleUnit'
 
 /**
  * @typedef {object} BatchUomConvert
@@ -14,17 +16,26 @@ import { hasSettleUnit, resolveSettleUnit, resolveStandardUnitWeight } from '@/u
  * @property {string} settleUnit
  * @property {number} actualUnitWeight 批次单重 = settleQty / pieceCount
  * @property {number|null} standardUnitWeight 主数据默认换算率（预估）
- * @property {number|null} deviationPct 相对默认率偏差 %
  * @property {number|null} stockQty 本批入库库存量
  * @property {string} stockUnit
  */
+
+function lineSettleUnit(line = {}) {
+  return String(line?.settleUnit || '').trim()
+}
+
+function lineStandardUnitWeight(line = {}) {
+  const n = Number(line?.standardUnitWeight)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
 
 /**
  * 由入库行结算字段生成整行换算快照（再按批分摊）
  * @returns {BatchUomConvert|null}
  */
 export function buildLineUomConvert(line = {}) {
-  if (!hasSettleUnit(line)) return null
+  const settleUnit = lineSettleUnit(line)
+  if (!settleUnit) return null
   const settleQty = Number(line.settleQty)
   if (!(settleQty > 0)) return null
 
@@ -41,9 +52,9 @@ export function buildLineUomConvert(line = {}) {
 
   return buildBatchUomConvert({
     convertType: 'batch',
-    settleUnit: resolveSettleUnit(line),
+    settleUnit,
     settleQty,
-    standardUnitWeight: resolveStandardUnitWeight(line) ?? line.standardUnitWeight,
+    standardUnitWeight: lineStandardUnitWeight(line) ?? line.standardUnitWeight,
     pieceCount,
     stockQty,
     stockUnit: line.unit || line.stockUnit || '',
@@ -70,7 +81,6 @@ export function buildBatchUomConvert({
   const actualUnitWeight = roundNumber(total / pieces, 4)
   const std = Number(standardUnitWeight)
   const hasStd = Number.isFinite(std) && std > 0
-  const deviationPct = hasStd ? roundNumber(((actualUnitWeight - std) / std) * 100, 2) : null
 
   return {
     convertType: convertType === 'fixed' ? 'fixed' : 'batch',
@@ -79,7 +89,6 @@ export function buildBatchUomConvert({
     settleUnit: unit,
     actualUnitWeight,
     standardUnitWeight: hasStd ? roundNumber(std, 4) : null,
-    deviationPct,
     stockQty: Number(stockQty) > 0 ? roundNumber(Number(stockQty), 4) : null,
     stockUnit: String(stockUnit || '').trim(),
   }
@@ -114,19 +123,4 @@ export function allocateBatchUomConvert(lineConvert, batchStockQty, lineStockTot
 export function hasBatchUomConvert(batch) {
   const c = batch?.uomConvert
   return Boolean(c && Number(c.settleQty) > 0 && c.settleUnit)
-}
-
-export function formatDeviationPct(pct) {
-  if (pct == null || pct === '' || !Number.isFinite(Number(pct))) return '—'
-  const n = Number(pct)
-  const sign = n > 0 ? '+' : ''
-  return `${sign}${roundNumber(n, 2)}%`
-}
-
-export function deviationTone(pct) {
-  if (pct == null || !Number.isFinite(Number(pct))) return 'default'
-  const abs = Math.abs(Number(pct))
-  if (abs <= 1) return 'success'
-  if (abs <= 3) return 'warning'
-  return 'error'
 }

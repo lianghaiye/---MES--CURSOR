@@ -10,6 +10,9 @@ export const STEEL_WEIGHT_BAR_NAME = '圆钢按重 40Cr φ40'
 /** 结算单位演示：采购/库存按件，与供应商按 kg 结算 */
 export const CASTING_BLANK_SETTLE_CODE = 'WL-CAST-BLANK-PUMP-01'
 export const CASTING_BLANK_SETTLE_NAME = '泵体铸件毛坯 HT250'
+/** 有结算单位、无主数据默认率：预估走最近批次单量 */
+export const CASTING_NORATE_SETTLE_CODE = 'WL-CAST-NORATE-DEMO'
+export const CASTING_NORATE_SETTLE_NAME = '异形铸件（无单重）'
 /** 三口径不一致演示：采购=根，库存=米，结算=kg */
 export const PIPE_TRIPLE_UNIT_CODE = 'WL-PIPE-TRIPLE-Q235-50'
 export const PIPE_TRIPLE_UNIT_NAME = '无缝钢管 三口径 Q235 φ50'
@@ -140,6 +143,44 @@ export function createCastingBlankSettleMaterial() {
 }
 
 /**
+ * 结算单位演示：有结算单位、主数据不配默认换算率。
+ * 开单预估取最近入库批次单量（uomConvert.actualUnitWeight）。
+ */
+export function createCastingNorateSettleMaterial() {
+  return {
+    id: 'mat-casting-norate-settle-demo',
+    code: CASTING_NORATE_SETTLE_CODE,
+    name: CASTING_NORATE_SETTLE_NAME,
+    barcodeType: '一批一码',
+    materialType: '原材料',
+    supplyForm: '外购件',
+    ...BLANK_CAT,
+    canSell: false,
+    canProduce: false,
+    canPurchase: true,
+    canOutsource: false,
+    isProductMaterial: false,
+    matchingRequirements: '',
+    outputTaxRate: 13,
+    inputTaxRate: 13,
+    createdAt: '2026-07-01',
+    isVariableLength: false,
+    inventoryUnit: '件',
+    stockUnit: '件',
+    purchaseUnit: '件',
+    settleUnit: 'kg',
+    settleConvertType: 'floating',
+    standardUnitWeight: undefined,
+    unitPrice: 9.5,
+    purchaseUnitPrice: 9.5,
+    specModel: '异形',
+    material: 'HT200',
+    techParams: '按件采购；结算按 kg；主数据无默认单重，预估用最近批次单量',
+    remark: '结算演示：无主数据默认率，预估回退最近批次 actualUnitWeight',
+  }
+}
+
+/**
  * 三口径不一致演示：采购按根、库存按米、结算按 kg。
  * 入库需：根数换算米数 + 结算重量。
  */
@@ -208,6 +249,7 @@ export function createDemoDualUnitMaterials() {
     createSteelPlateMaterial(),
     createSteelWeightBarMaterial(),
     createCastingBlankSettleMaterial(),
+    createCastingNorateSettleMaterial(),
     createPipeTripleUnitMaterial(),
     createSimpleUnitDemoMaterial(),
     baseDualUnitMaterial({

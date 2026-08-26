@@ -11,6 +11,8 @@ import {
   STEEL_WEIGHT_BAR_NAME,
   CASTING_BLANK_SETTLE_CODE,
   CASTING_BLANK_SETTLE_NAME,
+  CASTING_NORATE_SETTLE_CODE,
+  CASTING_NORATE_SETTLE_NAME,
 } from '@/mock/stockBatchSeed'
 import {
   createStockPiecesForBatch,
@@ -24,11 +26,12 @@ import {
 import { DEDICATED_SHIP_DEMO, ensureDedicatedShipDemoBatches } from '@/mock/dedicatedShipDemoSeed'
 import { ensureMultiUnitFlowBatches } from '@/mock/multiUnitFlowDemoSeed'
 import { allocateBatchUomConvert } from '@/utils/batchUomConvert'
+import { registerSettleBatchWeightLookup } from '@/utils/settleUnit'
 
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
-/** v22：铸件结算料批次换算演示写入库存台账 */
-const CURRENT_SEED_VERSION = '22'
+/** v23：无默认率铸件批次（批次单量供开单预估） */
+const CURRENT_SEED_VERSION = '23'
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',
@@ -143,6 +146,12 @@ if (initialBatchLoad.reseeded) {
       warehouse: '原料仓',
       itemCode: CASTING_BLANK_SETTLE_CODE,
       itemName: CASTING_BLANK_SETTLE_NAME,
+      unit: '件',
+    },
+    {
+      warehouse: '原料仓',
+      itemCode: CASTING_NORATE_SETTLE_CODE,
+      itemName: CASTING_NORATE_SETTLE_NAME,
       unit: '件',
     },
   ].forEach((row) =>
@@ -547,3 +556,28 @@ export function receiveRemnantBatch({
 export function getBatchesByItem(itemCode) {
   return listBatches({ itemCode })
 }
+
+/**
+ * 最近一批带结算换算记录的「批次单量」（settleQty / pieceCount）
+ * 用于：有结算单位但主数据无默认换算率时，开单预估
+ * @returns {number|null}
+ */
+export function resolveLatestBatchSettleUnitWeight(itemCode) {
+  const code = String(itemCode || '').trim()
+  if (!code) return null
+  const ranked = listBatches({ itemCode: code })
+    .filter((b) => {
+      const w = Number(b?.uomConvert?.actualUnitWeight)
+      return Number.isFinite(w) && w > 0
+    })
+    .sort((a, b) => {
+      const ta = String(a.updatedAt || a.createdAt || '')
+      const tb = String(b.updatedAt || b.createdAt || '')
+      return tb.localeCompare(ta)
+    })
+  if (!ranked.length) return null
+  const w = Number(ranked[0].uomConvert.actualUnitWeight)
+  return Number.isFinite(w) && w > 0 ? w : null
+}
+
+registerSettleBatchWeightLookup(resolveLatestBatchSettleUnitWeight)

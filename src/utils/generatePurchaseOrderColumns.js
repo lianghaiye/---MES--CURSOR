@@ -40,6 +40,8 @@ export const generatePurchaseOrderColumns = [
   { title: '库存数量', key: 'stockQty', dataIndex: 'stockQty', width: 90, align: 'right' },
   { title: '计划采购量', key: 'planPurchaseQty', width: 110, required: true },
   { title: '采购单位', key: 'unit', dataIndex: 'unit', width: 100, required: true },
+  { title: '结算单位', key: 'settleUnit', dataIndex: 'settleUnit', width: 80 },
+  { title: '预计结算数量', key: 'settleQty', width: 120 },
   { title: '库存预警', key: 'stockAlert', width: 130 },
   { title: '指定供应商', key: 'designatedSupplier', width: 110 },
   { title: '供应商名称', key: 'supplierName', width: 160, required: true },

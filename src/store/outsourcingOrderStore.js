@@ -15,6 +15,7 @@ import {
   calcWxLineRemainIssueQty,
 } from '@/utils/outsourcingInbound'
 import { addOutsourcingReceipt } from '@/store/outsourcingReceiptStore'
+import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 
 const STORAGE_KEY = 'i_doms_outsourcing_orders'
 const SEED_VERSION_KEY = 'i_doms_outsourcing_orders_seed_v'
@@ -593,4 +594,139 @@ export function toPurchaseOrderShape(order) {
       receivedQty: Number(l.receivedQty) || 0,
     })),
   }
+}
+
+/** 批量提交审核（含待提交 / 已拒绝重新提交） */
+export function batchSubmitOutsourcingOrders(ids = []) {
+  let ok = 0
+  const errors = []
+  for (const id of ids) {
+    const order = getOutsourcingOrderById(id)
+    if (!order) {
+      errors.push('存在无效外协订单')
+      continue
+    }
+    let result
+    if (canSubmitOutsourcingOrder(order)) {
+      result = submitOutsourcingOrderForApprove(id)
+    } else if (canResubmitOutsourcingOrder(order)) {
+      result = resubmitOutsourcingOrder(id)
+    } else {
+      errors.push(`「${order.orderNo}」不可提交（仅待提交/已拒绝）`)
+      continue
+    }
+    if (result.ok) ok += 1
+    else errors.push(result.message || `「${order.orderNo}」提交失败`)
+  }
+  return { ok, fail: errors.length, errors }
+}
+
+function buildDefaultWxReceiptLines(order) {
+  return (order.lineItems || [])
+    .filter((line) => (Number(line.planQty) || 0) > 0)
+    .map((line) => {
+      const remainingQty = calcWxLineRemainInboundQty(order, line)
+      if (remainingQty <= 1e-9) return null
+      const warehouse =
+        line.shipWarehouse ||
+        resolveDefaultWarehouseByMaterialCode(line.productCode || line.itemCode) ||
+        ''
+      return {
+        lineId: line.id,
+        poLineId: line.id,
+        receivingWarehouse: warehouse,
+        receiptQty: remainingQty,
+        remark: '',
+      }
+    })
+    .filter(Boolean)
+}
+
+function buildDefaultWxInboundLines(order) {
+  return (order.lineItems || [])
+    .filter((line) => (Number(line.planQty) || 0) > 0)
+    .map((line) => {
+      const remainingQty = calcWxLineRemainInboundQty(order, line)
+      if (remainingQty <= 1e-9) return null
+      const warehouse =
+        line.shipWarehouse ||
+        resolveDefaultWarehouseByMaterialCode(line.productCode || line.itemCode) ||
+        ''
+      return {
+        lineId: line.id,
+        poLineId: line.id,
+        qty: remainingQty,
+        warehouse,
+      }
+    })
+    .filter(Boolean)
+}
+
+/** 批量生成外协收货单 */
+export function batchGenerateOutsourcingReceipts(ids = []) {
+  let ok = 0
+  const errors = []
+  const receipts = []
+  for (const id of ids) {
+    const order = getOutsourcingOrderById(id)
+    if (!order) {
+      errors.push('存在无效外协订单')
+      continue
+    }
+    if (!canGenerateOutsourcingReceipt(order)) {
+      errors.push(`「${order.orderNo}」不可生成收货单`)
+      continue
+    }
+    const lines = buildDefaultWxReceiptLines(order)
+    if (!lines.length) {
+      errors.push(`「${order.orderNo}」没有可收货明细`)
+      continue
+    }
+    const missingWh = lines.find((l) => !String(l.receivingWarehouse || '').trim())
+    if (missingWh) {
+      errors.push(`「${order.orderNo}」存在缺少收货仓库的明细`)
+      continue
+    }
+    const result = submitOutsourcingReceipt(order.id, lines, {
+      remark: `批量生成（外协单 ${order.orderNo}）`,
+    })
+    if (result.ok) {
+      ok += 1
+      if (result.receipt) receipts.push(result.receipt)
+    } else {
+      errors.push(result.message || `「${order.orderNo}」生成收货单失败`)
+    }
+  }
+  return { ok, fail: errors.length, errors, receipts }
+}
+
+/** 批量生成外协入库（按剩余可入库量） */
+export function batchGenerateOutsourcingInbounds(ids = []) {
+  let ok = 0
+  const errors = []
+  for (const id of ids) {
+    const order = getOutsourcingOrderById(id)
+    if (!order) {
+      errors.push('存在无效外协订单')
+      continue
+    }
+    if (!canGenerateOutsourcingInbound(order)) {
+      errors.push(`「${order.orderNo}」不可生成入库单`)
+      continue
+    }
+    const lines = buildDefaultWxInboundLines(order)
+    if (!lines.length) {
+      errors.push(`「${order.orderNo}」没有可入库明细`)
+      continue
+    }
+    const missingWh = lines.find((l) => !String(l.warehouse || '').trim())
+    if (missingWh) {
+      errors.push(`「${order.orderNo}」存在缺少入库仓库的明细`)
+      continue
+    }
+    const result = submitOutsourcingInbound(order.id, lines)
+    if (result.ok) ok += 1
+    else errors.push(result.message || `「${order.orderNo}」生成入库单失败`)
+  }
+  return { ok, fail: errors.length, errors }
 }

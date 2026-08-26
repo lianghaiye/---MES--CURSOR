@@ -103,6 +103,7 @@
           <CheckOutlined />
           审核
         </a-button>
+        <a-button size="small" @click="handleBatchSubmit">批量提交</a-button>
         <a-button size="small" @click="openToolbarPriceChangeApprove">审核价格变更</a-button>
         <a-button size="small" @click="openReceiptModal">
           <CheckCircleOutlined />
@@ -135,6 +136,7 @@
           </a-button>
           <template #overlay>
             <a-menu @click="onBatchMenuClick">
+              <a-menu-item key="批量提交">批量提交</a-menu-item>
               <a-menu-item key="批量审核">批量审核</a-menu-item>
               <a-menu-item key="批量作废">批量作废</a-menu-item>
             </a-menu>
@@ -306,13 +308,13 @@
 
     <GenerateReceiptModal
       v-model:open="receiptModalOpen"
-      :purchase-order="receiptOrder"
+      :purchase-orders="receiptOrders"
       @confirmed="onReceiptConfirmed"
     />
 
     <GenerateInboundOrderModal
       v-model:open="inboundModalOpen"
-      :purchase-order="inboundOrder"
+      :purchase-orders="inboundOrders"
       @saved="onInboundSaved"
     />
 
@@ -371,6 +373,7 @@ import {
   canCompletePurchaseOrder,
   getPurchaseOrdersByIds,
   refreshPurchaseOrderOverdueStatusAll,
+  batchSubmitPurchaseOrders,
 } from '@/store/purchaseOrderStore'
 import {
   poStatusOptions,
@@ -413,8 +416,8 @@ const selectedRowKeys = ref([])
 const receiptModalOpen = ref(false)
 const inboundModalOpen = ref(false)
 const printModalOpen = ref(false)
-const receiptOrder = ref(null)
-const inboundOrder = ref(null)
+const receiptOrders = ref([])
+const inboundOrders = ref([])
 const printOrders = ref([])
 const priceChangeOpen = ref(false)
 const priceChangeOrder = ref(null)
@@ -595,6 +598,10 @@ function stubAction(name) {
 }
 
 function onBatchMenuClick({ key }) {
+  if (key === '批量提交') {
+    handleBatchSubmit()
+    return
+  }
   if (key === '批量审核') {
     handleBatchApprove()
     return
@@ -604,6 +611,37 @@ function onBatchMenuClick({ key }) {
     return
   }
   stubAction(key)
+}
+
+function reportBatchResult({ ok, errors }, successLabel) {
+  if (ok) message.success(`${successLabel} ${ok} 条`)
+  if (errors?.length) {
+    const preview = errors.slice(0, 3).join('；')
+    message.warning(errors.length > 3 ? `${preview}…等 ${errors.length} 条失败` : preview)
+  }
+}
+
+function handleBatchSubmit() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择要提交的采购单')
+    return
+  }
+  const targets = getPurchaseOrdersByIds(selectedRowKeys.value).filter(
+    (o) => canSubmitPurchaseOrder(o) || canResubmitPurchaseOrder(o),
+  )
+  if (!targets.length) {
+    message.warning('所选采购单均不可提交（仅待提交/已拒绝）')
+    return
+  }
+  Modal.confirm({
+    title: '批量提交',
+    content: `确定提交选中的 ${targets.length} 条采购单审核吗？`,
+    onOk: () => {
+      const result = batchSubmitPurchaseOrders(targets.map((o) => o.id))
+      reportBatchResult(result, '已提交审核')
+      selectedRowKeys.value = []
+    },
+  })
 }
 
 function openCreate() {
@@ -643,48 +681,48 @@ function openEdit(record) {
 }
 
 function openReceiptModal() {
-  if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条进行中的采购单后再生成收货单')
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选采购单后再生成收货单')
     return
   }
-  const order = purchaseOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
-  if (!order) {
-    message.warning('未找到所选采购单')
+  const selected = getPurchaseOrdersByIds(selectedRowKeys.value)
+  const blocked = selected.find((o) => getPendingPurchasePriceChangeBlock(o.id, '生成收货单'))
+  if (blocked) {
+    message.warning(getPendingPurchasePriceChangeBlock(blocked.id, '生成收货单'))
     return
   }
-  const block = getPendingPurchasePriceChangeBlock(order.id, '生成收货单')
-  if (block) {
-    message.warning(block)
+  const targets = selected.filter(canGenerateReceipt)
+  if (!targets.length) {
+    message.warning('所选采购单均不可生成收货单（需进行中且仍有可收货数量）')
     return
   }
-  if (!canGenerateReceipt(order)) {
-    message.warning('仅进行中且仍有可收货/入库数量的采购单可生成收货单')
-    return
+  if (targets.length < selected.length) {
+    message.info(`已过滤 ${selected.length - targets.length} 条不可收货的采购单`)
   }
-  receiptOrder.value = order
+  receiptOrders.value = targets
   receiptModalOpen.value = true
 }
 
 function openInboundModal() {
-  if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条采购单后再生成入库单')
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选采购单后再生成入库单')
     return
   }
-  const order = purchaseOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
-  if (!order) {
-    message.warning('未找到所选采购单')
+  const selected = getPurchaseOrdersByIds(selectedRowKeys.value)
+  const blocked = selected.find((o) => getPendingPurchasePriceChangeBlock(o.id, '生成入库单'))
+  if (blocked) {
+    message.warning(getPendingPurchasePriceChangeBlock(blocked.id, '生成入库单'))
     return
   }
-  const block = getPendingPurchasePriceChangeBlock(order.id, '生成入库单')
-  if (block) {
-    message.warning(block)
+  const targets = selected.filter(canGenerateInbound)
+  if (!targets.length) {
+    message.warning('所选采购单均不可生成入库单（需进行中且仍有可入库数量）')
     return
   }
-  if (!canGenerateInbound(order)) {
-    message.warning('仅进行中且仍有可收货/入库数量的采购单可生成入库单')
-    return
+  if (targets.length < selected.length) {
+    message.info(`已过滤 ${selected.length - targets.length} 条不可入库的采购单`)
   }
-  inboundOrder.value = order
+  inboundOrders.value = targets
   inboundModalOpen.value = true
 }
 
@@ -698,7 +736,7 @@ function openReceiptForRow(record) {
     message.warning('仅进行中且仍有可收货/入库数量的采购单可生成收货单')
     return
   }
-  receiptOrder.value = record
+  receiptOrders.value = [record]
   receiptModalOpen.value = true
 }
 
@@ -712,7 +750,7 @@ function openInboundForRow(record) {
     message.warning('仅进行中且仍有可收货/入库数量的采购单可生成入库单')
     return
   }
-  inboundOrder.value = record
+  inboundOrders.value = [record]
   inboundModalOpen.value = true
 }
 

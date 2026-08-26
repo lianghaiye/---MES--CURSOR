@@ -5,6 +5,8 @@ import { ensureCrossDemoInboundOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureMultiUnitFlowInboundOrders } from '@/mock/multiUnitFlowDemoSeed'
 import { purchaseOrderState, syncPurchaseOrderInboundStatus } from '@/store/purchaseOrderStore'
 import { calcPoLineRemainInboundQty } from '@/utils/purchaseLineInbound'
+import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
+import { estimateSettleQty } from '@/utils/settleUnit'
 import { warehouseState } from '@/store/warehouseStore'
 import { applyInboundToStock } from '@/store/stockStore'
 import { applyInboundToSalesAllocation } from '@/store/salesStockAllocationStore'
@@ -690,6 +692,8 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
         specAttr: line.specAttr || '',
         material: line.material || '',
         drawingNo: line.drawingNo || '',
+        barcodeType: line.barcodeType || '',
+        variantSummary: line.variantSummary || '',
         locationNo: line.locationNo || '',
         unit: line.unit || '个',
         stockUnit: line.stockUnit,
@@ -734,6 +738,102 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
   syncPurchaseOrderInboundStatus(po)
 
   return { ok: true, order: created[0] || null, orders: created }
+}
+
+/** 按剩余可入库量构造默认入库明细（批量一键用） */
+export function buildDefaultPurchaseInboundLines(order) {
+  if (!order) return []
+  return (order.lineItems || [])
+    .filter((line) => (Number(line.purchaseQty) || 0) > 0)
+    .map((line) => {
+      const remaining = calcPoLineRemainInboundQty(order, line)
+      if (remaining <= 1e-9) return null
+      const purchaseUnit = line.unit || '个'
+      const warehouse =
+        line.receivingWarehouse ||
+        resolveDefaultWarehouseByMaterialCode(line.itemCode || line.productCode) ||
+        ''
+      const settleUnit = String(line.settleUnit || '').trim()
+      const unitPrice = line.unitPriceInTax ?? line.unitPriceExTax ?? null
+      const settleQty = settleUnit
+        ? Number(line.settleQty) > 0
+          ? Number(line.settleQty)
+          : estimateSettleQty(line, remaining)
+        : undefined
+      return {
+        poLineId: line.id,
+        itemCode: line.itemCode || line.productCode || '',
+        itemName: line.itemName || line.productName || '',
+        itemType: line.itemType || '物料',
+        specModel: line.specModel || '',
+        specAttr: line.specAttr || '',
+        material: line.material || '',
+        drawingNo: line.drawingNo || '',
+        barcodeType: line.barcodeType || '',
+        variantSummary: line.variantSummary || '',
+        unit: purchaseUnit,
+        stockUnit: purchaseUnit,
+        purchaseUnit,
+        unitPrice,
+        totalPrice:
+          unitPrice != null ? Math.round(Number(unitPrice) * remaining * 100) / 100 : null,
+        warehouse,
+        qty: remaining,
+        isVariableLength: false,
+        settleUnit: settleUnit || '',
+        settleQty,
+        standardUnitWeight: line.standardUnitWeight,
+        settledSettleQty: 0,
+      }
+    })
+    .filter(Boolean)
+}
+
+/** 批量从采购订单生成入库单：按剩余可入库数量 + 默认仓库一键生成 */
+export function batchCreateInboundFromPurchaseOrders(ids = []) {
+  let ok = 0
+  const errors = []
+  const orders = []
+  for (const id of ids) {
+    const po = purchaseOrderState.orders.find((o) => o.id === id)
+    if (!po) {
+      errors.push('存在无效采购单')
+      continue
+    }
+    const lines = buildDefaultPurchaseInboundLines(po)
+    if (!lines.length) {
+      errors.push(`「${po.orderNo}」没有可入库明细`)
+      continue
+    }
+    const missingWh = lines.find((l) => !String(l.warehouse || '').trim())
+    if (missingWh) {
+      errors.push(
+        `「${po.orderNo}」明细「${missingWh.itemName || missingWh.itemCode}」缺少入库仓库`,
+      )
+      continue
+    }
+    const settleInvalid = lines.find(
+      (l) => String(l.settleUnit || '').trim() && !(Number(l.settleQty) > 0),
+    )
+    if (settleInvalid) {
+      errors.push(
+        `「${po.orderNo}」明细「${settleInvalid.itemName || settleInvalid.itemCode}」缺少结算数量`,
+      )
+      continue
+    }
+    const result = createInboundFromPurchaseOrder(po.id, {
+      remark: `批量生成（采购单 ${po.orderNo}）`,
+      lineItems: lines,
+    })
+    if (result.ok) {
+      ok += 1
+      const created = result.orders?.length ? result.orders : result.order ? [result.order] : []
+      orders.push(...created)
+    } else {
+      errors.push(result.message || `「${po.orderNo}」生成入库单失败`)
+    }
+  }
+  return { ok, fail: errors.length, errors, orders }
 }
 
 export function createInboundFromScrap(scrap, partial = {}) {

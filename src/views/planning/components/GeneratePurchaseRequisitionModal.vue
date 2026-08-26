@@ -69,14 +69,14 @@
           </a-form-item>
         </a-col>
         <a-col :span="6">
-          <a-form-item label="业务员" required>
+          <a-form-item label="采购员" required>
             <a-select
               v-model:value="headerForm.salesperson"
               size="small"
               style="width: 100%"
               show-search
               :options="salespersonOpts"
-              placeholder="请选择业务员"
+              placeholder="请选择采购员"
             />
           </a-form-item>
         </a-col>
@@ -591,7 +591,7 @@ function handleSave() {
     return
   }
   if (!headerForm.salesperson) {
-    message.warning('请选择业务员')
+    message.warning('请选择采购员')
     return
   }
 

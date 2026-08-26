@@ -15,23 +15,26 @@
               v-model:value="form.receiptNo"
               size="small"
               allow-clear
-              placeholder="留空自动生成 CGSH-年月日-流水"
+              :disabled="isMultiOrder"
+              :placeholder="
+                isMultiOrder ? '多单时自动按采购单分别生成' : '留空自动生成 CGSH-年月日-流水'
+              "
             />
           </a-form-item>
         </a-col>
         <a-col :span="6">
           <a-form-item label="采购单号" required>
-            <a-input :value="purchaseOrder?.orderNo" disabled size="small" />
+            <a-input :value="headerOrderNo" disabled size="small" :title="headerOrderNo" />
           </a-form-item>
         </a-col>
         <a-col :span="6">
           <a-form-item label="供应商">
-            <a-input :value="purchaseOrder?.supplier" disabled size="small" />
+            <a-input :value="headerSupplier" disabled size="small" :title="headerSupplier" />
           </a-form-item>
         </a-col>
         <a-col :span="6">
           <a-form-item label="采购员">
-            <a-input :value="purchaseOrder?.purchaser" disabled size="small" />
+            <a-input :value="headerPurchaser" disabled size="small" :title="headerPurchaser" />
           </a-form-item>
         </a-col>
         <a-col :span="24">
@@ -47,7 +50,7 @@
     <a-table
       :columns="columns"
       :data-source="displayLines"
-      row-key="id"
+      row-key="rowKey"
       size="small"
       bordered
       :pagination="false"
@@ -270,6 +273,7 @@ import {
   isPoLineOccupyFull,
 } from '@/utils/purchaseLineInbound'
 import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
+import { estimateSettleQty } from '@/utils/settleUnit'
 import { formatNumber } from '@/utils/numberFormat'
 import LongTextEditCell from '@/components/LongTextEditCell.vue'
 import InboundLineScopeToggle from '@/components/InboundLineScopeToggle.vue'
@@ -277,7 +281,10 @@ import { filterInboundLinesByScope } from '@/utils/inboundLineScope'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  /** 单张（详情页等） */
   purchaseOrder: { type: Object, default: null },
+  /** 多张（列表多选）；优先于 purchaseOrder */
+  purchaseOrders: { type: Array, default: null },
 })
 
 const emit = defineEmits(['update:open', 'confirmed'])
@@ -290,6 +297,30 @@ const lineScope = ref('pending')
 const lineEditOpen = ref(false)
 const lineEditDraft = ref(null)
 
+const sourceOrders = computed(() => {
+  if (Array.isArray(props.purchaseOrders) && props.purchaseOrders.length) {
+    return props.purchaseOrders.filter(Boolean)
+  }
+  return props.purchaseOrder ? [props.purchaseOrder] : []
+})
+const isMultiOrder = computed(() => sourceOrders.value.length > 1)
+const headerOrderNo = computed(() => {
+  const nos = sourceOrders.value.map((o) => o.orderNo).filter(Boolean)
+  if (!nos.length) return ''
+  if (nos.length === 1) return nos[0]
+  return nos.length <= 3 ? nos.join('、') : `${nos.slice(0, 2).join('、')} 等 ${nos.length} 单`
+})
+const headerSupplier = computed(() => {
+  const list = [...new Set(sourceOrders.value.map((o) => o.supplier).filter(Boolean))]
+  if (!list.length) return ''
+  return list.length === 1 ? list[0] : list.join('、')
+})
+const headerPurchaser = computed(() => {
+  const list = [...new Set(sourceOrders.value.map((o) => o.purchaser).filter(Boolean))]
+  if (!list.length) return ''
+  return list.length === 1 ? list[0] : list.join('、')
+})
+
 const displayLines = computed(() => filterInboundLinesByScope(receiptLines.value, lineScope.value))
 const lineEditId = ref('')
 const remarkEdit = reactive({ open: false, record: null, draft: '' })
@@ -300,40 +331,54 @@ const warehouseOpts = computed(() => {
   return getWarehouseSelectOptions()
 })
 
-const columns = [
-  { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
-  { title: '收货进度', key: 'inboundProgress', width: 180, fixed: 'left' },
-  {
-    title: '产品名称',
-    key: 'productName',
-    dataIndex: 'productName',
-    width: 140,
-    ellipsis: true,
-    fixed: 'left',
-  },
-  { title: '编号', key: 'productCode', dataIndex: 'productCode', width: 120, ellipsis: true },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
-  { title: '变体属性', dataIndex: 'variantSummary', width: 140, ellipsis: true },
-  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-  { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
-  { title: '采购单位', dataIndex: 'unit', width: 90 },
-  { title: '收货仓库', key: 'receivingWarehouse', width: 120, required: true },
-  { title: '收货数量', key: 'receiptQty', width: 110 },
-  {
-    title: '入库质检要求',
-    key: 'inboundQcRequirement',
-    dataIndex: 'inboundQcRequirement',
-    width: 110,
-  },
-  { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
-  { title: '结算数量', key: 'settleQty', width: 110 },
-  { title: '收货模式', key: 'receivingMode', width: 120 },
-  { title: '备注', key: 'remark', width: 140 },
-  { title: '操作', key: 'action', width: 130, fixed: 'right' },
-]
+const columns = computed(() => {
+  const cols = [
+    { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
+    { title: '收货进度', key: 'inboundProgress', width: 180, fixed: 'left' },
+  ]
+  if (isMultiOrder.value) {
+    cols.push({
+      title: '采购单号',
+      key: 'purchaseOrderNo',
+      dataIndex: 'purchaseOrderNo',
+      width: 140,
+      ellipsis: true,
+    })
+  }
+  cols.push(
+    {
+      title: '产品名称',
+      key: 'productName',
+      dataIndex: 'productName',
+      width: 140,
+      ellipsis: true,
+      fixed: isMultiOrder.value ? undefined : 'left',
+    },
+    { title: '编号', key: 'productCode', dataIndex: 'productCode', width: 120, ellipsis: true },
+    { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+    { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
+    { title: '变体属性', dataIndex: 'variantSummary', width: 140, ellipsis: true },
+    { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+    { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
+    { title: '采购单位', dataIndex: 'unit', width: 90 },
+    { title: '收货仓库', key: 'receivingWarehouse', width: 120, required: true },
+    { title: '收货数量', key: 'receiptQty', width: 110 },
+    {
+      title: '入库质检要求',
+      key: 'inboundQcRequirement',
+      dataIndex: 'inboundQcRequirement',
+      width: 110,
+    },
+    { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
+    { title: '结算数量', key: 'settleQty', width: 110 },
+    { title: '收货模式', key: 'receivingMode', width: 120 },
+    { title: '备注', key: 'remark', width: 140 },
+    { title: '操作', key: 'action', width: 130, fixed: 'right' },
+  )
+  return cols
+})
 
-const tableScrollX = columns.reduce((sum, col) => sum + (col.width || 100), 0)
+const tableScrollX = computed(() => columns.value.reduce((sum, col) => sum + (col.width || 100), 0))
 
 function formatQty(val) {
   return formatNumber(val, 4, { empty: '—' })
@@ -346,7 +391,10 @@ function buildLine(po, line) {
   const remainingQty = calcPoLineRemainInboundQty(po, line)
   const locked = isPoLineOccupyFull(po, line)
   return {
+    rowKey: `${po.id}__${line.id}`,
     id: line.id,
+    purchaseOrderId: po.id,
+    purchaseOrderNo: po.orderNo || '',
     productName: line.productName || line.itemName || '',
     productCode: line.productCode || line.itemCode || '',
     itemName: line.itemName || line.productName || '',
@@ -362,9 +410,10 @@ function buildLine(po, line) {
     settleQty: String(line.settleUnit || '').trim()
       ? Number(line.settleQty) > 0
         ? Number(line.settleQty)
-        : remainingQty > 0 && Number(line.standardUnitWeight) > 0
-          ? Math.round(remainingQty * Number(line.standardUnitWeight) * 1000) / 1000
-          : undefined
+        : (estimateSettleQty(
+            { ...line, settleQty: undefined, purchaseQty: remainingQty },
+            remainingQty,
+          ) ?? undefined)
       : undefined,
     standardUnitWeight: line.standardUnitWeight,
     receivingMode: line.receivingMode === '直发现场' ? '直发现场' : '正常收货',
@@ -382,16 +431,28 @@ function buildLine(po, line) {
   }
 }
 
+function buildLinesFromOrders(orders) {
+  return orders.flatMap((po) =>
+    (po.lineItems || [])
+      .filter((l) => (Number(l.purchaseQty) || 0) > 0)
+      .map((l) => buildLine(po, l)),
+  )
+}
+
 watch(
   () => props.open,
   (val) => {
-    if (!val || !props.purchaseOrder) return
+    if (!val || !sourceOrders.value.length) return
     form.receiptNo = ''
-    form.remark = props.purchaseOrder.remark || ''
+    form.remark =
+      sourceOrders.value.length === 1
+        ? sourceOrders.value[0].remark || ''
+        : `批量收货：${sourceOrders.value
+            .map((o) => o.orderNo)
+            .filter(Boolean)
+            .join('、')}`
     lineScope.value = 'pending'
-    receiptLines.value = (props.purchaseOrder.lineItems || [])
-      .filter((l) => (Number(l.purchaseQty) || 0) > 0)
-      .map((l) => buildLine(props.purchaseOrder, l))
+    receiptLines.value = buildLinesFromOrders(sourceOrders.value)
   },
 )
 
@@ -406,8 +467,8 @@ function warehouseStatus(record) {
 }
 
 function removeLine(record) {
-  const id = record?.id
-  const idx = receiptLines.value.findIndex((l) => l.id === id)
+  const key = record?.rowKey
+  const idx = receiptLines.value.findIndex((l) => l.rowKey === key)
   if (idx >= 0) receiptLines.value.splice(idx, 1)
 }
 
@@ -427,7 +488,7 @@ function confirmRemarkEdit() {
 
 function openLineEdit(record) {
   if (record.locked) return
-  lineEditId.value = record.id
+  lineEditId.value = record.rowKey
   lineEditDraft.value = { ...record }
   lineEditOpen.value = true
 }
@@ -454,7 +515,7 @@ function applyLineEdit() {
     message.warning(`请填写结算数量（${draft.settleUnit}）`)
     return
   }
-  const target = receiptLines.value.find((r) => r.id === lineEditId.value)
+  const target = receiptLines.value.find((r) => r.rowKey === lineEditId.value)
   if (target) {
     Object.assign(target, {
       receivingWarehouse: draft.receivingWarehouse,
@@ -472,10 +533,12 @@ function handleCancel() {
 }
 
 function handleConfirm() {
-  const block = getPendingPurchasePriceChangeBlock(props.purchaseOrder?.id, '生成收货单')
-  if (block) {
-    message.warning(block)
-    return
+  for (const order of sourceOrders.value) {
+    const block = getPendingPurchasePriceChangeBlock(order.id, '生成收货单')
+    if (block) {
+      message.warning(block)
+      return
+    }
   }
   const editableLines = receiptLines.value.filter((l) => !l.locked)
   if (!editableLines.length) {
@@ -502,16 +565,45 @@ function handleConfirm() {
     return
   }
 
-  const result = submitReceipt(props.purchaseOrder.id, submitLines, {
-    receiptNo: form.receiptNo,
-    remark: form.remark,
+  const byOrder = new Map()
+  submitLines.forEach((line) => {
+    const oid = line.purchaseOrderId
+    if (!byOrder.has(oid)) byOrder.set(oid, [])
+    byOrder.get(oid).push(line)
   })
-  if (result.ok) {
-    message.success(result.message)
+
+  let okCount = 0
+  const errors = []
+  const nos = []
+  let index = 0
+  for (const [orderId, lines] of byOrder) {
+    index += 1
+    const order = sourceOrders.value.find((o) => o.id === orderId)
+    const result = submitReceipt(orderId, lines, {
+      receiptNo: isMultiOrder.value ? '' : form.receiptNo,
+      remark:
+        form.remark ||
+        (order?.orderNo ? `采购单 ${order.orderNo} 生成` : '') ||
+        (isMultiOrder.value ? `批量收货第 ${index} 单` : ''),
+    })
+    if (result.ok) {
+      okCount += 1
+      if (result.receipt?.receiptNo) nos.push(result.receipt.receiptNo)
+    } else {
+      errors.push(result.message || `采购单「${order?.orderNo || orderId}」生成失败`)
+    }
+  }
+
+  if (okCount) {
+    message.success(
+      nos.length ? `已生成 ${okCount} 张收货单：${nos.join('、')}` : `已生成 ${okCount} 张收货单`,
+    )
     emit('confirmed')
     emit('update:open', false)
-  } else {
-    message.warning(result.message || '生成收货单失败')
+  }
+  if (errors.length) {
+    const preview = errors.slice(0, 3).join('；')
+    message.warning(errors.length > 3 ? `${preview}…等 ${errors.length} 条失败` : preview)
   }
 }
 </script>

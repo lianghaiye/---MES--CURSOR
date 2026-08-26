@@ -12,8 +12,8 @@ import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
 import { createStockAlertDemoMaterials } from '@/mock/stockAlertDemoMaterials'
 
 const STORAGE_KEY = 'i_doms_material_info'
-/** v16：演示料增加 needsBlankingSettle（需要下料结算） */
-const DATA_VERSION = 16
+/** v17：无默认率结算演示料 WL-CAST-NORATE-DEMO */
+const DATA_VERSION = 17
 let codeSeq = 100048
 
 function ensureDemoMaterialsByCodes(list, demos) {

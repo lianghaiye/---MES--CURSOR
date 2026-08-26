@@ -13,7 +13,14 @@ export function findMasterItemByCode(code) {
 }
 
 /**
- * @returns {{ type: 'below'|'above'|'', text: string, minStockQty?: number, maxStockQty?: number, stockQty: number }}
+ * @returns {{
+ *   type: 'below'|'above'|'',
+ *   text: string,
+ *   displayValue: string|number,
+ *   minStockQty?: number,
+ *   maxStockQty?: number,
+ *   stockQty: number
+ * }}
  */
 export function resolveStockAlertHint({ materialCode, stockQty } = {}) {
   const hit = findMasterItemByCode(materialCode)
@@ -24,15 +31,17 @@ export function resolveStockAlertHint({ materialCode, stockQty } = {}) {
     : Number(hit?.item?.stockQty ?? hit?.item?.inventoryQty) || 0
 
   if (!alert?.stockAlertEnabled) {
-    return { type: '', text: '—', stockQty: resolvedStock }
+    return { type: '', text: '—', displayValue: '—', stockQty: resolvedStock }
   }
 
   const min = Number(alert.minStockQty)
   const max = Number(alert.maxStockQty)
+  // 低于最低：展示主数据「最低库存」；高于最高：展示「最高库存」
   if (Number.isFinite(min) && resolvedStock < min) {
     return {
       type: 'below',
-      text: '低于「最低库存」',
+      text: String(min),
+      displayValue: min,
       minStockQty: min,
       maxStockQty: Number.isFinite(max) ? max : undefined,
       stockQty: resolvedStock,
@@ -41,7 +50,8 @@ export function resolveStockAlertHint({ materialCode, stockQty } = {}) {
   if (Number.isFinite(max) && resolvedStock > max) {
     return {
       type: 'above',
-      text: '高于【最高库存】',
+      text: String(max),
+      displayValue: max,
       minStockQty: Number.isFinite(min) ? min : undefined,
       maxStockQty: max,
       stockQty: resolvedStock,
@@ -50,6 +60,7 @@ export function resolveStockAlertHint({ materialCode, stockQty } = {}) {
   return {
     type: '',
     text: '—',
+    displayValue: '—',
     minStockQty: Number.isFinite(min) ? min : undefined,
     maxStockQty: Number.isFinite(max) ? max : undefined,
     stockQty: resolvedStock,
@@ -60,4 +71,13 @@ export function stockAlertClass(type) {
   if (type === 'below') return 'stock-alert-below'
   if (type === 'above') return 'stock-alert-above'
   return ''
+}
+
+/** 列表/表单展示：触发预警时显示主数据设置的最低/最高值 */
+export function formatStockAlertDisplay(hint) {
+  if (!hint) return '—'
+  if (hint.displayValue != null && hint.displayValue !== '') return String(hint.displayValue)
+  if (hint.type === 'below' && hint.minStockQty != null) return String(hint.minStockQty)
+  if (hint.type === 'above' && hint.maxStockQty != null) return String(hint.maxStockQty)
+  return hint.text || '—'
 }

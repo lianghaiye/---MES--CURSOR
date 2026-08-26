@@ -709,7 +709,11 @@ import { createPoLineItem } from '@/mock/purchaseOrders'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
-import { resolvePurchaseUnit, resolveInventoryUnit } from '@/utils/purchaseUomConvert'
+import {
+  resolvePurchaseUnit,
+  resolveInventoryUnit,
+  convertStockDemandToPurchase,
+} from '@/utils/purchaseUomConvert'
 import { applySettleFieldsFromMaterial, estimateSettleQty, hasSettleUnit } from '@/utils/settleUnit'
 import {
   addPurchaseOrder,
@@ -1037,6 +1041,7 @@ function mapPickerToPoLine(payload) {
     : payload.variantValues
       ? { ...payload.variantValues }
       : {}
+  const converted = convertStockDemandToPurchase(1, master || payload)
 
   const line = createPoLineItem({
     productName: payload.name,
@@ -1051,9 +1056,12 @@ function mapPickerToPoLine(payload) {
     drawingNo: payload.drawingNo || '',
     stockQty: resolveStockQty(code),
     purchaseQty: 1,
-    unit: resolvePurchaseUnit(master || payload),
-    purchaseUnit: resolvePurchaseUnit(master || payload),
-    inventoryUnit: resolveInventoryUnit(master || payload),
+    unit: converted.purchaseUnit || resolvePurchaseUnit(master || payload),
+    purchaseUnit: converted.purchaseUnit || resolvePurchaseUnit(master || payload),
+    inventoryUnit: converted.inventoryUnit || resolveInventoryUnit(master || payload),
+    packageContent: converted.purchaseConvertRate,
+    purchaseConvertRate: converted.purchaseConvertRate,
+    convertHint: converted.convertHint,
     settleUnit: master?.settleUnit || payload.settleUnit || '',
     standardUnitWeight: master?.standardUnitWeight ?? payload.standardUnitWeight,
     unitPriceExTax: unitPrice,
@@ -1156,6 +1164,11 @@ function onVariantConfigConfirm(payload) {
     target.unit = resolvePurchaseUnit(master)
     target.purchaseUnit = target.unit
     target.inventoryUnit = resolveInventoryUnit(master)
+    const converted = convertStockDemandToPurchase(1, master)
+    const convertRate = converted.purchaseConvertRate
+    target.packageContent = convertRate
+    target.purchaseConvertRate = convertRate
+    target.convertHint = converted.convertHint || target.convertHint
     applySettleFieldsFromMaterial(target, master)
     const est = estimateSettleQty(target, target.purchaseQty)
     if (est != null) target.settleQty = est
@@ -1289,7 +1302,7 @@ function recalcLineWithMode(record) {
 }
 
 function onLineChange(record) {
-  if (hasSettleUnit(record) && Number(record.standardUnitWeight) > 0) {
+  if (hasSettleUnit(record)) {
     const est = estimateSettleQty(record, record.purchaseQty)
     if (est != null) record.settleQty = est
   }

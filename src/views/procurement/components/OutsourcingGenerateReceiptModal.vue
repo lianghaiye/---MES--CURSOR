@@ -15,18 +15,19 @@
               v-model:value="form.receiptNo"
               size="small"
               allow-clear
-              placeholder="留空自动生成"
+              :disabled="isMultiOrder"
+              :placeholder="isMultiOrder ? '多单时自动按外协单分别生成' : '留空自动生成'"
             />
           </a-form-item>
         </a-col>
         <a-col :span="6">
           <a-form-item label="外协单号" required>
-            <a-input :value="outsourcingOrder?.orderNo" disabled size="small" />
+            <a-input :value="headerOrderNo" disabled size="small" :title="headerOrderNo" />
           </a-form-item>
         </a-col>
         <a-col :span="6">
           <a-form-item label="供应商">
-            <a-input :value="outsourcingOrder?.supplier" disabled size="small" />
+            <a-input :value="headerSupplier" disabled size="small" :title="headerSupplier" />
           </a-form-item>
         </a-col>
         <a-col :span="24">
@@ -42,7 +43,7 @@
     <a-table
       :columns="columns"
       :data-source="displayLines"
-      row-key="id"
+      row-key="rowKey"
       size="small"
       bordered
       :pagination="false"
@@ -140,6 +141,7 @@ import { filterInboundLinesByScope } from '@/utils/inboundLineScope'
 const props = defineProps({
   open: { type: Boolean, default: false },
   outsourcingOrder: { type: Object, default: null },
+  outsourcingOrders: { type: Array, default: null },
 })
 
 const emit = defineEmits(['update:open', 'confirmed'])
@@ -149,32 +151,65 @@ const receiptLines = ref([])
 const lineScope = ref('pending')
 const warehouseOpts = warehouseOptions
 
+const sourceOrders = computed(() => {
+  if (Array.isArray(props.outsourcingOrders) && props.outsourcingOrders.length) {
+    return props.outsourcingOrders.filter(Boolean)
+  }
+  return props.outsourcingOrder ? [props.outsourcingOrder] : []
+})
+const isMultiOrder = computed(() => sourceOrders.value.length > 1)
+const headerOrderNo = computed(() => {
+  const nos = sourceOrders.value.map((o) => o.orderNo).filter(Boolean)
+  if (!nos.length) return ''
+  if (nos.length === 1) return nos[0]
+  return nos.length <= 3 ? nos.join('、') : `${nos.slice(0, 2).join('、')} 等 ${nos.length} 单`
+})
+const headerSupplier = computed(() => {
+  const list = [...new Set(sourceOrders.value.map((o) => o.supplier).filter(Boolean))]
+  if (!list.length) return ''
+  return list.length === 1 ? list[0] : list.join('、')
+})
+
 const displayLines = computed(() => filterInboundLinesByScope(receiptLines.value, lineScope.value))
 
-const columns = [
-  { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
-  { title: '收货进度', key: 'inboundProgress', width: 180, fixed: 'left' },
-  {
-    title: '产品名称',
-    key: 'productName',
-    dataIndex: 'productName',
-    width: 140,
-    ellipsis: true,
-    fixed: 'left',
-  },
-  { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
-  { title: '变体属性', dataIndex: 'variantSummary', width: 140, ellipsis: true },
-  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-  { title: '计划数量', key: 'planQty', width: 100, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 80 },
-  { title: '收货仓库', key: 'receivingWarehouse', width: 120 },
-  { title: '收货数量', key: 'receiptQty', width: 110 },
-  { title: '操作', key: 'action', width: 100, fixed: 'right' },
-]
+const columns = computed(() => {
+  const cols = [
+    { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
+    { title: '收货进度', key: 'inboundProgress', width: 180, fixed: 'left' },
+  ]
+  if (isMultiOrder.value) {
+    cols.push({
+      title: '外协单号',
+      key: 'outsourcingOrderNo',
+      dataIndex: 'outsourcingOrderNo',
+      width: 140,
+      ellipsis: true,
+    })
+  }
+  cols.push(
+    {
+      title: '产品名称',
+      key: 'productName',
+      dataIndex: 'productName',
+      width: 140,
+      ellipsis: true,
+      fixed: isMultiOrder.value ? undefined : 'left',
+    },
+    { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
+    { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+    { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
+    { title: '变体属性', dataIndex: 'variantSummary', width: 140, ellipsis: true },
+    { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+    { title: '计划数量', key: 'planQty', width: 100, align: 'right' },
+    { title: '单位', dataIndex: 'unit', width: 80 },
+    { title: '收货仓库', key: 'receivingWarehouse', width: 120 },
+    { title: '收货数量', key: 'receiptQty', width: 110 },
+    { title: '操作', key: 'action', width: 100, fixed: 'right' },
+  )
+  return cols
+})
 
-const tableScrollX = columns.reduce((sum, col) => sum + (col.width || 100), 0)
+const tableScrollX = computed(() => columns.value.reduce((sum, col) => sum + (col.width || 100), 0))
 
 function formatQty(val) {
   return formatNumber(val, 4, { empty: '—' })
@@ -187,7 +222,10 @@ function buildLine(order, line) {
   const remainingQty = calcWxLineRemainInboundQty(order, line)
   const locked = isWxLineOccupyFull(order, line)
   return {
+    rowKey: `${order.id}__${line.id}`,
     id: line.id,
+    outsourcingOrderId: order.id,
+    outsourcingOrderNo: order.orderNo || '',
     productName: line.productName || line.itemName || '',
     productCode: line.productCode || line.itemCode || '',
     specModel: line.specModel || '',
@@ -208,13 +246,21 @@ function buildLine(order, line) {
 watch(
   () => props.open,
   (val) => {
-    if (!val || !props.outsourcingOrder) return
+    if (!val || !sourceOrders.value.length) return
     form.receiptNo = ''
-    form.remark = props.outsourcingOrder.remark || ''
+    form.remark =
+      sourceOrders.value.length === 1
+        ? sourceOrders.value[0].remark || ''
+        : `批量收货：${sourceOrders.value
+            .map((o) => o.orderNo)
+            .filter(Boolean)
+            .join('、')}`
     lineScope.value = 'pending'
-    receiptLines.value = (props.outsourcingOrder.lineItems || [])
-      .filter((l) => (Number(l.planQty) || 0) > 0)
-      .map((l) => buildLine(props.outsourcingOrder, l))
+    receiptLines.value = sourceOrders.value.flatMap((order) =>
+      (order.lineItems || [])
+        .filter((l) => (Number(l.planQty) || 0) > 0)
+        .map((l) => buildLine(order, l)),
+    )
   },
 )
 
@@ -223,8 +269,8 @@ function rowClassName(record) {
 }
 
 function removeLine(record) {
-  const id = record?.id
-  const idx = receiptLines.value.findIndex((l) => l.id === id)
+  const key = record?.rowKey
+  const idx = receiptLines.value.findIndex((l) => l.rowKey === key)
   if (idx >= 0) receiptLines.value.splice(idx, 1)
 }
 
@@ -248,21 +294,49 @@ function handleConfirm() {
     message.warning(`请为「${invalid.productName}」选择收货仓库`)
     return
   }
-  const result = submitOutsourcingReceipt(
-    props.outsourcingOrder.id,
-    submitLines.map((l) => ({
-      lineId: l.id,
-      receiptQty: l.receiptQty,
-      receivingWarehouse: l.receivingWarehouse,
-    })),
-    { receiptNo: form.receiptNo, remark: form.remark },
-  )
-  if (result.ok) {
-    message.success(result.message)
+
+  const byOrder = new Map()
+  submitLines.forEach((line) => {
+    const oid = line.outsourcingOrderId
+    if (!byOrder.has(oid)) byOrder.set(oid, [])
+    byOrder.get(oid).push(line)
+  })
+
+  let okCount = 0
+  const errors = []
+  const nos = []
+  for (const [orderId, lines] of byOrder) {
+    const order = sourceOrders.value.find((o) => o.id === orderId)
+    const result = submitOutsourcingReceipt(
+      orderId,
+      lines.map((l) => ({
+        lineId: l.id,
+        receiptQty: l.receiptQty,
+        receivingWarehouse: l.receivingWarehouse,
+      })),
+      {
+        receiptNo: isMultiOrder.value ? '' : form.receiptNo,
+        remark: form.remark || (order?.orderNo ? `外协单 ${order.orderNo} 生成` : ''),
+      },
+    )
+    if (result.ok) {
+      okCount += 1
+      if (result.receipt?.receiptNo) nos.push(result.receipt.receiptNo)
+    } else {
+      errors.push(result.message || `外协单「${order?.orderNo || orderId}」生成失败`)
+    }
+  }
+
+  if (okCount) {
+    message.success(
+      nos.length ? `已生成 ${okCount} 张收货单：${nos.join('、')}` : `已生成 ${okCount} 张收货单`,
+    )
     emit('confirmed')
     emit('update:open', false)
-  } else {
-    message.warning(result.message)
+  }
+  if (errors.length) {
+    const preview = errors.slice(0, 3).join('；')
+    message.warning(errors.length > 3 ? `${preview}…等 ${errors.length} 条失败` : preview)
   }
 }
 </script>

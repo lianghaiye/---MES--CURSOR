@@ -126,6 +126,7 @@
           <CheckOutlined />
           审核
         </a-button>
+        <a-button size="small" @click="handleBatchSubmit">批量提交</a-button>
         <a-button size="small" @click="handleGenerateIssue">
           <ExportOutlined />
           生成发料出库单
@@ -311,7 +312,7 @@
 
     <OutsourcingGenerateReceiptModal
       v-model:open="receiptModalOpen"
-      :outsourcing-order="receiptOrder"
+      :outsourcing-orders="receiptOrders"
       @confirmed="onReceiptConfirmed"
     />
 
@@ -323,7 +324,7 @@
 
     <OutsourcingGenerateInboundModal
       v-model:open="inboundModalOpen"
-      :outsourcing-order="inboundOrder"
+      :outsourcing-orders="inboundOrders"
       @saved="onInboundSaved"
     />
 
@@ -388,6 +389,7 @@ import {
   voidOutsourcingOrder,
   completeOutsourcingOrder,
   getOutsourcingOrdersByIds,
+  batchSubmitOutsourcingOrders,
 } from '@/store/outsourcingOrderStore'
 import OutsourcingGenerateReceiptModal from './components/OutsourcingGenerateReceiptModal.vue'
 import OutsourcingGenerateIssueModal from './components/OutsourcingGenerateIssueModal.vue'
@@ -426,8 +428,8 @@ const issueOrder = ref(null)
 const printModalOpen = ref(false)
 const printTemplateType = ref(OUTSOURCING_PRINT_TEMPLATE.DISPATCH)
 const printOrders = ref([])
-const receiptOrder = ref(null)
-const inboundOrder = ref(null)
+const receiptOrders = ref([])
+const inboundOrders = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const supplierOpts = supplierOptions
@@ -616,30 +618,38 @@ function openEdit(record) {
 }
 
 function openReceiptModal() {
-  if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条进行中的外协订单后再生成收货单')
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选外协订单后再生成收货单')
     return
   }
-  const order = outsourcingOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
-  if (!order || !canGenerateOutsourcingReceipt(order)) {
-    message.warning('仅进行中且仍有可回货数量的外协订单可生成收货单')
+  const selected = getOutsourcingOrdersByIds(selectedRowKeys.value)
+  const targets = selected.filter(canGenerateOutsourcingReceipt)
+  if (!targets.length) {
+    message.warning('所选外协订单均不可生成收货单（需进行中且仍有可回货数量）')
     return
   }
-  receiptOrder.value = order
+  if (targets.length < selected.length) {
+    message.info(`已过滤 ${selected.length - targets.length} 条不可收货的外协订单`)
+  }
+  receiptOrders.value = targets
   receiptModalOpen.value = true
 }
 
 function openInboundModal() {
-  if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条外协订单后再生成入库单')
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选外协订单后再生成入库单')
     return
   }
-  const order = outsourcingOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
-  if (!order || !canGenerateOutsourcingInbound(order)) {
-    message.warning('仅进行中且仍有可回货数量的外协订单可生成入库单')
+  const selected = getOutsourcingOrdersByIds(selectedRowKeys.value)
+  const targets = selected.filter(canGenerateOutsourcingInbound)
+  if (!targets.length) {
+    message.warning('所选外协订单均不可生成入库单（需进行中且仍有可回货数量）')
     return
   }
-  inboundOrder.value = order
+  if (targets.length < selected.length) {
+    message.info(`已过滤 ${selected.length - targets.length} 条不可入库的外协订单`)
+  }
+  inboundOrders.value = targets
   inboundModalOpen.value = true
 }
 
@@ -648,7 +658,7 @@ function openReceiptForRow(record) {
     message.warning('仅进行中且仍有可回货数量的外协订单可生成收货单')
     return
   }
-  receiptOrder.value = record
+  receiptOrders.value = [record]
   receiptModalOpen.value = true
 }
 
@@ -657,7 +667,7 @@ function openInboundForRow(record) {
     message.warning('仅进行中且仍有可回货数量的外协订单可生成入库单')
     return
   }
-  inboundOrder.value = record
+  inboundOrders.value = [record]
   inboundModalOpen.value = true
 }
 
@@ -707,6 +717,37 @@ function handleGenerateIssue() {
 
 function onIssueConfirmed() {
   selectedRowKeys.value = []
+}
+
+function reportBatchResult({ ok, errors }, successLabel) {
+  if (ok) message.success(`${successLabel} ${ok} 条`)
+  if (errors?.length) {
+    const preview = errors.slice(0, 3).join('；')
+    message.warning(errors.length > 3 ? `${preview}…等 ${errors.length} 条失败` : preview)
+  }
+}
+
+function handleBatchSubmit() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择要提交的外协订单')
+    return
+  }
+  const targets = getOutsourcingOrdersByIds(selectedRowKeys.value).filter(
+    (o) => canSubmitOutsourcingOrder(o) || canResubmitOutsourcingOrder(o),
+  )
+  if (!targets.length) {
+    message.warning('所选外协订单均不可提交（仅待提交/已拒绝）')
+    return
+  }
+  Modal.confirm({
+    title: '批量提交',
+    content: `确定提交选中的 ${targets.length} 条外协订单审核吗？`,
+    onOk: () => {
+      const result = batchSubmitOutsourcingOrders(targets.map((o) => o.id))
+      reportBatchResult(result, '已提交审核')
+      selectedRowKeys.value = []
+    },
+  })
 }
 
 function handleSubmit(record) {

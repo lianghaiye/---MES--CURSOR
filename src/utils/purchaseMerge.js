@@ -1,9 +1,14 @@
 /** 采购申请合并与价格计算 */
 
 import { resolveOrderSizeFromPlan } from '@/utils/orderSize'
+import { hasSettleUnit, resolveSettleEstimateRate, resolveSettleUnit } from '@/utils/settleUnit'
 
 export function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100
+}
+
+function roundSettleQty(n) {
+  return Math.round((Number(n) || 0) * 1000) / 1000
 }
 
 /** 紧急度优先级：特急 > 紧急/加急 > 正常 */
@@ -23,12 +28,36 @@ export function pickHighestUrgency(...values) {
   return best
 }
 
+/** 有结算单位时，按计划采购量 × 预估换算率（主数据默认率或最近批次单量）重算预计结算数量 */
+export function refreshSettleEstimate(line = {}) {
+  if (!hasSettleUnit(line)) return line
+  const { rate, source } = resolveSettleEstimateRate(line)
+  const purchaseQty = Number(line.planPurchaseQty) || 0
+  if (rate != null && purchaseQty > 0) {
+    line.settleQty = roundSettleQty(purchaseQty * rate)
+    if (!(Number(line.standardUnitWeight) > 0)) {
+      line.standardUnitWeight = rate
+    }
+    line.settleEstimateRateSource = source
+  }
+  return line
+}
+
 /**
  * @param {object} line
  * @param {boolean} [taxModeExcluding=true] true=按不含税算含税；false=按含税算不含税
+ * @param {{ refreshSettleEstimate?: boolean }} [options] 改计划量时默认重算预计结算；手改预计结算时传 false
  */
-export function recalcMergedLine(line, taxModeExcluding = true) {
-  const qty = Number(line.planPurchaseQty) || 0
+export function recalcMergedLine(line, taxModeExcluding = true, options = {}) {
+  if (options.refreshSettleEstimate !== false) {
+    refreshSettleEstimate(line)
+  }
+  const purchaseQty = Number(line.planPurchaseQty) || 0
+  const pricingQty = hasSettleUnit(line)
+    ? Number(line.settleQty) > 0
+      ? Number(line.settleQty)
+      : 0
+    : purchaseQty
   const rate = Number(line.taxRate) || 0
   if (taxModeExcluding) {
     const ex = Number(line.unitPriceExTax) || 0
@@ -37,8 +66,8 @@ export function recalcMergedLine(line, taxModeExcluding = true) {
     const inc = Number(line.unitPriceInTax) || 0
     line.unitPriceExTax = round2(inc / (1 + rate / 100))
   }
-  line.totalPriceExTax = round2(qty * (Number(line.unitPriceExTax) || 0))
-  line.totalPriceInTax = round2(qty * (Number(line.unitPriceInTax) || 0))
+  line.totalPriceExTax = round2(pricingQty * (Number(line.unitPriceExTax) || 0))
+  line.totalPriceInTax = round2(pricingQty * (Number(line.unitPriceInTax) || 0))
   return line
 }
 
@@ -57,6 +86,26 @@ export function mergeKey(materialCode, supplierName, salesOrderNo = '') {
 
 function isLinePendingPo(line) {
   return (line?.poGenStatus || '未生成采购') !== '已生成采购'
+}
+
+function pickSettleFields(line = {}) {
+  const settleUnit = resolveSettleUnit(line)
+  if (!settleUnit) {
+    return {
+      settleUnit: '',
+      standardUnitWeight: undefined,
+      settleQty: undefined,
+      settleEstimateRateSource: undefined,
+    }
+  }
+  const { rate, source } = resolveSettleEstimateRate({ ...line, settleUnit })
+  const settleQty = Number(line.settleQty)
+  return {
+    settleUnit,
+    standardUnitWeight: rate ?? undefined,
+    settleQty: Number.isFinite(settleQty) && settleQty > 0 ? settleQty : undefined,
+    settleEstimateRateSource: source || undefined,
+  }
 }
 
 /**
@@ -78,6 +127,7 @@ export function mergeRequisitionLines(requisitions, options = {}) {
       const existing = bucket.get(key)
       const lineId = line.id || `${req.id}-${line.inventoryCode}`
       const urgency = pickHighestUrgency(req.urgency, line.urgency)
+      const settle = pickSettleFields(line)
 
       if (!existing) {
         bucket.set(key, {
@@ -107,6 +157,7 @@ export function mergeRequisitionLines(requisitions, options = {}) {
           unit: line.unit || line.purchaseUnit || '件',
           purchaseUnit: line.purchaseUnit || line.unit || '件',
           inventoryUnit: line.inventoryUnit || '',
+          ...settle,
           blankSizeText: line.blankSizeText || '',
           blankSize: line.blankSize || null,
           blankSizeMode: line.blankSizeMode || '',
@@ -132,6 +183,10 @@ export function mergeRequisitionLines(requisitions, options = {}) {
       )
       existing.stockQty = Math.min(existing.stockQty, Number(line.stockQty) || 0)
       existing.urgency = pickHighestUrgency(existing.urgency, urgency)
+      if (!existing.settleUnit && settle.settleUnit) {
+        existing.settleUnit = settle.settleUnit
+        existing.standardUnitWeight = settle.standardUnitWeight
+      }
       if (String(req.source || '').trim() === '生产计划') {
         existing.fromProductionPlan = true
       }

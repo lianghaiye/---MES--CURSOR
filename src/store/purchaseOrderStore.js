@@ -7,6 +7,7 @@ import {
   computePurchaseOrderOverdueStatus,
 } from '@/mock/purchaseOrders'
 import { ensureCrossDemoPurchaseOrders } from '@/mock/crossModuleDemoSeed'
+import { ensureSettleUnitDemoPurchaseOrders } from '@/mock/settleUnitPurchaseDemoSeed'
 import { round2 } from '@/utils/purchaseMerge'
 import {
   calcPoHeaderInboundStatus,
@@ -15,6 +16,7 @@ import {
 } from '@/utils/purchaseLineInbound'
 import { addPurchaseReceipt } from '@/store/purchaseReceiptStore'
 import { estimateSettleQty, hasSettleUnit, resolvePricingQty } from '@/utils/settleUnit'
+import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 
 /** 由 purchaseRequisitionStore 注册，避免循环依赖导致 bind 未生效 */
 let draftBindApi = {
@@ -33,8 +35,8 @@ export function registerPurchaseRequisitionDraftBind(api = {}) {
 
 const STORAGE_KEY = 'i_doms_purchase_orders'
 const SEED_VERSION_KEY = 'i_doms_purchase_orders_seed_v'
-/** v6：审批记录演示；明细入库质检要求 */
-const CURRENT_SEED_VERSION = '6'
+/** v7：结算单位演示采购订单（铸件/三口径/无单重） */
+const CURRENT_SEED_VERSION = '7'
 let poSeq = 20
 
 function loadFromStorage() {
@@ -61,7 +63,7 @@ function persist() {
 
 function initPurchaseOrders() {
   const base = shouldReseed() ? clonePurchaseOrders() : loadFromStorage() || clonePurchaseOrders()
-  const orders = ensureCrossDemoPurchaseOrders(base)
+  const orders = ensureSettleUnitDemoPurchaseOrders(ensureCrossDemoPurchaseOrders(base))
   orders.forEach((order) => {
     if (!order || order.status === '草稿') {
       if (order) order.overdueStatus = order.overdueStatus || '未逾期'
@@ -346,6 +348,9 @@ export function createPurchaseOrdersFromMergedLines(mergedLines, options = {}) {
         unit: line.unit || line.purchaseUnit || '个',
         purchaseUnit: line.purchaseUnit || line.unit || '个',
         inventoryUnit: line.inventoryUnit || '',
+        settleUnit: line.settleUnit || '',
+        settleQty: line.settleQty,
+        standardUnitWeight: line.standardUnitWeight,
         blankSizeText: line.blankSizeText || '',
         blankSize: line.blankSize || null,
         blankSizeMode: line.blankSizeMode || '',
@@ -474,7 +479,10 @@ export function getGeneratePurchaseOrderDraft(draftId) {
 
 /** 所有「生成采购订单」草稿 */
 export function listGeneratePurchaseOrderDrafts() {
-  return purchaseOrderState.orders.filter((o) => o.status === '草稿')
+  // 循环依赖启动期 purchaseOrderState 可能尚未初始化
+  const orders = purchaseOrderState?.orders
+  if (!Array.isArray(orders)) return []
+  return orders.filter((o) => o.status === '草稿')
 }
 
 /**
@@ -926,4 +934,108 @@ export function reassignPoLinesToSupplier(orderId, lineIds, newSupplier) {
       ? `已拆出 ${moving.length} 行，生成采购单「${target.orderNo}」（供应商：${supplier}）`
       : `已拆出 ${moving.length} 行，并入采购单「${target.orderNo}」（供应商：${supplier}）`,
   }
+}
+
+/** 批量提交审核（含待提交 / 已拒绝重新提交） */
+export function batchSubmitPurchaseOrders(ids = []) {
+  let ok = 0
+  const errors = []
+  for (const id of ids) {
+    const order = getPurchaseOrderById(id)
+    if (!order) {
+      errors.push('存在无效采购单')
+      continue
+    }
+    let result
+    if (canSubmitPurchaseOrder(order)) {
+      result = submitPurchaseOrderForApprove(id)
+    } else if (canResubmitPurchaseOrder(order)) {
+      result = resubmitPurchaseOrder(id)
+    } else {
+      errors.push(`「${order.orderNo}」不可提交（仅待提交/已拒绝）`)
+      continue
+    }
+    if (result.ok) ok += 1
+    else errors.push(result.message || `「${order.orderNo}」提交失败`)
+  }
+  return { ok, fail: errors.length, errors }
+}
+
+/** 按剩余可收货量构造默认收货明细（批量一键用） */
+export function buildDefaultPurchaseReceiptLines(order) {
+  if (!order) return []
+  return (order.lineItems || [])
+    .filter((line) => (Number(line.purchaseQty) || 0) > 0)
+    .map((line) => {
+      const remainingQty = calcPoLineRemainInboundQty(order, line)
+      if (remainingQty <= 1e-9) return null
+      const warehouse =
+        line.receivingWarehouse ||
+        resolveDefaultWarehouseByMaterialCode(line.itemCode || line.productCode) ||
+        ''
+      const settleUnit = String(line.settleUnit || '').trim()
+      return {
+        id: line.id,
+        itemName: line.itemName || line.productName || '',
+        itemCode: line.itemCode || line.productCode || '',
+        itemType: line.itemType || '',
+        specModel: line.specModel || '',
+        material: line.material || '',
+        variantSummary: line.variantSummary || '',
+        drawingNo: line.drawingNo || '',
+        purchaseQty: Number(line.purchaseQty) || 0,
+        unit: line.unit || '',
+        receivingMode: line.receivingMode === '直发现场' ? '直发现场' : '正常收货',
+        receivingWarehouse: warehouse,
+        receiptQty: remainingQty,
+        settleUnit,
+        settleQty: settleUnit
+          ? Number(line.settleQty) > 0
+            ? Number(line.settleQty)
+            : estimateSettleQty(line, remainingQty)
+          : undefined,
+        remark: '',
+      }
+    })
+    .filter(Boolean)
+}
+
+/** 批量生成采购收货单：按剩余可收货数量 + 默认仓库一键生成 */
+export function batchGeneratePurchaseReceipts(ids = []) {
+  let ok = 0
+  const errors = []
+  const receipts = []
+  for (const id of ids) {
+    const order = getPurchaseOrderById(id)
+    if (!order) {
+      errors.push('存在无效采购单')
+      continue
+    }
+    if (!canGenerateReceipt(order)) {
+      errors.push(`「${order.orderNo}」不可生成收货单`)
+      continue
+    }
+    const lines = buildDefaultPurchaseReceiptLines(order)
+    if (!lines.length) {
+      errors.push(`「${order.orderNo}」没有可收货明细`)
+      continue
+    }
+    const missingWh = lines.find((l) => !String(l.receivingWarehouse || '').trim())
+    if (missingWh) {
+      errors.push(
+        `「${order.orderNo}」明细「${missingWh.itemName || missingWh.itemCode}」缺少收货仓库`,
+      )
+      continue
+    }
+    const result = submitReceipt(order.id, lines, {
+      remark: `批量生成（采购单 ${order.orderNo}）`,
+    })
+    if (result.ok) {
+      ok += 1
+      if (result.receipt) receipts.push(result.receipt)
+    } else {
+      errors.push(result.message || `「${order.orderNo}」生成收货单失败`)
+    }
+  }
+  return { ok, fail: errors.length, errors, receipts }
 }

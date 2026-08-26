@@ -74,13 +74,13 @@
               </a-form-item>
             </a-col>
             <a-col :span="6">
-              <a-form-item label="业务员">
+              <a-form-item label="采购员">
                 <a-select
                   v-model:value="form.salesperson"
                   size="small"
                   show-search
                   allow-clear
-                  placeholder="请选择业务员"
+                  placeholder="请选择采购员"
                   :options="salespersonOpts"
                 />
               </a-form-item>
@@ -312,7 +312,11 @@ import {
 } from '@/store/purchaseRequisitionStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
-import { convertStockDemandToPurchase, purchaseQtyToStockQty } from '@/utils/purchaseUomConvert'
+import {
+  convertStockDemandToPurchase,
+  purchaseQtyToStockQty,
+  resolveLinePurchaseConvertRate,
+} from '@/utils/purchaseUomConvert'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import BomBlankSizeModal from '@/views/product-process/components/BomBlankSizeModal.vue'
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
@@ -376,7 +380,7 @@ const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 const CURRENT_USER = 'admin1'
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-req-form-lines-v5', purchaseRequisitionFormLineColumns, {
+  useTableColumnSettings('purchase-req-form-lines-v6', purchaseRequisitionFormLineColumns, {
     minScrollX: 1560,
     pinEdgeColumns: false,
     pinActionColumn: true,
@@ -560,7 +564,8 @@ function mapPickerToLineItem(payload) {
     unit: converted.purchaseUnit,
     inventoryUnit: converted.inventoryUnit,
     purchaseUnit: converted.purchaseUnit,
-    packageContent: converted.packageContent,
+    packageContent: converted.purchaseConvertRate,
+    purchaseConvertRate: converted.purchaseConvertRate,
     convertHint: converted.convertHint,
     stockQty: resolveStockQty(code),
     demandQty: converted.demandStockQty,
@@ -689,8 +694,22 @@ function filterUnitOption(input, option) {
   return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
 }
 
+function resolveLineMaster(record) {
+  const code = record?.productCode || record?.inventoryCode || record?.itemCode || ''
+  if (!code) return null
+  return materialInfoState.materials.find((m) => m.code === code) || null
+}
+
 function onUnitChange(record) {
   record.purchaseUnit = record.unit || record.purchaseUnit || ''
+  const master = resolveLineMaster(record)
+  if (master) {
+    const converted = convertStockDemandToPurchase(Number(record.demandQty) || 1, master)
+    record.packageContent = converted.purchaseConvertRate
+    record.purchaseConvertRate = converted.purchaseConvertRate
+    record.convertHint = converted.convertHint
+    record.inventoryUnit = converted.inventoryUnit
+  }
   if (record.unit && record.inventoryUnit && record.unit === record.inventoryUnit) {
     record.convertHint = ''
   }
@@ -698,7 +717,10 @@ function onUnitChange(record) {
 }
 
 function onQtyChange(record) {
-  const content = Number(record.packageContent) > 0 ? Number(record.packageContent) : 1
+  const master = resolveLineMaster(record)
+  const content = resolveLinePurchaseConvertRate(record, master) ?? 1
+  record.packageContent = content
+  record.purchaseConvertRate = content
   const purchaseUnit = record.unit || record.purchaseUnit
   if (purchaseUnit && record.inventoryUnit && purchaseUnit !== record.inventoryUnit) {
     record.demandQty = purchaseQtyToStockQty(record.planPurchaseQty, content)
@@ -764,7 +786,10 @@ function handleSave() {
 
   const lineItems = validLines.map((line) => {
     const next = { ...line }
-    const content = Number(next.packageContent) > 0 ? Number(next.packageContent) : 1
+    const master = resolveLineMaster(next)
+    const content = resolveLinePurchaseConvertRate(next, master) ?? 1
+    next.packageContent = content
+    next.purchaseConvertRate = content
     if (next.purchaseUnit && next.inventoryUnit && next.purchaseUnit !== next.inventoryUnit) {
       next.demandQty = purchaseQtyToStockQty(next.planPurchaseQty, content)
     } else if (next.demandQty == null) {
