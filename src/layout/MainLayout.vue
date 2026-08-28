@@ -8,7 +8,7 @@
         <a-layout-content class="page-content">
           <router-view v-slot="{ Component, route: currentRoute }">
             <keep-alive :include="cachedViews">
-              <component :is="Component" :key="currentRoute.path" />
+              <component :is="Component" :key="viewCacheKey(currentRoute)" />
             </keep-alive>
           </router-view>
         </a-layout-content>
@@ -26,8 +26,10 @@ import GlobalTabs from './GlobalTabs.vue'
 import { sideMenus, resolveModuleKey } from '@/config/menus'
 import { createPageRegistry } from '@/config/createPages'
 import { enhanceListFilterBars, startListFilterBarObserver } from '@/utils/listFilterEnhance'
+import { useTabs } from '@/composables/useTabs'
 
 const route = useRoute()
+const { syncTabWithRoute } = useTabs()
 
 const moduleKey = computed(() => resolveModuleKey(route.path))
 const sideItems = computed(() => sideMenus[moduleKey.value] || [])
@@ -42,6 +44,11 @@ const cachedViews = [
   ...createPageRegistry.map((page) => page.keepAlive),
 ]
 
+/** 一律用 path 做缓存 key，避免 query 编码差异/丢参导致新建页重挂载刷新 */
+function viewCacheKey(currentRoute) {
+  return String(currentRoute?.path || '')
+}
+
 let filterObserver = null
 onMounted(() => {
   filterObserver = startListFilterBarObserver()
@@ -53,8 +60,10 @@ onUnmounted(() => {
 watch(
   () => route.fullPath,
   () => {
+    syncTabWithRoute(route.fullPath, route.path)
     requestAnimationFrame(() => enhanceListFilterBars(document))
   },
+  { immediate: true },
 )
 </script>
 

@@ -330,4 +330,112 @@ export function mergeTemplateIntoParent(flatNodes, lineItems, parentId, imported
   }
 }
 
+/** 清除 lineItems 上用于树形展示的临时字段（保存前调用） */
+export function stripLineTreeChildren(lineItems) {
+  if (!Array.isArray(lineItems)) return
+  lineItems.forEach((line) => {
+    delete line.children
+    delete line._treeIndex
+    delete line._stripeAlt
+  })
+}
+
+/** 构建物料清单树形表格数据（复用 lineItems 引用以支持行内编辑） */
+export function buildBomMaterialTree(flatNodes, lineItems) {
+  if (!Array.isArray(lineItems) || !lineItems.length) return []
+  stripLineTreeChildren(lineItems)
+  const rootId = getRootTreeId(flatNodes)
+
+  function buildLevel(parentId) {
+    const lines = getLinesForTreeNode(lineItems, parentId, flatNodes)
+    const linkedNodeIds = new Set()
+
+    lines.forEach((line) => {
+      const subNodeId = line.treeNodeId
+      if (subNodeId && subNodeId !== parentId) {
+        linkedNodeIds.add(subNodeId)
+        const children = buildLevel(subNodeId)
+        if (children.length) line.children = children
+      }
+    })
+
+    getOrderedChildNodeIds(parentId, flatNodes, lineItems).forEach((childNodeId) => {
+      if (linkedNodeIds.has(childNodeId)) return
+      const nodeChildren = buildLevel(childNodeId)
+      if (!nodeChildren.length) return
+      const node = flatNodes.find((n) => n.id === childNodeId)
+      const placeholderLine = lineItems.find((l) => l.treeNodeId === childNodeId)
+      if (placeholderLine) {
+        placeholderLine.children = nodeChildren
+      } else if (node?.lineId) {
+        const linked = lineItems.find((l) => l.id === node.lineId)
+        if (linked) linked.children = nodeChildren
+      }
+    })
+
+    return lines
+  }
+
+  return buildLevel(rootId)
+}
+
+/** 为树形物料行分配序号（1、1.1、1.2…） */
+export function assignMaterialTreeIndexes(rows, prefix = '') {
+  if (!Array.isArray(rows)) return []
+  rows.forEach((row, i) => {
+    const index = prefix ? `${prefix}.${i + 1}` : String(i + 1)
+    row._treeIndex = index
+    if (row.children?.length) assignMaterialTreeIndexes(row.children, index)
+  })
+  return rows
+}
+
+/** 一级物料间隔底色，下级继承所属一级物料的底色标记 */
+export function assignMaterialTreeStripe(rows) {
+  if (!Array.isArray(rows)) return []
+  rows.forEach((row, i) => {
+    applyMaterialTreeStripeBranch(row, i % 2 === 1)
+  })
+  return rows
+}
+
+function applyMaterialTreeStripeBranch(row, stripeAlt) {
+  row._stripeAlt = stripeAlt
+  if (row.children?.length) {
+    row.children.forEach((child) => applyMaterialTreeStripeBranch(child, stripeAlt))
+  }
+}
+
+/** 收集树形物料行 id，用于展开/收起 */
+export function collectMaterialTreeRowKeys(rows) {
+  const keys = []
+  function walk(list) {
+    list.forEach((row) => {
+      keys.push(row.id)
+      if (row.children?.length) walk(row.children)
+    })
+  }
+  walk(rows || [])
+  return keys
+}
+
+/** 展平树形物料行（勾选、合计等） */
+export function flattenMaterialTreeLines(rows) {
+  const result = []
+  function walk(list) {
+    list.forEach((row) => {
+      result.push(row)
+      if (row.children?.length) walk(row.children)
+    })
+  }
+  walk(rows || [])
+  return result
+}
+
+/** 节点是否有下级子节点 */
+export function nodeHasTreeChildren(flatNodes, nodeId, lineItems = []) {
+  if (!nodeId) return false
+  return getOrderedChildNodeIds(nodeId, flatNodes, lineItems).length > 0
+}
+
 export { ROOT_ID }

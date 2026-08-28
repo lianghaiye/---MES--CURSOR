@@ -309,7 +309,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { SettingOutlined, PlusOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons-vue'
 import {
@@ -711,15 +711,15 @@ function handleConfirm() {
   }
   confirming.value = true
   const payload = selectedRows.value.map((row) => toBomSubItemPayload(row))
-  requestAnimationFrame(() => {
+  keyword.value = ''
+  page.value = 1
+  appliedFilterConditions.value = []
+  selectedRowKeys.value = []
+  selectedRows.value = []
+  confirming.value = false
+  emit('update:open', false)
+  nextTick(() => {
     emit('selected', payload)
-    keyword.value = ''
-    page.value = 1
-    appliedFilterConditions.value = []
-    selectedRowKeys.value = []
-    selectedRows.value = []
-    confirming.value = false
-    emit('update:open', false)
   })
 }
 

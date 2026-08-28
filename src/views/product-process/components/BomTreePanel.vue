@@ -1,5 +1,5 @@
 <template>
-  <div class="bom-tree-panel">
+  <div class="bom-tree-panel" :class="{ 'is-page-scroll': pageScroll }">
     <div class="search-row">
       <a-input
         v-model:value="searchKeyword"
@@ -12,14 +12,36 @@
           <SearchOutlined />
         </template>
       </a-input>
-      <a-tooltip title="字段配置（最多显示4个字段）">
-        <a-button type="text" size="small" class="field-config-btn" @click="fieldDrawerOpen = true">
-          <SettingOutlined />
-        </a-button>
-      </a-tooltip>
+      <div class="search-row-actions">
+        <a-tooltip title="字段配置（最多显示4个字段）">
+          <a-button
+            type="text"
+            size="small"
+            class="field-config-btn"
+            @click="fieldDrawerOpen = true"
+          >
+            <SettingOutlined />
+          </a-button>
+        </a-tooltip>
+        <a-tooltip title="展开">
+          <a-button type="text" size="small" class="action-icon-btn" @click="expandAll">
+            <ExpandOutlined />
+          </a-button>
+        </a-tooltip>
+        <a-tooltip title="收起">
+          <a-button type="text" size="small" class="action-icon-btn" @click="collapseAll">
+            <CompressOutlined />
+          </a-button>
+        </a-tooltip>
+        <a-tooltip v-if="showCollapse" title="收起结构树">
+          <a-button type="text" size="small" class="field-config-btn" @click="emit('collapse')">
+            <MenuFoldOutlined />
+          </a-button>
+        </a-tooltip>
+      </div>
     </div>
 
-    <div class="action-row">
+    <div v-if="showActionRow" class="action-row">
       <div class="action-row-left">
         <a-button
           v-if="!readonly && !hideSwitchProduct"
@@ -33,7 +55,7 @@
           切换产品
         </a-button>
         <a-button
-          v-if="!readonly"
+          v-if="!readonly && !hideImportTemplate"
           type="text"
           size="small"
           class="action-text-btn"
@@ -42,18 +64,6 @@
           <ImportOutlined />
           从模板导入
         </a-button>
-      </div>
-      <div class="action-row-right">
-        <a-tooltip title="展开">
-          <a-button type="text" size="small" class="action-icon-btn" @click="expandAll">
-            <ExpandOutlined />
-          </a-button>
-        </a-tooltip>
-        <a-tooltip title="收起">
-          <a-button type="text" size="small" class="action-icon-btn" @click="collapseAll">
-            <CompressOutlined />
-          </a-button>
-        </a-tooltip>
       </div>
     </div>
 
@@ -122,6 +132,7 @@ import {
   ExpandOutlined,
   CompressOutlined,
   ImportOutlined,
+  MenuFoldOutlined,
 } from '@ant-design/icons-vue'
 import { buildAntTreeData } from '@/utils/bomTree'
 import { formatBomTreeNodeTitle, filterTreeNodesByKeyword } from '@/utils/bomTreeDisplay'
@@ -140,6 +151,10 @@ const props = defineProps({
     default: () => ({ code: '', name: '', specModel: '', supplyForm: '', subItemCount: 0 }),
   },
   hideSwitchProduct: { type: Boolean, default: false },
+  hideImportTemplate: { type: Boolean, default: false },
+  showCollapse: { type: Boolean, default: false },
+  /** 随页面整体滚动，树区不再单独限高 */
+  pageScroll: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -148,6 +163,7 @@ const emit = defineEmits([
   'delete-node',
   'select-node',
   'switch-product',
+  'collapse',
 ])
 
 const hoverKey = ref(null)
@@ -155,6 +171,11 @@ const expandedKeys = ref([])
 const searchKeyword = ref('')
 const fieldDrawerOpen = ref(false)
 const treeFieldSettings = ref(JSON.parse(JSON.stringify(defaultBomTreeFieldSettings)))
+
+const showActionRow = computed(
+  () =>
+    (!props.readonly && !props.hideSwitchProduct) || (!props.readonly && !props.hideImportTemplate),
+)
 
 const filteredFlatNodes = computed(() =>
   filterTreeNodesByKeyword(props.flatNodes, searchKeyword.value, props.rootMeta),
@@ -225,20 +246,33 @@ function collapseAll() {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
 
   .search-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     margin-bottom: 8px;
     flex-shrink: 0;
+    flex-wrap: nowrap;
 
     .tree-search {
       flex: 1;
       min-width: 0;
     }
 
-    .field-config-btn {
+    .search-row-actions {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      flex-wrap: nowrap;
+      gap: 0;
+    }
+
+    .field-config-btn,
+    .action-icon-btn {
       flex-shrink: 0;
       color: rgba(0, 0, 0, 0.55);
 
@@ -255,11 +289,9 @@ function collapseAll() {
     gap: 8px;
     margin-bottom: 8px;
     flex-shrink: 0;
-    flex-wrap: wrap;
   }
 
-  .action-row-left,
-  .action-row-right {
+  .action-row-left {
     display: flex;
     align-items: center;
     gap: 2px;
@@ -303,11 +335,45 @@ function collapseAll() {
   .tree-wrap {
     flex: 1;
     min-height: 0;
+    min-width: 0;
     overflow: auto;
     border: 1px solid #f0f0f0;
     border-radius: 4px;
     padding: 8px;
     background: #fafafa;
+
+    :deep(.ant-tree) {
+      width: 100%;
+    }
+
+    :deep(.ant-tree-treenode) {
+      width: 100%;
+      overflow: hidden;
+    }
+
+    :deep(.ant-tree-node-content-wrapper) {
+      flex: 1;
+      min-width: 0 !important;
+      overflow: hidden;
+    }
+
+    :deep(.ant-tree-title) {
+      display: block;
+      overflow: hidden;
+      min-width: 0;
+    }
+  }
+
+  &.is-page-scroll {
+    height: auto;
+    min-height: 0;
+
+    .tree-wrap {
+      flex: none;
+      min-height: auto;
+      overflow-x: hidden;
+      overflow-y: visible;
+    }
   }
 
   .tree-node-row {
@@ -317,6 +383,9 @@ function collapseAll() {
     gap: 8px;
     min-height: 28px;
     padding-right: 4px;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
 
     .node-label {
       flex: 1;

@@ -22,11 +22,12 @@ import { useRouter } from 'vue-router'
 import { useTabs } from '@/composables/useTabs'
 
 const router = useRouter()
-const { tabState, closeTab, setActive } = useTabs()
+const { tabState, closeTab, setActive, getTabNavigateTo } = useTabs()
 
 function onTabChange(key) {
   setActive(key)
-  router.push(key)
+  // 必须推 fullPath（含 query），否则新建页会丢参并被重新 init
+  router.push(getTabNavigateTo(key))
 }
 
 function onTabEdit(targetKey, action) {
@@ -34,7 +35,7 @@ function onTabEdit(targetKey, action) {
     const closingActive = tabState.activePath === targetKey
     closeTab(targetKey)
     if (closingActive) {
-      router.push(tabState.activePath)
+      router.push(getTabNavigateTo(tabState.activePath))
     }
   }
 }

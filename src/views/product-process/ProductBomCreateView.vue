@@ -1,5 +1,40 @@
 <template>
   <div class="product-bom-create-page">
+    <div class="page-sticky-head">
+      <div class="head-left">
+        <a-tooltip :title="leftSidebarCollapsed ? '展开结构树' : '收起结构树'">
+          <a-button type="text" size="small" class="head-tree-toggle-btn" @click="toggleLeft">
+            <MenuUnfoldOutlined v-if="leftSidebarCollapsed" />
+            <MenuFoldOutlined v-else />
+          </a-button>
+        </a-tooltip>
+        <span class="page-title">{{ pageHeadTitle }}</span>
+        <span v-if="!basicInfoExpanded" class="basic-summary">{{ basicInfoSummary }}</span>
+      </div>
+      <a-space class="head-actions" :size="8">
+        <a-button type="link" size="small" class="toggle-btn" @click="toggleBasicInfo">
+          {{ basicInfoExpanded ? '收起信息' : '展开信息' }}
+          <UpOutlined v-if="basicInfoExpanded" />
+          <DownOutlined v-else />
+        </a-button>
+        <a-button type="primary" :disabled="!hasRoot" @click="overviewModalOpen = true">
+          概览
+        </a-button>
+        <a-button :disabled="!hasRoot" @click="relationOpen = true">查看关联BOM</a-button>
+        <a-button type="primary" :loading="saving" @click="handleSave">
+          <SaveOutlined />
+          保存
+        </a-button>
+        <a-button type="primary" ghost :loading="saving" @click="handleSaveAndPublish">
+          保存并发布
+        </a-button>
+        <a-button @click="handleCancel">
+          <CloseOutlined />
+          取消
+        </a-button>
+      </a-space>
+    </div>
+
     <div class="page-body">
       <aside
         v-show="!leftSidebarCollapsed"
@@ -7,59 +42,25 @@
         :style="{ width: `${leftPanelWidth}px` }"
       >
         <BomTreePanel
+          hide-import-template
           :flat-nodes="flatNodes"
           :line-items="lineItems"
           :selected-node-id="selectedNodeId"
           :template-ref="templateRef"
           :root-meta="rootMeta"
-          :hide-switch-product="isShipBomMode"
-          @import-template="templateModalOpen = true"
+          :hide-switch-product="true"
           @add-child="onAddChild"
           @delete-node="onDeleteNode"
           @select-node="selectedNodeId = $event"
-          @switch-product="openSwitchProduct"
         />
       </aside>
-      <div v-if="leftSidebarCollapsed" class="sidebar-expand-trigger">
-        <a-button type="text" size="small" @click="leftSidebarCollapsed = false">
-          <MenuUnfoldOutlined />
-        </a-button>
-      </div>
       <div
         v-show="!leftSidebarCollapsed"
         class="panel-resizer"
         @mousedown.prevent="onResizeMouseDown"
       />
 
-      <main class="right-panel">
-        <div class="right-panel-head">
-          <div class="head-left">
-            <span v-if="!basicInfoExpanded" class="basic-summary">{{ basicInfoSummary }}</span>
-          </div>
-          <a-space class="head-actions">
-            <a-button type="link" size="small" class="toggle-btn" @click="toggleBasicInfo">
-              {{ basicInfoExpanded ? '收起信息' : '展开信息' }}
-              <UpOutlined v-if="basicInfoExpanded" />
-              <DownOutlined v-else />
-            </a-button>
-            <a-button type="primary" :disabled="!hasRoot" @click="overviewModalOpen = true">
-              概览
-            </a-button>
-            <a-button :disabled="!hasRoot" @click="relationOpen = true"> 查看关联BOM </a-button>
-            <a-button type="primary" :loading="saving" @click="handleSave">
-              <SaveOutlined />
-              保存
-            </a-button>
-            <a-button type="primary" ghost :loading="saving" @click="handleSaveAndPublish">
-              保存并发布
-            </a-button>
-            <a-button @click="handleCancel">
-              <CloseOutlined />
-              取消
-            </a-button>
-          </a-space>
-        </div>
-
+      <main ref="rightPanelRef" class="right-panel">
         <div v-show="basicInfoExpanded" class="section-card info-card">
           <div class="info-body">
             <div class="info-block">
@@ -95,8 +96,8 @@
                     :disabled="bomTypeLocked"
                   />
                 </a-form-item>
-                <a-form-item v-if="isShipBomMode && isEditMode" label="BOM版本">
-                  <a-input :value="editVersion" disabled style="width: 120px" />
+                <a-form-item v-if="isEditMode" label="BOM版本">
+                  <a-input :value="editVersion || '—'" disabled style="width: 120px" />
                 </a-form-item>
                 <a-form-item v-if="isShipBomMode" label="适用产品" class="applicable-products-item">
                   <div class="applicable-products-field">
@@ -131,104 +132,46 @@
             </div>
 
             <div v-if="!isShipBomMode" class="info-block">
-              <div class="info-block-head">
-                <div class="info-block-title">父项产品信息</div>
-              </div>
-              <a-form layout="inline" size="small" class="inline-info-form">
-                <a-form-item label="物品名称">
-                  <a-input
-                    :value="selectedParentInfo.itemName || '—'"
-                    disabled
-                    style="width: 180px"
-                  />
-                </a-form-item>
-                <a-form-item v-if="isEditMode" label="BOM版本">
-                  <a-input :value="editVersion" disabled style="width: 120px" />
-                </a-form-item>
-                <a-form-item label="规格型号">
-                  <a-input
-                    :value="selectedParentInfo.specModel || '—'"
-                    disabled
-                    style="width: 140px"
-                  />
-                </a-form-item>
-                <a-form-item label="材质">
-                  <a-input
-                    :value="selectedParentInfo.material || '—'"
-                    disabled
-                    style="width: 120px"
-                  />
-                </a-form-item>
-                <a-form-item label="图号">
-                  <a-input
-                    :value="selectedParentInfo.drawingNo || '—'"
-                    disabled
-                    style="width: 140px"
-                  />
-                </a-form-item>
-                <a-form-item label="工艺路线">
-                  <a-select
-                    v-if="isSelectedRoot"
-                    v-model:value="form.processRoute"
-                    allow-clear
-                    show-search
-                    placeholder="选择物品后带出，可修改"
-                    :filter-option="filterRoute"
-                    :options="processRouteOpts"
-                    style="width: 180px"
-                  />
-                  <a-input
-                    v-else
-                    :value="selectedParentInfo.processRoute || '—'"
-                    disabled
-                    style="width: 180px"
-                  />
-                </a-form-item>
-                <div class="params-pair-row">
-                  <a-form-item label="技术参数" class="pair-item">
-                    <a-textarea
-                      v-if="isSelectedRoot"
-                      v-model:value="form.techParams"
-                      placeholder="选择物品后带出，可修改"
-                      allow-clear
-                      :rows="3"
-                      style="width: 100%"
-                    />
-                    <a-textarea
-                      v-else
-                      :value="selectedParentInfo.techParams || '—'"
-                      disabled
-                      :rows="3"
-                      style="width: 100%"
-                    />
-                  </a-form-item>
-                  <a-form-item label="配套要求" class="pair-item">
-                    <a-textarea
-                      v-if="isSelectedRoot"
-                      v-model:value="form.matchingRequirements"
-                      placeholder="选择物品后带出，可修改"
-                      allow-clear
-                      :rows="3"
-                      style="width: 100%"
-                    />
-                    <a-textarea
-                      v-else
-                      :value="selectedParentInfo.matchingRequirements || '—'"
-                      disabled
-                      :rows="3"
-                      style="width: 100%"
-                    />
-                  </a-form-item>
-                </div>
-              </a-form>
+              <BomRootProductEditor
+                :readonly="false"
+                :can-change-item="canSwitchProduct"
+                :item-type="form.itemType"
+                :item-id="switchSelectedId"
+                :item-name="form.itemName"
+                :item-code="form.itemCode"
+                :spec-model="form.specModel"
+                :material="form.material"
+                :drawing-no="form.drawingNo"
+                :process-route="form.processRoute"
+                :tech-params="form.techParams"
+                :matching-requirements="form.matchingRequirements"
+                v-model:sync-to-master="syncToMaster"
+                :process-route-opts="processRouteOpts"
+                @update:item-name="onRootItemNameUpdate"
+                @update:spec-model="(v) => (form.specModel = v)"
+                @update:material="(v) => (form.material = v)"
+                @update:drawing-no="(v) => (form.drawingNo = v)"
+                @update:process-route="(v) => (form.processRoute = v)"
+                @update:tech-params="(v) => (form.techParams = v)"
+                @update:matching-requirements="(v) => (form.matchingRequirements = v)"
+                @select-item="onRootCatalogSelected"
+                @create-item="onRootItemCreate"
+                @open-picker="openSwitchProduct"
+                @open-detail="openRootItemDetail"
+              />
             </div>
           </div>
         </div>
 
         <div class="section-card table-section">
           <BomMaterialTable
-            :lines="displayLines"
+            :flat-nodes="flatNodes"
+            :line-items="lineItems"
             :column-settings="columnSettings"
+            :context-node-id="selectedNodeId"
+            :root-item-label="rootItemLabel"
+            :summary-meta="materialSummaryMeta"
+            :hide-switch-product="true"
             :empty-variant="hasRoot ? 'no-children' : 'default'"
             @refresh="refreshLines"
             @open-column-setting="columnDrawerOpen = true"
@@ -241,6 +184,8 @@
             @material-change="onMaterialChange"
             @item-name-change="onItemNameChange"
             @configure-variant="openVariantConfig"
+            @select-node="selectedNodeId = $event"
+            @import-template="templateModalOpen = true"
           />
         </div>
       </main>
@@ -274,6 +219,7 @@
       ecn-new-material-mode
       hide-add-material
       :multiple="false"
+      @update:open="onSwitchProductOpenChange"
       @selected="onSwitchProductSelected"
     />
     <SelectSpuOnlyModal
@@ -326,7 +272,16 @@ export default { name: 'ProductBomCreateView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref, onMounted, onUnmounted, watch } from 'vue'
+import {
+  computed,
+  reactive,
+  ref,
+  onMounted,
+  onActivated,
+  onDeactivated,
+  watch,
+  nextTick,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
@@ -335,9 +290,15 @@ import {
   UpOutlined,
   DownOutlined,
   MenuUnfoldOutlined,
+  MenuFoldOutlined,
 } from '@ant-design/icons-vue'
-import { productInfoState } from '@/store/productInfoStore'
-import { materialInfoState } from '@/store/materialInfoStore'
+import {
+  productInfoState,
+  addProduct,
+  updateProduct,
+  generateProductCode,
+} from '@/store/productInfoStore'
+import { materialInfoState, updateMaterial } from '@/store/materialInfoStore'
 import {
   generateBomNo,
   getProductBomById,
@@ -365,20 +326,22 @@ import {
 } from '@/utils/bomLineMaterial'
 import {
   createRootTreeNode,
-  getLinesForTreeNode,
   addChildMaterial,
   deleteTreeNode,
   reorderLinesForTreeNode,
   ROOT_ID,
   isRootNode,
   getRootTreeId,
+  stripLineTreeChildren,
 } from '@/utils/bomTree'
 import { syncRootNodeFromItem } from '@/utils/bomImport'
 import { useTabs } from '@/composables/useTabs'
+import { useBomSplitLayout } from '@/composables/useBomSplitLayout'
 import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
-import { findSpuById, updateSpu } from '@/store/spuStore'
+import { findSpuById, updateSpu, addSpu, generateSpuCode } from '@/store/spuStore'
 import { validateLinesSkuResolved, lineVariantSummary } from '@/utils/spuLineResolve'
 import BomTreePanel from './components/BomTreePanel.vue'
+import BomRootProductEditor from './components/BomRootProductEditor.vue'
 import BomMaterialTable from './components/BomMaterialTable.vue'
 import ImportBomTemplateModal from './components/ImportBomTemplateModal.vue'
 import SelectBomMaterialModal from './components/SelectBomMaterialModal.vue'
@@ -390,12 +353,16 @@ import BomRelationDrawer from './components/BomRelationDrawer.vue'
 import BomEnableReferenceModal from './components/BomEnableReferenceModal.vue'
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import { validateAllBomParentChildLines, validateParentChildNotSame } from '@/utils/bomValidation'
-import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
 import { findInvalidBlankSizeLine } from '@/utils/bomBlankSize'
+import {
+  saveCreatePageDraft,
+  loadCreatePageDraft,
+  isCreatePageBootstrapped,
+} from '@/utils/createPageDraft'
 
 const route = useRoute()
 const router = useRouter()
-const { closeTab } = useTabs()
+const { closeTab, openTab } = useTabs()
 const {
   variantConfigOpen,
   variantConfigSpuId,
@@ -413,22 +380,25 @@ const pageTabPath = computed(() =>
 )
 const editVersion = ref('')
 const editBomStatus = ref('')
+const editEffectiveAt = ref('')
+const editCreator = ref('')
 const canSwitchProduct = computed(() => {
   if (!isEditMode.value) return true
-  return isBomPending({ status: editBomStatus.value })
+  // 订单/工单引用的是 EBOM 快照，改产品 BOM 不影响在制；可编辑（待发布/生效）均可切换根产品
+  return isBomEditable({ status: editBomStatus.value })
 })
 const basicInfoExpanded = ref(true)
-const leftSidebarCollapsed = ref(false)
-const leftPanelWidth = ref(280)
+const { leftSidebarCollapsed, leftPanelWidth, toggleLeft, onResizeMouseDown } = useBomSplitLayout({
+  scopeKey: 'bom-editor',
+})
+const syncToMaster = ref(false)
 const switchProductOpen = ref(false)
+/** 已选根产品或用户关过选品窗：禁止再次自动弹出 */
+const skipAutoProductPicker = ref(false)
 const applicableProductPickerOpen = ref(false)
-const MIN_LEFT_WIDTH = 200
-const MAX_LEFT_WIDTH = 520
-let resizing = false
-let resizeStartX = 0
-let resizeStartWidth = 0
 
 const formRef = ref()
+const rightPanelRef = ref(null)
 const saving = ref(false)
 const enableRefOpen = ref(false)
 const enableTarget = ref(null)
@@ -536,6 +506,15 @@ const rootMeta = computed(() => {
   }
 })
 
+/** 物料清单元信息条左侧：根产品/物料名称 */
+const rootItemLabel = computed(() => {
+  if (isShipBomMode.value) {
+    return form.bomName || '发运附件包'
+  }
+  const parts = [form.itemCode, form.itemName].filter(Boolean)
+  return parts.length ? parts.join(' ') : form.bomName || ''
+})
+
 const basicInfoSummary = computed(() => {
   if (isShipBomMode.value) {
     const n = (form.applicableProductIds || []).length
@@ -546,6 +525,14 @@ const basicInfoSummary = computed(() => {
   return parts.length ? parts.join(' · ') : '请填写 BOM 基础信息'
 })
 
+const pageHeadTitle = computed(() => {
+  const bomTypeLabel = form.bomType === '基础BOM' ? '基准BOM' : form.bomType || '产品BOM'
+  const productName = isShipBomMode.value
+    ? form.bomName || '发运附件包'
+    : form.itemName || form.bomName || '—'
+  return `${bomTypeLabel} / ${productName}`
+})
+
 const overviewInfo = computed(() => ({
   bomNo: form.bomNo || '—',
   specModel: form.specModel || '—',
@@ -554,6 +541,12 @@ const overviewInfo = computed(() => ({
   drawingNo: form.drawingNo || '—',
   techParams: form.techParams || '—',
   matchingRequirements: form.matchingRequirements || '—',
+}))
+
+const materialSummaryMeta = computed(() => ({
+  version: editVersion.value || '—',
+  effectiveAt: editEffectiveAt.value ? String(editEffectiveAt.value).split(' ')[0] : '—',
+  creator: editCreator.value || '—',
 }))
 
 const relationBomContext = computed(() => {
@@ -593,25 +586,6 @@ const processRouteOpts = computed(() =>
 
 const hasRoot = computed(() => flatNodes.value.some((n) => n.isRoot))
 
-const displayLines = computed(() =>
-  getLinesForTreeNode(lineItems.value, selectedNodeId.value, flatNodes.value),
-)
-
-const selectedNode = computed(() => {
-  const id = selectedNodeId.value || getRootTreeId(flatNodes.value)
-  return flatNodes.value.find((n) => n.id === id) || flatNodes.value.find((n) => n.isRoot) || null
-})
-
-const isSelectedRoot = computed(() => !selectedNode.value || selectedNode.value.isRoot)
-
-const selectedParentInfo = computed(() =>
-  resolveBomNodeItemInfo(selectedNode.value, lineItems.value, form),
-)
-
-function filterRoute(input, option) {
-  return (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-}
-
 function findMasterItem(itemType, itemId) {
   if (itemType === 'spu') {
     return findSpuById(itemId)
@@ -639,27 +613,6 @@ function applyEditableMasterFields(itemType, itemId) {
 
 function toggleBasicInfo() {
   basicInfoExpanded.value = !basicInfoExpanded.value
-}
-
-function onResizeMouseDown(e) {
-  resizing = true
-  resizeStartX = e.clientX
-  resizeStartWidth = leftPanelWidth.value
-  document.body.style.cursor = 'col-resize'
-  document.body.style.userSelect = 'none'
-}
-
-function onResizeMouseMove(e) {
-  if (!resizing) return
-  const next = resizeStartWidth + (e.clientX - resizeStartX)
-  leftPanelWidth.value = Math.min(MAX_LEFT_WIDTH, Math.max(MIN_LEFT_WIDTH, next))
-}
-
-function onResizeMouseUp() {
-  if (!resizing) return
-  resizing = false
-  document.body.style.cursor = ''
-  document.body.style.userSelect = ''
 }
 
 function resolveDefaultBomTypeFromRoute() {
@@ -731,6 +684,8 @@ function resetNewBomState() {
   templateRef.value = null
   editVersion.value = ''
   editBomStatus.value = ''
+  editEffectiveAt.value = ''
+  editCreator.value = ''
   columnSettings.value = JSON.parse(JSON.stringify(defaultBomColumnSettings))
 }
 
@@ -762,16 +717,89 @@ function ensureShipKitRoot() {
   }
 }
 
+/** 本实例只初始化一次：切到其他标签再切回时 keep-alive 复用，禁止 reset / 再弹选品窗 */
+const bootstrappedNewBom = ref(false)
+const loadedEditBomId = ref('')
+
+function captureNewBomDraft() {
+  if (route.name !== 'product-process-bom-new') return
+  if (!bootstrappedNewBom.value && !isCreatePageBootstrapped(route.path)) return
+  saveCreatePageDraft(route.path, {
+    form: { ...form },
+    flatNodes: JSON.parse(JSON.stringify(flatNodes.value || [])),
+    lineItems: JSON.parse(JSON.stringify(lineItems.value || [])),
+    selectedNodeId: selectedNodeId.value,
+    syncToMaster: syncToMaster.value,
+    skipAutoProductPicker: skipAutoProductPicker.value,
+    columnSettings: JSON.parse(JSON.stringify(columnSettings.value || [])),
+    basicInfoExpanded: basicInfoExpanded.value,
+    templateRef: templateRef.value,
+  })
+}
+
+function restoreNewBomDraft() {
+  const draft = loadCreatePageDraft(route.path)
+  if (!draft?.form) return false
+  Object.assign(form, draft.form)
+  flatNodes.value = draft.flatNodes || []
+  lineItems.value = draft.lineItems || []
+  selectedNodeId.value = draft.selectedNodeId || ROOT_ID
+  syncToMaster.value = Boolean(draft.syncToMaster)
+  skipAutoProductPicker.value =
+    Boolean(draft.skipAutoProductPicker) ||
+    Boolean(draft.form?.itemId) ||
+    (draft.flatNodes || []).length > 0
+  if (draft.columnSettings) columnSettings.value = draft.columnSettings
+  if (typeof draft.basicInfoExpanded === 'boolean')
+    basicInfoExpanded.value = draft.basicInfoExpanded
+  templateRef.value = draft.templateRef || null
+  bootstrappedNewBom.value = true
+  switchProductOpen.value = false
+  return true
+}
+
+function shouldAutoOpenProductPicker() {
+  if (skipAutoProductPicker.value) return false
+  if (form.itemId || hasRoot.value) return false
+  return true
+}
+
+function closeProductPicker() {
+  switchProductOpen.value = false
+}
+
 function initPageFromRoute() {
-  if (isEditMode.value && editBomId.value) {
-    loadEditBom(String(editBomId.value))
+  if (route.name === 'product-process-bom-edit') {
+    const id = String(route.params.id || editBomId.value || '')
+    if (!id) return
+    if (loadedEditBomId.value === id) return
+    loadedEditBomId.value = id
+    bootstrappedNewBom.value = false
+    loadEditBom(id)
     return
   }
   if (route.name === 'product-process-bom-new') {
+    const alreadyBootstrapped = bootstrappedNewBom.value || isCreatePageBootstrapped(route.path)
+
+    if (alreadyBootstrapped) {
+      if (!bootstrappedNewBom.value) {
+        restoreNewBomDraft()
+      }
+      closeProductPicker()
+      return
+    }
+
+    if (restoreNewBomDraft()) return
+
+    bootstrappedNewBom.value = true
+    loadedEditBomId.value = ''
+
     resetNewBomState()
+    skipAutoProductPicker.value = false
     if (isShipBomMode.value) {
       ensureShipKitRoot()
-      switchProductOpen.value = false
+      closeProductPicker()
+      captureNewBomDraft()
       return
     }
     const { itemType, itemId, itemName } = route.query
@@ -780,21 +808,23 @@ function initPageFromRoute() {
       itemId ? String(itemId) : '',
       itemName ? String(itemName) : '',
     )
-    if (!applied) {
-      switchProductOpen.value = true
+    if (applied) {
+      skipAutoProductPicker.value = true
+      closeProductPicker()
+    } else {
+      switchProductOpen.value = shouldAutoOpenProductPicker()
     }
+    captureNewBomDraft()
   }
 }
 
+// 仅监听页面身份变化；不要监听 query（切标签丢 query / 还原 query 都会误触发 reset）
 watch(
-  () => [
-    route.name,
-    route.params.id,
-    route.query.bomType,
-    route.query.itemType,
-    route.query.itemId,
-  ],
-  () => initPageFromRoute(),
+  () => [route.name, String(route.params.id || '')],
+  ([name]) => {
+    if (name !== 'product-process-bom-new' && name !== 'product-process-bom-edit') return
+    initPageFromRoute()
+  },
 )
 
 watch(
@@ -807,14 +837,40 @@ watch(
 )
 
 onMounted(() => {
-  document.addEventListener('mousemove', onResizeMouseMove)
-  document.addEventListener('mouseup', onResizeMouseUp)
   initPageFromRoute()
 })
 
-onUnmounted(() => {
-  document.removeEventListener('mousemove', onResizeMouseMove)
-  document.removeEventListener('mouseup', onResizeMouseUp)
+/**
+ * keep-alive 再次激活（非首次挂载）时：
+ * 已有根产品/已选物料则关弹窗，绝不重新 init。
+ * 注意：keep-alive 下首次挂载也会触发 onActivated，不能在这里关「首次必开」的选品窗。
+ */
+const activatedOnce = ref(false)
+onActivated(() => {
+  if (route.name !== 'product-process-bom-new' && route.name !== 'product-process-bom-edit') return
+
+  if (route.name === 'product-process-bom-new') {
+    if (isCreatePageBootstrapped(route.path) && !bootstrappedNewBom.value) {
+      restoreNewBomDraft()
+    }
+    if (form.itemId || hasRoot.value || skipAutoProductPicker.value) {
+      closeProductPicker()
+    }
+    captureNewBomDraft()
+  }
+
+  if (!activatedOnce.value) {
+    activatedOnce.value = true
+    return
+  }
+
+  if (form.itemId || hasRoot.value || skipAutoProductPicker.value) {
+    closeProductPicker()
+  }
+})
+
+onDeactivated(() => {
+  captureNewBomDraft()
 })
 
 function applySelectedItem(opt, { preserveChildren = false } = {}) {
@@ -862,24 +918,188 @@ function openSwitchProduct() {
     return
   }
   if (isEditMode.value && !canSwitchProduct.value) {
-    message.info('仅待发布状态的 BOM 可切换产品')
+    message.info('当前状态的 BOM 不可切换产品')
     return
   }
   switchProductOpen.value = true
 }
 
+function onSwitchProductOpenChange(open) {
+  switchProductOpen.value = open
+  if (!open && route.name === 'product-process-bom-new') {
+    skipAutoProductPicker.value = true
+    captureNewBomDraft()
+  }
+}
+
+function onRootItemNameUpdate(name) {
+  form.itemName = name
+  if (hasRoot.value) {
+    flatNodes.value = syncRootNodeFromItem(flatNodes.value, {
+      itemCode: form.itemCode,
+      itemName: form.itemName,
+      specModel: form.specModel,
+      bomName: form.bomName,
+    })
+  }
+}
+
+function onRootCatalogSelected(item) {
+  if (!item?.id) return
+  if (isEditMode.value && !canSwitchProduct.value) {
+    message.info('当前状态的 BOM 不可切换产品')
+    return
+  }
+  const preserveChildren = hasRoot.value
+  form.itemId = `${item.itemType}:${item.id}`
+  applySelectedItem(
+    {
+      itemType: item.itemType,
+      itemId: item.id,
+      itemName: item.name || '',
+      itemCode: item.code || '',
+      specModel: item.specModel || '',
+    },
+    { preserveChildren },
+  )
+  if (item.material) form.material = item.material
+  if (item.drawingNo) form.drawingNo = item.drawingNo
+  if (preserveChildren) {
+    message.success('已切换根产品，子级结构已保留')
+  }
+  skipAutoProductPicker.value = true
+  closeProductPicker()
+  captureNewBomDraft()
+}
+
+function onRootItemCreate({ name }) {
+  const trimmed = String(name || '').trim()
+  if (!trimmed) return
+  if (isEditMode.value && !canSwitchProduct.value) {
+    message.info('当前状态的 BOM 不可切换产品')
+    return
+  }
+  if (isBaselineBomMode.value) {
+    const spu = addSpu({
+      code: generateSpuCode(),
+      name: trimmed,
+      canProduce: true,
+      canSell: true,
+    })
+    onRootCatalogSelected({
+      id: spu.id,
+      code: spu.code,
+      name: spu.name,
+      itemType: 'spu',
+      specModel: '',
+      material: '',
+      drawingNo: '',
+    })
+    message.success(`已创建产品族「${trimmed}」并设为根节点`)
+    return
+  }
+  const product = addProduct({
+    code: generateProductCode(),
+    name: trimmed,
+    specModel: form.specModel || '',
+    material: form.material || '',
+    drawingNo: form.drawingNo || '',
+    canProduce: true,
+    canSell: true,
+  })
+  onRootCatalogSelected({
+    id: product.id,
+    code: product.code,
+    name: product.name,
+    itemType: 'product',
+    specModel: product.specModel || '',
+    material: product.material || '',
+    drawingNo: product.drawingNo || '',
+  })
+  message.success(`已创建产品「${trimmed}」并设为根节点`)
+}
+
+function openRootItemDetail() {
+  const id = switchSelectedId.value
+  if (!id) {
+    message.info('请先选择产品')
+    return
+  }
+  if (form.itemType === 'spu') {
+    message.info('产品族暂无独立详情页')
+    return
+  }
+  const path = `/product-process/products/${id}/edit`
+  openTab(path, form.itemName || '产品详情')
+}
+
+function syncRootFieldsToMaster() {
+  if (!syncToMaster.value || isShipBomMode.value) return
+  const id = switchSelectedId.value
+  if (!id) return
+  const patch = {
+    name: form.itemName || undefined,
+    specModel: form.specModel || '',
+    material: form.material || '',
+    drawingNo: form.drawingNo || '',
+    techParams: form.techParams || '',
+    matchingRequirements: form.matchingRequirements || '',
+  }
+  if (form.itemType === 'product') {
+    updateProduct(id, {
+      ...patch,
+      production: {
+        ...(findMasterItem('product', id)?.production || {}),
+        defaultProcessRoute: form.processRoute || '',
+      },
+    })
+    return
+  }
+  if (form.itemType === 'material') {
+    updateMaterial(id, {
+      ...patch,
+      production: {
+        ...(findMasterItem('material', id)?.production || {}),
+        defaultProcessRoute: form.processRoute || '',
+      },
+    })
+    return
+  }
+  if (form.itemType === 'spu') {
+    updateSpu(id, {
+      name: form.itemName || undefined,
+      sharedFields: {
+        ...(findSpuById(id)?.sharedFields || {}),
+        techParams: form.techParams || '',
+        matchingRequirements: form.matchingRequirements || '',
+        processRoute: form.processRoute || '',
+        material: form.material || '',
+        drawingNo: form.drawingNo || '',
+        specModel: form.specModel || '',
+      },
+    })
+  }
+}
+
 function onSwitchProductSelected(items) {
+  skipAutoProductPicker.value = true
+  closeProductPicker()
   const row = Array.isArray(items) ? items[0] : items
   if (!row) return
-  onSwitchProductConfirm(row)
+  nextTick(() => {
+    onSwitchProductConfirm(row)
+    closeProductPicker()
+    captureNewBomDraft()
+  })
 }
 
 function onSwitchSpuSelected(items) {
+  switchProductOpen.value = false
   const row = Array.isArray(items) ? items[0] : items
   if (!row) return
   const id = row.spuId || row.id
   const spu = findSpuById(id) || row
-  const preserveChildren = isEditMode.value && canSwitchProduct.value && hasRoot.value
+  const preserveChildren = hasRoot.value
   form.itemId = `spu:${id}`
   applySelectedItem(
     {
@@ -897,8 +1117,10 @@ function onSwitchSpuSelected(items) {
 }
 
 function onSwitchProductConfirm(row) {
+  closeProductPicker()
+  skipAutoProductPicker.value = true
   const itemType = row.itemType === '物料' ? 'material' : 'product'
-  const preserveChildren = isEditMode.value && canSwitchProduct.value && hasRoot.value
+  const preserveChildren = hasRoot.value
   form.itemId = `${itemType}:${row.id}`
   applySelectedItem(
     {
@@ -913,14 +1135,17 @@ function onSwitchProductConfirm(row) {
   if (preserveChildren) {
     message.success('已切换产品，仅更新顶级物料，子级结构已保留')
   }
+  captureNewBomDraft()
 }
 
-function onAddSubItem() {
+function onAddSubItem(parentNodeId) {
   if (!hasRoot.value) {
     message.warning('请先选择产品/物料')
     return
   }
-  addChildParentId.value = selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
+  addChildParentId.value =
+    parentNodeId || selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
+  selectedNodeId.value = addChildParentId.value
   materialModalOpen.value = true
 }
 
@@ -962,6 +1187,16 @@ function onAddByBomConfirm({ pickerRow, usageCoefficient }) {
   message.success('已按 BOM 添加本级及下级结构')
 }
 
+function scrollPageToLatestDetail() {
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      const panel = rightPanelRef.value
+      if (!panel) return
+      panel.scrollTo({ top: panel.scrollHeight, behavior: 'smooth' })
+    })
+  })
+}
+
 function onAddDetailLine() {
   if (!hasRoot.value) {
     message.warning('请先选择产品/物料')
@@ -969,6 +1204,7 @@ function onAddDetailLine() {
   }
   const parentId = selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
   lineItems.value = [...lineItems.value, createEmptySubLine(parentId)]
+  scrollPageToLatestDetail()
 }
 
 function onReorderLines({ fromIndex, toIndex }) {
@@ -1072,6 +1308,24 @@ function onAddChild(parentId) {
   materialModalOpen.value = true
 }
 
+function onDeleteNode(nodeId) {
+  if (isRootNode(nodeId)) {
+    message.warning('根节点不可删除')
+    return
+  }
+  Modal.confirm({
+    title: '确认删除',
+    content: '删除该节点将同时移除其下级节点与关联物料，是否继续？',
+    okType: 'danger',
+    onOk: () => {
+      const result = deleteTreeNode(flatNodes.value, lineItems.value, nodeId)
+      flatNodes.value = result.flatNodes
+      lineItems.value = result.lineItems
+      if (selectedNodeId.value === nodeId) selectedNodeId.value = ROOT_ID
+    },
+  })
+}
+
 function onMaterialSelected(items) {
   const list = Array.isArray(items) ? items : [items]
   if (!list.length) return
@@ -1110,24 +1364,7 @@ function onMaterialSelected(items) {
   } else if (accepted.length > 1) {
     message.success(`已添加 ${accepted.length} 个子项`)
   }
-}
-
-function onDeleteNode(nodeId) {
-  if (isRootNode(nodeId)) {
-    message.warning('根节点不可删除')
-    return
-  }
-  Modal.confirm({
-    title: '确认删除',
-    content: '删除该节点将同时移除其下级节点与关联物料，是否继续？',
-    okType: 'danger',
-    onOk: () => {
-      const result = deleteTreeNode(flatNodes.value, lineItems.value, nodeId)
-      flatNodes.value = result.flatNodes
-      lineItems.value = result.lineItems
-      if (selectedNodeId.value === nodeId) selectedNodeId.value = ROOT_ID
-    },
-  })
+  scrollPageToLatestDetail()
 }
 
 function onDeleteLine(lineId) {
@@ -1187,6 +1424,8 @@ function loadEditBom(id) {
 
   editVersion.value = bom.version || ''
   editBomStatus.value = bom.status || ''
+  editEffectiveAt.value = bom.effectiveAt || ''
+  editCreator.value = bom.creator || ''
   form.bomNo = bom.bomNo
   form.bomName = bom.bomName
   form.bomType = normalizeBomType(bom.bomType || BOM_TYPE.PRODUCT)
@@ -1285,10 +1524,17 @@ async function persistBom({ closeAfter = true } = {}) {
     matchingRequirements: form.matchingRequirements || '',
     applicableProductIds,
     treeNodes: flatNodes.value,
-    lineItems: lineItems.value,
+    lineItems: lineItems.value.map((line) => {
+      const copy = { ...line }
+      delete copy.children
+      delete copy._treeIndex
+      return copy
+    }),
     templateRef: templateRef.value,
     columnSettings: columnSettings.value,
   }
+
+  stripLineTreeChildren(lineItems.value)
 
   saving.value = true
   try {
@@ -1300,6 +1546,9 @@ async function persistBom({ closeAfter = true } = {}) {
     }
     if (payload.itemType === 'spu' && normalizeBomType(payload.bomType) === BOM_TYPE.BASELINE) {
       updateSpu(payload.itemId, { baseBomId: res.record.id })
+    }
+    if (syncToMaster.value) {
+      syncRootFieldsToMaster()
     }
     if (closeAfter) {
       if (res.versionUpgraded) {
@@ -1422,43 +1671,102 @@ function handleCancel() {
   margin: -12px;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 112px);
+  height: calc(100% + 24px);
+  max-height: calc(100% + 24px);
   overflow: hidden;
   background: #f5f6f8;
 }
 
+.page-sticky-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+  .head-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .head-tree-toggle-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    color: rgba(0, 0, 0, 0.65);
+  }
+
+  .page-title {
+    flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.88);
+    white-space: nowrap;
+  }
+
+  .head-actions {
+    flex-shrink: 0;
+  }
+
+  .basic-summary {
+    font-size: 12px;
+    color: #888;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .toggle-btn {
+    padding: 0 4px;
+    height: auto;
+    flex-shrink: 0;
+  }
+}
+
 .page-body {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: row;
+  align-items: stretch;
   gap: 0;
   padding: 8px;
-  min-height: 0;
   overflow: hidden;
 }
 
 .left-panel {
   flex: 0 0 auto;
+  align-self: stretch;
+  height: 100%;
+  min-height: 0;
   min-width: 200px;
   max-width: 520px;
-  height: 100%;
+  overflow: hidden;
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 10px;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 
   :deep(.bom-tree-panel) {
     flex: 1;
+    height: 100%;
     min-height: 0;
-    height: auto;
   }
 }
 
 .panel-resizer {
   flex: 0 0 6px;
+  align-self: stretch;
   margin: 0 2px;
   cursor: col-resize;
   border-radius: 3px;
@@ -1486,44 +1794,11 @@ function handleCancel() {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.right-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
-  padding: 4px 4px 0;
-
-  .head-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    flex: 1;
-  }
-
-  .head-actions {
-    flex-shrink: 0;
-  }
-
-  .basic-summary {
-    font-size: 12px;
-    color: #888;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .toggle-btn {
-    padding: 0 4px;
-    height: auto;
-    flex-shrink: 0;
-  }
 }
 
 .section-card {
@@ -1580,6 +1855,12 @@ function handleCancel() {
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
+    .info-block-hint {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.45);
+      flex-shrink: 0;
+    }
   }
 }
 
@@ -1616,22 +1897,13 @@ function handleCancel() {
   }
 }
 
-.sidebar-expand-trigger {
-  flex: 0 0 28px;
-  display: flex;
-  align-items: flex-start;
-  padding-top: 8px;
-}
-
 .table-section {
   flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 
   :deep(.bom-material-table) {
-    height: 100%;
+    height: auto;
   }
 }
 

@@ -4,6 +4,7 @@
       <a-space :size="8" wrap class="toolbar-left">
         <span class="toolbar-title">物料清单</span>
         <template v-if="!readonly">
+          <a-button size="small" @click="emit('import-template')"> 从模板导入 </a-button>
           <a-button size="small" @click="emit('add-by-bom')">按BOM添加</a-button>
           <a-button type="primary" size="small" @click="emit('add-sub-item')">
             <PlusOutlined />
@@ -18,46 +19,38 @@
           </template>
         </template>
       </a-space>
-      <a-space v-if="!readonly" :size="4">
-        <a-tooltip title="刷新">
-          <a-button type="text" size="small" @click="emit('refresh')">
-            <ReloadOutlined />
-          </a-button>
-        </a-tooltip>
-        <a-tooltip title="列显隐">
-          <a-button type="text" size="small" @click="emit('open-column-setting')">
-            <SettingOutlined />
-          </a-button>
-        </a-tooltip>
+      <a-space :size="4">
+        <a-button v-if="isTreeMode" size="small" @click="toggleExpandAll">
+          {{ allTreeExpanded ? '收起' : '展开' }}
+        </a-button>
+        <template v-if="!readonly">
+          <a-tooltip title="刷新">
+            <a-button type="text" size="small" @click="emit('refresh')">
+              <ReloadOutlined />
+            </a-button>
+          </a-tooltip>
+          <a-tooltip title="列显隐">
+            <a-button type="text" size="small" @click="emit('open-column-setting')">
+              <SettingOutlined />
+            </a-button>
+          </a-tooltip>
+        </template>
       </a-space>
     </div>
 
-    <div v-if="showSummaryBar" class="list-summary-bar">
-      <span class="summary-item"
-        >合计 <strong>{{ summaryTotals.count }}</strong> 项</span
-      >
-      <span class="summary-sep">·</span>
-      <span class="summary-item"
-        >单位用量合计 <strong>{{ formatQty(summaryTotals.unitQtySum) }}</strong></span
-      >
-      <span class="summary-sep">·</span>
-      <span class="summary-item"
-        >BOM成本 <strong>{{ formatPrice(summaryTotals.unitPriceSum) }}</strong></span
-      >
-    </div>
-
-    <div ref="tableListPanelRef" class="table-list-panel">
-      <div ref="tableScrollWrapRef" class="table-scroll-wrap">
+    <div class="table-list-panel">
+      <div class="table-scroll-wrap">
         <a-table
           :columns="tableColumns"
-          :data-source="lines"
+          :data-source="tableData"
           row-key="id"
           size="small"
           bordered
           :pagination="false"
           :scroll="tableScroll"
           :custom-row="customRow"
-          :row-class-name="(record) => (activeRowId === record.id ? 'bom-row-active' : '')"
+          v-model:expanded-row-keys="expandedRowKeys"
+          :row-class-name="rowClassName"
         >
           <template #headerCell="{ column }">
             <template v-if="column.key === 'index' && !readonly">
@@ -104,7 +97,7 @@
               </a-tooltip>
             </template>
             <template v-else-if="column.key === 'index'">
-              <span v-if="readonly">{{ index + 1 }}</span>
+              <span v-if="readonly || isTreeMode">{{ displayRowIndex(record, index) }}</span>
               <div
                 v-else
                 class="row-index-cell"
@@ -306,10 +299,25 @@
               </span>
             </template>
             <template v-else-if="column.key === 'action'">
-              <a-button type="link" size="small" danger @click="emit('delete-line', record.id)">
-                <DeleteOutlined />
-                删除
-              </a-button>
+              <div class="action-cell" @click.stop>
+                <a-button
+                  type="link"
+                  size="small"
+                  class="action-link"
+                  @click="handleAddSubItem(record)"
+                >
+                  添加子项
+                </a-button>
+                <a-button
+                  type="link"
+                  size="small"
+                  danger
+                  class="action-link"
+                  @click="handleDeleteLine(record)"
+                >
+                  删除
+                </a-button>
+              </div>
             </template>
             <template v-else>
               {{ formatCell(record[column.dataIndex]) }}
@@ -320,8 +328,31 @@
 
       <div v-if="!readonly" class="table-list-footer">
         <a-button type="link" size="small" class="add-detail-link" @click="emit('add-detail-line')">
-          添加明细行
+          + 添加明细行
         </a-button>
+      </div>
+    </div>
+
+    <div v-if="showSummaryBar" class="list-summary-bar">
+      <div class="summary-totals-row">
+        <span class="summary-item"
+          >合计 <strong>{{ summaryTotals.count }}</strong> 项</span
+        >
+        <span class="summary-sep">·</span>
+        <span class="summary-item"
+          >单位用量合计 <strong>{{ formatQty(summaryTotals.unitQtySum) }}</strong></span
+        >
+        <span class="summary-sep">·</span>
+        <span class="summary-item"
+          >BOM成本 <strong>{{ formatPrice(summaryTotals.unitPriceSum) }}</strong></span
+        >
+      </div>
+      <div class="summary-meta-row">
+        <span>BOM版本：{{ summaryMeta.version || '—' }}</span>
+        <span class="summary-sep">/</span>
+        <span>生效日期：{{ summaryMeta.effectiveAt || '—' }}</span>
+        <span class="summary-sep">/</span>
+        <span>创建人：{{ summaryMeta.creator || '—' }}</span>
       </div>
     </div>
 
@@ -345,12 +376,11 @@ import {
   inputNumberFormatter,
   inputNumberParser,
 } from '@/utils/numberFormat'
-import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import {
   ReloadOutlined,
   SettingOutlined,
-  DeleteOutlined,
   PlusOutlined,
   HolderOutlined,
 } from '@ant-design/icons-vue'
@@ -368,12 +398,31 @@ import { applyBlankSizeToLine } from '@/utils/bomBlankSize'
 import { resolveLineStockUnit, inferUomRelation } from '@/utils/variableLengthMaterial'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
+import {
+  buildBomMaterialTree,
+  assignMaterialTreeIndexes,
+  assignMaterialTreeStripe,
+  collectMaterialTreeRowKeys,
+  flattenMaterialTreeLines,
+  nodeHasTreeChildren,
+} from '@/utils/bomTree'
 
 const props = defineProps({
   lines: { type: Array, default: () => [] },
+  flatNodes: { type: Array, default: () => [] },
+  lineItems: { type: Array, default: () => [] },
   columnSettings: { type: Array, default: () => [] },
   readonly: { type: Boolean, default: false },
   emptyVariant: { type: String, default: 'default' },
+  hideSwitchProduct: { type: Boolean, default: false },
+  /** 根产品/物料展示名（信息条左侧） */
+  rootItemLabel: { type: String, default: '' },
+  contextNodeId: { type: String, default: '' },
+  /** 合计区第二行：版本 / 生效日期 / 创建人 */
+  summaryMeta: {
+    type: Object,
+    default: () => ({ version: '', effectiveAt: '', creator: '' }),
+  },
 })
 
 function formatCell(val) {
@@ -427,10 +476,105 @@ const emit = defineEmits([
   'add-detail-line',
   'reorder-lines',
   'delete-lines',
+  'select-node',
+  'switch-product',
+  'import-template',
 ])
 
 const processDocOpts = processDocOptions
 const processRouteOpts = processRouteOptions
+
+const isTreeMode = computed(
+  () => props.flatNodes.length > 0 && props.lineItems.length >= 0 && !props.lines.length,
+)
+
+const tableData = computed(() => {
+  if (!isTreeMode.value) return props.lines
+  const tree = buildBomMaterialTree(props.flatNodes, props.lineItems)
+  assignMaterialTreeIndexes(tree)
+  assignMaterialTreeStripe(tree)
+  return tree
+})
+
+const flatLines = computed(() =>
+  isTreeMode.value ? flattenMaterialTreeLines(tableData.value) : props.lines,
+)
+
+const expandedRowKeys = ref([])
+
+const allTreeRowKeys = computed(() => collectMaterialTreeRowKeys(tableData.value))
+
+const allTreeExpanded = computed(
+  () =>
+    allTreeRowKeys.value.length > 0 &&
+    allTreeRowKeys.value.every((key) => expandedRowKeys.value.includes(key)),
+)
+
+watch(
+  () => [isTreeMode.value, allTreeRowKeys.value.join(',')],
+  () => {
+    if (!isTreeMode.value) {
+      expandedRowKeys.value = []
+      return
+    }
+    expandedRowKeys.value = [...allTreeRowKeys.value]
+  },
+  { immediate: true },
+)
+
+function toggleExpandAll() {
+  expandedRowKeys.value = allTreeExpanded.value ? [] : [...allTreeRowKeys.value]
+}
+
+function displayRowIndex(record, index) {
+  if (isTreeMode.value && record._treeIndex) return record._treeIndex
+  return index + 1
+}
+
+function rowClassName(record) {
+  const classes = []
+  if (activeRowId.value === record.id) classes.push('bom-row-active')
+  if (isTreeMode.value && props.contextNodeId && record.treeNodeId === props.contextNodeId) {
+    classes.push('bom-row-context')
+  }
+  if (isTreeMode.value && record._stripeAlt) {
+    classes.push('bom-row-stripe-alt')
+  }
+  return classes.join(' ')
+}
+
+function resolveContextNodeId(record) {
+  if (record?.treeNodeId) return record.treeNodeId
+  return record?.parentTreeId || ''
+}
+
+function lineHasSubtree(record) {
+  if (!record?.treeNodeId) return false
+  if (record.children?.length) return true
+  return nodeHasTreeChildren(props.flatNodes, record.treeNodeId, props.lineItems)
+}
+
+function handleAddSubItem(record) {
+  const parentId = resolveContextNodeId(record)
+  if (!parentId) {
+    message.warning('无法确定父节点')
+    return
+  }
+  emit('add-sub-item', parentId)
+}
+
+function handleDeleteLine(record) {
+  if (lineHasSubtree(record)) {
+    Modal.confirm({
+      title: '确认删除',
+      content: '删除该节点将同时移除其下级节点与关联物料，是否继续？',
+      okType: 'danger',
+      onOk: () => emit('delete-line', record.id),
+    })
+    return
+  }
+  emit('delete-line', record.id)
+}
 
 function lookupLineMaterial(record) {
   if (!record) return null
@@ -452,8 +596,8 @@ function lineStockUnit(record) {
 }
 
 const widthMap = {
-  materialCode: 120,
-  itemName: 200,
+  materialCode: 180,
+  itemName: 280,
   specModel: 120,
   categoryName: 90,
   materialType: 90,
@@ -481,10 +625,10 @@ const tableColumns = computed(() => {
     .sort((a, b) => a.order - b.order)
 
   const cols = [
-    ...(props.readonly
+    ...(props.readonly || isTreeMode.value
       ? []
       : [{ title: '拖动', key: 'drag', width: 52, align: 'center', fixed: 'left' }]),
-    { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
+    { title: '#', key: 'index', width: 72, align: 'center', fixed: 'left' },
     ...sorted.map((c) => ({
       title: c.title,
       key: c.key,
@@ -492,6 +636,7 @@ const tableColumns = computed(() => {
       width: widthMap[c.key] || 100,
       fixed: c.frozen ? 'left' : undefined,
       ellipsis: [
+        'materialCode',
         'itemName',
         'remark',
         'material',
@@ -502,7 +647,7 @@ const tableColumns = computed(() => {
         'blankSizeText',
       ].includes(c.key),
     })),
-    ...(props.readonly ? [] : [{ title: '操作', key: 'action', width: 80, fixed: 'right' }]),
+    ...(props.readonly ? [] : [{ title: '操作', key: 'action', width: 148, fixed: 'right' }]),
   ]
   return cols
 })
@@ -513,54 +658,18 @@ const scrollX = computed(() => {
 })
 
 const summaryTotals = computed(() => {
-  const count = props.lines.length
-  const unitQtySum = props.lines.reduce((s, line) => s + (Number(line.unitQty) || 0), 0)
-  const unitPriceSum = props.lines.reduce((s, line) => s + (Number(line.unitPrice) || 0), 0)
+  const rows = flatLines.value
+  const count = rows.length
+  const unitQtySum = rows.reduce((s, line) => s + (Number(line.unitQty) || 0), 0)
+  const unitPriceSum = rows.reduce((s, line) => s + (Number(line.unitPrice) || 0), 0)
   return { count, unitQtySum, unitPriceSum }
 })
 
-const showSummaryBar = computed(() => (props.readonly ? props.lines.length > 0 : true))
-
-const tableListPanelRef = ref(null)
-const tableScrollWrapRef = ref(null)
-const tableBodyHeight = ref(280)
-let tableResizeObserver = null
-
-const TABLE_HEADER_HEIGHT = 39
-
-function updateTableBodyHeight() {
-  const wrap = tableScrollWrapRef.value
-  if (!wrap) return
-  tableBodyHeight.value = Math.max(120, wrap.clientHeight - TABLE_HEADER_HEIGHT)
-}
-
-onMounted(() => {
-  nextTick(() => {
-    updateTableBodyHeight()
-    const observeTarget = tableListPanelRef.value || tableScrollWrapRef.value
-    if (observeTarget && typeof ResizeObserver !== 'undefined') {
-      tableResizeObserver = new ResizeObserver(() => updateTableBodyHeight())
-      tableResizeObserver.observe(observeTarget)
-    }
-  })
-})
-
-onUnmounted(() => {
-  tableResizeObserver?.disconnect()
-  tableResizeObserver = null
-})
+const showSummaryBar = computed(() => (props.readonly ? flatLines.value.length > 0 : true))
 
 const tableScroll = computed(() => ({
   x: scrollX.value,
-  y: tableBodyHeight.value,
 }))
-
-watch(
-  () => [props.lines.length, props.readonly],
-  () => {
-    nextTick(() => updateTableBodyHeight())
-  },
-)
 
 const dragFromIndex = ref(-1)
 const hoverRowId = ref('')
@@ -648,7 +757,7 @@ function onBlankSizeConfirm(payload) {
 
 const hasSelection = computed(() => selectedRowKeys.value.length > 0)
 
-const allLineIds = computed(() => props.lines.map((l) => l.id))
+const allLineIds = computed(() => flatLines.value.map((l) => l.id))
 
 const allSelected = computed(
   () =>
@@ -661,9 +770,9 @@ const indeterminate = computed(() => selectedRowKeys.value.length > 0 && !allSel
 const shouldShowHeaderCheckbox = computed(() => headerIndexHover.value || hasSelection.value)
 
 watch(
-  () => props.lines.map((l) => l.id).join(','),
+  () => flatLines.value.map((l) => l.id).join(','),
   () => {
-    const ids = new Set(props.lines.map((l) => l.id))
+    const ids = new Set(flatLines.value.map((l) => l.id))
     selectedRowKeys.value = selectedRowKeys.value.filter((id) => ids.has(id))
     if (activeRowId.value && !ids.has(activeRowId.value)) {
       activeRowId.value = ''
@@ -704,9 +813,16 @@ function openBatchEdit() {
 
 function handleBatchDelete() {
   if (!selectedRowKeys.value.length) return
+  const hasSubtree = selectedRowKeys.value.some((id) => {
+    const line = flatLines.value.find((l) => l.id === id)
+    return line && lineHasSubtree(line)
+  })
+  const content = hasSubtree
+    ? `选中有装配件含下级节点，删除将同时移除其下级节点与关联物料。确定删除选中的 ${selectedRowKeys.value.length} 条明细吗？`
+    : `确定删除选中的 ${selectedRowKeys.value.length} 条明细吗？`
   Modal.confirm({
     title: '确认删除',
-    content: `确定删除选中的 ${selectedRowKeys.value.length} 条明细吗？`,
+    content,
     okType: 'danger',
     onOk: () => {
       emit('delete-lines', [...selectedRowKeys.value])
@@ -717,7 +833,7 @@ function handleBatchDelete() {
 
 function handleBatchEditConfirm({ field, value }) {
   const ids = new Set(selectedRowKeys.value)
-  props.lines.forEach((line) => {
+  flatLines.value.forEach((line) => {
     if (!ids.has(line.id)) return
     if (field === 'unitQty') line.unitQty = value
     if (field === 'remark') line.remark = value
@@ -744,17 +860,26 @@ function onDragEnd() {
 }
 
 function customRow(record, index) {
-  if (props.readonly) return {}
+  if (props.readonly) {
+    return {
+      onClick: () => {
+        if (!isTreeMode.value) return
+        activeRowId.value = record.id
+        emit('select-node', resolveContextNodeId(record))
+      },
+    }
+  }
   return {
     onClick: (event) => {
-      // 避免点输入框/按钮时抢焦点；勾选框已 stopPropagation
       const tag = event?.target?.closest?.(
         'input, textarea, button, .ant-select, .ant-picker, .ant-input-number, a, .drag-handle',
       )
       if (tag) return
       activeRowId.value = record.id
+      if (isTreeMode.value) emit('select-node', resolveContextNodeId(record))
     },
     onDragover: (event) => {
+      if (isTreeMode.value) return
       event.preventDefault()
       clearDragOverClass()
       event.currentTarget?.classList.add('drag-over-row')
@@ -763,6 +888,7 @@ function customRow(record, index) {
       event.currentTarget?.classList.remove('drag-over-row')
     },
     onDrop: (event) => {
+      if (isTreeMode.value) return
       event.preventDefault()
       event.currentTarget?.classList.remove('drag-over-row')
       const from = dragFromIndex.value
@@ -779,7 +905,6 @@ function customRow(record, index) {
 <style lang="less" scoped>
 .bom-material-table {
   flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
 
@@ -805,11 +930,11 @@ function customRow(record, index) {
 
   .list-summary-bar {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 4px;
-    margin-bottom: 8px;
-    padding: 6px 12px;
+    margin-top: 8px;
+    padding: 10px 12px;
     background: #fafafa;
     border: 1px solid #f0f0f0;
     border-radius: 4px;
@@ -817,6 +942,19 @@ function customRow(record, index) {
     color: rgba(0, 0, 0, 0.65);
     line-height: 1.5;
     flex-shrink: 0;
+
+    .summary-totals-row,
+    .summary-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 6px;
+    }
+
+    .summary-meta-row {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.55);
+    }
 
     strong {
       color: rgba(0, 0, 0, 0.88);
@@ -826,6 +964,21 @@ function customRow(record, index) {
     .summary-sep {
       color: rgba(0, 0, 0, 0.25);
     }
+  }
+
+  .table-list-footer {
+    flex-shrink: 0;
+    padding: 10px 12px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    border-top: 1px solid #f0f0f0;
+    background: #fff;
+  }
+
+  .add-detail-link {
+    padding-left: 0;
+    font-size: 13px;
   }
 
   .add-detail-empty {
@@ -843,10 +996,6 @@ function customRow(record, index) {
     text-overflow: ellipsis;
     white-space: nowrap;
     color: rgba(0, 0, 0, 0.65);
-  }
-
-  .add-detail-link {
-    padding-left: 0;
   }
 
   .drag-handle {
@@ -906,6 +1055,28 @@ function customRow(record, index) {
     background: #bae0ff !important;
   }
 
+  :deep(.ant-table-tbody > tr.bom-row-context > td:first-child) {
+    box-shadow: inset 3px 0 0 #1677ff;
+  }
+
+  :deep(.ant-table-tbody > tr.bom-row-stripe-alt > td) {
+    background: #fafafa;
+  }
+
+  :deep(.ant-table-tbody > tr.bom-row-stripe-alt:hover > td) {
+    background: #f5f5f5;
+  }
+
+  :deep(.ant-table-tbody > tr > td) {
+    white-space: nowrap;
+  }
+
+  :deep(.ant-table-tbody > tr > td .ant-input),
+  :deep(.ant-table-tbody > tr > td .ant-input-number),
+  :deep(.ant-table-tbody > tr > td .ant-select) {
+    white-space: nowrap;
+  }
+
   &:not(.is-readonly) :deep(.ant-table-tbody > tr > td) {
     cursor: pointer;
   }
@@ -915,21 +1086,14 @@ function customRow(record, index) {
   }
 
   .table-list-panel {
-    flex: 1;
-    min-height: 0;
     display: flex;
     flex-direction: column;
     border: 1px solid #f0f0f0;
     border-radius: 4px;
-    overflow: hidden;
     background: #fff;
   }
 
   .table-scroll-wrap {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-
     :deep(.ant-table-wrapper) {
       height: auto;
     }
@@ -941,22 +1105,23 @@ function customRow(record, index) {
     :deep(.ant-table-container) {
       border-bottom: none !important;
     }
-  }
 
-  .table-list-footer {
-    flex-shrink: 0;
-    padding: 2px 12px;
-    min-height: 36px;
-    display: flex;
-    align-items: center;
-    border-top: 1px solid #f0f0f0;
-    background: #fafafa;
+    /* 明细随内容增高，由外层 page-content 统一纵向滚动 */
+    :deep(.ant-table-body) {
+      overflow: visible !important;
+      max-height: none !important;
+    }
   }
 
   .variant-field-link {
     color: #1677ff;
     cursor: pointer;
-    word-break: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: bottom;
 
     &:hover {
       color: #4096ff;
@@ -966,9 +1131,12 @@ function customRow(record, index) {
   .blank-size-link {
     color: #1677ff;
     cursor: pointer;
-    word-break: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     display: inline-block;
     max-width: 100%;
+    vertical-align: bottom;
 
     &:hover {
       color: #4096ff;
@@ -980,6 +1148,22 @@ function customRow(record, index) {
     font-size: 11px;
     color: #d46b08;
     line-height: 1.2;
+  }
+
+  .action-cell {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+
+    .action-link {
+      padding: 0 2px;
+      height: 22px;
+      line-height: 22px;
+      flex-shrink: 0;
+    }
   }
 }
 </style>

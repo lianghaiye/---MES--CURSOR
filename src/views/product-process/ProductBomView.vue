@@ -310,6 +310,7 @@ import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 import {
   PlusOutlined,
   SearchOutlined,
@@ -479,24 +480,27 @@ function openDetail(record) {
 }
 
 function openCreateProductBom() {
-  const path = '/product-process/bom/new'
-  const query = { bomType: '产品BOM' }
-  openTab(path, '新增产品BOM')
-  router.push({ path, query })
+  openCreateTab(router, openTab, {
+    path: '/product-process/bom/new',
+    title: '新增产品BOM',
+    query: { bomType: '产品BOM' },
+  })
 }
 
 function openCreateBaselineBom() {
-  const path = '/product-process/bom/new'
-  const query = { bomType: '基准BOM' }
-  openTab(path, '新增基准BOM')
-  router.push({ path, query })
+  openCreateTab(router, openTab, {
+    path: '/product-process/bom/new',
+    title: '新增基准BOM',
+    query: { bomType: '基准BOM' },
+  })
 }
 
 function openCreateShipBom() {
-  const path = '/product-process/bom/new'
-  const query = { bomType: '发运BOM' }
-  openTab(path, '新增发运BOM')
-  router.push({ path, query })
+  openCreateTab(router, openTab, {
+    path: '/product-process/bom/new',
+    title: '新增发运BOM',
+    query: { bomType: '发运BOM' },
+  })
 }
 
 function openEdit(record) {

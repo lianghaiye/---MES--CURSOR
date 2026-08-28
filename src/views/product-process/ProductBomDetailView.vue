@@ -32,18 +32,36 @@
         <template v-if="activeTab === 'detail'">
           <div class="detail-tab-body">
             <div class="page-body">
-              <aside class="left-panel" :style="{ width: `${leftPanelWidth}px` }">
+              <aside
+                v-show="!leftSidebarCollapsed"
+                class="left-panel"
+                :style="{ width: `${leftPanelWidth}px` }"
+              >
                 <BomTreePanel
                   readonly
+                  page-scroll
+                  show-collapse
                   :flat-nodes="flatNodes"
                   :line-items="lineItems"
                   :selected-node-id="selectedNodeId"
                   :version-info="versionInfo"
                   :root-meta="detailRootMeta"
                   @select-node="selectedNodeId = $event"
+                  @collapse="collapseLeft"
                 />
               </aside>
-              <div class="panel-resizer" @mousedown.prevent="onResizeMouseDown" />
+              <div v-if="leftSidebarCollapsed" class="sidebar-expand-trigger">
+                <a-tooltip title="展开结构树">
+                  <a-button type="text" size="small" @click="expandLeft">
+                    <MenuUnfoldOutlined />
+                  </a-button>
+                </a-tooltip>
+              </div>
+              <div
+                v-show="!leftSidebarCollapsed"
+                class="panel-resizer"
+                @mousedown.prevent="onResizeMouseDown"
+              />
               <main class="right-panel">
                 <div class="section-card info-card">
                   <div class="info-block">
@@ -55,6 +73,9 @@
                       }}</a-descriptions-item>
                       <a-descriptions-item label="BOM类型">
                         {{ record.bomType === '基础BOM' ? '基准BOM' : record.bomType || '产品BOM' }}
+                      </a-descriptions-item>
+                      <a-descriptions-item label="BOM版本">
+                        {{ record.version || '—' }}
                       </a-descriptions-item>
                       <a-descriptions-item v-if="isShipBom" label="适用产品" :span="2">
                         {{ applicableProductsLabel }}
@@ -71,41 +92,33 @@
                     </a-descriptions>
                   </div>
                   <div v-if="!isShipBom" class="info-block">
-                    <div class="section-title">父项产品信息</div>
-                    <a-descriptions :column="3" size="small" bordered class="basic-desc">
-                      <a-descriptions-item label="物品名称">
-                        {{ selectedParentInfo?.itemName || '—' }}
-                      </a-descriptions-item>
-                      <a-descriptions-item label="规格型号">
-                        {{ selectedParentInfo?.specModel || '—' }}
-                      </a-descriptions-item>
-                      <a-descriptions-item v-if="isSelectedRoot" label="BOM版本">
-                        {{ record.version }}
-                      </a-descriptions-item>
-                      <a-descriptions-item label="材质">
-                        {{ selectedParentInfo?.material || '—' }}
-                      </a-descriptions-item>
-                      <a-descriptions-item label="图号">
-                        {{ selectedParentInfo?.drawingNo || '—' }}
-                      </a-descriptions-item>
-                      <a-descriptions-item label="工艺路线">
-                        {{ selectedParentInfo?.processRoute || '—' }}
-                      </a-descriptions-item>
-                      <a-descriptions-item label="技术参数" class="multiline-desc">
-                        {{ selectedParentInfo?.techParams || '—' }}
-                      </a-descriptions-item>
-                      <a-descriptions-item label="配套要求" :span="2" class="multiline-desc">
-                        {{ selectedParentInfo?.matchingRequirements || '—' }}
-                      </a-descriptions-item>
-                    </a-descriptions>
+                    <BomRootProductEditor
+                      readonly
+                      :item-type="record.itemType || 'product'"
+                      :item-id="String(record.itemId || '')"
+                      :item-name="record.itemName || ''"
+                      :item-code="record.itemCode || ''"
+                      :spec-model="record.specModel || ''"
+                      :material="record.material || ''"
+                      :drawing-no="record.drawingNo || ''"
+                      :process-route="record.processRoute || ''"
+                      :tech-params="record.techParams || ''"
+                      :matching-requirements="record.matchingRequirements || record.remark || ''"
+                      @open-detail="openDetailRootItem"
+                    />
                   </div>
                 </div>
                 <div class="section-card table-section">
                   <BomMaterialTable
                     readonly
-                    :lines="displayLines"
+                    :flat-nodes="flatNodes"
+                    :line-items="lineItems"
                     :column-settings="columnSettings"
+                    :context-node-id="selectedNodeId"
+                    :root-item-label="detailRootItemLabel"
+                    :summary-meta="detailSummaryMeta"
                     empty-variant="no-children"
+                    @select-node="selectedNodeId = $event"
                   />
                 </div>
               </main>
@@ -189,10 +202,10 @@ export default { name: 'ProductBomDetailView' }
 </script>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { PrinterOutlined } from '@ant-design/icons-vue'
+import { PrinterOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue'
 import { getVersionsInGroup } from '@/mock/productBom'
 import { buildBomOperationLogs } from '@/mock/bomOperationLogs'
 import { defaultBomColumnSettings, isShipBomType } from '@/mock/bomMaterialColumns'
@@ -203,10 +216,11 @@ import { bomStatusColor, isBomEditable } from '@/mock/productBomOptions'
 import { getProductBomById, archiveProductBom, productBomState } from '@/store/productBomStore'
 import { findParentBomReferences } from '@/utils/bomVersionReference'
 import { loadBomDetailStructure } from '@/utils/bomImport'
-import { getLinesForTreeNode, ROOT_ID, getRootTreeId } from '@/utils/bomTree'
-import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
+import { getRootTreeId, ROOT_ID } from '@/utils/bomTree'
 import { tabStore, useTabs } from '@/composables/useTabs'
+import { useBomSplitLayout } from '@/composables/useBomSplitLayout'
 import BomTreePanel from './components/BomTreePanel.vue'
+import BomRootProductEditor from './components/BomRootProductEditor.vue'
 import BomMaterialTable from './components/BomMaterialTable.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
 import BomPrintModal from './components/BomPrintModal.vue'
@@ -242,12 +256,9 @@ function loadOverviewColumnSettings() {
   }
   return JSON.parse(JSON.stringify(defaultBomOverviewColumnSettings))
 }
-const leftPanelWidth = ref(280)
-const MIN_LEFT_WIDTH = 200
-const MAX_LEFT_WIDTH = 520
-let resizing = false
-let resizeStartX = 0
-let resizeStartWidth = 0
+
+const { leftSidebarCollapsed, leftPanelWidth, expandLeft, collapseLeft, onResizeMouseDown } =
+  useBomSplitLayout({ scopeKey: 'bom-detail' })
 
 const versionColumns = [
   { title: 'BOM状态', key: 'status', width: 90 },
@@ -275,32 +286,6 @@ const versionInfo = computed(() =>
     : null,
 )
 
-const displayLines = computed(() =>
-  getLinesForTreeNode(lineItems.value, selectedNodeId.value, flatNodes.value),
-)
-
-const rootForm = computed(() => {
-  const bom = record.value
-  if (!bom) return {}
-  return {
-    itemName: bom.itemName || '',
-    itemCode: bom.itemCode || '',
-    specModel: bom.specModel || '',
-    material: bom.material || '',
-    drawingNo: bom.drawingNo || '',
-    techParams: bom.techParams || '',
-    processRoute: bom.processRoute || '',
-    matchingRequirements: bom.matchingRequirements || bom.remark || '',
-  }
-})
-
-const selectedNode = computed(() => {
-  const id = selectedNodeId.value || getRootTreeId(flatNodes.value)
-  return flatNodes.value.find((n) => n.id === id) || flatNodes.value.find((n) => n.isRoot) || null
-})
-
-const isSelectedRoot = computed(() => !selectedNode.value || selectedNode.value.isRoot)
-
 const isShipBom = computed(() => isShipBomType(record.value?.bomType))
 
 const applicableProductsLabel = computed(() => {
@@ -314,10 +299,6 @@ const applicableProductsLabel = computed(() => {
   return labels.join('、')
 })
 
-const selectedParentInfo = computed(() =>
-  resolveBomNodeItemInfo(selectedNode.value, lineItems.value, rootForm.value),
-)
-
 const detailRootMeta = computed(() => {
   const bom = record.value
   if (!bom) return { code: '', name: '', specModel: '', supplyForm: '', subItemCount: 0 }
@@ -330,6 +311,37 @@ const detailRootMeta = computed(() => {
     subItemCount: lineItems.value.filter((l) => l.parentTreeId === rootId).length,
   }
 })
+
+const detailRootItemLabel = computed(() => {
+  const bom = record.value
+  if (!bom) return ''
+  const parts = [bom.itemCode, bom.itemName].filter(Boolean)
+  return parts.length ? parts.join(' ') : bom.bomName || ''
+})
+
+const detailSummaryMeta = computed(() => {
+  const bom = record.value
+  if (!bom) return { version: '—', effectiveAt: '—', creator: '—' }
+  return {
+    version: bom.version || '—',
+    effectiveAt: formatDisplayDate(bom.effectiveAt),
+    creator: bom.creator || '—',
+  }
+})
+
+function openDetailRootItem() {
+  const bom = record.value
+  if (!bom?.itemId) {
+    message.info('未绑定产品')
+    return
+  }
+  if (bom.itemType === 'spu') {
+    message.info('产品族暂无独立详情页')
+    return
+  }
+  const path = `/product-process/products/${bom.itemId}/edit`
+  openTab(path, bom.itemName || '产品详情')
+}
 
 const versionList = computed(() => {
   if (!record.value?.versionGroupId) return record.value ? [record.value] : []
@@ -455,37 +467,6 @@ function handleBack() {
   closeTab(detailPath)
   router.push(closingActive ? tabStore.activePath || listPath : listPath)
 }
-
-function onResizeMouseDown(e) {
-  resizing = true
-  resizeStartX = e.clientX
-  resizeStartWidth = leftPanelWidth.value
-  document.body.style.cursor = 'col-resize'
-  document.body.style.userSelect = 'none'
-}
-
-function onResizeMouseMove(e) {
-  if (!resizing) return
-  const next = resizeStartWidth + (e.clientX - resizeStartX)
-  leftPanelWidth.value = Math.min(MAX_LEFT_WIDTH, Math.max(MIN_LEFT_WIDTH, next))
-}
-
-function onResizeMouseUp() {
-  if (!resizing) return
-  resizing = false
-  document.body.style.cursor = ''
-  document.body.style.userSelect = ''
-}
-
-onMounted(() => {
-  document.addEventListener('mousemove', onResizeMouseMove)
-  document.addEventListener('mouseup', onResizeMouseUp)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('mousemove', onResizeMouseMove)
-  document.removeEventListener('mouseup', onResizeMouseUp)
-})
 </script>
 
 <style lang="less" scoped>
@@ -493,26 +474,21 @@ onUnmounted(() => {
   margin: -12px;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 112px);
-  overflow: hidden;
+  min-height: calc(100vh - 112px);
   background: #f5f6f8;
 
   :deep(.ant-spin-nested-loading),
   :deep(.ant-spin-container) {
     flex: 1;
-    min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
   }
 }
 
 .detail-tab-body {
   flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .detail-page-head {
@@ -525,6 +501,10 @@ onUnmounted(() => {
   margin-bottom: 8px;
   border-radius: 6px;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
 
   .head-actions {
     flex-shrink: 0;
@@ -548,28 +528,24 @@ onUnmounted(() => {
 .page-body {
   flex: 1;
   display: flex;
+  flex-direction: row;
+  align-items: flex-start;
   gap: 0;
   padding: 0 8px 8px;
-  min-height: 0;
-  overflow: hidden;
 }
 
 .left-panel {
   flex: 0 0 auto;
   min-width: 200px;
   max-width: 520px;
-  height: 100%;
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 10px;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 
   :deep(.bom-tree-panel) {
-    flex: 1;
-    min-height: 0;
     height: auto;
   }
 }
@@ -599,14 +575,19 @@ onUnmounted(() => {
   }
 }
 
+.sidebar-expand-trigger {
+  flex: 0 0 28px;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 8px;
+}
+
 .right-panel {
   flex: 1;
   min-width: 0;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow: hidden;
 }
 
 .section-card {
@@ -633,13 +614,11 @@ onUnmounted(() => {
 
 .table-section {
   flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 
   :deep(.bom-material-table) {
-    height: 100%;
+    height: auto;
   }
 }
 
@@ -666,7 +645,13 @@ onUnmounted(() => {
   }
 
   .left-panel {
-    width: 100%;
+    width: 100% !important;
+    max-width: none;
+    min-height: 240px;
+  }
+
+  .panel-resizer {
+    display: none;
   }
 }
 </style>
