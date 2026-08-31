@@ -1051,10 +1051,6 @@ function customRow(record, index) {
     background: #e6f4ff !important;
   }
 
-  :deep(.ant-table-tbody > tr.bom-row-active:hover > td) {
-    background: #bae0ff !important;
-  }
-
   :deep(.ant-table-tbody > tr.bom-row-context > td:first-child) {
     box-shadow: inset 3px 0 0 #1677ff;
   }
@@ -1063,8 +1059,14 @@ function customRow(record, index) {
     background: #fafafa;
   }
 
+  /* 悬浮行：浅橙色（含斑马纹行） */
+  :deep(.ant-table-tbody > tr:hover > td),
   :deep(.ant-table-tbody > tr.bom-row-stripe-alt:hover > td) {
-    background: #f5f5f5;
+    background: #fff7e6 !important;
+  }
+
+  :deep(.ant-table-tbody > tr.bom-row-active:hover > td) {
+    background: #ffe7ba !important;
   }
 
   :deep(.ant-table-tbody > tr > td) {
