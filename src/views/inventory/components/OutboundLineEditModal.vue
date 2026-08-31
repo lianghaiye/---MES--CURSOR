@@ -117,11 +117,6 @@
               style="width: 100%"
               @change="onShipQtyFieldChange"
             />
-            <div v-if="canBatchPick" class="vl-tip">
-              可用批次库存：{{ formatQty(availableQty) }} {{ stockUnitLabel }}（{{
-                issueRuleLabel
-              }}）
-            </div>
           </a-form-item>
         </a-col>
         <a-col :span="8">
