@@ -12,149 +12,165 @@
     </div>
 
     <a-form layout="inline" size="small" class="inline-info-form">
-      <div class="root-fields-row">
-        <a-form-item :label="itemLabel" class="root-field-item">
-          <div class="product-name-row">
-            <a-auto-complete
-              v-if="!readonly"
-              v-model:value="nameDraft"
-              :options="displayOptions"
-              allow-clear
-              size="small"
-              class="product-select field-control"
-              :placeholder="`搜索${itemLabel}编码/名称`"
-              :filter-option="false"
-              :disabled="!canChangeItem"
-              :dropdown-match-select-width="360"
-              :get-popup-container="getPopupContainer"
-              @search="onSearch"
-              @select="onSelectOption"
-              @change="onNameChange"
-              @dropdown-visible-change="onDropdownVisibleChange"
-            >
-              <template #dropdownRender="{ menuNode: menu }">
-                <div>
-                  <component :is="menu" />
-                  <template v-if="createKeyword">
-                    <a-divider style="margin: 4px 0" />
-                    <div class="create-option-row" @mousedown.prevent @click="onCreateClick">
-                      创建「{{ createKeyword }}」
-                    </div>
-                  </template>
-                  <a-divider style="margin: 4px 0" />
-                  <div class="search-more-row" @mousedown.prevent @click="emit('open-picker')">
-                    搜索更多...
-                  </div>
-                </div>
-              </template>
-            </a-auto-complete>
-            <a-input
-              v-else
-              :value="itemName || '—'"
-              disabled
-              class="product-select field-control"
-            />
-            <a-tooltip :title="openDetailTitle">
-              <a-button
-                type="text"
+      <div class="root-fields-grid">
+        <div class="grid-row cols-4">
+          <a-form-item :label="itemLabel" class="grid-field-item">
+            <div class="product-name-row">
+              <a-auto-complete
+                v-if="!readonly"
+                v-model:value="nameDraft"
+                :options="displayOptions"
+                allow-clear
                 size="small"
-                class="open-detail-btn"
-                :disabled="!canOpenDetail"
-                @click="emit('open-detail')"
+                class="product-select field-control"
+                :placeholder="`搜索${itemLabel}编码/名称`"
+                :filter-option="false"
+                :disabled="!canChangeItem"
+                :dropdown-match-select-width="360"
+                :get-popup-container="getPopupContainer"
+                @search="onSearch"
+                @select="onSelectOption"
+                @change="onNameChange"
+                @dropdown-visible-change="onDropdownVisibleChange"
               >
-                <ExportOutlined />
-              </a-button>
-            </a-tooltip>
-          </div>
-        </a-form-item>
+                <template #dropdownRender="{ menuNode: menu }">
+                  <div>
+                    <component :is="menu" />
+                    <template v-if="createKeyword">
+                      <a-divider style="margin: 4px 0" />
+                      <div class="create-option-row" @mousedown.prevent @click="onCreateClick">
+                        创建「{{ createKeyword }}」
+                      </div>
+                    </template>
+                    <a-divider style="margin: 4px 0" />
+                    <div class="search-more-row" @mousedown.prevent @click="emit('open-picker')">
+                      搜索更多...
+                    </div>
+                  </div>
+                </template>
+              </a-auto-complete>
+              <a-input
+                v-else
+                :value="itemName || '—'"
+                disabled
+                class="product-select field-control"
+              />
+              <a-tooltip :title="openDetailTitle">
+                <a-button
+                  type="text"
+                  size="small"
+                  class="open-detail-btn"
+                  :disabled="!canOpenDetail"
+                  @click="emit('open-detail')"
+                >
+                  <ExportOutlined />
+                </a-button>
+              </a-tooltip>
+            </div>
+          </a-form-item>
 
-        <a-form-item v-if="version" label="BOM版本" class="root-field-item">
-          <a-input :value="version" disabled class="field-control" />
-        </a-form-item>
+          <a-form-item label="编号" class="grid-field-item">
+            <a-input
+              :value="itemCode || '—'"
+              disabled
+              class="field-control"
+              placeholder="选择产品后带出"
+            />
+          </a-form-item>
 
-        <a-form-item label="规格型号" class="root-field-item">
-          <a-input
-            v-if="!readonly"
-            :value="specModel"
-            allow-clear
-            class="field-control"
-            placeholder="规格型号"
-            @update:value="(v) => emit('update:specModel', v)"
-          />
-          <a-input v-else :value="specModel || '—'" disabled class="field-control" />
-        </a-form-item>
+          <a-form-item label="规格型号" class="grid-field-item">
+            <a-input
+              v-if="!readonly"
+              :value="specModel"
+              allow-clear
+              class="field-control"
+              placeholder="规格型号"
+              @update:value="(v) => emit('update:specModel', v)"
+            />
+            <a-input v-else :value="specModel || '—'" disabled class="field-control" />
+          </a-form-item>
 
-        <a-form-item label="材质" class="root-field-item">
-          <a-input
-            v-if="!readonly"
-            :value="material"
-            allow-clear
-            class="field-control"
-            placeholder="材质"
-            @update:value="(v) => emit('update:material', v)"
-          />
-          <a-input v-else :value="material || '—'" disabled class="field-control" />
-        </a-form-item>
+          <a-form-item label="材质" class="grid-field-item">
+            <a-input
+              v-if="!readonly"
+              :value="material"
+              allow-clear
+              class="field-control"
+              placeholder="材质"
+              @update:value="(v) => emit('update:material', v)"
+            />
+            <a-input v-else :value="material || '—'" disabled class="field-control" />
+          </a-form-item>
+        </div>
 
-        <a-form-item label="图号" class="root-field-item">
-          <a-input
-            v-if="!readonly"
-            :value="drawingNo"
-            allow-clear
-            class="field-control"
-            placeholder="图号"
-            @update:value="(v) => emit('update:drawingNo', v)"
-          />
-          <a-input v-else :value="drawingNo || '—'" disabled class="field-control" />
-        </a-form-item>
+        <div class="grid-row cols-2">
+          <a-form-item label="图号" class="grid-field-item">
+            <a-input
+              v-if="!readonly"
+              :value="drawingNo"
+              allow-clear
+              class="field-control"
+              placeholder="图号"
+              @update:value="(v) => emit('update:drawingNo', v)"
+            />
+            <a-input v-else :value="drawingNo || '—'" disabled class="field-control" />
+          </a-form-item>
 
-        <a-form-item label="工艺路线" class="root-field-item">
-          <a-select
-            v-if="!readonly"
-            :value="processRoute"
-            allow-clear
-            show-search
-            class="field-control"
-            placeholder="选择工艺路线"
-            :filter-option="filterRoute"
-            :options="processRouteOpts"
-            @update:value="(v) => emit('update:processRoute', v)"
-          />
-          <a-input v-else :value="processRoute || '—'" disabled class="field-control" />
-        </a-form-item>
-      </div>
+          <a-form-item label="工艺路线" class="grid-field-item">
+            <a-select
+              v-if="!readonly"
+              :value="processRoute"
+              allow-clear
+              show-search
+              class="field-control"
+              placeholder="选择工艺路线"
+              :filter-option="filterRoute"
+              :options="processRouteOpts"
+              @update:value="(v) => emit('update:processRoute', v)"
+            />
+            <a-input v-else :value="processRoute || '—'" disabled class="field-control" />
+          </a-form-item>
+        </div>
 
-      <div class="params-pair-row">
-        <a-form-item label="技术参数" class="pair-item">
-          <a-textarea
-            v-if="!readonly"
-            :value="techParams"
-            placeholder="技术参数"
-            allow-clear
-            :rows="2"
-            style="width: 100%"
-            @update:value="(v) => emit('update:techParams', v)"
-          />
-          <a-textarea v-else :value="techParams || '—'" disabled :rows="2" style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="配套要求" class="pair-item">
-          <a-textarea
-            v-if="!readonly"
-            :value="matchingRequirements"
-            placeholder="配套要求"
-            allow-clear
-            :rows="2"
-            style="width: 100%"
-            @update:value="(v) => emit('update:matchingRequirements', v)"
-          />
-          <a-textarea
-            v-else
-            :value="matchingRequirements || '—'"
-            disabled
-            :rows="2"
-            style="width: 100%"
-          />
-        </a-form-item>
+        <div class="grid-row cols-2">
+          <a-form-item label="技术参数" class="grid-field-item grid-field-item-textarea">
+            <a-textarea
+              v-if="!readonly"
+              :value="techParams"
+              placeholder="技术参数"
+              allow-clear
+              :rows="2"
+              class="field-control"
+              @update:value="(v) => emit('update:techParams', v)"
+            />
+            <a-textarea
+              v-else
+              :value="techParams || '—'"
+              disabled
+              :rows="2"
+              class="field-control"
+            />
+          </a-form-item>
+
+          <a-form-item label="配置要求" class="grid-field-item grid-field-item-textarea">
+            <a-textarea
+              v-if="!readonly"
+              :value="matchingRequirements"
+              placeholder="配置要求"
+              allow-clear
+              :rows="2"
+              class="field-control"
+              @update:value="(v) => emit('update:matchingRequirements', v)"
+            />
+            <a-textarea
+              v-else
+              :value="matchingRequirements || '—'"
+              disabled
+              :rows="2"
+              class="field-control"
+            />
+          </a-form-item>
+        </div>
       </div>
     </a-form>
   </div>
@@ -472,22 +488,36 @@ function onCreateClick() {
 .inline-info-form {
   width: 100%;
 
-  .root-fields-row {
+  .root-fields-grid {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .grid-row {
+    display: grid;
     width: 100%;
     gap: 8px 12px;
     align-items: flex-start;
+
+    &.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    &.cols-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
-  .root-field-item {
-    flex: 1 1 0;
-    min-width: 120px;
+  .grid-field-item {
     margin-right: 0;
     margin-bottom: 0;
+    min-width: 0;
 
     :deep(.ant-form-item-row) {
       flex-wrap: nowrap;
+      width: 100%;
     }
 
     :deep(.ant-form-item-label) {
@@ -505,6 +535,12 @@ function onCreateClick() {
     }
   }
 
+  .grid-field-item-textarea {
+    :deep(.ant-form-item-row) {
+      align-items: flex-start;
+    }
+  }
+
   .field-control {
     width: 100%;
   }
@@ -513,19 +549,13 @@ function onCreateClick() {
     font-size: 12px;
     color: #666;
   }
+}
 
-  .params-pair-row {
-    display: flex;
-    width: 100%;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 8px;
-  }
-
-  .pair-item {
-    flex: 1;
-    min-width: 280px;
-    margin-right: 0;
+@media (max-width: 1200px) {
+  .inline-info-form {
+    .grid-row.cols-4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 }
 </style>

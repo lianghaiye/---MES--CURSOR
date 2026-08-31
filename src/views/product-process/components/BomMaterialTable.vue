@@ -202,6 +202,7 @@
                 :formatter="inputNumberFormatter"
                 :parser="inputNumberParser"
                 style="width: 100%"
+                @change="() => emitBomRefDescendantEdit(record.id)"
               />
             </template>
             <template v-else-if="column.key === 'blankSizeText'">
@@ -249,6 +250,7 @@
                 :max="100"
                 placeholder="请输入"
                 style="width: 100%"
+                @change="() => emitBomRefDescendantEdit(record.id)"
               />
             </template>
             <template v-else-if="column.key === 'unitPrice'">
@@ -464,12 +466,18 @@ function onItemNameRename(record, name) {
   emit('item-name-change', { lineId: record.id, itemName: String(name ?? '').trim() })
 }
 
+function emitBomRefDescendantEdit(lineId) {
+  if (!lineId) return
+  emit('bom-ref-descendant-edit', { lineId })
+}
+
 const emit = defineEmits([
   'refresh',
   'open-column-setting',
   'delete-line',
   'material-change',
   'item-name-change',
+  'bom-ref-descendant-edit',
   'configure-variant',
   'add-sub-item',
   'add-by-bom',
@@ -742,6 +750,7 @@ function onBlankSizeConfirm(payload) {
   const pieceWeightKg = payload?.pieceWeightKg
   applyBlankSizeToLine(line, blankSize, { mode, pieceWeightKg })
   line.unit = lineStockUnit(line)
+  emitBomRefDescendantEdit(line.id)
   if (pieceWeightKg != null && Number(pieceWeightKg) > 0) {
     message.success(
       `下料尺寸已更新，单位用量 ${formatQty(pieceWeightKg)} kg${line.blankSizeText ? `（${line.blankSizeText}）` : ''}`,
@@ -838,6 +847,9 @@ function handleBatchEditConfirm({ field, value }) {
     if (field === 'unitQty') line.unitQty = value
     if (field === 'remark') line.remark = value
   })
+  if (field === 'unitQty') {
+    emit('bom-ref-descendant-edit', { lineIds: [...ids] })
+  }
   message.success(`已批量修改 ${ids.size} 条明细`)
   selectedRowKeys.value = []
 }

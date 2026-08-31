@@ -3,11 +3,22 @@
     <a-spin :spinning="loading">
       <template v-if="record">
         <div class="detail-page-head">
-          <a-tabs v-model:active-key="activeTab" class="detail-tabs">
-            <a-tab-pane key="detail" tab="BOM明细" />
-            <a-tab-pane key="versions" tab="历史版本" />
-            <a-tab-pane key="logs" tab="操作记录" />
-          </a-tabs>
+          <div class="head-left">
+            <a-tooltip
+              v-if="activeTab === 'detail'"
+              :title="leftSidebarCollapsed ? '展开结构树' : '收起结构树'"
+            >
+              <a-button type="text" size="small" class="head-tree-toggle-btn" @click="toggleLeft">
+                <MenuUnfoldOutlined v-if="leftSidebarCollapsed" />
+                <MenuFoldOutlined v-else />
+              </a-button>
+            </a-tooltip>
+            <a-tabs v-model:active-key="activeTab" class="detail-tabs">
+              <a-tab-pane key="detail" tab="BOM明细" />
+              <a-tab-pane key="versions" tab="历史版本" />
+              <a-tab-pane key="logs" tab="操作记录" />
+            </a-tabs>
+          </div>
           <a-space class="head-actions">
             <a-button
               v-if="activeTab === 'detail'"
@@ -39,24 +50,14 @@
               >
                 <BomTreePanel
                   readonly
-                  page-scroll
-                  show-collapse
+                  hide-import-template
                   :flat-nodes="flatNodes"
                   :line-items="lineItems"
                   :selected-node-id="selectedNodeId"
-                  :version-info="versionInfo"
                   :root-meta="detailRootMeta"
                   @select-node="selectedNodeId = $event"
-                  @collapse="collapseLeft"
                 />
               </aside>
-              <div v-if="leftSidebarCollapsed" class="sidebar-expand-trigger">
-                <a-tooltip title="展开结构树">
-                  <a-button type="text" size="small" @click="expandLeft">
-                    <MenuUnfoldOutlined />
-                  </a-button>
-                </a-tooltip>
-              </div>
               <div
                 v-show="!leftSidebarCollapsed"
                 class="panel-resizer"
@@ -66,30 +67,7 @@
                 <div class="section-card info-card">
                   <div class="info-block">
                     <div class="section-title">基础信息</div>
-                    <a-descriptions :column="3" size="small" bordered class="basic-desc">
-                      <a-descriptions-item label="BOM编码">{{ record.bomNo }}</a-descriptions-item>
-                      <a-descriptions-item label="BOM名称">{{
-                        record.bomName
-                      }}</a-descriptions-item>
-                      <a-descriptions-item label="BOM类型">
-                        {{ record.bomType === '基础BOM' ? '基准BOM' : record.bomType || '产品BOM' }}
-                      </a-descriptions-item>
-                      <a-descriptions-item label="BOM版本">
-                        {{ record.version || '—' }}
-                      </a-descriptions-item>
-                      <a-descriptions-item v-if="isShipBom" label="适用产品" :span="2">
-                        {{ applicableProductsLabel }}
-                      </a-descriptions-item>
-                      <a-descriptions-item label="BOM状态">
-                        <a-tag :color="bomStatusColor(record.status)">{{ record.status }}</a-tag>
-                      </a-descriptions-item>
-                      <a-descriptions-item label="生效日期">
-                        {{ formatDisplayDate(record.effectiveAt) }}
-                      </a-descriptions-item>
-                      <a-descriptions-item label="失效日期">
-                        {{ formatDisplayDate(record.expiredAt) }}
-                      </a-descriptions-item>
-                    </a-descriptions>
+                    <BomBasicInfoSection :bom="record" />
                   </div>
                   <div v-if="!isShipBom" class="info-block">
                     <BomRootProductEditor
@@ -127,29 +105,14 @@
         </template>
 
         <template v-else-if="activeTab === 'versions'">
-          <div class="section-card">
-            <a-table
-              :columns="versionColumns"
-              :data-source="versionList"
-              row-key="id"
-              size="small"
-              bordered
-              :pagination="false"
-            >
-              <template #bodyCell="{ column, record: ver }">
-                <template v-if="column.key === 'status'">
-                  <a-tag :color="bomStatusColor(ver.status)">{{ ver.status }}</a-tag>
-                </template>
-                <template v-else-if="column.key === 'isDefault'">
-                  <a-tag :color="ver.isDefault ? 'success' : 'default'">
-                    {{ ver.isDefault ? '是' : '否' }}
-                  </a-tag>
-                </template>
-                <template v-else-if="column.key === 'bomNo'">
-                  <a class="link" @click.prevent="openBomDetail(ver)">{{ ver.bomNo }}</a>
-                </template>
-              </template>
-            </a-table>
+          <div class="section-card versions-tab-card">
+            <div class="section-title">BOM 版本变更</div>
+            <BomVersionHistoryPanel
+              :version-group-id="record.versionGroupId"
+              :current-bom="record"
+              @view-bom="handleVersionViewBom"
+              @compare="handleVersionCompare"
+            />
           </div>
         </template>
 
@@ -191,6 +154,13 @@
           :refs="archiveParentRefs"
           @confirm="onArchiveRefConfirm"
         />
+
+        <BomVersionCompareModal
+          v-model:open="versionCompareOpen"
+          :old-bom="compareOldBom"
+          :new-bom="compareNewBom"
+          :title="versionCompareTitle"
+        />
       </template>
       <a-empty v-else-if="!loading" description="未找到该 BOM" />
     </a-spin>
@@ -205,14 +175,13 @@ export default { name: 'ProductBomDetailView' }
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { PrinterOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue'
+import { PrinterOutlined, MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
 import { getVersionsInGroup } from '@/mock/productBom'
 import { buildBomOperationLogs } from '@/mock/bomOperationLogs'
 import { defaultBomColumnSettings, isShipBomType } from '@/mock/bomMaterialColumns'
-import { productInfoState } from '@/store/productInfoStore'
 import { defaultBomOverviewColumnSettings } from '@/mock/bomOverviewColumns'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
-import { bomStatusColor, isBomEditable } from '@/mock/productBomOptions'
+import { isBomEditable } from '@/mock/productBomOptions'
 import { getProductBomById, archiveProductBom, productBomState } from '@/store/productBomStore'
 import { findParentBomReferences } from '@/utils/bomVersionReference'
 import { loadBomDetailStructure } from '@/utils/bomImport'
@@ -220,12 +189,15 @@ import { getRootTreeId, ROOT_ID } from '@/utils/bomTree'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { useBomSplitLayout } from '@/composables/useBomSplitLayout'
 import BomTreePanel from './components/BomTreePanel.vue'
+import BomBasicInfoSection from './components/BomBasicInfoSection.vue'
 import BomRootProductEditor from './components/BomRootProductEditor.vue'
 import BomMaterialTable from './components/BomMaterialTable.vue'
+import BomVersionHistoryPanel from './components/BomVersionHistoryPanel.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
 import BomPrintModal from './components/BomPrintModal.vue'
 import BomRelationDrawer from './components/BomRelationDrawer.vue'
 import BomArchiveReferenceModal from './components/BomArchiveReferenceModal.vue'
+import BomVersionCompareModal from '@/components/BomVersionCompareModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -242,6 +214,10 @@ const printModalOpen = ref(false)
 const relationOpen = ref(false)
 const archiveRefOpen = ref(false)
 const archiveParentRefs = ref([])
+const versionCompareOpen = ref(false)
+const compareOldBom = ref(null)
+const compareNewBom = ref(null)
+const versionCompareTitle = ref('')
 const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
 const overviewColumnSettings = ref(loadOverviewColumnSettings())
 
@@ -257,18 +233,9 @@ function loadOverviewColumnSettings() {
   return JSON.parse(JSON.stringify(defaultBomOverviewColumnSettings))
 }
 
-const { leftSidebarCollapsed, leftPanelWidth, expandLeft, collapseLeft, onResizeMouseDown } =
-  useBomSplitLayout({ scopeKey: 'bom-detail' })
-
-const versionColumns = [
-  { title: 'BOM状态', key: 'status', width: 90 },
-  { title: 'BOM编号', key: 'bomNo', width: 130 },
-  { title: 'BOM名称', dataIndex: 'bomName', width: 160, ellipsis: true },
-  { title: 'BOM版本', dataIndex: 'version', width: 96 },
-  { title: '是否默认', key: 'isDefault', width: 88 },
-  { title: '生效日期', dataIndex: 'effectiveAt', width: 150 },
-  { title: '失效日期', dataIndex: 'expiredAt', width: 150 },
-]
+const { leftSidebarCollapsed, leftPanelWidth, toggleLeft, onResizeMouseDown } = useBomSplitLayout({
+  scopeKey: 'bom-detail',
+})
 
 const logColumns = [
   { title: '操作时间', dataIndex: 'operatedAt', width: 160 },
@@ -277,27 +244,7 @@ const logColumns = [
   { title: '说明', dataIndex: 'remark', ellipsis: true },
 ]
 
-const versionInfo = computed(() =>
-  record.value
-    ? {
-        version: record.value.version,
-        effectiveAt: record.value.effectiveAt,
-      }
-    : null,
-)
-
 const isShipBom = computed(() => isShipBomType(record.value?.bomType))
-
-const applicableProductsLabel = computed(() => {
-  const ids = record.value?.applicableProductIds || []
-  if (!ids.length) return '未指定（可在编辑中选择适用产品）'
-  const products = productInfoState.products || []
-  const labels = ids.map((id) => {
-    const p = products.find((x) => String(x.id) === String(id))
-    return p ? [p.code, p.name].filter(Boolean).join(' ') : String(id)
-  })
-  return labels.join('、')
-})
 
 const detailRootMeta = computed(() => {
   const bom = record.value
@@ -410,6 +357,39 @@ function openBomDetail(row) {
   router.push(resolved)
 }
 
+function findBomByVersion(version) {
+  if (!version) return null
+  return versionList.value.find((b) => b.version === version) || null
+}
+
+function handleVersionViewBom(item) {
+  const bomId = item.bomId
+  if (!bomId) {
+    message.info('未找到该版本 BOM')
+    return
+  }
+  if (bomId === record.value?.id) return
+  const bom = getProductBomById(bomId)
+  if (!bom) {
+    message.info('未找到该版本 BOM')
+    return
+  }
+  openBomDetail(bom)
+}
+
+function handleVersionCompare(item) {
+  const newBom = findBomByVersion(item.version)
+  const oldBom = findBomByVersion(item.compareVersion)
+  if (!newBom || !oldBom) {
+    message.info('暂无可对比的版本数据')
+    return
+  }
+  compareOldBom.value = oldBom
+  compareNewBom.value = newBom
+  versionCompareTitle.value = `${record.value?.itemName || record.value?.bomName || 'BOM'} · ${item.compareVersion} → ${item.version}`
+  versionCompareOpen.value = true
+}
+
 function handleEdit() {
   if (!canEdit.value || !record.value) {
     message.info('当前状态的 BOM 不可编辑')
@@ -474,7 +454,9 @@ function handleBack() {
   margin: -12px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 112px);
+  height: calc(100% + 24px);
+  max-height: calc(100% + 24px);
+  overflow: hidden;
   background: #f5f6f8;
 
   :deep(.ant-spin-nested-loading),
@@ -487,8 +469,10 @@ function handleBack() {
 
 .detail-tab-body {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .detail-page-head {
@@ -505,6 +489,22 @@ function handleBack() {
   top: 0;
   z-index: 25;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+
+  .head-left {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .head-tree-toggle-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    color: rgba(0, 0, 0, 0.65);
+  }
 
   .head-actions {
     flex-shrink: 0;
@@ -527,17 +527,23 @@ function handleBack() {
 
 .page-body {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 0;
   padding: 0 8px 8px;
+  overflow: hidden;
 }
 
 .left-panel {
   flex: 0 0 auto;
+  align-self: stretch;
+  height: 100%;
+  min-height: 0;
   min-width: 200px;
   max-width: 520px;
+  overflow: hidden;
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -546,12 +552,15 @@ function handleBack() {
   flex-direction: column;
 
   :deep(.bom-tree-panel) {
-    height: auto;
+    flex: 1;
+    height: 100%;
+    min-height: 0;
   }
 }
 
 .panel-resizer {
   flex: 0 0 6px;
+  align-self: stretch;
   margin: 0 2px;
   cursor: col-resize;
   border-radius: 3px;
@@ -575,16 +584,12 @@ function handleBack() {
   }
 }
 
-.sidebar-expand-trigger {
-  flex: 0 0 28px;
-  display: flex;
-  align-items: flex-start;
-  padding-top: 8px;
-}
-
 .right-panel {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -616,22 +621,15 @@ function handleBack() {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 
   :deep(.bom-material-table) {
     height: auto;
   }
 }
 
-.basic-desc {
-  :deep(.ant-descriptions-item-label) {
-    width: 100px;
-    color: rgba(0, 0, 0, 0.45);
-  }
-
-  :deep(.multiline-desc .ant-descriptions-item-content) {
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
+.versions-tab-card {
+  margin: 0 8px 8px;
 }
 
 .link {

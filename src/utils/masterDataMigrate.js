@@ -1,7 +1,15 @@
 import { isForbiddenProductOnlyProduce } from '@/utils/masterItemKind'
 
 /** 物料类型（与表单下拉一致） */
-export const MATERIAL_TYPE_OPTIONS = ['零部件', '原材料', '标准件', '毛胚', '半成品', '虚拟件']
+export const MATERIAL_TYPE_OPTIONS = [
+  '成品',
+  '零部件',
+  '原材料',
+  '标准件',
+  '毛胚',
+  '半成品',
+  '虚拟件',
+]
 
 /** 供应型态（与表单下拉一致） */
 export const SUPPLY_FORM_OPTIONS = ['外协件', '外购件', '自制件', '组装', '其他']
@@ -18,7 +26,6 @@ const LEGACY_SUPPLY_MAP = {
 }
 
 const LEGACY_TYPE_MAP = {
-  成品: '半成品',
   毛胚件: '毛胚',
 }
 

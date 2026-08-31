@@ -271,6 +271,108 @@ function scaleUnitQty(baseQty, coefficient) {
   return Math.round((Number(baseQty) || 1) * (Number(coefficient) || 1) * 100) / 100
 }
 
+/** 仅保留 BOM 根下直接子级（不递归展开子件自有 BOM） */
+export function extractBomOneLevelChildren(structure) {
+  if (!structure) return structure
+
+  const directNodes = (structure.treeNodes || []).filter((n) => n.parentId === '__ROOT__')
+  const lineItems = (structure.lineItems || []).filter((line) => line.parentTreeId === '__ROOT__')
+
+  return {
+    ...structure,
+    treeNodes: directNodes,
+    lineItems,
+  }
+}
+
+/** 复制结构时去掉子行的 BOM 引用字段，避免误计入当前 BOM 关联 */
+function stripNestedChildBomRefs(structure) {
+  if (!structure?.lineItems?.length) return structure
+  return {
+    ...structure,
+    lineItems: structure.lineItems.map((line) => ({
+      ...line,
+      childBomId: undefined,
+      childBom: '',
+      childBomVersion: '',
+      referencedItemId: undefined,
+      referencedItemType: undefined,
+    })),
+  }
+}
+
+/**
+ * 添加明细行内联选料：若物品有生效 BOM，在其下展开一层下级并建立引用
+ * @returns {{ flatNodes, lineItems, expanded: boolean, hasChildren?: boolean }}
+ */
+export function expandActiveBomOneLevelUnderLine(
+  flatNodes,
+  lineItems,
+  lineId,
+  material,
+  usageCoefficient = 1,
+) {
+  const line = lineItems.find((l) => l.id === lineId)
+  if (!line?.treeNodeId) {
+    return { flatNodes, lineItems, expanded: false }
+  }
+  if (material?.pickType === 'spu' || material?.isSpuTemplate || material?.isSpuLine) {
+    return { flatNodes, lineItems, expanded: false }
+  }
+
+  const itemType = material?.itemType === '产品' ? 'product' : 'material'
+  const itemId = material?.itemId || material?.id || material?.productId
+  if (!itemId) return { flatNodes, lineItems, expanded: false }
+
+  const bom = getActiveBomForItem(itemType, itemId)
+  if (!bom) return { flatNodes, lineItems, expanded: false }
+
+  const coef = Number(usageCoefficient)
+  const coefficient = Number.isNaN(coef) || coef < 0 ? 1 : coef
+
+  let structure = extractBomOneLevelChildren(extractBomChildrenStructure(resolveBomStructure(bom)))
+  structure = stripNestedChildBomRefs(structure)
+
+  const refPatch = {
+    childBom: bom.bomName || bom.bomNo || '',
+    childBomVersion: bom.version || '',
+    childBomId: bom.id,
+    referencedItemId: bom.itemId,
+    referencedItemType: bom.itemType,
+  }
+
+  let nextLines = lineItems.map((l) => (l.id === lineId ? { ...l, ...refPatch } : l))
+
+  if (!structure?.treeNodes?.length && !structure?.lineItems?.length) {
+    return {
+      flatNodes,
+      lineItems: nextLines,
+      expanded: true,
+      hasChildren: false,
+    }
+  }
+
+  const scaledStructure = {
+    ...structure,
+    treeNodes: structure.treeNodes.map((node) => ({
+      ...node,
+      quantity: scaleUnitQty(node.quantity ?? 1, coefficient),
+    })),
+    lineItems: structure.lineItems.map((item) => ({
+      ...item,
+      unitQty: scaleUnitQty(item.unitQty ?? 1, coefficient),
+    })),
+  }
+
+  const merged = mergeTemplateIntoParent(flatNodes, nextLines, line.treeNodeId, scaledStructure)
+  return {
+    flatNodes: merged.flatNodes,
+    lineItems: merged.lineItems,
+    expanded: true,
+    hasChildren: true,
+  }
+}
+
 /** 引用 BOM 时去掉其根节点，仅保留下级（本级已由 addChildMaterial 添加） */
 export function extractBomChildrenStructure(structure) {
   if (!structure?.treeNodes?.length) return structure

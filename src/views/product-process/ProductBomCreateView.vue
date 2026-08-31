@@ -72,33 +72,38 @@
                 size="small"
                 class="inline-info-form"
               >
-                <a-form-item label="BOM编码" name="bomNo">
-                  <a-input
-                    v-model:value="form.bomNo"
-                    placeholder="保存时自动生成"
-                    :disabled="isEditMode"
-                    allow-clear
-                    style="width: 180px"
-                  />
-                </a-form-item>
-                <a-form-item label="BOM名称" name="bomName">
-                  <a-input
-                    v-model:value="form.bomName"
-                    placeholder="请输入 BOM 名称"
-                    style="width: 220px"
-                  />
-                </a-form-item>
-                <a-form-item label="BOM类型" name="bomType">
-                  <a-select
-                    v-model:value="form.bomType"
-                    style="width: 160px"
-                    :options="bomTypeSelectOptions"
-                    :disabled="bomTypeLocked"
-                  />
-                </a-form-item>
-                <a-form-item v-if="isEditMode" label="BOM版本">
-                  <a-input :value="editVersion || '—'" disabled style="width: 120px" />
-                </a-form-item>
+                <div class="basic-fields-grid">
+                  <a-form-item label="BOM编码" name="bomNo" class="grid-field-item">
+                    <a-input
+                      v-model:value="form.bomNo"
+                      placeholder="保存时自动生成"
+                      :disabled="isEditMode"
+                      allow-clear
+                      class="field-control"
+                    />
+                  </a-form-item>
+                  <a-form-item label="BOM名称" name="bomName" class="grid-field-item">
+                    <a-input
+                      v-model:value="form.bomName"
+                      placeholder="请输入 BOM 名称"
+                      class="field-control"
+                    />
+                  </a-form-item>
+                  <a-form-item label="BOM类型" name="bomType" class="grid-field-item">
+                    <a-select
+                      v-model:value="form.bomType"
+                      class="field-control"
+                      :options="bomTypeSelectOptions"
+                      :disabled="bomTypeLocked"
+                    />
+                  </a-form-item>
+                  <a-form-item v-if="isEditMode" label="BOM版本" class="grid-field-item">
+                    <a-input :value="editVersion || '—'" disabled class="field-control" />
+                  </a-form-item>
+                  <a-form-item v-else-if="!isShipBomMode" label="BOM版本" class="grid-field-item">
+                    <a-input value="保存后生成" disabled class="field-control" />
+                  </a-form-item>
+                </div>
                 <a-form-item v-if="isShipBomMode" label="适用产品" class="applicable-products-item">
                   <div class="applicable-products-field">
                     <a-button
@@ -183,6 +188,7 @@
             @reorder-lines="onReorderLines"
             @material-change="onMaterialChange"
             @item-name-change="onItemNameChange"
+            @bom-ref-descendant-edit="onBomRefDescendantEdit"
             @configure-variant="openVariantConfig"
             @select-node="selectedNodeId = $event"
             @import-template="templateModalOpen = true"
@@ -309,6 +315,10 @@ import {
 } from '@/store/productBomStore'
 import { isBomEditable, isBomActive } from '@/mock/productBomOptions'
 import { findParentRefsForBomUpgrade } from '@/utils/bomVersionReference'
+import {
+  buildBomQuickCreateProductFields,
+  buildBomQuickCreateSpuFields,
+} from '@/constants/bomQuickCreateDefaults'
 import { loadBomDetailStructure, importBomByReference } from '@/utils/bomImport'
 import {
   defaultBomColumnSettings,
@@ -334,7 +344,12 @@ import {
   getRootTreeId,
   stripLineTreeChildren,
 } from '@/utils/bomTree'
-import { syncRootNodeFromItem } from '@/utils/bomImport'
+import { syncRootNodeFromItem, expandActiveBomOneLevelUnderLine } from '@/utils/bomImport'
+import {
+  detachChildBomRefForDescendantEdit,
+  detachChildBomRefForTreeNodeEdit,
+  lineHasChildBomRef,
+} from '@/utils/bomChildRefDetach'
 import { useTabs } from '@/composables/useTabs'
 import { useBomSplitLayout } from '@/composables/useBomSplitLayout'
 import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
@@ -758,12 +773,6 @@ function restoreNewBomDraft() {
   return true
 }
 
-function shouldAutoOpenProductPicker() {
-  if (skipAutoProductPicker.value) return false
-  if (form.itemId || hasRoot.value) return false
-  return true
-}
-
 function closeProductPicker() {
   switchProductOpen.value = false
 }
@@ -795,7 +804,7 @@ function initPageFromRoute() {
     loadedEditBomId.value = ''
 
     resetNewBomState()
-    skipAutoProductPicker.value = false
+    skipAutoProductPicker.value = true
     if (isShipBomMode.value) {
       ensureShipKitRoot()
       closeProductPicker()
@@ -810,10 +819,8 @@ function initPageFromRoute() {
     )
     if (applied) {
       skipAutoProductPicker.value = true
-      closeProductPicker()
-    } else {
-      switchProductOpen.value = shouldAutoOpenProductPicker()
     }
+    closeProductPicker()
     captureNewBomDraft()
   }
 }
@@ -843,7 +850,7 @@ onMounted(() => {
 /**
  * keep-alive 再次激活（非首次挂载）时：
  * 已有根产品/已选物料则关弹窗，绝不重新 init。
- * 注意：keep-alive 下首次挂载也会触发 onActivated，不能在这里关「首次必开」的选品窗。
+ * 注意：keep-alive 下首次挂载也会触发 onActivated，新建页不再自动打开选品窗。
  */
 const activatedOnce = ref(false)
 onActivated(() => {
@@ -983,8 +990,7 @@ function onRootItemCreate({ name }) {
     const spu = addSpu({
       code: generateSpuCode(),
       name: trimmed,
-      canProduce: true,
-      canSell: true,
+      ...buildBomQuickCreateSpuFields(),
     })
     onRootCatalogSelected({
       id: spu.id,
@@ -1001,11 +1007,7 @@ function onRootItemCreate({ name }) {
   const product = addProduct({
     code: generateProductCode(),
     name: trimmed,
-    specModel: form.specModel || '',
-    material: form.material || '',
-    drawingNo: form.drawingNo || '',
-    canProduce: true,
-    canSell: true,
+    ...buildBomQuickCreateProductFields(form),
   })
   onRootCatalogSelected({
     id: product.id,
@@ -1016,7 +1018,7 @@ function onRootItemCreate({ name }) {
     material: product.material || '',
     drawingNo: product.drawingNo || '',
   })
-  message.success(`已创建产品「${trimmed}」并设为根节点`)
+  message.success(`已创建产品「${trimmed}」并设为根节点（待归类 / 成品）`)
 }
 
 function openRootItemDetail() {
@@ -1197,12 +1199,28 @@ function scrollPageToLatestDetail() {
   })
 }
 
+function maybeDetachChildBomRef(editedLineId, parentTreeNodeId) {
+  const result = editedLineId
+    ? detachChildBomRefForDescendantEdit(flatNodes.value, lineItems.value, editedLineId)
+    : detachChildBomRefForTreeNodeEdit(flatNodes.value, lineItems.value, parentTreeNodeId)
+  return result.detached
+}
+
+function onBomRefDescendantEdit({ lineId, lineIds }) {
+  if (lineIds?.length) {
+    lineIds.forEach((id) => maybeDetachChildBomRef(id))
+    return
+  }
+  if (lineId) maybeDetachChildBomRef(lineId)
+}
+
 function onAddDetailLine() {
   if (!hasRoot.value) {
     message.warning('请先选择产品/物料')
     return
   }
   const parentId = selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
+  maybeDetachChildBomRef(null, parentId)
   lineItems.value = [...lineItems.value, createEmptySubLine(parentId)]
   scrollPageToLatestDetail()
 }
@@ -1234,15 +1252,34 @@ function onMaterialChange({ lineId, material }) {
     message.warning(check.message)
     return
   }
-  const result = applyMaterialToLine(flatNodes.value, lineItems.value, lineId, material)
+  const wasEmpty = !String(line?.materialCode || '').trim()
+  if (!wasEmpty) {
+    maybeDetachChildBomRef(lineId)
+  }
+  let result = applyMaterialToLine(flatNodes.value, lineItems.value, lineId, material)
+  const isSpuPick = material?.pickType === 'spu' || material?.isSpuTemplate
+  if (wasEmpty && !isSpuPick) {
+    result = expandActiveBomOneLevelUnderLine(
+      result.flatNodes,
+      result.lineItems,
+      lineId,
+      material,
+      line?.unitQty ?? 1,
+    )
+  }
   flatNodes.value = result.flatNodes
   lineItems.value = result.lineItems
-  if (material?.pickType === 'spu' || material?.isSpuTemplate) {
+  if (isSpuPick) {
     message.success('已添加产品族，请点击规格型号 / 材质 / 变体属性完成配置')
+  } else if (wasEmpty && result.expanded && result.hasChildren) {
+    message.success('已自动带入子件 BOM 下级')
+  } else if (wasEmpty && result.expanded) {
+    message.success('已关联子件 BOM')
   }
 }
 
 function onItemNameChange({ lineId, itemName }) {
+  maybeDetachChildBomRef(lineId)
   const line = lineItems.value.find((l) => l.id === lineId)
   if (!line?.treeNodeId) return
   const title =
@@ -1369,6 +1406,9 @@ function onMaterialSelected(items) {
 
 function onDeleteLine(lineId) {
   const line = lineItems.value.find((l) => l.id === lineId)
+  if (line && !lineHasChildBomRef(line)) {
+    maybeDetachChildBomRef(lineId)
+  }
   lineItems.value = lineItems.value.filter((l) => l.id !== lineId)
   if (line?.treeNodeId) {
     const result = deleteTreeNode(flatNodes.value, lineItems.value, line.treeNodeId)
@@ -1867,6 +1907,43 @@ function handleCancel() {
 .inline-info-form {
   width: 100%;
 
+  .basic-fields-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px 12px;
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .grid-field-item {
+    margin-right: 0;
+    margin-bottom: 0;
+    min-width: 0;
+
+    :deep(.ant-form-item-row) {
+      flex-wrap: nowrap;
+      width: 100%;
+    }
+
+    :deep(.ant-form-item-label) {
+      flex: 0 0 auto;
+      max-width: none;
+    }
+
+    :deep(.ant-form-item-control) {
+      flex: 1;
+      min-width: 0;
+    }
+
+    :deep(.ant-form-item-control-input) {
+      width: 100%;
+    }
+  }
+
+  .field-control {
+    width: 100%;
+  }
+
   :deep(.ant-form-item) {
     margin-bottom: 8px;
     margin-right: 12px;
@@ -1882,18 +1959,11 @@ function handleCancel() {
     width: 100%;
     margin-right: 0;
   }
+}
 
-  .params-pair-row {
-    display: flex;
-    width: 100%;
-    gap: 12px;
-    flex-wrap: wrap;
-
-    .pair-item {
-      flex: 1;
-      min-width: 280px;
-      margin-right: 0;
-    }
+@media (max-width: 1200px) {
+  .inline-info-form .basic-fields-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

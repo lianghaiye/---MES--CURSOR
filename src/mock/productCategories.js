@@ -1,5 +1,13 @@
+/** 系统预置：BOM 快捷创建等产品默认类别 */
+export const PRODUCT_CATEGORY_UNCLASSIFIED = {
+  key: 'pcat-unclassified',
+  code: '000',
+  title: '待归类',
+}
+
 /** 产品类别树 */
 export const productCategoryTree = [
+  { ...PRODUCT_CATEGORY_UNCLASSIFIED },
   { key: 'pcat-008', code: '008', title: '清水泵' },
   { key: 'pcat-pc', code: 'pc', title: '电脑' },
   {
