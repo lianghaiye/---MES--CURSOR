@@ -44,19 +44,41 @@
             </div>
           </div>
           <div class="preview-bottom">
-            <div class="preview-row">
-              <span class="preview-label">库存数量</span>
-              <span>
-                {{ formatQty(preview?.stockQty ?? draft.stockQty) }}
-                {{ preview?.unit || draft.unit || '件' }}
-              </span>
+            <div class="preview-rest">
+              <div class="preview-row">
+                <span class="preview-label">当前仓库</span>
+                <span>
+                  {{ formatQty(preview?.warehouseStockQty ?? draft.warehouseStockQty) }}
+                  {{ preview?.unit || draft.unit || '件' }}
+                </span>
+              </div>
+              <div class="preview-row">
+                <span class="preview-label">自由备货</span>
+                <span>
+                  {{ formatQty(preview?.freeQty ?? 0) }}
+                  {{ preview?.unit || draft.unit || '件' }}
+                </span>
+              </div>
+              <div class="preview-row">
+                <span class="preview-label">按单库存</span>
+                <span>
+                  {{ formatQty(preview?.dedicatedQty ?? 0) }}
+                  {{ preview?.unit || draft.unit || '件' }}
+                </span>
+              </div>
+              <div class="preview-row">
+                <span class="preview-label">可用库存</span>
+                <span>
+                  {{ formatQty(preview?.availableQty ?? 0) }}
+                  {{ preview?.unit || draft.unit || '件' }}
+                </span>
+              </div>
             </div>
-            <div class="preview-bottom-spacer" />
             <div class="preview-stock-box">
               <div class="stock-value">
-                {{ formatQty(preview?.warehouseStockQty ?? draft.warehouseStockQty) }}
+                {{ formatQty(preview?.stockQty ?? draft.stockQty) }}
               </div>
-              <div class="stock-label">当前仓库数量({{ preview?.unit || draft.unit || '件' }})</div>
+              <div class="stock-label">库存数量({{ preview?.unit || draft.unit || '件' }})</div>
             </div>
           </div>
         </div>
@@ -213,7 +235,8 @@ import {
   resolveOutboundStockUnit,
   syncLineTotalFromUnit,
 } from '@/utils/outboundLineHelpers'
-import { listBatches, stockBatchState } from '@/store/stockBatchStore'
+import { listBatches, stockBatchState, sumDedicatedQty, sumFreeQty } from '@/store/stockBatchStore'
+import { getSoftAllocatedQtyByItemCode } from '@/store/salesStockAllocationStore'
 import {
   OUTBOUND_BATCH_PICK_TIP_AUTO,
   OUTBOUND_BATCH_PICK_TIP_MANUAL,
@@ -420,13 +443,24 @@ function refreshPreviewStock() {
   if (!draft.value) return
   Object.assign(draft.value, enrichOutboundLine(draft.value))
   const unit = resolveOutboundStockUnit(draft.value)
+  const warehouse = draft.value.shipWarehouse || ''
+  const itemCode = draft.value.itemCode || ''
+  void stockBatchState.batches
+  const freeQty = warehouse && itemCode ? sumFreeQty({ warehouse, itemCode }) : 0
+  const dedicatedQty = warehouse && itemCode ? sumDedicatedQty({ warehouse, itemCode }) : 0
+  const warehouseStockQty = Number(draft.value.warehouseStockQty) || 0
+  const softAllocated = itemCode ? getSoftAllocatedQtyByItemCode(itemCode) : 0
+  const availableQty = Math.max(0, warehouseStockQty - softAllocated)
   preview.value = {
     itemCode: draft.value.itemCode,
     itemName: draft.value.itemName,
     specModel: draft.value.specModel,
     unit,
     stockQty: draft.value.stockQty,
-    warehouseStockQty: draft.value.warehouseStockQty,
+    warehouseStockQty,
+    freeQty,
+    dedicatedQty,
+    availableQty,
   }
 }
 

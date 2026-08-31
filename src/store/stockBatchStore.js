@@ -220,6 +220,12 @@ export function listFreeBatches({ warehouse, itemCode, inStockOnly = true } = {}
   return listBatches({ warehouse, itemCode, inStockOnly, freeOnly: true })
 }
 
+export function sumFreeQty(filters = {}) {
+  return roundMeters(
+    listFreeBatches(filters).reduce((s, b) => s + (Number(b.currentLength) || 0), 0),
+  )
+}
+
 export function sumDedicatedQty(filters = {}) {
   return roundMeters(
     listDedicatedBatches(filters).reduce((s, b) => s + (Number(b.currentLength) || 0), 0),
