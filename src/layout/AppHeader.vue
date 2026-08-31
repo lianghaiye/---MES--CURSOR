@@ -19,6 +19,7 @@
       </a-dropdown>
     </div>
     <div class="header-right">
+      <AppearanceSettingsDropdown />
       <a-badge dot>
         <BellOutlined class="header-icon" />
       </a-badge>
@@ -47,6 +48,7 @@ import { topModules, moreModules, resolveModuleKey, resolveModuleDefaultPath } f
 import { getUser, clearAuth } from '@/utils/auth'
 import { logout } from '@/api/auth'
 import { useTabs } from '@/composables/useTabs'
+import AppearanceSettingsDropdown from './AppearanceSettingsDropdown.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -118,9 +120,10 @@ async function handleLogout() {
   height: 56px;
   line-height: 56px;
   padding: 0 16px;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--header-bg, #fff);
+  border-bottom: 1px solid var(--divider, #f0f0f0);
   z-index: 100;
+  gap: 12px;
 }
 
 .header-left {
@@ -128,29 +131,33 @@ async function handleLogout() {
   align-items: center;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .logo {
   font-size: 20px;
   font-weight: 700;
-  color: #1677ff;
-  margin-right: 24px;
+  color: var(--primary, #1677ff);
+  margin-right: 16px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .top-menu {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   border-bottom: none;
   line-height: 54px;
+  overflow: hidden;
 }
 
 .more-btn {
   font-size: 20px;
-  color: rgba(0, 0, 0, 0.65);
-  padding: 0 12px;
-  margin-left: 4px;
+  color: var(--text-2, rgba(0, 0, 0, 0.65));
+  padding: 0 8px;
+  margin-left: 0;
+  flex-shrink: 0;
+  line-height: 56px;
 }
 
 .header-right {
@@ -162,7 +169,7 @@ async function handleLogout() {
 
 .header-icon {
   font-size: 18px;
-  color: #1677ff;
+  color: var(--primary, #1677ff);
   cursor: pointer;
 }
 
@@ -175,7 +182,7 @@ async function handleLogout() {
 
 .username {
   font-size: 13px;
-  color: rgba(0, 0, 0, 0.85);
+  color: var(--text-1, rgba(0, 0, 0, 0.85));
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;

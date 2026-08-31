@@ -1,6 +1,16 @@
 import dayjs from 'dayjs'
 import { mapApplicationToDeliveryOrder } from '@/utils/deliveryOrder'
 
+/** 演示数据：按不含税金额推 13% 含税（与常见销项税率一致） */
+function withInTaxAmount(line) {
+  const ex = Number(line.deliveryAmountExTax) || 0
+  if (!ex || line.deliveryAmountInTax != null) return line
+  return {
+    ...line,
+    deliveryAmountInTax: Math.round(ex * 1.13 * 100) / 100,
+  }
+}
+
 function app(partial, salesOrder) {
   return mapApplicationToDeliveryOrder(
     {
@@ -20,7 +30,7 @@ function app(partial, salesOrder) {
       applyOutbound: partial.applyOutbound !== false,
       outboundWarehouse: partial.outboundWarehouse || '成品仓',
       remark: partial.remark || '',
-      lineItems: partial.lineItems || [],
+      lineItems: (partial.lineItems || []).map(withInTaxAmount),
       scatterShipments: partial.scatterShipments || [],
       shipWeight: partial.shipWeight,
     },

@@ -22,6 +22,11 @@ export const deliveryExportFields = [
     getValue: (row) => formatShipWeight(row.shipWeight),
   },
   {
+    key: 'totalAmountInTax',
+    title: '发货总额（含税）',
+    getValue: (row) => formatAmountExTax(row.totalAmountInTax),
+  },
+  {
     key: 'totalAmountExTax',
     title: '发货总金额（不含税）',
     getValue: (row) => formatAmountExTax(row.totalAmountExTax),

@@ -89,6 +89,11 @@ const fields = computed(() => {
       format: () => formatShipWeight(o.shipWeight),
     },
     {
+      key: 'totalAmountInTax',
+      label: '发货总额（含税）',
+      format: () => `￥${formatAmountExTax(o.totalAmountInTax)}`,
+    },
+    {
       key: 'totalAmountExTax',
       label: '发货总金额（不含税）',
       format: () => `￥${formatAmountExTax(o.totalAmountExTax)}`,

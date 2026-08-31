@@ -27,78 +27,80 @@
       </div>
     </div>
 
-    <a-table
-      :columns="displayColumns"
-      :data-source="dataSource"
-      row-key="id"
-      size="small"
-      bordered
-      :scroll="{ x: tableScrollX }"
-      :pagination="false"
-      :row-selection="rowSelection"
-      :custom-row="customRow"
-      class="work-order-table"
-    >
-      <template #bodyCell="{ column, record, index }">
-        <template v-if="column.key === 'index'">
-          {{ rowIndex(index) }}
+    <div :class="wrapClass">
+      <a-table
+        :columns="displayColumns"
+        :data-source="dataSource"
+        row-key="id"
+        size="small"
+        bordered
+        :scroll="{ x: tableScrollX }"
+        :pagination="false"
+        :row-selection="rowSelection"
+        :custom-row="customRow"
+        class="work-order-table"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">
+            {{ rowIndex(index) }}
+          </template>
+          <template v-else-if="column.key === 'progress'">
+            <a-tag :color="statusColor(record.status)">
+              {{ formatCell(record.status) }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'customerName'">
+            {{ formatCell(resolveWorkOrderSalesMeta(record).customerName) }}
+          </template>
+          <template v-else-if="column.key === 'scheduleQty'">
+            <span>{{ formatScheduleProgress(record) }}</span>
+            <a-tag v-if="isPartialScheduled(record)" color="processing" class="partial-tag">
+              未排完
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'variantAttr'">
+            {{ formatCell(resolveWorkOrderVariantSummary(record)) }}
+          </template>
+          <template v-else-if="column.key === 'planDateRange'">
+            {{ formatCell(formatWorkOrderPlanDateRange(record.planDateRange)) }}
+          </template>
+          <template v-else-if="column.key === 'owner'">
+            {{ formatCell(record.creator || record.owner) }}
+          </template>
+          <template v-else-if="column.key === 'urgency'">
+            <a-tag :color="urgencyTagColor(record.urgency)">
+              {{ urgencyLabel(record.urgency) }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space :size="0" wrap>
+              <a-button type="link" size="small" @click.stop="emit('action', 'edit', record)">
+                编辑
+              </a-button>
+              <a-button
+                type="link"
+                size="small"
+                danger
+                @click.stop="emit('action', 'delete', record)"
+              >
+                删除
+              </a-button>
+              <a-button type="link" size="small" @click.stop="emit('action', 'clone', record)">
+                克隆
+              </a-button>
+              <a-button
+                v-if="canShowDispatchAction(record)"
+                type="link"
+                size="small"
+                @click.stop="emit('action', 'dispatch', record)"
+              >
+                下发任务
+              </a-button>
+            </a-space>
+          </template>
         </template>
-        <template v-else-if="column.key === 'progress'">
-          <a-tag :color="statusColor(record.status)">
-            {{ formatCell(record.status) }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'customerName'">
-          {{ formatCell(resolveWorkOrderSalesMeta(record).customerName) }}
-        </template>
-        <template v-else-if="column.key === 'scheduleQty'">
-          <span>{{ formatScheduleProgress(record) }}</span>
-          <a-tag v-if="isPartialScheduled(record)" color="processing" class="partial-tag">
-            未排完
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'variantAttr'">
-          {{ formatCell(resolveWorkOrderVariantSummary(record)) }}
-        </template>
-        <template v-else-if="column.key === 'planDateRange'">
-          {{ formatCell(formatWorkOrderPlanDateRange(record.planDateRange)) }}
-        </template>
-        <template v-else-if="column.key === 'owner'">
-          {{ formatCell(record.creator || record.owner) }}
-        </template>
-        <template v-else-if="column.key === 'urgency'">
-          <a-tag :color="urgencyTagColor(record.urgency)">
-            {{ urgencyLabel(record.urgency) }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space :size="0" wrap>
-            <a-button type="link" size="small" @click.stop="emit('action', 'edit', record)">
-              编辑
-            </a-button>
-            <a-button
-              type="link"
-              size="small"
-              danger
-              @click.stop="emit('action', 'delete', record)"
-            >
-              删除
-            </a-button>
-            <a-button type="link" size="small" @click.stop="emit('action', 'clone', record)">
-              克隆
-            </a-button>
-            <a-button
-              v-if="canShowDispatchAction(record)"
-              type="link"
-              size="small"
-              @click.stop="emit('action', 'dispatch', record)"
-            >
-              下发任务
-            </a-button>
-          </a-space>
-        </template>
-      </template>
-    </a-table>
+      </a-table>
+    </div>
 
     <div class="table-pagination">
       <a-pagination
@@ -128,6 +130,7 @@ import { AppstoreOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useTableDensity } from '@/composables/useTableDensity'
 import {
   formatWorkOrderFieldValue,
   formatWorkOrderPlanDateRange,
@@ -208,6 +211,8 @@ const baseColumns = [
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings(props.columnSettingsKey, baseColumns, { minScrollX: 2800 })
+
+const { wrapClass } = useTableDensity(props.columnSettingsKey)
 
 function formatCell(value) {
   return formatWorkOrderFieldValue(value)
@@ -319,21 +324,8 @@ function urgencyLabel(urgency) {
     line-height: 18px;
   }
 
-  :deep(.ant-table-thead > tr > th) {
-    background: #fafafa;
-    font-weight: 500;
-    padding: 8px;
-    font-size: 13px;
-  }
-
   :deep(.ant-table-tbody > tr > td) {
-    padding: 6px 8px;
-    font-size: 13px;
     cursor: pointer;
-  }
-
-  :deep(.table-row-active > td) {
-    background: #f0f7ff !important;
   }
 }
 

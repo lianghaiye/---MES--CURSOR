@@ -1,0 +1,104 @@
+/**
+ * 列表表格字号三档（大 / 中 / 小）
+ * - 全局：html[data-table-density] 作用于常见列表容器
+ * - 局部：.table-density-wrap 仍可用
+ */
+
+html {
+  --td-body-size: 14px;
+  --td-body-lh: 22px;
+  --td-row-height: 48px;
+  --td-head-size: 13px;
+  --td-text-1: #1f2329;
+  --td-text-2: #4e5969;
+  --td-text-3: #86909c;
+}
+
+html[data-table-density='medium'] {
+  --td-body-size: 13px;
+  --td-body-lh: 20px;
+  --td-row-height: 44px;
+  --td-head-size: 12.5px;
+}
+
+html[data-table-density='small'] {
+  --td-body-size: 12px;
+  --td-body-lh: 18px;
+  --td-row-height: 40px;
+  --td-head-size: 12px;
+}
+
+html[data-theme='dark'] {
+  --td-text-1: #e6e6e6;
+  --td-text-2: #bfbfbf;
+  --td-text-3: #8c8c8c;
+}
+
+.table-density-apply() {
+  .ant-table-thead > tr > th {
+    background: #f7f8fa !important;
+    height: 40px;
+    padding: 0 8px;
+    font-size: var(--td-head-size);
+    font-weight: 600;
+    color: var(--td-text-2);
+  }
+
+  .ant-table-tbody > tr > td {
+    font-size: var(--td-body-size);
+    line-height: var(--td-body-lh);
+    padding-top: calc((var(--td-row-height) - var(--td-body-lh)) / 2);
+    padding-bottom: calc((var(--td-row-height) - var(--td-body-lh)) / 2);
+    padding-left: 8px;
+    padding-right: 8px;
+    color: var(--td-text-1);
+  }
+
+  .ant-table-tbody > tr:hover > td {
+    background: #f5f6f7;
+  }
+
+  .ant-table-tbody > tr.table-row-active > td,
+  .ant-table-tbody > tr.ant-table-row-selected > td {
+    background: #e6f4ff !important;
+  }
+
+  .ant-table-cell-ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.table-card,
+.table-layout-card,
+.list-card,
+.table-density-wrap {
+  .table-density-apply();
+}
+
+html[data-theme='dark'] {
+  .table-card,
+  .table-layout-card,
+  .list-card,
+  .table-density-wrap {
+    .ant-table-thead > tr > th {
+      background: #262626 !important;
+    }
+
+    .ant-table-tbody > tr:hover > td {
+      background: #262626;
+    }
+
+    .ant-table-tbody > tr.table-row-active > td,
+    .ant-table-tbody > tr.ant-table-row-selected > td {
+      background: rgba(64, 150, 255, 0.16) !important;
+    }
+  }
+}
+
+.table-density-wrap.table-density--zebra {
+  .ant-table-tbody > tr:nth-child(even) > td {
+    background: #fafafa;
+  }
+}

@@ -8,8 +8,10 @@ import '@/store/productInfoStore'
 import '@/store/materialInfoStore'
 import '@/store/stockBatchStore'
 import { bootstrapSpuSkuData } from '@/utils/spuBootstrap'
+import { initUiAppearance } from '@/store/uiAppearanceStore'
 
 bootstrapSpuSkuData()
+initUiAppearance()
 
 const RESIZE_OBSERVER_ERR = /ResizeObserver loop/
 

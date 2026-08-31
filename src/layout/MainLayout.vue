@@ -71,7 +71,7 @@ watch(
 .main-layout {
   height: 100%;
   overflow: hidden;
-  background: #f0f2f5;
+  background: var(--page-bg, #f0f2f5);
 }
 
 .main-body {

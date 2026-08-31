@@ -8,6 +8,7 @@ import {
 import {
   calcApplyShipQty,
   calcDeliveryAmountExTax,
+  calcDeliveryAmountInTax,
   calcShipWeight,
   mapApplicationToDeliveryOrder,
 } from '@/utils/deliveryOrder'
@@ -22,8 +23,8 @@ import { refreshDeliveryMetrics } from '@/utils/deliveryOutboundSync'
 import { sumSelectedShipQty } from '@/utils/shipEbom'
 
 const STORAGE_KEY = 'i_doms_delivery_orders'
-/** v3：补充未出库/已出库/自提物流等多类型发货演示单 */
-const DATA_VERSION = 3
+/** v4：发货列表增加发货总额（含税） */
+const DATA_VERSION = 4
 
 function migrateOrders(orders) {
   return (orders || []).map((o) => {
@@ -33,6 +34,8 @@ function migrateOrders(orders) {
     }
     refreshDeliveryMetrics(row)
     row.actualOutboundQty = row.actualOutboundQty ?? 0
+    row.totalAmountExTax = calcDeliveryAmountExTax(row)
+    row.totalAmountInTax = calcDeliveryAmountInTax(row)
     const linked = findLinkedSalesOutbound(row)
     if (linked) row.outboundOrderId = linked.id
     return row
@@ -258,6 +261,7 @@ export function updateDeliveryOrder(id, patch) {
   const row = deliveryOrderState.orders[idx]
   row.applyShipQty = calcApplyShipQty(row)
   row.totalAmountExTax = calcDeliveryAmountExTax(row)
+  row.totalAmountInTax = calcDeliveryAmountInTax(row)
   row.shipWeight = patch.shipWeight ?? calcShipWeight(row)
   refreshRowMetrics(row)
 
