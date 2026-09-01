@@ -53,7 +53,11 @@
     <section class="kpi-row">
       <div class="kpi-block">
         <div class="kpi-block-title">工单数量</div>
-        <div class="kpi-metrics">
+        <div class="kpi-metrics kpi-metrics-4">
+          <div class="kpi-item">
+            <div class="kpi-label">工单总数</div>
+            <div class="kpi-value">{{ dashboard.kpis.woTotal }}</div>
+          </div>
           <div class="kpi-item">
             <div class="kpi-label">待下发</div>
             <div class="kpi-value tone-warn">{{ dashboard.kpis.pending }}</div>
@@ -68,26 +72,21 @@
           </div>
         </div>
       </div>
-      <div class="kpi-block">
-        <div class="kpi-block-title">报工数量</div>
-        <div class="kpi-metrics">
+      <div class="kpi-block kpi-block-wide">
+        <div class="kpi-block-title">任务执行</div>
+        <div class="kpi-metrics kpi-metrics-9">
           <div class="kpi-item">
-            <div class="kpi-label">笔数</div>
-            <div class="kpi-value">{{ dashboard.kpis.reportCount }}</div>
+            <div class="kpi-label">计划数</div>
+            <div class="kpi-value">{{ formatMonitorQty(dashboard.kpis.planQtyTotal) }}</div>
           </div>
           <div class="kpi-item">
-            <div class="kpi-label">良品数</div>
-            <div class="kpi-value tone-ok">{{ formatMonitorQty(dashboard.kpis.goodQty) }}</div>
+            <div class="kpi-label">排产数</div>
+            <div class="kpi-value">{{ formatMonitorQty(dashboard.kpis.scheduleQtyTotal) }}</div>
           </div>
           <div class="kpi-item">
-            <div class="kpi-label">不良品数</div>
-            <div class="kpi-value tone-bad">{{ formatMonitorQty(dashboard.kpis.badQty) }}</div>
+            <div class="kpi-label">任务数</div>
+            <div class="kpi-value">{{ dashboard.kpis.taskCount }}</div>
           </div>
-        </div>
-      </div>
-      <div class="kpi-block">
-        <div class="kpi-block-title">工序状态</div>
-        <div class="kpi-metrics kpi-metrics-3">
           <div class="kpi-item">
             <div class="kpi-label">已报工</div>
             <div class="kpi-value tone-ok">{{ dashboard.kpis.processDone }}</div>
@@ -99,6 +98,35 @@
           <div class="kpi-item">
             <div class="kpi-label">待领取</div>
             <div class="kpi-value tone-idle">{{ dashboard.kpis.processClaim }}</div>
+          </div>
+          <div class="kpi-item">
+            <div class="kpi-label">良品数</div>
+            <div class="kpi-value tone-ok">{{ formatMonitorQty(dashboard.kpis.goodQty) }}</div>
+          </div>
+          <div class="kpi-item">
+            <div class="kpi-label">不良品数</div>
+            <div class="kpi-value tone-bad">{{ formatMonitorQty(dashboard.kpis.badQty) }}</div>
+          </div>
+          <div class="kpi-item">
+            <div class="kpi-label">工时</div>
+            <div class="kpi-value">{{ formatMonitorHours(dashboard.kpis.workHours) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="kpi-block">
+        <div class="kpi-block-title">物料消耗<span class="kpi-block-sub">（按项数）</span></div>
+        <div class="kpi-metrics">
+          <div class="kpi-item">
+            <div class="kpi-label">已领取</div>
+            <div class="kpi-value tone-ok">{{ dashboard.kpis.materialClaimed }}</div>
+          </div>
+          <div class="kpi-item">
+            <div class="kpi-label">待出库</div>
+            <div class="kpi-value tone-warn">{{ dashboard.kpis.materialPendingOutbound }}</div>
+          </div>
+          <div class="kpi-item">
+            <div class="kpi-label">已消耗</div>
+            <div class="kpi-value tone-run">{{ dashboard.kpis.materialConsumed }}</div>
           </div>
         </div>
       </div>
@@ -357,8 +385,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { useTabs } from '@/composables/useTabs'
 import { workOrderState } from '@/store/workOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
-import { processReportState } from '@/store/processReportStore'
 import { employeeGroupState } from '@/store/employeeGroupStore'
+import { materialRequisitionState } from '@/store/materialRequisitionStore'
+import { mobileMaterialReqState } from '@/store/mobileMaterialReqStore'
+import { laborHourState } from '@/store/laborHourStore'
 import {
   MONITOR_LIST_STATUS,
   MONITOR_LIST_STATUS_OPTIONS,
@@ -370,6 +400,7 @@ import {
   MONITOR_WO_TYPE_OPTIONS,
   MONITOR_WORK_CENTER_OPTIONS,
   buildWorkOrderMonitorDashboard,
+  formatMonitorHours,
   formatMonitorQty,
 } from '@/utils/workOrderMonitorDashboard'
 
@@ -434,8 +465,10 @@ const dashboard = computed(() => {
   void tick.value
   void workOrderState.orders
   void assemblyWorkOrderState.orders
-  void processReportState.records
   void employeeGroupState.groups
+  void materialRequisitionState.records
+  void mobileMaterialReqState.items
+  void laborHourState.orders
   void parallelExpanded.value
   return buildWorkOrderMonitorDashboard({
     period: period.value,
@@ -797,7 +830,7 @@ watch(
 
 .kpi-row {
   display: grid;
-  grid-template-columns: 1.2fr 1.2fr 0.9fr;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(420px, 2fr) minmax(200px, 0.95fr);
   gap: clamp(8px, 0.8vw, 12px);
   margin-bottom: clamp(10px, 1vw, 16px);
   flex-shrink: 0;
@@ -817,6 +850,13 @@ watch(
   color: var(--accent);
 }
 
+.kpi-block-sub {
+  margin-left: 4px;
+  font-size: clamp(11px, 0.85vw, 12px);
+  font-weight: 400;
+  color: var(--muted);
+}
+
 .kpi-metrics {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -829,6 +869,30 @@ watch(
 
 .kpi-metrics-4 {
   grid-template-columns: repeat(4, 1fr);
+}
+
+.kpi-metrics-7 {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.kpi-metrics-9 {
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.kpi-block-wide .kpi-value {
+  font-size: clamp(16px, 1.5vw, 28px);
+}
+
+@media (max-width: 1280px) {
+  .kpi-row {
+    grid-template-columns: 1fr;
+  }
+  .kpi-metrics-7,
+  .kpi-metrics-9 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .kpi-label {

@@ -4,8 +4,11 @@
 import dayjs from 'dayjs'
 import { workOrderState } from '@/store/workOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
-import { processReportState } from '@/store/processReportStore'
 import { employeeGroupState } from '@/store/employeeGroupStore'
+import { materialRequisitionState } from '@/store/materialRequisitionStore'
+import { listMobileMaterialReqs, mobileMaterialReqState } from '@/store/mobileMaterialReqStore'
+import { laborHourState } from '@/store/laborHourStore'
+import { MATERIAL_DEDUCT_STATUS } from '@/mock/materialRequisitionRecords'
 import { listMobileTasksForWorkOrder } from '@/utils/workOrderStatus'
 import { MOBILE_TASK_SYNC_KEY } from '@/utils/mobileTaskDispatch'
 import { workCenterOptions } from '@/mock/workOrderOptions'
@@ -87,6 +90,154 @@ function isDateInPeriod(dateStr, period) {
   if (!d.isValid()) return false
   const [start, end] = getPeriodRange(period)
   return !d.isBefore(dayjs(start), 'day') && !d.isAfter(dayjs(end), 'day')
+}
+
+/** 任务是否已完成报工（与工序展示态「已报工」对齐） */
+export function isMonitorTaskReported(task) {
+  if (!task || task.hiddenByTerminate) return false
+  if (task.taskStatus === '已完成') return true
+  if (Number(task.reportedFinishedQty) > 0 || Number(task.reportedGoodQty) > 0) return true
+  return false
+}
+
+function isTaskLinkedToMonitorOrders(task, woIdSet, woNoSet, { woType, workCenter }) {
+  if (task.hiddenByTerminate) return false
+  if (task.workOrderId || task.workOrderNo || task.workOrderCode) {
+    return (
+      (task.workOrderId && woIdSet.has(task.workOrderId)) ||
+      (task.workOrderNo && woNoSet.has(task.workOrderNo)) ||
+      (task.workOrderCode && woNoSet.has(task.workOrderCode))
+    )
+  }
+  // 无工单关联：仅未筛类型/中心时计入
+  return woType === MONITOR_WO_TYPE.ALL && !workCenter
+}
+
+/**
+ * 报工数量 KPI：周期内生成的任务
+ * - taskCount / taskReported：按任务条数
+ * - goodQty / badQty：按工单归并，各取该单任务上报工量的最大值再求和
+ * - workHours：优先用工时管理核算工时；否则回退任务报工时长
+ */
+export function accumulateReportTaskKpis(tasks, { period, woIdSet, woNoSet, woType, workCenter }) {
+  let taskCount = 0
+  let taskReported = 0
+  let taskHours = 0
+  /** @type {Map<string, { good: number, bad: number }>} */
+  const byWo = new Map()
+
+  ;(tasks || []).forEach((t) => {
+    if (!isDateInPeriod(t.createdAt, period)) return
+    if (!isTaskLinkedToMonitorOrders(t, woIdSet, woNoSet, { woType, workCenter })) return
+    taskCount += 1
+    if (isMonitorTaskReported(t)) taskReported += 1
+    taskHours += Number(t.reportDuration) || Number(t.workHours) || Number(t.accountHours) || 0
+
+    const woKey =
+      t.workOrderId || t.workOrderNo || t.workOrderCode || `task:${t.id || Math.random()}`
+    const good = qtyOf(t.reportedGoodQty)
+    const bad = qtyOf(t.reportedBadQty, t.reportedDefectQty, t.badQty)
+    const prev = byWo.get(woKey) || { good: 0, bad: 0 }
+    byWo.set(woKey, {
+      good: Math.max(prev.good, good),
+      bad: Math.max(prev.bad, bad),
+    })
+  })
+
+  let goodQty = 0
+  let badQty = 0
+  byWo.forEach((v) => {
+    goodQty += v.good
+    badQty += v.bad
+  })
+
+  const laborHours = accumulateLaborHoursForMonitor({ period, woIdSet, woNoSet })
+  const workHours = laborHours > 0 ? laborHours : Math.round(taskHours * 100) / 100
+
+  return { taskCount, taskReported, goodQty, badQty, workHours }
+}
+
+/** 工时管理中、关联当前筛选工单且落在周期内的核算工时合计（小时） */
+function accumulateLaborHoursForMonitor({ period, woIdSet, woNoSet }) {
+  let hours = 0
+  ;(laborHourState.orders || []).forEach((o) => {
+    const linked =
+      (o.workOrderId && woIdSet.has(o.workOrderId)) ||
+      (o.workOrderNo && woNoSet.has(o.workOrderNo)) ||
+      (o.orderNo && woNoSet.has(o.orderNo))
+    if (!linked) return
+    const dateHint = o.reportDate || o.updatedAt || o.createdAt
+    if (dateHint && !isDateInPeriod(dateHint, period)) return
+    hours += Number(o.accountHours) || 0
+  })
+  return Math.round(hours * 100) / 100
+}
+
+/**
+ * 物料消耗 KPI（关联当前筛选工单；周期看申请/扣减创建时间）
+ * 按「物料行项数」统计，不按数量加总（单位不一致不可加）
+ * - materialClaimed 已领取：出库状态=已出库 的物料行数
+ * - materialPendingOutbound 待出库：出库状态=待出库 的物料行数
+ * - materialConsumed 已消耗：扣减成功/部分成功单据中可扣减行数
+ */
+export function accumulateMaterialConsumeKpis({ period, woIdSet, woNoSet }) {
+  let materialClaimed = 0
+  let materialPendingOutbound = 0
+  let materialConsumed = 0
+
+  const reqLinked = (req) => {
+    if (req.workOrderId && woIdSet.has(req.workOrderId)) return true
+    if (req.workOrderCode && woNoSet.has(req.workOrderCode)) return true
+    if (
+      (req.workOrders || []).some(
+        (w) => (w.id && woIdSet.has(w.id)) || (w.code && woNoSet.has(w.code)),
+      )
+    )
+      return true
+    if ((req.workOrderIds || []).some((id) => woIdSet.has(id))) return true
+    return false
+  }
+
+  const reqLineCount = (req) => {
+    if (Array.isArray(req.lines) && req.lines.length) return req.lines.length
+    const n = Number(req.lineCount)
+    if (Number.isFinite(n) && n > 0) return n
+    return 1
+  }
+
+  ;(listMobileMaterialReqs() || []).forEach((req) => {
+    if (!isDateInPeriod(req.createdAt, period)) return
+    if (!reqLinked(req)) return
+    const items = reqLineCount(req)
+    const st = req.outboundStatus || ''
+    if (st === '已出库') materialClaimed += items
+    else if (st === '待出库') materialPendingOutbound += items
+  })
+  ;(materialRequisitionState.records || []).forEach((row) => {
+    const st = row.status
+    if (st !== MATERIAL_DEDUCT_STATUS.SUCCESS && st !== MATERIAL_DEDUCT_STATUS.PARTIAL) return
+    if (!isDateInPeriod(row.confirmedAt || row.deductTime || row.createdAt, period)) return
+    const linked =
+      (row.workOrderId && woIdSet.has(row.workOrderId)) ||
+      (row.workOrderNo && woNoSet.has(row.workOrderNo))
+    if (!linked) return
+    const lines = row.lines || []
+    if (!lines.length) {
+      materialConsumed += 1
+      return
+    }
+    lines.forEach((l) => {
+      if (l.deductible === false) return
+      if (l.status === MATERIAL_DEDUCT_STATUS.SKIPPED) return
+      materialConsumed += 1
+    })
+  })
+
+  return {
+    materialClaimed,
+    materialPendingOutbound,
+    materialConsumed,
+  }
 }
 
 function mapWoBucket(status) {
@@ -598,6 +749,12 @@ export function formatMonitorQty(val) {
   return formatNumber(val, 4, { empty: '0' })
 }
 
+export function formatMonitorHours(val) {
+  const n = Number(val)
+  if (!Number.isFinite(n) || n === 0) return '0'
+  return `${formatNumber(n, 2, { empty: '0' })}h`
+}
+
 function resolvePlanDateRange(o) {
   if (Array.isArray(o?.planDateRange) && o.planDateRange.length >= 2) {
     return [o.planDateRange[0], o.planDateRange[1]]
@@ -724,42 +881,42 @@ export function buildWorkOrderMonitorDashboard(filters = {}) {
 
   void workOrderState.orders
   void assemblyWorkOrderState.orders
-  void processReportState.records
   void employeeGroupState.groups
+  void materialRequisitionState.records
+  void mobileMaterialReqState.items
+  void laborHourState.orders
 
   const all = filterByTypeAndCenter(collectMonitorWorkOrders(), { woType, workCenter })
 
-  // KPI 工单：待下发/进行中为当前快照；已完成为时段内
+  // KPI 工单：总数按时段创建；待下发/进行中为当前快照；已完成为时段内完结
+  let woTotal = 0
+  let planQtyTotal = 0
+  let scheduleQtyTotal = 0
   let pending = 0
   let running = 0
   let done = 0
   all.forEach((o) => {
+    if (isDateInPeriod(o.createdAt, period)) {
+      woTotal += 1
+      planQtyTotal += Number(o.planQty) || 0
+      scheduleQtyTotal += Number(o.scheduleQty) || 0
+    }
     const bucket = mapWoBucket(o.status)
     if (bucket === 'pending') pending += 1
     else if (bucket === 'running') running += 1
     else if (bucket === 'done' && isDateInPeriod(o.updatedAt || o.createdAt, period)) done += 1
   })
 
-  // 报工：时段内笔数 / 良品 / 不良（关联工单需过类型与工作中心）
+  // 报工数量：周期内生成的移动任务（任务数 / 已报工 / 良 / 不良）
   const woIdSet = new Set(all.map((o) => o.id))
   const woNoSet = new Set(all.map((o) => o.orderNo || o.workOrderNo).filter(Boolean))
-  let reportCount = 0
-  let goodQty = 0
-  let badQty = 0
-  ;(processReportState.records || []).forEach((r) => {
-    if (!isDateInPeriod(r.createdAt, period)) return
-    if (r.workOrderId || r.workOrderNo) {
-      const linked =
-        (r.workOrderId && woIdSet.has(r.workOrderId)) ||
-        (r.workOrderNo && woNoSet.has(r.workOrderNo))
-      if (!linked) return
-    } else if (woType !== MONITOR_WO_TYPE.ALL || workCenter) {
-      // 无工单关联的报工在已筛选时不计入，避免口径混淆
-      return
-    }
-    reportCount += 1
-    goodQty += Number(r.goodQty) || 0
-    badQty += Number(r.defectQty) || 0
+  const allTasks = withDemoWorkerTasks(listAllMobileTasks())
+  const reportTaskKpis = accumulateReportTaskKpis(allTasks, {
+    period,
+    woIdSet,
+    woNoSet,
+    woType,
+    workCenter,
   })
 
   const listSource = all
@@ -784,9 +941,9 @@ export function buildWorkOrderMonitorDashboard(filters = {}) {
   const pageRows = pages[safePage - 1] || []
   const pageUnits = pageRows.reduce((s, r) => s + (Number(r.heightUnits) || 1), 0)
 
-  const allTasks = withDemoWorkerTasks(listAllMobileTasks())
   const workerPanels = buildWorkerPanels(allTasks)
   const processStats = accumulateProcessStats(all)
+  const materialKpis = accumulateMaterialConsumeKpis({ period, woIdSet, woNoSet })
 
   const busyNameSet = new Set()
   workerPanels.groups.forEach((g) => {
@@ -810,16 +967,27 @@ export function buildWorkOrderMonitorDashboard(filters = {}) {
   return {
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     kpis: {
+      woTotal,
+      planQtyTotal,
+      scheduleQtyTotal,
       pending,
       running,
       done,
-      reportCount,
-      goodQty,
-      badQty,
+      taskCount: reportTaskKpis.taskCount,
+      /** 已报工：工艺节点快照（与在制/待领取同口径） */
       processDone: processStats.done,
       processRunning: processStats.running,
       processQueue: processStats.queue,
       processClaim: processStats.claim,
+      goodQty: reportTaskKpis.goodQty,
+      badQty: reportTaskKpis.badQty,
+      workHours: reportTaskKpis.workHours,
+      materialClaimed: materialKpis.materialClaimed,
+      materialPendingOutbound: materialKpis.materialPendingOutbound,
+      materialConsumed: materialKpis.materialConsumed,
+      /** @deprecated 兼容旧字段 */
+      taskReported: reportTaskKpis.taskReported,
+      reportCount: reportTaskKpis.taskCount,
     },
     list: {
       total,
@@ -846,6 +1014,7 @@ export function buildWorkOrderMonitorDashboard(filters = {}) {
 /** 演示：小组接单 + 单工人接单，右侧两种形态都能看到 */
 function withDemoWorkerTasks(tasks) {
   let next = tasks
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
   const g =
     (employeeGroupState.groups || []).find((x) => x.name === '加工小组') ||
     (employeeGroupState.groups || []).find((x) => x.status === '启用') ||
@@ -863,6 +1032,7 @@ function withDemoWorkerTasks(tasks) {
         groupId: g.id,
         groupName: g.name,
         resourceType: '工人小组',
+        createdAt: now,
       },
       ...next,
     ]
@@ -923,6 +1093,34 @@ function withDemoWorkerTasks(tasks) {
         executor: p.name,
         resourceType: '工人',
         executors: [p.name],
+        createdAt: now,
+        reportedGoodQty: p.status === '已完成' ? 8 : 0,
+      })),
+      ...next,
+    ]
+  }
+  // 看板 KPI 演示：挂到并行演示工单，保证「报工数量」有数
+  if (!next.some((t) => t.id === 'mon-demo-kpi-1')) {
+    const kpiSeeds = [
+      { id: 'mon-demo-kpi-1', name: '下料', status: '已完成', good: 20, bad: 0, hours: 2.5 },
+      { id: 'mon-demo-kpi-2', name: '钻孔', status: '已完成', good: 20, bad: 0, hours: 3 },
+      { id: 'mon-demo-kpi-3', name: '攻丝', status: '已完成', good: 19, bad: 1, hours: 2 },
+      { id: 'mon-demo-kpi-4', name: '去毛刺', status: '执行中', good: 6, bad: 0, hours: 1 },
+      { id: 'mon-demo-kpi-5', name: '合套', status: '待报工', good: 0, bad: 0, hours: 0 },
+    ]
+    next = [
+      ...kpiSeeds.map((s) => ({
+        id: s.id,
+        processName: s.name,
+        workOrderId: 'wo-monitor-parallel-demo',
+        workOrderNo: 'WO-PARALLEL-DEMO',
+        workOrderCode: 'WO-PARALLEL-DEMO',
+        taskStatus: s.status,
+        reportedGoodQty: s.good,
+        reportedBadQty: s.bad,
+        reportDuration: s.hours,
+        createdAt: now,
+        resourceType: '工人',
       })),
       ...next,
     ]
