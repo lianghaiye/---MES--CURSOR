@@ -234,18 +234,27 @@
                 <div class="group-head">
                   <div class="group-title">
                     <span class="group-name">{{ item.data.name }}</span>
+                    <span v-if="item.chunkTotal > 1" class="group-chunk-badge">
+                      {{ item.chunkIndex + 1 }}/{{ item.chunkTotal }}
+                    </span>
                     <span
                       class="group-status"
                       :class="item.data.groupBusy ? 'is-busy' : 'is-idle'"
                       >{{ item.data.groupStatus }}</span
                     >
                   </div>
-                  <div class="group-hint">{{ item.data.groupHint }}</div>
+                  <div class="group-hint">
+                    <template v-if="item.chunkIndex > 0">续 · </template>
+                    {{ item.data.groupHint }}
+                    <template v-if="item.memberTotal > GROUP_MEMBER_CHUNK">
+                      · 共 {{ item.memberTotal }} 人
+                    </template>
+                  </div>
                 </div>
                 <div class="group-members">
                   <div
-                    v-for="m in visibleGroupMembers(item.data)"
-                    :key="`${item.data.id}-${m.name}`"
+                    v-for="m in item.membersSlice"
+                    :key="`${item.id}-${m.name}`"
                     class="worker-row nested"
                     :class="m.statusTone"
                   >
@@ -262,12 +271,6 @@
                         m.status
                       }}</span>
                     </div>
-                  </div>
-                  <div
-                    v-if="(item.data.members || []).length > GROUP_MEMBER_VISIBLE"
-                    class="group-more"
-                  >
-                    等 {{ (item.data.members || []).length }} 人
                   </div>
                 </div>
               </div>
@@ -337,8 +340,8 @@ import {
 
 const CAROUSEL_STORAGE_KEY = 'i_doms_wo_monitor_carousel'
 const PARALLEL_VISIBLE = 4
-/** 小组卡内最多展示人数，其余折叠，保证分页高度稳定 */
-const GROUP_MEMBER_VISIBLE = 3
+/** 大组按块拆到多页：每块最多人数（轮播可看完全组，无人被折叠掉） */
+const GROUP_MEMBER_CHUNK = 8
 
 const route = useRoute()
 const router = useRouter()
@@ -356,7 +359,7 @@ const listStatus = ref(MONITOR_LIST_STATUS.RUNNING)
 const page = ref(1)
 const pageSize = ref(3)
 const workerPage = ref(1)
-/** 每页展示的「内容项」数：1 小组卡或 1 单工人 = 1 项（不含分区标题） */
+/** 每页展示的「内容项」数：1 小组分块卡或 1 单工人 = 1 项（不含分区标题） */
 const workerPageSize = ref(3)
 const tick = ref(0)
 
@@ -415,13 +418,40 @@ const totalPages = computed(() =>
 )
 
 /**
- * 工人区展平为可分页内容项（小组卡 / 单工人）。
+ * 工人区展平为可分页内容项。
+ * 大组按 GROUP_MEMBER_CHUNK 拆成多张续页卡，轮播可看完全员。
  * 分区标题不计入 pageSize，随当页首个同类型内容自动带出。
  */
 const workerContentItems = computed(() => {
   const items = []
   ;(dashboard.value.workers.groups || []).forEach((g) => {
-    items.push({ kind: 'group', id: `group-${g.id}`, data: g })
+    const members = g.members || []
+    const memberTotal = members.length
+    if (!memberTotal) {
+      items.push({
+        kind: 'group',
+        id: `group-${g.id}`,
+        data: g,
+        membersSlice: [],
+        chunkIndex: 0,
+        chunkTotal: 1,
+        memberTotal: 0,
+      })
+      return
+    }
+    const chunkTotal = Math.ceil(memberTotal / GROUP_MEMBER_CHUNK)
+    for (let i = 0; i < chunkTotal; i += 1) {
+      const start = i * GROUP_MEMBER_CHUNK
+      items.push({
+        kind: 'group',
+        id: `group-${g.id}-c${i}`,
+        data: g,
+        membersSlice: members.slice(start, start + GROUP_MEMBER_CHUNK),
+        chunkIndex: i,
+        chunkTotal,
+        memberTotal,
+      })
+    }
   })
   ;(dashboard.value.workers.individuals || []).forEach((w) => {
     items.push({ kind: 'person', id: w.id, data: w })
@@ -457,11 +487,6 @@ const pagedWorkerItems = computed(() => {
   })
   return out
 })
-
-function visibleGroupMembers(group) {
-  const members = group?.members || []
-  return members.slice(0, GROUP_MEMBER_VISIBLE)
-}
 
 watch([period, woType, workCenter, listStatus], () => {
   page.value = 1
@@ -529,9 +554,9 @@ function measurePageSizes() {
   }
   const wkEl = workerListEl.value
   if (wkEl?.clientHeight) {
-    // 小组卡约 150px、单工人行约 64px，取偏保守的每页条数，避免撑出滚动条
-    const est = 120
-    const n = Math.max(2, Math.min(5, Math.floor(wkEl.clientHeight / est)))
+    // 分块小组卡（最多 8 人）偏高，每页条数保守
+    const est = 160
+    const n = Math.max(1, Math.min(3, Math.floor(wkEl.clientHeight / est)))
     if (n !== workerPageSize.value) workerPageSize.value = n
   }
 }
@@ -1111,6 +1136,17 @@ watch(
 
 .worker-footer {
   flex-shrink: 0;
+}
+
+.group-chunk-badge {
+  margin-left: 6px;
+  font-size: 11px;
+  color: #9ad0ff;
+  background: rgba(58, 160, 255, 0.18);
+  border: 1px solid rgba(58, 160, 255, 0.35);
+  border-radius: 3px;
+  padding: 0 5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .group-more {

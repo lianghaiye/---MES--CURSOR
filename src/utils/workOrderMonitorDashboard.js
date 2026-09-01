@@ -510,6 +510,27 @@ function buildWorkerPanels(tasks) {
     const busyCount = memberRows.filter((m) => m.statusTone === 'busy').length
     const groupBusy = Boolean(groupTask) || busyCount > 0
 
+    // 看板演示：加工小组补足到 12 人，便于验收大组跨页分块
+    if (g.name === '加工小组' && memberRows.length < 12) {
+      const padNames = ['刘一', '陈二', '杨三', '黄四', '赵五', '周七', '吴八', '徐九', '孙十']
+      const exist = new Set(memberRows.map((m) => m.name))
+      for (const name of padNames) {
+        if (memberRows.length >= 12) break
+        if (exist.has(name)) continue
+        memberRows.push({
+          name,
+          isLeader: false,
+          status: groupBusy && leaderClaimedGroup ? '组内待命' : '空闲',
+          statusTone: groupBusy && leaderClaimedGroup ? 'standby' : 'idle',
+          sub:
+            groupBusy && leaderClaimedGroup
+              ? `小组任务进行中（${groupTask?.processName || '—'}）`
+              : '暂无进行中任务',
+          taskCount: 0,
+        })
+      }
+    }
+
     return {
       type: 'group',
       id: g.id,
