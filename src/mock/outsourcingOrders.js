@@ -78,6 +78,7 @@ export function createOutsourcingOrder(partial = {}) {
     settlementType: '先款后货',
     settlementCycle: '月结',
     settlementMethod: '现金结算',
+    shipWarehouse: '',
     remark: '',
     status: '待提交',
     issueStatus: '待出库',

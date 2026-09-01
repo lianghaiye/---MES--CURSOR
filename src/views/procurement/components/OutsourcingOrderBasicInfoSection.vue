@@ -76,6 +76,7 @@ const fields = computed(() => [
   { key: 'settlementType', label: '结算类型' },
   { key: 'settlementCycle', label: '结算周期' },
   { key: 'settlementMethod', label: '结算方式' },
+  { key: 'shipWarehouse', label: '预入仓库' },
   { key: 'updater', label: '更新人' },
   {
     key: 'updatedAt',

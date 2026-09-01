@@ -11,9 +11,16 @@
     @update:open="(val) => emit('update:open', val)"
   >
     <div class="wx-form-shell">
-      <div class="section-block">
-        <div class="section-title">基本信息</div>
-        <a-form layout="inline" class="header-form horizontal-form">
+      <div class="section-block" :class="{ 'is-collapsed': basicInfoCollapsed }">
+        <div class="section-title-row">
+          <span class="section-title">基本信息</span>
+          <a-button type="link" size="small" class="collapse-btn" @click="toggleBasicInfo">
+            {{ basicInfoCollapsed ? '展开' : '收起' }}
+            <DownOutlined v-if="basicInfoCollapsed" />
+            <UpOutlined v-else />
+          </a-button>
+        </div>
+        <a-form v-show="!basicInfoCollapsed" layout="inline" class="header-form horizontal-form">
           <a-row :gutter="[12, 12]" style="width: 100%">
             <a-col :span="6">
               <a-form-item label="外协单号">
@@ -116,6 +123,18 @@
                   v-model:value="form.settlementMethod"
                   size="small"
                   :options="settlementMethodOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="预入仓库">
+                <a-select
+                  v-model:value="form.shipWarehouse"
+                  size="small"
+                  allow-clear
+                  placeholder="请选择 预入仓库"
+                  :options="warehouseOpts"
+                  @change="onHeaderShipWarehouseChange"
                 />
               </a-form-item>
             </a-col>
@@ -392,9 +411,16 @@
 
 <script setup>
 import { computed, reactive, ref, watch, nextTick } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { PlusOutlined, CheckOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons-vue'
+import {
+  PlusOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  EditOutlined,
+  DownOutlined,
+  UpOutlined,
+} from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -441,6 +467,8 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 
 const taxModeExcluding = ref(true)
 const addingItems = ref(false)
+const basicInfoCollapsed = ref(false)
+const prevHeaderShipWarehouse = ref(undefined)
 const productPickerOpen = ref(false)
 const saving = ref(false)
 const remarkOpen = ref(false)
@@ -463,6 +491,7 @@ const form = reactive({
   settlementType: '先款后货',
   settlementCycle: '月结',
   settlementMethod: '现金结算',
+  shipWarehouse: undefined,
   remark: '',
   lineItems: [],
 })
@@ -575,9 +604,12 @@ function resetForm() {
   form.settlementType = '先款后货'
   form.settlementCycle = '月结'
   form.settlementMethod = '现金结算'
+  form.shipWarehouse = undefined
   form.remark = ''
   form.lineItems = []
   taxModeExcluding.value = true
+  basicInfoCollapsed.value = false
+  prevHeaderShipWarehouse.value = undefined
 }
 
 function loadEditForm(record) {
@@ -597,9 +629,12 @@ function loadEditForm(record) {
   form.settlementType = record.settlementType || '先款后货'
   form.settlementCycle = record.settlementCycle || '月结'
   form.settlementMethod = record.settlementMethod || '现金结算'
+  form.shipWarehouse = record.shipWarehouse || undefined
   form.remark = record.remark || ''
   form.lineItems = (record.lineItems || []).map((l) => ({ ...l }))
   taxModeExcluding.value = true
+  basicInfoCollapsed.value = false
+  prevHeaderShipWarehouse.value = form.shipWarehouse
 }
 
 watch(
@@ -615,6 +650,40 @@ watch(
 function onSalesOrderChange(val) {
   form.salesOrderNo = val || ''
   form.salesOrderId = ''
+}
+
+function toggleBasicInfo() {
+  basicInfoCollapsed.value = !basicInfoCollapsed.value
+}
+
+function syncLineShipWarehouses(warehouse) {
+  form.lineItems.forEach((line) => {
+    line.shipWarehouse = warehouse || ''
+  })
+}
+
+function onHeaderShipWarehouseChange(newVal) {
+  const oldVal = prevHeaderShipWarehouse.value
+  const changed = newVal !== oldVal
+  prevHeaderShipWarehouse.value = newVal
+
+  if (!changed || !form.lineItems.length) return
+
+  if (!oldVal && newVal) {
+    form.lineItems.forEach((line) => {
+      if (!line.shipWarehouse) line.shipWarehouse = newVal
+    })
+    return
+  }
+
+  if (!newVal) return
+
+  Modal.confirm({
+    title: '预入仓库已修改，是否同步修改明细预入仓库？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => syncLineShipWarehouses(newVal),
+  })
 }
 
 function openProductPicker() {
@@ -640,7 +709,7 @@ function mapPickerToLine(payload) {
     purchaseUnit: units.purchaseUnit,
     inventoryUnit: units.inventoryUnit,
     unitOptions: units.unitOptions,
-    shipWarehouse: '',
+    shipWarehouse: form.shipWarehouse || '',
     billingMethod: '按件数',
     unitPriceExTax: Number(payload.unitPrice) || 0,
     taxRate: Number(payload.inputTaxRate ?? 13),
@@ -770,6 +839,7 @@ function buildPayload() {
     settlementType: form.settlementType,
     settlementCycle: form.settlementCycle,
     settlementMethod: form.settlementMethod,
+    shipWarehouse: form.shipWarehouse || '',
     remark: form.remark || '',
     lineItems: form.lineItems.map((l) => ({ ...l })),
   }
@@ -788,6 +858,11 @@ function handleSave() {
     message.warning('请至少添加一条外协明细')
     return
   }
+  form.lineItems.forEach((line) => {
+    if (!line.shipWarehouse && form.shipWarehouse) {
+      line.shipWarehouse = form.shipWarehouse
+    }
+  })
   const bad = form.lineItems.find(
     (l) => !(Number(l.planQty) > 0) || !l.unit || !String(l.shipWarehouse || '').trim(),
   )
@@ -835,12 +910,39 @@ export default { name: 'CreateOutsourcingOrderModal' }
   padding: 12px;
   margin-bottom: 12px;
   border: 1px solid #f0f0f0;
-}
 
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 12px;
+  .section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .section-title-row .section-title {
+    margin-bottom: 0;
+  }
+
+  .collapse-btn {
+    padding-inline: 4px;
+    height: auto;
+    flex-shrink: 0;
+  }
+
+  &.is-collapsed {
+    padding-top: 10px;
+    padding-bottom: 10px;
+
+    .section-title-row {
+      margin-bottom: 0;
+    }
+  }
 }
 
 .horizontal-form {

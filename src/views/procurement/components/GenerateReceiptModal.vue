@@ -2,163 +2,203 @@
   <a-modal
     :open="open"
     title="采购收货单"
-    width="1280px"
+    width="96%"
     :mask-closable="false"
     destroy-on-close
+    wrap-class-name="generate-receipt-modal-wrap"
     @cancel="handleCancel"
   >
-    <a-form layout="inline" class="header-form horizontal-form">
-      <a-row :gutter="[12, 8]" style="width: 100%">
-        <a-col :span="6">
-          <a-form-item label="收货单号">
-            <a-input
-              v-model:value="form.receiptNo"
+    <div class="section-block">
+      <div class="section-title">基本信息</div>
+      <a-form layout="inline" class="header-form horizontal-form">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :span="6">
+            <a-form-item label="收货单号">
+              <a-input
+                v-model:value="form.receiptNo"
+                size="small"
+                allow-clear
+                :disabled="isMultiOrder"
+                :placeholder="
+                  isMultiOrder ? '多单时自动按采购单分别生成' : '留空自动生成 CGSH-年月日-流水'
+                "
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="采购单号" required>
+              <a-input :value="headerOrderNo" disabled size="small" :title="headerOrderNo" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="供应商">
+              <a-input :value="headerSupplier" disabled size="small" :title="headerSupplier" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="采购员">
+              <a-input :value="headerPurchaser" disabled size="small" :title="headerPurchaser" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="24">
+            <a-form-item label="备注" class="remark-item">
+              <a-textarea v-model:value="form.remark" :rows="2" placeholder="请输入备注" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </div>
+
+    <div class="section-block">
+      <div class="section-title">
+        采购订单 ({{ orderRows.length }})
+        <span class="section-hint">本次收货来源采购单，批量收货时展示多条</span>
+      </div>
+      <a-table
+        :columns="orderColumns"
+        :data-source="orderRows"
+        row-key="id"
+        size="small"
+        bordered
+        :pagination="false"
+        :scroll="{ x: 820 }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'inboundStatus'">
+            <a-tag :color="inboundStatusColor(record.inboundStatus)">
+              {{ record.inboundStatus || '—' }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'itemCount'">
+            {{ record.itemCount }}
+          </template>
+          <template v-else-if="column.key === 'purchaseQty'">
+            {{ formatQty(record.purchaseQty) }}
+          </template>
+          <template v-else>
+            {{ record[column.dataIndex] || '—' }}
+          </template>
+        </template>
+      </a-table>
+    </div>
+
+    <div class="section-block">
+      <div class="section-title">收货明细 ({{ displayLines.length }})</div>
+      <InboundLineScopeToggle v-model="lineScope" />
+
+      <a-table
+        :columns="columns"
+        :data-source="displayLines"
+        row-key="rowKey"
+        size="small"
+        bordered
+        :pagination="false"
+        :scroll="{ x: tableScrollX }"
+        :row-class-name="rowClassName"
+      >
+        <template #headerCell="{ column }">
+          <template v-if="column.key === 'inboundProgress'">
+            <span class="col-title-with-tip">
+              收货进度
+              <a-tooltip :title="INBOUND_PROGRESS_TOOLTIP">
+                <InfoCircleOutlined class="col-tip-icon" />
+              </a-tooltip>
+            </span>
+          </template>
+          <template v-else-if="column.required">
+            <span class="col-title-required">
+              <span class="required-star">*</span>{{ column.title }}
+            </span>
+          </template>
+          <template v-else>{{ column.title }}</template>
+        </template>
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'inboundProgress'">
+            {{
+              formatInboundProgress(record.receivedQty, record.appliedOccupyQty, record.purchaseQty)
+            }}
+          </template>
+          <template v-else-if="column.key === 'productName'">
+            <span class="product-name" :title="record.productName">{{
+              record.productName || '—'
+            }}</span>
+          </template>
+          <template v-else-if="column.key === 'purchaseQty'">
+            {{ formatQty(record.purchaseQty) }}
+          </template>
+          <template v-else-if="column.key === 'receivingWarehouse'">
+            <a-select
+              v-model:value="record.receivingWarehouse"
               size="small"
-              allow-clear
-              :disabled="isMultiOrder"
-              :placeholder="
-                isMultiOrder ? '多单时自动按采购单分别生成' : '留空自动生成 CGSH-年月日-流水'
-              "
+              style="width: 100%"
+              placeholder="请选择"
+              :options="warehouseOpts"
+              :disabled="record.locked"
+              :status="warehouseStatus(record)"
             />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="采购单号" required>
-            <a-input :value="headerOrderNo" disabled size="small" :title="headerOrderNo" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="供应商">
-            <a-input :value="headerSupplier" disabled size="small" :title="headerSupplier" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="采购员">
-            <a-input :value="headerPurchaser" disabled size="small" :title="headerPurchaser" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="24">
-          <a-form-item label="备注" class="remark-item">
-            <a-textarea v-model:value="form.remark" :rows="2" placeholder="请输入备注" />
-          </a-form-item>
-        </a-col>
-      </a-row>
-    </a-form>
-
-    <InboundLineScopeToggle v-model="lineScope" />
-
-    <a-table
-      :columns="columns"
-      :data-source="displayLines"
-      row-key="rowKey"
-      size="small"
-      bordered
-      :pagination="false"
-      :scroll="{ x: tableScrollX }"
-      :row-class-name="rowClassName"
-    >
-      <template #headerCell="{ column }">
-        <template v-if="column.key === 'inboundProgress'">
-          <span class="col-title-with-tip">
-            收货进度
-            <a-tooltip :title="INBOUND_PROGRESS_TOOLTIP">
-              <InfoCircleOutlined class="col-tip-icon" />
-            </a-tooltip>
-          </span>
+          </template>
+          <template v-else-if="column.key === 'receiptQty'">
+            <a-input-number
+              v-model:value="record.receiptQty"
+              size="small"
+              :min="0"
+              :max="record.remainingQty"
+              :precision="2"
+              style="width: 100%"
+              :disabled="record.locked"
+            />
+          </template>
+          <template v-else-if="column.key === 'settleUnit'">
+            {{ record.settleUnit || '—' }}
+          </template>
+          <template v-else-if="column.key === 'settleQty'">
+            <a-input-number
+              v-if="record.settleUnit"
+              v-model:value="record.settleQty"
+              size="small"
+              :min="0"
+              :precision="3"
+              style="width: 100%"
+              :disabled="record.locked"
+              placeholder="实重"
+            />
+            <span v-else>—</span>
+          </template>
+          <template v-else-if="column.key === 'receivingMode'">
+            <a-select
+              v-model:value="record.receivingMode"
+              size="small"
+              style="width: 100%"
+              :options="receivingModeOpts"
+              :disabled="record.locked"
+            />
+          </template>
+          <template v-else-if="column.key === 'remark'">
+            <LongTextEditCell
+              v-if="!record.locked"
+              :value="record.remark"
+              @edit="openRemarkEdit(record)"
+            />
+            <span v-else>{{ record.remark || '—' }}</span>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space :size="0">
+              <template v-if="!record.locked">
+                <a-button type="link" size="small" @click="openLineEdit(record)"> 编辑 </a-button>
+                <a-button type="link" size="small" danger @click="removeLine(record)">
+                  移出本单
+                </a-button>
+              </template>
+              <span v-else class="locked-tip">已满不可收货</span>
+            </a-space>
+          </template>
+          <template v-else>
+            {{ record[column.dataIndex] || '—' }}
+          </template>
         </template>
-        <template v-else-if="column.required">
-          <span class="col-title-required">
-            <span class="required-star">*</span>{{ column.title }}
-          </span>
-        </template>
-        <template v-else>{{ column.title }}</template>
-      </template>
-      <template #bodyCell="{ column, record, index }">
-        <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-        <template v-else-if="column.key === 'inboundProgress'">
-          {{
-            formatInboundProgress(record.receivedQty, record.appliedOccupyQty, record.purchaseQty)
-          }}
-        </template>
-        <template v-else-if="column.key === 'productName'">
-          <span class="product-name" :title="record.productName">{{
-            record.productName || '—'
-          }}</span>
-        </template>
-        <template v-else-if="column.key === 'purchaseQty'">
-          {{ formatQty(record.purchaseQty) }}
-        </template>
-        <template v-else-if="column.key === 'receivingWarehouse'">
-          <a-select
-            v-model:value="record.receivingWarehouse"
-            size="small"
-            style="width: 100%"
-            placeholder="请选择"
-            :options="warehouseOpts"
-            :disabled="record.locked"
-            :status="warehouseStatus(record)"
-          />
-        </template>
-        <template v-else-if="column.key === 'receiptQty'">
-          <a-input-number
-            v-model:value="record.receiptQty"
-            size="small"
-            :min="0"
-            :max="record.remainingQty"
-            :precision="2"
-            style="width: 100%"
-            :disabled="record.locked"
-          />
-        </template>
-        <template v-else-if="column.key === 'settleUnit'">
-          {{ record.settleUnit || '—' }}
-        </template>
-        <template v-else-if="column.key === 'settleQty'">
-          <a-input-number
-            v-if="record.settleUnit"
-            v-model:value="record.settleQty"
-            size="small"
-            :min="0"
-            :precision="3"
-            style="width: 100%"
-            :disabled="record.locked"
-            placeholder="实重"
-          />
-          <span v-else>—</span>
-        </template>
-        <template v-else-if="column.key === 'receivingMode'">
-          <a-select
-            v-model:value="record.receivingMode"
-            size="small"
-            style="width: 100%"
-            :options="receivingModeOpts"
-            :disabled="record.locked"
-          />
-        </template>
-        <template v-else-if="column.key === 'remark'">
-          <LongTextEditCell
-            v-if="!record.locked"
-            :value="record.remark"
-            @edit="openRemarkEdit(record)"
-          />
-          <span v-else>{{ record.remark || '—' }}</span>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space :size="0">
-            <template v-if="!record.locked">
-              <a-button type="link" size="small" @click="openLineEdit(record)"> 编辑 </a-button>
-              <a-button type="link" size="small" danger @click="removeLine(record)">
-                移出本单
-              </a-button>
-            </template>
-            <span v-else class="locked-tip">已满不可收货</span>
-          </a-space>
-        </template>
-        <template v-else>
-          {{ record[column.dataIndex] || '—' }}
-        </template>
-      </template>
-    </a-table>
+      </a-table>
+    </div>
 
     <a-modal
       v-model:open="remarkEdit.open"
@@ -320,6 +360,33 @@ const headerPurchaser = computed(() => {
   if (!list.length) return ''
   return list.length === 1 ? list[0] : list.join('、')
 })
+
+const orderColumns = [
+  { title: '采购单号', dataIndex: 'orderNo', key: 'orderNo', width: 160, ellipsis: true },
+  { title: '入库状态', key: 'inboundStatus', width: 100 },
+  { title: '供应商', dataIndex: 'supplier', key: 'supplier', width: 140, ellipsis: true },
+  { title: '采购项数', key: 'itemCount', width: 90, align: 'right' },
+  { title: '采购数量', key: 'purchaseQty', width: 110, align: 'right' },
+  { title: '采购员', dataIndex: 'purchaser', key: 'purchaser', width: 100 },
+]
+
+const orderRows = computed(() =>
+  sourceOrders.value.map((o) => ({
+    id: o.id,
+    orderNo: o.orderNo || '',
+    inboundStatus: o.inboundStatus || '待入库',
+    supplier: o.supplier || '',
+    itemCount: (o.lineItems || []).length,
+    purchaseQty:
+      o.totalQty ?? (o.lineItems || []).reduce((s, l) => s + (Number(l.purchaseQty) || 0), 0),
+    purchaser: o.purchaser || '',
+  })),
+)
+
+function inboundStatusColor(status) {
+  const map = { 待入库: 'default', 部分入库: 'warning', 已入库: 'success' }
+  return map[status] || 'default'
+}
 
 const displayLines = computed(() => filterInboundLinesByScope(receiptLines.value, lineScope.value))
 const lineEditId = ref('')
@@ -610,7 +677,7 @@ function handleConfirm() {
 
 <style lang="less" scoped>
 .header-form {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 
   :deep(.ant-form-item) {
     width: 100%;
@@ -627,6 +694,24 @@ function handleConfirm() {
       flex: 0 0 68px;
     }
   }
+}
+
+.section-block {
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.section-hint {
+  font-weight: 400;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .col-title-with-tip {
