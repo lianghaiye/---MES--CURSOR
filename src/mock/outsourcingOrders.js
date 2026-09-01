@@ -3,6 +3,7 @@
  */
 import dayjs from 'dayjs'
 import { formatLineBarcodeBatchNo } from '@/utils/outboundIssueLines'
+import { formatQty, roundNumber } from '@/utils/numberFormat'
 
 export const outsourcingStatusOptions = ['待提交', '待审核', '已拒绝', '进行中', '已完成', '已作废']
 
@@ -18,7 +19,7 @@ export function createOutsourcingLine(partial = {}) {
   const unitPriceInTax =
     partial.unitPriceInTax != null
       ? Number(partial.unitPriceInTax)
-      : Math.round(unitPriceExTax * (1 + taxRate / 100) * 100) / 100
+      : roundNumber(unitPriceExTax * (1 + taxRate / 100), 4)
   return {
     id: `wx-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     productName: '',
@@ -40,8 +41,8 @@ export function createOutsourcingLine(partial = {}) {
     taxRate,
     unitPriceExTax,
     unitPriceInTax,
-    totalPriceExTax: Math.round(planQty * unitPriceExTax * 100) / 100,
-    totalPriceInTax: Math.round(planQty * unitPriceInTax * 100) / 100,
+    totalPriceExTax: roundNumber(planQty * unitPriceExTax, 4),
+    totalPriceInTax: roundNumber(planQty * unitPriceInTax, 4),
     receivedQty: 0,
     appliedReceiptQty: 0,
     issuedQty: 0,
@@ -110,17 +111,21 @@ export function recalcOutsourcingTotals(order) {
 export function recalcOutsourcingLine(line, { fromInTax = false } = {}) {
   const qty = Number(line.planQty) || 0
   const rate = Number(line.taxRate) || 13
+  const round4 = (n) => {
+    const r = roundNumber(Number(n) || 0, 4)
+    return Number.isFinite(r) ? r : 0
+  }
   if (fromInTax) {
     const inTax = Number(line.unitPriceInTax) || 0
-    line.unitPriceExTax = Math.round((inTax / (1 + rate / 100)) * 100) / 100
+    line.unitPriceExTax = round4(inTax / (1 + rate / 100))
     line.unitPriceInTax = inTax
   } else {
     const ex = Number(line.unitPriceExTax) || 0
     line.unitPriceExTax = ex
-    line.unitPriceInTax = Math.round(ex * (1 + rate / 100) * 100) / 100
+    line.unitPriceInTax = round4(ex * (1 + rate / 100))
   }
-  line.totalPriceExTax = Math.round(qty * (Number(line.unitPriceExTax) || 0) * 100) / 100
-  line.totalPriceInTax = Math.round(qty * (Number(line.unitPriceInTax) || 0) * 100) / 100
+  line.totalPriceExTax = round4(qty * (Number(line.unitPriceExTax) || 0))
+  line.totalPriceInTax = round4(qty * (Number(line.unitPriceInTax) || 0))
   return line
 }
 
@@ -186,8 +191,7 @@ export function flattenOutsourcingIssueOutboundLines(order) {
 
 export function formatOutsourcingQtySummary(order) {
   const { lineCount, totalQty } = calcOutsourcingQtySummary(order)
-  const qtyText = Number.isFinite(totalQty) ? String(Number(totalQty.toFixed(4)).toString()) : '0'
-  return `${lineCount}行/${qtyText}`
+  return `${lineCount}行/${formatQty(totalQty)}`
 }
 
 /** WX- + YYMMDD + 3位流水，流水按月重置 */

@@ -2,7 +2,7 @@
  * 采购订单价格变更：状态、重算、汇总、审批展示
  * 交互对齐销售订单价格变更；采购无行折扣，仅改单价。
  */
-import { formatNumber } from '@/utils/numberFormat'
+import { formatNumber, roundNumber } from '@/utils/numberFormat'
 import { resolvePricingQty } from '@/utils/settleUnit'
 
 export const PURCHASE_PRICE_CHANGE_STATUS = {
@@ -30,7 +30,8 @@ export function purchasePriceChangeStatusColor(status) {
 }
 
 export function round2(n) {
-  return Math.round((Number(n) || 0) * 100) / 100
+  const r = roundNumber(Number(n) || 0, 4)
+  return Number.isFinite(r) ? r : 0
 }
 
 export function lineChangeAmount(qty, unitPrice) {
@@ -167,7 +168,7 @@ export function normalizePurchasePriceChangeRecord(record) {
   }
 }
 
-function formatGroupedSmartMoney(absVal, maxDecimals = 2) {
+function formatGroupedSmartMoney(absVal, maxDecimals = 4) {
   const text = formatNumber(absVal, maxDecimals, { empty: '' })
   if (!text) return '—'
   const neg = text.startsWith('-')

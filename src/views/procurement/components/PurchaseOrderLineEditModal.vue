@@ -75,7 +75,9 @@
               v-model:value="draft.taxRate"
               :min="0"
               :max="100"
-              :precision="2"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
               @change="recalcDraft"
             />
@@ -113,7 +115,9 @@
           <a-form-item label="总价（不含税）">
             <a-input-number
               :value="draft.totalPriceExTax"
-              :precision="2"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               disabled
               style="width: 100%"
             />
@@ -123,7 +127,9 @@
           <a-form-item label="总价（含税）">
             <a-input-number
               :value="draft.totalPriceInTax"
-              :precision="2"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               disabled
               style="width: 100%"
             />
@@ -165,7 +171,12 @@
 </template>
 
 <script setup>
-import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
+import {
+  formatQty,
+  inputNumberFormatter,
+  inputNumberParser,
+  roundNumber,
+} from '@/utils/numberFormat'
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -219,10 +230,10 @@ function recalcDraft() {
   const rate = Number(record.taxRate) || 0
   if (props.taxModeExcluding) {
     const ex = Number(record.unitPriceExTax) || 0
-    record.unitPriceInTax = Math.round(ex * (1 + rate / 100) * 100) / 100
+    record.unitPriceInTax = roundNumber(ex * (1 + rate / 100), 4)
   } else {
     const inc = Number(record.unitPriceInTax) || 0
-    record.unitPriceExTax = Math.round((inc / (1 + rate / 100)) * 100) / 100
+    record.unitPriceExTax = roundNumber(inc / (1 + rate / 100), 4)
   }
   recalcPoLine(record)
 }

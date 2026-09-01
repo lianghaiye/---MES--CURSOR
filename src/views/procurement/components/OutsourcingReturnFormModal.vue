@@ -152,7 +152,9 @@
             <a-input-number
               v-model:value="record.compensationAmount"
               :min="0"
-              :precision="2"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               size="small"
               style="width: 100%"
               :disabled="record.compensationMethod !== '赔款'"
@@ -216,6 +218,7 @@ import {
   buildReturnLinesFromOutsourcingOrder,
   formatQtyWithUnit,
 } from '@/utils/outsourcingReturnLine'
+import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import OutsourcingOrderSearchSelect from './OutsourcingOrderSearchSelect.vue'
 import OutsourcingReturnLineEditModal from './OutsourcingReturnLineEditModal.vue'
 

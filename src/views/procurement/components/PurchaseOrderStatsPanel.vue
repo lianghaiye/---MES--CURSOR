@@ -7,14 +7,9 @@ import { computed, ref } from 'vue'
 import ListPeriodStatsPanel from '@/components/ListPeriodStatsPanel.vue'
 import { calcPurchaseOrderDashboardStats } from '@/utils/purchaseOrderStats'
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
+import { formatQty } from '@/utils/numberFormat'
 
 const period = ref('本周')
-
-function formatQty(n) {
-  const v = Number(n) || 0
-  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v))
-  return String(Number(v.toFixed(4)))
-}
 
 function formatDeltaPlain(n) {
   const v = Number(n) || 0
@@ -44,7 +39,7 @@ const cards = computed(() => {
     {
       key: 'amount',
       title: '采购金额总计',
-      value: `¥${Number(s.amountExTax || 0).toFixed(2)}`,
+      value: `¥${formatQty(s.amountExTax || 0)}`,
       delta: c.amountExTax,
       iconClass: 'icon-shop',
     },

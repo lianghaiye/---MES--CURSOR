@@ -173,8 +173,8 @@
           当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
           <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
           共计 {{ filteredList.length }} 条数据，总计外协数量：{{
-            summary.totalQty.toLocaleString()
-          }}，加工总价含税：￥{{ summary.amountInTax.toFixed(2) }}元。
+            formatQty(summary.totalQty)
+          }}，加工总价含税：￥{{ formatQty(summary.amountInTax) }}元。
         </span>
       </template>
     </a-alert>
@@ -404,6 +404,7 @@ import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
+import { formatQty } from '@/utils/numberFormat'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -514,11 +515,7 @@ function rowIndex(index) {
 }
 
 function formatMoney(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  return formatQty(val)
 }
 
 function statusColor(status) {

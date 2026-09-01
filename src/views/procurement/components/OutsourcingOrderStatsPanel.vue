@@ -7,14 +7,9 @@ import { computed, ref } from 'vue'
 import ListPeriodStatsPanel from '@/components/ListPeriodStatsPanel.vue'
 import { calcOutsourcingOrderDashboardStats } from '@/utils/outsourcingOrderStats'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
+import { formatQty } from '@/utils/numberFormat'
 
 const period = ref('本周')
-
-function formatQty(n) {
-  const v = Number(n) || 0
-  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v))
-  return String(Number(v.toFixed(4)))
-}
 
 function formatDeltaPlain(n) {
   const v = Number(n) || 0
@@ -22,12 +17,12 @@ function formatDeltaPlain(n) {
 }
 
 function formatMoney(n) {
-  return `¥${Number(n || 0).toFixed(2)}`
+  return `¥${formatQty(n || 0)}`
 }
 
 function formatMoneyDelta(n) {
   const v = Number(n) || 0
-  const abs = Math.abs(v).toFixed(2)
+  const abs = formatQty(Math.abs(v))
   return v > 0 ? `+${abs}` : v < 0 ? `-${abs}` : abs
 }
 

@@ -202,6 +202,8 @@
                 v-model:value="record.planQty"
                 :min="0"
                 :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 size="small"
                 style="width: 100%"
                 @change="() => onLineChange(record)"
@@ -240,6 +242,8 @@
                 v-model:value="record.unitPriceExTax"
                 :min="0"
                 :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 size="small"
                 style="width: 100%"
                 @change="() => onLineChange(record)"
@@ -252,6 +256,8 @@
                 v-model:value="record.unitPriceInTax"
                 :min="0"
                 :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 size="small"
                 style="width: 100%"
                 @change="() => onLineChange(record, true)"
@@ -337,6 +343,8 @@
                 v-model:value="lineEditDraft.planQty"
                 :min="0"
                 :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
               />
             </a-form-item>
@@ -376,6 +384,8 @@
                 v-model:value="lineEditDraft.unitPriceExTax"
                 :min="0"
                 :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
               />
               <a-input-number
@@ -383,6 +393,8 @@
                 v-model:value="lineEditDraft.unitPriceInTax"
                 :min="0"
                 :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
               />
             </a-form-item>
@@ -426,7 +438,12 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
-import { formatQty } from '@/utils/numberFormat'
+import {
+  formatQty,
+  formatMoney,
+  inputNumberFormatter,
+  inputNumberParser,
+} from '@/utils/numberFormat'
 import { resolveReturnUnitDefaults } from '@/utils/purchaseReturnLine'
 import { mockInventory } from '@/mock/inventory'
 import {
@@ -570,14 +587,6 @@ const displayColumns = computed(() => {
       ]
   return [...before, ...orderedPrice, ...after]
 })
-
-function formatMoney(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
 
 function unitOptsFor(record) {
   const opts = record?.unitOptions?.length

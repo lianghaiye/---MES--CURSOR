@@ -1,12 +1,13 @@
 import dayjs from 'dayjs'
 import { ensureOrderSizeDefaults } from '@/utils/orderSize'
 import { estimateSettleQty } from '@/utils/settleUnit'
+import { roundNumber } from '@/utils/numberFormat'
 
 export function createPoLineItem(partial = {}) {
   const purchaseQty = partial.purchaseQty ?? 1
   const ex = Number(partial.unitPriceExTax) || 0
   const rate = partial.taxRate ?? 13
-  const inTax = Math.round(ex * (1 + rate / 100) * 100) / 100
+  const inTax = roundNumber(ex * (1 + rate / 100), 4)
   const sourceReqNos = Array.isArray(partial.sourceReqNos)
     ? [...partial.sourceReqNos]
     : String(partial.sourceReqNo || '')
@@ -58,8 +59,8 @@ export function createPoLineItem(partial = {}) {
     unitPriceExTax: ex,
     taxRate: rate,
     unitPriceInTax: inTax,
-    totalPriceExTax: Math.round(pricingQty * ex * 100) / 100,
-    totalPriceInTax: Math.round(pricingQty * inTax * 100) / 100,
+    totalPriceExTax: roundNumber(pricingQty * ex, 4),
+    totalPriceInTax: roundNumber(pricingQty * inTax, 4),
     deliveryDate: '',
     urgency: '正常',
     receivingMode: '正常收货',

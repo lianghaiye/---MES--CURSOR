@@ -32,7 +32,9 @@
             v-model:value="record.planPurchaseQty"
             size="small"
             :min="0"
-            :precision="2"
+            :precision="4"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="onRowChange(record)"
           />
@@ -94,7 +96,9 @@
             v-model:value="record.unitPriceExTax"
             size="small"
             :min="0"
-            :precision="2"
+            :precision="4"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="onRowChange(record)"
           />
@@ -106,22 +110,24 @@
             size="small"
             :min="0"
             :max="100"
-            :precision="2"
+            :precision="4"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="onRowChange(record)"
           />
         </template>
 
         <template v-else-if="column.key === 'unitPriceInTax'">
-          {{ formatNum(record.unitPriceInTax) }}
+          {{ formatQty(record.unitPriceInTax) }}
         </template>
 
         <template v-else-if="column.key === 'totalPriceExTax'">
-          {{ formatNum(record.totalPriceExTax) }}
+          {{ formatQty(record.totalPriceExTax) }}
         </template>
 
         <template v-else-if="column.key === 'totalPriceInTax'">
-          {{ formatNum(record.totalPriceInTax) }}
+          {{ formatQty(record.totalPriceInTax) }}
         </template>
 
         <template v-else-if="column.key === 'receivingMode'">
@@ -215,6 +221,8 @@
             v-model:value="batchEditValue"
             style="width: 100%"
             :precision="batchEditPrecision"
+            :formatter="batchEditUseQtyFormat ? inputNumberFormatter : undefined"
+            :parser="batchEditUseQtyFormat ? inputNumberParser : undefined"
           />
           <a-select
             v-else-if="batchEditType === 'select'"
@@ -278,6 +286,7 @@ import {
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
+import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -329,7 +338,7 @@ const editableKeys = [
 ]
 
 const batchEditMeta = {
-  planPurchaseQty: { label: '计划采购量', type: 'number', precision: 2 },
+  planPurchaseQty: { label: '计划采购量', type: 'number', precision: 4 },
   designatedSupplier: { label: '指定供应商', type: 'select', options: designatedSupplierOptions },
   supplierName: { label: '供应商名称', type: 'select', options: supplierOptions },
   settlementType: {
@@ -338,8 +347,8 @@ const batchEditMeta = {
     options: settlementTypeOptions.map((v) => ({ label: v, value: v })),
   },
   unit: { label: '采购单位', type: 'select', options: [] },
-  unitPriceExTax: { label: '不含税单价', type: 'number', precision: 2 },
-  taxRate: { label: '税率(%)', type: 'number', precision: 2 },
+  unitPriceExTax: { label: '不含税单价', type: 'number', precision: 4 },
+  taxRate: { label: '税率(%)', type: 'number', precision: 4 },
   receivingMode: {
     label: '收货模式',
     type: 'select',
@@ -445,6 +454,9 @@ const batchEditOptions = computed(() => {
   return batchEditMeta[key]?.options || []
 })
 const batchEditPrecision = computed(() => batchEditMeta[batchEditKey.value]?.precision ?? 2)
+const batchEditUseQtyFormat = computed(() =>
+  ['planPurchaseQty', 'unitPriceExTax', 'taxRate'].includes(batchEditKey.value),
+)
 const batchEditDateValue = computed(() =>
   batchEditValue.value ? dayjs(batchEditValue.value) : null,
 )
@@ -453,16 +465,16 @@ const summaryCells = computed(() => {
   const dataCols = columns.slice(1)
   return dataCols.map((col) => {
     if (col.key === 'demandQty') {
-      return { key: col.key, value: formatNum(totals.value.demandQty), align: 'right' }
+      return { key: col.key, value: formatQty(totals.value.demandQty), align: 'right' }
     }
     if (col.key === 'planPurchaseQty') {
-      return { key: col.key, value: formatNum(totals.value.planPurchaseQty), align: 'right' }
+      return { key: col.key, value: formatQty(totals.value.planPurchaseQty), align: 'right' }
     }
     if (col.key === 'totalPriceExTax') {
-      return { key: col.key, value: formatNum(totals.value.totalPriceExTax), align: 'right' }
+      return { key: col.key, value: formatQty(totals.value.totalPriceExTax), align: 'right' }
     }
     if (col.key === 'totalPriceInTax') {
-      return { key: col.key, value: formatNum(totals.value.totalPriceInTax), align: 'right' }
+      return { key: col.key, value: formatQty(totals.value.totalPriceInTax), align: 'right' }
     }
     return { key: col.key, value: '', align: undefined }
   })
@@ -496,11 +508,6 @@ watch(
     })
   },
 )
-
-function formatNum(val) {
-  const n = Number(val) || 0
-  return Number.isInteger(n) ? String(n) : n.toFixed(2)
-}
 
 function dateValue(val) {
   return val ? dayjs(val) : null

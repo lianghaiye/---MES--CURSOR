@@ -6,7 +6,7 @@ import {
   createLineItem,
   stampRequisitionLineSalesOrderNos,
 } from '@/mock/purchaseRequisitions'
-import { round2 } from '@/utils/purchaseMerge'
+import { round4 } from '@/utils/purchaseMerge'
 import {
   createPurchaseOrdersFromMergedLines,
   discardGeneratePurchaseOrderDraft,
@@ -531,7 +531,7 @@ export function buildRequisitionFromSalesOrder(salesOrder) {
     const qty = Number(line.salesQty) || Number(line.qty) || 0
     const ex = Number(line.unitPriceExTax) || 0
     const rate = line.taxRate ?? 13
-    const inTax = round2(ex * (1 + rate / 100))
+    const inTax = round4(ex * (1 + rate / 100))
     const lineDelivery = line.deliveryDate || deliveryDate
     return createLineItem({
       inventoryName: line.productName,
@@ -548,8 +548,8 @@ export function buildRequisitionFromSalesOrder(salesOrder) {
       unitPriceExTax: ex,
       taxRate: rate,
       unitPriceInTax: inTax,
-      totalPriceExTax: round2(qty * ex),
-      totalPriceInTax: round2(qty * inTax),
+      totalPriceExTax: round4(qty * ex),
+      totalPriceInTax: round4(qty * inTax),
       deliveryDate: lineDelivery,
       expectedArrivalDate: lineDelivery,
       salesOrderNo,

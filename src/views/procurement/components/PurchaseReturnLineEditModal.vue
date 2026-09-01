@@ -25,7 +25,9 @@
         <a-input-number
           v-model:value="form.settleQty"
           :min="0"
-          :precision="3"
+          :precision="4"
+          :formatter="inputNumberFormatter"
+          :parser="inputNumberParser"
           size="small"
           style="width: 100%"
           placeholder="实重/结算数量"
@@ -68,6 +70,7 @@ import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import { getDictOptions } from '@/store/systemDictStore'
+import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 
 const props = defineProps({
   open: { type: Boolean, default: false },

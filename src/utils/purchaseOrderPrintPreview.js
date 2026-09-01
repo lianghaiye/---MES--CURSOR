@@ -3,6 +3,7 @@
  */
 
 import { computePurchaseOrderOverdueStatus } from '@/mock/purchaseOrders'
+import { formatNumber } from '@/utils/numberFormat'
 
 const STORAGE_PREFIX = 'purchase-order-print-preview:'
 
@@ -23,10 +24,7 @@ function formatPrintMoney(val) {
   if (val == null || val === '') return ''
   const n = Number(val)
   if (!Number.isFinite(n)) return String(val)
-  return n.toLocaleString('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  return formatNumber(n, 4, { empty: '' })
 }
 
 function formatPrintTaxRate(val) {
@@ -36,7 +34,7 @@ function formatPrintTaxRate(val) {
   if (text.endsWith('%')) return text
   const n = Number(text)
   if (!Number.isFinite(n)) return text
-  return `${n}%`
+  return `${formatNumber(n, 4, { empty: '' })}%`
 }
 
 /** 构建单张采购订单打印数据（含明细） */

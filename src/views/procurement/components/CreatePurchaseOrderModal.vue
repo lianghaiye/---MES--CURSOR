@@ -426,7 +426,9 @@
                           v-model:value="record.taxRate"
                           :min="0"
                           :max="100"
-                          :precision="2"
+                          :precision="4"
+                          :formatter="inputNumberFormatter"
+                          :parser="inputNumberParser"
                           size="small"
                           style="width: 100%"
                           autofocus
@@ -682,7 +684,13 @@
 </template>
 
 <script setup>
-import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
+import {
+  formatQty,
+  formatMoney,
+  inputNumberFormatter,
+  inputNumberParser,
+  roundNumber,
+} from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -1157,8 +1165,7 @@ function onVariantConfigConfirm(payload) {
     if (taxModeExcluding.value) {
       target.unitPriceExTax = unitPrice
     } else {
-      target.unitPriceInTax =
-        Math.round(unitPrice * (1 + (Number(target.taxRate) || 13) / 100) * 100) / 100
+      target.unitPriceInTax = roundNumber(unitPrice * (1 + (Number(target.taxRate) || 13) / 100), 4)
     }
     target.taxRate = Number(master.inputTaxRate ?? target.taxRate ?? 13)
     target.unit = resolvePurchaseUnit(master)
@@ -1293,10 +1300,10 @@ function recalcLineWithMode(record) {
   const rate = Number(record.taxRate) || 0
   if (taxModeExcluding.value) {
     const ex = Number(record.unitPriceExTax) || 0
-    record.unitPriceInTax = Math.round(ex * (1 + rate / 100) * 100) / 100
+    record.unitPriceInTax = roundNumber(ex * (1 + rate / 100), 4)
   } else {
     const inc = Number(record.unitPriceInTax) || 0
-    record.unitPriceExTax = Math.round((inc / (1 + rate / 100)) * 100) / 100
+    record.unitPriceExTax = roundNumber(inc / (1 + rate / 100), 4)
   }
   recalcPoLine(record)
 }
@@ -1470,14 +1477,6 @@ function onLineEditSave(updated) {
   if (idx < 0) return
   Object.assign(form.lineItems[idx], updated)
   recalcLineWithMode(form.lineItems[idx])
-}
-
-function formatMoney(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
 }
 
 function handleSave() {

@@ -190,7 +190,11 @@
             {{ formatOutsourcingDetailMoney(record.unitPriceExTax) }}
           </template>
           <template v-else-if="column.key === 'taxRate'">
-            {{ record.taxRate != null && record.taxRate !== '' ? `${record.taxRate}%` : '—' }}
+            {{
+              record.taxRate != null && record.taxRate !== ''
+                ? `${formatOutsourcingDetailQty(record.taxRate)}%`
+                : '—'
+            }}
           </template>
           <template v-else-if="column.key === 'unitPriceInTax'">
             {{ formatOutsourcingDetailMoney(record.unitPriceInTax) }}

@@ -86,7 +86,9 @@
             v-model:value="record.planPurchaseQty"
             size="small"
             :min="0"
-            :precision="2"
+            :precision="4"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="onRowChange(record)"
           />
@@ -121,7 +123,9 @@
               v-model:value="record.settleQty"
               size="small"
               :min="0"
-              :precision="3"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
               placeholder="选填预估"
               @change="onSettleQtyChange(record)"
@@ -177,11 +181,13 @@
             v-model:value="record.unitPriceExTax"
             size="small"
             :min="0"
-            :precision="2"
+            :precision="4"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="onRowChange(record)"
           />
-          <span v-else>{{ formatNum(record.unitPriceExTax) }}</span>
+          <span v-else>{{ formatQty(record.unitPriceExTax) }}</span>
         </template>
 
         <template v-else-if="column.key === 'taxRate'">
@@ -190,7 +196,9 @@
             size="small"
             :min="0"
             :max="100"
-            :precision="2"
+            :precision="4"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="onRowChange(record)"
           />
@@ -202,17 +210,19 @@
             v-model:value="record.unitPriceInTax"
             size="small"
             :min="0"
-            :precision="2"
+            :precision="4"
+            :formatter="inputNumberFormatter"
+            :parser="inputNumberParser"
             style="width: 100%"
             @change="onRowChange(record)"
           />
-          <span v-else>{{ formatNum(record.unitPriceInTax) }}</span>
+          <span v-else>{{ formatQty(record.unitPriceInTax) }}</span>
         </template>
         <template v-else-if="column.key === 'totalPriceExTax'">
-          {{ formatNum(record.totalPriceExTax) }}
+          {{ formatQty(record.totalPriceExTax) }}
         </template>
         <template v-else-if="column.key === 'totalPriceInTax'">
-          {{ formatNum(record.totalPriceInTax) }}
+          {{ formatQty(record.totalPriceInTax) }}
         </template>
 
         <template v-else-if="column.key === 'receivingMode'">
@@ -350,7 +360,9 @@
               <a-input-number
                 v-model:value="lineEditDraft.planPurchaseQty"
                 :min="0"
-                :precision="2"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
               />
             </a-form-item>
@@ -377,7 +389,9 @@
               <a-input-number
                 v-model:value="lineEditDraft.settleQty"
                 :min="0"
-                :precision="3"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
                 placeholder="有标准单重时可自动预估"
               />
@@ -406,14 +420,18 @@
                 v-if="taxModeExcluding"
                 v-model:value="lineEditDraft.unitPriceExTax"
                 :min="0"
-                :precision="2"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
               />
               <a-input-number
                 v-else
                 v-model:value="lineEditDraft.unitPriceInTax"
                 :min="0"
-                :precision="2"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
               />
             </a-form-item>
@@ -424,7 +442,9 @@
                 v-model:value="lineEditDraft.taxRate"
                 :min="0"
                 :max="100"
-                :precision="2"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 style="width: 100%"
               />
             </a-form-item>
@@ -559,6 +579,7 @@ import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { calcTableScrollX, getColumnKey } from '@/utils/tableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
+import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 
 defineOptions({ name: 'GeneratePurchaseOrderView' })
 
@@ -794,16 +815,8 @@ watch(
   { immediate: true },
 )
 
-function formatNum(val) {
-  const n = Number(val) || 0
-  return Number.isInteger(n) ? String(n) : n.toFixed(2)
-}
-
 function formatStockQty(val) {
-  if (val == null || val === '') return '—'
-  const n = Number(val)
-  if (!Number.isFinite(n)) return '—'
-  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(4)))
+  return formatQty(val)
 }
 
 function dateValue(val) {

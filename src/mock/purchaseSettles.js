@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { roundNumber } from '@/utils/numberFormat'
 
 export const PURCHASE_SETTLE_STATUS = {
   DRAFT: '草稿',
@@ -19,7 +20,7 @@ export function createPurchaseSettleLine(partial = {}) {
     settleUnit: '',
     settleQty,
     unitPrice,
-    amount: Math.round(settleQty * unitPrice * 100) / 100,
+    amount: roundNumber(settleQty * unitPrice, 4),
     ...partial,
   }
 }

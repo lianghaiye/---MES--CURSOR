@@ -5,6 +5,7 @@ import {
   formatInboundProgress,
 } from '@/utils/purchaseLineInbound'
 import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
+import { formatQty } from '@/utils/numberFormat'
 
 function lineProductName(line) {
   return line.productName || line.itemName || ''
@@ -140,16 +141,11 @@ export function filterPurchaseDetailLines(rows, filters = {}) {
 }
 
 export function formatPurchaseDetailQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+  return formatQty(val)
 }
 
 export function formatPurchaseDetailMoney(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  return formatQty(val)
 }
 
 export function formatPurchaseDetailDate(val) {

@@ -174,7 +174,11 @@
             {{ formatPurchaseDetailMoney(record.unitPriceExTax) }}
           </template>
           <template v-else-if="column.key === 'taxRate'">
-            {{ record.taxRate != null && record.taxRate !== '' ? `${record.taxRate}%` : '—' }}
+            {{
+              record.taxRate != null && record.taxRate !== ''
+                ? `${formatPurchaseDetailQty(record.taxRate)}%`
+                : '—'
+            }}
           </template>
           <template v-else-if="column.key === 'unitPriceInTax'">
             {{ formatPurchaseDetailMoney(record.unitPriceInTax) }}

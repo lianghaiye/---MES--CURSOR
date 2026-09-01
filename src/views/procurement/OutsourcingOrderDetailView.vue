@@ -110,6 +110,9 @@
                   <template v-else-if="column.key === 'planQty'">
                     {{ formatQty(line.planQty) }}
                   </template>
+                  <template v-else-if="column.key === 'taxRate'">
+                    {{ formatQty(line.taxRate) }}
+                  </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
                     {{ formatMoney(line.unitPriceExTax) }}
                   </template>
@@ -551,11 +554,7 @@ function loadRecord() {
 watch(() => route.params.id, loadRecord, { immediate: true })
 
 function formatMoney(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  return formatQty(val)
 }
 
 function statusColor(status) {

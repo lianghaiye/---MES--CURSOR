@@ -10,6 +10,8 @@
  * 批次回退通过 registerSettleBatchWeightLookup 注入，避免与 stockBatchStore 循环依赖。
  */
 
+import { roundNumber } from '@/utils/numberFormat'
+
 /** @type {null | ((itemCode: string) => number|null)} */
 let batchWeightLookup = null
 
@@ -138,5 +140,6 @@ export function validateSettleUnitOnMaster(form = {}) {
 }
 
 function roundQty(val) {
-  return Math.round((Number(val) || 0) * 1000) / 1000
+  const r = roundNumber(Number(val) || 0, 4)
+  return Number.isFinite(r) ? r : 0
 }

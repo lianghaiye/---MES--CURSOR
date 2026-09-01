@@ -83,7 +83,7 @@
                   <template v-else-if="column.key === 'compensationAmount'">
                     {{
                       line.compensationMethod === '赔款' && line.compensationAmount != null
-                        ? Number(line.compensationAmount).toFixed(2)
+                        ? formatQty(line.compensationAmount)
                         : '—'
                     }}
                   </template>

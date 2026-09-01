@@ -158,7 +158,9 @@
               v-model:value="record.settleQty"
               size="small"
               :min="0"
-              :precision="3"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               style="width: 100%"
               :disabled="record.locked"
               placeholder="实重"
@@ -314,7 +316,7 @@ import {
 } from '@/utils/purchaseLineInbound'
 import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
 import { estimateSettleQty } from '@/utils/settleUnit'
-import { formatNumber } from '@/utils/numberFormat'
+import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import LongTextEditCell from '@/components/LongTextEditCell.vue'
 import InboundLineScopeToggle from '@/components/InboundLineScopeToggle.vue'
 import { filterInboundLinesByScope } from '@/utils/inboundLineScope'

@@ -10,6 +10,8 @@ import { purchaseOrderState } from '@/store/purchaseOrderStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { getRemainSettleQty, hasSettleUnit, resolvePricingQty } from '@/utils/settleUnit'
 
+import { roundNumber } from '@/utils/numberFormat'
+
 export const purchaseSettleState = reactive({
   settles: seedPurchaseSettles(),
 })
@@ -21,7 +23,8 @@ function nextSettleNo() {
 }
 
 function round2(n) {
-  return Math.round((Number(n) || 0) * 100) / 100
+  const r = roundNumber(Number(n) || 0, 4)
+  return Number.isFinite(r) ? r : 0
 }
 
 export function listPurchaseSettles() {

@@ -51,7 +51,9 @@
         <a-input-number
           v-model:value="form.compensationAmount"
           :min="0"
-          :precision="2"
+          :precision="4"
+          :formatter="inputNumberFormatter"
+          :parser="inputNumberParser"
           size="small"
           style="width: 100%"
           :disabled="form.compensationMethod !== '赔款'"
@@ -68,6 +70,7 @@
 <script setup>
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 
 const props = defineProps({
   open: { type: Boolean, default: false },

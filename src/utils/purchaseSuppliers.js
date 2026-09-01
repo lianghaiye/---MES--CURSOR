@@ -2,6 +2,7 @@
 
 import { SUPPLIER_ROLE } from '@/constants/supplierMaster'
 import { getAllSupplierOptions } from '@/utils/supplierSelect'
+import { roundNumber } from '@/utils/numberFormat'
 
 export const PURCHASE_CURRENCY_OPTIONS = [
   { label: 'CNY', value: 'CNY' },
@@ -44,7 +45,7 @@ export function calcPurchasePriceInclTax(unitPriceExTax, inputTaxRate) {
   if (!Number.isFinite(ex)) return null
   const rate = Number(inputTaxRate)
   const r = Number.isFinite(rate) ? rate : 0
-  return Number((ex * (1 + r / 100)).toFixed(2))
+  return roundNumber(ex * (1 + r / 100), 4)
 }
 
 const ROLE_ORDER = [SUPPLIER_ROLE.OUTSOURCE, SUPPLIER_ROLE.PURCHASE]

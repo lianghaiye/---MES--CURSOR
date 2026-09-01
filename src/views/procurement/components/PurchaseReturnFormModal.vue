@@ -134,7 +134,9 @@
               v-if="record.settleUnit"
               v-model:value="record.settleQty"
               :min="0"
-              :precision="3"
+              :precision="4"
+              :formatter="inputNumberFormatter"
+              :parser="inputNumberParser"
               size="small"
               style="width: 100%"
               placeholder="实重"
@@ -227,6 +229,7 @@ import {
   canEditPurchaseReturn,
 } from '@/store/purchaseReturnStore'
 import { buildReturnLinesFromPurchaseOrder, formatQtyWithUnit } from '@/utils/purchaseReturnLine'
+import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import PurchaseOrderSearchSelect from './PurchaseOrderSearchSelect.vue'
 import PurchaseReturnLineEditModal from './PurchaseReturnLineEditModal.vue'
 

@@ -190,6 +190,9 @@
                   v-model:value="record.planQty"
                   size="small"
                   :min="0"
+                  :precision="4"
+                  :formatter="inputNumberFormatter"
+                  :parser="inputNumberParser"
                   style="width: 100%"
                   autofocus
                   @blur="endEdit"
@@ -285,6 +288,7 @@ import { buildPurchaseRequisitionRows, resolveAssemblyDate } from '@/utils/mater
 import { buildRequisitionFromPlanRows } from '@/store/purchaseRequisitionStore'
 import PlanSupplierSelect from './PlanSupplierSelect.vue'
 import LongTextEditCell from '@/components/LongTextEditCell.vue'
+import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -535,10 +539,10 @@ function formatCell(record, key, text) {
   if (key === 'orderSizeText') return record.orderSizeText || record.blankSizeText || text || '—'
   if (key === 'convertHint') return formatConvertHint(record)
   if (key === 'planQty') {
-    const qty = Number(record.planQty)
+    const qty = formatQty(record.planQty)
     const unit = record.unit || record.purchaseUnit || ''
-    if (!Number.isFinite(qty)) return text ?? '—'
-    return unit ? `${qty} ${unit}` : String(qty)
+    if (qty === '—') return text ?? '—'
+    return unit ? `${qty} ${unit}` : qty
   }
   if (
     key === 'demandQty' ||

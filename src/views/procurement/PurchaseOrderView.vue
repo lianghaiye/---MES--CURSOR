@@ -159,9 +159,9 @@
           当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
           <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
           共计 {{ filteredList.length }} 条数据，总计采购数量：{{
-            summary.totalQty.toLocaleString()
-          }}，总计采购金额含税：￥{{ summary.amountInTax.toFixed(2) }}元，不含税：￥{{
-            summary.amountExTax.toFixed(2)
+            formatQty(summary.totalQty)
+          }}，总计采购金额含税：￥{{ formatQty(summary.amountInTax) }}元，不含税：￥{{
+            formatQty(summary.amountExTax)
           }}元。
         </span>
       </template>
@@ -393,6 +393,7 @@ import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
+import { formatQty } from '@/utils/numberFormat'
 import {
   canApplyPurchasePriceChange,
   getPendingPurchasePriceChange,

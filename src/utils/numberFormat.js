@@ -36,6 +36,11 @@ export function formatQty(val, maxDecimals = 4) {
   return formatNumber(val, maxDecimals)
 }
 
+/** 金额/单价/税率展示（最多 4 位，有几位显示几位） */
+export function formatMoney(val, maxDecimals = 4) {
+  return formatNumber(val, maxDecimals)
+}
+
 /** 数量与单位合并，如「20 个」「36 米」 */
 export function formatQtyWithUnit(val, unit, maxDecimals = 4) {
   const q = formatQty(val, maxDecimals)

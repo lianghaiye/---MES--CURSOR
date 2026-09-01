@@ -5,6 +5,7 @@ import {
   formatWxInboundProgress,
 } from '@/utils/outsourcingInbound'
 import { formatOutsourcingPlanDateDisplay } from '@/mock/outsourcingOrders'
+import { formatQty } from '@/utils/numberFormat'
 
 function lineProductName(line) {
   return line.productName || line.itemName || ''
@@ -141,16 +142,11 @@ export function filterOutsourcingDetailLines(rows, filters = {}) {
 }
 
 export function formatOutsourcingDetailQty(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 })
+  return formatQty(val)
 }
 
 export function formatOutsourcingDetailMoney(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  return formatQty(val)
 }
 
 export function formatOutsourcingDetailDate(val) {

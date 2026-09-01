@@ -47,6 +47,9 @@
             <template v-if="column.key === 'amount'">
               {{ formatMoney(row.amount) }}
             </template>
+            <template v-else-if="column.key === 'settleQty' || column.key === 'unitPrice'">
+              {{ formatMoney(row[column.dataIndex]) }}
+            </template>
             <template v-else>
               {{ row[column.dataIndex] ?? '—' }}
             </template>
@@ -71,6 +74,7 @@ import {
   deletePurchaseSettle,
   purchaseSettleState,
 } from '@/store/purchaseSettleStore'
+import { formatNumber } from '@/utils/numberFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -93,7 +97,7 @@ const columns = [
 function formatMoney(v) {
   const n = Number(v)
   if (!Number.isFinite(n)) return '—'
-  return n.toFixed(2)
+  return formatNumber(n, 4)
 }
 
 function goBack() {

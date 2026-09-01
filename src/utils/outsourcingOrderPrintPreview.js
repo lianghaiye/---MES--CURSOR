@@ -2,6 +2,8 @@
  * 外协订单打印：派单工 / 发料出库单
  */
 
+import { formatNumber } from '@/utils/numberFormat'
+
 export const OUTSOURCING_PRINT_TEMPLATE = {
   DISPATCH: '派单工',
   ISSUE: '发料出库单',
@@ -26,10 +28,7 @@ function formatPrintMoney(val) {
   if (val == null || val === '') return ''
   const n = Number(val)
   if (!Number.isFinite(n)) return String(val)
-  return n.toLocaleString('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  return formatNumber(n, 4, { empty: '' })
 }
 
 /** 计划日期：开始日期 ~ 结束日期 */

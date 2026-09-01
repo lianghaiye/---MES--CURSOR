@@ -8,7 +8,8 @@ import {
 } from '@/mock/purchaseOrders'
 import { ensureCrossDemoPurchaseOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureSettleUnitDemoPurchaseOrders } from '@/mock/settleUnitPurchaseDemoSeed'
-import { round2 } from '@/utils/purchaseMerge'
+import { round4 } from '@/utils/purchaseMerge'
+import { roundNumber } from '@/utils/numberFormat'
 import {
   calcPoHeaderInboundStatus,
   calcPoLineInboundStatus,
@@ -756,9 +757,9 @@ export function recalcPoLine(line) {
   const qty = resolvePricingQty(line)
   const ex = Number(line.unitPriceExTax) || 0
   const rate = Number(line.taxRate) || 0
-  line.unitPriceInTax = round2(ex * (1 + rate / 100))
-  line.totalPriceExTax = round2(qty * ex)
-  line.totalPriceInTax = round2(qty * line.unitPriceInTax)
+  line.unitPriceInTax = round4(ex * (1 + rate / 100))
+  line.totalPriceExTax = round4(qty * ex)
+  line.totalPriceInTax = round4(qty * line.unitPriceInTax)
   return line
 }
 
@@ -788,8 +789,9 @@ function mergeOrPushPoLines(target, lines) {
         (l) => lineMaterialCode(l) === code && (l.unit || '') === (src.unit || ''),
       )
     if (existing) {
-      existing.purchaseQty = round2(
+      existing.purchaseQty = roundNumber(
         (Number(existing.purchaseQty) || 0) + (Number(src.purchaseQty) || 0),
+        4,
       )
       const mergedReqNos = [
         ...new Set(

@@ -171,6 +171,9 @@
                   <template v-else-if="column.key === 'sourceReqNo'">
                     {{ line.sourceReqNo || (line.sourceReqNos || []).join(',') || '—' }}
                   </template>
+                  <template v-else-if="column.key === 'taxRate'">
+                    {{ formatQty(line.taxRate) }}
+                  </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
                     {{ formatMoney(line.unitPriceExTax) }}
                   </template>
@@ -832,11 +835,7 @@ function urgencyColor(urgency) {
 }
 
 function formatMoney(val) {
-  if (val == null || val === '') return '—'
-  return Number(val).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  return formatQty(val)
 }
 
 function openPrint() {

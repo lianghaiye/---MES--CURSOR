@@ -202,7 +202,9 @@
                       v-model:value="record.planPurchaseQty"
                       size="small"
                       :min="0"
-                      :precision="2"
+                      :precision="4"
+                      :formatter="inputNumberFormatter"
+                      :parser="inputNumberParser"
                       style="width: 100%"
                       @change="onQtyChange(record)"
                     />
@@ -310,7 +312,7 @@
 </template>
 
 <script setup>
-import { formatQty } from '@/utils/numberFormat'
+import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'

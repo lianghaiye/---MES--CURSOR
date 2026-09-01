@@ -112,6 +112,7 @@ import {
   deletePurchaseSettle,
 } from '@/store/purchaseSettleStore'
 import GeneratePurchaseSettleModal from './components/GeneratePurchaseSettleModal.vue'
+import { formatNumber } from '@/utils/numberFormat'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -165,7 +166,7 @@ const pagedList = computed(() => {
 function formatMoney(v) {
   const n = Number(v)
   if (!Number.isFinite(n)) return '—'
-  return n.toFixed(2)
+  return formatNumber(n, 4)
 }
 
 function handleSearch() {

@@ -138,7 +138,7 @@
         <span>
           当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
           <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
-          共计 {{ filteredList.length }} 条数据，总计采购数量：{{ summary.plannedQty.toFixed(4) }}。
+          共计 {{ filteredList.length }} 条数据，总计采购数量：{{ formatQty(summary.plannedQty) }}。
         </span>
       </template>
     </a-alert>

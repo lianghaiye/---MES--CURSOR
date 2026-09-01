@@ -72,7 +72,7 @@
             v-if="!isReview && taxModeExcluding"
             v-model:value="record.newUnitPriceExTax"
             :min="0"
-            :precision="2"
+            :precision="4"
             :formatter="inputNumberFormatter"
             :parser="inputNumberParser"
             style="width: 100%"
@@ -85,7 +85,7 @@
             v-if="!isReview && !taxModeExcluding"
             v-model:value="record.newUnitPriceInTax"
             :min="0"
-            :precision="2"
+            :precision="4"
             :formatter="inputNumberFormatter"
             :parser="inputNumberParser"
             style="width: 100%"
@@ -104,7 +104,7 @@
           </span>
         </template>
         <template v-else-if="column.key === 'taxRate'">
-          {{ record.taxRate ?? '—' }}
+          {{ record.taxRate != null && record.taxRate !== '' ? formatNumber(record.taxRate) : '—' }}
         </template>
         <template v-else>
           {{ record[column.dataIndex] || '—' }}
@@ -161,7 +161,7 @@ export default { name: 'PurchasePriceChangeModal' }
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
+import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import {
   PURCHASE_PRICE_CHANGE_REASON_OPTIONS,
   PURCHASE_PRICE_CHANGE_STATUS,

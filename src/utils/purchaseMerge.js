@@ -2,13 +2,24 @@
 
 import { resolveOrderSizeFromPlan } from '@/utils/orderSize'
 import { hasSettleUnit, resolveSettleEstimateRate, resolveSettleUnit } from '@/utils/settleUnit'
+import { roundNumber } from '@/utils/numberFormat'
+
+function roundQty(n) {
+  const r = roundNumber(Number(n) || 0, 4)
+  return Number.isFinite(r) ? r : 0
+}
+
+/** 金额 / 单价 / 税率 / 结算数量：最多 4 位小数 */
+export function round4(n) {
+  return roundQty(n)
+}
 
 export function round2(n) {
-  return Math.round((Number(n) || 0) * 100) / 100
+  return roundQty(n)
 }
 
 function roundSettleQty(n) {
-  return Math.round((Number(n) || 0) * 1000) / 1000
+  return roundQty(n)
 }
 
 /** 紧急度优先级：特急 > 紧急/加急 > 正常 */
@@ -61,13 +72,13 @@ export function recalcMergedLine(line, taxModeExcluding = true, options = {}) {
   const rate = Number(line.taxRate) || 0
   if (taxModeExcluding) {
     const ex = Number(line.unitPriceExTax) || 0
-    line.unitPriceInTax = round2(ex * (1 + rate / 100))
+    line.unitPriceInTax = round4(ex * (1 + rate / 100))
   } else {
     const inc = Number(line.unitPriceInTax) || 0
-    line.unitPriceExTax = round2(inc / (1 + rate / 100))
+    line.unitPriceExTax = round4(inc / (1 + rate / 100))
   }
-  line.totalPriceExTax = round2(pricingQty * (Number(line.unitPriceExTax) || 0))
-  line.totalPriceInTax = round2(pricingQty * (Number(line.unitPriceInTax) || 0))
+  line.totalPriceExTax = round4(pricingQty * (Number(line.unitPriceExTax) || 0))
+  line.totalPriceInTax = round4(pricingQty * (Number(line.unitPriceInTax) || 0))
   return line
 }
 
@@ -177,8 +188,8 @@ export function mergeRequisitionLines(requisitions, options = {}) {
         return
       }
 
-      existing.demandQty = round2(existing.demandQty + (Number(line.demandQty) || 0))
-      existing.planPurchaseQty = round2(
+      existing.demandQty = roundQty(existing.demandQty + (Number(line.demandQty) || 0))
+      existing.planPurchaseQty = roundQty(
         existing.planPurchaseQty + (Number(line.planPurchaseQty) || 0),
       )
       existing.stockQty = Math.min(existing.stockQty, Number(line.stockQty) || 0)

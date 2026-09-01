@@ -60,7 +60,9 @@
             size="small"
             :min="0"
             :max="record.remainSettleQty"
-            :precision="3"
+            :precision="4"
+            :formatter="formatSettleQtyInput"
+            :parser="parseSettleQtyInput"
             style="width: 100%"
             @change="() => onQtyChange(record)"
           />
@@ -91,6 +93,15 @@ import {
   createSettleFromPurchaseOrder,
   listSettleableInboundLines,
 } from '@/store/purchaseSettleStore'
+import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
+
+function formatSettleQtyInput(value) {
+  return inputNumberFormatter(value)
+}
+
+function parseSettleQtyInput(value) {
+  return inputNumberParser(value)
+}
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -165,7 +176,7 @@ function filterOption(input, option) {
 function formatMoney(v) {
   const n = Number(v)
   if (!Number.isFinite(n)) return '—'
-  return n.toFixed(2)
+  return formatNumber(n, 4)
 }
 
 function onPoChange(id) {
