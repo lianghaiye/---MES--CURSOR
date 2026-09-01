@@ -384,6 +384,8 @@ export const routeTitles = {
   '/qms/trace': '质量追溯',
   '/equipment/devices': '设备管理',
   '/report/overview': '报表中心',
+  '/board/work-order-monitor': '工单监管看板',
+  '/board/work-order-monitor/screen': '工单监管看板',
   '/basic-config/employee-groups': '员工组别',
   '/basic-config/defect-items': '不良品项',
   '/basic-config/material-grades': '材质管理',
