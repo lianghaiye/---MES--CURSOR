@@ -638,7 +638,8 @@ export function resolveMonitorBatchLabel(o) {
 function mapMonitorListRow(o) {
   const planRange = resolvePlanDateRange(o)
   const overdue = isMonitorWorkOrderOverdue(o)
-  return {
+  const routeSteps = buildProcessRouteSteps(o)
+  const row = {
     id: o.id,
     orderNo: o.orderNo || o.workOrderNo || o.id,
     name: o.name || o.productName || o.itemName || '—',
@@ -657,12 +658,56 @@ function mapMonitorListRow(o) {
     planEnd: resolvePlanEndDate(o),
     actualStart: o.executedAt || o.dispatchedAt || '',
     listPath: o.listPath,
-    routeSteps: buildProcessRouteSteps(o),
+    routeSteps,
   }
+  row.heightUnits = resolveMonitorRowHeightUnits(row, false)
+  return row
+}
+
+/** 一页固定可放的串行高度格数（6 张串行，或 1 并行折叠 + 4 串行 等） */
+export const MONITOR_PAGE_SLOT_UNITS = 6
+/** 并行工序默认展示条数（2×2），折叠时固定占 2 格 */
+export const MONITOR_PARALLEL_DEFAULT_VISIBLE = 4
+
+/**
+ * 列表高度格数：
+ * - 串行 = 1
+ * - 并行折叠（默认前 4 道）= 2
+ * - 并行展开后，每多展示一道工序 +1 格
+ */
+export function resolveMonitorRowHeightUnits(row, expanded = false) {
+  const parallelStep = (row.routeSteps || []).find((s) => s.parallel)
+  if (!parallelStep) return 1
+  const n = (parallelStep.nodes || []).length
+  if (!expanded || n <= MONITOR_PARALLEL_DEFAULT_VISIBLE) return 2
+  return 2 + (n - MONITOR_PARALLEL_DEFAULT_VISIBLE)
 }
 
 /**
- * @param {{ period: string, woType: string, workCenter: string, listStatus: string, page: number, pageSize: number }} filters
+ * 按高度格数装箱分页：串行 1 格、并行折叠 2 格；展开后按 resolveMonitorRowHeightUnits。
+ * 默认容量 6：全串行 6 单，或 1 张折叠并行 + 4 张串行 = 5 单。
+ */
+export function packMonitorListPages(rows, slotUnits = MONITOR_PAGE_SLOT_UNITS) {
+  const capacity = Math.max(1, Number(slotUnits) || MONITOR_PAGE_SLOT_UNITS)
+  const pages = []
+  let bucket = []
+  let used = 0
+  rows.forEach((row) => {
+    const units = Math.max(1, Number(row.heightUnits) || 1)
+    if (bucket.length && used + units > capacity) {
+      pages.push(bucket)
+      bucket = []
+      used = 0
+    }
+    bucket.push(row)
+    used += units
+  })
+  if (bucket.length) pages.push(bucket)
+  return pages.length ? pages : [[]]
+}
+
+/**
+ * @param {{ period: string, woType: string, workCenter: string, listStatus: string, page: number, slotUnits?: number, pageSize?: number, parallelExpanded?: Record<string, boolean> }} filters
  */
 export function buildWorkOrderMonitorDashboard(filters = {}) {
   const period = filters.period || MONITOR_PERIOD.TODAY
@@ -670,7 +715,12 @@ export function buildWorkOrderMonitorDashboard(filters = {}) {
   const workCenter = filters.workCenter || ''
   const listStatus = filters.listStatus || MONITOR_LIST_STATUS.RUNNING
   const page = Math.max(1, Number(filters.page) || 1)
-  const pageSize = Math.max(1, Number(filters.pageSize) || 6)
+  const slotUnits = Math.max(
+    1,
+    Number(filters.slotUnits != null ? filters.slotUnits : filters.pageSize) ||
+      MONITOR_PAGE_SLOT_UNITS,
+  )
+  const parallelExpanded = filters.parallelExpanded || {}
 
   void workOrderState.orders
   void assemblyWorkOrderState.orders
@@ -721,8 +771,18 @@ export function buildWorkOrderMonitorDashboard(filters = {}) {
     )
 
   const total = listSource.length
-  const start = (page - 1) * pageSize
-  const pageRows = listSource.slice(start, start + pageSize).map(mapMonitorListRow)
+  const mappedRows = listSource.map((o) => {
+    const row = mapMonitorListRow(o)
+    const expanded = Boolean(parallelExpanded[row.id])
+    row.parallelExpanded = expanded
+    row.heightUnits = resolveMonitorRowHeightUnits(row, expanded)
+    return row
+  })
+  const pages = packMonitorListPages(mappedRows, slotUnits)
+  const pageCount = Math.max(1, pages.length)
+  const safePage = Math.min(page, pageCount)
+  const pageRows = pages[safePage - 1] || []
+  const pageUnits = pageRows.reduce((s, r) => s + (Number(r.heightUnits) || 1), 0)
 
   const allTasks = withDemoWorkerTasks(listAllMobileTasks())
   const workerPanels = buildWorkerPanels(allTasks)
@@ -763,8 +823,11 @@ export function buildWorkOrderMonitorDashboard(filters = {}) {
     },
     list: {
       total,
-      page,
-      pageSize,
+      page: safePage,
+      pageSize: pageRows.length,
+      slotUnits,
+      pageUnits,
+      pageCount,
       rows: pageRows,
     },
     workers: {

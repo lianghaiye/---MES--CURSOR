@@ -67,7 +67,6 @@
             <div class="kpi-value tone-ok">{{ dashboard.kpis.done }}</div>
           </div>
         </div>
-        <div class="kpi-hint">待下发/进行中为当前快照；已完成按统计周期</div>
       </div>
       <div class="kpi-block">
         <div class="kpi-block-title">报工数量</div>
@@ -85,7 +84,6 @@
             <div class="kpi-value tone-bad">{{ formatMonitorQty(dashboard.kpis.badQty) }}</div>
           </div>
         </div>
-        <div class="kpi-hint">按报工创建时间落入{{ periodLabel }}统计</div>
       </div>
       <div class="kpi-block">
         <div class="kpi-block-title">工序状态</div>
@@ -103,7 +101,6 @@
             <div class="kpi-value tone-idle">{{ dashboard.kpis.processClaim }}</div>
           </div>
         </div>
-        <div class="kpi-hint">一次报工即完成；在制=已到工人端尚未报工</div>
       </div>
     </section>
 
@@ -124,7 +121,12 @@
 
         <a-empty v-if="!dashboard.list.rows.length" description="暂无工单" class="panel-empty" />
         <div v-else ref="woListEl" class="wo-list">
-          <article v-for="row in dashboard.list.rows" :key="row.id" class="wo-card">
+          <article
+            v-for="row in dashboard.list.rows"
+            :key="row.id"
+            class="wo-card"
+            :style="{ flex: `${row.heightUnits || 1} 1 0` }"
+          >
             <div class="wo-card-head">
               <div class="wo-main">
                 <a class="wo-no" @click="openWorkOrder(row)">{{ row.orderNo }}</a>
@@ -169,26 +171,55 @@
                   :class="{
                     parallel: step.parallel,
                     compact: step.compact,
-                    dense: step.nodes.length >= 6,
                   }"
                 >
-                  <div v-if="step.parallel" class="parallel-badge">
-                    并行 {{ step.nodes.length }}
+                  <div v-if="step.parallel" class="parallel-head">
+                    <span class="parallel-badge">并行 {{ step.nodes.length }}</span>
+                    <button
+                      v-if="step.nodes.length > PARALLEL_VISIBLE"
+                      type="button"
+                      class="parallel-expand-btn"
+                      @click.stop="toggleParallelExpand(row.id)"
+                    >
+                      {{ isParallelExpanded(row.id) ? '收起' : '展示全部' }}
+                    </button>
                   </div>
                   <div
-                    v-for="node in visibleStepNodes(row.id, step)"
-                    :key="node.id"
-                    class="proc-node"
-                    :class="`tone-${node.tone}`"
+                    v-if="step.parallel && step.compact"
+                    class="parallel-grid"
+                    :class="{ dense: step.nodes.length >= 6 }"
                   >
-                    <div class="proc-name" :title="node.name">{{ node.name }}</div>
-                    <div class="proc-status">{{ node.status }}</div>
-                    <div class="proc-qty">
-                      计划 {{ formatMonitorQty(node.planQty) }} / 良
-                      {{ formatMonitorQty(node.goodQty) }} / 不良
-                      {{ formatMonitorQty(node.badQty) }}
+                    <div
+                      v-for="node in visibleStepNodes(row.id, step)"
+                      :key="node.id"
+                      class="proc-node"
+                      :class="`tone-${node.tone}`"
+                    >
+                      <div class="proc-name" :title="node.name">{{ node.name }}</div>
+                      <div class="proc-status">{{ node.status }}</div>
+                      <div class="proc-qty">
+                        计划 {{ formatMonitorQty(node.planQty) }} / 良
+                        {{ formatMonitorQty(node.goodQty) }} / 不良
+                        {{ formatMonitorQty(node.badQty) }}
+                      </div>
                     </div>
                   </div>
+                  <template v-else>
+                    <div
+                      v-for="node in visibleStepNodes(row.id, step)"
+                      :key="node.id"
+                      class="proc-node"
+                      :class="`tone-${node.tone}`"
+                    >
+                      <div class="proc-name" :title="node.name">{{ node.name }}</div>
+                      <div class="proc-status">{{ node.status }}</div>
+                      <div class="proc-qty">
+                        计划 {{ formatMonitorQty(node.planQty) }} / 良
+                        {{ formatMonitorQty(node.goodQty) }} / 不良
+                        {{ formatMonitorQty(node.badQty) }}
+                      </div>
+                    </div>
+                  </template>
                 </div>
                 <div v-if="si < row.routeSteps.length - 1" class="route-arrow">→</div>
               </div>
@@ -198,11 +229,13 @@
         </div>
 
         <div class="panel-footer">
-          <span class="page-indicator">共 {{ dashboard.list.total }} 单 · 每页 {{ pageSize }}</span>
+          <span class="page-indicator">
+            共 {{ dashboard.list.total }} 单 · 本页 {{ dashboard.list.rows.length }}
+          </span>
           <a-pagination
             v-model:current="page"
-            :page-size="pageSize"
-            :total="dashboard.list.total"
+            :page-size="1"
+            :total="totalPages"
             size="small"
             :show-size-changer="false"
             simple
@@ -329,6 +362,8 @@ import { employeeGroupState } from '@/store/employeeGroupStore'
 import {
   MONITOR_LIST_STATUS,
   MONITOR_LIST_STATUS_OPTIONS,
+  MONITOR_PAGE_SLOT_UNITS,
+  MONITOR_PARALLEL_DEFAULT_VISIBLE,
   MONITOR_PERIOD,
   MONITOR_PERIOD_OPTIONS,
   MONITOR_WO_TYPE,
@@ -339,7 +374,7 @@ import {
 } from '@/utils/workOrderMonitorDashboard'
 
 const CAROUSEL_STORAGE_KEY = 'i_doms_wo_monitor_carousel'
-const PARALLEL_VISIBLE = 4
+const PARALLEL_VISIBLE = MONITOR_PARALLEL_DEFAULT_VISIBLE
 /** 大组按块拆到多页：每块最多人数（轮播可看完全组，无人被折叠掉） */
 const GROUP_MEMBER_CHUNK = 8
 
@@ -357,7 +392,10 @@ const woType = ref(MONITOR_WO_TYPE.ALL)
 const workCenter = ref('')
 const listStatus = ref(MONITOR_LIST_STATUS.RUNNING)
 const page = ref(1)
-const pageSize = ref(3)
+/** 固定 6 格：全串行一页 6 单；含折叠并行则约 5 单 */
+const slotUnits = MONITOR_PAGE_SLOT_UNITS
+/** 并行「展示全部」展开状态：woId -> true */
+const parallelExpanded = ref({})
 const workerPage = ref(1)
 /** 每页展示的「内容项」数：1 小组分块卡或 1 单工人 = 1 项（不含分区标题） */
 const workerPageSize = ref(3)
@@ -392,30 +430,43 @@ function persistCarouselSettings() {
   )
 }
 
-const periodLabel = computed(() => {
-  const hit = MONITOR_PERIOD_OPTIONS.find((o) => o.value === period.value)
-  return hit?.label || '本日'
-})
-
 const dashboard = computed(() => {
   void tick.value
   void workOrderState.orders
   void assemblyWorkOrderState.orders
   void processReportState.records
   void employeeGroupState.groups
+  void parallelExpanded.value
   return buildWorkOrderMonitorDashboard({
     period: period.value,
     woType: woType.value,
     workCenter: workCenter.value,
     listStatus: listStatus.value,
     page: page.value,
-    pageSize: pageSize.value,
+    slotUnits,
+    parallelExpanded: parallelExpanded.value,
   })
 })
 
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil((dashboard.value.list.total || 0) / pageSize.value)),
-)
+const totalPages = computed(() => Math.max(1, dashboard.value.list.pageCount || 1))
+
+function isParallelExpanded(woId) {
+  return Boolean(parallelExpanded.value[woId])
+}
+
+function toggleParallelExpand(woId) {
+  parallelExpanded.value = {
+    ...parallelExpanded.value,
+    [woId]: !parallelExpanded.value[woId],
+  }
+  page.value = 1
+}
+
+function visibleStepNodes(woId, step) {
+  if (!step.parallel || isParallelExpanded(woId)) return step.nodes
+  if (step.nodes.length <= PARALLEL_VISIBLE) return step.nodes
+  return step.nodes.slice(0, PARALLEL_VISIBLE)
+}
 
 /**
  * 工人区展平为可分页内容项。
@@ -491,10 +542,8 @@ const pagedWorkerItems = computed(() => {
 watch([period, woType, workCenter, listStatus], () => {
   page.value = 1
   workerPage.value = 1
-})
-
-watch(pageSize, (n, prev) => {
-  if (n !== prev) page.value = 1
+  parallelExpanded.value = {}
+  nextTick(() => measurePageSizes())
 })
 
 watch(workerPageSize, (n, prev) => {
@@ -545,16 +594,10 @@ function restartCarousel() {
   }, sec * 1000)
 }
 
+/** 工单区固定 6 格均匀分配，仅工人区按高度估每页条数 */
 function measurePageSizes() {
-  const woEl = woListEl.value
-  if (woEl?.clientHeight) {
-    const est = isStandalone.value || isFullscreen.value ? 148 : 168
-    const n = Math.max(1, Math.min(6, Math.floor(woEl.clientHeight / est)))
-    if (n !== pageSize.value) pageSize.value = n
-  }
   const wkEl = workerListEl.value
   if (wkEl?.clientHeight) {
-    // 分块小组卡（最多 8 人）偏高，每页条数保守
     const est = 160
     const n = Math.max(1, Math.min(3, Math.floor(wkEl.clientHeight / est)))
     if (n !== workerPageSize.value) workerPageSize.value = n
@@ -565,7 +608,6 @@ function bindResizeObserver() {
   resizeObserver?.disconnect()
   resizeObserver = new ResizeObserver(() => measurePageSizes())
   if (rootEl.value) resizeObserver.observe(rootEl.value)
-  if (woListEl.value) resizeObserver.observe(woListEl.value)
   if (workerListEl.value) resizeObserver.observe(workerListEl.value)
 }
 
@@ -586,11 +628,6 @@ async function toggleFullscreen() {
 function onFullscreenChange() {
   isFullscreen.value = document.fullscreenElement === rootEl.value
   nextTick(() => measurePageSizes())
-}
-
-function visibleStepNodes(_woId, step) {
-  if (step.nodes.length <= PARALLEL_VISIBLE) return step.nodes
-  return step.nodes.slice(0, PARALLEL_VISIBLE)
 }
 
 function openWorkOrder(row) {
@@ -623,7 +660,7 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [dashboard.value.list.rows.length, workerContentCount.value, isFullscreen.value],
+  () => [workerContentCount.value, isFullscreen.value],
   () =>
     nextTick(() => {
       measurePageSizes()
@@ -645,6 +682,9 @@ watch(
   --warn: #f5a623;
   --bad: #ff6b6b;
   --run: #4db3ff;
+  /* 工序内按 flex 均匀分格，工序块随卡片伸缩 */
+  --proc-serial-h: 0;
+  --proc-parallel-min-h: 0;
   /* 适配内容区高度；字体随视口缩放，常见车间电视 1080p/4K 可读 */
   height: calc(100vh - 132px);
   min-height: 560px;
@@ -819,12 +859,6 @@ watch(
   color: #9ad0ff;
 }
 
-.kpi-hint {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
 .main-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 22vw);
@@ -867,10 +901,10 @@ watch(
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding: 12px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .wo-card {
@@ -880,7 +914,7 @@ watch(
   background: var(--panel-2);
   border: 1px solid rgba(64, 158, 255, 0.16);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 6px 10px;
   display: flex;
   flex-direction: column;
 }
@@ -890,7 +924,8 @@ watch(
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
 }
 
 .wo-main {
@@ -985,10 +1020,10 @@ watch(
 
 .route-flow {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 6px;
   overflow: hidden;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -997,39 +1032,94 @@ watch(
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 .step-nodes {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   position: relative;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.step-nodes:not(.parallel) {
+  height: auto;
+  align-self: center;
+}
+
+.step-nodes:not(.parallel) .proc-node {
+  flex: 0 0 auto;
+  min-height: 0;
+  box-sizing: border-box;
 }
 
 .step-nodes.parallel {
-  padding: 8px 8px 6px;
+  padding: 6px;
   border: 1px dashed rgba(64, 158, 255, 0.35);
   border-radius: 6px;
-  max-width: 360px;
-}
-
-.step-nodes.compact.parallel {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  max-width: 380px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  max-height: 280px;
-  overflow-y: auto;
+  height: 100%;
+  align-self: stretch;
 }
 
-.step-nodes.dense.parallel {
-  grid-template-columns: repeat(2, minmax(110px, 1fr));
+.parallel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  line-height: 1.2;
 }
 
 .parallel-badge {
-  grid-column: 1 / -1;
   font-size: 11px;
   color: #9ad0ff;
-  margin-bottom: 2px;
+}
+
+.parallel-expand-btn {
+  margin: 0;
+  padding: 0 8px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid rgba(126, 195, 255, 0.45);
+  background: rgba(58, 160, 255, 0.14);
+  color: #9ad0ff;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 20px;
+}
+
+.parallel-expand-btn:hover {
+  background: rgba(58, 160, 255, 0.28);
+}
+
+.parallel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(118px, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 6px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.parallel-grid.dense {
+  grid-template-columns: repeat(2, minmax(110px, 1fr));
+}
+
+.step-nodes.parallel .proc-node {
+  min-height: 0;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.step-nodes.parallel:not(.compact) > .proc-node {
+  flex: 1 1 auto;
 }
 
 .expand-btn {
@@ -1049,12 +1139,16 @@ watch(
 }
 
 .proc-node {
-  min-width: 132px;
+  min-width: 120px;
   max-width: 180px;
-  padding: 8px 10px;
+  padding: 4px 8px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .proc-node.tone-done {
@@ -1112,6 +1206,8 @@ watch(
   color: rgba(126, 195, 255, 0.7);
   font-size: 16px;
   padding: 0 2px;
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .route-empty {
