@@ -111,6 +111,12 @@ const routes = [
     meta: { title: 'ECN打印', standalone: true },
   },
   {
+    path: '/board/work-order-monitor/screen',
+    name: 'board-work-order-monitor-screen',
+    component: () => import('@/views/board/WorkOrderMonitorView.vue'),
+    meta: { title: '工单监管看板', standalone: true },
+  },
+  {
     path: '/',
     component: MainLayout,
     redirect: '/home/dashboard',
@@ -812,6 +818,12 @@ const routes = [
         ...emptyChild('after-sales-service-orders', '服务工单'),
       },
       { path: 'after-sales/returns', ...emptyChild('after-sales-returns', '退换货') },
+      {
+        path: 'board/work-order-monitor',
+        name: 'board-work-order-monitor',
+        component: () => import('@/views/board/WorkOrderMonitorView.vue'),
+        meta: { title: '工单监管看板' },
+      },
       { path: 'wms/warehouse', ...emptyChild('wms-warehouse', '仓储管理') },
       { path: 'qms/trace', ...emptyChild('qms-trace', '质量追溯') },
       { path: 'equipment/devices', ...emptyChild('equipment-devices', '设备管理') },

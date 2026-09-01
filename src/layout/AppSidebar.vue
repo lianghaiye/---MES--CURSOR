@@ -21,13 +21,13 @@
 import { computed, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge } from 'ant-design-vue'
-import { sideMenus, resolveModuleKey } from '@/config/menus'
+import { sideMenus, resolveModuleKey, findSideMenuItemByPath } from '@/config/menus'
 import { useTabs } from '@/composables/useTabs'
 import { useWorkOrderMenuBadges } from '@/composables/useWorkOrderMenuBadges'
 
 const route = useRoute()
 const router = useRouter()
-const { openTab } = useTabs()
+const { openTab, getTabNavigateTo } = useTabs()
 const collapsed = ref(false)
 const { badges } = useWorkOrderMenuBadges()
 const openKeys = ref([])
@@ -111,8 +111,15 @@ watch(
 
 function onMenuClick({ key }) {
   if (!key.startsWith('/')) return
+  const menuItem = findSideMenuItemByPath(key)
+  if (menuItem?.openInBrowserTab) {
+    const tabPath = menuItem.browserTabPath || menuItem.path
+    window.open(router.resolve(tabPath).href, '_blank')
+    return
+  }
   openTab(key)
-  router.push(key)
+  // 若该 path 曾以带 query 的新建页打开过，切回时走 fullPath
+  router.push(getTabNavigateTo(key))
 }
 </script>
 

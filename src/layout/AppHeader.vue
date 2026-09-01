@@ -44,7 +44,13 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { BellOutlined, EllipsisOutlined } from '@ant-design/icons-vue'
-import { topModules, moreModules, resolveModuleKey, resolveModuleDefaultPath } from '@/config/menus'
+import {
+  topModules,
+  moreModules,
+  resolveModuleKey,
+  resolveModuleDefaultPath,
+  findSideMenuItemByPath,
+} from '@/config/menus'
 import { getUser, clearAuth } from '@/utils/auth'
 import { logout } from '@/api/auth'
 import { useTabs } from '@/composables/useTabs'
@@ -86,6 +92,12 @@ const moreMenuItems = computed(() =>
 function navigateToModule(mod) {
   const path = resolveModuleDefaultPath(mod)
   if (!path) return
+  const menuItem = findSideMenuItemByPath(path)
+  if (menuItem?.openInBrowserTab) {
+    const tabPath = menuItem.browserTabPath || menuItem.path
+    window.open(router.resolve(tabPath).href, '_blank')
+    return
+  }
   openTab(path)
   if (route.path === path) {
     setActive(path)

@@ -19,6 +19,7 @@ export const topModules = [
 
 /** 顶栏「更多」下拉模块（WMS/QMS 等扩展入口） */
 export const moreModules = [
+  { key: 'board', label: '看板管理', path: '/board' },
   { key: 'wms', label: '仓储管理 WMS', path: '/wms' },
   { key: 'qms', label: '质量追溯 QMS', path: '/qms' },
   { key: 'equipment', label: '设备管理', path: '/equipment' },
@@ -202,10 +203,39 @@ export const sideMenus = {
     { key: 'dict', label: '系统字典', path: '/system/dict' },
     { key: 'business-rules', label: '业务规则', path: '/system/business-rules' },
   ],
+
+  board: [
+    {
+      key: 'work-order-monitor',
+      label: '工单监管看板',
+      path: '/board/work-order-monitor',
+      openInBrowserTab: true,
+      browserTabPath: '/board/work-order-monitor/screen',
+    },
+  ],
   wms: [{ key: 'warehouse', label: '仓库作业', path: '/wms/warehouse' }],
   qms: [{ key: 'trace', label: '质量追溯', path: '/qms/trace' }],
   equipment: [{ key: 'devices', label: '设备台账', path: '/equipment/devices' }],
   report: [{ key: 'overview', label: '综合报表', path: '/report/overview' }],
+}
+
+/** 按 path 查找侧栏菜单项（含嵌套） */
+export function findSideMenuItemByPath(path) {
+  const walk = (items = []) => {
+    for (const item of items) {
+      if (item.path === path) return item
+      if (item.children?.length) {
+        const hit = walk(item.children)
+        if (hit) return hit
+      }
+    }
+    return null
+  }
+  for (const items of Object.values(sideMenus)) {
+    const hit = walk(items)
+    if (hit) return hit
+  }
+  return null
 }
 
 /** 根据路由路径解析所属顶栏模块 key */
