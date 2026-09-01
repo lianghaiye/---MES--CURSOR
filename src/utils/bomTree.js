@@ -115,6 +115,32 @@ export function getLinesForTreeNode(lineItems, treeNodeId, flatNodes = []) {
   })
 }
 
+/** 物料行所属父节点（根下统一归一到 rootId） */
+export function normalizeLineParentId(line, flatNodes = []) {
+  const pid = line?.parentTreeId
+  if (!pid || pid === '__ROOT__' || isRootNode(pid, flatNodes)) {
+    return getRootTreeId(flatNodes)
+  }
+  return pid
+}
+
+/** 按行 id 调整同级顺序；跨层级不改动 */
+export function reorderSiblingLinesByIds(lineItems, flatNodes, fromLineId, toLineId) {
+  if (!fromLineId || !toLineId || fromLineId === toLineId) {
+    return { lineItems, flatNodes }
+  }
+  const fromLine = lineItems.find((l) => l.id === fromLineId)
+  const toLine = lineItems.find((l) => l.id === toLineId)
+  if (!fromLine || !toLine) return { lineItems, flatNodes }
+  const fromParent = normalizeLineParentId(fromLine, flatNodes)
+  const toParent = normalizeLineParentId(toLine, flatNodes)
+  if (fromParent !== toParent) return { lineItems, flatNodes }
+  const displayed = getLinesForTreeNode(lineItems, fromParent, flatNodes)
+  const fromIndex = displayed.findIndex((l) => l.id === fromLineId)
+  const toIndex = displayed.findIndex((l) => l.id === toLineId)
+  return reorderLinesForTreeNode(lineItems, flatNodes, fromParent, fromIndex, toIndex)
+}
+
 /** 调整当前节点下物料行顺序，并同步同级树节点顺序 */
 export function reorderLinesForTreeNode(lineItems, flatNodes, treeNodeId, fromIndex, toIndex) {
   if (fromIndex === toIndex) return { lineItems, flatNodes }

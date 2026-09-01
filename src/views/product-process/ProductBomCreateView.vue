@@ -221,9 +221,9 @@
     <SelectBomMaterialModal
       v-if="!isBaselineBomMode"
       v-model:open="switchProductOpen"
-      title="选择产品/物料（SKU）"
-      ecn-new-material-mode
-      hide-add-material
+      title="选择产品/物料"
+      :include-spu-templates="true"
+      :spu-can-sell-only="false"
       :multiple="false"
       @update:open="onSwitchProductOpenChange"
       @selected="onSwitchProductSelected"
@@ -339,6 +339,7 @@ import {
   addChildMaterial,
   deleteTreeNode,
   reorderLinesForTreeNode,
+  reorderSiblingLinesByIds,
   ROOT_ID,
   isRootNode,
   getRootTreeId,
@@ -1121,6 +1122,19 @@ function onSwitchSpuSelected(items) {
 function onSwitchProductConfirm(row) {
   closeProductPicker()
   skipAutoProductPicker.value = true
+  if (!row) return
+  if (row.isSpuTemplate || row.pickType === 'spu') {
+    onRootCatalogSelected({
+      id: row.spuId || row.id,
+      code: row.code || '',
+      name: row.name || '',
+      itemType: 'spu',
+      specModel: row.specModel || '',
+      material: row.material || '',
+      drawingNo: row.drawingNo || '',
+    })
+    return
+  }
   const itemType = row.itemType === '物料' ? 'material' : 'product'
   const preserveChildren = hasRoot.value
   form.itemId = `${itemType}:${row.id}`
@@ -1134,6 +1148,8 @@ function onSwitchProductConfirm(row) {
     },
     { preserveChildren },
   )
+  if (row.material) form.material = row.material
+  if (row.drawingNo) form.drawingNo = row.drawingNo
   if (preserveChildren) {
     message.success('已切换产品，仅更新顶级物料，子级结构已保留')
   }
@@ -1225,14 +1241,17 @@ function onAddDetailLine() {
   scrollPageToLatestDetail()
 }
 
-function onReorderLines({ fromIndex, toIndex }) {
-  const result = reorderLinesForTreeNode(
-    lineItems.value,
-    flatNodes.value,
-    selectedNodeId.value,
-    fromIndex,
-    toIndex,
-  )
+function onReorderLines({ fromIndex, toIndex, fromLineId, toLineId, parentTreeId }) {
+  const result =
+    fromLineId && toLineId
+      ? reorderSiblingLinesByIds(lineItems.value, flatNodes.value, fromLineId, toLineId)
+      : reorderLinesForTreeNode(
+          lineItems.value,
+          flatNodes.value,
+          parentTreeId || selectedNodeId.value,
+          fromIndex,
+          toIndex,
+        )
   lineItems.value = result.lineItems
   flatNodes.value = result.flatNodes
 }

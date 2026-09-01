@@ -49,11 +49,15 @@
           :pagination="false"
           :scroll="tableScroll"
           :custom-row="customRow"
+          :row-selection="treeRowSelection"
+          :indent-size="isTreeMode ? 16 : 15"
+          :expand-icon-column-index="treeExpandIconColumnIndex"
+          :expand-column-width="treeExpandIconColumnIndex ? 1 : undefined"
           v-model:expanded-row-keys="expandedRowKeys"
           :row-class-name="rowClassName"
         >
           <template #headerCell="{ column }">
-            <template v-if="column.key === 'index' && !readonly">
+            <template v-if="column.key === 'index' && !readonly && !isTreeMode">
               <div
                 class="header-index-cell"
                 @mouseenter="headerIndexHover = true"
@@ -85,11 +89,12 @@
           </template>
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'drag'">
-              <a-tooltip title="拖动">
+              <a-tooltip title="拖动调整顺序">
                 <span
                   class="drag-handle"
                   draggable="true"
-                  @dragstart="onDragStart(index, $event)"
+                  @click.stop
+                  @dragstart="onDragStart(record, $event)"
                   @dragend="onDragEnd"
                 >
                   <HolderOutlined />
@@ -407,6 +412,7 @@ import {
   collectMaterialTreeRowKeys,
   flattenMaterialTreeLines,
   nodeHasTreeChildren,
+  normalizeLineParentId,
 } from '@/utils/bomTree'
 
 const props = defineProps({
@@ -632,32 +638,39 @@ const tableColumns = computed(() => {
     .filter((c) => !c.hidden)
     .sort((a, b) => a.order - b.order)
 
-  const cols = [
-    ...(props.readonly || isTreeMode.value
-      ? []
-      : [{ title: '拖动', key: 'drag', width: 52, align: 'center', fixed: 'left' }]),
-    { title: '#', key: 'index', width: 72, align: 'center', fixed: 'left' },
-    ...sorted.map((c) => ({
-      title: c.title,
-      key: c.key,
-      dataIndex: c.key,
-      width: widthMap[c.key] || 100,
-      fixed: c.frozen ? 'left' : undefined,
-      ellipsis: [
-        'materialCode',
-        'itemName',
-        'remark',
-        'material',
-        'variantAttr',
-        'childBom',
-        'drawingNo',
-        'substitutePart',
-        'blankSizeText',
-      ].includes(c.key),
-    })),
-    ...(props.readonly ? [] : [{ title: '操作', key: 'action', width: 148, fixed: 'right' }]),
-  ]
-  return cols
+  const dragCol = props.readonly
+    ? []
+    : [{ title: '拖动', key: 'drag', width: 48, align: 'center', fixed: 'left' }]
+  const indexCol = {
+    title: '#',
+    key: 'index',
+    width: isTreeMode.value ? 108 : 72,
+    align: 'center',
+    fixed: 'left',
+  }
+  const dataCols = sorted.map((c) => ({
+    title: c.title,
+    key: c.key,
+    dataIndex: c.key,
+    width: widthMap[c.key] || 100,
+    fixed: c.frozen ? 'left' : undefined,
+    ellipsis: [
+      'materialCode',
+      'itemName',
+      'remark',
+      'material',
+      'variantAttr',
+      'childBom',
+      'drawingNo',
+      'substitutePart',
+      'blankSizeText',
+    ].includes(c.key),
+  }))
+  const actionCol = props.readonly
+    ? []
+    : [{ title: '操作', key: 'action', width: 148, fixed: 'right' }]
+  // 勾选列由 row-selection 插在最前，拖动列紧随其后
+  return [...dragCol, indexCol, ...dataCols, ...actionCol]
 })
 
 const scrollX = computed(() => {
@@ -679,7 +692,7 @@ const tableScroll = computed(() => ({
   x: scrollX.value,
 }))
 
-const dragFromIndex = ref(-1)
+const dragFromRecord = ref(null)
 const hoverRowId = ref('')
 const headerIndexHover = ref(false)
 const selectedRowKeys = ref([])
@@ -693,12 +706,12 @@ function resolveBlankSizeTargetLine() {
   // 优先：恰好勾选一行（工具栏「下料」常见操作）
   if (selectedRowKeys.value.length === 1) {
     const key = selectedRowKeys.value[0]
-    const byCheck = props.lines.find((l) => String(l.id) === String(key))
+    const byCheck = flatLines.value.find((l) => String(l.id) === String(key))
     if (byCheck) return byCheck
   }
   // 其次：单击高亮行
   if (activeRowId.value) {
-    const byActive = props.lines.find((l) => String(l.id) === String(activeRowId.value))
+    const byActive = flatLines.value.find((l) => String(l.id) === String(activeRowId.value))
     if (byActive) return byActive
   }
   return null
@@ -777,6 +790,27 @@ const allSelected = computed(
 const indeterminate = computed(() => selectedRowKeys.value.length > 0 && !allSelected.value)
 
 const shouldShowHeaderCheckbox = computed(() => headerIndexHover.value || hasSelection.value)
+
+const treeRowSelection = computed(() => {
+  if (props.readonly || !isTreeMode.value) return undefined
+  return {
+    selectedRowKeys: selectedRowKeys.value,
+    checkStrictly: true,
+    columnWidth: 48,
+    preserveSelectedRowKeys: true,
+    onSelect: (record, selected) => {
+      toggleRowSelect(record.id, selected)
+    },
+    onSelectAll: (selected) => {
+      selectedRowKeys.value = selected ? [...allLineIds.value] : []
+    },
+  }
+})
+
+/** 树表 + 勾选时，展开图标默认会落到第 1 列数据列（拖动）。传入 3 抵消 rowSelection 的 -1，落到序号列。 */
+const treeExpandIconColumnIndex = computed(() =>
+  isTreeMode.value && !props.readonly ? 3 : undefined,
+)
 
 watch(
   () => flatLines.value.map((l) => l.id).join(','),
@@ -860,14 +894,25 @@ function clearDragOverClass() {
   })
 }
 
-function onDragStart(index, event) {
-  dragFromIndex.value = index
-  event.dataTransfer?.setData('text/plain', String(index))
+function lineParentKey(record) {
+  return normalizeLineParentId(record, props.flatNodes)
+}
+
+function canDropOn(targetRecord) {
+  const from = dragFromRecord.value
+  if (!from || !targetRecord || from.id === targetRecord.id) return false
+  if (!isTreeMode.value) return true
+  return lineParentKey(from) === lineParentKey(targetRecord)
+}
+
+function onDragStart(record, event) {
+  dragFromRecord.value = record
+  event.dataTransfer?.setData('text/plain', String(record?.id || ''))
   event.dataTransfer.effectAllowed = 'move'
 }
 
 function onDragEnd() {
-  dragFromIndex.value = -1
+  dragFromRecord.value = null
   clearDragOverClass()
 }
 
@@ -884,14 +929,14 @@ function customRow(record, index) {
   return {
     onClick: (event) => {
       const tag = event?.target?.closest?.(
-        'input, textarea, button, .ant-select, .ant-picker, .ant-input-number, a, .drag-handle',
+        'input, textarea, button, .ant-select, .ant-picker, .ant-input-number, a, .drag-handle, .ant-checkbox-wrapper, .ant-table-selection-column, .ant-table-row-expand-icon',
       )
       if (tag) return
       activeRowId.value = record.id
       if (isTreeMode.value) emit('select-node', resolveContextNodeId(record))
     },
     onDragover: (event) => {
-      if (isTreeMode.value) return
+      if (!canDropOn(record)) return
       event.preventDefault()
       clearDragOverClass()
       event.currentTarget?.classList.add('drag-over-row')
@@ -900,14 +945,27 @@ function customRow(record, index) {
       event.currentTarget?.classList.remove('drag-over-row')
     },
     onDrop: (event) => {
-      if (isTreeMode.value) return
       event.preventDefault()
       event.currentTarget?.classList.remove('drag-over-row')
-      const from = dragFromIndex.value
-      const to = index
-      dragFromIndex.value = -1
-      if (from >= 0 && to >= 0 && from !== to) {
-        emit('reorder-lines', { fromIndex: from, toIndex: to })
+      const from = dragFromRecord.value
+      dragFromRecord.value = null
+      if (!from || from.id === record.id) return
+      if (isTreeMode.value) {
+        if (lineParentKey(from) !== lineParentKey(record)) {
+          message.warning('只能在同一层级内拖动调整顺序')
+          return
+        }
+        emit('reorder-lines', {
+          fromLineId: from.id,
+          toLineId: record.id,
+          parentTreeId: from.parentTreeId,
+        })
+        return
+      }
+      const fromIndex = props.lines.findIndex((l) => l.id === from.id)
+      const toIndex = index
+      if (fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
+        emit('reorder-lines', { fromIndex, toIndex })
       }
     },
   }
@@ -1026,6 +1084,34 @@ function customRow(record, index) {
     &:hover {
       color: #1677ff;
     }
+  }
+
+  :deep(.ant-table-selection-column) {
+    text-align: center !important;
+  }
+
+  :deep(.ant-table-row-expand-icon) {
+    margin-inline-end: 4px;
+  }
+
+  /* 展开图标改放到序号列后，隐藏表格额外插入的空展开列 */
+  :deep(col.ant-table-expand-icon-col) {
+    width: 0 !important;
+    min-width: 0 !important;
+  }
+
+  :deep(th.ant-table-row-expand-icon-cell),
+  :deep(td.ant-table-row-expand-icon-cell) {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+    border-right: none !important;
+  }
+
+  :deep(.ant-table-row-expand-icon-cell .ant-table-row-expand-icon) {
+    display: none;
   }
 
   .row-index-cell {
