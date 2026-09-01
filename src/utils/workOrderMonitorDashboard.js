@@ -784,29 +784,62 @@ function withDemoWorkerTasks(tasks) {
     ]
   }
   if (!next.some((t) => t.id === 'mon-demo-person-claim')) {
-    next = [
+    const demoPeople = [
       {
         id: 'mon-demo-person-claim',
         processName: '钻孔',
         workOrderNo: 'WO-PERSON-DEMO',
-        workOrderCode: 'WO-PERSON-DEMO',
-        taskStatus: '执行中',
-        claimedBy: '赵六',
-        executor: '赵六',
-        resourceType: '工人',
-        executors: ['赵六'],
+        status: '执行中',
+        name: '赵六',
       },
       {
         id: 'mon-demo-person-idle',
         processName: '去毛刺',
         workOrderNo: 'WO-PERSON-DEMO-2',
-        workOrderCode: 'WO-PERSON-DEMO-2',
-        taskStatus: '已完成',
-        claimedBy: '钱七',
-        executor: '钱七',
-        resourceType: '工人',
-        executors: ['钱七'],
+        status: '已完成',
+        name: '钱七',
       },
+      {
+        id: 'mon-demo-person-3',
+        processName: '焊接',
+        workOrderNo: 'WO-PERSON-DEMO-3',
+        status: '执行中',
+        name: '周八',
+      },
+      {
+        id: 'mon-demo-person-4',
+        processName: '打磨',
+        workOrderNo: 'WO-PERSON-DEMO-4',
+        status: '待开始',
+        name: '吴九',
+      },
+      {
+        id: 'mon-demo-person-5',
+        processName: '装配',
+        workOrderNo: 'WO-PERSON-DEMO-5',
+        status: '执行中',
+        name: '郑十',
+      },
+      {
+        id: 'mon-demo-person-6',
+        processName: '试压',
+        workOrderNo: 'WO-PERSON-DEMO-6',
+        status: '待报工',
+        name: '冯十一',
+      },
+    ]
+    next = [
+      ...demoPeople.map((p) => ({
+        id: p.id,
+        processName: p.processName,
+        workOrderNo: p.workOrderNo,
+        workOrderCode: p.workOrderNo,
+        taskStatus: p.status,
+        claimedBy: p.name,
+        executor: p.name,
+        resourceType: '工人',
+        executors: [p.name],
+      })),
       ...next,
     ]
   }

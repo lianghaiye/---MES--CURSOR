@@ -216,72 +216,96 @@
           <div class="worker-head-stats">
             忙 {{ dashboard.workers.busy }} · 待命 {{ dashboard.workers.standby }} · 闲
             {{ dashboard.workers.idle }}
-            <template v-if="workerTotalPages > 1">
-              · {{ workerPage }}/{{ workerTotalPages }}
-            </template>
           </div>
         </div>
-        <a-empty v-if="!workerItems.length" description="暂无工人数据" class="panel-empty" />
-        <div v-else ref="workerListEl" class="worker-list">
-          <template v-for="item in pagedWorkerItems" :key="item.id">
-            <div v-if="item.kind === 'group-title'" class="person-section-title">工人小组</div>
-            <div v-else-if="item.kind === 'person-title'" class="person-section-title">单工人</div>
-            <div
-              v-else-if="item.kind === 'group'"
-              class="group-card"
-              :class="{ busy: item.data.groupBusy }"
-            >
-              <div class="group-head">
-                <div class="group-title">
-                  <span class="group-name">{{ item.data.name }}</span>
-                  <span class="group-status" :class="item.data.groupBusy ? 'is-busy' : 'is-idle'">{{
-                    item.data.groupStatus
-                  }}</span>
-                </div>
-                <div class="group-hint">{{ item.data.groupHint }}</div>
+        <a-empty v-if="!workerContentCount" description="暂无工人数据" class="panel-empty" />
+        <template v-else>
+          <div ref="workerListEl" class="worker-list">
+            <template v-for="item in pagedWorkerItems" :key="item.id">
+              <div v-if="item.kind === 'group-title'" class="person-section-title">工人小组</div>
+              <div v-else-if="item.kind === 'person-title'" class="person-section-title">
+                单工人
               </div>
-              <div class="group-members">
-                <div
-                  v-for="m in item.data.members"
-                  :key="`${item.data.id}-${m.name}`"
-                  class="worker-row nested"
-                  :class="m.statusTone"
-                >
-                  <div class="worker-avatar">{{ m.name.slice(0, 1) }}</div>
-                  <div class="worker-info">
-                    <div class="worker-name">
-                      {{ m.name }}
-                      <span v-if="m.isLeader" class="leader-badge">组长</span>
+              <div
+                v-else-if="item.kind === 'group'"
+                class="group-card"
+                :class="{ busy: item.data.groupBusy }"
+              >
+                <div class="group-head">
+                  <div class="group-title">
+                    <span class="group-name">{{ item.data.name }}</span>
+                    <span
+                      class="group-status"
+                      :class="item.data.groupBusy ? 'is-busy' : 'is-idle'"
+                      >{{ item.data.groupStatus }}</span
+                    >
+                  </div>
+                  <div class="group-hint">{{ item.data.groupHint }}</div>
+                </div>
+                <div class="group-members">
+                  <div
+                    v-for="m in visibleGroupMembers(item.data)"
+                    :key="`${item.data.id}-${m.name}`"
+                    class="worker-row nested"
+                    :class="m.statusTone"
+                  >
+                    <div class="worker-avatar">{{ m.name.slice(0, 1) }}</div>
+                    <div class="worker-info">
+                      <div class="worker-name">
+                        {{ m.name }}
+                        <span v-if="m.isLeader" class="leader-badge">组长</span>
+                      </div>
+                      <div class="worker-sub">{{ m.sub }}</div>
                     </div>
-                    <div class="worker-sub">{{ m.sub }}</div>
+                    <div class="worker-right">
+                      <span class="worker-status" :class="`is-${m.statusTone}`">{{
+                        m.status
+                      }}</span>
+                    </div>
                   </div>
-                  <div class="worker-right">
-                    <span class="worker-status" :class="`is-${m.statusTone}`">{{ m.status }}</span>
+                  <div
+                    v-if="(item.data.members || []).length > GROUP_MEMBER_VISIBLE"
+                    class="group-more"
+                  >
+                    等 {{ (item.data.members || []).length }} 人
                   </div>
                 </div>
               </div>
-            </div>
-            <div
-              v-else-if="item.kind === 'person'"
-              class="worker-row"
-              :class="{ busy: item.data.busy }"
+              <div
+                v-else-if="item.kind === 'person'"
+                class="worker-row"
+                :class="{ busy: item.data.busy }"
+              >
+                <div class="worker-avatar">{{ item.data.name.slice(0, 1) }}</div>
+                <div class="worker-info">
+                  <div class="worker-name">{{ item.data.name }}</div>
+                  <div class="worker-sub">{{ item.data.sub }}</div>
+                </div>
+                <div class="worker-right">
+                  <span class="worker-status" :class="item.data.busy ? 'is-busy' : 'is-idle'">
+                    {{ item.data.status }}
+                  </span>
+                  <span v-if="item.data.taskCount" class="worker-count"
+                    >{{ item.data.taskCount }} 任务</span
+                  >
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="panel-footer worker-footer">
+            <span class="page-indicator"
+              >共 {{ workerContentCount }} 项 · {{ workerPage }}/{{ workerTotalPages }}</span
             >
-              <div class="worker-avatar">{{ item.data.name.slice(0, 1) }}</div>
-              <div class="worker-info">
-                <div class="worker-name">{{ item.data.name }}</div>
-                <div class="worker-sub">{{ item.data.sub }}</div>
-              </div>
-              <div class="worker-right">
-                <span class="worker-status" :class="item.data.busy ? 'is-busy' : 'is-idle'">
-                  {{ item.data.status }}
-                </span>
-                <span v-if="item.data.taskCount" class="worker-count"
-                  >{{ item.data.taskCount }} 任务</span
-                >
-              </div>
-            </div>
-          </template>
-        </div>
+            <a-pagination
+              v-model:current="workerPage"
+              :page-size="workerPageSize"
+              :total="workerContentCount"
+              size="small"
+              :show-size-changer="false"
+              simple
+            />
+          </div>
+        </template>
       </aside>
     </div>
   </div>
@@ -313,6 +337,8 @@ import {
 
 const CAROUSEL_STORAGE_KEY = 'i_doms_wo_monitor_carousel'
 const PARALLEL_VISIBLE = 4
+/** 小组卡内最多展示人数，其余折叠，保证分页高度稳定 */
+const GROUP_MEMBER_VISIBLE = 3
 
 const route = useRoute()
 const router = useRouter()
@@ -330,7 +356,8 @@ const listStatus = ref(MONITOR_LIST_STATUS.RUNNING)
 const page = ref(1)
 const pageSize = ref(3)
 const workerPage = ref(1)
-const workerPageSize = ref(4)
+/** 每页展示的「内容项」数：1 小组卡或 1 单工人 = 1 项（不含分区标题） */
+const workerPageSize = ref(3)
 const tick = ref(0)
 
 const carouselEnabled = ref(true)
@@ -387,64 +414,66 @@ const totalPages = computed(() =>
   Math.max(1, Math.ceil((dashboard.value.list.total || 0) / pageSize.value)),
 )
 
-/** 工人区展平：标题 + 小组卡 + 单工人行，按 slot 计页 */
-const workerItems = computed(() => {
+/**
+ * 工人区展平为可分页内容项（小组卡 / 单工人）。
+ * 分区标题不计入 pageSize，随当页首个同类型内容自动带出。
+ */
+const workerContentItems = computed(() => {
   const items = []
-  const groups = dashboard.value.workers.groups || []
-  const individuals = dashboard.value.workers.individuals || []
-  if (groups.length) {
-    items.push({ kind: 'group-title', id: 'title-group', slots: 0.4, data: null })
-    groups.forEach((g) => {
-      const memberSlots = Math.max(1, (g.members || []).length) * 0.55
-      items.push({
-        kind: 'group',
-        id: `group-${g.id}`,
-        slots: 1.2 + memberSlots,
-        data: g,
-      })
-    })
-  }
-  if (individuals.length) {
-    items.push({ kind: 'person-title', id: 'title-person', slots: 0.4, data: null })
-    individuals.forEach((w) => {
-      items.push({ kind: 'person', id: w.id, slots: 1, data: w })
-    })
-  }
+  ;(dashboard.value.workers.groups || []).forEach((g) => {
+    items.push({ kind: 'group', id: `group-${g.id}`, data: g })
+  })
+  ;(dashboard.value.workers.individuals || []).forEach((w) => {
+    items.push({ kind: 'person', id: w.id, data: w })
+  })
   return items
 })
 
-const workerPages = computed(() => {
-  const pages = []
-  let current = []
-  let used = 0
-  const capacity = Math.max(2, workerPageSize.value)
-  workerItems.value.forEach((item) => {
-    const need = item.slots || 1
-    if (current.length && used + need > capacity) {
-      pages.push(current)
-      current = []
-      used = 0
-    }
-    current.push(item)
-    used += need
-  })
-  if (current.length) pages.push(current)
-  return pages.length ? pages : [[]]
-})
+const workerContentCount = computed(() => workerContentItems.value.length)
 
-const workerTotalPages = computed(() => Math.max(1, workerPages.value.length))
+const workerTotalPages = computed(() =>
+  Math.max(1, Math.ceil(workerContentCount.value / Math.max(1, workerPageSize.value))),
+)
 
 const pagedWorkerItems = computed(() => {
-  const idx = Math.min(workerPage.value, workerTotalPages.value) - 1
-  return workerPages.value[idx] || []
+  const size = Math.max(1, workerPageSize.value)
+  const idx = Math.min(Math.max(1, workerPage.value), workerTotalPages.value) - 1
+  const slice = workerContentItems.value.slice(idx * size, idx * size + size)
+  if (!slice.length) return []
+
+  const out = []
+  let shownGroupTitle = false
+  let shownPersonTitle = false
+  slice.forEach((item) => {
+    if (item.kind === 'group' && !shownGroupTitle) {
+      out.push({ kind: 'group-title', id: `title-group-${idx}`, data: null })
+      shownGroupTitle = true
+    }
+    if (item.kind === 'person' && !shownPersonTitle) {
+      out.push({ kind: 'person-title', id: `title-person-${idx}`, data: null })
+      shownPersonTitle = true
+    }
+    out.push(item)
+  })
+  return out
 })
+
+function visibleGroupMembers(group) {
+  const members = group?.members || []
+  return members.slice(0, GROUP_MEMBER_VISIBLE)
+}
 
 watch([period, woType, workCenter, listStatus], () => {
   page.value = 1
+  workerPage.value = 1
 })
 
 watch(pageSize, (n, prev) => {
   if (n !== prev) page.value = 1
+})
+
+watch(workerPageSize, (n, prev) => {
+  if (n !== prev) workerPage.value = 1
 })
 
 watch([carouselEnabled, carouselSeconds], () => {
@@ -500,8 +529,9 @@ function measurePageSizes() {
   }
   const wkEl = workerListEl.value
   if (wkEl?.clientHeight) {
-    const est = 70
-    const n = Math.max(3, Math.min(10, Math.floor(wkEl.clientHeight / est)))
+    // 小组卡约 150px、单工人行约 64px，取偏保守的每页条数，避免撑出滚动条
+    const est = 120
+    const n = Math.max(2, Math.min(5, Math.floor(wkEl.clientHeight / est)))
     if (n !== workerPageSize.value) workerPageSize.value = n
   }
 }
@@ -568,7 +598,7 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [dashboard.value.list.rows.length, workerItems.value.length, isFullscreen.value],
+  () => [dashboard.value.list.rows.length, workerContentCount.value, isFullscreen.value],
   () =>
     nextTick(() => {
       measurePageSizes()
@@ -1076,6 +1106,17 @@ watch(
 
 .page-indicator {
   font-size: 12px;
+  color: var(--muted);
+}
+
+.worker-footer {
+  flex-shrink: 0;
+}
+
+.group-more {
+  margin-top: 4px;
+  padding-left: 42px;
+  font-size: 11px;
   color: var(--muted);
 }
 
