@@ -471,6 +471,8 @@ const props = defineProps({
   pageMode: { type: Boolean, default: false },
   listPath: { type: String, default: '/procurement/outsourcing-orders' },
   editRecord: { type: Object, default: null },
+  /** 工单一键转外协：预填工单产品与计划数量 */
+  seedWorkOrder: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -646,11 +648,44 @@ function loadEditForm(record) {
   prevHeaderShipWarehouse.value = form.shipWarehouse
 }
 
+function loadSeedFromWorkOrder(wo) {
+  resetForm()
+  if (!wo) return
+  const qty = Math.max(0, Number(wo.planQty) || 0) - Math.max(0, Number(wo.finishedQty) || 0)
+  const planQty = qty > 0 ? qty : Math.max(0, Number(wo.planQty) || 0) || 1
+  const code = wo.materialCode || wo.productCode || ''
+  const name = wo.productName || wo.name || ''
+  form.workOrderName = wo.name || wo.code || ''
+  form.salesOrderNo = wo.sourceOrderNo || ''
+  form.salesOrderId = wo.salesOrderId || ''
+  form.shipWarehouse = wo.warehouse || undefined
+  form.remark = `来源工单 ${wo.code || ''} 一键转外协`
+  if (Array.isArray(wo.planDateRange) && wo.planDateRange[0] && wo.planDateRange[1]) {
+    form.planDateRange = [dayjs(wo.planDateRange[0]), dayjs(wo.planDateRange[1])]
+  } else {
+    const start = dayjs()
+    form.planDateRange = [start, start.add(14, 'day')]
+  }
+  const line = mapPickerToLine({
+    code,
+    name,
+    specModel: wo.specModel || '',
+    material: wo.material || '',
+    drawingNo: wo.drawingNo || '',
+  })
+  line.planQty = planQty
+  if (form.shipWarehouse) line.shipWarehouse = form.shipWarehouse
+  recalcOutsourcingLine(line, { fromInTax: !taxModeExcluding.value })
+  form.lineItems = [line]
+  prevHeaderShipWarehouse.value = form.shipWarehouse
+}
+
 watch(
-  () => [props.open, props.pageMode, props.editRecord?.id],
+  () => [props.open, props.pageMode, props.editRecord?.id, props.seedWorkOrder?.id],
   () => {
     if (!isActive.value) return
     if (props.editRecord) loadEditForm(props.editRecord)
+    else if (props.seedWorkOrder) loadSeedFromWorkOrder(props.seedWorkOrder)
     else resetForm()
   },
   { immediate: true },

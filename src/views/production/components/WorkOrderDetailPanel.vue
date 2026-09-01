@@ -65,6 +65,20 @@
           终止
         </a-button>
         <a-button
+          v-if="canConvertPurchaseOrOutsource"
+          size="small"
+          @click="emitAction('to-purchase')"
+        >
+          转采购
+        </a-button>
+        <a-button
+          v-if="canConvertPurchaseOrOutsource"
+          size="small"
+          @click="emitAction('to-outsource')"
+        >
+          转外协
+        </a-button>
+        <a-button
           v-if="canComplete"
           size="small"
           class="btn-complete"
@@ -175,6 +189,7 @@ import {
   isScheduleIncomplete,
 } from '@/utils/workOrderScheduleBatch'
 import { canShowEditScheduleQty } from '@/utils/workOrderStatus'
+import { canConvertWorkOrderToPurchaseOrOutsource } from '@/utils/workOrderConvert'
 
 const WorkOrderOutboundInfoTab = defineAsyncComponent(
   () => import('./WorkOrderOutboundInfoTab.vue'),
@@ -268,6 +283,10 @@ const canResume = computed(() => workOrder.value?.status === '暂停')
 
 const canTerminate = computed(() =>
   ['待下发', '已下发', '执行中', '暂停'].includes(workOrder.value?.status),
+)
+
+const canConvertPurchaseOrOutsource = computed(() =>
+  canConvertWorkOrderToPurchaseOrOutsource(workOrder.value),
 )
 
 const canComplete = computed(() => ['已下发', '执行中'].includes(workOrder.value?.status))
