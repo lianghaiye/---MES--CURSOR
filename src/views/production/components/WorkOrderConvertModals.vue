@@ -24,6 +24,7 @@ import {
   buildConvertSyntheticOrder,
   canConvertWorkOrderToPurchaseOrOutsource,
 } from '@/utils/workOrderConvert'
+import { resolveWorkOrderProcurementSource } from '@/constants/procurementDocSource'
 
 const emit = defineEmits(['converted'])
 
@@ -66,11 +67,13 @@ function openOutsource(wo) {
 function onPurchaseSaved(requisition) {
   if (!requisition) return
   const wo = sourceWorkOrder.value
-  requisition.source = '工单转采购'
+  const source = resolveWorkOrderProcurementSource(wo)
+  requisition.source = source
   if (wo?.code) {
-    requisition.remark = [requisition.remark, `来源工单 ${wo.code}`].filter(Boolean).join('；')
+    requisition.sourceOrderNo = wo.code
     requisition.sourceWorkOrderId = wo.id
     requisition.sourceWorkOrderNo = wo.code
+    requisition.remark = [requisition.remark, `来源工单 ${wo.code}`].filter(Boolean).join('；')
   }
   addPurchaseRequisition(requisition)
   emit('converted', { type: 'purchase', workOrder: wo, requisition })

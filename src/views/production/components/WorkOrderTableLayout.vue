@@ -44,6 +44,11 @@
           <template v-if="column.key === 'index'">
             {{ rowIndex(index) }}
           </template>
+          <template v-else-if="column.key === 'code'">
+            <a class="link-code" @click.prevent="emit('select', record.id)">{{
+              formatCell(record.code)
+            }}</a>
+          </template>
           <template v-else-if="column.key === 'progress'">
             <a-tag :color="statusColor(record.status)">
               {{ formatCell(record.status) }}
@@ -326,6 +331,15 @@ function urgencyLabel(urgency) {
 
   :deep(.ant-table-tbody > tr > td) {
     cursor: pointer;
+  }
+
+  .link-code {
+    color: #1677ff;
+    cursor: pointer;
+
+    &:hover {
+      color: #4096ff;
+    }
   }
 }
 

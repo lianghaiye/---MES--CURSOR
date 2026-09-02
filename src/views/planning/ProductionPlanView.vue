@@ -1694,10 +1694,13 @@ function handleReset() {
 
 .info-plain {
   margin-bottom: 12px;
-  padding: 8px 4px 4px;
+  padding: 12px 14px;
   font-size: 13px;
   line-height: 1.7;
   color: rgba(0, 0, 0, 0.88);
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
 
   .info-plain-grid {
     display: grid;

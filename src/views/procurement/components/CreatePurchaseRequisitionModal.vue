@@ -845,6 +845,7 @@ function handleSave() {
     lineItems,
     orderDate: dayjs().format('YYYY-MM-DD'),
     source: '新增',
+    sourceOrderNo: props.editRecord?.sourceOrderNo || '',
     docStatus: '待处理',
     overdueStatus: '未逾期',
     salesOrderNo: props.editRecord?.salesOrderNo || '',

@@ -97,6 +97,7 @@ function createRequisition(partial) {
     deliveryDate: '',
     estimatedArrivalDate: '',
     source: '新增',
+    sourceOrderNo: '',
     operator: '管理员',
     creator: '管理员',
     salesperson: 'admin1',
@@ -108,6 +109,14 @@ function createRequisition(partial) {
     amountWan,
     lineItems,
     ...partial,
+  }
+  // 计划/销售来源：无来源单号时默认用销售单号
+  if (
+    !requisition.sourceOrderNo &&
+    (requisition.source === '生产计划' || requisition.source === '销售订单') &&
+    requisition.salesOrderNo
+  ) {
+    requisition.sourceOrderNo = requisition.salesOrderNo
   }
   return stampRequisitionLineSalesOrderNos(requisition)
 }
@@ -728,6 +737,17 @@ export function filterPurchaseRequisitions(list, filters) {
     const reqNoQ = String(filters.reqNo || '').trim()
     if (reqNoQ && !String(item.reqNo || '').includes(reqNoQ)) return false
     if (filters.salesOrderNo && !item.salesOrderNo?.includes(filters.salesOrderNo)) return false
+    if (filters.source) {
+      const src = String(item.source || '').trim()
+      const normalized =
+        src === '外购销售' ? '销售订单' : src === '工单转采购' ? '生产工单' : src || '新增'
+      if (normalized !== filters.source) return false
+    }
+    if (filters.sourceOrderNo) {
+      const q = String(filters.sourceOrderNo).trim()
+      const no = String(item.sourceOrderNo || item.sourceWorkOrderNo || '').trim()
+      if (!no.includes(q)) return false
+    }
     if (filters.urgency && item.urgency !== filters.urgency) return false
     if (filters.docStatus && item.docStatus !== filters.docStatus) return false
     if (filters.overdueStatus && item.overdueStatus !== filters.overdueStatus) return false

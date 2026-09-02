@@ -66,6 +66,8 @@ export function createOutsourcingOrder(partial = {}) {
     workOrderName: '',
     salesOrderNo: '',
     salesOrderId: '',
+    source: '新增',
+    sourceOrderNo: '',
     supplier: '',
     /** 兼容旧字段：结束日期 */
     planDate: '',
@@ -243,6 +245,8 @@ export function filterOutsourcingOrders(list, filters = {}) {
   const status = filters.status
   const orderNo = String(filters.orderNo || '').trim()
   const salesOrderNo = String(filters.salesOrderNo || '').trim()
+  const source = filters.source
+  const sourceOrderNo = String(filters.sourceOrderNo || '').trim()
   const supplier = filters.supplier
   const issueStatus = filters.issueStatus
   const returnStatus = filters.returnStatus
@@ -254,6 +258,15 @@ export function filterOutsourcingOrders(list, filters = {}) {
     if (status && row.status !== status) return false
     if (orderNo && !String(row.orderNo || '').includes(orderNo)) return false
     if (salesOrderNo && !String(row.salesOrderNo || '').includes(salesOrderNo)) return false
+    if (source) {
+      const src = String(row.source || '').trim() || '新增'
+      const normalized = src === '工单转外协' ? '生产工单' : src
+      if (normalized !== source) return false
+    }
+    if (sourceOrderNo) {
+      const no = String(row.sourceOrderNo || row.sourceWorkOrderNo || '').trim()
+      if (!no.includes(sourceOrderNo)) return false
+    }
     if (supplier && row.supplier !== supplier) return false
     if (issueStatus && row.issueStatus !== issueStatus) return false
     if (returnStatus && row.returnStatus !== returnStatus) return false

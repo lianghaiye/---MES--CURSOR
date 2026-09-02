@@ -36,6 +36,27 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="来源">
+              <a-select
+                v-model:value="filters.source"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="sourceOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="来源单号">
+              <a-input
+                v-model:value="filters.sourceOrderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="供应商">
               <a-select
                 v-model:value="filters.supplier"
@@ -213,6 +234,12 @@
           </template>
           <template v-else-if="column.key === 'qtySummary'">
             {{ formatOutsourcingQtySummary(record) }}
+          </template>
+          <template v-else-if="column.key === 'source'">
+            {{ normalizeProcurementDocSource(record.source) }}
+          </template>
+          <template v-else-if="column.key === 'sourceOrderNo'">
+            {{ record.sourceOrderNo || record.sourceWorkOrderNo || '—' }}
           </template>
           <template v-else-if="column.key === 'planDate'">
             {{ formatOutsourcingPlanDateDisplay(record) || '—' }}
@@ -405,6 +432,10 @@ import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { formatQty } from '@/utils/numberFormat'
+import {
+  PROCUREMENT_DOC_SOURCE_OPTIONS,
+  normalizeProcurementDocSource,
+} from '@/constants/procurementDocSource'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -413,6 +444,8 @@ const filters = reactive({
   status: undefined,
   orderNo: '',
   salesOrderNo: '',
+  source: undefined,
+  sourceOrderNo: '',
   supplier: undefined,
   issueStatus: undefined,
   returnStatus: undefined,
@@ -439,6 +472,7 @@ const issueStatusOpts = outsourcingIssueStatusOptions.map((v) => ({ label: v, va
 const returnStatusOpts = outsourcingReturnStatusOptions.map((v) => ({ label: v, value: v }))
 const overdueStatusOpts = outsourcingOverdueStatusOptions.map((v) => ({ label: v, value: v }))
 const operatorOpts = computed(() => listOutsourcingOperators())
+const sourceOpts = PROCUREMENT_DOC_SOURCE_OPTIONS
 
 const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
@@ -455,6 +489,14 @@ const baseColumns = [
   { title: '结算类型', dataIndex: 'settlementType', width: 110 },
   { title: '结算周期', dataIndex: 'settlementCycle', width: 90 },
   { title: '结算方式', dataIndex: 'settlementMethod', width: 100 },
+  { title: '来源', key: 'source', dataIndex: 'source', width: 110 },
+  {
+    title: '来源单号',
+    key: 'sourceOrderNo',
+    dataIndex: 'sourceOrderNo',
+    width: 140,
+    ellipsis: true,
+  },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
   { title: '更新人', dataIndex: 'updater', width: 90 },
@@ -463,7 +505,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outsourcing-order-list-v5', baseColumns)
+  useTableColumnSettings('outsourcing-order-list-v6', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -568,6 +610,8 @@ function handleReset() {
   filters.status = undefined
   filters.orderNo = ''
   filters.salesOrderNo = ''
+  filters.source = undefined
+  filters.sourceOrderNo = ''
   filters.supplier = undefined
   filters.issueStatus = undefined
   filters.returnStatus = undefined

@@ -465,6 +465,7 @@ import {
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import { resolveWorkOrderProcurementSource } from '@/constants/procurementDocSource'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -502,6 +503,8 @@ const form = reactive({
   workOrderName: '',
   salesOrderNo: '',
   salesOrderId: '',
+  source: '新增',
+  sourceOrderNo: '',
   supplier: '',
   planDateRange: null,
   contactPerson: '',
@@ -607,6 +610,8 @@ function resetForm() {
   form.workOrderName = ''
   form.salesOrderNo = ''
   form.salesOrderId = ''
+  form.source = '新增'
+  form.sourceOrderNo = ''
   form.supplier = ''
   form.planDateRange = null
   form.contactPerson = ''
@@ -628,6 +633,8 @@ function loadEditForm(record) {
   form.workOrderName = record.workOrderName || ''
   form.salesOrderNo = record.salesOrderNo || ''
   form.salesOrderId = record.salesOrderId || ''
+  form.source = record.source || '新增'
+  form.sourceOrderNo = record.sourceOrderNo || record.sourceWorkOrderNo || ''
   form.supplier = record.supplier || ''
   {
     const start = record.planStartDate || record.planDate
@@ -658,6 +665,8 @@ function loadSeedFromWorkOrder(wo) {
   form.workOrderName = wo.name || wo.code || ''
   form.salesOrderNo = wo.sourceOrderNo || ''
   form.salesOrderId = wo.salesOrderId || ''
+  form.source = resolveWorkOrderProcurementSource(wo)
+  form.sourceOrderNo = wo.code || ''
   form.shipWarehouse = wo.warehouse || undefined
   form.remark = `来源工单 ${wo.code || ''} 一键转外协`
   if (Array.isArray(wo.planDateRange) && wo.planDateRange[0] && wo.planDateRange[1]) {
@@ -873,6 +882,8 @@ function buildPayload() {
     workOrderName: form.workOrderName || '',
     salesOrderNo: form.salesOrderNo || '',
     salesOrderId: form.salesOrderId || '',
+    source: form.source || '新增',
+    sourceOrderNo: form.sourceOrderNo || '',
     supplier: form.supplier || '',
     planStartDate: start,
     planEndDate: end,

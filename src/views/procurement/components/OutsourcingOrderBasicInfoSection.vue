@@ -27,6 +27,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
+import { normalizeProcurementDocSource } from '@/constants/procurementDocSource'
 
 const props = defineProps({
   order: { type: Object, required: true },
@@ -55,6 +56,16 @@ const fields = computed(() => [
   { key: 'orderNo', label: '外协单号' },
   { key: 'workOrderName', label: '工单名称' },
   { key: 'salesOrderNo', label: '销售单号', slot: 'salesOrderNo' },
+  {
+    key: 'source',
+    label: '来源',
+    format: (o) => normalizeProcurementDocSource(o.source),
+  },
+  {
+    key: 'sourceOrderNo',
+    label: '来源单号',
+    format: (o) => display(o.sourceOrderNo || o.sourceWorkOrderNo),
+  },
   { key: 'supplier', label: '供应商' },
   {
     key: 'planDate',

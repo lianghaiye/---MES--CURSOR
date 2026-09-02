@@ -24,6 +24,27 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="来源">
+              <a-select
+                v-model:value="filters.source"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="sourceOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="来源单号">
+              <a-input
+                v-model:value="filters.sourceOrderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="紧急度">
               <a-select
                 v-model:value="filters.urgency"
@@ -188,6 +209,12 @@
           <template v-else-if="column.key === 'amountWan'">
             {{ formatQty(record.amountWan) }}
           </template>
+          <template v-else-if="column.key === 'source'">
+            {{ normalizeProcurementDocSource(record.source) }}
+          </template>
+          <template v-else-if="column.key === 'sourceOrderNo'">
+            {{ record.sourceOrderNo || record.sourceWorkOrderNo || '—' }}
+          </template>
           <template v-else-if="column.key === 'updater'">
             {{ record.updater || record.operator || '—' }}
           </template>
@@ -302,6 +329,10 @@ import {
   overdueStatusOptions,
   operatorOptions,
 } from '@/mock/purchaseRequisitionOptions'
+import {
+  PROCUREMENT_DOC_SOURCE_OPTIONS,
+  normalizeProcurementDocSource,
+} from '@/constants/procurementDocSource'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import PurchaseRequisitionPrintModal from './components/PurchaseRequisitionPrintModal.vue'
@@ -322,6 +353,8 @@ onMounted(() => {
 const filters = reactive({
   reqNo: '',
   salesOrderNo: '',
+  source: undefined,
+  sourceOrderNo: '',
   urgency: undefined,
   docStatus: undefined,
   orderDateRange: null,
@@ -339,6 +372,7 @@ const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const docStatusOpts = docStatusOptions.map((v) => ({ label: v, value: v }))
 const overdueOpts = overdueStatusOptions.map((v) => ({ label: v, value: v }))
 const operatorOpts = operatorOptions.map((v) => ({ label: v, value: v }))
+const sourceOpts = PROCUREMENT_DOC_SOURCE_OPTIONS
 
 const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
@@ -359,7 +393,14 @@ const baseColumns = [
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { title: '预计到货日期', dataIndex: 'estimatedArrivalDate', width: 120 },
   { title: '采购员', dataIndex: 'salesperson', width: 100 },
-  { title: '来源', dataIndex: 'source', width: 110 },
+  { title: '来源', key: 'source', dataIndex: 'source', width: 110 },
+  {
+    title: '来源单号',
+    key: 'sourceOrderNo',
+    dataIndex: 'sourceOrderNo',
+    width: 140,
+    ellipsis: true,
+  },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 140 },
   { title: '更新人', key: 'updater', width: 90 },
@@ -368,7 +409,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-req-list-v5', baseColumns)
+  useTableColumnSettings('purchase-req-list-v6', baseColumns)
 
 const filteredList = computed(() => {
   void purchaseOrderState.orders
@@ -469,6 +510,8 @@ function handleSearch() {
 function handleReset() {
   filters.reqNo = ''
   filters.salesOrderNo = ''
+  filters.source = undefined
+  filters.sourceOrderNo = ''
   filters.urgency = undefined
   filters.docStatus = undefined
   filters.orderDateRange = null
