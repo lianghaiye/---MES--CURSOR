@@ -409,7 +409,8 @@ function formatScheduleQty(val) {
 }
 
 function isLineOverSchedule(line) {
-  if (line.isGroup) return false
+  // 组内多人共享同一份成果：只在主行提示，避免子行重复感叹号
+  if (line.isCollabChild && line.outcomeMode === 'shared') return false
   return isLineReportQtyOverSchedule(line, bundle.value?.scheduleQty)
 }
 
