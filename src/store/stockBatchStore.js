@@ -26,6 +26,10 @@ import {
 import { DEDICATED_SHIP_DEMO, ensureDedicatedShipDemoBatches } from '@/mock/dedicatedShipDemoSeed'
 import { ensureMultiUnitFlowBatches } from '@/mock/multiUnitFlowDemoSeed'
 import {
+  ensureCategoryBatchPieceBatches,
+  CBP_INV_STOCK_SYNC_ROWS,
+} from '@/mock/categoryBatchPieceDemoSeed'
+import {
   ensureOneItemOneCodeInventoryBatches,
   OIOC_INV_STOCK_SYNC_ROWS,
 } from '@/mock/oneItemOneCodeInventoryDemoSeed'
@@ -34,8 +38,8 @@ import { registerSettleBatchWeightLookup } from '@/utils/settleUnit'
 
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
-/** v25：一类/一批按件入库改为 1 父批 + 四位 SN */
-const CURRENT_SEED_VERSION = '25'
+/** v28：一类/一批补三口径（根/米/kg）在库批与件码 */
+const CURRENT_SEED_VERSION = '28'
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',
@@ -69,14 +73,18 @@ function initBatches() {
   if (shouldReseed() || !stored?.length) {
     return {
       batches: ensureOneItemOneCodeInventoryBatches(
-        ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(cloneStockBatchSeed())),
+        ensureCategoryBatchPieceBatches(
+          ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(cloneStockBatchSeed())),
+        ),
       ),
       reseeded: true,
     }
   }
   return {
     batches: ensureOneItemOneCodeInventoryBatches(
-      ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(stored)),
+      ensureCategoryBatchPieceBatches(
+        ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(stored)),
+      ),
     ),
     reseeded: false,
   }
@@ -163,6 +171,7 @@ if (initialBatchLoad.reseeded) {
       unit: '件',
     },
     ...OIOC_INV_STOCK_SYNC_ROWS,
+    ...CBP_INV_STOCK_SYNC_ROWS,
   ].forEach((row) =>
     syncAggregateStockFromBatches(row.warehouse, row.itemCode, row.itemName, row.unit),
   )
@@ -297,6 +306,15 @@ export function createBatch(partial = {}) {
     itemCode: partial.itemCode || '',
     itemName: partial.itemName || '',
     currentLength: length,
+    inboundQty:
+      partial.inboundQty != null && partial.inboundQty !== ''
+        ? roundMeters(Number(partial.inboundQty))
+        : length,
+    inboundPurchaseQty:
+      partial.inboundPurchaseQty != null && partial.inboundPurchaseQty !== ''
+        ? roundMeters(Number(partial.inboundPurchaseQty))
+        : null,
+    purchaseUnit: partial.purchaseUnit || partial.attrs?.purchaseUnit || '',
     unit: partial.unit || '米',
     status: partial.status || BATCH_STATUS.IN_STOCK,
     sourceType: partial.sourceType || '',
@@ -345,7 +363,20 @@ export function applyInboundBatchesFromRoots(payload) {
     workOrderNo: payload.workOrderNo || '',
   }
   const lineUomConvert = payload.uomConvert || null
-  const lineStockTotal = roundMeters(values.reduce((s, l) => s + l, 0))
+  const thisCallStock = roundMeters(values.reduce((s, l) => s + l, 0))
+  const lineStockTotal =
+    Number(payload.lineStockQty) > 0 ? roundMeters(Number(payload.lineStockQty)) : thisCallStock
+  const linePurchaseQty = Number(payload.purchaseQty)
+  const purchaseUnit = payload.purchaseUnit || payload.attrs?.purchaseUnit || ''
+
+  function inboundPurchaseFor(batchStockQty, pieceCount) {
+    if (Number.isFinite(linePurchaseQty) && linePurchaseQty > 0 && lineStockTotal > 0) {
+      if (Math.abs(batchStockQty - lineStockTotal) < 1e-9) return roundMeters(linePurchaseQty)
+      return roundMeters(linePurchaseQty * (batchStockQty / lineStockTotal))
+    }
+    if (pieceCount > 0) return pieceCount
+    return null
+  }
 
   // 一物一码；或一类/一批一码在采购≠库存且按单件/逐件填写：1 父批 + N 件码（四位 SN）
   if (
@@ -358,12 +389,14 @@ export function applyInboundBatchesFromRoots(payload) {
       unit,
     })
   ) {
-    const total = lineStockTotal
+    const total = thisCallStock
     const parent = createBatch({
       warehouse: payload.warehouse,
       itemCode: payload.itemCode,
       itemName: payload.itemName || '',
       currentLength: total,
+      inboundPurchaseQty: inboundPurchaseFor(total, values.length),
+      purchaseUnit,
       unit,
       sourceType: payload.sourceType || '采购入库',
       sourceDocNo: payload.sourceDocNo || '',
@@ -403,6 +436,8 @@ export function applyInboundBatchesFromRoots(payload) {
       itemCode: payload.itemCode,
       itemName: payload.itemName || '',
       currentLength: val,
+      inboundPurchaseQty: inboundPurchaseFor(val, 0),
+      purchaseUnit,
       unit,
       sourceType: payload.sourceType || '采购入库',
       sourceDocNo: payload.sourceDocNo || '',
@@ -563,6 +598,8 @@ export function receiveRemnantBatch({
     itemCode: source.itemCode,
     itemName: source.itemName,
     currentLength: len,
+    inboundQty: len,
+    purchaseUnit: source.purchaseUnit || '',
     unit: source.unit || '米',
     sourceType,
     sourceDocNo,

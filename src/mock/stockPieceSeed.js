@@ -1,4 +1,4 @@
-/** 库存明细「查看批次」件码演示种子（一物一码） */
+/** 库存明细「查看批次」件码演示种子（一物一码轴承 + 一批一码不锈钢管统一单件） */
 
 export function cloneStockPieceSeed() {
   const batchNo = 'B-260718-301'

@@ -16,6 +16,8 @@ export const CASTING_NORATE_SETTLE_NAME = '异形铸件（无单重）'
 /** 三口径不一致演示：采购=根，库存=米，结算=kg */
 export const PIPE_TRIPLE_UNIT_CODE = 'WL-PIPE-TRIPLE-Q235-50'
 export const PIPE_TRIPLE_UNIT_NAME = '无缝钢管 三口径 Q235 φ50'
+export const PIPE_TRIPLE_CAT_CODE = 'WL-PIPE-TRIPLE-CAT-50'
+export const PIPE_TRIPLE_CAT_NAME = '无缝钢管 三口径（一类一码）'
 /** 单一单位演示：采购=库存=件，无结算单位 */
 export const SIMPLE_UNIT_DEMO_CODE = 'WL-BEARING-6205-UNIT'
 export const SIMPLE_UNIT_DEMO_NAME = '深沟球轴承 6205（单单位）'
@@ -206,6 +208,29 @@ export function createPipeTripleUnitMaterial() {
   })
 }
 
+/** 三口径 + 一类一码：统一单件/逐件会挂 SN */
+export function createPipeTripleCategoryMaterial() {
+  return baseDualUnitMaterial({
+    id: 'mat-pipe-triple-category-demo',
+    code: PIPE_TRIPLE_CAT_CODE,
+    name: PIPE_TRIPLE_CAT_NAME,
+    barcodeType: '一类一码',
+    inventoryUnit: '米',
+    stockUnit: '米',
+    purchaseUnit: '根',
+    settleUnit: 'kg',
+    settleConvertType: 'floating',
+    standardUnitWeight: 18.5,
+    uomRelation: 'per_piece_length',
+    unitPrice: 6.8,
+    purchaseUnitPrice: 6.8,
+    specModel: 'φ50×3',
+    material: 'Q235',
+    techParams: '一类一码三口径：根 / 米 / kg；按统一单件或逐件入库时挂件码',
+    remark: '三口径演示（一类一码）：采购根、库存米、结算kg',
+  })
+}
+
 /** 单一单位演示：采购/库存均为件，不启用双单位与结算单位 */
 export function createSimpleUnitDemoMaterial() {
   return {
@@ -251,6 +276,7 @@ export function createDemoDualUnitMaterials() {
     createCastingBlankSettleMaterial(),
     createCastingNorateSettleMaterial(),
     createPipeTripleUnitMaterial(),
+    createPipeTripleCategoryMaterial(),
     createSimpleUnitDemoMaterial(),
     baseDualUnitMaterial({
       id: 'mat-vl-plate-ss-304',
@@ -390,13 +416,38 @@ export function createDemoDualUnitMaterials() {
   ]
 }
 
+function demoInboundPurchase(itemCode) {
+  if (itemCode === STEEL_PIPE_CODE || itemCode === STEEL_WEIGHT_BAR_CODE) {
+    return { qty: 1, unit: '根' }
+  }
+  if (itemCode === STEEL_PLATE_CODE) {
+    return { qty: 1, unit: '张' }
+  }
+  return null
+}
+
 function seedBatch(partial) {
+  const currentLength = Number(partial.currentLength) || 0
+  const fromConvertStock = Number(partial.uomConvert?.stockQty)
+  const fromConvertPiece = Number(partial.uomConvert?.pieceCount)
+  const demoPurchase = demoInboundPurchase(partial.itemCode)
   return {
     parentBatchId: '',
     createdAt: '2026-07-01T00:00:00.000Z',
     updatedAt: '2026-07-01T00:00:00.000Z',
     status: '在库',
     sourceType: '期初',
+    inboundQty:
+      partial.inboundQty ??
+      (Number.isFinite(fromConvertStock) && fromConvertStock > 0
+        ? fromConvertStock
+        : currentLength),
+    inboundPurchaseQty:
+      partial.inboundPurchaseQty ??
+      (Number.isFinite(fromConvertPiece) && fromConvertPiece > 0
+        ? fromConvertPiece
+        : (demoPurchase?.qty ?? null)),
+    purchaseUnit: partial.purchaseUnit || demoPurchase?.unit || '',
     ...partial,
   }
 }

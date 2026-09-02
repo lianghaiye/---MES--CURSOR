@@ -1,6 +1,6 @@
 /**
  * 批次换算记录：入库过磅实填沉淀到库存批次（不进主数据）
- * 主数据「按批次覆盖」仅声明规则；批次单重看库存明细 · 批次明细。
+ * 主数据「按批次覆盖」仅声明规则；批次单量看库存明细 · 批次明细。
  *
  * 注意：本文件不 import settleUnit / stockBatchStore，避免
  * settleUnit → stockBatchStore → batchUomConvert → settleUnit 循环依赖导致白屏。
@@ -11,10 +11,11 @@ import { roundNumber } from '@/utils/numberFormat'
 /**
  * @typedef {object} BatchUomConvert
  * @property {'batch'|'fixed'} convertType
- * @property {number} pieceCount 本批件数/张数（采购点货量）
+ * @property {number} pieceCount 本批入库件数（点收量：采购到货或成品/半成品缴库，出库不扣）
+ * @property {string} [purchaseUnit] 入库件数单位（采购单位；成品/半成品多为件）
  * @property {number} settleQty 过磅/结算总重
  * @property {string} settleUnit
- * @property {number} actualUnitWeight 批次单重 = settleQty / pieceCount
+ * @property {number} actualUnitWeight 批次单量 = settleQty / pieceCount（结算单位 / 入库件数单位）
  * @property {number|null} standardUnitWeight 主数据默认换算率（预估）
  * @property {number|null} stockQty 本批入库库存量
  * @property {string} stockUnit
@@ -58,6 +59,7 @@ export function buildLineUomConvert(line = {}) {
     pieceCount,
     stockQty,
     stockUnit: line.unit || line.stockUnit || '',
+    purchaseUnit: line.purchaseUnit || '',
   })
 }
 
@@ -72,6 +74,7 @@ export function buildBatchUomConvert({
   pieceCount,
   stockQty,
   stockUnit = '',
+  purchaseUnit = '',
 } = {}) {
   const unit = String(settleUnit || '').trim()
   const total = Number(settleQty)
@@ -91,11 +94,12 @@ export function buildBatchUomConvert({
     standardUnitWeight: hasStd ? roundNumber(std, 4) : null,
     stockQty: Number(stockQty) > 0 ? roundNumber(Number(stockQty), 4) : null,
     stockUnit: String(stockUnit || '').trim(),
+    purchaseUnit: String(purchaseUnit || '').trim(),
   }
 }
 
 /**
- * 一行多批时按库存量占比分摊过磅总重与件数
+ * 一行多批时按库存量占比分摊结算数量与入库件数
  * @returns {BatchUomConvert|null}
  */
 export function allocateBatchUomConvert(lineConvert, batchStockQty, lineStockTotal) {

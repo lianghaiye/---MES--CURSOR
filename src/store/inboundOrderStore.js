@@ -415,6 +415,8 @@ function prepareAndApplyInboundLine(order, line) {
     isVariableLength: Boolean(line.isVariableLength),
     purchaseUnit: line.purchaseUnit,
     stockUnit: line.stockUnit || line.unit,
+    purchaseQty: Number(line.purchaseQty) || 0,
+    lineStockQty: Number(line.stockQty) || Number(line.qty) || 0,
     workOrderNo: resolveWorkOrderNoFromInbound(order) || line.workOrderNo || '',
     attrs: {
       material: line.material,

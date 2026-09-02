@@ -1,14 +1,15 @@
-/** 库存件码（一物一码挂在父批次下，不单独占库存批次） */
+/** 库存件码（挂在父批次下，不单独占库存批次；一物一码，或一类/一批按件入库） */
 
 import { reactive, watch } from 'vue'
 import { roundMeters } from '@/utils/variableLengthMaterial'
 import { cloneStockPieceSeed } from '@/mock/stockPieceSeed'
 import { ensureOneItemOneCodeInventoryPieces } from '@/mock/oneItemOneCodeInventoryDemoSeed'
+import { ensureCategoryBatchPiecePieces } from '@/mock/categoryBatchPieceDemoSeed'
 
 const STORAGE_KEY = 'i_doms_stock_pieces'
 const SEED_VERSION_KEY = 'i_doms_stock_pieces_seed_v'
-/** v4：件码改为四位 SN；一类/一批按件入库挂件码 */
-const CURRENT_SEED_VERSION = '4'
+/** v6：一类/一批三口径件码 */
+const CURRENT_SEED_VERSION = '6'
 
 export const PIECE_STATUS = {
   IN_STOCK: '在库',
@@ -44,7 +45,7 @@ function nid() {
 function initPieces() {
   const stored = loadFromStorage()
   const base = shouldReseed() || !stored?.length ? cloneStockPieceSeed() : stored
-  return ensureOneItemOneCodeInventoryPieces(base)
+  return ensureCategoryBatchPiecePieces(ensureOneItemOneCodeInventoryPieces(base))
 }
 
 export const stockPieceState = reactive({
@@ -81,8 +82,11 @@ export function getStockPieceById(id) {
   return stockPieceState.pieces.find((p) => p.id === id) || null
 }
 
+/** 父批是否按件管理（有 SN 件码即可展开；含一类/一批一码按单件、逐件入库） */
 export function isPieceManagedBatch(batch) {
-  return Boolean(batch?.attrs?.manageByPiece)
+  if (batch?.attrs?.manageByPiece) return true
+  if (!batch?.id) return false
+  return stockPieceState.pieces.some((p) => p.batchId === batch.id)
 }
 
 /**

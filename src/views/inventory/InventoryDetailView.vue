@@ -336,9 +336,14 @@
     <a-drawer
       v-model:open="batchDrawerOpen"
       :title="batchDrawerTitle"
-      width="1280"
+      v-bind="batchDrawerBind"
+      :width="batchDrawerWidth"
+      root-class-name="batch-view-drawer"
       destroy-on-close
     >
+      <template #extra>
+        <a-button size="small" @click="closeBatchDrawer">返回列表</a-button>
+      </template>
       <div v-if="batchDrawerRow" class="batch-soft-summary">
         <span
           >在库合计
@@ -370,6 +375,21 @@
         >
       </div>
 
+      <div v-if="batchDrawerRow" class="batch-item-meta">
+        <span
+          >产品名称：<b>{{ drawerItemMeta.itemName }}</b></span
+        >
+        <span
+          >规格型号：<b>{{ drawerItemMeta.specModel }}</b></span
+        >
+        <span
+          >材质：<b>{{ drawerItemMeta.material }}</b></span
+        >
+        <span
+          >变体属性：<b>{{ drawerItemMeta.variantSummary }}</b></span
+        >
+      </div>
+
       <a-tabs v-model:activeKey="drawerInnerTab" size="small" class="batch-drawer-tabs">
         <a-tab-pane key="batches" tab="批次明细">
           <div class="batch-drawer-toolbar">
@@ -383,7 +403,7 @@
             type="info"
             show-icon
             class="batch-soft-tip"
-            message="本页为批次快照：按当前出库规则排序（余料优先 → 批次号先进先出/后进先出）。按件管理的批次（一物一码，或一类/一批一码按单件、逐件入库）可展开查看件码；有结算过磅的批次会显示件数/过磅总重/批次单重（按批次覆盖换算记录，不进主数据）。出入库痕迹请看「物料流水」。"
+            message="本页为批次快照：入库建批 + 出库扣减后的本批余量。在库数量是当前还剩多少（库存单位）；入库数量是本批建账量（有采购单位差时按采购单位点收）。采购≠库存时另显示入库库存量（建账时折成库存单位的量）。有结算单位时另显示结算数量、批次单量。出入库痕迹请看「物料流水」。"
           />
           <a-table
             :columns="drawerBatchColumns"
@@ -407,6 +427,11 @@
               <template v-else-if="column.key === 'createdAt'">
                 {{ formatBatchTime(record.createdAt) }}
               </template>
+              <template v-else-if="column.key === 'sourceDocNo'">
+                <span class="ellipsis-cell" :title="record.sourceDocNo || ''">{{
+                  record.sourceDocNo || '—'
+                }}</span>
+              </template>
               <template v-else-if="column.key === 'remnant'">
                 <a-tag v-if="isRemnantBatch(record)" color="orange">余料</a-tag>
                 <span v-else class="muted">—</span>
@@ -418,6 +443,12 @@
                 </template>
                 <span v-else class="muted">—</span>
               </template>
+              <template v-else-if="column.key === 'inboundQty'">
+                {{ formatDrawerInboundQty(record) }}
+              </template>
+              <template v-else-if="column.key === 'inboundStockQty'">
+                {{ formatDrawerInboundStockQty(record) }}
+              </template>
               <template v-else-if="column.key === 'currentLength'">
                 {{
                   formatInventoryQtyWithUnit(
@@ -425,9 +456,6 @@
                     record.unit || batchDrawerRow?.unit,
                   )
                 }}
-              </template>
-              <template v-else-if="column.key === 'convertPieceCount'">
-                {{ formatConvertPieceCount(record) }}
               </template>
               <template v-else-if="column.key === 'convertSettleQty'">
                 {{ formatConvertSettleQty(record) }}
@@ -503,8 +531,8 @@
             row-key="id"
             size="small"
             bordered
+            table-layout="fixed"
             :pagination="{ pageSize: 15, size: 'small' }"
-            :scroll="{ x: 1200 }"
             :locale="{ emptyText: '暂无流水记录' }"
           >
             <template #bodyCell="{ column, record }">
@@ -609,6 +637,8 @@ import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useListExport } from '@/composables/useListExport'
+import { useDrawerWidth } from '@/composables/useDrawerWidth'
+import { lineVariantSummary } from '@/utils/spuLineResolve'
 import { inventoryDetailExportFields } from '@/utils/exportFields/inventoryDetailExport'
 import {
   buildInventoryDetailLines,
@@ -620,18 +650,26 @@ import {
   inventoryMaterialTypeOptions,
 } from '@/utils/inventoryDetailLines'
 import { hasBatchUomConvert } from '@/utils/batchUomConvert'
+import { hasSettleUnit } from '@/utils/settleUnit'
 import { formatQtyWithUnit, formatQty } from '@/utils/numberFormat'
 import {
   CASTING_BLANK_SETTLE_CODE,
   STEEL_PIPE_CODE,
   STEEL_PLATE_CODE,
   STEEL_WEIGHT_BAR_CODE,
+  PIPE_TRIPLE_UNIT_CODE,
+  PIPE_TRIPLE_CAT_CODE,
 } from '@/mock/stockBatchSeed'
+import { CBP_ANGLE_CODE, CBP_SS_PIPE_CODE } from '@/mock/categoryBatchPieceDemoSeed'
 
-/** 库存台账置顶演示料（按批次覆盖 / 双单位），方便原型验收一眼看到 */
+/** 库存台账置顶演示料（单位口径 / 一类一批件码），方便原型验收一眼看到 */
 const DEMO_STOCK_PIN_CODES = [
+  PIPE_TRIPLE_UNIT_CODE,
+  PIPE_TRIPLE_CAT_CODE,
   CASTING_BLANK_SETTLE_CODE,
   STEEL_PIPE_CODE,
+  CBP_ANGLE_CODE,
+  CBP_SS_PIPE_CODE,
   STEEL_PLATE_CODE,
   STEEL_WEIGHT_BAR_CODE,
 ]
@@ -816,34 +854,94 @@ const batchQueryColumns = [
   { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 140 },
 ]
 
+const drawerBatches = computed(() => {
+  const r = batchDrawerRow.value
+  if (!r) return []
+  void stockBatchState.batches
+  const list = listBatches({
+    warehouse: r.warehouse,
+    itemCode: r.itemCode,
+    inStockOnly: drawerBatchScope.value === 'inStock',
+  })
+  return sortBatchesByIssueRule(list, getOutboundIssueRule())
+})
+
+const drawerHasSalesOrder = computed(() =>
+  drawerBatches.value.some((b) => b.salesOrderNo || b.salesOrderId),
+)
+
+/** 抽屉物料口径：采购≠库存才拆两列入库；有结算单位才出结算列 */
+const drawerItemUnits = computed(() => {
+  const row = batchDrawerRow.value
+  if (!row) {
+    return {
+      stockUnit: '',
+      purchaseUnit: '',
+      settleUnit: '',
+      hasPurchaseSplit: false,
+      hasSettle: false,
+    }
+  }
+  const code = row.itemCode
+  const mat = materialInfoState.materials.find((m) => m.code === code)
+  const product = productInfoState.products.find((p) => p.code === code)
+  const master = mat || product || {}
+  const stockUnit = String(row.unit || master.inventoryUnit || master.stockUnit || '').trim()
+  const purchaseUnit = String(master.purchaseUnit || '').trim()
+  const settleUnit = String(master.settleUnit || '').trim()
+  const hasPurchaseSplit = Boolean(purchaseUnit && stockUnit && purchaseUnit !== stockUnit)
+  const hasSettleOnBatches = drawerBatches.value.some((b) => hasBatchUomConvert(b))
+  return {
+    stockUnit,
+    purchaseUnit,
+    settleUnit,
+    hasPurchaseSplit,
+    hasSettle: hasSettleUnit(master) || hasSettleOnBatches,
+  }
+})
+
 const drawerBatchColumns = computed(() => {
   const cols = [
-    { title: 'FIFO序', key: 'fifoIndex', width: 64, align: 'center', fixed: 'left' },
-    { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 140, fixed: 'left' },
+    { title: 'FIFO序', key: 'fifoIndex', width: 72, align: 'center' },
+    { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 140 },
     { title: '入库时间', key: 'createdAt', width: 150 },
     { title: '余料', key: 'remnant', width: 72 },
     { title: '归属', key: 'ownership', width: 88 },
-    { title: '销售订单号', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 130 },
-    { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
-    { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 130 },
-    { title: '单位', dataIndex: 'unit', key: 'unit', width: 56 },
-    { title: '在库数量', key: 'currentLength', width: 100, align: 'right' },
   ]
-  if (drawerHasUomConvert.value) {
+  if (drawerHasSalesOrder.value) {
+    cols.push({
+      title: '销售订单号',
+      dataIndex: 'salesOrderNo',
+      key: 'salesOrderNo',
+      width: 130,
+      ellipsis: true,
+    })
+  }
+  cols.push(
+    { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
+    { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 132, ellipsis: true },
+    { title: '在库数量', key: 'currentLength', width: 110, align: 'right' },
+    { title: '入库数量', key: 'inboundQty', width: 110, align: 'right' },
+  )
+  if (drawerItemUnits.value.hasPurchaseSplit) {
+    cols.push({ title: '入库库存量', key: 'inboundStockQty', width: 118, align: 'right' })
+  }
+  if (drawerItemUnits.value.hasSettle) {
     cols.push(
-      { title: '件数', key: 'convertPieceCount', width: 72, align: 'right' },
-      { title: '过磅总重', key: 'convertSettleQty', width: 110, align: 'right' },
-      { title: '批次单重', key: 'convertActualUnitWeight', width: 110, align: 'right' },
+      { title: '结算数量', key: 'convertSettleQty', width: 110, align: 'right' },
+      { title: '批次单量', key: 'convertActualUnitWeight', width: 120, align: 'right' },
     )
   }
   cols.push(
-    { title: '件码', key: 'pieceManage', width: 110 },
+    { title: '件码', key: 'pieceManage', width: 120 },
     { title: '状态', key: 'status', width: 72 },
   )
   return cols
 })
 
-const drawerBatchTableScrollX = computed(() => (drawerHasUomConvert.value ? 1600 : 1280))
+const drawerBatchTableScrollX = computed(() =>
+  drawerBatchColumns.value.reduce((sum, col) => sum + (Number(col.width) || 100), 48),
+)
 
 const drawerPieceColumns = [
   { title: '件码', dataIndex: 'serialNo', key: 'serialNo', width: 160 },
@@ -879,23 +977,124 @@ const batchDrawerTitle = computed(() => {
   return `批次 · ${r.warehouse || ''} / ${r.itemCode || ''}`
 })
 
-const drawerBatches = computed(() => {
-  const r = batchDrawerRow.value
-  if (!r) return []
-  void stockBatchState.batches
-  const list = listBatches({
-    warehouse: r.warehouse,
-    itemCode: r.itemCode,
-    inStockOnly: drawerBatchScope.value === 'inStock',
+function dashText(value) {
+  const text = String(value ?? '').trim()
+  return text || '—'
+}
+
+const { drawerBind: batchDrawerBind, isNarrowViewport } = useDrawerWidth('l')
+/** 约页面 2/3 宽，左侧仍能对照库存列表 */
+const batchDrawerWidth = computed(() => (isNarrowViewport.value ? '100%' : '66vw'))
+
+const drawerItemMeta = computed(() => {
+  const row = batchDrawerRow.value
+  if (!row) {
+    return { itemName: '—', specModel: '—', material: '—', variantSummary: '—' }
+  }
+  const code = row.itemCode
+  const product = productInfoState.products.find((p) => p.code === code)
+  const mat = materialInfoState.materials.find((m) => m.code === code)
+  const master = product || mat
+  const specMeta = resolveBatchSpecMaterial({
+    itemCode: code,
+    attrs: {
+      specModel: row.specModel || row.spec,
+      spec: row.spec,
+      material: row.material,
+    },
   })
-  return sortBatchesByIssueRule(list, getOutboundIssueRule())
+  const variantSummary =
+    row.variantSummary ||
+    lineVariantSummary({
+      spuId: master?.spuId || row.spuId,
+      variantValues: master?.variantValues || row.variantValues || {},
+    }) ||
+    master?.variantSummary ||
+    ''
+  return {
+    itemName: dashText(row.itemName || master?.name),
+    specModel: dashText(specMeta.specModel || master?.specModel),
+    material: dashText(specMeta.material || master?.material),
+    variantSummary: dashText(variantSummary),
+  }
 })
 
-const drawerHasUomConvert = computed(() => drawerBatches.value.some((b) => hasBatchUomConvert(b)))
+function resolveBatchPurchaseUnit(batch) {
+  const fromConvert = String(batch?.uomConvert?.purchaseUnit || '').trim()
+  if (fromConvert) return fromConvert
+  const code = batch?.itemCode
+  const mat = materialInfoState.materials.find((m) => m.code === code)
+  const product = productInfoState.products.find((p) => p.code === code)
+  const master = mat || product
+  const fromMaster = String(master?.purchaseUnit || '').trim()
+  if (fromMaster) return fromMaster
+  const stockU = String(batch?.uomConvert?.stockUnit || batch?.unit || '').trim()
+  return stockU || '件'
+}
 
-function formatConvertPieceCount(batch) {
-  if (!hasBatchUomConvert(batch)) return '—'
-  return formatQty(batch.uomConvert.pieceCount)
+function issuedQtyOfBatch(batch) {
+  if (!batch) return 0
+  void outboundState.orders
+  let sum = 0
+  for (const order of outboundState.orders || []) {
+    for (const line of order.lineItems || []) {
+      const allocs = Array.isArray(line.batchAllocations) ? line.batchAllocations : []
+      for (const a of allocs) {
+        const matchId = a.batchId && a.batchId === batch.id
+        const matchNo = a.batchNo && a.batchNo === batch.batchNo
+        if (!matchId && !matchNo) continue
+        sum += Number(a.qty) || 0
+      }
+    }
+  }
+  return sum
+}
+
+/** 本批建账库存量（库存单位）；与在库余量不同，出库不扣 */
+function resolveBatchInboundQty(batch) {
+  const fromConvert = Number(batch?.uomConvert?.stockQty)
+  if (Number.isFinite(fromConvert) && fromConvert > 0) return fromConvert
+  const stored = Number(batch?.inboundQty)
+  if (Number.isFinite(stored) && stored > 0) return stored
+  const remain = Number(batch?.currentLength) || 0
+  const issued = issuedQtyOfBatch(batch)
+  return Math.round((remain + issued) * 10000) / 10000
+}
+
+/** 本批建账采购量（采购单位）；出库不扣 */
+function resolveBatchInboundPurchaseQty(batch) {
+  const stored = Number(batch?.inboundPurchaseQty)
+  if (Number.isFinite(stored) && stored > 0) return stored
+  const fromConvert = Number(batch?.uomConvert?.pieceCount)
+  if (Number.isFinite(fromConvert) && fromConvert > 0) return fromConvert
+  const fromAttrs = Number(batch?.attrs?.pieceCount)
+  if (Number.isFinite(fromAttrs) && fromAttrs > 0) return fromAttrs
+  if (isPieceManagedBatch(batch) && batch?.id) {
+    const n = listStockPieces({ batchId: batch.id }).length
+    if (n > 0) return n
+  }
+  return null
+}
+
+function formatDrawerInboundQty(batch) {
+  const units = drawerItemUnits.value
+  if (units.hasPurchaseSplit) {
+    const qty = resolveBatchInboundPurchaseQty(batch)
+    if (!(qty > 0)) return '—'
+    return formatInventoryQtyWithUnit(qty, units.purchaseUnit || resolveBatchPurchaseUnit(batch))
+  }
+  return formatInventoryQtyWithUnit(
+    resolveBatchInboundQty(batch),
+    batch.unit || units.stockUnit || batchDrawerRow.value?.unit,
+  )
+}
+
+function formatDrawerInboundStockQty(batch) {
+  const units = drawerItemUnits.value
+  return formatInventoryQtyWithUnit(
+    resolveBatchInboundQty(batch),
+    batch.unit || units.stockUnit || batchDrawerRow.value?.unit,
+  )
 }
 
 function formatConvertSettleQty(batch) {
@@ -906,8 +1105,8 @@ function formatConvertSettleQty(batch) {
 function formatConvertActualUnitWeight(batch) {
   if (!hasBatchUomConvert(batch)) return '—'
   const u = batch.uomConvert.settleUnit
-  const stockU = batch.uomConvert.stockUnit || batch.unit || '件'
-  return `${formatQty(batch.uomConvert.actualUnitWeight)} ${u}/${stockU}`
+  const pieceU = resolveBatchPurchaseUnit(batch)
+  return `${formatQty(batch.uomConvert.actualUnitWeight)} ${u}/${pieceU}`
 }
 
 const drawerBatchStockTotal = computed(() =>
@@ -1201,6 +1400,11 @@ function openBatchDrawer(record) {
   softAllocDetailOpen.value = false
 }
 
+function closeBatchDrawer() {
+  batchDrawerOpen.value = false
+  softAllocDetailOpen.value = false
+}
+
 function formatBatchTime(val) {
   if (!val) return '—'
   const d = dayjs(val)
@@ -1340,6 +1544,26 @@ watch(
   margin-top: 4px;
 }
 
+.batch-drawer-tabs :deep(.ant-tabs-nav) {
+  margin-bottom: 12px;
+}
+
+.batch-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 22px;
+  color: #4e5969;
+}
+
+.batch-item-meta b {
+  color: #1f2329;
+  font-weight: 700;
+}
+
 .batch-drawer-toolbar {
   display: flex;
   align-items: center;
@@ -1380,6 +1604,13 @@ watch(
   color: rgba(0, 0, 0, 0.25);
 }
 
+.ellipsis-cell {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .soft-detail-btn {
   padding-inline: 4px;
   height: auto;
@@ -1387,5 +1618,18 @@ watch(
 
 .batch-soft-tip {
   margin-bottom: 12px;
+}
+</style>
+
+<style>
+.batch-view-drawer .ant-drawer-content-wrapper {
+  max-width: 100%;
+}
+.batch-view-drawer .ant-drawer-body {
+  padding: 16px 20px 20px;
+  overflow-x: hidden;
+}
+.batch-view-drawer .ant-drawer-extra {
+  margin-inline-end: 4px;
 }
 </style>
