@@ -186,6 +186,18 @@
                       >
                         终止
                       </a-menu-item>
+                      <a-menu-item
+                        v-if="canConvertWorkOrderToPurchaseOrOutsource(wo)"
+                        key="to-purchase"
+                      >
+                        转采购
+                      </a-menu-item>
+                      <a-menu-item
+                        v-if="canConvertWorkOrderToPurchaseOrOutsource(wo)"
+                        key="to-outsource"
+                      >
+                        转外协
+                      </a-menu-item>
                       <a-menu-item v-if="['已下发', '执行中'].includes(wo.status)" key="complete">
                         标记已完成
                       </a-menu-item>
@@ -326,6 +338,8 @@
       @updated="onWorkOrderUpdated"
     />
 
+    <WorkOrderConvertModals ref="convertModalsRef" />
+
     <EditScheduleQtyModal
       v-model:open="editScheduleQtyModalOpen"
       :work-order="editScheduleQtyTarget"
@@ -400,6 +414,7 @@ import {
   buildTerminateWorkOrderResult,
   buildEditScheduleQtyResult,
 } from '@/utils/workOrderStatus'
+import { canConvertWorkOrderToPurchaseOrOutsource } from '@/utils/workOrderConvert'
 import { sortWorkOrdersForList } from '@/utils/workOrderListSort'
 import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
@@ -407,6 +422,7 @@ import { bomOptions } from '@/mock/workOrderMaster'
 import CreateWorkOrderModal from './components/CreateWorkOrderModal.vue'
 import CreateScheduleBatchModal from './components/CreateScheduleBatchModal.vue'
 import EditScheduleQtyModal from './components/EditScheduleQtyModal.vue'
+import WorkOrderConvertModals from './components/WorkOrderConvertModals.vue'
 import WorkOrderDetailPanel from './components/WorkOrderDetailPanel.vue'
 import WorkOrderPrintModal from './components/WorkOrderPrintModal.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
@@ -447,6 +463,7 @@ const detailTab = ref('dispatch')
 const detailCollapsed = ref(false)
 const createModalOpen = ref(false)
 const editRecord = ref(null)
+const convertModalsRef = ref(null)
 const urgencyModalOpen = ref(false)
 const scheduleBatchModalOpen = ref(false)
 const scheduleBatchTarget = ref(null)
@@ -842,6 +859,14 @@ function onCardAction(key, wo) {
     urgencyModalOpen.value = true
     return
   }
+  if (key === 'to-purchase') {
+    convertModalsRef.value?.openPurchase(wo)
+    return
+  }
+  if (key === 'to-outsource') {
+    convertModalsRef.value?.openOutsource(wo)
+    return
+  }
   const map = { pause: '暂停', terminate: '终止', complete: '已完成' }
   if (key === 'resume') {
     const result = buildResumeWorkOrderResult(wo)
@@ -1043,7 +1068,11 @@ function onDetailAction({ key, workOrder: wo, record, patch }) {
     })
     return
   }
-  if (['urgency', 'pause', 'terminate', 'complete', 'resume'].includes(key)) {
+  if (
+    ['urgency', 'pause', 'terminate', 'complete', 'resume', 'to-purchase', 'to-outsource'].includes(
+      key,
+    )
+  ) {
     onCardAction(key, wo)
   }
 }

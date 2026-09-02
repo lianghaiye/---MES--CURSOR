@@ -162,39 +162,45 @@
             </a-space>
           </div>
 
-          <a-descriptions
-            v-show="!detailCollapsed"
-            :column="4"
-            size="small"
-            bordered
-            class="info-grid"
-          >
-            <a-descriptions-item label="计划来源">{{
-              planSourceLabel(selectedOrder.planSource)
-            }}</a-descriptions-item>
-            <a-descriptions-item label="所属区域">{{
-              selectedOrder.region || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="结算类型">{{
-              selectedOrder.settlementType || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="交货方式">{{
-              selectedOrder.deliveryMethod || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item :label="isStockReplenishPlan(selectedOrder) ? '操作人' : '业务员'">
-              {{
-                isStockReplenishPlan(selectedOrder)
-                  ? planOperatorName(selectedOrder)
-                  : selectedOrder.salesperson || '—'
-              }}
-            </a-descriptions-item>
-            <a-descriptions-item label="订单日期">{{
-              selectedOrder.orderDate
-            }}</a-descriptions-item>
-            <a-descriptions-item label="备注" :span="2">{{
-              selectedOrder.remark || '-'
-            }}</a-descriptions-item>
-          </a-descriptions>
+          <!-- 字段名：字段值，一行四列，备注独占一行 -->
+          <div v-show="!detailCollapsed" class="info-plain">
+            <div class="info-plain-grid">
+              <div class="info-plain-item">
+                <span class="k">计划来源：</span>
+                <span class="v">{{ planSourceLabel(selectedOrder.planSource) }}</span>
+              </div>
+              <div class="info-plain-item">
+                <span class="k">所属区域：</span>
+                <span class="v">{{ selectedOrder.region || '—' }}</span>
+              </div>
+              <div class="info-plain-item">
+                <span class="k">结算类型：</span>
+                <span class="v">{{ selectedOrder.settlementType || '—' }}</span>
+              </div>
+              <div class="info-plain-item">
+                <span class="k">交货方式：</span>
+                <span class="v">{{ selectedOrder.deliveryMethod || '—' }}</span>
+              </div>
+              <div class="info-plain-item">
+                <span class="k"
+                  >{{ isStockReplenishPlan(selectedOrder) ? '操作人' : '业务员' }}：</span
+                >
+                <span class="v">{{
+                  isStockReplenishPlan(selectedOrder)
+                    ? planOperatorName(selectedOrder)
+                    : selectedOrder.salesperson || '—'
+                }}</span>
+              </div>
+              <div class="info-plain-item">
+                <span class="k">订单日期：</span>
+                <span class="v">{{ selectedOrder.orderDate || '—' }}</span>
+              </div>
+            </div>
+            <div class="info-plain-remark">
+              <span class="k">备注：</span>
+              <span class="v">{{ selectedOrder.remark || '—' }}</span>
+            </div>
+          </div>
         </template>
 
         <div v-else class="fullscreen-toolbar">
@@ -274,6 +280,7 @@
                   <template
                     v-else-if="
                       column.key === 'specModel' ||
+                      column.key === 'variantSummary' ||
                       column.key === 'drawingNo' ||
                       column.key === 'material' ||
                       column.key === 'techParams' ||
@@ -796,6 +803,13 @@ const baseWorkColumns = [
   { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
   { title: '产品编号', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 110, ellipsis: true },
+  {
+    title: '变体属性',
+    key: 'variantSummary',
+    dataIndex: 'variantSummary',
+    width: 140,
+    ellipsis: true,
+  },
   { title: '图号', key: 'drawingNo', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '材质', key: 'material', dataIndex: 'material', width: 80, ellipsis: true },
   { title: '订单数量', dataIndex: 'orderQty', width: 88, align: 'right' },
@@ -837,7 +851,7 @@ const {
   displayColumns: displayWorkColumns,
   tableScrollX: workTableScrollX,
   defaultColumnSettings: defaultWorkColumnSettings,
-} = useTableColumnSettings('production-plan-work-list', baseWorkColumns, { minScrollX: 1960 })
+} = useTableColumnSettings('production-plan-work-list-v2', baseWorkColumns, { minScrollX: 2100 })
 
 const baseMaterialColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 90, fixed: 'left' },
@@ -1678,8 +1692,40 @@ function handleReset() {
   }
 }
 
-.info-grid {
+.info-plain {
   margin-bottom: 12px;
+  padding: 8px 4px 4px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(0, 0, 0, 0.88);
+
+  .info-plain-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px 16px;
+  }
+
+  .info-plain-item,
+  .info-plain-remark {
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .info-plain-remark {
+    margin-top: 6px;
+  }
+
+  .k {
+    flex-shrink: 0;
+    color: rgba(0, 0, 0, 0.45);
+  }
+
+  .v {
+    min-width: 0;
+    word-break: break-all;
+  }
 }
 
 .action-row {

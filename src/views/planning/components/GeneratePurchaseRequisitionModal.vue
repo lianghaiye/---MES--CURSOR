@@ -307,7 +307,7 @@ const baseColumnDefsBeforeQty = [
   { key: 'spec', title: '规格型号', width: 130, total: false },
   { key: 'material', title: '材质', width: 70, total: false },
   { key: 'drawingNo', title: '图号', width: 100, total: false },
-  { key: 'specAttr', title: '规格属性', width: 90, total: false },
+  { key: 'specAttr', title: '变体属性', width: 90, total: false },
   { key: 'materialType', title: '物料类型', width: 90, total: false },
   { key: 'designatedSupplier', title: '指定供应商', width: 96, total: false },
   { key: 'supplier', title: '供应商', width: 140, editable: true, total: false },

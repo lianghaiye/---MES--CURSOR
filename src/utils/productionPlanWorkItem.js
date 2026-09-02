@@ -72,12 +72,22 @@ export function enrichWorkItem(wi, salesLine = null, index = 0) {
     supplementDesc: wi.supplementDesc ?? line.supplementDesc ?? line.lineRemark ?? '',
     attachment: wi.attachment ?? line.attachment ?? '',
     specModel: wi.specModel ?? wi.model ?? line.specModel ?? '',
+    variantSummary:
+      wi.variantSummary ||
+      wi.variantAttr ||
+      line.variantSummary ||
+      line.variantAttr ||
+      line.productAttr ||
+      wi.spec ||
+      line.specAttr ||
+      '',
   }
 }
 
 export function normalizePlanWorkItems(plan) {
   plan.workItems?.forEach((wi, idx) => {
-    Object.assign(wi, enrichWorkItem(wi, null, idx))
+    const salesLine = resolveSalesLineForWorkItem(plan, wi)
+    Object.assign(wi, enrichWorkItem(wi, salesLine, idx))
     if (wi.expanded == null) wi.expanded = idx === 0
   })
   return plan
