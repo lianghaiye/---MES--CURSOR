@@ -9,7 +9,11 @@ import {
 const STORAGE_PREFIX = 'i_doms_table_col_'
 
 export function useTableColumnSettings(storageKey, baseColumns, options = {}) {
-  const defaultColumnSettings = createDefaultColumnSettings(baseColumns, options.excludeKeys)
+  const defaultColumnSettings = createDefaultColumnSettings(
+    baseColumns,
+    options.excludeKeys,
+    options.defaultHiddenKeys,
+  )
 
   function loadSettings() {
     try {

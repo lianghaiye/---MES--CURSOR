@@ -273,6 +273,12 @@ const routes = [
         meta: { title: '销售订单详情' },
       },
       {
+        path: 'sales/sales-lines',
+        name: 'sales-sales-lines',
+        component: () => import('@/views/sales/SalesOrderLineListView.vue'),
+        meta: { title: '销售明细' },
+      },
+      {
         path: 'sales/delivery',
         name: 'sales-delivery',
         component: () => import('@/views/sales/DeliveryManagementView.vue'),

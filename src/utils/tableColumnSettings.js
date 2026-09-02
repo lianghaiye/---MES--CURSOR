@@ -6,7 +6,12 @@ export function getColumnKey(col) {
 
 export const PINNED_COLUMN_KEYS = ['index', 'action', 'actions']
 
-export function createDefaultColumnSettings(baseColumns, excludeKeys = PINNED_COLUMN_KEYS) {
+export function createDefaultColumnSettings(
+  baseColumns,
+  excludeKeys = PINNED_COLUMN_KEYS,
+  defaultHiddenKeys = [],
+) {
+  const hiddenSet = new Set(defaultHiddenKeys || [])
   return baseColumns
     .filter((c) => {
       const key = getColumnKey(c)
@@ -15,7 +20,7 @@ export function createDefaultColumnSettings(baseColumns, excludeKeys = PINNED_CO
     .map((c, i) => ({
       key: getColumnKey(c),
       title: typeof c.title === 'string' ? c.title : String(getColumnKey(c)),
-      hidden: false,
+      hidden: hiddenSet.has(getColumnKey(c)),
       frozen: c.fixed === 'left',
       order: i,
     }))

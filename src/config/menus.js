@@ -61,6 +61,7 @@ export const sideMenus = {
   ],
   sales: [
     { key: 'orders', label: '销售订单', path: '/sales/orders' },
+    { key: 'sales-lines', label: '销售明细', path: '/sales/sales-lines' },
     { key: 'delivery', label: '发货管理', path: '/sales/delivery' },
     { key: 'framework-contracts', label: '框架合同', path: '/sales/framework-contracts' },
   ],
@@ -300,6 +301,7 @@ export const routeTitles = {
   '/sales/orders/:id': '销售订单详情',
   '/sales/orders/:id/edit': '编辑销售订单',
   '/sales/orders/:id/approve': '审核销售订单',
+  '/sales/sales-lines': '销售明细',
   '/sales/delivery': '发货管理',
   '/sales/delivery/new': '新增发货单',
   '/sales/delivery/:id/edit': '编辑发货单',
