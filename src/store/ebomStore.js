@@ -6,6 +6,7 @@ import { resolveDesignBaselineBom } from '@/utils/designBomBaseline'
 import { createRootTreeNode } from '@/utils/bomTree'
 import { defaultBomColumnSettings } from '@/mock/bomMaterialColumns'
 import { buildMockEbomRecords } from '@/mock/ebomSeed'
+import { ensureScatterEbomRecord } from '@/mock/scatterEbomShipDemoSeed'
 
 const STORAGE_KEY = 'i_doms_ebom'
 const DATA_VERSION = 2
@@ -35,7 +36,7 @@ function persist() {
 }
 
 export const ebomState = reactive({
-  items: loadFromStorage() || buildMockEbomRecords(),
+  items: ensureScatterEbomRecord(loadFromStorage() || buildMockEbomRecords()),
 })
 
 watch(

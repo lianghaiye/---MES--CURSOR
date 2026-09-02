@@ -13,7 +13,7 @@ export function cloneStockPieceSeed() {
   for (let i = 1; i <= 30; i += 1) {
     pieces.push({
       id: `pc-seed-bearing-${String(i).padStart(3, '0')}`,
-      serialNo: `${batchNo}-${String(i).padStart(3, '0')}`,
+      serialNo: `${batchNo}-${String(i).padStart(4, '0')}`,
       batchId,
       batchNo,
       warehouse,
@@ -42,7 +42,7 @@ export function cloneStockPieceSeed() {
   for (let i = 31; i <= 36; i += 1) {
     pieces.push({
       id: `pc-seed-bearing-${String(i).padStart(3, '0')}`,
-      serialNo: `${batchNo}-${String(i).padStart(3, '0')}`,
+      serialNo: `${batchNo}-${String(i).padStart(4, '0')}`,
       batchId,
       batchNo,
       warehouse,
@@ -73,7 +73,7 @@ export function cloneStockPieceSeed() {
   for (let i = 1; i <= 6; i += 1) {
     pieces.push({
       id: `pc-seed-bearing2-${String(i).padStart(3, '0')}`,
-      serialNo: `${batchNo2}-${String(i).padStart(3, '0')}`,
+      serialNo: `${batchNo2}-${String(i).padStart(4, '0')}`,
       batchId: batchId2,
       batchNo: batchNo2,
       warehouse,
@@ -93,6 +93,36 @@ export function cloneStockPieceSeed() {
       remnantFromSerialNo: '',
       createdAt: '2026-08-05T13:00:00.000Z',
       updatedAt: '2026-08-05T13:00:00.000Z',
+      issuedAt: '',
+      issueDocNo: '',
+    })
+  }
+
+  const ssBatchNo = 'B-260713-002'
+  const ssBatchId = 'bat-ib-demo-ss-6a'
+  for (let i = 1; i <= 2; i += 1) {
+    pieces.push({
+      id: `pc-seed-ss-pipe-${String(i).padStart(4, '0')}`,
+      serialNo: `${ssBatchNo}-${String(i).padStart(4, '0')}`,
+      batchId: ssBatchId,
+      batchNo: ssBatchNo,
+      warehouse: '库线边仓',
+      itemCode: 'WL-PIPE-304-25',
+      itemName: '不锈钢管 304 φ25×2',
+      pieceQty: 6,
+      unit: '米',
+      status: '在库',
+      sourceDocNo: '1-20260713-00004',
+      sourceType: '采购入库',
+      salesOrderId: '',
+      salesOrderNo: '',
+      salesLineId: '',
+      workOrderNo: '',
+      index: i,
+      remnant: false,
+      remnantFromSerialNo: '',
+      createdAt: '2026-07-13T15:20:00.000Z',
+      updatedAt: '2026-07-13T15:20:00.000Z',
       issuedAt: '',
       issueDocNo: '',
     })

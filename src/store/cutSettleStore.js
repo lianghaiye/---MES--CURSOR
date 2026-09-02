@@ -12,6 +12,7 @@ import { getOutboundOrderById } from '@/store/outboundStore'
 import { addInboundOrder, generateInboundNo } from '@/store/inboundOrderStore'
 import { createCutSettleSeed } from '@/mock/cutSettleSeed'
 import { ensureMultiUnitFlowCutSettleRecords } from '@/mock/multiUnitFlowDemoSeed'
+import { ensureOneItemOneCodeInventoryCutSettles } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import {
   getCutSettleCandidateLines,
   isOutboundEligibleForCutSettle,
@@ -19,8 +20,8 @@ import {
 
 const STORAGE_KEY = 'i_doms_cut_settle_records'
 const SEED_VERSION_KEY = 'i_doms_cut_settle_seed_v'
-/** v4：结算明细需求数/实耗/余料带库存单位 */
-const CURRENT_SEED_VERSION = '4'
+/** v5：一物一码下料结算余料演示 */
+const CURRENT_SEED_VERSION = '5'
 
 function loadFromStorage() {
   try {
@@ -46,9 +47,13 @@ function persist() {
 
 function initRecords() {
   if (shouldReseed() || !loadFromStorage()?.length) {
-    return ensureMultiUnitFlowCutSettleRecords(createCutSettleSeed())
+    return ensureOneItemOneCodeInventoryCutSettles(
+      ensureMultiUnitFlowCutSettleRecords(createCutSettleSeed()),
+    )
   }
-  return ensureMultiUnitFlowCutSettleRecords(loadFromStorage())
+  return ensureOneItemOneCodeInventoryCutSettles(
+    ensureMultiUnitFlowCutSettleRecords(loadFromStorage()),
+  )
 }
 
 export const cutSettleState = reactive({

@@ -1026,7 +1026,7 @@ function onLineStockUnitQtyInput(line, value) {
     syncInboundLineTotalFromUnit(line)
     return
   }
-  // 一物一码：列表按「统一单件数量」填写
+  // 一物一码或一类/一批按件：列表按「统一单件数量」填写
   line.inboundEntryMode = INBOUND_ENTRY_MODE.UNIFORM
   line.uniformValue = value
   line.totalValue = undefined

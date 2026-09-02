@@ -9,12 +9,13 @@ import {
 } from '@/utils/productMaterialSync'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
+import { createOneItemOneCodeDemoMaterials } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import { createStockAlertDemoMaterials } from '@/mock/stockAlertDemoMaterials'
 import { createPackageConvertDemoMaterial } from '@/mock/packageConvertPurchaseDemoSeed'
 
 const STORAGE_KEY = 'i_doms_material_info'
-/** v18：包装换算演示料 WL-PKG-BOX-100（个/盒=100） */
-const DATA_VERSION = 18
+/** v19：一物一码库存演示料 WL-OIOC-* */
+const DATA_VERSION = 19
 let codeSeq = 100048
 
 function ensureDemoMaterialsByCodes(list, demos) {
@@ -35,7 +36,10 @@ function ensureDemoMaterialsByCodes(list, demos) {
 }
 
 function ensureDemoVariableLengthMaterials(list) {
-  return ensureDemoMaterialsByCodes(list, createDemoDualUnitMaterials())
+  return ensureDemoMaterialsByCodes(list, [
+    ...createDemoDualUnitMaterials(),
+    ...createOneItemOneCodeDemoMaterials(),
+  ])
 }
 
 function ensureDemoPackagePurchaseMaterials(list) {

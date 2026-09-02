@@ -7,6 +7,7 @@ import { mockProducts } from '@/mock/productInfo'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { laborDemoBomMaterials } from '@/mock/laborHourDemoSeed'
 import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
+import { createOneItemOneCodeDemoMaterials } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import {
   matchesBusinessTypeFilter,
   MATERIAL_BUSINESS_TYPE_OPTIONS,
@@ -152,6 +153,7 @@ function createDemoBackflushMaterials() {
 
 const rawMockMaterials = [
   ...createDemoDualUnitMaterials(),
+  ...createOneItemOneCodeDemoMaterials(),
   ...createDemoBackflushMaterials(),
   ...laborDemoBomMaterials,
   ...bomTemplateMaterials,

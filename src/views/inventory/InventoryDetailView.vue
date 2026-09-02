@@ -383,7 +383,7 @@
             type="info"
             show-icon
             class="batch-soft-tip"
-            message="本页为批次快照：按当前出库规则排序（余料优先 → 批次号先进先出/后进先出）。一物一码批次可展开查看在库件码；有结算过磅的批次会显示件数/过磅总重/批次单重（按批次覆盖换算记录，不进主数据）。出入库痕迹请看「物料流水」。"
+            message="本页为批次快照：按当前出库规则排序（余料优先 → 批次号先进先出/后进先出）。按件管理的批次（一物一码，或一类/一批一码按单件、逐件入库）可展开查看件码；有结算过磅的批次会显示件数/过磅总重/批次单重（按批次覆盖换算记录，不进主数据）。出入库痕迹请看「物料流水」。"
           />
           <a-table
             :columns="drawerBatchColumns"
@@ -413,7 +413,7 @@
               </template>
               <template v-else-if="column.key === 'pieceManage'">
                 <template v-if="isPieceManagedBatch(record)">
-                  <a-tag color="purple">一物一码</a-tag>
+                  <a-tag color="purple">{{ record.attrs?.barcodeType || '按件' }}</a-tag>
                   <span class="piece-count">{{ pieceCountOf(record) }} 件</span>
                 </template>
                 <span v-else class="muted">—</span>
@@ -924,7 +924,7 @@ const drawerIssueRuleLabel = computed(() => {
 
 const drawerBatchExpandable = computed(() => ({
   rowExpandable: (record) => isPieceManagedBatch(record),
-  /** 非一物一码不渲染展开图标，避免空加号 */
+  /** 非按件管理不渲染展开图标，避免空加号 */
   expandIcon: ({ expanded, onExpand, record }) => {
     if (!isPieceManagedBatch(record)) return null
     return h('button', {

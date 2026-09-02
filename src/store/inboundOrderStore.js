@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { cloneInboundSeedOrders, createInboundLine, createInboundOrder } from '@/mock/inboundOrders'
 import { ensureCrossDemoInboundOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureMultiUnitFlowInboundOrders } from '@/mock/multiUnitFlowDemoSeed'
+import { ensureOneItemOneCodeInventoryInboundOrders } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import { purchaseOrderState, syncPurchaseOrderInboundStatus } from '@/store/purchaseOrderStore'
 import { calcPoLineRemainInboundQty } from '@/utils/purchaseLineInbound'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
@@ -39,8 +40,8 @@ function resolveInboundSalesOrder(order) {
 
 const STORAGE_KEY = 'i_doms_inbound_orders'
 const SEED_VERSION_KEY = 'i_doms_inbound_orders_seed_v'
-/** v7：多单位出入库/领料/下料结算联动演示 */
-const CURRENT_SEED_VERSION = '7'
+/** v9：一类/一批按件入库 1 父批 + 四位 SN */
+const CURRENT_SEED_VERSION = '9'
 
 function loadFromStorage() {
   try {
@@ -97,7 +98,9 @@ function initOrders() {
     shouldReseed() || !stored?.length
       ? cloneInboundSeedOrders().map(normalizeLegacyOrder)
       : stored.map(normalizeLegacyOrder)
-  return ensureMultiUnitFlowInboundOrders(ensureCrossDemoInboundOrders(base))
+  return ensureOneItemOneCodeInventoryInboundOrders(
+    ensureMultiUnitFlowInboundOrders(ensureCrossDemoInboundOrders(base)),
+  )
 }
 
 export function generateInboundNo() {
@@ -408,6 +411,10 @@ function prepareAndApplyInboundLine(order, line) {
     sourceDocNo: order.docNo,
     unit: line.unit || (line.isVariableLength ? '米' : '件'),
     barcodeType,
+    inboundEntryMode: line.inboundEntryMode,
+    isVariableLength: Boolean(line.isVariableLength),
+    purchaseUnit: line.purchaseUnit,
+    stockUnit: line.stockUnit || line.unit,
     workOrderNo: resolveWorkOrderNoFromInbound(order) || line.workOrderNo || '',
     attrs: {
       material: line.material,

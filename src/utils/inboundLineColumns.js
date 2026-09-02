@@ -35,7 +35,7 @@ export const inboundDetailLineColumns = inboundFormLineColumns.filter((c) => c.k
 
 /** 库存数量列提示文案 */
 export const STOCK_UNIT_QTY_TIP =
-  '一类一码/一批一码：可直接填库存合计。一物一码：填统一单件量（钢管=长度；板材请点「编辑」填长×宽换算面积）；每件不同也请点编辑逐件/逐张填写'
+  '一类一码/一批一码：可直接填库存合计（合为一个批次、无 SN）。若按统一单件或逐件填写（采购单位≠库存单位），则 1 个父批 + 四位 SN 件码，同一物一码。一物一码：须按件填写，禁止合计。'
 
 /** 结算数量列提示 */
 export const SETTLE_QTY_TIP =

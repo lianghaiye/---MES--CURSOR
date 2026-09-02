@@ -262,6 +262,26 @@ export function coerceInboundEntryMode(mode, barcodeType) {
   return normalized
 }
 
+/** 采购单位与库存单位不同（双单位 / 可变长） */
+export function isPurchaseStockUnitSplit(line = {}) {
+  const purchase = String(line.purchaseUnit || '').trim()
+  const stock = String(line.stockUnit || line.unit || '').trim()
+  if (purchase && stock && purchase !== stock) return true
+  return Boolean(line.isVariableLength)
+}
+
+/**
+ * 入库是否按「1 父批 + N 件码（四位 SN）」建账
+ * - 一物一码：始终按件
+ * - 一类/一批一码：仅当采购单位≠库存单位，且填写统一单件或逐件（合计仍合为一批、无 SN）
+ */
+export function shouldInboundManageByPiece(line = {}) {
+  if (isOneItemOneCodeBarcode(line.barcodeType)) return true
+  if (!isPurchaseStockUnitSplit(line)) return false
+  const mode = coerceInboundEntryMode(line.inboundEntryMode, line.barcodeType)
+  return mode === INBOUND_ENTRY_MODE.UNIFORM || mode === INBOUND_ENTRY_MODE.PIECE
+}
+
 function resolveUniformValue(line) {
   if (isAreaBasedDualUnit(line)) {
     const fromDims = calcAreaSquareMeters(

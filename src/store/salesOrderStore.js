@@ -64,6 +64,7 @@ import {
   SALES_ORDER_STATUS,
 } from '@/utils/salesOrderStatus'
 import { ensureDedicatedShipDemoSalesOrders } from '@/mock/dedicatedShipDemoSeed'
+import { ensureScatterEbomShipDemoSalesOrders } from '@/mock/scatterEbomShipDemoSeed'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
 const DATA_VERSION = 10
@@ -119,7 +120,9 @@ function persist() {
 function loadInitialSalesOrders() {
   ensureEcnDemoBootstrap()
   const orders = migrateSalesOrderStatuses(loadFromStorage() || buildMockSalesOrders(mockProducts))
-  return ensureDedicatedShipDemoSalesOrders(hydrateApprovedSelfProdOrders(orders))
+  return ensureScatterEbomShipDemoSalesOrders(
+    ensureDedicatedShipDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+  )
 }
 
 function touchOrder(order) {

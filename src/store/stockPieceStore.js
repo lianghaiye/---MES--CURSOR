@@ -3,11 +3,12 @@
 import { reactive, watch } from 'vue'
 import { roundMeters } from '@/utils/variableLengthMaterial'
 import { cloneStockPieceSeed } from '@/mock/stockPieceSeed'
+import { ensureOneItemOneCodeInventoryPieces } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 
 const STORAGE_KEY = 'i_doms_stock_pieces'
 const SEED_VERSION_KEY = 'i_doms_stock_pieces_seed_v'
-/** v2：库存明细轴承一物一码演示件 */
-const CURRENT_SEED_VERSION = '2'
+/** v4：件码改为四位 SN；一类/一批按件入库挂件码 */
+const CURRENT_SEED_VERSION = '4'
 
 export const PIECE_STATUS = {
   IN_STOCK: '在库',
@@ -41,15 +42,16 @@ function nid() {
 }
 
 function initPieces() {
-  if (shouldReseed() || !loadFromStorage()?.length) {
-    return cloneStockPieceSeed()
-  }
-  return loadFromStorage() || []
+  const stored = loadFromStorage()
+  const base = shouldReseed() || !stored?.length ? cloneStockPieceSeed() : stored
+  return ensureOneItemOneCodeInventoryPieces(base)
 }
 
 export const stockPieceState = reactive({
   pieces: initPieces(),
 })
+
+persist()
 
 watch(
   () => stockPieceState.pieces,
@@ -57,9 +59,9 @@ watch(
   { deep: true },
 )
 
-/** 件码：父批号-3位序号，如 B-260724-001-001 */
+/** 件码：父批号-4位 SN，如 B-260724-001-0001 */
 export function generatePieceSerialNo(batchNo, index) {
-  return `${batchNo}-${String(index).padStart(3, '0')}`
+  return `${batchNo}-${String(index).padStart(4, '0')}`
 }
 
 export function listStockPieces(filters = {}) {

@@ -387,7 +387,7 @@ export function cloneInboundSeedOrders() {
       handler: '张三',
       creator: '张三',
       createdAt: `${today} 10:05:00`,
-      remark: '演示：一物一码按统一单件填写，确认入库后每件一个批次',
+      remark: '演示：一物一码按统一单件填写，确认入库后 1 个父批 + 四位 SN 件码',
       lineItems: [
         dualUnitLine({
           id: 'ib-demo-002-l1',
@@ -552,7 +552,9 @@ export function cloneInboundSeedOrders() {
           totalPrice: 1440,
           warehouse: '库线边仓',
           locationNo: 'L-01-02',
-          batchNos: ['B-260713-002', 'B-260713-003'],
+          batchNos: ['B-260713-002'],
+          pieceSerialNos: ['B-260713-002-0001', 'B-260713-002-0002'],
+          manageByPiece: true,
         }),
       ],
     }),

@@ -215,7 +215,7 @@
                         <span class="empty-inline">暂无件码</span>
                       </template>
                     </a-table>
-                    <span v-else class="empty-inline">非一物一码批次</span>
+                    <span v-else class="empty-inline">合计入库，无件码</span>
                   </template>
                   <template #emptyText>
                     <a-empty
@@ -223,7 +223,7 @@
                       :description="
                         record.status === '已完成'
                           ? '该物品暂无批次记录'
-                          : '确认入库后生成库存批次；一物一码为 1 父批 + N 件码'
+                          : '确认入库后生成库存批次：合计为一批；按件（一物一码，或一类/一批的单件、逐件）为 1 父批 + 四位 SN'
                       "
                     />
                   </template>

@@ -1,5 +1,5 @@
 import { reactive, watch } from 'vue'
-import { isOneItemOneCodeBarcode, roundMeters } from '@/utils/variableLengthMaterial'
+import { roundMeters, shouldInboundManageByPiece } from '@/utils/variableLengthMaterial'
 import { adjustStockQty, getStockQty } from '@/store/stockStore'
 import {
   cloneStockBatchSeed,
@@ -25,13 +25,17 @@ import {
 } from '@/store/stockPieceStore'
 import { DEDICATED_SHIP_DEMO, ensureDedicatedShipDemoBatches } from '@/mock/dedicatedShipDemoSeed'
 import { ensureMultiUnitFlowBatches } from '@/mock/multiUnitFlowDemoSeed'
+import {
+  ensureOneItemOneCodeInventoryBatches,
+  OIOC_INV_STOCK_SYNC_ROWS,
+} from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import { allocateBatchUomConvert } from '@/utils/batchUomConvert'
 import { registerSettleBatchWeightLookup } from '@/utils/settleUnit'
 
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
-/** v23：无默认率铸件批次（批次单量供开单预估） */
-const CURRENT_SEED_VERSION = '23'
+/** v25：一类/一批按件入库改为 1 父批 + 四位 SN */
+const CURRENT_SEED_VERSION = '25'
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',
@@ -64,12 +68,16 @@ function initBatches() {
   const stored = loadFromStorage()
   if (shouldReseed() || !stored?.length) {
     return {
-      batches: ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(cloneStockBatchSeed())),
+      batches: ensureOneItemOneCodeInventoryBatches(
+        ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(cloneStockBatchSeed())),
+      ),
       reseeded: true,
     }
   }
   return {
-    batches: ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(stored)),
+    batches: ensureOneItemOneCodeInventoryBatches(
+      ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(stored)),
+    ),
     reseeded: false,
   }
 }
@@ -154,6 +162,7 @@ if (initialBatchLoad.reseeded) {
       itemName: CASTING_NORATE_SETTLE_NAME,
       unit: '件',
     },
+    ...OIOC_INV_STOCK_SYNC_ROWS,
   ].forEach((row) =>
     syncAggregateStockFromBatches(row.warehouse, row.itemCode, row.itemName, row.unit),
   )
@@ -338,8 +347,17 @@ export function applyInboundBatchesFromRoots(payload) {
   const lineUomConvert = payload.uomConvert || null
   const lineStockTotal = roundMeters(values.reduce((s, l) => s + l, 0))
 
-  // 一物一码：1 个父批次（库存账）+ N 条件码（件身份）
-  if (isOneItemOneCodeBarcode(barcodeType)) {
+  // 一物一码；或一类/一批一码在采购≠库存且按单件/逐件填写：1 父批 + N 件码（四位 SN）
+  if (
+    shouldInboundManageByPiece({
+      barcodeType,
+      inboundEntryMode: payload.inboundEntryMode || baseAttrs.inboundEntryMode,
+      isVariableLength: payload.isVariableLength,
+      purchaseUnit: payload.purchaseUnit,
+      stockUnit: payload.stockUnit || unit,
+      unit,
+    })
+  ) {
     const total = lineStockTotal
     const parent = createBatch({
       warehouse: payload.warehouse,

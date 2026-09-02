@@ -208,7 +208,12 @@
                   库存单位为面积时，可用「长 × 宽」换算，也可直接填合计{{ stockUnitLabel }}。
                 </template>
                 <template v-if="isPieceManagedBarcode">
-                  一物一码须按件填写，不支持「直接填合计」。
+                  一物一码须按件填写，不支持「直接填合计」。确认入库后 1 个父批，件码为批次号+四位
+                  SN。
+                </template>
+                <template v-else>
+                  「直接填合计」只生成一个批次、无 SN。选「统一单件」或「逐件」时，同一物一码：1
+                  个父批 + 四位 SN 件码。
                 </template>
               </div>
             </a-form-item>

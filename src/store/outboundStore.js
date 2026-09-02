@@ -4,6 +4,7 @@ import { cloneOutboundOrders, createOutboundLine, createOutboundOrder } from '@/
 import { ensureCrossDemoOutboundOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureMaterialReqOutboundOrders } from '@/mock/materialReqOutboundSeed'
 import { ensureMultiUnitFlowOutboundOrders } from '@/mock/multiUnitFlowDemoSeed'
+import { ensureOneItemOneCodeInventoryOutboundOrders } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import { needsOutboundApproval } from '@/mock/outboundOptions'
 import {
   createFactoryQcFromOutbound,
@@ -32,8 +33,8 @@ import { preallocateDeliveryBatches } from '@/utils/salesOrderDedicatedStock'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
-/** v7：多单位出入库/领料/下料结算联动演示 */
-const CURRENT_SEED_VERSION = '7'
+/** v8：一物一码库存明细出入库流水 */
+const CURRENT_SEED_VERSION = '8'
 
 /** 领料/发料出库不再审批：历史「待处理」升为「待出库」 */
 function migrateSkipApprovalStatuses(orders) {
@@ -95,9 +96,11 @@ function initOutboundOrders() {
   const base = shouldReseedOutbound()
     ? cloneOutboundOrders()
     : loadFromStorage() || cloneOutboundOrders()
-  return ensureMultiUnitFlowOutboundOrders(
-    ensureMaterialReqOutboundOrders(
-      ensureCrossDemoOutboundOrders(migrateSkipApprovalStatuses(base)),
+  return ensureOneItemOneCodeInventoryOutboundOrders(
+    ensureMultiUnitFlowOutboundOrders(
+      ensureMaterialReqOutboundOrders(
+        ensureCrossDemoOutboundOrders(migrateSkipApprovalStatuses(base)),
+      ),
     ),
   )
 }
