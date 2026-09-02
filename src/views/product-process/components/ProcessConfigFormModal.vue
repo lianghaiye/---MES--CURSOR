@@ -74,6 +74,7 @@
               placeholder="请选择任务执行模式"
               :options="taskExecutionModeOpts"
             />
+            <div v-if="taskExecutionModeHint" class="field-hint">{{ taskExecutionModeHint }}</div>
           </a-form-item>
         </a-col>
         <a-col :span="showTaskExecutionMode ? 8 : 16">
@@ -228,6 +229,25 @@ const showTaskExecutionMode = computed(
     form.reportMode === '时长报工' &&
     (form.resourceType === '工人' || form.resourceType === '工人小组'),
 )
+
+const taskExecutionModeHint = computed(() => {
+  if (!showTaskExecutionMode.value) return ''
+  const resource = form.resourceType
+  const mode = form.taskExecutionMode
+  if (resource === '工人' && mode === 'single_claim') {
+    return '下发多人时进待领取，谁领谁做，一人报工'
+  }
+  if (resource === '工人' && mode === 'collaborative') {
+    return '按下发人数拆成多条任务，各进待报工，各人各报'
+  }
+  if (resource === '工人小组' && mode === 'single_claim') {
+    return '下发多组时进组长待领取，谁领算哪组，一人报工'
+  }
+  if (resource === '工人小组' && mode === 'collaborative') {
+    return '下发多组时进组长待领取，谁领算哪组，组内可多人报工'
+  }
+  return ''
+})
 
 const showProcessOperations = computed(() => !isMinimalReportMode())
 

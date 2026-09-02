@@ -253,7 +253,7 @@ export function createQuickReportSeedData() {
 
     base({
       id: 'qr-rw-06',
-      productName: '工时演示-时长计件',
+      productName: '工时演示-时长计时（调试）',
       productCode: 'LH-MAT-03',
       itemType: 'material',
       reportDate: yesterday,
@@ -564,7 +564,7 @@ export function createQuickReportSeedData() {
 
     base({
       id: 'qr-rw-16',
-      productName: '工时演示-时长计件',
+      productName: '工时演示-时长计时（调试）',
       productCode: 'LH-MAT-03',
       itemType: 'material',
       reportDate: twoDaysAgo,
@@ -578,7 +578,7 @@ export function createQuickReportSeedData() {
       status: '已确认',
       reporter: '李四',
       createdAt: atTime(twoDaysAgo, '12:15'),
-      remark: '时长计件已确认样例',
+      remark: '时长计时已确认样例',
       processes: [
         proc('qr-p-16-1', '调试', {
           goodQty: 4,

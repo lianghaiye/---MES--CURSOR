@@ -1,6 +1,6 @@
 /**
  * 工时管理演示数据：物料工时配置 + 真实工单，一一对应。
- * 覆盖四种组合：批量计件/时长报工 × 计件工资/计时工资
+ * 合法组合：批量计件×计件/计时，时长报工仅计时工资
  */
 let laborRowSeq = 0
 
@@ -53,15 +53,15 @@ export const DEMO_MATERIAL_DEFS = [
   },
   {
     code: 'LH-MAT-03',
-    name: '工时演示-时长计件',
-    specModel: 'DEMO-DU-P',
+    name: '工时演示-时长计时（调试）',
+    specModel: 'DEMO-DU-T-DBG',
     reportType: '时长报工',
-    salaryMethod: '计件工资',
+    salaryMethod: '计时工资',
     processName: '调试',
     standardMinutesPerPiece: 10,
     setupMinutesPerBatch: 15,
     standardHourlyRate: 42,
-    pieceRate: 8,
+    pieceRate: 0,
   },
   {
     code: 'LH-MAT-04',
@@ -152,7 +152,7 @@ function baseWorkOrderFields(def, partial) {
   }
 }
 
-/** 生产工单：演示 批量计件+计件、时长报工+计件、时长报工+计时 */
+/** 生产工单：演示 批量计件+计件、时长报工+计时（调试/检验） */
 export function createLaborDemoProductionOrders() {
   const d1 = DEMO_MATERIAL_DEFS[0]
   const d3 = DEMO_MATERIAL_DEFS[2]

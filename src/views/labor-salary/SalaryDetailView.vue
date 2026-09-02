@@ -189,6 +189,7 @@ import { querySalaryStats } from '@/utils/salaryStatsAggregate'
 import { reloadProcessReports } from '@/store/processReportStore'
 import { reloadQuickReports } from '@/store/quickReportStore'
 import { processConfigState } from '@/store/processConfigStore'
+import { formatMoney as formatMoneySmart, formatNumber } from '@/utils/numberFormat'
 
 const route = useRoute()
 
@@ -241,6 +242,9 @@ const baseColumns = [
   { title: '来源', key: 'sourceLabel', dataIndex: 'sourceLabel', width: 100 },
   { title: '工单编号', key: 'workOrderCode', dataIndex: 'workOrderCode', width: 170 },
   { title: '任务编号', key: 'taskNo', dataIndex: 'taskNo', width: 130 },
+  { title: '资源类型', key: 'resourceTypeLabel', dataIndex: 'resourceTypeLabel', width: 100 },
+  { title: '执行模式', key: 'executionModeLabel', dataIndex: 'executionModeLabel', width: 100 },
+  { title: '拆分序号', key: 'splitSlotLabel', dataIndex: 'splitSlotLabel', width: 90 },
   { title: '工序名称', key: 'processName', dataIndex: 'processName', width: 110 },
   { title: '报工类型', key: 'reportType', dataIndex: 'reportType', width: 100 },
   { title: '报工时间', key: 'reportTime', dataIndex: 'reportTime', width: 160 },
@@ -320,7 +324,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('salary-detail-list', baseColumns, { minScrollX: 2600 })
+  useTableColumnSettings('salary-detail-list-v3', baseColumns, { minScrollX: 2800 })
 
 const NUMERIC_KEYS = new Set([
   'goodQty',
@@ -400,13 +404,11 @@ const summaryCells = computed(() =>
 )
 
 function formatNum(val) {
-  const num = Number(val)
-  if (!Number.isFinite(num)) return '0.00'
-  return num.toFixed(2)
+  return formatNumber(val, 4, { empty: '—' })
 }
 
 function formatMoney(val) {
-  return formatNum(val)
+  return formatMoneySmart(val, 4)
 }
 
 function formatOptionalNum(val) {

@@ -11,7 +11,7 @@ import { createProcessReportQuickSeed } from '@/mock/processReportQuickSeed'
 
 export const PROCESS_REPORT_STORAGE_KEY = 'i_doms_mobile_process_report_records'
 export const PROCESS_REPORT_SEED_VERSION_KEY = 'i_doms_process_report_seed_v'
-export const PROCESS_REPORT_SEED_VERSION = '9'
+export const PROCESS_REPORT_SEED_VERSION = '13'
 export const PROCESS_REPORT_WO_LOG_KEY = 'i_doms_process_report_wo_logs'
 export const PROCESS_REPORT_QUICK_LOG_KEY = 'i_doms_process_report_quick_logs'
 

@@ -488,6 +488,7 @@
                         :options="reportTypeOpts"
                         placeholder="请选择报工类型"
                         style="width: 100%"
+                        @change="(v) => onLaborReportTypeChange(row, v)"
                       />
                     </a-form-item>
                   </a-col>
@@ -496,7 +497,7 @@
                       <template #label>
                         <span>计薪方式</span>
                         <a-tooltip
-                          title="计件工资=合格数量×单件计件单价+补贴报工数量；计时工资按标准工时单价核算（详见工时管理）"
+                          title="计件工资=合格数量×单件计件单价+补贴报工数量；计时工资按标准工时单价核算（详见工时管理）。时长报工仅支持计时工资。"
                         >
                           <InfoCircleOutlined class="info-icon" />
                         </a-tooltip>
@@ -504,7 +505,7 @@
                       <a-select
                         v-model:value="row.salaryMethod"
                         size="small"
-                        :options="salaryMethodOpts"
+                        :options="salaryMethodOptsFor(row.reportType)"
                         placeholder="请选择计薪方式"
                         style="width: 100%"
                       />
@@ -703,6 +704,10 @@ import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { useTabs } from '@/composables/useTabs'
 import { resolveItemBomNavigation } from '@/utils/itemBomNavigation'
+import {
+  normalizeSalaryMethodForReportType,
+  resolveSalaryMethodOptions,
+} from '@/utils/laborConfigResolver'
 import { flattenCategoryNodes, productCategoryTree } from '@/mock/productCategories'
 import {
   flattenCategoryNodes as flattenMatCats,
@@ -713,7 +718,6 @@ import {
   materialTypeOptions,
   supplyFormOptions,
   reportTypeOptions,
-  salaryMethodOptions,
   workCenterOpts,
   processOpts,
   createDefaultLaborRow,
@@ -835,7 +839,15 @@ const materialGradeOpts = computed(() => {
   return getMaterialGradeOptions()
 })
 const reportTypeOpts = reportTypeOptions.map((v) => ({ label: v, value: v }))
-const salaryMethodOpts = salaryMethodOptions.map((v) => ({ label: v, value: v }))
+
+function salaryMethodOptsFor(reportType) {
+  return resolveSalaryMethodOptions(reportType).map((v) => ({ label: v, value: v }))
+}
+
+function onLaborReportTypeChange(row, reportType) {
+  row.salaryMethod = normalizeSalaryMethodForReportType(reportType, row.salaryMethod)
+  if (reportType === '时长报工') row.pieceRate = 0
+}
 const planStrategyOpts = PLAN_STRATEGY_OPTIONS
 const categoryOpts = flatCats.map((c) => ({
   label: `(${c.code}) ${c.title}`,
@@ -1206,6 +1218,10 @@ function validate() {
       }
       if (!row.salaryMethod) {
         message.warning(`请为第 ${i + 1} 行选择计薪方式`)
+        return false
+      }
+      if (!resolveSalaryMethodOptions(row.reportType).includes(row.salaryMethod)) {
+        message.warning(`第 ${i + 1} 行：时长报工仅支持计时工资`)
         return false
       }
     }

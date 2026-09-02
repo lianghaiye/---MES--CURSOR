@@ -93,7 +93,7 @@ export function createProcessReportQuickSeed() {
       timeLabel: '今天 11:15',
       remark: '快速报工-批量计件计时',
     }),
-    // 时长报工 + 计件工资
+    // 时长报工 + 计时工资
     createQuick({
       id: 'pr-quick-du-p',
       processName: LH['LH-MAT-03'].processName,
@@ -112,7 +112,7 @@ export function createProcessReportQuickSeed() {
       status: '已审核',
       createdAt: dateTime(yesterday, '16:30'),
       timeLabel: '昨天 16:30',
-      remark: '快速报工-时长计件',
+      remark: '快速报工-时长计时',
     }),
     // 时长报工 + 计时工资
     createQuick({

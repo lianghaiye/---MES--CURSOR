@@ -1,18 +1,19 @@
 import dayjs from 'dayjs'
-import { getLaborHourOrders } from '@/store/laborHourStore'
 import { processReportState } from '@/store/processReportStore'
 import { quickReportState } from '@/store/quickReportStore'
 import { isQuickReportConfirmed } from '@/mock/quickReports'
 import { resolveLaborConfig } from '@/utils/laborConfigResolver'
-import {
-  enrichProcessReportLine,
-  calcFinalPieceQty,
-  resolveSubsidyWage,
-} from '@/utils/processReportWageCalc'
+import { enrichProcessReportLine, calcFinalPieceQty } from '@/utils/processReportWageCalc'
 import { enrichProcessReportRecord } from '@/utils/processReportEnrich'
 import { buildReportWorkPerProcessBundle } from '@/utils/reportWorkPerProcess'
 import { resolveEmployeeProfile } from '@/utils/employeeProfileResolver'
-import { ensureSalaryStatsDemoData } from '@/store/laborHourStore'
+import { getProcessByName } from '@/store/processConfigStore'
+import {
+  formatSplitSlotLabel,
+  resolveCollaborationGroupKey,
+  resolveCollabOutcomeMode,
+} from '@/utils/processReportCollaboration'
+import { getTaskExecutionModeLabel } from '@/utils/taskExecutionMode'
 
 function round2(val) {
   return Math.round((Number(val) || 0) * 100) / 100
@@ -70,7 +71,6 @@ function resolveSourceLabel(source = '') {
   const map = {
     'process-report': '工序报工',
     'quick-report': '登记产出',
-    'labor-hour': '工时管理',
   }
   return map[source] || '—'
 }
@@ -88,32 +88,32 @@ function computeAccountHoursFromLine(line = {}) {
   return round2(hours + subsidy)
 }
 
-function computeSubsidyAmount(line = {}, config = null) {
-  if (line.subsidyAmount != null && line.subsidyAmount !== '') {
-    return round2(line.subsidyAmount)
+function resolveProcessMeta(record = {}) {
+  const proc = record.processName ? getProcessByName(record.processName) : null
+  const resourceType = record.resourceType || proc?.resourceType || ''
+  let taskExecutionMode = record.taskExecutionMode || proc?.taskExecutionMode || ''
+  if (!taskExecutionMode && resolveCollabOutcomeMode(record)) {
+    taskExecutionMode = 'collaborative'
   }
-  if (line.subsidyWage != null && line.subsidyWage !== '') {
-    return round2(line.subsidyWage)
+  const resourceTypeLabel = resourceType || '—'
+  const executionModeLabel = taskExecutionMode ? getTaskExecutionModeLabel(taskExecutionMode) : '—'
+  const splitSlotLabel =
+    formatSplitSlotLabel({
+      ...record,
+      resourceType,
+      taskExecutionMode,
+    }) || '—'
+  return {
+    resourceType,
+    resourceTypeLabel,
+    taskExecutionMode,
+    executionModeLabel,
+    taskGroupId: resolveCollaborationGroupKey(record) || '',
+    outcomeMode: resolveCollabOutcomeMode(record) || '',
+    splitSlotLabel,
+    collaborationSlot: record.collaborationSlot,
+    collaborationTotal: record.collaborationTotal,
   }
-  if (!config) return 0
-  const subsidyLine = {
-    subsidyMethod: line.subsidyMethod,
-    subsidyFixedAmount: line.subsidyFixedAmount,
-    subsidyReportQty: line.subsidyReportQty,
-    subsidyHours: line.subsidyHours,
-  }
-  if (
-    line.subsidyMethod ||
-    Number(line.subsidyFixedAmount) > 0 ||
-    Number(line.subsidyReportQty) > 0 ||
-    Number(line.subsidyHours) > 0
-  ) {
-    return resolveSubsidyWage(subsidyLine, config)
-  }
-  if (config.salaryMethod === '计件工资') {
-    return round2((Number(line.subsidyReportQty) || 0) * (Number(config.pieceRate) || 0))
-  }
-  return round2((Number(line.subsidyHours) || 0) * (Number(config.standardHourlyRate) || 0))
 }
 
 function buildDetailLine(partial) {
@@ -141,57 +141,19 @@ function buildDetailLine(partial) {
     prepWage: round2(partial.prepWage),
     qualityDeduction: round2(partial.qualityDeduction),
     salaryAmount: round2(partial.salaryAmount),
+    resourceType: partial.resourceType || '',
+    resourceTypeLabel: partial.resourceTypeLabel || partial.resourceType || '—',
+    taskExecutionMode: partial.taskExecutionMode || '',
+    executionModeLabel: partial.executionModeLabel || '—',
+    splitSlotLabel: partial.splitSlotLabel || '—',
+    taskGroupId: partial.taskGroupId || '',
+    outcomeMode: partial.outcomeMode || '',
+    collaborationSlot: partial.collaborationSlot,
+    collaborationTotal: partial.collaborationTotal,
   }
   line.finalPieceQty = partial.finalPieceQty ?? computeFinalPieceQtyFromLine(line)
   line.accountHours = partial.accountHours ?? computeAccountHoursFromLine(line)
   return line
-}
-
-function collectLaborHourLines() {
-  const lines = []
-  getLaborHourOrders().forEach((order) => {
-    ;(order.lines || []).forEach((line) => {
-      if (line.auditStatus !== '已审核') return
-      const config = resolveLaborConfig(order.materialCode, line.processName)
-      lines.push(
-        buildDetailLine({
-          id: `lh-${order.id}-${line.id}`,
-          source: 'labor-hour',
-          employeeName: line.executor || '—',
-          workOrderCode: order.workOrderCode || '—',
-          taskNo: line.taskNo || '—',
-          processName: line.processName || '—',
-          reportType: line.reportType || '—',
-          reportTime: line.taskEndTime || order.latestSubmitAt || order.createdAt,
-          goodQty: Number(line.reportQty) || 0,
-          defectQty: 0,
-          defectReason: '—',
-          reportQty: Number(line.reportQty) || 0,
-          workHours: Number(line.reportDuration ?? line.accountHours) || 0,
-          adjustedGoodQty:
-            line.adjustedReportQty != null && line.adjustedReportQty !== ''
-              ? round2(line.adjustedReportQty)
-              : null,
-          adjustedDefectQty: null,
-          adjustedReportQty: resolveAdjustedReportQty(line),
-          adjustedWorkHours:
-            line.adjustedDuration != null && line.adjustedDuration !== ''
-              ? round2(line.adjustedDuration)
-              : null,
-          subsidyReportQty: line.subsidyReportQty,
-          subsidyHours: line.subsidyHours,
-          subsidyAmount: computeSubsidyAmount(line, config),
-          salaryMethod: line.salaryMethod || '—',
-          goodWage: line.salaryAmount,
-          defectWage: 0,
-          prepWage: 0,
-          qualityDeduction: 0,
-          salaryAmount: line.salaryAmount,
-        }),
-      )
-    })
-  })
-  return lines
 }
 
 function collectProcessReportLines() {
@@ -260,6 +222,7 @@ function collectProcessReportLines() {
           prepWage: wageLine.prepWage,
           qualityDeduction: wageLine.qualityDeduction,
           salaryAmount: wageLine.salaryAmount,
+          ...resolveProcessMeta(record),
         }),
       )
     })
@@ -312,7 +275,8 @@ function collectQuickReportLines() {
 }
 
 export function collectAllSalaryDetailLines() {
-  return [...collectLaborHourLines(), ...collectProcessReportLines(), ...collectQuickReportLines()]
+  // 极简模式：仅工序报工 + 登记产出；工时管理属于标准模式，不参与本页核算
+  return [...collectProcessReportLines(), ...collectQuickReportLines()]
 }
 
 export function filterSalaryDetailLines(lines = [], filters = {}) {
@@ -402,7 +366,6 @@ export function summarizeSalarySummaryTotals(rows = []) {
 }
 
 export function querySalaryStats(filters = {}) {
-  ensureSalaryStatsDemoData()
   const lines = filterSalaryDetailLines(collectAllSalaryDetailLines(), filters)
   const summaryRows = summarizeSalaryByEmployee(lines)
   return {

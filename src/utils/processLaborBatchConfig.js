@@ -1,6 +1,7 @@
 import { productInfoState, updateProduct } from '@/store/productInfoStore'
 import { materialInfoState, updateMaterial } from '@/store/materialInfoStore'
 import { createDefaultLaborRow } from '@/mock/materialInfoOptions'
+import { normalizeSalaryMethodForReportType } from '@/utils/laborConfigResolver'
 
 export const BATCH_UNCHANGED = '__UNCHANGED__'
 
@@ -71,8 +72,12 @@ export function applyBatchFillPatch(rows, patch = {}) {
     Object.keys(patch).forEach((field) => {
       row[field] = patch[field]
     })
-    if (patch.reportType === '时长报工' && !('salaryMethod' in patch) && !row.salaryMethod) {
+    if (patch.reportType === '时长报工' && !('salaryMethod' in patch)) {
       row.salaryMethod = '计时工资'
+    }
+    if (row.reportType === '时长报工') {
+      row.salaryMethod = normalizeSalaryMethodForReportType(row.reportType, row.salaryMethod)
+      row.pieceRate = 0
     }
   })
 }

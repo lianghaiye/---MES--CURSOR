@@ -77,6 +77,14 @@ export function resolveSalaryMethodOptions(reportType = '') {
   return ['计件工资', '计时工资']
 }
 
+/** 按报工类型校正计薪方式（时长报工仅允许计时工资） */
+export function normalizeSalaryMethodForReportType(reportType = '', salaryMethod = '') {
+  const opts = resolveSalaryMethodOptions(reportType)
+  if (!opts.length) return ''
+  if (salaryMethod && opts.includes(salaryMethod)) return salaryMethod
+  return opts[0]
+}
+
 export function canEditSalaryMethod(config = {}) {
   return resolveSalaryMethodOptions(config.reportType).length > 1
 }

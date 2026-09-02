@@ -10,6 +10,30 @@ export const salaryDetailExportFields = [
   { key: 'sourceLabel', title: '来源', getValue: (row) => cell(row, 'sourceLabel') },
   { key: 'workOrderCode', title: '工单编号', getValue: (row) => cell(row, 'workOrderCode') },
   { key: 'taskNo', title: '任务编号', getValue: (row) => cell(row, 'taskNo') },
+  {
+    key: 'resourceTypeLabel',
+    title: '资源类型',
+    getValue: (row) => {
+      const v = row.resourceTypeLabel || row.resourceType
+      return !v || v === '—' ? '' : v
+    },
+  },
+  {
+    key: 'executionModeLabel',
+    title: '执行模式',
+    getValue: (row) => {
+      const v = row.executionModeLabel
+      return !v || v === '—' ? '' : v
+    },
+  },
+  {
+    key: 'splitSlotLabel',
+    title: '拆分序号',
+    getValue: (row) => {
+      const v = row.splitSlotLabel
+      return !v || v === '—' ? '' : v
+    },
+  },
   { key: 'processName', title: '工序名称', getValue: (row) => cell(row, 'processName') },
   { key: 'reportType', title: '报工类型', getValue: (row) => cell(row, 'reportType') },
   { key: 'reportTime', title: '报工时间', getValue: (row) => cell(row, 'reportTime') },

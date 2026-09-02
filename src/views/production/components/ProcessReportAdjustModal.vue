@@ -12,6 +12,9 @@
       <a-descriptions-item label="任务编号">{{ line?.taskNo || '—' }}</a-descriptions-item>
       <a-descriptions-item label="工序">{{ line?.processName || '—' }}</a-descriptions-item>
       <a-descriptions-item label="执行人">{{ line?.reporter || '—' }}</a-descriptions-item>
+      <a-descriptions-item v-if="groupMemberCount > 1" label="协作范围" :span="3">
+        将同步调整本组 {{ groupMemberCount }} 名成员（子行仍可单独再调）
+      </a-descriptions-item>
       <a-descriptions-item label="报工类型">{{ displayReportType }}</a-descriptions-item>
       <a-descriptions-item label="计薪方式">{{ displaySalaryMethod }}</a-descriptions-item>
       <a-descriptions-item label="报工良品数">{{
@@ -203,6 +206,8 @@ const props = defineProps({
   config: { type: Object, default: null },
   /** task=任务报工详情；quick=快速报工详情（核算/调整/推送逻辑与任务报工一致） */
   variant: { type: String, default: 'task' },
+  /** 协作主行调整时的成员数；>1 时提示同步写回 */
+  groupMemberCount: { type: Number, default: 1 },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -224,8 +229,9 @@ const qtySnapshot = reactive({ goodQty: 0, defectQty: 0 })
 
 const modalTitle = computed(() => {
   const c = props.config
-  if (!c) return '调整'
-  return `调整-${c.reportType}+${c.salaryMethod}`
+  const base = !c ? '调整' : `调整-${c.reportType}+${c.salaryMethod}`
+  if (props.groupMemberCount > 1) return `${base}（同步 ${props.groupMemberCount} 人）`
+  return base
 })
 
 const defectItems = computed(() => {

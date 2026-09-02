@@ -100,8 +100,12 @@
 <script setup>
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { reportTypeOptions, salaryMethodOptions } from '@/mock/materialInfoOptions'
+import { reportTypeOptions } from '@/mock/materialInfoOptions'
 import { BATCH_UNCHANGED, buildBatchFillHint } from '@/utils/processLaborBatchConfig'
+import {
+  normalizeSalaryMethodForReportType,
+  resolveSalaryMethodOptions,
+} from '@/utils/laborConfigResolver'
 
 const props = defineProps({
   open: Boolean,
@@ -123,7 +127,9 @@ const reportTypeFieldOpts = computed(() => {
 })
 
 const salaryMethodFieldOpts = computed(() => {
-  const items = salaryMethodOptions.map((v) => ({ label: v, value: v }))
+  const reportType = form.reportType && form.reportType !== BATCH_UNCHANGED ? form.reportType : ''
+  const methods = resolveSalaryMethodOptions(reportType)
+  const items = methods.map((v) => ({ label: v, value: v }))
   return isFillMode.value ? items : [{ label: '不修改', value: BATCH_UNCHANGED }, ...items]
 })
 
@@ -147,7 +153,8 @@ function resetBatchForm() {
 
 function resetFillForm(row = {}) {
   form.reportType = row.reportType || undefined
-  form.salaryMethod = row.salaryMethod || undefined
+  form.salaryMethod =
+    normalizeSalaryMethodForReportType(row.reportType, row.salaryMethod) || undefined
   form.standardMinutesPerPiece =
     row.standardMinutesPerPiece != null && row.standardMinutesPerPiece !== ''
       ? Number(row.standardMinutesPerPiece)
@@ -169,6 +176,25 @@ watch(
     if (!props.open) return
     if (isFillMode.value) resetFillForm(props.initialRow || {})
     else resetBatchForm()
+  },
+)
+
+watch(
+  () => form.reportType,
+  (reportType) => {
+    if (!reportType || reportType === BATCH_UNCHANGED) return
+    const next = normalizeSalaryMethodForReportType(reportType, form.salaryMethod)
+    if (form.salaryMethod && form.salaryMethod !== BATCH_UNCHANGED && form.salaryMethod !== next) {
+      form.salaryMethod = next
+    } else if (isFillMode.value && !form.salaryMethod) {
+      form.salaryMethod = next
+    } else if (
+      isFillMode.value &&
+      form.salaryMethod &&
+      !resolveSalaryMethodOptions(reportType).includes(form.salaryMethod)
+    ) {
+      form.salaryMethod = next
+    }
   },
 )
 
@@ -248,6 +274,16 @@ function handleOk() {
     message.warning(
       isFillMode.value ? '请至少填写报工类型与计薪方式' : '请至少填写一个需要批量修改的字段',
     )
+    return
+  }
+  if (
+    form.reportType &&
+    form.reportType !== BATCH_UNCHANGED &&
+    form.salaryMethod &&
+    form.salaryMethod !== BATCH_UNCHANGED &&
+    !resolveSalaryMethodOptions(form.reportType).includes(form.salaryMethod)
+  ) {
+    message.warning('时长报工仅支持计时工资')
     return
   }
   emit('confirm', buildEmitPatch())

@@ -6,12 +6,13 @@ export const processReportOperatorHint =
   '在终端提交本条报工记录的人员；组长代报时为组长，自报时与执行人相同'
 
 export const processReportDetailLineColumns = [
-  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
-  { title: '任务状态', key: 'taskStatus', width: 90, fixed: 'left' },
+  { title: '序号', key: 'index', width: 96, align: 'left', fixed: 'left' },
+  { title: '任务状态', key: 'taskStatus', width: 100, fixed: 'left' },
   { title: '推送状态', key: 'pushStatus', width: 100, fixed: 'left' },
-  { title: '任务编号', dataIndex: 'taskNo', width: 130 },
+  { title: '任务编号', key: 'taskNo', dataIndex: 'taskNo', width: 150 },
   { title: '工序名称', dataIndex: 'processName', width: 110 },
-  { title: '执行人', key: 'reporter', dataIndex: 'reporter', width: 90 },
+  { title: '执行形态', key: 'collab', width: 168 },
+  { title: '执行人', key: 'reporter', dataIndex: 'reporter', width: 140, ellipsis: true },
   { title: '操作人', key: 'operator', dataIndex: 'operator', width: 90 },
   { title: '班组', dataIndex: 'team', width: 100 },
   { title: '报工类型', dataIndex: 'reportType', width: 100 },
@@ -37,13 +38,14 @@ export function buildProcessReportDetailSummaryCells(summary, formatAccountHours
     align: undefined,
   }))
   cells[1].content = '合计'
-  cells[10].content = String(summary.goodQty)
-  cells[10].align = 'right'
-  cells[11].content = String(summary.defectQty)
+  // 列位移：新增「协作」后，良品/不良/工时/计薪索引 +1
+  cells[11].content = String(summary.goodQty)
   cells[11].align = 'right'
-  cells[12].content = formatAccountHours(summary.accountHours, true)
+  cells[12].content = String(summary.defectQty)
   cells[12].align = 'right'
-  cells[15].content = formatMoney(summary.salaryAmount)
-  cells[15].align = 'right'
+  cells[13].content = formatAccountHours(summary.accountHours, true)
+  cells[13].align = 'right'
+  cells[16].content = formatMoney(summary.salaryAmount)
+  cells[16].align = 'right'
   return cells
 }

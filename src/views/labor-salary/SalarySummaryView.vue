@@ -79,7 +79,12 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'positions'">
-          <span class="positions-text" :title="record.positions">{{ record.positions }}</span>
+          <span class="positions-text" :title="record.positions">{{
+            record.positions || '—'
+          }}</span>
+        </template>
+        <template v-else-if="TEXT_KEYS.has(column.dataIndex)">
+          {{ formatText(record[column.dataIndex]) }}
         </template>
         <template
           v-else-if="
@@ -93,8 +98,11 @@
         <template v-else-if="column.key === 'action'">
           <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
         </template>
-        <template v-else-if="column.dataIndex">
+        <template v-else-if="NUM_KEYS.has(column.dataIndex)">
           {{ formatNum(record[column.dataIndex]) }}
+        </template>
+        <template v-else-if="column.dataIndex">
+          {{ formatText(record[column.dataIndex]) }}
         </template>
       </template>
       <template #summary>
@@ -151,12 +159,15 @@ import { employeeNameOptions } from '@/utils/employeeProfileResolver'
 import { querySalaryStats } from '@/utils/salaryStatsAggregate'
 import { reloadProcessReports } from '@/store/processReportStore'
 import { reloadQuickReports } from '@/store/quickReportStore'
-import { ensureSalaryStatsDemoData } from '@/store/laborHourStore'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useListExport } from '@/composables/useListExport'
 import { salarySummaryExportFields } from '@/utils/exportFields/salarySummaryExport'
+import { formatMoney as formatMoneySmart, formatNumber } from '@/utils/numberFormat'
 
 const router = useRouter()
+
+const TEXT_KEYS = new Set(['employeeNo', 'employeeName', 'workCenter'])
+const NUM_KEYS = new Set(['taskCount', 'reportQty', 'workHours'])
 
 function getCurrentMonthRange() {
   return {
@@ -284,15 +295,16 @@ const summaryCells = computed(() => {
 })
 
 function formatNum(val) {
-  const num = Number(val)
-  if (!Number.isFinite(num)) return '—'
-  return num.toFixed(2)
+  return formatNumber(val, 4, { empty: '—' })
 }
 
 function formatMoney(val) {
-  const num = Number(val)
-  if (!Number.isFinite(num)) return '—'
-  return num.toFixed(2)
+  return formatMoneySmart(val, 4, { empty: '—' })
+}
+
+function formatText(val) {
+  if (val == null || val === '') return '—'
+  return String(val)
 }
 
 function filterEmployee(input, option) {
@@ -302,7 +314,7 @@ function filterEmployee(input, option) {
 function loadData() {
   reloadProcessReports()
   reloadQuickReports()
-  ensureSalaryStatsDemoData()
+  // 极简模式：仅工序报工 / 登记产出
   statsResult.value = querySalaryStats(appliedFilters.value)
 }
 

@@ -96,6 +96,12 @@ function mapRecordToLine(record, index, materialCode) {
     seq: index + 1,
     taskNo: buildTaskNo(record, index),
     team: record.team || resolveTeam(record.reporter),
+    taskGroupId: record.taskGroupId || '',
+    taskExecutionMode: record.taskExecutionMode || '',
+    outcomeMode: record.outcomeMode || '',
+    resourceType: record.resourceType || '',
+    collaborationSlot: record.collaborationSlot,
+    collaborationTotal: record.collaborationTotal,
     defectReason: record.defectReason || enriched.defectItems || '—',
     taskStartTime:
       record.taskStartTime || (datePrefix ? `${datePrefix} ${record.startTime || '08:00'}` : '—'),

@@ -370,6 +370,25 @@ export function adjustProcessReportLine(recordId, payload = {}, operator = 'admi
   return { ok: true }
 }
 
+/** 协作主行：同一调整写回多条子任务 */
+export function adjustProcessReportLines(recordIds = [], payload = {}, operator = 'admin1') {
+  const ids = [...new Set((recordIds || []).filter(Boolean))]
+  if (!ids.length) return { ok: false, message: '未选择可调整记录' }
+  let okCount = 0
+  let lastError = ''
+  ids.forEach((id) => {
+    const res = adjustProcessReportLine(id, payload, operator)
+    if (res.ok) okCount += 1
+    else lastError = res.message || lastError
+  })
+  if (!okCount) return { ok: false, message: lastError || '调整失败' }
+  return {
+    ok: true,
+    message: ids.length > 1 ? `已同步调整 ${okCount} 条协作成员` : '调整已保存',
+    okCount,
+  }
+}
+
 export function subsidyProcessReportLine(recordId, payload = {}) {
   return adjustProcessReportLine(recordId, {
     subsidyMethod: Number(payload.subsidyReportQty) > 0 ? 'qty' : 'fixed',

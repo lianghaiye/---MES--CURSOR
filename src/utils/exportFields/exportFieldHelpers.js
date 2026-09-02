@@ -1,3 +1,5 @@
+import { formatNumber } from '@/utils/numberFormat'
+
 /** 从行对象取字段，空值导出为空字符串 */
 
 export function cell(row, key) {
@@ -6,10 +8,9 @@ export function cell(row, key) {
   return val ?? ''
 }
 
-export function numCell(val, digits = 2) {
-  const n = Number(val)
-  if (!Number.isFinite(n)) return ''
-  return n.toFixed(digits)
+/** 有小数才显示小数位，不补尾零 */
+export function numCell(val, digits = 4) {
+  return formatNumber(val, digits, { empty: '' })
 }
 
 export function intCell(val) {
