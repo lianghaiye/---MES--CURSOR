@@ -8,7 +8,7 @@ import {
 
 const STORAGE_KEY = 'i_doms_purchase_receipts'
 const SEED_VERSION_KEY = 'i_doms_purchase_receipts_seed_v'
-const CURRENT_SEED_VERSION = '6'
+const CURRENT_SEED_VERSION = '8'
 
 const UNFINISHED_QC_STATUSES = new Set(['未质检', '质检中'])
 const UNFINISHED_INBOUND_STATUSES = new Set(['入库中', '部分入库'])

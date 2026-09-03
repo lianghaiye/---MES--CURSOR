@@ -132,6 +132,38 @@ export const BLANK_SIZE_ASSIST_DESCRIPTION =
 export const ENABLE_BOM_LEVEL_MTS_DESCRIPTION =
   '开启后，生产计划展开 BOM 时支持子件级按库存MTS：子件主数据为按库存MTS 且库存充足时，可不下推该层生产/采购需求；关闭则生产计划仍按订单展开，仅成品级计划策略生效。默认关闭。'
 
+/** 质检门控：按业务类型配置（强管控阻断 / 弱管控仅预警） */
+export const QC_GATE_POLICY_PARAM_OPTIONS = [
+  { value: 'hard', label: '强管控（阻断下游）' },
+  { value: 'soft', label: '弱管控（仅预警）' },
+]
+
+export const QC_GATE_POLICY_BIZ_SCOPES = [
+  '来料质检',
+  '外协回货检',
+  '生产过程检',
+  '成品检',
+  '出厂质检',
+]
+
+export const QC_GATE_POLICY_DESCRIPTION =
+  '按质检业务类型配置下游门控：强管控在未检/不合格等场景阻断入库、报工、出库；弱管控仅 Toast 预警不拦按钮。默认强管控。'
+
+function normalizeQcGatePolicyParam(value) {
+  const v = String(value || '').trim()
+  if (v === 'strong') return 'hard'
+  if (v === 'weak') return 'soft'
+  return QC_GATE_POLICY_PARAM_OPTIONS.some((o) => o.value === v) ? v : 'hard'
+}
+
+function normalizeQcGatePolicyMap(map = {}) {
+  const result = {}
+  QC_GATE_POLICY_BIZ_SCOPES.forEach((scope) => {
+    result[scope] = normalizeQcGatePolicyParam(map?.[scope])
+  })
+  return result
+}
+
 export const AUTO_APPROVE_TYPES = {
   PURCHASE_ORDER: 'purchaseOrder',
   SALES_ORDER: 'salesOrder',
@@ -331,6 +363,8 @@ function loadFromStorage() {
           blankSizeAssistTools,
           blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
           enableBomLevelMts: parsed.enableBomLevelMts === true,
+          qcDefaultGatePolicy: normalizeQcGatePolicyParam(parsed.qcDefaultGatePolicy),
+          qcGatePolicyByBizScope: normalizeQcGatePolicyMap(parsed.qcGatePolicyByBizScope),
         }
       }
     }
@@ -355,6 +389,8 @@ export const functionParamState = reactive({
     blankSizeAssistTools: createDefaultBlankSizeAssistTools(),
     blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
     enableBomLevelMts: false,
+    qcDefaultGatePolicy: 'hard',
+    qcGatePolicyByBizScope: normalizeQcGatePolicyMap(),
   },
 })
 
@@ -557,6 +593,37 @@ export function isBomLevelMtsEnabled() {
 export function setEnableBomLevelMts(enabled) {
   functionParamState.params.enableBomLevelMts = Boolean(enabled)
   return { ok: true }
+}
+
+export function getQcDefaultGatePolicy() {
+  return normalizeQcGatePolicyParam(functionParamState.params.qcDefaultGatePolicy)
+}
+
+export function setQcDefaultGatePolicy(value) {
+  const v = normalizeQcGatePolicyParam(value)
+  functionParamState.params.qcDefaultGatePolicy = v
+  return { ok: true }
+}
+
+export function getQcGatePolicyByBizScope(bizScope) {
+  const scope = String(bizScope || '').trim()
+  const map = functionParamState.params.qcGatePolicyByBizScope || {}
+  if (scope && map[scope]) return normalizeQcGatePolicyParam(map[scope])
+  return getQcDefaultGatePolicy()
+}
+
+export function setQcGatePolicyByBizScope(bizScope, policy) {
+  const scope = String(bizScope || '').trim()
+  if (!scope) return { ok: false, message: 'bizScope 不能为空' }
+  if (!functionParamState.params.qcGatePolicyByBizScope) {
+    functionParamState.params.qcGatePolicyByBizScope = normalizeQcGatePolicyMap()
+  }
+  functionParamState.params.qcGatePolicyByBizScope[scope] = normalizeQcGatePolicyParam(policy)
+  return { ok: true }
+}
+
+export function getQcGatePolicyMap() {
+  return normalizeQcGatePolicyMap(functionParamState.params.qcGatePolicyByBizScope)
 }
 
 /** @deprecated 使用 isReportSalaryPush */

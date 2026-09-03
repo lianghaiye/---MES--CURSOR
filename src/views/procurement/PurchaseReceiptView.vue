@@ -85,7 +85,7 @@
 
     <div class="toolbar-row">
       <a-space wrap :size="8">
-        <a-button size="small" @click="message.info('生成质检单功能开发中')">生成质检单</a-button>
+        <a-button size="small" @click="openGenerateQcModal">生成质检单</a-button>
         <a-button size="small" @click="openInboundModal">生成入库单</a-button>
         <a-button size="small" type="primary" @click="handleComplete">完成</a-button>
         <a-dropdown>
@@ -229,6 +229,8 @@
 
     <PurchaseReceiptPrintModal v-model:open="printModalOpen" :receipts="printReceipts" />
 
+    <GenerateIncomingQcModal v-model:open="qcModalOpen" :receipt="qcReceipt" @saved="onQcSaved" />
+
     <GenerateInboundOrderModal
       v-model:open="inboundModalOpen"
       :purchase-order="inboundOrder"
@@ -267,10 +269,12 @@ import {
   canCompletePurchaseReceipt,
   voidPurchaseReceipt,
   completePurchaseReceipt,
+  hasReceiptQcSheet,
 } from '@/store/purchaseReceiptStore'
 import { canGenerateInbound, getPurchaseOrderById } from '@/store/purchaseOrderStore'
 import { supplierOptions } from '@/mock/purchaseOrderOptions'
 import PurchaseReceiptPrintModal from './components/PurchaseReceiptPrintModal.vue'
+import GenerateIncomingQcModal from './components/GenerateIncomingQcModal.vue'
 import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -296,6 +300,8 @@ const printReceipts = ref([])
 const inboundModalOpen = ref(false)
 const inboundOrder = ref(null)
 const inboundReceipt = ref(null)
+const qcModalOpen = ref(false)
+const qcReceipt = ref(null)
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const supplierOpts = supplierOptions
@@ -408,10 +414,11 @@ function openPurchaseOrder(record) {
   })
 }
 
-/** 进行中且质检未完成 → 展示「质检」 */
+/** 进行中且尚未生成质检单 → 展示「质检」 */
 function canShowReceiptQcAction(record) {
-  if (record?.receiptStatus !== '进行中') return false
-  return ['未质检', '质检中'].includes(record.qcStatus || '未质检')
+  if (record?.receiptStatus !== '进行中' && record?.receiptStatus !== '新建') return false
+  if (hasReceiptQcSheet(record)) return false
+  return (record.qcStatus || '未质检') === '未质检'
 }
 
 /** 进行中且入库未完成、关联采购单仍可入库 → 展示「入库」 */
@@ -431,12 +438,43 @@ function hasRowActions(record) {
   )
 }
 
-function handleQc(record) {
-  if (!canShowReceiptQcAction(record)) {
-    message.warning('当前收货单不可质检')
+function openQcForReceipt(receipt) {
+  if (!receipt) {
+    message.warning('未找到收货单')
     return
   }
-  message.info(`收货单「${record.receiptNo}」生成质检单功能开发中`)
+  if (hasReceiptQcSheet(receipt)) {
+    message.warning('该收货单已生成质检单')
+    return
+  }
+  if (!canShowReceiptQcAction(receipt)) {
+    message.warning('当前收货单不可生成质检单')
+    return
+  }
+  if (!(receipt.lineItems || []).some((l) => (Number(l.receiptQty) || 0) > 0)) {
+    message.warning('收货明细为空，无法生成质检单')
+    return
+  }
+  qcReceipt.value = receipt
+  qcModalOpen.value = true
+}
+
+function handleQc(record) {
+  openQcForReceipt(record)
+}
+
+function openGenerateQcModal() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条收货单后再生成质检单')
+    return
+  }
+  const receipt = purchaseReceiptState.receipts.find((r) => r.id === selectedRowKeys.value[0])
+  openQcForReceipt(receipt)
+}
+
+function onQcSaved() {
+  qcReceipt.value = null
+  selectedRowKeys.value = []
 }
 
 function openInboundForRow(receipt) {

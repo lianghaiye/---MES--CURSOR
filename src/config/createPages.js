@@ -216,6 +216,14 @@ export const createPageRegistry = [
     view: () => import('@/views/quality/FactoryQcCreateView.vue'),
     keepAlive: 'FactoryQcCreateView',
   },
+  {
+    listPath: '/quality/qc-template',
+    newPath: '/quality/qc-template/new',
+    title: '新增质检模板',
+    name: 'quality-qc-template-new',
+    view: () => import('@/views/quality/QcTemplateCreateView.vue'),
+    keepAlive: 'QcTemplateCreateView',
+  },
 ]
 
 export function findCreatePageByListPath(listPath) {

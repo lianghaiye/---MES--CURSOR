@@ -548,6 +548,50 @@ const routes = [
         meta: { title: '下料结算详情', listPath: '/inventory/cut-settle' },
       },
       {
+        path: 'quality/incoming-qc',
+        name: 'quality-incoming-qc',
+        component: () => import('@/views/quality/QcTaskListView.vue'),
+        meta: { title: '来料质检', bizScope: '来料质检' },
+      },
+      {
+        path: 'quality/incoming-qc/:id/inspect',
+        name: 'quality-incoming-qc-inspect',
+        component: () => import('@/views/quality/QcTaskInspectView.vue'),
+        meta: {
+          title: '录入质检结果',
+          listPath: '/quality/incoming-qc',
+          bizScope: '来料质检',
+        },
+      },
+      {
+        path: 'quality/incoming-qc/:id',
+        name: 'quality-incoming-qc-detail',
+        component: () => import('@/views/quality/QcTaskDetailView.vue'),
+        meta: {
+          title: '来料质检详情',
+          listPath: '/quality/incoming-qc',
+          bizScope: '来料质检',
+        },
+      },
+      {
+        path: 'quality/outsourcing-qc',
+        name: 'quality-outsourcing-qc',
+        component: () => import('@/views/quality/QcTaskListView.vue'),
+        meta: { title: '外协回货检', bizScope: '外协回货检' },
+      },
+      {
+        path: 'quality/process-qc',
+        name: 'quality-process-qc',
+        component: () => import('@/views/quality/QcTaskListView.vue'),
+        meta: { title: '生产过程检', bizScope: '生产过程检' },
+      },
+      {
+        path: 'quality/finished-qc',
+        name: 'quality-finished-qc',
+        component: () => import('@/views/quality/QcTaskListView.vue'),
+        meta: { title: '成品检', bizScope: '成品检' },
+      },
+      {
         path: 'quality/factory-qc',
         name: 'quality-factory-qc',
         component: () => import('@/views/quality/FactoryQcView.vue'),

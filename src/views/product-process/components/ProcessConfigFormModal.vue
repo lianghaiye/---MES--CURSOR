@@ -3,136 +3,156 @@
     :page-mode="pageMode"
     :open="open"
     :title="shellTitle"
-    width="960px"
+    width="1100px"
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" class="process-form">
-      <a-row :gutter="16">
-        <a-col :span="8">
-          <a-form-item label="工序编码" name="code">
-            <a-input v-model:value="form.code" placeholder="留空则自动生成 GX+流水" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="工序名称" name="name" required>
-            <a-input v-model:value="form.name" placeholder="请输入 工序名称" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="工序分类" name="category" required>
-            <a-select
-              v-model:value="form.category"
-              placeholder="请选择 工序分类"
-              :options="categoryOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="资源类型" name="resourceType" required>
-            <a-select
-              v-model:value="form.resourceType"
-              placeholder="请选择 资源类型"
-              :options="resourceTypeOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="默认执行人/工组">
-            <ExecutorTagPicker
-              :executors="form.defaultExecutors"
-              :resource-type="form.resourceType"
-              placeholder="请选择默认执行人/工组"
-              @update:executors="(v) => (form.defaultExecutors = v)"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="岗位" name="position" required>
-            <a-select
-              v-model:value="form.position"
-              show-search
-              placeholder="请选择 岗位"
-              :options="positionOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="报工类型" name="reportMode">
-            <a-select
-              v-model:value="form.reportMode"
-              allow-clear
-              placeholder="请选择报工类型（选填）"
-              :options="reportModeOpts"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="showTaskExecutionMode" :span="8">
-          <a-form-item label="任务执行模式" name="taskExecutionMode">
-            <a-select
-              v-model:value="form.taskExecutionMode"
-              placeholder="请选择任务执行模式"
-              :options="taskExecutionModeOpts"
-            />
-            <div v-if="taskExecutionModeHint" class="field-hint">{{ taskExecutionModeHint }}</div>
-          </a-form-item>
-        </a-col>
-        <a-col :span="showTaskExecutionMode ? 8 : 16">
-          <a-form-item label="不良品项">
-            <a-select
-              v-model:value="form.defectItemIds"
-              mode="multiple"
-              show-search
-              allow-clear
-              placeholder="请选择不良品项（支持搜索）"
-              :options="defectItemOpts"
-              :filter-option="filterDefectOption"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="下料工序">
-            <a-switch
-              v-model:checked="form.isBlanking"
-              checked-children="是"
-              un-checked-children="否"
-            />
-            <div class="field-hint">
-              开启后：工艺路线含本工序的工单可进入下料结算；具体结算哪些物料，以物料主数据「需要下料结算」为准
-            </div>
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="图片">
-            <div class="image-upload-mock">
-              <div v-if="form.image" class="image-preview">
-                <img :src="form.image" alt="工序图片" />
-                <a-button type="link" size="small" danger @click="form.image = ''">移除</a-button>
+      <div class="form-section-box">
+        <div class="section-label">基本信息</div>
+        <a-row :gutter="[12, 8]">
+          <a-col :span="6">
+            <a-form-item label="工序编码" name="code">
+              <a-input v-model:value="form.code" placeholder="留空则自动生成 GX+流水" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="工序名称" name="name" required>
+              <a-input v-model:value="form.name" placeholder="请输入工序名称" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="工序分类" name="category" required>
+              <a-select
+                v-model:value="form.category"
+                placeholder="请选择工序分类"
+                :options="categoryOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="资源类型" name="resourceType" required>
+              <a-select
+                v-model:value="form.resourceType"
+                placeholder="请选择资源类型"
+                :options="resourceTypeOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="默认执行人/工组">
+              <ExecutorTagPicker
+                :executors="form.defaultExecutors"
+                :resource-type="form.resourceType"
+                placeholder="请选择默认执行人/工组"
+                @update:executors="(v) => (form.defaultExecutors = v)"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="岗位" name="position" required>
+              <a-select
+                v-model:value="form.position"
+                show-search
+                placeholder="请选择岗位"
+                :options="positionOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="报工类型" name="reportMode">
+              <a-select
+                v-model:value="form.reportMode"
+                allow-clear
+                placeholder="请选择报工类型（选填）"
+                :options="reportModeOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="showTaskExecutionMode" :span="6">
+            <a-form-item label="任务执行模式" name="taskExecutionMode">
+              <a-select
+                v-model:value="form.taskExecutionMode"
+                placeholder="请选择任务执行模式"
+                :options="taskExecutionModeOpts"
+              />
+              <div v-if="taskExecutionModeHint" class="field-hint">{{ taskExecutionModeHint }}</div>
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="不良品项">
+              <a-select
+                v-model:value="form.defectItemIds"
+                mode="multiple"
+                show-search
+                allow-clear
+                placeholder="请选择不良品项（支持搜索）"
+                :options="defectItemOpts"
+                :filter-option="filterDefectOption"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="下料工序">
+              <a-switch
+                v-model:checked="form.isBlanking"
+                checked-children="是"
+                un-checked-children="否"
+              />
+              <div class="field-hint">开启后可进入下料结算；具体物料以主数据为准</div>
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="质检">
+              <a-switch
+                v-model:checked="form.operations.opQc"
+                checked-children="开"
+                un-checked-children="关"
+                @change="onQcSwitchChange"
+              />
+              <div class="field-hint">开启后选择质检类型；极简下发时预生成任务</div>
+            </a-form-item>
+          </a-col>
+          <a-col v-if="form.operations.opQc" :span="12">
+            <a-form-item label="质检类型" required>
+              <a-checkbox-group v-model:value="qcBizScopes" :options="processQcBizScopeOptions()" />
+              <div class="field-hint">可多选；工单下发时按勾选项分别生成质检任务</div>
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="图片">
+              <div class="image-upload-mock">
+                <div v-if="form.image" class="image-preview">
+                  <img :src="form.image" alt="工序图片" />
+                  <a-button type="link" size="small" danger @click="form.image = ''">移除</a-button>
+                </div>
+                <a-button v-else size="small" @click="setMockImage">
+                  <PlusOutlined />
+                  上传
+                </a-button>
+                <div class="image-hint">jpg/png/jpeg（演示为 MOCK）</div>
               </div>
-              <a-button v-else size="small" @click="setMockImage">
-                <PlusOutlined />
-                上传
-              </a-button>
-              <div class="image-hint">只能上传 jpg/png/jpeg 图片（演示为 MOCK）</div>
-            </div>
-          </a-form-item>
-        </a-col>
-        <a-col :span="24">
-          <a-form-item label="备注">
-            <a-textarea v-model:value="form.remark" placeholder="请输入备注" :rows="2" />
-          </a-form-item>
-        </a-col>
-      </a-row>
+            </a-form-item>
+          </a-col>
+          <a-col :span="24">
+            <a-form-item label="备注">
+              <a-textarea v-model:value="form.remark" placeholder="请输入备注" :rows="2" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </div>
 
-      <div v-if="showProcessOperations" class="ops-title">工序操作</div>
-      <a-row v-if="showProcessOperations" :gutter="[16, 12]" class="ops-grid">
-        <a-col v-for="item in PROCESS_OPERATION_DEFS" :key="item.key" :span="6">
-          <div class="ops-item">
-            <span>{{ item.label }}</span>
-            <a-switch v-model:checked="form.operations[item.key]" size="small" />
-          </div>
-        </a-col>
-      </a-row>
+      <div v-if="showProcessOperations" class="form-section-box">
+        <div class="section-label">工序操作</div>
+        <a-row :gutter="[16, 12]" class="ops-grid">
+          <a-col v-for="item in visibleProcessOperationDefs" :key="item.key" :span="6">
+            <div class="ops-item">
+              <span>{{ item.label }}</span>
+              <a-switch v-model:checked="form.operations[item.key]" size="small" />
+            </div>
+          </a-col>
+        </a-row>
+      </div>
     </a-form>
 
     <template #footer>
@@ -169,6 +189,12 @@ import { DEFAULT_TASK_EXECUTION_MODE } from '@/utils/taskExecutionMode'
 import { isMinimalReportMode } from '@/store/businessRuleStore'
 import { getActiveCategoryOptions } from '@/store/processCategoryStore'
 import { getDefectItemOptions } from '@/store/defectItemStore'
+import {
+  createProcessQcConfig,
+  defaultQcConfigsFromOperations,
+  normalizeProcessQcConfigs,
+  processQcBizScopeOptions,
+} from '@/utils/qcProcessConfig'
 import ExecutorTagPicker from '@/views/production/components/ExecutorTagPicker.vue'
 
 const MOCK_IMAGE =
@@ -212,6 +238,7 @@ const form = reactive({
   taskExecutionMode: DEFAULT_TASK_EXECUTION_MODE,
   defectItemIds: [],
   operations: defaultOps(),
+  qcConfigs: [],
 })
 
 const categoryOpts = computed(() => getActiveCategoryOptions())
@@ -251,6 +278,34 @@ const taskExecutionModeHint = computed(() => {
 
 const showProcessOperations = computed(() => !isMinimalReportMode())
 
+/** 质检开关已单独展示，工序操作区不再重复 */
+const visibleProcessOperationDefs = computed(() =>
+  PROCESS_OPERATION_DEFS.filter((d) => d.key !== 'opQc'),
+)
+
+/** 勾选的质检业务类型 ↔ qcConfigs */
+const qcBizScopes = computed({
+  get() {
+    return form.qcConfigs.map((c) => c.bizScope).filter(Boolean)
+  },
+  set(scopes) {
+    const selected = [...new Set((scopes || []).filter(Boolean))]
+    const prevByScope = Object.fromEntries(form.qcConfigs.map((c) => [c.bizScope, c]))
+    form.qcConfigs = selected.map(
+      (scope) => prevByScope[scope] || createProcessQcConfig({ bizScope: scope }),
+    )
+  },
+})
+
+function onQcSwitchChange(enabled) {
+  if (enabled && !form.qcConfigs.length) {
+    form.qcConfigs = defaultQcConfigsFromOperations({ opQc: true })
+  }
+  if (!enabled) {
+    form.qcConfigs = []
+  }
+}
+
 const rules = {
   name: [{ required: true, message: '请输入工序名称', trigger: 'blur' }],
   category: [{ required: true, message: '请选择工序分类', trigger: 'change' }],
@@ -284,6 +339,13 @@ watch(
     form.taskExecutionMode = r?.taskExecutionMode || DEFAULT_TASK_EXECUTION_MODE
     form.defectItemIds = [...(r?.defectItemIds || [])]
     form.operations = { ...defaultOps(), ...(r?.operations || {}) }
+    const loadedQcConfigs = normalizeProcessQcConfigs(
+      r?.qcConfigs?.length ? r.qcConfigs : defaultQcConfigsFromOperations(r?.operations),
+    )
+    if (loadedQcConfigs.length) {
+      form.operations.opQc = true
+    }
+    form.qcConfigs = loadedQcConfigs
   },
   { immediate: true },
 )
@@ -318,10 +380,19 @@ async function handleSave() {
   } catch {
     return
   }
+  if (form.operations.opQc && !form.qcConfigs.length) {
+    message.warning('请至少勾选一种质检类型')
+    return
+  }
   saving.value = true
+  const baseOps = showProcessOperations.value ? { ...form.operations } : defaultOps()
+  if (!showProcessOperations.value) {
+    baseOps.opQc = Boolean(form.operations.opQc)
+  }
   const payload = {
     ...form,
-    operations: showProcessOperations.value ? { ...form.operations } : defaultOps(),
+    operations: baseOps,
+    qcConfigs: form.operations.opQc ? normalizeProcessQcConfigs(form.qcConfigs) : [],
   }
   const res = isEdit.value
     ? updateProcessConfig(props.record.id, payload)
@@ -339,11 +410,20 @@ async function handleSave() {
 
 <style lang="less" scoped>
 .process-form {
-  .ops-title {
-    font-weight: 500;
-    margin: 8px 0 12px;
-    padding-top: 8px;
-    border-top: 1px solid #f0f0f0;
+  .form-section-box {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+  }
+
+  .section-label {
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.88);
   }
 
   .ops-grid .ops-item {
@@ -351,7 +431,8 @@ async function handleSave() {
     align-items: center;
     justify-content: space-between;
     padding: 4px 8px;
-    background: #fafafa;
+    background: #fff;
+    border: 1px solid #f0f0f0;
     border-radius: 4px;
   }
 

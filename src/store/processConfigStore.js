@@ -11,6 +11,7 @@ import {
 import { getActiveCategoryNames } from '@/store/processCategoryStore'
 import { normalizeReportMode } from '@/utils/reportMode'
 import { normalizeTaskExecutionMode } from '@/utils/taskExecutionMode'
+import { defaultQcConfigsFromOperations, normalizeProcessQcConfigs } from '@/utils/qcProcessConfig'
 
 const STORAGE_KEY = 'i_doms_process_config'
 const SEED_VERSION_KEY = 'i_doms_process_config_seed_v'
@@ -54,14 +55,29 @@ function normalizeOperations(ops = {}) {
 }
 
 function normalizeProcessList(list) {
-  return (list || []).map((p) => ({
-    ...p,
-    isBlanking: p.isBlanking != null ? Boolean(p.isBlanking) : p.name === '下料',
-    defaultExecutors: Array.isArray(p.defaultExecutors) ? [...p.defaultExecutors] : [],
-    reportMode: normalizeReportMode(p.reportMode),
-    taskExecutionMode: normalizeTaskExecutionMode(p.taskExecutionMode),
-    defectItemIds: Array.isArray(p.defectItemIds) ? [...p.defectItemIds] : [],
-  }))
+  return (list || []).map((p) => {
+    const operations = normalizeOperations(p.operations)
+    let qcConfigs = normalizeProcessQcConfigs(
+      Array.isArray(p.qcConfigs) && p.qcConfigs.length
+        ? p.qcConfigs
+        : defaultQcConfigsFromOperations(operations),
+    )
+    if (qcConfigs.length) {
+      operations.opQc = true
+    } else if (!operations.opQc) {
+      qcConfigs = []
+    }
+    return {
+      ...p,
+      isBlanking: p.isBlanking != null ? Boolean(p.isBlanking) : p.name === '下料',
+      defaultExecutors: Array.isArray(p.defaultExecutors) ? [...p.defaultExecutors] : [],
+      reportMode: normalizeReportMode(p.reportMode),
+      taskExecutionMode: normalizeTaskExecutionMode(p.taskExecutionMode),
+      defectItemIds: Array.isArray(p.defectItemIds) ? [...p.defectItemIds] : [],
+      operations,
+      qcConfigs,
+    }
+  })
 }
 
 export const processConfigState = reactive({
@@ -178,6 +194,13 @@ export function addProcessConfig(payload) {
   if (!check.ok) return check
 
   const codes = processConfigState.processes.map((p) => p.code)
+  const operations = normalizeOperations(payload.operations)
+  const qcConfigs = normalizeProcessQcConfigs(
+    payload.qcConfigs ?? defaultQcConfigsFromOperations(operations),
+  )
+  if (qcConfigs.length) operations.opQc = true
+  else operations.opQc = false
+
   const row = {
     id: `proc-${Date.now()}`,
     code: payload.code?.trim() || generateProcessCode(codes),
@@ -188,12 +211,13 @@ export function addProcessConfig(payload) {
     image: payload.image || '',
     remark: payload.remark?.trim() || '',
     status: '使用中',
-    operations: normalizeOperations(payload.operations),
+    operations,
     isBlanking: Boolean(payload.isBlanking),
     defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
     reportMode: payload.reportMode ? normalizeReportMode(payload.reportMode) : '',
     taskExecutionMode: normalizeTaskExecutionMode(payload.taskExecutionMode),
     defectItemIds: Array.isArray(payload.defectItemIds) ? [...payload.defectItemIds] : [],
+    qcConfigs: operations.opQc ? qcConfigs : [],
     createdAt: dayjs().format('YYYY-MM-DD'),
     updatedAt: dayjs().format('YYYY-MM-DD'),
   }
@@ -209,6 +233,15 @@ export function updateProcessConfig(id, payload) {
   if (!check.ok) return check
 
   const row = processConfigState.processes[idx]
+  const operations = normalizeOperations(payload.operations)
+  const qcConfigs = normalizeProcessQcConfigs(
+    payload.qcConfigs != null ? payload.qcConfigs : row.qcConfigs || [],
+  )
+  if (qcConfigs.length) operations.opQc = true
+  else if (!operations.opQc) {
+    /* keep off */
+  }
+
   Object.assign(row, {
     code: payload.code?.trim() || row.code,
     name: payload.name.trim(),
@@ -217,7 +250,7 @@ export function updateProcessConfig(id, payload) {
     position: payload.position,
     image: payload.image ?? row.image,
     remark: payload.remark?.trim() ?? row.remark,
-    operations: normalizeOperations(payload.operations),
+    operations,
     isBlanking: Boolean(payload.isBlanking),
     defaultExecutors: Array.isArray(payload.defaultExecutors) ? [...payload.defaultExecutors] : [],
     reportMode: payload.reportMode
@@ -227,6 +260,7 @@ export function updateProcessConfig(id, payload) {
       payload.taskExecutionMode ?? row.taskExecutionMode,
     ),
     defectItemIds: Array.isArray(payload.defectItemIds) ? [...payload.defectItemIds] : [],
+    qcConfigs: operations.opQc ? qcConfigs : [],
     updatedAt: dayjs().format('YYYY-MM-DD'),
   })
   return { ok: true, process: row }
