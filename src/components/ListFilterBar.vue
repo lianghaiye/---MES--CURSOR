@@ -107,6 +107,11 @@ const collapsible = computed(() => effectiveCount.value > props.collapseCount)
     align-self: end;
     min-height: 32px;
   }
+
+  /* 条件不足 5 个：按钮与条件同一行 */
+  > .list-filter-actions-cell:nth-child(-n + 5) {
+    grid-row: 1;
+  }
 }
 
 .list-filter-bar.is-collapsed .list-filter-fields > .ant-form-item:nth-child(n + 10),
@@ -133,6 +138,10 @@ const collapsible = computed(() => effectiveCount.value > props.collapseCount)
     > .list-filter-actions-cell {
       grid-column: 3;
       grid-row: 2;
+    }
+
+    > .list-filter-actions-cell:nth-child(-n + 3) {
+      grid-row: 1;
     }
   }
 

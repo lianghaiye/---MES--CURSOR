@@ -15,25 +15,69 @@
 
         <div class="section-card">
           <div class="section-title">基础信息</div>
-          <a-descriptions bordered size="small" :column="3">
-            <a-descriptions-item label="工单编号">
-              <a-space :size="6">
-                <span>{{ bundle.workOrderCode }}</span>
-                <a-button type="link" size="small" @click="copyWorkOrderCode">复制</a-button>
-              </a-space>
-            </a-descriptions-item>
-            <a-descriptions-item label="物品编码">{{ bundle.materialCode }}</a-descriptions-item>
-            <a-descriptions-item label="物品名称">{{ bundle.materialName }}</a-descriptions-item>
-            <a-descriptions-item label="规格型号">{{ bundle.specModel }}</a-descriptions-item>
-            <a-descriptions-item label="销售单号">{{ bundle.salesOrderNo }}</a-descriptions-item>
-            <a-descriptions-item label="排产数量">{{ bundle.scheduleQty }}</a-descriptions-item>
-            <a-descriptions-item label="工作中心">{{ bundle.workCenter }}</a-descriptions-item>
-            <a-descriptions-item label="负责人">{{ bundle.owner }}</a-descriptions-item>
-            <a-descriptions-item label="工艺路线">{{
-              bundle.processRouteName
-            }}</a-descriptions-item>
-            <a-descriptions-item label="EBOM" :span="3">{{ bundle.ebomLabel }}</a-descriptions-item>
-          </a-descriptions>
+          <div class="basic-info-grid">
+            <div class="basic-info-item">
+              <span class="basic-info-label">工单编号：</span>
+              <span class="basic-info-value">
+                <a-space :size="6">
+                  <span>{{ bundle.workOrderCode || '—' }}</span>
+                  <a-button type="link" size="small" @click="copyWorkOrderCode">复制</a-button>
+                </a-space>
+              </span>
+            </div>
+            <div class="basic-info-item">
+              <span class="basic-info-label">物品编码：</span>
+              <span class="basic-info-value" :title="bundle.materialCode">{{
+                bundle.materialCode || '—'
+              }}</span>
+            </div>
+            <div class="basic-info-item">
+              <span class="basic-info-label">物品名称：</span>
+              <span class="basic-info-value" :title="bundle.materialName">{{
+                bundle.materialName || '—'
+              }}</span>
+            </div>
+            <div class="basic-info-item">
+              <span class="basic-info-label">规格型号：</span>
+              <span class="basic-info-value" :title="bundle.specModel">{{
+                bundle.specModel || '—'
+              }}</span>
+            </div>
+            <div class="basic-info-item">
+              <span class="basic-info-label">销售单号：</span>
+              <span class="basic-info-value" :title="bundle.salesOrderNo">{{
+                bundle.salesOrderNo || '—'
+              }}</span>
+            </div>
+            <div class="basic-info-item">
+              <span class="basic-info-label">排产数量：</span>
+              <span class="basic-info-value">{{
+                bundle.scheduleQty != null && bundle.scheduleQty !== '' ? bundle.scheduleQty : '—'
+              }}</span>
+            </div>
+            <div class="basic-info-item">
+              <span class="basic-info-label">工作中心：</span>
+              <span class="basic-info-value" :title="bundle.workCenter">{{
+                bundle.workCenter || '—'
+              }}</span>
+            </div>
+            <div class="basic-info-item">
+              <span class="basic-info-label">负责人：</span>
+              <span class="basic-info-value" :title="bundle.owner">{{ bundle.owner || '—' }}</span>
+            </div>
+            <div class="basic-info-item">
+              <span class="basic-info-label">工艺路线：</span>
+              <span class="basic-info-value" :title="bundle.processRouteName">{{
+                bundle.processRouteName || '—'
+              }}</span>
+            </div>
+            <div class="basic-info-item">
+              <span class="basic-info-label">EBOM：</span>
+              <span class="basic-info-value" :title="bundle.ebomLabel">{{
+                bundle.ebomLabel || '—'
+              }}</span>
+            </div>
+          </div>
         </div>
 
         <div class="section-card">
@@ -629,6 +673,44 @@ function handleBatchPush() {
   .section-title {
     font-weight: 600;
     margin-bottom: 10px;
+  }
+
+  .basic-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: 20px;
+    row-gap: 10px;
+  }
+
+  .basic-info-item {
+    display: flex;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .basic-info-label {
+    flex-shrink: 0;
+    font-size: 13px;
+    line-height: 22px;
+    color: rgba(0, 0, 0, 0.45);
+    white-space: nowrap;
+  }
+
+  .basic-info-value {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 22px;
+    color: rgba(0, 0, 0, 0.88);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 1200px) {
+    .basic-info-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   .detail-toolbar {

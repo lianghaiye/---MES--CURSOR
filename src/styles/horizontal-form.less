@@ -84,7 +84,7 @@
   padding-right: 0 !important;
 }
 
-/* 操作按钮：固定第二行末尾，不占满整行 */
+/* 操作按钮：默认第二行末尾；条件不足 5 个时与条件同行（第 1 行第 5 列） */
 .filter-card
   .filter-form.horizontal-form
   > .ant-row
@@ -94,6 +94,21 @@
   grid-column: 5;
   grid-row: 2;
   align-self: end;
+}
+
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row
+  > .ant-col.ant-col-24:has(.filter-actions-item):nth-child(-n + 5),
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row
+  > .ant-col:has(.filter-actions-item):nth-child(-n + 5),
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row
+  > .ant-col:has(.filter-footer):nth-child(-n + 5) {
+  grid-row: 1;
 }
 
 .filter-card
@@ -132,6 +147,17 @@
   .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-footer) {
     grid-column: 3;
     grid-row: 2;
+  }
+
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row
+    > .ant-col:has(.filter-actions-item):nth-child(-n + 3),
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row
+    > .ant-col:has(.filter-footer):nth-child(-n + 3) {
+    grid-row: 1;
   }
 
   .filter-card
@@ -193,6 +219,18 @@
 }
 
 .filter-card
+  .filter-form.list-filter-inline-grid
+  > .ant-form-item:has(.ant-space):nth-child(-n + 5),
+.filter-card
+  .filter-form.list-filter-inline-grid
+  > .ant-form-item.filter-actions-item:nth-child(-n + 5),
+.filter-card
+  .filter-form.list-filter-inline-grid
+  > .ant-form-item:not(:has(.ant-form-item-label)):nth-child(-n + 5) {
+  grid-row: 1;
+}
+
+.filter-card
   .filter-form.list-filter-inline-grid.is-filter-collapsed
   > .ant-form-item:not(.filter-actions-item):not(:has(.ant-space)):nth-child(n + 10) {
   display: none !important;
@@ -210,6 +248,18 @@
     > .ant-form-item:not(:has(.ant-form-item-label)) {
     grid-column: 3;
     grid-row: 2;
+  }
+
+  .filter-card
+    .filter-form.list-filter-inline-grid
+    > .ant-form-item:has(.ant-space):nth-child(-n + 3),
+  .filter-card
+    .filter-form.list-filter-inline-grid
+    > .ant-form-item.filter-actions-item:nth-child(-n + 3),
+  .filter-card
+    .filter-form.list-filter-inline-grid
+    > .ant-form-item:not(:has(.ant-form-item-label)):nth-child(-n + 3) {
+    grid-row: 1;
   }
 }
 

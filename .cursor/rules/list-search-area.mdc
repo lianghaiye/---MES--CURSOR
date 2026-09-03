@@ -1,0 +1,81 @@
+---
+description: i-doms-web 列表页搜索区布局规范（一行 5 条件、按钮固定第二行第 5 列、展开收起）
+globs: i-doms-web/**/*.vue
+alwaysApply: false
+---
+
+# 搜索区规范
+
+列表页 / 管理页顶部筛选区，统一 `.filter-card` + `.filter-form.horizontal-form`。
+
+## 布局规则（强制）
+
+| 规则 | 说明 |
+|------|------|
+| 列数 | ≥1280px：**一行 5 个**条件，等分（各 1/5 行宽） |
+| 按钮位 | 条件 **≥5**：第二行第 5 列；条件 **不足 5**：与条件**同一行**第 5 列；**不算**条件数量 |
+| 收起展示 | 最多 **9** 个条件：第 1 行 5 + 第 2 行 4 |
+| ≤9 个条件 | 全部展示，**不显示**展开/收起 |
+| >9 个条件 | 收起态展示前 9 个 +「展开 ▾」；展开后全显 +「收起 ▴」 |
+
+### 禁止
+
+- ❌ 不足 10 个条件仍显示展开按钮
+- ❌ 搜索/重置未与第二行条件右对齐
+- ❌ 展开/收起后按钮位置漂移
+- ❌ 展开/收起无过渡导致页面跳动
+
+## 尺寸与对齐
+
+| 项 | 值 |
+|----|-----|
+| 响应式 | ≥1280px：5 列；平板 **3 / 2 / 1** 列降级 |
+| 条件结构 | label（**64px** 定宽，最大 **80px**）+ 控件 `flex:1` |
+| label | **右对齐** + 中文冒号「：」；垂直居中；**13px / text-2** |
+| 控件 | 高 **28px**；圆角 **5px**；输入/选择均 `flex:1` |
+| 条件间距 | 水平 **12px**；行间距 **8px** |
+| 卡片 padding | **12px 16px**（上下 12 / 左右 16） |
+
+## 按钮组
+
+- **位置**：条件 ≥5 时在第二行第 5 列；条件不足 5 时与条件同行第 5 列；宽度 ≈ 1 个条件列宽；与所在行条件**顶部对齐**
+- **结构**（**同一行横排**，不换行）：
+  - **重置｜搜索｜展开 ▾ / 收起 ▴**
+  - 展开/收起仅条件 **> 9** 时显示；`flex-wrap: nowrap`，组内右对齐（`justify-content: flex-end`）
+- 与 `@ListFilterBar.vue` 的 `.list-filter-actions-cell` 一致
+
+## 推荐实现
+
+**新页面优先** `@ListFilterBar.vue`：
+
+```vue
+<div class="filter-card">
+  <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
+    <ListFilterBar :field-count="N" @search="handleSearch" @reset="handleReset">
+      <a-form-item label="字段名">
+        <a-input v-model:value="filters.xxx" size="small" allow-clear placeholder="请输入" />
+      </a-form-item>
+      <!-- 更多条件… -->
+    </ListFilterBar>
+  </a-form>
+</div>
+```
+
+参考：`WorkOrderManagementView.vue`、`AssemblyWorkOrderManagementView.vue`
+
+** legacy 页面**：`a-row` + `.filter-actions-item` + 全局样式 / `listFilterEnhance.js`  
+参考：`PurchaseOrderView.vue`；样式见 `src/styles/horizontal-form.less`
+
+## 样式与逻辑来源
+
+- Grid 布局、收起 `nth-child(n+10)`：`horizontal-form.less`、`ListFilterBar.vue`
+- 自动增强旧页：`src/utils/listFilterEnhance.js`（`MAX_VISIBLE = 9`）
+- 表单横向 label：`horizontal-form` class（与弹窗表单共用）
+
+## 检查清单
+
+- [ ] 外层 `.filter-card`，form 带 `filter-form horizontal-form`
+- [ ] 控件统一 `size="small"`
+- [ ] 条件 ≥5 时按钮在第二行第 5 列；不足 5 时与条件同行；非条件列表末尾 inline 漂移
+- [ ] `field-count` 或 DOM 计数正确，≤9 无展开按钮
+- [ ] 展开/收起用 class 切换（`is-filter-collapsed`），非销毁 DOM
