@@ -42,6 +42,12 @@ function createLineItem(partial = {}) {
     stockFulfillmentMode: 'prefer_stock',
     stockTakeQty: null,
     planProduceQty: null,
+    /** 是否需要工业标识（默认跟产品主数据） */
+    needIndustrialLabel: false,
+    industrialLabelStatus: '—',
+    industrialLabelSuccessCount: 0,
+    industrialLabelFailCount: 0,
+    industrialLabelRequestNo: '',
     lineAccessoryKits: [],
     ebomSnapshot: null,
     businessType: '自产销售',

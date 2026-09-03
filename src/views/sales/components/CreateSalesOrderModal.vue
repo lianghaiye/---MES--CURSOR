@@ -491,6 +491,10 @@
                   />
                 </template>
 
+                <template v-else-if="column.key === 'needIndustrialLabel'">
+                  <a-checkbox v-model:checked="record.needIndustrialLabel" />
+                </template>
+
                 <template v-else-if="column.key === 'deliveryMode'">
                   <a-select
                     v-model:value="record.deliveryMode"
@@ -896,6 +900,7 @@ const columnDefs = [
   { key: 'techParams', title: '技术参数', width: 120, ellipsis: true },
   { key: 'matchingRequirements', title: '配套要求', width: 120, ellipsis: true },
   { key: 'salesQty', title: '销售数量', width: 90 },
+  { key: 'needIndustrialLabel', title: '工业标识', width: 90 },
   { key: 'deliveryMode', title: '交付方式', width: 100 },
   { key: 'stockFulfillmentMode', title: '库存履约', width: 130 },
   { key: 'deliveryDate', title: '交货日期', width: 120 },
@@ -1566,6 +1571,7 @@ function mapPickerToSalesLine(payload) {
     bomFulfillmentPath: bom
       ? BOM_FULFILLMENT_PATH.USE_CATALOG_BOM
       : BOM_FULFILLMENT_PATH.DESIGN_REQUIRED,
+    needIndustrialLabel: Boolean(master?.production?.needIndustrialLabel),
     salesQty: 1,
     taxRate,
     listUnitPriceExTax: pricing.listUnitPriceExTax,

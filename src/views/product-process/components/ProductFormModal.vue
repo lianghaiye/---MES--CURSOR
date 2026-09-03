@@ -444,6 +444,20 @@
                   />
                 </a-form-item>
               </a-col>
+              <a-col :span="8">
+                <a-form-item label="需要工业标识">
+                  <a-switch
+                    v-model:checked="form.production.needIndustrialLabel"
+                    size="small"
+                    checked-children="是"
+                    un-checked-children="否"
+                    :disabled="viewOnly"
+                  />
+                  <div class="field-hint">
+                    开启后，销售行默认勾选工业标识，审核按排产缺口自动申请 SN
+                  </div>
+                </a-form-item>
+              </a-col>
             </a-row>
           </a-form>
         </div>
@@ -1372,6 +1386,13 @@ function navigateToMaintainBom(productId, productName) {
   &:focus {
     box-shadow: none;
   }
+}
+
+.field-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .entity-capability-row {

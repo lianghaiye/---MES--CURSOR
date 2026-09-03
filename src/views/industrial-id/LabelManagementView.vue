@@ -519,6 +519,8 @@
 </template>
 
 <script>
+import { industrialLabelState } from '@/store/industrialLabelStore'
+
 export default {
   data() {
     return {
@@ -536,147 +538,8 @@ export default {
       // --- 批量选择 ---
       batchSelectedIds: [],
 
-      // --- 标识列表数据 ---
-      labels: [
-        {
-          id: 'L001',
-          labelCode: 'BXBZ2025052009300001',
-          qrStatus: '已绑定',
-          requestOrderNo: 'GYHLBS250520001',
-          templateName: '系统全局模板',
-          productName: '智能水泵X1-标准型',
-          batchNo: 'BATCH-2025-0520-A',
-          spec: 'X1-STD-2025',
-          regTime: '2025-05-20 09:31:00',
-          operationLogs: [
-            {
-              type: '模板变更',
-              detail: '模板由"系统全局模板"变更为"系统全局模板"',
-              operator: '张三',
-              time: '2025-05-20 09:31:00',
-            },
-            {
-              type: '扫码绑定',
-              detail: '小程序扫码绑定产品信息',
-              operator: '李四',
-              time: '2025-05-21 10:15:00',
-            },
-            {
-              type: '二维码下载',
-              detail: '下载标识二维码（PNG）',
-              operator: '张三',
-              time: '2025-05-22 14:30:00',
-            },
-          ],
-        },
-        {
-          id: 'L002',
-          labelCode: 'BXBZ2025052009300002',
-          qrStatus: '待绑定',
-          requestOrderNo: 'GYHLBS250520001',
-          templateName: '系统全局模板',
-          productName: '智能水泵X1-标准型',
-          batchNo: 'BATCH-2025-0520-A',
-          spec: 'X1-STD-2025',
-          regTime: '2025-05-20 09:31:00',
-          operationLogs: [
-            {
-              type: '模板变更',
-              detail: '模板由"系统全局模板"变更为"系统全局模板"',
-              operator: '张三',
-              time: '2025-05-20 09:31:00',
-            },
-          ],
-        },
-        {
-          id: 'L003',
-          labelCode: 'BXBZ2025052100010001',
-          qrStatus: '待绑定',
-          requestOrderNo: 'GYHLBS250521001',
-          templateName: '水泵产品模板',
-          productName: '智能水泵X2-节能型',
-          batchNo: 'BATCH-2025-0521-B',
-          spec: 'X2-ECO-2025',
-          regTime: '2025-05-21 14:16:00',
-          operationLogs: [
-            {
-              type: '注册成功',
-              detail: '标识注册成功，关联模板"水泵产品模板"',
-              operator: '系统',
-              time: '2025-05-21 14:16:00',
-            },
-          ],
-        },
-        {
-          id: 'L004',
-          labelCode: 'BXBZ2025052100010002',
-          qrStatus: '已绑定',
-          requestOrderNo: 'GYHLBS250521001',
-          templateName: '水泵产品模板',
-          productName: '智能水泵X2-节能型',
-          batchNo: 'BATCH-2025-0521-B',
-          spec: 'X2-ECO-2025',
-          regTime: '2025-05-21 14:16:00',
-          operationLogs: [
-            {
-              type: '注册成功',
-              detail: '标识注册成功，关联模板"水泵产品模板"',
-              operator: '系统',
-              time: '2025-05-21 14:16:00',
-            },
-            {
-              type: '扫码绑定',
-              detail: '小程序扫码绑定产品信息',
-              operator: '王五',
-              time: '2025-05-21 16:00:00',
-            },
-          ],
-        },
-        {
-          id: 'L005',
-          labelCode: 'BXBZ2025052100010003',
-          qrStatus: '待绑定',
-          requestOrderNo: 'GYHLBS250521001',
-          templateName: '传感器通用模板',
-          productName: '压力传感器P10',
-          batchNo: 'BATCH-2025-0521-C',
-          spec: 'P10-2025',
-          regTime: '2025-05-21 14:17:00',
-          operationLogs: [
-            {
-              type: '注册成功',
-              detail: '标识注册成功，关联模板"传感器通用模板"',
-              operator: '系统',
-              time: '2025-05-21 14:17:00',
-            },
-          ],
-        },
-        {
-          id: 'L006',
-          labelCode: 'BXBZ2025052400010001',
-          qrStatus: '待绑定',
-          requestOrderNo: 'GYHLBS250524001',
-          templateName: '系统全局模板',
-          productName: '流量计F2-高精度',
-          batchNo: 'BATCH-2025-0524-F',
-          spec: 'F2-PREC-2025',
-          regTime: '2025-05-24 08:21:00',
-          operationLogs: [
-            {
-              type: '注册成功',
-              detail: '标识注册成功，关联模板"系统全局模板"',
-              operator: '系统',
-              time: '2025-05-24 08:21:00',
-            },
-            {
-              type: '模板变更',
-              detail: '模板由"流量计模板V1"变更为"系统全局模板"',
-              operator: '张三',
-              time: '2025-05-24 09:00:00',
-            },
-          ],
-        },
-      ],
+      // --- 标识列表（读 industrialLabelStore） ---
+      labelStore: industrialLabelState,
 
       // --- 可用模板列表 ---
       availableTemplates: [
@@ -742,19 +605,34 @@ export default {
   },
 
   computed: {
+    labels() {
+      return this.labelStore.labels || []
+    },
     filteredLabels() {
       let list = this.labels
       if (this.filterBatchNo) {
         const kw = this.filterBatchNo.toLowerCase()
-        list = list.filter((l) => l.batchNo.toLowerCase().includes(kw))
+        list = list.filter((l) =>
+          String(l.batchNo || '')
+            .toLowerCase()
+            .includes(kw),
+        )
       }
       if (this.filterOrderNo) {
         const kw = this.filterOrderNo.toLowerCase()
-        list = list.filter((l) => l.requestOrderNo.toLowerCase().includes(kw))
+        list = list.filter((l) =>
+          String(l.requestOrderNo || '')
+            .toLowerCase()
+            .includes(kw),
+        )
       }
       if (this.filterProduct) {
         const kw = this.filterProduct.toLowerCase()
-        list = list.filter((l) => l.productName.toLowerCase().includes(kw))
+        list = list.filter((l) =>
+          String(l.productName || '')
+            .toLowerCase()
+            .includes(kw),
+        )
       }
       if (this.filterQrStatus) {
         list = list.filter((l) => l.qrStatus === this.filterQrStatus)

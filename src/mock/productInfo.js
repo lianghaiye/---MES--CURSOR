@@ -67,6 +67,7 @@ function createProduct(index, overrides = {}) {
           ? supplierOptions[index % supplierOptions.length].value
           : undefined,
       defaultWarehouse: '半成品仓',
+      needIndustrialLabel: false,
     },
     stockQty: undefined,
     alert: {

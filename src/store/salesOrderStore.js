@@ -2,6 +2,7 @@ import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
 import { buildMockSalesOrders } from '@/mock/salesOrderSeed'
+import { createLineItem, createSalesOrder } from '@/mock/salesOrders'
 import {
   addPurchaseRequisition,
   buildRequisitionFromSalesOrder,
@@ -38,6 +39,12 @@ import {
 import { createOutsourcingWorkOrdersFromSalesOrder } from '@/utils/salesOrderOutsourceWorkOrder'
 import { createMaintenanceWorkOrdersFromSalesOrder } from '@/utils/salesOrderMaintenanceWorkOrder'
 import { createDesignTaskFromSalesLine } from '@/store/designTaskStore'
+import {
+  createLabelRequestFromSalesOrder,
+  applyLabelSummaryToSalesLines,
+  voidLabelsBySalesOrder,
+  salesOrderHasBoundLabels,
+} from '@/store/industrialLabelStore'
 import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
 import { validateSalesLinesSkuResolved } from '@/utils/spuLineResolve'
@@ -67,7 +74,7 @@ import { ensureDedicatedShipDemoSalesOrders } from '@/mock/dedicatedShipDemoSeed
 import { ensureScatterEbomShipDemoSalesOrders } from '@/mock/scatterEbomShipDemoSeed'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 10
+const DATA_VERSION = 11
 let orderSeq = 20
 let deliverySeq = 113
 
@@ -99,7 +106,10 @@ function loadFromStorage() {
       const parsed = JSON.parse(raw)
       if (
         Array.isArray(parsed.orders) &&
-        (parsed.version === DATA_VERSION || parsed.version === 8 || parsed.version === 9)
+        (parsed.version === DATA_VERSION ||
+          parsed.version === 8 ||
+          parsed.version === 9 ||
+          parsed.version === 10)
       ) {
         return migrateSalesOrderStatuses(parsed.orders)
       }
@@ -120,9 +130,82 @@ function persist() {
 function loadInitialSalesOrders() {
   ensureEcnDemoBootstrap()
   const orders = migrateSalesOrderStatuses(loadFromStorage() || buildMockSalesOrders(mockProducts))
-  return ensureScatterEbomShipDemoSalesOrders(
-    ensureDedicatedShipDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+  return ensureIndustrialLabelDemoSalesOrder(
+    ensureScatterEbomShipDemoSalesOrders(
+      ensureDedicatedShipDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+    ),
   )
+}
+
+/** 确保工业标识演示待审单存在（产品勾选 + 行勾选） */
+function ensureIndustrialLabelDemoSalesOrder(orders) {
+  const list = Array.isArray(orders) ? [...orders] : []
+  if (list.some((o) => o.id === 'so-seed-industrial-label')) return list
+  const p0 = mockProducts[0]
+  const p1 = mockProducts[1]
+  const p3 = mockProducts[3]
+  if (!p0 || !p1) return list
+  const now = dayjs()
+  list.unshift(
+    createSalesOrder({
+      id: 'so-seed-industrial-label',
+      orderNo: '1-20260903-IL01',
+      customerName: '山东化工泵业集团',
+      region: '华北',
+      salesperson: '王芳',
+      progressStatus: '待审核',
+      businessType: '自产销售',
+      documentDate: now.format('YYYY-MM-DD'),
+      createdAt: now.format('YYYY-MM-DD HH:mm'),
+      creator: '王芳',
+      remark: '工业标识演示：行已勾选，审核后按排产缺口自动申请 SN',
+      lineItems: [
+        createLineItem({
+          id: 'line-seed-il-a',
+          productId: p0.id,
+          productName: p0.name,
+          productCode: p0.code,
+          productAttr: p0.productAttribute,
+          salesQty: 4,
+          needIndustrialLabel: true,
+          stockFulfillmentMode: 'prefer_stock',
+          deliveryMode: '整机',
+          unit: p0.inventoryUnit || '台',
+          businessType: '自产销售',
+        }),
+        createLineItem({
+          id: 'line-seed-il-b',
+          productId: p1.id,
+          productName: p1.name,
+          productCode: p1.code,
+          productAttr: p1.productAttribute,
+          salesQty: 2,
+          needIndustrialLabel: true,
+          stockFulfillmentMode: 'force_mto',
+          deliveryMode: '整机',
+          unit: p1.inventoryUnit || '台',
+          businessType: '自产销售',
+        }),
+        ...(p3
+          ? [
+              createLineItem({
+                id: 'line-seed-il-c',
+                productId: p3.id,
+                productName: p3.name,
+                productCode: p3.code,
+                productAttr: p3.productAttribute,
+                salesQty: 1,
+                needIndustrialLabel: false,
+                deliveryMode: '整机',
+                unit: p3.inventoryUnit || '台',
+                businessType: '自产销售',
+              }),
+            ]
+          : []),
+      ],
+    }),
+  )
+  return list
 }
 
 function touchOrder(order) {
@@ -595,6 +678,26 @@ export function approveSalesOrder(id, opinion = '') {
   touchOrder(order)
   pushApprovalRecord(order, { result: '已通过', opinion })
 
+  let industrialLabelHint = ''
+  try {
+    const labelRes = createLabelRequestFromSalesOrder(order)
+    applyLabelSummaryToSalesLines(order, labelRes.lineResults || [])
+    if (labelRes.request?.orderNo) {
+      ;(order.lineItems || []).forEach((line) => {
+        if (line.needIndustrialLabel && (Number(line.planProduceQty) || 0) > 0) {
+          line.industrialLabelRequestNo = labelRes.request.orderNo
+        }
+      })
+    }
+    if (labelRes.request) {
+      industrialLabelHint = labelRes.ok
+        ? `工业标识申请 ${labelRes.request.orderNo}（成功 ${labelRes.request.successCount}）`
+        : `工业标识申请未全部成功（可在详情重试/补申请）`
+    }
+  } catch (e) {
+    industrialLabelHint = '工业标识申请异常，订单已审核通过，可在详情重试'
+  }
+
   const hints = []
   if (purchaseReqNo) hints.push(`已自动生成采购申请 ${purchaseReqNo}`)
   if (planOrderNo) {
@@ -611,6 +714,7 @@ export function approveSalesOrder(id, opinion = '') {
   if (maintenanceWorkOrderCodes.length) {
     hints.push(`维修工单 ${maintenanceWorkOrderCodes.join('、')}`)
   }
+  if (industrialLabelHint) hints.push(industrialLabelHint)
 
   const message = hints.length
     ? `订单「${order.orderNo}」审核通过，${hints.join('；')}`
@@ -662,6 +766,30 @@ export function revokeSalesOrderApproval(id) {
     }
   }
 
+  if (salesOrderHasBoundLabels(order.orderNo)) {
+    return {
+      ok: false,
+      blocked: true,
+      message: '存在已挂完工入库/出库或工单的工业标识，禁止反审',
+    }
+  }
+
+  const voidRes = voidLabelsBySalesOrder(order.orderNo)
+  if (!voidRes.ok) {
+    return {
+      ok: false,
+      blocked: Boolean(voidRes.blocked),
+      message: voidRes.message || '工业标识作废失败，无法反审',
+    }
+  }
+
+  ;(order.lineItems || []).forEach((line) => {
+    line.industrialLabelStatus = '—'
+    line.industrialLabelSuccessCount = 0
+    line.industrialLabelFailCount = 0
+    line.industrialLabelRequestNo = ''
+  })
+
   order.progressStatus = SALES_ORDER_STATUS.PENDING
   order.approver = ''
   order.approvedAt = ''
@@ -670,7 +798,11 @@ export function revokeSalesOrderApproval(id) {
   touchOrder(order)
   pushApprovalRecord(order, { result: '已反审', opinion: '' })
 
-  return { ok: true, message: `订单「${order.orderNo}」已反审，状态已变更为待审核` }
+  const voidHint = voidRes.voidedCount ? `，已作废工业标识 ${voidRes.voidedCount} 个` : ''
+  return {
+    ok: true,
+    message: `订单「${order.orderNo}」已反审，状态已变更为待审核${voidHint}`,
+  }
 }
 
 export { isSalesOrderApproved, SALES_ORDER_STATUS }

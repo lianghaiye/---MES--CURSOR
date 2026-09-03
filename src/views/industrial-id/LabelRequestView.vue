@@ -531,6 +531,12 @@
 </template>
 
 <script>
+import {
+  industrialLabelState,
+  createManualLabelRequest,
+  submitPendingLabelRequest,
+} from '@/store/industrialLabelStore'
+
 export default {
   data() {
     return {
@@ -543,134 +549,8 @@ export default {
       filterDateStart: '',
       filterDateEnd: '',
 
-      // --- 申请列表 ---
-      applications: [
-        {
-          id: 1,
-          orderNo: 'GYHLBS250520001',
-          status: '全部成功',
-          productNames: '智能水泵X1-标准型',
-          productCount: 1,
-          batchNos: 'BATCH-2025-0520-A',
-          totalCount: 50,
-          successCount: 50,
-          failCount: 0,
-          remark: '第一批次标识申请',
-          createTime: '2025-05-20 09:30:00',
-          productDetails: [
-            {
-              productName: '智能水泵X1-标准型',
-              batchNo: 'BATCH-2025-0520-A',
-              quantity: 50,
-              successCount: 50,
-              failCount: 0,
-            },
-          ],
-        },
-        {
-          id: 2,
-          orderNo: 'GYHLBS250521001',
-          status: '部分成功',
-          productNames: '智能水泵X2-节能型、压力传感器P10',
-          productCount: 2,
-          batchNos: 'BATCH-2025-0521-B、BATCH-2025-0521-C',
-          totalCount: 120,
-          successCount: 85,
-          failCount: 35,
-          remark: '第二批多种产品标识申请，包含两款产品',
-          createTime: '2025-05-21 14:15:00',
-          productDetails: [
-            {
-              productName: '智能水泵X2-节能型',
-              batchNo: 'BATCH-2025-0521-B',
-              quantity: 80,
-              successCount: 80,
-              failCount: 0,
-            },
-            {
-              productName: '压力传感器P10',
-              batchNo: 'BATCH-2025-0521-C',
-              quantity: 40,
-              successCount: 5,
-              failCount: 35,
-            },
-          ],
-        },
-        {
-          id: 3,
-          orderNo: 'GYHLBS250522001',
-          status: '处理中',
-          productNames: '智能阀门V3',
-          productCount: 1,
-          batchNos: 'BATCH-2025-0522-D',
-          totalCount: 30,
-          successCount: 0,
-          failCount: 0,
-          remark: '阀门标识第三批',
-          createTime: '2025-05-22 10:00:00',
-          productDetails: [
-            {
-              productName: '智能阀门V3',
-              batchNo: 'BATCH-2025-0522-D',
-              quantity: 30,
-              successCount: 0,
-              failCount: 0,
-            },
-          ],
-        },
-        {
-          id: 4,
-          orderNo: 'GYHLBS250523001',
-          status: '全部失败',
-          productNames: '温控传感器T5',
-          productCount: 1,
-          batchNos: 'BATCH-2025-0523-E',
-          totalCount: 60,
-          successCount: 0,
-          failCount: 60,
-          remark: '全部注册失败，需排查二级节点连接',
-          createTime: '2025-05-23 16:45:00',
-          productDetails: [
-            {
-              productName: '温控传感器T5',
-              batchNo: 'BATCH-2025-0523-E',
-              quantity: 60,
-              successCount: 0,
-              failCount: 60,
-            },
-          ],
-        },
-        {
-          id: 5,
-          orderNo: 'GYHLBS250524001',
-          status: '待提交',
-          productNames: '流量计F2-高精度',
-          productCount: 1,
-          batchNos: 'BATCH-2025-0524-F',
-          totalCount: 80,
-          successCount: 0,
-          failCount: 0,
-          remark: '新批次标识申请，尚未提交',
-          createTime: '2025-05-24 08:20:00',
-          productDetails: [
-            {
-              productName: '流量计F2-高精度',
-              batchNo: 'BATCH-2025-0524-F',
-              quantity: 80,
-              successCount: 0,
-              failCount: 0,
-            },
-          ],
-        },
-      ],
-
-      // --- 新增表单 ---
-      newAppForm: {
-        remark: '',
-        products: [
-          { productName: '', batchNo: '', quantity: 1, showDropdown: false, searchResults: [] },
-        ],
-      },
+      // --- 申请列表（读 industrialLabelStore） ---
+      labelStore: industrialLabelState,
 
       // --- 产品库（搜索用） ---
       productLibrary: [
@@ -721,6 +601,9 @@ export default {
   },
 
   computed: {
+    applications() {
+      return this.labelStore.requests || []
+    },
     filteredApplications() {
       let list = this.applications
       if (this.filterStatus) {
@@ -728,11 +611,19 @@ export default {
       }
       if (this.filterProduct) {
         const kw = this.filterProduct.toLowerCase()
-        list = list.filter((a) => a.productNames.toLowerCase().includes(kw))
+        list = list.filter((a) => (a.productNames || '').toLowerCase().includes(kw))
       }
       if (this.filterBatchNo) {
         const kw = this.filterBatchNo.toLowerCase()
-        list = list.filter((a) => a.batchNos.toLowerCase().includes(kw))
+        list = list.filter(
+          (a) =>
+            String(a.batchNos || '')
+              .toLowerCase()
+              .includes(kw) ||
+            String(a.batchNo || '')
+              .toLowerCase()
+              .includes(kw),
+        )
       }
       if (this.filterDateStart) {
         list = list.filter((a) => a.createTime >= this.filterDateStart)
@@ -813,8 +704,8 @@ export default {
       this.submitTarget = null
     },
     doSubmit() {
-      if (this.submitTarget) {
-        this.submitTarget.status = '处理中'
+      if (this.submitTarget?.orderNo) {
+        submitPendingLabelRequest(this.submitTarget.orderNo)
       }
       this.submitConfirmVisible = false
       this.submitTarget = null
@@ -990,68 +881,37 @@ export default {
 
     saveApplication() {
       if (!this.validateNewApp()) return
-      const orderNo = this.generateOrderNo()
       const products = this.newAppForm.products.map((p) => ({
         productName: p.productName.trim(),
         batchNo: p.batchNo.trim(),
         quantity: parseInt(p.quantity),
-        successCount: 0,
-        failCount: 0,
       }))
-      const totalCount = products.reduce((s, p) => s + p.quantity, 0)
-      const productNames = [...new Set(products.map((p) => p.productName))].join('、')
-      const batchNos = [...new Set(products.map((p) => p.batchNo))].join('、')
-
-      this.applications.unshift({
-        id: Date.now(),
-        orderNo,
-        status: '待提交',
-        productNames,
-        productCount: products.length,
-        batchNos,
-        totalCount,
-        successCount: 0,
-        failCount: 0,
+      const res = createManualLabelRequest({
         remark: this.newAppForm.remark.trim(),
-        createTime: this.getNow(),
-        productDetails: products,
+        products,
+        submit: false,
       })
-
       this.currentView = 'list'
-      this.showSuccess('保存成功', `申请单 ${orderNo} 已保存，状态为"待提交"。`)
+      this.showSuccess('保存成功', `申请单 ${res.request.orderNo} 已保存，状态为"待提交"。`)
     },
 
     saveAndSubmit() {
       if (!this.validateNewApp()) return
-      const orderNo = this.generateOrderNo()
       const products = this.newAppForm.products.map((p) => ({
         productName: p.productName.trim(),
         batchNo: p.batchNo.trim(),
         quantity: parseInt(p.quantity),
-        successCount: 0,
-        failCount: 0,
       }))
-      const totalCount = products.reduce((s, p) => s + p.quantity, 0)
-      const productNames = [...new Set(products.map((p) => p.productName))].join('、')
-      const batchNos = [...new Set(products.map((p) => p.batchNo))].join('、')
-
-      this.applications.unshift({
-        id: Date.now(),
-        orderNo,
-        status: '处理中',
-        productNames,
-        productCount: products.length,
-        batchNos,
-        totalCount,
-        successCount: 0,
-        failCount: 0,
+      const res = createManualLabelRequest({
         remark: this.newAppForm.remark.trim(),
-        createTime: this.getNow(),
-        productDetails: products,
+        products,
+        submit: true,
       })
-
       this.currentView = 'list'
-      this.showSuccess('提交成功', `申请单 ${orderNo} 已保存并提交注册，后台正在异步处理中。`)
+      this.showSuccess(
+        '提交成功',
+        `申请单 ${res.request.orderNo} 已保存并提交注册，后台正在异步处理中。`,
+      )
     },
 
     // --- 提示弹窗 ---

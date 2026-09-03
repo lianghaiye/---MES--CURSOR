@@ -87,6 +87,7 @@ export function createDefaultProductProduction() {
     defaultSupplier: undefined,
     defaultOutsourceSupplier: undefined,
     defaultWarehouse: undefined,
+    needIndustrialLabel: false,
   }
 }
 

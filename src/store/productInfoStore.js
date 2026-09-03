@@ -10,8 +10,8 @@ import {
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 
 const STORAGE_KEY = 'i_doms_product_info'
-/** v11：计划策略 MTS 演示产品 */
-const DATA_VERSION = 11
+/** v12：工业标识演示产品 */
+const DATA_VERSION = 12
 let codeSeq = 20000
 
 /** 内联注入，避免 import blankSizeBomDemoSeed 在启动早期拉起 BOM 循环依赖 */
@@ -42,7 +42,7 @@ function ensureBlankSizeDemoProducts(products) {
 function ensureMtsDemoProduct(products) {
   const list = Array.isArray(products) ? [...products] : []
   const idx = list.findIndex((p) => p.id === 'prod-00001' || p.code === 'CP2610001')
-  if (idx === -1) return list
+  if (idx === -1) return ensureIndustrialLabelDemoProduct(list)
   const row = list[idx]
   list[idx] = {
     ...row,
@@ -52,12 +52,29 @@ function ensureMtsDemoProduct(products) {
       planStrategy: 'mts',
       replenishQty: row.production?.replenishQty ?? 20,
       defaultWarehouse: row.production?.defaultWarehouse || '成品仓',
+      needIndustrialLabel: true,
     },
     alert: {
       ...(row.alert || {}),
       stockAlertEnabled: true,
       minStockQty: 10,
       maxStockQty: 50,
+    },
+  }
+  return ensureIndustrialLabelDemoProduct(list)
+}
+
+/** 演示：再勾选一个标准产品需要工业标识 */
+function ensureIndustrialLabelDemoProduct(products) {
+  const list = Array.isArray(products) ? [...products] : []
+  const idx = list.findIndex((p) => p.id === 'prod-00002' || p.code === 'CP2610002')
+  if (idx === -1) return list
+  const row = list[idx]
+  list[idx] = {
+    ...row,
+    production: {
+      ...(row.production || {}),
+      needIndustrialLabel: true,
     },
   }
   return list
