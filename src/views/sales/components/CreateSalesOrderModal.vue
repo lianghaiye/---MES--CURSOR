@@ -573,6 +573,7 @@
                     :precision="4"
                     :formatter="inputNumberFormatter"
                     :parser="inputNumberParser"
+                    :disabled="!taxModeExcluding"
                     style="width: 100%"
                     @change="onUnitPriceExTaxChange(record)"
                   />
@@ -586,6 +587,7 @@
                     :precision="4"
                     :formatter="inputNumberFormatter"
                     :parser="inputNumberParser"
+                    :disabled="taxModeExcluding"
                     style="width: 100%"
                     @change="onUnitPriceInTaxChange(record)"
                   />
@@ -900,7 +902,6 @@ const columnDefs = [
   { key: 'techParams', title: '技术参数', width: 120, ellipsis: true },
   { key: 'matchingRequirements', title: '配套要求', width: 120, ellipsis: true },
   { key: 'salesQty', title: '销售数量', width: 90 },
-  { key: 'needIndustrialLabel', title: '工业标识', width: 90 },
   { key: 'deliveryMode', title: '交付方式', width: 100 },
   { key: 'stockFulfillmentMode', title: '库存履约', width: 130 },
   { key: 'deliveryDate', title: '交货日期', width: 120 },
@@ -915,6 +916,7 @@ const columnDefs = [
   { key: 'lineDiscountPercent', title: '行折扣(%)', width: 90 },
   { key: 'lineDiscountAmount', title: '行优惠金额', width: 100 },
   { key: 'packagingForm', title: '包装形式', width: 90 },
+  { key: 'needIndustrialLabel', title: '工业标识', width: 90 },
   { key: 'supplementDesc', title: '补充说明', width: 90 },
   { key: 'lineAttachment', title: '上传附件', width: 120 },
   { key: 'action', title: '操作', width: 150, fixed: 'right' },

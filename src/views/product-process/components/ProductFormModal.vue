@@ -22,6 +22,9 @@
         <a-checkbox v-model:checked="form.isPart" :disabled="viewOnly">零部件</a-checkbox>
         <a-checkbox v-model:checked="form.canPurchase" :disabled="viewOnly">可采购</a-checkbox>
         <a-checkbox v-model:checked="form.canOutsource" :disabled="viewOnly">可外协</a-checkbox>
+        <a-checkbox v-model:checked="form.production.needIndustrialLabel" :disabled="viewOnly">
+          工业标识
+        </a-checkbox>
       </div>
     </div>
 
@@ -442,20 +445,6 @@
                     :options="warehouseOpts"
                     placeholder="请选择 默认存放仓库"
                   />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="需要工业标识">
-                  <a-switch
-                    v-model:checked="form.production.needIndustrialLabel"
-                    size="small"
-                    checked-children="是"
-                    un-checked-children="否"
-                    :disabled="viewOnly"
-                  />
-                  <div class="field-hint">
-                    开启后，销售行默认勾选工业标识，审核按排产缺口自动申请 SN
-                  </div>
                 </a-form-item>
               </a-col>
             </a-row>

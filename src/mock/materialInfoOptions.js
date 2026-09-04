@@ -106,6 +106,7 @@ export function createDefaultProductionControl() {
     isAuxiliary: false,
     isHazardous: false,
     inboundQcRequirement: undefined,
+    needIndustrialLabel: false,
   }
 }
 

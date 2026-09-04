@@ -78,6 +78,7 @@
                 </template>
               </a-tab-pane>
               <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
+              <a-tab-pane key="industrial-label" :tab="`工业标识 (${industrialLabelSnCount})`" />
               <a-tab-pane key="approval" tab="审批信息" />
             </a-tabs>
           </div>
@@ -280,8 +281,9 @@
             <div class="section-card">
               <div class="section-title">工业标识</div>
               <div class="section-hint">
-                审核时按排产缺口预申请
-                SN；现货占用展示库存件已有码（有则显示）。可重试失败申请或补申请。
+                审核时按「现货占用 + 排产缺口」预申请
+                SN。成品入库不自动挂码；小程序装牌确认后再挂到实物。失败或部分成功时可重试 /
+                补申请。
               </div>
               <a-table
                 :columns="industrialLabelLineColumns"
@@ -290,7 +292,7 @@
                 size="small"
                 bordered
                 :pagination="false"
-                :scroll="{ x: 960 }"
+                :scroll="{ x: 720 }"
                 :locale="{ emptyText: '本单无需工业标识' }"
               >
                 <template #bodyCell="{ column, record: row }">
@@ -306,21 +308,6 @@
                     </a-tag>
                     <span v-else>—</span>
                   </template>
-                  <template v-else-if="column.key === 'sns'">
-                    <template v-if="row.labels.length">
-                      <a
-                        v-for="lbl in row.labels.slice(0, 3)"
-                        :key="lbl.id"
-                        class="link-code"
-                        style="margin-right: 8px"
-                        @click.prevent="goLabelDetail(lbl)"
-                      >
-                        {{ lbl.labelCode }}
-                      </a>
-                      <span v-if="row.labels.length > 3">等 {{ row.labels.length }} 个</span>
-                    </template>
-                    <span v-else>{{ row.stockHint || '—' }}</span>
-                  </template>
                   <template v-else-if="column.key === 'action'">
                     <a-space v-if="canOperateIndustrialLabel">
                       <a
@@ -330,7 +317,11 @@
                       >
                         重试
                       </a>
-                      <a class="link-code" @click.prevent="openSupplementIndustrialLabel(row)">
+                      <a
+                        v-if="row.canSupplement"
+                        class="link-code"
+                        @click.prevent="openSupplementIndustrialLabel(row)"
+                      >
                         补申请
                       </a>
                     </a-space>
@@ -809,6 +800,111 @@
             </div>
           </template>
 
+          <template v-else-if="activeTab === 'industrial-label'">
+            <div class="section-card">
+              <div class="section-title">工业标识申请摘要</div>
+              <a-table
+                :columns="industrialLabelLineColumns"
+                :data-source="industrialLabelRows"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 720 }"
+                :locale="{ emptyText: '本单暂无工业标识申请' }"
+              >
+                <template #bodyCell="{ column, record: row }">
+                  <template v-if="column.key === 'need'">
+                    {{ row.needIndustrialLabel ? '是' : '否' }}
+                  </template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag
+                      v-if="row.status && row.status !== '—'"
+                      :color="industrialLabelStatusColor(row.status)"
+                    >
+                      {{ row.status }}
+                    </a-tag>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'action'">
+                    <a-space v-if="canOperateIndustrialLabel">
+                      <a
+                        v-if="row.canRetry"
+                        class="link-code"
+                        @click.prevent="handleRetryIndustrialLabel(row)"
+                      >
+                        重试
+                      </a>
+                      <a
+                        v-if="row.canSupplement"
+                        class="link-code"
+                        @click.prevent="openSupplementIndustrialLabel(row)"
+                      >
+                        补申请
+                      </a>
+                    </a-space>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] ?? '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </div>
+
+            <div class="section-card">
+              <div class="section-title-row">
+                <div class="section-title">SN / 二维码明细</div>
+                <a-button
+                  size="small"
+                  :disabled="!industrialLabelSnRows.length"
+                  @click="exportIndustrialLabelSns"
+                >
+                  导出
+                </a-button>
+              </div>
+              <a-table
+                :columns="industrialLabelSnColumns"
+                :data-source="industrialLabelSnRows"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1100 }"
+                :locale="{ emptyText: '暂无已申请的工业标识 SN' }"
+              >
+                <template #bodyCell="{ column, record: row }">
+                  <template v-if="column.key === 'labelCode'">
+                    <a class="link-code" @click.prevent="openIndustrialLabelQr(row)">
+                      {{ row.labelCode }}
+                    </a>
+                  </template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag :color="row.status === '有效' ? 'success' : 'default'">
+                      {{ row.status || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'qrStatus'">
+                    <a-tag :color="row.qrStatus === '已绑定' ? 'blue' : 'orange'">
+                      {{ row.qrStatus || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'qrPreview'">
+                    <div class="il-qr-thumb" @click="openIndustrialLabelQr(row)">
+                      <IndustrialLabelQrMock :size="48" />
+                    </div>
+                  </template>
+                  <template v-else-if="column.key === 'action'">
+                    <a class="link-code" @click.prevent="goLabelDetail(row)">标识管理</a>
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] ?? '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </div>
+          </template>
+
           <template v-else-if="activeTab === 'approval'">
             <div class="section-card">
               <div class="section-title">销售订单审批</div>
@@ -905,9 +1001,48 @@
           />
         </a-form-item>
         <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px">
-          默认 = 排产缺口 − 已成功数；批次号使用销售单号。
+          默认 = 申请数量 − 已成功数；批次号使用销售单号。
         </div>
       </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="industrialQrOpen"
+      title="工业标识二维码"
+      :footer="null"
+      width="420px"
+      destroy-on-close
+    >
+      <div v-if="industrialQrLabel" class="il-qr-modal">
+        <div class="il-qr-modal-preview">
+          <IndustrialLabelQrMock :size="180" />
+        </div>
+        <div class="il-qr-modal-meta">
+          <div class="il-qr-code">{{ industrialQrLabel.labelCode }}</div>
+          <div class="il-qr-row">
+            <span class="il-qr-k">产品</span>
+            <span>{{ industrialQrLabel.productName || '—' }}</span>
+          </div>
+          <div class="il-qr-row">
+            <span class="il-qr-k">批次号</span>
+            <span>{{ industrialQrLabel.batchNo || '—' }}</span>
+          </div>
+          <div class="il-qr-row">
+            <span class="il-qr-k">申请单号</span>
+            <span>{{ industrialQrLabel.requestOrderNo || '—' }}</span>
+          </div>
+          <div class="il-qr-row">
+            <span class="il-qr-k">二维码状态</span>
+            <a-tag
+              :color="industrialQrLabel.qrStatus === '已绑定' ? 'blue' : 'orange'"
+              size="small"
+            >
+              {{ industrialQrLabel.qrStatus || '—' }}
+            </a-tag>
+          </div>
+          <div class="il-qr-hint">演示二维码 · 内容为 SN 码（非真实注册平台）</div>
+        </div>
+      </div>
     </a-modal>
   </div>
 </template>
@@ -986,6 +1121,7 @@ import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
 import SalesOrderPrintModal from './components/SalesOrderPrintModal.vue'
 import SalesOrderEbomDiffSection from './components/SalesOrderEbomDiffSection.vue'
+import IndustrialLabelQrMock from './components/IndustrialLabelQrMock.vue'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
 import {
   industrialLabelState,
@@ -993,6 +1129,7 @@ import {
   retryLabelRequestForSalesLine,
   supplementLabelRequest,
   applyLabelSummaryToSalesLines,
+  salesLineIndustrialLabelNeedQty,
 } from '@/store/industrialLabelStore'
 import {
   formatDiscountRatePercent,
@@ -1007,6 +1144,7 @@ import {
   persistSalesOrderDetailTab,
   readSalesOrderDetailTab,
 } from '@/utils/salesOrderDetailTab'
+import { buildExportFileName, exportRowsToExcel } from '@/utils/excelExport'
 
 const route = useRoute()
 const router = useRouter()
@@ -1023,6 +1161,8 @@ const supplementLabelOpen = ref(false)
 const supplementLabelLine = ref(null)
 const supplementLabelQty = ref(1)
 const supplementLabelMax = ref(99)
+const industrialQrOpen = ref(false)
+const industrialQrLabel = ref(null)
 
 const pendingPriceChange = computed(() => {
   void salesPriceChangeState.orders
@@ -1179,12 +1319,25 @@ const industrialLabelLineColumns = [
   { key: 'productName', title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true },
   { key: 'productCode', title: '产品编码', dataIndex: 'productCode', width: 120, ellipsis: true },
   { key: 'need', title: '勾选', width: 64, align: 'center' },
-  { key: 'planQty', title: '排产缺口', dataIndex: 'planQty', width: 88, align: 'right' },
+  { key: 'needQty', title: '申请数量', dataIndex: 'needQty', width: 88, align: 'right' },
   { key: 'status', title: '申请状态', width: 100 },
   { key: 'success', title: '成功数', dataIndex: 'success', width: 80, align: 'right' },
   { key: 'fail', title: '失败数', dataIndex: 'fail', width: 80, align: 'right' },
-  { key: 'sns', title: 'SN / 现货码', width: 260 },
   { key: 'action', title: '操作', width: 120, fixed: 'right' },
+]
+
+const industrialLabelSnColumns = [
+  { key: 'labelCode', title: 'SN 码', width: 200, fixed: 'left' },
+  { key: 'qrPreview', title: '二维码', width: 72, align: 'center' },
+  { key: 'productName', title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true },
+  { key: 'productCode', title: '产品编码', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
+  { key: 'material', title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
+  { key: 'requestOrderNo', title: '申请单号', dataIndex: 'requestOrderNo', width: 150 },
+  { key: 'status', title: '标识状态', width: 88 },
+  { key: 'qrStatus', title: '二维码状态', width: 100 },
+  { key: 'regTime', title: '注册时间', dataIndex: 'regTime', width: 160 },
+  { key: 'action', title: '操作', width: 100, fixed: 'right' },
 ]
 
 const canOperateIndustrialLabel = computed(() => {
@@ -1202,49 +1355,97 @@ const industrialLabelRows = computed(() => {
     .filter((line) => line.needIndustrialLabel)
     .map((line) => {
       const labels = all.filter((l) => l.salesLineId === line.id)
-      const planQty = Math.floor(Number(line.planProduceQty) || 0)
+      const needQty = salesLineIndustrialLabelNeedQty(line)
       const success = labels.length
       const fail = Number(line.industrialLabelFailCount) || 0
-      const stockOnly = planQty <= 0 && (Number(line.stockTakeQty) || 0) > 0
       let status = line.industrialLabelStatus || '—'
       if (line.needIndustrialLabel) {
-        if (planQty <= 0) status = success ? '现货已有码' : '现货待绑定'
-        else if (success >= planQty) status = '成功'
+        if (needQty <= 0) status = '—'
+        else if (success >= needQty) status = '成功'
         else if (success > 0) status = '部分成功'
         else if (fail > 0) status = '失败'
         else status = '待申请'
       }
+      const canSupplement = status === '失败' || status === '部分成功'
       return {
         id: line.id,
         line,
         productName: line.productName,
         productCode: line.productCode,
         needIndustrialLabel: Boolean(line.needIndustrialLabel),
-        planQty,
+        needQty,
         status,
         success,
         fail,
         labels,
-        canRetry: Boolean(line.needIndustrialLabel) && planQty > success,
-        stockHint: stockOnly
-          ? labels.length
-            ? ''
-            : '现货待出库绑定'
-          : labels.length
-            ? ''
-            : planQty > 0
-              ? '待申请'
-              : '—',
+        canRetry: Boolean(line.needIndustrialLabel) && needQty > success && fail > 0,
+        canSupplement,
       }
     })
 })
 
+const industrialLabelSnRows = computed(() => {
+  void industrialLabelState.labels
+  const o = order.value
+  if (!o?.orderNo) return []
+  const lineMap = Object.fromEntries((o.lineItems || []).map((l) => [l.id, l]))
+  return listLabelsBySalesOrder(o.orderNo).map((lbl) => {
+    const line = lineMap[lbl.salesLineId] || {}
+    return {
+      ...lbl,
+      salesOrderNo: o.orderNo,
+      customerName: o.customerName || '',
+      specModel: lbl.specModel || line.specModel || '',
+      material: lbl.material || line.material || '',
+      productName: lbl.productName || line.productName || '',
+      productCode: lbl.productCode || line.productCode || '',
+    }
+  })
+})
+
+const industrialLabelSnCount = computed(() => industrialLabelSnRows.value.length)
+
+const industrialLabelSnExportFields = [
+  { title: '销售单号', getValue: (row) => row.salesOrderNo || '' },
+  { title: '客户名称', getValue: (row) => row.customerName || '' },
+  { title: 'SN 码', getValue: (row) => row.labelCode || '' },
+  { title: '产品名称', getValue: (row) => row.productName || '' },
+  { title: '产品编码', getValue: (row) => row.productCode || '' },
+  { title: '规格型号', getValue: (row) => row.specModel || '' },
+  { title: '材质', getValue: (row) => row.material || '' },
+  { title: '申请单号', getValue: (row) => row.requestOrderNo || '' },
+  { title: '标识状态', getValue: (row) => row.status || '' },
+  { title: '二维码状态', getValue: (row) => row.qrStatus || '' },
+  { title: '注册时间', getValue: (row) => row.regTime || '' },
+]
+
+function exportIndustrialLabelSns() {
+  const rows = industrialLabelSnRows.value
+  if (!rows.length) {
+    message.warning('暂无可导出的 SN')
+    return
+  }
+  const orderNo = order.value?.orderNo || '销售订单'
+  exportRowsToExcel({
+    rows,
+    fields: industrialLabelSnExportFields,
+    fileName: buildExportFileName(`工业标识SN_${orderNo}`),
+    sheetName: 'SN明细',
+  })
+  message.success(`已导出 ${rows.length} 条 SN，可发给车间刻铭牌`)
+}
+
 function industrialLabelStatusColor(status) {
-  if (status === '成功' || status === '现货已有码') return 'success'
+  if (status === '成功') return 'success'
   if (status === '部分成功') return 'warning'
   if (status === '失败') return 'error'
-  if (status === '待申请' || status === '现货待绑定') return 'processing'
+  if (status === '待申请') return 'processing'
   return 'default'
+}
+
+function openIndustrialLabelQr(lbl) {
+  industrialQrLabel.value = lbl
+  industrialQrOpen.value = true
 }
 
 function goLabelDetail(lbl) {
@@ -1273,11 +1474,11 @@ function handleRetryIndustrialLabel(row) {
 
 function openSupplementIndustrialLabel(row) {
   if (!order.value || !row?.line) return
-  const planQty = Math.floor(Number(row.line.planProduceQty) || 0)
+  const needQty = salesLineIndustrialLabelNeedQty(row.line)
   const active = listLabelsBySalesOrder(order.value.orderNo).filter(
     (l) => l.salesLineId === row.line.id && l.status !== '作废',
   )
-  const gap = Math.max(1, planQty - active.length)
+  const gap = Math.max(1, needQty - active.length)
   const salesQty = Math.floor(Number(row.line.salesQty ?? row.line.qty) || 0)
   supplementLabelLine.value = row.line
   supplementLabelMax.value = Math.max(gap, salesQty || gap)
@@ -1980,6 +2181,18 @@ function openBomDetail(bomId, bomName) {
   margin-bottom: 12px;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-title-row .section-title {
+  margin-bottom: 0;
+}
+
 .price-summary-header .section-title {
   margin-bottom: 0;
 }
@@ -2164,5 +2377,59 @@ function openBomDetail(bomId, bomName) {
   margin-top: 6px;
   color: rgba(0, 0, 0, 0.65);
   font-size: 13px;
+}
+
+.il-qr-thumb {
+  display: inline-flex;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.il-qr-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0 4px;
+}
+
+.il-qr-modal-preview {
+  padding: 12px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.il-qr-modal-meta {
+  width: 100%;
+}
+
+.il-qr-code {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  word-break: break-all;
+  text-align: center;
+}
+
+.il-qr-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.il-qr-k {
+  flex: 0 0 72px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.il-qr-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  text-align: center;
 }
 </style>

@@ -65,6 +65,9 @@
                 <template v-else-if="column.key === 'planProduceQty'">
                   {{ previewPlanQty(line) }}
                 </template>
+                <template v-else-if="column.key === 'needIndustrialLabel'">
+                  {{ line.needIndustrialLabel ? '是' : '否' }}
+                </template>
                 <template v-else-if="moneyKeys.has(column.key)">
                   {{ formatMoney(line[column.dataIndex]) }}
                 </template>
@@ -207,7 +210,12 @@ watch(
   { immediate: true },
 )
 
-const lineColumns = salesOrderDetailLineColumns
+/** 审核页只需是否勾选工业标识；申请结果在详情「工业标识」Tab 查看 */
+const APPROVE_HIDDEN_LINE_KEYS = new Set(['industrialLabelStatus', 'industrialLabelSuccessCount'])
+
+const lineColumns = salesOrderDetailLineColumns.filter(
+  (col) => !APPROVE_HIDDEN_LINE_KEYS.has(col.key),
+)
 
 const lineTableScrollX = lineColumns.reduce((sum, col) => sum + (col.width || 100), 0)
 

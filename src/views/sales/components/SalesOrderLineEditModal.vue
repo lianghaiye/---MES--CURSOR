@@ -2,92 +2,113 @@
   <a-modal
     v-model:open="visible"
     title="编辑销售明细"
-    width="1180px"
+    width="90vw"
     :mask-closable="false"
     destroy-on-close
+    class="inventory-line-edit-modal sales-order-line-edit-modal"
+    wrap-class-name="sales-order-line-edit-modal-wrap"
     @cancel="handleCancel"
   >
     <a-form
       layout="horizontal"
-      class="line-edit-form"
+      class="edit-form line-edit-form"
       :label-col="{ flex: '0 0 118px' }"
       :wrapper-col="{ flex: '1 1 0' }"
     >
-      <a-row :gutter="[20, 8]">
+      <div class="preview-block">
+        <div class="preview-block-title">产品信息</div>
+        <div class="item-preview">
+          <div class="preview-grid">
+            <div class="preview-row">
+              <span class="preview-label">产品编码</span>
+              <span>{{ draft.productCode || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">产品名称</span>
+              <span>{{ draft.productName || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">规格型号</span>
+              <span>{{ draft.specModel || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">材质</span>
+              <span>{{ draft.material || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">图号</span>
+              <span>{{ draft.drawingNo || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">变体属性</span>
+              <span>{{ draft.variantSummary || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">产品属性</span>
+              <span>{{ draft.productAttr || '—' }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">BOM</span>
+              <span>{{ bomNameVersionDisplay }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <a-row :gutter="[16, 8]">
         <a-col :span="8">
           <a-form-item label="业务类型" required>
             <a-select
               v-model:value="draft.businessType"
+              size="small"
               :options="businessTypeOpts"
               placeholder="请选择业务类型"
               @change="onBusinessTypeChange"
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
-          <a-form-item label="产品名称" required>
-            <a-input
-              v-if="draft.isManualLine"
-              v-model:value="draft.productName"
-              placeholder="请输入产品名称"
-            />
-            <a-input v-else :value="draft.productName" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="产品编码" :required="draft.isManualLine">
-            <a-input
-              v-if="draft.isManualLine"
-              v-model:value="draft.productCode"
-              placeholder="请输入产品编码"
-            />
-            <a-input v-else :value="draft.productCode" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="规格型号">
-            <a-input
-              v-if="draft.isManualLine"
-              v-model:value="draft.specModel"
-              placeholder="请输入规格型号"
-            />
-            <a-input v-else :value="draft.specModel || '—'" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="材质">
-            <a-input
-              v-if="draft.isManualLine"
-              v-model:value="draft.material"
-              placeholder="请输入材质"
-            />
-            <a-input v-else :value="draft.material || '—'" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="isSpuDraft" :span="8">
-          <a-form-item label="变体属性">
-            <a-input :value="draft.variantSummary || '—'" disabled />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="图号">
-            <a-input
-              v-if="draft.isManualLine"
-              v-model:value="draft.drawingNo"
-              placeholder="请输入图号"
-            />
-            <a-input v-else :value="draft.drawingNo || '—'" disabled placeholder="—" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="单位" required>
-            <a-input v-model:value="draft.unit" placeholder="如 件" />
-          </a-form-item>
-        </a-col>
+
+        <template v-if="draft.isManualLine">
+          <a-col :span="8">
+            <a-form-item label="产品名称" required>
+              <a-input
+                v-model:value="draft.productName"
+                size="small"
+                placeholder="请输入产品名称"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="产品编码" required>
+              <a-input
+                v-model:value="draft.productCode"
+                size="small"
+                placeholder="请输入产品编码"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="规格型号">
+              <a-input v-model:value="draft.specModel" size="small" placeholder="请输入规格型号" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="材质">
+              <a-input v-model:value="draft.material" size="small" placeholder="请输入材质" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="图号">
+              <a-input v-model:value="draft.drawingNo" size="small" placeholder="请输入图号" />
+            </a-form-item>
+          </a-col>
+        </template>
+
         <a-col :span="8">
           <a-form-item label="销售数量" required>
             <a-input-number
               v-model:value="draft.salesQty"
+              size="small"
               :min="0"
               :precision="4"
               :formatter="inputNumberFormatter"
@@ -97,14 +118,20 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
+          <a-form-item label="单位" required>
+            <a-input v-model:value="draft.unit" size="small" placeholder="如 件" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
           <a-form-item label="交付方式" required>
-            <a-select v-model:value="draft.deliveryMode" :options="deliveryModeOpts" />
+            <a-select v-model:value="draft.deliveryMode" size="small" :options="deliveryModeOpts" />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="库存履约" required>
             <a-select
               v-model:value="draft.stockFulfillmentMode"
+              size="small"
               :options="stockFulfillmentModeOpts"
             />
           </a-form-item>
@@ -113,20 +140,17 @@
           <a-form-item label="交货日期" required>
             <a-date-picker
               :value="deliveryDateValue"
+              size="small"
               style="width: 100%"
               @change="onDeliveryDateChange"
             />
           </a-form-item>
         </a-col>
         <a-col v-if="showFulfillmentPath" :span="8">
-          <a-form-item label="BOM名称+版本">
-            <a-input :value="bomNameVersionDisplay" disabled placeholder="—" />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="showFulfillmentPath" :span="8">
           <a-form-item :label="BOM_FULFILLMENT_FIELD_LABEL" required>
             <a-select
               v-model:value="draft.bomFulfillmentPath"
+              size="small"
               :options="fulfillmentPathOpts"
               :placeholder="`请选择${BOM_FULFILLMENT_FIELD_LABEL}`"
               @change="onFulfillmentPathChange"
@@ -137,10 +161,12 @@
           <a-form-item label="单价（不含税）" required>
             <a-input-number
               v-model:value="draft.unitPriceExTax"
+              size="small"
               :min="0"
               :precision="4"
               :formatter="inputNumberFormatter"
               :parser="inputNumberParser"
+              :disabled="!props.taxModeExcluding"
               style="width: 100%"
               @change="onUnitPriceExTaxEdit"
             />
@@ -150,10 +176,12 @@
           <a-form-item label="单价（含税）" required>
             <a-input-number
               v-model:value="draft.unitPriceInTax"
+              size="small"
               :min="0"
               :precision="4"
               :formatter="inputNumberFormatter"
               :parser="inputNumberParser"
+              :disabled="props.taxModeExcluding"
               style="width: 100%"
               @change="onUnitPriceInTaxEdit"
             />
@@ -163,6 +191,7 @@
           <a-form-item label="税率(%)" required>
             <a-input-number
               v-model:value="draft.taxRate"
+              size="small"
               :min="0"
               :max="100"
               :precision="2"
@@ -173,24 +202,27 @@
         </a-col>
         <a-col :span="8">
           <a-form-item label="总价（不含税）">
-            <a-input :value="formatMoney(linePricingPreview.totalPriceExTax)" disabled />
+            <a-input
+              :value="formatMoney(linePricingPreview.totalPriceExTax)"
+              size="small"
+              disabled
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="总价（含税）">
-            <a-input :value="formatMoney(linePricingPreview.totalPriceInTax)" disabled />
+            <a-input
+              :value="formatMoney(linePricingPreview.totalPriceInTax)"
+              size="small"
+              disabled
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item required>
-            <template #label>
-              <span>行折扣(%)</span>
-              <a-tooltip :title="lineDiscountFieldTooltip">
-                <QuestionCircleOutlined class="field-tip-icon" />
-              </a-tooltip>
-            </template>
+          <a-form-item label="行折扣(%)" required>
             <a-input-number
               v-model:value="draft.lineDiscountPercent"
+              size="small"
               :min="1"
               :max="100"
               :precision="2"
@@ -198,26 +230,28 @@
               style="width: 100%"
               @change="onDiscountPercentEdit"
             />
-            <div v-if="lineDiscountReadOnly" class="field-hint">
-              无折扣或仅整单折扣策略下，行折扣固定 100%
-            </div>
           </a-form-item>
         </a-col>
         <a-col :span="8">
           <a-form-item label="行优惠金额">
-            <a-input :value="formatMoney(linePricingPreview.lineDiscountAmount)" disabled />
+            <a-input
+              :value="formatMoney(linePricingPreview.lineDiscountAmount)"
+              size="small"
+              disabled
+            />
           </a-form-item>
         </a-col>
-      </a-row>
-    </a-form>
-
-    <a-form layout="vertical" class="line-edit-form-vertical">
-      <a-row :gutter="[20, 0]">
-        <a-col :span="24">
+        <a-col :span="8">
           <a-form-item label="包装形式">
-            <a-input v-model:value="draft.packagingForm" placeholder="包装形式" />
+            <a-input v-model:value="draft.packagingForm" size="small" placeholder="包装形式" />
           </a-form-item>
         </a-col>
+        <a-col :span="16">
+          <a-form-item label="工业标识">
+            <a-checkbox v-model:checked="draft.needIndustrialLabel"> 生成工业SN/二维码 </a-checkbox>
+          </a-form-item>
+        </a-col>
+
         <a-col :span="24">
           <a-form-item label="技术参数">
             <a-textarea v-model:value="draft.techParams" :rows="2" placeholder="技术参数" />
@@ -237,30 +271,24 @@
             <a-textarea v-model:value="draft.supplementDesc" :rows="2" placeholder="补充说明" />
           </a-form-item>
         </a-col>
+        <a-col :span="24">
+          <a-form-item label="明细附件">
+            <a-upload
+              class="line-attachment-upload"
+              :file-list="lineUploadFileList"
+              :before-upload="beforeLineUpload"
+              multiple
+              @remove="onLineFileRemove"
+            >
+              <a-button type="primary" size="small">
+                <UploadOutlined />
+                上传附件
+              </a-button>
+            </a-upload>
+            <div class="field-hint">支持各类型文件，单文件不超过 200MB</div>
+          </a-form-item>
+        </a-col>
       </a-row>
-    </a-form>
-
-    <a-form
-      layout="horizontal"
-      class="line-edit-form"
-      :label-col="{ flex: '0 0 118px' }"
-      :wrapper-col="{ flex: '1 1 0' }"
-    >
-      <a-form-item label="明细附件">
-        <a-upload
-          class="line-attachment-upload"
-          :file-list="lineUploadFileList"
-          :before-upload="beforeLineUpload"
-          multiple
-          @remove="onLineFileRemove"
-        >
-          <a-button type="primary" size="small">
-            <UploadOutlined />
-            上传附件
-          </a-button>
-        </a-upload>
-        <div class="field-hint">支持各类型文件，单文件不超过 200MB</div>
-      </a-form-item>
     </a-form>
 
     <template #footer>
@@ -273,7 +301,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message, Upload } from 'ant-design-vue'
-import { QuestionCircleOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import { UploadOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 
@@ -368,9 +396,6 @@ const linkedCatalogBom = computed(() => {
 
 const lineDiscountReadOnly = computed(() => isLineDiscountDisabled(props.discountStrategy))
 
-const lineDiscountFieldTooltip =
-  '行优惠金额 = 标准单价(不含税) × 数量 × (1 - 行折扣率)\n改单价（不含税/含税）会按税率互算，并反推行折扣'
-
 const priceEditMode = ref('unitPriceInTax') // unitPriceExTax | unitPriceInTax | discount
 
 const linePricingPreview = computed(() => {
@@ -451,7 +476,7 @@ watch(
   (open) => {
     if (!open || !props.line) return
     Object.assign(draft, createDraft(props.line))
-    priceEditMode.value = 'unitPriceInTax'
+    priceEditMode.value = props.taxModeExcluding ? 'unitPriceExTax' : 'unitPriceInTax'
     draft.bomFulfillmentPath = normalizeBomFulfillmentPath(draft.bomFulfillmentPath)
     if (lineDiscountReadOnly.value) {
       draft.lineDiscountPercent = 100
@@ -468,6 +493,9 @@ function syncFieldsFromProduct() {
   const product = productInfoState.products.find((p) => p.id === draft.productId)
   if (product?.drawingNo) {
     draft.drawingNo = product.drawingNo
+  }
+  if (draft.needIndustrialLabel == null && product?.production?.needIndustrialLabel != null) {
+    draft.needIndustrialLabel = Boolean(product.production.needIndustrialLabel)
   }
   syncCatalogBomFromProduct()
 }
@@ -503,6 +531,7 @@ function createDraft(line = {}) {
     deliveryMode: line.deliveryMode || '整机',
     stockFulfillmentMode: normalizeStockFulfillmentMode(line.stockFulfillmentMode),
     deliveryDate: line.deliveryDate || '',
+    needIndustrialLabel: Boolean(line.needIndustrialLabel),
     listUnitPriceExTax: line.listUnitPriceExTax ?? line.unitPriceExTax ?? 0,
     lineDiscountPercent: round2(normalizeDiscountRate(line.lineDiscountRate, 1) * 100),
     unitPriceExTax: line.unitPriceExTax ?? 0,
@@ -727,6 +756,7 @@ function handleSave() {
     deliveryMode: draft.deliveryMode,
     stockFulfillmentMode: normalizeStockFulfillmentMode(draft.stockFulfillmentMode),
     deliveryDate: draft.deliveryDate,
+    needIndustrialLabel: Boolean(draft.needIndustrialLabel),
     listUnitPriceExTax: Number(draft.listUnitPriceExTax) || 0,
     lineDiscountRate: lineDiscountReadOnly.value
       ? 1
@@ -773,32 +803,79 @@ function handleSave() {
 }
 </script>
 
-<style scoped>
+<style lang="less" scoped>
+@import '../../inventory/components/inventoryLineEditModal.less';
+
+.preview-block {
+  margin-bottom: 16px;
+}
+
+.preview-block-title {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
 .line-edit-form :deep(.ant-form-item) {
   margin-bottom: 12px;
 }
 
+.line-edit-form :deep(.ant-form-item-row) {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
 .line-edit-form :deep(.ant-form-item-label) {
+  flex: 0 0 118px !important;
+  max-width: 118px;
+  padding: 0 !important;
   text-align: right;
+
+  > label {
+    display: inline-flex;
+    align-items: center;
+    height: 32px !important;
+    margin: 0 !important;
+    white-space: nowrap;
+    line-height: 32px;
+  }
+}
+
+.line-edit-form :deep(.ant-form-item-control) {
+  flex: 1 1 0 !important;
+  min-width: 0;
 }
 
 .line-edit-form :deep(.ant-form-item-control-input) {
   min-height: 32px;
+  align-items: center;
 }
 
-.line-edit-form-vertical {
-  margin-top: 4px;
+.line-edit-form :deep(.ant-form-item-control-input-content) {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
 }
 
-.line-edit-form-vertical :deep(.ant-form-item) {
-  margin-bottom: 12px;
+.line-edit-form :deep(.ant-checkbox-wrapper) {
+  line-height: 32px;
 }
 
-.field-tip-icon {
-  margin-left: 4px;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.35);
-  cursor: help;
+/* 长文本：标签顶对齐 */
+.line-edit-form :deep(.ant-col-24 .ant-form-item-row) {
+  align-items: flex-start;
+}
+
+.line-edit-form :deep(.ant-col-24 .ant-form-item-label > label) {
+  height: auto !important;
+  line-height: 22px;
+  padding-top: 5px;
+}
+
+.line-edit-form :deep(.ant-col-24 .ant-form-item-control-input-content) {
+  display: block;
+  min-height: auto;
 }
 
 .field-hint {
@@ -810,5 +887,17 @@ function handleSave() {
 
 .line-attachment-upload {
   width: 100%;
+}
+
+.preview-row .preview-label {
+  width: 5em;
+}
+</style>
+
+<style lang="less">
+.sales-order-line-edit-modal-wrap {
+  .ant-modal {
+    max-width: 1200px;
+  }
 }
 </style>

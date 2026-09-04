@@ -10,6 +10,7 @@ export const SALES_ORDER_DETAIL_TABS = [
   'attachments',
   'ebom-info',
   'price-change',
+  'industrial-label',
   'approval',
 ]
 

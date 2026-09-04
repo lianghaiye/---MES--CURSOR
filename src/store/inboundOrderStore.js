@@ -20,17 +20,11 @@ import {
   sumPieceValues,
 } from '@/utils/variableLengthMaterial'
 import { materialInfoState } from '@/store/materialInfoStore'
-import { productInfoState } from '@/store/productInfoStore'
 import {
   findSalesOrderByNoOrId,
   splitInboundPieceValuesForSalesOrder,
   resolveWorkOrderNoFromInbound,
 } from '@/utils/salesOrderDedicatedStock'
-import {
-  attachLabelsOnSalesProductionInbound,
-  createAndAttachLabelsOnReplenishInbound,
-} from '@/store/industrialLabelStore'
-import { isProductionInboundType } from '@/utils/inboundWorkOrders'
 
 function isFinishedOrSemiInbound(order) {
   const t = order?.inboundType || ''
@@ -546,7 +540,6 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
       line.lineStatus = '已入库'
     })
     syncSalesAllocationAfterInbound(order, pendingLines)
-    syncIndustrialLabelsAfterInbound(order, pendingLines)
     recomputeInboundOrderStatus(order, operator)
     count += 1
   })
@@ -573,84 +566,8 @@ export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
 
   line.lineStatus = '已入库'
   syncSalesAllocationAfterInbound(order, [line])
-  syncIndustrialLabelsAfterInbound(order, [line])
   recomputeInboundOrderStatus(order, operator)
   return { ok: true, order, line }
-}
-
-/**
- * 完工入库挂载工业标识：
- * - 有销售单号：消耗审核预申请 SN，挂工单/入库
- * - 无销售单号（补货等）：按产品主数据当场申请并挂载，批次=补货/源单号
- */
-function syncIndustrialLabelsAfterInbound(order, lines) {
-  if (!order || !isProductionInboundType(order.inboundType)) return
-
-  const salesOrderNo = String(order.salesOrderNo || order.sourceSalesOrderNo || '').trim()
-  const salesOrder =
-    (order.salesOrderId || order.sourceSalesOrderId
-      ? salesOrderState.orders.find(
-          (o) => o.id === order.salesOrderId || o.id === order.sourceSalesOrderId,
-        )
-      : null) ||
-    (salesOrderNo ? salesOrderState.orders.find((o) => o.orderNo === salesOrderNo) : null)
-  const workOrderCode = resolveWorkOrderNoFromInbound(order) || ''
-  const workOrderType = order.inboundType === '半成品入库' ? 'assembly' : 'production'
-
-  for (const line of lines || []) {
-    const code = String(line.itemCode || line.productCode || '').trim()
-    const qty =
-      line.dedicatedInboundQty != null
-        ? Number(line.dedicatedInboundQty) || 0
-        : Number(line.qty) || 0
-    if (!code || qty <= 0) continue
-
-    const product = productInfoState.products.find((p) => p.code === code)
-    const needFlag =
-      Boolean(line.needIndustrialLabel) ||
-      Boolean(product?.production?.needIndustrialLabel) ||
-      Boolean(
-        salesOrder?.lineItems?.find((l) => l.id === line.salesLineId || l.productCode === code)
-          ?.needIndustrialLabel,
-      )
-
-    const pieceIds = Array.isArray(line.pieceSerialNos) ? line.pieceSerialNos : []
-
-    if (salesOrder) {
-      if (!needFlag) continue
-      attachLabelsOnSalesProductionInbound({
-        salesOrderNo: salesOrder.orderNo,
-        salesLineId: line.salesLineId || '',
-        productCode: code,
-        qty,
-        workOrderCode,
-        workOrderId: '',
-        workOrderType,
-        inboundDocNo: order.docNo,
-        pieceIds,
-      })
-      continue
-    }
-
-    // 补货 / 无销售单：入库时当场申请
-    const replenishDocNo =
-      order.replenishLedgerNo ||
-      order.replenishDocNo ||
-      (String(order.sourceType || '').includes('补货') ? order.sourceOrderNo : '') ||
-      order.sourceOrderNo ||
-      order.docNo
-    createAndAttachLabelsOnReplenishInbound({
-      replenishDocNo,
-      replenishDocId: order.id,
-      productCode: code,
-      productName: line.itemName || line.productName || product?.name || '',
-      qty,
-      needIndustrialLabel: needFlag,
-      workOrderCode,
-      inboundDocNo: order.docNo,
-      pieceIds,
-    })
-  }
 }
 
 /** 入库后：偿还调拨欠量，并按来源销售单补软占用 */

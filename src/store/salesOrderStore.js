@@ -44,6 +44,7 @@ import {
   applyLabelSummaryToSalesLines,
   voidLabelsBySalesOrder,
   salesOrderHasBoundLabels,
+  salesLineIndustrialLabelNeedQty,
 } from '@/store/industrialLabelStore'
 import { isCustomProductAttribute } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
@@ -137,74 +138,159 @@ function loadInitialSalesOrders() {
   )
 }
 
-/** 确保工业标识演示待审单存在（产品勾选 + 行勾选） */
+/** 确保工业标识演示单存在：待审单 + 已审带 SN 单 */
 function ensureIndustrialLabelDemoSalesOrder(orders) {
   const list = Array.isArray(orders) ? [...orders] : []
-  if (list.some((o) => o.id === 'so-seed-industrial-label')) return list
   const p0 = mockProducts[0]
   const p1 = mockProducts[1]
   const p3 = mockProducts[3]
   if (!p0 || !p1) return list
   const now = dayjs()
-  list.unshift(
-    createSalesOrder({
-      id: 'so-seed-industrial-label',
-      orderNo: '1-20260903-IL01',
-      customerName: '山东化工泵业集团',
-      region: '华北',
-      salesperson: '王芳',
-      progressStatus: '待审核',
-      businessType: '自产销售',
-      documentDate: now.format('YYYY-MM-DD'),
-      createdAt: now.format('YYYY-MM-DD HH:mm'),
-      creator: '王芳',
-      remark: '工业标识演示：行已勾选，审核后按排产缺口自动申请 SN',
-      lineItems: [
-        createLineItem({
-          id: 'line-seed-il-a',
-          productId: p0.id,
-          productName: p0.name,
-          productCode: p0.code,
-          productAttr: p0.productAttribute,
-          salesQty: 4,
-          needIndustrialLabel: true,
-          stockFulfillmentMode: 'prefer_stock',
-          deliveryMode: '整机',
-          unit: p0.inventoryUnit || '台',
-          businessType: '自产销售',
-        }),
-        createLineItem({
-          id: 'line-seed-il-b',
-          productId: p1.id,
-          productName: p1.name,
-          productCode: p1.code,
-          productAttr: p1.productAttribute,
-          salesQty: 2,
-          needIndustrialLabel: true,
-          stockFulfillmentMode: 'force_mto',
-          deliveryMode: '整机',
-          unit: p1.inventoryUnit || '台',
-          businessType: '自产销售',
-        }),
-        ...(p3
-          ? [
-              createLineItem({
-                id: 'line-seed-il-c',
-                productId: p3.id,
-                productName: p3.name,
-                productCode: p3.code,
-                productAttr: p3.productAttribute,
-                salesQty: 1,
-                needIndustrialLabel: false,
-                deliveryMode: '整机',
-                unit: p3.inventoryUnit || '台',
-                businessType: '自产销售',
-              }),
-            ]
-          : []),
-      ],
-    }),
-  )
+
+  if (!list.some((o) => o.id === 'so-seed-industrial-label')) {
+    list.unshift(
+      createSalesOrder({
+        id: 'so-seed-industrial-label',
+        orderNo: '1-20260903-IL01',
+        customerName: '山东化工泵业集团',
+        region: '华北',
+        salesperson: '王芳',
+        progressStatus: '待审核',
+        businessType: '自产销售',
+        documentDate: now.format('YYYY-MM-DD'),
+        createdAt: now.format('YYYY-MM-DD HH:mm'),
+        creator: '王芳',
+        remark: '工业标识演示：行已勾选，审核后按现货占用+排产缺口自动申请 SN',
+        lineItems: [
+          createLineItem({
+            id: 'line-seed-il-a',
+            productId: p0.id,
+            productName: p0.name,
+            productCode: p0.code,
+            productAttr: p0.productAttribute,
+            salesQty: 4,
+            needIndustrialLabel: true,
+            stockFulfillmentMode: 'prefer_stock',
+            deliveryMode: '整机',
+            unit: p0.inventoryUnit || '台',
+            businessType: '自产销售',
+          }),
+          createLineItem({
+            id: 'line-seed-il-b',
+            productId: p1.id,
+            productName: p1.name,
+            productCode: p1.code,
+            productAttr: p1.productAttribute,
+            salesQty: 2,
+            needIndustrialLabel: true,
+            stockFulfillmentMode: 'force_mto',
+            deliveryMode: '整机',
+            unit: p1.inventoryUnit || '台',
+            businessType: '自产销售',
+          }),
+          ...(p3
+            ? [
+                createLineItem({
+                  id: 'line-seed-il-c',
+                  productId: p3.id,
+                  productName: p3.name,
+                  productCode: p3.code,
+                  productAttr: p3.productAttribute,
+                  salesQty: 1,
+                  needIndustrialLabel: false,
+                  deliveryMode: '整机',
+                  unit: p3.inventoryUnit || '台',
+                  businessType: '自产销售',
+                }),
+              ]
+            : []),
+        ],
+      }),
+    )
+  }
+
+  if (!list.some((o) => o.id === 'so-seed-industrial-label-done')) {
+    list.unshift(
+      createSalesOrder({
+        id: 'so-seed-industrial-label-done',
+        orderNo: '1-20260903-IL02',
+        customerName: '华东机械制造有限公司',
+        region: '华东',
+        salesperson: '王芳',
+        progressStatus: '进行中',
+        businessType: '自产销售',
+        documentDate: now.subtract(2, 'day').format('YYYY-MM-DD'),
+        createdAt: now.subtract(2, 'day').format('YYYY-MM-DD HH:mm'),
+        creator: '王芳',
+        approver: 'admin1',
+        approvedAt: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm'),
+        remark: '工业标识演示：已审核并预申请 SN（含现货占用），可在「工业标识」Tab 查看',
+        approvalRecords: [
+          {
+            name: 'admin1',
+            role: '销售审核',
+            result: '已通过',
+            time: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm'),
+            opinion: '同意，按现货占用+排产缺口申请工业标识',
+          },
+        ],
+        lineItems: [
+          createLineItem({
+            id: 'line-seed-il2-a',
+            productId: p0.id,
+            productName: p0.name,
+            productCode: p0.code,
+            productAttr: p0.productAttribute,
+            salesQty: 5,
+            planProduceQty: 3,
+            stockTakeQty: 2,
+            needIndustrialLabel: true,
+            industrialLabelStatus: '成功',
+            industrialLabelSuccessCount: 5,
+            industrialLabelFailCount: 0,
+            industrialLabelRequestNo: 'GYHLBS260903001',
+            stockFulfillmentMode: 'prefer_stock',
+            deliveryMode: '整机',
+            unit: p0.inventoryUnit || '台',
+            businessType: '自产销售',
+          }),
+          createLineItem({
+            id: 'line-seed-il2-b',
+            productId: p1.id,
+            productName: p1.name,
+            productCode: p1.code,
+            productAttr: p1.productAttribute,
+            salesQty: 2,
+            planProduceQty: 2,
+            stockTakeQty: 0,
+            needIndustrialLabel: true,
+            industrialLabelStatus: '成功',
+            industrialLabelSuccessCount: 2,
+            industrialLabelFailCount: 0,
+            industrialLabelRequestNo: 'GYHLBS260903001',
+            stockFulfillmentMode: 'force_mto',
+            deliveryMode: '整机',
+            unit: p1.inventoryUnit || '台',
+            businessType: '自产销售',
+          }),
+        ],
+      }),
+    )
+  } else {
+    // 方案 A：已有演示单补齐现货占用口径
+    const done = list.find((o) => o.id === 'so-seed-industrial-label-done')
+    const lineA = done?.lineItems?.find((l) => l.id === 'line-seed-il2-a')
+    if (lineA && (Number(lineA.stockTakeQty) || 0) <= 0) {
+      lineA.salesQty = 5
+      lineA.stockTakeQty = 2
+      lineA.planProduceQty = 3
+      lineA.industrialLabelSuccessCount = 5
+      lineA.industrialLabelStatus = '成功'
+      lineA.stockFulfillmentMode = 'prefer_stock'
+      done.remark = '工业标识演示：已审核并预申请 SN（含现货占用），可在「工业标识」Tab 查看'
+    }
+  }
+
   return list
 }
 
@@ -684,7 +770,7 @@ export function approveSalesOrder(id, opinion = '') {
     applyLabelSummaryToSalesLines(order, labelRes.lineResults || [])
     if (labelRes.request?.orderNo) {
       ;(order.lineItems || []).forEach((line) => {
-        if (line.needIndustrialLabel && (Number(line.planProduceQty) || 0) > 0) {
+        if (line.needIndustrialLabel && salesLineIndustrialLabelNeedQty(line) > 0) {
           line.industrialLabelRequestNo = labelRes.request.orderNo
         }
       })
@@ -770,7 +856,7 @@ export function revokeSalesOrderApproval(id) {
     return {
       ok: false,
       blocked: true,
-      message: '存在已挂完工入库/出库或工单的工业标识，禁止反审',
+      message: '存在已装牌或已出库的工业标识，禁止反审',
     }
   }
 

@@ -1,9 +1,11 @@
 /**
  * 工业标识：申请单 + SN 件码 + 生命周期
- * 销售审核预申请；补货入库当场申请；工单完工入库挂载预申请码
+ * 销售审核按「现货占用+排产缺口」预申请；
+ * 方案 A：完工入库不自动挂 SN；装牌确认（小程序）时再挂到实物
  */
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
+import { mockProducts } from '@/mock/productInfo'
 
 export const LABEL_SOURCE = {
   SALES_ORDER: 'sales_order',
@@ -186,6 +188,129 @@ watch(
   { deep: true },
 )
 
+/** 销售单工业标识演示 SN（已审单 1-20260903-IL02） */
+export function ensureSalesOrderIndustrialLabelDemo() {
+  const salesOrderNo = '1-20260903-IL02'
+  const existing = industrialLabelState.labels.filter(
+    (l) => l.salesOrderNo === salesOrderNo && l.status !== LABEL_STATUS.VOID,
+  )
+  // 方案 A 演示：现货2+排产3 + 行B排产2 = 7
+  if (existing.length >= 7) return
+  if (existing.length > 0) {
+    industrialLabelState.labels = industrialLabelState.labels.filter(
+      (l) => l.salesOrderNo !== salesOrderNo,
+    )
+    industrialLabelState.requests = industrialLabelState.requests.filter(
+      (r) => r.id !== 'ilreq-sales-demo-il02',
+    )
+  }
+
+  const p0 = mockProducts[0] || { code: 'CP2610001', name: '清水离心泵 ISG50-160' }
+  const p1 = mockProducts[1] || { code: 'CP2610002', name: '立式多级离心泵 CDL4-40' }
+
+  const requestNo = 'GYHLBS260903001'
+  const now = dayjs().subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss')
+  const productDetails = [
+    {
+      salesLineId: 'line-seed-il2-a',
+      productCode: p0.code,
+      productName: p0.name,
+      batchNo: salesOrderNo,
+      quantity: 5,
+      successCount: 5,
+      failCount: 0,
+      templateName: '标准泵铭牌',
+    },
+    {
+      salesLineId: 'line-seed-il2-b',
+      productCode: p1.code,
+      productName: p1.name,
+      batchNo: salesOrderNo,
+      quantity: 2,
+      successCount: 2,
+      failCount: 0,
+      templateName: '标准泵铭牌',
+    },
+  ]
+
+  const req = {
+    id: 'ilreq-sales-demo-il02',
+    orderNo: requestNo,
+    sourceType: LABEL_SOURCE.SALES_ORDER,
+    salesOrderId: 'so-seed-industrial-label-done',
+    salesOrderNo,
+    batchNo: salesOrderNo,
+    status: REQUEST_STATUS.ALL_SUCCESS,
+    remark: '销售订单审核自动申请（演示）',
+    createTime: now,
+    productDetails,
+  }
+  summarizeRequest(req)
+
+  const labels = []
+  let idx = 0
+  productDetails.forEach((line) => {
+    for (let i = 0; i < line.quantity; i += 1) {
+      idx += 1
+      labels.push({
+        id: `ilbl-sales-il02-${idx}`,
+        labelCode: `IL02${dayjs().format('YYYYMMDD')}${String(idx).padStart(4, '0')}`,
+        status: LABEL_STATUS.ACTIVE,
+        qrStatus: idx <= 2 ? '已绑定' : '待绑定',
+        requestOrderNo: requestNo,
+        sourceType: LABEL_SOURCE.SALES_ORDER,
+        salesOrderId: 'so-seed-industrial-label-done',
+        salesOrderNo,
+        salesLineId: line.salesLineId,
+        replenishDocNo: '',
+        productCode: line.productCode,
+        productName: line.productName,
+        batchNo: salesOrderNo,
+        templateName: line.templateName,
+        pieceId: idx <= 2 ? `PC-IL02-${idx}` : '',
+        pieceSerialNo: idx <= 2 ? `PC-IL02-${idx}` : '',
+        boundAtInbound: idx <= 2,
+        nameplateMountedAt: idx <= 2 ? now : '',
+        nameplateMountedBy: idx <= 2 ? '演示装牌' : '',
+        regTime: now,
+        lifecycle: [
+          {
+            type: LABEL_LIFECYCLE.SALES_ORDER,
+            docNo: salesOrderNo,
+            docId: 'so-seed-industrial-label-done',
+            at: now,
+          },
+        ],
+        operationLogs: [
+          {
+            type: '注册',
+            detail: '销售订单审核自动注册标识',
+            operator: 'system',
+            time: now,
+          },
+          ...(idx <= 2
+            ? [
+                {
+                  type: '装牌确认',
+                  detail: '演示装牌确认',
+                  operator: '演示装牌',
+                  time: now,
+                },
+              ]
+            : []),
+        ],
+      })
+    }
+  })
+
+  industrialLabelState.requests.unshift(req)
+  industrialLabelState.labels.unshift(...labels)
+  if (industrialLabelState.seq < 30) industrialLabelState.seq = 30
+  persist()
+}
+
+ensureSalesOrderIndustrialLabelDemo()
+
 function summarizeRequest(req) {
   const lines = req.productDetails || []
   req.productNames =
@@ -234,6 +359,8 @@ function generateLabelsForRequest(req, { forceFail = false } = {}) {
         replenishDocNo: req.replenishDocNo || '',
         productCode: line.productCode || '',
         productName: line.productName || '',
+        specModel: line.specModel || '',
+        material: line.material || '',
         batchNo: line.batchNo || req.batchNo || '',
         templateName: line.templateName || '标准泵铭牌',
         pieceId: '',
@@ -317,6 +444,39 @@ export function getLabelByCode(labelCode) {
   return industrialLabelState.labels.find((l) => l.labelCode === labelCode) || null
 }
 
+/**
+ * 铭牌装牌确认（小程序/现场）：此时才将 SN 挂到实物（方案 A）
+ */
+export function confirmNameplateMount(labelCode, { operator = '小程序', pieceSerialNo = '' } = {}) {
+  const code = String(labelCode || '').trim()
+  if (!code) return { ok: false, message: '请输入 SN 码' }
+  const label = getLabelByCode(code)
+  if (!label) return { ok: false, message: '未找到该 SN' }
+  if (label.status === LABEL_STATUS.VOID) return { ok: false, message: '该标识已作废，不可装牌' }
+  if (label.nameplateMountedAt || label.boundAtInbound) {
+    return { ok: true, label, message: '该 SN 已装牌确认', already: true }
+  }
+
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  label.qrStatus = '已绑定'
+  label.boundAtInbound = true
+  label.nameplateMountedAt = now
+  label.nameplateMountedBy = operator || '小程序'
+  if (pieceSerialNo) {
+    label.pieceId = pieceSerialNo
+    label.pieceSerialNo = pieceSerialNo
+  }
+  label.operationLogs = label.operationLogs || []
+  label.operationLogs.unshift({
+    type: '装牌确认',
+    detail: pieceSerialNo ? `铭牌已刻装，件号 ${pieceSerialNo}` : '铭牌已刻装确认',
+    operator: label.nameplateMountedBy,
+    time: now,
+  })
+  persist()
+  return { ok: true, label, message: '装牌确认成功' }
+}
+
 function pushLifecycle(label, entry) {
   if (!label) return
   label.lifecycle = label.lifecycle || []
@@ -336,14 +496,10 @@ function pushLifecycle(label, entry) {
 
 export function labelHasBlockingLifecycle(label) {
   if (!label || label.status !== LABEL_STATUS.ACTIVE) return false
+  // 方案 A：装牌确认后视为已挂实物，禁止反审；出库生命周期仍阻断
+  if (label.nameplateMountedAt || label.boundAtInbound) return true
   const types = new Set((label.lifecycle || []).map((x) => x.type))
-  return (
-    types.has(LABEL_LIFECYCLE.INBOUND) ||
-    types.has(LABEL_LIFECYCLE.OUTBOUND) ||
-    types.has(LABEL_LIFECYCLE.PRODUCTION_WO) ||
-    types.has(LABEL_LIFECYCLE.ASSEMBLY_WO) ||
-    label.boundAtInbound
-  )
+  return types.has(LABEL_LIFECYCLE.OUTBOUND)
 }
 
 /** 销售订单是否存在已挂完工入库/出库等阻断反审的 SN */
@@ -351,16 +507,27 @@ export function salesOrderHasBoundLabels(salesOrderNo) {
   return listLabels({ salesOrderNo, activeOnly: true }).some((l) => labelHasBlockingLifecycle(l))
 }
 
+/** 销售行工业标识应申请数量 = 现货占用 + 排产缺口（审核拆分后）；未拆分时回退销售数量 */
+export function salesLineIndustrialLabelNeedQty(line) {
+  if (!line) return 0
+  const stock = line.stockTakeQty
+  const plan = line.planProduceQty
+  const hasSplit = stock != null || plan != null
+  if (hasSplit) {
+    return Math.max(0, Math.floor(Number(stock) || 0) + Math.floor(Number(plan) || 0))
+  }
+  return Math.max(0, Math.floor(Number(line.salesQty ?? line.qty) || 0))
+}
+
 /**
- * 销售审核：按排产缺口自动申请
+ * 销售审核：按「现货占用 + 排产缺口」预申请 SN（销售驱动铭牌，不绑死库存件）
  * @returns {{ ok: boolean, message?: string, request?: object, labels?: object[], lineResults?: object[] }}
  */
 export function createLabelRequestFromSalesOrder(order, options = {}) {
   if (!order?.orderNo) return { ok: false, message: '销售订单无效' }
   const lines = (order.lineItems || []).filter((line) => {
     if (!line.needIndustrialLabel) return false
-    const qty = Math.floor(Number(line.planProduceQty) || 0)
-    return qty > 0
+    return salesLineIndustrialLabelNeedQty(line) > 0
   })
   if (!lines.length) {
     return { ok: true, message: '无需申请工业标识', request: null, labels: [], lineResults: [] }
@@ -370,8 +537,10 @@ export function createLabelRequestFromSalesOrder(order, options = {}) {
     salesLineId: line.id,
     productCode: line.productCode || '',
     productName: line.productName || '',
+    specModel: line.specModel || '',
+    material: line.material || '',
     batchNo: order.orderNo,
-    quantity: Math.floor(Number(line.planProduceQty) || 0),
+    quantity: salesLineIndustrialLabelNeedQty(line),
     successCount: 0,
     failCount: 0,
     templateName: '标准泵铭牌',
@@ -425,6 +594,8 @@ export function supplementLabelRequest(order, line, quantity, options = {}) {
       salesLineId: line.id,
       productCode: line.productCode || '',
       productName: line.productName || '',
+      specModel: line.specModel || '',
+      material: line.material || '',
       batchNo: order.orderNo,
       quantity: qty,
       successCount: 0,
@@ -462,7 +633,7 @@ export function retryLabelRequestForSalesLine(order, line) {
     salesLineId: line.id,
     activeOnly: true,
   })
-  const need = Math.floor(Number(line.planProduceQty) || 0)
+  const need = salesLineIndustrialLabelNeedQty(line)
   const gap = Math.max(0, need - active.length)
   if (gap <= 0) return { ok: true, message: '该行标识已齐，无需重试', labels: active }
   return supplementLabelRequest(order, line, gap, { remark: '销售订单标识重试' })
@@ -475,7 +646,7 @@ export function voidLabelsBySalesOrder(salesOrderNo) {
     return {
       ok: false,
       blocked: true,
-      message: '存在已挂完工入库/出库或工单的工业标识，禁止反审',
+      message: '存在已装牌或已出库的工业标识，禁止反审',
     }
   }
   const labels = listLabels({ salesOrderNo, activeOnly: true })
@@ -498,61 +669,15 @@ export function voidLabelsBySalesOrder(salesOrderNo) {
 }
 
 /**
- * 销售排产工单完工入库：匹配未挂物件的预申请 SN
+ * @deprecated 方案 A：完工入库不再自动挂 SN；请使用 confirmNameplateMount
+ * 保留函数以免外部引用报错，调用即空操作。
  */
-export function attachLabelsOnSalesProductionInbound({
-  salesOrderNo,
-  salesLineId,
-  productCode,
-  qty,
-  workOrderCode,
-  workOrderId,
-  workOrderType = 'production',
-  inboundDocNo,
-  pieceIds = [],
-} = {}) {
-  const need = Math.max(0, Math.floor(Number(qty) || 0))
-  if (!need) return { ok: true, labels: [] }
-
-  let pool = listLabels({ salesOrderNo, activeOnly: true }).filter((l) => !l.boundAtInbound)
-  if (salesLineId) pool = pool.filter((l) => !l.salesLineId || l.salesLineId === salesLineId)
-  if (productCode) pool = pool.filter((l) => !l.productCode || l.productCode === productCode)
-  pool = pool.sort((a, b) => String(a.regTime).localeCompare(String(b.regTime)))
-
-  const picked = pool.slice(0, need)
-  const woType =
-    workOrderType === 'assembly' ? LABEL_LIFECYCLE.ASSEMBLY_WO : LABEL_LIFECYCLE.PRODUCTION_WO
-
-  picked.forEach((label, idx) => {
-    label.boundAtInbound = true
-    label.qrStatus = '已绑定'
-    if (pieceIds[idx]) {
-      label.pieceId = pieceIds[idx]
-      label.pieceSerialNo = pieceIds[idx]
-    }
-    if (workOrderCode) {
-      pushLifecycle(label, {
-        type: woType,
-        docNo: workOrderCode,
-        docId: workOrderId || '',
-      })
-    }
-    if (inboundDocNo) {
-      pushLifecycle(label, {
-        type: LABEL_LIFECYCLE.INBOUND,
-        docNo: inboundDocNo,
-        docId: '',
-      })
-    }
-  })
-
+export function attachLabelsOnSalesProductionInbound() {
   return {
-    ok: picked.length >= need,
-    message:
-      picked.length < need
-        ? `预申请标识不足：需要 ${need}，仅匹配 ${picked.length}`
-        : `已挂载 ${picked.length} 个工业标识`,
-    labels: picked,
+    ok: true,
+    labels: [],
+    skipped: true,
+    message: '方案 A：入库不自动挂 SN，请在装牌确认时挂载',
   }
 }
 
@@ -651,7 +776,7 @@ export function applyLabelSummaryToSalesLines(order, lineResults = []) {
     if (successCount <= 0 && failCount > 0) line.industrialLabelStatus = '失败'
     else if (successCount > 0 && failCount > 0) line.industrialLabelStatus = '部分成功'
     else if (successCount > 0) line.industrialLabelStatus = '成功'
-    else if (line.needIndustrialLabel && (Number(line.planProduceQty) || 0) > 0) {
+    else if (line.needIndustrialLabel && salesLineIndustrialLabelNeedQty(line) > 0) {
       line.industrialLabelStatus = line.industrialLabelStatus || '待申请'
     } else {
       line.industrialLabelStatus = line.industrialLabelStatus || '—'
@@ -672,9 +797,9 @@ export function refreshSalesLineLabelSummary(order) {
       activeOnly: true,
     })
     line.industrialLabelSuccessCount = active.length
-    const need = Math.floor(Number(line.planProduceQty) || 0)
+    const need = salesLineIndustrialLabelNeedQty(line)
     if (need <= 0) {
-      line.industrialLabelStatus = active.length ? '现货已有码' : '现货待绑定'
+      line.industrialLabelStatus = '—'
     } else if (active.length >= need) {
       line.industrialLabelStatus = '成功'
       line.industrialLabelFailCount = 0

@@ -21,6 +21,9 @@
         <a-checkbox v-model:checked="form.canProduce" disabled>可生产</a-checkbox>
         <a-checkbox v-model:checked="form.canPurchase" :disabled="viewOnly">可采购</a-checkbox>
         <a-checkbox v-model:checked="form.canOutsource" :disabled="viewOnly">可外协</a-checkbox>
+        <a-checkbox v-model:checked="form.production.needIndustrialLabel" :disabled="viewOnly">
+          工业标识
+        </a-checkbox>
       </div>
     </div>
 
@@ -1394,6 +1397,13 @@ function handleOk() {
   background: #fafafa;
   border: 1px solid #f0f0f0;
   border-radius: 6px;
+}
+
+.field-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .section-label {

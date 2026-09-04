@@ -25,6 +25,9 @@
         </template>
         <a-checkbox v-model:checked="form.canPurchase" :disabled="viewOnly">可采购</a-checkbox>
         <a-checkbox v-model:checked="form.canOutsource" :disabled="viewOnly">可外协</a-checkbox>
+        <a-checkbox v-model:checked="form.production.needIndustrialLabel" :disabled="viewOnly">
+          工业标识
+        </a-checkbox>
         <span v-if="derivedItemKindLabel" class="derived-type-tag">
           产品类型：{{ derivedItemKindLabel }}
         </span>
@@ -2376,6 +2379,13 @@ function handleSaveAndMaintainBom() {
 
 .basic-info-box:last-child {
   margin-bottom: 0;
+}
+
+.field-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .section-label {
