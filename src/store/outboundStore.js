@@ -16,7 +16,11 @@ import { applyOutboundToStock } from '@/store/stockStore'
 import { releaseAllocationOnShip } from '@/store/salesStockAllocationStore'
 import { salesOrderState } from '@/store/salesOrderStore'
 import { issueBatchQty, getBatchById } from '@/store/stockBatchStore'
-import { getOutboundIssueRule, OUTBOUND_ISSUE_RULES } from '@/store/functionParamStore'
+import {
+  getOutboundIssueRule,
+  isSalesOutboundByOrder,
+  OUTBOUND_ISSUE_RULES,
+} from '@/store/functionParamStore'
 import {
   allocateOutboundBatches,
   getLineBatchAllocations,
@@ -521,8 +525,8 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
       continue
     }
 
-    // 销售出库：禁止全仓 FIFO；无预锁批时按销售单履约方式再分配（本单按单 → 自由备货）
-    if (order.outboundType === '销售出库') {
+    // 销售出库：按单发货时禁止全仓 FIFO；无预锁批时按销售单履约方式再分配（本单按单 → 自由备货）
+    if (order.outboundType === '销售出库' && isSalesOutboundByOrder()) {
       if (!(Number(line.shipQty) > 0)) {
         return {
           ok: false,

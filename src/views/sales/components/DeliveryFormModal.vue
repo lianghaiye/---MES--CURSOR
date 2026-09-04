@@ -831,6 +831,7 @@ import {
 } from '@/utils/shipBomAttachments'
 import { getActiveShipBomForProduct } from '@/store/productBomStore'
 import { calcSalesLineAvailableQty } from '@/utils/salesLineShipped'
+import { isSalesOutboundByOrder } from '@/store/functionParamStore'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
 import {
   formatAllocationsBarcode,
@@ -1741,6 +1742,13 @@ function refreshLineBatchPreview(line) {
   if (!(shipQty > 0) || !so) {
     line.batchAllocations = []
     line.barcodeBatchNo = ''
+    line.manualBatchPick = false
+    return { ok: true }
+  }
+  if (!isSalesOutboundByOrder()) {
+    line.batchAllocations = []
+    line.barcodeBatchNo = ''
+    line.manualBatchPick = false
     return { ok: true }
   }
   const salesLine = (so.lineItems || []).find((l) => l.id === line.salesLineId || l.id === line.id)

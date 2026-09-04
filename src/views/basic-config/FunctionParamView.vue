@@ -83,6 +83,19 @@
               </a-radio>
             </a-radio-group>
             <a-radio-group
+              v-else-if="record.key === 'salesOutboundIssueRule'"
+              :value="salesOutboundIssueRule"
+              @change="(e) => onSalesOutboundIssueRuleChange(e.target.value)"
+            >
+              <a-radio
+                v-for="option in SALES_OUTBOUND_ISSUE_RULE_OPTIONS"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </a-radio>
+            </a-radio-group>
+            <a-radio-group
               v-else-if="record.key === 'dualUnitIssueStrategy'"
               :value="dualUnitIssueStrategy"
               @change="(e) => onDualUnitIssueStrategyChange(e.target.value)"
@@ -141,6 +154,7 @@ import {
   AUTO_APPROVE_OPTIONS,
   INVENTORY_DEDUCT_OPTIONS,
   OUTBOUND_ISSUE_RULE_OPTIONS,
+  SALES_OUTBOUND_ISSUE_RULE_OPTIONS,
   DUAL_UNIT_ISSUE_STRATEGY_OPTIONS,
   BLANK_SIZE_ASSIST_OPTIONS,
   functionParamState,
@@ -151,6 +165,8 @@ import {
   getInventoryDeductMode,
   setOutboundIssueRule,
   getOutboundIssueRule,
+  setSalesOutboundIssueRule,
+  getSalesOutboundIssueRule,
   setDualUnitIssueStrategy,
   getDualUnitIssueStrategy,
   getBlankSizeAssistTools,
@@ -171,6 +187,7 @@ const salaryPushMode = computed(() => functionParamState.params.salaryPushMode)
 
 const inventoryDeductMode = computed(() => getInventoryDeductMode())
 const outboundIssueRule = computed(() => getOutboundIssueRule())
+const salesOutboundIssueRule = computed(() => getSalesOutboundIssueRule())
 const dualUnitIssueStrategy = computed(() => getDualUnitIssueStrategy())
 const enableBomLevelMts = computed(() => isBomLevelMtsEnabled())
 
@@ -232,6 +249,15 @@ function onInventoryDeductChange(mode) {
 
 function onOutboundIssueRuleChange(mode) {
   const res = setOutboundIssueRule(mode)
+  if (!res.ok) {
+    message.warning(res.message)
+    return
+  }
+  message.success('已保存')
+}
+
+function onSalesOutboundIssueRuleChange(mode) {
+  const res = setSalesOutboundIssueRule(mode)
   if (!res.ok) {
     message.warning(res.message)
     return

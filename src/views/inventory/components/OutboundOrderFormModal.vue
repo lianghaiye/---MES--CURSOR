@@ -613,6 +613,7 @@ import { createOutboundLine } from '@/mock/outboundOrders'
 import { getBatchById, listBatches, stockBatchState } from '@/store/stockBatchStore'
 import {
   getOutboundIssueRule,
+  isSalesOutboundByOrder,
   OUTBOUND_ISSUE_RULE_OPTIONS,
   functionParamState,
 } from '@/store/functionParamStore'
@@ -831,6 +832,7 @@ function autoAllocPreview(record) {
   void stockBatchState.batches
   void functionParamState.params.outboundIssueRule
   void functionParamState.params.dualUnitIssueStrategy
+  void functionParamState.params.salesOutboundIssueRule
   const rule = getOutboundIssueRule()
   const ruleName = issueRuleLabel.value
   const wh = record.shipWarehouse || form.warehouse
@@ -844,7 +846,7 @@ function autoAllocPreview(record) {
   if (!(Number(record.shipQty) > 0)) {
     return `${ruleName}·确认时自动扣批`
   }
-  if (isSalesOutbound.value) {
+  if (isSalesOutbound.value && isSalesOutboundByOrder()) {
     const so =
       (form.salesOrderId && getSalesOrderById(form.salesOrderId)) ||
       findSalesOrderByOrderNo(form.salesOrderNo) ||

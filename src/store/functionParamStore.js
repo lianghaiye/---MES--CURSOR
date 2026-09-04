@@ -82,7 +82,29 @@ export const OUTBOUND_ISSUE_RULE_DESCRIPTION =
   '本期仅开放先进先出，按物料类型自动区分拣批细节：' +
   '①普通物料（未勾「需要下料结算」）：按批次号先进先出，按出库数量扣减，余量留原批；' +
   '②需下料结算物料：FIFO + 优先找单批/单件能满足出库数量的批，候选中余料优先、其次最短够用，没有单批够用才跨批。' +
-  '扣批是「整出」还是「部分出」见下方「下料结算发料方式」。「后进先出」「自主拣选」本期置灰未开放。'
+  '扣批是「整出」还是「部分出」见下方「下料结算发料方式」。「后进先出」「自主拣选」本期置灰未开放。领料、外协发料始终走本项；销售发货见下方「发货出库规则」。'
+
+/**
+ * 销售发货出库如何扣批（不影响领料 / 外协发料）
+ * - by_order：按单发货，先扣本销售单打标批次，禁止 FIFO 抢走他单按单库存
+ * - fifo：发货按仓库批次先进先出，不区分是否本单库存
+ */
+export const SALES_OUTBOUND_ISSUE_RULES = {
+  BY_ORDER: 'by_order',
+  FIFO: 'fifo',
+}
+
+export const SALES_OUTBOUND_ISSUE_RULE_OPTIONS = [
+  { value: SALES_OUTBOUND_ISSUE_RULES.BY_ORDER, label: '按单发货' },
+  { value: SALES_OUTBOUND_ISSUE_RULES.FIFO, label: '先进先出（FIFO）' },
+]
+
+export const SALES_OUTBOUND_ISSUE_RULE_DESCRIPTION =
+  '只作用于销售发货出库，领料、外协发料仍走上方「出库规则」。' +
+  '按单发货：成品/半成品入库时挂了本销售单的批次，发货时优先（或必须）扣这些批次，不能用全仓先进先出把别人订单的货发出去。' +
+  '支持分批发货，但发货量不可超过本单的已入库量。' +
+  '销售行若是「强制按单生产」，不够的部分也不能拿自由备货或其他订单的货来凑。' +
+  '先进先出（FIFO）：发货时不管批次是不是本单生产的，按仓库里批次先后扣减，适合不需要按订单锁货的场景。'
 
 /**
  * 下料结算物料的发料方式（仅作用于勾选「需要下料结算」的物料；普通料固定按出库数量扣）
@@ -291,6 +313,11 @@ export const FUNCTION_PARAM_ROWS = [
     description: OUTBOUND_ISSUE_RULE_DESCRIPTION,
   },
   {
+    key: 'salesOutboundIssueRule',
+    scenario: '发货出库规则',
+    description: SALES_OUTBOUND_ISSUE_RULE_DESCRIPTION,
+  },
+  {
     key: 'dualUnitIssueStrategy',
     scenario: '下料结算发料方式',
     description: DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION,
@@ -327,6 +354,11 @@ function normalizeOutboundIssueRule(mode) {
   return OUTBOUND_ISSUE_RULES.FIFO
 }
 
+function normalizeSalesOutboundIssueRule(mode) {
+  if (SALES_OUTBOUND_ISSUE_RULE_OPTIONS.some((item) => item.value === mode)) return mode
+  return SALES_OUTBOUND_ISSUE_RULES.BY_ORDER
+}
+
 function normalizeDualUnitIssueStrategy(mode) {
   if (
     mode === DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL ||
@@ -359,6 +391,7 @@ function loadFromStorage() {
           autoApproveDocs: normalizeAutoApproveDocs(parsed.autoApproveDocs),
           inventoryDeductMode: normalizeInventoryDeductMode(parsed.inventoryDeductMode),
           outboundIssueRule: normalizeOutboundIssueRule(parsed.outboundIssueRule),
+          salesOutboundIssueRule: normalizeSalesOutboundIssueRule(parsed.salesOutboundIssueRule),
           dualUnitIssueStrategy: normalizeDualUnitIssueStrategy(parsed.dualUnitIssueStrategy),
           blankSizeAssistTools,
           blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
@@ -385,6 +418,7 @@ export const functionParamState = reactive({
     autoApproveDocs: createDefaultAutoApproveDocs(),
     inventoryDeductMode: INVENTORY_DEDUCT_MODES.NO_ISSUE,
     outboundIssueRule: OUTBOUND_ISSUE_RULES.FIFO,
+    salesOutboundIssueRule: SALES_OUTBOUND_ISSUE_RULES.BY_ORDER,
     dualUnitIssueStrategy: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL,
     blankSizeAssistTools: createDefaultBlankSizeAssistTools(),
     blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
@@ -507,6 +541,24 @@ export function isManualOutboundIssue() {
 export function isAutoOutboundIssue() {
   const rule = getOutboundIssueRule()
   return rule === OUTBOUND_ISSUE_RULES.FIFO || rule === OUTBOUND_ISSUE_RULES.LIFO
+}
+
+export function getSalesOutboundIssueRule() {
+  return normalizeSalesOutboundIssueRule(functionParamState.params.salesOutboundIssueRule)
+}
+
+export function setSalesOutboundIssueRule(mode) {
+  const normalized = normalizeSalesOutboundIssueRule(mode)
+  if (!SALES_OUTBOUND_ISSUE_RULE_OPTIONS.some((item) => item.value === normalized)) {
+    return { ok: false, message: '无效的发货出库规则' }
+  }
+  functionParamState.params.salesOutboundIssueRule = normalized
+  return { ok: true }
+}
+
+/** 销售发货是否按单扣批（禁止全仓 FIFO 抢他单按单库存） */
+export function isSalesOutboundByOrder() {
+  return getSalesOutboundIssueRule() === SALES_OUTBOUND_ISSUE_RULES.BY_ORDER
 }
 
 export function getDualUnitIssueStrategy() {

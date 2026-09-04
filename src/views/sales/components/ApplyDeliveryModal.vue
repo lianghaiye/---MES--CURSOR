@@ -362,6 +362,7 @@ import {
   removeMaterialPickFromShipment,
 } from '@/utils/shipEbom'
 import ScatterShipDrawer from './ScatterShipDrawer.vue'
+import { isSalesOutboundByOrder } from '@/store/functionParamStore'
 import {
   formatAllocationsBarcode,
   preallocateDeliveryBatches,
@@ -528,6 +529,13 @@ function refreshLineBatchPreview(line) {
   if (!(shipQty > 0) || !so) {
     line.batchAllocations = []
     line.barcodeBatchNo = ''
+    line.manualBatchPick = false
+    return { ok: true }
+  }
+  if (!isSalesOutboundByOrder()) {
+    line.batchAllocations = []
+    line.barcodeBatchNo = ''
+    line.manualBatchPick = false
     return { ok: true }
   }
   const salesLine = (so.lineItems || []).find((l) => l.id === line.salesLineId || l.id === line.id)
