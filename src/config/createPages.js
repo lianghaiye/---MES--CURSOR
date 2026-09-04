@@ -121,14 +121,6 @@ export const createPageRegistry = [
     keepAlive: 'MasterItemCreateView',
   },
   {
-    listPath: '/product-process/process-config',
-    newPath: '/product-process/process-config/new',
-    title: '新增工序',
-    name: 'product-process-process-config-new',
-    view: () => import('@/views/product-process/ProcessConfigCreateView.vue'),
-    keepAlive: 'ProcessConfigCreateView',
-  },
-  {
     listPath: '/product-process/process-category',
     newPath: '/product-process/process-category/new',
     title: '新增工序分类',
@@ -223,6 +215,14 @@ export const createPageRegistry = [
     name: 'quality-qc-template-new',
     view: () => import('@/views/quality/QcTemplateCreateView.vue'),
     keepAlive: 'QcTemplateCreateView',
+  },
+  {
+    listPath: '/quality/qc-field-library',
+    newPath: '/quality/qc-field-library/new',
+    title: '新增检验项',
+    name: 'quality-qc-field-library-new',
+    view: () => import('@/views/quality/QcFieldLibraryCreateView.vue'),
+    keepAlive: 'QcFieldLibraryCreateView',
   },
 ]
 

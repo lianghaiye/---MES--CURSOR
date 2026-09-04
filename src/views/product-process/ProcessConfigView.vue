@@ -190,9 +190,6 @@ import ProcessLaborConfigModal from './components/ProcessLaborConfigModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
-import { useTabs } from '@/composables/useTabs'
-import { findCreatePageByListPath } from '@/config/createPages'
-import { openCreateTab } from '@/utils/openCreateTab'
 import {
   processConfigState,
   filterProcessConfig,
@@ -208,8 +205,6 @@ import ImportExportHistoryModal from '@/components/ImportExportHistoryModal.vue'
 import { processRouteBundleImportDef } from '@/utils/importDefs/processRouteBundleImport'
 
 const router = useRouter()
-const { openTab } = useTabs()
-const processConfigCreatePage = findCreatePageByListPath('/product-process/process-config')
 const importOpen = ref(false)
 const historyOpen = ref(false)
 const filters = reactive({
@@ -286,10 +281,8 @@ function handleReset() {
 }
 
 function openCreate() {
-  openCreateTab(router, openTab, {
-    path: processConfigCreatePage.newPath,
-    title: processConfigCreatePage.title,
-  })
+  editRecord.value = null
+  modalOpen.value = true
 }
 
 function openEdit(record) {

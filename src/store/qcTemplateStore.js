@@ -21,6 +21,39 @@ export const qcTemplateState = reactive({
   templates: cloneQcTemplates(),
 })
 
+/** 热更新下同步密封件模板中的复合字段结构，并移除多点 */
+export function ensureQcTemplateDemoSeed() {
+  const row = qcTemplateState.templates.find((t) => t.code === 'QCT-USR-LL-001')
+  if (!row) return false
+  const fresh = cloneQcTemplates().find((t) => t.code === 'QCT-USR-LL-001')
+  if (!fresh) return false
+
+  let changed = false
+  const fields = (row.fields || []).filter((f) => f.type !== 'matrix' && f.code !== 'QC_PERF_CURVE')
+  if (fields.length !== (row.fields || []).length) changed = true
+
+  const freshComplex = (fresh.fields || []).filter((f) => f.code === 'QC_RUN_TEST')
+  freshComplex.forEach((demo) => {
+    const idx = fields.findIndex((f) => f.code === demo.code)
+    if (idx < 0) {
+      fields.push({ ...demo })
+      changed = true
+      return
+    }
+    const prev = fields[idx]
+    const sameChildren = JSON.stringify(prev.children || []) === JSON.stringify(demo.children || [])
+    if (!sameChildren || prev.type !== demo.type) {
+      fields[idx] = { ...prev, ...demo, sortOrder: prev.sortOrder ?? demo.sortOrder }
+      changed = true
+    }
+  })
+  if (changed) {
+    row.fields = fields
+    row.fieldCount = fields.length
+  }
+  return changed
+}
+
 export function getQcTemplateById(id) {
   return qcTemplateState.templates.find((t) => t.id === id) || null
 }
@@ -181,6 +214,8 @@ export function updateQcTemplate(
       bizScope: nextBizScope,
       objects: objectsToSave,
       status: '启用',
+      sheetPassRule:
+        payload.sheetPassRule != null ? payload.sheetPassRule : row.sheetPassRule || 'manual',
       fields: fields.map((f) => ({ ...f, options: f.options ? [...f.options] : [] })),
       fieldCount: payload.fieldCount != null ? payload.fieldCount : fields.length,
       updater: operator,
@@ -195,6 +230,8 @@ export function updateQcTemplate(
     bizScope: nextBizScope,
     objects: nextObjects,
     status: nextStatus,
+    sheetPassRule:
+      payload.sheetPassRule != null ? payload.sheetPassRule : row.sheetPassRule || 'manual',
     fields: fields.map((f) => ({ ...f, options: f.options ? [...f.options] : [] })),
     fieldCount: payload.fieldCount != null ? payload.fieldCount : fields.length,
     updater: operator,
@@ -219,6 +256,7 @@ export function copyQcTemplate(id, operator = 'admin1') {
       bizScope: source.bizScope,
       scopeType: source.scopeType,
       objects: Array.isArray(source.objects) ? [...source.objects] : [],
+      sheetPassRule: source.sheetPassRule,
       fields,
       fieldCount: fields.length,
       gatePolicy: source.gatePolicy,

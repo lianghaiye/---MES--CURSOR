@@ -98,7 +98,18 @@
         size="small"
         bordered
         :pagination="false"
+        v-model:expandedRowKeys="expandedKeys"
       >
+        <template #expandIcon="{ expanded, onExpand: onExp, record }">
+          <a-button type="link" size="small" @click="(e) => onExp(record, e)">
+            {{ expanded ? '收起检验项' : '展开检验项' }}
+          </a-button>
+        </template>
+        <template #expandedRowRender="{ record }">
+          <div class="expand-form-wrap">
+            <QcLineFieldValuesReadonly :line="record" :task="task" />
+          </div>
+        </template>
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ index + 1 }}</template>
           <template v-else>{{ record[column.dataIndex] ?? '—' }}</template>
@@ -109,9 +120,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { QC_TASK_STATUS, QC_TASK_RESULT } from '@/store/qcTaskStore'
 import { useDrawerWidth } from '@/composables/useDrawerWidth'
+import QcLineFieldValuesReadonly from './QcLineFieldValuesReadonly.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -121,6 +133,7 @@ const props = defineProps({
 const emit = defineEmits(['update:open'])
 
 const { drawerBind } = useDrawerWidth('l')
+const expandedKeys = ref([])
 
 const INBOUND_SCOPES = new Set(['来料质检', '外协回货检'])
 const PRODUCTION_SCOPES = new Set(['生产过程检', '成品检'])
@@ -136,6 +149,13 @@ const lineColumns = [
   { title: '检验数量', dataIndex: 'inspectQty', width: 90, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56 },
 ]
+
+watch(
+  () => props.open,
+  (val) => {
+    if (!val) expandedKeys.value = []
+  },
+)
 
 function statusColor(status) {
   if (status === QC_TASK_STATUS.COMPLETED) return 'success'
@@ -182,5 +202,10 @@ function resultColor(result) {
     line-height: 22px;
     word-break: break-all;
   }
+}
+
+.expand-form-wrap {
+  padding: 8px 4px;
+  background: #fafafa;
 }
 </style>

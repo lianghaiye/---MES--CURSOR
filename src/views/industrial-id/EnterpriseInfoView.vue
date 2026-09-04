@@ -1,25 +1,6 @@
 <template>
   <div class="enterprise-reg">
     <div class="page-card">
-      <div class="page-header">
-        <h2>基础配置</h2>
-        <small>管理企业注册与铭牌模板</small>
-      </div>
-      <div class="sub-tabs">
-        <router-link
-          to="/industrial-id/base-config/enterprise-info"
-          class="sub-tab"
-          exact-active-class="active"
-          >企业信息</router-link
-        >
-        <router-link
-          to="/industrial-id/base-config/nameplate-template"
-          class="sub-tab"
-          active-class="active"
-          >配置铭牌模板</router-link
-        >
-      </div>
-
       <div v-if="!submitted" class="banner">
         <div class="banner-content">
           <div class="banner-title-row">
@@ -466,42 +447,6 @@ export default {
   background: #fff;
   border-radius: 8px;
 }
-.page-header {
-  padding: 24px 24px 0;
-}
-.page-header h2 {
-  font-size: 18px;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-.page-header small {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.sub-tabs {
-  display: flex;
-  padding: 16px 24px 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-.sub-tab {
-  padding: 10px 20px;
-  font-size: 14px;
-  color: #6b7280;
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: all 0.2s;
-}
-.sub-tab:hover {
-  color: #1890ff;
-}
-.sub-tab.active {
-  color: #1890ff;
-  border-bottom-color: #1890ff;
-  font-weight: 500;
-}
-
 .banner {
   background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
   margin: 0 24px;

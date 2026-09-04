@@ -97,18 +97,27 @@
         @cancel="pendingSavePayload = null"
       />
 
+      <QcFieldLibraryPickModal
+        v-model:open="pickLibraryOpen"
+        :existing-fields="form.fields"
+        @confirm="onPickLibraryFields"
+      />
+
       <div class="fields-section">
         <div class="fields-header">
           <div>
             <h4>模板字段</h4>
             <div class="fields-hint">
-              系统字段：质检方式、质检数量、质检结果（类型「系统」，不可删除）。用户添加的字段类型为「自定义」。全部字段均可拖拽排序；添加字段时会将方式/数量置顶、结果置底，拖动后以你调整的顺序为准。
+              系统字段：质检方式、质检数量、质检结果（类型「系统」，不可删除）。自定义字段可从「检验项库」批量选用，或点「新增检验项」在新标签页创建入库后再选用。全部字段均可拖拽排序；新增字段时方式/数量置顶、结果置底，拖动后以你调整的顺序为准。
             </div>
           </div>
-          <a-button type="primary" size="small" @click="openFieldModal(null)">
-            <PlusOutlined />
-            添加字段
-          </a-button>
+          <a-space size="small">
+            <a-button size="small" @click="pickLibraryOpen = true">从检验项库添加</a-button>
+            <a-button type="primary" size="small" @click="openCreateField">
+              <PlusOutlined />
+              新增检验项
+            </a-button>
+          </a-space>
         </div>
 
         <a-table
@@ -133,6 +142,21 @@
             </template>
             <template v-else-if="column.key === 'required'">
               {{ record.required ? '是' : '否' }}
+            </template>
+            <template v-else-if="column.key === 'unit'">
+              {{ displayFieldUnit(record) }}
+            </template>
+            <template v-else-if="column.key === 'standard'">
+              {{ buildStandardText(record) || '—' }}
+            </template>
+            <template v-else-if="column.key === 'keyForSheetPass'">
+              <a-checkbox
+                v-if="!isQcSystemFixedField(record)"
+                :checked="Boolean(record.keyForSheetPass)"
+                :disabled="form.sheetPassRule !== 'keyFields'"
+                @change="(e) => (record.keyForSheetPass = e.target.checked)"
+              />
+              <span v-else class="muted">—</span>
             </template>
             <template v-else-if="column.key === 'fieldKind'">
               <a-tag v-if="isQcSystemFixedField(record)" color="blue">系统</a-tag>
@@ -170,6 +194,33 @@
         </a-table>
         <p v-else class="empty-hint">暂无字段</p>
       </div>
+
+      <div class="sheet-pass-section">
+        <div class="fields-header">
+          <div>
+            <h4>整单合格规则</h4>
+            <div class="fields-hint">
+              配置本模板判定「质检通过」时，对检验项合格标准的约束（与下方各字段合格标准配合使用）。
+            </div>
+          </div>
+        </div>
+        <a-radio-group v-model:value="form.sheetPassRule" class="sheet-pass-radios">
+          <div
+            v-for="opt in sheetPassRuleOpts"
+            :key="opt.value"
+            class="sheet-pass-option"
+            :class="{ active: form.sheetPassRule === opt.value }"
+          >
+            <a-radio :value="opt.value">
+              <span class="sheet-pass-label">{{ opt.label }}</span>
+            </a-radio>
+            <div class="sheet-pass-desc">{{ opt.desc }}</div>
+          </div>
+        </a-radio-group>
+        <div v-if="form.sheetPassRule === 'keyFields'" class="sheet-pass-key-tip">
+          请在上方字段表「关键项」列勾选需强制达标的检验项（系统字段不可勾选）。
+        </div>
+      </div>
     </div>
 
     <template #footer>
@@ -180,197 +231,82 @@
     <a-modal
       v-model:open="fieldModalOpen"
       :title="fieldModalTitle"
-      width="780px"
+      :width="editingConclusion ? 780 : fieldForm.type === 'composite' ? 920 : 780"
       :mask-closable="false"
       destroy-on-close
       @ok="saveField"
       @cancel="closeFieldModal"
     >
-      <a-form layout="vertical" class="field-form-grid">
-        <template v-if="editingConclusion">
-          <a-row :gutter="16">
-            <a-col :span="12">
-              <a-form-item label="字段名称" required>
-                <a-input v-model:value="fieldForm.name" placeholder="请输入字段名称" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="12">
-              <a-form-item label="启用结论字段">
-                <a-switch
-                  v-model:checked="fieldForm.enabled"
-                  checked-children="启用"
-                  un-checked-children="关闭"
-                />
-                <div class="option-map-hint">
-                  关闭后检验录入不展示结论，也不据此回写任务质检结果。
-                </div>
-              </a-form-item>
-            </a-col>
-          </a-row>
-          <a-form-item label="输入提示">
-            <a-input v-model:value="fieldForm.placeholder" placeholder="请输入提示文案" />
-          </a-form-item>
-          <a-form-item label="结论选项（含结果映射）">
-            <div
-              v-for="(item, i) in fieldForm.optionItems"
-              :key="i"
-              class="option-row conclusion-opt"
-            >
-              <a-input
-                v-model:value="item.value"
-                placeholder="选项文案"
-                :disabled="isLockedConclusionOption(item)"
+      <a-form v-if="editingConclusion" layout="vertical" class="field-form-grid">
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="字段名称" required>
+              <a-input v-model:value="fieldForm.name" placeholder="请输入字段名称" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="启用结论字段">
+              <a-switch
+                v-model:checked="fieldForm.enabled"
+                checked-children="启用"
+                un-checked-children="关闭"
               />
-              <a-select
-                v-model:value="item.result"
-                placeholder="对应质检结果"
-                style="width: 132px; flex-shrink: 0"
-                :options="conclusionResultOpts"
-              />
-              <a-checkbox
-                :checked="Boolean(item.isDefault)"
-                @change="(e) => setConclusionDefault(i, e.target.checked)"
-              >
-                设为默认值
-              </a-checkbox>
-              <a-button
-                type="text"
-                danger
-                :disabled="isLockedConclusionOption(item)"
-                @click="removeConclusionOption(i)"
-              >
-                删除
-              </a-button>
-            </div>
-            <a-button type="link" size="small" @click="addConclusionOption">+ 添加选项</a-button>
-            <div class="option-map-hint">
-              预设「合格 / 不合格 /
-              让步合格」不可删除。映射仅支持质检通过、质检不通过。可勾选「设为默认值」。
-            </div>
-          </a-form-item>
-        </template>
-
-        <template v-else>
-          <a-row :gutter="16">
-            <a-col :span="12">
-              <a-form-item label="字段名称" required>
-                <a-input v-model:value="fieldForm.name" placeholder="请输入字段名称" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="12">
-              <a-form-item label="字段类型" required>
-                <a-select
-                  v-model:value="fieldForm.type"
-                  placeholder="请选择"
-                  :options="fieldTypeOpts"
-                  @change="onFieldTypeChange"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-
-          <a-row :gutter="16">
-            <a-col :span="12">
-              <a-form-item label="是否必填">
-                <a-radio-group v-model:value="fieldForm.required">
-                  <a-radio :value="true">是</a-radio>
-                  <a-radio :value="false">否</a-radio>
-                </a-radio-group>
-              </a-form-item>
-            </a-col>
-            <a-col :span="12">
-              <a-form-item label="是否带单位">
-                <div class="unit-inline-row">
-                  <a-checkbox v-model:checked="fieldForm.withUnit">带单位</a-checkbox>
-                  <a-input
-                    v-if="fieldForm.withUnit"
-                    v-model:value="fieldForm.unit"
-                    placeholder="请输入单位"
-                    allow-clear
-                  />
-                </div>
-              </a-form-item>
-            </a-col>
-          </a-row>
-
-          <a-row v-if="showFormatField || fieldForm.type === 'number'" :gutter="16">
-            <a-col v-if="showFormatField" :span="12">
-              <a-form-item label="字段格式">
-                <a-input
-                  v-model:value="fieldForm.format"
-                  :placeholder="formatPlaceholder"
-                  allow-clear
-                />
-                <div class="option-map-hint">
-                  用于日期/日期时间的展示与录入格式（如 yyyy-MM-dd、yyyy-MM-dd HH:mm:ss）。
-                </div>
-              </a-form-item>
-            </a-col>
-            <a-col v-if="fieldForm.type === 'number'" :span="12">
-              <a-form-item label="数字设置">
-                <a-checkbox v-model:checked="fieldForm.allowDecimal">允许小数</a-checkbox>
-              </a-form-item>
-            </a-col>
-          </a-row>
-
-          <a-row :gutter="16">
-            <a-col :span="12">
-              <a-form-item label="输入提示">
-                <a-input v-model:value="fieldForm.placeholder" placeholder="请输入提示文案" />
-              </a-form-item>
-            </a-col>
-            <a-col v-if="['text', 'textarea', 'number'].includes(fieldForm.type)" :span="12">
-              <a-form-item label="默认值">
-                <a-input v-model:value="fieldForm.defaultValue" placeholder="请输入默认值" />
-              </a-form-item>
-            </a-col>
-          </a-row>
-
-          <a-row v-if="fieldForm.type === 'text' || fieldForm.type === 'textarea'" :gutter="16">
-            <a-col :span="12">
-              <a-form-item label="字符限制">
-                <a-input-number
-                  v-model:value="fieldForm.charLimit"
-                  :min="1"
-                  style="width: 100%"
-                  placeholder="最大字符数"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-
-          <a-form-item
-            v-if="fieldForm.type === 'radio' || fieldForm.type === 'checkbox'"
-            label="选项列表"
+              <div class="option-map-hint">
+                关闭后检验录入不展示结论，也不据此回写任务质检结果。若模板配置了「全部达标 /
+                关键项达标」规则，判定通过时仍会校验检验项标准。
+              </div>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="输入提示">
+          <a-input v-model:value="fieldForm.placeholder" placeholder="请输入提示文案" />
+        </a-form-item>
+        <a-form-item label="结论选项（含结果映射）">
+          <div
+            v-for="(item, i) in fieldForm.optionItems"
+            :key="i"
+            class="option-row conclusion-opt"
           >
-            <div
-              v-for="(opt, i) in fieldForm.optionRows"
-              :key="i"
-              class="option-row conclusion-opt"
-            >
-              <a-input v-model:value="opt.value" placeholder="选项值" />
-              <a-checkbox
-                :checked="Boolean(opt.isDefault)"
-                @change="(e) => setOptionDefault(i, e.target.checked)"
-              >
-                设为默认值
-              </a-checkbox>
-              <a-button type="text" danger @click="fieldForm.optionRows.splice(i, 1)">
-                删除
-              </a-button>
-            </div>
-            <a-button type="link" size="small" @click="addOptionRow">+ 添加选项</a-button>
-          </a-form-item>
-
-          <a-form-item label="字段描述">
             <a-input
-              v-model:value="fieldForm.description"
-              allow-clear
-              placeholder="请输入字段描述（选填）"
+              v-model:value="item.value"
+              placeholder="选项文案"
+              :disabled="isLockedConclusionOption(item)"
             />
-          </a-form-item>
-        </template>
+            <a-select
+              v-model:value="item.result"
+              placeholder="对应质检结果"
+              style="width: 132px; flex-shrink: 0"
+              :options="conclusionResultOpts"
+            />
+            <a-checkbox
+              :checked="Boolean(item.isDefault)"
+              @change="(e) => setConclusionDefault(i, e.target.checked)"
+            >
+              设为默认值
+            </a-checkbox>
+            <a-button
+              type="text"
+              danger
+              :disabled="isLockedConclusionOption(item)"
+              @click="removeConclusionOption(i)"
+            >
+              删除
+            </a-button>
+          </div>
+          <a-button type="link" size="small" @click="addConclusionOption">+ 添加选项</a-button>
+          <div class="option-map-hint">
+            预设「合格 / 不合格 /
+            让步合格」不可删除。映射仅支持质检通过、质检不通过。可勾选「设为默认值」。
+          </div>
+        </a-form-item>
       </a-form>
+
+      <QcFieldEditorForm
+        v-else
+        :model="fieldForm"
+        :show-sync-to-library="editingFieldIndex == null"
+        @update:model="onFieldFormUpdate"
+      />
     </a-modal>
   </FormCreateShell>
 </template>
@@ -381,11 +317,14 @@ export default { name: 'QcTemplateFormModal' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message, TreeSelect } from 'ant-design-vue'
 import { PlusOutlined, HolderOutlined } from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
+import { useTabs } from '@/composables/useTabs'
+import { findCreatePageByListPath } from '@/config/createPages'
+import { openCreateTab } from '@/utils/openCreateTab'
 import {
   QC_TEMPLATE_SCOPE_TYPE,
   qcTemplateBizScopeOptions,
@@ -409,6 +348,29 @@ import {
 import { buildBomSubItemPickerRows, filterBomSubItemPickerRows } from '@/utils/bomSubItemPicker'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import QcTemplateConflictModal from './QcTemplateConflictModal.vue'
+import QcFieldLibraryPickModal from './QcFieldLibraryPickModal.vue'
+import QcFieldEditorForm from './QcFieldEditorForm.vue'
+import {
+  pickLibraryFieldsForTemplate,
+  syncTemplateFieldToLibrary,
+} from '@/store/qcFieldLibraryStore'
+import {
+  QC_FIELD_JUDGE_RULE,
+  QC_UNIT_POSITION,
+  buildStandardText,
+  pickFieldStandardProps,
+  validateManualOptionItems,
+} from '@/utils/qcFieldStandard'
+import {
+  pickComplexFieldProps,
+  validateComplexFieldConfig,
+  ensureChildFieldCodes,
+} from '@/utils/qcComplexField'
+import {
+  QC_TEMPLATE_SHEET_PASS_RULE,
+  QC_TEMPLATE_SHEET_PASS_RULE_OPTIONS,
+  normalizeSheetPassRule,
+} from '@/utils/qcTemplateSheetPass'
 
 const SHOW_CHILD = TreeSelect.SHOW_CHILD
 const props = defineProps({
@@ -420,6 +382,9 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'saved'])
 const route = useRoute()
+const router = useRouter()
+const { openTab } = useTabs()
+const fieldLibraryCreatePage = findCreatePageByListPath('/quality/qc-field-library')
 
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/quality/qc-template',
@@ -428,6 +393,7 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
 
 const saving = ref(false)
 const fieldModalOpen = ref(false)
+const pickLibraryOpen = ref(false)
 const editingFieldIndex = ref(null)
 const editingId = ref('')
 const templateStatus = ref('停用')
@@ -447,9 +413,10 @@ const fieldTypeMap = {
   datetime: '日期时间',
   radio: '单选',
   checkbox: '多选',
+  composite: '复合项',
+  matrix: '多点网格',
 }
 
-const fieldTypeOpts = Object.entries(fieldTypeMap).map(([value, label]) => ({ label, value }))
 const scopeTypeOpts = qcTemplateScopeTypeOptions
 const bizScopeOpts = qcTemplateBizScopeOptions.map((v) => ({ label: v, value: v }))
 const conclusionResultOpts = QC_CONCLUSION_RESULT_OPTIONS
@@ -463,10 +430,6 @@ const fieldModalTitle = computed(() => {
   if (editingFieldIndex.value == null) return '新增模板字段'
   return editingConclusion.value ? '编辑质检结果' : '编辑模板字段'
 })
-const showFormatField = computed(() => fieldForm.type === 'date' || fieldForm.type === 'datetime')
-const formatPlaceholder = computed(() =>
-  fieldForm.type === 'datetime' ? '如：yyyy-MM-dd HH:mm:ss' : '如：yyyy-MM-dd',
-)
 
 const form = reactive({
   name: '',
@@ -474,7 +437,10 @@ const form = reactive({
   scopeType: QC_TEMPLATE_SCOPE_TYPE.GLOBAL,
   objects: [],
   fields: [],
+  sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.MANUAL,
 })
+
+const sheetPassRuleOpts = QC_TEMPLATE_SHEET_PASS_RULE_OPTIONS
 
 const fieldForm = reactive(emptyFieldForm())
 
@@ -628,18 +594,27 @@ watch(
   },
 )
 
-const fieldColumns = [
-  { title: '', key: 'drag', width: 36, align: 'center' },
-  { title: '序号', key: 'index', width: 56, align: 'center' },
-  { title: '字段名称', dataIndex: 'name', width: 120 },
-  { title: '字段类型', key: 'type', width: 90 },
-  { title: '类型', key: 'fieldKind', width: 80, align: 'center' },
-  { title: '启用', key: 'enabled', width: 90, align: 'center' },
-  { title: '必填', key: 'required', width: 56, align: 'center' },
-  { title: '单位', dataIndex: 'unit', width: 64 },
-  { title: '输入提示', dataIndex: 'placeholder', ellipsis: true },
-  { title: '操作', key: 'action', width: 110 },
-]
+const fieldColumns = computed(() => {
+  const cols = [
+    { title: '', key: 'drag', width: 36, align: 'center' },
+    { title: '序号', key: 'index', width: 56, align: 'center' },
+    { title: '字段名称', dataIndex: 'name', width: 120 },
+    { title: '字段类型', key: 'type', width: 90 },
+    { title: '类型', key: 'fieldKind', width: 80, align: 'center' },
+    { title: '启用', key: 'enabled', width: 90, align: 'center' },
+    { title: '必填', key: 'required', width: 56, align: 'center' },
+    { title: '单位', key: 'unit', width: 88 },
+    { title: '合格标准', key: 'standard', width: 140, ellipsis: true },
+  ]
+  if (form.sheetPassRule === QC_TEMPLATE_SHEET_PASS_RULE.KEY_FIELDS) {
+    cols.push({ title: '关键项', key: 'keyForSheetPass', width: 72, align: 'center' })
+  }
+  cols.push(
+    { title: '输入提示', dataIndex: 'placeholder', ellipsis: true },
+    { title: '操作', key: 'action', width: 110 },
+  )
+  return cols
+})
 
 const dragFieldIndex = ref(null)
 const dragOverFieldIndex = ref(null)
@@ -707,11 +682,13 @@ function emptyFieldForm() {
   return {
     code: '',
     name: '',
+    indicatorKind: 'basic',
     type: undefined,
     format: '',
     required: false,
     withUnit: false,
     unit: '',
+    unitPosition: QC_UNIT_POSITION.SUFFIX,
     allowDecimal: false,
     description: '',
     enabled: true,
@@ -720,7 +697,30 @@ function emptyFieldForm() {
     optionItems: [],
     defaultValue: '',
     charLimit: null,
+    judgeRule: QC_FIELD_JUDGE_RULE.NONE,
+    standardMin: '',
+    standardMax: '',
+    standardValue: '',
+    passOptions: [],
+    standardText: '',
+    children: [],
+    matrixColumns: [],
+    matrixRows: [],
+    matrixAllowAddRow: true,
+    syncToLibrary: true,
+    manualOptionItems: [],
   }
+}
+
+function onFieldFormUpdate(next) {
+  Object.assign(fieldForm, next)
+}
+
+function displayFieldUnit(record) {
+  if (!record?.withUnit && !record?.unit) return '—'
+  const unit = String(record.unit || '').trim() || '—'
+  if (!unit || unit === '—') return '—'
+  return record.unitPosition === 'prefix' ? `${unit}（前）` : `${unit}（后）`
 }
 
 function generateFieldCode(existingFields = []) {
@@ -757,16 +757,6 @@ function resolveDefaultFromOptionRows(rows = []) {
   return hit ? String(hit.value).trim() : ''
 }
 
-function addOptionRow() {
-  fieldForm.optionRows.push({ value: '', isDefault: false })
-}
-
-function setOptionDefault(index, checked) {
-  fieldForm.optionRows.forEach((row, i) => {
-    row.isDefault = checked && i === index
-  })
-}
-
 function addConclusionOption() {
   fieldForm.optionItems.push({
     value: '',
@@ -798,6 +788,7 @@ function resetForm() {
   form.bizScope = '成品检'
   form.scopeType = QC_TEMPLATE_SCOPE_TYPE.GLOBAL
   form.objects = []
+  form.sheetPassRule = QC_TEMPLATE_SHEET_PASS_RULE.MANUAL
   form.fields = ensureFieldsWithSystemFixedItems([], { layout: 'default' })
 }
 
@@ -826,7 +817,13 @@ function loadEdit(record) {
   form.bizScope = resolveBizScope(record)
   form.scopeType = resolveScopeType(record)
   form.objects = Array.isArray(record.objects) ? record.objects.map((o) => ({ ...o })) : []
-  form.fields = ensureFieldsWithSystemFixedItems(record.fields || [], { layout: 'preserve' })
+  form.sheetPassRule = normalizeSheetPassRule(record.sheetPassRule)
+  form.fields = ensureFieldsWithSystemFixedItems(record.fields || [], { layout: 'preserve' }).map(
+    (f) => ({
+      ...f,
+      keyForSheetPass: Boolean(f.keyForSheetPass),
+    }),
+  )
 }
 
 function resolveActiveRecord() {
@@ -856,6 +853,17 @@ function removeField(index) {
   form.fields = ensureFieldsWithSystemFixedItems(form.fields, { layout: 'preserve' })
 }
 
+function openCreateField() {
+  if (!fieldLibraryCreatePage) {
+    message.warning('未配置新增页')
+    return
+  }
+  openCreateTab(router, openTab, {
+    path: fieldLibraryCreatePage.newPath,
+    title: fieldLibraryCreatePage.title,
+  })
+}
+
 function openFieldModal(index) {
   editingFieldIndex.value = index
   if (index != null && form.fields[index]) {
@@ -869,13 +877,16 @@ function openFieldModal(index) {
         }))
       : []
     Object.assign(fieldForm, {
+      ...emptyFieldForm(),
       code: f.code || '',
       name: f.name || '',
-      type: f.type || undefined,
+      indicatorKind: f.type === 'composite' ? 'composite' : 'basic',
+      type: f.type === 'matrix' ? undefined : f.type || undefined,
       format: f.format || '',
       required: Boolean(f.required),
       withUnit: Boolean(f.withUnit) || Boolean(unit),
       unit,
+      unitPosition: f.unitPosition === 'prefix' ? QC_UNIT_POSITION.PREFIX : QC_UNIT_POSITION.SUFFIX,
       allowDecimal: Boolean(f.allowDecimal),
       description: f.description || '',
       enabled: f.enabled !== false,
@@ -884,6 +895,15 @@ function openFieldModal(index) {
       optionItems,
       defaultValue: f.defaultValue || '',
       charLimit: f.charLimit ?? null,
+      ...pickFieldStandardProps(f),
+      ...pickComplexFieldProps(f),
+      children: (f.children || []).map((c) => ({
+        ...c,
+        optionRows: Array.isArray(c.optionRows)
+          ? c.optionRows
+          : toOptionRows(c.options || [], c.defaultValue),
+        unitPosition: c.unitPosition === 'prefix' ? 'prefix' : 'suffix',
+      })),
     })
   } else {
     Object.assign(fieldForm, emptyFieldForm())
@@ -896,28 +916,17 @@ function closeFieldModal() {
   editingFieldIndex.value = null
 }
 
-function onFieldTypeChange() {
-  if (editingConclusion.value) return
-  fieldForm.optionRows = []
-  fieldForm.defaultValue = ''
-  fieldForm.charLimit = null
-  fieldForm.allowDecimal = false
-  if (fieldForm.type === 'date') {
-    fieldForm.format = fieldForm.format || 'yyyy-MM-dd'
-  } else if (fieldForm.type === 'datetime') {
-    fieldForm.format = fieldForm.format || 'yyyy-MM-dd HH:mm:ss'
-  } else {
-    fieldForm.format = ''
-  }
-}
-
 function saveField() {
-  if (!String(fieldForm.name || '').trim()) {
-    message.warning('请输入字段名称')
+  if (!fieldForm.type) {
+    message.warning(fieldForm.indicatorKind === 'composite' ? '请选择复合类型' : '请选择字段类型')
     return
   }
-  if (!fieldForm.type) {
-    message.warning('请选择字段类型')
+  if (fieldForm.type === 'matrix') {
+    message.warning('多点项暂未开放')
+    return
+  }
+  if (!String(fieldForm.name || '').trim()) {
+    message.warning(fieldForm.type === 'composite' ? '请输入父项名称' : '请输入字段名称')
     return
   }
   if (fieldForm.withUnit && !String(fieldForm.unit || '').trim()) {
@@ -961,6 +970,52 @@ function saveField() {
     }
   }
 
+  const complexCheck = validateComplexFieldConfig(fieldForm)
+  if (!complexCheck.ok) {
+    message.warning(complexCheck.message)
+    return
+  }
+
+  if (fieldForm.judgeRule === QC_FIELD_JUDGE_RULE.RANGE) {
+    const hasMin = fieldForm.standardMin !== '' && fieldForm.standardMin != null
+    const hasMax = fieldForm.standardMax !== '' && fieldForm.standardMax != null
+    if (!hasMin && !hasMax) {
+      message.warning('请至少填写合格区间的下限或上限')
+      return
+    }
+    if (hasMin && hasMax && Number(fieldForm.standardMin) > Number(fieldForm.standardMax)) {
+      message.warning('合格下限不能大于上限')
+      return
+    }
+  }
+  if (
+    fieldForm.judgeRule === QC_FIELD_JUDGE_RULE.OPTION_PASS &&
+    !(fieldForm.passOptions || []).length
+  ) {
+    message.warning('请选择至少一个合格选项')
+    return
+  }
+  if (fieldForm.judgeRule === QC_FIELD_JUDGE_RULE.MANUAL) {
+    const checked = validateManualOptionItems(fieldForm.manualOptionItems)
+    if (!checked.ok) {
+      message.warning(checked.message)
+      return
+    }
+    fieldForm.manualOptionItems = checked.items.map((item) => ({
+      ...item,
+      isDefault: Boolean(
+        (fieldForm.manualOptionItems || []).find((o) => o.value === item.value && o.isDefault),
+      ),
+    }))
+  }
+  if (
+    fieldForm.judgeRule === QC_FIELD_JUDGE_RULE.EQUALS &&
+    !String(fieldForm.standardValue || '').trim()
+  ) {
+    message.warning('请填写标准值')
+    return
+  }
+
   const existingCode =
     editingFieldIndex.value != null ? form.fields[editingFieldIndex.value]?.code : ''
   const code = String(existingCode || fieldForm.code || '').trim() || generateFieldCode(form.fields)
@@ -973,14 +1028,24 @@ function saveField() {
     ? resolveDefaultFromOptionRows(fieldForm.optionRows)
     : fieldForm.defaultValue || ''
 
+  const children =
+    fieldForm.type === 'composite'
+      ? complexCheck.children || ensureChildFieldCodes(fieldForm.children)
+      : []
+
+  const standard = pickFieldStandardProps({
+    ...fieldForm,
+    options: optionValues,
+    passOptions: fieldForm.passOptions || [],
+  })
+  const complex = pickComplexFieldProps({ ...fieldForm, children })
   const payload = {
     code,
     name: String(fieldForm.name).trim(),
     type: fieldForm.type,
-    format: showFormatField.value ? fieldForm.format || '' : '',
+    format:
+      fieldForm.type === 'date' || fieldForm.type === 'datetime' ? fieldForm.format || '' : '',
     required: Boolean(fieldForm.required),
-    withUnit: Boolean(fieldForm.withUnit),
-    unit: fieldForm.withUnit ? String(fieldForm.unit || '').trim() : '',
     allowDecimal: fieldForm.type === 'number' ? Boolean(fieldForm.allowDecimal) : false,
     description: String(fieldForm.description || '').trim(),
     isConclusion: false,
@@ -988,6 +1053,14 @@ function saveField() {
     options: optionValues,
     defaultValue,
     charLimit: fieldForm.charLimit,
+    ...standard,
+    ...complex,
+    children,
+    standardText:
+      String(fieldForm.standardText || '').trim() ||
+      (fieldForm.type === 'composite'
+        ? buildStandardText({ ...fieldForm, ...standard }) || '含子项分别判定'
+        : buildStandardText({ ...fieldForm, ...standard, options: optionValues })),
   }
 
   if (editingFieldIndex.value != null) {
@@ -995,8 +1068,37 @@ function saveField() {
     form.fields = ensureFieldsWithSystemFixedItems(form.fields, { layout: 'preserve' })
   } else {
     form.fields = insertFieldBeforeConclusion(form.fields, payload)
+    if (fieldForm.syncToLibrary) {
+      const syncRes = syncTemplateFieldToLibrary(payload)
+      if (syncRes.ok && !syncRes.skipped) {
+        message.success(`字段已加入模板，并同步到检验项库（${syncRes.field.code}）`)
+      } else if (syncRes.ok && syncRes.skipped) {
+        message.success('字段已加入模板（检验项库已有同编码，未重复写入）')
+      } else if (!syncRes.ok && !syncRes.skipped) {
+        message.warning(syncRes.message || '同步检验项库失败，字段仍已加入模板')
+      }
+    }
   }
   closeFieldModal()
+}
+
+function onPickLibraryFields(ids = []) {
+  const { added, skipped } = pickLibraryFieldsForTemplate(ids, form.fields)
+  if (!added.length) {
+    message.warning(
+      skipped.length
+        ? `未添加任何字段（${skipped.map((s) => s.reason).join('、')}）`
+        : '未选择字段',
+    )
+    return
+  }
+  let list = ensureFieldsWithSystemFixedItems(form.fields, { layout: 'default' })
+  added.forEach((field) => {
+    list = insertFieldBeforeConclusion(list, field)
+  })
+  form.fields = list
+  const skipTip = skipped.length ? `，跳过 ${skipped.length} 项` : ''
+  message.success(`已从检验项库添加 ${added.length} 个字段${skipTip}`)
 }
 
 function buildSavePayload() {
@@ -1013,8 +1115,13 @@ function buildSavePayload() {
     scopeType: form.scopeType,
     objects,
     status: templateStatus.value || '停用',
+    sheetPassRule: normalizeSheetPassRule(form.sheetPassRule),
     fields: fields.map((f) => ({
       ...f,
+      keyForSheetPass:
+        form.sheetPassRule === QC_TEMPLATE_SHEET_PASS_RULE.KEY_FIELDS
+          ? Boolean(f.keyForSheetPass)
+          : false,
       options: f.options ? [...f.options] : [],
     })),
     fieldCount: fields.length,
@@ -1040,6 +1147,15 @@ function handleSave(conflictResolution = null) {
   ) {
     if (!(form.objects || []).length) {
       message.warning('请选择适用对象')
+      return
+    }
+  }
+  if (form.sheetPassRule === QC_TEMPLATE_SHEET_PASS_RULE.KEY_FIELDS) {
+    const hasKey = (form.fields || []).some(
+      (f) => !isQcSystemFixedField(f) && f.keyForSheetPass === true,
+    )
+    if (!hasKey) {
+      message.warning('规则为「关键项必须达标」时，请至少勾选一个关键项')
       return
     }
   }
@@ -1212,6 +1328,54 @@ function onConflictConfirm({ mode }) {
   text-align: center;
   font-size: 13px;
   color: rgba(0, 0, 0, 0.45);
+}
+
+.sheet-pass-section {
+  margin-top: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  background: #fff;
+}
+
+.sheet-pass-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.sheet-pass-option {
+  padding: 10px 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.sheet-pass-option.active {
+  border-color: #91caff;
+  background: #e6f4ff;
+}
+
+.sheet-pass-label {
+  font-weight: 600;
+}
+
+.sheet-pass-desc {
+  margin: 4px 0 0 24px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
+}
+
+.sheet-pass-key-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #1677ff;
+}
+
+.muted {
+  color: rgba(0, 0, 0, 0.25);
 }
 
 .drag-handle {

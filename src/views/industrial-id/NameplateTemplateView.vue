@@ -4,40 +4,75 @@
       <!-- 列表视图 -->
       <template v-if="currentView === 'list'">
         <div class="page-card">
-          <div class="page-header">
-            <h2>基础配置</h2>
-            <small>管理企业注册与铭牌模板</small>
-          </div>
-          <div class="sub-tabs">
-            <router-link to="/industrial-id/base-config/enterprise-info" class="sub-tab"
-              >企业信息</router-link
-            >
-            <router-link to="/industrial-id/base-config/nameplate-template" class="sub-tab active"
-              >配置铭牌模板</router-link
-            >
-          </div>
-
-          <!-- Banner -->
-          <div class="banner">
-            <div class="banner-text">
-              <h3>配置铭牌模板</h3>
-              <p>配置企业特有的铭牌字段。</p>
-            </div>
-            <div class="banner-decor"></div>
+          <div class="filter-card">
+            <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
+              <ListFilterBar :field-count="7" @search="handleSearch" @reset="handleReset">
+                <a-form-item label="状态">
+                  <a-select
+                    v-model:value="filters.status"
+                    allow-clear
+                    size="small"
+                    placeholder="请选择"
+                    :options="statusOpts"
+                  />
+                </a-form-item>
+                <a-form-item label="类型">
+                  <a-select
+                    v-model:value="filters.type"
+                    allow-clear
+                    size="small"
+                    placeholder="请选择"
+                    :options="typeOpts"
+                  />
+                </a-form-item>
+                <a-form-item label="编码">
+                  <a-input
+                    v-model:value="filters.code"
+                    allow-clear
+                    size="small"
+                    placeholder="请输入"
+                  />
+                </a-form-item>
+                <a-form-item label="名称">
+                  <a-input
+                    v-model:value="filters.name"
+                    allow-clear
+                    size="small"
+                    placeholder="请输入"
+                  />
+                </a-form-item>
+                <a-form-item label="适用范围">
+                  <a-select
+                    v-model:value="filters.scope"
+                    allow-clear
+                    size="small"
+                    placeholder="请选择"
+                    :options="scopeFilterOpts"
+                  />
+                </a-form-item>
+                <a-form-item label="创建人">
+                  <a-input
+                    v-model:value="filters.creator"
+                    allow-clear
+                    size="small"
+                    placeholder="请输入"
+                  />
+                </a-form-item>
+                <a-form-item label="创建时间">
+                  <a-range-picker
+                    v-model:value="filters.dateRange"
+                    size="small"
+                    style="width: 100%"
+                    value-format="YYYY-MM-DD"
+                  />
+                </a-form-item>
+              </ListFilterBar>
+            </a-form>
           </div>
 
           <div class="toolbar">
             <div class="toolbar-left">
               <button class="btn btn-primary" @click="openCreateModal">+ 新增模板</button>
-            </div>
-            <div class="toolbar-right">
-              <input
-                v-model="searchKeyword"
-                placeholder="请输入模板编码/名称搜索"
-                class="search-input"
-                @keyup.enter="search"
-              />
-              <button class="btn btn-default" @click="search">搜索</button>
             </div>
           </div>
 
@@ -120,19 +155,6 @@
       <!-- 详情视图 -->
       <template v-if="currentView === 'detail'">
         <div class="page-card">
-          <div class="page-header">
-            <h2>基础配置</h2>
-            <small>管理企业注册与铭牌模板</small>
-          </div>
-          <div class="sub-tabs">
-            <router-link to="/industrial-id/base-config/enterprise-info" class="sub-tab"
-              >企业信息</router-link
-            >
-            <router-link to="/industrial-id/base-config/nameplate-template" class="sub-tab active"
-              >配置铭牌模板</router-link
-            >
-          </div>
-
           <div class="detail-header">
             <button class="btn btn-default" @click="currentView = 'list'">← 返回列表</button>
             <h3 class="detail-title">模板详情 - {{ detailTemplate.name }}</h3>
@@ -300,7 +322,7 @@
     <div v-if="createModalVisible" class="modal-overlay" @click.self="closeCreateModal">
       <div class="modal-card modal-lg">
         <div class="modal-header">
-          <h3>{{ editingTemplate ? '编辑铭牌模板' : '新增铭牌模板' }}</h3>
+          <h3>{{ editingTemplate ? '编辑产品信息模板' : '新增产品信息模板' }}</h3>
           <button class="btn-close" @click="closeCreateModal">✕</button>
         </div>
         <div class="modal-body">
@@ -637,11 +659,27 @@
 </template>
 
 <script>
+import ListFilterBar from '@/components/ListFilterBar.vue'
+
+function emptyFilters() {
+  return {
+    status: undefined,
+    type: undefined,
+    code: '',
+    name: '',
+    scope: undefined,
+    creator: '',
+    dateRange: undefined,
+  }
+}
+
 export default {
+  components: { ListFilterBar },
   data() {
     return {
       currentView: 'list',
-      searchKeyword: '',
+      filters: emptyFilters(),
+      appliedFilters: emptyFilters(),
       // 预设模板列表
       templates: [
         {
@@ -809,11 +847,41 @@ export default {
   },
   computed: {
     filteredTemplates() {
-      if (!this.searchKeyword) return this.templates
-      const kw = this.searchKeyword.toLowerCase()
-      return this.templates.filter(
-        (t) => t.code.toLowerCase().includes(kw) || t.name.toLowerCase().includes(kw),
-      )
+      const f = this.appliedFilters
+      return this.templates.filter((t) => {
+        if (f.status && t.status !== f.status) return false
+        if (f.type && t.type !== f.type) return false
+        if (
+          f.code &&
+          !String(t.code || '')
+            .toLowerCase()
+            .includes(f.code.trim().toLowerCase())
+        ) {
+          return false
+        }
+        if (
+          f.name &&
+          !String(t.name || '')
+            .toLowerCase()
+            .includes(f.name.trim().toLowerCase())
+        ) {
+          return false
+        }
+        if (f.scope && t.scope !== f.scope) return false
+        if (
+          f.creator &&
+          !String(t.creator || '')
+            .toLowerCase()
+            .includes(f.creator.trim().toLowerCase())
+        ) {
+          return false
+        }
+        if (f.dateRange?.length === 2) {
+          const day = String(t.createTime || '').slice(0, 10)
+          if (day < f.dateRange[0] || day > f.dateRange[1]) return false
+        }
+        return true
+      })
     },
     displayedProducts() {
       const all = this.allProducts
@@ -841,6 +909,21 @@ export default {
     },
     productCategories() {
       return ['水泵', '阀门', '电机', '控制器', '管道', '仪表']
+    },
+    statusOpts() {
+      return [
+        { label: '启用', value: '启用' },
+        { label: '停用', value: '停用' },
+      ]
+    },
+    typeOpts() {
+      return [
+        { label: '系统模板', value: '系统模板' },
+        { label: '自定义模板', value: '自定义模板' },
+      ]
+    },
+    scopeFilterOpts() {
+      return this.scopeOptions.map((s) => ({ label: s.label, value: s.label }))
     },
     scopeOptions() {
       return [
@@ -885,7 +968,16 @@ export default {
       const scale = Math.min(scaleW, scaleH, 1)
       document.documentElement.style.setProperty('--phone-scale', scale.toFixed(4))
     },
-    search() {},
+    handleSearch() {
+      this.appliedFilters = {
+        ...this.filters,
+        dateRange: this.filters.dateRange ? [...this.filters.dateRange] : undefined,
+      }
+    },
+    handleReset() {
+      this.filters = emptyFilters()
+      this.appliedFilters = emptyFilters()
+    },
     // 单行启用/停用
     toggleStatus(tpl) {
       this.rowConfirmTarget = tpl
@@ -1137,76 +1229,30 @@ export default {
   background: #fff;
   border-radius: 8px;
 }
-.page-header {
-  padding: 24px 24px 0;
-}
-.page-header h2 {
-  font-size: 18px;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-.page-header small {
-  color: #6b7280;
-  font-size: 13px;
+
+.filter-card {
+  padding: 12px 16px 8px;
 }
 
-.sub-tabs {
-  display: flex;
-  padding: 16px 24px 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-.sub-tab {
-  padding: 10px 20px;
-  font-size: 14px;
-  color: #6b7280;
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: all 0.2s;
-}
-.sub-tab:hover {
-  color: #1890ff;
-}
-.sub-tab.active {
-  color: #1890ff;
-  border-bottom-color: #1890ff;
-  font-weight: 500;
+.filter-card :deep(.filter-form.horizontal-form) {
+  width: 100%;
 }
 
-/* ---- Banner ---- */
-.banner {
-  position: relative;
-  margin: 0;
-  padding: 24px 32px;
-  background: linear-gradient(135deg, #e0f0ff 0%, #c8e4ff 40%, #d4e8f8 70%, #b8d4f0 100%);
-  overflow: hidden;
-  display: flex;
+.filter-card :deep(.ant-form-item) {
+  width: 100%;
+  margin-bottom: 0;
+  margin-inline-end: 0;
+}
+
+.filter-card :deep(.ant-form-item-row) {
+  flex-wrap: nowrap;
   align-items: center;
 }
-.banner-text h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1e3a5f;
-  margin: 0 0 6px;
-}
-.banner-text p {
+
+.filter-card :deep(.ant-form-item-label > label) {
+  height: 24px;
+  line-height: 24px;
   font-size: 13px;
-  color: #4a6fa5;
-  margin: 0;
-}
-.banner-decor {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 280px;
-  background: linear-gradient(
-    135deg,
-    transparent 0%,
-    rgba(180, 210, 240, 0.5) 50%,
-    rgba(150, 190, 230, 0.7) 100%
-  );
-  clip-path: ellipse(120% 100% at 90% 50%);
 }
 
 /* ---- 工具栏 ---- */
@@ -1220,13 +1266,6 @@ export default {
 .toolbar-left {
   display: flex;
   gap: 8px;
-}
-.search-input {
-  padding: 6px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 13px;
-  width: 200px;
 }
 
 /* ---- 按钮 ---- */

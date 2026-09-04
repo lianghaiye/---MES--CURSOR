@@ -8,6 +8,14 @@ import {
   QC_SYSTEM_UNIVERSAL_TEMPLATE_CODE,
 } from '@/mock/qcSystemTemplateFields'
 import { ensureFieldsWithSystemFixedItems } from '@/utils/qcConclusionField'
+import {
+  QC_FIELD_JUDGE_RULE,
+  QC_UNIT_POSITION,
+  buildStandardText,
+  pickFieldStandardProps,
+} from '@/utils/qcFieldStandard'
+import { pickComplexFieldProps } from '@/utils/qcComplexField'
+import { QC_TEMPLATE_SHEET_PASS_RULE, normalizeSheetPassRule } from '@/utils/qcTemplateSheetPass'
 
 export const qcTemplateStatusOptions = ['启用', '停用']
 
@@ -67,6 +75,9 @@ export function createQcTemplate(partial = {}) {
     fields,
     fieldCount: fields.length,
     scopeType: resolvedScopeType,
+    sheetPassRule: normalizeSheetPassRule(
+      partial.sheetPassRule ?? QC_TEMPLATE_SHEET_PASS_RULE.MANUAL,
+    ),
   }
 }
 
@@ -78,17 +89,34 @@ function ensureIncomingDemoFields(extraFields = [], { methodDefault = '抽检' }
     }
     return f
   })
-  const extras = (extraFields || []).map((f, idx) => ({
-    code: f.code,
-    name: f.name,
-    type: f.type || 'text',
-    required: f.required !== false,
-    options: f.options ? [...f.options] : [],
-    allowDecimal: Boolean(f.allowDecimal),
-    placeholder: f.placeholder || `请填写${f.name}`,
-    sortOrder: f.sortOrder ?? 20 + idx,
-    defaultValue: f.defaultValue ?? '',
-  }))
+  const extras = (extraFields || []).map((f, idx) => {
+    const standard = pickFieldStandardProps(f)
+    const complex = pickComplexFieldProps(f)
+    const row = {
+      code: f.code,
+      name: f.name,
+      type: f.type || 'text',
+      required: f.required !== false,
+      options: f.options ? [...f.options] : [],
+      allowDecimal: Boolean(f.allowDecimal),
+      placeholder: f.placeholder || `请填写${f.name}`,
+      sortOrder: f.sortOrder ?? 20 + idx,
+      defaultValue: f.defaultValue ?? '',
+      ...standard,
+      ...complex,
+      passOptions: Array.isArray(f.passOptions) ? [...f.passOptions] : standard.passOptions,
+      standardText: f.standardText || '',
+    }
+    if (!row.standardText) {
+      row.standardText =
+        row.type === 'composite'
+          ? '含子项分别判定'
+          : row.type === 'matrix'
+            ? '多点测点录入'
+            : buildStandardText(row)
+    }
+    return row
+  })
   // 插在结论字段前
   const withoutConclusion = base.filter((f) => !f.isConclusion && !f.isPresetConclusion)
   const conclusion = base.find((f) => f.isConclusion || f.isPresetConclusion)
@@ -162,6 +190,12 @@ export const mockQcTemplates = [
         type: 'number',
         required: true,
         allowDecimal: true,
+        withUnit: true,
+        unit: 'HRC',
+        unitPosition: QC_UNIT_POSITION.SUFFIX,
+        judgeRule: QC_FIELD_JUDGE_RULE.RANGE,
+        standardMin: 58,
+        standardMax: 62,
         sortOrder: 10,
       },
       {
@@ -170,7 +204,62 @@ export const mockQcTemplates = [
         type: 'radio',
         required: true,
         options: ['完好', '划伤', '破损'],
+        judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
+        passOptions: ['完好'],
         sortOrder: 11,
+      },
+      {
+        code: 'QC_RUN_TEST',
+        name: '出厂试验-运转',
+        type: 'composite',
+        required: true,
+        sortOrder: 12,
+        children: [
+          {
+            code: 'bearing_temp',
+            name: '轴承温升（滚动）',
+            type: 'number',
+            withUnit: true,
+            unit: '°C',
+            unitPosition: 'suffix',
+            judgeRule: QC_FIELD_JUDGE_RULE.RANGE,
+            standardMax: 80,
+            allowDecimal: true,
+          },
+          {
+            code: 'seal_leak',
+            name: '机封泄漏',
+            type: 'number',
+            withUnit: true,
+            unit: 'ml/h',
+            unitPosition: 'suffix',
+            judgeRule: QC_FIELD_JUDGE_RULE.RANGE,
+            standardMax: 5,
+            allowDecimal: true,
+          },
+          {
+            code: 'surface_state',
+            name: '表面状态',
+            type: 'radio',
+            options: ['完好', '轻微划伤', '破损'],
+            judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
+            passOptions: ['完好'],
+          },
+          {
+            code: 'batch_mark',
+            name: '批次标识',
+            type: 'text',
+            judgeRule: QC_FIELD_JUDGE_RULE.EQUALS,
+            standardValue: 'A1',
+          },
+          {
+            code: 'remark',
+            name: '备注说明',
+            type: 'textarea',
+            required: false,
+            judgeRule: QC_FIELD_JUDGE_RULE.MANUAL,
+          },
+        ],
       },
     ])
     return createQcTemplate({
@@ -200,6 +289,8 @@ export const mockQcTemplates = [
           type: 'radio',
           required: true,
           options: ['无异响', '有异响'],
+          judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
+          passOptions: ['无异响'],
           sortOrder: 10,
         },
         {
@@ -208,6 +299,12 @@ export const mockQcTemplates = [
           type: 'number',
           required: true,
           allowDecimal: true,
+          withUnit: true,
+          unit: 'mm',
+          unitPosition: QC_UNIT_POSITION.SUFFIX,
+          judgeRule: QC_FIELD_JUDGE_RULE.RANGE,
+          standardMin: 0.01,
+          standardMax: 0.03,
           sortOrder: 11,
         },
       ],
@@ -242,6 +339,12 @@ export function cloneQcTemplates() {
             options: f.options ? [...f.options] : [],
             optionItems: f.optionItems ? f.optionItems.map((o) => ({ ...o })) : undefined,
             optionResults: f.optionResults ? { ...f.optionResults } : undefined,
+            children: Array.isArray(f.children) ? f.children.map((c) => ({ ...c })) : [],
+            matrixColumns: Array.isArray(f.matrixColumns)
+              ? f.matrixColumns.map((c) => ({ ...c }))
+              : [],
+            matrixRows: Array.isArray(f.matrixRows) ? f.matrixRows.map((r) => ({ ...r })) : [],
+            matrixAllowAddRow: f.matrixAllowAddRow,
           }))
         : [],
     )
@@ -258,6 +361,13 @@ export function filterQcTemplates(list = [], filters = {}) {
   return (list || []).filter((row) => {
     if (filters.status && row.status !== filters.status) return false
     if (filters.type && row.type !== filters.type) return false
+    if (filters.bizScope) {
+      const scope = String(filters.bizScope).trim()
+      const isUniversal =
+        row.isSystem && (row.isUniversal || row.bizScope === '通用' || row.code === 'QCT-SYS-001')
+      if (!isUniversal && row.bizScope !== scope) return false
+    }
+    if (filters.scopeType && row.scopeType !== filters.scopeType) return false
     if (filters.code && !(row.code || '').includes(String(filters.code).trim())) return false
     if (filters.name && !(row.name || '').includes(String(filters.name).trim())) return false
     if (filters.creator && !(row.creator || '').includes(String(filters.creator).trim())) {
@@ -273,6 +383,43 @@ export function filterQcTemplates(list = [], filters = {}) {
     }
     return true
   })
+}
+
+function scopeSortRank(scopeType) {
+  if (scopeType === QC_TEMPLATE_SCOPE_TYPE.SINGLE) return 3
+  if (scopeType === QC_TEMPLATE_SCOPE_TYPE.CATEGORY) return 2
+  if (scopeType === QC_TEMPLATE_SCOPE_TYPE.GLOBAL) return 1
+  return 0
+}
+
+/** 生效视图排序：业务类型 → 适用范围（单产品>类别>全局）→ 更新时间倒序 */
+export function sortQcTemplatesForBrowse(list = []) {
+  return (list || []).slice().sort((a, b) => {
+    const bizA = String(a.isUniversal || a.bizScope === '通用' ? '通用' : a.bizScope || '')
+    const bizB = String(b.isUniversal || b.bizScope === '通用' ? '通用' : b.bizScope || '')
+    if (bizA !== bizB) return bizA.localeCompare(bizB, 'zh-CN')
+    const scopeDiff = scopeSortRank(b.scopeType) - scopeSortRank(a.scopeType)
+    if (scopeDiff !== 0) return scopeDiff
+    return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+  })
+}
+
+/** 列表展示适用对象摘要 */
+export function formatQcTemplateObjects(template = {}) {
+  if (template.isUniversal || template.bizScope === '通用' || template.code === 'QCT-SYS-001') {
+    return '全业务兜底'
+  }
+  const scopeType = template.scopeType || QC_TEMPLATE_SCOPE_TYPE.GLOBAL
+  if (scopeType === QC_TEMPLATE_SCOPE_TYPE.GLOBAL) return '全部'
+  const objects = Array.isArray(template.objects) ? template.objects : []
+  if (!objects.length) return '—'
+  const labels = objects
+    .map((o) => o.label || o.code || o.value || o.name)
+    .map((s) => String(s || '').trim())
+    .filter(Boolean)
+  if (!labels.length) return '—'
+  if (labels.length <= 2) return labels.join('、')
+  return `${labels.slice(0, 2).join('、')} 等${labels.length}项`
 }
 
 export function nextQcTemplateCode(list = []) {

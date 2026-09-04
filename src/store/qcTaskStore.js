@@ -7,6 +7,7 @@ import {
   ensureFieldsWithSystemFixedItems,
   resolveQcResultFromFieldValues,
 } from '@/utils/qcConclusionField'
+import { normalizeSheetPassRule } from '@/utils/qcTemplateSheetPass'
 import { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS } from '@/constants/qcTaskResult'
 import { cloneMockIncomingQcTasks } from '@/mock/qcTasks'
 
@@ -15,7 +16,7 @@ export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 const STORAGE_KEY = 'i_doms_qc_tasks'
 const STORAGE_VERSION = 2
 const SEED_VERSION_KEY = 'i_doms_qc_tasks_seed_v'
-const CURRENT_SEED_VERSION = '3'
+const CURRENT_SEED_VERSION = '7'
 
 export const QC_TASK_STATUS = {
   PENDING: '待质检',
@@ -105,6 +106,7 @@ export function createQcTaskLineItem(partial = {}) {
     templateName: partial.templateName || '',
     templateMatchSource: partial.templateMatchSource || '',
     ...partial,
+    sheetPassRule: normalizeSheetPassRule(partial.sheetPassRule),
     templateFields: Array.isArray(partial.templateFields)
       ? cloneTemplateFieldsSnapshot(partial.templateFields)
       : templateFields,
@@ -118,6 +120,11 @@ export function cloneTemplateFieldsSnapshot(fields = []) {
     options: f.options ? [...f.options] : [],
     optionItems: f.optionItems ? f.optionItems.map((o) => ({ ...o })) : undefined,
     optionResults: f.optionResults ? { ...f.optionResults } : undefined,
+    children: Array.isArray(f.children) ? f.children.map((c) => ({ ...c })) : [],
+    matrixColumns: Array.isArray(f.matrixColumns) ? f.matrixColumns.map((c) => ({ ...c })) : [],
+    matrixRows: Array.isArray(f.matrixRows) ? f.matrixRows.map((r) => ({ ...r })) : [],
+    matrixAllowAddRow: f.matrixAllowAddRow,
+    keyForSheetPass: Boolean(f.keyForSheetPass),
   }))
 }
 
@@ -141,6 +148,7 @@ export function bindQcLineTemplate(linePartial = {}, { bizScope, categoryCode, c
     templateName: template.name,
     templateMatchSource: matched.matchSource,
     templateFields: cloneTemplateFieldsSnapshot(template.fields),
+    sheetPassRule: normalizeSheetPassRule(template.sheetPassRule),
     inspectMethod:
       linePartial.inspectMethod || resolveInspectMethodFromTemplate(template) || '抽检',
   })

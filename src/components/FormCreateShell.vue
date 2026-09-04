@@ -1,18 +1,20 @@
 <template>
   <div v-if="pageMode" class="form-create-page">
-    <div class="page-header">
-      <div class="header-left">
-        <a-button type="text" size="small" class="back-btn" @click="$emit('cancel')">
-          <ArrowLeftOutlined />
-        </a-button>
-        <span class="page-title">{{ title }}</span>
+    <div class="form-create-inner" :style="innerStyle">
+      <div class="page-header">
+        <div class="header-left">
+          <a-button type="text" size="small" class="back-btn" @click="$emit('cancel')">
+            <ArrowLeftOutlined />
+          </a-button>
+          <span class="page-title">{{ title }}</span>
+        </div>
+        <div v-if="$slots.footer" class="header-actions">
+          <slot name="footer" />
+        </div>
       </div>
-      <div v-if="$slots.footer" class="header-actions">
-        <slot name="footer" />
+      <div class="form-body">
+        <slot />
       </div>
-    </div>
-    <div class="form-body">
-      <slot />
     </div>
   </div>
   <a-modal
@@ -35,18 +37,29 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 
-defineProps({
+const props = defineProps({
   pageMode: { type: Boolean, default: false },
   open: { type: Boolean, default: false },
   title: { type: String, default: '' },
   width: { type: [String, Number], default: '720px' },
+  /** 页面模式左右内边距，默认 12 */
+  pageSidePadding: { type: [String, Number], default: 12 },
   maskClosable: { type: Boolean, default: false },
   destroyOnClose: { type: Boolean, default: true },
 })
 
 defineEmits(['cancel', 'update:open'])
+
+const innerStyle = computed(() => {
+  const pad =
+    typeof props.pageSidePadding === 'number'
+      ? `${props.pageSidePadding}px`
+      : String(props.pageSidePadding)
+  return { paddingLeft: pad, paddingRight: pad }
+})
 </script>
 
 <style lang="less" scoped>
@@ -57,13 +70,22 @@ defineEmits(['cancel', 'update:open'])
   min-height: calc(100vh - 112px);
 }
 
+/* 全宽大盒子：标题栏与下方分区白盒同宽 */
+.form-create-inner {
+  width: 100%;
+  margin: 12px 0 0;
+  box-sizing: border-box;
+}
+
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
   background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 12px;
   position: sticky;
   top: 0;
   z-index: 30;
@@ -103,7 +125,7 @@ defineEmits(['cancel', 'update:open'])
 }
 
 .form-body {
-  padding: 12px;
+  padding: 0;
 
   :deep(.section-block) {
     background: #fff;

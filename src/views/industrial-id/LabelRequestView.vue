@@ -597,6 +597,13 @@ export default {
 
       // --- 流水号 ---
       serialCounter: 5,
+
+      newAppForm: {
+        remark: '',
+        products: [
+          { productName: '', batchNo: '', quantity: 1, showDropdown: false, searchResults: [] },
+        ],
+      },
     }
   },
 
@@ -635,7 +642,10 @@ export default {
     },
 
     totalApplyCount() {
-      return this.newAppForm.products.reduce((sum, p) => sum + (parseInt(p.quantity) || 0), 0)
+      return (this.newAppForm?.products || []).reduce(
+        (sum, p) => sum + (parseInt(p.quantity) || 0),
+        0,
+      )
     },
 
     exportDateStr() {
@@ -940,8 +950,10 @@ export default {
 
     // --- 全局点击关闭下拉 ---
     handleGlobalClick(e) {
+      const products = this.newAppForm?.products
+      if (!products?.length) return
       if (!e.target.closest('.product-search-cell')) {
-        this.newAppForm.products.forEach((p) => {
+        products.forEach((p) => {
           p.showDropdown = false
         })
       }

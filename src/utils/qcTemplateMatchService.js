@@ -155,3 +155,96 @@ export function matchQcTemplate({
     matchSource: 'builtin',
   }
 }
+
+export const QC_TEMPLATE_MATCH_SOURCE_LABELS = {
+  explicit: '指定模板编码',
+  single: '单产品',
+  category: '产品类别',
+  global: '全局自定义',
+  system: '系统通用模板',
+  builtin: '内置兜底',
+}
+
+function sortCandidates(list = []) {
+  return (list || []).slice().sort((a, b) => {
+    const scopeDiff = scopeRank(b.scopeType) - scopeRank(a.scopeType)
+    if (scopeDiff !== 0) return scopeDiff
+    return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+  })
+}
+
+/**
+ * 匹配试算：返回生效模板 + 各优先级层候选（便于理解「为什么是这份」）
+ */
+export function probeQcTemplateMatch(params = {}) {
+  const result = matchQcTemplate(params)
+  if (!result.ok) return { ...result, layers: [], priorityTip: '' }
+
+  const { bizScope, itemCode, categoryCode, categoryKey } = params
+  const target = { itemCode, categoryCode, categoryKey }
+  const enabledCustom = qcTemplateState.templates.filter(
+    (t) => !t.isSystem && t.bizScope === bizScope && isTemplateEnabled(t),
+  )
+
+  const singleHits = sortCandidates(
+    enabledCustom.filter(
+      (t) => t.scopeType === QC_TEMPLATE_SCOPE_TYPE.SINGLE && templateMatchesTarget(t, target),
+    ),
+  )
+  const categoryHits = sortCandidates(
+    enabledCustom.filter(
+      (t) => t.scopeType === QC_TEMPLATE_SCOPE_TYPE.CATEGORY && templateMatchesTarget(t, target),
+    ),
+  )
+  const globalHits = sortCandidates(
+    enabledCustom.filter((t) => t.scopeType === QC_TEMPLATE_SCOPE_TYPE.GLOBAL),
+  )
+  const system = getSystemQcTemplate()
+
+  const winnerId = result.template?.id
+  const layers = [
+    {
+      key: 'single',
+      label: '单产品',
+      priority: 1,
+      items: singleHits,
+    },
+    {
+      key: 'category',
+      label: '产品类别',
+      priority: 2,
+      items: categoryHits,
+    },
+    {
+      key: 'global',
+      label: '全局自定义',
+      priority: 3,
+      items: globalHits,
+    },
+    {
+      key: 'system',
+      label: '系统通用',
+      priority: 4,
+      items: system ? [system] : [],
+    },
+  ].map((layer) => ({
+    ...layer,
+    items: (layer.items || []).map((t) => ({
+      id: t.id,
+      code: t.code,
+      name: t.name,
+      scopeType: t.scopeType,
+      status: t.status,
+      updatedAt: t.updatedAt,
+      isWinner:
+        t.id === winnerId || (result.matchSource === layer.key && t.code === result.template?.code),
+    })),
+  }))
+
+  return {
+    ...result,
+    matchSourceLabel: QC_TEMPLATE_MATCH_SOURCE_LABELS[result.matchSource] || result.matchSource,
+    priorityTip: '优先级：单产品 > 产品类别 > 全局自定义 > 系统通用模板',
+    layers,
+  }
+}

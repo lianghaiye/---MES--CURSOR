@@ -93,47 +93,101 @@
 
             <template #expandedRowRender="{ record }">
               <div v-if="extraFields(record).length" class="expand-form-wrap">
-                <a-form layout="inline" class="horizontal-form expand-form">
-                  <a-row :gutter="[12, 12]" style="width: 100%">
-                    <a-col
-                      v-for="field in extraFields(record)"
-                      :key="field.code"
-                      :span="field.type === 'textarea' ? 24 : 6"
+                <div class="inspect-fields-grid">
+                  <template v-for="field in extraFields(record)" :key="field.code">
+                    <QcInspectComplexField
+                      v-if="isComplexField(field)"
+                      :field="field"
+                      v-model="record.fieldMap[field.code]"
+                      @change="onFieldChange(record, field)"
+                    />
+                    <div
+                      v-else
+                      class="inspect-field-card"
+                      :class="{
+                        'is-pass': judgeHint(record, field) === 'pass',
+                        'is-fail': judgeHint(record, field) === 'fail',
+                      }"
                     >
-                      <a-form-item :label="field.name" :required="field.required !== false">
+                      <div class="inspect-field-head">
+                        <div class="inspect-field-title">
+                          <span v-if="field.required !== false" class="req">*</span>
+                          {{ field.name }}
+                        </div>
+                        <a-tag
+                          v-if="judgeHint(record, field) === 'pass'"
+                          color="success"
+                          class="judge-tag"
+                        >
+                          达标
+                        </a-tag>
+                        <a-tag
+                          v-else-if="judgeHint(record, field) === 'fail'"
+                          color="error"
+                          class="judge-tag"
+                        >
+                          未达标
+                        </a-tag>
+                      </div>
+                      <div class="inspect-field-standard">
+                        <template v-if="standardHint(field)">
+                          合格标准：{{ standardHint(field) }}
+                        </template>
+                        <template v-else>合格标准：未设置（仅记录实测值）</template>
+                      </div>
+                      <div class="field-input-wrap">
+                        <span v-if="unitPrefix(field)" class="unit-affix">{{
+                          unitPrefix(field)
+                        }}</span>
                         <a-select
                           v-if="isSelectLike(field)"
-                          v-model:value="record.fieldMap[field.code]"
+                          :value="getMeasuredValue(record, field)"
                           size="small"
                           allow-clear
                           :placeholder="field.placeholder || `请选择${field.name}`"
                           :options="fieldOptions(field)"
-                          style="width: 100%"
-                          @change="onFieldChange(record, field)"
+                          style="flex: 1; min-width: 0"
+                          @update:value="(v) => setMeasuredValue(record, field, v)"
                         />
                         <a-input-number
                           v-else-if="field.type === 'number'"
-                          v-model:value="record.fieldMap[field.code]"
+                          :value="getMeasuredValue(record, field)"
                           size="small"
                           :min="0"
-                          style="width: 100%"
+                          style="flex: 1; min-width: 0"
                           :formatter="qtyFormatter"
                           :parser="qtyParser"
                           :placeholder="field.placeholder || `请输入${field.name}`"
-                          @change="onFieldChange(record, field)"
+                          @update:value="(v) => setMeasuredValue(record, field, v)"
                         />
                         <a-input
                           v-else
-                          v-model:value="record.fieldMap[field.code]"
+                          :value="getMeasuredValue(record, field)"
                           size="small"
                           allow-clear
+                          style="flex: 1; min-width: 0"
                           :placeholder="field.placeholder || `请输入${field.name}`"
-                          @change="onFieldChange(record, field)"
+                          @update:value="(v) => setMeasuredValue(record, field, v)"
                         />
-                      </a-form-item>
-                    </a-col>
-                  </a-row>
-                </a-form>
+                        <span v-if="unitSuffix(field)" class="unit-affix">{{
+                          unitSuffix(field)
+                        }}</span>
+                      </div>
+                      <div v-if="isManualJudgeField(field)" class="manual-judgment-row">
+                        <span class="manual-label"><span class="req">*</span>本项结论</span>
+                        <a-select
+                          :value="getManualJudgment(record, field)"
+                          size="small"
+                          allow-clear
+                          placeholder="请选择"
+                          :options="listManualJudgmentSelectOptions(field)"
+                          style="flex: 1; min-width: 0"
+                          @update:value="(v) => setManualJudgment(record, field, v)"
+                        />
+                      </div>
+                    </div>
+                  </template>
+                </div>
               </div>
               <span v-else class="muted">该行无额外检验项</span>
             </template>
@@ -203,7 +257,7 @@ export default { name: 'QcTaskInspectView' }
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
 import {
   QC_CONCLUSION_CONCESSION_OPTION,
   QC_CONCLUSION_FAIL_OPTION,
@@ -221,6 +275,35 @@ import {
 } from '@/store/qcTaskStore'
 import { formatQty } from '@/utils/numberFormat'
 import { useTabs, tabStore } from '@/composables/useTabs'
+import {
+  QC_UNIT_POSITION,
+  buildStandardText,
+  evaluateFieldAgainstStandard,
+  isManualJudgeField,
+  isManualJudgmentMissing,
+  listManualJudgmentSelectOptions,
+  normalizeUnitPosition,
+  parseManualFieldValue,
+  pickFieldStandardProps,
+  wrapManualFieldValue,
+} from '@/utils/qcFieldStandard'
+import {
+  collectAllFailingStandardHints,
+  evaluateComplexOrSimpleField,
+  isComplexField,
+  isComplexValueEmpty,
+  normalizeComplexValue,
+} from '@/utils/qcComplexField'
+import {
+  QC_TEMPLATE_SHEET_PASS_RULE,
+  normalizeSheetPassRule,
+  sheetPassRuleLabel,
+  validateLineSheetPassRule,
+} from '@/utils/qcTemplateSheetPass'
+import { getQcLibraryFieldByCode, ensureQcLibraryDemoSeed } from '@/store/qcFieldLibraryStore'
+import { getQcTemplateByCode, ensureQcTemplateDemoSeed } from '@/store/qcTemplateStore'
+import { cloneTemplateFieldsSnapshot } from '@/store/qcTaskStore'
+import QcInspectComplexField from './components/QcInspectComplexField.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -265,6 +348,8 @@ const templateSummary = computed(() => {
 })
 
 function loadPage() {
+  ensureQcLibraryDemoSeed()
+  ensureQcTemplateDemoSeed()
   const id = route.params.id
   loading.value = true
   const row = getQcTaskById(id)
@@ -294,8 +379,26 @@ function loadPage() {
 watch(() => route.params.id, loadPage, { immediate: true })
 
 function resolveLineFields(line, t) {
-  if (Array.isArray(line.templateFields) && line.templateFields.length) return line.templateFields
-  return t?.templateFields || []
+  const frozen =
+    Array.isArray(line.templateFields) && line.templateFields.length
+      ? line.templateFields
+      : t?.templateFields || []
+  const hasComplex = (frozen || []).some(
+    (f) => f.type === 'composite' || f.type === 'matrix' || f.code === 'QC_RUN_TEST',
+  )
+  if (hasComplex) return frozen
+  const live = getQcTemplateByCode(line.templateCode || t?.templateCode)
+  if (live?.fields?.length) {
+    return cloneTemplateFieldsSnapshot(live.fields)
+  }
+  return frozen
+}
+
+function resolveLineSheetPassRule(line, t) {
+  if (line?.sheetPassRule) return normalizeSheetPassRule(line.sheetPassRule)
+  const live = getQcTemplateByCode(line?.templateCode || t?.templateCode)
+  if (live?.sheetPassRule) return normalizeSheetPassRule(live.sheetPassRule)
+  return QC_TEMPLATE_SHEET_PASS_RULE.MANUAL
 }
 
 function hydrateLineDraft(line, t) {
@@ -307,6 +410,30 @@ function hydrateLineDraft(line, t) {
   })
 
   fields.forEach((f) => {
+    if (isComplexField(f)) {
+      fieldMap[f.code] = normalizeComplexValue(f, fieldMap[f.code])
+      return
+    }
+    if (isManualJudgeField(f)) {
+      const existing = fieldMap[f.code]
+      const defJudgment =
+        listManualJudgmentSelectOptions(f).find((o) => {
+          const items = f.manualOptionItems || []
+          return items.some((it) => it.value === o.value && it.isDefault)
+        })?.value ||
+        (f.manualOptionItems || []).find((o) => o.isDefault)?.value ||
+        ''
+      if (existing !== undefined && existing !== null && existing !== '') {
+        const parsed = parseManualFieldValue(existing)
+        if (!parsed.judgment && defJudgment) {
+          fieldMap[f.code] = wrapManualFieldValue(parsed.measured, defJudgment)
+        }
+        return
+      }
+      const measured = f.defaultValue !== '' && f.defaultValue != null ? f.defaultValue : ''
+      fieldMap[f.code] = wrapManualFieldValue(measured, defJudgment)
+      return
+    }
     if (fieldMap[f.code] !== undefined && fieldMap[f.code] !== null && fieldMap[f.code] !== '') {
       return
     }
@@ -334,6 +461,9 @@ function hydrateLineDraft(line, t) {
       ...f,
       options: f.options ? [...f.options] : [],
       optionItems: f.optionItems ? f.optionItems.map((o) => ({ ...o })) : undefined,
+      children: Array.isArray(f.children) ? f.children.map((c) => ({ ...c })) : [],
+      matrixColumns: Array.isArray(f.matrixColumns) ? f.matrixColumns.map((c) => ({ ...c })) : [],
+      matrixRows: Array.isArray(f.matrixRows) ? f.matrixRows.map((r) => ({ ...r })) : [],
     })),
     inspectMethod: fieldMap.QC_INSPECT_METHOD || line.inspectMethod || '抽检',
     inspectQty: Number(fieldMap.QC_INSPECT_QTY ?? line.inspectQty ?? line.receiptQty ?? 0),
@@ -349,9 +479,40 @@ function conclusionCode(line) {
 
 /** 表格外展开的专属检验项（排除方式/数量/结论） */
 function extraFields(line) {
-  return resolveLineFields(line, task.value).filter(
-    (f) => f.code !== 'QC_INSPECT_METHOD' && f.code !== 'QC_INSPECT_QTY' && !isQcConclusionField(f),
-  )
+  return resolveLineFields(line, task.value)
+    .filter(
+      (f) =>
+        f.code !== 'QC_INSPECT_METHOD' && f.code !== 'QC_INSPECT_QTY' && !isQcConclusionField(f),
+    )
+    .map((f) => enrichInspectField(f))
+}
+
+/** 补齐单位/合格标准：优先用行内冻结模板，缺省时回落检验项库 */
+function enrichInspectField(field = {}) {
+  const hasStandard =
+    Boolean(field.judgeRule && field.judgeRule !== 'none') ||
+    Boolean(buildStandardText(field)) ||
+    Boolean(field.withUnit || field.unit)
+  if (hasStandard) {
+    const standard = pickFieldStandardProps(field)
+    return {
+      ...field,
+      ...standard,
+      standardText: field.standardText || buildStandardText({ ...field, ...standard }),
+    }
+  }
+  const lib = getQcLibraryFieldByCode(field.code)
+  if (!lib) return { ...field, ...pickFieldStandardProps(field) }
+  const standard = pickFieldStandardProps({ ...lib, ...field })
+  return {
+    ...field,
+    ...standard,
+    options: field.options?.length ? field.options : lib.options ? [...lib.options] : [],
+    standardText:
+      field.standardText ||
+      lib.standardText ||
+      buildStandardText({ ...lib, ...field, ...standard }),
+  }
 }
 
 function methodOptsFor(line) {
@@ -381,6 +542,61 @@ function fieldOptions(field) {
   return (field.options || []).map((v) =>
     typeof v === 'string' ? { label: v, value: v } : { label: v.label || v.value, value: v.value },
   )
+}
+
+function getMeasuredValue(line, field) {
+  if (isManualJudgeField(field)) {
+    return parseManualFieldValue(line.fieldMap?.[field.code]).measured
+  }
+  return line.fieldMap?.[field.code]
+}
+
+function setMeasuredValue(line, field, v) {
+  if (isManualJudgeField(field)) {
+    const prev = parseManualFieldValue(line.fieldMap?.[field.code])
+    line.fieldMap[field.code] = wrapManualFieldValue(v, prev.judgment)
+  } else {
+    line.fieldMap[field.code] = v
+  }
+  onFieldChange(line, field)
+}
+
+function getManualJudgment(line, field) {
+  return parseManualFieldValue(line.fieldMap?.[field.code]).judgment || undefined
+}
+
+function setManualJudgment(line, field, v) {
+  const prev = parseManualFieldValue(line.fieldMap?.[field.code])
+  line.fieldMap[field.code] = wrapManualFieldValue(prev.measured, v)
+  onFieldChange(line, field)
+}
+
+function unitText(field) {
+  if (!field?.withUnit && !field?.unit) return ''
+  return String(field.unit || '').trim()
+}
+
+function unitPrefix(field) {
+  const unit = unitText(field)
+  if (!unit) return ''
+  return normalizeUnitPosition(field.unitPosition) === QC_UNIT_POSITION.PREFIX ? unit : ''
+}
+
+function unitSuffix(field) {
+  const unit = unitText(field)
+  if (!unit) return ''
+  return normalizeUnitPosition(field.unitPosition) === QC_UNIT_POSITION.SUFFIX ? unit : ''
+}
+
+function standardHint(field) {
+  return buildStandardText(field)
+}
+
+function judgeHint(line, field) {
+  if (isComplexField(field)) {
+    return evaluateComplexOrSimpleField(field, line?.fieldMap?.[field.code])
+  }
+  return evaluateFieldAgainstStandard(field, line?.fieldMap?.[field.code])
 }
 
 function getConclusionValue(line) {
@@ -444,7 +660,11 @@ function buildFieldValues(line) {
       fieldName: f.name,
       value: line.fieldMap?.[f.code],
     }))
-    .filter((v) => v.value !== undefined && v.value !== null && String(v.value).trim() !== '')
+    .filter((v) => {
+      if (v.value === undefined || v.value === null) return false
+      if (typeof v.value === 'object') return true
+      return String(v.value).trim() !== ''
+    })
 }
 
 function handleCancel() {
@@ -470,8 +690,38 @@ async function handleOk() {
       return
     }
     for (const field of fields) {
-      if (field.required === false) continue
+      if (field.required === false && !isManualJudgeField(field)) continue
       const val = line.fieldMap?.[field.code]
+      if (isComplexField(field)) {
+        if (field.required === false) continue
+        if (isComplexValueEmpty(field, val)) {
+          message.warning(
+            `请填写「${line.itemName || line.itemCode}」的${field.name || field.code}`,
+          )
+          return
+        }
+        continue
+      }
+      if (isManualJudgeField(field)) {
+        const { measured } = parseManualFieldValue(val)
+        if (
+          field.required !== false &&
+          (measured === undefined || measured === null || String(measured).trim() === '')
+        ) {
+          message.warning(
+            `请填写「${line.itemName || line.itemCode}」的${field.name || field.code}`,
+          )
+          return
+        }
+        if (isManualJudgmentMissing(val)) {
+          message.warning(
+            `请为「${line.itemName || line.itemCode}」的${field.name || field.code}选择本项结论`,
+          )
+          return
+        }
+        continue
+      }
+      if (field.required === false) continue
       if (val === undefined || val === null || String(val).trim() === '') {
         message.warning(`请填写「${line.itemName || line.itemCode}」的${field.name || field.code}`)
         return
@@ -482,8 +732,40 @@ async function handleOk() {
       message.warning(`请为「${line.itemName || line.itemCode}」选择处理方案`)
       return
     }
+
+    const sheetRule = resolveLineSheetPassRule(line, task.value)
+    const check = validateLineSheetPassRule(line, fields, sheetRule)
+    if (!check.ok) {
+      message.warning(check.message || '未满足模板整单合格规则')
+      return
+    }
   }
 
+  const failHints = collectAllFailingStandardHints(form.lineItems, (line) => extraFields(line))
+  if (failHints.length) {
+    const hasHardRule = form.lineItems.some((line) => {
+      const rule = resolveLineSheetPassRule(line, task.value)
+      return rule !== QC_TEMPLATE_SHEET_PASS_RULE.MANUAL
+    })
+    // 强制规则已在上方拦截「通过」；此处仅对「仍人工判定」做软提示
+    if (!hasHardRule) {
+      const preview = failHints.slice(0, 5).join('；')
+      const more = failHints.length > 5 ? `等共 ${failHints.length} 项` : ''
+      Modal.confirm({
+        title: '存在未达标检验项',
+        content: `以下检验项未达标准：${preview}${more}。模板规则为「${sheetPassRuleLabel(QC_TEMPLATE_SHEET_PASS_RULE.MANUAL)}」，整单结论仍以「质检结果」为准，是否继续提交？`,
+        okText: '继续提交',
+        cancelText: '返回修改',
+        onOk: () => doSubmit(),
+      })
+      return
+    }
+  }
+
+  await doSubmit()
+}
+
+async function doSubmit() {
   saving.value = true
   try {
     const lineItems = form.lineItems.map((line) => ({
@@ -492,6 +774,7 @@ async function handleOk() {
       inspectQty: line.fieldMap?.QC_INSPECT_QTY ?? line.inspectQty,
       fieldValues: buildFieldValues(line),
       treatmentPlan: line.treatmentPlan || '',
+      sheetPassRule: resolveLineSheetPassRule(line, task.value),
       fieldMap: undefined,
     }))
     const res = submitQcTaskInspection(task.value.id, {
@@ -588,8 +871,94 @@ async function handleOk() {
 }
 
 .expand-form-wrap {
-  padding: 8px 12px 4px;
-  background: #fafafa;
+  padding: 10px 12px;
+  background: #f7f8fa;
+}
+
+.inspect-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.inspect-field-card {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+}
+
+.inspect-field-card.is-pass {
+  border-color: #b7eb8f;
+  background: #f6ffed;
+}
+
+.inspect-field-card.is-fail {
+  border-color: #ffa39e;
+  background: #fff2f0;
+}
+
+.inspect-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.inspect-field-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  line-height: 22px;
+}
+
+.inspect-field-title .req {
+  margin-right: 2px;
+  color: #ff4d4f;
+}
+
+.inspect-field-standard {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
+}
+
+.field-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.manual-judgment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.manual-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+}
+
+.manual-label .req {
+  margin-right: 2px;
+  color: #ff4d4f;
+}
+
+.unit-affix {
+  flex-shrink: 0;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.judge-tag {
+  margin: 0;
 }
 
 .muted {

@@ -618,6 +618,12 @@ const routes = [
         meta: { title: '报废品详情' },
       },
       {
+        path: 'quality/qc-field-library',
+        name: 'quality-qc-field-library',
+        component: () => import('@/views/quality/QcFieldLibraryView.vue'),
+        meta: { title: '检验项库' },
+      },
+      {
         path: 'quality/qc-template',
         name: 'quality-qc-template',
         component: () => import('@/views/quality/QcTemplateView.vue'),
@@ -1000,7 +1006,7 @@ const routes = [
       },
       {
         path: 'industrial-id',
-        redirect: '/industrial-id/base-config/enterprise-info',
+        redirect: '/industrial-id/label-request',
       },
       {
         path: 'industrial-id/base-config/enterprise-info',
@@ -1016,7 +1022,7 @@ const routes = [
         path: 'industrial-id/base-config/nameplate-template',
         name: 'industrial-id-nameplate-template',
         component: () => import('@/views/industrial-id/NameplateTemplateView.vue'),
-        meta: { title: '配置铭牌模板' },
+        meta: { title: '产品信息模板' },
       },
       {
         path: 'industrial-id/label-request',

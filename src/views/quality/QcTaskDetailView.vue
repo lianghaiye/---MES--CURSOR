@@ -71,7 +71,29 @@
             bordered
             :pagination="false"
             :scroll="{ x: 1100 }"
+            v-model:expandedRowKeys="expandedKeys"
           >
+            <template #expandIcon="{ expanded, onExpand: onExp, record }">
+              <a-button type="link" size="small" @click="(e) => onExp(record, e)">
+                {{ expanded ? '收起检验项' : '展开检验项' }}
+              </a-button>
+            </template>
+            <template #expandedRowRender="{ record }">
+              <div class="expand-form-wrap">
+                <a-alert
+                  v-if="canInspect && !hasEnteredValues(record)"
+                  type="info"
+                  show-icon
+                  class="enter-tip"
+                  message="尚未录入实测值。点击右上角「质检」进入录入页，可填写普通项 / 复合子项 / 多点测点。"
+                />
+                <QcLineFieldValuesReadonly
+                  :line="record"
+                  :task="task"
+                  empty-text="该行模板暂无自定义检验项"
+                />
+              </div>
+            </template>
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'index'">{{ index + 1 }}</template>
               <template v-else-if="column.key === 'receiptQty'">
@@ -103,7 +125,7 @@ export default { name: 'QcTaskDetailView' }
 </script>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   QC_TASK_RESULT,
@@ -112,15 +134,24 @@ import {
   getQcTaskById,
   qcTaskState,
 } from '@/store/qcTaskStore'
+import { ensureQcTemplateDemoSeed } from '@/store/qcTemplateStore'
+import { ensureQcLibraryDemoSeed } from '@/store/qcFieldLibraryStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { formatQty } from '@/utils/numberFormat'
+import QcLineFieldValuesReadonly from './components/QcLineFieldValuesReadonly.vue'
+
+onMounted(() => {
+  ensureQcLibraryDemoSeed()
+  ensureQcTemplateDemoSeed()
+})
 
 const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 const loading = ref(false)
 const task = ref(null)
+const expandedKeys = ref([])
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 52, align: 'center' },
@@ -138,6 +169,19 @@ const lineColumns = [
 ]
 
 const canInspect = computed(() => canInspectQcTask(task.value))
+
+function hasEnteredValues(line) {
+  const values = line?.fieldValues || []
+  if (!values.length) return false
+  return values.some((v) => {
+    const code = v.fieldCode || v.code
+    if (!code || code === 'QC_INSPECT_METHOD' || code === 'QC_INSPECT_QTY') return false
+    const val = v.value ?? v.fieldValue
+    if (val === undefined || val === null) return false
+    if (typeof val === 'object') return true
+    return String(val).trim() !== ''
+  })
+}
 
 function loadTask() {
   const id = route.params.id
@@ -221,5 +265,14 @@ function openInspect() {
   margin-bottom: 10px;
   font-size: 14px;
   font-weight: 600;
+}
+
+.expand-form-wrap {
+  padding: 8px 12px 4px;
+  background: #fafafa;
+}
+
+.enter-tip {
+  margin-bottom: 10px;
 }
 </style>

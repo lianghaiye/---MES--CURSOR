@@ -1,8 +1,36 @@
 <template>
   <div class="qc-template-page">
+    <a-alert
+      type="info"
+      show-icon
+      class="page-tip"
+      message="模板字段支持「基础 / 复合」指标类型；复合子项可各自配置类型与判定。多点暂未开放。演示：编辑「密封件来料检模板」。"
+    />
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="业务类型">
+              <a-select
+                v-model:value="filters.bizScope"
+                allow-clear
+                size="small"
+                placeholder="请选择"
+                :options="bizScopeOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="适用范围">
+              <a-select
+                v-model:value="filters.scopeType"
+                allow-clear
+                size="small"
+                placeholder="请选择"
+                :options="scopeTypeOpts"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="状态">
               <a-select
@@ -76,6 +104,15 @@
           <PlusOutlined />
           新增模板
         </a-button>
+        <a-button size="small" @click="probeOpen = true">匹配试算</a-button>
+        <a-button
+          size="small"
+          :type="effectiveView ? 'primary' : 'default'"
+          ghost
+          @click="toggleEffectiveView"
+        >
+          {{ effectiveView ? '退出生效视图' : '生效视图' }}
+        </a-button>
       </a-space>
       <a-space :size="4" class="toolbar-icons">
         <a-tooltip title="刷新">
@@ -89,7 +126,13 @@
 
     <a-alert type="info" show-icon class="summary-bar" :banner="false">
       <template #message>
-        <span>共计 {{ filteredList.length }} 条数据。</span>
+        <span>
+          共计 {{ filteredList.length }} 条。
+          <template v-if="effectiveView">
+            当前为生效视图：仅启用模板，按业务类型与适用范围（单产品→类别→全局）排序。
+          </template>
+          不确定某物料用哪份模板时，请用「匹配试算」。
+        </span>
       </template>
     </a-alert>
 
@@ -111,10 +154,7 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'code'">
-            <a v-if="record.isSystem" class="link-code" @click.prevent="handlePreview(record)">
-              {{ record.code }}
-            </a>
-            <span v-else>{{ record.code }}</span>
+            <a class="link-code" @click.prevent="openDetail(record)">{{ record.code }}</a>
           </template>
           <template v-else-if="column.key === 'type'">
             <a-tag :color="record.type === '系统模板' ? 'blue' : 'processing'">
@@ -124,6 +164,11 @@
           <template v-else-if="column.key === 'scopeType'">
             {{ qcTemplateScopeTypeLabel(record.scopeType) }}
           </template>
+          <template v-else-if="column.key === 'objects'">
+            <span :title="formatQcTemplateObjects(record)">
+              {{ formatQcTemplateObjects(record) }}
+            </span>
+          </template>
           <template v-else-if="column.key === 'createdAt'">
             {{ formatDateTimeMinute(record.createdAt) }}
           </template>
@@ -132,6 +177,8 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space :size="0">
+              <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+              <a-button type="link" size="small" @click="openFillPreview(record)">预览</a-button>
               <template v-if="record.isSystem">
                 <a-button type="link" size="small" @click="handleCopy(record)">复制</a-button>
               </template>
@@ -173,6 +220,7 @@
     <QcTemplatePreviewDrawer
       v-model:open="previewOpen"
       :record="previewRecord"
+      :initial-tab="previewTab"
       @copy="handleCopyFromPreview"
     />
 
@@ -184,6 +232,8 @@
       @confirm="onConflictConfirm"
       @cancel="pendingEnableId = ''"
     />
+
+    <QcTemplateMatchProbeDrawer v-model:open="probeOpen" />
   </div>
 </template>
 
@@ -192,21 +242,26 @@ export default { name: 'QcTemplateView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import {
   filterQcTemplates,
+  formatQcTemplateObjects,
+  qcTemplateBizScopeOptions,
   qcTemplateScopeTypeLabel,
+  qcTemplateScopeTypeOptions,
   qcTemplateStatusOptions,
   qcTemplateTypeOptions,
+  sortQcTemplatesForBrowse,
 } from '@/mock/qcTemplates'
 import {
   qcTemplateState,
   enableQcTemplate,
   disableQcTemplate,
   copyQcTemplate,
+  ensureQcTemplateDemoSeed,
 } from '@/store/qcTemplateStore'
 import { processConfigState } from '@/store/processConfigStore'
 import { qcTaskState, QC_TASK_STATUS } from '@/store/qcTaskStore'
@@ -214,8 +269,15 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import QcTemplatePreviewDrawer from './components/QcTemplatePreviewDrawer.vue'
 import QcTemplateConflictModal from './components/QcTemplateConflictModal.vue'
+import QcTemplateMatchProbeDrawer from './components/QcTemplateMatchProbeDrawer.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
+import { ensureQcLibraryDemoSeed } from '@/store/qcFieldLibraryStore'
+
+onMounted(() => {
+  ensureQcLibraryDemoSeed()
+  ensureQcTemplateDemoSeed()
+})
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { useTabs } from '@/composables/useTabs'
@@ -227,6 +289,8 @@ const qcTemplateCreatePage = findCreatePageByListPath('/quality/qc-template')
 const filters = reactive({
   status: undefined,
   type: undefined,
+  bizScope: undefined,
+  scopeType: undefined,
   code: '',
   name: '',
   creator: '',
@@ -236,11 +300,14 @@ const appliedFilters = ref({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const previewOpen = ref(false)
 const previewRecord = ref(null)
+const previewTab = ref('detail')
 const conflictOpen = ref(false)
 const conflictKind = ref('single')
 const conflictRows = ref([])
 const conflictTemplateName = ref('')
 const pendingEnableId = ref('')
+const probeOpen = ref(false)
+const effectiveView = ref(false)
 
 function isTemplateReferenced(template) {
   const code = String(template?.code || '').trim()
@@ -258,29 +325,33 @@ function isTemplateReferenced(template) {
 
 const statusOpts = qcTemplateStatusOptions.map((v) => ({ label: v, value: v }))
 const typeOpts = qcTemplateTypeOptions.map((v) => ({ label: v, value: v }))
+const bizScopeOpts = qcTemplateBizScopeOptions.map((v) => ({ label: v, value: v }))
+const scopeTypeOpts = qcTemplateScopeTypeOptions
 
 const baseColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 80, fixed: 'left' },
   { title: '模板编号', key: 'code', dataIndex: 'code', width: 140, fixed: 'left' },
-  { title: '模板名称', dataIndex: 'name', width: 180, ellipsis: true },
-  { title: '类型', key: 'type', width: 110 },
+  { title: '模板名称', dataIndex: 'name', width: 160, ellipsis: true },
+  { title: '类型', key: 'type', width: 100 },
   { title: '业务类型', key: 'bizScope', dataIndex: 'bizScope', width: 110 },
-  { title: '适用范围', key: 'scopeType', width: 100 },
+  { title: '适用范围', key: 'scopeType', width: 90 },
+  { title: '适用对象', key: 'objects', width: 160, ellipsis: true },
   { title: '字段数量', dataIndex: 'fieldCount', width: 90, align: 'right' },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
   { title: '更新人', dataIndex: 'updater', width: 90 },
   { title: '更新时间', key: 'updatedAt', dataIndex: 'updatedAt', width: 150 },
-  { title: '操作', key: 'action', width: 160, fixed: 'right' },
+  { title: '操作', key: 'action', width: 260, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('qc-template-list-v3', baseColumns)
+  useTableColumnSettings('qc-template-list-v4', baseColumns)
 
-const filteredList = computed(() =>
-  filterQcTemplates(qcTemplateState.templates, appliedFilters.value),
-)
+const filteredList = computed(() => {
+  const base = filterQcTemplates(qcTemplateState.templates, appliedFilters.value)
+  return sortQcTemplatesForBrowse(base)
+})
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -306,12 +377,24 @@ function handleSearch() {
 }
 
 function handleReset() {
-  filters.status = undefined
+  filters.status = effectiveView.value ? '启用' : undefined
   filters.type = undefined
+  filters.bizScope = undefined
+  filters.scopeType = undefined
   filters.code = ''
   filters.name = ''
   filters.creator = ''
   filters.dateRange = undefined
+  handleSearch()
+}
+
+function toggleEffectiveView() {
+  effectiveView.value = !effectiveView.value
+  if (effectiveView.value) {
+    filters.status = '启用'
+  } else if (filters.status === '启用') {
+    filters.status = undefined
+  }
   handleSearch()
 }
 
@@ -326,16 +409,27 @@ function handleCreate() {
   })
 }
 
-function handlePreview(record) {
-  if (!record?.isSystem) return
+function openTemplateDrawer(record, tab = 'detail') {
+  if (!record) return
+  previewTab.value = tab === 'fill' ? 'fill' : 'detail'
   previewRecord.value = {
     ...record,
     fields: (record.fields || []).map((f) => ({
       ...f,
       options: f.options ? [...f.options] : [],
+      optionItems: f.optionItems ? f.optionItems.map((o) => ({ ...o })) : undefined,
+      children: Array.isArray(f.children) ? f.children.map((c) => ({ ...c })) : [],
     })),
   }
   previewOpen.value = true
+}
+
+function openDetail(record) {
+  openTemplateDrawer(record, 'detail')
+}
+
+function openFillPreview(record) {
+  openTemplateDrawer(record, 'fill')
 }
 
 function openEditTab(template, title) {
@@ -427,6 +521,10 @@ function onConflictConfirm({ mode }) {
   padding: 0;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
+}
+
+.page-tip {
+  margin: 12px 12px 0;
 }
 
 .filter-card,

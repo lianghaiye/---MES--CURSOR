@@ -117,6 +117,7 @@ export const sideMenus = {
     { key: 'factory-qc', label: '出厂质检', path: '/quality/factory-qc' },
     { key: 'scrap-orders', label: '报废品管理', path: '/quality/scrap-orders' },
     { key: 'qc-template', label: '质检模板', path: '/quality/qc-template' },
+    { key: 'qc-field-library', label: '检验项库', path: '/quality/qc-field-library' },
   ],
   procurement: [
     { key: 'purchase-req', label: '采购申请', path: '/procurement/purchase-req' },
@@ -144,24 +145,18 @@ export const sideMenus = {
     { key: 'returns', label: '退换货', path: '/after-sales/returns' },
   ],
   'industrial-id': [
-    {
-      key: 'base-config',
-      label: '基础配置',
-      children: [
-        {
-          key: 'enterprise-info',
-          label: '企业信息',
-          path: '/industrial-id/base-config/enterprise-info',
-        },
-        {
-          key: 'nameplate-template',
-          label: '配置铭牌模板',
-          path: '/industrial-id/base-config/nameplate-template',
-        },
-      ],
-    },
     { key: 'label-request', label: '标识申请', path: '/industrial-id/label-request' },
     { key: 'label-management', label: '标识管理', path: '/industrial-id/label-management' },
+    {
+      key: 'enterprise-info',
+      label: '企业信息',
+      path: '/industrial-id/base-config/enterprise-info',
+    },
+    {
+      key: 'nameplate-template',
+      label: '产品信息模板',
+      path: '/industrial-id/base-config/nameplate-template',
+    },
   ],
   'basic-config': [
     { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
@@ -355,6 +350,7 @@ export const routeTitles = {
   '/quality/factory-qc': '出厂质检',
   '/quality/scrap-orders': '报废品管理',
   '/quality/scrap-orders/:id': '报废品详情',
+  '/quality/qc-field-library': '检验项库',
   '/quality/qc-template': '质检模板',
   '/system/dict': '系统字典',
   '/system/business-rules': '业务规则',
@@ -389,7 +385,7 @@ export const routeTitles = {
   '/after-sales/service-orders': '服务工单',
   '/after-sales/returns': '退换货',
   '/industrial-id/base-config/enterprise-info': '企业信息',
-  '/industrial-id/base-config/nameplate-template': '配置铭牌模板',
+  '/industrial-id/base-config/nameplate-template': '产品信息模板',
   '/industrial-id/label-request': '标识申请',
   '/industrial-id/label-management': '标识管理',
   '/wms/warehouse': '仓储管理',
