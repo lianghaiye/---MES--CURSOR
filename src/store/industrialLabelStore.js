@@ -257,6 +257,7 @@ export function ensureSalesOrderIndustrialLabelDemo() {
         labelCode: `IL02${dayjs().format('YYYYMMDD')}${String(idx).padStart(4, '0')}`,
         status: LABEL_STATUS.ACTIVE,
         qrStatus: idx <= 2 ? '已绑定' : '待绑定',
+        engraveStatus: idx <= 2 ? '已刻录' : '待刻录',
         requestOrderNo: requestNo,
         sourceType: LABEL_SOURCE.SALES_ORDER,
         salesOrderId: 'so-seed-industrial-label-done',
@@ -351,6 +352,7 @@ function generateLabelsForRequest(req, { forceFail = false } = {}) {
         labelCode: nextLabelCode(req.batchNo || line.batchNo, globalIdx),
         status: LABEL_STATUS.ACTIVE,
         qrStatus: '待绑定',
+        engraveStatus: '待刻录',
         requestOrderNo: req.orderNo,
         sourceType: req.sourceType || LABEL_SOURCE.MANUAL,
         salesOrderId: req.salesOrderId || '',
@@ -460,6 +462,7 @@ export function confirmNameplateMount(labelCode, { operator = '小程序', piece
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   label.qrStatus = '已绑定'
   label.boundAtInbound = true
+  label.engraveStatus = '已刻录'
   label.nameplateMountedAt = now
   label.nameplateMountedBy = operator || '小程序'
   if (pieceSerialNo) {

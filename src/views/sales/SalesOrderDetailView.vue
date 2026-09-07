@@ -889,6 +889,11 @@
                       {{ row.qrStatus || '—' }}
                     </a-tag>
                   </template>
+                  <template v-else-if="column.key === 'engraveStatus'">
+                    <a-tag :color="row.engraveStatus === '已刻录' ? 'success' : 'orange'">
+                      {{ row.engraveStatus || '待刻录' }}
+                    </a-tag>
+                  </template>
                   <template v-else-if="column.key === 'qrPreview'">
                     <div class="il-qr-thumb" @click="openIndustrialLabelQr(row)">
                       <IndustrialLabelQrMock :size="48" />
@@ -1041,6 +1046,23 @@
               size="small"
             >
               {{ industrialQrLabel.qrStatus || '—' }}
+            </a-tag>
+          </div>
+          <div class="il-qr-row">
+            <span class="il-qr-k">刻录状态</span>
+            <a-tag
+              :color="
+                industrialQrLabel.engraveStatus === '已刻录' || industrialQrLabel.nameplateMountedAt
+                  ? 'success'
+                  : 'orange'
+              "
+              size="small"
+            >
+              {{
+                industrialQrLabel.engraveStatus === '已刻录' || industrialQrLabel.nameplateMountedAt
+                  ? '已刻录'
+                  : '待刻录'
+              }}
             </a-tag>
           </div>
           <div class="il-qr-hint">演示二维码 · 内容为 SN 码（非真实注册平台）</div>
@@ -1339,6 +1361,7 @@ const industrialLabelSnColumns = [
   { key: 'requestOrderNo', title: '申请单号', dataIndex: 'requestOrderNo', width: 150 },
   { key: 'status', title: '标识状态', width: 88 },
   { key: 'qrStatus', title: '二维码状态', width: 100 },
+  { key: 'engraveStatus', title: '刻录状态', width: 100 },
   { key: 'regTime', title: '注册时间', dataIndex: 'regTime', width: 160 },
   { key: 'action', title: '操作', width: 100, fixed: 'right' },
 ]
@@ -1394,6 +1417,7 @@ const industrialLabelSnRows = computed(() => {
   const lineMap = Object.fromEntries((o.lineItems || []).map((l) => [l.id, l]))
   return listLabelsBySalesOrder(o.orderNo).map((lbl) => {
     const line = lineMap[lbl.salesLineId] || {}
+    const engraved = Boolean(lbl.nameplateMountedAt || lbl.engraveStatus === '已刻录')
     return {
       ...lbl,
       salesOrderNo: o.orderNo,
@@ -1402,6 +1426,7 @@ const industrialLabelSnRows = computed(() => {
       material: lbl.material || line.material || '',
       productName: lbl.productName || line.productName || '',
       productCode: lbl.productCode || line.productCode || '',
+      engraveStatus: engraved ? '已刻录' : '待刻录',
     }
   })
 })
@@ -1419,6 +1444,7 @@ const industrialLabelSnExportFields = [
   { title: '申请单号', getValue: (row) => row.requestOrderNo || '' },
   { title: '标识状态', getValue: (row) => row.status || '' },
   { title: '二维码状态', getValue: (row) => row.qrStatus || '' },
+  { title: '刻录状态', getValue: (row) => row.engraveStatus || '待刻录' },
   { title: '注册时间', getValue: (row) => row.regTime || '' },
 ]
 
