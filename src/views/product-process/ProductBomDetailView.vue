@@ -187,6 +187,7 @@ import { findParentBomReferences } from '@/utils/bomVersionReference'
 import { loadBomDetailStructure } from '@/utils/bomImport'
 import { getRootTreeId, ROOT_ID } from '@/utils/bomTree'
 import { tabStore, useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 import { useBomSplitLayout } from '@/composables/useBomSplitLayout'
 import BomTreePanel from './components/BomTreePanel.vue'
 import BomBasicInfoSection from './components/BomBasicInfoSection.vue'
@@ -286,8 +287,10 @@ function openDetailRootItem() {
     message.info('产品族暂无独立详情页')
     return
   }
-  const path = `/product-process/products/${bom.itemId}/edit`
-  openTab(path, bom.itemName || '产品详情')
+  openCreateTab(router, openTab, {
+    path: `/product-process/products/${bom.itemId}`,
+    title: bom.itemName || '产品详情',
+  })
 }
 
 const versionList = computed(() => {

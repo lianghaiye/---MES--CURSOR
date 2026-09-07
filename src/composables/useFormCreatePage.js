@@ -5,7 +5,7 @@ import { useTabs } from '@/composables/useTabs'
 export function useFormCreatePage(listPath) {
   const route = useRoute()
   const router = useRouter()
-  const { closeTab } = useTabs()
+  const { closeTab, tabState, getTabNavigateTo } = useTabs()
 
   function resolveListPath() {
     if (typeof listPath === 'function') return listPath()
@@ -19,5 +19,11 @@ export function useFormCreatePage(listPath) {
     router.push(target)
   }
 
-  return { goBack, resolveListPath }
+  /** 只读详情：关标签后留在其余已打开的页（如从 BOM 点进来则回到 BOM） */
+  function closeToActiveTab() {
+    closeTab(route.path)
+    router.push(getTabNavigateTo(tabState.activePath))
+  }
+
+  return { goBack, closeToActiveTab, resolveListPath }
 }

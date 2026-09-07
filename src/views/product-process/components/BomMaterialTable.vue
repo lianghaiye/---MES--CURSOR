@@ -120,6 +120,16 @@
                 />
               </div>
             </template>
+            <template v-else-if="column.key === 'materialCode'">
+              <a
+                v-if="record.materialCode"
+                class="item-code-link"
+                @click.stop.prevent="openLineItemDetail(record)"
+              >
+                {{ record.materialCode }}
+              </a>
+              <span v-else>—</span>
+            </template>
             <template v-else-if="readonly">
               <template v-if="column.key === 'unitQty'">{{ formatQty(record.unitQty) }}</template>
               <template v-else-if="column.key === 'blankSizeText'">
@@ -384,6 +394,7 @@ import {
   inputNumberParser,
 } from '@/utils/numberFormat'
 import { computed, nextTick, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   ReloadOutlined,
@@ -400,11 +411,13 @@ import {
 import BomMaterialBatchEditModal from './BomMaterialBatchEditModal.vue'
 import BomBlankSizeModal from './BomBlankSizeModal.vue'
 import BomSubItemMaterialSelect from './BomSubItemMaterialSelect.vue'
-import { isSpuLine, lineVariantSummary } from '@/utils/spuLineResolve'
+import { isSpuLine, lineVariantSummary, resolvedSkuId } from '@/utils/spuLineResolve'
 import { applyBlankSizeToLine } from '@/utils/bomBlankSize'
 import { resolveLineStockUnit, inferUomRelation } from '@/utils/variableLengthMaterial'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 import {
   buildBomMaterialTree,
   assignMaterialTreeIndexes,
@@ -436,6 +449,43 @@ const props = defineProps({
 function formatCell(val) {
   if (val == null || val === '') return '—'
   return val
+}
+
+const router = useRouter()
+const { openTab } = useTabs()
+
+function unwrapMasterId(raw) {
+  if (raw == null || raw === '') return ''
+  const id = String(raw)
+  return id.includes(':') ? id.split(':')[1] : id
+}
+
+/** 仅点击时解析，不在列表渲染时扫主数据 */
+function resolveLineMasterId(record) {
+  const direct = unwrapMasterId(record?.productId || record?.materialId || record?.itemId)
+  if (direct) return direct
+  const code = String(record?.materialCode || '').trim()
+  if (!code) return ''
+  const product = productInfoState.products.find((p) => p.code === code)
+  if (product?.id) return product.id
+  const material = materialInfoState.materials.find((m) => m.code === code)
+  return material?.id || ''
+}
+
+function openLineItemDetail(record) {
+  if (isSpuLine(record) && !resolvedSkuId(record) && !record.materialCode) {
+    message.info('请先配置变体后再查看详情')
+    return
+  }
+  const id = resolveLineMasterId(record)
+  if (!id) {
+    message.info('未找到该子项的主数据详情')
+    return
+  }
+  openCreateTab(router, openTab, {
+    path: `/product-process/products/${id}`,
+    title: record.itemName || record.materialCode || '产品详情',
+  })
 }
 
 function lineVariantDisplay(record) {
@@ -1210,6 +1260,21 @@ function customRow(record, index) {
     :deep(.ant-table-body) {
       overflow: visible !important;
       max-height: none !important;
+    }
+  }
+
+  .item-code-link {
+    color: #1677ff;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: bottom;
+
+    &:hover {
+      color: #4096ff;
     }
   }
 

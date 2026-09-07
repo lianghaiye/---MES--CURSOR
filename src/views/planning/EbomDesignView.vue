@@ -222,6 +222,7 @@ import {
   generateEbomNo,
 } from '@/store/ebomStore'
 import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 import { useBomSplitLayout } from '@/composables/useBomSplitLayout'
 import { useSpuVariantConfig } from '@/composables/useSpuVariantConfig'
 import {
@@ -484,8 +485,10 @@ function openRootItemDetail() {
     message.info('当前设计任务未关联产品主数据')
     return
   }
-  const path = `/product-process/products/${id}/edit`
-  openTab(path, parentForm.itemName || '产品详情')
+  openCreateTab(router, openTab, {
+    path: `/product-process/products/${id}`,
+    title: parentForm.itemName || '产品详情',
+  })
 }
 
 function maybeDetachChildBomRef(editedLineId, parentTreeNodeId) {

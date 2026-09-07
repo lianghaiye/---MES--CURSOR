@@ -185,6 +185,12 @@ const routes = [
         meta: { title: '编辑产品', listPath: '/product-process/products' },
       },
       {
+        path: 'product-process/products/:id',
+        name: 'product-process-products-detail',
+        component: () => import('@/views/product-process/MasterItemDetailView.vue'),
+        meta: { title: '产品详情', listPath: '/product-process/products' },
+      },
+      {
         path: 'product-process/bom',
         name: 'product-process-bom',
         component: () => import('@/views/product-process/ProductBomView.vue'),

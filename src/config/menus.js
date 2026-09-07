@@ -285,6 +285,7 @@ export const routeTitles = {
   '/product-process/materials': '产品信息',
   '/product-process/products': '产品信息',
   '/product-process/products/:id/edit': '编辑产品',
+  '/product-process/products/:id': '产品详情',
   '/product-process/bom': '产品BOM',
   '/product-process/bom/new': '新增BOM',
   '/product-process/bom/:id/edit': '编辑BOM',

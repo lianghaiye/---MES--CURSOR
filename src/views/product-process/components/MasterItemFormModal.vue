@@ -15,6 +15,7 @@
         class="entity-name-input"
         placeholder="请输入产品名称"
         allow-clear
+        :disabled="viewOnly"
       />
       <div class="entity-capability-row">
         <a-checkbox v-model:checked="form.canSell" :disabled="viewOnly">可销售</a-checkbox>
