@@ -37,6 +37,7 @@
             <div v-if="record.lineItems?.length" class="section-card">
               <div class="section-title">整机发货明细</div>
               <a-table
+                class="delivery-line-table"
                 :columns="wholeColumns"
                 :data-source="wholeLineRows"
                 row-key="id"
@@ -76,8 +77,8 @@
                   <template v-else-if="column.key === 'shipWeight'">
                     {{ formatDeliveryWeight(line.shipWeight ?? line.itemWeightKg) }}
                   </template>
-                  <template v-else-if="column.key === 'deliveryUnitPriceInTax'">
-                    {{ formatDeliveryPrice(line.deliveryUnitPriceInTax) }}
+                  <template v-else-if="column.key === 'deliveryAmountExTax'">
+                    {{ formatDeliveryPrice(line.deliveryAmountExTax) }}
                   </template>
                   <template v-else-if="column.key === 'deliveryAmountInTax'">
                     {{ formatDeliveryPrice(line.deliveryAmountInTax) }}
@@ -264,8 +265,14 @@ const wholeColumns = [
   { title: '出库仓库', dataIndex: 'shipWarehouse', width: 120 },
   { title: '本次发货数量', key: 'shipQty', width: 120, align: 'right' },
   { title: '发货重量', key: 'shipWeight', width: 110, align: 'right' },
-  { title: '发货单价（含税）', key: 'deliveryUnitPriceInTax', width: 148, align: 'right' },
-  { title: '发货总额（含税）', key: 'deliveryAmountInTax', width: 124, align: 'right' },
+  { title: '发货总额（不含税）', key: 'deliveryAmountExTax', width: 148, align: 'right' },
+  {
+    title: '发货总额（含税）',
+    key: 'deliveryAmountInTax',
+    width: 148,
+    align: 'right',
+    customHeaderCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+  },
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
   { title: '备注', dataIndex: 'lineRemark', width: 120, ellipsis: true },
@@ -461,6 +468,12 @@ function goSalesOrder() {
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 12px;
+}
+
+.delivery-line-table {
+  :deep(.ant-table-thead > tr > th) {
+    white-space: nowrap;
+  }
 }
 
 .scatter-block {

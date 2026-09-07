@@ -55,7 +55,7 @@
                     <th>变体属性</th>
                     <th>单位</th>
                     <th>本次发货</th>
-                    <th>发货单价（含税）</th>
+                    <th>发货总额（不含税）</th>
                     <th>发货总额（含税）</th>
                     <th>出库仓库</th>
                     <th>包装形式</th>
@@ -72,7 +72,7 @@
                     <td>{{ row.variantAttr }}</td>
                     <td>{{ row.unit }}</td>
                     <td class="cell-num">{{ row.shipQty }}</td>
-                    <td class="cell-num">{{ row.unitPriceInTax }}</td>
+                    <td class="cell-num">{{ row.amountExTax }}</td>
                     <td class="cell-num">{{ row.amountInTax }}</td>
                     <td>{{ row.shipWarehouse }}</td>
                     <td>{{ row.packagingForm }}</td>

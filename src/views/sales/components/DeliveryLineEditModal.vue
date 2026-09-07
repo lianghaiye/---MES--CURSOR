@@ -59,14 +59,21 @@
                 <span>{{ progressDisplay }}</span>
               </div>
               <div class="preview-row">
-                <span class="preview-label">发货单价（含税）</span>
-                <span>{{ formatDeliveryPrice(draft.deliveryUnitPriceInTax) }}</span>
+                <span class="preview-label">单价（不含税）</span>
+                <span>{{ formatDeliveryPrice(draft.unitPriceExTax) }}</span>
+              </div>
+              <div class="preview-row">
+                <span class="preview-label">单价（含税）</span>
+                <span>{{ formatDeliveryPrice(draft.unitPriceInTax) }}</span>
+              </div>
+              <div class="preview-row">
+                <span class="preview-label">发货总额（不含税）</span>
+                <span>{{ formatDeliveryPrice(draft.deliveryAmountExTax) }}</span>
               </div>
               <div class="preview-row">
                 <span class="preview-label">发货总额（含税）</span>
                 <span>{{ formatDeliveryPrice(draft.deliveryAmountInTax) }}</span>
               </div>
-              <div class="price-lock-hint">按申请时订单有效价锁定，改价请走订单价格变更</div>
             </div>
             <div class="preview-stock-box">
               <div class="stock-value">{{ formatDeliveryQty(draft.warehouseStockQty) }}</div>
@@ -287,10 +294,6 @@ function handleSave() {
       return
     }
   }
-  if (draft.deliveryUnitPriceInTax == null || draft.deliveryUnitPriceInTax === '') {
-    message.warning('请填写发货单价（含税）')
-    return
-  }
 
   recalcDeliveryLine(draft)
   refreshDeliveryLineStock(draft)
@@ -315,14 +318,6 @@ function handleSave() {
 
 <style lang="less" scoped>
 @import '../../inventory/components/inventoryLineEditModal.less';
-
-.price-lock-hint {
-  margin-top: 4px;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-  line-height: 1.4;
-  white-space: nowrap;
-}
 
 .preview-row .preview-label {
   min-width: 7em;

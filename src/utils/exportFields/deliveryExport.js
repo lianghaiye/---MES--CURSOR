@@ -28,7 +28,7 @@ export const deliveryExportFields = [
   },
   {
     key: 'totalAmountExTax',
-    title: '发货总金额（不含税）',
+    title: '发货总额（不含税）',
     getValue: (row) => formatAmountExTax(row.totalAmountExTax),
   },
   { key: 'shipmentMethod', title: '交货方式', getValue: (row) => cell(row, 'shipmentMethod') },

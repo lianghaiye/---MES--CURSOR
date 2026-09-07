@@ -291,7 +291,7 @@ const baseColumns = [
   { title: '实际出库数量', key: 'actualOutboundQty', width: 110, align: 'right' },
   { title: '发货重量', key: 'shipWeight', width: 96, align: 'right' },
   { title: '发货总额（含税）', key: 'totalAmountInTax', width: 124, align: 'right' },
-  { title: '发货总金额（不含税）', key: 'totalAmountExTax', width: 140, align: 'right' },
+  { title: '发货总额（不含税）', key: 'totalAmountExTax', width: 140, align: 'right' },
   { title: '交货方式', dataIndex: 'shipmentMethod', width: 88 },
   { title: '物流单号', dataIndex: 'logisticsNo', width: 130, ellipsis: true },
   { title: '客户联系人', dataIndex: 'contactPerson', width: 100 },

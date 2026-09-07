@@ -18,25 +18,27 @@ export function calcApplyShipQty(application) {
 /** 发货总金额（不含税） */
 export function calcDeliveryAmountExTax(application) {
   if (!application) return 0
-  const whole = (application.lineItems || []).reduce(
-    (s, l) => s + (Number(l.deliveryAmountExTax) || 0),
-    0,
-  )
-  return Math.round(whole * 100) / 100
+  const sumRows = (rows = []) => rows.reduce((s, l) => s + (Number(l.deliveryAmountExTax) || 0), 0)
+  const whole = sumRows(application.lineItems)
+  const scatter = sumRows(application.scatterShipments)
+  return Math.round((whole + scatter) * 100) / 100
 }
 
 /** 发货总额（含税） */
 export function calcDeliveryAmountInTax(application) {
   if (!application) return 0
-  const whole = (application.lineItems || []).reduce((s, l) => {
-    const explicit = Number(l.deliveryAmountInTax)
-    if (Number.isFinite(explicit) && explicit > 0) return s + explicit
-    const qty = Number(l.shipQty) || 0
-    const price = Number(l.deliveryUnitPriceInTax ?? l.unitPriceInTax) || 0
-    if (qty > 0 && price > 0) return s + Math.round(qty * price * 100) / 100
-    return s
-  }, 0)
-  return Math.round(whole * 100) / 100
+  const sumRows = (rows = []) =>
+    rows.reduce((s, l) => {
+      const explicit = Number(l.deliveryAmountInTax)
+      if (Number.isFinite(explicit)) return s + explicit
+      const qty = Number(l.shipQty) || 0
+      const price = Number(l.unitPriceInTax) || 0
+      if (qty > 0 && price > 0) return s + Math.round(qty * price * 100) / 100
+      return s
+    }, 0)
+  return (
+    Math.round((sumRows(application.lineItems) + sumRows(application.scatterShipments)) * 100) / 100
+  )
 }
 
 /** 发货重量：明细行 shipWeight 优先，否则按件重 × 数量 */

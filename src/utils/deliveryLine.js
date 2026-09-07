@@ -6,6 +6,8 @@ import { materialInfoState } from '@/store/materialInfoStore'
 import { findSpuById } from '@/store/spuStore'
 import { formatVariantSummary } from '@/utils/spuVariant'
 import { formatNumber, roundNumber } from '@/utils/numberFormat'
+import { pickLatestApprovedLinePrices } from '@/utils/salesPriceChange'
+import { listPriceChangesByOrderId } from '@/store/salesPriceChangeStore'
 
 export { roundNumber as roundDeliveryDecimal, formatNumber as formatDeliveryDecimal }
 
@@ -88,6 +90,24 @@ export function isDeliveryLineShipLocked(line) {
   return orderQty > 0 && remain <= 1e-9
 }
 
+function resolveDeliveryLineUnitPrices(line, order) {
+  const lineId = line?.id || line?.salesLineId
+  const changed = pickLatestApprovedLinePrices(
+    order?.id ? listPriceChangesByOrderId(order.id) : [],
+    lineId,
+  )
+  if (changed) {
+    return {
+      unitPriceExTax: roundDeliveryDecimal(changed.unitPriceExTax, 4),
+      unitPriceInTax: roundDeliveryDecimal(changed.unitPriceInTax, 4),
+    }
+  }
+  return {
+    unitPriceExTax: roundDeliveryDecimal(Number(line?.unitPriceExTax ?? 0), 4),
+    unitPriceInTax: roundDeliveryDecimal(Number(line?.unitPriceInTax ?? 0), 4),
+  }
+}
+
 function buildDeliveryLineBase(line, order) {
   const orderQty = roundDeliveryDecimal(Number(line.salesQty ?? line.qty ?? 0), 4)
   const confirmedOutboundQty = roundDeliveryDecimal(calcSalesLineShippedQty(order, line), 4)
@@ -95,8 +115,7 @@ function buildDeliveryLineBase(line, order) {
   const shippedQty = confirmedOutboundQty
   const remainShipQty = Math.max(0, orderQty - appliedShipQty)
   const shipLocked = remainShipQty <= 1e-9 && orderQty > 0
-  const unitPriceExTax = roundDeliveryDecimal(Number(line.unitPriceExTax ?? 0), 4)
-  const unitPriceInTax = roundDeliveryDecimal(Number(line.unitPriceInTax ?? 0), 4)
+  const { unitPriceExTax, unitPriceInTax } = resolveDeliveryLineUnitPrices(line, order)
   const shipQty = shipLocked ? 0 : remainShipQty
   const shipWeight = roundDeliveryDecimal(Number(line.shipWeight ?? line.itemWeightKg ?? 0), 4)
 
@@ -163,18 +182,18 @@ export function calcDeliveryAmount(shipQty, unitPriceExTax) {
 }
 
 export function resolveDeliveryUnitPriceInTax(line) {
-  const locked = Number(line?.deliveryUnitPriceInTax)
-  if (Number.isFinite(locked)) return roundDeliveryDecimal(locked, 4)
   return roundDeliveryDecimal(Number(line?.unitPriceInTax) || 0, 4)
 }
 
 export function recalcDeliveryLine(line) {
   line.shipQty = roundDeliveryDecimal(line.shipQty, 4)
   line.shipWeight = roundDeliveryDecimal(line.shipWeight, 4)
-  line.deliveryUnitPriceExTax = roundDeliveryDecimal(line.deliveryUnitPriceExTax, 4)
-  line.deliveryAmountExTax = calcDeliveryAmount(line.shipQty, line.deliveryUnitPriceExTax)
-  line.deliveryUnitPriceInTax = resolveDeliveryUnitPriceInTax(line)
-  line.deliveryAmountInTax = calcDeliveryAmount(line.shipQty, line.deliveryUnitPriceInTax)
+  line.unitPriceExTax = roundDeliveryDecimal(line.unitPriceExTax, 4)
+  line.unitPriceInTax = roundDeliveryDecimal(line.unitPriceInTax, 4)
+  line.deliveryUnitPriceExTax = line.unitPriceExTax
+  line.deliveryUnitPriceInTax = line.unitPriceInTax
+  line.deliveryAmountExTax = calcDeliveryAmount(line.shipQty, line.unitPriceExTax)
+  line.deliveryAmountInTax = calcDeliveryAmount(line.shipQty, line.unitPriceInTax)
 }
 
 export function formatDeliveryQty(val) {
@@ -241,8 +260,11 @@ export function enrichDeliveryLineForDisplay(line, salesOrder, header = {}) {
     fillBlank(row, 'material', salesLine.material)
     fillBlank(row, 'drawingNo', salesLine.drawingNo)
     fillBlank(row, 'unit', salesLine.unit)
-    fillBlank(row, 'unitPriceExTax', salesLine.unitPriceExTax)
-    fillBlank(row, 'unitPriceInTax', salesLine.unitPriceInTax)
+    {
+      const prices = resolveDeliveryLineUnitPrices(salesLine, salesOrder)
+      fillBlank(row, 'unitPriceExTax', prices.unitPriceExTax)
+      fillBlank(row, 'unitPriceInTax', prices.unitPriceInTax)
+    }
     fillBlank(row, 'deliveryMode', salesLine.deliveryMode)
     fillBlank(row, 'packagingForm', salesLine.packagingForm)
     fillBlank(row, 'variantSummary', salesLine.variantSummary)

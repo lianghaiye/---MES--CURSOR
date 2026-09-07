@@ -176,6 +176,9 @@
           <template v-else-if="column.key === 'unitPriceExTax'">
             {{ formatDeliveryPrice(record.unitPriceExTax) }}
           </template>
+          <template v-else-if="column.key === 'unitPriceInTax'">
+            {{ formatDeliveryPrice(record.unitPriceInTax) }}
+          </template>
           <template v-else-if="column.key === 'deliveryMode'">
             <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
               {{ record.deliveryMode || '整机' }}
@@ -196,20 +199,8 @@
               {{ record.barcodeBatchNo || '—' }}
             </span>
           </template>
-          <template v-else-if="column.key === 'deliveryUnitPriceInTax'">
-            <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
-              <span class="price-locked-wrap">
-                <a-input-number
-                  v-model:value="record.deliveryUnitPriceInTax"
-                  size="small"
-                  :min="0"
-                  :precision="4"
-                  style="width: 100%"
-                  disabled
-                  @change="onLineCalc(record)"
-                />
-              </span>
-            </a-tooltip>
+          <template v-else-if="column.key === 'deliveryAmountExTax'">
+            {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
           </template>
           <template v-else-if="column.key === 'deliveryAmountInTax'">
             {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
@@ -256,25 +247,16 @@
           <template v-else-if="column.key === 'unitPriceExTax'">
             {{ formatDeliveryPrice(record.unitPriceExTax) }}
           </template>
+          <template v-else-if="column.key === 'unitPriceInTax'">
+            {{ formatDeliveryPrice(record.unitPriceInTax) }}
+          </template>
           <template v-else-if="column.key === 'deliveryMode'">
             <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
               {{ record.deliveryMode || '散件' }}
             </a-tag>
           </template>
-          <template v-else-if="column.key === 'deliveryUnitPriceInTax'">
-            <a-tooltip title="发货单价按申请时订单有效价锁定，改价请走订单价格变更">
-              <span class="price-locked-wrap">
-                <a-input-number
-                  v-model:value="record.deliveryUnitPriceInTax"
-                  size="small"
-                  :min="0"
-                  :precision="4"
-                  style="width: 100%"
-                  disabled
-                  @change="onScatterLinePriceChange(record)"
-                />
-              </span>
-            </a-tooltip>
+          <template v-else-if="column.key === 'deliveryAmountExTax'">
+            {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
           </template>
           <template v-else-if="column.key === 'deliveryAmountInTax'">
             {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
@@ -389,11 +371,12 @@ const lineColumns = [
   { title: '材质', dataIndex: 'material', width: 72 },
   { title: '变体属性', dataIndex: 'specAttr', width: 88 },
   { title: '订单数量', key: 'orderQty', width: 88, align: 'right' },
-  { title: '单价', key: 'unitPriceExTax', width: 96, align: 'right' },
+  { title: '单价（不含税）', key: 'unitPriceExTax', width: 120, align: 'right' },
+  { title: '单价（含税）', key: 'unitPriceInTax', width: 110, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56, align: 'center' },
   { title: '本次发货数量', key: 'shipQty', width: 112, align: 'right' },
   { title: '条码号/批次号', key: 'barcodeBatchNo', width: 160, ellipsis: true },
-  { title: '发货单价（含税）', key: 'deliveryUnitPriceInTax', width: 148, align: 'right' },
+  { title: '发货总额（不含税）', key: 'deliveryAmountExTax', width: 148, align: 'right' },
   { title: '发货总额（含税）', key: 'deliveryAmountInTax', width: 124, align: 'right' },
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
@@ -493,10 +476,6 @@ function syncExpandedScatterRows() {
 function openScatterDrawer(ship) {
   activeScatterShipment.value = ship
   scatterDrawerOpen.value = true
-}
-
-function onScatterLinePriceChange(record) {
-  recalcDeliveryLine(record)
 }
 
 function onScatterDrawerSave(payload) {
@@ -667,11 +646,6 @@ function handleConfirm() {
 
 .section-divider {
   margin: 8px 0 12px;
-}
-
-.price-locked-wrap {
-  display: block;
-  width: 100%;
 }
 
 .scatter-picks-panel {

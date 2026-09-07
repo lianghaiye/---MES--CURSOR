@@ -51,7 +51,8 @@ export function buildDeliveryOrderPrintPayload(row, options = {}) {
       shipQty: formatPrintQty(enriched.shipQty),
       shipWarehouse: formatPrintFieldValue(enriched.shipWarehouse || row.outboundWarehouse),
       packagingForm: formatPrintFieldValue(enriched.packagingForm),
-      unitPriceInTax: formatPrintMoney(enriched.deliveryUnitPriceInTax),
+      unitPriceExTax: formatPrintMoney(enriched.unitPriceExTax),
+      amountExTax: formatPrintMoney(enriched.deliveryAmountExTax),
       amountInTax: formatPrintMoney(enriched.deliveryAmountInTax),
       remark: formatPrintFieldValue(enriched.lineRemark || enriched.remark),
     }
@@ -82,7 +83,7 @@ export function buildDeliveryOrderPrintPayload(row, options = {}) {
     const amt = Number(l.deliveryAmountInTax)
     if (Number.isFinite(amt)) return s + amt
     const qty = Number(l.shipQty) || 0
-    const price = Number(l.deliveryUnitPriceInTax ?? l.unitPriceInTax) || 0
+    const price = Number(l.unitPriceInTax) || 0
     return s + qty * price
   }, 0)
 
