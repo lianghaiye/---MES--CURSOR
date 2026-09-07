@@ -230,6 +230,35 @@ export function addPurchaseRequisition(requisition) {
   return requisition
 }
 
+/** 一键复制采购申请：新单号、待处理，不带已生成采购关系 */
+export function clonePurchaseRequisition(id) {
+  const source = getPurchaseRequisitionById(id)
+  if (!source || source.isGeneratePoDraft) return null
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
+  const cloned = JSON.parse(JSON.stringify(source))
+  cloned.id = `pr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+  cloned.reqNo = generateReqNo()
+  cloned.docStatus = '待处理'
+  cloned.overdueStatus = '未逾期'
+  cloned.purchaseOrderNo = ''
+  cloned.generatePoDraftId = undefined
+  cloned.generateDraftId = undefined
+  cloned.isGeneratePoDraft = false
+  cloned.orderDate = dayjs().format('YYYY-MM-DD')
+  cloned.createdAt = now
+  cloned.updatedAt = now
+  cloned.operator = cloned.creator || '管理员'
+  cloned.lineItems = (cloned.lineItems || []).map((line, index) => ({
+    ...line,
+    id: `pr-line-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 5)}`,
+    poGenStatus: '未生成采购',
+    purchaseOrderNos: '',
+  }))
+  delete cloned.generatePoDraftId
+  delete cloned.generateDraftId
+  return addPurchaseRequisition(cloned)
+}
+
 export function updatePurchaseRequisition(id, patch) {
   const idx = purchaseRequisitionState.requisitions.findIndex((r) => r.id === id)
   if (idx === -1) return null

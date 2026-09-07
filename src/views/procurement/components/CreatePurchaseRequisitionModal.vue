@@ -37,6 +37,14 @@
               </a-form-item>
             </a-col>
             <a-col :span="6">
+              <a-form-item label="销售订单">
+                <SalesOrderSearchSelect
+                  :value="form.salesOrderNo"
+                  @update:value="onSalesOrderNoChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
               <a-form-item label="期望到货日期" required>
                 <a-date-picker
                   v-model:value="form.estimatedArrivalDate"
@@ -328,6 +336,7 @@ import {
   generateReqNo,
   updatePurchaseRequisition,
 } from '@/store/purchaseRequisitionStore'
+import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 import {
@@ -413,6 +422,7 @@ const warehouseOpts = computed(() => {
 
 const form = reactive({
   reqNo: '',
+  salesOrderNo: '',
   urgency: '正常',
   deliveryDate: null,
   estimatedArrivalDate: null,
@@ -488,6 +498,7 @@ function normalizeLineItems(items) {
 
 function resetForm() {
   form.reqNo = ''
+  form.salesOrderNo = ''
   form.urgency = '正常'
   form.deliveryDate = null
   form.estimatedArrivalDate = null
@@ -500,6 +511,7 @@ function resetForm() {
 
 function loadEditForm(record) {
   form.reqNo = record.reqNo
+  form.salesOrderNo = record.salesOrderNo || ''
   form.urgency = record.urgency
   form.deliveryDate = record.deliveryDate ? dayjs(record.deliveryDate) : null
   form.estimatedArrivalDate = record.estimatedArrivalDate
@@ -514,6 +526,17 @@ function loadEditForm(record) {
 
 function filterWarehouseOption(input, option) {
   return (option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
+}
+
+function onSalesOrderNoChange(orderNo) {
+  const prev = form.salesOrderNo
+  const next = orderNo || ''
+  form.salesOrderNo = next
+  form.lineItems.forEach((line) => {
+    if (!String(line.salesOrderNo || '').trim() || line.salesOrderNo === prev) {
+      line.salesOrderNo = next
+    }
+  })
 }
 
 function syncLineReceivingWarehouses(warehouse) {
@@ -591,6 +614,7 @@ function mapPickerToLineItem(payload) {
     supplierName: payload.defaultSupplier || '',
     designatedSupplier: Boolean(payload.defaultSupplier),
     receivingWarehouse: resolveLineWarehouse(code),
+    salesOrderNo: form.salesOrderNo || '',
     remark: '',
     isSpuLine: false,
     spuId: payload.spuId || '',
@@ -627,6 +651,7 @@ function onSpuDraftSelected(rows) {
         demandQty: 1,
         stockQty: 0,
         receivingWarehouse: form.receivingWarehouse || '',
+        salesOrderNo: form.salesOrderNo || '',
         remark: '',
       }),
     )
@@ -699,6 +724,7 @@ function addBlankLine() {
       inventoryCode: '',
       planPurchaseQty: 1,
       receivingWarehouse: form.receivingWarehouse || '',
+      salesOrderNo: form.salesOrderNo || '',
     }),
   )
 }
@@ -845,10 +871,10 @@ function handleSave() {
     lineItems,
     orderDate: dayjs().format('YYYY-MM-DD'),
     source: '新增',
-    sourceOrderNo: props.editRecord?.sourceOrderNo || '',
+    sourceOrderNo: form.salesOrderNo || props.editRecord?.sourceOrderNo || '',
     docStatus: '待处理',
     overdueStatus: '未逾期',
-    salesOrderNo: props.editRecord?.salesOrderNo || '',
+    salesOrderNo: form.salesOrderNo || '',
     purchaseOrderNo: props.editRecord?.purchaseOrderNo || '',
     operator: '管理员',
     creator: props.editRecord?.creator || '管理员',

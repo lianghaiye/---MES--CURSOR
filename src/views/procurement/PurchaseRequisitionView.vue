@@ -226,7 +226,12 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space
-              v-if="record.isGeneratePoDraft || canEditRequisition(record) || canGeneratePO(record)"
+              v-if="
+                record.isGeneratePoDraft ||
+                canCopyRequisition(record) ||
+                canEditRequisition(record) ||
+                canGeneratePO(record)
+              "
               :size="0"
             >
               <template v-if="record.isGeneratePoDraft">
@@ -246,6 +251,7 @@
                 >
                   编辑
                 </a-button>
+                <a-button type="link" size="small" @click="handleCopy(record)">复制</a-button>
                 <a-button
                   v-if="canGeneratePO(record)"
                   type="link"
@@ -315,6 +321,7 @@ import {
   canGeneratePO,
   isPurchaseRequisitionDraftLocked,
   ensureDemoPurchaseRequisitionCgsq2026060001,
+  clonePurchaseRequisition,
 } from '@/store/purchaseRequisitionStore'
 import {
   getActiveDraftForRequisition,
@@ -405,11 +412,11 @@ const baseColumns = [
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 140 },
   { title: '更新人', key: 'updater', width: 90 },
   { title: '更新时间', key: 'updatedAt', dataIndex: 'updatedAt', width: 140 },
-  { title: '操作', key: 'action', width: 180, fixed: 'right' },
+  { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-req-list-v6', baseColumns)
+  useTableColumnSettings('purchase-req-list-v7', baseColumns)
 
 const filteredList = computed(() => {
   void purchaseOrderState.orders
@@ -534,12 +541,29 @@ function draftOrderNo(record) {
   return draft?.orderNo || ''
 }
 
+function canCopyRequisition(record) {
+  return Boolean(record?.id) && !record?.isGeneratePoDraft
+}
+
 function canEditRequisition(record) {
   return (
     record?.docStatus === '待处理' &&
     !record?.isGeneratePoDraft &&
     !isPurchaseRequisitionDraftLocked(record)
   )
+}
+
+function handleCopy(record) {
+  if (!canCopyRequisition(record)) {
+    message.warning('当前单据不可复制')
+    return
+  }
+  const cloned = clonePurchaseRequisition(record.id)
+  if (!cloned) {
+    message.warning('复制失败')
+    return
+  }
+  message.success(`已复制为 ${cloned.reqNo}`)
 }
 
 function openEdit(record) {

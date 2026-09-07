@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     title="选择销售订单"
-    width="920px"
+    width="1080px"
     :mask-closable="false"
     destroy-on-close
     class="sales-order-select-modal"
@@ -47,26 +47,60 @@
       </a-form-item>
     </a-form>
 
-    <a-table
-      :columns="columns"
-      :data-source="filteredList"
-      row-key="id"
-      size="small"
-      bordered
-      :pagination="{ pageSize: 8, size: 'small', showTotal: (t) => `共 ${t} 条` }"
-      :row-selection="rowSelection"
-      :scroll="{ x: 860, y: 360 }"
-      :custom-row="customRow"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'productNames'">
-          <span class="product-names-cell">{{ formatSalesOrderProductNames(record) }}</span>
-        </template>
-        <template v-else-if="column.key === 'createdAt'">
-          {{ resolveSalesOrderCreatedAt(record) }}
-        </template>
-      </template>
-    </a-table>
+    <div class="picker-body">
+      <div class="table-panel">
+        <a-table
+          :columns="columns"
+          :data-source="filteredList"
+          row-key="id"
+          size="small"
+          bordered
+          :pagination="{ pageSize: 8, size: 'small', showTotal: (t) => `共 ${t} 条` }"
+          :row-selection="rowSelection"
+          :scroll="{ x: 720, y: 360 }"
+          :custom-row="customRow"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'productNames'">
+              <span class="product-names-cell">{{ formatSalesOrderProductNames(record) }}</span>
+            </template>
+            <template v-else-if="column.key === 'createdAt'">
+              {{ resolveSalesOrderCreatedAt(record) }}
+            </template>
+          </template>
+        </a-table>
+      </div>
+
+      <div class="selected-panel">
+        <div class="selected-head">
+          <span class="selected-title">已选 {{ selectedRow ? 1 : 0 }} 项</span>
+          <a-button
+            v-if="selectedRow"
+            type="link"
+            size="small"
+            class="clear-btn"
+            @click="clearSelection"
+          >
+            清空
+          </a-button>
+        </div>
+        <div v-if="selectedRow" class="selected-list">
+          <div class="selected-item">
+            <div class="selected-item-main">
+              <span class="selected-code">{{ selectedRow.orderNo }}</span>
+              <span class="selected-name" :title="selectedRow.customerName">
+                {{ selectedRow.customerName || '—' }}
+              </span>
+              <span class="selected-meta">{{ formatSalesOrderProductNames(selectedRow) }}</span>
+            </div>
+            <a-button type="text" size="small" class="remove-btn" @click="clearSelection">
+              <CloseOutlined />
+            </a-button>
+          </div>
+        </div>
+        <a-empty v-else :image="false" description="请从左侧选择" class="selected-empty" />
+      </div>
+    </div>
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
@@ -78,6 +112,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { CloseOutlined } from '@ant-design/icons-vue'
 import { salesOrderState } from '@/store/salesOrderStore'
 import {
   filterSalesOrdersForPicker,
@@ -87,6 +122,7 @@ import {
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  excludeStatuses: { type: Array, default: undefined },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -107,13 +143,16 @@ const selectedRow = ref(null)
 const columns = [
   { title: '销售订单号', dataIndex: 'orderNo', width: 140, ellipsis: true },
   { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true },
-  { title: '产品名称', key: 'productNames', width: 220, ellipsis: true },
+  { title: '产品名称', key: 'productNames', width: 200, ellipsis: true },
   { title: '业务员', dataIndex: 'salesperson', width: 90 },
   { title: '创建时间', key: 'createdAt', width: 150 },
 ]
 
 const filteredList = computed(() =>
-  filterSalesOrdersForPicker(salesOrderState.orders, applied)
+  filterSalesOrdersForPicker(salesOrderState.orders, {
+    ...applied,
+    excludeStatuses: props.excludeStatuses,
+  })
     .slice()
     .sort((a, b) => {
       const ta = resolveSalesOrderCreatedAt(a)
@@ -138,6 +177,11 @@ function customRow(record) {
       selectedRow.value = record
     },
   }
+}
+
+function clearSelection() {
+  selectedRowKeys.value = []
+  selectedRow.value = null
 }
 
 watch(
@@ -195,6 +239,107 @@ export default { name: 'SalesOrderSelectModal' }
   :deep(.ant-form-item) {
     margin-bottom: 8px;
   }
+}
+
+.picker-body {
+  display: flex;
+  gap: 12px;
+  min-height: 420px;
+}
+
+.table-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+.selected-panel {
+  width: 240px;
+  flex-shrink: 0;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+.selected-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.selected-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+}
+
+.clear-btn {
+  padding: 0;
+  height: auto;
+}
+
+.selected-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}
+
+.selected-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+}
+
+.selected-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.selected-code {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.selected-name,
+.selected-meta {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-btn {
+  flex-shrink: 0;
+  color: rgba(0, 0, 0, 0.45);
+
+  &:hover {
+    color: #ff4d4f;
+  }
+}
+
+.selected-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
 }
 
 .product-names-cell {

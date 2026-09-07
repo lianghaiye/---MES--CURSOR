@@ -45,22 +45,13 @@
           </a-col>
           <a-col :span="6">
             <a-form-item label="销售订单">
-              <a-input-group compact>
-                <a-input
-                  :value="form.salesOrderNo"
-                  readonly
-                  size="small"
-                  style="width: calc(100% - 72px)"
-                  placeholder="请选择销售订单"
-                />
-                <a-button size="small" @click="salesOrderPickerOpen = true">选择</a-button>
-              </a-input-group>
+              <SalesOrderSearchSelect
+                :value="form.salesOrderNo"
+                @update:value="onSalesOrderNoChange"
+              />
             </a-form-item>
           </a-col>
         </a-row>
-        <div v-if="form.salesOrderNo" class="sales-order-summary">
-          {{ form.salesOrderNo }} / {{ form.customerName || '-' }} / {{ form.salesperson || '-' }}
-        </div>
       </div>
 
       <div class="section-block">
@@ -253,8 +244,6 @@
       <a-button type="primary" size="small" @click="handleSubmit">确定</a-button>
     </template>
   </FormCreateShell>
-
-  <SalesOrderSelectModal v-model:open="salesOrderPickerOpen" @confirm="onSalesOrderPicked" />
 </template>
 
 <script setup>
@@ -290,7 +279,7 @@ import { getProductBomById } from '@/store/productBomStore'
 import ProductMaterialSelect from './ProductMaterialSelect.vue'
 import WorkOrderBomSelect from './WorkOrderBomSelect.vue'
 import WorkOrderOwnerSelect from './WorkOrderOwnerSelect.vue'
-import SalesOrderSelectModal from './SalesOrderSelectModal.vue'
+import SalesOrderSearchSelect from '@/views/procurement/components/SalesOrderSearchSelect.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
@@ -317,7 +306,6 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
   },
 })
 
-const salesOrderPickerOpen = ref(false)
 const activeTab = ref('components')
 const componentLines = ref([])
 const lastPlanQty = ref(1)
@@ -488,9 +476,23 @@ function onBomSelect(bom) {
   syncingProductBom.value = false
 }
 
-function onSalesOrderPicked(order) {
+function onSalesOrderNoChange(orderNo) {
+  const next = orderNo || ''
+  form.salesOrderNo = next
+  if (!next) {
+    form.salesOrderId = ''
+    form.customerName = ''
+    form.salesperson = ''
+    return
+  }
+  const order = findSalesOrderByOrderNo(next)
+  if (!order) {
+    form.salesOrderId = ''
+    form.customerName = ''
+    form.salesperson = ''
+    return
+  }
   form.salesOrderId = order.id
-  form.salesOrderNo = order.orderNo
   form.customerName = order.customerName || ''
   form.salesperson = order.salesperson || ''
 }
@@ -829,17 +831,6 @@ export default { name: 'CreateWorkOrderModal' }
   :deep(.ant-form-item-label) {
     flex: 0 0 80px;
   }
-}
-
-.sales-order-summary {
-  margin-top: 8px;
-  margin-bottom: 4px;
-  padding: 6px 10px;
-  font-size: 13px;
-  color: #1677ff;
-  background: #e6f4ff;
-  border-radius: 6px;
-  line-height: 20px;
 }
 
 .section-block {
