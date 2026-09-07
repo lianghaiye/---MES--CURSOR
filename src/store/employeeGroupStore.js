@@ -9,7 +9,15 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.groups)) return parsed.groups
+      if (Array.isArray(parsed.groups)) {
+        const seed = createSeedGroups()
+        const ids = new Set(parsed.groups.map((g) => g.id))
+        const names = new Set(parsed.groups.map((g) => g.name))
+        seed.forEach((g) => {
+          if (!ids.has(g.id) && !names.has(g.name)) parsed.groups.push(g)
+        })
+        return parsed.groups
+      }
     }
   } catch {
     /* ignore */
@@ -117,6 +125,25 @@ function createSeedGroups() {
       workers: [
         { id: 'emp-4', name: '王五', isLeader: true },
         { id: 'emp-2', name: '张三', isLeader: false },
+      ],
+      remark: '',
+      createdAt: '2026-03-10',
+    },
+    {
+      id: 'eg-6',
+      code: 'WG20260310006',
+      name: '精加小组',
+      workCenter: '机泵',
+      position: '车间工人',
+      allowTaskGen: true,
+      leaderParticipates: true,
+      multiExecutor: true,
+      status: '启用',
+      leaderId: 'emp-2',
+      leaderName: '张三',
+      workers: [
+        { id: 'emp-2', name: '张三', isLeader: true },
+        { id: 'emp-9', name: '赵六', isLeader: false },
       ],
       remark: '',
       createdAt: '2026-03-10',
