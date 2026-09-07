@@ -1,5 +1,5 @@
 /**
- * 销售订单价格变更：申请 / 审核 / 回写订单有效价
+ * 销售订单变更：申请 / 审核 / 回写订单有效价与客户
  */
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
@@ -8,6 +8,7 @@ import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamS
 import { recalcSalesLinePricing } from '@/utils/salesOrderPricing'
 import {
   PRICE_CHANGE_STATUS,
+  isCustomerChanged,
   normalizePriceChangeRecord,
   recalcPriceChangeLine,
   summarizePriceChangeLines,
@@ -15,7 +16,7 @@ import {
 import { SALES_ORDER_STATUS, normalizeSalesOrderProgressStatus } from '@/utils/salesOrderStatus'
 
 const STORAGE_KEY = 'i_doms_sales_price_changes'
-const DATA_VERSION = 2
+const DATA_VERSION = 3
 
 function loadFromStorage() {
   try {
@@ -23,7 +24,8 @@ function loadFromStorage() {
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed || !Array.isArray(parsed.orders)) return null
-    if (parsed.version !== 1 && parsed.version !== DATA_VERSION) return null
+    const version = Number(parsed.version)
+    if (!Number.isFinite(version) || version < 1 || version > DATA_VERSION) return null
     return parsed.orders.map((record) => normalizePriceChangeRecord(record))
   } catch {
     /* ignore */
@@ -51,6 +53,8 @@ function buildSeed() {
       status: PRICE_CHANGE_STATUS.APPROVED,
       reasonType: '设计变更',
       reason: '客户确认叶轮材质升级，未发货部分按新单价执行。',
+      oldCustomerName: '山东化工泵业集团',
+      newCustomerName: '山东化工泵业集团',
       taxModeExcluding: true,
       lines: [
         {
@@ -116,7 +120,7 @@ export function getPendingPriceChange(salesOrderId) {
 export function getPendingPriceChangeDeliveryBlock(salesOrderId) {
   const pending = getPendingPriceChange(salesOrderId)
   if (!pending) return ''
-  return `存在待审核的价格变更「${pending.changeNo}」，请先完成审核后再申请发货`
+  return `存在待审核的订单变更「${pending.changeNo}」，请先完成审核后再申请发货`
 }
 
 export function canApplySalesPriceChange(order) {
@@ -129,13 +133,15 @@ export function submitSalesPriceChange({
   reasonType,
   reason,
   taxModeExcluding = true,
+  oldCustomerName = '',
+  newCustomerName = '',
   operator = 'admin1',
 }) {
   if (!canApplySalesPriceChange(salesOrder)) {
-    return { ok: false, message: '仅「进行中」的销售订单可申请价格变更' }
+    return { ok: false, message: '仅「进行中」的销售订单可申请订单变更' }
   }
   if (getPendingPriceChange(salesOrder.id)) {
-    return { ok: false, message: '已有待审核的价格变更，请先完成审核' }
+    return { ok: false, message: '已有待审核的订单变更，请先完成审核' }
   }
   const prepared = (lines || []).map((row) => {
     const next = { ...row }
@@ -146,11 +152,20 @@ export function submitSalesPriceChange({
     })
   })
   const summary = summarizePriceChangeLines(prepared)
-  if (!summary.changedCount) {
-    return { ok: false, message: '请至少修改一行单价或折扣' }
+  const originCustomer = String(oldCustomerName || salesOrder?.customerName || '').trim()
+  const nextCustomer = String(newCustomerName || originCustomer).trim()
+  const customerChanged = isCustomerChanged({
+    oldCustomerName: originCustomer,
+    newCustomerName: nextCustomer,
+  })
+  if (!summary.changedCount && !customerChanged) {
+    return { ok: false, message: '请至少修改客户名称或一行单价/折扣' }
   }
   if (!reasonType) {
     return { ok: false, message: '请选择变更原因' }
+  }
+  if (!nextCustomer) {
+    return { ok: false, message: '请选择客户名称' }
   }
 
   const now = dayjs().format('YYYY-MM-DD HH:mm')
@@ -163,6 +178,8 @@ export function submitSalesPriceChange({
     reasonType,
     reason: String(reason || '').trim(),
     taxModeExcluding: taxModeExcluding !== false,
+    oldCustomerName: originCustomer,
+    newCustomerName: nextCustomer,
     lines: prepared,
     oldAmountExTax: summary.oldAmountExTax,
     newAmountExTax: summary.newAmountExTax,
@@ -191,11 +208,11 @@ export function submitSalesPriceChange({
       ok: true,
       record: approved.change,
       autoApproved: true,
-      message: '价格变更已自动审批通过，订单有效价已更新',
+      message: '订单变更已自动审批通过，订单信息已更新',
     }
   }
 
-  return { ok: true, record, message: '价格变更已提交审核' }
+  return { ok: true, record, message: '订单变更已提交审核' }
 }
 
 function applyApprovedPrices(change) {
@@ -222,13 +239,16 @@ function applyApprovedPrices(change) {
       recalcSalesLinePricing(line, { taxModeExcluding: false, editMode: 'unitPrice' })
     }
   }
+  if (isCustomerChanged(change)) {
+    order.customerName = String(change.newCustomerName || '').trim()
+  }
   recalcOrderAmounts(order)
   return { ok: true, order }
 }
 
 export function approveSalesPriceChange(id, operator = 'admin1', opinion = '', extra = {}) {
   const change = salesPriceChangeState.orders.find((o) => o.id === id)
-  if (!change) return { ok: false, message: '价格变更单不存在' }
+  if (!change) return { ok: false, message: '订单变更单不存在' }
   if (change.status !== PRICE_CHANGE_STATUS.PENDING) {
     return { ok: false, message: '仅待审核单据可通过' }
   }
@@ -240,12 +260,12 @@ export function approveSalesPriceChange(id, operator = 'admin1', opinion = '', e
   change.opinion = opinion || '同意'
   change.autoApproved = Boolean(extra.autoApproved)
   persist()
-  return { ok: true, change, message: '价格变更已通过，订单有效价已更新' }
+  return { ok: true, change, message: '订单变更已通过，订单信息已更新' }
 }
 
 export function rejectSalesPriceChange(id, operator = 'admin1', opinion = '') {
   const change = salesPriceChangeState.orders.find((o) => o.id === id)
-  if (!change) return { ok: false, message: '价格变更单不存在' }
+  if (!change) return { ok: false, message: '订单变更单不存在' }
   if (change.status !== PRICE_CHANGE_STATUS.PENDING) {
     return { ok: false, message: '仅待审核单据可驳回' }
   }
@@ -254,5 +274,5 @@ export function rejectSalesPriceChange(id, operator = 'admin1', opinion = '') {
   change.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
   change.opinion = opinion || '驳回'
   persist()
-  return { ok: true, change, message: '价格变更已驳回' }
+  return { ok: true, change, message: '订单变更已驳回' }
 }

@@ -7,12 +7,15 @@
       :columns="columns"
       :data-source="records"
       :pagination="false"
-      :locale="{ emptyText: '暂无价格变更记录' }"
-      :scroll="{ x: 1480 }"
+      :locale="{ emptyText: '暂无订单变更记录' }"
+      :scroll="{ x: 1680 }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="priceChangeStatusColor(record.status)">{{ record.status }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'customer'">
+          {{ customerDisplay(record) }}
         </template>
         <template v-else-if="column.key === 'deltaAmountExTax'">
           <span :class="deltaClass(record.deltaAmountExTax)">
@@ -82,9 +85,11 @@ export default { name: 'SalesPriceChangeHistoryPanel' }
 import { computed } from 'vue'
 import { listPriceChangesByOrderId, salesPriceChangeState } from '@/store/salesPriceChangeStore'
 import {
+  formatCustomerChangeHint,
   formatPriceChangeAbsMoney,
   formatPriceChangeDiscount,
   formatPriceChangeMoney,
+  isCustomerChanged,
   normalizePriceChangeRecord,
   priceChangeStatusColor,
 } from '@/utils/salesPriceChange'
@@ -101,6 +106,7 @@ const records = computed(() => {
 const columns = [
   { title: '变更单号', dataIndex: 'changeNo', width: 150 },
   { title: '状态', key: 'status', width: 88 },
+  { title: '客户名称', key: 'customer', width: 220, ellipsis: true },
   { title: '原因', dataIndex: 'reasonType', width: 100 },
   { title: '说明', dataIndex: 'reason', ellipsis: true },
   { title: '变更后（不含税）', key: 'newAmountExTax', width: 148, align: 'right' },
@@ -143,6 +149,13 @@ const lineColumns = [
   { title: '差额（不含税）', key: 'deltaAmountExTax', width: 118, align: 'right' },
   { title: '差额（含税）', key: 'deltaAmountInTax', width: 110, align: 'right' },
 ]
+
+function customerDisplay(record) {
+  if (isCustomerChanged(record)) {
+    return formatCustomerChangeHint(record.oldCustomerName, record.newCustomerName)
+  }
+  return record.newCustomerName || record.oldCustomerName || '—'
+}
 
 function deltaClass(val) {
   const n = Number(val) || 0

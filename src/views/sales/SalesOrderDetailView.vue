@@ -44,7 +44,7 @@
                   >申请发货</a-button
                 >
                 <a-button size="small" @click="handlePriceChange">
-                  {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
+                  {{ pendingPriceChange ? '审核订单变更' : '订单变更' }}
                 </a-button>
                 <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
                 <a-button size="small" @click="handleComplete">完成</a-button>
@@ -77,7 +77,7 @@
                   />
                 </template>
               </a-tab-pane>
-              <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
+              <a-tab-pane key="price-change" :tab="`订单变更 (${priceChangeCount})`" />
               <a-tab-pane key="industrial-label" :tab="`工业标识 (${industrialLabelSnCount})`" />
               <a-tab-pane key="approval" tab="审批信息" />
             </a-tabs>
@@ -91,7 +91,7 @@
               type="warning"
               show-icon
               class="pending-price-alert"
-              :message="`价格变更「${pendingPriceChange.changeNo}」待审核，通过前不可申请发货。`"
+              :message="`订单变更「${pendingPriceChange.changeNo}」待审核，通过前不可申请发货。`"
             />
             <div class="section-card">
               <div class="section-title">基本信息</div>
@@ -795,7 +795,7 @@
 
           <template v-else-if="activeTab === 'price-change'">
             <div class="section-card">
-              <div class="section-title">价格变更履历</div>
+              <div class="section-title">订单变更履历</div>
               <SalesPriceChangeHistoryPanel :order="order" />
             </div>
           </template>
@@ -926,7 +926,7 @@
             </div>
 
             <div class="section-card">
-              <div class="section-title">价格变更审批</div>
+              <div class="section-title">订单变更审批</div>
               <a-divider style="margin: 12px 0" />
               <div v-if="priceChangeApprovalGroups.length" class="price-change-approval">
                 <div
@@ -940,6 +940,9 @@
                       {{ group.status }}
                     </a-tag>
                     <span v-if="group.reasonType" class="group-reason">{{ group.reasonType }}</span>
+                  </div>
+                  <div v-if="group.customerHint" class="group-customer">
+                    {{ group.customerHint }}
                   </div>
                   <div class="history-list">
                     <div
@@ -960,7 +963,7 @@
                   </div>
                 </div>
               </div>
-              <a-empty v-else description="暂无价格变更审批记录" />
+              <a-empty v-else description="暂无订单变更审批记录" />
             </div>
           </template>
         </div>
@@ -1973,7 +1976,7 @@ function handleApplyDelivery() {
 function handlePriceChange() {
   if (!order.value) return
   if (!canApplySalesPriceChange(order.value)) {
-    message.warning('仅「进行中」的销售订单可申请价格变更')
+    message.warning('仅「进行中」的销售订单可申请订单变更')
     return
   }
   priceChangeOrder.value = order.value
@@ -2365,6 +2368,12 @@ function openBomDetail(bomId, bomName) {
 .group-reason {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
+}
+
+.group-customer {
+  margin: -2px 0 8px;
+  font-size: 12px;
+  color: #d46b08;
 }
 
 .history-time {

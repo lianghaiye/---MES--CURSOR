@@ -13,12 +13,12 @@
       type="warning"
       show-icon
       class="pending-alert"
-      message="待审核：通过后将回写销售订单有效单价与行折扣，后续发货按新价计算。"
+      message="待审核：通过后将回写销售订单单价、折扣；若客户有变更则同步更新客户名称。后续发货按新价计算。"
     />
 
     <a-form layout="vertical" class="price-change-form">
       <a-row :gutter="12">
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item label="变更原因" required>
             <a-select
               v-model:value="form.reasonType"
@@ -28,7 +28,26 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="16">
+        <a-col :span="8">
+          <a-form-item label="客户名称" required>
+            <CustomerSelect
+              v-model="form.newCustomerName"
+              size="middle"
+              placeholder="请搜索或选择客户名称"
+              :disabled="isReview"
+              @change="onCustomerNameChange"
+            />
+            <div v-if="isCustomerChanged(form)" class="customer-change-hint">
+              <span>原客户：{{ form.oldCustomerName || '—' }}</span>
+              <span class="hint-arrow" aria-hidden="true">→</span>
+              <span>新客户：{{ form.newCustomerName || '—' }}</span>
+            </div>
+            <div v-else-if="customerChangeHint" class="customer-change-hint">
+              {{ customerChangeHint }}
+            </div>
+          </a-form-item>
+        </a-col>
+        <a-col :span="10">
           <a-form-item label="变更说明">
             <a-input
               v-model:value="form.reason"
@@ -177,9 +196,11 @@ import {
   PRICE_CHANGE_REASON_OPTIONS,
   PRICE_CHANGE_STATUS,
   buildPriceChangeDraftLines,
+  formatCustomerChangeHint,
   formatPriceChangeAbsMoney,
   formatPriceChangeDiscount,
   formatPriceChangeMoney,
+  isCustomerChanged,
   normalizePriceChangeLine,
   recalcPriceChangeLine,
   summarizePriceChangeLines,
@@ -189,6 +210,7 @@ import {
   rejectSalesPriceChange,
   submitSalesPriceChange,
 } from '@/store/salesPriceChangeStore'
+import CustomerSelect from './CustomerSelect.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -219,8 +241,8 @@ const inTaxColumnKeys = new Set([
 
 const modalTitle = computed(() =>
   isReview.value
-    ? `审核价格变更 ${props.pendingChange?.changeNo || ''}`.trim()
-    : `价格变更 ${props.salesOrder?.orderNo || ''}`.trim(),
+    ? `审核订单变更 ${props.pendingChange?.changeNo || ''}`.trim()
+    : `订单变更 ${props.salesOrder?.orderNo || ''}`.trim(),
 )
 
 const taxModeHint = computed(() =>
@@ -236,7 +258,19 @@ const canEditDiscount = computed(
 const form = reactive({
   reasonType: undefined,
   reason: '',
+  oldCustomerName: '',
+  newCustomerName: '',
   lines: [],
+})
+
+const customerChangeHint = computed(() => {
+  if (isCustomerChanged(form)) {
+    return formatCustomerChangeHint(form.oldCustomerName, form.newCustomerName)
+  }
+  if (isReview.value && (form.newCustomerName || form.oldCustomerName)) {
+    return `客户名称：${form.newCustomerName || form.oldCustomerName}`
+  }
+  return ''
 })
 
 const moneyKeys = new Set([
@@ -310,12 +344,20 @@ watch(
     if (props.pendingChange) {
       form.reasonType = props.pendingChange.reasonType
       form.reason = props.pendingChange.reason || ''
+      form.oldCustomerName = String(
+        props.pendingChange.oldCustomerName || props.salesOrder?.customerName || '',
+      ).trim()
+      form.newCustomerName = String(
+        props.pendingChange.newCustomerName || form.oldCustomerName,
+      ).trim()
       taxModeExcluding.value = props.pendingChange.taxModeExcluding !== false
       form.lines = attachDiscountPercent(props.pendingChange.lines)
       return
     }
     form.reasonType = undefined
     form.reason = ''
+    form.oldCustomerName = String(props.salesOrder?.customerName || '').trim()
+    form.newCustomerName = form.oldCustomerName
     taxModeExcluding.value = true
     form.lines = attachDiscountPercent(buildPriceChangeDraftLines(props.salesOrder))
   },
@@ -357,6 +399,13 @@ function handleCancel() {
   emit('update:open', false)
 }
 
+function onCustomerNameChange(nextName) {
+  form.newCustomerName = nextName || ''
+  if (isCustomerChanged(form)) {
+    message.info(formatCustomerChangeHint(form.oldCustomerName, form.newCustomerName))
+  }
+}
+
 function handleSubmit() {
   const res = submitSalesPriceChange({
     salesOrder: props.salesOrder,
@@ -364,6 +413,8 @@ function handleSubmit() {
     reasonType: form.reasonType,
     reason: form.reason,
     taxModeExcluding: taxModeExcluding.value,
+    oldCustomerName: form.oldCustomerName,
+    newCustomerName: form.newCustomerName,
   })
   if (!res.ok) {
     message.warning(res.message)
@@ -404,6 +455,23 @@ function handleReject() {
 
 .price-change-form {
   margin-bottom: 4px;
+}
+
+.customer-change-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #d46b08;
+}
+
+.hint-arrow {
+  margin: 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fa8c16;
 }
 
 .table-toolbar {

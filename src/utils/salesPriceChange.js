@@ -27,6 +27,31 @@ export function lineChangeAmount(qty, unitPrice) {
   return round2((Number(qty) || 0) * (Number(unitPrice) || 0))
 }
 
+/** 取该销售行最近一次已通过价格变更的新单价；无变更则返回 null */
+export function pickLatestApprovedLinePrices(changes = [], salesLineId) {
+  if (!salesLineId) return null
+  const approved = (changes || [])
+    .filter((c) => c.status === PRICE_CHANGE_STATUS.APPROVED)
+    .slice()
+    .sort((a, b) =>
+      String(b.approvedAt || b.createdAt || '').localeCompare(
+        String(a.approvedAt || a.createdAt || ''),
+      ),
+    )
+  for (const change of approved) {
+    const row = (change.lines || []).find((r) => r.salesLineId === salesLineId)
+    if (!row) continue
+    const ex = Number(row.newUnitPriceExTax)
+    const inc = Number(row.newUnitPriceInTax)
+    if (!Number.isFinite(ex) && !Number.isFinite(inc)) continue
+    return {
+      unitPriceExTax: Number.isFinite(ex) ? ex : 0,
+      unitPriceInTax: Number.isFinite(inc) ? inc : 0,
+    }
+  }
+  return null
+}
+
 function lineDiscountAmount(listPrice, qty, discountRate) {
   const rate = normalizeDiscountRate(discountRate, 1)
   return round2(
@@ -181,6 +206,8 @@ export function normalizePriceChangeRecord(record) {
   return {
     ...record,
     taxModeExcluding,
+    oldCustomerName: record.oldCustomerName || '',
+    newCustomerName: record.newCustomerName || record.oldCustomerName || '',
     lines,
     oldAmountExTax: summary.oldAmountExTax,
     newAmountExTax: summary.newAmountExTax,
@@ -220,12 +247,25 @@ export function formatPriceChangeAbsMoney(val) {
   return `${sign}￥${formatGroupedSmartMoney(Math.abs(n))}`
 }
 
+export function isCustomerChanged(change = {}) {
+  const oldName = String(change.oldCustomerName || '').trim()
+  const newName = String(change.newCustomerName || '').trim()
+  return Boolean(oldName && newName && oldName !== newName)
+}
+
+export function formatCustomerChangeHint(oldName, newName) {
+  return `原客户：${oldName || '—'} → 新客户：${newName || '—'}`
+}
+
 export function buildPriceChangeApprovalGroups(changes = []) {
   return (changes || []).map((change) => {
+    const oldCustomerName = String(change.oldCustomerName || '').trim()
+    const newCustomerName = String(change.newCustomerName || oldCustomerName).trim()
+    const customerChanged = isCustomerChanged({ oldCustomerName, newCustomerName })
     const items = [
       {
         name: change.submitter || change.creator || '—',
-        role: '价格变更申请',
+        role: '订单变更申请',
         result: '已提交',
         time: change.submittedAt || change.createdAt || '—',
         opinion: [change.reasonType, change.reason].filter(Boolean).join('：'),
@@ -237,7 +277,7 @@ export function buildPriceChangeApprovalGroups(changes = []) {
     ) {
       items.push({
         name: change.approver || '—',
-        role: change.autoApproved ? '系统自动审批' : '价格变更审核',
+        role: change.autoApproved ? '系统自动审批' : '订单变更审核',
         result: change.status === PRICE_CHANGE_STATUS.APPROVED ? '已通过' : '已驳回',
         time: change.approvedAt || '—',
         opinion: change.opinion || '',
@@ -245,7 +285,7 @@ export function buildPriceChangeApprovalGroups(changes = []) {
     } else {
       items.push({
         name: '—',
-        role: '价格变更审核',
+        role: '订单变更审核',
         result: '待审核',
         time: '',
         opinion: '',
@@ -256,6 +296,14 @@ export function buildPriceChangeApprovalGroups(changes = []) {
       changeNo: change.changeNo,
       status: change.status,
       reasonType: change.reasonType,
+      oldCustomerName,
+      newCustomerName,
+      customerName: newCustomerName || oldCustomerName,
+      customerHint: customerChanged
+        ? formatCustomerChangeHint(oldCustomerName, newCustomerName)
+        : newCustomerName
+          ? `客户名称：${newCustomerName}`
+          : '',
       items,
     }
   })

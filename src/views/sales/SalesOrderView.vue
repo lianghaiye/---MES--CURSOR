@@ -119,7 +119,7 @@
           <RollbackOutlined />
           反审
         </a-button>
-        <a-button size="small" @click="openToolbarPriceChangeApprove">审核价格变更</a-button>
+        <a-button size="small" @click="openToolbarPriceChangeApprove">审核订单变更</a-button>
         <a-button size="small" @click="openDeliveryModal">
           <FileTextOutlined />
           申请发货
@@ -829,12 +829,12 @@ function openDeliveryForOrder(order) {
 }
 
 function rowPriceChangeLabel(order) {
-  return getPendingPriceChange(order?.id) ? '审核价格变更' : '价格变更'
+  return getPendingPriceChange(order?.id) ? '审核订单变更' : '订单变更'
 }
 
 function openPriceChangeForOrder(order) {
   if (!canApplySalesPriceChange(order)) {
-    message.warning('仅「进行中」的销售订单可申请价格变更')
+    message.warning('仅「进行中」的销售订单可申请订单变更')
     return
   }
   priceChangeOrder.value = order
@@ -843,7 +843,7 @@ function openPriceChangeForOrder(order) {
 
 function openToolbarPriceChangeApprove() {
   if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条待审核价格变更的销售订单')
+    message.warning('请勾选一条待审核订单变更的销售订单')
     return
   }
   const order = salesOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
@@ -852,7 +852,7 @@ function openToolbarPriceChangeApprove() {
     return
   }
   if (!getPendingPriceChange(order.id)) {
-    message.warning('当前订单没有待审核的价格变更')
+    message.warning('当前订单没有待审核的订单变更')
     return
   }
   priceChangeOrder.value = order
