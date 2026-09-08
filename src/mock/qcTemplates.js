@@ -694,7 +694,57 @@ export const mockQcTemplates = [
   (() => {
     const fields = buildTemplateFields({
       method: true,
-      qty: false,
+      qty: true,
+      remark: true,
+      conclusion: true,
+      extras: [
+        {
+          code: 'QC_WX_SURFACE',
+          name: '回货外观',
+          type: 'radio',
+          options: ['合格', '轻微缺陷', '不合格'],
+          judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
+          passOptions: ['合格', '轻微缺陷'],
+          sortOrder: 10,
+        },
+        {
+          code: 'QC_WX_DIM',
+          name: '关键尺寸',
+          type: 'number',
+          allowDecimal: true,
+          withUnit: true,
+          unit: 'mm',
+          unitPosition: QC_UNIT_POSITION.SUFFIX,
+          judgeRule: QC_FIELD_JUDGE_RULE.RANGE,
+          standardMin: 49.9,
+          standardMax: 50.1,
+          sortOrder: 11,
+        },
+      ],
+    })
+    return createQcTemplate({
+      id: 'qct-usr-wx-1',
+      code: 'QCT-USR-WX-001',
+      name: '外协回货检（全部达标·2项）',
+      status: '启用',
+      type: '自定义模板',
+      isSystem: false,
+      scopeType: QC_TEMPLATE_SCOPE_TYPE.GLOBAL,
+      bizScope: '外协回货检',
+      objects: [],
+      fields,
+      sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.ALL_PASS,
+      sheetConclusionOptionItems: SHEET_CONCLUSION_STRICT.map((o) => ({ ...o })),
+      creator: '质检员A',
+      createdAt: '2026-08-20 10:00:00',
+      updater: '质检员A',
+      updatedAt: '2026-09-08 11:00:00',
+    })
+  })(),
+  (() => {
+    const fields = buildTemplateFields({
+      method: true,
+      qty: true,
       remark: true,
       conclusion: true,
       extras: [
@@ -711,7 +761,7 @@ export const mockQcTemplates = [
     return createQcTemplate({
       id: 'qct-usr-wx-draft',
       code: 'QCT-USR-004',
-      name: '外协回货检草稿',
+      name: '外协回货检（人工判定·草稿）',
       status: '停用',
       type: '自定义模板',
       isSystem: false,

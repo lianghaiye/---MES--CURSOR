@@ -17,7 +17,7 @@
         <a-row :gutter="[12, 12]" style="width: 100%">
           <a-col :span="8">
             <a-form-item label="质检类型">
-              <a-input value="来料质检" disabled size="small" />
+              <a-input :value="qcTypeLabel" disabled size="small" />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -110,12 +110,21 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { createIncomingQcFromReceipt } from '@/store/qcTaskStore'
-import { attachReceiptQcSheet, hasReceiptQcSheet } from '@/store/purchaseReceiptStore'
+import { createInboundQcFromReceipt } from '@/store/qcTaskStore'
+import {
+  attachReceiptQcSheet as attachPurchaseReceiptQcSheet,
+  hasReceiptQcSheet as hasPurchaseReceiptQcSheet,
+} from '@/store/purchaseReceiptStore'
+import {
+  attachReceiptQcSheet as attachOutsourcingReceiptQcSheet,
+  hasReceiptQcSheet as hasOutsourcingReceiptQcSheet,
+} from '@/store/outsourcingReceiptStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   receipt: { type: Object, default: null },
+  /** 来料质检 | 外协回货检 */
+  bizScope: { type: String, default: '来料质检' },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -127,6 +136,8 @@ const form = reactive({
   remark: '',
 })
 
+const isOutsourcing = computed(() => props.bizScope === '外协回货检')
+const qcTypeLabel = computed(() => (isOutsourcing.value ? '外协回货检' : '来料质检'))
 const receiptNo = computed(() => props.receipt?.receiptNo || '—')
 
 const columns = [
@@ -156,7 +167,7 @@ function cloneLines(receipt) {
       material: l.material || l.materialGrade || '',
       variantSummary: l.variantSummary || '',
       unit: l.unit || '件',
-      purchaseQty: l.purchaseQty,
+      purchaseQty: l.purchaseQty ?? l.planQty,
       receiptQty: l.receiptQty ?? l.qty,
       receivingWarehouse: l.receivingWarehouse || l.warehouse || '',
     }))
@@ -212,7 +223,10 @@ async function handleOk() {
     message.warning('未找到收货单')
     return Promise.reject()
   }
-  if (hasReceiptQcSheet(props.receipt)) {
+  const alreadyHasQc = isOutsourcing.value
+    ? hasOutsourcingReceiptQcSheet(props.receipt)
+    : hasPurchaseReceiptQcSheet(props.receipt)
+  if (alreadyHasQc) {
     message.warning('该收货单已生成质检单')
     return Promise.reject()
   }
@@ -223,7 +237,7 @@ async function handleOk() {
 
   saving.value = true
   try {
-    const res = createIncomingQcFromReceipt({
+    const res = createInboundQcFromReceipt({
       receipt: {
         ...props.receipt,
         lineItems: lines.value,
@@ -231,6 +245,8 @@ async function handleOk() {
       lineIds: lines.value.map((l) => l.id),
       qcNo: form.qcNo,
       remark: form.remark,
+      bizScope: props.bizScope,
+      sourceType: isOutsourcing.value ? 'outsourcing_receipt' : 'purchase_receipt',
     })
 
     if (!res.ok) {
@@ -238,7 +254,10 @@ async function handleOk() {
       return Promise.reject()
     }
 
-    attachReceiptQcSheet(props.receipt.id, {
+    const attach = isOutsourcing.value
+      ? attachOutsourcingReceiptQcSheet
+      : attachPurchaseReceiptQcSheet
+    attach(props.receipt.id, {
       qcNo: res.task.qcNo,
       qcStatus: '质检中',
     })

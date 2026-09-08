@@ -19,7 +19,7 @@ export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 const STORAGE_KEY = 'i_doms_qc_tasks'
 const STORAGE_VERSION = 3
 const SEED_VERSION_KEY = 'i_doms_qc_tasks_seed_v'
-const CURRENT_SEED_VERSION = '9'
+const CURRENT_SEED_VERSION = '10'
 
 export const QC_TASK_STATUS = {
   PENDING: '待质检',
@@ -615,12 +615,17 @@ export function createManualQcTask(payload = {}) {
 }
 
 /**
- * 采购收货生成来料质检单（一单多行；每行独立匹配并冻结质检模板）
- * @param {{ receipt, lineIds?: string[], qcNo?: string, remark?: string }} payload
+ * 收货单生成质检单（一单多行；每行独立匹配并冻结质检模板）
+ * 支持来料质检 / 外协回货检
+ * @param {{ receipt, lineIds?: string[], qcNo?: string, remark?: string, bizScope?: string, sourceType?: string }} payload
  */
-export function createIncomingQcFromReceipt(payload = {}) {
+export function createInboundQcFromReceipt(payload = {}) {
   const receipt = payload.receipt
   if (!receipt?.id) return { ok: false, message: '收货单无效' }
+
+  const bizScope = payload.bizScope || '来料质检'
+  const sourceType =
+    payload.sourceType || (bizScope === '外协回货检' ? 'outsourcing_receipt' : 'purchase_receipt')
 
   const allLines = receipt.lineItems || receipt.lines || []
   const lineIdSet =
@@ -655,12 +660,12 @@ export function createIncomingQcFromReceipt(payload = {}) {
         categoryCode: line.categoryCode || '',
         categoryKey: line.categoryKey || '',
         unit: line.unit || '件',
-        purchaseQty: line.purchaseQty,
+        purchaseQty: line.purchaseQty ?? line.planQty,
         receiptQty: line.receiptQty ?? line.qty,
         receivingWarehouse: line.receivingWarehouse || line.warehouse || '',
         inspectQty: line.receiptQty ?? line.qty ?? 0,
       },
-      { bizScope: '来料质检' },
+      { bizScope },
     )
     if (!bound.ok) return { ok: false, message: bound.message || '模板匹配失败' }
     boundLines.push(bound.line)
@@ -669,8 +674,8 @@ export function createIncomingQcFromReceipt(payload = {}) {
   const first = boundLines[0]
   const summary = summarizeTaskTemplates(boundLines)
   const task = createQcTask({
-    bizScope: '来料质检',
-    sourceType: 'purchase_receipt',
+    bizScope,
+    sourceType,
     sourceDocId: receipt.id,
     sourceDocNo: receipt.receiptNo || '',
     itemCode: first.itemCode || '',
@@ -693,6 +698,24 @@ export function createIncomingQcFromReceipt(payload = {}) {
 
   const saved = addQcTask(task)
   return { ok: true, task: saved }
+}
+
+/** @deprecated 使用 createInboundQcFromReceipt；保留兼容采购收货入口 */
+export function createIncomingQcFromReceipt(payload = {}) {
+  return createInboundQcFromReceipt({
+    ...payload,
+    bizScope: '来料质检',
+    sourceType: 'purchase_receipt',
+  })
+}
+
+/** 外协收货生成外协回货检质检单 */
+export function createOutsourcingQcFromReceipt(payload = {}) {
+  return createInboundQcFromReceipt({
+    ...payload,
+    bizScope: '外协回货检',
+    sourceType: 'outsourcing_receipt',
+  })
 }
 
 export function sumTaskInspectQty(task) {

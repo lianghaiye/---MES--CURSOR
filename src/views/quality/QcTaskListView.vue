@@ -40,7 +40,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col v-if="isIncomingScope" :xs="24" :sm="12" :md="6">
+          <a-col v-if="isInboundScope" :xs="24" :sm="12" :md="6">
             <a-form-item label="供应商">
               <a-input
                 v-model:value="filters.supplier"
@@ -168,7 +168,7 @@
             {{ formatDateTimeMinute(record.createdAt) }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <template v-if="isIncomingScope">
+            <template v-if="isInboundScope">
               <a-button
                 v-if="canInspectQcTask(record)"
                 type="link"
@@ -250,17 +250,19 @@ import { getOutsourcingReceiptById } from '@/store/outsourcingReceiptStore'
 import { canGenerateInbound, getPurchaseOrderById } from '@/store/purchaseOrderStore'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { useTabs } from '@/composables/useTabs'
+import { getQcTaskRouteBundle, isInboundQcBizScope } from '@/utils/qcTaskRoutes'
 
 const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
 const bizScope = computed(() => route.meta.bizScope || '来料质检')
+const routeBundle = computed(() => getQcTaskRouteBundle(bizScope.value))
 const INBOUND_SCOPES = new Set(['来料质检', '外协回货检'])
 const isInboundScope = computed(() => INBOUND_SCOPES.has(bizScope.value))
 const isIncomingScope = computed(() => bizScope.value === '来料质检')
 const isProductionScope = computed(() => !isInboundScope.value)
-/** 本期：来料质检不开放列表「新增」，由采购收货生成 */
+/** 来料禁止列表新建；外协可手工建，也支持从收货单生成 */
 const showCreateButton = computed(() => bizScope.value !== '来料质检')
 
 const sourceDocLabel = computed(() =>
@@ -318,11 +320,6 @@ const commonColumns = [
   { title: '检验数量', key: 'inspectQty', width: 90, align: 'right' },
 ]
 
-const inboundExtraColumns = [
-  { title: '来源单号', dataIndex: 'sourceDocNo', width: 140 },
-  { title: '质检模板', dataIndex: 'templateName', width: 140, ellipsis: true },
-]
-
 const productionExtraColumns = [
   { title: '工单号', dataIndex: 'workOrderNo', width: 130 },
   { title: '工序', dataIndex: 'processName', width: 100 },
@@ -336,15 +333,11 @@ const tailColumns = [
 ]
 
 const displayColumns = computed(() => {
-  if (isIncomingScope.value) return incomingColumns
-  return [
-    ...commonColumns,
-    ...(isInboundScope.value ? inboundExtraColumns : productionExtraColumns),
-    ...tailColumns,
-  ]
+  if (isInboundScope.value) return incomingColumns
+  return [...commonColumns, ...productionExtraColumns, ...tailColumns]
 })
 
-const tableScrollX = computed(() => (isIncomingScope.value ? 1300 : 1400))
+const tableScrollX = computed(() => (isInboundScope.value ? 1300 : 1400))
 
 const filteredList = computed(() => {
   let list = filterQcTasks(qcTaskState.tasks, appliedFilters.value)
@@ -463,13 +456,14 @@ function handleReset() {
   handleSearch()
 }
 
-/** 来料质检：新标签页打开详情 */
+/** 来料 / 外协：新标签页打开详情 */
 function openDetailTab(record) {
   if (!record?.id) return
-  if (isIncomingScope.value) {
-    const path = `/quality/incoming-qc/${record.id}`
-    openTab(path, record.qcNo || '来料质检详情')
-    router.push({ name: 'quality-incoming-qc-detail', params: { id: record.id } })
+  if (isInboundQcBizScope(bizScope.value)) {
+    const bundle = routeBundle.value
+    const path = `${bundle.listPath}/${record.id}`
+    openTab(path, record.qcNo || bundle.detailTitle)
+    router.push({ name: bundle.detailName, params: { id: record.id } })
     return
   }
   openDetailDrawer(record)
@@ -485,9 +479,10 @@ function openInspect(record) {
     message.warning('当前状态不可质检')
     return
   }
-  const path = `/quality/incoming-qc/${record.id}/inspect`
+  const bundle = getQcTaskRouteBundle(record.bizScope || bizScope.value)
+  const path = `${bundle.listPath}/${record.id}/inspect`
   openTab(path, `质检 ${record.qcNo || ''}`.trim())
-  router.push({ name: 'quality-incoming-qc-inspect', params: { id: record.id } })
+  router.push({ name: bundle.inspectName, params: { id: record.id } })
 }
 
 function openGenerateInbound() {

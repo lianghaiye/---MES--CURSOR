@@ -64,13 +64,15 @@
         <div class="section-card">
           <div class="section-title">质检明细</div>
           <a-table
+            class="detail-lines-table"
             :columns="lineColumns"
             :data-source="task.lineItems || []"
             row-key="id"
             size="small"
             bordered
             :pagination="false"
-            :scroll="{ x: 1100 }"
+            :scroll="{ x: 1000 }"
+            :sticky="tableSticky"
             v-model:expandedRowKeys="expandedKeys"
           >
             <template #expandIcon="{ expanded, onExpand: onExp, record }">
@@ -139,6 +141,7 @@ import { ensureQcLibraryDemoSeed } from '@/store/qcFieldLibraryStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { formatQty } from '@/utils/numberFormat'
+import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
 import QcLineFieldValuesReadonly from './components/QcLineFieldValuesReadonly.vue'
 
 onMounted(() => {
@@ -153,6 +156,10 @@ const loading = ref(false)
 const task = ref(null)
 const expandedKeys = ref([])
 
+const routeBundle = computed(() =>
+  getQcTaskRouteBundle(route.meta.bizScope || task.value?.bizScope || '来料质检'),
+)
+
 const lineColumns = [
   { title: '序号', key: 'index', width: 52, align: 'center' },
   { title: '产品名称', dataIndex: 'itemName', width: 130, ellipsis: true },
@@ -165,8 +172,16 @@ const lineColumns = [
   { title: '单位', dataIndex: 'unit', width: 56 },
   { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 100 },
   { title: '质检结果', key: 'lineQcResult', width: 100 },
-  { title: '处理方案', dataIndex: 'treatmentPlan', width: 100 },
 ]
+
+function getPageScrollContainer() {
+  return document.querySelector('.page-content') || window
+}
+
+const tableSticky = {
+  offsetHeader: 56,
+  getContainer: getPageScrollContainer,
+}
 
 const canInspect = computed(() => canInspectQcTask(task.value))
 
@@ -219,9 +234,10 @@ function channelLabel(channel) {
 
 function openInspect() {
   if (!task.value?.id) return
-  const path = `/quality/incoming-qc/${task.value.id}/inspect`
+  const bundle = routeBundle.value
+  const path = `${bundle.listPath}/${task.value.id}/inspect`
   openTab(path, `质检 ${task.value.qcNo || ''}`.trim())
-  router.push({ name: 'quality-incoming-qc-inspect', params: { id: task.value.id } })
+  router.push({ name: bundle.inspectName, params: { id: task.value.id } })
 }
 </script>
 
@@ -265,6 +281,16 @@ function openInspect() {
   margin-bottom: 10px;
   font-size: 14px;
   font-weight: 600;
+}
+
+.detail-lines-table {
+  :deep(.ant-table-sticky-holder) {
+    z-index: 20;
+  }
+
+  :deep(.ant-table-thead > tr > th) {
+    background: #fafafa;
+  }
 }
 
 .expand-form-wrap {

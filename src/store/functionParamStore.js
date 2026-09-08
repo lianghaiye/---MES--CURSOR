@@ -107,6 +107,27 @@ export const SALES_OUTBOUND_ISSUE_RULE_DESCRIPTION =
   '先进先出（FIFO）：发货时不管批次是不是本单生产的，按仓库里批次先后扣减，适合不需要按订单锁货的场景。'
 
 /**
+ * 随货附件在哪一环节确定纳入清单
+ * - apply：销售申请发货时勾选纳入、填写套数
+ * - warehouse：申请发货不展示附件；仓管在发货环节（随货查询）确定
+ * 无论哪种配置，「库存 → 随货查询」都可以维护本票附件
+ */
+export const SHIP_ATTACHMENT_DECIDE_STAGES = {
+  APPLY: 'apply',
+  WAREHOUSE: 'warehouse',
+}
+
+export const SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS = [
+  { value: SHIP_ATTACHMENT_DECIDE_STAGES.APPLY, label: '申请发货时确定' },
+  { value: SHIP_ATTACHMENT_DECIDE_STAGES.WAREHOUSE, label: '仓管发货时确定' },
+]
+
+export const SHIP_ATTACHMENT_DECIDE_STAGE_DESCRIPTION =
+  '申请发货时确定：销售在申请发货页勾选纳入、填写套数。' +
+  '仓管发货时确定：申请发货页不展示发货附件及相关提示。' +
+  '无论哪种配置，仓管都可在「库存 → 随货查询」维护本票纳入清单；纳入后随同一张销售出库单出库。'
+
+/**
  * 下料结算物料的发料方式（仅作用于勾选「需要下料结算」的物料；普通料固定按出库数量扣）
  * - partial：部分出+余料留原批（按出库数量扣，不因整批多扣；无人填下料结算时常用）
  * - whole_with_remnant：整批出+下料结算回库（实发可大于出库数量；有人填实耗时用）
@@ -318,6 +339,11 @@ export const FUNCTION_PARAM_ROWS = [
     description: SALES_OUTBOUND_ISSUE_RULE_DESCRIPTION,
   },
   {
+    key: 'shipAttachmentDecideStage',
+    scenario: '随货附件确定环节',
+    description: SHIP_ATTACHMENT_DECIDE_STAGE_DESCRIPTION,
+  },
+  {
     key: 'dualUnitIssueStrategy',
     scenario: '下料结算发料方式',
     description: DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION,
@@ -359,6 +385,11 @@ function normalizeSalesOutboundIssueRule(mode) {
   return SALES_OUTBOUND_ISSUE_RULES.BY_ORDER
 }
 
+function normalizeShipAttachmentDecideStage(mode) {
+  if (SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS.some((item) => item.value === mode)) return mode
+  return SHIP_ATTACHMENT_DECIDE_STAGES.APPLY
+}
+
 function normalizeDualUnitIssueStrategy(mode) {
   if (
     mode === DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL ||
@@ -392,6 +423,9 @@ function loadFromStorage() {
           inventoryDeductMode: normalizeInventoryDeductMode(parsed.inventoryDeductMode),
           outboundIssueRule: normalizeOutboundIssueRule(parsed.outboundIssueRule),
           salesOutboundIssueRule: normalizeSalesOutboundIssueRule(parsed.salesOutboundIssueRule),
+          shipAttachmentDecideStage: normalizeShipAttachmentDecideStage(
+            parsed.shipAttachmentDecideStage,
+          ),
           dualUnitIssueStrategy: normalizeDualUnitIssueStrategy(parsed.dualUnitIssueStrategy),
           blankSizeAssistTools,
           blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
@@ -419,6 +453,7 @@ export const functionParamState = reactive({
     inventoryDeductMode: INVENTORY_DEDUCT_MODES.NO_ISSUE,
     outboundIssueRule: OUTBOUND_ISSUE_RULES.FIFO,
     salesOutboundIssueRule: SALES_OUTBOUND_ISSUE_RULES.BY_ORDER,
+    shipAttachmentDecideStage: SHIP_ATTACHMENT_DECIDE_STAGES.APPLY,
     dualUnitIssueStrategy: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL,
     blankSizeAssistTools: createDefaultBlankSizeAssistTools(),
     blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
@@ -559,6 +594,29 @@ export function setSalesOutboundIssueRule(mode) {
 /** 销售发货是否按单扣批（禁止全仓 FIFO 抢他单按单库存） */
 export function isSalesOutboundByOrder() {
   return getSalesOutboundIssueRule() === SALES_OUTBOUND_ISSUE_RULES.BY_ORDER
+}
+
+export function getShipAttachmentDecideStage() {
+  return normalizeShipAttachmentDecideStage(functionParamState.params.shipAttachmentDecideStage)
+}
+
+export function setShipAttachmentDecideStage(mode) {
+  const normalized = normalizeShipAttachmentDecideStage(mode)
+  if (!SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS.some((item) => item.value === normalized)) {
+    return { ok: false, message: '无效的随货附件确定环节' }
+  }
+  functionParamState.params.shipAttachmentDecideStage = normalized
+  return { ok: true }
+}
+
+/** 销售申请发货时确定附件（展示申请页附件能力） */
+export function isShipAttachmentDecidedAtApply() {
+  return getShipAttachmentDecideStage() === SHIP_ATTACHMENT_DECIDE_STAGES.APPLY
+}
+
+/** 仓管发货时才确定附件（申请页隐藏，随货查询可维护） */
+export function isShipAttachmentDecidedAtWarehouse() {
+  return getShipAttachmentDecideStage() === SHIP_ATTACHMENT_DECIDE_STAGES.WAREHOUSE
 }
 
 export function getDualUnitIssueStrategy() {

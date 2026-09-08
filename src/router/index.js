@@ -554,6 +554,12 @@ const routes = [
       },
       { path: 'inventory/in-out', redirect: '/inventory/in-out-detail' },
       {
+        path: 'inventory/ship-attachment-query',
+        name: 'inventory-ship-attachment-query',
+        component: () => import('@/views/inventory/ShipAttachmentQueryView.vue'),
+        meta: { title: '随货查询' },
+      },
+      {
         path: 'inventory/deduct-records',
         name: 'inventory-deduct-records',
         component: () => import('@/views/inventory/InventoryDeductRecordView.vue'),
@@ -608,6 +614,26 @@ const routes = [
         name: 'quality-outsourcing-qc',
         component: () => import('@/views/quality/QcTaskListView.vue'),
         meta: { title: '外协回货检', bizScope: '外协回货检' },
+      },
+      {
+        path: 'quality/outsourcing-qc/:id/inspect',
+        name: 'quality-outsourcing-qc-inspect',
+        component: () => import('@/views/quality/QcTaskInspectView.vue'),
+        meta: {
+          title: '录入质检结果',
+          listPath: '/quality/outsourcing-qc',
+          bizScope: '外协回货检',
+        },
+      },
+      {
+        path: 'quality/outsourcing-qc/:id',
+        name: 'quality-outsourcing-qc-detail',
+        component: () => import('@/views/quality/QcTaskDetailView.vue'),
+        meta: {
+          title: '外协回货检详情',
+          listPath: '/quality/outsourcing-qc',
+          bizScope: '外协回货检',
+        },
       },
       {
         path: 'quality/process-qc',

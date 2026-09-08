@@ -17,7 +17,7 @@ import {
 } from '@/utils/qcTemplateConflictService'
 
 const TEMPLATE_SEED_KEY = 'i_doms_qc_templates_seed_v'
-const TEMPLATE_SEED_VERSION = '11'
+const TEMPLATE_SEED_VERSION = '12'
 
 function nowText() {
   return dayjs().format('YYYY-MM-DD HH:mm:ss')

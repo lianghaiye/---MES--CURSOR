@@ -1,5 +1,6 @@
 import dayjs from 'dayjs'
 import { mapApplicationToDeliveryOrder } from '@/utils/deliveryOrder'
+import { createShipAttachmentLine } from '@/utils/shipBomAttachments'
 
 /** 演示数据：按不含税金额推 13% 含税（与常见销项税率一致） */
 function withInTaxAmount(line) {
@@ -9,6 +10,60 @@ function withInTaxAmount(line) {
     ...line,
     deliveryAmountInTax: Math.round(ex * 1.13 * 100) / 100,
   }
+}
+
+function demoPumpKitAttachments({ qty = 1, selectedSpare = false } = {}) {
+  const product = {
+    productId: 'prod-00001',
+    productCode: 'CP2610001',
+    productName: '清水离心泵 ISG50-160',
+  }
+  const defs = [
+    {
+      materialCode: 'DOC-MANUAL',
+      materialName: '产品说明书',
+      specModel: '中文版',
+      unit: '册',
+      unitQty: 1,
+      selected: true,
+    },
+    {
+      materialCode: 'DOC-CERT',
+      materialName: '合格证',
+      specModel: 'A4',
+      unit: '份',
+      unitQty: 1,
+      selected: true,
+    },
+    {
+      materialCode: 'TOOL-WRENCH',
+      materialName: '专用扳手组',
+      specModel: 'M8-M24',
+      unit: '套',
+      unitQty: 1,
+      selected: true,
+    },
+    {
+      materialCode: 'SPARE-ORING',
+      materialName: 'O型密封圈',
+      specModel: 'NBR-50',
+      unit: '个',
+      unitQty: 4,
+      selected: selectedSpare,
+    },
+  ]
+  return defs.map((d) =>
+    createShipAttachmentLine({
+      ...d,
+      ...product,
+      source: 'BOM',
+      sourceBomId: 'bom-ship-shared-demo',
+      sourceBomNo: 'BOM-SHIP-STD',
+      kitSets: qty,
+      shipQty: d.unitQty * qty,
+      planQty: d.unitQty * qty,
+    }),
+  )
 }
 
 function app(partial, salesOrder) {
@@ -33,6 +88,7 @@ function app(partial, salesOrder) {
       lineItems: (partial.lineItems || []).map(withInTaxAmount),
       scatterShipments: partial.scatterShipments || [],
       shipWeight: partial.shipWeight,
+      shipAttachments: partial.shipAttachments || [],
     },
     salesOrder,
   )
@@ -111,6 +167,7 @@ export function buildDeliveryOrderSeed() {
             deliveryMode: '整机',
           },
         ],
+        shipAttachments: demoPumpKitAttachments({ qty: 3, selectedSpare: false }),
         shipWeight: 37.5,
       },
       soPump,

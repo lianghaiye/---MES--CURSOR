@@ -16,13 +16,6 @@
           </a-space>
         </div>
 
-        <a-alert
-          type="info"
-          show-icon
-          class="channel-tip"
-          message="各物料按建单时冻结的质检模板分别录入。展开行按「基本信息 / 检验项目 / 整单结论」填写；「全部达标 / 关键项达标」由系统自动给出结论，「人工判定」才需手选。"
-        />
-
         <div class="section-card">
           <div class="section-title">基本信息</div>
           <a-form layout="inline" class="header-form horizontal-form">
@@ -62,35 +55,42 @@
           </a-form>
         </div>
 
-        <div class="section-card">
+        <div class="section-card inspect-lines-card">
           <div class="section-title">质检明细（{{ form.lineItems.length }}）</div>
-          <a-table
-            :columns="lineColumns"
-            :data-source="form.lineItems"
-            row-key="id"
-            size="small"
-            bordered
-            :pagination="false"
-            :scroll="{ x: 960 }"
-            v-model:expandedRowKeys="expandedKeys"
-          >
-            <template #expandIcon="{ expanded, onExpand: onExp, record }">
-              <a-button type="link" size="small" @click="(e) => onExp(record, e)">
-                {{ expanded ? '收起' : '展开' }}
-              </a-button>
-            </template>
-
-            <template #expandedRowRender="{ record }">
-              <div class="line-sheet-wrap">
-                <div class="line-sheet-meta">
-                  <span>模板：{{ record.templateName || record.templateCode || '—' }}</span>
-                  <span
-                    >整单规则：{{
-                      sheetPassRuleLabel(resolveLineSheetPassRule(record, task))
-                    }}</span
-                  >
+          <div v-if="form.lineItems.length" class="line-card-list">
+            <div
+              v-for="(record, index) in form.lineItems"
+              :key="record.id"
+              class="line-card"
+              :class="{ 'is-collapsed': !isLineExpanded(record.id) }"
+            >
+              <div class="line-card-head" @click="toggleLine(record.id)">
+                <div class="line-card-head-main">
+                  <span class="line-card-index">{{ index + 1 }}</span>
+                  <div class="line-card-identity">
+                    <div class="line-card-name">
+                      <span class="line-card-item-name">{{ record.itemName || '—' }}</span>
+                      <span class="line-card-item-code">{{ record.itemCode || '—' }}</span>
+                    </div>
+                    <div class="line-card-meta">
+                      <span>规格 {{ record.specModel || '—' }}</span>
+                      <span class="meta-sep">·</span>
+                      <span>材质 {{ record.material || '—' }}</span>
+                      <span class="meta-sep">·</span>
+                      <span>{{ record.templateName || record.templateCode || '—' }}</span>
+                      <span class="meta-sep">·</span>
+                      <span>{{ sheetPassRuleLabel(resolveLineSheetPassRule(record, task)) }}</span>
+                      <span class="meta-sep">·</span>
+                      <span>收货 {{ formatQty(record.receiptQty) }}</span>
+                    </div>
+                  </div>
                 </div>
+                <a-button type="link" size="small" @click.stop="toggleLine(record.id)">
+                  {{ isLineExpanded(record.id) ? '收起' : '展开' }}
+                </a-button>
+              </div>
 
+              <div v-show="isLineExpanded(record.id)" class="line-sheet-wrap">
                 <!-- 行内基本信息：方式 / 数量 / 备注 -->
                 <div v-if="headerFields(record).length" class="line-sheet-section">
                   <div class="line-sheet-title">基本信息</div>
@@ -253,16 +253,14 @@
                   <div v-else class="muted">该模板未配置检验项目</div>
                 </div>
 
-                <!-- 整单结论 -->
-                <div class="line-sheet-section">
-                  <div class="line-sheet-title">整单结论</div>
-                  <div class="line-conclusion-hint">{{ conclusionHintFor(record) }}</div>
-                  <div class="line-conclusion-row">
-                    <div class="line-conclusion-item">
-                      <label class="line-field-label">
-                        <span v-if="!isAutoConclusionLine(record)" class="req">*</span>整单结论
-                      </label>
-                      <!-- 全部达标 / 关键项：系统自动给出，只读 -->
+                <!-- 整单结论 + 处理方案（业务处置，非模板指标） -->
+                <div class="line-sheet-section line-conclusion-section">
+                  <div class="line-conclusion-head">
+                    <div class="line-conclusion-left">
+                      <div class="line-sheet-title">整单结论</div>
+                      <div class="line-conclusion-hint">{{ conclusionHintFor(record) }}</div>
+                    </div>
+                    <div class="line-conclusion-right">
                       <div
                         v-if="isAutoConclusionLine(record)"
                         class="auto-conclusion-box"
@@ -290,41 +288,35 @@
                         v-model:value="record.fieldMap[conclusionCode(record)]"
                         size="middle"
                         placeholder="请选择整单结论"
-                        style="width: 100%; max-width: 320px"
+                        style="width: 200px"
                         :options="conclusionOptsFor(record)"
                         @change="onConclusionChange(record)"
                       />
                     </div>
-                    <!-- 处理方案为来料质检固定字段，仅在列表编辑；模板若单独配置了同名字段则在检验项目中展示 -->
+                  </div>
+                  <div class="line-treatment-row">
+                    <div class="line-treatment-label">
+                      <span v-if="needTreatmentForLine(record)" class="req">*</span>处理方案
+                      <span class="line-treatment-tip">来料处置字段，不属于质检模板指标</span>
+                    </div>
+                    <a-select
+                      v-model:value="record.treatmentPlan"
+                      size="middle"
+                      allow-clear
+                      placeholder="请选择处理方案"
+                      style="width: 220px"
+                      :options="planOpts"
+                      :disabled="!needTreatmentForLine(record)"
+                    />
+                    <span v-if="!needTreatmentForLine(record)" class="line-treatment-idle"
+                      >合格时无需填写</span
+                    >
                   </div>
                 </div>
               </div>
-            </template>
-
-            <template #bodyCell="{ column, record, index }">
-              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-              <template v-else-if="column.key === 'receiptQty'">
-                {{ formatQty(record.receiptQty) }}
-              </template>
-              <template v-else-if="column.key === 'treatmentPlan'">
-                <a-select
-                  v-model:value="record.treatmentPlan"
-                  size="small"
-                  allow-clear
-                  placeholder="请选择"
-                  style="width: 100%"
-                  :options="planOpts"
-                  :disabled="!needTreatmentForLine(record)"
-                />
-              </template>
-              <template v-else-if="column.key === 'sheetRule'">
-                {{ sheetPassRuleLabel(resolveLineSheetPassRule(record, task)) }}
-              </template>
-              <template v-else>
-                {{ displayCell(record, column) }}
-              </template>
-            </template>
-          </a-table>
+            </div>
+          </div>
+          <a-empty v-else description="暂无质检明细" />
         </div>
       </template>
       <a-empty v-else-if="!loading" description="未找到该质检单或不可录入" />
@@ -337,7 +329,7 @@ export default { name: 'QcTaskInspectView' }
 </script>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
@@ -360,6 +352,7 @@ import {
 } from '@/store/qcTaskStore'
 import { formatQty } from '@/utils/numberFormat'
 import { useTabs, tabStore } from '@/composables/useTabs'
+import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
 import {
   QC_UNIT_POSITION,
   buildStandardText,
@@ -398,6 +391,10 @@ const route = useRoute()
 const router = useRouter()
 const { closeTab } = useTabs()
 
+const detailRouteName = computed(
+  () => getQcTaskRouteBundle(route.meta.bizScope || '来料质检').detailName,
+)
+
 const loading = ref(false)
 const saving = ref(false)
 const task = ref(null)
@@ -415,16 +412,18 @@ const planOpts = [
   { label: '换批次', value: '换批次' },
 ]
 
-const lineColumns = [
-  { title: '序号', key: 'index', width: 56, align: 'center' },
-  { title: '产品名称', dataIndex: 'itemName', width: 140, ellipsis: true },
-  { title: '产品编号', dataIndex: 'itemCode', width: 120 },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '质检模板', dataIndex: 'templateName', width: 160, ellipsis: true },
-  { title: '整单规则', key: 'sheetRule', width: 120, ellipsis: true },
-  { title: '收货数量', key: 'receiptQty', width: 90, align: 'right' },
-  { title: '处理方案', key: 'treatmentPlan', width: 120 },
-]
+function isLineExpanded(id) {
+  return expandedKeys.value.includes(id)
+}
+
+function toggleLine(id) {
+  const idx = expandedKeys.value.indexOf(id)
+  if (idx >= 0) {
+    expandedKeys.value = expandedKeys.value.filter((k) => k !== id)
+  } else {
+    expandedKeys.value = [...expandedKeys.value, id]
+  }
+}
 
 function loadPage() {
   ensureQcLibraryDemoSeed()
@@ -620,13 +619,13 @@ function inspectFields(line) {
         !isQcInspectQtyField(f) &&
         !isQcInspectRemarkField(f) &&
         !isQcConclusionField(f) &&
-        // 处理方案为来料质检列表固定字段，不在模板展开区重复展示
+        // 处理方案为来料业务处置字段，在整单结论区填写（不在明细列表展示）
         !isTreatmentPlanField(f),
     )
     .map((f) => enrichInspectField(f))
 }
 
-/** 模板内若配置了「处理方案」字段则识别（展开区不重复，只走列表固定列） */
+/** 模板内若配置了「处理方案」字段则识别（避免与业务处置列重复） */
 function isTreatmentPlanField(field = {}) {
   const code = String(field.code || '')
     .trim()
@@ -841,12 +840,6 @@ function onFieldChange(line, field) {
   syncAutoConclusion(line)
 }
 
-function displayCell(record, column) {
-  const key = column.dataIndex || column.key
-  const val = record[key]
-  return val !== undefined && val !== null && String(val).trim() !== '' ? val : '—'
-}
-
 function statusColor(status) {
   if (status === QC_TASK_STATUS.COMPLETED) return 'success'
   if (status === QC_TASK_STATUS.IN_PROGRESS) return 'processing'
@@ -872,7 +865,7 @@ function buildFieldValues(line) {
 function handleCancel() {
   const path = route.path
   closeTab(path)
-  router.push({ name: 'quality-incoming-qc-detail', params: { id: route.params.id } })
+  router.push({ name: detailRouteName.value, params: { id: route.params.id } })
 }
 
 async function handleOk() {
@@ -1012,7 +1005,7 @@ async function doSubmit() {
     message.success(`质检完成：${res.qcResult}`)
     const path = route.path
     closeTab(path)
-    router.push({ name: 'quality-incoming-qc-detail', params: { id: task.value.id } })
+    router.push({ name: detailRouteName.value, params: { id: task.value.id } })
   } catch (err) {
     console.error(err)
     message.error(err?.message || '提交失败')
@@ -1055,10 +1048,6 @@ async function doSubmit() {
   color: #8c8c8c;
 }
 
-.channel-tip {
-  margin-bottom: 12px;
-}
-
 .section-card {
   margin-bottom: 12px;
   padding: 12px 16px 16px;
@@ -1097,19 +1086,105 @@ async function doSubmit() {
   background: #f7f8fa;
 }
 
+.line-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.line-card {
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.line-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fafbfc;
+  border-bottom: 1px solid #f0f0f0;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.line-card.is-collapsed .line-card-head {
+  border-bottom: none;
+  border-radius: 8px;
+}
+
+.line-card-head-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.line-card-index {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: #e6f4ff;
+  color: #1677ff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 24px;
+  text-align: center;
+}
+
+.line-card-identity {
+  min-width: 0;
+}
+
+.line-card-name {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.line-card-item-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  line-height: 22px;
+}
+
+.line-card-item-code {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.line-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
+}
+
+.meta-sep {
+  margin: 0 6px;
+  color: rgba(0, 0, 0, 0.25);
+}
+
 .line-sheet-wrap {
   padding: 12px 14px;
   background: #fafbfc;
-  border-radius: 6px;
 }
 
-.line-sheet-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-bottom: 12px;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+.inspect-lines-card {
+  overflow: visible;
 }
 
 .line-sheet-section {
@@ -1160,24 +1235,74 @@ async function doSubmit() {
   line-height: 22px;
 }
 
+.line-conclusion-section {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.line-conclusion-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+
+.line-conclusion-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.line-conclusion-left .line-sheet-title {
+  margin-bottom: 6px;
+}
+
+.line-conclusion-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 48%;
+}
+
 .line-conclusion-hint {
-  margin-bottom: 10px;
+  margin-bottom: 0;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.5;
 }
 
-.line-conclusion-row {
+.line-treatment-row {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 12px 24px;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #f0f0f0;
 }
 
-.line-conclusion-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 200px;
+.line-treatment-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+  line-height: 22px;
+  white-space: nowrap;
+}
+
+.line-treatment-label .req {
+  margin-right: 2px;
+  color: #ff4d4f;
+}
+
+.line-treatment-tip {
+  margin-left: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+  font-weight: 400;
+}
+
+.line-treatment-idle {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
 }
 
 .auto-conclusion-box {
@@ -1211,6 +1336,17 @@ async function doSubmit() {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .line-conclusion-head {
+    flex-direction: column;
+  }
+
+  .line-conclusion-right {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .inspect-fields-grid {

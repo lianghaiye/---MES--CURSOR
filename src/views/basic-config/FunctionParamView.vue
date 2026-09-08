@@ -96,6 +96,19 @@
               </a-radio>
             </a-radio-group>
             <a-radio-group
+              v-else-if="record.key === 'shipAttachmentDecideStage'"
+              :value="shipAttachmentDecideStage"
+              @change="(e) => onShipAttachmentDecideStageChange(e.target.value)"
+            >
+              <a-radio
+                v-for="option in SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </a-radio>
+            </a-radio-group>
+            <a-radio-group
               v-else-if="record.key === 'dualUnitIssueStrategy'"
               :value="dualUnitIssueStrategy"
               @change="(e) => onDualUnitIssueStrategyChange(e.target.value)"
@@ -155,6 +168,7 @@ import {
   INVENTORY_DEDUCT_OPTIONS,
   OUTBOUND_ISSUE_RULE_OPTIONS,
   SALES_OUTBOUND_ISSUE_RULE_OPTIONS,
+  SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS,
   DUAL_UNIT_ISSUE_STRATEGY_OPTIONS,
   BLANK_SIZE_ASSIST_OPTIONS,
   functionParamState,
@@ -167,6 +181,8 @@ import {
   getOutboundIssueRule,
   setSalesOutboundIssueRule,
   getSalesOutboundIssueRule,
+  setShipAttachmentDecideStage,
+  getShipAttachmentDecideStage,
   setDualUnitIssueStrategy,
   getDualUnitIssueStrategy,
   getBlankSizeAssistTools,
@@ -188,6 +204,7 @@ const salaryPushMode = computed(() => functionParamState.params.salaryPushMode)
 const inventoryDeductMode = computed(() => getInventoryDeductMode())
 const outboundIssueRule = computed(() => getOutboundIssueRule())
 const salesOutboundIssueRule = computed(() => getSalesOutboundIssueRule())
+const shipAttachmentDecideStage = computed(() => getShipAttachmentDecideStage())
 const dualUnitIssueStrategy = computed(() => getDualUnitIssueStrategy())
 const enableBomLevelMts = computed(() => isBomLevelMtsEnabled())
 
@@ -258,6 +275,15 @@ function onOutboundIssueRuleChange(mode) {
 
 function onSalesOutboundIssueRuleChange(mode) {
   const res = setSalesOutboundIssueRule(mode)
+  if (!res.ok) {
+    message.warning(res.message)
+    return
+  }
+  message.success('已保存')
+}
+
+function onShipAttachmentDecideStageChange(mode) {
+  const res = setShipAttachmentDecideStage(mode)
   if (!res.ok) {
     message.warning(res.message)
     return
