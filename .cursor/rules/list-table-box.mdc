@@ -1,0 +1,103 @@
+---
+description: i-doms-web 列表盒子/表格区规范（容器尺寸、字号三档、列宽拖拽、列显隐、行行为）
+globs: i-doms-web/**/*.vue
+alwaysApply: false
+---
+
+# 列表盒子尺寸
+
+列表数据区统一白色卡片容器 + 工具栏 + 表格 + 分页，与上方 `.filter-card` 搜索区配套。
+
+## 容器
+
+| 项 | 值 |
+|----|-----|
+| 外观 | 白底；圆角 **8px**；描边 `#e5e6eb` 或 shadow-1；**width: 100%** |
+| 最小高度 | **320px**（数据不足用空态填充） |
+| 内边距 | **8px 12px**（上下 8 / 左右 12） |
+| 内部结构 | 工具栏 **48px**（细则见 `list-toolbar.mdc`）+ 表格 `flex:1` + 分页 **48px**（细则见 `list-pagination.mdc`）；**纵向无间距** |
+
+类名参考：`.list-card`、`.table-layout-card`（见 `WorkOrderTableLayout.vue`）
+
+## 表头与行高
+
+| 项 | 值 |
+|----|-----|
+| 表头 | 背景 `#f7f8fa`；高 **40px**；**13px / 600**；颜色 text-2 `#4e5969` |
+| 行 hover | `#f5f6f7`；选中 `#e6f4ff`；斑马纹可选 `#fafafa` |
+
+### 字号三档
+
+| 档位 | 正文 / 行高 | 行高(px) | 表头 | 场景 |
+|------|-------------|----------|------|------|
+| **大**（默认） | 14px / 22px | 48 | 13px | 常规列表 |
+| **中**（推荐） | 13px / 20px | 44 | 12.5px | 信息较多 |
+| **小** | 12px / 18px | 40 | 12px | 高密度 |
+
+- 颜色：正文 text-1 `#1f2329`；表头 text-2；时间戳/辅助 text-3 `#86909c`
+- 工具栏 **字号** 按钮（A-/A）切换三档；**用户 + 页面** 维度持久化
+- 实现：`useTableDensity(pageKey)` + `TableDensityButton` + 表格外层 `wrapClass`（见 `table-density.less`）
+
+## 列宽拖拽
+
+- 表头分隔线 hover → `cursor: col-resize` 手柄；拖动实时改宽
+- **最小 80px**；**选择列 / 操作列禁止拖拽**（固定宽）
+- 松开鼠标后 **500ms 防抖** 写入 localStorage（key：`页面路由 + 列 key`）；登录态可同步服务端
+- 刷新后恢复；列设置面板底部 **恢复默认**
+- 超宽 `ellipsis` + hover **tooltip**
+
+参考：`GeneratePurchaseOrderView.vue`、`CreateSalesOrderModal.vue` 列宽拖拽实现
+
+## 列显隐（Drawer）
+
+- 入口：工具栏 **列设置**（`TableColumnSettingButton`）
+- 抽屉标题 **「列显隐」**；宽 **520px**（`<768px` 全宽）；内容滚动、**页脚固定**；与 `@TableColumnSettingDrawer.vue` 一致
+- 结构：隐藏 / 冻结 / 排序 + 列名列表；页脚 **恢复默认｜取消｜确定**
+- **选择列、操作列、序号列** 默认固定且不可隐藏；冻结至少 1 列
+- 至少 **1 列可见**（取消最后一个时禁用）
+- 排序：上移 ▴ / 下移 ▾；**确定后生效**并持久化（同列宽规则）
+- 有改动时遮罩/ESC/取消 → 二次确认「列设置已修改，是否放弃？」
+- 可选：表头右键「隐藏该列」
+
+组件：`@TableColumnSettingDrawer.vue` + `@useTableColumnSettings.js` + `@tableColumnSettings.js`
+
+## 表格行与列行为
+
+| 类型 | 对齐 |
+|------|------|
+| 文字 | 左对齐、垂直居中 |
+| 数值（金额/数量/百分比） | 右对齐；小数位一致；格式化见 `number-currency-format.mdc` |
+| 操作列 | 右对齐或固定最右 |
+
+- **默认整行不可点进详情**（防误触）；用行内「详情/编辑」链接
+- 长文本 ellipsis + tooltip；状态用 **Tag**；布尔用 **是/否** 文字
+- **无数据**：空态，不渲染空表格
+- 横向超出：`scroll.x`；选择列/操作列左右固定（可选）
+
+## 用户偏好隔离（强制）
+
+列宽 / 显隐 / 排序 / 字号属于 **用户偏好**：
+
+- 必须 **按用户隔离**，不得全局覆盖他人配置
+- localStorage key 含 **用户标识 + 页面/表格 key**（如 `i_doms_table_col_${storageKey}`）
+- 多端同步由业务决定，可选
+
+## 推荐实现
+
+```vue
+<div class="list-card">
+  <div class="table-toolbar">…工具栏 + TableColumnSettingButton…</div>
+  <a-table :columns="displayColumns" :scroll="{ x: tableScrollX }" … />
+  <div class="table-pagination"><a-pagination … /></div>
+  <TableColumnSettingDrawer v-model:open="columnDrawerOpen" v-model:settings="columnSettings" … />
+</div>
+```
+
+参考：`WorkOrderTableLayout.vue`、`PurchaseOrderView.vue`、`useTableColumnSettings.js`
+
+## 避免
+
+- ❌ 列偏好写死全局、不带用户维度
+- ❌ 操作列可拖拽或可被隐藏
+- ❌ 无数据仍显示只有表头的空表格
+- ❌ 整行 click 进详情且无 hover 提示、与操作链接冲突

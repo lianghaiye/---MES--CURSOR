@@ -1,0 +1,46 @@
+---
+description: i-doms-web 设计总则与适用范围（统一性、强制性分级、适用场景）
+globs: i-doms-web/**/*
+alwaysApply: false
+---
+
+# 总则与适用范围
+
+来源：设计规范 v1.3 第 1 章。
+
+## 设计目标
+
+| 目标 | 说明 |
+|------|------|
+| **统一** | 色彩、字号、间距、圆角、阴影取自 Design Tokens（见 `design-tokens.mdc`） |
+| **一致** | 搜索、新增、编辑、弹窗、反馈等同类交互全站行为一致 |
+| **效率** | 搜索条件、翻页、列配置、字号三档等支持**用户 + 页面**维度持久化 |
+| **可扩展** | 新页面默认继承规范；特殊场景须评审后例外 |
+
+## 强制性分级
+
+| 级别 | 说明 | 示例 |
+|------|------|------|
+| **强制** | 违反视为缺陷 | 主色、字号三档、列宽拖拽保存、新标签/弹窗判定 |
+| **推荐** | 默认采用，可评审调整 | 间距档位、卡片圆角、反馈时长 |
+| **建议** | 按场景选用 | 斑马纹、表头右键列设置、行操作「更多」折叠 |
+
+## 适用范围
+
+桌面端 Web（含内嵌运营页）：列表、新增、编辑、详情、弹窗、抽屉、表单、反馈、空态/异常态。
+
+## 规则索引
+
+| 章节 | 规则文件 |
+|------|----------|
+| Tokens | `design-tokens.mdc` |
+| 打开方式 | `page-open-mode.mdc` |
+| 列表五区 | `list-page-zones.mdc` |
+| 搜索/列表/工具栏/分页 | `list-search-area` / `list-table-box` / `list-toolbar` / `list-pagination` |
+| 按钮 | `button-spec.mdc` |
+| 表单 | `form-horizontal-layout` / `form-page-shell` / `form-fields.mdc` |
+| 弹窗/抽屉 | `modal-layout` / `drawer-layout` |
+| 反馈 | `feedback-status.mdc` |
+| 响应式 | `responsive-breakpoints.mdc` |
+| 无障碍/键盘 | `accessibility.mdc` / `keyboard-shortcuts.mdc` |
+| 数值/金额 | `number-currency-format.mdc` |

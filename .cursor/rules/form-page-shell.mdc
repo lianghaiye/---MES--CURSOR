@@ -1,0 +1,117 @@
+---
+description: i-doms-web 新增/编辑页通用结构（页头、操作组、保存成功、区块栅格、编辑骨架屏）
+globs: i-doms-web/**/*{Create,Edit,Form}*.vue
+alwaysApply: false
+---
+
+# 新增 / 编辑页通用结构
+
+所有新增 / 编辑页的共用壳层约定。字段组织方式见：
+
+- 折叠卡片式 → `form-collapsible-card.mdc`
+- 子表行内新增 → `form-inline-row-add.mdc`
+- 表单横向布局 → `form-horizontal-layout.mdc`
+
+壳组件：`@FormCreateShell.vue`（`page-mode`）+ `@useFormCreatePage.js`。
+
+## 页头
+
+| 项 | 约定 |
+|----|------|
+| 面包屑 | **可选** |
+| 标题 | 「新增{对象} / 编辑{对象}」，如「新增客户」「编辑客户」；**20px / 600** |
+| 左侧辅助 | 返回箭头 `←`（`FormCreateShell` 默认提供） |
+| 右上角操作组 | **右对齐** |
+
+## 右上角操作组
+
+### 常规
+
+**取消**（次）｜**保存**（主）
+
+### 有流程时
+
+替换为：
+
+- **暂存**
+- **上一步 / 下一步**
+- **提交**
+
+编辑页可另增「返回列表」。
+
+```vue
+<FormCreateShell page-mode :title="isEdit ? '编辑客户' : '新增客户'" @cancel="goBack">
+  <template #footer>
+    <a-button @click="goBack">取消</a-button>
+    <a-button type="primary" :loading="saving" :disabled="loading" @click="handleSave">
+      保存
+    </a-button>
+  </template>
+  …
+</FormCreateShell>
+```
+
+## 保存成功
+
+1. `toast`：**「保存成功」**
+2. **关闭当前标签页**，并刷新 / 回到来源列表（`useFormCreatePage.goBack`）
+3. 若浏览器策略不允许自动关签：展示**成功页** + 「返回列表」主按钮
+
+```javascript
+async function handleSave() {
+  await validateAndSubmit()
+  message.success('保存成功')
+  goBack() // closeTab + router.push(listPath)
+}
+```
+
+## 表单区块
+
+| 项 | 约定 |
+|----|------|
+| 区块标题 | **16px / 600**（基本信息 / 扩展信息…） |
+| 区块间距 | 标题下 **8px** 分隔（或卡片 `margin` 分隔） |
+| 字段栅格 | 区块内 **2~3 列**（`span="12"` / `span="8"`） |
+| 复杂单据 | 字段很多时可用 **4 列**（见折叠卡片规范） |
+
+横向表单：`layout="inline"` + `horizontal-form`。
+
+## 编辑页加载
+
+| 阶段 | 行为 |
+|------|------|
+| 请求中 | 先展示**骨架屏**（`a-skeleton`） |
+| 回填中 | **保存按钮禁用**（`:disabled="loading"`） |
+| 回填完成 | 解除禁用，可编辑 / 可保存 |
+
+```vue
+<a-skeleton v-if="loading" active :paragraph="{ rows: 8 }" />
+<template v-else>
+  <!-- 表单区块 -->
+</template>
+```
+
+## 页面结构总览
+
+```
+[面包屑 可选]
+页头：← 新增客户 / 编辑客户     取消｜保存
+└─ 区块「基本信息」（标题 16px）
+└─ 区块「扩展信息」…
+（编辑：加载时骨架屏，保存禁用）
+```
+
+## 避免
+
+- ❌ 标题写成泛化的「新增」「编辑」不带对象名
+- ❌ 保存成功不关 Tab、不回列表
+- ❌ 编辑页空白闪一下再出数据（无骨架）
+- ❌ 回填未完成即可点保存
+- ❌ 有多步流程仍只用「取消｜保存」且无暂存/下一步
+
+## 与折叠卡片规范的关系
+
+| 本规则（通用壳） | 折叠卡片规范 |
+|------------------|--------------|
+| 页头 / 操作组 / 保存成功 / 骨架屏 | 可折叠区块、子表、附件、4 列密集字段 |
+| 2~3 列默认栅格 | 字段多时升 4 列 |

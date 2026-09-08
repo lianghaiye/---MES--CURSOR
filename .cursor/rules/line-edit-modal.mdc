@@ -1,0 +1,78 @@
+---
+description: i-doms-web 行内/明细编辑弹窗规范（编辑出库明细、销售明细、BOM 子项等 *LineEditModal）
+globs: i-doms-web/**/*.vue
+alwaysApply: false
+---
+
+# 行内编辑弹窗 / 明细编辑弹窗
+
+用于新增/编辑页或列表页中，编辑**某一行明细**的完整信息。
+
+通用弹窗尺寸 / 关闭 / 页脚见 `modal-layout.mdc`；本规则约束**明细编辑**专用结构。
+
+## 标题与宽度
+
+- **标题**：`动作 + 对象名称`，如「编辑出库明细」「编辑销售明细」「编辑 BOM 子项」
+- **宽度**：
+  - 常规：**720px**
+  - 字段 > 9 个或含子表：**90vw**（`max-width: 1200px`）
+
+## 整体结构
+
+```
+标题
+└─ 只读「信息」卡片（顶部）
+└─ 可编辑字段区
+└─ 页脚按钮（右对齐）
+```
+
+## 信息卡片（只读）
+
+- 位于弹窗顶部；背景 `#fafbfc`；圆角 + 浅边框
+- 字段 **一行两列** 只读展示：`字段名：字段值`；label **text-2**（比值浅），值 **text-1**；空值 **—**；**不用** bordered 表格
+- 右侧可放 **1~2 个关键指标**（如当前库存）：
+  - 指标值：`28px / font-weight 600`
+  - 单位/说明：`12px / text-3`
+  - 浅灰边框小卡片包裹
+
+样式复用：`src/views/inventory/components/inventoryLineEditModal.less`（`.item-preview`、`.preview-stock-box`、`.stock-value`、`.stock-label`）
+
+## 可编辑字段区
+
+- 信息卡片下方；**一行三列**（`a-col :span="8"`）
+- 必填项 label 前 **红星**；只读字段 **禁用态灰底**
+- 备注、说明性只读内容、长文本 → **`span="24"` 占整行**
+- 输入框下方可跟辅助说明：`12px / text-3`
+
+控件统一 `size="small"`；表单项可参考 `@InboundLineEditModal.vue`、`@SalesOrderLineEditModal.vue`。
+
+## 页脚与交互
+
+- 右对齐：**取消**（次）｜**确定**（主）
+- 有未保存改动关闭时 → 按 **10.3 二次确认** 规则
+- 从父页列表「编辑」触发；**保存后只刷新当前明细行**，不整页刷新
+
+## 校验与计算
+
+- 校验失败：错误字段 **红框 + 红字**；弹窗 **不关闭**；**滚动到首个错误**
+- 数量 × 单价 = 总价等联动：**前端实时计算**；**仅在 blur 或点确定时统一校验**（避免输入抖动）
+
+## 只读退化
+
+若该行**无可编辑字段**（仅查看）→ 退化为只读抽屉/弹窗，标题改为 **「查看明细」**
+
+## 参考实现
+
+| 场景 | 组件 |
+|------|------|
+| 入库/出库 | `InboundLineEditModal.vue`、`OutboundLineEditModal.vue` |
+| 销售 | `SalesOrderLineEditModal.vue` |
+| 采购 | `PurchaseOrderLineEditModal.vue` |
+| 样式 | `inventoryLineEditModal.less` |
+
+## 避免
+
+- ❌ 保存后 `location.reload()` 或整表重载父页
+- ❌ 校验失败仍关闭弹窗
+- ❌ 输入 `@input` 逐字校验导致联动字段闪烁
+- ❌ 标题写成泛化的「编辑明细」（应带业务对象名）

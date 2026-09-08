@@ -1,0 +1,137 @@
+---
+description: i-doms-web 折叠卡片式复杂表单（新增/编辑页：页头、可折叠区块、子表、附件、校验提交）
+globs: i-doms-web/**/*{Create,Edit,Form}*.vue
+alwaysApply: false
+---
+
+# 折叠卡片式复杂表单
+
+新增 / 编辑页承载表单填写与保存。字段较多时主要有两种组织方式：**折叠卡片式**（本规则）与 **Tab 选项卡式**。
+
+**页头 / 操作组 / 保存成功 / 编辑骨架屏** 见通用壳 `form-page-shell.mdc`。
+
+壳组件优先：`@FormCreateShell.vue`（`page-mode`）+ `@useFormCreatePage.js`。
+
+## 页头（摘要）
+
+| 项 | 约定 |
+|----|------|
+| 左侧 | 返回箭头 `←` + 页面标题（**20px / 600**，如「新增销售订单」） |
+| 右侧操作组 | **右对齐**：取消（次）｜保存（主）；有流程时见 `form-page-shell.mdc` |
+| 编辑页 | 可增加「返回列表」 |
+
+```vue
+<FormCreateShell page-mode :title="pageTitle" @cancel="goBack">
+  <template #footer>
+    <a-button @click="goBack">取消</a-button>
+    <a-button type="primary" :loading="saving" @click="handleSave">保存</a-button>
+  </template>
+  <!-- 折叠卡片内容 -->
+</FormCreateShell>
+```
+
+## 基本信息区块
+
+- **默认展开**，支持收起 / 展开
+- 区块标题右侧：「收起 ▴ / 展开 ▾」文字按钮（`type="link" size="small"`）
+- 字段多时：**4 列栅格**（`a-col :span="6"`），一屏约 4~5 行
+- 必填项前 **红星**；备注 / 长文本等不规则字段 **占整行**（`span="24"` 或 `span="12"+` + `remark-item`）
+- 表单：`layout="inline"` + `horizontal-form`（见 `form-horizontal-layout.mdc`）
+
+```vue
+<div class="section-block" :class="{ 'is-collapsed': basicInfoCollapsed }">
+  <div class="section-title-row">
+    <span class="section-title">基本信息</span>
+    <a-button type="link" size="small" class="collapse-btn" @click="toggleBasicInfo">
+      {{ basicInfoCollapsed ? '展开' : '收起' }}
+      <DownOutlined v-if="basicInfoCollapsed" />
+      <UpOutlined v-else />
+    </a-button>
+  </div>
+  <a-form v-show="!basicInfoCollapsed" layout="inline" class="header-form horizontal-form">
+    <a-row :gutter="[12, 8]" style="width: 100%">
+      <a-col :span="6">…</a-col>
+      <a-col :span="24"><!-- 备注整行 --></a-col>
+    </a-row>
+  </a-form>
+</div>
+```
+
+参考：`CreateSalesOrderModal.vue`、`CreatePurchaseRequisitionModal.vue`
+
+## 统计摘要（可选）
+
+- 不一定每个页面都有
+- 位置：基本信息与子表**之间**
+- 只读信息横向排布；标签 **12px / text-3**；数值 **14px / 600** 右对齐
+- **整行无输入框**
+
+## 可折叠区块
+
+- 除基本信息外，「摘要」「明细」等子表 / 扩展信息也做成**可折叠卡片**
+- **默认展开首个**，其余按业务决定
+- 区块结构：白底卡片 + `section-title-row` + 收起展开
+
+## 子表工具栏
+
+| 位置 | 内容 |
+|------|------|
+| 子表**左上方** | 新增行（主按钮，打开弹窗批量选择）+ 批量操作 + 业务切换按钮 |
+| 超过 **4** 个 | 收入「更多」下拉 |
+| 子表**右侧** | 列显隐（`TableColumnSettingButton`） |
+| 表格末行下方 | 「+ 添加物品行」行内快捷入口（细则见 `form-inline-row-add.mdc`） |
+
+## 空数据
+
+- 子表无数据：空态占位（No data / `a-empty`）
+- 提供主按钮引导添加（如「添加物品」）
+
+## 说明性文本
+
+- 页面底部或相关区块下方的辅助说明
+- **12px**，颜色 `--text-3` 或 `--primary`；整行展示
+- 不换行时末尾 **tooltip**（如「库存履约说明」）
+
+## 附件上传
+
+独立区块 **「图片文档信息」**：
+
+- 上传按钮 + 已上传文件列表
+- 限制说明文案，如「支持上传各类型文件，大小不超过 200MB」
+
+## 校验与提交
+
+| 规则 | 说明 |
+|------|------|
+| 校验时机 | **提交时全量校验** |
+| 失败展示 | 错误字段 **红框 + 红字**；弹层/页**不关闭**；**滚动到首个错误** |
+| 保存成功 | toast「保存成功」→ 关 Tab 并回列表（细则见 `form-page-shell.mdc`） |
+
+## 页面结构总览
+
+```
+页头（← 标题 | 取消 保存）
+└─ 基本信息（可折叠，默认展开，4 列）
+└─ 统计摘要（可选，只读）
+└─ 明细子表（可折叠；工具栏 + 表格 / 空态）
+└─ 扩展区块…（可折叠）
+└─ 图片文档信息（附件）
+└─ 说明性文本
+```
+
+## 避免
+
+- ❌ 字段很多却全部平铺、无折叠
+- ❌ 基本信息用垂直 layout（须横向，见 `form-horizontal-layout.mdc`）
+- ❌ 子表工具栏按钮超过 4 个仍全部平铺
+- ❌ 校验失败仍关闭页签
+- ❌ 保存成功不关 Tab / 不回列表
+
+## 选型提示
+
+| 场景 | 选型 |
+|------|------|
+| 字段多、需对照列表 | 本规范折叠卡片页 |
+| 字段分区清晰、互斥模块 | Tab 选项卡式 |
+| 轻量行编辑、需看列表 | 抽屉（`drawer-layout.mdc`） |
+| 单行明细轻编辑 | 行内弹窗（`line-edit-modal.mdc`） |

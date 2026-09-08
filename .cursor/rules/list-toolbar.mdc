@@ -1,0 +1,101 @@
+---
+description: i-doms-web 列表/弹窗表格工具栏规范（左侧业务按钮、右侧视图图标、更多收纳、批量区）
+globs: i-doms-web/**/*.vue
+alwaysApply: false
+---
+
+# 工具栏规范
+
+列表页与弹窗内表格的操作条：左侧业务操作、右侧视图配置，**禁止混排**。
+
+类名参考：`.toolbar-row`、`.table-toolbar`（见 `WorkOrderTableLayout.vue`、`PurchaseOrderView.vue`）
+
+## 整体分区
+
+```
+┌─ 工具栏 ─────────────────────────────────────────────┐
+│ 左侧业务操作区              │  右侧视图操作区（图标） │
+│ [新增] [审核] … [更多▾]     │  视图 字号 列设置 刷新 导出 │
+└──────────────────────────────────────────────────────┘
+```
+
+## 左侧业务操作区
+
+| 规则 | 说明 |
+|------|------|
+| 位置 | 列表**左上方** |
+| 首按钮 | **必须是「新增」**（主按钮 `type="primary"`） |
+| 其后 | 按业务频率排列（批量打印、生成出库单、批量操作等） |
+| `size` | 统一 `small` |
+
+### 按钮收纳（强制）
+
+- 左侧业务按钮最多直接展示 **6~8 个**（**含新增**）
+- 超出统一归入 **「更多 ▾」** 下拉
+- **不计入限额**：批量操作下拉、业务状态切换标签（Segmented / Tab）
+- 仍建议控制左侧整体密度，避免 overcrowding
+
+```vue
+<div class="toolbar-row">
+  <a-space wrap :size="8" class="toolbar-left">
+    <a-button type="primary" size="small" @click="openCreate">
+      <PlusOutlined />新增
+    </a-button>
+    <!-- 高频操作… 合计 ≤ 6~8（含新增） -->
+    <a-dropdown v-if="moreActions.length">
+      <a-button size="small">更多 <DownOutlined /></a-button>
+      <template #overlay>
+        <a-menu @click="onMoreMenu">…</a-menu>
+      </template>
+    </a-dropdown>
+  </a-space>
+  <a-space :size="4" class="toolbar-right">…视图图标…</a-space>
+</div>
+```
+
+## 右侧视图操作区
+
+仅放与**列表视图 / 配置**相关的图标（或文字）按钮，**不得**与左侧业务按钮混排。
+
+**顺序固定（从左到右）**：
+
+1. **视图切换**（卡片 / 列表）
+2. **字号**（`TableDensityButton`）
+3. **列设置**（`TableColumnSettingButton`）
+4. **刷新**
+5. **导出**
+
+缺某项则跳过，保持相对顺序。
+
+## 批量操作区
+
+| 项 | 约定 |
+|----|------|
+| 出现时机 | **勾选数据后**出现 |
+| 位置 | 「新增」右侧，或独立批量区 |
+| 未勾选 | **隐藏**或用占位保持高度，**避免布局跳动** |
+| 已选提示 | 「已选 N 项」置于批量按钮旁 |
+
+批量操作下拉本身**不计入**左侧 6~8 限额。
+
+## 弹窗内表格工具栏
+
+- 同样：**左上方**业务按钮，超过 6~8 收入「更多」
+- 弹窗**右侧**：列设置、刷新等视图图标（若有）
+- 子表工具栏另见 `form-collapsible-card.mdc`（新增行 + 更多 + 列显隐）
+
+## 避免
+
+- ❌ 第一个按钮不是「新增」
+- ❌ 左侧平铺超过 8 个业务按钮不归「更多」
+- ❌ 列设置 / 刷新混在左侧业务按钮中
+- ❌ 右侧视图图标顺序随意
+- ❌ 勾选后批量区突然撑开导致整表跳动
+
+## 参考实现
+
+| 场景 | 文件 |
+|------|------|
+| 左右分区 | `WorkOrderTableLayout.vue` |
+| 业务按钮密集 | `PurchaseOrderView.vue`（宜收敛到「更多」） |
+| 字号 / 列设置 | `TableDensityButton`、`TableColumnSettingButton` |

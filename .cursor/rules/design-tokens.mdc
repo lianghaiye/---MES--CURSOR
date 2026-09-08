@@ -1,0 +1,85 @@
+---
+description: i-doms-web Design Tokens（颜色、字号、间距、圆角、阴影）— 禁止页面内裸值
+globs: i-doms-web/**/*.{vue,less,css,scss,js,ts}
+alwaysApply: false
+---
+
+# Design Tokens
+
+所有颜色、字号、间距必须从令牌取值，**禁止**页面内硬编码裸值。建议落地为 CSS Variables 或主题配置。
+
+## 2.1 主题色
+
+| 令牌 | 用途 | 值 |
+|------|------|-----|
+| primary | 主按钮、链接、选中、loading | `#1677ff` |
+| primary-hover | hover | `#4096ff` |
+| primary-active | mousedown | `#0958d9` |
+| primary-bg | 选中行/标签/弱化背景 | `#e6f4ff` |
+| primary-disabled | 主按钮禁用 | `#8ec6ff` |
+| link | 列表操作列链接 | `#1677ff` |
+
+## 2.2 功能色
+
+| 语义 | 主色 | 浅背景 | 场景 |
+|------|------|--------|------|
+| 成功 | `#52c41a` | `#f6ffed` | 启用/正常、成功提示 |
+| 警告 | `#faad14` | `#fffbe6` | 待处理、需关注 |
+| 错误 | `#ff4d4f` | `#fff2f0` | 校验错误、删除类 |
+| 信息 | `#1677ff` | `#e6f4ff` | 进行中、系统提示 |
+
+## 2.3 中性色 / 文字
+
+| 令牌 | 用途 | 值 |
+|------|------|-----|
+| text-1 | 标题、表格正文、按钮 | `#1f2329` |
+| text-2 | 表头、label、说明 | `#4e5969` |
+| text-3 | 占位符、时间戳、分页统计 | `#86909c` |
+| text-4 | 禁用文字 | `#c9cdd4` |
+| border | 控件边框 | `#d9d9d9` |
+| divider | 分割线、卡片边框 | `#e5e6eb` |
+| line / page-bg | 页面/区块底色 | `#f0f2f5` |
+| row-hover | 表格行 hover | `#f5f6f7` |
+| row-zebra | 斑马纹（可选） | `#fafafa` |
+| th-bg | 表头背景 | `#f7f8fa` |
+
+## 2.4 字体
+
+```css
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+  "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+```
+
+| 层级 | 字号/字重/行高 | 用途 |
+|------|----------------|------|
+| 页面大标题 | 20px / 600 / 28px | 列表页标题、表单页标题 |
+| 区块标题 | 16px / 600 / 24px | 「基本信息」等区块 |
+| 正文默认 | 14px / 400 / 22px | label、按钮、弹窗内容 |
+| 辅助说明 | 12px / 400 / 18px | 表头、占位符、校验错误 |
+
+列表字号三档（**强制**，见 `list-table-box.mdc`）：大 14/22、中 13/20、小 12/18。
+
+数字类（金额、数量、单号）建议 `font-variant-numeric: tabular-nums`。
+
+## 2.5 间距
+
+基于 **4px** 梯度：`4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48`，不得使用梯度外值。
+
+| 位置 | 间距 | 说明 |
+|------|------|------|
+| 页面左右内边距 | 20px（≥1280）/ 24px（≥1920）/ 16px（平板） | 内容距视口 |
+| 搜索区 ↔ 列表区 | **12px** | 垂直相邻卡片 |
+| 搜索卡片 padding | **12px 16px** | 见 `list-search-area.mdc` |
+| 列表卡片 padding | **8px 12px** | 见 `list-table-box.mdc`（项目已收紧） |
+
+## 2.6 圆角 / 阴影
+
+| 令牌 | 值 | 用途 |
+|------|-----|------|
+| radius-s | 6px | 按钮、输入框、标签 |
+| radius-m | 8px | 卡片、弹窗、下拉 |
+| radius-l | 12px | 页面级特殊容器 |
+| shadow-1 | `0 1px 2px rgba(0,0,0,.03), 0 1px 6px -1px rgba(0,0,0,.02)` | 常规卡片 |
+| shadow-2 | `0 6px 16px rgba(0,0,0,.08), 0 3px 6px -4px rgba(0,0,0,.12)` | 弹窗、下拉 |
+
+同一页面卡片风格统一：要么全部描边，要么全部描边 + shadow-1，**禁止混用**。

@@ -1,0 +1,178 @@
+---
+description: i-doms-web 抽屉（Drawer）规范：三档宽度、列表对照场景、与弹窗/新标签页选型
+globs: i-doms-web/**/*.vue
+alwaysApply: false
+---
+
+# 抽屉规范
+
+## 用途
+
+需要**保留列表上下文对照**时使用抽屉：
+
+- 参考数据填表
+- 快速预览
+- 行内轻编辑
+
+## 抽屉 vs 弹窗 vs 新标签页
+
+| 场景 | 选型 |
+|------|------|
+| 需看到列表做参照 | **抽屉** |
+| 不需参照、纯表单 | **弹窗**（见 `modal-layout.mdc`；行内明细见 `line-edit-modal.mdc`） |
+| 字段 > 8 或含内嵌可滚动表格，大 L 仍不够（>12 字段） | **新标签页** |
+
+## 位置 / 遮罩 / 动画
+
+| 项 | 约定 |
+|----|------|
+| 位置 | **右侧滑出** `placement="right"` |
+| 窄屏 | **≤768px 强制全宽**，不提供多尺寸切换 |
+| 遮罩 | `rgba(0,0,0,.45)`；点击关闭 |
+| 未保存 | 同弹窗 **10.3 二次确认** 后再关 |
+| 头部 | 标题 **16px / 600** + 右侧 ✕ |
+| 页脚 | 同弹窗：**右对齐** 取消｜确定（有 `#footer` slot） |
+| 动画 | 滑入 **250ms ease**；打开时 **锁定 body 滚动**（Ant Design Drawer 默认） |
+
+## 三档尺寸（11.1）
+
+不再使用单一固定宽度，统一 **小 S / 中 M / 大 L**：
+
+| 档位 | 宽度 | 适用场景 | 示例 |
+|------|------|----------|------|
+| **S 小** | **360px** | 快速预览 / 1–3 字段轻编辑 / 辅助确认 | 记录摘要、单行少量配置 |
+| **M 中** | **520px** | 详情查看 / ≤6 字段编辑 | 单据详情预览、**列显隐** |
+| **L 大** | **720px** | 多字段表单 / 并排多列 / **含表格** | 含信息卡片 + 可编辑区的行编辑 |
+
+### 尺寸红线
+
+- 字段 **> 8** 或需**内嵌可滚动表格** → 至少 **L（720px）**
+- 大 L 仍不够（**>12 字段**）→ **新标签页**，禁止缩小字号/压缩间距硬塞
+
+```vue
+<a-drawer
+  :open="open"
+  title="列显隐"
+  placement="right"
+  :width="drawerWidth"
+  destroy-on-close
+  @close="onClose"
+>
+  …
+  <template #footer>
+    <a-space><a-button>取消</a-button><a-button type="primary">确定</a-button></a-space>
+  </template>
+</a-drawer>
+```
+
+## 宽度取值
+
+实现：`useDrawerWidth(size)` + `utils/drawerWidth.js`
+
+| 档位 | 常量 | 宽度 |
+|------|------|------|
+| s | `'s'` | 360px |
+| m | `'m'` | 520px |
+| l | `'l'` | 720px |
+
+```javascript
+import { useDrawerWidth } from '@/composables/useDrawerWidth'
+import { suggestDrawerSize } from '@/utils/drawerWidth'
+
+const { drawerWidth, drawerBind } = useDrawerWidth('m')
+// drawerBind → { placement:'right', width, maskStyle } 可 v-bind 到 a-drawer
+
+const size = suggestDrawerSize({ fieldCount: 10, hasEmbeddedTable: true }) // 'l' | 'page'
+```
+
+```vue
+<a-drawer v-bind="drawerBind" … />
+```
+
+## 参考实现
+
+| 档位 | 组件 |
+|------|------|
+| M 520 | `@TableColumnSettingDrawer.vue` |
+| M/L | `@QcTemplatePreviewDrawer.vue`（560，宜归 M） |
+| L | 含表格的 `@QcTaskDetailDrawer.vue`（640，复杂内容宜升 L 720） |
+
+## 内容结构建议
+
+```
+头部标题
+└─ 只读基本信息（多列「标签：值」纯文本，见下）
+└─ 明细表格 / 可编辑区（scroll-y）
+└─ 页脚按钮
+```
+
+- 内容区可独立滚动；**页脚固定**（`#footer`）
+- 长文本、表格区域用内部 `max-height` + `overflow-y: auto`
+
+## 只读基本信息区（强制）
+
+抽屉内预览/详情的「基本信息」用**多列纯文本键值**，对齐列表页行编辑顶部信息区风格；**禁止**用带边框的两列表格（`a-table` / `bordered` Descriptions）展示元数据。
+
+| 项 | 约定 |
+|----|------|
+| 小标题 | 盒子**外侧上方**「**基本信息**」：**14px / 600**，与盒子间距 **8px** |
+| 容器 | **白底卡片盒子**：圆角 **8px**、描边 `#e5e6eb`、内边距 **12px 16px** |
+| 布局 | 多列栅格：抽屉 **M（520）→ 2 列**；**L（720）→ 2~3 列**；窄屏 1 列 |
+| 单项结构 | `字段名：字段值`（中文冒号「：」贴在 label 后） |
+| **label 颜色** | **text-2** `#4e5969`（比值浅） |
+| **值颜色** | **text-1** `#1f2329` |
+| 字号 | 均为 **14px**；行高约 22px；行间距 **8~12px** |
+| 空值 | **—** |
+| 状态类 | 仍用 `a-tag`，不用纯色字代替 |
+| 长文本 | 单独占满一行 |
+
+```vue
+<div class="section-title">基本信息</div>
+<div class="drawer-basic-card">
+  <a-row :gutter="[24, 8]" class="drawer-basic-info">
+    <a-col :span="12">
+      <span class="info-label">模板编号：</span>
+      <span class="info-value">{{ data.code }}</span>
+    </a-col>
+    <a-col :span="12">
+      <span class="info-label">模板名称：</span>
+      <span class="info-value">{{ data.name }}</span>
+    </a-col>
+  </a-row>
+</div>
+```
+
+```less
+.section-title {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.drawer-basic-card {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+}
+
+.drawer-basic-info {
+  .info-label { color: #4e5969; }   // text-2，稍浅
+  .info-value { color: #1f2329; }   // text-1
+}
+```
+
+若用 `a-descriptions`：必须 **`bordered={false}`**，且通过样式让 `label` → text-2、`content` → text-1；**禁止**默认 bordered 表格皮肤。
+
+下方「模板字段」等**列表数据**仍用表格，与上方基本信息区分开。
+
+## 避免
+
+- ❌ 需对照列表却用居中 Modal 挡住列表
+- ❌ 列设置 / 简单预览用 720px 过宽
+- ❌ 10+ 字段复杂表单硬塞抽屉
+- ❌ 遮罩点击直接关且有未保存改动
+- ❌ 窄屏仍写死 520px 导致横向溢出
+- ❌ 基本信息用带框两列表格（图1样式）；label 与值同色、无深浅区分

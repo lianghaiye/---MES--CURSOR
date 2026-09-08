@@ -1,0 +1,43 @@
+---
+description: i-doms-web 暗色主题（令牌覆盖、非简单反色、功能色浅底调整）
+globs: i-doms-web/**/*.{vue,less,css,scss}
+alwaysApply: false
+---
+
+# 暗色主题
+
+来源：设计规范 v1.3 第 22 章。通过**覆盖 Design Tokens** 实现，不重新定义组件。
+
+## 触发
+
+- 跟随系统 `prefers-color-scheme: dark`
+- 或用户在设置中手动切换
+
+## 核心令牌映射
+
+| 令牌 | 亮色 | 暗色 |
+|------|------|------|
+| page-bg | `#f5f7fa` / `#f0f2f5` | `#141414` |
+| card-bg | `#ffffff` | `#1f1f1f` |
+| hover-bg | `#f5f5f5` | `#262626` |
+| text-1 / 2 / 3 | `#1f2329` / `#4e5969` / `#86909c` | `#e6e6e6` / `#bfbfbf` / `#8c8c8c` |
+| border / divider | `#d9d9d9` / `#e5e6eb` | `#303030` / `#424242` |
+| primary | `#1677ff` | `#4096ff`（提亮对比） |
+
+## 注意
+
+- 暗色**不是简单反色**：阴影减弱、描边增强
+- 图片/图表单独保证对比度
+- 功能色浅背景在暗色下改为**低透明度同色叠加**（非亮色 `#f6ffed` 等直接沿用）
+
+## 实现
+
+```css
+[data-theme='dark'] {
+  --page-bg: #141414;
+  --card-bg: #1f1f1f;
+  /* ... */
+}
+```
+
+新组件样式须使用 CSS 变量（见 `design-tokens.mdc`），便于主题切换。

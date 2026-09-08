@@ -1,0 +1,82 @@
+---
+description: i-doms-web 列表分页规范（位置、每页条数、样式、持久化、与筛选联动）
+globs: i-doms-web/**/*.vue
+alwaysApply: false
+---
+
+# 分页规范
+
+列表底部右对齐分页区，与列表盒子配套（见 `list-table-box.mdc`，分页区高 **48px**）。
+
+## 位置与结构
+
+| 项 | 约定 |
+|----|------|
+| 位置 | 列表**底部**，**右对齐**（`.table-pagination`） |
+| 结构 | `共 N 条`（text-3）｜每页条数选择｜页码｜上下页箭头 |
+
+```vue
+<div class="table-pagination">
+  <a-pagination
+    v-model:current="pagination.current"
+    v-model:page-size="pagination.pageSize"
+    :total="total"
+    show-size-changer
+    :page-size-options="['10', '20', '50', '100']"
+    :show-total="(t) => `共 ${t} 条`"
+    @change="onPageChange"
+    @showSizeChange="onPageSizeChange"
+  />
+</div>
+```
+
+参考：`WorkOrderTableLayout.vue`、`PurchaseOrderView.vue`、`QcTemplateView.vue`
+
+## 每页条数
+
+| 项 | 值 |
+|----|-----|
+| 档位 | **10 / 20 / 50 / 100** |
+| 默认 | **10** |
+| 持久化 | 按**用户**记忆（localStorage，建议 key 含用户 + 页面） |
+| 翻页 | 回到**当前页**数据；**不清空**搜索 / 筛选条件 |
+
+## 页码样式
+
+| 项 | 约定 |
+|----|------|
+| 尺寸 | **中尺寸 32px**（与按钮体系一致） |
+| 当前页 | **primary** 填充 + 白字 |
+| 其他页 | 白底描边 |
+
+## 数据量小
+
+- 总数 **≤ 10** 时：默认**仍显示**分页器（保持布局稳定）
+- 或按产品约定隐藏（需业务明确）
+
+## 与筛选 / 排序联动（强制）
+
+| 操作 | 页码行为 | 搜索条件 |
+|------|----------|----------|
+| 搜索 / 排序 / 筛选变化 | **重置为第 1 页** | 按新条件生效 |
+| 翻页 / 改每页条数 | 保持当前页逻辑 | **不清空** |
+
+```javascript
+function handleSearch() {
+  pagination.current = 1 // 筛选变化必须回到第 1 页
+  loadList()
+}
+
+function onPageChange(page, pageSize) {
+  pagination.current = page
+  pagination.pageSize = pageSize
+  loadList() // 保留 filters，不重置
+}
+```
+
+## 避免
+
+- ❌ 搜索后仍停在旧页码（可能空页）
+- ❌ 翻页清空筛选条件
+- ❌ 每页条数档位不统一（如只有 10/20/50）
+- ❌ 分页器左对齐或夹在表格中间

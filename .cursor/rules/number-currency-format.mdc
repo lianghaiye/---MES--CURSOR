@@ -1,0 +1,88 @@
+---
+description: i-doms-web 数值与金额格式化（精度 4 位、去尾零、千分位、币种、负号）
+globs: i-doms-web/**/*.{vue,js,ts}
+alwaysApply: false
+---
+
+# 数值与金额格式化规范
+
+来源：设计规范 v1.3 第 26 章。列表数值列右对齐见 `list-table-box.mdc`；locale 见 `i18n-text.mdc`。
+
+## 26.1 小数位规则（精度层 / 系统负责）
+
+| 规则 | 说明 |
+|------|------|
+| **精度上限 4 位** | 系统内数值字段最多保留 **4 位小数** |
+| **舍入由系统完成** | 后端/计算层对超过 4 位的结果 **四舍五入** 到第 4 位后再落库；前端**不做精度截断**，只做展示格式化 |
+| **前端不做二次舍入** | 传到前端的值应已 ≤4 位；若出现 **>4 位**（异常数据），在第 4 位**截断**并上报，**禁止**静默再舍入 |
+
+### 职责边界
+
+```
+计算 / 落库 / 接口返回  →  后端四舍五入至 4 位
+表格 / 详情 / 弹窗展示  →  前端 formatNumber / formatCurrency（去尾零、千分位、符号）
+```
+
+前端 `toFixed(n)` 用于**业务计算**（如含税价推导）时，结果仍须符合 4 位上限；**禁止**在展示层对同一字段重复 round 掩盖后端精度问题。
+
+## 26.2 展示格式化（前端层）
+
+| 规则 | 说明 |
+|------|------|
+| **去尾零** | 有小数显示有效小数位；无小数只显示整数（`3.00` → `3`） |
+| **零值归一** | `0` / `0.00` / `0.0000` 统一展示为 **`0`** |
+| **千分位** | 金额、单价、数量等较长数值按 locale 加千分位；较短值（如数量 ≤999）可不强制 |
+| **负数** | 负号前缀（如 `-3.2`）；默认跟随文字色；财务场景可用红色（**全站统一**） |
+| **金额 / 币种** | 带币种符号 + **右对齐**；符号位置按 locale（如 `¥1,234.5`） |
+
+数字列样式：`font-variant-numeric: tabular-nums`（见 `design-tokens.mdc`）。
+
+## 26.3 转换示例
+
+| 系统原值 | 前端展示 | 说明 |
+|----------|----------|------|
+| `3` | `3` | 整数，无小数 |
+| `3.00` | `3` | 去尾零 |
+| `3.5` | `3.5` | 保留 1 位 |
+| `3.1234` | `3.1234` | 4 位全保留 |
+| `3.12345` | `3.1235` | 系统已四舍五入到 4 位 |
+| `0` / `0.00` | `0` | 零值归一 |
+| `-2.10` | `-2.1` | 负号前缀 + 去尾零 |
+| `1234.5` | `¥1,234.5` | 千分位 + 币种（按 locale） |
+
+## 项目实现（强制复用）
+
+| 场景 | 工具 | 路径 |
+|------|------|------|
+| 数量 / 通用数值 | `formatNumber` / `formatQty` | `@/utils/numberFormat` |
+| 数量 + 单位 | `formatQtyWithUnit` | `@/utils/numberFormat` |
+| 输入框去尾零 | `inputNumberFormatter` / `inputNumberParser` | `@/utils/numberFormat` |
+| 业务计算舍入 | `roundNumber(val, 4)` | `@/utils/numberFormat`（仅计算，非展示二次舍入） |
+| 金额（不含税等） | `formatAmountExTax` 等 | 按模块 `@/utils/*`，逐步收敛到统一 `formatCurrency` |
+
+### 禁止
+
+- ❌ 页面内手写 `Number(x).toFixed(2/4)` 做列表/详情展示（应走 `formatNumber` / 金额 formatter）
+- ❌ 对接口异常超 4 位数据静默 `Math.round` 而不记录
+- ❌ 金额列左对齐；币种符号与数字混用不一致写法（`￥`/`¥`/无符号混排）
+
+### 新增 formatter 建议
+
+```javascript
+import { formatNumber } from '@/utils/numberFormat'
+
+// 数量
+formatNumber(val, 4, { empty: '—' })
+
+// 金额（示例：符号 + 千分位 + 去尾零，maxDecimals 按业务字段）
+function formatCurrency(val, { symbol = '¥', maxDecimals = 4, empty = '—' } = {}) {
+  const s = formatNumber(val, maxDecimals, { empty })
+  if (s === empty) return empty
+  const num = Number(s.replace(/,/g, ''))
+  const grouped = new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDecimals,
+  }).format(num)
+  return `${symbol}${grouped}`
+}
+```

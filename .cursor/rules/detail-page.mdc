@@ -1,0 +1,124 @@
+---
+description: i-doms-web 详情页规范（页头、操作按钮、胶囊 Tab、只读区块、子表）
+globs: i-doms-web/**/*Detail*.vue
+alwaysApply: false
+---
+
+# 详情页规范
+
+详情页用于展示**一条完整记录的只读信息**，并承载该记录的主要操作入口。
+
+与新增/编辑页分工：只读 + 业务动作 → 详情；填写保存 → `form-page-shell.mdc`。
+
+参考：`SalesOrderDetailView.vue`、`ProductBomDetailView.vue`；胶囊 Tab 样式见 `detail-tabs-pill.less`。
+
+## 页头
+
+| 项 | 约定 |
+|----|------|
+| 左侧 | 返回箭头 `←` + **标题**（单号 / 名称，**20px / 600**）+ **状态标签** |
+| 右侧 | 操作按钮组（右对齐） |
+
+状态继续用 **`a-tag`**（功能色），可并列多个（如进度状态 + 发货状态）。
+
+## 操作按钮组
+
+- 位于标题**右侧**
+- 包含该记录可执行的核心操作，如：反审、申请发货、价格变更、完成、作废、打印、返回列表
+- 按钮随状态显隐（无权限 / 不可执行则不展示）
+- 超过 **6~8 个**收入 **「更多 ▾」**（同 `list-toolbar.mdc` 收纳规则）
+
+```vue
+<div class="page-header">
+  <div class="header-left">
+    <a-button type="text" size="small" @click="handleBack"><ArrowLeftOutlined /></a-button>
+    <span class="order-no">{{ record.docNo }}</span>
+    <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+  </div>
+  <a-space :size="8">
+    <!-- 核心操作 ≤ 6~8 -->
+    <a-button size="small" @click="handleBack">返回列表</a-button>
+  </a-space>
+</div>
+```
+
+## 胶囊 Tab
+
+当详情包含**多个子维度**时使用，例如：
+
+概览｜发货信息｜入库信息｜采购｜生产｜EBOM｜审批信息｜附件…
+
+| 项 | 约定 |
+|----|------|
+| 样式 | 胶囊 Tab（`detail-tabs-pill`） |
+| 顺序 | **固定**，不随用户拖拽改序 |
+| 当前 Tab | **高亮** |
+| 数量角标 | 可用 `发货信息 (N)` 或 badge |
+
+```vue
+<a-tabs v-model:active-key="activeTab" class="detail-tabs detail-tabs-pill">
+  <a-tab-pane key="overview" tab="概览" />
+  <a-tab-pane key="shipping" :tab="`发货信息 (${count})`" />
+  …
+</a-tabs>
+```
+
+单维度详情可不使用 Tab，直接铺区块。
+
+## 基本信息区块
+
+| 项 | 约定 |
+|----|------|
+| 容器 | **白色卡片** |
+| 标题 | **16px / 600** |
+| 字段 | **3~4 列**栅格；`字段名：字段值` 纯文本（同抽屉只读信息区） |
+| **label** | **text-2** `#4e5969`（比值浅）+ 中文冒号「：」 |
+| **值** | **text-1** `#1f2329`，左对齐 |
+| 长文本（备注） | **占整行** |
+| 禁止 | **带边框两列表格**展示元数据；与明细 `a-table` 区分开 |
+
+抽屉内轻量详情的基本信息细则见 `drawer-layout.mdc`「只读基本信息区」。
+
+## 汇总 / 子表区块
+
+- 每个子表前有**独立标题**，**可折叠**
+- 子表操作按钮在子表**左上方**，收纳规则同工具栏（≤6~8，超出「更多」）
+- 子表本身只读；行内「详情」链接可跳转关联单据
+
+## 只读样式
+
+| 项 | 约定 |
+|----|------|
+| label | **14px / text-2**（`#4e5969`），比值稍浅 |
+| 值文字 | **14px / text-1**（`#1f2329`） |
+| 空值 | **—** |
+| 金额 / 数量 | **右对齐**；小数位一致 |
+| 状态 | **标签组件**，不用纯色文字代替 |
+| 布尔 | 「是 / 否」文字 |
+
+## 页面结构总览
+
+```
+← SO2024001  [已审核] [部分发货]     反审｜申请发货｜…｜打印｜返回列表
+[概览] [发货信息] [入库] [采购] [生产] [EBOM] [审批] …
+└─ 基本信息（白卡，3~4 列只读）
+└─ 价格汇总 / 明细子表（可折叠）
+```
+
+## 避免
+
+- ❌ 详情页做成可直接改字段的大表单（应跳转编辑页）
+- ❌ 操作按钮超过 8 个仍全部平铺
+- ❌ Tab 顺序每进一次页面都变
+- ❌ 空值显示空白或 `null` / `undefined`
+- ❌ 状态用纯文本不用 Tag
+- ❌ 基本信息用 bordered 表格；label 与值同色无层级
+
+## 与其他规范
+
+| 场景 | 规则 |
+|------|------|
+| 新增 / 编辑页壳 | `form-page-shell.mdc` |
+| 列表工具栏收纳 | `list-toolbar.mdc` |
+| 轻量预览对照列表 | 抽屉 `drawer-layout.mdc` |
+| 折叠表单组织 | `form-collapsible-card.mdc` |
