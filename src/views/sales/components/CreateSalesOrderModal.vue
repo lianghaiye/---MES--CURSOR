@@ -120,17 +120,6 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="订单金额">
-                  <a-input-number
-                    :value="orderAmount"
-                    :precision="2"
-                    disabled
-                    size="small"
-                    style="width: 100%"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
                 <a-form-item label="技术规范编码">
                   <a-input
                     v-model:value="form.techSpecCode"

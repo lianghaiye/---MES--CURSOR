@@ -38,6 +38,15 @@
         </template>
       </template>
       <template #expandedRowRender="{ record }">
+        <div v-if="headerDiffs(record).length" class="header-diff">
+          <div class="header-diff-title">基本信息变更</div>
+          <div v-for="item in headerDiffs(record)" :key="item.key" class="header-diff-row">
+            <span class="header-diff-label">{{ item.label }}</span>
+            <span>{{ item.oldValue }}</span>
+            <span class="hint-arrow">→</span>
+            <span>{{ item.newValue }}</span>
+          </div>
+        </div>
         <a-table
           size="small"
           bordered
@@ -45,10 +54,14 @@
           :columns="lineColumns"
           :data-source="record.lines || []"
           :pagination="false"
-          :scroll="{ x: 1460 }"
+          :scroll="{ x: 1960 }"
         >
           <template #bodyCell="{ column, record: line }">
-            <template v-if="isLineMoney(column.key)">
+            <template v-if="column.key === 'productName'">
+              <span>{{ line.productName || '—' }}</span>
+              <a-tag v-if="line.cancelled" color="default" class="cancelled-tag">已取消</a-tag>
+            </template>
+            <template v-else-if="isLineMoney(column.key)">
               {{ formatPriceChangeAbsMoney(line[column.key]) }}
             </template>
             <template v-else-if="column.key === 'oldLineDiscountRate'">
@@ -90,6 +103,7 @@ import {
   formatPriceChangeDiscount,
   formatPriceChangeMoney,
   isCustomerChanged,
+  listOrderChangeHeaderDiffs,
   normalizePriceChangeRecord,
   priceChangeStatusColor,
 } from '@/utils/salesPriceChange'
@@ -133,11 +147,16 @@ function isLineMoney(key) {
 }
 
 const lineColumns = [
-  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true },
+  { title: '产品名称', key: 'productName', dataIndex: 'productName', width: 160, ellipsis: true },
   { title: '产品编号', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
-  { title: '数量', dataIndex: 'qty', width: 64, align: 'right' },
+  { title: '原数量', dataIndex: 'oldQty', width: 72, align: 'right' },
+  { title: '新数量', dataIndex: 'newQty', width: 72, align: 'right' },
+  { title: '原交货日期', dataIndex: 'oldDeliveryDate', width: 110 },
+  { title: '新交货日期', dataIndex: 'newDeliveryDate', width: 110 },
+  { title: '原税率(%)', dataIndex: 'oldTaxRate', width: 88, align: 'right' },
+  { title: '新税率(%)', dataIndex: 'newTaxRate', width: 88, align: 'right' },
   { title: '原单价（不含税）', key: 'oldUnitPriceExTax', width: 122, align: 'right' },
   { title: '原单价（含税）', key: 'oldUnitPriceInTax', width: 110, align: 'right' },
   { title: '新单价（不含税）', key: 'newUnitPriceExTax', width: 122, align: 'right' },
@@ -149,6 +168,10 @@ const lineColumns = [
   { title: '差额（不含税）', key: 'deltaAmountExTax', width: 118, align: 'right' },
   { title: '差额（含税）', key: 'deltaAmountInTax', width: 110, align: 'right' },
 ]
+
+function headerDiffs(record) {
+  return listOrderChangeHeaderDiffs(record.headerOld, record.headerNew)
+}
 
 function customerDisplay(record) {
   if (isCustomerChanged(record)) {
@@ -178,5 +201,41 @@ function deltaClass(val) {
 
 .delta-down {
   color: #389e0d;
+}
+
+.header-diff {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+}
+
+.header-diff-title {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.header-diff-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.header-diff-label {
+  min-width: 96px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.hint-arrow {
+  color: #fa8c16;
+  font-weight: 600;
+}
+
+.cancelled-tag {
+  margin-left: 6px;
 }
 </style>

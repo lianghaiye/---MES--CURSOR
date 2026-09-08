@@ -1,5 +1,6 @@
 import { formatDiscountRatePercent, normalizeDiscountRate, round2 } from '@/utils/salesOrderPricing'
 import { formatNumber } from '@/utils/numberFormat'
+import { calcSalesLineAppliedShipQty } from '@/utils/salesLineShipped'
 
 export const PRICE_CHANGE_STATUS = {
   PENDING: '待审核',
@@ -9,12 +10,117 @@ export const PRICE_CHANGE_STATUS = {
 
 export const PRICE_CHANGE_REASON_OPTIONS = [
   { value: '客户增配', label: '客户增配' },
+  { value: '客户取消订货', label: '客户取消订货' },
   { value: '设计变更', label: '设计变更' },
   { value: '材质升级', label: '材质升级' },
   { value: '工艺加价', label: '工艺加价' },
   { value: '材料涨价', label: '材料涨价' },
+  { value: '交期调整', label: '交期调整' },
   { value: '其他', label: '其他' },
 ]
+
+/** 订单变更可改的基本信息（不含销售单号） */
+export const ORDER_CHANGE_HEADER_KEYS = [
+  'urgency',
+  'contractType',
+  'contractNo',
+  'settlementCurrency',
+  'orderType',
+  'customerName',
+  'contactPerson',
+  'contactPhone',
+  'deliveryAddress',
+  'deliveryMethod',
+  'techSpecCode',
+  'reminderDate',
+  'salesperson',
+  'settlementType',
+  'paymentRatio',
+  'downPaymentAmount',
+  'remark',
+]
+
+export const ORDER_CHANGE_HEADER_LABELS = {
+  urgency: '紧急度',
+  contractType: '合同类型',
+  contractNo: '合同编号',
+  settlementCurrency: '结算币种',
+  orderType: '订单类型',
+  customerName: '客户名称',
+  contactPerson: '联系人',
+  contactPhone: '联系人电话',
+  deliveryAddress: '交货地址',
+  deliveryMethod: '交货方式',
+  techSpecCode: '技术规范编码',
+  reminderDate: '提醒日期',
+  salesperson: '业务员',
+  settlementType: '结算类型',
+  paymentRatio: '付款比例',
+  downPaymentAmount: '首付/定金金额',
+  remark: '备注',
+}
+
+function headerScalar(key, value) {
+  if (key === 'downPaymentAmount') {
+    if (value == null || value === '') return null
+    const n = Number(value)
+    return Number.isFinite(n) ? n : null
+  }
+  if (key === 'reminderDate') {
+    if (!value) return ''
+    if (typeof value?.format === 'function') return value.format('YYYY-MM-DD')
+    return String(value).slice(0, 10)
+  }
+  if (value == null || value === undefined) return ''
+  return value
+}
+
+export function snapshotOrderChangeHeader(order = {}) {
+  const snap = {}
+  ORDER_CHANGE_HEADER_KEYS.forEach((key) => {
+    snap[key] = headerScalar(key, order[key])
+  })
+  return snap
+}
+
+export function isOrderChangeHeaderChanged(oldHeader = {}, newHeader = {}) {
+  return ORDER_CHANGE_HEADER_KEYS.some(
+    (key) =>
+      String(headerScalar(key, oldHeader[key]) ?? '') !==
+      String(headerScalar(key, newHeader[key]) ?? ''),
+  )
+}
+
+function formatHeaderDiffValue(key, value) {
+  const v = headerScalar(key, value)
+  if (key === 'downPaymentAmount') {
+    if (v == null || v === '') return '—'
+    return `￥${Number(v).toFixed(2)}`
+  }
+  if (v == null || v === '') return '—'
+  return String(v)
+}
+
+export function listOrderChangeHeaderDiffs(oldHeader = {}, newHeader = {}) {
+  return ORDER_CHANGE_HEADER_KEYS.filter(
+    (key) =>
+      String(headerScalar(key, oldHeader[key]) ?? '') !==
+      String(headerScalar(key, newHeader[key]) ?? ''),
+  ).map((key) => ({
+    key,
+    label: ORDER_CHANGE_HEADER_LABELS[key] || key,
+    oldValue: formatHeaderDiffValue(key, oldHeader[key]),
+    newValue: formatHeaderDiffValue(key, newHeader[key]),
+  }))
+}
+
+/** 未发部分仍有余量时才可「取消行」（已全部占用发货则不可） */
+export function canCancelPriceChangeLine(row) {
+  if (!row || row.cancelled || row.oldCancelled) return false
+  const oldQty = Number(row.oldQty ?? row.qty) || 0
+  const applied = Number(row.appliedShipQty) || 0
+  return oldQty > applied + 1e-9
+}
 
 export function priceChangeStatusColor(status) {
   if (status === PRICE_CHANGE_STATUS.APPROVED) return 'success'
@@ -71,10 +177,14 @@ function deriveExTax(inc, taxRate) {
 
 export function isPriceChangeLineChanged(row) {
   if (!row) return false
+  if (Boolean(row.cancelled) !== Boolean(row.oldCancelled)) return true
+  if (String(row.newDeliveryDate || '') !== String(row.oldDeliveryDate || '')) return true
   const checks = [
     [row.newUnitPriceExTax, row.oldUnitPriceExTax],
     [row.newUnitPriceInTax, row.oldUnitPriceInTax],
     [row.newLineDiscountRate, row.oldLineDiscountRate],
+    [row.newQty, row.oldQty],
+    [row.newTaxRate, row.oldTaxRate],
   ]
   return checks.some(([a, b]) => Math.abs((Number(a) || 0) - (Number(b) || 0)) > 1e-9)
 }
@@ -85,12 +195,15 @@ export function buildPriceChangeDraftLines(order) {
     .map((line) => {
       const qty = Number(line.salesQty ?? line.qty) || 0
       const taxRate = Number(line.taxRate) || 0
+      const deliveryDate = line.deliveryDate ? String(line.deliveryDate).slice(0, 10) : ''
+      const appliedShipQty = calcSalesLineAppliedShipQty(order, line)
       const oldUnitPriceExTax = round2(Number(line.unitPriceExTax) || 0)
       const oldUnitPriceInTax = round2(
         Number(line.unitPriceInTax) || deriveInTax(oldUnitPriceExTax, taxRate),
       )
       const listUnitPriceExTax = round2(Number(line.listUnitPriceExTax) || oldUnitPriceExTax)
       const oldLineDiscountRate = normalizeDiscountRate(line.lineDiscountRate, 1)
+      const alreadyCancelled = Boolean(line.cancelled)
       const row = {
         salesLineId: line.id,
         productCode: line.productCode || '',
@@ -99,7 +212,16 @@ export function buildPriceChangeDraftLines(order) {
         material: line.material || '',
         unit: line.unit || '',
         qty,
+        oldQty: qty,
+        newQty: qty,
+        appliedShipQty,
+        oldDeliveryDate: deliveryDate,
+        newDeliveryDate: deliveryDate,
+        oldTaxRate: taxRate,
+        newTaxRate: taxRate,
         taxRate,
+        oldCancelled: alreadyCancelled,
+        cancelled: alreadyCancelled,
         listUnitPriceExTax,
         oldUnitPriceExTax,
         oldUnitPriceInTax,
@@ -117,41 +239,49 @@ export function buildPriceChangeDraftLines(order) {
 export function recalcPriceChangeLine(row, options = {}) {
   const taxModeExcluding = options.taxModeExcluding !== false
   const editMode = options.editMode || 'unitPrice'
-  const qty = Number(row.qty) || 0
-  const taxRate = Number(row.taxRate) || 0
+  const oldQty = Number(row.oldQty ?? row.qty) || 0
+  const minQty = Number(row.appliedShipQty) || 0
+  let newQty = Number(row.newQty ?? row.qty) || 0
+  if (row.cancelled) newQty = minQty
+  if (newQty < minQty) newQty = minQty
+  const oldTaxRate = Number(row.oldTaxRate ?? row.taxRate) || 0
+  const newTaxRate = Number(row.newTaxRate ?? row.taxRate) || 0
   const listPrice = Number(row.listUnitPriceExTax) || Number(row.oldUnitPriceExTax) || 0
-  row.taxRate = taxRate
+  row.oldQty = oldQty
+  row.newQty = newQty
+  row.qty = newQty
+  row.oldTaxRate = oldTaxRate
+  row.newTaxRate = newTaxRate
+  row.taxRate = newTaxRate
   row.listUnitPriceExTax = round2(listPrice)
-  row.qty = qty
 
   row.oldUnitPriceExTax = round2(Number(row.oldUnitPriceExTax) || 0)
   row.oldUnitPriceInTax = round2(
-    Number(row.oldUnitPriceInTax) || deriveInTax(row.oldUnitPriceExTax, taxRate),
+    Number(row.oldUnitPriceInTax) || deriveInTax(row.oldUnitPriceExTax, oldTaxRate),
   )
-  row.oldAmountExTax = lineChangeAmount(qty, row.oldUnitPriceExTax)
-  row.oldAmountInTax = lineChangeAmount(qty, row.oldUnitPriceInTax)
+  row.oldAmountExTax = lineChangeAmount(oldQty, row.oldUnitPriceExTax)
+  row.oldAmountInTax = lineChangeAmount(oldQty, row.oldUnitPriceInTax)
   row.oldLineDiscountRate = normalizeDiscountRate(row.oldLineDiscountRate, 1)
-  row.oldLineDiscountAmount = lineDiscountAmount(listPrice, qty, row.oldLineDiscountRate)
+  row.oldLineDiscountAmount = lineDiscountAmount(listPrice, oldQty, row.oldLineDiscountRate)
 
   if (editMode === 'discount') {
     const rate = normalizeDiscountRate(row.newLineDiscountRate, 1)
     row.newLineDiscountRate = rate
     row.newUnitPriceExTax = round2(listPrice * rate)
-    row.newUnitPriceInTax = deriveInTax(row.newUnitPriceExTax, taxRate)
+    row.newUnitPriceInTax = deriveInTax(row.newUnitPriceExTax, newTaxRate)
   } else if (taxModeExcluding) {
-    // 改单价：互算含税/不含税，保留行折扣不反算
     row.newUnitPriceExTax = round2(Number(row.newUnitPriceExTax) || 0)
-    row.newUnitPriceInTax = deriveInTax(row.newUnitPriceExTax, taxRate)
+    row.newUnitPriceInTax = deriveInTax(row.newUnitPriceExTax, newTaxRate)
     row.newLineDiscountRate = normalizeDiscountRate(row.newLineDiscountRate, 1)
   } else {
     row.newUnitPriceInTax = round2(Number(row.newUnitPriceInTax) || 0)
-    row.newUnitPriceExTax = deriveExTax(row.newUnitPriceInTax, taxRate)
+    row.newUnitPriceExTax = deriveExTax(row.newUnitPriceInTax, newTaxRate)
     row.newLineDiscountRate = normalizeDiscountRate(row.newLineDiscountRate, 1)
   }
 
-  row.newAmountExTax = lineChangeAmount(qty, row.newUnitPriceExTax)
-  row.newAmountInTax = lineChangeAmount(qty, row.newUnitPriceInTax)
-  row.newLineDiscountAmount = lineDiscountAmount(listPrice, qty, row.newLineDiscountRate)
+  row.newAmountExTax = lineChangeAmount(newQty, row.newUnitPriceExTax)
+  row.newAmountInTax = lineChangeAmount(newQty, row.newUnitPriceInTax)
+  row.newLineDiscountAmount = lineDiscountAmount(listPrice, newQty, row.newLineDiscountRate)
   row.deltaAmountExTax = round2(row.newAmountExTax - row.oldAmountExTax)
   row.deltaAmountInTax = round2(row.newAmountInTax - row.oldAmountInTax)
   return row
@@ -185,7 +315,16 @@ export function summarizePriceChangeLines(lines = []) {
 
 export function normalizePriceChangeLine(row, taxModeExcluding = true) {
   const next = { ...row }
-  if (next.taxRate == null || next.taxRate === '') next.taxRate = 13
+  if (next.oldQty == null) next.oldQty = next.qty
+  if (next.newQty == null) next.newQty = next.qty
+  if (next.oldTaxRate == null || next.oldTaxRate === '') next.oldTaxRate = next.taxRate ?? 13
+  if (next.newTaxRate == null || next.newTaxRate === '') next.newTaxRate = next.taxRate ?? 13
+  if (next.taxRate == null || next.taxRate === '') next.taxRate = next.newTaxRate
+  if (next.oldDeliveryDate == null) next.oldDeliveryDate = next.deliveryDate || ''
+  if (next.newDeliveryDate == null) next.newDeliveryDate = next.deliveryDate || next.oldDeliveryDate
+  if (next.oldCancelled == null) next.oldCancelled = false
+  if (next.cancelled == null) next.cancelled = false
+  if (next.appliedShipQty == null) next.appliedShipQty = 0
   if (next.listUnitPriceExTax == null || next.listUnitPriceExTax === '') {
     next.listUnitPriceExTax = next.oldUnitPriceExTax
   }
@@ -206,8 +345,19 @@ export function normalizePriceChangeRecord(record) {
   return {
     ...record,
     taxModeExcluding,
-    oldCustomerName: record.oldCustomerName || '',
-    newCustomerName: record.newCustomerName || record.oldCustomerName || '',
+    oldCustomerName: record.oldCustomerName || record.headerOld?.customerName || '',
+    newCustomerName:
+      record.newCustomerName || record.headerNew?.customerName || record.oldCustomerName || '',
+    headerOld:
+      record.headerOld ||
+      snapshotOrderChangeHeader({
+        customerName: record.oldCustomerName,
+      }),
+    headerNew:
+      record.headerNew ||
+      snapshotOrderChangeHeader({
+        customerName: record.newCustomerName || record.oldCustomerName,
+      }),
     lines,
     oldAmountExTax: summary.oldAmountExTax,
     newAmountExTax: summary.newAmountExTax,

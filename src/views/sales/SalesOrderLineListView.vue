@@ -183,6 +183,10 @@
               record.lineDeliveryStatus || '未发货'
             }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'productName'">
+            <span>{{ record.productName || '—' }}</span>
+            <a-tag v-if="record.cancelled" color="default" class="cancelled-tag">已取消</a-tag>
+          </template>
           <template v-else-if="column.key === 'salesQty'">
             {{ formatQty(record.salesQty) }}
           </template>
@@ -637,5 +641,9 @@ function openDetail(record) {
   &:hover {
     color: #4096ff;
   }
+}
+
+.cancelled-tag {
+  margin-left: 6px;
 }
 </style>

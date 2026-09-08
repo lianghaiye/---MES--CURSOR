@@ -70,11 +70,6 @@ const fields = computed(() => {
       format: () => DISCOUNT_STRATEGY_LABELS[o.discountStrategy] || '无折扣',
     },
     {
-      key: 'orderAmount',
-      label: '订单金额',
-      format: () => `￥${Number(o.orderAmount ?? o.amountInTax ?? 0).toFixed(2)}`,
-    },
-    {
       key: 'totalDiscountAmount',
       label: '优惠合计',
       format: () =>

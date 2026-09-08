@@ -219,10 +219,17 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :row-class-name="(record) => (record.cancelled ? 'line-cancelled' : '')"
                 :scroll="{ x: lineTableScrollX }"
               >
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'productName'">
+                    <span>{{ line.productName || '—' }}</span>
+                    <a-tag v-if="line.cancelled" color="default" class="cancelled-tag"
+                      >已取消</a-tag
+                    >
+                  </template>
                   <template v-else-if="column.key === 'businessType'">
                     {{ resolveLineBusinessType(line, order) }}
                   </template>
@@ -2466,5 +2473,13 @@ function openBomDetail(bomId, bomName) {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   text-align: center;
+}
+
+.cancelled-tag {
+  margin-left: 6px;
+}
+
+:deep(.line-cancelled) {
+  color: rgba(0, 0, 0, 0.45);
 }
 </style>

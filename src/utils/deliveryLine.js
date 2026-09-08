@@ -160,14 +160,16 @@ export function refreshDeliveryLineStock(line) {
   return line
 }
 
-/** 将销售订单明细转为申请发货明细行（仅整机行） */
+/** 将销售订单明细转为申请发货明细行（仅整机行；已取消行不再发货） */
 export function mapSalesLineToDeliveryLine(line, order) {
+  if (line?.cancelled) return null
   if (order && !isWholeMachineLine(line, order)) return null
   return buildDeliveryLineBase(line, order)
 }
 
 /** 散件发运产品行展示（字段与整机一致，不含本次发货数量列） */
 export function mapScatterShipDisplayLine(line, order) {
+  if (line?.cancelled) return null
   if (order && !isScatterLine(line, order)) return null
   const base = buildDeliveryLineBase(line, order)
   return {

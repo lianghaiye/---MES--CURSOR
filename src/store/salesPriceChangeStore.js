@@ -1,22 +1,24 @@
-/**
- * 销售订单变更：申请 / 审核 / 回写订单有效价与客户
- */
 import { reactive, watch } from 'vue'
+import { persistJson } from '@/utils/safeStorage'
 import dayjs from 'dayjs'
 import { getSalesOrderById, recalcOrderAmounts } from '@/store/salesOrderStore'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
 import { recalcSalesLinePricing } from '@/utils/salesOrderPricing'
 import {
+  ORDER_CHANGE_HEADER_KEYS,
   PRICE_CHANGE_STATUS,
   isCustomerChanged,
+  isOrderChangeHeaderChanged,
+  isPriceChangeLineChanged,
   normalizePriceChangeRecord,
   recalcPriceChangeLine,
+  snapshotOrderChangeHeader,
   summarizePriceChangeLines,
 } from '@/utils/salesPriceChange'
 import { SALES_ORDER_STATUS, normalizeSalesOrderProgressStatus } from '@/utils/salesOrderStatus'
 
 const STORAGE_KEY = 'i_doms_sales_price_changes'
-const DATA_VERSION = 3
+const DATA_VERSION = 4
 
 function loadFromStorage() {
   try {
@@ -34,13 +36,10 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      version: DATA_VERSION,
-      orders: salesPriceChangeState.orders,
-    }),
-  )
+  persistJson(STORAGE_KEY, {
+    version: DATA_VERSION,
+    orders: salesPriceChangeState.orders,
+  })
 }
 
 function buildSeed() {
@@ -135,6 +134,8 @@ export function submitSalesPriceChange({
   taxModeExcluding = true,
   oldCustomerName = '',
   newCustomerName = '',
+  headerOld = null,
+  headerNew = null,
   operator = 'admin1',
 }) {
   if (!canApplySalesPriceChange(salesOrder)) {
@@ -151,15 +152,33 @@ export function submitSalesPriceChange({
       editMode: 'unitPrice',
     })
   })
+  const overOccupied = prepared.find(
+    (row) => Number(row.newQty) + 1e-9 < (Number(row.appliedShipQty) || 0),
+  )
+  if (overOccupied) {
+    return {
+      ok: false,
+      message: `「${overOccupied.productName || overOccupied.productCode}」销售数量不能小于已占用发货数量 ${overOccupied.appliedShipQty}`,
+    }
+  }
   const summary = summarizePriceChangeLines(prepared)
-  const originCustomer = String(oldCustomerName || salesOrder?.customerName || '').trim()
-  const nextCustomer = String(newCustomerName || originCustomer).trim()
+  const originHeader = snapshotOrderChangeHeader(headerOld || salesOrder)
+  const nextHeader = snapshotOrderChangeHeader({
+    ...(headerNew || salesOrder),
+    customerName: newCustomerName || headerNew?.customerName || salesOrder?.customerName,
+  })
+  const originCustomer = String(
+    oldCustomerName || originHeader.customerName || salesOrder?.customerName || '',
+  ).trim()
+  const nextCustomer = String(newCustomerName || nextHeader.customerName || originCustomer).trim()
+  nextHeader.customerName = nextCustomer
   const customerChanged = isCustomerChanged({
     oldCustomerName: originCustomer,
     newCustomerName: nextCustomer,
   })
-  if (!summary.changedCount && !customerChanged) {
-    return { ok: false, message: '请至少修改客户名称或一行单价/折扣' }
+  const headerChanged = isOrderChangeHeaderChanged(originHeader, nextHeader)
+  if (!summary.changedCount && !customerChanged && !headerChanged) {
+    return { ok: false, message: '请至少修改一项基本信息或一行明细' }
   }
   if (!reasonType) {
     return { ok: false, message: '请选择变更原因' }
@@ -180,6 +199,8 @@ export function submitSalesPriceChange({
     taxModeExcluding: taxModeExcluding !== false,
     oldCustomerName: originCustomer,
     newCustomerName: nextCustomer,
+    headerOld: originHeader,
+    headerNew: nextHeader,
     lines: prepared,
     oldAmountExTax: summary.oldAmountExTax,
     newAmountExTax: summary.newAmountExTax,
@@ -220,27 +241,39 @@ function applyApprovedPrices(change) {
   if (!order) return { ok: false, message: '销售订单不存在' }
   const lineMap = new Map((order.lineItems || []).map((l) => [l.id, l]))
   const taxModeExcluding = change.taxModeExcluding !== false
+  const headerNew = change.headerNew
+  if (headerNew) {
+    ORDER_CHANGE_HEADER_KEYS.forEach((key) => {
+      if (headerNew[key] === undefined) return
+      order[key] = headerNew[key]
+    })
+  } else if (isCustomerChanged(change)) {
+    order.customerName = String(change.newCustomerName || '').trim()
+  }
   for (const row of change.lines || []) {
     const line = lineMap.get(row.salesLineId)
-    if (!line) continue
-    const newEx = Number(row.newUnitPriceExTax)
-    const oldEx = Number(row.oldUnitPriceExTax)
-    const newIn = Number(row.newUnitPriceInTax)
-    const oldIn = Number(row.oldUnitPriceInTax)
-    const priceChanged =
-      (Number.isFinite(newEx) && Math.abs(newEx - oldEx) > 1e-9) ||
-      (Number.isFinite(newIn) && Math.abs(newIn - oldIn) > 1e-9)
-    if (!priceChanged) continue
+    if (!line || !isPriceChangeLineChanged(row)) continue
+    const nextQty = Number(row.newQty)
+    if (Number.isFinite(nextQty)) {
+      line.salesQty = nextQty
+      line.qty = nextQty
+    }
+    if (row.newDeliveryDate != null) {
+      line.deliveryDate = String(row.newDeliveryDate || '').slice(0, 10)
+    }
+    if (row.newTaxRate != null && row.newTaxRate !== '') {
+      line.taxRate = Number(row.newTaxRate) || 0
+    }
+    line.cancelled = Boolean(row.cancelled)
     if (taxModeExcluding) {
-      line.unitPriceExTax = newEx
+      const newEx = Number(row.newUnitPriceExTax)
+      if (Number.isFinite(newEx)) line.unitPriceExTax = newEx
       recalcSalesLinePricing(line, { taxModeExcluding: true, editMode: 'unitPrice' })
     } else {
+      const newIn = Number(row.newUnitPriceInTax)
       line.unitPriceInTax = Number.isFinite(newIn) ? newIn : Number(line.unitPriceInTax) || 0
       recalcSalesLinePricing(line, { taxModeExcluding: false, editMode: 'unitPrice' })
     }
-  }
-  if (isCustomerChanged(change)) {
-    order.customerName = String(change.newCustomerName || '').trim()
   }
   recalcOrderAmounts(order)
   return { ok: true, order }
