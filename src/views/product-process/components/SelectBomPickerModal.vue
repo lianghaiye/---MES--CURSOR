@@ -394,6 +394,13 @@ export default { name: 'SelectBomPickerModal' }
   :deep(.ant-table-container) {
     height: 100%;
   }
+
+  :deep(.ant-table-thead > tr > th),
+  :deep(.ant-table-tbody > tr > td) {
+    height: 48px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
 }
 
 .table-pagination {
