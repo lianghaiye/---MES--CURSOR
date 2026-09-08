@@ -1,5 +1,5 @@
 ---
-description: i-doms-web 抽屉（Drawer）规范：三档宽度、列表对照场景、与弹窗/新标签页选型
+description: i-doms-web 抽屉（Drawer）规范：三档宽度、矮标题栏底边分隔、列表对照场景、与弹窗/新标签页选型
 globs: i-doms-web/**/*.vue
 alwaysApply: false
 ---
@@ -30,7 +30,7 @@ alwaysApply: false
 | 窄屏 | **≤768px 强制全宽**，不提供多尺寸切换 |
 | 遮罩 | `rgba(0,0,0,.45)`；点击关闭 |
 | 未保存 | 同弹窗 **10.3 二次确认** 后再关 |
-| 头部 | 标题 **16px / 600** + 右侧 ✕ |
+| 头部 | 标题栏规范见下节「标题栏（强制）」；与弹窗一致 |
 | 页脚 | 同弹窗：**右对齐** 取消｜确定（有 `#footer` slot） |
 | 动画 | 滑入 **250ms ease**；打开时 **锁定 body 滚动**（Ant Design Drawer 默认） |
 
@@ -88,6 +88,40 @@ const size = suggestDrawerSize({ fieldCount: 10, hasEmbeddedTable: true }) // 'l
 ```vue
 <a-drawer v-bind="drawerBind" … />
 ```
+
+## 标题栏（强制）
+
+与弹窗同一套标题栏视觉（见 `modal-layout.mdc`「标题区分隔」），抽屉右侧滑出时同样适用：
+
+| 项 | 约定 |
+|----|------|
+| **结构** | 标题栏盒子：上 / 左 / 右 **无边框**，**仅底边**有色 |
+| **宽度** | 底边与抽屉面板**同宽**（顶到左右边缘，禁止左右缩进） |
+| **高度** | 偏矮：上下约 **10px** + 标题行高 **24px**（总高约 **44px**） |
+| **标题** | **16px / 600** / line-height **24px**，左对齐；颜色 text-1 |
+| **关闭 ✕** | 右侧；与标题**垂直居中对齐**，禁止悬在栏顶 |
+| **底边** | `1px solid` `var(--divider)`（`#e5e6eb`，见 `design-tokens.mdc`） |
+| **实现** | 全局 `src/styles/modal-layout.less` 已覆盖 `.ant-drawer-header`；自定义标题加 **`drawer-title-underline`** |
+
+```less
+// 全局（与弹窗同文件）：src/styles/modal-layout.less
+.ant-drawer .ant-drawer-header {
+  margin: 0;
+  padding: 10px 16px;
+  border: none;
+  border-bottom: 1px solid var(--divider, #e5e6eb);
+}
+.ant-drawer .ant-drawer-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+```
+
+避免：
+- ❌ 标题栏无底边 / 四边描边
+- ❌ 底边左右缩进、未拉满抽屉宽度
+- ❌ 标题栏过高，或 ✕ 与标题上下错位
 
 ## 参考实现
 
@@ -175,4 +209,5 @@ const size = suggestDrawerSize({ fieldCount: 10, hasEmbeddedTable: true }) // 'l
 - ❌ 10+ 字段复杂表单硬塞抽屉
 - ❌ 遮罩点击直接关且有未保存改动
 - ❌ 窄屏仍写死 520px 导致横向溢出
+- ❌ 标题栏无底边、底边未拉满、或 ✕ 与标题未垂直对齐
 - ❌ 基本信息用带框两列表格（图1样式）；label 与值同色、无深浅区分

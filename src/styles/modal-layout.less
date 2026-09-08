@@ -1,0 +1,110 @@
+/**
+ * 弹窗 / 抽屉 标题栏：矮栏 + 仅底边分隔 + 关闭钮垂直对齐
+ * 对齐 modal-layout.mdc、drawer-layout.mdc
+ *
+ * Ant Design Vue 4 / Ant Design 5：Modal content 默认有 padding，须清零后由 header/body/footer
+ * 各自出边距，否则底边无法拉满宽度，关闭钮会相对 content 顶部悬空。
+ */
+
+/* ========== Modal ========== */
+.ant-modal {
+  .ant-modal-content {
+    padding: 0;
+  }
+
+  .ant-modal-header {
+    margin: 0;
+    padding: 10px 48px 10px 16px;
+    border: none;
+    border-bottom: 1px solid var(--divider, #e5e6eb);
+    background: transparent;
+  }
+
+  .ant-modal-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 24px;
+    color: var(--text-1, rgba(0, 0, 0, 0.88));
+  }
+
+  .ant-modal-close {
+    top: 0;
+    inset-inline-end: 0;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+  }
+
+  .ant-modal-body {
+    padding: 16px 24px;
+  }
+
+  .ant-modal-footer {
+    margin: 0;
+    padding: 10px 16px;
+    border-top: none;
+  }
+}
+
+.ant-modal-confirm {
+  .ant-modal-body {
+    padding: 24px;
+  }
+}
+
+/* ========== Drawer ========== */
+.ant-drawer {
+  .ant-drawer-header {
+    margin: 0;
+    padding: 10px 16px;
+    border: none;
+    border-bottom: 1px solid var(--divider, #e5e6eb);
+    background: transparent;
+  }
+
+  .ant-drawer-header-title {
+    display: flex;
+    align-items: center;
+    flex-direction: row-reverse; /* close 在右时与标题同排垂直居中 */
+    gap: 8px;
+  }
+
+  .ant-drawer-title {
+    margin: 0;
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 24px;
+    color: var(--text-1, rgba(0, 0, 0, 0.88));
+  }
+
+  .ant-drawer-close {
+    margin: 0;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ant-drawer-body {
+    padding: 16px 24px;
+  }
+
+  .ant-drawer-footer {
+    margin: 0;
+    padding: 10px 16px;
+    border-top: 1px solid var(--divider, #e5e6eb);
+  }
+}
+
+/* 自定义标题 slot / 非 ant header 时的底边工具类（弹窗、抽屉通用） */
+.modal-title-underline,
+.drawer-title-underline {
+  border: none;
+  border-bottom: 1px solid var(--divider, #e5e6eb);
+  padding: 10px 0;
+  margin: 0 0 16px;
+}

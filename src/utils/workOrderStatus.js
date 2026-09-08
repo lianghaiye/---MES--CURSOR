@@ -4,6 +4,7 @@
  * 「部分下发」不再作为主状态；未排完用排产进度旁显
  */
 import { MOBILE_TASK_SYNC_KEY } from '@/utils/mobileTaskDispatch'
+import { getWorkOrderConvertOccupyQty } from '@/utils/workOrderConvertOccupy'
 
 export const WORK_ORDER_STATUSES = ['待下发', '已下发', '执行中', '已完成', '暂停', '终止']
 
@@ -23,7 +24,7 @@ function scheduledQtyOf(wo) {
 }
 
 function remainScheduleQtyOf(wo) {
-  return Math.max(0, planQtyOf(wo) - scheduledQtyOf(wo))
+  return Math.max(0, planQtyOf(wo) - scheduledQtyOf(wo) - getWorkOrderConvertOccupyQty(wo))
 }
 
 function hasScheduleStarted(wo) {

@@ -466,6 +466,7 @@ import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.v
 import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import { resolveWorkOrderProcurementSource } from '@/constants/procurementDocSource'
+import { getWorkOrderConvertQty, validateWorkOrderConvertQty } from '@/utils/workOrderConvert'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -505,6 +506,8 @@ const form = reactive({
   salesOrderId: '',
   source: '新增',
   sourceOrderNo: '',
+  sourceWorkOrderId: '',
+  sourceWorkOrderNo: '',
   supplier: '',
   planDateRange: null,
   contactPerson: '',
@@ -612,6 +615,8 @@ function resetForm() {
   form.salesOrderId = ''
   form.source = '新增'
   form.sourceOrderNo = ''
+  form.sourceWorkOrderId = ''
+  form.sourceWorkOrderNo = ''
   form.supplier = ''
   form.planDateRange = null
   form.contactPerson = ''
@@ -635,6 +640,8 @@ function loadEditForm(record) {
   form.salesOrderId = record.salesOrderId || ''
   form.source = record.source || '新增'
   form.sourceOrderNo = record.sourceOrderNo || record.sourceWorkOrderNo || ''
+  form.sourceWorkOrderId = record.sourceWorkOrderId || ''
+  form.sourceWorkOrderNo = record.sourceWorkOrderNo || ''
   form.supplier = record.supplier || ''
   {
     const start = record.planStartDate || record.planDate
@@ -658,8 +665,7 @@ function loadEditForm(record) {
 function loadSeedFromWorkOrder(wo) {
   resetForm()
   if (!wo) return
-  const qty = Math.max(0, Number(wo.planQty) || 0) - Math.max(0, Number(wo.finishedQty) || 0)
-  const planQty = qty > 0 ? qty : Math.max(0, Number(wo.planQty) || 0) || 1
+  const planQty = getWorkOrderConvertQty(wo) || 1
   const code = wo.materialCode || wo.productCode || ''
   const name = wo.productName || wo.name || ''
   form.workOrderName = wo.name || wo.code || ''
@@ -667,6 +673,8 @@ function loadSeedFromWorkOrder(wo) {
   form.salesOrderId = wo.salesOrderId || ''
   form.source = resolveWorkOrderProcurementSource(wo)
   form.sourceOrderNo = wo.code || ''
+  form.sourceWorkOrderId = wo.id || ''
+  form.sourceWorkOrderNo = wo.code || ''
   form.shipWarehouse = wo.warehouse || undefined
   form.remark = `来源工单 ${wo.code || ''} 一键转外协`
   if (Array.isArray(wo.planDateRange) && wo.planDateRange[0] && wo.planDateRange[1]) {
@@ -884,6 +892,8 @@ function buildPayload() {
     salesOrderId: form.salesOrderId || '',
     source: form.source || '新增',
     sourceOrderNo: form.sourceOrderNo || '',
+    sourceWorkOrderId: form.sourceWorkOrderId || '',
+    sourceWorkOrderNo: form.sourceWorkOrderNo || '',
     supplier: form.supplier || '',
     planStartDate: start,
     planEndDate: end,
@@ -930,19 +940,29 @@ function handleSave() {
     return
   }
 
+  if (props.seedWorkOrder && !isEdit.value) {
+    const convertQty = form.lineItems.reduce((s, l) => s + (Number(l.planQty) || 0), 0)
+    const check = validateWorkOrderConvertQty(props.seedWorkOrder, convertQty)
+    if (!check.ok) {
+      message.warning(check.message || '转换数量超出待排产')
+      return
+    }
+  }
+
   saving.value = true
   try {
     const payload = buildPayload()
     form.lineItems.forEach((l) => recalcOutsourcingLine(l, { fromInTax: !taxModeExcluding.value }))
     payload.lineItems = form.lineItems.map((l) => ({ ...l }))
     if (isEdit.value) {
-      updateOutsourcingOrder(props.editRecord.id, payload)
+      const updated = updateOutsourcingOrder(props.editRecord.id, payload)
       message.success('外协订单已更新')
+      emit('saved', updated)
     } else {
-      addOutsourcingOrder(payload)
+      const created = addOutsourcingOrder(payload)
       message.success('外协订单已保存')
+      emit('saved', created)
     }
-    emit('saved')
     closeAfterSave()
   } finally {
     saving.value = false

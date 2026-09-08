@@ -162,6 +162,13 @@
                 <a-tag v-if="isScheduleIncomplete(wo)" color="processing" class="status-tag">
                   未排完
                 </a-tag>
+                <a-tag
+                  v-if="convertSideLabelOf(wo)"
+                  :color="getWorkOrderConvertSideTagColor(convertSideLabelOf(wo))"
+                  class="status-tag"
+                >
+                  {{ convertSideLabelOf(wo) }}
+                </a-tag>
                 <a-dropdown :trigger="['click']">
                   <a-button type="text" size="small" class="more-btn" @click.stop>
                     <EllipsisOutlined />
@@ -214,6 +221,10 @@
                 <template v-if="isScheduleIncomplete(wo)">
                   <span class="meta-divider">·</span>
                   <span>未排完</span>
+                </template>
+                <template v-if="convertSideLabelOf(wo)">
+                  <span class="meta-divider">·</span>
+                  <span>{{ convertSideLabelOf(wo) }}</span>
                 </template>
               </div>
               <div class="card-tags">
@@ -405,6 +416,10 @@ import {
   canEditWorkOrder,
 } from '@/utils/workOrderDispatchHelpers'
 import { formatScheduleProgress, isScheduleIncomplete } from '@/utils/workOrderScheduleBatch'
+import {
+  getWorkOrderConvertSideLabel,
+  getWorkOrderConvertSideTagColor,
+} from '@/utils/workOrderConvertOccupy'
 import { tipMessageIfScheduleOverSales } from '@/utils/scheduleOverSalesTip'
 import {
   WORK_ORDER_STATUSES,
@@ -582,6 +597,10 @@ watch(
 
 function statusColor(status) {
   return workOrderStatusColor(status)
+}
+
+function convertSideLabelOf(wo) {
+  return getWorkOrderConvertSideLabel(wo)
 }
 
 function urgencyTagColor(urgency) {

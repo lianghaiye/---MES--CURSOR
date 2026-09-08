@@ -62,6 +62,13 @@
             <a-tag v-if="isPartialScheduled(record)" color="processing" class="partial-tag">
               未排完
             </a-tag>
+            <a-tag
+              v-if="convertSideLabelOf(record)"
+              :color="getWorkOrderConvertSideTagColor(convertSideLabelOf(record))"
+              class="partial-tag"
+            >
+              {{ convertSideLabelOf(record) }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'variantAttr'">
             {{ formatCell(resolveWorkOrderVariantSummary(record)) }}
@@ -143,6 +150,10 @@ import {
   resolveWorkOrderVariantSummary,
 } from '@/utils/workOrderBasicFields'
 import { formatScheduleProgress, isPartialScheduled } from '@/utils/workOrderScheduleBatch'
+import {
+  getWorkOrderConvertSideLabel,
+  getWorkOrderConvertSideTagColor,
+} from '@/utils/workOrderConvertOccupy'
 import { workOrderStatusColor } from '@/utils/workOrderStatus'
 
 const props = defineProps({
@@ -221,6 +232,10 @@ const { wrapClass } = useTableDensity(props.columnSettingsKey)
 
 function formatCell(value) {
   return formatWorkOrderFieldValue(value)
+}
+
+function convertSideLabelOf(record) {
+  return getWorkOrderConvertSideLabel(record)
 }
 
 const rowSelection = computed(() => ({

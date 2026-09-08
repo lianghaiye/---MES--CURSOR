@@ -19,7 +19,7 @@ export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 const STORAGE_KEY = 'i_doms_qc_tasks'
 const STORAGE_VERSION = 3
 const SEED_VERSION_KEY = 'i_doms_qc_tasks_seed_v'
-const CURRENT_SEED_VERSION = '10'
+const CURRENT_SEED_VERSION = '11'
 
 export const QC_TASK_STATUS = {
   PENDING: '待质检',

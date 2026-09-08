@@ -10,6 +10,9 @@
           <a-tag>{{ workOrder.orderCategory || '生产工单' }}</a-tag>
           <a-tag :color="statusTagColor(workOrder.status)">{{ workOrder.status }}</a-tag>
           <a-tag v-if="isScheduleIncomplete(workOrder)" color="processing">未排完</a-tag>
+          <a-tag v-if="convertSideLabel" :color="getWorkOrderConvertSideTagColor(convertSideLabel)">
+            {{ convertSideLabel }}
+          </a-tag>
           <a-tag
             v-if="workOrder.urgency && workOrder.urgency !== '普通' && workOrder.urgency !== '正常'"
             color="orange"
@@ -130,6 +133,12 @@
         <a-tab-pane key="material-req" tab="领料信息">
           <WorkOrderMaterialReqTab :work-order="workOrder" />
         </a-tab-pane>
+        <a-tab-pane key="purchase" tab="采购">
+          <WorkOrderPurchaseInfoTab :work-order="workOrder" />
+        </a-tab-pane>
+        <a-tab-pane key="outsourcing" tab="外协">
+          <WorkOrderOutsourcingInfoTab :work-order="workOrder" />
+        </a-tab-pane>
         <a-tab-pane key="outbound" tab="出库信息">
           <WorkOrderOutboundInfoTab v-if="workOrder" :work-order="workOrder" />
         </a-tab-pane>
@@ -175,6 +184,8 @@ import WorkOrderDispatchTab from './WorkOrderDispatchTab.vue'
 import WorkOrderDetailTab from './WorkOrderDetailTab.vue'
 import WorkOrderScheduleInfoTab from './WorkOrderScheduleInfoTab.vue'
 import WorkOrderMaterialReqTab from './WorkOrderMaterialReqTab.vue'
+import WorkOrderPurchaseInfoTab from './WorkOrderPurchaseInfoTab.vue'
+import WorkOrderOutsourcingInfoTab from './WorkOrderOutsourcingInfoTab.vue'
 import WorkOrderInboundInfoTab from './WorkOrderInboundInfoTab.vue'
 import WorkOrderQcInfoTab from './WorkOrderQcInfoTab.vue'
 import WorkOrderEbomTreeTab from './WorkOrderEbomTreeTab.vue'
@@ -183,13 +194,17 @@ import WorkOrderBomVersionTab from './WorkOrderBomVersionTab.vue'
 import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
 import WorkOrderPrintModal from './WorkOrderPrintModal.vue'
 import {
-  getBatchesScheduledQty,
+  getRemainScheduleQty,
   getWorkOrderPlanQty,
   normalizeWorkOrderScheduleFields,
   isScheduleIncomplete,
 } from '@/utils/workOrderScheduleBatch'
 import { canShowEditScheduleQty } from '@/utils/workOrderStatus'
 import { canConvertWorkOrderToPurchaseOrOutsource } from '@/utils/workOrderConvert'
+import {
+  getWorkOrderConvertSideLabel,
+  getWorkOrderConvertSideTagColor,
+} from '@/utils/workOrderConvertOccupy'
 
 const WorkOrderOutboundInfoTab = defineAsyncComponent(
   () => import('./WorkOrderOutboundInfoTab.vue'),
@@ -249,9 +264,7 @@ watch(
   () => {
     if (!workOrder.value || !props.showDispatchTab) return
     normalizeWorkOrderScheduleFields(workOrder.value)
-    const plan = getWorkOrderPlanQty(workOrder.value)
-    const scheduled = getBatchesScheduledQty(workOrder.value)
-    const suggest = Math.max(0, plan - scheduled)
+    const suggest = getRemainScheduleQty(workOrder.value)
     const current = Number(workOrder.value.dispatchBatchQty)
     if (
       workOrder.value.dispatchBatchQty == null ||
@@ -289,6 +302,8 @@ const canConvertPurchaseOrOutsource = computed(() =>
   canConvertWorkOrderToPurchaseOrOutsource(workOrder.value),
 )
 
+const convertSideLabel = computed(() => getWorkOrderConvertSideLabel(workOrder.value))
+
 const canComplete = computed(() => ['已下发', '执行中'].includes(workOrder.value?.status))
 
 function emitAction(key) {
@@ -299,11 +314,11 @@ function emitAction(key) {
 function onWorkOrderFieldUpdate({ key, value }) {
   if (!workOrder.value) return
   if (key === 'dispatchBatchQty') {
-    const plan = getWorkOrderPlanQty(workOrder.value)
-    const scheduled = getBatchesScheduledQty(workOrder.value)
-    const max = Math.max(0, plan - scheduled)
+    const max = getRemainScheduleQty(workOrder.value)
     const n = Number(value)
-    workOrder.value[key] = Number.isFinite(n) ? Math.min(Math.max(0, n), max || plan) : value
+    workOrder.value[key] = Number.isFinite(n)
+      ? Math.min(Math.max(0, n), max || getWorkOrderPlanQty(workOrder.value))
+      : value
     return
   }
   workOrder.value[key] = value

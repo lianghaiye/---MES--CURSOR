@@ -1,5 +1,5 @@
 /**
- * 工单详情关联信息（排产任务行 / 领料 / 入库 / 质检）
+ * 工单详情关联信息（排产任务行 / 领料 / 入库 / 质检 / 采购 / 外协）
  */
 import dayjs from 'dayjs'
 import { getActiveScheduleBatch } from '@/utils/workOrderScheduleBatch'
@@ -7,9 +7,19 @@ import { materialRequisitionState } from '@/store/materialRequisitionStore'
 import { listMobileMaterialReqs } from '@/store/mobileMaterialReqStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { outboundState } from '@/store/outboundStore'
+import { getPurchaseOrdersByRequisition } from '@/store/purchaseOrderStore'
 import { listMobileTasksForWorkOrder } from '@/utils/workOrderStatus'
 import { flattenMaterialReqOutboundLines } from '@/utils/materialReqOutboundLines'
 import { flattenOutboundOrdersToIssueLines } from '@/utils/outboundIssueLines'
+import {
+  getWorkOrderConvertedOutsourceQty,
+  getWorkOrderConvertedPurchaseQty,
+  getWorkOrderConvertOccupyQty,
+  getWorkOrderConvertSideLabel,
+  getWorkOrderConvertSideTagColor,
+  listWorkOrderOutsourcingOrders,
+  listWorkOrderPurchaseRequisitions,
+} from '@/utils/workOrderConvertOccupy'
 
 function sumLineQty(lines) {
   return (lines || []).reduce((s, l) => s + (Number(l.qty ?? l.applyQty ?? l.reqQty) || 0), 0)
@@ -412,6 +422,28 @@ export function qcInfoResultColor(result) {
   if (result === '部分通过') return 'processing'
   if (result === '不通过') return 'error'
   return 'default'
+}
+
+/** 由工单关联采购申请派生的采购订单 */
+export function listWorkOrderPurchaseOrders(workOrder) {
+  const reqs = listWorkOrderPurchaseRequisitions(workOrder)
+  const map = new Map()
+  reqs.forEach((req) => {
+    getPurchaseOrdersByRequisition(req).forEach((po) => {
+      if (po?.id) map.set(po.id, po)
+    })
+  })
+  return [...map.values()]
+}
+
+export {
+  getWorkOrderConvertedOutsourceQty,
+  getWorkOrderConvertedPurchaseQty,
+  getWorkOrderConvertOccupyQty,
+  getWorkOrderConvertSideLabel,
+  getWorkOrderConvertSideTagColor,
+  listWorkOrderOutsourcingOrders,
+  listWorkOrderPurchaseRequisitions,
 }
 
 export { getActiveScheduleBatch }

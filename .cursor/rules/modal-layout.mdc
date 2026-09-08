@@ -1,5 +1,5 @@
 ---
-description: i-doms-web 弹窗通用规范（尺寸档位、横向表单样式、关闭二次确认、选择器弹窗、表单+多表格弹窗）
+description: i-doms-web 弹窗通用规范（尺寸档位、标题底边分隔、横向表单样式、关闭二次确认、选择器弹窗、表单+多表格弹窗）
 globs: i-doms-web/**/*.vue
 alwaysApply: false
 ---
@@ -27,9 +27,47 @@ const MODAL_WIDTH = { s: 400, m: 520, l: 720, xl: '90vw' }
 |----|------|
 | 遮罩 | `rgba(0,0,0,.45)`，全屏；打开时锁定 body 滚动 |
 | 标题 | **16px / 600**，左对齐；确认框可带 ⚠ / ❓ 语义图标 |
+| 标题区分隔（强制） | 标题与内容之间必须有明确分隔，见下节 |
 | 内容区 | padding **24px**；超高时**仅内容区滚动**，页脚固定；`max-height ≈ 60vh` |
 | 页脚 | **右对齐**：取消（次）+ 确定/保存（主），间距 **8px**；按钮高 **32px** |
 | 圆角 / 阴影 | **8px** / shadow-2；垂直水平居中 |
+
+### 标题区分隔（强制）
+
+标题与正文之间须有一条可见底边，避免标题「浮」在内容上。**弹窗与抽屉同一套约定**（抽屉见 `drawer-layout.mdc`「标题栏」）。
+
+| 项 | 约定 |
+|----|------|
+| **优先** | 标题栏盒子：上 / 左 / 右 **无边框**，**仅底边**有色；**宽度与弹窗同宽**（底边顶到左右边缘） |
+| 底边色 | `#e5e6eb`（`divider` / `var(--divider)`，见 `design-tokens.mdc`） |
+| 底边粗细 | **1px solid** |
+| 高度 | 偏矮：上下约 **10px** padding + 标题行高 **24px**（总高约 **44px**）；标题与关闭钮**垂直居中对齐** |
+| 备选 | 标题下方单独画一条同色横线（不必包满盒子），效果等价 |
+| Ant Design | 全局 `src/styles/modal-layout.less`（已引入）：`.ant-modal-content` **padding: 0**，header/body 各自出边距；自定义标题加 **`modal-title-underline`** |
+
+```less
+// 全局：src/styles/modal-layout.less（已在 global.less 引入）
+.ant-modal .ant-modal-content { padding: 0; }
+.ant-modal .ant-modal-header {
+  margin: 0;
+  padding: 10px 48px 10px 16px; // 右侧留给关闭钮
+  border: none;
+  border-bottom: 1px solid var(--divider, #e5e6eb);
+}
+.ant-modal .ant-modal-close {
+  top: 0;
+  width: 44px;
+  height: 44px; // 与标题栏同高，垂直居中
+}
+.ant-modal .ant-modal-body { padding: 16px 24px; }
+```
+
+避免：
+- ❌ 标题区完全无底边 / 无线（与内容糊成一片）
+- ❌ 标题盒子四边都描边（过重）
+- ❌ 底边左右缩进、未拉满弹窗宽度
+- ❌ 标题栏过高，或关闭钮与标题上下错位
+- ❌ 底边用主色 / 粗线抢视觉（除非危险确认等特殊语义）
 
 ```vue
 <a-modal
@@ -168,6 +206,10 @@ const MODAL_WIDTH = { s: 400, m: 520, l: 720, xl: '90vw' }
 ## 避免
 
 - ❌ 弹窗表单用 `layout="vertical"`（label 在上、控件在下）
+- ❌ 标题区无底边 / 无线，与内容糊成一片
+- ❌ 标题盒子四边描边（只用底边）
+- ❌ 标题底边左右缩进、未与弹窗同宽
+- ❌ 标题栏过高，或关闭钮与标题未垂直对齐
 - ❌ 确认框用 720px 过宽
 - ❌ 同时打开多个表单弹窗
 - ❌ 危险确认主按钮只写「确定」不写动作动词（应用「删除」等）

@@ -10,6 +10,10 @@
           <span class="meta-label">排产</span>
           未排完
         </span>
+        <span v-if="convertSideLabel" class="meta-item">
+          <span class="meta-label">转出</span>
+          {{ convertSideLabel }}
+        </span>
         <span class="meta-item">
           <span class="meta-label">创建日期</span>
           {{ formatWorkOrderFieldValue(workOrder.createdAt) }}
@@ -120,9 +124,17 @@ import { resolveWorkCenterOwner } from '@/mock/workOrderOptions'
 import WorkOrderOwnerSelect from './WorkOrderOwnerSelect.vue'
 import {
   getBatchesScheduledQty,
+  getRemainScheduleQty,
   getWorkOrderPlanQty,
   isScheduleIncomplete,
 } from '@/utils/workOrderScheduleBatch'
+import {
+  getWorkOrderConvertedOutsourceQty,
+  getWorkOrderConvertedPurchaseQty,
+  getWorkOrderConvertSideLabel,
+} from '@/utils/workOrderRelatedInfo'
+import { purchaseRequisitionState } from '@/store/purchaseRequisitionStore'
+import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -140,6 +152,22 @@ const props = defineProps({
 const emit = defineEmits(['change', 'plan-date-change', 'process-route-change', 'update-field'])
 
 const salesMeta = computed(() => resolveWorkOrderSalesMeta(props.workOrder))
+
+const convertedPurchaseQty = computed(() => {
+  void purchaseRequisitionState.requisitions
+  return getWorkOrderConvertedPurchaseQty(props.workOrder)
+})
+
+const convertedOutsourceQty = computed(() => {
+  void outsourcingOrderState.orders
+  return getWorkOrderConvertedOutsourceQty(props.workOrder)
+})
+
+const convertSideLabel = computed(() => {
+  void purchaseRequisitionState.requisitions
+  void outsourcingOrderState.orders
+  return getWorkOrderConvertSideLabel(props.workOrder)
+})
 
 function displayValue(value) {
   return formatWorkOrderFieldValue(value)
@@ -208,7 +236,7 @@ const detailFields = computed(() => {
       },
     )
     if (props.dispatchMode) {
-      const remain = Math.max(0, getWorkOrderPlanQty(wo) - getBatchesScheduledQty(wo))
+      const remain = getRemainScheduleQty(wo)
       fields.push(
         {
           key: 'dispatchBatchQty',
@@ -261,6 +289,16 @@ const arrangementFields = computed(() => {
       { key: 'warehouse', label: '预入仓库', type: 'select', options: props.warehouseOpts },
       { key: 'urgency', label: '紧急度', type: 'select', options: props.urgencyOpts },
       { key: 'planDateRange', label: '计划日期', type: 'date-range', required: true },
+      {
+        key: 'convertedPurchaseQty',
+        label: '转采购数',
+        getValue: () => displayValue(convertedPurchaseQty.value),
+      },
+      {
+        key: 'convertedOutsourceQty',
+        label: '转外协数',
+        getValue: () => displayValue(convertedOutsourceQty.value),
+      },
       { key: 'remark', label: '工单备注', type: 'textarea', span: 24 },
     ]
   }
@@ -274,6 +312,16 @@ const arrangementFields = computed(() => {
       key: 'planDateRange',
       label: '计划日期',
       getValue: () => displayValue(formatWorkOrderPlanDateRange(wo.planDateRange)),
+    },
+    {
+      key: 'convertedPurchaseQty',
+      label: '转采购数',
+      getValue: () => displayValue(convertedPurchaseQty.value),
+    },
+    {
+      key: 'convertedOutsourceQty',
+      label: '转外协数',
+      getValue: () => displayValue(convertedOutsourceQty.value),
     },
     { key: 'remark', label: '工单备注', value: wo.remark, span: 24, multiline: true },
   ]

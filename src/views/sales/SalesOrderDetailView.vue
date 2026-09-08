@@ -558,6 +558,12 @@
                   <template v-else-if="column.key === 'plannedQty'">
                     {{ formatPurchaseQty(row.plannedQty) }}
                   </template>
+                  <template v-else-if="column.key === 'source'">
+                    {{ formatProcurementSource(row) }}
+                  </template>
+                  <template v-else-if="column.key === 'sourceOrderNo'">
+                    {{ formatProcurementSourceOrderNo(row) }}
+                  </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
                   </template>
@@ -600,6 +606,12 @@
                   </template>
                   <template v-else-if="column.key === 'purchaseQty'">
                     {{ formatPurchaseQty(purchaseOrderQty(row)) }}
+                  </template>
+                  <template v-else-if="column.key === 'source'">
+                    {{ formatProcurementSource(row) }}
+                  </template>
+                  <template v-else-if="column.key === 'sourceOrderNo'">
+                    {{ formatProcurementSourceOrderNo(row) }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -766,6 +778,12 @@
                   </template>
                   <template v-else-if="column.key === 'planTime'">
                     {{ row.planTime || row.planCompleteDate || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'source'">
+                    {{ formatProcurementSource(row) }}
+                  </template>
+                  <template v-else-if="column.key === 'sourceOrderNo'">
+                    {{ formatProcurementSourceOrderNo(row) }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -951,10 +969,6 @@
                     <a-tag :color="priceChangeStatusColor(group.status)" size="small">
                       {{ group.status }}
                     </a-tag>
-                    <span v-if="group.reasonType" class="group-reason">{{ group.reasonType }}</span>
-                  </div>
-                  <div v-if="group.customerHint" class="group-customer">
-                    {{ group.customerHint }}
                   </div>
                   <div class="history-list">
                     <div
@@ -1085,6 +1099,7 @@ export default { name: 'SalesOrderDetailView' }
 
 <script setup>
 import { formatQty } from '@/utils/numberFormat'
+import { normalizeProcurementDocSource } from '@/constants/procurementDocSource'
 import { computed, onActivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
@@ -1616,6 +1631,8 @@ const purchaseReqColumns = [
   { title: '计划数量', key: 'plannedQty', width: 100, align: 'right' },
   { title: '期望到货时间', dataIndex: 'estimatedArrivalDate', width: 120 },
   { title: '预入仓库', dataIndex: 'receivingWarehouse', width: 100, ellipsis: true },
+  { title: '来源', key: 'source', width: 100, ellipsis: true },
+  { title: '来源单号', key: 'sourceOrderNo', width: 140, ellipsis: true },
   { title: '创建人', dataIndex: 'creator', width: 88 },
   { title: '创建时间', dataIndex: 'createdAt', width: 150 },
 ]
@@ -1633,6 +1650,8 @@ const purchaseOrderColumns = [
   { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { title: '采购员', dataIndex: 'purchaser', width: 88 },
+  { title: '来源', key: 'source', width: 100, ellipsis: true },
+  { title: '来源单号', key: 'sourceOrderNo', width: 140, ellipsis: true },
   { title: '创建人', dataIndex: 'creator', width: 88 },
   { title: '创建日期', dataIndex: 'documentDate', width: 110 },
 ]
@@ -1656,6 +1675,15 @@ function purchaseOrderQty(row) {
 
 function formatPurchaseQty(val) {
   return formatQty(val)
+}
+
+function formatProcurementSource(row) {
+  const raw = row?.source || row?.orderSource || ''
+  return normalizeProcurementDocSource(raw) || '—'
+}
+
+function formatProcurementSourceOrderNo(row) {
+  return row?.sourceOrderNo || row?.sourceWorkOrderNo || row?.salesOrderNo || row?.reqNo || '—'
 }
 
 function purchaseReqStatusColor(status) {
@@ -1766,8 +1794,8 @@ function productionWorkOrderCell(row, column) {
 
 const outsourcingColumns = [
   { title: '状态', key: 'status', width: 88, fixed: 'left' },
-  { title: '入库状态', key: 'inboundStatus', width: 96 },
-  { title: '外协单号', dataIndex: 'orderNo', width: 130, fixed: 'left' },
+  { title: '入库状态', key: 'inboundStatus', width: 96, fixed: 'left' },
+  { title: '外协单号', dataIndex: 'orderNo', width: 140, fixed: 'left' },
   { title: '产品名称', key: 'productName', width: 130, ellipsis: true },
   { title: '规格型号', key: 'specModel', width: 110, ellipsis: true },
   { title: '材质', key: 'material', width: 88, ellipsis: true },
@@ -1776,6 +1804,8 @@ const outsourcingColumns = [
   { title: '供应商', dataIndex: 'supplierName', width: 140, ellipsis: true },
   { title: '外协数量', key: 'outsourceQty', width: 96, align: 'right' },
   { title: '计划时间', key: 'planTime', width: 110 },
+  { title: '来源', key: 'source', width: 100, ellipsis: true },
+  { title: '来源单号', key: 'sourceOrderNo', width: 140, ellipsis: true },
   { title: '创建人', dataIndex: 'creator', width: 88 },
   { title: '创建时间', dataIndex: 'createdAt', width: 150 },
 ]
@@ -2396,17 +2426,6 @@ function openBomDetail(bomId, bomName) {
 .group-no {
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
-}
-
-.group-reason {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-}
-
-.group-customer {
-  margin: -2px 0 8px;
-  font-size: 12px;
-  color: #d46b08;
 }
 
 .history-time {

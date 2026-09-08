@@ -30,7 +30,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col v-if="!isIncomingScope" :xs="24" :sm="12" :md="6">
+          <a-col v-if="isProductionScope" :xs="24" :sm="12" :md="6">
             <a-form-item label="物料编码">
               <a-input
                 v-model:value="filters.itemCode"
@@ -98,6 +98,14 @@
           @click="openGenerateInbound"
         >
           生成入库单
+        </a-button>
+        <a-button
+          v-if="isOutsourcingScope"
+          size="small"
+          :disabled="selectedRowKeys.length !== 1"
+          @click="openGenerateOutsourcingInbound"
+        >
+          生成外协入库单
         </a-button>
         <a-button size="small" :disabled="!selectedRowKeys.length" @click="handleTerminate">
           <StopOutlined />
@@ -218,6 +226,12 @@
       :purchase-receipt="inboundReceipt"
       @saved="onInboundSaved"
     />
+
+    <OutsourcingGenerateInboundModal
+      v-model:open="wxInboundModalOpen"
+      :outsourcing-order="wxInboundOrder"
+      @saved="onOutsourcingInboundSaved"
+    />
   </div>
 </template>
 
@@ -245,9 +259,17 @@ import {
 import QcTaskDetailDrawer from './components/QcTaskDetailDrawer.vue'
 import QcTaskCreateModal from './components/QcTaskCreateModal.vue'
 import GenerateInboundOrderModal from '@/views/procurement/components/GenerateInboundOrderModal.vue'
+import OutsourcingGenerateInboundModal from '@/views/procurement/components/OutsourcingGenerateInboundModal.vue'
 import { getPurchaseReceiptById } from '@/store/purchaseReceiptStore'
-import { getOutsourcingReceiptById } from '@/store/outsourcingReceiptStore'
+import {
+  attachReceiptInboundOrder,
+  getOutsourcingReceiptById,
+} from '@/store/outsourcingReceiptStore'
 import { canGenerateInbound, getPurchaseOrderById } from '@/store/purchaseOrderStore'
+import {
+  canGenerateOutsourcingInbound,
+  getOutsourcingOrderById,
+} from '@/store/outsourcingOrderStore'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { useTabs } from '@/composables/useTabs'
 import { getQcTaskRouteBundle, isInboundQcBizScope } from '@/utils/qcTaskRoutes'
@@ -261,9 +283,10 @@ const routeBundle = computed(() => getQcTaskRouteBundle(bizScope.value))
 const INBOUND_SCOPES = new Set(['来料质检', '外协回货检'])
 const isInboundScope = computed(() => INBOUND_SCOPES.has(bizScope.value))
 const isIncomingScope = computed(() => bizScope.value === '来料质检')
+const isOutsourcingScope = computed(() => bizScope.value === '外协回货检')
 const isProductionScope = computed(() => !isInboundScope.value)
-/** 来料禁止列表新建；外协可手工建，也支持从收货单生成 */
-const showCreateButton = computed(() => bizScope.value !== '来料质检')
+/** 各业务质检列表均不支持手工新增（由上游单据/报工等生成） */
+const showCreateButton = computed(() => false)
 
 const sourceDocLabel = computed(() =>
   bizScope.value === '外协回货检' ? '外协收货单号' : '采购收货单号',
@@ -289,6 +312,9 @@ const inboundModalOpen = ref(false)
 const inboundOrder = ref(null)
 const inboundReceipt = ref(null)
 const inboundFromQcId = ref('')
+const wxInboundModalOpen = ref(false)
+const wxInboundOrder = ref(null)
+const wxInboundReceipt = ref(null)
 
 const statusOpts = QC_TASK_STATUS_OPTIONS.map((v) => ({ label: v, value: v }))
 const resultOpts = QC_TASK_RESULT_OPTIONS.map((v) => ({ label: v, value: v }))
@@ -544,6 +570,62 @@ function onInboundSaved(order, allCreated = []) {
   inboundFromQcId.value = ''
   inboundReceipt.value = null
   inboundOrder.value = null
+  selectedRowKeys.value = []
+  handleSearch()
+}
+
+/** 外协回货检 → 生成外协入库单（弹窗与外协订单侧一致） */
+function openGenerateOutsourcingInbound() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条质检单后再生成外协入库单')
+    return
+  }
+  const task = qcTaskState.tasks.find((t) => t.id === selectedRowKeys.value[0])
+  if (!task) {
+    message.warning('未找到质检单')
+    return
+  }
+  if (task.qcStatus === QC_TASK_STATUS.CANCELLED) {
+    message.warning('已终止的质检单不可生成外协入库单')
+    return
+  }
+  if (task.qcStatus !== QC_TASK_STATUS.COMPLETED) {
+    message.warning('请先完成质检后再生成外协入库单')
+    return
+  }
+  if (task.qcResult === QC_TASK_RESULT.FAIL) {
+    message.warning('质检不通过的单据不可生成外协入库单')
+    return
+  }
+  const receipt = getOutsourcingReceiptById(task.sourceDocId)
+  if (!receipt) {
+    message.warning('未找到关联外协收货单')
+    return
+  }
+  if (receipt.receiptStatus === '作废' || receipt.receiptStatus === '已完成') {
+    message.warning('关联收货单已完成或作废，不可生成外协入库单')
+    return
+  }
+  if (receipt.inboundStatus === '已入库') {
+    message.warning('关联收货单已入库完成')
+    return
+  }
+  const order = getOutsourcingOrderById(receipt.outsourcingOrderId || receipt.purchaseOrderId)
+  if (!order || !canGenerateOutsourcingInbound(order)) {
+    message.warning('关联外协订单不可生成入库单（需进行中且仍有可回货数量）')
+    return
+  }
+  wxInboundReceipt.value = receipt
+  wxInboundOrder.value = order
+  wxInboundModalOpen.value = true
+}
+
+function onOutsourcingInboundSaved() {
+  if (wxInboundReceipt.value?.id) {
+    attachReceiptInboundOrder(wxInboundReceipt.value.id, { inboundStatus: '入库中' })
+  }
+  wxInboundReceipt.value = null
+  wxInboundOrder.value = null
   selectedRowKeys.value = []
   handleSearch()
 }

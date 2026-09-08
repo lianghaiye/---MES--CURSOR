@@ -4,6 +4,7 @@
  */
 import dayjs from 'dayjs'
 import { syncWorkOrderExecutionStatus, isScheduleIncomplete } from '@/utils/workOrderStatus'
+import { getWorkOrderConvertOccupyQty } from '@/utils/workOrderConvertOccupy'
 
 export function getWorkOrderPlanQty(wo) {
   return Math.max(0, Number(wo?.planQty) || 0)
@@ -21,8 +22,12 @@ export function getBatchesScheduledQty(wo) {
   return Math.max(0, Number(wo?.scheduleQty) || 0)
 }
 
+/** 待排产 = 计划 − 已排产 − 转采购/转外协占用 */
 export function getRemainScheduleQty(wo) {
-  return Math.max(0, getWorkOrderPlanQty(wo) - getBatchesScheduledQty(wo))
+  return Math.max(
+    0,
+    getWorkOrderPlanQty(wo) - getBatchesScheduledQty(wo) - getWorkOrderConvertOccupyQty(wo),
+  )
 }
 
 export function formatScheduleProgress(wo) {
