@@ -527,7 +527,7 @@ const baseColumns = [
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
   { title: '创建人', key: 'creator', width: 88 },
-  { title: '操作', key: 'action', width: 180, fixed: 'right' },
+  { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =

@@ -1,6 +1,7 @@
 <template>
   <div class="master-info-row-actions" @click.stop>
     <a class="action-link" @click="emit('edit')">编辑</a>
+    <a class="action-link" @click="emit('clone')">克隆</a>
     <a class="action-link" @click="emit('bom')">BOM维护</a>
     <a-dropdown :trigger="['click']">
       <a class="action-link" @click.prevent>操作</a>
@@ -12,12 +13,6 @@
               删除
             </span>
           </a-menu-item>
-          <a-menu-item key="clone">
-            <span class="menu-item-inner">
-              <CopyOutlined />
-              克隆
-            </span>
-          </a-menu-item>
         </a-menu>
       </template>
     </a-dropdown>
@@ -25,13 +20,12 @@
 </template>
 
 <script setup>
-import { DeleteOutlined, CopyOutlined } from '@ant-design/icons-vue'
+import { DeleteOutlined } from '@ant-design/icons-vue'
 
 const emit = defineEmits(['edit', 'bom', 'delete', 'clone'])
 
 function onMenuClick({ key }) {
   if (key === 'delete') emit('delete')
-  else if (key === 'clone') emit('clone')
 }
 </script>
 

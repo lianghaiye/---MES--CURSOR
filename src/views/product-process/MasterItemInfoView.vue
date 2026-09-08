@@ -194,121 +194,126 @@
         </div>
 
         <div class="table-card">
-          <a-table
-            v-if="listViewMode === 'sku'"
-            :columns="tableColumns"
-            :data-source="pagedList"
-            row-key="id"
-            size="small"
-            bordered
-            :scroll="{ x: tableScrollX }"
-            :pagination="false"
-            :row-selection="rowSelection"
-            @change="onTableChange"
-          >
-            <template #bodyCell="{ column, record, index }">
-              <template v-if="column.key === 'index'">
-                {{ rowIndex(index) }}
+          <div ref="tableWrapRef" class="table-wrap">
+            <a-table
+              v-if="listViewMode === 'sku'"
+              :columns="tableColumns"
+              :data-source="pagedList"
+              row-key="id"
+              size="small"
+              bordered
+              :scroll="{ x: tableScrollX, y: tableScrollY }"
+              :pagination="false"
+              :row-selection="rowSelection"
+              @change="onTableChange"
+            >
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.key === 'index'">
+                  {{ rowIndex(index) }}
+                </template>
+                <template v-else-if="column.key === 'itemKind'">
+                  <a-tag>{{ record.itemKindLabel || '—' }}</a-tag>
+                </template>
+                <template v-else-if="column.key === 'businessType'">
+                  <span class="attr-ellipsis">{{ formatProductBusinessType(record) }}</span>
+                </template>
+                <template v-else-if="column.key === 'bomInfo'">
+                  <span class="attr-ellipsis">{{ formatProductBomInfo(record) }}</span>
+                </template>
+                <template v-else-if="column.key === 'productAttribute'">
+                  <span class="attr-ellipsis">{{ record.productAttribute || '—' }}</span>
+                </template>
+                <template v-else-if="column.key === 'materialType'">
+                  {{ record.materialType || '—' }}
+                </template>
+                <template v-else-if="column.key === 'supplyForm'">
+                  {{ record.supplyForm || '—' }}
+                </template>
+                <template v-else-if="column.key === 'weight'">
+                  {{ formatWeight(record.weight) }}
+                </template>
+                <template v-else-if="column.key === 'inventoryUnit'">
+                  <a-tag color="blue" class="unit-tag">{{ record.inventoryUnit || '—' }}</a-tag>
+                </template>
+                <template v-else-if="column.key === 'unitPrice'">
+                  {{ formatPrice(record.unitPrice) }}
+                </template>
+                <template v-else-if="column.key === 'matchingRequirements'">
+                  {{ record.matchingRequirements || record.remark || '—' }}
+                </template>
+                <template v-else-if="column.dataIndex === 'techParams'">
+                  {{ record.techParams || '—' }}
+                </template>
+                <template v-else-if="column.key === 'defaultWorkCenter'">
+                  {{ record.production?.defaultWorkCenter || '—' }}
+                </template>
+                <template v-else-if="column.key === 'defaultSupplier'">
+                  {{
+                    formatPurchaseSuppliersSummary(
+                      record.purchaseSuppliers || record.production?.purchaseSuppliers,
+                    ) ||
+                    record.production?.defaultSupplier ||
+                    '—'
+                  }}
+                </template>
+                <template v-else-if="column.key === 'defaultOutsourceSupplier'">
+                  {{ record.production?.defaultOutsourceSupplier || '—' }}
+                </template>
+                <template v-else-if="column.key === 'isProductMaterial'">
+                  <a-tag :color="record.isProductMaterial ? 'success' : 'error'">
+                    {{ record.isProductMaterial ? '是' : '否' }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'creator'">
+                  {{ record.creator || '—' }}
+                </template>
+                <template v-else-if="column.key === 'action'">
+                  <MasterInfoRowActions
+                    @edit="openEdit(record)"
+                    @bom="openBomMaintenance(record)"
+                    @delete="confirmDelete(record)"
+                    @clone="handleClone(record)"
+                  />
+                </template>
               </template>
-              <template v-else-if="column.key === 'itemKind'">
-                <a-tag>{{ record.itemKindLabel || '—' }}</a-tag>
-              </template>
-              <template v-else-if="column.key === 'businessType'">
-                <span class="attr-ellipsis">{{ formatProductBusinessType(record) }}</span>
-              </template>
-              <template v-else-if="column.key === 'bomInfo'">
-                <span class="attr-ellipsis">{{ formatProductBomInfo(record) }}</span>
-              </template>
-              <template v-else-if="column.key === 'productAttribute'">
-                <span class="attr-ellipsis">{{ record.productAttribute || '—' }}</span>
-              </template>
-              <template v-else-if="column.key === 'materialType'">
-                {{ record.materialType || '—' }}
-              </template>
-              <template v-else-if="column.key === 'supplyForm'">
-                {{ record.supplyForm || '—' }}
-              </template>
-              <template v-else-if="column.key === 'weight'">
-                {{ formatWeight(record.weight) }}
-              </template>
-              <template v-else-if="column.key === 'inventoryUnit'">
-                <a-tag color="blue" class="unit-tag">{{ record.inventoryUnit || '—' }}</a-tag>
-              </template>
-              <template v-else-if="column.key === 'unitPrice'">
-                {{ formatPrice(record.unitPrice) }}
-              </template>
-              <template v-else-if="column.key === 'matchingRequirements'">
-                {{ record.matchingRequirements || record.remark || '—' }}
-              </template>
-              <template v-else-if="column.dataIndex === 'techParams'">
-                {{ record.techParams || '—' }}
-              </template>
-              <template v-else-if="column.key === 'defaultWorkCenter'">
-                {{ record.production?.defaultWorkCenter || '—' }}
-              </template>
-              <template v-else-if="column.key === 'defaultSupplier'">
-                {{
-                  formatPurchaseSuppliersSummary(
-                    record.purchaseSuppliers || record.production?.purchaseSuppliers,
-                  ) ||
-                  record.production?.defaultSupplier ||
-                  '—'
-                }}
-              </template>
-              <template v-else-if="column.key === 'defaultOutsourceSupplier'">
-                {{ record.production?.defaultOutsourceSupplier || '—' }}
-              </template>
-              <template v-else-if="column.key === 'isProductMaterial'">
-                <a-tag :color="record.isProductMaterial ? 'success' : 'error'">
-                  {{ record.isProductMaterial ? '是' : '否' }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'creator'">
-                {{ record.creator || '—' }}
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <MasterInfoRowActions
-                  @edit="openEdit(record)"
-                  @bom="openBomMaintenance(record)"
-                  @delete="confirmDelete(record)"
-                  @clone="handleClone(record)"
-                />
-              </template>
-            </template>
-          </a-table>
+            </a-table>
 
-          <a-table
-            v-else
-            :columns="templateColumns"
-            :data-source="pagedTemplateList"
-            row-key="id"
-            size="small"
-            bordered
-            :pagination="false"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'variantAxes'">
-                {{ (record.variantAxes || []).map((a) => a.label).join(' + ') || '—' }}
+            <a-table
+              v-else
+              :columns="templateColumns"
+              :data-source="pagedTemplateList"
+              row-key="id"
+              size="small"
+              bordered
+              :scroll="{ y: tableScrollY }"
+              :pagination="false"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'variantAxes'">
+                  {{ (record.variantAxes || []).map((a) => a.label).join(' + ') || '—' }}
+                </template>
+                <template v-else-if="column.key === 'bomStrategy'">
+                  {{ bomStrategyLabel(record.bomStrategy) }}
+                </template>
+                <template v-else-if="column.key === 'skuCount'">
+                  {{ listSkusForSpu(record.id).length }}
+                </template>
+                <template v-else-if="column.key === 'templateAction'">
+                  <a-space :size="4">
+                    <a-button type="link" size="small" @click="openEditSpu(record)"
+                      >编辑模板</a-button
+                    >
+                    <a-button type="link" size="small" @click="openMatrix(record)"
+                      >变体矩阵</a-button
+                    >
+                    <a-button type="link" size="small" @click="openTemplateBom(record)"
+                      >模板 BOM</a-button
+                    >
+                  </a-space>
+                </template>
               </template>
-              <template v-else-if="column.key === 'bomStrategy'">
-                {{ bomStrategyLabel(record.bomStrategy) }}
-              </template>
-              <template v-else-if="column.key === 'skuCount'">
-                {{ listSkusForSpu(record.id).length }}
-              </template>
-              <template v-else-if="column.key === 'templateAction'">
-                <a-space :size="4">
-                  <a-button type="link" size="small" @click="openEditSpu(record)"
-                    >编辑模板</a-button
-                  >
-                  <a-button type="link" size="small" @click="openMatrix(record)">变体矩阵</a-button>
-                  <a-button type="link" size="small" @click="openTemplateBom(record)"
-                    >模板 BOM</a-button
-                  >
-                </a-space>
-              </template>
-            </template>
-          </a-table>
+            </a-table>
+          </div>
 
           <div class="table-pagination">
             <a-pagination
@@ -376,7 +381,7 @@ export default { name: 'MasterItemInfoView' }
 </script>
 
 <script setup>
-import { computed, h, reactive, ref, watch } from 'vue'
+import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
@@ -467,7 +472,10 @@ const matrixPreviewRef = ref(null)
 watch(formModalOpen, (open) => {
   if (!open) viewOnly.value = false
 })
-const pagination = reactive({ current: 1, pageSize: 10 })
+const pagination = reactive({ current: 1, pageSize: 20 })
+const tableWrapRef = ref(null)
+const tableScrollY = ref(420)
+let tableResizeObserver = null
 
 const barcodeOpts = barcodeTypeOptions.map((v) => ({ label: v, value: v }))
 const businessTypeFilterOpts = MASTER_BUSINESS_TYPE_OPTIONS.map((o) => ({
@@ -662,11 +670,11 @@ const baseColumns = [
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
   { title: '创建人', key: 'creator', width: 88 },
-  { title: '操作', key: 'action', width: 180, fixed: 'right' },
+  { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('master-item-list-v2', baseColumns, { minScrollX: 2780 })
+  useTableColumnSettings('master-item-list-v2', baseColumns, { minScrollX: 2820 })
 
 const tableColumns = computed(() =>
   displayColumns.value.map((col) => {
@@ -859,29 +867,72 @@ function onBatchMenu({ key }) {
 function onAddCategory() {
   message.info('新增类别功能开发中')
 }
+
+function syncTableScrollY() {
+  const el = tableWrapRef.value
+  if (!el) return
+  const header = el.querySelector('.ant-table-header') || el.querySelector('.ant-table-thead')
+  const headerH = header?.offsetHeight || 39
+  tableScrollY.value = Math.max(240, Math.floor(el.clientHeight - headerH))
+}
+
+function unbindTableResize() {
+  tableResizeObserver?.disconnect()
+  tableResizeObserver = null
+}
+
+function bindTableResize() {
+  unbindTableResize()
+  const el = tableWrapRef.value
+  if (!el) return
+  if (typeof ResizeObserver !== 'undefined') {
+    tableResizeObserver = new ResizeObserver(() => syncTableScrollY())
+    tableResizeObserver.observe(el)
+  }
+  syncTableScrollY()
+}
+
+watch(listViewMode, async () => {
+  await nextTick()
+  bindTableResize()
+})
+
+onMounted(() => {
+  nextTick(() => bindTableResize())
+})
+
+onBeforeUnmount(unbindTableResize)
 </script>
 
 <style lang="less" scoped>
 .product-info-page {
   margin: -12px;
-  padding: 0;
+  padding: 8px;
   background: #f5f6f8;
-  min-height: calc(100vh - 112px);
+  height: calc(100vh - 56px - 40px - 24px);
+  min-height: calc(100vh - 56px - 40px - 24px);
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .page-layout {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: 8px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .category-panel {
   flex: 0 0 200px;
+  height: 100%;
+  min-height: 0;
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 8px;
-  max-height: calc(100vh - 140px);
   display: flex;
   flex-direction: column;
 
@@ -889,16 +940,19 @@ function onAddCategory() {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
     margin-bottom: 8px;
+    flex-shrink: 0;
   }
 
   .category-tree-toggle {
     margin-bottom: 8px;
+    flex-shrink: 0;
   }
 
   .category-search {
     display: flex;
     gap: 4px;
     margin-bottom: 8px;
+    flex-shrink: 0;
 
     .add-cat-btn {
       flex-shrink: 0;
@@ -908,6 +962,7 @@ function onAddCategory() {
 
   .category-tree-wrap {
     flex: 1;
+    min-height: 0;
     overflow: auto;
 
     :deep(.ant-tree-title) {
@@ -919,6 +974,9 @@ function onAddCategory() {
 .main-panel {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .filter-card,
@@ -929,6 +987,7 @@ function onAddCategory() {
 }
 
 .filter-card {
+  flex-shrink: 0;
   padding: 10px 12px 6px;
   margin-bottom: 8px;
 }
@@ -967,6 +1026,7 @@ function onAddCategory() {
   margin-bottom: 8px;
   flex-wrap: wrap;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .toolbar-icons {
@@ -975,13 +1035,23 @@ function onAddCategory() {
 }
 
 .table-card {
-  padding: 8px 12px 12px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px 8px;
+
+  :deep(.ant-table-thead > tr > th),
+  :deep(.ant-table-tbody > tr > td) {
+    height: 48px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    font-size: 13px;
+  }
 
   :deep(.ant-table-thead > tr > th) {
     background: #fafafa;
     font-weight: 500;
-    padding: 8px;
-    font-size: 13px;
   }
 
   :deep(.ant-table-thead th.ant-table-column-has-sorters) {
@@ -990,11 +1060,6 @@ function onAddCategory() {
 
   :deep(.ant-table-column-sorter) {
     color: #8c8c8c;
-  }
-
-  :deep(.ant-table-tbody > tr > td) {
-    padding: 6px 8px;
-    font-size: 13px;
   }
 
   .unit-tag {
@@ -1017,20 +1082,51 @@ function onAddCategory() {
   }
 }
 
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+
+  :deep(.ant-table-wrapper),
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container),
+  :deep(.ant-table),
+  :deep(.ant-table-container) {
+    height: 100%;
+  }
+}
+
 .table-pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
+  margin-top: 8px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 992px) {
+  .product-info-page {
+    height: auto;
+    min-height: calc(100vh - 56px - 40px - 24px);
+    overflow: auto;
+  }
+
   .page-layout {
     flex-direction: column;
+    flex: none;
   }
 
   .category-panel {
     width: 100%;
+    height: auto;
     max-height: 220px;
+  }
+
+  .main-panel,
+  .table-card,
+  .table-wrap {
+    flex: none;
+    min-height: auto;
+    height: auto;
   }
 }
 </style>
