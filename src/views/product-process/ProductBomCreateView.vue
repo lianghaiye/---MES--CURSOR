@@ -24,12 +24,20 @@
         <a-button type="primary" :disabled="!hasRoot" @click="overviewModalOpen = true">
           概览
         </a-button>
-        <a-button :disabled="!hasRoot" @click="relationOpen = true">查看关联BOM</a-button>
+        <a-button v-if="!isShipBomMode" :disabled="!hasRoot" @click="relationOpen = true">
+          查看关联BOM
+        </a-button>
         <a-button type="primary" :loading="saving" @click="handleSave">
           <SaveOutlined />
           保存
         </a-button>
-        <a-button type="primary" ghost :loading="saving" @click="handleSaveAndPublish">
+        <a-button
+          v-if="!isShipBomMode"
+          type="primary"
+          ghost
+          :loading="saving"
+          @click="handleSaveAndPublish"
+        >
           保存并发布
         </a-button>
         <a-button @click="handleCancel">
@@ -77,23 +85,41 @@
                 class="inline-info-form"
               >
                 <div class="basic-fields-grid">
-                  <a-form-item label="BOM编码" name="bomNo" class="grid-field-item">
+                  <a-form-item
+                    :label="isShipBomMode ? '编号' : 'BOM编码'"
+                    name="bomNo"
+                    class="grid-field-item"
+                  >
                     <a-input
                       v-model:value="form.bomNo"
-                      :placeholder="isEditMode ? '—' : '选择产品后带出，可修改'"
+                      :placeholder="
+                        isEditMode
+                          ? '—'
+                          : isShipBomMode
+                            ? '保存后生成，可修改'
+                            : '选择产品后带出，可修改'
+                      "
                       :disabled="isEditMode"
                       allow-clear
                       class="field-control"
                     />
                   </a-form-item>
-                  <a-form-item label="BOM名称" name="bomName" class="grid-field-item">
+                  <a-form-item
+                    :label="isShipBomMode ? '名称' : 'BOM名称'"
+                    name="bomName"
+                    class="grid-field-item"
+                  >
                     <a-input
                       v-model:value="form.bomName"
-                      placeholder="请输入 BOM 名称"
+                      :placeholder="isShipBomMode ? '请输入名称' : '请输入 BOM 名称'"
                       class="field-control"
                     />
                   </a-form-item>
-                  <a-form-item label="BOM类型" name="bomType" class="grid-field-item">
+                  <a-form-item
+                    :label="isShipBomMode ? '类型' : 'BOM类型'"
+                    name="bomType"
+                    class="grid-field-item"
+                  >
                     <a-select
                       v-model:value="form.bomType"
                       class="field-control"
@@ -101,41 +127,22 @@
                       :disabled="bomTypeLocked"
                     />
                   </a-form-item>
-                  <a-form-item v-if="isEditMode" label="BOM版本" class="grid-field-item">
+                  <a-form-item
+                    v-if="isEditMode && !isShipBomMode"
+                    label="BOM版本"
+                    class="grid-field-item"
+                  >
                     <a-input :value="editVersion || '—'" disabled class="field-control" />
                   </a-form-item>
                   <a-form-item v-else-if="!isShipBomMode" label="BOM版本" class="grid-field-item">
                     <a-input value="保存后生成" disabled class="field-control" />
                   </a-form-item>
                 </div>
-                <a-form-item v-if="isShipBomMode" label="适用产品" class="applicable-products-item">
-                  <div class="applicable-products-field">
-                    <a-button
-                      size="small"
-                      type="primary"
-                      ghost
-                      @click="applicableProductPickerOpen = true"
-                    >
-                      选择产品
-                    </a-button>
-                    <div
-                      v-if="selectedApplicableProducts.length"
-                      class="applicable-products-selected"
-                    >
-                      <a-tag
-                        v-for="p in selectedApplicableProducts"
-                        :key="p.id"
-                        closable
-                        class="applicable-product-tag"
-                        @close.prevent="removeApplicableProduct(p.id)"
-                      >
-                        <span class="tag-code">{{ p.code || '—' }}</span>
-                        <span class="tag-name">{{ p.name || '—' }}</span>
-                        <span v-if="p.specModel" class="tag-spec">{{ p.specModel }}</span>
-                      </a-tag>
-                    </div>
-                    <div v-else class="applicable-products-empty">未选择适用产品（可多选）</div>
-                  </div>
+                <a-form-item v-if="isShipBomMode" class="ship-scope-item">
+                  <ScopeApplyFields
+                    v-model:scope-type="form.scopeType"
+                    v-model:objects="form.objects"
+                  />
                 </a-form-item>
               </a-form>
             </div>
@@ -181,6 +188,7 @@
             :root-item-label="rootItemLabel"
             :summary-meta="materialSummaryMeta"
             :hide-switch-product="true"
+            :ship-attachment-mode="isShipBomMode"
             :empty-variant="hasRoot ? 'no-children' : 'default'"
             @refresh="refreshLines"
             @open-column-setting="columnDrawerOpen = true"
@@ -196,17 +204,25 @@
             @configure-variant="openVariantConfig"
             @select-node="selectedNodeId = $event"
             @import-template="templateModalOpen = true"
+            @import-ship-attachment="onImportShipAttachment"
           />
         </div>
       </main>
     </div>
 
     <ImportBomTemplateModal
+      v-if="!isShipBomMode"
       v-model:open="templateModalOpen"
       :has-root="hasRoot"
       :flat-nodes="flatNodes"
       :line-items="lineItems"
       @imported="onTemplateImported"
+    />
+    <ImportShipAttachmentModal
+      v-if="isShipBomMode"
+      v-model:open="importShipAttachmentOpen"
+      :exclude-id="editBomId"
+      @confirm="onImportShipAttachmentConfirm"
     />
     <SelectBomMaterialModal
       v-model:open="materialModalOpen"
@@ -221,7 +237,11 @@
       confirm-text="确定"
       @confirm="onVariantConfigConfirm"
     />
-    <AddByBomModal v-model:open="addByBomModalOpen" @confirm="onAddByBomConfirm" />
+    <AddByBomModal
+      v-if="!isShipBomMode"
+      v-model:open="addByBomModalOpen"
+      @confirm="onAddByBomConfirm"
+    />
     <SelectBomMaterialModal
       v-if="!isBaselineBomMode"
       v-model:open="switchProductOpen"
@@ -242,15 +262,15 @@
       :show-flat-sku-search="false"
       @selected="onSwitchSpuSelected"
     />
-    <SelectBomMaterialModal
-      v-if="isShipBomMode"
-      v-model:open="applicableProductPickerOpen"
-      title="选择适用产品"
-      hide-add-material
-      multiple
-      picker-default-item-type="产品"
-      :initial-selected-ids="form.applicableProductIds"
-      @selected="onApplicableProductsSelected"
+    <QcTemplateConflictModal
+      v-model:open="shipConflictOpen"
+      title="随货附件冲突"
+      entity-label="随货附件"
+      :kind="shipConflictKind"
+      :conflicts="shipConflictRows"
+      :current-template-name="form.bomName"
+      @confirm="onShipSaveConflictConfirm"
+      @cancel="pendingShipConflictResolution = null"
     />
     <BomColumnSettingDrawer v-model:open="columnDrawerOpen" v-model:settings="columnSettings" />
     <BomOverviewModal
@@ -324,14 +344,37 @@ import {
   buildBomQuickCreateProductFields,
   buildBomQuickCreateSpuFields,
 } from '@/constants/bomQuickCreateDefaults'
-import { loadBomDetailStructure, importBomByReference } from '@/utils/bomImport'
+import {
+  loadBomDetailStructure,
+  importBomByReference,
+  importShipAttachmentLines,
+} from '@/utils/bomImport'
 import {
   defaultBomColumnSettings,
   bomTypeSelectOptions,
   BOM_TYPE,
   normalizeBomType,
+  isShipBomType,
   SHIP_KIT_ITEM_TYPE,
 } from '@/mock/bomMaterialColumns'
+import {
+  formatBomTypeLabel,
+  isBomCreateRouteName,
+  isBomEditRouteName,
+  isBomEditorRouteName,
+  isShipAttachmentPath,
+  productBomListPath,
+  SHIP_ATTACHMENT_DISPLAY_NAME,
+  SHIP_ATTACHMENT_LIST_PATH,
+  shipAttachmentEditPath,
+} from '@/utils/shipAttachmentNav'
+import {
+  formatShipAttachmentObjects,
+  normalizeShipAttachmentScope,
+  SHIP_ATTACHMENT_SCOPE_TYPE,
+} from '@/utils/shipAttachmentScope'
+import ScopeApplyFields from '@/components/ScopeApplyFields.vue'
+import QcTemplateConflictModal from '@/views/quality/components/QcTemplateConflictModal.vue'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
 import { processRouteState } from '@/store/processRouteStore'
 import {
@@ -368,6 +411,7 @@ import ImportBomTemplateModal from './components/ImportBomTemplateModal.vue'
 import SelectBomMaterialModal from './components/SelectBomMaterialModal.vue'
 import SelectSpuOnlyModal from './components/SelectSpuOnlyModal.vue'
 import AddByBomModal from './components/AddByBomModal.vue'
+import ImportShipAttachmentModal from './components/ImportShipAttachmentModal.vue'
 import BomColumnSettingDrawer from './components/BomColumnSettingDrawer.vue'
 import BomOverviewModal from './components/BomOverviewModal.vue'
 import BomRelationDrawer from './components/BomRelationDrawer.vue'
@@ -393,13 +437,9 @@ const {
   openVariantConfig,
 } = useSpuVariantConfig()
 
-const isEditMode = computed(() => route.name === 'product-process-bom-edit')
+const isEditMode = computed(() => isBomEditRouteName(route.name))
 const editBomId = computed(() => route.params.id)
-const pageTabPath = computed(() =>
-  isEditMode.value && editBomId.value
-    ? `/product-process/bom/${editBomId.value}/edit`
-    : '/product-process/bom/new',
-)
+const pageTabPath = computed(() => route.path)
 const editVersion = ref('')
 const editBomStatus = ref('')
 const editEffectiveAt = ref('')
@@ -417,7 +457,6 @@ const syncToMaster = ref(false)
 const switchProductOpen = ref(false)
 /** 已选根产品或用户关过选品窗：禁止再次自动弹出 */
 const skipAutoProductPicker = ref(false)
-const applicableProductPickerOpen = ref(false)
 
 const formRef = ref()
 const rightPanelRef = ref(null)
@@ -427,11 +466,16 @@ const enableTarget = ref(null)
 const enableParentRefs = ref([])
 const enableNewVersion = ref('')
 const enableCurrentVersion = ref('')
+const shipConflictOpen = ref(false)
+const shipConflictKind = ref('single')
+const shipConflictRows = ref([])
+const pendingShipConflictResolution = ref(null)
 const flatNodes = ref([])
 const lineItems = ref([])
 const selectedNodeId = ref(ROOT_ID)
 const templateRef = ref(null)
 const templateModalOpen = ref(false)
+const importShipAttachmentOpen = ref(false)
 const materialModalOpen = ref(false)
 const addByBomModalOpen = ref(false)
 const addChildParentId = ref('')
@@ -454,8 +498,8 @@ const form = reactive({
   techParams: '',
   processRoute: undefined,
   matchingRequirements: '',
-  /** 发运 BOM：适用产品 id 列表（多产品共用，不绑单一产品） */
-  applicableProductIds: [],
+  scopeType: SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL,
+  objects: [],
 })
 
 const UNDO_LIMIT = 50
@@ -516,46 +560,14 @@ const bomTypeLocked = computed(() => true)
 const isBaselineBomMode = computed(() => form.bomType === BOM_TYPE.BASELINE)
 const isShipBomMode = computed(() => form.bomType === BOM_TYPE.SHIP)
 
-const rules = {
-  bomName: [{ required: true, message: '请输入 BOM 名称' }],
-}
-
-const selectedApplicableProducts = computed(() => {
-  const ids = (form.applicableProductIds || []).map(String)
-  if (!ids.length) return []
-  const products = productInfoState.products || []
-  return ids.map((id) => {
-    const p = products.find((x) => String(x.id) === id)
-    return p
-      ? { id: p.id, code: p.code, name: p.name, specModel: p.specModel || '' }
-      : { id, code: '', name: id, specModel: '' }
-  })
-})
-
-function onApplicableProductsSelected(items) {
-  const rows = Array.isArray(items) ? items : [items]
-  const productIds = [
-    ...new Set(
-      rows
-        .filter((r) => r && (r.itemType === '产品' || !r.itemType))
-        .map((r) => r.id)
-        .filter(Boolean)
-        .map(String),
-    ),
-  ]
-  withUndo(() => {
-    form.applicableProductIds = productIds
-  })
-  applicableProductPickerOpen.value = false
-}
-
-function removeApplicableProduct(id) {
-  withUndo(() => {
-    form.applicableProductIds = (form.applicableProductIds || []).filter(
-      (x) => String(x) !== String(id),
-    )
-  })
-}
+const rules = computed(() => ({
+  bomName: [
+    {
+      required: true,
+      message: isShipBomMode.value ? '请输入名称' : '请输入 BOM 名称',
+    },
+  ],
+}))
 
 const switchSelectedId = computed(() => {
   if (!form.itemId) return ''
@@ -568,7 +580,7 @@ const rootMeta = computed(() => {
   if (isShipBomMode.value) {
     return {
       code: form.itemCode || '',
-      name: form.bomName || form.itemName || '发运附件包',
+      name: form.bomName || form.itemName || SHIP_ATTACHMENT_DISPLAY_NAME,
       specModel: '',
       supplyForm: '',
       subItemCount: lineItems.value.filter((l) => l.parentTreeId === rootId).length,
@@ -587,7 +599,7 @@ const rootMeta = computed(() => {
 /** 物料清单元信息条左侧：根产品/物料名称 */
 const rootItemLabel = computed(() => {
   if (isShipBomMode.value) {
-    return form.bomName || '发运附件包'
+    return form.bomName || SHIP_ATTACHMENT_DISPLAY_NAME
   }
   const parts = [form.itemCode, form.itemName].filter(Boolean)
   return parts.length ? parts.join(' ') : form.bomName || ''
@@ -595,8 +607,14 @@ const rootItemLabel = computed(() => {
 
 const basicInfoSummary = computed(() => {
   if (isShipBomMode.value) {
-    const n = (form.applicableProductIds || []).length
-    const parts = [form.bomName, n ? `适用 ${n} 个产品` : '未指定适用产品'].filter(Boolean)
+    const parts = [
+      form.bomName,
+      formatShipAttachmentObjects({
+        bomType: form.bomType,
+        scopeType: form.scopeType,
+        objects: form.objects,
+      }),
+    ].filter(Boolean)
     return parts.join(' · ')
   }
   const parts = [form.bomName, form.itemName].filter(Boolean)
@@ -604,9 +622,9 @@ const basicInfoSummary = computed(() => {
 })
 
 const pageHeadTitle = computed(() => {
-  const bomTypeLabel = form.bomType === '基础BOM' ? '基准BOM' : form.bomType || '产品BOM'
+  const bomTypeLabel = formatBomTypeLabel(normalizeBomType(form.bomType) || BOM_TYPE.PRODUCT)
   const productName = isShipBomMode.value
-    ? form.bomName || '发运附件包'
+    ? form.bomName || SHIP_ATTACHMENT_DISPLAY_NAME
     : form.itemName || form.bomName || '—'
   return `${bomTypeLabel} / ${productName}`
 })
@@ -693,9 +711,18 @@ function toggleBasicInfo() {
   basicInfoExpanded.value = !basicInfoExpanded.value
 }
 
+function editorListPath() {
+  if (isShipBomMode.value || isShipAttachmentPath(route.path)) return SHIP_ATTACHMENT_LIST_PATH
+  return productBomListPath()
+}
+
 function resolveDefaultBomTypeFromRoute() {
+  if (isShipAttachmentPath(route.path)) return BOM_TYPE.SHIP
   const qType = route.query.bomType
-  if (qType) return normalizeBomType(String(qType))
+  if (qType) {
+    const type = normalizeBomType(String(qType))
+    return type === BOM_TYPE.SHIP ? BOM_TYPE.PRODUCT : type
+  }
   if (route.query.itemType === 'spu') return BOM_TYPE.BASELINE
   return BOM_TYPE.PRODUCT
 }
@@ -754,7 +781,8 @@ function resetNewBomState() {
     techParams: '',
     processRoute: undefined,
     matchingRequirements: '',
-    applicableProductIds: [],
+    scopeType: SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL,
+    objects: [],
   })
   flatNodes.value = []
   lineItems.value = []
@@ -770,7 +798,7 @@ function resetNewBomState() {
 
 /** 发运 BOM：不绑产品，用名称作为根节点 */
 function ensureShipKitRoot() {
-  const kitName = form.bomName?.trim() || '发运附件包'
+  const kitName = form.bomName?.trim() || SHIP_ATTACHMENT_DISPLAY_NAME
   // 新建共用包：挂到 shipKit；编辑旧「单产品发运 BOM」保留原 itemType/itemId 以延续版本组
   if (!form.itemId || form.itemType === SHIP_KIT_ITEM_TYPE) {
     form.itemType = SHIP_KIT_ITEM_TYPE
@@ -801,7 +829,7 @@ const bootstrappedNewBom = ref(false)
 const loadedEditBomId = ref('')
 
 function captureNewBomDraft() {
-  if (route.name !== 'product-process-bom-new') return
+  if (!isBomCreateRouteName(route.name)) return
   if (!bootstrappedNewBom.value && !isCreatePageBootstrapped(route.path)) return
   saveCreatePageDraft(route.path, {
     form: { ...form },
@@ -843,7 +871,7 @@ function closeProductPicker() {
 }
 
 function initPageFromRoute() {
-  if (route.name === 'product-process-bom-edit') {
+  if (isBomEditRouteName(route.name)) {
     const id = String(route.params.id || editBomId.value || '')
     if (!id) return
     if (loadedEditBomId.value === id) return
@@ -852,7 +880,7 @@ function initPageFromRoute() {
     loadEditBom(id)
     return
   }
-  if (route.name === 'product-process-bom-new') {
+  if (isBomCreateRouteName(route.name)) {
     const alreadyBootstrapped = bootstrappedNewBom.value || isCreatePageBootstrapped(route.path)
 
     if (alreadyBootstrapped) {
@@ -894,7 +922,7 @@ function initPageFromRoute() {
 watch(
   () => [route.name, String(route.params.id || '')],
   ([name]) => {
-    if (name !== 'product-process-bom-new' && name !== 'product-process-bom-edit') return
+    if (!isBomEditorRouteName(name)) return
     initPageFromRoute()
   },
 )
@@ -919,9 +947,9 @@ onMounted(() => {
  */
 const activatedOnce = ref(false)
 onActivated(() => {
-  if (route.name !== 'product-process-bom-new' && route.name !== 'product-process-bom-edit') return
+  if (!isBomEditorRouteName(route.name)) return
 
-  if (route.name === 'product-process-bom-new') {
+  if (isBomCreateRouteName(route.name)) {
     if (isCreatePageBootstrapped(route.path) && !bootstrappedNewBom.value) {
       restoreNewBomDraft()
     }
@@ -952,7 +980,7 @@ function isAutoGeneratedBomNo(bomNo) {
 /** 新增时 BOM 名称/编码默认跟根产品走，用户改过则换产品时不再覆盖 */
 function applyCreateBomDefaultsFromRoot(opt) {
   if (isShipBomMode.value) {
-    if (!form.bomName) form.bomName = `${opt.itemName}-发运附件`
+    if (!form.bomName) form.bomName = `${opt.itemName}-随货附件`
     return
   }
   if (isEditMode.value) {
@@ -1009,7 +1037,7 @@ function applySelectedItem(opt, { preserveChildren = false } = {}) {
 
 function openSwitchProduct() {
   if (isShipBomMode.value) {
-    message.info('发运 BOM 不绑定单一产品，请在「适用产品」中多选')
+    message.info('随货附件不绑定单一产品，请在「适用产品」中多选')
     return
   }
   if (isEditMode.value && !canSwitchProduct.value) {
@@ -1021,7 +1049,7 @@ function openSwitchProduct() {
 
 function onSwitchProductOpenChange(open) {
   switchProductOpen.value = open
-  if (!open && route.name === 'product-process-bom-new') {
+  if (!open && isBomCreateRouteName(route.name)) {
     skipAutoProductPicker.value = true
     captureNewBomDraft()
   }
@@ -1250,7 +1278,9 @@ function onSwitchProductConfirm(row) {
 }
 
 function onAddSubItem(parentNodeId) {
-  if (!hasRoot.value) {
+  if (isShipBomMode.value) {
+    ensureShipKitRoot()
+  } else if (!hasRoot.value) {
     message.warning('请先选择产品/物料')
     return
   }
@@ -1266,6 +1296,27 @@ function onAddByBom() {
     return
   }
   addByBomModalOpen.value = true
+}
+
+function onImportShipAttachment() {
+  ensureShipKitRoot()
+  importShipAttachmentOpen.value = true
+}
+
+function onImportShipAttachmentConfirm(sourceBom) {
+  ensureShipKitRoot()
+  const result = importShipAttachmentLines(sourceBom, flatNodes.value, lineItems.value)
+  if (!result || !result.importedCount) {
+    message.warning('所选随货附件没有可导入的明细')
+    return
+  }
+  withUndo(() => {
+    flatNodes.value = result.flatNodes
+    lineItems.value = result.lineItems
+    selectedNodeId.value = getRootTreeId(flatNodes.value) || ROOT_ID
+  })
+  message.success(`已从「${sourceBom.bomName || sourceBom.bomNo}」导入 ${result.importedCount} 项`)
+  scrollPageToLatestDetail()
 }
 
 function onAddByBomConfirm({ pickerRow, usageCoefficient }) {
@@ -1578,13 +1629,21 @@ function refreshLines() {
 function loadEditBom(id) {
   const bom = getProductBomById(id)
   if (!bom) {
-    message.error('BOM 不存在')
-    router.push('/product-process/bom')
+    message.error(isShipAttachmentPath(route.path) ? '随货附件不存在' : 'BOM 不存在')
+    router.push(editorListPath())
     return
   }
   if (!isBomEditable(bom)) {
-    message.warning('当前状态的 BOM 不可编辑')
-    router.push('/product-process/bom')
+    message.warning(isShipBomType(bom.bomType) ? '当前状态不可编辑' : '当前状态的 BOM 不可编辑')
+    router.push(editorListPath())
+    return
+  }
+  if (isShipBomType(bom.bomType) && !isShipAttachmentPath(route.path)) {
+    router.replace(shipAttachmentEditPath(id))
+    return
+  }
+  if (!isShipBomType(bom.bomType) && isShipAttachmentPath(route.path)) {
+    router.replace(`/product-process/bom/${id}/edit`)
     return
   }
 
@@ -1614,16 +1673,16 @@ function loadEditBom(id) {
   form.techParams = bom.techParams || ''
   form.processRoute = bom.processRoute || undefined
   form.matchingRequirements = bom.matchingRequirements || bom.remark || ''
-  form.applicableProductIds = Array.isArray(bom.applicableProductIds)
-    ? [...bom.applicableProductIds]
-    : []
+  const scope = normalizeShipAttachmentScope(bom)
+  form.scopeType = scope.scopeType
+  form.objects = scope.objects
   if (form.bomType !== BOM_TYPE.SHIP) {
     applyReadonlyMasterFields(bom.itemType, bom.itemId)
   }
   clearUndoStack()
 }
 
-async function persistBom({ closeAfter = true } = {}) {
+async function persistBom({ closeAfter = true, conflictResolution = null } = {}) {
   try {
     await formRef.value.validate()
   } catch {
@@ -1631,11 +1690,24 @@ async function persistBom({ closeAfter = true } = {}) {
   }
   if (isShipBomMode.value) {
     ensureShipKitRoot()
+    if (!form.scopeType) {
+      message.warning('请选择适用范围')
+      return null
+    }
+    if (
+      form.scopeType === SHIP_ATTACHMENT_SCOPE_TYPE.CATEGORY ||
+      form.scopeType === SHIP_ATTACHMENT_SCOPE_TYPE.SINGLE
+    ) {
+      if (!(form.objects || []).length) {
+        message.warning('请选择适用对象')
+        return null
+      }
+    }
   }
   if (!hasRoot.value || !form.itemId) {
     message.warning(
       isShipBomMode.value
-        ? '请填写发运 BOM 名称'
+        ? '请填写随货附件名称'
         : isBaselineBomMode.value
           ? '请先通过左侧树切换选择产品族'
           : '请先通过左侧树切换选择产品/物料',
@@ -1670,16 +1742,6 @@ async function persistBom({ closeAfter = true } = {}) {
   const itemId =
     typeof rawItemId === 'string' && rawItemId.includes(':') ? rawItemId.split(':')[1] : rawItemId
 
-  let applicableProductIds = isShipBomMode.value ? [...(form.applicableProductIds || [])] : []
-  if (
-    isShipBomMode.value &&
-    form.itemType === 'product' &&
-    itemId &&
-    !applicableProductIds.map(String).includes(String(itemId))
-  ) {
-    applicableProductIds = [...applicableProductIds, itemId]
-  }
-
   const payload = {
     bomNo: form.bomNo || generateBomNo(),
     bomName: form.bomName,
@@ -1698,7 +1760,8 @@ async function persistBom({ closeAfter = true } = {}) {
     techParams: isShipBomMode.value ? '' : form.techParams || '',
     processRoute: isShipBomMode.value ? '' : form.processRoute || '',
     matchingRequirements: form.matchingRequirements || '',
-    applicableProductIds,
+    scopeType: isShipBomMode.value ? form.scopeType : undefined,
+    objects: isShipBomMode.value ? (form.objects || []).map((o) => ({ ...o })) : [],
     treeNodes: flatNodes.value,
     lineItems: lineItems.value.map((line) => {
       const copy = { ...line }
@@ -1715,9 +1778,17 @@ async function persistBom({ closeAfter = true } = {}) {
   saving.value = true
   try {
     const bomId = isEditMode.value ? editBomId.value : null
-    const res = saveProductBom(bomId, payload)
-    if (res?.error) {
-      message.warning(res.error)
+    const res = saveProductBom(bomId, payload, {
+      conflictResolution: conflictResolution || pendingShipConflictResolution.value || undefined,
+    })
+    if (res?.needConflict) {
+      shipConflictKind.value = res.conflict.kind
+      shipConflictRows.value = res.conflict.conflicts || []
+      shipConflictOpen.value = true
+      return null
+    }
+    if (res?.error || res?.ok === false) {
+      message.warning(res.error || res.message || '保存失败')
       return null
     }
     if (payload.itemType === 'spu' && normalizeBomType(payload.bomType) === BOM_TYPE.BASELINE) {
@@ -1732,24 +1803,34 @@ async function persistBom({ closeAfter = true } = {}) {
           `已生成新版本 ${res.record.version}（待发布），当前生效版本保持不变，审核发布后新版本才生效`,
         )
       } else if (isEditMode.value) {
-        message.success('BOM 已更新')
+        message.success(isShipBomMode.value ? '随货附件已更新' : 'BOM 已更新')
       } else {
-        message.success('BOM 已保存，状态为待发布，审核发布后方可用于生产')
+        message.success(
+          isShipBomMode.value
+            ? '随货附件已保存（默认停用）'
+            : 'BOM 已保存，状态为待发布，审核发布后方可用于生产',
+        )
       }
       if (!isEditMode.value) {
         resetNewBomState()
       }
       closeTab(pageTabPath.value)
-      router.push('/product-process/bom')
+      router.push(editorListPath())
     }
     return res
   } finally {
     saving.value = false
+    pendingShipConflictResolution.value = null
   }
 }
 
 async function handleSave() {
   await persistBom({ closeAfter: true })
+}
+
+function onShipSaveConflictConfirm({ mode }) {
+  pendingShipConflictResolution.value = { mode }
+  persistBom({ closeAfter: true, conflictResolution: { mode } })
 }
 
 function doEnableBom(record, upgradeParentRefs = false, parentRefs = []) {
@@ -1762,14 +1843,20 @@ function doEnableBom(record, upgradeParentRefs = false, parentRefs = []) {
     upgradeParentRefs && parentRefs.length
       ? `，已同步更新 ${parentRefs.length} 个父级 BOM 的引用版本`
       : ''
-  message.success(`保存并发布成功，当前版本已生效可用于生产${syncHint}`)
+  message.success(
+    isShipBomMode.value
+      ? `保存并发布成功，当前版本已生效可用于发货${syncHint}`
+      : `保存并发布成功，当前版本已生效可用于生产${syncHint}`,
+  )
   return true
 }
 
 function startPublishFlow(record) {
   if (!record) return
   if (!isBomPending(record)) {
-    message.warning('仅待发布状态的 BOM 可发布')
+    message.warning(
+      isShipBomMode.value ? '仅待发布状态的随货附件可发布' : '仅待发布状态的 BOM 可发布',
+    )
     return
   }
   const refs = findParentRefsForBomUpgrade(record)
@@ -1791,7 +1878,7 @@ function startPublishFlow(record) {
   if (doEnableBom(record)) {
     if (!isEditMode.value) resetNewBomState()
     closeTab(pageTabPath.value)
-    router.push('/product-process/bom')
+    router.push(editorListPath())
   }
 }
 
@@ -1805,7 +1892,7 @@ function onEnableRefConfirm({ action, selectedRefs }) {
     enableCurrentVersion.value = ''
     if (!isEditMode.value) resetNewBomState()
     closeTab(pageTabPath.value)
-    router.push('/product-process/bom')
+    router.push(editorListPath())
     return
   }
   const upgrade = action === 'upgrade'
@@ -1817,7 +1904,7 @@ function onEnableRefConfirm({ action, selectedRefs }) {
   if (ok) {
     if (!isEditMode.value) resetNewBomState()
     closeTab(pageTabPath.value)
-    router.push('/product-process/bom')
+    router.push(editorListPath())
   }
 }
 
@@ -1836,7 +1923,7 @@ function handleCancel() {
         resetNewBomState()
       }
       closeTab(pageTabPath.value)
-      router.push('/product-process/bom')
+      router.push(editorListPath())
     },
   })
 }
@@ -2117,58 +2204,13 @@ function handleCancel() {
   width: 100%;
 }
 
-.applicable-products-item {
+.ship-scope-item {
+  width: 100%;
+  margin: 12px 0 0;
+
   :deep(.ant-form-item-control-input-content) {
     display: block;
   }
-}
-
-.applicable-products-field {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 320px;
-  max-width: 720px;
-}
-
-.applicable-products-selected {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  width: 100%;
-  padding: 8px 10px;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-}
-
-.applicable-product-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  max-width: 100%;
-  line-height: 22px;
-  white-space: normal;
-}
-
-.applicable-product-tag .tag-code {
-  color: #1677ff;
-  font-weight: 500;
-}
-
-.applicable-product-tag .tag-name {
-  color: rgba(0, 0, 0, 0.85);
-}
-
-.applicable-product-tag .tag-spec {
-  color: rgba(0, 0, 0, 0.45);
-}
-
-.applicable-products-empty {
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
 }
 
 @media (max-width: 992px) {

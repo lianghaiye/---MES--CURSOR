@@ -15,8 +15,15 @@
 <script setup>
 import { computed } from 'vue'
 import { isShipBomType } from '@/mock/bomMaterialColumns'
+import { formatBomTypeLabel } from '@/utils/shipAttachmentNav'
 import { bomStatusColor } from '@/mock/productBomOptions'
-import { productInfoState } from '@/store/productInfoStore'
+import {
+  displayShipAttachmentStatus,
+  formatShipAttachmentObjects,
+  isShipAttachmentEnabled,
+  normalizeShipAttachmentScope,
+  shipAttachmentScopeTypeLabel,
+} from '@/utils/shipAttachmentScope'
 
 const props = defineProps({
   bom: { type: Object, required: true },
@@ -38,17 +45,6 @@ function formatEffectiveRange(bom) {
   return `${start} ~ ${end}`
 }
 
-function applicableProductsLabel(bom) {
-  const ids = bom.applicableProductIds || []
-  if (!ids.length) return '未指定'
-  const products = productInfoState.products || []
-  const labels = ids.map((id) => {
-    const p = products.find((x) => String(x.id) === String(id))
-    return p ? [p.code, p.name].filter(Boolean).join(' ') : String(id)
-  })
-  return labels.join('、')
-}
-
 function fieldText(field) {
   if (field.format) return field.format(props.bom)
   return display(props.bom[field.key])
@@ -57,13 +53,38 @@ function fieldText(field) {
 const fields = computed(() => {
   const bom = props.bom
   const isShip = isShipBomType(bom.bomType)
-  const list = [
+  if (isShip) {
+    return [
+      { key: 'bomNo', label: '编号' },
+      { key: 'bomName', label: '名称' },
+      {
+        key: 'status',
+        label: '状态',
+        tag: isShipAttachmentEnabled(bom) ? 'success' : 'default',
+        format: displayShipAttachmentStatus,
+      },
+      {
+        key: 'scopeType',
+        label: '适用范围',
+        format: (row) =>
+          shipAttachmentScopeTypeLabel(
+            row.scopeType || normalizeShipAttachmentScope(row).scopeType,
+          ),
+      },
+      {
+        key: 'scopeObjects',
+        label: '适用对象',
+        format: formatShipAttachmentObjects,
+      },
+    ]
+  }
+  return [
     { key: 'bomNo', label: 'BOM编码' },
     { key: 'bomName', label: 'BOM名称' },
     {
       key: 'bomType',
       label: 'BOM类型',
-      format: (row) => (row.bomType === '基础BOM' ? '基准BOM' : row.bomType || '产品BOM'),
+      format: (row) => formatBomTypeLabel(row.bomType === '基础BOM' ? '基准BOM' : row.bomType),
     },
     { key: 'version', label: 'BOM版本' },
     {
@@ -78,14 +99,6 @@ const fields = computed(() => {
       format: formatEffectiveRange,
     },
   ]
-  if (isShip) {
-    list.push({
-      key: 'applicableProducts',
-      label: '适用产品',
-      format: applicableProductsLabel,
-    })
-  }
-  return list
 })
 </script>
 

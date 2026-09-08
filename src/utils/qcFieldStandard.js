@@ -79,7 +79,7 @@ export function createDefaultManualOptionItems() {
     {
       value: QC_MANUAL_JUDGMENT.CONCESSION,
       result: QC_TASK_RESULT.PASS,
-      locked: true,
+      locked: false,
       isDefault: false,
     },
   ]
@@ -87,7 +87,8 @@ export function createDefaultManualOptionItems() {
 
 /**
  * 规范化人工判定选项：
- * - 默认三项可改文案、不可删除（locked）
+ * - 「合格 / 不合格」可改文案、不可删除（locked）
+ * - 「让步合格」默认可删；历史 locked 数据会解锁
  * - 可追加自定义项
  * - 不强制把文案重置为「合格/不合格/让步合格」
  */
@@ -111,10 +112,12 @@ export function normalizeManualOptionItems(field = {}) {
   return rawItems.map((o) => {
     const value = String(o?.value ?? '').trim()
     const result = o?.result === QC_TASK_RESULT.FAIL ? QC_TASK_RESULT.FAIL : QC_TASK_RESULT.PASS
+    // 让步合格允许删除（含历史 locked:true 数据）
+    const locked = value === QC_MANUAL_JUDGMENT.CONCESSION ? false : Boolean(o?.locked)
     return {
       value,
       result,
-      locked: Boolean(o?.locked),
+      locked,
       isDefault: Boolean(value && defaultSet.has(value)),
     }
   })

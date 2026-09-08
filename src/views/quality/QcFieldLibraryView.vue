@@ -1,11 +1,5 @@
 <template>
   <div class="qc-field-library-page">
-    <a-alert
-      type="info"
-      show-icon
-      class="page-tip"
-      message="指标类型分「基础 / 复合」。复合子项支持与基础相同的字段类型与判定；多点暂未开放。演示：出厂试验-运转。"
-    />
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -72,16 +66,6 @@
       </a-space>
     </div>
 
-    <a-alert type="info" show-icon class="summary-bar" :banner="false">
-      <template #message>
-        <span>
-          共计
-          {{ filteredList.length }}
-          条。检验项库供质检模板复用；系统字段（方式/数量/结果）不在此维护。
-        </span>
-      </template>
-    </a-alert>
-
     <div class="table-card">
       <a-table
         :columns="columns"
@@ -98,10 +82,16 @@
             <a-tag :color="record.status === '启用' ? 'success' : 'default'">
               {{ record.status || '—' }}
             </a-tag>
+            <a-tag v-if="record.isSystem" color="blue" style="margin-left: 4px">系统</a-tag>
+          </template>
+          <template v-else-if="column.dataIndex === 'code'">
+            <a class="code-link" @click.prevent="openDetail(record)">{{ record.code || '—' }}</a>
+          </template>
+          <template v-else-if="column.dataIndex === 'name'">
+            {{ record.name || '—' }}
           </template>
           <template v-else-if="column.key === 'type'">
-            <a-tag v-if="record.type === 'composite'" color="processing">复合项</a-tag>
-            <template v-else>{{ qcFieldTypeLabel(record.type) }}</template>
+            {{ qcFieldTypeLabel(record.type) }}
           </template>
           <template v-else-if="column.key === 'required'">
             {{ record.required ? '是' : '否' }}
@@ -121,7 +111,13 @@
                 {{ record.status === '启用' ? '停用' : '启用' }}
               </a-button>
               <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="handleDelete(record)">
+              <a-button
+                v-if="!record.isSystem"
+                type="link"
+                size="small"
+                danger
+                @click="handleDelete(record)"
+              >
                 删除
               </a-button>
             </a-space>
@@ -145,6 +141,8 @@
         />
       </div>
     </div>
+
+    <QcFieldLibraryDetailDrawer v-model:open="detailOpen" :record="detailRecord" />
   </div>
 </template>
 
@@ -174,6 +172,7 @@ import { buildStandardText } from '@/utils/qcFieldStandard'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { useTabs } from '@/composables/useTabs'
+import QcFieldLibraryDetailDrawer from './components/QcFieldLibraryDetailDrawer.vue'
 
 onMounted(() => {
   ensureQcLibraryDemoSeed()
@@ -191,13 +190,15 @@ const filters = reactive({
 })
 const appliedFilters = ref({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
+const detailOpen = ref(false)
+const detailRecord = ref(null)
 
 const statusOpts = qcFieldLibraryStatusOptions.map((v) => ({ label: v, value: v }))
 const typeOpts = qcFieldLibraryTypeOptions
 
 const columns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
-  { title: '状态', key: 'status', width: 80, fixed: 'left' },
+  { title: '状态', key: 'status', width: 110, fixed: 'left' },
   { title: '指标编码', dataIndex: 'code', width: 140, fixed: 'left' },
   { title: '名称', dataIndex: 'name', width: 140, ellipsis: true },
   { title: '字段类型', key: 'type', width: 110 },
@@ -210,7 +211,6 @@ const columns = [
 ]
 
 const filteredList = computed(() => {
-  // 依赖 state 触发刷新
   void qcFieldLibraryState.fields.length
   return listQcLibraryFields(appliedFilters.value)
 })
@@ -235,6 +235,11 @@ function displayUnit(record) {
   const unit = String(record.unit || '').trim()
   if (!unit) return '—'
   return record.unitPosition === 'prefix' ? `${unit}（前）` : `${unit}（后）`
+}
+
+function openDetail(record) {
+  detailRecord.value = record
+  detailOpen.value = true
 }
 
 function handleSearch() {
@@ -311,10 +316,6 @@ function handleDelete(record) {
   min-height: calc(100vh - 112px);
 }
 
-.page-tip {
-  margin: 12px 12px 0;
-}
-
 .filter-card,
 .table-card {
   background: #fff;
@@ -331,10 +332,6 @@ function handleDelete(record) {
   margin-bottom: 8px;
 }
 
-.summary-bar {
-  margin: 0 0 8px;
-}
-
 .table-pagination {
   margin-top: 12px;
   display: flex;
@@ -343,5 +340,14 @@ function handleDelete(record) {
 
 .filter-actions-item :deep(.ant-form-item-control-input-content) {
   display: flex;
+}
+
+.code-link {
+  color: #1677ff;
+  cursor: pointer;
+}
+
+.code-link:hover {
+  color: #4096ff;
 }
 </style>

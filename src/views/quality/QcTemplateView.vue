@@ -1,11 +1,5 @@
 <template>
   <div class="qc-template-page">
-    <a-alert
-      type="info"
-      show-icon
-      class="page-tip"
-      message="模板字段支持「基础 / 复合」指标类型；复合子项可各自配置类型与判定。多点暂未开放。演示：编辑「密封件来料检模板」。"
-    />
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -105,14 +99,6 @@
           新增模板
         </a-button>
         <a-button size="small" @click="probeOpen = true">匹配试算</a-button>
-        <a-button
-          size="small"
-          :type="effectiveView ? 'primary' : 'default'"
-          ghost
-          @click="toggleEffectiveView"
-        >
-          {{ effectiveView ? '退出生效视图' : '生效视图' }}
-        </a-button>
       </a-space>
       <a-space :size="4" class="toolbar-icons">
         <a-tooltip title="刷新">
@@ -123,18 +109,6 @@
         <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
-
-    <a-alert type="info" show-icon class="summary-bar" :banner="false">
-      <template #message>
-        <span>
-          共计 {{ filteredList.length }} 条。
-          <template v-if="effectiveView">
-            当前为生效视图：仅启用模板，按业务类型与适用范围（单产品→类别→全局）排序。
-          </template>
-          不确定某物料用哪份模板时，请用「匹配试算」。
-        </span>
-      </template>
-    </a-alert>
 
     <div class="table-card">
       <a-table
@@ -177,8 +151,6 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space :size="0">
-              <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
-              <a-button type="link" size="small" @click="openFillPreview(record)">预览</a-button>
               <template v-if="record.isSystem">
                 <a-button type="link" size="small" @click="handleCopy(record)">复制</a-button>
               </template>
@@ -215,13 +187,6 @@
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
-    />
-
-    <QcTemplatePreviewDrawer
-      v-model:open="previewOpen"
-      :record="previewRecord"
-      :initial-tab="previewTab"
-      @copy="handleCopyFromPreview"
     />
 
     <QcTemplateConflictModal
@@ -267,7 +232,6 @@ import { processConfigState } from '@/store/processConfigStore'
 import { qcTaskState, QC_TASK_STATUS } from '@/store/qcTaskStore'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
-import QcTemplatePreviewDrawer from './components/QcTemplatePreviewDrawer.vue'
 import QcTemplateConflictModal from './components/QcTemplateConflictModal.vue'
 import QcTemplateMatchProbeDrawer from './components/QcTemplateMatchProbeDrawer.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -298,16 +262,12 @@ const filters = reactive({
 })
 const appliedFilters = ref({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
-const previewOpen = ref(false)
-const previewRecord = ref(null)
-const previewTab = ref('detail')
 const conflictOpen = ref(false)
 const conflictKind = ref('single')
 const conflictRows = ref([])
 const conflictTemplateName = ref('')
 const pendingEnableId = ref('')
 const probeOpen = ref(false)
-const effectiveView = ref(false)
 
 function isTemplateReferenced(template) {
   const code = String(template?.code || '').trim()
@@ -342,11 +302,11 @@ const baseColumns = [
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
   { title: '更新人', dataIndex: 'updater', width: 90 },
   { title: '更新时间', key: 'updatedAt', dataIndex: 'updatedAt', width: 150 },
-  { title: '操作', key: 'action', width: 260, fixed: 'right' },
+  { title: '操作', key: 'action', width: 180, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('qc-template-list-v4', baseColumns)
+  useTableColumnSettings('qc-template-list-v5', baseColumns)
 
 const filteredList = computed(() => {
   const base = filterQcTemplates(qcTemplateState.templates, appliedFilters.value)
@@ -377,7 +337,7 @@ function handleSearch() {
 }
 
 function handleReset() {
-  filters.status = effectiveView.value ? '启用' : undefined
+  filters.status = undefined
   filters.type = undefined
   filters.bizScope = undefined
   filters.scopeType = undefined
@@ -385,16 +345,6 @@ function handleReset() {
   filters.name = ''
   filters.creator = ''
   filters.dateRange = undefined
-  handleSearch()
-}
-
-function toggleEffectiveView() {
-  effectiveView.value = !effectiveView.value
-  if (effectiveView.value) {
-    filters.status = '启用'
-  } else if (filters.status === '启用') {
-    filters.status = undefined
-  }
   handleSearch()
 }
 
@@ -409,27 +359,11 @@ function handleCreate() {
   })
 }
 
-function openTemplateDrawer(record, tab = 'detail') {
-  if (!record) return
-  previewTab.value = tab === 'fill' ? 'fill' : 'detail'
-  previewRecord.value = {
-    ...record,
-    fields: (record.fields || []).map((f) => ({
-      ...f,
-      options: f.options ? [...f.options] : [],
-      optionItems: f.optionItems ? f.optionItems.map((o) => ({ ...o })) : undefined,
-      children: Array.isArray(f.children) ? f.children.map((c) => ({ ...c })) : [],
-    })),
-  }
-  previewOpen.value = true
-}
-
 function openDetail(record) {
-  openTemplateDrawer(record, 'detail')
-}
-
-function openFillPreview(record) {
-  openTemplateDrawer(record, 'fill')
+  if (!record?.id) return
+  const path = `/quality/qc-template/${record.id}`
+  openTab(path, record.code || '质检模板详情')
+  router.push({ name: 'quality-qc-template-detail', params: { id: record.id } })
 }
 
 function openEditTab(template, title) {
@@ -448,13 +382,7 @@ function handleCopy(record) {
     return
   }
   message.success(`已复制为 ${res.template.code}`)
-  previewOpen.value = false
   openEditTab(res.template, `编辑质检模板 ${res.template.code}`)
-}
-
-function handleCopyFromPreview(record) {
-  if (!record) return
-  handleCopy(record)
 }
 
 function handleEdit(record) {
@@ -523,10 +451,6 @@ function onConflictConfirm({ mode }) {
   min-height: calc(100vh - 112px);
 }
 
-.page-tip {
-  margin: 12px 12px 0;
-}
-
 .filter-card,
 .table-card {
   background: #fff;
@@ -572,15 +496,6 @@ function onConflictConfirm({ mode }) {
   margin-bottom: 8px;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.summary-bar {
-  margin-bottom: 8px;
-  padding: 6px 12px;
-
-  :deep(.ant-alert-message) {
-    font-size: 13px;
-  }
 }
 
 .table-card {

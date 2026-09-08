@@ -16,110 +16,113 @@
 
     <div v-if="expanded" class="complex-body">
       <template v-if="isCompositeField(field)">
-        <a-table
-          :columns="compositeColumns"
-          :data-source="compositeRows"
-          :pagination="false"
-          size="small"
-          bordered
-          row-key="code"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'standard'">
-              {{ buildStandardText(record.child) || '—' }}
-            </template>
-            <template v-else-if="column.key === 'value'">
-              <div class="child-value-stack">
-                <div class="field-input-wrap">
-                  <span
-                    v-if="record.unit && record.child.unitPosition === 'prefix'"
-                    class="unit-affix"
-                    >{{ record.unit }}</span
-                  >
-                  <a-input-number
-                    v-if="record.child.type === 'number'"
-                    :value="childMeasured(record)"
-                    size="small"
-                    style="flex: 1; min-width: 0"
-                    :placeholder="`请输入${record.name}`"
-                    @update:value="(v) => onChildMeasured(record.code, record.child, v)"
-                  />
-                  <a-select
-                    v-else-if="record.child.type === 'radio'"
-                    :value="childMeasured(record)"
-                    size="small"
-                    allow-clear
-                    style="flex: 1; min-width: 0"
-                    :placeholder="`请选择${record.name}`"
-                    :options="radioOpts(record.child)"
-                    @update:value="(v) => onChildMeasured(record.code, record.child, v)"
-                  />
-                  <a-select
-                    v-else-if="record.child.type === 'checkbox'"
-                    :value="asArray(childMeasured(record))"
-                    mode="multiple"
-                    size="small"
-                    allow-clear
-                    style="flex: 1; min-width: 0"
-                    :placeholder="`请选择${record.name}`"
-                    :options="radioOpts(record.child)"
-                    @update:value="(v) => onChildMeasured(record.code, record.child, v)"
-                  />
-                  <a-input
-                    v-else-if="record.child.type === 'date' || record.child.type === 'datetime'"
-                    :value="childMeasured(record)"
-                    size="small"
-                    style="flex: 1; min-width: 0"
-                    :placeholder="
-                      record.child.type === 'datetime' ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd'
-                    "
-                    @update:value="(v) => onChildMeasured(record.code, record.child, v)"
-                  />
-                  <a-textarea
-                    v-else-if="record.child.type === 'textarea'"
-                    :value="childMeasured(record)"
-                    size="small"
-                    :rows="2"
-                    style="flex: 1; min-width: 0"
-                    :placeholder="`请输入${record.name}`"
-                    @update:value="(v) => onChildMeasured(record.code, record.child, v)"
-                  />
-                  <a-input
-                    v-else
-                    :value="childMeasured(record)"
-                    size="small"
-                    style="flex: 1; min-width: 0"
-                    :placeholder="`请输入${record.name}`"
-                    @update:value="(v) => onChildMeasured(record.code, record.child, v)"
-                  />
-                  <span
-                    v-if="record.unit && record.child.unitPosition !== 'prefix'"
-                    class="unit-affix"
-                    >{{ record.unit }}</span
-                  >
+        <div class="sub-field-list">
+          <div
+            v-for="record in compositeRows"
+            :key="record.code"
+            class="sub-field-row"
+            :class="{
+              'is-pass': record.judge === 'pass',
+              'is-fail': record.judge === 'fail',
+            }"
+          >
+            <div class="sub-field-main">
+              <div class="sub-field-head">
+                <div class="sub-field-name">
+                  <span v-if="record.child.required !== false" class="req">*</span>
+                  {{ record.name }}
                 </div>
-                <div v-if="isManualJudgeField(record.child)" class="manual-judgment-row">
-                  <span class="manual-label">本项结论</span>
-                  <a-select
-                    :value="childJudgment(record) || undefined"
-                    size="small"
-                    allow-clear
-                    placeholder="合格/不合格/让步合格"
-                    :options="listManualJudgmentSelectOptions(record.child)"
-                    style="flex: 1; min-width: 0"
-                    @update:value="(v) => onChildJudgment(record.code, record.child, v)"
-                  />
-                </div>
+                <a-tag v-if="record.judge === 'pass'" color="success">合格</a-tag>
+                <a-tag v-else-if="record.judge === 'fail'" color="error">不合格</a-tag>
+                <span v-else class="judge-placeholder">待判定</span>
               </div>
-            </template>
-            <template v-else-if="column.key === 'judge'">
-              <a-tag v-if="record.judge === 'pass'" color="success">合格</a-tag>
-              <a-tag v-else-if="record.judge === 'fail'" color="error">不合格</a-tag>
-              <span v-else class="muted">—</span>
-            </template>
-            <template v-else>{{ record[column.dataIndex] }}</template>
-          </template>
-        </a-table>
+              <div class="sub-field-standard">
+                {{ buildStandardText(record.child) || '未设置合格标准（仅记录）' }}
+              </div>
+              <div class="field-input-wrap">
+                <span
+                  v-if="record.unit && record.child.unitPosition === 'prefix'"
+                  class="unit-affix"
+                  >{{ record.unit }}</span
+                >
+                <a-input-number
+                  v-if="record.child.type === 'number'"
+                  :value="childMeasured(record)"
+                  size="middle"
+                  style="flex: 1; min-width: 0"
+                  :placeholder="`请输入${record.name}`"
+                  @update:value="(v) => onChildMeasured(record.code, record.child, v)"
+                />
+                <a-select
+                  v-else-if="record.child.type === 'radio'"
+                  :value="childMeasured(record)"
+                  size="middle"
+                  allow-clear
+                  style="flex: 1; min-width: 0"
+                  :placeholder="`请选择${record.name}`"
+                  :options="radioOpts(record.child)"
+                  @update:value="(v) => onChildMeasured(record.code, record.child, v)"
+                />
+                <a-select
+                  v-else-if="record.child.type === 'checkbox'"
+                  :value="asArray(childMeasured(record))"
+                  mode="multiple"
+                  size="middle"
+                  allow-clear
+                  style="flex: 1; min-width: 0"
+                  :placeholder="`请选择${record.name}`"
+                  :options="radioOpts(record.child)"
+                  @update:value="(v) => onChildMeasured(record.code, record.child, v)"
+                />
+                <a-input
+                  v-else-if="record.child.type === 'date' || record.child.type === 'datetime'"
+                  :value="childMeasured(record)"
+                  size="middle"
+                  style="flex: 1; min-width: 0"
+                  :placeholder="
+                    record.child.type === 'datetime' ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd'
+                  "
+                  @update:value="(v) => onChildMeasured(record.code, record.child, v)"
+                />
+                <a-textarea
+                  v-else-if="record.child.type === 'textarea'"
+                  :value="childMeasured(record)"
+                  :rows="2"
+                  allow-clear
+                  style="flex: 1; min-width: 0"
+                  :placeholder="`请输入${record.name}`"
+                  @update:value="(v) => onChildMeasured(record.code, record.child, v)"
+                />
+                <a-input
+                  v-else
+                  :value="childMeasured(record)"
+                  size="middle"
+                  allow-clear
+                  style="flex: 1; min-width: 0"
+                  :placeholder="`请输入${record.name}`"
+                  @update:value="(v) => onChildMeasured(record.code, record.child, v)"
+                />
+                <span
+                  v-if="record.unit && record.child.unitPosition !== 'prefix'"
+                  class="unit-affix"
+                  >{{ record.unit }}</span
+                >
+              </div>
+              <div v-if="isManualJudgeField(record.child)" class="manual-judgment-row">
+                <span class="manual-label"><span class="req">*</span>本项结论</span>
+                <a-select
+                  :value="childJudgment(record) || undefined"
+                  size="middle"
+                  allow-clear
+                  placeholder="请选择本项结论"
+                  :options="listManualJudgmentSelectOptions(record.child)"
+                  style="flex: 1; min-width: 0"
+                  @update:value="(v) => onChildJudgment(record.code, record.child, v)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
         <div v-if="parentJudge === 'pass'" class="group-tip ok">
           整组判定：合格 — 可自动判定的子项均达标
         </div>
@@ -133,7 +136,7 @@
           :columns="matrixColumns"
           :data-source="matrixRows"
           :pagination="false"
-          size="small"
+          size="middle"
           bordered
           row-key="_key"
         >
@@ -151,14 +154,14 @@
               <a-input-number
                 v-if="colMeta(column.dataIndex)?.valueType !== 'text'"
                 :value="record[column.dataIndex]"
-                size="small"
+                size="middle"
                 style="width: 100%"
                 @update:value="(v) => onMatrixCell(index, column.dataIndex, v)"
               />
               <a-input
                 v-else
                 :value="record[column.dataIndex]"
-                size="small"
+                size="middle"
                 style="width: 100%"
                 @update:value="(v) => onMatrixCell(index, column.dataIndex, v)"
               />
@@ -217,17 +220,10 @@ const parentJudge = computed(() => evaluateComplexOrSimpleField(props.field, loc
 const expandLabel = computed(() => {
   if (isCompositeField(props.field)) {
     const n = (props.field.children || []).length
-    return `展开 ${n} 个子项录入`
+    return `展开 ${n} 个子项`
   }
-  return '展开多点测点录入'
+  return '展开多点测点'
 })
-
-const compositeColumns = [
-  { title: '子项', dataIndex: 'name', width: 140 },
-  { title: '判定标准', key: 'standard', width: 130 },
-  { title: '实测值 / 结论', key: 'value', width: 260 },
-  { title: '判定', key: 'judge', width: 90 },
-]
 
 const compositeRows = computed(() => {
   const childrenMap = localValue.value?.children || {}
@@ -353,10 +349,10 @@ function addMatrixRow() {
 <style lang="less" scoped>
 .complex-inspect-block {
   grid-column: 1 / -1;
-  padding: 10px 12px;
+  padding: 14px 16px;
   background: #fff;
-  border: 1px solid #e8e8e8;
-  border-radius: 6px;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
 }
 
 .complex-head {
@@ -367,11 +363,12 @@ function addMatrixRow() {
 }
 
 .complex-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -380,52 +377,121 @@ function addMatrixRow() {
 }
 
 .complex-body {
-  margin-top: 10px;
+  margin-top: 12px;
+}
+
+.sub-field-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 1280px) {
+  .sub-field-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .sub-field-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sub-field-row {
+  padding: 12px 14px;
+  background: #fafbfc;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+  min-width: 0;
+}
+
+.sub-field-row.is-pass {
+  border-color: #b7eb8f;
+  background: #f6ffed;
+}
+
+.sub-field-row.is-fail {
+  border-color: #ffa39e;
+  background: #fff2f0;
+}
+
+.sub-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sub-field-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  line-height: 22px;
+}
+
+.sub-field-standard {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
+}
+
+.judge-placeholder {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.25);
 }
 
 .field-input-wrap {
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-.child-value-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .manual-judgment-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .manual-label {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: rgba(0, 0, 0, 0.65);
   white-space: nowrap;
 }
 
 .unit-affix {
+  flex-shrink: 0;
   color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
+  min-width: 28px;
 }
 
 .group-tip {
-  margin-top: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
   font-size: 12px;
   line-height: 1.4;
 }
 
 .group-tip.ok {
   color: #389e0d;
+  background: #f6ffed;
 }
 
 .group-tip.fail {
   color: #cf1322;
+  background: #fff2f0;
 }
 
 .rated {

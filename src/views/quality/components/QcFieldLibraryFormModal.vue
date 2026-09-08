@@ -39,10 +39,11 @@ export default { name: 'QcFieldLibraryFormModal' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
+import { useTabs } from '@/composables/useTabs'
 import {
   addQcLibraryField,
   ensureQcLibraryDemoSeed,
@@ -72,9 +73,14 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'saved'])
 const route = useRoute()
+const router = useRouter()
+const { openTab, closeTab } = useTabs()
 
 const saving = ref(false)
 const form = reactive(emptyForm())
+
+const returnTo = computed(() => String(route.query.returnTo || '').trim())
+const returnTitle = computed(() => String(route.query.returnTitle || '').trim())
 
 const editingId = computed(() => {
   if (props.editRecord?.id) return props.editRecord.id
@@ -86,6 +92,21 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
   listPath: '/quality/qc-field-library',
   getTitle: () => (isEdit.value ? '编辑检验项' : '新增检验项'),
 })
+
+/** 从质检模板跳转新建时：保存后回到模板并带入字段 */
+function finishAfterSave(field) {
+  emit('saved', field)
+  if (props.pageMode && returnTo.value && !isEdit.value && field?.id) {
+    const resolved = router.resolve(returnTo.value)
+    const nextQuery = { ...resolved.query, injectFieldId: field.id }
+    const fullPath = router.resolve({ path: resolved.path, query: nextQuery }).fullPath
+    closeTab(route.path)
+    openTab(fullPath, returnTitle.value || undefined)
+    router.push({ path: resolved.path, query: nextQuery })
+    return
+  }
+  closeAfterSave()
+}
 
 function emptyForm() {
   return {
@@ -230,7 +251,7 @@ function handleSave() {
     return
   }
   if (!String(form.name || '').trim()) {
-    message.warning(form.type === 'composite' ? '请输入父项名称' : '请输入字段名称')
+    message.warning(form.type === 'composite' ? '请输入父项名称' : '请输入指标名称')
     return
   }
   if (form.withUnit && !String(form.unit || '').trim()) {
@@ -298,8 +319,7 @@ function handleSave() {
       return
     }
     message.success(isEdit.value ? '检验项已更新' : `已创建 ${res.field.code}`)
-    emit('saved', res.field)
-    closeAfterSave()
+    finishAfterSave(res.field)
   } finally {
     saving.value = false
   }

@@ -1,7 +1,7 @@
 <template>
   <a-modal
     :open="open"
-    title="模板冲突"
+    :title="title"
     :width="kind === 'global' ? 520 : 720"
     :mask-closable="false"
     destroy-on-close
@@ -11,9 +11,11 @@
     <div class="conflict-head">
       <ExclamationCircleFilled class="warn-icon" />
       <div>
-        <div class="conflict-title">检测到模板冲突</div>
+        <div class="conflict-title">检测到{{ entityLabel }}冲突</div>
         <div v-if="kind === 'global'" class="conflict-desc">
-          系统已存在生效的全局模板，是否确认用当前模板替换原有全局模板？
+          系统已存在生效的全局{{ entityLabel }}，是否确认用当前{{ entityLabel }}替换原有全局{{
+            entityLabel
+          }}？
         </div>
         <div v-else class="conflict-desc">{{ listHint }}</div>
       </div>
@@ -65,6 +67,8 @@ const props = defineProps({
   kind: { type: String, default: 'single' },
   conflicts: { type: Array, default: () => [] },
   currentTemplateName: { type: String, default: '' },
+  title: { type: String, default: '模板冲突' },
+  entityLabel: { type: String, default: '模板' },
 })
 
 const emit = defineEmits(['update:open', 'confirm', 'cancel'])
@@ -82,20 +86,20 @@ const isCategory = computed(() => props.kind === QC_TEMPLATE_SCOPE_TYPE.CATEGORY
 
 const listHint = computed(() =>
   isCategory.value
-    ? '本次模板中，以下产品类别已关联其他生效的类别模板：'
-    : '本次模板中，以下产品型号已关联其他生效的单产品模板：',
+    ? `本次${props.entityLabel}中，以下产品类别已关联其他生效的类别${props.entityLabel}：`
+    : `本次${props.entityLabel}中，以下产品型号已关联其他生效的单产品${props.entityLabel}：`,
 )
 
 const replaceHint = computed(() =>
   isCategory.value
-    ? '以上类别的生效模板将由旧模板替换为当前模板。原模板保留但自动解除对应类别绑定；若绑定清空则停用。'
-    : '将以上产品的生效模板替换为本次操作模板，原模板保留但自动停用对应产品的绑定关系。',
+    ? `以上类别的生效${props.entityLabel}将由旧${props.entityLabel}替换为当前${props.entityLabel}。原${props.entityLabel}保留但自动解除对应类别绑定；若绑定清空则停用。`
+    : `将以上产品的生效${props.entityLabel}替换为本次操作${props.entityLabel}，原${props.entityLabel}保留但自动停用对应产品的绑定关系。`,
 )
 
 const skipHint = computed(() =>
   isCategory.value
-    ? '跳过冲突类别：仅为无冲突的类别启用当前模板，冲突类别维持原有模板不变。'
-    : '跳过冲突产品：仅为无冲突的产品启用模板，冲突产品维持原有模板不变。',
+    ? `跳过冲突类别：仅为无冲突的类别启用当前${props.entityLabel}，冲突类别维持原有${props.entityLabel}不变。`
+    : `跳过冲突产品：仅为无冲突的产品启用${props.entityLabel}，冲突产品维持原有${props.entityLabel}不变。`,
 )
 
 const columns = computed(() => {
@@ -103,15 +107,15 @@ const columns = computed(() => {
     return [
       { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
       { title: '产品类别', dataIndex: 'objectLabel', ellipsis: true },
-      { title: '当前生效模板', dataIndex: 'currentTemplateName', ellipsis: true },
-      { title: '本次操作模板', key: 'current', ellipsis: true },
+      { title: `当前生效${props.entityLabel}`, dataIndex: 'currentTemplateName', ellipsis: true },
+      { title: `本次操作${props.entityLabel}`, key: 'current', ellipsis: true },
     ]
   }
   return [
     { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
     { title: '产品信息', dataIndex: 'objectLabel', ellipsis: true },
-    { title: '当前生效模板', dataIndex: 'currentTemplateName', ellipsis: true },
-    { title: '本次操作模板', key: 'current', ellipsis: true },
+    { title: `当前生效${props.entityLabel}`, dataIndex: 'currentTemplateName', ellipsis: true },
+    { title: `本次操作${props.entityLabel}`, key: 'current', ellipsis: true },
   ]
 })
 

@@ -1,10 +1,13 @@
 import { productBomState } from '@/store/productBomStore'
 import { isBomActive, isBomPending } from '@/mock/productBomOptions'
+import { isShipBomType } from '@/mock/bomMaterialColumns'
 
-/** 解析产品/物料对应的 BOM 维护入口 */
+/** 解析产品/物料对应的 BOM 维护入口（不含随货附件） */
 export function resolveItemBomNavigation(itemType, itemId) {
   void productBomState.boms
-  const boms = productBomState.boms.filter((b) => b.itemType === itemType && b.itemId === itemId)
+  const boms = productBomState.boms.filter(
+    (b) => b.itemType === itemType && b.itemId === itemId && !isShipBomType(b.bomType),
+  )
   const draft = boms.find((b) => isBomPending(b))
   if (draft) {
     return {

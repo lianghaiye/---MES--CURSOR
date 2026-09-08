@@ -57,12 +57,47 @@ function createBom(index) {
 
 export const mockProductBoms = Array.from({ length: 303 }, (_, i) => createBom(i))
 
+import { isShipBomType } from '@/mock/bomMaterialColumns'
+import { isShipAttachmentEnabled, normalizeShipAttachmentScope } from '@/utils/shipAttachmentScope'
+
 export function filterProductBoms(list, filters) {
   return list.filter((item) => {
+    if (filters.onlyShip && !isShipBomType(item.bomType)) return false
+    if (filters.excludeShip && isShipBomType(item.bomType)) return false
     if (filters.bomNo && !item.bomNo.includes(filters.bomNo)) return false
     if (filters.bomName && !item.bomName.includes(filters.bomName)) return false
-    if (filters.itemId && item.itemId !== filters.itemId) return false
-    if (filters.status && item.status !== filters.status) return false
+    if (filters.itemId) {
+      if (isShipBomType(item.bomType)) {
+        const applicable = Array.isArray(item.applicableProductIds) ? item.applicableProductIds : []
+        if (
+          !applicable.map(String).includes(String(filters.itemId)) &&
+          String(item.itemId) !== String(filters.itemId)
+        ) {
+          return false
+        }
+      } else if (item.itemId !== filters.itemId) {
+        return false
+      }
+    }
+    if (filters.onlyShip && filters.scopeType) {
+      const scope = normalizeShipAttachmentScope(item)
+      if (scope.scopeType !== filters.scopeType) return false
+    }
+    if (filters.status) {
+      if (filters.onlyShip) {
+        if (filters.status === '启用' && !isShipAttachmentEnabled(item)) return false
+        else if (filters.status === '停用' && isShipAttachmentEnabled(item)) return false
+        else if (
+          filters.status !== '启用' &&
+          filters.status !== '停用' &&
+          item.status !== filters.status
+        ) {
+          return false
+        }
+      } else if (item.status !== filters.status) {
+        return false
+      }
+    }
     if (filters.specModel && !(item.specModel || '').includes(filters.specModel)) return false
     if (filters.material && !(item.material || '').includes(filters.material)) return false
     if (filters.drawingNo && !(item.drawingNo || '').includes(filters.drawingNo)) return false

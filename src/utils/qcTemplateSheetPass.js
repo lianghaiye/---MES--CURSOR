@@ -23,18 +23,18 @@ export const QC_TEMPLATE_SHEET_PASS_RULE = {
 export const QC_TEMPLATE_SHEET_PASS_RULE_OPTIONS = [
   {
     value: QC_TEMPLATE_SHEET_PASS_RULE.MANUAL,
-    label: '仍人工判定',
-    desc: '整单结论以「质检结果」为准；未达标仅提示，不强制拦截。',
+    label: '人工判定',
+    desc: '整单结论由质检员从本模板配置的结论选项中选择（可含特采等）；检验项未达标仅提示，不强制拦截。',
   },
   {
     value: QC_TEMPLATE_SHEET_PASS_RULE.ALL_PASS,
     label: '全部达标才通过',
-    desc: '凡配置了合格标准的检验项均须达标，才允许判定「质检通过」。',
+    desc: '系统按检验项自动给出整单结论：凡配置了合格标准的项全部达标则为「合格」，任一未达标则为「不合格」。',
   },
   {
     value: QC_TEMPLATE_SHEET_PASS_RULE.KEY_FIELDS,
     label: '关键项必须达标',
-    desc: '勾选为关键项的检验项必须达标，才允许判定「质检通过」。',
+    desc: '系统按关键项自动给出整单结论：勾选的关键项全部达标则为「合格」，任一未达标则为「不合格」。',
   },
 ]
 
@@ -50,11 +50,17 @@ export function normalizeSheetPassRule(rule) {
   return QC_TEMPLATE_SHEET_PASS_RULE.MANUAL
 }
 
+/** 是否由系统自动给出整单结论（非人工选择） */
+export function isAutoSheetConclusionRule(rule) {
+  const r = normalizeSheetPassRule(rule)
+  return r === QC_TEMPLATE_SHEET_PASS_RULE.ALL_PASS || r === QC_TEMPLATE_SHEET_PASS_RULE.KEY_FIELDS
+}
+
 export function sheetPassRuleLabel(rule) {
   const hit = QC_TEMPLATE_SHEET_PASS_RULE_OPTIONS.find(
     (o) => o.value === normalizeSheetPassRule(rule),
   )
-  return hit?.label || '仍人工判定'
+  return hit?.label || '人工判定'
 }
 
 export function sheetPassRuleDesc(rule) {
@@ -64,7 +70,7 @@ export function sheetPassRuleDesc(rule) {
   return hit?.desc || ''
 }
 
-/** 参与整单规则判定的检验项（排除方式/数量/结论） */
+/** 参与整单规则判定的检验项（排除方式/数量/备注/结论） */
 export function listSheetPassCandidateFields(fields = []) {
   return (fields || []).filter(
     (f) =>
@@ -72,7 +78,14 @@ export function listSheetPassCandidateFields(fields = []) {
       f.code &&
       !isQcInspectMethodField(f) &&
       !isQcInspectQtyField(f) &&
-      !isQcConclusionField(f),
+      !isQcConclusionField(f) &&
+      String(f.code || '')
+        .trim()
+        .toUpperCase() !== 'QC_INSPECT_REMARK' &&
+      String(f.code || '')
+        .trim()
+        .toUpperCase() !== 'QC_FIELD_REMARK' &&
+      String(f.name || '').trim() !== '检验备注',
   )
 }
 
@@ -107,6 +120,122 @@ function resolveValueMap(line = {}) {
     if (code) valueMap[code] = v.value ?? v.fieldValue
   })
   return valueMap
+}
+
+function pickAutoConclusionLabels(optionItems = []) {
+  const items = Array.isArray(optionItems) ? optionItems : []
+  const pass =
+    items.find(
+      (o) => o?.result === QC_TASK_RESULT.PASS && String(o.value || '').trim() === '合格',
+    ) || items.find((o) => o?.result === QC_TASK_RESULT.PASS)
+  const fail = items.find((o) => o?.result === QC_TASK_RESULT.FAIL)
+  return {
+    passLabel: String(pass?.value || '合格').trim() || '合格',
+    failLabel: String(fail?.value || '不合格').trim() || '不合格',
+  }
+}
+
+/**
+ * 按「全部达标 / 关键项达标」自动给出整单结论。
+ * @returns {{
+ *   auto: boolean,
+ *   status: 'manual'|'pending'|'pass'|'fail'|'unavailable',
+ *   value: string,
+ *   mappedResult: string,
+ *   reason: string,
+ *   failHints: string[],
+ * }}
+ */
+export function resolveAutoSheetConclusion(
+  line = {},
+  fields = [],
+  sheetPassRule,
+  optionItems = [],
+) {
+  const rule = normalizeSheetPassRule(sheetPassRule)
+  if (!isAutoSheetConclusionRule(rule)) {
+    return {
+      auto: false,
+      status: 'manual',
+      value: '',
+      mappedResult: '',
+      reason: '',
+      failHints: [],
+    }
+  }
+
+  const { passLabel, failLabel } = pickAutoConclusionLabels(optionItems)
+  const enforced = listSheetPassEnforcedFields(fields, rule)
+
+  if (rule === QC_TEMPLATE_SHEET_PASS_RULE.KEY_FIELDS && !enforced.length) {
+    return {
+      auto: true,
+      status: 'unavailable',
+      value: '',
+      mappedResult: '',
+      reason: '模板未勾选关键项，无法自动判定',
+      failHints: [],
+    }
+  }
+
+  if (!enforced.length) {
+    return {
+      auto: true,
+      status: 'pending',
+      value: '',
+      mappedResult: '',
+      reason: '暂无可自动判定的检验项，请先录入带合格标准的项目',
+      failHints: [],
+    }
+  }
+
+  const valueMap = resolveValueMap(line)
+  const item = line.itemName || line.itemCode || '明细'
+  const failHints = []
+  let pending = false
+
+  enforced.forEach((field) => {
+    const raw = valueMap[field.code]
+    const judge = isComplexField(field)
+      ? evaluateComplexOrSimpleField(field, raw)
+      : evaluateFieldAgainstStandard(field, raw)
+    if (judge === 'fail') {
+      failHints.push(`${item} · ${field.name || field.code}`)
+      return
+    }
+    if (judge !== 'pass') pending = true
+  })
+
+  if (failHints.length) {
+    return {
+      auto: true,
+      status: 'fail',
+      value: failLabel,
+      mappedResult: QC_TASK_RESULT.FAIL,
+      reason: `存在未达标项，系统判定为「${failLabel}」`,
+      failHints,
+    }
+  }
+
+  if (pending) {
+    return {
+      auto: true,
+      status: 'pending',
+      value: '',
+      mappedResult: '',
+      reason: '检验项尚未全部录入完成，结论待自动判定',
+      failHints: [],
+    }
+  }
+
+  return {
+    auto: true,
+    status: 'pass',
+    value: passLabel,
+    mappedResult: QC_TASK_RESULT.PASS,
+    reason: `按「${sheetPassRuleLabel(rule)}」，系统判定为「${passLabel}」`,
+    failHints: [],
+  }
 }
 
 /**

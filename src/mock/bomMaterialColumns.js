@@ -7,7 +7,7 @@ export const defaultBomColumnSettings = [
   { key: 'variantAttr', title: '变体属性', hidden: false, frozen: false, order: 4 },
   { key: 'drawingNo', title: '图号', hidden: false, frozen: false, order: 5 },
   { key: 'unitQty', title: '单位用量', hidden: false, frozen: false, order: 6 },
-  { key: 'blankSizeText', title: '下料尺寸', hidden: false, frozen: false, order: 7 },
+  { key: 'blankSizeText', title: '下料尺寸', hidden: true, frozen: false, order: 7 },
   { key: 'unit', title: '库存单位', hidden: false, frozen: false, order: 8 },
   { key: 'supplyForm', title: '供应型态', hidden: false, frozen: false, order: 9 },
   { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 10 },
@@ -59,13 +59,15 @@ export const bomTypeOptions = [
   BOM_TYPE.SHIP,
 ]
 
-export const bomTypeSelectOptions = bomTypeOptions.map((v) => ({ label: v, value: v }))
+export const bomTypeSelectOptions = bomTypeOptions.map((v) => ({
+  label: v === BOM_TYPE.SHIP ? '随货附件' : v,
+  value: v,
+}))
 
-/** 产品 BOM 创建页可选类型（不含订单/配置等特殊类型） */
+/** 产品 BOM 创建页可选类型（不含订单/配置/随货附件） */
 export const productBomCreateTypeOptions = [
   { label: BOM_TYPE.PRODUCT, value: BOM_TYPE.PRODUCT },
   { label: BOM_TYPE.BASELINE, value: BOM_TYPE.BASELINE },
-  { label: `${BOM_TYPE.SHIP}（可多产品共用）`, value: BOM_TYPE.SHIP },
 ]
 
 /** 历史「基础BOM」归一为基准 BOM（族模板） */

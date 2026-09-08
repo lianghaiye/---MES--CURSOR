@@ -20,12 +20,12 @@
           <template v-else>
             <div class="version-row">
               <span class="row-label">变更来源：</span>
-              <a v-if="item.ecnNo" class="link-code">{{ item.ecnNo }}</a>
-              <span v-else>—</span>
+              <a v-if="item.changeSourceIsEcn && item.ecnNo" class="link-code">{{ item.ecnNo }}</a>
+              <span v-else>{{ item.changeSource || '—' }}</span>
             </div>
             <div class="version-row">
               <span class="row-label">变更内容：</span>
-              <span>{{ item.changeSummary || '—' }}</span>
+              <span class="change-summary">{{ item.changeSummary || '—' }}</span>
             </div>
             <div class="version-row">
               <span class="row-label">执行人：</span>
@@ -164,6 +164,11 @@ function emitCompare(item) {
   color: #262626;
   font-weight: 500;
   flex-shrink: 0;
+}
+
+.change-summary {
+  min-width: 0;
+  word-break: break-word;
 }
 
 .initial-note {

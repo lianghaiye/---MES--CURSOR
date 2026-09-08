@@ -52,6 +52,8 @@ import { useRouter } from 'vue-router'
 import { findChildBomReferenceRows, findParentBomReferenceRows } from '@/utils/bomRelation'
 import { bomStatusColor } from '@/mock/productBomOptions'
 import { useTabs } from '@/composables/useTabs'
+import { getProductBomById } from '@/store/productBomStore'
+import { bomWorkspaceDetailPath } from '@/utils/shipAttachmentNav'
 
 const props = defineProps({
   open: Boolean,
@@ -116,12 +118,10 @@ function handleClose() {
 
 function openBomDetail(record) {
   if (!record.bomId) return
-  const resolved = router.resolve({
-    name: 'product-process-bom-detail',
-    params: { id: record.bomId },
-  })
-  openTab(resolved.path, record.bomName || 'BOM详情')
-  router.push(resolved)
+  const bom = getProductBomById(record.bomId)
+  const path = bom ? bomWorkspaceDetailPath(bom) : `/product-process/bom/${record.bomId}`
+  openTab(path, record.bomName || 'BOM详情')
+  router.push(path)
 }
 </script>
 

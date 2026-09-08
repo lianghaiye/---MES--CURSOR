@@ -19,7 +19,7 @@ function resolveStock(warehouse, code) {
   }
 }
 
-/** 产品是否配置了生效发运 BOM */
+/** 产品是否配置了已启用随货附件 */
 export function productHasShipBom(productId) {
   if (productId == null || productId === '') return false
   return Boolean(getActiveShipBomForProduct(productId))

@@ -1,4 +1,5 @@
 import { ECN_CHANGE_ITEM_TYPE } from '@/constants/ecn'
+import { BOM_CHANGE_SOURCE_TYPE } from '@/constants/bomChangeSource'
 import {
   getProductBomById,
   getActiveBomForItem,
@@ -122,6 +123,8 @@ export function executeEcnBomVersionUpgrade(ecnRecord = {}, operator = '张工')
   Object.assign(saveRes.record, {
     sourceEcnNo: ecnRecord.ecnNo || '',
     sourceEcnId: ecnRecord.id || '',
+    changeSourceType: BOM_CHANGE_SOURCE_TYPE.ECN,
+    changeSourceLabel: '',
     changeSummary,
     upgradedBy: operator,
     upgradedAt: enableRes.effectiveAt || enableRes.updatedAt,

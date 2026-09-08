@@ -28,11 +28,11 @@
         </a-col>
         <template v-if="indicatorKind === 'basic'">
           <a-col :span="6">
-            <a-form-item label="字段名称" required>
+            <a-form-item label="指标名称" required>
               <a-input
                 :value="model.name"
                 allow-clear
-                placeholder="请输入字段名称"
+                placeholder="请输入指标名称"
                 @update:value="(v) => update('name', v)"
               />
             </a-form-item>
@@ -414,7 +414,9 @@
                   + 添加选项
                 </a-button>
                 <div class="option-map-hint">
-                  默认三项文案可改、不可删除；可追加选项。映射仅支持质检通过 / 质检不通过。
+                  「合格 /
+                  不合格」文案可改、不可删除；「让步合格」可删。可追加选项。映射仅支持质检通过 /
+                  质检不通过。
                 </div>
               </div>
             </a-form-item>
@@ -520,7 +522,8 @@
               </div>
               <a-button type="link" size="small" @click="addManualOption">+ 添加选项</a-button>
               <div class="option-map-hint">
-                默认三项文案可改、不可删除；可追加选项。映射仅支持质检通过 /
+                「合格 /
+                不合格」文案可改、不可删除；「让步合格」可删。可追加选项。映射仅支持质检通过 /
                 质检不通过。可勾选默认。
               </div>
             </div>

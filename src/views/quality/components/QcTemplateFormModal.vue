@@ -108,7 +108,8 @@
           <div>
             <h4>模板字段</h4>
             <div class="fields-hint">
-              系统字段：质检方式、质检数量、质检结果（类型「系统」，不可删除）。自定义字段可从「检验项库」批量选用，或点「新增检验项」在新标签页创建入库后再选用。全部字段均可拖拽排序；新增字段时方式/数量置顶、结果置底，拖动后以你调整的顺序为准。
+              模板字段由用户自行配置：可从「检验项库」选用系统默认项（质检方式、质检数量、检验备注）及其他检验项，或点「新增检验项」创建。「人工判定」时在下方配置结论选项；「全部达标
+              / 关键项达标」由系统自动给出合格/不合格。字段均可拖拽排序、删除。
             </div>
           </div>
           <a-space size="small">
@@ -121,9 +122,9 @@
         </div>
 
         <a-table
-          v-if="form.fields.length"
+          v-if="displayFields.length"
           :columns="fieldColumns"
-          :data-source="form.fields"
+          :data-source="displayFields"
           :row-key="fieldRowKey"
           size="small"
           bordered
@@ -151,7 +152,7 @@
             </template>
             <template v-else-if="column.key === 'keyForSheetPass'">
               <a-checkbox
-                v-if="!isQcSystemFixedField(record)"
+                v-if="canMarkKeyForSheetPass(record)"
                 :checked="Boolean(record.keyForSheetPass)"
                 :disabled="form.sheetPassRule !== 'keyFields'"
                 @change="(e) => (record.keyForSheetPass = e.target.checked)"
@@ -159,30 +160,18 @@
               <span v-else class="muted">—</span>
             </template>
             <template v-else-if="column.key === 'fieldKind'">
-              <a-tag v-if="isQcSystemFixedField(record)" color="blue">系统</a-tag>
+              <a-tag
+                v-if="isQcSystemLibraryField(record) || isQcConclusionField(record)"
+                color="blue"
+              >
+                系统
+              </a-tag>
               <a-tag v-else color="default">自定义</a-tag>
-            </template>
-            <template v-else-if="column.key === 'enabled'">
-              <a-switch
-                v-if="isQcConclusionField(record)"
-                :checked="record.enabled !== false"
-                size="small"
-                checked-children="启用"
-                un-checked-children="关闭"
-                @change="(v) => (record.enabled = v)"
-              />
-              <span v-else class="muted">—</span>
             </template>
             <template v-else-if="column.key === 'action'">
               <a-space :size="0">
-                <a-button type="link" size="small" @click="openFieldModal(index)">编辑</a-button>
-                <a-button
-                  v-if="!isQcSystemFixedField(record)"
-                  type="link"
-                  size="small"
-                  danger
-                  @click="removeField(index)"
-                >
+                <a-button type="link" size="small" @click="openFieldModal(record)">编辑</a-button>
+                <a-button type="link" size="small" danger @click="removeField(record)">
                   删除
                 </a-button>
               </a-space>
@@ -218,7 +207,50 @@
           </div>
         </a-radio-group>
         <div v-if="form.sheetPassRule === 'keyFields'" class="sheet-pass-key-tip">
-          请在上方字段表「关键项」列勾选需强制达标的检验项（系统字段不可勾选）。
+          请在上方字段表「关键项」列勾选需强制达标的检验项（方式/数量/备注不可勾选）。录入时系统按关键项自动给出合格/不合格，无需手选。
+        </div>
+        <div v-if="form.sheetPassRule === 'allPass'" class="sheet-pass-key-tip">
+          录入时系统按检验项达标情况自动给出合格/不合格，无需质检员手选结论。
+        </div>
+        <div v-if="form.sheetPassRule === 'manual'" class="sheet-conclusion-options">
+          <div class="sheet-conclusion-label">结论选项（含结果映射）</div>
+          <div class="manual-options-panel">
+            <div
+              v-for="(item, i) in form.sheetConclusionOptionItems"
+              :key="i"
+              class="option-row manual-opt"
+            >
+              <a-input v-model:value="item.value" placeholder="选项文案" class="manual-opt-label" />
+              <a-select
+                v-model:value="item.result"
+                placeholder="对应质检结果"
+                class="manual-opt-result"
+                :options="conclusionResultOpts"
+              />
+              <a-checkbox
+                :checked="Boolean(item.isDefault)"
+                @change="(e) => setSheetConclusionDefault(i, e.target.checked)"
+              >
+                默认
+              </a-checkbox>
+              <a-button
+                type="text"
+                danger
+                size="small"
+                :disabled="isLockedConclusionOption(item)"
+                @click="removeSheetConclusionOption(i)"
+              >
+                删除
+              </a-button>
+            </div>
+            <a-button type="link" size="small" @click="addSheetConclusionOption"
+              >+ 添加选项</a-button
+            >
+            <div class="option-map-hint">
+              「合格 / 不合格」文案可改、不可删除；「让步合格」可删。可追加选项。映射仅支持质检通过
+              / 质检不通过。可勾选默认。
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -261,42 +293,37 @@
         <a-form-item label="输入提示">
           <a-input v-model:value="fieldForm.placeholder" placeholder="请输入提示文案" />
         </a-form-item>
-        <a-form-item label="结论选项（含结果映射）">
-          <div
-            v-for="(item, i) in fieldForm.optionItems"
-            :key="i"
-            class="option-row conclusion-opt"
-          >
-            <a-input
-              v-model:value="item.value"
-              placeholder="选项文案"
-              :disabled="isLockedConclusionOption(item)"
-            />
-            <a-select
-              v-model:value="item.result"
-              placeholder="对应质检结果"
-              style="width: 132px; flex-shrink: 0"
-              :options="conclusionResultOpts"
-            />
-            <a-checkbox
-              :checked="Boolean(item.isDefault)"
-              @change="(e) => setConclusionDefault(i, e.target.checked)"
-            >
-              设为默认值
-            </a-checkbox>
-            <a-button
-              type="text"
-              danger
-              :disabled="isLockedConclusionOption(item)"
-              @click="removeConclusionOption(i)"
-            >
-              删除
-            </a-button>
-          </div>
-          <a-button type="link" size="small" @click="addConclusionOption">+ 添加选项</a-button>
-          <div class="option-map-hint">
-            预设「合格 / 不合格 /
-            让步合格」不可删除。映射仅支持质检通过、质检不通过。可勾选「设为默认值」。
+        <a-form-item label="结论选项（含结果映射）" required>
+          <div class="manual-options-panel">
+            <div v-for="(item, i) in fieldForm.optionItems" :key="i" class="option-row manual-opt">
+              <a-input v-model:value="item.value" placeholder="选项文案" class="manual-opt-label" />
+              <a-select
+                v-model:value="item.result"
+                placeholder="对应质检结果"
+                class="manual-opt-result"
+                :options="conclusionResultOpts"
+              />
+              <a-checkbox
+                :checked="Boolean(item.isDefault)"
+                @change="(e) => setConclusionDefault(i, e.target.checked)"
+              >
+                默认
+              </a-checkbox>
+              <a-button
+                type="text"
+                danger
+                size="small"
+                :disabled="isLockedConclusionOption(item)"
+                @click="removeConclusionOption(i)"
+              >
+                删除
+              </a-button>
+            </div>
+            <a-button type="link" size="small" @click="addConclusionOption">+ 添加选项</a-button>
+            <div class="option-map-hint">
+              与检验项「人工判定」一致：文案可改；「合格 /
+              不合格」不可删除，「让步合格」可删；可追加选项。映射质检通过 / 质检不通过。
+            </div>
           </div>
         </a-form-item>
       </a-form>
@@ -316,7 +343,7 @@ export default { name: 'QcTemplateFormModal' }
 </script>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onActivated, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, TreeSelect } from 'ant-design-vue'
 import { PlusOutlined, HolderOutlined } from '@ant-design/icons-vue'
@@ -325,6 +352,11 @@ import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { useTabs } from '@/composables/useTabs'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
+import {
+  saveCreatePageDraft,
+  loadCreatePageDraft,
+  isCreatePageBootstrapped,
+} from '@/utils/createPageDraft'
 import {
   QC_TEMPLATE_SCOPE_TYPE,
   qcTemplateBizScopeOptions,
@@ -335,14 +367,21 @@ import { materialCategoryTree } from '@/mock/materialCategories'
 import { addQcTemplate, getQcTemplateById, updateQcTemplate } from '@/store/qcTemplateStore'
 import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 import {
+  DEFAULT_CONCLUSION_OPTION_ITEMS,
   QC_CONCLUSION_RESULT_OPTIONS,
   createPresetConclusionField,
   ensureFieldsWithSystemFixedItems,
+  extractSheetConclusionOptionItems,
   insertFieldBeforeConclusion,
   isLockedConclusionOption,
   isQcConclusionField,
-  isQcSystemFixedField,
+  isQcInspectMethodField,
+  isQcInspectQtyField,
+  isQcInspectRemarkField,
+  isQcSystemLibraryField,
   normalizeConclusionOptionItems,
+  normalizeSheetConclusionOptionItems,
+  upsertSheetConclusionField,
   validateConclusionOptionItems,
 } from '@/utils/qcConclusionField'
 import { buildBomSubItemPickerRows, filterBomSubItemPickerRows } from '@/utils/bomSubItemPicker'
@@ -399,6 +438,9 @@ const editingId = ref('')
 const templateStatus = ref('停用')
 const itemPickerOpen = ref(false)
 const itemSearchKeyword = ref('')
+/** 页面模式：跨「新增检验项」往返时用草稿恢复表单 */
+const TEMPLATE_DRAFT_PATH = '/quality/qc-template/new'
+const formBootstrapped = ref(false)
 const conflictOpen = ref(false)
 const conflictKind = ref('single')
 const conflictRows = ref([])
@@ -438,9 +480,13 @@ const form = reactive({
   objects: [],
   fields: [],
   sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.MANUAL,
+  sheetConclusionOptionItems: DEFAULT_CONCLUSION_OPTION_ITEMS.map((o) => ({ ...o })),
 })
 
 const sheetPassRuleOpts = QC_TEMPLATE_SHEET_PASS_RULE_OPTIONS
+
+/** 表格不展示整单结论字段（由下方「人工判定」结论选项配置，保存时自动同步） */
+const displayFields = computed(() => (form.fields || []).filter((f) => !isQcConclusionField(f)))
 
 const fieldForm = reactive(emptyFieldForm())
 
@@ -601,7 +647,6 @@ const fieldColumns = computed(() => {
     { title: '字段名称', dataIndex: 'name', width: 120 },
     { title: '字段类型', key: 'type', width: 90 },
     { title: '类型', key: 'fieldKind', width: 80, align: 'center' },
-    { title: '启用', key: 'enabled', width: 90, align: 'center' },
     { title: '必填', key: 'required', width: 56, align: 'center' },
     { title: '单位', key: 'unit', width: 88 },
     { title: '合格标准', key: 'standard', width: 140, ellipsis: true },
@@ -661,16 +706,19 @@ function onFieldDrop(index, e) {
   dragOverFieldIndex.value = null
   dragFieldIndex.value = null
   if (from == null || from === index) return
-  const list = form.fields.map((f) => ({
+  const visible = displayFields.value.map((f) => ({
     ...f,
     options: f.options ? [...f.options] : [],
     optionItems: f.optionItems ? f.optionItems.map((o) => ({ ...o })) : undefined,
     optionResults: f.optionResults ? { ...f.optionResults } : undefined,
   }))
-  const [item] = list.splice(from, 1)
-  list.splice(index, 0, item)
-  // 保留用户拖拽顺序，仅规范化系统项标记
-  form.fields = ensureFieldsWithSystemFixedItems(list, { layout: 'preserve' })
+  const conclusions = (form.fields || []).filter((f) => isQcConclusionField(f))
+  const [item] = visible.splice(from, 1)
+  visible.splice(index, 0, item)
+  // 保留用户拖拽顺序，仅规范化系统项标记；结论字段仍挂在末尾由整单规则管理
+  form.fields = ensureFieldsWithSystemFixedItems([...visible, ...conclusions], {
+    layout: 'preserve',
+  })
 }
 
 function onFieldDragEnd() {
@@ -781,6 +829,30 @@ function removeConclusionOption(index) {
   fieldForm.optionItems.splice(index, 1)
 }
 
+function addSheetConclusionOption() {
+  form.sheetConclusionOptionItems.push({
+    value: '',
+    result: QC_TASK_RESULT.PASS,
+    locked: false,
+    isDefault: false,
+  })
+}
+
+function setSheetConclusionDefault(index, checked) {
+  form.sheetConclusionOptionItems.forEach((row, i) => {
+    row.isDefault = checked && i === index
+  })
+}
+
+function removeSheetConclusionOption(index) {
+  const item = form.sheetConclusionOptionItems[index]
+  if (isLockedConclusionOption(item)) {
+    message.warning('「合格 / 不合格」不可删除')
+    return
+  }
+  form.sheetConclusionOptionItems.splice(index, 1)
+}
+
 function resetForm() {
   editingId.value = ''
   templateStatus.value = '停用'
@@ -789,7 +861,8 @@ function resetForm() {
   form.scopeType = QC_TEMPLATE_SCOPE_TYPE.GLOBAL
   form.objects = []
   form.sheetPassRule = QC_TEMPLATE_SHEET_PASS_RULE.MANUAL
-  form.fields = ensureFieldsWithSystemFixedItems([], { layout: 'default' })
+  form.sheetConclusionOptionItems = DEFAULT_CONCLUSION_OPTION_ITEMS.map((o) => ({ ...o }))
+  form.fields = []
 }
 
 function resolveScopeType(record) {
@@ -824,6 +897,10 @@ function loadEdit(record) {
       keyForSheetPass: Boolean(f.keyForSheetPass),
     }),
   )
+  form.sheetConclusionOptionItems = extractSheetConclusionOptionItems(
+    form.fields,
+    record.sheetConclusionOptionItems,
+  )
 }
 
 function resolveActiveRecord() {
@@ -833,24 +910,137 @@ function resolveActiveRecord() {
   return null
 }
 
-watch(
-  () => [isActive.value, props.editRecord?.id, route.query.id],
-  ([active]) => {
-    if (!active) return
+function cloneFieldsForDraft(fields = []) {
+  return (fields || []).map((f) => ({
+    ...f,
+    options: f.options ? [...f.options] : [],
+    optionItems: f.optionItems ? f.optionItems.map((o) => ({ ...o })) : undefined,
+    optionResults: f.optionResults ? { ...f.optionResults } : undefined,
+    children: Array.isArray(f.children) ? f.children.map((c) => ({ ...c })) : [],
+    manualOptionItems: Array.isArray(f.manualOptionItems)
+      ? f.manualOptionItems.map((o) => ({ ...o }))
+      : undefined,
+  }))
+}
+
+function captureDraft() {
+  if (!props.pageMode) return
+  if (!formBootstrapped.value && !isCreatePageBootstrapped(TEMPLATE_DRAFT_PATH)) return
+  saveCreatePageDraft(TEMPLATE_DRAFT_PATH, {
+    editingId: editingId.value,
+    templateStatus: templateStatus.value,
+    form: {
+      name: form.name,
+      bizScope: form.bizScope,
+      scopeType: form.scopeType,
+      objects: (form.objects || []).map((o) => ({ ...o })),
+      fields: cloneFieldsForDraft(form.fields),
+      sheetPassRule: form.sheetPassRule,
+      sheetConclusionOptionItems: (form.sheetConclusionOptionItems || []).map((o) => ({ ...o })),
+    },
+  })
+}
+
+function restoreDraft() {
+  const draft = loadCreatePageDraft(TEMPLATE_DRAFT_PATH)
+  if (!draft?.form) return false
+  editingId.value = draft.editingId || ''
+  templateStatus.value = draft.templateStatus || '停用'
+  form.name = draft.form.name || ''
+  form.bizScope = draft.form.bizScope || '成品检'
+  form.scopeType = draft.form.scopeType || QC_TEMPLATE_SCOPE_TYPE.GLOBAL
+  form.objects = Array.isArray(draft.form.objects) ? draft.form.objects.map((o) => ({ ...o })) : []
+  form.fields = cloneFieldsForDraft(draft.form.fields)
+  form.sheetPassRule = normalizeSheetPassRule(draft.form.sheetPassRule)
+  form.sheetConclusionOptionItems = normalizeSheetConclusionOptionItems(
+    draft.form.sheetConclusionOptionItems,
+  )
+  formBootstrapped.value = true
+  return true
+}
+
+function injectFieldById(fieldId) {
+  const id = String(fieldId || '').trim()
+  if (!id) return false
+  const { added } = pickLibraryFieldsForTemplate([id], form.fields)
+  if (!added.length) {
+    message.warning('新建检验项未找到或已在模板中')
+    return false
+  }
+  let list = ensureFieldsWithSystemFixedItems(form.fields, { layout: 'preserve' })
+  added.forEach((field) => {
+    list = insertFieldBeforeConclusion(list, field)
+  })
+  form.fields = list
+  message.success(`已带入检验项「${added[0].name || added[0].code}」`)
+  captureDraft()
+  return true
+}
+
+function clearInjectQuery() {
+  if (!route.query.injectFieldId) return
+  const q = { ...route.query }
+  delete q.injectFieldId
+  router.replace({ path: route.path, query: q })
+}
+
+function initFromRoute() {
+  if (!isActive.value) return
+
+  if (props.pageMode) {
+    const injectId = String(route.query.injectFieldId || '').trim()
+    const already = formBootstrapped.value || isCreatePageBootstrapped(TEMPLATE_DRAFT_PATH)
+
+    if (already || injectId) {
+      if (!formBootstrapped.value) restoreDraft()
+      if (injectId) {
+        injectFieldById(injectId)
+        clearInjectQuery()
+      }
+      return
+    }
+
+    if (restoreDraft()) return
+
     const record = resolveActiveRecord()
     if (record) loadEdit(record)
     else resetForm()
-  },
+    formBootstrapped.value = true
+    captureDraft()
+    return
+  }
+
+  const record = resolveActiveRecord()
+  if (record) loadEdit(record)
+  else resetForm()
+}
+
+watch(
+  () => [isActive.value, props.editRecord?.id, route.query.id, route.query.injectFieldId],
+  () => initFromRoute(),
   { immediate: true },
 )
 
-function removeField(index) {
-  if (isQcSystemFixedField(form.fields[index])) {
-    message.warning('系统固定项不可删除')
-    return
-  }
+onActivated(() => {
+  if (props.pageMode && route.query.injectFieldId) initFromRoute()
+})
+
+function canMarkKeyForSheetPass(record) {
+  return (
+    record &&
+    !isQcInspectMethodField(record) &&
+    !isQcInspectQtyField(record) &&
+    !isQcInspectRemarkField(record) &&
+    !isQcConclusionField(record)
+  )
+}
+
+function removeField(record) {
+  const index = form.fields.indexOf(record)
+  if (index < 0) return
   form.fields.splice(index, 1)
   form.fields = ensureFieldsWithSystemFixedItems(form.fields, { layout: 'preserve' })
+  captureDraft()
 }
 
 function openCreateField() {
@@ -858,15 +1048,25 @@ function openCreateField() {
     message.warning('未配置新增页')
     return
   }
+  formBootstrapped.value = true
+  captureDraft()
   openCreateTab(router, openTab, {
     path: fieldLibraryCreatePage.newPath,
     title: fieldLibraryCreatePage.title,
+    query: {
+      returnTo: route.fullPath,
+      returnTitle: shellTitle.value,
+    },
   })
 }
 
-function openFieldModal(index) {
-  editingFieldIndex.value = index
-  if (index != null && form.fields[index]) {
+function openFieldModal(recordOrIndex) {
+  const index =
+    typeof recordOrIndex === 'number'
+      ? form.fields.indexOf(displayFields.value[recordOrIndex])
+      : form.fields.indexOf(recordOrIndex)
+  editingFieldIndex.value = index >= 0 ? index : null
+  if (index != null && index >= 0 && form.fields[index]) {
     const f = form.fields[index]
     const isConclusion = isQcConclusionField(f)
     const unit = String(f.unit || '').trim()
@@ -1092,17 +1292,24 @@ function onPickLibraryFields(ids = []) {
     )
     return
   }
-  let list = ensureFieldsWithSystemFixedItems(form.fields, { layout: 'default' })
+  let list = ensureFieldsWithSystemFixedItems(form.fields, { layout: 'preserve' })
   added.forEach((field) => {
     list = insertFieldBeforeConclusion(list, field)
   })
   form.fields = list
   const skipTip = skipped.length ? `，跳过 ${skipped.length} 项` : ''
   message.success(`已从检验项库添加 ${added.length} 个字段${skipTip}`)
+  captureDraft()
 }
 
 function buildSavePayload() {
-  const fields = ensureFieldsWithSystemFixedItems(form.fields, { layout: 'preserve' })
+  const checked = validateConclusionOptionItems(form.sheetConclusionOptionItems)
+  const sheetItems = checked.ok
+    ? checked.items
+    : normalizeSheetConclusionOptionItems(form.sheetConclusionOptionItems)
+  let fields = ensureFieldsWithSystemFixedItems(form.fields, { layout: 'preserve' })
+  // 整单结论由模板配置驱动，保存时写入隐藏的质检结果字段供录入使用
+  fields = upsertSheetConclusionField(fields, sheetItems)
   let objects = []
   if (form.scopeType === QC_TEMPLATE_SCOPE_TYPE.GLOBAL) {
     objects = []
@@ -1116,6 +1323,7 @@ function buildSavePayload() {
     objects,
     status: templateStatus.value || '停用',
     sheetPassRule: normalizeSheetPassRule(form.sheetPassRule),
+    sheetConclusionOptionItems: sheetItems.map((o) => ({ ...o })),
     fields: fields.map((f) => ({
       ...f,
       keyForSheetPass:
@@ -1150,9 +1358,17 @@ function handleSave(conflictResolution = null) {
       return
     }
   }
+  if (form.sheetPassRule === QC_TEMPLATE_SHEET_PASS_RULE.MANUAL) {
+    const checked = validateConclusionOptionItems(form.sheetConclusionOptionItems)
+    if (!checked.ok) {
+      message.warning(checked.message || '请完善整单结论选项')
+      return
+    }
+    form.sheetConclusionOptionItems = checked.items.map((o) => ({ ...o }))
+  }
   if (form.sheetPassRule === QC_TEMPLATE_SHEET_PASS_RULE.KEY_FIELDS) {
     const hasKey = (form.fields || []).some(
-      (f) => !isQcSystemFixedField(f) && f.keyForSheetPass === true,
+      (f) => canMarkKeyForSheetPass(f) && f.keyForSheetPass === true,
     )
     if (!hasKey) {
       message.warning('规则为「关键项必须达标」时，请至少勾选一个关键项')
@@ -1374,6 +1590,21 @@ function onConflictConfirm({ mode }) {
   color: #1677ff;
 }
 
+.sheet-conclusion-options {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #e6f4ff;
+  border-radius: 6px;
+  background: #f9fcff;
+}
+
+.sheet-conclusion-label {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
 .muted {
   color: rgba(0, 0, 0, 0.25);
 }
@@ -1413,6 +1644,28 @@ function onConflictConfirm({ mode }) {
 .option-row.conclusion-opt > :deep(.ant-input) {
   flex: 1;
   min-width: 0;
+}
+
+.manual-options-panel {
+  max-width: 560px;
+}
+
+.option-row.manual-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: nowrap;
+}
+
+.manual-opt-label {
+  width: 140px;
+  flex: 0 0 140px;
+}
+
+.manual-opt-result {
+  width: 128px;
+  flex: 0 0 128px;
 }
 
 .option-row :deep(.ant-checkbox-wrapper) {

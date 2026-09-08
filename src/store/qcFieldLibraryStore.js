@@ -12,7 +12,7 @@ import { isQcSystemFixedField } from '@/utils/qcConclusionField'
 import { qcTemplateState } from '@/store/qcTemplateStore'
 
 const LIBRARY_SEED_KEY = 'i_doms_qc_field_library_seed_v'
-const LIBRARY_SEED_VERSION = '5'
+const LIBRARY_SEED_VERSION = '7'
 
 function nowText() {
   return dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -34,7 +34,9 @@ export const qcFieldLibraryState = reactive({
   fields: initLibraryFields(),
 })
 
-/** 热更新/旧内存下补齐复合演示项，并强制刷新演示结构；移除多点演示 */
+const SYSTEM_LIBRARY_CODES = new Set(['QC_INSPECT_METHOD', 'QC_INSPECT_QTY', 'QC_INSPECT_REMARK'])
+
+/** 热更新/旧内存下补齐系统默认项与复合演示项 */
 export function ensureQcLibraryDemoSeed() {
   const all = cloneQcLibraryFields()
   let changed = false
@@ -43,6 +45,50 @@ export function ensureQcLibraryDemoSeed() {
   const before = qcFieldLibraryState.fields.length
   qcFieldLibraryState.fields = qcFieldLibraryState.fields.filter((f) => f.type !== 'matrix')
   if (qcFieldLibraryState.fields.length !== before) changed = true
+
+  // 质检结果改为模板整单「人工判定」配置，不再作为检验项库系统指标
+  const beforeConclusion = qcFieldLibraryState.fields.length
+  qcFieldLibraryState.fields = qcFieldLibraryState.fields.filter(
+    (f) =>
+      String(f.code || '')
+        .trim()
+        .toUpperCase() !== 'QC_CONCLUSION' && String(f.name || '').trim() !== '质检结果',
+  )
+  if (qcFieldLibraryState.fields.length !== beforeConclusion) changed = true
+
+  // 移除旧版停用「检验备注」演示，改由系统项 QC_INSPECT_REMARK 承接
+  const beforeRemark = qcFieldLibraryState.fields.length
+  qcFieldLibraryState.fields = qcFieldLibraryState.fields.filter(
+    (f) => String(f.code || '').toUpperCase() !== 'QC_FIELD_REMARK',
+  )
+  if (qcFieldLibraryState.fields.length !== beforeRemark) changed = true
+
+  const ensureCodes = [...SYSTEM_LIBRARY_CODES, 'QC_RUN_TEST']
+  ensureCodes.forEach((code) => {
+    const seed = all.find((f) => String(f.code || '').toUpperCase() === code)
+    if (!seed) return
+    const idx = qcFieldLibraryState.fields.findIndex(
+      (f) =>
+        String(f.code || '')
+          .trim()
+          .toUpperCase() === code,
+    )
+    if (idx < 0) {
+      qcFieldLibraryState.fields.unshift(seed)
+      changed = true
+      return
+    }
+    if (SYSTEM_LIBRARY_CODES.has(code)) {
+      const prev = qcFieldLibraryState.fields[idx]
+      qcFieldLibraryState.fields[idx] = {
+        ...seed,
+        id: prev.id || seed.id,
+        isSystem: true,
+        status: prev.status === '停用' ? '停用' : '启用',
+      }
+      changed = true
+    }
+  })
 
   const demos = all.filter((f) => f.code === 'QC_RUN_TEST')
   demos.forEach((d) => {
@@ -55,17 +101,32 @@ export function ensureQcLibraryDemoSeed() {
     const prev = qcFieldLibraryState.fields[idx]
     const next = { ...d, id: prev.id || d.id }
     const sameChildren = JSON.stringify(prev.children || []) === JSON.stringify(next.children || [])
-    if (!sameChildren || idx > 1) {
+    if (!sameChildren || idx > 3) {
       qcFieldLibraryState.fields.splice(idx, 1)
       qcFieldLibraryState.fields.unshift(next)
       changed = true
     }
   })
-  const hasRun = qcFieldLibraryState.fields.some((f) => f.code === 'QC_RUN_TEST')
-  if (!hasRun) {
-    qcFieldLibraryState.fields.splice(0, qcFieldLibraryState.fields.length, ...all)
+
+  // 系统项置顶
+  const systemRows = []
+  const rest = []
+  qcFieldLibraryState.fields.forEach((f) => {
+    const code = String(f.code || '')
+      .trim()
+      .toUpperCase()
+    if (SYSTEM_LIBRARY_CODES.has(code) || f.isSystem) systemRows.push(f)
+    else rest.push(f)
+  })
+  const ordered = [...systemRows, ...rest]
+  if (
+    JSON.stringify(ordered.map((f) => f.id)) !==
+    JSON.stringify(qcFieldLibraryState.fields.map((f) => f.id))
+  ) {
+    qcFieldLibraryState.fields.splice(0, qcFieldLibraryState.fields.length, ...ordered)
     changed = true
   }
+
   if (changed) {
     try {
       localStorage.setItem(LIBRARY_SEED_KEY, LIBRARY_SEED_VERSION)
@@ -216,6 +277,7 @@ export function toggleQcLibraryFieldStatus(id, operator = 'admin1') {
 export function deleteQcLibraryField(id) {
   const row = getQcLibraryFieldById(id)
   if (!row) return { ok: false, message: '检验项不存在' }
+  if (row.isSystem) return { ok: false, message: '系统默认检验项不可删除' }
   if (row.status === '启用') return { ok: false, message: '请先停用后再删除' }
   if (isQcLibraryFieldReferenced(row.code)) {
     return { ok: false, message: '该检验项已被质检模板引用，不可删除，请保持停用' }
@@ -268,6 +330,10 @@ export function pickLibraryFieldsForTemplate(libraryIds = [], currentFields = []
     const code = String(lib.code || '')
       .trim()
       .toUpperCase()
+    if (code === 'QC_CONCLUSION' || String(lib.name || '').trim() === '质检结果') {
+      skipped.push({ id, code: lib.code, reason: '质检结果已改为模板整单规则配置' })
+      return
+    }
     if (existingCodes.has(code)) {
       skipped.push({ id, code: lib.code, reason: '模板中已存在' })
       return

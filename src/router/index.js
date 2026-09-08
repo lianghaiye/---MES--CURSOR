@@ -212,7 +212,31 @@ const routes = [
         path: 'product-process/bom/:id',
         name: 'product-process-bom-detail',
         component: () => import('@/views/product-process/ProductBomDetailView.vue'),
-        meta: { title: 'BOM详情' },
+        meta: { title: 'BOM详情', listPath: '/product-process/bom' },
+      },
+      {
+        path: 'product-process/ship-attachments',
+        name: 'product-process-ship-attachments',
+        component: () => import('@/views/product-process/ProductBomView.vue'),
+        meta: { title: '随货附件' },
+      },
+      {
+        path: 'product-process/ship-attachments/new',
+        name: 'product-process-ship-attachments-new',
+        component: () => import('@/views/product-process/ProductBomCreateView.vue'),
+        meta: { title: '新增随货附件', listPath: '/product-process/ship-attachments' },
+      },
+      {
+        path: 'product-process/ship-attachments/:id/edit',
+        name: 'product-process-ship-attachments-edit',
+        component: () => import('@/views/product-process/ProductBomCreateView.vue'),
+        meta: { title: '编辑随货附件', listPath: '/product-process/ship-attachments' },
+      },
+      {
+        path: 'product-process/ship-attachments/:id',
+        name: 'product-process-ship-attachments-detail',
+        component: () => import('@/views/product-process/ProductBomDetailView.vue'),
+        meta: { title: '随货附件详情', listPath: '/product-process/ship-attachments' },
       },
       {
         path: 'product-process/routing',
@@ -634,6 +658,12 @@ const routes = [
         name: 'quality-qc-template',
         component: () => import('@/views/quality/QcTemplateView.vue'),
         meta: { title: '质检模板' },
+      },
+      {
+        path: 'quality/qc-template/:id',
+        name: 'quality-qc-template-detail',
+        component: () => import('@/views/quality/QcTemplateDetailView.vue'),
+        meta: { title: '质检模板详情', listPath: '/quality/qc-template' },
       },
       {
         path: 'procurement/purchase-req',

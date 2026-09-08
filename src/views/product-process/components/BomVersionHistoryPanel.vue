@@ -39,6 +39,8 @@ const timelineItems = computed(() => {
         tag: '当前版本',
         date: formatDate(props.currentBom.effectiveAt || props.currentBom.createdAt),
         ecnNo: props.currentBom.sourceEcnNo || '',
+        changeSource: props.currentBom.sourceEcnNo || '',
+        changeSourceIsEcn: Boolean(props.currentBom.sourceEcnNo),
         changeSummary: props.currentBom.changeSummary || props.currentBom.remark || '',
         executor: props.currentBom.creator || '—',
         isInitial: true,

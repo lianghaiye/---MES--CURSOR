@@ -466,3 +466,37 @@ export function importBomByReference(
     newNodeId: added.newNodeId,
   }
 }
+
+/** 随货附件：取出可拷贝的子项（保留顶级明细，不剥顶层物料） */
+export function resolveShipAttachmentImportStructure(bom) {
+  if (!bom) return null
+  const { flatNodes, lineItems } = loadBomDetailStructure(bom)
+  const root = (flatNodes || []).find((n) => n.isRoot)
+  const rootId = root?.id
+  const treeNodes = (flatNodes || [])
+    .filter((n) => !n.isRoot)
+    .map((n) => ({
+      ...n,
+      parentId: !n.parentId || n.parentId === rootId ? '__ROOT__' : n.parentId,
+      isRoot: false,
+    }))
+  const lines = (lineItems || []).map((line) => ({
+    ...line,
+    parentTreeId:
+      !line.parentTreeId || line.parentTreeId === rootId ? '__ROOT__' : line.parentTreeId,
+  }))
+  if (!treeNodes.length && !lines.length) return null
+  return { treeNodes, lineItems: lines }
+}
+
+/** 将其他随货附件的明细追加到当前根下（不改名称/适用范围） */
+export function importShipAttachmentLines(sourceBom, flatNodes, lineItems) {
+  const structure = resolveShipAttachmentImportStructure(sourceBom)
+  if (!structure) return null
+  const merged = mergeTemplateIntoRoot(flatNodes, lineItems, structure)
+  return {
+    flatNodes: merged.flatNodes,
+    lineItems: merged.lineItems,
+    importedCount: structure.lineItems?.length || 0,
+  }
+}

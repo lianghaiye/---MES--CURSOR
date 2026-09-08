@@ -8,6 +8,7 @@ export const QC_CONCLUSION_CONCESSION_OPTION = '让步合格'
 export const QC_CONCLUSION_FIELD_CODE = 'QC_CONCLUSION'
 export const QC_INSPECT_METHOD_FIELD_CODE = 'QC_INSPECT_METHOD'
 export const QC_INSPECT_QTY_FIELD_CODE = 'QC_INSPECT_QTY'
+export const QC_INSPECT_REMARK_FIELD_CODE = 'QC_INSPECT_REMARK'
 
 /** 结论选项可映射的任务结果（仅通过 / 不通过） */
 export const QC_CONCLUSION_RESULT_OPTIONS = [
@@ -17,20 +18,28 @@ export const QC_CONCLUSION_RESULT_OPTIONS = [
 
 const CONCLUSION_MAP_RESULTS = new Set([QC_TASK_RESULT.PASS, QC_TASK_RESULT.FAIL])
 
-/** 系统预设三项，不可删除 */
+/** 默认结论选项（合格/不合格不可删；让步合格可删） */
 export const DEFAULT_CONCLUSION_OPTION_ITEMS = [
   { value: QC_CONCLUSION_PASS_OPTION, result: QC_TASK_RESULT.PASS, locked: true },
   { value: QC_CONCLUSION_FAIL_OPTION, result: QC_TASK_RESULT.FAIL, locked: true },
-  { value: QC_CONCLUSION_CONCESSION_OPTION, result: QC_TASK_RESULT.PASS, locked: true },
+  { value: QC_CONCLUSION_CONCESSION_OPTION, result: QC_TASK_RESULT.PASS, locked: false },
 ]
+
+/** 不可删除的结论文案（仅合格/不合格） */
+export const LOCKED_CONCLUSION_OPTION_VALUES = new Set([
+  QC_CONCLUSION_PASS_OPTION,
+  QC_CONCLUSION_FAIL_OPTION,
+])
 
 export const PRESET_CONCLUSION_OPTION_VALUES = new Set(
   DEFAULT_CONCLUSION_OPTION_ITEMS.map((o) => o.value),
 )
 
+/** locked = 不可删除；文案仍可改。让步合格可删。 */
 export function isLockedConclusionOption(item = {}) {
-  if (item.locked === true) return true
-  return PRESET_CONCLUSION_OPTION_VALUES.has(String(item.value || '').trim())
+  if (item?.locked === true) return true
+  const v = String(item?.value || '').trim()
+  return LOCKED_CONCLUSION_OPTION_VALUES.has(v)
 }
 
 const PASS_VALUES = new Set([
@@ -102,9 +111,32 @@ export function isQcInspectQtyField(field = {}) {
   return String(field.name || '').trim() === '质检数量'
 }
 
-/** 系统固定项：质检方式 / 质检数量 / 质检结果（不可删除） */
+/** 判定是否为系统默认「检验备注」 */
+export function isQcInspectRemarkField(field = {}) {
+  if (field.isPresetInspectRemark === true) return true
+  const code = String(field.code || '')
+    .trim()
+    .toUpperCase()
+  if (code === QC_INSPECT_REMARK_FIELD_CODE || code === 'QC_FIELD_REMARK') return true
+  return String(field.name || '').trim() === '检验备注'
+}
+
+/** 检验项库中的系统预置项（方式/数量/备注等） */
+export function isQcSystemLibraryField(field = {}) {
+  if (field?.isSystem === true || field?.isSystemLibrary === true) return true
+  return (
+    isQcInspectMethodField(field) || isQcInspectQtyField(field) || isQcInspectRemarkField(field)
+  )
+}
+
+/** 系统固定项（历史兼容）：结论仍可识别；模板侧不再强制不可删 */
 export function isQcSystemFixedField(field = {}) {
-  return isQcInspectMethodField(field) || isQcInspectQtyField(field) || isQcConclusionField(field)
+  return (
+    isQcInspectMethodField(field) ||
+    isQcInspectQtyField(field) ||
+    isQcInspectRemarkField(field) ||
+    isQcConclusionField(field)
+  )
 }
 
 function parseRawOptionItems(field = {}) {
@@ -146,31 +178,39 @@ function parseRawOptionItems(field = {}) {
 }
 
 /**
- * 规范化结论选项：保证三项系统预设在前且 locked，其后为自定义项。
- * 兼容历史：options: string[] / optionResults / optionItems
+ * 规范化结论选项（与检验项「人工判定」一致）：
+ * - 文案可改；合格/不合格不可删除；让步合格可删
+ * - 不强制把已删的让步合格补回
  */
 export function normalizeConclusionOptionItems(field = {}) {
   const parsed = parseRawOptionItems(field)
-  const byValue = new Map(parsed.map((o) => [o.value, o]))
+  if (!parsed.length) {
+    return DEFAULT_CONCLUSION_OPTION_ITEMS.map((def) => ({ ...def }))
+  }
 
-  const presets = DEFAULT_CONCLUSION_OPTION_ITEMS.map((def) => {
-    const existing = byValue.get(def.value)
-    return {
-      value: def.value,
-      result: existing ? coerceConclusionResult(existing.result, def.value) : def.result,
-      locked: true,
+  const defaultSet = new Set()
+  parsed.forEach((o) => {
+    if (o?.isDefault && String(o.value || '').trim()) {
+      defaultSet.add(String(o.value).trim())
     }
   })
+  const defVal = String(field.defaultValue || '').trim()
+  if (defVal) defaultSet.add(defVal)
 
-  const customs = parsed
-    .filter((o) => !PRESET_CONCLUSION_OPTION_VALUES.has(o.value))
-    .map((o) => ({
-      value: o.value,
-      result: coerceConclusionResult(o.result, o.value),
-      locked: false,
-    }))
-
-  return [...presets, ...customs]
+  return parsed.map((o) => {
+    const value = String(o?.value ?? '').trim()
+    const result = coerceConclusionResult(o?.result, value)
+    const locked =
+      value === QC_CONCLUSION_CONCESSION_OPTION
+        ? false
+        : Boolean(o?.locked) || LOCKED_CONCLUSION_OPTION_VALUES.has(value)
+    return {
+      value,
+      result,
+      locked,
+      isDefault: Boolean(value && defaultSet.has(value)),
+    }
+  })
 }
 
 export function optionItemsToOptions(optionItems = []) {
@@ -188,12 +228,14 @@ export function optionItemsToResultMap(optionItems = []) {
 /** 预设结论字段（默认启用、固定末位；选项可扩展并配置结果映射） */
 export function createPresetConclusionField(partial = {}) {
   const safeItems = normalizeConclusionOptionItems(partial)
+  const defaultValue =
+    String(partial.defaultValue || '').trim() || safeItems.find((o) => o.isDefault)?.value || ''
 
   return {
     name: partial.name || '质检结果',
     enabled: partial.enabled !== false,
     placeholder: partial.placeholder || '请选择质检结果',
-    defaultValue: partial.defaultValue || '',
+    defaultValue,
     format: partial.format || '',
     charLimit: partial.charLimit ?? null,
     category: partial.category || '',
@@ -213,6 +255,42 @@ export function createPresetConclusionField(partial = {}) {
     passOption: safeItems.find((o) => o.result === QC_TASK_RESULT.PASS)?.value || '',
     failOption: safeItems.find((o) => o.result === QC_TASK_RESULT.FAIL)?.value || '',
   }
+}
+
+/** 规范化模板级整单结论选项（与检验项人工判定一致） */
+export function normalizeSheetConclusionOptionItems(items) {
+  return normalizeConclusionOptionItems({ optionItems: items })
+}
+
+/**
+ * 将模板级结论选项同步进字段列表（写入/覆盖 QC_CONCLUSION）。
+ * 整单「人工判定」不再依赖检验项库「质检结果」，由模板配置驱动。
+ */
+export function upsertSheetConclusionField(fields = [], sheetConclusionOptionItems) {
+  const list = Array.isArray(fields) ? fields.filter((f) => !isQcConclusionField(f)) : []
+  const existing = findQcConclusionField(fields)
+  const sourceItems = Array.isArray(sheetConclusionOptionItems)
+    ? sheetConclusionOptionItems
+    : existing?.optionItems
+  const conclusion = createPresetConclusionField({
+    name: existing?.name || '质检结果',
+    enabled: existing?.enabled !== false,
+    placeholder: existing?.placeholder || '请选择质检结果',
+    defaultValue: existing?.defaultValue || '',
+    optionItems: sourceItems,
+    sortOrder: existing?.sortOrder != null ? existing.sortOrder : 9999,
+  })
+  return [...list, conclusion]
+}
+
+/** 从模板字段中提取结论选项，供表单回填 */
+export function extractSheetConclusionOptionItems(fields = [], fallbackItems) {
+  const conclusion = findQcConclusionField(fields)
+  if (conclusion) return normalizeConclusionOptionItems(conclusion)
+  if (Array.isArray(fallbackItems) && fallbackItems.length) {
+    return normalizeSheetConclusionOptionItems(fallbackItems)
+  }
+  return DEFAULT_CONCLUSION_OPTION_ITEMS.map((o) => ({ ...o }))
 }
 
 /** 系统固定：质检方式 */
@@ -242,10 +320,11 @@ export function createPresetInspectMethodField(partial = {}) {
     isPresetConclusion: false,
     category: '',
     unit: '',
-    judgeRule: 'manual',
+    judgeRule: partial.judgeRule || 'none',
     format: '',
     charLimit: null,
     description: partial.description || '',
+    isSystem: true,
   }
 }
 
@@ -269,10 +348,38 @@ export function createPresetInspectQtyField(partial = {}) {
     isPresetConclusion: false,
     category: '',
     unit: partial.unit || '',
-    judgeRule: 'manual',
+    judgeRule: partial.judgeRule || 'none',
     format: '',
     charLimit: null,
     description: partial.description || '',
+    isSystem: true,
+  }
+}
+
+/** 系统默认：检验备注 */
+export function createPresetInspectRemarkField(partial = {}) {
+  return {
+    code: QC_INSPECT_REMARK_FIELD_CODE,
+    name: '检验备注',
+    type: 'textarea',
+    required: false,
+    enabled: partial.enabled !== false,
+    options: [],
+    defaultValue: partial.defaultValue ?? '',
+    placeholder: partial.placeholder || '请输入检验备注',
+    sortOrder: partial.sortOrder != null ? partial.sortOrder : 3,
+    isPresetField: true,
+    isPresetInspectRemark: true,
+    isSystemFixed: false,
+    isConclusion: false,
+    isPresetConclusion: false,
+    category: partial.category || '其他',
+    unit: '',
+    judgeRule: 'none',
+    format: '',
+    charLimit: partial.charLimit ?? null,
+    description: partial.description || '',
+    isSystem: true,
   }
 }
 
@@ -288,39 +395,42 @@ function cloneFieldShallow(f = {}) {
 }
 
 /**
- * 规范模板字段：保证方式 / 数量 / 结果三项存在且标记正确。
+ * 规范化模板字段。
+ * 默认不自动补齐系统项（由用户从检验项库选用）；传 inject:true 可兼容旧行为补齐方式/数量/结果。
  * @param {object[]} fields
- * @param {{ layout?: 'preserve' | 'default' }} [options]
- * - preserve（默认）：保留现有顺序（含用户拖拽）；缺失项按默认位置补齐
- * - default：强制 方式 → 数量 → 自定义 → 结果（新建 / 添加字段时用）
+ * @param {{ layout?: 'preserve' | 'default', inject?: boolean }} [options]
  */
 export function ensureFieldsWithSystemFixedItems(fields = [], options = {}) {
   const layout = options.layout === 'default' ? 'default' : 'preserve'
+  const inject = options.inject === true
   const list = Array.isArray(fields) ? fields.map(cloneFieldShallow) : []
 
   let methodSrc = null
   let qtySrc = null
+  let remarkSrc = null
   let conclusionSrc = null
-  const customs = []
+  const others = []
   list.forEach((f) => {
     if (!methodSrc && isQcInspectMethodField(f)) methodSrc = f
     else if (!qtySrc && isQcInspectQtyField(f)) qtySrc = f
+    else if (!remarkSrc && isQcInspectRemarkField(f)) remarkSrc = f
     else if (!conclusionSrc && isQcConclusionField(f)) conclusionSrc = f
-    else if (!isQcSystemFixedField(f)) {
-      customs.push({
+    else {
+      others.push({
         ...f,
         isConclusion: false,
         isPresetConclusion: false,
         isPresetInspectMethod: false,
         isPresetInspectQty: false,
+        isPresetInspectRemark: false,
         isSystemFixed: false,
-        isPresetField: false,
       })
     }
   })
 
-  const method = createPresetInspectMethodField(methodSrc || {})
-  const qty = createPresetInspectQtyField(qtySrc || {})
+  const method = methodSrc ? createPresetInspectMethodField(methodSrc) : null
+  const qty = qtySrc ? createPresetInspectQtyField(qtySrc) : null
+  const remark = remarkSrc ? createPresetInspectRemarkField(remarkSrc) : null
   const conclusion = conclusionSrc
     ? createPresetConclusionField({
         name: conclusionSrc.name === '检验结论' ? '质检结果' : conclusionSrc.name || '质检结果',
@@ -334,58 +444,80 @@ export function ensureFieldsWithSystemFixedItems(fields = [], options = {}) {
         options: conclusionSrc.options,
         optionResults: conclusionSrc.optionResults,
       })
-    : createPresetConclusionField()
+    : null
 
-  if (layout === 'default') {
-    return [method, qty, ...customs, conclusion]
+  if (inject) {
+    const m = method || createPresetInspectMethodField()
+    const q = qty || createPresetInspectQtyField()
+    const c = conclusion || createPresetConclusionField()
+    if (layout === 'default') {
+      return [m, q, ...(remark ? [remark] : []), ...others, c]
+    }
   }
 
-  // preserve：按原顺序回写规范化后的系统项，跳过重复
-  const used = { method: false, qty: false, conclusion: false }
+  if (layout === 'default') {
+    return [
+      ...(method ? [method] : []),
+      ...(qty ? [qty] : []),
+      ...(remark ? [remark] : []),
+      ...others,
+      ...(conclusion ? [conclusion] : []),
+    ]
+  }
+
+  // preserve：按原顺序回写规范化后的系统项，跳过重复；默认不补缺失项
+  const used = { method: false, qty: false, remark: false, conclusion: false }
   const result = []
   list.forEach((f) => {
     if (isQcInspectMethodField(f)) {
       if (used.method) return
       used.method = true
-      result.push(method)
+      if (method) result.push(method)
       return
     }
     if (isQcInspectQtyField(f)) {
       if (used.qty) return
       used.qty = true
-      result.push(qty)
+      if (qty) result.push(qty)
+      return
+    }
+    if (isQcInspectRemarkField(f)) {
+      if (used.remark) return
+      used.remark = true
+      if (remark) result.push(remark)
       return
     }
     if (isQcConclusionField(f)) {
       if (used.conclusion) return
       used.conclusion = true
-      result.push(conclusion)
+      if (conclusion) result.push(conclusion)
       return
     }
-    if (!isQcSystemFixedField(f)) {
-      result.push({
-        ...f,
-        isConclusion: false,
-        isPresetConclusion: false,
-        isPresetInspectMethod: false,
-        isPresetInspectQty: false,
-        isSystemFixed: false,
-        isPresetField: false,
-      })
-    }
+    result.push({
+      ...f,
+      isConclusion: false,
+      isPresetConclusion: false,
+      isPresetInspectMethod: false,
+      isPresetInspectQty: false,
+      isPresetInspectRemark: false,
+      isSystemFixed: false,
+    })
   })
 
-  if (!used.method) result.unshift(method)
-  if (!used.qty) {
-    const methodIdx = result.findIndex((f) => isQcInspectMethodField(f))
-    result.splice(methodIdx >= 0 ? methodIdx + 1 : 0, 0, qty)
+  if (inject) {
+    if (!used.method) result.unshift(method || createPresetInspectMethodField())
+    if (!used.qty) {
+      const methodIdx = result.findIndex((f) => isQcInspectMethodField(f))
+      result.splice(methodIdx >= 0 ? methodIdx + 1 : 0, 0, qty || createPresetInspectQtyField())
+    }
+    if (!used.conclusion) result.push(conclusion || createPresetConclusionField())
   }
-  if (!used.conclusion) result.push(conclusion)
+
   return result
 }
 
 /**
- * @deprecated 使用 ensureFieldsWithSystemFixedItems（已包含方式/数量/结果三项固定）
+ * @deprecated 使用 ensureFieldsWithSystemFixedItems
  */
 export function ensureFieldsWithPresetConclusion(fields = []) {
   return ensureFieldsWithSystemFixedItems(fields, { layout: 'preserve' })
@@ -402,10 +534,10 @@ export function getConclusionFieldIndex(fields = []) {
 }
 
 /**
- * 新增普通字段：先恢复默认布局（方式/数量置顶、结果置底），再插到结论前。
+ * 新增普通字段：插到结论前；无结论则追加末尾。不再强制补齐系统项。
  */
 export function insertFieldBeforeConclusion(fields, field) {
-  const list = ensureFieldsWithSystemFixedItems(fields, { layout: 'default' })
+  const list = ensureFieldsWithSystemFixedItems(fields, { layout: 'preserve' })
   const idx = getConclusionFieldIndex(list)
   if (idx < 0) {
     list.push(field)
@@ -462,21 +594,20 @@ export function aggregateLineConclusions(lineResults = []) {
   return QC_TASK_RESULT.PARTIAL
 }
 
-/** 校验结论选项配置 */
+/** 校验结论选项配置（与检验项人工判定一致：须有通过/不通过映射；让步合格可无） */
 export function validateConclusionOptionItems(optionItems = []) {
   const items = (optionItems || [])
     .map((o) => ({
       value: String(o?.value ?? '').trim(),
       result: coerceConclusionResult(o?.result, o?.value),
       locked:
-        Boolean(o?.locked) || PRESET_CONCLUSION_OPTION_VALUES.has(String(o?.value ?? '').trim()),
+        Boolean(o?.locked) || LOCKED_CONCLUSION_OPTION_VALUES.has(String(o?.value ?? '').trim()),
+      isDefault: Boolean(o?.isDefault),
     }))
     .filter((o) => o.value)
 
-  for (const preset of DEFAULT_CONCLUSION_OPTION_ITEMS) {
-    if (!items.some((o) => o.value === preset.value)) {
-      return { ok: false, message: `系统预设选项「${preset.value}」不可删除` }
-    }
+  if (items.length < 2) {
+    return { ok: false, message: '请至少配置两个结论选项' }
   }
 
   const names = new Set()

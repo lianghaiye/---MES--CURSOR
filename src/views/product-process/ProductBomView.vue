@@ -4,26 +4,37 @@
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item label="BOM编号">
+            <a-form-item :label="isShipList ? '编号' : 'BOM编号'">
               <a-input
                 v-model:value="filters.bomNo"
                 allow-clear
                 size="small"
-                placeholder="请输入 BOM 编号"
+                :placeholder="isShipList ? '请输入编号' : '请输入 BOM 编号'"
               />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item label="BOM名称">
+            <a-form-item :label="isShipList ? '名称' : 'BOM名称'">
               <a-input
                 v-model:value="filters.bomName"
                 allow-clear
                 size="small"
-                placeholder="请输入 BOM 名称"
+                :placeholder="isShipList ? '请输入名称' : '请输入 BOM 名称'"
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+          <a-col v-if="isShipList" :xs="24" :sm="12" :md="6" :lg="5">
+            <a-form-item label="适用范围">
+              <a-select
+                v-model:value="filters.scopeType"
+                allow-clear
+                size="small"
+                placeholder="请选择"
+                :options="shipAttachmentScopeTypeOptions"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col v-else :xs="24" :sm="12" :md="6" :lg="5">
             <a-form-item label="物品名称">
               <a-select
                 v-model:value="filters.itemId"
@@ -37,17 +48,17 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item label="BOM状态">
+            <a-form-item :label="isShipList ? '状态' : 'BOM状态'">
               <a-select
                 v-model:value="filters.status"
                 allow-clear
                 size="small"
                 placeholder="请选择状态"
-                :options="bomStatusOptions"
+                :options="isShipList ? shipAttachmentStatusOptions : bomStatusOptions"
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+          <a-col v-if="!isShipList" :xs="24" :sm="12" :md="6" :lg="5">
             <a-form-item label="规格型号">
               <a-input
                 v-model:value="filters.specModel"
@@ -57,7 +68,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+          <a-col v-if="!isShipList" :xs="24" :sm="12" :md="6" :lg="5">
             <a-form-item label="材质">
               <a-input
                 v-model:value="filters.material"
@@ -67,7 +78,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+          <a-col v-if="!isShipList" :xs="24" :sm="12" :md="6" :lg="5">
             <a-form-item label="图号">
               <a-input
                 v-model:value="filters.drawingNo"
@@ -94,30 +105,31 @@
 
     <div class="toolbar-row">
       <a-space wrap :size="8">
-        <a-button type="primary" size="small" @click="openCreateProductBom">
+        <a-button v-if="!isShipList" type="primary" size="small" @click="openCreateProductBom">
           <PlusOutlined />
           新增产品BOM
         </a-button>
-        <a-button size="small" @click="openCreateBaselineBom">
+        <a-button v-if="!isShipList" size="small" @click="openCreateBaselineBom">
           <PlusOutlined />
           新增基准BOM
         </a-button>
-        <a-button size="small" @click="openCreateShipBom">
+        <a-button v-if="isShipList" type="primary" size="small" @click="openCreateShipBom">
           <PlusOutlined />
-          新增发运BOM
+          新增随货附件
         </a-button>
-        <a-button size="small" @click="handleBatchEnable">
+        <a-button v-if="isShipList" size="small" @click="probeOpen = true">匹配试算</a-button>
+        <a-button v-if="!isShipList" size="small" @click="handleBatchEnable">
           <CheckOutlined />
           审核发布
         </a-button>
-        <a-button size="small" @click="handleBatchArchive">
+        <a-button v-if="!isShipList" size="small" @click="handleBatchArchive">
           <InboxOutlined />
           归档
         </a-button>
-        <a-dropdown>
+        <a-dropdown v-if="!isShipList">
           <a-button size="small">
             <DownloadOutlined />
-            导出BOM
+            {{ isShipList ? '导出' : '导出BOM' }}
             <DownOutlined />
           </a-button>
           <template #overlay>
@@ -147,20 +159,38 @@
         bordered
         :scroll="{ x: tableScrollX }"
         :pagination="false"
-        :row-selection="rowSelection"
+        :row-selection="isShipList ? null : rowSelection"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">
             {{ rowIndex(index) }}
           </template>
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="bomStatusColor(record.status)">{{ record.status }}</a-tag>
+            <a-tag
+              v-if="isShipList"
+              :color="isShipAttachmentEnabled(record) ? 'success' : 'default'"
+            >
+              {{ displayShipAttachmentStatus(record) }}
+            </a-tag>
+            <a-tag v-else :color="bomStatusColor(record.status)">{{ record.status }}</a-tag>
           </template>
           <template v-else-if="column.key === 'bomName'">
             <a class="link-name" @click.prevent="openDetail(record)">{{ record.bomName }}</a>
           </template>
           <template v-else-if="column.key === 'bomType'">
-            {{ normalizeBomType(record.bomType) }}
+            {{ formatBomTypeLabel(record.bomType) }}
+          </template>
+          <template v-else-if="column.key === 'scopeType'">
+            {{
+              shipAttachmentScopeTypeLabel(
+                record.scopeType || normalizeShipAttachmentScope(record).scopeType,
+              )
+            }}
+          </template>
+          <template v-else-if="column.key === 'scopeObjects'">
+            <span :title="formatShipAttachmentObjects(record)">
+              {{ formatShipAttachmentObjects(record) }}
+            </span>
           </template>
           <template v-else-if="column.key === 'itemName' || column.dataIndex === 'itemName'">
             <span v-if="isShipBomType(record.bomType)">
@@ -189,7 +219,14 @@
             {{ record[column.dataIndex] || '—' }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space v-if="isBomPending(record)" :size="0" wrap>
+            <a-space v-if="isShipList" :size="0">
+              <a-button type="link" size="small" @click="handleToggleShipStatus(record)">
+                {{ isShipAttachmentEnabled(record) ? '停用' : '启用' }}
+              </a-button>
+              <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+              <a-button type="link" size="small" @click="handleClone(record)">复制</a-button>
+            </a-space>
+            <a-space v-else-if="isBomPending(record)" :size="0" wrap>
               <a-button type="link" size="small" @click="handleEnable(record)">
                 <CheckOutlined />
                 启用
@@ -222,7 +259,12 @@
                 <EditOutlined />
                 编辑
               </a-button>
-              <a-button type="link" size="small" @click="openRelationDrawer(record)">
+              <a-button
+                v-if="!isShipList"
+                type="link"
+                size="small"
+                @click="openRelationDrawer(record)"
+              >
                 查看关联BOM
               </a-button>
               <a-dropdown>
@@ -293,6 +335,19 @@
 
     <BomRelationDrawer v-model:open="relationOpen" :bom="relationBom" />
 
+    <QcTemplateConflictModal
+      v-model:open="shipConflictOpen"
+      title="随货附件冲突"
+      entity-label="随货附件"
+      :kind="shipConflictKind"
+      :conflicts="shipConflictRows"
+      :current-template-name="shipConflictName"
+      @confirm="onShipConflictConfirm"
+      @cancel="pendingShipEnableId = ''"
+    />
+
+    <ShipAttachmentMatchProbeDrawer v-if="isShipList" v-model:open="probeOpen" />
+
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -307,7 +362,7 @@ export default { name: 'ProductBomView' }
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
@@ -331,7 +386,16 @@ import {
   isBomActive,
   isBomArchived,
 } from '@/mock/productBomOptions'
-import { normalizeBomType, isShipBomType, SHIP_KIT_ITEM_TYPE } from '@/mock/bomMaterialColumns'
+import { isShipBomType, SHIP_KIT_ITEM_TYPE, BOM_TYPE } from '@/mock/bomMaterialColumns'
+import {
+  SHIP_ATTACHMENT_DISPLAY_NAME,
+  SHIP_ATTACHMENT_LIST_PATH,
+  SHIP_ATTACHMENT_ROUTE,
+  formatBomTypeLabel,
+  shipAttachmentCreatePath,
+  bomWorkspaceDetailPath,
+  bomWorkspaceEditPath,
+} from '@/utils/shipAttachmentNav'
 import { productBomState } from '@/store/productBomStore'
 import {
   deleteProductBom,
@@ -339,27 +403,50 @@ import {
   archiveProductBom,
   batchEnableProductBom,
   enableProductBom,
+  enableShipAttachment,
+  disableShipAttachment,
 } from '@/store/productBomStore'
 import { findParentBomReferences, findParentRefsForBomUpgrade } from '@/utils/bomVersionReference'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
+import { deliveryOrderState } from '@/store/deliveryOrderStore'
+import { salesOrderState } from '@/store/salesOrderStore'
 import ProductBomVersionDrawer from './components/ProductBomVersionDrawer.vue'
 import BomEnableReferenceModal from './components/BomEnableReferenceModal.vue'
 import BomArchiveReferenceModal from './components/BomArchiveReferenceModal.vue'
 import BomRelationDrawer from './components/BomRelationDrawer.vue'
+import QcTemplateConflictModal from '@/views/quality/components/QcTemplateConflictModal.vue'
+import ShipAttachmentMatchProbeDrawer from './components/ShipAttachmentMatchProbeDrawer.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { buildMasterLookup, enrichProductBomList } from '@/utils/productBomListEnrich'
+import {
+  displayShipAttachmentStatus,
+  formatShipAttachmentObjects,
+  isShipAttachmentEnabled,
+  normalizeShipAttachmentScope,
+  shipAttachmentScopeTypeLabel,
+  shipAttachmentScopeTypeOptions,
+  shipAttachmentStatusOptions,
+} from '@/utils/shipAttachmentScope'
 
 const router = useRouter()
+const route = useRoute()
 const { openTab } = useTabs()
+
+const isShipList = computed(
+  () =>
+    route.name === SHIP_ATTACHMENT_ROUTE.list ||
+    String(route.path).startsWith(SHIP_ATTACHMENT_LIST_PATH),
+)
 
 const filters = reactive({
   bomNo: '',
   bomName: '',
   itemId: undefined,
   status: undefined,
+  scopeType: undefined,
   specModel: '',
   material: '',
   drawingNo: '',
@@ -381,12 +468,19 @@ const archiveParentRefs = ref([])
 const archiveQueue = ref([])
 const relationOpen = ref(false)
 const relationBom = ref(null)
+const shipConflictOpen = ref(false)
+const shipConflictKind = ref('single')
+const shipConflictRows = ref([])
+const shipConflictName = ref('')
+const pendingShipEnableId = ref('')
+const probeOpen = ref(false)
 
 const itemFilterOptions = computed(() => {
   const products = productInfoState.products.slice(0, 150).map((p) => ({
     label: p.name,
     value: p.id,
   }))
+  if (isShipList.value) return products
   const materials = materialInfoState.materials.slice(0, 80).map((m) => ({
     label: m.name,
     value: m.id,
@@ -404,7 +498,13 @@ const masterLookup = computed(() =>
 
 const enrichedList = computed(() => enrichProductBomList(productBomState.boms, masterLookup.value))
 
-const filteredList = computed(() => filterProductBoms(enrichedList.value, appliedFilters.value))
+const filteredList = computed(() =>
+  filterProductBoms(enrichedList.value, {
+    ...appliedFilters.value,
+    onlyShip: isShipList.value,
+    excludeShip: !isShipList.value,
+  }),
+)
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -420,12 +520,12 @@ const rowSelection = computed(() => ({
   },
 }))
 
-const baseColumns = [
+const productBaseColumns = [
   { title: 'BOM状态', key: 'status', width: 92, fixed: 'left' },
   { title: 'BOM名称', key: 'bomName', width: 160, fixed: 'left', ellipsis: true },
   { title: 'BOM编号', dataIndex: 'bomNo', width: 140, ellipsis: true },
   { title: 'BOM类型', key: 'bomType', width: 100 },
-  { title: '物品/适用', key: 'itemName', dataIndex: 'itemName', width: 180, ellipsis: true },
+  { title: '物品名称', key: 'itemName', dataIndex: 'itemName', width: 180, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
@@ -439,8 +539,49 @@ const baseColumns = [
   { title: '操作', key: 'action', width: 260, fixed: 'right' },
 ]
 
-const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('product-bom-list', baseColumns, { minScrollX: 2200 })
+const shipBaseColumns = [
+  { title: '状态', key: 'status', width: 80, fixed: 'left' },
+  { title: '名称', key: 'bomName', width: 180, fixed: 'left', ellipsis: true },
+  { title: '编号', dataIndex: 'bomNo', width: 140, ellipsis: true },
+  { title: '适用范围', key: 'scopeType', width: 90 },
+  { title: '适用对象', key: 'scopeObjects', width: 200, ellipsis: true },
+  { title: '层级数', key: 'levelCount', width: 72, align: 'center' },
+  { title: '物料数', key: 'materialCount', width: 72, align: 'center' },
+  { title: '操作', key: 'action', width: 180, fixed: 'right' },
+]
+
+const productTable = useTableColumnSettings('product-bom-list', productBaseColumns, {
+  minScrollX: 2200,
+})
+const shipTable = useTableColumnSettings('ship-attachment-list-v2', shipBaseColumns, {
+  minScrollX: 1600,
+})
+
+const columnSettings = computed({
+  get: () =>
+    isShipList.value ? shipTable.columnSettings.value : productTable.columnSettings.value,
+  set: (value) => {
+    if (isShipList.value) shipTable.columnSettings.value = value
+    else productTable.columnSettings.value = value
+  },
+})
+const columnDrawerOpen = computed({
+  get: () =>
+    isShipList.value ? shipTable.columnDrawerOpen.value : productTable.columnDrawerOpen.value,
+  set: (value) => {
+    if (isShipList.value) shipTable.columnDrawerOpen.value = value
+    else productTable.columnDrawerOpen.value = value
+  },
+})
+const displayColumns = computed(() =>
+  isShipList.value ? shipTable.displayColumns.value : productTable.displayColumns.value,
+)
+const tableScrollX = computed(() =>
+  isShipList.value ? shipTable.tableScrollX.value : productTable.tableScrollX.value,
+)
+const defaultColumnSettings = computed(() =>
+  isShipList.value ? shipTable.defaultColumnSettings : productTable.defaultColumnSettings,
+)
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
@@ -449,7 +590,7 @@ function rowIndex(index) {
 function formatShipBomItemLabel(record) {
   const n = Array.isArray(record.applicableProductIds) ? record.applicableProductIds.length : 0
   if (record.itemType === SHIP_KIT_ITEM_TYPE || n > 0) {
-    return n > 0 ? `共用附件包 · 适用 ${n} 个产品` : '共用附件包 · 未指定产品'
+    return n > 0 ? `适用 ${n} 个产品` : '未指定适用产品'
   }
   return record.itemName || '—'
 }
@@ -467,16 +608,14 @@ function handleReset() {
   filters.specModel = ''
   filters.material = ''
   filters.drawingNo = ''
+  filters.scopeType = undefined
   handleSearch()
 }
 
 function openDetail(record) {
-  const resolved = router.resolve({
-    name: 'product-process-bom-detail',
-    params: { id: record.id },
-  })
-  openTab(resolved.path, record.bomName || 'BOM详情')
-  router.push(resolved)
+  const path = bomWorkspaceDetailPath(record)
+  openTab(path, record.bomName || (isShipList.value ? '随货附件详情' : 'BOM详情'))
+  router.push(path)
 }
 
 function openCreateProductBom() {
@@ -497,19 +636,22 @@ function openCreateBaselineBom() {
 
 function openCreateShipBom() {
   openCreateTab(router, openTab, {
-    path: '/product-process/bom/new',
-    title: '新增发运BOM',
-    query: { bomType: '发运BOM' },
+    path: shipAttachmentCreatePath(),
+    title: `新增${SHIP_ATTACHMENT_DISPLAY_NAME}`,
+    query: { bomType: BOM_TYPE.SHIP },
   })
 }
 
 function openEdit(record) {
-  if (!isBomPending(record) && !isBomActive(record)) {
+  if (!isShipList.value && !isBomPending(record) && !isBomActive(record)) {
     message.warning('当前状态的 BOM 不可编辑')
     return
   }
-  const path = `/product-process/bom/${record.id}/edit`
-  openTab(path, `编辑BOM·${record.bomName || ''}`)
+  const path = bomWorkspaceEditPath(record)
+  openTab(
+    path,
+    `编辑${isShipList.value ? SHIP_ATTACHMENT_DISPLAY_NAME : 'BOM'}·${record.bomName || ''}`,
+  )
   router.push(path)
 }
 
@@ -527,7 +669,7 @@ function onPendingAction(key, record) {
   if (key === 'delete') {
     Modal.confirm({
       title: '确认删除',
-      content: `确定删除 BOM「${record.bomName}」吗？`,
+      content: `确定删除${isShipBomType(record.bomType) ? '随货附件' : 'BOM'}「${record.bomName}」吗？`,
       okType: 'danger',
       onOk: () => {
         const res = deleteProductBom(record.id)
@@ -618,19 +760,23 @@ function onArchiveRefCancel() {
 
 function handleBatchEnable() {
   if (!selectedRowKeys.value.length) {
-    message.warning('请先选择要启用的 BOM')
+    message.warning(isShipList.value ? '请先选择要启用的记录' : '请先选择要启用的 BOM')
     return
   }
   const targets = productBomState.boms.filter(
     (r) => selectedRowKeys.value.includes(r.id) && isBomPending(r),
   )
   if (!targets.length) {
-    message.warning('所选记录中没有「待发布」状态的 BOM')
+    message.warning(
+      isShipList.value
+        ? '所选记录中没有「待发布」状态的随货附件'
+        : '所选记录中没有「待发布」状态的 BOM',
+    )
     return
   }
   Modal.confirm({
     title: '批量审核发布',
-    content: `确定审核发布选中的 ${targets.length} 条待发布 BOM 吗？同物品仅允许一个生效版本。`,
+    content: `确定审核发布选中的 ${targets.length} 条待发布${isShipList.value ? '随货附件' : 'BOM'}吗？${isShipList.value ? '同一附件包仅允许一个生效版本。' : '同物品仅允许一个生效版本。'}`,
     onOk: () => {
       const { ok, errors } = batchEnableProductBom(selectedRowKeys.value)
       selectedRowKeys.value = []
@@ -644,7 +790,7 @@ function handleBatchEnable() {
 
 function handleBatchArchive() {
   if (!selectedRowKeys.value.length) {
-    message.warning('请先选择要归档的 BOM')
+    message.warning(isShipList.value ? '请先选择要归档的记录' : '请先选择要归档的 BOM')
     return
   }
   const targets = productBomState.boms.filter(
@@ -667,8 +813,8 @@ function handleBatchArchive() {
     title: '批量归档',
     content:
       withRefs.length > 0
-        ? `将归档 ${targets.length} 条 BOM，其中 ${withRefs.length} 条被母件引用，需逐条确认如何处理母件中的子件。`
-        : `确定归档选中的 ${targets.length} 条 BOM 吗？`,
+        ? `将归档 ${targets.length} 条记录，其中 ${withRefs.length} 条被母件引用，需逐条确认如何处理母件中的子件。`
+        : `确定归档选中的 ${targets.length} 条${isShipList.value ? '随货附件' : 'BOM'}吗？`,
     onOk: () => {
       withoutRefs.forEach((row) => archiveProductBom(row.id))
       selectedRowKeys.value = []
@@ -687,7 +833,72 @@ function handleBatchArchive() {
 
 function handleClone(record) {
   const cloned = cloneProductBom(record.id)
-  if (cloned) message.success('已克隆为待发布版本')
+  if (cloned) {
+    message.success(isShipList.value ? '已复制为停用状态' : '已克隆为待发布版本')
+  }
+}
+
+function isShipAttachmentReferenced(record) {
+  const id = String(record?.id || '')
+  if (!id) return false
+  const inDelivery = (deliveryOrderState.orders || []).some((o) =>
+    (o.shipAttachments || []).some((a) => String(a.sourceBomId) === id),
+  )
+  if (inDelivery) return true
+  return (salesOrderState.orders || []).some((so) =>
+    (so.deliveryApplications || []).some((app) =>
+      (app.shipAttachments || []).some((a) => String(a.sourceBomId) === id),
+    ),
+  )
+}
+
+function handleToggleShipStatus(record) {
+  if (isShipAttachmentEnabled(record)) {
+    const referenced = isShipAttachmentReferenced(record)
+    Modal.confirm({
+      title: '停用确认',
+      content: referenced
+        ? '当前随货附件已被引用，停用后，发货将按优先级匹配已启用的随货附件。是否确认停用？'
+        : `确定要停用随货附件「${record.bomName}」吗？`,
+      onOk: () => {
+        const res = disableShipAttachment(record.id, { force: true })
+        if (!res.ok) {
+          message.warning(res.message || '操作失败')
+          return
+        }
+        message.success('已停用')
+      },
+    })
+    return
+  }
+
+  const res = enableShipAttachment(record.id)
+  if (res.needConflict) {
+    pendingShipEnableId.value = record.id
+    shipConflictKind.value = res.conflict.kind
+    shipConflictRows.value = res.conflict.conflicts || []
+    shipConflictName.value = record.bomName || ''
+    shipConflictOpen.value = true
+    return
+  }
+  if (!res.ok) {
+    message.warning(res.message || '启用失败')
+    return
+  }
+  message.success('已启用')
+}
+
+function onShipConflictConfirm({ mode }) {
+  if (!pendingShipEnableId.value) return
+  const res = enableShipAttachment(pendingShipEnableId.value, {
+    conflictResolution: { mode },
+  })
+  pendingShipEnableId.value = ''
+  if (!res.ok) {
+    message.warning(res.message || '启用失败')
+    return
+  }
+  message.success('已启用')
 }
 
 function doEnable(record, upgradeParentRefs = false, parentRefs = []) {
@@ -700,7 +911,11 @@ function doEnable(record, upgradeParentRefs = false, parentRefs = []) {
     upgradeParentRefs && parentRefs.length
       ? `，已同步更新 ${parentRefs.length} 个父级 BOM 的引用版本`
       : ''
-  message.success(`审核发布成功，当前版本已生效可用于生产${syncHint}`)
+  message.success(
+    isShipBomType(record.bomType)
+      ? `审核发布成功，当前版本已生效可用于发货${syncHint}`
+      : `审核发布成功，当前版本已生效可用于生产${syncHint}`,
+  )
 }
 
 function handleEnable(record) {

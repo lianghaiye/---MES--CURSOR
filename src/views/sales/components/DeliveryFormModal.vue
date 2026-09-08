@@ -494,13 +494,13 @@
         <div class="section-title">
           发货附件
           <a-tooltip
-            title="按产品分组管理发运附件包。套数展示为「已选择套数/订单套数」；可通过「从发运BOM添加」多次累加套数（可大于订单套数，用于赠送）。"
+            title="按产品分组管理随货附件包。套数展示为「已选择套数/订单套数」；可通过「从随货附件添加」多次累加套数（可大于订单套数，用于赠送）。"
           >
             <QuestionCircleOutlined class="th-tip-icon" />
           </a-tooltip>
         </div>
         <a-space :size="8">
-          <a-button size="small" @click="openAddFromShipBom">从发运BOM添加</a-button>
+          <a-button size="small" @click="openAddFromShipBom">从随货附件添加</a-button>
           <a-button type="primary" size="small" @click="attachmentPickerOpen = true">
             手工添加
           </a-button>
@@ -518,7 +518,7 @@
 
       <a-empty
         v-if="!shipAttachmentProductSummaries.length"
-        description="暂无发货附件（选择销售订单后，有发运 BOM 的产品会按产品分组列出）"
+        description="暂无发货附件（选择销售订单后，有随货附件的产品会按产品分组列出）"
       />
 
       <a-collapse
@@ -703,7 +703,7 @@
 
     <a-modal
       v-model:open="shipBomAddOpen"
-      title="从发运BOM添加"
+      title="从随货附件添加"
       ok-text="添加"
       destroy-on-close
       @ok="confirmAddFromShipBom"
@@ -1513,7 +1513,7 @@ function openAddFromShipBom() {
     return
   }
   if (!shipBomAddProductOpts.value.length) {
-    message.warning('本单产品均无生效发运 BOM，请先配置或使用手工添加')
+    message.warning('本单产品均无生效随货附件，请先配置或使用手工添加')
     return
   }
   shipBomAddForm.productKey = shipBomAddProductOpts.value[0]?.value
@@ -1534,7 +1534,7 @@ function confirmAddFromShipBom() {
   }
   const shipBom = getActiveShipBomForProduct(opt.productId)
   if (!shipBom) {
-    message.warning(`产品「${opt.productName}」无生效发运 BOM`)
+    message.warning(`产品「${opt.productName}」无生效随货附件`)
     return Promise.reject()
   }
   form.shipAttachments = enrichShipAttachmentsWithShipStatus(
@@ -1560,7 +1560,7 @@ function confirmAddFromShipBom() {
         (opt.productCode && r.productCode === opt.productCode),
     )?.kitSets ?? addSets
   message.success(
-    `已为「${opt.productName}」添加 ${addSets} 套发运附件（当前套数：${curSets}/${opt.orderSets}）`,
+    `已为「${opt.productName}」添加 ${addSets} 套随货附件（当前套数：${curSets}/${opt.orderSets}）`,
   )
 }
 

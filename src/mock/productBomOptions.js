@@ -14,6 +14,7 @@ export const bomStatusOptions = [
 export function normalizeBomStatusValue(status) {
   if (status === '待启用') return BOM_STATUS.PENDING
   if (status === '使用中') return BOM_STATUS.ACTIVE
+  if (status === '启用' || status === '停用') return status
   if (Object.values(BOM_STATUS).includes(status)) return status
   return BOM_STATUS.PENDING
 }
@@ -41,6 +42,8 @@ export function isBomArchived(bom) {
 }
 
 export function isBomEditable(bom) {
+  const status = bom?.status
+  if (status === '启用' || status === '停用') return true
   return isBomPending(bom) || isBomActive(bom)
 }
 

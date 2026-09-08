@@ -5,9 +5,8 @@
 import dayjs from 'dayjs'
 import { createBomLineItem, createBomTreeNode } from '@/mock/bomTemplates'
 import { formatBomVersion, getBomVersionYear } from '@/utils/bomVersion'
-import { BOM_STATUS } from '@/mock/productBomOptions'
 import { BOM_TYPE, SHIP_KIT_ITEM_TYPE } from '@/mock/bomMaterialColumns'
-import { mockProducts } from '@/mock/productInfo'
+import { SHIP_ATTACHMENT_SCOPE_TYPE, SHIP_ATTACHMENT_STATUS } from '@/utils/shipAttachmentScope'
 
 const SHARED_SHIP_BOM_ID = 'bom-ship-shared-demo'
 const SHARED_KIT_ID = 'ship-kit-std-demo'
@@ -51,7 +50,7 @@ const ATTACHMENT_DEFS = [
   },
 ]
 
-function buildSharedShipBom(applicableProductIds) {
+function buildSharedShipBom() {
   const bomId = SHARED_SHIP_BOM_ID
   const rootId = 'bom-ship-root-shared'
   const root = createBomTreeNode({
@@ -109,7 +108,7 @@ function buildSharedShipBom(applicableProductIds) {
     version: formatBomVersion(year, 1),
     versionYear: year,
     versionSub: 1,
-    status: BOM_STATUS.ACTIVE,
+    status: SHIP_ATTACHMENT_STATUS.ENABLED,
     isDefault: true,
     effectiveAt: ts,
     expiredAt: '',
@@ -117,10 +116,12 @@ function buildSharedShipBom(applicableProductIds) {
     creator: 'admin',
     createdAt: ts,
     updatedAt: ts,
-    remark: '演示：多产品共用发运 BOM，申请发货按适用产品自动带出',
+    remark: '演示：全局随货附件，申请发货按优先级匹配带出',
     matchingRequirements: '',
     bomType: BOM_TYPE.SHIP,
-    applicableProductIds,
+    scopeType: SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL,
+    objects: [],
+    applicableProductIds: [],
     specModel: '',
     material: '',
     drawingNo: '',
@@ -135,9 +136,7 @@ function buildSharedShipBom(applicableProductIds) {
 }
 
 export function createShipBomDemoRecords() {
-  const products = (mockProducts || []).filter((p) => p?.id && p?.canSell !== false).slice(0, 8)
-  const applicableProductIds = products.map((p) => p.id)
-  return [buildSharedShipBom(applicableProductIds)]
+  return [buildSharedShipBom()]
 }
 
 /** 强制刷新演示发运 BOM；移除旧的「一产品一发运BOM」演示 */

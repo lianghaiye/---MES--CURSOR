@@ -2,7 +2,7 @@
  * 检验项库（质检字段库）mock
  */
 import dayjs from 'dayjs'
-import { isQcSystemFixedField } from '@/utils/qcConclusionField'
+import { isQcSystemFixedField, createPresetConclusionField } from '@/utils/qcConclusionField'
 import {
   QC_FIELD_JUDGE_RULE,
   QC_UNIT_POSITION,
@@ -66,6 +66,7 @@ export function createQcLibraryField(partial = {}) {
     defaultValue: partial.defaultValue ?? '',
     format: partial.format || '',
     charLimit: partial.charLimit ?? null,
+    isSystem: Boolean(partial.isSystem),
     ...standard,
     ...complex,
     creator: partial.creator || 'admin1',
@@ -82,8 +83,59 @@ export function createQcLibraryField(partial = {}) {
   return row
 }
 
-/** 演示种子：常见检验项 */
+/** 演示种子：系统默认项 + 常见检验项 */
 export const mockQcLibraryFields = [
+  createQcLibraryField({
+    id: 'qcf-sys-method',
+    code: 'QC_INSPECT_METHOD',
+    name: '质检方式',
+    type: 'radio',
+    status: '启用',
+    category: '其他',
+    required: true,
+    isSystem: true,
+    options: ['抽检', '全检'],
+    defaultValue: '抽检',
+    judgeRule: QC_FIELD_JUDGE_RULE.NONE,
+    placeholder: '请选择质检方式',
+    creator: '系统管理员',
+    createdAt: '2026-01-01 00:00:00',
+    updater: '系统管理员',
+    updatedAt: '2026-01-01 00:00:00',
+  }),
+  createQcLibraryField({
+    id: 'qcf-sys-qty',
+    code: 'QC_INSPECT_QTY',
+    name: '质检数量',
+    type: 'number',
+    status: '启用',
+    category: '其他',
+    required: true,
+    isSystem: true,
+    allowDecimal: true,
+    judgeRule: QC_FIELD_JUDGE_RULE.NONE,
+    placeholder: '请输入质检数量',
+    creator: '系统管理员',
+    createdAt: '2026-01-01 00:00:00',
+    updater: '系统管理员',
+    updatedAt: '2026-01-01 00:00:00',
+  }),
+  createQcLibraryField({
+    id: 'qcf-sys-remark',
+    code: 'QC_INSPECT_REMARK',
+    name: '检验备注',
+    type: 'textarea',
+    status: '启用',
+    category: '其他',
+    required: false,
+    isSystem: true,
+    judgeRule: QC_FIELD_JUDGE_RULE.NONE,
+    placeholder: '请输入检验备注',
+    creator: '系统管理员',
+    createdAt: '2026-01-01 00:00:00',
+    updater: '系统管理员',
+    updatedAt: '2026-01-01 00:00:00',
+  }),
   createQcLibraryField({
     id: 'qcf-hardness',
     code: 'QC_HARDNESS',
@@ -197,21 +249,6 @@ export const mockQcLibraryFields = [
     createdAt: '2026-06-01 09:10:00',
     updater: '系统管理员',
     updatedAt: '2026-06-01 09:10:00',
-  }),
-  createQcLibraryField({
-    id: 'qcf-remark',
-    code: 'QC_FIELD_REMARK',
-    name: '检验备注',
-    type: 'textarea',
-    status: '停用',
-    category: '其他',
-    required: false,
-    judgeRule: QC_FIELD_JUDGE_RULE.NONE,
-    placeholder: '请输入备注',
-    creator: '系统管理员',
-    createdAt: '2026-06-15 11:00:00',
-    updater: '系统管理员',
-    updatedAt: '2026-06-15 11:00:00',
   }),
   createQcLibraryField({
     id: 'qcf-run-test',
@@ -355,6 +392,20 @@ export function templateFieldToLibraryPayload(field = {}) {
 
 /** 库字段 → 模板字段快照 */
 export function libraryFieldToTemplateField(lib = {}) {
+  const code = String(lib.code || '')
+    .trim()
+    .toUpperCase()
+  if (code === 'QC_CONCLUSION' || String(lib.name || '').trim() === '质检结果') {
+    return createPresetConclusionField({
+      name: lib.name || '质检结果',
+      placeholder: lib.placeholder || '请选择质检结果',
+      defaultValue: lib.defaultValue || '',
+      options: lib.options,
+      optionItems: lib.optionItems,
+      optionResults: lib.optionResults,
+      enabled: lib.status !== '停用',
+    })
+  }
   const standard = pickFieldStandardProps(lib)
   const complex = pickComplexFieldProps(lib)
   return {
@@ -370,6 +421,7 @@ export function libraryFieldToTemplateField(lib = {}) {
     format: lib.format || '',
     charLimit: lib.charLimit ?? null,
     category: lib.category || '',
+    isSystem: Boolean(lib.isSystem),
     ...standard,
     ...complex,
     standardText:

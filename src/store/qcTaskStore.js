@@ -5,18 +5,21 @@ import { matchQcTemplate } from '@/utils/qcTemplateMatchService'
 import {
   aggregateLineConclusions,
   ensureFieldsWithSystemFixedItems,
+  normalizeSheetConclusionOptionItems,
   resolveQcResultFromFieldValues,
+  upsertSheetConclusionField,
 } from '@/utils/qcConclusionField'
 import { normalizeSheetPassRule } from '@/utils/qcTemplateSheetPass'
 import { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS } from '@/constants/qcTaskResult'
 import { cloneMockIncomingQcTasks } from '@/mock/qcTasks'
+import { getQcTemplateByCode } from '@/store/qcTemplateStore'
 
 export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 
 const STORAGE_KEY = 'i_doms_qc_tasks'
-const STORAGE_VERSION = 2
+const STORAGE_VERSION = 3
 const SEED_VERSION_KEY = 'i_doms_qc_tasks_seed_v'
-const CURRENT_SEED_VERSION = '7'
+const CURRENT_SEED_VERSION = '9'
 
 export const QC_TASK_STATUS = {
   PENDING: '待质检',
@@ -41,13 +44,75 @@ function markSeeded() {
   localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
+function isQuotaExceededError(err) {
+  if (!err) return false
+  return (
+    err.name === 'QuotaExceededError' ||
+    err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    err.code === 22 ||
+    err.code === 1014
+  )
+}
+
+/** 落盘瘦身：不存 templateFields / fieldMap（可按 templateCode 回填），避免撑爆 localStorage */
+function slimTasksForStorage(tasks = []) {
+  return (tasks || []).map((t) => {
+    const taskRest = { ...(t || {}) }
+    delete taskRest.templateFields
+    return {
+      ...taskRest,
+      lineItems: (t.lineItems || []).map((l) => {
+        const lineRest = { ...(l || {}) }
+        delete lineRest.templateFields
+        delete lineRest.fieldMap
+        return {
+          ...lineRest,
+          sheetConclusionOptionItems: Array.isArray(l.sheetConclusionOptionItems)
+            ? l.sheetConclusionOptionItems.map((o) => ({ ...o }))
+            : l.sheetConclusionOptionItems,
+          fieldValues: Array.isArray(l.fieldValues) ? l.fieldValues.map((v) => ({ ...v })) : [],
+        }
+      }),
+    }
+  })
+}
+
+function hydrateLineTemplateFields(line = {}) {
+  if (Array.isArray(line.templateFields) && line.templateFields.length) {
+    return line
+  }
+  const tpl = getQcTemplateByCode(line.templateCode)
+  if (!tpl?.fields?.length) return line
+  const sheetConclusionOptionItems = normalizeSheetConclusionOptionItems(
+    line.sheetConclusionOptionItems || tpl.sheetConclusionOptionItems,
+  )
+  return {
+    ...line,
+    sheetPassRule: normalizeSheetPassRule(line.sheetPassRule || tpl.sheetPassRule),
+    sheetConclusionOptionItems,
+    templateId: line.templateId || tpl.id,
+    templateName: line.templateName || tpl.name,
+    templateFields: cloneTemplateFieldsSnapshot(tpl.fields, sheetConclusionOptionItems),
+  }
+}
+
+function hydrateTasksAfterLoad(tasks = []) {
+  return (tasks || []).map((t) => ({
+    ...t,
+    lineItems: (t.lineItems || []).map((l) => hydrateLineTemplateFields(l)),
+  }))
+}
+
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed.version === STORAGE_VERSION && Array.isArray(parsed.tasks)) {
-        return parsed.tasks
+      if (
+        (parsed.version === STORAGE_VERSION || parsed.version === 2) &&
+        Array.isArray(parsed.tasks)
+      ) {
+        return hydrateTasksAfterLoad(parsed.tasks)
       }
     }
   } catch {
@@ -59,16 +124,50 @@ function loadFromStorage() {
 function initTasks() {
   if (shouldReseed()) {
     markSeeded()
-    return cloneMockIncomingQcTasks()
+    const seeded = cloneMockIncomingQcTasks()
+    // 立刻按瘦身格式写入，腾出配额并避免首屏 deep watch 再写膨胀数据
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ version: STORAGE_VERSION, tasks: slimTasksForStorage(seeded) }),
+      )
+    } catch {
+      /* ignore */
+    }
+    return hydrateTasksAfterLoad(seeded)
   }
-  return loadFromStorage() || cloneMockIncomingQcTasks()
+  return loadFromStorage() || hydrateTasksAfterLoad(cloneMockIncomingQcTasks())
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ version: STORAGE_VERSION, tasks: qcTaskState.tasks }),
-  )
+  const payload = JSON.stringify({
+    version: STORAGE_VERSION,
+    tasks: slimTasksForStorage(qcTaskState.tasks),
+  })
+  try {
+    localStorage.setItem(STORAGE_KEY, payload)
+    return
+  } catch (err) {
+    if (!isQuotaExceededError(err)) return
+  }
+  // 配额不足：清掉本 key 再写；仍失败则放弃持久化，不抛错打断页面
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.setItem(STORAGE_KEY, payload)
+  } catch {
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          version: STORAGE_VERSION,
+          tasks: slimTasksForStorage(cloneMockIncomingQcTasks()),
+        }),
+      )
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export function generateQcTaskNo(bizScope) {
@@ -86,8 +185,11 @@ export function generateQcTaskNo(bizScope) {
 }
 
 export function createQcTaskLineItem(partial = {}) {
+  const sheetConclusionOptionItems = normalizeSheetConclusionOptionItems(
+    partial.sheetConclusionOptionItems,
+  )
   const templateFields = Array.isArray(partial.templateFields)
-    ? cloneTemplateFieldsSnapshot(partial.templateFields)
+    ? cloneTemplateFieldsSnapshot(partial.templateFields, sheetConclusionOptionItems)
     : []
   return {
     id: partial.id || `qtl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -107,15 +209,20 @@ export function createQcTaskLineItem(partial = {}) {
     templateMatchSource: partial.templateMatchSource || '',
     ...partial,
     sheetPassRule: normalizeSheetPassRule(partial.sheetPassRule),
+    sheetConclusionOptionItems,
     templateFields: Array.isArray(partial.templateFields)
-      ? cloneTemplateFieldsSnapshot(partial.templateFields)
+      ? cloneTemplateFieldsSnapshot(partial.templateFields, sheetConclusionOptionItems)
       : templateFields,
   }
 }
 
-/** 冻结模板字段快照到质检行（补齐系统固定项：方式/数量/结果） */
-export function cloneTemplateFieldsSnapshot(fields = []) {
-  return ensureFieldsWithSystemFixedItems(fields || []).map((f) => ({
+/** 冻结模板字段快照到质检行（补齐整单结论字段） */
+export function cloneTemplateFieldsSnapshot(fields = [], sheetConclusionOptionItems) {
+  const list = upsertSheetConclusionField(
+    ensureFieldsWithSystemFixedItems(fields || []),
+    sheetConclusionOptionItems,
+  )
+  return list.map((f) => ({
     ...f,
     options: f.options ? [...f.options] : [],
     optionItems: f.optionItems ? f.optionItems.map((o) => ({ ...o })) : undefined,
@@ -141,14 +248,18 @@ export function bindQcLineTemplate(linePartial = {}, { bizScope, categoryCode, c
     return { ok: false, message: matched.message || `物料 ${itemCode || '—'} 未匹配到模板` }
   }
   const template = matched.template
+  const sheetConclusionOptionItems = normalizeSheetConclusionOptionItems(
+    template.sheetConclusionOptionItems,
+  )
   const line = createQcTaskLineItem({
     ...linePartial,
     templateId: template.id,
     templateCode: template.code,
     templateName: template.name,
     templateMatchSource: matched.matchSource,
-    templateFields: cloneTemplateFieldsSnapshot(template.fields),
+    templateFields: cloneTemplateFieldsSnapshot(template.fields, sheetConclusionOptionItems),
     sheetPassRule: normalizeSheetPassRule(template.sheetPassRule),
+    sheetConclusionOptionItems,
     inspectMethod:
       linePartial.inspectMethod || resolveInspectMethodFromTemplate(template) || '抽检',
   })

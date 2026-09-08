@@ -36,17 +36,23 @@ export function formatObjectLabel(obj = {}, scopeType) {
   return obj.label || obj.title || obj.value || '—'
 }
 
-/** 纯函数：传入模板列表做冲突检测 */
-export function findQcTemplateConflicts(
-  templates = [],
+/**
+ * 同范围类型下的启用冲突（质检模板 / 随货附件共用）。
+ * bizScope 有值时仅在相同业务类型内比较。
+ */
+export function findEnabledScopeConflicts(
+  rows = [],
   { id, bizScope, scopeType, objects = [] } = {},
+  { isEnabled = isEnabledCustom, nameOf = (row) => row?.name, codeOf = (row) => row?.code } = {},
 ) {
-  const scope = String(bizScope || '').trim()
-  if (!scope || !scopeType) return { hasConflict: false, conflicts: [], kind: scopeType }
+  if (!scopeType) return { hasConflict: false, conflicts: [], kind: scopeType }
+  const scope = bizScope != null ? String(bizScope).trim() : ''
 
-  const others = (templates || []).filter(
-    (t) => isEnabledCustom(t) && t.bizScope === scope && t.scopeType === scopeType && t.id !== id,
-  )
+  const others = (rows || []).filter((t) => {
+    if (!isEnabled(t) || t.scopeType !== scopeType || t.id === id) return false
+    if (scope) return t.bizScope === scope
+    return true
+  })
 
   if (scopeType === QC_TEMPLATE_SCOPE_TYPE.GLOBAL) {
     const hit = others[0] || null
@@ -58,8 +64,8 @@ export function findQcTemplateConflicts(
         {
           key: `global:${hit.id}`,
           currentTemplateId: hit.id,
-          currentTemplateName: hit.name,
-          currentTemplateCode: hit.code,
+          currentTemplateName: nameOf(hit),
+          currentTemplateCode: codeOf(hit),
         },
       ],
     }
@@ -78,8 +84,8 @@ export function findQcTemplateConflicts(
       object: { ...obj },
       objectLabel: formatObjectLabel(obj, scopeType),
       currentTemplateId: hit.id,
-      currentTemplateName: hit.name,
-      currentTemplateCode: hit.code,
+      currentTemplateName: nameOf(hit),
+      currentTemplateCode: codeOf(hit),
     })
   })
 
@@ -88,6 +94,15 @@ export function findQcTemplateConflicts(
     kind: scopeType,
     conflicts,
   }
+}
+
+/** 纯函数：传入模板列表做冲突检测 */
+export function findQcTemplateConflicts(templates = [], payload = {}) {
+  const scope = String(payload.bizScope || '').trim()
+  if (!scope || !payload.scopeType) {
+    return { hasConflict: false, conflicts: [], kind: payload.scopeType }
+  }
+  return findEnabledScopeConflicts(templates, payload)
 }
 
 export function applyQcTemplateConflictReplace(

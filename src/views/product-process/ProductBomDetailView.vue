@@ -14,8 +14,8 @@
               </a-button>
             </a-tooltip>
             <a-tabs v-model:active-key="activeTab" class="detail-tabs">
-              <a-tab-pane key="detail" tab="BOM明细" />
-              <a-tab-pane key="versions" tab="历史版本" />
+              <a-tab-pane key="detail" :tab="isShipBom ? '附件明细' : 'BOM明细'" />
+              <a-tab-pane v-if="!isShipBom" key="versions" tab="历史版本" />
               <a-tab-pane key="logs" tab="操作记录" />
             </a-tabs>
           </div>
@@ -27,15 +27,20 @@
             >
               概览
             </a-button>
-            <a-button v-if="activeTab === 'detail'" @click="relationOpen = true">
+            <a-button v-if="activeTab === 'detail' && !isShipBom" @click="relationOpen = true">
               查看关联BOM
             </a-button>
             <a-button v-if="activeTab === 'detail'" @click="printModalOpen = true">
               <PrinterOutlined />
               打印
             </a-button>
-            <a-button :disabled="!canEdit" @click="handleEdit">编辑</a-button>
-            <a-button :disabled="record.status === '已归档'" @click="handleArchive">归档</a-button>
+            <a-button :disabled="!isShipBom && !canEdit" @click="handleEdit">编辑</a-button>
+            <a-button v-if="isShipBom" @click="handleToggleShipStatus">
+              {{ isShipAttachmentEnabled(record) ? '停用' : '启用' }}
+            </a-button>
+            <a-button v-else :disabled="record.status === '已归档'" @click="handleArchive">
+              归档
+            </a-button>
             <a-button @click="handleBack">返回列表</a-button>
           </a-space>
         </div>
@@ -106,7 +111,7 @@
 
         <template v-else-if="activeTab === 'versions'">
           <div class="section-card versions-tab-card">
-            <div class="section-title">BOM 版本变更</div>
+            <div class="section-title">{{ isShipBom ? '版本变更' : 'BOM 版本变更' }}</div>
             <BomVersionHistoryPanel
               :version-group-id="record.versionGroupId"
               :current-bom="record"
@@ -155,6 +160,16 @@
           @confirm="onArchiveRefConfirm"
         />
 
+        <QcTemplateConflictModal
+          v-model:open="shipConflictOpen"
+          title="随货附件冲突"
+          entity-label="随货附件"
+          :kind="shipConflictKind"
+          :conflicts="shipConflictRows"
+          :current-template-name="record?.bomName || ''"
+          @confirm="onShipConflictConfirm"
+          @cancel="pendingShipEnable = false"
+        />
         <BomVersionCompareModal
           v-model:open="versionCompareOpen"
           :old-bom="compareOldBom"
@@ -162,7 +177,10 @@
           :title="versionCompareTitle"
         />
       </template>
-      <a-empty v-else-if="!loading" description="未找到该 BOM" />
+      <a-empty
+        v-else-if="!loading"
+        :description="isShipAttachmentPath(route.path) ? '未找到该随货附件' : '未找到该 BOM'"
+      />
     </a-spin>
   </div>
 </template>
@@ -179,10 +197,28 @@ import { PrinterOutlined, MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-desi
 import { getVersionsInGroup } from '@/mock/productBom'
 import { buildBomOperationLogs } from '@/mock/bomOperationLogs'
 import { defaultBomColumnSettings, isShipBomType } from '@/mock/bomMaterialColumns'
+import {
+  bomWorkspaceDetailPath,
+  bomWorkspaceEditPath,
+  bomWorkspaceListPath,
+  isShipAttachmentPath,
+  SHIP_ATTACHMENT_DISPLAY_NAME,
+  shipAttachmentDetailPath,
+} from '@/utils/shipAttachmentNav'
 import { defaultBomOverviewColumnSettings } from '@/mock/bomOverviewColumns'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
 import { isBomEditable } from '@/mock/productBomOptions'
-import { getProductBomById, archiveProductBom, productBomState } from '@/store/productBomStore'
+import {
+  getProductBomById,
+  archiveProductBom,
+  productBomState,
+  enableShipAttachment,
+  disableShipAttachment,
+} from '@/store/productBomStore'
+import { isShipAttachmentEnabled } from '@/utils/shipAttachmentScope'
+import { deliveryOrderState } from '@/store/deliveryOrderStore'
+import { salesOrderState } from '@/store/salesOrderStore'
+import QcTemplateConflictModal from '@/views/quality/components/QcTemplateConflictModal.vue'
 import { findParentBomReferences } from '@/utils/bomVersionReference'
 import { loadBomDetailStructure } from '@/utils/bomImport'
 import { getRootTreeId, ROOT_ID } from '@/utils/bomTree'
@@ -219,6 +255,10 @@ const versionCompareOpen = ref(false)
 const compareOldBom = ref(null)
 const compareNewBom = ref(null)
 const versionCompareTitle = ref('')
+const shipConflictOpen = ref(false)
+const shipConflictKind = ref('single')
+const shipConflictRows = ref([])
+const pendingShipEnable = ref(false)
 const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
 const overviewColumnSettings = ref(loadOverviewColumnSettings())
 
@@ -343,21 +383,25 @@ function loadDetail() {
     selectedNodeId.value = structure.flatNodes.find((n) => n.isRoot)?.id || ROOT_ID
 
     const tab = tabStore.tabs.find((t) => t.path === route.path)
-    if (tab) tab.title = bom.bomName || 'BOM详情'
+    if (tab) tab.title = bom.bomName || (isShipBomType(bom.bomType) ? '随货附件详情' : 'BOM详情')
   }
   loading.value = false
+  if (bom && isShipBomType(bom.bomType) && !isShipAttachmentPath(route.path)) {
+    router.replace(shipAttachmentDetailPath(bom.id))
+    return
+  }
+  if (bom && !isShipBomType(bom.bomType) && isShipAttachmentPath(route.path)) {
+    router.replace(`/product-process/bom/${bom.id}`)
+  }
 }
 
 watch(() => route.params.id, loadDetail, { immediate: true })
 
 function openBomDetail(row) {
   if (row.id === record.value?.id) return
-  const resolved = router.resolve({
-    name: 'product-process-bom-detail',
-    params: { id: row.id },
-  })
-  openTab(resolved.path, row.bomName || 'BOM详情')
-  router.push(resolved)
+  const path = bomWorkspaceDetailPath(row)
+  openTab(path, row.bomName || (isShipBomType(row.bomType) ? '随货附件详情' : 'BOM详情'))
+  router.push(path)
 }
 
 function findBomByVersion(version) {
@@ -381,8 +425,10 @@ function handleVersionViewBom(item) {
 }
 
 function handleVersionCompare(item) {
-  const newBom = findBomByVersion(item.version)
-  const oldBom = findBomByVersion(item.compareVersion)
+  const newBom = item.bomId ? getProductBomById(item.bomId) : findBomByVersion(item.version)
+  const oldBom = item.compareBomId
+    ? getProductBomById(item.compareBomId)
+    : findBomByVersion(item.compareVersion)
   if (!newBom || !oldBom) {
     message.info('暂无可对比的版本数据')
     return
@@ -394,13 +440,81 @@ function handleVersionCompare(item) {
 }
 
 function handleEdit() {
-  if (!canEdit.value || !record.value) {
+  if (!record.value) return
+  if (!isShipBom.value && !canEdit.value) {
     message.info('当前状态的 BOM 不可编辑')
     return
   }
-  const path = `/product-process/bom/${record.value.id}/edit`
-  openTab(path, `编辑BOM·${record.value.bomName || ''}`)
+  const path = bomWorkspaceEditPath(record.value)
+  openTab(
+    path,
+    `编辑${isShipBom.value ? SHIP_ATTACHMENT_DISPLAY_NAME : 'BOM'}·${record.value.bomName || ''}`,
+  )
   router.push(path)
+}
+
+function isShipAttachmentReferenced(row) {
+  const id = String(row?.id || '')
+  if (!id) return false
+  const inDelivery = (deliveryOrderState.orders || []).some((o) =>
+    (o.shipAttachments || []).some((a) => String(a.sourceBomId) === id),
+  )
+  if (inDelivery) return true
+  return (salesOrderState.orders || []).some((so) =>
+    (so.deliveryApplications || []).some((app) =>
+      (app.shipAttachments || []).some((a) => String(a.sourceBomId) === id),
+    ),
+  )
+}
+
+function handleToggleShipStatus() {
+  const row = record.value
+  if (!row) return
+  if (isShipAttachmentEnabled(row)) {
+    const referenced = isShipAttachmentReferenced(row)
+    Modal.confirm({
+      title: '停用确认',
+      content: referenced
+        ? '当前随货附件已被引用，停用后，发货将按优先级匹配已启用的随货附件。是否确认停用？'
+        : `确定要停用随货附件「${row.bomName}」吗？`,
+      onOk: () => {
+        const res = disableShipAttachment(row.id, { force: true })
+        if (!res.ok) {
+          message.warning(res.message || '操作失败')
+          return
+        }
+        loadDetail()
+        message.success('已停用')
+      },
+    })
+    return
+  }
+  const res = enableShipAttachment(row.id)
+  if (res.needConflict) {
+    pendingShipEnable.value = true
+    shipConflictKind.value = res.conflict.kind
+    shipConflictRows.value = res.conflict.conflicts || []
+    shipConflictOpen.value = true
+    return
+  }
+  if (!res.ok) {
+    message.warning(res.message || '启用失败')
+    return
+  }
+  loadDetail()
+  message.success('已启用')
+}
+
+function onShipConflictConfirm({ mode }) {
+  if (!pendingShipEnable.value || !record.value) return
+  const res = enableShipAttachment(record.value.id, { conflictResolution: { mode } })
+  pendingShipEnable.value = false
+  if (!res.ok) {
+    message.warning(res.message || '启用失败')
+    return
+  }
+  loadDetail()
+  message.success('已启用')
 }
 
 function handleArchive() {
@@ -413,7 +527,7 @@ function handleArchive() {
   }
   Modal.confirm({
     title: '确认归档',
-    content: `确定归档 BOM「${record.value.bomName}」吗？`,
+    content: `确定归档${isShipBom.value ? '随货附件' : 'BOM'}「${record.value.bomName}」吗？`,
     onOk: () => {
       const res = archiveProductBom(record.value.id)
       if (!res) {
@@ -445,7 +559,7 @@ function onArchiveRefConfirm({ removeRefs = [], keepSelfRefs = [] }) {
 
 function handleBack() {
   const detailPath = route.path
-  const listPath = '/product-process/bom'
+  const listPath = bomWorkspaceListPath(record.value)
   const closingActive = tabStore.activePath === detailPath
   closeTab(detailPath)
   router.push(closingActive ? tabStore.activePath || listPath : listPath)

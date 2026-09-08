@@ -6,29 +6,75 @@ import {
   createQcTemplate,
   nextQcTemplateCode,
 } from '@/mock/qcTemplates'
-import { ensureFieldsWithSystemFixedItems } from '@/utils/qcConclusionField'
+import {
+  ensureFieldsWithSystemFixedItems,
+  upsertSheetConclusionField,
+} from '@/utils/qcConclusionField'
 import {
   applyQcTemplateConflictReplace,
   filterObjectsSkippingConflicts,
   findQcTemplateConflicts,
 } from '@/utils/qcTemplateConflictService'
 
+const TEMPLATE_SEED_KEY = 'i_doms_qc_templates_seed_v'
+const TEMPLATE_SEED_VERSION = '11'
+
 function nowText() {
   return dayjs().format('YYYY-MM-DD HH:mm:ss')
 }
 
+function initTemplates() {
+  try {
+    if (localStorage.getItem(TEMPLATE_SEED_KEY) !== TEMPLATE_SEED_VERSION) {
+      localStorage.setItem(TEMPLATE_SEED_KEY, TEMPLATE_SEED_VERSION)
+    }
+  } catch {
+    /* ignore */
+  }
+  return cloneQcTemplates()
+}
+
 export const qcTemplateState = reactive({
-  templates: cloneQcTemplates(),
+  templates: initTemplates(),
 })
 
-/** 热更新下同步密封件模板中的复合字段结构，并移除多点 */
+/** 按种子版本重载演示模板；热更新时同步密封件复合结构 */
 export function ensureQcTemplateDemoSeed() {
+  let changed = false
+  try {
+    if (localStorage.getItem(TEMPLATE_SEED_KEY) !== TEMPLATE_SEED_VERSION) {
+      localStorage.setItem(TEMPLATE_SEED_KEY, TEMPLATE_SEED_VERSION)
+      const fresh = cloneQcTemplates()
+      qcTemplateState.templates.splice(0, qcTemplateState.templates.length, ...fresh)
+      return true
+    }
+  } catch {
+    /* ignore */
+  }
+
   const row = qcTemplateState.templates.find((t) => t.code === 'QCT-USR-LL-001')
   if (!row) return false
   const fresh = cloneQcTemplates().find((t) => t.code === 'QCT-USR-LL-001')
   if (!fresh) return false
 
-  let changed = false
+  if (row.sheetPassRule !== fresh.sheetPassRule) {
+    row.sheetPassRule = fresh.sheetPassRule
+    changed = true
+  }
+  if (
+    JSON.stringify(row.sheetConclusionOptionItems || []) !==
+    JSON.stringify(fresh.sheetConclusionOptionItems || [])
+  ) {
+    row.sheetConclusionOptionItems = (fresh.sheetConclusionOptionItems || []).map((o) => ({
+      ...o,
+    }))
+    changed = true
+  }
+  if (row.name !== fresh.name) {
+    row.name = fresh.name
+    changed = true
+  }
+
   const fields = (row.fields || []).filter((f) => f.type !== 'matrix' && f.code !== 'QC_PERF_CURVE')
   if (fields.length !== (row.fields || []).length) changed = true
 
@@ -142,8 +188,9 @@ export function deleteQcTemplate(id) {
 
 export function addQcTemplate(payload = {}, operator = 'admin1') {
   const now = nowText()
-  const fields = ensureFieldsWithSystemFixedItems(
-    Array.isArray(payload.fields) ? payload.fields : [],
+  const fields = upsertSheetConclusionField(
+    ensureFieldsWithSystemFixedItems(Array.isArray(payload.fields) ? payload.fields : []),
+    payload.sheetConclusionOptionItems,
   )
   const row = createQcTemplate({
     ...payload,
@@ -183,8 +230,11 @@ export function updateQcTemplate(
   const nextStatus = payload.status != null ? payload.status : row.status
   const willEnable = nextStatus === '启用'
 
-  const fields = ensureFieldsWithSystemFixedItems(
-    Array.isArray(payload.fields) ? payload.fields : row.fields,
+  const fields = upsertSheetConclusionField(
+    ensureFieldsWithSystemFixedItems(Array.isArray(payload.fields) ? payload.fields : row.fields),
+    payload.sheetConclusionOptionItems != null
+      ? payload.sheetConclusionOptionItems
+      : row.sheetConclusionOptionItems,
   )
 
   if (willEnable) {
@@ -216,6 +266,10 @@ export function updateQcTemplate(
       status: '启用',
       sheetPassRule:
         payload.sheetPassRule != null ? payload.sheetPassRule : row.sheetPassRule || 'manual',
+      sheetConclusionOptionItems:
+        payload.sheetConclusionOptionItems != null
+          ? payload.sheetConclusionOptionItems
+          : row.sheetConclusionOptionItems,
       fields: fields.map((f) => ({ ...f, options: f.options ? [...f.options] : [] })),
       fieldCount: payload.fieldCount != null ? payload.fieldCount : fields.length,
       updater: operator,
@@ -232,6 +286,10 @@ export function updateQcTemplate(
     status: nextStatus,
     sheetPassRule:
       payload.sheetPassRule != null ? payload.sheetPassRule : row.sheetPassRule || 'manual',
+    sheetConclusionOptionItems:
+      payload.sheetConclusionOptionItems != null
+        ? payload.sheetConclusionOptionItems
+        : row.sheetConclusionOptionItems,
     fields: fields.map((f) => ({ ...f, options: f.options ? [...f.options] : [] })),
     fieldCount: payload.fieldCount != null ? payload.fieldCount : fields.length,
     updater: operator,
@@ -257,6 +315,7 @@ export function copyQcTemplate(id, operator = 'admin1') {
       scopeType: source.scopeType,
       objects: Array.isArray(source.objects) ? [...source.objects] : [],
       sheetPassRule: source.sheetPassRule,
+      sheetConclusionOptionItems: source.sheetConclusionOptionItems,
       fields,
       fieldCount: fields.length,
       gatePolicy: source.gatePolicy,

@@ -8,6 +8,11 @@ import {
   QC_SYSTEM_UNIVERSAL_TEMPLATE_CODE,
 } from '@/mock/qcSystemTemplateFields'
 import { mockQcTemplates } from '@/mock/qcTemplates'
+import {
+  normalizeSheetConclusionOptionItems,
+  upsertSheetConclusionField,
+} from '@/utils/qcConclusionField'
+import { normalizeSheetPassRule } from '@/utils/qcTemplateSheetPass'
 
 const SYSTEM_FIELDS = () =>
   cloneUniversalSystemTemplateFields().map((f) => ({
@@ -31,9 +36,15 @@ function findTpl(code) {
   return mockQcTemplates.find((t) => t.code === code) || null
 }
 
+/** 按模板冻结字段、整单规则与结论选项（避免录入时串成「人工判定」默认行为） */
 function lineWithTemplate(partial = {}, templateCode) {
   const tpl = findTpl(templateCode)
-  const fields = tpl ? cloneFields(tpl.fields) : SYSTEM_FIELDS()
+  const sheetConclusionOptionItems = normalizeSheetConclusionOptionItems(
+    tpl?.sheetConclusionOptionItems,
+  )
+  const fields = tpl
+    ? cloneFields(upsertSheetConclusionField(tpl.fields || [], sheetConclusionOptionItems))
+    : SYSTEM_FIELDS()
   const methodField = fields.find((f) => f.code === 'QC_INSPECT_METHOD')
   return line({
     ...partial,
@@ -41,7 +52,8 @@ function lineWithTemplate(partial = {}, templateCode) {
     templateCode: tpl?.code || QC_SYSTEM_UNIVERSAL_TEMPLATE_CODE,
     templateName: tpl?.name || '系统通用模板',
     templateFields: fields,
-    sheetPassRule: tpl?.sheetPassRule || 'manual',
+    sheetPassRule: normalizeSheetPassRule(tpl?.sheetPassRule),
+    sheetConclusionOptionItems: sheetConclusionOptionItems.map((o) => ({ ...o })),
     inspectMethod: partial.inspectMethod || methodField?.defaultValue || '抽检',
   })
 }
@@ -70,6 +82,10 @@ function line(partial = {}) {
     templateCode: partial.templateCode || '',
     templateName: partial.templateName || '',
     ...partial,
+    sheetPassRule: normalizeSheetPassRule(partial.sheetPassRule),
+    sheetConclusionOptionItems: Array.isArray(partial.sheetConclusionOptionItems)
+      ? partial.sheetConclusionOptionItems.map((o) => ({ ...o }))
+      : normalizeSheetConclusionOptionItems(partial.sheetConclusionOptionItems),
     templateFields: Array.isArray(partial.templateFields)
       ? cloneFields(partial.templateFields)
       : partial.templateFields || [],
@@ -132,8 +148,9 @@ function task(partial = {}) {
   }
 }
 
-/** 来料质检演示单据 */
+/** 来料质检演示单据（覆盖：全部达标 / 人工判定 / 关键项 / 少项 / 多模板） */
 export const mockIncomingQcTasks = [
+  // 多模板对照：密封件=全部达标多项；轴承=人工判定2项
   task({
     id: 'qctask-ll-1',
     qcNo: 'LLZJ202608280001',
@@ -146,7 +163,7 @@ export const mockIncomingQcTasks = [
     itemName: '机械密封件',
     specModel: 'Φ45',
     unit: '套',
-    remark: '急料，优先检验',
+    remark: '对照单：密封件=全部达标·多项；轴承=人工判定·2项（含特采）',
     createdAt: '2026-08-28 09:20:00',
     updatedAt: '2026-08-28 09:20:00',
     lineItems: [
@@ -184,11 +201,12 @@ export const mockIncomingQcTasks = [
       ),
     ],
   }),
+  // O型圈：全部达标·1项
   task({
     id: 'qctask-ll-2',
     qcNo: 'LLZJ202608270002',
     qcStatus: '检验中',
-    inspectMethod: '全检',
+    inspectMethod: '抽检',
     sourceDocNo: 'CGSH-260819-011',
     sourceDocId: 'prct-mock-sh-2',
     supplier: '采购供应商A',
@@ -199,7 +217,7 @@ export const mockIncomingQcTasks = [
     specModel: 'Φ50',
     unit: '件',
     inspector: '质检员A',
-    remark: '',
+    remark: '演示：全部达标 + 仅 1 个检验项',
     createdAt: '2026-08-27 14:10:00',
     updatedAt: '2026-08-27 16:40:00',
     lineItems: [
@@ -215,14 +233,15 @@ export const mockIncomingQcTasks = [
           unit: '件',
           purchaseQty: 200,
           receiptQty: 200,
-          inspectQty: 200,
+          inspectQty: 20,
           receivingWarehouse: '辅料仓',
-          inspectMethod: '全检',
+          inspectMethod: '抽检',
         },
-        QC_SYSTEM_UNIVERSAL_TEMPLATE_CODE,
+        'QCT-USR-LL-004',
       ),
     ],
   }),
+  // 密封件已完成：全部达标多项
   task({
     id: 'qctask-ll-3',
     qcNo: 'LLZJ202608260003',
@@ -242,6 +261,7 @@ export const mockIncomingQcTasks = [
     unit: '套',
     inspector: '质检员B',
     inspectedAt: '2026-08-26 11:30:00',
+    remark: '演示：全部达标·多项（硬度+外观+运转复合）',
     createdAt: '2026-08-26 08:50:00',
     updatedAt: '2026-08-26 11:30:00',
     lineItems: [
@@ -272,16 +292,86 @@ export const mockIncomingQcTasks = [
                 children: {
                   bearing_temp: 62,
                   seal_leak: 2,
-                  surface_state: '完好',
-                  batch_mark: 'A1',
-                  remark: '运转平稳',
+                  vibration: 3.2,
+                  noise: 78,
                 },
               },
             },
-            { fieldCode: 'QC_CONCLUSION', fieldName: '质检结果', value: '合格' },
+            { fieldCode: 'QC_CONCLUSION', fieldName: '整单结论', value: '合格' },
           ],
         },
         'QCT-USR-LL-001',
+      ),
+    ],
+  }),
+  // 垫片：关键项达标·3项
+  task({
+    id: 'qctask-ll-7',
+    qcNo: 'LLZJ202609080007',
+    qcStatus: '待质检',
+    sourceDocNo: 'CGSH-260908-021',
+    sourceDocId: 'prct-mock-sh-7',
+    supplier: '密封件标准件厂',
+    creator: 'admin1',
+    itemCode: 'DP-PTFE-3',
+    itemName: 'PTFE 垫片',
+    specModel: '3mm',
+    unit: '片',
+    remark: '演示：关键项达标（仅「垫片面外观」为关键项，厚度/标记不强制）',
+    createdAt: '2026-09-08 09:00:00',
+    updatedAt: '2026-09-08 09:00:00',
+    lineItems: [
+      lineWithTemplate(
+        {
+          id: 'qtl-ll-7-1',
+          sourceLineId: 'prct-mock-sh-7-l1',
+          itemCode: 'DP-PTFE-3',
+          itemName: 'PTFE 垫片',
+          specModel: '3mm',
+          material: 'PTFE',
+          unit: '片',
+          purchaseQty: 100,
+          receiptQty: 100,
+          inspectQty: 10,
+          receivingWarehouse: '辅料仓',
+        },
+        'QCT-USR-LL-003',
+      ),
+    ],
+  }),
+  // 轴承单模板：人工判定
+  task({
+    id: 'qctask-ll-8',
+    qcNo: 'LLZJ202609080008',
+    qcStatus: '待质检',
+    sourceDocNo: 'CGSH-260908-022',
+    sourceDocId: 'prct-mock-sh-8',
+    supplier: 'SKF代理商',
+    creator: 'admin1',
+    itemCode: 'ZC-6312',
+    itemName: '深沟球轴承 6312',
+    specModel: '6312-2RS',
+    unit: '件',
+    remark: '演示：人工判定（结论含「特采放行」，检验项未达标不强制拦截）',
+    createdAt: '2026-09-08 09:30:00',
+    updatedAt: '2026-09-08 09:30:00',
+    lineItems: [
+      lineWithTemplate(
+        {
+          id: 'qtl-ll-8-1',
+          sourceLineId: 'prct-mock-sh-8-l1',
+          itemCode: 'ZC-6312',
+          itemName: '深沟球轴承 6312',
+          specModel: '6312-2RS',
+          material: 'GCr15',
+          unit: '件',
+          purchaseQty: 80,
+          receiptQty: 80,
+          inspectQty: 8,
+          receivingWarehouse: '原材料仓',
+          inspectMethod: '全检',
+        },
+        'QCT-USR-LL-002',
       ),
     ],
   }),
@@ -303,25 +393,33 @@ export const mockIncomingQcTasks = [
     inspector: '质检员A',
     inspectedAt: '2026-08-25 17:05:00',
     treatmentPlan: '退货',
-    remark: '气孔超标',
+    remark: '气孔超标（系统通用模板兜底）',
     createdAt: '2026-08-25 10:00:00',
     updatedAt: '2026-08-25 17:05:00',
     lineItems: [
-      line({
-        id: 'qtl-ll-4-1',
-        sourceLineId: 'prct-mock-sh-4-l1',
-        itemCode: 'ZG-HT200',
-        itemName: '铸铁泵体毛坯',
-        specModel: 'IS80-65-160',
-        material: 'HT200',
-        unit: '件',
-        purchaseQty: 12,
-        receiptQty: 12,
-        inspectQty: 12,
-        receivingWarehouse: '毛坯仓',
-        lineQcResult: QC_TASK_RESULT.FAIL,
-        treatmentPlan: '退货',
-      }),
+      lineWithTemplate(
+        {
+          id: 'qtl-ll-4-1',
+          sourceLineId: 'prct-mock-sh-4-l1',
+          itemCode: 'ZG-HT200',
+          itemName: '铸铁泵体毛坯',
+          specModel: 'IS80-65-160',
+          material: 'HT200',
+          unit: '件',
+          purchaseQty: 12,
+          receiptQty: 12,
+          inspectQty: 12,
+          receivingWarehouse: '毛坯仓',
+          lineQcResult: QC_TASK_RESULT.FAIL,
+          treatmentPlan: '退货',
+          fieldValues: [
+            { fieldCode: 'QC_INSPECT_METHOD', fieldName: '质检方式', value: '全检' },
+            { fieldCode: 'QC_INSPECT_QTY', fieldName: '质检数量', value: 12 },
+            { fieldCode: 'QC_CONCLUSION', fieldName: '整单结论', value: '不合格' },
+          ],
+        },
+        QC_SYSTEM_UNIVERSAL_TEMPLATE_CODE,
+      ),
     ],
   }),
   task({
@@ -343,39 +441,45 @@ export const mockIncomingQcTasks = [
     inspector: '质检员C',
     inspectedAt: '2026-08-24 15:20:00',
     treatmentPlan: '让步接收',
-    remark: '部分批次表面锈蚀，让步入库',
+    remark: '部分批次表面锈蚀，让步入库（系统通用模板）',
     createdAt: '2026-08-24 09:15:00',
     updatedAt: '2026-08-24 15:20:00',
     lineItems: [
-      line({
-        id: 'qtl-ll-5-1',
-        sourceLineId: 'prct-mock-sh-5-l1',
-        itemCode: 'DX-18',
-        itemName: '螺栓 M18',
-        specModel: 'M18×60',
-        material: '8.8级',
-        unit: '件',
-        purchaseQty: 500,
-        receiptQty: 500,
-        inspectQty: 50,
-        receivingWarehouse: '标准件仓',
-        lineQcResult: QC_TASK_RESULT.PASS,
-      }),
-      line({
-        id: 'qtl-ll-5-2',
-        sourceLineId: 'prct-mock-sh-5-l2',
-        itemCode: 'DX-16',
-        itemName: '螺栓 M16',
-        specModel: 'M16×50',
-        material: '8.8级',
-        unit: '件',
-        purchaseQty: 300,
-        receiptQty: 300,
-        inspectQty: 30,
-        receivingWarehouse: '标准件仓',
-        lineQcResult: QC_TASK_RESULT.FAIL,
-        treatmentPlan: '让步接收',
-      }),
+      lineWithTemplate(
+        {
+          id: 'qtl-ll-5-1',
+          sourceLineId: 'prct-mock-sh-5-l1',
+          itemCode: 'DX-18',
+          itemName: '螺栓 M18',
+          specModel: 'M18×60',
+          material: '8.8级',
+          unit: '件',
+          purchaseQty: 500,
+          receiptQty: 500,
+          inspectQty: 50,
+          receivingWarehouse: '标准件仓',
+          lineQcResult: QC_TASK_RESULT.PASS,
+        },
+        QC_SYSTEM_UNIVERSAL_TEMPLATE_CODE,
+      ),
+      lineWithTemplate(
+        {
+          id: 'qtl-ll-5-2',
+          sourceLineId: 'prct-mock-sh-5-l2',
+          itemCode: 'DX-16',
+          itemName: '螺栓 M16',
+          specModel: 'M16×50',
+          material: '8.8级',
+          unit: '件',
+          purchaseQty: 300,
+          receiptQty: 300,
+          inspectQty: 30,
+          receivingWarehouse: '标准件仓',
+          lineQcResult: QC_TASK_RESULT.FAIL,
+          treatmentPlan: '让步接收',
+        },
+        QC_SYSTEM_UNIVERSAL_TEMPLATE_CODE,
+      ),
     ],
   }),
   task({
@@ -394,19 +498,22 @@ export const mockIncomingQcTasks = [
     createdAt: '2026-08-23 11:00:00',
     updatedAt: '2026-08-23 13:40:00',
     lineItems: [
-      line({
-        id: 'qtl-ll-6-1',
-        sourceLineId: 'prct-mock-sh-6-l1',
-        itemCode: 'YG-20',
-        itemName: '圆钢 Φ20',
-        specModel: 'Φ20×6000',
-        material: '45#',
-        unit: '根',
-        purchaseQty: 40,
-        receiptQty: 40,
-        inspectQty: 40,
-        receivingWarehouse: '钢材仓',
-      }),
+      lineWithTemplate(
+        {
+          id: 'qtl-ll-6-1',
+          sourceLineId: 'prct-mock-sh-6-l1',
+          itemCode: 'YG-20',
+          itemName: '圆钢 Φ20',
+          specModel: 'Φ20×6000',
+          material: '45#',
+          unit: '根',
+          purchaseQty: 40,
+          receiptQty: 40,
+          inspectQty: 40,
+          receivingWarehouse: '钢材仓',
+        },
+        QC_SYSTEM_UNIVERSAL_TEMPLATE_CODE,
+      ),
     ],
   }),
 ]

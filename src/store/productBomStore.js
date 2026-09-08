@@ -34,13 +34,23 @@ import { formatBomInfoLabel, sortBomsForDisplay } from '@/utils/itemBomInfo'
 import { resolveActiveBomForItem } from '@/utils/spuBomResolve'
 import { ensureBlankSizeDemoBoms } from '@/mock/blankSizeBomDemoSeed'
 import { ensureShipBomDemos } from '@/mock/shipBomDemoSeed'
-import {
-  BOM_TYPE,
-  isShipBomType,
-  normalizeBomType,
-  SHIP_KIT_ITEM_TYPE,
-} from '@/mock/bomMaterialColumns'
+import { ensureManualBomEditDemo } from '@/mock/manualBomEditDemoSeed'
+import { BOM_TYPE, isShipBomType, normalizeBomType } from '@/mock/bomMaterialColumns'
 import { productInfoState } from '@/store/productInfoStore'
+import { BOM_CHANGE_SOURCE_TYPE, BOM_MANUAL_CHANGE_SOURCE_LABEL } from '@/constants/bomChangeSource'
+import {
+  deriveApplicableProductIds,
+  isShipAttachmentEnabled,
+  matchShipAttachmentForProduct,
+  SHIP_ATTACHMENT_SCOPE_TYPE,
+  SHIP_ATTACHMENT_STATUS,
+} from '@/utils/shipAttachmentScope'
+import {
+  applyShipAttachmentConflictReplace,
+  filterObjectsSkippingConflicts,
+  findShipAttachmentConflicts,
+  hydrateShipAttachmentScope,
+} from '@/utils/shipAttachmentConflict'
 
 const STORAGE_KEY = 'i_doms_product_bom'
 /** v13：归档演示增加母件丙；弹窗改为逐行处理方式 */
@@ -110,7 +120,8 @@ function loadInitialBoms() {
   const base = stored
     ? stored
     : injectBomParentReferenceMocks(normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials)))
-  return ensureShipBomDemos(ensureBlankSizeDemoBoms(injectBomArchiveDemoMocks(base)))
+  const withDemos = ensureShipBomDemos(ensureBlankSizeDemoBoms(injectBomArchiveDemoMocks(base)))
+  return ensureManualBomEditDemo(withDemos)
 }
 
 export const productBomState = reactive({
@@ -168,59 +179,35 @@ export function getOwnActiveBomForItem(itemType, itemId) {
 export function getOwnActiveBomForItemByType(itemType, itemId, bomType) {
   if (!itemType || itemId == null || itemId === '' || !bomType) return null
   const type = normalizeBomType(bomType)
+  const activeCheck = type === BOM_TYPE.SHIP ? isShipAttachmentEnabled : isBomActive
   const row = productBomState.boms.find(
     (b) =>
       b.itemType === itemType &&
       String(b.itemId) === String(itemId) &&
-      isBomActive(b) &&
+      activeCheck(b) &&
       normalizeBomType(b.bomType) === type,
   )
   return row ? ensureBomStructure(row) : null
 }
 
-/** 产品关联的生效发运 BOM（多产品可共用同一套） */
+/** 产品关联的已启用随货附件（单产品 > 产品类别 > 全局） */
 export function getActiveShipBomForProduct(productId) {
   if (productId == null || productId === '') return null
   const pid = String(productId)
+  const product = (productInfoState.products || []).find((p) => String(p.id) === pid) || { id: pid }
 
-  // 1) 产品主数据显式指定
-  const product = (productInfoState.products || []).find((p) => String(p.id) === pid)
-  if (product?.shipBomId) {
+  if (product.shipBomId) {
     const byId = getProductBomById(product.shipBomId)
-    if (byId && isBomActive(byId) && isShipBomType(byId.bomType)) return byId
-    const groupId = byId?.versionGroupId
-    if (groupId) {
-      const activeInGroup = productBomState.boms.find(
-        (b) => b.versionGroupId === groupId && isBomActive(b) && isShipBomType(b.bomType),
-      )
-      if (activeInGroup) return ensureBomStructure(activeInGroup)
-    }
+    if (byId && isShipAttachmentEnabled(byId)) return ensureBomStructure(byId)
   }
 
-  // 2) 共用发运 BOM：适用产品列表包含本产品
-  const shared = productBomState.boms.find(
-    (b) =>
-      isShipBomType(b.bomType) &&
-      isBomActive(b) &&
-      (b.itemType === SHIP_KIT_ITEM_TYPE || Array.isArray(b.applicableProductIds)) &&
-      (b.applicableProductIds || []).map(String).includes(pid),
-  )
-  if (shared) return ensureBomStructure(shared)
-
-  // 3) 兼容旧数据：发运 BOM 曾绑在单一产品上
-  return getOwnActiveBomForItemByType('product', productId, BOM_TYPE.SHIP)
+  const matched = matchShipAttachmentForProduct(productBomState.boms, product)
+  return matched ? ensureBomStructure(matched) : null
 }
 
-/** 全部生效的共用发运 BOM（供产品关联下拉） */
+/** 全部已启用的随货附件（供产品关联下拉） */
 export function listActiveSharedShipBoms() {
-  return productBomState.boms
-    .filter(
-      (b) =>
-        isShipBomType(b.bomType) &&
-        isBomActive(b) &&
-        (b.itemType === SHIP_KIT_ITEM_TYPE || !b.itemType || b.itemType === 'product'),
-    )
-    .map(ensureBomStructure)
+  return productBomState.boms.filter(isShipAttachmentEnabled).map(ensureBomStructure)
 }
 
 /**
@@ -233,12 +220,12 @@ export function getActiveBomForItem(itemType, itemId) {
   return resolveActiveBomForItem(itemType, itemId)
 }
 
-/** 产品/物料关联的全部 BOM 版本（含生效、待发布、已归档） */
+/** 产品/物料关联的全部产品 BOM 版本（含生效、待发布、已归档，不含随货附件） */
 export function getBomsForItem(itemType, itemId) {
   if (!itemType || itemId == null || itemId === '') return []
   const id = String(itemId)
   const rows = productBomState.boms.filter(
-    (b) => b.itemType === itemType && String(b.itemId) === id,
+    (b) => b.itemType === itemType && String(b.itemId) === id && !isShipBomType(b.bomType),
   )
   return sortBomsForDisplay(rows.map(ensureBomStructure))
 }
@@ -262,6 +249,15 @@ export function getBaselineBomForProduct(productId) {
   if (own) return own
   const all = getBomsForItem('product', productId)
   return all.find(isBomPending) || all[0] || null
+}
+
+function stampManualUpgradeMeta(record) {
+  if (!record || record.sourceEcnNo) return record
+  record.changeSourceType = BOM_CHANGE_SOURCE_TYPE.MANUAL_EDIT
+  record.changeSourceLabel = BOM_MANUAL_CHANGE_SOURCE_LABEL
+  record.upgradedBy = record.upgradedBy || record.operator || 'admin'
+  record.upgradedAt = record.upgradedAt || nowStr()
+  return record
 }
 
 function archiveActiveForItem(itemType, itemId, exceptId, bomType) {
@@ -314,10 +310,11 @@ function buildBomRecord(payload, { versionGroupId, ver, status, source }) {
     remark: payload.matchingRequirements || payload.remark || '',
     matchingRequirements: payload.matchingRequirements || payload.remark || '',
     bomType: payload.bomType || '基准BOM',
-    /** 发运 BOM 适用产品 id 列表（多产品共用） */
     applicableProductIds: Array.isArray(payload.applicableProductIds)
       ? [...payload.applicableProductIds]
       : [],
+    scopeType: payload.scopeType || undefined,
+    objects: Array.isArray(payload.objects) ? payload.objects.map((o) => ({ ...o })) : [],
     specModel: payload.specModel || '',
     material: payload.material || '',
     drawingNo: payload.drawingNo || '',
@@ -360,16 +357,165 @@ export function updateProductBom(id, patch) {
   return row
 }
 
+function hydrateAllShipAttachmentScopes() {
+  productBomState.boms.forEach((b) => {
+    if (isShipBomType(b.bomType)) hydrateShipAttachmentScope(b)
+  })
+}
+
+function applyShipScopeToRecord(record, payload = {}) {
+  const scopeType = payload.scopeType || SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL
+  const objects =
+    scopeType === SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL
+      ? []
+      : Array.isArray(payload.objects)
+        ? payload.objects.map((o) => ({ ...o }))
+        : []
+  record.scopeType = scopeType
+  record.objects = objects
+  record.applicableProductIds = deriveApplicableProductIds(scopeType, objects)
+}
+
+function resolveShipAttachmentEnableConflict(
+  row,
+  { scopeType, objects },
+  conflictResolution,
+  operator,
+) {
+  const conflict = findShipAttachmentConflicts(productBomState.boms, {
+    id: row.id,
+    scopeType,
+    objects,
+  })
+  if (conflict.hasConflict && !conflictResolution) {
+    return { ok: false, needConflict: true, conflict, record: row }
+  }
+  let nextObjects = objects
+  if (conflict.hasConflict && conflictResolution?.mode === 'replace') {
+    applyShipAttachmentConflictReplace(productBomState.boms, conflict.conflicts, operator)
+  } else if (conflict.hasConflict && conflictResolution?.mode === 'skip') {
+    nextObjects = filterObjectsSkippingConflicts(objects, conflict.conflicts)
+    if (scopeType !== SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL && !nextObjects.length) {
+      return { ok: false, message: '跳过冲突后无剩余适用对象，无法启用' }
+    }
+  }
+  return { ok: true, objects: nextObjects }
+}
+
+export function saveShipAttachment(id, payload, { conflictResolution, operator = 'admin' } = {}) {
+  hydrateAllShipAttachmentScopes()
+  const bomType = BOM_TYPE.SHIP
+  const scopeType = payload.scopeType || SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL
+  let objects =
+    scopeType === SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL
+      ? []
+      : Array.isArray(payload.objects)
+        ? payload.objects.map((o) => ({ ...o }))
+        : []
+
+  if (!id) {
+    const record = buildBomRecord(
+      { ...payload, bomType },
+      {
+        versionGroupId: `bom-grp-${bomType}-${payload.itemType}-${payload.itemId}-${Date.now()}`,
+        ver: buildVersion(payload.itemType, payload.itemId, ''),
+        status: SHIP_ATTACHMENT_STATUS.DISABLED,
+      },
+    )
+    applyShipScopeToRecord(record, { scopeType, objects })
+    productBomState.boms.unshift(record)
+    return { ok: true, record, created: true }
+  }
+
+  const row = productBomState.boms.find((b) => b.id === id)
+  if (!row) return { error: '记录不存在', ok: false }
+  hydrateShipAttachmentScope(row)
+
+  const nextStatus = payload.status != null ? payload.status : row.status
+  const willEnable =
+    nextStatus === SHIP_ATTACHMENT_STATUS.ENABLED ||
+    nextStatus === BOM_STATUS.ACTIVE ||
+    isShipAttachmentEnabled({ ...row, status: nextStatus })
+
+  if (willEnable) {
+    const resolved = resolveShipAttachmentEnableConflict(
+      row,
+      { scopeType, objects },
+      conflictResolution,
+      operator,
+    )
+    if (!resolved.ok) return resolved
+    objects = resolved.objects
+  }
+
+  const updated = updateProductBom(id, payload)
+  if (updated?.error) return { ...updated, ok: false }
+  applyShipScopeToRecord(row, { scopeType, objects })
+  if (willEnable) {
+    row.status = SHIP_ATTACHMENT_STATUS.ENABLED
+    row.isDefault = true
+    row.effectiveAt = row.effectiveAt || nowStr()
+    row.expiredAt = ''
+  }
+  row.updatedAt = nowStr()
+  row.operator = operator
+  return { ok: true, record: row, created: false }
+}
+
+export function enableShipAttachment(id, { conflictResolution, operator = 'admin' } = {}) {
+  hydrateAllShipAttachmentScopes()
+  const row = productBomState.boms.find((b) => b.id === id)
+  if (!row) return { ok: false, message: '记录不存在' }
+  if (!isShipBomType(row.bomType)) return { ok: false, message: '仅随货附件可启用' }
+  hydrateShipAttachmentScope(row)
+  if (isShipAttachmentEnabled(row)) return { ok: true, record: row }
+
+  const scopeType = row.scopeType
+  const objects = [...(row.objects || [])]
+  const resolved = resolveShipAttachmentEnableConflict(
+    row,
+    { scopeType, objects },
+    conflictResolution,
+    operator,
+  )
+  if (!resolved.ok) return resolved
+  applyShipScopeToRecord(row, { scopeType, objects: resolved.objects })
+  row.status = SHIP_ATTACHMENT_STATUS.ENABLED
+  row.isDefault = true
+  row.effectiveAt = row.effectiveAt || nowStr()
+  row.expiredAt = ''
+  row.updatedAt = nowStr()
+  row.operator = operator
+  return { ok: true, record: row }
+}
+
+export function disableShipAttachment(id, { force = false, operator = 'admin' } = {}) {
+  const row = productBomState.boms.find((b) => b.id === id)
+  if (!row) return { ok: false, message: '记录不存在' }
+  if (!isShipBomType(row.bomType)) return { ok: false, message: '仅随货附件可停用' }
+  if (!isShipAttachmentEnabled(row)) return { ok: true, record: row }
+  if (!force) return { ok: false, needConfirm: true, record: row }
+  row.status = SHIP_ATTACHMENT_STATUS.DISABLED
+  row.isDefault = false
+  row.updatedAt = nowStr()
+  row.operator = operator
+  return { ok: true, record: row }
+}
+
 /**
  * 保存 BOM：待发布原地更新；生效中保存则生成待发布新版本（旧版保持生效，审核发布后再归档）
  */
-export function saveProductBom(id, payload) {
+export function saveProductBom(id, payload, options = {}) {
+  if (isShipBomType(payload?.bomType) || (id && isShipBomType(getProductBomById(id)?.bomType))) {
+    return saveShipAttachment(id, payload, options)
+  }
   if (!id) {
     const bomType = normalizeBomType(payload.bomType || BOM_TYPE.PRODUCT)
     const hadActive = Boolean(
       getOwnActiveBomForItemByType(payload.itemType, payload.itemId, bomType),
     )
     const record = addProductBom(payload)
+    if (hadActive) stampManualUpgradeMeta(record)
     return { record, created: true, versionUpgraded: hadActive }
   }
 
@@ -392,6 +538,7 @@ export function saveProductBom(id, payload) {
       source: row,
     })
     productBomState.boms.unshift(record)
+    stampManualUpgradeMeta(record)
     return { record, created: true, versionUpgraded: true, previousActiveId: row.id }
   }
 
@@ -418,6 +565,7 @@ export function createBomNewVersion(sourceId) {
     operator: 'admin',
     creator: 'admin',
   }
+  stampManualUpgradeMeta(record)
   productBomState.boms.unshift(record)
   return record
 }
@@ -444,6 +592,10 @@ export function enableProductBom(id, { upgradeParentRefs = false, parentRefs = [
   row.effectiveAt = row.effectiveAt || ts
   row.expiredAt = ''
   row.updatedAt = ts
+  if (row.changeSourceType === BOM_CHANGE_SOURCE_TYPE.MANUAL_EDIT && !row.upgradedAt) {
+    row.upgradedAt = ts
+    row.upgradedBy = row.upgradedBy || row.operator || 'admin'
+  }
 
   if (upgradeParentRefs && parentRefs.length) {
     upgradeParentBomReferences(row, parentRefs)
@@ -497,6 +649,9 @@ export function deleteProductBom(id) {
   const idx = productBomState.boms.findIndex((b) => b.id === id)
   if (idx === -1) return false
   const row = productBomState.boms[idx]
+  if (isShipBomType(row.bomType) && isShipAttachmentEnabled(row)) {
+    return { error: '请先停用后再删除' }
+  }
   if (isBomActive(row)) {
     return { error: '生效中的 BOM 不可删除，请先归档' }
   }
@@ -516,7 +671,7 @@ export function cloneProductBom(id) {
     bomNo: generateBomNo(),
     bomName: `${source.bomName}-克隆`,
     ...ver,
-    status: BOM_STATUS.PENDING,
+    status: isShipBomType(source.bomType) ? SHIP_ATTACHMENT_STATUS.DISABLED : BOM_STATUS.PENDING,
     isDefault: false,
     effectiveAt: '',
     expiredAt: '',
@@ -525,6 +680,7 @@ export function cloneProductBom(id) {
     operator: 'admin',
     creator: 'admin',
   }
+  if (isShipBomType(cloned.bomType)) hydrateShipAttachmentScope(cloned)
   productBomState.boms.unshift(cloned)
   return cloned
 }
