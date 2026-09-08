@@ -34,6 +34,7 @@ import {
 import { formatBatchAttrsText } from '@/utils/outboundLineColumns'
 import { transferOutboundToReceiveWarehouse } from '@/utils/outboundReceiveTransfer'
 import { preallocateDeliveryBatches } from '@/utils/salesOrderDedicatedStock'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
@@ -88,8 +89,8 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: outboundState.orders }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { orders: outboundState.orders })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function shouldReseedOutbound() {

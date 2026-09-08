@@ -8,7 +8,6 @@
     destroy-on-close
     @close="handleClose"
   >
-    <a-alert type="info" show-icon class="drawer-alert" :message="statusHint" />
     <DeliveryShipAttachmentSection
       v-if="draft"
       ref="editorRef"
@@ -20,20 +19,34 @@
       :warehouse="draft.outboundWarehouse || ''"
       :disabled="!editable"
       show-bring-standard-kit
-      empty-description="暂无发货附件。可点「带出标准包」按本单产品带出（默认不纳入），再勾选纳入。"
+      expand-all-by-default
+      title="本单纳入附件"
+      title-tip="勾选「纳入本单」即本票要发的附件。待出库时可保存并再次同步到出库单；出库单已出库后不可再改。"
+      hide-inner-alert
+      hide-product-source-columns
+      show-outbound-status
+      :delivery="delivery"
+      empty-description="暂无附件。可点「带出标准包」按本单产品带出（默认不纳入），再勾选纳入。"
     />
+
+    <div class="kit-wrap">
+      <ShipAttachmentStandardKitBlock :kits="standardKits" />
+    </div>
+
     <template #footer>
       <a-space>
-        <a-button size="small" @click="handleClose">取消</a-button>
-        <a-button
-          type="primary"
-          size="small"
-          :loading="saving"
-          :disabled="!editable"
-          @click="handleSave"
-        >
-          保存
-        </a-button>
+        <a-button size="small" @click="handleClose">{{ editable ? '取消' : '关闭' }}</a-button>
+        <a-tooltip :title="saveTip">
+          <a-button
+            type="primary"
+            size="small"
+            :loading="saving"
+            :disabled="!editable"
+            @click="handleSave"
+          >
+            保存并同步到出库单
+          </a-button>
+        </a-tooltip>
       </a-space>
     </template>
   </a-drawer>
@@ -48,7 +61,10 @@ import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { canEditDeliveryOrder, updateDeliveryOrder } from '@/store/deliveryOrderStore'
 import { salesOrderState } from '@/store/salesOrderStore'
+import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
+import { suggestStandardKitsForDelivery } from '@/utils/shipAttachmentQuery'
 import DeliveryShipAttachmentSection from '@/views/sales/components/DeliveryShipAttachmentSection.vue'
+import ShipAttachmentStandardKitBlock from './ShipAttachmentStandardKitBlock.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -63,6 +79,8 @@ const draft = ref(null)
 
 const editable = computed(() => canEditDeliveryOrder(props.delivery))
 
+const linkedOutbound = computed(() => findLinkedSalesOutbound(props.delivery))
+
 const drawerTitle = computed(() => {
   const code = props.delivery?.deliveryCode || ''
   return code ? `维护发货附件 · ${code}` : '维护发货附件'
@@ -74,11 +92,14 @@ const salesOrder = computed(() => {
   return salesOrderState.orders.find((o) => o.id === id) || null
 })
 
-const statusHint = computed(() => {
-  if (!editable.value) {
-    return '关联出库单已出库或发货单已不可改，附件仅供查看。'
+const standardKits = computed(() => suggestStandardKitsForDelivery(props.delivery || draft.value))
+
+const saveTip = computed(() => {
+  if (!editable.value) return '出库单已出库或已发货，不可再改附件'
+  if (linkedOutbound.value?.status === '待出库') {
+    return '修改后保存会覆盖同步到同一张待出库的销售出库单'
   }
-  return '纳入后会随本发货单生成/同步到同一张销售出库单。默认不纳入；请勾选本票要发的附件并填写套数。'
+  return '保存后写入本发货单，并生成/同步到同一张销售出库单'
 })
 
 watch(
@@ -120,7 +141,7 @@ function handleSave() {
       message.warning(res.message || '保存失败')
       return
     }
-    const synced = res?.outboundSynced ? '，关联待出库出库单已同步更新' : ''
+    const synced = res?.outboundSynced ? '，已同步到出库单' : ''
     message.success(`发货附件已保存${synced}`)
     emit('saved')
     handleClose()
@@ -131,7 +152,9 @@ function handleSave() {
 </script>
 
 <style lang="less" scoped>
-.drawer-alert {
-  margin-bottom: 12px;
+.kit-wrap {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
 }
 </style>

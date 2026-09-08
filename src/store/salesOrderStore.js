@@ -73,6 +73,7 @@ import {
 } from '@/utils/salesOrderStatus'
 import { ensureDedicatedShipDemoSalesOrders } from '@/mock/dedicatedShipDemoSeed'
 import { ensureScatterEbomShipDemoSalesOrders } from '@/mock/scatterEbomShipDemoSeed'
+import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
 const DATA_VERSION = 11
@@ -122,10 +123,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ version: DATA_VERSION, orders: salesOrderState.orders }),
-  )
+  persistJson(STORAGE_KEY, { version: DATA_VERSION, orders: salesOrderState.orders })
 }
 
 function loadInitialSalesOrders() {

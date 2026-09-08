@@ -2,10 +2,8 @@
   <div class="section-block">
     <div class="section-title-row">
       <div class="section-title">
-        发货附件
-        <a-tooltip
-          title="按产品分组管理随货附件包。套数展示为「已选择套数/订单套数」；可通过「从随货附件添加」多次累加套数（可大于订单套数，用于赠送）。"
-        >
+        {{ title }}
+        <a-tooltip :title="titleTip">
           <QuestionCircleOutlined class="th-tip-icon" />
         </a-tooltip>
       </div>
@@ -34,7 +32,7 @@
     <a-divider class="section-divider" />
 
     <a-alert
-      v-if="shipAttachmentProductSummaries.length"
+      v-if="!hideInnerAlert && shipAttachmentProductSummaries.length"
       type="info"
       show-icon
       class="ship-att-alert"
@@ -43,7 +41,12 @@
 
     <a-empty v-if="!shipAttachmentProductSummaries.length" :description="emptyDescription" />
 
-    <a-collapse v-else v-model:active-key="attachmentActiveKey" accordion class="ship-att-collapse">
+    <a-collapse
+      v-else
+      v-model:active-key="attachmentActiveKey"
+      :accordion="!expandAllByDefault"
+      class="ship-att-collapse"
+    >
       <a-collapse-panel
         v-for="group in shipAttachmentProductSummaries"
         :key="group.key"
@@ -89,13 +92,33 @@
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1200 }"
+          :scroll="{ x: tableScrollX }"
         >
           <template #headerCell="{ column }">
             <template v-if="column.key === 'shipProgress'">
               <span>
                 发货进度
                 <a-tooltip title="已发货数量 / 已申请数量 / 计划数量（订单套数×单位用量）">
+                  <QuestionCircleOutlined class="th-tip-icon" />
+                </a-tooltip>
+              </span>
+            </template>
+            <template v-else-if="column.key === 'selected'">
+              <span>
+                纳入本单
+                <a-tooltip
+                  title="勾选后保存，会写入本发货单对应的同一张销售出库单；未勾选不随本票出库。"
+                >
+                  <QuestionCircleOutlined class="th-tip-icon" />
+                </a-tooltip>
+              </span>
+            </template>
+            <template v-else-if="column.key === 'outboundStatus'">
+              <span>
+                出库单
+                <a-tooltip
+                  title="已写入：已在关联销售出库单明细中。待写入：已勾选，保存后才会写入。不纳入：未勾选。"
+                >
                   <QuestionCircleOutlined class="th-tip-icon" />
                 </a-tooltip>
               </span>
@@ -107,7 +130,16 @@
               {{ attachmentsOfGroup(group).indexOf(record) + 1 }}
             </template>
             <template v-else-if="column.key === 'selected'">
-              <a-checkbox v-model:checked="record.selected" :disabled="disabled" />
+              <a-checkbox
+                :checked="record.selected !== false"
+                :disabled="disabled"
+                @change="(e) => (record.selected = e.target.checked)"
+              />
+            </template>
+            <template v-else-if="column.key === 'outboundStatus'">
+              <a-tag :color="outboundStatusOf(record).color">
+                {{ outboundStatusOf(record).text }}
+              </a-tag>
             </template>
             <template v-else-if="column.key === 'shipStatus'">
               <a-tag :color="attachmentShipStatusColor(record.shipStatus)">
@@ -234,7 +266,7 @@ export default { name: 'DeliveryShipAttachmentSection' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { QuestionCircleOutlined } from '@ant-design/icons-vue'
 import { formatDeliveryQty, isDeliveryLineShipLocked } from '@/utils/deliveryLine'
@@ -252,6 +284,8 @@ import {
   addShipBomAttachmentSets,
 } from '@/utils/shipBomAttachments'
 import { getActiveShipBomForProduct } from '@/store/productBomStore'
+import { outboundState } from '@/store/outboundStore'
+import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 
 const props = defineProps({
@@ -262,6 +296,17 @@ const props = defineProps({
   warehouse: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
   showBringStandardKit: { type: Boolean, default: false },
+  title: { type: String, default: '发货附件' },
+  titleTip: {
+    type: String,
+    default:
+      '勾选「纳入本单」即本票执行清单。套数展示为「已选择套数/订单套数」；可通过「从随货附件添加」多次累加套数（可大于订单套数，用于赠送）。',
+  },
+  hideInnerAlert: { type: Boolean, default: false },
+  hideProductSourceColumns: { type: Boolean, default: false },
+  showOutboundStatus: { type: Boolean, default: false },
+  delivery: { type: Object, default: null },
+  expandAllByDefault: { type: Boolean, default: false },
   emptyDescription: {
     type: String,
     default: '暂无发货附件（选择销售订单后，有随货附件的产品会按产品分组列出）',
@@ -276,27 +321,91 @@ const shipBomAddForm = reactive({
   productKey: undefined,
   addSets: 1,
 })
-const attachmentActiveKey = ref('')
+const attachmentActiveKey = ref(props.expandAllByDefault ? [] : '')
 
-const shipAttachmentColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center' },
-  { title: '纳入本单', key: 'selected', width: 88, align: 'center' },
-  { title: '发货状态', key: 'shipStatus', width: 88, align: 'center' },
-  { title: '发货进度', key: 'shipProgress', width: 140, align: 'right' },
-  { title: '关联产品', key: 'productName', dataIndex: 'productName', width: 180, ellipsis: true },
-  { title: '来源', key: 'source', width: 72 },
-  { title: '物料编码', dataIndex: 'materialCode', width: 120, ellipsis: true },
-  { title: '物料名称', dataIndex: 'materialName', width: 140, ellipsis: true },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '单位', dataIndex: 'unit', width: 56 },
-  { title: '单位用量', key: 'unitQty', width: 88, align: 'right' },
-  { title: '发货套数', key: 'kitSets', width: 100 },
-  { title: '本次发运', key: 'shipQty', width: 110 },
-  { title: '操作', key: 'action', width: 72, align: 'center' },
-]
+const shipAttachmentColumns = computed(() => {
+  const cols = [
+    { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
+    { title: '纳入本单', key: 'selected', width: 100, align: 'center', fixed: 'left' },
+  ]
+  if (props.showOutboundStatus) {
+    cols.push({ title: '出库单', key: 'outboundStatus', width: 88, align: 'center', fixed: 'left' })
+  }
+  cols.push({ title: '发货状态', key: 'shipStatus', width: 88, align: 'center' })
+  cols.push({ title: '发货进度', key: 'shipProgress', width: 140, align: 'right' })
+  if (!props.hideProductSourceColumns) {
+    cols.push({
+      title: '关联产品',
+      key: 'productName',
+      dataIndex: 'productName',
+      width: 180,
+      ellipsis: true,
+    })
+    cols.push({ title: '来源', key: 'source', width: 72 })
+  }
+  cols.push(
+    { title: '物料编码', dataIndex: 'materialCode', width: 120, ellipsis: true },
+    { title: '物料名称', dataIndex: 'materialName', width: 140, ellipsis: true },
+    { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+    { title: '单位', dataIndex: 'unit', width: 56 },
+    { title: '单位用量', key: 'unitQty', width: 88, align: 'right' },
+    { title: '发货套数', key: 'kitSets', width: 100 },
+    { title: '本次发运', key: 'shipQty', width: 110 },
+    { title: '操作', key: 'action', width: 72, align: 'center' },
+  )
+  return cols
+})
+
+const tableScrollX = computed(() => {
+  return shipAttachmentColumns.value.reduce((s, c) => s + (Number(c.width) || 120), 0)
+})
+
+function outboundStatusOf(record) {
+  void outboundState.orders
+  const selected = record?.selected !== false
+  if (!selected) return { text: '不纳入', color: 'default' }
+  const ob = findLinkedSalesOutbound(props.delivery)
+  if (!ob) return { text: '待写入', color: 'warning' }
+  const code = String(record.materialCode || '').trim()
+  const hit = (ob.lineItems || []).some((l) => String(l.itemCode || '').trim() === code)
+  if (hit) {
+    return ob.status === '已出库'
+      ? { text: '已出库', color: 'success' }
+      : { text: '已写入', color: 'success' }
+  }
+  return { text: '待写入', color: 'warning' }
+}
 
 const shipAttachmentProductSummaries = computed(() =>
   summarizeShipAttachmentsByProduct(attachments.value),
+)
+
+function allGroupKeys() {
+  return shipAttachmentProductSummaries.value.map((g) => g.key)
+}
+
+function activateGroups(preferredKey) {
+  const keys = allGroupKeys()
+  if (props.expandAllByDefault) {
+    attachmentActiveKey.value = keys
+    return
+  }
+  if (preferredKey && keys.includes(preferredKey)) {
+    attachmentActiveKey.value = preferredKey
+    return
+  }
+  attachmentActiveKey.value = keys[0] || ''
+}
+
+watch(
+  () => allGroupKeys().join('|'),
+  () => {
+    if (!props.expandAllByDefault) return
+    const keys = allGroupKeys()
+    const cur = Array.isArray(attachmentActiveKey.value) ? attachmentActiveKey.value : []
+    if (!cur.length && keys.length) attachmentActiveKey.value = keys
+  },
+  { immediate: true },
 )
 
 const shipAttachmentProductOpts = computed(() => {
@@ -544,11 +653,15 @@ function isAttachmentOnCurrentDelivery(att) {
 
 function pruneToCurrentDelivery() {
   attachments.value = (attachments.value || []).filter(isAttachmentOnCurrentDelivery)
-  if (
-    attachmentActiveKey.value &&
-    !shipAttachmentProductSummaries.value.some((g) => g.key === attachmentActiveKey.value)
-  ) {
-    attachmentActiveKey.value = shipAttachmentProductSummaries.value[0]?.key || ''
+  const keys = allGroupKeys()
+  if (props.expandAllByDefault) {
+    const cur = Array.isArray(attachmentActiveKey.value) ? attachmentActiveKey.value : []
+    const keep = cur.filter((k) => keys.includes(k))
+    attachmentActiveKey.value = keep.length ? keep : keys
+    return
+  }
+  if (attachmentActiveKey.value && !keys.includes(attachmentActiveKey.value)) {
+    attachmentActiveKey.value = keys[0] || ''
   }
 }
 
@@ -571,7 +684,7 @@ function rebuildFromCurrentDelivery({ merge = false } = {}) {
   }
   pruneToCurrentDelivery()
   syncKitSetsFromWholeLines()
-  attachmentActiveKey.value = shipAttachmentProductSummaries.value[0]?.key || ''
+  activateGroups()
 }
 
 function openAddFromShipBom() {
@@ -618,7 +731,7 @@ function confirmAddFromShipBom() {
     { preserveShipQty: true },
   )
   const groupKey = String(opt.productId || opt.productCode || opt.productName)
-  attachmentActiveKey.value = groupKey
+  activateGroups(groupKey)
   shipBomAddOpen.value = false
   const curSets =
     (attachments.value || []).find(

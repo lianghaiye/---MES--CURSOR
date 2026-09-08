@@ -83,118 +83,28 @@
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1100 }"
+          :scroll="{ x: 2200 }"
         >
-          <template #expandedRowRender="{ record }">
-            <div class="expand-block">
-              <div class="expand-title-row">
-                <div class="expand-title">本单纳入附件（执行）</div>
-                <a-tooltip :title="maintainDisabledTip(record)">
-                  <span>
-                    <a-button
-                      type="link"
-                      size="small"
-                      :disabled="!canMaintain(record)"
-                      @click="openMaintain(record)"
-                    >
-                      维护附件
-                    </a-button>
-                  </span>
-                </a-tooltip>
-              </div>
-              <a-table
-                v-if="record.selectedRows.length"
-                :columns="attachmentColumns"
-                :data-source="record.selectedRows"
-                row-key="id"
-                size="small"
-                bordered
-                :pagination="false"
-              >
-                <template #bodyCell="{ column, record: line }">
-                  <template v-if="column.key === 'source'">
-                    <a-tag :color="line.source === 'BOM' ? 'blue' : 'default'">
-                      {{ line.source || '手工' }}
-                    </a-tag>
-                  </template>
-                  <template v-else-if="column.key === 'shipStatus'">
-                    <a-tag :color="attachmentShipStatusColor(line.shipStatus)">
-                      {{ line.shipStatus || '未发货' }}
-                    </a-tag>
-                  </template>
-                  <template v-else>
-                    {{ line[column.dataIndex] ?? '—' }}
-                  </template>
-                </template>
-              </a-table>
-              <a-empty
-                v-else
-                description="本单尚未纳入随货附件"
-                :image="false"
-                class="inner-empty"
-              />
-
-              <div class="expand-title">标准随货包（参考）</div>
-              <div v-if="record.standardKits.length" class="kit-list">
-                <div v-for="kit in record.standardKits" :key="kit.key" class="kit-card">
-                  <div class="kit-head">
-                    <span>
-                      {{ kit.productName }}
-                      <span v-if="kit.productCode" class="kit-code">{{ kit.productCode }}</span>
-                    </span>
-                    <span v-if="kit.bomName" class="kit-bom">
-                      {{ kit.bomName }}（{{ kit.bomNo }}）· {{ kit.materialCount }} 项
-                    </span>
-                    <span v-else class="kit-bom muted">未命中已启用随货附件</span>
-                  </div>
-                  <a-table
-                    v-if="kit.lines.length"
-                    :columns="kitLineColumns"
-                    :data-source="kit.lines"
-                    row-key="id"
-                    size="small"
-                    bordered
-                    :pagination="false"
-                  />
-                </div>
-              </div>
-              <a-empty
-                v-else
-                description="本单没有可匹配的产品"
-                :image="false"
-                class="inner-empty"
-              />
-            </div>
-          </template>
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'deliveryCode'">
-              <a class="link-name" @click.prevent="openDelivery(record)">{{
-                record.deliveryCode || '—'
-              }}</a>
-            </template>
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">{{ deliveryRowIndex(index) }}</template>
             <template v-else-if="column.key === 'deliveryStatus'">
               <a-tag :color="deliveryStatusColor(record.deliveryStatus)">
                 {{ record.deliveryStatus || '—' }}
               </a-tag>
             </template>
+            <template v-else-if="column.key === 'applyDate'">
+              {{ record.documentDate || record.deliveryDate || '—' }}
+            </template>
+            <template v-else-if="column.key === 'applyShipQty'">
+              {{ formatOutboundQtyInt(record.applyShipQty ?? calcApplyShipQty(record)) }}
+            </template>
             <template v-else-if="column.key === 'attachmentCount'">
               {{ record.selectedCount }}/{{ record.attachmentTotal }}
             </template>
             <template v-else-if="column.key === 'action'">
-              <a-button type="link" size="small" @click="openDelivery(record)">查看发货单</a-button>
-              <a-tooltip :title="maintainDisabledTip(record)">
-                <span>
-                  <a-button
-                    type="link"
-                    size="small"
-                    :disabled="!canMaintain(record)"
-                    @click="openMaintain(record)"
-                  >
-                    维护附件
-                  </a-button>
-                </span>
-              </a-tooltip>
+              <a-button type="link" size="small" @click="openMaintain(record)">维护附件</a-button>
             </template>
+            <template v-else>{{ record[column.dataIndex] || '—' }}</template>
           </template>
         </a-table>
         <div class="table-pagination">
@@ -326,21 +236,7 @@
                 {{ record.selectedCount }}/{{ record.attachmentTotal }}
               </template>
               <template v-else-if="column.key === 'action'">
-                <a-button type="link" size="small" @click="openDelivery(record)"
-                  >查看发货单</a-button
-                >
-                <a-tooltip :title="maintainDisabledTip(record)">
-                  <span>
-                    <a-button
-                      type="link"
-                      size="small"
-                      :disabled="!canMaintain(record)"
-                      @click="openMaintain(record)"
-                    >
-                      维护附件
-                    </a-button>
-                  </span>
-                </a-tooltip>
+                <a-button type="link" size="small" @click="openMaintain(record)">维护附件</a-button>
               </template>
             </template>
           </a-table>
@@ -380,9 +276,13 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { useTabs } from '@/composables/useTabs'
-import { deliveryOrderState, canEditDeliveryOrder } from '@/store/deliveryOrderStore'
-import { DELIVERY_STATUS_OPTIONS, deliveryStatusColor } from '@/utils/deliveryOrder'
-import { attachmentShipStatusColor } from '@/utils/shipBomAttachments'
+import { deliveryOrderState } from '@/store/deliveryOrderStore'
+import {
+  DELIVERY_STATUS_OPTIONS,
+  deliveryStatusColor,
+  calcApplyShipQty,
+  formatOutboundQtyInt,
+} from '@/utils/deliveryOrder'
 import {
   listDeliveryShipQueryRows,
   queryShipAttachmentByProduct,
@@ -398,9 +298,9 @@ const { openTab } = useTabs()
 const mode = ref('delivery')
 const modeHint = computed(() => {
   if (mode.value === 'product') {
-    return '按产品匹配已启用的随货附件模板（单产品 > 类别 > 全局）。这是标准包，不是某一票发货单。相关发货单待发货/待出库时可维护附件。'
+    return '按产品匹配已启用的随货附件模板（单产品 > 类别 > 全局）。这是标准包，不是某一票发货单。相关发货单可点「维护附件」查看纳入清单与标准随货包。'
   }
-  return '按发货单查看并维护本票要发的附件。待发货、待出库可点「维护附件」勾选纳入；已出库后不可再改。标准随货包仅供参考，不会覆盖本单已勾选内容。'
+  return '按发货单维护本票随货附件。点「维护附件」查看纳入清单、标准随货包，并勾选本票要发的附件。待发货/待出库可保存；已出库后仅可查看。'
 })
 
 const deliveryFilters = reactive({
@@ -434,25 +334,23 @@ const pagedDeliveries = computed(() => {
 })
 
 const deliveryColumns = [
-  { title: '发货单号', key: 'deliveryCode', width: 150, ellipsis: true },
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '发货状态', key: 'deliveryStatus', width: 90, fixed: 'left' },
+  { title: '发货单号', dataIndex: 'deliveryCode', key: 'deliveryCode', width: 150, ellipsis: true },
   { title: '客户', dataIndex: 'customerName', width: 140, ellipsis: true },
   { title: '源单号', dataIndex: 'sourceOrderNo', width: 140, ellipsis: true },
-  { title: '单据日期', dataIndex: 'documentDate', width: 110 },
-  { title: '发货状态', key: 'deliveryStatus', width: 90 },
-  { title: '产品', dataIndex: 'productSummary', ellipsis: true },
+  { title: '申请发货日期', key: 'applyDate', width: 120 },
+  { title: '产品', dataIndex: 'productSummary', width: 180, ellipsis: true },
+  { title: '申请发货数量', key: 'applyShipQty', width: 110, align: 'right' },
+  { title: '交货方式', dataIndex: 'shipmentMethod', width: 88 },
+  { title: '客户联系人', dataIndex: 'contactPerson', width: 100 },
+  { title: '联系方式', dataIndex: 'contactPhone', width: 120 },
+  { title: '交货地址', dataIndex: 'deliveryAddress', width: 180, ellipsis: true },
+  { title: '司机姓名', dataIndex: 'driverName', width: 90 },
+  { title: '联系方式', dataIndex: 'driverPhone', key: 'driverPhone', width: 120 },
+  { title: '车牌号', dataIndex: 'plateNo', width: 100 },
   { title: '纳入/全部', key: 'attachmentCount', width: 90, align: 'right' },
-  { title: '操作', key: 'action', width: 180, fixed: 'right' },
-]
-
-const attachmentColumns = [
-  { title: '物料编码', dataIndex: 'materialCode', width: 120 },
-  { title: '物料名称', dataIndex: 'materialName', ellipsis: true },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '关联产品', dataIndex: 'productName', width: 140, ellipsis: true },
-  { title: '来源', key: 'source', width: 72 },
-  { title: '发运数量', dataIndex: 'shipQty', width: 88, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 56 },
-  { title: '发货状态', key: 'shipStatus', width: 88 },
+  { title: '操作', key: 'action', width: 100, fixed: 'right' },
 ]
 
 const kitLineColumns = [
@@ -466,11 +364,15 @@ const kitLineColumns = [
 const relatedDeliveryColumns = [
   { title: '发货单号', key: 'deliveryCode', width: 150 },
   { title: '客户', dataIndex: 'customerName', ellipsis: true },
-  { title: '单据日期', dataIndex: 'documentDate', width: 110 },
+  { title: '申请发货日期', dataIndex: 'documentDate', width: 120 },
   { title: '发货状态', key: 'deliveryStatus', width: 90 },
   { title: '纳入/全部', key: 'attachmentCount', width: 90, align: 'right' },
-  { title: '操作', key: 'action', width: 180 },
+  { title: '操作', key: 'action', width: 100 },
 ]
+
+function deliveryRowIndex(index) {
+  return (deliveryPager.current - 1) * deliveryPager.pageSize + index + 1
+}
 
 function searchDelivery() {
   appliedDeliveryFilters.value = { ...deliveryFilters }
@@ -606,21 +508,9 @@ function resolveLiveDelivery(record) {
   return (deliveryOrderState.orders || []).find((o) => o.id === record.id) || record
 }
 
-function canMaintain(record) {
-  void deliveryOrderState.orders
-  return canEditDeliveryOrder(resolveLiveDelivery(record))
-}
-
-function maintainDisabledTip(record) {
-  return canMaintain(record) ? '' : '已出库或已发货，不可再改附件'
-}
-
 function openMaintain(record) {
   const live = resolveLiveDelivery(record)
-  if (!canMaintain(live)) {
-    message.warning('当前发货单不可维护附件')
-    return
-  }
+  if (!live?.id) return
   maintainTarget.value = live
   maintainOpen.value = true
 }
@@ -710,64 +600,5 @@ function openShipAttachment(id) {
   &:hover {
     color: #4096ff;
   }
-}
-
-.expand-block {
-  padding: 4px 8px 8px;
-}
-
-.expand-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.expand-title {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 8px 0 6px;
-}
-
-.inner-empty {
-  margin: 8px 0 12px;
-  :deep(.ant-empty-description) {
-    font-size: 12px;
-  }
-}
-
-.kit-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.kit-card {
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: #fafafa;
-}
-
-.kit-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
-.kit-code {
-  margin-left: 6px;
-  color: rgba(0, 0, 0, 0.45);
-}
-
-.kit-bom {
-  color: rgba(0, 0, 0, 0.65);
-  flex-shrink: 0;
-}
-
-.muted {
-  color: rgba(0, 0, 0, 0.45);
 }
 </style>

@@ -1,4 +1,5 @@
 import { reactive, watch } from 'vue'
+import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_function_params'
 /** 尺寸辅助默认从「全关」升级为「全开」的一次性迁移版本 */
@@ -442,7 +443,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(functionParamState.params))
+  persistJson(STORAGE_KEY, functionParamState.params)
 }
 
 export const functionParamState = reactive({

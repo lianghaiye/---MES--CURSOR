@@ -22,6 +22,8 @@ import {
 import { refreshDeliveryMetrics } from '@/utils/deliveryOutboundSync'
 import { sumSelectedShipQty } from '@/utils/shipEbom'
 
+import { persistJson } from '@/utils/safeStorage'
+
 const STORAGE_KEY = 'i_doms_delivery_orders'
 /** v4：发货列表增加发货总额（含税） */
 const DATA_VERSION = 4
@@ -61,10 +63,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ version: DATA_VERSION, orders: deliveryOrderState.orders }),
-  )
+  persistJson(STORAGE_KEY, { version: DATA_VERSION, orders: deliveryOrderState.orders })
 }
 
 export const deliveryOrderState = reactive({

@@ -9,7 +9,7 @@ import {
   isCatalogSeedBom,
 } from '@/mock/productBomSeed'
 import { mockMaterials } from '@/mock/materialInfo'
-import { safeRemoveItem, safeSetItem } from '@/utils/safeStorage'
+import { persistJson, safeRemoveItem } from '@/utils/safeStorage'
 import {
   BOM_STATUS,
   isBomActive,
@@ -98,14 +98,10 @@ function serializeBomsForStorage(boms) {
 }
 
 function persist() {
-  const payload = JSON.stringify({
+  persistJson(STORAGE_KEY, {
     version: DATA_VERSION,
     boms: serializeBomsForStorage(productBomState.boms),
   })
-  if (safeSetItem(STORAGE_KEY, payload)) return
-
-  safeRemoveItem(STORAGE_KEY)
-  safeSetItem(STORAGE_KEY, payload)
 }
 
 function ensureBomStructure(bom) {
