@@ -11,6 +11,7 @@ import {
   isOrderChangeHeaderChanged,
   isPriceChangeLineChanged,
   normalizePriceChangeRecord,
+  normalizeReasonTypes,
   recalcPriceChangeLine,
   snapshotOrderChangeHeader,
   summarizePriceChangeLines,
@@ -180,7 +181,8 @@ export function submitSalesPriceChange({
   if (!summary.changedCount && !customerChanged && !headerChanged) {
     return { ok: false, message: '请至少修改一项基本信息或一行明细' }
   }
-  if (!reasonType) {
+  const reasons = normalizeReasonTypes(reasonType)
+  if (!reasons.length) {
     return { ok: false, message: '请选择变更原因' }
   }
   if (!nextCustomer) {
@@ -194,7 +196,7 @@ export function submitSalesPriceChange({
     salesOrderId: salesOrder.id,
     salesOrderNo: salesOrder.orderNo,
     status: PRICE_CHANGE_STATUS.PENDING,
-    reasonType,
+    reasonType: reasons,
     reason: String(reason || '').trim(),
     taxModeExcluding: taxModeExcluding !== false,
     oldCustomerName: originCustomer,

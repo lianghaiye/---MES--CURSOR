@@ -14,6 +14,9 @@
         <template v-if="column.key === 'status'">
           <a-tag :color="priceChangeStatusColor(record.status)">{{ record.status }}</a-tag>
         </template>
+        <template v-else-if="column.key === 'reasonType'">
+          {{ formatReasonTypes(record.reasonType) }}
+        </template>
         <template v-else-if="column.key === 'customer'">
           {{ customerDisplay(record) }}
         </template>
@@ -54,12 +57,41 @@
           :columns="lineColumns"
           :data-source="record.lines || []"
           :pagination="false"
+          :row-class-name="(line) => (line.cancelled ? 'line-cancelled' : '')"
           :scroll="{ x: 1960 }"
         >
           <template #bodyCell="{ column, record: line }">
             <template v-if="column.key === 'productName'">
               <span>{{ line.productName || '—' }}</span>
               <a-tag v-if="line.cancelled" color="default" class="cancelled-tag">已取消</a-tag>
+            </template>
+            <template v-else-if="column.key === 'newQty'">
+              <span :class="{ 'cell-changed': numChanged(line.newQty, line.oldQty) }">{{
+                line.newQty ?? '—'
+              }}</span>
+            </template>
+            <template v-else-if="column.key === 'newTaxRate'">
+              <span :class="{ 'cell-changed': numChanged(line.newTaxRate, line.oldTaxRate) }">{{
+                line.newTaxRate ?? '—'
+              }}</span>
+            </template>
+            <template v-else-if="column.key === 'newUnitPriceExTax'">
+              <span
+                :class="{
+                  'cell-changed': numChanged(line.newUnitPriceExTax, line.oldUnitPriceExTax),
+                }"
+              >
+                {{ formatPriceChangeAbsMoney(line.newUnitPriceExTax) }}
+              </span>
+            </template>
+            <template v-else-if="column.key === 'newUnitPriceInTax'">
+              <span
+                :class="{
+                  'cell-changed': numChanged(line.newUnitPriceInTax, line.oldUnitPriceInTax),
+                }"
+              >
+                {{ formatPriceChangeAbsMoney(line.newUnitPriceInTax) }}
+              </span>
             </template>
             <template v-else-if="isLineMoney(column.key)">
               {{ formatPriceChangeAbsMoney(line[column.key]) }}
@@ -102,6 +134,7 @@ import {
   formatPriceChangeAbsMoney,
   formatPriceChangeDiscount,
   formatPriceChangeMoney,
+  formatReasonTypes,
   isCustomerChanged,
   listOrderChangeHeaderDiffs,
   normalizePriceChangeRecord,
@@ -121,7 +154,7 @@ const columns = [
   { title: '变更单号', dataIndex: 'changeNo', width: 150 },
   { title: '状态', key: 'status', width: 88 },
   { title: '客户名称', key: 'customer', width: 220, ellipsis: true },
-  { title: '原因', dataIndex: 'reasonType', width: 100 },
+  { title: '原因', key: 'reasonType', width: 160, ellipsis: true },
   { title: '说明', dataIndex: 'reason', ellipsis: true },
   { title: '变更后（不含税）', key: 'newAmountExTax', width: 148, align: 'right' },
   { title: '变更后（含税）', key: 'newAmountInTax', width: 136, align: 'right' },
@@ -152,11 +185,11 @@ const lineColumns = [
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
   { title: '原数量', dataIndex: 'oldQty', width: 72, align: 'right' },
-  { title: '新数量', dataIndex: 'newQty', width: 72, align: 'right' },
+  { title: '新数量', key: 'newQty', dataIndex: 'newQty', width: 72, align: 'right' },
   { title: '原交货日期', dataIndex: 'oldDeliveryDate', width: 110 },
   { title: '新交货日期', dataIndex: 'newDeliveryDate', width: 110 },
   { title: '原税率(%)', dataIndex: 'oldTaxRate', width: 88, align: 'right' },
-  { title: '新税率(%)', dataIndex: 'newTaxRate', width: 88, align: 'right' },
+  { title: '新税率(%)', key: 'newTaxRate', dataIndex: 'newTaxRate', width: 88, align: 'right' },
   { title: '原单价（不含税）', key: 'oldUnitPriceExTax', width: 122, align: 'right' },
   { title: '原单价（含税）', key: 'oldUnitPriceInTax', width: 110, align: 'right' },
   { title: '新单价（不含税）', key: 'newUnitPriceExTax', width: 122, align: 'right' },
@@ -171,6 +204,10 @@ const lineColumns = [
 
 function headerDiffs(record) {
   return listOrderChangeHeaderDiffs(record.headerOld, record.headerNew)
+}
+
+function numChanged(a, b) {
+  return Math.abs((Number(a) || 0) - (Number(b) || 0)) > 1e-9
 }
 
 function customerDisplay(record) {
@@ -237,5 +274,14 @@ function deltaClass(val) {
 
 .cancelled-tag {
   margin-left: 6px;
+}
+
+.cell-changed {
+  color: #cf1322;
+  font-weight: 600;
+}
+
+:deep(tr.line-cancelled > td) {
+  background: #f5f5f5 !important;
 }
 </style>

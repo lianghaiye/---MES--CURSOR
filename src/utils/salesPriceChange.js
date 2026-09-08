@@ -114,6 +114,22 @@ export function listOrderChangeHeaderDiffs(oldHeader = {}, newHeader = {}) {
   }))
 }
 
+export function formatOrderChangeHeaderValue(key, value) {
+  return formatHeaderDiffValue(key, value)
+}
+
+export function normalizeReasonTypes(reasonType) {
+  if (Array.isArray(reasonType))
+    return reasonType.map((item) => String(item || '').trim()).filter(Boolean)
+  const text = String(reasonType || '').trim()
+  return text ? [text] : []
+}
+
+export function formatReasonTypes(reasonType) {
+  const list = normalizeReasonTypes(reasonType)
+  return list.length ? list.join('、') : '—'
+}
+
 /** 未发部分仍有余量时才可「取消行」（已全部占用发货则不可） */
 export function canCancelPriceChangeLine(row) {
   if (!row || row.cancelled || row.oldCancelled) return false
@@ -345,6 +361,7 @@ export function normalizePriceChangeRecord(record) {
   return {
     ...record,
     taxModeExcluding,
+    reasonType: normalizeReasonTypes(record.reasonType),
     oldCustomerName: record.oldCustomerName || record.headerOld?.customerName || '',
     newCustomerName:
       record.newCustomerName || record.headerNew?.customerName || record.oldCustomerName || '',
@@ -418,7 +435,12 @@ export function buildPriceChangeApprovalGroups(changes = []) {
         role: '订单变更申请',
         result: '已提交',
         time: change.submittedAt || change.createdAt || '—',
-        opinion: [change.reasonType, change.reason].filter(Boolean).join('：'),
+        opinion: [
+          formatReasonTypes(change.reasonType) === '—' ? '' : formatReasonTypes(change.reasonType),
+          change.reason,
+        ]
+          .filter(Boolean)
+          .join('：'),
       },
     ]
     if (
@@ -445,7 +467,7 @@ export function buildPriceChangeApprovalGroups(changes = []) {
       id: change.id,
       changeNo: change.changeNo,
       status: change.status,
-      reasonType: change.reasonType,
+      reasonType: formatReasonTypes(change.reasonType),
       oldCustomerName,
       newCustomerName,
       customerName: newCustomerName || oldCustomerName,
