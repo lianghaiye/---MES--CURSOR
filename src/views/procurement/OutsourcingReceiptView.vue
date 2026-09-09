@@ -232,6 +232,8 @@
     <OutsourcingGenerateInboundModal
       v-model:open="inboundModalOpen"
       :outsourcing-order="inboundOrder"
+      :qc-qty-hints="inboundQcQtyHints"
+      :qc-enforce-qty-cap="inboundQcEnforceCap"
       @saved="onInboundSaved"
     />
 
@@ -289,6 +291,8 @@ import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
+import { evaluateReceiptInboundByQc } from '@/utils/qcInboundFromReceipt'
+import { attachQcTaskInboundOrder } from '@/store/qcTaskStore'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -308,6 +312,9 @@ const printReceipts = ref([])
 const inboundModalOpen = ref(false)
 const inboundOrder = ref(null)
 const inboundReceipt = ref(null)
+const inboundQcQtyHints = ref(null)
+const inboundQcEnforceCap = ref(false)
+const inboundFromQcId = ref('')
 const qcModalOpen = ref(false)
 const qcReceipt = ref(null)
 const pagination = reactive({ current: 1, pageSize: 10 })
@@ -428,12 +435,19 @@ function canShowReceiptQcAction(record) {
   return ['未质检', '质检中'].includes(record.qcStatus || '未质检')
 }
 
-/** 进行中且入库未完成、关联外协单仍可入库 → 展示「入库」 */
+/** 进行中且入库未完成、关联外协单仍可入库；有关联质检时须通过门控 */
 function canShowReceiptInboundAction(record) {
   if (record?.receiptStatus !== '进行中') return false
   if (record.inboundStatus === '已入库') return false
   const order = getOutsourcingOrderById(record.outsourcingOrderId)
-  return Boolean(order && canGenerateOutsourcingInbound(order))
+  if (!(order && canGenerateOutsourcingInbound(order))) return false
+  if (hasReceiptQcSheet(record)) {
+    return evaluateReceiptInboundByQc(record.id, {
+      bizScope: '外协回货检',
+      receiptNo: record.receiptNo,
+    }).ok
+  }
+  return true
 }
 
 function hasRowActions(record) {
@@ -497,6 +511,14 @@ function openInboundForRow(receipt) {
     message.warning('该收货单已入库完成')
     return
   }
+  const gate = evaluateReceiptInboundByQc(receipt.id, {
+    bizScope: '外协回货检',
+    receiptNo: receipt.receiptNo,
+  })
+  if (!gate.ok) {
+    message.warning(gate.message || '当前收货单不可生成入库单')
+    return
+  }
   const order = getOutsourcingOrderById(receipt.outsourcingOrderId)
   if (!order || !canGenerateOutsourcingInbound(order)) {
     message.warning('关联外协订单不可生成入库单（需进行中且仍有可回货数量）')
@@ -504,6 +526,9 @@ function openInboundForRow(receipt) {
   }
   inboundReceipt.value = receipt
   inboundOrder.value = order
+  inboundQcQtyHints.value = gate.qtyHints || null
+  inboundQcEnforceCap.value = Boolean(gate.enforceQtyCap && gate.qtyHints)
+  inboundFromQcId.value = gate.task?.id || ''
   inboundModalOpen.value = true
 }
 
@@ -520,8 +545,14 @@ function onInboundSaved() {
   if (inboundReceipt.value?.id) {
     attachReceiptInboundOrder(inboundReceipt.value.id, { inboundStatus: '入库中' })
   }
+  if (inboundFromQcId.value) {
+    attachQcTaskInboundOrder(inboundFromQcId.value, {})
+  }
   inboundReceipt.value = null
   inboundOrder.value = null
+  inboundQcQtyHints.value = null
+  inboundQcEnforceCap.value = false
+  inboundFromQcId.value = ''
   selectedRowKeys.value = []
 }
 

@@ -61,6 +61,18 @@
 }
 
 /**
+ * 列表筛选区白底卡片盒子（对齐 list-search-area.mdc）
+ * 各页 scoped 可覆盖 padding/margin；描边与背景由此统一兜底
+ */
+.filter-card {
+  margin-bottom: 8px;
+  padding: 12px 16px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--divider, #e5e6eb);
+  border-radius: 8px;
+}
+
+/**
  * 列表筛选：一行 5 个（覆盖各页 a-row/a-col 栅格）
  * 搜索/重置固定在第二行末尾（第 10 格）；收起时最多展示 9 个条件
  * 已使用 ListFilterBar 的页面不受影响

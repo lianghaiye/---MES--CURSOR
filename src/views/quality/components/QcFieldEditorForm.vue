@@ -1,6 +1,6 @@
 <template>
   <a-form layout="vertical" class="qc-field-editor-form">
-    <div class="form-section-box">
+    <div class="form-section-box modal-basic-card">
       <div class="section-label">基本信息</div>
       <a-row :gutter="[12, 8]">
         <a-col v-if="showCode" :span="6">
@@ -414,9 +414,8 @@
                   + 添加选项
                 </a-button>
                 <div class="option-map-hint">
-                  「合格 /
-                  不合格」文案可改、不可删除；「让步合格」可删。可追加选项。映射仅支持质检通过 /
-                  质检不通过。
+                  「合格 / 不合格」文案可改、不可删除；「让步合格 /
+                  部分合格」可删。可追加选项。映射支持质检通过 / 质检不通过 / 部分通过。
                 </div>
               </div>
             </a-form-item>
@@ -522,9 +521,8 @@
               </div>
               <a-button type="link" size="small" @click="addManualOption">+ 添加选项</a-button>
               <div class="option-map-hint">
-                「合格 /
-                不合格」文案可改、不可删除；「让步合格」可删。可追加选项。映射仅支持质检通过 /
-                质检不通过。可勾选默认。
+                「合格 / 不合格」文案可改、不可删除；「让步合格 /
+                部分合格」可删。可追加选项。映射支持质检通过 / 质检不通过 / 部分通过。可勾选默认。
               </div>
             </div>
           </a-form-item>
@@ -563,9 +561,9 @@
       <div class="option-map-hint standard-hint">
         {{
           indicatorKind === 'composite'
-            ? '父项级标准；子项另有判定。人工判定项在录入时选择合格/不合格/让步合格。'
+            ? '父项级标准；子项另有判定。人工判定项在录入时选择合格/不合格/让步合格/部分合格。'
             : model.judgeRule === 'manual'
-              ? '录入时除实测值外，须选择本项结论（可自定义选项文案，并映射质检通过/不通过）。'
+              ? '录入时除实测值外，须选择本项结论（可自定义选项文案，并映射质检通过/不通过/部分通过）。'
               : '单项合格提示；可配合模板「整单合格规则」约束判定通过。'
         }}
       </div>

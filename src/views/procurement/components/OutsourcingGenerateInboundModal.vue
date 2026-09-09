@@ -55,6 +55,13 @@
       </a-row>
     </a-form>
 
+    <a-alert
+      v-if="qcEnforceQtyCap && qcQtyHints"
+      type="info"
+      show-icon
+      style="margin-bottom: 12px"
+      message="已按质检「合格入库数量」带入本次入库数量，可改小，不可超过合格入库数与可入剩余。"
+    />
     <InboundLineScopeToggle v-model="lineScope" />
 
     <a-table
@@ -155,11 +162,14 @@ import {
 import { formatNumber } from '@/utils/numberFormat'
 import InboundLineScopeToggle from '@/components/InboundLineScopeToggle.vue'
 import { filterInboundLinesByScope } from '@/utils/inboundLineScope'
+import { applyQcQtyHintsToInboundLines } from '@/utils/qcInboundFromReceipt'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   outsourcingOrder: { type: Object, default: null },
   outsourcingOrders: { type: Array, default: null },
+  qcQtyHints: { type: Object, default: null },
+  qcEnforceQtyCap: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -271,6 +281,9 @@ watch(
         .filter((l) => (Number(l.planQty) || 0) > 0)
         .map((l) => buildLine(order, l)),
     )
+    applyQcQtyHintsToInboundLines(inboundLines.value, props.qcQtyHints, {
+      enforceQtyCap: props.qcEnforceQtyCap,
+    })
   },
 )
 
@@ -303,6 +316,15 @@ function handleSave() {
   const submitLines = editableLines.filter((l) => Number(l.qty) > 0)
   if (!submitLines.length) {
     message.warning('请至少填写一行入库数量')
+    return
+  }
+  const overQcCap = submitLines.find(
+    (line) => line.qcMaxQty != null && Number(line.qty) > Number(line.qcMaxQty) + 1e-9,
+  )
+  if (overQcCap) {
+    message.warning(
+      `「${overQcCap.productName}」入库数量不可超过质检合格入库数量（${overQcCap.qcMaxQty}）`,
+    )
     return
   }
   const invalid = submitLines.find((l) => !String(l.warehouse || '').trim())

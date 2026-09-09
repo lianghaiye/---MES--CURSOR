@@ -163,6 +163,15 @@
             </a-tag>
             <span v-else class="muted">—</span>
           </template>
+          <template v-else-if="column.key === 'inboundStatus'">
+            <a-tag
+              v-if="taskInboundStatus(record)"
+              :color="inboundStatusTagColor(taskInboundStatus(record))"
+            >
+              {{ taskInboundStatus(record) }}
+            </a-tag>
+            <span v-else class="muted">—</span>
+          </template>
           <template v-else-if="column.key === 'inspectQty'">
             {{ sumTaskInspectQty(record) || '—' }}
           </template>
@@ -177,15 +186,32 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <template v-if="isInboundScope">
-              <a-button
-                v-if="canInspectQcTask(record)"
-                type="link"
-                size="small"
-                @click="openInspect(record)"
-              >
-                质检
-              </a-button>
-              <span v-else class="muted">—</span>
+              <a-space :size="0">
+                <a-button
+                  v-if="canInspectQcTask(record)"
+                  type="link"
+                  size="small"
+                  @click="openInspect(record)"
+                >
+                  质检
+                </a-button>
+                <a-button
+                  v-if="isIncomingScope && canGenerateInboundFromQc(record)"
+                  type="link"
+                  size="small"
+                  @click="openGenerateInboundFromRow(record)"
+                >
+                  入库
+                </a-button>
+                <span
+                  v-if="
+                    !canInspectQcTask(record) &&
+                    !(isIncomingScope && canGenerateInboundFromQc(record))
+                  "
+                  class="muted"
+                  >—</span
+                >
+              </a-space>
             </template>
             <a-button v-else type="link" size="small" @click="openDetailDrawer(record)">
               详情
@@ -224,12 +250,16 @@
       v-model:open="inboundModalOpen"
       :purchase-order="inboundOrder"
       :purchase-receipt="inboundReceipt"
+      :qc-qty-hints="inboundQcQtyHints"
+      :qc-enforce-qty-cap="inboundQcEnforceCap"
       @saved="onInboundSaved"
     />
 
     <OutsourcingGenerateInboundModal
       v-model:open="wxInboundModalOpen"
       :outsourcing-order="wxInboundOrder"
+      :qc-qty-hints="inboundQcQtyHints"
+      :qc-enforce-qty-cap="inboundQcEnforceCap"
       @saved="onOutsourcingInboundSaved"
     />
   </div>
@@ -260,10 +290,11 @@ import QcTaskDetailDrawer from './components/QcTaskDetailDrawer.vue'
 import QcTaskCreateModal from './components/QcTaskCreateModal.vue'
 import GenerateInboundOrderModal from '@/views/procurement/components/GenerateInboundOrderModal.vue'
 import OutsourcingGenerateInboundModal from '@/views/procurement/components/OutsourcingGenerateInboundModal.vue'
-import { getPurchaseReceiptById } from '@/store/purchaseReceiptStore'
+import { getPurchaseReceiptById, purchaseReceiptState } from '@/store/purchaseReceiptStore'
 import {
   attachReceiptInboundOrder,
   getOutsourcingReceiptById,
+  outsourcingReceiptState,
 } from '@/store/outsourcingReceiptStore'
 import { canGenerateInbound, getPurchaseOrderById } from '@/store/purchaseOrderStore'
 import {
@@ -273,6 +304,12 @@ import {
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { useTabs } from '@/composables/useTabs'
 import { getQcTaskRouteBundle, isInboundQcBizScope } from '@/utils/qcTaskRoutes'
+import {
+  evaluateQcInboundGate,
+  inboundStatusTagColor,
+  resolveQcTaskInboundStatus,
+  resolveSourceReceiptForQcTask,
+} from '@/utils/qcInboundFromReceipt'
 
 const route = useRoute()
 const router = useRouter()
@@ -312,6 +349,9 @@ const inboundModalOpen = ref(false)
 const inboundOrder = ref(null)
 const inboundReceipt = ref(null)
 const inboundFromQcId = ref('')
+/** 质检合格入库数量提示：itemCode → qty */
+const inboundQcQtyHints = ref(null)
+const inboundQcEnforceCap = ref(false)
 const wxInboundModalOpen = ref(false)
 const wxInboundOrder = ref(null)
 const wxInboundReceipt = ref(null)
@@ -324,6 +364,7 @@ const incomingColumns = [
   { title: '质检单号', key: 'qcNo', width: 160, fixed: 'left' },
   { title: '质检状态', key: 'qcStatus', width: 90 },
   { title: '质检结果', key: 'qcResult', width: 100 },
+  { title: '入库状态', key: 'inboundStatus', width: 100 },
   { title: '供应商', dataIndex: 'supplier', width: 140, ellipsis: true },
   { title: '来源单号', dataIndex: 'sourceDocNo', width: 140 },
   { title: '入库单号', dataIndex: 'inboundOrderNo', width: 140 },
@@ -331,7 +372,7 @@ const incomingColumns = [
   { title: '质检时间', key: 'inspectedAt', width: 150 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', width: 150 },
-  { title: '操作', key: 'action', width: 72, fixed: 'right' },
+  { title: '操作', key: 'action', width: 100, fixed: 'right' },
 ]
 
 const commonColumns = [
@@ -363,9 +404,12 @@ const displayColumns = computed(() => {
   return [...commonColumns, ...productionExtraColumns, ...tailColumns]
 })
 
-const tableScrollX = computed(() => (isInboundScope.value ? 1300 : 1400))
+const tableScrollX = computed(() => (isInboundScope.value ? 1400 : 1400))
 
 const filteredList = computed(() => {
+  // 依赖收货入库状态变更，驱动「入库状态」列刷新
+  void purchaseReceiptState.receipts
+  void outsourcingReceiptState.receipts
   let list = filterQcTasks(qcTaskState.tasks, appliedFilters.value)
   const supplier = String(appliedFilters.value.supplier || '').trim()
   if (supplier) {
@@ -511,6 +555,31 @@ function openInspect(record) {
   router.push({ name: bundle.inspectName, params: { id: record.id } })
 }
 
+/** 来料：已完成且（质检通过 / 部分通过且有合格入库数）可显示行内「入库」 */
+function canGenerateInboundFromQc(task) {
+  if (!task) return false
+  if (task.qcStatus !== QC_TASK_STATUS.COMPLETED) return false
+  return evaluateQcInboundGate(task).ok
+}
+
+function taskInboundStatus(task) {
+  return resolveQcTaskInboundStatus(task)
+}
+
+function applyInboundGateToHints(gate) {
+  inboundQcQtyHints.value = gate.qtyHints || null
+  inboundQcEnforceCap.value = Boolean(gate.enforceQtyCap && gate.qtyHints)
+}
+
+function openGenerateInboundFromRow(record) {
+  if (!canGenerateInboundFromQc(record)) {
+    const gate = evaluateQcInboundGate(record)
+    message.warning(gate.message || '当前质检单不可生成入库单')
+    return
+  }
+  openGenerateInboundForTask(record)
+}
+
 function openGenerateInbound() {
   if (selectedRowKeys.value.length !== 1) {
     message.warning('请勾选一条质检单后再生成入库单')
@@ -521,19 +590,24 @@ function openGenerateInbound() {
     message.warning('未找到质检单')
     return
   }
+  openGenerateInboundForTask(task)
+}
+
+function openGenerateInboundForTask(task) {
+  if (!task) {
+    message.warning('未找到质检单')
+    return
+  }
   if (task.qcStatus === QC_TASK_STATUS.CANCELLED) {
     message.warning('已终止的质检单不可生成入库单')
     return
   }
-  if (task.qcStatus !== QC_TASK_STATUS.COMPLETED) {
-    message.warning('请先完成质检后再生成入库单')
+  const gate = evaluateQcInboundGate(task)
+  if (!gate.ok) {
+    message.warning(gate.message || '当前质检单不可生成入库单')
     return
   }
-  if (task.qcResult === QC_TASK_RESULT.FAIL) {
-    message.warning('质检不通过的单据不可生成入库单')
-    return
-  }
-  const receipt = getPurchaseReceiptById(task.sourceDocId)
+  const receipt = resolveSourceReceiptForQcTask(task)
   if (!receipt) {
     message.warning('未找到关联采购收货单')
     return
@@ -554,6 +628,7 @@ function openGenerateInbound() {
   inboundFromQcId.value = task.id
   inboundReceipt.value = receipt
   inboundOrder.value = po
+  applyInboundGateToHints(gate)
   inboundModalOpen.value = true
 }
 
@@ -568,6 +643,8 @@ function onInboundSaved(order, allCreated = []) {
     })
   }
   inboundFromQcId.value = ''
+  inboundQcQtyHints.value = null
+  inboundQcEnforceCap.value = false
   inboundReceipt.value = null
   inboundOrder.value = null
   selectedRowKeys.value = []
@@ -589,15 +666,12 @@ function openGenerateOutsourcingInbound() {
     message.warning('已终止的质检单不可生成外协入库单')
     return
   }
-  if (task.qcStatus !== QC_TASK_STATUS.COMPLETED) {
-    message.warning('请先完成质检后再生成外协入库单')
+  const gate = evaluateQcInboundGate(task)
+  if (!gate.ok) {
+    message.warning(gate.message || '当前质检单不可生成外协入库单')
     return
   }
-  if (task.qcResult === QC_TASK_RESULT.FAIL) {
-    message.warning('质检不通过的单据不可生成外协入库单')
-    return
-  }
-  const receipt = getOutsourcingReceiptById(task.sourceDocId)
+  const receipt = resolveSourceReceiptForQcTask(task)
   if (!receipt) {
     message.warning('未找到关联外协收货单')
     return
@@ -615,8 +689,10 @@ function openGenerateOutsourcingInbound() {
     message.warning('关联外协订单不可生成入库单（需进行中且仍有可回货数量）')
     return
   }
+  inboundFromQcId.value = task.id
   wxInboundReceipt.value = receipt
   wxInboundOrder.value = order
+  applyInboundGateToHints(gate)
   wxInboundModalOpen.value = true
 }
 
@@ -624,6 +700,12 @@ function onOutsourcingInboundSaved() {
   if (wxInboundReceipt.value?.id) {
     attachReceiptInboundOrder(wxInboundReceipt.value.id, { inboundStatus: '入库中' })
   }
+  if (inboundFromQcId.value) {
+    attachQcTaskInboundOrder(inboundFromQcId.value, {})
+  }
+  inboundFromQcId.value = ''
+  inboundQcQtyHints.value = null
+  inboundQcEnforceCap.value = false
   wxInboundReceipt.value = null
   wxInboundOrder.value = null
   selectedRowKeys.value = []

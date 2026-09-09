@@ -8,7 +8,7 @@
     wrap-class-name="generate-receipt-modal-wrap"
     @cancel="handleCancel"
   >
-    <div class="section-block">
+    <div class="section-block modal-basic-card">
       <div class="section-title">基本信息</div>
       <a-form layout="inline" class="header-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">

@@ -4,25 +4,32 @@ import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 export const QC_CONCLUSION_PASS_OPTION = '合格'
 export const QC_CONCLUSION_FAIL_OPTION = '不合格'
 export const QC_CONCLUSION_CONCESSION_OPTION = '让步合格'
+export const QC_CONCLUSION_PARTIAL_OPTION = '部分合格'
 
 export const QC_CONCLUSION_FIELD_CODE = 'QC_CONCLUSION'
 export const QC_INSPECT_METHOD_FIELD_CODE = 'QC_INSPECT_METHOD'
 export const QC_INSPECT_QTY_FIELD_CODE = 'QC_INSPECT_QTY'
 export const QC_INSPECT_REMARK_FIELD_CODE = 'QC_INSPECT_REMARK'
 
-/** 结论选项可映射的任务结果（仅通过 / 不通过） */
+/** 结论选项可映射的任务结果 */
 export const QC_CONCLUSION_RESULT_OPTIONS = [
   { label: '质检通过', value: QC_TASK_RESULT.PASS },
   { label: '质检不通过', value: QC_TASK_RESULT.FAIL },
+  { label: '部分通过', value: QC_TASK_RESULT.PARTIAL },
 ]
 
-const CONCLUSION_MAP_RESULTS = new Set([QC_TASK_RESULT.PASS, QC_TASK_RESULT.FAIL])
+const CONCLUSION_MAP_RESULTS = new Set([
+  QC_TASK_RESULT.PASS,
+  QC_TASK_RESULT.FAIL,
+  QC_TASK_RESULT.PARTIAL,
+])
 
-/** 默认结论选项（合格/不合格不可删；让步合格可删） */
+/** 默认结论选项（合格/不合格不可删；让步合格、部分合格可删） */
 export const DEFAULT_CONCLUSION_OPTION_ITEMS = [
   { value: QC_CONCLUSION_PASS_OPTION, result: QC_TASK_RESULT.PASS, locked: true },
   { value: QC_CONCLUSION_FAIL_OPTION, result: QC_TASK_RESULT.FAIL, locked: true },
   { value: QC_CONCLUSION_CONCESSION_OPTION, result: QC_TASK_RESULT.PASS, locked: false },
+  { value: QC_CONCLUSION_PARTIAL_OPTION, result: QC_TASK_RESULT.PARTIAL, locked: false },
 ]
 
 /** 不可删除的结论文案（仅合格/不合格） */
@@ -61,10 +68,20 @@ const FAIL_VALUES = new Set([
   'fail',
   'ng',
 ])
+const PARTIAL_VALUES = new Set([
+  QC_CONCLUSION_PARTIAL_OPTION,
+  '部分通过',
+  QC_TASK_RESULT.PARTIAL,
+  'PARTIAL',
+  'partial',
+])
 
 function guessResultForLabel(label) {
   const v = String(label || '').trim()
   if (!v) return QC_TASK_RESULT.PASS
+  if (PARTIAL_VALUES.has(v) || v.includes('部分合格') || v.includes('部分通过')) {
+    return QC_TASK_RESULT.PARTIAL
+  }
   if (FAIL_VALUES.has(v)) return QC_TASK_RESULT.FAIL
   if (PASS_VALUES.has(v)) return QC_TASK_RESULT.PASS
   return QC_TASK_RESULT.PASS
@@ -72,8 +89,6 @@ function guessResultForLabel(label) {
 
 function coerceConclusionResult(result, label = '') {
   if (CONCLUSION_MAP_RESULTS.has(result)) return result
-  // 历史「部分通过」等统一收敛到通过
-  if (result === QC_TASK_RESULT.PARTIAL) return QC_TASK_RESULT.PASS
   return guessResultForLabel(label)
 }
 
@@ -201,7 +216,7 @@ export function normalizeConclusionOptionItems(field = {}) {
     const value = String(o?.value ?? '').trim()
     const result = coerceConclusionResult(o?.result, value)
     const locked =
-      value === QC_CONCLUSION_CONCESSION_OPTION
+      value === QC_CONCLUSION_CONCESSION_OPTION || value === QC_CONCLUSION_PARTIAL_OPTION
         ? false
         : Boolean(o?.locked) || LOCKED_CONCLUSION_OPTION_VALUES.has(value)
     return {
@@ -567,6 +582,9 @@ export function mapConclusionValueToQcResult(raw, field = null) {
     if (field.failOption && v === field.failOption) return QC_TASK_RESULT.FAIL
   }
 
+  if (PARTIAL_VALUES.has(v) || v.includes('部分合格') || v.includes('部分通过')) {
+    return QC_TASK_RESULT.PARTIAL
+  }
   if (PASS_VALUES.has(v)) return QC_TASK_RESULT.PASS
   if (FAIL_VALUES.has(v)) return QC_TASK_RESULT.FAIL
   return ''
@@ -617,7 +635,7 @@ export function validateConclusionOptionItems(optionItems = []) {
     }
     names.add(item.value)
     if (!CONCLUSION_MAP_RESULTS.has(item.result)) {
-      return { ok: false, message: `请为「${item.value}」选择质检通过或质检不通过` }
+      return { ok: false, message: `请为「${item.value}」选择质检通过、质检不通过或部分通过` }
     }
   }
   const hasPass = items.some((o) => o.result === QC_TASK_RESULT.PASS)

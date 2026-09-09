@@ -36,171 +36,177 @@
     >
       <a-tab-pane key="basic" tab="基本信息">
         <div class="tab-pane-body">
-          <a-form layout="inline" class="horizontal-form">
-            <a-row :gutter="[12, 12]" style="width: 100%">
-              <a-col :span="8">
-                <a-form-item label="产品编码">
-                  <a-input
-                    v-model:value="form.code"
-                    size="small"
-                    placeholder="请输入"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="条码类型" required>
-                  <a-select v-model:value="form.barcodeType" size="small" :options="barcodeOpts" />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="类别" required>
-                  <a-select
-                    v-model:value="form.categoryKey"
-                    size="small"
-                    :options="categoryOpts"
-                    placeholder="请选择 类别"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="产品属性" required>
-                  <a-select
-                    v-model:value="form.productAttribute"
-                    size="small"
-                    :options="productAttrOpts"
-                    :disabled="viewOnly"
-                    placeholder="请选择 产品属性"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="型号规格" required>
-                  <a-input
-                    v-model:value="form.specModel"
-                    size="small"
-                    placeholder="请输入 型号规格"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="图号">
-                  <a-input
-                    v-model:value="form.drawingNo"
-                    size="small"
-                    placeholder="请输入 图号"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="材质">
-                  <a-select
-                    v-model:value="form.material"
-                    size="small"
-                    allow-clear
-                    show-search
-                    :options="materialGradeOpts"
-                    placeholder="请选择 材质"
-                    :filter-option="filterMaterialGrade"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="重量">
-                  <a-input v-model:value="form.weight" size="small" placeholder="请输入 重量" />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="库存单位" required>
-                  <a-select
-                    v-model:value="form.inventoryUnit"
-                    size="small"
-                    :options="unitOpts"
-                    placeholder="请选择 库存单位"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="标准规范">
-                  <a-select
-                    v-model:value="form.standardSpec"
-                    size="small"
-                    allow-clear
-                    :options="standardSpecOpts"
-                    placeholder="请选择 标准规范"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="24">
-                <div class="form-option-row">
-                  <div v-if="showAssemblyPartSwitch" class="form-option-item">
-                    <span class="form-option-label">是否组装件</span>
-                    <a-switch v-model:checked="form.isAssemblyPart" :disabled="viewOnly" />
+          <div class="modal-basic-card">
+            <a-form layout="inline" class="horizontal-form">
+              <a-row :gutter="[12, 12]" style="width: 100%">
+                <a-col :span="8">
+                  <a-form-item label="产品编码">
+                    <a-input
+                      v-model:value="form.code"
+                      size="small"
+                      placeholder="请输入"
+                      allow-clear
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="条码类型" required>
+                    <a-select
+                      v-model:value="form.barcodeType"
+                      size="small"
+                      :options="barcodeOpts"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="类别" required>
+                    <a-select
+                      v-model:value="form.categoryKey"
+                      size="small"
+                      :options="categoryOpts"
+                      placeholder="请选择 类别"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="产品属性" required>
+                    <a-select
+                      v-model:value="form.productAttribute"
+                      size="small"
+                      :options="productAttrOpts"
+                      :disabled="viewOnly"
+                      placeholder="请选择 产品属性"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="型号规格" required>
+                    <a-input
+                      v-model:value="form.specModel"
+                      size="small"
+                      placeholder="请输入 型号规格"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="图号">
+                    <a-input
+                      v-model:value="form.drawingNo"
+                      size="small"
+                      placeholder="请输入 图号"
+                      allow-clear
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="材质">
+                    <a-select
+                      v-model:value="form.material"
+                      size="small"
+                      allow-clear
+                      show-search
+                      :options="materialGradeOpts"
+                      placeholder="请选择 材质"
+                      :filter-option="filterMaterialGrade"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="重量">
+                    <a-input v-model:value="form.weight" size="small" placeholder="请输入 重量" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="库存单位" required>
+                    <a-select
+                      v-model:value="form.inventoryUnit"
+                      size="small"
+                      :options="unitOpts"
+                      placeholder="请选择 库存单位"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="标准规范">
+                    <a-select
+                      v-model:value="form.standardSpec"
+                      size="small"
+                      allow-clear
+                      :options="standardSpecOpts"
+                      placeholder="请选择 标准规范"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="24">
+                  <div class="form-option-row">
+                    <div v-if="showAssemblyPartSwitch" class="form-option-item">
+                      <span class="form-option-label">是否组装件</span>
+                      <a-switch v-model:checked="form.isAssemblyPart" :disabled="viewOnly" />
+                    </div>
+                    <div v-if="!form.isPart" class="form-option-item">
+                      <span class="form-option-label">产品物料</span>
+                      <a-switch v-model:checked="form.isProductMaterial" :disabled="viewOnly" />
+                    </div>
                   </div>
-                  <div v-if="!form.isPart" class="form-option-item">
-                    <span class="form-option-label">产品物料</span>
-                    <a-switch v-model:checked="form.isProductMaterial" :disabled="viewOnly" />
-                  </div>
-                </div>
-              </a-col>
-              <template v-if="form.isProductMaterial">
-                <a-col :span="8">
-                  <a-form-item label="物料类型" required>
-                    <a-select
-                      v-model:value="form.materialType"
+                </a-col>
+                <template v-if="form.isProductMaterial">
+                  <a-col :span="8">
+                    <a-form-item label="物料类型" required>
+                      <a-select
+                        v-model:value="form.materialType"
+                        size="small"
+                        :options="materialTypeOpts"
+                        placeholder="请选择 物料类型"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="物料类别" required>
+                      <a-select
+                        v-model:value="form.materialCategoryKey"
+                        size="small"
+                        :options="materialCategoryOpts"
+                        placeholder="请选择 物料类别"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="供应型态" required>
+                      <a-select
+                        v-model:value="form.supplyForm"
+                        size="small"
+                        :options="supplyFormOpts"
+                        placeholder="请选择 供应型态"
+                      />
+                    </a-form-item>
+                  </a-col>
+                </template>
+                <a-col :span="24">
+                  <a-form-item label="技术参数" class="remark-item">
+                    <a-textarea
+                      v-model:value="form.techParams"
+                      :rows="3"
                       size="small"
-                      :options="materialTypeOpts"
-                      placeholder="请选择 物料类型"
+                      placeholder="请输入技术参数"
+                      allow-clear
                     />
                   </a-form-item>
                 </a-col>
-                <a-col :span="8">
-                  <a-form-item label="物料类别" required>
-                    <a-select
-                      v-model:value="form.materialCategoryKey"
+                <a-col :span="24">
+                  <a-form-item label="配套要求" class="remark-item">
+                    <a-textarea
+                      v-model:value="form.matchingRequirements"
+                      :rows="2"
                       size="small"
-                      :options="materialCategoryOpts"
-                      placeholder="请选择 物料类别"
+                      placeholder="请输入配套要求"
+                      :maxlength="200"
+                      show-count
                     />
                   </a-form-item>
                 </a-col>
-                <a-col :span="8">
-                  <a-form-item label="供应型态" required>
-                    <a-select
-                      v-model:value="form.supplyForm"
-                      size="small"
-                      :options="supplyFormOpts"
-                      placeholder="请选择 供应型态"
-                    />
-                  </a-form-item>
-                </a-col>
-              </template>
-              <a-col :span="24">
-                <a-form-item label="技术参数" class="remark-item">
-                  <a-textarea
-                    v-model:value="form.techParams"
-                    :rows="3"
-                    size="small"
-                    placeholder="请输入技术参数"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="24">
-                <a-form-item label="配套要求" class="remark-item">
-                  <a-textarea
-                    v-model:value="form.matchingRequirements"
-                    :rows="2"
-                    size="small"
-                    placeholder="请输入配套要求"
-                    :maxlength="200"
-                    show-count
-                  />
-                </a-form-item>
-              </a-col>
-            </a-row>
-          </a-form>
+              </a-row>
+            </a-form>
+          </div>
         </div>
       </a-tab-pane>
 

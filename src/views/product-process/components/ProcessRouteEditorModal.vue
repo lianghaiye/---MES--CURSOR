@@ -14,83 +14,93 @@
       v-model:selected-row="selectedRow"
     >
       <template #basic>
-        <div class="section-title">基本信息</div>
-        <a-form
-          :model="form"
-          layout="horizontal"
-          class="route-basic-form horizontal-form"
-          :label-col="{ style: { width: '110px' } }"
-          :wrapper-col="{ style: { flex: 1 } }"
-        >
-          <a-row :gutter="[16, 0]" style="width: 100%">
-            <a-col :span="24">
-              <a-form-item label="工艺路线名称" required>
-                <a-input v-model:value="form.name" size="small" placeholder="请输入 工艺路线名称" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="24">
-              <a-form-item label="工艺应用范围" required>
-                <a-radio-group v-model:value="form.applyScope" size="small" @change="onScopeChange">
-                  <a-radio value="全部产品">全部产品</a-radio>
-                  <a-radio value="单个物品">单个物品</a-radio>
-                  <a-radio value="物品类别">物品类别</a-radio>
-                </a-radio-group>
-              </a-form-item>
-            </a-col>
-            <a-col v-if="form.applyScope === '单个物品'" :span="24">
-              <a-form-item label="物品" required>
-                <a-input-group compact style="width: 100%">
-                  <a-input
-                    :value="form.itemName ? `${form.itemName}` : ''"
-                    readonly
-                    size="small"
-                    placeholder="请选择 物品"
-                    style="width: calc(100% - 72px)"
-                  />
-                  <a-button size="small" @click="itemPickerOpen = true">选择</a-button>
-                </a-input-group>
-              </a-form-item>
-            </a-col>
-            <template v-if="form.applyScope === '物品类别'">
+        <div class="modal-basic-card">
+          <div class="section-title">基本信息</div>
+          <a-form
+            :model="form"
+            layout="horizontal"
+            class="route-basic-form horizontal-form"
+            :label-col="{ style: { width: '110px' } }"
+            :wrapper-col="{ style: { flex: 1 } }"
+          >
+            <a-row :gutter="[16, 0]" style="width: 100%">
               <a-col :span="24">
-                <a-form-item label="类别类型" required>
-                  <a-radio-group
-                    v-model:value="form.categoryType"
+                <a-form-item label="工艺路线名称" required>
+                  <a-input
+                    v-model:value="form.name"
                     size="small"
-                    @change="onCategoryTypeChange"
+                    placeholder="请输入 工艺路线名称"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="24">
+                <a-form-item label="工艺应用范围" required>
+                  <a-radio-group
+                    v-model:value="form.applyScope"
+                    size="small"
+                    @change="onScopeChange"
                   >
-                    <a-radio value="产品">产品类别</a-radio>
-                    <a-radio value="物料">物料类别</a-radio>
+                    <a-radio value="全部产品">全部产品</a-radio>
+                    <a-radio value="单个物品">单个物品</a-radio>
+                    <a-radio value="物品类别">物品类别</a-radio>
                   </a-radio-group>
                 </a-form-item>
               </a-col>
+              <a-col v-if="form.applyScope === '单个物品'" :span="24">
+                <a-form-item label="物品" required>
+                  <a-input-group compact style="width: 100%">
+                    <a-input
+                      :value="form.itemName ? `${form.itemName}` : ''"
+                      readonly
+                      size="small"
+                      placeholder="请选择 物品"
+                      style="width: calc(100% - 72px)"
+                    />
+                    <a-button size="small" @click="itemPickerOpen = true">选择</a-button>
+                  </a-input-group>
+                </a-form-item>
+              </a-col>
+              <template v-if="form.applyScope === '物品类别'">
+                <a-col :span="24">
+                  <a-form-item label="类别类型" required>
+                    <a-radio-group
+                      v-model:value="form.categoryType"
+                      size="small"
+                      @change="onCategoryTypeChange"
+                    >
+                      <a-radio value="产品">产品类别</a-radio>
+                      <a-radio value="物料">物料类别</a-radio>
+                    </a-radio-group>
+                  </a-form-item>
+                </a-col>
+                <a-col :span="24">
+                  <a-form-item label="物品类别" required>
+                    <a-tree-select
+                      v-model:value="form.categoryKey"
+                      :tree-data="categoryTree"
+                      placeholder="请选择 物品类别"
+                      tree-default-expand-all
+                      allow-clear
+                      size="small"
+                      style="width: 100%"
+                      @change="onCategoryChange"
+                    />
+                  </a-form-item>
+                </a-col>
+              </template>
               <a-col :span="24">
-                <a-form-item label="物品类别" required>
-                  <a-tree-select
-                    v-model:value="form.categoryKey"
-                    :tree-data="categoryTree"
-                    placeholder="请选择 物品类别"
-                    tree-default-expand-all
-                    allow-clear
+                <a-form-item label="备注">
+                  <a-textarea
+                    v-model:value="form.remark"
+                    :rows="2"
                     size="small"
-                    style="width: 100%"
-                    @change="onCategoryChange"
+                    placeholder="请输入 备注"
                   />
                 </a-form-item>
               </a-col>
-            </template>
-            <a-col :span="24">
-              <a-form-item label="备注">
-                <a-textarea
-                  v-model:value="form.remark"
-                  :rows="2"
-                  size="small"
-                  placeholder="请输入 备注"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-form>
+            </a-row>
+          </a-form>
+        </div>
       </template>
     </ProcessRouteGridEditor>
 

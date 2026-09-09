@@ -9,7 +9,7 @@
     @update:open="(val) => emit('update:open', val)"
   >
     <div class="form-layout">
-      <div class="section-block">
+      <div class="section-block modal-basic-card">
         <div class="section-title">基本信息</div>
         <a-form :model="form" layout="inline" class="header-form horizontal-form">
           <a-row :gutter="[12, 12]" style="width: 100%">

@@ -37,7 +37,7 @@ export function registerPurchaseRequisitionDraftBind(api = {}) {
 const STORAGE_KEY = 'i_doms_purchase_orders'
 const SEED_VERSION_KEY = 'i_doms_purchase_orders_seed_v'
 /** v7：结算单位演示采购订单（铸件/三口径/无单重） */
-const CURRENT_SEED_VERSION = '7'
+const CURRENT_SEED_VERSION = '8'
 let poSeq = 20
 
 function loadFromStorage() {

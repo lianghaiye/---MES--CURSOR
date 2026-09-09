@@ -10,7 +10,7 @@
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
-    <div class="section-block">
+    <div class="section-block modal-basic-card">
       <div class="section-title">基本信息</div>
       <a-divider class="section-divider" />
       <a-form layout="inline" class="horizontal-form">

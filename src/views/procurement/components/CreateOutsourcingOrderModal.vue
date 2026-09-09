@@ -11,7 +11,7 @@
     @update:open="(val) => emit('update:open', val)"
   >
     <div class="wx-form-shell">
-      <div class="section-block" :class="{ 'is-collapsed': basicInfoCollapsed }">
+      <div class="section-block modal-basic-card" :class="{ 'is-collapsed': basicInfoCollapsed }">
         <div class="section-title-row">
           <span class="section-title">基本信息</span>
           <a-button type="link" size="small" class="collapse-btn" @click="toggleBasicInfo">

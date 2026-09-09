@@ -56,7 +56,7 @@
       <a-tab-pane key="basic" tab="基本信息">
         <div class="tab-pane-body">
           <a-form layout="inline" class="horizontal-form">
-            <div class="form-product-material-section basic-info-box">
+            <div class="form-product-material-section basic-info-box modal-basic-card">
               <a-row :gutter="[12, 12]" style="width: 100%">
                 <a-col :span="6">
                   <a-form-item :label="isMultiVariantMode ? '族编码' : '编号'">
@@ -195,7 +195,7 @@
               </a-row>
             </div>
 
-            <div class="form-product-material-section basic-info-box">
+            <div class="form-product-material-section basic-info-box modal-basic-card">
               <a-row :gutter="[12, 12]" style="width: 100%">
                 <a-col v-if="showProductFields" :span="6">
                   <a-form-item label="计划策略">

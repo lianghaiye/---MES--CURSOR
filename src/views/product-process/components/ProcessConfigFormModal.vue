@@ -8,7 +8,7 @@
     @update:open="(val) => emit('update:open', val)"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" class="process-form">
-      <div class="form-section-box">
+      <div class="form-section-box modal-basic-card">
         <div class="section-label">基本信息</div>
         <a-row :gutter="[12, 8]">
           <a-col :span="6">

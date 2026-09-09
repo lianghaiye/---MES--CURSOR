@@ -178,6 +178,8 @@
           v-model:open="inboundModalOpen"
           :purchase-order="inboundOrder"
           :purchase-receipt="record"
+          :qc-qty-hints="inboundQcQtyHints"
+          :qc-enforce-qty-cap="inboundQcEnforceCap"
           @saved="onInboundSaved"
         />
       </template>
@@ -213,6 +215,8 @@ import {
   createInboundInfoLineColumns,
   getInboundInfoLineScrollX,
 } from '@/utils/purchaseOrderInboundLines'
+import { evaluateReceiptInboundByQc } from '@/utils/qcInboundFromReceipt'
+import { attachQcTaskInboundOrder } from '@/store/qcTaskStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import PurchaseReceiptBasicInfoSection from './components/PurchaseReceiptBasicInfoSection.vue'
 import PurchaseReceiptPrintModal from './components/PurchaseReceiptPrintModal.vue'
@@ -227,6 +231,9 @@ const printModalOpen = ref(false)
 const record = ref(null)
 const inboundModalOpen = ref(false)
 const inboundOrder = ref(null)
+const inboundQcQtyHints = ref(null)
+const inboundQcEnforceCap = ref(false)
+const inboundFromQcId = ref('')
 const activeTab = ref('basic')
 
 const lineColumns = [
@@ -329,20 +336,51 @@ function canOpenInboundFromReceipt(receipt) {
   if (!receipt || receipt.receiptStatus === '作废' || receipt.receiptStatus === '已完成') {
     return false
   }
+  if (receipt.inboundStatus === '已入库') return false
   const po = getPurchaseOrderById(receipt.purchaseOrderId)
-  return Boolean(po && canGenerateInbound(po))
+  if (!(po && canGenerateInbound(po))) return false
+  if (receipt.qcNo) {
+    return evaluateReceiptInboundByQc(receipt.id, {
+      bizScope: '来料质检',
+      receiptNo: receipt.receiptNo,
+    }).ok
+  }
+  return true
 }
 
 function openInboundModal() {
   if (!canOpenInboundFromReceipt(record.value)) {
-    message.warning('当前收货单不可生成入库单')
+    const gate = evaluateReceiptInboundByQc(record.value?.id, {
+      bizScope: '来料质检',
+      receiptNo: record.value?.receiptNo,
+    })
+    message.warning(gate.message || '当前收货单不可生成入库单')
     return
   }
+  const gate = evaluateReceiptInboundByQc(record.value.id, {
+    bizScope: '来料质检',
+    receiptNo: record.value.receiptNo,
+  })
   inboundOrder.value = getPurchaseOrderById(record.value.purchaseOrderId)
+  inboundQcQtyHints.value = gate.qtyHints || null
+  inboundQcEnforceCap.value = Boolean(gate.enforceQtyCap && gate.qtyHints)
+  inboundFromQcId.value = gate.task?.id || ''
   inboundModalOpen.value = true
 }
 
-function onInboundSaved() {
+function onInboundSaved(order, allCreated = []) {
+  const list = allCreated?.length ? allCreated : order ? [order] : []
+  if (inboundFromQcId.value && list.length) {
+    list.forEach((o) => {
+      attachQcTaskInboundOrder(inboundFromQcId.value, {
+        inboundOrderNo: o.docNo,
+        inboundOrderId: o.id,
+      })
+    })
+  }
+  inboundQcQtyHints.value = null
+  inboundQcEnforceCap.value = false
+  inboundFromQcId.value = ''
   loadRecord()
 }
 

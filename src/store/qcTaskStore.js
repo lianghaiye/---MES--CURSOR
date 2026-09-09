@@ -10,6 +10,8 @@ import {
   upsertSheetConclusionField,
 } from '@/utils/qcConclusionField'
 import { normalizeSheetPassRule } from '@/utils/qcTemplateSheetPass'
+import { updatePurchaseReceipt } from '@/store/purchaseReceiptStore'
+import { updateOutsourcingReceipt } from '@/store/outsourcingReceiptStore'
 import { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS } from '@/constants/qcTaskResult'
 import { cloneMockIncomingQcTasks } from '@/mock/qcTasks'
 import { getQcTemplateByCode } from '@/store/qcTemplateStore'
@@ -19,7 +21,7 @@ export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 const STORAGE_KEY = 'i_doms_qc_tasks'
 const STORAGE_VERSION = 3
 const SEED_VERSION_KEY = 'i_doms_qc_tasks_seed_v'
-const CURRENT_SEED_VERSION = '11'
+const CURRENT_SEED_VERSION = '12'
 
 export const QC_TASK_STATUS = {
   PENDING: '待质检',
@@ -201,6 +203,9 @@ export function createQcTaskLineItem(partial = {}) {
     inspectMethod: partial.inspectMethod || '',
     lineQcResult: partial.lineQcResult,
     treatmentPlan: partial.treatmentPlan,
+    acceptInboundQty: partial.acceptInboundQty,
+    returnQty: partial.returnQty,
+    exchangeQty: partial.exchangeQty,
     fieldValues: Array.isArray(partial.fieldValues) ? [...partial.fieldValues] : [],
     sourceLineId: partial.sourceLineId,
     templateId: partial.templateId || '',
@@ -431,6 +436,30 @@ export function updateQcTask(id, patch = {}) {
   return row
 }
 
+/** 质检提交后回写关联收货单的质检状态/结果（与收货列表联动） */
+function syncSourceReceiptAfterQcSubmit(task) {
+  if (!task?.sourceDocId) return
+  let receiptQcStatus = ''
+  if (task.qcResult === QC_TASK_RESULT.PASS) receiptQcStatus = '质检通过'
+  else if (task.qcResult === QC_TASK_RESULT.FAIL) receiptQcStatus = '质检不通过'
+  else if (task.qcResult === QC_TASK_RESULT.PARTIAL) receiptQcStatus = '部分通过'
+  if (!receiptQcStatus) return
+  const patch = {
+    qcStatus: receiptQcStatus,
+    qcResult: task.qcResult || '',
+    inspector: task.inspector || '',
+    inspectedAt: task.inspectedAt || '',
+  }
+  if (task.qcNo) patch.qcNo = task.qcNo
+  if (task.bizScope === '外协回货检' || task.sourceType === 'outsourcing_receipt') {
+    updateOutsourcingReceipt(task.sourceDocId, patch)
+    return
+  }
+  if (task.bizScope === '来料质检' || task.sourceType === 'purchase_receipt' || !task.bizScope) {
+    updatePurchaseReceipt(task.sourceDocId, patch)
+  }
+}
+
 /**
  * 提交检验：从模板「检验结论」字段挖掘任务级 qcResult，并完成任务
  * WEB / 小程序共用本接口（entryChannel 区分录入端）
@@ -486,6 +515,7 @@ export function submitQcTaskInspection(
     remark: remark != null ? remark : row.remark,
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   })
+  syncSourceReceiptAfterQcSubmit(row)
   return { ok: true, task: row, qcResult }
 }
 

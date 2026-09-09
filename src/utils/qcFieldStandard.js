@@ -30,11 +30,12 @@ export const QC_FIELD_JUDGE_RULE_OPTIONS = [
   { value: QC_FIELD_JUDGE_RULE.EQUALS, label: '等于指定值' },
 ]
 
-/** 人工判定本项结论（默认三项，可扩展；映射质检通过/不通过） */
+/** 人工判定本项结论（默认可含部分合格；映射质检通过/不通过/部分通过） */
 export const QC_MANUAL_JUDGMENT = {
   PASS: '合格',
   FAIL: '不合格',
   CONCESSION: '让步合格',
+  PARTIAL: '部分合格',
 }
 
 /** @deprecated 请用 listManualJudgmentSelectOptions(field) */
@@ -42,6 +43,7 @@ export const QC_MANUAL_JUDGMENT_OPTIONS = [
   { value: QC_MANUAL_JUDGMENT.PASS, label: '合格' },
   { value: QC_MANUAL_JUDGMENT.FAIL, label: '不合格' },
   { value: QC_MANUAL_JUDGMENT.CONCESSION, label: '让步合格' },
+  { value: QC_MANUAL_JUDGMENT.PARTIAL, label: '部分合格' },
 ]
 
 export function isManualJudgeField(field = {}) {
@@ -57,11 +59,22 @@ export function isManualJudgmentOption(v, field = null) {
   return (
     s === QC_MANUAL_JUDGMENT.PASS ||
     s === QC_MANUAL_JUDGMENT.FAIL ||
-    s === QC_MANUAL_JUDGMENT.CONCESSION
+    s === QC_MANUAL_JUDGMENT.CONCESSION ||
+    s === QC_MANUAL_JUDGMENT.PARTIAL
   )
 }
 
-/** 默认人工判定选项（与质检结果预设一致） */
+function coerceManualOptionResult(result) {
+  if (result === QC_TASK_RESULT.FAIL) return QC_TASK_RESULT.FAIL
+  if (result === QC_TASK_RESULT.PARTIAL) return QC_TASK_RESULT.PARTIAL
+  return QC_TASK_RESULT.PASS
+}
+
+function isDeletableManualPreset(value) {
+  return value === QC_MANUAL_JUDGMENT.CONCESSION || value === QC_MANUAL_JUDGMENT.PARTIAL
+}
+
+/** 默认人工判定选项（与整单结论预设一致） */
 export function createDefaultManualOptionItems() {
   return [
     {
@@ -82,15 +95,21 @@ export function createDefaultManualOptionItems() {
       locked: false,
       isDefault: false,
     },
+    {
+      value: QC_MANUAL_JUDGMENT.PARTIAL,
+      result: QC_TASK_RESULT.PARTIAL,
+      locked: false,
+      isDefault: false,
+    },
   ]
 }
 
 /**
  * 规范化人工判定选项：
  * - 「合格 / 不合格」可改文案、不可删除（locked）
- * - 「让步合格」默认可删；历史 locked 数据会解锁
+ * - 「让步合格 / 部分合格」默认可删；历史 locked 数据会解锁
  * - 可追加自定义项
- * - 不强制把文案重置为「合格/不合格/让步合格」
+ * - 不强制把文案重置为默认四项
  */
 export function normalizeManualOptionItems(field = {}) {
   const rawItems = Array.isArray(field.manualOptionItems)
@@ -111,9 +130,9 @@ export function normalizeManualOptionItems(field = {}) {
 
   return rawItems.map((o) => {
     const value = String(o?.value ?? '').trim()
-    const result = o?.result === QC_TASK_RESULT.FAIL ? QC_TASK_RESULT.FAIL : QC_TASK_RESULT.PASS
-    // 让步合格允许删除（含历史 locked:true 数据）
-    const locked = value === QC_MANUAL_JUDGMENT.CONCESSION ? false : Boolean(o?.locked)
+    const result = coerceManualOptionResult(o?.result)
+    // 让步合格 / 部分合格允许删除（含历史 locked:true 数据）
+    const locked = isDeletableManualPreset(value) ? false : Boolean(o?.locked)
     return {
       value,
       result,
@@ -142,7 +161,7 @@ export function validateManualOptionItems(optionItems = []) {
   const items = (optionItems || [])
     .map((o) => ({
       value: String(o?.value ?? '').trim(),
-      result: o?.result === QC_TASK_RESULT.FAIL ? QC_TASK_RESULT.FAIL : QC_TASK_RESULT.PASS,
+      result: coerceManualOptionResult(o?.result),
       locked: Boolean(o?.locked),
       isDefault: Boolean(o?.isDefault),
     }))
@@ -166,16 +185,17 @@ export function validateManualOptionItems(optionItems = []) {
   return { ok: true, items }
 }
 
-/** 根据选项映射判定达标：质检不通过→fail，其余映射→pass */
+/** 根据选项映射判定达标：不通过/部分通过→fail，通过→pass */
 export function mapManualJudgmentToPassFail(field = {}, judgment) {
   const v = String(judgment ?? '').trim()
   if (!v) return ''
   const items = normalizeManualOptionItems(field)
   const hit = items.find((o) => o.value === v)
   if (hit) {
-    return hit.result === QC_TASK_RESULT.FAIL ? 'fail' : 'pass'
+    if (hit.result === QC_TASK_RESULT.FAIL || hit.result === QC_TASK_RESULT.PARTIAL) return 'fail'
+    return 'pass'
   }
-  if (v === QC_MANUAL_JUDGMENT.FAIL) return 'fail'
+  if (v === QC_MANUAL_JUDGMENT.FAIL || v === QC_MANUAL_JUDGMENT.PARTIAL) return 'fail'
   if (v === QC_MANUAL_JUDGMENT.PASS || v === QC_MANUAL_JUDGMENT.CONCESSION) return 'pass'
   return ''
 }
@@ -275,7 +295,7 @@ export function buildStandardText(field = {}) {
       .filter(Boolean)
     return labels.length
       ? `人工判定：${labels.join(' / ')}`
-      : '人工判定（合格 / 不合格 / 让步合格）'
+      : '人工判定（合格 / 不合格 / 让步合格 / 部分合格）'
   }
   return ''
 }

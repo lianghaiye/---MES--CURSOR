@@ -8,6 +8,19 @@ alwaysApply: false
 
 列表页 / 管理页顶部筛选区，统一 `.filter-card` + `.filter-form.horizontal-form`。
 
+## 筛选区白底卡片（强制）
+
+筛选条件须装进白底描边盒子，与下方表格区分开。
+
+| 项 | 约定 |
+|----|------|
+| 容器 class | **`.filter-card`** |
+| 背景 | **白底** `#fff` / `var(--card-bg)` |
+| 描边 | `1px solid` `var(--divider, #e5e6eb)` |
+| 圆角 | **8px** |
+| 内边距 | **12px 16px** |
+| 全局样式 | `src/styles/horizontal-form.less` 已提供 `.filter-card` 盒子兜底 |
+
 ## 布局规则（强制）
 
 | 规则 | 说明 |
@@ -74,7 +87,7 @@ alwaysApply: false
 
 ## 检查清单
 
-- [ ] 外层 `.filter-card`，form 带 `filter-form horizontal-form`
+- [ ] 外层 `.filter-card`（白底 + 描边盒子），form 带 `filter-form horizontal-form`
 - [ ] 控件统一 `size="small"`
 - [ ] 条件 ≥5 时按钮在第二行第 5 列；不足 5 时与条件同行；非条件列表末尾 inline 漂移
 - [ ] `field-count` 或 DOM 计数正确，≤9 无展开按钮

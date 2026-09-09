@@ -8,7 +8,7 @@
     class="bom-sub-item-filter-modal"
     @cancel="handleCancel"
   >
-    <div v-if="!localConditions.length" class="empty-wrap">
+    <div v-if="!localConditions.length" class="empty-wrap filter-card">
       <a-empty :image="false" description="暂无筛选条件">
         <a-button type="dashed" size="small" @click="addCondition">
           <PlusOutlined />
@@ -17,7 +17,7 @@
       </a-empty>
     </div>
 
-    <div v-else class="condition-list">
+    <div v-else class="condition-list filter-card">
       <div v-for="(cond, index) in localConditions" :key="cond.id" class="condition-row">
         <a-select
           v-if="index > 0"

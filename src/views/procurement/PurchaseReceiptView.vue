@@ -235,6 +235,8 @@
       v-model:open="inboundModalOpen"
       :purchase-order="inboundOrder"
       :purchase-receipt="inboundReceipt"
+      :qc-qty-hints="inboundQcQtyHints"
+      :qc-enforce-qty-cap="inboundQcEnforceCap"
       @saved="onInboundSaved"
     />
 
@@ -281,6 +283,8 @@ import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
+import { evaluateReceiptInboundByQc } from '@/utils/qcInboundFromReceipt'
+import { attachQcTaskInboundOrder } from '@/store/qcTaskStore'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -300,6 +304,9 @@ const printReceipts = ref([])
 const inboundModalOpen = ref(false)
 const inboundOrder = ref(null)
 const inboundReceipt = ref(null)
+const inboundQcQtyHints = ref(null)
+const inboundQcEnforceCap = ref(false)
+const inboundFromQcId = ref('')
 const qcModalOpen = ref(false)
 const qcReceipt = ref(null)
 const pagination = reactive({ current: 1, pageSize: 10 })
@@ -421,12 +428,19 @@ function canShowReceiptQcAction(record) {
   return (record.qcStatus || '未质检') === '未质检'
 }
 
-/** 进行中且入库未完成、关联采购单仍可入库 → 展示「入库」 */
+/** 进行中且入库未完成、关联采购单仍可入库；有关联质检时须通过门控 */
 function canShowReceiptInboundAction(record) {
   if (record?.receiptStatus !== '进行中') return false
   if (record.inboundStatus === '已入库') return false
   const po = getPurchaseOrderById(record.purchaseOrderId)
-  return Boolean(po && canGenerateInbound(po))
+  if (!(po && canGenerateInbound(po))) return false
+  if (hasReceiptQcSheet(record)) {
+    return evaluateReceiptInboundByQc(record.id, {
+      bizScope: '来料质检',
+      receiptNo: record.receiptNo,
+    }).ok
+  }
+  return true
 }
 
 function hasRowActions(record) {
@@ -490,6 +504,14 @@ function openInboundForRow(receipt) {
     message.warning('该收货单已入库完成')
     return
   }
+  const gate = evaluateReceiptInboundByQc(receipt.id, {
+    bizScope: '来料质检',
+    receiptNo: receipt.receiptNo,
+  })
+  if (!gate.ok) {
+    message.warning(gate.message || '当前收货单不可生成入库单')
+    return
+  }
   const po = getPurchaseOrderById(receipt.purchaseOrderId)
   if (!po || !canGenerateInbound(po)) {
     message.warning('关联采购单不可生成入库单（需进行中且仍有可入库数量）')
@@ -497,6 +519,9 @@ function openInboundForRow(receipt) {
   }
   inboundReceipt.value = receipt
   inboundOrder.value = po
+  inboundQcQtyHints.value = gate.qtyHints || null
+  inboundQcEnforceCap.value = Boolean(gate.enforceQtyCap && gate.qtyHints)
+  inboundFromQcId.value = gate.task?.id || ''
   inboundModalOpen.value = true
 }
 
@@ -509,9 +534,21 @@ function openInboundModal() {
   openInboundForRow(receipt)
 }
 
-function onInboundSaved() {
+function onInboundSaved(order, allCreated = []) {
+  const list = allCreated?.length ? allCreated : order ? [order] : []
+  if (inboundFromQcId.value && list.length) {
+    list.forEach((o) => {
+      attachQcTaskInboundOrder(inboundFromQcId.value, {
+        inboundOrderNo: o.docNo,
+        inboundOrderId: o.id,
+      })
+    })
+  }
   inboundReceipt.value = null
   inboundOrder.value = null
+  inboundQcQtyHints.value = null
+  inboundQcEnforceCap.value = false
+  inboundFromQcId.value = ''
   selectedRowKeys.value = []
 }
 
