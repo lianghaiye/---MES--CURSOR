@@ -546,7 +546,6 @@ const emit = defineEmits([
   'add-detail-line',
   'reorder-lines',
   'delete-lines',
-  'select-node',
   'switch-product',
   'import-template',
   'import-ship-attachment',
@@ -561,8 +560,8 @@ const isTreeMode = computed(
 
 const tableData = computed(() => {
   if (!isTreeMode.value) return props.lines
-  const tree = buildBomMaterialTree(props.flatNodes, props.lineItems)
-  assignMaterialTreeIndexes(tree)
+  const tree = buildBomMaterialTree(props.flatNodes, props.lineItems, props.contextNodeId)
+  assignMaterialTreeIndexes(tree, props.flatNodes, props.lineItems)
   assignMaterialTreeStripe(tree)
   return tree
 })
@@ -952,7 +951,6 @@ function customRow(record, index) {
       onClick: () => {
         if (!isTreeMode.value) return
         activeRowId.value = record.id
-        emit('select-node', resolveContextNodeId(record))
       },
     }
   }
@@ -963,7 +961,6 @@ function customRow(record, index) {
       )
       if (tag) return
       activeRowId.value = record.id
-      if (isTreeMode.value) emit('select-node', resolveContextNodeId(record))
     },
     onDragover: (event) => {
       if (!canDropOn(record)) return

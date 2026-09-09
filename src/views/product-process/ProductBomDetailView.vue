@@ -101,7 +101,6 @@
                     :root-item-label="detailRootItemLabel"
                     :summary-meta="detailSummaryMeta"
                     empty-variant="no-children"
-                    @select-node="selectedNodeId = $event"
                   />
                 </div>
               </main>

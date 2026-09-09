@@ -1,4 +1,8 @@
-import { parseMaterialCodeFromNodeTitle, getOrderedChildNodeIds } from '@/utils/bomTree'
+import {
+  parseMaterialCodeFromNodeTitle,
+  buildBomTreeLevelNoMap,
+  getBomTreeLevelNo,
+} from '@/utils/bomTree'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
 
@@ -53,37 +57,7 @@ export function resolveBomNodeItemInfo(node, lineItems, rootForm = {}) {
   }
 }
 
-export { resolveNodeLine }
-
-/**
- * BOM 树层级编号：顶级 0；一级 1、2、3…；二级 1.1、1.2…；三级 1.1.1…
- */
-export function buildBomTreeLevelNoMap(flatNodes, lineItems = []) {
-  const map = new Map()
-  const root = flatNodes.find((n) => n.isRoot)
-  if (!root) return map
-
-  map.set(root.id, '0')
-
-  function walk(parentId, parentLevelNo) {
-    const childIds = getOrderedChildNodeIds(parentId, flatNodes, lineItems)
-    childIds.forEach((childId, idx) => {
-      const levelNo = parentLevelNo === '0' ? String(idx + 1) : `${parentLevelNo}.${idx + 1}`
-      map.set(childId, levelNo)
-      walk(childId, levelNo)
-    })
-  }
-
-  walk(root.id, '0')
-  return map
-}
-
-export function getBomTreeLevelNo(nodeId, flatNodes, lineItems = []) {
-  const node = flatNodes.find((n) => n.id === nodeId)
-  if (!node) return ''
-  if (node.isRoot) return '0'
-  return buildBomTreeLevelNoMap(flatNodes, lineItems).get(nodeId) || ''
-}
+export { resolveNodeLine, buildBomTreeLevelNoMap, getBomTreeLevelNo }
 
 /** 按字段配置格式化树节点标题 */
 export function formatBomTreeNodeTitle(

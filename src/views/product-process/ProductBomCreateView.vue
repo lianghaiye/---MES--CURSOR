@@ -202,7 +202,6 @@
             @item-name-change="onItemNameChange"
             @bom-ref-descendant-edit="onBomRefDescendantEdit"
             @configure-variant="openVariantConfig"
-            @select-node="selectedNodeId = $event"
             @import-template="templateModalOpen = true"
             @import-ship-attachment="onImportShipAttachment"
           />
@@ -1286,7 +1285,6 @@ function onAddSubItem(parentNodeId) {
   }
   addChildParentId.value =
     parentNodeId || selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
-  selectedNodeId.value = addChildParentId.value
   materialModalOpen.value = true
 }
 
@@ -1346,7 +1344,6 @@ function onAddByBomConfirm({ pickerRow, usageCoefficient }) {
   withUndo(() => {
     flatNodes.value = result.flatNodes
     lineItems.value = result.lineItems
-    selectedNodeId.value = parentId
   })
   message.success('已按 BOM 添加本级及下级结构')
 }
@@ -1571,7 +1568,6 @@ function onMaterialSelected(items) {
     })
     flatNodes.value = nodes
     lineItems.value = lines
-    selectedNodeId.value = parentId
     if (spuAdded) {
       message.success(`已添加 ${spuAdded} 个产品族，请点击规格型号 / 材质 / 变体属性完成配置`)
     } else if (accepted.length > 1) {

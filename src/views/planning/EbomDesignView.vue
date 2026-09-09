@@ -141,7 +141,6 @@
             @item-name-change="onItemNameChange"
             @bom-ref-descendant-edit="onBomRefDescendantEdit"
             @configure-variant="openVariantConfig"
-            @select-node="selectedNodeId = $event"
             @import-template="templateModalOpen = true"
           />
         </div>
@@ -621,8 +620,9 @@ function onAddChild(parentId) {
   materialModalOpen.value = true
 }
 
-function onAddSubItem() {
-  addChildParentId.value = selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
+function onAddSubItem(parentNodeId) {
+  addChildParentId.value =
+    parentNodeId || selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
   materialModalOpen.value = true
 }
 

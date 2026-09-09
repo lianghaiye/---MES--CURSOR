@@ -366,8 +366,10 @@ export function stripLineTreeChildren(lineItems) {
   })
 }
 
-/** 构建物料清单树形表格数据（复用 lineItems 引用以支持行内编辑） */
-export function buildBomMaterialTree(flatNodes, lineItems) {
+/** 构建物料清单树形表格数据（复用 lineItems 引用以支持行内编辑）
+ * @param {string} [focusNodeId] 左侧树选中节点：仅展示该节点本级行及其所有子集；根/空则展示整树
+ */
+export function buildBomMaterialTree(flatNodes, lineItems, focusNodeId = '') {
   if (!Array.isArray(lineItems) || !lineItems.length) return []
   stripLineTreeChildren(lineItems)
   const rootId = getRootTreeId(flatNodes)
@@ -402,18 +404,27 @@ export function buildBomMaterialTree(flatNodes, lineItems) {
     return lines
   }
 
-  return buildLevel(rootId)
-}
+  if (!focusNodeId || isRootNode(focusNodeId, flatNodes)) {
+    return buildLevel(rootId)
+  }
 
-/** 为树形物料行分配序号（1、1.1、1.2…） */
-export function assignMaterialTreeIndexes(rows, prefix = '') {
-  if (!Array.isArray(rows)) return []
-  rows.forEach((row, i) => {
-    const index = prefix ? `${prefix}.${i + 1}` : String(i + 1)
-    row._treeIndex = index
-    if (row.children?.length) assignMaterialTreeIndexes(row.children, index)
-  })
-  return rows
+  // 本级：当前选中节点对应物料行；子集：其下递归子级
+  const focusLine =
+    lineItems.find((l) => l.treeNodeId === focusNodeId) ||
+    (() => {
+      const node = flatNodes.find((n) => n.id === focusNodeId)
+      return node?.lineId ? lineItems.find((l) => l.id === node.lineId) : null
+    })()
+
+  const children = buildLevel(focusNodeId)
+  if (focusLine) {
+    if (children.length) focusLine.children = children
+    else delete focusLine.children
+    return [focusLine]
+  }
+
+  // 无对应物料行时，仍展示该节点下的子集
+  return children
 }
 
 /** 一级物料间隔底色，下级继承所属一级物料的底色标记 */
@@ -462,6 +473,67 @@ export function flattenMaterialTreeLines(rows) {
 export function nodeHasTreeChildren(flatNodes, nodeId, lineItems = []) {
   if (!nodeId) return false
   return getOrderedChildNodeIds(nodeId, flatNodes, lineItems).length > 0
+}
+
+/**
+ * BOM 树层级编号：根 0；一级 1、2、3…；二级 1.1、1.2…（与左侧树一致）
+ */
+export function buildBomTreeLevelNoMap(flatNodes, lineItems = []) {
+  const map = new Map()
+  const root = flatNodes?.find((n) => n.isRoot)
+  if (!root) return map
+
+  map.set(root.id, '0')
+
+  function walk(parentId, parentLevelNo) {
+    const childIds = getOrderedChildNodeIds(parentId, flatNodes, lineItems)
+    childIds.forEach((childId, idx) => {
+      const levelNo = parentLevelNo === '0' ? String(idx + 1) : `${parentLevelNo}.${idx + 1}`
+      map.set(childId, levelNo)
+      walk(childId, levelNo)
+    })
+  }
+
+  walk(root.id, '0')
+  return map
+}
+
+export function getBomTreeLevelNo(nodeId, flatNodes, lineItems = []) {
+  const node = flatNodes?.find((n) => n.id === nodeId)
+  if (!node) return ''
+  if (node.isRoot) return '0'
+  return buildBomTreeLevelNoMap(flatNodes, lineItems).get(nodeId) || ''
+}
+
+/**
+ * 为树形物料行分配序号。
+ * 传入 flatNodes 时与左侧树层级编号对齐（含过滤子树场景，如 6 / 6.1 / 6.2）；
+ * 否则按当前展示树从 1 起编。
+ */
+export function assignMaterialTreeIndexes(rows, flatNodesOrPrefix = '', lineItems = []) {
+  if (!Array.isArray(rows)) return []
+
+  if (Array.isArray(flatNodesOrPrefix)) {
+    const levelNoMap = buildBomTreeLevelNoMap(flatNodesOrPrefix, lineItems)
+    const walk = (list, parentIndex = '') => {
+      list.forEach((row, i) => {
+        const fromMap = row.treeNodeId ? levelNoMap.get(row.treeNodeId) : ''
+        const index = fromMap || (parentIndex ? `${parentIndex}.${i + 1}` : String(i + 1))
+        row._treeIndex = index
+        if (row.children?.length) walk(row.children, index)
+      })
+    }
+    walk(rows)
+    return rows
+  }
+
+  const prefix = flatNodesOrPrefix || ''
+  rows.forEach((row, i) => {
+    const index = prefix ? `${prefix}.${i + 1}` : String(i + 1)
+    row._treeIndex = index
+    if (row.children?.length) assignMaterialTreeIndexes(row.children, index)
+  })
+  return rows
 }
 
 export { ROOT_ID }
