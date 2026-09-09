@@ -40,6 +40,8 @@ function createLineItem(partial = {}) {
     deliveryMode: '整机',
     /** 库存履约：prefer_stock | force_mto | stock_only */
     stockFulfillmentMode: 'prefer_stock',
+    /** 优先现货时：占用现货数；空=尽量占满自由备货 */
+    preferStockTakeQty: null,
     stockTakeQty: null,
     planProduceQty: null,
     /** 是否需要工业标识（默认跟产品主数据） */

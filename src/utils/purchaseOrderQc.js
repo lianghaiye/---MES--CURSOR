@@ -78,9 +78,22 @@ function collectQcTasksForReceipt(receipt) {
   return [...map.values()]
 }
 
+function formatQcProductInfo(line = {}, task = {}) {
+  const parts = [
+    line?.itemCode || line?.productCode || task.itemCode,
+    line?.itemName || line?.productName || task.itemName,
+    line?.specModel || task.specModel,
+    line?.material || task.material,
+  ]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+  return parts.length ? parts.join('/') : '—'
+}
+
 function mapTaskLineToQcResultRow(task, line, idx, meta = {}) {
   return {
     id: `${task.id}__${line?.id || idx}`,
+    taskId: task.id || '',
     purchaseOrderNo: meta.purchaseOrderNo || '',
     receiptNo: meta.receiptNo || '',
     receiptId: meta.receiptId || '',
@@ -89,12 +102,17 @@ function mapTaskLineToQcResultRow(task, line, idx, meta = {}) {
     qcResult: line?.lineQcResult || task.qcResult || '',
     itemName: line?.itemName || line?.productName || task.itemName || '—',
     itemCode: line?.itemCode || line?.productCode || task.itemCode || '',
+    specModel: line?.specModel || task.specModel || '',
+    material: line?.material || task.material || '',
+    productInfo: formatQcProductInfo(line, task),
     inspectMethod: line?.inspectMethod || task.inspectMethod || '—',
     inspectQty: line?.inspectQty ?? line?.receiptQty ?? task.inspectQty ?? '',
     treatmentPlan: line?.treatmentPlan || task.treatmentPlan || '—',
     acceptInboundQty:
       line?.acceptInboundQty != null && line?.acceptInboundQty !== '' ? line.acceptInboundQty : '—',
     returnExchange: line ? formatReturnExchangeText(line) : '—',
+    inspector: task.inspector || '',
+    inspectedAt: task.inspectedAt || '',
   }
 }
 

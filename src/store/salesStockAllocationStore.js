@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import { stockState } from '@/store/stockStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
+import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_sales_stock_allocations'
 const DATA_VERSION = 3
@@ -30,15 +31,12 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      version: DATA_VERSION,
-      allocations: salesStockAllocationState.allocations,
-      transfers: salesStockAllocationState.transfers,
-      debts: salesStockAllocationState.debts,
-    }),
-  )
+  persistJson(STORAGE_KEY, {
+    version: DATA_VERSION,
+    allocations: salesStockAllocationState.allocations,
+    transfers: salesStockAllocationState.transfers,
+    debts: salesStockAllocationState.debts,
+  })
 }
 
 const stored = loadFromStorage()

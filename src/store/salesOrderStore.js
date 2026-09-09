@@ -3,10 +3,6 @@ import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
 import { buildMockSalesOrders } from '@/mock/salesOrderSeed'
 import { createLineItem, createSalesOrder } from '@/mock/salesOrders'
-import {
-  addPurchaseRequisition,
-  buildRequisitionFromSalesOrder,
-} from '@/store/purchaseRequisitionStore'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import {
   BOM_FULFILLMENT_PATH,
@@ -684,6 +680,12 @@ export function approveSalesOrder(id, opinion = '') {
     if (order.purchaseRequisitionNo) {
       return { ok: false, message: `订单「${order.orderNo}」已关联采购申请` }
     }
+    // 运行时再取，避免 salesOrderStore ↔ purchaseRequisitionStore 循环依赖
+    // eslint-disable-next-line global-require
+    const {
+      buildRequisitionFromSalesOrder,
+      addPurchaseRequisition,
+    } = require('@/store/purchaseRequisitionStore')
     const requisition = buildRequisitionFromSalesOrder({ ...order, lineItems: purchaseLines })
     addPurchaseRequisition(requisition)
     order.purchaseRequisitionNo = requisition.reqNo

@@ -94,7 +94,7 @@
         <a-button
           v-if="isIncomingScope"
           size="small"
-          :disabled="selectedRowKeys.length !== 1"
+          :disabled="!selectedRowKeys.length"
           @click="openGenerateInbound"
         >
           生成入库单
@@ -106,6 +106,14 @@
           @click="openGenerateOutsourcingInbound"
         >
           生成外协入库单
+        </a-button>
+        <a-button
+          v-if="isInboundScope"
+          size="small"
+          :disabled="!selectedRowKeys.length"
+          @click="openPrintSelected"
+        >
+          打印质检单
         </a-button>
         <a-button size="small" :disabled="!selectedRowKeys.length" @click="handleTerminate">
           <StopOutlined />
@@ -203,14 +211,7 @@
                 >
                   入库
                 </a-button>
-                <span
-                  v-if="
-                    !canInspectQcTask(record) &&
-                    !(isIncomingScope && canGenerateInboundFromQc(record))
-                  "
-                  class="muted"
-                  >—</span
-                >
+                <a-button type="link" size="small" @click="openPrint(record)">打印</a-button>
               </a-space>
             </template>
             <a-button v-else type="link" size="small" @click="openDetailDrawer(record)">
@@ -248,10 +249,11 @@
 
     <GenerateInboundOrderModal
       v-model:open="inboundModalOpen"
-      :purchase-order="inboundOrder"
-      :purchase-receipt="inboundReceipt"
+      :purchase-orders="inboundOrders"
+      :purchase-receipts="inboundReceipts"
       :qc-qty-hints="inboundQcQtyHints"
       :qc-enforce-qty-cap="inboundQcEnforceCap"
+      :qc-hint-bundles="inboundQcHintBundles"
       @saved="onInboundSaved"
     />
 
@@ -262,6 +264,8 @@
       :qc-enforce-qty-cap="inboundQcEnforceCap"
       @saved="onOutsourcingInboundSaved"
     />
+
+    <QcTaskPrintModal v-model:open="printModalOpen" :task="printTask" :tasks="printTasks" />
   </div>
 </template>
 
@@ -283,11 +287,13 @@ import {
   canInspectQcTask,
   cancelQcTasks,
   filterQcTasks,
+  getQcTaskById,
   qcTaskState,
   sumTaskInspectQty,
 } from '@/store/qcTaskStore'
 import QcTaskDetailDrawer from './components/QcTaskDetailDrawer.vue'
 import QcTaskCreateModal from './components/QcTaskCreateModal.vue'
+import QcTaskPrintModal from './components/QcTaskPrintModal.vue'
 import GenerateInboundOrderModal from '@/views/procurement/components/GenerateInboundOrderModal.vue'
 import OutsourcingGenerateInboundModal from '@/views/procurement/components/OutsourcingGenerateInboundModal.vue'
 import { getPurchaseReceiptById, purchaseReceiptState } from '@/store/purchaseReceiptStore'
@@ -346,15 +352,23 @@ const detailTask = ref(null)
 const createOpen = ref(false)
 const createSourceReceipt = ref(null)
 const inboundModalOpen = ref(false)
-const inboundOrder = ref(null)
-const inboundReceipt = ref(null)
-const inboundFromQcId = ref('')
-/** 质检合格入库数量提示：itemCode → qty */
+const inboundOrders = ref([])
+const inboundReceipts = ref([])
+/** receiptId → qcTaskId，保存后回写质检单入库关联 */
+const inboundQcTaskByReceipt = ref({})
+/** 质检合格入库数量提示：itemCode → qty（单张兼容） */
 const inboundQcQtyHints = ref(null)
 const inboundQcEnforceCap = ref(false)
+/** 批量：按收货单拆分 hints */
+const inboundQcHintBundles = ref([])
+/** 外协回货检生成入库时回写质检关联 */
+const inboundFromQcId = ref('')
 const wxInboundModalOpen = ref(false)
 const wxInboundOrder = ref(null)
 const wxInboundReceipt = ref(null)
+const printModalOpen = ref(false)
+const printTask = ref(null)
+const printTasks = ref([])
 
 const statusOpts = QC_TASK_STATUS_OPTIONS.map((v) => ({ label: v, value: v }))
 const resultOpts = QC_TASK_RESULT_OPTIONS.map((v) => ({ label: v, value: v }))
@@ -372,7 +386,7 @@ const incomingColumns = [
   { title: '质检时间', key: 'inspectedAt', width: 150 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', width: 150 },
-  { title: '操作', key: 'action', width: 100, fixed: 'right' },
+  { title: '操作', key: 'action', width: 140, fixed: 'right' },
 ]
 
 const commonColumns = [
@@ -555,6 +569,28 @@ function openInspect(record) {
   router.push({ name: bundle.inspectName, params: { id: record.id } })
 }
 
+function openPrint(record) {
+  if (!record?.id) return
+  printTask.value = getQcTaskById(record.id) || record
+  printTasks.value = []
+  printModalOpen.value = true
+}
+
+function openPrintSelected() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请勾选要打印的质检单')
+    return
+  }
+  const list = selectedRowKeys.value.map((id) => getQcTaskById(id)).filter(Boolean)
+  if (!list.length) {
+    message.warning('未找到可打印的质检单')
+    return
+  }
+  printTask.value = null
+  printTasks.value = list
+  printModalOpen.value = true
+}
+
 /** 来料：已完成且（质检通过 / 部分通过且有合格入库数）可显示行内「入库」 */
 function canGenerateInboundFromQc(task) {
   if (!task) return false
@@ -571,82 +607,143 @@ function applyInboundGateToHints(gate) {
   inboundQcEnforceCap.value = Boolean(gate.enforceQtyCap && gate.qtyHints)
 }
 
+function resetInboundModalState() {
+  inboundOrders.value = []
+  inboundReceipts.value = []
+  inboundQcTaskByReceipt.value = {}
+  inboundQcQtyHints.value = null
+  inboundQcEnforceCap.value = false
+  inboundQcHintBundles.value = []
+}
+
 function openGenerateInboundFromRow(record) {
   if (!canGenerateInboundFromQc(record)) {
     const gate = evaluateQcInboundGate(record)
     message.warning(gate.message || '当前质检单不可生成入库单')
     return
   }
-  openGenerateInboundForTask(record)
+  openGenerateInboundForTasks([record])
 }
 
 function openGenerateInbound() {
-  if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条质检单后再生成入库单')
+  if (!selectedRowKeys.value.length) {
+    message.warning('请勾选质检单后再生成入库单')
     return
   }
-  const task = qcTaskState.tasks.find((t) => t.id === selectedRowKeys.value[0])
-  if (!task) {
+  const tasks = selectedRowKeys.value
+    .map((id) => qcTaskState.tasks.find((t) => t.id === id))
+    .filter(Boolean)
+  if (!tasks.length) {
     message.warning('未找到质检单')
     return
   }
-  openGenerateInboundForTask(task)
+  openGenerateInboundForTasks(tasks)
 }
 
-function openGenerateInboundForTask(task) {
-  if (!task) {
+/**
+ * 批量生成入库：仅节省操作；按收货单去重，一收货单一张入库单。
+ */
+function openGenerateInboundForTasks(tasks = []) {
+  const list = (tasks || []).filter(Boolean)
+  if (!list.length) {
     message.warning('未找到质检单')
     return
   }
-  if (task.qcStatus === QC_TASK_STATUS.CANCELLED) {
-    message.warning('已终止的质检单不可生成入库单')
+
+  /** @type {Map<string, { receipt: object, po: object, task: object, gate: object }>} */
+  const byReceipt = new Map()
+  const failMessages = []
+
+  for (const task of list) {
+    if (task.qcStatus === QC_TASK_STATUS.CANCELLED) {
+      failMessages.push(`${task.qcNo || task.id}：已终止`)
+      continue
+    }
+    const gate = evaluateQcInboundGate(task)
+    if (!gate.ok) {
+      failMessages.push(`${task.qcNo || task.id}：${gate.message || '不可生成入库单'}`)
+      continue
+    }
+    const receipt = resolveSourceReceiptForQcTask(task)
+    if (!receipt) {
+      failMessages.push(`${task.qcNo || task.id}：未找到关联采购收货单`)
+      continue
+    }
+    if (receipt.receiptStatus === '作废' || receipt.receiptStatus === '已完成') {
+      failMessages.push(`${task.qcNo || task.id}：关联收货单已完成或作废`)
+      continue
+    }
+    if (receipt.inboundStatus === '已入库') {
+      failMessages.push(`${task.qcNo || task.id}：关联收货单已入库完成`)
+      continue
+    }
+    const po = getPurchaseOrderById(receipt.purchaseOrderId)
+    if (!po || !canGenerateInbound(po)) {
+      failMessages.push(`${task.qcNo || task.id}：关联采购单不可生成入库单`)
+      continue
+    }
+    const existing = byReceipt.get(receipt.id)
+    if (existing) {
+      // 同一收货单多张质检：合并部分通过 hints，保留任一可入库任务
+      if (gate.qtyHints) {
+        existing.gate.qtyHints = { ...(existing.gate.qtyHints || {}), ...gate.qtyHints }
+        existing.gate.enforceQtyCap = existing.gate.enforceQtyCap || gate.enforceQtyCap
+      }
+      continue
+    }
+    byReceipt.set(receipt.id, { receipt, po, task, gate })
+  }
+
+  if (!byReceipt.size) {
+    message.warning(failMessages[0] || '所选质检单均不可生成入库单')
     return
   }
-  const gate = evaluateQcInboundGate(task)
-  if (!gate.ok) {
-    message.warning(gate.message || '当前质检单不可生成入库单')
-    return
+  if (failMessages.length) {
+    const preview = failMessages.slice(0, 2).join('；')
+    message.warning(
+      failMessages.length > 2
+        ? `${preview}…等 ${failMessages.length} 条已跳过`
+        : `${preview}（已跳过）`,
+    )
   }
-  const receipt = resolveSourceReceiptForQcTask(task)
-  if (!receipt) {
-    message.warning('未找到关联采购收货单')
-    return
+
+  const entries = [...byReceipt.values()]
+  inboundReceipts.value = entries.map((e) => e.receipt)
+  const poMap = new Map()
+  entries.forEach((e) => {
+    if (e.po?.id) poMap.set(e.po.id, e.po)
+  })
+  inboundOrders.value = [...poMap.values()]
+  inboundQcTaskByReceipt.value = Object.fromEntries(entries.map((e) => [e.receipt.id, e.task.id]))
+  inboundQcHintBundles.value = entries
+    .filter((e) => e.gate?.qtyHints)
+    .map((e) => ({
+      receiptId: e.receipt.id,
+      hints: e.gate.qtyHints,
+      enforceQtyCap: Boolean(e.gate.enforceQtyCap),
+    }))
+  if (entries.length === 1) {
+    applyInboundGateToHints(entries[0].gate)
+  } else {
+    inboundQcQtyHints.value = null
+    inboundQcEnforceCap.value = inboundQcHintBundles.value.some((b) => b.enforceQtyCap)
   }
-  if (receipt.receiptStatus === '作废' || receipt.receiptStatus === '已完成') {
-    message.warning('关联收货单已完成或作废，不可生成入库单')
-    return
-  }
-  if (receipt.inboundStatus === '已入库') {
-    message.warning('关联收货单已入库完成')
-    return
-  }
-  const po = getPurchaseOrderById(receipt.purchaseOrderId)
-  if (!po || !canGenerateInbound(po)) {
-    message.warning('关联采购单不可生成入库单（需进行中且仍有可入库数量）')
-    return
-  }
-  inboundFromQcId.value = task.id
-  inboundReceipt.value = receipt
-  inboundOrder.value = po
-  applyInboundGateToHints(gate)
   inboundModalOpen.value = true
 }
 
 function onInboundSaved(order, allCreated = []) {
   const list = allCreated?.length ? allCreated : order ? [order] : []
-  if (inboundFromQcId.value && list.length) {
-    list.forEach((o) => {
-      attachQcTaskInboundOrder(inboundFromQcId.value, {
-        inboundOrderNo: o.docNo,
-        inboundOrderId: o.id,
-      })
+  const taskMap = inboundQcTaskByReceipt.value || {}
+  list.forEach((o) => {
+    const receiptId = o.purchaseReceiptId
+    const taskId = receiptId ? taskMap[receiptId] : null
+    if (!taskId) return
+    attachQcTaskInboundOrder(taskId, {
+      inboundOrderNo: o.docNo,
+      inboundOrderId: o.id,
     })
-  }
-  inboundFromQcId.value = ''
-  inboundQcQtyHints.value = null
-  inboundQcEnforceCap.value = false
-  inboundReceipt.value = null
-  inboundOrder.value = null
+  })
+  resetInboundModalState()
   selectedRowKeys.value = []
   handleSearch()
 }

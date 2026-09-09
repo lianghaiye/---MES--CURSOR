@@ -75,6 +75,7 @@ export function flattenSalesOrderLines(orders = []) {
         deliveryMode: line.deliveryMode || '',
         stockFulfillmentMode: line.stockFulfillmentMode || '',
         stockFulfillmentModeLabel: stockFulfillmentModeLabel(line.stockFulfillmentMode),
+        preferStockTakeQty: line.preferStockTakeQty,
         stockTakeQty: line.stockTakeQty,
         planProduceQty: line.planProduceQty,
         deliveryDate: line.deliveryDate || '',

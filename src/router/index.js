@@ -63,6 +63,12 @@ const routes = [
     meta: { title: '采购收货明细预览', standalone: true },
   },
   {
+    path: '/quality/qc-tasks/preview',
+    name: 'quality-qc-task-preview',
+    component: () => import('@/views/quality/QcTaskPrintPreviewView.vue'),
+    meta: { title: '质检单打印预览', standalone: true },
+  },
+  {
     path: '/procurement/purchase-returns/preview',
     name: 'procurement-purchase-return-preview',
     component: () => import('@/views/procurement/PurchaseReturnPrintPreviewView.vue'),

@@ -35,6 +35,7 @@ import {
 } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import { allocateBatchUomConvert } from '@/utils/batchUomConvert'
 import { registerSettleBatchWeightLookup } from '@/utils/settleUnit'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
@@ -64,8 +65,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ batches: stockBatchState.batches }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { batches: stockBatchState.batches })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function initBatches() {

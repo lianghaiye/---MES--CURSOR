@@ -40,6 +40,13 @@ export const salesOrderDetailLineColumns = [
   { key: 'salesQty', title: '销售数量', dataIndex: 'salesQty', width: 90, align: 'right' },
   { key: 'deliveryMode', title: '交付方式', width: 100 },
   { key: 'stockFulfillmentMode', title: '库存履约', width: 120 },
+  {
+    key: 'preferStockTakeQty',
+    title: '占用现货数',
+    dataIndex: 'preferStockTakeQty',
+    width: 110,
+    align: 'right',
+  },
   { key: 'stockTakeQty', title: '现货占用', dataIndex: 'stockTakeQty', width: 88, align: 'right' },
   {
     key: 'planProduceQty',

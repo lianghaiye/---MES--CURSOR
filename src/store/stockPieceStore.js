@@ -5,6 +5,7 @@ import { roundMeters } from '@/utils/variableLengthMaterial'
 import { cloneStockPieceSeed } from '@/mock/stockPieceSeed'
 import { ensureOneItemOneCodeInventoryPieces } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import { ensureCategoryBatchPiecePieces } from '@/mock/categoryBatchPieceDemoSeed'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_stock_pieces'
 const SEED_VERSION_KEY = 'i_doms_stock_pieces_seed_v'
@@ -34,8 +35,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ pieces: stockPieceState.pieces }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { pieces: stockPieceState.pieces })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function nid() {

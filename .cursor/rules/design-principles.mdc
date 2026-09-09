@@ -1,7 +1,7 @@
 ---
 description: i-doms-web 设计总则与适用范围（统一性、强制性分级、适用场景）
 globs: i-doms-web/**/*
-alwaysApply: false
+alwaysApply: true
 ---
 
 # 总则与适用范围

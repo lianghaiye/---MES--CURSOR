@@ -1,7 +1,7 @@
 ---
 description: i-doms-web 新增/编辑页通用结构（页头、操作组、保存成功、区块栅格、编辑骨架屏）
 globs: i-doms-web/**/*{Create,Edit,Form}*.vue
-alwaysApply: false
+alwaysApply: true
 ---
 
 # 新增 / 编辑页通用结构

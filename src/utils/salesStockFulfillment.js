@@ -2,7 +2,7 @@ import { getFreeQtyByItemCode, buildLineStockReminder } from '@/store/salesStock
 
 /** 销售行库存履约方式：决定审核时占用现货 vs 排产数量 */
 export const STOCK_FULFILLMENT_MODE = {
-  /** 优先吃自由备货，缺口再进生产计划 */
+  /** 优先吃自由备货，缺口再进生产计划；可填占用现货数 */
   PREFER_STOCK: 'prefer_stock',
   /** 即使有自由备货也按全量排产，不占用自由备货 */
   FORCE_MTO: 'force_mto',
@@ -49,9 +49,26 @@ export function stockFulfillmentModeLabel(mode) {
 }
 
 /**
+ * 解析「占用现货数」：空 = 不限制（尽量占满）；数字 = 占用上限（含已调拨占用）
+ * @returns {number|null}
+ */
+export function normalizePreferStockTakeQty(val) {
+  if (val === null || val === undefined || val === '') return null
+  const n = Number(val)
+  if (!Number.isFinite(n) || n < 0) return null
+  return n
+}
+
+export function formatPreferStockTakeQty(val) {
+  const n = normalizePreferStockTakeQty(val)
+  return n == null ? '—' : String(n)
+}
+
+/**
  * 按行计算审核时的「预计占用 / 预计排产」。
  * 同编码多行按顺序扣减自由备货，避免重复吃同一批库存。
  * 已占用（如审核前跨单调拨）计入覆盖，不再重复从自由备货扣减。
+ * 「优先现货」可填 preferStockTakeQty（占用现货数）：最多占用该数量现货，其余排产；空则尽量占满。
  * @param {object[]} lines
  * @param {{
  *   getFreeQty?: (code: string) => number,
@@ -76,6 +93,7 @@ export function buildLineStockFulfillmentPlan(lines, options = {}) {
     }
     const freeBefore = code ? freeLeft.get(code) || 0 : 0
     const needRemain = Math.max(0, need - already)
+    const preferCap = normalizePreferStockTakeQty(line?.preferStockTakeQty)
 
     let stockTake = already
     let planQty = 0
@@ -94,7 +112,12 @@ export function buildLineStockFulfillmentPlan(lines, options = {}) {
       stockTake = already + additionalTake
       planQty = 0
     } else {
-      additionalTake = Math.min(needRemain, freeBefore)
+      // prefer_stock：可填占用现货数（含已占用）；空则尽量占满
+      let maxAdditional = needRemain
+      if (preferCap != null) {
+        maxAdditional = Math.min(needRemain, Math.max(0, preferCap - already))
+      }
+      additionalTake = Math.min(maxAdditional, freeBefore)
       stockTake = already + additionalTake
       planQty = Math.max(0, need - stockTake)
     }
@@ -108,6 +131,7 @@ export function buildLineStockFulfillmentPlan(lines, options = {}) {
       need,
       mode,
       modeLabel: stockFulfillmentModeLabel(mode),
+      preferStockTakeQty: preferCap,
       freeBefore,
       already,
       stockTake,

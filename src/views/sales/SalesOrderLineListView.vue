@@ -199,6 +199,13 @@
           <template v-else-if="column.key === 'stockTakeQty'">
             {{ formatQty(record.stockTakeQty) }}
           </template>
+          <template v-else-if="column.key === 'preferStockTakeQty'">
+            {{
+              record.preferStockTakeQty == null || record.preferStockTakeQty === ''
+                ? '—'
+                : formatQty(record.preferStockTakeQty)
+            }}
+          </template>
           <template v-else-if="column.key === 'planProduceQty'">
             {{ formatQty(record.planProduceQty) }}
           </template>
@@ -379,6 +386,13 @@ const baseColumns = [
     key: 'stockFulfillmentMode',
     dataIndex: 'stockFulfillmentModeLabel',
     width: 120,
+  },
+  {
+    title: '占用现货数',
+    key: 'preferStockTakeQty',
+    dataIndex: 'preferStockTakeQty',
+    width: 110,
+    align: 'right',
   },
   {
     title: '现货占用',

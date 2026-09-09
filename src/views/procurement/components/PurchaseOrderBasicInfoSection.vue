@@ -32,7 +32,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
+import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 
 const props = defineProps({
   order: { type: Object, required: true },
@@ -50,8 +50,6 @@ function fieldText(field) {
 const metaItems = computed(() => {
   const o = props.order
   return [
-    { key: 'approverName', label: '审批人', value: display(o.approverName) },
-    { key: 'approvedAt', label: '审批时间', value: resolveApprovalTime(o) },
     { key: 'creator', label: '创建人', value: display(o.creator) },
     { key: 'createdAt', label: '创建时间', value: formatDateTimeMinute(o.createdAt) },
     { key: 'updater', label: '更新人', value: display(o.updater) },

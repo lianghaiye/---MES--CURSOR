@@ -12,6 +12,7 @@ import { createDemoDualUnitMaterials } from '@/mock/stockBatchSeed'
 import { createOneItemOneCodeDemoMaterials } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import { createStockAlertDemoMaterials } from '@/mock/stockAlertDemoMaterials'
 import { createPackageConvertDemoMaterial } from '@/mock/packageConvertPurchaseDemoSeed'
+import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_material_info'
 /** v19：一物一码库存演示料 WL-OIOC-* */
@@ -80,10 +81,10 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ version: DATA_VERSION, materials: materialInfoState.materials }),
-  )
+  persistJson(STORAGE_KEY, {
+    version: DATA_VERSION,
+    materials: materialInfoState.materials,
+  })
 }
 
 export const materialInfoState = reactive({

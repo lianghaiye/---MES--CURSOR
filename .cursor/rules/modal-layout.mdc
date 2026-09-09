@@ -1,7 +1,7 @@
 ---
 description: i-doms-web 弹窗通用规范（尺寸档位、标题底边、基本信息白底卡片、横向表单、关闭二次确认、选择器与表单+多表弹窗）
 globs: i-doms-web/**/*.vue
-alwaysApply: false
+alwaysApply: true
 ---
 
 # 弹窗规范

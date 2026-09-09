@@ -8,6 +8,7 @@ import {
   removeLinkedMaterial,
 } from '@/utils/productMaterialSync'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
+import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_product_info'
 /** v12：工业标识演示产品 */
@@ -99,10 +100,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ version: DATA_VERSION, products: productInfoState.products }),
-  )
+  persistJson(STORAGE_KEY, { version: DATA_VERSION, products: productInfoState.products })
 }
 
 export const productInfoState = reactive({

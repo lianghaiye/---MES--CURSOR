@@ -1,7 +1,7 @@
 ---
 description: i-doms-web 表单横向布局规范（标签与控件平行排列）
 globs: i-doms-web/**/*.vue
-alwaysApply: false
+alwaysApply: true
 ---
 
 # 表单横向布局

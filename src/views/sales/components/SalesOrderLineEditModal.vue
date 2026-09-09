@@ -133,6 +133,20 @@
               v-model:value="draft.stockFulfillmentMode"
               size="small"
               :options="stockFulfillmentModeOpts"
+              @change="onStockFulfillmentModeChange"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col v-if="isPreferStockDraft" :span="8">
+          <a-form-item label="占用现货数">
+            <a-input-number
+              v-model:value="draft.preferStockTakeQty"
+              size="small"
+              :min="0"
+              :max="Number(draft.salesQty) || undefined"
+              :precision="0"
+              placeholder="填写要用的现货数量，空则尽量占满"
+              style="width: 100%"
             />
           </a-form-item>
         </a-col>
@@ -308,7 +322,9 @@ import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 const MAX_LINE_FILE_SIZE = 200 * 1024 * 1024
 import { deliveryModeOptions } from '@/mock/salesOrderOptions'
 import {
+  STOCK_FULFILLMENT_MODE,
   STOCK_FULFILLMENT_MODE_OPTIONS,
+  normalizePreferStockTakeQty,
   normalizeStockFulfillmentMode,
 } from '@/utils/salesStockFulfillment'
 import { productInfoState } from '@/store/productInfoStore'
@@ -364,6 +380,19 @@ const manualBusinessTypeOpts = [
 
 const deliveryModeOpts = deliveryModeOptions.map((v) => ({ label: v, value: v }))
 const stockFulfillmentModeOpts = STOCK_FULFILLMENT_MODE_OPTIONS
+
+const isPreferStockDraft = computed(
+  () =>
+    normalizeStockFulfillmentMode(draft.stockFulfillmentMode) ===
+    STOCK_FULFILLMENT_MODE.PREFER_STOCK,
+)
+
+function onStockFulfillmentModeChange(val) {
+  draft.stockFulfillmentMode = normalizeStockFulfillmentMode(val)
+  if (draft.stockFulfillmentMode !== STOCK_FULFILLMENT_MODE.PREFER_STOCK) {
+    draft.preferStockTakeQty = null
+  }
+}
 
 const draft = reactive(createDraft())
 
@@ -530,6 +559,7 @@ function createDraft(line = {}) {
     salesQty: line.salesQty ?? line.qty ?? 1,
     deliveryMode: line.deliveryMode || '整机',
     stockFulfillmentMode: normalizeStockFulfillmentMode(line.stockFulfillmentMode),
+    preferStockTakeQty: normalizePreferStockTakeQty(line.preferStockTakeQty),
     deliveryDate: line.deliveryDate || '',
     needIndustrialLabel: Boolean(line.needIndustrialLabel),
     listUnitPriceExTax: line.listUnitPriceExTax ?? line.unitPriceExTax ?? 0,
@@ -755,6 +785,11 @@ function handleSave() {
     qty: Number(draft.salesQty),
     deliveryMode: draft.deliveryMode,
     stockFulfillmentMode: normalizeStockFulfillmentMode(draft.stockFulfillmentMode),
+    preferStockTakeQty:
+      normalizeStockFulfillmentMode(draft.stockFulfillmentMode) ===
+      STOCK_FULFILLMENT_MODE.PREFER_STOCK
+        ? normalizePreferStockTakeQty(draft.preferStockTakeQty)
+        : null,
     deliveryDate: draft.deliveryDate,
     needIndustrialLabel: Boolean(draft.needIndustrialLabel),
     listUnitPriceExTax: Number(draft.listUnitPriceExTax) || 0,

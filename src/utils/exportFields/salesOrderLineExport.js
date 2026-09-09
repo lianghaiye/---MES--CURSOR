@@ -32,6 +32,14 @@ export const salesOrderLineExportFields = [
     title: '库存履约',
     getValue: (row) => cell(row, 'stockFulfillmentModeLabel'),
   },
+  {
+    key: 'preferStockTakeQty',
+    title: '占用现货数',
+    getValue: (row) =>
+      row.preferStockTakeQty == null || row.preferStockTakeQty === ''
+        ? ''
+        : numCell(row.preferStockTakeQty, 0),
+  },
   { key: 'stockTakeQty', title: '现货占用', getValue: (row) => numCell(row.stockTakeQty, 0) },
   { key: 'planProduceQty', title: '排产数量', getValue: (row) => numCell(row.planProduceQty, 0) },
   { key: 'deliveryDate', title: '交货日期', getValue: (row) => cell(row, 'deliveryDate') },

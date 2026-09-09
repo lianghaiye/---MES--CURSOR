@@ -401,6 +401,7 @@ export function buildMockSalesOrders(products) {
           salesQty: 5,
           planProduceQty: 3,
           stockTakeQty: 2,
+          preferStockTakeQty: 2,
           needIndustrialLabel: true,
           industrialLabelStatus: '成功',
           industrialLabelSuccessCount: 5,

@@ -730,17 +730,16 @@ export function canGeneratePO(record) {
 
 export { normalizeRequisitionLinePoStatus }
 
-registerPurchaseRequisitionDraftBind({
-  bind: bindRequisitionsToGenerateDraft,
-  unbind: unbindRequisitionsFromGenerateDraft,
-  bindByReqNos: bindRequisitionsToGenerateDraftByReqNos,
-})
-
-// 延后到微任务：避免与 purchaseOrderStore 循环依赖时 state 尚未就绪
+// 延后注册/对账：避免 purchaseOrderStore ↔ purchaseRequisitionStore 循环依赖 TDZ
 queueMicrotask(() => {
   try {
+    registerPurchaseRequisitionDraftBind({
+      bind: bindRequisitionsToGenerateDraft,
+      unbind: unbindRequisitionsFromGenerateDraft,
+      bindByReqNos: bindRequisitionsToGenerateDraftByReqNos,
+    })
     reconcilePurchaseRequisitionDraftStatuses()
   } catch (e) {
-    console.warn('[purchaseRequisitionStore] reconcile draft statuses failed', e)
+    console.warn('[purchaseRequisitionStore] draft bind/reconcile failed', e)
   }
 })

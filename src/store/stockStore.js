@@ -1,5 +1,6 @@
 import { reactive, watch } from 'vue'
 import { buildCrossDemoStockRecords } from '@/mock/crossModuleDemoSeed'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_inventory_stock'
 const SEED_VERSION_KEY = 'i_doms_inventory_stock_seed_v'
@@ -28,8 +29,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ records: stockState.records }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { records: stockState.records })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function mergeDemoStock(records) {

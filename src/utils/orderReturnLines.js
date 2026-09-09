@@ -5,6 +5,12 @@ import { purchaseReturnState } from '@/store/purchaseReturnStore'
 import { outsourcingReturnState } from '@/store/outsourcingReturnStore'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 
+function isActivePurchaseReturn(ret) {
+  if (!ret) return false
+  const status = ret.status || ''
+  return status !== '作废' && status !== '已作废' && status !== '已取消'
+}
+
 function flattenReturns(returns, matchFn, mapLine) {
   const rows = []
   ;(returns || []).filter(matchFn).forEach((ret) => {
@@ -21,11 +27,13 @@ export function listReturnLinesForPurchaseOrder(po) {
   return flattenReturns(
     purchaseReturnState.returns,
     (r) =>
-      (po.id && r.purchaseOrderId === po.id) || (po.orderNo && r.purchaseOrderNo === po.orderNo),
+      isActivePurchaseReturn(r) &&
+      ((po.id && r.purchaseOrderId === po.id) || (po.orderNo && r.purchaseOrderNo === po.orderNo)),
     (ret, line, idx) => ({
       id: `${ret.id}-${line.id || idx}`,
       returnId: ret.id,
       returnNo: ret.returnNo || '',
+      poLineId: line.poLineId || '',
       itemName: line.productName || line.itemName || '',
       itemCode: line.productCode || line.itemCode || '',
       purchaseQty: Number(line.purchaseQty) || Number(line.planQty) || 0,
@@ -36,6 +44,34 @@ export function listReturnLinesForPurchaseOrder(po) {
       createdAt: formatDateTimeMinute(ret.createdAt),
     }),
   )
+}
+
+/**
+ * 采购订单行累计退货数量（有效退货单；优先 poLineId，其次产品编号）
+ */
+export function calcPoLineReturnQty(po, line) {
+  if (!po || !line) return 0
+  void purchaseReturnState.returns
+  const lineId = line.id
+  const code = line.productCode || line.itemCode || ''
+  let total = 0
+  ;(purchaseReturnState.returns || []).forEach((ret) => {
+    if (
+      !isActivePurchaseReturn(ret) ||
+      !(
+        (po.id && ret.purchaseOrderId === po.id) ||
+        (po.orderNo && ret.purchaseOrderNo === po.orderNo)
+      )
+    ) {
+      return
+    }
+    ;(ret.lineItems || []).forEach((rl) => {
+      const byId = lineId && rl.poLineId && rl.poLineId === lineId
+      const byCode = !rl.poLineId && code && (rl.productCode === code || rl.itemCode === code)
+      if (byId || byCode) total += Number(rl.returnQty) || 0
+    })
+  })
+  return total
 }
 
 export function listReturnLinesForOutsourcingOrder(order) {

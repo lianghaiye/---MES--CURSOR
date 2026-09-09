@@ -5,10 +5,17 @@
  * - 直接入库
  * 已申请入库（收货）= 有效收货单占用 + 有效入库单占用
  * 已入库 = 已确认入库数量
+ *
+ * 注意：不顶层 import inboundOrderStore，避免与 purchaseOrderStore 循环依赖导致 TDZ。
  */
-import { inboundOrderState } from '@/store/inboundOrderStore'
 import { purchaseReceiptState } from '@/store/purchaseReceiptStore'
 import { formatNumber } from '@/utils/numberFormat'
+
+function getInboundOrders() {
+  // eslint-disable-next-line global-require
+  const { inboundOrderState } = require('@/store/inboundOrderStore')
+  return inboundOrderState?.orders || []
+}
 
 function lineIdMatches(row, lineId) {
   return row.poLineId === lineId || row.id === lineId
@@ -32,7 +39,7 @@ function isActivePurchaseReceipt(receipt) {
 
 function listInboundOrdersForPo(po) {
   if (!po) return []
-  return (inboundOrderState.orders || []).filter(
+  return getInboundOrders().filter(
     (o) =>
       isActiveInboundOrder(o) && (o.purchaseOrderId === po.id || o.sourceOrderNo === po.orderNo),
   )

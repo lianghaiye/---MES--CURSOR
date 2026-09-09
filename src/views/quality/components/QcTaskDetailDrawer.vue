@@ -101,12 +101,18 @@
         v-model:expandedRowKeys="expandedKeys"
       >
         <template #expandIcon="{ expanded, onExpand: onExp, record }">
-          <a-button type="link" size="small" @click="(e) => onExp(record, e)">
-            {{ expanded ? '收起检验项' : '展开检验项' }}
-          </a-button>
+          <button
+            type="button"
+            class="line-expand-btn"
+            :aria-label="expanded ? '收起检验项' : '展开检验项'"
+            @click="(e) => onExp(record, e)"
+          >
+            <DownOutlined v-if="expanded" />
+            <RightOutlined v-else />
+          </button>
         </template>
         <template #expandedRowRender="{ record }">
-          <div class="expand-form-wrap">
+          <div class="expand-panel">
             <QcLineFieldValuesReadonly :line="record" :task="task" />
           </div>
         </template>
@@ -121,6 +127,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { DownOutlined, RightOutlined } from '@ant-design/icons-vue'
 import { QC_TASK_STATUS, QC_TASK_RESULT } from '@/store/qcTaskStore'
 import { useDrawerWidth } from '@/composables/useDrawerWidth'
 import QcLineFieldValuesReadonly from './QcLineFieldValuesReadonly.vue'
@@ -204,8 +211,27 @@ function resultColor(result) {
   }
 }
 
-.expand-form-wrap {
-  padding: 8px 4px;
-  background: #fafafa;
+.expand-panel {
+  padding: 10px 8px;
+  background: #f7f8fa;
+}
+
+.line-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #86909c;
+  cursor: pointer;
+}
+
+.line-expand-btn:hover {
+  color: #1677ff;
+  background: #e6f4ff;
 }
 </style>

@@ -1,7 +1,7 @@
 ---
 description: i-doms-web 列表页五区划分（A 页头 ~ E 分页、统计卡片、对齐留白）
 globs: i-doms-web/**/*.vue
-alwaysApply: false
+alwaysApply: true
 ---
 
 # 列表页区域划分

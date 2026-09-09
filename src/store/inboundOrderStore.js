@@ -11,7 +11,6 @@ import { estimateSettleQty } from '@/utils/settleUnit'
 import { warehouseState } from '@/store/warehouseStore'
 import { applyInboundToStock } from '@/store/stockStore'
 import { applyInboundToSalesAllocation } from '@/store/salesStockAllocationStore'
-import { salesOrderState } from '@/store/salesOrderStore'
 import { applyInboundBatchesFromRoots } from '@/store/stockBatchStore'
 import { buildLineUomConvert } from '@/utils/batchUomConvert'
 import {
@@ -573,6 +572,8 @@ export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
 /** 入库后：偿还调拨欠量，并按来源销售单补软占用 */
 function syncSalesAllocationAfterInbound(order, lines) {
   const sourceOrderNo = order.sourceOrderNo || order.salesOrderNo || ''
+  // eslint-disable-next-line global-require
+  const { salesOrderState } = require('@/store/salesOrderStore')
   const salesOrder = sourceOrderNo
     ? salesOrderState.orders.find((o) => o.orderNo === sourceOrderNo)
     : null

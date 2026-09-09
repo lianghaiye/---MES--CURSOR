@@ -59,6 +59,19 @@
                   />
                   <span v-else>{{ stockFulfillmentModeLabel(line.stockFulfillmentMode) }}</span>
                 </template>
+                <template v-else-if="column.key === 'preferStockTakeQty'">
+                  <a-input-number
+                    v-if="canApprove && isSelfMadeLine(line) && isPreferStockLine(line)"
+                    v-model:value="line.preferStockTakeQty"
+                    size="small"
+                    :min="0"
+                    :max="Number(line.salesQty ?? line.qty) || undefined"
+                    :precision="0"
+                    placeholder="填写要用的现货数量，空则尽量占满"
+                    style="width: 100%"
+                  />
+                  <span v-else>{{ formatPreferStockTakeQty(line.preferStockTakeQty) }}</span>
+                </template>
                 <template v-else-if="column.key === 'stockTakeQty'">
                   {{ previewTakeQty(line) }}
                 </template>
@@ -102,7 +115,7 @@
           <div class="subsection">
             <div class="section-title">库存提醒</div>
             <p class="stock-remind-tip">
-              审核通过前按当前现存量与他单占用评估；通过后将按履约结果做初始软占用。
+              审核通过前按当前现存量与他单占用评估；通过后将按履约结果做初始软占用。「优先现货」可填「占用现货数」：填多少就用多少现货，其余排产。
             </p>
             <SalesOrderStockRemindPanel :order="record" />
           </div>
@@ -166,8 +179,10 @@ import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOr
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
 import SalesOrderStockRemindPanel from './components/SalesOrderStockRemindPanel.vue'
 import {
+  STOCK_FULFILLMENT_MODE,
   STOCK_FULFILLMENT_MODE_OPTIONS,
   buildLineStockFulfillmentPlan,
+  formatPreferStockTakeQty,
   listStockOnlyShortfalls,
   normalizeStockFulfillmentMode,
   stockFulfillmentModeLabel,
@@ -275,6 +290,16 @@ function isSelfMadeLine(line) {
 
 function onFulfillmentModeChange(line, val) {
   line.stockFulfillmentMode = normalizeStockFulfillmentMode(val)
+  if (line.stockFulfillmentMode !== STOCK_FULFILLMENT_MODE.PREFER_STOCK) {
+    line.preferStockTakeQty = null
+  }
+}
+
+function isPreferStockLine(line) {
+  return (
+    normalizeStockFulfillmentMode(line?.stockFulfillmentMode) ===
+    STOCK_FULFILLMENT_MODE.PREFER_STOCK
+  )
 }
 
 function previewTakeQty(line) {

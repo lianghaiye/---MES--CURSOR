@@ -1,0 +1,31 @@
+---
+description: i-doms-web UI 规范总索引——做页面/弹窗/详情前必须先遵守对应规则，禁止用组件库默认样式替代项目约定
+alwaysApply: true
+---
+
+# i-doms-web UI 规范总索引（强制）
+
+改 `i-doms-web` 前端 UI（列表 / 详情 / 表单 / 弹窗 / 抽屉）时：
+
+1. **先对照本索引选对规则，再写代码**；不得凭 Ant Design 默认皮肤直接铺页面。
+2. **禁止**未对照规范就用 `a-descriptions bordered`、默认垂直表单、无白底卡片的基本信息区等「组件库默认样子」。
+3. 细则以 `.cursor/rules/*.mdc` 正文为准；与默认组件冲突时以规则为准。
+
+## 场景 → 规则
+
+| 场景 | 必读规则 |
+|------|----------|
+| 详情页（只读 + 操作） | `detail-page.mdc` |
+| 居中弹窗 | `modal-layout.mdc`（行内明细编辑另见 `line-edit-modal.mdc`） |
+| 抽屉（对照列表） | `drawer-layout.mdc` |
+| 新增 / 编辑整页 | `form-page-shell.mdc` + `form-horizontal-layout.mdc` |
+| 列表页结构 | `list-page-zones.mdc`（检索/工具栏/表格/分页见对应 `list-*.mdc`） |
+| 设计总则 / Token | `design-principles.mdc`、`design-tokens.mdc` |
+
+## 开做前自检（最短）
+
+- [ ] 详情基本信息：纯文本「字段名：值」，**不是** bordered 描述列表
+- [ ] 弹窗基本信息：白底描边卡片 + 横向表单
+- [ ] 表单：`layout` 横向（标签与控件同行）
+- [ ] 状态：用 `a-tag`，不用纯色文字冒充
+- [ ] 空值显示 `—`

@@ -503,6 +503,20 @@
                   />
                 </template>
 
+                <template v-else-if="column.key === 'preferStockTakeQty'">
+                  <a-input-number
+                    v-if="isPreferStockMode(record)"
+                    v-model:value="record.preferStockTakeQty"
+                    size="small"
+                    :min="0"
+                    :max="Number(record.salesQty ?? record.qty) || undefined"
+                    :precision="0"
+                    placeholder="填写要用的现货数量，空则尽量占满"
+                    style="width: 100%"
+                  />
+                  <span v-else class="readonly-cell">—</span>
+                </template>
+
                 <template v-else-if="column.key === 'deliveryDate'">
                   <a-date-picker
                     :value="lineDateValue(record.deliveryDate)"
@@ -635,8 +649,9 @@
               </template>
             </a-table>
             <div class="fulfillment-hint">
-              库存履约说明：优先现货 — 自由备货能覆盖则不排产，缺口才进生产计划；强制按单生产 —
-              全量排产且不新占自由备货；仅现货 —
+              库存履约说明：优先现货 —
+              自由备货能覆盖则不排产，缺口才进生产计划；可填「占用现货数」控制用多少现货，其余排产（空则尽量占满）；强制按单生产
+              — 全量排产且不新占自由备货；仅现货 —
               必须被自由备货覆盖，否则无法通过审核。审核时确认占用与排产结果。
             </div>
           </div>
@@ -768,6 +783,7 @@ import {
 } from '@/store/salesOrderStore'
 import { ensureStockTransferDemoMocksForOrder } from '@/store/salesStockAllocationStore'
 import {
+  STOCK_FULFILLMENT_MODE,
   STOCK_FULFILLMENT_MODE_OPTIONS,
   normalizeStockFulfillmentMode,
 } from '@/utils/salesStockFulfillment'
@@ -893,6 +909,7 @@ const columnDefs = [
   { key: 'salesQty', title: '销售数量', width: 90 },
   { key: 'deliveryMode', title: '交付方式', width: 100 },
   { key: 'stockFulfillmentMode', title: '库存履约', width: 130 },
+  { key: 'preferStockTakeQty', title: '占用现货数', width: 118 },
   { key: 'deliveryDate', title: '交货日期', width: 120 },
   { key: 'unit', title: '单位', width: 70 },
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 100, ellipsis: true },
@@ -1098,6 +1115,16 @@ function toggleBasicInfo() {
 
 function onStockFulfillmentModeChange(record, val) {
   record.stockFulfillmentMode = normalizeStockFulfillmentMode(val)
+  if (record.stockFulfillmentMode !== STOCK_FULFILLMENT_MODE.PREFER_STOCK) {
+    record.preferStockTakeQty = null
+  }
+}
+
+function isPreferStockMode(record) {
+  return (
+    normalizeStockFulfillmentMode(record?.stockFulfillmentMode) ===
+    STOCK_FULFILLMENT_MODE.PREFER_STOCK
+  )
 }
 
 const orderAmount = computed(() => orderPricing.value.orderAmount)

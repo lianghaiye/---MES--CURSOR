@@ -260,6 +260,9 @@
                   <template v-else-if="column.key === 'stockFulfillmentMode'">
                     {{ stockFulfillmentModeLabel(line.stockFulfillmentMode) }}
                   </template>
+                  <template v-else-if="column.key === 'preferStockTakeQty'">
+                    {{ formatPreferStockTakeQty(line.preferStockTakeQty) }}
+                  </template>
                   <template
                     v-else-if="column.key === 'stockTakeQty' || column.key === 'planProduceQty'"
                   >
@@ -1143,7 +1146,7 @@ import {
   shouldShowLiveStockRemind,
   ensureStockTransferDemoMocksForOrder,
 } from '@/store/salesStockAllocationStore'
-import { stockFulfillmentModeLabel } from '@/utils/salesStockFulfillment'
+import { stockFulfillmentModeLabel, formatPreferStockTakeQty } from '@/utils/salesStockFulfillment'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import {
   deliveryStatusColor,

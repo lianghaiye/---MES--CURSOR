@@ -64,6 +64,7 @@
             <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
             <a-tab-pane key="return" :tab="`退货信息 (${relatedReturnLines.length})`" />
             <a-tab-pane key="settle" :tab="`结算信息 (${relatedSettleLines.length})`" />
+            <a-tab-pane key="approval" tab="审批信息" />
           </a-tabs>
         </div>
 
@@ -150,6 +151,9 @@
                   <template v-else-if="column.key === 'purchaseQty'">
                     {{ formatQty(line.purchaseQty) }}
                   </template>
+                  <template v-else-if="column.key === 'returnQty'">
+                    {{ formatQty(lineReturnQty(line)) }}
+                  </template>
                   <template v-else-if="column.key === 'settleQty'">
                     {{
                       line.settleUnit
@@ -158,9 +162,6 @@
                           : '—'
                         : '—'
                     }}
-                  </template>
-                  <template v-else-if="column.key === 'stockQty'">
-                    {{ formatQty(line.stockQty) }}
                   </template>
                   <template v-else-if="column.key === 'urgency'">
                     <a-tag :color="urgencyColor(line.urgency)">{{ line.urgency || '正常' }}</a-tag>
@@ -204,56 +205,6 @@
                 <span class="summary-item">含税：{{ formatMoney(summary.totalAmountInTax) }}</span>
               </div>
             </div>
-
-            <div class="section-card">
-              <div class="section-title">审批记录</div>
-              <a-divider style="margin: 12px 0" />
-              <div v-if="approvalRecords.length" class="history-list">
-                <div v-for="(item, idx) in approvalRecords" :key="idx" class="history-item">
-                  <div class="history-head">
-                    <span class="history-user">{{ item.name }}</span>
-                    <span class="history-role">（{{ item.role }}）</span>
-                    <a-tag :color="approvalResultColor(item.result)" size="small">
-                      {{ item.result }}
-                    </a-tag>
-                    <span class="history-time">{{ item.time }}</span>
-                  </div>
-                  <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
-                </div>
-              </div>
-              <a-empty v-else description="暂无审批记录" />
-            </div>
-
-            <div v-if="priceChangeApprovalGroups.length" class="section-card">
-              <div class="section-title">价格变更审批</div>
-              <a-divider style="margin: 12px 0" />
-              <div
-                v-for="group in priceChangeApprovalGroups"
-                :key="group.id"
-                class="price-change-approval-group"
-              >
-                <div class="price-change-approval-head">
-                  <span>{{ group.changeNo }}</span>
-                  <a-tag :color="purchasePriceChangeStatusColor(group.status)" size="small">
-                    {{ group.status }}
-                  </a-tag>
-                  <span v-if="group.reasonType" class="muted">{{ group.reasonType }}</span>
-                </div>
-                <div class="history-list">
-                  <div v-for="(item, idx) in group.items" :key="idx" class="history-item">
-                    <div class="history-head">
-                      <span class="history-user">{{ item.name }}</span>
-                      <span class="history-role">（{{ item.role }}）</span>
-                      <a-tag :color="approvalResultColor(item.result)" size="small">
-                        {{ item.result }}
-                      </a-tag>
-                      <span class="history-time">{{ item.time || '—' }}</span>
-                    </div>
-                    <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </template>
 
           <template v-else-if="activeTab === 'price-change'">
@@ -273,6 +224,7 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: 1400 }"
                 :locale="{ emptyText: '暂无质检单' }"
               >
                 <template #bodyCell="{ column, record: row }">
@@ -286,10 +238,28 @@
                     <a-tag :color="qcStatusColor(row.qcStatus)">{{ row.qcStatus || '—' }}</a-tag>
                   </template>
                   <template v-else-if="column.key === 'qcResult'">
-                    {{ row.qcResult || '—' }}
+                    <a-tag v-if="row.qcResult" :color="qcResultColor(row.qcResult)">
+                      {{ row.qcResult }}
+                    </a-tag>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'productInfo'">
+                    <span :title="row.productInfo || ''">{{ row.productInfo || '—' }}</span>
+                  </template>
+                  <template
+                    v-else-if="column.key === 'inspectQty' || column.key === 'acceptInboundQty'"
+                  >
+                    {{
+                      row[column.key] === '' || row[column.key] == null || row[column.key] === '—'
+                        ? '—'
+                        : formatQty(row[column.key])
+                    }}
+                  </template>
+                  <template v-else-if="column.key === 'inspectedAt'">
+                    {{ formatDateTimeMinute(row.inspectedAt) || '—' }}
                   </template>
                   <template v-else>
-                    {{ row[column.dataIndex] || '—' }}
+                    {{ row[column.dataIndex] ?? row[column.key] ?? '—' }}
                   </template>
                 </template>
               </a-table>
@@ -397,6 +367,77 @@
               </a-table>
             </div>
           </template>
+
+          <template v-else-if="activeTab === 'approval'">
+            <div class="section-card">
+              <div class="section-title">审批摘要</div>
+              <div class="approval-summary-grid">
+                <div class="approval-summary-item">
+                  <span class="approval-summary-label">审批人：</span>
+                  <span class="approval-summary-value">{{ record.approverName || '—' }}</span>
+                </div>
+                <div class="approval-summary-item">
+                  <span class="approval-summary-label">审批时间：</span>
+                  <span class="approval-summary-value">{{
+                    resolveApprovalTime(record) || '—'
+                  }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-card">
+              <div class="section-title">审批记录</div>
+              <a-divider style="margin: 12px 0" />
+              <div v-if="approvalRecords.length" class="history-list">
+                <div v-for="(item, idx) in approvalRecords" :key="idx" class="history-item">
+                  <div class="history-head">
+                    <span class="history-user">{{ item.name }}</span>
+                    <span class="history-role">（{{ item.role }}）</span>
+                    <a-tag :color="approvalResultColor(item.result)" size="small">
+                      {{ item.result }}
+                    </a-tag>
+                    <span class="history-time">{{ item.time }}</span>
+                  </div>
+                  <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
+                </div>
+              </div>
+              <a-empty v-else description="暂无审批记录" />
+            </div>
+
+            <div class="section-card">
+              <div class="section-title">价格变更审批</div>
+              <a-divider style="margin: 12px 0" />
+              <div v-if="priceChangeApprovalGroups.length">
+                <div
+                  v-for="group in priceChangeApprovalGroups"
+                  :key="group.id"
+                  class="price-change-approval-group"
+                >
+                  <div class="price-change-approval-head">
+                    <span>{{ group.changeNo }}</span>
+                    <a-tag :color="purchasePriceChangeStatusColor(group.status)" size="small">
+                      {{ group.status }}
+                    </a-tag>
+                    <span v-if="group.reasonType" class="muted">{{ group.reasonType }}</span>
+                  </div>
+                  <div class="history-list">
+                    <div v-for="(item, idx) in group.items" :key="idx" class="history-item">
+                      <div class="history-head">
+                        <span class="history-user">{{ item.name }}</span>
+                        <span class="history-role">（{{ item.role }}）</span>
+                        <a-tag :color="approvalResultColor(item.result)" size="small">
+                          {{ item.result }}
+                        </a-tag>
+                        <span class="history-time">{{ item.time || '—' }}</span>
+                      </div>
+                      <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <a-empty v-else description="暂无价格变更审批记录" />
+            </div>
+          </template>
         </div>
       </template>
 
@@ -469,8 +510,12 @@ import {
   getInboundInfoLineScrollX,
 } from '@/utils/purchaseOrderInboundLines'
 import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
-import { listInboundQcForPurchaseOrder } from '@/utils/purchaseOrderQc'
-import { listReturnLinesForPurchaseOrder } from '@/utils/orderReturnLines'
+import { listQcProductResultLinesForPurchaseOrders } from '@/utils/purchaseOrderQc'
+import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
+import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
+import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
+import { qcTaskState } from '@/store/qcTaskStore'
+import { listReturnLinesForPurchaseOrder, calcPoLineReturnQty } from '@/utils/orderReturnLines'
 import { purchaseReceiptState } from '@/store/purchaseReceiptStore'
 import { purchaseReturnState } from '@/store/purchaseReturnStore'
 import { buildPoSettleTabRows, purchaseSettleState } from '@/store/purchaseSettleStore'
@@ -564,7 +609,6 @@ const lineColumns = [
   { title: '产品名称', key: 'productName', width: 140, ellipsis: true },
   { title: '产品编号', key: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '规格属性', dataIndex: 'specAttr', width: 90, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
   {
     title: '变体属性',
@@ -574,9 +618,9 @@ const lineColumns = [
     ellipsis: true,
   },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-  { title: '库存数量', key: 'stockQty', width: 90, align: 'right' },
   { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 110, ellipsis: true },
   { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
+  { title: '退货数量', key: 'returnQty', width: 100, align: 'right' },
   { title: '采购单位', dataIndex: 'unit', width: 80 },
   { title: '结算单位', dataIndex: 'settleUnit', width: 80 },
   { title: '预计结算数量', dataIndex: 'settleQty', key: 'settleQty', width: 110, align: 'right' },
@@ -609,11 +653,17 @@ const inboundLineColumns = createInboundInfoLineColumns()
 const inboundLineScrollX = getInboundInfoLineScrollX(inboundLineColumns)
 
 const qcColumns = [
-  { title: '质检单号', key: 'qcNo', width: 160 },
-  { title: '质检状态', key: 'qcStatus', width: 110 },
-  { title: '质检结果', key: 'qcResult', dataIndex: 'qcResult', width: 110 },
-  { title: '质检人', dataIndex: 'inspector', width: 100 },
-  { title: '质检时间', dataIndex: 'inspectedAt', width: 160 },
+  { title: '质检单号', key: 'qcNo', width: 150, ellipsis: true },
+  { title: '质检状态', key: 'qcStatus', width: 90 },
+  { title: '质检结果', key: 'qcResult', width: 100 },
+  { title: '产品信息', key: 'productInfo', width: 240, ellipsis: true },
+  { title: '质检方式', dataIndex: 'inspectMethod', width: 90 },
+  { title: '质检数量', key: 'inspectQty', width: 90, align: 'right' },
+  { title: '处理方案', dataIndex: 'treatmentPlan', width: 100, ellipsis: true },
+  { title: '合格入库数', key: 'acceptInboundQty', width: 100, align: 'right' },
+  { title: '退/换货', dataIndex: 'returnExchange', width: 120, ellipsis: true },
+  { title: '质检人', dataIndex: 'inspector', width: 90 },
+  { title: '质检时间', key: 'inspectedAt', width: 150 },
 ]
 
 const returnColumns = [
@@ -677,7 +727,8 @@ const relatedSettleLines = computed(() => {
 const approvalRecords = computed(() => record.value?.approvalRecords || [])
 const relatedQcRecords = computed(() => {
   void purchaseReceiptState.receipts
-  return listInboundQcForPurchaseOrder(record.value)
+  void qcTaskState.tasks
+  return listQcProductResultLinesForPurchaseOrders(record.value)
 })
 
 function openSettleDetail(row) {
@@ -731,20 +782,39 @@ function approvalResultColor(result) {
 
 function qcStatusColor(status) {
   const map = {
+    待质检: 'warning',
+    检验中: 'processing',
+    已完成: 'success',
+    已终止: 'default',
     未质检: 'default',
     质检中: 'processing',
     质检通过: 'success',
+    部分通过: 'warning',
     质检不通过: 'error',
   }
   return map[status] || 'default'
 }
 
+function qcResultColor(result) {
+  if (result === QC_TASK_RESULT.PASS || result === '合格') return 'success'
+  if (result === QC_TASK_RESULT.PARTIAL || result === '部分合格') return 'processing'
+  if (result === QC_TASK_RESULT.FAIL || result === '不合格') return 'error'
+  return 'default'
+}
+
 function openQcDetail(row) {
-  if (!row?.qcNo) {
+  if (!row?.taskId && !row?.qcNo) {
     message.info('暂无质检单号')
     return
   }
-  message.info(`入库质检详情「${row.qcNo}」开发中`)
+  const bundle = getQcTaskRouteBundle('来料质检')
+  if (row.taskId) {
+    const path = `${bundle.listPath}/${row.taskId}`
+    openTab(path, row.qcNo || bundle.detailTitle)
+    router.push({ name: bundle.detailName, params: { id: row.taskId } })
+    return
+  }
+  message.info(`未找到质检单「${row.qcNo}」`)
 }
 
 const purchaseReqLinks = computed(() => {
@@ -797,6 +867,11 @@ function lineInboundProgress(line) {
     calcPoLineAppliedOccupyQty(record.value, line),
     Number(line.purchaseQty) || 0,
   )
+}
+
+function lineReturnQty(line) {
+  void purchaseReturnState.returns
+  return calcPoLineReturnQty(record.value, line)
 }
 
 function statusColor(status) {
@@ -1179,6 +1254,43 @@ function openApprove() {
   gap: 8px;
   margin-bottom: 8px;
   font-weight: 500;
+}
+
+.approval-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 20px;
+  row-gap: 10px;
+  padding: 4px 0 2px;
+}
+
+.approval-summary-item {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.approval-summary-label {
+  flex: 0 0 72px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  line-height: 22px;
+  text-align: right;
+  padding-right: 8px;
+}
+
+.approval-summary-value {
+  flex: 1;
+  min-width: 0;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 13px;
+  line-height: 22px;
+}
+
+@media (max-width: 1200px) {
+  .approval-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .muted {

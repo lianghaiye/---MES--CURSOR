@@ -1,7 +1,7 @@
 ---
 description: i-doms-web 详情页规范（页头、操作按钮、胶囊 Tab、只读区块、子表）
 globs: i-doms-web/**/*Detail*.vue
-alwaysApply: false
+alwaysApply: true
 ---
 
 # 详情页规范
@@ -10,7 +10,7 @@ alwaysApply: false
 
 与新增/编辑页分工：只读 + 业务动作 → 详情；填写保存 → `form-page-shell.mdc`。
 
-参考：`SalesOrderDetailView.vue`、`ProductBomDetailView.vue`；胶囊 Tab 样式见 `detail-tabs-pill.less`。
+参考：`SalesOrderDetailView.vue`、`ProductBomDetailView.vue`、`QcTaskDetailView.vue`、`WorkOrderProductionSections.vue`；胶囊 Tab 样式见 `detail-tabs-pill.less`。
 
 ## 页头
 
@@ -69,15 +69,36 @@ alwaysApply: false
 
 | 项 | 约定 |
 |----|------|
-| 容器 | **白色卡片** |
+| 容器 | **白色卡片**（内层可再包一层浅边框面板，对齐工单详情） |
 | 标题 | **16px / 600** |
-| 字段 | **3~4 列**栅格；`字段名：字段值` 纯文本（同抽屉只读信息区） |
-| **label** | **text-2** `#4e5969`（比值浅）+ 中文冒号「：」 |
-| **值** | **text-1** `#1f2329`，左对齐 |
-| 长文本（备注） | **占整行** |
+| **顶部 meta 栏** | 创建/质检等审计字段横排在最上；下接 **虚线分隔**（`1px dashed #e8e8e8`），再铺业务字段 |
+| 字段 | **3~4 列**栅格；`字段名：字段值` 只读文本（可用 `a-form` inline + `a-col :span="6"`，同 `WorkOrderProductionSections`） |
+| **label** | **text-2** `#4e5969`（比值浅）；meta 栏 label 约 **13px / 0.45 透明度** |
+| **值** | **text-1** `#1f2329`（或 `rgba(0,0,0,0.88)`），左对齐 |
+| 长文本（备注） | **占整行**（`span: 24`） |
 | 禁止 | **带边框两列表格**展示元数据；与明细 `a-table` 区分开 |
 
+### Meta 栏字段（按业务取舍）
+
+| 页面 | 顶部 meta（示例） |
+|------|-------------------|
+| 生产/总装工单 | 状态、排产旁显、创建日期、创建人、更新时间、更新人… |
+| **质检详情** | **创建人、创建时间、质检人、质检时间、录入端**（勿再塞进下方四列） |
+
+参考：`WorkOrderProductionSections.vue`（`show-meta-bar`）、`QcTaskDetailView.vue`。
+
 抽屉内轻量详情的基本信息细则见 `drawer-layout.mdc`「只读基本信息区」。
+
+## 质检详情 · 生成入库单
+
+适用于来料质检 / 外协回货检详情（`QcTaskDetailView`）：
+
+| 项 | 约定 |
+|----|------|
+| 位置 | 页头**右上角**操作区（与「质检」「返回列表」同组） |
+| 显隐 | **尚未关联入库单**（无 `inboundOrderNo` / `inboundOrderId`），且质检已完成、`evaluateQcInboundGate` 通过时展示 |
+| 行为 | 与列表「生成入库单」同一套弹窗与回写（`GenerateInboundOrderModal` / `OutsourcingGenerateInboundModal` + `attachQcTaskInboundOrder`） |
+| 已入库 | 已有入库单号则**不展示**该按钮 |
 
 ## 汇总 / 子表区块
 
@@ -101,8 +122,20 @@ alwaysApply: false
 ```
 ← SO2024001  [已审核] [部分发货]     反审｜申请发货｜…｜打印｜返回列表
 [概览] [发货信息] [入库] [采购] [生产] [EBOM] [审批] …
-└─ 基本信息（白卡，3~4 列只读）
+└─ 基本信息（白卡）
+     ├─ meta 栏：创建人 / 创建时间 / …（虚线分隔）
+     └─ 3~4 列业务字段
 └─ 价格汇总 / 明细子表（可折叠）
+```
+
+质检详情示例：
+
+```
+← ZJ…  [已完成] [质检通过]     生成入库单｜质检｜返回列表
+└─ 基本信息
+     ├─ meta：创建人｜创建时间｜质检人｜质检时间｜录入端
+     └─ 质检单号 / 类型 / 状态 / 结果 / 供应商 / …
+└─ 质检明细（子表）
 ```
 
 ## 避免
@@ -113,6 +146,8 @@ alwaysApply: false
 - ❌ 空值显示空白或 `null` / `undefined`
 - ❌ 状态用纯文本不用 Tag
 - ❌ 基本信息用 bordered 表格；label 与值同色无层级
+- ❌ 创建人/质检人等审计字段与业务字段混排在同一栅格、无 meta 栏
+- ❌ 质检详情已有入库单仍展示「生成入库单」
 
 ## 与其他规范
 

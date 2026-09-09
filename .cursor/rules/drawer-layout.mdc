@@ -1,7 +1,7 @@
 ---
 description: i-doms-web 抽屉（Drawer）规范：三档宽度、矮标题栏底边分隔、列表对照场景、与弹窗/新标签页选型
 globs: i-doms-web/**/*.vue
-alwaysApply: false
+alwaysApply: true
 ---
 
 # 抽屉规范
