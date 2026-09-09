@@ -1,9 +1,5 @@
 import { cell } from './exportFieldHelpers'
-import {
-  formatInventoryMoney,
-  formatInventoryQtyWithUnit,
-  formatInventoryWeight,
-} from '@/utils/inventoryDetailLines'
+import { formatInventoryMoney, formatInventoryQtyWithUnit } from '@/utils/inventoryDetailLines'
 
 export const inventoryDetailExportFields = [
   { key: 'warehouse', title: '所属仓库', getValue: (row) => cell(row, 'warehouse') },
@@ -12,12 +8,8 @@ export const inventoryDetailExportFields = [
   { key: 'materialType', title: '类型', getValue: (row) => cell(row, 'materialType') },
   { key: 'specModel', title: '规格型号', getValue: (row) => cell(row, 'specModel') },
   { key: 'material', title: '材质', getValue: (row) => cell(row, 'material') },
+  { key: 'variantSummary', title: '变体属性', getValue: (row) => cell(row, 'variantSummary') },
   { key: 'drawingNo', title: '图号', getValue: (row) => cell(row, 'drawingNo') },
-  {
-    key: 'weight',
-    title: '重量',
-    getValue: (row) => formatInventoryWeight(row.weight),
-  },
   {
     key: 'stockQty',
     title: '库存数量',

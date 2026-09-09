@@ -1,5 +1,6 @@
 import { resolveOutboundLocationNo } from '@/utils/outboundLineHelpers'
 import { demoStockQty } from '@/utils/productionPlanWorkItem'
+import { lineVariantSummary } from '@/utils/spuLineResolve'
 
 const PRODUCT_TYPE = {
   PRODUCT: '产品',
@@ -34,6 +35,14 @@ function buildMasterIndex(products = [], materials = [], spus = []) {
       spuId: p.spuId || '',
       spuCode: spu?.code || '',
       isVariantSku: Boolean(p.isVariantSku || p.spuId),
+      variantValues: p.variantValues || {},
+      variantSummary:
+        p.variantSummary ||
+        lineVariantSummary({
+          spuId: p.spuId,
+          variantValues: p.variantValues || {},
+        }) ||
+        '',
     })
   })
 
@@ -53,6 +62,14 @@ function buildMasterIndex(products = [], materials = [], spus = []) {
       spuId: m.spuId || '',
       spuCode: spu?.code || '',
       isVariantSku: Boolean(m.isVariantSku || m.spuId),
+      variantValues: m.variantValues || {},
+      variantSummary:
+        m.variantSummary ||
+        lineVariantSummary({
+          spuId: m.spuId,
+          variantValues: m.variantValues || {},
+        }) ||
+        '',
     })
   })
 
@@ -83,6 +100,8 @@ function resolveMaster(byCode, itemCode, itemName, itemType) {
     spuId: '',
     spuCode: '',
     isVariantSku: false,
+    variantValues: {},
+    variantSummary: '',
   }
 }
 
@@ -129,6 +148,7 @@ function enrichStockRow(row, master) {
     material: master.material,
     drawingNo: master.drawingNo,
     weight: master.weight,
+    variantSummary: master.variantSummary || '',
     unit: row.unit || master.unit || '件',
     stockQty: qty,
     locationNo,

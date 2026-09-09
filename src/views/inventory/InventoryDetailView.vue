@@ -167,8 +167,8 @@
             <template v-else-if="column.key === 'materialType'">
               {{ record.materialType || '—' }}
             </template>
-            <template v-else-if="column.key === 'weight'">
-              {{ formatInventoryWeight(record.weight) }}
+            <template v-else-if="column.key === 'variantSummary'">
+              {{ record.variantSummary || '—' }}
             </template>
             <template v-else-if="column.key === 'stockQty'">
               {{ formatInventoryQtyWithUnit(record.stockQty, record.unit) }}
@@ -646,7 +646,6 @@ import {
   formatInventoryMoney,
   formatInventoryQty,
   formatInventoryQtyWithUnit,
-  formatInventoryWeight,
   inventoryMaterialTypeOptions,
 } from '@/utils/inventoryDetailLines'
 import { hasBatchUomConvert } from '@/utils/batchUomConvert'
@@ -948,7 +947,7 @@ const drawerPieceColumns = [
   { title: '数量', key: 'pieceQty', width: 100, align: 'right' },
   { title: '余料', key: 'remnant', width: 72 },
   { title: '入库时间', key: 'createdAt', width: 150 },
-  { title: '来源件码', dataIndex: 'remnantFromSerialNo', key: 'remnantFromSerialNo', width: 140 },
+  { title: '来源批次', dataIndex: 'remnantFromSerialNo', key: 'remnantFromSerialNo', width: 140 },
 ]
 
 const drawerFlowColumns = [
@@ -1331,8 +1330,14 @@ const baseColumns = [
   { title: '类型', key: 'materialType', width: 88, align: 'center' },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88 },
+  {
+    title: '变体属性',
+    key: 'variantSummary',
+    dataIndex: 'variantSummary',
+    width: 140,
+    ellipsis: true,
+  },
   { title: '图号', dataIndex: 'drawingNo', width: 110, ellipsis: true },
-  { title: '重量', key: 'weight', width: 88, align: 'right' },
   { title: '现存量', key: 'stockQty', width: 110, align: 'right' },
   { title: '软占用', key: 'softAllocated', width: 110, align: 'right' },
   { title: '可用', key: 'availableQty', width: 110, align: 'right' },
@@ -1344,7 +1349,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inventory-detail-list-v4', baseColumns, { minScrollX: 1880 })
+  useTableColumnSettings('inventory-detail-list-v5', baseColumns, { minScrollX: 1920 })
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
