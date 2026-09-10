@@ -66,6 +66,9 @@
           <PlusOutlined />
           新增
         </a-button>
+        <a-button size="small" :disabled="!selectedRowKeys.length" @click="openPrintSelected">
+          打印质检单
+        </a-button>
         <a-button size="small" @click="handleTerminate">
           <StopOutlined />
           终止
@@ -93,6 +96,7 @@
 
     <div class="table-card">
       <a-table
+        class="factory-qc-table factory-qc-table--nowrap"
         :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
@@ -119,16 +123,27 @@
             }}</a>
             <span v-else>-</span>
           </template>
+          <template v-else-if="column.key === 'shipQty'">
+            {{ formatShipQty(record) }}
+          </template>
+          <template v-else-if="column.key === 'inspectedAt'">
+            {{ formatDateTimeMinute(record.inspectedAt) || '—' }}
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ formatDateTimeMinute(record.createdAt) || '—' }}
+          </template>
           <template v-else-if="column.key === 'action'">
-            <a-button
-              v-if="canInspect(record)"
-              type="link"
-              size="small"
-              @click="openInspect(record)"
-            >
-              质检
-            </a-button>
-            <span v-else class="action-disabled">-</span>
+            <a-space :size="0">
+              <a-button
+                v-if="canInspect(record)"
+                type="link"
+                size="small"
+                @click="openInspect(record)"
+              >
+                质检
+              </a-button>
+              <a-button type="link" size="small" @click="openPrint(record)">打印</a-button>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -152,6 +167,8 @@
       :record="inspectRecord"
       @saved="onInspectSaved"
     />
+
+    <QcTaskPrintModal v-model:open="printModalOpen" :factory-records="printFactoryRecords" />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -181,7 +198,9 @@ import { qcStatusOptions, qcResultOptions } from '@/mock/factoryQcOptions'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import FactoryQcInspectModal from './components/FactoryQcInspectModal.vue'
+import QcTaskPrintModal from './components/QcTaskPrintModal.vue'
 import { useTabs } from '@/composables/useTabs'
+import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -199,25 +218,31 @@ const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const inspectModalOpen = ref(false)
 const inspectRecord = ref(null)
+const printModalOpen = ref(false)
+const printFactoryRecords = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 const statusOpts = qcStatusOptions.map((v) => ({ label: v, value: v }))
 const resultOpts = qcResultOptions.map((v) => ({ label: v, value: v }))
 
 const baseColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
-  { title: '质检状态', key: 'qcStatus', width: 90, fixed: 'left' },
-  { title: '质检结果', key: 'qcResult', width: 100, fixed: 'left' },
   { title: '质检单号', key: 'qcNo', width: 150, fixed: 'left' },
+  { title: '质检状态', key: 'qcStatus', width: 90 },
+  { title: '质检结果', key: 'qcResult', width: 100 },
   { title: '源单号', dataIndex: 'sourceOrderNo', width: 140 },
+  { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true },
+  { title: '销售单号', dataIndex: 'salesOrderNo', width: 140 },
+  { title: '发货数量', key: 'shipQty', width: 90, align: 'right' },
   { title: '来源', dataIndex: 'source', width: 90 },
   { title: '质检人', dataIndex: 'inspector', width: 90 },
-  { title: '质检时间', dataIndex: 'inspectedAt', width: 140 },
-  { title: '操作', key: 'action', width: 80, fixed: 'right' },
+  { title: '质检时间', key: 'inspectedAt', width: 150 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', width: 150 },
+  { title: '操作', key: 'action', width: 100, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('factory-qc-list', baseColumns)
+  useTableColumnSettings('factory-qc-list-v2', baseColumns)
 
 const filteredList = computed(() =>
   filterFactoryQcRecords(factoryQcState.records, appliedFilters.value),
@@ -282,6 +307,31 @@ function handleReset() {
 function openInspect(record) {
   inspectRecord.value = record
   inspectModalOpen.value = true
+}
+
+function formatShipQty(record) {
+  const total = (record?.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
+  return total > 0 ? total : '—'
+}
+
+function openPrint(record) {
+  if (!record) return
+  printFactoryRecords.value = [record]
+  printModalOpen.value = true
+}
+
+function openPrintSelected() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请勾选要打印的质检单')
+    return
+  }
+  const list = factoryQcState.records.filter((r) => selectedRowKeys.value.includes(r.id))
+  if (!list.length) {
+    message.warning('未找到可打印的质检单')
+    return
+  }
+  printFactoryRecords.value = list
+  printModalOpen.value = true
 }
 
 function onInspectSaved() {
@@ -371,6 +421,13 @@ function handleTerminate() {
   :deep(.ant-table-thead > tr > th) {
     background: #fafafa;
     font-size: 13px;
+  }
+}
+
+.factory-qc-table--nowrap {
+  :deep(.ant-table-thead > tr > th),
+  :deep(.ant-table-tbody > tr > td) {
+    white-space: nowrap;
   }
 }
 

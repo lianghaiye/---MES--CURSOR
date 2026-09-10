@@ -184,7 +184,66 @@ function resolvePrintTitle(task) {
   if (scope === '外协回货检') return '外协回货质检单'
   if (scope === '生产过程检') return '生产过程质检单'
   if (scope === '成品检') return '成品质检单'
+  if (scope === '出厂质检') return '出厂质检单'
   return '来料质检单'
+}
+
+/**
+ * 出厂质检 → 打印预览 payload（复用质检单预览页）
+ */
+export function buildFactoryQcPrintPayload(record, options = {}) {
+  if (!record) return null
+  const shipQty = (record.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
+  const asTask = {
+    bizScope: '出厂质检',
+    qcNo: record.qcNo,
+    qcStatus: record.qcStatus,
+    qcResult: record.qcResult,
+    supplier: record.customerName,
+    sourceDocNo: record.sourceOrderNo || record.salesOrderNo,
+    templateName: '',
+    inspectMethod: record.inspectMethod,
+    inboundOrderNo: '',
+    inspector: record.inspector,
+    inspectedAt: record.inspectedAt,
+    creator: record.creator,
+    createdAt: record.createdAt,
+    remark: [
+      record.remark,
+      record.salesOrderNo ? `销售单号：${record.salesOrderNo}` : '',
+      shipQty ? `发货数量：${shipQty}` : '',
+    ]
+      .filter(Boolean)
+      .join('；'),
+    lineItems: (record.lineItems || []).map((line, idx) => ({
+      id: line.id || `fqc-line-${idx}`,
+      itemCode: line.itemCode,
+      itemName: line.itemName,
+      productCode: line.itemCode,
+      productName: line.itemName,
+      specModel: line.specModel,
+      unit: line.unit,
+      receiptQty: line.shipQty,
+      inspectQty: line.inspectQty,
+      lineQcResult: line.lineQcResult,
+      treatmentPlan: line.treatmentPlan,
+      templateName: '',
+      templateFields: [],
+      fieldValues: [],
+    })),
+  }
+  return buildQcTaskPrintPayload(asTask, options)
+}
+
+export function buildFactoryQcBatchPrintPayload(records, options = {}) {
+  const sheets = (records || []).map((r) => buildFactoryQcPrintPayload(r, options)).filter(Boolean)
+  if (!sheets.length) return null
+  return {
+    sheets,
+    paper: options.paper || 'A4',
+    orientation: options.orientation || 'portrait',
+    printedAt: new Date().toISOString(),
+  }
 }
 
 /** 构建单张质检单打印数据（按模板展开明细） */

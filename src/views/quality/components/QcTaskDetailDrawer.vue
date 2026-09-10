@@ -166,7 +166,8 @@ watch(
 
 function statusColor(status) {
   if (status === QC_TASK_STATUS.COMPLETED) return 'success'
-  if (status === QC_TASK_STATUS.IN_PROGRESS) return 'processing'
+  if (status === QC_TASK_STATUS.PENDING || status === '检验中' || status === '检测中')
+    return 'warning'
   if (status === QC_TASK_STATUS.CANCELLED) return 'default'
   return 'warning'
 }

@@ -279,7 +279,7 @@ function isTemplateReferenced(template) {
   return (qcTaskState.tasks || []).some(
     (t) =>
       String(t.templateCode || '').trim() === code &&
-      (t.qcStatus === QC_TASK_STATUS.PENDING || t.qcStatus === QC_TASK_STATUS.IN_PROGRESS),
+      (t.qcStatus === QC_TASK_STATUS.PENDING || t.qcStatus === '检验中' || t.qcStatus === '检测中'),
   )
 }
 

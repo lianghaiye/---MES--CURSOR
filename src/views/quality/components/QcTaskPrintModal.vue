@@ -55,6 +55,8 @@ import { computed, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { EyeOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 import {
+  buildFactoryQcBatchPrintPayload,
+  buildFactoryQcPrintPayload,
   buildQcTaskBatchPrintPayload,
   buildQcTaskPrintPayload,
   openQcTaskPrintPreview,
@@ -64,6 +66,7 @@ const props = defineProps({
   open: Boolean,
   task: { type: Object, default: null },
   tasks: { type: Array, default: () => [] },
+  factoryRecords: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:open'])
@@ -80,7 +83,10 @@ const paperOptions = [
   { label: 'A3', value: 'A3' },
 ]
 
+const isFactoryMode = computed(() => (props.factoryRecords || []).length > 0)
+
 const targetTasks = computed(() => {
+  if (isFactoryMode.value) return props.factoryRecords
   if (props.tasks?.length) return props.tasks
   return props.task ? [props.task] : []
 })
@@ -104,8 +110,11 @@ function openPreview(autoPrint) {
     orientation: form.orientation,
     autoPrint,
   }
-  const payload =
-    list.length === 1
+  const payload = isFactoryMode.value
+    ? list.length === 1
+      ? buildFactoryQcPrintPayload(list[0], options)
+      : buildFactoryQcBatchPrintPayload(list, options)
+    : list.length === 1
       ? buildQcTaskPrintPayload(list[0], options)
       : buildQcTaskBatchPrintPayload(list, options)
   if (!payload) return

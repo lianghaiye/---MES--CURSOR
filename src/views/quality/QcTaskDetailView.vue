@@ -277,8 +277,8 @@ const tableSticky = {
 }
 
 const canInspect = computed(() => canInspectQcTask(task.value))
-/** 来料 / 外协回货检详情支持按模板打印 */
-const canPrint = computed(() => isInboundScope.value && Boolean(task.value?.id))
+/** 来料 / 外协 / 过程检 / 成品检详情均支持按模板打印 */
+const canPrint = computed(() => Boolean(task.value?.id))
 
 function hasInboundOrder(row) {
   if (!row) return false
@@ -373,7 +373,8 @@ watch(() => [route.params.id, qcTaskState.tasks], loadTask, { immediate: true, d
 
 function statusColor(status) {
   if (status === QC_TASK_STATUS.COMPLETED) return 'success'
-  if (status === QC_TASK_STATUS.IN_PROGRESS) return 'processing'
+  if (status === QC_TASK_STATUS.PENDING || status === '检验中' || status === '检测中')
+    return 'warning'
   if (status === QC_TASK_STATUS.CANCELLED) return 'default'
   return 'warning'
 }

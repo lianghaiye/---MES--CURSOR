@@ -27,6 +27,8 @@ function createFactoryQc(partial) {
     source: '销售发货',
     inspector: '',
     inspectedAt: '',
+    creator: partial.creator || 'admin1',
+    createdAt: partial.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
     outboundDocNo: '',
     inspectMethod: '抽检',
     inspectDate: dayjs().format('YYYY-MM-DD'),

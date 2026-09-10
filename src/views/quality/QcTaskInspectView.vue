@@ -507,7 +507,6 @@ function loadPage() {
   }
 
   startQcTaskInspection(row.id, { entryChannel: 'web' })
-  // 开始检验后状态可能变为「检验中」，重新取最新引用
   task.value = getQcTaskById(id) || row
   form.inspector = task.value.inspector || 'admin1'
   form.remark = task.value.remark || ''
@@ -1099,7 +1098,8 @@ function onFieldChange(line, field) {
 
 function statusColor(status) {
   if (status === QC_TASK_STATUS.COMPLETED) return 'success'
-  if (status === QC_TASK_STATUS.IN_PROGRESS) return 'processing'
+  if (status === QC_TASK_STATUS.PENDING || status === '检验中' || status === '检测中')
+    return 'warning'
   if (status === QC_TASK_STATUS.CANCELLED) return 'default'
   return 'warning'
 }

@@ -108,7 +108,15 @@
           生成外协入库单
         </a-button>
         <a-button
-          v-if="isInboundScope"
+          v-if="isFinishedScope"
+          size="small"
+          :disabled="!selectedRowKeys.length"
+          @click="openGenerateFinishedInbound"
+        >
+          生成成品入库单
+        </a-button>
+        <a-button
+          v-if="canPrintQc"
           size="small"
           :disabled="!selectedRowKeys.length"
           @click="openPrintSelected"
@@ -148,6 +156,8 @@
 
     <div class="table-card">
       <a-table
+        class="qc-task-table"
+        :class="{ 'qc-task-table--nowrap': isProductionScope }"
         :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
@@ -193,30 +203,27 @@
             {{ formatDateTimeMinute(record.createdAt) }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <template v-if="isInboundScope">
-              <a-space :size="0">
-                <a-button
-                  v-if="canInspectQcTask(record)"
-                  type="link"
-                  size="small"
-                  @click="openInspect(record)"
-                >
-                  质检
-                </a-button>
-                <a-button
-                  v-if="isIncomingScope && canGenerateInboundFromQc(record)"
-                  type="link"
-                  size="small"
-                  @click="openGenerateInboundFromRow(record)"
-                >
-                  入库
-                </a-button>
-                <a-button type="link" size="small" @click="openPrint(record)">打印</a-button>
-              </a-space>
-            </template>
-            <a-button v-else type="link" size="small" @click="openDetailDrawer(record)">
-              详情
-            </a-button>
+            <a-space :size="0">
+              <a-button
+                v-if="canInspectQcTask(record)"
+                type="link"
+                size="small"
+                @click="openInspect(record)"
+              >
+                质检
+              </a-button>
+              <a-button
+                v-if="isIncomingScope && canGenerateInboundFromQc(record)"
+                type="link"
+                size="small"
+                @click="openGenerateInboundFromRow(record)"
+              >
+                入库
+              </a-button>
+              <a-button v-if="canPrintQc" type="link" size="small" @click="openPrint(record)">
+                打印
+              </a-button>
+            </a-space>
           </template>
           <template v-else>
             {{ displayCell(record, column) }}
@@ -307,9 +314,10 @@ import {
   canGenerateOutsourcingInbound,
   getOutsourcingOrderById,
 } from '@/store/outsourcingOrderStore'
+import { createInboundFromFinishedQc } from '@/store/inboundOrderStore'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { useTabs } from '@/composables/useTabs'
-import { getQcTaskRouteBundle, isInboundQcBizScope } from '@/utils/qcTaskRoutes'
+import { getQcTaskRouteBundle, isProcessQcBizScope } from '@/utils/qcTaskRoutes'
 import {
   evaluateQcInboundGate,
   inboundStatusTagColor,
@@ -322,12 +330,13 @@ const router = useRouter()
 const { openTab } = useTabs()
 
 const bizScope = computed(() => route.meta.bizScope || '来料质检')
-const routeBundle = computed(() => getQcTaskRouteBundle(bizScope.value))
 const INBOUND_SCOPES = new Set(['来料质检', '外协回货检'])
 const isInboundScope = computed(() => INBOUND_SCOPES.has(bizScope.value))
 const isIncomingScope = computed(() => bizScope.value === '来料质检')
 const isOutsourcingScope = computed(() => bizScope.value === '外协回货检')
-const isProductionScope = computed(() => !isInboundScope.value)
+const isProductionScope = computed(() => isProcessQcBizScope(bizScope.value))
+const isFinishedScope = computed(() => bizScope.value === '成品检')
+const canPrintQc = computed(() => isInboundScope.value || isProductionScope.value)
 /** 各业务质检列表均不支持手工新增（由上游单据/报工等生成） */
 const showCreateButton = computed(() => false)
 
@@ -389,36 +398,33 @@ const incomingColumns = [
   { title: '操作', key: 'action', width: 140, fixed: 'right' },
 ]
 
-const commonColumns = [
+const productionColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '质检单号', key: 'qcNo', width: 150, fixed: 'left' },
   { title: '质检状态', key: 'qcStatus', width: 90 },
   { title: '质检结果', key: 'qcResult', width: 100 },
+  { title: '工单号', dataIndex: 'workOrderNo', width: 130 },
+  { title: '工序', dataIndex: 'processName', width: 100 },
   { title: '物料编码', dataIndex: 'itemCode', width: 120 },
   { title: '物料名称', dataIndex: 'itemName', width: 140, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '检验方式', dataIndex: 'inspectMethod', width: 90 },
   { title: '检验数量', key: 'inspectQty', width: 90, align: 'right' },
-]
-
-const productionExtraColumns = [
-  { title: '工单号', dataIndex: 'workOrderNo', width: 130 },
-  { title: '工序', dataIndex: 'processName', width: 100 },
   { title: '排产批次', key: 'scheduleBatchNo', width: 90 },
   { title: '质检模板', dataIndex: 'templateName', width: 140, ellipsis: true },
-]
-
-const tailColumns = [
+  { title: '质检人', dataIndex: 'inspector', width: 90 },
+  { title: '质检时间', key: 'inspectedAt', width: 150 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', width: 150 },
-  { title: '操作', key: 'action', width: 72, fixed: 'right' },
+  { title: '操作', key: 'action', width: 140, fixed: 'right' },
 ]
 
 const displayColumns = computed(() => {
   if (isInboundScope.value) return incomingColumns
-  return [...commonColumns, ...productionExtraColumns, ...tailColumns]
+  return productionColumns
 })
 
-const tableScrollX = computed(() => (isInboundScope.value ? 1400 : 1400))
+const tableScrollX = computed(() => (isInboundScope.value ? 1400 : 1900))
 
 const filteredList = computed(() => {
   // 依赖收货入库状态变更，驱动「入库状态」列刷新
@@ -509,7 +515,8 @@ function displayCell(record, column) {
 
 function statusColor(status) {
   if (status === QC_TASK_STATUS.COMPLETED) return 'success'
-  if (status === QC_TASK_STATUS.IN_PROGRESS) return 'processing'
+  if (status === QC_TASK_STATUS.PENDING || status === '检验中' || status === '检测中')
+    return 'warning'
   if (status === QC_TASK_STATUS.CANCELLED) return 'default'
   return 'warning'
 }
@@ -540,11 +547,11 @@ function handleReset() {
   handleSearch()
 }
 
-/** 来料 / 外协：新标签页打开详情 */
+/** 来料 / 外协 / 过程检 / 成品检：新标签页打开详情 */
 function openDetailTab(record) {
   if (!record?.id) return
-  if (isInboundQcBizScope(bizScope.value)) {
-    const bundle = routeBundle.value
+  const bundle = getQcTaskRouteBundle(record.bizScope || bizScope.value)
+  if (bundle?.detailName) {
     const path = `${bundle.listPath}/${record.id}`
     openTab(path, record.qcNo || bundle.detailTitle)
     router.push({ name: bundle.detailName, params: { id: record.id } })
@@ -589,6 +596,67 @@ function openPrintSelected() {
   printTask.value = null
   printTasks.value = list
   printModalOpen.value = true
+}
+
+function canGenerateFinishedInboundFromQc(task) {
+  if (!task || task.bizScope !== '成品检') return false
+  if (task.qcStatus !== QC_TASK_STATUS.COMPLETED) return false
+  if (task.qcResult === QC_TASK_RESULT.FAIL) return false
+  if (String(task.inboundOrderNo || '').trim()) return false
+  return true
+}
+
+function openGenerateFinishedInbound() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请勾选成品检质检单后再生成入库单')
+    return
+  }
+  const tasks = selectedRowKeys.value.map((id) => getQcTaskById(id)).filter(Boolean)
+  if (!tasks.length) {
+    message.warning('未找到质检单')
+    return
+  }
+  const okTasks = []
+  const failMessages = []
+  tasks.forEach((task) => {
+    if (!canGenerateFinishedInboundFromQc(task)) {
+      failMessages.push(`${task.qcNo || task.id}：需已完成且非不通过、且尚未关联入库单`)
+      return
+    }
+    okTasks.push(task)
+  })
+  if (!okTasks.length) {
+    message.warning(failMessages[0] || '所选质检单均不可生成成品入库单')
+    return
+  }
+
+  let success = 0
+  const created = []
+  okTasks.forEach((task) => {
+    const result = createInboundFromFinishedQc(task)
+    if (result.ok) {
+      success += 1
+      created.push(result.order)
+    } else {
+      failMessages.push(`${task.qcNo || task.id}：${result.message}`)
+    }
+  })
+
+  if (success) {
+    message.success(
+      success === 1
+        ? `已生成成品入库单「${created[0]?.docNo || ''}」`
+        : `已生成 ${success} 张成品入库单`,
+    )
+    selectedRowKeys.value = []
+    if (created.length === 1 && created[0]?.id) {
+      const path = `/inventory/inbound/${created[0].id}`
+      openTab(path, `入库单 ${created[0].docNo || ''}`.trim())
+      router.push({ name: 'inventory-inbound-detail', params: { id: created[0].id } })
+    }
+  } else {
+    message.warning(failMessages[0] || '生成成品入库单失败')
+  }
 }
 
 /** 来料：已完成且（质检通过 / 部分通过且有合格入库数）可显示行内「入库」 */
@@ -880,6 +948,17 @@ function handleTerminate() {
 
 .table-card {
   padding: 8px 12px 12px;
+}
+
+.qc-task-table--nowrap {
+  :deep(.ant-table-thead > tr > th),
+  :deep(.ant-table-tbody > tr > td) {
+    white-space: nowrap;
+  }
+
+  :deep(.ant-table-cell-ellipsis) {
+    white-space: nowrap;
+  }
 }
 
 .link-code {

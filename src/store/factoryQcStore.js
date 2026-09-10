@@ -7,7 +7,7 @@ import {
 } from '@/mock/factoryQcRecords'
 
 const STORAGE_KEY = 'i_doms_factory_qc'
-const STORAGE_VERSION = 2
+const STORAGE_VERSION = 3
 const QC_NO_PREFIX = 'CCZJ'
 
 function loadFromStorage() {
@@ -172,6 +172,8 @@ export function createFactoryQcFromOutbound(outbound, options = {}) {
     source: '销售发货',
     inspector: '',
     inspectedAt: '',
+    creator: options.creator || 'admin1',
+    createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     outboundDocNo: outbound.docNo,
     inspectMethod: '抽检',
     inspectDate: dayjs().format('YYYY-MM-DD'),

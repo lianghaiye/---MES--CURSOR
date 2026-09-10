@@ -8,7 +8,7 @@ export const QC_GATE_MODE = {
   SOFT: 'soft',
 }
 
-const OPEN_STATUSES = new Set([QC_TASK_STATUS.PENDING, QC_TASK_STATUS.IN_PROGRESS])
+const OPEN_STATUSES = new Set([QC_TASK_STATUS.PENDING])
 
 /** 入库类：仅「质检不通过」算不合格；让步/通过不拦 */
 function inboundResultBlocks(result) {
@@ -263,7 +263,7 @@ export function evaluateOutboundQcGate(order) {
     const qc = getFactoryQcById(order.factoryQcId)
     if (!qc) {
       issues.push('出厂质检记录不存在（视为未检）')
-    } else if (qc.qcStatus === '待质检' || qc.qcStatus === '检验中') {
+    } else if (qc.qcStatus === '待质检' || qc.qcStatus === '检验中' || qc.qcStatus === '检测中') {
       issues.push(`出厂质检尚未完成（${qc.qcNo || ''}）`)
     } else if (qc.qcStatus === '已完成') {
       if (qcResultBlocksOutbound(qc.qcResult) || qc.qcResult !== QC_RESULT_PASS) {

@@ -876,4 +876,71 @@ export function createInboundFromScrap(scrap, partial = {}) {
   return order
 }
 
+/**
+ * 成品检 → 生成成品入库单
+ * @param {object} task 成品检质检单
+ */
+export function createInboundFromFinishedQc(task, partial = {}) {
+  if (!task) return { ok: false, message: '质检单不存在' }
+  if (task.bizScope !== '成品检') return { ok: false, message: '仅成品检可生成成品入库单' }
+  if (task.qcStatus !== '已完成') return { ok: false, message: '仅已完成的成品检可生成入库单' }
+  if (task.qcResult === '质检不通过') {
+    return { ok: false, message: '质检不通过不可生成成品入库单' }
+  }
+  if (String(task.inboundOrderNo || '').trim()) {
+    return { ok: false, message: `已关联入库单「${task.inboundOrderNo}」` }
+  }
+
+  const lineItems = (task.lineItems || [])
+    .map((line, idx) => {
+      const qty =
+        Number(line.acceptInboundQty) || Number(line.inspectQty) || Number(line.receiptQty) || 0
+      if (!(qty > 0)) return null
+      return createInboundLine({
+        id: `ib-fqc-${task.id}-${line.id || idx}`,
+        itemCode: line.itemCode || task.itemCode || '',
+        itemName: line.itemName || task.itemName || '',
+        specModel: line.specModel || task.specModel || '',
+        material: line.material || task.material || '',
+        qty,
+        unit: line.unit || task.unit || '件',
+        warehouse: line.receivingWarehouse || '成品仓',
+        lineSource: '生产',
+      })
+    })
+    .filter(Boolean)
+
+  if (!lineItems.length) {
+    return { ok: false, message: '无可入库数量（请检查合格入库数/质检数量）' }
+  }
+
+  const workOrderNo = task.workOrderNo || task.sourceDocNo || ''
+  const order = addInboundOrder({
+    inboundType: '成品入库',
+    status: '待处理',
+    warehouse: lineItems[0].warehouse || '成品仓',
+    itemType: '产品',
+    sourceOrderNo: workOrderNo,
+    sourceType: '成品检',
+    handler: partial.creator || task.inspector || '管理员',
+    creator: partial.creator || '管理员',
+    remark: partial.remark || `来自成品检 ${task.qcNo || ''}`.trim(),
+    inboundDate: dayjs().format('YYYY-MM-DD'),
+    workOrders: workOrderNo
+      ? [{ workOrderNo, workOrderId: task.workOrderId || '', qty: lineItems[0].qty }]
+      : [],
+    lineItems,
+    ...partial,
+  })
+
+  // eslint-disable-next-line global-require
+  const { attachQcTaskInboundOrder } = require('@/store/qcTaskStore')
+  attachQcTaskInboundOrder(task.id, {
+    inboundOrderNo: order.docNo,
+    inboundOrderId: order.id,
+  })
+
+  return { ok: true, order, message: `已生成成品入库单「${order.docNo}」` }
+}
+
 export { canDeleteInbound, canEditInbound, canConfirmInbound, canApproveInbound }

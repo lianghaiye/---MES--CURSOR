@@ -648,10 +648,50 @@ const routes = [
         meta: { title: '生产过程检', bizScope: '生产过程检' },
       },
       {
+        path: 'quality/process-qc/:id/inspect',
+        name: 'quality-process-qc-inspect',
+        component: () => import('@/views/quality/QcTaskInspectView.vue'),
+        meta: {
+          title: '录入质检结果',
+          listPath: '/quality/process-qc',
+          bizScope: '生产过程检',
+        },
+      },
+      {
+        path: 'quality/process-qc/:id',
+        name: 'quality-process-qc-detail',
+        component: () => import('@/views/quality/QcTaskDetailView.vue'),
+        meta: {
+          title: '生产过程检详情',
+          listPath: '/quality/process-qc',
+          bizScope: '生产过程检',
+        },
+      },
+      {
         path: 'quality/finished-qc',
         name: 'quality-finished-qc',
         component: () => import('@/views/quality/QcTaskListView.vue'),
         meta: { title: '成品检', bizScope: '成品检' },
+      },
+      {
+        path: 'quality/finished-qc/:id/inspect',
+        name: 'quality-finished-qc-inspect',
+        component: () => import('@/views/quality/QcTaskInspectView.vue'),
+        meta: {
+          title: '录入质检结果',
+          listPath: '/quality/finished-qc',
+          bizScope: '成品检',
+        },
+      },
+      {
+        path: 'quality/finished-qc/:id',
+        name: 'quality-finished-qc-detail',
+        component: () => import('@/views/quality/QcTaskDetailView.vue'),
+        meta: {
+          title: '成品检详情',
+          listPath: '/quality/finished-qc',
+          bizScope: '成品检',
+        },
       },
       {
         path: 'quality/factory-qc',

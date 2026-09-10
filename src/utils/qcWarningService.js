@@ -1,6 +1,6 @@
 import { QC_TASK_RESULT, QC_TASK_STATUS, listQcTasks } from '@/store/qcTaskStore'
 
-const OPEN_QC_STATUSES = new Set([QC_TASK_STATUS.PENDING, QC_TASK_STATUS.IN_PROGRESS])
+const OPEN_QC_STATUSES = new Set([QC_TASK_STATUS.PENDING])
 const FAIL_RESULTS = new Set([QC_TASK_RESULT.FAIL, QC_TASK_RESULT.PARTIAL, '不合格', '质检不通过'])
 
 export function getProcessQcWarningForWorkOrderProcess(workOrder, processIndex) {

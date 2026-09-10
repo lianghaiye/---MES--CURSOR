@@ -21,13 +21,18 @@ export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 const STORAGE_KEY = 'i_doms_qc_tasks'
 const STORAGE_VERSION = 3
 const SEED_VERSION_KEY = 'i_doms_qc_tasks_seed_v'
-const CURRENT_SEED_VERSION = '12'
+const CURRENT_SEED_VERSION = '14'
 
 export const QC_TASK_STATUS = {
   PENDING: '待质检',
-  IN_PROGRESS: '检验中',
   COMPLETED: '已完成',
   CANCELLED: '已终止',
+}
+
+/** 历史「检验中」并入「待质检」（不再保留该状态） */
+function normalizeQcTaskStatus(status) {
+  if (status === '检验中' || status === '检测中') return QC_TASK_STATUS.PENDING
+  return status || QC_TASK_STATUS.PENDING
 }
 
 const QC_NO_PREFIX = {
@@ -101,6 +106,7 @@ function hydrateLineTemplateFields(line = {}) {
 function hydrateTasksAfterLoad(tasks = []) {
   return (tasks || []).map((t) => ({
     ...t,
+    qcStatus: normalizeQcTaskStatus(t.qcStatus),
     lineItems: (t.lineItems || []).map((l) => hydrateLineTemplateFields(l)),
   }))
 }
@@ -321,7 +327,7 @@ export function createQcTask(partial = {}) {
     id: partial.id || `qctask-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     qcNo: partial.qcNo || generateQcTaskNo(bizScope),
     bizScope,
-    qcStatus: partial.qcStatus || QC_TASK_STATUS.PENDING,
+    qcStatus: normalizeQcTaskStatus(partial.qcStatus || QC_TASK_STATUS.PENDING),
     qcResult: partial.qcResult || '',
     templateId: template?.id || partial.templateId || '',
     templateCode: template?.code || partial.templateCode || '',
@@ -519,7 +525,7 @@ export function submitQcTaskInspection(
   return { ok: true, task: row, qcResult }
 }
 
-/** 开始检验（待质检 → 检验中），WEB/小程序打开录入页时调用 */
+/** 打开录入页时记录录入端；状态保持「待质检」，提交后变为「已完成」 */
 export function startQcTaskInspection(id, { entryChannel = 'web' } = {}) {
   const row = getQcTaskById(id)
   if (!row) return { ok: false, message: '质检任务不存在' }
@@ -529,8 +535,11 @@ export function startQcTaskInspection(id, { entryChannel = 'web' } = {}) {
   if (row.qcStatus === QC_TASK_STATUS.COMPLETED) {
     return { ok: false, message: '任务已完成' }
   }
+  // 兼容历史「检验中」数据
+  if (row.qcStatus === '检验中' || row.qcStatus === '检测中') {
+    row.qcStatus = QC_TASK_STATUS.PENDING
+  }
   if (row.qcStatus === QC_TASK_STATUS.PENDING) {
-    row.qcStatus = QC_TASK_STATUS.IN_PROGRESS
     row.entryChannel = entryChannel
     row.updatedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   }
@@ -539,7 +548,8 @@ export function startQcTaskInspection(id, { entryChannel = 'web' } = {}) {
 
 export function canInspectQcTask(task) {
   if (!task) return false
-  return task.qcStatus === QC_TASK_STATUS.PENDING || task.qcStatus === QC_TASK_STATUS.IN_PROGRESS
+  const status = normalizeQcTaskStatus(task.qcStatus)
+  return status === QC_TASK_STATUS.PENDING
 }
 
 /** 质检单回写入库单号 */
