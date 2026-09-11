@@ -246,32 +246,35 @@ export function evaluateProcessReportQcGate({ workOrderId, workOrderNo, processe
 
 /**
  * 出厂检门控（确认出库）
- * 强：未发起/未完成/不通过/部分通过 → 拦
- * 弱：仅 warnings，仍可出库
+ * 规则：未发起出厂质检 → 不校验（与现网一致，可直接出库）
+ * 已发起：强管控阻断未完成/不通过/部分通过；弱管控仅 warnings，仍可出库
  */
 export function evaluateOutboundQcGate(order) {
   if (!order || order.outboundType !== '销售出库') {
     return { ok: true, blocked: false, warnings: [], messages: [] }
   }
 
+  // 未发起：不纳入门控
+  if (!order.factoryQcId) {
+    return { ok: true, blocked: false, warnings: [], messages: [] }
+  }
+
   const mode = getGateMode('出厂质检')
   const issues = []
+  const qc = getFactoryQcById(order.factoryQcId)
 
-  if (!order.factoryQcId) {
-    issues.push('尚未发起出厂质检（视为未检）')
-  } else {
-    const qc = getFactoryQcById(order.factoryQcId)
-    if (!qc) {
-      issues.push('出厂质检记录不存在（视为未检）')
-    } else if (qc.qcStatus === '待质检' || qc.qcStatus === '检验中' || qc.qcStatus === '检测中') {
-      issues.push(`出厂质检尚未完成（${qc.qcNo || ''}）`)
-    } else if (qc.qcStatus === '已完成') {
-      if (qcResultBlocksOutbound(qc.qcResult) || qc.qcResult !== QC_RESULT_PASS) {
-        issues.push(`出厂质检结果为「${qc.qcResult || '未通过'}」`)
-      }
-    } else {
-      issues.push(`出厂质检状态为「${qc.qcStatus}」`)
+  if (!qc) {
+    issues.push('出厂质检记录不存在（视为未检）')
+  } else if (qc.qcStatus === '待质检' || qc.qcStatus === '检验中' || qc.qcStatus === '检测中') {
+    issues.push(`出厂质检尚未完成（${qc.qcNo || ''}）`)
+  } else if (qc.qcStatus === '已完成') {
+    if (qcResultBlocksOutbound(qc.qcResult) || qc.qcResult !== QC_RESULT_PASS) {
+      issues.push(`出厂质检结果为「${qc.qcResult || '未通过'}」`)
     }
+  } else if (qc.qcStatus === '已终止') {
+    // 已终止视同未有效质检，不阻断（与未发起一致）
+  } else {
+    issues.push(`出厂质检状态为「${qc.qcStatus}」`)
   }
 
   if (!issues.length) {

@@ -200,8 +200,8 @@ export function buildFactoryQcPrintPayload(record, options = {}) {
     qcStatus: record.qcStatus,
     qcResult: record.qcResult,
     supplier: record.customerName,
-    sourceDocNo: record.sourceOrderNo || record.salesOrderNo,
-    templateName: '',
+    sourceDocNo: record.outboundDocNo || record.sourceOrderNo || record.salesOrderNo,
+    templateName: record.templateName || '',
     inspectMethod: record.inspectMethod,
     inboundOrderNo: '',
     inspector: record.inspector,
@@ -227,10 +227,15 @@ export function buildFactoryQcPrintPayload(record, options = {}) {
       inspectQty: line.inspectQty,
       lineQcResult: line.lineQcResult,
       treatmentPlan: line.treatmentPlan,
-      templateName: '',
-      templateFields: [],
-      fieldValues: [],
+      templateName: line.templateName || record.templateName || '',
+      templateCode: line.templateCode || record.templateCode || '',
+      templateFields: line.templateFields || [],
+      fieldValues: line.fieldValues || [],
+      sheetPassRule: line.sheetPassRule,
     })),
+  }
+  if (!asTask.templateName) {
+    asTask.templateName = asTask.lineItems.map((l) => l.templateName).filter(Boolean)[0] || ''
   }
   return buildQcTaskPrintPayload(asTask, options)
 }

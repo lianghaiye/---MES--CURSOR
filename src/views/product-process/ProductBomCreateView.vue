@@ -380,6 +380,7 @@ import { processRouteState } from '@/store/processRouteStore'
 import {
   applyMaterialToLine,
   createEmptySubLine,
+  insertEmptySiblingAfter,
   applyResolvedSkuToBomLineInTree,
 } from '@/utils/bomLineMaterial'
 import {
@@ -1376,9 +1377,23 @@ function onBomRefDescendantEdit({ lineId, lineIds }) {
   if (lineId) maybeDetachChildBomRef(lineId)
 }
 
-function onAddDetailLine() {
+function onAddDetailLine(payload) {
   if (!hasRoot.value) {
     message.warning('请先选择产品/物料')
+    return
+  }
+  const afterLineId = payload?.afterLineId
+  if (afterLineId) {
+    const afterLine = lineItems.value.find((l) => l.id === afterLineId)
+    const parentId = afterLine
+      ? afterLine.parentTreeId || getRootTreeId(flatNodes.value) || ROOT_ID
+      : selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID
+    withUndo(() => {
+      maybeDetachChildBomRef(null, parentId)
+      const result = insertEmptySiblingAfter(lineItems.value, flatNodes.value, afterLineId)
+      lineItems.value = result.lineItems
+      flatNodes.value = result.flatNodes
+    })
     return
   }
   const parentId = selectedNodeId.value || getRootTreeId(flatNodes.value) || ROOT_ID

@@ -123,6 +123,9 @@
             }}</a>
             <span v-else>-</span>
           </template>
+          <template v-else-if="column.key === 'sourceOrderNo'">
+            {{ record.outboundDocNo || record.sourceOrderNo || '—' }}
+          </template>
           <template v-else-if="column.key === 'shipQty'">
             {{ formatShipQty(record) }}
           </template>
@@ -162,12 +165,6 @@
       </div>
     </div>
 
-    <FactoryQcInspectModal
-      v-model:open="inspectModalOpen"
-      :record="inspectRecord"
-      @saved="onInspectSaved"
-    />
-
     <QcTaskPrintModal v-model:open="printModalOpen" :factory-records="printFactoryRecords" />
 
     <TableColumnSettingDrawer
@@ -197,13 +194,13 @@ import {
 import { qcStatusOptions, qcResultOptions } from '@/mock/factoryQcOptions'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
-import FactoryQcInspectModal from './components/FactoryQcInspectModal.vue'
 import QcTaskPrintModal from './components/QcTaskPrintModal.vue'
 import { useTabs } from '@/composables/useTabs'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -216,8 +213,6 @@ const filters = reactive({
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
-const inspectModalOpen = ref(false)
-const inspectRecord = ref(null)
 const printModalOpen = ref(false)
 const printFactoryRecords = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
@@ -229,11 +224,16 @@ const baseColumns = [
   { title: '质检单号', key: 'qcNo', width: 150, fixed: 'left' },
   { title: '质检状态', key: 'qcStatus', width: 90 },
   { title: '质检结果', key: 'qcResult', width: 100 },
-  { title: '源单号', dataIndex: 'sourceOrderNo', width: 140 },
+  {
+    title: '源单号',
+    key: 'sourceOrderNo',
+    width: 140,
+  },
   { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true },
   { title: '销售单号', dataIndex: 'salesOrderNo', width: 140 },
   { title: '发货数量', key: 'shipQty', width: 90, align: 'right' },
   { title: '来源', dataIndex: 'source', width: 90 },
+  { title: '质检模板', dataIndex: 'templateName', width: 140, ellipsis: true },
   { title: '质检人', dataIndex: 'inspector', width: 90 },
   { title: '质检时间', key: 'inspectedAt', width: 150 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
@@ -242,7 +242,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('factory-qc-list-v2', baseColumns)
+  useTableColumnSettings('factory-qc-list-v3', baseColumns)
 
 const filteredList = computed(() =>
   filterFactoryQcRecords(factoryQcState.records, appliedFilters.value),
@@ -305,8 +305,14 @@ function handleReset() {
 }
 
 function openInspect(record) {
-  inspectRecord.value = record
-  inspectModalOpen.value = true
+  if (!canInspect(record)) {
+    message.warning('当前状态不可质检')
+    return
+  }
+  const bundle = getQcTaskRouteBundle('出厂质检')
+  const path = `${bundle.listPath}/${record.id}/inspect`
+  openTab(path, `质检 ${record.qcNo || ''}`.trim())
+  router.push({ name: bundle.inspectName, params: { id: record.id } })
 }
 
 function formatShipQty(record) {
@@ -332,11 +338,6 @@ function openPrintSelected() {
   }
   printFactoryRecords.value = list
   printModalOpen.value = true
-}
-
-function onInspectSaved() {
-  selectedRowKeys.value = []
-  handleSearch()
 }
 
 function handleTerminate() {

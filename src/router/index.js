@@ -697,13 +697,23 @@ const routes = [
         path: 'quality/factory-qc',
         name: 'quality-factory-qc',
         component: () => import('@/views/quality/FactoryQcView.vue'),
-        meta: { title: '出厂质检' },
+        meta: { title: '出厂质检', bizScope: '出厂质检' },
+      },
+      {
+        path: 'quality/factory-qc/:id/inspect',
+        name: 'quality-factory-qc-inspect',
+        component: () => import('@/views/quality/QcTaskInspectView.vue'),
+        meta: {
+          title: '录入质检结果',
+          listPath: '/quality/factory-qc',
+          bizScope: '出厂质检',
+        },
       },
       {
         path: 'quality/factory-qc/:id',
         name: 'quality-factory-qc-detail',
         component: () => import('@/views/quality/FactoryQcDetailView.vue'),
-        meta: { title: '出厂质检详情' },
+        meta: { title: '出厂质检详情', listPath: '/quality/factory-qc', bizScope: '出厂质检' },
       },
       { path: 'quality/inspection', redirect: '/quality/factory-qc' },
       { path: 'quality/defect', redirect: '/quality/scrap-orders' },
@@ -1024,9 +1034,7 @@ const routes = [
       },
       {
         path: 'basic-config/function-params',
-        name: 'basic-config-function-params',
-        component: () => import('@/views/basic-config/FunctionParamView.vue'),
-        meta: { title: '功能参数' },
+        redirect: '/system/function-params',
       },
       {
         path: 'basic-config/business-dict',
@@ -1111,6 +1119,12 @@ const routes = [
         name: 'system-business-rules',
         component: () => import('@/views/system/BusinessRuleView.vue'),
         meta: { title: '业务规则' },
+      },
+      {
+        path: 'system/function-params',
+        name: 'system-function-params',
+        component: () => import('@/views/basic-config/FunctionParamView.vue'),
+        meta: { title: '功能参数' },
       },
       {
         path: 'industrial-id',

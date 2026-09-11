@@ -487,7 +487,7 @@ export function issueBatchQty(batchId, qty, meta = {}) {
     }
   }
 
-  // 默认按需求扣可拆件；整出（需要下料结算）由调用方传 allowPieceSplit: false
+  // 默认按出库数量扣，件长大于出库量时可拆件留仓内余料
   const allowSplit = meta.allowPieceSplit !== false
   let issuedPieces = []
   let remnantPieces = []

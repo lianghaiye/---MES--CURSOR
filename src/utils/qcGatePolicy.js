@@ -33,6 +33,7 @@ export function resolveQcGatePolicy({ processPolicy, templatePolicy, bizScope } 
     const scoped = normalizeQcGatePolicy(getQcGatePolicyByBizScope(bizScope))
     if (scoped === QC_GATE_POLICY.SOFT || scoped === QC_GATE_POLICY.HARD) return scoped
   }
+  // 当期默认弱管控
   return normalizeQcGatePolicy(getQcDefaultGatePolicy()) || QC_GATE_POLICY.SOFT
 }
 

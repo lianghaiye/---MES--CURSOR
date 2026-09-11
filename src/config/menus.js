@@ -171,7 +171,6 @@ export const sideMenus = {
     { key: 'units', label: '单位管理', path: '/basic-config/units' },
     { key: 'packaging', label: '包装管理', path: '/basic-config/packaging' },
     { key: 'business-dict', label: '业务字典', path: '/basic-config/business-dict' },
-    { key: 'function-params', label: '功能参数', path: '/basic-config/function-params' },
     {
       key: 'warehouse-mgmt',
       label: '仓库管理',
@@ -208,6 +207,7 @@ export const sideMenus = {
   system: [
     { key: 'dict', label: '系统字典', path: '/system/dict' },
     { key: 'business-rules', label: '业务规则', path: '/system/business-rules' },
+    { key: 'function-params', label: '功能参数', path: '/system/function-params' },
   ],
 
   board: [
@@ -373,6 +373,7 @@ export const routeTitles = {
   '/quality/qc-template/:id': '质检模板详情',
   '/system/dict': '系统字典',
   '/system/business-rules': '业务规则',
+  '/system/function-params': '功能参数',
   '/procurement/purchase-req': '采购申请',
   '/procurement/purchase-orders': '采购订单',
   '/procurement/purchase-orders/:id/edit': '编辑采购单',
@@ -418,7 +419,6 @@ export const routeTitles = {
   '/basic-config/material-grades': '材质管理',
   '/basic-config/units': '单位管理',
   '/basic-config/packaging': '包装管理',
-  '/basic-config/function-params': '功能参数',
   '/basic-config/business-dict': '业务字典',
   '/basic-config/warehouse-categories': '仓库分类',
   '/basic-config/warehouses': '仓库列表',

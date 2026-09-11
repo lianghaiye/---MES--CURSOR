@@ -501,10 +501,13 @@ function handleConfirmOne(record) {
   Modal.confirm({
     title: `确认出库 ${record.docNo}？`,
     onOk: () => {
-      const { count, blocked } = confirmOutbound([record.id])
+      const { count, blocked, warnings } = confirmOutbound([record.id])
       if (blocked.length) {
         message.warning(blocked.map((b) => b.message).join('；'))
         return
+      }
+      if (warnings?.length) {
+        message.warning(warnings.join('；'))
       }
       if (count > 0) {
         message.success('已确认出库')
@@ -594,7 +597,7 @@ function handleConfirmOutbound() {
     message.warning('请先选择出库单')
     return
   }
-  const { count, blocked } = confirmOutbound(selectedRowKeys.value)
+  const { count, blocked, warnings } = confirmOutbound(selectedRowKeys.value)
   const qcBlocked = blocked.filter((b) => b.qcBlocked)
   if (qcBlocked.length) {
     Modal.warning({
@@ -610,6 +613,9 @@ function handleConfirmOutbound() {
         .slice(0, 3)
         .join('；'),
     )
+  }
+  if (warnings?.length) {
+    message.warning(warnings.slice(0, 3).join('；'))
   }
   if (count > 0) {
     message.success(`已确认出库 ${count} 条`)

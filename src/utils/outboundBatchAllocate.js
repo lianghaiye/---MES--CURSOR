@@ -5,9 +5,7 @@ import {
   getStockPieceById,
   isPieceManagedBatch,
   listStockPieces,
-  pickPiecesFifoForQty,
   pickPiecesFifoForPartialQty,
-  pickPiecesFifoCoveringQty,
 } from '@/store/stockPieceStore'
 import {
   OUTBOUND_ISSUE_RULES,
@@ -18,9 +16,10 @@ import {
 import { resolveNeedsBlankingSettle } from '@/utils/blankingSettleMaterial'
 
 /**
- * 行级扣批策略（与双单位无关）：
- * - 普通物料 → 一律按需求扣、余量留原批
- * - 需要下料结算 → 跟功能参数「批次扣批方式」（整出+结算 / 部分出+留原批）
+ * 行级发料策略（仅「需要下料结算」能力物料读功能参数；普通料恒为 partial）：
+ * - partial：无需下料结算（余料留线边仓）
+ * - whole_with_remnant：需下料结算（余料回库）
+ * 两种策略扣批数量一律 = 出库数量；差异仅是否进入下料结算。
  */
 export function resolveLineBatchIssueStrategy(line = {}) {
   if (!resolveNeedsBlankingSettle(line)) {
@@ -40,17 +39,6 @@ export function isLineWholeWithRemnantBatchIssue(line = {}) {
 /** 拣批是否用「优先整批 + 余料优先」（仅需下料结算物料） */
 export function isLineEnhancedBlankingPick(line = {}) {
   return resolveNeedsBlankingSettle(line)
-}
-
-function resolveIssueStrategyFromOpts(opts = {}) {
-  if (
-    opts.issueStrategy === DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL ||
-    opts.issueStrategy === DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT
-  ) {
-    return opts.issueStrategy
-  }
-  if (opts.line) return resolveLineBatchIssueStrategy(opts.line)
-  return DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL
 }
 
 /** 该明细行是否走自主拣选（行级开关或全局出库规则） */
@@ -75,13 +63,7 @@ export function getManualPickBatchIds(line = {}) {
  * 从所选批次按「余量小优先」跨批扣减，凑齐 demandQty
  * @returns {{ ok: boolean, message?: string, allocations: Array, available: number }}
  */
-export function allocateFromSelectedBatches({
-  batchIds = [],
-  demandQty,
-  unit = '',
-  line,
-  issueStrategy,
-} = {}) {
+export function allocateFromSelectedBatches({ batchIds = [], demandQty, unit = '' } = {}) {
   const need = roundQty(demandQty)
   const ids = Array.isArray(batchIds) ? batchIds.filter(Boolean) : []
   if (!ids.length) {
@@ -112,15 +94,12 @@ export function allocateFromSelectedBatches({
   }
   let left = need
   const allocations = []
-  const whole =
-    resolveIssueStrategyFromOpts({ line, issueStrategy }) ===
-    DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT
   for (const b of batches) {
     if (!(left > 0)) break
     const avail = roundQty(Number(b.currentLength) || 0)
     if (!(avail > 0)) continue
-    // 整出+余料回：整批出完（可略超需求）；部分出：按需求扣、余量留原批
-    const take = whole ? avail : roundQty(Math.min(avail, left))
+    // 一律按出库数量扣，余量留原批（是否下料结算不改变扣库量）
+    const take = roundQty(Math.min(avail, left))
     allocations.push({
       batchId: b.id,
       batchNo: b.batchNo,
@@ -133,9 +112,7 @@ export function allocateFromSelectedBatches({
   if (!(left <= 0) || !allocations.length) {
     return {
       ok: false,
-      message: whole
-        ? `所选批次整批出库后仍不足需求（需 ${need}，可用 ${available}），请增选批次`
-        : `所选批次不足（需 ${need}，可用 ${available}）`,
+      message: `所选批次不足（需 ${need}，可用 ${available}）`,
       allocations: [],
       available,
     }
@@ -224,16 +201,13 @@ function sortedInStockPiecesForBatch(batchId) {
 }
 
 /**
- * 优先整批/整根：找单批或单件 ≥ 需求的最优候选
+ * 优先单批/单件够用：找 ≥ 出库数量的最优候选，分配量仍 = 出库数量（不整批多扣）
  * 排序：余料优先 → 最短够用 → 批次号 FIFO/LIFO
  * @returns {null | {batchId,batchNo,qty,unit,pieceIds?,pieceSerialNos?,pieceSplit?}}
  */
-export function pickWholeSatisfyAllocation(batches, demandQty, rule, issueStrategy) {
+export function pickWholeSatisfyAllocation(batches, demandQty, rule) {
   const need = roundQty(demandQty)
   if (!(need > 0)) return null
-  const strategy = resolveIssueStrategyFromOpts({ issueStrategy })
-  const whole = strategy === DUAL_UNIT_ISSUE_STRATEGIES.WHOLE_WITH_REMNANT
-  const partial = strategy === DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL
   const candidates = []
 
   for (const b of batches || []) {
@@ -252,11 +226,11 @@ export function pickWholeSatisfyAllocation(batches, demandQty, rule, issueStrate
           allocation: {
             batchId: b.id,
             batchNo: b.batchNo,
-            qty: whole ? pq : need,
+            qty: need,
             unit: b.unit || p.unit || '',
             pieceIds: [p.id],
             pieceSerialNos: [p.serialNo],
-            pieceSplit: partial && pq > need + 0.0001,
+            pieceSplit: pq > need + 0.0001,
           },
         })
       }
@@ -272,7 +246,7 @@ export function pickWholeSatisfyAllocation(batches, demandQty, rule, issueStrate
       allocation: {
         batchId: b.id,
         batchNo: b.batchNo,
-        qty: whole ? avail : need,
+        qty: need,
         unit: b.unit || '',
       },
     })
@@ -308,7 +282,6 @@ export function allocateOutboundBatches({
   freeOnly = false,
   excludeOtherDedicated = false,
   line,
-  issueStrategy,
 } = {}) {
   const need = roundQty(demandQty)
   if (!(need > 0)) {
@@ -318,8 +291,6 @@ export function allocateOutboundBatches({
     return { ok: false, message: '缺少仓库或物料编码', allocations: [], available: 0 }
   }
 
-  const strategy = resolveIssueStrategyFromOpts({ line, issueStrategy })
-  const partial = strategy === DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL
   const enhancedPick = line ? isLineEnhancedBlankingPick(line) : false
   const issueRule =
     rule === OUTBOUND_ISSUE_RULES.LIFO ? OUTBOUND_ISSUE_RULES.LIFO : OUTBOUND_ISSUE_RULES.FIFO
@@ -346,9 +317,9 @@ export function allocateOutboundBatches({
     }
   }
 
-  // 需下料结算：优先单批满足 + 余料优先；普通物料：直接按批次号 FIFO 跨批扣
+  // 需下料结算能力物料：优先单批够用 + 余料优先；分配量仍 = 出库数量
   if (enhancedPick) {
-    const wholePick = pickWholeSatisfyAllocation(rawBatches, need, issueRule, strategy)
+    const wholePick = pickWholeSatisfyAllocation(rawBatches, need, issueRule)
     if (wholePick) {
       return { ok: true, allocations: [wholePick], available }
     }
@@ -366,26 +337,9 @@ export function allocateOutboundBatches({
 
     if (isPieceManagedBatch(b)) {
       const target = roundQty(Math.min(avail, left))
-      if (partial) {
-        const pick = pickPiecesFifoForPartialQty(b.id, target)
-        if (!pick.ok) continue
-        const take = roundQty(pick.consumeQty ?? pick.total)
-        if (!(take > 0)) continue
-        allocations.push({
-          batchId: b.id,
-          batchNo: b.batchNo,
-          qty: take,
-          unit: b.unit || '',
-          pieceIds: pick.pieces.map((p) => p.id),
-          pieceSerialNos: pick.pieces.map((p) => p.serialNo),
-          pieceSplit: Boolean(pick.split),
-        })
-        left = roundQty(left - take)
-        continue
-      }
-      // 整出+余料回：整件出库直至 ≥ 剩余需求（可略超；本批不足则跨批）
-      const pick = pickPiecesFifoCoveringQty(b.id, left)
-      const take = roundQty(pick.total)
+      const pick = pickPiecesFifoForPartialQty(b.id, target)
+      if (!pick.ok) continue
+      const take = roundQty(pick.consumeQty ?? pick.total)
       if (!(take > 0)) continue
       allocations.push({
         batchId: b.id,
@@ -394,41 +348,26 @@ export function allocateOutboundBatches({
         unit: b.unit || '',
         pieceIds: pick.pieces.map((p) => p.id),
         pieceSerialNos: pick.pieces.map((p) => p.serialNo),
+        pieceSplit: Boolean(pick.split),
       })
       left = roundQty(left - take)
       continue
     }
 
-    // 一批一码 / 一类一码
-    if (partial) {
-      const take = roundQty(Math.min(avail, left))
-      allocations.push({
-        batchId: b.id,
-        batchNo: b.batchNo,
-        qty: take,
-        unit: b.unit || '',
-      })
-      left = roundQty(left - take)
-    } else {
-      // 整出+余料回：整批出库（可大于剩余需求），余料经下料结算回库
-      const take = avail
-      allocations.push({
-        batchId: b.id,
-        batchNo: b.batchNo,
-        qty: take,
-        unit: b.unit || '',
-      })
-      left = roundQty(left - take)
-    }
+    // 一批一码 / 一类一码：按出库数量扣，余量留原批
+    const take = roundQty(Math.min(avail, left))
+    allocations.push({
+      batchId: b.id,
+      batchNo: b.batchNo,
+      qty: take,
+      unit: b.unit || '',
+    })
+    left = roundQty(left - take)
   }
 
   if (!(left <= 0) || !allocations.length) {
     const pieceHint =
-      left > 0
-        ? partial
-          ? `；剩余 ${left} 无法从在库件码分配（无足够整件可凑齐，也无单件 ≥ 需求可拆）`
-          : `；一物一码须按整件出库，剩余 ${left} 无法用整件凑齐，请调整出库数量`
-        : ''
+      left > 0 ? `；剩余 ${left} 无法从在库件码分配（无足够整件可凑齐，也无单件 ≥ 需求可拆）` : ''
     return {
       ok: false,
       message: `可用库存不足（需 ${need}，可用 ${available}）${pieceHint}`,
@@ -631,7 +570,6 @@ export function validateManualBatchAllocations(line, { requireAllocations = true
   if (!allocated.ok) {
     return allocated
   }
-  const partial = isLinePartialBatchIssue(line)
   const allocations = allocated.allocations.map((a) => ({ ...a }))
   for (const a of allocations) {
     const batch = getBatchById(a.batchId)
@@ -658,7 +596,7 @@ export function validateManualBatchAllocations(line, { requireAllocations = true
         }
         const qty = roundQty(a.qty)
         const canSplit =
-          partial && a.pieceIds.length === 1 && sum + 0.0001 >= qty && Math.abs(sum - qty) > 0.0001
+          a.pieceIds.length === 1 && sum + 0.0001 >= qty && Math.abs(sum - qty) > 0.0001
         if (!canSplit && Math.abs(sum - qty) > 0.0001) {
           return {
             ok: false,
@@ -666,7 +604,7 @@ export function validateManualBatchAllocations(line, { requireAllocations = true
           }
         }
         if (canSplit) a.pieceSplit = true
-      } else if (partial) {
+      } else {
         const partialPick = pickPiecesFifoForPartialQty(a.batchId, a.qty)
         if (!partialPick.ok) {
           return { ok: false, message: partialPick.message }
@@ -674,13 +612,6 @@ export function validateManualBatchAllocations(line, { requireAllocations = true
         a.pieceIds = partialPick.pieces.map((p) => p.id)
         a.pieceSerialNos = partialPick.pieces.map((p) => p.serialNo)
         a.pieceSplit = Boolean(partialPick.split)
-      } else {
-        const exact = pickPiecesFifoForQty(a.batchId, a.qty)
-        if (!exact.ok) {
-          return { ok: false, message: exact.message }
-        }
-        a.pieceIds = exact.pieces.map((p) => p.id)
-        a.pieceSerialNos = exact.pieces.map((p) => p.serialNo)
       }
     }
   }

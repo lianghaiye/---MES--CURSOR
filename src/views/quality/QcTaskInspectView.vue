@@ -31,7 +31,7 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="供应商">
+                <a-form-item :label="isFactoryScope ? '客户名称' : '供应商'">
                   <a-input :value="task.supplier" disabled size="small" />
                 </a-form-item>
               </a-col>
@@ -81,7 +81,10 @@
                       <span class="meta-sep">·</span>
                       <span>{{ sheetPassRuleLabel(resolveLineSheetPassRule(record, task)) }}</span>
                       <span class="meta-sep">·</span>
-                      <span>收货 {{ formatQty(record.receiptQty) }}</span>
+                      <span
+                        >{{ isFactoryScope ? '发货' : '收货' }}
+                        {{ formatQty(record.receiptQty ?? record.shipQty) }}</span
+                      >
                     </div>
                   </div>
                 </div>
@@ -406,6 +409,13 @@ import {
   startQcTaskInspection,
   submitQcTaskInspection,
 } from '@/store/qcTaskStore'
+import {
+  FACTORY_QC_BIZ_SCOPE,
+  canInspect as canInspectFactoryQc,
+  getFactoryQcById,
+  submitFactoryQcInspection,
+  toFactoryQcInspectTask,
+} from '@/store/factoryQcStore'
 import { formatQty } from '@/utils/numberFormat'
 import { useTabs, tabStore } from '@/composables/useTabs'
 import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
@@ -447,9 +457,9 @@ const route = useRoute()
 const router = useRouter()
 const { closeTab } = useTabs()
 
-const detailRouteName = computed(
-  () => getQcTaskRouteBundle(route.meta.bizScope || '来料质检').detailName,
-)
+const bizScope = computed(() => route.meta.bizScope || task.value?.bizScope || '来料质检')
+const isFactoryScope = computed(() => bizScope.value === FACTORY_QC_BIZ_SCOPE)
+const detailRouteName = computed(() => getQcTaskRouteBundle(bizScope.value).detailName)
 
 const loading = ref(false)
 const saving = ref(false)
@@ -496,18 +506,35 @@ function loadPage() {
   ensureQcTemplateDemoSeed()
   const id = route.params.id
   loading.value = true
-  const row = getQcTaskById(id)
-  task.value = row
-  loading.value = false
 
-  if (!row) return
-  if (!canInspectQcTask(row)) {
-    message.warning('当前状态不可录入质检结果')
-    return
+  let row = null
+  if (route.meta.bizScope === FACTORY_QC_BIZ_SCOPE) {
+    const factoryRow = getFactoryQcById(id)
+    row = toFactoryQcInspectTask(factoryRow)
+    task.value = row
+    loading.value = false
+    if (!factoryRow) return
+    if (!canInspectFactoryQc(factoryRow)) {
+      message.warning('当前状态不可录入质检结果')
+      return
+    }
+    if (!(row.lineItems || []).some((l) => (l.templateFields || []).length)) {
+      message.warning('未匹配到出厂质检模板，请先在质检模板中配置「出厂质检」业务类型模板')
+      return
+    }
+  } else {
+    row = getQcTaskById(id)
+    task.value = row
+    loading.value = false
+    if (!row) return
+    if (!canInspectQcTask(row)) {
+      message.warning('当前状态不可录入质检结果')
+      return
+    }
+    startQcTaskInspection(row.id, { entryChannel: 'web' })
+    task.value = getQcTaskById(id) || row
   }
 
-  startQcTaskInspection(row.id, { entryChannel: 'web' })
-  task.value = getQcTaskById(id) || row
   form.inspector = task.value.inspector || 'admin1'
   form.remark = task.value.remark || ''
   form.lineItems = JSON.parse(JSON.stringify(task.value.lineItems || [])).map((line) =>
@@ -1259,12 +1286,18 @@ async function doSubmit() {
       sheetPassRule: resolveLineSheetPassRule(line, task.value),
       fieldMap: undefined,
     }))
-    const res = submitQcTaskInspection(task.value.id, {
-      lineItems,
-      inspector: form.inspector || 'admin1',
-      entryChannel: 'web',
-      remark: form.remark,
-    })
+    const res = isFactoryScope.value
+      ? submitFactoryQcInspection(task.value.id, {
+          lineItems,
+          inspector: form.inspector || 'admin1',
+          remark: form.remark,
+        })
+      : submitQcTaskInspection(task.value.id, {
+          lineItems,
+          inspector: form.inspector || 'admin1',
+          entryChannel: 'web',
+          remark: form.remark,
+        })
     if (!res.ok) {
       message.warning(res.message || '提交失败')
       return

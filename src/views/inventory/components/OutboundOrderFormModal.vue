@@ -1086,6 +1086,9 @@ function handleConfirmLineOutbound(record) {
     message.warning(res.message || '确认出库失败')
     return
   }
+  if (res.warnings?.length) {
+    message.warning(res.warnings.join('；'))
+  }
   message.success(
     res.order?.status === '已出库'
       ? '明细已出库，出库单已全部出库'

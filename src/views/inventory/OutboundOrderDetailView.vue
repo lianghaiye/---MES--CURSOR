@@ -521,10 +521,13 @@ function handleConfirmOutbound() {
   Modal.confirm({
     title: `确认出库 ${record.value.docNo}？`,
     onOk: () => {
-      const { count, blocked } = confirmOutbound([record.value.id])
+      const { count, blocked, warnings } = confirmOutbound([record.value.id])
       if (blocked.length) {
         message.warning(blocked.map((b) => b.message).join('；'))
         return
+      }
+      if (warnings?.length) {
+        message.warning(warnings.join('；'))
       }
       if (count > 0) {
         message.success('已确认出库')

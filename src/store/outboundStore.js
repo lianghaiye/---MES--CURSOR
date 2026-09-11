@@ -12,6 +12,7 @@ import {
   qcResultBlocksOutbound,
   QC_RESULT_PASS,
 } from '@/store/factoryQcStore'
+import { evaluateOutboundQcGate } from '@/utils/qcGateEnforceService'
 import { applyOutboundToStock } from '@/store/stockStore'
 import { releaseAllocationOnShip } from '@/store/salesStockAllocationStore'
 import { salesOrderState } from '@/store/salesOrderStore'
@@ -26,8 +27,6 @@ import {
   getLineBatchAllocations,
   getOutboundAvailableBatchQty,
   isLineManualBatchPick,
-  isLinePartialBatchIssue,
-  isLineWholeWithRemnantBatchIssue,
   resolveLineBatchIssueStrategy,
   validateManualBatchAllocations,
 } from '@/utils/outboundBatchAllocate'
@@ -321,6 +320,7 @@ export function refuseOutbound(ids, { reason = '', operator = 'admin1' } = {}) {
 
 export function confirmOutbound(ids) {
   const blocked = []
+  const warnings = []
   let count = 0
   ids.forEach((id) => {
     const order = outboundState.orders.find((o) => o.id === id)
@@ -334,6 +334,9 @@ export function confirmOutbound(ids) {
         })
       }
       return
+    }
+    if (check.warnings?.length) {
+      warnings.push(...check.warnings.map((w) => `${order?.docNo || id}：${w}`))
     }
 
     const pendingIds = (order.lineItems || [])
@@ -371,7 +374,7 @@ export function confirmOutbound(ids) {
     }
     count += 1
   })
-  return { count, blocked }
+  return { count, blocked, warnings }
 }
 
 /** 按明细确认出库 */
@@ -400,7 +403,7 @@ export function confirmOutboundLine(orderId, lineId) {
       syncDeliveryAfterOutboundConfirm(order)
     })
   }
-  return { ok: true, order, line }
+  return { ok: true, order, line, warnings: check.warnings || [] }
 }
 
 export function recomputeOutboundOrderStatus(order) {
@@ -439,10 +442,11 @@ function writeIssuedBatchFields(line, issuedAllocations, { rule, demandQty }) {
   line.outboundIssueRule = rule
   const strategy = resolveLineBatchIssueStrategy(line)
   line.dualUnitIssueStrategy = strategy
-  if (isLineWholeWithRemnantBatchIssue(line) && !(Number(line.demandMeters) > 0)) {
+  // 出库数量一律保持单据填写值，禁止因整批多扣把 shipQty 抬高
+  if (!(Number(line.demandMeters) > 0) && Number(demandQty) > 0) {
     line.demandMeters = demandQty
   }
-  line.shipQty = issuedTotal
+  line.shipQty = Number(demandQty) > 0 ? demandQty : issuedTotal
   line.issuedBatchNo = issuedNos.join('、')
   line.issuedPieceSerialNos = issuedSerials
   line.remnantPieceSerialNos = remnantSerials
@@ -480,7 +484,8 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
     const meta = {
       sourceDocNo: order.docNo,
       workOrderNo: line.workOrderNo || line.sourceDocNo || order.sourceOrderNo || '',
-      allowPieceSplit: isLinePartialBatchIssue(line),
+      // 一律按出库数量扣；件长大于出库量时允许仓内拆件留余
+      allowPieceSplit: true,
     }
     const lineManual = isLineManualBatchPick(line)
     const warehouse = line.shipWarehouse || order.warehouse
@@ -678,7 +683,7 @@ function applyOutboundStockMovements(order, { lineIds } = {}) {
   return { ok: true }
 }
 
-/** 校验是否可确认出库 */
+/** 校验是否可确认出库（出厂质检门控读取功能参数：弱预警 / 强阻断） */
 export function validateOutboundForConfirm(order) {
   if (!order) return { ok: false, message: '出库单不存在' }
   if (order.status === '已出库') return { ok: false, code: 'already_done', message: '已出库' }
@@ -687,36 +692,19 @@ export function validateOutboundForConfirm(order) {
   }
 
   if (order.outboundType !== '销售出库') {
-    return { ok: true }
+    return { ok: true, warnings: [] }
   }
 
-  // 未发起出厂质检：无需校验，可直接确认出库
-  if (!order.factoryQcId) {
-    return { ok: true }
-  }
-
-  const qc = getFactoryQcById(order.factoryQcId)
-  if (!qc) {
-    return { ok: true }
-  }
-
-  if (qc.qcStatus === '待质检') {
-    return { ok: false, message: '出厂质检尚未完成，请先完成质检' }
-  }
-
-  if (qcResultBlocksOutbound(qc.qcResult)) {
+  const gate = evaluateOutboundQcGate(order)
+  if (gate.blocked) {
     return {
       ok: false,
-      qcBlocked: true,
-      message: '出厂质检结果不符合出库要求，请重新发起出厂质检',
+      qcBlocked: Boolean(gate.qcBlocked),
+      message: gate.message || '出厂质检未通过，无法确认出库',
+      warnings: gate.warnings || [],
     }
   }
-
-  if (qc.qcResult !== QC_RESULT_PASS) {
-    return { ok: false, message: '出厂质检未通过，无法确认出库' }
-  }
-
-  return { ok: true }
+  return { ok: true, warnings: gate.warnings || [] }
 }
 
 export function linkOutboundToQc(outboundId, qcId) {

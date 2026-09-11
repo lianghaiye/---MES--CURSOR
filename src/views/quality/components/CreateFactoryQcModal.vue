@@ -44,7 +44,12 @@ import dayjs from 'dayjs'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { salesOrderState } from '@/store/salesOrderStore'
-import { addFactoryQc, findQcBySalesOrderNo, generateFactoryQcNo } from '@/store/factoryQcStore'
+import {
+  addFactoryQc,
+  bindFactoryQcLines,
+  findQcBySalesOrderNo,
+  generateFactoryQcNo,
+} from '@/store/factoryQcStore'
 import { createQcLineItem } from '@/mock/factoryQcRecords'
 
 const props = defineProps({
@@ -101,32 +106,45 @@ function handleSave() {
     return
   }
 
+  const rawLines = order.lineItems.map((line) =>
+    createQcLineItem({
+      itemName: line.productName,
+      itemCode: line.productCode,
+      specModel: line.specModel,
+      shipQty: line.salesQty || line.qty,
+      shipWarehouse: '成品仓',
+      unit: line.unit,
+      inspectQty: line.salesQty || line.qty,
+    }),
+  )
+  const bound = bindFactoryQcLines(rawLines)
+  if (!bound.ok) {
+    message.warning(bound.message || '模板匹配失败')
+    return
+  }
+  const summary = bound.summary
+
   const record = {
     id: `fqc-${Date.now()}`,
     qcStatus: '待质检',
     qcResult: '',
     qcNo: generateFactoryQcNo(),
     salesOrderNo: order.orderNo,
-    sourceOrderNo: order.orderNo,
+    sourceOrderNo: '',
     customerName: order.customerName,
     source: '销售发货',
     inspector: '',
     inspectedAt: '',
     outboundDocNo: '',
-    inspectMethod: '抽检',
+    multiTemplate: summary.multiTemplate,
+    templateId: summary.templateId,
+    templateCode: summary.templateCode,
+    templateName: summary.templateName,
+    templateFields: summary.templateFields,
+    inspectMethod: summary.inspectMethod || '抽检',
     inspectDate: dayjs().format('YYYY-MM-DD'),
     remark: '',
-    lineItems: order.lineItems.map((line) =>
-      createQcLineItem({
-        itemName: line.productName,
-        itemCode: line.productCode,
-        specModel: line.specModel,
-        shipQty: line.salesQty || line.qty,
-        shipWarehouse: '成品仓',
-        unit: line.unit,
-        inspectQty: line.salesQty || line.qty,
-      }),
-    ),
+    lineItems: bound.lineItems,
   }
 
   addFactoryQc(record)

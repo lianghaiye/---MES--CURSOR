@@ -174,7 +174,7 @@ export function pickPiecesFifoUpToQty(batchId, wantQty) {
 }
 
 /**
- * 整出+余料回：按 FIFO 取整件直至合计 ≥ want，或本批件码取尽（可略超需求；未凑齐则由调用方跨批继续）
+ * 按 FIFO 取整件直至合计 ≥ want，或本批件码取尽（历史「整件覆盖」；出库主路径已改为按出库数量拆件）
  */
 export function pickPiecesFifoCoveringQty(batchId, wantQty) {
   const want = roundMeters(wantQty)

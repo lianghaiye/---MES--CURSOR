@@ -82,24 +82,20 @@ import { computed } from 'vue'
 import { formatNumber } from '@/utils/numberFormat'
 import { getBatchById } from '@/store/stockBatchStore'
 import { isPieceManagedBatch, listStockPieces } from '@/store/stockPieceStore'
-import {
-  buildAllocationsFromBatchIds,
-  sumBatchAllocations,
-  isLinePartialBatchIssue,
-} from '@/utils/outboundBatchAllocate'
+import { buildAllocationsFromBatchIds, sumBatchAllocations } from '@/utils/outboundBatchAllocate'
 
 const props = defineProps({
   allocations: { type: Array, default: () => [] },
   options: { type: Array, default: () => [] },
   unitLabel: { type: String, default: '' },
   tip: { type: String, default: '' },
-  /** 出库行：用于按「需要下料结算」判断是否允许拆件 */
+  /** 出库行：兼容旧 prop；拆件一律允许（按出库数量扣） */
   line: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:allocations'])
 
-const allowPieceSplit = computed(() => (props.line ? isLinePartialBatchIssue(props.line) : true))
+const allowPieceSplit = computed(() => true)
 
 function formatQty(val) {
   return formatNumber(val, 4, { empty: '0' })
@@ -129,7 +125,7 @@ function hasPieceSelection(record) {
   return Array.isArray(record.pieceIds) && record.pieceIds.length > 0
 }
 
-/** 多件勾选时数量锁定为件码合计；单件+部分出时可改出库数量（拆件） */
+/** 多件勾选时数量锁定为件码合计；单件时可改出库数量（仓内拆件） */
 function isPieceQtyLocked(record) {
   if (!isPieceRow(record) || !hasPieceSelection(record)) return false
   if (allowPieceSplit.value && record.pieceIds.length === 1) return false

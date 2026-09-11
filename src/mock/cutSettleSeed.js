@@ -1,4 +1,4 @@
-/** 下料结算演示种子（整出+余料回：出库后确认实耗与余料回库） */
+/** 下料结算演示种子（需下料结算：出库后确认实耗与余料回库） */
 
 export function createCutSettleSeed() {
   return [

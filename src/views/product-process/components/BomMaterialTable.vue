@@ -32,9 +32,12 @@
         </template>
       </a-space>
       <a-space :size="4">
-        <a-button v-if="isTreeMode" size="small" @click="toggleExpandAll">
-          {{ allTreeExpanded ? '收起' : '展开' }}
-        </a-button>
+        <a-tooltip v-if="isTreeMode" :title="allTreeExpanded ? '收起' : '展开'">
+          <a-button type="text" size="small" @click="toggleExpandAll">
+            <CompressOutlined v-if="allTreeExpanded" />
+            <ExpandOutlined v-else />
+          </a-button>
+        </a-tooltip>
         <template v-if="!readonly">
           <a-tooltip title="刷新">
             <a-button type="text" size="small" @click="emit('refresh')">
@@ -337,15 +340,27 @@
                 >
                   添加子项
                 </a-button>
-                <a-button
-                  type="link"
-                  size="small"
-                  danger
-                  class="action-link"
-                  @click="handleDeleteLine(record)"
-                >
-                  删除
-                </a-button>
+                <a-tooltip title="在下方新增空白行">
+                  <a-button
+                    type="link"
+                    size="small"
+                    class="action-icon-btn"
+                    @click="handleInsertBlankAfter(record)"
+                  >
+                    <PlusOutlined />
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip title="删除">
+                  <a-button
+                    type="link"
+                    size="small"
+                    danger
+                    class="action-icon-btn"
+                    @click="handleDeleteLine(record)"
+                  >
+                    <DeleteOutlined />
+                  </a-button>
+                </a-tooltip>
               </div>
             </template>
             <template v-else>
@@ -412,7 +427,10 @@ import {
   ReloadOutlined,
   SettingOutlined,
   PlusOutlined,
+  DeleteOutlined,
   HolderOutlined,
+  ExpandOutlined,
+  CompressOutlined,
 } from '@ant-design/icons-vue'
 import {
   processDocOptions,
@@ -641,6 +659,11 @@ function handleAddSubItem(record) {
   emit('add-sub-item', parentId)
 }
 
+function handleInsertBlankAfter(record) {
+  if (!record?.id) return
+  emit('add-detail-line', { afterLineId: record.id })
+}
+
 function handleDeleteLine(record) {
   if (lineHasSubtree(record)) {
     Modal.confirm({
@@ -735,7 +758,7 @@ const tableColumns = computed(() => {
   }))
   const actionCol = props.readonly
     ? []
-    : [{ title: '操作', key: 'action', width: 148, fixed: 'right' }]
+    : [{ title: '操作', key: 'action', width: 156, fixed: 'right' }]
   // 勾选列由 row-selection 插在最前，拖动列紧随其后
   return [...dragCol, indexCol, ...dataCols, ...actionCol]
 })
@@ -1335,11 +1358,19 @@ function customRow(record, index) {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     white-space: nowrap;
 
     .action-link {
       padding: 0 2px;
+      height: 22px;
+      line-height: 22px;
+      flex-shrink: 0;
+    }
+
+    .action-icon-btn {
+      padding: 0 4px;
+      width: 24px;
       height: 22px;
       line-height: 22px;
       flex-shrink: 0;

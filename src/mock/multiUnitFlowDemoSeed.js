@@ -768,7 +768,7 @@ export function createMultiUnitFlowOutboundOrders() {
       completedAt: d,
       auditDate: d,
       outboundTime: nowTime('09:10:00'),
-      remark: '【多单位流程】已整批出：实发 9m > 需求 5m，待下料结算回余料',
+      remark: '【多单位流程】已出库：按出库数量扣库，待下料结算回余料',
       workOrders: [
         {
           id: MULTI_UNIT_FLOW_IDS.workOrder,

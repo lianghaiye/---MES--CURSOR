@@ -1,5 +1,5 @@
 import { createBomLineItem, createBomTreeNode } from '@/mock/bomTemplates'
-import { getRootTreeId } from '@/utils/bomTree'
+import { getRootTreeId, getLinesForTreeNode, normalizeLineParentId } from '@/utils/bomTree'
 import { createSpuLineDraft, applyResolvedSkuToBomLine, isSpuLine } from '@/utils/spuLineResolve'
 import { inferUomRelation } from '@/utils/variableLengthMaterial'
 
@@ -16,6 +16,35 @@ export function createEmptySubLine(parentTreeId) {
     unitQty: 1,
     drawingNo: '',
   })
+}
+
+/** 在指定行同级之后插入一行空白明细（与当前行同一父节点） */
+export function insertEmptySiblingAfter(lineItems, flatNodes, afterLineId) {
+  const afterLine = lineItems.find((l) => l.id === afterLineId)
+  if (!afterLine) {
+    const parentId = getRootTreeId(flatNodes)
+    return { lineItems: [...lineItems, createEmptySubLine(parentId)], flatNodes }
+  }
+
+  const parentId = normalizeLineParentId(afterLine, flatNodes)
+  const newLine = createEmptySubLine(parentId)
+  const siblings = getLinesForTreeNode(lineItems, parentId, flatNodes)
+  const sibIds = siblings.map((l) => l.id)
+  const at = sibIds.indexOf(afterLineId)
+  if (at < 0) {
+    return { lineItems: [...lineItems, newLine], flatNodes }
+  }
+
+  const nextSibIds = [...sibIds]
+  nextSibIds.splice(at + 1, 0, newLine.id)
+  const idSet = new Set(sibIds)
+  const firstIdx = lineItems.findIndex((l) => idSet.has(l.id))
+  const without = lineItems.filter((l) => !idSet.has(l.id))
+  const sorted = nextSibIds.map((id) =>
+    id === newLine.id ? newLine : lineItems.find((l) => l.id === id),
+  )
+  without.splice(firstIdx >= 0 ? firstIdx : without.length, 0, ...sorted)
+  return { lineItems: without, flatNodes }
 }
 
 function isSpuPickerPayload(material) {

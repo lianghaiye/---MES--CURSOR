@@ -43,6 +43,16 @@ const BUNDLE = {
     listTitle: '成品检',
     sourceType: 'work_order',
   },
+  出厂质检: {
+    bizScope: '出厂质检',
+    listPath: '/quality/factory-qc',
+    listName: 'quality-factory-qc',
+    detailName: 'quality-factory-qc-detail',
+    inspectName: 'quality-factory-qc-inspect',
+    detailTitle: '出厂质检详情',
+    listTitle: '出厂质检',
+    sourceType: 'sales_outbound',
+  },
 }
 
 export function getQcTaskRouteBundle(bizScope) {

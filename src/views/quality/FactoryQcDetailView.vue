@@ -36,6 +36,9 @@
             <a-descriptions-item label="质检方式">
               {{ record.inspectMethod || '—' }}
             </a-descriptions-item>
+            <a-descriptions-item label="质检模板">
+              {{ record.templateName || record.templateCode || '—' }}
+            </a-descriptions-item>
             <a-descriptions-item label="质检日期">
               {{ record.inspectDate || '—' }}
             </a-descriptions-item>
@@ -97,12 +100,6 @@
 
       <a-empty v-else-if="!loading" description="未找到该出厂质检单" />
     </a-spin>
-
-    <FactoryQcInspectModal
-      v-model:open="inspectModalOpen"
-      :record="inspectRecord"
-      @saved="onInspectSaved"
-    />
   </div>
 </template>
 
@@ -113,16 +110,16 @@ export default { name: 'FactoryQcDetailView' }
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getFactoryQcById, canInspect } from '@/store/factoryQcStore'
-import { tabStore } from '@/composables/useTabs'
-import FactoryQcInspectModal from './components/FactoryQcInspectModal.vue'
+import { tabStore, useTabs } from '@/composables/useTabs'
+import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
 
 const route = useRoute()
+const router = useRouter()
+const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
-const inspectModalOpen = ref(false)
-const inspectRecord = ref(null)
 
 const lineColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
@@ -172,18 +169,22 @@ function resultColor(result) {
 }
 
 function lineResultColor(result) {
-  const map = { 合格: 'success', 不合格: 'error' }
+  const map = {
+    合格: 'success',
+    不合格: 'error',
+    质检通过: 'success',
+    质检不通过: 'error',
+    部分通过: 'warning',
+  }
   return map[result] || 'default'
 }
 
 function openInspect() {
-  if (!record.value) return
-  inspectRecord.value = record.value
-  inspectModalOpen.value = true
-}
-
-function onInspectSaved() {
-  loadRecord()
+  if (!record.value || !canInspect(record.value)) return
+  const bundle = getQcTaskRouteBundle('出厂质检')
+  const path = `${bundle.listPath}/${record.value.id}/inspect`
+  openTab(path, `质检 ${record.value.qcNo || ''}`.trim())
+  router.push({ name: bundle.inspectName, params: { id: record.value.id } })
 }
 </script>
 
