@@ -1,4 +1,9 @@
-import { ITEM_KIND, inferItemKindFromRecord, resolveItemKind } from '@/utils/masterItemKind'
+import {
+  ITEM_KIND,
+  inferItemKindFromRecord,
+  resolveItemKind,
+  normalizeCapabilityFlags,
+} from '@/utils/masterItemKind'
 import {
   productInfoState,
   addProduct,
@@ -38,18 +43,22 @@ export function resolveMasterItemEditRecord(record) {
     })
 
   const base = productRow || materialRow || record
+  const caps = normalizeCapabilityFlags(
+    {
+      ...base,
+      ...record,
+      canSell: record.canSell ?? productRow?.canSell,
+      canProduce: record.canProduce ?? productRow?.canProduce ?? materialRow?.canProduce,
+    },
+    productRow ? 'product' : materialRow ? 'material' : '',
+  )
+
   return {
     ...base,
     ...record,
     itemKind,
-    canSell: Boolean(record.canSell ?? productRow?.canSell ?? materialRow?.canSell ?? false),
-    canProduce: Boolean(
-      record.canProduce ??
-      productRow?.canProduce ??
-      materialRow?.canProduce ??
-      productRow?.isPart ??
-      false,
-    ),
+    canSell: caps.canSell,
+    canProduce: caps.canProduce,
     isWholeMachine: Boolean(productRow?.isWholeMachine ?? record.isWholeMachine),
     isPart: Boolean(productRow?.isPart ?? record.isPart),
     categoryKey: materialRow?.categoryKey ?? record.materialCategoryKey ?? record.categoryKey,

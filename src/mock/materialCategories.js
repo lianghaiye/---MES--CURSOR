@@ -27,11 +27,11 @@ const DEMO_MATERIAL_CATEGORIES = [
   },
 ]
 
-/** 新租户 / 空库种子：系统默认 + 演示数据 */
+/** 新租户 / 空库种子：业务演示类别在前，系统默认「物料」靠后 */
 export function createMaterialCategorySeed() {
   return [
-    { ...MATERIAL_CATEGORY_DEFAULT },
     ...DEMO_MATERIAL_CATEGORIES.map((n) => structuredClone(n)),
+    { ...MATERIAL_CATEGORY_DEFAULT },
   ]
 }
 
@@ -55,7 +55,7 @@ export function ensureSystemMaterialCategories(tree) {
     existing.system = true
     if (!existing.code) existing.code = MATERIAL_CATEGORY_DEFAULT.code
   } else {
-    list.unshift({ ...MATERIAL_CATEGORY_DEFAULT })
+    list.push({ ...MATERIAL_CATEGORY_DEFAULT })
   }
   return list
 }

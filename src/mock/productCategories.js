@@ -30,12 +30,12 @@ const DEMO_PRODUCT_CATEGORIES = [
   },
 ]
 
-/** 新租户 / 空库种子：系统默认 + 演示数据 */
+/** 新租户 / 空库种子：业务演示类别在前，系统默认靠后（展示时还会按主数据量再排） */
 export function createProductCategorySeed() {
   return [
+    ...DEMO_PRODUCT_CATEGORIES.map((n) => structuredClone(n)),
     { ...PRODUCT_CATEGORY_FINISHED },
     { ...PRODUCT_CATEGORY_UNCLASSIFIED },
-    ...DEMO_PRODUCT_CATEGORIES.map((n) => structuredClone(n)),
   ]
 }
 
@@ -50,23 +50,21 @@ function walkFind(nodes, key) {
 
 /**
  * 补齐系统默认类别（旧租户升级、localStorage 缺项时调用）。
- * 已存在则只强制 system 标记，不覆盖用户改过的名称。
+ * 已存在则只强制 system 标记，不覆盖用户改过的名称；新增时追加到末尾。
  */
 export function ensureSystemProductCategories(tree) {
   const list = Array.isArray(tree) ? tree : []
-  const ensureOne = (preset, unshift = false) => {
+  const ensureOne = (preset) => {
     const existing = walkFind(list, preset.key)
     if (existing) {
       existing.system = true
       if (!existing.code) existing.code = preset.code
       return
     }
-    const row = { ...preset }
-    if (unshift) list.unshift(row)
-    else list.push(row)
+    list.push({ ...preset })
   }
-  ensureOne(PRODUCT_CATEGORY_FINISHED, true)
-  ensureOne(PRODUCT_CATEGORY_UNCLASSIFIED, false)
+  ensureOne(PRODUCT_CATEGORY_FINISHED)
+  ensureOne(PRODUCT_CATEGORY_UNCLASSIFIED)
   return list
 }
 

@@ -4,6 +4,7 @@ import {
   ensureSystemMaterialCategories,
 } from '@/mock/materialCategories'
 import { flattenCategoryNodes, isSystemCategory } from '@/mock/materialCategories'
+import { moveCategoryInList } from '@/utils/categoryTreeSort'
 
 const STORAGE_KEY = 'i_doms_material_categories'
 const SEED_VERSION_KEY = 'i_doms_material_categories_seed_v'
@@ -155,4 +156,11 @@ export function deleteMaterialCategory(key) {
   }
   hit.list.splice(hit.index, 1)
   return { ok: true }
+}
+
+/** direction: -1 上移 / 1 下移；写入 sortOrder 供展示排序 */
+export function moveMaterialCategory(key, direction) {
+  const hit = findParentList(key)
+  if (!hit) return { ok: false, message: '物料类别不存在' }
+  return moveCategoryInList(hit.list, key, direction)
 }

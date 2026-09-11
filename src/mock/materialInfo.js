@@ -14,7 +14,7 @@ import {
 } from '@/utils/businessTypeLabel'
 
 const flatCats = flattenCategoryNodes(materialCategoryTree)
-const leafCats = flatCats.filter((c) => !c.children?.length)
+const leafCats = flatCats.filter((c) => !c.children?.length && !c.system)
 
 const specs = ['HT250', '304', 'GHMB-35', '38CrMoAl', '45#', '316L', 'DN80', 'M16']
 const materialTypes = ['零部件', '标准件', '原材料', '毛胚', '半成品', '虚拟件']

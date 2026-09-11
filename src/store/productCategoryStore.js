@@ -1,6 +1,7 @@
 import { reactive, watch } from 'vue'
 import { createProductCategorySeed, ensureSystemProductCategories } from '@/mock/productCategories'
 import { flattenCategoryNodes, isSystemCategory } from '@/mock/materialCategories'
+import { moveCategoryInList } from '@/utils/categoryTreeSort'
 
 const STORAGE_KEY = 'i_doms_product_categories'
 const SEED_VERSION_KEY = 'i_doms_product_categories_seed_v'
@@ -150,4 +151,11 @@ export function deleteProductCategory(key) {
   }
   hit.list.splice(hit.index, 1)
   return { ok: true }
+}
+
+/** direction: -1 上移 / 1 下移；写入 sortOrder 供展示排序 */
+export function moveProductCategory(key, direction) {
+  const hit = findParentList(key)
+  if (!hit) return { ok: false, message: '产品类别不存在' }
+  return moveCategoryInList(hit.list, key, direction)
 }

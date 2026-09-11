@@ -7,7 +7,7 @@ import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { matchesBusinessTypeFilter, PRODUCT_BUSINESS_TYPE_OPTIONS } from '@/utils/businessTypeLabel'
 
 const flatCats = flattenCategoryNodes(productCategoryTree)
-const leafCats = flatCats.filter((c) => !c.children?.length)
+const leafCats = flatCats.filter((c) => !c.children?.length && !c.system)
 
 const attrs = ['标准产品', '定制产品', '标准零部件', '定制零部件']
 const specs = ['50*30', 'ISG50-160', '80-65-200', 'DN100', 'QJ200-40', '65-160A', '32-25']

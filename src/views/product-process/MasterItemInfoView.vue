@@ -8,7 +8,7 @@
             <a-radio-button value="material">物料类别</a-radio-button>
           </a-radio-group>
         </div>
-        <div class="category-tip">*右击可对列表项进行操作</div>
+        <div class="category-tip">*右击可上移/下移、改名或删除；有主数据的类别默认靠前</div>
         <div class="category-search">
           <a-input v-model:value="categoryKeyword" allow-clear size="small" placeholder="搜索类别">
             <template #suffix>
@@ -35,6 +35,9 @@
                 <span class="cat-node-title">{{ node.title }}</span>
                 <template #overlay>
                   <a-menu @click="({ key }) => onCategoryMenu(key, node)">
+                    <a-menu-item key="moveUp">上移</a-menu-item>
+                    <a-menu-item key="moveDown">下移</a-menu-item>
+                    <a-menu-divider />
                     <a-menu-item key="rename">修改名称</a-menu-item>
                     <a-menu-item key="delete" :disabled="isSystemCategoryKey(node.key)" danger>
                       删除
@@ -423,12 +426,15 @@ import {
   productCategoryState,
   deleteProductCategory,
   findProductCategory,
+  moveProductCategory,
 } from '@/store/productCategoryStore'
 import {
   materialCategoryState,
   deleteMaterialCategory,
   findMaterialCategory,
+  moveMaterialCategory,
 } from '@/store/materialCategoryStore'
+import { buildCategoryItemCountMap, sortCategoryTreeForDisplay } from '@/utils/categoryTreeSort'
 import { barcodeTypeOptions, workCenterOpts } from '@/mock/materialInfoOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
@@ -473,8 +479,8 @@ const productCreatePage = findCreatePageByListPath('/product-process/products')
 
 const categoryTreeMode = ref(CATEGORY_TREE_MODE.PRODUCT)
 const categoryKeyword = ref('')
-const selectedCategoryKey = ref('pcat-finished')
-const expandedKeys = ref(['pcat-finished'])
+const selectedCategoryKey = ref('')
+const expandedKeys = ref([])
 const selectedCategoryKeys = computed(() =>
   selectedCategoryKey.value ? [selectedCategoryKey.value] : [],
 )
@@ -532,21 +538,66 @@ const activeCategoryTree = computed(() => {
     : productCategoryState.tree
 })
 
+const categoryItemCountMap = computed(() => {
+  void productInfoState.products
+  void materialInfoState.materials
+  const tree = activeCategoryTree.value
+  const keys =
+    categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+      ? materialInfoState.materials.flatMap((m) => [
+          m.categoryKey,
+          m.materialCategoryKey,
+          m.parentCategoryKey,
+        ])
+      : productInfoState.products.flatMap((p) => [
+          p.categoryKey,
+          p.productCategoryKey,
+          p.parentCategoryKey,
+        ])
+  return buildCategoryItemCountMap(tree, keys)
+})
+
+const sortedCategoryTree = computed(() =>
+  sortCategoryTreeForDisplay(activeCategoryTree.value, categoryItemCountMap.value),
+)
+
+function pickDefaultCategoryKey(tree) {
+  const first = tree?.[0]
+  return first?.key || ''
+}
+
+watch(
+  sortedCategoryTree,
+  (tree) => {
+    if (!selectedCategoryKey.value && tree?.length) {
+      selectedCategoryKey.value = pickDefaultCategoryKey(tree)
+      expandedKeys.value = selectedCategoryKey.value ? [selectedCategoryKey.value] : []
+    }
+  },
+  { immediate: true },
+)
+
 watch(categoryTreeMode, (mode) => {
-  selectedCategoryKey.value =
-    mode === CATEGORY_TREE_MODE.MATERIAL ? 'cat-material' : 'pcat-finished'
-  expandedKeys.value = [selectedCategoryKey.value]
+  const tree = sortCategoryTreeForDisplay(
+    mode === CATEGORY_TREE_MODE.MATERIAL ? materialCategoryState.tree : productCategoryState.tree,
+    categoryItemCountMap.value,
+  )
+  selectedCategoryKey.value = pickDefaultCategoryKey(tree)
+  expandedKeys.value = selectedCategoryKey.value ? [selectedCategoryKey.value] : []
   filters.categoryKey = undefined
   pagination.current = 1
 })
 
 function mapTreeNodes(nodes) {
-  return nodes.map((node) => ({
-    key: node.key,
-    title: `(${node.code}) ${node.title}`,
-    system: Boolean(node.system),
-    children: node.children?.length ? mapTreeNodes(node.children) : undefined,
-  }))
+  return nodes.map((node) => {
+    const count = categoryItemCountMap.value[node.key] || 0
+    return {
+      key: node.key,
+      title: `(${node.code}) ${node.title}${count ? ` · ${count}` : ''}`,
+      system: Boolean(node.system),
+      children: node.children?.length ? mapTreeNodes(node.children) : undefined,
+    }
+  })
 }
 
 function isSystemCategoryKey(key) {
@@ -567,6 +618,15 @@ function onCategoryMenu(key, node) {
       ? findMaterialCategory(node.key)
       : findProductCategory(node.key)
   if (!record) return
+  if (key === 'moveUp' || key === 'moveDown') {
+    const dir = key === 'moveUp' ? -1 : 1
+    const res =
+      categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+        ? moveMaterialCategory(record.key, dir)
+        : moveProductCategory(record.key, dir)
+    if (!res.ok) message.warning(res.message)
+    return
+  }
   if (key === 'rename') {
     categoryEditRecord.value = { ...record }
     categoryFormOpen.value = true
@@ -591,10 +651,7 @@ function onCategoryMenu(key, node) {
           return
         }
         if (selectedCategoryKey.value === record.key) {
-          selectedCategoryKey.value =
-            categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
-              ? 'cat-material'
-              : 'pcat-finished'
+          selectedCategoryKey.value = pickDefaultCategoryKey(sortedCategoryTree.value)
         }
         message.success('已删除')
       },
@@ -607,7 +664,7 @@ function onCategorySaved() {
 }
 
 const displayTree = computed(() => {
-  const tree = activeCategoryTree.value
+  const tree = sortedCategoryTree.value
   const filterFn =
     categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
       ? filterMaterialCategoryTree
