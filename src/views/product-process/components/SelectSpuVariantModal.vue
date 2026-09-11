@@ -142,8 +142,9 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { materialCategoryTree, filterCategoryTree } from '@/mock/materialCategories'
-import { productCategoryTree } from '@/mock/productCategories'
+import { filterCategoryTree } from '@/mock/materialCategories'
+import { productCategoryState } from '@/store/productCategoryStore'
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import { listSpus, spuState } from '@/store/spuStore'
 import { listSkusForSpu, skuToPickerPayload } from '@/utils/spuSkuSave'
 import { normalizeVariantValues } from '@/utils/spuVariant'
@@ -193,7 +194,8 @@ function axisSelectOptions(axis) {
 }
 
 const displayTree = computed(() => {
-  const tree = categoryTreeMode.value === 'product' ? productCategoryTree : materialCategoryTree
+  const tree =
+    categoryTreeMode.value === 'product' ? productCategoryState.tree : materialCategoryState.tree
   return filterCategoryTree(tree, categoryKeyword.value)
 })
 

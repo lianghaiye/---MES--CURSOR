@@ -7,7 +7,7 @@ export const defaultBomColumnSettings = [
   { key: 'variantAttr', title: '变体属性', hidden: false, frozen: false, order: 4 },
   { key: 'drawingNo', title: '图号', hidden: false, frozen: false, order: 5 },
   { key: 'unitQty', title: '单位用量', hidden: false, frozen: false, order: 6 },
-  { key: 'blankSizeText', title: '下料尺寸', hidden: true, frozen: false, order: 7 },
+  { key: 'blankSizeText', title: '下料尺寸', hidden: false, frozen: false, order: 7 },
   { key: 'unit', title: '库存单位', hidden: false, frozen: false, order: 8 },
   { key: 'supplyForm', title: '供应型态', hidden: false, frozen: false, order: 9 },
   { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 10 },
@@ -19,6 +19,12 @@ export const defaultBomColumnSettings = [
   { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 16 },
   { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 17 },
 ]
+
+/** 历史误藏「下料尺寸」列：合并配置时强制恢复可见（用户仍可再藏） */
+export function restoreBomBlankSizeColumn(settings) {
+  if (!Array.isArray(settings)) return settings
+  return settings.map((c) => (c?.key === 'blankSizeText' ? { ...c, hidden: false } : c))
+}
 
 /** 子件 BOM 展示：BOM 名称 + 版本号 */
 export function formatChildBomLabel(line) {

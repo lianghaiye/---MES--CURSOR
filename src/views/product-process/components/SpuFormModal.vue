@@ -59,8 +59,9 @@
 <script setup>
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { flattenCategoryNodes, materialCategoryTree } from '@/mock/materialCategories'
-import { productCategoryTree } from '@/mock/productCategories'
+import { flattenCategoryNodes } from '@/mock/materialCategories'
+import { productCategoryState } from '@/store/productCategoryStore'
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import { addSpu, updateSpu, generateSpuCode } from '@/store/spuStore'
 import {
   PRODUCT_SKU_CODE_PATTERN,
@@ -117,7 +118,8 @@ const form = reactive({
 })
 
 const categoryOpts = computed(() => {
-  const tree = form.categoryTreeMode === 'product' ? productCategoryTree : materialCategoryTree
+  const tree =
+    form.categoryTreeMode === 'product' ? productCategoryState.tree : materialCategoryState.tree
   return flattenCategoryNodes(tree)
     .filter((c) => !c.children?.length)
     .map((c) => ({ label: c.title, value: c.key }))
@@ -156,7 +158,7 @@ watch(
 
 function onCategoryChange(key) {
   const flat = flattenCategoryNodes(
-    form.categoryTreeMode === 'product' ? productCategoryTree : materialCategoryTree,
+    form.categoryTreeMode === 'product' ? productCategoryState.tree : materialCategoryState.tree,
   )
   const node = flat.find((c) => c.key === key)
   form.categoryName = node?.title || ''

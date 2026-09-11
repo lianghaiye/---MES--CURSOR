@@ -160,8 +160,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { filterCategoryTree } from '@/mock/materialCategories'
-import { productCategoryTree } from '@/mock/productCategories'
-import { materialCategoryTree } from '@/mock/materialCategories'
+import { productCategoryState } from '@/store/productCategoryStore'
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import { productAttributeOptions } from '@/mock/productInfoOptions'
 import { materialTypeOptions, supplyFormOptions } from '@/mock/materialInfoOptions'
 import {
@@ -245,8 +245,8 @@ const displayTree = computed(() => {
   const kw = categoryKeyword.value.trim().toLowerCase()
   const tree = buildWarehouseItemCategoryTree()
   if (!kw) return tree
-  const filterMat = filterCategoryTree(materialCategoryTree, kw)
-  const filterProd = filterCategoryTree(productCategoryTree, kw)
+  const filterMat = filterCategoryTree(materialCategoryState.tree, kw)
+  const filterProd = filterCategoryTree(productCategoryState.tree, kw)
   return [
     { key: 'root-material', title: '物料', selectable: false, children: filterMat },
     { key: 'root-product', title: '产品', selectable: false, children: filterProd },

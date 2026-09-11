@@ -80,27 +80,6 @@
                     />
                   </a-form-item>
                 </a-col>
-                <a-col v-if="showProductFields" :span="6">
-                  <a-form-item label="产品类别" required>
-                    <a-select
-                      v-model:value="form.productCategoryKey"
-                      size="small"
-                      :options="productCategoryOpts"
-                      placeholder="请选择 产品类别"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col v-if="showProductFields" :span="6">
-                  <a-form-item label="产品属性">
-                    <a-select
-                      v-model:value="form.productAttribute"
-                      size="small"
-                      allow-clear
-                      :options="productAttrOpts"
-                      placeholder="请选择 产品属性"
-                    />
-                  </a-form-item>
-                </a-col>
                 <a-col :span="6">
                   <a-form-item label="类型" required>
                     <a-select
@@ -108,6 +87,16 @@
                       size="small"
                       :options="materialTypeOpts"
                       placeholder="请选择 类型"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="6">
+                  <a-form-item label="供应型态" required>
+                    <a-select
+                      v-model:value="form.supplyForm"
+                      size="small"
+                      :options="supplyFormOpts"
+                      placeholder="请选择 供应型态"
                     />
                   </a-form-item>
                 </a-col>
@@ -155,14 +144,14 @@
                     />
                   </a-form-item>
                 </a-col>
-                <a-col :span="6">
-                  <a-form-item label="供应型态">
+                <a-col v-if="showProductFields" :span="6">
+                  <a-form-item label="产品类别">
                     <a-select
-                      v-model:value="form.supplyForm"
+                      v-model:value="form.productCategoryKey"
                       size="small"
                       allow-clear
-                      :options="supplyFormOpts"
-                      placeholder="请选择 供应型态"
+                      :options="productCategoryOpts"
+                      placeholder="请选择 产品类别"
                     />
                   </a-form-item>
                 </a-col>
@@ -174,6 +163,17 @@
                       allow-clear
                       :options="categoryOpts"
                       placeholder="请选择 物料类别"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col v-if="showProductFields" :span="6">
+                  <a-form-item label="产品属性">
+                    <a-select
+                      v-model:value="form.productAttribute"
+                      size="small"
+                      allow-clear
+                      :options="productAttrOpts"
+                      placeholder="请选择 产品属性"
                     />
                   </a-form-item>
                 </a-col>
@@ -267,31 +267,33 @@
               </a-row>
             </div>
 
-            <a-row :gutter="[12, 12]" style="width: 100%">
-              <a-col :span="24">
-                <a-form-item label="技术参数" class="remark-item">
-                  <a-textarea
-                    v-model:value="form.techParams"
-                    :rows="3"
-                    size="small"
-                    placeholder="请输入技术参数"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="24">
-                <a-form-item label="配置要求" class="remark-item">
-                  <a-textarea
-                    v-model:value="form.matchingRequirements"
-                    :rows="2"
-                    size="small"
-                    placeholder="请输入配置要求"
-                    :maxlength="200"
-                    show-count
-                  />
-                </a-form-item>
-              </a-col>
-            </a-row>
+            <div class="form-product-material-section basic-info-box modal-basic-card">
+              <a-row :gutter="[12, 12]" style="width: 100%">
+                <a-col :span="24">
+                  <a-form-item label="技术参数" class="remark-item">
+                    <a-textarea
+                      v-model:value="form.techParams"
+                      :rows="3"
+                      size="small"
+                      placeholder="请输入技术参数"
+                      allow-clear
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="24">
+                  <a-form-item label="配置要求" class="remark-item">
+                    <a-textarea
+                      v-model:value="form.matchingRequirements"
+                      :rows="2"
+                      size="small"
+                      placeholder="请输入配置要求"
+                      :maxlength="200"
+                      show-count
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </div>
           </a-form>
         </div>
       </a-tab-pane>
@@ -873,7 +875,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import {
   CloseOutlined,
@@ -883,8 +885,10 @@ import {
 } from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
-import { flattenCategoryNodes, materialCategoryTree } from '@/mock/materialCategories'
-import { productCategoryTree } from '@/mock/productCategories'
+import { flattenCategoryNodes } from '@/mock/materialCategories'
+import { PRODUCT_CATEGORY_FINISHED } from '@/mock/productCategories'
+import { productCategoryState } from '@/store/productCategoryStore'
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import {
   partProductAttributeOptions,
   normalizePartProductAttribute,
@@ -1086,8 +1090,12 @@ function popupContainer(trigger) {
 /** 产品族已落库后，才允许维护族模板 BOM（需关联 spuId） */
 const hasSavedSpu = computed(() => Boolean(form.spuId || props.editSpu?.id))
 
-const flatCats = flattenCategoryNodes(materialCategoryTree).filter((c) => !c.children?.length)
-const flatProductCats = flattenCategoryNodes(productCategoryTree).filter((c) => !c.children?.length)
+const flatCats = computed(() =>
+  flattenCategoryNodes(materialCategoryState.tree).filter((c) => !c.children?.length),
+)
+const flatProductCats = computed(() =>
+  flattenCategoryNodes(productCategoryState.tree).filter((c) => !c.children?.length),
+)
 
 /** 族编码：手填优先；未填时按保存规则预览自动生成码 */
 const familyCodePreview = computed(() => {
@@ -1139,10 +1147,12 @@ function onLaborReportTypeChange(row, reportType) {
 }
 const inboundQcOpts = inboundQcOptions.map((v) => ({ label: v, value: v }))
 const planStrategyOpts = PLAN_STRATEGY_OPTIONS
-const categoryOpts = flatCats.map((c) => ({
-  label: `(${c.code}) ${c.title}`,
-  value: c.key,
-}))
+const categoryOpts = computed(() =>
+  flatCats.value.map((c) => ({
+    label: `(${c.code}) ${c.title}`,
+    value: c.key,
+  })),
+)
 const productAttrOpts = computed(() => {
   let options = partProductAttributeOptions
   if (showProductFields.value && form.canSell && !form.isPart) {
@@ -1150,10 +1160,12 @@ const productAttrOpts = computed(() => {
   }
   return options.map((v) => ({ label: v, value: v }))
 })
-const productCategoryOpts = flatProductCats.map((c) => ({
-  label: `(${c.code}) ${c.title}`,
-  value: c.key,
-}))
+const productCategoryOpts = computed(() =>
+  flatProductCats.value.map((c) => ({
+    label: `(${c.code}) ${c.title}`,
+    value: c.key,
+  })),
+)
 const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
@@ -1287,7 +1299,7 @@ const form = reactive({
   canPurchase: false,
   canOutsource: false,
   productAttribute: undefined,
-  productCategoryKey: undefined,
+  productCategoryKey: PRODUCT_CATEGORY_FINISHED.key,
   standardSpec: '',
   isAssemblyPart: false,
   matchingRequirements: '',
@@ -1415,7 +1427,7 @@ function resetForm() {
   form.canPurchase = false
   form.canOutsource = false
   form.productAttribute = undefined
-  form.productCategoryKey = undefined
+  form.productCategoryKey = PRODUCT_CATEGORY_FINISHED.key
   form.standardSpec = ''
   form.isAssemblyPart = false
   form.matchingRequirements = ''
@@ -1435,6 +1447,7 @@ function resetForm() {
 
 function loadEditRecord(record) {
   const source = resolveMasterItemEditRecord(record)
+  suppressMaterialTypeDefault = true
   resetForm()
   form.code = source.code
   form.name = source.name
@@ -1532,6 +1545,9 @@ function loadEditRecord(record) {
   }
   if (form.isPart) form.isWholeMachine = false
   else if (form.isWholeMachine) form.isPart = false
+  nextTick(() => {
+    suppressMaterialTypeDefault = false
+  })
 }
 
 function loadEditSpu(spu) {
@@ -1617,6 +1633,8 @@ watch(
 )
 
 let syncingProductTypePair = false
+/** 编辑回填时跳过整机/零部件对「类型」的默认写入 */
+let suppressMaterialTypeDefault = false
 
 watch(
   () => form.isWholeMachine,
@@ -1626,6 +1644,9 @@ watch(
       syncingProductTypePair = true
       form.isPart = false
       syncingProductTypePair = false
+    }
+    if (val && !suppressMaterialTypeDefault) {
+      form.materialType = '成品'
     }
     if (
       val &&
@@ -1646,6 +1667,9 @@ watch(
       syncingProductTypePair = false
     }
     if (val) {
+      if (!suppressMaterialTypeDefault) {
+        form.materialType = '零部件'
+      }
       form.productAttribute = normalizePartProductAttribute(form.productAttribute)
     } else if (isPartProductAttribute(form.productAttribute)) {
       form.productAttribute = undefined
@@ -1679,18 +1703,16 @@ function validate() {
     return false
   }
   applyPurchaseSupplierSync()
-  if (showProductFields.value) {
-    if (!form.productCategoryKey) {
-      message.warning('请选择产品类别')
-      return false
-    }
-  }
   if (!form.barcodeType) {
     message.warning('请选择条码类型')
     return false
   }
   if (!form.materialType) {
     message.warning('请选择类型')
+    return false
+  }
+  if (!form.supplyForm) {
+    message.warning('请选择供应型态')
     return false
   }
   if (!isMultiVariantMode.value && !form.specModel?.trim()) {
@@ -1788,9 +1810,9 @@ function filterSelectOption(input, option) {
 }
 
 function buildProductPayload() {
-  const cat = flatProductCats.find((c) => c.key === form.productCategoryKey)
+  const cat = flatProductCats.value.find((c) => c.key === form.productCategoryKey)
   const parent = cat?.parentKey
-    ? flattenCategoryNodes(productCategoryTree).find((c) => c.key === cat.parentKey)
+    ? flattenCategoryNodes(productCategoryState.tree).find((c) => c.key === cat.parentKey)
     : null
   const code = form.code?.trim() || generateProductCode()
   const isPm = derivedItemKind.value === ITEM_KIND.PRODUCT_MATERIAL
@@ -1878,9 +1900,9 @@ function buildProductPayload() {
 }
 
 function buildMaterialPayload() {
-  const cat = flatCats.find((c) => c.key === form.categoryKey)
+  const cat = flatCats.value.find((c) => c.key === form.categoryKey)
   const parent = cat?.parentKey
-    ? flattenCategoryNodes(materialCategoryTree).find((c) => c.key === cat.parentKey)
+    ? flattenCategoryNodes(materialCategoryState.tree).find((c) => c.key === cat.parentKey)
     : null
   const code = form.code?.trim() || generateProductCode()
   const isPm = derivedItemKind.value === ITEM_KIND.PRODUCT_MATERIAL
@@ -1970,7 +1992,8 @@ function buildMaterialPayload() {
 function buildSpuPayloadFromForm() {
   const catKey = form.categoryKey || form.productCategoryKey
   const cat =
-    flatCats.find((c) => c.key === catKey) || flatProductCats.find((c) => c.key === catKey)
+    flatCats.value.find((c) => c.key === catKey) ||
+    flatProductCats.value.find((c) => c.key === catKey)
   const parentKey = cat?.parentKey || catKey
   const kind = resolveItemKind({ canSell: form.canSell, canProduce: form.canProduce })
   return {

@@ -350,6 +350,7 @@ import {
 } from '@/utils/bomImport'
 import {
   defaultBomColumnSettings,
+  restoreBomBlankSizeColumn,
   bomTypeSelectOptions,
   BOM_TYPE,
   normalizeBomType,
@@ -855,7 +856,9 @@ function restoreNewBomDraft() {
     Boolean(draft.skipAutoProductPicker) ||
     Boolean(draft.form?.itemId) ||
     (draft.flatNodes || []).length > 0
-  if (draft.columnSettings) columnSettings.value = draft.columnSettings
+  if (draft.columnSettings) {
+    columnSettings.value = restoreBomBlankSizeColumn(draft.columnSettings)
+  }
   if (typeof draft.basicInfoExpanded === 'boolean')
     basicInfoExpanded.value = draft.basicInfoExpanded
   templateRef.value = draft.templateRef || null
@@ -1649,7 +1652,7 @@ function loadEditBom(id) {
   selectedNodeId.value = nodes.find((n) => n.isRoot)?.id || ROOT_ID
   templateRef.value = bom.templateRef || null
   columnSettings.value = bom.columnSettings?.length
-    ? mergeColumnSettings(defaultBomColumnSettings, bom.columnSettings)
+    ? restoreBomBlankSizeColumn(mergeColumnSettings(defaultBomColumnSettings, bom.columnSettings))
     : JSON.parse(JSON.stringify(defaultBomColumnSettings))
 
   editVersion.value = bom.version || ''

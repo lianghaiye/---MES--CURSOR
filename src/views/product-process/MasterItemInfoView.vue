@@ -28,7 +28,22 @@
             block-node
             @expand="onExpand"
             @select="onSelectCategory"
-          />
+            @rightClick="onCategoryRightClick"
+          >
+            <template #title="node">
+              <a-dropdown :trigger="['contextmenu']">
+                <span class="cat-node-title">{{ node.title }}</span>
+                <template #overlay>
+                  <a-menu @click="({ key }) => onCategoryMenu(key, node)">
+                    <a-menu-item key="rename">修改名称</a-menu-item>
+                    <a-menu-item key="delete" :disabled="isSystemCategoryKey(node.key)" danger>
+                      删除
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </template>
+          </a-tree>
           <a-empty v-else :image="false" description="无匹配类别" />
         </div>
       </div>
@@ -340,6 +355,13 @@
       @saved="onSaved"
     />
 
+    <MasterItemCategoryFormModal
+      v-model:open="categoryFormOpen"
+      :mode="categoryTreeMode"
+      :record="categoryEditRecord"
+      @saved="onCategorySaved"
+    />
+
     <a-modal
       v-model:open="matrixOpen"
       :title="`变体矩阵 — ${matrixSpu?.name || ''}`"
@@ -392,15 +414,26 @@ import {
   DownOutlined,
   SyncOutlined,
 } from '@ant-design/icons-vue'
-import { productCategoryTree, filterCategoryTree } from '@/mock/productCategories'
+import { filterCategoryTree } from '@/mock/productCategories'
 import {
-  materialCategoryTree,
   filterCategoryTree as filterMaterialCategoryTree,
+  isSystemCategory,
 } from '@/mock/materialCategories'
+import {
+  productCategoryState,
+  deleteProductCategory,
+  findProductCategory,
+} from '@/store/productCategoryStore'
+import {
+  materialCategoryState,
+  deleteMaterialCategory,
+  findMaterialCategory,
+} from '@/store/materialCategoryStore'
 import { barcodeTypeOptions, workCenterOpts } from '@/mock/materialInfoOptions'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import MasterItemFormModal from './components/MasterItemFormModal.vue'
+import MasterItemCategoryFormModal from './components/MasterItemCategoryFormModal.vue'
 import MasterInfoRowActions from './components/MasterInfoRowActions.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -440,11 +473,13 @@ const productCreatePage = findCreatePageByListPath('/product-process/products')
 
 const categoryTreeMode = ref(CATEGORY_TREE_MODE.PRODUCT)
 const categoryKeyword = ref('')
-const selectedCategoryKey = ref('pcat-004')
-const expandedKeys = ref(['pcat-004'])
+const selectedCategoryKey = ref('pcat-finished')
+const expandedKeys = ref(['pcat-finished'])
 const selectedCategoryKeys = computed(() =>
   selectedCategoryKey.value ? [selectedCategoryKey.value] : [],
 )
+const categoryFormOpen = ref(false)
+const categoryEditRecord = ref(null)
 
 const filters = reactive({
   code: '',
@@ -489,14 +524,17 @@ const itemKindFilterOpts = [
 ]
 const workCenterFilterOpts = workCenterOpts
 
-const activeCategoryTree = computed(() =>
-  categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
-    ? materialCategoryTree
-    : productCategoryTree,
-)
+const activeCategoryTree = computed(() => {
+  void productCategoryState.tree
+  void materialCategoryState.tree
+  return categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+    ? materialCategoryState.tree
+    : productCategoryState.tree
+})
 
 watch(categoryTreeMode, (mode) => {
-  selectedCategoryKey.value = mode === CATEGORY_TREE_MODE.MATERIAL ? 'cat-004' : 'pcat-004'
+  selectedCategoryKey.value =
+    mode === CATEGORY_TREE_MODE.MATERIAL ? 'cat-material' : 'pcat-finished'
   expandedKeys.value = [selectedCategoryKey.value]
   filters.categoryKey = undefined
   pagination.current = 1
@@ -506,8 +544,66 @@ function mapTreeNodes(nodes) {
   return nodes.map((node) => ({
     key: node.key,
     title: `(${node.code}) ${node.title}`,
+    system: Boolean(node.system),
     children: node.children?.length ? mapTreeNodes(node.children) : undefined,
   }))
+}
+
+function isSystemCategoryKey(key) {
+  const node =
+    categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+      ? findMaterialCategory(key)
+      : findProductCategory(key)
+  return isSystemCategory(node)
+}
+
+function onCategoryRightClick() {
+  /* ant-tree rightClick；实际菜单由 dropdown contextmenu 触发 */
+}
+
+function onCategoryMenu(key, node) {
+  const record =
+    categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+      ? findMaterialCategory(node.key)
+      : findProductCategory(node.key)
+  if (!record) return
+  if (key === 'rename') {
+    categoryEditRecord.value = { ...record }
+    categoryFormOpen.value = true
+    return
+  }
+  if (key === 'delete') {
+    if (isSystemCategory(record)) {
+      message.warning('系统默认类别不可删除')
+      return
+    }
+    Modal.confirm({
+      title: '确认删除该类别？',
+      content: `将删除「${record.title}」`,
+      okType: 'danger',
+      onOk: () => {
+        const res =
+          categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+            ? deleteMaterialCategory(record.key)
+            : deleteProductCategory(record.key)
+        if (!res.ok) {
+          message.warning(res.message)
+          return
+        }
+        if (selectedCategoryKey.value === record.key) {
+          selectedCategoryKey.value =
+            categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+              ? 'cat-material'
+              : 'pcat-finished'
+        }
+        message.success('已删除')
+      },
+    })
+  }
+}
+
+function onCategorySaved() {
+  /* store 已响应式更新树 */
 }
 
 const displayTree = computed(() => {
@@ -865,7 +961,8 @@ function onBatchMenu({ key }) {
 }
 
 function onAddCategory() {
-  message.info('新增类别功能开发中')
+  categoryEditRecord.value = null
+  categoryFormOpen.value = true
 }
 
 function syncTableScrollY() {
@@ -967,6 +1064,11 @@ onBeforeUnmount(unbindTableResize)
 
     :deep(.ant-tree-title) {
       font-size: 13px;
+    }
+
+    .cat-node-title {
+      display: inline-block;
+      width: 100%;
     }
   }
 }

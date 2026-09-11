@@ -74,8 +74,8 @@ export default { name: 'ScopeApplyFields' }
 import { computed, ref } from 'vue'
 import { TreeSelect } from 'ant-design-vue'
 import { QC_TEMPLATE_SCOPE_TYPE, qcTemplateScopeTypeOptions } from '@/mock/qcTemplates'
-import { productCategoryTree } from '@/mock/productCategories'
-import { materialCategoryTree } from '@/mock/materialCategories'
+import { productCategoryState } from '@/store/productCategoryStore'
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import { buildBomSubItemPickerRows, filterBomSubItemPickerRows } from '@/utils/bomSubItemPicker'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 
@@ -106,14 +106,14 @@ function mapCategoryTree(nodes, type) {
   }))
 }
 
-const categoryTreeData = [
+const categoryTreeData = computed(() => [
   {
     title: '产品类别',
     value: '__group_product__',
     key: '__group_product__',
     selectable: false,
     disableCheckbox: true,
-    children: mapCategoryTree(productCategoryTree, 'productCategory'),
+    children: mapCategoryTree(productCategoryState.tree, 'productCategory'),
   },
   {
     title: '物料类别',
@@ -121,9 +121,9 @@ const categoryTreeData = [
     key: '__group_material__',
     selectable: false,
     disableCheckbox: true,
-    children: mapCategoryTree(materialCategoryTree, 'materialCategory'),
+    children: mapCategoryTree(materialCategoryState.tree, 'materialCategory'),
   },
-]
+])
 
 function setObjects(list) {
   emit('update:objects', list)
@@ -149,7 +149,7 @@ const categoryObjectKeys = computed({
         if (n.children) walk(n.children)
       })
     }
-    walk(categoryTreeData)
+    walk(categoryTreeData.value)
     setObjects(
       list
         .map((k) => flat.find((n) => n.value === k))

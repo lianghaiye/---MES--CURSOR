@@ -102,9 +102,10 @@ import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
-import { materialCategoryTree, filterCategoryTree } from '@/mock/materialCategories'
-import { productCategoryTree } from '@/mock/productCategories'
+import { filterCategoryTree as filterMaterialCategoryTree } from '@/mock/materialCategories'
 import { filterCategoryTree as filterProdTree } from '@/mock/materialCategories'
+import { productCategoryState } from '@/store/productCategoryStore'
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import { spuState, listSpus, deleteSpu, countSkusForSpu } from '@/store/spuStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
@@ -135,12 +136,13 @@ const columns = [
 ]
 
 const displayTree = computed(() => {
-  const tree = categoryTreeMode.value === 'product' ? productCategoryTree : materialCategoryTree
+  const tree =
+    categoryTreeMode.value === 'product' ? productCategoryState.tree : materialCategoryState.tree
   const kw = categoryKeyword.value
   if (categoryTreeMode.value === 'product') {
     return filterProdTree(tree, kw)
   }
-  return filterCategoryTree(tree, kw)
+  return filterMaterialCategoryTree(tree, kw)
 })
 
 const tableRows = computed(() => {

@@ -362,8 +362,8 @@ import {
   qcTemplateBizScopeOptions,
   qcTemplateScopeTypeOptions,
 } from '@/mock/qcTemplates'
-import { productCategoryTree } from '@/mock/productCategories'
-import { materialCategoryTree } from '@/mock/materialCategories'
+import { productCategoryState } from '@/store/productCategoryStore' // 类别树取自 store
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import { addQcTemplate, getQcTemplateById, updateQcTemplate } from '@/store/qcTemplateStore'
 import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 import {
@@ -502,14 +502,14 @@ function mapCategoryTree(nodes, type) {
   }))
 }
 
-const categoryTreeData = [
+const categoryTreeData = computed(() => [
   {
     title: '产品类别',
     value: '__group_product__',
     key: '__group_product__',
     selectable: false,
     disableCheckbox: true,
-    children: mapCategoryTree(productCategoryTree, 'productCategory'),
+    children: mapCategoryTree(productCategoryState.tree, 'productCategory'),
   },
   {
     title: '物料类别',
@@ -517,9 +517,9 @@ const categoryTreeData = [
     key: '__group_material__',
     selectable: false,
     disableCheckbox: true,
-    children: mapCategoryTree(materialCategoryTree, 'materialCategory'),
+    children: mapCategoryTree(materialCategoryState.tree, 'materialCategory'),
   },
-]
+])
 
 const categoryObjectKeys = computed({
   get() {
@@ -536,7 +536,7 @@ const categoryObjectKeys = computed({
         if (n.children) walk(n.children)
       })
     }
-    walk(categoryTreeData)
+    walk(categoryTreeData.value)
     form.objects = list
       .map((k) => flat.find((n) => n.value === k))
       .filter(Boolean)

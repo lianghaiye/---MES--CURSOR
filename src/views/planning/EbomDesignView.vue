@@ -204,7 +204,11 @@ import {
   MenuUnfoldOutlined,
   MenuFoldOutlined,
 } from '@ant-design/icons-vue'
-import { defaultBomColumnSettings, EBOM_TYPE_VALUE } from '@/mock/bomMaterialColumns'
+import {
+  defaultBomColumnSettings,
+  restoreBomBlankSizeColumn,
+  EBOM_TYPE_VALUE,
+} from '@/mock/bomMaterialColumns'
 import { DESIGN_TASK_SOURCE } from '@/constants/designTask'
 import { productInfoState } from '@/store/productInfoStore'
 import { processRouteState } from '@/store/processRouteStore'
@@ -449,8 +453,10 @@ function loadPage() {
   })
   lineItems.value = JSON.parse(JSON.stringify(ebom.lineItems || []))
   templateRef.value = ebom.templateRef ? { ...ebom.templateRef } : null
-  columnSettings.value = JSON.parse(
-    JSON.stringify(ebom.columnSettings?.length ? ebom.columnSettings : defaultBomColumnSettings),
+  columnSettings.value = restoreBomBlankSizeColumn(
+    JSON.parse(
+      JSON.stringify(ebom.columnSettings?.length ? ebom.columnSettings : defaultBomColumnSettings),
+    ),
   )
   selectedNodeId.value = getRootTreeId(flatNodes.value)
 }

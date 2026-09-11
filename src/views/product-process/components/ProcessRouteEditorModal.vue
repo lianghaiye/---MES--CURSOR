@@ -126,8 +126,8 @@ import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { createEmptyGrid } from '@/utils/processRouteGrid'
 import { addProcessRoute, updateProcessRoute } from '@/store/processRouteStore'
-import { productCategoryTree } from '@/mock/productCategories'
-import { materialCategoryTree } from '@/mock/materialCategories'
+import { productCategoryState } from '@/store/productCategoryStore'
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import ProcessRouteGridEditor from './ProcessRouteGridEditor.vue'
 import SelectProductMaterialModal from './SelectProductMaterialModal.vue'
 
@@ -166,7 +166,7 @@ const form = reactive({
 })
 
 const categoryTree = computed(() => {
-  const tree = form.categoryType === '物料' ? materialCategoryTree : productCategoryTree
+  const tree = form.categoryType === '物料' ? materialCategoryState.tree : productCategoryState.tree
   const mapNode = (n) => ({
     title: n.title,
     value: n.key,
@@ -237,7 +237,7 @@ function onCategoryChange(key) {
     }
     return ''
   }
-  const tree = form.categoryType === '物料' ? materialCategoryTree : productCategoryTree
+  const tree = form.categoryType === '物料' ? materialCategoryState.tree : productCategoryState.tree
   form.categoryName = findTitle(tree)
   form.productDisplay = form.categoryName
 }

@@ -2,14 +2,10 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { resolveWarehouseItemCategoryScope } from '@/utils/warehouseItemPicker'
-import {
-  materialCategoryTree,
-  flattenCategoryNodes as flattenMatCats,
-} from '@/mock/materialCategories'
-import {
-  productCategoryTree,
-  flattenCategoryNodes as flattenProdCats,
-} from '@/mock/productCategories'
+import { flattenCategoryNodes as flattenMatCats } from '@/mock/materialCategories'
+import { flattenCategoryNodes as flattenProdCats } from '@/mock/productCategories'
+import { materialCategoryState } from '@/store/materialCategoryStore'
+import { productCategoryState } from '@/store/productCategoryStore'
 import { findSpuById, spuState } from '@/store/spuStore'
 import { formatVariantSummary, formatVariantTooltip } from '@/utils/spuVariant'
 import { isProductSyncedMirror } from '@/utils/bomMaterialPicker'
@@ -296,8 +292,8 @@ export function filterEcnNewMaterialRows(rows, filters = {}) {
 
 function collectCategoryKeys(categoryKey) {
   if (!categoryKey) return null
-  const matFlat = flattenMatCats(materialCategoryTree)
-  const prodFlat = flattenProdCats(productCategoryTree)
+  const matFlat = flattenMatCats(materialCategoryState.tree)
+  const prodFlat = flattenProdCats(productCategoryState.tree)
 
   if (categoryKey === 'root-material') {
     return { scope: 'material', keys: new Set(matFlat.map((n) => n.key)) }

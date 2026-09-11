@@ -1,12 +1,11 @@
 import dayjs from 'dayjs'
-import { productCategoryTree, flattenCategoryNodes } from '@/mock/productCategories'
-import { materialCategoryTree } from '@/mock/materialCategories'
+import { flattenCategoryNodes } from '@/mock/productCategories'
+import { productCategoryState } from '@/store/productCategoryStore'
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import { normalizeMaterialType, normalizeSupplyForm } from '@/utils/masterDataMigrate'
 
-const flatProductCats = flattenCategoryNodes(productCategoryTree)
-const flatMaterialCats = flattenCategoryNodes(materialCategoryTree)
-
 function resolveProductCategory(categoryKey) {
+  const flatProductCats = flattenCategoryNodes(productCategoryState.tree)
   const cat = flatProductCats.find((c) => c.key === categoryKey)
   const parent = cat?.parentKey ? flatProductCats.find((c) => c.key === cat.parentKey) : null
   return {
@@ -18,6 +17,7 @@ function resolveProductCategory(categoryKey) {
 }
 
 function resolveMaterialCategory(categoryKey) {
+  const flatMaterialCats = flattenCategoryNodes(materialCategoryState.tree)
   const cat = flatMaterialCats.find((c) => c.key === categoryKey)
   const parent = cat?.parentKey ? flatMaterialCats.find((c) => c.key === cat.parentKey) : null
   return {

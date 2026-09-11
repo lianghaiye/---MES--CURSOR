@@ -1,8 +1,7 @@
-import { productCategoryTree, flattenCategoryNodes } from '@/mock/productCategories'
-import {
-  materialCategoryTree,
-  flattenCategoryNodes as flattenMatCats,
-} from '@/mock/materialCategories'
+import { flattenCategoryNodes } from '@/mock/productCategories'
+import { flattenCategoryNodes as flattenMatCats } from '@/mock/materialCategories'
+import { productCategoryState } from '@/store/productCategoryStore'
+import { materialCategoryState } from '@/store/materialCategoryStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 
@@ -19,20 +18,20 @@ export function buildWarehouseItemCategoryTree() {
       key: 'root-material',
       title: '物料',
       selectable: false,
-      children: mapNodes(materialCategoryTree),
+      children: mapNodes(materialCategoryState.tree),
     },
     {
       key: 'root-product',
       title: '产品',
       selectable: false,
-      children: mapNodes(productCategoryTree),
+      children: mapNodes(productCategoryState.tree),
     },
   ]
 }
 
 function collectDescendantKeys(nodes, rootKey) {
-  const matFlat = flattenMatCats(materialCategoryTree)
-  const prodFlat = flattenCategoryNodes(productCategoryTree)
+  const matFlat = flattenMatCats(materialCategoryState.tree)
+  const prodFlat = flattenCategoryNodes(productCategoryState.tree)
 
   if (rootKey === 'root-material') {
     return new Set(matFlat.map((n) => n.key))
@@ -116,7 +115,7 @@ export function filterWarehousePickableItems(list, filters = {}, categoryKey) {
 
   if (categoryKey) {
     const keys = collectDescendantKeys(
-      categoryKey.startsWith('cat-') ? materialCategoryTree : productCategoryTree,
+      categoryKey.startsWith('cat-') ? materialCategoryState.tree : productCategoryState.tree,
       categoryKey,
     )
     if (categoryKey === 'root-material') {

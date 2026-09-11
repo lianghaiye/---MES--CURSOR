@@ -17,6 +17,14 @@
             <PlusOutlined />
             添加子项
           </a-button>
+          <a-button
+            v-if="!shipAttachmentMode"
+            size="small"
+            html-type="button"
+            @click="openBlankSizeFromToolbar"
+          >
+            下料
+          </a-button>
           <template v-if="hasSelection">
             <a-button size="small" @click="openBatchEdit">修改</a-button>
             <a-button size="small" danger @click="handleBatchDelete">删除</a-button>
@@ -691,7 +699,9 @@ const widthMap = {
 
 const tableColumns = computed(() => {
   const sorted = [...props.columnSettings]
-    .map((c) => (c.key === 'blankSizeText' ? { ...c, hidden: true } : c))
+    .map((c) =>
+      props.shipAttachmentMode && c.key === 'blankSizeText' ? { ...c, hidden: true } : c,
+    )
     .filter((c) => !c.hidden)
     .sort((a, b) => a.order - b.order)
 
@@ -753,11 +763,39 @@ const dragFromRecord = ref(null)
 const hoverRowId = ref('')
 const headerIndexHover = ref(false)
 const selectedRowKeys = ref([])
-/** 单击选中的当前行 */
+/** 单击选中的当前行（用于下料） */
 const activeRowId = ref('')
 const batchEditOpen = ref(false)
 const blankSizeOpen = ref(false)
 const blankSizeTargetLine = ref(null)
+
+function resolveBlankSizeTargetLine() {
+  // 优先：恰好勾选一行（工具栏「下料」常见操作）
+  if (selectedRowKeys.value.length === 1) {
+    const key = selectedRowKeys.value[0]
+    const byCheck = flatLines.value.find((l) => String(l.id) === String(key))
+    if (byCheck) return byCheck
+  }
+  // 其次：单击高亮行
+  if (activeRowId.value) {
+    const byActive = flatLines.value.find((l) => String(l.id) === String(activeRowId.value))
+    if (byActive) return byActive
+  }
+  return null
+}
+
+function openBlankSizeFromToolbar() {
+  if (selectedRowKeys.value.length > 1) {
+    message.warning('下料仅支持单行，请只勾选一条物料行，或单击选中一行后再点「下料」')
+    return
+  }
+  const line = resolveBlankSizeTargetLine()
+  if (!line) {
+    message.warning('请先勾选或单击选中一条物料行')
+    return
+  }
+  openBlankSizeForLine(line)
+}
 
 function openBlankSizeForLine(record) {
   if (!record) {

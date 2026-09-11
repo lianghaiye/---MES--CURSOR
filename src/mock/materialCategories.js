@@ -1,5 +1,14 @@
-/** 物料类别树 */
-export const materialCategoryTree = [
+/** 系统默认：物料类别「物料」（可改名、不可删除；新租户入驻即有） */
+export const MATERIAL_CATEGORY_DEFAULT = {
+  key: 'cat-material',
+  code: '000',
+  title: '物料',
+  system: true,
+  count: 0,
+}
+
+/** 演示业务类别（可删可改） */
+const DEMO_MATERIAL_CATEGORIES = [
   { key: 'cat-009', code: '009', title: '附件', count: 12 },
   { key: 'cat-008', code: '008', title: '标准件', count: 28 },
   { key: 'cat-007', code: '007', title: '毛坯件', count: 15 },
@@ -17,6 +26,42 @@ export const materialCategoryTree = [
     ],
   },
 ]
+
+/** 新租户 / 空库种子：系统默认 + 演示数据 */
+export function createMaterialCategorySeed() {
+  return [
+    { ...MATERIAL_CATEGORY_DEFAULT },
+    ...DEMO_MATERIAL_CATEGORIES.map((n) => structuredClone(n)),
+  ]
+}
+
+function walkFind(nodes, key) {
+  for (const node of nodes || []) {
+    if (node.key === key) return node
+    const hit = walkFind(node.children, key)
+    if (hit) return hit
+  }
+  return null
+}
+
+/**
+ * 补齐系统默认类别（旧租户升级、localStorage 缺项时调用）。
+ * 已存在则只强制 system 标记，不覆盖用户改过的名称。
+ */
+export function ensureSystemMaterialCategories(tree) {
+  const list = Array.isArray(tree) ? tree : []
+  const existing = walkFind(list, MATERIAL_CATEGORY_DEFAULT.key)
+  if (existing) {
+    existing.system = true
+    if (!existing.code) existing.code = MATERIAL_CATEGORY_DEFAULT.code
+  } else {
+    list.unshift({ ...MATERIAL_CATEGORY_DEFAULT })
+  }
+  return list
+}
+
+/** @deprecated 请优先用 store 的响应式树；保留给种子脚本一次性读取 */
+export const materialCategoryTree = createMaterialCategorySeed()
 
 export function flattenCategoryNodes(nodes, list = []) {
   nodes.forEach((node) => {
@@ -51,4 +96,8 @@ export function getCategoryKeysUnder(nodeKey, tree = materialCategoryTree) {
   if (!node) return []
   if (!node.children?.length) return [nodeKey]
   return flat.filter((n) => n.parentKey === nodeKey || n.key === nodeKey).map((n) => n.key)
+}
+
+export function isSystemCategory(node) {
+  return Boolean(node?.system)
 }
