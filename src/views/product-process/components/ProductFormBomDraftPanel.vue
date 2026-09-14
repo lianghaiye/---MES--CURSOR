@@ -1,7 +1,7 @@
 <template>
   <div class="product-form-bom-draft">
     <div class="draft-hint">
-      同步维护 BOM（预览版）：可添加/删除子项看效果；保存产品时暂不落库 BOM。
+      新增时可同步维护 BOM：保存产品时若有物料明细，将一并落库为待发布产品 BOM；无明细则跳过。
     </div>
     <BomMaterialTable
       :flat-nodes="flatNodes"
@@ -239,6 +239,7 @@ defineExpose({
     return {
       flatNodes: JSON.parse(JSON.stringify(flatNodes.value)),
       lineItems: JSON.parse(JSON.stringify(lineItems.value)),
+      columnSettings: JSON.parse(JSON.stringify(columnSettings.value)),
     }
   },
   clearDraft() {

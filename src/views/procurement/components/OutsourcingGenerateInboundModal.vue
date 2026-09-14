@@ -60,7 +60,7 @@
       type="info"
       show-icon
       style="margin-bottom: 12px"
-      message="已按质检「合格入库数量」带入本次入库数量，可改小，不可超过合格入库数与可入剩余。"
+      message="已按质检「合格入库数量」带入本次点收数量，可改小，不可超过合格入库数与可入剩余。"
     />
     <InboundLineScopeToggle v-model="lineScope" />
 
@@ -226,7 +226,7 @@ const columns = computed(() => {
     { title: '单位', dataIndex: 'unit', width: 80 },
     { title: '剩余可入', key: 'remainQty', width: 100, align: 'right' },
     { title: '入库仓库', key: 'warehouse', width: 120 },
-    { title: '入库数量', key: 'qty', width: 110 },
+    { title: '点收数量', key: 'qty', width: 110 },
     { title: '操作', key: 'action', width: 80 },
   )
   return cols
@@ -315,7 +315,7 @@ function handleSave() {
   const editableLines = inboundLines.value.filter((l) => !l.locked)
   const submitLines = editableLines.filter((l) => Number(l.qty) > 0)
   if (!submitLines.length) {
-    message.warning('请至少填写一行入库数量')
+    message.warning('请至少填写一行点收数量')
     return
   }
   const overQcCap = submitLines.find(
@@ -323,7 +323,7 @@ function handleSave() {
   )
   if (overQcCap) {
     message.warning(
-      `「${overQcCap.productName}」入库数量不可超过质检合格入库数量（${overQcCap.qcMaxQty}）`,
+      `「${overQcCap.productName}」点收数量不可超过质检合格入库数量（${overQcCap.qcMaxQty}）`,
     )
     return
   }

@@ -299,7 +299,11 @@
           </div>
         </a-tab-pane>
 
-        <a-tab-pane v-if="isProductEntry && !isMultiVariantMode" key="bomMaintain" tab="BOM维护">
+        <a-tab-pane
+          v-if="isProductEntry && !isMultiVariantMode && !isEdit"
+          key="bomMaintain"
+          tab="BOM维护"
+        >
           <div class="tab-pane-body">
             <div class="form-product-material-section basic-info-box modal-basic-card">
               <ProductFormBomDraftPanel
@@ -600,13 +604,7 @@
                     </a-form-item>
                   </a-col>
                   <a-col :span="6">
-                    <a-form-item>
-                      <template #label>
-                        <span>入库质检要求</span>
-                        <a-tooltip title="入库时的质检策略">
-                          <InfoCircleOutlined class="info-icon" />
-                        </a-tooltip>
-                      </template>
+                    <a-form-item label="入库质检要求">
                       <a-select
                         v-model:value="form.production.inboundQcRequirement"
                         size="small"
@@ -618,16 +616,7 @@
                     </a-form-item>
                   </a-col>
                   <a-col :span="6">
-                    <a-form-item>
-                      <template #label>
-                        <span>领料属性</span>
-                        <a-tooltip
-                          :overlay-style="{ maxWidth: '360px' }"
-                          title="开=参与领料；关=不进领料单，发料方式=倒冲"
-                        >
-                          <InfoCircleOutlined class="info-icon" />
-                        </a-tooltip>
-                      </template>
+                    <a-form-item label="领料属性">
                       <a-switch
                         v-model:checked="form.production.requisitionEnabled"
                         :disabled="viewOnly"
@@ -635,16 +624,7 @@
                     </a-form-item>
                   </a-col>
                   <a-col :span="6">
-                    <a-form-item>
-                      <template #label>
-                        <span>需要下料结算</span>
-                        <a-tooltip
-                          :overlay-style="{ maxWidth: '400px' }"
-                          title="开=作为 BOM 子件领出后需做下料结算（实耗+余料回库）。工单工艺含「下料工序」时，下发页会展示本物料；单单位米/kg 也可开启。"
-                        >
-                          <InfoCircleOutlined class="info-icon" />
-                        </a-tooltip>
-                      </template>
+                    <a-form-item label="需要下料结算">
                       <a-switch v-model:checked="form.needsBlankingSettle" :disabled="viewOnly" />
                     </a-form-item>
                   </a-col>
@@ -910,7 +890,10 @@
           <CloseOutlined />
           取消
         </a-button>
-        <a-button v-if="showProductFields && !isMultiVariantMode" @click="handleSaveAndMaintainBom">
+        <a-button
+          v-if="showProductFields && !isMultiVariantMode && isEdit"
+          @click="handleSaveAndMaintainBom"
+        >
           保存并维护BOM
         </a-button>
         <a-button type="primary" @click="handleOk">
@@ -963,6 +946,7 @@ import {
 } from '@/mock/materialInfoOptions'
 import { unitState, getInventoryUnitOptions } from '@/store/unitStore'
 import { saveMasterItem, resolveMasterItemEditRecord } from '@/utils/masterItemSave'
+import { persistProductBomDraft, validateProductBomDraft } from '@/utils/productBomFromDraft'
 import {
   ITEM_KIND,
   itemKindLabel,
@@ -1517,7 +1501,7 @@ function resetForm() {
   form.production = createDefaultProductionControl()
   form.alert = createDefaultAlertConfig()
   activeTabKey.value = 'basic'
-  // 产品信息入口新增：默认可销售，以便展示产品字段/计划策略/保存并维护BOM
+  // 产品信息入口新增：默认可销售，以便展示产品字段/计划策略
   if (isProductEntry.value) {
     form.canSell = true
   }
@@ -2171,6 +2155,36 @@ function navigateToMaintainBom(itemType, itemId, itemName) {
   router.push(resolved)
 }
 
+/** 新增产品且存在 BOM 草稿明细时，随主数据一并落库为待发布产品 BOM */
+function tryPersistBomDraftOnCreate(result) {
+  if (isEdit.value || !isProductEntry.value || isMultiVariantMode.value) {
+    return { saved: false, skipped: true }
+  }
+  if (!result?.id) return { saved: false, skipped: true }
+
+  const draft = bomDraftPanelRef.value?.getDraft?.()
+  if (!draft?.lineItems?.length) return { saved: false, skipped: true }
+
+  const itemType =
+    result.kind === ITEM_KIND.MATERIAL || (!showProductFields.value && showMaterialFields.value)
+      ? 'material'
+      : 'product'
+
+  return persistProductBomDraft({
+    draft,
+    itemId: result.id,
+    itemType,
+    itemCode: form.code?.trim() || '',
+    itemName: form.name?.trim() || '',
+    specModel: form.specModel || '',
+    material: form.material || '',
+    drawingNo: form.drawingNo || '',
+    techParams: form.techParams || '',
+    processRoute: form.production?.defaultProcessRoute || '',
+    matchingRequirements: form.matchingRequirements || '',
+  })
+}
+
 function handleOk() {
   if (!validate()) return
   if (isMultiVariantMode.value && !isEdit.value) {
@@ -2181,6 +2195,18 @@ function handleOk() {
     saveMultiVariantMaster()
     return
   }
+
+  const canAttachBomDraft = !isEdit.value && isProductEntry.value && !isMultiVariantMode.value
+  if (canAttachBomDraft) {
+    const draft = bomDraftPanelRef.value?.getDraft?.()
+    const draftCheck = validateProductBomDraft(draft)
+    if (!draftCheck.ok) {
+      message.warning(draftCheck.message || 'BOM 草稿校验未通过')
+      activeTabKey.value = 'bomMaintain'
+      return
+    }
+  }
+
   const productPayload = showProductFields.value ? buildProductPayload() : null
   const materialPayload = showMaterialFields.value ? buildMaterialPayload() : null
   const payload = {
@@ -2189,11 +2215,26 @@ function handleOk() {
     productPayload,
     materialPayload,
   }
-  if (props.pageMode) {
-    saveMasterItem(payload)
-  } else {
-    emit('saved', payload)
+
+  if (props.pageMode || canAttachBomDraft) {
+    const result = saveMasterItem(payload)
+    if (!props.pageMode) {
+      emit('saved', { ...payload, alreadySaved: true, id: result?.id })
+    }
+    const bomRes = tryPersistBomDraftOnCreate(result)
+    if (bomRes?.error) {
+      message.warning(`产品已保存，但 BOM 落库失败：${bomRes.error}`)
+      closeAfterSave()
+      return
+    }
+    message.success(
+      bomRes?.saved ? '已保存产品及 BOM（待发布）' : isEdit.value ? '已更新' : '已保存',
+    )
+    closeAfterSave()
+    return
   }
+
+  emit('saved', payload)
   message.success(isEdit.value ? '已更新' : '已保存')
   closeAfterSave()
 }

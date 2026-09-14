@@ -96,7 +96,7 @@
             <template #label>
               <span class="field-label">
                 <UnorderedListOutlined />
-                库存数量（{{ stockUnitLabel }}）
+                入库数量（{{ stockUnitLabel }}）
               </span>
             </template>
             <a-input-number
@@ -174,7 +174,7 @@
               <template #label>
                 <span class="field-label">
                   <UnorderedListOutlined />
-                  到货件数（{{ purchaseUnitLabel }}）
+                  点收数量（{{ purchaseUnitLabel }}）
                 </span>
               </template>
               <a-input-number
@@ -192,7 +192,7 @@
               <template #label>
                 <span class="field-label">
                   <UnorderedListOutlined />
-                  库存数量怎么填
+                  入库数量怎么填
                 </span>
               </template>
               <a-radio-group
@@ -203,7 +203,7 @@
               <div class="vl-tip">
                 采购单位（{{ purchaseUnitLabel }}）与库存单位（{{
                   stockUnitLabel
-                }}）不同：先填到货件数，再填库存数量。
+                }}）不同：先填点收数量，再填入库数量。
                 <template v-if="showAreaShortcut">
                   库存单位为面积时，可用「长 × 宽」换算，也可直接填合计{{ stockUnitLabel }}。
                 </template>
@@ -328,7 +328,7 @@
             </span>
           </div>
           <div v-if="!pieceExpectedCount" class="vl-tip">
-            请先填写到货件数（{{ purchaseUnitLabel }}）
+            请先填写点收数量（{{ purchaseUnitLabel }}）
           </div>
           <template v-else>
             <div class="piece-quick-fill">
@@ -396,7 +396,7 @@
           </div>
 
           <div v-if="!pieceExpectedCount" class="vl-tip">
-            请先填写到货件数（{{ purchaseUnitLabel }}）
+            请先填写点收数量（{{ purchaseUnitLabel }}）
           </div>
 
           <template v-else>
@@ -891,7 +891,7 @@ function onPieceEditModeChange() {
 function applyPiecePaste() {
   const n = pieceExpectedCount.value
   if (!(n > 0)) {
-    message.warning(`请先填写到货件数（${purchaseUnitLabel.value}）`)
+    message.warning(`请先填写点收数量（${purchaseUnitLabel.value}）`)
     return
   }
   const parsed = parsePiecePasteText(piecePasteText.value)
@@ -1066,7 +1066,7 @@ function handleOk() {
       draft.value.uniformValue = expanded.pieceValues[0]
     }
   } else if (draft.value.qty == null || Number(draft.value.qty) <= 0) {
-    message.warning('请输入库存数量')
+    message.warning('请输入入库数量')
     return
   }
   syncInboundLineTotalFromUnit(draft.value)

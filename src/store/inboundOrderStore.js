@@ -654,7 +654,7 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
 
   const invalid = lines.find((line) => !line.warehouse || !line.qty || Number(line.qty) <= 0)
   if (invalid) {
-    return { ok: false, message: '请完善入库仓库和入库数量' }
+    return { ok: false, message: '请完善入库仓库和点收数量' }
   }
   const settleInvalid = lines.find(
     (line) => String(line.settleUnit || '').trim() && !(Number(line.settleQty) > 0),

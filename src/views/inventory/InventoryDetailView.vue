@@ -403,7 +403,7 @@
             type="info"
             show-icon
             class="batch-soft-tip"
-            message="本页为批次快照：入库建批 + 出库扣减后的本批余量。在库数量是当前还剩多少（库存单位）；入库数量是本批建账量（有采购单位差时按采购单位点收）。采购≠库存时另显示入库库存量（建账时折成库存单位的量）。有结算单位时另显示结算数量、批次单量。出入库痕迹请看「物料流水」。"
+            message="本页为批次快照：入库建批 + 出库扣减后的本批余量。在库数量是当前还剩多少（库存单位）；点收数量是本批建账时的采购单位点数；采购≠库存时另显示入库数量（建账时折成库存单位的量）。有结算单位时另显示结算数量、批次单量。出入库痕迹请看「物料流水」。"
           />
           <a-table
             :columns="drawerBatchColumns"
@@ -920,10 +920,10 @@ const drawerBatchColumns = computed(() => {
     { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
     { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 132, ellipsis: true },
     { title: '在库数量', key: 'currentLength', width: 110, align: 'right' },
-    { title: '入库数量', key: 'inboundQty', width: 110, align: 'right' },
+    { title: '点收数量', key: 'inboundQty', width: 110, align: 'right' },
   )
   if (drawerItemUnits.value.hasPurchaseSplit) {
-    cols.push({ title: '入库库存量', key: 'inboundStockQty', width: 118, align: 'right' })
+    cols.push({ title: '入库数量', key: 'inboundStockQty', width: 118, align: 'right' })
   }
   if (drawerItemUnits.value.hasSettle) {
     cols.push(

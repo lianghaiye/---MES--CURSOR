@@ -47,10 +47,10 @@ export function buildUnitCaliberHint({ inventoryUnit, purchaseUnit, settleUnit }
     return `主单位是「${inv}」，未配置采购/结算辅助单位：入库只填一个数量即可。`
   }
   if (!dual && hasSettle) {
-    return `主单位「${inv}」，结算辅助单位「${settle}」：入库填${inv}数量，并再填结算数量（${settle}）。`
+    return `主单位「${inv}」，结算辅助单位「${settle}」：入库填入库数量（${inv}），并再填结算数量（${settle}）。`
   }
   if (dual && !hasSettle) {
-    return `采购辅助单位「${pur}」、主单位「${inv}」：入库先填到货件数（${pur}），再填库存数量（${inv}）。`
+    return `采购辅助单位「${pur}」、主单位「${inv}」：入库先填点收数量（${pur}），再填入库数量（${inv}）。`
   }
-  return `采购「${pur}」、主单位「${inv}」、结算「${settle}」：入库要填到货件数、库存数量和结算数量。`
+  return `采购「${pur}」、主单位「${inv}」、结算「${settle}」：入库要填点收数量、入库数量和结算数量。`
 }

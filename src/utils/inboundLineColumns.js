@@ -16,10 +16,10 @@ export const inboundFormLineColumns = [
   },
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 90, ellipsis: true },
   { title: '条码类型', dataIndex: 'barcodeType', key: 'barcodeType', width: 96 },
-  /** 数量与单位合并展示，如「3 根」 */
-  { title: '入库数量', key: 'qty', width: 120 },
-  /** 双单位时的库存量，如「36 米」；单单位同入库数量 */
-  { title: '库存数量', key: 'stockUnitQty', width: 130 },
+  /** 点收数量：按采购单位计，如「3 根」；单单位时与入库数量同值 */
+  { title: '点收数量', key: 'qty', width: 120 },
+  /** 入库数量：按库存单位入账，如「36 米」；单单位同点收数量 */
+  { title: '入库数量', key: 'stockUnitQty', width: 130 },
   /** 有结算单位时展示，如「55.5 kg」 */
   { title: '结算数量', key: 'settleQty', width: 120 },
   { title: '入库仓库', key: 'warehouse', width: 120 },
@@ -33,9 +33,13 @@ export const inboundFormLineColumns = [
 
 export const inboundDetailLineColumns = inboundFormLineColumns.filter((c) => c.key !== 'actions')
 
-/** 库存数量列提示文案 */
+/** 点收数量列提示 */
+export const RECEIVE_QTY_TIP =
+  '按采购单位点收（如根/卷/件）。采购单位与库存单位不同时，本列是件数；入账库存量见「入库数量」。'
+
+/** 入库数量列提示文案（库存单位入账量） */
 export const STOCK_UNIT_QTY_TIP =
-  '一类一码/一批一码：可直接填库存合计（合为一个批次、无 SN）。若按统一单件或逐件填写（采购单位≠库存单位），则 1 个父批 + 四位 SN 件码，同一物一码。一物一码：须按件填写，禁止合计。'
+  '按库存单位入账的数量。一类一码/一批一码：可直接填库存合计（合为一个批次、无 SN）。若按统一单件或逐件填写（采购单位≠库存单位），则 1 个父批 + 四位 SN 件码，同一物一码。一物一码：须按件填写，禁止合计。'
 
 /** 结算数量列提示 */
 export const SETTLE_QTY_TIP =

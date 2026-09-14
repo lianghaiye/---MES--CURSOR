@@ -113,7 +113,7 @@ export function calcAreaSquareMeters(length, width, dimUnit = DEFAULT_PLATE_DIM_
  * 双单位计量形态（入库/下料共用语义）：用户可手动指定，未指定时按库存单位推断
  * - length：型材 · 按长度（根→米等）
  * - plate：板材 · 长×宽→㎡
- * - generic：通用 · 只填库存数量，不强求尺寸换算
+ * - generic：通用 · 只填入库数量（库存单位），不强求尺寸换算
  */
 export const DUAL_UNIT_MEASURE_MODE = {
   LENGTH: 'length',
@@ -405,7 +405,7 @@ export function expandDualUnitInboundPieces(line, stockUnit) {
     const roots = Number(line.purchaseQty)
     const per = resolveUniformValue(line)
     if (!(roots > 0)) {
-      return { ok: false, message: `请填写入库数量（${purchaseLabel}）` }
+      return { ok: false, message: `请填写点收数量（${purchaseLabel}）` }
     }
     if (!(per > 0)) {
       return {
@@ -423,7 +423,7 @@ export function expandDualUnitInboundPieces(line, stockUnit) {
     const roots = Number(line.purchaseQty)
     const pieceValues = resolvePieceValues(line)
     if (!(roots > 0)) {
-      return { ok: false, message: `请填写入库数量（${purchaseLabel}）` }
+      return { ok: false, message: `请填写点收数量（${purchaseLabel}）` }
     }
     if (pieceValues.length !== roots) {
       return {
@@ -446,7 +446,7 @@ export function expandDualUnitInboundPieces(line, stockUnit) {
     const roots = Number(line.purchaseQty)
     const total = resolveTotalValue(line)
     if (!(roots > 0)) {
-      return { ok: false, message: `请填写入库数量（${purchaseLabel}）` }
+      return { ok: false, message: `请填写点收数量（${purchaseLabel}）` }
     }
     if (!(total > 0)) {
       return {

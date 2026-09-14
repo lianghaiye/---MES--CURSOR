@@ -40,7 +40,7 @@ export function isInboundDualUnitLine(line = {}, material = null) {
   return Boolean(line.isVariableLength || mat?.isVariableLength)
 }
 
-/** 入库数量对应单位（双单位=采购单位，单单位=库存单位） */
+/** 点收数量对应单位（双单位=采购单位，单单位=库存单位） */
 export function resolveInboundQtyUnit(line = {}, material = null) {
   const mat = material || findMaterialByCode(line.itemCode)
   if (isInboundDualUnitLine(line, mat)) {
@@ -49,7 +49,7 @@ export function resolveInboundQtyUnit(line = {}, material = null) {
   return line.unit || mat?.inventoryUnit || mat?.stockUnit || '件'
 }
 
-/** 库存单位展示 */
+/** 入库数量（库存单位）展示 */
 export function resolveInboundStockUnit(line = {}, material = null) {
   const mat = material || findMaterialByCode(line.itemCode)
   if (isInboundDualUnitLine(line, mat)) {
@@ -58,13 +58,13 @@ export function resolveInboundStockUnit(line = {}, material = null) {
   return line.unit || mat?.inventoryUnit || mat?.stockUnit || '件'
 }
 
-/** 入库数量（双单位取采购件数） */
+/** 点收数量（双单位取采购件数） */
 export function getInboundQtyValue(line = {}) {
   if (isInboundDualUnitLine(line)) return line.purchaseQty
   return line.qty
 }
 
-/** 库存单位量（双单位：按填写方式取合计；单单位同入库数量） */
+/** 入库数量/库存单位量（双单位：按填写方式取合计；单单位同点收数量） */
 export function getStockUnitQtyValue(line = {}) {
   if (!isInboundDualUnitLine(line)) return line.qty
   const mode = coerceInboundEntryMode(line.inboundEntryMode, line.barcodeType)

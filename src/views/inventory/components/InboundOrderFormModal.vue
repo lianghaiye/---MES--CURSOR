@@ -197,9 +197,17 @@
               :scroll="lineTableScroll"
             >
               <template #headerCell="{ column }">
-                <template v-if="column.key === 'stockUnitQty'">
+                <template v-if="column.key === 'qty'">
                   <span class="col-title-with-tip">
-                    库存数量
+                    点收数量
+                    <a-tooltip :title="RECEIVE_QTY_TIP">
+                      <InfoCircleOutlined class="col-tip-icon" />
+                    </a-tooltip>
+                  </span>
+                </template>
+                <template v-else-if="column.key === 'stockUnitQty'">
+                  <span class="col-title-with-tip">
+                    入库数量
                     <a-tooltip :title="STOCK_UNIT_QTY_TIP">
                       <InfoCircleOutlined class="col-tip-icon" />
                     </a-tooltip>
@@ -646,6 +654,7 @@ import {
   inboundFormLineColumns,
   STOCK_UNIT_QTY_TIP,
   SETTLE_QTY_TIP,
+  RECEIVE_QTY_TIP,
 } from '@/utils/inboundLineColumns'
 import { normalizeInventoryPickerItem } from '@/utils/inventoryLineItemPicker'
 import { warehouseOptionLabel } from '@/utils/inventoryFormLineDisplay'
@@ -1319,7 +1328,7 @@ function handleSave() {
     message.warning(
       isOneItemOneCodeLine(invalidDual)
         ? `一物一码「${invalidDual.itemName}」请填写统一单件数量（库存单位量），或点编辑改逐件`
-        : `双物料单位「${invalidDual.itemName}」请填写入库数量与库存单位量`,
+        : `双物料单位「${invalidDual.itemName}」请填写点收数量与入库数量`,
     )
     return
   }

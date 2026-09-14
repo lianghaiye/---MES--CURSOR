@@ -1,7 +1,8 @@
 /**
- * 工单完工库存扣减：按 BOM 同时带出领料件与倒冲件（一张工单维度单据）
- * - 领料申请仍排除倒冲件
- * - 完工扣减单按发料方式区分；倒冲件始终参与扣减；领料件仅在「按报工数量扣」模式下参与扣减
+ * 工单完工库存扣减：按 BOM 单位用量 × 完工数量生成扣减明细
+ * - 「不领料」模式：不建工单完工扣减单（由调用方跳过）
+ * - 「完工后预扣+确认」：默认扣发料仓；领料件+倒冲件都实扣；不可自动确认
+ * - 「自主领料+完工后预扣+确认」：默认扣线边仓；领料件+倒冲件都按 BOM×完工数实扣（领料出库只是调入线边，不等于消耗）
  */
 
 import { materialInfoState } from '@/store/materialInfoStore'
@@ -10,31 +11,60 @@ import { warehouseState } from '@/store/warehouseStore'
 import { resolveWorkOrderAllMaterialLines } from '@/utils/materialReqEbom'
 import { isBackflushMaterial } from '@/utils/backflushMaterial'
 import { getStockQty } from '@/store/stockStore'
-import { getInventoryDeductMode, INVENTORY_DEDUCT_MODES } from '@/store/functionParamStore'
+import {
+  getInventoryDeductMode,
+  INVENTORY_DEDUCT_MODES,
+  isInventoryDeductByActual,
+} from '@/store/functionParamStore'
 
 function lookupMaterial(code) {
   if (!code) return null
   return materialInfoState.materials.find((m) => m.code === code) || null
 }
 
-/** 默认完工扣减仓：优先线边仓 / 工单收料仓 */
+/**
+ * 默认完工扣减仓（单据上仍可改）：
+ * - 自主领料模式 → 线边仓 / 工单收料仓
+ * - 无领料完工直扣 → 发料仓 / 工单仓库
+ */
 export function resolveBackflushWarehouse(workOrder = {}) {
-  const preferred = workOrder.receiveWarehouse || workOrder.lineWarehouse || ''
-  if (preferred) {
-    return { warehouseName: preferred, warehouseCode: resolveWarehouseCode(preferred) }
-  }
   void warehouseState.warehouses
-  const lineSide = (warehouseState.warehouses || []).find(
-    (w) => w.enabled !== false && w.categoryName === '线边仓',
+  if (isInventoryDeductByActual()) {
+    const preferred = workOrder.receiveWarehouse || workOrder.lineWarehouse || ''
+    if (preferred) {
+      return { warehouseName: preferred, warehouseCode: resolveWarehouseCode(preferred) }
+    }
+    const lineSide = (warehouseState.warehouses || []).find(
+      (w) => w.enabled !== false && w.categoryName === '线边仓',
+    )
+    if (lineSide) {
+      return { warehouseName: lineSide.name, warehouseCode: lineSide.code || '' }
+    }
+    const opts = getWarehouseSelectOptions()
+    const first = opts[0]
+    return {
+      warehouseName: first?.value || '库线边仓',
+      warehouseCode: resolveWarehouseCode(first?.value || ''),
+    }
+  }
+
+  // 完工直扣发料仓
+  const shipPreferred =
+    workOrder.warehouse || workOrder.issueWarehouse || workOrder.shipWarehouse || ''
+  if (shipPreferred) {
+    return { warehouseName: shipPreferred, warehouseCode: resolveWarehouseCode(shipPreferred) }
+  }
+  const rawWh = (warehouseState.warehouses || []).find(
+    (w) => w.enabled !== false && (w.categoryName === '原料仓' || w.categoryName === '发料仓'),
   )
-  if (lineSide) {
-    return { warehouseName: lineSide.name, warehouseCode: lineSide.code || '' }
+  if (rawWh) {
+    return { warehouseName: rawWh.name, warehouseCode: rawWh.code || '' }
   }
   const opts = getWarehouseSelectOptions()
   const first = opts[0]
   return {
-    warehouseName: workOrder.warehouse || first?.value || '库线边仓',
-    warehouseCode: resolveWarehouseCode(workOrder.warehouse || first?.value || ''),
+    warehouseName: first?.value || '原料仓',
+    warehouseCode: resolveWarehouseCode(first?.value || ''),
   }
 }
 
@@ -50,12 +80,12 @@ export function resolveLineIssueMode(line, material) {
   return '领料'
 }
 
-/** 该行是否在完工扣减单中实际扣库存 */
-export function isCompletionDeductLineDeductible(line, deductMode = getInventoryDeductMode()) {
-  const mode = line?.issueMode || (line?.isBackflush ? '倒冲' : '领料')
-  if (mode === '倒冲') return true
-  // 领料件：仅「完工后按报工数量扣」时在本单扣减；自主领料已通过领料出库扣过
-  return deductMode === INVENTORY_DEDUCT_MODES.POST_COMPLETE_BY_REPORT
+/** 该行是否在完工扣减单中实际扣库存（两档完工模式均按 BOM×完工数实扣） */
+export function isCompletionDeductLineDeductible(_line, deductMode = getInventoryDeductMode()) {
+  return (
+    deductMode === INVENTORY_DEDUCT_MODES.POST_COMPLETE_BY_REPORT ||
+    deductMode === INVENTORY_DEDUCT_MODES.SELF_ISSUE_BY_ACTUAL
+  )
 }
 
 /**
@@ -145,7 +175,7 @@ export function buildWorkOrderCompletionDeductDraft(workOrder, finishedQty) {
       deductSource: 'work_order',
       requisitionMode: 'work-order',
       lines,
-      remark: `工单完工扣减（报工/完工数量 ${reportQty}；领料 ${issueCount} / 倒冲 ${backflushCount}）`,
+      remark: `工单完工扣减（完工数量 ${reportQty}；按 BOM×完工数，领料 ${issueCount} / 倒冲 ${backflushCount}）`,
     },
   }
 }

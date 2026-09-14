@@ -10,7 +10,13 @@ import {
   resolveDeductSource,
   isQuickMaterialDeduct,
 } from '@/mock/materialRequisitionRecords'
-import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
+import {
+  AUTO_APPROVE_TYPES,
+  isAutoApproveEnabled,
+  isInventoryNoIssue,
+  isInventoryDeductByReport,
+  isInventoryDeductByActual,
+} from '@/store/functionParamStore'
 import { buildWorkOrderCompletionDeductDraft } from '@/utils/backflushDeduct'
 import { ensureCrossDemoDeductRecords } from '@/mock/crossModuleDemoSeed'
 
@@ -145,7 +151,7 @@ export function createMaterialDeductRecord(payload = {}) {
   recalcMaterialCount(row)
   materialRequisitionState.records.unshift(row)
 
-  if (isAutoApproveEnabled(AUTO_APPROVE_TYPES.INVENTORY_DEDUCT)) {
+  if (isInventoryDeductByActual() && isAutoApproveEnabled(AUTO_APPROVE_TYPES.INVENTORY_DEDUCT)) {
     return confirmMaterialDeduct(row.id)
   }
   return { ok: true, record: row }
@@ -157,6 +163,14 @@ export function createMaterialDeductRecord(payload = {}) {
  */
 export function createWorkOrderCompletionDeduct(workOrder, finishedQty) {
   if (!workOrder) return { ok: false, message: '工单不存在' }
+  // 「不领料」：无工单完工扣减（极简报工场景）
+  if (isInventoryNoIssue()) {
+    return { ok: true, skipped: true, message: '当前为「不领料」模式，不生成工单完工库存扣减' }
+  }
+  // 仅两档完工扣减模式建单
+  if (!isInventoryDeductByReport() && !isInventoryDeductByActual()) {
+    return { ok: true, skipped: true, message: '当前库存扣减模式不生成工单完工扣减' }
+  }
   const woNo = workOrder.code || workOrder.workOrderNo || ''
   const existed = materialRequisitionState.records.find((r) => {
     if (r.status === MATERIAL_DEDUCT_STATUS.VOIDED) return false
@@ -331,7 +345,8 @@ export function getMaterialDeductStats() {
 }
 
 export function isInventoryDeductAutoApprove() {
-  return isAutoApproveEnabled(AUTO_APPROVE_TYPES.INVENTORY_DEDUCT)
+  // 仅自主领料模式允许自动确认；无领料完工直扣必须人工确认
+  return isInventoryDeductByActual() && isAutoApproveEnabled(AUTO_APPROVE_TYPES.INVENTORY_DEDUCT)
 }
 
 export function updatePendingMaterialDeduct(id, patch = {}) {

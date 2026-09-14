@@ -208,7 +208,7 @@
         type="info"
         show-icon
         class="qc-qty-hint-alert"
-        message="已按质检「合格入库数量」带入本次入库数量，可改小，不可超过合格入库数与可入剩余。"
+        message="已按质检「合格入库数量」带入本次点收数量，可改小，不可超过合格入库数与可入剩余。"
       />
       <InboundLineScopeToggle v-model="lineScope" />
 
@@ -416,7 +416,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="入库数量" required>
+            <a-form-item label="点收数量" required>
               <a-input-number
                 v-model:value="lineEditDraft.qty"
                 :min="0"
@@ -1041,11 +1041,11 @@ function applyLineEdit() {
     return
   }
   if (!(Number(draft.qty) > 0)) {
-    message.warning('请填写入库数量')
+    message.warning('请填写点收数量')
     return
   }
   if (Number(draft.qty) > Number(draft.remainingQty) + 1e-9) {
-    message.warning(`入库数量不能超过剩余可入库数量 ${draft.remainingQty}`)
+    message.warning(`点收数量不能超过剩余可入库数量 ${draft.remainingQty}`)
     return
   }
   if (draft.settleUnit && !(Number(draft.settleQty) > 0)) {
@@ -1120,7 +1120,7 @@ function handleSave() {
   }
   const submitLines = editableLines.filter((line) => Number(line.qty) > 0)
   if (!submitLines.length) {
-    message.warning('请至少填写一行入库数量')
+    message.warning('请至少填写一行点收数量')
     return
   }
   const overQcCap = submitLines.find(
@@ -1128,7 +1128,7 @@ function handleSave() {
   )
   if (overQcCap) {
     message.warning(
-      `「${overQcCap.itemName}」入库数量不可超过质检合格入库数量（${overQcCap.qcMaxQty}）`,
+      `「${overQcCap.itemName}」点收数量不可超过质检合格入库数量（${overQcCap.qcMaxQty}）`,
     )
     return
   }

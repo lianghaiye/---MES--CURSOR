@@ -67,9 +67,17 @@
                 :scroll="{ x: lineScrollX }"
               >
                 <template #headerCell="{ column }">
-                  <template v-if="column.key === 'stockUnitQty'">
+                  <template v-if="column.key === 'qty'">
                     <span class="col-title-with-tip">
-                      库存数量
+                      点收数量
+                      <a-tooltip :title="RECEIVE_QTY_TIP">
+                        <InfoCircleOutlined class="col-tip-icon" />
+                      </a-tooltip>
+                    </span>
+                  </template>
+                  <template v-else-if="column.key === 'stockUnitQty'">
+                    <span class="col-title-with-tip">
+                      入库数量
                       <a-tooltip :title="STOCK_UNIT_QTY_TIP">
                         <InfoCircleOutlined class="col-tip-icon" />
                       </a-tooltip>
@@ -261,6 +269,7 @@ import { listStockPieces, stockPieceState } from '@/store/stockPieceStore'
 import { resolveInboundSourceRoute } from '@/utils/inboundSourceLink'
 import {
   inboundDetailLineColumns,
+  RECEIVE_QTY_TIP,
   STOCK_UNIT_QTY_TIP,
   SETTLE_QTY_TIP,
 } from '@/utils/inboundLineColumns'
