@@ -74,11 +74,17 @@ function normalizeRecord(row) {
     row.lines = row.lines.map((l) => {
       const isBackflush = Boolean(l.isBackflush || l.issueMode === '倒冲')
       const issueMode = l.issueMode || (isBackflush ? '倒冲' : '领料')
+      const viaCutSettle =
+        Boolean(l.viaCutSettle) ||
+        l.deductChannel === 'cut_settle' ||
+        l.status === MATERIAL_DEDUCT_STATUS.CUT_SETTLE
       return {
         ...l,
         isBackflush,
         issueMode,
-        deductible: l.deductible != null ? Boolean(l.deductible) : true,
+        viaCutSettle,
+        deductChannel: viaCutSettle ? 'cut_settle' : l.deductChannel || 'completion',
+        deductible: viaCutSettle ? false : l.deductible != null ? Boolean(l.deductible) : true,
         status: normalizeMaterialDeductStatus(l.status),
       }
     })
@@ -114,13 +120,22 @@ export function generateMaterialDeductNo() {
  * 写入一条库存扣减记录；若开启库存扣减自动审批则直接确认
  */
 export function createMaterialDeductRecord(payload = {}) {
-  const lines = (payload.lines || []).map((l) => ({
-    ...l,
-    planQty: Number(l.planQty) || 0,
-    actualQty: 0,
-    status: MATERIAL_DEDUCT_STATUS.PENDING,
-    failReason: '',
-  }))
+  const lines = (payload.lines || []).map((l) => {
+    const viaCutSettle =
+      Boolean(l.viaCutSettle) ||
+      l.deductChannel === 'cut_settle' ||
+      l.status === MATERIAL_DEDUCT_STATUS.CUT_SETTLE
+    return {
+      ...l,
+      planQty: Number(l.planQty) || 0,
+      actualQty: 0,
+      viaCutSettle,
+      deductChannel: viaCutSettle ? 'cut_settle' : l.deductChannel || 'completion',
+      deductible: viaCutSettle ? false : l.deductible !== false,
+      status: viaCutSettle ? MATERIAL_DEDUCT_STATUS.CUT_SETTLE : MATERIAL_DEDUCT_STATUS.PENDING,
+      failReason: viaCutSettle ? l.failReason || '线边消耗在下料结算完成' : l.failReason || '',
+    }
+  })
   if (!lines.length) {
     return { ok: false, message: '扣减明细不能为空' }
   }
@@ -260,7 +275,9 @@ function recalcMaterialCount(row) {
   row.materialTotal = deductible.length || lines.length
   row.materialDone = (deductible.length ? deductible : lines).filter(
     (l) =>
-      l.status === MATERIAL_DEDUCT_STATUS.SUCCESS || l.status === MATERIAL_DEDUCT_STATUS.SKIPPED,
+      l.status === MATERIAL_DEDUCT_STATUS.SUCCESS ||
+      l.status === MATERIAL_DEDUCT_STATUS.SKIPPED ||
+      l.status === MATERIAL_DEDUCT_STATUS.CUT_SETTLE,
   ).length
 }
 
@@ -271,7 +288,9 @@ function resolveDeductResultStatus(lines = []) {
   if (!total) return MATERIAL_DEDUCT_STATUS.FAILED
   const success = pool.filter(
     (l) =>
-      l.status === MATERIAL_DEDUCT_STATUS.SUCCESS || l.status === MATERIAL_DEDUCT_STATUS.SKIPPED,
+      l.status === MATERIAL_DEDUCT_STATUS.SUCCESS ||
+      l.status === MATERIAL_DEDUCT_STATUS.SKIPPED ||
+      l.status === MATERIAL_DEDUCT_STATUS.CUT_SETTLE,
   ).length
   const failed = pool.filter((l) => l.status === MATERIAL_DEDUCT_STATUS.FAILED).length
   if (failed === 0 && success === total) return MATERIAL_DEDUCT_STATUS.SUCCESS
@@ -279,15 +298,19 @@ function resolveDeductResultStatus(lines = []) {
   return MATERIAL_DEDUCT_STATUS.PARTIAL
 }
 
-/** 模拟扣减执行：库存不足则失败；领料展示行（deductible=false）记为无需扣减 */
+/** 模拟扣减执行：库存不足则失败；下料结算行 / 无需扣减行不实扣 */
 function executeDeductLines(lines = []) {
   return lines.map((l) => {
     if (l.deductible === false) {
+      const viaCutSettle =
+        Boolean(l.viaCutSettle) ||
+        l.deductChannel === 'cut_settle' ||
+        l.status === MATERIAL_DEDUCT_STATUS.CUT_SETTLE
       return {
         ...l,
         actualQty: 0,
-        status: MATERIAL_DEDUCT_STATUS.SKIPPED,
-        failReason: '',
+        status: viaCutSettle ? MATERIAL_DEDUCT_STATUS.CUT_SETTLE : MATERIAL_DEDUCT_STATUS.SKIPPED,
+        failReason: viaCutSettle ? l.failReason || '线边消耗在下料结算完成' : '',
       }
     }
     const planQty = Number(l.planQty) || 0

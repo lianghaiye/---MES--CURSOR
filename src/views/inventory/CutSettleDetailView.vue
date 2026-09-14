@@ -19,6 +19,9 @@
         >
           确认结算
         </a-button>
+        <a-button v-else-if="canReturnRemnant" type="primary" size="small" @click="onReturnRemnant">
+          余料退回发料仓
+        </a-button>
         <a-button size="small" @click="goBack">返回列表</a-button>
       </a-space>
     </div>
@@ -46,6 +49,9 @@
           }}</a-descriptions-item>
           <a-descriptions-item v-if="record.remnantInboundDocNo" label="余料入库单">
             {{ record.remnantInboundDocNo }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="remnantDispositionLabel" label="余料处置">
+            {{ remnantDispositionLabel }}
           </a-descriptions-item>
           <a-descriptions-item v-if="record.remark" label="备注" :span="2">
             {{ record.remark }}
@@ -167,7 +173,10 @@
 
         <div v-if="record.status === '待确认'" class="drawer-footer">
           <a-button @click="confirmOpen = false">取消</a-button>
-          <a-button type="primary" @click="submitConfirm">确认结算（耗用 + 余料回仓）</a-button>
+          <a-button @click="submitConfirm('return_to_ship')">确认结算（余料退回发料仓）</a-button>
+          <a-button type="primary" @click="submitConfirm('keep_line_side')"
+            >确认结算（余料留线边）</a-button
+          >
         </div>
       </template>
     </a-drawer>
@@ -182,7 +191,14 @@ export default { name: 'CutSettleDetailView' }
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { confirmCutSettle, getCutSettleById, cutSettleState } from '@/store/cutSettleStore'
+import {
+  confirmCutSettle,
+  getCutSettleById,
+  cutSettleState,
+  hasCutSettleRemnantPendingReturn,
+  returnCutSettleRemnantToShip,
+  CUT_SETTLE_REMNANT_DISPOSITION,
+} from '@/store/cutSettleStore'
 import { roundMeters } from '@/utils/variableLengthMaterial'
 import { formatQtyWithUnit } from '@/utils/numberFormat'
 
@@ -195,6 +211,17 @@ const record = computed(() => {
   tick.value
   void cutSettleState.records
   return getCutSettleById(String(route.params.id || ''))
+})
+
+const canReturnRemnant = computed(() => hasCutSettleRemnantPendingReturn(record.value))
+
+const remnantDispositionLabel = computed(() => {
+  const d = record.value?.remnantDisposition
+  if (d === CUT_SETTLE_REMNANT_DISPOSITION.KEEP_LINE_SIDE) {
+    return canReturnRemnant.value ? '余料留线边（待退回）' : '余料留线边'
+  }
+  if (d === CUT_SETTLE_REMNANT_DISPOSITION.RETURN_TO_SHIP) return '余料已退回发料仓'
+  return ''
 })
 
 const workOrderNos = computed(() => {
@@ -242,25 +269,56 @@ function goBack() {
   router.push('/inventory/cut-settle')
 }
 
-function submitConfirm() {
+function submitConfirm(disposition) {
+  const row = record.value
+  if (!row) return
+  const keep = disposition === CUT_SETTLE_REMNANT_DISPOSITION.KEEP_LINE_SIDE
+  Modal.confirm({
+    title: keep ? '确认结算（余料留线边）？' : '确认结算（余料退回发料仓）？',
+    content: keep
+      ? '将按实耗从线边扣减；余料仍留在线边仓，可供后续工单继续使用，需要时可再「余料退回发料仓」。'
+      : '将按实耗从线边扣减，并把余料退回发料仓（生成余料入库单）。',
+    onOk: () => {
+      ;(row.lines || []).forEach((line) => recalcRemnant(line))
+      const res = confirmCutSettle(row.id, { remnantDisposition: disposition })
+      if (!res.ok) {
+        message.error(res.message)
+        return
+      }
+      if (keep) {
+        message.success(
+          hasCutSettleRemnantPendingReturn(res.record)
+            ? '已确认：实耗已扣，余料留在线边'
+            : '已确认（无余料）',
+        )
+      } else {
+        message.success(
+          res.record.remnantInboundDocNo
+            ? `已确认，余料入库单 ${res.record.remnantInboundDocNo}`
+            : '已确认（无余料）',
+        )
+      }
+      confirmOpen.value = false
+      tick.value += 1
+    },
+  })
+}
+
+function onReturnRemnant() {
   const row = record.value
   if (!row) return
   Modal.confirm({
-    title: '确认下料结算？',
-    content: '将按实耗记工单用料，余料按新批次回仓。',
+    title: '余料退回发料仓？',
+    content: '将把本单仍留在线边的余料退回发料仓，并生成余料入库单。',
     onOk: () => {
-      ;(row.lines || []).forEach((line) => recalcRemnant(line))
-      const res = confirmCutSettle(row.id)
+      const res = returnCutSettleRemnantToShip(row.id)
       if (!res.ok) {
         message.error(res.message)
         return
       }
       message.success(
-        res.record.remnantInboundDocNo
-          ? `已确认，余料入库单 ${res.record.remnantInboundDocNo}`
-          : '已确认（无余料）',
+        res.inboundDocNo ? `余料已退回，入库单 ${res.inboundDocNo}` : '余料已退回发料仓',
       )
-      confirmOpen.value = false
       tick.value += 1
     },
   })

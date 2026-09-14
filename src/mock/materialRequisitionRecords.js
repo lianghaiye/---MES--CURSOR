@@ -6,8 +6,10 @@ export const MATERIAL_DEDUCT_STATUS = {
   PARTIAL: '部分成功',
   VOIDED: '已作废',
   PENDING: '待确认',
-  /** 领料展示行：同单展示但不在本单扣库存 */
+  /** 同单展示但不在本单扣库存（历史/兼容） */
   SKIPPED: '无需扣减',
+  /** 需下料结算物料：线边消耗在下料结算完成，本单仅展示 */
+  CUT_SETTLE: '下料结算扣减',
 }
 
 export const MATERIAL_DEDUCT_STATUS_OPTIONS = [
@@ -16,6 +18,7 @@ export const MATERIAL_DEDUCT_STATUS_OPTIONS = [
   { label: '成功', value: MATERIAL_DEDUCT_STATUS.SUCCESS },
   { label: '部分成功', value: MATERIAL_DEDUCT_STATUS.PARTIAL },
   { label: '失败', value: MATERIAL_DEDUCT_STATUS.FAILED },
+  { label: '下料结算扣减', value: MATERIAL_DEDUCT_STATUS.CUT_SETTLE },
   { label: '无需扣减', value: MATERIAL_DEDUCT_STATUS.SKIPPED },
   { label: '已作废', value: MATERIAL_DEDUCT_STATUS.VOIDED },
 ]

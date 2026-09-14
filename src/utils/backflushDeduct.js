@@ -1,8 +1,10 @@
 /**
  * 工单完工库存扣减：按 BOM 单位用量 × 完工数量生成扣减明细
  * - 「不领料」模式：不建工单完工扣减单（由调用方跳过）
- * - 「完工后预扣+确认」：默认扣发料仓；领料件+倒冲件都实扣；不可自动确认
- * - 「自主领料+完工后预扣+确认」：默认扣线边仓；领料件+倒冲件都按 BOM×完工数实扣（领料出库只是调入线边，不等于消耗）
+ * - 「完工后预扣+确认」：默认扣发料仓；须人工确认
+ * - 「自主领料+完工后预扣+确认」：默认扣线边仓；可自动确认
+ * - 物料主数据勾选「需要下料结算」且功能参数为「需下料结算」：本单仅展示为「下料结算扣减」，线边实扣在下料结算完成
+ * - 功能参数「无需下料结算」或未勾选需要下料结算：仍在本单按 BOM×完工数实扣
  */
 
 import { materialInfoState } from '@/store/materialInfoStore'
@@ -10,12 +12,15 @@ import { getWarehouseSelectOptions } from '@/store/warehouseStore'
 import { warehouseState } from '@/store/warehouseStore'
 import { resolveWorkOrderAllMaterialLines } from '@/utils/materialReqEbom'
 import { isBackflushMaterial } from '@/utils/backflushMaterial'
+import { resolveNeedsBlankingSettle } from '@/utils/blankingSettleMaterial'
 import { getStockQty } from '@/store/stockStore'
 import {
   getInventoryDeductMode,
   INVENTORY_DEDUCT_MODES,
   isInventoryDeductByActual,
+  isWholeWithRemnantIssue,
 } from '@/store/functionParamStore'
+import { MATERIAL_DEDUCT_STATUS } from '@/mock/materialRequisitionRecords'
 
 function lookupMaterial(code) {
   if (!code) return null
@@ -80,8 +85,17 @@ export function resolveLineIssueMode(line, material) {
   return '领料'
 }
 
-/** 该行是否在完工扣减单中实际扣库存（两档完工模式均按 BOM×完工数实扣） */
-export function isCompletionDeductLineDeductible(_line, deductMode = getInventoryDeductMode()) {
+/** 该行是否走下料结算消耗（库存扣减单仅展示、不实扣） */
+export function shouldCompletionDeductViaCutSettle(materialOrLine) {
+  if (!resolveNeedsBlankingSettle(materialOrLine)) return false
+  // 功能参数「需下料结算」才走下料结算扣线边；「无需下料结算」仍在本单扣
+  return isWholeWithRemnantIssue()
+}
+
+/** 该行是否在完工扣减单中实际扣库存 */
+export function isCompletionDeductLineDeductible(line, deductMode = getInventoryDeductMode()) {
+  if (line?.deductChannel === 'cut_settle' || line?.viaCutSettle) return false
+  if (shouldCompletionDeductViaCutSettle(line)) return false
   return (
     deductMode === INVENTORY_DEDUCT_MODES.POST_COMPLETE_BY_REPORT ||
     deductMode === INVENTORY_DEDUCT_MODES.SELF_ISSUE_BY_ACTUAL
@@ -114,7 +128,11 @@ export function collectWorkOrderCompletionDeductLines(workOrder, finishedQty) {
     const unitUsage = Number(bl.unitUsage) || Number(bl.unitQty) || Number(bl.shipQty) || 1
     const planQty = Math.round(unitUsage * qty * 1000) / 1000
     if (!(planQty > 0)) continue
-    const deductible = isCompletionDeductLineDeductible({ issueMode, isBackflush }, deductMode)
+    const viaCutSettle =
+      shouldCompletionDeductViaCutSettle(mat) || shouldCompletionDeductViaCutSettle(bl)
+    const deductible =
+      !viaCutSettle &&
+      isCompletionDeductLineDeductible({ issueMode, isBackflush, viaCutSettle }, deductMode)
     const stock = getStockQty(warehouseName, code)
     lines.push({
       id: `wo-deduct-line-${code}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
@@ -128,11 +146,13 @@ export function collectWorkOrderCompletionDeductLines(workOrder, finishedQty) {
       blankSizeMode: bl.blankSizeMode || '',
       planQty,
       actualQty: 0,
-      status: '待确认',
-      failReason: '',
+      status: viaCutSettle ? MATERIAL_DEDUCT_STATUS.CUT_SETTLE : MATERIAL_DEDUCT_STATUS.PENDING,
+      failReason: viaCutSettle ? '线边消耗在下料结算完成' : '',
       warehouseStockQty: stock,
       issueMode,
       isBackflush,
+      viaCutSettle,
+      deductChannel: viaCutSettle ? 'cut_settle' : 'completion',
       deductible,
       unit: bl.unit || mat?.inventoryUnit || mat?.stockUnit || '个',
       unitUsage,
@@ -159,6 +179,7 @@ export function buildWorkOrderCompletionDeductDraft(workOrder, finishedQty) {
   const wh = resolveBackflushWarehouse(workOrder)
   const backflushCount = lines.filter((l) => l.isBackflush).length
   const issueCount = lines.length - backflushCount
+  const cutSettleCount = lines.filter((l) => l.viaCutSettle).length
   return {
     ok: true,
     draft: {
@@ -175,7 +196,7 @@ export function buildWorkOrderCompletionDeductDraft(workOrder, finishedQty) {
       deductSource: 'work_order',
       requisitionMode: 'work-order',
       lines,
-      remark: `工单完工扣减（完工数量 ${reportQty}；按 BOM×完工数，领料 ${issueCount} / 倒冲 ${backflushCount}）`,
+      remark: `工单完工扣减（完工数量 ${reportQty}；领料 ${issueCount} / 倒冲 ${backflushCount}；下料结算扣减 ${cutSettleCount}）`,
     },
   }
 }

@@ -44,7 +44,7 @@
           type="info"
           show-icon
           class="phase-alert"
-          message="当前为预扣状态：按 BOM 单位用量×完工数量锁定扣减仓库存，确认后转为实扣；库存不足的行将扣减失败。自主领料模式下默认扣线边仓，无领料模式下默认扣发料仓（仓库均可改）。"
+          message="当前为预扣状态：需在本单实扣的物料按 BOM×完工数量锁定扣减仓库存；「下料结算扣减」行仅展示，线边消耗在下料结算完成。确认后正式实扣；库存不足则该行失败。"
         />
         <a-alert
           v-else-if="locked"
@@ -253,6 +253,7 @@ function statusClass(status) {
     [STATUS.VOIDED]: 'is-voided',
     [STATUS.PENDING]: 'is-pending',
     [STATUS.SKIPPED]: 'is-skipped',
+    [STATUS.CUT_SETTLE]: 'is-skipped',
   }
   return map[status] || ''
 }

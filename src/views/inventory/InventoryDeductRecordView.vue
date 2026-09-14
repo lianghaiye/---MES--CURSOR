@@ -402,6 +402,8 @@ function statusClass(status) {
     [STATUS.PARTIAL]: 'is-partial',
     [STATUS.VOIDED]: 'is-voided',
     [STATUS.PENDING]: 'is-pending',
+    [STATUS.SKIPPED]: 'is-skipped',
+    [STATUS.CUT_SETTLE]: 'is-skipped',
   }
   return map[status] || ''
 }
