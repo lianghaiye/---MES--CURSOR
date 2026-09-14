@@ -19,9 +19,6 @@
         >
           确认结算
         </a-button>
-        <a-button v-else-if="canReturnRemnant" type="primary" size="small" @click="onReturnRemnant">
-          余料退回发料仓
-        </a-button>
         <a-button size="small" @click="goBack">返回列表</a-button>
       </a-space>
     </div>
@@ -195,8 +192,6 @@ import {
   confirmCutSettle,
   getCutSettleById,
   cutSettleState,
-  hasCutSettleRemnantPendingReturn,
-  returnCutSettleRemnantToShip,
   CUT_SETTLE_REMNANT_DISPOSITION,
 } from '@/store/cutSettleStore'
 import { roundMeters } from '@/utils/variableLengthMaterial'
@@ -213,13 +208,9 @@ const record = computed(() => {
   return getCutSettleById(String(route.params.id || ''))
 })
 
-const canReturnRemnant = computed(() => hasCutSettleRemnantPendingReturn(record.value))
-
 const remnantDispositionLabel = computed(() => {
   const d = record.value?.remnantDisposition
-  if (d === CUT_SETTLE_REMNANT_DISPOSITION.KEEP_LINE_SIDE) {
-    return canReturnRemnant.value ? '余料留线边（待退回）' : '余料留线边'
-  }
+  if (d === CUT_SETTLE_REMNANT_DISPOSITION.KEEP_LINE_SIDE) return '余料留线边'
   if (d === CUT_SETTLE_REMNANT_DISPOSITION.RETURN_TO_SHIP) return '余料已退回发料仓'
   return ''
 })
@@ -276,7 +267,7 @@ function submitConfirm(disposition) {
   Modal.confirm({
     title: keep ? '确认结算（余料留线边）？' : '确认结算（余料退回发料仓）？',
     content: keep
-      ? '将按实耗从线边扣减；余料仍留在线边仓，可供后续工单继续使用，需要时可再「余料退回发料仓」。'
+      ? '将按实耗从线边扣减；余料仍留在线边仓，可供后续工单继续使用。'
       : '将按实耗从线边扣减，并把余料退回发料仓（生成余料入库单）。',
     onOk: () => {
       ;(row.lines || []).forEach((line) => recalcRemnant(line))
@@ -286,11 +277,8 @@ function submitConfirm(disposition) {
         return
       }
       if (keep) {
-        message.success(
-          hasCutSettleRemnantPendingReturn(res.record)
-            ? '已确认：实耗已扣，余料留在线边'
-            : '已确认（无余料）',
-        )
+        const hasRemnant = (res.record.lines || []).some((l) => Number(l.remnantLength) > 0)
+        message.success(hasRemnant ? '已确认：实耗已扣，余料留在线边' : '已确认（无余料）')
       } else {
         message.success(
           res.record.remnantInboundDocNo
@@ -299,26 +287,6 @@ function submitConfirm(disposition) {
         )
       }
       confirmOpen.value = false
-      tick.value += 1
-    },
-  })
-}
-
-function onReturnRemnant() {
-  const row = record.value
-  if (!row) return
-  Modal.confirm({
-    title: '余料退回发料仓？',
-    content: '将把本单仍留在线边的余料退回发料仓，并生成余料入库单。',
-    onOk: () => {
-      const res = returnCutSettleRemnantToShip(row.id)
-      if (!res.ok) {
-        message.error(res.message)
-        return
-      }
-      message.success(
-        res.inboundDocNo ? `余料已退回，入库单 ${res.inboundDocNo}` : '余料已退回发料仓',
-      )
       tick.value += 1
     },
   })

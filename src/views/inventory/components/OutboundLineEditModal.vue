@@ -79,6 +79,11 @@
                 {{ formatQty(preview?.stockQty ?? draft.stockQty) }}
               </div>
               <div class="stock-label">库存数量({{ preview?.unit || draft.unit || '件' }})</div>
+              <div class="stock-soft">
+                软占用
+                {{ formatQty(preview?.softAllocatedQty ?? 0) }}
+                {{ preview?.unit || draft.unit || '件' }}
+              </div>
             </div>
           </div>
         </div>
@@ -444,8 +449,8 @@ function refreshPreviewStock() {
   const freeQty = warehouse && itemCode ? sumFreeQty({ warehouse, itemCode }) : 0
   const dedicatedQty = warehouse && itemCode ? sumDedicatedQty({ warehouse, itemCode }) : 0
   const warehouseStockQty = Number(draft.value.warehouseStockQty) || 0
-  const softAllocated = itemCode ? getSoftAllocatedQtyByItemCode(itemCode) : 0
-  const availableQty = Math.max(0, warehouseStockQty - softAllocated)
+  const softAllocatedQty = itemCode ? getSoftAllocatedQtyByItemCode(itemCode) : 0
+  const availableQty = Math.max(0, warehouseStockQty - softAllocatedQty)
   preview.value = {
     itemCode: draft.value.itemCode,
     itemName: draft.value.itemName,
@@ -455,6 +460,7 @@ function refreshPreviewStock() {
     warehouseStockQty,
     freeQty,
     dedicatedQty,
+    softAllocatedQty,
     availableQty,
   }
 }

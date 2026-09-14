@@ -2,7 +2,11 @@ import { createOutboundLine } from '@/mock/outboundOrders'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getStockQty, stockState } from '@/store/stockStore'
-import { listBatches } from '@/store/stockBatchStore'
+import { listBatches, sumDedicatedQty } from '@/store/stockBatchStore'
+import {
+  getSoftAllocatedQtyByItemCode,
+  salesStockAllocationState,
+} from '@/store/salesStockAllocationStore'
 import { demoStockQty } from '@/utils/productionPlanWorkItem'
 import { resolveVariableLengthFields } from '@/utils/variableLengthMaterial'
 
@@ -175,8 +179,17 @@ export function enrichOutboundLineStock(line = {}) {
   const warehouse = line.shipWarehouse || ''
   const batchQty = getBatchStockQty(warehouse, itemCode)
   const realWh = getWarehouseStockQty(warehouse, itemCode)
+  void salesStockAllocationState.allocations
+  const stockQty = getTotalStockQty(itemCode)
+  const dedicatedQty = itemCode ? sumDedicatedQty({ itemCode }) : 0
+  const softAllocatedQty = itemCode ? getSoftAllocatedQtyByItemCode(itemCode) : 0
+  // 当前可用 = 总库存 − 按单库存 − 软占用
+  const availableStockQty = roundQty(Math.max(0, stockQty - dedicatedQty - softAllocatedQty))
   return {
-    stockQty: getTotalStockQty(itemCode),
+    stockQty,
+    dedicatedStockQty: dedicatedQty,
+    softAllocatedQty,
+    availableStockQty,
     // 有批次账时以批次合计为准，避免汇总与批次不一致；无批次则为真实仓存（可为 0）
     warehouseStockQty: batchQty > 0 ? batchQty : realWh,
   }

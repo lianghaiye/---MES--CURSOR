@@ -144,8 +144,8 @@
                       {{ line.lineStatus || '待出库' }}
                     </a-tag>
                   </template>
-                  <template v-else-if="column.key === 'stockQty'">
-                    {{ formatQty(line.stockQty) }}
+                  <template v-else-if="column.key === 'availableStockQty'">
+                    {{ formatQty(line.availableStockQty) }}
                     <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>
                   </template>
                   <template v-else-if="column.key === 'warehouseStockQty'">

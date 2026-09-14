@@ -29,7 +29,7 @@ export const outboundFormLineColumns = [
     ellipsis: true,
   },
   { title: '条码类型', dataIndex: 'barcodeType', key: 'barcodeType', width: 96 },
-  { title: '当前库存数', key: 'stockQty', width: 120, align: 'right' },
+  { title: '当前可用库存数', key: 'availableStockQty', width: 130, align: 'right' },
   { title: '当前仓库数量', key: 'warehouseStockQty', width: 130, align: 'right' },
   { title: '仓库', key: 'shipWarehouse', width: 120 },
   { title: '货位号', key: 'locationNo', dataIndex: 'locationNo', width: 110, ellipsis: true },

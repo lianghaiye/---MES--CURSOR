@@ -286,8 +286,8 @@
                   </template>
                   <span v-else>—</span>
                 </template>
-                <template v-else-if="column.key === 'stockQty'">
-                  {{ formatQty(record.stockQty) }}
+                <template v-else-if="column.key === 'availableStockQty'">
+                  {{ formatQty(record.availableStockQty) }}
                   <span class="unit-suffix">{{ resolveOutboundStockUnit(record) }}</span>
                 </template>
                 <template v-else-if="column.key === 'warehouseStockQty'">
@@ -1419,6 +1419,9 @@ function onLineItemClear(record) {
   record.material = ''
   record.drawingNo = ''
   record.stockQty = null
+  record.availableStockQty = null
+  record.softAllocatedQty = null
+  record.dedicatedStockQty = null
   record.warehouseStockQty = null
 }
 
