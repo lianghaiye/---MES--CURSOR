@@ -458,12 +458,7 @@ import {
   itemKindLabel,
   resolveBomItemTypeForKind,
 } from '@/utils/masterItemKind'
-import {
-  saveMasterItem,
-  deleteMasterItem,
-  cloneMasterItem,
-  resolveMasterItemEditRecord,
-} from '@/utils/masterItemSave'
+import { saveMasterItem, deleteMasterItem, cloneMasterItem } from '@/utils/masterItemSave'
 import { spuState, listSpus, updateSpu } from '@/store/spuStore'
 import { listSkusForSpu, batchGenerateSkus } from '@/utils/spuSkuSave'
 import { matrixRowsToSkuCombos } from '@/utils/spuMatrix'
@@ -738,18 +733,6 @@ const rowSelection = computed(() => ({
   },
 }))
 
-function resolveProductRecord(record) {
-  return resolveMasterItemEditRecord(record)
-}
-
-function openFormModal({ record = null, readOnly = false } = {}) {
-  viewOnly.value = readOnly
-  editRecord.value = record ? resolveProductRecord(record) : null
-  editSpu.value = null
-  modalSessionKey.value += 1
-  formModalOpen.value = true
-}
-
 function openCreate() {
   openCreateTab(router, openTab, {
     path: productCreatePage.newPath,
@@ -766,7 +749,10 @@ function openEdit(record) {
 }
 
 function openDetail(record) {
-  openFormModal({ record, readOnly: true })
+  if (!record?.id) return
+  const path = `/product-process/products/${record.id}`
+  openTab(path, `产品 ${record.code || record.name || ''}`.trim())
+  router.push({ name: 'product-process-products-detail', params: { id: record.id } })
 }
 
 function renderProductCodeLink({ text, record }) {

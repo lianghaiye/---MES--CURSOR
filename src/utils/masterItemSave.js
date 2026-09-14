@@ -22,11 +22,13 @@ import {
 import { generateSharedItemId } from '@/utils/productMaterialSync'
 
 function findProduct(id) {
-  return productInfoState.products.find((p) => p.id === id)
+  const sid = String(id ?? '')
+  return productInfoState.products.find((p) => String(p.id) === sid)
 }
 
 function findMaterial(id) {
-  return materialInfoState.materials.find((m) => m.id === id)
+  const sid = String(id ?? '')
+  return materialInfoState.materials.find((m) => String(m.id) === sid)
 }
 
 /** 编辑时合并双表记录供表单加载 */

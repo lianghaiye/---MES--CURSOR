@@ -1,13 +1,21 @@
 <template>
   <FormCreateShell
     :page-mode="pageMode"
+    :detail-mode="isDetailPage"
     :open="open"
-    :title="shellTitle"
+    :title="isDetailPage ? detailPageTitle : shellTitle"
     width="92%"
     class="master-item-form-modal"
+    :class="{ 'is-detail-page': isDetailPage }"
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
+    <template v-if="isDetailPage" #header-extra>
+      <span v-if="form.name" class="detail-product-name">{{ form.name }}</span>
+      <a-tag v-if="derivedItemKindLabel">{{ derivedItemKindLabel }}</a-tag>
+      <a-tag v-if="form.supplyForm">{{ form.supplyForm }}</a-tag>
+      <a-tag v-if="form.materialType">{{ form.materialType }}</a-tag>
+    </template>
     <div class="master-form-header-card">
       <div class="entity-name-header">
         <div class="entity-name-label">产品名称</div>
@@ -883,7 +891,18 @@
 
     <template #footer>
       <template v-if="viewOnly">
-        <a-button type="primary" @click="handleCancel">关闭</a-button>
+        <template v-if="isDetailPage">
+          <a-button size="small" @click="handleGoEditFromDetail">编辑</a-button>
+          <a-button
+            v-if="showProductFields && !isMultiVariantMode"
+            size="small"
+            @click="handleMaintainBomFromDetail"
+          >
+            BOM维护
+          </a-button>
+          <a-button size="small" @click="goBack">返回列表</a-button>
+        </template>
+        <a-button v-else type="primary" @click="handleCancel">关闭</a-button>
       </template>
       <template v-else>
         <a-button @click="handleCancel">
@@ -946,6 +965,7 @@ import {
 } from '@/mock/materialInfoOptions'
 import { unitState, getInventoryUnitOptions } from '@/store/unitStore'
 import { saveMasterItem, resolveMasterItemEditRecord } from '@/utils/masterItemSave'
+import { openCreateTab } from '@/utils/openCreateTab'
 import { persistProductBomDraft, validateProductBomDraft } from '@/utils/productBomFromDraft'
 import {
   ITEM_KIND,
@@ -1034,18 +1054,27 @@ const bomStrategyHelp = computed(
     '同类变体共用结构 → 建族模板 +「继承」；特殊 SKU 再建独立 BOM。销售投产仅认 SKU 自有生效 BOM。',
 )
 
-const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
-  listPath: '/product-process/products',
-  getTitle: () => {
-    const isProductEntry = String(props.listPath || '').includes('/product-process/products')
-    if (props.viewOnly) return isProductEntry ? '产品详情' : '主数据详情'
-    if (isProductEntry) return isEdit.value ? '编辑产品' : '新增产品'
-    return isEdit.value ? '编辑主数据' : '新增主数据'
+const { isActive, shellTitle, handleCancel, closeAfterSave, goBack } = useFormCreateModal(
+  props,
+  emit,
+  {
+    listPath: '/product-process/products',
+    getTitle: () => {
+      const isProductEntry = String(props.listPath || '').includes('/product-process/products')
+      if (props.viewOnly) return isProductEntry ? '产品详情' : '主数据详情'
+      if (isProductEntry) return isEdit.value ? '编辑产品' : '新增产品'
+      return isEdit.value ? '编辑主数据' : '新增主数据'
+    },
   },
-})
+)
 
 const isProductEntry = computed(() =>
   String(props.listPath || '').includes('/product-process/products'),
+)
+
+const isDetailPage = computed(() => Boolean(props.pageMode && props.viewOnly))
+const detailPageTitle = computed(
+  () => form.code || (isProductEntry.value ? '产品详情' : '主数据详情'),
 )
 
 const derivedItemKind = computed(() =>
@@ -2155,6 +2184,29 @@ function navigateToMaintainBom(itemType, itemId, itemName) {
   router.push(resolved)
 }
 
+function handleGoEditFromDetail() {
+  const id = props.editRecord?.id
+  if (!id) return
+  openCreateTab(router, openTab, {
+    path: `/product-process/products/${id}/edit`,
+    title: `编辑产品 ${form.code || form.name || ''}`.trim(),
+  })
+}
+
+function handleMaintainBomFromDetail() {
+  const id = props.editRecord?.id
+  if (!id) {
+    message.warning('无法定位物品，请稍后从列表维护 BOM')
+    return
+  }
+  const itemType =
+    derivedItemKind.value === ITEM_KIND.MATERIAL ||
+    (!showProductFields.value && showMaterialFields.value)
+      ? 'material'
+      : 'product'
+  navigateToMaintainBom(itemType, id, form.name)
+}
+
 /** 新增产品且存在 BOM 草稿明细时，随主数据一并落库为待发布产品 BOM */
 function tryPersistBomDraftOnCreate(result) {
   if (isEdit.value || !isProductEntry.value || isMultiVariantMode.value) {
@@ -2373,6 +2425,23 @@ function handleSaveAndMaintainBom() {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.65);
   margin-left: 8px;
+}
+
+.detail-product-name {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.65);
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.master-item-form-modal.is-detail-page {
+  .master-form-header-card,
+  .master-form-tabs-card {
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
 }
 
 /* 必须带齐 detail-tabs-pill，否则全局 margin:0 !important 会盖掉下间距 */
