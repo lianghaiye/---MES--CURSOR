@@ -1,18 +1,18 @@
 <template>
   <div class="board-catalog-page">
-    <div class="toolbar-row">
-      <a-space wrap :size="8">
-        <a-button type="primary" size="small" @click="openCreate">
-          <PlusOutlined />
-          新建看板
-        </a-button>
-      </a-space>
-      <a-button type="text" size="small" @click="refresh">
-        <ReloadOutlined />
-      </a-button>
-    </div>
-
     <div class="table-card">
+      <div class="toolbar-row">
+        <a-space wrap :size="8">
+          <a-button type="primary" size="small" @click="openCreate">
+            <PlusOutlined />
+            新建看板
+          </a-button>
+        </a-space>
+        <a-button type="text" size="small" @click="refresh">
+          <ReloadOutlined />
+        </a-button>
+      </div>
+
       <a-table
         :columns="columns"
         :data-source="list"
@@ -101,16 +101,16 @@ function toggleEnabled(record) {
   padding: 0;
 }
 
+.table-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 16px 16px;
+}
+
 .toolbar-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
-}
-
-.table-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px;
 }
 </style>
