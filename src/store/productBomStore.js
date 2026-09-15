@@ -6,6 +6,7 @@ import {
   hydrateCatalogBom,
   injectBomArchiveDemoMocks,
   injectBomParentReferenceMocks,
+  injectBomUpgradeSyncDemoMocks,
   isCatalogSeedBom,
 } from '@/mock/productBomSeed'
 import { mockMaterials } from '@/mock/materialInfo'
@@ -53,8 +54,8 @@ import {
 } from '@/utils/shipAttachmentConflict'
 
 const STORAGE_KEY = 'i_doms_product_bom'
-/** v13：归档演示增加母件丙；弹窗改为逐行处理方式 */
-const DATA_VERSION = 13
+/** v14：升版同步演示（子件待发布 + 母件引用旧版） */
+const DATA_VERSION = 14
 let bomNoSeq = 31000
 
 function normalizeBoms(boms) {
@@ -116,7 +117,9 @@ function loadInitialBoms() {
   const base = stored
     ? stored
     : injectBomParentReferenceMocks(normalizeBoms(buildPagedMockBoms(mockProducts, mockMaterials)))
-  const withDemos = ensureShipBomDemos(ensureBlankSizeDemoBoms(injectBomArchiveDemoMocks(base)))
+  const withDemos = ensureShipBomDemos(
+    ensureBlankSizeDemoBoms(injectBomUpgradeSyncDemoMocks(injectBomArchiveDemoMocks(base))),
+  )
   return ensureManualBomEditDemo(withDemos)
 }
 

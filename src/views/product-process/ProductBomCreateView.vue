@@ -1896,7 +1896,7 @@ function startPublishFlow(record) {
   }
 }
 
-function onEnableRefConfirm({ action, selectedRefs }) {
+function onEnableRefConfirm({ action, selectedRefs, upgradeRefs }) {
   if (!enableTarget.value) return
   if (action === 'reject') {
     message.info('已取消本次审核发布（BOM 已保存为待发布）')
@@ -1909,8 +1909,9 @@ function onEnableRefConfirm({ action, selectedRefs }) {
     router.push(editorListPath())
     return
   }
-  const upgrade = action === 'upgrade'
-  const ok = doEnableBom(enableTarget.value, upgrade, upgrade ? selectedRefs : [])
+  const refsToUpgrade = upgradeRefs || selectedRefs || []
+  const upgrade = refsToUpgrade.length > 0
+  const ok = doEnableBom(enableTarget.value, upgrade, refsToUpgrade)
   enableTarget.value = null
   enableParentRefs.value = []
   enableNewVersion.value = ''

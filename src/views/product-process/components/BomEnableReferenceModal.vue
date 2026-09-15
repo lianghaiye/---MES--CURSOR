@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     title="审核发布确认"
-    :width="720"
+    :width="880"
     :mask-closable="false"
     :footer="null"
     destroy-on-close
@@ -17,7 +17,9 @@
       <strong>{{ refs.length }}</strong>
       个父级 BOM 引用其生效版本
       <strong>{{ currentVersion || '—' }}</strong>
-      。请勾选需要同步升级的父级 BOM，并选择审核处理方式。
+      。请
+      <strong>逐行</strong>
+      选择每个母件的处理方式后确认发布。
     </p>
 
     <a-table
@@ -27,28 +29,46 @@
       size="small"
       bordered
       :pagination="false"
-      :row-selection="rowSelection"
       class="ref-table"
-    />
+    >
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'action'">
+          <a-select
+            v-model:value="rowModes[record.parentBomId]"
+            size="small"
+            style="width: 100%"
+            :options="actionOptions"
+          />
+        </template>
+      </template>
+    </a-table>
 
     <div class="action-hint">
-      处理方式说明：「通过并升级」仅更新已勾选的父级引用；「通过但不升级」仅发布当前
-      BOM；「不通过」取消本次审核发布。
+      <div>
+        <strong>同步升级引用版本</strong>
+        ：将该母件中对本子件的引用改到新版本
+        {{ newVersion || '—' }}。
+      </div>
+      <div>
+        <strong>不升级（保持引用旧版）</strong>
+        ：仅发布当前 BOM，该母件仍指向生效旧版
+        {{ currentVersion || '—' }}（发布后旧版将归档）。
+      </div>
     </div>
 
     <div class="modal-footer">
-      <a-button @click="handleAction('reject')">不通过</a-button>
-      <a-space>
-        <a-button @click="handleAction('approve-only')">通过但不升级</a-button>
-        <a-button type="primary" @click="handleAction('upgrade')">通过并升级</a-button>
-      </a-space>
+      <a-button @click="handleReject">不通过</a-button>
+      <a-button type="primary" @click="handleConfirm">确认发布</a-button>
     </div>
   </a-modal>
 </template>
 
+<script>
+export default { name: 'BomEnableReferenceModal' }
+</script>
+
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { computed, reactive, watch } from 'vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -61,57 +81,50 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'confirm'])
 
-const selectedRowKeys = ref([])
+/** @type {Record<string, 'upgrade'|'keep'>} */
+const rowModes = reactive({})
 
 const displayProductName = computed(() => props.productName || props.bomName || '—')
 
-const refColumns = [
-  { title: '父级产品', dataIndex: 'parentItemName', width: 150, ellipsis: true },
-  { title: '父级 BOM', dataIndex: 'parentBomName', width: 180, ellipsis: true },
-  { title: '父级版本', dataIndex: 'parentVersion', width: 96 },
-  { title: '引用行数', dataIndex: 'count', width: 88, align: 'center' },
+const actionOptions = [
+  { value: 'upgrade', label: '同步升级引用版本' },
+  { value: 'keep', label: '不升级（保持引用旧版）' },
 ]
 
-const rowSelection = computed(() => ({
-  selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys) => {
-    selectedRowKeys.value = keys
-  },
-}))
+const refColumns = [
+  { title: '父级产品', dataIndex: 'parentItemName', width: 140, ellipsis: true },
+  { title: '父级 BOM', dataIndex: 'parentBomName', width: 160, ellipsis: true },
+  { title: '父级版本', dataIndex: 'parentVersion', width: 88 },
+  { title: '引用行数', dataIndex: 'count', width: 80, align: 'center' },
+  { title: '处理方式', key: 'action', width: 220 },
+]
 
 watch(
   () => props.open,
   (open) => {
     if (!open) return
-    selectedRowKeys.value = props.refs.map((ref) => ref.parentBomId)
+    Object.keys(rowModes).forEach((k) => delete rowModes[k])
+    props.refs.forEach((ref) => {
+      rowModes[ref.parentBomId] = 'upgrade'
+    })
   },
 )
 
-function getSelectedRefs() {
-  const keySet = new Set(selectedRowKeys.value)
-  return props.refs.filter((ref) => keySet.has(ref.parentBomId))
+function handleReject() {
+  emit('update:open', false)
+  emit('confirm', { action: 'reject', upgradeRefs: [], keepRefs: [] })
 }
 
-function handleAction(action) {
-  if (action === 'reject') {
-    emit('update:open', false)
-    emit('confirm', { action: 'reject', selectedRefs: [] })
-    return
-  }
-
-  if (action === 'upgrade') {
-    const selectedRefs = getSelectedRefs()
-    if (!selectedRefs.length) {
-      message.warning('请至少勾选一个需要升级的父级 BOM')
-      return
-    }
-    emit('update:open', false)
-    emit('confirm', { action: 'upgrade', selectedRefs })
-    return
-  }
-
+function handleConfirm() {
+  const upgradeRefs = []
+  const keepRefs = []
+  props.refs.forEach((ref) => {
+    const mode = rowModes[ref.parentBomId] || 'upgrade'
+    if (mode === 'keep') keepRefs.push(ref)
+    else upgradeRefs.push(ref)
+  })
   emit('update:open', false)
-  emit('confirm', { action: 'approve-only', selectedRefs: [] })
+  emit('confirm', { action: 'approve', upgradeRefs, keepRefs })
 }
 </script>
 
@@ -133,14 +146,19 @@ function handleAction(action) {
 .action-hint {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
-  line-height: 1.6;
+  line-height: 1.7;
   margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .modal-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   padding-top: 4px;
 }
 </style>

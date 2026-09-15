@@ -938,7 +938,7 @@ function handleEnable(record) {
   doEnable(record)
 }
 
-function onEnableRefConfirm({ action, selectedRefs }) {
+function onEnableRefConfirm({ action, selectedRefs, upgradeRefs }) {
   if (!enableTarget.value) return
   if (action === 'reject') {
     message.info('已取消本次审核发布')
@@ -948,8 +948,9 @@ function onEnableRefConfirm({ action, selectedRefs }) {
     enableCurrentVersion.value = ''
     return
   }
-  const upgrade = action === 'upgrade'
-  doEnable(enableTarget.value, upgrade, upgrade ? selectedRefs : [])
+  const refsToUpgrade = upgradeRefs || selectedRefs || []
+  const upgrade = refsToUpgrade.length > 0
+  doEnable(enableTarget.value, upgrade, refsToUpgrade)
   enableTarget.value = null
   enableParentRefs.value = []
   enableNewVersion.value = ''

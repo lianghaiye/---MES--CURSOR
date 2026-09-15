@@ -438,6 +438,180 @@ export function injectBomArchiveDemoMocks(boms) {
   return boms
 }
 
+/**
+ * 升版同步演示：子件生效旧版 + 待发布新版，三份母件引用旧版。
+ * 列表筛「升版同步」→ 打开待发布子件 → 审核发布，应弹出父级同步升级窗。
+ */
+export function injectBomUpgradeSyncDemoMocks(boms) {
+  if (!Array.isArray(boms)) return boms
+  if (boms.some((b) => b.id === 'bom-demo-upgrade-child-pending')) return boms
+
+  const year = getBomVersionYear()
+  const activeVersion = formatBomVersion(year, 1)
+  const pendingVersion = formatBomVersion(year, 2)
+  const ts = dayjs().format('YYYY-MM-DD HH:mm')
+
+  const childItem = {
+    id: 'prod-upgrade-child',
+    code: 'ZJ-UPGRADE-001',
+    name: '[升版同步]叶轮组件',
+    specModel: 'YL-SYNC-A',
+    material: 'ZG230-450',
+    drawingNo: 'TZ-UPGRADE-C',
+  }
+  const childMats = pickChildMaterials(mockMaterials, childItem.code, 40, 4)
+  const childSubMap = {}
+  if (childMats.length > 1) {
+    childSubMap[0] = pickChildMaterials(mockMaterials, childMats[0].code, 50, 2)
+  }
+  const childStructure = buildBomStructureForItem(childItem, childMats, childSubMap)
+
+  const childActive = {
+    id: 'bom-demo-upgrade-child-active',
+    versionGroupId: 'bom-grp-demo-upgrade-child',
+    bomNo: 'BOM-UPGRADE-C01',
+    bomName: '[升版同步]叶轮组件 BOM',
+    itemType: 'product',
+    itemId: childItem.id,
+    itemName: childItem.name,
+    itemCode: childItem.code,
+    version: activeVersion,
+    versionYear: year,
+    versionSub: 1,
+    status: BOM_STATUS.ACTIVE,
+    isDefault: true,
+    effectiveAt: ts,
+    expiredAt: '',
+    operator: 'admin',
+    creator: 'admin',
+    createdAt: ts,
+    updatedAt: ts,
+    remark: '生效旧版：被母件引用；发布新版时用于父级同步演示',
+    matchingRequirements: '',
+    techParams: '',
+    processRoute: '',
+    bomType: '产品BOM',
+    specModel: childItem.specModel,
+    material: childItem.material,
+    drawingNo: childItem.drawingNo,
+    seedSource: 'upgrade-sync-demo',
+    treeNodes: childStructure.treeNodes,
+    lineItems: childStructure.lineItems,
+    templateRef: null,
+    columnSettings: [],
+    _mockUpgradeSyncDemo: true,
+  }
+
+  const pendingStructure = JSON.parse(JSON.stringify(childStructure))
+  const pendingFirst = pendingStructure.lineItems?.[0]
+  if (pendingFirst) {
+    pendingFirst.unitQty = (Number(pendingFirst.unitQty) || 1) + 1
+    const node = pendingStructure.treeNodes.find((n) => n.id === pendingFirst.treeNodeId)
+    if (node) node.quantity = pendingFirst.unitQty
+  }
+
+  const childPending = {
+    ...childActive,
+    id: 'bom-demo-upgrade-child-pending',
+    bomNo: 'BOM-UPGRADE-C02',
+    version: pendingVersion,
+    versionSub: 2,
+    status: BOM_STATUS.PENDING,
+    isDefault: false,
+    effectiveAt: '',
+    createdAt: ts,
+    updatedAt: ts,
+    remark: '待发布新版：审核发布时应弹出父级引用同步升级',
+    treeNodes: pendingStructure.treeNodes,
+    lineItems: pendingStructure.lineItems,
+    changeSourceType: 'manual_edit',
+    changeSourceLabel: '产品BOM编辑',
+  }
+
+  const parentDefs = [
+    {
+      id: 'bom-demo-upgrade-parent-a',
+      itemId: 'prod-upgrade-parent-a',
+      code: 'ZJ-UPGRADE-P01',
+      name: '[升版同步]母件整机-甲',
+      bomNo: 'BOM-UPGRADE-P01',
+      bomName: '[升版同步]母件整机-甲 BOM',
+    },
+    {
+      id: 'bom-demo-upgrade-parent-b',
+      itemId: 'prod-upgrade-parent-b',
+      code: 'ZJ-UPGRADE-P02',
+      name: '[升版同步]母件整机-乙',
+      bomNo: 'BOM-UPGRADE-P02',
+      bomName: '[升版同步]母件整机-乙 BOM',
+    },
+    {
+      id: 'bom-demo-upgrade-parent-c',
+      itemId: 'prod-upgrade-parent-c',
+      code: 'ZJ-UPGRADE-P03',
+      name: '[升版同步]母件整机-丙',
+      bomNo: 'BOM-UPGRADE-P03',
+      bomName: '[升版同步]母件整机-丙 BOM',
+    },
+  ]
+
+  const parents = parentDefs.map((def, idx) => {
+    const item = {
+      id: def.itemId,
+      code: def.code,
+      name: def.name,
+      specModel: `YS-DEMO-${idx + 1}`,
+      drawingNo: `TZ-UPGRADE-P${idx + 1}`,
+    }
+    const ownMats = pickChildMaterials(mockMaterials, item.code, 60 + idx * 5, 2)
+    const structure = buildBomStructureForItem(item, ownMats)
+    const parent = {
+      id: def.id,
+      versionGroupId: `bom-grp-${def.id}`,
+      bomNo: def.bomNo,
+      bomName: def.bomName,
+      itemType: 'product',
+      itemId: item.id,
+      itemName: item.name,
+      itemCode: item.code,
+      version: activeVersion,
+      versionYear: year,
+      versionSub: 1,
+      status: BOM_STATUS.ACTIVE,
+      isDefault: true,
+      effectiveAt: ts,
+      expiredAt: '',
+      operator: 'admin',
+      creator: 'admin',
+      createdAt: ts,
+      updatedAt: ts,
+      remark: '引用 [升版同步]叶轮组件 BOM 生效版，用于审核发布同步升级演示',
+      matchingRequirements: '',
+      techParams: '',
+      processRoute: '',
+      bomType: '产品BOM',
+      specModel: item.specModel,
+      material: '',
+      drawingNo: item.drawingNo,
+      seedSource: 'upgrade-sync-demo',
+      treeNodes: structure.treeNodes,
+      lineItems: structure.lineItems,
+      templateRef: null,
+      columnSettings: [],
+      _mockUpgradeSyncDemo: true,
+    }
+    const rootId = parent.treeNodes?.[0]?.id
+    appendBomRefWithChildren(parent, rootId, childActive, {
+      remark: '升版同步演示：子件 BOM 引用（指向生效旧版）',
+      subordinateCount: 2,
+    })
+    return parent
+  })
+
+  boms.unshift(...parents, childPending, childActive)
+  return boms
+}
+
 /** @deprecated 使用 buildPagedMockBoms */
 export function buildCatalogProductBoms(products) {
   return buildPagedMockBoms(products, mockMaterials)
