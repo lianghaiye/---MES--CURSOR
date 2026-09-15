@@ -1,5 +1,9 @@
 <template>
-  <ListPeriodStatsPanel v-model:period="period" :cards="cards" />
+  <ListPeriodStatsPanel
+    v-model:period="period"
+    :cards="cards"
+    storage-key="i_doms_purchase_order_stats_collapsed"
+  />
 </template>
 
 <script setup>

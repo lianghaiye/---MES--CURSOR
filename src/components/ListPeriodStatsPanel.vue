@@ -1,35 +1,75 @@
 <template>
-  <div class="list-period-stats-panel">
-    <div class="stats-toolbar">
-      <a-select v-model:value="period" size="small" style="width: 100px" :options="periodOpts" />
+  <div class="list-period-stats-panel" :class="{ 'is-collapsed': collapsed }">
+    <div class="stats-header">
+      <div class="stats-header-left">
+        <span class="stats-title">{{ title }}</span>
+        <a-select
+          v-if="showPeriod"
+          v-model:value="period"
+          size="small"
+          class="period-select"
+          :options="resolvedPeriodOpts"
+        />
+      </div>
+      <a-button type="link" size="small" class="collapse-btn" @click="collapsed = !collapsed">
+        {{ collapsed ? '展开' : '收起' }}
+        <UpOutlined v-if="!collapsed" />
+        <DownOutlined v-else />
+      </a-button>
     </div>
-    <a-row :gutter="12">
-      <a-col v-for="card in cards" :key="card.key" :xs="24" :sm="12" :lg="colSpan">
-        <div class="stat-card">
-          <div class="stat-body">
-            <div class="stat-title">{{ card.title }}</div>
-            <div class="stat-value">{{ card.value }}</div>
-            <div class="stat-compare" :class="compareClass(card.delta)">
-              <span>较上周期 {{ formatDelta(card.delta, card.deltaSuffix) }}</span>
-              <span v-if="Number(card.delta) !== 0" class="arrow">{{
-                Number(card.delta) > 0 ? '↑' : '↓'
-              }}</span>
+
+    <div v-show="!collapsed" class="stats-body">
+      <a-row :gutter="12">
+        <a-col v-for="card in cards" :key="card.key" :xs="24" :sm="12" :lg="colSpan">
+          <div class="stat-card">
+            <div class="stat-body">
+              <div class="stat-card-title">{{ card.title }}</div>
+              <div class="stat-value">
+                {{ card.value }}<span v-if="card.unit" class="stat-unit">{{ card.unit }}</span>
+              </div>
+              <div
+                v-if="card.compareText != null || card.delta != null"
+                class="stat-compare"
+                :class="card.compareClass || compareClass(card.delta)"
+              >
+                <span>{{
+                  card.compareText || `较上周期 ${formatDelta(card.delta, card.deltaSuffix)}`
+                }}</span>
+                <span
+                  v-if="card.delta != null && Number(card.delta) !== 0 && !card.hideArrow"
+                  class="arrow"
+                >
+                  {{ Number(card.delta) > 0 ? '↑' : '↓' }}
+                </span>
+              </div>
             </div>
+            <div
+              v-if="card.iconClass !== false"
+              class="stat-icon"
+              :class="card.iconClass || 'icon-shop'"
+            />
           </div>
-          <div class="stat-icon" :class="card.iconClass || 'icon-shop'" />
-        </div>
-      </a-col>
-    </a-row>
+        </a-col>
+      </a-row>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { DownOutlined, UpOutlined } from '@ant-design/icons-vue'
 import { STAT_PERIOD_OPTIONS } from '@/utils/deliveryStats'
 
 const props = defineProps({
+  title: { type: String, default: '统计概览' },
   period: { type: String, default: '本周' },
   cards: { type: Array, default: () => [] },
+  /** 是否显示周期切换 */
+  showPeriod: { type: Boolean, default: true },
+  /** 自定义周期选项；默认本周/本月/本季/本年 */
+  periodOptions: { type: Array, default: null },
+  /** 收起状态本地存储 key，传入则记住展开状态 */
+  storageKey: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:period'])
@@ -39,7 +79,34 @@ const period = computed({
   set: (v) => emit('update:period', v),
 })
 
-const periodOpts = STAT_PERIOD_OPTIONS.map((v) => ({ label: v, value: v }))
+const resolvedPeriodOpts = computed(() => {
+  if (Array.isArray(props.periodOptions) && props.periodOptions.length) {
+    return props.periodOptions.map((opt) =>
+      typeof opt === 'string' ? { label: opt, value: opt } : opt,
+    )
+  }
+  return STAT_PERIOD_OPTIONS.map((v) => ({ label: v, value: v }))
+})
+
+function loadCollapsed() {
+  if (!props.storageKey) return false
+  try {
+    return localStorage.getItem(props.storageKey) === '1'
+  } catch {
+    return false
+  }
+}
+
+const collapsed = ref(loadCollapsed())
+
+watch(collapsed, (v) => {
+  if (!props.storageKey) return
+  try {
+    localStorage.setItem(props.storageKey, v ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+})
 
 const colSpan = computed(() => {
   const n = props.cards?.length || 4
@@ -73,15 +140,54 @@ export default { name: 'ListPeriodStatsPanel' }
 .list-period-stats-panel {
   background: #fff;
   border-radius: 6px;
-  padding: 12px 12px 8px;
+  padding: 10px 12px 8px;
   margin-bottom: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  &.is-collapsed {
+    padding-bottom: 10px;
+  }
 }
 
-.stats-toolbar {
+.stats-header {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.stats-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stats-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+}
+
+.period-select {
+  width: 100px;
+}
+
+.collapse-btn {
+  padding-inline: 4px;
+  height: 24px;
+  color: rgba(0, 0, 0, 0.55);
+
+  :deep(.anticon) {
+    margin-left: 4px;
+    font-size: 10px;
+  }
+}
+
+.stats-body {
+  margin-top: 10px;
 }
 
 .stat-card {
@@ -96,7 +202,7 @@ export default { name: 'ListPeriodStatsPanel' }
   background: linear-gradient(135deg, #fafbff 0%, #fff 60%);
 }
 
-.stat-title {
+.stat-card-title {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.55);
   margin-bottom: 8px;
@@ -108,6 +214,13 @@ export default { name: 'ListPeriodStatsPanel' }
   color: rgba(0, 0, 0, 0.88);
   line-height: 1.2;
   word-break: break-all;
+}
+
+.stat-unit {
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .stat-compare {
@@ -146,6 +259,14 @@ export default { name: 'ListPeriodStatsPanel' }
   &.icon-warn {
     background: linear-gradient(145deg, #ffc069 0%, #fa8c16 55%, #ffc53d 100%);
     box-shadow: 0 6px 16px rgba(250, 140, 22, 0.22);
+  }
+  &.icon-blue {
+    background: linear-gradient(145deg, #91caff 0%, #1677ff 55%, #69b1ff 100%);
+    box-shadow: 0 6px 16px rgba(22, 119, 255, 0.25);
+  }
+  &.icon-purple {
+    background: linear-gradient(145deg, #b37feb 0%, #722ed1 50%, #9254de 100%);
+    box-shadow: 0 6px 16px rgba(114, 46, 209, 0.2);
   }
 }
 </style>
