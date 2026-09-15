@@ -421,6 +421,7 @@ export const routeTitles = {
   '/report/overview': '报表中心',
   '/board/catalog': '看板列表',
   '/board/carousel': '轮播管理',
+  '/board/carousel/new': '新建轮播方案',
   '/board/work-order-monitor': '工单监管看板',
   '/board/work-order-monitor/screen': '工单监管看板',
   '/board/carousel/play': '看板轮播播放',

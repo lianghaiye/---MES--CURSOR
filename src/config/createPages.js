@@ -232,6 +232,14 @@ export const createPageRegistry = [
     view: () => import('@/views/quality/QcFieldLibraryCreateView.vue'),
     keepAlive: 'QcFieldLibraryCreateView',
   },
+  {
+    listPath: '/board/carousel',
+    newPath: '/board/carousel/new',
+    title: '新建轮播方案',
+    name: 'board-carousel-new',
+    view: () => import('@/views/board/BoardCarouselSchemeEditView.vue'),
+    keepAlive: 'BoardCarouselSchemeEditView',
+  },
 ]
 
 export function findCreatePageByListPath(listPath) {

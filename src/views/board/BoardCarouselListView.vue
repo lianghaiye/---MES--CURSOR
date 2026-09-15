@@ -1,18 +1,18 @@
 <template>
   <div class="board-carousel-page">
-    <div class="toolbar-row">
-      <a-space wrap :size="8">
-        <a-button type="primary" size="small" @click="openCreate">
-          <PlusOutlined />
-          新建方案
-        </a-button>
-      </a-space>
-      <a-button type="text" size="small" @click="tick++">
-        <ReloadOutlined />
-      </a-button>
-    </div>
-
     <div class="table-card">
+      <div class="toolbar-row">
+        <a-space wrap :size="8">
+          <a-button type="primary" size="small" @click="openCreate">
+            <PlusOutlined />
+            新建方案
+          </a-button>
+        </a-space>
+        <a-button type="text" size="small" @click="tick++">
+          <ReloadOutlined />
+        </a-button>
+      </div>
+
       <a-table
         :columns="columns"
         :data-source="list"
@@ -52,8 +52,6 @@
         </template>
       </a-table>
     </div>
-
-    <BoardCarouselSchemeDrawer v-model:open="drawerOpen" :record="editRecord" @saved="tick++" />
   </div>
 </template>
 
@@ -62,6 +60,9 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 import {
   afterRoundLabel,
   boardCarouselState,
@@ -71,12 +72,11 @@ import {
   setCarouselSchemeEnabled,
   transitionLabel,
 } from '@/store/boardCarouselStore'
-import BoardCarouselSchemeDrawer from './components/BoardCarouselSchemeDrawer.vue'
 
 const router = useRouter()
+const { openTab } = useTabs()
+const createPage = findCreatePageByListPath('/board/carousel')
 const tick = ref(0)
-const drawerOpen = ref(false)
-const editRecord = ref(null)
 
 const list = computed(() => {
   void boardCarouselState.schemes
@@ -101,13 +101,23 @@ const columns = [
 ]
 
 function openCreate() {
-  editRecord.value = null
-  drawerOpen.value = true
+  if (!createPage) {
+    message.warning('未配置新建页')
+    return
+  }
+  openCreateTab(router, openTab, {
+    path: createPage.newPath,
+    title: createPage.title,
+  })
 }
 
 function openEdit(record) {
-  editRecord.value = JSON.parse(JSON.stringify(record))
-  drawerOpen.value = true
+  if (!createPage || !record?.id) return
+  openCreateTab(router, openTab, {
+    path: createPage.newPath,
+    title: `编辑方案 ${record.name || ''}`.trim(),
+    query: { id: record.id },
+  })
 }
 
 function handleDuplicate(record) {
@@ -158,16 +168,16 @@ function playFullscreen(record) {
 </script>
 
 <style scoped lang="less">
+.table-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 16px 16px;
+}
+
 .toolbar-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
-}
-
-.table-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px;
 }
 </style>
