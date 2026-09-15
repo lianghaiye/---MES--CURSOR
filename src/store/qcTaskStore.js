@@ -14,6 +14,7 @@ import { updatePurchaseReceipt } from '@/store/purchaseReceiptStore'
 import { updateOutsourcingReceipt } from '@/store/outsourcingReceiptStore'
 import { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS } from '@/constants/qcTaskResult'
 import { cloneMockIncomingQcTasks } from '@/mock/qcTasks'
+import { buildSharedQcTaskSeed } from '@/mock/qcSharedDemoSeed'
 import { getQcTemplateByCode } from '@/store/qcTemplateStore'
 
 export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
@@ -21,7 +22,7 @@ export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 const STORAGE_KEY = 'i_doms_qc_tasks'
 const STORAGE_VERSION = 3
 const SEED_VERSION_KEY = 'i_doms_qc_tasks_seed_v'
-const CURRENT_SEED_VERSION = '14'
+const CURRENT_SEED_VERSION = '16'
 
 export const QC_TASK_STATUS = {
   PENDING: '待质检',
@@ -129,10 +130,16 @@ function loadFromStorage() {
   return null
 }
 
+function mergeSharedDemoTasks(tasks = []) {
+  const shared = buildSharedQcTaskSeed()
+  const rest = (tasks || []).filter((t) => !String(t.id || '').startsWith('shared-'))
+  return [...shared, ...rest]
+}
+
 function initTasks() {
   if (shouldReseed()) {
     markSeeded()
-    const seeded = cloneMockIncomingQcTasks()
+    const seeded = mergeSharedDemoTasks(cloneMockIncomingQcTasks())
     // 立刻按瘦身格式写入，腾出配额并避免首屏 deep watch 再写膨胀数据
     try {
       localStorage.setItem(
@@ -144,7 +151,21 @@ function initTasks() {
     }
     return hydrateTasksAfterLoad(seeded)
   }
-  return loadFromStorage() || hydrateTasksAfterLoad(cloneMockIncomingQcTasks())
+  const loaded = loadFromStorage()
+  if (loaded) {
+    const merged = mergeSharedDemoTasks(loaded)
+    // 补齐同源演示单并回写（不改 seed 版本）
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ version: STORAGE_VERSION, tasks: slimTasksForStorage(merged) }),
+      )
+    } catch {
+      /* ignore */
+    }
+    return hydrateTasksAfterLoad(merged)
+  }
+  return hydrateTasksAfterLoad(mergeSharedDemoTasks(cloneMockIncomingQcTasks()))
 }
 
 function persist() {

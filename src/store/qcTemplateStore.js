@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import {
   QC_TEMPLATE_SCOPE_TYPE,
@@ -18,25 +18,78 @@ import {
 
 const TEMPLATE_SEED_KEY = 'i_doms_qc_templates_seed_v'
 const TEMPLATE_SEED_VERSION = '12'
+/** 与小程序共用：模板快照落盘，供移动端回填 templateFields */
+const TEMPLATE_STORAGE_KEY = 'i_doms_qc_templates'
+const TEMPLATE_STORAGE_VERSION = 1
 
 function nowText() {
   return dayjs().format('YYYY-MM-DD HH:mm:ss')
+}
+
+function loadTemplatesFromStorage() {
+  try {
+    const raw = localStorage.getItem(TEMPLATE_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (
+      parsed?.version === TEMPLATE_STORAGE_VERSION &&
+      Array.isArray(parsed.templates) &&
+      parsed.templates.length
+    ) {
+      return parsed.templates
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+function persistTemplates() {
+  try {
+    localStorage.setItem(
+      TEMPLATE_STORAGE_KEY,
+      JSON.stringify({
+        version: TEMPLATE_STORAGE_VERSION,
+        templates: qcTemplateState.templates,
+      }),
+    )
+  } catch {
+    /* ignore quota */
+  }
 }
 
 function initTemplates() {
   try {
     if (localStorage.getItem(TEMPLATE_SEED_KEY) !== TEMPLATE_SEED_VERSION) {
       localStorage.setItem(TEMPLATE_SEED_KEY, TEMPLATE_SEED_VERSION)
+      const fresh = cloneQcTemplates()
+      // 种子升级时覆盖落盘，保证小程序读到最新模板
+      try {
+        localStorage.setItem(
+          TEMPLATE_STORAGE_KEY,
+          JSON.stringify({ version: TEMPLATE_STORAGE_VERSION, templates: fresh }),
+        )
+      } catch {
+        /* ignore */
+      }
+      return fresh
     }
   } catch {
     /* ignore */
   }
-  return cloneQcTemplates()
+  return loadTemplatesFromStorage() || cloneQcTemplates()
 }
 
 export const qcTemplateState = reactive({
   templates: initTemplates(),
 })
+
+persistTemplates()
+watch(
+  () => qcTemplateState.templates,
+  () => persistTemplates(),
+  { deep: true },
+)
 
 /** 按种子版本重载演示模板；热更新时同步密封件复合结构 */
 export function ensureQcTemplateDemoSeed() {
@@ -96,6 +149,7 @@ export function ensureQcTemplateDemoSeed() {
   if (changed) {
     row.fields = fields
     row.fieldCount = fields.length
+    persistTemplates()
   }
   return changed
 }

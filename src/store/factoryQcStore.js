@@ -5,6 +5,7 @@ import {
   createQcLineItem,
   resolveHeaderQcResult,
 } from '@/mock/factoryQcRecords'
+import { buildSharedFactoryQcSeed } from '@/mock/qcSharedDemoSeed'
 import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 import { aggregateLineConclusions, resolveQcResultFromFieldValues } from '@/utils/qcConclusionField'
 import { bindQcLineTemplate, summarizeTaskTemplates } from '@/store/qcTaskStore'
@@ -51,9 +52,24 @@ export function generateFactoryQcNo() {
   return `${prefix}${String(maxSeq + 1).padStart(4, '0')}`
 }
 
+function mergeSharedFactoryDemo(records = []) {
+  const shared = buildSharedFactoryQcSeed()
+  const rest = (records || []).filter((r) => !String(r.id || '').startsWith('shared-'))
+  return [...shared, ...rest]
+}
+
+function initFactoryRecords() {
+  const loaded = loadFromStorage()
+  if (loaded) return mergeSharedFactoryDemo(loaded)
+  return mergeSharedFactoryDemo(cloneFactoryQcRecords())
+}
+
 export const factoryQcState = reactive({
-  records: loadFromStorage() || cloneFactoryQcRecords(),
+  records: initFactoryRecords(),
 })
+
+// 首屏合并演示单后落盘，便于小程序同源读取
+persist()
 
 watch(
   () => factoryQcState.records,
