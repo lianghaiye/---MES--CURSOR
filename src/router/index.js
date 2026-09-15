@@ -1055,6 +1055,12 @@ const routes = [
         meta: { title: '仓库列表' },
       },
       {
+        path: 'basic-config/warehouse-locations',
+        name: 'basic-config-warehouse-locations',
+        component: () => import('@/views/basic-config/WarehouseLocationView.vue'),
+        meta: { title: '货位管理' },
+      },
+      {
         path: 'basic-config/warehouses/:id',
         name: 'basic-config-warehouse-detail',
         component: () => import('@/views/basic-config/WarehouseDetailView.vue'),

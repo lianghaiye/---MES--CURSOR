@@ -97,6 +97,7 @@
             <a-space :size="8">
               <a @click="openEdit(record)">编辑</a>
               <a @click="openStorage(record)">存放管理</a>
+              <a @click="goLocations(record)">货位</a>
               <a class="danger-link" @click="confirmDelete(record)">删除</a>
             </a-space>
           </template>
@@ -131,6 +132,7 @@ import { DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@a
 import WarehouseFormModal from './components/WarehouseFormModal.vue'
 import WarehouseStorageModal from './components/WarehouseStorageModal.vue'
 import { warehouseState, filterWarehouses, deleteWarehouse } from '@/store/warehouseStore'
+import { countLocationsByWarehouseId } from '@/store/warehouseLocationStore'
 import { getWarehouseCategoryOptions } from '@/store/warehouseCategoryStore'
 import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
@@ -160,7 +162,7 @@ const baseColumns = [
   { title: '仓库地址', dataIndex: 'address', width: 140, ellipsis: true },
   { title: '存放物品', key: 'storedCount', width: 80, align: 'center' },
   { title: '创建日期', dataIndex: 'createdAt', width: 170 },
-  { title: '操作', key: 'actions', width: 180, fixed: 'right' },
+  { title: '操作', key: 'actions', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -201,7 +203,16 @@ function openStorage(record) {
   storageOpen.value = true
 }
 
+function goLocations(record) {
+  openTab('/basic-config/warehouse-locations', '货位管理')
+  router.push({ path: '/basic-config/warehouse-locations', query: { warehouseId: record.id } })
+}
+
 function confirmDelete(record) {
+  if (countLocationsByWarehouseId(record.id) > 0) {
+    message.warning('该仓库下存在货位，请先删除货位')
+    return
+  }
   Modal.confirm({
     title: '确认删除',
     content: `确定删除仓库「${record.name}」吗？`,

@@ -169,6 +169,14 @@ export const createPageRegistry = [
     keepAlive: 'WarehouseCreateView',
   },
   {
+    listPath: '/basic-config/warehouse-locations',
+    newPath: '/basic-config/warehouse-locations/new',
+    title: '新增货位',
+    name: 'basic-config-warehouse-locations-new',
+    view: () => import('@/views/basic-config/WarehouseLocationCreateView.vue'),
+    keepAlive: 'WarehouseLocationCreateView',
+  },
+  {
     listPath: '/basic-config/warehouse-categories',
     newPath: '/basic-config/warehouse-categories/new',
     title: '新增仓库分类',

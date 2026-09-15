@@ -9,6 +9,7 @@
           </div>
           <a-space>
             <a-button type="primary" size="small" @click="openStorage">存放管理</a-button>
+            <a-button size="small" @click="goLocations">货位管理</a-button>
             <a-button size="small" @click="openEdit">编辑</a-button>
             <a-button size="small" @click="goBack">返回列表</a-button>
           </a-space>
@@ -71,6 +72,35 @@
             </template>
           </a-table>
         </div>
+
+        <div class="section-card">
+          <div class="section-title">
+            货位
+            <span class="item-count">（{{ locationRows.length }} 个）</span>
+          </div>
+          <a-table
+            :columns="locationColumns"
+            :data-source="locationRows"
+            row-key="id"
+            size="small"
+            bordered
+            :pagination="{ pageSize: 8, size: 'small', showTotal: (t) => `共 ${t} 条` }"
+          >
+            <template #bodyCell="{ column, record: loc }">
+              <template v-if="column.key === 'enabled'">
+                <a-tag :color="loc.enabled === false ? 'default' : 'success'">
+                  {{ loc.enabled === false ? '停用' : '启用' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'occupyStatus'">
+                {{ loc.occupyStatus || '空闲' }}
+              </template>
+            </template>
+            <template #emptyText>
+              <a-empty :image="false" description="暂未维护货位" />
+            </template>
+          </a-table>
+        </div>
       </template>
       <a-empty v-else-if="!loading" description="未找到该仓库" />
     </a-spin>
@@ -88,11 +118,14 @@ export default { name: 'WarehouseDetailView' }
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getWarehouseById } from '@/store/warehouseStore'
+import { warehouseLocationState, filterWarehouseLocations } from '@/store/warehouseLocationStore'
+import { useTabs } from '@/composables/useTabs'
 import WarehouseFormModal from './components/WarehouseFormModal.vue'
 import WarehouseStorageModal from './components/WarehouseStorageModal.vue'
 
 const route = useRoute()
 const router = useRouter()
+const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 const editOpen = ref(false)
@@ -116,6 +149,31 @@ const storedItems = computed(() =>
     rowKey: `${it.itemType}-${it.itemId}`,
   })),
 )
+
+const locationColumns = [
+  { title: '货位编码', dataIndex: 'code', width: 160 },
+  { title: '库区', dataIndex: 'zone', width: 90 },
+  { title: '类型', dataIndex: 'locationType', width: 100 },
+  { title: '状态', key: 'enabled', width: 80 },
+  { title: '占用', key: 'occupyStatus', width: 90 },
+]
+
+const locationRows = computed(() => {
+  void warehouseLocationState.locations
+  if (!record.value?.id) return []
+  return filterWarehouseLocations(warehouseLocationState.locations, {
+    warehouseId: record.value.id,
+  })
+})
+
+function goLocations() {
+  if (!record.value?.id) return
+  openTab('/basic-config/warehouse-locations', '货位管理')
+  router.push({
+    path: '/basic-config/warehouse-locations',
+    query: { warehouseId: record.value.id },
+  })
+}
 
 function reload() {
   record.value = getWarehouseById(route.params.id)

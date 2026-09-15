@@ -177,6 +177,11 @@ export const sideMenus = {
       children: [
         { key: 'warehouses', label: '仓库列表', path: '/basic-config/warehouses' },
         {
+          key: 'warehouse-locations',
+          label: '货位管理',
+          path: '/basic-config/warehouse-locations',
+        },
+        {
           key: 'warehouse-categories',
           label: '仓库分类',
           path: '/basic-config/warehouse-categories',
@@ -422,6 +427,7 @@ export const routeTitles = {
   '/basic-config/business-dict': '业务字典',
   '/basic-config/warehouse-categories': '仓库分类',
   '/basic-config/warehouses': '仓库列表',
+  '/basic-config/warehouse-locations': '货位管理',
   ...createPageRouteTitles,
 }
 
