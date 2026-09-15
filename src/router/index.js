@@ -123,6 +123,12 @@ const routes = [
     meta: { title: '工单监管看板', standalone: true },
   },
   {
+    path: '/board/carousel/play/:schemeId',
+    name: 'board-carousel-play',
+    component: () => import('@/views/board/BoardCarouselPlayView.vue'),
+    meta: { title: '看板轮播播放', standalone: true },
+  },
+  {
     path: '/',
     component: MainLayout,
     redirect: '/home/dashboard',
@@ -992,6 +998,18 @@ const routes = [
         ...emptyChild('after-sales-service-orders', '服务工单'),
       },
       { path: 'after-sales/returns', ...emptyChild('after-sales-returns', '退换货') },
+      {
+        path: 'board/catalog',
+        name: 'board-catalog',
+        component: () => import('@/views/board/BoardCatalogView.vue'),
+        meta: { title: '看板列表' },
+      },
+      {
+        path: 'board/carousel',
+        name: 'board-carousel',
+        component: () => import('@/views/board/BoardCarouselListView.vue'),
+        meta: { title: '轮播管理' },
+      },
       {
         path: 'board/work-order-monitor',
         name: 'board-work-order-monitor',

@@ -216,6 +216,8 @@ export const sideMenus = {
   ],
 
   board: [
+    { key: 'catalog', label: '看板列表', path: '/board/catalog' },
+    { key: 'carousel', label: '轮播管理', path: '/board/carousel' },
     {
       key: 'work-order-monitor',
       label: '工单监管看板',
@@ -417,8 +419,11 @@ export const routeTitles = {
   '/qms/trace': '质量追溯',
   '/equipment/devices': '设备管理',
   '/report/overview': '报表中心',
+  '/board/catalog': '看板列表',
+  '/board/carousel': '轮播管理',
   '/board/work-order-monitor': '工单监管看板',
   '/board/work-order-monitor/screen': '工单监管看板',
+  '/board/carousel/play': '看板轮播播放',
   '/basic-config/employee-groups': '员工组别',
   '/basic-config/defect-items': '不良品项',
   '/basic-config/material-grades': '材质管理',
