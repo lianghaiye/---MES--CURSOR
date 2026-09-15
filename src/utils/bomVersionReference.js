@@ -36,6 +36,14 @@ export function lineReferencesBom(line, bom) {
   return childBom === bom.bomName || childBom === bom.bomNo
 }
 
+/** 母件产品展示：编号/名称/规格型号/材质 */
+export function formatParentBomItemLabel(parent = {}) {
+  const parts = [parent.itemCode, parent.itemName, parent.specModel, parent.material]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+  return parts.length ? parts.join('/') : parent.itemName || '—'
+}
+
 /** 查找引用了该 BOM 版本的父级 BOM */
 export function findParentBomReferences(bom) {
   if (!bom) return []
@@ -50,6 +58,10 @@ export function findParentBomReferences(bom) {
       parentBomId: parent.id,
       parentBomName: parent.bomName,
       parentItemName: parent.itemName,
+      parentItemCode: parent.itemCode || '',
+      parentSpecModel: parent.specModel || '',
+      parentMaterial: parent.material || '',
+      parentItemLabel: formatParentBomItemLabel(parent),
       parentVersion: parent.version,
       lineIds: matched.map((l) => l.id),
       count: matched.length,

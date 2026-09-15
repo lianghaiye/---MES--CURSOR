@@ -8,14 +8,14 @@
     destroy-on-close
     @update:open="emit('update:open', $event)"
   >
-    <a-alert type="warning" show-icon class="ref-alert" message="检测到父级 BOM 引用" />
+    <a-alert type="warning" show-icon class="ref-alert" message="检测到母件 BOM 引用" />
 
     <p class="ref-tip">
       【{{ displayProductName }}】待发布新版本
       <strong>{{ newVersion || '—' }}</strong>
       ，当前仍有
       <strong>{{ refs.length }}</strong>
-      个父级 BOM 引用其生效版本
+      个母件 BOM 引用其生效版本
       <strong>{{ currentVersion || '—' }}</strong>
       。请
       <strong>逐行</strong>
@@ -92,9 +92,15 @@ const actionOptions = [
 ]
 
 const refColumns = [
-  { title: '父级产品', dataIndex: 'parentItemName', width: 140, ellipsis: true },
-  { title: '父级 BOM', dataIndex: 'parentBomName', width: 160, ellipsis: true },
-  { title: '父级版本', dataIndex: 'parentVersion', width: 88 },
+  {
+    title: '母件产品',
+    dataIndex: 'parentItemLabel',
+    key: 'parentItemLabel',
+    width: 220,
+    ellipsis: true,
+  },
+  { title: '母件 BOM', dataIndex: 'parentBomName', width: 160, ellipsis: true },
+  { title: '母件版本', dataIndex: 'parentVersion', width: 88 },
   { title: '引用行数', dataIndex: 'count', width: 80, align: 'center' },
   { title: '处理方式', key: 'action', width: 220 },
 ]

@@ -98,7 +98,13 @@ const actionOptions = [
 ]
 
 const refColumns = [
-  { title: '母件产品', dataIndex: 'parentItemName', width: 140, ellipsis: true },
+  {
+    title: '母件产品',
+    dataIndex: 'parentItemLabel',
+    key: 'parentItemLabel',
+    width: 220,
+    ellipsis: true,
+  },
   { title: '母件 BOM', dataIndex: 'parentBomName', width: 160, ellipsis: true },
   { title: '母件版本', dataIndex: 'parentVersion', width: 88 },
   { title: '引用行数', dataIndex: 'count', width: 80, align: 'center' },
