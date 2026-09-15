@@ -528,15 +528,15 @@ const baseColumns = [
   { title: '来源', key: 'sourceChannel', width: 80 },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
   { title: '创建人', dataIndex: 'creator', width: 80 },
-  { title: '确认时间', dataIndex: 'auditDate', width: 160 },
-  { title: '确认人', dataIndex: 'auditor', width: 80 },
-  { title: '确认人', dataIndex: 'warehouseKeeper', width: 80 },
+  { title: '操作时间', dataIndex: 'auditDate', width: 160 },
+  { title: '操作人', dataIndex: 'auditor', width: 80 },
+  { title: '仓管员', dataIndex: 'warehouseKeeper', width: 80 },
   { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
   { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outbound-list-v4', baseColumns, { minScrollX: 2200 })
+  useTableColumnSettings('outbound-list-v6', baseColumns, { minScrollX: 2200 })
 
 const filteredList = computed(() =>
   filterOutboundOrders(outboundState.orders, appliedFilters.value),
@@ -549,7 +549,7 @@ const {
   defaultExportFieldSettings,
   doExport,
 } = useListExport({
-  storageKey: 'outbound-list-v4',
+  storageKey: 'outbound-list-v6',
   fieldDefinitions: outboundExportFields,
   getFilteredRows: () => filteredList.value,
   getSelectedRows: () => outboundState.orders.filter((o) => selectedRowKeys.value.includes(o.id)),

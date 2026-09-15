@@ -29,8 +29,8 @@ export const outboundExportFields = [
   },
   { key: 'createdAt', title: '创建时间', getValue: (row) => cell(row, 'createdAt') },
   { key: 'creator', title: '创建人', getValue: (row) => cell(row, 'creator') },
-  { key: 'auditDate', title: '确认时间', getValue: (row) => cell(row, 'auditDate') },
-  { key: 'auditor', title: '确认人', getValue: (row) => cell(row, 'auditor') },
+  { key: 'auditDate', title: '操作时间', getValue: (row) => cell(row, 'auditDate') },
+  { key: 'auditor', title: '操作人', getValue: (row) => cell(row, 'auditor') },
   { key: 'warehouseKeeper', title: '仓管员', getValue: (row) => cell(row, 'warehouseKeeper') },
   { key: 'remark', title: '备注', getValue: (row) => cell(row, 'remark') },
   {

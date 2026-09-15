@@ -54,7 +54,8 @@ const metaItems = computed(() => {
     { key: 'status', label: '状态', value: display(r.status) },
     { key: 'creator', label: '创建人', value: display(r.creator) },
     { key: 'createdAt', label: '创建时间', value: display(r.createdAt) },
-    { key: 'warehouseKeeper', label: '确认人', value: display(r.warehouseKeeper) },
+    { key: 'auditor', label: '操作人', value: display(r.auditor) },
+    { key: 'auditDate', label: '操作时间', value: display(r.auditDate) },
     { key: 'completedAt', label: '完成日期', value: display(r.completedAt) },
   ]
 })
