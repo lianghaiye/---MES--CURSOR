@@ -49,7 +49,16 @@ export const outboundFormLineColumns = [
   { title: '操作', key: 'actions', width: 220 },
 ]
 
-export const outboundDetailLineColumns = outboundFormLineColumns.filter((c) => c.key !== 'actions')
+/** 详情页不展示实时库存；拣选批次改为出库实扣批次 */
+export const OUTBOUND_DETAIL_HIDDEN_LINE_KEYS = [
+  'actions',
+  'availableStockQty',
+  'warehouseStockQty',
+]
+
+export const outboundDetailLineColumns = outboundFormLineColumns.filter(
+  (c) => !OUTBOUND_DETAIL_HIDDEN_LINE_KEYS.includes(c.key),
+)
 
 /** 按出库类型过滤明细列（非销售出库隐藏包装形式、发货备注；销售出库隐藏下料尺寸） */
 export function filterOutboundLineColumns(columns, outboundType) {

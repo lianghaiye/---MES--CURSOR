@@ -9,6 +9,7 @@ import {
 } from '@/store/salesStockAllocationStore'
 import { demoStockQty } from '@/utils/productionPlanWorkItem'
 import { resolveVariableLengthFields } from '@/utils/variableLengthMaterial'
+import { getLocationSelectOptions } from '@/store/warehouseLocationStore'
 
 function roundQty(val) {
   return Math.round((Number(val) || 0) * 1000) / 1000
@@ -76,6 +77,31 @@ export function applyDualUnitFieldsToOutboundLine(line = {}, itemCode = '') {
 /** 出库明细是否展示拣选批次 */
 export function canOutboundBatchPick(line = {}) {
   return Boolean(line?.itemCode || line?.materialCode || line?.productCode)
+}
+
+/** 件码：兼容数组与「、」分隔字符串 */
+export function normalizePieceSerialNos(value) {
+  if (!value) return []
+  if (Array.isArray(value)) return value.map((s) => String(s).trim()).filter(Boolean)
+  return String(value)
+    .split(/[、,，;；\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/** 出库确认时实际扣减的批次文案（优先分配明细） */
+export function formatOutboundIssuedBatchText(line = {}) {
+  const allocs = (line.batchAllocations || []).filter((a) => a?.batchNo)
+  if (allocs.length) {
+    return allocs
+      .map((a) => {
+        const qty = Number(a.qty)
+        if (Number.isFinite(qty) && qty > 0) return `${a.batchNo}×${qty}`
+        return a.batchNo
+      })
+      .join('；')
+  }
+  return line.issuedBatchNo || line.pickedBatchNo || line.barcodeBatchNo || ''
 }
 
 export function calcLineTotalPrice(line = {}) {
@@ -157,8 +183,12 @@ export function getBatchStockQty(warehouse, itemCode) {
   )
 }
 
-/** 根据仓库与物品编码解析货位号（只读展示） */
+/** 优先用已维护货位；否则回落演示货位号 */
 export function resolveOutboundLocationNo(warehouse, itemCode) {
+  if (warehouse) {
+    const opts = getLocationSelectOptions(warehouse)
+    if (opts.length) return opts[0].value
+  }
   if (!warehouse || !itemCode) return ''
   const seed = `${warehouse}::${itemCode}`
   const zones = ['A', 'B', 'C', 'D', 'E']
@@ -169,6 +199,7 @@ export function resolveOutboundLocationNo(warehouse, itemCode) {
 }
 
 export function enrichOutboundLineLocation(line = {}) {
+  if (line.locationNo) return { locationNo: line.locationNo }
   return {
     locationNo: resolveOutboundLocationNo(line.shipWarehouse, line.itemCode),
   }

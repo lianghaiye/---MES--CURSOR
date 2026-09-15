@@ -39,6 +39,11 @@ import { formatBatchAttrsText } from '@/utils/outboundLineColumns'
 import { transferOutboundToReceiveWarehouse } from '@/utils/outboundReceiveTransfer'
 import { preallocateDeliveryBatches } from '@/utils/salesOrderDedicatedStock'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
+import {
+  appendOutboundOperationLog,
+  backfillOutboundOperationLogs,
+  summarizeOutboundLines,
+} from '@/utils/outboundOperationLog'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
@@ -52,6 +57,7 @@ function migrateSkipApprovalStatuses(orders) {
     next.status = normalizeOutboundStatus(next.status)
     next.sourceChannel = resolveOutboundSourceChannel(next)
     if (!next.refuseReason) next.refuseReason = ''
+    backfillOutboundOperationLogs(next)
     return next
   })
 }
@@ -241,6 +247,12 @@ export function appendOutboundOrder(payload) {
     workshop: payload.workshop || payload.requisitionDept || '默认工厂',
     sourceChannel: resolveOutboundSourceChannel(payload),
   })
+  appendOutboundOperationLog(row, {
+    action: '创建',
+    operator: row.creator || 'admin1',
+    operatedAt: row.createdAt,
+    remark: `创建出库单 ${row.docNo}，类型 ${row.outboundType}`,
+  })
   outboundState.orders.unshift(row)
   return { ok: true, order: row }
 }
@@ -276,6 +288,11 @@ export function updateOutboundOrder(id, payload) {
     return { ok: false, message: '请至少添加一条明细' }
   }
   applyOutboundHeaderFields(order, { ...payload, docNo })
+  appendOutboundOperationLog(order, {
+    action: '编辑',
+    operator: payload.handler || payload.creator || order.creator || 'admin1',
+    remark: `保存出库单，明细 ${(order.lineItems || []).length} 行`,
+  })
   return { ok: true, order }
 }
 
@@ -290,6 +307,11 @@ export function approveOutboundOrder(id, operator = 'admin1') {
   order.status = '待出库'
   order.auditor = operator
   order.auditDate = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  appendOutboundOperationLog(order, {
+    action: '审批',
+    operator,
+    remark: '审批通过，状态变为待出库',
+  })
   return { ok: true, order }
 }
 
@@ -333,6 +355,11 @@ export function refuseOutbound(ids, { reason = '', operator = 'admin1' } = {}) {
     order.refuseReason = reasonText
     order.refusedBy = operator
     order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    appendOutboundOperationLog(order, {
+      action: '拒绝出库',
+      operator,
+      remark: `拒绝理由：${reasonText}`,
+    })
     syncMaterialReqAfterRefuse(order)
     refused.push(order)
     count += 1
@@ -340,7 +367,7 @@ export function refuseOutbound(ids, { reason = '', operator = 'admin1' } = {}) {
   return { count, blocked, refused }
 }
 
-export function confirmOutbound(ids) {
+export function confirmOutbound(ids, { operator = 'admin1' } = {}) {
   const blocked = []
   const warnings = []
   let count = 0
@@ -361,12 +388,20 @@ export function confirmOutbound(ids) {
       warnings.push(...check.warnings.map((w) => `${order?.docNo || id}：${w}`))
     }
 
-    const pendingIds = (order.lineItems || [])
-      .filter((l) => (l.lineStatus || '待出库') !== '已出库')
-      .map((l) => l.id)
+    const pendingLines = (order.lineItems || []).filter(
+      (l) => (l.lineStatus || '待出库') !== '已出库',
+    )
+    const pendingIds = pendingLines.map((l) => l.id)
     if (!pendingIds.length) {
       order.status = '已出库'
       order.completedAt = dayjs().format('YYYY-MM-DD')
+      order.auditor = operator
+      order.auditDate = dayjs().format('YYYY-MM-DD HH:mm:ss')
+      appendOutboundOperationLog(order, {
+        action: '整单确认出库',
+        operator,
+        remark: '整单确认出库',
+      })
       count += 1
       return
     }
@@ -389,6 +424,17 @@ export function confirmOutbound(ids) {
     }
 
     recomputeOutboundOrderStatus(order)
+    order.auditor = operator
+    order.auditDate = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const action = order.status === '部分出库' ? '部分确认出库' : '整单确认出库'
+    appendOutboundOperationLog(order, {
+      action,
+      operator,
+      remark:
+        action === '部分确认出库'
+          ? `部分确认 ${pendingLines.length} 行：${summarizeOutboundLines(pendingLines)}`
+          : `整单确认出库，本次 ${pendingLines.length} 行`,
+    })
     if (order.outboundType === '销售出库' && order.status === '已出库') {
       import('@/utils/deliveryOutboundSync').then(({ syncDeliveryAfterOutboundConfirm }) => {
         syncDeliveryAfterOutboundConfirm(order)
@@ -400,7 +446,7 @@ export function confirmOutbound(ids) {
 }
 
 /** 按明细确认出库 */
-export function confirmOutboundLine(orderId, lineId) {
+export function confirmOutboundLine(orderId, lineId, { operator = 'admin1' } = {}) {
   const order = outboundState.orders.find((o) => o.id === orderId)
   const check = validateOutboundForConfirm(order)
   if (!check.ok) return { ok: false, message: check.message, qcBlocked: check.qcBlocked }
@@ -420,6 +466,14 @@ export function confirmOutboundLine(orderId, lineId) {
   }
 
   recomputeOutboundOrderStatus(order)
+  order.auditor = operator
+  order.auditDate = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const action = order.status === '部分出库' ? '部分确认出库' : '整单确认出库'
+  appendOutboundOperationLog(order, {
+    action,
+    operator,
+    remark: `确认明细：${summarizeOutboundLines([line])}`,
+  })
   if (order.outboundType === '销售出库' && order.status === '已出库') {
     import('@/utils/deliveryOutboundSync').then(({ syncDeliveryAfterOutboundConfirm }) => {
       syncDeliveryAfterOutboundConfirm(order)
@@ -791,6 +845,10 @@ export function initiateFactoryQcFromOutbound(outboundId) {
   })
   if (result.ok && result.record) {
     linkOutboundToQc(outboundId, result.record.id)
+    appendOutboundOperationLog(outbound, {
+      action: isRetry ? '重新发起出厂质检' : '发起出厂质检',
+      remark: result.record.qcNo ? `质检单 ${result.record.qcNo}` : '',
+    })
   }
   return result
 }

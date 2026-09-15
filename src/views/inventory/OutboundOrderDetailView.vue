@@ -46,20 +46,24 @@
           </a-space>
         </div>
 
-        <div v-if="isMaterialReqOutbound" class="detail-tabs-wrap">
+        <div class="detail-tabs-wrap">
           <a-tabs
             v-model:active-key="infoTab"
             class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
           >
             <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane key="cutSettle" :tab="`下料结算 (${relatedCutSettles.length})`" />
+            <a-tab-pane
+              v-if="isMaterialReqOutbound"
+              key="cutSettle"
+              :tab="`下料结算 (${relatedCutSettles.length})`"
+            />
+            <a-tab-pane key="logs" tab="操作日志" />
           </a-tabs>
         </div>
 
         <div class="tab-body">
-          <template v-if="!isMaterialReqOutbound || infoTab === 'basic'">
+          <template v-if="infoTab === 'basic'">
             <div class="section-card">
-              <div v-if="!isMaterialReqOutbound" class="section-title">基本信息</div>
               <OutboundOrderBasicInfoSection
                 :record="record"
                 :is-material-req-outbound="isMaterialReqOutbound"
@@ -106,7 +110,7 @@
                   <template v-if="column.key === 'batchPick'">
                     <span class="col-title-with-tip">
                       拣选批次
-                      <a-tooltip :title="batchPickTip">
+                      <a-tooltip title="出库确认时实际扣减的批次">
                         <InfoCircleOutlined class="col-tip-icon" />
                       </a-tooltip>
                     </span>
@@ -121,14 +125,6 @@
                     >
                       {{ line.lineStatus || '待出库' }}
                     </a-tag>
-                  </template>
-                  <template v-else-if="column.key === 'availableStockQty'">
-                    {{ formatQty(line.availableStockQty) }}
-                    <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>
-                  </template>
-                  <template v-else-if="column.key === 'warehouseStockQty'">
-                    {{ formatQty(line.warehouseStockQty) }}
-                    <span class="unit-suffix">{{ resolveOutboundStockUnit(line) }}</span>
                   </template>
                   <template v-else-if="column.key === 'locationNo'">
                     {{ line.locationNo || '—' }}
@@ -149,29 +145,19 @@
                     <span v-else>—</span>
                   </template>
                   <template v-else-if="column.key === 'batchPick'">
-                    <template v-if="canOutboundBatchPick(line)">
+                    <template v-if="formatOutboundIssuedBatchText(line)">
                       <div v-if="line.manualBatchPick" class="manual-pick-tag">自主拣选</div>
-                      <span v-if="line.issuedBatchNo || line.batchAllocations?.length">
-                        {{
-                          line.issuedBatchNo ||
-                          (line.batchAllocations || [])
-                            .map((a) => `${a.batchNo}×${a.qty}`)
-                            .join('；')
-                        }}
-                      </span>
-                      <template v-else>
-                        {{
-                          line.pickedBatchNo ||
-                          (line.manualBatchPick ? '待选批次' : '确认时自动扣批/库存')
-                        }}
-                        <span v-if="line.pickedLength != null" class="unit-suffix">
-                          / {{ formatQty(line.pickedLength) }}{{ resolveOutboundStockUnit(line) }}
-                        </span>
-                      </template>
-                      <div v-if="line.issuedPieceSerialNos?.length" class="piece-serials">
-                        件码：{{ line.issuedPieceSerialNos.join('、') }}
+                      <span>{{ formatOutboundIssuedBatchText(line) }}</span>
+                      <div
+                        v-if="normalizePieceSerialNos(line.issuedPieceSerialNos).length"
+                        class="piece-serials"
+                      >
+                        件码：{{ normalizePieceSerialNos(line.issuedPieceSerialNos).join('、') }}
                       </div>
                     </template>
+                    <span v-else-if="(line.lineStatus || '待出库') !== '已出库'">
+                      {{ line.manualBatchPick ? '待选批次' : '确认出库时扣减批次' }}
+                    </span>
                     <span v-else>—</span>
                   </template>
                   <template v-else-if="column.key === 'barcodeType'">
@@ -226,7 +212,7 @@
             </div>
           </template>
 
-          <template v-else>
+          <template v-else-if="infoTab === 'cutSettle'">
             <div class="section-card">
               <a-table
                 :columns="cutSettleColumns"
@@ -256,6 +242,20 @@
                   </template>
                 </template>
               </a-table>
+            </div>
+          </template>
+
+          <template v-else-if="infoTab === 'logs'">
+            <div class="section-card">
+              <a-table
+                :columns="logColumns"
+                :data-source="operationLogs"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :locale="{ emptyText: '暂无操作日志' }"
+              />
             </div>
           </template>
         </div>
@@ -300,14 +300,11 @@ import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
+import { outboundDetailLineColumns, filterOutboundLineColumns } from '@/utils/outboundLineColumns'
 import {
-  outboundDetailLineColumns,
-  OUTBOUND_BATCH_PICK_TIP_AUTO,
-  filterOutboundLineColumns,
-} from '@/utils/outboundLineColumns'
-import {
-  canOutboundBatchPick,
   enrichOutboundLine,
+  formatOutboundIssuedBatchText,
+  normalizePieceSerialNos,
   resolveOutboundStockUnit,
 } from '@/utils/outboundLineHelpers'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
@@ -332,6 +329,15 @@ const infoTab = ref('basic')
 const refuseModalOpen = ref(false)
 
 const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领料出库')
+
+const operationLogs = computed(() => record.value?.operationLogs || [])
+
+const logColumns = [
+  { title: '操作时间', dataIndex: 'operatedAt', width: 180 },
+  { title: '操作人', dataIndex: 'operator', width: 120 },
+  { title: '操作', dataIndex: 'action', width: 140 },
+  { title: '说明', dataIndex: 'remark', ellipsis: true },
+]
 
 const workOrderList = computed(() => {
   void mobileMaterialReqState.items
@@ -373,8 +379,6 @@ const lineColumns = computed(() =>
   filterOutboundLineColumns(outboundDetailLineColumns, record.value?.outboundType),
 )
 const lineScrollX = computed(() => lineColumns.value.reduce((s, c) => s + (c.width || 80), 0))
-
-const batchPickTip = computed(() => OUTBOUND_BATCH_PICK_TIP_AUTO)
 
 const linkedQc = computed(() => {
   if (!record.value?.factoryQcId) return null

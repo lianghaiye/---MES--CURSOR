@@ -88,7 +88,20 @@
                 货位号
               </span>
             </template>
-            <a-input v-model:value="draft.locationNo" allow-clear placeholder="请输入货位号" />
+            <a-select
+              v-if="locationOpts.length"
+              v-model:value="draft.locationNo"
+              allow-clear
+              show-search
+              placeholder="请选择货位"
+              :options="locationOpts"
+            />
+            <a-input
+              v-else
+              v-model:value="draft.locationNo"
+              allow-clear
+              placeholder="请输入货位号"
+            />
           </a-form-item>
         </a-col>
         <a-col v-if="!isVariableLengthLine" :span="8">
@@ -555,6 +568,7 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { getLocationSelectOptions, warehouseLocationState } from '@/store/warehouseLocationStore'
 import { enrichInboundLine, syncInboundLineTotalFromUnit } from '@/utils/inboundLineHelpers'
 import { hasSettleUnit } from '@/utils/settleUnit'
 import { isPlateAreaMeasureEnabled } from '@/store/functionParamStore'
@@ -654,6 +668,11 @@ function syncPasteTextFromList() {
 const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
+})
+
+const locationOpts = computed(() => {
+  void warehouseLocationState.locations
+  return getLocationSelectOptions(draft.value?.warehouse)
 })
 
 const resolvedMaterial = computed(() => {

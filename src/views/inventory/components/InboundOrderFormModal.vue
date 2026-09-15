@@ -331,7 +331,22 @@
                     @end="endLineCellEdit"
                   >
                     <template #edit="{ endEdit }">
+                      <a-select
+                        v-if="locationOptsForLine(record).length"
+                        v-model:value="record.locationNo"
+                        size="small"
+                        show-search
+                        allow-clear
+                        autofocus
+                        placeholder="请选择货位"
+                        :options="locationOptsForLine(record)"
+                        style="width: 100%"
+                        :open="lineCellSelectOpen"
+                        @dropdownVisibleChange="onLineCellSelectOpenChange"
+                        @change="endEdit"
+                      />
                       <a-input
+                        v-else
                         v-model:value="record.locationNo"
                         size="small"
                         allow-clear
@@ -643,6 +658,7 @@ import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
 import { inboundTypeOptions, handlerOptions } from '@/mock/inboundOptions'
 import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
+import { getLocationSelectOptions, warehouseLocationState } from '@/store/warehouseLocationStore'
 import {
   addInboundOrder,
   updateInboundOrder,
@@ -803,6 +819,11 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
+
+function locationOptsForLine(line) {
+  void warehouseLocationState.locations
+  return getLocationSelectOptions(line?.warehouse || form.warehouse)
+}
 
 function lineWarehouseLabel(value) {
   return warehouseOptionLabel(value, warehouseOpts.value)

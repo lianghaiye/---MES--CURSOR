@@ -72,6 +72,7 @@ export function createOutboundOrder(partial) {
     refuseReason: '',
     refusedBy: '',
     refusedAt: '',
+    operationLogs: [],
     /** 领料/发料：领入仓库（线边仓）；确认出库后 A→B 调入 */
     receiveWarehouse: '',
     stockTransferredToReceive: false,
