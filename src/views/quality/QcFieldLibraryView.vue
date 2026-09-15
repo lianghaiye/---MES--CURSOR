@@ -75,6 +75,7 @@
         bordered
         :pagination="false"
         :scroll="{ x: 1100 }"
+        children-column-name="__noTreeChildren__"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>

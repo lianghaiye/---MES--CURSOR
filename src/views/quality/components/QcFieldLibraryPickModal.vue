@@ -55,6 +55,7 @@
           :scroll="{ y: tableScrollY }"
           :row-selection="rowSelection"
           :custom-row="customRow"
+          children-column-name="__noTreeChildren__"
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
