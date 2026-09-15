@@ -23,6 +23,7 @@
             allow-clear
             placeholder="搜索工单号或领料单号"
             style="width: 180px"
+            @press-enter="handleSearch"
           />
         </a-form-item>
         <a-form-item label="扣减状态">
@@ -60,13 +61,28 @@
         </a-form-item>
         <a-form-item class="filter-actions">
           <a-space>
-            <a-button type="primary" :disabled="!selectedPendingIds.length" @click="onBatchConfirm">
-              批量确认
+            <a-button type="primary" size="small" @click="handleSearch">
+              <SearchOutlined />
+              搜索
             </a-button>
-            <a-button @click="openExportModal">导出</a-button>
+            <a-button size="small" @click="handleReset">清空</a-button>
           </a-space>
         </a-form-item>
       </a-form>
+    </div>
+
+    <div class="toolbar-row">
+      <a-space wrap :size="8">
+        <a-button
+          type="primary"
+          size="small"
+          :disabled="!selectedPendingIds.length"
+          @click="onBatchConfirm"
+        >
+          批量确认
+        </a-button>
+        <a-button size="small" @click="openExportModal">导出</a-button>
+      </a-space>
     </div>
 
     <div class="table-card">
@@ -173,10 +189,10 @@ export default { name: 'InventoryDeductRecordView' }
 </script>
 
 <script setup>
-import { computed, createVNode, reactive, ref, watch } from 'vue'
+import { computed, createVNode, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
+import { ExclamationCircleOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import {
   MATERIAL_DEDUCT_STATUS,
   MATERIAL_DEDUCT_STATUS_OPTIONS,
@@ -216,6 +232,7 @@ const filters = reactive({
   warehouse: '',
   date: undefined,
 })
+const appliedFilters = ref({ ...filters })
 
 const pagination = reactive({
   current: 1,
@@ -300,7 +317,10 @@ function docNoLabel(record) {
 }
 
 const filteredList = computed(() => {
-  const kw = filters.workOrderNo.trim().toLowerCase()
+  const f = appliedFilters.value
+  const kw = String(f.workOrderNo || '')
+    .trim()
+    .toLowerCase()
   return materialRequisitionState.records.filter((r) => {
     const docNo = resolveInventoryDeductDocNo(r)
     if (
@@ -308,18 +328,18 @@ const filteredList = computed(() => {
       !`${docNo} ${r.workOrderNo || ''} ${r.reqNo || ''} ${r.deductNo}`.toLowerCase().includes(kw)
     )
       return false
-    if (filters.status && r.status !== filters.status) return false
-    if (filters.deductSource && resolveDeductSource(r) !== filters.deductSource) return false
-    if (filters.warehouse) {
+    if (f.status && r.status !== f.status) return false
+    if (f.deductSource && resolveDeductSource(r) !== f.deductSource) return false
+    if (f.warehouse) {
       const key = `${r.warehouseName}|${r.warehouseCode}`
-      if (key !== filters.warehouse) return false
+      if (key !== f.warehouse) return false
     }
-    if (filters.date) {
+    if (f.date) {
       const day = (r.deductTime || '').slice(0, 10)
       if (day) {
-        if (day !== filters.date) return false
+        if (day !== f.date) return false
       } else {
-        const mmdd = filters.date.slice(5).replace('-', '')
+        const mmdd = String(f.date).slice(5).replace('-', '')
         if (!String(docNo || '').includes(mmdd)) return false
       }
     }
@@ -327,19 +347,20 @@ const filteredList = computed(() => {
   })
 })
 
-watch(
-  () => [
-    filters.workOrderNo,
-    filters.status,
-    filters.deductSource,
-    filters.warehouse,
-    filters.date,
-  ],
-  () => {
-    pagination.current = 1
-    selectedRowKeys.value = []
-  },
-)
+function handleSearch() {
+  appliedFilters.value = { ...filters }
+  pagination.current = 1
+  selectedRowKeys.value = []
+}
+
+function handleReset() {
+  filters.workOrderNo = ''
+  filters.status = ''
+  filters.deductSource = ''
+  filters.warehouse = ''
+  filters.date = undefined
+  handleSearch()
+}
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -625,10 +646,20 @@ function onSaved() {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 0 4px;
 }
 
 .filter-actions {
-  margin-left: auto;
+  margin-left: 0;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .table-card {

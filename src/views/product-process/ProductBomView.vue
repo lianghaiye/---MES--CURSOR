@@ -522,6 +522,7 @@ const rowSelection = computed(() => ({
 }))
 
 const productBaseColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: 'BOM状态', key: 'status', width: 92, fixed: 'left' },
   { title: 'BOM名称', key: 'bomName', width: 160, fixed: 'left', ellipsis: true },
   { title: 'BOM编号', dataIndex: 'bomNo', width: 140, ellipsis: true },
@@ -541,6 +542,7 @@ const productBaseColumns = [
 ]
 
 const shipBaseColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 80, fixed: 'left' },
   { title: '名称', key: 'bomName', width: 180, fixed: 'left', ellipsis: true },
   { title: '编号', dataIndex: 'bomNo', width: 140, ellipsis: true },
@@ -551,11 +553,11 @@ const shipBaseColumns = [
   { title: '操作', key: 'action', width: 180, fixed: 'right' },
 ]
 
-const productTable = useTableColumnSettings('product-bom-list', productBaseColumns, {
-  minScrollX: 2200,
+const productTable = useTableColumnSettings('product-bom-list-v2', productBaseColumns, {
+  minScrollX: 2260,
 })
-const shipTable = useTableColumnSettings('ship-attachment-list-v2', shipBaseColumns, {
-  minScrollX: 1600,
+const shipTable = useTableColumnSettings('ship-attachment-list-v3', shipBaseColumns, {
+  minScrollX: 1660,
 })
 
 const columnSettings = computed({
@@ -1018,9 +1020,8 @@ function onExportMenu({ key }) {
 <style lang="less" scoped>
 .product-bom-page {
   margin: -12px;
-  padding: 0;
+  padding: 0 0 8px;
   background: #f5f6f8;
-  min-height: calc(100vh - 112px);
 }
 
 .filter-card,
@@ -1072,7 +1073,7 @@ function onExportMenu({ key }) {
 }
 
 .table-card {
-  padding: 8px 12px 12px;
+  padding: 8px 12px;
 
   :deep(.ant-table-thead > tr > th) {
     background: #fafafa;
@@ -1104,6 +1105,6 @@ function onExportMenu({ key }) {
 .table-pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 </style>
