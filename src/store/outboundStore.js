@@ -5,7 +5,12 @@ import { ensureCrossDemoOutboundOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureMaterialReqOutboundOrders } from '@/mock/materialReqOutboundSeed'
 import { ensureMultiUnitFlowOutboundOrders } from '@/mock/multiUnitFlowDemoSeed'
 import { ensureOneItemOneCodeInventoryOutboundOrders } from '@/mock/oneItemOneCodeInventoryDemoSeed'
-import { needsOutboundApproval } from '@/mock/outboundOptions'
+import {
+  needsOutboundApproval,
+  normalizeOutboundStatus,
+  resolveOutboundSourceChannel,
+  OUTBOUND_SOURCE,
+} from '@/mock/outboundOptions'
 import {
   createFactoryQcFromOutbound,
   getFactoryQcById,
@@ -37,17 +42,17 @@ import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
-/** v8：一物一码库存明细出入库流水 */
-const CURRENT_SEED_VERSION = '8'
+/** v9：来源改业务/新增；状态去掉待处理/拒绝领料 */
+const CURRENT_SEED_VERSION = '9'
 
-/** 领料/发料出库不再审批：历史「待处理」升为「待出库」 */
+/** 领料/发料出库不再审批：历史「待处理」升为「待出库」；拒绝领料→已拒绝；来源归一 */
 function migrateSkipApprovalStatuses(orders) {
-  const skipTypes = new Set(['领料出库', '发料出库'])
   return (orders || []).map((o) => {
-    if (skipTypes.has(o.outboundType) && o.status === '待处理') {
-      return { ...o, status: '待出库' }
-    }
-    return o
+    const next = { ...o }
+    next.status = normalizeOutboundStatus(next.status)
+    next.sourceChannel = resolveOutboundSourceChannel(next)
+    if (!next.refuseReason) next.refuseReason = ''
+    return next
   })
 }
 
@@ -135,6 +140,8 @@ export function getOutboundOrderByDocNo(docNo) {
 }
 
 export function deleteOutboundOrder(id) {
+  const order = getOutboundOrderById(id)
+  if (!canDeleteOutbound(order)) return false
   const idx = outboundState.orders.findIndex((o) => o.id === id)
   if (idx === -1) return false
   outboundState.orders.splice(idx, 1)
@@ -142,26 +149,32 @@ export function deleteOutboundOrder(id) {
 }
 
 export function canEditOutbound(order) {
-  return ['待处理', '待出库', '部分出库'].includes(order?.status)
+  const status = normalizeOutboundStatus(order?.status)
+  return ['待出库', '部分出库'].includes(status)
 }
 
+/** 仅「新增」来源且待出库可删；业务来源不支持删除 */
 export function canDeleteOutbound(order) {
-  return ['待处理', '待出库'].includes(order?.status)
+  if (!order) return false
+  if (resolveOutboundSourceChannel(order) === OUTBOUND_SOURCE.BUSINESS) return false
+  return normalizeOutboundStatus(order.status) === '待出库'
 }
 
 export function canApproveOutbound(order) {
-  return order?.status === '待处理' && needsOutboundApproval(order.outboundType)
+  return (
+    normalizeOutboundStatus(order?.status) === '待出库' && needsOutboundApproval(order.outboundType)
+  )
 }
 
-/** 待处理 / 待出库可拒绝出库（未实际扣账前） */
+/** 待出库可拒绝出库（未实际扣账前） */
 export function canRefuseOutbound(order) {
-  return Boolean(order && ['待处理', '待出库'].includes(order.status))
+  return Boolean(order && normalizeOutboundStatus(order.status) === '待出库')
 }
 
-/** 新建出库单初始状态：需审批类型为待处理，其余（含领料/发料）直接待出库 */
+/** 新建出库单初始状态：需审批类型为待出库（审批能力已关闭时同样待出库） */
 export function resolveOutboundInitialStatus(outboundType, explicitStatus) {
-  if (explicitStatus) return explicitStatus
-  if (needsOutboundApproval(outboundType)) return '待处理'
+  if (explicitStatus) return normalizeOutboundStatus(explicitStatus)
+  if (needsOutboundApproval(outboundType)) return '待出库'
   return '待出库'
 }
 
@@ -189,6 +202,10 @@ function applyOutboundHeaderFields(order, payload) {
     outboundTime:
       payload.outboundTime || order.outboundTime || dayjs().format('YYYY-MM-DD HH:mm:ss'),
     remark: payload.remark?.trim?.() ?? payload.remark ?? order.remark,
+  })
+  order.sourceChannel = resolveOutboundSourceChannel({
+    ...order,
+    sourceChannel: payload.sourceChannel ?? order.sourceChannel,
   })
   return order
 }
@@ -222,7 +239,7 @@ export function appendOutboundOrder(payload) {
     creator: payload.creator || 'admin1',
     warehouseKeeper: payload.warehouseKeeper || payload.handler || 'admin1',
     workshop: payload.workshop || payload.requisitionDept || '默认工厂',
-    sourceChannel: payload.sourceChannel || 'web',
+    sourceChannel: resolveOutboundSourceChannel(payload),
   })
   outboundState.orders.unshift(row)
   return { ok: true, order: row }
@@ -276,10 +293,7 @@ export function approveOutboundOrder(id, operator = 'admin1') {
   return { ok: true, order }
 }
 
-function resolveRefuseStatus(order) {
-  if (order?.outboundType === '领料出库' || order?.outboundType === '发料出库') {
-    return '拒绝领料'
-  }
+function resolveRefuseStatus() {
   return '已拒绝'
 }
 
@@ -293,7 +307,7 @@ function syncMaterialReqAfterRefuse(order) {
     .catch(() => {})
 }
 
-/** 拒绝出库：未扣账单据直接置为已拒绝/拒绝领料；领料出库同步回写申请单 */
+/** 拒绝出库：未扣账单据置为已拒绝；领料出库同步回写申请单 */
 export function refuseOutbound(ids, { reason = '', operator = 'admin1' } = {}) {
   const blocked = []
   const refused = []
@@ -307,8 +321,16 @@ export function refuseOutbound(ids, { reason = '', operator = 'admin1' } = {}) {
       })
       return
     }
-    order.status = resolveRefuseStatus(order)
-    order.refuseReason = String(reason || '').trim()
+    const reasonText = String(reason || '').trim()
+    if (!reasonText) {
+      blocked.push({
+        docNo: order?.docNo || id,
+        message: '请填写拒绝理由',
+      })
+      return
+    }
+    order.status = resolveRefuseStatus()
+    order.refuseReason = reasonText
     order.refusedBy = operator
     order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
     syncMaterialReqAfterRefuse(order)

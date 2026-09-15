@@ -17,6 +17,7 @@ import {
   getOutboundOrderById,
   resolveOutboundInitialStatus,
 } from '@/store/outboundStore'
+import { OUTBOUND_SOURCE } from '@/mock/outboundOptions'
 import { snapshotWorkOrdersForOutbound } from '@/utils/outboundWorkOrders'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
 import {
@@ -274,7 +275,7 @@ function resolveLineSourceDocNo(payload, line) {
  * WEB / 小程序同逻辑：提交领料申请；审核通过后生成领料出库单
  * @param {object} payload
  * @param {'work-order'|'quick'|'batch-work-order'|'sales-order'} payload.mode
- * @param {string} [payload.sourceChannel] web | mini-program
+ * @param {string} [payload.sourceChannel] 历史字段；生成出库单统一记为业务来源
  */
 export function submitMaterialRequisition(payload) {
   const isMulti = isMaterialReqMultiSourceMode(payload.mode)
@@ -372,7 +373,6 @@ function createOutboundForRequisition(record) {
     (isMaterialReqMultiSourceMode(record.mode)
       ? resolveBatchSourceOrderNo(record)
       : record.workOrderCode || record.salesOrderNo || '')
-  const channel = draft.channel || record.sourceChannel || 'web'
   const outboundStatus = resolveOutboundInitialStatus('领料出库')
 
   const workOrders = snapshotWorkOrdersForOutbound(
@@ -460,7 +460,7 @@ function createOutboundForRequisition(record) {
       salesOrderNo: record.salesOrderNo || '',
       warehouse,
       remark,
-      sourceChannel: channel,
+      sourceChannel: OUTBOUND_SOURCE.BUSINESS,
       workOrders,
       lineItems,
     })

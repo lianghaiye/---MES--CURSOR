@@ -55,11 +55,11 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="领用部门">
+            <a-form-item label="申请部门">
               <a-select
                 v-model:value="filters.requisitionDept"
                 allow-clear
-                placeholder="请选择 领用部门"
+                placeholder="请选择 申请部门"
                 size="small"
                 :options="requisitionDeptOpts"
               />
@@ -101,7 +101,121 @@
       </a-form>
     </div>
 
-    <div class="list-panel">
+    <!-- 卡片主从视图 -->
+    <div v-if="layoutMode === 'split'" class="master-detail">
+      <div class="list-card">
+        <div class="list-title-row">
+          <a-checkbox
+            :checked="allPageSelected"
+            :indeterminate="pageIndeterminate"
+            @change="onToggleSelectAllPage"
+          />
+          <span class="list-title">出库单列表</span>
+          <span v-if="selectedRowKeys.length" class="selected-count"
+            >已选 {{ selectedRowKeys.length }}</span
+          >
+          <div class="list-title-actions">
+            <a-tooltip title="刷新">
+              <a-button type="text" size="small" class="layout-toggle-btn" @click="handleSearch">
+                <ReloadOutlined />
+              </a-button>
+            </a-tooltip>
+            <a-tooltip title="切换为列表视图">
+              <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
+                <TableOutlined />
+              </a-button>
+            </a-tooltip>
+          </div>
+        </div>
+        <div class="split-toolbar">
+          <a-space wrap :size="6">
+            <a-button type="primary" size="small" @click="openCreate">
+              <PlusOutlined />
+              新增
+            </a-button>
+            <a-button size="small" @click="handleConfirmOutbound">确认出库</a-button>
+            <a-button size="small" danger @click="handleRefuseOutbound">拒绝出库</a-button>
+            <a-button size="small" @click="handleBatchDelete">删除</a-button>
+          </a-space>
+        </div>
+        <div class="list-body">
+          <div
+            v-for="row in pagedList"
+            :key="row.id"
+            class="order-card"
+            :class="{ active: selectedId === row.id, checked: selectedRowKeys.includes(row.id) }"
+            @click="selectOrder(row.id)"
+          >
+            <a-checkbox
+              class="card-checkbox"
+              :checked="selectedRowKeys.includes(row.id)"
+              @click.stop
+              @change="(e) => toggleSelect(row.id, e.target.checked)"
+            />
+            <div class="card-content">
+              <div class="card-head">
+                <a-tag :color="outboundStatusColor(row.status)" class="status-tag">
+                  {{ row.status }}
+                </a-tag>
+                <a-dropdown :trigger="['click']">
+                  <a-button type="text" size="small" class="more-btn" @click.stop>
+                    <EllipsisOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu @click="({ key }) => onCardAction(key, row)">
+                      <a-menu-item v-if="canEditOutbound(row)" key="edit">编辑</a-menu-item>
+                      <a-menu-item v-if="canConfirm(row)" key="confirm">确认出库</a-menu-item>
+                      <a-menu-item v-if="canRefuseOutbound(row)" key="refuse" danger>
+                        拒绝出库
+                      </a-menu-item>
+                      <a-menu-item v-if="canDeleteOutbound(row)" key="delete" danger>
+                        删除
+                      </a-menu-item>
+                      <a-menu-item key="detail">打开详情</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
+              </div>
+              <div class="card-code">{{ row.docNo }}</div>
+              <div class="card-name">{{ row.outboundType }} · {{ row.warehouse || '—' }}</div>
+              <div class="card-meta">
+                <span>{{ outboundSourceLabel(row.sourceChannel) }}</span>
+                <span class="meta-divider">·</span>
+                <span>数量 {{ formatOutboundQtyRatio(row, formatQty) }}</span>
+              </div>
+              <div v-if="row.requisitionDept" class="card-meta">
+                <span>申请部门 {{ row.requisitionDept }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="list-pagination">
+          <a-pagination
+            v-model:current="pagination.current"
+            :total="filteredList.length"
+            :page-size="pagination.pageSize"
+            size="small"
+            simple
+          />
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <OutboundOrderDetailPanel
+          :order-id="selectedId"
+          @approve="selectedRecord && handleApprove(selectedRecord)"
+          @confirm="selectedRecord && handleConfirmOne(selectedRecord)"
+          @refuse="selectedRecord && openRefuse([selectedRecord])"
+          @edit="selectedRecord && openEdit(selectedRecord)"
+          @delete="selectedRecord && confirmDelete(selectedRecord)"
+          @initiate-qc="selectedRecord && handleInitiateQc(selectedRecord)"
+          @open-full="selectedRecord && goDetail(selectedRecord)"
+        />
+      </div>
+    </div>
+
+    <!-- 表格视图 -->
+    <div v-else class="list-panel">
       <div class="toolbar-row">
         <a-space wrap :size="8">
           <a-button type="primary" size="small" @click="openCreate">
@@ -150,6 +264,11 @@
               <ReloadOutlined />
             </a-button>
           </a-tooltip>
+          <a-tooltip title="切换为卡片视图">
+            <a-button type="text" size="small" @click="toggleLayout">
+              <AppstoreOutlined />
+            </a-button>
+          </a-tooltip>
           <TableColumnSettingButton @click="columnDrawerOpen = true" />
         </a-space>
       </div>
@@ -173,30 +292,31 @@
           :scroll="{ x: tableScrollX }"
           :pagination="false"
           :row-selection="rowSelection"
+          :custom-row="
+            (record) => ({
+              onClick: () => selectOrder(record.id),
+            })
+          "
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'docNo'">
-              <a class="link-code" @click="goDetail(record)">{{ record.docNo }}</a>
+              <a class="link-code" @click.stop="goDetail(record)">{{ record.docNo }}</a>
             </template>
             <template v-else-if="column.key === 'sourceOrderNo'">
               <a v-if="record.sourceOrderNo" class="link-code">{{ record.sourceOrderNo }}</a>
               <span v-else>-</span>
             </template>
             <template v-else-if="column.key === 'salesOrderNo'">
-              <a v-if="record.salesOrderNo" class="link-code" @click="goSalesOrder(record)">
+              <a v-if="record.salesOrderNo" class="link-code" @click.stop="goSalesOrder(record)">
                 {{ record.salesOrderNo }}
               </a>
               <span v-else>—</span>
             </template>
-            <template v-else-if="column.key === 'totalWeight'">
-              {{ record.totalWeight != null ? record.totalWeight : '' }}
-            </template>
             <template v-else-if="column.key === 'shipQtyTotal'">
-              {{ formatQty(calcOutboundShipQty(record)) }}
+              {{ formatOutboundQtyRatio(record, formatQty) }}
             </template>
             <template v-else-if="column.key === 'sourceChannel'">
-              <a-tag v-if="record.sourceChannel === 'mini-program'" color="cyan">小程序</a-tag>
-              <span v-else>WEB</span>
+              {{ outboundSourceLabel(record.sourceChannel) }}
             </template>
             <template v-else-if="column.key === 'status'">
               <a-tag :color="outboundStatusColor(record.status)">{{ record.status }}</a-tag>
@@ -207,7 +327,7 @@
                   v-if="canApproveOutbound(record)"
                   type="link"
                   size="small"
-                  @click="handleApprove(record)"
+                  @click.stop="handleApprove(record)"
                 >
                   审批
                 </a-button>
@@ -215,7 +335,7 @@
                   v-if="canEditOutbound(record)"
                   type="link"
                   size="small"
-                  @click="openEdit(record)"
+                  @click.stop="openEdit(record)"
                 >
                   编辑
                 </a-button>
@@ -223,7 +343,7 @@
                   v-if="canConfirm(record)"
                   type="link"
                   size="small"
-                  @click="handleConfirmOne(record)"
+                  @click.stop="handleConfirmOne(record)"
                 >
                   确认出库
                 </a-button>
@@ -232,7 +352,7 @@
                   type="link"
                   size="small"
                   danger
-                  @click="handleRefuseOne(record)"
+                  @click.stop="openRefuse([record])"
                 >
                   拒绝出库
                 </a-button>
@@ -241,7 +361,7 @@
                   type="link"
                   size="small"
                   danger
-                  @click="confirmDelete(record)"
+                  @click.stop="confirmDelete(record)"
                 >
                   删除
                 </a-button>
@@ -249,7 +369,7 @@
                   v-if="canInitiateFactoryQc(record)"
                   type="link"
                   size="small"
-                  @click="handleInitiateQc(record)"
+                  @click.stop="handleInitiateQc(record)"
                 >
                   {{ initiateQcActionLabel(record) }}
                 </a-button>
@@ -287,16 +407,21 @@
       :selected-count="selectedRowKeys.length"
       @export="doExport"
     />
+
+    <OutboundRefuseModal
+      v-model:open="refuseModalOpen"
+      :doc-nos="refuseDocNos"
+      @confirm="submitRefuse"
+    />
   </div>
 </template>
 
 <script>
-import { formatQty } from '@/utils/numberFormat'
 export default { name: 'OutboundManagementView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
@@ -308,8 +433,12 @@ import {
   CloseCircleOutlined,
   PrinterOutlined,
   DownOutlined,
+  TableOutlined,
+  AppstoreOutlined,
+  EllipsisOutlined,
 } from '@ant-design/icons-vue'
-import { filterOutboundOrders, calcOutboundShipQty } from '@/mock/outboundOrders'
+import { formatQty } from '@/utils/numberFormat'
+import { filterOutboundOrders, formatOutboundQtyRatio } from '@/mock/outboundOrders'
 import {
   outboundTypeOptions,
   outboundStatusOptions,
@@ -317,6 +446,8 @@ import {
   outboundTimeUnitOptions,
   warehouseOptions,
   requisitionDeptOptions,
+  outboundSourceLabel,
+  isOutboundBusinessSource,
 } from '@/mock/outboundOptions'
 import {
   outboundState,
@@ -344,9 +475,18 @@ import { useListExport } from '@/composables/useListExport'
 import { outboundExportFields } from '@/utils/exportFields/outboundExport'
 import { useTabs } from '@/composables/useTabs'
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
+import OutboundOrderDetailPanel from './components/OutboundOrderDetailPanel.vue'
+import OutboundRefuseModal from './components/OutboundRefuseModal.vue'
+
+const LAYOUT_STORAGE_KEY = 'i_doms_outbound_layout'
 
 const router = useRouter()
 const { openTab } = useTabs()
+
+const layoutMode = ref(localStorage.getItem(LAYOUT_STORAGE_KEY) || 'split')
+const selectedId = ref('')
+const refuseModalOpen = ref(false)
+const refuseTargets = ref([])
 
 const filters = reactive({
   docNo: '',
@@ -375,30 +515,28 @@ const outboundTimePicker = computed(() => {
 })
 
 const baseColumns = [
-  { title: '状态', key: 'status', width: 110 },
-  { title: '出库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
-  { title: '出库类型', dataIndex: 'outboundType', width: 100 },
-  { title: '来源', key: 'sourceChannel', width: 90 },
-  { title: '出库仓库', dataIndex: 'warehouse', width: 90 },
-  { title: '出库数量', key: 'shipQtyTotal', width: 90, align: 'right' },
+  { title: '状态', key: 'status', width: 120, fixed: 'left' },
+  { title: '出库单号', key: 'docNo', dataIndex: 'docNo', width: 168, fixed: 'left' },
+  { title: '出库类型', dataIndex: 'outboundType', width: 110 },
+  { title: '出库仓库', dataIndex: 'warehouse', width: 100 },
+  { title: '出库数量', key: 'shipQtyTotal', width: 120, align: 'right' },
   { title: '源单号', key: 'sourceOrderNo', width: 140 },
   { title: '销售订单', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
-  { title: '领用部门', dataIndex: 'requisitionDept', width: 100, ellipsis: true },
-  { title: '出库总重量', key: 'totalWeight', width: 110, align: 'right' },
+  { title: '申请部门', dataIndex: 'requisitionDept', width: 100, ellipsis: true },
   { title: '出库时间', dataIndex: 'outboundTime', width: 160 },
+  { title: '来源', key: 'sourceChannel', width: 80 },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
   { title: '创建人', dataIndex: 'creator', width: 80 },
   { title: '确认时间', dataIndex: 'auditDate', width: 160 },
   { title: '确认人', dataIndex: 'auditor', width: 80 },
   { title: '确认人', dataIndex: 'warehouseKeeper', width: 80 },
-  { title: '所在车间', dataIndex: 'workshop', width: 100 },
   { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
   { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outbound-list-v2', baseColumns, { minScrollX: 2480 })
+  useTableColumnSettings('outbound-list-v4', baseColumns, { minScrollX: 2200 })
 
 const filteredList = computed(() =>
   filterOutboundOrders(outboundState.orders, appliedFilters.value),
@@ -411,7 +549,7 @@ const {
   defaultExportFieldSettings,
   doExport,
 } = useListExport({
-  storageKey: 'outbound-list',
+  storageKey: 'outbound-list-v4',
   fieldDefinitions: outboundExportFields,
   getFilteredRows: () => filteredList.value,
   getSelectedRows: () => outboundState.orders.filter((o) => selectedRowKeys.value.includes(o.id)),
@@ -423,6 +561,22 @@ const pagedList = computed(() => {
   return filteredList.value.slice(start, start + pagination.pageSize)
 })
 
+const selectedRecord = computed(
+  () => outboundState.orders.find((o) => o.id === selectedId.value) || null,
+)
+
+const refuseDocNos = computed(() => (refuseTargets.value || []).map((o) => o.docNo || o.id))
+
+const allPageSelected = computed(
+  () =>
+    pagedList.value.length > 0 &&
+    pagedList.value.every((row) => selectedRowKeys.value.includes(row.id)),
+)
+const pageIndeterminate = computed(() => {
+  const n = pagedList.value.filter((row) => selectedRowKeys.value.includes(row.id)).length
+  return n > 0 && n < pagedList.value.length
+})
+
 const rowSelection = computed(() => ({
   fixed: true,
   selectedRowKeys: selectedRowKeys.value,
@@ -430,6 +584,55 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys
   },
 }))
+
+watch(
+  filteredList,
+  (list) => {
+    if (!list.length) {
+      selectedId.value = ''
+      return
+    }
+    if (!list.some((o) => o.id === selectedId.value)) {
+      selectedId.value = list[0].id
+    }
+  },
+  { immediate: true },
+)
+
+function toggleLayout() {
+  layoutMode.value = layoutMode.value === 'split' ? 'table' : 'split'
+  localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode.value)
+}
+
+function selectOrder(id) {
+  selectedId.value = id
+}
+
+function toggleSelect(id, checked) {
+  if (checked) {
+    if (!selectedRowKeys.value.includes(id)) selectedRowKeys.value = [...selectedRowKeys.value, id]
+  } else {
+    selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== id)
+  }
+}
+
+function onToggleSelectAllPage(e) {
+  const ids = pagedList.value.map((r) => r.id)
+  if (e.target.checked) {
+    selectedRowKeys.value = Array.from(new Set([...selectedRowKeys.value, ...ids]))
+  } else {
+    const drop = new Set(ids)
+    selectedRowKeys.value = selectedRowKeys.value.filter((id) => !drop.has(id))
+  }
+}
+
+function onCardAction(key, row) {
+  if (key === 'edit') openEdit(row)
+  else if (key === 'confirm') handleConfirmOne(row)
+  else if (key === 'refuse') openRefuse([row])
+  else if (key === 'delete') confirmDelete(row)
+  else if (key === 'detail') goDetail(row)
+}
 
 function canConfirm(record) {
   return validateOutboundForConfirm(record).ok
@@ -530,23 +733,25 @@ function applyRefuseResult({ count, blocked, refused }) {
   if (count > 0) {
     message.success(count === 1 ? '已拒绝出库' : `已拒绝出库 ${count} 条`)
     selectedRowKeys.value = []
+    refuseModalOpen.value = false
+    refuseTargets.value = []
     handleSearch()
   }
 }
 
-function handleRefuseOne(record) {
-  Modal.confirm({
-    title: `拒绝出库 ${record.docNo}？`,
-    content:
-      record.outboundType === '领料出库'
-        ? '拒绝后出库单将标记为「拒绝领料」，并回写关联领料申请的出库状态。'
-        : '拒绝后出库单将标记为「已拒绝」。',
-    okText: '拒绝出库',
-    okType: 'danger',
-    onOk: () => {
-      applyRefuseResult(refuseOutbound([record.id]))
-    },
-  })
+function openRefuse(records) {
+  const list = (records || []).filter(Boolean)
+  if (!list.length) {
+    message.warning('请先选择出库单')
+    return
+  }
+  refuseTargets.value = list
+  refuseModalOpen.value = true
+}
+
+function submitRefuse(reason) {
+  const ids = refuseTargets.value.map((o) => o.id)
+  applyRefuseResult(refuseOutbound(ids, { reason }))
 }
 
 function handleRefuseOutbound() {
@@ -554,15 +759,8 @@ function handleRefuseOutbound() {
     message.warning('请先选择出库单')
     return
   }
-  Modal.confirm({
-    title: `拒绝出库所选 ${selectedRowKeys.value.length} 条单据？`,
-    content: '领料出库将被标记为「拒绝领料」并回写领料申请；其他类型标记为「已拒绝」。',
-    okText: '拒绝出库',
-    okType: 'danger',
-    onOk: () => {
-      applyRefuseResult(refuseOutbound(selectedRowKeys.value))
-    },
-  })
+  const rows = outboundState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
+  openRefuse(rows)
 }
 
 function goDetail(record) {
@@ -630,14 +828,20 @@ function handleBatchDelete() {
     message.warning('请先选择要删除的出库单')
     return
   }
+  const rows = outboundState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
+  const blockedBiz = rows.filter((o) => isOutboundBusinessSource(o))
   Modal.confirm({
     title: '确认删除所选出库单？',
+    content: blockedBiz.length
+      ? `其中 ${blockedBiz.length} 条为业务来源，不支持删除，将自动跳过。`
+      : undefined,
     onOk: () => {
       let n = 0
       selectedRowKeys.value.forEach((id) => {
         if (deleteOutboundOrder(id)) n += 1
       })
-      message.success(`已删除 ${n} 条`)
+      if (n > 0) message.success(`已删除 ${n} 条`)
+      else message.warning('没有可删除的单据（业务来源或状态不允许）')
       selectedRowKeys.value = []
     },
   })
@@ -645,7 +849,9 @@ function handleBatchDelete() {
 
 function confirmDelete(record) {
   if (!canDeleteOutbound(record)) {
-    message.warning('当前状态不可删除')
+    message.warning(
+      isOutboundBusinessSource(record) ? '业务来源出库单不支持删除' : '当前状态不可删除',
+    )
     return
   }
   Modal.confirm({
@@ -654,6 +860,7 @@ function confirmDelete(record) {
       if (deleteOutboundOrder(record.id)) {
         message.success('已删除')
         selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== record.id)
+        if (selectedId.value === record.id) selectedId.value = ''
       }
     },
   })
@@ -701,7 +908,9 @@ function handleBatchInitiateQc() {
 
 .filter-card,
 .list-panel,
-.table-card {
+.table-card,
+.list-card,
+.detail-card {
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -781,10 +990,6 @@ function handleBatchInitiateQc() {
   margin-bottom: 8px;
   padding: 0;
 
-  :deep(.ant-alert) {
-    border-radius: 4px;
-  }
-
   :deep(.ant-alert-message) {
     font-size: 13px;
   }
@@ -803,10 +1008,6 @@ function handleBatchInitiateQc() {
   :deep(.ant-table-tbody > tr > td) {
     padding: 6px 8px;
     font-size: 13px;
-  }
-
-  :deep(.ant-table-cell) {
-    vertical-align: middle;
   }
 
   :deep(.ant-table-cell-fix-right) {
@@ -838,6 +1039,180 @@ function handleBatchInitiateQc() {
   :deep(.ant-picker) {
     flex: 1;
     min-width: 0;
+  }
+}
+
+.master-detail {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-height: 520px;
+}
+
+.list-card {
+  width: 22%;
+  min-width: 240px;
+  max-width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 220px);
+
+  .list-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px 6px;
+    border-bottom: 1px solid #f0f0f0;
+
+    .list-title {
+      font-weight: 600;
+      font-size: 14px;
+      flex: 1;
+    }
+
+    .selected-count {
+      font-size: 12px;
+      color: #1677ff;
+    }
+
+    .list-title-actions {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .layout-toggle-btn {
+      color: rgba(0, 0, 0, 0.45);
+
+      &:hover {
+        color: #1677ff;
+      }
+    }
+  }
+
+  .split-toolbar {
+    padding: 6px 10px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .list-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+  }
+
+  .list-pagination {
+    padding: 6px 8px;
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: center;
+  }
+}
+
+.detail-card {
+  flex: 1;
+  min-width: 0;
+  max-height: calc(100vh - 220px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.order-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 6px 8px 6px 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  background: #fff;
+  transition: all 0.2s;
+  border-left: 2px solid transparent;
+
+  &:hover {
+    border-color: #d6e4ff;
+    box-shadow: 0 1px 4px rgba(22, 119, 255, 0.08);
+  }
+
+  &.active {
+    border-color: #91caff;
+    border-left-color: #1677ff;
+    background: #f0f7ff;
+  }
+
+  &.checked {
+    background: #fafcff;
+  }
+
+  .card-checkbox {
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .card-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+
+    .status-tag {
+      margin: 0;
+      line-height: 18px;
+      font-size: 12px;
+      padding-inline: 6px;
+    }
+
+    .more-btn {
+      padding: 0 2px;
+      height: 22px;
+      color: rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  .card-code {
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.88);
+  }
+
+  .card-name {
+    margin-top: 2px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.65);
+  }
+
+  .card-meta {
+    margin-top: 4px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+
+    .meta-divider {
+      margin: 0 4px;
+    }
+  }
+}
+
+@media (max-width: 960px) {
+  .master-detail {
+    flex-direction: column;
+  }
+
+  .list-card {
+    width: 100%;
+    max-width: none;
+    max-height: 360px;
+  }
+
+  .detail-card {
+    max-height: none;
   }
 }
 </style>

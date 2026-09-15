@@ -32,6 +32,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { outboundSourceLabel } from '@/mock/outboundOptions'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -58,28 +59,39 @@ const metaItems = computed(() => {
   ]
 })
 
-const fields = computed(() => [
-  { key: 'docNo', label: '出库单号' },
-  { key: 'outboundType', label: '出库类型' },
-  { key: 'warehouse', label: '出库仓库' },
-  { key: 'requisitionDept', label: '领用部门' },
-  { key: 'outboundTime', label: '出库时间' },
-  { key: 'sourceOrderNo', label: '源单编号', slot: 'sourceOrderNo' },
-  { key: 'salesOrderNo', label: '销售单号', slot: 'salesOrderNo' },
-  {
-    key: 'totalWeight',
-    label: '出库总重量(kg)',
-    format: (r) => (r.totalWeight != null ? String(r.totalWeight) : '—'),
-  },
-  { key: 'workshop', label: '所在车间' },
-  {
-    key: 'factoryQc',
-    label: '出厂质检',
-    slot: 'factoryQc',
-    hideWhenMaterialReq: true,
-  },
-  { key: 'remark', label: '备注', fullRow: true },
-])
+const fields = computed(() => {
+  const r = props.record
+  const list = [
+    { key: 'docNo', label: '出库单号' },
+    { key: 'outboundType', label: '出库类型' },
+    {
+      key: 'sourceChannel',
+      label: '来源',
+      format: (row) => outboundSourceLabel(row.sourceChannel),
+    },
+    { key: 'warehouse', label: '出库仓库' },
+    { key: 'requisitionDept', label: '申请部门' },
+    { key: 'outboundTime', label: '出库时间' },
+    { key: 'sourceOrderNo', label: '源单编号', slot: 'sourceOrderNo' },
+    { key: 'salesOrderNo', label: '销售单号', slot: 'salesOrderNo' },
+    {
+      key: 'factoryQc',
+      label: '出厂质检',
+      slot: 'factoryQc',
+      hideWhenMaterialReq: true,
+    },
+    { key: 'remark', label: '备注', fullRow: true },
+  ]
+  if (r.status === '已拒绝' || r.refuseReason) {
+    list.splice(list.length - 1, 0, {
+      key: 'refuseReason',
+      label: '拒绝理由',
+      fullRow: true,
+      format: (row) => display(row.refuseReason),
+    })
+  }
+  return list
+})
 
 const visibleFields = computed(() =>
   fields.value.filter((f) => !(f.hideWhenMaterialReq && props.isMaterialReqOutbound)),

@@ -9,62 +9,40 @@
             <span class="sub-type">{{ record.outboundType }}</span>
           </div>
           <a-space>
-            <template v-if="record.status === '待处理'">
-              <a-button
-                v-if="canApproveOutbound(record)"
-                type="primary"
-                size="small"
-                @click="handleApprove"
-              >
-                审批
-              </a-button>
-              <a-button
-                v-if="canRefuseOutbound(record)"
-                size="small"
-                danger
-                @click="handleRefuseOutbound"
-              >
-                拒绝出库
-              </a-button>
-              <a-button v-if="canEditOutbound(record)" size="small" @click="openEdit">
-                编辑
-              </a-button>
-              <a-button v-if="canDeleteOutbound(record)" size="small" danger @click="handleDelete">
-                删除
-              </a-button>
-              <a-button size="small" @click="goBack">返回列表</a-button>
-            </template>
-            <template v-else-if="record.status === '待出库'">
-              <a-button
-                v-if="canConfirm(record)"
-                type="primary"
-                size="small"
-                @click="handleConfirmOutbound"
-              >
-                确认出库
-              </a-button>
-              <a-button
-                v-if="canRefuseOutbound(record)"
-                size="small"
-                danger
-                @click="handleRefuseOutbound"
-              >
-                拒绝出库
-              </a-button>
-              <a-button v-if="canEditOutbound(record)" size="small" @click="openEdit">
-                编辑
-              </a-button>
-              <a-button v-if="canDeleteOutbound(record)" size="small" danger @click="handleDelete">
-                删除
-              </a-button>
-              <a-button v-if="canInitiateFactoryQc(record)" size="small" @click="handleInitiateQc">
-                {{ initiateQcActionLabel(record) }}
-              </a-button>
-              <a-button size="small" @click="goBack">返回列表</a-button>
-            </template>
-            <template v-else>
-              <a-button size="small" @click="goBack">返回列表</a-button>
-            </template>
+            <a-button
+              v-if="canApproveOutbound(record)"
+              type="primary"
+              size="small"
+              @click="handleApprove"
+            >
+              审批
+            </a-button>
+            <a-button
+              v-if="canConfirm(record)"
+              type="primary"
+              size="small"
+              @click="handleConfirmOutbound"
+            >
+              确认出库
+            </a-button>
+            <a-button
+              v-if="canRefuseOutbound(record)"
+              size="small"
+              danger
+              @click="handleRefuseOutbound"
+            >
+              拒绝出库
+            </a-button>
+            <a-button v-if="canEditOutbound(record)" size="small" @click="openEdit">
+              编辑
+            </a-button>
+            <a-button v-if="canDeleteOutbound(record)" size="small" danger @click="handleDelete">
+              删除
+            </a-button>
+            <a-button v-if="canInitiateFactoryQc(record)" size="small" @click="handleInitiateQc">
+              {{ initiateQcActionLabel(record) }}
+            </a-button>
+            <a-button size="small" @click="goBack">返回列表</a-button>
           </a-space>
         </div>
 
@@ -284,6 +262,12 @@
       </template>
       <a-empty v-else-if="!loading" description="未找到该出库单" />
     </a-spin>
+
+    <OutboundRefuseModal
+      v-model:open="refuseModalOpen"
+      :doc-nos="record ? [record.docNo] : []"
+      @confirm="submitRefuse"
+    />
   </div>
 </template>
 
@@ -296,7 +280,7 @@ export default { name: 'OutboundOrderDetailView' }
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { outboundStatusColor } from '@/mock/outboundOptions'
+import { outboundStatusColor, isOutboundBusinessSource } from '@/mock/outboundOptions'
 import {
   getOutboundOrderById,
   confirmOutbound,
@@ -328,6 +312,7 @@ import {
 } from '@/utils/outboundLineHelpers'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import OutboundOrderBasicInfoSection from './components/OutboundOrderBasicInfoSection.vue'
+import OutboundRefuseModal from './components/OutboundRefuseModal.vue'
 import OutboundWorkOrderList from './components/OutboundWorkOrderList.vue'
 import OutboundOutsourcingOrderList from './components/OutboundOutsourcingOrderList.vue'
 import {
@@ -344,6 +329,7 @@ const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 const infoTab = ref('basic')
+const refuseModalOpen = ref(false)
 
 const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领料出库')
 
@@ -537,37 +523,38 @@ function handleConfirmOutbound() {
   })
 }
 
-function applyRefuseOutbound(orderId) {
-  const result = refuseOutbound([orderId])
+function applyRefuseOutbound(orderId, reason) {
+  const result = refuseOutbound([orderId], { reason })
   ;(result.refused || []).forEach((order) => syncMaterialReqOnOutboundRefuse(order))
   return result
 }
 
 function handleRefuseOutbound() {
   if (!record.value) return
-  Modal.confirm({
-    title: `拒绝出库 ${record.value.docNo}？`,
-    content:
-      record.value.outboundType === '领料出库'
-        ? '拒绝后出库单将标记为「拒绝领料」，并回写关联领料申请的出库状态。'
-        : '拒绝后出库单将标记为「已拒绝」。',
-    okText: '拒绝出库',
-    okType: 'danger',
-    onOk: () => {
-      const { count, blocked } = applyRefuseOutbound(record.value.id)
-      if (blocked.length) {
-        message.warning(blocked.map((b) => b.message).join('；'))
-        return
-      }
-      if (count > 0) {
-        message.success('已拒绝出库')
-        reload()
-      }
-    },
-  })
+  refuseModalOpen.value = true
+}
+
+function submitRefuse(reason) {
+  if (!record.value) return
+  const { count, blocked } = applyRefuseOutbound(record.value.id, reason)
+  if (blocked.length) {
+    message.warning(blocked.map((b) => b.message).join('；'))
+    return
+  }
+  if (count > 0) {
+    message.success('已拒绝出库')
+    refuseModalOpen.value = false
+    reload()
+  }
 }
 
 function handleDelete() {
+  if (!canDeleteOutbound(record.value)) {
+    message.warning(
+      isOutboundBusinessSource(record.value) ? '业务来源出库单不支持删除' : '当前状态不可删除',
+    )
+    return
+  }
   Modal.confirm({
     title: `确认删除出库单 ${record.value.docNo}？`,
     onOk: () => {

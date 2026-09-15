@@ -56,7 +56,7 @@ export function createOutboundOrder(partial) {
     customerName: '',
     itemType: '',
     totalWeight: null,
-    status: '待处理',
+    status: '待出库',
     createdAt: dayjs().format('YYYY-MM-DD'),
     completedAt: '',
     auditDate: '',
@@ -68,7 +68,10 @@ export function createOutboundOrder(partial) {
     creator: 'admin1',
     lineItems: [],
     factoryQcId: '',
-    sourceChannel: '',
+    sourceChannel: 'manual',
+    refuseReason: '',
+    refusedBy: '',
+    refusedAt: '',
     /** 领料/发料：领入仓库（线边仓）；确认出库后 A→B 调入 */
     receiveWarehouse: '',
     stockTransferredToReceive: false,
@@ -418,6 +421,31 @@ export function cloneOutboundOrders() {
 
 export function calcOutboundShipQty(order) {
   return (order?.lineItems || []).reduce((sum, line) => sum + (Number(line.shipQty) || 0), 0)
+}
+
+/** 出库单数量（单据计划量） */
+export function calcOutboundOrderQty(order) {
+  return calcOutboundShipQty(order)
+}
+
+/** 已出库数量（明细已确认出库部分；整单已出库/待确认视为全部已出） */
+export function calcOutboundShippedQty(order) {
+  const status = order?.status
+  if (status === '已出库' || status === '待申领人确认') {
+    return calcOutboundOrderQty(order)
+  }
+  return (order?.lineItems || []).reduce((sum, line) => {
+    if ((line.lineStatus || '待出库') === '已出库') {
+      return sum + (Number(line.shipQty) || 0)
+    }
+    return sum
+  }, 0)
+}
+
+/** 列表/导出展示：已出库数量/出库单数量 */
+export function formatOutboundQtyRatio(order, formatFn) {
+  const fmt = typeof formatFn === 'function' ? formatFn : (v) => String(v ?? 0)
+  return `${fmt(calcOutboundShippedQty(order))}/${fmt(calcOutboundOrderQty(order))}`
 }
 
 function matchOutboundTimeRange(item, filters) {

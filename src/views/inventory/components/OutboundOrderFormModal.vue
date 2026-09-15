@@ -72,12 +72,12 @@
               </a-form-item>
             </a-col>
             <a-col v-if="!isSalesOutbound" :span="8">
-              <a-form-item label="领用部门">
+              <a-form-item label="申请部门">
                 <a-select
                   v-model:value="form.requisitionDept"
                   allow-clear
                   size="small"
-                  placeholder="请选择 领用部门"
+                  placeholder="请选择 申请部门"
                   :options="requisitionDeptOpts"
                 />
               </a-form-item>
@@ -580,7 +580,11 @@ import {
   snapshotOutsourcingOrdersForOutbound,
 } from '@/utils/outboundOutsourcingOrders'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
-import { outboundTypeOptions, requisitionDeptOptions } from '@/mock/outboundOptions'
+import {
+  outboundTypeOptions,
+  requisitionDeptOptions,
+  OUTBOUND_SOURCE,
+} from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
   addOutboundOrder,
@@ -1468,7 +1472,7 @@ function removeLine(id) {
 }
 
 function buildPayload() {
-  return {
+  const payload = {
     docNo: form.docNo?.trim(),
     outboundType: form.outboundType,
     outboundTime: normalizeOutboundTime(form.outboundTime),
@@ -1503,6 +1507,11 @@ function buildPayload() {
         return row
       }),
   }
+  // 仓管在出库页新建 →「新增」；编辑不改写原有来源
+  if (!props.editRecord) {
+    payload.sourceChannel = OUTBOUND_SOURCE.MANUAL
+  }
+  return payload
 }
 
 function handleSave() {
