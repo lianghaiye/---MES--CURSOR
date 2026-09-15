@@ -7,6 +7,7 @@
     :footer="null"
     destroy-on-close
     @update:open="emit('update:open', $event)"
+    @cancel="handleReject"
   >
     <a-alert type="warning" show-icon class="ref-alert" message="检测到母件 BOM 引用" />
 

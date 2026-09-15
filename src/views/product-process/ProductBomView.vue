@@ -401,7 +401,6 @@ import {
   deleteProductBom,
   cloneProductBom,
   archiveProductBom,
-  batchEnableProductBom,
   enableProductBom,
   enableShipAttachment,
   disableShipAttachment,
@@ -461,6 +460,8 @@ const enableTarget = ref(null)
 const enableParentRefs = ref([])
 const enableNewVersion = ref('')
 const enableCurrentVersion = ref('')
+/** 批量审核发布时待处理队列（需弹窗确认母件引用的 BOM） */
+const enableQueue = ref([])
 const archiveRefOpen = ref(false)
 const archiveTarget = ref(null)
 const archiveParentRefs = ref([])
@@ -774,16 +775,46 @@ function handleBatchEnable() {
     )
     return
   }
+
+  const withRefs = []
+  const withoutRefs = []
+  targets.forEach((row) => {
+    const refs = findParentRefsForBomUpgrade(row)
+    if (refs.length) withRefs.push(row)
+    else withoutRefs.push(row)
+  })
+
+  const entityLabel = isShipList.value ? '随货附件' : 'BOM'
   Modal.confirm({
     title: '批量审核发布',
-    content: `确定审核发布选中的 ${targets.length} 条待发布${isShipList.value ? '随货附件' : 'BOM'}吗？${isShipList.value ? '同一附件包仅允许一个生效版本。' : '同物品仅允许一个生效版本。'}`,
+    content:
+      withRefs.length > 0
+        ? `将发布 ${targets.length} 条记录，其中 ${withRefs.length} 条存在母件引用，需逐条确认是否同步升级引用版本。${isShipList.value ? '同一附件包仅允许一个生效版本。' : '同物品仅允许一个生效版本。'}`
+        : `确定审核发布选中的 ${targets.length} 条待发布${entityLabel}吗？${isShipList.value ? '同一附件包仅允许一个生效版本。' : '同物品仅允许一个生效版本。'}`,
     onOk: () => {
-      const { ok, errors } = batchEnableProductBom(selectedRowKeys.value)
+      let ok = 0
+      const errors = []
+      withoutRefs.forEach((row) => {
+        const res = enableProductBom(row.id)
+        if (res?.error) errors.push(`${row.bomNo || row.bomName}: ${res.error}`)
+        else ok += 1
+      })
       selectedRowKeys.value = []
-      if (ok) message.success(`已成功发布 ${ok} 条`)
+      if (!withRefs.length) {
+        if (ok) message.success(`已成功发布 ${ok} 条`)
+        if (errors.length) {
+          message.warning(errors.slice(0, 3).join('；') + (errors.length > 3 ? '…' : ''))
+        }
+        return
+      }
+      if (ok) {
+        message.success(`已先发布 ${ok} 条无母件引用的 ${entityLabel}`)
+      }
       if (errors.length) {
         message.warning(errors.slice(0, 3).join('；') + (errors.length > 3 ? '…' : ''))
       }
+      enableQueue.value = [...withRefs]
+      processNextEnableInQueue()
     },
   })
 }
@@ -918,21 +949,45 @@ function doEnable(record, upgradeParentRefs = false, parentRefs = []) {
   )
 }
 
+function openEnableRefModal(record, refs) {
+  enableTarget.value = record
+  enableParentRefs.value = refs
+  enableNewVersion.value = record.version || ''
+  const active = productBomState.boms.find(
+    (b) =>
+      b.itemType === record.itemType &&
+      b.itemId === record.itemId &&
+      b.id !== record.id &&
+      isBomActive(b),
+  )
+  enableCurrentVersion.value = active?.version || ''
+  enableRefOpen.value = true
+}
+
+function clearEnableRefState() {
+  enableTarget.value = null
+  enableParentRefs.value = []
+  enableNewVersion.value = ''
+  enableCurrentVersion.value = ''
+}
+
+function processNextEnableInQueue() {
+  const next = enableQueue.value.shift()
+  if (!next) return
+  const refs = findParentRefsForBomUpgrade(next)
+  if (!refs.length) {
+    doEnable(next)
+    processNextEnableInQueue()
+    return
+  }
+  openEnableRefModal(next, refs)
+}
+
 function handleEnable(record) {
   const refs = findParentRefsForBomUpgrade(record)
   if (refs.length) {
-    enableTarget.value = record
-    enableParentRefs.value = refs
-    enableNewVersion.value = record.version || ''
-    const active = productBomState.boms.find(
-      (b) =>
-        b.itemType === record.itemType &&
-        b.itemId === record.itemId &&
-        b.id !== record.id &&
-        isBomActive(b),
-    )
-    enableCurrentVersion.value = active?.version || ''
-    enableRefOpen.value = true
+    enableQueue.value = []
+    openEnableRefModal(record, refs)
     return
   }
   doEnable(record)
@@ -941,20 +996,18 @@ function handleEnable(record) {
 function onEnableRefConfirm({ action, selectedRefs, upgradeRefs }) {
   if (!enableTarget.value) return
   if (action === 'reject') {
-    message.info('已取消本次审核发布')
-    enableTarget.value = null
-    enableParentRefs.value = []
-    enableNewVersion.value = ''
-    enableCurrentVersion.value = ''
+    message.info(
+      enableQueue.value.length ? '已取消当前条审核发布，其余待确认项已停止' : '已取消本次审核发布',
+    )
+    clearEnableRefState()
+    enableQueue.value = []
     return
   }
   const refsToUpgrade = upgradeRefs || selectedRefs || []
   const upgrade = refsToUpgrade.length > 0
   doEnable(enableTarget.value, upgrade, refsToUpgrade)
-  enableTarget.value = null
-  enableParentRefs.value = []
-  enableNewVersion.value = ''
-  enableCurrentVersion.value = ''
+  clearEnableRefState()
+  processNextEnableInQueue()
 }
 
 function onExportMenu({ key }) {
