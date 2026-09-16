@@ -1,8 +1,26 @@
 <template>
   <div class="packaging-variant-matrix-preview">
-    <div class="matrix-summary">
-      属性组合将生成 <strong>{{ matrixRows.length }}</strong> 个包装 SKU，已启用
-      <strong>{{ enabledCount }}</strong> 个
+    <div class="matrix-summary-row">
+      <div class="matrix-summary">
+        属性组合将生成 <strong>{{ matrixRows.length }}</strong> 个包装 SKU，已启用
+        <strong>{{ enabledCount }}</strong> 个
+      </div>
+      <a-space :size="8">
+        <a-button
+          size="small"
+          :disabled="!matrixRows.length || allEnabled"
+          @click="setAllEnabled(true)"
+        >
+          全部启用
+        </a-button>
+        <a-button
+          size="small"
+          :disabled="!matrixRows.length || noneEnabled"
+          @click="setAllEnabled(false)"
+        >
+          全部停用
+        </a-button>
+      </a-space>
     </div>
 
     <a-table
@@ -46,6 +64,10 @@ const matrixRows = ref([])
 const pagination = reactive({ pageSize: 10, current: 1 })
 
 const enabledCount = computed(() => matrixRows.value.filter((r) => r.enabled).length)
+const allEnabled = computed(
+  () => matrixRows.value.length > 0 && enabledCount.value === matrixRows.value.length,
+)
+const noneEnabled = computed(() => enabledCount.value === 0)
 
 const displayColumns = computed(() => {
   const cols = [{ title: '#', dataIndex: 'index', width: 48 }]
@@ -88,14 +110,30 @@ watch(() => [props.spu, props.variantAxes, props.skuCodePattern], rebuildMatrix,
   immediate: true,
 })
 
+function setAllEnabled(enabled) {
+  if (!matrixRows.value.length) return
+  matrixRows.value.forEach((r) => {
+    r.enabled = enabled
+  })
+  emitMatrixChange()
+}
+
 function emitMatrixChange() {
   emit('matrix-change', matrixRows.value)
 }
 </script>
 
 <style scoped>
-.matrix-summary {
+.matrix-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.matrix-summary {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.65);
 }

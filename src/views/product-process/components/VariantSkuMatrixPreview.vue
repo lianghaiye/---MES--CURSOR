@@ -1,8 +1,26 @@
 <template>
   <div class="variant-sku-matrix-preview">
-    <div class="matrix-summary">
-      属性组合将生成 <strong>{{ matrixRows.length }}</strong> 个变体 SKU，已启用
-      <strong>{{ enabledCount }}</strong> 个
+    <div class="matrix-summary-row">
+      <div class="matrix-summary">
+        属性组合将生成 <strong>{{ matrixRows.length }}</strong> 个变体 SKU，已启用
+        <strong>{{ enabledCount }}</strong> 个
+      </div>
+      <a-space v-if="!disabled" :size="8">
+        <a-button
+          size="small"
+          :disabled="!matrixRows.length || allEnabled"
+          @click="setAllEnabled(true)"
+        >
+          全部启用
+        </a-button>
+        <a-button
+          size="small"
+          :disabled="!matrixRows.length || noneEnabled"
+          @click="setAllEnabled(false)"
+        >
+          全部停用
+        </a-button>
+      </a-space>
     </div>
 
     <a-table
@@ -57,6 +75,10 @@ const matrixRows = ref([])
 const pagination = reactive({ pageSize: 10, current: 1 })
 
 const enabledCount = computed(() => matrixRows.value.filter((r) => r.enabled).length)
+const allEnabled = computed(
+  () => matrixRows.value.length > 0 && enabledCount.value === matrixRows.value.length,
+)
+const noneEnabled = computed(() => enabledCount.value === 0)
 
 const displayColumns = computed(() => {
   const cols = [{ title: '#', dataIndex: 'index', width: 48 }]
@@ -87,29 +109,25 @@ function rebuildMatrix() {
     skuCodePattern: props.skuCodePattern,
     bomStrategy: props.spu?.bomStrategy,
   }
-  // 空数组 / null：默认全部启用（新建产品族矩阵）
-  const hasExplicitKeys = Array.isArray(props.enabledKeys) && props.enabledKeys.length > 0
-  const enabledSet = hasExplicitKeys ? new Set(props.enabledKeys) : null
+  // null/undefined：未指定，默认全部启用；数组（含空）：显式启用集合，空数组=全部停用
+  const isExplicit = Array.isArray(props.enabledKeys)
+  const enabledSet = isExplicit ? new Set(props.enabledKeys) : null
   const existingSkus = props.spu?.id ? listSkusForSpu(props.spu.id) : []
   const rows = previewMatrixRows(spu, {
     materialGrades: materialGradeState.items,
     existingSkus,
     enabledKeys: enabledSet,
   })
-  if (enabledSet == null) {
+  if (!isExplicit) {
     rows.forEach((r) => {
       r.enabled = true
     })
   }
   matrixRows.value = rows
 
-  if (enabledSet == null && rows.length) {
+  if (!isExplicit && rows.length) {
     const keys = rows.map((r) => r.rowKey)
-    const prev = Array.isArray(props.enabledKeys) ? props.enabledKeys : []
-    const same = prev.length === keys.length && keys.every((k) => prev.includes(k))
-    if (!same) {
-      emit('update:enabledKeys', keys)
-    }
+    emit('update:enabledKeys', keys)
   }
   emitMatrixChange()
 }
@@ -126,6 +144,14 @@ function onEnabledChange() {
   emitMatrixChange()
 }
 
+function setAllEnabled(enabled) {
+  if (props.disabled || !matrixRows.value.length) return
+  matrixRows.value.forEach((r) => {
+    r.enabled = enabled
+  })
+  onEnabledChange()
+}
+
 function emitMatrixChange() {
   emit('matrix-change', matrixRows.value)
 }
@@ -138,8 +164,16 @@ defineExpose({ getEnabledRows, rebuildMatrix })
 </script>
 
 <style scoped>
-.matrix-summary {
+.matrix-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin: 12px 0 10px;
+  flex-wrap: wrap;
+}
+
+.matrix-summary {
   font-size: 13px;
 }
 </style>

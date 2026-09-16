@@ -1361,7 +1361,7 @@ const form = reactive({
   spuCode: '',
   variantAxes: [],
   skuCodePattern: PRODUCT_SKU_CODE_PATTERN,
-  enabledCombinationKeys: [],
+  enabledCombinationKeys: null,
   bomStrategy: SPU_BOM_STRATEGY.INHERIT,
   baseBomId: '',
   techParams: '',
@@ -1490,7 +1490,7 @@ function resetForm() {
   form.spuCode = ''
   form.variantAxes = []
   form.skuCodePattern = PRODUCT_SKU_CODE_PATTERN
-  form.enabledCombinationKeys = []
+  form.enabledCombinationKeys = null
   form.bomStrategy = SPU_BOM_STRATEGY.INHERIT
   form.baseBomId = ''
   form.techParams = ''
@@ -1680,7 +1680,9 @@ function loadEditSpu(spu) {
     getMaterialGradeById,
   )
   form.skuCodePattern = PRODUCT_SKU_CODE_PATTERN
-  form.enabledCombinationKeys = [...(spu.enabledCombinations || [])]
+  form.enabledCombinationKeys = Array.isArray(spu.enabledCombinations)
+    ? [...spu.enabledCombinations]
+    : null
   form.bomStrategy = spu.bomStrategy || SPU_BOM_STRATEGY.INHERIT
   form.baseBomId = spu.baseBomId || ''
   const shared = spu.sharedFields || {}
@@ -2126,7 +2128,9 @@ function buildSpuPayloadFromForm() {
     canOutsource: form.canOutsource,
     variantAxes: JSON.parse(JSON.stringify(form.variantAxes || [])),
     skuCodePattern: form.skuCodePattern,
-    enabledCombinations: [...(form.enabledCombinationKeys || [])],
+    enabledCombinations: Array.isArray(form.enabledCombinationKeys)
+      ? [...form.enabledCombinationKeys]
+      : [],
     bomStrategy: form.bomStrategy,
     baseBomId: form.baseBomId,
     mixedBomRules: null,
