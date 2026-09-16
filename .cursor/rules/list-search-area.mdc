@@ -53,8 +53,8 @@ alwaysApply: false
 
 - **位置**：条件 ≥5 时在第二行第 5 列；条件不足 5 时与条件同行第 5 列；宽度 ≈ 1 个条件列宽；与所在行条件**顶部对齐**
 - **结构**（**同一行横排**，不换行）：
-  - **重置｜搜索｜展开 ▾ / 收起 ▴**
-  - 展开/收起仅条件 **> 9** 时显示；`flex-wrap: nowrap`，组内右对齐（`justify-content: flex-end`）
+  - **搜索/查询｜清空/重置｜展开 ▾ / 收起 ▴**
+  - 展开/收起仅条件 **≥ 10** 时显示（蓝色文字链 + ▾/▴，对齐工单页）；`flex-wrap: nowrap`，组内右对齐（`justify-content: flex-end`）
 - 与 `@ListFilterBar.vue` 的 `.list-filter-actions-cell` 一致
 
 ## 推荐实现

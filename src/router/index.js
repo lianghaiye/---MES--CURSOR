@@ -534,6 +534,12 @@ const routes = [
         meta: { title: '出库管理' },
       },
       {
+        path: 'inventory/pending-outbound',
+        name: 'inventory-pending-outbound',
+        component: () => import('@/views/inventory/PendingOutboundListView.vue'),
+        meta: { title: '待出库列表' },
+      },
+      {
         path: 'inventory/outbound/:id/edit',
         name: 'inventory-outbound-edit',
         component: () => import('@/views/inventory/OutboundOrderEditView.vue'),
@@ -551,6 +557,12 @@ const routes = [
         name: 'inventory-inbound',
         component: () => import('@/views/inventory/InboundManagementView.vue'),
         meta: { title: '入库管理' },
+      },
+      {
+        path: 'inventory/pending-inbound',
+        name: 'inventory-pending-inbound',
+        component: () => import('@/views/inventory/PendingInboundListView.vue'),
+        meta: { title: '待入库列表' },
       },
       {
         path: 'inventory/inbound/:id/edit',

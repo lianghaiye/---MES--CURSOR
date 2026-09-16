@@ -1,5 +1,5 @@
 <template>
-  <div class="outbound-page">
+  <div class="pending-outbound-page">
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -8,7 +8,7 @@
               <a-input
                 v-model:value="filters.docNo"
                 allow-clear
-                placeholder="请输入 出库单号"
+                placeholder="请输入"
                 size="small"
               />
             </a-form-item>
@@ -18,60 +18,9 @@
               <a-select
                 v-model:value="filters.outboundType"
                 allow-clear
-                placeholder="请选择 出库类型"
+                placeholder="请选择"
                 size="small"
                 :options="outboundTypeOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="出库仓库">
-              <a-select
-                v-model:value="filters.warehouse"
-                allow-clear
-                placeholder="请选择 出库仓库"
-                size="small"
-                :options="warehouseOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="出库时间">
-              <a-input-group compact class="outbound-time-filter">
-                <a-select
-                  v-model:value="filters.outboundTimeUnit"
-                  size="small"
-                  :options="outboundTimeUnitOpts"
-                  style="width: 64px"
-                />
-                <a-range-picker
-                  v-model:value="filters.outboundTimeRange"
-                  size="small"
-                  style="flex: 1; min-width: 0"
-                  :picker="outboundTimePicker"
-                  :placeholder="['开始日期', '结束日期']"
-                />
-              </a-input-group>
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="申请部门">
-              <a-select
-                v-model:value="filters.requisitionDept"
-                allow-clear
-                placeholder="请选择 申请部门"
-                size="small"
-                :options="requisitionDeptOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="源单编号">
-              <a-input
-                v-model:value="filters.sourceOrderNo"
-                allow-clear
-                placeholder="请输入 源单编号"
-                size="small"
               />
             </a-form-item>
           </a-col>
@@ -80,15 +29,86 @@
               <a-select
                 v-model:value="filters.status"
                 allow-clear
-                placeholder="请选择 状态"
+                placeholder="请选择"
                 size="small"
                 :options="statusOpts"
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="8">
-            <a-form-item class="filter-actions-item">
-              <a-space>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="源单号">
+              <a-input
+                v-model:value="filters.sourceOrderNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="物品名称">
+              <a-input
+                v-model:value="filters.itemName"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="物品编码">
+              <a-input
+                v-model:value="filters.itemCode"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="出库仓库">
+              <a-select
+                v-model:value="filters.warehouse"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="warehouseOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="规格型号">
+              <a-input
+                v-model:value="filters.specModel"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="材质">
+              <a-input
+                v-model:value="filters.material"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="创建时间">
+              <a-range-picker
+                v-model:value="filters.createdAtRange"
+                size="small"
+                style="width: 100%"
+                :placeholder="['开始日期', '结束日期']"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item class="filter-actions-item" label=" ">
+              <a-space :size="8">
                 <a-button type="primary" size="small" @click="handleSearch">
                   <SearchOutlined />
                   搜索
@@ -116,6 +136,10 @@
           <CloseCircleOutlined />
           拒绝出库
         </a-button>
+        <a-button size="small" @click="stubAction('生成采购单')">
+          <CheckOutlined />
+          生成采购单
+        </a-button>
         <a-button size="small" @click="handleBatchDelete">
           <DeleteOutlined />
           删除
@@ -123,6 +147,21 @@
         <a-button size="small" @click="openPrintSelected">
           <PrinterOutlined />
           打印
+        </a-button>
+        <a-dropdown>
+          <a-button size="small" @click.prevent>
+            批量操作
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onBatchMenu">
+              <a-menu-item key="export">导出</a-menu-item>
+              <a-menu-item key="import">导入</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+        <a-button size="small" type="primary" ghost @click="handleBatchInitiateQc">
+          发起出厂质检
         </a-button>
       </a-space>
       <div class="split-action-right">
@@ -148,24 +187,24 @@
             :indeterminate="pageIndeterminate"
             @change="onToggleSelectAllPage"
           />
-          <span class="list-title">出库单列表</span>
-          <span v-if="selectedRowKeys.length" class="selected-count"
-            >已选 {{ selectedRowKeys.length }}</span
+          <span class="list-title">待出库单列表</span>
+          <span v-if="selectedOrderIds.length" class="selected-count"
+            >已选 {{ selectedOrderIds.length }}</span
           >
         </div>
         <div class="list-body">
           <div
-            v-for="row in pagedList"
+            v-for="row in pagedOrders"
             :key="row.id"
             class="order-card"
-            :class="{ active: selectedId === row.id, checked: selectedRowKeys.includes(row.id) }"
+            :class="{ active: selectedId === row.id, checked: selectedOrderIds.includes(row.id) }"
             @click="selectOrder(row.id)"
           >
             <a-checkbox
               class="card-checkbox"
-              :checked="selectedRowKeys.includes(row.id)"
+              :checked="selectedOrderIds.includes(row.id)"
               @click.stop
-              @change="(e) => toggleSelect(row.id, e.target.checked)"
+              @change="(e) => toggleSelectOrder(row.id, e.target.checked)"
             />
             <div class="card-content">
               <div class="card-head">
@@ -207,7 +246,7 @@
         <div class="list-pagination">
           <a-pagination
             v-model:current="pagination.current"
-            :total="filteredList.length"
+            :total="filteredOrders.length"
             :page-size="pagination.pageSize"
             size="small"
             simple
@@ -293,15 +332,16 @@
       <a-alert type="info" show-icon class="summary-bar" :banner="false">
         <template #message>
           <span>
-            当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
-            <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
+            仅展示「待出库 / 部分出库」明细，共 {{ filteredList.length }} 条；当前表格已选择
+            <strong>{{ selectedOrderIds.length }}</strong> 项
+            <a-button type="link" size="small" @click="selectedOrderIds = []">清空</a-button>
           </span>
         </template>
       </a-alert>
 
       <div class="table-card">
         <a-table
-          :columns="displayColumns"
+          :columns="mergedDisplayColumns"
           :data-source="pagedList"
           row-key="id"
           size="small"
@@ -311,84 +351,104 @@
           :row-selection="rowSelection"
           :custom-row="
             (record) => ({
-              onClick: () => selectOrder(record.id),
+              onClick: () => selectOrder(record.orderId),
             })
           "
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'docNo'">
-              <a class="link-code" @click.stop="goDetail(record)">{{ record.docNo }}</a>
-            </template>
-            <template v-else-if="column.key === 'sourceOrderNo'">
-              <a v-if="record.sourceOrderNo" class="link-code">{{ record.sourceOrderNo }}</a>
-              <span v-else>-</span>
-            </template>
-            <template v-else-if="column.key === 'salesOrderNo'">
-              <a v-if="record.salesOrderNo" class="link-code" @click.stop="goSalesOrder(record)">
-                {{ record.salesOrderNo }}
-              </a>
-              <span v-else>—</span>
-            </template>
-            <template v-else-if="column.key === 'shipQtyTotal'">
-              {{ formatOutboundQtyRatio(record, formatQty) }}
-            </template>
-            <template v-else-if="column.key === 'sourceChannel'">
-              {{ outboundSourceLabel(record.sourceChannel) }}
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">
+              {{ rowIndex(index) }}
             </template>
             <template v-else-if="column.key === 'status'">
               <a-tag :color="outboundStatusColor(record.status)">{{ record.status }}</a-tag>
             </template>
+            <template v-else-if="column.key === 'docNo'">
+              <a class="link-code" @click.stop="goDetail(record)">{{ record.docNo || '—' }}</a>
+            </template>
+            <template v-else-if="column.key === 'shipQtyTotal'">
+              {{ record.shipQtyTotal || '—' }}
+            </template>
+            <template v-else-if="column.key === 'sourceChannel'">
+              {{ record.sourceChannelLabel || '—' }}
+            </template>
+            <template v-else-if="column.key === 'itemName'">
+              {{ record.itemName || '—' }}
+            </template>
+            <template v-else-if="column.key === 'itemCode'">
+              {{ record.itemCode || '—' }}
+            </template>
+            <template v-else-if="column.key === 'specModel'">
+              {{ record.specModel || '—' }}
+            </template>
+            <template v-else-if="column.key === 'material'">
+              {{ record.material || '—' }}
+            </template>
+            <template v-else-if="column.key === 'drawingNo'">
+              {{ record.drawingNo || '—' }}
+            </template>
+            <template v-else-if="column.key === 'shipQty'">
+              {{ formatQtyWithUnit(record.shipQty, record.unit) }}
+            </template>
+            <template v-else-if="column.key === 'warehouse'">
+              {{ record.warehouse || '—' }}
+            </template>
+            <template v-else-if="column.key === 'salesOrderNo'">
+              {{ record.salesOrderNo || '—' }}
+            </template>
+            <template v-else-if="column.key === 'sourceOrderNo'">
+              {{ record.sourceOrderNo || '—' }}
+            </template>
             <template v-else-if="column.key === 'action'">
               <a-space :size="0" wrap>
                 <a-button
-                  v-if="canApproveOutbound(record)"
+                  v-if="canApproveOutbound(resolveOrder(record))"
                   type="link"
                   size="small"
-                  @click.stop="handleApprove(record)"
+                  @click.stop="handleApprove(resolveOrder(record))"
                 >
                   审批
                 </a-button>
                 <a-button
-                  v-if="canEditOutbound(record)"
+                  v-if="canEditOutbound(resolveOrder(record))"
                   type="link"
                   size="small"
-                  @click.stop="openEdit(record)"
+                  @click.stop="openEdit(resolveOrder(record))"
                 >
                   编辑
                 </a-button>
                 <a-button
-                  v-if="canConfirm(record)"
+                  v-if="canConfirm(resolveOrder(record))"
                   type="link"
                   size="small"
-                  @click.stop="handleConfirmOne(record)"
+                  @click.stop="handleConfirmOne(resolveOrder(record))"
                 >
                   确认出库
                 </a-button>
                 <a-button
-                  v-if="canRefuseOutbound(record)"
+                  v-if="canRefuseOutbound(resolveOrder(record))"
                   type="link"
                   size="small"
                   danger
-                  @click.stop="openRefuse([record])"
+                  @click.stop="openRefuse([resolveOrder(record)])"
                 >
                   拒绝出库
                 </a-button>
                 <a-button
-                  v-if="canDeleteOutbound(record)"
+                  v-if="canDeleteOutbound(resolveOrder(record))"
                   type="link"
                   size="small"
                   danger
-                  @click.stop="confirmDelete(record)"
+                  @click.stop="confirmDelete(resolveOrder(record))"
                 >
                   删除
                 </a-button>
                 <a-button
-                  v-if="canInitiateFactoryQc(record)"
+                  v-if="canInitiateFactoryQc(resolveOrder(record))"
                   type="link"
                   size="small"
-                  @click.stop="handleInitiateQc(record)"
+                  @click.stop="handleInitiateQc(resolveOrder(record))"
                 >
-                  {{ initiateQcActionLabel(record) }}
+                  {{ initiateQcActionLabel(resolveOrder(record)) }}
                 </a-button>
               </a-space>
             </template>
@@ -416,15 +476,6 @@
       :default-settings="defaultColumnSettings"
     />
 
-    <ExportExcelModal
-      v-model:open="exportModalOpen"
-      v-model:settings="exportFieldSettings"
-      :default-settings="defaultExportFieldSettings"
-      :filtered-count="filteredList.length"
-      :selected-count="selectedRowKeys.length"
-      @export="doExport"
-    />
-
     <OutboundRefuseModal
       v-model:open="refuseModalOpen"
       :doc-nos="refuseDocNos"
@@ -440,7 +491,7 @@
 </template>
 
 <script>
-export default { name: 'OutboundManagementView' }
+export default { name: 'PendingOutboundListView' }
 </script>
 
 <script setup>
@@ -455,20 +506,17 @@ import {
   CheckOutlined,
   CloseCircleOutlined,
   PrinterOutlined,
-  DownOutlined,
   TableOutlined,
   AppstoreOutlined,
   EllipsisOutlined,
+  DownOutlined,
 } from '@ant-design/icons-vue'
-import { formatQty } from '@/utils/numberFormat'
-import { filterOutboundOrders, formatOutboundQtyRatio } from '@/mock/outboundOrders'
+import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
+import { formatOutboundQtyRatio } from '@/mock/outboundOrders'
 import {
   outboundTypeOptions,
-  outboundStatusOptions,
   outboundStatusColor,
-  outboundTimeUnitOptions,
   warehouseOptions,
-  requisitionDeptOptions,
   outboundSourceLabel,
   isOutboundBusinessSource,
 } from '@/mock/outboundOptions'
@@ -492,17 +540,21 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
-import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
-import { useListExport } from '@/composables/useListExport'
-import { outboundExportFields } from '@/utils/exportFields/outboundExport'
 import { useTabs } from '@/composables/useTabs'
-import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import OutboundOrderDetailPanel from './components/OutboundOrderDetailPanel.vue'
 import OutboundRefuseModal from './components/OutboundRefuseModal.vue'
 import OutboundOrderPrintModal from './components/OutboundOrderPrintModal.vue'
+import {
+  PENDING_OUTBOUND_STATUSES,
+  PENDING_OUTBOUND_ORDER_MERGE_KEYS,
+  flattenPendingOutboundLines,
+  filterPendingOutboundLines,
+  comparePendingOutboundLinesDefault,
+  buildPendingOutboundLineRowSpans,
+} from '@/utils/pendingOutboundLines'
 
-const LAYOUT_STORAGE_KEY = 'i_doms_outbound_layout'
+const LAYOUT_STORAGE_KEY = 'i_doms_pending_outbound_layout'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -519,74 +571,56 @@ const printOrders = ref([])
 const filters = reactive({
   docNo: '',
   outboundType: undefined,
-  warehouse: undefined,
-  requisitionDept: undefined,
-  sourceOrderNo: '',
   status: undefined,
-  outboundTimeUnit: 'day',
-  outboundTimeRange: null,
+  sourceOrderNo: '',
+  itemName: '',
+  itemCode: '',
+  warehouse: undefined,
+  specModel: '',
+  material: '',
+  createdAtRange: null,
 })
 const appliedFilters = ref({ ...filters })
-const selectedRowKeys = ref([])
+const selectedOrderIds = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 
-const outboundTypeOpts = outboundTypeOptions.map((v) => ({ label: v, value: v }))
-const statusOpts = outboundStatusOptions.map((v) => ({ label: v, value: v }))
-const outboundTimeUnitOpts = outboundTimeUnitOptions
-const warehouseOpts = warehouseOptions.map((w) => ({ label: w.label, value: w.value }))
-const requisitionDeptOpts = requisitionDeptOptions.map((v) => ({ label: v, value: v }))
-
-const outboundTimePicker = computed(() => {
-  if (filters.outboundTimeUnit === 'month') return 'month'
-  if (filters.outboundTimeUnit === 'year') return 'year'
-  return 'date'
-})
-
-const baseColumns = [
-  { title: '状态', key: 'status', width: 120, fixed: 'left' },
-  { title: '出库单号', key: 'docNo', dataIndex: 'docNo', width: 168, fixed: 'left' },
-  { title: '出库类型', dataIndex: 'outboundType', width: 110 },
-  { title: '出库仓库', dataIndex: 'warehouse', width: 100 },
-  { title: '出库数量', key: 'shipQtyTotal', width: 120, align: 'right' },
-  { title: '源单号', key: 'sourceOrderNo', width: 140 },
-  { title: '销售订单', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
-  { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
-  { title: '申请部门', dataIndex: 'requisitionDept', width: 100, ellipsis: true },
-  { title: '出库时间', dataIndex: 'outboundTime', width: 160 },
-  { title: '来源', key: 'sourceChannel', width: 80 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '创建人', dataIndex: 'creator', width: 80 },
-  { title: '操作时间', dataIndex: 'auditDate', width: 160 },
-  { title: '操作人', dataIndex: 'auditor', width: 80 },
-  { title: '仓管员', dataIndex: 'warehouseKeeper', width: 80 },
-  { title: '备注', dataIndex: 'remark', width: 100, ellipsis: true },
-  { title: '操作', key: 'action', width: 220, fixed: 'right' },
-]
-
-const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outbound-list-v6', baseColumns, { minScrollX: 2200 })
-
-const filteredList = computed(() =>
-  filterOutboundOrders(outboundState.orders, appliedFilters.value),
+const outboundTypeOpts = outboundTypeOptions.map((v) =>
+  typeof v === 'string' ? { label: v, value: v } : v,
+)
+const statusOpts = PENDING_OUTBOUND_STATUSES.map((v) => ({ label: v, value: v }))
+const warehouseOpts = warehouseOptions.map((w) =>
+  typeof w === 'string' ? { label: w, value: w } : { label: w.label, value: w.value },
 )
 
-const {
-  exportModalOpen,
-  openExportModal,
-  exportFieldSettings,
-  defaultExportFieldSettings,
-  doExport,
-} = useListExport({
-  storageKey: 'outbound-list-v6',
-  fieldDefinitions: outboundExportFields,
-  getFilteredRows: () => filteredList.value,
-  getSelectedRows: () => outboundState.orders.filter((o) => selectedRowKeys.value.includes(o.id)),
-  fileNamePrefix: '出库管理',
+const allLines = computed(() => flattenPendingOutboundLines(outboundState.orders))
+
+const filteredList = computed(() =>
+  [...filterPendingOutboundLines(allLines.value, appliedFilters.value)].sort(
+    comparePendingOutboundLinesDefault,
+  ),
+)
+
+const filteredOrders = computed(() => {
+  const seen = new Set()
+  const orders = []
+  for (const line of filteredList.value) {
+    const oid = line.orderId
+    if (!oid || seen.has(oid)) continue
+    seen.add(oid)
+    const order = outboundState.orders.find((o) => o.id === oid)
+    if (order) orders.push(order)
+  }
+  return orders
 })
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
   return filteredList.value.slice(start, start + pagination.pageSize)
+})
+
+const pagedOrders = computed(() => {
+  const start = (pagination.current - 1) * pagination.pageSize
+  return filteredOrders.value.slice(start, start + pagination.pageSize)
 })
 
 const selectedRecord = computed(
@@ -597,24 +631,85 @@ const refuseDocNos = computed(() => (refuseTargets.value || []).map((o) => o.doc
 
 const allPageSelected = computed(
   () =>
-    pagedList.value.length > 0 &&
-    pagedList.value.every((row) => selectedRowKeys.value.includes(row.id)),
+    pagedOrders.value.length > 0 &&
+    pagedOrders.value.every((row) => selectedOrderIds.value.includes(row.id)),
 )
 const pageIndeterminate = computed(() => {
-  const n = pagedList.value.filter((row) => selectedRowKeys.value.includes(row.id)).length
-  return n > 0 && n < pagedList.value.length
+  const n = pagedOrders.value.filter((row) => selectedOrderIds.value.includes(row.id)).length
+  return n > 0 && n < pagedOrders.value.length
 })
+
+const baseColumns = [
+  { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
+  { title: '状态', key: 'status', dataIndex: 'status', width: 100, fixed: 'left' },
+  { title: '出库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
+  { title: '出库类型', key: 'outboundType', dataIndex: 'outboundType', width: 110 },
+  { title: '出库数量', key: 'shipQtyTotal', width: 120, align: 'right' },
+  { title: '物品编码', key: 'itemCode', dataIndex: 'itemCode', width: 120, ellipsis: true },
+  { title: '物品名称', key: 'itemName', dataIndex: 'itemName', width: 140, ellipsis: true },
+  { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', key: 'material', dataIndex: 'material', width: 80, ellipsis: true },
+  { title: '图号', key: 'drawingNo', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '出库数量', key: 'shipQty', width: 110, align: 'right' },
+  { title: '出库仓库', key: 'warehouse', dataIndex: 'warehouse', width: 100 },
+  { title: '源单号', key: 'sourceOrderNo', dataIndex: 'sourceOrderNo', width: 140, ellipsis: true },
+  { title: '销售单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
+  {
+    title: '申请部门',
+    key: 'requisitionDept',
+    dataIndex: 'requisitionDept',
+    width: 100,
+    ellipsis: true,
+  },
+  { title: '出库时间', key: 'outboundTime', dataIndex: 'outboundTime', width: 160 },
+  { title: '来源', key: 'sourceChannel', width: 80 },
+  { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 160 },
+  { title: '创建人', key: 'creator', dataIndex: 'creator', width: 80 },
+  { title: '操作时间', key: 'auditDate', dataIndex: 'auditDate', width: 160 },
+  { title: '操作人', key: 'auditor', dataIndex: 'auditor', width: 80 },
+  { title: '仓管员', key: 'warehouseKeeper', dataIndex: 'warehouseKeeper', width: 80 },
+  { title: '操作', key: 'action', width: 260, fixed: 'right' },
+]
+
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('pending-outbound-list-v2', baseColumns, { minScrollX: 3000 })
+
+const pageOrderRowSpans = computed(() => buildPendingOutboundLineRowSpans(pagedList.value))
+const orderMergeKeySet = new Set(PENDING_OUTBOUND_ORDER_MERGE_KEYS)
+const mergedDisplayColumns = computed(() =>
+  displayColumns.value.map((col) => {
+    if (!orderMergeKeySet.has(col.key)) return col
+    return {
+      ...col,
+      customCell: (_record, index) => ({
+        rowSpan: pageOrderRowSpans.value[index] ?? 1,
+        style: { verticalAlign: 'middle' },
+      }),
+    }
+  }),
+)
 
 const rowSelection = computed(() => ({
   fixed: true,
-  selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys) => {
-    selectedRowKeys.value = keys
+  selectedRowKeys: pagedList.value
+    .filter((r) => selectedOrderIds.value.includes(r.orderId))
+    .map((r) => r.id),
+  onSelect: (record, selected) => {
+    toggleSelectOrder(record.orderId, selected)
+  },
+  onSelectAll: (selected) => {
+    const pageOrderIds = [...new Set(pagedList.value.map((r) => r.orderId).filter(Boolean))]
+    if (selected) {
+      selectedOrderIds.value = Array.from(new Set([...selectedOrderIds.value, ...pageOrderIds]))
+    } else {
+      const drop = new Set(pageOrderIds)
+      selectedOrderIds.value = selectedOrderIds.value.filter((id) => !drop.has(id))
+    }
   },
 }))
 
 watch(
-  filteredList,
+  filteredOrders,
   (list) => {
     if (!list.length) {
       selectedId.value = ''
@@ -628,32 +723,43 @@ watch(
   { immediate: true },
 )
 
+function resolveOrder(record) {
+  if (!record) return null
+  const id = record.orderId || record.id
+  return outboundState.orders.find((o) => o.id === id) || null
+}
+
 function toggleLayout() {
   layoutMode.value = layoutMode.value === 'split' ? 'table' : 'split'
   localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode.value)
+  pagination.current = 1
 }
 
 function selectOrder(id) {
+  if (!id) return
   selectedId.value = id
   const row = outboundState.orders.find((o) => o.id === id)
   detailTab.value = canEditOutbound(row) ? 'edit' : 'basic'
 }
 
-function toggleSelect(id, checked) {
+function toggleSelectOrder(id, checked) {
+  if (!id) return
   if (checked) {
-    if (!selectedRowKeys.value.includes(id)) selectedRowKeys.value = [...selectedRowKeys.value, id]
+    if (!selectedOrderIds.value.includes(id)) {
+      selectedOrderIds.value = [...selectedOrderIds.value, id]
+    }
   } else {
-    selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== id)
+    selectedOrderIds.value = selectedOrderIds.value.filter((k) => k !== id)
   }
 }
 
 function onToggleSelectAllPage(e) {
-  const ids = pagedList.value.map((r) => r.id)
+  const ids = pagedOrders.value.map((r) => r.id)
   if (e.target.checked) {
-    selectedRowKeys.value = Array.from(new Set([...selectedRowKeys.value, ...ids]))
+    selectedOrderIds.value = Array.from(new Set([...selectedOrderIds.value, ...ids]))
   } else {
     const drop = new Set(ids)
-    selectedRowKeys.value = selectedRowKeys.value.filter((id) => !drop.has(id))
+    selectedOrderIds.value = selectedOrderIds.value.filter((id) => !drop.has(id))
   }
 }
 
@@ -668,7 +774,11 @@ function onCardAction(key, row) {
 }
 
 function canConfirm(record) {
-  return validateOutboundForConfirm(record).ok
+  return record && validateOutboundForConfirm(record).ok
+}
+
+function rowIndex(index) {
+  return (pagination.current - 1) * pagination.pageSize + index + 1
 }
 
 function handleSearch() {
@@ -680,39 +790,30 @@ function handleReset() {
   Object.assign(filters, {
     docNo: '',
     outboundType: undefined,
-    warehouse: undefined,
-    requisitionDept: undefined,
-    sourceOrderNo: '',
     status: undefined,
-    outboundTimeUnit: 'day',
-    outboundTimeRange: null,
+    sourceOrderNo: '',
+    itemName: '',
+    itemCode: '',
+    warehouse: undefined,
+    specModel: '',
+    material: '',
+    createdAtRange: null,
   })
   appliedFilters.value = { ...filters }
   pagination.current = 1
 }
 
-function onBatchMenu({ key }) {
-  if (key === 'export') {
-    openExportModal()
-    return
-  }
-  stubAction(`批量操作：${key}`)
-}
-
-function stubAction(name) {
-  message.info(`${name}功能开发中`)
-}
-
 function openPrintOne(record) {
-  if (!record) return
-  printOrder.value = record
+  const order = resolveOrder(record)
+  if (!order) return
+  printOrder.value = order
   printOrders.value = []
   printModalOpen.value = true
 }
 
 function openPrintSelected() {
-  const rows = selectedRowKeys.value.length
-    ? filteredList.value.filter((r) => selectedRowKeys.value.includes(r.id))
+  const rows = selectedOrderIds.value.length
+    ? filteredOrders.value.filter((r) => selectedOrderIds.value.includes(r.id))
     : selectedRecord.value
       ? [selectedRecord.value]
       : []
@@ -736,19 +837,22 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  if (!record?.id) return
+  const order = resolveOrder(record)
+  if (!order?.id) return
   openCreateTab(router, openTab, {
-    path: `/inventory/outbound/${record.id}/edit`,
-    title: `编辑出库单 ${record.docNo || ''}`.trim(),
+    path: `/inventory/outbound/${order.id}/edit`,
+    title: `编辑出库单 ${order.docNo || ''}`.trim(),
   })
 }
 
 function handleApprove(record) {
+  const order = resolveOrder(record)
+  if (!order) return
   Modal.confirm({
-    title: `审批通过出库单 ${record.docNo}？`,
+    title: `审批通过出库单 ${order.docNo}？`,
     okText: '审批',
     onOk: () => {
-      const res = approveOutboundOrder(record.id)
+      const res = approveOutboundOrder(order.id)
       if (!res.ok) {
         message.warning(res.message)
         return
@@ -760,10 +864,12 @@ function handleApprove(record) {
 }
 
 function handleConfirmOne(record) {
+  const order = resolveOrder(record)
+  if (!order) return
   Modal.confirm({
-    title: `确认出库 ${record.docNo}？`,
+    title: `确认出库 ${order.docNo}？`,
     onOk: () => {
-      const { count, blocked, warnings } = confirmOutbound([record.id])
+      const { count, blocked, warnings } = confirmOutbound([order.id])
       if (blocked.length) {
         message.warning(blocked.map((b) => b.message).join('；'))
         return
@@ -791,7 +897,7 @@ function applyRefuseResult({ count, blocked, refused }) {
   }
   if (count > 0) {
     message.success(count === 1 ? '已拒绝出库' : `已拒绝出库 ${count} 条`)
-    selectedRowKeys.value = []
+    selectedOrderIds.value = []
     refuseModalOpen.value = false
     refuseTargets.value = []
     handleSearch()
@@ -799,7 +905,7 @@ function applyRefuseResult({ count, blocked, refused }) {
 }
 
 function openRefuse(records) {
-  const list = (records || []).filter(Boolean)
+  const list = (records || []).map((r) => resolveOrder(r)).filter(Boolean)
   if (!list.length) {
     message.warning('请先选择出库单')
     return
@@ -814,30 +920,19 @@ function submitRefuse(reason) {
 }
 
 function handleRefuseOutbound() {
-  if (!selectedRowKeys.value.length) {
+  if (!selectedOrderIds.value.length) {
     message.warning('请先选择出库单')
     return
   }
-  const rows = outboundState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
+  const rows = outboundState.orders.filter((o) => selectedOrderIds.value.includes(o.id))
   openRefuse(rows)
 }
 
 function goDetail(record) {
-  const path = `/inventory/outbound/${record.id}`
-  openTab(path, record.docNo || '出库单详情')
-  router.push(path)
-}
-
-function goSalesOrder(record) {
-  const no = record?.salesOrderNo
-  if (!no) return
-  const order = findSalesOrderByOrderNo(no)
-  if (!order) {
-    message.info('未找到关联销售订单')
-    return
-  }
-  const path = `/sales/orders/${order.id}`
-  openTab(path, `销售订单 ${no}`)
+  const order = resolveOrder(record)
+  if (!order?.id) return
+  const path = `/inventory/outbound/${order.id}`
+  openTab(path, order.docNo || '出库单详情')
   router.push(path)
 }
 
@@ -850,11 +945,11 @@ function initiateQcActionLabel(record) {
 }
 
 function handleConfirmOutbound() {
-  if (!selectedRowKeys.value.length) {
+  if (!selectedOrderIds.value.length) {
     message.warning('请先选择出库单')
     return
   }
-  const { count, blocked, warnings } = confirmOutbound(selectedRowKeys.value)
+  const { count, blocked, warnings } = confirmOutbound(selectedOrderIds.value)
   const qcBlocked = blocked.filter((b) => b.qcBlocked)
   if (qcBlocked.length) {
     Modal.warning({
@@ -876,18 +971,19 @@ function handleConfirmOutbound() {
   }
   if (count > 0) {
     message.success(`已确认出库 ${count} 条`)
-    selectedRowKeys.value = []
+    selectedOrderIds.value = []
+    handleSearch()
   } else if (!qcBlocked.length && !otherBlocked.length) {
     message.warning('所选单据均已出库或无效')
   }
 }
 
 function handleBatchDelete() {
-  if (!selectedRowKeys.value.length) {
+  if (!selectedOrderIds.value.length) {
     message.warning('请先选择要删除的出库单')
     return
   }
-  const rows = outboundState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
+  const rows = outboundState.orders.filter((o) => selectedOrderIds.value.includes(o.id))
   const blockedBiz = rows.filter((o) => isOutboundBusinessSource(o))
   Modal.confirm({
     title: '确认删除所选出库单？',
@@ -896,37 +992,43 @@ function handleBatchDelete() {
       : undefined,
     onOk: () => {
       let n = 0
-      selectedRowKeys.value.forEach((id) => {
+      selectedOrderIds.value.forEach((id) => {
         if (deleteOutboundOrder(id)) n += 1
       })
       if (n > 0) message.success(`已删除 ${n} 条`)
       else message.warning('没有可删除的单据（业务来源或状态不允许）')
-      selectedRowKeys.value = []
+      selectedOrderIds.value = []
+      handleSearch()
     },
   })
 }
 
 function confirmDelete(record) {
-  if (!canDeleteOutbound(record)) {
+  const order = resolveOrder(record)
+  if (!order) return
+  if (!canDeleteOutbound(order)) {
     message.warning(
-      isOutboundBusinessSource(record) ? '业务来源出库单不支持删除' : '当前状态不可删除',
+      isOutboundBusinessSource(order) ? '业务来源出库单不支持删除' : '当前状态不可删除',
     )
     return
   }
   Modal.confirm({
-    title: `确认删除出库单 ${record.docNo}？`,
+    title: `确认删除出库单 ${order.docNo}？`,
     onOk: () => {
-      if (deleteOutboundOrder(record.id)) {
+      if (deleteOutboundOrder(order.id)) {
         message.success('已删除')
-        selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== record.id)
-        if (selectedId.value === record.id) selectedId.value = ''
+        selectedOrderIds.value = selectedOrderIds.value.filter((k) => k !== order.id)
+        if (selectedId.value === order.id) selectedId.value = ''
+        handleSearch()
       }
     },
   })
 }
 
 function handleInitiateQc(record) {
-  const result = initiateFactoryQcFromOutbound(record.id)
+  const order = resolveOrder(record)
+  if (!order) return
+  const result = initiateFactoryQcFromOutbound(order.id)
   if (result.ok) {
     message.success(result.message || '已在出厂质检生成待质检记录')
   } else {
@@ -934,8 +1036,16 @@ function handleInitiateQc(record) {
   }
 }
 
+function onBatchMenu({ key }) {
+  stubAction(`批量操作：${key}`)
+}
+
+function stubAction(name) {
+  message.info(`${name}功能开发中`)
+}
+
 function handleBatchInitiateQc() {
-  const ids = selectedRowKeys.value.length ? selectedRowKeys.value : []
+  const ids = selectedOrderIds.value.length ? [...selectedOrderIds.value] : []
   if (!ids.length) {
     message.warning('请先勾选要发起出厂质检的销售出库单')
     return
@@ -958,7 +1068,7 @@ function handleBatchInitiateQc() {
 </script>
 
 <style lang="less" scoped>
-.outbound-page {
+.pending-outbound-page {
   margin: -12px;
   padding: 0;
   background: #f5f6f8;
@@ -1141,16 +1251,6 @@ function handleBatchInitiateQc() {
 :deep(.ant-table-wrapper .ant-btn-link) {
   padding: 0 4px;
   height: auto;
-}
-
-.outbound-time-filter {
-  display: flex;
-  width: 100%;
-
-  :deep(.ant-picker) {
-    flex: 1;
-    min-width: 0;
-  }
 }
 
 .master-detail {

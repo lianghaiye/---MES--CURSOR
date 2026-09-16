@@ -152,3 +152,42 @@ export function formatPurchaseDetailDate(val) {
   if (!val) return '—'
   return String(val).slice(0, 10)
 }
+
+/** 默认排序：先按采购单号聚拢（便于订单级字段 rowspan），同单内再按行 */
+export function comparePurchaseDetailLinesDefault(a, b) {
+  const noCmp = String(b.orderNo || '').localeCompare(String(a.orderNo || ''), 'zh-CN')
+  if (noCmp) return noCmp
+  const idA = String(a.orderId || a.orderNo || '')
+  const idB = String(b.orderId || b.orderNo || '')
+  if (idA !== idB) return idA.localeCompare(idB)
+  return String(a.lineId || '').localeCompare(String(b.lineId || ''))
+}
+
+/** 当前页内按订单计算 rowspan：首行 = 连续行数，后续行 = 0 */
+export function buildPurchaseDetailLineRowSpans(rows = []) {
+  const spans = new Array(rows.length).fill(1)
+  let i = 0
+  while (i < rows.length) {
+    const key = String(rows[i]?.orderId || rows[i]?.orderNo || '')
+    let j = i + 1
+    while (j < rows.length) {
+      const next = String(rows[j]?.orderId || rows[j]?.orderNo || '')
+      if (next !== key) break
+      j += 1
+    }
+    spans[i] = j - i
+    for (let k = i + 1; k < j; k += 1) spans[k] = 0
+    i = j
+  }
+  return spans
+}
+
+/** 订单级可合并列 */
+export const PURCHASE_LINE_ORDER_MERGE_KEYS = [
+  'orderNo',
+  'status',
+  'supplier',
+  'purchaser',
+  'createdAt',
+  'creator',
+]

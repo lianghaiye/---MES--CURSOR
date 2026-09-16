@@ -40,10 +40,10 @@ import { SearchOutlined, ReloadOutlined, UpOutlined, DownOutlined } from '@ant-d
 
 const props = defineProps({
   /**
-   * 超过该数量显示展开/收起。
-   * 默认 9：一行 5 个、第二行末尾留给按钮，第 10 个条件起需展开。
+   * 条件数 ≥ 该值时显示展开/收起。
+   * 默认 10：收起态最多展示 9 个条件（第 10 格留给按钮）。
    */
-  collapseCount: { type: Number, default: 9 },
+  collapseCount: { type: Number, default: 10 },
   searchText: { type: String, default: '查询' },
   resetText: { type: String, default: '重置' },
   /** 若已知字段数可传入，避免依赖 DOM 计数 */
@@ -74,11 +74,12 @@ onUpdated(() => nextTick(measureFields))
 const effectiveCount = computed(() =>
   props.fieldCount != null ? props.fieldCount : measuredCount.value,
 )
-const collapsible = computed(() => effectiveCount.value > props.collapseCount)
+/** ≥ collapseCount（默认 10）才出现展开/收起 */
+const collapsible = computed(() => effectiveCount.value >= props.collapseCount)
 </script>
 
 <style lang="less">
-/* 全局：列表筛选一行 5 个；按钮固定第二行末尾 */
+/* 全局：列表筛选一行 5 个；按钮固定第二行末尾并右对齐 */
 .list-filter-bar {
   width: 100%;
 }
@@ -106,6 +107,7 @@ const collapsible = computed(() => effectiveCount.value > props.collapseCount)
     gap: 8px;
     align-self: end;
     min-height: 32px;
+    width: 100%;
   }
 
   /* 条件不足 5 个：按钮与条件同一行 */
@@ -128,7 +130,12 @@ const collapsible = computed(() => effectiveCount.value > props.collapseCount)
 }
 
 .list-filter-toggle {
-  padding-inline: 4px;
+  padding-inline: 4px !important;
+  height: auto !important;
+  line-height: 1.2 !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 2px;
 }
 
 @media (max-width: 1199px) {
@@ -158,7 +165,7 @@ const collapsible = computed(() => effectiveCount.value > props.collapseCount)
     > .list-filter-actions-cell {
       grid-column: 1;
       grid-row: auto;
-      justify-content: flex-start;
+      justify-content: flex-end;
     }
   }
 }

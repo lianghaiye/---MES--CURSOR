@@ -96,7 +96,9 @@ export const sideMenus = {
   ],
   inventory: [
     { key: 'stock-detail', label: '库存明细', path: '/inventory/stock-detail' },
+    { key: 'pending-outbound', label: '待出库列表', path: '/inventory/pending-outbound' },
     { key: 'outbound', label: '出库管理', path: '/inventory/outbound' },
+    { key: 'pending-inbound', label: '待入库列表', path: '/inventory/pending-inbound' },
     { key: 'inbound', label: '入库管理', path: '/inventory/inbound' },
     { key: 'in-out-detail', label: '出入库详情', path: '/inventory/in-out-detail' },
     {
@@ -354,9 +356,11 @@ export const routeTitles = {
   '/report-management/salary-detail': '核算详情',
   '/inventory/stock-detail': '库存明细',
   '/inventory/outbound': '出库管理',
+  '/inventory/pending-outbound': '待出库列表',
   '/inventory/outbound/:id': '出库单详情',
   '/inventory/sales-outbound': '出库管理',
   '/inventory/inbound': '入库管理',
+  '/inventory/pending-inbound': '待入库列表',
   '/inventory/in-out-detail': '出入库详情',
   '/inventory/inbound/:id': '入库单详情',
   '/inventory/ship-attachment-query': '随货查询',

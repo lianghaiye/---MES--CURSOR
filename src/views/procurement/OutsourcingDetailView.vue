@@ -159,7 +159,7 @@
 
     <div class="table-card">
       <a-table
-        :columns="displayColumns"
+        :columns="mergedDisplayColumns"
         :data-source="pagedList"
         row-key="id"
         size="small"
@@ -280,10 +280,13 @@ import { useListExport } from '@/composables/useListExport'
 import { outsourcingDetailExportFields } from '@/utils/exportFields/outsourcingDetailExport'
 import {
   buildOutsourcingDetailLines,
+  buildOutsourcingDetailLineRowSpans,
+  compareOutsourcingDetailLinesDefault,
   filterOutsourcingDetailLines,
   formatOutsourcingDetailDate,
   formatOutsourcingDetailMoney,
   formatOutsourcingDetailQty,
+  OUTSOURCING_LINE_ORDER_MERGE_KEYS,
 } from '@/utils/outsourcingDetailLines'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { useTabs } from '@/composables/useTabs'
@@ -318,7 +321,9 @@ const allLines = computed(() =>
 )
 
 const filteredList = computed(() =>
-  filterOutsourcingDetailLines(allLines.value, appliedFilters.value),
+  [...filterOutsourcingDetailLines(allLines.value, appliedFilters.value)].sort(
+    compareOutsourcingDetailLinesDefault,
+  ),
 )
 
 const {
@@ -385,14 +390,28 @@ const baseColumns = [
   { title: '入库日期', key: 'inboundDate', width: 110 },
   { title: '关联工单', dataIndex: 'workOrderName', width: 130, ellipsis: true },
   { title: '关联销售单号', dataIndex: 'salesOrderNo', width: 130, ellipsis: true },
-  { title: '联系人', dataIndex: 'contactPerson', width: 88 },
-  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '联系人', key: 'contactPerson', dataIndex: 'contactPerson', width: 88 },
+  { title: '创建人', key: 'creator', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 140 },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings('outsourcing-detail-list-v5', baseColumns, { minScrollX: 3000 })
 
+const pageOrderRowSpans = computed(() => buildOutsourcingDetailLineRowSpans(pagedList.value))
+const orderMergeKeySet = new Set(OUTSOURCING_LINE_ORDER_MERGE_KEYS)
+const mergedDisplayColumns = computed(() =>
+  displayColumns.value.map((col) => {
+    if (!orderMergeKeySet.has(col.key)) return col
+    return {
+      ...col,
+      customCell: (_record, index) => ({
+        rowSpan: pageOrderRowSpans.value[index] ?? 1,
+        style: { verticalAlign: 'middle' },
+      }),
+    }
+  }),
+)
 function statusColor(status) {
   const map = {
     待提交: 'default',

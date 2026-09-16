@@ -92,7 +92,7 @@
 
     <!-- 卡片视图：搜索下方独立操作条 -->
     <div v-if="layoutMode === 'split'" class="split-action-card">
-      <a-space wrap :size="8">
+      <a-space wrap :size="8" class="split-action-left">
         <a-button type="primary" size="small" @click="openCreate">
           <PlusOutlined />
           新增工单
@@ -117,6 +117,18 @@
           批量下发
         </a-button>
       </a-space>
+      <div class="split-action-right">
+        <a-tooltip title="刷新">
+          <a-button type="text" size="small" class="layout-toggle-btn" @click="handleSearch">
+            <ReloadOutlined />
+          </a-button>
+        </a-tooltip>
+        <a-tooltip title="切换为列表视图">
+          <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
+            <TableOutlined />
+          </a-button>
+        </a-tooltip>
+      </div>
     </div>
 
     <!-- 主从布局 / 列表布局 -->
@@ -133,18 +145,6 @@
           <span v-if="selectedIds.length" class="selected-count"
             >已选 {{ selectedIds.length }}</span
           >
-          <div class="list-title-actions">
-            <a-tooltip title="刷新">
-              <a-button type="text" size="small" class="layout-toggle-btn" @click="handleSearch">
-                <ReloadOutlined />
-              </a-button>
-            </a-tooltip>
-            <a-tooltip title="切换为列表视图">
-              <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
-                <TableOutlined />
-              </a-button>
-            </a-tooltip>
-          </div>
         </div>
         <div class="list-body">
           <div
@@ -1187,20 +1187,52 @@ function onScheduleBatchSubmit(payload) {
 .split-action-card {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  padding: 10px 12px;
+  padding: 8px 12px;
   margin-bottom: 8px;
   box-sizing: border-box;
+  min-height: 44px;
+
+  .split-action-left {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .split-action-right {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: auto;
+    gap: 0;
+  }
 
   :deep(.ant-space) {
+    align-items: center;
+  }
+
+  :deep(.ant-space-item) {
+    display: inline-flex;
     align-items: center;
   }
 
   :deep(.ant-btn) {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+  }
+
+  .layout-toggle-btn {
+    color: rgba(0, 0, 0, 0.45);
+
+    &:hover {
+      color: #1677ff;
+    }
   }
 }
 
@@ -1312,31 +1344,15 @@ function onScheduleBatchSubmit(payload) {
     padding: 8px 10px 6px;
     border-bottom: 1px solid #f0f0f0;
 
-    .list-title {
-      font-weight: 600;
-      font-size: 14px;
-      flex: 1;
-    }
-
     .selected-count {
       font-size: 12px;
       color: #1677ff;
-    }
-
-    .list-title-actions {
       margin-left: auto;
-      display: inline-flex;
-      align-items: center;
-      flex-shrink: 0;
-      gap: 0;
     }
 
-    .layout-toggle-btn {
-      color: rgba(0, 0, 0, 0.45);
-
-      &:hover {
-        color: #1677ff;
-      }
+    .list-title {
+      font-weight: 600;
+      font-size: 14px;
     }
   }
 
