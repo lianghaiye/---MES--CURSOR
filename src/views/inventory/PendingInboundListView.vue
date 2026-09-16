@@ -658,7 +658,7 @@ function resolveOrder(record) {
 }
 
 function statusColor(status) {
-  if (status === '已完成') return 'success'
+  if (status === '已完成' || status === '已入库') return 'success'
   if (status === '已拒绝') return 'error'
   if (status === '待审批') return 'warning'
   if (status === '部分入库') return 'warning'

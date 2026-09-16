@@ -222,9 +222,7 @@
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'lineStatus'">
-                  <a-tag
-                    :color="(record.lineStatus || '待出库') === '已出库' ? 'success' : 'processing'"
-                  >
+                  <a-tag :color="lineStatusColor(record.lineStatus)">
                     {{ record.lineStatus || '待出库' }}
                   </a-tag>
                 </template>
@@ -432,31 +430,43 @@
                 <template v-else-if="column.key === 'actions'">
                   <a-space :size="4">
                     <a
-                      v-if="(record.lineStatus || '待出库') !== '已出库'"
+                      v-if="isLinePendingOutbound(record)"
                       @click="handleConfirmLineOutbound(record)"
                     >
                       确认出库
                     </a>
                     <a
-                      v-if="(record.lineStatus || '待出库') !== '已出库'"
-                      @click="openLineEdit(record, 'edit')"
+                      v-if="canRefuseLine(record)"
+                      class="danger-link"
+                      @click="openRefuseLine(record)"
                     >
+                      拒绝出库
+                    </a>
+                    <a v-if="isLinePendingOutbound(record)" @click="openLineEdit(record, 'edit')">
                       编辑
                     </a>
-                    <a
-                      v-if="(record.lineStatus || '待出库') !== '已出库'"
-                      @click="openLineEdit(record, 'copy')"
-                    >
+                    <a v-if="isLinePendingOutbound(record)" @click="openLineEdit(record, 'copy')">
                       复制
                     </a>
                     <a
-                      v-if="(record.lineStatus || '待出库') !== '已出库'"
+                      v-if="isLinePendingOutbound(record)"
                       class="danger-link"
                       @click="removeLine(record.id)"
                     >
                       删除
                     </a>
-                    <span v-else class="muted-text">已出库</span>
+                    <span
+                      v-else-if="(record.lineStatus || '待出库') === '已出库'"
+                      class="muted-text"
+                    >
+                      已出库
+                    </span>
+                    <span
+                      v-else-if="(record.lineStatus || '待出库') === '已拒绝'"
+                      class="muted-text"
+                    >
+                      已拒绝
+                    </span>
                   </a-space>
                 </template>
               </template>
@@ -579,6 +589,14 @@
     :selected-ids="batchSearchTarget ? manualBatchIds(batchSearchTarget) : []"
     @confirm="onBatchSearchConfirm"
   />
+
+  <OutboundRefuseModal
+    v-model:open="refuseLineOpen"
+    mode="line"
+    :doc-nos="refuseLineDocNos"
+    :confirm-loading="refuseLineLoading"
+    @confirm="handleRefuseLineConfirm"
+  />
 </template>
 
 <script setup>
@@ -629,11 +647,14 @@ import {
   generateOutboundNo,
   updateOutboundOrder,
   confirmOutboundLine,
+  refuseOutboundLine,
   getOutboundOrderById,
   canRefuseOutbound,
+  canRefuseOutboundLine,
   canDeleteOutbound,
   validateOutboundForConfirm,
 } from '@/store/outboundStore'
+import OutboundRefuseModal from '@/views/inventory/components/OutboundRefuseModal.vue'
 import {
   outboundFormLineColumns,
   OUTBOUND_BATCH_PICK_TIP_AUTO,
@@ -785,6 +806,9 @@ const totalWeightManual = ref(false)
 const prevHeaderWarehouse = ref(undefined)
 const salesOrderPickerOpen = ref(false)
 const batchSearchOpen = ref(false)
+const refuseLineOpen = ref(false)
+const refuseLineLoading = ref(false)
+const refuseLineTarget = ref(null)
 const batchSearchTarget = ref(null)
 
 const outboundTypeOpts = outboundTypeOptions.map((v) => ({ label: v, value: v }))
@@ -1130,6 +1154,64 @@ function loadEditForm(record) {
   }
 }
 
+const refuseLineDocNos = computed(() => {
+  const line = refuseLineTarget.value
+  if (!line) return []
+  return [`${line.itemCode || ''} ${line.itemName || ''}`.trim() || line.id]
+})
+
+function isLinePendingOutbound(record) {
+  const st = record?.lineStatus || '待出库'
+  return st !== '已出库' && st !== '已拒绝'
+}
+
+function lineStatusColor(status) {
+  const st = status || '待出库'
+  if (st === '已出库') return 'success'
+  if (st === '已拒绝') return 'error'
+  return 'processing'
+}
+
+function canRefuseLine(record) {
+  if (!isEdit.value || !props.editRecord) return false
+  return canRefuseOutboundLine(props.editRecord, record)
+}
+
+function openRefuseLine(record) {
+  if (!isEdit.value || !props.editRecord?.id) {
+    message.warning('请先保存出库单后再拒绝出库')
+    return
+  }
+  refuseLineTarget.value = record
+  refuseLineOpen.value = true
+}
+
+async function handleRefuseLineConfirm(reason) {
+  const line = refuseLineTarget.value
+  if (!line || !props.editRecord?.id) return
+  refuseLineLoading.value = true
+  try {
+    const saved = updateOutboundOrder(props.editRecord.id, buildPayload())
+    if (saved && !saved.ok) {
+      message.warning(saved.message || '保存失败，无法拒绝出库')
+      return
+    }
+    const res = refuseOutboundLine(props.editRecord.id, line.id, { reason })
+    if (!res.ok) {
+      message.warning(res.message || '拒绝出库失败')
+      return
+    }
+    message.success(
+      res.order?.status === '已拒绝' ? '明细已拒绝，出库单已全部拒绝' : '明细已拒绝出库',
+    )
+    refuseLineOpen.value = false
+    const latest = getOutboundOrderById(props.editRecord.id)
+    if (latest) loadEditForm(latest)
+  } finally {
+    refuseLineLoading.value = false
+  }
+}
+
 function handleConfirmLineOutbound(record) {
   if (!isEdit.value || !props.editRecord?.id) {
     message.warning('请先保存出库单后再确认出库')
@@ -1137,6 +1219,10 @@ function handleConfirmLineOutbound(record) {
   }
   if ((record.lineStatus || '待出库') === '已出库') {
     message.info('该明细已出库')
+    return
+  }
+  if ((record.lineStatus || '待出库') === '已拒绝') {
+    message.info('该明细已拒绝出库')
     return
   }
   // 先落盘当前编辑内容，避免确认时扣账用到旧数据
@@ -1153,11 +1239,13 @@ function handleConfirmLineOutbound(record) {
   if (res.warnings?.length) {
     message.warning(res.warnings.join('；'))
   }
-  message.success(
+  const inboundNo = res.inboundOrder?.docNo
+  let tip =
     res.order?.status === '已出库'
       ? '明细已出库，出库单已全部出库'
-      : '明细已出库，出库单状态：部分出库',
-  )
+      : '明细已出库，出库单状态：部分出库'
+  if (inboundNo) tip += `；已生成领料入库单 ${inboundNo}`
+  message.success(tip)
   const latest = getOutboundOrderById(props.editRecord.id)
   if (latest) loadEditForm(latest)
 }

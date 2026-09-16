@@ -232,7 +232,7 @@ export function resolveWarehouseKeeper(warehouseName) {
 }
 
 function canDeleteInbound(order) {
-  return order && order.status !== '已完成'
+  return order && order.status !== '已完成' && order.status !== '已入库'
 }
 
 function canEditInbound(order) {
@@ -259,11 +259,14 @@ export function recomputeInboundOrderStatus(order, operator = 'admin1') {
   }
   const done = lines.filter((l) => (l.lineStatus || '待入库') === '已入库').length
   if (done === 0) {
-    if (order.status === '部分入库' || order.status === '已完成') order.status = '待处理'
+    if (order.status === '部分入库' || order.status === '已完成' || order.status === '已入库') {
+      order.status = '待处理'
+    }
     return
   }
   if (done === lines.length) {
-    order.status = '已完成'
+    // 领料入库：头状态用「已入库」；其它类型保持「已完成」
+    order.status = order.inboundType === '领料入库' ? '已入库' : '已完成'
     order.confirmer = order.confirmer || operator
     order.confirmedAt = order.confirmedAt || dayjs().format('YYYY-MM-DD HH:mm:ss')
     return

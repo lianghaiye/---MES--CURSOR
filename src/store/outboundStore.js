@@ -172,9 +172,24 @@ export function canApproveOutbound(order) {
   )
 }
 
-/** 待出库可拒绝出库（未实际扣账前） */
+/** 待出库可整单拒绝出库（未实际扣账前） */
 export function canRefuseOutbound(order) {
-  return Boolean(order && normalizeOutboundStatus(order.status) === '待出库')
+  if (!order || normalizeOutboundStatus(order.status) !== '待出库') return false
+  const lines = order.lineItems || []
+  if (!lines.length) return true
+  return lines.every((l) => {
+    const st = l.lineStatus || '待出库'
+    return st !== '已出库'
+  })
+}
+
+/** 明细行是否可拒绝出库 */
+export function canRefuseOutboundLine(order, line) {
+  if (!order || !line) return false
+  const head = normalizeOutboundStatus(order.status)
+  if (head !== '待出库' && head !== '部分出库') return false
+  const st = line.lineStatus || '待出库'
+  return st !== '已出库' && st !== '已拒绝'
 }
 
 /** 新建出库单初始状态：需审批类型为待出库（审批能力已关闭时同样待出库） */
@@ -367,6 +382,36 @@ export function refuseOutbound(ids, { reason = '', operator = 'admin1' } = {}) {
   return { count, blocked, refused }
 }
 
+/**
+ * 按明细拒绝出库（未扣账行）；已出库行不可拒
+ */
+export function refuseOutboundLine(orderId, lineId, { reason = '', operator = 'admin1' } = {}) {
+  const order = outboundState.orders.find((o) => o.id === orderId)
+  const line = (order?.lineItems || []).find((l) => l.id === lineId)
+  if (!canRefuseOutboundLine(order, line)) {
+    return { ok: false, message: '当前明细不可拒绝出库' }
+  }
+  const reasonText = String(reason || '').trim()
+  if (!reasonText) return { ok: false, message: '请填写拒绝理由' }
+
+  line.lineStatus = '已拒绝'
+  line.refuseReason = reasonText
+  line.refusedBy = operator
+  line.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  recomputeOutboundOrderStatus(order)
+  order.refuseReason = reasonText
+  order.refusedBy = operator
+  order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  appendOutboundOperationLog(order, {
+    action: '部分拒绝出库',
+    operator,
+    remark: `拒绝明细：${summarizeOutboundLines([line])}；理由：${reasonText}`,
+  })
+  syncMaterialReqAfterRefuse(order)
+  return { ok: true, order, line }
+}
+
 export function confirmOutbound(ids, { operator = 'admin1' } = {}) {
   const blocked = []
   const warnings = []
@@ -388,19 +433,19 @@ export function confirmOutbound(ids, { operator = 'admin1' } = {}) {
       warnings.push(...check.warnings.map((w) => `${order?.docNo || id}：${w}`))
     }
 
-    const pendingLines = (order.lineItems || []).filter(
-      (l) => (l.lineStatus || '待出库') !== '已出库',
-    )
+    const pendingLines = (order.lineItems || []).filter((l) => {
+      const st = l.lineStatus || '待出库'
+      return st !== '已出库' && st !== '已拒绝'
+    })
     const pendingIds = pendingLines.map((l) => l.id)
     if (!pendingIds.length) {
-      order.status = '已出库'
-      order.completedAt = dayjs().format('YYYY-MM-DD')
+      recomputeOutboundOrderStatus(order)
       order.auditor = operator
       order.auditDate = dayjs().format('YYYY-MM-DD HH:mm:ss')
       appendOutboundOperationLog(order, {
         action: '整单确认出库',
         operator,
-        remark: '整单确认出库',
+        remark: '无待出库明细',
       })
       count += 1
       return
@@ -417,7 +462,7 @@ export function confirmOutbound(ids, { operator = 'admin1' } = {}) {
       if (line) line.lineStatus = '已出库'
     })
 
-    const transfer = transferOutboundToReceiveWarehouse(order, { lineIds: pendingIds })
+    const transfer = transferOutboundToReceiveWarehouse(order, { lineIds: pendingIds, operator })
     if (!transfer.ok) {
       blocked.push({ docNo: order.docNo, message: transfer.message || '领入仓调入失败' })
       return
@@ -427,13 +472,16 @@ export function confirmOutbound(ids, { operator = 'admin1' } = {}) {
     order.auditor = operator
     order.auditDate = dayjs().format('YYYY-MM-DD HH:mm:ss')
     const action = order.status === '部分出库' ? '部分确认出库' : '整单确认出库'
+    const inboundRemark = transfer.inboundOrder?.docNo
+      ? `；生成领料入库单 ${transfer.inboundOrder.docNo}`
+      : ''
     appendOutboundOperationLog(order, {
       action,
       operator,
       remark:
         action === '部分确认出库'
-          ? `部分确认 ${pendingLines.length} 行：${summarizeOutboundLines(pendingLines)}`
-          : `整单确认出库，本次 ${pendingLines.length} 行`,
+          ? `部分确认 ${pendingLines.length} 行：${summarizeOutboundLines(pendingLines)}${inboundRemark}`
+          : `整单确认出库，本次 ${pendingLines.length} 行${inboundRemark}`,
     })
     if (order.outboundType === '销售出库' && order.status === '已出库') {
       import('@/utils/deliveryOutboundSync').then(({ syncDeliveryAfterOutboundConfirm }) => {
@@ -455,12 +503,15 @@ export function confirmOutboundLine(orderId, lineId, { operator = 'admin1' } = {
   if ((line.lineStatus || '待出库') === '已出库') {
     return { ok: false, message: '该明细已出库' }
   }
+  if ((line.lineStatus || '待出库') === '已拒绝') {
+    return { ok: false, message: '该明细已拒绝出库' }
+  }
 
   const stockCheck = applyOutboundStockMovements(order, { lineIds: [lineId] })
   if (!stockCheck.ok) return stockCheck
 
   line.lineStatus = '已出库'
-  const transfer = transferOutboundToReceiveWarehouse(order, { lineIds: [lineId] })
+  const transfer = transferOutboundToReceiveWarehouse(order, { lineIds: [lineId], operator })
   if (!transfer.ok) {
     return { ok: false, message: transfer.message || '领入仓调入失败' }
   }
@@ -469,17 +520,26 @@ export function confirmOutboundLine(orderId, lineId, { operator = 'admin1' } = {
   order.auditor = operator
   order.auditDate = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const action = order.status === '部分出库' ? '部分确认出库' : '整单确认出库'
+  const inboundRemark = transfer.inboundOrder?.docNo
+    ? `；生成领料入库单 ${transfer.inboundOrder.docNo}`
+    : ''
   appendOutboundOperationLog(order, {
     action,
     operator,
-    remark: `确认明细：${summarizeOutboundLines([line])}`,
+    remark: `确认明细：${summarizeOutboundLines([line])}${inboundRemark}`,
   })
   if (order.outboundType === '销售出库' && order.status === '已出库') {
     import('@/utils/deliveryOutboundSync').then(({ syncDeliveryAfterOutboundConfirm }) => {
       syncDeliveryAfterOutboundConfirm(order)
     })
   }
-  return { ok: true, order, line, warnings: check.warnings || [] }
+  return {
+    ok: true,
+    order,
+    line,
+    warnings: check.warnings || [],
+    inboundOrder: transfer.inboundOrder || null,
+  }
 }
 
 export function recomputeOutboundOrderStatus(order) {
@@ -489,17 +549,29 @@ export function recomputeOutboundOrderStatus(order) {
     if (order.status === '部分出库') order.status = '待出库'
     return
   }
-  const done = lines.filter((l) => (l.lineStatus || '待出库') === '已出库').length
-  if (done === 0) {
-    if (order.status === '部分出库' || order.status === '已出库') order.status = '待出库'
+  const shipped = lines.filter((l) => (l.lineStatus || '待出库') === '已出库').length
+  const refused = lines.filter((l) => (l.lineStatus || '待出库') === '已拒绝').length
+  const pending = lines.length - shipped - refused
+
+  if (shipped === 0 && pending === 0) {
+    // 全部拒绝（或无可出明细）
+    order.status = '已拒绝'
+    order.completedAt = ''
     return
   }
-  if (done === lines.length) {
+  if (shipped === 0 && pending > 0) {
+    if (order.status === '部分出库' || order.status === '已出库' || order.status === '已拒绝') {
+      order.status = '待出库'
+    }
+    return
+  }
+  if (pending === 0 && shipped === lines.length) {
     order.status = '已出库'
     order.completedAt = order.completedAt || dayjs().format('YYYY-MM-DD')
     if (!order.auditDate) order.auditDate = order.completedAt
     return
   }
+  // 有已出行，且仍有待出或有拒绝行
   order.status = '部分出库'
   order.completedAt = ''
 }

@@ -4,34 +4,12 @@
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="入库状态">
-              <a-select
-                v-model:value="filters.status"
-                allow-clear
-                size="small"
-                placeholder="请选择"
-                :options="statusOpts"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="入库单号">
               <a-input
                 v-model:value="filters.docNo"
                 allow-clear
+                placeholder="请输入 入库单号"
                 size="small"
-                placeholder="请输入"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="仓库">
-              <a-select
-                v-model:value="filters.warehouse"
-                allow-clear
-                size="small"
-                placeholder="请选择"
-                :options="warehouseOpts"
               />
             </a-form-item>
           </a-col>
@@ -40,28 +18,72 @@
               <a-select
                 v-model:value="filters.inboundType"
                 allow-clear
+                placeholder="请选择 入库类型"
                 size="small"
-                placeholder="请选择"
                 :options="inboundTypeOpts"
               />
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="发票号码">
-              <a-input
-                v-model:value="filters.invoiceNo"
+            <a-form-item label="入库仓库">
+              <a-select
+                v-model:value="filters.warehouse"
                 allow-clear
+                placeholder="请选择 入库仓库"
                 size="small"
-                placeholder="请输入"
+                :options="warehouseOpts"
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="8">
-            <a-form-item label="入库日期">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="入库时间">
               <a-range-picker
                 v-model:value="filters.inboundDateRange"
                 size="small"
                 style="width: 100%"
+                :placeholder="['开始日期', '结束日期']"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="申请部门">
+              <a-select
+                v-model:value="filters.requisitionDept"
+                allow-clear
+                placeholder="请选择 申请部门"
+                size="small"
+                :options="requisitionDeptOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="源单编号">
+              <a-input
+                v-model:value="filters.sourceOrderNo"
+                allow-clear
+                placeholder="请输入 源单编号"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="销售单号">
+              <a-input
+                v-model:value="filters.salesOrderNo"
+                allow-clear
+                placeholder="请输入 销售单号"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="状态">
+              <a-select
+                v-model:value="filters.status"
+                allow-clear
+                placeholder="请选择 状态"
+                size="small"
+                :options="statusOpts"
               />
             </a-form-item>
           </a-col>
@@ -80,7 +102,143 @@
       </a-form>
     </div>
 
-    <div class="list-panel">
+    <!-- 卡片视图：搜索下方独立操作条 -->
+    <div v-if="layoutMode === 'split'" class="split-action-card">
+      <a-space wrap :size="8" class="split-action-left">
+        <a-button type="primary" size="small" @click="openCreate">
+          <PlusOutlined />
+          新增
+        </a-button>
+        <a-button size="small" @click="handleConfirmInbound">
+          <CheckOutlined />
+          确认入库
+        </a-button>
+        <a-button size="small" @click="handleBatchDelete">
+          <DeleteOutlined />
+          删除
+        </a-button>
+        <a-button size="small" @click="stubAction('批量打印')">
+          <PrinterOutlined />
+          批量打印
+        </a-button>
+        <a-dropdown>
+          <a-button size="small" @click.prevent>
+            批量操作
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="({ key }) => stubAction(`批量操作：${key}`)">
+              <a-menu-item key="export">导出</a-menu-item>
+              <a-menu-item key="import">导入</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </a-space>
+      <div class="split-action-right">
+        <a-tooltip title="刷新">
+          <a-button type="text" size="small" class="layout-toggle-btn" @click="handleSearch">
+            <ReloadOutlined />
+          </a-button>
+        </a-tooltip>
+        <a-tooltip title="切换为列表视图">
+          <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
+            <TableOutlined />
+          </a-button>
+        </a-tooltip>
+      </div>
+    </div>
+
+    <!-- 卡片主从视图 -->
+    <div v-if="layoutMode === 'split'" class="master-detail">
+      <div class="list-card">
+        <div class="list-title-row">
+          <a-checkbox
+            :checked="allPageSelected"
+            :indeterminate="pageIndeterminate"
+            @change="onToggleSelectAllPage"
+          />
+          <span class="list-title">入库单列表</span>
+          <span v-if="selectedRowKeys.length" class="selected-count"
+            >已选 {{ selectedRowKeys.length }}</span
+          >
+        </div>
+        <div class="list-body">
+          <div
+            v-for="row in pagedList"
+            :key="row.id"
+            class="order-card"
+            :class="{ active: selectedId === row.id, checked: selectedRowKeys.includes(row.id) }"
+            @click="selectOrder(row.id)"
+          >
+            <a-checkbox
+              class="card-checkbox"
+              :checked="selectedRowKeys.includes(row.id)"
+              @click.stop
+              @change="(e) => toggleSelect(row.id, e.target.checked)"
+            />
+            <div class="card-content">
+              <div class="card-head">
+                <a-tag :color="statusColor(row.status)" class="status-tag">
+                  {{ row.status }}
+                </a-tag>
+                <a-dropdown :trigger="['click']">
+                  <a-button type="text" size="small" class="more-btn" @click.stop>
+                    <EllipsisOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu @click="({ key }) => onCardAction(key, row)">
+                      <a-menu-item v-if="canEditInbound(row)" key="edit">编辑</a-menu-item>
+                      <a-menu-item v-if="canConfirmInbound(row)" key="confirm"
+                        >确认入库</a-menu-item
+                      >
+                      <a-menu-item v-if="canDeleteInbound(row)" key="delete" danger>
+                        删除
+                      </a-menu-item>
+                      <a-menu-item key="detail">打开详情</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
+              </div>
+              <div class="card-code">{{ row.docNo }}</div>
+              <div class="card-name">{{ row.inboundType }} · {{ row.warehouse || '—' }}</div>
+              <div class="card-meta">
+                <span>{{ row.sourceType || '—' }}</span>
+                <span class="meta-divider">·</span>
+                <span>数量 {{ formatInboundQtyRatio(row, formatQty) }}</span>
+              </div>
+              <div v-if="row.requisitionDept" class="card-meta">
+                <span>申请部门 {{ row.requisitionDept }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="list-pagination">
+          <a-pagination
+            v-model:current="pagination.current"
+            :total="filteredList.length"
+            :page-size="pagination.pageSize"
+            size="small"
+            simple
+          />
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <InboundOrderDetailPanel
+          :order-id="selectedId"
+          v-model:detail-tab="detailTab"
+          @confirm="selectedRecord && handleConfirmOne(selectedRecord)"
+          @edit="selectedRecord && openEdit(selectedRecord)"
+          @delete="selectedRecord && confirmDelete(selectedRecord)"
+          @approve-pass="selectedRecord && handleApprovePass(selectedRecord)"
+          @approve-reject="selectedRecord && handleApproveReject(selectedRecord)"
+          @open-full="selectedRecord && goDetail(selectedRecord)"
+        />
+      </div>
+    </div>
+
+    <!-- 表格视图 -->
+    <div v-else class="list-panel">
       <div class="toolbar-row">
         <a-space wrap :size="8">
           <a-button type="primary" size="small" @click="openCreate">
@@ -118,6 +276,11 @@
               <ReloadOutlined />
             </a-button>
           </a-tooltip>
+          <a-tooltip title="切换为卡片视图">
+            <a-button type="text" size="small" @click="toggleLayout">
+              <AppstoreOutlined />
+            </a-button>
+          </a-tooltip>
           <TableColumnSettingButton @click="columnDrawerOpen = true" />
         </a-space>
       </div>
@@ -141,22 +304,42 @@
           :scroll="{ x: tableScrollX }"
           :pagination="false"
           :row-selection="rowSelection"
+          :custom-row="
+            (record) => ({
+              onClick: () => selectOrder(record.id),
+            })
+          "
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'docNo'">
-              <a class="link-code" @click="goDetail(record)">{{ record.docNo }}</a>
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">
+              {{ rowIndex(index) }}
+            </template>
+            <template v-else-if="column.key === 'docNo'">
+              <a class="link-code" @click.stop="goDetail(record)">{{ record.docNo }}</a>
+            </template>
+            <template v-else-if="column.key === 'inboundQtyTotal'">
+              {{ formatInboundQtyRatio(record, formatQty) }}
             </template>
             <template v-else-if="column.key === 'sourceOrderNo'">
-              <a v-if="record.sourceOrderNo" class="link-code" @click="goSource(record)">
+              <a v-if="record.sourceOrderNo" class="link-code" @click.stop="goSource(record)">
                 {{ record.sourceOrderNo }}
               </a>
               <span v-else>—</span>
             </template>
             <template v-else-if="column.key === 'salesOrderNo'">
-              <a v-if="record.salesOrderNo" class="link-code" @click="goSalesOrder(record)">
+              <a v-if="record.salesOrderNo" class="link-code" @click.stop="goSalesOrder(record)">
                 {{ record.salesOrderNo }}
               </a>
               <span v-else>—</span>
+            </template>
+            <template v-else-if="column.key === 'supplier'">
+              {{ record.inboundType === '采购入库' ? record.supplier || '—' : '—' }}
+            </template>
+            <template v-else-if="column.key === 'inboundTime'">
+              {{ record.inboundDate || record.inboundTime || '—' }}
+            </template>
+            <template v-else-if="column.key === 'sourceType'">
+              {{ record.sourceType || '—' }}
             </template>
             <template v-else-if="column.key === 'status'">
               <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
@@ -167,24 +350,37 @@
                   v-if="canEditInbound(record)"
                   type="link"
                   size="small"
-                  @click="openEdit(record)"
+                  @click.stop="openEdit(record)"
                 >
                   编辑
                 </a-button>
                 <template v-if="canApproveInbound(record)">
-                  <a-button type="link" size="small" @click="handleApprovePass(record)">
+                  <a-button type="link" size="small" @click.stop="handleApprovePass(record)">
                     通过
                   </a-button>
-                  <a-button type="link" size="small" danger @click="handleApproveReject(record)">
+                  <a-button
+                    type="link"
+                    size="small"
+                    danger
+                    @click.stop="handleApproveReject(record)"
+                  >
                     拒绝
                   </a-button>
                 </template>
+                <a-button
+                  v-if="canConfirmInbound(record)"
+                  type="link"
+                  size="small"
+                  @click.stop="handleConfirmOne(record)"
+                >
+                  确认入库
+                </a-button>
                 <a-button
                   v-if="canDeleteInbound(record)"
                   type="link"
                   size="small"
                   danger
-                  @click="confirmDelete(record)"
+                  @click.stop="confirmDelete(record)"
                 >
                   删除
                 </a-button>
@@ -221,7 +417,7 @@ export default { name: 'InboundManagementView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
@@ -232,9 +428,15 @@ import {
   CheckOutlined,
   PrinterOutlined,
   DownOutlined,
+  TableOutlined,
+  AppstoreOutlined,
+  EllipsisOutlined,
 } from '@ant-design/icons-vue'
+import { formatQty } from '@/utils/numberFormat'
+import { formatInboundQtyRatio } from '@/utils/pendingInboundLines'
 import { filterInboundOrders } from '@/mock/inboundOrders'
 import { inboundTypeOptions, inboundStatusOptions } from '@/mock/inboundOptions'
+import { requisitionDeptOptions } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
   inboundOrderState,
@@ -245,6 +447,7 @@ import {
   canEditInbound,
   canDeleteInbound,
   canApproveInbound,
+  canConfirmInbound,
 } from '@/store/inboundOrderStore'
 import { resolveInboundSourceRoute } from '@/utils/inboundSourceLink'
 import { findCreatePageByListPath } from '@/config/createPages'
@@ -254,17 +457,26 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
+import InboundOrderDetailPanel from './components/InboundOrderDetailPanel.vue'
+
+const LAYOUT_STORAGE_KEY = 'i_doms_inbound_layout'
 
 const router = useRouter()
 const { openTab } = useTabs()
 
+const layoutMode = ref(localStorage.getItem(LAYOUT_STORAGE_KEY) || 'split')
+const selectedId = ref('')
+const detailTab = ref('basic')
+
 const filters = reactive({
-  status: undefined,
   docNo: '',
-  warehouse: undefined,
   inboundType: undefined,
-  invoiceNo: '',
+  warehouse: undefined,
   inboundDateRange: null,
+  requisitionDept: undefined,
+  sourceOrderNo: '',
+  salesOrderNo: '',
+  status: undefined,
 })
 const appliedFilters = ref({ ...filters, inboundDateRange: null })
 const selectedRowKeys = ref([])
@@ -272,33 +484,38 @@ const pagination = reactive({ current: 1, pageSize: 10 })
 
 const statusOpts = inboundStatusOptions.map((v) => ({ label: v, value: v }))
 const inboundTypeOpts = inboundTypeOptions.map((v) => ({ label: v, value: v }))
+const requisitionDeptOpts = requisitionDeptOptions.map((v) => ({ label: v, value: v }))
 const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
 
 const baseColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 90, fixed: 'left' },
   { title: '入库单号', key: 'docNo', dataIndex: 'docNo', width: 150, fixed: 'left' },
-  { title: '入库日期', dataIndex: 'inboundDate', width: 110 },
-  { title: '仓库', dataIndex: 'warehouse', width: 100 },
   { title: '入库类型', dataIndex: 'inboundType', width: 100 },
+  { title: '入库仓库', dataIndex: 'warehouse', width: 100 },
+  { title: '入库数量', key: 'inboundQtyTotal', width: 120, align: 'right' },
   { title: '源单号', key: 'sourceOrderNo', width: 140 },
-  { title: '销售订单', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
+  { title: '销售单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
-  { title: '供应商', dataIndex: 'supplier', width: 120, ellipsis: true },
-  { title: '来源车间', dataIndex: 'sourceWorkshop', width: 100 },
-  { title: '发票号码', dataIndex: 'invoiceNo', width: 120 },
-  { title: '创建人', dataIndex: 'creator', width: 80 },
+  { title: '申请部门', dataIndex: 'requisitionDept', width: 100, ellipsis: true },
+  { title: '供应商', key: 'supplier', dataIndex: 'supplier', width: 120, ellipsis: true },
+  { title: '入库时间', key: 'inboundTime', width: 110 },
+  { title: '来源', key: 'sourceType', dataIndex: 'sourceType', width: 100 },
+  { title: '发票号', dataIndex: 'invoiceNo', width: 120 },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '确认人', dataIndex: 'confirmer', width: 80 },
-  { title: '确认时间', dataIndex: 'confirmedAt', width: 160 },
+  { title: '创建人', dataIndex: 'creator', width: 80 },
+  { title: '操作时间', dataIndex: 'confirmedAt', width: 160 },
+  { title: '操作人', dataIndex: 'confirmer', width: 80 },
   { title: '仓管员', dataIndex: 'warehouseKeeper', width: 80 },
-  { title: '操作', key: 'action', width: 160, fixed: 'right' },
+  { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
+  { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('inbound-list-v2', baseColumns)
+  useTableColumnSettings('inbound-list-v3', baseColumns, { minScrollX: 2400 })
 
 const filteredList = computed(() => {
   const range = appliedFilters.value.inboundDateRange
@@ -315,6 +532,20 @@ const pagedList = computed(() => {
   return filteredList.value.slice(start, start + pagination.pageSize)
 })
 
+const selectedRecord = computed(
+  () => inboundOrderState.orders.find((o) => o.id === selectedId.value) || null,
+)
+
+const allPageSelected = computed(
+  () =>
+    pagedList.value.length > 0 &&
+    pagedList.value.every((row) => selectedRowKeys.value.includes(row.id)),
+)
+const pageIndeterminate = computed(() => {
+  const n = pagedList.value.filter((row) => selectedRowKeys.value.includes(row.id)).length
+  return n > 0 && n < pagedList.value.length
+})
+
 const rowSelection = computed(() => ({
   fixed: true,
   selectedRowKeys: selectedRowKeys.value,
@@ -323,11 +554,67 @@ const rowSelection = computed(() => ({
   },
 }))
 
+watch(
+  filteredList,
+  (list) => {
+    if (!list.length) {
+      selectedId.value = ''
+      return
+    }
+    if (!list.some((o) => o.id === selectedId.value)) {
+      selectedId.value = list[0].id
+      detailTab.value = 'basic'
+    }
+  },
+  { immediate: true },
+)
+
+function rowIndex(index) {
+  return (pagination.current - 1) * pagination.pageSize + index + 1
+}
+
 function statusColor(status) {
-  if (status === '已完成') return 'success'
+  if (status === '已完成' || status === '已入库') return 'success'
   if (status === '已拒绝') return 'error'
   if (status === '待审批') return 'warning'
-  return 'processing'
+  if (status === '部分入库') return 'warning'
+  if (status === '待处理') return 'processing'
+  return 'default'
+}
+
+function toggleLayout() {
+  layoutMode.value = layoutMode.value === 'split' ? 'table' : 'split'
+  localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode.value)
+}
+
+function selectOrder(id) {
+  selectedId.value = id
+  detailTab.value = 'basic'
+}
+
+function toggleSelect(id, checked) {
+  if (checked) {
+    if (!selectedRowKeys.value.includes(id)) selectedRowKeys.value = [...selectedRowKeys.value, id]
+  } else {
+    selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== id)
+  }
+}
+
+function onToggleSelectAllPage(e) {
+  const ids = pagedList.value.map((r) => r.id)
+  if (e.target.checked) {
+    selectedRowKeys.value = Array.from(new Set([...selectedRowKeys.value, ...ids]))
+  } else {
+    const drop = new Set(ids)
+    selectedRowKeys.value = selectedRowKeys.value.filter((id) => !drop.has(id))
+  }
+}
+
+function onCardAction(key, row) {
+  if (key === 'edit') openEdit(row)
+  else if (key === 'confirm') handleConfirmOne(row)
+  else if (key === 'delete') confirmDelete(row)
+  else if (key === 'detail') goDetail(row)
 }
 
 function handleSearch() {
@@ -337,12 +624,14 @@ function handleSearch() {
 
 function handleReset() {
   Object.assign(filters, {
-    status: undefined,
     docNo: '',
-    warehouse: undefined,
     inboundType: undefined,
-    invoiceNo: '',
+    warehouse: undefined,
     inboundDateRange: null,
+    requisitionDept: undefined,
+    sourceOrderNo: '',
+    salesOrderNo: '',
+    status: undefined,
   })
   handleSearch()
 }
@@ -366,7 +655,10 @@ function openEdit(record) {
 }
 
 function goDetail(record) {
-  router.push(`/inventory/inbound/${record.id}`)
+  if (!record?.id) return
+  const path = `/inventory/inbound/${record.id}`
+  openTab(path, record.docNo || '入库单详情')
+  router.push(path)
 }
 
 function goSource(record) {
@@ -391,6 +683,24 @@ function goSalesOrder(record) {
   router.push(path)
 }
 
+function handleConfirmOne(record) {
+  if (!record) return
+  Modal.confirm({
+    title: `确认入库 ${record.docNo}？`,
+    onOk: () => {
+      const { count, blocked } = confirmInboundOrders([record.id])
+      if (blocked.length) {
+        message.warning(blocked.map((b) => b.message).join('；'))
+        return
+      }
+      if (count > 0) {
+        message.success('已确认入库')
+        handleSearch()
+      }
+    },
+  })
+}
+
 function handleConfirmInbound() {
   if (!selectedRowKeys.value.length) {
     message.warning('请先选择入库单')
@@ -408,6 +718,7 @@ function handleConfirmInbound() {
   if (count > 0) {
     message.success(`已确认入库 ${count} 条`)
     selectedRowKeys.value = []
+    handleSearch()
   } else if (!blocked.length) {
     message.warning('所选单据无法确认入库')
   }
@@ -427,6 +738,7 @@ function handleBatchDelete() {
       })
       message.success(`已删除 ${n} 条`)
       selectedRowKeys.value = []
+      handleSearch()
     },
   })
 }
@@ -438,6 +750,8 @@ function confirmDelete(record) {
       if (deleteInboundOrder(record.id)) {
         message.success('已删除')
         selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== record.id)
+        if (selectedId.value === record.id) selectedId.value = ''
+        handleSearch()
       } else {
         message.warning('当前状态不可删除')
       }
@@ -451,8 +765,10 @@ function handleApprovePass(record) {
     content: '通过后状态变为「待处理」，可进行确认入库。',
     onOk: () => {
       const res = approveInboundOrder(record.id)
-      if (res.ok) message.success('审批已通过')
-      else message.warning(res.message)
+      if (res.ok) {
+        message.success('审批已通过')
+        handleSearch()
+      } else message.warning(res.message)
     },
   })
 }
@@ -464,8 +780,10 @@ function handleApproveReject(record) {
     okType: 'danger',
     onOk: () => {
       const res = rejectInboundOrder(record.id)
-      if (res.ok) message.success('已拒绝，小程序任务已恢复为待开始')
-      else message.warning(res.message)
+      if (res.ok) {
+        message.success('已拒绝，小程序任务已恢复为待开始')
+        handleSearch()
+      } else message.warning(res.message)
     },
   })
 }
@@ -481,7 +799,9 @@ function handleApproveReject(record) {
 
 .filter-card,
 .list-panel,
-.table-card {
+.table-card,
+.list-card,
+.detail-card {
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -490,6 +810,58 @@ function handleApproveReject(record) {
 .filter-card {
   padding: 10px 12px 6px;
   margin-bottom: 8px;
+}
+
+.split-action-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+  min-height: 44px;
+
+  .split-action-left {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .split-action-right {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: auto;
+    gap: 0;
+  }
+
+  :deep(.ant-space) {
+    align-items: center;
+  }
+
+  :deep(.ant-space-item) {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  :deep(.ant-btn) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .layout-toggle-btn {
+    color: rgba(0, 0, 0, 0.45);
+
+    &:hover {
+      color: #1677ff;
+    }
+  }
 }
 
 .list-panel {
@@ -520,6 +892,10 @@ function handleApproveReject(record) {
     line-height: 24px;
     font-size: 13px;
     white-space: nowrap;
+
+    &::after {
+      margin-inline: 2px 6px;
+    }
   }
 
   :deep(.ant-form-item-control) {
@@ -547,24 +923,211 @@ function handleApproveReject(record) {
   margin-bottom: 8px;
   flex-wrap: wrap;
   gap: 8px;
+
+  .toolbar-icons {
+    color: rgba(0, 0, 0, 0.45);
+  }
 }
 
 .summary-bar {
   margin-bottom: 8px;
+  padding: 0;
+
+  :deep(.ant-alert-message) {
+    font-size: 13px;
+  }
 }
 
 .table-card {
   padding: 0;
+
+  :deep(.ant-table-thead > tr > th) {
+    background: #fafafa;
+    font-weight: 500;
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-tbody > tr > td) {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-cell-fix-right) {
+    background: #fff;
+  }
 }
 
 .table-pagination {
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
+  padding-top: 4px;
 }
 
 .link-code {
   color: #1677ff;
   cursor: pointer;
+}
+
+:deep(.ant-table-wrapper .ant-btn-link) {
+  padding: 0 4px;
+  height: auto;
+}
+
+.master-detail {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-height: 520px;
+}
+
+.list-card {
+  width: 22%;
+  min-width: 240px;
+  max-width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 220px);
+
+  .list-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px 6px;
+    border-bottom: 1px solid #f0f0f0;
+
+    .list-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .selected-count {
+      font-size: 12px;
+      color: #1677ff;
+      margin-left: auto;
+    }
+  }
+
+  .list-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+  }
+
+  .list-pagination {
+    padding: 6px 8px;
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: center;
+  }
+}
+
+.detail-card {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px 10px;
+  max-height: calc(100vh - 220px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.order-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 6px 8px 6px 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  background: #fff;
+  transition: all 0.2s;
+  border-left: 2px solid transparent;
+
+  &:hover {
+    border-color: #d6e4ff;
+    box-shadow: 0 1px 4px rgba(22, 119, 255, 0.08);
+  }
+
+  &.active {
+    border-color: #91caff;
+    border-left-color: #1677ff;
+    background: #f0f7ff;
+  }
+
+  &.checked {
+    background: #fafcff;
+  }
+
+  .card-checkbox {
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .card-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+
+    .status-tag {
+      margin: 0;
+      line-height: 18px;
+      font-size: 12px;
+      padding-inline: 6px;
+    }
+
+    .more-btn {
+      padding: 0 2px;
+      height: 22px;
+      color: rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  .card-code {
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.88);
+  }
+
+  .card-name {
+    margin-top: 2px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.65);
+  }
+
+  .card-meta {
+    margin-top: 4px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+
+    .meta-divider {
+      margin: 0 4px;
+    }
+  }
+}
+
+@media (max-width: 960px) {
+  .master-detail {
+    flex-direction: column;
+  }
+
+  .list-card {
+    width: 100%;
+    max-width: none;
+    max-height: 360px;
+  }
+
+  .detail-card {
+    max-height: none;
+  }
 }
 </style>
