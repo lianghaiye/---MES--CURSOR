@@ -6,6 +6,7 @@
       :data-source="list"
       :row-key="(r) => r.id || r.orderNo"
       size="small"
+      bordered
       :pagination="false"
       :scroll="{ x: 1100 }"
     >

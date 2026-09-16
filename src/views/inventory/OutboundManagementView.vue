@@ -101,6 +101,23 @@
       </a-form>
     </div>
 
+    <!-- 卡片视图：搜索下方独立操作条 -->
+    <div v-if="layoutMode === 'split'" class="split-action-card">
+      <a-space wrap :size="8">
+        <a-button type="primary" size="small" @click="openCreate">
+          <PlusOutlined />
+          新增
+        </a-button>
+        <a-button size="small" @click="handleConfirmOutbound">确认出库</a-button>
+        <a-button size="small" danger @click="handleRefuseOutbound">拒绝出库</a-button>
+        <a-button size="small" @click="handleBatchDelete">删除</a-button>
+        <a-button size="small" @click="openPrintSelected">
+          <PrinterOutlined />
+          打印
+        </a-button>
+      </a-space>
+    </div>
+
     <!-- 卡片主从视图 -->
     <div v-if="layoutMode === 'split'" class="master-detail">
       <div class="list-card">
@@ -126,17 +143,6 @@
               </a-button>
             </a-tooltip>
           </div>
-        </div>
-        <div class="split-toolbar">
-          <a-space wrap :size="6">
-            <a-button type="primary" size="small" @click="openCreate">
-              <PlusOutlined />
-              新增
-            </a-button>
-            <a-button size="small" @click="handleConfirmOutbound">确认出库</a-button>
-            <a-button size="small" danger @click="handleRefuseOutbound">拒绝出库</a-button>
-            <a-button size="small" @click="handleBatchDelete">删除</a-button>
-          </a-space>
         </div>
         <div class="list-body">
           <div
@@ -203,13 +209,15 @@
       <div class="detail-card">
         <OutboundOrderDetailPanel
           :order-id="selectedId"
+          v-model:detail-tab="detailTab"
           @approve="selectedRecord && handleApprove(selectedRecord)"
           @confirm="selectedRecord && handleConfirmOne(selectedRecord)"
           @refuse="selectedRecord && openRefuse([selectedRecord])"
-          @edit="selectedRecord && openEdit(selectedRecord)"
           @delete="selectedRecord && confirmDelete(selectedRecord)"
           @initiate-qc="selectedRecord && handleInitiateQc(selectedRecord)"
+          @print="selectedRecord && openPrintOne(selectedRecord)"
           @open-full="selectedRecord && goDetail(selectedRecord)"
+          @saved="handleSearch"
         />
       </div>
     </div>
@@ -238,7 +246,7 @@
             <DeleteOutlined />
             删除
           </a-button>
-          <a-button size="small" @click="stubAction('打印')">
+          <a-button size="small" @click="openPrintSelected">
             <PrinterOutlined />
             打印
           </a-button>
@@ -413,6 +421,12 @@
       :doc-nos="refuseDocNos"
       @confirm="submitRefuse"
     />
+
+    <OutboundOrderPrintModal
+      v-model:open="printModalOpen"
+      :order="printOrder"
+      :orders="printOrders"
+    />
   </div>
 </template>
 
@@ -477,6 +491,7 @@ import { useTabs } from '@/composables/useTabs'
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import OutboundOrderDetailPanel from './components/OutboundOrderDetailPanel.vue'
 import OutboundRefuseModal from './components/OutboundRefuseModal.vue'
+import OutboundOrderPrintModal from './components/OutboundOrderPrintModal.vue'
 
 const LAYOUT_STORAGE_KEY = 'i_doms_outbound_layout'
 
@@ -485,8 +500,12 @@ const { openTab } = useTabs()
 
 const layoutMode = ref(localStorage.getItem(LAYOUT_STORAGE_KEY) || 'split')
 const selectedId = ref('')
+const detailTab = ref('basic')
 const refuseModalOpen = ref(false)
 const refuseTargets = ref([])
+const printModalOpen = ref(false)
+const printOrder = ref(null)
+const printOrders = ref([])
 
 const filters = reactive({
   docNo: '',
@@ -594,6 +613,7 @@ watch(
     }
     if (!list.some((o) => o.id === selectedId.value)) {
       selectedId.value = list[0].id
+      detailTab.value = canEditOutbound(list[0]) ? 'edit' : 'basic'
     }
   },
   { immediate: true },
@@ -606,6 +626,8 @@ function toggleLayout() {
 
 function selectOrder(id) {
   selectedId.value = id
+  const row = outboundState.orders.find((o) => o.id === id)
+  detailTab.value = canEditOutbound(row) ? 'edit' : 'basic'
 }
 
 function toggleSelect(id, checked) {
@@ -627,8 +649,10 @@ function onToggleSelectAllPage(e) {
 }
 
 function onCardAction(key, row) {
-  if (key === 'edit') openEdit(row)
-  else if (key === 'confirm') handleConfirmOne(row)
+  if (key === 'edit') {
+    selectOrder(row.id)
+    detailTab.value = 'edit'
+  } else if (key === 'confirm') handleConfirmOne(row)
   else if (key === 'refuse') openRefuse([row])
   else if (key === 'delete') confirmDelete(row)
   else if (key === 'detail') goDetail(row)
@@ -668,6 +692,32 @@ function onBatchMenu({ key }) {
 
 function stubAction(name) {
   message.info(`${name}功能开发中`)
+}
+
+function openPrintOne(record) {
+  if (!record) return
+  printOrder.value = record
+  printOrders.value = []
+  printModalOpen.value = true
+}
+
+function openPrintSelected() {
+  const rows = selectedRowKeys.value.length
+    ? filteredList.value.filter((r) => selectedRowKeys.value.includes(r.id))
+    : selectedRecord.value
+      ? [selectedRecord.value]
+      : []
+  if (!rows.length) {
+    message.warning('请先选择要打印的出库单')
+    return
+  }
+  if (rows.length === 1) {
+    openPrintOne(rows[0])
+    return
+  }
+  printOrder.value = null
+  printOrders.value = rows
+  printModalOpen.value = true
 }
 
 function openCreate() {
@@ -921,6 +971,26 @@ function handleBatchInitiateQc() {
   margin-bottom: 8px;
 }
 
+.split-action-card {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+
+  :deep(.ant-space) {
+    align-items: center;
+  }
+
+  :deep(.ant-btn) {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
 .list-panel {
   padding: 10px 12px 12px;
 }
@@ -1091,11 +1161,6 @@ function handleBatchInitiateQc() {
     }
   }
 
-  .split-toolbar {
-    padding: 6px 10px;
-    border-bottom: 1px solid #f0f0f0;
-  }
-
   .list-body {
     flex: 1;
     overflow-y: auto;
@@ -1113,6 +1178,7 @@ function handleBatchInitiateQc() {
 .detail-card {
   flex: 1;
   min-width: 0;
+  padding: 8px 12px 10px;
   max-height: calc(100vh - 220px);
   overflow: hidden;
   display: flex;

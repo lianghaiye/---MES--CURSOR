@@ -107,10 +107,10 @@ export default { name: 'OutboundOrderBasicInfoSection' }
 @label-width: 108px;
 
 .outbound-order-basic-section {
-  padding: 10px 12px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .field-label {

@@ -6,6 +6,7 @@
       :data-source="list"
       :row-key="(r) => r.id || r.code"
       size="small"
+      bordered
       :pagination="false"
       :scroll="{ x: 1100 }"
     >
@@ -42,8 +43,14 @@ const list = computed(() => (props.workOrders || []).map(enrichOutboundWorkOrder
 </script>
 
 <style lang="less" scoped>
+.outbound-wo-list {
+  width: 100%;
+}
+
 .section-title {
+  font-size: 13px;
   font-weight: 600;
   margin-bottom: 12px;
+  color: rgba(0, 0, 0, 0.85);
 }
 </style>

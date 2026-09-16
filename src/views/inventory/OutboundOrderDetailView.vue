@@ -9,6 +9,10 @@
             <span class="sub-type">{{ record.outboundType }}</span>
           </div>
           <a-space>
+            <a-button type="link" size="small" @click="openPrint">
+              <PrinterOutlined />
+              打印
+            </a-button>
             <a-button
               v-if="canApproveOutbound(record)"
               type="primary"
@@ -64,6 +68,7 @@
         <div class="tab-body">
           <template v-if="infoTab === 'basic'">
             <div class="section-card">
+              <div class="section-title">基本信息</div>
               <OutboundOrderBasicInfoSection
                 :record="record"
                 :is-material-req-outbound="isMaterialReqOutbound"
@@ -268,6 +273,8 @@
       :doc-nos="record ? [record.docNo] : []"
       @confirm="submitRefuse"
     />
+
+    <OutboundOrderPrintModal v-model:open="printModalOpen" :order="record" />
   </div>
 </template>
 
@@ -307,9 +314,10 @@ import {
   normalizePieceSerialNos,
   resolveOutboundStockUnit,
 } from '@/utils/outboundLineHelpers'
-import { InfoCircleOutlined } from '@ant-design/icons-vue'
+import { InfoCircleOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 import OutboundOrderBasicInfoSection from './components/OutboundOrderBasicInfoSection.vue'
 import OutboundRefuseModal from './components/OutboundRefuseModal.vue'
+import OutboundOrderPrintModal from './components/OutboundOrderPrintModal.vue'
 import OutboundWorkOrderList from './components/OutboundWorkOrderList.vue'
 import OutboundOutsourcingOrderList from './components/OutboundOutsourcingOrderList.vue'
 import {
@@ -327,6 +335,7 @@ const loading = ref(false)
 const record = ref(null)
 const infoTab = ref('basic')
 const refuseModalOpen = ref(false)
+const printModalOpen = ref(false)
 
 const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领料出库')
 
@@ -459,6 +468,11 @@ function openEdit() {
     path: `/inventory/outbound/${record.value.id}/edit`,
     title: `编辑出库单 ${record.value.docNo || ''}`.trim(),
   })
+}
+
+function openPrint() {
+  if (!record.value) return
+  printModalOpen.value = true
 }
 
 function goSource() {
@@ -612,20 +626,30 @@ function handleInitiateQc() {
     color: #8c8c8c;
   }
 
+  .detail-tabs-wrap {
+    padding-bottom: 0;
+  }
+
   .tab-body {
     margin-top: 0;
+    padding: 8px 12px 16px;
+    background: #f5f6f8;
   }
 
   .section-card {
     background: #fff;
-    border-radius: 4px;
-    padding: 16px;
-    margin-bottom: 16px;
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
   .section-title {
     font-weight: 600;
+    font-size: 14px;
     margin-bottom: 12px;
+    color: rgba(0, 0, 0, 0.85);
   }
 
   .link-code {

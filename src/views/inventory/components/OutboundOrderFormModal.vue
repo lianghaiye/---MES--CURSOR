@@ -1,10 +1,13 @@
 <template>
   <FormCreateShell
     :page-mode="pageMode"
+    :embedded="embedded"
+    :content-only="contentOnly"
     :open="open"
     :title="shellTitle"
     width="1400px"
     class="outbound-form-modal"
+    :class="{ 'is-embedded': embedded }"
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
@@ -484,9 +487,37 @@
       </div>
     </div>
 
+    <template #header-extra>
+      <template v-if="embedded && editRecord">
+        <a-tag :color="outboundStatusColor(editRecord.status)">{{ editRecord.status }}</a-tag>
+        <a-tag>{{ outboundSourceLabel(editRecord.sourceChannel) }}</a-tag>
+      </template>
+    </template>
+
     <template #footer>
-      <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :loading="saving" @click="handleSave">
+      <template v-if="embedded && !contentOnly">
+        <a-button type="link" size="small" class="header-print-btn" @click="emit('print')">
+          <PrinterOutlined />
+          打印
+        </a-button>
+        <a-button v-if="canConfirmEmbedded" type="primary" size="small" @click="emit('confirm')">
+          确认出库
+        </a-button>
+        <a-button v-if="canRefuseEmbedded" size="small" danger @click="emit('refuse')">
+          拒绝出库
+        </a-button>
+        <a-button v-if="canDeleteEmbedded" size="small" danger @click="emit('delete')">
+          删除
+        </a-button>
+        <a-button size="small" @click="emit('open-full')">打开详情</a-button>
+      </template>
+      <a-button v-if="!embedded" @click="handleCancel">取消</a-button>
+      <a-button
+        type="primary"
+        :size="embedded ? 'small' : 'middle'"
+        :loading="saving"
+        @click="handleSave"
+      >
         <CheckOutlined />
         保存
       </a-button>
@@ -555,7 +586,12 @@ import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { CheckOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import {
+  CheckOutlined,
+  InfoCircleOutlined,
+  PlusOutlined,
+  PrinterOutlined,
+} from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -584,6 +620,8 @@ import {
   outboundTypeOptions,
   requisitionDeptOptions,
   OUTBOUND_SOURCE,
+  outboundStatusColor,
+  outboundSourceLabel,
 } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
@@ -592,6 +630,9 @@ import {
   updateOutboundOrder,
   confirmOutboundLine,
   getOutboundOrderById,
+  canRefuseOutbound,
+  canDeleteOutbound,
+  validateOutboundForConfirm,
 } from '@/store/outboundStore'
 import {
   outboundFormLineColumns,
@@ -652,11 +693,22 @@ import {
 const props = defineProps({
   open: { type: Boolean, default: false },
   pageMode: { type: Boolean, default: false },
+  embedded: { type: Boolean, default: false },
+  contentOnly: { type: Boolean, default: false },
   listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
 })
 
-const emit = defineEmits(['update:open', 'saved'])
+const emit = defineEmits([
+  'update:open',
+  'saved',
+  'cancel',
+  'confirm',
+  'refuse',
+  'delete',
+  'print',
+  'open-full',
+])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 const isFromDelivery = computed(() =>
@@ -666,6 +718,11 @@ const isSalesOutbound = computed(() => form.outboundType === '销售出库')
 const showReceiveWarehouse = computed(
   () => form.outboundType === '领料出库' || form.outboundType === '发料出库',
 )
+const canConfirmEmbedded = computed(
+  () => props.embedded && props.editRecord && validateOutboundForConfirm(props.editRecord).ok,
+)
+const canRefuseEmbedded = computed(() => props.embedded && canRefuseOutbound(props.editRecord))
+const canDeleteEmbedded = computed(() => props.embedded && canDeleteOutbound(props.editRecord))
 const workOrderList = computed(() => {
   void mobileMaterialReqState.items
   const orderLike = {
@@ -702,7 +759,10 @@ const lockSalesOrder = computed(() => isFromDelivery.value)
 
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/inventory/outbound',
-  getTitle: () => (isEdit.value ? '编辑出库单' : '新增出库单'),
+  getTitle: () => {
+    if (props.embedded && props.editRecord?.docNo) return props.editRecord.docNo
+    return isEdit.value ? '编辑出库单' : '新增出库单'
+  },
 })
 
 const saving = ref(false)
@@ -1585,16 +1645,21 @@ function handleSave() {
 </style>
 
 <style lang="less" scoped>
-:deep(.form-create-page.outbound-form-modal) {
+:deep(.form-create-page.outbound-form-modal),
+:deep(.form-embedded-panel.outbound-form-modal),
+:deep(.form-embedded-content-only.outbound-form-modal),
+.form-embedded-panel,
+.form-embedded-content-only {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 112px);
-  max-height: calc(100vh - 112px);
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
   overflow: hidden;
   padding-bottom: 0;
 
-  .form-body {
+  .form-body,
+  .embedded-body {
     flex: 1;
     min-height: 0;
     min-width: 0;
@@ -1603,6 +1668,11 @@ function handleSave() {
     flex-direction: column;
     padding-bottom: 12px;
   }
+}
+
+:deep(.form-create-page.outbound-form-modal) {
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
 }
 
 :deep(.ant-modal.outbound-form-modal) {
@@ -1736,6 +1806,15 @@ function handleSave() {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
   cursor: help;
+}
+
+.header-print-btn {
+  padding-inline: 4px;
+  color: rgba(0, 0, 0, 0.65);
+
+  &:hover {
+    color: #1677ff;
+  }
 }
 
 .unit-suffix {
