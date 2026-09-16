@@ -5,21 +5,26 @@
         <div class="detail-title" :class="{ 'title-bold': variant === 'qc' }">
           <span class="code">{{ workOrder.code }}</span>
           <span class="name">{{ workOrder.name }}</span>
+          <a-space :size="6" class="header-tags">
+            <a-tag>{{ workOrder.orderCategory || '生产工单' }}</a-tag>
+            <a-tag :color="statusTagColor(workOrder.status)">{{ workOrder.status }}</a-tag>
+            <a-tag v-if="isScheduleIncomplete(workOrder)" color="processing">未排完</a-tag>
+            <a-tag
+              v-if="convertSideLabel"
+              :color="getWorkOrderConvertSideTagColor(convertSideLabel)"
+            >
+              {{ convertSideLabel }}
+            </a-tag>
+            <a-tag
+              v-if="
+                workOrder.urgency && workOrder.urgency !== '普通' && workOrder.urgency !== '正常'
+              "
+              color="orange"
+            >
+              {{ workOrder.urgency }}
+            </a-tag>
+          </a-space>
         </div>
-        <a-space :size="6" class="header-tags">
-          <a-tag>{{ workOrder.orderCategory || '生产工单' }}</a-tag>
-          <a-tag :color="statusTagColor(workOrder.status)">{{ workOrder.status }}</a-tag>
-          <a-tag v-if="isScheduleIncomplete(workOrder)" color="processing">未排完</a-tag>
-          <a-tag v-if="convertSideLabel" :color="getWorkOrderConvertSideTagColor(convertSideLabel)">
-            {{ convertSideLabel }}
-          </a-tag>
-          <a-tag
-            v-if="workOrder.urgency && workOrder.urgency !== '普通' && workOrder.urgency !== '正常'"
-            color="orange"
-          >
-            {{ workOrder.urgency }}
-          </a-tag>
-        </a-space>
       </div>
       <a-space :size="4" class="header-actions">
         <a-button type="link" size="small" class="header-action-btn" @click="printModalOpen = true">
@@ -349,17 +354,13 @@ function statusTagColor(status) {
   .detail-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     margin-bottom: 10px;
     gap: 12px;
 
     .header-main {
       min-width: 0;
       flex: 1;
-    }
-
-    .header-tags {
-      margin-top: 6px;
     }
 
     .header-actions {
@@ -372,6 +373,10 @@ function statusTagColor(status) {
     }
 
     .detail-title {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 10px;
       min-width: 0;
 
       &.title-bold {
@@ -381,22 +386,22 @@ function statusTagColor(status) {
           font-size: 14px;
           color: rgba(0, 0, 0, 0.88);
         }
-
-        .name {
-          margin-left: 8px;
-        }
       }
 
       .code {
         font-size: 14px;
         font-weight: 600;
         color: rgba(0, 0, 0, 0.88);
-        margin-right: 8px;
       }
 
       .name {
         font-size: 13px;
         color: rgba(0, 0, 0, 0.65);
+      }
+
+      .header-tags {
+        display: inline-flex;
+        align-items: center;
       }
     }
 
@@ -431,7 +436,7 @@ function statusTagColor(status) {
     margin-top: 4px;
 
     :deep(.ant-tabs-nav) {
-      margin-bottom: 12px !important;
+      margin-bottom: 8px !important;
     }
   }
 

@@ -627,12 +627,12 @@ function handleInitiateQc() {
   }
 
   .detail-tabs-wrap {
-    padding-bottom: 0;
+    padding-bottom: 8px;
   }
 
   .tab-body {
     margin-top: 0;
-    padding: 8px 12px 16px;
+    padding: 0 12px 16px;
     background: #f5f6f8;
   }
 

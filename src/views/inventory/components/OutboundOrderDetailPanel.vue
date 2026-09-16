@@ -5,11 +5,11 @@
         <div class="detail-title">
           <a class="code link-code" @click="emit('open-full')">{{ record.docNo }}</a>
           <span class="name">{{ record.outboundType }}</span>
+          <a-space :size="6" class="header-tags">
+            <a-tag :color="outboundStatusColor(record.status)">{{ record.status }}</a-tag>
+            <a-tag>{{ outboundSourceLabel(record.sourceChannel) }}</a-tag>
+          </a-space>
         </div>
-        <a-space :size="6" class="header-tags">
-          <a-tag :color="outboundStatusColor(record.status)">{{ record.status }}</a-tag>
-          <a-tag>{{ outboundSourceLabel(record.sourceChannel) }}</a-tag>
-        </a-space>
       </div>
       <a-space :size="4" class="header-actions">
         <a-button type="link" size="small" class="header-action-btn" @click="emit('print')">
@@ -414,7 +414,7 @@ export default { name: 'OutboundOrderDetailPanel' }
 
 .detail-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
@@ -440,14 +440,11 @@ export default { name: 'OutboundOrderDetailPanel' }
   flex: 1;
 }
 
-.header-tags {
-  margin-top: 6px;
-}
-
 .detail-title {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   min-width: 0;
 
   .code {
@@ -458,6 +455,11 @@ export default { name: 'OutboundOrderDetailPanel' }
   .name {
     font-size: 13px;
     color: rgba(0, 0, 0, 0.65);
+  }
+
+  .header-tags {
+    display: inline-flex;
+    align-items: center;
   }
 }
 
@@ -474,11 +476,6 @@ export default { name: 'OutboundOrderDetailPanel' }
   flex-direction: column;
   margin-top: 4px;
   padding: 0;
-
-  :deep(> .ant-tabs-nav) {
-    margin: 0 0 8px !important;
-    flex-shrink: 0;
-  }
 
   :deep(.ant-tabs-content-holder) {
     flex: 1;
