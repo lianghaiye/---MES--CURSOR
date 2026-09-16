@@ -150,6 +150,7 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { submitOutsourcingInbound } from '@/store/outsourcingOrderStore'
+import { getPendingOutsourcingPriceChangeBlock } from '@/store/outsourcingPriceChangeStore'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import {
   calcWxLineAppliedOccupyQty,
@@ -308,6 +309,13 @@ function handleCancel() {
 }
 
 function handleSave() {
+  for (const order of sourceOrders.value) {
+    const block = getPendingOutsourcingPriceChangeBlock(order.id, '生成入库单')
+    if (block) {
+      message.warning(block)
+      return
+    }
+  }
   if (!form.receiptDate) {
     message.warning('请选择收货日期')
     return

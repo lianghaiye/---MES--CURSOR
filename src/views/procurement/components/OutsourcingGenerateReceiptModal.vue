@@ -125,6 +125,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { submitOutsourcingReceipt } from '@/store/outsourcingOrderStore'
+import { getPendingOutsourcingPriceChangeBlock } from '@/store/outsourcingPriceChangeStore'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import {
   calcWxLineAppliedOccupyQty,
@@ -279,6 +280,13 @@ function handleCancel() {
 }
 
 function handleConfirm() {
+  for (const order of sourceOrders.value) {
+    const block = getPendingOutsourcingPriceChangeBlock(order.id, '生成收货单')
+    if (block) {
+      message.warning(block)
+      return
+    }
+  }
   const editableLines = receiptLines.value.filter((l) => !l.locked)
   if (!editableLines.length) {
     message.warning('没有可收货的明细')

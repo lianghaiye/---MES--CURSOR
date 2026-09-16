@@ -148,6 +148,7 @@
           审核
         </a-button>
         <a-button size="small" @click="handleBatchSubmit">批量提交</a-button>
+        <a-button size="small" @click="openToolbarPriceChangeApprove">审核价格变更</a-button>
         <a-button size="small" @click="handleGenerateIssue">
           <ExportOutlined />
           生成发料出库单
@@ -317,6 +318,14 @@
                   入库
                 </a-button>
               </template>
+              <a-button
+                v-if="canApplyOutsourcingPriceChange(record)"
+                type="link"
+                size="small"
+                @click="openPriceChangeForOrder(record)"
+              >
+                {{ rowPriceChangeLabel(record) }}
+              </a-button>
               <span v-if="!hasRowActions(record)" class="action-disabled">-</span>
             </a-space>
           </template>
@@ -359,6 +368,13 @@
       v-model:open="printModalOpen"
       :template-type="printTemplateType"
       :outsourcing-orders="printOrders"
+    />
+
+    <OutsourcingPriceChangeModal
+      v-model:open="priceChangeOpen"
+      :outsourcing-order="priceChangeOrder"
+      :pending-change="priceChangePending"
+      @done="onPriceChangeDone"
     />
 
     <TableColumnSettingDrawer
@@ -423,6 +439,12 @@ import OutsourcingGenerateIssueModal from './components/OutsourcingGenerateIssue
 import OutsourcingGenerateInboundModal from './components/OutsourcingGenerateInboundModal.vue'
 import OutsourcingOrderPrintModal from './components/OutsourcingOrderPrintModal.vue'
 import OutsourcingOrderStatsPanel from './components/OutsourcingOrderStatsPanel.vue'
+import OutsourcingPriceChangeModal from './components/OutsourcingPriceChangeModal.vue'
+import {
+  canApplyOutsourcingPriceChange,
+  getPendingOutsourcingPriceChange,
+  getPendingOutsourcingPriceChangeBlock,
+} from '@/store/outsourcingPriceChangeStore'
 import { OUTSOURCING_PRINT_TEMPLATE } from '@/utils/outsourcingOrderPrintPreview'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -459,6 +481,11 @@ const receiptModalOpen = ref(false)
 const issueModalOpen = ref(false)
 const inboundModalOpen = ref(false)
 const issueOrder = ref(null)
+const priceChangeOpen = ref(false)
+const priceChangeOrder = ref(null)
+const priceChangePending = computed(() =>
+  getPendingOutsourcingPriceChange(priceChangeOrder.value?.id),
+)
 const printModalOpen = ref(false)
 const printTemplateType = ref(OUTSOURCING_PRINT_TEMPLATE.DISPATCH)
 const printOrders = ref([])
@@ -591,7 +618,8 @@ function hasRowActions(record) {
     canResubmitOutsourcingOrder(record) ||
     canVoidOutsourcingOrder(record) ||
     canGenerateOutsourcingReceipt(record) ||
-    canGenerateOutsourcingInbound(record)
+    canGenerateOutsourcingInbound(record) ||
+    canApplyOutsourcingPriceChange(record)
   )
 }
 
@@ -664,6 +692,11 @@ function openReceiptModal() {
     return
   }
   const selected = getOutsourcingOrdersByIds(selectedRowKeys.value)
+  const blocked = selected.find((o) => getPendingOutsourcingPriceChangeBlock(o.id, '生成收货单'))
+  if (blocked) {
+    message.warning(getPendingOutsourcingPriceChangeBlock(blocked.id, '生成收货单'))
+    return
+  }
   const targets = selected.filter(canGenerateOutsourcingReceipt)
   if (!targets.length) {
     message.warning('所选外协订单均不可生成收货单（需进行中且仍有可回货数量）')
@@ -682,6 +715,11 @@ function openInboundModal() {
     return
   }
   const selected = getOutsourcingOrdersByIds(selectedRowKeys.value)
+  const blocked = selected.find((o) => getPendingOutsourcingPriceChangeBlock(o.id, '生成入库单'))
+  if (blocked) {
+    message.warning(getPendingOutsourcingPriceChangeBlock(blocked.id, '生成入库单'))
+    return
+  }
   const targets = selected.filter(canGenerateOutsourcingInbound)
   if (!targets.length) {
     message.warning('所选外协订单均不可生成入库单（需进行中且仍有可回货数量）')
@@ -695,6 +733,11 @@ function openInboundModal() {
 }
 
 function openReceiptForRow(record) {
+  const block = getPendingOutsourcingPriceChangeBlock(record?.id, '生成收货单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   if (!canGenerateOutsourcingReceipt(record)) {
     message.warning('仅进行中且仍有可回货数量的外协订单可生成收货单')
     return
@@ -704,12 +747,52 @@ function openReceiptForRow(record) {
 }
 
 function openInboundForRow(record) {
+  const block = getPendingOutsourcingPriceChangeBlock(record?.id, '生成入库单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   if (!canGenerateOutsourcingInbound(record)) {
     message.warning('仅进行中且仍有可回货数量的外协订单可生成入库单')
     return
   }
   inboundOrders.value = [record]
   inboundModalOpen.value = true
+}
+
+function rowPriceChangeLabel(order) {
+  return getPendingOutsourcingPriceChange(order?.id) ? '审核价格变更' : '价格变更'
+}
+
+function openPriceChangeForOrder(order) {
+  if (!canApplyOutsourcingPriceChange(order)) {
+    message.warning('仅「进行中 / 已完成」的外协订单可申请价格变更')
+    return
+  }
+  priceChangeOrder.value = order
+  priceChangeOpen.value = true
+}
+
+function openToolbarPriceChangeApprove() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条待审核价格变更的外协订单')
+    return
+  }
+  const order = outsourcingOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
+    message.warning('未找到所选外协订单')
+    return
+  }
+  if (!getPendingOutsourcingPriceChange(order.id)) {
+    message.warning('所选外协单没有待审核的价格变更')
+    return
+  }
+  priceChangeOrder.value = order
+  priceChangeOpen.value = true
+}
+
+function onPriceChangeDone() {
+  priceChangeOrder.value = null
 }
 
 function openExceptionCreate(order) {

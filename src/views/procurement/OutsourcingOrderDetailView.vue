@@ -49,6 +49,13 @@
               <a-button size="small" @click="openExceptionCreate">异常处理</a-button>
               <a-button size="small" @click="handleComplete">完成</a-button>
             </template>
+            <a-button
+              v-if="canApplyOutsourcingPriceChange(record)"
+              size="small"
+              @click="handlePriceChange"
+            >
+              {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
+            </a-button>
             <a-dropdown>
               <a-button size="small">
                 打印
@@ -71,6 +78,7 @@
             class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
           >
             <a-tab-pane key="basic" tab="基本信息" />
+            <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
             <a-tab-pane key="issue" :tab="`发料信息 (${issueApplicationRows.length})`" />
             <a-tab-pane key="return" :tab="`回货信息 (${relatedInboundLines.length})`" />
             <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
@@ -80,6 +88,14 @@
         </div>
 
         <div class="tab-body">
+          <a-alert
+            v-if="pendingPriceChange && activeTab === 'basic'"
+            type="warning"
+            show-icon
+            class="pending-price-alert"
+            :message="`价格变更「${pendingPriceChange.changeNo}」待审核，通过前不可收货 / 入库 / 结算。`"
+            style="margin-bottom: 12px"
+          />
           <template v-if="activeTab === 'basic'">
             <div class="section-card">
               <div class="section-title">基本信息</div>
@@ -155,6 +171,47 @@
                 </div>
               </div>
               <a-empty v-else description="暂无审批记录" />
+            </div>
+
+            <div class="section-card">
+              <div class="section-title">价格变更审批</div>
+              <a-divider style="margin: 12px 0" />
+              <div v-if="priceChangeApprovalGroups.length">
+                <div
+                  v-for="group in priceChangeApprovalGroups"
+                  :key="group.id"
+                  class="price-change-approval-group"
+                >
+                  <div class="price-change-approval-head">
+                    <span>{{ group.changeNo }}</span>
+                    <a-tag :color="outsourcingPriceChangeStatusColor(group.status)" size="small">
+                      {{ group.status }}
+                    </a-tag>
+                    <span v-if="group.reasonType" class="muted">{{ group.reasonType }}</span>
+                  </div>
+                  <div class="history-list">
+                    <div v-for="(item, idx) in group.items" :key="idx" class="history-item">
+                      <div class="history-head">
+                        <span class="history-user">{{ item.name }}</span>
+                        <span class="history-role">（{{ item.role }}）</span>
+                        <a-tag :color="approvalResultColor(item.result)" size="small">
+                          {{ item.result }}
+                        </a-tag>
+                        <span class="history-time">{{ item.time || '—' }}</span>
+                      </div>
+                      <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <a-empty v-else description="暂无价格变更审批记录" />
+            </div>
+          </template>
+
+          <template v-else-if="activeTab === 'price-change'">
+            <div class="section-card">
+              <div class="section-title">价格变更履历</div>
+              <OutsourcingPriceChangeHistoryPanel :order="record" />
             </div>
           </template>
 
@@ -375,6 +432,12 @@
           :template-type="printTemplateType"
           :outsourcing-order="record"
         />
+        <OutsourcingPriceChangeModal
+          v-model:open="priceChangeOpen"
+          :outsourcing-order="priceChangeOrder"
+          :pending-change="priceChangePending"
+          @done="onPriceChangeDone"
+        />
       </template>
       <a-empty v-else-if="!loading" description="未找到该外协订单" />
     </a-spin>
@@ -428,6 +491,19 @@ import OutsourcingOrderPrintModal from './components/OutsourcingOrderPrintModal.
 import OutsourcingGenerateIssueModal from './components/OutsourcingGenerateIssueModal.vue'
 import OutsourcingGenerateReceiptModal from './components/OutsourcingGenerateReceiptModal.vue'
 import OutsourcingGenerateInboundModal from './components/OutsourcingGenerateInboundModal.vue'
+import OutsourcingPriceChangeModal from './components/OutsourcingPriceChangeModal.vue'
+import OutsourcingPriceChangeHistoryPanel from './components/OutsourcingPriceChangeHistoryPanel.vue'
+import {
+  buildOutsourcingPriceChangeApprovalGroups,
+  outsourcingPriceChangeStatusColor,
+} from '@/utils/outsourcingPriceChange'
+import {
+  canApplyOutsourcingPriceChange,
+  getPendingOutsourcingPriceChange,
+  getPendingOutsourcingPriceChangeBlock,
+  listOutsourcingPriceChangesByOrderId,
+  outsourcingPriceChangeState,
+} from '@/store/outsourcingPriceChangeStore'
 
 const route = useRoute()
 const router = useRouter()
@@ -441,6 +517,8 @@ const receiptModalOpen = ref(false)
 const inboundModalOpen = ref(false)
 const printModalOpen = ref(false)
 const printTemplateType = ref(OUTSOURCING_PRINT_TEMPLATE.DISPATCH)
+const priceChangeOpen = ref(false)
+const priceChangeOrder = ref(null)
 const listPath = '/procurement/outsourcing-orders'
 
 const lineColumns = [
@@ -523,6 +601,22 @@ const summary = computed(() => {
 })
 
 const approvalRecords = computed(() => record.value?.approvalRecords || [])
+
+const pendingPriceChange = computed(() => {
+  void outsourcingPriceChangeState.orders
+  return getPendingOutsourcingPriceChange(record.value?.id)
+})
+const priceChangePending = computed(() =>
+  getPendingOutsourcingPriceChange(priceChangeOrder.value?.id),
+)
+const priceChangeRecords = computed(() => {
+  void outsourcingPriceChangeState.orders
+  return listOutsourcingPriceChangesByOrderId(record.value?.id)
+})
+const priceChangeCount = computed(() => priceChangeRecords.value.length)
+const priceChangeApprovalGroups = computed(() =>
+  buildOutsourcingPriceChangeApprovalGroups(priceChangeRecords.value),
+)
 
 const issueApplicationRows = computed(() => listIssueApplicationsForOutsourcingOrder(record.value))
 const issueRows = computed(() => flattenOutsourcingIssueOutboundLines(record.value))
@@ -706,15 +800,48 @@ function handleComplete() {
   loadRecord()
 }
 
+function handlePriceChange() {
+  if (!record.value) return
+  if (!canApplyOutsourcingPriceChange(record.value)) {
+    message.warning('仅「进行中 / 已完成」的外协订单可申请价格变更')
+    return
+  }
+  priceChangeOrder.value = record.value
+  priceChangeOpen.value = true
+}
+
+function onPriceChangeDone() {
+  priceChangeOrder.value = null
+  loadRecord()
+}
+
 function openIssueModal() {
   issueModalOpen.value = true
 }
 
 function openReceiptModal() {
+  if (!record.value || !canGenerateOutsourcingReceipt(record.value)) {
+    message.warning('当前外协单不可生成收货单')
+    return
+  }
+  const block = getPendingOutsourcingPriceChangeBlock(record.value.id, '生成收货单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   receiptModalOpen.value = true
 }
 
 function openInboundModal() {
+  if (!record.value || !canGenerateOutsourcingInbound(record.value)) {
+    message.warning('当前外协单不可生成入库单')
+    return
+  }
+  const block = getPendingOutsourcingPriceChangeBlock(record.value.id, '生成入库单')
+  if (block) {
+    message.warning(block)
+    return
+  }
   inboundModalOpen.value = true
 }
 
@@ -840,5 +967,26 @@ function openExceptionCreate() {
   margin-top: 6px;
   font-size: 13px;
   color: #595959;
+}
+
+.price-change-approval-group {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.price-change-approval-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.muted {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

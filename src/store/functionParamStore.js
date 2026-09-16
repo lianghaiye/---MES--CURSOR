@@ -234,6 +234,7 @@ export const AUTO_APPROVE_TYPES = {
   SALES_ORDER: 'salesOrder',
   SALES_ORDER_PRICE_CHANGE: 'salesOrderPriceChange',
   PURCHASE_ORDER_PRICE_CHANGE: 'purchaseOrderPriceChange',
+  OUTSOURCING_ORDER_PRICE_CHANGE: 'outsourcingOrderPriceChange',
   OUTSOURCING_ORDER: 'outsourcingOrder',
   FINISHED_INBOUND: 'finishedInbound',
   MATERIAL_REQUISITION: 'materialRequisition',
@@ -246,6 +247,7 @@ export const AUTO_APPROVE_OPTIONS = [
   { value: AUTO_APPROVE_TYPES.SALES_ORDER, label: '销售订单' },
   { value: AUTO_APPROVE_TYPES.SALES_ORDER_PRICE_CHANGE, label: '销售订单变更' },
   { value: AUTO_APPROVE_TYPES.PURCHASE_ORDER_PRICE_CHANGE, label: '采购订单价格变更' },
+  { value: AUTO_APPROVE_TYPES.OUTSOURCING_ORDER_PRICE_CHANGE, label: '外协订单价格变更' },
   { value: AUTO_APPROVE_TYPES.OUTSOURCING_ORDER, label: '外协订单' },
   { value: AUTO_APPROVE_TYPES.FINISHED_INBOUND, label: '成品入库' },
   { value: AUTO_APPROVE_TYPES.MATERIAL_REQUISITION, label: '领料申请' },
@@ -254,7 +256,7 @@ export const AUTO_APPROVE_OPTIONS = [
 ]
 
 export const AUTO_APPROVE_DESCRIPTION =
-  '勾选后对应单据提交即自动审批通过。勾选「销售订单变更」后，订单变更单提交即回写基本信息与销售明细（数量、交期、税率、单价、折扣、取消行及客户等）；勾选「采购订单价格变更」后，价格变更单提交即回写采购订单有效价。未勾选「领料申请」时，领料申请单需人工审核（待审核 → 审核通过 / 审核驳回）。' +
+  '勾选后对应单据提交即自动审批通过。勾选「销售订单变更」后，订单变更单提交即回写基本信息与销售明细（数量、交期、税率、单价、折扣、取消行及客户等）；勾选「采购订单价格变更」后，价格变更单提交即回写采购订单有效价；勾选「外协订单价格变更」后，价格变更单提交即回写外协订单有效价。未勾选「领料申请」时，领料申请单需人工审核（待审核 → 审核通过 / 审核驳回）。' +
   '「库存扣减」自动确认仅对「自主领料+完工后预扣+确认」生效：勾选后生成扣减单即自动确认；未勾选则须人工确认。' +
   '「完工后预扣+确认（无领料）」无论是否勾选，均须人工确认，不可自动确认。' +
   '勾选「报废单审批」表示报废单走自动审批（配置项已展示，报废业务侧暂未接入读取）。'
@@ -285,6 +287,7 @@ function createDefaultAutoApproveDocs() {
     [AUTO_APPROVE_TYPES.SALES_ORDER]: false,
     [AUTO_APPROVE_TYPES.SALES_ORDER_PRICE_CHANGE]: false,
     [AUTO_APPROVE_TYPES.PURCHASE_ORDER_PRICE_CHANGE]: false,
+    [AUTO_APPROVE_TYPES.OUTSOURCING_ORDER_PRICE_CHANGE]: false,
     [AUTO_APPROVE_TYPES.OUTSOURCING_ORDER]: false,
     [AUTO_APPROVE_TYPES.FINISHED_INBOUND]: false,
     [AUTO_APPROVE_TYPES.MATERIAL_REQUISITION]: false,
