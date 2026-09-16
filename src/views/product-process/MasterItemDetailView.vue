@@ -33,12 +33,10 @@
 
       <div class="tab-body">
         <template v-if="activeTab === 'basic'">
-          <div class="section-card">
-            <div class="section-title">基本信息</div>
+          <DetailSectionCard title="基本信息">
             <DetailInfoGrid :meta-items="capabilityMeta" :fields="basicFields" flush />
-          </div>
-          <div class="section-card">
-            <div class="section-title">单位管理</div>
+          </DetailSectionCard>
+          <DetailSectionCard title="单位管理">
             <DetailInfoGrid :fields="unitFields" flush />
             <a-table
               class="detail-sub-table"
@@ -62,13 +60,11 @@
                 </template>
               </template>
             </a-table>
-          </div>
-          <div class="section-card">
-            <div class="section-title">销售</div>
+          </DetailSectionCard>
+          <DetailSectionCard title="销售">
             <DetailInfoGrid :fields="salesFields" flush />
-          </div>
-          <div class="section-card">
-            <div class="section-title">采购</div>
+          </DetailSectionCard>
+          <DetailSectionCard title="采购">
             <DetailInfoGrid :fields="purchaseFields" flush />
             <a-table
               class="detail-sub-table"
@@ -91,15 +87,13 @@
                 </template>
               </template>
             </a-table>
-          </div>
-          <div class="section-card">
-            <div class="section-title">生产控制</div>
+          </DetailSectionCard>
+          <DetailSectionCard title="生产控制">
             <DetailInfoGrid :fields="productionFields" flush />
-          </div>
-          <div class="section-card">
-            <div class="section-title">预警信息</div>
+          </DetailSectionCard>
+          <DetailSectionCard title="预警信息">
             <DetailInfoGrid :fields="alertFields" flush />
-          </div>
+          </DetailSectionCard>
         </template>
 
         <div v-else-if="activeTab === 'labor'" class="section-card">
@@ -130,6 +124,7 @@
 </template>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { productInfoState } from '@/store/productInfoStore'

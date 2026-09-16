@@ -39,8 +39,7 @@
 
         <div class="tab-body">
           <template v-if="activeTab === 'basic'">
-            <div class="section-card">
-              <div class="section-title">基本信息</div>
+            <DetailSectionCard title="基本信息">
               <PurchaseReturnBasicInfoSection :record="record">
                 <template #purchaseOrderNo>
                   <a
@@ -53,10 +52,9 @@
                   <span v-else>{{ record.purchaseOrderNo || '—' }}</span>
                 </template>
               </PurchaseReturnBasicInfoSection>
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title">退货明细</div>
+            <DetailSectionCard title="退货明细">
               <a-table
                 :columns="lineColumns"
                 :data-source="record.lineItems || []"
@@ -88,12 +86,11 @@
                 <span class="summary-item">行数：{{ lineSummary.lineCount }}</span>
                 <span class="summary-item">退货数量：{{ formatQty(lineSummary.totalQty) }}</span>
               </div>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'outbound'">
-            <div class="section-card">
-              <div class="section-title">出库信息</div>
+            <DetailSectionCard title="出库信息">
               <a-table
                 :columns="outboundColumns"
                 :data-source="outboundRows"
@@ -120,7 +117,7 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
         </div>
 
@@ -136,6 +133,7 @@ export default { name: 'PurchaseReturnDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

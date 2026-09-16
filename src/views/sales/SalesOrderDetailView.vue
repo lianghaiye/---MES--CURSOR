@@ -93,21 +93,19 @@
               class="pending-price-alert"
               :message="`订单变更「${pendingPriceChange.changeNo}」待审核，通过前不可申请发货。`"
             />
-            <div class="section-card">
-              <div class="section-title">基本信息</div>
+            <DetailSectionCard title="基本信息">
               <SalesOrderBasicInfoSection :order="order" />
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="price-summary-header">
-                <div class="section-title">价格汇总</div>
+            <DetailSectionCard title="价格汇总">
+              <template #extra>
                 <div class="discount-strategy-row">
                   <span class="strategy-label">折扣策略</span>
                   <a-tag bordered :color="discountStrategyTagColor" class="discount-strategy-tag">
                     {{ discountStrategyLabel }}
                   </a-tag>
                 </div>
-              </div>
+              </template>
 
               <a-row :gutter="[16, 12]" class="price-summary-grid">
                 <a-col :span="8">
@@ -203,15 +201,13 @@
                 <span class="reason-label">优惠原因</span>
                 <span class="reason-text">{{ order.orderDiscountReason }}</span>
               </div>
-            </div>
+            </DetailSectionCard>
 
-            <div v-if="showLiveStockRemind" class="section-card">
-              <div class="section-title">库存提醒</div>
+            <DetailSectionCard v-if="showLiveStockRemind" title="库存提醒">
               <SalesOrderStockRemindPanel :order="order" />
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title">销售明细</div>
+            <DetailSectionCard title="销售明细">
               <a-table
                 :columns="lineColumns"
                 :data-source="order.lineItems || []"
@@ -286,68 +282,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
-
-            <div class="section-card">
-              <div class="section-title">工业标识</div>
-              <div class="section-hint">
-                审核时按「现货占用 + 排产缺口」预申请
-                SN。成品入库不自动挂码；小程序装牌确认后再挂到实物。失败或部分成功时可重试 /
-                补申请。
-              </div>
-              <a-table
-                :columns="industrialLabelLineColumns"
-                :data-source="industrialLabelRows"
-                row-key="id"
-                size="small"
-                bordered
-                :pagination="false"
-                :scroll="{ x: 720 }"
-                :locale="{ emptyText: '本单无需工业标识' }"
-              >
-                <template #bodyCell="{ column, record: row }">
-                  <template v-if="column.key === 'need'">
-                    {{ row.needIndustrialLabel ? '是' : '否' }}
-                  </template>
-                  <template v-else-if="column.key === 'status'">
-                    <a-tag
-                      v-if="row.status && row.status !== '—'"
-                      :color="industrialLabelStatusColor(row.status)"
-                    >
-                      {{ row.status }}
-                    </a-tag>
-                    <span v-else>—</span>
-                  </template>
-                  <template v-else-if="column.key === 'action'">
-                    <a-space v-if="canOperateIndustrialLabel">
-                      <a
-                        v-if="row.canRetry"
-                        class="link-code"
-                        @click.prevent="handleRetryIndustrialLabel(row)"
-                      >
-                        重试
-                      </a>
-                      <a
-                        v-if="row.canSupplement"
-                        class="link-code"
-                        @click.prevent="openSupplementIndustrialLabel(row)"
-                      >
-                        补申请
-                      </a>
-                    </a-space>
-                    <span v-else>—</span>
-                  </template>
-                  <template v-else>
-                    {{ row[column.dataIndex] ?? '—' }}
-                  </template>
-                </template>
-              </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'ebom-info'">
-            <div class="section-card">
-              <div class="section-title">EBOM 信息</div>
+            <DetailSectionCard title="EBOM 信息">
               <div class="section-hint">
                 展示各明细行现行
                 EBOM（始终为最新版本）；「初始版本」为订单审核通过时生成的快照版本。
@@ -385,10 +324,9 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
 
-            <div v-if="bomChangedLines.length" class="section-card">
-              <div class="section-title">EBOM 版本变更</div>
+            <DetailSectionCard v-if="bomChangedLines.length" title="EBOM 版本变更">
               <div v-for="line in bomChangedLines" :key="line.id" class="bom-product-block">
                 <div class="bom-line-head">
                   <span class="bom-product-name">{{ line.productName }}</span>
@@ -406,12 +344,11 @@
                 />
                 <SalesOrderEbomDiffSection :line="line" />
               </div>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'shipping'">
-            <div class="section-card">
-              <div class="section-title">发货申请</div>
+            <DetailSectionCard title="发货申请">
               <a-table
                 :columns="deliveryColumns"
                 :data-source="relations.deliveryApplications"
@@ -451,9 +388,8 @@
                   </template>
                 </template>
               </a-table>
-            </div>
-            <div class="section-card shipping-outbound-section">
-              <div class="section-title">出库信息</div>
+            </DetailSectionCard>
+            <DetailSectionCard title="出库信息" class="shipping-outbound-section">
               <a-table
                 :columns="outboundColumns"
                 :data-source="outboundRows"
@@ -490,12 +426,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'inbound'">
-            <div class="section-card">
-              <div class="section-title">入库信息</div>
+            <DetailSectionCard title="入库信息">
               <a-table
                 :columns="inboundLineColumns"
                 :data-source="inboundRows"
@@ -527,12 +462,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'purchase'">
-            <div class="section-card">
-              <div class="section-title">采购申请</div>
+            <DetailSectionCard title="采购申请">
               <a-table
                 :columns="purchaseReqColumns"
                 :data-source="relations.purchaseRequisitions"
@@ -572,9 +506,8 @@
                   </template>
                 </template>
               </a-table>
-            </div>
-            <div class="section-card">
-              <div class="section-title">采购订单</div>
+            </DetailSectionCard>
+            <DetailSectionCard title="采购订单">
               <a-table
                 :columns="purchaseOrderColumns"
                 :data-source="relations.purchaseOrders"
@@ -621,12 +554,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'production'">
-            <div class="section-card">
-              <div class="section-title">生产计划</div>
+            <DetailSectionCard title="生产计划">
               <a-table
                 :columns="planColumns"
                 :data-source="relations.productionPlans"
@@ -655,9 +587,8 @@
                   </template>
                 </template>
               </a-table>
-            </div>
-            <div class="section-card">
-              <div class="section-title">生产工单</div>
+            </DetailSectionCard>
+            <DetailSectionCard title="生产工单">
               <a-table
                 :columns="productionWorkOrderColumns"
                 :data-source="relations.workOrders"
@@ -695,9 +626,8 @@
                   </template>
                 </template>
               </a-table>
-            </div>
-            <div class="section-card">
-              <div class="section-title">总装工单</div>
+            </DetailSectionCard>
+            <DetailSectionCard title="总装工单">
               <a-table
                 :columns="assemblyWorkOrderColumns"
                 :data-source="relations.assemblyWorkOrders"
@@ -734,12 +664,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'outsourcing'">
-            <div class="section-card">
-              <div class="section-title">外协订单</div>
+            <DetailSectionCard title="外协订单">
               <a-table
                 :columns="outsourcingColumns"
                 :data-source="relations.outsourcingOrders"
@@ -793,12 +722,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'attachments'">
-            <div class="section-card">
-              <div class="section-title">附件信息</div>
+            <DetailSectionCard title="附件信息">
               <a-table
                 v-if="relations.attachments.length"
                 :columns="attachmentColumns"
@@ -818,19 +746,17 @@
                 </template>
               </a-table>
               <a-empty v-else description="暂无附件" />
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'price-change'">
-            <div class="section-card">
-              <div class="section-title">订单变更履历</div>
+            <DetailSectionCard title="订单变更履历">
               <SalesPriceChangeHistoryPanel :order="order" />
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'industrial-label'">
-            <div class="section-card">
-              <div class="section-title">工业标识申请摘要</div>
+            <DetailSectionCard title="工业标识申请摘要">
               <a-table
                 :columns="industrialLabelLineColumns"
                 :data-source="industrialLabelRows"
@@ -878,11 +804,10 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title-row">
-                <div class="section-title">SN / 二维码明细</div>
+            <DetailSectionCard title="SN / 二维码明细">
+              <template #actions>
                 <a-button
                   size="small"
                   :disabled="!industrialLabelSnRows.length"
@@ -890,7 +815,7 @@
                 >
                   导出
                 </a-button>
-              </div>
+              </template>
               <a-table
                 :columns="industrialLabelSnColumns"
                 :data-source="industrialLabelSnRows"
@@ -935,12 +860,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'approval'">
-            <div class="section-card">
-              <div class="section-title">销售订单审批</div>
+            <DetailSectionCard title="销售订单审批">
               <a-divider style="margin: 12px 0" />
               <div v-if="approvalRecords.length" class="history-list">
                 <div v-for="(item, idx) in approvalRecords" :key="idx" class="history-item">
@@ -956,10 +880,9 @@
                 </div>
               </div>
               <a-empty v-else description="暂无销售订单审批记录" />
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title">订单变更审批</div>
+            <DetailSectionCard title="订单变更审批">
               <a-divider style="margin: 12px 0" />
               <div v-if="priceChangeApprovalGroups.length" class="price-change-approval">
                 <div
@@ -993,7 +916,7 @@
                 </div>
               </div>
               <a-empty v-else description="暂无订单变更审批记录" />
-            </div>
+            </DetailSectionCard>
           </template>
         </div>
       </template>
@@ -1101,6 +1024,7 @@ export default { name: 'SalesOrderDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { formatQty } from '@/utils/numberFormat'
 import { normalizeProcurementDocSource } from '@/constants/procurementDocSource'
 import { computed, onActivated, ref, watch } from 'vue'

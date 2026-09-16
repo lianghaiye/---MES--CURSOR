@@ -39,8 +39,7 @@
 
         <div class="tab-body">
           <template v-if="activeTab === 'basic'">
-            <div class="section-card">
-              <div class="section-title">基本信息</div>
+            <DetailSectionCard title="基本信息">
               <InboundOrderBasicInfoSection :record="record">
                 <template #sourceOrderNo>
                   <a v-if="record.sourceOrderNo" class="link-code" @click="goSource">{{
@@ -49,14 +48,13 @@
                   <span v-else>—</span>
                 </template>
               </InboundOrderBasicInfoSection>
-            </div>
+            </DetailSectionCard>
 
             <div v-if="workOrderList.length" class="section-card">
               <InboundWorkOrderList :work-orders="workOrderList" />
             </div>
 
-            <div class="section-card">
-              <div class="section-title">入库明细</div>
+            <DetailSectionCard title="入库明细">
               <a-table
                 :columns="lineColumns"
                 :data-source="record.lineItems || []"
@@ -146,12 +144,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'batches'">
-            <div class="section-card">
-              <div class="section-title">批次详情</div>
+            <DetailSectionCard title="批次详情">
               <a-empty v-if="!batchGroups.length" :image="false" description="暂无入库明细" />
               <div v-for="group in batchGroups" :key="group.key" class="batch-item-block">
                 <div class="batch-item-head">
@@ -237,7 +234,7 @@
                   </template>
                 </a-table>
               </div>
-            </div>
+            </DetailSectionCard>
           </template>
         </div>
       </template>
@@ -252,6 +249,7 @@ export default { name: 'InboundOrderDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTabs } from '@/composables/useTabs'

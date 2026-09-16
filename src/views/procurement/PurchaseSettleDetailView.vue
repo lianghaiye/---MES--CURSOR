@@ -16,8 +16,7 @@
 
     <a-empty v-if="!record" description="结算单不存在" />
     <template v-else>
-      <div class="section-card">
-        <div class="section-title">基本信息</div>
+      <DetailSectionCard title="基本信息">
         <a-descriptions :column="3" size="small" bordered>
           <a-descriptions-item label="结算单号">{{ record.settleNo }}</a-descriptions-item>
           <a-descriptions-item label="采购单号">{{ record.purchaseOrderNo }}</a-descriptions-item>
@@ -31,10 +30,9 @@
             record.remark || '—'
           }}</a-descriptions-item>
         </a-descriptions>
-      </div>
+      </DetailSectionCard>
 
-      <div class="section-card">
-        <div class="section-title">结算明细</div>
+      <DetailSectionCard title="结算明细">
         <a-table
           :columns="columns"
           :data-source="record.lineItems || []"
@@ -55,7 +53,7 @@
             </template>
           </template>
         </a-table>
-      </div>
+      </DetailSectionCard>
     </template>
   </div>
 </template>
@@ -65,6 +63,7 @@ export default { name: 'PurchaseSettleDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'

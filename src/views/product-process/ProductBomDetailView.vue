@@ -69,29 +69,26 @@
                 @mousedown.prevent="onResizeMouseDown"
               />
               <main class="right-panel">
-                <div class="section-card info-card">
-                  <div class="info-block">
-                    <div class="section-title">基础信息</div>
-                    <BomBasicInfoSection :bom="record" />
-                  </div>
-                  <div v-if="!isShipBom" class="info-block">
-                    <BomRootProductEditor
-                      readonly
-                      :item-type="record.itemType || 'product'"
-                      :item-id="String(record.itemId || '')"
-                      :item-name="record.itemName || ''"
-                      :item-code="record.itemCode || ''"
-                      :spec-model="record.specModel || ''"
-                      :material="record.material || ''"
-                      :drawing-no="record.drawingNo || ''"
-                      :process-route="record.processRoute || ''"
-                      :tech-params="record.techParams || ''"
-                      :matching-requirements="record.matchingRequirements || record.remark || ''"
-                      @open-detail="openDetailRootItem"
-                    />
-                  </div>
-                </div>
-                <div class="section-card table-section">
+                <DetailSectionCard title="基础信息" class="info-card">
+                  <BomBasicInfoSection :bom="record" />
+                </DetailSectionCard>
+                <DetailSectionCard v-if="!isShipBom" title="根件信息" class="info-card">
+                  <BomRootProductEditor
+                    readonly
+                    :item-type="record.itemType || 'product'"
+                    :item-id="String(record.itemId || '')"
+                    :item-name="record.itemName || ''"
+                    :item-code="record.itemCode || ''"
+                    :spec-model="record.specModel || ''"
+                    :material="record.material || ''"
+                    :drawing-no="record.drawingNo || ''"
+                    :process-route="record.processRoute || ''"
+                    :tech-params="record.techParams || ''"
+                    :matching-requirements="record.matchingRequirements || record.remark || ''"
+                    @open-detail="openDetailRootItem"
+                  />
+                </DetailSectionCard>
+                <DetailSectionCard title="物料明细" class="table-section">
                   <BomMaterialTable
                     readonly
                     :flat-nodes="flatNodes"
@@ -102,26 +99,28 @@
                     :summary-meta="detailSummaryMeta"
                     empty-variant="no-children"
                   />
-                </div>
+                </DetailSectionCard>
               </main>
             </div>
           </div>
         </template>
 
         <template v-else-if="activeTab === 'versions'">
-          <div class="section-card versions-tab-card">
-            <div class="section-title">{{ isShipBom ? '版本变更' : 'BOM 版本变更' }}</div>
+          <DetailSectionCard
+            :title="`${isShipBom ? '版本变更' : 'BOM 版本变更'}`"
+            class="versions-tab-card"
+          >
             <BomVersionHistoryPanel
               :version-group-id="record.versionGroupId"
               :current-bom="record"
               @view-bom="handleVersionViewBom"
               @compare="handleVersionCompare"
             />
-          </div>
+          </DetailSectionCard>
         </template>
 
         <template v-else-if="activeTab === 'logs'">
-          <div class="section-card">
+          <DetailSectionCard title="操作记录">
             <a-table
               :columns="logColumns"
               :data-source="operationLogs"
@@ -130,7 +129,7 @@
               bordered
               :pagination="false"
             />
-          </div>
+          </DetailSectionCard>
         </template>
 
         <BomOverviewModal
@@ -189,6 +188,7 @@ export default { name: 'ProductBomDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

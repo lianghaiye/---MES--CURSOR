@@ -28,7 +28,7 @@
           <a-tab-pane key="system" tab="系统信息" />
         </a-tabs>
 
-        <div class="section-card">
+        <DetailSectionCard title="供应商信息">
           <template v-if="activeTab === 'basic'">
             <a-descriptions bordered size="small" :column="3">
               <a-descriptions-item label="供应商编码">{{ record.code }}</a-descriptions-item>
@@ -182,7 +182,7 @@
               }}</a-descriptions-item>
             </a-descriptions>
           </template>
-        </div>
+        </DetailSectionCard>
       </template>
       <a-empty v-else description="供应商不存在" />
     </a-spin>
@@ -190,6 +190,7 @@
 </template>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getSupplierById } from '@/store/supplierStore'

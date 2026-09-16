@@ -11,8 +11,7 @@
           <a-button size="small" @click="goBack">返回列表</a-button>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基本信息</div>
+        <DetailSectionCard title="基本信息">
           <a-descriptions bordered size="small" :column="3">
             <a-descriptions-item label="工艺路线编号">{{ record.code }}</a-descriptions-item>
             <a-descriptions-item label="名称">{{ record.name }}</a-descriptions-item>
@@ -25,10 +24,9 @@
             <a-descriptions-item label="创建日期">{{ record.createdAt }}</a-descriptions-item>
             <a-descriptions-item label="更新日期">{{ record.updatedAt }}</a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">工序流程（只读）</div>
+        <DetailSectionCard title="工序流程（只读）">
           <a-table
             :columns="stepCols"
             :data-source="flatSteps"
@@ -46,7 +44,7 @@
               </template>
             </template>
           </a-table>
-        </div>
+        </DetailSectionCard>
       </template>
       <a-empty v-else-if="!loading" description="未找到该工艺路线" />
     </a-spin>
@@ -58,6 +56,7 @@ export default { name: 'ProcessRouteDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProcessRouteById } from '@/store/processRouteStore'

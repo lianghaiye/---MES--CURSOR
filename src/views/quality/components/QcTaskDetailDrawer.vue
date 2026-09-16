@@ -7,120 +7,122 @@
     @close="emit('update:open', false)"
   >
     <template v-if="task">
-      <div class="section-title">基本信息</div>
-      <div class="drawer-basic-card">
-        <a-row :gutter="[24, 8]" class="drawer-basic-info">
-          <a-col :span="24">
-            <span class="info-label">质检单号：</span>
-            <span class="info-value">{{ task.qcNo }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">业务类型：</span>
-            <span class="info-value">{{ task.bizScope }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">质检状态：</span>
-            <span class="info-value">
-              <a-tag :color="statusColor(task.qcStatus)">{{ task.qcStatus }}</a-tag>
-            </span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">质检结果：</span>
-            <span class="info-value">
-              <a-tag v-if="task.qcResult" :color="resultColor(task.qcResult)">{{
-                task.qcResult
-              }}</a-tag>
-              <template v-else>—</template>
-            </span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">检验方式：</span>
-            <span class="info-value">{{ task.inspectMethod || '—' }}</span>
-          </a-col>
-          <a-col :span="24">
-            <span class="info-label">质检模板：</span>
-            <span class="info-value">{{ task.templateName || task.templateCode || '—' }}</span>
-          </a-col>
-          <a-col v-if="isInboundScope" :span="24">
-            <span class="info-label">来源单号：</span>
-            <span class="info-value">{{ task.sourceDocNo || '—' }}</span>
-          </a-col>
-          <a-col v-if="isProductionScope" :span="12">
-            <span class="info-label">工单号：</span>
-            <span class="info-value">{{ task.workOrderNo || '—' }}</span>
-          </a-col>
-          <a-col v-if="isProductionScope" :span="12">
-            <span class="info-label">工序：</span>
-            <span class="info-value">{{ task.processName || task.processCode || '—' }}</span>
-          </a-col>
-          <a-col v-if="isProductionScope" :span="12">
-            <span class="info-label">排产批次：</span>
-            <span class="info-value">{{
-              task.scheduleBatchNo != null ? `批次${task.scheduleBatchNo}` : '—'
-            }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">物料编码：</span>
-            <span class="info-value">{{ task.itemCode || '—' }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">物料名称：</span>
-            <span class="info-value">{{ task.itemName || '—' }}</span>
-          </a-col>
-          <a-col :span="24">
-            <span class="info-label">规格型号：</span>
-            <span class="info-value">{{ task.specModel || '—' }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">检验员：</span>
-            <span class="info-value">{{ task.inspector || '—' }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">检验时间：</span>
-            <span class="info-value">{{ task.inspectedAt || '—' }}</span>
-          </a-col>
-          <a-col :span="24">
-            <span class="info-label">创建时间：</span>
-            <span class="info-value">{{ task.createdAt || '—' }}</span>
-          </a-col>
-          <a-col v-if="task.remark" :span="24">
-            <span class="info-label">备注：</span>
-            <span class="info-value">{{ task.remark }}</span>
-          </a-col>
-        </a-row>
-      </div>
+      <DetailSectionCard title="基本信息">
+        <div class="drawer-basic-card">
+          <a-row :gutter="[24, 8]" class="drawer-basic-info">
+            <a-col :span="24">
+              <span class="info-label">质检单号：</span>
+              <span class="info-value">{{ task.qcNo }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">业务类型：</span>
+              <span class="info-value">{{ task.bizScope }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">质检状态：</span>
+              <span class="info-value">
+                <a-tag :color="statusColor(task.qcStatus)">{{ task.qcStatus }}</a-tag>
+              </span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">质检结果：</span>
+              <span class="info-value">
+                <a-tag v-if="task.qcResult" :color="resultColor(task.qcResult)">{{
+                  task.qcResult
+                }}</a-tag>
+                <template v-else>—</template>
+              </span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">检验方式：</span>
+              <span class="info-value">{{ task.inspectMethod || '—' }}</span>
+            </a-col>
+            <a-col :span="24">
+              <span class="info-label">质检模板：</span>
+              <span class="info-value">{{ task.templateName || task.templateCode || '—' }}</span>
+            </a-col>
+            <a-col v-if="isInboundScope" :span="24">
+              <span class="info-label">来源单号：</span>
+              <span class="info-value">{{ task.sourceDocNo || '—' }}</span>
+            </a-col>
+            <a-col v-if="isProductionScope" :span="12">
+              <span class="info-label">工单号：</span>
+              <span class="info-value">{{ task.workOrderNo || '—' }}</span>
+            </a-col>
+            <a-col v-if="isProductionScope" :span="12">
+              <span class="info-label">工序：</span>
+              <span class="info-value">{{ task.processName || task.processCode || '—' }}</span>
+            </a-col>
+            <a-col v-if="isProductionScope" :span="12">
+              <span class="info-label">排产批次：</span>
+              <span class="info-value">{{
+                task.scheduleBatchNo != null ? `批次${task.scheduleBatchNo}` : '—'
+              }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">物料编码：</span>
+              <span class="info-value">{{ task.itemCode || '—' }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">物料名称：</span>
+              <span class="info-value">{{ task.itemName || '—' }}</span>
+            </a-col>
+            <a-col :span="24">
+              <span class="info-label">规格型号：</span>
+              <span class="info-value">{{ task.specModel || '—' }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">检验员：</span>
+              <span class="info-value">{{ task.inspector || '—' }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">检验时间：</span>
+              <span class="info-value">{{ task.inspectedAt || '—' }}</span>
+            </a-col>
+            <a-col :span="24">
+              <span class="info-label">创建时间：</span>
+              <span class="info-value">{{ task.createdAt || '—' }}</span>
+            </a-col>
+            <a-col v-if="task.remark" :span="24">
+              <span class="info-label">备注：</span>
+              <span class="info-value">{{ task.remark }}</span>
+            </a-col>
+          </a-row>
+        </div>
+      </DetailSectionCard>
 
-      <div class="section-title">检验明细</div>
-      <a-table
-        :columns="lineColumns"
-        :data-source="task.lineItems || []"
-        row-key="id"
-        size="small"
-        bordered
-        :pagination="false"
-        v-model:expandedRowKeys="expandedKeys"
-      >
-        <template #expandIcon="{ expanded, onExpand: onExp, record }">
-          <button
-            type="button"
-            class="line-expand-btn"
-            :aria-label="expanded ? '收起检验项' : '展开检验项'"
-            @click="(e) => onExp(record, e)"
-          >
-            <DownOutlined v-if="expanded" />
-            <RightOutlined v-else />
-          </button>
-        </template>
-        <template #expandedRowRender="{ record }">
-          <div class="expand-panel">
-            <QcLineFieldValuesReadonly :line="record" :task="task" />
-          </div>
-        </template>
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-          <template v-else>{{ record[column.dataIndex] ?? '—' }}</template>
-        </template>
-      </a-table>
+      <DetailSectionCard title="检验明细">
+        <a-table
+          :columns="lineColumns"
+          :data-source="task.lineItems || []"
+          row-key="id"
+          size="small"
+          bordered
+          :pagination="false"
+          v-model:expandedRowKeys="expandedKeys"
+        >
+          <template #expandIcon="{ expanded, onExpand: onExp, record }">
+            <button
+              type="button"
+              class="line-expand-btn"
+              :aria-label="expanded ? '收起检验项' : '展开检验项'"
+              @click="(e) => onExp(record, e)"
+            >
+              <DownOutlined v-if="expanded" />
+              <RightOutlined v-else />
+            </button>
+          </template>
+          <template #expandedRowRender="{ record }">
+            <div class="expand-panel">
+              <QcLineFieldValuesReadonly :line="record" :task="task" />
+            </div>
+          </template>
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+            <template v-else>{{ record[column.dataIndex] ?? '—' }}</template>
+          </template>
+        </a-table>
+      </DetailSectionCard>
     </template>
   </a-drawer>
 </template>
@@ -128,6 +130,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { DownOutlined, RightOutlined } from '@ant-design/icons-vue'
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { QC_TASK_STATUS, QC_TASK_RESULT } from '@/store/qcTaskStore'
 import { useDrawerWidth } from '@/composables/useDrawerWidth'
 import QcLineFieldValuesReadonly from './QcLineFieldValuesReadonly.vue'

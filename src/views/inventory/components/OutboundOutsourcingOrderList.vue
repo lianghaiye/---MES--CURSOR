@@ -1,6 +1,6 @@
 <template>
   <div v-if="list.length" class="outbound-wx-list">
-    <div class="section-title">外协订单清单 ({{ list.length }})</div>
+    <div v-if="!hideTitle" class="section-title">外协订单清单 ({{ list.length }})</div>
     <a-table
       :columns="columns"
       :data-source="list"
@@ -38,6 +38,7 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  hideTitle: { type: Boolean, default: false },
 })
 
 const columns = OUTBOUND_OUTSOURCING_ORDER_COLUMNS

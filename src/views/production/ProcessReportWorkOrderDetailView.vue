@@ -13,8 +13,7 @@
           </a-space>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基础信息</div>
+        <DetailSectionCard title="基础信息">
           <div class="basic-info-grid">
             <div class="basic-info-item">
               <span class="basic-info-label">工单编号：</span>
@@ -78,7 +77,7 @@
               }}</span>
             </div>
           </div>
-        </div>
+        </DetailSectionCard>
 
         <div class="section-card">
           <div class="detail-toolbar">
@@ -272,6 +271,7 @@ export default { name: 'ProcessReportWorkOrderDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

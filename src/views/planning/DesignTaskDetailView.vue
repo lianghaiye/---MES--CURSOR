@@ -38,124 +38,114 @@
           </aside>
           <div class="panel-resizer" @mousedown.prevent="onResizeMouseDown" />
           <main class="right-panel">
-            <div class="section-card info-card">
-              <div class="info-block">
-                <div class="section-title">基础信息</div>
-                <a-descriptions :column="3" size="small" bordered class="task-desc">
-                  <a-descriptions-item label="任务编号">{{
-                    task.taskNo || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="状态">
-                    <a-tag :color="designTaskStatusColor(task.status)">{{ task.status }}</a-tag>
-                  </a-descriptions-item>
-                  <a-descriptions-item label="来源">{{
-                    designTaskSourceLabel(task.source)
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="销售订单">{{
-                    task.salesOrderNo || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="客户">{{
-                    task.customerName || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="业务员">{{
-                    task.salesperson || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="产品">{{
-                    task.productName || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="产品属性">{{
-                    task.productAttr || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="规格型号">{{
-                    task.specModel || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="材质">{{ task.material || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="技术参数" :span="3" class="multiline-desc">
-                    {{ task.techParams || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="配套要求" :span="3" class="multiline-desc">
-                    {{ matchingRequirements || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="补充说明" :span="3" class="multiline-desc">
-                    {{ supplementDesc || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="订单附件" :span="3">
-                    <template v-if="orderAttachments.length">
-                      <div class="attachment-list">
-                        <div
-                          v-for="file in orderAttachments"
-                          :key="file.uid || file.name"
-                          class="attachment-row"
-                        >
-                          <span class="attachment-name">{{ file.name || '未命名附件' }}</span>
-                          <span v-if="file.type" class="attachment-meta">{{ file.type }}</span>
-                          <span v-if="file.uploadedAt" class="attachment-meta">{{
-                            file.uploadedAt
-                          }}</span>
-                          <a class="attachment-link" @click="previewFile(file)">预览</a>
-                        </div>
+            <DetailSectionCard title="基础信息" class="info-card">
+              <a-descriptions :column="3" size="small" bordered class="task-desc">
+                <a-descriptions-item label="任务编号">{{ task.taskNo || '—' }}</a-descriptions-item>
+                <a-descriptions-item label="状态">
+                  <a-tag :color="designTaskStatusColor(task.status)">{{ task.status }}</a-tag>
+                </a-descriptions-item>
+                <a-descriptions-item label="来源">{{
+                  designTaskSourceLabel(task.source)
+                }}</a-descriptions-item>
+                <a-descriptions-item label="销售订单">{{
+                  task.salesOrderNo || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="客户">{{
+                  task.customerName || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="业务员">{{
+                  task.salesperson || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="产品">{{
+                  task.productName || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="产品属性">{{
+                  task.productAttr || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="规格型号">{{
+                  task.specModel || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="材质">{{ task.material || '—' }}</a-descriptions-item>
+                <a-descriptions-item label="技术参数" :span="3" class="multiline-desc">
+                  {{ task.techParams || '—' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="配套要求" :span="3" class="multiline-desc">
+                  {{ matchingRequirements || '—' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="补充说明" :span="3" class="multiline-desc">
+                  {{ supplementDesc || '—' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="订单附件" :span="3">
+                  <template v-if="orderAttachments.length">
+                    <div class="attachment-list">
+                      <div
+                        v-for="file in orderAttachments"
+                        :key="file.uid || file.name"
+                        class="attachment-row"
+                      >
+                        <span class="attachment-name">{{ file.name || '未命名附件' }}</span>
+                        <span v-if="file.type" class="attachment-meta">{{ file.type }}</span>
+                        <span v-if="file.uploadedAt" class="attachment-meta">{{
+                          file.uploadedAt
+                        }}</span>
+                        <a class="attachment-link" @click="previewFile(file)">预览</a>
                       </div>
-                    </template>
-                    <span v-else>—</span>
-                  </a-descriptions-item>
-                  <a-descriptions-item label="EBOM">{{ task.ebomName || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="EBOM编码">{{
-                    task.ebomCode || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="设计人">{{
-                    task.designer || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="设计时间">{{
-                    task.designTime || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="校核人">{{
-                    task.checker || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="校核时间">{{
-                    task.checkTime || '—'
-                  }}</a-descriptions-item>
-                </a-descriptions>
-              </div>
+                    </div>
+                  </template>
+                  <span v-else>—</span>
+                </a-descriptions-item>
+                <a-descriptions-item label="EBOM">{{ task.ebomName || '—' }}</a-descriptions-item>
+                <a-descriptions-item label="EBOM编码">{{
+                  task.ebomCode || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="设计人">{{ task.designer || '—' }}</a-descriptions-item>
+                <a-descriptions-item label="设计时间">{{
+                  task.designTime || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="校核人">{{ task.checker || '—' }}</a-descriptions-item>
+                <a-descriptions-item label="校核时间">{{
+                  task.checkTime || '—'
+                }}</a-descriptions-item>
+              </a-descriptions>
+            </DetailSectionCard>
 
-              <div class="info-block">
-                <div class="section-title">父级物料信息</div>
-                <a-descriptions :column="3" size="small" bordered class="task-desc">
-                  <a-descriptions-item label="物品名称">{{
-                    selectedParentInfo?.itemName || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="规格型号">{{
-                    selectedParentInfo?.specModel || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item v-if="isSelectedRoot" label="EBOM版本">
-                    {{ ebom?.version || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="材质">{{
-                    selectedParentInfo?.material || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="图号">{{
-                    selectedParentInfo?.drawingNo || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="工艺路线">{{
-                    selectedParentInfo?.processRoute || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="技术参数" class="multiline-desc">
-                    {{ selectedParentInfo?.techParams || '—' }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="配套要求" :span="2" class="multiline-desc">
-                    {{ selectedParentInfo?.matchingRequirements || '—' }}
-                  </a-descriptions-item>
-                </a-descriptions>
-              </div>
-            </div>
+            <DetailSectionCard title="父级物料信息" class="info-card">
+              <a-descriptions :column="3" size="small" bordered class="task-desc">
+                <a-descriptions-item label="物品名称">{{
+                  selectedParentInfo?.itemName || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="规格型号">{{
+                  selectedParentInfo?.specModel || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item v-if="isSelectedRoot" label="EBOM版本">
+                  {{ ebom?.version || '—' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="材质">{{
+                  selectedParentInfo?.material || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="图号">{{
+                  selectedParentInfo?.drawingNo || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="工艺路线">{{
+                  selectedParentInfo?.processRoute || '—'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="技术参数" class="multiline-desc">
+                  {{ selectedParentInfo?.techParams || '—' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="配套要求" :span="2" class="multiline-desc">
+                  {{ selectedParentInfo?.matchingRequirements || '—' }}
+                </a-descriptions-item>
+              </a-descriptions>
+            </DetailSectionCard>
 
-            <div class="section-card table-section">
+            <DetailSectionCard title="物料明细" class="table-section">
               <BomMaterialTable
                 readonly
                 :lines="displayLines"
                 :column-settings="columnSettings"
                 empty-variant="no-children"
               />
-            </div>
+            </DetailSectionCard>
           </main>
         </div>
       </template>
@@ -169,6 +159,7 @@ export default { name: 'DesignTaskDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

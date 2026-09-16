@@ -38,13 +38,14 @@
 
       <div class="tab-body">
         <template v-if="activeTab === 'basic'">
-          <div class="section-card">
-            <div class="section-title">基本信息</div>
+          <DetailSectionCard title="基本信息">
             <MaterialRequisitionBasicInfoSection :record="record" />
-          </div>
+          </DetailSectionCard>
 
-          <div v-if="workOrderList.length" class="section-card">
-            <div class="section-title">工单清单（{{ workOrderList.length }}）</div>
+          <DetailSectionCard
+            v-if="workOrderList.length"
+            :title="`工单清单（${workOrderList.length}）`"
+          >
             <a-table
               :columns="woColumns"
               :data-source="workOrderList"
@@ -69,12 +70,11 @@
                 <template v-else-if="column.key === 'planQty'">{{ row.planQty ?? '—' }}</template>
               </template>
             </a-table>
-          </div>
+          </DetailSectionCard>
 
-          <div class="section-card">
-            <div class="section-title">
-              领料明细（{{ record.lineCount || 0 }} 项 / 合计 {{ record.totalQty || 0 }}）
-            </div>
+          <DetailSectionCard
+            :title="`领料明细（${record.lineCount || 0} 项 / 合计 ${record.totalQty || 0}）`"
+          >
             <a-table
               :columns="lineColumns"
               :data-source="record.lines || []"
@@ -121,7 +121,7 @@
                 </template>
               </template>
             </a-table>
-          </div>
+          </DetailSectionCard>
 
           <div class="tip-card">
             <template v-if="record.auditStatus === MATERIAL_REQ_AUDIT.PENDING">
@@ -142,8 +142,7 @@
         </template>
 
         <template v-else-if="activeTab === 'outbound'">
-          <div class="section-card">
-            <div class="section-title">出库信息</div>
+          <DetailSectionCard title="出库信息">
             <a-table
               :columns="outboundColumns"
               :data-source="outboundRows"
@@ -177,7 +176,7 @@
                 </template>
               </template>
             </a-table>
-          </div>
+          </DetailSectionCard>
         </template>
       </div>
     </template>
@@ -189,6 +188,7 @@ export default { name: 'MaterialRequisitionDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'

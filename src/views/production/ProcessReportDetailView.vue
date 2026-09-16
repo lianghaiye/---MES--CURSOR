@@ -14,8 +14,7 @@
           </a-space>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基础信息</div>
+        <DetailSectionCard title="基础信息">
           <a-descriptions bordered size="small" :column="3">
             <a-descriptions-item label="物品编码">{{ bundle.materialCode }}</a-descriptions-item>
             <a-descriptions-item label="物品名称">{{ bundle.materialName }}</a-descriptions-item>
@@ -27,7 +26,7 @@
             }}</a-descriptions-item>
             <a-descriptions-item label="EBOM" :span="3">{{ bundle.ebomLabel }}</a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
         <div class="section-card">
           <div class="detail-toolbar">
@@ -184,6 +183,7 @@ export default { name: 'ProcessReportDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

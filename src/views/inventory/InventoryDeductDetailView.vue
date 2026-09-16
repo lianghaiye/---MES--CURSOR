@@ -68,8 +68,7 @@
           message="单据已作废：预扣已解冻退回，不可再重新发起。"
         />
 
-        <div class="section-card">
-          <div class="section-title">基本信息</div>
+        <DetailSectionCard title="基本信息">
           <a-descriptions :column="3" size="small" bordered>
             <a-descriptions-item label="工单/领料单号">
               {{ resolveInventoryDeductDocNo(record) || '—' }}
@@ -111,10 +110,9 @@
               {{ record.revokeRemark }}
             </a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">扣减明细（{{ record.lines?.length || 0 }}）</div>
+        <DetailSectionCard :title="`扣减明细（${record.lines?.length || 0}）`">
           <a-table
             :columns="lineColumns"
             :data-source="record.lines || []"
@@ -156,7 +154,7 @@
               </template>
             </template>
           </a-table>
-        </div>
+        </DetailSectionCard>
       </template>
     </div>
 
@@ -169,6 +167,7 @@ export default { name: 'InventoryDeductDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, createVNode, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'

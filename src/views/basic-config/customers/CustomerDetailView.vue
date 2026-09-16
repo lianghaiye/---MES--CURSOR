@@ -31,7 +31,7 @@
           <a-tab-pane key="system" tab="系统信息" />
         </a-tabs>
 
-        <div class="section-card">
+        <DetailSectionCard title="客户信息">
           <template v-if="activeTab === 'basic'">
             <a-descriptions bordered size="small" :column="3">
               <a-descriptions-item label="客户编码">{{ record.code }}</a-descriptions-item>
@@ -278,7 +278,7 @@
               }}</a-descriptions-item>
             </a-descriptions>
           </template>
-        </div>
+        </DetailSectionCard>
       </template>
       <a-empty v-else-if="!loading" description="未找到该客户" />
     </a-spin>
@@ -286,6 +286,7 @@
 </template>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customerState, getCustomerById } from '@/store/customerStore'

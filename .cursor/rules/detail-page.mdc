@@ -100,10 +100,36 @@ alwaysApply: true
 | 行为 | 与列表「生成入库单」同一套弹窗与回写（`GenerateInboundOrderModal` / `OutsourcingGenerateInboundModal` + `attachQcTaskInboundOrder`） |
 | 已入库 | 已有入库单号则**不展示**该按钮 |
 
+## 内容区块展开 / 收起（强制）
+
+详情页**每一个有内容的区块**（基本信息、价格汇总、库存提醒、各类明细/子表、审批、附件等）均须支持展开 / 收起。
+
+| 项 | 约定 |
+|----|------|
+| 组件 | 优先 `@DetailSectionCard.vue`（`section-card` + 标题行 + 折叠） |
+| 按钮位置 | 区块标题行**右侧** |
+| 样式 | **蓝色文字链**（`a-button type="link" size="small"`）+ **▾ / ▴** |
+| 文案 | 展开态：`收起 ▴`；收起态：`展开 ▾` |
+| 默认 | **默认展开**；标题行右侧可另放业务操作（`#actions`），折叠按钮仍在最右 |
+| 禁止 | ❌ 用图标按钮或灰色次按钮代替文字链；❌ 有内容区块无折叠入口 |
+
+```vue
+<DetailSectionCard title="基本信息">
+  <SalesOrderBasicInfoSection :order="order" />
+</DetailSectionCard>
+
+<DetailSectionCard title="销售明细">
+  <template #actions>
+    <a-button size="small">导出</a-button>
+  </template>
+  <a-table … />
+</DetailSectionCard>
+```
+
 ## 汇总 / 子表区块
 
-- 每个子表前有**独立标题**，**可折叠**
-- 子表操作按钮在子表**左上方**，收纳规则同工具栏（≤6~8，超出「更多」）
+- 每个子表前有**独立标题**，**可折叠**（同上）
+- 子表操作按钮在标题行右侧（`#actions`）或子表**左上方**，收纳规则同工具栏（≤6~8，超出「更多」）
 - 子表本身只读；行内「详情」链接可跳转关联单据
 
 ## 只读样式

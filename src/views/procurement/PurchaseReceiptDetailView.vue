@@ -57,8 +57,7 @@
 
         <div class="tab-body">
           <template v-if="activeTab === 'basic'">
-            <div class="section-card">
-              <div class="section-title">基本信息</div>
+            <DetailSectionCard title="基本信息">
               <PurchaseReceiptBasicInfoSection :record="record">
                 <template #purchaseOrderNo>
                   <a
@@ -71,10 +70,9 @@
                   <span v-else>{{ record.purchaseOrderNo || '—' }}</span>
                 </template>
               </PurchaseReceiptBasicInfoSection>
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title">收货明细</div>
+            <DetailSectionCard title="收货明细">
               <a-table
                 :columns="lineColumns"
                 :data-source="record.lineItems || []"
@@ -109,12 +107,11 @@
                 <span class="summary-item">行数：{{ lineSummary.lineCount }}</span>
                 <span class="summary-item">收货数量：{{ formatQty(lineSummary.totalQty) }}</span>
               </div>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'qc'">
-            <div class="section-card">
-              <div class="section-title">质检信息</div>
+            <DetailSectionCard title="质检信息">
               <a-table
                 :columns="qcColumns"
                 :data-source="qcRows"
@@ -161,12 +158,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'inbound'">
-            <div class="section-card">
-              <div class="section-title">入库信息</div>
+            <DetailSectionCard title="入库信息">
               <a-table
                 :columns="inboundLineColumns"
                 :data-source="relatedInboundLines"
@@ -198,7 +194,7 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
         </div>
 
@@ -223,6 +219,7 @@ export default { name: 'PurchaseReceiptDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

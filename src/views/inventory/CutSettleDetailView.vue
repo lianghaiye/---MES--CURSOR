@@ -20,8 +20,7 @@
     <a-empty v-if="!record" description="结算单不存在或已删除" />
 
     <template v-else>
-      <div class="section-card">
-        <div class="section-title">基本信息</div>
+      <DetailSectionCard title="基本信息">
         <a-descriptions size="small" bordered :column="3">
           <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
           <a-descriptions-item label="结算单号">{{ record.docNo }}</a-descriptions-item>
@@ -48,10 +47,9 @@
             {{ record.remark }}
           </a-descriptions-item>
         </a-descriptions>
-      </div>
+      </DetailSectionCard>
 
-      <div class="section-card">
-        <div class="section-title">结算明细（{{ record.lines?.length || 0 }}）</div>
+      <DetailSectionCard :title="`结算明细（${record.lines?.length || 0}）`">
         <a-table
           :columns="lineColumns"
           :data-source="record.lines || []"
@@ -100,7 +98,7 @@
             </template>
           </template>
         </a-table>
-      </div>
+      </DetailSectionCard>
 
       <div v-if="isConfirmMode" class="page-footer">
         <a-button @click="goBack">取消</a-button>
@@ -118,6 +116,7 @@ export default { name: 'CutSettleDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'

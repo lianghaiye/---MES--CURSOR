@@ -21,8 +21,7 @@
           </a-space>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基础信息</div>
+        <DetailSectionCard title="基础信息">
           <a-descriptions bordered size="small" :column="3">
             <a-descriptions-item v-if="bundle.isWorkOrderRegistration" label="工单编号">
               <a-space :size="6">
@@ -40,10 +39,9 @@
             }}</a-descriptions-item>
             <a-descriptions-item label="EBOM" :span="3">{{ bundle.ebomLabel }}</a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">报工详情</div>
+        <DetailSectionCard title="报工详情">
           <a-table
             :columns="lineColumns"
             :data-source="bundle.lines"
@@ -87,7 +85,7 @@
           <div v-if="summaryLine" class="wage-summary-wrap">
             <ProcessReportWageSummary :line="summaryLine" />
           </div>
-        </div>
+        </DetailSectionCard>
       </template>
 
       <template v-else-if="record">
@@ -109,8 +107,7 @@
           </a-space>
         </div>
 
-        <div v-if="isWorkOrderRegistration" class="section-card">
-          <div class="section-title">工单信息</div>
+        <DetailSectionCard v-if="isWorkOrderRegistration" title="工单信息">
           <a-descriptions bordered size="small" :column="3">
             <a-descriptions-item label="工单编号">{{ record.workOrderNo }}</a-descriptions-item>
             <a-descriptions-item label="产品">{{ record.productName }}</a-descriptions-item>
@@ -118,10 +115,9 @@
               record.registrationType
             }}</a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">基础信息</div>
+        <DetailSectionCard title="基础信息">
           <a-descriptions bordered size="small" :column="3">
             <a-descriptions-item v-if="!isWorkOrderRegistration" label="产品名称">
               {{ record.productName }}
@@ -142,10 +138,9 @@
               record.createdAt || '—'
             }}</a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">报工信息</div>
+        <DetailSectionCard title="报工信息">
           <a-alert
             type="warning"
             show-icon
@@ -170,7 +165,7 @@
               record.remark || '—'
             }}</a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
       </template>
 
       <a-empty v-else-if="!loading" description="未找到该登记记录" />
@@ -197,6 +192,7 @@ export default { name: 'ReportWorkDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'

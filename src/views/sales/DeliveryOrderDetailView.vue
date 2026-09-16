@@ -29,13 +29,11 @@
 
         <div class="tab-body">
           <template v-if="activeTab === 'basic'">
-            <div class="section-card">
-              <div class="section-title">基本信息</div>
+            <DetailSectionCard title="基本信息">
               <DeliveryOrderBasicInfoSection :order="record" @go-sales="goSalesOrder" />
-            </div>
+            </DetailSectionCard>
 
-            <div v-if="record.lineItems?.length" class="section-card">
-              <div class="section-title">整机发货明细</div>
+            <DetailSectionCard v-if="record.lineItems?.length" title="整机发货明细">
               <a-table
                 class="delivery-line-table"
                 :columns="wholeColumns"
@@ -91,9 +89,8 @@
                   </template>
                 </template>
               </a-table>
-            </div>
-            <div v-if="record.scatterShipments?.length" class="section-card">
-              <div class="section-title">散件发运</div>
+            </DetailSectionCard>
+            <DetailSectionCard v-if="record.scatterShipments?.length" title="散件发运">
               <div v-for="ship in record.scatterShipments" :key="ship.id" class="scatter-block">
                 <div class="scatter-head">{{ ship.productName }}（{{ ship.productCode }}）</div>
                 <a-table
@@ -106,9 +103,8 @@
                   :scroll="{ x: 720 }"
                 />
               </div>
-            </div>
-            <div v-if="record.shipAttachments?.length" class="section-card">
-              <div class="section-title">发货附件</div>
+            </DetailSectionCard>
+            <DetailSectionCard v-if="record.shipAttachments?.length" title="发货附件">
               <a-table
                 :columns="shipAttachmentColumns"
                 :data-source="record.shipAttachments"
@@ -142,7 +138,7 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
             <a-empty
               v-if="
                 !record.lineItems?.length &&
@@ -154,8 +150,7 @@
           </template>
 
           <template v-else-if="activeTab === 'outbound'">
-            <div class="section-card">
-              <div class="section-title">出库信息</div>
+            <DetailSectionCard title="出库信息">
               <a-table
                 :columns="outboundColumns"
                 :data-source="outboundRows"
@@ -189,7 +184,7 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
         </div>
       </template>
@@ -205,6 +200,7 @@ export default { name: 'DeliveryOrderDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tabStore, useTabs } from '@/composables/useTabs'

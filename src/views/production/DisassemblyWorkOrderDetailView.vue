@@ -46,8 +46,7 @@
           </a-step>
         </a-steps>
 
-        <div class="section-card">
-          <div class="section-title">订单基础信息</div>
+        <DetailSectionCard title="订单基础信息">
           <a-descriptions :column="4" size="small" bordered>
             <a-descriptions-item label="工单编号">{{ order.code }}</a-descriptions-item>
             <a-descriptions-item label="工单类型">{{ order.orderType }}</a-descriptions-item>
@@ -85,7 +84,7 @@
               order.remark || '—'
             }}</a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
         <a-tabs v-model:active-key="activeTab" class="detail-tabs">
           <a-tab-pane key="product" tab="产品明细" />
@@ -217,6 +216,7 @@ export default { name: 'DisassemblyWorkOrderDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

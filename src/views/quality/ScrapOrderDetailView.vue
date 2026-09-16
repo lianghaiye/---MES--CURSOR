@@ -30,8 +30,7 @@
           </a-space>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基础信息</div>
+        <DetailSectionCard title="基础信息">
           <a-descriptions :column="3" size="small" bordered class="basic-desc">
             <a-descriptions-item label="报废单号">{{ record.scrapNo }}</a-descriptions-item>
             <a-descriptions-item label="来源工单">{{
@@ -65,10 +64,9 @@
               {{ record.auditComment || '—' }}
             </a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">报废明细</div>
+        <DetailSectionCard title="报废明细">
           <a-table
             :columns="scrapLineCols"
             :data-source="scrapLines"
@@ -87,10 +85,9 @@
               </template>
             </template>
           </a-table>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">补料单明细</div>
+        <DetailSectionCard title="补料单明细">
           <a-table
             :columns="replenishCols"
             :data-source="replenishRows"
@@ -113,10 +110,9 @@
               </template>
             </template>
           </a-table>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">处置明细</div>
+        <DetailSectionCard title="处置明细">
           <a-table
             :columns="disposalCols"
             :data-source="disposalRows"
@@ -139,7 +135,7 @@
               </template>
             </template>
           </a-table>
-        </div>
+        </DetailSectionCard>
       </template>
 
       <a-empty v-else-if="!loading" description="未找到该报废单" />
@@ -155,6 +151,7 @@ export default { name: 'ScrapOrderDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getScrapOrderById } from '@/store/scrapOrderStore'

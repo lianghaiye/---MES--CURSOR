@@ -67,8 +67,7 @@
 
         <div class="tab-body">
           <template v-if="infoTab === 'basic'">
-            <div class="section-card">
-              <div class="section-title">基本信息</div>
+            <DetailSectionCard title="基本信息">
               <OutboundOrderBasicInfoSection
                 :record="record"
                 :is-material-req-outbound="isMaterialReqOutbound"
@@ -90,7 +89,7 @@
                   <span v-else>—</span>
                 </template>
               </OutboundOrderBasicInfoSection>
-            </div>
+            </DetailSectionCard>
 
             <div v-if="workOrderList.length" class="section-card">
               <OutboundWorkOrderList :work-orders="workOrderList" />
@@ -100,8 +99,7 @@
               <OutboundOutsourcingOrderList :outsourcing-orders="outsourcingOrderList" />
             </div>
 
-            <div class="section-card">
-              <div class="section-title">出库明细</div>
+            <DetailSectionCard title="出库明细">
               <a-table
                 :columns="lineColumns"
                 :data-source="record.lineItems || []"
@@ -214,11 +212,11 @@
                   </a-table-summary>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="infoTab === 'cutSettle'">
-            <div class="section-card">
+            <DetailSectionCard title="下料结算">
               <a-table
                 :columns="cutSettleColumns"
                 :data-source="relatedCutSettles"
@@ -247,11 +245,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="infoTab === 'logs'">
-            <div class="section-card">
+            <DetailSectionCard title="操作日志">
               <a-table
                 :columns="logColumns"
                 :data-source="operationLogs"
@@ -261,7 +259,7 @@
                 :pagination="false"
                 :locale="{ emptyText: '暂无操作日志' }"
               />
-            </div>
+            </DetailSectionCard>
           </template>
         </div>
       </template>
@@ -284,6 +282,7 @@ export default { name: 'OutboundOrderDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

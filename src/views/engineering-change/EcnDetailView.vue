@@ -17,28 +17,24 @@
           </a-space>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基本信息</div>
+        <DetailSectionCard title="基本信息">
           <EcnBasicInfoSection :record="record" :module-config="moduleConfig" />
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">变更技术内容</div>
+        <DetailSectionCard title="变更技术内容">
           <EcnChangeItemsReadonlyTable :items="changeItems" />
-        </div>
+        </DetailSectionCard>
 
         <template v-if="showPostApprovalSections">
-          <div class="section-card">
-            <div class="section-title">BOM版本变更信息</div>
+          <DetailSectionCard title="BOM版本变更信息">
             <EcnBomVersionTimeline
               :items="bomVersionHistory"
               @view-bom="handleViewBom"
               @compare="handleCompare"
             />
-          </div>
+          </DetailSectionCard>
 
-          <div class="section-card">
-            <div class="section-title">审批记录</div>
+          <DetailSectionCard title="审批记录">
             <a-divider style="margin: 12px 0" />
             <div v-if="historyRecords.length" class="history-list">
               <div v-for="(item, idx) in historyRecords" :key="idx" class="history-item">
@@ -54,7 +50,7 @@
               </div>
             </div>
             <a-empty v-else description="暂无审批记录" />
-          </div>
+          </DetailSectionCard>
         </template>
       </template>
     </a-spin>
@@ -68,6 +64,7 @@ export default { name: 'EcnDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

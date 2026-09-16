@@ -61,8 +61,7 @@
 
       <a-tab-pane key="basic" tab="基本信息">
         <div class="tab-scroll-body">
-          <div class="section-card">
-            <div class="section-title">基本信息</div>
+          <DetailSectionCard title="基本信息">
             <OutboundOrderBasicInfoSection
               :record="record"
               :is-material-req-outbound="isMaterialReqOutbound"
@@ -77,18 +76,17 @@
                 <span>{{ linkedQcNo || '—' }}</span>
               </template>
             </OutboundOrderBasicInfoSection>
-          </div>
+          </DetailSectionCard>
 
-          <div v-if="workOrderList.length" class="section-card">
-            <OutboundWorkOrderList :work-orders="workOrderList" />
-          </div>
+          <DetailSectionCard v-if="workOrderList.length" title="工单清单">
+            <OutboundWorkOrderList hide-title :work-orders="workOrderList" />
+          </DetailSectionCard>
 
-          <div v-if="outsourcingOrderList.length" class="section-card">
-            <OutboundOutsourcingOrderList :outsourcing-orders="outsourcingOrderList" />
-          </div>
+          <DetailSectionCard v-if="outsourcingOrderList.length" title="外协订单清单">
+            <OutboundOutsourcingOrderList hide-title :outsourcing-orders="outsourcingOrderList" />
+          </DetailSectionCard>
 
-          <div class="section-card">
-            <div class="section-title">出库明细</div>
+          <DetailSectionCard title="出库明细">
             <a-table
               :columns="lineColumns"
               :data-source="lineItems"
@@ -175,7 +173,7 @@
                 </template>
               </template>
             </a-table>
-          </div>
+          </DetailSectionCard>
         </div>
       </a-tab-pane>
 
@@ -185,7 +183,7 @@
         :tab="`下料结算 (${relatedCutSettles.length})`"
       >
         <div class="tab-scroll-body">
-          <div class="section-card">
+          <DetailSectionCard title="下料结算">
             <a-table
               :columns="cutSettleColumns"
               :data-source="relatedCutSettles"
@@ -209,13 +207,13 @@
                 </template>
               </template>
             </a-table>
-          </div>
+          </DetailSectionCard>
         </div>
       </a-tab-pane>
 
       <a-tab-pane key="logs" tab="操作日志">
         <div class="tab-scroll-body">
-          <div class="section-card">
+          <DetailSectionCard title="操作日志">
             <a-table
               :columns="logColumns"
               :data-source="operationLogs"
@@ -225,7 +223,7 @@
               :pagination="false"
               :locale="{ emptyText: '暂无操作日志' }"
             />
-          </div>
+          </DetailSectionCard>
         </div>
       </a-tab-pane>
     </a-tabs>
@@ -236,6 +234,7 @@
 </template>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { InfoCircleOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'

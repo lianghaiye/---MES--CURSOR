@@ -12,8 +12,7 @@
           </a-button>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基础信息</div>
+        <DetailSectionCard title="基础信息">
           <a-descriptions :column="3" size="small" bordered class="basic-desc">
             <a-descriptions-item label="质检单号">
               {{ record.qcNo || '—' }}
@@ -52,10 +51,9 @@
               {{ record.remark || '—' }}
             </a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">质检明细</div>
+        <DetailSectionCard title="质检明细">
           <a-table
             :columns="lineColumns"
             :data-source="record.lineItems || []"
@@ -95,7 +93,7 @@
             <span class="summary-item">检验数量：{{ summary.inspectQty }}</span>
             <span class="summary-item">明细行数：{{ (record.lineItems || []).length }}</span>
           </div>
-        </div>
+        </DetailSectionCard>
       </template>
 
       <a-empty v-else-if="!loading" description="未找到该出厂质检单" />
@@ -109,6 +107,7 @@ export default { name: 'FactoryQcDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getFactoryQcById, canInspect } from '@/store/factoryQcStore'

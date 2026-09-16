@@ -45,18 +45,16 @@
 
         <div class="tab-body">
           <template v-if="activeTab === 'basic'">
-            <div class="section-card">
-              <div class="section-title">基本信息</div>
+            <DetailSectionCard title="基本信息">
               <PurchaseRequisitionBasicInfoSection
                 :record="record"
                 :active-draft="activeDraft"
                 :draft-source-req-nos="draftSourceReqNos"
                 :default-warehouse="defaultWarehouse"
               />
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title">采购清单</div>
+            <DetailSectionCard title="采购清单">
               <a-table
                 :columns="lineColumns"
                 :data-source="record.lineItems"
@@ -135,12 +133,11 @@
                 <span class="summary-item">项数 {{ summary.lineCount }}</span>
                 <span class="summary-item">数量 {{ formatQty(summary.totalQty) }}</span>
               </div>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'purchase'">
-            <div class="section-card">
-              <div class="section-title">采购信息</div>
+            <DetailSectionCard title="采购信息">
               <a-table
                 :columns="purchaseOrderColumns"
                 :data-source="relatedPurchaseOrders"
@@ -172,7 +169,7 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
         </div>
       </template>
@@ -190,6 +187,7 @@ export default { name: 'PurchaseRequisitionDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

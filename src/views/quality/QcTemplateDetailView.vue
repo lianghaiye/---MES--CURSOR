@@ -24,9 +24,9 @@
           </a-space>
         </div>
 
-        <div class="section-card">
+        <DetailSectionCard title="模板详情">
           <QcTemplateDetailPanel :record="record" :table-scroll-y="560" />
-        </div>
+        </DetailSectionCard>
       </template>
     </a-spin>
   </div>
@@ -37,6 +37,7 @@ export default { name: 'QcTemplateDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

@@ -35,8 +35,7 @@
 
       <div class="tab-body">
         <template v-if="activeTab === 'basic'">
-          <div class="section-card">
-            <div class="section-title">基本信息</div>
+          <DetailSectionCard title="基本信息">
             <OutsourcingIssueBasicInfoSection :record="record">
               <template #outsourcingOrderNo>
                 <a class="doc-link" @click="goOutsourcingOrder">{{
@@ -44,10 +43,12 @@
                 }}</a>
               </template>
             </OutsourcingIssueBasicInfoSection>
-          </div>
+          </DetailSectionCard>
 
-          <div v-if="productSetRows.length" class="section-card">
-            <div class="section-title">外协产品套数（{{ productSetRows.length }}）</div>
+          <DetailSectionCard
+            v-if="productSetRows.length"
+            :title="`外协产品套数（${productSetRows.length}）`"
+          >
             <a-table
               :columns="productSetColumns"
               :data-source="productSetRows"
@@ -69,10 +70,9 @@
                 </template>
               </template>
             </a-table>
-          </div>
+          </DetailSectionCard>
 
-          <div class="section-card">
-            <div class="section-title">发料物料明细（{{ materialRows.length }}）</div>
+          <DetailSectionCard :title="`发料物料明细（${materialRows.length}）`">
             <a-table
               :columns="materialColumns"
               :data-source="materialRows"
@@ -96,12 +96,11 @@
                 </template>
               </template>
             </a-table>
-          </div>
+          </DetailSectionCard>
         </template>
 
         <template v-else-if="activeTab === 'outbound'">
-          <div class="section-card">
-            <div class="section-title">出库信息</div>
+          <DetailSectionCard title="出库信息">
             <a-table
               :columns="outboundColumns"
               :data-source="outboundRows"
@@ -128,7 +127,7 @@
                 </template>
               </template>
             </a-table>
-          </div>
+          </DetailSectionCard>
         </template>
       </div>
     </template>
@@ -140,6 +139,7 @@ export default { name: 'OutsourcingIssueDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { formatQty } from '@/utils/numberFormat'

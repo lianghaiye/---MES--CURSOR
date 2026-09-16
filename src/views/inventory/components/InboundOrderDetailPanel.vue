@@ -36,17 +36,15 @@
     <a-tabs v-model:activeKey="activeTab" class="detail-tabs detail-tabs-pill">
       <a-tab-pane key="basic" tab="基本信息">
         <div class="tab-scroll-body">
-          <div class="section-card">
-            <div class="section-title">基本信息</div>
+          <DetailSectionCard title="基本信息">
             <InboundOrderBasicInfoSection :record="record">
               <template #sourceOrderNo>
                 <span>{{ record.sourceOrderNo || '—' }}</span>
               </template>
             </InboundOrderBasicInfoSection>
-          </div>
+          </DetailSectionCard>
 
-          <div class="section-card">
-            <div class="section-title">入库明细</div>
+          <DetailSectionCard title="入库明细">
             <a-table
               :columns="lineColumns"
               :data-source="lineItems"
@@ -107,7 +105,7 @@
                 </template>
               </template>
             </a-table>
-          </div>
+          </DetailSectionCard>
         </div>
       </a-tab-pane>
     </a-tabs>
@@ -118,6 +116,7 @@
 </template>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 import {

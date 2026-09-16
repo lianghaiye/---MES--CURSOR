@@ -9,145 +9,148 @@
   >
     <template v-if="record">
       <!-- 1. 基本信息 -->
-      <div class="section-title">基本信息</div>
-      <div class="drawer-section-card">
-        <a-row :gutter="[24, 10]" class="drawer-info">
-          <a-col :span="12">
-            <span class="info-label">状态：</span>
-            <span class="info-value">
-              <a-tag :color="record.status === '启用' ? 'success' : 'default'">
-                {{ record.status || '—' }}
-              </a-tag>
-              <a-tag v-if="record.isSystem" color="blue">系统</a-tag>
-            </span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">编码：</span>
-            <span class="info-value">{{ record.code || '—' }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">指标类型：</span>
-            <span class="info-value">{{ indicatorKindLabel }}</span>
-          </a-col>
-        </a-row>
-      </div>
+      <DetailSectionCard title="基本信息">
+        <div class="drawer-section-card">
+          <a-row :gutter="[24, 10]" class="drawer-info">
+            <a-col :span="12">
+              <span class="info-label">状态：</span>
+              <span class="info-value">
+                <a-tag :color="record.status === '启用' ? 'success' : 'default'">
+                  {{ record.status || '—' }}
+                </a-tag>
+                <a-tag v-if="record.isSystem" color="blue">系统</a-tag>
+              </span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">编码：</span>
+              <span class="info-value">{{ record.code || '—' }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">指标类型：</span>
+              <span class="info-value">{{ indicatorKindLabel }}</span>
+            </a-col>
+          </a-row>
+        </div>
+      </DetailSectionCard>
 
       <!-- 2. 指标信息 -->
-      <div class="section-title">指标信息</div>
-      <div class="drawer-section-card">
-        <a-row :gutter="[24, 10]" class="drawer-info">
-          <a-col :span="12">
-            <span class="info-label">指标名称：</span>
-            <span class="info-value">{{ record.name || '—' }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">字段类型：</span>
-            <span class="info-value">{{ qcFieldTypeLabel(record.type) }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">是否必填：</span>
-            <span class="info-value">{{ record.required ? '是' : '否' }}</span>
-          </a-col>
-          <a-col :span="12">
-            <span class="info-label">单位：</span>
-            <span class="info-value">{{ displayUnit(record) }}</span>
-          </a-col>
-          <a-col :span="24">
-            <span class="info-label">输入提示：</span>
-            <span class="info-value">{{ record.placeholder || '—' }}</span>
-          </a-col>
-          <a-col :span="24">
-            <span class="info-label">字段描述：</span>
-            <span class="info-value">{{ record.description || '—' }}</span>
-          </a-col>
-        </a-row>
+      <DetailSectionCard title="指标信息">
+        <div class="drawer-section-card">
+          <a-row :gutter="[24, 10]" class="drawer-info">
+            <a-col :span="12">
+              <span class="info-label">指标名称：</span>
+              <span class="info-value">{{ record.name || '—' }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">字段类型：</span>
+              <span class="info-value">{{ qcFieldTypeLabel(record.type) }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">是否必填：</span>
+              <span class="info-value">{{ record.required ? '是' : '否' }}</span>
+            </a-col>
+            <a-col :span="12">
+              <span class="info-label">单位：</span>
+              <span class="info-value">{{ displayUnit(record) }}</span>
+            </a-col>
+            <a-col :span="24">
+              <span class="info-label">输入提示：</span>
+              <span class="info-value">{{ record.placeholder || '—' }}</span>
+            </a-col>
+            <a-col :span="24">
+              <span class="info-label">字段描述：</span>
+              <span class="info-value">{{ record.description || '—' }}</span>
+            </a-col>
+          </a-row>
 
-        <template v-if="showOptionTable">
-          <div class="sub-block-title">待选项</div>
-          <a-table
-            :columns="optionColumns"
-            :data-source="optionRows"
-            row-key="key"
-            size="small"
-            bordered
-            :pagination="false"
-          >
-            <template #bodyCell="{ column, record: row }">
-              <template v-if="column.key === 'isDefault'">
-                {{ row.isDefault ? '是' : '—' }}
+          <template v-if="showOptionTable">
+            <div class="sub-block-title">待选项</div>
+            <a-table
+              :columns="optionColumns"
+              :data-source="optionRows"
+              row-key="key"
+              size="small"
+              bordered
+              :pagination="false"
+            >
+              <template #bodyCell="{ column, record: row }">
+                <template v-if="column.key === 'isDefault'">
+                  {{ row.isDefault ? '是' : '—' }}
+                </template>
+                <template v-else>
+                  {{ row[column.dataIndex] ?? row[column.key] ?? '—' }}
+                </template>
               </template>
-              <template v-else>
-                {{ row[column.dataIndex] ?? row[column.key] ?? '—' }}
-              </template>
-            </template>
-          </a-table>
-        </template>
+            </a-table>
+          </template>
 
-        <template v-if="isComposite">
-          <div class="sub-block-title">子项（{{ childRows.length }}）</div>
-          <a-table
-            v-if="childRows.length"
-            :columns="childColumns"
-            :data-source="childRows"
-            row-key="code"
-            size="small"
-            bordered
-            :pagination="false"
-            :scroll="{ y: 280 }"
-          >
-            <template #bodyCell="{ column, record: row, index }">
-              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-              <template v-else-if="column.key === 'type'">
-                {{ qcFieldTypeLabel(row.type) }}
+          <template v-if="isComposite">
+            <div class="sub-block-title">子项（{{ childRows.length }}）</div>
+            <a-table
+              v-if="childRows.length"
+              :columns="childColumns"
+              :data-source="childRows"
+              row-key="code"
+              size="small"
+              bordered
+              :pagination="false"
+              :scroll="{ y: 280 }"
+            >
+              <template #bodyCell="{ column, record: row, index }">
+                <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'type'">
+                  {{ qcFieldTypeLabel(row.type) }}
+                </template>
+                <template v-else-if="column.key === 'required'">
+                  {{ row.required === false ? '否' : '是' }}
+                </template>
+                <template v-else-if="column.key === 'unit'">
+                  {{ displayUnit(row) }}
+                </template>
+                <template v-else-if="column.key === 'standard'">
+                  {{ buildStandardText(row) || '—' }}
+                </template>
+                <template v-else>
+                  {{ row[column.dataIndex] || '—' }}
+                </template>
               </template>
-              <template v-else-if="column.key === 'required'">
-                {{ row.required === false ? '否' : '是' }}
-              </template>
-              <template v-else-if="column.key === 'unit'">
-                {{ displayUnit(row) }}
-              </template>
-              <template v-else-if="column.key === 'standard'">
-                {{ buildStandardText(row) || '—' }}
-              </template>
-              <template v-else>
-                {{ row[column.dataIndex] || '—' }}
-              </template>
-            </template>
-          </a-table>
-          <a-empty v-else description="暂无子项" />
-        </template>
-      </div>
+            </a-table>
+            <a-empty v-else description="暂无子项" />
+          </template>
+        </div>
+      </DetailSectionCard>
 
       <!-- 3. 合格标准 -->
-      <div class="section-title">合格标准</div>
-      <div class="drawer-section-card">
-        <a-row :gutter="[24, 10]" class="drawer-info">
-          <a-col :span="24">
-            <span class="info-label">判定方式：</span>
-            <span class="info-value">{{ judgeRuleLabel }}</span>
-          </a-col>
-          <a-col :span="24">
-            <span class="info-label">判定关联：</span>
-            <span class="info-value">{{ judgeRelatedText }}</span>
-          </a-col>
-          <a-col :span="24">
-            <span class="info-label">标准说明：</span>
-            <span class="info-value">{{ standardDescText }}</span>
-          </a-col>
-        </a-row>
+      <DetailSectionCard title="合格标准">
+        <div class="drawer-section-card">
+          <a-row :gutter="[24, 10]" class="drawer-info">
+            <a-col :span="24">
+              <span class="info-label">判定方式：</span>
+              <span class="info-value">{{ judgeRuleLabel }}</span>
+            </a-col>
+            <a-col :span="24">
+              <span class="info-label">判定关联：</span>
+              <span class="info-value">{{ judgeRelatedText }}</span>
+            </a-col>
+            <a-col :span="24">
+              <span class="info-label">标准说明：</span>
+              <span class="info-value">{{ standardDescText }}</span>
+            </a-col>
+          </a-row>
 
-        <template v-if="showManualOptionTable">
-          <div class="sub-block-title">结论选项（含结果映射）</div>
-          <a-table
-            :columns="manualOptionColumns"
-            :data-source="manualOptionRows"
-            row-key="key"
-            size="small"
-            bordered
-            :pagination="false"
-          />
-        </template>
-      </div>
+          <template v-if="showManualOptionTable">
+            <div class="sub-block-title">结论选项（含结果映射）</div>
+            <a-table
+              :columns="manualOptionColumns"
+              :data-source="manualOptionRows"
+              row-key="key"
+              size="small"
+              bordered
+              :pagination="false"
+            />
+          </template>
+        </div>
+      </DetailSectionCard>
     </template>
   </a-drawer>
 </template>
@@ -157,6 +160,7 @@ export default { name: 'QcFieldLibraryDetailDrawer' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed } from 'vue'
 import { useDrawerWidth } from '@/composables/useDrawerWidth'
 import { qcFieldTypeLabel } from '@/mock/qcFieldLibrary'

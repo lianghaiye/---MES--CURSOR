@@ -1,6 +1,6 @@
 <template>
   <div v-if="list.length" class="outbound-wo-list">
-    <div class="section-title">工单清单 ({{ list.length }})</div>
+    <div v-if="!hideTitle" class="section-title">工单清单 ({{ list.length }})</div>
     <a-table
       :columns="columns"
       :data-source="list"
@@ -35,6 +35,7 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  hideTitle: { type: Boolean, default: false },
 })
 
 const columns = OUTBOUND_WORK_ORDER_COLUMNS

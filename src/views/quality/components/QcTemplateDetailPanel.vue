@@ -2,162 +2,165 @@
   <div v-if="record" class="qc-template-detail-panel">
     <a-tabs v-model:activeKey="activeTab" size="small" class="preview-tabs">
       <a-tab-pane key="detail" tab="详情">
-        <div class="section-title">基本信息</div>
-        <div class="basic-card">
-          <a-row :gutter="[24, 8]" class="basic-info">
-            <a-col :span="12">
-              <span class="info-label">模板编号：</span>
-              <span class="info-value">{{ record.code || '—' }}</span>
-            </a-col>
-            <a-col :span="12">
-              <span class="info-label">模板名称：</span>
-              <span class="info-value">{{ record.name || '—' }}</span>
-            </a-col>
-            <a-col :span="12">
-              <span class="info-label">类型：</span>
-              <span class="info-value">
-                <a-tag :color="record.isSystem ? 'blue' : 'processing'">
-                  {{ record.type || '—' }}
-                </a-tag>
-              </span>
-            </a-col>
-            <a-col v-if="!record.isSystem" :span="12">
-              <span class="info-label">状态：</span>
-              <span class="info-value">
-                <a-tag :color="record.status === '启用' ? 'success' : 'default'">
-                  {{ record.status || '—' }}
-                </a-tag>
-              </span>
-            </a-col>
-            <a-col :span="12">
-              <span class="info-label">业务类型：</span>
-              <span class="info-value">{{ record.bizScope || '—' }}</span>
-            </a-col>
-            <a-col :span="12">
-              <span class="info-label">适用范围：</span>
-              <span class="info-value">{{ qcTemplateScopeTypeLabel(record.scopeType) }}</span>
-            </a-col>
-            <a-col v-if="scopeObjectsText" :span="24">
-              <span class="info-label">适用对象：</span>
-              <span class="info-value" :title="scopeObjectsText">{{ scopeObjectsText }}</span>
-            </a-col>
-            <a-col :span="12">
-              <span class="info-label">指标数量：</span>
-              <span class="info-value">{{ fieldList.length }}</span>
-            </a-col>
-            <a-col :span="24">
-              <span class="info-label">整单合格规则：</span>
-              <span class="info-value">{{ sheetPassRuleLabel(record.sheetPassRule) }}</span>
-            </a-col>
-            <a-col v-if="sheetConclusionSummary" :span="24">
-              <span class="info-label">结论选项：</span>
-              <span class="info-value" :title="sheetConclusionSummary">{{
-                sheetConclusionSummary
-              }}</span>
-            </a-col>
-          </a-row>
-        </div>
+        <DetailSectionCard title="基本信息">
+          <div class="basic-card">
+            <a-row :gutter="[24, 8]" class="basic-info">
+              <a-col :span="12">
+                <span class="info-label">模板编号：</span>
+                <span class="info-value">{{ record.code || '—' }}</span>
+              </a-col>
+              <a-col :span="12">
+                <span class="info-label">模板名称：</span>
+                <span class="info-value">{{ record.name || '—' }}</span>
+              </a-col>
+              <a-col :span="12">
+                <span class="info-label">类型：</span>
+                <span class="info-value">
+                  <a-tag :color="record.isSystem ? 'blue' : 'processing'">
+                    {{ record.type || '—' }}
+                  </a-tag>
+                </span>
+              </a-col>
+              <a-col v-if="!record.isSystem" :span="12">
+                <span class="info-label">状态：</span>
+                <span class="info-value">
+                  <a-tag :color="record.status === '启用' ? 'success' : 'default'">
+                    {{ record.status || '—' }}
+                  </a-tag>
+                </span>
+              </a-col>
+              <a-col :span="12">
+                <span class="info-label">业务类型：</span>
+                <span class="info-value">{{ record.bizScope || '—' }}</span>
+              </a-col>
+              <a-col :span="12">
+                <span class="info-label">适用范围：</span>
+                <span class="info-value">{{ qcTemplateScopeTypeLabel(record.scopeType) }}</span>
+              </a-col>
+              <a-col v-if="scopeObjectsText" :span="24">
+                <span class="info-label">适用对象：</span>
+                <span class="info-value" :title="scopeObjectsText">{{ scopeObjectsText }}</span>
+              </a-col>
+              <a-col :span="12">
+                <span class="info-label">指标数量：</span>
+                <span class="info-value">{{ fieldList.length }}</span>
+              </a-col>
+              <a-col :span="24">
+                <span class="info-label">整单合格规则：</span>
+                <span class="info-value">{{ sheetPassRuleLabel(record.sheetPassRule) }}</span>
+              </a-col>
+              <a-col v-if="sheetConclusionSummary" :span="24">
+                <span class="info-label">结论选项：</span>
+                <span class="info-value" :title="sheetConclusionSummary">{{
+                  sheetConclusionSummary
+                }}</span>
+              </a-col>
+            </a-row>
+          </div>
+        </DetailSectionCard>
 
-        <div class="section-title">
-          模板指标
-          <span class="section-hint">仅复合指标可展开查看子项</span>
-        </div>
-        <a-table
-          v-if="fieldList.length"
-          class="field-table"
-          :columns="fieldColumns"
-          :data-source="fieldList"
-          row-key="code"
-          size="small"
-          bordered
-          :pagination="false"
-          children-column-name="__noTreeChildren__"
-          :expandable="fieldExpandable"
-          :scroll="{ x: fieldTableScrollX, y: tableScrollY }"
-        >
-          <template #expandIcon="{ expanded, onExpand, record: row }">
-            <button
-              v-if="isCompositeRow(row)"
-              type="button"
-              class="ant-table-row-expand-icon"
-              :class="
-                expanded
-                  ? 'ant-table-row-expand-icon-expanded'
-                  : 'ant-table-row-expand-icon-collapsed'
-              "
-              :aria-label="expanded ? '收起子项' : '展开子项'"
-              @click.stop="(e) => onExpand(row, e)"
-            />
-            <span v-else class="expand-icon-placeholder" aria-hidden="true" />
+        <DetailSectionCard>
+          <template #title>
+            模板指标
+            <span class="section-hint">仅复合指标可展开查看子项</span>
           </template>
-          <template #bodyCell="{ column, record: row, index }">
-            <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-            <template v-else-if="column.key === 'code'">
-              <span :title="row.code">{{ row.code || '—' }}</span>
+          <a-table
+            v-if="fieldList.length"
+            class="field-table"
+            :columns="fieldColumns"
+            :data-source="fieldList"
+            row-key="code"
+            size="small"
+            bordered
+            :pagination="false"
+            children-column-name="__noTreeChildren__"
+            :expandable="fieldExpandable"
+            :scroll="{ x: fieldTableScrollX, y: tableScrollY }"
+          >
+            <template #expandIcon="{ expanded, onExpand, record: row }">
+              <button
+                v-if="isCompositeRow(row)"
+                type="button"
+                class="ant-table-row-expand-icon"
+                :class="
+                  expanded
+                    ? 'ant-table-row-expand-icon-expanded'
+                    : 'ant-table-row-expand-icon-collapsed'
+                "
+                :aria-label="expanded ? '收起子项' : '展开子项'"
+                @click.stop="(e) => onExpand(row, e)"
+              />
+              <span v-else class="expand-icon-placeholder" aria-hidden="true" />
             </template>
-            <template v-else-if="column.key === 'name'">
-              <span :title="row.name">{{ row.name || '—' }}</span>
-            </template>
-            <template v-else-if="column.key === 'type'">
-              <template v-if="row.type === 'composite'">
-                复合项（{{ (row.childFields || []).length }} 子项）
+            <template #bodyCell="{ column, record: row, index }">
+              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'code'">
+                <span :title="row.code">{{ row.code || '—' }}</span>
               </template>
-              <template v-else>{{ fieldTypeLabel(row.type) }}</template>
-            </template>
-            <template v-else-if="column.key === 'required'">
-              {{ row.required ? '是' : '否' }}
-            </template>
-            <template v-else-if="column.key === 'unit'">
-              {{ displayUnit(row) }}
-            </template>
-            <template v-else-if="column.key === 'standard'">
-              <span :title="standardCell(row)">{{ standardCell(row) }}</span>
-            </template>
-            <template v-else-if="column.key === 'keyForSheetPass'">
-              {{ row.keyForSheetPass ? '是' : '—' }}
-            </template>
-            <template v-else-if="column.key === 'options'">
-              <span :title="formatOptions(row)">{{ formatOptions(row) }}</span>
-            </template>
-            <template v-else>
-              {{ row[column.dataIndex] || '—' }}
-            </template>
-          </template>
-
-          <template #expandedRowRender="{ record: row }">
-            <div v-if="isCompositeRow(row)" class="child-expand-wrap">
-              <div class="child-expand-title">子项明细</div>
-              <a-table
-                :columns="childColumns"
-                :data-source="row.childFields || []"
-                row-key="code"
-                size="small"
-                bordered
-                :pagination="false"
-              >
-                <template #bodyCell="{ column, record: child, index }">
-                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-                  <template v-else-if="column.key === 'type'">
-                    {{ fieldTypeLabel(child.type) }}
-                  </template>
-                  <template v-else-if="column.key === 'required'">
-                    {{ child.required === false ? '否' : '是' }}
-                  </template>
-                  <template v-else-if="column.key === 'unit'">
-                    {{ displayUnit(child) }}
-                  </template>
-                  <template v-else-if="column.key === 'standard'">
-                    {{ buildStandardText(child) || '—' }}
-                  </template>
-                  <template v-else>
-                    {{ child[column.dataIndex] || '—' }}
-                  </template>
+              <template v-else-if="column.key === 'name'">
+                <span :title="row.name">{{ row.name || '—' }}</span>
+              </template>
+              <template v-else-if="column.key === 'type'">
+                <template v-if="row.type === 'composite'">
+                  复合项（{{ (row.childFields || []).length }} 子项）
                 </template>
-              </a-table>
-            </div>
-          </template>
-        </a-table>
-        <a-empty v-else description="暂无指标" />
+                <template v-else>{{ fieldTypeLabel(row.type) }}</template>
+              </template>
+              <template v-else-if="column.key === 'required'">
+                {{ row.required ? '是' : '否' }}
+              </template>
+              <template v-else-if="column.key === 'unit'">
+                {{ displayUnit(row) }}
+              </template>
+              <template v-else-if="column.key === 'standard'">
+                <span :title="standardCell(row)">{{ standardCell(row) }}</span>
+              </template>
+              <template v-else-if="column.key === 'keyForSheetPass'">
+                {{ row.keyForSheetPass ? '是' : '—' }}
+              </template>
+              <template v-else-if="column.key === 'options'">
+                <span :title="formatOptions(row)">{{ formatOptions(row) }}</span>
+              </template>
+              <template v-else>
+                {{ row[column.dataIndex] || '—' }}
+              </template>
+            </template>
+
+            <template #expandedRowRender="{ record: row }">
+              <div v-if="isCompositeRow(row)" class="child-expand-wrap">
+                <div class="child-expand-title">子项明细</div>
+                <a-table
+                  :columns="childColumns"
+                  :data-source="row.childFields || []"
+                  row-key="code"
+                  size="small"
+                  bordered
+                  :pagination="false"
+                >
+                  <template #bodyCell="{ column, record: child, index }">
+                    <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                    <template v-else-if="column.key === 'type'">
+                      {{ fieldTypeLabel(child.type) }}
+                    </template>
+                    <template v-else-if="column.key === 'required'">
+                      {{ child.required === false ? '否' : '是' }}
+                    </template>
+                    <template v-else-if="column.key === 'unit'">
+                      {{ displayUnit(child) }}
+                    </template>
+                    <template v-else-if="column.key === 'standard'">
+                      {{ buildStandardText(child) || '—' }}
+                    </template>
+                    <template v-else>
+                      {{ child[column.dataIndex] || '—' }}
+                    </template>
+                  </template>
+                </a-table>
+              </div>
+            </template>
+          </a-table>
+          <a-empty v-else description="暂无指标" />
+        </DetailSectionCard>
       </a-tab-pane>
 
       <a-tab-pane key="fill" tab="填写预览">
@@ -178,6 +181,7 @@ export default { name: 'QcTemplateDetailPanel' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { QC_TEMPLATE_SCOPE_TYPE, qcTemplateScopeTypeLabel } from '@/mock/qcTemplates'
 import { buildStandardText } from '@/utils/qcFieldStandard'

@@ -97,17 +97,15 @@
             style="margin-bottom: 12px"
           />
           <template v-if="activeTab === 'basic'">
-            <div class="section-card">
-              <div class="section-title">基本信息</div>
+            <DetailSectionCard title="基本信息">
               <OutsourcingOrderBasicInfoSection :order="record">
                 <template #salesOrderNo>
                   <span>{{ record.salesOrderNo || '—' }}</span>
                 </template>
               </OutsourcingOrderBasicInfoSection>
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title">外协明细</div>
+            <DetailSectionCard title="外协明细">
               <a-table
                 :columns="lineColumns"
                 :data-source="record.lineItems || []"
@@ -152,10 +150,9 @@
                 <span class="summary-item">不含税：{{ formatMoney(summary.amountExTax) }}</span>
                 <span class="summary-item">含税：{{ formatMoney(summary.amountInTax) }}</span>
               </div>
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title">审批记录</div>
+            <DetailSectionCard title="审批记录">
               <a-divider style="margin: 12px 0" />
               <div v-if="approvalRecords.length" class="history-list">
                 <div v-for="(item, idx) in approvalRecords" :key="idx" class="history-item">
@@ -171,10 +168,9 @@
                 </div>
               </div>
               <a-empty v-else description="暂无审批记录" />
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title">价格变更审批</div>
+            <DetailSectionCard title="价格变更审批">
               <a-divider style="margin: 12px 0" />
               <div v-if="priceChangeApprovalGroups.length">
                 <div
@@ -205,19 +201,17 @@
                 </div>
               </div>
               <a-empty v-else description="暂无价格变更审批记录" />
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'price-change'">
-            <div class="section-card">
-              <div class="section-title">价格变更履历</div>
+            <DetailSectionCard title="价格变更履历">
               <OutsourcingPriceChangeHistoryPanel :order="record" />
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'issue'">
-            <div class="section-card">
-              <div class="section-title">发料申请（{{ issueApplicationRows.length }}）</div>
+            <DetailSectionCard :title="`发料申请（${issueApplicationRows.length}）`">
               <a-table
                 :columns="issueApplicationColumns"
                 :data-source="issueApplicationRows"
@@ -259,10 +253,9 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
 
-            <div class="section-card">
-              <div class="section-title">出库信息（{{ issueRows.length }}）</div>
+            <DetailSectionCard :title="`出库信息（${issueRows.length}）`">
               <a-table
                 :columns="issueColumns"
                 :data-source="issueRows"
@@ -289,12 +282,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'return'">
-            <div class="section-card">
-              <div class="section-title">回货信息</div>
+            <DetailSectionCard title="回货信息">
               <a-table
                 :columns="returnColumns"
                 :data-source="relatedInboundLines"
@@ -326,12 +318,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'qc'">
-            <div class="section-card">
-              <div class="section-title">质检信息</div>
+            <DetailSectionCard title="质检信息">
               <a-table
                 :columns="qcColumns"
                 :data-source="relatedQcRecords"
@@ -359,12 +350,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'goodsReturn'">
-            <div class="section-card">
-              <div class="section-title">外协异常处理</div>
+            <DetailSectionCard title="外协异常处理">
               <a-table
                 :columns="goodsReturnColumns"
                 :data-source="relatedReturnLines"
@@ -393,12 +383,11 @@
                   </template>
                 </template>
               </a-table>
-            </div>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'settle'">
-            <div class="section-card">
-              <div class="section-title">结算信息</div>
+            <DetailSectionCard title="结算信息">
               <a-table
                 :columns="settleColumns"
                 :data-source="relatedSettleLines"
@@ -408,7 +397,7 @@
                 :pagination="false"
                 :locale="{ emptyText: '暂无结算信息' }"
               />
-            </div>
+            </DetailSectionCard>
           </template>
         </div>
 
@@ -449,6 +438,7 @@ export default { name: 'OutsourcingOrderDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

@@ -13,8 +13,7 @@
           </a-space>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基础信息</div>
+        <DetailSectionCard title="基础信息">
           <a-descriptions bordered size="small" :column="3">
             <a-descriptions-item label="工单编号">{{ record.workOrderCode }}</a-descriptions-item>
             <a-descriptions-item label="物品编码">{{
@@ -36,9 +35,9 @@
               record.processRouteName || '—'
             }}</a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
+        <DetailSectionCard title="核算与日志">
           <div class="detail-toolbar">
             <a-radio-group v-model:value="activeTab" button-style="solid" size="small">
               <a-radio-button value="account">核算详情</a-radio-button>
@@ -167,7 +166,7 @@
             bordered
             :pagination="false"
           />
-        </div>
+        </DetailSectionCard>
       </template>
       <a-empty v-else-if="!loading" description="未找到工时记录" />
     </a-spin>
@@ -192,6 +191,7 @@ export default { name: 'LaborHourDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'

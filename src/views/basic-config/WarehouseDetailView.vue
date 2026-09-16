@@ -15,8 +15,7 @@
           </a-space>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基本信息</div>
+        <DetailSectionCard title="基本信息">
           <a-descriptions bordered size="small" :column="3">
             <a-descriptions-item label="仓库编号">{{ record.code }}</a-descriptions-item>
             <a-descriptions-item label="仓库名称">{{ record.name }}</a-descriptions-item>
@@ -43,13 +42,13 @@
               record.createdAt || '—'
             }}</a-descriptions-item>
           </a-descriptions>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">
+        <DetailSectionCard>
+          <template #title>
             默认存放物品
             <span class="item-count">（{{ storedItems.length }} 项）</span>
-          </div>
+          </template>
           <a-table
             :columns="itemColumns"
             :data-source="storedItems"
@@ -71,13 +70,13 @@
               <a-empty :image="false" description="暂未配置存放物品" />
             </template>
           </a-table>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">
+        <DetailSectionCard>
+          <template #title>
             货位
             <span class="item-count">（{{ locationRows.length }} 个）</span>
-          </div>
+          </template>
           <a-table
             :columns="locationColumns"
             :data-source="locationRows"
@@ -100,7 +99,7 @@
               <a-empty :image="false" description="暂未维护货位" />
             </template>
           </a-table>
-        </div>
+        </DetailSectionCard>
       </template>
       <a-empty v-else-if="!loading" description="未找到该仓库" />
     </a-spin>
@@ -115,6 +114,7 @@ export default { name: 'WarehouseDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getWarehouseById } from '@/store/warehouseStore'

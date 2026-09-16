@@ -30,8 +30,7 @@
           </a-space>
         </div>
 
-        <div class="section-card">
-          <div class="section-title">基本信息</div>
+        <DetailSectionCard title="基本信息">
           <div class="basic-info-panel">
             <div class="meta-bar">
               <a-space :size="8" wrap>
@@ -85,10 +84,9 @@
               </a-row>
             </a-form>
           </div>
-        </div>
+        </DetailSectionCard>
 
-        <div class="section-card">
-          <div class="section-title">质检明细</div>
+        <DetailSectionCard title="质检明细">
           <a-table
             class="detail-lines-table"
             :columns="lineColumns"
@@ -156,7 +154,7 @@
               </template>
             </template>
           </a-table>
-        </div>
+        </DetailSectionCard>
       </template>
       <a-empty v-else-if="!loading" description="未找到该质检单" />
     </a-spin>
@@ -187,6 +185,7 @@ export default { name: 'QcTaskDetailView' }
 </script>
 
 <script setup>
+import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
