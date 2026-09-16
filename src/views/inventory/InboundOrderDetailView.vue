@@ -9,19 +9,31 @@
             <span class="sub-type">{{ record.inboundType }}</span>
           </div>
           <a-space>
-            <template v-if="record.status === '待审批'">
+            <a-button type="link" size="small" @click="openPrint">
+              <PrinterOutlined />
+              打印
+            </a-button>
+            <template v-if="canApproveInbound(record)">
               <a-button type="primary" size="small" @click="handleApprovePass">通过</a-button>
               <a-button size="small" danger @click="handleApproveReject">拒绝</a-button>
               <a-button size="small" @click="goBack">返回列表</a-button>
             </template>
-            <template v-else-if="record.status === '待处理'">
-              <a-button type="primary" size="small" @click="handleConfirmInbound"
-                >确认入库</a-button
-              >
-              <a-button size="small" @click="openEdit">编辑</a-button>
-              <a-button size="small" danger @click="handleDelete">删除</a-button>
-            </template>
             <template v-else>
+              <a-button
+                v-if="canConfirmInbound(record)"
+                type="primary"
+                size="small"
+                @click="handleConfirmInbound"
+              >
+                确认入库
+              </a-button>
+              <a-button v-if="canRefuseInbound(record)" size="small" danger @click="openRefuse">
+                拒绝入库
+              </a-button>
+              <a-button v-if="canEditInbound(record)" size="small" @click="openEdit">编辑</a-button>
+              <a-button v-if="canDeleteInbound(record)" size="small" danger @click="handleDelete">
+                删除
+              </a-button>
               <a-button size="small" @click="goBack">返回列表</a-button>
             </template>
           </a-space>
@@ -94,9 +106,7 @@
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                   <template v-else-if="column.key === 'lineStatus'">
-                    <a-tag
-                      :color="(line.lineStatus || '待入库') === '已入库' ? 'success' : 'processing'"
-                    >
+                    <a-tag :color="lineStatusColor(line.lineStatus)">
                       {{ line.lineStatus || '待入库' }}
                     </a-tag>
                   </template>
@@ -226,7 +236,7 @@
                     <a-empty
                       :image="false"
                       :description="
-                        record.status === '已完成'
+                        record.status === '已入库'
                           ? '该物品暂无批次记录'
                           : '确认入库后生成库存批次：合计为一批；按件（一物一码，或一类/一批的单件、逐件）为 1 父批 + 四位 SN'
                       "
@@ -240,6 +250,13 @@
       </template>
       <a-empty v-else-if="!loading" description="未找到该入库单" />
     </a-spin>
+
+    <InboundRefuseModal
+      v-model:open="refuseModalOpen"
+      :doc-nos="refuseDocNos"
+      @confirm="onRefuseConfirm"
+    />
+    <InboundOrderPrintModal v-model:open="printModalOpen" :order="record" />
   </div>
 </template>
 
@@ -261,7 +278,14 @@ import {
   rejectInboundOrder,
   confirmInboundOrders,
   deleteInboundOrder,
+  refuseInbound,
+  canConfirmInbound,
+  canRefuseInbound,
+  canEditInbound,
+  canDeleteInbound,
+  canApproveInbound,
 } from '@/store/inboundOrderStore'
+import { inboundStatusColor } from '@/mock/inboundOptions'
 import { stockBatchState } from '@/store/stockBatchStore'
 import { listStockPieces, stockPieceState } from '@/store/stockPieceStore'
 import { resolveInboundSourceRoute } from '@/utils/inboundSourceLink'
@@ -282,6 +306,9 @@ import { hasSettleUnit } from '@/utils/settleUnit'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import InboundOrderBasicInfoSection from './components/InboundOrderBasicInfoSection.vue'
 import InboundWorkOrderList from './components/InboundWorkOrderList.vue'
+import InboundRefuseModal from './components/InboundRefuseModal.vue'
+import InboundOrderPrintModal from './components/InboundOrderPrintModal.vue'
+import { PrinterOutlined } from '@ant-design/icons-vue'
 import { resolveInboundWorkOrders } from '@/utils/inboundWorkOrders'
 
 const route = useRoute()
@@ -290,6 +317,9 @@ const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 const activeTab = ref('basic')
+const refuseModalOpen = ref(false)
+const printModalOpen = ref(false)
+const refuseDocNos = computed(() => (record.value ? [record.value.docNo || record.value.id] : []))
 
 const workOrderList = computed(() => resolveInboundWorkOrders(record.value))
 
@@ -399,10 +429,13 @@ function reload() {
 }
 
 function statusColor(status) {
-  if (status === '已完成' || status === '已入库') return 'success'
-  if (status === '已拒绝') return 'error'
-  if (status === '待审批') return 'warning'
-  if (status === '部分入库') return 'warning'
+  return inboundStatusColor(status)
+}
+
+function lineStatusColor(status) {
+  const st = status || '待入库'
+  if (st === '已入库') return 'success'
+  if (st === '已拒绝') return 'error'
   return 'processing'
 }
 
@@ -437,7 +470,7 @@ function openEdit() {
 function handleApprovePass() {
   Modal.confirm({
     title: `通过审批 ${record.value.docNo}？`,
-    content: '通过后状态变为「待处理」，可进行确认入库。',
+    content: '通过后状态变为「待入库」，可进行确认入库。',
     onOk: () => {
       const res = approveInboundOrder(record.value.id)
       if (res.ok) {
@@ -460,6 +493,29 @@ function handleApproveReject() {
       } else message.warning(res.message)
     },
   })
+}
+
+function openRefuse() {
+  refuseModalOpen.value = true
+}
+
+function openPrint() {
+  if (!record.value) return
+  printModalOpen.value = true
+}
+
+function onRefuseConfirm(reason) {
+  if (!record.value?.id) return
+  const result = refuseInbound([record.value.id], { reason })
+  if (result.blocked?.length) {
+    message.warning(result.blocked.map((b) => b.message).join('；'))
+    return
+  }
+  if (result.count > 0) {
+    message.success('已拒绝入库')
+    refuseModalOpen.value = false
+    reload()
+  }
 }
 
 function handleConfirmInbound() {

@@ -226,9 +226,7 @@
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'lineStatus'">
-                  <a-tag
-                    :color="(record.lineStatus || '待入库') === '已入库' ? 'success' : 'processing'"
-                  >
+                  <a-tag :color="lineStatusColor(record.lineStatus)">
                     {{ record.lineStatus || '待入库' }}
                   </a-tag>
                 </template>
@@ -521,31 +519,43 @@
                 <template v-else-if="column.key === 'actions'">
                   <a-space :size="4">
                     <a
-                      v-if="(record.lineStatus || '待入库') !== '已入库'"
+                      v-if="isLinePendingInbound(record)"
                       @click="handleConfirmLineInbound(record)"
                     >
                       确认入库
                     </a>
                     <a
-                      v-if="(record.lineStatus || '待入库') !== '已入库'"
-                      @click="openLineEdit(record, 'edit')"
+                      v-if="canRefuseLine(record)"
+                      class="danger-link"
+                      @click="openRefuseLine(record)"
                     >
+                      拒绝入库
+                    </a>
+                    <a v-if="isLinePendingInbound(record)" @click="openLineEdit(record, 'edit')">
                       编辑
                     </a>
-                    <a
-                      v-if="(record.lineStatus || '待入库') !== '已入库'"
-                      @click="openLineEdit(record, 'copy')"
-                    >
+                    <a v-if="isLinePendingInbound(record)" @click="openLineEdit(record, 'copy')">
                       复制
                     </a>
                     <a
-                      v-if="(record.lineStatus || '待入库') !== '已入库'"
+                      v-if="isLinePendingInbound(record)"
                       class="danger-link"
                       @click="removeLine(record.id)"
                     >
                       删除
                     </a>
-                    <span v-else class="muted-text">已入库</span>
+                    <span
+                      v-else-if="(record.lineStatus || '待入库') === '已入库'"
+                      class="muted-text"
+                    >
+                      已入库
+                    </span>
+                    <span
+                      v-else-if="(record.lineStatus || '待入库') === '已拒绝'"
+                      class="muted-text"
+                    >
+                      已拒绝
+                    </span>
                   </a-space>
                 </template>
               </template>
@@ -633,6 +643,14 @@
   />
 
   <SalesOrderSelectModal v-model:open="salesOrderPickerOpen" @confirm="onSalesOrderPicked" />
+
+  <InboundRefuseModal
+    v-model:open="refuseLineOpen"
+    mode="line"
+    :doc-nos="refuseLineDocNos"
+    :confirm-loading="refuseLineLoading"
+    @confirm="handleRefuseLineConfirm"
+  />
 </template>
 
 <script setup>
@@ -652,10 +670,11 @@ import SelectBomMaterialModal from '@/views/product-process/components/SelectBom
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import AddByBomModal from '@/views/product-process/components/AddByBomModal.vue'
 import InboundLineEditModal from './InboundLineEditModal.vue'
+import InboundRefuseModal from './InboundRefuseModal.vue'
 import InventoryLineItemSelect from './InventoryLineItemSelect.vue'
 import InventoryLineEditableCell from './InventoryLineEditableCell.vue'
 import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
-import { inboundTypeOptions, handlerOptions } from '@/mock/inboundOptions'
+import { inboundTypeOptions, handlerOptions, INBOUND_SOURCE } from '@/mock/inboundOptions'
 import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { getLocationSelectOptions, warehouseLocationState } from '@/store/warehouseLocationStore'
@@ -664,6 +683,8 @@ import {
   updateInboundOrder,
   resolveWarehouseKeeper,
   confirmInboundLine,
+  refuseInboundLine,
+  canRefuseInboundLine,
   getInboundOrderById,
 } from '@/store/inboundOrderStore'
 import {
@@ -765,6 +786,14 @@ const lineEditMode = ref('edit')
 const lineEditSourceId = ref(null)
 const prevHeaderWarehouse = ref(undefined)
 const salesOrderPickerOpen = ref(false)
+const refuseLineOpen = ref(false)
+const refuseLineTarget = ref(null)
+const refuseLineLoading = ref(false)
+const refuseLineDocNos = computed(() => {
+  const line = refuseLineTarget.value
+  if (!line) return []
+  return [`${line.itemCode || ''} ${line.itemName || ''}`.trim() || line.id]
+})
 
 const inboundTypeOpts = inboundTypeOptions.map((v) => ({ label: v, value: v }))
 const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
@@ -994,6 +1023,58 @@ function loadEditForm(record) {
   }
 }
 
+function isLinePendingInbound(record) {
+  const st = record?.lineStatus || '待入库'
+  return st !== '已入库' && st !== '已拒绝'
+}
+
+function lineStatusColor(status) {
+  const st = status || '待入库'
+  if (st === '已入库') return 'success'
+  if (st === '已拒绝') return 'error'
+  return 'processing'
+}
+
+function canRefuseLine(record) {
+  if (!isEdit.value || !props.editRecord) return false
+  return canRefuseInboundLine(props.editRecord, record)
+}
+
+function openRefuseLine(record) {
+  if (!isEdit.value || !props.editRecord?.id) {
+    message.warning('请先保存入库单后再拒绝入库')
+    return
+  }
+  refuseLineTarget.value = record
+  refuseLineOpen.value = true
+}
+
+async function handleRefuseLineConfirm(reason) {
+  const line = refuseLineTarget.value
+  if (!line || !props.editRecord?.id) return
+  refuseLineLoading.value = true
+  try {
+    const saved = updateInboundOrder(props.editRecord.id, buildPayload())
+    if (saved && !saved.ok) {
+      message.warning(saved.message || '保存失败，无法拒绝入库')
+      return
+    }
+    const res = refuseInboundLine(props.editRecord.id, line.id, { reason })
+    if (!res.ok) {
+      message.warning(res.message || '拒绝入库失败')
+      return
+    }
+    message.success(
+      res.order?.status === '已拒绝' ? '明细已拒绝，入库单已全部拒绝' : '明细已拒绝入库',
+    )
+    refuseLineOpen.value = false
+    const latest = getInboundOrderById(props.editRecord.id)
+    if (latest) loadEditForm(latest)
+  } finally {
+    refuseLineLoading.value = false
+  }
+}
+
 function handleConfirmLineInbound(record) {
   if (!isEdit.value || !props.editRecord?.id) {
     message.warning('请先保存入库单后再确认入库')
@@ -1001,6 +1082,10 @@ function handleConfirmLineInbound(record) {
   }
   if ((record.lineStatus || '待入库') === '已入库') {
     message.info('该明细已入库')
+    return
+  }
+  if ((record.lineStatus || '待入库') === '已拒绝') {
+    message.info('该明细已拒绝入库')
     return
   }
   const payload = buildPayload()
@@ -1015,7 +1100,7 @@ function handleConfirmLineInbound(record) {
     return
   }
   message.success(
-    res.order?.status === '已完成'
+    res.order?.status === '已入库'
       ? '明细已入库，入库单已全部完成'
       : '明细已入库，入库单状态：部分入库',
   )
@@ -1278,7 +1363,7 @@ function removeLine(id) {
 }
 
 function buildPayload() {
-  return {
+  const payload = {
     docNo: form.docNo?.trim(),
     inboundType: form.inboundType,
     warehouse: form.warehouse || '',
@@ -1296,6 +1381,10 @@ function buildPayload() {
     workOrders: form.workOrders || [],
     lineItems: form.lineItems.filter((l) => l.itemCode).map((l) => enrichInboundLine({ ...l })),
   }
+  if (!isEdit.value) {
+    payload.sourceChannel = INBOUND_SOURCE.MANUAL
+  }
+  return payload
 }
 
 function handleSave() {

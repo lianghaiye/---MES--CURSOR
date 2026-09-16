@@ -24,6 +24,11 @@ import {
   splitInboundPieceValuesForSalesOrder,
   resolveWorkOrderNoFromInbound,
 } from '@/utils/salesOrderDedicatedStock'
+import {
+  normalizeInboundStatus,
+  resolveInboundSourceChannel,
+  INBOUND_SOURCE,
+} from '@/mock/inboundOptions'
 
 function isFinishedOrSemiInbound(order) {
   const t = order?.inboundType || ''
@@ -39,8 +44,8 @@ function resolveInboundSalesOrder(order) {
 
 const STORAGE_KEY = 'i_doms_inbound_orders'
 const SEED_VERSION_KEY = 'i_doms_inbound_orders_seed_v'
-/** v9：一类/一批按件入库 1 父批 + 四位 SN */
-const CURRENT_SEED_VERSION = '9'
+/** v10：状态归一待入库/已入库；来源业务/新增；支持拒绝入库 */
+const CURRENT_SEED_VERSION = '11'
 
 function loadFromStorage() {
   try {
@@ -78,15 +83,11 @@ function normalizeLegacyOrder(order) {
   if (!row.approvedAt) row.approvedAt = ''
   if (!row.miniProgramTaskId) row.miniProgramTaskId = ''
   if (!row.purchaseOrderId) row.purchaseOrderId = ''
+  if (!row.refuseReason) row.refuseReason = ''
   if (!Array.isArray(row.workOrders)) row.workOrders = []
   if (row.inboundType === '生产退库') row.inboundType = '半成品入库'
-  if (
-    row.status === '待处理' &&
-    (row.inboundType === '成品入库' || row.inboundType === '半成品入库') &&
-    row.miniProgramTaskId
-  ) {
-    row.status = '待审批'
-  }
+  row.status = normalizeInboundStatus(row.status)
+  row.sourceChannel = resolveInboundSourceChannel(row)
   if (!Array.isArray(row.lineItems)) row.lineItems = []
   return row
 }
@@ -232,45 +233,86 @@ export function resolveWarehouseKeeper(warehouseName) {
 }
 
 function canDeleteInbound(order) {
-  return order && order.status !== '已完成' && order.status !== '已入库'
+  if (!order) return false
+  if (resolveInboundSourceChannel(order) === INBOUND_SOURCE.BUSINESS) return false
+  const status = normalizeInboundStatus(order.status)
+  return status === '待入库' || status === '部分入库'
 }
 
 function canEditInbound(order) {
-  return order && ['待处理', '待审批', '已拒绝', '部分入库'].includes(order.status)
+  const status = normalizeInboundStatus(order?.status)
+  return status === '待入库' || status === '部分入库'
 }
 
 function canConfirmInbound(order) {
-  return order?.status === '待处理' || order?.status === '部分入库'
+  const status = normalizeInboundStatus(order?.status)
+  return status === '待入库' || status === '部分入库'
 }
 
 function canApproveInbound(order) {
+  // 历史「待审批」已归一为「待入库」，审批入口自然关闭
   return (
     order?.status === '待审批' &&
     (order?.inboundType === '成品入库' || order?.inboundType === '半成品入库')
   )
 }
 
+/** 待入库可整单拒绝入库（未实际入账前） */
+export function canRefuseInbound(order) {
+  if (!order || normalizeInboundStatus(order.status) !== '待入库') return false
+  const lines = order.lineItems || []
+  if (!lines.length) return true
+  return lines.every((l) => {
+    const st = l.lineStatus || '待入库'
+    return st !== '已入库'
+  })
+}
+
+/** 明细行是否可拒绝入库 */
+export function canRefuseInboundLine(order, line) {
+  if (!order || !line) return false
+  const head = normalizeInboundStatus(order.status)
+  if (head !== '待入库' && head !== '部分入库') return false
+  const st = line.lineStatus || '待入库'
+  return st !== '已入库' && st !== '已拒绝'
+}
+
 export function recomputeInboundOrderStatus(order, operator = 'admin1') {
   if (!order) return
   const lines = order.lineItems || []
   if (!lines.length) {
-    if (order.status === '部分入库') order.status = '待处理'
+    if (order.status === '部分入库') order.status = '待入库'
     return
   }
-  const done = lines.filter((l) => (l.lineStatus || '待入库') === '已入库').length
-  if (done === 0) {
-    if (order.status === '部分入库' || order.status === '已完成' || order.status === '已入库') {
-      order.status = '待处理'
+  const received = lines.filter((l) => (l.lineStatus || '待入库') === '已入库').length
+  const refused = lines.filter((l) => (l.lineStatus || '待入库') === '已拒绝').length
+  const pending = lines.length - received - refused
+
+  if (received === 0 && pending === 0) {
+    order.status = '已拒绝'
+    order.confirmedAt = ''
+    return
+  }
+  if (received === 0 && pending > 0) {
+    if (
+      order.status === '部分入库' ||
+      order.status === '已完成' ||
+      order.status === '已入库' ||
+      order.status === '已拒绝'
+    ) {
+      order.status = '待入库'
+    } else {
+      order.status = normalizeInboundStatus(order.status)
     }
     return
   }
-  if (done === lines.length) {
-    // 领料入库：头状态用「已入库」；其它类型保持「已完成」
-    order.status = order.inboundType === '领料入库' ? '已入库' : '已完成'
+  if (pending === 0 && received === lines.length) {
+    order.status = '已入库'
     order.confirmer = order.confirmer || operator
     order.confirmedAt = order.confirmedAt || dayjs().format('YYYY-MM-DD HH:mm:ss')
     return
   }
+  // 有已入库行，且仍有待入或有拒绝行
   order.status = '部分入库'
   order.confirmedAt = ''
 }
@@ -290,6 +332,7 @@ export function addInboundOrder(payload) {
   const headerWarehouse =
     payload.warehouse || lineItems.find((line) => line.warehouse)?.warehouse || ''
   const whKeeper = resolveWarehouseKeeper(headerWarehouse)
+  const sourceChannel = resolveInboundSourceChannel(payload)
   const row = normalizeLegacyOrder(
     createInboundOrder({
       ...payload,
@@ -298,12 +341,8 @@ export function addInboundOrder(payload) {
       warehouse: headerWarehouse || undefined,
       lineItems,
       warehouseKeeper: payload.warehouseKeeper || whKeeper,
-      status:
-        payload.status ||
-        ((payload.inboundType === '成品入库' || payload.inboundType === '半成品入库') &&
-        payload.miniProgramTaskId
-          ? '待审批'
-          : '待处理'),
+      status: normalizeInboundStatus(payload.status) || '待入库',
+      sourceChannel,
       createdAt: payload.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
     }),
   )
@@ -512,13 +551,14 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
   ids.forEach((id) => {
     const order = inboundOrderState.orders.find((o) => o.id === id)
     if (!canConfirmInbound(order)) {
-      blocked.push({ docNo: order?.docNo || id, message: '仅待处理/部分入库状态可确认入库' })
+      blocked.push({ docNo: order?.docNo || id, message: '仅待入库/部分入库状态可确认入库' })
       return
     }
 
-    const pendingLines = (order.lineItems || []).filter(
-      (l) => (l.lineStatus || '待入库') !== '已入库',
-    )
+    const pendingLines = (order.lineItems || []).filter((l) => {
+      const st = l.lineStatus || '待入库'
+      return st !== '已入库' && st !== '已拒绝'
+    })
     if (!pendingLines.length) {
       recomputeInboundOrderStatus(order, operator)
       count += 1
@@ -552,12 +592,15 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
 export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
   const order = inboundOrderState.orders.find((o) => o.id === orderId)
   if (!canConfirmInbound(order)) {
-    return { ok: false, message: '仅待处理/部分入库状态可确认入库' }
+    return { ok: false, message: '仅待入库/部分入库状态可确认入库' }
   }
   const line = (order.lineItems || []).find((l) => l.id === lineId)
   if (!line) return { ok: false, message: '明细不存在' }
   if ((line.lineStatus || '待入库') === '已入库') {
     return { ok: false, message: '该明细已入库' }
+  }
+  if ((line.lineStatus || '待入库') === '已拒绝') {
+    return { ok: false, message: '该明细已拒绝入库' }
   }
 
   const prep = prepareAndApplyInboundLine(order, line)
@@ -612,7 +655,7 @@ export function approveInboundOrder(id, operator = 'admin1') {
   if (!canApproveInbound(order)) {
     return { ok: false, message: '仅成品/半成品入库待审批单据可审批' }
   }
-  order.status = '待处理'
+  order.status = '待入库'
   order.approver = operator
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   return { ok: true, order }
@@ -628,6 +671,72 @@ export function rejectInboundOrder(id, operator = 'admin1') {
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   resetMiniProgramInboundTask(order.miniProgramTaskId)
   return { ok: true, order }
+}
+
+/** 拒绝入库：未入账单据置为已拒绝 */
+export function refuseInbound(ids, { reason = '', operator = 'admin1' } = {}) {
+  const blocked = []
+  const refused = []
+  let count = 0
+  ;(ids || []).forEach((id) => {
+    const order = inboundOrderState.orders.find((o) => o.id === id)
+    if (!canRefuseInbound(order)) {
+      blocked.push({
+        docNo: order?.docNo || id,
+        message: '当前状态不可拒绝入库',
+      })
+      return
+    }
+    const reasonText = String(reason || '').trim()
+    if (!reasonText) {
+      blocked.push({
+        docNo: order?.docNo || id,
+        message: '请填写拒绝理由',
+      })
+      return
+    }
+    order.status = '已拒绝'
+    order.refuseReason = reasonText
+    order.refusedBy = operator
+    order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    ;(order.lineItems || []).forEach((line) => {
+      const st = line.lineStatus || '待入库'
+      if (st !== '已入库') {
+        line.lineStatus = '已拒绝'
+        line.refuseReason = reasonText
+        line.refusedBy = operator
+        line.refusedAt = order.refusedAt
+      }
+    })
+    if (order.miniProgramTaskId) resetMiniProgramInboundTask(order.miniProgramTaskId)
+    refused.push(order)
+    count += 1
+  })
+  return { count, blocked, refused }
+}
+
+/**
+ * 按明细拒绝入库（未入账行）；已入库行不可拒
+ */
+export function refuseInboundLine(orderId, lineId, { reason = '', operator = 'admin1' } = {}) {
+  const order = inboundOrderState.orders.find((o) => o.id === orderId)
+  const line = (order?.lineItems || []).find((l) => l.id === lineId)
+  if (!canRefuseInboundLine(order, line)) {
+    return { ok: false, message: '当前明细不可拒绝入库' }
+  }
+  const reasonText = String(reason || '').trim()
+  if (!reasonText) return { ok: false, message: '请填写拒绝理由' }
+
+  line.lineStatus = '已拒绝'
+  line.refuseReason = reasonText
+  line.refusedBy = operator
+  line.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  recomputeInboundOrderStatus(order, operator)
+  order.refuseReason = reasonText
+  order.refusedBy = operator
+  order.refusedAt = line.refusedAt
+  return { ok: true, order, line }
 }
 
 /** 拒绝后小程序入库任务恢复为待开始（占位，后续对接小程序） */
@@ -647,7 +756,7 @@ export function resetMiniProgramInboundTask(taskId) {
   }
 }
 
-/** 采购订单生成采购入库单（待处理）——按剩余可申请量校验，支持多次入库 */
+/** 采购订单生成采购入库单（待入库）——按剩余可申请量校验，支持多次入库 */
 export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
   const po = purchaseOrderState.orders.find((o) => o.id === purchaseOrderId)
   if (!po) return { ok: false, message: '采购单不存在' }
@@ -729,7 +838,7 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
     const order = addInboundOrder({
       id: `ib-po-${Date.now()}-${index}`,
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse,
       warehouseKeeper: resolveWarehouseKeeper(warehouse),
       inboundDate: payload.inboundDate || dayjs().format('YYYY-MM-DD'),
@@ -854,7 +963,7 @@ export function createInboundFromScrap(scrap, partial = {}) {
     partial.inboundType === '生产退库' ? '半成品入库' : partial.inboundType || '报废入库'
   const order = addInboundOrder({
     inboundType,
-    status: '待处理',
+    status: '待入库',
     warehouse: partial.warehouse || scrap.warehouse || '半成品仓',
     sourceOrderNo: scrap.scrapNo,
     sourceType: '报废单',
@@ -920,7 +1029,7 @@ export function createInboundFromFinishedQc(task, partial = {}) {
   const workOrderNo = task.workOrderNo || task.sourceDocNo || ''
   const order = addInboundOrder({
     inboundType: '成品入库',
-    status: '待处理',
+    status: '待入库',
     warehouse: lineItems[0].warehouse || '成品仓',
     itemType: '产品',
     sourceOrderNo: workOrderNo,

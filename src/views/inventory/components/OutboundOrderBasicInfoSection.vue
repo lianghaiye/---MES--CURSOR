@@ -71,8 +71,15 @@ const fields = computed(() => {
       format: (row) => outboundSourceLabel(row.sourceChannel),
     },
     { key: 'warehouse', label: '出库仓库' },
+    { key: 'receiveWarehouse', label: '领入仓库' },
     { key: 'requisitionDept', label: '申请部门' },
     { key: 'outboundTime', label: '出库时间' },
+    {
+      key: 'totalWeight',
+      label: '出库总重量(kg)',
+      format: (row) =>
+        row.totalWeight != null && row.totalWeight !== '' ? String(row.totalWeight) : '—',
+    },
     { key: 'sourceOrderNo', label: '源单编号', slot: 'sourceOrderNo' },
     { key: 'salesOrderNo', label: '销售单号', slot: 'salesOrderNo' },
     {

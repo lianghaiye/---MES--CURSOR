@@ -37,6 +37,11 @@ export function flattenCutSettleLines(records = []) {
         workOrderNo: '',
         pickedBatchNo: '',
         pickedLength: null,
+        remnantBatchNo: '',
+        remnantInboundDocNo: r.remnantInboundDocNo || '',
+        remnantInboundId: r.remnantInboundId || '',
+        confirmer: r.confirmer || '',
+        confirmedAt: r.confirmedAt || '',
       })
       continue
     }
@@ -65,6 +70,11 @@ export function flattenCutSettleLines(records = []) {
         workOrderNo: line.workOrderNo || '',
         pickedBatchNo: line.pickedBatchNo || line.issuedBatchNo || '',
         pickedLength: line.pickedLength,
+        remnantBatchNo: line.remnantBatchNo || '',
+        remnantInboundDocNo: r.remnantInboundDocNo || line.remnantInboundDocNo || '',
+        remnantInboundId: r.remnantInboundId || line.remnantInboundId || '',
+        confirmer: r.confirmer || '',
+        confirmedAt: r.confirmedAt || '',
       })
     })
   }

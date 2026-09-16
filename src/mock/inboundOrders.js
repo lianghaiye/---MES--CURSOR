@@ -51,7 +51,8 @@ export function createInboundOrder(partial = {}) {
     id: '',
     docNo: '',
     inboundType: '其他入库',
-    status: '待处理',
+    status: '待入库',
+    sourceChannel: '',
     warehouse: undefined,
     warehouseKeeper: '',
     inboundDate: dayjs().format('YYYY-MM-DD'),
@@ -107,7 +108,7 @@ export function cloneInboundSeedOrders() {
       id: 'ib-unit-demo-single',
       docNo: '1-20260718-U001',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: today,
@@ -145,7 +146,7 @@ export function cloneInboundSeedOrders() {
       id: 'ib-unit-demo-dual',
       docNo: '1-20260718-U002',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: today,
@@ -186,7 +187,7 @@ export function cloneInboundSeedOrders() {
       id: 'ib-unit-demo-settle',
       docNo: '1-20260718-U003',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: today,
@@ -227,7 +228,7 @@ export function cloneInboundSeedOrders() {
       id: 'ib-unit-demo-pur-settle',
       docNo: '1-20260718-U004',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: today,
@@ -268,7 +269,7 @@ export function cloneInboundSeedOrders() {
       id: 'ib-unit-demo-triple',
       docNo: '1-20260718-U005',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: today,
@@ -309,12 +310,12 @@ export function cloneInboundSeedOrders() {
       ],
     }),
 
-    // 1 待处理：一批一码 + 一类一码（可直接填合计）
+    // 1 待入库：一批一码 + 一类一码（可直接填合计）
     createInboundOrder({
       id: 'ib-demo-001',
       docNo: '1-20260715-00001',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: today,
@@ -370,12 +371,12 @@ export function cloneInboundSeedOrders() {
       ],
     }),
 
-    // 2 待处理：一物一码（统一单件）
+    // 2 待入库：一物一码（统一单件）
     createInboundOrder({
       id: 'ib-demo-002',
       docNo: '1-20260715-00002',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: today,
@@ -431,12 +432,12 @@ export function cloneInboundSeedOrders() {
       ],
     }),
 
-    // 3 待处理：一物一码（逐件不同）+ 重量类
+    // 3 待入库：一物一码（逐件不同）+ 重量类
     createInboundOrder({
       id: 'ib-demo-003',
       docNo: '1-20260715-00003',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: today,
@@ -492,12 +493,12 @@ export function cloneInboundSeedOrders() {
       ],
     }),
 
-    // 4 已完成：已确认并生成批次号（对应演示批次追溯）
+    // 4 已入库：已确认并生成批次号（对应演示批次追溯）
     createInboundOrder({
       id: 'ib-demo-004',
       docNo: '1-20260713-00004',
       inboundType: '采购入库',
-      status: '已完成',
+      status: '已入库',
       warehouse: '库线边仓',
       warehouseKeeper: 'admin1',
       inboundDate: twoDaysAgo,
@@ -533,6 +534,7 @@ export function cloneInboundSeedOrders() {
           warehouse: '库线边仓',
           locationNo: 'L-01-01',
           batchNos: ['B-260713-001'],
+          lineStatus: '已入库',
         }),
         dualUnitLine({
           id: 'ib-demo-004-l2',
@@ -556,16 +558,17 @@ export function cloneInboundSeedOrders() {
           batchNos: ['B-260713-002'],
           pieceSerialNos: ['B-260713-002-0001', 'B-260713-002-0002'],
           manageByPiece: true,
+          lineStatus: '已入库',
         }),
       ],
     }),
 
-    // 5 成品入库待审批（非双单位）
+    // 5 成品入库待入库（非双单位，原待审批演示）
     createInboundOrder({
       id: 'ib-demo-005',
       docNo: '1-20260715-00005',
       inboundType: '成品入库',
-      status: '待审批',
+      status: '待入库',
       warehouse: '成品主仓',
       warehouseKeeper: 'admin1',
       inboundDate: today,
@@ -577,7 +580,7 @@ export function cloneInboundSeedOrders() {
       creator: '张三',
       createdAt: `${today} 08:40:00`,
       miniProgramTaskId: 'mp-task-demo-001',
-      remark: '演示：成品入库待审批',
+      remark: '演示：成品入库待入库',
       lineItems: [
         createInboundLine({
           id: 'ib-demo-005-l1',
@@ -596,12 +599,12 @@ export function cloneInboundSeedOrders() {
       ],
     }),
 
-    // 6 半成品已完成
+    // 6 半成品已入库
     createInboundOrder({
       id: 'ib-demo-006',
       docNo: '1-20260714-00006',
       inboundType: '半成品入库',
-      status: '已完成',
+      status: '已入库',
       warehouse: '库线边仓',
       warehouseKeeper: 'admin1',
       inboundDate: yesterday,
@@ -614,7 +617,7 @@ export function cloneInboundSeedOrders() {
       createdAt: `${yesterday} 16:10:00`,
       confirmer: 'admin1',
       confirmedAt: `${yesterday} 17:00:00`,
-      remark: '演示：半成品入库已完成',
+      remark: '演示：半成品入库已入库',
       lineItems: [
         createInboundLine({
           id: 'ib-demo-006-l1',
@@ -628,6 +631,75 @@ export function cloneInboundSeedOrders() {
           warehouse: '库线边仓',
           locationNo: 'SF-02-01',
           lineSource: '生产',
+          lineStatus: '已入库',
+        }),
+      ],
+    }),
+
+    // 领料出库确认后生成的领料入库（关联 OUT202607280101）
+    createInboundOrder({
+      id: 'ib-ll-from-ob-cut-1',
+      docNo: '1-20260728-LL01',
+      inboundType: '领料入库',
+      status: '已入库',
+      warehouse: '库线边仓',
+      warehouseKeeper: 'admin1',
+      inboundDate: '2026-07-28',
+      itemType: '物料',
+      sourceOrderNo: 'OUT202607280101',
+      sourceType: '领料出库',
+      outboundOrderId: 'ob-cut-seed-1',
+      outboundDocNo: 'OUT202607280101',
+      handler: 'admin1',
+      creator: 'admin1',
+      createdAt: '2026-07-28 10:10:00',
+      confirmer: 'admin1',
+      confirmedAt: '2026-07-28 10:10:00',
+      remark: '由领料出库 OUT202607280101 确认后生成',
+      lineItems: [
+        createInboundLine({
+          id: 'ib-ll-from-ob-cut-1-l1',
+          itemCode: 'WL-PIPE-Q235-50',
+          itemName: '无缝钢管 Q235 φ50×3',
+          qty: 12,
+          unit: '米',
+          warehouse: '库线边仓',
+          lineStatus: '已入库',
+          outboundLineId: 'ob-cut-seed-1-l1',
+        }),
+      ],
+    }),
+
+    // 业务来源领料部分出库关联入库
+    createInboundOrder({
+      id: 'ib-ll-from-ob-biz-partial',
+      docNo: '1-20260915-LL08',
+      inboundType: '领料入库',
+      status: '已入库',
+      warehouse: '库线边仓',
+      warehouseKeeper: 'admin1',
+      inboundDate: '2026-09-15',
+      itemType: '物料',
+      sourceOrderNo: 'OUT202609150088',
+      sourceType: '领料出库',
+      outboundOrderId: 'ob-biz-ll-partial-1',
+      outboundDocNo: 'OUT202609150088',
+      handler: 'admin1',
+      creator: 'admin1',
+      createdAt: '2026-09-15 14:30:00',
+      confirmer: 'admin1',
+      confirmedAt: '2026-09-15 14:30:00',
+      remark: '由领料出库 OUT202609150088 部分确认生成',
+      lineItems: [
+        createInboundLine({
+          id: 'ib-ll-from-ob-biz-partial-l1',
+          itemCode: 'WL-BAR-45-20',
+          itemName: '圆钢 45# φ20',
+          qty: 4,
+          unit: '米',
+          warehouse: '库线边仓',
+          lineStatus: '已入库',
+          outboundLineId: 'ob-biz-ll-partial-1-l1',
         }),
       ],
     }),
@@ -637,6 +709,7 @@ export function cloneInboundSeedOrders() {
 export function filterInboundOrders(list, filters = {}) {
   return list.filter((o) => {
     if (filters.status && o.status !== filters.status) return false
+    if (filters.sourceChannel && o.sourceChannel !== filters.sourceChannel) return false
     if (filters.docNo && !o.docNo?.includes(filters.docNo)) return false
     if (filters.warehouse && o.warehouse !== filters.warehouse) return false
     if (filters.inboundType && o.inboundType !== filters.inboundType) return false

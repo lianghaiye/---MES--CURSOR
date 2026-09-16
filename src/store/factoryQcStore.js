@@ -12,7 +12,7 @@ import { bindQcLineTemplate, summarizeTaskTemplates } from '@/store/qcTaskStore'
 import { ensureQcTemplateDemoSeed } from '@/store/qcTemplateStore'
 
 const STORAGE_KEY = 'i_doms_factory_qc'
-const STORAGE_VERSION = 5
+const STORAGE_VERSION = 6
 const QC_NO_PREFIX = 'CCZJ'
 export const FACTORY_QC_BIZ_SCOPE = '出厂质检'
 

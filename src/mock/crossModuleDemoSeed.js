@@ -387,6 +387,7 @@ export function createCrossDemoInboundOrders() {
           locationNo: 'B-02-01',
           batchNos: ['B-260801-001'],
           barcodeBatchNo: 'B-260801-001',
+          lineStatus: '已入库',
         }),
       ],
     }),

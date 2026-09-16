@@ -2,7 +2,7 @@
  * 多单位出入库 / 领料 / 下料结算 联动演示种子
  *
  * 建议验证路径：
- * 1. 入库管理：待处理「MU-IB-*」——双单位 / 结算 / 三口径 / 单单位
+ * 1. 入库管理：待入库「MU-IB-*」——双单位 / 结算 / 三口径 / 单单位
  * 2. 出库管理：待出库「MU-OB-PEND-*」——钢管(需下料结算) + 轴承(普通 FIFO)
  * 3. 出库管理：已出库「MU-OB-ISSUE-*」——整批出 / 部分出
  * 4. 领料申请：ML-MU-FLOW-* —— 审核通过，已生成领料出库
@@ -333,7 +333,7 @@ export function createMultiUnitFlowBatches() {
   ]
 }
 
-/** ——— 入库（待处理，覆盖多口径） ——— */
+/** ——— 入库（待入库，覆盖多口径） ——— */
 export function createMultiUnitFlowInboundOrders() {
   const d = today()
   return [
@@ -341,7 +341,7 @@ export function createMultiUnitFlowInboundOrders() {
       id: MULTI_UNIT_FLOW_IDS.inboundDual,
       docNo: 'MU-IB-DUAL-001',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: d,
@@ -382,7 +382,7 @@ export function createMultiUnitFlowInboundOrders() {
       id: MULTI_UNIT_FLOW_IDS.inboundSettle,
       docNo: 'MU-IB-SETTLE-001',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: d,
@@ -423,7 +423,7 @@ export function createMultiUnitFlowInboundOrders() {
       id: MULTI_UNIT_FLOW_IDS.inboundTriple,
       docNo: 'MU-IB-TRIPLE-001',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: d,
@@ -466,7 +466,7 @@ export function createMultiUnitFlowInboundOrders() {
       id: MULTI_UNIT_FLOW_IDS.inboundSingle,
       docNo: 'MU-IB-SINGLE-001',
       inboundType: '采购入库',
-      status: '待处理',
+      status: '待入库',
       warehouse: '原料仓',
       warehouseKeeper: 'admin1',
       inboundDate: d,

@@ -71,6 +71,7 @@
                   size="small"
                   placeholder="线边仓（确认后从出库仓调入）"
                   :options="receiveWarehouseOpts"
+                  :disabled="lockReceiveWarehouse"
                 />
               </a-form-item>
             </a-col>
@@ -82,6 +83,7 @@
                   size="small"
                   placeholder="请选择 申请部门"
                   :options="requisitionDeptOpts"
+                  :disabled="lockRequisitionDept"
                 />
               </a-form-item>
             </a-col>
@@ -93,6 +95,7 @@
                   :precision="3"
                   size="small"
                   style="width: 100%"
+                  @change="onTotalWeightManual"
                 />
               </a-form-item>
             </a-col>
@@ -353,6 +356,32 @@
                     </template>
                   </InventoryLineEditableCell>
                 </template>
+                <template v-else-if="column.key === 'weight'">
+                  <InventoryLineEditableCell
+                    :active="isLineCellEditing(record.id, 'weight')"
+                    :display="formatQty(record.weight)"
+                    :empty="record.weight == null || record.weight === ''"
+                    editable
+                    placeholder="填写重量"
+                    numeric
+                    @activate="startLineCellEdit(record.id, 'weight')"
+                    @end="endLineCellEdit"
+                  >
+                    <template #edit="{ endEdit }">
+                      <a-input-number
+                        v-model:value="record.weight"
+                        :min="0"
+                        :precision="3"
+                        size="small"
+                        style="width: 100%"
+                        autofocus
+                        @blur="endEdit"
+                        @pressEnter="endEdit"
+                        @change="onLineWeightChange"
+                      />
+                    </template>
+                  </InventoryLineEditableCell>
+                </template>
                 <template v-else-if="column.key === 'batchPick'">
                   <template v-if="canOutboundBatchPick(record)">
                     <template v-if="isRecordManualPick(record)">
@@ -428,33 +457,36 @@
                   {{ formatMoney(record.totalPrice) }}
                 </template>
                 <template v-else-if="column.key === 'actions'">
-                  <a-space :size="4">
+                  <a-space :size="4" class="line-actions">
                     <a
                       v-if="isLinePendingOutbound(record)"
                       @click="handleConfirmLineOutbound(record)"
                     >
-                      确认出库
+                      确认
                     </a>
                     <a
                       v-if="canRefuseLine(record)"
                       class="danger-link"
                       @click="openRefuseLine(record)"
                     >
-                      拒绝出库
+                      拒绝
                     </a>
                     <a v-if="isLinePendingOutbound(record)" @click="openLineEdit(record, 'edit')">
                       编辑
                     </a>
-                    <a v-if="isLinePendingOutbound(record)" @click="openLineEdit(record, 'copy')">
-                      复制
-                    </a>
-                    <a
-                      v-if="isLinePendingOutbound(record)"
-                      class="danger-link"
-                      @click="removeLine(record.id)"
+                    <a-tooltip v-if="isLinePendingOutbound(record)" title="复制">
+                      <a class="line-action-icon" @click="openLineEdit(record, 'copy')">
+                        <CopyOutlined />
+                      </a>
+                    </a-tooltip>
+                    <a-tooltip
+                      v-if="canRemoveOutboundLine && isLinePendingOutbound(record)"
+                      title="删除"
                     >
-                      删除
-                    </a>
+                      <a class="line-action-icon danger-link" @click="removeLine(record.id)">
+                        <DeleteOutlined />
+                      </a>
+                    </a-tooltip>
                     <span
                       v-else-if="(record.lineStatus || '待出库') === '已出库'"
                       class="muted-text"
@@ -487,6 +519,9 @@
               >
               <template v-else-if="column.key === 'shipQty'">
                 {{ formatQty(lineSummary.shipQtyTotal) }}
+              </template>
+              <template v-else-if="column.key === 'weight'">
+                {{ formatQty(lineSummary.weightTotal) }}
               </template>
               <template v-else-if="column.key === 'totalPrice'">
                 {{ formatMoney(lineSummary.totalPrice) }}
@@ -606,6 +641,8 @@ import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import {
   CheckOutlined,
+  CopyOutlined,
+  DeleteOutlined,
   InfoCircleOutlined,
   PlusOutlined,
   PrinterOutlined,
@@ -640,6 +677,7 @@ import {
   OUTBOUND_SOURCE,
   outboundStatusColor,
   outboundSourceLabel,
+  isOutboundBusinessSource,
 } from '@/mock/outboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
@@ -735,6 +773,10 @@ const isEdit = computed(() => Boolean(props.editRecord?.id))
 const isFromDelivery = computed(() =>
   Boolean(props.editRecord?.linkedDeliveryId || props.editRecord?.linkedDeliveryCode),
 )
+const isBusinessSource = computed(() => {
+  if (!props.editRecord) return false
+  return isOutboundBusinessSource(props.editRecord)
+})
 const isSalesOutbound = computed(() => form.outboundType === '销售出库')
 const showReceiveWarehouse = computed(
   () => form.outboundType === '领料出库' || form.outboundType === '发料出库',
@@ -775,8 +817,12 @@ const outsourcingOrderList = computed(() => {
   return resolveOutboundOutsourcingOrders(orderLike)
 })
 
-const lockOutboundType = computed(() => isFromDelivery.value)
+const lockOutboundType = computed(() => isFromDelivery.value || isBusinessSource.value)
 const lockSalesOrder = computed(() => isFromDelivery.value)
+const lockReceiveWarehouse = computed(() => isBusinessSource.value)
+const lockRequisitionDept = computed(() => isBusinessSource.value)
+/** 来源为业务的出库单不允许删除明细行 */
+const canRemoveOutboundLine = computed(() => !isBusinessSource.value)
 
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/inventory/outbound',
@@ -1012,8 +1058,8 @@ const {
   columnDrawerOpen,
   displayColumns: rawDisplayColumns,
   defaultColumnSettings,
-} = useTableColumnSettings('outbound-form-lines-v9', baseLineColumns, {
-  minScrollX: 1806,
+} = useTableColumnSettings('outbound-form-lines-v11', baseLineColumns, {
+  minScrollX: 1874,
   pinEdgeColumns: false,
   pinActionColumn: true,
 })
@@ -1027,10 +1073,12 @@ const lineScrollX = computed(() => displayColumns.value.reduce((s, c) => s + (c.
 const lineSummary = computed(() => {
   const lines = form.lineItems.filter((l) => l.itemCode)
   const shipQtyTotal = lines.reduce((sum, line) => sum + (Number(line.shipQty) || 0), 0)
+  const weightTotal = lines.reduce((sum, line) => sum + (Number(line.weight) || 0), 0)
   const totalPrice = lines.reduce((sum, line) => sum + (Number(line.totalPrice) || 0), 0)
   return {
     lineCount: lines.length,
     shipQtyTotal: Math.round(shipQtyTotal * 1000) / 1000,
+    weightTotal: Math.round(weightTotal * 1000) / 1000,
     totalPrice: Math.round(totalPrice * 100) / 100,
   }
 })
@@ -1422,6 +1470,15 @@ function syncTotalWeight() {
   form.totalWeight = Math.round(calcLineWeightTotal() * 1000) / 1000
 }
 
+function onTotalWeightManual() {
+  totalWeightManual.value = true
+}
+
+function onLineWeightChange() {
+  totalWeightManual.value = false
+  syncTotalWeight()
+}
+
 function onSalesProductsSelected(rows) {
   const list = Array.isArray(rows) ? rows : [rows]
   const skuRows = list.filter((r) => r.pickType !== 'spu')
@@ -1604,14 +1661,14 @@ function onLineEditConfirm(updated) {
   const enriched = enrichOutboundLine(updated)
   if (lineEditMode.value === 'copy') {
     form.lineItems.push(cloneOutboundLine(enriched))
-    syncTotalWeight()
+    onLineWeightChange()
     return
   }
   const idx = form.lineItems.findIndex((l) => l.id === lineEditSourceId.value)
   if (idx !== -1) {
     form.lineItems[idx] = { ...form.lineItems[idx], ...enriched }
   }
-  syncTotalWeight()
+  onLineWeightChange()
 }
 
 function removeLine(id) {
@@ -1962,6 +2019,18 @@ function handleSave() {
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
   word-break: break-all;
+}
+
+.line-actions {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.line-action-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .danger-link {

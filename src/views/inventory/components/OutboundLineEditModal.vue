@@ -127,6 +127,20 @@
         <a-col :span="8">
           <a-form-item>
             <template #label>
+              <span class="field-label">出库重量(kg)</span>
+            </template>
+            <a-input-number
+              v-model:value="draft.weight"
+              :min="0"
+              :precision="3"
+              placeholder="请填写出库重量"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item>
+            <template #label>
               <span class="field-label">
                 <DollarOutlined />
                 单价

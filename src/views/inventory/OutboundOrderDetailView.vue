@@ -58,8 +58,18 @@
             <a-tab-pane key="basic" tab="基本信息" />
             <a-tab-pane
               v-if="isMaterialReqOutbound"
+              key="related"
+              :tab="`关联单据 (${relatedInbounds.length})`"
+            />
+            <a-tab-pane
+              v-if="isPurchaseReturnOutbound"
+              key="related"
+              :tab="`关联单据 (${relatedPurchaseReturns.length})`"
+            />
+            <a-tab-pane
+              v-if="isMaterialReqOutbound"
               key="cutSettle"
-              :tab="`下料结算 (${relatedCutSettles.length})`"
+              :tab="`下料结算 (${relatedCutSettleLines.length})`"
             />
             <a-tab-pane key="logs" tab="操作日志" />
           </a-tabs>
@@ -135,6 +145,9 @@
                   <template v-else-if="column.key === 'shipQty'">
                     {{ formatQtyWithUnit(line.shipQty, resolveOutboundStockUnit(line)) }}
                   </template>
+                  <template v-else-if="column.key === 'weight'">
+                    {{ line.weight != null && line.weight !== '' ? formatQty(line.weight) : '—' }}
+                  </template>
                   <template v-else-if="column.key === 'blankSizeText'">
                     <template v-if="line.blankSizeText">
                       {{ line.blankSizeText }}
@@ -204,6 +217,9 @@
                         <template v-else-if="col.key === 'shipQty'">
                           {{ formatQty(lineSummary.shipQtyTotal) }}
                         </template>
+                        <template v-else-if="col.key === 'weight'">
+                          {{ formatQty(lineSummary.weightTotal) }}
+                        </template>
                         <template v-else-if="col.key === 'totalPrice'">
                           {{ formatMoney(lineSummary.totalPrice) }}
                         </template>
@@ -215,33 +231,116 @@
             </DetailSectionCard>
           </template>
 
-          <template v-else-if="infoTab === 'cutSettle'">
-            <DetailSectionCard title="下料结算">
+          <template v-else-if="infoTab === 'related' && isMaterialReqOutbound">
+            <DetailSectionCard title="关联单据">
               <a-table
-                :columns="cutSettleColumns"
-                :data-source="relatedCutSettles"
+                :columns="relatedInboundColumns"
+                :data-source="relatedInbounds"
                 row-key="id"
                 size="small"
                 bordered
                 :pagination="false"
+                :locale="{ emptyText: '暂无领入仓入库单（确认出库后生成）' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag :color="inboundStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'docNo'">
+                    <a class="link-code" @click.prevent="goInbound(row)">{{ row.docNo || '—' }}</a>
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
+          <template v-else-if="infoTab === 'related' && isPurchaseReturnOutbound">
+            <DetailSectionCard title="关联单据">
+              <a-table
+                :columns="relatedPurchaseReturnColumns"
+                :data-source="relatedPurchaseReturns"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :locale="{ emptyText: '暂无关联的采购退货单' }"
+                :scroll="{ x: 1280 }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag :color="purchaseReturnStatusColor(row.status)">{{
+                      row.status || '—'
+                    }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'outboundStatus'">
+                    {{ row.outboundStatus || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'returnNo'">
+                    <a class="link-code" @click.prevent="goPurchaseReturn(row)">{{
+                      row.returnNo || '—'
+                    }}</a>
+                  </template>
+                  <template v-else-if="column.key === 'returnQty'">
+                    {{ row.returnQtyText || '—' }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
+          <template v-else-if="infoTab === 'cutSettle'">
+            <DetailSectionCard title="下料结算">
+              <a-table
+                :columns="cutSettleColumns"
+                :data-source="relatedCutSettleLines"
+                row-key="rowKey"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: cutSettleScrollX }"
                 :locale="{ emptyText: '暂无关联的下料结算单' }"
               >
-                <template #bodyCell="{ column, record: settle }">
-                  <template v-if="column.key === 'status'">
-                    <a-tag :color="settle.status === '已确认' ? 'green' : 'orange'">{{
-                      settle.status || '—'
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag :color="row.status === '已确认' ? 'green' : 'orange'">{{
+                      row.status || '—'
                     }}</a-tag>
                   </template>
                   <template v-else-if="column.key === 'docNo'">
-                    <a class="link-code" @click.prevent="goCutSettle(settle)">{{
-                      settle.docNo || '—'
+                    <a class="link-code" @click.prevent="goCutSettle(row)">{{
+                      row.docNo || '—'
                     }}</a>
                   </template>
-                  <template v-else-if="column.key === 'lineCount'">
-                    {{ (settle.lines || []).length }}
+                  <template v-else-if="column.key === 'demandMeters'">
+                    {{ formatQtyWithUnit(row.demandMeters, cutSettleLineUnit(row)) }}
                   </template>
-                  <template v-else-if="column.key === 'action'">
-                    <a @click.prevent="goCutSettle(settle)">查看</a>
+                  <template v-else-if="column.key === 'actualConsumeMeters'">
+                    {{ formatQtyWithUnit(row.actualConsumeMeters, cutSettleLineUnit(row)) }}
+                  </template>
+                  <template v-else-if="column.key === 'remnantLength'">
+                    {{ formatQtyWithUnit(row.remnantLength, cutSettleLineUnit(row)) }}
+                  </template>
+                  <template v-else-if="column.key === 'remnantInboundDocNo'">
+                    <a
+                      v-if="row.remnantInboundDocNo"
+                      class="link-code"
+                      @click.prevent="goRemnantInbound(row)"
+                    >
+                      {{ row.remnantInboundDocNo }}
+                    </a>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else>
+                    {{ (column.dataIndex ? row[column.dataIndex] : row[column.key]) || '—' }}
                   </template>
                 </template>
               </a-table>
@@ -326,6 +425,14 @@ import {
 import { resolveOutboundWorkOrders } from '@/utils/outboundWorkOrders'
 import { resolveOutboundOutsourcingOrders } from '@/utils/outboundOutsourcingOrders'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
+import { flattenCutSettleLines } from '@/utils/cutSettleLines'
+import { inboundOrderState } from '@/store/inboundOrderStore'
+import { inboundStatusColor } from '@/mock/inboundOptions'
+import { purchaseReturnState } from '@/store/purchaseReturnStore'
+import {
+  listRelatedInboundsForOutbound,
+  listRelatedPurchaseReturnsForOutbound,
+} from '@/utils/outboundRelatedDocs'
 
 const route = useRoute()
 const router = useRouter()
@@ -337,6 +444,7 @@ const refuseModalOpen = ref(false)
 const printModalOpen = ref(false)
 
 const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领料出库')
+const isPurchaseReturnOutbound = computed(() => record.value?.outboundType === '采购退货')
 
 const operationLogs = computed(() => record.value?.operationLogs || [])
 
@@ -357,6 +465,41 @@ const outsourcingOrderList = computed(() => {
   return resolveOutboundOutsourcingOrders(record.value)
 })
 
+const relatedInbounds = computed(() => {
+  void inboundOrderState.orders
+  return listRelatedInboundsForOutbound(record.value)
+})
+
+const relatedPurchaseReturns = computed(() => {
+  void purchaseReturnState.returns
+  return listRelatedPurchaseReturnsForOutbound(record.value)
+})
+
+const relatedInboundColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '状态', key: 'status', width: 90 },
+  { title: '入库单号', key: 'docNo', width: 160 },
+  { title: '入库类型', dataIndex: 'inboundType', width: 110 },
+  { title: '入库仓库', dataIndex: 'warehouse', width: 110 },
+  { title: '源单号', dataIndex: 'sourceOrderNo', width: 140 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+]
+
+const relatedPurchaseReturnColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '状态', key: 'status', width: 90 },
+  { title: '出库状态', key: 'outboundStatus', width: 100 },
+  { title: '退货单号', key: 'returnNo', width: 150 },
+  { title: '采购单号', dataIndex: 'purchaseOrderNo', width: 140 },
+  { title: '供应商', dataIndex: 'supplier', width: 120, ellipsis: true },
+  { title: '退货数量', key: 'returnQty', width: 110, align: 'right' },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+  { title: '更新人', dataIndex: 'updater', width: 90 },
+  { title: '更新时间', dataIndex: 'updatedAt', width: 160 },
+]
+
 const relatedCutSettles = computed(() => {
   void cutSettleState.records
   const id = record.value?.id
@@ -367,21 +510,30 @@ const relatedCutSettles = computed(() => {
   )
 })
 
+const relatedCutSettleLines = computed(() => flattenCutSettleLines(relatedCutSettles.value))
+
 const cutSettleColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '状态', key: 'status', width: 90 },
   { title: '结算单号', key: 'docNo', width: 140 },
-  { title: '源单编号', dataIndex: 'sourceOrderNo', key: 'sourceOrderNo', width: 140 },
-  { title: '出库仓库', dataIndex: 'shipWarehouse', key: 'shipWarehouse', width: 100 },
-  { title: '领入仓库', dataIndex: 'receiveWarehouse', key: 'receiveWarehouse', width: 100 },
-  { title: '明细行数', key: 'lineCount', width: 90, align: 'right' },
-  { title: '出库时间', dataIndex: 'outboundTime', key: 'outboundTime', width: 160 },
-  { title: '创建人', dataIndex: 'creator', key: 'creator', width: 100 },
-  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160 },
-  { title: '确认人', dataIndex: 'confirmer', key: 'confirmer', width: 100 },
-  { title: '确认时间', dataIndex: 'confirmedAt', key: 'confirmedAt', width: 160 },
-  { title: '备注', dataIndex: 'remark', key: 'remark', ellipsis: true },
-  { title: '操作', key: 'action', width: 80, fixed: 'right' },
+  { title: '物料名称', dataIndex: 'itemName', width: 150, ellipsis: true },
+  { title: '编码', dataIndex: 'itemCode', width: 130 },
+  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 90 },
+  { title: '图号', dataIndex: 'drawingNo', width: 110, ellipsis: true },
+  { title: '下料尺寸', dataIndex: 'blankSizeText', width: 150, ellipsis: true },
+  { title: '需求数', key: 'demandMeters', width: 100, align: 'right' },
+  { title: '实耗', key: 'actualConsumeMeters', width: 100, align: 'right' },
+  { title: '余料', key: 'remnantLength', width: 100, align: 'right' },
+  { title: '工单编号', dataIndex: 'workOrderNo', width: 140 },
+  { title: '余料入库单号', key: 'remnantInboundDocNo', width: 150 },
+  { title: '确认人', dataIndex: 'confirmer', width: 90 },
+  { title: '确认时间', dataIndex: 'confirmedAt', width: 160 },
+  { title: '拣选批次', dataIndex: 'pickedBatchNo', width: 140 },
+  { title: '余料新批次', dataIndex: 'remnantBatchNo', width: 140 },
 ]
+
+const cutSettleScrollX = cutSettleColumns.reduce((s, c) => s + (c.width || 100), 0)
 
 const lineColumns = computed(() =>
   filterOutboundLineColumns(outboundDetailLineColumns, record.value?.outboundType),
@@ -396,10 +548,12 @@ const linkedQc = computed(() => {
 const lineSummary = computed(() => {
   const lines = record.value?.lineItems || []
   const shipQtyTotal = lines.reduce((sum, line) => sum + (Number(line.shipQty) || 0), 0)
+  const weightTotal = lines.reduce((sum, line) => sum + (Number(line.weight) || 0), 0)
   const totalPrice = lines.reduce((sum, line) => sum + (Number(line.totalPrice) || 0), 0)
   return {
     lineCount: lines.length,
     shipQtyTotal: Math.round(shipQtyTotal * 1000) / 1000,
+    weightTotal: Math.round(weightTotal * 1000) / 1000,
     totalPrice: Math.round(totalPrice * 100) / 100,
   }
 })
@@ -454,11 +608,36 @@ function goBack() {
   router.push('/inventory/outbound')
 }
 
-function goCutSettle(settle) {
-  if (!settle?.id) return
-  const path = `/inventory/cut-settle/${settle.id}`
-  openTab(path, settle.docNo || '下料结算详情')
+function goCutSettle(row) {
+  const id = row?.settleId || row?.id
+  if (!id) return
+  const path = `/inventory/cut-settle/${id}`
+  openTab(path, row.docNo || '下料结算详情')
   router.push(path)
+}
+
+function cutSettleLineUnit(row) {
+  return String(row?.unit || '').trim() || '米'
+}
+
+function goRemnantInbound(row) {
+  const id = row?.remnantInboundId
+  if (id) {
+    const path = `/inventory/inbound/${id}`
+    openTab(path, row.remnantInboundDocNo || '入库单详情')
+    router.push(path)
+    return
+  }
+  const docNo = row?.remnantInboundDocNo
+  if (!docNo) return
+  const found = inboundOrderState.orders.find((o) => o.docNo === docNo)
+  if (found) {
+    const path = `/inventory/inbound/${found.id}`
+    openTab(path, docNo)
+    router.push(path)
+    return
+  }
+  message.info(`未找到余料入库单 ${docNo}`)
 }
 
 function openEdit() {
@@ -502,6 +681,27 @@ function goFactoryQc() {
   const path = `/quality/factory-qc/${linkedQc.value.id}`
   openTab(path, linkedQc.value.qcNo || '出厂质检详情')
   router.push(path)
+}
+
+function goInbound(row) {
+  if (!row?.id) return
+  const path = `/inventory/inbound/${row.id}`
+  openTab(path, row.docNo || '入库单详情')
+  router.push(path)
+}
+
+function goPurchaseReturn(row) {
+  if (!row?.id) return
+  const path = `/procurement/purchase-returns/${row.id}`
+  openTab(path, `采购退货 ${row.returnNo || ''}`.trim())
+  router.push(path)
+}
+
+function purchaseReturnStatusColor(status) {
+  if (status === '已完成') return 'success'
+  if (status === '进行中') return 'processing'
+  if (status === '作废') return 'default'
+  return 'warning'
 }
 
 function handleApprove() {

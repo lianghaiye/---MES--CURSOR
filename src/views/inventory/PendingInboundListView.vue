@@ -132,11 +132,15 @@
           <CheckOutlined />
           确认入库
         </a-button>
+        <a-button size="small" danger @click="handleRefuseInbound">
+          <CloseCircleOutlined />
+          拒绝入库
+        </a-button>
         <a-button size="small" @click="handleBatchDelete">
           <DeleteOutlined />
           删除
         </a-button>
-        <a-button size="small" @click="stubPrint">
+        <a-button size="small" @click="openPrintSelected">
           <PrinterOutlined />
           打印
         </a-button>
@@ -210,6 +214,9 @@
                       <a-menu-item v-if="canConfirmInbound(row)" key="confirm"
                         >确认入库</a-menu-item
                       >
+                      <a-menu-item v-if="canRefuseInbound(row)" key="refuse" danger>
+                        拒绝入库
+                      </a-menu-item>
                       <a-menu-item v-if="canDeleteInbound(row)" key="delete" danger>
                         删除
                       </a-menu-item>
@@ -246,11 +253,13 @@
           :order-id="selectedId"
           v-model:detail-tab="detailTab"
           @confirm="selectedRecord && handleConfirmOne(selectedRecord)"
+          @refuse="selectedRecord && openRefuse([selectedRecord])"
           @edit="selectedRecord && openEdit(selectedRecord)"
           @delete="selectedRecord && confirmDelete(selectedRecord)"
           @approve-pass="selectedRecord && handleApprovePass(selectedRecord)"
           @approve-reject="selectedRecord && handleApproveReject(selectedRecord)"
           @open-full="selectedRecord && goDetail(selectedRecord)"
+          @print="selectedRecord && openPrintOne(selectedRecord)"
         />
       </div>
     </div>
@@ -267,11 +276,15 @@
             <CheckOutlined />
             确认入库
           </a-button>
+          <a-button size="small" danger @click="handleRefuseInbound">
+            <CloseCircleOutlined />
+            拒绝入库
+          </a-button>
           <a-button size="small" @click="handleBatchDelete">
             <DeleteOutlined />
             删除
           </a-button>
-          <a-button size="small" @click="stubPrint">
+          <a-button size="small" @click="openPrintSelected">
             <PrinterOutlined />
             打印
           </a-button>
@@ -306,7 +319,7 @@
       <a-alert type="info" show-icon class="summary-bar" :banner="false">
         <template #message>
           <span>
-            仅展示「待处理 / 部分入库」明细，共 {{ filteredList.length }} 条；当前表格已选择
+            仅展示「待入库 / 部分入库」明细，共 {{ filteredList.length }} 条；当前表格已选择
             <strong>{{ selectedOrderIds.length }}</strong> 项
             <a-button type="link" size="small" @click="selectedOrderIds = []">清空</a-button>
           </span>
@@ -408,6 +421,15 @@
                   确认入库
                 </a-button>
                 <a-button
+                  v-if="canRefuseInbound(resolveOrder(record))"
+                  type="link"
+                  size="small"
+                  danger
+                  @click.stop="openRefuse([resolveOrder(record)])"
+                >
+                  拒绝入库
+                </a-button>
+                <a-button
                   v-if="canDeleteInbound(resolveOrder(record))"
                   type="link"
                   size="small"
@@ -436,6 +458,18 @@
       </div>
     </div>
 
+    <InboundRefuseModal
+      v-model:open="refuseModalOpen"
+      :doc-nos="refuseDocNos"
+      @confirm="onRefuseConfirm"
+    />
+
+    <InboundOrderPrintModal
+      v-model:open="printModalOpen"
+      :order="printOrder"
+      :orders="printOrders"
+    />
+
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -458,6 +492,7 @@ import {
   ReloadOutlined,
   DeleteOutlined,
   CheckOutlined,
+  CloseCircleOutlined,
   PrinterOutlined,
   TableOutlined,
   AppstoreOutlined,
@@ -465,7 +500,7 @@ import {
   DownOutlined,
 } from '@ant-design/icons-vue'
 import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
-import { inboundTypeOptions } from '@/mock/inboundOptions'
+import { inboundTypeOptions, inboundStatusColor } from '@/mock/inboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
   inboundOrderState,
@@ -473,10 +508,12 @@ import {
   deleteInboundOrder,
   approveInboundOrder,
   rejectInboundOrder,
+  refuseInbound,
   canEditInbound,
   canDeleteInbound,
   canApproveInbound,
   canConfirmInbound,
+  canRefuseInbound,
 } from '@/store/inboundOrderStore'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
@@ -485,6 +522,8 @@ import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 import InboundOrderDetailPanel from './components/InboundOrderDetailPanel.vue'
+import InboundRefuseModal from './components/InboundRefuseModal.vue'
+import InboundOrderPrintModal from './components/InboundOrderPrintModal.vue'
 import {
   PENDING_INBOUND_STATUSES,
   PENDING_INBOUND_ORDER_MERGE_KEYS,
@@ -519,6 +558,12 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const selectedOrderIds = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
+const refuseModalOpen = ref(false)
+const refuseTargets = ref([])
+const printModalOpen = ref(false)
+const printOrder = ref(null)
+const printOrders = ref([])
+const refuseDocNos = computed(() => (refuseTargets.value || []).map((o) => o.docNo || o.id))
 
 const inboundTypeOpts = inboundTypeOptions.map((v) =>
   typeof v === 'string' ? { label: v, value: v } : v,
@@ -658,12 +703,7 @@ function resolveOrder(record) {
 }
 
 function statusColor(status) {
-  if (status === '已完成' || status === '已入库') return 'success'
-  if (status === '已拒绝') return 'error'
-  if (status === '待审批') return 'warning'
-  if (status === '部分入库') return 'warning'
-  if (status === '待处理') return 'processing'
-  return 'default'
+  return inboundStatusColor(status)
 }
 
 function toggleLayout() {
@@ -702,6 +742,7 @@ function onToggleSelectAllPage(e) {
 function onCardAction(key, row) {
   if (key === 'edit') openEdit(row)
   else if (key === 'confirm') handleConfirmOne(row)
+  else if (key === 'refuse') openRefuse([row])
   else if (key === 'delete') confirmDelete(row)
   else if (key === 'detail') goDetail(row)
 }
@@ -732,8 +773,31 @@ function handleReset() {
   pagination.current = 1
 }
 
-function stubPrint() {
-  message.info('批量打印功能开发中')
+function openPrintOne(record) {
+  const order = resolveOrder(record)
+  if (!order) return
+  printOrder.value = order
+  printOrders.value = []
+  printModalOpen.value = true
+}
+
+function openPrintSelected() {
+  const rows = selectedOrderIds.value.length
+    ? filteredOrders.value.filter((r) => selectedOrderIds.value.includes(r.id))
+    : selectedRecord.value
+      ? [selectedRecord.value]
+      : []
+  if (!rows.length) {
+    message.warning('请先选择要打印的入库单')
+    return
+  }
+  if (rows.length === 1) {
+    openPrintOne(rows[0])
+    return
+  }
+  printOrder.value = null
+  printOrders.value = rows
+  printModalOpen.value = true
 }
 
 function onBatchMenu({ key }) {
@@ -847,7 +911,7 @@ function handleApprovePass(record) {
   if (!order) return
   Modal.confirm({
     title: `通过审批 ${order.docNo}？`,
-    content: '通过后状态变为「待处理」，可进行确认入库。',
+    content: '通过后状态变为「待入库」，可进行确认入库。',
     onOk: () => {
       const res = approveInboundOrder(order.id)
       if (res.ok) {
@@ -873,6 +937,50 @@ function handleApproveReject(record) {
       } else message.warning(res.message)
     },
   })
+}
+
+function applyRefuseResult({ count, blocked }) {
+  if (blocked?.length) {
+    message.warning(
+      blocked
+        .map((b) => `${b.docNo}: ${b.message}`)
+        .slice(0, 3)
+        .join('；'),
+    )
+  }
+  if (count > 0) {
+    message.success(count === 1 ? '已拒绝入库' : `已拒绝入库 ${count} 条`)
+    selectedOrderIds.value = []
+    refuseModalOpen.value = false
+    refuseTargets.value = []
+    handleSearch()
+  } else if (!blocked?.length) {
+    message.warning('所选单据无法拒绝入库')
+  }
+}
+
+function openRefuse(records) {
+  const list = (records || []).filter(Boolean)
+  if (!list.length) {
+    message.warning('请先选择入库单')
+    return
+  }
+  refuseTargets.value = list
+  refuseModalOpen.value = true
+}
+
+function onRefuseConfirm(reason) {
+  const ids = refuseTargets.value.map((o) => o.id)
+  applyRefuseResult(refuseInbound(ids, { reason }))
+}
+
+function handleRefuseInbound() {
+  if (!selectedOrderIds.value.length) {
+    message.warning('请先选择入库单')
+    return
+  }
+  const rows = inboundOrderState.orders.filter((o) => selectedOrderIds.value.includes(o.id))
+  openRefuse(rows)
 }
 </script>
 

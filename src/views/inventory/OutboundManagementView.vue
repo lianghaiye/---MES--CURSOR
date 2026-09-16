@@ -345,6 +345,13 @@
             <template v-else-if="column.key === 'shipQtyTotal'">
               {{ formatOutboundQtyRatio(record, formatQty) }}
             </template>
+            <template v-else-if="column.key === 'totalWeight'">
+              {{
+                record.totalWeight != null && record.totalWeight !== ''
+                  ? formatQty(record.totalWeight)
+                  : '—'
+              }}
+            </template>
             <template v-else-if="column.key === 'sourceChannel'">
               {{ outboundSourceLabel(record.sourceChannel) }}
             </template>
@@ -563,6 +570,7 @@ const baseColumns = [
   { title: '出库类型', dataIndex: 'outboundType', width: 110 },
   { title: '出库仓库', dataIndex: 'warehouse', width: 100 },
   { title: '出库数量', key: 'shipQtyTotal', width: 120, align: 'right' },
+  { title: '出库重量(kg)', key: 'totalWeight', width: 120, align: 'right' },
   { title: '源单号', key: 'sourceOrderNo', width: 140 },
   { title: '销售单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
@@ -579,7 +587,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outbound-list-v7', baseColumns, { minScrollX: 2260 })
+  useTableColumnSettings('outbound-list-v8', baseColumns, { minScrollX: 2380 })
 
 const filteredList = computed(() =>
   filterOutboundOrders(outboundState.orders, appliedFilters.value),

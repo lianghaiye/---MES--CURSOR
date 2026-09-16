@@ -26,6 +26,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { inboundSourceLabel } from '@/mock/inboundOptions'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -44,6 +45,11 @@ const metaItems = computed(() => {
   const r = props.record
   return [
     { key: 'status', label: '状态', value: display(r.status) },
+    {
+      key: 'sourceChannel',
+      label: '来源',
+      value: inboundSourceLabel(r.sourceChannel),
+    },
     { key: 'creator', label: '创建人', value: display(r.creator) },
     { key: 'createdAt', label: '创建时间', value: display(r.createdAt) },
     { key: 'confirmer', label: '确认人', value: display(r.confirmer) },

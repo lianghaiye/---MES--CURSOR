@@ -1,8 +1,9 @@
 /** 待入库列表：入库单展平为明细行 + 订单级 rowspan */
 
 import dayjs from 'dayjs'
+import { normalizeInboundStatus } from '@/mock/inboundOptions'
 
-export const PENDING_INBOUND_STATUSES = ['待处理', '部分入库']
+export const PENDING_INBOUND_STATUSES = ['待入库', '部分入库']
 
 /** 订单级可合并列 */
 export const PENDING_INBOUND_ORDER_MERGE_KEYS = [
@@ -45,7 +46,8 @@ export function calcInboundOrderQty(order) {
 }
 
 export function calcInboundReceivedQty(order) {
-  if (order?.status === '已完成') return calcInboundOrderQty(order)
+  const status = normalizeInboundStatus(order?.status)
+  if (status === '已入库') return calcInboundOrderQty(order)
   return (order?.lineItems || []).reduce((sum, line) => {
     if ((line.lineStatus || '待入库') === '已入库') {
       return sum + (Number(line.qty) || 0)
@@ -59,11 +61,11 @@ export function formatInboundQtyRatio(order, formatFn) {
   return `${fmt(calcInboundReceivedQty(order))}/${fmt(calcInboundOrderQty(order))}`
 }
 
-/** 待处理/部分入库单据 → 明细行 */
+/** 待入库/部分入库单据 → 明细行 */
 export function flattenPendingInboundLines(orders = []) {
   const rows = []
   for (const order of orders || []) {
-    const status = order.status || '待处理'
+    const status = normalizeInboundStatus(order.status)
     if (!PENDING_INBOUND_STATUSES.includes(status)) continue
     const inboundQtyTotalText = formatInboundQtyRatio(order, (v) => {
       const n = Number(v)

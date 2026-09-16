@@ -35,6 +35,7 @@ export const outboundFormLineColumns = [
   { title: '货位号', key: 'locationNo', dataIndex: 'locationNo', width: 110, ellipsis: true },
   /** 数量与单位合并展示，如「10 米」 */
   { title: '出库数量', key: 'shipQty', width: 120 },
+  { title: '出库重量(kg)', key: 'weight', width: 120, align: 'right' },
   { title: '拣选批次', key: 'batchPick', width: 260 },
   {
     title: '包装形式',
@@ -46,7 +47,7 @@ export const outboundFormLineColumns = [
   { title: '发货备注', key: 'deliveryRemark', width: 140, ellipsis: true },
   { title: '单价', key: 'unitPrice', width: 96, align: 'right' },
   { title: '总价', key: 'totalPrice', width: 96, align: 'right' },
-  { title: '操作', key: 'actions', width: 220 },
+  { title: '操作', key: 'actions', width: 168 },
 ]
 
 /** 详情页不展示实时库存；拣选批次改为出库实扣批次 */

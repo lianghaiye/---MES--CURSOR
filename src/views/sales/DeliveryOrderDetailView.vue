@@ -22,6 +22,7 @@
               class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
             >
               <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="factoryQc" :tab="`出厂质检 (${factoryQcList.length})`" />
               <a-tab-pane key="outbound" :tab="`出库信息 (${outboundList.length})`" />
             </a-tabs>
           </div>
@@ -149,6 +150,42 @@
             />
           </template>
 
+          <template v-else-if="activeTab === 'factoryQc'">
+            <DetailSectionCard title="出厂质检">
+              <a-table
+                :columns="factoryQcColumns"
+                :data-source="factoryQcList"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :locale="{ emptyText: '暂无出厂质检单（由关联销售出库生成）' }"
+                :scroll="{ x: 1400 }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'qcNo'">
+                    <a class="link-code" @click.prevent="goFactoryQc(row)">{{ row.qcNo || '—' }}</a>
+                  </template>
+                  <template v-else-if="column.key === 'qcStatus'">
+                    <a-tag :color="factoryQcStatusColor(row.qcStatus)">{{
+                      row.qcStatus || '—'
+                    }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'qcResult'">
+                    {{ row.qcResult || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'inspectQty'">
+                    {{ formatFactoryQcQty(row) }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
           <template v-else-if="activeTab === 'outbound'">
             <DetailSectionCard title="出库信息">
               <a-table
@@ -205,6 +242,8 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
+import { listFactoryQcForDelivery, calcFactoryQcInspectQty } from '@/utils/outboundRelatedDocs'
+import { factoryQcState } from '@/store/factoryQcStore'
 import {
   flattenOutboundOrdersToIssueLines,
   createOutboundIssueLineColumns,
@@ -302,6 +341,20 @@ const shipAttachmentColumns = [
 const outboundColumns = createOutboundIssueLineColumns()
 const outboundTableScrollX = getOutboundIssueLineScrollX(outboundColumns)
 
+const factoryQcColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '质检单号', key: 'qcNo', width: 150 },
+  { title: '质检状态', key: 'qcStatus', width: 100 },
+  { title: '质检结果', key: 'qcResult', width: 100 },
+  { title: '客户名称', dataIndex: 'customerName', width: 120, ellipsis: true },
+  { title: '销售单号', dataIndex: 'salesOrderNo', width: 140 },
+  { title: '质检数量', key: 'inspectQty', width: 100, align: 'right' },
+  { title: '质检人', dataIndex: 'inspector', width: 90 },
+  { title: '质检时间', dataIndex: 'inspectedAt', width: 160 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+]
+
 const outboundRows = computed(() => {
   void outboundState.orders
   if (!record.value) return []
@@ -310,6 +363,12 @@ const outboundRows = computed(() => {
 })
 
 const outboundList = outboundRows
+
+const factoryQcList = computed(() => {
+  void outboundState.orders
+  void factoryQcState.records
+  return listFactoryQcForDelivery(record.value)
+})
 
 const sourceSalesOrder = computed(() => {
   if (!record.value?.salesOrderId) return null
@@ -342,6 +401,25 @@ function goOutboundDetail(row) {
   const path = `/inventory/outbound/${id}`
   openTab(path, '出库单详情')
   router.push(path)
+}
+
+function goFactoryQc(row) {
+  if (!row?.id) return
+  const path = `/quality/factory-qc/${row.id}`
+  const resolved = router.resolve(path)
+  window.open(resolved.href, '_blank')
+}
+
+function factoryQcStatusColor(status) {
+  if (status === '已完成') return 'success'
+  if (status === '待质检') return 'processing'
+  if (status === '已终止') return 'default'
+  return 'warning'
+}
+
+function formatFactoryQcQty(row) {
+  const qty = calcFactoryQcInspectQty(row)
+  return qty || qty === 0 ? qty : '—'
 }
 
 function scatterPicks(ship) {

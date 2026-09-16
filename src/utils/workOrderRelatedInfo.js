@@ -375,7 +375,7 @@ export function buildWorkOrderInboundRows(workOrder) {
       {
         id: `ib-demo-${workOrder.id}`,
         index: 1,
-        status: '待处理',
+        status: '待入库',
         docNo: `1-${dayjs().format('YYYYMMDD')}-001`,
         docId: '',
         summary: workOrder.productName || '—',

@@ -10,6 +10,12 @@
           </a-space>
         </div>
       </div>
+      <a-space :size="4" class="header-actions">
+        <a-button type="link" size="small" class="header-action-btn" @click="emit('print')">
+          <PrinterOutlined />
+          打印
+        </a-button>
+      </a-space>
     </div>
 
     <div v-if="hasActions" class="detail-action-bar">
@@ -21,6 +27,9 @@
           @click="emit('confirm')"
         >
           确认入库
+        </a-button>
+        <a-button v-if="canRefuseInbound(record)" size="small" danger @click="emit('refuse')">
+          拒绝入库
         </a-button>
         <a-button v-if="canEditInbound(record)" size="small" @click="emit('edit')">编辑</a-button>
         <template v-if="canApproveInbound(record)">
@@ -57,9 +66,7 @@
               <template #bodyCell="{ column, record: line, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'lineStatus'">
-                  <a-tag
-                    :color="(line.lineStatus || '待入库') === '已入库' ? 'success' : 'processing'"
-                  >
+                  <a-tag :color="lineStatusColor(line.lineStatus)">
                     {{ line.lineStatus || '待入库' }}
                   </a-tag>
                 </template>
@@ -118,6 +125,7 @@
 <script setup>
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
+import { PrinterOutlined } from '@ant-design/icons-vue'
 import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 import {
   inboundOrderState,
@@ -126,7 +134,9 @@ import {
   canEditInbound,
   canDeleteInbound,
   canApproveInbound,
+  canRefuseInbound,
 } from '@/store/inboundOrderStore'
+import { inboundStatusColor } from '@/mock/inboundOptions'
 import { inboundDetailLineColumns } from '@/utils/inboundLineColumns'
 import {
   enrichInboundLine,
@@ -146,11 +156,13 @@ const props = defineProps({
 const emit = defineEmits([
   'update:detailTab',
   'confirm',
+  'refuse',
   'edit',
   'delete',
   'approve-pass',
   'approve-reject',
   'open-full',
+  'print',
 ])
 
 const internalTab = ref('basic')
@@ -189,16 +201,24 @@ const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 
 const hasActions = computed(() => {
   const r = record.value
   if (!r) return false
-  return canConfirmInbound(r) || canEditInbound(r) || canDeleteInbound(r) || canApproveInbound(r)
+  return (
+    canConfirmInbound(r) ||
+    canRefuseInbound(r) ||
+    canEditInbound(r) ||
+    canDeleteInbound(r) ||
+    canApproveInbound(r)
+  )
 })
 
 function statusColor(status) {
-  if (status === '已完成' || status === '已入库') return 'success'
-  if (status === '已拒绝') return 'error'
-  if (status === '待审批') return 'warning'
-  if (status === '部分入库') return 'warning'
-  if (status === '待处理') return 'processing'
-  return 'default'
+  return inboundStatusColor(status)
+}
+
+function lineStatusColor(status) {
+  const st = status || '待入库'
+  if (st === '已入库') return 'success'
+  if (st === '已拒绝') return 'error'
+  return 'processing'
 }
 </script>
 
@@ -228,6 +248,19 @@ export default { name: 'InboundOrderDetailPanel' }
 .header-main {
   min-width: 0;
   flex: 1;
+}
+
+.header-actions {
+  flex-shrink: 0;
+}
+
+.header-action-btn {
+  padding-inline: 4px;
+  color: rgba(0, 0, 0, 0.65);
+
+  &:hover {
+    color: #1677ff;
+  }
 }
 
 .detail-title {

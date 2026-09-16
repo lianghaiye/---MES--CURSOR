@@ -40,6 +40,32 @@ function createFactoryQc(partial) {
 
 export const mockFactoryQcRecords = [
   createFactoryQc({
+    id: 'fqc-delivery-seed-1',
+    qcNo: 'CCZJ202605130001',
+    qcStatus: '待质检',
+    qcResult: '',
+    salesOrderNo: '1-20260512-005',
+    sourceOrderNo: 'OUT202605130001',
+    customerName: '测试人员',
+    outboundDocNo: 'OUT202605130001',
+    inspector: '',
+    inspectedAt: '',
+    creator: 'admin1',
+    createdAt: '2026-05-13 10:00:00',
+    inspectMethod: '抽检',
+    inspectDate: '2026-05-13',
+    lineItems: [
+      createQcLineItem({
+        itemName: '清水离心泵',
+        itemCode: 'CP2610001',
+        shipQty: 3,
+        shipWarehouse: '成品仓',
+        unit: '件',
+        inspectQty: 3,
+      }),
+    ],
+  }),
+  createFactoryQc({
     id: 'fqc-1',
     qcStatus: '已终止',
     salesOrderNo: '1-20260520-099',

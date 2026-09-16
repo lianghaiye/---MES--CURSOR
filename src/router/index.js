@@ -117,6 +117,12 @@ const routes = [
     meta: { title: '出库单预览', standalone: true },
   },
   {
+    path: '/inventory/inbound/preview',
+    name: 'inventory-inbound-preview',
+    component: () => import('@/views/inventory/InboundOrderPrintPreviewView.vue'),
+    meta: { title: '入库单预览', standalone: true },
+  },
+  {
     path: '/engineering-change/ecn/print',
     name: 'engineering-change-ecn-print',
     component: () => import('@/views/engineering-change/EcnPrintPreviewView.vue'),

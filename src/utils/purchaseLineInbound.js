@@ -67,7 +67,7 @@ export function calcPoLineAppliedReceiptQty(po, line) {
   return total
 }
 
-/** 已申请入库数量（含待处理入库单） */
+/** 已申请入库数量（含待入库入库单） */
 export function calcPoLineAppliedInboundQty(po, line) {
   if (!line) return 0
   const lineId = line.id
