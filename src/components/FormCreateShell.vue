@@ -1,5 +1,27 @@
 <template>
-  <div v-if="pageMode && detailMode" class="form-detail-page">
+  <div v-if="pageMode && embedded && contentOnly" class="form-embedded-content-only">
+    <div class="embedded-body">
+      <slot />
+    </div>
+    <div v-if="$slots.footer" class="embedded-footer">
+      <slot name="footer" />
+    </div>
+  </div>
+  <div v-else-if="pageMode && embedded" class="form-embedded-panel">
+    <div class="embedded-header">
+      <div class="header-left">
+        <span class="page-title">{{ title }}</span>
+        <slot name="header-extra" />
+      </div>
+      <a-space v-if="$slots.footer" :size="8" class="header-actions">
+        <slot name="footer" />
+      </a-space>
+    </div>
+    <div class="embedded-body">
+      <slot />
+    </div>
+  </div>
+  <div v-else-if="pageMode && detailMode" class="form-detail-page">
     <div class="detail-sticky-bar">
       <div class="page-header is-detail">
         <div class="header-left">
@@ -60,6 +82,10 @@ const props = defineProps({
   pageMode: { type: Boolean, default: false },
   /** 只读详情：顶栏对齐销售订单（单号 + 标签 + 右侧操作） */
   detailMode: { type: Boolean, default: false },
+  /** 主从卡片右侧内嵌（无返回、占满容器高度） */
+  embedded: { type: Boolean, default: false },
+  /** 仅表单内容（用于详情 Tab，不重复顶栏） */
+  contentOnly: { type: Boolean, default: false },
   open: { type: Boolean, default: false },
   title: { type: String, default: '' },
   width: { type: [String, Number], default: '720px' },
@@ -81,6 +107,112 @@ const innerStyle = computed(() => {
 </script>
 
 <style lang="less" scoped>
+.form-embedded-content-only {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #f5f6f8;
+
+  .embedded-body {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0 0 8px;
+    display: flex;
+    flex-direction: column;
+
+    :deep(.section-block) {
+      background: #fff;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+      .section-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: #1f1f1f;
+      }
+    }
+
+    :deep(.form-layout) {
+      flex: 1;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  .embedded-footer {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px 0 0;
+    background: #f5f6f8;
+  }
+}
+
+.form-embedded-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #f5f6f8;
+  overflow: hidden;
+}
+
+.embedded-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.embedded-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+
+  :deep(.section-block) {
+    background: #fff;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #1f1f1f;
+    }
+  }
+
+  :deep(.form-layout) {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 .form-detail-page {
   margin: -12px;
   height: calc(100vh - 112px);

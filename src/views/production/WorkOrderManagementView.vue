@@ -86,33 +86,37 @@
               :options="workCenterOpts"
             />
           </a-form-item>
-          <template v-if="layoutMode === 'split'" #toolbar>
-            <a-button type="primary" size="small" @click="openCreate">
-              <PlusOutlined />
-              新增工单
-            </a-button>
-            <a-button size="small" @click="openBatchPrint">
-              <PrinterOutlined />
-              批量打印
-            </a-button>
-            <a-dropdown>
-              <a-button size="small">
-                批量操作
-                <DownOutlined />
-              </a-button>
-              <template #overlay>
-                <a-menu @click="onBatchMenu">
-                  <a-menu-item key="import">批量导入</a-menu-item>
-                  <a-menu-item key="export">批量导出</a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
-            <a-button class="batch-dispatch-btn" size="small" @click="handleBatchDispatch">
-              批量下发
-            </a-button>
-          </template>
         </ListFilterBar>
       </a-form>
+    </div>
+
+    <!-- 卡片视图：搜索下方独立操作条 -->
+    <div v-if="layoutMode === 'split'" class="split-action-card">
+      <a-space wrap :size="8">
+        <a-button type="primary" size="small" @click="openCreate">
+          <PlusOutlined />
+          新增工单
+        </a-button>
+        <a-button size="small" @click="openBatchPrint">
+          <PrinterOutlined />
+          批量打印
+        </a-button>
+        <a-dropdown>
+          <a-button size="small">
+            批量操作
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onBatchMenu">
+              <a-menu-item key="import">批量导入</a-menu-item>
+              <a-menu-item key="export">批量导出</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+        <a-button class="batch-dispatch-btn" size="small" @click="handleBatchDispatch">
+          批量下发
+        </a-button>
+      </a-space>
     </div>
 
     <!-- 主从布局 / 列表布局 -->
@@ -1178,6 +1182,26 @@ function onScheduleBatchSubmit(payload) {
 .filter-card {
   padding: 8px 12px 6px;
   margin-bottom: 8px;
+}
+
+.split-action-card {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+
+  :deep(.ant-space) {
+    align-items: center;
+  }
+
+  :deep(.ant-btn) {
+    display: inline-flex;
+    align-items: center;
+  }
 }
 
 .filter-footer {

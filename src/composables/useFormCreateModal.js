@@ -10,6 +10,10 @@ export function useFormCreateModal(props, emit, options = {}) {
   const shellTitle = computed(() => (typeof getTitle === 'function' ? getTitle() : getTitle || ''))
 
   function handleCancel() {
+    if (props.embedded) {
+      emit('cancel')
+      return
+    }
     if (props.pageMode) {
       if (props.viewOnly) {
         closeToActiveTab()
@@ -22,6 +26,7 @@ export function useFormCreateModal(props, emit, options = {}) {
   }
 
   function closeAfterSave() {
+    if (props.embedded) return
     if (props.pageMode) {
       goBack()
       return
