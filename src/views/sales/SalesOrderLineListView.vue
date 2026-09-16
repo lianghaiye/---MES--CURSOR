@@ -157,7 +157,7 @@
 
     <div class="table-card">
       <a-table
-        :columns="displayColumns"
+        :columns="mergedDisplayColumns"
         :data-source="pagedRows"
         row-key="id"
         size="small"
@@ -282,10 +282,12 @@ import {
   salespersonOptions,
 } from '@/mock/salesOrderOptions'
 import {
+  buildSalesOrderLineRowSpans,
   compareSalesOrderLinesDefault,
   filterSalesOrderLines,
   flattenSalesOrderLines,
   SALES_LINE_DELIVERY_STATUS_OPTIONS,
+  SALES_LINE_ORDER_MERGE_KEYS,
 } from '@/utils/salesOrderLineList'
 import { salesOrderLineExportFields } from '@/utils/exportFields/salesOrderLineExport'
 import { salesDeliveryStatusColor, salesOrderStatusColor } from '@/utils/salesOrderStatus'
@@ -493,6 +495,24 @@ const pagedRows = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
   return filteredRows.value.slice(start, start + pagination.pageSize)
 })
+
+/** 当前页内同订单合并：销售单号/状态/客户/业务员/创建人/创建时间 */
+const pageOrderRowSpans = computed(() => buildSalesOrderLineRowSpans(pagedRows.value))
+
+const orderMergeKeySet = new Set(SALES_LINE_ORDER_MERGE_KEYS)
+
+const mergedDisplayColumns = computed(() =>
+  displayColumns.value.map((col) => {
+    if (!orderMergeKeySet.has(col.key)) return col
+    return {
+      ...col,
+      customCell: (_record, index) => ({
+        rowSpan: pageOrderRowSpans.value[index] ?? 1,
+        style: { verticalAlign: 'middle' },
+      }),
+    }
+  }),
+)
 
 const summary = computed(() => {
   const list = filteredRows.value

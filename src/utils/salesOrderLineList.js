@@ -136,12 +136,48 @@ export function filterSalesOrderLines(rows = [], filters = {}) {
   })
 }
 
-/** 默认排序：交货日期升序（空值靠后），再按销售单号、行序 */
+/**
+ * 默认排序：先按销售单号聚拢（便于列表订单级字段 rowspan），
+ * 同单内交货日期升序（空值靠后），再按行序
+ */
 export function compareSalesOrderLinesDefault(a, b) {
+  const idA = String(a.orderId || a.orderNo || '')
+  const idB = String(b.orderId || b.orderNo || '')
+  const noCmp = String(b.orderNo || '').localeCompare(String(a.orderNo || ''), 'zh-CN')
+  if (noCmp) return noCmp
+  if (idA !== idB) return idA.localeCompare(idB)
   const da = a.deliveryDate ? dayjs(a.deliveryDate).valueOf() : Number.POSITIVE_INFINITY
   const db = b.deliveryDate ? dayjs(b.deliveryDate).valueOf() : Number.POSITIVE_INFINITY
   if (da !== db) return da - db
-  const noCmp = String(b.orderNo || '').localeCompare(String(a.orderNo || ''), 'zh-CN')
-  if (noCmp) return noCmp
   return (a.lineIndex || 0) - (b.lineIndex || 0)
 }
+
+/** 当前页内按订单计算 rowspan：首行 = 连续行数，后续行 = 0 */
+export function buildSalesOrderLineRowSpans(rows = []) {
+  const spans = new Array(rows.length).fill(1)
+  let i = 0
+  while (i < rows.length) {
+    const key = String(rows[i]?.orderId || rows[i]?.orderNo || '')
+    let j = i + 1
+    while (j < rows.length) {
+      const next = String(rows[j]?.orderId || rows[j]?.orderNo || '')
+      if (next !== key) break
+      j += 1
+    }
+    const span = j - i
+    spans[i] = span
+    for (let k = i + 1; k < j; k += 1) spans[k] = 0
+    i = j
+  }
+  return spans
+}
+
+/** 订单级可合并列（产品明细列不合并） */
+export const SALES_LINE_ORDER_MERGE_KEYS = [
+  'orderNo',
+  'progressStatus',
+  'customerName',
+  'salesperson',
+  'createdAt',
+  'creator',
+]
