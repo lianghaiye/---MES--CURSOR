@@ -110,7 +110,7 @@
       row-key="rowKey"
       size="small"
       bordered
-      :scroll="{ x: 1980 }"
+      :scroll="{ x: 2080 }"
       :pagination="pagination"
       @change="onTableChange"
     >
@@ -128,9 +128,12 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space v-if="record.status === '待确认'" :size="8">
-            <a @click.prevent="openConfirmDrawer(record)">确认结算</a>
+            <a @click.prevent="openConfirmTab(record)">确认结算</a>
           </a-space>
           <span v-else class="action-disabled">—</span>
+        </template>
+        <template v-else-if="column.key === 'pickedLength'">
+          {{ formatQtyWithUnit(record.pickedLength, lineUnit(record)) }}
         </template>
         <template v-else-if="column.key === 'demandMeters'">
           {{ formatQtyWithUnit(record.demandMeters, lineUnit(record)) }}
@@ -165,89 +168,6 @@
         </a-form-item>
       </a-form>
     </a-modal>
-
-    <a-drawer
-      v-model:open="confirmOpen"
-      :title="confirmRecord?.docNo ? `确认结算 ${confirmRecord.docNo}` : '确认结算'"
-      width="1080"
-      :destroy-on-close="true"
-    >
-      <template v-if="confirmRecord">
-        <div class="section-title">基本信息</div>
-        <a-descriptions size="small" bordered :column="3" class="mb-16">
-          <a-descriptions-item label="状态">{{ confirmRecord.status }}</a-descriptions-item>
-          <a-descriptions-item label="结算单号">{{ confirmRecord.docNo }}</a-descriptions-item>
-          <a-descriptions-item label="出库单号">{{
-            confirmRecord.outboundDocNo || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="工单号">{{ headerWorkOrderNo }}</a-descriptions-item>
-          <a-descriptions-item label="出库仓库">{{
-            confirmRecord.shipWarehouse || confirmRecord.lines?.[0]?.shipWarehouse || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="领入仓库">{{
-            confirmRecord.receiveWarehouse || confirmRecord.lines?.[0]?.warehouse || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="出库时间" :span="3">{{
-            confirmRecord.outboundTime || '—'
-          }}</a-descriptions-item>
-        </a-descriptions>
-
-        <div class="section-title">结算明细</div>
-        <a-table
-          :columns="drawerLineColumns"
-          :data-source="confirmRecord.lines || []"
-          row-key="id"
-          size="small"
-          bordered
-          :pagination="false"
-          :scroll="{ x: 1240 }"
-        >
-          <template #bodyCell="{ column, record: line, index }">
-            <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-            <template v-else-if="column.key === 'blankSizeText'">
-              {{ line.blankSizeText || '—' }}
-            </template>
-            <template v-else-if="column.key === 'specModel'">{{ line.specModel || '—' }}</template>
-            <template v-else-if="column.key === 'drawingNo'">{{ line.drawingNo || '—' }}</template>
-            <template v-else-if="column.key === 'material'">{{ line.material || '—' }}</template>
-            <template v-else-if="column.key === 'demandMeters'">
-              {{ formatQtyWithUnit(line.demandMeters, lineUnit(line)) }}
-            </template>
-            <template v-else-if="column.key === 'actualConsumeMeters'">
-              <a-input-number
-                v-if="confirmRecord.status === '待确认'"
-                v-model:value="line.actualConsumeMeters"
-                :min="0.001"
-                :max="Number(line.pickedLength) || undefined"
-                :precision="3"
-                size="small"
-                style="width: 100%"
-                :addon-after="lineUnit(line)"
-                @change="() => recalcRemnant(line)"
-              />
-              <span v-else>{{ formatQtyWithUnit(line.actualConsumeMeters, lineUnit(line)) }}</span>
-            </template>
-            <template v-else-if="column.key === 'remnantLength'">
-              {{ formatQtyWithUnit(line.remnantLength, lineUnit(line)) }}
-            </template>
-            <template v-else-if="column.key === 'pickedBatchNo'">
-              {{ line.pickedBatchNo || '—' }}
-            </template>
-            <template v-else-if="column.key === 'remnantBatchNo'">
-              {{ line.remnantBatchNo || '—' }}
-            </template>
-          </template>
-        </a-table>
-
-        <div v-if="confirmRecord.status === '待确认'" class="drawer-footer">
-          <a-button @click="confirmOpen = false">取消</a-button>
-          <a-button @click="submitConfirm('return_to_ship')">确认结算（余料退回发料仓）</a-button>
-          <a-button type="primary" @click="submitConfirm('keep_line_side')"
-            >确认结算（余料留线边）</a-button
-          >
-        </div>
-      </template>
-    </a-drawer>
   </div>
 </template>
 
@@ -258,17 +178,13 @@ export default { name: 'CutSettleRecordView' }
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { message, Modal } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 import {
   cutSettleState,
   buildCutSettleDraftFromOutbound,
   createCutSettleRecord,
-  confirmCutSettle,
-  getCutSettleById,
-  CUT_SETTLE_REMNANT_DISPOSITION,
 } from '@/store/cutSettleStore'
 import { outboundState } from '@/store/outboundStore'
-import { roundMeters } from '@/utils/variableLengthMaterial'
 import { flattenCutSettleLines, filterCutSettleLineRows } from '@/utils/cutSettleLines'
 import { isOutboundEligibleForCutSettle } from '@/utils/workOrderBlanking'
 import { formatQtyWithUnit } from '@/utils/numberFormat'
@@ -280,8 +196,6 @@ const { openTab } = useTabs()
 const createOpen = ref(false)
 const selectedOutboundId = ref(undefined)
 const createRemark = ref('')
-const confirmOpen = ref(false)
-const confirmSettleId = ref('')
 const page = ref(1)
 const pageSize = ref(20)
 
@@ -298,16 +212,6 @@ const filters = reactive({
   outboundTimeRange: undefined,
 })
 const applied = reactive({ ...filters })
-
-const confirmRecord = computed(() =>
-  confirmSettleId.value ? getCutSettleById(confirmSettleId.value) : null,
-)
-
-const headerWorkOrderNo = computed(() => {
-  const lines = confirmRecord.value?.lines || []
-  const nos = [...new Set(lines.map((l) => l.workOrderNo).filter(Boolean))]
-  return nos.join('、') || '—'
-})
 
 const allRows = computed(() => {
   void cutSettleState.records
@@ -348,6 +252,7 @@ const columns = [
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 110, ellipsis: true },
   { title: '材质', dataIndex: 'material', key: 'material', width: 90 },
   { title: '下料尺寸', key: 'blankSizeText', width: 150, ellipsis: true },
+  { title: '出库数量', key: 'pickedLength', width: 100, align: 'right' },
   { title: '需求数', key: 'demandMeters', width: 100, align: 'right' },
   { title: '实耗', key: 'actualConsumeMeters', width: 100, align: 'right' },
   { title: '余料', key: 'remnantLength', width: 100, align: 'right' },
@@ -357,29 +262,8 @@ const columns = [
   { title: '操作', key: 'action', width: 100, fixed: 'right' },
 ]
 
-const drawerLineColumns = [
-  { title: '序号', key: 'index', width: 60, align: 'center' },
-  { title: '物料名称', dataIndex: 'itemName', key: 'itemName', width: 140, ellipsis: true },
-  { title: '编码', dataIndex: 'itemCode', key: 'itemCode', width: 120 },
-  { title: '型号规格', key: 'specModel', width: 100, ellipsis: true },
-  { title: '图号', key: 'drawingNo', width: 100, ellipsis: true },
-  { title: '材质', key: 'material', width: 80 },
-  { title: '下料尺寸', key: 'blankSizeText', width: 140, ellipsis: true },
-  { title: '需求数', key: 'demandMeters', width: 100, align: 'right' },
-  { title: '实耗', key: 'actualConsumeMeters', width: 140 },
-  { title: '余料', key: 'remnantLength', width: 100, align: 'right' },
-  { title: '拣选批次', key: 'pickedBatchNo', width: 130 },
-  { title: '余料新批次', key: 'remnantBatchNo', width: 140 },
-]
-
 function lineUnit(line) {
   return String(line?.unit || line?.stockUnit || '').trim() || '米'
-}
-
-function recalcRemnant(line) {
-  line.remnantLength = roundMeters(
-    Math.max(0, Number(line.pickedLength) - Number(line.actualConsumeMeters)),
-  )
 }
 
 function applyFilters() {
@@ -417,9 +301,10 @@ function openDetailTab(record) {
   router.push(path)
 }
 
-function openConfirmDrawer(record) {
-  confirmSettleId.value = record.settleId
-  confirmOpen.value = true
+function openConfirmTab(record) {
+  const path = `/inventory/cut-settle/${record.settleId}`
+  openTab(path, record.docNo ? `确认结算 ${record.docNo}` : '确认结算')
+  router.push(path)
 }
 
 function onCreate() {
@@ -444,38 +329,7 @@ function onCreate() {
   createOpen.value = false
   selectedOutboundId.value = undefined
   createRemark.value = ''
-  openConfirmDrawer({ settleId: res.record.id })
-}
-
-function submitConfirm(disposition) {
-  const row = confirmRecord.value
-  if (!row) return
-  const keep = disposition === CUT_SETTLE_REMNANT_DISPOSITION.KEEP_LINE_SIDE
-  Modal.confirm({
-    title: keep ? '确认结算（余料留线边）？' : '确认结算（余料退回发料仓）？',
-    content: keep
-      ? '将按实耗从线边扣减；余料仍留在线边仓，可供后续工单继续使用。'
-      : '将按实耗从线边扣减，并把余料退回发料仓（生成余料入库单）。',
-    onOk: () => {
-      ;(row.lines || []).forEach((line) => recalcRemnant(line))
-      const res = confirmCutSettle(row.id, { remnantDisposition: disposition })
-      if (!res.ok) {
-        message.error(res.message)
-        return
-      }
-      if (keep) {
-        const hasRemnant = (res.record.lines || []).some((l) => Number(l.remnantLength) > 0)
-        message.success(hasRemnant ? '已确认：实耗已扣，余料留在线边' : '已确认（无余料）')
-      } else {
-        message.success(
-          res.record.remnantInboundDocNo
-            ? `已确认，余料入库单 ${res.record.remnantInboundDocNo}`
-            : '已确认（无余料）',
-        )
-      }
-      confirmOpen.value = false
-    },
-  })
+  openConfirmTab({ settleId: res.record.id, docNo: res.record.docNo })
 }
 </script>
 
@@ -507,19 +361,6 @@ function submitConfirm(disposition) {
 }
 .filter-form :deep(.ant-form-item) {
   margin-bottom: 12px;
-}
-.section-title {
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-.mb-16 {
-  margin-bottom: 16px;
-}
-.drawer-footer {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }
 .action-disabled {
   color: #bfbfbf;

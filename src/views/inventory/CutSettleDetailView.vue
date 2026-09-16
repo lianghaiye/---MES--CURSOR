@@ -3,7 +3,9 @@
     <div class="page-header">
       <div class="header-left">
         <template v-if="record">
-          <span class="page-title">{{ record.docNo }}</span>
+          <span class="page-title">{{
+            isConfirmMode ? `确认结算 ${record.docNo}` : record.docNo
+          }}</span>
           <a-tag :color="record.status === '已确认' ? 'green' : 'orange'">{{
             record.status
           }}</a-tag>
@@ -11,14 +13,6 @@
         <span v-else class="page-title">下料结算详情</span>
       </div>
       <a-space>
-        <a-button
-          v-if="record?.status === '待确认'"
-          type="primary"
-          size="small"
-          @click="openConfirmDrawer"
-        >
-          确认结算
-        </a-button>
         <a-button size="small" @click="goBack">返回列表</a-button>
       </a-space>
     </div>
@@ -65,7 +59,7 @@
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1340 }"
+          :scroll="{ x: 1540 }"
         >
           <template #bodyCell="{ column, record: line, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -75,76 +69,15 @@
             <template v-else-if="column.key === 'specModel'">{{ line.specModel || '—' }}</template>
             <template v-else-if="column.key === 'drawingNo'">{{ line.drawingNo || '—' }}</template>
             <template v-else-if="column.key === 'material'">{{ line.material || '—' }}</template>
-            <template v-else-if="column.key === 'demandMeters'">
-              {{ formatQtyWithUnit(line.demandMeters, lineUnit(line)) }}
+            <template v-else-if="column.key === 'pickedLength'">
+              {{ formatQtyWithUnit(line.pickedLength, lineUnit(line)) }}
             </template>
-            <template v-else-if="column.key === 'actualConsumeMeters'">
-              {{ formatQtyWithUnit(line.actualConsumeMeters, lineUnit(line)) }}
-            </template>
-            <template v-else-if="column.key === 'remnantLength'">
-              {{ formatQtyWithUnit(line.remnantLength, lineUnit(line)) }}
-            </template>
-            <template v-else-if="column.key === 'pickedBatchNo'">
-              {{ line.pickedBatchNo || '—' }}
-            </template>
-            <template v-else-if="column.key === 'remnantBatchNo'">
-              {{ line.remnantBatchNo || '—' }}
-            </template>
-          </template>
-        </a-table>
-      </div>
-    </template>
-
-    <a-drawer
-      v-model:open="confirmOpen"
-      :title="record?.docNo ? `确认结算 ${record.docNo}` : '确认结算'"
-      width="1080"
-      :destroy-on-close="true"
-    >
-      <template v-if="record">
-        <div class="section-title">基本信息</div>
-        <a-descriptions size="small" bordered :column="3" class="mb-16">
-          <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
-          <a-descriptions-item label="结算单号">{{ record.docNo }}</a-descriptions-item>
-          <a-descriptions-item label="出库单号">{{
-            record.outboundDocNo || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="工单号">{{ workOrderNos }}</a-descriptions-item>
-          <a-descriptions-item label="出库仓库">{{
-            record.shipWarehouse || record.lines?.[0]?.shipWarehouse || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="领入仓库">{{
-            record.receiveWarehouse || record.lines?.[0]?.warehouse || '—'
-          }}</a-descriptions-item>
-          <a-descriptions-item label="出库时间" :span="3">{{
-            record.outboundTime || '—'
-          }}</a-descriptions-item>
-        </a-descriptions>
-
-        <div class="section-title">结算明细</div>
-        <a-table
-          :columns="confirmLineColumns"
-          :data-source="record.lines || []"
-          row-key="id"
-          size="small"
-          bordered
-          :pagination="false"
-          :scroll="{ x: 1300 }"
-        >
-          <template #bodyCell="{ column, record: line, index }">
-            <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-            <template v-else-if="column.key === 'blankSizeText'">
-              {{ line.blankSizeText || '—' }}
-            </template>
-            <template v-else-if="column.key === 'specModel'">{{ line.specModel || '—' }}</template>
-            <template v-else-if="column.key === 'drawingNo'">{{ line.drawingNo || '—' }}</template>
-            <template v-else-if="column.key === 'material'">{{ line.material || '—' }}</template>
             <template v-else-if="column.key === 'demandMeters'">
               {{ formatQtyWithUnit(line.demandMeters, lineUnit(line)) }}
             </template>
             <template v-else-if="column.key === 'actualConsumeMeters'">
               <a-input-number
-                v-if="record.status === '待确认'"
+                v-if="isConfirmMode"
                 v-model:value="line.actualConsumeMeters"
                 :min="0.001"
                 :max="Number(line.pickedLength) || undefined"
@@ -167,16 +100,16 @@
             </template>
           </template>
         </a-table>
+      </div>
 
-        <div v-if="record.status === '待确认'" class="drawer-footer">
-          <a-button @click="confirmOpen = false">取消</a-button>
-          <a-button @click="submitConfirm('return_to_ship')">确认结算（余料退回发料仓）</a-button>
-          <a-button type="primary" @click="submitConfirm('keep_line_side')"
-            >确认结算（余料留线边）</a-button
-          >
-        </div>
-      </template>
-    </a-drawer>
+      <div v-if="isConfirmMode" class="page-footer">
+        <a-button @click="goBack">取消</a-button>
+        <a-button @click="submitConfirm('return_to_ship')">确认结算（余料退回发料仓）</a-button>
+        <a-button type="primary" @click="submitConfirm('keep_line_side')"
+          >确认结算（余料留线边）</a-button
+        >
+      </div>
+    </template>
   </div>
 </template>
 
@@ -185,7 +118,7 @@ export default { name: 'CutSettleDetailView' }
 </script>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -196,10 +129,11 @@ import {
 } from '@/store/cutSettleStore'
 import { roundMeters } from '@/utils/variableLengthMaterial'
 import { formatQtyWithUnit } from '@/utils/numberFormat'
+import { useTabs } from '@/composables/useTabs'
 
 const route = useRoute()
 const router = useRouter()
-const confirmOpen = ref(false)
+const { openTab, closeTab, tabState } = useTabs()
 const tick = ref(0)
 
 const record = computed(() => {
@@ -207,6 +141,8 @@ const record = computed(() => {
   void cutSettleState.records
   return getCutSettleById(String(route.params.id || ''))
 })
+
+const isConfirmMode = computed(() => record.value?.status === '待确认')
 
 const remnantDispositionLabel = computed(() => {
   const d = record.value?.remnantDisposition
@@ -221,30 +157,43 @@ const workOrderNos = computed(() => {
   return nos.join('、') || '—'
 })
 
+watch(
+  () => [record.value?.docNo, record.value?.status],
+  ([docNo, status]) => {
+    if (!docNo) return
+    const title = status === '待确认' ? `确认结算 ${docNo}` : docNo
+    openTab(route.path, title)
+  },
+  { immediate: true },
+)
+
 function lineUnit(line) {
   return String(line?.unit || line?.stockUnit || '').trim() || '米'
 }
 
-const lineColumns = [
-  { title: '序号', key: 'index', width: 60, align: 'center' },
-  { title: '物料名称', dataIndex: 'itemName', key: 'itemName', width: 140, ellipsis: true },
-  { title: '编码', dataIndex: 'itemCode', key: 'itemCode', width: 120 },
-  { title: '型号规格', key: 'specModel', width: 100, ellipsis: true },
-  { title: '图号', key: 'drawingNo', width: 100, ellipsis: true },
-  { title: '材质', key: 'material', width: 80 },
-  { title: '下料尺寸', key: 'blankSizeText', width: 140, ellipsis: true },
-  { title: '需求数', key: 'demandMeters', width: 100, align: 'right' },
-  { title: '实耗', key: 'actualConsumeMeters', width: 100, align: 'right' },
-  { title: '余料', key: 'remnantLength', width: 100, align: 'right' },
-  { title: '拣选批次', key: 'pickedBatchNo', width: 130 },
-  { title: '余料新批次', key: 'remnantBatchNo', width: 140 },
-]
-
-const confirmLineColumns = [
-  ...lineColumns.slice(0, 8),
-  { title: '实耗', key: 'actualConsumeMeters', width: 140 },
-  ...lineColumns.slice(9),
-]
+const lineColumns = computed(() => {
+  const cols = [
+    { title: '序号', key: 'index', width: 60, align: 'center' },
+    { title: '物料名称', dataIndex: 'itemName', key: 'itemName', width: 140, ellipsis: true },
+    { title: '编码', dataIndex: 'itemCode', key: 'itemCode', width: 120 },
+    { title: '型号规格', key: 'specModel', width: 100, ellipsis: true },
+    { title: '图号', key: 'drawingNo', width: 100, ellipsis: true },
+    { title: '材质', key: 'material', width: 80 },
+    { title: '下料尺寸', key: 'blankSizeText', width: 140, ellipsis: true },
+    { title: '出库数量', key: 'pickedLength', width: 100, align: 'right' },
+    { title: '需求数', key: 'demandMeters', width: 100, align: 'right' },
+    {
+      title: '实耗',
+      key: 'actualConsumeMeters',
+      width: isConfirmMode.value ? 140 : 100,
+      align: 'right',
+    },
+    { title: '余料', key: 'remnantLength', width: 100, align: 'right' },
+    { title: '拣选批次', key: 'pickedBatchNo', width: 130 },
+    { title: '余料新批次', key: 'remnantBatchNo', width: 140 },
+  ]
+  return cols
+})
 
 function recalcRemnant(line) {
   line.remnantLength = roundMeters(
@@ -252,12 +201,12 @@ function recalcRemnant(line) {
   )
 }
 
-function openConfirmDrawer() {
-  confirmOpen.value = true
-}
-
 function goBack() {
-  router.push('/inventory/cut-settle')
+  const listPath = '/inventory/cut-settle'
+  const detailPath = route.path
+  const closingActive = tabState.activePath === detailPath
+  closeTab(detailPath)
+  router.push(closingActive ? tabState.activePath || listPath : listPath)
 }
 
 function submitConfirm(disposition) {
@@ -286,8 +235,8 @@ function submitConfirm(disposition) {
             : '已确认（无余料）',
         )
       }
-      confirmOpen.value = false
       tick.value += 1
+      openTab(route.path, res.record.docNo)
     },
   })
 }
@@ -321,13 +270,12 @@ function submitConfirm(disposition) {
   margin-bottom: 8px;
   font-weight: 600;
 }
-.mb-16 {
-  margin-bottom: 16px;
-}
-.drawer-footer {
-  margin-top: 16px;
+.page-footer {
+  margin-top: 8px;
+  padding: 12px 0 4px;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  border-top: 1px solid #f0f0f0;
 }
 </style>
