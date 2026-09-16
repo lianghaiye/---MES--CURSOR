@@ -64,6 +64,7 @@ export function createInboundOrder(partial = {}) {
     salesOrderNo: '',
     salesOrderId: '',
     contractNo: '',
+    requisitionDept: '',
     invoiceNo: '',
     handler: 'admin1',
     creator: 'admin1',
@@ -639,12 +640,17 @@ export function filterInboundOrders(list, filters = {}) {
     if (filters.docNo && !o.docNo?.includes(filters.docNo)) return false
     if (filters.warehouse && o.warehouse !== filters.warehouse) return false
     if (filters.inboundType && o.inboundType !== filters.inboundType) return false
+    if (filters.requisitionDept && o.requisitionDept !== filters.requisitionDept) return false
+    if (filters.sourceOrderNo && !o.sourceOrderNo?.includes(filters.sourceOrderNo)) return false
+    if (filters.salesOrderNo && !o.salesOrderNo?.includes(filters.salesOrderNo)) return false
     if (filters.invoiceNo && !o.invoiceNo?.includes(filters.invoiceNo)) return false
     if (filters.inboundDateRange?.length === 2) {
       const [start, end] = filters.inboundDateRange
-      const d = o.inboundDate || ''
+      const d = (o.inboundDate || o.inboundTime || '').slice(0, 10)
       if (d < start || d > end) return false
     }
     return true
   })
 }
+
+export { formatInboundQtyRatio } from '@/utils/pendingInboundLines'

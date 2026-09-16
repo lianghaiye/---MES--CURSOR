@@ -76,6 +76,16 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="销售单号">
+              <a-input
+                v-model:value="filters.salesOrderNo"
+                allow-clear
+                placeholder="请输入 销售单号"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="状态">
               <a-select
                 v-model:value="filters.status"
@@ -315,8 +325,11 @@
             })
           "
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'docNo'">
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">
+              {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
+            </template>
+            <template v-else-if="column.key === 'docNo'">
               <a class="link-code" @click.stop="goDetail(record)">{{ record.docNo }}</a>
             </template>
             <template v-else-if="column.key === 'sourceOrderNo'">
@@ -522,6 +535,7 @@ const filters = reactive({
   warehouse: undefined,
   requisitionDept: undefined,
   sourceOrderNo: '',
+  salesOrderNo: '',
   status: undefined,
   outboundTimeUnit: 'day',
   outboundTimeRange: null,
@@ -543,13 +557,14 @@ const outboundTimePicker = computed(() => {
 })
 
 const baseColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 120, fixed: 'left' },
   { title: '出库单号', key: 'docNo', dataIndex: 'docNo', width: 168, fixed: 'left' },
   { title: '出库类型', dataIndex: 'outboundType', width: 110 },
   { title: '出库仓库', dataIndex: 'warehouse', width: 100 },
   { title: '出库数量', key: 'shipQtyTotal', width: 120, align: 'right' },
   { title: '源单号', key: 'sourceOrderNo', width: 140 },
-  { title: '销售订单', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
+  { title: '销售单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '合同编号', dataIndex: 'contractNo', width: 130, ellipsis: true },
   { title: '申请部门', dataIndex: 'requisitionDept', width: 100, ellipsis: true },
   { title: '出库时间', dataIndex: 'outboundTime', width: 160 },
@@ -564,7 +579,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outbound-list-v6', baseColumns, { minScrollX: 2200 })
+  useTableColumnSettings('outbound-list-v7', baseColumns, { minScrollX: 2260 })
 
 const filteredList = computed(() =>
   filterOutboundOrders(outboundState.orders, appliedFilters.value),
@@ -683,6 +698,7 @@ function handleReset() {
     warehouse: undefined,
     requisitionDept: undefined,
     sourceOrderNo: '',
+    salesOrderNo: '',
     status: undefined,
     outboundTimeUnit: 'day',
     outboundTimeRange: null,

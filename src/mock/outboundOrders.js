@@ -480,6 +480,7 @@ export function filterOutboundOrders(list, filters) {
     if (filters.handler && item.handler !== filters.handler) return false
     if (filters.requisitionDept && item.requisitionDept !== filters.requisitionDept) return false
     if (filters.sourceOrderNo && !item.sourceOrderNo?.includes(filters.sourceOrderNo)) return false
+    if (filters.salesOrderNo && !item.salesOrderNo?.includes(filters.salesOrderNo)) return false
     if (filters.status && item.status !== filters.status) return false
     if (!matchOutboundTimeRange(item, filters)) return false
     return true
