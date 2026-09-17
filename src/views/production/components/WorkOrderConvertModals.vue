@@ -9,6 +9,7 @@
   <CreateOutsourcingOrderModal
     v-model:open="outsourceOpen"
     :seed-work-order="seedWorkOrder"
+    :seed-process="seedProcess"
     @saved="onOutsourceSaved"
   />
 </template>
@@ -27,6 +28,11 @@ import {
   validateWorkOrderConvertPurchaseQty,
 } from '@/utils/workOrderConvert'
 import { resolveWorkOrderProcurementSource } from '@/constants/procurementDocSource'
+import { isProcessOutsourceOrder } from '@/utils/outsourcingMode'
+import {
+  canCreateProcessOutsource,
+  calcProcessOutsourceRemainQty,
+} from '@/utils/workOrderProcessOutsource'
 
 const emit = defineEmits(['converted'])
 
@@ -35,6 +41,7 @@ const outsourceOpen = ref(false)
 const modalOrder = ref(null)
 const modalMaterials = ref([])
 const seedWorkOrder = ref(null)
+const seedProcess = ref(null)
 const sourceWorkOrder = ref(null)
 
 function openPurchase(wo) {
@@ -63,6 +70,27 @@ function openOutsource(wo) {
   }
   sourceWorkOrder.value = wo
   seedWorkOrder.value = wo
+  seedProcess.value = null
+  outsourceOpen.value = true
+}
+
+function openProcessOutsource(wo, process) {
+  if (!canCreateProcessOutsource(wo, process)) {
+    message.warning('当前工序不可转工序外协（需工序可外协，且工单为待下发/已下发/执行中）')
+    return
+  }
+  const remain = calcProcessOutsourceRemainQty(wo, process)
+  if (!(remain > 0)) {
+    message.warning('该工序可外协数量已用完')
+    return
+  }
+  if (!wo.materialCode && !wo.productCode && !(wo.productName || wo.name)) {
+    message.warning('工单缺少产品信息，无法转工序外协')
+    return
+  }
+  sourceWorkOrder.value = wo
+  seedWorkOrder.value = wo
+  seedProcess.value = process
   outsourceOpen.value = true
 }
 
@@ -93,16 +121,27 @@ function onPurchaseSaved(requisition) {
 
 function onOutsourceSaved(order) {
   const wo = sourceWorkOrder.value
-  const completed = completeWorkOrderIfNoRemainSchedule(wo)
-  if (completed) {
-    message.success('待排产已全部转出且无未完成任务，工单已完成')
+  const processMode = isProcessOutsourceOrder(order)
+  let completed = false
+  if (!processMode) {
+    completed = completeWorkOrderIfNoRemainSchedule(wo)
+    if (completed) {
+      message.success('待排产已全部转出且无未完成任务，工单已完成')
+    }
   }
-  emit('converted', { type: 'outsource', workOrder: wo, order, completed })
+  emit('converted', {
+    type: processMode ? 'process-outsource' : 'outsource',
+    workOrder: wo,
+    process: seedProcess.value,
+    order,
+    completed,
+  })
   sourceWorkOrder.value = null
   seedWorkOrder.value = null
+  seedProcess.value = null
 }
 
-defineExpose({ openPurchase, openOutsource })
+defineExpose({ openPurchase, openOutsource, openProcessOutsource })
 </script>
 
 <script>

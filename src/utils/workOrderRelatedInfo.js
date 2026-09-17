@@ -53,6 +53,7 @@ function findMobileTaskForRow(tasks, processName, executor, batch) {
 
 function mapMobileTaskStatus(task) {
   if (!task) return ''
+  if (task.taskStatus === '已终止') return '已终止'
   if (task.controlStatus === '暂停' && task.taskStatus !== '已完成') return '暂停'
   if (task.taskStatus === '已完成') return '已报工'
   if (Number(task.reportedFinishedQty) > 0 || Number(task.reportedGoodQty) > 0) return '已报工'
@@ -170,6 +171,7 @@ export function scheduleTaskStatusColor(status) {
     待报工: 'processing',
     已报工: 'success',
     暂停: 'warning',
+    已终止: 'default',
   }
   return map[status] || 'default'
 }

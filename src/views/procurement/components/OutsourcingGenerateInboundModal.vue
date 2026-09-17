@@ -149,7 +149,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
-import { submitOutsourcingInbound } from '@/store/outsourcingOrderStore'
+import { getOutsourcingOrderById, submitOutsourcingInbound } from '@/store/outsourcingOrderStore'
+import { syncProcessOutsourceStatusFromOrder } from '@/utils/workOrderProcessOutsource'
 import { getPendingOutsourcingPriceChangeBlock } from '@/store/outsourcingPriceChangeStore'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import {
@@ -360,8 +361,11 @@ function handleSave() {
           warehouse: l.warehouse,
         })),
       )
-      if (result.ok) okCount += 1
-      else errors.push(result.message || `外协单「${order?.orderNo || orderId}」生成失败`)
+      if (result.ok) {
+        okCount += 1
+        const latest = getOutsourcingOrderById(orderId) || order
+        syncProcessOutsourceStatusFromOrder(latest)
+      } else errors.push(result.message || `外协单「${order?.orderNo || orderId}」生成失败`)
     }
     if (okCount) {
       message.success(`已生成 ${okCount} 张外协入库单`)

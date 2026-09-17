@@ -6,8 +6,10 @@ import {
 } from '@/utils/workOrderBasicFields'
 import {
   formatProcessExecutors,
-  formatProcessFeedingSummary,
+  formatWorkOrderProcessConfigText,
+  formatWorkOrderProcessExecutionMode,
 } from '@/utils/workOrderProcessDisplay'
+import { formatBlankingMaterialsSummary } from '@/utils/blankingSettleMaterial'
 import { buildWorkOrderDispatchEbomSnapshot } from '@/utils/workOrderEbomTree'
 
 const STORAGE_PREFIX = 'work-order-print-preview:'
@@ -39,12 +41,16 @@ function printProcessText(value) {
   return text
 }
 
-function printProcessFeeding(process) {
-  return printProcessText(formatProcessFeedingSummary(process))
-}
-
 function printProcessExecutors(process) {
   return printProcessText(formatProcessExecutors(process))
+}
+
+function printBlankingMaterials(process) {
+  return printProcessText(formatBlankingMaterialsSummary(process))
+}
+
+function printOutsourceStatus(process) {
+  return printProcessText(process?.outsourceStatus)
 }
 
 function formatPrintQty(val) {
@@ -99,12 +105,13 @@ export function buildWorkOrderPrintPayload(workOrder, options = {}) {
   const processes = (detail?.processes || workOrder.processes || []).map((p, index) => ({
     seq: index + 1,
     name: printProcessText(p.name),
-    processContent: printProcessText(p.processContent),
-    feeding: printProcessFeeding(p),
+    processConfig: printProcessText(formatWorkOrderProcessConfigText(p)),
+    resourceType: printProcessText(p.resourceType || '工人'),
+    executionMode: printProcessText(formatWorkOrderProcessExecutionMode(p)),
     executors: printProcessExecutors(p),
-    finishDate: printProcessText(p.finishDate),
-    inspection: printProcessText(p.inspection),
-    remark: printProcessText(p.remark),
+    blankingMaterials: printBlankingMaterials(p),
+    outsourceStatus: printOutsourceStatus(p),
+    processContent: printProcessText(p.processContent),
   }))
 
   const basicFields = [

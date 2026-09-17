@@ -597,14 +597,18 @@
 
     <template #footer>
       <a-button v-if="!embedded" @click="onShellCancel">取消</a-button>
+      <a-button :size="embedded ? 'small' : 'middle'" :loading="saving" @click="handleSave">
+        保存
+      </a-button>
       <a-button
+        v-if="canSaveAndConfirm"
         type="primary"
         :size="embedded ? 'small' : 'middle'"
         :loading="saving"
-        @click="handleSave"
+        @click="handleSaveAndConfirm"
       >
         <CheckOutlined />
-        保存
+        保存并入库
       </a-button>
     </template>
   </FormCreateShell>
@@ -699,9 +703,11 @@ import {
   addInboundOrder,
   updateInboundOrder,
   resolveWarehouseKeeper,
+  confirmInboundOrders,
   confirmInboundLine,
   refuseInboundLine,
   canRefuseInboundLine,
+  canConfirmInbound,
   getInboundOrderById,
 } from '@/store/inboundOrderStore'
 import {
@@ -764,6 +770,12 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => Boolean(props.editRecord?.id))
+
+/** 新增，或待入库/部分入库时可「保存并入库」 */
+const canSaveAndConfirm = computed(() => {
+  if (!isEdit.value) return true
+  return canConfirmInbound(props.editRecord)
+})
 
 const workOrderList = computed(() => {
   const orderLike = {
@@ -1409,14 +1421,14 @@ function buildPayload() {
   return payload
 }
 
-function handleSave() {
+function validateInboundForm() {
   if (!form.inboundType) {
     message.warning('请选择入库类型')
-    return
+    return false
   }
   if (isFinishedOrSemiType.value && !String(form.salesOrderNo || '').trim()) {
     message.warning('成品/半成品入库须选择销售订单')
-    return
+    return false
   }
   if (isFinishedOrSemiType.value) {
     const so = findSalesOrderByNoOrId({
@@ -1425,20 +1437,20 @@ function handleSave() {
     })
     if (!so) {
       message.warning('销售订单无法解析，请重新选择')
-      return
+      return false
     }
   }
 
   const skuCheck = validateLinesSkuResolved(form.lineItems)
   if (!skuCheck.ok) {
     message.warning(skuCheck.message)
-    return
+    return false
   }
 
   const validLines = form.lineItems.filter((l) => l.itemCode)
   if (!validLines.length) {
     message.warning('请至少添加一条有效明细')
-    return
+    return false
   }
 
   const invalidDual = validLines.find((line) => {
@@ -1462,28 +1474,75 @@ function handleSave() {
         ? `一物一码「${invalidDual.itemName}」请填写统一单件数量（库存单位量），或点编辑改逐件`
         : `双物料单位「${invalidDual.itemName}」请填写点收数量与入库数量`,
     )
+    return false
+  }
+  return true
+}
+
+/** @returns {{ ok: boolean, order?: object, message?: string }} */
+function persistInboundOrder() {
+  const payload = buildPayload()
+  if (isEdit.value) {
+    return updateInboundOrder(props.editRecord.id, payload)
+  }
+  const order = addInboundOrder(payload)
+  return { ok: true, order }
+}
+
+function handleSave() {
+  if (!validateInboundForm()) return
+  saving.value = true
+  const res = persistInboundOrder()
+  saving.value = false
+  if (!res.ok) {
+    message.warning(res.message)
     return
   }
-
-  saving.value = true
-  const payload = buildPayload()
-
-  if (isEdit.value) {
-    const res = updateInboundOrder(props.editRecord.id, payload)
-    saving.value = false
-    if (!res.ok) {
-      message.warning(res.message)
-      return
-    }
-    message.success('入库单已更新')
-  } else {
-    addInboundOrder(payload)
-    saving.value = false
-    message.success('入库单已创建')
-  }
-
-  emit('saved')
+  message.success(isEdit.value ? '入库单已更新' : '入库单已创建')
+  emit('saved', res.order)
   closeAfterSave()
+}
+
+function handleSaveAndConfirm() {
+  if (!validateInboundForm()) return
+  Modal.confirm({
+    title: '保存并入库',
+    content: '将先保存当前编辑内容，再确认入库并增加库存，是否继续？',
+    okText: '确定',
+    cancelText: '取消',
+    onOk: () => {
+      saving.value = true
+      const saved = persistInboundOrder()
+      if (!saved.ok) {
+        saving.value = false
+        message.warning(saved.message || '保存失败')
+        return Promise.reject()
+      }
+      const orderId = saved.order?.id
+      if (!orderId) {
+        saving.value = false
+        message.warning('保存成功但无法确认入库')
+        return Promise.reject()
+      }
+      const { count, blocked } = confirmInboundOrders([orderId])
+      saving.value = false
+      if (blocked?.length) {
+        message.warning(blocked.map((b) => b.message).join('；'))
+        emit('saved', saved.order)
+        return Promise.reject()
+      }
+      if (count > 0) {
+        message.success(isEdit.value ? '已保存并确认入库' : '已创建并确认入库')
+        const latest = getInboundOrderById(orderId)
+        emit('saved', latest || saved.order)
+        closeAfterSave()
+        return undefined
+      }
+      message.warning('未确认入库')
+      emit('saved', saved.order)
+      return Promise.reject()
+    },
+  })
 }
 </script>
 

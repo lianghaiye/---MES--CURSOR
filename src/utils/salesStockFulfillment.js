@@ -1,4 +1,11 @@
-import { getFreeQtyByItemCode, buildLineStockReminder } from '@/store/salesStockAllocationStore'
+/** 避免与 salesStockAllocationStore / stockBatch 演示种子形成循环依赖 */
+function getFreeQtyByItemCode(itemCode) {
+  return require('@/store/salesStockAllocationStore').getFreeQtyByItemCode(itemCode)
+}
+
+function buildLineStockReminder(line, order) {
+  return require('@/store/salesStockAllocationStore').buildLineStockReminder(line, order)
+}
 
 /** 销售行库存履约方式：决定审核时占用现货 vs 排产数量 */
 export const STOCK_FULFILLMENT_MODE = {

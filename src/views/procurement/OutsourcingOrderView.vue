@@ -47,6 +47,17 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="外协类型">
+              <a-select
+                v-model:value="filters.outsourceMode"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="outsourceModeOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="来源单号">
               <a-input
                 v-model:value="filters.sourceOrderNo"
@@ -219,6 +230,14 @@
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'outsourceMode'">
+            <a-tag :color="record.outsourceMode === 'process' ? 'blue' : 'default'">
+              {{ outsourceModeLabel(record.outsourceMode) }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'sourceProcessName'">
+            {{ record.sourceProcessName || '—' }}
           </template>
           <template v-else-if="column.key === 'issueStatus'">
             <a-tag :color="issueColor(record.issueStatus)">{{ record.issueStatus || '—' }}</a-tag>
@@ -412,7 +431,9 @@ import {
   outsourcingIssueStatusOptions,
   outsourcingReturnStatusOptions,
   outsourcingOverdueStatusOptions,
+  outsourcingModeFilterOptions,
 } from '@/mock/outsourcingOrders'
+import { outsourceModeLabel } from '@/utils/outsourcingMode'
 import { supplierOptions } from '@/mock/purchaseOrderOptions'
 import {
   outsourcingOrderState,
@@ -467,6 +488,7 @@ const filters = reactive({
   orderNo: '',
   salesOrderNo: '',
   source: undefined,
+  outsourceMode: undefined,
   sourceOrderNo: '',
   supplier: undefined,
   issueStatus: undefined,
@@ -500,11 +522,14 @@ const returnStatusOpts = outsourcingReturnStatusOptions.map((v) => ({ label: v, 
 const overdueStatusOpts = outsourcingOverdueStatusOptions.map((v) => ({ label: v, value: v }))
 const operatorOpts = computed(() => listOutsourcingOperators())
 const sourceOpts = PROCUREMENT_DOC_SOURCE_OPTIONS
+const outsourceModeOpts = outsourcingModeFilterOptions
 
 const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 90, fixed: 'left' },
   { title: '外协单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
+  { title: '外协类型', key: 'outsourceMode', width: 96 },
+  { title: '外协工序', key: 'sourceProcessName', width: 110, ellipsis: true },
   { title: '发料状态', key: 'issueStatus', width: 90 },
   { title: '回货状态', key: 'returnStatus', width: 90 },
   { title: '逾期状态', key: 'overdueStatus', width: 90 },
@@ -532,7 +557,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outsourcing-order-list-v6', baseColumns)
+  useTableColumnSettings('outsourcing-order-list-v7', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -639,6 +664,7 @@ function handleReset() {
   filters.orderNo = ''
   filters.salesOrderNo = ''
   filters.source = undefined
+  filters.outsourceMode = undefined
   filters.sourceOrderNo = ''
   filters.supplier = undefined
   filters.issueStatus = undefined

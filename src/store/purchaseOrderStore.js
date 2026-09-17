@@ -723,6 +723,7 @@ export function submitReceipt(orderId, receiptLines, extra = {}) {
       receivingMode: rl.receivingMode || '正常收货',
       receivingWarehouse: rl.receivingWarehouse || '',
       receiptQty: Number(rl.receiptQty) || 0,
+      inboundQcRequirement: String(rl.inboundQcRequirement || '').trim(),
       remark: rl.remark || '',
     }
   })

@@ -16,11 +16,12 @@ import {
 } from '@/utils/outsourcingInbound'
 import { addOutsourcingReceipt } from '@/store/outsourcingReceiptStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
+import { normalizeOutsourceMode } from '@/utils/outsourcingMode'
 
 const STORAGE_KEY = 'i_doms_outsourcing_orders'
 const SEED_VERSION_KEY = 'i_doms_outsourcing_orders_seed_v'
-/** v7：发料申请物料行补齐来源产品/单位用量/下料尺寸等展示字段 */
-const CURRENT_SEED_VERSION = '7'
+/** v9：工序外协发料改为产品本身（不再挂 BOM 下级 componentLines） */
+const CURRENT_SEED_VERSION = '9'
 
 function loadFromStorage() {
   try {
@@ -77,6 +78,11 @@ function normalizeOrder(row) {
   if (!o.updatedAt) o.updatedAt = o.createdAt || nowText()
   if (!o.issueStatus) o.issueStatus = '待出库'
   if (!o.returnStatus) o.returnStatus = '待入库'
+  o.outsourceMode = normalizeOutsourceMode(o.outsourceMode)
+  if (!o.sourceProcessId) o.sourceProcessId = ''
+  if (!o.sourceProcessCode) o.sourceProcessCode = ''
+  if (!o.sourceProcessName) o.sourceProcessName = ''
+  if (o.sourceProcessIndex == null) o.sourceProcessIndex = null
   o.lineItems.forEach((line) => {
     if (line.appliedIssueQty == null) {
       line.appliedIssueQty = Number(line.issuedQty) || 0
@@ -326,6 +332,7 @@ export function submitOutsourcingReceipt(orderId, lines = [], extra = {}) {
       unit: line?.unit || '',
       receivingWarehouse: item.receivingWarehouse || '',
       receiptQty: Number(item.receiptQty) || 0,
+      inboundQcRequirement: String(item.inboundQcRequirement || '').trim(),
       remark: item.remark || '',
     }
   })

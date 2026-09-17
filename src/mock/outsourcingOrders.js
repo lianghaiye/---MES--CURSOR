@@ -4,6 +4,7 @@
 import dayjs from 'dayjs'
 import { formatLineBarcodeBatchNo } from '@/utils/outboundIssueLines'
 import { formatQty, roundNumber } from '@/utils/numberFormat'
+import { OUTSOURCE_MODE, normalizeOutsourceMode } from '@/utils/outsourcingMode'
 
 export const outsourcingStatusOptions = ['待提交', '待审核', '已拒绝', '进行中', '已完成', '已作废']
 
@@ -11,6 +12,10 @@ export const outsourcingIssueStatusOptions = ['待出库', '部分出库', '已�
 export const outsourcingReturnStatusOptions = ['待入库', '部分入库', '已入库']
 export const outsourcingOverdueStatusOptions = ['未逾期', '已逾期']
 export const outsourcingBillingMethodOptions = ['按重量', '按件数']
+export const outsourcingModeFilterOptions = [
+  { label: '整单外协', value: OUTSOURCE_MODE.WHOLE },
+  { label: '工序外协', value: OUTSOURCE_MODE.PROCESS },
+]
 
 export function createOutsourcingLine(partial = {}) {
   const planQty = Number(partial.planQty) || 0
@@ -68,6 +73,12 @@ export function createOutsourcingOrder(partial = {}) {
     salesOrderId: '',
     source: '新增',
     sourceOrderNo: '',
+    sourceWorkOrderId: '',
+    sourceWorkOrderNo: '',
+    sourceProcessId: '',
+    sourceProcessCode: '',
+    sourceProcessName: '',
+    sourceProcessIndex: null,
     supplier: '',
     /** 兼容旧字段：结束日期 */
     planDate: '',
@@ -99,6 +110,7 @@ export function createOutsourcingOrder(partial = {}) {
     updater: 'admin1',
     updatedAt: now,
     ...partial,
+    outsourceMode: normalizeOutsourceMode(partial.outsourceMode),
   }
 }
 
@@ -252,6 +264,7 @@ export function filterOutsourcingOrders(list, filters = {}) {
   const returnStatus = filters.returnStatus
   const overdueStatus = filters.overdueStatus
   const operator = filters.operator
+  const outsourceMode = filters.outsourceMode
   const range = filters.createdAtRange
 
   return (list || []).filter((row) => {
@@ -270,6 +283,7 @@ export function filterOutsourcingOrders(list, filters = {}) {
     if (supplier && row.supplier !== supplier) return false
     if (issueStatus && row.issueStatus !== issueStatus) return false
     if (returnStatus && row.returnStatus !== returnStatus) return false
+    if (outsourceMode && normalizeOutsourceMode(row.outsourceMode) !== outsourceMode) return false
     const overdue = row.overdueStatus || computeOutsourcingOverdueStatus(row)
     if (overdueStatus && overdue !== overdueStatus) return false
     if (operator) {
@@ -623,6 +637,51 @@ export const mockOutsourcingOrders = [
         issuedQty: 10,
         appliedIssueQty: 10,
         unitPriceExTax: 80,
+      }),
+    ],
+  }),
+  /** 工序外协演示：绑定控制演示工单「机加工」工序 */
+  createOutsourcingOrder({
+    id: 'wx-proc-1',
+    orderNo: 'WX-260817-PROC01',
+    workOrderName: '【演示·暂停确认】法兰盘加工工单',
+    salesOrderNo: 'SO-CTRL-PAUSE',
+    supplier: '多功能供应商01',
+    planDate: '2026-08-25',
+    planStartDate: '2026-08-18',
+    planEndDate: '2026-08-25',
+    source: '生产工单',
+    sourceOrderNo: 'WO-CTRL-PAUSE-001',
+    sourceWorkOrderId: 'wo-ctrl-pause-reported',
+    sourceWorkOrderNo: 'WO-CTRL-PAUSE-001',
+    outsourceMode: OUTSOURCE_MODE.PROCESS,
+    sourceProcessId: 'route-machining-step-3',
+    sourceProcessCode: 'OP-JG-03',
+    sourceProcessName: '机加工',
+    sourceProcessIndex: 3,
+    contactPerson: '张经理',
+    contactPhone: '13800138001',
+    leadTimeDays: 7,
+    status: '进行中',
+    issueStatus: '待出库',
+    returnStatus: '待入库',
+    approvalResult: '审核通过',
+    approverName: '李四',
+    shipWarehouse: '半成品仓',
+    remark: '工序外协演示：机加工外协',
+    createdAt: '2026-08-17 10:00:00',
+    updatedAt: '2026-08-17 11:00:00',
+    lineItems: [
+      line({
+        id: 'wx-proc-1-line-1',
+        productName: '法兰盘',
+        productCode: 'CP-CTRL-01',
+        planQty: 5,
+        unit: '件',
+        shipWarehouse: '半成品仓',
+        processId: 'route-machining-step-3',
+        processName: '机加工',
+        unitPriceExTax: 45,
       }),
     ],
   }),

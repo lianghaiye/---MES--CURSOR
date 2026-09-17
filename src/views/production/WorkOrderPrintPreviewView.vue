@@ -46,24 +46,26 @@
                   <tr>
                     <th>序号</th>
                     <th>工序名称</th>
+                    <th>工序配置</th>
+                    <th>资源类型</th>
+                    <th>任务模式</th>
+                    <th>执行人</th>
+                    <th class="col-blanking">下料物料</th>
+                    <th>外协状态</th>
                     <th class="col-process-content">工序内容</th>
-                    <th class="col-feeding">投料</th>
-                    <th>执行者</th>
-                    <th>完工日期</th>
-                    <th>检验</th>
-                    <th>备注</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="row in sheet.processes" :key="`${index}-${row.seq}`">
                     <td class="cell-index">{{ row.seq }}</td>
-                    <td>{{ row.name }}</td>
-                    <td class="col-process-content">{{ row.processContent }}</td>
-                    <td class="col-feeding">{{ row.feeding }}</td>
-                    <td>{{ row.executors }}</td>
-                    <td>{{ row.finishDate }}</td>
-                    <td>{{ row.inspection }}</td>
-                    <td>{{ row.remark }}</td>
+                    <td>{{ row.name || '—' }}</td>
+                    <td>{{ row.processConfig || '—' }}</td>
+                    <td>{{ row.resourceType || '—' }}</td>
+                    <td>{{ row.executionMode || '—' }}</td>
+                    <td>{{ row.executors || '—' }}</td>
+                    <td class="col-blanking">{{ row.blankingMaterials || '—' }}</td>
+                    <td>{{ row.outsourceStatus || '—' }}</td>
+                    <td class="col-process-content">{{ row.processContent || '—' }}</td>
                   </tr>
                 </tbody>
               </table>

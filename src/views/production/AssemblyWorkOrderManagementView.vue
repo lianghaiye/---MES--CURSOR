@@ -1006,6 +1006,10 @@ function confirmUrgency() {
 
 function onDetailAction({ key, workOrder: wo, record, patch }) {
   if (!wo) return
+  if (key === 'process-outsource') {
+    convertModalsRef.value?.openProcessOutsource(wo, record)
+    return
+  }
   if (key === 'schedule-qty') {
     const gate = buildEditScheduleQtyResult(wo, Math.max(1, Number(wo.scheduleQty) || 1))
     if (gate.blocked) {
@@ -1019,7 +1023,12 @@ function onDetailAction({ key, workOrder: wo, record, patch }) {
     editScheduleQtyModalOpen.value = true
     return
   }
-  if (key === 'gen-task' || key === 'edit-executor' || key === 'reset-status') {
+  if (
+    key === 'gen-task' ||
+    key === 'edit-executor' ||
+    key === 'reset-status' ||
+    key === 'terminate-task'
+  ) {
     updateAssemblyWorkOrder(wo.id, { ...wo, ...(patch || {}) })
     return
   }

@@ -42,6 +42,16 @@
                 />
               </a-form-item>
             </a-col>
+            <a-col v-if="isProcessMode" :span="6">
+              <a-form-item label="外协类型">
+                <a-input value="工序外协" disabled size="small" />
+              </a-form-item>
+            </a-col>
+            <a-col v-if="isProcessMode" :span="6">
+              <a-form-item label="外协工序">
+                <a-input :value="form.sourceProcessName || '—'" disabled size="small" />
+              </a-form-item>
+            </a-col>
             <a-col :span="6">
               <a-form-item label="关联销售订单">
                 <SalesOrderSearchSelect
@@ -467,6 +477,11 @@ import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import { resolveWorkOrderProcurementSource } from '@/constants/procurementDocSource'
 import { getWorkOrderConvertQty, validateWorkOrderConvertQty } from '@/utils/workOrderConvert'
+import { OUTSOURCE_MODE, normalizeOutsourceMode } from '@/utils/outsourcingMode'
+import {
+  calcProcessOutsourceRemainQty,
+  linkWorkOrderProcessOutsource,
+} from '@/utils/workOrderProcessOutsource'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -475,6 +490,8 @@ const props = defineProps({
   editRecord: { type: Object, default: null },
   /** 工单一键转外协：预填工单产品与计划数量 */
   seedWorkOrder: { type: Object, default: null },
+  /** 工序外协：绑定工单工序 */
+  seedProcess: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -483,7 +500,13 @@ const salesOrderExcludeStatuses = ['待审核', '待提交', '已作废', '已�
 const isEdit = computed(() => Boolean(props.editRecord?.id))
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: props.listPath,
-  getTitle: () => (isEdit.value ? '编辑外协订单' : '新增外协订单'),
+  getTitle: () => {
+    if (isEdit.value) return '编辑外协订单'
+    if (props.seedProcess?.id || props.editRecord?.outsourceMode === 'process') {
+      return '新增工序外协订单'
+    }
+    return '新增外协订单'
+  },
 })
 
 const taxModeExcluding = ref(true)
@@ -508,6 +531,11 @@ const form = reactive({
   sourceOrderNo: '',
   sourceWorkOrderId: '',
   sourceWorkOrderNo: '',
+  outsourceMode: OUTSOURCE_MODE.WHOLE,
+  sourceProcessId: '',
+  sourceProcessCode: '',
+  sourceProcessName: '',
+  sourceProcessIndex: null,
   supplier: '',
   planDateRange: null,
   contactPerson: '',
@@ -520,6 +548,13 @@ const form = reactive({
   remark: '',
   lineItems: [],
 })
+
+const isProcessMode = computed(
+  () =>
+    Boolean(props.seedProcess?.id) ||
+    normalizeOutsourceMode(props.editRecord?.outsourceMode || form.outsourceMode) ===
+      OUTSOURCE_MODE.PROCESS,
+)
 
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const settlementCycleOpts = settlementCycleOptions.map((v) => ({ label: v, value: v }))
@@ -617,6 +652,11 @@ function resetForm() {
   form.sourceOrderNo = ''
   form.sourceWorkOrderId = ''
   form.sourceWorkOrderNo = ''
+  form.outsourceMode = OUTSOURCE_MODE.WHOLE
+  form.sourceProcessId = ''
+  form.sourceProcessCode = ''
+  form.sourceProcessName = ''
+  form.sourceProcessIndex = null
   form.supplier = ''
   form.planDateRange = null
   form.contactPerson = ''
@@ -642,6 +682,11 @@ function loadEditForm(record) {
   form.sourceOrderNo = record.sourceOrderNo || record.sourceWorkOrderNo || ''
   form.sourceWorkOrderId = record.sourceWorkOrderId || ''
   form.sourceWorkOrderNo = record.sourceWorkOrderNo || ''
+  form.outsourceMode = normalizeOutsourceMode(record.outsourceMode)
+  form.sourceProcessId = record.sourceProcessId || ''
+  form.sourceProcessCode = record.sourceProcessCode || ''
+  form.sourceProcessName = record.sourceProcessName || ''
+  form.sourceProcessIndex = record.sourceProcessIndex ?? null
   form.supplier = record.supplier || ''
   {
     const start = record.planStartDate || record.planDate
@@ -662,10 +707,14 @@ function loadEditForm(record) {
   prevHeaderShipWarehouse.value = form.shipWarehouse
 }
 
-function loadSeedFromWorkOrder(wo) {
+function loadSeedFromWorkOrder(wo, process = null) {
   resetForm()
   if (!wo) return
-  const planQty = getWorkOrderConvertQty(wo) || 1
+  const isProcess = Boolean(process?.id)
+  form.outsourceMode = isProcess ? OUTSOURCE_MODE.PROCESS : OUTSOURCE_MODE.WHOLE
+  const planQty = isProcess
+    ? calcProcessOutsourceRemainQty(wo, process) || getWorkOrderConvertQty(wo) || 1
+    : getWorkOrderConvertQty(wo) || 1
   const code = wo.materialCode || wo.productCode || ''
   const name = wo.productName || wo.name || ''
   form.workOrderName = wo.name || wo.code || ''
@@ -675,8 +724,16 @@ function loadSeedFromWorkOrder(wo) {
   form.sourceOrderNo = wo.code || ''
   form.sourceWorkOrderId = wo.id || ''
   form.sourceWorkOrderNo = wo.code || ''
+  if (isProcess) {
+    form.sourceProcessId = process.id || ''
+    form.sourceProcessCode = process.processCode || ''
+    form.sourceProcessName = process.name || ''
+    form.sourceProcessIndex = process.index ?? process.stepNo ?? null
+    form.remark = `来源工单 ${wo.code || ''} 工序「${process.name || ''}」外协`
+  } else {
+    form.remark = `来源工单 ${wo.code || ''} 一键转外协`
+  }
   form.shipWarehouse = wo.warehouse || undefined
-  form.remark = `来源工单 ${wo.code || ''} 一键转外协`
   if (Array.isArray(wo.planDateRange) && wo.planDateRange[0] && wo.planDateRange[1]) {
     form.planDateRange = [dayjs(wo.planDateRange[0]), dayjs(wo.planDateRange[1])]
   } else {
@@ -691,6 +748,10 @@ function loadSeedFromWorkOrder(wo) {
     drawingNo: wo.drawingNo || '',
   })
   line.planQty = planQty
+  if (isProcess) {
+    line.processId = process.id
+    line.processName = process.name
+  }
   if (form.shipWarehouse) line.shipWarehouse = form.shipWarehouse
   recalcOutsourcingLine(line, { fromInTax: !taxModeExcluding.value })
   form.lineItems = [line]
@@ -698,11 +759,18 @@ function loadSeedFromWorkOrder(wo) {
 }
 
 watch(
-  () => [props.open, props.pageMode, props.editRecord?.id, props.seedWorkOrder?.id],
+  () => [
+    props.open,
+    props.pageMode,
+    props.editRecord?.id,
+    props.seedWorkOrder?.id,
+    props.seedProcess?.id,
+  ],
   () => {
     if (!isActive.value) return
     if (props.editRecord) loadEditForm(props.editRecord)
-    else if (props.seedWorkOrder) loadSeedFromWorkOrder(props.seedWorkOrder)
+    else if (props.seedWorkOrder)
+      loadSeedFromWorkOrder(props.seedWorkOrder, props.seedProcess || null)
     else resetForm()
   },
   { immediate: true },
@@ -894,6 +962,11 @@ function buildPayload() {
     sourceOrderNo: form.sourceOrderNo || '',
     sourceWorkOrderId: form.sourceWorkOrderId || '',
     sourceWorkOrderNo: form.sourceWorkOrderNo || '',
+    outsourceMode: normalizeOutsourceMode(form.outsourceMode),
+    sourceProcessId: form.sourceProcessId || '',
+    sourceProcessCode: form.sourceProcessCode || '',
+    sourceProcessName: form.sourceProcessName || '',
+    sourceProcessIndex: form.sourceProcessIndex,
     supplier: form.supplier || '',
     planStartDate: start,
     planEndDate: end,
@@ -940,11 +1013,23 @@ function handleSave() {
     return
   }
 
-  if (props.seedWorkOrder && !isEdit.value) {
+  if (props.seedWorkOrder && !isEdit.value && !isProcessMode.value) {
     const convertQty = form.lineItems.reduce((s, l) => s + (Number(l.planQty) || 0), 0)
     const check = validateWorkOrderConvertQty(props.seedWorkOrder, convertQty)
     if (!check.ok) {
       message.warning(check.message || '转换数量超出待排产')
+      return
+    }
+  }
+  if (isProcessMode.value && props.seedWorkOrder && props.seedProcess && !isEdit.value) {
+    const convertQty = form.lineItems.reduce((s, l) => s + (Number(l.planQty) || 0), 0)
+    const remain = calcProcessOutsourceRemainQty(props.seedWorkOrder, props.seedProcess)
+    if (convertQty > remain + 1e-9) {
+      message.warning(`工序外协数量不能超过可外协剩余 ${remain}`)
+      return
+    }
+    if (!(convertQty > 0)) {
+      message.warning('请填写工序外协数量')
       return
     }
   }
@@ -956,11 +1041,17 @@ function handleSave() {
     payload.lineItems = form.lineItems.map((l) => ({ ...l }))
     if (isEdit.value) {
       const updated = updateOutsourcingOrder(props.editRecord.id, payload)
+      if (normalizeOutsourceMode(updated?.outsourceMode) === OUTSOURCE_MODE.PROCESS) {
+        linkWorkOrderProcessOutsource(updated)
+      }
       message.success('外协订单已更新')
       emit('saved', updated)
     } else {
       const created = addOutsourcingOrder(payload)
-      message.success('外协订单已保存')
+      if (normalizeOutsourceMode(created?.outsourceMode) === OUTSOURCE_MODE.PROCESS) {
+        linkWorkOrderProcessOutsource(created)
+      }
+      message.success(isProcessMode.value ? '工序外协订单已保存' : '外协订单已保存')
       emit('saved', created)
     }
     closeAfterSave()

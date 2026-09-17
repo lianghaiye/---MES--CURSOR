@@ -8,174 +8,165 @@
     class="select-bom-material-modal"
     @cancel="handleCancel"
   >
-    <div class="picker-toolbar">
-      <a-form v-if="ecnNewMaterialMode" layout="inline" class="ecn-filter-form toolbar-left">
-        <a-form-item label="类型">
-          <a-select
-            v-model:value="quickItemType"
-            size="small"
-            class="type-select"
-            :options="itemTypeOpts"
-          />
-        </a-form-item>
-        <a-form-item label="物品名称">
-          <a-input
-            v-model:value="ecnFilters.itemName"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 110px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="编码">
-          <a-input
-            v-model:value="ecnFilters.materialCode"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 110px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="规格型号">
-          <a-input
-            v-model:value="ecnFilters.specModel"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 100px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="类别">
-          <a-input
-            v-model:value="ecnFilters.categoryName"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 90px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="材质">
-          <a-input
-            v-model:value="ecnFilters.material"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 90px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="图号">
-          <a-input
-            v-model:value="ecnFilters.drawingNo"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 100px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item>
-          <a-space :size="8">
-            <a-button type="primary" size="small" @click="handleEcnSearch">搜索</a-button>
-            <a-button size="small" @click="handleEcnClear">清空</a-button>
-          </a-space>
-        </a-form-item>
+    <div class="filter-card">
+      <a-form
+        v-if="ecnNewMaterialMode"
+        layout="inline"
+        class="filter-form horizontal-form ecn-filter-form"
+      >
+        <ListFilterBar
+          :field-count="7"
+          search-text="搜索"
+          reset-text="清空"
+          @search="handleEcnSearch"
+          @reset="handleEcnClear"
+        >
+          <a-form-item label="类型">
+            <a-select
+              v-model:value="quickItemType"
+              size="small"
+              class="type-select"
+              :options="itemTypeOpts"
+            />
+          </a-form-item>
+          <a-form-item label="物品名称">
+            <a-input
+              v-model:value="ecnFilters.itemName"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="编码">
+            <a-input
+              v-model:value="ecnFilters.materialCode"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="规格型号">
+            <a-input
+              v-model:value="ecnFilters.specModel"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="类别">
+            <a-input
+              v-model:value="ecnFilters.categoryName"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="材质">
+            <a-input
+              v-model:value="ecnFilters.material"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="图号">
+            <a-input
+              v-model:value="ecnFilters.drawingNo"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+        </ListFilterBar>
       </a-form>
-      <a-form v-else layout="inline" class="ecn-filter-form toolbar-left">
-        <a-form-item v-if="!onlyWithBom && !hideAddMaterial">
-          <a-button type="primary" size="small" @click="materialFormOpen = true">
-            <PlusOutlined />
-            添加产品/物料
-          </a-button>
-        </a-form-item>
-        <a-form-item label="类型">
-          <a-select
-            v-model:value="quickItemType"
-            allow-clear
-            size="small"
-            placeholder="全部"
-            class="type-select"
-            :options="itemTypeOpts"
-          />
-        </a-form-item>
-        <a-form-item v-if="includeSpuTemplates" label="产品族/SKU">
-          <a-select
-            v-model:value="catalogKindFilter"
-            allow-clear
-            size="small"
-            placeholder="全部"
-            style="width: 110px"
-            :options="catalogKindOpts"
-          />
-        </a-form-item>
-        <a-form-item label="物品名称">
-          <a-input
-            v-model:value="ecnFilters.itemName"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 110px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="编码">
-          <a-input
-            v-model:value="ecnFilters.materialCode"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 110px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="规格型号">
-          <a-input
-            v-model:value="ecnFilters.specModel"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 100px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="类别">
-          <a-input
-            v-model:value="ecnFilters.categoryName"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 90px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="材质">
-          <a-input
-            v-model:value="ecnFilters.material"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 90px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item label="图号">
-          <a-input
-            v-model:value="ecnFilters.drawingNo"
-            allow-clear
-            size="small"
-            placeholder="请输入"
-            style="width: 100px"
-            @press-enter="handleEcnSearch"
-          />
-        </a-form-item>
-        <a-form-item>
-          <a-space :size="8">
-            <a-button type="primary" size="small" @click="handleEcnSearch">搜索</a-button>
-            <a-button size="small" @click="handleEcnClear">清空</a-button>
+      <a-form v-else layout="inline" class="filter-form horizontal-form ecn-filter-form">
+        <ListFilterBar
+          :field-count="includeSpuTemplates ? 8 : 7"
+          search-text="搜索"
+          reset-text="清空"
+          @search="handleEcnSearch"
+          @reset="handleEcnClear"
+        >
+          <a-form-item label="类型">
+            <a-select
+              v-model:value="quickItemType"
+              allow-clear
+              size="small"
+              placeholder="全部"
+              class="type-select"
+              :options="itemTypeOpts"
+            />
+          </a-form-item>
+          <a-form-item v-if="includeSpuTemplates" label="产品族/SKU">
+            <a-select
+              v-model:value="catalogKindFilter"
+              allow-clear
+              size="small"
+              placeholder="全部"
+              :options="catalogKindOpts"
+            />
+          </a-form-item>
+          <a-form-item label="物品名称">
+            <a-input
+              v-model:value="ecnFilters.itemName"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="编码">
+            <a-input
+              v-model:value="ecnFilters.materialCode"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="规格型号">
+            <a-input
+              v-model:value="ecnFilters.specModel"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="类别">
+            <a-input
+              v-model:value="ecnFilters.categoryName"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="材质">
+            <a-input
+              v-model:value="ecnFilters.material"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item label="图号">
+            <a-input
+              v-model:value="ecnFilters.drawingNo"
+              allow-clear
+              size="small"
+              placeholder="请输入"
+              @press-enter="handleEcnSearch"
+            />
+          </a-form-item>
+          <a-form-item class="list-filter-skip filter-extra-action">
             <a-badge :count="activeFilterCount" :offset="[-4, 4]">
               <a-button
                 size="small"
@@ -187,19 +178,9 @@
                 筛选
               </a-button>
             </a-badge>
-          </a-space>
-        </a-form-item>
+          </a-form-item>
+        </ListFilterBar>
       </a-form>
-      <a-tooltip v-if="!ecnNewMaterialMode" title="列显隐">
-        <a-button type="text" size="small" @click="columnDrawerOpen = true">
-          <SettingOutlined />
-        </a-button>
-      </a-tooltip>
-      <a-tooltip v-if="ecnNewMaterialMode" title="列显隐">
-        <a-button type="text" size="small" @click="columnDrawerOpen = true">
-          <SettingOutlined />
-        </a-button>
-      </a-tooltip>
     </div>
 
     <div v-if="!ecnNewMaterialMode && activeFilterCount" class="filter-tags">
@@ -219,6 +200,26 @@
 
     <div class="picker-body">
       <div class="table-panel">
+        <div class="list-toolbar">
+          <div class="list-toolbar-left">
+            <a-button
+              v-if="!ecnNewMaterialMode && !onlyWithBom && !hideAddMaterial"
+              type="primary"
+              size="small"
+              @click="materialFormOpen = true"
+            >
+              <PlusOutlined />
+              添加产品/物料
+            </a-button>
+          </div>
+          <div class="list-toolbar-right">
+            <a-tooltip title="列显隐">
+              <a-button type="text" size="small" @click="columnDrawerOpen = true">
+                <SettingOutlined />
+              </a-button>
+            </a-tooltip>
+          </div>
+        </div>
         <a-table
           :row-selection="rowSelection"
           :columns="tableColumns"
@@ -312,6 +313,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { SettingOutlined, PlusOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons-vue'
+import ListFilterBar from '@/components/ListFilterBar.vue'
 import {
   buildBomSubItemPickerRows,
   dedupePickerRowsPreferProduct,
@@ -743,33 +745,15 @@ function onMaterialSaved({ isEdit, data }) {
     padding-top: 16px;
   }
 
-  .picker-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-
-    .toolbar-left {
-      flex: 1;
+  .ecn-filter-form {
+    :deep(.type-select) {
       min-width: 0;
     }
 
-    .search-input {
-      width: 360px;
-    }
-
-    .type-select {
-      width: 120px;
-    }
-
-    .ecn-filter-form {
-      flex: 1;
-      min-width: 0;
-
-      :deep(.ant-form-item) {
-        margin-bottom: 8px;
-      }
+    :deep(.filter-extra-action) {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
     }
   }
 
@@ -800,7 +784,7 @@ function onMaterialSaved({ isEdit, data }) {
     display: flex;
     gap: 12px;
     height: 580px;
-    max-height: calc(86vh - 200px);
+    max-height: calc(86vh - 220px);
     min-height: 520px;
   }
 
@@ -808,6 +792,24 @@ function onMaterialSaved({ isEdit, data }) {
     flex: 1;
     min-width: 0;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .list-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+  }
+
+  .list-toolbar-left,
+  .list-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .selected-panel {

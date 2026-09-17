@@ -149,6 +149,17 @@
               :disabled="record.locked"
             />
           </template>
+          <template v-else-if="column.key === 'inboundQcRequirement'">
+            <a-select
+              v-model:value="record.inboundQcRequirement"
+              size="small"
+              style="width: 100%"
+              placeholder="请选择"
+              allow-clear
+              :options="inboundQcOpts"
+              :disabled="record.locked"
+            />
+          </template>
           <template v-else-if="column.key === 'settleUnit'">
             {{ record.settleUnit || '—' }}
           </template>
@@ -249,7 +260,13 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="入库质检要求">
-              <a-input :value="lineEditDraft.inboundQcRequirement || '—'" disabled />
+              <a-select
+                v-model:value="lineEditDraft.inboundQcRequirement"
+                style="width: 100%"
+                placeholder="请选择"
+                allow-clear
+                :options="inboundQcOpts"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -293,7 +310,10 @@
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" @click="handleConfirm">确定</a-button>
+      <a-button type="primary" ghost :loading="submitting" @click="handleConfirmAndCreateQc">
+        确认并生成质检任务
+      </a-button>
+      <a-button type="primary" :loading="submitting" @click="handleConfirm">确定</a-button>
     </template>
   </a-modal>
 </template>
@@ -304,6 +324,8 @@ import { message } from 'ant-design-vue'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { submitReceipt } from '@/store/purchaseOrderStore'
 import { getPendingPurchasePriceChangeBlock } from '@/store/purchasePriceChangeStore'
+import { createIncomingQcFromReceipt } from '@/store/qcTaskStore'
+import { attachReceiptQcSheet } from '@/store/purchaseReceiptStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import {
@@ -314,9 +336,10 @@ import {
   INBOUND_PROGRESS_TOOLTIP,
   isPoLineOccupyFull,
 } from '@/utils/purchaseLineInbound'
-import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
+import { resolveEditableInboundQcRequirement } from '@/utils/inboundQcRequirement'
 import { estimateSettleQty } from '@/utils/settleUnit'
 import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
+import { inboundQcOptions } from '@/mock/materialInfoOptions'
 import LongTextEditCell from '@/components/LongTextEditCell.vue'
 import InboundLineScopeToggle from '@/components/InboundLineScopeToggle.vue'
 import { filterInboundLinesByScope } from '@/utils/inboundLineScope'
@@ -338,6 +361,8 @@ const receiptLines = ref([])
 const lineScope = ref('pending')
 const lineEditOpen = ref(false)
 const lineEditDraft = ref(null)
+const submitting = ref(false)
+const inboundQcOpts = inboundQcOptions.map((v) => ({ label: v, value: v }))
 
 const sourceOrders = computed(() => {
   if (Array.isArray(props.purchaseOrders) && props.purchaseOrders.length) {
@@ -495,7 +520,7 @@ function buildLine(po, line) {
     receivedQty,
     appliedOccupyQty,
     locked,
-    inboundQcRequirement: resolveLineInboundQcRequirement(line),
+    inboundQcRequirement: resolveEditableInboundQcRequirement(line),
     remark: '',
   }
 }
@@ -601,28 +626,28 @@ function handleCancel() {
   emit('update:open', false)
 }
 
-function handleConfirm() {
+function collectSubmitLines() {
   for (const order of sourceOrders.value) {
     const block = getPendingPurchasePriceChangeBlock(order.id, '生成收货单')
     if (block) {
       message.warning(block)
-      return
+      return null
     }
   }
   const editableLines = receiptLines.value.filter((l) => !l.locked)
   if (!editableLines.length) {
     message.warning('没有可收货的明细（已占满的明细不可再收货）')
-    return
+    return null
   }
   const submitLines = editableLines.filter((l) => Number(l.receiptQty) > 0)
   if (!submitLines.length) {
     message.warning('请至少填写一行收货数量')
-    return
+    return null
   }
   const invalid = submitLines.find((l) => !String(l.receivingWarehouse || '').trim())
   if (invalid) {
     message.warning(`「${invalid.productName || '明细'}」的收货仓库为必填项`)
-    return
+    return null
   }
   const settleInvalid = submitLines.find(
     (l) => String(l.settleUnit || '').trim() && !(Number(l.settleQty) > 0),
@@ -631,9 +656,12 @@ function handleConfirm() {
     message.warning(
       `「${settleInvalid.productName || '明细'}」已启用结算单位，请填写结算数量（${settleInvalid.settleUnit}）`,
     )
-    return
+    return null
   }
+  return submitLines
+}
 
+function submitReceipts(submitLines, { createQc = false } = {}) {
   const byOrder = new Map()
   submitLines.forEach((line) => {
     const oid = line.purchaseOrderId
@@ -642,8 +670,10 @@ function handleConfirm() {
   })
 
   let okCount = 0
+  let qcOkCount = 0
   const errors = []
   const nos = []
+  const qcNos = []
   let index = 0
   for (const [orderId, lines] of byOrder) {
     index += 1
@@ -658,21 +688,69 @@ function handleConfirm() {
     if (result.ok) {
       okCount += 1
       if (result.receipt?.receiptNo) nos.push(result.receipt.receiptNo)
+      if (createQc && result.receipt) {
+        const qcRes = createIncomingQcFromReceipt({
+          receipt: result.receipt,
+          remark: form.remark || '',
+        })
+        if (qcRes.ok) {
+          attachReceiptQcSheet(result.receipt.id, {
+            qcNo: qcRes.task.qcNo,
+            qcStatus: '质检中',
+          })
+          qcOkCount += 1
+          if (qcRes.task?.qcNo) qcNos.push(qcRes.task.qcNo)
+        } else {
+          errors.push(
+            qcRes.message || `收货单「${result.receipt.receiptNo}」已生成，但质检单生成失败`,
+          )
+        }
+      }
     } else {
       errors.push(result.message || `采购单「${order?.orderNo || orderId}」生成失败`)
     }
   }
 
   if (okCount) {
-    message.success(
-      nos.length ? `已生成 ${okCount} 张收货单：${nos.join('、')}` : `已生成 ${okCount} 张收货单`,
-    )
+    if (createQc && qcOkCount) {
+      message.success(
+        qcNos.length
+          ? `已生成 ${okCount} 张收货单，并生成质检单：${qcNos.join('、')}`
+          : `已生成 ${okCount} 张收货单并生成质检单`,
+      )
+    } else {
+      message.success(
+        nos.length ? `已生成 ${okCount} 张收货单：${nos.join('、')}` : `已生成 ${okCount} 张收货单`,
+      )
+    }
     emit('confirmed')
     emit('update:open', false)
   }
   if (errors.length) {
     const preview = errors.slice(0, 3).join('；')
     message.warning(errors.length > 3 ? `${preview}…等 ${errors.length} 条失败` : preview)
+  }
+}
+
+function handleConfirm() {
+  const submitLines = collectSubmitLines()
+  if (!submitLines) return
+  submitting.value = true
+  try {
+    submitReceipts(submitLines, { createQc: false })
+  } finally {
+    submitting.value = false
+  }
+}
+
+function handleConfirmAndCreateQc() {
+  const submitLines = collectSubmitLines()
+  if (!submitLines) return
+  submitting.value = true
+  try {
+    submitReceipts(submitLines, { createQc: true })
+  } finally {
+    submitting.value = false
   }
 }
 </script>

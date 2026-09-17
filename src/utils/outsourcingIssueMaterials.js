@@ -10,6 +10,8 @@ import {
   calcWxLineRemainIssueQty,
   isWxLineIssueFull,
 } from '@/utils/outsourcingInbound'
+import { isProcessOutsourceOrder } from '@/utils/outsourcingMode'
+import { resolveMaterialsForProcessOutsource } from '@/utils/workOrderProcessOutsource'
 
 /** 产品色条调色板（与物料行同源） */
 export const WX_ISSUE_PRODUCT_COLORS = [
@@ -271,8 +273,15 @@ export function buildOutsourcingIssueMaterialRows(productRows = [], order = null
     (productRows || []).map((p) => [p.id, { key: p.colorKey, bar: p.colorBar, bg: p.colorBg }]),
   )
   const raw = []
+  const isProcess = isProcessOutsourceOrder(order)
   for (const p of selected) {
-    const mats = resolveMaterialsForOutsourcingProduct(p.raw || p, p.setQty)
+    let mats = []
+    if (isProcess) {
+      // 工序外协：投料优先，否则发产品本身；绝不展开 BOM
+      mats = resolveMaterialsForProcessOutsource(order, p.setQty, p.raw || p)
+    } else {
+      mats = resolveMaterialsForOutsourcingProduct(p.raw || p, p.setQty)
+    }
     for (const m of mats) {
       raw.push({
         ...m,

@@ -66,6 +66,7 @@ export function flattenGridToSteps(grid) {
         icon: proc?.icon || 'ToolOutlined',
         hasFeeding: Boolean(proc?.operations?.opFeeding || proc?.hasFeeding),
         isBlanking: Boolean(proc?.isBlanking),
+        opOutsource: Boolean(proc?.operations?.opOutsource),
         resourceType: proc?.resourceType || '工人',
         reportMode: normalizeReportMode(proc?.reportMode),
         taskExecutionMode: normalizeTaskExecutionMode(proc?.taskExecutionMode),
@@ -98,6 +99,7 @@ export function buildWorkOrderProcessesFromGrid(grid, routeId = '') {
     processFileName: step.processFileName,
     executors: resolveDefaultExecutors(getProcessById(step.processId)),
     ...createEmptyWorkOrderProcessExtras(),
+    opOutsource: Boolean(step.opOutsource),
     feedingMaterials: step.hasFeeding
       ? [{ id: `feed-${Date.now()}-${index}`, materialId: undefined, materialName: '', qty: null }]
       : [],

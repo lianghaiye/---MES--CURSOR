@@ -72,7 +72,7 @@ const router = useRouter()
 
 const form = reactive({
   paper: 'A4',
-  orientation: 'portrait',
+  orientation: 'landscape',
 })
 
 const paperOptions = [
@@ -92,7 +92,8 @@ watch(
   (visible) => {
     if (!visible) return
     form.paper = 'A4'
-    form.orientation = 'portrait'
+    // 明细含点收/入库/结算等多单位列，默认横向更易读
+    form.orientation = 'landscape'
   },
 )
 

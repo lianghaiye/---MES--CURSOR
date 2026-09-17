@@ -20,8 +20,25 @@ const TS = dayjs().format('YYYY-MM-DD HH:mm:ss')
 function baseProcesses(executors = ['张三']) {
   return buildProcessesFromRoute(ROUTE).map((p, i) => ({
     ...p,
+    opOutsource: p.name === '机加工' ? true : Boolean(p.opOutsource),
     executors: i === 0 ? [...executors] : [...executors],
   }))
+}
+
+function withProcessOutsourceDemo(processes) {
+  return (processes || []).map((p) =>
+    p.name === '机加工'
+      ? {
+          ...p,
+          opOutsource: true,
+          outsourceStatus: '外协中',
+          outsourceQty: 5,
+          outsourcingOrderIds: ['wx-proc-1'],
+          // 工序外协演示：无单独投料时发料为产品本身
+          feedingMaterials: [],
+        }
+      : p,
+  )
 }
 
 function makeBatch(woId, qty, status = '执行中') {
@@ -61,7 +78,7 @@ export function createWorkOrderControlDemoOrders() {
       processRouteName: ROUTE,
       source: 'control-demo',
       sourceOrderNo: 'SO-CTRL-PAUSE',
-      processes: baseProcesses(['张三', '李四']),
+      processes: withProcessOutsourceDemo(baseProcesses(['张三', '李四'])),
       scheduleBatches: [makeBatch('wo-ctrl-pause-reported', 10)],
       activeScheduleBatchId: 'sb-wo-ctrl-pause-reported-1',
       createdAt: '2026-08-01',

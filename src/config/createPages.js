@@ -113,6 +113,22 @@ export const createPageRegistry = [
     keepAlive: 'OutboundOrderCreateView',
   },
   {
+    listPath: '/inventory/transfer',
+    newPath: '/inventory/transfer/new',
+    title: '新增调拨单',
+    name: 'inventory-transfer-new',
+    view: () => import('@/views/inventory/TransferOrderCreateView.vue'),
+    keepAlive: 'TransferOrderCreateView',
+  },
+  {
+    listPath: '/inventory/stocktake',
+    newPath: '/inventory/stocktake/new',
+    title: '新增盘点单',
+    name: 'inventory-stocktake-new',
+    view: () => import('@/views/inventory/StocktakeOrderCreateView.vue'),
+    keepAlive: 'StocktakeOrderCreateView',
+  },
+  {
     listPath: '/product-process/products',
     newPath: '/product-process/products/new',
     title: '新增产品',

@@ -173,14 +173,14 @@
 
 .work-order-print-preview-page .process-table .col-process-content,
 .work-order-print-iframe-body .process-table .col-process-content {
-  width: 22%;
-  min-width: 120px;
+  width: 16%;
+  min-width: 90px;
 }
 
-.work-order-print-preview-page .process-table .col-feeding,
-.work-order-print-iframe-body .process-table .col-feeding {
-  width: 26%;
-  min-width: 140px;
+.work-order-print-preview-page .process-table .col-blanking,
+.work-order-print-iframe-body .process-table .col-blanking {
+  width: 18%;
+  min-width: 100px;
 }
 
 .work-order-print-preview-page .bom-table .cell-num,

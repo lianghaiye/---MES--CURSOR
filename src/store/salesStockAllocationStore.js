@@ -5,9 +5,16 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { stockState } from '@/store/stockStore'
-import { productInfoState } from '@/store/productInfoStore'
-import { materialInfoState } from '@/store/materialInfoStore'
 import { persistJson } from '@/utils/safeStorage'
+
+/** 延迟取主数据，避免与 productInfo/materialInfo → demo seed → 本 store 循环初始化 */
+function getProductInfoState() {
+  return require('@/store/productInfoStore').productInfoState
+}
+
+function getMaterialInfoState() {
+  return require('@/store/materialInfoStore').materialInfoState
+}
 
 const STORAGE_KEY = 'i_doms_sales_stock_allocations'
 const DATA_VERSION = 3
@@ -65,12 +72,12 @@ export function getOnHandQtyByItemCode(itemCode) {
     .filter((r) => r.itemCode === code)
     .reduce((s, r) => s + (Number(r.qty) || 0), 0)
   if (fromLedger > 0) return fromLedger
-  const product = productInfoState.products.find((p) => p.code === code)
+  const product = getProductInfoState().products.find((p) => p.code === code)
   if (product) {
     const q = Number(product.stockQty ?? product.inventoryQty)
     if (Number.isFinite(q)) return q
   }
-  const material = materialInfoState.materials.find((m) => m.code === code)
+  const material = getMaterialInfoState().materials.find((m) => m.code === code)
   if (material) {
     const q = Number(material.stockQty ?? material.inventoryQty)
     if (Number.isFinite(q)) return q
@@ -415,7 +422,7 @@ export function buildLineStockReminder(line, salesOrder) {
   if (covered <= 0 && need > 0) status = '缺货'
   else if (covered < need) status = '部分缺货'
 
-  const product = productInfoState.products.find((p) => p.code === code)
+  const product = getProductInfoState().products.find((p) => p.code === code)
   const planStrategy = product?.production?.planStrategy || 'mto'
 
   return {
@@ -511,7 +518,7 @@ const DEMO_DONOR_ALLOCATIONS = [
 
 function ensureDemoOnHand(itemCode, minQty) {
   if (getOnHandQtyByItemCode(itemCode) >= minQty) return
-  const product = productInfoState.products.find((p) => p.code === itemCode)
+  const product = getProductInfoState().products.find((p) => p.code === itemCode)
   if (product) {
     product.stockQty = Math.max(Number(product.stockQty) || 0, minQty)
   }
@@ -603,4 +610,11 @@ export function shouldShowLiveStockRemind(order) {
   return status !== '已完成' && status !== '已作废'
 }
 
-ensureStockTransferDemoMocks()
+/** 模块加载完成后再灌演示数据，避免循环依赖 TDZ */
+queueMicrotask(() => {
+  try {
+    ensureStockTransferDemoMocks()
+  } catch {
+    /* ignore seed failures during boot */
+  }
+})

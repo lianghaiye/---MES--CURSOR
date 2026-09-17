@@ -23,9 +23,6 @@
             <a-descriptions-item label="工序分类">{{ record.category }}</a-descriptions-item>
             <a-descriptions-item label="资源类型">{{ record.resourceType }}</a-descriptions-item>
             <a-descriptions-item label="岗位">{{ record.position }}</a-descriptions-item>
-            <a-descriptions-item label="下料工序">{{
-              record.isBlanking ? '是' : '否'
-            }}</a-descriptions-item>
             <a-descriptions-item label="默认执行人/工组" :span="2">
               <template v-if="record.defaultExecutors?.length">
                 <a-tag
@@ -52,10 +49,15 @@
           </a-descriptions>
         </DetailSectionCard>
 
-        <DetailSectionCard v-if="showProcessOperations" title="工序操作（工单任务可操作项）">
+        <DetailSectionCard title="工序操作">
           <div class="ops-tags">
-            <a-tag v-for="label in operationLabels" :key="label" color="blue">{{ label }}</a-tag>
-            <span v-if="!operationLabels.length" class="empty-ops">未配置任何操作</span>
+            <a-tag v-if="record.isBlanking" color="orange">下料</a-tag>
+            <a-tag v-for="label in displayOperationLabels" :key="label" color="blue">{{
+              label
+            }}</a-tag>
+            <span v-if="!record.isBlanking && !displayOperationLabels.length" class="empty-ops"
+              >未配置任何操作</span
+            >
           </div>
         </DetailSectionCard>
       </template>
@@ -74,9 +76,20 @@ export default { name: 'ProcessConfigDetailView' }
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getProcessById, getOperationLabels } from '@/store/processConfigStore'
-import { isMinimalReportMode } from '@/store/businessRuleStore'
+import {
+  getProcessById,
+  getOperationLabels,
+  PROCESS_OPERATION_DEFS,
+} from '@/store/processConfigStore'
+import { getProductionMode, isMinimalReportMode } from '@/store/businessRuleStore'
 import ProcessConfigFormModal from './components/ProcessConfigFormModal.vue'
+
+const MINIMAL_PROCESS_OPERATION_KEYS = new Set([
+  'opQc',
+  'opOutsource',
+  'opDisassembly',
+  'opDisassemblyQc',
+])
 
 const route = useRoute()
 const router = useRouter()
@@ -84,8 +97,22 @@ const loading = ref(false)
 const record = ref(null)
 const modalOpen = ref(false)
 
-const operationLabels = computed(() => (record.value ? getOperationLabels(record.value) : []))
-const showProcessOperations = computed(() => !isMinimalReportMode())
+const isMinimalMode = computed(() => {
+  const mode = getProductionMode()
+  return mode === 'minimal' || mode === 'minimal_salary' || isMinimalReportMode()
+})
+
+const displayOperationLabels = computed(() => {
+  if (!record.value) return []
+  const all = getOperationLabels(record.value)
+  if (!isMinimalMode.value) return all
+  const allowLabels = new Set(
+    PROCESS_OPERATION_DEFS.filter((d) => MINIMAL_PROCESS_OPERATION_KEYS.has(d.key)).map(
+      (d) => d.label,
+    ),
+  )
+  return all.filter((label) => allowLabels.has(label))
+})
 
 function reload() {
   const id = route.params.id

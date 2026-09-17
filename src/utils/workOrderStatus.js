@@ -541,6 +541,58 @@ export function resetWorkOrderScheduleTask(workOrder, record) {
   }
 }
 
+/**
+ * 排产信息行：终止任务（状态 → 已终止）
+ * @param {object} workOrder
+ * @param {{ batchId?: string, processName?: string, executor?: string }} record
+ */
+export function terminateWorkOrderScheduleTask(workOrder, record) {
+  if (!workOrder || !record) return { ok: false, message: '参数无效' }
+  if (record.status === '已终止') return { ok: false, message: '任务已终止' }
+
+  const processName = record.processName || ''
+  const executor = record.executor && record.executor !== '—' ? record.executor : ''
+  const tasks = listMobileTasksForWorkOrder(workOrder.id)
+  const byProcess = tasks.filter((t) => !t.hiddenByTerminate && t.processName === processName)
+  const matched = executor
+    ? byProcess.filter((t) => t.executor === executor || t.claimedBy === executor || !t.executor)
+    : byProcess
+  const targets = matched.length ? matched : byProcess
+
+  const patches = {}
+  for (const task of targets) {
+    patches[task.id] = {
+      taskStatus: '已终止',
+      controlStatus: '',
+      taskStatusBeforeControl: '',
+    }
+  }
+  try {
+    persistMobileTaskPatches(patches)
+  } catch {
+    /* ignore */
+  }
+
+  const batch = (workOrder.scheduleBatches || []).find((b) => b.id === record.batchId)
+  if (batch) {
+    const assignment = (batch.processAssignments || []).find((a) => a.processName === processName)
+    if (assignment) {
+      assignment.scheduleTaskStatus = '已终止'
+    }
+  }
+
+  syncWorkOrderExecutionStatus(workOrder)
+
+  return {
+    ok: true,
+    terminateCount: Object.keys(patches).length,
+    patch: {
+      scheduleBatches: workOrder.scheduleBatches,
+      status: workOrder.status,
+    },
+  }
+}
+
 /** 详情栏是否展示「修改排产数量」（不按已下发/执行中区分可改性；有报工在操作时拦截） */
 export function canShowEditScheduleQty(workOrder) {
   if (!workOrder) return false

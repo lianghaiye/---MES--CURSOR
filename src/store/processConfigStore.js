@@ -15,7 +15,7 @@ import { defaultQcConfigsFromOperations, normalizeProcessQcConfigs } from '@/uti
 
 const STORAGE_KEY = 'i_doms_process_config'
 const SEED_VERSION_KEY = 'i_doms_process_config_seed_v'
-const CURRENT_SEED_VERSION = '8'
+const CURRENT_SEED_VERSION = '9'
 
 export {
   PROCESS_OPERATION_DEFS,

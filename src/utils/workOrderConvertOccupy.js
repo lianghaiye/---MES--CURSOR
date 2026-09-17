@@ -4,6 +4,7 @@
  */
 import { purchaseRequisitionState } from '@/store/purchaseRequisitionStore'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
+import { isProcessOutsourceOrder } from '@/utils/outsourcingMode'
 
 function matchesWorkOrderSource(row, workOrder) {
   if (!row || !workOrder) return false
@@ -56,7 +57,11 @@ export function getWorkOrderConvertedPurchaseQty(workOrder) {
 }
 
 export function getWorkOrderConvertedOutsourceQty(workOrder) {
-  return listWorkOrderOutsourcingOrders(workOrder).reduce((s, o) => s + outsourcingOrderQty(o), 0)
+  return listWorkOrderOutsourcingOrders(workOrder).reduce((s, o) => {
+    // 工序外协不占用待排产
+    if (isProcessOutsourceOrder(o)) return s
+    return s + outsourcingOrderQty(o)
+  }, 0)
 }
 
 export function getWorkOrderConvertOccupyQty(workOrder) {

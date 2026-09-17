@@ -28,6 +28,7 @@
 import { computed } from 'vue'
 import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
 import { normalizeProcurementDocSource } from '@/constants/procurementDocSource'
+import { outsourceModeLabel, normalizeOutsourceMode } from '@/utils/outsourcingMode'
 
 const props = defineProps({
   order: { type: Object, required: true },
@@ -54,6 +55,22 @@ const metaItems = computed(() => {
 
 const fields = computed(() => [
   { key: 'orderNo', label: '外协单号' },
+  {
+    key: 'outsourceMode',
+    label: '外协类型',
+    format: (o) => outsourceModeLabel(o.outsourceMode),
+  },
+  {
+    key: 'sourceProcessName',
+    label: '外协工序',
+    format: (o) => {
+      if (normalizeOutsourceMode(o.outsourceMode) !== 'process') return '—'
+      const name = display(o.sourceProcessName)
+      const code = String(o.sourceProcessCode || '').trim()
+      if (name === '—') return '—'
+      return code ? `${name}（${code}）` : name
+    },
+  },
   { key: 'workOrderName', label: '工单名称' },
   { key: 'salesOrderNo', label: '销售单号', slot: 'salesOrderNo' },
   {

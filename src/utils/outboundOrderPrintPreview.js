@@ -37,6 +37,11 @@ function formatShipQty(line) {
   return formatPrintQty(line.shipQty)
 }
 
+function formatLineWeight(line) {
+  if (line.weight == null || line.weight === '') return ''
+  return formatPrintQty(line.weight)
+}
+
 /** 构建单张出库单打印数据（含明细） */
 export function buildOutboundOrderPrintPayload(row, options = {}) {
   if (!row) return null
@@ -56,12 +61,19 @@ export function buildOutboundOrderPrintPayload(row, options = {}) {
       shipWarehouse: formatPrintFieldValue(line.shipWarehouse || row.warehouse),
       locationNo: formatPrintFieldValue(line.locationNo),
       shipQty: formatShipQty(line),
+      weight: formatLineWeight(line),
       packagingForm: formatPrintFieldValue(line.packagingForm),
       unitPrice: formatPrintMoney(line.unitPrice),
       totalPrice: formatPrintMoney(line.totalPrice),
       remark: formatPrintFieldValue(line.deliveryRemark || line.remark),
     }
   })
+
+  const totalShipQty = (row.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
+  const lineWeightTotal = (row.lineItems || []).reduce((s, l) => s + (Number(l.weight) || 0), 0)
+  const headerWeight =
+    row.totalWeight != null && row.totalWeight !== '' ? Number(row.totalWeight) : lineWeightTotal
+  const totalPrice = (row.lineItems || []).reduce((s, l) => s + (Number(l.totalPrice) || 0), 0)
 
   const basicFields = [
     { label: '状态', value: row.status },
@@ -78,7 +90,13 @@ export function buildOutboundOrderPrintPayload(row, options = {}) {
     { label: '创建时间', value: row.createdAt },
     { label: '操作人', value: row.auditor || row.handler },
     { label: '操作时间', value: row.auditDate },
-    { label: '出库总重量(kg)', value: row.totalWeight },
+    {
+      label: '出库总重量(kg)',
+      value:
+        headerWeight != null && Number.isFinite(headerWeight) && headerWeight > 0
+          ? formatPrintQty(headerWeight)
+          : '',
+    },
     { label: '备注', value: row.remark, wide: true },
   ]
     .filter((field) => field.value != null && String(field.value).trim() !== '')
@@ -86,9 +104,6 @@ export function buildOutboundOrderPrintPayload(row, options = {}) {
       ...field,
       value: formatPrintFieldValue(field.value),
     }))
-
-  const totalShipQty = (row.lineItems || []).reduce((s, l) => s + (Number(l.shipQty) || 0), 0)
-  const totalPrice = (row.lineItems || []).reduce((s, l) => s + (Number(l.totalPrice) || 0), 0)
 
   return {
     docNo: formatPrintFieldValue(row.docNo),
@@ -100,6 +115,7 @@ export function buildOutboundOrderPrintPayload(row, options = {}) {
     summary: {
       lineCount: String(lineItems.length),
       totalQty: formatPrintQty(totalShipQty),
+      totalWeight: formatPrintQty(headerWeight),
       totalPrice: formatPrintMoney(totalPrice),
     },
     paper: options.paper || 'A4',

@@ -15,6 +15,14 @@
         <template v-if="column.key === 'status'">
           <a-tag :color="outsourcingStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
         </template>
+        <template v-else-if="column.key === 'outsourceMode'">
+          <a-tag :color="row.outsourceMode === 'process' ? 'blue' : 'default'">
+            {{ outsourceModeLabel(row.outsourceMode) }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'sourceProcessName'">
+          {{ row.sourceProcessName || '—' }}
+        </template>
         <template v-else-if="column.key === 'inboundStatus'">
           <a-tag :color="inboundStatusColor(row.inboundStatus)">
             {{ row.inboundStatus || '—' }}
@@ -69,6 +77,7 @@ import { formatQty } from '@/utils/numberFormat'
 import { normalizeProcurementDocSource } from '@/constants/procurementDocSource'
 import { listWorkOrderOutsourcingOrders } from '@/utils/workOrderRelatedInfo'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
+import { outsourceModeLabel } from '@/utils/outsourcingMode'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -86,6 +95,8 @@ const outsourcingColumns = [
   { title: '状态', key: 'status', width: 88, fixed: 'left' },
   { title: '入库状态', key: 'inboundStatus', width: 96, fixed: 'left' },
   { title: '外协单号', key: 'orderNo', width: 140, fixed: 'left' },
+  { title: '外协类型', key: 'outsourceMode', width: 96 },
+  { title: '工序', key: 'sourceProcessName', width: 110, ellipsis: true },
   { title: '产品名称', key: 'productName', width: 130, ellipsis: true },
   { title: '规格型号', key: 'specModel', width: 110, ellipsis: true },
   { title: '材质', key: 'material', width: 88, ellipsis: true },

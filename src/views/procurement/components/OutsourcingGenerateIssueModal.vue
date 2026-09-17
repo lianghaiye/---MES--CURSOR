@@ -41,12 +41,7 @@
       </a-form>
     </div>
 
-    <a-alert
-      type="info"
-      show-icon
-      class="issue-tip"
-      message="勾选上方外协产品并填写本次套数后，系统按产品 BOM 自动生成下方发料物料；改套数将覆盖重算物料数量。橙色表示多产品共用物料。"
-    />
+    <a-alert type="info" show-icon class="issue-tip" :message="issueTipMessage" />
 
     <div class="section-block">
       <div class="section-title">
@@ -237,6 +232,7 @@ import {
   buildOutsourcingIssueMaterialRows,
   buildOutsourcingIssueProductRows,
 } from '@/utils/outsourcingIssueMaterials'
+import { isProcessOutsourceOrder } from '@/utils/outsourcingMode'
 import OutsourcingIssueLineEditModal from './OutsourcingIssueLineEditModal.vue'
 import LongTextEditCell from '@/components/LongTextEditCell.vue'
 
@@ -257,6 +253,12 @@ const editOpen = ref(false)
 const editingLine = ref(null)
 const remarkOpen = ref(false)
 const remarkDraft = ref('')
+
+const issueTipMessage = computed(() =>
+  isProcessOutsourceOrder(props.outsourcingOrder)
+    ? '工序外协：勾选产品并填写本次套数后，优先按工序投料生成发料物料；无投料时发外协产品本身（不按 BOM 展开下级）。'
+    : '勾选上方外协产品并填写本次套数后，系统按产品 BOM 自动生成下方发料物料；改套数将覆盖重算物料数量。橙色表示多产品共用物料。',
+)
 const remarkTargetId = ref('')
 const warehouseOpts = warehouseOptions
 

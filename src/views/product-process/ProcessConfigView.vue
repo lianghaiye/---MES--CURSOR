@@ -116,19 +116,15 @@
             </div>
             <span v-else class="muted">—</span>
           </template>
-          <template v-else-if="column.key === 'isBlanking'">
-            <a-tag v-if="record.isBlanking" color="orange">是</a-tag>
-            <span v-else class="muted">—</span>
-          </template>
-          <template v-else-if="column.key === 'operations'">
-            <div v-if="getOperationLabels(record).length" class="executor-tags">
+          <template v-else-if="column.key === 'processConfig'">
+            <div v-if="processConfigLabels(record).length" class="executor-tags">
               <a-tag
-                v-for="label in getOperationLabels(record)"
-                :key="label"
-                color="blue"
+                v-for="item in processConfigLabels(record)"
+                :key="item.label"
+                :color="item.color"
                 class="executor-tag"
               >
-                {{ label }}
+                {{ item.label }}
               </a-tag>
             </div>
             <span v-else class="muted">—</span>
@@ -164,7 +160,7 @@
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
-      :default-settings="filteredDefaultColumnSettings"
+      :default-settings="defaultColumnSettings"
     />
 
     <ImportExcelModal
@@ -195,14 +191,23 @@ import {
   filterProcessConfig,
   deleteProcessConfig,
   getOperationLabels,
+  PROCESS_OPERATION_DEFS,
   PROCESS_STATUS,
   RESOURCE_TYPES,
 } from '@/store/processConfigStore'
 import { getActiveCategoryOptions } from '@/store/processCategoryStore'
-import { isMinimalReportMode } from '@/store/businessRuleStore'
+import { getProductionMode, isMinimalReportMode } from '@/store/businessRuleStore'
 import ImportExcelModal from '@/components/ImportExcelModal.vue'
 import ImportExportHistoryModal from '@/components/ImportExportHistoryModal.vue'
 import { processRouteBundleImportDef } from '@/utils/importDefs/processRouteBundleImport'
+
+/** 极简模式列表仅展示这些工序操作标签 */
+const MINIMAL_PROCESS_OPERATION_KEYS = new Set([
+  'opQc',
+  'opOutsource',
+  'opDisassembly',
+  'opDisassemblyQc',
+])
 
 const router = useRouter()
 const importOpen = ref(false)
@@ -227,17 +232,40 @@ const laborProcess = ref(null)
 const categoryOpts = computed(() => getActiveCategoryOptions())
 const resourceTypeOpts = RESOURCE_TYPES.map((v) => ({ label: v, value: v }))
 const statusOpts = PROCESS_STATUS.map((v) => ({ label: v, value: v }))
-const showProcessOperations = computed(() => !isMinimalReportMode())
+
+const isMinimalMode = computed(() => {
+  const mode = getProductionMode()
+  return mode === 'minimal' || mode === 'minimal_salary' || isMinimalReportMode()
+})
+
+function processConfigLabels(record) {
+  const tags = []
+  if (record?.isBlanking) {
+    tags.push({ label: '下料', color: 'orange' })
+  }
+  let labels = getOperationLabels(record)
+  if (isMinimalMode.value) {
+    const allow = new Set(
+      PROCESS_OPERATION_DEFS.filter((d) => MINIMAL_PROCESS_OPERATION_KEYS.has(d.key)).map(
+        (d) => d.label,
+      ),
+    )
+    labels = labels.filter((label) => allow.has(label))
+  }
+  labels.forEach((label) => {
+    tags.push({ label, color: 'blue' })
+  })
+  return tags
+}
 
 const allBaseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
   { title: '工序编码', key: 'code', width: 130 },
   { title: '工序名称', dataIndex: 'name', width: 140 },
   { title: '工序分类', dataIndex: 'category', width: 100 },
-  { title: '下料工序', key: 'isBlanking', width: 90 },
+  { title: '工序配置', key: 'processConfig', width: 240, ellipsis: true },
   { title: '资源类型', dataIndex: 'resourceType', width: 100 },
   { title: '默认执行人/工组', key: 'defaultExecutors', width: 180, ellipsis: true },
-  { title: '工序操作', key: 'operations', width: 220, ellipsis: true },
   { title: '图片', key: 'image', width: 72 },
   { title: '状态', key: 'status', width: 90 },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
@@ -245,23 +273,8 @@ const allBaseColumns = [
   { title: '操作', key: 'actions', width: 180, fixed: 'right' },
 ]
 
-const {
-  columnSettings,
-  columnDrawerOpen,
-  displayColumns: rawDisplayColumns,
-  tableScrollX,
-  defaultColumnSettings,
-} = useTableColumnSettings('process-config-list', allBaseColumns)
-
-const displayColumns = computed(() => {
-  if (showProcessOperations.value) return rawDisplayColumns.value
-  return rawDisplayColumns.value.filter((col) => col.key !== 'operations')
-})
-
-const filteredDefaultColumnSettings = computed(() => {
-  if (showProcessOperations.value) return defaultColumnSettings
-  return defaultColumnSettings.filter((col) => col.key !== 'operations')
-})
+const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
+  useTableColumnSettings('process-config-list-v2', allBaseColumns)
 
 const filteredList = computed(() => filterProcessConfig(processConfigState.processes, applied))
 

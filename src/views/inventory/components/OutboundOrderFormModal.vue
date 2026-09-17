@@ -557,14 +557,18 @@
         <a-button size="small" @click="emit('open-full')">打开详情</a-button>
       </template>
       <a-button v-if="!embedded" @click="handleCancel">取消</a-button>
+      <a-button :size="embedded ? 'small' : 'middle'" :loading="saving" @click="handleSave">
+        保存
+      </a-button>
       <a-button
+        v-if="canSaveAndConfirm"
         type="primary"
         :size="embedded ? 'small' : 'middle'"
         :loading="saving"
-        @click="handleSave"
+        @click="handleSaveAndConfirm"
       >
         <CheckOutlined />
-        保存
+        保存并出库
       </a-button>
     </template>
   </FormCreateShell>
@@ -684,6 +688,7 @@ import {
   addOutboundOrder,
   generateOutboundNo,
   updateOutboundOrder,
+  confirmOutbound,
   confirmOutboundLine,
   refuseOutboundLine,
   getOutboundOrderById,
@@ -786,6 +791,12 @@ const canConfirmEmbedded = computed(
 )
 const canRefuseEmbedded = computed(() => props.embedded && canRefuseOutbound(props.editRecord))
 const canDeleteEmbedded = computed(() => props.embedded && canDeleteOutbound(props.editRecord))
+/** 新增，或待出库/部分出库时可「保存并出库」 */
+const canSaveAndConfirm = computed(() => {
+  if (!isEdit.value) return true
+  const st = props.editRecord?.status
+  return st === '待出库' || st === '部分出库'
+})
 const workOrderList = computed(() => {
   void mobileMaterialReqState.items
   const orderLike = {
@@ -1719,25 +1730,25 @@ function buildPayload() {
   return payload
 }
 
-function handleSave() {
+function validateOutboundForm() {
   if (!form.outboundType) {
     message.warning('请选择出库类型')
-    return
+    return false
   }
   if (!form.docNo?.trim()) {
     message.warning('请输入出库单号')
-    return
+    return false
   }
 
   const skuCheck = validateLinesSkuResolved(form.lineItems)
   if (!skuCheck.ok) {
     message.warning(skuCheck.message)
-    return
+    return false
   }
 
   if (!form.lineItems.filter((l) => l.itemCode).length) {
     message.warning('请至少添加一条有效明细')
-    return
+    return false
   }
 
   const invalidBatchLine = form.lineItems.find((line) => {
@@ -1767,13 +1778,22 @@ function handleSave() {
         ? `「${invalidBatchLine.itemName || invalidBatchLine.itemCode}」${manualMsg || '请多选批次并分配数量'}`
         : `「${invalidBatchLine.itemName || invalidBatchLine.itemCode}」请填写出库数量（可为 0），且不超过可用库存（${issueRuleLabel.value}）`,
     )
-    return
+    return false
   }
+  return true
+}
 
-  saving.value = true
-  const res = isEdit.value
+/** @returns {{ ok: boolean, order?: object, message?: string }} */
+function persistOutboundOrder() {
+  return isEdit.value
     ? updateOutboundOrder(props.editRecord.id, buildPayload())
     : addOutboundOrder(buildPayload())
+}
+
+function handleSave() {
+  if (!validateOutboundForm()) return
+  saving.value = true
+  const res = persistOutboundOrder()
   saving.value = false
   if (!res.ok) {
     message.warning(res.message)
@@ -1782,6 +1802,51 @@ function handleSave() {
   message.success(isEdit.value ? '出库单已更新' : '出库单已创建')
   emit('saved', res.order)
   closeAfterSave()
+}
+
+function handleSaveAndConfirm() {
+  if (!validateOutboundForm()) return
+  Modal.confirm({
+    title: '保存并出库',
+    content: '将先保存当前编辑内容，再确认出库并扣减库存，是否继续？',
+    okText: '确定',
+    cancelText: '取消',
+    onOk: () => {
+      saving.value = true
+      const saved = persistOutboundOrder()
+      if (!saved.ok) {
+        saving.value = false
+        message.warning(saved.message || '保存失败')
+        return Promise.reject()
+      }
+      const orderId = saved.order?.id
+      if (!orderId) {
+        saving.value = false
+        message.warning('保存成功但无法确认出库')
+        return Promise.reject()
+      }
+      const { count, blocked, warnings } = confirmOutbound([orderId])
+      saving.value = false
+      if (blocked?.length) {
+        message.warning(blocked.map((b) => b.message).join('；'))
+        emit('saved', saved.order)
+        return Promise.reject()
+      }
+      if (warnings?.length) {
+        message.warning(warnings.join('；'))
+      }
+      if (count > 0) {
+        message.success(isEdit.value ? '已保存并确认出库' : '已创建并确认出库')
+        const latest = getOutboundOrderById(orderId)
+        emit('saved', latest || saved.order)
+        closeAfterSave()
+        return undefined
+      }
+      message.warning('未确认出库')
+      emit('saved', saved.order)
+      return Promise.reject()
+    },
+  })
 }
 </script>
 

@@ -1,7 +1,6 @@
 /** 工艺「下料工序」→ 工单/出库 → 下料结算准入 */
 
 import { getProcessById, getProcessByName } from '@/store/processConfigStore'
-import { workOrderState } from '@/store/workOrderStore'
 import { resolveNeedsBlankingSettle } from '@/utils/blankingSettleMaterial'
 import { isLineWholeWithRemnantBatchIssue } from '@/utils/outboundBatchAllocate'
 import { DUAL_UNIT_ISSUE_STRATEGIES, getDualUnitIssueStrategy } from '@/store/functionParamStore'
@@ -25,6 +24,9 @@ export function workOrderHasBlankingProcess(workOrder) {
 export function findWorkOrderByCode(code) {
   const no = String(code || '').trim()
   if (!no) return null
+  // 运行时加载，避免 processRouteStore ↔ workOrderStore 循环依赖
+  // eslint-disable-next-line global-require
+  const { workOrderState } = require('@/store/workOrderStore')
   void workOrderState.orders
   return workOrderState.orders.find((o) => o.code === no) || null
 }

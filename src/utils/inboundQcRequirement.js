@@ -31,3 +31,9 @@ export function resolveLineInboundQcRequirement(line = {}) {
   const code = line.productCode || line.itemCode || line.materialCode || ''
   return resolveInboundQcRequirementByCode(code) || '—'
 }
+
+/** 可编辑下拉默认值：无值时返回空，不落「—」 */
+export function resolveEditableInboundQcRequirement(line = {}) {
+  const v = resolveLineInboundQcRequirement(line)
+  return v && v !== '—' ? v : undefined
+}

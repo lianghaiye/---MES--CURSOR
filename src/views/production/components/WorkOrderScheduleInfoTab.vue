@@ -50,6 +50,13 @@
               <a class="action-link" @click="onGenTask(record)">生成任务</a>
               <a class="action-link" @click="openEditExecutor(record)">修改执行人</a>
               <a class="action-link" @click="onResetStatus(record)">重置状态</a>
+              <a
+                v-if="record.status !== '已终止'"
+                class="action-link danger"
+                @click="onTerminateTask(record)"
+              >
+                终止
+              </a>
             </a-space>
           </template>
         </template>
@@ -87,7 +94,7 @@ import {
   scheduleTaskStatusColor,
 } from '@/utils/workOrderRelatedInfo'
 import { batchStatusColor } from '@/utils/workOrderScheduleBatch'
-import { resetWorkOrderScheduleTask } from '@/utils/workOrderStatus'
+import { resetWorkOrderScheduleTask, terminateWorkOrderScheduleTask } from '@/utils/workOrderStatus'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -118,7 +125,7 @@ const columns = [
   { title: '不良品数', dataIndex: 'badQty', width: 88, align: 'right' },
   { title: '报工时长', dataIndex: 'reportDuration', width: 90 },
   { title: '报工时间', dataIndex: 'reportedAt', width: 140 },
-  { title: '操作', key: 'actions', width: 220, fixed: 'right' },
+  { title: '操作', key: 'actions', width: 280, fixed: 'right' },
 ]
 
 function onGenTask(record) {
@@ -149,6 +156,30 @@ function onResetStatus(record) {
           ? `已重置 ${result.resetCount} 条任务状态并清零报工数量`
           : '已重置任务状态并清零报工数量',
       )
+    },
+  })
+}
+
+function onTerminateTask(record) {
+  Modal.confirm({
+    title: '终止任务',
+    content: `确定终止任务「${record.taskNo || record.processName}」？终止后状态将变为「已终止」。`,
+    okText: '确认终止',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: () => {
+      const result = terminateWorkOrderScheduleTask(props.workOrder, record)
+      if (!result.ok) {
+        message.error(result.message || '终止失败')
+        return Promise.reject()
+      }
+      emit('action', {
+        key: 'terminate-task',
+        workOrder: props.workOrder,
+        record,
+        patch: result.patch,
+      })
+      message.success('任务已终止')
     },
   })
 }
@@ -272,6 +303,10 @@ function saveExecutor() {
 
   .action-link {
     font-size: 12px;
+
+    &.danger {
+      color: #ff4d4f;
+    }
   }
 
   .executor-edit {

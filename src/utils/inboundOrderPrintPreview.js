@@ -5,10 +5,13 @@
 import { inboundSourceLabel } from '@/mock/inboundOptions'
 import {
   enrichInboundLine,
+  getInboundQtyValue,
   getStockUnitQtyValue,
+  resolveInboundQtyUnit,
   resolveInboundStockUnit,
 } from '@/utils/inboundLineHelpers'
 import { formatQtyWithUnit } from '@/utils/numberFormat'
+import { hasSettleUnit } from '@/utils/settleUnit'
 
 const STORAGE_PREFIX = 'inbound-order-print-preview:'
 
@@ -35,11 +38,27 @@ function formatPrintMoney(val) {
   })
 }
 
-function formatInboundQty(line) {
-  const qty = getStockUnitQtyValue(line)
-  const unit = resolveInboundStockUnit(line)
-  if (unit) return formatQtyWithUnit(qty, unit)
+function formatPrintQtyWithUnit(qty, unit) {
+  if (qty == null || qty === '') return ''
+  const u = String(unit || '').trim()
+  if (u) return formatQtyWithUnit(qty, u)
   return formatPrintQty(qty)
+}
+
+/** 点收数量（采购/辅助单位） */
+function formatReceiveQty(line) {
+  return formatPrintQtyWithUnit(getInboundQtyValue(line), resolveInboundQtyUnit(line))
+}
+
+/** 入库数量（库存主单位） */
+function formatInboundQty(line) {
+  return formatPrintQtyWithUnit(getStockUnitQtyValue(line), resolveInboundStockUnit(line))
+}
+
+/** 结算数量（结算单位，未启用则空） */
+function formatSettleQty(line) {
+  if (!hasSettleUnit(line)) return ''
+  return formatPrintQtyWithUnit(line.settleQty, line.settleUnit)
 }
 
 /** 构建单张入库单打印数据（含明细） */
@@ -57,9 +76,12 @@ export function buildInboundOrderPrintPayload(row, options = {}) {
       material: formatPrintFieldValue(line.material),
       variantAttr: formatPrintFieldValue(line.variantSummary || line.variantAttr),
       drawingNo: formatPrintFieldValue(line.drawingNo),
+      barcodeType: formatPrintFieldValue(line.barcodeType),
+      receiveQty: formatReceiveQty(line),
+      qty: formatInboundQty(line),
+      settleQty: formatSettleQty(line),
       warehouse: formatPrintFieldValue(line.warehouse || row.warehouse),
       locationNo: formatPrintFieldValue(line.locationNo),
-      qty: formatInboundQty(line),
       unitPrice: formatPrintMoney(line.unitPrice),
       totalPrice: formatPrintMoney(line.totalPrice),
       remark: formatPrintFieldValue(line.lineRemark || line.remark),

@@ -13,21 +13,46 @@
           :data-source="processConfigList"
           row-key="id"
           :pagination="false"
-          :scroll="{ x: showBlankingColumn || showFeedingColumn ? 860 : 520 }"
+          :scroll="{ x: tableScrollX }"
           bordered
         >
           <template #bodyCell="{ column, record, index, text }">
             <template v-if="column.key === 'index' || column.dataIndex === 'index'">
               {{ index + 1 }}
             </template>
-            <template v-else-if="column.key === 'feeding'">
-              {{ formatProcessFeedingSummary(record) }}
+            <template v-else-if="column.key === 'processConfig'">
+              <div v-if="processConfigTags(record).length" class="config-tags">
+                <a-tag
+                  v-for="item in processConfigTags(record)"
+                  :key="item.label"
+                  :color="item.color"
+                  class="config-tag"
+                >
+                  {{ item.label }}
+                </a-tag>
+              </div>
+              <span v-else>—</span>
+            </template>
+            <template v-else-if="column.key === 'resourceType'">
+              {{ record.resourceType || '工人' }}
+            </template>
+            <template v-else-if="column.key === 'executionMode'">
+              {{ formatWorkOrderProcessExecutionMode(record) }}
+            </template>
+            <template v-else-if="column.key === 'executors'">
+              {{ formatProcessExecutors(record) }}
             </template>
             <template v-else-if="column.key === 'blankingMaterials'">
               {{ formatBlankingMaterialsSummary(record) }}
             </template>
-            <template v-else-if="column.key === 'executors'">
-              {{ formatProcessExecutors(record) }}
+            <template v-else-if="column.key === 'outsourceStatus'">
+              <a-tag
+                v-if="record.outsourceStatus"
+                :color="outsourceStatusColor(record.outsourceStatus)"
+              >
+                {{ record.outsourceStatus }}
+              </a-tag>
+              <span v-else>—</span>
             </template>
             <template v-else-if="column.dataIndex">
               {{ displayProcessCell(text) }}
@@ -43,11 +68,10 @@
 import { computed, ref } from 'vue'
 import {
   formatProcessExecutors,
-  formatProcessFeedingSummary,
+  formatWorkOrderProcessExecutionMode,
+  resolveWorkOrderProcessConfigTags,
 } from '@/utils/workOrderProcessDisplay'
 import { formatBlankingMaterialsSummary } from '@/utils/blankingSettleMaterial'
-import { resolveProcessIsBlanking } from '@/utils/workOrderBlanking'
-import { businessRuleState } from '@/store/businessRuleStore'
 import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
 
 const props = defineProps({
@@ -60,31 +84,38 @@ const collapseKeys = ref(['basic', 'process-config'])
 
 const processConfigList = computed(() => props.workOrder?.processes || [])
 
-const showFeedingColumn = computed(() => businessRuleState.rules.productionMode === 'standard')
+const processConfigCols = [
+  { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
+  { title: '工序名称', dataIndex: 'name', width: 100 },
+  { title: '工序配置', key: 'processConfig', width: 160 },
+  { title: '资源类型', key: 'resourceType', width: 90 },
+  { title: '任务模式', key: 'executionMode', width: 96 },
+  { title: '执行人', key: 'executors', width: 120 },
+  { title: '下料物料', key: 'blankingMaterials', width: 200, ellipsis: true },
+  { title: '外协状态', key: 'outsourceStatus', width: 96 },
+  { title: '工序内容', dataIndex: 'processContent', width: 140, ellipsis: true },
+]
 
-const showBlankingColumn = computed(() =>
-  (props.workOrder?.processes || []).some((p) => resolveProcessIsBlanking(p)),
+const tableScrollX = computed(() =>
+  processConfigCols.reduce((sum, col) => sum + (col.width || 100), 0),
 )
 
-const processConfigCols = computed(() => {
-  const cols = [
-    { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
-    { title: '工序名称', dataIndex: 'name', width: 100 },
-    { title: '工序内容', dataIndex: 'processContent', width: 140, ellipsis: true },
-  ]
-  if (showFeedingColumn.value) {
-    cols.push({ title: '投料', key: 'feeding', width: 160, ellipsis: true })
-  }
-  if (showBlankingColumn.value) {
-    cols.push({ title: '下料物料', key: 'blankingMaterials', width: 200, ellipsis: true })
-  }
-  cols.push({ title: '执行人', key: 'executors', width: 120 })
-  return cols
-})
+function processConfigTags(record) {
+  return resolveWorkOrderProcessConfigTags(record)
+}
 
 function displayProcessCell(value) {
   const text = String(value ?? '').trim()
   return text || '—'
+}
+
+function outsourceStatusColor(status) {
+  const map = {
+    待外协: 'default',
+    外协中: 'processing',
+    已回货: 'success',
+  }
+  return map[status] || 'default'
 }
 </script>
 
@@ -113,6 +144,16 @@ function displayProcessCell(value) {
     margin-bottom: 8px;
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
+  }
+
+  .config-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .config-tag {
+    margin-inline-end: 0;
   }
 }
 </style>

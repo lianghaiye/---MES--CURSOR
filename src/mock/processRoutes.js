@@ -1,7 +1,17 @@
-import { getProcessRouteByName, getActiveRouteOptions } from '@/store/processRouteStore'
 import { getProcessByName, resolveDefaultExecutors } from '@/store/processConfigStore'
 import { buildWorkOrderProcessesFromGrid } from '@/utils/processRouteGrid'
 import { createEmptyWorkOrderProcessExtras } from '@/utils/workOrderProcessDisplay'
+
+function getProcessRouteByNameLazy(name) {
+  // 运行时加载，避免 workOrderStore → processRoutes → processRouteStore 循环依赖
+  // eslint-disable-next-line global-require
+  return require('@/store/processRouteStore').getProcessRouteByName(name)
+}
+
+function getActiveRouteOptionsLazy(filters) {
+  // eslint-disable-next-line global-require
+  return require('@/store/processRouteStore').getActiveRouteOptions(filters)
+}
 
 /** @deprecated 兼容旧工单种子数据 */
 export const processRouteMaster = {
@@ -115,7 +125,7 @@ export const disassemblyProcessDefs = [
 ]
 
 export function buildProcessesFromRoute(routeName) {
-  const route = getProcessRouteByName(routeName)
+  const route = getProcessRouteByNameLazy(routeName)
   if (route?.grid) {
     return buildWorkOrderProcessesFromGrid(route.grid, route.id)
   }
@@ -135,6 +145,7 @@ export function buildProcessesFromRoute(routeName) {
       resourceType: proc?.resourceType || step.resourceType || '工人',
       executors: resolveDefaultExecutors(proc),
       ...createEmptyWorkOrderProcessExtras(),
+      opOutsource: Boolean(proc?.operations?.opOutsource) || step.name === '机加工',
       feedingMaterials: step.hasFeeding
         ? [
             {
@@ -164,6 +175,7 @@ export function buildDisassemblyProcesses() {
       resourceType: proc?.resourceType || step.resourceType,
       executors: resolveDefaultExecutors(proc),
       ...createEmptyWorkOrderProcessExtras(),
+      opOutsource: Boolean(proc?.operations?.opOutsource),
       feedingMaterials: [],
     }
   })
@@ -172,8 +184,11 @@ export function buildDisassemblyProcesses() {
 export function getDefaultProductRoute(productName) {
   if (productName?.includes('电机') || productName?.includes('装配')) return '离心泵标准装配路线'
   if (productName?.includes('泵体') || productName?.includes('机加')) return '泵体机加路线'
-  const opts = getActiveRouteOptions({ productName })
+  const opts = getActiveRouteOptionsLazy({ productName })
   return opts[0] || '离心泵标准装配路线'
 }
 
-export { getActiveRouteOptions }
+/** 兼容旧引用：转发到 processRouteStore（惰性加载防循环依赖） */
+export function getActiveRouteOptions(filters) {
+  return getActiveRouteOptionsLazy(filters)
+}

@@ -93,33 +93,6 @@
             </a-form-item>
           </a-col>
           <a-col :span="6">
-            <a-form-item label="下料工序">
-              <a-switch
-                v-model:checked="form.isBlanking"
-                checked-children="是"
-                un-checked-children="否"
-              />
-              <div class="field-hint">开启后可进入下料结算；具体物料以主数据为准</div>
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
-            <a-form-item label="质检">
-              <a-switch
-                v-model:checked="form.operations.opQc"
-                checked-children="开"
-                un-checked-children="关"
-                @change="onQcSwitchChange"
-              />
-              <div class="field-hint">开启后选择质检类型；极简下发时预生成任务</div>
-            </a-form-item>
-          </a-col>
-          <a-col v-if="form.operations.opQc" :span="12">
-            <a-form-item label="质检类型" required>
-              <a-checkbox-group v-model:value="qcBizScopes" :options="processQcBizScopeOptions()" />
-              <div class="field-hint">可多选；工单下发时按勾选项分别生成质检任务</div>
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
             <a-form-item label="图片">
               <div class="image-upload-mock">
                 <div v-if="form.image" class="image-preview">
@@ -142,16 +115,32 @@
         </a-row>
       </div>
 
-      <div v-if="showProcessOperations" class="form-section-box">
+      <div class="form-section-box">
         <div class="section-label">工序操作</div>
+        <div v-if="isMinimalMode" class="ops-hint">极简模式仅配置下料、质检、外协、拆解相关项</div>
         <a-row :gutter="[16, 12]" class="ops-grid">
+          <a-col :span="6">
+            <div class="ops-item">
+              <span>下料</span>
+              <a-switch v-model:checked="form.isBlanking" size="small" />
+            </div>
+          </a-col>
           <a-col v-for="item in visibleProcessOperationDefs" :key="item.key" :span="6">
             <div class="ops-item">
               <span>{{ item.label }}</span>
-              <a-switch v-model:checked="form.operations[item.key]" size="small" />
+              <a-switch
+                v-model:checked="form.operations[item.key]"
+                size="small"
+                @change="(checked) => onOpSwitchChange(item.key, checked)"
+              />
             </div>
           </a-col>
         </a-row>
+        <div v-if="form.operations.opQc" class="qc-scopes">
+          <div class="qc-scopes-label">质检类型</div>
+          <a-checkbox-group v-model:value="qcBizScopes" :options="processQcBizScopeOptions()" />
+          <div class="field-hint">可多选；工单下发时按勾选项分别生成质检任务</div>
+        </div>
       </div>
     </a-form>
 
@@ -186,7 +175,10 @@ import {
   MOCK_POSITIONS,
 } from '@/store/processConfigStore'
 import { DEFAULT_TASK_EXECUTION_MODE } from '@/utils/taskExecutionMode'
-import { isMinimalReportMode } from '@/store/businessRuleStore'
+import { getProductionMode, isMinimalReportMode } from '@/store/businessRuleStore'
+
+/** 极简模式（极简报工 / 下发即报工）可配置的工序操作 */
+const MINIMAL_PROCESS_OPERATION_KEYS = ['opQc', 'opOutsource', 'opDisassembly', 'opDisassemblyQc']
 import { getActiveCategoryOptions } from '@/store/processCategoryStore'
 import { getDefectItemOptions } from '@/store/defectItemStore'
 import {
@@ -276,12 +268,17 @@ const taskExecutionModeHint = computed(() => {
   return ''
 })
 
-const showProcessOperations = computed(() => !isMinimalReportMode())
+const isMinimalMode = computed(() => {
+  const mode = getProductionMode()
+  return mode === 'minimal' || mode === 'minimal_salary' || isMinimalReportMode()
+})
 
-/** 质检开关已单独展示，工序操作区不再重复 */
-const visibleProcessOperationDefs = computed(() =>
-  PROCESS_OPERATION_DEFS.filter((d) => d.key !== 'opQc'),
-)
+/** 标准模式展示全部操作；极简模式仅下料+质检/外协/拆解 */
+const visibleProcessOperationDefs = computed(() => {
+  if (!isMinimalMode.value) return PROCESS_OPERATION_DEFS
+  const allow = new Set(MINIMAL_PROCESS_OPERATION_KEYS)
+  return PROCESS_OPERATION_DEFS.filter((d) => allow.has(d.key))
+})
 
 /** 勾选的质检业务类型 ↔ qcConfigs */
 const qcBizScopes = computed({
@@ -297,11 +294,12 @@ const qcBizScopes = computed({
   },
 })
 
-function onQcSwitchChange(enabled) {
-  if (enabled && !form.qcConfigs.length) {
+function onOpSwitchChange(key, checked) {
+  if (key !== 'opQc') return
+  if (checked && !form.qcConfigs.length) {
     form.qcConfigs = defaultQcConfigsFromOperations({ opQc: true })
   }
-  if (!enabled) {
+  if (!checked) {
     form.qcConfigs = []
   }
 }
@@ -385,9 +383,14 @@ async function handleSave() {
     return
   }
   saving.value = true
-  const baseOps = showProcessOperations.value ? { ...form.operations } : defaultOps()
-  if (!showProcessOperations.value) {
-    baseOps.opQc = Boolean(form.operations.opQc)
+  // 极简模式：只持久化允许配置的操作项，其余保持原值（编辑）或默认 false（新增）
+  let baseOps = { ...form.operations }
+  if (isMinimalMode.value) {
+    const prev = props.record?.operations || defaultOps()
+    baseOps = { ...defaultOps(), ...prev }
+    MINIMAL_PROCESS_OPERATION_KEYS.forEach((key) => {
+      baseOps[key] = Boolean(form.operations[key])
+    })
   }
   const payload = {
     ...form,
@@ -426,6 +429,12 @@ async function handleSave() {
     color: rgba(0, 0, 0, 0.88);
   }
 
+  .ops-hint {
+    margin: -4px 0 10px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+  }
+
   .ops-grid .ops-item {
     display: flex;
     align-items: center;
@@ -434,6 +443,18 @@ async function handleSave() {
     background: #fff;
     border: 1px solid #f0f0f0;
     border-radius: 4px;
+  }
+
+  .qc-scopes {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed #f0f0f0;
+  }
+
+  .qc-scopes-label {
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.88);
   }
 
   .image-upload-mock {

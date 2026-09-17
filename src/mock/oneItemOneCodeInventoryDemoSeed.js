@@ -835,6 +835,8 @@ export function createOneItemOneCodeDemoInboundOrders() {
           material: 'Q235',
           barcodeType: '一物一码',
           isVariableLength: true,
+          purchaseUnit: '根',
+          purchaseQty: 1,
           qty: 7,
           stockQty: 7,
           unit: '米',

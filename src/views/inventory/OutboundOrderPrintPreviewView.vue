@@ -59,6 +59,7 @@
                     <th>变体属性</th>
                     <th>图号</th>
                     <th>出库数量</th>
+                    <th>出库重量(kg)</th>
                     <th>出库仓库</th>
                     <th>货位号</th>
                     <th>单价</th>
@@ -77,6 +78,7 @@
                     <td>{{ row.variantAttr }}</td>
                     <td>{{ row.drawingNo }}</td>
                     <td class="cell-num">{{ row.shipQty }}</td>
+                    <td class="cell-num">{{ row.weight }}</td>
                     <td>{{ row.shipWarehouse }}</td>
                     <td>{{ row.locationNo }}</td>
                     <td class="cell-num">{{ row.unitPrice }}</td>
@@ -90,6 +92,7 @@
             <div v-if="sheet.summary" class="print-summary">
               <span>明细行数：{{ sheet.summary.lineCount || '—' }}</span>
               <span>出库数量合计：{{ sheet.summary.totalQty || '—' }}</span>
+              <span>出库重量合计(kg)：{{ sheet.summary.totalWeight || '—' }}</span>
               <span>总价合计：{{ sheet.summary.totalPrice || '—' }}</span>
             </div>
           </section>
