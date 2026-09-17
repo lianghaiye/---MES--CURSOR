@@ -132,6 +132,12 @@ export function filterSalesOrderLines(rows = [], filters = {}) {
     if (f.businessType && row.businessType !== f.businessType) return false
     if (f.deliveryMode && row.deliveryMode !== f.deliveryMode) return false
     if (!inDateRange(row.deliveryDate, f.deliveryDateRange)) return false
+    if (f.snMatchedLineIds instanceof Set) {
+      if (!f.snMatchedLineIds.has(row.lineId)) return false
+    } else if (f.snCode) {
+      // 兜底：若调用方未预计算 Set，则拒绝（由 View 负责 lookup）
+      return false
+    }
     return true
   })
 }

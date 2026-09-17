@@ -6,6 +6,11 @@ export const salesOrderLineExportFields = [
   { key: 'customerName', title: '客户名称', getValue: (row) => cell(row, 'customerName') },
   { key: 'productName', title: '产品名称', getValue: (row) => cell(row, 'productName') },
   { key: 'productCode', title: '产品编码', getValue: (row) => cell(row, 'productCode') },
+  {
+    key: 'snSummaryText',
+    title: '工业 SN 摘要',
+    getValue: (row) => cell(row, 'snSummaryText'),
+  },
   { key: 'businessType', title: '业务类型', getValue: (row) => cell(row, 'businessType') },
   { key: 'productAttr', title: '产品属性', getValue: (row) => cell(row, 'productAttr') },
   { key: 'specModel', title: '规格型号', getValue: (row) => cell(row, 'specModel') },
