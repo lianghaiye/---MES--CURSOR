@@ -647,7 +647,11 @@ function handleSearch() {
       snMatchedLabelCodes.value = (res.matchedLabels || []).map((l) => l.labelCode).filter(Boolean)
     }
   }
-  appliedFilters.value = { ...filters, snMatchedLineIds }
+  appliedFilters.value = {
+    ...filters,
+    snCode: filters.snCode?.trim() || '',
+    snMatchedLineIds,
+  }
   pagination.current = 1
   selectedRowKeys.value = []
 }
