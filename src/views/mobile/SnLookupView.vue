@@ -198,6 +198,7 @@ function stopScan() {
 
 async function startDetectLoop(video) {
   if (typeof window.BarcodeDetector !== 'function') {
+    stopScan()
     message.warning('请改用手输')
     return
   }
@@ -206,6 +207,7 @@ async function startDetectLoop(video) {
       formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'codabar'],
     })
   } catch {
+    stopScan()
     message.warning('请改用手输')
     return
   }
@@ -232,6 +234,11 @@ async function toggleScan() {
   }
 
   if (!navigator.mediaDevices?.getUserMedia) {
+    message.warning('请改用手输')
+    return
+  }
+
+  if (typeof window.BarcodeDetector !== 'function') {
     message.warning('请改用手输')
     return
   }
