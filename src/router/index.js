@@ -141,6 +141,12 @@ const routes = [
     meta: { title: '看板轮播播放', standalone: true },
   },
   {
+    path: '/m/sn-lookup',
+    name: 'mobile-sn-lookup',
+    component: () => import('@/views/mobile/SnLookupView.vue'),
+    meta: { title: '扫 SN 查单', standalone: true },
+  },
+  {
     path: '/',
     component: MainLayout,
     redirect: '/home/dashboard',
