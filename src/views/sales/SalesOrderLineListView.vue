@@ -110,6 +110,24 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="SN 码">
+              <a-input
+                v-model:value="filters.snCode"
+                allow-clear
+                placeholder="完整 SN 或片段"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label=" ">
+              <a-space :size="12">
+                <a-checkbox v-model:checked="filters.snFuzzy">模糊匹配</a-checkbox>
+                <a class="link-code" @click.prevent="openMobileSnLookup">手机查单</a>
+              </a-space>
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item class="filter-actions-item" label=" ">
               <a-space :size="8">
                 <a-button type="primary" size="small" @click="handleSearch">
@@ -187,6 +205,19 @@
             <span>{{ record.productName || '—' }}</span>
             <a-tag v-if="record.cancelled" color="default" class="cancelled-tag">已取消</a-tag>
           </template>
+          <template v-else-if="column.key === 'industrialSn'">
+            <template v-if="!record.snTotal">
+              <span>—</span>
+            </template>
+            <template v-else>
+              <a class="link-code" @click.prevent="openSnDrawer(record)">{{
+                record.snSummaryText
+              }}</a>
+              <a-tag v-if="isSnHitRow(record)" color="processing" size="small" class="sn-hit-tag"
+                >命中</a-tag
+              >
+            </template>
+          </template>
           <template v-else-if="column.key === 'salesQty'">
             {{ formatQty(record.salesQty) }}
           </template>
@@ -260,6 +291,12 @@
       :selected-count="selectedRowKeys.length"
       @export="doExport"
     />
+
+    <SalesLineSnDrawer
+      v-model:open="snDrawerOpen"
+      :line-row="snDrawerRow"
+      :highlight-label-codes="snHighlightCodes"
+    />
   </div>
 </template>
 
@@ -267,13 +304,16 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { message } from 'ant-design-vue'
 import { useTabs } from '@/composables/useTabs'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useListExport } from '@/composables/useListExport'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
+import SalesLineSnDrawer from '@/views/sales/components/SalesLineSnDrawer.vue'
 import { salesOrderState } from '@/store/salesOrderStore'
+import { industrialLabelState } from '@/store/industrialLabelStore'
 import {
   businessTypeOptions,
   customerOptions,
@@ -291,6 +331,7 @@ import {
 } from '@/utils/salesOrderLineList'
 import { salesOrderLineExportFields } from '@/utils/exportFields/salesOrderLineExport'
 import { salesDeliveryStatusColor, salesOrderStatusColor } from '@/utils/salesOrderStatus'
+import { lookupSalesBySn, summarizeLineLabels } from '@/utils/salesSnLookup'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -306,8 +347,13 @@ const filters = reactive({
   businessType: undefined,
   deliveryMode: undefined,
   deliveryDateRange: null,
+  snCode: '',
+  snFuzzy: false,
 })
-const appliedFilters = ref({ ...filters })
+const appliedFilters = ref({ ...filters, snMatchedLineIds: null })
+const snMatchedLabelCodes = ref([])
+const snDrawerOpen = ref(false)
+const snDrawerRow = ref(null)
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 
@@ -353,6 +399,7 @@ const baseColumns = [
     width: 130,
     ellipsis: true,
   },
+  { title: '工业 SN', key: 'industrialSn', width: 130 },
   { title: '业务类型', key: 'businessType', dataIndex: 'businessType', width: 110 },
   { title: '产品属性', key: 'productAttr', dataIndex: 'productAttr', width: 90 },
   { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 100, ellipsis: true },
@@ -472,11 +519,22 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('sales-order-line-list-v2', baseColumns, {
-    minScrollX: 3600,
+  useTableColumnSettings('sales-order-line-list-v3', baseColumns, {
+    minScrollX: 3730,
   })
 
 const allLineRows = computed(() => flattenSalesOrderLines(salesOrderState.orders))
+
+function enrichRowSnSummary(row) {
+  void industrialLabelState.labels
+  const sum = summarizeLineLabels(row.lineId)
+  return {
+    ...row,
+    snTotal: sum.total,
+    snMounted: sum.mounted,
+    snSummaryText: sum.summaryText,
+  }
+}
 
 const filteredRows = computed(() => {
   const f = { ...appliedFilters.value }
@@ -488,7 +546,21 @@ const filteredRows = computed(() => {
   } else {
     f.deliveryDateRange = null
   }
-  return [...filterSalesOrderLines(allLineRows.value, f)].sort(compareSalesOrderLinesDefault)
+  return [...filterSalesOrderLines(allLineRows.value, f)]
+    .sort(compareSalesOrderLinesDefault)
+    .map(enrichRowSnSummary)
+})
+
+const snHighlightCodes = computed(() => {
+  const codes = snMatchedLabelCodes.value || []
+  const lineId = snDrawerRow.value?.lineId
+  if (!lineId || !codes.length) return codes
+  return codes.filter((code) => {
+    const lbl = (industrialLabelState.labels || []).find(
+      (l) => String(l.labelCode || '').toLowerCase() === String(code || '').toLowerCase(),
+    )
+    return lbl?.salesLineId === lineId
+  })
 })
 
 const pagedRows = computed(() => {
@@ -563,7 +635,19 @@ function formatDiscountRate(val) {
 }
 
 function handleSearch() {
-  appliedFilters.value = { ...filters }
+  let snMatchedLineIds = null
+  snMatchedLabelCodes.value = []
+  if (filters.snCode?.trim()) {
+    const res = lookupSalesBySn(filters.snCode, { fuzzy: filters.snFuzzy })
+    if (!res.ok) {
+      message.warning(res.message)
+      snMatchedLineIds = new Set()
+    } else {
+      snMatchedLineIds = new Set(res.salesLineIds)
+      snMatchedLabelCodes.value = (res.matchedLabels || []).map((l) => l.labelCode).filter(Boolean)
+    }
+  }
+  appliedFilters.value = { ...filters, snMatchedLineIds }
   pagination.current = 1
   selectedRowKeys.value = []
 }
@@ -579,7 +663,27 @@ function handleReset() {
   filters.businessType = undefined
   filters.deliveryMode = undefined
   filters.deliveryDateRange = null
+  filters.snCode = ''
+  filters.snFuzzy = false
   handleSearch()
+}
+
+function isSnHitRow(record) {
+  const set = appliedFilters.value?.snMatchedLineIds
+  return set instanceof Set && set.has(record.lineId)
+}
+
+function openSnDrawer(record) {
+  snDrawerRow.value = record
+  snDrawerOpen.value = true
+}
+
+function openMobileSnLookup() {
+  const resolved = router.resolve({
+    path: '/m/sn-lookup',
+    query: filters.snCode?.trim() ? { sn: filters.snCode.trim() } : {},
+  })
+  window.open(resolved.href, '_blank')
 }
 
 function openDetail(record) {
@@ -678,6 +782,10 @@ function openDetail(record) {
 }
 
 .cancelled-tag {
+  margin-left: 6px;
+}
+
+.sn-hit-tag {
   margin-left: 6px;
 }
 </style>
