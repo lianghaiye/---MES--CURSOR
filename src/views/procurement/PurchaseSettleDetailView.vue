@@ -19,8 +19,21 @@
       <DetailSectionCard title="基本信息">
         <a-descriptions :column="3" size="small" bordered>
           <a-descriptions-item label="结算单号">{{ record.settleNo }}</a-descriptions-item>
-          <a-descriptions-item label="采购单号">{{ record.purchaseOrderNo }}</a-descriptions-item>
+          <a-descriptions-item label="生成方式">{{
+            record.generateMode === 'period' ? '账期' : '采购单'
+          }}</a-descriptions-item>
           <a-descriptions-item label="供应商">{{ record.supplier || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="采购单号">{{ displayPoNos }}</a-descriptions-item>
+          <a-descriptions-item label="结算周期">{{
+            record.settlementCycle || '—'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="账期">{{ record.periodKey || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="账期窗口">
+            <template v-if="record.periodStart && record.periodEnd">
+              {{ record.periodStart }} ~ {{ record.periodEnd }}
+            </template>
+            <template v-else>—</template>
+          </a-descriptions-item>
           <a-descriptions-item label="结算日期">{{ record.settleDate }}</a-descriptions-item>
           <a-descriptions-item label="结算金额">{{
             formatMoney(record.totalAmount)
@@ -33,26 +46,35 @@
       </DetailSectionCard>
 
       <DetailSectionCard title="结算明细">
-        <a-table
-          :columns="columns"
-          :data-source="record.lineItems || []"
-          row-key="id"
-          size="small"
-          :pagination="false"
-          :scroll="{ x: 900 }"
-        >
-          <template #bodyCell="{ column, record: row }">
-            <template v-if="column.key === 'amount'">
-              {{ formatMoney(row.amount) }}
-            </template>
-            <template v-else-if="column.key === 'settleQty' || column.key === 'unitPrice'">
-              {{ formatMoney(row[column.dataIndex]) }}
-            </template>
-            <template v-else>
-              {{ row[column.dataIndex] ?? '—' }}
-            </template>
-          </template>
-        </a-table>
+        <template v-if="groupedLines.length">
+          <div v-for="group in groupedLines" :key="group.poKey" class="po-group">
+            <div class="po-group-title">
+              采购单 {{ group.purchaseOrderNo || '—' }}
+              <span class="po-group-amount">小计 {{ formatMoney(group.amount) }}</span>
+            </div>
+            <a-table
+              :columns="columns"
+              :data-source="group.lines"
+              row-key="id"
+              size="small"
+              :pagination="false"
+              :scroll="{ x: 900 }"
+            >
+              <template #bodyCell="{ column, record: row }">
+                <template v-if="column.key === 'amount'">
+                  {{ formatMoney(row.amount) }}
+                </template>
+                <template v-else-if="column.key === 'settleQty' || column.key === 'unitPrice'">
+                  {{ formatMoney(row[column.dataIndex]) }}
+                </template>
+                <template v-else>
+                  {{ row[column.dataIndex] ?? '—' }}
+                </template>
+              </template>
+            </a-table>
+          </div>
+        </template>
+        <a-empty v-else description="暂无明细" />
       </DetailSectionCard>
     </template>
   </div>
@@ -81,6 +103,36 @@ const router = useRouter()
 const record = computed(() => {
   void purchaseSettleState.settles
   return getPurchaseSettleById(String(route.params.id || ''))
+})
+
+const displayPoNos = computed(() => {
+  const row = record.value
+  if (!row) return '—'
+  if (row.purchaseOrderNos?.length) return row.purchaseOrderNos.join('、')
+  return row.purchaseOrderNo || '—'
+})
+
+const groupedLines = computed(() => {
+  const lines = record.value?.lineItems || []
+  const map = new Map()
+  lines.forEach((line) => {
+    const poNo = line.purchaseOrderNo || record.value?.purchaseOrderNo || '未关联采购单'
+    const poId = line.purchaseOrderId || record.value?.purchaseOrderId || poNo
+    const key = poId || poNo
+    if (!map.has(key)) {
+      map.set(key, {
+        poKey: key,
+        purchaseOrderId: poId,
+        purchaseOrderNo: poNo,
+        lines: [],
+        amount: 0,
+      })
+    }
+    const g = map.get(key)
+    g.lines.push(line)
+    g.amount += Number(line.amount) || 0
+  })
+  return [...map.values()]
 })
 
 const columns = [
@@ -163,14 +215,19 @@ function onDelete() {
     font-size: 18px;
   }
 }
-.section-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
+.po-group {
+  margin-bottom: 16px;
 }
-.section-title {
+.po-group-title {
   font-weight: 600;
   margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.po-group-amount {
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
 }
 </style>

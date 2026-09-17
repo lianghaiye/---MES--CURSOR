@@ -268,10 +268,23 @@
                   >删除</a-button
                 >
               </template>
-              <template v-else-if="canWithdrawSalesOrder(record)">
-                <a-button type="link" size="small" @click="handleRowWithdraw(record)"
-                  >撤回</a-button
+              <template v-else-if="canWithdrawSalesOrder(record) || canApproveSalesOrder(record)">
+                <a-button
+                  v-if="canApproveSalesOrder(record)"
+                  type="link"
+                  size="small"
+                  @click="openApproveForOrder(record)"
                 >
+                  审核
+                </a-button>
+                <a-button
+                  v-if="canWithdrawSalesOrder(record)"
+                  type="link"
+                  size="small"
+                  @click="handleRowWithdraw(record)"
+                >
+                  撤回
+                </a-button>
               </template>
               <template v-else-if="canResubmitSalesOrder(record)">
                 <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
@@ -686,6 +699,16 @@ function onMoreMenuClick({ key }) {
   stubAction(key)
 }
 
+function openApproveForOrder(order) {
+  if (!canApproveSalesOrder(order)) {
+    message.warning('仅「待审核」状态的销售订单可审核')
+    return
+  }
+  const path = `/sales/orders/${order.id}/approve`
+  openTab(path, `审核销售订单 ${order.orderNo || ''}`.trim())
+  router.push({ name: 'sales-orders-approve', params: { id: order.id } })
+}
+
 function openToolbarApprove() {
   if (selectedRowKeys.value.length !== 1) {
     message.warning('请勾选一条待审核的销售订单')
@@ -696,13 +719,7 @@ function openToolbarApprove() {
     message.warning('未找到所选订单')
     return
   }
-  if (!canApproveSalesOrder(order)) {
-    message.warning('仅「待审核」状态的销售订单可审核')
-    return
-  }
-  const path = `/sales/orders/${order.id}/approve`
-  openTab(path, `审核销售订单 ${order.orderNo || ''}`.trim())
-  router.push({ name: 'sales-orders-approve', params: { id: order.id } })
+  openApproveForOrder(order)
 }
 
 function handleRevokeApprove() {
@@ -762,6 +779,7 @@ function isInProgressSalesOrder(order) {
 function hasRowActions(order) {
   return (
     canSubmitSalesOrder(order) ||
+    canApproveSalesOrder(order) ||
     canWithdrawSalesOrder(order) ||
     canResubmitSalesOrder(order) ||
     isInProgressSalesOrder(order)

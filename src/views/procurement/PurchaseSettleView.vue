@@ -24,6 +24,37 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="供应商">
+              <a-input
+                v-model:value="filters.supplier"
+                allow-clear
+                size="small"
+                placeholder="请输入"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="账期">
+              <a-input
+                v-model:value="filters.periodKey"
+                allow-clear
+                size="small"
+                placeholder="如 2026-08"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="生成方式">
+              <a-select
+                v-model:value="filters.generateMode"
+                allow-clear
+                size="small"
+                placeholder="请选择"
+                :options="generateModeOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="状态">
               <a-select
                 v-model:value="filters.status"
@@ -48,7 +79,10 @@
 
     <div class="table-card">
       <div class="table-toolbar">
-        <a-button type="primary" size="small" @click="openCreate">从采购单生成结算</a-button>
+        <a-space>
+          <a-button type="primary" size="small" @click="openPeriodCreate">按账期生成</a-button>
+          <a-button size="small" @click="openCreate">从采购单生成结算</a-button>
+        </a-space>
       </div>
       <a-table
         :columns="columns"
@@ -56,11 +90,17 @@
         row-key="id"
         size="small"
         :pagination="false"
-        :scroll="{ x: 980 }"
+        :scroll="{ x: 1180 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'settleNo'">
             <a @click="openDetail(record)">{{ record.settleNo }}</a>
+          </template>
+          <template v-else-if="column.key === 'purchaseOrderNo'">
+            {{ displayPoNos(record) }}
+          </template>
+          <template v-else-if="column.key === 'generateMode'">
+            {{ record.generateMode === 'period' ? '账期' : '采购单' }}
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="record.status === '已确认' ? 'green' : 'default'">{{
@@ -94,6 +134,7 @@
     </div>
 
     <GeneratePurchaseSettleModal v-model:open="createOpen" @confirmed="onCreated" />
+    <GeneratePeriodSettleModal v-model:open="periodOpen" @confirmed="onCreated" />
   </div>
 </template>
 
@@ -112,6 +153,7 @@ import {
   deletePurchaseSettle,
 } from '@/store/purchaseSettleStore'
 import GeneratePurchaseSettleModal from './components/GeneratePurchaseSettleModal.vue'
+import GeneratePeriodSettleModal from './components/GeneratePeriodSettleModal.vue'
 import { formatNumber } from '@/utils/numberFormat'
 
 const router = useRouter()
@@ -120,20 +162,31 @@ const { openTab } = useTabs()
 const filters = reactive({
   settleNo: '',
   purchaseOrderNo: '',
+  supplier: '',
+  periodKey: '',
+  generateMode: undefined,
   status: undefined,
 })
 const applied = reactive({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const createOpen = ref(false)
+const periodOpen = ref(false)
 
 const statusOpts = [
   { label: '草稿', value: '草稿' },
   { label: '已确认', value: '已确认' },
 ]
 
+const generateModeOpts = [
+  { label: '账期', value: 'period' },
+  { label: '采购单', value: 'po' },
+]
+
 const columns = [
   { title: '结算单号', key: 'settleNo', width: 150 },
-  { title: '采购单号', dataIndex: 'purchaseOrderNo', key: 'purchaseOrderNo', width: 140 },
+  { title: '生成方式', key: 'generateMode', width: 90 },
+  { title: '账期', dataIndex: 'periodKey', key: 'periodKey', width: 120 },
+  { title: '采购单号', key: 'purchaseOrderNo', width: 160, ellipsis: true },
   { title: '供应商', dataIndex: 'supplier', key: 'supplier', width: 140, ellipsis: true },
   { title: '结算日期', dataIndex: 'settleDate', key: 'settleDate', width: 120 },
   { title: '结算金额', key: 'totalAmount', width: 120, align: 'right' },
@@ -147,12 +200,24 @@ const filteredList = computed(() => {
     if (applied.settleNo && !String(row.settleNo || '').includes(applied.settleNo.trim())) {
       return false
     }
-    if (
-      applied.purchaseOrderNo &&
-      !String(row.purchaseOrderNo || '').includes(applied.purchaseOrderNo.trim())
-    ) {
+    if (applied.purchaseOrderNo) {
+      const keyword = applied.purchaseOrderNo.trim()
+      const nos = [
+        row.purchaseOrderNo,
+        ...(row.purchaseOrderNos || []),
+        ...(row.lineItems || []).map((l) => l.purchaseOrderNo),
+      ]
+        .filter(Boolean)
+        .join(' ')
+      if (!nos.includes(keyword)) return false
+    }
+    if (applied.supplier && !String(row.supplier || '').includes(applied.supplier.trim())) {
       return false
     }
+    if (applied.periodKey && !String(row.periodKey || '').includes(applied.periodKey.trim())) {
+      return false
+    }
+    if (applied.generateMode && (row.generateMode || 'po') !== applied.generateMode) return false
     if (applied.status && row.status !== applied.status) return false
     return true
   })
@@ -162,6 +227,11 @@ const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
   return filteredList.value.slice(start, start + pagination.pageSize)
 })
+
+function displayPoNos(record) {
+  if (record.purchaseOrderNos?.length) return record.purchaseOrderNos.join('、')
+  return record.purchaseOrderNo || '—'
+}
 
 function formatMoney(v) {
   const n = Number(v)
@@ -177,12 +247,19 @@ function handleSearch() {
 function handleReset() {
   filters.settleNo = ''
   filters.purchaseOrderNo = ''
+  filters.supplier = ''
+  filters.periodKey = ''
+  filters.generateMode = undefined
   filters.status = undefined
   handleSearch()
 }
 
 function openCreate() {
   createOpen.value = true
+}
+
+function openPeriodCreate() {
+  periodOpen.value = true
 }
 
 function onCreated() {

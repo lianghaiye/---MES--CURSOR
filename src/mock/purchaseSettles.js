@@ -6,6 +6,11 @@ export const PURCHASE_SETTLE_STATUS = {
   CONFIRMED: '已确认',
 }
 
+export const PURCHASE_SETTLE_GENERATE_MODE = {
+  PO: 'po',
+  PERIOD: 'period',
+}
+
 export function createPurchaseSettleLine(partial = {}) {
   const settleQty = Number(partial.settleQty) || 0
   const unitPrice = Number(partial.unitPrice) || 0
@@ -15,6 +20,8 @@ export function createPurchaseSettleLine(partial = {}) {
     inboundDocNo: '',
     inboundLineId: '',
     poLineId: '',
+    purchaseOrderId: '',
+    purchaseOrderNo: '',
     itemCode: '',
     itemName: '',
     settleUnit: '',
@@ -31,9 +38,16 @@ export function createPurchaseSettle(partial = {}) {
     id: '',
     settleNo: '',
     status: PURCHASE_SETTLE_STATUS.DRAFT,
+    generateMode: PURCHASE_SETTLE_GENERATE_MODE.PO,
     purchaseOrderId: '',
     purchaseOrderNo: '',
+    purchaseOrderNos: [],
+    supplierId: '',
     supplier: '',
+    settlementCycle: '',
+    periodKey: '',
+    periodStart: '',
+    periodEnd: '',
     settleDate: dayjs().format('YYYY-MM-DD'),
     totalAmount: 0,
     remark: '',

@@ -141,7 +141,19 @@ export function mapApplicationToDeliveryOrder(application, salesOrder) {
     outboundWarehouse: application.outboundWarehouse || '',
     deliveryStatus: application.status || '待发货',
     remark: application.remark || '',
+    creator: application.creator || salesOrder?.creator || salesOrder?.salesperson || 'admin1',
     createdAt: application.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
+    operator:
+      application.operator ||
+      application.updater ||
+      application.creator ||
+      salesOrder?.salesperson ||
+      'admin1',
+    operatedAt:
+      application.operatedAt ||
+      application.updatedAt ||
+      application.createdAt ||
+      dayjs().format('YYYY-MM-DD HH:mm'),
     lineItems: application.lineItems || [],
     scatterShipments: application.scatterShipments || [],
     shipAttachments: application.shipAttachments || [],

@@ -457,7 +457,7 @@
                   {{ formatMoney(record.totalPrice) }}
                 </template>
                 <template v-else-if="column.key === 'actions'">
-                  <a-space :size="4" class="line-actions">
+                  <a-space :size="8" class="line-actions">
                     <a
                       v-if="isLinePendingOutbound(record)"
                       @click="handleConfirmLineOutbound(record)"

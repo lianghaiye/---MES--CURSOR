@@ -228,11 +228,12 @@
               <div class="card-code">{{ row.docNo }}</div>
               <div class="card-name">{{ row.inboundType }} · {{ row.warehouse || '—' }}</div>
               <div class="card-meta">
+                <span>{{ inboundSourceLabel(row.sourceChannel) }}</span>
+                <span class="meta-divider">·</span>
                 <span>数量 {{ formatInboundQtyRatio(row, formatQty) }}</span>
-                <template v-if="row.supplier">
-                  <span class="meta-divider">·</span>
-                  <span>{{ row.supplier }}</span>
-                </template>
+              </div>
+              <div v-if="row.handler || row.creator" class="card-meta">
+                <span>申请人 {{ row.handler || row.creator }}</span>
               </div>
             </div>
           </div>
@@ -260,6 +261,7 @@
           @approve-reject="selectedRecord && handleApproveReject(selectedRecord)"
           @open-full="selectedRecord && goDetail(selectedRecord)"
           @print="selectedRecord && openPrintOne(selectedRecord)"
+          @saved="handleSearch"
         />
       </div>
     </div>
@@ -500,7 +502,7 @@ import {
   DownOutlined,
 } from '@ant-design/icons-vue'
 import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
-import { inboundTypeOptions, inboundStatusColor } from '@/mock/inboundOptions'
+import { inboundTypeOptions, inboundStatusColor, inboundSourceLabel } from '@/mock/inboundOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
   inboundOrderState,
@@ -690,7 +692,7 @@ watch(
     }
     if (!list.some((o) => o.id === selectedId.value)) {
       selectedId.value = list[0].id
-      detailTab.value = 'basic'
+      detailTab.value = canEditInbound(list[0]) ? 'edit' : 'basic'
     }
   },
   { immediate: true },
@@ -715,7 +717,8 @@ function toggleLayout() {
 function selectOrder(id) {
   if (!id) return
   selectedId.value = id
-  detailTab.value = 'basic'
+  const row = inboundOrderState.orders.find((o) => o.id === id)
+  detailTab.value = canEditInbound(row) ? 'edit' : 'basic'
 }
 
 function toggleSelectOrder(id, checked) {
@@ -740,8 +743,10 @@ function onToggleSelectAllPage(e) {
 }
 
 function onCardAction(key, row) {
-  if (key === 'edit') openEdit(row)
-  else if (key === 'confirm') handleConfirmOne(row)
+  if (key === 'edit') {
+    selectOrder(row.id)
+    detailTab.value = 'edit'
+  } else if (key === 'confirm') handleConfirmOne(row)
   else if (key === 'refuse') openRefuse([row])
   else if (key === 'delete') confirmDelete(row)
   else if (key === 'detail') goDetail(row)

@@ -208,8 +208,8 @@
                 <span class="meta-divider">·</span>
                 <span>数量 {{ formatOutboundQtyRatio(row, formatQty) }}</span>
               </div>
-              <div v-if="row.requisitionDept" class="card-meta">
-                <span>申请部门 {{ row.requisitionDept }}</span>
+              <div v-if="row.handler || row.creator" class="card-meta">
+                <span>申请人 {{ row.handler || row.creator }}</span>
               </div>
             </div>
           </div>

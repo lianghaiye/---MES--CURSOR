@@ -31,7 +31,6 @@
         <a-button v-if="canRefuseInbound(record)" size="small" danger @click="emit('refuse')">
           拒绝入库
         </a-button>
-        <a-button v-if="canEditInbound(record)" size="small" @click="emit('edit')">编辑</a-button>
         <template v-if="canApproveInbound(record)">
           <a-button type="primary" size="small" @click="emit('approve-pass')">通过</a-button>
           <a-button size="small" danger @click="emit('approve-reject')">拒绝</a-button>
@@ -43,6 +42,20 @@
     </div>
 
     <a-tabs v-model:activeKey="activeTab" class="detail-tabs detail-tabs-pill">
+      <a-tab-pane v-if="showEditTab" key="edit" tab="编辑入库">
+        <div class="edit-tab-body">
+          <InboundOrderFormModal
+            :key="`edit-tab-${record.id}`"
+            page-mode
+            embedded
+            content-only
+            :open="true"
+            :edit-record="record"
+            @saved="emit('saved')"
+          />
+        </div>
+      </a-tab-pane>
+
       <a-tab-pane key="basic" tab="基本信息">
         <div class="tab-scroll-body">
           <DetailSectionCard title="基本信息">
@@ -147,6 +160,7 @@ import {
 } from '@/utils/inboundLineHelpers'
 import { hasSettleUnit } from '@/utils/settleUnit'
 import InboundOrderBasicInfoSection from './InboundOrderBasicInfoSection.vue'
+import InboundOrderFormModal from './InboundOrderFormModal.vue'
 
 const props = defineProps({
   orderId: { type: String, default: '' },
@@ -163,6 +177,7 @@ const emit = defineEmits([
   'approve-reject',
   'open-full',
   'print',
+  'saved',
 ])
 
 const internalTab = ref('basic')
@@ -172,6 +187,8 @@ const record = computed(() => {
   if (!props.orderId) return null
   return getInboundOrderById(props.orderId)
 })
+
+const showEditTab = computed(() => canEditInbound(record.value))
 
 const activeTab = computed({
   get() {
@@ -184,11 +201,16 @@ const activeTab = computed({
 })
 
 watch(
-  () => record.value?.id,
+  () => [record.value?.id, showEditTab.value],
   () => {
     if (!record.value) return
-    activeTab.value = 'basic'
+    if (showEditTab.value) {
+      activeTab.value = 'edit'
+    } else if (activeTab.value === 'edit') {
+      activeTab.value = 'basic'
+    }
   },
+  { immediate: true },
 )
 
 const lineItems = computed(() =>
@@ -201,13 +223,7 @@ const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 
 const hasActions = computed(() => {
   const r = record.value
   if (!r) return false
-  return (
-    canConfirmInbound(r) ||
-    canRefuseInbound(r) ||
-    canEditInbound(r) ||
-    canDeleteInbound(r) ||
-    canApproveInbound(r)
-  )
+  return canConfirmInbound(r) || canRefuseInbound(r) || canDeleteInbound(r) || canApproveInbound(r)
 })
 
 function statusColor(status) {
@@ -312,11 +328,27 @@ export default { name: 'InboundOrderDetailPanel' }
   }
 }
 
+.edit-tab-body,
 .tab-scroll-body {
   height: 100%;
   min-height: 0;
   overflow: auto;
+}
+
+.tab-scroll-body {
   padding-bottom: 8px;
+}
+
+.edit-tab-body {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  :deep(.inbound-form-modal),
+  :deep(.form-embedded-content-only) {
+    flex: 1;
+    min-height: 0;
+  }
 }
 
 .section-card {

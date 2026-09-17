@@ -4,12 +4,18 @@ import {
   createPurchaseSettle,
   createPurchaseSettleLine,
   PURCHASE_SETTLE_STATUS,
+  PURCHASE_SETTLE_GENERATE_MODE,
   seedPurchaseSettles,
 } from '@/mock/purchaseSettles'
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
+import { getSupplierById, getSupplierByName, supplierState } from '@/store/supplierStore'
 import { getRemainSettleQty, hasSettleUnit, resolvePricingQty } from '@/utils/settleUnit'
-
+import {
+  inboundDateInWindow,
+  isPeriodSettleCycle,
+  resolvePeriodWindows,
+} from '@/utils/purchaseSettlePeriod'
 import { roundNumber } from '@/utils/numberFormat'
 
 export const purchaseSettleState = reactive({
@@ -27,6 +33,44 @@ function round2(n) {
   return Number.isFinite(r) ? r : 0
 }
 
+function resolveSupplierCycle(supplierName, po, supplierRecord) {
+  const supplier = supplierRecord || getSupplierByName(supplierName)
+  if (supplier?.settlementCycle) return supplier.settlementCycle
+  if (po?.settlementCycle) return po.settlementCycle
+  return ''
+}
+
+function buildSettleableRow(order, line, po) {
+  const remain = getRemainSettleQty(line)
+  if (!(remain > 0)) return null
+  if ((line.lineStatus || '待入库') !== '已入库') return null
+  const poLine = (po?.lineItems || []).find((l) => l.id === line.poLineId) || null
+  const unitPrice = Number(poLine?.unitPriceInTax ?? poLine?.unitPriceExTax ?? line.unitPrice ?? 0)
+  const settleUnit = hasSettleUnit(line)
+    ? line.settleUnit
+    : hasSettleUnit(poLine || {})
+      ? poLine.settleUnit
+      : ''
+  return {
+    key: `${order.id}:${line.id}`,
+    inboundOrderId: order.id,
+    inboundDocNo: order.docNo,
+    inboundLineId: line.id,
+    poLineId: line.poLineId || poLine?.id || '',
+    purchaseOrderId: po?.id || order.purchaseOrderId || '',
+    purchaseOrderNo: po?.orderNo || order.purchaseOrderNo || '',
+    itemCode: line.itemCode,
+    itemName: line.itemName,
+    settleUnit: settleUnit || line.unit || '件',
+    remainSettleQty: remain,
+    settleQty: remain,
+    unitPrice,
+    amount: round2(remain * unitPrice),
+    sourceLine: line,
+    poLine,
+  }
+}
+
 export function listPurchaseSettles() {
   return purchaseSettleState.settles
 }
@@ -37,7 +81,20 @@ export function getPurchaseSettleById(id) {
 
 export function listSettlesByPurchaseOrderId(purchaseOrderId) {
   if (!purchaseOrderId) return []
-  return purchaseSettleState.settles.filter((s) => s.purchaseOrderId === purchaseOrderId)
+  return purchaseSettleState.settles.filter((s) => {
+    if (s.purchaseOrderId === purchaseOrderId) return true
+    return (s.lineItems || []).some((l) => l.purchaseOrderId === purchaseOrderId)
+  })
+}
+
+export function findSettleBySupplierPeriod(supplierId, supplierName, periodKey) {
+  return (
+    purchaseSettleState.settles.find((s) => {
+      if (s.periodKey !== periodKey) return false
+      if (supplierId && s.supplierId && s.supplierId === supplierId) return true
+      return s.supplier === supplierName
+    }) || null
+  )
 }
 
 /** 可结算的入库行：已入库、挂采购单、仍有剩余结算量 */
@@ -48,38 +105,236 @@ export function listSettleableInboundLines(purchaseOrderId) {
   const rows = []
   orders.forEach((order) => {
     ;(order.lineItems || []).forEach((line) => {
-      if ((line.lineStatus || '待入库') !== '已入库') return
-      const remain = getRemainSettleQty(line)
-      if (!(remain > 0)) return
-      const poLine = (po.lineItems || []).find((l) => l.id === line.poLineId) || null
-      const unitPrice = Number(
-        poLine?.unitPriceInTax ?? poLine?.unitPriceExTax ?? line.unitPrice ?? 0,
-      )
-      const settleUnit = hasSettleUnit(line)
-        ? line.settleUnit
-        : hasSettleUnit(poLine || {})
-          ? poLine.settleUnit
-          : ''
-      const defaultQty = remain
-      rows.push({
-        key: `${order.id}:${line.id}`,
-        inboundOrderId: order.id,
-        inboundDocNo: order.docNo,
-        inboundLineId: line.id,
-        poLineId: line.poLineId || poLine?.id || '',
-        itemCode: line.itemCode,
-        itemName: line.itemName,
-        settleUnit: settleUnit || line.unit || '件',
-        remainSettleQty: remain,
-        settleQty: defaultQty,
-        unitPrice,
-        amount: round2(defaultQty * unitPrice),
-        sourceLine: line,
-        poLine,
-      })
+      const row = buildSettleableRow(order, line, po)
+      if (row) rows.push(row)
     })
   })
   return rows
+}
+
+/**
+ * 按入库业务日窗口筛选可结算行（可按供应商名过滤）
+ */
+export function listSettleableInboundLinesByPeriod({
+  supplierId,
+  supplierName,
+  periodStart,
+  periodEnd,
+} = {}) {
+  const supplier =
+    (supplierId && getSupplierById(supplierId)) ||
+    (supplierName ? getSupplierByName(supplierName) : null)
+  const targetName = supplier?.name || supplierName || ''
+
+  const rows = []
+  inboundOrderState.orders.forEach((order) => {
+    if (!order.purchaseOrderId) return
+    if (!inboundDateInWindow(order, periodStart, periodEnd)) return
+    const po = purchaseOrderState.orders.find((o) => o.id === order.purchaseOrderId)
+    if (!po) return
+    const orderSupplier = po.supplier || order.supplier || ''
+    if (targetName && orderSupplier !== targetName) return
+    ;(order.lineItems || []).forEach((line) => {
+      const row = buildSettleableRow(order, line, po)
+      if (row) rows.push(row)
+    })
+  })
+  return rows
+}
+
+/**
+ * 预览账期结算：按供应商 + 子窗口聚合
+ * @param {{ yearMonth: string, supplierIds?: string[], supplierNames?: string[], halfParts?: ('H1'|'H2')[], allowAppend?: boolean }} params
+ */
+export function previewPeriodSettles(params = {}) {
+  const { yearMonth, supplierIds, supplierNames, halfParts, allowAppend = false } = params
+  if (!yearMonth) return { ok: false, message: '请选择会计期间', groups: [] }
+
+  const suppliers = collectCandidateSuppliers(supplierIds, supplierNames)
+  if (!suppliers.length) return { ok: false, message: '没有可参与账期结算的供应商', groups: [] }
+
+  const groups = []
+  const messages = []
+
+  for (const supplier of suppliers) {
+    const cycle = resolveSupplierCycle(supplier.name, null, supplier)
+    if (!isPeriodSettleCycle(cycle)) continue
+
+    const winRes = resolvePeriodWindows(cycle, yearMonth, { halfParts })
+    if (!winRes.ok) {
+      if (cycle === '季结') messages.push(`${supplier.name}：${winRes.message}`)
+      continue
+    }
+
+    for (const win of winRes.windows) {
+      const lines = listSettleableInboundLinesByPeriod({
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        periodStart: win.periodStart,
+        periodEnd: win.periodEnd,
+      })
+      const existing = findSettleBySupplierPeriod(supplier.id, supplier.name, win.periodKey)
+      const totalAmount = round2(lines.reduce((s, l) => s + (Number(l.amount) || 0), 0))
+      const key = `${supplier.id || supplier.name}:${win.periodKey}`
+      groups.push({
+        key,
+        supplierId: supplier.id || '',
+        supplier: supplier.name,
+        settlementCycle: cycle,
+        periodKey: win.periodKey,
+        periodStart: win.periodStart,
+        periodEnd: win.periodEnd,
+        periodLabel: win.label,
+        lineCount: lines.length,
+        totalAmount,
+        lineItems: lines,
+        exists: !!existing,
+        existingSettleNo: existing?.settleNo || '',
+        existingStatus: existing?.status || '',
+        skipByDefault: !!existing && !allowAppend,
+        selectable: lines.length > 0 && (!existing || allowAppend),
+      })
+    }
+  }
+
+  return {
+    ok: true,
+    groups,
+    message: messages.length ? messages.join('；') : '',
+  }
+}
+
+function collectCandidateSuppliers(supplierIds, supplierNames) {
+  let list = supplierState.suppliers.filter((s) => s.status !== '停用')
+
+  if (supplierIds?.length) {
+    const idSet = new Set(supplierIds)
+    list = list.filter((s) => idSet.has(s.id))
+  } else if (supplierNames?.length) {
+    const nameSet = new Set(supplierNames)
+    list = list.filter((s) => nameSet.has(s.name))
+  } else {
+    const names = new Set()
+    inboundOrderState.orders.forEach((order) => {
+      if (!order.purchaseOrderId) return
+      const po = purchaseOrderState.orders.find((o) => o.id === order.purchaseOrderId)
+      const name = po?.supplier || order.supplier
+      if (name) names.add(name)
+    })
+    list = list.filter((s) => names.has(s.name))
+    names.forEach((name) => {
+      if (list.some((s) => s.name === name)) return
+      const cycle = resolveSupplierCycle(name)
+      if (isPeriodSettleCycle(cycle)) {
+        list.push({ id: '', name, settlementCycle: cycle })
+        return
+      }
+      const po = purchaseOrderState.orders.find((o) => o.supplier === name)
+      const poCycle = po?.settlementCycle
+      if (isPeriodSettleCycle(poCycle)) {
+        list.push({ id: '', name, settlementCycle: poCycle })
+      }
+    })
+  }
+
+  return list.filter((s) => isPeriodSettleCycle(resolveSupplierCycle(s.name, null, s)))
+}
+
+/**
+ * 根据预览勾选批量创建草稿结算单
+ * @param {Array} selectedGroups preview 中的 group
+ * @param {{ settleDate?: string, remark?: string, allowAppend?: boolean }} options
+ */
+export function createSettlesFromPeriod(selectedGroups = [], options = {}) {
+  if (!selectedGroups.length) return { ok: false, message: '请至少勾选一组账期结算', settles: [] }
+
+  const created = []
+  const skipped = []
+
+  for (const group of selectedGroups) {
+    const existing = findSettleBySupplierPeriod(group.supplierId, group.supplier, group.periodKey)
+    if (existing && !options.allowAppend) {
+      skipped.push(`${group.supplier} / ${group.periodKey} 已有结算单「${existing.settleNo}」`)
+      continue
+    }
+
+    const lines = (group.lineItems || []).filter((l) => (Number(l.settleQty) || 0) > 0)
+    if (!lines.length) {
+      skipped.push(`${group.supplier} / ${group.periodKey} 无可结算明细`)
+      continue
+    }
+
+    const lineItems = []
+    for (const row of lines) {
+      const qty = Number(row.settleQty) || 0
+      const inbound = inboundOrderState.orders.find((o) => o.id === row.inboundOrderId)
+      const line = inbound?.lineItems?.find((l) => l.id === row.inboundLineId)
+      if (!line) {
+        return { ok: false, message: '入库明细不存在', settles: created }
+      }
+      const remain = getRemainSettleQty(line)
+      if (qty > remain + 1e-9) {
+        return {
+          ok: false,
+          message: `「${line.itemName || line.itemCode}」可结算数量不足（剩余 ${remain}）`,
+          settles: created,
+        }
+      }
+      const unitPrice = Number(row.unitPrice) || 0
+      lineItems.push(
+        createPurchaseSettleLine({
+          inboundOrderId: row.inboundOrderId,
+          inboundDocNo: row.inboundDocNo || inbound.docNo,
+          inboundLineId: row.inboundLineId,
+          poLineId: row.poLineId || line.poLineId,
+          purchaseOrderId: row.purchaseOrderId || '',
+          purchaseOrderNo: row.purchaseOrderNo || '',
+          itemCode: line.itemCode,
+          itemName: line.itemName,
+          settleUnit: row.settleUnit || line.settleUnit || line.unit || '',
+          settleQty: qty,
+          unitPrice,
+          amount: round2(qty * unitPrice),
+        }),
+      )
+    }
+
+    const poNos = [...new Set(lineItems.map((l) => l.purchaseOrderNo).filter(Boolean))]
+    const settle = createPurchaseSettle({
+      id: `ps-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      settleNo: nextSettleNo(),
+      status: PURCHASE_SETTLE_STATUS.DRAFT,
+      generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      purchaseOrderId: poNos.length === 1 ? lineItems[0].purchaseOrderId : '',
+      purchaseOrderNo: poNos.length === 1 ? poNos[0] : poNos.length ? '多单' : '',
+      purchaseOrderNos: poNos,
+      supplierId: group.supplierId || '',
+      supplier: group.supplier,
+      settlementCycle: group.settlementCycle,
+      periodKey: group.periodKey,
+      periodStart: group.periodStart,
+      periodEnd: group.periodEnd,
+      settleDate: options.settleDate || dayjs().format('YYYY-MM-DD'),
+      remark:
+        options.remark || `账期生成 ${group.periodKey}（${group.periodStart}~${group.periodEnd}）`,
+      lineItems,
+      totalAmount: round2(lineItems.reduce((s, l) => s + (Number(l.amount) || 0), 0)),
+    })
+    purchaseSettleState.settles.unshift(settle)
+    created.push(settle)
+  }
+
+  if (!created.length) {
+    return {
+      ok: false,
+      message: skipped.length ? skipped.join('；') : '未生成任何结算单',
+      settles: [],
+      skipped,
+    }
+  }
+
+  const msg = `已生成 ${created.length} 张结算单${skipped.length ? `；跳过：${skipped.join('；')}` : ''}`
+  return { ok: true, settles: created, skipped, message: msg }
 }
 
 export function createSettleFromPurchaseOrder(purchaseOrderId, payload = {}) {
@@ -88,6 +343,7 @@ export function createSettleFromPurchaseOrder(purchaseOrderId, payload = {}) {
   const selected = payload.lineItems || []
   if (!selected.length) return { ok: false, message: '请至少选择一行结算明细' }
 
+  const supplier = getSupplierByName(po.supplier)
   const lineItems = []
   for (const row of selected) {
     const qty = Number(row.settleQty) || 0
@@ -109,6 +365,8 @@ export function createSettleFromPurchaseOrder(purchaseOrderId, payload = {}) {
         inboundDocNo: row.inboundDocNo || inbound.docNo,
         inboundLineId: row.inboundLineId,
         poLineId: row.poLineId || line.poLineId,
+        purchaseOrderId: po.id,
+        purchaseOrderNo: po.orderNo,
         itemCode: line.itemCode,
         itemName: line.itemName,
         settleUnit: row.settleUnit || line.settleUnit || line.unit || '',
@@ -123,9 +381,13 @@ export function createSettleFromPurchaseOrder(purchaseOrderId, payload = {}) {
     id: `ps-${Date.now()}`,
     settleNo: payload.settleNo || nextSettleNo(),
     status: PURCHASE_SETTLE_STATUS.DRAFT,
+    generateMode: PURCHASE_SETTLE_GENERATE_MODE.PO,
     purchaseOrderId: po.id,
     purchaseOrderNo: po.orderNo,
+    purchaseOrderNos: [po.orderNo],
+    supplierId: supplier?.id || '',
     supplier: po.supplier,
+    settlementCycle: resolveSupplierCycle(po.supplier, po),
     settleDate: payload.settleDate || dayjs().format('YYYY-MM-DD'),
     remark: payload.remark || '',
     lineItems,
@@ -189,4 +451,4 @@ export function buildPoSettleTabRows(purchaseOrderId) {
   }))
 }
 
-export { resolvePricingQty, PURCHASE_SETTLE_STATUS }
+export { resolvePricingQty, PURCHASE_SETTLE_STATUS, PURCHASE_SETTLE_GENERATE_MODE }

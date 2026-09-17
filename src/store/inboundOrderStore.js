@@ -4,6 +4,7 @@ import { cloneInboundSeedOrders, createInboundLine, createInboundOrder } from '@
 import { ensureCrossDemoInboundOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureMultiUnitFlowInboundOrders } from '@/mock/multiUnitFlowDemoSeed'
 import { ensureOneItemOneCodeInventoryInboundOrders } from '@/mock/oneItemOneCodeInventoryDemoSeed'
+import { ensurePeriodSettleDemoInboundOrders } from '@/mock/periodSettleDemoSeed'
 import { purchaseOrderState, syncPurchaseOrderInboundStatus } from '@/store/purchaseOrderStore'
 import { calcPoLineRemainInboundQty } from '@/utils/purchaseLineInbound'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
@@ -99,7 +100,9 @@ function initOrders() {
       ? cloneInboundSeedOrders().map(normalizeLegacyOrder)
       : stored.map(normalizeLegacyOrder)
   return ensureOneItemOneCodeInventoryInboundOrders(
-    ensureMultiUnitFlowInboundOrders(ensureCrossDemoInboundOrders(base)),
+    ensureMultiUnitFlowInboundOrders(
+      ensurePeriodSettleDemoInboundOrders(ensureCrossDemoInboundOrders(base)),
+    ),
   )
 }
 

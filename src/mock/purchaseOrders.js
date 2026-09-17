@@ -89,7 +89,7 @@ function line(partial) {
   return item
 }
 
-function createPurchaseOrder(partial) {
+export function createPurchaseOrder(partial) {
   const lineItems = partial.lineItems || []
   const totalQty = lineItems.reduce((s, i) => s + (Number(i.purchaseQty) || 0), 0)
   const amountExTax = lineItems.reduce((s, i) => s + (Number(i.totalPriceExTax) || 0), 0)

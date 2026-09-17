@@ -177,6 +177,9 @@
                           <div class="inspect-field-title">
                             <span v-if="field.required !== false" class="req">*</span>
                             {{ field.name }}
+                            <a-tag v-if="field.keyForSheetPass" color="warning" class="key-item-tag"
+                              >关键项</a-tag
+                            >
                           </div>
                           <a-tag
                             v-if="judgeHint(record, field) === 'pass'"
@@ -1728,11 +1731,20 @@ async function doSubmit() {
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
   line-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .inspect-field-title .req {
   margin-right: 2px;
   color: #ff4d4f;
+}
+
+.key-item-tag {
+  margin: 0;
+  font-weight: 500;
 }
 
 .inspect-field-standard {

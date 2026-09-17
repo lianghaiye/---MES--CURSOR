@@ -4,6 +4,7 @@
       <div class="complex-title">
         <span v-if="field.required !== false" class="req">*</span>
         {{ field.name }}
+        <a-tag v-if="field.keyForSheetPass" color="warning">关键项</a-tag>
         <a-tag v-if="isCompositeField(field)" color="processing">复合</a-tag>
         <a-tag v-else color="orange">多点</a-tag>
         <a-tag v-if="parentJudge === 'pass'" color="success">合格</a-tag>

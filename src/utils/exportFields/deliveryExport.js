@@ -39,4 +39,8 @@ export const deliveryExportFields = [
   { key: 'driverName', title: '司机姓名', getValue: (row) => cell(row, 'driverName') },
   { key: 'driverPhone', title: '司机联系方式', getValue: (row) => cell(row, 'driverPhone') },
   { key: 'plateNo', title: '车牌号', getValue: (row) => cell(row, 'plateNo') },
+  { key: 'creator', title: '创建人', getValue: (row) => cell(row, 'creator') },
+  { key: 'createdAt', title: '创建时间', getValue: (row) => cell(row, 'createdAt') },
+  { key: 'operator', title: '操作人', getValue: (row) => cell(row, 'operator') },
+  { key: 'operatedAt', title: '操作时间', getValue: (row) => cell(row, 'operatedAt') },
 ]

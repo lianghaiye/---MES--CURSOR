@@ -213,8 +213,8 @@
                 <span class="meta-divider">·</span>
                 <span>数量 {{ formatInboundQtyRatio(row, formatQty) }}</span>
               </div>
-              <div v-if="row.requisitionDept" class="card-meta">
-                <span>申请部门 {{ row.requisitionDept }}</span>
+              <div v-if="row.handler || row.creator" class="card-meta">
+                <span>申请人 {{ row.handler || row.creator }}</span>
               </div>
             </div>
           </div>
@@ -242,6 +242,7 @@
           @approve-reject="selectedRecord && handleApproveReject(selectedRecord)"
           @open-full="selectedRecord && goDetail(selectedRecord)"
           @print="selectedRecord && openPrintOne(selectedRecord)"
+          @saved="handleSearch"
         />
       </div>
     </div>
@@ -613,7 +614,7 @@ watch(
     }
     if (!list.some((o) => o.id === selectedId.value)) {
       selectedId.value = list[0].id
-      detailTab.value = 'basic'
+      detailTab.value = canEditInbound(list[0]) ? 'edit' : 'basic'
     }
   },
   { immediate: true },
@@ -634,7 +635,8 @@ function toggleLayout() {
 
 function selectOrder(id) {
   selectedId.value = id
-  detailTab.value = 'basic'
+  const row = inboundOrderState.orders.find((o) => o.id === id)
+  detailTab.value = canEditInbound(row) ? 'edit' : 'basic'
 }
 
 function toggleSelect(id, checked) {
@@ -656,8 +658,10 @@ function onToggleSelectAllPage(e) {
 }
 
 function onCardAction(key, row) {
-  if (key === 'edit') openEdit(row)
-  else if (key === 'confirm') handleConfirmOne(row)
+  if (key === 'edit') {
+    selectOrder(row.id)
+    detailTab.value = 'edit'
+  } else if (key === 'confirm') handleConfirmOne(row)
   else if (key === 'refuse') openRefuse([row])
   else if (key === 'delete') confirmDelete(row)
   else if (key === 'detail') goDetail(row)

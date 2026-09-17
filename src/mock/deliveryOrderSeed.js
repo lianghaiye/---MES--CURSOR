@@ -66,14 +66,113 @@ function demoPumpKitAttachments({ qty = 1, selectedSpare = false } = {}) {
   )
 }
 
+/** 散件 EBOM 勾选物料行（详情「散件发运」表用） */
+function demoMaterialPick(partial = {}) {
+  const demandQty = Number(partial.demandQty) || 0
+  const shipQty =
+    partial.shipQty != null ? Number(partial.shipQty) : partial.selected === false ? 0 : demandQty
+  return {
+    materialId: partial.materialId || `mat-${partial.code || 'x'}`,
+    parentMaterialId: partial.parentMaterialId || null,
+    name: partial.name || '',
+    code: partial.code || '',
+    spec: partial.spec || '',
+    unit: partial.unit || '件',
+    supplyType: partial.supplyType || '外购',
+    materialType: partial.materialType || '物料',
+    unitDemandQty: Number(partial.unitDemandQty) || demandQty,
+    demandQty,
+    orderDemandQty: Number(partial.orderDemandQty) || demandQty,
+    availableStock: Number(partial.availableStock) || 0,
+    gapQty: Math.max(0, demandQty - (Number(partial.availableStock) || 0)),
+    depth: partial.depth || 0,
+    hasChildren: false,
+    canExpand: false,
+    selectable: true,
+    selected: partial.selected !== false,
+    shipQty,
+    shippedQty: Number(partial.shippedQty) || 0,
+    appliedQty: Number(partial.appliedQty) || 0,
+  }
+}
+
+/**
+ * 散件发运头（按销售行 1 套展开 EBOM 勾选）
+ * @param {object} opts
+ */
+function demoScatterShipment({
+  id,
+  salesLineId,
+  productName,
+  productCode,
+  specModel = '',
+  material = '',
+  drawingNo = '',
+  unit = '台',
+  orderQty = 1,
+  shipSets = 1,
+  unitPriceExTax = 0,
+  unitPriceInTax = 0,
+  deliveryAmountExTax = 0,
+  shipWarehouse = '成品仓',
+  packagingForm = '纸箱',
+  itemWeightKg = 0,
+  materialPicks = [],
+} = {}) {
+  const picks = materialPicks.map((p) =>
+    demoMaterialPick({
+      ...p,
+      demandQty: (Number(p.unitDemandQty) || Number(p.demandQty) || 1) * shipSets,
+      unitDemandQty: Number(p.unitDemandQty) || Number(p.demandQty) || 1,
+      orderDemandQty:
+        (Number(p.unitDemandQty) || Number(p.demandQty) || 1) * (Number(orderQty) || 1),
+    }),
+  )
+  const amountEx =
+    deliveryAmountExTax ||
+    Math.round((Number(unitPriceExTax) || 0) * (Number(shipSets) || 0) * 100) / 100
+  const priceIn = unitPriceInTax || Math.round((Number(unitPriceExTax) || 0) * 1.13 * 10000) / 10000
+  return {
+    id,
+    salesLineId: salesLineId || id,
+    productName,
+    productCode,
+    specModel,
+    material,
+    drawingNo,
+    unit,
+    orderQty,
+    shipSets,
+    maxShipSets: shipSets,
+    deliveryMode: '散件',
+    shipQty: shipSets,
+    shipWarehouse,
+    packagingForm,
+    itemWeightKg,
+    shipWeight: Math.round((Number(itemWeightKg) || 0) * (Number(shipSets) || 0) * 100) / 100,
+    unitPriceExTax,
+    unitPriceInTax: priceIn,
+    deliveryUnitPriceExTax: unitPriceExTax,
+    deliveryUnitPriceInTax: priceIn,
+    deliveryAmountExTax: amountEx,
+    deliveryAmountInTax: Math.round(amountEx * 1.13 * 100) / 100,
+    materialPicks: picks,
+    lineShipStatus: picks.some((p) => p.selected && Number(p.shipQty) > 0) ? '部分发货' : '未发货',
+    remark: '',
+  }
+}
+
 function app(partial, salesOrder) {
   return mapApplicationToDeliveryOrder(
     {
       id: partial.id,
       deliveryCode: partial.deliveryCode,
       createdAt: partial.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
+      creator: partial.creator || salesOrder?.salesperson || 'admin1',
+      operator: partial.operator || partial.creator || salesOrder?.salesperson || 'admin1',
+      operatedAt: partial.operatedAt || partial.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
       deliveryDate: partial.deliveryDate,
-      status: partial.status || '待发货',
+      status: partial.deliveryStatus || partial.status || '待发货',
       shipmentMethod: partial.shipmentMethod || '送货',
       logisticsNo: partial.logisticsNo || '',
       contactPerson: partial.contactPerson || salesOrder?.contactPerson || '',
@@ -99,7 +198,8 @@ function app(partial, salesOrder) {
  * - 未生成出库单 → 列表「待发货」，可点「生成出库单」
  * - 已生成待出库出库单 → 「待出库」
  * - 关联出库单已出库 → 「已发货」
- * 发运方式含：送货 / 自提 / 物流
+ * - 发运方式：送货 / 自提 / 物流
+ * - 发货形态：纯整机 / 纯散件 / 整机+散件混合
  */
 export function buildDeliveryOrderSeed() {
   const soPump = {
@@ -138,6 +238,69 @@ export function buildDeliveryOrderSeed() {
     contactPerson: '赵经理',
     contactPhone: '13700002222',
   }
+  const soBiz = {
+    id: 'so-biz-seed-1',
+    orderNo: '1-20260916-001',
+    customerName: '江南泵业',
+    salesperson: 'admin1',
+    contactPerson: '周工',
+    contactPhone: '13611112222',
+  }
+  const soScatter = {
+    id: 'so-seed-scatter',
+    orderNo: '1-20260910-021',
+    customerName: '齐鲁化工装备',
+    salesperson: '赵六',
+    contactPerson: '孙工',
+    contactPhone: '13988886666',
+  }
+  const soMixed = {
+    id: 'so-seed-1',
+    orderNo: '1-20260512-005',
+    customerName: '测试人员',
+    salesperson: 'admin1',
+    contactPerson: 'TEST',
+    contactPhone: '16522033362',
+  }
+
+  const chemicalPumpScatterPicks = [
+    {
+      materialId: 'mat-pump-casing',
+      name: '泵体',
+      code: 'MAT-CASING-316L',
+      spec: '316L φ50',
+      unit: '件',
+      unitDemandQty: 1,
+      availableStock: 20,
+    },
+    {
+      materialId: 'mat-pump-impeller',
+      name: '叶轮',
+      code: 'MAT-IMP-316L',
+      spec: '316L',
+      unit: '件',
+      unitDemandQty: 1,
+      availableStock: 15,
+    },
+    {
+      materialId: 'mat-pump-seal',
+      name: '机械密封组件',
+      code: 'MAT-SEAL-KIT',
+      spec: 'φ25',
+      unit: '套',
+      unitDemandQty: 1,
+      availableStock: 8,
+    },
+    {
+      materialId: 'mat-pump-manual',
+      name: '安装说明书',
+      code: 'DOC-INSTALL',
+      spec: '中文',
+      unit: '册',
+      unitDemandQty: 1,
+      availableStock: 100,
+    },
+  ]
 
   return [
     // —— 已生成出库单（待出库）· 送货 ——
@@ -378,6 +541,284 @@ export function buildDeliveryOrderSeed() {
         shipWeight: 165,
       },
       soValve,
+    ),
+
+    // —— 纯整机 · 待发货（多台整机）——
+    app(
+      {
+        id: 'do-seed-whole-only',
+        deliveryCode: 'SH20260912001',
+        createdAt: '2026-09-12 10:20',
+        deliveryDate: '2026-09-15',
+        shipmentMethod: '送货',
+        deliveryAddress: '青岛市黄岛区黄河西路 66 号',
+        driverName: '马师傅',
+        driverPhone: '13300005555',
+        plateNo: '鲁B12345',
+        remark: '演示：纯整机发货（待发货，可生成出库单）',
+        lineItems: [
+          {
+            id: 'dl-whole-1',
+            salesLineId: 'line-seed-2a',
+            productName: '清水离心泵 ISG80-160',
+            productCode: 'CP2610080',
+            specModel: 'ISG80-160',
+            unit: '台',
+            shipQty: 2,
+            orderQty: 8,
+            deliveryAmountExTax: 17600,
+            itemWeightKg: 48,
+            packagingForm: '木箱',
+            deliveryMode: '整机',
+          },
+          {
+            id: 'dl-whole-2',
+            salesLineId: 'line-seed-2b',
+            productName: '管道泵 ISG65-125',
+            productCode: 'CP2610065',
+            specModel: 'ISG65-125',
+            unit: '台',
+            shipQty: 1,
+            orderQty: 4,
+            deliveryAmountExTax: 6200,
+            itemWeightKg: 32,
+            packagingForm: '纸箱',
+            deliveryMode: '整机',
+          },
+        ],
+        shipAttachments: demoPumpKitAttachments({ qty: 2, selectedSpare: true }),
+        shipWeight: 128,
+      },
+      soPump,
+    ),
+
+    // —— 纯散件 · 待发货 ——
+    app(
+      {
+        id: 'do-seed-scatter-only',
+        deliveryCode: 'SH20260910021',
+        createdAt: '2026-09-10 14:05',
+        deliveryDate: '2026-09-12',
+        shipmentMethod: '物流',
+        logisticsNo: 'YT9876543210',
+        deliveryAddress: '淄博市张店区工业南路 128 号',
+        remark: '演示：纯散件发货（按 EBOM 勾选物料）',
+        lineItems: [],
+        scatterShipments: [
+          demoScatterShipment({
+            id: 'sc-seed-1',
+            salesLineId: 'line-seed-scatter-1',
+            productName: '耐腐蚀化工泵',
+            productCode: 'CP-CHEM-316L',
+            specModel: 'IH50-32-160',
+            material: '316L',
+            drawingNo: 'DWG-CHEM-50',
+            orderQty: 2,
+            shipSets: 1,
+            unitPriceExTax: 4800,
+            itemWeightKg: 86,
+            deliveryAmountExTax: 4800,
+            materialPicks: chemicalPumpScatterPicks,
+          }),
+        ],
+        shipWeight: 86,
+      },
+      soScatter,
+    ),
+
+    // —— 整机 + 散件混合 · 待出库（对齐业务出库单 ob-biz-so-pending-1）——
+    app(
+      {
+        id: 'do-biz-seed-1',
+        deliveryCode: 'SH20260916001',
+        createdAt: '2026-09-16 15:30',
+        deliveryDate: '2026-09-18',
+        shipmentMethod: '送货',
+        deliveryAddress: '无锡市新吴区硕放工业园',
+        driverName: '钱师傅',
+        driverPhone: '13200006666',
+        plateNo: '苏B88888',
+        remark: '演示：整机+散件混合；已生成销售出库单（待出库）',
+        lineItems: [
+          {
+            id: 'dl-biz-whole-1',
+            salesLineId: 'line-biz-whole-1',
+            productName: '清水离心泵',
+            productCode: 'CP2610001',
+            specModel: 'ISG50-160',
+            unit: '台',
+            shipQty: 2,
+            orderQty: 3,
+            deliveryAmountExTax: 9600,
+            itemWeightKg: 48,
+            packagingForm: '木箱',
+            deliveryMode: '整机',
+          },
+        ],
+        scatterShipments: [
+          demoScatterShipment({
+            id: 'sc-biz-1',
+            salesLineId: 'line-seed-1b',
+            productName: '耐腐蚀化工泵',
+            productCode: 'CP-CHEM-316L',
+            specModel: 'IH50-32-160',
+            material: '316L',
+            drawingNo: 'DWG-CHEM-50',
+            orderQty: 2,
+            shipSets: 1,
+            unitPriceExTax: 5200,
+            itemWeightKg: 72,
+            deliveryAmountExTax: 5200,
+            materialPicks: [
+              ...chemicalPumpScatterPicks.slice(0, 3),
+              {
+                materialId: 'mat-pump-bolt',
+                name: '地脚螺栓组',
+                code: 'FAST-ANCHOR-M16',
+                spec: 'M16×200',
+                unit: '套',
+                unitDemandQty: 4,
+                availableStock: 40,
+              },
+            ],
+          }),
+        ],
+        shipAttachments: demoPumpKitAttachments({ qty: 2, selectedSpare: false }),
+        shipWeight: 120,
+      },
+      soBiz,
+    ),
+
+    // —— 整机 + 散件混合 · 待发货（关联 so-seed-1）——
+    app(
+      {
+        id: 'do-seed-mixed-pending',
+        deliveryCode: 'SH20260914008',
+        createdAt: '2026-09-14 09:40',
+        deliveryDate: '2026-09-16',
+        shipmentMethod: '送货',
+        deliveryAddress: '上海市浦东新区示范路 88 号',
+        remark: '演示：同单整机+散件；尚未生成出库单',
+        lineItems: [
+          {
+            id: 'dl-mixed-whole-1',
+            salesLineId: 'line-seed-1a',
+            productName: '清水离心泵 ISG50-160',
+            productCode: 'CP2610001',
+            specModel: 'ISG50-160',
+            unit: '台',
+            shipQty: 1,
+            orderQty: 3,
+            deliveryAmountExTax: 3200,
+            itemWeightKg: 12.5,
+            packagingForm: '纸箱',
+            deliveryMode: '整机',
+          },
+          {
+            id: 'dl-mixed-whole-2',
+            salesLineId: 'line-seed-1c',
+            productName: '管道泵 ISG40-125',
+            productCode: 'CP2610040',
+            specModel: 'ISG40-125',
+            unit: '台',
+            shipQty: 1,
+            orderQty: 1,
+            deliveryAmountExTax: 2800,
+            itemWeightKg: 18,
+            packagingForm: '纸箱',
+            deliveryMode: '整机',
+          },
+        ],
+        scatterShipments: [
+          demoScatterShipment({
+            id: 'sc-mixed-1',
+            salesLineId: 'line-seed-1b',
+            productName: '耐腐蚀化工泵',
+            productCode: 'CP-CHEM-316L',
+            specModel: 'IH50-32-160',
+            material: '316L',
+            drawingNo: 'DWG-CHEM-50',
+            orderQty: 2,
+            shipSets: 1,
+            unitPriceExTax: 5100,
+            itemWeightKg: 65,
+            deliveryAmountExTax: 5100,
+            materialPicks: chemicalPumpScatterPicks,
+          }),
+        ],
+        shipAttachments: demoPumpKitAttachments({ qty: 1, selectedSpare: true }),
+        shipWeight: 95.5,
+      },
+      soMixed,
+    ),
+
+    // —— 纯散件 · 已发货 ——
+    app(
+      {
+        id: 'do-seed-scatter-shipped',
+        deliveryCode: 'SH20260908005',
+        createdAt: '2026-09-08 11:10',
+        deliveryDate: '2026-09-09',
+        shipmentMethod: '自提',
+        contactPerson: '孙自提',
+        contactPhone: '13177778888',
+        remark: '演示：纯散件已发货（客户自提密封件包）',
+        deliveryStatus: '已发货',
+        lineItems: [],
+        scatterShipments: [
+          demoScatterShipment({
+            id: 'sc-shipped-1',
+            salesLineId: 'line-seed-scatter-shipped',
+            productName: '密封检修包',
+            productCode: 'KIT-SEAL-50',
+            specModel: 'DN50',
+            material: '组合',
+            orderQty: 5,
+            shipSets: 5,
+            unitPriceExTax: 700,
+            itemWeightKg: 2.4,
+            deliveryAmountExTax: 3500,
+            packagingForm: '纸箱',
+            materialPicks: [
+              {
+                materialId: 'mat-oring-a',
+                name: 'O型圈',
+                code: 'SEAL-ORING-50',
+                spec: 'NBR',
+                unit: '个',
+                unitDemandQty: 4,
+                availableStock: 200,
+                shippedQty: 20,
+                appliedQty: 20,
+              },
+              {
+                materialId: 'mat-gasket-a',
+                name: '密封垫',
+                code: 'SEAL-GSK-50',
+                spec: 'PTFE',
+                unit: '片',
+                unitDemandQty: 2,
+                availableStock: 80,
+                shippedQty: 10,
+                appliedQty: 10,
+              },
+              {
+                materialId: 'mat-grease-a',
+                name: '润滑脂',
+                code: 'LUBE-GRS-01',
+                spec: '200g',
+                unit: '支',
+                unitDemandQty: 1,
+                availableStock: 50,
+                shippedQty: 5,
+                appliedQty: 5,
+              },
+            ],
+          }),
+        ],
+        shipWeight: 12,
+      },
+      soScatter,
     ),
   ]
 }

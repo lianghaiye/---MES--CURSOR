@@ -1,192 +1,159 @@
 <template>
   <div class="qc-sheet-preview">
-    <div class="sheet-paper">
-      <div class="sheet-header">
-        <div class="sheet-title">{{ templateName || '质检单' }}</div>
-        <div class="sheet-meta">
-          <span v-if="templateCode">模板编号：{{ templateCode }}</span>
-          <span>整单规则：{{ sheetPassRuleLabel(sheetPassRule) }}</span>
-          <span class="sheet-meta-muted">预览试填，不保存</span>
-        </div>
+    <div class="sheet-header">
+      <div class="sheet-title">{{ templateName || '质检单' }}</div>
+      <div class="sheet-meta">
+        <span v-if="templateCode">模板编号：{{ templateCode }}</span>
+        <span>整单规则：{{ sheetPassRuleLabel(sheetPassRule) }}</span>
+        <span class="sheet-meta-muted">预览试填，不保存</span>
       </div>
+    </div>
 
-      <div v-if="headerFields.length" class="sheet-section">
-        <div class="sheet-section-title">基本信息</div>
-        <div class="sheet-form-grid">
-          <div v-for="field in headerFields" :key="field.code" class="sheet-form-item">
-            <label class="sheet-label">
+    <div class="line-sheet-wrap">
+      <div v-if="headerFields.length" class="line-sheet-section">
+        <div class="line-sheet-title">基本信息</div>
+        <div class="line-header-grid">
+          <div v-for="field in headerFields" :key="field.code" class="line-header-item">
+            <label class="line-field-label">
               <span v-if="field.required !== false" class="req">*</span>
               {{ field.name }}
             </label>
-            <div class="sheet-control">
-              <a-select
-                v-if="isSelectLike(field)"
-                v-model:value="fieldMap[field.code]"
-                allow-clear
-                size="middle"
-                :placeholder="field.placeholder || `请选择${field.name}`"
-                :options="fieldOptions(field)"
-                style="width: 100%"
-                @change="() => onFieldChange(field)"
-              />
-              <a-input-number
-                v-else-if="field.type === 'number'"
-                v-model:value="fieldMap[field.code]"
-                :min="0"
-                size="middle"
-                style="width: 100%"
-                :placeholder="field.placeholder || `请输入${field.name}`"
-                @change="() => onFieldChange(field)"
-              />
-              <a-textarea
-                v-else-if="field.type === 'textarea'"
-                v-model:value="fieldMap[field.code]"
-                :rows="2"
-                allow-clear
-                :placeholder="field.placeholder || `请输入${field.name}`"
-                @change="() => onFieldChange(field)"
-              />
-              <a-input
-                v-else
-                v-model:value="fieldMap[field.code]"
-                allow-clear
-                size="middle"
-                :placeholder="field.placeholder || `请输入${field.name}`"
-                @change="() => onFieldChange(field)"
-              />
-            </div>
+            <a-select
+              v-if="isSelectLike(field)"
+              v-model:value="fieldMap[field.code]"
+              allow-clear
+              size="middle"
+              :placeholder="field.placeholder || `请选择${field.name}`"
+              :options="fieldOptions(field)"
+              style="width: 100%"
+              @change="() => onFieldChange(field)"
+            />
+            <a-input-number
+              v-else-if="field.type === 'number'"
+              v-model:value="fieldMap[field.code]"
+              :min="0"
+              size="middle"
+              style="width: 100%"
+              :placeholder="field.placeholder || `请输入${field.name}`"
+              @change="() => onFieldChange(field)"
+            />
+            <a-input
+              v-else-if="field.type === 'textarea'"
+              v-model:value="fieldMap[field.code]"
+              allow-clear
+              size="middle"
+              style="width: 100%"
+              :placeholder="field.placeholder || `请输入${field.name}`"
+              @change="() => onFieldChange(field)"
+            />
+            <a-input
+              v-else
+              v-model:value="fieldMap[field.code]"
+              allow-clear
+              size="middle"
+              style="width: 100%"
+              :placeholder="field.placeholder || `请输入${field.name}`"
+              @change="() => onFieldChange(field)"
+            />
           </div>
         </div>
       </div>
 
-      <div v-if="inspectFields.length" class="sheet-section">
-        <div class="sheet-section-title">检验项目</div>
-        <div class="sheet-inspect-list">
-          <template v-for="(field, idx) in inspectFields" :key="field.code">
-            <div
+      <div class="line-sheet-section">
+        <div class="line-sheet-title">检验项目</div>
+        <div v-if="inspectFields.length" class="inspect-fields-grid">
+          <template v-for="field in inspectFields" :key="field.code">
+            <QcInspectComplexField
               v-if="isComplexField(field)"
-              class="sheet-inspect-block is-complex"
-              :class="{
-                'is-pass': judgeHint(field) === 'pass',
-                'is-fail': judgeHint(field) === 'fail',
-              }"
-            >
-              <div class="sheet-inspect-head">
-                <span class="sheet-seq">{{ idx + 1 }}</span>
-                <div class="sheet-inspect-title">
-                  <span v-if="field.required !== false" class="req">*</span>
-                  {{ field.name }}
-                  <a-tag color="processing">复合</a-tag>
-                </div>
-                <a-tag v-if="judgeHint(field) === 'pass'" color="success">合格</a-tag>
-                <a-tag v-else-if="judgeHint(field) === 'fail'" color="error">不合格</a-tag>
-              </div>
-              <div class="sheet-standard">子项分别判定，录入时展开填写</div>
-              <QcInspectComplexField
-                :field="field"
-                v-model="fieldMap[field.code]"
-                @change="() => onFieldChange(field)"
-              />
-            </div>
-
+              :field="field"
+              v-model="fieldMap[field.code]"
+              @change="() => onFieldChange(field)"
+            />
             <div
               v-else
-              class="sheet-inspect-block"
+              class="inspect-field-card"
               :class="{
                 'is-pass': judgeHint(field) === 'pass',
                 'is-fail': judgeHint(field) === 'fail',
               }"
             >
-              <div class="sheet-inspect-head">
-                <span class="sheet-seq">{{ idx + 1 }}</span>
-                <div class="sheet-inspect-title">
+              <div class="inspect-field-head">
+                <div class="inspect-field-title">
                   <span v-if="field.required !== false" class="req">*</span>
                   {{ field.name }}
+                  <a-tag v-if="field.keyForSheetPass" color="warning" class="key-item-tag"
+                    >关键项</a-tag
+                  >
                 </div>
-                <a-tag v-if="judgeHint(field) === 'pass'" color="success">合格</a-tag>
-                <a-tag v-else-if="judgeHint(field) === 'fail'" color="error">不合格</a-tag>
+                <a-tag v-if="judgeHint(field) === 'pass'" color="success" class="judge-tag">
+                  合格
+                </a-tag>
+                <a-tag v-else-if="judgeHint(field) === 'fail'" color="error" class="judge-tag">
+                  不合格
+                </a-tag>
                 <span v-else class="judge-placeholder">待判定</span>
               </div>
-              <div class="sheet-standard">
-                合格标准：{{ standardHint(field) || '未设置（仅记录）' }}
+              <div class="inspect-field-standard">
+                <template v-if="standardHint(field)">合格标准：{{ standardHint(field) }}</template>
+                <template v-else>合格标准：未设置（仅记录实测值）</template>
               </div>
-              <div class="sheet-form-item is-inline">
-                <label class="sheet-label">实测值</label>
-                <div class="sheet-control field-input-wrap">
-                  <span v-if="unitPrefix(field)" class="unit-affix">{{ unitPrefix(field) }}</span>
-                  <a-select
-                    v-if="isSelectLike(field)"
-                    :value="getMeasuredValue(field)"
-                    allow-clear
-                    size="middle"
-                    :placeholder="field.placeholder || `请选择${field.name}`"
-                    :options="fieldOptions(field)"
-                    style="flex: 1; min-width: 0"
-                    @update:value="(v) => setMeasuredValue(field, v)"
-                  />
-                  <a-input-number
-                    v-else-if="field.type === 'number'"
-                    :value="getMeasuredValue(field)"
-                    :min="0"
-                    size="middle"
-                    style="flex: 1; min-width: 0"
-                    :placeholder="field.placeholder || `请输入${field.name}`"
-                    @update:value="(v) => setMeasuredValue(field, v)"
-                  />
-                  <a-textarea
-                    v-else-if="field.type === 'textarea'"
-                    :value="getMeasuredValue(field)"
-                    :rows="2"
-                    allow-clear
-                    style="flex: 1; min-width: 0"
-                    :placeholder="field.placeholder || `请输入${field.name}`"
-                    @update:value="(v) => setMeasuredValue(field, v)"
-                  />
-                  <a-input
-                    v-else
-                    :value="getMeasuredValue(field)"
-                    allow-clear
-                    size="middle"
-                    style="flex: 1; min-width: 0"
-                    :placeholder="field.placeholder || `请输入${field.name}`"
-                    @update:value="(v) => setMeasuredValue(field, v)"
-                  />
-                  <span v-if="unitSuffix(field)" class="unit-affix">{{ unitSuffix(field) }}</span>
-                </div>
+              <div class="field-input-wrap">
+                <span v-if="unitPrefix(field)" class="unit-affix">{{ unitPrefix(field) }}</span>
+                <a-select
+                  v-if="isSelectLike(field)"
+                  :value="getMeasuredValue(field)"
+                  allow-clear
+                  size="middle"
+                  :placeholder="field.placeholder || `请选择${field.name}`"
+                  :options="fieldOptions(field)"
+                  style="flex: 1; min-width: 0"
+                  @update:value="(v) => setMeasuredValue(field, v)"
+                />
+                <a-input-number
+                  v-else-if="field.type === 'number'"
+                  :value="getMeasuredValue(field)"
+                  :min="0"
+                  size="middle"
+                  style="flex: 1; min-width: 0"
+                  :placeholder="field.placeholder || `请输入${field.name}`"
+                  @update:value="(v) => setMeasuredValue(field, v)"
+                />
+                <a-input
+                  v-else
+                  :value="getMeasuredValue(field)"
+                  allow-clear
+                  size="middle"
+                  style="flex: 1; min-width: 0"
+                  :placeholder="field.placeholder || `请输入${field.name}`"
+                  @update:value="(v) => setMeasuredValue(field, v)"
+                />
+                <span v-if="unitSuffix(field)" class="unit-affix">{{ unitSuffix(field) }}</span>
               </div>
-              <div v-if="isManualJudgeField(field)" class="sheet-form-item is-inline">
-                <label class="sheet-label"><span class="req">*</span>本项结论</label>
-                <div class="sheet-control">
-                  <a-select
-                    :value="getManualJudgment(field) || undefined"
-                    allow-clear
-                    size="middle"
-                    placeholder="请选择"
-                    :options="listManualJudgmentSelectOptions(field)"
-                    style="width: 100%"
-                    @update:value="(v) => setManualJudgment(field, v)"
-                  />
-                </div>
+              <div v-if="isManualJudgeField(field)" class="manual-judgment-row">
+                <span class="manual-label"><span class="req">*</span>本项结论</span>
+                <a-select
+                  :value="getManualJudgment(field) || undefined"
+                  allow-clear
+                  size="middle"
+                  placeholder="请选择本项结论"
+                  :options="listManualJudgmentSelectOptions(field)"
+                  style="flex: 1; min-width: 0"
+                  @update:value="(v) => setManualJudgment(field, v)"
+                />
               </div>
             </div>
           </template>
         </div>
+        <div v-else class="muted">该模板未配置检验项目</div>
       </div>
 
-      <div v-if="showConclusionSection" class="sheet-section sheet-footer-section">
-        <div class="sheet-section-title">整单结论</div>
-        <div class="sheet-conclusion-hint">{{ conclusionHint }}</div>
-        <div
-          class="sheet-form-item is-inline conclusion-item"
-          :class="{
-            'is-pass': isPassConclusion,
-            'is-fail': isFailConclusion,
-          }"
-        >
-          <label class="sheet-label">
-            <span v-if="!isAutoConclusion" class="req">*</span>整单结论
-          </label>
-          <div class="sheet-control">
+      <div v-if="showConclusionSection" class="line-sheet-section line-conclusion-section">
+        <div class="line-conclusion-head">
+          <div class="line-conclusion-left">
+            <div class="line-sheet-title">整单结论</div>
+            <div class="line-conclusion-hint">{{ conclusionHint }}</div>
+          </div>
+          <div class="line-conclusion-right">
             <div
               v-if="isAutoConclusion"
               class="auto-conclusion-box"
@@ -215,7 +182,7 @@
               size="middle"
               placeholder="请选择整单结论"
               :options="conclusionSelectOptions"
-              style="width: 100%; max-width: 320px"
+              style="width: 200px"
             />
           </div>
         </div>
@@ -241,7 +208,6 @@ import {
   normalizeConclusionOptionItems,
   normalizeSheetConclusionOptionItems,
   QC_CONCLUSION_FIELD_CODE,
-  mapConclusionValueToQcResult,
 } from '@/utils/qcConclusionField'
 import {
   QC_UNIT_POSITION,
@@ -267,7 +233,6 @@ import {
   resolveAutoSheetConclusion,
   sheetPassRuleLabel,
 } from '@/utils/qcTemplateSheetPass'
-import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 
 const props = defineProps({
   fields: { type: Array, default: () => [] },
@@ -374,30 +339,6 @@ const conclusionHint = computed(() => {
     return `整单规则为「${sheetPassRuleLabel(rule)}」：无需手选，系统根据关键项达标情况自动给出合格/不合格。`
   }
   return ''
-})
-
-const isPassConclusion = computed(() => {
-  void tick.n
-  if (isAutoConclusion.value) return autoConclusion.value.status === 'pass'
-  const raw = conclusionValue.value
-  if (raw === undefined || raw === null || raw === '') return false
-  return (
-    mapConclusionValueToQcResult(raw, {
-      optionItems: conclusionOptionItems.value,
-    }) === QC_TASK_RESULT.PASS
-  )
-})
-
-const isFailConclusion = computed(() => {
-  void tick.n
-  if (isAutoConclusion.value) return autoConclusion.value.status === 'fail'
-  const raw = conclusionValue.value
-  if (raw === undefined || raw === null || raw === '') return false
-  return (
-    mapConclusionValueToQcResult(raw, {
-      optionItems: conclusionOptionItems.value,
-    }) === QC_TASK_RESULT.FAIL
-  )
 })
 
 watch(
@@ -547,28 +488,23 @@ function judgeHint(field) {
 
 <style lang="less" scoped>
 .qc-sheet-preview {
-  padding-bottom: 8px;
-}
-
-.sheet-paper {
-  background: #fff;
   border: 1px solid #e5e6eb;
   border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   overflow: hidden;
+  background: #fff;
 }
 
 .sheet-header {
-  padding: 16px 20px 12px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid #f0f0f0;
-  background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
+  background: #fff;
 }
 
 .sheet-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  color: #1f2329;
-  line-height: 28px;
+  color: rgba(0, 0, 0, 0.88);
+  line-height: 24px;
 }
 
 .sheet-meta {
@@ -584,153 +520,134 @@ function judgeHint(field) {
   color: rgba(0, 0, 0, 0.35);
 }
 
-.sheet-section {
-  padding: 14px 20px 16px;
-  border-bottom: 1px solid #f0f0f0;
+/* 与录入质检结果行展开模板一致 */
+.line-sheet-wrap {
+  padding: 12px 14px;
+  background: #fafbfc;
 }
 
-.sheet-section:last-child {
-  border-bottom: none;
+.line-sheet-section {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
 }
 
-.sheet-section-title {
+.line-sheet-section:last-child {
+  margin-bottom: 0;
+}
+
+.line-sheet-title {
   margin-bottom: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.88);
   padding-left: 8px;
   border-left: 3px solid #1677ff;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
   line-height: 1.2;
 }
 
-.sheet-form-grid {
+.line-header-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 20px;
+  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(220px, 2fr);
+  gap: 12px 16px;
+  align-items: end;
 }
 
-@media (max-width: 640px) {
-  .sheet-form-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 900px) {
+  .line-header-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-.sheet-form-item {
+.line-header-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
 }
 
-.sheet-form-item.is-inline {
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.sheet-form-item.is-inline .sheet-label {
-  width: 72px;
-  flex-shrink: 0;
-  padding-top: 5px;
-  text-align: right;
-}
-
-.sheet-form-item.is-inline .sheet-control {
-  flex: 1;
-  min-width: 0;
-}
-
-.sheet-label {
+.line-field-label {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.65);
   line-height: 22px;
 }
 
-.sheet-control {
-  min-width: 0;
-}
-
-.req {
+.line-field-label .req,
+.inspect-field-title .req,
+.manual-label .req {
   margin-right: 2px;
   color: #ff4d4f;
 }
 
-.sheet-inspect-list {
-  display: flex;
-  flex-direction: column;
+.inspect-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
-.sheet-inspect-block {
+@media (max-width: 1280px) {
+  .inspect-fields-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .inspect-fields-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inspect-field-card {
   padding: 12px 14px;
+  background: #fafbfc;
   border: 1px solid #f0f0f0;
   border-radius: 8px;
-  background: #fafbfc;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
 }
 
-.sheet-inspect-block.is-complex {
-  background: #fff;
-  border-color: #e5e6eb;
-}
-
-.sheet-inspect-block.is-pass {
+.inspect-field-card.is-pass {
   border-color: #b7eb8f;
   background: #f6ffed;
 }
 
-.sheet-inspect-block.is-fail {
+.inspect-field-card.is-fail {
   border-color: #ffa39e;
   background: #fff2f0;
 }
 
-.sheet-inspect-head {
+.inspect-field-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
-.sheet-seq {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #1677ff;
-  color: #fff;
-  font-size: 12px;
-  line-height: 22px;
-  text-align: center;
-}
-
-.sheet-inspect-title {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
+.inspect-field-title {
+  font-size: 13px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
-  display: flex;
+  line-height: 22px;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
   flex-wrap: wrap;
+  gap: 4px;
 }
 
-.sheet-standard {
-  margin: 0 0 10px 30px;
+.key-item-tag {
+  margin: 0;
+  font-weight: 500;
+}
+
+.inspect-field-standard {
+  margin-bottom: 8px;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
-}
-
-.sheet-inspect-block :deep(.complex-inspect-block) {
-  margin-left: 30px;
-  margin-top: 4px;
-  border: none;
-  background: transparent;
-  padding: 0;
-}
-
-.sheet-inspect-block :deep(.complex-head) {
-  display: none;
 }
 
 .field-input-wrap {
@@ -738,7 +655,78 @@ function judgeHint(field) {
   align-items: center;
   gap: 8px;
   width: 100%;
-  max-width: 420px;
+  max-width: 100%;
+}
+
+.unit-affix {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.manual-judgment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.manual-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+}
+
+.judge-placeholder {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+}
+
+.judge-tag {
+  margin: 0;
+}
+
+.muted {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.line-conclusion-section {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.line-conclusion-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+
+.line-conclusion-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.line-conclusion-left .line-sheet-title {
+  margin-bottom: 6px;
+}
+
+.line-conclusion-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 48%;
+}
+
+.line-conclusion-hint {
+  margin-bottom: 0;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
 }
 
 .auto-conclusion-box {
@@ -751,8 +739,6 @@ function judgeHint(field) {
   border-radius: 8px;
   border: 1px solid #f0f0f0;
   background: #fafbfc;
-  width: 100%;
-  max-width: 480px;
 }
 
 .auto-conclusion-box.is-pass {
@@ -765,43 +751,25 @@ function judgeHint(field) {
   background: #fff2f0;
 }
 
+.auto-conclusion-box.is-pending {
+  border-color: #e5e6eb;
+  background: #fafbfc;
+}
+
 .auto-conclusion-text {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
 }
 
-.judge-placeholder {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.25);
-}
+@media (max-width: 900px) {
+  .line-conclusion-head {
+    flex-direction: column;
+  }
 
-.unit-affix {
-  flex-shrink: 0;
-  color: rgba(0, 0, 0, 0.65);
-  font-size: 12px;
-}
-
-.sheet-footer-section .conclusion-item {
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid #e8e8e8;
-}
-
-.sheet-conclusion-hint {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-  line-height: 1.5;
-}
-
-.sheet-footer-section .conclusion-item.is-pass {
-  border-color: #b7eb8f;
-  background: #f6ffed;
-}
-
-.sheet-footer-section .conclusion-item.is-fail {
-  border-color: #ffa39e;
-  background: #fff2f0;
+  .line-conclusion-right {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>

@@ -11,7 +11,7 @@ export const applyTypeOptions = ['日常采购', '紧急采购']
 
 export const settlementTypeOptions = ['先款后货', '预付款+货到付', '货到付款', '月结']
 
-export const settlementCycleOptions = ['月结', '季结', '现结']
+export const settlementCycleOptions = ['月结', '周结', '半月结', '季结', '现结']
 
 export const settlementMethodOptions = ['现金结算', '银行转账', '承兑汇票']
 

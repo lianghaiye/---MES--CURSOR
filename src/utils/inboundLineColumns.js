@@ -28,7 +28,7 @@ export const inboundFormLineColumns = [
   { title: '总价', key: 'totalPrice', width: 96, align: 'right' },
   { title: '当前库存数', key: 'stockQty', width: 120, align: 'right' },
   { title: '当前仓库数量', key: 'warehouseStockQty', width: 130, align: 'right' },
-  { title: '操作', key: 'actions', width: 220 },
+  { title: '操作', key: 'actions', width: 200 },
 ]
 
 export const inboundDetailLineColumns = inboundFormLineColumns.filter((c) => c.key !== 'actions')

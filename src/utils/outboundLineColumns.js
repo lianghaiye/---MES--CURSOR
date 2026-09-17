@@ -47,7 +47,7 @@ export const outboundFormLineColumns = [
   { title: '发货备注', key: 'deliveryRemark', width: 140, ellipsis: true },
   { title: '单价', key: 'unitPrice', width: 96, align: 'right' },
   { title: '总价', key: 'totalPrice', width: 96, align: 'right' },
-  { title: '操作', key: 'actions', width: 168 },
+  { title: '操作', key: 'actions', width: 200 },
 ]
 
 /** 详情页不展示实时库存；拣选批次改为出库实扣批次 */

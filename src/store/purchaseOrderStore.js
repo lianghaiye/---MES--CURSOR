@@ -8,6 +8,7 @@ import {
 } from '@/mock/purchaseOrders'
 import { ensureCrossDemoPurchaseOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureSettleUnitDemoPurchaseOrders } from '@/mock/settleUnitPurchaseDemoSeed'
+import { ensurePeriodSettleDemoPurchaseOrders } from '@/mock/periodSettleDemoSeed'
 import { round4 } from '@/utils/purchaseMerge'
 import { roundNumber } from '@/utils/numberFormat'
 import {
@@ -64,7 +65,9 @@ function persist() {
 
 function initPurchaseOrders() {
   const base = shouldReseed() ? clonePurchaseOrders() : loadFromStorage() || clonePurchaseOrders()
-  const orders = ensureSettleUnitDemoPurchaseOrders(ensureCrossDemoPurchaseOrders(base))
+  const orders = ensurePeriodSettleDemoPurchaseOrders(
+    ensureSettleUnitDemoPurchaseOrders(ensureCrossDemoPurchaseOrders(base)),
+  )
   orders.forEach((order) => {
     if (!order || order.status === '草稿') {
       if (order) order.overdueStatus = order.overdueStatus || '未逾期'

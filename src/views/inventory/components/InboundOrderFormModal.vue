@@ -1,10 +1,13 @@
 <template>
   <FormCreateShell
     :page-mode="pageMode"
+    :embedded="embedded"
+    :content-only="contentOnly"
     :open="open"
     :title="shellTitle"
     width="1400px"
     class="inbound-form-modal"
+    :class="{ 'is-embedded': embedded }"
     @cancel="onShellCancel"
     @update:open="(val) => emit('update:open', val)"
   >
@@ -517,33 +520,36 @@
                   {{ formatMoney(record.totalPrice) }}
                 </template>
                 <template v-else-if="column.key === 'actions'">
-                  <a-space :size="4">
+                  <a-space :size="8" class="line-actions">
                     <a
                       v-if="isLinePendingInbound(record)"
                       @click="handleConfirmLineInbound(record)"
                     >
-                      确认入库
+                      确认
                     </a>
                     <a
                       v-if="canRefuseLine(record)"
                       class="danger-link"
                       @click="openRefuseLine(record)"
                     >
-                      拒绝入库
+                      拒绝
                     </a>
                     <a v-if="isLinePendingInbound(record)" @click="openLineEdit(record, 'edit')">
                       编辑
                     </a>
-                    <a v-if="isLinePendingInbound(record)" @click="openLineEdit(record, 'copy')">
-                      复制
-                    </a>
-                    <a
-                      v-if="isLinePendingInbound(record)"
-                      class="danger-link"
-                      @click="removeLine(record.id)"
+                    <a-tooltip v-if="isLinePendingInbound(record)" title="复制">
+                      <a class="line-action-icon" @click="openLineEdit(record, 'copy')">
+                        <CopyOutlined />
+                      </a>
+                    </a-tooltip>
+                    <a-tooltip
+                      v-if="canRemoveInboundLine && isLinePendingInbound(record)"
+                      title="删除"
                     >
-                      删除
-                    </a>
+                      <a class="line-action-icon danger-link" @click="removeLine(record.id)">
+                        <DeleteOutlined />
+                      </a>
+                    </a-tooltip>
                     <span
                       v-else-if="(record.lineStatus || '待入库') === '已入库'"
                       class="muted-text"
@@ -590,8 +596,13 @@
     </div>
 
     <template #footer>
-      <a-button @click="onShellCancel">取消</a-button>
-      <a-button type="primary" :loading="saving" @click="handleSave">
+      <a-button v-if="!embedded" @click="onShellCancel">取消</a-button>
+      <a-button
+        type="primary"
+        :size="embedded ? 'small' : 'middle'"
+        :loading="saving"
+        @click="handleSave"
+      >
         <CheckOutlined />
         保存
       </a-button>
@@ -658,7 +669,13 @@ import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { CheckOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import {
+  CheckOutlined,
+  CopyOutlined,
+  DeleteOutlined,
+  InfoCircleOutlined,
+  PlusOutlined,
+} from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -738,6 +755,8 @@ import {
 const props = defineProps({
   open: { type: Boolean, default: false },
   pageMode: { type: Boolean, default: false },
+  embedded: { type: Boolean, default: false },
+  contentOnly: { type: Boolean, default: false },
   listPath: { type: String, default: '' },
   editRecord: { type: Object, default: null },
 })
@@ -765,7 +784,10 @@ const {
   closeAfterSave,
 } = useFormCreateModal(props, emit, {
   listPath: '/inventory/inbound',
-  getTitle: () => (isEdit.value ? '编辑入库单' : '新增入库单'),
+  getTitle: () => {
+    if (props.embedded && props.editRecord?.docNo) return props.editRecord.docNo
+    return isEdit.value ? '编辑入库单' : '新增入库单'
+  },
 })
 
 const saving = ref(false)
@@ -1470,16 +1492,21 @@ function handleSave() {
 </style>
 
 <style lang="less" scoped>
-:deep(.form-create-page.inbound-form-modal) {
+:deep(.form-create-page.inbound-form-modal),
+:deep(.form-embedded-panel.inbound-form-modal),
+:deep(.form-embedded-content-only.inbound-form-modal),
+.form-embedded-panel,
+.form-embedded-content-only {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 112px);
-  max-height: calc(100vh - 112px);
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
   overflow: hidden;
   padding-bottom: 0;
 
-  .form-body {
+  .form-body,
+  .embedded-body {
     flex: 1;
     min-height: 0;
     min-width: 0;
@@ -1488,6 +1515,11 @@ function handleSave() {
     flex-direction: column;
     padding-bottom: 12px;
   }
+}
+
+:deep(.form-create-page.inbound-form-modal) {
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
 }
 
 :deep(.ant-modal.inbound-form-modal) {

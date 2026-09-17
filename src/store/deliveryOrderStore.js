@@ -25,8 +25,8 @@ import { sumSelectedShipQty } from '@/utils/shipEbom'
 import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_delivery_orders'
-/** v4：发货列表增加发货总额（含税） */
-const DATA_VERSION = 4
+/** v6：散件发运行补齐单价/仓库/材质等，详情与申请单表单列对齐 */
+const DATA_VERSION = 6
 
 function migrateOrders(orders) {
   return (orders || []).map((o) => {
@@ -34,6 +34,9 @@ function migrateOrders(orders) {
     if (row.deliveryStatus === '已出库' || row.deliveryStatus === '部分出库') {
       row.deliveryStatus = '已发货'
     }
+    if (!row.creator) row.creator = row.salesperson || 'admin1'
+    if (!row.operator) row.operator = row.updater || row.creator || 'admin1'
+    if (!row.operatedAt) row.operatedAt = row.updatedAt || row.createdAt || ''
     refreshDeliveryMetrics(row)
     row.actualOutboundQty = row.actualOutboundQty ?? 0
     row.totalAmountExTax = calcDeliveryAmountExTax(row)
@@ -49,10 +52,8 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
+      // 版本不一致时重建 seed，避免旧结构散件行继续展示简化表
       if (parsed.version === DATA_VERSION && Array.isArray(parsed.orders)) {
-        return migrateOrders(parsed.orders)
-      }
-      if (Array.isArray(parsed.orders)) {
         return migrateOrders(parsed.orders)
       }
     }
@@ -170,6 +171,8 @@ export function generateOutboundForDelivery(id) {
   if (res.ok) {
     row.deliveryStatus = '待出库'
     row.outboundOrderId = res.outbound.id
+    row.operator = row.operator || row.creator || 'admin1'
+    row.operatedAt = dayjs().format('YYYY-MM-DD HH:mm')
   }
   return res
 }
@@ -190,11 +193,16 @@ export function createDeliveryOrder(payload) {
     (s, ship) => s + sumSelectedShipQty(ship),
     0,
   )
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
+  const operator = payload.operator || payload.creator || 'admin1'
   const appPayload = {
     id,
     deliveryCode: payload.deliveryCode || nextDeliveryCode(),
     deliveryDate: payload.documentDate || dayjs().format('YYYY-MM-DD'),
-    createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    createdAt: now,
+    creator: payload.creator || operator,
+    operator,
+    operatedAt: now,
     customerName: payload.customerName || so?.customerName,
     shipmentMethod: payload.shipmentMethod || '送货',
     logisticsNo: payload.logisticsNo || '',
@@ -258,6 +266,8 @@ export function updateDeliveryOrder(id, patch) {
 
   Object.assign(deliveryOrderState.orders[idx], patch)
   const row = deliveryOrderState.orders[idx]
+  row.operator = patch.operator || patch.updater || row.operator || row.creator || 'admin1'
+  row.operatedAt = patch.operatedAt || patch.updatedAt || dayjs().format('YYYY-MM-DD HH:mm')
   row.applyShipQty = calcApplyShipQty(row)
   row.totalAmountExTax = calcDeliveryAmountExTax(row)
   row.totalAmountInTax = calcDeliveryAmountInTax(row)

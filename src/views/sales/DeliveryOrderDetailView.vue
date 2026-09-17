@@ -92,18 +92,96 @@
               </a-table>
             </DetailSectionCard>
             <DetailSectionCard v-if="record.scatterShipments?.length" title="散件发运">
-              <div v-for="ship in record.scatterShipments" :key="ship.id" class="scatter-block">
-                <div class="scatter-head">{{ ship.productName }}（{{ ship.productCode }}）</div>
-                <a-table
-                  :columns="scatterPickColumns"
-                  :data-source="scatterPicks(ship)"
-                  row-key="materialId"
-                  size="small"
-                  bordered
-                  :pagination="false"
-                  :scroll="{ x: 720 }"
-                />
-              </div>
+              <a-table
+                class="delivery-line-table"
+                :columns="scatterLineColumns"
+                :data-source="scatterLineRows"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: scatterTableScrollX }"
+                :default-expand-all-rows="true"
+              >
+                <template #bodyCell="{ column, record: line, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'lineShipStatus'">
+                    <a-tag :color="lineShipStatusColor(line.lineShipStatus)">
+                      {{ line.lineShipStatus || '—' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'shipProgress'">
+                    {{
+                      formatShipProgress(
+                        line.confirmedOutboundQty ?? line.shippedQty,
+                        line.appliedShipQty ?? line.shippedQty,
+                        line.orderQty,
+                      )
+                    }}
+                  </template>
+                  <template v-else-if="column.key === 'orderQty'">
+                    {{ formatDeliveryQty(line.orderQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'unitPriceExTax'">
+                    {{ formatDeliveryPrice(line.unitPriceExTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'unitPriceInTax'">
+                    {{ formatDeliveryPrice(line.unitPriceInTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'shipSets'">
+                    {{ formatDeliveryQty(line.shipSets) }}
+                  </template>
+                  <template v-else-if="column.key === 'shipWeight'">
+                    {{ formatDeliveryWeight(line.shipWeight ?? line.itemWeightKg) }}
+                  </template>
+                  <template v-else-if="column.key === 'deliveryAmountExTax'">
+                    {{ formatDeliveryPrice(line.deliveryAmountExTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'deliveryAmountInTax'">
+                    {{ formatDeliveryPrice(line.deliveryAmountInTax) }}
+                  </template>
+                  <template v-else-if="column.key === 'deliveryMode'">
+                    <a-tag color="orange">{{ line.deliveryMode || '散件' }}</a-tag>
+                  </template>
+                  <template v-else>
+                    {{ displayLineCell(line, column) }}
+                  </template>
+                </template>
+                <template #expandedRowRender="{ record: ship }">
+                  <div class="scatter-picks-panel">
+                    <div class="scatter-picks-title">已选发运物料</div>
+                    <a-table
+                      v-if="scatterPicks(ship).length"
+                      :columns="scatterPickColumns"
+                      :data-source="scatterPicks(ship)"
+                      row-key="materialId"
+                      size="small"
+                      bordered
+                      :pagination="false"
+                      :scroll="{ x: 900 }"
+                    >
+                      <template #bodyCell="{ column, record: mat }">
+                        <template v-if="column.key === 'shipProgress'">
+                          {{
+                            formatMaterialShipProgress(
+                              mat.shippedQty,
+                              mat.appliedQty,
+                              mat.orderDemandQty ?? mat.demandQty,
+                            )
+                          }}
+                        </template>
+                        <template v-else>
+                          {{ mat[column.dataIndex] ?? '—' }}
+                        </template>
+                      </template>
+                    </a-table>
+                    <a-empty v-else description="本单未勾选发运物料" :image="false" />
+                    <div v-if="ship.remark" class="scatter-line-remark">
+                      发运备注：{{ ship.remark }}
+                    </div>
+                  </div>
+                </template>
+              </a-table>
             </DetailSectionCard>
             <DetailSectionCard v-if="record.shipAttachments?.length" title="发货附件">
               <a-table
@@ -253,7 +331,7 @@ import { getDeliveryOrderById, refreshOutboundQtyAll } from '@/store/deliveryOrd
 import { getSalesOrderById, salesOrderState } from '@/store/salesOrderStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { outboundState } from '@/store/outboundStore'
-import { getSelectedMaterialPicks } from '@/utils/shipEbom'
+import { getSelectedMaterialPicks, formatMaterialShipProgress } from '@/utils/shipEbom'
 import { deliveryStatusColor, formatOutboundQtyInt } from '@/utils/deliveryOrder'
 import {
   enrichDeliveryLineForDisplay,
@@ -315,11 +393,52 @@ const wholeColumns = [
 
 const wholeTableScrollX = wholeColumns.reduce((sum, col) => sum + (col.width || 100), 0)
 
+/** 散件产品行：与整机列对齐，无「本次发货数量」，改为「发货套数」 */
+const scatterLineColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  {
+    title: '产品名称',
+    dataIndex: 'productName',
+    width: 140,
+    ellipsis: true,
+    fixed: 'left',
+  },
+  { title: '发货状态', key: 'lineShipStatus', width: 88, align: 'center' },
+  { title: '发货进度', key: 'shipProgress', width: 160, align: 'right' },
+  { title: '产品编码', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specModel', width: 100, ellipsis: true },
+  { title: '材质', dataIndex: 'material', width: 72 },
+  { title: '变体属性', dataIndex: 'variantAttr', width: 140, ellipsis: true },
+  { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
+  { title: '订单数量', key: 'orderQty', width: 96, align: 'right' },
+  { title: '单价（不含税）', key: 'unitPriceExTax', width: 120, align: 'right' },
+  { title: '单价（含税）', key: 'unitPriceInTax', width: 110, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 56, align: 'center' },
+  { title: '出库仓库', dataIndex: 'shipWarehouse', width: 120 },
+  { title: '发货套数', key: 'shipSets', width: 96, align: 'right' },
+  { title: '发货重量', key: 'shipWeight', width: 110, align: 'right' },
+  { title: '发货总额（不含税）', key: 'deliveryAmountExTax', width: 148, align: 'right' },
+  {
+    title: '发货总额（含税）',
+    key: 'deliveryAmountInTax',
+    width: 148,
+    align: 'right',
+    customHeaderCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+  },
+  { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
+  { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
+  { title: '备注', dataIndex: 'lineRemark', width: 120, ellipsis: true },
+]
+
+const scatterTableScrollX = scatterLineColumns.reduce((sum, col) => sum + (col.width || 100), 0)
+
 const scatterPickColumns = [
   { title: '物料名称', dataIndex: 'name', width: 160, ellipsis: true },
   { title: '编码', dataIndex: 'code', width: 120, ellipsis: true },
   { title: '规格', dataIndex: 'spec', width: 100, ellipsis: true },
+  { title: '发货进度', key: 'shipProgress', width: 130, align: 'right' },
   { title: '需求数量', dataIndex: 'demandQty', width: 88, align: 'right' },
+  { title: '可用库存', dataIndex: 'availableStock', width: 88, align: 'right' },
   { title: '本次发运', dataIndex: 'shipQty', width: 88, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 56 },
 ]
@@ -390,6 +509,30 @@ const wholeLineRows = computed(() => {
   })
 })
 
+const scatterLineRows = computed(() => {
+  void salesOrderState.orders
+  void productInfoState.products
+  const order = record.value
+  if (!order?.scatterShipments?.length) return []
+  const so = sourceSalesOrder.value
+  return order.scatterShipments.map((ship) => {
+    const row = enrichDeliveryLineForDisplay(
+      {
+        ...ship,
+        deliveryMode: ship.deliveryMode || '散件',
+        shipWarehouse: ship.shipWarehouse || order.outboundWarehouse || '成品仓',
+      },
+      so,
+      { outboundWarehouse: order.outboundWarehouse },
+    )
+    if (row.deliveryAmountExTax == null && ship.deliveryAmountExTax != null) {
+      row.deliveryAmountExTax = ship.deliveryAmountExTax
+      row.deliveryAmountInTax = ship.deliveryAmountInTax
+    }
+    return row
+  })
+})
+
 function displayLineCell(line, column) {
   const val = column.dataIndex ? line[column.dataIndex] : line[column.key]
   return val !== undefined && val !== null && String(val).trim() !== '' ? val : '—'
@@ -429,8 +572,12 @@ function scatterPicks(ship) {
     code: p.code,
     spec: p.spec || '—',
     demandQty: formatDeliveryQty(p.demandQty),
+    availableStock: formatDeliveryQty(p.availableStock),
     shipQty: formatDeliveryQty(p.shipQty),
     unit: p.unit || '件',
+    shippedQty: p.shippedQty,
+    appliedQty: p.appliedQty,
+    orderDemandQty: p.orderDemandQty ?? p.demandQty,
   }))
 }
 
@@ -550,18 +697,21 @@ function goSalesOrder() {
   }
 }
 
-.scatter-block {
-  margin-bottom: 12px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
+.scatter-picks-panel {
+  padding: 8px 12px 4px;
+  background: #fafafa;
 }
 
-.scatter-head {
+.scatter-picks-title {
   font-size: 13px;
   font-weight: 600;
-  color: #262626;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.scatter-line-remark {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 </style>

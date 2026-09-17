@@ -173,13 +173,43 @@
             {{ formatAmountExTax(record.totalAmountExTax) }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space v-if="canEditDeliveryOrder(record)" :size="0">
-              <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="confirmDelete(record)">
+            <a-space :size="0">
+              <a-button
+                v-if="canGenerateOutboundForRow(record)"
+                type="link"
+                size="small"
+                @click="handleGenerateOutboundForRow(record)"
+              >
+                生成出库单
+              </a-button>
+              <a-button
+                v-if="canEditDeliveryOrder(record)"
+                type="link"
+                size="small"
+                @click="openEdit(record)"
+              >
+                编辑
+              </a-button>
+              <a-button
+                v-if="canDeleteDeliveryOrder(record)"
+                type="link"
+                size="small"
+                danger
+                @click="confirmDelete(record)"
+              >
                 删除
               </a-button>
+              <span
+                v-if="
+                  !canGenerateOutboundForRow(record) &&
+                  !canEditDeliveryOrder(record) &&
+                  !canDeleteDeliveryOrder(record)
+                "
+                class="action-muted"
+              >
+                —
+              </span>
             </a-space>
-            <span v-else class="action-muted">—</span>
           </template>
           <template v-else>
             {{ record[column.dataIndex] ?? '—' }}
@@ -300,7 +330,11 @@ const baseColumns = [
   { title: '司机姓名', dataIndex: 'driverName', width: 90 },
   { title: '司机联系方式', dataIndex: 'driverPhone', width: 120 },
   { title: '车牌号', dataIndex: 'plateNo', width: 100 },
-  { title: '操作', key: 'action', width: 120, fixed: 'right' },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
+  { title: '操作人', dataIndex: 'operator', width: 90 },
+  { title: '操作时间', dataIndex: 'operatedAt', width: 150 },
+  { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -404,6 +438,24 @@ function openEdit(record) {
   })
 }
 
+function canGenerateOutboundForRow(row) {
+  return row?.deliveryStatus === '待发货' && !hasLinkedSalesOutbound(row)
+}
+
+function handleGenerateOutboundForRow(record) {
+  if (!canGenerateOutboundForRow(record)) {
+    message.warning('仅待发货且未关联出库单时可生成出库单')
+    return
+  }
+  const res = generateOutboundForDelivery(record.id)
+  if (!res.ok) {
+    message.warning(res.message)
+    return
+  }
+  message.success('已生成销售出库单')
+  refreshOutboundQtyAll()
+}
+
 function handleGenerateOutbound() {
   const id = selectedRowKeys.value[0]
   const res = generateOutboundForDelivery(id)
@@ -422,7 +474,7 @@ function confirmDelete(record) {
   }
   Modal.confirm({
     title: '确认删除',
-    content: `删除发货单「${record.deliveryCode}」将同时删除关联的待出库出库单，是否继续？`,
+    content: `确定删除发货单「${record.deliveryCode}」吗？`,
     okType: 'danger',
     onOk: () => {
       deleteDeliveryOrder(record.id)
