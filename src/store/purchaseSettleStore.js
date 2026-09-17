@@ -204,6 +204,112 @@ export function previewPeriodSettles(params = {}) {
   }
 }
 
+/**
+ * 按固定日期窗预览：一供应商一窗（不按结算周期再切分）
+ * 用于结算规则「按入库」自动执行
+ */
+export function previewSettlesByFixedWindow(params = {}) {
+  const {
+    periodStart,
+    periodEnd,
+    periodKey,
+    periodLabel,
+    supplierIds,
+    supplierNames,
+    settlementCycles,
+    allowAppend = false,
+  } = params
+  if (!periodStart || !periodEnd) {
+    return { ok: false, message: '请指定扫描起止日期', groups: [] }
+  }
+
+  let suppliers = collectCandidateSuppliers(supplierIds, supplierNames)
+  if (settlementCycles?.length) {
+    const cycleSet = new Set(settlementCycles)
+    suppliers = suppliers.filter((s) => cycleSet.has(resolveSupplierCycle(s.name, null, s)))
+  }
+  // 规则场景：若指定了供应商但无账期周期，仍允许纳入（按入库不强制周期）
+  if (supplierIds?.length || supplierNames?.length) {
+    const extra = []
+    if (supplierIds?.length) {
+      supplierIds.forEach((id) => {
+        const s = getSupplierById(id)
+        if (s && !suppliers.some((x) => x.id === s.id)) extra.push(s)
+      })
+    }
+    if (supplierNames?.length) {
+      supplierNames.forEach((name) => {
+        const s = getSupplierByName(name)
+        if (s && !suppliers.some((x) => x.name === s.name)) extra.push(s)
+        else if (!s && !suppliers.some((x) => x.name === name)) {
+          extra.push({ id: '', name, settlementCycle: '' })
+        }
+      })
+    }
+    suppliers = [...suppliers, ...extra]
+  }
+
+  // 无供应商筛选时：从窗内可结算入库反推供应商（不强制账期周期）
+  if (!supplierIds?.length && !supplierNames?.length) {
+    const nameMap = new Map()
+    inboundOrderState.orders.forEach((order) => {
+      if (!order.purchaseOrderId) return
+      if (!inboundDateInWindow(order, periodStart, periodEnd)) return
+      const po = purchaseOrderState.orders.find((o) => o.id === order.purchaseOrderId)
+      const name = po?.supplier || order.supplier
+      if (!name) return
+      if (nameMap.has(name)) return
+      const s = getSupplierByName(name)
+      nameMap.set(name, s || { id: '', name, settlementCycle: po?.settlementCycle || '' })
+    })
+    suppliers = [...nameMap.values()]
+    if (settlementCycles?.length) {
+      const cycleSet = new Set(settlementCycles)
+      suppliers = suppliers.filter((s) =>
+        cycleSet.has(resolveSupplierCycle(s.name, null, s) || s.settlementCycle),
+      )
+    }
+  }
+
+  if (!suppliers.length) return { ok: false, message: '扫描窗口内没有可结算供应商', groups: [] }
+
+  const keyBase = periodKey || `fixed-${periodStart}_${periodEnd}`
+  const groups = []
+  for (const supplier of suppliers) {
+    const cycle =
+      resolveSupplierCycle(supplier.name, null, supplier) || supplier.settlementCycle || ''
+    const lines = listSettleableInboundLinesByPeriod({
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      periodStart,
+      periodEnd,
+    })
+    const winKey = `${keyBase}:${supplier.id || supplier.name}`
+    const existing = findSettleBySupplierPeriod(supplier.id, supplier.name, winKey)
+    const totalAmount = round2(lines.reduce((s, l) => s + (Number(l.amount) || 0), 0))
+    groups.push({
+      key: `${supplier.id || supplier.name}:${winKey}`,
+      supplierId: supplier.id || '',
+      supplier: supplier.name,
+      settlementCycle: cycle,
+      periodKey: winKey,
+      periodStart,
+      periodEnd,
+      periodLabel: periodLabel || `${periodStart}~${periodEnd}`,
+      lineCount: lines.length,
+      totalAmount,
+      lineItems: lines,
+      exists: !!existing,
+      existingSettleNo: existing?.settleNo || '',
+      existingStatus: existing?.status || '',
+      skipByDefault: !!existing && !allowAppend,
+      selectable: lines.length > 0 && (!existing || allowAppend),
+    })
+  }
+
+  return { ok: true, groups, message: '' }
+}
+
 function collectCandidateSuppliers(supplierIds, supplierNames) {
   let list = supplierState.suppliers.filter((s) => s.status !== '停用')
 
