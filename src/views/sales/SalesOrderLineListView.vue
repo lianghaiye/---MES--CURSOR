@@ -123,7 +123,6 @@
             <a-form-item label=" ">
               <a-space :size="12">
                 <a-checkbox v-model:checked="filters.snFuzzy">模糊匹配</a-checkbox>
-                <a class="link-code" @click.prevent="openMobileSnLookup">手机查单</a>
               </a-space>
             </a-form-item>
           </a-col>
@@ -680,14 +679,6 @@ function isSnHitRow(record) {
 function openSnDrawer(record) {
   snDrawerRow.value = record
   snDrawerOpen.value = true
-}
-
-function openMobileSnLookup() {
-  const resolved = router.resolve({
-    path: '/m/sn-lookup',
-    query: filters.snCode?.trim() ? { sn: filters.snCode.trim() } : {},
-  })
-  window.open(resolved.href, '_blank')
 }
 
 function openDetail(record) {

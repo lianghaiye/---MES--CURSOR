@@ -141,12 +141,6 @@ const routes = [
     meta: { title: '看板轮播播放', standalone: true },
   },
   {
-    path: '/m/sn-lookup',
-    name: 'mobile-sn-lookup',
-    component: () => import('@/views/mobile/SnLookupView.vue'),
-    meta: { title: '扫 SN 查单', standalone: true },
-  },
-  {
     path: '/',
     component: MainLayout,
     redirect: '/home/dashboard',
@@ -902,6 +896,12 @@ const routes = [
         name: 'procurement-purchase-settles-detail',
         component: () => import('@/views/procurement/PurchaseSettleDetailView.vue'),
         meta: { title: '采购结算详情', listPath: '/procurement/purchase-settles' },
+      },
+      {
+        path: 'procurement/purchase-settle-rules',
+        name: 'procurement-purchase-settle-rules',
+        component: () => import('@/views/procurement/PurchaseSettleRuleView.vue'),
+        meta: { title: '结算规则' },
       },
       {
         path: 'procurement/purchase-returns',
