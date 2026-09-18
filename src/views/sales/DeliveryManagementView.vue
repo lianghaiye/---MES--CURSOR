@@ -521,36 +521,36 @@ function onBatchMenu({ key }) {
 <style lang="less" scoped>
 .delivery-management-page {
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
+  box-sizing: border-box;
 }
 
 .filter-card,
 .table-card {
   background: #fff;
-  border-radius: 6px;
+  border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .filter-card {
-  padding: 10px 12px 6px;
-  margin-bottom: 8px;
-}
-
-.toolbar-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
 }
 
 .selection-bar {
-  margin: 0 12px 8px;
+  margin: 0 0 12px;
+}
+
+.toolbar-row {
+  margin-bottom: 12px;
 }
 
 .table-card {
-  padding: 0 8px 8px;
+  margin-top: 0;
+  padding: 12px;
+  border: 1px solid #e5e6eb;
 }
 
 .table-pagination {

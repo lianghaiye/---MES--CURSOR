@@ -574,16 +574,18 @@ function onSaved() {
 }
 
 .stat-card {
-  background: #fff;
+  background: linear-gradient(145deg, #f5f8ff 0%, #ffffff 70%);
   border-radius: 8px;
   padding: 16px 18px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid #e8eef8;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   border-left-width: 3px;
   border-left-style: solid;
 
   &.tone-green {
     border-left-color: #52c41a;
+    background: linear-gradient(145deg, #f6ffed 0%, #ffffff 70%);
+    border-color: #b7eb8f;
     .stat-value {
       color: #389e0d;
     }
@@ -591,6 +593,8 @@ function onSaved() {
 
   &.tone-orange {
     border-left-color: #fa8c16;
+    background: linear-gradient(145deg, #fff7e6 0%, #ffffff 70%);
+    border-color: #ffd591;
     .stat-value {
       color: #d46b08;
     }
@@ -598,6 +602,8 @@ function onSaved() {
 
   &.tone-red {
     border-left-color: #ff4d4f;
+    background: linear-gradient(145deg, #fff1f0 0%, #ffffff 70%);
+    border-color: #ffa39e;
     .stat-value {
       color: #cf1322;
     }
@@ -605,6 +611,8 @@ function onSaved() {
 
   &.tone-gray {
     border-left-color: #8c8c8c;
+    background: linear-gradient(145deg, #fafafa 0%, #ffffff 70%);
+    border-color: #d9d9d9;
     .stat-value {
       color: #595959;
     }

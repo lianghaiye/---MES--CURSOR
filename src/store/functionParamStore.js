@@ -144,6 +144,15 @@ export const SHIP_ATTACHMENT_DECIDE_STAGE_DESCRIPTION =
   '无论哪种配置，仓管都可在「库存 → 随货查询」维护本票纳入清单；纳入后随同一张销售出库单出库。'
 
 /**
+ * 调拨：出库确认后是否还需入库方签收
+ * - true：生成调拨入库待签收，需入库方确认完结
+ * - false：出库确认后自动入库完结
+ */
+export const TRANSFER_REQUIRE_INBOUND_CONFIRM_DESCRIPTION =
+  '需要：调拨出库确认后生成调拨入库单，须入库方签收后完结。' +
+  '自动：调拨出库确认后系统自动完成入库，无需入库方再签收。'
+
+/**
  * 下料结算相关发料策略（仅作用于勾选「需要下料结算」能力的物料场景；普通料不受本项影响）
  * 业务口径：确认出库一律按出库单数量扣库存；本项只区分发料后余料是否还要走下料结算回库。
  * - partial：无需下料结算（余料留线边仓等，不再回库结算）
@@ -537,6 +546,12 @@ export const FUNCTION_PARAM_ROWS = [
     description: SHIP_ATTACHMENT_DECIDE_STAGE_DESCRIPTION,
   },
   {
+    key: 'transferRequireInboundConfirm',
+    category: 'inventory',
+    scenario: '调拨入库方签收',
+    description: TRANSFER_REQUIRE_INBOUND_CONFIRM_DESCRIPTION,
+  },
+  {
     key: 'dualUnitIssueStrategy',
     category: 'inventory',
     scenario: '是否需要下料结算',
@@ -642,6 +657,26 @@ function normalizeDualUnitIssueStrategy(mode) {
   return DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL
 }
 
+/** 兼容旧版调拨页工具栏开关（i_doms_transfer_settings） */
+function readLegacyTransferRequireInboundConfirm() {
+  try {
+    const raw = localStorage.getItem('i_doms_transfer_settings')
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw)
+    const v = parsed?.settings?.requireInboundConfirm
+    if (typeof v === 'boolean') return v
+  } catch {
+    /* ignore */
+  }
+  return undefined
+}
+
+function normalizeTransferRequireInboundConfirm(value, legacyFallback) {
+  if (typeof value === 'boolean') return value
+  if (typeof legacyFallback === 'boolean') return legacyFallback
+  return true
+}
+
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -657,6 +692,7 @@ function loadFromStorage() {
         if (assistVersion < BLANK_SIZE_ASSIST_DEFAULTS_VERSION) {
           blankSizeAssistTools = createDefaultBlankSizeAssistTools()
         }
+        const legacyTransferConfirm = readLegacyTransferRequireInboundConfirm()
         return {
           ...parsed,
           salaryPushMode: normalizeSalaryPushMode(parsed.salaryPushMode),
@@ -667,6 +703,10 @@ function loadFromStorage() {
           salesOutboundIssueRule: normalizeSalesOutboundIssueRule(parsed.salesOutboundIssueRule),
           shipAttachmentDecideStage: normalizeShipAttachmentDecideStage(
             parsed.shipAttachmentDecideStage,
+          ),
+          transferRequireInboundConfirm: normalizeTransferRequireInboundConfirm(
+            parsed.transferRequireInboundConfirm,
+            legacyTransferConfirm,
           ),
           dualUnitIssueStrategy: normalizeDualUnitIssueStrategy(parsed.dualUnitIssueStrategy),
           blankSizeAssistTools,
@@ -697,6 +737,10 @@ export const functionParamState = reactive({
     outboundIssueRule: OUTBOUND_ISSUE_RULES.FIFO,
     salesOutboundIssueRule: SALES_OUTBOUND_ISSUE_RULES.BY_ORDER,
     shipAttachmentDecideStage: SHIP_ATTACHMENT_DECIDE_STAGES.APPLY,
+    transferRequireInboundConfirm: normalizeTransferRequireInboundConfirm(
+      undefined,
+      readLegacyTransferRequireInboundConfirm(),
+    ),
     dualUnitIssueStrategy: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL,
     blankSizeAssistTools: createDefaultBlankSizeAssistTools(),
     blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
@@ -850,6 +894,18 @@ export function setShipAttachmentDecideStage(mode) {
     return { ok: false, message: '无效的随货附件确定环节' }
   }
   functionParamState.params.shipAttachmentDecideStage = normalized
+  return { ok: true }
+}
+
+/** 调拨是否需入库方签收（默认需要） */
+export function isTransferRequireInboundConfirm() {
+  return normalizeTransferRequireInboundConfirm(
+    functionParamState.params.transferRequireInboundConfirm,
+  )
+}
+
+export function setTransferRequireInboundConfirm(value) {
+  functionParamState.params.transferRequireInboundConfirm = Boolean(value)
   return { ok: true }
 }
 

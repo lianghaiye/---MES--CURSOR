@@ -10,8 +10,9 @@
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
-    <a-form :model="form" class="work-order-form" :required-mark="true">
-      <div class="header-fields">
+    <a-form :model="form" class="work-order-form form-layout" :required-mark="true">
+      <div class="section-block">
+        <div class="section-title">基本信息</div>
         <a-row :gutter="[12, 12]" style="width: 100%">
           <a-col :span="6">
             <a-form-item label="工单编号">
@@ -202,42 +203,44 @@
       </div>
     </a-form>
 
-    <a-tabs v-model:active-key="activeTab" class="detail-tabs">
-      <a-tab-pane key="components" tab="组件">
-        <a-table
-          :columns="componentColumns"
-          :data-source="componentLines"
-          row-key="id"
-          size="small"
-          bordered
-          :pagination="false"
-          :scroll="{ x: 'max-content' }"
-          class="component-table"
-        >
-          <template #bodyCell="{ column, record, index, text }">
-            <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-            <template v-else-if="column.key === 'requiredQty'">
-              {{ formatQty(record.requiredQty) }}
+    <div class="section-block detail-tabs-block">
+      <a-tabs v-model:active-key="activeTab" class="detail-tabs">
+        <a-tab-pane key="components" tab="组件">
+          <a-table
+            :columns="componentColumns"
+            :data-source="componentLines"
+            row-key="id"
+            size="small"
+            bordered
+            :pagination="false"
+            :scroll="{ x: 'max-content' }"
+            class="component-table"
+          >
+            <template #bodyCell="{ column, record, index, text }">
+              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'requiredQty'">
+                {{ formatQty(record.requiredQty) }}
+              </template>
+              <template v-else-if="column.key === 'unitQty'">
+                {{ formatQty(record.unitQty) }}
+              </template>
+              <template v-else-if="column.key === 'stockQty'">
+                {{ formatQty(record.stockQty) }}
+              </template>
+              <template v-else-if="column.dataIndex">
+                {{ displayCell(text) }}
+              </template>
             </template>
-            <template v-else-if="column.key === 'unitQty'">
-              {{ formatQty(record.unitQty) }}
+            <template #emptyText>
+              <span class="empty-hint">请选择产品后自动带出物料清单</span>
             </template>
-            <template v-else-if="column.key === 'stockQty'">
-              {{ formatQty(record.stockQty) }}
-            </template>
-            <template v-else-if="column.dataIndex">
-              {{ displayCell(text) }}
-            </template>
-          </template>
-          <template #emptyText>
-            <span class="empty-hint">请选择产品后自动带出物料清单</span>
-          </template>
-        </a-table>
-      </a-tab-pane>
-      <a-tab-pane key="operations" tab="作业">
-        <a-empty description="作业内容后续补充" />
-      </a-tab-pane>
-    </a-tabs>
+          </a-table>
+        </a-tab-pane>
+        <a-tab-pane key="operations" tab="作业">
+          <a-empty description="作业内容后续补充" />
+        </a-tab-pane>
+      </a-tabs>
+    </div>
 
     <template #footer>
       <a-button size="small" @click="handleCancel">取消</a-button>
@@ -825,16 +828,8 @@ export default { name: 'CreateWorkOrderModal' }
   margin-top: 8px;
 }
 
-.header-fields {
-  margin-bottom: 12px;
-
-  :deep(.ant-form-item-label) {
-    flex: 0 0 80px;
-  }
-}
-
 .section-block {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 
   .section-title {
     font-weight: 600;
@@ -845,12 +840,21 @@ export default { name: 'CreateWorkOrderModal' }
   }
 }
 
+.detail-tabs-block {
+  .detail-tabs {
+    margin-top: 0;
+
+    :deep(.ant-tabs-nav) {
+      margin-bottom: 8px;
+    }
+  }
+}
+
 .production-detail-row {
   :deep(.ant-col) {
     align-self: flex-start;
   }
 }
-
 .qty-col {
   display: flex;
   justify-content: flex-start;
@@ -974,8 +978,6 @@ export default { name: 'CreateWorkOrderModal' }
 }
 
 .detail-tabs {
-  margin-top: 4px;
-
   :deep(.ant-tabs-nav) {
     margin-bottom: 8px;
   }

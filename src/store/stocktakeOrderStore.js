@@ -9,22 +9,49 @@ import {
 import {
   STOCKTAKE_SOURCE,
   STOCKTAKE_STATUS,
+  STOCKTAKE_POSTING,
+  STOCKTAKE_TYPE,
+  normalizeStocktakeStatus,
   isStocktakeBusinessSource,
   isStocktakeManualSource,
 } from '@/mock/stocktakeOptions'
-import { postStocktakeLine } from '@/utils/stocktakeConfirm'
+import { postStocktakeOrder } from '@/utils/stocktakeConfirm'
+import { isStocktakeAutoPostOnApprove } from '@/store/stocktakeSettingsStore'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_stocktake_orders'
 const SEED_VERSION_KEY = 'i_doms_stocktake_orders_seed_v'
-const CURRENT_SEED_VERSION = '2'
+/** v3：审核流 + 过账状态 */
+const CURRENT_SEED_VERSION = '3'
+
+function migrateOrder(order) {
+  if (!order) return order
+  order.status = normalizeStocktakeStatus(order.status)
+  if (!order.stocktakeType) order.stocktakeType = STOCKTAKE_TYPE.OTHER
+  if (!order.postingStatus) {
+    if (order.status === STOCKTAKE_STATUS.POSTED) order.postingStatus = STOCKTAKE_POSTING.SUCCESS
+    else if (order.status === STOCKTAKE_STATUS.APPROVED)
+      order.postingStatus = STOCKTAKE_POSTING.PENDING
+    else order.postingStatus = ''
+  }
+  order.linkedInboundIds = order.linkedInboundIds || []
+  order.linkedOutboundIds = order.linkedOutboundIds || []
+  order.linkedInboundDocNos = order.linkedInboundDocNos || []
+  order.linkedOutboundDocNos = order.linkedOutboundDocNos || []
+  ;(order.lineItems || []).forEach((l) => {
+    const st = l.lineStatus
+    if (st === '待确认' || st === '部分确认') l.lineStatus = STOCKTAKE_STATUS.PENDING_APPROVAL
+    if (st === '已确认') l.lineStatus = STOCKTAKE_STATUS.POSTED
+  })
+  return order
+}
 
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.orders)) return parsed.orders
+      if (Array.isArray(parsed.orders)) return parsed.orders.map(migrateOrder)
     }
   } catch {
     /* ignore */
@@ -42,8 +69,8 @@ function shouldReseed() {
 }
 
 const initial = shouldReseed()
-  ? cloneStocktakeSeedOrders()
-  : loadFromStorage() || cloneStocktakeSeedOrders()
+  ? cloneStocktakeSeedOrders().map(migrateOrder)
+  : (loadFromStorage() || cloneStocktakeSeedOrders()).map(migrateOrder)
 
 export const stocktakeOrderState = reactive({
   orders: initial,
@@ -60,68 +87,35 @@ export function getStocktakeOrderById(id) {
 }
 
 export function canEditStocktake(order) {
-  const st = order?.status
-  return st === STOCKTAKE_STATUS.PENDING || st === STOCKTAKE_STATUS.PARTIAL
+  return normalizeStocktakeStatus(order?.status) === STOCKTAKE_STATUS.PENDING_APPROVAL
 }
 
 export function canDeleteStocktake(order) {
   if (!order || isStocktakeBusinessSource(order)) return false
   if (!isStocktakeManualSource(order)) return false
-  const hasConfirmed = (order.lineItems || []).some(
-    (l) => (l.lineStatus || '') === STOCKTAKE_STATUS.DONE,
-  )
-  if (hasConfirmed) return false
-  return order.status === STOCKTAKE_STATUS.PENDING || order.status === STOCKTAKE_STATUS.PARTIAL
+  return normalizeStocktakeStatus(order.status) === STOCKTAKE_STATUS.PENDING_APPROVAL
 }
 
-export function canConfirmStocktake(order) {
-  if (!canEditStocktake(order)) return false
-  return (order.lineItems || []).some((l) => {
-    const st = l.lineStatus || STOCKTAKE_STATUS.PENDING
-    return st !== STOCKTAKE_STATUS.DONE && st !== STOCKTAKE_STATUS.REFUSED
-  })
+/** 审核通过 */
+export function canApproveStocktake(order) {
+  return normalizeStocktakeStatus(order?.status) === STOCKTAKE_STATUS.PENDING_APPROVAL
 }
 
+/** 审核拒绝 */
 export function canRefuseStocktake(order) {
-  if (!order || order.status !== STOCKTAKE_STATUS.PENDING) return false
-  const lines = order.lineItems || []
-  if (!lines.length) return true
-  return lines.every((l) => (l.lineStatus || STOCKTAKE_STATUS.PENDING) !== STOCKTAKE_STATUS.DONE)
+  return normalizeStocktakeStatus(order?.status) === STOCKTAKE_STATUS.PENDING_APPROVAL
 }
 
-export function canRefuseStocktakeLine(order, line) {
-  if (!order || !line) return false
-  if (!canEditStocktake(order)) return false
-  const st = line.lineStatus || STOCKTAKE_STATUS.PENDING
-  return st !== STOCKTAKE_STATUS.DONE && st !== STOCKTAKE_STATUS.REFUSED
-}
-
-export function recomputeStocktakeOrderStatus(order, operator = 'admin1') {
-  if (!order) return
-  const lines = order.lineItems || []
-  if (!lines.length) {
-    if (order.status === STOCKTAKE_STATUS.PARTIAL) order.status = STOCKTAKE_STATUS.PENDING
-    return
-  }
-  const done = lines.filter((l) => (l.lineStatus || '') === STOCKTAKE_STATUS.DONE).length
-  const refused = lines.filter((l) => (l.lineStatus || '') === STOCKTAKE_STATUS.REFUSED).length
-  const pending = lines.length - done - refused
-
-  if (done === 0 && pending === 0) {
-    order.status = STOCKTAKE_STATUS.REFUSED
-    return
-  }
-  if (done === 0 && pending > 0) {
-    order.status = STOCKTAKE_STATUS.PENDING
-    return
-  }
-  if (pending === 0 && done === lines.length) {
-    order.status = STOCKTAKE_STATUS.DONE
-    order.confirmer = order.confirmer || operator
-    order.confirmedAt = order.confirmedAt || dayjs().format('YYYY-MM-DD HH:mm:ss')
-    return
-  }
-  order.status = STOCKTAKE_STATUS.PARTIAL
+/** 生成盘盈盘亏 / 重新过账 */
+export function canPostStocktake(order) {
+  if (!order) return false
+  const st = normalizeStocktakeStatus(order.status)
+  if (st !== STOCKTAKE_STATUS.APPROVED) return false
+  return (
+    order.postingStatus === STOCKTAKE_POSTING.PENDING ||
+    order.postingStatus === STOCKTAKE_POSTING.FAILED ||
+    !order.postingStatus
+  )
 }
 
 export function addStocktakeOrder(payload) {
@@ -143,7 +137,7 @@ export function addStocktakeOrder(payload) {
       bookQty,
       actualQty,
       diffQty,
-      lineStatus: l.lineStatus || STOCKTAKE_STATUS.PENDING,
+      lineStatus: STOCKTAKE_STATUS.PENDING_APPROVAL,
     })
   })
 
@@ -152,9 +146,12 @@ export function addStocktakeOrder(payload) {
     id: payload.id || `st-${Date.now()}`,
     docNo,
     warehouse,
+    stocktakeType: payload.stocktakeType || STOCKTAKE_TYPE.OTHER,
     lineItems,
     sourceChannel: payload.sourceChannel || STOCKTAKE_SOURCE.MANUAL,
-    status: STOCKTAKE_STATUS.PENDING,
+    status: STOCKTAKE_STATUS.PENDING_APPROVAL,
+    postingStatus: '',
+    postingError: '',
     createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   })
   stocktakeOrderState.orders.unshift(row)
@@ -177,7 +174,7 @@ export function updateStocktakeOrder(id, patch) {
         bookQty,
         actualQty,
         diffQty,
-        lineStatus: l.lineStatus || STOCKTAKE_STATUS.PENDING,
+        lineStatus: l.lineStatus || STOCKTAKE_STATUS.PENDING_APPROVAL,
       })
     })
   }
@@ -193,81 +190,104 @@ export function deleteStocktakeOrder(id) {
   return true
 }
 
-function attachLinkedDocs(order, line, postResult) {
-  if (postResult.inboundOrder?.id) {
-    if (!order.linkedInboundIds.includes(postResult.inboundOrder.id)) {
-      order.linkedInboundIds.push(postResult.inboundOrder.id)
-    }
-    if (
-      postResult.inboundOrder.docNo &&
-      !order.linkedInboundDocNos.includes(postResult.inboundOrder.docNo)
-    ) {
-      order.linkedInboundDocNos.push(postResult.inboundOrder.docNo)
-    }
-    line.linkedInboundId = postResult.inboundOrder.id
-    line.linkedInboundDocNo = postResult.inboundOrder.docNo
-  }
-  if (postResult.outbound?.id) {
-    if (!order.linkedOutboundIds.includes(postResult.outbound.id)) {
-      order.linkedOutboundIds.push(postResult.outbound.id)
-    }
-    if (
-      postResult.outbound.docNo &&
-      !order.linkedOutboundDocNos.includes(postResult.outbound.docNo)
-    ) {
-      order.linkedOutboundDocNos.push(postResult.outbound.docNo)
-    }
-    line.linkedOutboundId = postResult.outbound.id
-    line.linkedOutboundDocNo = postResult.outbound.docNo
-  }
+function mergeLinked(order, postResult) {
+  ;(postResult.linkedInboundIds || []).forEach((id) => {
+    if (!order.linkedInboundIds.includes(id)) order.linkedInboundIds.push(id)
+  })
+  ;(postResult.linkedInboundDocNos || []).forEach((no) => {
+    if (no && !order.linkedInboundDocNos.includes(no)) order.linkedInboundDocNos.push(no)
+  })
+  ;(postResult.linkedOutboundIds || []).forEach((id) => {
+    if (!order.linkedOutboundIds.includes(id)) order.linkedOutboundIds.push(id)
+  })
+  ;(postResult.linkedOutboundDocNos || []).forEach((no) => {
+    if (no && !order.linkedOutboundDocNos.includes(no)) order.linkedOutboundDocNos.push(no)
+  })
 }
 
-export function confirmStocktake(ids, { operator = 'admin1' } = {}) {
+function markPosted(order, operator) {
+  order.status = STOCKTAKE_STATUS.POSTED
+  order.postingStatus = STOCKTAKE_POSTING.SUCCESS
+  order.postingError = ''
+  order.confirmer = operator
+  order.confirmedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  order.postedAt = order.confirmedAt
+  ;(order.lineItems || []).forEach((l) => {
+    l.lineStatus = STOCKTAKE_STATUS.POSTED
+  })
+}
+
+function markPostFailed(order, message) {
+  order.status = STOCKTAKE_STATUS.APPROVED
+  order.postingStatus = STOCKTAKE_POSTING.FAILED
+  order.postingError = message || '过账失败'
+}
+
+/** 执行过账（生成盘盈盘亏并入账） */
+export function postStocktake(ids, { operator = 'admin1', force = false } = {}) {
   const blocked = []
   let count = 0
   ;(ids || []).forEach((id) => {
     const order = getStocktakeOrderById(id)
-    if (!canConfirmStocktake(order)) {
-      blocked.push({ docNo: order?.docNo || id, message: '当前状态不可确认' })
+    if (
+      !canPostStocktake(order) &&
+      normalizeStocktakeStatus(order?.status) !== STOCKTAKE_STATUS.APPROVED
+    ) {
+      blocked.push({ docNo: order?.docNo || id, message: '当前状态不可过账' })
       return
     }
-    const pending = (order.lineItems || []).filter((l) => {
-      const st = l.lineStatus || STOCKTAKE_STATUS.PENDING
-      return st !== STOCKTAKE_STATUS.DONE && st !== STOCKTAKE_STATUS.REFUSED
-    })
-    let okLines = 0
-    for (const line of pending) {
-      const res = postStocktakeLine(order, line, { operator })
-      if (!res.ok) {
-        blocked.push({ docNo: order.docNo, message: `${line.itemCode || line.id}: ${res.message}` })
-        continue
-      }
-      line.lineStatus = STOCKTAKE_STATUS.DONE
-      attachLinkedDocs(order, line, res)
-      okLines += 1
+    if (normalizeStocktakeStatus(order.status) === STOCKTAKE_STATUS.POSTED) {
+      blocked.push({ docNo: order.docNo, message: '已过账' })
+      return
     }
-    if (okLines > 0) {
-      recomputeStocktakeOrderStatus(order, operator)
-      count += 1
+    const res = postStocktakeOrder(order, { operator, force })
+    if (!res.ok) {
+      markPostFailed(order, res.message)
+      blocked.push({ docNo: order.docNo, message: res.message, postingFailed: true })
+      return
     }
+    mergeLinked(order, res)
+    markPosted(order, operator)
+    count += 1
   })
   return { count, blocked }
 }
 
-export function confirmStocktakeLine(orderId, lineId, { operator = 'admin1' } = {}) {
-  const order = getStocktakeOrderById(orderId)
-  const line = (order?.lineItems || []).find((l) => l.id === lineId)
-  if (!order || !line) return { ok: false, message: '明细不存在' }
-  if (!canConfirmStocktake(order)) return { ok: false, message: '当前状态不可确认' }
-  const st = line.lineStatus || STOCKTAKE_STATUS.PENDING
-  if (st === STOCKTAKE_STATUS.DONE) return { ok: false, message: '该明细已确认' }
-  if (st === STOCKTAKE_STATUS.REFUSED) return { ok: false, message: '该明细已拒绝' }
-  const res = postStocktakeLine(order, line, { operator })
-  if (!res.ok) return res
-  line.lineStatus = STOCKTAKE_STATUS.DONE
-  attachLinkedDocs(order, line, res)
-  recomputeStocktakeOrderStatus(order, operator)
-  return { ok: true, order, ...res }
+/** 审核通过；按配置自动过账 */
+export function approveStocktake(ids, { operator = 'admin1', force = false } = {}) {
+  const blocked = []
+  const posted = []
+  let count = 0
+  ;(ids || []).forEach((id) => {
+    const order = getStocktakeOrderById(id)
+    if (!canApproveStocktake(order)) {
+      blocked.push({ docNo: order?.docNo || id, message: '当前状态不可审核' })
+      return
+    }
+    order.status = STOCKTAKE_STATUS.APPROVED
+    order.postingStatus = STOCKTAKE_POSTING.PENDING
+    order.postingError = ''
+    order.approver = operator
+    order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    count += 1
+
+    if (!isStocktakeAutoPostOnApprove()) return
+
+    const res = postStocktakeOrder(order, { operator, force })
+    if (!res.ok) {
+      markPostFailed(order, res.message)
+      blocked.push({
+        docNo: order.docNo,
+        message: `审核通过，过账失败：${res.message}`,
+        postingFailed: true,
+      })
+      return
+    }
+    mergeLinked(order, res)
+    markPosted(order, operator)
+    posted.push(order.docNo)
+  })
+  return { count, blocked, posted }
 }
 
 export function refuseStocktake(ids, { reason = '', operator = 'admin1' } = {}) {
@@ -288,37 +308,28 @@ export function refuseStocktake(ids, { reason = '', operator = 'admin1' } = {}) 
     order.refuseReason = reasonText
     order.refusedBy = operator
     order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    order.postingStatus = ''
     ;(order.lineItems || []).forEach((line) => {
-      if ((line.lineStatus || '') !== STOCKTAKE_STATUS.DONE) {
-        line.lineStatus = STOCKTAKE_STATUS.REFUSED
-        line.refuseReason = reasonText
-      }
+      line.lineStatus = STOCKTAKE_STATUS.REFUSED
+      line.refuseReason = reasonText
     })
     count += 1
   })
   return { count, blocked }
 }
 
-export function refuseStocktakeLine(orderId, lineId, { reason = '', operator = 'admin1' } = {}) {
-  const order = getStocktakeOrderById(orderId)
-  const line = (order?.lineItems || []).find((l) => l.id === lineId)
-  if (!canRefuseStocktakeLine(order, line)) return { ok: false, message: '当前明细不可拒绝' }
-  const reasonText = String(reason || '').trim()
-  if (!reasonText) return { ok: false, message: '请填写拒绝理由' }
-  line.lineStatus = STOCKTAKE_STATUS.REFUSED
-  line.refuseReason = reasonText
-  order.refuseReason = reasonText
-  order.refusedBy = operator
-  order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-  recomputeStocktakeOrderStatus(order, operator)
-  return { ok: true, order }
+/** @deprecated 兼容旧调用：改为审核通过 */
+export function confirmStocktake(ids, options) {
+  return approveStocktake(ids, options)
 }
 
 export function filterStocktakeOrders(orders, filters = {}) {
   return (orders || []).filter((o) => {
+    const status = normalizeStocktakeStatus(o.status)
     if (filters.docNo && !String(o.docNo || '').includes(String(filters.docNo).trim())) return false
     if (filters.warehouse && o.warehouse !== filters.warehouse) return false
-    if (filters.status && o.status !== filters.status) return false
+    if (filters.status && status !== filters.status && o.status !== filters.status) return false
+    if (filters.stocktakeType && o.stocktakeType !== filters.stocktakeType) return false
     if (filters.applicant && !String(o.applicant || '').includes(String(filters.applicant).trim()))
       return false
     if (filters.dateRange?.length === 2) {

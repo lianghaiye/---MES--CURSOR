@@ -127,6 +127,14 @@
     />
 
     <a-switch
+      v-else-if="record.key === 'transferRequireInboundConfirm'"
+      :checked="transferRequireInboundConfirm"
+      checked-children="需要"
+      un-checked-children="自动"
+      @change="onTransferRequireInboundConfirmChange"
+    />
+
+    <a-switch
       v-else-if="record.displayOnly && record.controlType === 'switch'"
       :checked="Boolean(displayParams[displaySwitchKey(record)])"
       checked-children="开"
@@ -214,6 +222,8 @@ import {
   setBlankSizeAssistTools,
   isBomLevelMtsEnabled,
   setEnableBomLevelMts,
+  isTransferRequireInboundConfirm,
+  setTransferRequireInboundConfirm,
   getQcGatePolicyMap,
   setQcGatePolicyByBizScope,
   getDisplayParams,
@@ -231,6 +241,7 @@ const salesOutboundIssueRule = computed(() => getSalesOutboundIssueRule())
 const shipAttachmentDecideStage = computed(() => getShipAttachmentDecideStage())
 const dualUnitIssueStrategy = computed(() => getDualUnitIssueStrategy())
 const enableBomLevelMts = computed(() => isBomLevelMtsEnabled())
+const transferRequireInboundConfirm = computed(() => isTransferRequireInboundConfirm())
 
 const displayParams = computed(() => {
   void functionParamState.params.displayParams
@@ -301,6 +312,12 @@ function onEnableBomLevelMtsChange(checked) {
   toastSave(
     setEnableBomLevelMts(checked),
     checked ? '已开启生产计划 BOM 级 MTS' : '已关闭生产计划 BOM 级 MTS',
+  )
+}
+function onTransferRequireInboundConfirmChange(checked) {
+  toastSave(
+    setTransferRequireInboundConfirm(checked),
+    checked ? '已开启：调拨出库后需入库方签收' : '已关闭：调拨出库后自动入库完结',
   )
 }
 function onQcGatePolicyChange(scope, policy) {

@@ -539,7 +539,7 @@
       </template>
     </template>
 
-    <template #footer>
+    <template v-if="!(embedded && contentOnly)" #footer>
       <template v-if="embedded && !contentOnly">
         <a-button type="link" size="small" class="header-print-btn" @click="emit('print')">
           <PrinterOutlined />

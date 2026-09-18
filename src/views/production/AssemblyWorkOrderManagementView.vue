@@ -117,14 +117,19 @@
             >已选 {{ selectedIds.length }}</span
           >
           <div class="list-title-actions">
+            <a-radio-group
+              :value="layoutMode"
+              button-style="solid"
+              size="small"
+              class="layout-mode-switch"
+              @change="onLayoutModeChange"
+            >
+              <a-radio-button value="split">主从视图</a-radio-button>
+              <a-radio-button value="table">列表视图</a-radio-button>
+            </a-radio-group>
             <a-tooltip title="刷新">
               <a-button type="text" size="small" class="layout-toggle-btn" @click="handleSearch">
                 <ReloadOutlined />
-              </a-button>
-            </a-tooltip>
-            <a-tooltip title="切换为列表视图">
-              <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
-                <TableOutlined />
               </a-button>
             </a-tooltip>
           </div>
@@ -264,9 +269,10 @@
         :pagination="pagination"
         :selected-ids="selectedIds"
         :active-id="selectedId"
+        :layout-mode="layoutMode"
         column-settings-key="assembly-work-order-list-v3"
         @refresh="handleSearch"
-        @toggle-layout="toggleLayout"
+        @update:layout-mode="setLayoutMode"
         @select="onTableRowSelect"
         @action="handleTableAction"
         @update:pagination="onTablePaginationUpdate"
@@ -368,13 +374,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import {
-  DownOutlined,
-  EllipsisOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  TableOutlined,
-} from '@ant-design/icons-vue'
+import { DownOutlined, EllipsisOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   assemblyWorkOrderState,
   filterAssemblyWorkOrders,
@@ -624,15 +624,21 @@ function selectOrder(id) {
   selectedId.value = id
 }
 
-function toggleLayout() {
-  layoutMode.value = layoutMode.value === 'split' ? 'table' : 'split'
-  localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode.value)
-  if (layoutMode.value === 'split') {
+function setLayoutMode(mode) {
+  if (mode !== 'split' && mode !== 'table') return
+  if (layoutMode.value === mode) return
+  layoutMode.value = mode
+  localStorage.setItem(LAYOUT_STORAGE_KEY, mode)
+  if (mode === 'split') {
     detailDrawerOpen.value = false
   } else {
     pagination.current = 1
     if (pagination.pageSize > 20) pagination.pageSize = 10
   }
+}
+
+function onLayoutModeChange(e) {
+  setLayoutMode(e?.target?.value ?? e)
 }
 
 function onTableRowSelect(id) {
@@ -1216,7 +1222,7 @@ async function onScheduleBatchSubmit(payload) {
 <style lang="less" scoped>
 .work-order-page {
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }
@@ -1358,7 +1364,19 @@ async function onScheduleBatchSubmit(payload) {
       display: inline-flex;
       align-items: center;
       flex-shrink: 0;
-      gap: 0;
+      gap: 8px;
+
+      .layout-mode-switch {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .ant-radio-button-wrapper {
+        height: 28px;
+        line-height: 26px;
+        font-size: 13px;
+        padding-inline: 10px;
+      }
     }
 
     .layout-toggle-btn {
@@ -1388,28 +1406,30 @@ async function onScheduleBatchSubmit(payload) {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid #e8eef8;
   border-radius: 6px;
   padding: 6px 8px 6px 6px;
   margin-bottom: 6px;
   cursor: pointer;
-  background: #fff;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
   transition: all 0.2s;
-  border-left: 2px solid transparent;
+  border-left: 3px solid transparent;
+  box-sizing: border-box;
 
   &:hover {
-    border-color: #d6e4ff;
-    box-shadow: 0 1px 4px rgba(22, 119, 255, 0.08);
+    border-color: #91caff;
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.12);
   }
 
   &.active {
-    border-color: #91caff;
+    border-color: #1677ff;
     border-left-color: #1677ff;
-    background: #f0f7ff;
+    background: linear-gradient(180deg, #e6f4ff 0%, #f5faff 55%, #ffffff 100%);
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.16);
   }
 
   &.checked {
-    background: #fafcff;
+    border-color: #91caff;
   }
 
   .card-checkbox {

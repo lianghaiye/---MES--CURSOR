@@ -1,6 +1,6 @@
 <template>
   <div class="bom-material-table" :class="{ 'is-readonly': readonly }">
-    <div class="table-toolbar">
+    <div v-if="!hideToolbar" class="table-toolbar">
       <a-space :size="8" wrap class="toolbar-left">
         <span class="toolbar-title">物料清单</span>
         <template v-if="!readonly">
@@ -464,6 +464,8 @@ const props = defineProps({
   lineItems: { type: Array, default: () => [] },
   columnSettings: { type: Array, default: () => [] },
   readonly: { type: Boolean, default: false },
+  /** 外层已有区块标题时隐藏表内工具栏（含「物料清单」标题） */
+  hideToolbar: { type: Boolean, default: false },
   emptyVariant: { type: String, default: 'default' },
   hideSwitchProduct: { type: Boolean, default: false },
   /** 随货附件编辑：隐藏模板/按BOM，改为从其他附件导入 */

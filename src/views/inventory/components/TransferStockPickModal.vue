@@ -1,11 +1,12 @@
 <template>
   <a-modal
     :open="open"
-    title="选择调出仓库存"
-    width="1280px"
+    :title="title"
+    width="1360px"
     :mask-closable="false"
     destroy-on-close
     class="transfer-stock-pick-modal"
+    wrap-class-name="transfer-stock-pick-modal-wrap"
     @cancel="handleCancel"
   >
     <div class="filter-card">
@@ -192,12 +193,16 @@ import { lineVariantSummary } from '@/utils/spuLineResolve'
 const props = defineProps({
   open: { type: Boolean, default: false },
   warehouse: { type: String, default: '' },
+  /** 弹窗标题（盘点复用时传「选择盘点库存」） */
+  title: { type: String, default: '选择调出仓库存' },
+  /** 为 true 时账面/可选量不扣调拨软锁（盘点用） */
+  ignoreSoftLock: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
 
-/** 默认自由备货 */
-const ownershipTab = ref('free')
+/** 默认全部（自由备货 + 按单在库） */
+const ownershipTab = ref('all')
 const search = reactive(emptySearch())
 const applied = reactive(emptySearch())
 const selectedRowKeys = ref([])
@@ -243,7 +248,9 @@ const baseColumns = [
 ]
 
 const tableScrollX = computed(() => baseColumns.reduce((s, c) => s + (c.width || 90), 0))
-const tableScrollY = 360
+/** ant-table size=small 约 40px/行，保证默认 10 条无需纵向滚动 */
+const TABLE_BODY_ROW_H = 40
+const tableScrollY = TABLE_BODY_ROW_H * 10
 
 /** 当前页内按物料编码合并产品信息列 */
 function buildItemCodeRowSpans(rows = []) {
@@ -325,7 +332,9 @@ function buildFreeRows(wh) {
   codes.forEach((code) => {
     const free = sumFreeQty({ warehouse: wh, itemCode: code })
     const whQty = getWarehouseStockQty(wh, code)
-    const locked = getTransferSoftLockedQty({ warehouse: wh, itemCode: code })
+    const locked = props.ignoreSoftLock
+      ? 0
+      : getTransferSoftLockedQty({ warehouse: wh, itemCode: code })
     const base = free > 0 ? free : whQty
     const qty = Math.max(0, base - locked)
     if (!(qty > 0)) return
@@ -362,11 +371,13 @@ function buildDedicatedRows(wh) {
     .filter((b) => isDedicatedBatch(b))
     .map((b) => {
       const raw = Number(b.currentLength) || 0
-      const locked = getTransferSoftLockedQty({
-        warehouse: wh,
-        itemCode: b.itemCode,
-        batchId: b.id,
-      })
+      const locked = props.ignoreSoftLock
+        ? 0
+        : getTransferSoftLockedQty({
+            warehouse: wh,
+            itemCode: b.itemCode,
+            batchId: b.id,
+          })
       const qty = Math.max(0, raw - locked)
       if (!(qty > 0)) return null
       const meta = resolveItemMeta(b.itemCode, b)
@@ -521,7 +532,7 @@ function removeSelected(rowKey) {
 }
 
 function resetState() {
-  ownershipTab.value = 'free'
+  ownershipTab.value = 'all'
   Object.assign(search, emptySearch())
   Object.assign(applied, emptySearch())
   clearSelection()
@@ -559,21 +570,29 @@ function handleConfirm() {
 
 <style lang="less" scoped>
 .ownership-tabs {
-  margin-bottom: 8px;
+  margin: 0 0 8px !important;
+
+  :deep(> .ant-tabs-nav) {
+    margin: 0 !important;
+  }
+
+  :deep(> .ant-tabs-content-holder) {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 0 !important;
+  }
 }
 
 .picker-body {
   display: flex;
+  align-items: stretch;
   gap: 12px;
-  height: 480px;
-  max-height: calc(86vh - 260px);
-  min-height: 420px;
 }
 
 .table-panel {
   flex: 1;
   min-width: 0;
-  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -588,7 +607,7 @@ function handleConfirm() {
 .selected-panel {
   width: 260px;
   flex-shrink: 0;
-  height: 100%;
+  align-self: stretch;
   min-height: 0;
   border: 1px solid #f0f0f0;
   border-radius: 4px;
@@ -681,5 +700,19 @@ function handleConfirm() {
   align-items: center;
   justify-content: center;
   padding: 24px 0;
+}
+</style>
+
+<style lang="less">
+.transfer-stock-pick-modal-wrap {
+  .ant-modal {
+    top: 40px;
+    padding-bottom: 0;
+  }
+
+  .ant-modal-body {
+    max-height: calc(100vh - 120px);
+    overflow: auto;
+  }
 }
 </style>

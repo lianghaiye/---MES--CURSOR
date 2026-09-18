@@ -859,6 +859,7 @@ function submit() {
 <style lang="less" scoped>
 .ecn-create-page {
   margin: -12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 112px);

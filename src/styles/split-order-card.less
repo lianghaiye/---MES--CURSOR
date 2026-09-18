@@ -1,0 +1,26 @@
+/**
+ * 卡片视图（master-detail）左侧列表卡片渐变
+ * 基准：WorkOrderManagementView.vue `.order-card`
+ */
+.order-card-split-gradient() {
+  border-color: #e8eef8;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
+  border-left: 3px solid transparent;
+  box-sizing: border-box;
+
+  &:hover {
+    border-color: #91caff;
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.12);
+  }
+
+  &.active {
+    border-color: #1677ff;
+    border-left-color: #1677ff;
+    background: linear-gradient(180deg, #e6f4ff 0%, #f5faff 55%, #ffffff 100%);
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.16);
+  }
+
+  &.checked {
+    border-color: #91caff;
+  }
+}

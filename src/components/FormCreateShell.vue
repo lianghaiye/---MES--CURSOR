@@ -89,8 +89,8 @@ const props = defineProps({
   open: { type: Boolean, default: false },
   title: { type: String, default: '' },
   width: { type: [String, Number], default: '720px' },
-  /** 页面模式左右内边距，默认 12 */
-  pageSidePadding: { type: [String, Number], default: 12 },
+  /** 页面模式左右内边距；默认 0，与 GlobalTabs / 内容白盒左缘对齐（勿再叠一层 12） */
+  pageSidePadding: { type: [String, Number], default: 0 },
   maskClosable: { type: Boolean, default: false },
   destroyOnClose: { type: Boolean, default: true },
 })
@@ -215,6 +215,7 @@ const innerStyle = computed(() => {
 
 .form-detail-page {
   margin: -12px;
+  padding: 12px;
   height: calc(100vh - 112px);
   max-height: calc(100vh - 112px);
   min-height: 0;
@@ -233,12 +234,12 @@ const innerStyle = computed(() => {
 }
 
 .page-header.is-detail {
-  border: none;
-  border-bottom: 1px solid #f0f0f0;
-  border-radius: 0;
-  margin-bottom: 0;
-  padding: 10px 12px;
+  border: 1px solid #e8eef8;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
   position: static;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
 
   .header-left {
     gap: 8px;
@@ -255,22 +256,26 @@ const innerStyle = computed(() => {
 .tab-body {
   flex: 1;
   min-height: 0;
-  padding: 8px 12px 16px;
+  padding: 12px 0 16px;
   overflow: auto;
 }
 
 .form-create-page {
+  /* 抵消 page-content 的 12px padding；本层 padding 12 后与 GlobalTabs（margin 24）左缘对齐 */
   margin: -12px;
-  padding: 0 0 24px;
+  padding: 12px 12px 24px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
+  box-sizing: border-box;
 }
 
-/* 全宽大盒子：标题栏与下方分区白盒同宽 */
 .form-create-inner {
   width: 100%;
-  margin: 12px 0 0;
+  margin: 0;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .page-header {
@@ -278,13 +283,14 @@ const innerStyle = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-  margin-bottom: 12px;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
+  border: 1px solid #e8eef8;
+  border-radius: 8px;
+  margin-bottom: 0;
   position: sticky;
   top: 0;
   z-index: 30;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .header-left {
@@ -322,13 +328,24 @@ const innerStyle = computed(() => {
 
 .form-body {
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  :deep(.form-layout) {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
 
   :deep(.section-block) {
     background: #fff;
-    border-radius: 6px;
-    padding: 16px;
-    margin-bottom: 12px;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 0;
+    border: 1px solid #e5e6eb;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    flex: none;
 
     .section-title {
       font-size: 14px;

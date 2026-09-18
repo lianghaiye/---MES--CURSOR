@@ -139,7 +139,6 @@
                 :rows="2"
                 :maxlength="200"
                 show-count
-                size="small"
                 placeholder="请输入 备注"
               />
             </a-form-item>

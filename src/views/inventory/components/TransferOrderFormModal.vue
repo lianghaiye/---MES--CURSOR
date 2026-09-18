@@ -73,6 +73,7 @@
       </div>
 
       <div class="section-block section-block--lines">
+        <div class="section-title">调拨清单</div>
         <div class="line-toolbar">
           <a-space>
             <a-button
@@ -84,20 +85,28 @@
               <PlusOutlined />
               从库存添加
             </a-button>
-            <span class="hint">默认自由备货；按单在库请在弹窗 TAB 中切换选择</span>
+            <span class="hint">默认展示全部库存；可按「自由备货 / 按单在库」筛选</span>
           </a-space>
         </div>
         <a-table
-          :columns="lineColumns"
-          :data-source="form.lineItems"
+          :columns="displayColumns"
+          :data-source="displayLines"
           row-key="id"
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 960, y: 360 }"
+          :scroll="{ x: 1280, y: 360 }"
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+            <template v-else-if="column.key === 'ownership'">
+              <a-tag :color="isDedicatedLine(record) ? 'orange' : 'blue'">
+                {{ isDedicatedLine(record) ? '按单' : '自由' }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'stockQty'">
+              {{ formatStockQty(record) }}
+            </template>
             <template v-else-if="column.key === 'qty'">
               <a-input-number
                 v-model:value="record.qty"
@@ -107,16 +116,14 @@
                 style="width: 100%"
               />
             </template>
-            <template v-else-if="column.key === 'batchNo'">
-              {{
-                record.batchNo || (record.salesOrderNo ? `按单 ${record.salesOrderNo}` : '自由备货')
-              }}
+            <template v-else-if="column.key === 'salesOrderNo'">
+              {{ isDedicatedLine(record) ? record.salesOrderNo || '—' : '—' }}
             </template>
             <template v-else-if="column.key === 'action'">
               <a class="danger-link" @click="removeLine(record.id)">删除</a>
             </template>
             <template v-else>
-              {{ record[column.dataIndex] ?? '—' }}
+              {{ displayCell(record[column.dataIndex]) }}
             </template>
           </template>
         </a-table>
@@ -155,6 +162,12 @@ import {
   updateTransferOrder,
   saveAndConfirmTransfer,
 } from '@/store/transferOrderStore'
+import {
+  isDedicatedInventoryLine,
+  sortInventoryLinesByItemCode,
+  buildItemCodeRowSpans,
+  withProductMergeColumns,
+} from '@/utils/inventoryLineMerge'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -193,16 +206,46 @@ const form = reactive({
 const warehouseOpts = computed(() => getWarehouseSelectOptions())
 
 const lineColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center' },
-  { title: '物品编码', dataIndex: 'itemCode', width: 120 },
-  { title: '物品名称', dataIndex: 'itemName', width: 140 },
-  { title: '规格', dataIndex: 'specModel', width: 100 },
-  { title: '单位', dataIndex: 'unit', width: 64 },
-  { title: '账面', dataIndex: 'bookQty', width: 88, align: 'right' },
-  { title: '调拨数量', key: 'qty', width: 110 },
-  { title: '批次/归属', key: 'batchNo', width: 140 },
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '归属', key: 'ownership', width: 72, align: 'center' },
+  { title: '产品名称', key: 'itemName', dataIndex: 'itemName', width: 140, ellipsis: true },
+  { title: '编码', key: 'itemCode', dataIndex: 'itemCode', width: 130, ellipsis: true },
+  { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', key: 'material', dataIndex: 'material', width: 80, ellipsis: true },
+  {
+    title: '变体属性',
+    key: 'variantSummary',
+    dataIndex: 'variantSummary',
+    width: 120,
+    ellipsis: true,
+  },
+  { title: '当前库存数量', key: 'stockQty', width: 120, align: 'right' },
+  { title: '调拨数量', key: 'qty', width: 120 },
+  { title: '销售单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '操作', key: 'action', width: 72, fixed: 'right' },
 ]
+
+const displayLines = computed(() => sortInventoryLinesByItemCode(form.lineItems))
+const lineRowSpans = computed(() => buildItemCodeRowSpans(displayLines.value))
+const displayColumns = computed(() => withProductMergeColumns(lineColumns, lineRowSpans.value))
+
+function isDedicatedLine(record) {
+  return isDedicatedInventoryLine(record)
+}
+
+function displayCell(val) {
+  const t = String(val ?? '').trim()
+  return t || '—'
+}
+
+function formatStockQty(record) {
+  const qty = record?.bookQty
+  if (qty == null || qty === '') return '—'
+  const n = Number(qty)
+  const q = Number.isFinite(n) ? n : qty
+  const unit = String(record?.unit || '').trim()
+  return unit ? `${q} ${unit}` : String(q)
+}
 
 function resetForm() {
   Object.assign(form, {
@@ -266,6 +309,7 @@ function onPickerConfirm(rows) {
         itemType: row.itemType || '物料',
         specModel: row.specModel || '',
         material: row.material || '',
+        variantSummary: row.variantSummary || '',
         unit: row.unit,
         bookQty: row.qty,
         qty: row.qty,

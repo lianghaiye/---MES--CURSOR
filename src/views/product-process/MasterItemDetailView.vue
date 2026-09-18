@@ -464,6 +464,7 @@ function handleBack() {
 <style lang="less" scoped>
 .product-master-detail-page {
   margin: -12px;
+  padding: 12px;
   height: calc(100vh - 112px);
   max-height: calc(100vh - 112px);
   min-height: 0;
@@ -485,7 +486,7 @@ function handleBack() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 12px 16px;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
 }
@@ -516,7 +517,7 @@ function handleBack() {
 .tab-body {
   flex: 1;
   min-height: 0;
-  padding: 8px 12px 16px;
+  padding: 12px 0 16px;
   overflow: auto;
 }
 

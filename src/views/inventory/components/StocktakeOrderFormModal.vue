@@ -47,11 +47,21 @@
               </a-form-item>
             </a-col>
             <a-col :span="8">
+              <a-form-item label="盘点类型" required>
+                <a-select
+                  v-model:value="form.stocktakeType"
+                  size="small"
+                  placeholder="请选择"
+                  :options="typeOpts"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
               <a-form-item label="申请人">
                 <a-input v-model:value="form.applicant" size="small" />
               </a-form-item>
             </a-col>
-            <a-col :span="16">
+            <a-col :span="8">
               <a-form-item label="备注">
                 <a-input v-model:value="form.remark" size="small" />
               </a-form-item>
@@ -60,27 +70,39 @@
         </a-form>
       </div>
 
-      <div class="section-block">
+      <div class="section-block section-block--lines">
+        <div class="section-title">盘点清单</div>
         <div class="line-toolbar">
-          <a-space>
+          <a-space wrap>
             <a-button type="primary" size="small" :disabled="!form.warehouse" @click="openPicker">
               <PlusOutlined />
               从库存添加
             </a-button>
-            <span class="hint">带入账面后填写实盘数量；差异 = 实盘 − 账面</span>
+            <a-button size="small" :disabled="!form.warehouse" @click="loadWarehouseStock">
+              加载本仓库存
+            </a-button>
+            <span class="hint">默认自由+按单分行；实盘默认同账面，差异 = 实盘 − 账面</span>
           </a-space>
         </div>
         <a-table
-          :columns="lineColumns"
-          :data-source="form.lineItems"
+          :columns="displayColumns"
+          :data-source="displayLines"
           row-key="id"
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1000, y: 360 }"
+          :scroll="{ x: 1400 }"
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+            <template v-else-if="column.key === 'ownership'">
+              <a-tag :color="isDedicated(record) ? 'orange' : 'blue'">
+                {{ isDedicated(record) ? '按单' : '自由' }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'bookQty'">
+              {{ formatBookQty(record) }}
+            </template>
             <template v-else-if="column.key === 'actualQty'">
               <a-input-number
                 v-model:value="record.actualQty"
@@ -96,14 +118,14 @@
                 {{ record.diffQty }}
               </span>
             </template>
-            <template v-else-if="column.key === 'batchNo'">
-              {{ record.batchNo || (record.salesOrderNo ? `按单 ${record.salesOrderNo}` : '—') }}
+            <template v-else-if="column.key === 'salesOrderNo'">
+              {{ isDedicated(record) ? record.salesOrderNo || '—' : '—' }}
             </template>
             <template v-else-if="column.key === 'action'">
               <a class="danger-link" @click="removeLine(record.id)">删除</a>
             </template>
             <template v-else>
-              {{ record[column.dataIndex] ?? '—' }}
+              {{ displayCell(record[column.dataIndex]) }}
             </template>
           </template>
         </a-table>
@@ -119,33 +141,13 @@
     </template>
   </FormCreateShell>
 
-  <a-modal
+  <TransferStockPickModal
     v-model:open="pickerOpen"
     title="选择盘点库存"
-    width="860px"
-    ok-text="添加"
-    @ok="confirmPicker"
-  >
-    <a-space style="margin-bottom: 8px">
-      <a-checkbox v-model:checked="includeDedicated">含按单在库批次</a-checkbox>
-      <a-input
-        v-model:value="pickerKeyword"
-        size="small"
-        allow-clear
-        placeholder="编码/名称"
-        style="width: 200px"
-      />
-    </a-space>
-    <a-table
-      :columns="pickerColumns"
-      :data-source="pickerRows"
-      row-key="rowKey"
-      size="small"
-      :pagination="{ pageSize: 8 }"
-      :row-selection="pickerSelection"
-      :scroll="{ y: 360 }"
-    />
-  </a-modal>
+    :warehouse="form.warehouse"
+    ignore-soft-lock
+    @confirm="onPickerConfirm"
+  />
 </template>
 
 <script setup>
@@ -155,12 +157,22 @@ import dayjs from 'dayjs'
 import { CheckOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
+import TransferStockPickModal from '@/views/inventory/components/TransferStockPickModal.vue'
 import { getWarehouseSelectOptions } from '@/store/warehouseStore'
 import { stockState } from '@/store/stockStore'
 import { listBatches, listFreeBatches, sumFreeQty } from '@/store/stockBatchStore'
 import { createStocktakeLine } from '@/mock/stocktakeOrders'
+import { STOCKTAKE_TYPE, stocktakeTypeOptions } from '@/mock/stocktakeOptions'
 import { addStocktakeOrder, updateStocktakeOrder } from '@/store/stocktakeOrderStore'
 import { getWarehouseStockQty } from '@/utils/inboundLineHelpers'
+import { findMasterItemByCode } from '@/utils/stockAlertDisplay'
+import { lineVariantSummary } from '@/utils/spuLineResolve'
+import {
+  isDedicatedInventoryLine,
+  sortInventoryLinesByItemCode,
+  buildItemCodeRowSpans,
+  withProductMergeColumns,
+} from '@/utils/inventoryLineMerge'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -185,112 +197,150 @@ const {
 
 const saving = ref(false)
 const pickerOpen = ref(false)
-const includeDedicated = ref(false)
-const pickerKeyword = ref('')
-const selectedPickerKeys = ref([])
 
 const form = reactive({
   docNo: '',
   warehouse: undefined,
   stocktakeDate: dayjs().format('YYYY-MM-DD'),
+  stocktakeType: STOCKTAKE_TYPE.OTHER,
   applicant: 'admin1',
   remark: '',
   lineItems: [],
 })
 
 const warehouseOpts = computed(() => getWarehouseSelectOptions())
+const typeOpts = stocktakeTypeOptions.map((v) => ({ label: v, value: v }))
 
 const lineColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center' },
-  { title: '物品编码', dataIndex: 'itemCode', width: 120 },
-  { title: '物品名称', dataIndex: 'itemName', width: 140 },
-  { title: '单位', dataIndex: 'unit', width: 64 },
-  { title: '账面', dataIndex: 'bookQty', width: 88, align: 'right' },
-  { title: '实盘', key: 'actualQty', width: 110 },
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '归属', key: 'ownership', width: 72, align: 'center' },
+  { title: '产品名称', key: 'itemName', dataIndex: 'itemName', width: 140, ellipsis: true },
+  { title: '编码', key: 'itemCode', dataIndex: 'itemCode', width: 130, ellipsis: true },
+  { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', key: 'material', dataIndex: 'material', width: 80, ellipsis: true },
+  {
+    title: '变体属性',
+    key: 'variantSummary',
+    dataIndex: 'variantSummary',
+    width: 120,
+    ellipsis: true,
+  },
+  { title: '当前账面数量', key: 'bookQty', width: 120, align: 'right' },
+  { title: '实盘', key: 'actualQty', width: 120 },
   { title: '差异', key: 'diffQty', width: 88, align: 'right' },
-  { title: '批次/归属', key: 'batchNo', width: 140 },
+  { title: '销售单号', key: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '操作', key: 'action', width: 72, fixed: 'right' },
 ]
 
-const pickerColumns = [
-  { title: '编码', dataIndex: 'itemCode', width: 120 },
-  { title: '名称', dataIndex: 'itemName', width: 140 },
-  { title: '账面', dataIndex: 'qty', width: 90, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 64 },
-  { title: '批次', dataIndex: 'batchNo', width: 120 },
-  { title: '销售单', dataIndex: 'salesOrderNo', width: 120 },
-]
+const displayLines = computed(() => sortInventoryLinesByItemCode(form.lineItems))
+const lineRowSpans = computed(() => buildItemCodeRowSpans(displayLines.value))
+const displayColumns = computed(() => withProductMergeColumns(lineColumns, lineRowSpans.value))
 
-const pickerRows = computed(() => {
-  const wh = form.warehouse
-  if (!wh) return []
-  const kw = String(pickerKeyword.value || '')
-    .trim()
-    .toLowerCase()
-  const rows = []
+function isDedicated(record) {
+  return isDedicatedInventoryLine(record)
+}
 
-  if (includeDedicated.value) {
-    listBatches({ warehouse: wh, inStockOnly: true }).forEach((b) => {
-      const qty = Number(b.currentLength) || 0
-      if (!(qty > 0)) return
-      rows.push({
-        rowKey: `b-${b.id}`,
-        itemCode: b.itemCode,
-        itemName: b.itemName,
-        qty,
-        unit: b.unit || '件',
-        batchId: b.id,
-        batchNo: b.batchNo,
-        salesOrderId: b.salesOrderId || '',
-        salesOrderNo: b.salesOrderNo || '',
-        salesLineId: b.salesLineId || '',
-      })
-    })
-  } else {
-    const codes = new Set()
-    listFreeBatches({ warehouse: wh }).forEach((b) => codes.add(b.itemCode))
-    ;(stockState.records || []).forEach((r) => {
-      if (r.warehouse === wh && r.itemCode) codes.add(r.itemCode)
-    })
-    codes.forEach((code) => {
-      const free = sumFreeQty({ warehouse: wh, itemCode: code })
-      const whQty = getWarehouseStockQty(wh, code)
-      const qty = free > 0 ? free : whQty
-      if (!(qty > 0)) return
-      const sample = listFreeBatches({ warehouse: wh, itemCode: code })[0]
-      const name =
-        sample?.itemName ||
-        stockState.records.find((r) => r.warehouse === wh && r.itemCode === code)?.itemName ||
-        code
-      rows.push({
-        rowKey: `f-${code}`,
-        itemCode: code,
-        itemName: name,
-        qty,
-        unit: sample?.unit || '件',
-        batchId: '',
-        batchNo: '',
-        salesOrderId: '',
-        salesOrderNo: '',
-        salesLineId: '',
-      })
-    })
+function displayCell(val) {
+  const t = String(val ?? '').trim()
+  return t || '—'
+}
+
+function formatBookQty(record) {
+  const qty = record?.bookQty
+  if (qty == null || qty === '') return '—'
+  const n = Number(qty)
+  const q = Number.isFinite(n) ? n : qty
+  const unit = String(record?.unit || '').trim()
+  return unit ? `${q} ${unit}` : String(q)
+}
+
+function resolveItemMeta(itemCode, batch) {
+  const hit = findMasterItemByCode(itemCode)
+  const master = hit?.item || {}
+  const attrs = batch?.attrs || {}
+  return {
+    itemName: batch?.itemName || master.name || itemCode,
+    unit: batch?.unit || master.inventoryUnit || master.stockUnit || '件',
+    specModel: attrs.specModel || attrs.spec || master.specModel || master.spec || '',
+    material: attrs.material || master.material || '',
+    variantSummary:
+      attrs.variantSummary ||
+      lineVariantSummary({
+        spuId: master.spuId || batch?.spuId,
+        variantValues: master.variantValues || attrs.variantValues || batch?.variantValues || {},
+      }) ||
+      master.variantSummary ||
+      '',
+    itemType: hit?.kind === 'product' ? '产品' : master.itemType || '物料',
+    locationNo: batch?.locationNo || attrs.locationNo || '',
   }
+}
 
-  return rows.filter((r) => {
-    if (!kw) return true
-    return (
-      String(r.itemCode).toLowerCase().includes(kw) || String(r.itemName).toLowerCase().includes(kw)
-    )
+/** 加载本仓：自由+按单分行（账面不扣软锁） */
+function buildStockRows(wh) {
+  const rows = []
+  const codes = new Set()
+  listFreeBatches({ warehouse: wh }).forEach((b) => {
+    if (!(b.salesOrderId || b.salesOrderNo)) codes.add(b.itemCode)
   })
-})
+  ;(stockState.records || []).forEach((r) => {
+    if (r.warehouse === wh && r.itemCode) codes.add(r.itemCode)
+  })
+  codes.forEach((code) => {
+    const free = sumFreeQty({ warehouse: wh, itemCode: code })
+    const whQty = getWarehouseStockQty(wh, code)
+    const qty = free > 0 ? free : whQty
+    if (!(qty > 0)) return
+    const sample = listFreeBatches({ warehouse: wh, itemCode: code }).find(
+      (b) => !(b.salesOrderId || b.salesOrderNo),
+    )
+    const meta = resolveItemMeta(code, sample)
+    rows.push({
+      rowKey: `f-${code}`,
+      itemCode: code,
+      itemName: meta.itemName,
+      qty,
+      unit: meta.unit,
+      batchId: '',
+      batchNo: '',
+      salesOrderId: '',
+      salesOrderNo: '',
+      salesLineId: '',
+      dedicated: false,
+      specModel: meta.specModel,
+      material: meta.material,
+      variantSummary: meta.variantSummary,
+      itemType: meta.itemType,
+      locationNo: meta.locationNo,
+    })
+  })
 
-const pickerSelection = computed(() => ({
-  selectedRowKeys: selectedPickerKeys.value,
-  onChange: (keys) => {
-    selectedPickerKeys.value = keys
-  },
-}))
+  listBatches({ warehouse: wh, inStockOnly: true }).forEach((b) => {
+    if (!(b.salesOrderId || b.salesOrderNo)) return
+    const qty = Number(b.currentLength) || 0
+    if (!(qty > 0)) return
+    const meta = resolveItemMeta(b.itemCode, b)
+    rows.push({
+      rowKey: `b-${b.id}`,
+      itemCode: b.itemCode,
+      itemName: meta.itemName,
+      qty,
+      unit: meta.unit,
+      batchId: b.id,
+      batchNo: b.batchNo || '',
+      salesOrderId: b.salesOrderId || '',
+      salesOrderNo: b.salesOrderNo || '',
+      salesLineId: b.salesLineId || '',
+      dedicated: true,
+      specModel: meta.specModel,
+      material: meta.material,
+      variantSummary: meta.variantSummary,
+      itemType: meta.itemType,
+      locationNo: meta.locationNo,
+    })
+  })
+  return rows
+}
 
 function syncDiff(record) {
   const book = Number(record.bookQty) || 0
@@ -303,6 +353,7 @@ function resetForm() {
     docNo: '',
     warehouse: undefined,
     stocktakeDate: dayjs().format('YYYY-MM-DD'),
+    stocktakeType: STOCKTAKE_TYPE.OTHER,
     applicant: 'admin1',
     remark: '',
     lineItems: [],
@@ -314,6 +365,7 @@ function loadEdit(record) {
     docNo: record.docNo || '',
     warehouse: record.warehouse,
     stocktakeDate: record.stocktakeDate || dayjs().format('YYYY-MM-DD'),
+    stocktakeType: record.stocktakeType || STOCKTAKE_TYPE.OTHER,
     applicant: record.applicant || 'admin1',
     remark: record.remark || '',
     lineItems: (record.lineItems || []).map((l) => createStocktakeLine({ ...l })),
@@ -339,36 +391,60 @@ function openPicker() {
     message.warning('请先选择盘点仓库')
     return
   }
-  selectedPickerKeys.value = []
   pickerOpen.value = true
 }
 
-function confirmPicker() {
-  const map = new Map(pickerRows.value.map((r) => [r.rowKey, r]))
-  selectedPickerKeys.value.forEach((key) => {
-    const row = map.get(key)
-    if (!row) return
-    const exists = form.lineItems.some(
-      (l) => l.itemCode === row.itemCode && (l.batchId || '') === (row.batchId || ''),
-    )
-    if (exists) return
-    form.lineItems.push(
-      createStocktakeLine({
-        itemCode: row.itemCode,
-        itemName: row.itemName,
-        unit: row.unit,
-        bookQty: row.qty,
-        actualQty: row.qty,
-        diffQty: 0,
-        batchId: row.batchId || '',
-        batchNo: row.batchNo || '',
-        salesOrderId: row.salesOrderId || '',
-        salesOrderNo: row.salesOrderNo || '',
-        salesLineId: row.salesLineId || '',
-      }),
-    )
+function pushStockRow(row) {
+  const exists = form.lineItems.some(
+    (l) =>
+      l.itemCode === row.itemCode &&
+      (l.batchId || '') === (row.batchId || '') &&
+      (l.salesOrderNo || '') === (row.salesOrderNo || ''),
+  )
+  if (exists) return false
+  form.lineItems.push(
+    createStocktakeLine({
+      itemCode: row.itemCode,
+      itemName: row.itemName,
+      itemType: row.itemType || '物料',
+      specModel: row.specModel || '',
+      material: row.material || '',
+      variantSummary: row.variantSummary || '',
+      unit: row.unit,
+      bookQty: row.qty,
+      actualQty: row.qty,
+      diffQty: 0,
+      batchId: row.batchId || '',
+      batchNo: row.batchNo || '',
+      salesOrderId: row.salesOrderId || '',
+      salesOrderNo: row.salesOrderNo || '',
+      salesLineId: row.salesLineId || '',
+      locationNo: row.locationNo || '',
+      dedicated: Boolean(row.dedicated),
+    }),
+  )
+  return true
+}
+
+function onPickerConfirm(rows) {
+  let n = 0
+  ;(rows || []).forEach((row) => {
+    if (pushStockRow(row)) n += 1
   })
-  pickerOpen.value = false
+  if (n) message.success(`已添加 ${n} 行`)
+}
+
+function loadWarehouseStock() {
+  if (!form.warehouse) {
+    message.warning('请先选择盘点仓库')
+    return
+  }
+  const rows = buildStockRows(form.warehouse)
+  let n = 0
+  rows.forEach((row) => {
+    if (pushStockRow(row)) n += 1
+  })
+  message.success(n ? `已加载 ${n} 行本仓库存` : '无可加载库存或均已在清单中')
 }
 
 function removeLine(id) {
@@ -376,12 +452,17 @@ function removeLine(id) {
 }
 
 function handleSave() {
+  if (!form.stocktakeType) {
+    message.warning('请选择盘点类型')
+    return
+  }
   saving.value = true
   form.lineItems.forEach(syncDiff)
   const payload = {
     docNo: form.docNo,
     warehouse: form.warehouse,
     stocktakeDate: form.stocktakeDate,
+    stocktakeType: form.stocktakeType,
     applicant: form.applicant,
     remark: form.remark,
     lineItems: form.lineItems,
@@ -409,8 +490,13 @@ function handleSave() {
 .section-block {
   background: #fff;
   border-radius: 6px;
-  padding: 16px;
+  padding: 12px;
+  margin-bottom: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  flex: none;
+}
+.section-block--lines {
+  flex: none;
 }
 .section-title {
   font-size: 14px;
@@ -418,7 +504,7 @@ function handleSave() {
   margin-bottom: 12px;
 }
 .line-toolbar {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 .hint {
   font-size: 12px;

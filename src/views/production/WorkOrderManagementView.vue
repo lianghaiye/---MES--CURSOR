@@ -118,14 +118,18 @@
         </a-button>
       </a-space>
       <div class="split-action-right">
+        <a-radio-group
+          :value="layoutMode"
+          button-style="solid"
+          class="layout-mode-switch"
+          @change="onLayoutModeChange"
+        >
+          <a-radio-button value="split">主从视图</a-radio-button>
+          <a-radio-button value="table">列表视图</a-radio-button>
+        </a-radio-group>
         <a-tooltip title="刷新">
-          <a-button type="text" size="small" class="layout-toggle-btn" @click="handleSearch">
+          <a-button type="text" class="layout-toggle-btn" @click="handleSearch">
             <ReloadOutlined />
-          </a-button>
-        </a-tooltip>
-        <a-tooltip title="切换为列表视图">
-          <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
-            <TableOutlined />
           </a-button>
         </a-tooltip>
       </div>
@@ -283,9 +287,10 @@
         :pagination="pagination"
         :selected-ids="selectedIds"
         :active-id="selectedId"
+        :layout-mode="layoutMode"
         column-settings-key="work-order-list-v3"
         @refresh="handleSearch"
-        @toggle-layout="toggleLayout"
+        @update:layout-mode="setLayoutMode"
         @select="onTableRowSelect"
         @action="handleTableAction"
         @update:pagination="onTablePaginationUpdate"
@@ -398,7 +403,6 @@ import {
   PlusOutlined,
   PrinterOutlined,
   ReloadOutlined,
-  TableOutlined,
 } from '@ant-design/icons-vue'
 import {
   workOrderState,
@@ -649,15 +653,21 @@ function selectOrder(id) {
   selectedId.value = id
 }
 
-function toggleLayout() {
-  layoutMode.value = layoutMode.value === 'split' ? 'table' : 'split'
-  localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode.value)
-  if (layoutMode.value === 'split') {
+function setLayoutMode(mode) {
+  if (mode !== 'split' && mode !== 'table') return
+  if (layoutMode.value === mode) return
+  layoutMode.value = mode
+  localStorage.setItem(LAYOUT_STORAGE_KEY, mode)
+  if (mode === 'split') {
     detailDrawerOpen.value = false
   } else {
     pagination.current = 1
     if (pagination.pageSize > 20) pagination.pageSize = 10
   }
+}
+
+function onLayoutModeChange(e) {
+  setLayoutMode(e?.target?.value ?? e)
 }
 
 function onTableRowSelect(id) {
@@ -1253,9 +1263,10 @@ async function onScheduleBatchSubmit(payload) {
 </script>
 
 <style lang="less" scoped>
+@import '@/styles/split-order-card.less';
 .work-order-page {
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }
@@ -1269,60 +1280,8 @@ async function onScheduleBatchSubmit(payload) {
 }
 
 .filter-card {
-  padding: 8px 12px 6px;
-  margin-bottom: 8px;
-}
-
-.split-action-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: #fff;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  box-sizing: border-box;
-  min-height: 44px;
-
-  .split-action-left {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-
-  .split-action-right {
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-    margin-left: auto;
-    gap: 0;
-  }
-
-  :deep(.ant-space) {
-    align-items: center;
-  }
-
-  :deep(.ant-space-item) {
-    display: inline-flex;
-    align-items: center;
-  }
-
-  :deep(.ant-btn) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .layout-toggle-btn {
-    color: rgba(0, 0, 0, 0.45);
-
-    &:hover {
-      color: #1677ff;
-    }
-  }
+  padding: 12px 16px;
+  margin-bottom: 12px;
 }
 
 .filter-footer {
@@ -1418,9 +1377,9 @@ async function onScheduleBatchSubmit(payload) {
 }
 
 .list-card {
-  width: 22%;
-  min-width: 220px;
-  max-width: 268px;
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1430,7 +1389,7 @@ async function onScheduleBatchSubmit(payload) {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 10px 6px;
+    padding: 8px 12px 6px;
     border-bottom: 1px solid #f0f0f0;
 
     .selected-count {
@@ -1448,7 +1407,7 @@ async function onScheduleBatchSubmit(payload) {
   .list-body {
     flex: 1;
     overflow-y: auto;
-    padding: 6px;
+    padding: 8px;
   }
 
   .list-pagination {
@@ -1462,34 +1421,18 @@ async function onScheduleBatchSubmit(payload) {
 .order-card {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  border: 1px solid #f0f0f0;
+  gap: 8px;
+  border: 1px solid #e8eef8;
   border-radius: 6px;
-  padding: 6px 8px 6px 6px;
-  margin-bottom: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
   cursor: pointer;
-  background: #fff;
   transition: all 0.2s;
-  border-left: 2px solid transparent;
-
-  &:hover {
-    border-color: #d6e4ff;
-    box-shadow: 0 1px 4px rgba(22, 119, 255, 0.08);
-  }
-
-  &.active {
-    border-color: #91caff;
-    border-left-color: #1677ff;
-    background: #f0f7ff;
-  }
-
-  &.checked {
-    background: #fafcff;
-  }
+  .order-card-split-gradient();
 
   .card-checkbox {
     flex-shrink: 0;
-    margin-top: 1px;
+    margin-top: 2px;
   }
 
   .card-content {
@@ -1501,7 +1444,7 @@ async function onScheduleBatchSubmit(payload) {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 
     .status-tag {
       margin: 0;
@@ -1521,15 +1464,15 @@ async function onScheduleBatchSubmit(payload) {
     font-weight: 600;
     font-size: 13px;
     color: rgba(0, 0, 0, 0.88);
-    margin-bottom: 2px;
+    margin-bottom: 4px;
     line-height: 1.3;
   }
 
   .card-name {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.65);
-    margin-bottom: 4px;
-    line-height: 1.35;
+    margin-bottom: 6px;
+    line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -1537,9 +1480,9 @@ async function onScheduleBatchSubmit(payload) {
   }
 
   .card-meta {
-    font-size: 11px;
+    font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
-    line-height: 1.4;
+    line-height: 1.5;
 
     .meta-divider {
       margin: 0 4px;
@@ -1547,7 +1490,7 @@ async function onScheduleBatchSubmit(payload) {
   }
 
   .card-tags {
-    margin-top: 4px;
+    margin-top: 6px;
 
     .urgency-tag {
       margin: 0;
@@ -1586,6 +1529,7 @@ async function onScheduleBatchSubmit(payload) {
 
   .list-card {
     width: 100%;
+    min-width: 0;
     max-width: none;
     max-height: 240px;
   }

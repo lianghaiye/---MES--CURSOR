@@ -139,13 +139,14 @@ export default { name: 'ListPeriodStatsPanel' }
 <style lang="less" scoped>
 .list-period-stats-panel {
   background: #fff;
-  border-radius: 6px;
-  padding: 10px 12px 8px;
-  margin-bottom: 8px;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border: 1px solid #e5e6eb;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
   &.is-collapsed {
-    padding-bottom: 10px;
+    padding-bottom: 12px;
   }
 }
 
@@ -194,12 +195,31 @@ export default { name: 'ListPeriodStatsPanel' }
   display: flex;
   align-items: stretch;
   justify-content: space-between;
-  border: 1px solid #f0f0f0;
+  border: 1px solid #e8eef8;
   border-radius: 8px;
   padding: 14px 12px;
   margin-bottom: 8px;
   min-height: 108px;
-  background: linear-gradient(135deg, #fafbff 0%, #fff 60%);
+  /* 默认浅蓝渐变；按右侧图标色系换肤 */
+  background: linear-gradient(145deg, #e6f4ff 0%, #f0f7ff 45%, #ffffff 100%);
+  box-shadow: 0 1px 2px rgba(22, 119, 255, 0.06);
+
+  &:has(.icon-shop),
+  &:has(.icon-blue) {
+    background: linear-gradient(145deg, #e6f4ff 0%, #f0f7ff 45%, #ffffff 100%);
+    border-color: #91caff;
+  }
+
+  &:has(.icon-screen),
+  &:has(.icon-purple) {
+    background: linear-gradient(145deg, #f9f0ff 0%, #f5e8ff 45%, #ffffff 100%);
+    border-color: #d3adf7;
+  }
+
+  &:has(.icon-warn) {
+    background: linear-gradient(145deg, #fff7e6 0%, #fff1e0 45%, #ffffff 100%);
+    border-color: #ffd591;
+  }
 }
 
 .stat-card-title {

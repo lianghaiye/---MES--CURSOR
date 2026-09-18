@@ -2,12 +2,12 @@
   <div class="design-task-detail-page">
     <a-spin :spinning="loading">
       <template v-if="task">
-        <div class="detail-page-head">
-          <div class="head-title">
-            <span class="title-text">{{ task.taskNo }}</span>
+        <div class="page-header">
+          <div class="header-left">
+            <span class="order-no">{{ task.taskNo }}</span>
             <a-tag :color="designTaskStatusColor(task.status)">{{ task.status }}</a-tag>
           </div>
-          <a-space class="head-actions">
+          <a-space :size="8" class="header-actions">
             <a-button
               v-if="canStartDesign || canOpenDraft"
               type="primary"
@@ -38,109 +38,118 @@
           </aside>
           <div class="panel-resizer" @mousedown.prevent="onResizeMouseDown" />
           <main class="right-panel">
-            <DetailSectionCard title="基础信息" class="info-card">
-              <a-descriptions :column="3" size="small" bordered class="task-desc">
-                <a-descriptions-item label="任务编号">{{ task.taskNo || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="状态">
-                  <a-tag :color="designTaskStatusColor(task.status)">{{ task.status }}</a-tag>
-                </a-descriptions-item>
-                <a-descriptions-item label="来源">{{
-                  designTaskSourceLabel(task.source)
-                }}</a-descriptions-item>
-                <a-descriptions-item label="销售订单">{{
-                  task.salesOrderNo || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="客户">{{
-                  task.customerName || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="业务员">{{
-                  task.salesperson || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="产品">{{
-                  task.productName || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="产品属性">{{
-                  task.productAttr || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="规格型号">{{
-                  task.specModel || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="材质">{{ task.material || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="技术参数" :span="3" class="multiline-desc">
-                  {{ task.techParams || '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="配套要求" :span="3" class="multiline-desc">
-                  {{ matchingRequirements || '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="补充说明" :span="3" class="multiline-desc">
-                  {{ supplementDesc || '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="订单附件" :span="3">
-                  <template v-if="orderAttachments.length">
-                    <div class="attachment-list">
-                      <div
-                        v-for="file in orderAttachments"
-                        :key="file.uid || file.name"
-                        class="attachment-row"
-                      >
-                        <span class="attachment-name">{{ file.name || '未命名附件' }}</span>
-                        <span v-if="file.type" class="attachment-meta">{{ file.type }}</span>
-                        <span v-if="file.uploadedAt" class="attachment-meta">{{
-                          file.uploadedAt
-                        }}</span>
-                        <a class="attachment-link" @click="previewFile(file)">预览</a>
-                      </div>
-                    </div>
-                  </template>
-                  <span v-else>—</span>
-                </a-descriptions-item>
-                <a-descriptions-item label="EBOM">{{ task.ebomName || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="EBOM编码">{{
-                  task.ebomCode || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="设计人">{{ task.designer || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="设计时间">{{
-                  task.designTime || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="校核人">{{ task.checker || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="校核时间">{{
-                  task.checkTime || '—'
-                }}</a-descriptions-item>
-              </a-descriptions>
+            <DetailSectionCard title="基本信息" class="info-card">
+              <div class="basic-info-section">
+                <div class="meta-bar">
+                  <div class="meta-item">
+                    <span class="field-label">来源</span>
+                    <span class="field-value">{{ designTaskSourceLabel(task.source) }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="field-label">设计人</span>
+                    <span class="field-value">{{ task.designer || '—' }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="field-label">设计时间</span>
+                    <span class="field-value">{{ task.designTime || '—' }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="field-label">校核人</span>
+                    <span class="field-value">{{ task.checker || '—' }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="field-label">校核时间</span>
+                    <span class="field-value">{{ task.checkTime || '—' }}</span>
+                  </div>
+                </div>
+
+                <div class="info-grid">
+                  <div class="info-item">
+                    <span class="field-label">销售订单</span>
+                    <span class="field-value" :title="task.salesOrderNo || ''">{{
+                      task.salesOrderNo || '—'
+                    }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="field-label">客户</span>
+                    <span class="field-value" :title="task.customerName || ''">{{
+                      task.customerName || '—'
+                    }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="field-label">业务员</span>
+                    <span class="field-value">{{ task.salesperson || '—' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="field-label">产品</span>
+                    <span class="field-value" :title="task.productName || ''">{{
+                      task.productName || '—'
+                    }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="field-label">编码</span>
+                    <span class="field-value">{{ task.productCode || '—' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="field-label">规格型号</span>
+                    <span class="field-value">{{ task.specModel || '—' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="field-label">材质</span>
+                    <span class="field-value">{{ task.material || '—' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="field-label">EBOM</span>
+                    <span class="field-value" :title="task.ebomName || ''">{{
+                      task.ebomName || '—'
+                    }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="field-label">EBOM编码</span>
+                    <span class="field-value">{{ task.ebomCode || '—' }}</span>
+                  </div>
+                  <div class="info-item info-item-full">
+                    <span class="field-label">技术参数</span>
+                    <span class="field-value">{{ task.techParams || '—' }}</span>
+                  </div>
+                  <div class="info-item info-item-full">
+                    <span class="field-label">配套要求</span>
+                    <span class="field-value">{{ matchingRequirements || '—' }}</span>
+                  </div>
+                  <div class="info-item info-item-full">
+                    <span class="field-label">补充说明</span>
+                    <span class="field-value">{{ supplementDesc || '—' }}</span>
+                  </div>
+                  <div class="info-item info-item-full">
+                    <span class="field-label">订单附件</span>
+                    <span class="field-value field-value-block">
+                      <template v-if="orderAttachments.length">
+                        <div class="attachment-list">
+                          <div
+                            v-for="file in orderAttachments"
+                            :key="file.uid || file.name"
+                            class="attachment-row"
+                          >
+                            <span class="attachment-name">{{ file.name || '未命名附件' }}</span>
+                            <span v-if="file.type" class="attachment-meta">{{ file.type }}</span>
+                            <span v-if="file.uploadedAt" class="attachment-meta">{{
+                              file.uploadedAt
+                            }}</span>
+                            <a class="attachment-link" @click="previewFile(file)">预览</a>
+                          </div>
+                        </div>
+                      </template>
+                      <template v-else>—</template>
+                    </span>
+                  </div>
+                </div>
+              </div>
             </DetailSectionCard>
 
-            <DetailSectionCard title="父级物料信息" class="info-card">
-              <a-descriptions :column="3" size="small" bordered class="task-desc">
-                <a-descriptions-item label="物品名称">{{
-                  selectedParentInfo?.itemName || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="规格型号">{{
-                  selectedParentInfo?.specModel || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item v-if="isSelectedRoot" label="EBOM版本">
-                  {{ ebom?.version || '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="材质">{{
-                  selectedParentInfo?.material || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="图号">{{
-                  selectedParentInfo?.drawingNo || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="工艺路线">{{
-                  selectedParentInfo?.processRoute || '—'
-                }}</a-descriptions-item>
-                <a-descriptions-item label="技术参数" class="multiline-desc">
-                  {{ selectedParentInfo?.techParams || '—' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="配套要求" :span="2" class="multiline-desc">
-                  {{ selectedParentInfo?.matchingRequirements || '—' }}
-                </a-descriptions-item>
-              </a-descriptions>
-            </DetailSectionCard>
-
-            <DetailSectionCard title="物料明细" class="table-section">
+            <DetailSectionCard title="物料清单" class="table-section">
               <BomMaterialTable
                 readonly
+                hide-toolbar
                 :lines="displayLines"
                 :column-settings="columnSettings"
                 empty-variant="no-children"
@@ -178,7 +187,6 @@ import {
   getRootTreeId,
   normalizeFlatNodesWithRoot,
 } from '@/utils/bomTree'
-import { resolveBomNodeItemInfo } from '@/utils/bomTreeDisplay'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import BomTreePanel from '@/views/product-process/components/BomTreePanel.vue'
 import BomMaterialTable from '@/views/product-process/components/BomMaterialTable.vue'
@@ -233,32 +241,6 @@ const orderAttachments = computed(() => {
 
 const displayLines = computed(() =>
   getLinesForTreeNode(lineItems.value, selectedNodeId.value, flatNodes.value),
-)
-
-const rootForm = computed(() => {
-  const t = task.value
-  if (!t) return {}
-  return {
-    itemName: t.productName || '',
-    itemCode: t.productCode || '',
-    specModel: t.specModel || '',
-    material: t.material || '',
-    drawingNo: relatedSalesLine.value?.drawingNo || '',
-    techParams: t.techParams || '',
-    processRoute: '',
-    matchingRequirements: matchingRequirements.value || '',
-  }
-})
-
-const selectedNode = computed(() => {
-  const id = selectedNodeId.value || getRootTreeId(flatNodes.value)
-  return flatNodes.value.find((n) => n.id === id) || flatNodes.value.find((n) => n.isRoot) || null
-})
-
-const isSelectedRoot = computed(() => !selectedNode.value || selectedNode.value.isRoot)
-
-const selectedParentInfo = computed(() =>
-  resolveBomNodeItemInfo(selectedNode.value, lineItems.value, rootForm.value),
 )
 
 const detailRootMeta = computed(() => {
@@ -385,13 +367,19 @@ onUnmounted(() => {
 </script>
 
 <style lang="less" scoped>
+@label-width: 96px;
+
 .design-task-detail-page {
+  /* 与 GlobalTabs（margin 24）左缘对齐 */
   margin: -12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 112px);
   overflow: hidden;
   background: #f5f6f8;
+  box-sizing: border-box;
+  gap: 12px;
 
   :deep(.ant-spin-nested-loading),
   :deep(.ant-spin-container) {
@@ -400,42 +388,44 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    gap: 12px;
   }
 }
 
-.detail-page-head {
+.page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: #fff;
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  border-radius: 6px;
+  padding: 10px 12px;
   flex-shrink: 0;
+  /* 渐变由 detail-page-header.less 统一覆盖 */
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
 
-  .head-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 
-  .title-text {
-    font-weight: 600;
-    font-size: 15px;
-  }
+.order-no {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
 
-  .head-actions {
-    flex-shrink: 0;
-  }
+.header-actions {
+  flex-shrink: 0;
 }
 
 .page-body {
   flex: 1;
   display: flex;
   gap: 0;
-  padding: 0 8px 8px;
+  padding: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -446,7 +436,8 @@ onUnmounted(() => {
   max-width: 520px;
   height: 100%;
   background: #fff;
-  border-radius: 6px;
+  border-radius: 8px;
+  border: 1px solid #e5e6eb;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 10px;
   overflow: hidden;
@@ -496,35 +487,95 @@ onUnmounted(() => {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   overflow: hidden;
-}
 
-.section-card {
-  background: #fff;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  padding: 12px 16px;
-  flex-shrink: 0;
+  :deep(.detail-section-card) {
+    margin-bottom: 0;
+    border-radius: 8px;
+    border: 1px solid #e5e6eb;
+  }
 }
 
 .info-card {
   max-height: 52%;
   overflow: auto;
+  flex-shrink: 0;
+}
 
-  .info-block + .info-block {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed #f0f0f0;
-  }
+.basic-info-section {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
 
-  .section-title {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 12px;
+.field-label {
+  flex: 0 0 @label-width;
+  width: @label-width;
+  padding-right: 8px;
+  text-align: right;
+  font-size: 13px;
+  line-height: 22px;
+  color: rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.field-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 22px;
+  color: rgba(0, 0, 0, 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e8e8e8;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 20px;
+  row-gap: 10px;
+}
+
+.info-item {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.info-item-full {
+  grid-column: 1 / -1;
+
+  .field-value {
+    white-space: pre-wrap;
+    word-break: break-word;
   }
+}
+
+.field-value-block {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
 }
 
 .attachment-list {
@@ -562,20 +613,21 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
 
+  :deep(.section-body) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
   :deep(.bom-material-table) {
     height: 100%;
   }
 }
 
-.task-desc {
-  :deep(.ant-descriptions-item-label) {
-    width: 100px;
-    color: rgba(0, 0, 0, 0.45);
-  }
-
-  :deep(.multiline-desc .ant-descriptions-item-content) {
-    white-space: pre-wrap;
-    word-break: break-word;
+@media (max-width: 1200px) {
+  .info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

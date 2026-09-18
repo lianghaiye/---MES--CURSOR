@@ -2097,6 +2097,7 @@ function openBomDetail(bomId, bomName) {
 
 .sales-order-detail-page {
   margin: -12px;
+  padding: 12px;
   height: calc(100vh - 112px);
   max-height: calc(100vh - 112px);
   min-height: 0;

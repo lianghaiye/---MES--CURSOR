@@ -1,8 +1,10 @@
 import { getCategoryFilterKeys as getProductCategoryFilterKeys } from '@/mock/productInfo'
 import { getCategoryFilterKeys as getMaterialCategoryFilterKeys } from '@/mock/materialInfo'
 import {
+  CATEGORY_TREE_ALL_ROOT,
   CATEGORY_TREE_MODE,
   ITEM_KIND,
+  decodeCategoryTreeKey,
   inferItemKindFromRecord,
   itemKindLabel,
   normalizeCapabilityFlags,
@@ -124,6 +126,23 @@ export function buildUnifiedListRows(products = [], materials = []) {
 
 function matchesCategoryTree(row, treeMode, selectedCategoryKey) {
   if (!selectedCategoryKey) return true
+
+  if (treeMode === CATEGORY_TREE_MODE.ALL) {
+    if (selectedCategoryKey === CATEGORY_TREE_ALL_ROOT.PRODUCT) {
+      return row.itemKind !== ITEM_KIND.MATERIAL
+    }
+    if (selectedCategoryKey === CATEGORY_TREE_ALL_ROOT.MATERIAL) {
+      return row.itemKind !== ITEM_KIND.PRODUCT
+    }
+    const decoded = decodeCategoryTreeKey(selectedCategoryKey)
+    if (decoded.side === CATEGORY_TREE_MODE.PRODUCT && decoded.key) {
+      return matchesCategoryTree(row, CATEGORY_TREE_MODE.PRODUCT, decoded.key)
+    }
+    if (decoded.side === CATEGORY_TREE_MODE.MATERIAL && decoded.key) {
+      return matchesCategoryTree(row, CATEGORY_TREE_MODE.MATERIAL, decoded.key)
+    }
+    return true
+  }
 
   const productKeys =
     treeMode === CATEGORY_TREE_MODE.PRODUCT

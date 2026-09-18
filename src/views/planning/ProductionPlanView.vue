@@ -3,7 +3,7 @@
     <div class="filter-card">
       <a-form :model="filters" class="filter-form horizontal-form" layout="inline">
         <a-row :gutter="[12, 8]" style="width: 100%">
-          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+          <a-col :span="24">
             <a-form-item label="订单编号">
               <a-input
                 v-model:value="filters.orderNo"
@@ -13,7 +13,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="5">
+          <a-col :span="24">
             <a-form-item label="客户名称">
               <a-input
                 v-model:value="filters.customerName"
@@ -23,7 +23,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+          <a-col :span="24">
             <a-form-item label="紧急度">
               <a-select
                 v-model:value="filters.urgency"
@@ -38,7 +38,7 @@
               </a-select>
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+          <a-col :span="24">
             <a-form-item label="计划来源">
               <a-select
                 v-model:value="filters.planSource"
@@ -50,7 +50,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+          <a-col :span="24">
             <a-form-item label="订单状态">
               <a-select
                 v-model:value="filters.orderStatus"
@@ -66,15 +66,7 @@
               </a-select>
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="6">
-            <a-form-item class="filter-actions-item">
-              <a-space>
-                <a-button type="primary" size="small" @click="handleSearch">查询</a-button>
-                <a-button size="small" @click="handleReset">重置</a-button>
-              </a-space>
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="8" :lg="8">
+          <a-col :span="24">
             <a-form-item label="订单日期">
               <a-range-picker
                 v-model:value="filters.orderDateRange"
@@ -83,13 +75,21 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="8" :lg="8">
+          <a-col :span="24">
             <a-form-item label="交付日期">
               <a-range-picker
                 v-model:value="filters.deliveryDateRange"
                 size="small"
                 style="width: 100%"
               />
+            </a-form-item>
+          </a-col>
+          <a-col :span="24">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="handleSearch">查询</a-button>
+                <a-button size="small" @click="handleReset">重置</a-button>
+              </a-space>
             </a-form-item>
           </a-col>
         </a-row>
@@ -1536,10 +1536,10 @@ function handleReset() {
 .filter-card {
   flex-shrink: 0;
   background: #fff;
-  border-radius: 6px;
+  border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  padding: 10px 12px 6px;
-  margin-bottom: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
 }
 
 .horizontal-form {
@@ -1591,17 +1591,25 @@ function handleReset() {
 }
 
 .order-card {
-  border: 1px solid #f0f0f0;
+  border: 1px solid #e8eef8;
   border-radius: 6px;
   padding: 10px 12px;
   cursor: pointer;
   transition: all 0.2s;
-  background: #fafafa;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
+  border-left: 3px solid transparent;
+  box-sizing: border-box;
 
-  &:hover,
+  &:hover {
+    border-color: #91caff;
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.12);
+  }
+
   &.active {
     border-color: #1677ff;
-    background: #e6f4ff;
+    border-left-color: #1677ff;
+    background: linear-gradient(180deg, #e6f4ff 0%, #f5faff 55%, #ffffff 100%);
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.16);
   }
 
   .card-tags {
@@ -1685,6 +1693,11 @@ function handleReset() {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid #e8eef8;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
+  box-sizing: border-box;
 
   h3 {
     margin: 0 0 8px;

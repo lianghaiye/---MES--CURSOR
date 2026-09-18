@@ -18,36 +18,63 @@
     </template>
     <div class="master-form-header-card">
       <div class="entity-name-header">
-        <div class="entity-name-label">产品名称</div>
-        <a-input
-          v-model:value="form.name"
-          class="entity-name-input"
-          placeholder="请输入产品名称"
-          allow-clear
-          :disabled="viewOnly"
-        />
-        <div class="entity-capability-row">
-          <a-checkbox v-model:checked="form.canSell" :disabled="viewOnly">可销售</a-checkbox>
-          <a-checkbox v-model:checked="form.canProduce" :disabled="viewOnly">可生产</a-checkbox>
-          <template v-if="form.canSell">
-            <a-checkbox v-model:checked="form.isWholeMachine" :disabled="viewOnly">整机</a-checkbox>
-            <a-checkbox v-model:checked="form.isPart" :disabled="viewOnly">零部件</a-checkbox>
-          </template>
-          <a-checkbox v-model:checked="form.canPurchase" :disabled="viewOnly">可采购</a-checkbox>
-          <a-checkbox v-model:checked="form.canOutsource" :disabled="viewOnly">可外协</a-checkbox>
-          <a-checkbox v-model:checked="form.production.needIndustrialLabel" :disabled="viewOnly">
-            工业标识
-          </a-checkbox>
-          <span v-if="derivedItemKindLabel" class="derived-type-tag">
-            产品类型：{{ derivedItemKindLabel }}
-          </span>
+        <div class="entity-identity-panel">
+          <div class="entity-identity-grid">
+            <div class="entity-identity-field">
+              <div class="entity-name-label">
+                <span class="entity-required-mark">*</span>
+                产品名称
+              </div>
+              <a-input
+                v-model:value="form.name"
+                class="entity-name-input"
+                placeholder="请输入产品名称"
+                allow-clear
+                :disabled="viewOnly"
+              />
+            </div>
+            <div class="entity-identity-field">
+              <div class="entity-name-label entity-code-label">
+                <span>{{ isMultiVariantMode ? '族编码' : '产品编码' }}</span>
+                <span class="entity-code-hint">（留空则按系统规则自动生成）</span>
+              </div>
+              <a-input
+                v-model:value="form.code"
+                class="entity-name-input"
+                :placeholder="isMultiVariantMode ? '如 F0001' : '请输入产品编码'"
+                allow-clear
+                :disabled="viewOnly"
+                @change="onFamilyCodeChange"
+              />
+            </div>
+          </div>
         </div>
-        <div v-if="!viewOnly && !isEdit" class="master-data-mode-row">
-          <span class="mode-label">创建模式：</span>
-          <a-radio-group v-model:value="form.masterDataMode" size="small">
-            <a-radio-button value="single">单规格物料</a-radio-button>
-            <a-radio-button value="multiVariant">多规格变体</a-radio-button>
-          </a-radio-group>
+        <div class="entity-capability-panel">
+          <div class="entity-capability-row">
+            <a-checkbox v-model:checked="form.canSell" :disabled="viewOnly">可销售</a-checkbox>
+            <a-checkbox v-model:checked="form.canProduce" :disabled="viewOnly">可生产</a-checkbox>
+            <template v-if="form.canSell">
+              <a-checkbox v-model:checked="form.isWholeMachine" :disabled="viewOnly"
+                >整机</a-checkbox
+              >
+              <a-checkbox v-model:checked="form.isPart" :disabled="viewOnly">零部件</a-checkbox>
+            </template>
+            <a-checkbox v-model:checked="form.canPurchase" :disabled="viewOnly">可采购</a-checkbox>
+            <a-checkbox v-model:checked="form.canOutsource" :disabled="viewOnly">可外协</a-checkbox>
+            <a-checkbox v-model:checked="form.production.needIndustrialLabel" :disabled="viewOnly">
+              工业标识
+            </a-checkbox>
+            <span v-if="derivedItemKindLabel" class="derived-type-tag">
+              产品类型：{{ derivedItemKindLabel }}
+            </span>
+          </div>
+          <div v-if="!viewOnly && !isEdit" class="master-data-mode-row">
+            <span class="mode-label">创建模式：</span>
+            <a-radio-group v-model:value="form.masterDataMode" size="small">
+              <a-radio-button value="single">单规格物料</a-radio-button>
+              <a-radio-button value="multiVariant">多规格变体</a-radio-button>
+            </a-radio-group>
+          </div>
         </div>
       </div>
       <div v-if="form.spuId" class="spu-inherit-banner">
@@ -67,19 +94,6 @@
             <a-form layout="inline" class="horizontal-form">
               <div class="form-product-material-section basic-info-box modal-basic-card">
                 <a-row :gutter="[12, 12]" style="width: 100%">
-                  <a-col :span="6">
-                    <a-form-item :label="isMultiVariantMode ? '族编码' : '编号'">
-                      <a-input
-                        v-model:value="form.code"
-                        size="small"
-                        :placeholder="
-                          isMultiVariantMode ? '留空则保存时自动生成，如 F0001' : '请输入'
-                        "
-                        allow-clear
-                        @change="onFamilyCodeChange"
-                      />
-                    </a-form-item>
-                  </a-col>
                   <a-col :span="6">
                     <a-form-item label="条码类型" required>
                       <a-select
@@ -1765,7 +1779,7 @@ watch(
       !form.isPart &&
       !wholeMachineProductAttributeOptions.includes(form.productAttribute)
     ) {
-      form.productAttribute = undefined
+      form.productAttribute = '标准产品'
     }
   },
 )
@@ -2356,6 +2370,7 @@ function handleSaveAndMaintainBom() {
   padding: 8px 12px;
   background: #e6f4ff;
   border-radius: 4px;
+  border: 1px solid #91caff;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2375,9 +2390,9 @@ function handleSaveAndMaintainBom() {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-/* 创建模式所在盒子 与 TAB 盒子间距 8px */
+/* 名称/能力外白盒 与 Tab 白盒间距 12px */
 .master-form-header-card {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .entity-name-header {
@@ -2393,6 +2408,16 @@ function handleSaveAndMaintainBom() {
   margin-bottom: 4px;
 }
 
+.entity-required-mark {
+  display: inline-block;
+  margin-inline-end: 4px;
+  color: #ff4d4f;
+  font-family: SimSun, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+}
+
 .entity-name-input {
   font-size: 18px;
   font-weight: 600;
@@ -2401,6 +2426,7 @@ function handleSaveAndMaintainBom() {
   border-bottom: 1px solid #d9d9d9;
   border-radius: 0;
   box-shadow: none;
+  width: 100%;
 
   &:hover,
   &:focus {
@@ -2416,13 +2442,59 @@ function handleSaveAndMaintainBom() {
   }
 }
 
+.entity-code-label {
+  margin-top: 0;
+}
+
+.entity-code-hint {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.entity-identity-panel,
+.entity-capability-panel {
+  padding: 12px 14px;
+  border: 1px solid #91caff;
+  border-radius: 8px;
+}
+
+.entity-identity-panel {
+  margin: 0;
+  background: #fff;
+}
+
+.entity-identity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+  align-items: start;
+}
+
+.entity-identity-field {
+  min-width: 0;
+  width: 100%;
+}
+
+.entity-capability-panel {
+  margin-top: 12px;
+  background: #f0f5ff;
+}
+
 .entity-capability-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 24px;
-  margin-top: 8px;
-  padding-top: 4px;
+  margin-top: 0;
+  padding-top: 0;
   align-items: center;
+}
+
+.entity-capability-panel .master-data-mode-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #91caff;
 }
 
 .derived-type-tag {
@@ -2448,15 +2520,13 @@ function handleSaveAndMaintainBom() {
   }
 }
 
-/* 必须带齐 detail-tabs-pill，否则全局 margin:0 !important 会盖掉下间距 */
+/* 胶囊 Tab 与所在白盒、下方内容的间距统一为 12px */
 .form-tabs.detail-tabs.detail-tabs-pill {
   margin: 0;
-  /* 浅蓝外框相对所在白盒上边 4px */
-  padding: 4px 16px 0 !important;
+  padding: 12px 16px 0 !important;
 
   :deep(> .ant-tabs-nav) {
-    /* 浅蓝外框相对下方字段盒子 4px（覆盖全局 pill 的 margin:0） */
-    margin: 0 0 4px !important;
+    margin: 0 0 12px !important;
     padding: 0 !important;
   }
 

@@ -6,8 +6,52 @@ export const ITEM_KIND = {
 }
 
 export const CATEGORY_TREE_MODE = {
+  ALL: 'all',
   PRODUCT: 'product',
   MATERIAL: 'material',
+}
+
+/** 「全部」Tab 下合成树根节点 */
+export const CATEGORY_TREE_ALL_ROOT = {
+  PRODUCT: '__all_product__',
+  MATERIAL: '__all_material__',
+}
+
+export const CATEGORY_TREE_KEY_PREFIX = {
+  PRODUCT: 'product:',
+  MATERIAL: 'material:',
+}
+
+export function encodeCategoryTreeKey(side, key) {
+  if (!key) return ''
+  return side === CATEGORY_TREE_MODE.MATERIAL
+    ? `${CATEGORY_TREE_KEY_PREFIX.MATERIAL}${key}`
+    : `${CATEGORY_TREE_KEY_PREFIX.PRODUCT}${key}`
+}
+
+export function decodeCategoryTreeKey(encoded, fallbackSide = CATEGORY_TREE_MODE.PRODUCT) {
+  if (!encoded) return { side: null, key: '', isRoot: false }
+  if (encoded === CATEGORY_TREE_ALL_ROOT.PRODUCT) {
+    return { side: CATEGORY_TREE_MODE.PRODUCT, key: '', isRoot: true }
+  }
+  if (encoded === CATEGORY_TREE_ALL_ROOT.MATERIAL) {
+    return { side: CATEGORY_TREE_MODE.MATERIAL, key: '', isRoot: true }
+  }
+  if (encoded.startsWith(CATEGORY_TREE_KEY_PREFIX.PRODUCT)) {
+    return {
+      side: CATEGORY_TREE_MODE.PRODUCT,
+      key: encoded.slice(CATEGORY_TREE_KEY_PREFIX.PRODUCT.length),
+      isRoot: false,
+    }
+  }
+  if (encoded.startsWith(CATEGORY_TREE_KEY_PREFIX.MATERIAL)) {
+    return {
+      side: CATEGORY_TREE_MODE.MATERIAL,
+      key: encoded.slice(CATEGORY_TREE_KEY_PREFIX.MATERIAL.length),
+      isRoot: false,
+    }
+  }
+  return { side: fallbackSide, key: encoded, isRoot: false }
 }
 
 /** 由可销售、可生产推导条目类型；两者都不勾选时返回 null */

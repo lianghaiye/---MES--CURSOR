@@ -355,8 +355,13 @@ function statusTagColor(status) {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     gap: 12px;
+    padding: 12px 16px;
+    border: 1px solid #e8eef8;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
+    box-sizing: border-box;
 
     .header-main {
       min-width: 0;

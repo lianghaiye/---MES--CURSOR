@@ -67,6 +67,18 @@ alwaysApply: false
 
 缺某项则跳过，保持相对顺序。
 
+### 卡片视图左侧列表卡（强制）
+
+`layoutMode === 'split'`（或生产计划等常驻左卡）时，左侧 `.order-card` **必须**用蓝系渐变，禁止纯白/纯灰底：
+
+| 状态 | 背景 |
+|------|------|
+| 默认 | `linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%)` |
+| 选中 `.active` | `linear-gradient(180deg, #e6f4ff 0%, #f5faff 55%, #ffffff 100%)` |
+| 描边 | 默认 `#e8eef8`；选中左边框 **3px** `#1677ff` |
+
+基准实现：`WorkOrderManagementView.vue`；公共 mixin：`src/styles/split-order-card.less`（`.order-card-split-gradient()`）。
+
 ## 批量操作区
 
 | 项 | 约定 |

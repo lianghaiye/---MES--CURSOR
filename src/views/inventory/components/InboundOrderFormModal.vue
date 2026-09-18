@@ -595,7 +595,7 @@
       </div>
     </div>
 
-    <template #footer>
+    <template v-if="!(embedded && contentOnly)" #footer>
       <a-button v-if="!embedded" @click="onShellCancel">取消</a-button>
       <a-button :size="embedded ? 'small' : 'middle'" :loading="saving" @click="handleSave">
         保存

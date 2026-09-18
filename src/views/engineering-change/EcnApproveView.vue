@@ -167,7 +167,7 @@ function handleReject() {
 <style lang="less" scoped>
 .ecn-approve-page {
   margin: -12px;
-  padding: 0 12px 24px;
+  padding: 12px 12px 24px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }

@@ -83,15 +83,6 @@
             删除
           </a-button>
         </a-space>
-        <a-space>
-          <span class="setting-label">入库方签收</span>
-          <a-switch
-            :checked="requireInboundConfirm"
-            checked-children="需要"
-            un-checked-children="自动"
-            @change="onRequireInboundChange"
-          />
-        </a-space>
       </div>
 
       <a-alert type="info" show-icon class="summary-bar" :banner="false">
@@ -221,10 +212,6 @@ import {
   voidTransfer,
   deleteTransferOrder,
 } from '@/store/transferOrderStore'
-import {
-  transferSettingsState,
-  setTransferRequireInboundConfirm,
-} from '@/store/transferSettingsStore'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { useTabs } from '@/composables/useTabs'
@@ -250,12 +237,6 @@ const voidTargets = ref([])
 const warehouseOpts = computed(() => getWarehouseSelectOptions())
 const statusOpts = transferStatusOptions.map((v) => ({ label: v, value: v }))
 const voidDocNos = computed(() => voidTargets.value.map((o) => o.docNo || o.id))
-const requireInboundConfirm = computed(() => transferSettingsState.requireInboundConfirm)
-
-function onRequireInboundChange(checked) {
-  setTransferRequireInboundConfirm(checked)
-  message.success(checked ? '已开启：出库确认后需入库方签收' : '已关闭：出库确认后自动入库完结')
-}
 
 const columns = [
   { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
@@ -330,6 +311,8 @@ function handleConfirmOne(record) {
   Modal.confirm({
     title: `确认调拨 ${record.docNo}？`,
     content: '将软锁定调出仓库存并生成调拨出库；按配置决定是否需入库方签收。',
+    okText: '确认',
+    cancelText: '取消',
     onOk: () => {
       const { count, blocked } = confirmTransfer([record.id])
       if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
@@ -345,6 +328,8 @@ function handleConfirmSelected() {
   }
   Modal.confirm({
     title: '确认所选调拨单？',
+    okText: '确认',
+    cancelText: '取消',
     onOk: () => {
       const { count, blocked } = confirmTransfer(selectedRowKeys.value)
       if (blocked?.length)
@@ -385,6 +370,9 @@ function onVoidConfirm(reason) {
 function confirmDelete(record) {
   Modal.confirm({
     title: `确认删除调拨单 ${record.docNo}？`,
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
     onOk: () => {
       if (deleteTransferOrder(record.id)) message.success('已删除')
       else message.warning('当前单据不可删除')
@@ -399,6 +387,9 @@ function handleBatchDelete() {
   }
   Modal.confirm({
     title: '确认删除所选调拨单？',
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
     onOk: () => {
       let n = 0
       selectedRowKeys.value.forEach((id) => {
@@ -414,7 +405,7 @@ function handleBatchDelete() {
 <style lang="less" scoped>
 .transfer-page {
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }
@@ -443,11 +434,6 @@ function handleBatchDelete() {
   margin-bottom: 8px;
 }
 
-.setting-label {
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.65);
-}
-
 .summary-bar {
   margin-top: 0;
   margin-bottom: 8px;
@@ -473,6 +459,7 @@ function handleBatchDelete() {
     font-size: 13px;
   }
 
+  :deep(.ant-table-cell-fix-left),
   :deep(.ant-table-cell-fix-right) {
     background: #fff;
   }

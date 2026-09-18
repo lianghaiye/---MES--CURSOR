@@ -93,18 +93,19 @@ watch(
 .page-content {
   flex: 1;
   min-height: 0;
+  /* 左右 margin+padding = 24，与 GlobalTabs margin 0 24px 对齐 */
   margin: 0 12px 12px;
   padding: 12px;
-  background: #fff;
+  /* 灰底：避免顶栏与页头之间露出「白盒」空隙；各页白卡片自行铺底 */
+  background: #f0f2f5;
   border-radius: 4px;
   overflow: auto;
 
-  /* 各页标题操作栏随内容区顶部固定 */
+  /* 各页标题操作栏随内容区顶部固定；背景由各页自定（含详情渐变） */
   :deep(.page-header) {
     position: sticky;
     top: 0;
     z-index: 30;
-    background: #fff;
   }
 }
 </style>

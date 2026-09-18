@@ -394,6 +394,7 @@ function statusBadge(status) {
 <style lang="less" scoped>
 .material-req-detail-page {
   margin: -12px;
+  padding: 12px;
   height: calc(100vh - 56px - 40px - 24px);
   background: #f5f6f8;
   display: flex;

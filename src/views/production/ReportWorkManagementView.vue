@@ -273,15 +273,31 @@ onMounted(handleSearch)
 <style lang="less" scoped>
 .report-confirm-page {
   .stats-row {
-    margin-bottom: 8px;
+    margin-bottom: 12px;
+
+    :deep(.ant-col:nth-child(3n + 1) .stat-card) {
+      background: linear-gradient(145deg, #e6f4ff 0%, #f0f7ff 45%, #ffffff 100%);
+      border-color: #91caff;
+    }
+
+    :deep(.ant-col:nth-child(3n + 2) .stat-card) {
+      background: linear-gradient(145deg, #f9f0ff 0%, #f5e8ff 45%, #ffffff 100%);
+      border-color: #d3adf7;
+    }
+
+    :deep(.ant-col:nth-child(3n) .stat-card) {
+      background: linear-gradient(145deg, #fff7e6 0%, #fff1e0 45%, #ffffff 100%);
+      border-color: #ffd591;
+    }
   }
 
   .stat-card {
-    background: #fff;
-    border: 1px solid #f0f0f0;
+    background: linear-gradient(145deg, #e6f4ff 0%, #f0f7ff 45%, #ffffff 100%);
+    border: 1px solid #91caff;
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(22, 119, 255, 0.06);
   }
 
   .stat-title {

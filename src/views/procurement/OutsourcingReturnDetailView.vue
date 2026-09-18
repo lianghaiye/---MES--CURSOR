@@ -268,6 +268,7 @@ function openOutsourcingOrder() {
 <style lang="less" scoped>
 .outsourcing-return-detail-page {
   margin: -12px;
+  padding: 12px;
   min-height: calc(100vh - 112px);
   background: #f5f6f8;
   display: flex;

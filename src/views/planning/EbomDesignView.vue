@@ -872,6 +872,7 @@ onMounted(() => {
 <style lang="less" scoped>
 .ebom-design-page {
   margin: -12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   height: calc(100% + 24px);

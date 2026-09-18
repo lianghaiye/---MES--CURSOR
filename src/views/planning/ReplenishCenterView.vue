@@ -14,6 +14,10 @@ import StockReplenishPanel from './components/StockReplenishPanel.vue'
 
 <style lang="less" scoped>
 .replenish-center-page {
-  padding: 0;
+  margin: -12px;
+  padding: 12px;
+  background: #f5f6f8;
+  min-height: calc(100vh - 112px);
+  box-sizing: border-box;
 }
 </style>

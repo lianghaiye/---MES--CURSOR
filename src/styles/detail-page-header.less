@@ -1,0 +1,47 @@
+/**
+ * 详情 / 新建表单页标题栏：浅蓝 → 白渐变，圆角 8px
+ * 与上方标签区间距由 page-content / 各页 padding: 12px 保证
+ */
+.page-content {
+  .page-header {
+    background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%) !important;
+    border: 1px solid #e8eef8 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    box-sizing: border-box;
+  }
+
+  /* 标题下紧跟 Tabs：整栏成一盒，标题仅上圆角 */
+  .detail-sticky-bar:has(.detail-tabs-wrap),
+  .detail-sticky-bar:has(.ant-tabs) {
+    border: 1px solid #e8eef8;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .detail-sticky-bar:has(.detail-tabs-wrap) > .page-header,
+  .detail-sticky-bar:has(.ant-tabs) > .page-header {
+    border: none !important;
+    border-bottom: 1px solid #eef2f8 !important;
+    border-radius: 0 !important;
+    margin-bottom: 0;
+    box-shadow: none;
+  }
+
+  /* 标题栏与下方内容盒左右同宽：去掉 tab-body 水平内边距 */
+  .tab-body {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 12px;
+  }
+
+  /* 工业标识等多段列表头：保持白底分区，不加表单/详情渐变 */
+  .page-wrapper .page-header {
+    background: #fff !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none;
+  }
+}

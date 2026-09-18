@@ -1,77 +1,106 @@
 <template>
   <div class="stock-replenish-panel">
     <div class="filter-card">
-      <div class="filter-row">
-        <a-form layout="inline" class="filter-form" :model="filters">
-          <a-form-item label="来源">
-            <a-select
-              v-model:value="filters.alertSource"
-              allow-clear
-              placeholder="全部"
-              :options="sourceFilterOpts"
-              style="width: 120px"
-            />
-          </a-form-item>
-          <a-form-item label="类型">
-            <a-select
-              v-model:value="filters.alertKind"
-              allow-clear
-              placeholder="全部"
-              :options="alertKindFilterOpts"
-              style="width: 120px"
-            />
-          </a-form-item>
-          <a-form-item label="产品名称">
-            <a-input
-              v-model:value="filters.productName"
-              allow-clear
-              placeholder="搜索名称"
-              style="width: 140px"
-            />
-          </a-form-item>
-          <a-form-item label="编码">
-            <a-input
-              v-model:value="filters.productCode"
-              allow-clear
-              placeholder="搜索编码"
-              style="width: 140px"
-            />
-          </a-form-item>
-          <a-form-item label="规格型号">
-            <a-input
-              v-model:value="filters.specModel"
-              allow-clear
-              placeholder="搜索规格"
-              style="width: 140px"
-            />
-          </a-form-item>
-        </a-form>
-        <a-space class="filter-actions" :size="8">
-          <a-button type="primary" @click="applyFilters">搜索</a-button>
-          <a-button @click="resetFilters">清空</a-button>
-        </a-space>
-      </div>
+      <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="来源">
+              <a-select
+                v-model:value="filters.alertSource"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                style="width: 100%"
+                :options="sourceFilterOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="类型">
+              <a-select
+                v-model:value="filters.alertKind"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                style="width: 100%"
+                :options="alertKindFilterOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="产品名称">
+              <a-input
+                v-model:value="filters.productName"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="编码">
+              <a-input
+                v-model:value="filters.productCode"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="规格型号">
+              <a-input
+                v-model:value="filters.specModel"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="applyFilters">
+                  <SearchOutlined />
+                  搜索
+                </a-button>
+                <a-button size="small" @click="resetFilters">清空</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </div>
+
+    <div class="toolbar-row">
+      <a-space wrap :size="8">
+        <a-button size="small" @click="refreshRows">
+          <ReloadOutlined />
+          刷新预警
+        </a-button>
+        <a-tooltip :title="batchDisabledTip">
+          <span class="batch-btn-wrap">
+            <a-button
+              type="primary"
+              size="small"
+              :disabled="batchExecuteDisabled"
+              @click="handleConfirm()"
+            >
+              批量执行（{{ selectedKeys.length }}）
+            </a-button>
+          </span>
+        </a-tooltip>
+      </a-space>
+      <a-space :size="4" class="toolbar-icons">
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
+      </a-space>
     </div>
 
     <div class="table-card">
-      <div class="table-toolbar">
-        <a-space>
-          <a-button @click="refreshRows">刷新预警</a-button>
-          <a-tooltip :title="batchDisabledTip">
-            <span class="batch-btn-wrap">
-              <a-button type="primary" :disabled="batchExecuteDisabled" @click="handleConfirm()">
-                批量执行（{{ selectedKeys.length }}）
-              </a-button>
-            </span>
-          </a-tooltip>
-        </a-space>
-        <a-space :size="4" class="toolbar-icons">
-          <TableColumnSettingButton @click="columnDrawerOpen = true" />
-        </a-space>
-      </div>
       <a-table
-        size="middle"
+        size="small"
         row-key="key"
+        bordered
         :columns="displayColumns"
         :data-source="pagedRows"
         :pagination="false"
@@ -204,6 +233,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
 import { useTabs } from '@/composables/useTabs'
 import { useReplenishExecute } from '@/composables/useReplenishExecute'
@@ -483,69 +513,44 @@ defineExpose({ refreshRows })
   padding: 0;
 }
 
-.filter-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  border: 1px solid #f0f0f0;
-}
-
-.filter-row {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 12px;
-}
-
-.filter-form {
-  flex: 1;
-  min-width: 0;
-  margin-bottom: 0 !important;
-
-  :deep(.ant-form-item) {
-    margin-bottom: 0 !important;
-    margin-right: 16px;
-  }
-
-  :deep(.ant-form-item-row) {
-    flex-wrap: nowrap;
-    align-items: center;
-  }
-
-  :deep(.ant-form-item-label > label) {
-    height: 32px;
-    line-height: 32px;
-  }
-}
-
-.filter-actions {
-  flex-shrink: 0;
-}
-
+.filter-card,
 .table-card {
   background: #fff;
   border-radius: 8px;
-  padding: 12px 16px 16px;
-  border: 1px solid #f0f0f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.table-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.filter-card {
+  padding: 12px 16px;
   margin-bottom: 12px;
 }
 
-.toolbar-icons {
-  flex-shrink: 0;
+.toolbar-row {
+  margin-bottom: 12px;
 }
 
-.batch-btn-wrap {
-  display: inline-block;
+.table-card {
+  padding: 12px;
+  border: 1px solid #e5e6eb;
 }
 
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+}
+
+.filter-actions-item {
+  :deep(.ant-form-item-control) {
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+.batch-btn-wrap,
 .action-btn-wrap {
   display: inline-block;
 }
@@ -562,6 +567,6 @@ defineExpose({ refreshRows })
 .table-pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
+  padding: 12px 4px 4px;
 }
 </style>

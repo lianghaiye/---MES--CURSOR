@@ -1860,17 +1860,19 @@ function handleSave() {
 }
 
 .price-summary-card {
-  margin-bottom: 8px;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
+  margin: 0;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
   overflow: hidden;
-  background: #fafafa;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
   .price-summary-header {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 8px 12px;
+    padding: 10px 16px;
+    background: #fff;
     cursor: pointer;
     user-select: none;
 
@@ -1878,6 +1880,7 @@ function handleSave() {
       font-weight: 600;
       font-size: 14px;
       flex-shrink: 0;
+      color: #1f1f1f;
     }
 
     .header-amounts {
@@ -1910,8 +1913,9 @@ function handleSave() {
   }
 
   .price-summary-body {
-    padding: 0 12px 8px;
+    padding: 0 16px 12px;
     border-top: 1px solid #f0f0f0;
+    background: #fff;
   }
 
   .summary-amounts-strip {
@@ -1968,17 +1972,19 @@ function handleSave() {
 }
 
 .detail-section {
-  margin-top: 8px;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
+  margin: 0;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
   overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
   .detail-section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 12px;
-    background: #fafafa;
+    padding: 10px 16px;
+    background: #fff;
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
     user-select: none;
@@ -1986,6 +1992,7 @@ function handleSave() {
     .section-title {
       font-weight: 600;
       font-size: 14px;
+      color: #1f1f1f;
     }
 
     .collapse-icon {
@@ -1998,11 +2005,15 @@ function handleSave() {
     }
   }
 
+  .detail-section-body {
+    background: #fff;
+  }
+
   .detail-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 12px 8px;
+    padding: 10px 16px 8px;
     gap: 8px;
 
     .tax-toggle-btn {
@@ -2022,7 +2033,7 @@ function handleSave() {
   }
 
   :deep(.ant-table-wrapper) {
-    padding: 0 12px 12px;
+    padding: 0 16px 12px;
   }
 
   :deep(.sales-line-table .ant-table-body) {
@@ -2127,24 +2138,27 @@ function handleSave() {
 }
 
 .fulfillment-hint {
-  margin-top: 8px;
+  margin: 8px 16px 12px;
   font-size: 12px;
   line-height: 1.6;
   color: #1677ff;
 }
 
 .attachment-section {
-  margin-top: 8px;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
+  margin: 0;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
   overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
   .attachment-section-header {
-    padding: 10px 12px 0;
+    padding: 10px 16px 0;
 
     .section-title {
       font-weight: 600;
       font-size: 14px;
+      color: #1f1f1f;
     }
   }
 

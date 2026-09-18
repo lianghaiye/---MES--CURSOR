@@ -597,7 +597,7 @@ function onDetailAction({ key, workOrder: wo }) {
 <style lang="less" scoped>
 .work-order-page {
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }
@@ -747,28 +747,30 @@ function onDetailAction({ key, workOrder: wo }) {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid #e8eef8;
   border-radius: 6px;
   padding: 6px 8px 6px 6px;
   margin-bottom: 6px;
   cursor: pointer;
-  background: #fff;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
   transition: all 0.2s;
-  border-left: 2px solid transparent;
+  border-left: 3px solid transparent;
+  box-sizing: border-box;
 
   &:hover {
-    border-color: #d6e4ff;
-    box-shadow: 0 1px 4px rgba(22, 119, 255, 0.08);
+    border-color: #91caff;
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.12);
   }
 
   &.active {
-    border-color: #91caff;
+    border-color: #1677ff;
     border-left-color: #1677ff;
-    background: #f0f7ff;
+    background: linear-gradient(180deg, #e6f4ff 0%, #f5faff 55%, #ffffff 100%);
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.16);
   }
 
   &.checked {
-    background: #fafcff;
+    border-color: #91caff;
   }
 
   .card-checkbox {

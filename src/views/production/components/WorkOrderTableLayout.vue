@@ -8,22 +8,21 @@
         <span class="table-summary">共 {{ total }} 条工单</span>
       </div>
       <div class="table-toolbar-right">
+        <a-radio-group
+          :value="layoutMode"
+          button-style="solid"
+          class="layout-mode-switch"
+          @change="onLayoutModeChange"
+        >
+          <a-radio-button value="split">主从视图</a-radio-button>
+          <a-radio-button value="table">列表视图</a-radio-button>
+        </a-radio-group>
         <a-tooltip title="刷新">
           <a-button type="text" size="small" class="toolbar-icon-btn" @click="emit('refresh')">
             <ReloadOutlined />
           </a-button>
         </a-tooltip>
         <TableColumnSettingButton @click="columnDrawerOpen = true" />
-        <a-tooltip title="切换为卡片视图">
-          <a-button
-            type="text"
-            size="small"
-            class="toolbar-icon-btn"
-            @click="emit('toggle-layout')"
-          >
-            <AppstoreOutlined />
-          </a-button>
-        </a-tooltip>
       </div>
     </div>
 
@@ -138,7 +137,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { AppstoreOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { ReloadOutlined } from '@ant-design/icons-vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -162,17 +161,22 @@ const props = defineProps({
   pagination: { type: Object, required: true },
   selectedIds: { type: Array, default: () => [] },
   activeId: { type: String, default: null },
+  layoutMode: { type: String, default: 'table' },
   columnSettingsKey: { type: String, default: 'work-order-list-v3' },
 })
 
 const emit = defineEmits([
   'refresh',
-  'toggle-layout',
+  'update:layoutMode',
   'select',
   'action',
   'update:pagination',
   'update:selectedIds',
 ])
+
+function onLayoutModeChange(e) {
+  emit('update:layoutMode', e?.target?.value ?? e)
+}
 
 const baseColumns = [
   { title: '#', key: 'index', width: 56, align: 'center', fixed: 'left' },
@@ -324,8 +328,19 @@ function urgencyLabel(urgency) {
   .table-toolbar-right {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     flex-shrink: 0;
+
+    .layout-mode-switch {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .ant-radio-button-wrapper {
+      height: 32px;
+      line-height: 30px;
+      font-size: 14px;
+    }
   }
 
   .toolbar-icon-btn {

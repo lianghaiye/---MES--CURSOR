@@ -44,6 +44,22 @@
     width: 100%;
   }
 
+  /* TextArea：禁止沿用 small Input 的固定高度，避免只剩字数统计条 */
+  textarea.ant-input,
+  .ant-input-textarea .ant-input,
+  .ant-input-textarea textarea {
+    width: 100%;
+    height: auto !important;
+    min-height: 54px;
+    line-height: 1.5715 !important;
+    resize: vertical;
+  }
+
+  .ant-input-textarea,
+  .ant-input-textarea-show-count {
+    width: 100%;
+  }
+
   .remark-item .ant-form-item-label {
     flex: 0 0 68px;
     align-self: flex-start;
@@ -65,11 +81,103 @@
  * 各页 scoped 可覆盖 padding/margin；描边与背景由此统一兜底
  */
 .filter-card {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   padding: 12px 16px;
   background: var(--card-bg, #fff);
   border: 1px solid var(--divider, #e5e6eb);
   border-radius: 8px;
+}
+
+/**
+ * 列表操作栏白盒：对齐生产管理 split-action-card
+ * 兼容 .toolbar-row / .list-action-card / .split-action-card
+ */
+.list-action-card,
+.toolbar-row,
+.split-action-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 12px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+  min-height: 56px;
+
+  > .ant-space,
+  > .split-action-left,
+  > .split-action-right,
+  > .toolbar-icons {
+    display: inline-flex !important;
+    align-items: center !important;
+    align-self: center;
+    margin-bottom: 0 !important;
+    line-height: 1;
+  }
+
+  .split-action-left,
+  .toolbar-left {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .split-action-right,
+  .toolbar-icons {
+    flex-shrink: 0;
+    margin-left: auto;
+    gap: 8px;
+    color: rgba(0, 0, 0, 0.45);
+  }
+
+  .ant-space-item {
+    display: inline-flex !important;
+    align-items: center !important;
+    line-height: 1;
+  }
+
+  /* 统一中号高度，避免左侧 small 按钮相对右侧 radio 偏矮/显偏下 */
+  .ant-btn {
+    height: 32px !important;
+    padding-inline: 15px;
+    font-size: 14px;
+    border-radius: 6px;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center;
+    line-height: 1 !important;
+  }
+
+  .ant-btn.ant-btn-icon-only,
+  .ant-btn.ant-btn-text,
+  .ant-btn.ant-btn-link {
+    width: 32px;
+    min-width: 32px;
+    padding-inline: 0;
+  }
+
+  .ant-btn > .anticon {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+  }
+
+  .ant-radio-group,
+  .layout-mode-switch {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .ant-radio-button-wrapper {
+    height: 32px !important;
+    line-height: 30px !important;
+    padding-inline: 12px;
+    font-size: 14px;
+  }
 }
 
 /**

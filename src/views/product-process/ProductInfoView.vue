@@ -672,7 +672,7 @@ function onAddCategory() {
 <style lang="less" scoped>
 .product-info-page {
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }

@@ -75,10 +75,7 @@
                   <SearchOutlined />
                   搜索
                 </a-button>
-                <a-button size="small" @click="handleReset">
-                  <ClearOutlined />
-                  清空
-                </a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
               </a-space>
             </a-form-item>
           </a-col>
@@ -189,7 +186,6 @@ import { useRouter } from 'vue-router'
 import { Checkbox, Modal, message } from 'ant-design-vue'
 import {
   SearchOutlined,
-  ClearOutlined,
   CheckOutlined,
   RollbackOutlined,
   PlusOutlined,
@@ -392,29 +388,54 @@ function handleWithdraw() {
 
 <style lang="less" scoped>
 .design-task-page {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin: -12px;
+  padding: 12px;
+  background: #f5f6f8;
+  min-height: calc(100vh - 112px);
+  box-sizing: border-box;
 }
 
 .filter-card,
 .table-card {
   background: #fff;
-  border-radius: 4px;
-  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.filter-card {
+  padding: 12px 16px;
+  margin-bottom: 12px;
 }
 
 .toolbar-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 4px;
+  margin-bottom: 12px;
+}
+
+.table-card {
+  padding: 12px;
+  border: 1px solid #e5e6eb;
+}
+
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+}
+
+.filter-actions-item {
+  :deep(.ant-form-item-control) {
+    display: flex;
+    justify-content: flex-end;
+  }
 }
 
 .table-pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
+  padding: 12px 4px 4px;
 }
 
 .link-code {

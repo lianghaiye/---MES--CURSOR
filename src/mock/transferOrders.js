@@ -19,6 +19,7 @@ export function createTransferLine(partial = {}) {
     itemType: '物料',
     specModel: '',
     material: '',
+    variantSummary: '',
     unit: '件',
     qty: 1,
     bookQty: null,

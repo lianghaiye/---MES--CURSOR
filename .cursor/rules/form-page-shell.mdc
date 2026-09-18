@@ -14,6 +14,14 @@ alwaysApply: true
 
 壳组件：`@FormCreateShell.vue`（`page-mode`）+ `@useFormCreatePage.js`。
 
+## 页头与内容对齐
+
+| 项 | 约定 |
+|----|------|
+| 与全局标签 | 标题白盒、下方区块白盒与 `GlobalTabs` **左缘对齐**（等效距内容区外缘 **24px**） |
+| `FormCreateShell` | `pageSidePadding` 默认 **0**；靠 `.form-create-page` 的 `margin:-12` + `padding:12` 对齐，**禁止**再叠一层左右 padding 把内容顶进去 |
+| 标题 ↔ 首区块 | 间距 **12px**（`.form-create-inner` 用 `gap: 12px`） |
+
 ## 页头
 
 | 项 | 约定 |

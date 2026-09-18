@@ -37,6 +37,17 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="盘点类型">
+              <a-select
+                v-model:value="filters.stocktakeType"
+                size="small"
+                allow-clear
+                placeholder="请选择 类型"
+                :options="typeOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item class="filter-actions-item">
               <a-space>
                 <a-button type="primary" size="small" @click="handleSearch">
@@ -58,9 +69,13 @@
             <PlusOutlined />
             新增
           </a-button>
-          <a-button size="small" @click="handleConfirmSelected">
+          <a-button size="small" @click="handleApproveSelected">
             <CheckOutlined />
-            确认
+            审核通过
+          </a-button>
+          <a-button size="small" @click="handlePostSelected">
+            <FileDoneOutlined />
+            生成盘盈盘亏
           </a-button>
           <a-button size="small" danger @click="handleRefuseSelected">
             <CloseCircleOutlined />
@@ -70,6 +85,15 @@
             <DeleteOutlined />
             删除
           </a-button>
+        </a-space>
+        <a-space>
+          <span class="setting-label">审核通过后过账</span>
+          <a-switch
+            :checked="autoPostOnApprove"
+            checked-children="自动"
+            un-checked-children="手动"
+            @change="onAutoPostChange"
+          />
         </a-space>
       </div>
 
@@ -91,7 +115,7 @@
           bordered
           :pagination="false"
           :row-selection="rowSelection"
-          :scroll="{ x: 1100 }"
+          :scroll="{ x: 1380 }"
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
@@ -99,10 +123,20 @@
               <a class="link-code" @click="goDetail(record)">{{ record.docNo }}</a>
             </template>
             <template v-else-if="column.key === 'status'">
-              <a-tag :color="stocktakeStatusColor(record.status)">{{ record.status }}</a-tag>
+              <a-space :size="4" wrap>
+                <a-tag :color="stocktakeStatusColor(record.status)">{{ record.status }}</a-tag>
+                <a-tag v-if="postingTag(record)" :color="postingTag(record).color">
+                  {{ postingTag(record).text }}
+                </a-tag>
+              </a-space>
             </template>
             <template v-else-if="column.key === 'sourceChannel'">
               {{ stocktakeSourceLabel(record.sourceChannel) }}
+            </template>
+            <template v-else-if="column.key === 'stocktakeQty'">
+              <a-tooltip title="差异行数 / 全部行数">
+                {{ formatStocktakeQtyRatio(record) }}
+              </a-tooltip>
             </template>
             <template v-else-if="column.key === 'action'">
               <a-space :size="0" wrap>
@@ -115,12 +149,20 @@
                   编辑
                 </a-button>
                 <a-button
-                  v-if="canConfirmStocktake(record)"
+                  v-if="canApproveStocktake(record)"
                   type="link"
                   size="small"
-                  @click="handleConfirmOne(record)"
+                  @click="handleApproveOne(record)"
                 >
-                  确认
+                  审核通过
+                </a-button>
+                <a-button
+                  v-if="canPostStocktake(record)"
+                  type="link"
+                  size="small"
+                  @click="handlePostOne(record)"
+                >
+                  {{ record.postingStatus === 'failed' ? '重新过账' : '生成盘盈盘亏' }}
                 </a-button>
                 <a-button
                   v-if="canRefuseStocktake(record)"
@@ -141,6 +183,9 @@
                   删除
                 </a-button>
               </a-space>
+            </template>
+            <template v-else>
+              {{ displayCell(record[column.dataIndex]) }}
             </template>
           </template>
         </a-table>
@@ -175,24 +220,36 @@ import {
   CheckOutlined,
   CloseCircleOutlined,
   DeleteOutlined,
+  FileDoneOutlined,
 } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions } from '@/store/warehouseStore'
 import {
+  STOCKTAKE_POSTING,
+  STOCKTAKE_STATUS,
   stocktakeStatusColor,
   stocktakeSourceLabel,
   stocktakeStatusOptions,
+  stocktakeTypeOptions,
+  stocktakePostingLabel,
+  formatStocktakeQtyRatio,
 } from '@/mock/stocktakeOptions'
 import {
   stocktakeOrderState,
   filterStocktakeOrders,
   canEditStocktake,
   canDeleteStocktake,
-  canConfirmStocktake,
+  canApproveStocktake,
+  canPostStocktake,
   canRefuseStocktake,
-  confirmStocktake,
+  approveStocktake,
+  postStocktake,
   refuseStocktake,
   deleteStocktakeOrder,
 } from '@/store/stocktakeOrderStore'
+import {
+  stocktakeSettingsState,
+  setStocktakeAutoPostOnApprove,
+} from '@/store/stocktakeSettingsStore'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { useTabs } from '@/composables/useTabs'
@@ -207,6 +264,7 @@ const filters = reactive({
   docNo: '',
   warehouse: undefined,
   status: undefined,
+  stocktakeType: undefined,
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
@@ -216,18 +274,22 @@ const refuseTargets = ref([])
 
 const warehouseOpts = computed(() => getWarehouseSelectOptions())
 const statusOpts = stocktakeStatusOptions.map((v) => ({ label: v, value: v }))
+const typeOpts = stocktakeTypeOptions.map((v) => ({ label: v, value: v }))
 const refuseDocNos = computed(() => refuseTargets.value.map((o) => o.docNo || o.id))
+const autoPostOnApprove = computed(() => stocktakeSettingsState.autoPostOnApprove)
 
 const columns = [
   { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
   { title: '盘点单号', key: 'docNo', width: 160, fixed: 'left' },
-  { title: '状态', key: 'status', width: 100 },
+  { title: '状态', key: 'status', width: 160 },
+  { title: '盘点类型', dataIndex: 'stocktakeType', width: 100 },
   { title: '来源', key: 'sourceChannel', width: 72 },
   { title: '盘点仓库', dataIndex: 'warehouse', width: 110 },
+  { title: '盘点数量', key: 'stocktakeQty', width: 120, align: 'right' },
   { title: '盘点日期', dataIndex: 'stocktakeDate', width: 110 },
   { title: '申请人', dataIndex: 'applicant', width: 90 },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '操作', key: 'action', width: 200, fixed: 'right' },
+  { title: '操作', key: 'action', width: 240, fixed: 'right' },
 ]
 
 const filteredList = computed(() => {
@@ -251,13 +313,37 @@ function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
 }
 
+function displayCell(val) {
+  const t = String(val ?? '').trim()
+  return t || '—'
+}
+
+function postingTag(record) {
+  if (record.status !== STOCKTAKE_STATUS.APPROVED) return null
+  const label = stocktakePostingLabel(record.postingStatus)
+  if (!label) return null
+  if (record.postingStatus === STOCKTAKE_POSTING.FAILED) return { text: label, color: 'error' }
+  if (record.postingStatus === STOCKTAKE_POSTING.PENDING) return { text: label, color: 'warning' }
+  return { text: label, color: 'default' }
+}
+
+function onAutoPostChange(checked) {
+  setStocktakeAutoPostOnApprove(checked)
+  message.success(checked ? '已开启：审核通过后自动过账' : '已关闭：审核通过后需手动生成盘盈盘亏')
+}
+
 function handleSearch() {
   appliedFilters.value = { ...filters }
   pagination.current = 1
 }
 
 function handleReset() {
-  Object.assign(filters, { docNo: '', warehouse: undefined, status: undefined })
+  Object.assign(filters, {
+    docNo: '',
+    warehouse: undefined,
+    status: undefined,
+    stocktakeType: undefined,
+  })
   handleSearch()
 }
 
@@ -280,33 +366,78 @@ function goDetail(record) {
   router.push(path)
 }
 
-function handleConfirmOne(record) {
+function reportApproveResult({ count, blocked, posted }) {
+  if (blocked?.length) {
+    message.warning(blocked.map((b) => `${b.docNo}: ${b.message}`).join('；'))
+  }
+  if (count) {
+    const postHint = posted?.length ? `，已过账 ${posted.length} 条` : ''
+    message.success(`审核通过 ${count} 条${postHint}`)
+  }
+}
+
+function reportPostResult({ count, blocked }) {
+  if (blocked?.length) {
+    message.warning(blocked.map((b) => `${b.docNo}: ${b.message}`).join('；'))
+  }
+  if (count) message.success(`已过账 ${count} 条`)
+}
+
+function handleApproveOne(record) {
   Modal.confirm({
-    title: `确认盘点 ${record.docNo}？`,
-    content: '将按差异生成盘盈入库或盘亏出库并入账。',
+    title: `审核通过 ${record.docNo}？`,
+    content: autoPostOnApprove.value
+      ? '将审核通过，并按配置自动生成盘盈入库 / 盘亏出库。'
+      : '将审核通过；需手动点击「生成盘盈盘亏」过账。',
     onOk: () => {
-      const { count, blocked } = confirmStocktake([record.id])
-      if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
-      if (count) message.success('已确认盘点')
+      reportApproveResult(approveStocktake([record.id]))
     },
   })
 }
 
-function handleConfirmSelected() {
+function handleApproveSelected() {
   if (!selectedRowKeys.value.length) {
     message.warning('请先选择盘点单')
     return
   }
   Modal.confirm({
-    title: '确认所选盘点单？',
+    title: '审核通过所选盘点单？',
+    content: autoPostOnApprove.value
+      ? '将审核通过，并按配置自动过账。'
+      : '将审核通过；需手动生成盘盈盘亏。',
     onOk: () => {
-      const { count, blocked } = confirmStocktake(selectedRowKeys.value)
-      if (blocked?.length)
-        message.warning(blocked.map((b) => `${b.docNo}: ${b.message}`).join('；'))
-      if (count) {
-        message.success(`已确认 ${count} 条`)
-        selectedRowKeys.value = []
-      }
+      const res = approveStocktake(selectedRowKeys.value)
+      reportApproveResult(res)
+      if (res.count) selectedRowKeys.value = []
+    },
+  })
+}
+
+function handlePostOne(record) {
+  const isRetry = record.postingStatus === STOCKTAKE_POSTING.FAILED
+  Modal.confirm({
+    title: isRetry ? `重新过账 ${record.docNo}？` : `生成盘盈盘亏 ${record.docNo}？`,
+    content: isRetry
+      ? record.postingError || '将再次尝试生成盘盈入库 / 盘亏出库并入账。'
+      : '将按差异生成盘盈入库或盘亏出库并入账。',
+    onOk: () => {
+      reportPostResult(postStocktake([record.id]))
+    },
+  })
+}
+
+function handlePostSelected() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择盘点单')
+    return
+  }
+  Modal.confirm({
+    title: '对所选盘点单生成盘盈盘亏？',
+    content: '仅「审核通过」且待过账/过账失败的单据会执行。',
+    onOk: () => {
+      const res = postStocktake(selectedRowKeys.value)
+      reportPostResult(res)
+      if (res.count) selectedRowKeys.value = []
     },
   })
 }
@@ -368,7 +499,7 @@ function handleBatchDelete() {
 <style lang="less" scoped>
 .stocktake-page {
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }
@@ -397,6 +528,11 @@ function handleBatchDelete() {
   margin-bottom: 8px;
 }
 
+.setting-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
 .summary-bar {
   margin-top: 0;
   margin-bottom: 8px;
@@ -422,6 +558,7 @@ function handleBatchDelete() {
     font-size: 13px;
   }
 
+  :deep(.ant-table-cell-fix-left),
   :deep(.ant-table-cell-fix-right) {
     background: #fff;
   }

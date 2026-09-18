@@ -158,14 +158,18 @@
         </a-dropdown>
       </a-space>
       <div class="split-action-right">
+        <a-radio-group
+          :value="layoutMode"
+          button-style="solid"
+          class="layout-mode-switch"
+          @change="onLayoutModeChange"
+        >
+          <a-radio-button value="split">主从视图</a-radio-button>
+          <a-radio-button value="table">列表视图</a-radio-button>
+        </a-radio-group>
         <a-tooltip title="刷新">
-          <a-button type="text" size="small" class="layout-toggle-btn" @click="handleSearch">
+          <a-button type="text" class="layout-toggle-btn" @click="handleSearch">
             <ReloadOutlined />
-          </a-button>
-        </a-tooltip>
-        <a-tooltip title="切换为列表视图">
-          <a-button type="text" size="small" class="layout-toggle-btn" @click="toggleLayout">
-            <TableOutlined />
           </a-button>
         </a-tooltip>
       </div>
@@ -303,15 +307,19 @@
             </template>
           </a-dropdown>
         </a-space>
-        <a-space :size="4" class="toolbar-icons">
+        <a-space :size="8" class="toolbar-icons" align="center">
+          <a-radio-group
+            :value="layoutMode"
+            button-style="solid"
+            class="layout-mode-switch"
+            @change="onLayoutModeChange"
+          >
+            <a-radio-button value="split">主从视图</a-radio-button>
+            <a-radio-button value="table">列表视图</a-radio-button>
+          </a-radio-group>
           <a-tooltip title="刷新">
-            <a-button type="text" size="small" @click="handleSearch">
+            <a-button type="text" @click="handleSearch">
               <ReloadOutlined />
-            </a-button>
-          </a-tooltip>
-          <a-tooltip title="切换为卡片视图">
-            <a-button type="text" size="small" @click="toggleLayout">
-              <AppstoreOutlined />
             </a-button>
           </a-tooltip>
           <TableColumnSettingButton @click="columnDrawerOpen = true" />
@@ -496,8 +504,6 @@ import {
   CheckOutlined,
   CloseCircleOutlined,
   PrinterOutlined,
-  TableOutlined,
-  AppstoreOutlined,
   EllipsisOutlined,
   DownOutlined,
 } from '@ant-design/icons-vue'
@@ -708,10 +714,15 @@ function statusColor(status) {
   return inboundStatusColor(status)
 }
 
-function toggleLayout() {
-  layoutMode.value = layoutMode.value === 'split' ? 'table' : 'split'
-  localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode.value)
-  pagination.current = 1
+function setLayoutMode(mode) {
+  if (mode !== 'split' && mode !== 'table') return
+  if (layoutMode.value === mode) return
+  layoutMode.value = mode
+  localStorage.setItem(LAYOUT_STORAGE_KEY, mode)
+}
+
+function onLayoutModeChange(e) {
+  setLayoutMode(e?.target?.value ?? e)
 }
 
 function selectOrder(id) {
@@ -992,7 +1003,7 @@ function handleRefuseInbound() {
 <style lang="less" scoped>
 .pending-inbound-page {
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }
@@ -1010,58 +1021,6 @@ function handleRefuseInbound() {
 .filter-card {
   padding: 10px 12px 6px;
   margin-bottom: 8px;
-}
-
-.split-action-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: #fff;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  box-sizing: border-box;
-  min-height: 44px;
-
-  .split-action-left {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-
-  .split-action-right {
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-    margin-left: auto;
-    gap: 0;
-  }
-
-  :deep(.ant-space) {
-    align-items: center;
-  }
-
-  :deep(.ant-space-item) {
-    display: inline-flex;
-    align-items: center;
-  }
-
-  :deep(.ant-btn) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .layout-toggle-btn {
-    color: rgba(0, 0, 0, 0.45);
-
-    &:hover {
-      color: #1677ff;
-    }
-  }
 }
 
 .list-panel {
@@ -1238,28 +1197,30 @@ function handleRefuseInbound() {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid #e8eef8;
   border-radius: 6px;
   padding: 6px 8px 6px 6px;
   margin-bottom: 6px;
   cursor: pointer;
-  background: #fff;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
   transition: all 0.2s;
-  border-left: 2px solid transparent;
+  border-left: 3px solid transparent;
+  box-sizing: border-box;
 
   &:hover {
-    border-color: #d6e4ff;
-    box-shadow: 0 1px 4px rgba(22, 119, 255, 0.08);
+    border-color: #91caff;
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.12);
   }
 
   &.active {
-    border-color: #91caff;
+    border-color: #1677ff;
     border-left-color: #1677ff;
-    background: #f0f7ff;
+    background: linear-gradient(180deg, #e6f4ff 0%, #f5faff 55%, #ffffff 100%);
+    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.16);
   }
 
   &.checked {
-    background: #fafcff;
+    border-color: #91caff;
   }
 
   .card-checkbox {

@@ -242,6 +242,7 @@ function scrollTo(selector) {
 <style lang="less" scoped>
 .prd-page {
   margin: -12px;
+  padding: 12px;
   height: calc(100vh - 56px - 40px - 24px);
   display: flex;
   flex-direction: column;

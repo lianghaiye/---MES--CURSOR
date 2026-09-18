@@ -148,14 +148,13 @@
               <a-input v-model:value="form.plateNo" size="small" placeholder="请输入 车牌号" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :span="24">
             <a-form-item label="备注" class="remark-item">
               <a-textarea
                 v-model:value="form.remark"
                 :rows="2"
                 :maxlength="200"
                 show-count
-                size="small"
                 placeholder="请输入 备注"
               />
             </a-form-item>
@@ -1397,14 +1396,6 @@ export default { name: 'DeliveryFormModal' }
 </script>
 
 <style lang="less" scoped>
-.section-block {
-  margin-bottom: 12px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
 .section-title {
   font-weight: 600;
   font-size: 14px;

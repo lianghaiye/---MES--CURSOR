@@ -3,7 +3,7 @@
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="台账号">
               <a-input
                 v-model:value="filters.ledgerNo"
@@ -13,7 +13,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="物料编码">
               <a-input
                 v-model:value="filters.itemCode"
@@ -23,7 +23,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="物料名称">
               <a-input
                 v-model:value="filters.itemName"
@@ -33,7 +33,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="来源">
               <a-select
                 v-model:value="filters.source"
@@ -45,7 +45,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="状态">
               <a-select
                 v-model:value="filters.status"
@@ -57,7 +57,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="补货动作">
               <a-select
                 v-model:value="filters.action"
@@ -69,16 +69,19 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="8" :lg="6">
+          <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="处理日期">
               <a-range-picker v-model:value="filters.dateRange" size="small" style="width: 100%" />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="6">
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item class="filter-actions-item">
               <a-space>
-                <a-button type="primary" size="small" @click="handleSearch">查询</a-button>
-                <a-button size="small" @click="handleReset">重置</a-button>
+                <a-button type="primary" size="small" @click="handleSearch">
+                  <SearchOutlined />
+                  搜索
+                </a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
               </a-space>
             </a-form-item>
           </a-col>
@@ -86,10 +89,23 @@
       </a-form>
     </div>
 
+    <div class="toolbar-row">
+      <a-space wrap :size="8">
+        <a-button type="primary" size="small" @click="manualModalOpen = true">
+          <PlusOutlined />
+          手工补货
+        </a-button>
+      </a-space>
+      <a-space :size="4" class="toolbar-icons">
+        <a-tooltip title="刷新">
+          <a-button type="text" size="small" @click="handleSearch">
+            <ReloadOutlined />
+          </a-button>
+        </a-tooltip>
+      </a-space>
+    </div>
+
     <div class="table-card">
-      <div class="table-toolbar">
-        <a-button type="primary" size="small" @click="manualModalOpen = true">手工补货</a-button>
-      </div>
       <a-table
         size="small"
         row-key="id"
@@ -132,7 +148,7 @@
           </template>
         </template>
       </a-table>
-      <div class="pager">
+      <div class="table-pagination">
         <a-pagination
           v-model:current="pagination.current"
           v-model:page-size="pagination.pageSize"
@@ -155,6 +171,7 @@ export default { name: 'ReplenishLedgerView' }
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { useTabs } from '@/composables/useTabs'
 import {
   replenishLedgerState,
@@ -275,31 +292,54 @@ function goWorkOrder() {
 
 <style lang="less" scoped>
 .replenish-ledger-page {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   margin: -12px;
   padding: 12px;
   background: #f5f6f8;
-  min-height: calc(100vh - 56px - 40px - 24px);
+  min-height: calc(100vh - 112px);
   box-sizing: border-box;
 }
 
 .filter-card,
 .table-card {
   background: #fff;
-  border-radius: 6px;
-  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.table-toolbar {
+.filter-card {
+  padding: 12px 16px;
   margin-bottom: 12px;
 }
 
-.pager {
+.toolbar-row {
+  margin-bottom: 12px;
+}
+
+.table-card {
+  padding: 12px;
+  border: 1px solid #e5e6eb;
+}
+
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+}
+
+.filter-actions-item {
+  :deep(.ant-form-item-control) {
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+.table-pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
+  padding: 12px 4px 4px;
 }
 
 .ref-links {

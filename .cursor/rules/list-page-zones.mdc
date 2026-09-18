@@ -21,10 +21,17 @@ alwaysApply: true
 ## 4.2 对齐与留白
 
 - 所有卡片左右对齐，卡片间**水平无间隙**
+- **全局标签区（`GlobalTabs`）白盒与下方内容区白盒必须左对齐**（同一垂直线）；实现上标签栏左右 margin 须等于 `page-content` 的 `margin + padding`（当前均为 **24px** 等效：`tabs margin 0 24px` ↔ `content margin 12 + padding 12`）
+- **新增/编辑表单页**（`FormCreateShell`）标题盒与区块白盒同样与标签左对齐；勿在 `form-create-inner` 再加默认左右 padding（见 `form-page-shell.mdc`）
 - 页头左对齐；工具栏左业务右视图；分页右对齐
 - 超大屏（>1920）内容区可 **1440px 居中**，两侧留白
 - 搜索区与列表区间距 **12px**
 - 表格列：文字垂直居中、左对齐；**数值列右对齐**
+
+### 禁止
+
+- ❌ 标签栏 margin 12、内容区 margin+padding 共 24，导致标签盒比内容盒更靠左
+- ❌ 单页用负 margin 抵消 padding 后未保证与 `GlobalTabs` 左缘一致
 
 ## 4.3 统计卡片（可选）
 

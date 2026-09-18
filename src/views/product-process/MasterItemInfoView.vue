@@ -1,14 +1,17 @@
 <template>
   <div class="product-info-page master-item-info-page">
     <div class="page-layout">
-      <div class="category-panel">
+      <div
+        class="category-panel"
+        :style="{ width: `${categoryPanelWidth}px`, flexBasis: `${categoryPanelWidth}px` }"
+      >
         <div class="category-tree-toggle">
           <a-radio-group v-model:value="categoryTreeMode" size="small" button-style="solid">
-            <a-radio-button value="product">产品类别</a-radio-button>
-            <a-radio-button value="material">物料类别</a-radio-button>
+            <a-radio-button :value="CATEGORY_TREE_MODE.ALL">全部</a-radio-button>
+            <a-radio-button :value="CATEGORY_TREE_MODE.PRODUCT">产品</a-radio-button>
+            <a-radio-button :value="CATEGORY_TREE_MODE.MATERIAL">物料</a-radio-button>
           </a-radio-group>
         </div>
-        <div class="category-tip">*右击可上移/下移、改名或删除；有主数据的类别默认靠前</div>
         <div class="category-search">
           <a-input v-model:value="categoryKeyword" allow-clear size="small" placeholder="搜索类别">
             <template #suffix>
@@ -31,7 +34,7 @@
             @rightClick="onCategoryRightClick"
           >
             <template #title="node">
-              <a-dropdown :trigger="['contextmenu']">
+              <a-dropdown :trigger="['contextmenu']" :disabled="isAllModeRootKey(node.key)">
                 <span class="cat-node-title">{{ node.title }}</span>
                 <template #overlay>
                   <a-menu @click="({ key }) => onCategoryMenu(key, node)">
@@ -50,6 +53,12 @@
           <a-empty v-else :image="false" description="无匹配类别" />
         </div>
       </div>
+
+      <div
+        class="panel-resizer"
+        title="拖动调整宽度"
+        @mousedown.prevent="onCategoryResizeMouseDown"
+      />
 
       <div class="main-panel">
         <div class="filter-card">
@@ -164,22 +173,22 @@
           </a-form>
         </div>
 
-        <div class="toolbar-row">
-          <a-space wrap :size="8">
-            <a-button type="primary" size="small" @click="openCreate">
+        <div class="toolbar-row list-action-card">
+          <a-space wrap :size="8" align="center">
+            <a-button type="primary" @click="openCreate">
               <PlusOutlined />
               新增
             </a-button>
-            <a-button size="small" @click="handleBatchDelete">
+            <a-button @click="handleBatchDelete">
               <DeleteOutlined />
               删除
             </a-button>
-            <a-button size="small" @click="handleSyncSpec">
+            <a-button @click="handleSyncSpec">
               <SyncOutlined />
               同步规格属性
             </a-button>
             <a-dropdown>
-              <a-button size="small">
+              <a-button>
                 批量操作
                 <DownOutlined />
               </a-button>
@@ -195,7 +204,6 @@
           <a-space :size="8" class="toolbar-icons" align="center">
             <a-radio-group
               v-model:value="listViewMode"
-              size="small"
               button-style="solid"
               @change="pagination.current = 1"
             >
@@ -203,7 +211,7 @@
               <a-radio-button value="template">模板视图</a-radio-button>
             </a-radio-group>
             <a-tooltip title="刷新">
-              <a-button type="text" size="small" @click="handleSearch">
+              <a-button type="text" @click="handleSearch">
                 <ReloadOutlined />
               </a-button>
             </a-tooltip>
@@ -360,7 +368,7 @@
 
     <MasterItemCategoryFormModal
       v-model:open="categoryFormOpen"
-      :mode="categoryTreeMode"
+      :mode="categoryFormMode"
       :record="categoryEditRecord"
       @saved="onCategorySaved"
     />
@@ -453,8 +461,11 @@ import { formatBusinessTypeLabels, MASTER_BUSINESS_TYPE_OPTIONS } from '@/utils/
 import { productBomState, getBomInfoLabelForItem, getBomsForItem } from '@/store/productBomStore'
 import { buildUnifiedListRows, filterUnifiedListRows } from '@/utils/masterItemList'
 import {
+  CATEGORY_TREE_ALL_ROOT,
   CATEGORY_TREE_MODE,
   ITEM_KIND,
+  decodeCategoryTreeKey,
+  encodeCategoryTreeKey,
   itemKindLabel,
   resolveBomItemTypeForKind,
 } from '@/utils/masterItemKind'
@@ -472,7 +483,23 @@ const router = useRouter()
 const { openTab } = useTabs()
 const productCreatePage = findCreatePageByListPath('/product-process/products')
 
-const categoryTreeMode = ref(CATEGORY_TREE_MODE.PRODUCT)
+const CATEGORY_PANEL_WIDTH_KEY = 'master-item-category-panel-width'
+const MIN_CATEGORY_PANEL_WIDTH = 180
+const MAX_CATEGORY_PANEL_WIDTH = 480
+const DEFAULT_CATEGORY_PANEL_WIDTH = 220
+
+function readCategoryPanelWidth() {
+  const raw = Number(localStorage.getItem(CATEGORY_PANEL_WIDTH_KEY))
+  if (!Number.isFinite(raw)) return DEFAULT_CATEGORY_PANEL_WIDTH
+  return Math.min(MAX_CATEGORY_PANEL_WIDTH, Math.max(MIN_CATEGORY_PANEL_WIDTH, raw))
+}
+
+const categoryPanelWidth = ref(readCategoryPanelWidth())
+let categoryResizing = false
+let categoryResizeStartX = 0
+let categoryResizeStartWidth = 0
+
+const categoryTreeMode = ref(CATEGORY_TREE_MODE.ALL)
 const categoryKeyword = ref('')
 const selectedCategoryKey = ref('')
 const expandedKeys = ref([])
@@ -481,6 +508,33 @@ const selectedCategoryKeys = computed(() =>
 )
 const categoryFormOpen = ref(false)
 const categoryEditRecord = ref(null)
+
+const categoryFormMode = computed(() => {
+  if (categoryTreeMode.value === CATEGORY_TREE_MODE.ALL) {
+    const decoded = decodeCategoryTreeKey(selectedCategoryKey.value, CATEGORY_TREE_MODE.PRODUCT)
+    return decoded.side || CATEGORY_TREE_MODE.PRODUCT
+  }
+  return categoryTreeMode.value
+})
+
+function isAllModeRootKey(key) {
+  return key === CATEGORY_TREE_ALL_ROOT.PRODUCT || key === CATEGORY_TREE_ALL_ROOT.MATERIAL
+}
+
+function resolveCategorySide(encodedKey) {
+  if (categoryTreeMode.value === CATEGORY_TREE_MODE.ALL) {
+    return decodeCategoryTreeKey(encodedKey, CATEGORY_TREE_MODE.PRODUCT).side
+  }
+  return categoryTreeMode.value
+}
+
+function resolveRawCategoryKey(encodedKey) {
+  if (categoryTreeMode.value === CATEGORY_TREE_MODE.ALL) {
+    const decoded = decodeCategoryTreeKey(encodedKey, CATEGORY_TREE_MODE.PRODUCT)
+    return decoded.isRoot ? '' : decoded.key
+  }
+  return encodedKey
+}
 
 const filters = reactive({
   code: '',
@@ -525,38 +579,64 @@ const itemKindFilterOpts = [
 ]
 const workCenterFilterOpts = workCenterOpts
 
-const activeCategoryTree = computed(() => {
-  void productCategoryState.tree
-  void materialCategoryState.tree
-  return categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
-    ? materialCategoryState.tree
-    : productCategoryState.tree
-})
-
-const categoryItemCountMap = computed(() => {
+const productCategoryCountMap = computed(() => {
   void productInfoState.products
-  void materialInfoState.materials
-  const tree = activeCategoryTree.value
-  const keys =
-    categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
-      ? materialInfoState.materials.flatMap((m) => [
-          m.categoryKey,
-          m.materialCategoryKey,
-          m.parentCategoryKey,
-        ])
-      : productInfoState.products.flatMap((p) => [
-          p.categoryKey,
-          p.productCategoryKey,
-          p.parentCategoryKey,
-        ])
-  return buildCategoryItemCountMap(tree, keys)
+  void productCategoryState.tree
+  const keys = productInfoState.products.flatMap((p) => [
+    p.categoryKey,
+    p.productCategoryKey,
+    p.parentCategoryKey,
+  ])
+  return buildCategoryItemCountMap(productCategoryState.tree, keys)
 })
 
-const sortedCategoryTree = computed(() =>
-  sortCategoryTreeForDisplay(activeCategoryTree.value, categoryItemCountMap.value),
+const materialCategoryCountMap = computed(() => {
+  void materialInfoState.materials
+  void materialCategoryState.tree
+  const keys = materialInfoState.materials.flatMap((m) => [
+    m.categoryKey,
+    m.materialCategoryKey,
+    m.parentCategoryKey,
+  ])
+  return buildCategoryItemCountMap(materialCategoryState.tree, keys)
+})
+
+const sortedProductCategoryTree = computed(() =>
+  sortCategoryTreeForDisplay(productCategoryState.tree, productCategoryCountMap.value),
 )
 
+const sortedMaterialCategoryTree = computed(() =>
+  sortCategoryTreeForDisplay(materialCategoryState.tree, materialCategoryCountMap.value),
+)
+
+const sortedCategoryTree = computed(() => {
+  void productCategoryState.tree
+  void materialCategoryState.tree
+  if (categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL) {
+    return sortedMaterialCategoryTree.value
+  }
+  if (categoryTreeMode.value === CATEGORY_TREE_MODE.PRODUCT) {
+    return sortedProductCategoryTree.value
+  }
+  return [
+    {
+      key: CATEGORY_TREE_ALL_ROOT.PRODUCT,
+      title: '产品',
+      code: 'P',
+      children: sortedProductCategoryTree.value,
+    },
+    {
+      key: CATEGORY_TREE_ALL_ROOT.MATERIAL,
+      title: '物料',
+      code: 'M',
+      children: sortedMaterialCategoryTree.value,
+    },
+  ]
+})
+
 function pickDefaultCategoryKey(tree) {
+  // 「全部」默认不选中，展示全量列表
+  if (categoryTreeMode.value === CATEGORY_TREE_MODE.ALL) return ''
   const first = tree?.[0]
   return first?.key || ''
 }
@@ -566,40 +646,72 @@ watch(
   (tree) => {
     if (!selectedCategoryKey.value && tree?.length) {
       selectedCategoryKey.value = pickDefaultCategoryKey(tree)
-      expandedKeys.value = selectedCategoryKey.value ? [selectedCategoryKey.value] : []
+      if (categoryTreeMode.value === CATEGORY_TREE_MODE.ALL) {
+        expandedKeys.value = [CATEGORY_TREE_ALL_ROOT.PRODUCT, CATEGORY_TREE_ALL_ROOT.MATERIAL]
+      } else {
+        expandedKeys.value = selectedCategoryKey.value ? [selectedCategoryKey.value] : []
+      }
     }
   },
   { immediate: true },
 )
 
-watch(categoryTreeMode, (mode) => {
-  const tree = sortCategoryTreeForDisplay(
-    mode === CATEGORY_TREE_MODE.MATERIAL ? materialCategoryState.tree : productCategoryState.tree,
-    categoryItemCountMap.value,
-  )
+watch(categoryTreeMode, () => {
+  const tree = sortedCategoryTree.value
   selectedCategoryKey.value = pickDefaultCategoryKey(tree)
-  expandedKeys.value = selectedCategoryKey.value ? [selectedCategoryKey.value] : []
+  if (categoryTreeMode.value === CATEGORY_TREE_MODE.ALL) {
+    expandedKeys.value = [CATEGORY_TREE_ALL_ROOT.PRODUCT, CATEGORY_TREE_ALL_ROOT.MATERIAL]
+  } else {
+    expandedKeys.value = selectedCategoryKey.value ? [selectedCategoryKey.value] : []
+  }
   filters.categoryKey = undefined
   pagination.current = 1
 })
 
-function mapTreeNodes(nodes) {
-  return nodes.map((node) => {
-    const count = categoryItemCountMap.value[node.key] || 0
+function mapTreeNodes(nodes, side = null) {
+  const defaultSide =
+    side ||
+    (categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+      ? CATEGORY_TREE_MODE.MATERIAL
+      : CATEGORY_TREE_MODE.PRODUCT)
+  return (nodes || []).map((node) => {
+    const isVirtualRoot = isAllModeRootKey(node.key)
+    const nodeSide = isVirtualRoot
+      ? node.key === CATEGORY_TREE_ALL_ROOT.MATERIAL
+        ? CATEGORY_TREE_MODE.MATERIAL
+        : CATEGORY_TREE_MODE.PRODUCT
+      : defaultSide
+    const rawKey = node.key
+    const displayKey =
+      categoryTreeMode.value === CATEGORY_TREE_MODE.ALL && !isVirtualRoot
+        ? encodeCategoryTreeKey(nodeSide, rawKey)
+        : rawKey
+    const countMap =
+      nodeSide === CATEGORY_TREE_MODE.MATERIAL
+        ? materialCategoryCountMap.value
+        : productCategoryCountMap.value
+    const count = isVirtualRoot ? 0 : countMap[rawKey] || 0
+    const title = isVirtualRoot
+      ? node.title
+      : `(${node.code}) ${node.title}${count ? ` · ${count}` : ''}`
     return {
-      key: node.key,
-      title: `(${node.code}) ${node.title}${count ? ` · ${count}` : ''}`,
+      key: displayKey,
+      title,
       system: Boolean(node.system),
-      children: node.children?.length ? mapTreeNodes(node.children) : undefined,
+      children: node.children?.length ? mapTreeNodes(node.children, nodeSide) : undefined,
     }
   })
 }
 
 function isSystemCategoryKey(key) {
+  if (isAllModeRootKey(key)) return true
+  const side = resolveCategorySide(key)
+  const rawKey = resolveRawCategoryKey(key)
+  if (!rawKey) return true
   const node =
-    categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
-      ? findMaterialCategory(key)
-      : findProductCategory(key)
+    side === CATEGORY_TREE_MODE.MATERIAL
+      ? findMaterialCategory(rawKey)
+      : findProductCategory(rawKey)
   return isSystemCategory(node)
 }
 
@@ -608,15 +720,18 @@ function onCategoryRightClick() {
 }
 
 function onCategoryMenu(key, node) {
+  if (isAllModeRootKey(node.key)) return
+  const side = resolveCategorySide(node.key)
+  const rawKey = resolveRawCategoryKey(node.key)
   const record =
-    categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
-      ? findMaterialCategory(node.key)
-      : findProductCategory(node.key)
+    side === CATEGORY_TREE_MODE.MATERIAL
+      ? findMaterialCategory(rawKey)
+      : findProductCategory(rawKey)
   if (!record) return
   if (key === 'moveUp' || key === 'moveDown') {
     const dir = key === 'moveUp' ? -1 : 1
     const res =
-      categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+      side === CATEGORY_TREE_MODE.MATERIAL
         ? moveMaterialCategory(record.key, dir)
         : moveProductCategory(record.key, dir)
     if (!res.ok) message.warning(res.message)
@@ -638,14 +753,14 @@ function onCategoryMenu(key, node) {
       okType: 'danger',
       onOk: () => {
         const res =
-          categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
+          side === CATEGORY_TREE_MODE.MATERIAL
             ? deleteMaterialCategory(record.key)
             : deleteProductCategory(record.key)
         if (!res.ok) {
           message.warning(res.message)
           return
         }
-        if (selectedCategoryKey.value === record.key) {
+        if (selectedCategoryKey.value === node.key) {
           selectedCategoryKey.value = pickDefaultCategoryKey(sortedCategoryTree.value)
         }
         message.success('已删除')
@@ -660,6 +775,25 @@ function onCategorySaved() {
 
 const displayTree = computed(() => {
   const tree = sortedCategoryTree.value
+  if (categoryTreeMode.value === CATEGORY_TREE_MODE.ALL) {
+    const kw = String(categoryKeyword.value || '').trim()
+    const productFiltered = filterCategoryTree(sortedProductCategoryTree.value, kw)
+    const materialFiltered = filterMaterialCategoryTree(sortedMaterialCategoryTree.value, kw)
+    return mapTreeNodes([
+      {
+        key: CATEGORY_TREE_ALL_ROOT.PRODUCT,
+        title: '产品',
+        code: 'P',
+        children: productFiltered,
+      },
+      {
+        key: CATEGORY_TREE_ALL_ROOT.MATERIAL,
+        title: '物料',
+        code: 'M',
+        children: materialFiltered,
+      },
+    ])
+  }
   const filterFn =
     categoryTreeMode.value === CATEGORY_TREE_MODE.MATERIAL
       ? filterMaterialCategoryTree
@@ -1008,6 +1142,31 @@ function onAddCategory() {
   categoryFormOpen.value = true
 }
 
+function onCategoryResizeMouseDown(e) {
+  categoryResizing = true
+  categoryResizeStartX = e.clientX
+  categoryResizeStartWidth = categoryPanelWidth.value
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+
+function onCategoryResizeMouseMove(e) {
+  if (!categoryResizing) return
+  const next = categoryResizeStartWidth + (e.clientX - categoryResizeStartX)
+  categoryPanelWidth.value = Math.min(
+    MAX_CATEGORY_PANEL_WIDTH,
+    Math.max(MIN_CATEGORY_PANEL_WIDTH, next),
+  )
+}
+
+function onCategoryResizeMouseUp() {
+  if (!categoryResizing) return
+  categoryResizing = false
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  localStorage.setItem(CATEGORY_PANEL_WIDTH_KEY, String(categoryPanelWidth.value))
+}
+
 function syncTableScrollY() {
   const el = tableWrapRef.value
   if (!el) return
@@ -1038,16 +1197,22 @@ watch(listViewMode, async () => {
 })
 
 onMounted(() => {
+  document.addEventListener('mousemove', onCategoryResizeMouseMove)
+  document.addEventListener('mouseup', onCategoryResizeMouseUp)
   nextTick(() => bindTableResize())
 })
 
-onBeforeUnmount(unbindTableResize)
+onBeforeUnmount(() => {
+  document.removeEventListener('mousemove', onCategoryResizeMouseMove)
+  document.removeEventListener('mouseup', onCategoryResizeMouseUp)
+  unbindTableResize()
+})
 </script>
 
 <style lang="less" scoped>
 .product-info-page {
   margin: -12px;
-  padding: 8px;
+  padding: 12px;
   background: #f5f6f8;
   height: calc(100vh - 56px - 40px - 24px);
   min-height: calc(100vh - 56px - 40px - 24px);
@@ -1061,31 +1226,38 @@ onBeforeUnmount(unbindTableResize)
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 8px;
+  gap: 0;
   align-items: stretch;
 }
 
 .category-panel {
-  flex: 0 0 200px;
+  flex: 0 0 auto;
+  width: 220px;
   height: 100%;
   min-height: 0;
+  min-width: 0;
   background: #fff;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 8px;
   display: flex;
   flex-direction: column;
-
-  .category-tip {
-    font-size: 12px;
-    color: rgba(0, 0, 0, 0.45);
-    margin-bottom: 8px;
-    flex-shrink: 0;
-  }
+  box-sizing: border-box;
 
   .category-tree-toggle {
     margin-bottom: 8px;
     flex-shrink: 0;
+
+    :deep(.ant-radio-group) {
+      display: flex;
+      width: 100%;
+    }
+
+    :deep(.ant-radio-button-wrapper) {
+      flex: 1;
+      text-align: center;
+      padding-inline: 0;
+    }
   }
 
   .category-search {
@@ -1116,6 +1288,32 @@ onBeforeUnmount(unbindTableResize)
   }
 }
 
+.panel-resizer {
+  flex: 0 0 6px;
+  margin: 0 3px;
+  cursor: col-resize;
+  border-radius: 3px;
+  position: relative;
+  align-self: stretch;
+
+  &:hover,
+  &:active {
+    background: rgba(22, 119, 255, 0.12);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 36px;
+    border-radius: 1px;
+    background: #d9d9d9;
+  }
+}
+
 .main-panel {
   flex: 1;
   min-width: 0;
@@ -1133,8 +1331,9 @@ onBeforeUnmount(unbindTableResize)
 
 .filter-card {
   flex-shrink: 0;
-  padding: 10px 12px 6px;
-  margin-bottom: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border-radius: 8px;
 }
 
 .horizontal-form {
@@ -1165,17 +1364,6 @@ onBeforeUnmount(unbindTableResize)
 }
 
 .toolbar-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.toolbar-icons {
-  margin-left: auto;
   flex-shrink: 0;
 }
 
@@ -1261,9 +1449,14 @@ onBeforeUnmount(unbindTableResize)
   }
 
   .category-panel {
-    width: 100%;
+    width: 100% !important;
+    flex-basis: auto !important;
     height: auto;
     max-height: 220px;
+  }
+
+  .panel-resizer {
+    display: none;
   }
 
   .main-panel,

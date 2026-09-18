@@ -144,7 +144,7 @@
       </a-form>
     </div>
 
-    <div class="toolbar-row">
+    <div class="toolbar-row list-action-card">
       <a-space :size="8">
         <a-button size="small" @click="exportModalOpen = true">导出</a-button>
       </a-space>
@@ -727,7 +727,7 @@ function openDetail(record) {
 <style lang="less" scoped>
 .sales-line-page {
   margin: -12px;
-  padding: 0;
+  padding: 12px;
   background: #f5f6f8;
   min-height: calc(100vh - 112px);
 }
@@ -740,8 +740,8 @@ function openDetail(record) {
 }
 
 .filter-card {
-  padding: 10px 12px 6px;
-  margin-bottom: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
 }
 
 .horizontal-form {
@@ -767,19 +767,6 @@ function openDetail(record) {
     :deep(.ant-form-item-label) {
       display: none;
     }
-  }
-}
-
-.toolbar-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-  gap: 8px;
-
-  .toolbar-icons {
-    color: rgba(0, 0, 0, 0.45);
   }
 }
 
