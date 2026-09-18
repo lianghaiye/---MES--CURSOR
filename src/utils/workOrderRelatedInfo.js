@@ -20,6 +20,11 @@ import {
   listWorkOrderOutsourcingOrders,
   listWorkOrderPurchaseRequisitions,
 } from '@/utils/workOrderConvertOccupy'
+import { resolveWorkOrderProcessConfigTags } from '@/utils/workOrderProcessDisplay'
+import {
+  resolveProcessOpOutsource,
+  resolveScheduleProcessOutsourceStatusLabel,
+} from '@/utils/workOrderProcessOutsource'
 
 function sumLineQty(lines) {
   return (lines || []).reduce((s, l) => s + (Number(l.qty ?? l.applyQty ?? l.reqQty) || 0), 0)
@@ -86,6 +91,18 @@ export function buildWorkOrderScheduleInfoBatchGroups(workOrder) {
     const rows = []
     let seq = 0
     assignments.forEach((a, ai) => {
+      const process = (workOrder.processes || []).find(
+        (p) =>
+          (a.processId && String(p.id) === String(a.processId)) ||
+          (a.processName && p.name === a.processName),
+      ) || {
+        id: a.processId,
+        name: a.processName,
+        processCode: a.processCode,
+        resourceType: a.resourceType,
+        opOutsource: a.opOutsource,
+        operations: a.operations,
+      }
       const executors = a.executors?.length ? a.executors : ['—']
       executors.forEach((executor, ei) => {
         seq += 1
@@ -135,7 +152,12 @@ export function buildWorkOrderScheduleInfoBatchGroups(workOrder) {
           batchNo: batch.batchNo,
           batchStatus: batch.status || '待下发',
           seq,
+          processId: process?.id || a.processId || '',
           processName: a.processName || '—',
+          processConfigTags: resolveWorkOrderProcessConfigTags(process),
+          isOutsourceProcess: resolveProcessOpOutsource(process),
+          outsourceStatus: resolveScheduleProcessOutsourceStatusLabel(workOrder, process, batch.id),
+          processLead: ei === 0,
           status,
           taskNo,
           executor,

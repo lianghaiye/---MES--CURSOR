@@ -9,9 +9,11 @@ import '@/store/materialInfoStore'
 import '@/store/stockBatchStore'
 import { bootstrapSpuSkuData } from '@/utils/spuBootstrap'
 import { initUiAppearance } from '@/store/uiAppearanceStore'
+import { startPurchaseSettleRuleScheduler } from '@/utils/purchaseSettleRuleScheduler'
 
 bootstrapSpuSkuData()
 initUiAppearance()
+startPurchaseSettleRuleScheduler()
 
 const RESIZE_OBSERVER_ERR = /ResizeObserver loop/
 

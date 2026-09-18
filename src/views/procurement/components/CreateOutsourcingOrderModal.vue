@@ -42,14 +42,24 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col v-if="isProcessMode" :span="6">
+            <a-col :span="6">
               <a-form-item label="外协类型">
-                <a-input value="工序外协" disabled size="small" />
+                <a-select
+                  v-model:value="form.outsourceMode"
+                  :options="outsourceTypeOpts"
+                  size="small"
+                  :disabled="outsourceTypeLocked"
+                  style="width: 100%"
+                />
               </a-form-item>
             </a-col>
             <a-col v-if="isProcessMode" :span="6">
-              <a-form-item label="外协工序">
-                <a-input :value="form.sourceProcessName || '—'" disabled size="small" />
+              <a-form-item label="选择工序" required>
+                <ProcessConfigSearchSelect
+                  v-model:value="form.sourceProcessId"
+                  :disabled="processSelectLocked"
+                  @change="onProcessConfigChange"
+                />
               </a-form-item>
             </a-col>
             <a-col :span="6">
@@ -62,7 +72,7 @@
               </a-form-item>
             </a-col>
             <a-col :span="6">
-              <a-form-item label="供应商" required>
+              <a-form-item label="供应商" :required="supplierRequired">
                 <PlanSupplierSelect
                   v-model:value="form.supplier"
                   placeholder="请搜索或选择供应商"
@@ -474,10 +484,15 @@ import {
 } from '@/store/outsourcingOrderStore'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
+import ProcessConfigSearchSelect from './ProcessConfigSearchSelect.vue'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import { resolveWorkOrderProcurementSource } from '@/constants/procurementDocSource'
 import { getWorkOrderConvertQty, validateWorkOrderConvertQty } from '@/utils/workOrderConvert'
-import { OUTSOURCE_MODE, normalizeOutsourceMode } from '@/utils/outsourcingMode'
+import {
+  OUTSOURCE_MODE,
+  OUTSOURCE_MODE_OPTIONS,
+  normalizeOutsourceMode,
+} from '@/utils/outsourcingMode'
 import {
   calcProcessOutsourceRemainQty,
   linkWorkOrderProcessOutsource,
@@ -492,6 +507,8 @@ const props = defineProps({
   seedWorkOrder: { type: Object, default: null },
   /** 工序外协：绑定工单工序 */
   seedProcess: { type: Object, default: null },
+  /** 下发确认预填计划数量（优先于可外协剩余） */
+  seedPlanQty: { type: Number, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -502,7 +519,11 @@ const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModa
   listPath: props.listPath,
   getTitle: () => {
     if (isEdit.value) return '编辑外协订单'
-    if (props.seedProcess?.id || props.editRecord?.outsourceMode === 'process') {
+    if (
+      props.seedProcess?.id ||
+      normalizeOutsourceMode(form.outsourceMode) === OUTSOURCE_MODE.PROCESS ||
+      normalizeOutsourceMode(props.editRecord?.outsourceMode) === OUTSOURCE_MODE.PROCESS
+    ) {
       return '新增工序外协订单'
     }
     return '新增外协订单'
@@ -550,11 +571,27 @@ const form = reactive({
 })
 
 const isProcessMode = computed(
+  () => normalizeOutsourceMode(form.outsourceMode) === OUTSOURCE_MODE.PROCESS,
+)
+
+/** 列表自由新增必填；工单转外协 / 工单生成的工序外协可空 */
+const supplierRequired = computed(() => {
+  if (props.seedWorkOrder?.id) return false
+  if (form.sourceWorkOrderId || props.editRecord?.sourceWorkOrderId) return false
+  return true
+})
+
+/** 工单工序入口 / 编辑工序单：类型与工序锁定 */
+const outsourceTypeLocked = computed(
   () =>
     Boolean(props.seedProcess?.id) ||
-    normalizeOutsourceMode(props.editRecord?.outsourceMode || form.outsourceMode) ===
-      OUTSOURCE_MODE.PROCESS,
+    (isEdit.value &&
+      normalizeOutsourceMode(props.editRecord?.outsourceMode) === OUTSOURCE_MODE.PROCESS),
 )
+
+const processSelectLocked = computed(() => outsourceTypeLocked.value)
+
+const outsourceTypeOpts = OUTSOURCE_MODE_OPTIONS
 
 const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: v }))
 const settlementCycleOpts = settlementCycleOptions.map((v) => ({ label: v, value: v }))
@@ -712,8 +749,11 @@ function loadSeedFromWorkOrder(wo, process = null) {
   if (!wo) return
   const isProcess = Boolean(process?.id)
   form.outsourceMode = isProcess ? OUTSOURCE_MODE.PROCESS : OUTSOURCE_MODE.WHOLE
+  const seededQty = Number(props.seedPlanQty)
   const planQty = isProcess
-    ? calcProcessOutsourceRemainQty(wo, process) || getWorkOrderConvertQty(wo) || 1
+    ? seededQty > 0
+      ? seededQty
+      : calcProcessOutsourceRemainQty(wo, process) || getWorkOrderConvertQty(wo) || 1
     : getWorkOrderConvertQty(wo) || 1
   const code = wo.materialCode || wo.productCode || ''
   const name = wo.productName || wo.name || ''
@@ -765,6 +805,7 @@ watch(
     props.editRecord?.id,
     props.seedWorkOrder?.id,
     props.seedProcess?.id,
+    props.seedPlanQty,
   ],
   () => {
     if (!isActive.value) return
@@ -780,6 +821,37 @@ function onSalesOrderChange(val) {
   form.salesOrderNo = val || ''
   form.salesOrderId = ''
 }
+
+function clearProcessFields() {
+  form.sourceProcessId = ''
+  form.sourceProcessCode = ''
+  form.sourceProcessName = ''
+  form.sourceProcessIndex = null
+}
+
+function onProcessConfigChange(processId, process) {
+  if (!processId || !process) {
+    clearProcessFields()
+    return
+  }
+  form.sourceProcessId = process.id || processId
+  form.sourceProcessCode = process.code || ''
+  form.sourceProcessName = process.name || ''
+  form.sourceProcessIndex = null
+}
+
+watch(
+  () => form.outsourceMode,
+  (mode, prev) => {
+    if (outsourceTypeLocked.value) return
+    if (
+      normalizeOutsourceMode(prev) === OUTSOURCE_MODE.PROCESS &&
+      normalizeOutsourceMode(mode) === OUTSOURCE_MODE.WHOLE
+    ) {
+      clearProcessFields()
+    }
+  },
+)
 
 function toggleBasicInfo() {
   basicInfoCollapsed.value = !basicInfoCollapsed.value
@@ -984,7 +1056,11 @@ function buildPayload() {
 }
 
 function handleSave() {
-  if (!String(form.supplier || '').trim()) {
+  if (isProcessMode.value && !String(form.sourceProcessId || '').trim()) {
+    message.warning('请选择工序')
+    return
+  }
+  if (supplierRequired.value && !String(form.supplier || '').trim()) {
     message.warning('请选择供应商')
     return
   }

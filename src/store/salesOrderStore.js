@@ -69,10 +69,11 @@ import {
 } from '@/utils/salesOrderStatus'
 import { ensureDedicatedShipDemoSalesOrders } from '@/mock/dedicatedShipDemoSeed'
 import { ensureScatterEbomShipDemoSalesOrders } from '@/mock/scatterEbomShipDemoSeed'
+import { ensureSalesLineShipInfoDemoSalesOrders } from '@/mock/salesLineShipInfoDemoSeed'
 import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 11
+const DATA_VERSION = 12
 let orderSeq = 20
 let deliverySeq = 113
 
@@ -127,7 +128,9 @@ function loadInitialSalesOrders() {
   const orders = migrateSalesOrderStatuses(loadFromStorage() || buildMockSalesOrders(mockProducts))
   return ensureIndustrialLabelDemoSalesOrder(
     ensureScatterEbomShipDemoSalesOrders(
-      ensureDedicatedShipDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+      ensureDedicatedShipDemoSalesOrders(
+        ensureSalesLineShipInfoDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+      ),
     ),
   )
 }

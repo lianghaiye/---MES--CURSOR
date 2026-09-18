@@ -568,6 +568,25 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
       return
     }
 
+    // 调拨入库：软签收迁仓，不走普通入库建批
+    if (order.transferOrderId || order.transferSoftReceive || order.inboundType === '调拨入库') {
+      const {
+        applyTransferInboundReceive,
+        syncTransferOrderFromInbound,
+      } = require('@/utils/transferConfirm')
+      const { getTransferOrderById } = require('@/store/transferOrderStore')
+      const transferOrder = getTransferOrderById(order.transferOrderId)
+      const res = applyTransferInboundReceive(transferOrder, order, pendingLines, { operator })
+      if (!res.ok) {
+        blocked.push({ docNo: order.docNo, message: res.message || '调拨签收失败' })
+        return
+      }
+      recomputeInboundOrderStatus(order, operator)
+      syncTransferOrderFromInbound(order, { operator })
+      count += 1
+      return
+    }
+
     for (const line of pendingLines) {
       const prep = prepareAndApplyInboundLine(order, line)
       if (!prep.ok) {
@@ -604,6 +623,20 @@ export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
   }
   if ((line.lineStatus || '待入库') === '已拒绝') {
     return { ok: false, message: '该明细已拒绝入库' }
+  }
+
+  if (order.transferOrderId || order.transferSoftReceive || order.inboundType === '调拨入库') {
+    const {
+      applyTransferInboundReceive,
+      syncTransferOrderFromInbound,
+    } = require('@/utils/transferConfirm')
+    const { getTransferOrderById } = require('@/store/transferOrderStore')
+    const transferOrder = getTransferOrderById(order.transferOrderId)
+    const res = applyTransferInboundReceive(transferOrder, order, [line], { operator })
+    if (!res.ok) return res
+    recomputeInboundOrderStatus(order, operator)
+    syncTransferOrderFromInbound(order, { operator })
+    return { ok: true, order, line }
   }
 
   const prep = prepareAndApplyInboundLine(order, line)
@@ -698,6 +731,32 @@ export function refuseInbound(ids, { reason = '', operator = 'admin1' } = {}) {
       })
       return
     }
+
+    const pendingLines = (order.lineItems || []).filter((l) => {
+      const st = l.lineStatus || '待入库'
+      return st !== '已入库' && st !== '已拒绝'
+    })
+
+    if (order.transferOrderId || order.transferSoftReceive || order.inboundType === '调拨入库') {
+      const {
+        applyTransferInboundRefuse,
+        syncTransferOrderFromInbound,
+      } = require('@/utils/transferConfirm')
+      const { getTransferOrderById } = require('@/store/transferOrderStore')
+      const transferOrder = getTransferOrderById(order.transferOrderId)
+      applyTransferInboundRefuse(transferOrder, order, pendingLines, { reason: reasonText })
+      order.status =
+        pendingLines.length === (order.lineItems || []).length ? '已拒绝' : order.status
+      order.refuseReason = reasonText
+      order.refusedBy = operator
+      order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+      recomputeInboundOrderStatus(order, operator)
+      syncTransferOrderFromInbound(order, { operator })
+      refused.push(order)
+      count += 1
+      return
+    }
+
     order.status = '已拒绝'
     order.refuseReason = reasonText
     order.refusedBy = operator
@@ -729,6 +788,22 @@ export function refuseInboundLine(orderId, lineId, { reason = '', operator = 'ad
   }
   const reasonText = String(reason || '').trim()
   if (!reasonText) return { ok: false, message: '请填写拒绝理由' }
+
+  if (order.transferOrderId || order.transferSoftReceive || order.inboundType === '调拨入库') {
+    const {
+      applyTransferInboundRefuse,
+      syncTransferOrderFromInbound,
+    } = require('@/utils/transferConfirm')
+    const { getTransferOrderById } = require('@/store/transferOrderStore')
+    const transferOrder = getTransferOrderById(order.transferOrderId)
+    applyTransferInboundRefuse(transferOrder, order, [line], { reason: reasonText })
+    recomputeInboundOrderStatus(order, operator)
+    order.refuseReason = reasonText
+    order.refusedBy = operator
+    order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    syncTransferOrderFromInbound(order, { operator })
+    return { ok: true, order, line }
+  }
 
   line.lineStatus = '已拒绝'
   line.refuseReason = reasonText

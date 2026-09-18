@@ -7,9 +7,11 @@
     @saved="onPurchaseSaved"
   />
   <CreateOutsourcingOrderModal
-    v-model:open="outsourceOpen"
+    :open="outsourceOpen"
     :seed-work-order="seedWorkOrder"
     :seed-process="seedProcess"
+    :seed-plan-qty="seedPlanQty"
+    @update:open="onOutsourceOpenUpdate"
     @saved="onOutsourceSaved"
   />
 </template>
@@ -20,6 +22,7 @@ import { message } from 'ant-design-vue'
 import GeneratePurchaseRequisitionModal from '@/views/planning/components/GeneratePurchaseRequisitionModal.vue'
 import CreateOutsourcingOrderModal from '@/views/procurement/components/CreateOutsourcingOrderModal.vue'
 import { addPurchaseRequisition } from '@/store/purchaseRequisitionStore'
+import { updateOutsourcingOrder } from '@/store/outsourcingOrderStore'
 import {
   buildConvertMaterialFromWorkOrder,
   buildConvertSyntheticOrder,
@@ -42,7 +45,26 @@ const modalOrder = ref(null)
 const modalMaterials = ref([])
 const seedWorkOrder = ref(null)
 const seedProcess = ref(null)
+const seedPlanQty = ref(null)
+const seedScheduleBatchId = ref('')
 const sourceWorkOrder = ref(null)
+
+/** @type {{ resolve: Function, settled: boolean } | null} */
+let pendingDispatchConfirm = null
+
+function settleDispatchConfirm(payload) {
+  if (!pendingDispatchConfirm || pendingDispatchConfirm.settled) return
+  pendingDispatchConfirm.settled = true
+  pendingDispatchConfirm.resolve(payload)
+  pendingDispatchConfirm = null
+}
+
+function clearOutsourceSeed() {
+  seedWorkOrder.value = null
+  seedProcess.value = null
+  seedPlanQty.value = null
+  seedScheduleBatchId.value = ''
+}
 
 function openPurchase(wo) {
   if (!canConvertWorkOrderToPurchaseOrOutsource(wo)) {
@@ -71,10 +93,17 @@ function openOutsource(wo) {
   sourceWorkOrder.value = wo
   seedWorkOrder.value = wo
   seedProcess.value = null
+  seedPlanQty.value = null
+  seedScheduleBatchId.value = ''
   outsourceOpen.value = true
 }
 
-function openProcessOutsource(wo, process) {
+/**
+ * @param {object} wo
+ * @param {object} process
+ * @param {{ planQty?: number, scheduleBatchId?: string }} [opts]
+ */
+function openProcessOutsource(wo, process, opts = {}) {
   if (!canCreateProcessOutsource(wo, process)) {
     message.warning('当前工序不可转工序外协（需工序可外协，且工单为待下发/已下发/执行中）')
     return
@@ -91,7 +120,35 @@ function openProcessOutsource(wo, process) {
   sourceWorkOrder.value = wo
   seedWorkOrder.value = wo
   seedProcess.value = process
+  const planQty = Number(opts.planQty)
+  seedPlanQty.value = planQty > 0 ? planQty : null
+  seedScheduleBatchId.value = opts.scheduleBatchId || ''
   outsourceOpen.value = true
+}
+
+/**
+ * 下发前确认：打开「新增工序外协订单」弹窗，等待保存或取消
+ * @returns {Promise<{ saved: boolean, order?: object }>}
+ */
+function openProcessOutsourceForDispatch(wo, process, batchQty, scheduleBatchId = '') {
+  return new Promise((resolve) => {
+    if (!wo || !process) {
+      resolve({ saved: false })
+      return
+    }
+    if (!wo.materialCode && !wo.productCode && !(wo.productName || wo.name)) {
+      message.warning('工单缺少产品信息，无法转工序外协')
+      resolve({ saved: false })
+      return
+    }
+    pendingDispatchConfirm = { resolve, settled: false }
+    sourceWorkOrder.value = wo
+    seedWorkOrder.value = wo
+    seedProcess.value = process
+    seedPlanQty.value = Number(batchQty) > 0 ? Number(batchQty) : null
+    seedScheduleBatchId.value = scheduleBatchId || ''
+    outsourceOpen.value = true
+  })
 }
 
 function onPurchaseSaved(requisition) {
@@ -122,6 +179,9 @@ function onPurchaseSaved(requisition) {
 function onOutsourceSaved(order) {
   const wo = sourceWorkOrder.value
   const processMode = isProcessOutsourceOrder(order)
+  if (processMode && seedScheduleBatchId.value && order?.id) {
+    updateOutsourcingOrder(order.id, { sourceScheduleBatchId: seedScheduleBatchId.value })
+  }
   let completed = false
   if (!processMode) {
     completed = completeWorkOrderIfNoRemainSchedule(wo)
@@ -136,12 +196,25 @@ function onOutsourceSaved(order) {
     order,
     completed,
   })
+  settleDispatchConfirm({ saved: true, order })
   sourceWorkOrder.value = null
-  seedWorkOrder.value = null
-  seedProcess.value = null
+  clearOutsourceSeed()
 }
 
-defineExpose({ openPurchase, openOutsource, openProcessOutsource })
+function onOutsourceOpenUpdate(open) {
+  outsourceOpen.value = open
+  if (!open) {
+    settleDispatchConfirm({ saved: false })
+    clearOutsourceSeed()
+  }
+}
+
+defineExpose({
+  openPurchase,
+  openOutsource,
+  openProcessOutsource,
+  openProcessOutsourceForDispatch,
+})
 </script>
 
 <script>

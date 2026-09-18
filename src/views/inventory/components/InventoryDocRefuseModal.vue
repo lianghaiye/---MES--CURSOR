@@ -12,13 +12,18 @@
   >
     <p class="refuse-hint">{{ hint }}</p>
     <a-form layout="vertical">
-      <a-form-item label="拒绝理由" required :validate-status="error ? 'error' : ''" :help="error">
+      <a-form-item
+        :label="`${actionLabel}理由`"
+        required
+        :validate-status="error ? 'error' : ''"
+        :help="error"
+      >
         <a-textarea
           v-model:value="reason"
           :rows="4"
           :maxlength="200"
           show-count
-          placeholder="请填写拒绝理由"
+          :placeholder="`请填写${actionLabel}理由`"
         />
       </a-form-item>
     </a-form>
@@ -34,6 +39,8 @@ const props = defineProps({
   confirmLoading: { type: Boolean, default: false },
   /** 调拨 | 盘点 */
   docLabel: { type: String, default: '单据' },
+  /** refuse | void */
+  actionType: { type: String, default: 'refuse' },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -41,16 +48,21 @@ const emit = defineEmits(['update:open', 'confirm'])
 const reason = ref('')
 const error = ref('')
 
-const okText = computed(() => `拒绝${props.docLabel}`)
+const actionLabel = computed(() => (props.actionType === 'void' ? '作废' : '拒绝'))
+const resultStatus = computed(() => (props.actionType === 'void' ? '已作废' : '已拒绝'))
+
+const okText = computed(() => `${actionLabel.value}${props.docLabel}`)
 
 const title = computed(() => {
   const nos = props.docNos || []
-  if (nos.length === 1) return `拒绝${props.docLabel} ${nos[0]}？`
-  if (nos.length > 1) return `拒绝所选 ${nos.length} 条${props.docLabel}？`
-  return `拒绝${props.docLabel}`
+  if (nos.length === 1) return `${actionLabel.value}${props.docLabel} ${nos[0]}？`
+  if (nos.length > 1) return `${actionLabel.value}所选 ${nos.length} 条${props.docLabel}？`
+  return `${actionLabel.value}${props.docLabel}`
 })
 
-const hint = computed(() => `拒绝后${props.docLabel}将标记为「已拒绝」。`)
+const hint = computed(
+  () => `${actionLabel.value}后${props.docLabel}将标记为「${resultStatus.value}」。`,
+)
 
 watch(
   () => props.open,
@@ -65,7 +77,7 @@ watch(
 function handleOk() {
   const text = String(reason.value || '').trim()
   if (!text) {
-    error.value = '请填写拒绝理由'
+    error.value = `请填写${actionLabel.value}理由`
     return
   }
   emit('confirm', text)

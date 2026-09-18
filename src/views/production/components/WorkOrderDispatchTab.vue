@@ -24,14 +24,27 @@
         </template>
         <template v-else-if="column.key === 'processConfig'">
           <div v-if="processConfigTags(record).length" class="config-tags">
-            <a-tag
-              v-for="item in processConfigTags(record)"
-              :key="item.label"
-              :color="item.color"
-              class="config-tag"
-            >
-              {{ item.label }}
-            </a-tag>
+            <template v-for="item in processConfigTags(record)" :key="item.label">
+              <a-tag :color="item.color" class="config-tag">
+                {{ item.label }}
+              </a-tag>
+              <template v-if="item.label === '外协' && isOutsourceProcess(record)">
+                <a-checkbox
+                  v-model:checked="record.skipProcessOutsourceOnDispatch"
+                  class="outsource-opt-check"
+                  @change="onSkipChange(record)"
+                >
+                  本次不出
+                </a-checkbox>
+                <a-checkbox
+                  v-model:checked="record.outsourceConfirmBeforeDispatch"
+                  class="outsource-opt-check"
+                  @change="onConfirmChange(record)"
+                >
+                  下发前确认
+                </a-checkbox>
+              </template>
+            </template>
           </div>
           <span v-else class="muted">—</span>
         </template>
@@ -114,6 +127,7 @@ import {
   formatWorkOrderProcessExecutionMode,
   resolveWorkOrderProcessConfigTags,
 } from '@/utils/workOrderProcessDisplay'
+import { resolveProcessOpOutsource } from '@/utils/workOrderProcessOutsource'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -132,7 +146,7 @@ watch(
 const columns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '工序名称', key: 'process', width: 120 },
-  { title: '工序配置', key: 'processConfig', width: 160 },
+  { title: '工序配置', key: 'processConfig', width: 360 },
   { title: '资源类型', key: 'resourceType', width: 90 },
   { title: '任务模式', key: 'executionMode', width: 96 },
   { title: '选择执行人', key: 'executors', width: 220 },
@@ -143,6 +157,24 @@ const columns = [
 
 function processConfigTags(record) {
   return resolveWorkOrderProcessConfigTags(record)
+}
+
+function isOutsourceProcess(record) {
+  return resolveProcessOpOutsource(record)
+}
+
+function onSkipChange(record) {
+  record.skipProcessOutsourceOnDispatch = Boolean(record.skipProcessOutsourceOnDispatch)
+  if (record.skipProcessOutsourceOnDispatch) {
+    record.outsourceConfirmBeforeDispatch = false
+  }
+}
+
+function onConfirmChange(record) {
+  record.outsourceConfirmBeforeDispatch = Boolean(record.outsourceConfirmBeforeDispatch)
+  if (record.outsourceConfirmBeforeDispatch) {
+    record.skipProcessOutsourceOnDispatch = false
+  }
 }
 
 function isBlankingProcess(record) {
@@ -198,11 +230,18 @@ function emitDispatchAndStart() {
   .config-tags {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 4px;
   }
 
   .config-tag {
     margin-inline-end: 0;
+  }
+
+  .outsource-opt-check {
+    font-size: 12px;
+    margin-left: 2px;
+    white-space: nowrap;
   }
 
   .task-hint {

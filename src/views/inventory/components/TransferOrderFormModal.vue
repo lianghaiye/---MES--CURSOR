@@ -125,9 +125,10 @@
 
     <template #footer>
       <a-button @click="onShellCancel">取消</a-button>
-      <a-button type="primary" :loading="saving" @click="handleSave">
+      <a-button :loading="saving" @click="handleSave">保存</a-button>
+      <a-button type="primary" :loading="saving" @click="handleSaveAndConfirm">
         <CheckOutlined />
-        保存
+        保存并确认
       </a-button>
     </template>
   </FormCreateShell>
@@ -149,7 +150,11 @@ import TransferStockPickModal from '@/views/inventory/components/TransferStockPi
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { getWarehouseSelectOptions } from '@/store/warehouseStore'
 import { createTransferLine } from '@/mock/transferOrders'
-import { addTransferOrder, updateTransferOrder } from '@/store/transferOrderStore'
+import {
+  addTransferOrder,
+  updateTransferOrder,
+  saveAndConfirmTransfer,
+} from '@/store/transferOrderStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -291,7 +296,7 @@ function handleSave() {
     lineItems: form.lineItems,
   }
   const res = isEdit.value
-    ? updateTransferOrder(props.editRecord.id, payload)
+    ? updateTransferOrder(props.editRecord.id, { ...payload, id: props.editRecord.id })
     : addTransferOrder(payload)
   saving.value = false
   if (!res.ok) {
@@ -299,6 +304,29 @@ function handleSave() {
     return
   }
   message.success(isEdit.value ? '调拨单已更新' : '调拨单已创建')
+  emit('saved')
+  closeAfterSave()
+}
+
+function handleSaveAndConfirm() {
+  saving.value = true
+  const payload = {
+    id: isEdit.value ? props.editRecord.id : undefined,
+    docNo: form.docNo,
+    fromWarehouse: form.fromWarehouse,
+    toWarehouse: form.toWarehouse,
+    transferDate: form.transferDate,
+    applicant: form.applicant,
+    remark: form.remark,
+    lineItems: form.lineItems,
+  }
+  const res = saveAndConfirmTransfer(payload)
+  saving.value = false
+  if (!res.ok) {
+    message.warning(res.message || '保存并确认失败')
+    return
+  }
+  message.success('已保存并确认出库')
   emit('saved')
   closeAfterSave()
 }

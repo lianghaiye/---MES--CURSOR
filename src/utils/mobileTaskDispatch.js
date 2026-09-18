@@ -13,6 +13,7 @@ import {
   shouldSplitCollaborativeTasks,
 } from '@/utils/taskExecutionMode'
 import { isParallelTaskDispatch } from '@/store/businessRuleStore'
+import { resolveProcessOpOutsource } from '@/utils/workOrderProcessOutsource'
 
 export const MOBILE_TASK_SYNC_KEY = 'i_doms_mobile_tasks_sync'
 
@@ -265,6 +266,7 @@ export function generateMobileTasksFromWorkOrder(workOrder, orderCategory) {
   const tasks = []
 
   processes.forEach((rawProcess, index) => {
+    if (resolveProcessOpOutsource(rawProcess)) return
     const process = enrichProcessForTask(rawProcess)
     const processSeq = process.index ?? index + 1
 

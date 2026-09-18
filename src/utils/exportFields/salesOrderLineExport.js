@@ -6,11 +6,6 @@ export const salesOrderLineExportFields = [
   { key: 'customerName', title: '客户名称', getValue: (row) => cell(row, 'customerName') },
   { key: 'productName', title: '产品名称', getValue: (row) => cell(row, 'productName') },
   { key: 'productCode', title: '产品编码', getValue: (row) => cell(row, 'productCode') },
-  {
-    key: 'snSummaryText',
-    title: '工业 SN 摘要',
-    getValue: (row) => cell(row, 'snSummaryText'),
-  },
   { key: 'businessType', title: '业务类型', getValue: (row) => cell(row, 'businessType') },
   { key: 'productAttr', title: '产品属性', getValue: (row) => cell(row, 'productAttr') },
   { key: 'specModel', title: '规格型号', getValue: (row) => cell(row, 'specModel') },
@@ -24,6 +19,7 @@ export const salesOrderLineExportFields = [
     getValue: (row) => cell(row, 'matchingRequirements'),
   },
   { key: 'salesQty', title: '销售数量', getValue: (row) => numCell(row.salesQty, 0) },
+  { key: 'contractNo', title: '合同编号', getValue: (row) => cell(row, 'contractNo') },
   { key: 'shippedQty', title: '已发数量', getValue: (row) => numCell(row.shippedQty, 0) },
   { key: 'unshippedQty', title: '未发数量', getValue: (row) => numCell(row.unshippedQty, 0) },
   {
@@ -32,6 +28,16 @@ export const salesOrderLineExportFields = [
     getValue: (row) => cell(row, 'lineDeliveryStatus'),
   },
   { key: 'deliveryMode', title: '交付方式', getValue: (row) => cell(row, 'deliveryMode') },
+  {
+    key: 'shipSummaryText',
+    title: '发货信息',
+    getValue: (row) => cell(row, 'shipSummaryText'),
+  },
+  {
+    key: 'snSummaryText',
+    title: '工业 SN 摘要',
+    getValue: (row) => cell(row, 'snSummaryText'),
+  },
   {
     key: 'stockFulfillmentModeLabel',
     title: '库存履约',
@@ -86,7 +92,7 @@ export const salesOrderLineExportFields = [
   { key: 'packagingForm', title: '包装形式', getValue: (row) => cell(row, 'packagingForm') },
   { key: 'supplementDesc', title: '补充说明', getValue: (row) => cell(row, 'supplementDesc') },
   { key: 'salesperson', title: '业务员', getValue: (row) => cell(row, 'salesperson') },
-  { key: 'contractNo', title: '合同编号', getValue: (row) => cell(row, 'contractNo') },
+  { key: 'region', title: '区域', getValue: (row) => cell(row, 'region') },
   { key: 'createdAt', title: '创建时间', getValue: (row) => cell(row, 'createdAt') },
   { key: 'creator', title: '创建人', getValue: (row) => cell(row, 'creator') },
 ]

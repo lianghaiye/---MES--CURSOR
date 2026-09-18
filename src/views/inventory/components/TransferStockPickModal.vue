@@ -180,6 +180,7 @@ import { CloseOutlined } from '@ant-design/icons-vue'
 import ListFilterBar from '@/components/ListFilterBar.vue'
 import { stockState } from '@/store/stockStore'
 import { listBatches, listFreeBatches, sumFreeQty } from '@/store/stockBatchStore'
+import { getTransferSoftLockedQty, transferSoftLockState } from '@/store/transferSoftLockStore'
 import { findMasterItemByCode } from '@/utils/stockAlertDisplay'
 import { getWarehouseStockQty } from '@/utils/inboundLineHelpers'
 import { lineVariantSummary } from '@/utils/spuLineResolve'
@@ -278,7 +279,9 @@ function buildFreeRows(wh) {
   codes.forEach((code) => {
     const free = sumFreeQty({ warehouse: wh, itemCode: code })
     const whQty = getWarehouseStockQty(wh, code)
-    const qty = free > 0 ? free : whQty
+    const locked = getTransferSoftLockedQty({ warehouse: wh, itemCode: code })
+    const base = free > 0 ? free : whQty
+    const qty = Math.max(0, base - locked)
     if (!(qty > 0)) return
     const sample = listFreeBatches({ warehouse: wh, itemCode: code }).find(
       (b) => !isDedicatedBatch(b),
@@ -312,7 +315,13 @@ function buildDedicatedRows(wh) {
   return listBatches({ warehouse: wh, inStockOnly: true })
     .filter((b) => isDedicatedBatch(b))
     .map((b) => {
-      const qty = Number(b.currentLength) || 0
+      const raw = Number(b.currentLength) || 0
+      const locked = getTransferSoftLockedQty({
+        warehouse: wh,
+        itemCode: b.itemCode,
+        batchId: b.id,
+      })
+      const qty = Math.max(0, raw - locked)
       if (!(qty > 0)) return null
       const meta = resolveItemMeta(b.itemCode, b)
       return {
@@ -343,6 +352,7 @@ const allRows = computed(() => {
   const wh = String(props.warehouse || '').trim()
   if (!wh) return []
   void stockState.records
+  void transferSoftLockState.locks
   const tab = ownershipTab.value
   if (tab === 'free') return buildFreeRows(wh)
   if (tab === 'dedicated') return buildDedicatedRows(wh)

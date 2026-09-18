@@ -15,10 +15,10 @@
               size="small"
               @click="handleConfirm"
             >
-              确认
+              确认出库
             </a-button>
-            <a-button v-if="canRefuseTransfer(record)" size="small" danger @click="openRefuse">
-              拒绝
+            <a-button v-if="canVoidTransfer(record)" size="small" danger @click="openVoid">
+              作废
             </a-button>
             <a-button v-if="canEditTransfer(record)" size="small" @click="openEdit">编辑</a-button>
             <a-button size="small" @click="goBack">返回</a-button>
@@ -35,6 +35,9 @@
             <a-descriptions-item label="创建时间">{{
               record.createdAt || '—'
             }}</a-descriptions-item>
+            <a-descriptions-item label="调拨数量">
+              {{ formatTransferQtyRatio(record) }}
+            </a-descriptions-item>
             <a-descriptions-item label="联动出库">
               {{ (record.linkedOutboundDocNos || []).join('、') || '—' }}
             </a-descriptions-item>
@@ -66,23 +69,6 @@
               <template v-else-if="column.key === 'batch'">
                 {{ line.batchNo || line.salesOrderNo || '自由备货' }}
               </template>
-              <template v-else-if="column.key === 'action'">
-                <a-space :size="4">
-                  <a
-                    v-if="(line.lineStatus || '待确认') === '待确认'"
-                    @click="handleConfirmLine(line)"
-                  >
-                    确认
-                  </a>
-                  <a
-                    v-if="canRefuseTransferLine(record, line)"
-                    class="danger"
-                    @click="handleRefuseLine(line)"
-                  >
-                    拒绝
-                  </a>
-                </a-space>
-              </template>
             </template>
           </a-table>
         </DetailSectionCard>
@@ -91,10 +77,11 @@
     </a-spin>
 
     <InventoryDocRefuseModal
-      v-model:open="refuseModalOpen"
+      v-model:open="voidModalOpen"
+      action-type="void"
       doc-label="调拨"
       :doc-nos="[record?.docNo].filter(Boolean)"
-      @confirm="onRefuseConfirm"
+      @confirm="onVoidConfirm"
     />
   </div>
 </template>
@@ -106,18 +93,19 @@ import { Modal, message } from 'ant-design-vue'
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
-import { transferStatusColor, transferSourceLabel } from '@/mock/transferOptions'
+import {
+  transferStatusColor,
+  transferSourceLabel,
+  formatTransferQtyRatio,
+} from '@/mock/transferOptions'
 import {
   transferOrderState,
   getTransferOrderById,
   canEditTransfer,
   canConfirmTransfer,
-  canRefuseTransfer,
-  canRefuseTransferLine,
+  canVoidTransfer,
   confirmTransfer,
-  confirmTransferLine,
-  refuseTransfer,
-  refuseTransferLine,
+  voidTransfer,
 } from '@/store/transferOrderStore'
 import InventoryDocRefuseModal from './components/InventoryDocRefuseModal.vue'
 
@@ -126,7 +114,7 @@ defineOptions({ name: 'TransferOrderDetailView' })
 const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
-const refuseModalOpen = ref(false)
+const voidModalOpen = ref(false)
 
 const record = computed(() => {
   void transferOrderState.orders
@@ -141,7 +129,6 @@ const lineColumns = [
   { title: '数量', dataIndex: 'qty', width: 90 },
   { title: '单位', dataIndex: 'unit', width: 64 },
   { title: '批次/归属', key: 'batch', width: 140 },
-  { title: '操作', key: 'action', width: 120 },
 ]
 
 function goBack() {
@@ -158,67 +145,51 @@ function openEdit() {
 
 function handleConfirm() {
   Modal.confirm({
-    title: `确认调拨 ${record.value.docNo}？`,
+    title: `确认出库 ${record.value.docNo}？`,
+    content: '将软锁定调出仓库存并生成调拨出库；按配置决定是否需入库方签收。',
     onOk: () => {
       const { count, blocked } = confirmTransfer([record.value.id])
       if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
-      if (count) message.success('已确认')
+      if (count) message.success('已确认出库')
     },
   })
 }
 
-function handleConfirmLine(line) {
-  const res = confirmTransferLine(record.value.id, line.id)
-  if (!res.ok) message.warning(res.message)
-  else message.success('明细已确认')
+function openVoid() {
+  voidModalOpen.value = true
 }
 
-function openRefuse() {
-  refuseModalOpen.value = true
-}
-
-function onRefuseConfirm(reason) {
-  const { count, blocked } = refuseTransfer([record.value.id], { reason })
+function onVoidConfirm(reason) {
+  const { count, blocked } = voidTransfer([record.value.id], { reason })
   if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
   if (count) {
-    message.success('已拒绝')
-    refuseModalOpen.value = false
+    message.success('已作废')
+    voidModalOpen.value = false
   }
-}
-
-function handleRefuseLine(line) {
-  Modal.confirm({
-    title: `拒绝明细 ${line.itemCode}？`,
-    content: '请在下一框填写理由（演示：使用默认理由）',
-    onOk: () => {
-      const res = refuseTransferLine(record.value.id, line.id, { reason: '明细拒绝' })
-      if (!res.ok) message.warning(res.message)
-      else message.success('明细已拒绝')
-    },
-  })
 }
 </script>
 
 <style lang="less" scoped>
 .detail-page {
-  padding: 12px 16px 24px;
+  padding: 0 0 24px;
 }
 .page-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 12px;
 }
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .page-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  margin-right: 8px;
 }
 .sub {
-  margin-left: 8px;
   color: rgba(0, 0, 0, 0.45);
-}
-.danger {
-  color: #ff4d4f;
+  font-size: 13px;
 }
 </style>

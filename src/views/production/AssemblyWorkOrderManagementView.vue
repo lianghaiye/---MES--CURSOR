@@ -394,7 +394,15 @@ import {
   dispatchAndStartWorkOrder,
   canEditWorkOrder,
 } from '@/utils/workOrderDispatchHelpers'
-import { formatScheduleProgress, isScheduleIncomplete } from '@/utils/workOrderScheduleBatch'
+import {
+  formatScheduleProgress,
+  isScheduleIncomplete,
+  getActiveScheduleBatch,
+} from '@/utils/workOrderScheduleBatch'
+import {
+  ensureProcessOutsourceOrdersAfterDispatch,
+  resolveProcessOpOutsource,
+} from '@/utils/workOrderProcessOutsource'
 import {
   getWorkOrderConvertSideLabel,
   getWorkOrderConvertSideTagColor,
@@ -456,6 +464,26 @@ const detailCollapsed = ref(false)
 const createModalOpen = ref(false)
 const editRecord = ref(null)
 const convertModalsRef = ref(null)
+
+function confirmProcessOutsourceOnDispatch({ workOrder, process, batchQty, scheduleBatchId }) {
+  return (
+    convertModalsRef.value?.openProcessOutsourceForDispatch(
+      workOrder,
+      process,
+      batchQty,
+      scheduleBatchId,
+    ) || Promise.resolve({ saved: false })
+  )
+}
+
+function runEnsureProcessOutsourceOrders(workOrder, batchQty, scheduleBatchId = '') {
+  return ensureProcessOutsourceOrdersAfterDispatch({
+    workOrder,
+    batchQty,
+    scheduleBatchId,
+    confirmProcess: confirmProcessOutsourceOnDispatch,
+  })
+}
 const urgencyModalOpen = ref(false)
 const scheduleBatchModalOpen = ref(false)
 const scheduleBatchTarget = ref(null)
@@ -720,7 +748,7 @@ function onWorkOrderUpdated({ id, patch }) {
 }
 
 function validateProcesses(processes) {
-  const missing = processes.filter((p) => !p.executors?.length)
+  const missing = processes.filter((p) => !resolveProcessOpOutsource(p) && !p.executors?.length)
   if (missing.length) {
     message.error(`请为工序「${missing.map((p) => p.name).join('、')}」选择执行人`)
     return false
@@ -732,7 +760,7 @@ function handleSaveDispatch() {
   saveDispatchDraft(updateAssemblyWorkOrder, selectedOrder.value)
 }
 
-function handleDispatchAndStart() {
+async function handleDispatchAndStart() {
   const wo = selectedOrder.value
   if (!wo) return
   const batchQty = Math.max(0, Number(wo.dispatchBatchQty ?? wo.scheduleQty) || 0)
@@ -754,12 +782,18 @@ function handleDispatchAndStart() {
       processCode: p.processCode,
       resourceType: p.resourceType || '工人',
       executors: [...(p.executors || [])],
+      skipProcessOutsourceOnDispatch: Boolean(p.skipProcessOutsourceOnDispatch),
+      outsourceConfirmBeforeDispatch: Boolean(p.outsourceConfirmBeforeDispatch),
     })),
     dispatchNow: true,
   })
   if (!batchResult.ok) {
     message.error(batchResult.message || '记录排产批次失败')
     return
+  }
+  const outsourceResult = await runEnsureProcessOutsourceOrders(wo, batchQty, batchResult.batch?.id)
+  if (outsourceResult.created > 0) {
+    message.success(`已自动生成工序外协单 ${outsourceResult.created} 张`)
   }
   const overTip = tipMessageIfScheduleOverSales(wo, batchQty)
   if (overTip) message.info(overTip)
@@ -773,7 +807,7 @@ function handleDispatchCancel() {
   message.info('已取消本次编辑')
 }
 
-function handleBatchDispatch() {
+async function handleBatchDispatch() {
   if (!selectedIds.value.length) {
     message.warning('请勾选要下发并开始的工单')
     return
@@ -786,6 +820,7 @@ function handleBatchDispatch() {
     return
   }
   let count = 0
+  let outsourceCount = 0
   for (const wo of targets) {
     if (!validateProcesses(wo.processes)) return
     if (
@@ -796,9 +831,21 @@ function handleBatchDispatch() {
       })
     ) {
       count += 1
+      const batchQty = Math.max(0, Number(wo.dispatchBatchQty ?? wo.scheduleQty ?? wo.planQty) || 0)
+      if (batchQty > 0) {
+        const out = await runEnsureProcessOutsourceOrders(
+          wo,
+          batchQty,
+          getActiveScheduleBatch(wo)?.id,
+        )
+        outsourceCount += out.created
+      }
     }
   }
-  if (count) message.success(`已批量下发并开始 ${count} 条工单`)
+  if (count) {
+    const extra = outsourceCount > 0 ? `，并生成工序外协单 ${outsourceCount} 张` : ''
+    message.success(`已批量下发并开始 ${count} 条工单${extra}`)
+  }
   selectedIds.value = []
 }
 
@@ -1004,10 +1051,31 @@ function confirmUrgency() {
   urgencyModalOpen.value = false
 }
 
-function onDetailAction({ key, workOrder: wo, record, patch }) {
+async function onDetailAction({ key, workOrder: wo, record, patch }) {
   if (!wo) return
-  if (key === 'process-outsource') {
-    convertModalsRef.value?.openProcessOutsource(wo, record)
+  if (key === 'process-outsource' || key === 'create-process-outsource') {
+    const process =
+      key === 'create-process-outsource'
+        ? (wo.processes || []).find(
+            (p) =>
+              (record?.processId && String(p.id) === String(record.processId)) ||
+              (record?.processName && p.name === record.processName),
+          )
+        : record
+    if (!process) {
+      message.warning('未找到对应工序')
+      return
+    }
+    convertModalsRef.value?.openProcessOutsource(
+      wo,
+      process,
+      key === 'create-process-outsource'
+        ? {
+            planQty: record?.scheduleQty,
+            scheduleBatchId: record?.batchId,
+          }
+        : {},
+    )
     return
   }
   if (key === 'schedule-qty') {
@@ -1043,6 +1111,11 @@ function onDetailAction({ key, workOrder: wo, record, patch }) {
       return
     }
     message.success(`批次 #${result.batch.batchNo} 已下发并开始`)
+    const batchQty = Math.max(0, Number(result.batch.qty) || 0)
+    const out = await runEnsureProcessOutsourceOrders(wo, batchQty, result.batch.id)
+    if (out.created > 0) {
+      message.success(`已自动生成工序外协单 ${out.created} 张`)
+    }
     return
   }
   if (key === 'remove-batch' && record?.id) {
@@ -1115,7 +1188,7 @@ function onEditScheduleQtySubmit({ qty, batchId }) {
   })
 }
 
-function onScheduleBatchSubmit(payload) {
+async function onScheduleBatchSubmit(payload) {
   const wo = scheduleBatchTarget.value
   if (!wo) return
   const result = addAssemblyScheduleBatch(wo.id, payload)
@@ -1129,6 +1202,13 @@ function onScheduleBatchSubmit(payload) {
       ? `已创建并下发批次 #${result.batch.batchNo}（数量 ${result.batch.qty}）`
       : `已保存批次 #${result.batch.batchNo}（数量 ${result.batch.qty}），可稍后下发`,
   )
+  if (payload.dispatchNow) {
+    const batchQty = Math.max(0, Number(result.batch.qty) || 0)
+    const out = await runEnsureProcessOutsourceOrders(wo, batchQty, result.batch.id)
+    if (out.created > 0) {
+      message.success(`已自动生成工序外协单 ${out.created} 张`)
+    }
+  }
   detailTab.value = 'schedule'
 }
 </script>

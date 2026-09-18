@@ -317,6 +317,7 @@ export function completePurchaseOrder(id) {
   }
   order.status = '已完成'
   order.overdueStatus = '未逾期'
+  order.completedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   return { ok: true, message: `采购单「${order.orderNo}」已完成` }
 }
 

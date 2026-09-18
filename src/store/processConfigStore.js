@@ -161,8 +161,13 @@ function isProcessUsedInRoutes(processId) {
 
 export function filterProcessConfig(list, filters = {}) {
   return list.filter((p) => {
-    if (filters.name && !p.name.includes(filters.name)) return false
-    if (filters.code && !p.code.includes(filters.code)) return false
+    if (filters.name) {
+      const kw = String(filters.name).trim()
+      const hitName = String(p.name || '').includes(kw)
+      const hitCode = String(p.code || '').includes(kw)
+      if (!hitName && !hitCode) return false
+    }
+    if (filters.code && !String(p.code || '').includes(filters.code)) return false
     if (filters.category && p.category !== filters.category) return false
     if (filters.resourceType && p.resourceType !== filters.resourceType) return false
     if (filters.status && p.status !== filters.status) return false

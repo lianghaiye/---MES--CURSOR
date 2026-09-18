@@ -52,6 +52,7 @@ export function flattenSalesOrderLines(orders = []) {
         progressStatus: normalizeSalesOrderProgressStatus(order.progressStatus),
         customerName: order.customerName || '',
         salesperson: order.salesperson || '',
+        region: order.region || '',
         contractNo: order.contractNo || '',
         orderSource: order.orderSource || '',
         urgency: order.urgency || '',
@@ -184,6 +185,7 @@ export const SALES_LINE_ORDER_MERGE_KEYS = [
   'progressStatus',
   'customerName',
   'salesperson',
+  'region',
   'createdAt',
   'creator',
 ]

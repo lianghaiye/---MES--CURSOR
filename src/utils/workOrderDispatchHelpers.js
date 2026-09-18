@@ -10,16 +10,18 @@ import { getProcessByName } from '@/store/processConfigStore'
 import { normalizeReportMode } from '@/utils/reportMode'
 import { shouldSplitCollaborativeTasks } from '@/utils/taskExecutionMode'
 import { isParallelTaskDispatch } from '@/store/businessRuleStore'
+import { resolveProcessOpOutsource } from '@/utils/workOrderProcessOutsource'
 
 export function validateProcessExecutors(processes) {
-  const missing = (processes || []).filter((p) => !p.executors?.length)
+  const needExecutors = (processes || []).filter((p) => !resolveProcessOpOutsource(p))
+  const missing = needExecutors.filter((p) => !p.executors?.length)
   if (missing.length) {
     const label = missing[0].resourceType === '工人小组' ? '执行组别' : '执行人'
     message.error(`请为工序「${missing.map((p) => p.name).join('、')}」选择${label}`)
     return false
   }
 
-  for (const process of processes || []) {
+  for (const process of needExecutors) {
     const procConfig = getProcessByName(process.name)
     const enriched = {
       ...process,

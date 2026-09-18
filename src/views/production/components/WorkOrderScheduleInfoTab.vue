@@ -39,23 +39,54 @@
         :columns="columns"
         :data-source="group.rows"
         :pagination="false"
-        :scroll="{ x: 1320 }"
+        :scroll="{ x: 1520 }"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
+          <template v-if="column.key === 'processConfig'">
+            <div v-if="record.processConfigTags?.length" class="config-tags">
+              <a-tag
+                v-for="item in record.processConfigTags"
+                :key="item.label"
+                :color="item.color"
+                class="config-tag"
+              >
+                {{ item.label }}
+              </a-tag>
+            </div>
+            <span v-else class="muted">—</span>
+          </template>
+          <template v-else-if="column.key === 'status'">
             <a-tag :color="scheduleTaskStatusColor(record.status)">{{ record.status }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'outsourceStatus'">
+            <a-tag
+              v-if="record.isOutsourceProcess"
+              :color="outsourceStatusColor(record.outsourceStatus)"
+            >
+              {{ record.outsourceStatus || '未生成' }}
+            </a-tag>
+            <span v-else class="muted">—</span>
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space :size="8" wrap>
               <a class="action-link" @click="onGenTask(record)">生成任务</a>
-              <a class="action-link" @click="openEditExecutor(record)">修改执行人</a>
-              <a class="action-link" @click="onResetStatus(record)">重置状态</a>
+              <template v-if="!record.isOutsourceProcess">
+                <a class="action-link" @click="openEditExecutor(record)">修改执行人</a>
+                <a class="action-link" @click="onResetStatus(record)">重置状态</a>
+                <a
+                  v-if="record.status !== '已终止'"
+                  class="action-link danger"
+                  @click="onTerminateTask(record)"
+                >
+                  终止
+                </a>
+              </template>
               <a
-                v-if="record.status !== '已终止'"
-                class="action-link danger"
-                @click="onTerminateTask(record)"
+                v-if="canCreateProcessOutsourceOrder(record)"
+                class="action-link"
+                @click="onCreateProcessOutsource(record)"
               >
-                终止
+                生成工序外协单
               </a>
             </a-space>
           </template>
@@ -95,6 +126,7 @@ import {
 } from '@/utils/workOrderRelatedInfo'
 import { batchStatusColor } from '@/utils/workOrderScheduleBatch'
 import { resetWorkOrderScheduleTask, terminateWorkOrderScheduleTask } from '@/utils/workOrderStatus'
+import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -102,7 +134,11 @@ const props = defineProps({
 
 const emit = defineEmits(['action'])
 
-const batchGroups = computed(() => buildWorkOrderScheduleInfoBatchGroups(props.workOrder))
+const batchGroups = computed(() => {
+  // 依赖外协订单变化，补单后刷新「外协状态」
+  void outsourcingOrderState.orders.length
+  return buildWorkOrderScheduleInfoBatchGroups(props.workOrder)
+})
 const totalRowCount = computed(() =>
   batchGroups.value.reduce((s, g) => s + (g.rows?.length || 0), 0),
 )
@@ -116,6 +152,7 @@ const editingResourceType = ref('工人')
 const columns = [
   { title: '顺序', dataIndex: 'seq', width: 64, fixed: 'left' },
   { title: '工序名', dataIndex: 'processName', width: 100, fixed: 'left' },
+  { title: '工序配置', key: 'processConfig', width: 120 },
   { title: '状态', key: 'status', width: 90 },
   { title: '任务编号', dataIndex: 'taskNo', width: 180, ellipsis: true },
   { title: '执行者', dataIndex: 'executor', width: 90 },
@@ -125,8 +162,36 @@ const columns = [
   { title: '不良品数', dataIndex: 'badQty', width: 88, align: 'right' },
   { title: '报工时长', dataIndex: 'reportDuration', width: 90 },
   { title: '报工时间', dataIndex: 'reportedAt', width: 140 },
-  { title: '操作', key: 'actions', width: 280, fixed: 'right' },
+  { title: '外协状态', key: 'outsourceStatus', width: 100 },
+  { title: '操作', key: 'actions', width: 300, fixed: 'right' },
 ]
+
+function isBatchCompleted(status) {
+  return status === '完成' || status === '已完成'
+}
+
+function canCreateProcessOutsourceOrder(record) {
+  if (!record?.isOutsourceProcess || !record.processLead) return false
+  if (isBatchCompleted(record.batchStatus)) return false
+  if (record.batchStatus === '待下发') return false
+  return (record.outsourceStatus || '未生成') === '未生成'
+}
+
+function outsourceStatusColor(status) {
+  if (!status || status === '未生成') return 'default'
+  if (status === '已作废') return 'default'
+  if (status === '已完成') return 'success'
+  if (status === '待提交' || status === '待审核') return 'warning'
+  return 'processing'
+}
+
+function onCreateProcessOutsource(record) {
+  emit('action', {
+    key: 'create-process-outsource',
+    workOrder: props.workOrder,
+    record,
+  })
+}
 
 function onGenTask(record) {
   emit('action', { key: 'gen-task', workOrder: props.workOrder, record })
@@ -299,6 +364,20 @@ function saveExecutor() {
       color: rgba(0, 0, 0, 0.85);
       font-weight: 600;
     }
+  }
+
+  .config-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .config-tag {
+    margin: 0;
+  }
+
+  .muted {
+    color: rgba(0, 0, 0, 0.25);
   }
 
   .action-link {

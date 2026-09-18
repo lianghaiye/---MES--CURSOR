@@ -1,120 +1,158 @@
 <template>
-  <div class="page-wrap">
+  <div class="stocktake-page">
     <div class="filter-card">
-      <a-form layout="inline" :model="filters" class="filter-form">
-        <a-form-item label="盘点单号">
-          <a-input v-model:value="filters.docNo" size="small" allow-clear placeholder="单号" />
-        </a-form-item>
-        <a-form-item label="盘点仓库">
-          <a-select
-            v-model:value="filters.warehouse"
-            size="small"
-            allow-clear
-            show-search
-            style="width: 140px"
-            :options="warehouseOpts"
-          />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select
-            v-model:value="filters.status"
-            size="small"
-            allow-clear
-            style="width: 120px"
-            :options="statusOpts"
-          />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" size="small" @click="handleSearch">查询</a-button>
-            <a-button size="small" @click="handleReset">重置</a-button>
-          </a-space>
-        </a-form-item>
+      <a-form layout="inline" :model="filters" class="filter-form horizontal-form">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="盘点单号">
+              <a-input
+                v-model:value="filters.docNo"
+                size="small"
+                allow-clear
+                placeholder="请输入 盘点单号"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="盘点仓库">
+              <a-select
+                v-model:value="filters.warehouse"
+                size="small"
+                allow-clear
+                show-search
+                placeholder="请选择 盘点仓库"
+                :options="warehouseOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="状态">
+              <a-select
+                v-model:value="filters.status"
+                size="small"
+                allow-clear
+                placeholder="请选择 状态"
+                :options="statusOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="handleSearch">
+                  <SearchOutlined />
+                  搜索
+                </a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
       </a-form>
     </div>
 
     <div class="list-panel">
       <div class="toolbar-row">
-        <a-space>
+        <a-space wrap :size="8">
           <a-button type="primary" size="small" @click="openCreate">
             <PlusOutlined />
             新增
           </a-button>
-          <a-button size="small" @click="handleConfirmSelected">确认</a-button>
-          <a-button size="small" danger @click="handleRefuseSelected">拒绝</a-button>
-          <a-button size="small" @click="handleBatchDelete">删除</a-button>
+          <a-button size="small" @click="handleConfirmSelected">
+            <CheckOutlined />
+            确认
+          </a-button>
+          <a-button size="small" danger @click="handleRefuseSelected">
+            <CloseCircleOutlined />
+            拒绝
+          </a-button>
+          <a-button size="small" @click="handleBatchDelete">
+            <DeleteOutlined />
+            删除
+          </a-button>
         </a-space>
       </div>
 
-      <a-table
-        :columns="columns"
-        :data-source="pagedList"
-        row-key="id"
-        size="small"
-        bordered
-        :pagination="false"
-        :row-selection="rowSelection"
-        :scroll="{ x: 1100 }"
-      >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
-          <template v-else-if="column.key === 'docNo'">
-            <a @click="goDetail(record)">{{ record.docNo }}</a>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="stocktakeStatusColor(record.status)">{{ record.status }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'sourceChannel'">
-            {{ stocktakeSourceLabel(record.sourceChannel) }}
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space :size="0" wrap>
-              <a-button
-                v-if="canEditStocktake(record)"
-                type="link"
-                size="small"
-                @click="openEdit(record)"
-              >
-                编辑
-              </a-button>
-              <a-button
-                v-if="canConfirmStocktake(record)"
-                type="link"
-                size="small"
-                @click="handleConfirmOne(record)"
-              >
-                确认
-              </a-button>
-              <a-button
-                v-if="canRefuseStocktake(record)"
-                type="link"
-                size="small"
-                danger
-                @click="openRefuse([record])"
-              >
-                拒绝
-              </a-button>
-              <a-button
-                v-if="canDeleteStocktake(record)"
-                type="link"
-                size="small"
-                danger
-                @click="confirmDelete(record)"
-              >
-                删除
-              </a-button>
-            </a-space>
-          </template>
+      <a-alert type="info" show-icon class="summary-bar" :banner="false">
+        <template #message>
+          <span>
+            当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
+            <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
+          </span>
         </template>
-      </a-table>
-      <div class="table-pagination">
-        <a-pagination
-          v-model:current="pagination.current"
-          v-model:page-size="pagination.pageSize"
-          :total="filteredList.length"
-          show-size-changer
-          :show-total="(t) => `共 ${t} 条`"
-        />
+      </a-alert>
+
+      <div class="table-card">
+        <a-table
+          :columns="columns"
+          :data-source="pagedList"
+          row-key="id"
+          size="small"
+          bordered
+          :pagination="false"
+          :row-selection="rowSelection"
+          :scroll="{ x: 1100 }"
+        >
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
+            <template v-else-if="column.key === 'docNo'">
+              <a class="link-code" @click="goDetail(record)">{{ record.docNo }}</a>
+            </template>
+            <template v-else-if="column.key === 'status'">
+              <a-tag :color="stocktakeStatusColor(record.status)">{{ record.status }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'sourceChannel'">
+              {{ stocktakeSourceLabel(record.sourceChannel) }}
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-space :size="0" wrap>
+                <a-button
+                  v-if="canEditStocktake(record)"
+                  type="link"
+                  size="small"
+                  @click="openEdit(record)"
+                >
+                  编辑
+                </a-button>
+                <a-button
+                  v-if="canConfirmStocktake(record)"
+                  type="link"
+                  size="small"
+                  @click="handleConfirmOne(record)"
+                >
+                  确认
+                </a-button>
+                <a-button
+                  v-if="canRefuseStocktake(record)"
+                  type="link"
+                  size="small"
+                  danger
+                  @click="openRefuse([record])"
+                >
+                  拒绝
+                </a-button>
+                <a-button
+                  v-if="canDeleteStocktake(record)"
+                  type="link"
+                  size="small"
+                  danger
+                  @click="confirmDelete(record)"
+                >
+                  删除
+                </a-button>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
+        <div class="table-pagination">
+          <a-pagination
+            v-model:current="pagination.current"
+            v-model:page-size="pagination.pageSize"
+            :total="filteredList.length"
+            show-size-changer
+            :show-total="(t) => `共 ${t} 条`"
+          />
+        </div>
       </div>
     </div>
 
@@ -131,7 +169,13 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
+import {
+  PlusOutlined,
+  SearchOutlined,
+  CheckOutlined,
+  CloseCircleOutlined,
+  DeleteOutlined,
+} from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions } from '@/store/warehouseStore'
 import {
   stocktakeStatusColor,
@@ -322,24 +366,96 @@ function handleBatchDelete() {
 </script>
 
 <style lang="less" scoped>
-.page-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
+.stocktake-page {
+  margin: -12px;
+  padding: 0;
+  background: #f5f6f8;
+  min-height: calc(100vh - 112px);
 }
+
 .filter-card,
-.list-panel {
+.list-panel,
+.table-card {
   background: #fff;
-  border-radius: 8px;
-  padding: 12px 16px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
+.filter-card {
+  padding: 10px 12px 6px;
+  margin-bottom: 8px;
+}
+
+.list-panel {
+  padding: 10px 12px 12px;
+}
+
 .toolbar-row {
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
+
+.summary-bar {
+  margin-top: 0;
+  margin-bottom: 8px;
+  padding: 6px 12px;
+
+  :deep(.ant-alert-message) {
+    font-size: 13px;
+  }
+}
+
+.table-card {
+  padding: 0;
+
+  :deep(.ant-table-thead > tr > th) {
+    background: #fafafa;
+    font-weight: 500;
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-tbody > tr > td) {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-cell-fix-right) {
+    background: #fff;
+  }
+}
+
 .table-pagination {
-  margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+  margin-top: 12px;
+  padding: 0 8px 8px;
+}
+
+.link-code {
+  color: #1677ff;
+  cursor: pointer;
+}
+
+:deep(.ant-table-wrapper .ant-btn-link) {
+  padding: 0 4px;
+  height: auto;
+}
+
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+    margin-inline-end: 0;
+  }
+
+  .filter-actions-item :deep(.ant-form-item-control-input-content) {
+    display: flex;
+    justify-content: flex-end;
+  }
 }
 </style>

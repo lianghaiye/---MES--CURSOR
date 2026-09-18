@@ -5,6 +5,30 @@
 import dayjs from 'dayjs'
 import { syncWorkOrderExecutionStatus, isScheduleIncomplete } from '@/utils/workOrderStatus'
 import { getWorkOrderConvertOccupyQty } from '@/utils/workOrderConvertOccupy'
+import { getProcessById, getProcessByName } from '@/store/processConfigStore'
+
+/** 轻量判定（避免与 assemblyWorkOrderStore ↔ 本文件循环依赖） */
+function isOutsourceProcessLike(process) {
+  if (!process) return false
+  if (process.opOutsource != null) return Boolean(process.opOutsource)
+  if (process.operations?.opOutsource) return true
+  const master =
+    (process.processId && getProcessById(process.processId)) ||
+    getProcessByName(process.processName || process.name) ||
+    null
+  return Boolean(master?.operations?.opOutsource)
+}
+
+function resolveAssignmentProcess(workOrder, assignment) {
+  return (
+    (workOrder?.processes || []).find((p) => String(p.id) === String(assignment?.processId)) ||
+    assignment
+  )
+}
+
+function assignmentNeedsExecutor(workOrder, assignment) {
+  return !isOutsourceProcessLike(resolveAssignmentProcess(workOrder, assignment))
+}
 
 export function getWorkOrderPlanQty(wo) {
   return Math.max(0, Number(wo?.planQty) || 0)
@@ -76,6 +100,8 @@ export function buildBatchProcessAssignments(processes = []) {
     processCode: p.processCode || '',
     resourceType: p.resourceType || '工人',
     executors: Array.isArray(p.executors) ? [...p.executors] : [],
+    skipProcessOutsourceOnDispatch: Boolean(p.skipProcessOutsourceOnDispatch),
+    outsourceConfirmBeforeDispatch: Boolean(p.outsourceConfirmBeforeDispatch),
   }))
 }
 
@@ -116,10 +142,14 @@ export function createScheduleBatch(workOrder, input) {
           processCode: a.processCode || '',
           resourceType: a.resourceType || '工人',
           executors: Array.isArray(a.executors) ? [...a.executors] : [],
+          skipProcessOutsourceOnDispatch: Boolean(a.skipProcessOutsourceOnDispatch),
+          outsourceConfirmBeforeDispatch: Boolean(a.outsourceConfirmBeforeDispatch),
         }))
       : buildBatchProcessAssignments(workOrder.processes)
 
-  const missing = assignments.filter((a) => !a.executors?.length)
+  const missing = assignments.filter(
+    (a) => assignmentNeedsExecutor(workOrder, a) && !a.executors?.length,
+  )
   if (input.dispatchNow && missing.length) {
     return {
       ok: false,
@@ -174,7 +204,9 @@ export function dispatchScheduleBatch(workOrder, batchId) {
   if (!batch) return { ok: false, message: '排产批次不存在' }
   if (batch.status !== '待下发') return { ok: false, message: '仅待下发批次可下发' }
 
-  const missing = (batch.processAssignments || []).filter((a) => !a.executors?.length)
+  const missing = (batch.processAssignments || []).filter(
+    (a) => assignmentNeedsExecutor(workOrder, a) && !a.executors?.length,
+  )
   if (missing.length) {
     return {
       ok: false,

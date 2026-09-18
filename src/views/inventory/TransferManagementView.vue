@@ -1,138 +1,193 @@
 <template>
-  <div class="page-wrap">
+  <div class="transfer-page">
     <div class="filter-card">
-      <a-form layout="inline" :model="filters" class="filter-form">
-        <a-form-item label="调拨单号">
-          <a-input v-model:value="filters.docNo" size="small" allow-clear placeholder="单号" />
-        </a-form-item>
-        <a-form-item label="调出仓库">
-          <a-select
-            v-model:value="filters.fromWarehouse"
-            size="small"
-            allow-clear
-            show-search
-            style="width: 140px"
-            :options="warehouseOpts"
-          />
-        </a-form-item>
-        <a-form-item label="调入仓库">
-          <a-select
-            v-model:value="filters.toWarehouse"
-            size="small"
-            allow-clear
-            show-search
-            style="width: 140px"
-            :options="warehouseOpts"
-          />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select
-            v-model:value="filters.status"
-            size="small"
-            allow-clear
-            style="width: 120px"
-            :options="statusOpts"
-          />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" size="small" @click="handleSearch">查询</a-button>
-            <a-button size="small" @click="handleReset">重置</a-button>
-          </a-space>
-        </a-form-item>
+      <a-form layout="inline" :model="filters" class="filter-form horizontal-form">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="调拨单号">
+              <a-input
+                v-model:value="filters.docNo"
+                size="small"
+                allow-clear
+                placeholder="请输入 调拨单号"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="调出仓库">
+              <a-select
+                v-model:value="filters.fromWarehouse"
+                size="small"
+                allow-clear
+                show-search
+                placeholder="请选择 调出仓库"
+                :options="warehouseOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="调入仓库">
+              <a-select
+                v-model:value="filters.toWarehouse"
+                size="small"
+                allow-clear
+                show-search
+                placeholder="请选择 调入仓库"
+                :options="warehouseOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="状态">
+              <a-select
+                v-model:value="filters.status"
+                size="small"
+                allow-clear
+                placeholder="请选择 状态"
+                :options="statusOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="handleSearch">
+                  <SearchOutlined />
+                  搜索
+                </a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
       </a-form>
     </div>
 
     <div class="list-panel">
       <div class="toolbar-row">
-        <a-space>
+        <a-space wrap :size="8">
           <a-button type="primary" size="small" @click="openCreate">
             <PlusOutlined />
             新增
           </a-button>
-          <a-button size="small" @click="handleConfirmSelected">确认</a-button>
-          <a-button size="small" danger @click="handleRefuseSelected">拒绝</a-button>
-          <a-button size="small" @click="handleBatchDelete">删除</a-button>
+          <a-button size="small" @click="handleConfirmSelected">
+            <CheckOutlined />
+            确认出库
+          </a-button>
+          <a-button size="small" danger @click="handleVoidSelected">
+            <StopOutlined />
+            作废
+          </a-button>
+          <a-button size="small" @click="handleBatchDelete">
+            <DeleteOutlined />
+            删除
+          </a-button>
+        </a-space>
+        <a-space>
+          <span class="setting-label">入库方签收</span>
+          <a-switch
+            :checked="requireInboundConfirm"
+            checked-children="需要"
+            un-checked-children="自动"
+            @change="onRequireInboundChange"
+          />
         </a-space>
       </div>
 
-      <a-table
-        :columns="columns"
-        :data-source="pagedList"
-        row-key="id"
-        size="small"
-        bordered
-        :pagination="false"
-        :row-selection="rowSelection"
-        :scroll="{ x: 1200 }"
-      >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
-          <template v-else-if="column.key === 'docNo'">
-            <a @click="goDetail(record)">{{ record.docNo }}</a>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="transferStatusColor(record.status)">{{ record.status }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'sourceChannel'">
-            {{ transferSourceLabel(record.sourceChannel) }}
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space :size="0" wrap>
-              <a-button
-                v-if="canEditTransfer(record)"
-                type="link"
-                size="small"
-                @click="openEdit(record)"
-              >
-                编辑
-              </a-button>
-              <a-button
-                v-if="canConfirmTransfer(record)"
-                type="link"
-                size="small"
-                @click="handleConfirmOne(record)"
-              >
-                确认
-              </a-button>
-              <a-button
-                v-if="canRefuseTransfer(record)"
-                type="link"
-                size="small"
-                danger
-                @click="openRefuse([record])"
-              >
-                拒绝
-              </a-button>
-              <a-button
-                v-if="canDeleteTransfer(record)"
-                type="link"
-                size="small"
-                danger
-                @click="confirmDelete(record)"
-              >
-                删除
-              </a-button>
-            </a-space>
-          </template>
+      <a-alert type="info" show-icon class="summary-bar" :banner="false">
+        <template #message>
+          <span>
+            当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
+            <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
+          </span>
         </template>
-      </a-table>
-      <div class="table-pagination">
-        <a-pagination
-          v-model:current="pagination.current"
-          v-model:page-size="pagination.pageSize"
-          :total="filteredList.length"
-          show-size-changer
-          :show-total="(t) => `共 ${t} 条`"
-        />
+      </a-alert>
+
+      <div class="table-card">
+        <a-table
+          :columns="columns"
+          :data-source="pagedList"
+          row-key="id"
+          size="small"
+          bordered
+          :pagination="false"
+          :row-selection="rowSelection"
+          :scroll="{ x: 1280 }"
+        >
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
+            <template v-else-if="column.key === 'docNo'">
+              <a class="link-code" @click="goDetail(record)">{{ record.docNo }}</a>
+            </template>
+            <template v-else-if="column.key === 'status'">
+              <a-tag :color="transferStatusColor(record.status)">{{ record.status }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'sourceChannel'">
+              {{ transferSourceLabel(record.sourceChannel) }}
+            </template>
+            <template v-else-if="column.key === 'transferQty'">
+              <a-tooltip title="已签收数量 / 全部数量">
+                {{ formatTransferQtyRatio(record) }}
+              </a-tooltip>
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-space :size="0" wrap>
+                <a-button
+                  v-if="canEditTransfer(record)"
+                  type="link"
+                  size="small"
+                  @click="openEdit(record)"
+                >
+                  编辑
+                </a-button>
+                <a-button
+                  v-if="canConfirmTransfer(record)"
+                  type="link"
+                  size="small"
+                  @click="handleConfirmOne(record)"
+                >
+                  确认出库
+                </a-button>
+                <a-button
+                  v-if="canVoidTransfer(record)"
+                  type="link"
+                  size="small"
+                  danger
+                  @click="openVoid([record])"
+                >
+                  作废
+                </a-button>
+                <a-button
+                  v-if="canDeleteTransfer(record)"
+                  type="link"
+                  size="small"
+                  danger
+                  @click="confirmDelete(record)"
+                >
+                  删除
+                </a-button>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
+        <div class="table-pagination">
+          <a-pagination
+            v-model:current="pagination.current"
+            v-model:page-size="pagination.pageSize"
+            :total="filteredList.length"
+            show-size-changer
+            :show-total="(t) => `共 ${t} 条`"
+          />
+        </div>
       </div>
     </div>
 
     <InventoryDocRefuseModal
-      v-model:open="refuseModalOpen"
+      v-model:open="voidModalOpen"
+      action-type="void"
       doc-label="调拨"
-      :doc-nos="refuseDocNos"
-      @confirm="onRefuseConfirm"
+      :doc-nos="voidDocNos"
+      @confirm="onVoidConfirm"
     />
   </div>
 </template>
@@ -141,12 +196,19 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
+import {
+  PlusOutlined,
+  SearchOutlined,
+  CheckOutlined,
+  StopOutlined,
+  DeleteOutlined,
+} from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions } from '@/store/warehouseStore'
 import {
   transferStatusColor,
   transferSourceLabel,
   transferStatusOptions,
+  formatTransferQtyRatio,
 } from '@/mock/transferOptions'
 import {
   transferOrderState,
@@ -154,11 +216,15 @@ import {
   canEditTransfer,
   canDeleteTransfer,
   canConfirmTransfer,
-  canRefuseTransfer,
+  canVoidTransfer,
   confirmTransfer,
-  refuseTransfer,
+  voidTransfer,
   deleteTransferOrder,
 } from '@/store/transferOrderStore'
+import {
+  transferSettingsState,
+  setTransferRequireInboundConfirm,
+} from '@/store/transferSettingsStore'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { useTabs } from '@/composables/useTabs'
@@ -178,12 +244,18 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
-const refuseModalOpen = ref(false)
-const refuseTargets = ref([])
+const voidModalOpen = ref(false)
+const voidTargets = ref([])
 
 const warehouseOpts = computed(() => getWarehouseSelectOptions())
 const statusOpts = transferStatusOptions.map((v) => ({ label: v, value: v }))
-const refuseDocNos = computed(() => refuseTargets.value.map((o) => o.docNo || o.id))
+const voidDocNos = computed(() => voidTargets.value.map((o) => o.docNo || o.id))
+const requireInboundConfirm = computed(() => transferSettingsState.requireInboundConfirm)
+
+function onRequireInboundChange(checked) {
+  setTransferRequireInboundConfirm(checked)
+  message.success(checked ? '已开启：出库确认后需入库方签收' : '已关闭：出库确认后自动入库完结')
+}
 
 const columns = [
   { title: '#', key: 'index', width: 52, align: 'center', fixed: 'left' },
@@ -192,6 +264,7 @@ const columns = [
   { title: '来源', key: 'sourceChannel', width: 72 },
   { title: '调出仓库', dataIndex: 'fromWarehouse', width: 110 },
   { title: '调入仓库', dataIndex: 'toWarehouse', width: 110 },
+  { title: '调拨数量', key: 'transferQty', width: 130, align: 'right' },
   { title: '调拨日期', dataIndex: 'transferDate', width: 110 },
   { title: '申请人', dataIndex: 'applicant', width: 90 },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
@@ -255,12 +328,12 @@ function goDetail(record) {
 
 function handleConfirmOne(record) {
   Modal.confirm({
-    title: `确认调拨 ${record.docNo}？`,
-    content: '将生成调拨出库与调拨入库并入账。',
+    title: `确认出库 ${record.docNo}？`,
+    content: '将软锁定调出仓库存并生成调拨出库；按配置决定是否需入库方签收。',
     onOk: () => {
       const { count, blocked } = confirmTransfer([record.id])
       if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
-      if (count) message.success('已确认调拨')
+      if (count) message.success('已确认出库')
     },
   })
 }
@@ -271,40 +344,40 @@ function handleConfirmSelected() {
     return
   }
   Modal.confirm({
-    title: '确认所选调拨单？',
+    title: '确认所选调拨单出库？',
     onOk: () => {
       const { count, blocked } = confirmTransfer(selectedRowKeys.value)
       if (blocked?.length)
         message.warning(blocked.map((b) => `${b.docNo}: ${b.message}`).join('；'))
       if (count) {
-        message.success(`已确认 ${count} 条`)
+        message.success(`已确认出库 ${count} 条`)
         selectedRowKeys.value = []
       }
     },
   })
 }
 
-function openRefuse(records) {
-  refuseTargets.value = records || []
-  refuseModalOpen.value = true
+function openVoid(records) {
+  voidTargets.value = records || []
+  voidModalOpen.value = true
 }
 
-function handleRefuseSelected() {
+function handleVoidSelected() {
   const rows = transferOrderState.orders.filter((o) => selectedRowKeys.value.includes(o.id))
   if (!rows.length) {
     message.warning('请先选择调拨单')
     return
   }
-  openRefuse(rows)
+  openVoid(rows)
 }
 
-function onRefuseConfirm(reason) {
-  const ids = refuseTargets.value.map((o) => o.id)
-  const { count, blocked } = refuseTransfer(ids, { reason })
+function onVoidConfirm(reason) {
+  const ids = voidTargets.value.map((o) => o.id)
+  const { count, blocked } = voidTransfer(ids, { reason })
   if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
   if (count) {
-    message.success(count === 1 ? '已拒绝' : `已拒绝 ${count} 条`)
-    refuseModalOpen.value = false
+    message.success(count === 1 ? '已作废' : `已作废 ${count} 条`)
+    voidModalOpen.value = false
     selectedRowKeys.value = []
   }
 }
@@ -339,24 +412,101 @@ function handleBatchDelete() {
 </script>
 
 <style lang="less" scoped>
-.page-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
+.transfer-page {
+  margin: -12px;
+  padding: 0;
+  background: #f5f6f8;
+  min-height: calc(100vh - 112px);
 }
+
 .filter-card,
-.list-panel {
+.list-panel,
+.table-card {
   background: #fff;
-  border-radius: 8px;
-  padding: 12px 16px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
+.filter-card {
+  padding: 10px 12px 6px;
+  margin-bottom: 8px;
+}
+
+.list-panel {
+  padding: 10px 12px 12px;
+}
+
 .toolbar-row {
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
+
+.setting-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.summary-bar {
+  margin-top: 0;
+  margin-bottom: 8px;
+  padding: 6px 12px;
+
+  :deep(.ant-alert-message) {
+    font-size: 13px;
+  }
+}
+
+.table-card {
+  padding: 0;
+
+  :deep(.ant-table-thead > tr > th) {
+    background: #fafafa;
+    font-weight: 500;
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-tbody > tr > td) {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-cell-fix-right) {
+    background: #fff;
+  }
+}
+
 .table-pagination {
-  margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+  margin-top: 12px;
+  padding: 0 8px 8px;
+}
+
+.link-code {
+  color: #1677ff;
+  cursor: pointer;
+}
+
+:deep(.ant-table-wrapper .ant-btn-link) {
+  padding: 0 4px;
+  height: auto;
+}
+
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+    margin-inline-end: 0;
+  }
+
+  .filter-actions-item :deep(.ant-form-item-control-input-content) {
+    display: flex;
+    justify-content: flex-end;
+  }
 }
 </style>

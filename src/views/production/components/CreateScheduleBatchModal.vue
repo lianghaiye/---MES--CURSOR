@@ -71,6 +71,7 @@ import {
   getRemainScheduleQty,
   getWorkOrderPlanQty,
 } from '@/utils/workOrderScheduleBatch'
+import { resolveProcessOpOutsource } from '@/utils/workOrderProcessOutsource'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -124,7 +125,12 @@ function handleSave(dispatchNow) {
     return
   }
   if (dispatchNow) {
-    const missing = form.assignments.filter((a) => !a.executors?.length)
+    const missing = form.assignments.filter((a) => {
+      const process =
+        (props.workOrder?.processes || []).find((p) => String(p.id) === String(a.processId)) || a
+      if (resolveProcessOpOutsource(process)) return false
+      return !a.executors?.length
+    })
     if (missing.length) {
       message.error(`请为工序「${missing.map((a) => a.processName).join('、')}」选择本批执行人`)
       return

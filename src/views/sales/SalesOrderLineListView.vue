@@ -217,6 +217,16 @@
               >
             </template>
           </template>
+          <template v-else-if="column.key === 'shipInfo'">
+            <template v-if="!record.shipTotal">
+              <span>—</span>
+            </template>
+            <template v-else>
+              <a class="link-code" @click.prevent="openShipDrawer(record)">{{
+                record.shipSummaryText
+              }}</a>
+            </template>
+          </template>
           <template v-else-if="column.key === 'salesQty'">
             {{ formatQty(record.salesQty) }}
           </template>
@@ -296,6 +306,8 @@
       :line-row="snDrawerRow"
       :highlight-label-codes="snHighlightCodes"
     />
+
+    <SalesLineShipDrawer v-model:open="shipDrawerOpen" :line-row="shipDrawerRow" />
   </div>
 </template>
 
@@ -311,6 +323,7 @@ import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import SalesLineSnDrawer from '@/views/sales/components/SalesLineSnDrawer.vue'
+import SalesLineShipDrawer from '@/views/sales/components/SalesLineShipDrawer.vue'
 import { salesOrderState } from '@/store/salesOrderStore'
 import { industrialLabelState } from '@/store/industrialLabelStore'
 import {
@@ -331,6 +344,7 @@ import {
 import { salesOrderLineExportFields } from '@/utils/exportFields/salesOrderLineExport'
 import { salesDeliveryStatusColor, salesOrderStatusColor } from '@/utils/salesOrderStatus'
 import { lookupSalesBySn, summarizeLineLabels } from '@/utils/salesSnLookup'
+import { summarizeLineShipInfo } from '@/utils/salesLineShipInfo'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -353,6 +367,8 @@ const appliedFilters = ref({ ...filters, snMatchedLineIds: null })
 const snMatchedLabelCodes = ref([])
 const snDrawerOpen = ref(false)
 const snDrawerRow = ref(null)
+const shipDrawerOpen = ref(false)
+const shipDrawerRow = ref(null)
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 
@@ -398,7 +414,6 @@ const baseColumns = [
     width: 130,
     ellipsis: true,
   },
-  { title: '工业 SN', key: 'industrialSn', width: 130 },
   { title: '业务类型', key: 'businessType', dataIndex: 'businessType', width: 110 },
   { title: '产品属性', key: 'productAttr', dataIndex: 'productAttr', width: 90 },
   { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 100, ellipsis: true },
@@ -420,6 +435,7 @@ const baseColumns = [
     ellipsis: true,
   },
   { title: '销售数量', key: 'salesQty', dataIndex: 'salesQty', width: 90, align: 'right' },
+  { title: '合同编号', key: 'contractNo', dataIndex: 'contractNo', width: 130, ellipsis: true },
   { title: '已发数量', key: 'shippedQty', dataIndex: 'shippedQty', width: 90, align: 'right' },
   { title: '未发数量', key: 'unshippedQty', dataIndex: 'unshippedQty', width: 90, align: 'right' },
   {
@@ -429,6 +445,8 @@ const baseColumns = [
     width: 100,
   },
   { title: '交付方式', key: 'deliveryMode', dataIndex: 'deliveryMode', width: 100 },
+  { title: '发货信息', key: 'shipInfo', width: 110 },
+  { title: '工业 SN', key: 'industrialSn', width: 130 },
   {
     title: '库存履约',
     key: 'stockFulfillmentMode',
@@ -512,14 +530,14 @@ const baseColumns = [
     ellipsis: true,
   },
   { title: '业务员', key: 'salesperson', dataIndex: 'salesperson', width: 90 },
-  { title: '合同编号', key: 'contractNo', dataIndex: 'contractNo', width: 130, ellipsis: true },
+  { title: '区域', key: 'region', dataIndex: 'region', width: 90 },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 140 },
   { title: '创建人', key: 'creator', dataIndex: 'creator', width: 90 },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('sales-order-line-list-v3', baseColumns, {
-    minScrollX: 3730,
+  useTableColumnSettings('sales-order-line-list-v5', baseColumns, {
+    minScrollX: 3930,
   })
 
 const allLineRows = computed(() => flattenSalesOrderLines(salesOrderState.orders))
@@ -532,6 +550,17 @@ function enrichRowSnSummary(row) {
     snTotal: sum.total,
     snMounted: sum.mounted,
     snSummaryText: sum.summaryText,
+  }
+}
+
+function enrichRowShipInfo(row) {
+  void salesOrderState.orders
+  const order = salesOrderState.orders.find((o) => o.id === row.orderId)
+  const sum = summarizeLineShipInfo(order, row.lineId)
+  return {
+    ...row,
+    shipTotal: sum.total,
+    shipSummaryText: sum.summaryText,
   }
 }
 
@@ -548,6 +577,7 @@ const filteredRows = computed(() => {
   return [...filterSalesOrderLines(allLineRows.value, f)]
     .sort(compareSalesOrderLinesDefault)
     .map(enrichRowSnSummary)
+    .map(enrichRowShipInfo)
 })
 
 const snHighlightCodes = computed(() => {
@@ -567,7 +597,7 @@ const pagedRows = computed(() => {
   return filteredRows.value.slice(start, start + pagination.pageSize)
 })
 
-/** 当前页内同订单合并：销售单号/状态/客户/业务员/创建人/创建时间 */
+/** 当前页内同订单合并：销售单号/状态/客户/业务员/区域/创建人/创建时间 */
 const pageOrderRowSpans = computed(() => buildSalesOrderLineRowSpans(pagedRows.value))
 
 const orderMergeKeySet = new Set(SALES_LINE_ORDER_MERGE_KEYS)
@@ -603,7 +633,7 @@ const rowSelection = computed(() => ({
 
 const { exportModalOpen, exportFieldSettings, defaultExportFieldSettings, doExport } =
   useListExport({
-    storageKey: 'sales-order-line-list',
+    storageKey: 'sales-order-line-list-v3',
     fieldDefinitions: salesOrderLineExportFields,
     getFilteredRows: () => filteredRows.value,
     getSelectedRows: () => filteredRows.value.filter((r) => selectedRowKeys.value.includes(r.id)),
@@ -679,6 +709,11 @@ function isSnHitRow(record) {
 function openSnDrawer(record) {
   snDrawerRow.value = record
   snDrawerOpen.value = true
+}
+
+function openShipDrawer(record) {
+  shipDrawerRow.value = record
+  shipDrawerOpen.value = true
 }
 
 function openDetail(record) {

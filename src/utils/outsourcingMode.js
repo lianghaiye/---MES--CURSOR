@@ -1,11 +1,11 @@
-/** 外协订单模式：整单 vs 工序 */
+/** 外协订单模式：整件 vs 工序 */
 export const OUTSOURCE_MODE = {
   WHOLE: 'whole',
   PROCESS: 'process',
 }
 
 export const OUTSOURCE_MODE_OPTIONS = [
-  { label: '整单外协', value: OUTSOURCE_MODE.WHOLE },
+  { label: '整件外协', value: OUTSOURCE_MODE.WHOLE },
   { label: '工序外协', value: OUTSOURCE_MODE.PROCESS },
 ]
 
@@ -14,7 +14,7 @@ export function normalizeOutsourceMode(mode) {
 }
 
 export function outsourceModeLabel(mode) {
-  return normalizeOutsourceMode(mode) === OUTSOURCE_MODE.PROCESS ? '工序外协' : '整单外协'
+  return normalizeOutsourceMode(mode) === OUTSOURCE_MODE.PROCESS ? '工序外协' : '整件外协'
 }
 
 export function isProcessOutsourceOrder(order) {

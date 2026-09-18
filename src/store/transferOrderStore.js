@@ -9,27 +9,43 @@ import {
 import {
   TRANSFER_SOURCE,
   TRANSFER_STATUS,
+  TRANSFER_LINE_STATUS,
   isTransferBusinessSource,
   isTransferManualSource,
 } from '@/mock/transferOptions'
-import { postTransferLines } from '@/utils/transferConfirm'
+import {
+  postTransferOutboundConfirm,
+  recomputeTransferStatusFromLines,
+} from '@/utils/transferConfirm'
+import { releaseTransferSoftLocksByOrderId } from '@/store/transferSoftLockStore'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_transfer_orders'
 const SEED_VERSION_KEY = 'i_doms_transfer_orders_seed_v'
-const CURRENT_SEED_VERSION = '1'
+/** v2：两段式状态（已完成/待入库方确认/已作废） */
+const CURRENT_SEED_VERSION = '2'
 
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.orders)) return parsed.orders
+      if (Array.isArray(parsed.orders)) return parsed.orders.map(migrateTransferOrder)
     }
   } catch {
     /* ignore */
   }
   return null
+}
+
+function migrateTransferOrder(order) {
+  if (!order) return order
+  // 旧「已确认」→「已完成」
+  if (order.status === '已确认') order.status = TRANSFER_STATUS.DONE
+  ;(order.lineItems || []).forEach((l) => {
+    if (l.lineStatus === '已确认') l.lineStatus = TRANSFER_LINE_STATUS.DONE
+  })
+  return order
 }
 
 function persist() {
@@ -46,7 +62,7 @@ const initial = shouldReseed()
   : loadFromStorage() || cloneTransferSeedOrders()
 
 export const transferOrderState = reactive({
-  orders: initial,
+  orders: (initial || []).map(migrateTransferOrder),
 })
 
 watch(
@@ -60,68 +76,31 @@ export function getTransferOrderById(id) {
 }
 
 export function canEditTransfer(order) {
-  const st = order?.status
-  return st === TRANSFER_STATUS.PENDING || st === TRANSFER_STATUS.PARTIAL
+  return order?.status === TRANSFER_STATUS.PENDING
 }
 
 export function canDeleteTransfer(order) {
   if (!order || isTransferBusinessSource(order)) return false
   if (!isTransferManualSource(order)) return false
-  const hasConfirmed = (order.lineItems || []).some(
-    (l) => (l.lineStatus || '') === TRANSFER_STATUS.DONE,
-  )
-  if (hasConfirmed) return false
-  return order.status === TRANSFER_STATUS.PENDING || order.status === TRANSFER_STATUS.PARTIAL
+  return order.status === TRANSFER_STATUS.PENDING
 }
 
+/** 出库方确认（整单） */
 export function canConfirmTransfer(order) {
-  if (!canEditTransfer(order)) return false
+  if (order?.status !== TRANSFER_STATUS.PENDING) return false
   return (order.lineItems || []).some((l) => {
-    const st = l.lineStatus || TRANSFER_STATUS.PENDING
-    return st !== TRANSFER_STATUS.DONE && st !== TRANSFER_STATUS.REFUSED
+    const st = l.lineStatus || TRANSFER_LINE_STATUS.PENDING
+    return st === TRANSFER_LINE_STATUS.PENDING && Number(l.qty) > 0
   })
 }
 
-export function canRefuseTransfer(order) {
-  if (!order || order.status !== TRANSFER_STATUS.PENDING) return false
-  const lines = order.lineItems || []
-  if (!lines.length) return true
-  return lines.every((l) => (l.lineStatus || TRANSFER_STATUS.PENDING) !== TRANSFER_STATUS.DONE)
-}
-
-export function canRefuseTransferLine(order, line) {
-  if (!order || !line) return false
-  if (!canEditTransfer(order)) return false
-  const st = line.lineStatus || TRANSFER_STATUS.PENDING
-  return st !== TRANSFER_STATUS.DONE && st !== TRANSFER_STATUS.REFUSED
+/** 作废：仅待确认 */
+export function canVoidTransfer(order) {
+  return order?.status === TRANSFER_STATUS.PENDING
 }
 
 export function recomputeTransferOrderStatus(order, operator = 'admin1') {
-  if (!order) return
-  const lines = order.lineItems || []
-  if (!lines.length) {
-    if (order.status === TRANSFER_STATUS.PARTIAL) order.status = TRANSFER_STATUS.PENDING
-    return
-  }
-  const done = lines.filter((l) => (l.lineStatus || '') === TRANSFER_STATUS.DONE).length
-  const refused = lines.filter((l) => (l.lineStatus || '') === TRANSFER_STATUS.REFUSED).length
-  const pending = lines.length - done - refused
-
-  if (done === 0 && pending === 0) {
-    order.status = TRANSFER_STATUS.REFUSED
-    return
-  }
-  if (done === 0 && pending > 0) {
-    order.status = TRANSFER_STATUS.PENDING
-    return
-  }
-  if (pending === 0 && done === lines.length) {
-    order.status = TRANSFER_STATUS.DONE
-    order.confirmer = order.confirmer || operator
-    order.confirmedAt = order.confirmedAt || dayjs().format('YYYY-MM-DD HH:mm:ss')
-    return
-  }
-  order.status = TRANSFER_STATUS.PARTIAL
+  recomputeTransferStatusFromLines(order, operator)
 }
 
 export function addTransferOrder(payload) {
@@ -139,7 +118,7 @@ export function addTransferOrder(payload) {
   const lineItems = (payload.lineItems || []).map((l) =>
     createTransferLine({
       ...l,
-      lineStatus: l.lineStatus || TRANSFER_STATUS.PENDING,
+      lineStatus: l.lineStatus || TRANSFER_LINE_STATUS.PENDING,
     }),
   )
   const row = createTransferOrder({
@@ -169,7 +148,7 @@ export function updateTransferOrder(id, patch) {
     patch.lineItems = patch.lineItems.map((l) =>
       createTransferLine({
         ...l,
-        lineStatus: l.lineStatus || TRANSFER_STATUS.PENDING,
+        lineStatus: l.lineStatus || TRANSFER_LINE_STATUS.PENDING,
       }),
     )
   }
@@ -185,12 +164,7 @@ export function deleteTransferOrder(id) {
   return true
 }
 
-function markLinesConfirmed(order, lineIds, postResult, operator) {
-  const idSet = new Set(lineIds)
-  ;(order.lineItems || []).forEach((line) => {
-    if (!idSet.has(line.id)) return
-    line.lineStatus = TRANSFER_STATUS.DONE
-  })
+function linkOutboundInbound(order, postResult) {
   if (postResult.outbound?.id) {
     if (!order.linkedOutboundIds.includes(postResult.outbound.id)) {
       order.linkedOutboundIds.push(postResult.outbound.id)
@@ -213,7 +187,6 @@ function markLinesConfirmed(order, lineIds, postResult, operator) {
       order.linkedInboundDocNos.push(postResult.inboundOrder.docNo)
     }
   }
-  recomputeTransferOrderStatus(order, operator)
 }
 
 export function confirmTransfer(ids, { operator = 'admin1' } = {}) {
@@ -226,76 +199,67 @@ export function confirmTransfer(ids, { operator = 'admin1' } = {}) {
       return
     }
     const pending = (order.lineItems || []).filter((l) => {
-      const st = l.lineStatus || TRANSFER_STATUS.PENDING
-      return st !== TRANSFER_STATUS.DONE && st !== TRANSFER_STATUS.REFUSED
+      const st = l.lineStatus || TRANSFER_LINE_STATUS.PENDING
+      return st === TRANSFER_LINE_STATUS.PENDING
     })
-    const res = postTransferLines(order, pending, { operator })
+    const res = postTransferOutboundConfirm(order, pending, { operator })
     if (!res.ok) {
       blocked.push({ docNo: order.docNo, message: res.message })
       return
     }
-    markLinesConfirmed(order, res.confirmedLineIds, res, operator)
+    linkOutboundInbound(order, res)
+    recomputeTransferStatusFromLines(order, operator)
     count += 1
   })
   return { count, blocked }
 }
 
-export function confirmTransferLine(orderId, lineId, { operator = 'admin1' } = {}) {
-  const order = getTransferOrderById(orderId)
-  const line = (order?.lineItems || []).find((l) => l.id === lineId)
-  if (!order || !line) return { ok: false, message: '明细不存在' }
-  if (!canConfirmTransfer(order)) return { ok: false, message: '当前状态不可确认' }
-  const st = line.lineStatus || TRANSFER_STATUS.PENDING
-  if (st === TRANSFER_STATUS.DONE) return { ok: false, message: '该明细已确认' }
-  if (st === TRANSFER_STATUS.REFUSED) return { ok: false, message: '该明细已拒绝' }
-  const res = postTransferLines(order, [line], { operator })
-  if (!res.ok) return res
-  markLinesConfirmed(order, res.confirmedLineIds, res, operator)
-  return { ok: true, order, outbound: res.outbound, inboundOrder: res.inboundOrder }
+/** 保存并确认：先落单再出库确认 */
+export function saveAndConfirmTransfer(payload, { operator = 'admin1' } = {}) {
+  const addRes = payload?.id ? updateTransferOrder(payload.id, payload) : addTransferOrder(payload)
+  if (!addRes.ok) return addRes
+  const confirmRes = confirmTransfer([addRes.order.id], { operator })
+  if (confirmRes.blocked?.length) {
+    return {
+      ok: false,
+      message: confirmRes.blocked.map((b) => b.message).join('；'),
+      order: addRes.order,
+    }
+  }
+  return { ok: true, order: getTransferOrderById(addRes.order.id) }
 }
 
-export function refuseTransfer(ids, { reason = '', operator = 'admin1' } = {}) {
+export function voidTransfer(ids, { reason = '', operator = 'admin1' } = {}) {
   const blocked = []
   let count = 0
   const reasonText = String(reason || '').trim()
   ;(ids || []).forEach((id) => {
     const order = getTransferOrderById(id)
-    if (!canRefuseTransfer(order)) {
-      blocked.push({ docNo: order?.docNo || id, message: '当前状态不可拒绝' })
+    if (!canVoidTransfer(order)) {
+      blocked.push({ docNo: order?.docNo || id, message: '仅待确认单据可作废' })
       return
     }
     if (!reasonText) {
-      blocked.push({ docNo: order?.docNo || id, message: '请填写拒绝理由' })
+      blocked.push({ docNo: order?.docNo || id, message: '请填写作废理由' })
       return
     }
-    order.status = TRANSFER_STATUS.REFUSED
-    order.refuseReason = reasonText
-    order.refusedBy = operator
-    order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-    ;(order.lineItems || []).forEach((line) => {
-      if ((line.lineStatus || '') !== TRANSFER_STATUS.DONE) {
-        line.lineStatus = TRANSFER_STATUS.REFUSED
-        line.refuseReason = reasonText
-      }
-    })
+    order.status = TRANSFER_STATUS.VOIDED
+    order.voidReason = reasonText
+    order.voidedBy = operator
+    order.voidedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    releaseTransferSoftLocksByOrderId(order.id)
     count += 1
   })
   return { count, blocked }
 }
 
-export function refuseTransferLine(orderId, lineId, { reason = '', operator = 'admin1' } = {}) {
-  const order = getTransferOrderById(orderId)
-  const line = (order?.lineItems || []).find((l) => l.id === lineId)
-  if (!canRefuseTransferLine(order, line)) return { ok: false, message: '当前明细不可拒绝' }
-  const reasonText = String(reason || '').trim()
-  if (!reasonText) return { ok: false, message: '请填写拒绝理由' }
-  line.lineStatus = TRANSFER_STATUS.REFUSED
-  line.refuseReason = reasonText
-  order.refuseReason = reasonText
-  order.refusedBy = operator
-  order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-  recomputeTransferOrderStatus(order, operator)
-  return { ok: true, order }
+/** @deprecated 使用 voidTransfer */
+export function refuseTransfer(ids, options) {
+  return voidTransfer(ids, options)
+}
+
+export function canRefuseTransfer(order) {
+  return canVoidTransfer(order)
 }
 
 export function filterTransferOrders(orders, filters = {}) {

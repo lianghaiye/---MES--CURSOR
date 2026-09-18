@@ -13,7 +13,7 @@ export const outsourcingReturnStatusOptions = ['待入库', '部分入库', '已
 export const outsourcingOverdueStatusOptions = ['未逾期', '已逾期']
 export const outsourcingBillingMethodOptions = ['按重量', '按件数']
 export const outsourcingModeFilterOptions = [
-  { label: '整单外协', value: OUTSOURCE_MODE.WHOLE },
+  { label: '整件外协', value: OUTSOURCE_MODE.WHOLE },
   { label: '工序外协', value: OUTSOURCE_MODE.PROCESS },
 ]
 
