@@ -326,7 +326,7 @@ function handleSaveAndConfirm() {
     message.warning(res.message || '保存并确认失败')
     return
   }
-  message.success('已保存并确认出库')
+  message.success('已保存并确认调拨')
   emit('saved')
   closeAfterSave()
 }

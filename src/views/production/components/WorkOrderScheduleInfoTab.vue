@@ -69,7 +69,9 @@
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space :size="8" wrap>
-              <a class="action-link" @click="onGenTask(record)">生成任务</a>
+              <a v-if="!record.isOutsourceProcess" class="action-link" @click="onGenTask(record)">
+                生成任务
+              </a>
               <template v-if="!record.isOutsourceProcess">
                 <a class="action-link" @click="openEditExecutor(record)">修改执行人</a>
                 <a class="action-link" @click="onResetStatus(record)">重置状态</a>

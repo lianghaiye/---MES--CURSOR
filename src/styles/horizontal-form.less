@@ -74,7 +74,8 @@
 
 /**
  * 列表筛选：一行 5 个（覆盖各页 a-row/a-col 栅格）
- * 搜索/重置固定在第二行末尾（第 10 格）；收起时最多展示 9 个条件
+ * - 收起：最多 9 个条件，搜索/重置/展开收起固定在第二行末尾（第 10 格）
+ * - 展开：条件按序铺满；第 10 个条件占第二行末格，按钮落在最后一行末尾
  * 已使用 ListFilterBar 的页面不受影响
  */
 .filter-card .filter-form.horizontal-form > .ant-row.list-filter-grid-row,
@@ -96,7 +97,7 @@
   padding-right: 0 !important;
 }
 
-/* 操作按钮：默认第二行末尾；条件不足 5 个时与条件同行（第 1 行第 5 列）；组内右对齐 */
+/* 操作按钮：右对齐第 5 列；展开时随条件流到最后一行末尾 */
 .filter-card
   .filter-form.horizontal-form
   > .ant-row
@@ -105,13 +106,34 @@
 .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-footer),
 .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-actions) {
   grid-column: 5;
-  grid-row: 2;
+  grid-row: auto;
   align-self: end;
   display: flex !important;
   justify-content: flex-end;
   align-items: center;
 }
 
+/* 收起：按钮钉在第二行末尾（前 9 个条件 + 按钮） */
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed
+  > .ant-col.ant-col-24:has(.filter-actions-item),
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed
+  > .ant-col:has(.filter-actions-item),
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed
+  > .ant-col:has(.filter-footer),
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed
+  > .ant-col:has(.filter-actions) {
+  grid-row: 2;
+}
+
+/* 条件不足 5 个时：按钮与条件同行（第 1 行第 5 列） */
 .filter-card
   .filter-form.horizontal-form
   > .ant-row
@@ -228,6 +250,21 @@
   .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-footer),
   .filter-card .filter-form.horizontal-form > .ant-row > .ant-col:has(.filter-actions) {
     grid-column: 3;
+    grid-row: auto;
+  }
+
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row.is-filter-collapsed
+    > .ant-col:has(.filter-actions-item),
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row.is-filter-collapsed
+    > .ant-col:has(.filter-footer),
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row.is-filter-collapsed
+    > .ant-col:has(.filter-actions) {
     grid-row: 2;
   }
 

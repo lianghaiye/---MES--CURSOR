@@ -33,6 +33,10 @@ import {
   ensureOneItemOneCodeInventoryBatches,
   OIOC_INV_STOCK_SYNC_ROWS,
 } from '@/mock/oneItemOneCodeInventoryDemoSeed'
+import {
+  ensureTransferDualOwnershipBatches,
+  TRANSFER_DUAL_OWNERSHIP_STOCK_SYNC_ROWS,
+} from '@/mock/transferDualOwnershipDemoSeed'
 import { allocateBatchUomConvert } from '@/utils/batchUomConvert'
 import { registerSettleBatchWeightLookup } from '@/utils/settleUnit'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
@@ -40,7 +44,7 @@ import { persistJson, safeSetItem } from '@/utils/safeStorage'
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
 /** v28：一类/一批补三口径（根/米/kg）在库批与件码 */
-const CURRENT_SEED_VERSION = '28'
+const CURRENT_SEED_VERSION = '29'
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',
@@ -73,18 +77,22 @@ function initBatches() {
   const stored = loadFromStorage()
   if (shouldReseed() || !stored?.length) {
     return {
-      batches: ensureOneItemOneCodeInventoryBatches(
-        ensureCategoryBatchPieceBatches(
-          ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(cloneStockBatchSeed())),
+      batches: ensureTransferDualOwnershipBatches(
+        ensureOneItemOneCodeInventoryBatches(
+          ensureCategoryBatchPieceBatches(
+            ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(cloneStockBatchSeed())),
+          ),
         ),
       ),
       reseeded: true,
     }
   }
   return {
-    batches: ensureOneItemOneCodeInventoryBatches(
-      ensureCategoryBatchPieceBatches(
-        ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(stored)),
+    batches: ensureTransferDualOwnershipBatches(
+      ensureOneItemOneCodeInventoryBatches(
+        ensureCategoryBatchPieceBatches(
+          ensureMultiUnitFlowBatches(ensureDedicatedShipDemoBatches(stored)),
+        ),
       ),
     ),
     reseeded: false,
@@ -173,6 +181,7 @@ if (initialBatchLoad.reseeded) {
     },
     ...OIOC_INV_STOCK_SYNC_ROWS,
     ...CBP_INV_STOCK_SYNC_ROWS,
+    ...TRANSFER_DUAL_OWNERSHIP_STOCK_SYNC_ROWS,
   ].forEach((row) =>
     syncAggregateStockFromBatches(row.warehouse, row.itemCode, row.itemName, row.unit),
   )

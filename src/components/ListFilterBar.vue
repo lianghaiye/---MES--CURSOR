@@ -99,7 +99,7 @@ const collapsible = computed(() => effectiveCount.value >= props.collapseCount)
 
   > .list-filter-actions-cell {
     grid-column: 5;
-    grid-row: 2;
+    grid-row: auto;
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -114,6 +114,10 @@ const collapsible = computed(() => effectiveCount.value >= props.collapseCount)
   > .list-filter-actions-cell:nth-child(-n + 5) {
     grid-row: 1;
   }
+}
+
+.list-filter-bar.is-collapsed .list-filter-fields > .list-filter-actions-cell {
+  grid-row: 2;
 }
 
 .list-filter-bar.is-collapsed .list-filter-fields > .ant-form-item:nth-child(n + 10),
@@ -144,12 +148,16 @@ const collapsible = computed(() => effectiveCount.value >= props.collapseCount)
 
     > .list-filter-actions-cell {
       grid-column: 3;
-      grid-row: 2;
+      grid-row: auto;
     }
 
     > .list-filter-actions-cell:nth-child(-n + 3) {
       grid-row: 1;
     }
+  }
+
+  .list-filter-bar.is-collapsed .list-filter-fields > .list-filter-actions-cell {
+    grid-row: 2;
   }
 
   .list-filter-bar.is-collapsed .list-filter-fields > .ant-form-item:nth-child(n + 6),

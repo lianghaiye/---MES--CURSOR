@@ -1,13 +1,18 @@
 /**
  * 列表页筛选区统一：
  * - 一行 5 个
- * - 搜索/重置固定在第二行末尾（第 10 格），组内右对齐
- * - 收起时最多展示 9 个条件；≥10 个条件才显示「展开 ▾ / 收起 ▴」
+ * - 收起：最多 9 个条件，搜索/重置/展开收起钉在第二行末尾
+ * - 展开：条件按序铺满；第 10 个条件占第二行末格，按钮落在最后一行末尾
+ *
+ * 折叠态存在 WeakMap，避免 Vue 重渲染清掉 ant-row 上的 class 导致「点了没用」。
  */
 const ENHANCED = 'data-list-filter-enhanced'
 const COLLAPSED = 'is-filter-collapsed'
 /** 收起时可见条件数（第 10 格留给按钮） */
 const MAX_VISIBLE = 9
+
+/** @type {WeakMap<Element, boolean>} true=收起 */
+const collapsedMap = new WeakMap()
 
 function isActionItem(el) {
   if (!el || el.nodeType !== 1) return false
@@ -17,7 +22,7 @@ function isActionItem(el) {
   )
     return true
   const hasControl = el.querySelector?.(
-    '.ant-input, .ant-select, .ant-picker, .ant-input-number, .ant-input-affix-wrapper, textarea, .ant-input-group',
+    '.ant-input, .ant-select, .ant-picker, .ant-input-number, .ant-input-affix-wrapper, textarea, .ant-input-group, .ant-checkbox-wrapper, .ant-checkbox',
   )
   const hasBtn = el.querySelector?.('button, .ant-btn')
   if (el.classList.contains('ant-form-item')) {
@@ -51,6 +56,15 @@ function setToggleLabel(toggle, collapsed) {
   toggle.appendChild(icon)
 }
 
+function getCollapsed(container) {
+  return collapsedMap.get(container) === true
+}
+
+function setCollapsed(container, collapsed) {
+  collapsedMap.set(container, Boolean(collapsed))
+  container.classList.toggle(COLLAPSED, Boolean(collapsed))
+}
+
 function ensureToggle(actionRoot, container) {
   let toggle = actionRoot.querySelector('.list-filter-auto-toggle')
   if (!toggle) {
@@ -71,14 +85,13 @@ function ensureToggle(actionRoot, container) {
       }
     }
   }
-  const collapsed = container.classList.contains(COLLAPSED)
+  const collapsed = getCollapsed(container)
   setToggleLabel(toggle, collapsed)
   toggle.onclick = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    container.classList.toggle(COLLAPSED)
-    const nowCollapsed = container.classList.contains(COLLAPSED)
-    setToggleLabel(toggle, nowCollapsed)
+    setCollapsed(container, !getCollapsed(container))
+    setToggleLabel(toggle, getCollapsed(container))
     applyVisibility(container)
   }
   return toggle
@@ -91,7 +104,9 @@ function fieldChildren(container) {
 function applyVisibility(container) {
   const cols = fieldChildren(container)
   const fieldCols = cols.filter((c) => !isActionItem(c))
-  const collapsed = container.classList.contains(COLLAPSED)
+  const collapsed = getCollapsed(container)
+  // 每次按 WeakMap 回写 class，抵消 Vue class patch 清掉的情况
+  container.classList.toggle(COLLAPSED, collapsed)
   fieldCols.forEach((col, idx) => {
     if (collapsed && idx >= MAX_VISIBLE) col.style.display = 'none'
     else col.style.display = ''
@@ -112,15 +127,21 @@ function enhanceContainer(container) {
 
   // ≤9 个条件：全部展示，不出现展开/收起
   if (fieldCols.length <= MAX_VISIBLE) {
+    collapsedMap.delete(container)
     container.classList.remove(COLLAPSED)
     const stale = container.querySelector('.list-filter-auto-toggle')
     if (stale) stale.remove()
-    applyVisibility(container)
+    fieldCols.forEach((col) => {
+      col.style.display = ''
+    })
     return
   }
 
   // ≥10 个条件：显示「展开 ▾ / 收起 ▴」（首次默认收起）
-  if (!already) container.classList.add(COLLAPSED)
+  if (!already || !collapsedMap.has(container)) {
+    collapsedMap.set(container, true)
+  }
+  setCollapsed(container, getCollapsed(container))
   const actionRoot = actionCols[0] || container
   ensureToggle(actionRoot, container)
   applyVisibility(container)

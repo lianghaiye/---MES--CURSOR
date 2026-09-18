@@ -22,8 +22,8 @@ import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_transfer_orders'
 const SEED_VERSION_KEY = 'i_doms_transfer_orders_seed_v'
-/** v2：两段式状态（已完成/待入库方确认/已作废） */
-const CURRENT_SEED_VERSION = '2'
+/** v3：补齐各状态演示种子 */
+const CURRENT_SEED_VERSION = '3'
 
 function loadFromStorage() {
   try {

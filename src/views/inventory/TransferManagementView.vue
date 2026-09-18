@@ -72,7 +72,7 @@
           </a-button>
           <a-button size="small" @click="handleConfirmSelected">
             <CheckOutlined />
-            确认出库
+            确认调拨
           </a-button>
           <a-button size="small" danger @click="handleVoidSelected">
             <StopOutlined />
@@ -146,7 +146,7 @@
                   size="small"
                   @click="handleConfirmOne(record)"
                 >
-                  确认出库
+                  确认调拨
                 </a-button>
                 <a-button
                   v-if="canVoidTransfer(record)"
@@ -328,12 +328,12 @@ function goDetail(record) {
 
 function handleConfirmOne(record) {
   Modal.confirm({
-    title: `确认出库 ${record.docNo}？`,
+    title: `确认调拨 ${record.docNo}？`,
     content: '将软锁定调出仓库存并生成调拨出库；按配置决定是否需入库方签收。',
     onOk: () => {
       const { count, blocked } = confirmTransfer([record.id])
       if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
-      if (count) message.success('已确认出库')
+      if (count) message.success('已确认调拨')
     },
   })
 }
@@ -344,13 +344,13 @@ function handleConfirmSelected() {
     return
   }
   Modal.confirm({
-    title: '确认所选调拨单出库？',
+    title: '确认所选调拨单？',
     onOk: () => {
       const { count, blocked } = confirmTransfer(selectedRowKeys.value)
       if (blocked?.length)
         message.warning(blocked.map((b) => `${b.docNo}: ${b.message}`).join('；'))
       if (count) {
-        message.success(`已确认出库 ${count} 条`)
+        message.success(`已确认调拨 ${count} 条`)
         selectedRowKeys.value = []
       }
     },

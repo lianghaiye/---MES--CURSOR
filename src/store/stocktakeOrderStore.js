@@ -17,7 +17,7 @@ import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_stocktake_orders'
 const SEED_VERSION_KEY = 'i_doms_stocktake_orders_seed_v'
-const CURRENT_SEED_VERSION = '1'
+const CURRENT_SEED_VERSION = '2'
 
 function loadFromStorage() {
   try {

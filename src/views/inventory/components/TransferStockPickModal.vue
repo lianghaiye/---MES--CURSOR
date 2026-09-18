@@ -75,7 +75,11 @@
       </a-form>
     </div>
 
-    <a-tabs v-model:activeKey="ownershipTab" size="small" class="ownership-tabs">
+    <a-tabs
+      v-model:activeKey="ownershipTab"
+      size="small"
+      class="ownership-tabs detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+    >
       <a-tab-pane key="all" tab="全部" />
       <a-tab-pane key="free" tab="自由备货" />
       <a-tab-pane key="dedicated" tab="按单在库" />
@@ -84,7 +88,7 @@
     <div class="picker-body">
       <div class="table-panel">
         <a-table
-          :columns="columns"
+          :columns="displayColumns"
           :data-source="pagedRows"
           row-key="rowKey"
           size="small"
@@ -212,20 +216,62 @@ function emptySearch() {
   }
 }
 
-const columns = [
+const PRODUCT_MERGE_KEYS = new Set([
+  'itemName',
+  'itemCode',
+  'specModel',
+  'material',
+  'variantSummary',
+])
+
+const baseColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '归属', key: 'ownership', width: 72, align: 'center' },
-  { title: '产品名称', dataIndex: 'itemName', width: 140, ellipsis: true },
-  { title: '产品编码', dataIndex: 'itemCode', width: 120 },
-  { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
-  { title: '变体属性', dataIndex: 'variantSummary', width: 120, ellipsis: true },
+  { title: '产品名称', key: 'itemName', dataIndex: 'itemName', width: 140, ellipsis: true },
+  { title: '产品编码', key: 'itemCode', dataIndex: 'itemCode', width: 120 },
+  { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 110, ellipsis: true },
+  { title: '材质', key: 'material', dataIndex: 'material', width: 80, ellipsis: true },
+  {
+    title: '变体属性',
+    key: 'variantSummary',
+    dataIndex: 'variantSummary',
+    width: 120,
+    ellipsis: true,
+  },
   { title: '库存数量', key: 'qtyText', width: 110, align: 'right' },
   { title: '销售单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 130 },
 ]
 
-const tableScrollX = computed(() => columns.reduce((s, c) => s + (c.width || 90), 0))
+const tableScrollX = computed(() => baseColumns.reduce((s, c) => s + (c.width || 90), 0))
 const tableScrollY = 360
+
+/** 当前页内按物料编码合并产品信息列 */
+function buildItemCodeRowSpans(rows = []) {
+  const spans = new Array(rows.length).fill(1)
+  let i = 0
+  while (i < rows.length) {
+    const key = String(rows[i]?.itemCode || '')
+    let j = i + 1
+    while (j < rows.length) {
+      if (String(rows[j]?.itemCode || '') !== key) break
+      j += 1
+    }
+    const span = j - i
+    spans[i] = span
+    for (let k = i + 1; k < j; k += 1) spans[k] = 0
+    i = j
+  }
+  return spans
+}
+
+function sortRowsByItemCode(rows) {
+  return [...rows].sort((a, b) => {
+    const codeCmp = String(a.itemCode || '').localeCompare(String(b.itemCode || ''), 'zh-CN')
+    if (codeCmp !== 0) return codeCmp
+    // 同物料：自由备货在前，按单在库在后
+    return Number(Boolean(a.dedicated)) - Number(Boolean(b.dedicated))
+  })
+}
 
 function isDedicatedBatch(b) {
   return Boolean(b?.salesOrderId || b?.salesOrderNo)
@@ -386,7 +432,7 @@ const filteredRows = computed(() => {
   const locKw = String(f.locationNo || '')
     .trim()
     .toLowerCase()
-  return allRows.value.filter((r) => {
+  const filtered = allRows.value.filter((r) => {
     if (!includesKw(r.itemCode, codeKw)) return false
     if (!includesKw(r.itemName, nameKw)) return false
     if (!includesKw(r.specModel, specKw)) return false
@@ -395,12 +441,27 @@ const filteredRows = computed(() => {
     if (!includesKw(r.locationNo, locKw)) return false
     return true
   })
+  return sortRowsByItemCode(filtered)
 })
 
 const pagedRows = computed(() => {
   const start = (page.value - 1) * pageSize.value
   return filteredRows.value.slice(start, start + pageSize.value)
 })
+
+const pageItemRowSpans = computed(() => buildItemCodeRowSpans(pagedRows.value))
+
+const displayColumns = computed(() =>
+  baseColumns.map((col) => {
+    if (!PRODUCT_MERGE_KEYS.has(col.key)) return col
+    return {
+      ...col,
+      customCell: (_record, index) => ({
+        rowSpan: pageItemRowSpans.value[index] ?? 1,
+      }),
+    }
+  }),
+)
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -499,10 +560,6 @@ function handleConfirm() {
 <style lang="less" scoped>
 .ownership-tabs {
   margin-bottom: 8px;
-
-  :deep(.ant-tabs-nav) {
-    margin-bottom: 0;
-  }
 }
 
 .picker-body {
