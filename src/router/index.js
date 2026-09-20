@@ -660,6 +660,12 @@ const routes = [
         meta: { title: '库存扣减记录' },
       },
       {
+        path: 'inventory/deduct-records/:id/edit',
+        name: 'inventory-deduct-record-edit',
+        component: () => import('@/views/inventory/InventoryDeductEditView.vue'),
+        meta: { title: '编辑扣减记录', listPath: '/inventory/deduct-records' },
+      },
+      {
         path: 'inventory/deduct-records/:id',
         name: 'inventory-deduct-record-detail',
         component: () => import('@/views/inventory/InventoryDeductDetailView.vue'),

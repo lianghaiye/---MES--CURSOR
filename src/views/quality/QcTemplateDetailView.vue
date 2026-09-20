@@ -117,7 +117,7 @@ watch(
 <style lang="less" scoped>
 .qc-template-detail-page {
   padding: 16px;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   min-height: 100%;
 }
 

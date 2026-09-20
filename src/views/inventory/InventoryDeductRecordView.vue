@@ -52,7 +52,7 @@
           />
         </a-form-item>
         <a-form-item class="filter-actions">
-          <a-space>
+          <a-space :size="8">
             <a-button type="primary" size="small" @click="handleSearch">
               <SearchOutlined />
               搜索
@@ -164,7 +164,6 @@
       </div>
     </div>
 
-    <InventoryDeductEditModal v-model:open="editOpen" :record="activeRecord" @saved="onSaved" />
     <ExportExcelModal
       v-model:open="exportModalOpen"
       v-model:settings="exportFieldSettings"
@@ -204,8 +203,8 @@ import {
   isMaterialDeductLocked,
 } from '@/store/materialRequisitionStore'
 import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 import ListPeriodStatsPanel from '@/components/ListPeriodStatsPanel.vue'
-import InventoryDeductEditModal from './components/InventoryDeductEditModal.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useListExport } from '@/composables/useListExport'
 import {
@@ -232,8 +231,6 @@ const pagination = reactive({
   pageSize: 8,
 })
 
-const editOpen = ref(false)
-const activeRecord = ref(null)
 const selectedRowKeys = ref([])
 
 const statusOptions = MATERIAL_DEDUCT_STATUS_OPTIONS
@@ -426,12 +423,6 @@ function isLocked(record) {
   return isMaterialDeductLocked(record)
 }
 
-function refreshActive() {
-  if (!activeRecord.value?.id) return
-  activeRecord.value =
-    materialRequisitionState.records.find((r) => r.id === activeRecord.value.id) || null
-}
-
 function openDetail(record) {
   const path = `/inventory/deduct-records/${record.id}`
   openTab(path, record.deductNo || '扣减记录详情')
@@ -439,8 +430,10 @@ function openDetail(record) {
 }
 
 function openEdit(record) {
-  activeRecord.value = record
-  editOpen.value = true
+  openCreateTab(router, openTab, {
+    path: `/inventory/deduct-records/${record.id}/edit`,
+    title: `编辑扣减记录 ${record.deductNo || ''}`.trim(),
+  })
 }
 
 function onConfirm(record) {
@@ -456,7 +449,6 @@ function onConfirm(record) {
         return
       }
       message.success(`已确认，状态：${res.record.status}`)
-      refreshActive()
       selectedRowKeys.value = selectedRowKeys.value.filter((id) => id !== record.id)
     },
   })
@@ -483,7 +475,6 @@ function onBatchConfirm() {
         `已确认 ${res.okCount} 条${res.failCount ? `，失败 ${res.failCount} 条` : ''}`,
       )
       selectedRowKeys.value = []
-      refreshActive()
     },
   })
 }
@@ -502,7 +493,6 @@ function onUndoConfirm(record) {
         return
       }
       message.success('已撤销确认，单据已恢复为待确认')
-      refreshActive()
     },
   })
 }
@@ -533,7 +523,6 @@ function onVoid(record) {
         return
       }
       message.success('单据已作废')
-      refreshActive()
       selectedRowKeys.value = selectedRowKeys.value.filter((id) => id !== record.id)
     },
   })
@@ -546,11 +535,6 @@ function onRetry(record) {
     return
   }
   message.success(`已重试，状态：${res.record.status}`)
-  refreshActive()
-}
-
-function onSaved() {
-  refreshActive()
 }
 </script>
 

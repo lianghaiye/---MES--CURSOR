@@ -270,7 +270,7 @@ function openOutsourcingOrder() {
   margin: -12px;
   padding: 12px;
   min-height: calc(100vh - 112px);
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   display: flex;
   flex-direction: column;
 }

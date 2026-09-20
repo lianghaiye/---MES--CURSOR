@@ -832,7 +832,7 @@ function handleInitiateQc() {
   .tab-body {
     margin-top: 0;
     padding: 0 12px 16px;
-    background: #f5f6f8;
+    background: var(--page-bg, #f0f2f5);
   }
 
   .section-card {

@@ -409,7 +409,7 @@ function statusTagColor(status) {
   }
 
   .detail-action-bar {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     padding: 8px 12px;
     background: #fff;
     border: 1px solid #e5e6eb;

@@ -136,7 +136,7 @@ function scrollToReq(id) {
 .prd-page {
   margin: -12px;
   padding: 16px 20px 32px;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   min-height: calc(100vh - 112px);
 }
 

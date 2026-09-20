@@ -39,7 +39,13 @@
                 size="small"
                 @click="handlePost"
               >
-                {{ record.postingStatus === 'failed' ? '重新过账' : '生成盘盈盘亏' }}
+                {{
+                  record.postingStatus === 'failed'
+                    ? '重新过账'
+                    : record.postingStatus === 'partial'
+                      ? '继续过账'
+                      : '生成盘盈盘亏'
+                }}
               </a-button>
               <a-button v-if="canEditStocktake(record)" size="small" @click="openEdit"
                 >编辑</a-button
@@ -167,6 +173,13 @@
       :doc-nos="[record?.docNo].filter(Boolean)"
       @confirm="onRefuseConfirm"
     />
+
+    <StocktakePostModeModal
+      v-model:open="postModeModalOpen"
+      :title="postModeModalTitle"
+      :hint="postModeModalHint"
+      @confirm="onPostModeConfirm"
+    />
   </div>
 </template>
 
@@ -204,6 +217,7 @@ import { getInboundOrderById, inboundOrderState } from '@/store/inboundOrderStor
 import { getOutboundOrderById, outboundState } from '@/store/outboundStore'
 import { isStocktakeAutoPostOnApprove } from '@/store/stocktakeSettingsStore'
 import InventoryDocRefuseModal from './components/InventoryDocRefuseModal.vue'
+import StocktakePostModeModal from './components/StocktakePostModeModal.vue'
 import StocktakeOrderBasicInfoSection from './components/StocktakeOrderBasicInfoSection.vue'
 import {
   isDedicatedInventoryLine,
@@ -218,6 +232,9 @@ const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 const refuseModalOpen = ref(false)
+const postModeModalOpen = ref(false)
+const postModeModalTitle = ref('生成盘盈盘亏')
+const postModeModalHint = ref('请选择本次要生成的单据范围。')
 const infoTab = ref('basic')
 
 const record = computed(() => {
@@ -409,18 +426,28 @@ function handleApprove() {
 }
 
 function handlePost() {
+  if (!record.value) return
   const isRetry = record.value.postingStatus === STOCKTAKE_POSTING.FAILED
-  Modal.confirm({
-    title: isRetry ? `重新过账 ${record.value.docNo}？` : `生成盘盈盘亏 ${record.value.docNo}？`,
-    content: isRetry
-      ? record.value.postingError || '将再次尝试生成盘盈入库 / 盘亏出库并入账。'
-      : '将按差异生成盘盈入库或盘亏出库并入账。',
-    onOk: () => {
-      const { count, blocked } = postStocktake([record.value.id])
-      if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
-      if (count) message.success('已过账')
-    },
-  })
+  const isPartial = record.value.postingStatus === STOCKTAKE_POSTING.PARTIAL
+  postModeModalTitle.value = isRetry
+    ? `重新过账 ${record.value.docNo}`
+    : isPartial
+      ? `继续过账 ${record.value.docNo}`
+      : `生成盘盈盘亏 ${record.value.docNo}`
+  postModeModalHint.value = isRetry
+    ? record.value.postingError || '请选择本次要重新生成的单据范围。'
+    : isPartial
+      ? '当前为部分过账，请选择要继续生成的单据范围。'
+      : '请选择本次要生成的单据范围。'
+  postModeModalOpen.value = true
+}
+
+function onPostModeConfirm(mode) {
+  if (!record.value?.id) return
+  const { count, blocked, partialCount } = postStocktake([record.value.id], { mode })
+  if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
+  if (!count) return
+  message.success(partialCount ? '已生成（尚有差异可继续过账）' : '已过账')
 }
 
 function openRefuse() {
@@ -444,7 +471,7 @@ function onRefuseConfirm(reason) {
   height: calc(100vh - 112px);
   max-height: calc(100vh - 112px);
   min-height: 0;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -465,7 +492,7 @@ function onRefuseConfirm(reason) {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
 }
 
 .page-header {

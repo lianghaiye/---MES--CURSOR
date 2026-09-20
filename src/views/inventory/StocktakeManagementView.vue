@@ -79,7 +79,7 @@
           <PlusOutlined />
           新增
         </a-button>
-        <a-button size="small" @click="handleSubmitSelected">提交</a-button>
+        <a-button size="small" @click="handleSubmitSelected">提交审核</a-button>
         <a-button size="small" @click="handleApproveSelected">
           <CheckOutlined />
           审核通过
@@ -158,7 +158,7 @@
                 size="small"
                 @click="handleSubmitOne(record)"
               >
-                提交
+                提交审核
               </a-button>
               <a-button
                 v-if="canApproveStocktake(record)"
@@ -191,7 +191,13 @@
                 size="small"
                 @click="handlePostOne(record)"
               >
-                {{ record.postingStatus === 'failed' ? '重新过账' : '生成盘盈盘亏' }}
+                {{
+                  record.postingStatus === 'failed'
+                    ? '重新过账'
+                    : record.postingStatus === 'partial'
+                      ? '继续过账'
+                      : '生成盘盈盘亏'
+                }}
               </a-button>
               <a-button
                 v-if="canDeleteStocktake(record)"
@@ -225,6 +231,13 @@
       doc-label="盘点"
       :doc-nos="refuseDocNos"
       @confirm="onRefuseConfirm"
+    />
+
+    <StocktakePostModeModal
+      v-model:open="postModeModalOpen"
+      :title="postModeModalTitle"
+      :hint="postModeModalHint"
+      @confirm="onPostModeConfirm"
     />
   </div>
 </template>
@@ -275,6 +288,7 @@ import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { useTabs } from '@/composables/useTabs'
 import InventoryDocRefuseModal from './components/InventoryDocRefuseModal.vue'
+import StocktakePostModeModal from './components/StocktakePostModeModal.vue'
 
 defineOptions({ name: 'StocktakeManagementView' })
 
@@ -293,6 +307,10 @@ const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
 const refuseModalOpen = ref(false)
 const refuseTargets = ref([])
+const postModeModalOpen = ref(false)
+const postModeModalTitle = ref('生成盘盈盘亏')
+const postModeModalHint = ref('请选择本次要生成的单据范围。')
+const postTargetIds = ref([])
 
 const warehouseOpts = computed(() => getWarehouseSelectOptions())
 const statusOpts = stocktakeStatusOptions.map((v) => ({ label: v, value: v }))
@@ -390,11 +408,64 @@ function reportApproveResult({ count, blocked, posted }) {
   }
 }
 
-function reportPostResult({ count, blocked }) {
+function reportPostResult({ count, blocked, partialCount }) {
   if (blocked?.length) {
     message.warning(blocked.map((b) => `${b.docNo}: ${b.message}`).join('；'))
   }
-  if (count) message.success(`已过账 ${count} 条`)
+  if (!count) return
+  if (partialCount) {
+    message.success(`已生成 ${count} 条（其中 ${partialCount} 条尚有差异可继续过账）`)
+  } else {
+    message.success(`已过账 ${count} 条`)
+  }
+}
+
+function openPostModeModal({ title, hint, ids }) {
+  postModeModalTitle.value = title
+  postModeModalHint.value = hint
+  postTargetIds.value = ids || []
+  postModeModalOpen.value = true
+}
+
+function onPostModeConfirm(mode) {
+  const ids = postTargetIds.value
+  if (!ids.length) return
+  const res = postStocktake(ids, { mode })
+  reportPostResult(res)
+  if (res.count) {
+    selectedRowKeys.value = selectedRowKeys.value.filter((id) => !ids.includes(id))
+  }
+  postTargetIds.value = []
+}
+
+function handlePostOne(record) {
+  const isRetry = record.postingStatus === STOCKTAKE_POSTING.FAILED
+  const isPartial = record.postingStatus === STOCKTAKE_POSTING.PARTIAL
+  openPostModeModal({
+    title: isRetry
+      ? `重新过账 ${record.docNo}`
+      : isPartial
+        ? `继续过账 ${record.docNo}`
+        : `生成盘盈盘亏 ${record.docNo}`,
+    hint: isRetry
+      ? record.postingError || '请选择本次要重新生成的单据范围。'
+      : isPartial
+        ? '当前为部分过账，请选择要继续生成的单据范围。'
+        : '请选择本次要生成的单据范围。',
+    ids: [record.id],
+  })
+}
+
+function handlePostSelected() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择盘点单')
+    return
+  }
+  openPostModeModal({
+    title: '对所选盘点单生成盘盈盘亏',
+    hint: '仅「审核通过」且待过账/过账失败的单据会执行；请选择生成范围。',
+    ids: [...selectedRowKeys.value],
+  })
 }
 
 function handleSubmitOne(record) {
@@ -491,35 +562,6 @@ function handleApproveSelected() {
   })
 }
 
-function handlePostOne(record) {
-  const isRetry = record.postingStatus === STOCKTAKE_POSTING.FAILED
-  Modal.confirm({
-    title: isRetry ? `重新过账 ${record.docNo}？` : `生成盘盈盘亏 ${record.docNo}？`,
-    content: isRetry
-      ? record.postingError || '将再次尝试生成盘盈入库 / 盘亏出库并入账。'
-      : '将按差异生成盘盈入库或盘亏出库并入账。',
-    onOk: () => {
-      reportPostResult(postStocktake([record.id]))
-    },
-  })
-}
-
-function handlePostSelected() {
-  if (!selectedRowKeys.value.length) {
-    message.warning('请先选择盘点单')
-    return
-  }
-  Modal.confirm({
-    title: '对所选盘点单生成盘盈盘亏？',
-    content: '仅「审核通过」且待过账/过账失败的单据会执行。',
-    onOk: () => {
-      const res = postStocktake(selectedRowKeys.value)
-      reportPostResult(res)
-      if (res.count) selectedRowKeys.value = []
-    },
-  })
-}
-
 function openRefuse(records) {
   refuseTargets.value = records || []
   refuseModalOpen.value = true
@@ -578,7 +620,7 @@ function handleBatchDelete() {
 .stocktake-page {
   margin: -12px;
   padding: 12px;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   min-height: calc(100vh - 112px);
 }
 

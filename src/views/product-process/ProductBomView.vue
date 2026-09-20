@@ -1021,7 +1021,7 @@ function onExportMenu({ key }) {
 .product-bom-page {
   margin: -12px;
   padding: 12px;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
 }
 
 .filter-card,

@@ -96,7 +96,8 @@ function withDiff(partial) {
 }
 
 /**
- * 盘点单演示种子：待提交 / 待审核 / 审核通过(待过账) / 过账成功 / 已拒绝 / 过账失败
+ * 盘点单演示种子 v6：
+ * 待提交 / 待审核 / 待过账(含盘盈+盘亏) / 部分过账 / 过账成功 / 已拒绝 / 过账失败
  */
 export function cloneStocktakeSeedOrders() {
   const today = dayjs().format('YYYY-MM-DD')
@@ -105,9 +106,10 @@ export function cloneStocktakeSeedOrders() {
   const threeDaysAgo = dayjs().subtract(3, 'day').format('YYYY-MM-DD')
 
   return [
+    // 1 待提交
     createStocktakeOrder({
       id: 'st-seed-draft',
-      docNo: 'PD20260919000',
+      docNo: 'PD20260920001',
       status: STOCKTAKE_STATUS.DRAFT,
       stocktakeType: STOCKTAKE_TYPE.OTHER,
       sourceChannel: STOCKTAKE_SOURCE.MANUAL,
@@ -122,27 +124,41 @@ export function cloneStocktakeSeedOrders() {
           id: 'st-seed-draft-l1',
           itemCode: SIMPLE_UNIT_DEMO_CODE,
           itemName: SIMPLE_UNIT_DEMO_NAME,
+          specModel: '6205-2RS',
+          material: 'GCr15',
           unit: '件',
           bookQty: 20,
-          actualQty: 20,
+          actualQty: 18,
+          dedicated: false,
+        }),
+        withDiff({
+          id: 'st-seed-draft-l2',
+          itemCode: STEEL_PIPE_CODE,
+          itemName: STEEL_PIPE_NAME,
+          specModel: 'φ50×3',
+          material: 'Q235',
+          unit: '米',
+          bookQty: 40,
+          actualQty: 40,
           dedicated: false,
         }),
       ],
     }),
 
+    // 2 待审核（含盘亏 + 盘盈）
     createStocktakeOrder({
       id: 'st-seed-pending',
-      docNo: 'PD20260918001',
+      docNo: 'PD20260920002',
       status: STOCKTAKE_STATUS.PENDING_APPROVAL,
       stocktakeType: STOCKTAKE_TYPE.CLOSING,
       sourceChannel: STOCKTAKE_SOURCE.MANUAL,
       warehouse: '原料仓',
       stocktakeDate: today,
-      applicant: 'admin1',
+      applicant: '张三',
       creator: '管理员',
       createdAt: `${today} 09:30:00`,
       submittedAt: `${today} 09:35:00`,
-      remark: '演示：原料仓期末盘点，待审核',
+      remark: '演示：原料仓期末盘点，待审核（含盘盈盘亏）',
       lineItems: [
         withDiff({
           id: 'st-seed-pending-l1',
@@ -183,9 +199,10 @@ export function cloneStocktakeSeedOrders() {
       ],
     }),
 
+    // 3 审核通过 · 待过账（同时有盘盈、盘亏，便于测「只生成一侧 / 部分过账」）
     createStocktakeOrder({
-      id: 'st-seed-approved',
-      docNo: 'PD20260917002',
+      id: 'st-seed-approved-both',
+      docNo: 'PD20260920003',
       status: STOCKTAKE_STATUS.APPROVED,
       postingStatus: STOCKTAKE_POSTING.PENDING,
       stocktakeType: STOCKTAKE_TYPE.OTHER,
@@ -197,23 +214,91 @@ export function cloneStocktakeSeedOrders() {
       createdAt: `${yesterday} 13:10:00`,
       approver: '管理员',
       approvedAt: `${yesterday} 16:00:00`,
-      remark: '演示：审核通过，待手动过账',
+      remark: '演示：待过账，明细含盘盈+盘亏，可分侧生成',
       lineItems: [
         withDiff({
-          id: 'st-seed-approved-l1',
+          id: 'st-seed-approved-both-l1',
           itemCode: CASTING_BLANK_SETTLE_CODE,
           itemName: CASTING_BLANK_SETTLE_NAME,
           unit: '件',
           bookQty: 30,
           actualQty: 28,
           dedicated: false,
+          lineStatus: STOCKTAKE_STATUS.APPROVED,
+        }),
+        withDiff({
+          id: 'st-seed-approved-both-l2',
+          itemCode: SIMPLE_UNIT_DEMO_CODE,
+          itemName: SIMPLE_UNIT_DEMO_NAME,
+          unit: '件',
+          bookQty: 12,
+          actualQty: 15,
+          dedicated: false,
+          lineStatus: STOCKTAKE_STATUS.APPROVED,
+        }),
+        withDiff({
+          id: 'st-seed-approved-both-l3',
+          itemCode: STEEL_WEIGHT_BAR_CODE,
+          itemName: STEEL_WEIGHT_BAR_NAME,
+          unit: 'kg',
+          bookQty: 100,
+          actualQty: 100,
+          dedicated: false,
+          lineStatus: STOCKTAKE_STATUS.APPROVED,
         }),
       ],
     }),
 
+    // 4 部分过账（已生成盘盈，盘亏未生成，可继续过账）
+    createStocktakeOrder({
+      id: 'st-seed-partial',
+      docNo: 'PD20260920004',
+      status: STOCKTAKE_STATUS.APPROVED,
+      postingStatus: STOCKTAKE_POSTING.PARTIAL,
+      stocktakeType: STOCKTAKE_TYPE.CLOSING,
+      sourceChannel: STOCKTAKE_SOURCE.MANUAL,
+      warehouse: '原料仓',
+      stocktakeDate: yesterday,
+      applicant: '李四',
+      creator: '管理员',
+      createdAt: `${yesterday} 10:00:00`,
+      approver: '管理员',
+      approvedAt: `${yesterday} 11:00:00`,
+      confirmer: '李四',
+      confirmedAt: `${yesterday} 11:30:00`,
+      remark: '演示：部分过账——盘盈已生成，盘亏可继续过账',
+      linkedInboundIds: ['ib-st-seed-partial'],
+      linkedInboundDocNos: ['PDYK20260919113001'],
+      lineItems: [
+        withDiff({
+          id: 'st-seed-partial-l1',
+          itemCode: STEEL_PIPE_CODE,
+          itemName: STEEL_PIPE_NAME,
+          unit: '米',
+          bookQty: 36,
+          actualQty: 40,
+          dedicated: false,
+          lineStatus: STOCKTAKE_STATUS.APPROVED,
+          linkedInboundId: 'ib-st-seed-partial',
+          linkedInboundDocNo: 'PDYK20260919113001',
+        }),
+        withDiff({
+          id: 'st-seed-partial-l2',
+          itemCode: SIMPLE_UNIT_DEMO_CODE,
+          itemName: SIMPLE_UNIT_DEMO_NAME,
+          unit: '件',
+          bookQty: 25,
+          actualQty: 22,
+          dedicated: false,
+          lineStatus: STOCKTAKE_STATUS.APPROVED,
+        }),
+      ],
+    }),
+
+    // 5 过账成功
     createStocktakeOrder({
       id: 'st-seed-posted',
-      docNo: 'PD20260916003',
+      docNo: 'PD20260920005',
       status: STOCKTAKE_STATUS.APPROVED,
       postingStatus: STOCKTAKE_POSTING.SUCCESS,
       stocktakeType: STOCKTAKE_TYPE.CLOSING,
@@ -231,8 +316,8 @@ export function cloneStocktakeSeedOrders() {
       remark: '演示：审核通过且过账成功',
       linkedOutboundIds: ['ob-st-seed-done'],
       linkedInboundIds: ['ib-st-seed-done'],
-      linkedOutboundDocNos: ['CK202609160P03'],
-      linkedInboundDocNos: ['RK202609160P03'],
+      linkedOutboundDocNos: ['CK202609180P03'],
+      linkedInboundDocNos: ['RK202609180P03'],
       lineItems: [
         withDiff({
           id: 'st-seed-posted-l1',
@@ -244,7 +329,7 @@ export function cloneStocktakeSeedOrders() {
           lineStatus: STOCKTAKE_STATUS.APPROVED,
           dedicated: false,
           linkedInboundId: 'ib-st-seed-done',
-          linkedInboundDocNo: 'RK202609160P03',
+          linkedInboundDocNo: 'RK202609180P03',
         }),
         withDiff({
           id: 'st-seed-posted-l2',
@@ -256,14 +341,15 @@ export function cloneStocktakeSeedOrders() {
           lineStatus: STOCKTAKE_STATUS.APPROVED,
           dedicated: false,
           linkedOutboundId: 'ob-st-seed-done',
-          linkedOutboundDocNo: 'CK202609160P03',
+          linkedOutboundDocNo: 'CK202609180P03',
         }),
       ],
     }),
 
+    // 6 已拒绝
     createStocktakeOrder({
       id: 'st-seed-refused',
-      docNo: 'PD20260915004',
+      docNo: 'PD20260920006',
       status: STOCKTAKE_STATUS.REFUSED,
       stocktakeType: STOCKTAKE_TYPE.COST,
       sourceChannel: STOCKTAKE_SOURCE.MANUAL,
@@ -291,9 +377,10 @@ export function cloneStocktakeSeedOrders() {
       ],
     }),
 
+    // 7 过账失败（可重新过账）
     createStocktakeOrder({
       id: 'st-seed-post-fail',
-      docNo: 'PD20260918005',
+      docNo: 'PD20260920007',
       status: STOCKTAKE_STATUS.APPROVED,
       postingStatus: STOCKTAKE_POSTING.FAILED,
       postingError: '演示：自由可用不足，过账失败（可重新过账）',
@@ -316,6 +403,7 @@ export function cloneStocktakeSeedOrders() {
           bookQty: 36,
           actualQty: 10,
           dedicated: false,
+          lineStatus: STOCKTAKE_STATUS.APPROVED,
         }),
       ],
     }),

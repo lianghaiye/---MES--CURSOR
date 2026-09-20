@@ -1004,7 +1004,7 @@ function handleRefuseInbound() {
 .pending-inbound-page {
   margin: -12px;
   padding: 12px;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   min-height: calc(100vh - 112px);
 }
 
@@ -1191,11 +1191,11 @@ function handleRefuseInbound() {
 .order-card {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 8px;
   border: 1px solid #e8eef8;
   border-radius: 6px;
-  padding: 6px 8px 6px 6px;
-  margin-bottom: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
   cursor: pointer;
   background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
   transition: all 0.2s;
@@ -1220,7 +1220,7 @@ function handleRefuseInbound() {
 
   .card-checkbox {
     flex-shrink: 0;
-    margin-top: 1px;
+    margin-top: 2px;
   }
 
   .card-content {
@@ -1230,9 +1230,10 @@ function handleRefuseInbound() {
 
   .card-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 4px;
+    gap: 4px;
+    margin-bottom: 6px;
 
     .status-tag {
       margin: 0;
@@ -1242,6 +1243,7 @@ function handleRefuseInbound() {
     }
 
     .more-btn {
+      flex-shrink: 0;
       padding: 0 2px;
       height: 22px;
       color: rgba(0, 0, 0, 0.45);
@@ -1252,18 +1254,22 @@ function handleRefuseInbound() {
     font-weight: 600;
     font-size: 13px;
     color: rgba(0, 0, 0, 0.88);
+    margin-bottom: 4px;
+    line-height: 1.3;
   }
 
   .card-name {
-    margin-top: 2px;
     font-size: 12px;
     color: rgba(0, 0, 0, 0.65);
+    margin-bottom: 4px;
+    line-height: 1.4;
   }
 
   .card-meta {
-    margin-top: 4px;
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
+    line-height: 1.5;
+    margin-bottom: 4px;
 
     .meta-divider {
       margin: 0 4px;

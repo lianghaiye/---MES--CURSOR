@@ -315,7 +315,7 @@ function onDocChange(docId) {
 
 <style scoped>
 .route-editor-layout {
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   border-radius: 4px;
 }
 

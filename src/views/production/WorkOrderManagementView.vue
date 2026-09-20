@@ -1275,7 +1275,7 @@ async function onScheduleBatchSubmit(payload) {
 .work-order-page {
   margin: -12px;
   padding: 12px;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   min-height: calc(100vh - 112px);
 }
 

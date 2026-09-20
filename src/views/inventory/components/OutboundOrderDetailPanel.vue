@@ -621,9 +621,12 @@ export default { name: 'OutboundOrderDetailPanel' }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
-  padding: 0;
-  border-bottom: none;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid #e8eef8;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
+  box-sizing: border-box;
 }
 
 .header-actions {
@@ -652,8 +655,9 @@ export default { name: 'OutboundOrderDetailPanel' }
   min-width: 0;
 
   .code {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
+    color: rgba(0, 0, 0, 0.88);
   }
 
   .name {
@@ -668,7 +672,7 @@ export default { name: 'OutboundOrderDetailPanel' }
 }
 
 .detail-action-bar {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding: 8px 12px;
   background: #fff;
   border: 1px solid #e5e6eb;
@@ -705,7 +709,7 @@ export default { name: 'OutboundOrderDetailPanel' }
   min-height: 0;
   display: flex;
   flex-direction: column;
-  margin-top: 4px;
+  margin-top: 0;
   padding: 0;
 
   :deep(.ant-tabs-content-holder) {

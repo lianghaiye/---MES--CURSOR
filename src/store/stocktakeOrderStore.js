@@ -15,7 +15,11 @@ import {
   isStocktakeBusinessSource,
   isStocktakeManualSource,
 } from '@/mock/stocktakeOptions'
-import { postStocktakeOrder } from '@/utils/stocktakeConfirm'
+import {
+  postStocktakeOrder,
+  hasUnpostedStocktakeDiff,
+  stocktakePostModeLabel,
+} from '@/utils/stocktakeConfirm'
 import { isStocktakeAutoPostOnApprove } from '@/store/stocktakeSettingsStore'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
 import {
@@ -25,8 +29,8 @@ import {
 
 const STORAGE_KEY = 'i_doms_stocktake_orders'
 const SEED_VERSION_KEY = 'i_doms_stocktake_orders_seed_v'
-/** v5：待提交 + 状态与过账拆分 */
-const CURRENT_SEED_VERSION = '5'
+/** v6：重做演示种子 + 修复刷新回滚（初始化立即落盘） */
+const CURRENT_SEED_VERSION = '6'
 
 function migrateOrder(order) {
   if (!order) return order
@@ -75,13 +79,20 @@ function shouldReseed() {
   return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
 }
 
-const initial = shouldReseed()
-  ? cloneStocktakeSeedOrders().map(migrateOrder)
-  : (loadFromStorage() || cloneStocktakeSeedOrders()).map(migrateOrder)
+function initOrders() {
+  const stored = loadFromStorage()
+  if (shouldReseed() || !stored?.length) {
+    return cloneStocktakeSeedOrders().map(migrateOrder)
+  }
+  return stored
+}
 
 export const stocktakeOrderState = reactive({
-  orders: initial,
+  orders: initOrders(),
 })
+
+// 立即落盘：避免仅注册 watch、未操作就刷新时种子版本未写入导致每次重置
+persist()
 
 watch(
   () => stocktakeOrderState.orders,
@@ -123,13 +134,14 @@ export function canWithdrawStocktake(order) {
   return normalizeStocktakeStatus(order?.status) === STOCKTAKE_STATUS.PENDING_APPROVAL
 }
 
-/** 生成盘盈盘亏 / 重新过账 */
+/** 生成盘盈盘亏 / 重新过账 / 继续过账（部分过账） */
 export function canPostStocktake(order) {
   if (!order) return false
   const st = normalizeStocktakeStatus(order.status)
   if (st !== STOCKTAKE_STATUS.APPROVED) return false
   return (
     order.postingStatus === STOCKTAKE_POSTING.PENDING ||
+    order.postingStatus === STOCKTAKE_POSTING.PARTIAL ||
     order.postingStatus === STOCKTAKE_POSTING.FAILED ||
     !order.postingStatus
   )
@@ -233,22 +245,24 @@ function mergeLinked(order, postResult) {
   })
 }
 
-function markPosted(order, operator) {
+function markPosted(order, operator, { modeLabel = '生成盘盈盘亏并入账', partial = false } = {}) {
   // 单据状态保持「审核通过」，过账结果写入 postingStatus
   order.status = STOCKTAKE_STATUS.APPROVED
-  order.postingStatus = STOCKTAKE_POSTING.SUCCESS
+  order.postingStatus = partial ? STOCKTAKE_POSTING.PARTIAL : STOCKTAKE_POSTING.SUCCESS
   order.postingError = ''
   order.confirmer = operator
   order.confirmedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-  order.postedAt = order.confirmedAt
-  ;(order.lineItems || []).forEach((l) => {
-    l.lineStatus = STOCKTAKE_STATUS.APPROVED
-  })
+  if (!partial) {
+    order.postedAt = order.confirmedAt
+    ;(order.lineItems || []).forEach((l) => {
+      l.lineStatus = STOCKTAKE_STATUS.APPROVED
+    })
+  }
   appendStocktakeOperationLog(order, {
-    action: '过账',
+    action: partial ? '部分过账' : '过账',
     operator,
-    operatedAt: order.postedAt,
-    remark: '生成盘盈盘亏并入账',
+    operatedAt: order.confirmedAt,
+    remark: partial ? `${modeLabel}（尚有差异未生成，可继续过账）` : modeLabel,
   })
 }
 
@@ -264,9 +278,10 @@ function markPostFailed(order, message, operator = 'admin1') {
 }
 
 /** 执行过账（生成盘盈盘亏并入账） */
-export function postStocktake(ids, { operator = 'admin1', force = false } = {}) {
+export function postStocktake(ids, { operator = 'admin1', force = false, mode } = {}) {
   const blocked = []
   let count = 0
+  let partialCount = 0
   ;(ids || []).forEach((id) => {
     const order = getStocktakeOrderById(id)
     if (
@@ -280,17 +295,23 @@ export function postStocktake(ids, { operator = 'admin1', force = false } = {}) 
       blocked.push({ docNo: order.docNo, message: '已过账' })
       return
     }
-    const res = postStocktakeOrder(order, { operator, force })
+    const res = postStocktakeOrder(order, { operator, force, mode })
     if (!res.ok) {
       markPostFailed(order, res.message, operator)
       blocked.push({ docNo: order.docNo, message: res.message, postingFailed: true })
       return
     }
     mergeLinked(order, res)
-    markPosted(order, operator)
+    // 以明细关联单二次确认，避免只生成一侧时误标为过账成功
+    const partial = Boolean(res.partial) || hasUnpostedStocktakeDiff(order)
+    markPosted(order, operator, {
+      modeLabel: stocktakePostModeLabel(res.mode),
+      partial,
+    })
     count += 1
+    if (partial) partialCount += 1
   })
-  return { count, blocked }
+  return { count, blocked, partialCount }
 }
 
 /** 审核通过；按配置自动过账 */
@@ -330,8 +351,12 @@ export function approveStocktake(ids, { operator = 'admin1', force = false } = {
       return
     }
     mergeLinked(order, res)
-    markPosted(order, operator)
-    posted.push(order.docNo)
+    const partial = Boolean(res.partial) || hasUnpostedStocktakeDiff(order)
+    markPosted(order, operator, {
+      modeLabel: stocktakePostModeLabel(res.mode),
+      partial,
+    })
+    if (!partial) posted.push(order.docNo)
   })
   return { count, blocked, posted }
 }

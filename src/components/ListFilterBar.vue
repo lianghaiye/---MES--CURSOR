@@ -1,5 +1,11 @@
 <template>
-  <div class="list-filter-bar" :class="{ 'is-collapsed': !expanded && collapsible }">
+  <div
+    class="list-filter-bar"
+    :class="{
+      'is-collapsed': !expanded && collapsible,
+      'is-compact': collapsible && effectiveCount < 10,
+    }"
+  >
     <div ref="fieldsEl" class="list-filter-fields">
       <slot />
       <div class="list-filter-actions-cell">
@@ -41,9 +47,9 @@ import { SearchOutlined, ReloadOutlined, UpOutlined, DownOutlined } from '@ant-d
 const props = defineProps({
   /**
    * 条件数 ≥ 该值时显示展开/收起。
-   * 默认 10：收起态最多展示 9 个条件（第 10 格留给按钮）。
+   * 默认 5：收起态最多展示 4 个条件（第 5 格留给按钮）；≥10 时收起最多 9 个。
    */
-  collapseCount: { type: Number, default: 10 },
+  collapseCount: { type: Number, default: 5 },
   searchText: { type: String, default: '查询' },
   resetText: { type: String, default: '重置' },
   /** 若已知字段数可传入，避免依赖 DOM 计数 */
@@ -74,7 +80,7 @@ onUpdated(() => nextTick(measureFields))
 const effectiveCount = computed(() =>
   props.fieldCount != null ? props.fieldCount : measuredCount.value,
 )
-/** ≥ collapseCount（默认 10）才出现展开/收起 */
+/** ≥ collapseCount（默认 5）才出现展开/收起 */
 const collapsible = computed(() => effectiveCount.value >= props.collapseCount)
 </script>
 
@@ -116,12 +122,27 @@ const collapsible = computed(() => effectiveCount.value >= props.collapseCount)
   }
 }
 
-.list-filter-bar.is-collapsed .list-filter-fields > .list-filter-actions-cell {
+/* ≥10 收起：按钮在第二行末尾 */
+.list-filter-bar.is-collapsed:not(.is-compact) .list-filter-fields > .list-filter-actions-cell {
   grid-row: 2;
 }
 
-.list-filter-bar.is-collapsed .list-filter-fields > .ant-form-item:nth-child(n + 10),
-.list-filter-bar.is-collapsed .list-filter-fields > .list-filter-item:nth-child(n + 10) {
+/* 5～9 收起：按钮在第一行末尾 */
+.list-filter-bar.is-collapsed.is-compact .list-filter-fields > .list-filter-actions-cell {
+  grid-row: 1;
+}
+
+.list-filter-bar.is-collapsed:not(.is-compact)
+  .list-filter-fields
+  > .ant-form-item:nth-child(n + 10),
+.list-filter-bar.is-collapsed:not(.is-compact)
+  .list-filter-fields
+  > .list-filter-item:nth-child(n + 10) {
+  display: none !important;
+}
+
+.list-filter-bar.is-collapsed.is-compact .list-filter-fields > .ant-form-item:nth-child(n + 5),
+.list-filter-bar.is-collapsed.is-compact .list-filter-fields > .list-filter-item:nth-child(n + 5) {
   display: none !important;
 }
 
@@ -156,7 +177,8 @@ const collapsible = computed(() => effectiveCount.value >= props.collapseCount)
     }
   }
 
-  .list-filter-bar.is-collapsed .list-filter-fields > .list-filter-actions-cell {
+  .list-filter-bar.is-collapsed .list-filter-fields > .list-filter-actions-cell,
+  .list-filter-bar.is-collapsed.is-compact .list-filter-fields > .list-filter-actions-cell {
     grid-row: 2;
   }
 

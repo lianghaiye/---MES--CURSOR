@@ -104,10 +104,10 @@
   border: 1px solid var(--divider, #e5e6eb);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  padding: 12px;
+  padding: 8px 12px;
   margin-bottom: 8px;
   box-sizing: border-box;
-  min-height: 56px;
+  min-height: 48px;
 
   > .ant-space,
   > .split-action-left,
@@ -182,8 +182,9 @@
 
 /**
  * 列表筛选：一行 5 个（覆盖各页 a-row/a-col 栅格）
- * - 收起：最多 9 个条件，搜索/重置/展开收起固定在第二行末尾（第 10 格）
- * - 展开：条件按序铺满；第 10 个条件占第二行末格，按钮落在最后一行末尾
+ * - 条件 ≥5 出现展开/收起（默认收起）
+ * - 5～9（is-filter-compact）：收起最多 4 个，按钮在第一行末尾；展开后第 5 个起按序铺满，按钮在第二行/最后一行末尾
+ * - ≥10：收起最多 9 个，按钮钉在第二行末尾；展开后按钮落在最后一行末尾
  * 已使用 ListFilterBar 的页面不受影响
  */
 .filter-card .filter-form.horizontal-form > .ant-row.list-filter-grid-row,
@@ -221,24 +222,44 @@
   align-items: center;
 }
 
-/* 收起：按钮钉在第二行末尾（前 9 个条件 + 按钮） */
+/* 收起（≥10）：按钮钉在第二行末尾（前 9 个条件 + 按钮） */
 .filter-card
   .filter-form.horizontal-form
-  > .ant-row.is-filter-collapsed
+  > .ant-row.is-filter-collapsed:not(.is-filter-compact)
   > .ant-col.ant-col-24:has(.filter-actions-item),
 .filter-card
   .filter-form.horizontal-form
-  > .ant-row.is-filter-collapsed
+  > .ant-row.is-filter-collapsed:not(.is-filter-compact)
   > .ant-col:has(.filter-actions-item),
 .filter-card
   .filter-form.horizontal-form
-  > .ant-row.is-filter-collapsed
+  > .ant-row.is-filter-collapsed:not(.is-filter-compact)
   > .ant-col:has(.filter-footer),
 .filter-card
   .filter-form.horizontal-form
-  > .ant-row.is-filter-collapsed
+  > .ant-row.is-filter-collapsed:not(.is-filter-compact)
   > .ant-col:has(.filter-actions) {
   grid-row: 2;
+}
+
+/* 收起（5～9 紧凑）：按钮钉在第一行末尾（前 4 个条件 + 按钮） */
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed.is-filter-compact
+  > .ant-col.ant-col-24:has(.filter-actions-item),
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed.is-filter-compact
+  > .ant-col:has(.filter-actions-item),
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed.is-filter-compact
+  > .ant-col:has(.filter-footer),
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed.is-filter-compact
+  > .ant-col:has(.filter-actions) {
+  grid-row: 1;
 }
 
 /* 条件不足 5 个时：按钮与条件同行（第 1 行第 5 列） */
@@ -338,13 +359,23 @@
   transform: translateY(-0.5px);
 }
 
-/* 收起：隐藏第 10 个及以后的条件（按钮在第 10 格，不隐藏） */
+/* 收起（≥10）：隐藏第 10 个及以后的条件 */
 .filter-card
   .filter-form.horizontal-form
-  > .ant-row.is-filter-collapsed
+  > .ant-row.is-filter-collapsed:not(.is-filter-compact)
   > .ant-col:not(:has(.filter-actions-item)):not(:has(.filter-footer)):not(
     :has(.filter-actions)
   ):nth-child(n + 10) {
+  display: none !important;
+}
+
+/* 收起（5～9 紧凑）：隐藏第 5 个及以后的条件 */
+.filter-card
+  .filter-form.horizontal-form
+  > .ant-row.is-filter-collapsed.is-filter-compact
+  > .ant-col:not(:has(.filter-actions-item)):not(:has(.filter-footer)):not(
+    :has(.filter-actions)
+  ):nth-child(n + 5) {
   display: none !important;
 }
 
@@ -372,6 +403,18 @@
   .filter-card
     .filter-form.horizontal-form
     > .ant-row.is-filter-collapsed
+    > .ant-col:has(.filter-actions),
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row.is-filter-collapsed.is-filter-compact
+    > .ant-col:has(.filter-actions-item),
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row.is-filter-collapsed.is-filter-compact
+    > .ant-col:has(.filter-footer),
+  .filter-card
+    .filter-form.horizontal-form
+    > .ant-row.is-filter-collapsed.is-filter-compact
     > .ant-col:has(.filter-actions) {
     grid-row: 2;
   }
@@ -424,7 +467,7 @@
   }
 }
 
-/* 内联筛选（无 a-row）：同样一行 5 个，按钮在第二行末尾 */
+/* 内联筛选（无 a-row）：同样一行 5 个 */
 .filter-card .filter-form.list-filter-inline-grid {
   display: grid !important;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -446,8 +489,10 @@
   width: 100% !important;
 }
 
+/* 操作区：默认右对齐第 5 列；条件≥5 展开时落在第二行末尾 */
 .filter-card .filter-form.list-filter-inline-grid > .ant-form-item:has(.ant-space),
 .filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions-item,
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions,
 .filter-card .filter-form.list-filter-inline-grid > .ant-form-item:not(:has(.ant-form-item-label)) {
   grid-column: 5;
   grid-row: 2;
@@ -464,28 +509,63 @@
 .filter-card
   .filter-form.list-filter-inline-grid
   > .ant-form-item.filter-actions-item
+  .ant-form-item-control-input-content,
+.filter-card
+  .filter-form.list-filter-inline-grid
+  > .ant-form-item.filter-actions
   .ant-form-item-control-input-content {
   display: flex !important;
   justify-content: flex-end;
   align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
+/* 条件不足 5 个：按钮与条件同行 */
 .filter-card
   .filter-form.list-filter-inline-grid
   > .ant-form-item:has(.ant-space):nth-child(-n + 5),
 .filter-card
   .filter-form.list-filter-inline-grid
   > .ant-form-item.filter-actions-item:nth-child(-n + 5),
+.filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions:nth-child(-n + 5),
 .filter-card
   .filter-form.list-filter-inline-grid
   > .ant-form-item:not(:has(.ant-form-item-label)):nth-child(-n + 5) {
   grid-row: 1;
 }
 
+/* 收起（≥10）：隐藏第 10 个起的条件；按钮在第二行 */
 .filter-card
-  .filter-form.list-filter-inline-grid.is-filter-collapsed
-  > .ant-form-item:not(.filter-actions-item):not(:has(.ant-space)):nth-child(n + 10) {
+  .filter-form.list-filter-inline-grid.is-filter-collapsed:not(.is-filter-compact)
+  > .ant-form-item:not(.filter-actions-item):not(.filter-actions):not(:has(.ant-space)):nth-child(
+    n + 10
+  ) {
   display: none !important;
+}
+
+/* 收起（5～9 紧凑）：隐藏第 5 个起的条件；按钮在第一行末尾 */
+.filter-card
+  .filter-form.list-filter-inline-grid.is-filter-collapsed.is-filter-compact
+  > .ant-form-item:not(.filter-actions-item):not(.filter-actions):not(:has(.ant-space)):nth-child(
+    n + 5
+  ) {
+  display: none !important;
+}
+
+.filter-card
+  .filter-form.list-filter-inline-grid.is-filter-collapsed.is-filter-compact
+  > .ant-form-item:has(.ant-space),
+.filter-card
+  .filter-form.list-filter-inline-grid.is-filter-collapsed.is-filter-compact
+  > .ant-form-item.filter-actions-item,
+.filter-card
+  .filter-form.list-filter-inline-grid.is-filter-collapsed.is-filter-compact
+  > .ant-form-item.filter-actions,
+.filter-card
+  .filter-form.list-filter-inline-grid.is-filter-collapsed.is-filter-compact
+  > .ant-form-item:not(:has(.ant-form-item-label)) {
+  grid-row: 1;
 }
 
 @media (max-width: 1199px) {
@@ -495,6 +575,7 @@
 
   .filter-card .filter-form.list-filter-inline-grid > .ant-form-item:has(.ant-space),
   .filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions-item,
+  .filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions,
   .filter-card
     .filter-form.list-filter-inline-grid
     > .ant-form-item:not(:has(.ant-form-item-label)) {
@@ -510,8 +591,26 @@
     > .ant-form-item.filter-actions-item:nth-child(-n + 3),
   .filter-card
     .filter-form.list-filter-inline-grid
+    > .ant-form-item.filter-actions:nth-child(-n + 3),
+  .filter-card
+    .filter-form.list-filter-inline-grid
     > .ant-form-item:not(:has(.ant-form-item-label)):nth-child(-n + 3) {
     grid-row: 1;
+  }
+
+  .filter-card
+    .filter-form.list-filter-inline-grid.is-filter-collapsed.is-filter-compact
+    > .ant-form-item:has(.ant-space),
+  .filter-card
+    .filter-form.list-filter-inline-grid.is-filter-collapsed.is-filter-compact
+    > .ant-form-item.filter-actions-item,
+  .filter-card
+    .filter-form.list-filter-inline-grid.is-filter-collapsed.is-filter-compact
+    > .ant-form-item.filter-actions,
+  .filter-card
+    .filter-form.list-filter-inline-grid.is-filter-collapsed.is-filter-compact
+    > .ant-form-item:not(:has(.ant-form-item-label)) {
+    grid-row: 2;
   }
 }
 
@@ -522,6 +621,7 @@
 
   .filter-card .filter-form.list-filter-inline-grid > .ant-form-item:has(.ant-space),
   .filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions-item,
+  .filter-card .filter-form.list-filter-inline-grid > .ant-form-item.filter-actions,
   .filter-card
     .filter-form.list-filter-inline-grid
     > .ant-form-item:not(:has(.ant-form-item-label)) {

@@ -157,8 +157,6 @@
         </DetailSectionCard>
       </template>
     </div>
-
-    <InventoryDeductEditModal v-model:open="editOpen" :record="record" @saved="onSaved" />
   </div>
 </template>
 
@@ -187,12 +185,13 @@ import {
   isMaterialDeductLocked,
 } from '@/store/materialRequisitionStore'
 import { lineVariantSummary } from '@/utils/spuLineResolve'
-import InventoryDeductEditModal from './components/InventoryDeductEditModal.vue'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 
 const route = useRoute()
 const router = useRouter()
+const { openTab } = useTabs()
 const STATUS = MATERIAL_DEDUCT_STATUS
-const editOpen = ref(false)
 const tick = ref(0)
 
 const record = computed(() => {
@@ -262,11 +261,12 @@ function goBack() {
 }
 
 function openEdit() {
-  editOpen.value = true
-}
-
-function onSaved() {
-  refresh()
+  const row = record.value
+  if (!row?.id) return
+  openCreateTab(router, openTab, {
+    path: `/inventory/deduct-records/${row.id}/edit`,
+    title: `编辑扣减记录 ${row.deductNo || ''}`.trim(),
+  })
 }
 
 function onConfirm() {
@@ -361,7 +361,7 @@ function onRetry() {
   margin: -12px;
   padding: 12px;
   height: calc(100vh - 56px - 40px - 24px);
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   display: flex;
   flex-direction: column;
   overflow: hidden;

@@ -1,99 +1,112 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    title="编辑待确认"
-    :width="1100"
-    destroy-on-close
-    ok-text="保存"
-    cancel-text="取消"
-    @cancel="emit('update:open', false)"
-    @ok="handleOk"
+    :title="shellTitle"
+    width="1100px"
+    class="inventory-deduct-edit-modal"
+    @cancel="onShellCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
-    <a-form layout="vertical" class="edit-form">
-      <a-form-item label="仓库" required>
-        <a-select
-          v-model:value="form.warehouseKey"
-          :options="warehouseOpts"
-          show-search
-          placeholder="请选择仓库"
-          style="width: 100%"
-        />
-      </a-form-item>
-    </a-form>
+    <div class="form-layout">
+      <div class="section-block">
+        <div class="section-title">基本信息</div>
+        <a-form layout="vertical" class="edit-form">
+          <a-form-item label="仓库" required>
+            <a-select
+              v-model:value="form.warehouseKey"
+              :options="warehouseOpts"
+              show-search
+              placeholder="请选择仓库"
+              style="width: 100%; max-width: 360px"
+            />
+          </a-form-item>
+        </a-form>
+      </div>
 
-    <div class="section-head">
-      <span>扣减物料</span>
-      <a-button type="link" size="small" @click="pickerOpen = true">+ 添加物料</a-button>
+      <div class="section-block section-block--lines">
+        <div class="section-head">
+          <span class="section-title">扣减物料</span>
+          <a-button type="link" size="small" @click="pickerOpen = true">+ 添加物料</a-button>
+        </div>
+        <a-table
+          :columns="columns"
+          :data-source="form.lines"
+          row-key="id"
+          size="small"
+          bordered
+          :pagination="false"
+          :scroll="{ x: 1180 }"
+        >
+          <template #headerCell="{ column }">
+            <template v-if="column.key === 'stockDisplay'">
+              <span class="col-title-with-tip">
+                当前库存量
+                <a-tooltip :title="STOCK_DISPLAY_TIP">
+                  <InfoCircleOutlined class="col-tip-icon" />
+                </a-tooltip>
+              </span>
+            </template>
+            <template v-else>{{ column.title }}</template>
+          </template>
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'issueMode'">
+              <a-tag
+                :color="
+                  (record.issueMode || (record.isBackflush ? '倒冲' : '领料')) === '倒冲'
+                    ? 'orange'
+                    : 'blue'
+                "
+              >
+                {{ record.issueMode || (record.isBackflush ? '倒冲' : '领料') }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'blankSizeText'">
+              {{ record.blankSizeText || '—' }}
+            </template>
+            <template v-else-if="column.key === 'stockDisplay'">
+              <span class="stock-display">{{ formatStockDisplay(record) }}</span>
+            </template>
+            <template v-else-if="column.key === 'planQty'">
+              <a-input-number
+                v-model:value="record.planQty"
+                :min="0"
+                :precision="3"
+                size="small"
+                style="width: 100%"
+                :disabled="record.deductible === false"
+              />
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-button type="link" size="small" danger @click="form.lines.splice(index, 1)">
+                删除
+              </a-button>
+            </template>
+          </template>
+        </a-table>
+      </div>
     </div>
-    <a-table
-      :columns="columns"
-      :data-source="form.lines"
-      row-key="id"
-      size="small"
-      bordered
-      :pagination="false"
-      :scroll="{ x: 1180 }"
-    >
-      <template #headerCell="{ column }">
-        <template v-if="column.key === 'stockDisplay'">
-          <span class="col-title-with-tip">
-            当前库存量
-            <a-tooltip :title="STOCK_DISPLAY_TIP">
-              <InfoCircleOutlined class="col-tip-icon" />
-            </a-tooltip>
-          </span>
-        </template>
-        <template v-else>{{ column.title }}</template>
-      </template>
-      <template #bodyCell="{ column, record, index }">
-        <template v-if="column.key === 'issueMode'">
-          <a-tag
-            :color="
-              (record.issueMode || (record.isBackflush ? '倒冲' : '领料')) === '倒冲'
-                ? 'orange'
-                : 'blue'
-            "
-          >
-            {{ record.issueMode || (record.isBackflush ? '倒冲' : '领料') }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'blankSizeText'">
-          {{ record.blankSizeText || '—' }}
-        </template>
-        <template v-else-if="column.key === 'stockDisplay'">
-          <span class="stock-display">{{ formatStockDisplay(record) }}</span>
-        </template>
-        <template v-else-if="column.key === 'planQty'">
-          <a-input-number
-            v-model:value="record.planQty"
-            :min="0"
-            :precision="3"
-            size="small"
-            style="width: 100%"
-            :disabled="record.deductible === false"
-          />
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-button type="link" size="small" danger @click="form.lines.splice(index, 1)">
-            删除
-          </a-button>
-        </template>
-      </template>
-    </a-table>
 
-    <SelectBomMaterialModal
-      v-model:open="pickerOpen"
-      :multiple="true"
-      :include-spu-templates="false"
-      @selected="onMaterialsPicked"
-    />
-  </a-modal>
+    <template #footer>
+      <a-button @click="onShellCancel">取消</a-button>
+      <a-button type="primary" :loading="saving" @click="handleOk">保存</a-button>
+    </template>
+  </FormCreateShell>
+
+  <SelectBomMaterialModal
+    v-model:open="pickerOpen"
+    :multiple="true"
+    :include-spu-templates="false"
+    @selected="onMaterialsPicked"
+  />
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
   getMaterialDeductLockedQty,
@@ -106,12 +119,32 @@ import SelectBomMaterialModal from '@/views/product-process/components/SelectBom
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '' },
+  editRecord: { type: Object, default: null },
+  /** @deprecated 兼容旧调用，优先使用 editRecord */
   record: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
 
+const activeRecord = computed(() => props.editRecord || props.record)
+
+const {
+  isActive,
+  shellTitle,
+  handleCancel: onShellCancel,
+  closeAfterSave,
+} = useFormCreateModal(props, emit, {
+  listPath: '/inventory/deduct-records',
+  getTitle: () => {
+    const no = activeRecord.value?.deductNo
+    return no ? `编辑扣减记录 ${no}` : '编辑待确认'
+  },
+})
+
 const pickerOpen = ref(false)
+const saving = ref(false)
 const form = reactive({
   warehouseKey: '',
   lines: [],
@@ -160,25 +193,34 @@ function formatStockDisplay(line) {
   return `${a} / ${b}`
 }
 
+function loadWarehouses() {
+  warehouseOpts.value = warehouseState.warehouses
+    .filter((w) => w.enabled !== false)
+    .map((w) => ({
+      label: `${w.name}${w.code ? ` (${w.code})` : ''}`,
+      value: `${w.name}|${w.code || ''}`,
+    }))
+  if (!warehouseOpts.value.length) {
+    warehouseOpts.value = getWarehouseSelectOptions().map((w) => ({
+      label: w.label,
+      value: `${w.value}|`,
+    }))
+  }
+}
+
+function loadEdit(record) {
+  loadWarehouses()
+  form.warehouseKey = `${record.warehouseName}|${record.warehouseCode || ''}`
+  form.lines = (record.lines || []).map((l) => ({ ...l }))
+}
+
 watch(
-  () => [props.open, props.record],
+  () => [isActive.value, activeRecord.value?.id],
   () => {
-    if (!props.open || !props.record) return
-    warehouseOpts.value = warehouseState.warehouses
-      .filter((w) => w.enabled !== false)
-      .map((w) => ({
-        label: `${w.name}${w.code ? ` (${w.code})` : ''}`,
-        value: `${w.name}|${w.code || ''}`,
-      }))
-    if (!warehouseOpts.value.length) {
-      warehouseOpts.value = getWarehouseSelectOptions().map((w) => ({
-        label: w.label,
-        value: `${w.value}|`,
-      }))
-    }
-    form.warehouseKey = `${props.record.warehouseName}|${props.record.warehouseCode || ''}`
-    form.lines = (props.record.lines || []).map((l) => ({ ...l }))
+    if (!isActive.value || !activeRecord.value) return
+    loadEdit(activeRecord.value)
   },
+  { immediate: true },
 )
 
 function onMaterialsPicked(items) {
@@ -212,37 +254,63 @@ function onMaterialsPicked(items) {
 }
 
 function handleOk() {
+  if (!activeRecord.value?.id) {
+    message.warning('记录不存在')
+    return
+  }
   if (!form.warehouseKey) {
     message.warning('请选择仓库')
-    return Promise.reject()
+    return
   }
   if (!form.lines.length) {
     message.warning('请至少保留一条物料')
-    return Promise.reject()
+    return
   }
+  saving.value = true
   const [warehouseName, warehouseCode = ''] = form.warehouseKey.split('|')
-  const res = updatePendingMaterialDeduct(props.record.id, {
+  const res = updatePendingMaterialDeduct(activeRecord.value.id, {
     warehouseName,
     warehouseCode,
     lines: form.lines,
   })
+  saving.value = false
   if (!res.ok) {
     message.warning(res.message)
-    return Promise.reject()
+    return
   }
   message.success('已保存')
-  emit('update:open', false)
   emit('saved')
+  closeAfterSave()
 }
 </script>
 
 <style lang="less" scoped>
+.form-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-block {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.section-title {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
 .section-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
-  font-weight: 600;
+
+  .section-title {
+    margin-bottom: 0;
+  }
 }
 
 .col-title-with-tip {

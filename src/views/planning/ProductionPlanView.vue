@@ -1526,7 +1526,7 @@ function handleReset() {
   flex-direction: column;
   margin: -12px;
   padding: 12px;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   height: calc(100vh - 56px - 40px - 24px);
   min-height: calc(100vh - 56px - 40px - 24px);
   box-sizing: border-box;

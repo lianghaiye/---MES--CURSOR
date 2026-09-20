@@ -14,12 +14,34 @@ import { getBatchById, sumFreeQty } from '@/store/stockBatchStore'
 import { getTransferSoftLockedQty } from '@/store/transferSoftLockStore'
 import { getWarehouseStockQty } from '@/utils/inboundLineHelpers'
 
+/** 过账生成范围 */
+export const STOCKTAKE_POST_MODE = {
+  GAIN: 'gain',
+  LOSS: 'loss',
+  BOTH: 'both',
+}
+
+export const STOCKTAKE_POST_MODE_OPTIONS = [
+  { label: '生成盘盈单', value: STOCKTAKE_POST_MODE.GAIN },
+  { label: '生成盘亏单', value: STOCKTAKE_POST_MODE.LOSS },
+  { label: '同时生成盘盈盘亏单', value: STOCKTAKE_POST_MODE.BOTH },
+]
+
+export function stocktakePostModeLabel(mode) {
+  return STOCKTAKE_POST_MODE_OPTIONS.find((o) => o.value === mode)?.label || '同时生成盘盈盘亏单'
+}
+
 function genDocNo(prefix) {
   return `${prefix}${dayjs().format('YYYYMMDDHHmmss')}${String(Math.floor(Math.random() * 90) + 10)}`
 }
 
 function round4(n) {
   return Math.round((Number(n) || 0) * 10000) / 10000
+}
+
+function normalizePostMode(mode) {
+  if (mode === STOCKTAKE_POST_MODE.GAIN || mode === STOCKTAKE_POST_MODE.LOSS) return mode
+  return STOCKTAKE_POST_MODE.BOTH
 }
 
 export function isDedicatedStocktakeLine(line) {
@@ -55,7 +77,11 @@ function resolveAvailableFree(line, warehouse) {
  * 过账前全量校验（先校验再生成，避免半截单据）
  * @returns {{ ok: boolean, errors: Array<{ lineId, itemCode, message, needForce?: boolean }> }}
  */
-export function validateStocktakePosting(stocktakeOrder, { force = false } = {}) {
+export function validateStocktakePosting(
+  stocktakeOrder,
+  { force = false, mode = STOCKTAKE_POST_MODE.BOTH } = {},
+) {
+  const postMode = normalizePostMode(mode)
   const errors = []
   const warehouse = String(stocktakeOrder?.warehouse || '').trim()
   if (!warehouse) {
@@ -81,6 +107,8 @@ export function validateStocktakePosting(stocktakeOrder, { force = false } = {})
     line.bookQty = bookQty
     line.diffQty = diffQty
     if (!(diffQty < 0)) return
+    if (postMode === STOCKTAKE_POST_MODE.GAIN) return
+    if (line.linkedOutboundId) return
 
     const lossQty = Math.abs(diffQty)
     if (isDedicatedStocktakeLine(line)) {
@@ -222,10 +250,15 @@ function postLossLine(stocktakeOrder, line, lossQty, operator) {
 /**
  * 单行过账（内部用）；调用前应已 validate
  */
-export function postStocktakeLine(stocktakeOrder, line, { operator = 'admin1' } = {}) {
+export function postStocktakeLine(
+  stocktakeOrder,
+  line,
+  { operator = 'admin1', mode = STOCKTAKE_POST_MODE.BOTH } = {},
+) {
   if (!stocktakeOrder || !line) return { ok: false, message: '盘点明细不存在' }
   const warehouse = String(stocktakeOrder.warehouse || '').trim()
   if (!warehouse) return { ok: false, message: '请填写盘点仓库' }
+  const postMode = normalizePostMode(mode)
 
   const bookQty = resolveStocktakeBookQty(line, warehouse)
   const actualQty = Number(line.actualQty)
@@ -237,17 +270,54 @@ export function postStocktakeLine(stocktakeOrder, line, { operator = 'admin1' } 
   line.diffQty = diffQty
 
   if (diffQty === 0) {
-    return { ok: true, diffQty: 0, outbound: null, inboundOrder: null }
+    return { ok: true, diffQty: 0, outbound: null, inboundOrder: null, skipped: true }
   }
-  if (diffQty > 0) return postGainLine(stocktakeOrder, line, diffQty, operator)
+  if (diffQty > 0) {
+    if (postMode === STOCKTAKE_POST_MODE.LOSS) {
+      return { ok: true, diffQty, outbound: null, inboundOrder: null, skipped: true }
+    }
+    if (line.linkedInboundId) {
+      return { ok: true, diffQty, outbound: null, inboundOrder: null, skipped: true }
+    }
+    return postGainLine(stocktakeOrder, line, diffQty, operator)
+  }
+  if (postMode === STOCKTAKE_POST_MODE.GAIN) {
+    return { ok: true, diffQty, outbound: null, inboundOrder: null, skipped: true }
+  }
+  if (line.linkedOutboundId) {
+    return { ok: true, diffQty, outbound: null, inboundOrder: null, skipped: true }
+  }
   return postLossLine(stocktakeOrder, line, Math.abs(diffQty), operator)
+}
+
+/** 是否仍有未生成的盘盈/盘亏差异行（以落库 diff + 关联单为准，避免入账后账面回算把差异抹掉） */
+export function hasUnpostedStocktakeDiff(stocktakeOrder) {
+  const warehouse = String(stocktakeOrder?.warehouse || '').trim()
+  return (stocktakeOrder?.lineItems || []).some((line) => {
+    let diffQty = Number(line.diffQty)
+    if (!Number.isFinite(diffQty)) {
+      const actualQty = Number(line.actualQty)
+      if (!Number.isFinite(actualQty)) return false
+      const bookQty = Number.isFinite(Number(line.bookQty))
+        ? Number(line.bookQty)
+        : resolveStocktakeBookQty(line, warehouse)
+      diffQty = round4(actualQty - bookQty)
+    }
+    if (diffQty > 1e-9 && !line.linkedInboundId) return true
+    if (diffQty < -1e-9 && !line.linkedOutboundId) return true
+    return false
+  })
 }
 
 /**
  * 整单过账：先校验，再逐行生成
  */
-export function postStocktakeOrder(stocktakeOrder, { operator = 'admin1', force = false } = {}) {
-  const check = validateStocktakePosting(stocktakeOrder, { force })
+export function postStocktakeOrder(
+  stocktakeOrder,
+  { operator = 'admin1', force = false, mode = STOCKTAKE_POST_MODE.BOTH } = {},
+) {
+  const postMode = normalizePostMode(mode)
+  const check = validateStocktakePosting(stocktakeOrder, { force, mode: postMode })
   if (!check.ok) {
     return {
       ok: false,
@@ -262,20 +332,22 @@ export function postStocktakeOrder(stocktakeOrder, { operator = 'admin1', force 
   const linkedInboundDocNos = []
   const linkedOutboundIds = []
   const linkedOutboundDocNos = []
+  let generated = 0
 
   for (const line of stocktakeOrder.lineItems || []) {
-    if (line.linkedInboundId || line.linkedOutboundId) continue
-    const res = postStocktakeLine(stocktakeOrder, line, { operator })
+    const res = postStocktakeLine(stocktakeOrder, line, { operator, mode: postMode })
     if (!res.ok) {
       return { ok: false, message: `${line.itemCode || line.id}: ${res.message}`, errors: [] }
     }
     if (res.inboundOrder?.id) {
+      generated += 1
       linkedInboundIds.push(res.inboundOrder.id)
       if (res.inboundOrder.docNo) linkedInboundDocNos.push(res.inboundOrder.docNo)
       line.linkedInboundId = res.inboundOrder.id
       line.linkedInboundDocNo = res.inboundOrder.docNo
     }
     if (res.outbound?.id) {
+      generated += 1
       linkedOutboundIds.push(res.outbound.id)
       if (res.outbound.docNo) linkedOutboundDocNos.push(res.outbound.docNo)
       line.linkedOutboundId = res.outbound.id
@@ -283,8 +355,35 @@ export function postStocktakeOrder(stocktakeOrder, { operator = 'admin1', force 
     }
   }
 
+  if (!generated) {
+    return {
+      ok: false,
+      message:
+        postMode === STOCKTAKE_POST_MODE.GAIN
+          ? '没有可生成的盘盈差异'
+          : postMode === STOCKTAKE_POST_MODE.LOSS
+            ? '没有可生成的盘亏差异'
+            : '没有可过账的盘点差异',
+      errors: [],
+    }
+  }
+
+  const partial = hasUnpostedStocktakeDiff(stocktakeOrder)
+
   return {
     ok: true,
+    mode: postMode,
+    // 只生成一侧时：只要另一侧差异仍未挂单，一律部分过账
+    partial:
+      partial ||
+      (postMode === STOCKTAKE_POST_MODE.GAIN &&
+        (stocktakeOrder.lineItems || []).some(
+          (l) => Number(l.diffQty) < -1e-9 && !l.linkedOutboundId,
+        )) ||
+      (postMode === STOCKTAKE_POST_MODE.LOSS &&
+        (stocktakeOrder.lineItems || []).some(
+          (l) => Number(l.diffQty) > 1e-9 && !l.linkedInboundId,
+        )),
     linkedInboundIds,
     linkedInboundDocNos,
     linkedOutboundIds,

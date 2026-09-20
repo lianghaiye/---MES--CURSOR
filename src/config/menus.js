@@ -347,6 +347,7 @@ export const routeTitles = {
   '/production/material-requisition/create': '申请领料',
   '/production/material-requisition/:id': '领料申请详情',
   '/inventory/deduct-records': '库存扣减记录',
+  '/inventory/deduct-records/:id/edit': '编辑扣减记录',
   '/inventory/deduct-records/:id': '扣减记录详情',
   '/inventory/cut-settle': '下料结算',
   '/inventory/cut-settle/:id': '下料结算详情',

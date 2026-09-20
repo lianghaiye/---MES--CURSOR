@@ -72,18 +72,21 @@ export const stocktakeTypeOptions = [
 /** 过账状态（与单据状态拆分；仅审核通过后有意义） */
 export const STOCKTAKE_POSTING = {
   PENDING: 'pending',
+  PARTIAL: 'partial',
   SUCCESS: 'success',
   FAILED: 'failed',
 }
 
 export const stocktakePostingOptions = [
   { label: '待过账', value: STOCKTAKE_POSTING.PENDING },
+  { label: '部分过账', value: STOCKTAKE_POSTING.PARTIAL },
   { label: '过账成功', value: STOCKTAKE_POSTING.SUCCESS },
   { label: '过账失败', value: STOCKTAKE_POSTING.FAILED },
 ]
 
 export function stocktakePostingLabel(status) {
   if (status === STOCKTAKE_POSTING.SUCCESS) return '过账成功'
+  if (status === STOCKTAKE_POSTING.PARTIAL) return '部分过账'
   if (status === STOCKTAKE_POSTING.FAILED) return '过账失败'
   if (status === STOCKTAKE_POSTING.PENDING) return '待过账'
   return ''
@@ -91,6 +94,7 @@ export function stocktakePostingLabel(status) {
 
 export function stocktakePostingColor(status) {
   if (status === STOCKTAKE_POSTING.SUCCESS) return 'success'
+  if (status === STOCKTAKE_POSTING.PARTIAL) return 'processing'
   if (status === STOCKTAKE_POSTING.FAILED) return 'error'
   if (status === STOCKTAKE_POSTING.PENDING) return 'warning'
   return 'default'

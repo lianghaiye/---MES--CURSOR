@@ -113,7 +113,7 @@ const innerStyle = computed(() => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
 
   .embedded-body {
     flex: 1;
@@ -155,7 +155,7 @@ const innerStyle = computed(() => {
     justify-content: flex-end;
     gap: 8px;
     padding: 8px 0 0;
-    background: #f5f6f8;
+    background: var(--page-bg, #f0f2f5);
   }
 }
 
@@ -164,7 +164,7 @@ const innerStyle = computed(() => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   overflow: hidden;
 }
 
@@ -222,7 +222,7 @@ const innerStyle = computed(() => {
   height: calc(100vh - 112px);
   max-height: calc(100vh - 112px);
   min-height: 0;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -233,7 +233,7 @@ const innerStyle = computed(() => {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
 }
 
 .page-header.is-detail {
@@ -270,7 +270,7 @@ const innerStyle = computed(() => {
   /* 抵消 page-content 的 12px padding；本层 padding 12 后与 GlobalTabs（margin 24）左缘对齐 */
   margin: -12px;
   padding: 12px 12px 24px;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   min-height: calc(100vh - 112px);
   box-sizing: border-box;
 }

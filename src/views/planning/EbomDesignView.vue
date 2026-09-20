@@ -878,7 +878,7 @@ onMounted(() => {
   height: calc(100% + 24px);
   max-height: calc(100% + 24px);
   overflow: hidden;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
 }
 
 .page-sticky-head {

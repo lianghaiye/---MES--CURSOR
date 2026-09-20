@@ -622,7 +622,7 @@ function goSalesOrder() {
   height: calc(100vh - 112px);
   max-height: calc(100vh - 112px);
   min-height: 0;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -642,7 +642,7 @@ function goSalesOrder() {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: #f5f6f8;
+  background: var(--page-bg, #f0f2f5);
 }
 
 .page-header {

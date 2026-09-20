@@ -1,15 +1,22 @@
 /**
  * 列表页筛选区统一：
  * - 一行 5 个
- * - 收起：最多 9 个条件，搜索/重置/展开收起钉在第二行末尾
- * - 展开：条件按序铺满；第 10 个条件占第二行末格，按钮落在最后一行末尾
+ * - 条件 ≥5：出现展开/收起（默认收起）
+ * - 5～9 个（紧凑）：收起最多 4 个条件，搜索/清空/展开钉在第一行末尾；
+ *   展开后条件按序铺满，按钮落在第二行（或最后一行）末尾
+ * - ≥10 个：收起最多 9 个条件，按钮钉在第二行末尾；展开后按钮随条件落到最后一行末尾
  *
  * 折叠态存在 WeakMap，避免 Vue 重渲染清掉 ant-row 上的 class 导致「点了没用」。
  */
 const ENHANCED = 'data-list-filter-enhanced'
 const COLLAPSED = 'is-filter-collapsed'
-/** 收起时可见条件数（第 10 格留给按钮） */
-const MAX_VISIBLE = 9
+const COMPACT = 'is-filter-compact'
+/** ≥ 该数量出现展开/收起 */
+const COLLAPSE_AT = 5
+/** 紧凑模式（5～9）收起时可见条件数 */
+const MAX_VISIBLE_COMPACT = 4
+/** 大表单（≥10）收起时可见条件数 */
+const MAX_VISIBLE_LARGE = 9
 
 /** @type {WeakMap<Element, boolean>} true=收起 */
 const collapsedMap = new WeakMap()
@@ -65,6 +72,10 @@ function setCollapsed(container, collapsed) {
   container.classList.toggle(COLLAPSED, Boolean(collapsed))
 }
 
+function maxVisibleFor(fieldCount) {
+  return fieldCount >= 10 ? MAX_VISIBLE_LARGE : MAX_VISIBLE_COMPACT
+}
+
 function ensureToggle(actionRoot, container) {
   let toggle = actionRoot.querySelector('.list-filter-auto-toggle')
   if (!toggle) {
@@ -105,10 +116,12 @@ function applyVisibility(container) {
   const cols = fieldChildren(container)
   const fieldCols = cols.filter((c) => !isActionItem(c))
   const collapsed = getCollapsed(container)
+  const maxVisible = maxVisibleFor(fieldCols.length)
   // 每次按 WeakMap 回写 class，抵消 Vue class patch 清掉的情况
   container.classList.toggle(COLLAPSED, collapsed)
+  container.classList.toggle(COMPACT, fieldCols.length < 10)
   fieldCols.forEach((col, idx) => {
-    if (collapsed && idx >= MAX_VISIBLE) col.style.display = 'none'
+    if (collapsed && idx >= maxVisible) col.style.display = 'none'
     else col.style.display = ''
   })
 }
@@ -125,10 +138,10 @@ function enhanceContainer(container) {
   container.classList.add('list-filter-grid-row')
   container.setAttribute(ENHANCED, '1')
 
-  // ≤9 个条件：全部展示，不出现展开/收起
-  if (fieldCols.length <= MAX_VISIBLE) {
+  // ＜5 个条件：全部展示，不出现展开/收起
+  if (fieldCols.length < COLLAPSE_AT) {
     collapsedMap.delete(container)
-    container.classList.remove(COLLAPSED)
+    container.classList.remove(COLLAPSED, COMPACT)
     const stale = container.querySelector('.list-filter-auto-toggle')
     if (stale) stale.remove()
     fieldCols.forEach((col) => {
@@ -137,11 +150,12 @@ function enhanceContainer(container) {
     return
   }
 
-  // ≥10 个条件：显示「展开 ▾ / 收起 ▴」（首次默认收起）
+  // ≥5 个条件：显示「展开 ▾ / 收起 ▴」（首次默认收起）
   if (!already || !collapsedMap.has(container)) {
     collapsedMap.set(container, true)
   }
   setCollapsed(container, getCollapsed(container))
+  container.classList.toggle(COMPACT, fieldCols.length < 10)
   const actionRoot = actionCols[0] || container
   ensureToggle(actionRoot, container)
   applyVisibility(container)
