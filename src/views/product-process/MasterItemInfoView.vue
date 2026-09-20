@@ -1332,7 +1332,7 @@ onBeforeUnmount(() => {
 .filter-card {
   flex-shrink: 0;
   padding: 12px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border-radius: 8px;
 }
 

@@ -994,7 +994,7 @@ function setChildOptionDefault(childIndex, optIndex, checked) {
 
   .form-section-box {
     width: 100%;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     padding: 12px 14px;
     background: #fff;
     border: 1px solid #f0f0f0;

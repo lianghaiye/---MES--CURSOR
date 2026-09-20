@@ -374,11 +374,11 @@ function handleEdit() {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 12px;
+    gap: 8px;
     background: #fff;
     border-radius: 6px;
     padding: 16px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .head-title {
@@ -406,11 +406,11 @@ function handleEdit() {
     background: #fff;
     border-radius: 0 0 6px 6px;
     padding: 16px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .discount-summary {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .price-list-table {

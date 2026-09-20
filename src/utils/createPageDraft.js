@@ -32,3 +32,8 @@ export function clearCreatePageDraft(path) {
   drafts.delete(key)
   bootstrappedPaths.delete(key)
 }
+
+export function clearAllCreatePageDrafts() {
+  drafts.clear()
+  bootstrappedPaths.clear()
+}

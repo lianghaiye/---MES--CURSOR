@@ -1,32 +1,26 @@
 <template>
   <div class="material-req-detail-page">
-    <div class="page-header">
-      <div class="header-left">
-        <template v-if="record">
-          <span class="page-title">{{ record.reqNo }}</span>
-          <a-tag :color="modeColor(record.mode)">{{ record.modeLabel }}</a-tag>
-          <a-tag :color="auditColor(record.auditStatus)">{{ record.auditStatus }}</a-tag>
-          <a-badge :status="statusBadge(record.outboundStatus)" :text="record.outboundStatus" />
-        </template>
-        <span v-else class="page-title">领料申请详情</span>
+    <div class="detail-sticky-bar">
+      <div class="page-header">
+        <div class="header-left">
+          <template v-if="record">
+            <span class="order-no">{{ record.reqNo }}</span>
+            <a-tag :color="modeColor(record.mode)">{{ record.modeLabel }}</a-tag>
+            <a-tag :color="auditColor(record.auditStatus)">{{ record.auditStatus }}</a-tag>
+            <a-badge :status="statusBadge(record.outboundStatus)" :text="record.outboundStatus" />
+          </template>
+          <span v-else class="order-no">领料申请详情</span>
+        </div>
+        <a-space :size="8">
+          <template v-if="record?.auditStatus === MATERIAL_REQ_AUDIT.PENDING">
+            <a-button type="primary" size="small" @click="onApprove">审核通过</a-button>
+            <a-button danger size="small" @click="onReject">审核驳回</a-button>
+          </template>
+          <a-button size="small" @click="goBack">返回列表</a-button>
+        </a-space>
       </div>
-      <a-space :size="8">
-        <template v-if="record?.auditStatus === MATERIAL_REQ_AUDIT.PENDING">
-          <a-button type="primary" size="small" @click="onApprove">审核通过</a-button>
-          <a-button danger size="small" @click="onReject">审核驳回</a-button>
-        </template>
-        <a-button size="small" @click="goBack">返回列表</a-button>
-      </a-space>
-    </div>
 
-    <template v-if="!record">
-      <div class="page-body">
-        <a-empty description="申请单不存在或已删除" />
-      </div>
-    </template>
-
-    <template v-else>
-      <div class="detail-tabs-wrap">
+      <div v-if="record" class="detail-tabs-wrap">
         <a-tabs
           v-model:active-key="activeTab"
           class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
@@ -35,7 +29,15 @@
           <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
         </a-tabs>
       </div>
+    </div>
 
+    <template v-if="!record">
+      <div class="tab-body">
+        <a-empty description="申请单不存在或已删除" />
+      </div>
+    </template>
+
+    <template v-else>
       <div class="tab-body">
         <template v-if="activeTab === 'basic'">
           <DetailSectionCard title="基本信息">
@@ -395,24 +397,33 @@ function statusBadge(status) {
 .material-req-detail-page {
   margin: -12px;
   padding: 12px;
-  height: calc(100vh - 56px - 40px - 24px);
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
   background: #f5f6f8;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.page-header {
+.detail-sticky-bar {
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #f5f6f8;
+}
+
+.page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
-  z-index: 30;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .header-left {
@@ -420,35 +431,37 @@ function statusBadge(status) {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  flex-wrap: wrap;
 }
 
-.page-title {
+.order-no {
   font-size: 16px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
 }
 
-.page-body,
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
+
 .tab-body {
   flex: 1;
   min-height: 0;
+  padding: 8px 12px 16px;
   overflow: auto;
-  padding: 12px;
 }
 
 .section-card {
   background: #fff;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
-  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .section-title {
-  font-size: 15px;
   font-weight: 600;
-  margin-bottom: 12px;
+  font-size: 14px;
+  margin-bottom: 8px;
 }
 
 .doc-link {

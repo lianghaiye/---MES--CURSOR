@@ -173,7 +173,7 @@ function openCreateBom() {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 12px;
   padding: 10px 12px;
   background: #fafafa;

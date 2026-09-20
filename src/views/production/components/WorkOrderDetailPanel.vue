@@ -44,54 +44,32 @@
       </a-space>
     </div>
 
-    <div v-if="variant === 'production' || variant === 'assembly'" class="detail-action-bar">
-      <a-space :size="8" wrap>
+    <div
+      v-if="(variant === 'production' || variant === 'assembly') && showDetailActionBar"
+      class="detail-action-bar"
+    >
+      <a-space :size="8">
         <a-button
           v-if="canEditScheduleQty"
           type="primary"
           ghost
-          size="small"
           @click="emitAction('schedule-qty')"
         >
           修改排产数量
         </a-button>
-        <a-button
-          v-if="canAdjustUrgency"
-          type="primary"
-          size="small"
-          @click="emitAction('urgency')"
-        >
+        <a-button v-if="canAdjustUrgency" type="primary" @click="emitAction('urgency')">
           调整紧急度
         </a-button>
-        <a-button v-if="canPause" size="small" class="btn-pause" @click="emitAction('pause')">
-          暂停
-        </a-button>
-        <a-button v-if="canResume" size="small" type="primary" @click="emitAction('resume')">
-          恢复
-        </a-button>
-        <a-button v-if="canTerminate" danger size="small" @click="emitAction('terminate')">
-          终止
-        </a-button>
-        <a-button
-          v-if="canConvertPurchaseOrOutsource"
-          size="small"
-          @click="emitAction('to-purchase')"
-        >
+        <a-button v-if="canPause" class="btn-pause" @click="emitAction('pause')">暂停</a-button>
+        <a-button v-if="canResume" type="primary" @click="emitAction('resume')">恢复</a-button>
+        <a-button v-if="canTerminate" danger @click="emitAction('terminate')">终止</a-button>
+        <a-button v-if="canConvertPurchaseOrOutsource" @click="emitAction('to-purchase')">
           转采购
         </a-button>
-        <a-button
-          v-if="canConvertPurchaseOrOutsource"
-          size="small"
-          @click="emitAction('to-outsource')"
-        >
+        <a-button v-if="canConvertPurchaseOrOutsource" @click="emitAction('to-outsource')">
           转外协
         </a-button>
-        <a-button
-          v-if="canComplete"
-          size="small"
-          class="btn-complete"
-          @click="emitAction('complete')"
-        >
+        <a-button v-if="canComplete" class="btn-complete" @click="emitAction('complete')">
           完成
         </a-button>
       </a-space>
@@ -311,6 +289,17 @@ const convertSideLabel = computed(() => getWorkOrderConvertSideLabel(workOrder.v
 
 const canComplete = computed(() => ['已下发', '执行中'].includes(workOrder.value?.status))
 
+const showDetailActionBar = computed(
+  () =>
+    canEditScheduleQty.value ||
+    canAdjustUrgency.value ||
+    canPause.value ||
+    canResume.value ||
+    canTerminate.value ||
+    canConvertPurchaseOrOutsource.value ||
+    canComplete.value,
+)
+
 function emitAction(key) {
   if (!workOrder.value) return
   emit('detail-action', { key, workOrder: workOrder.value })
@@ -356,7 +345,7 @@ function statusTagColor(status) {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
-    gap: 12px;
+    gap: 8px;
     padding: 12px 16px;
     border: 1px solid #e8eef8;
     border-radius: 8px;
@@ -421,8 +410,35 @@ function statusTagColor(status) {
 
   .detail-action-bar {
     margin-bottom: 12px;
-    padding: 8px 0;
-    border-bottom: 1px solid #f0f0f0;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid #e5e6eb;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+
+    :deep(.ant-space) {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    :deep(.ant-space-item) {
+      margin-bottom: 0 !important;
+    }
+
+    :deep(.ant-btn) {
+      height: 32px;
+      padding: 0 15px;
+      font-size: 14px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
 
     .btn-pause {
       color: #d46b08;
@@ -438,7 +454,7 @@ function statusTagColor(status) {
   }
 
   .detail-tabs {
-    margin-top: 4px;
+    margin-top: 0;
 
     :deep(.ant-tabs-nav) {
       margin-bottom: 8px !important;

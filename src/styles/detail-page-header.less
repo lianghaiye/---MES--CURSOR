@@ -1,17 +1,32 @@
 /**
- * 详情 / 新建表单页标题栏：浅蓝 → 白渐变，圆角 8px
+ * 详情 / 新建 / 编辑页标题栏：浅蓝 → 白渐变，圆角 8px，高度统一 48px
+ * （参考新增销售订单：padding 12×2 + small 按钮 24 = 48）
  * 与上方标签区间距由 page-content / 各页 padding: 12px 保证
  */
 .page-content {
   .page-header {
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    padding: 0 16px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
     background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%) !important;
     border: 1px solid #e8eef8 !important;
     border-radius: 8px !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    box-sizing: border-box;
   }
 
-  /* 标题下紧跟 Tabs：整栏成一盒，标题仅上圆角 */
+  /* BOM/EBOM 顶栏按钮多，允许按内容撑开，仅保留统一渐变盒子 */
+  .page-sticky-head.page-header {
+    height: auto !important;
+    min-height: 48px !important;
+    max-height: none !important;
+    padding: 8px 16px !important;
+  }
+
+  /* 标题下紧跟 Tabs：整栏成一盒，标题仅上圆角；标题条仍保持 48px */
   .detail-sticky-bar:has(.detail-tabs-wrap),
   .detail-sticky-bar:has(.ant-tabs) {
     border: 1px solid #e8eef8;
@@ -34,11 +49,15 @@
   .tab-body {
     padding-left: 0 !important;
     padding-right: 0 !important;
-    padding-top: 12px;
+    padding-top: 8px;
   }
 
-  /* 工业标识等多段列表头：保持白底分区，不加表单/详情渐变 */
+  /* 工业标识等多段列表头：保持白底分区，不加表单/详情渐变与固定高度 */
   .page-wrapper .page-header {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 24px 24px 0 !important;
     background: #fff !important;
     border: none !important;
     border-radius: 0 !important;

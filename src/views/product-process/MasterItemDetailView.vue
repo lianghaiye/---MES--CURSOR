@@ -525,7 +525,7 @@ function handleBack() {
   background: #fff;
   border-radius: 8px;
   padding: 12px 16px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border: 1px solid #e5e6eb;
   box-shadow: none;
 }

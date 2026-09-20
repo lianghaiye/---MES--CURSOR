@@ -1149,7 +1149,7 @@ export default {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 24px;
   border-top: 1px solid #e5e7eb;
 }
@@ -1463,7 +1463,7 @@ export default {
 .qrcode-meta {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 .qrcode-code {
   font-size: 16px;

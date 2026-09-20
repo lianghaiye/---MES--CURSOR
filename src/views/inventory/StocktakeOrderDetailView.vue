@@ -1,125 +1,113 @@
 <template>
-  <div class="detail-page">
+  <div class="stocktake-detail-page">
     <a-spin :spinning="!record">
       <template v-if="record">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="page-title">{{ record.docNo }}</span>
-            <a-tag :color="stocktakeStatusColor(record.status)">{{ record.status }}</a-tag>
-            <a-tag v-if="postingTag" :color="postingTag.color">{{ postingTag.text }}</a-tag>
-            <span class="sub">{{ stocktakeSourceLabel(record.sourceChannel) }}</span>
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ record.docNo }}</span>
+              <a-tag :color="stocktakeStatusColor(record.status)">{{ record.status }}</a-tag>
+              <a-tag v-if="postingTag" :color="postingTag.color">{{ postingTag.text }}</a-tag>
+              <span class="sub">{{ stocktakeSourceLabel(record.sourceChannel) }}</span>
+            </div>
+            <a-space :size="8">
+              <a-button
+                v-if="canSubmitStocktake(record)"
+                type="primary"
+                size="small"
+                @click="handleSubmit"
+              >
+                提交
+              </a-button>
+              <a-button
+                v-if="canApproveStocktake(record)"
+                type="primary"
+                size="small"
+                @click="handleApprove"
+              >
+                审核通过
+              </a-button>
+              <a-button v-if="canRefuseStocktake(record)" size="small" danger @click="openRefuse">
+                拒绝
+              </a-button>
+              <a-button v-if="canWithdrawStocktake(record)" size="small" @click="handleWithdraw">
+                撤回
+              </a-button>
+              <a-button
+                v-if="canPostStocktake(record)"
+                type="primary"
+                size="small"
+                @click="handlePost"
+              >
+                {{ record.postingStatus === 'failed' ? '重新过账' : '生成盘盈盘亏' }}
+              </a-button>
+              <a-button v-if="canEditStocktake(record)" size="small" @click="openEdit"
+                >编辑</a-button
+              >
+              <a-button size="small" @click="goBack">返回列表</a-button>
+            </a-space>
           </div>
-          <a-space :size="12">
-            <a-button
-              v-if="canApproveStocktake(record)"
-              type="primary"
-              size="small"
-              @click="handleApprove"
-            >
-              审核通过
-            </a-button>
-            <a-button
-              v-if="canPostStocktake(record)"
-              type="primary"
-              size="small"
-              @click="handlePost"
-            >
-              {{ record.postingStatus === 'failed' ? '重新过账' : '生成盘盈盘亏' }}
-            </a-button>
-            <a-button v-if="canRefuseStocktake(record)" size="small" danger @click="openRefuse">
-              拒绝
-            </a-button>
-            <a-button v-if="canEditStocktake(record)" size="small" @click="openEdit">编辑</a-button>
-            <a-button size="small" @click="goBack">返回</a-button>
-          </a-space>
-        </div>
 
-        <a-alert
-          v-if="record.postingStatus === 'failed' && record.postingError"
-          type="error"
-          show-icon
-          class="posting-alert"
-          :message="`过账失败：${record.postingError}`"
-        />
-
-        <div class="detail-tabs-wrap">
-          <a-tabs
-            v-model:activeKey="infoTab"
-            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-          >
-            <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane key="related" :tab="`关联单据 (${relatedDocs.length})`" />
-          </a-tabs>
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="infoTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="related" :tab="`关联单据 (${relatedDocs.length})`" />
+              <a-tab-pane key="logs" :tab="`操作日志 (${operationLogs.length})`" />
+            </a-tabs>
+          </div>
         </div>
 
         <div class="tab-body">
-          <template v-if="infoTab === 'basic'">
-            <div class="basic-stack">
-              <DetailSectionCard title="基本信息">
-                <a-descriptions :column="3" size="small">
-                  <a-descriptions-item label="盘点仓库">{{ record.warehouse }}</a-descriptions-item>
-                  <a-descriptions-item label="盘点类型">{{
-                    record.stocktakeType || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="盘点日期">{{
-                    record.stocktakeDate
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="申请人">{{
-                    record.applicant || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="审核人">{{
-                    record.approver || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="审核时间">{{
-                    record.approvedAt || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item label="过账时间">{{
-                    record.postedAt || '—'
-                  }}</a-descriptions-item>
-                  <a-descriptions-item v-if="record.refuseReason" label="拒绝理由" :span="2">
-                    {{ record.refuseReason }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="备注" :span="3">{{
-                    record.remark || '—'
-                  }}</a-descriptions-item>
-                </a-descriptions>
-              </DetailSectionCard>
+          <a-alert
+            v-if="record.postingStatus === 'failed' && record.postingError"
+            type="error"
+            show-icon
+            class="posting-alert"
+            :message="`过账失败：${record.postingError}`"
+          />
 
-              <DetailSectionCard :title="`盘点清单（${displayLines.length}）`">
-                <a-table
-                  :columns="displayColumns"
-                  :data-source="displayLines"
-                  row-key="id"
-                  size="small"
-                  bordered
-                  :pagination="false"
-                  :scroll="{ x: 1400 }"
-                >
-                  <template #bodyCell="{ column, record: line, index }">
-                    <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-                    <template v-else-if="column.key === 'ownership'">
-                      <a-tag :color="isDedicated(line) ? 'orange' : 'blue'">
-                        {{ isDedicated(line) ? '按单' : '自由' }}
-                      </a-tag>
-                    </template>
-                    <template v-else-if="column.key === 'bookQty'">
-                      {{ formatBookQty(line) }}
-                    </template>
-                    <template v-else-if="column.key === 'diffQty'">
-                      <span :class="{ pos: line.diffQty > 0, neg: line.diffQty < 0 }">{{
-                        line.diffQty
-                      }}</span>
-                    </template>
-                    <template v-else-if="column.key === 'salesOrderNo'">
-                      {{ isDedicated(line) ? line.salesOrderNo || '—' : '—' }}
-                    </template>
-                    <template v-else>
-                      {{ displayCell(line[column.dataIndex]) }}
-                    </template>
+          <template v-if="infoTab === 'basic'">
+            <DetailSectionCard title="基本信息">
+              <StocktakeOrderBasicInfoSection :record="record" />
+            </DetailSectionCard>
+
+            <DetailSectionCard :title="`盘点清单（${displayLines.length}）`">
+              <a-table
+                :columns="displayColumns"
+                :data-source="displayLines"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1400 }"
+              >
+                <template #bodyCell="{ column, record: line, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'ownership'">
+                    <a-tag :color="isDedicated(line) ? 'orange' : 'blue'">
+                      {{ isDedicated(line) ? '按单' : '自由' }}
+                    </a-tag>
                   </template>
-                </a-table>
-              </DetailSectionCard>
-            </div>
+                  <template v-else-if="column.key === 'bookQty'">
+                    {{ formatBookQty(line) }}
+                  </template>
+                  <template v-else-if="column.key === 'diffQty'">
+                    <span :class="{ pos: line.diffQty > 0, neg: line.diffQty < 0 }">{{
+                      line.diffQty
+                    }}</span>
+                  </template>
+                  <template v-else-if="column.key === 'salesOrderNo'">
+                    {{ isDedicated(line) ? line.salesOrderNo || '—' : '—' }}
+                  </template>
+                  <template v-else>
+                    {{ displayCell(line[column.dataIndex]) }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
           </template>
 
           <template v-else-if="infoTab === 'related'">
@@ -132,6 +120,7 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: 1100 }"
               >
                 <template #bodyCell="{ column, record: row }">
                   <template v-if="column.key === 'docNo'">
@@ -142,6 +131,9 @@
                       {{ row.docType }}
                     </a-tag>
                   </template>
+                  <template v-else-if="column.key === 'qtySummary'">
+                    {{ row.qtySummary }}
+                  </template>
                   <template v-else>
                     {{ displayCell(row[column.dataIndex]) }}
                   </template>
@@ -149,6 +141,20 @@
               </a-table>
               <a-empty v-else description="暂无关联出入库单据" />
             </DetailSectionCard>
+          </template>
+
+          <template v-else-if="infoTab === 'logs'">
+            <div class="section-card">
+              <a-table
+                :columns="logColumns"
+                :data-source="operationLogs"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :locale="{ emptyText: '暂无操作日志' }"
+              />
+            </div>
           </template>
         </div>
       </template>
@@ -171,26 +177,34 @@ import { Modal, message } from 'ant-design-vue'
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
+import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 import {
   STOCKTAKE_POSTING,
-  STOCKTAKE_STATUS,
   stocktakeStatusColor,
   stocktakeSourceLabel,
   stocktakePostingLabel,
+  stocktakePostingColor,
 } from '@/mock/stocktakeOptions'
 import {
   stocktakeOrderState,
   getStocktakeOrderById,
   canEditStocktake,
+  canSubmitStocktake,
   canApproveStocktake,
   canPostStocktake,
   canRefuseStocktake,
+  canWithdrawStocktake,
+  submitStocktake,
   approveStocktake,
   postStocktake,
   refuseStocktake,
+  withdrawStocktake,
 } from '@/store/stocktakeOrderStore'
+import { getInboundOrderById, inboundOrderState } from '@/store/inboundOrderStore'
+import { getOutboundOrderById, outboundState } from '@/store/outboundStore'
 import { isStocktakeAutoPostOnApprove } from '@/store/stocktakeSettingsStore'
 import InventoryDocRefuseModal from './components/InventoryDocRefuseModal.vue'
+import StocktakeOrderBasicInfoSection from './components/StocktakeOrderBasicInfoSection.vue'
 import {
   isDedicatedInventoryLine,
   sortInventoryLinesByItemCode,
@@ -213,12 +227,10 @@ const record = computed(() => {
 
 const postingTag = computed(() => {
   const r = record.value
-  if (!r || r.status !== STOCKTAKE_STATUS.APPROVED) return null
+  if (!r) return null
   const label = stocktakePostingLabel(r.postingStatus)
   if (!label) return null
-  if (r.postingStatus === STOCKTAKE_POSTING.FAILED) return { text: label, color: 'error' }
-  if (r.postingStatus === STOCKTAKE_POSTING.PENDING) return { text: label, color: 'warning' }
-  return { text: label, color: 'default' }
+  return { text: label, color: stocktakePostingColor(r.postingStatus) }
 })
 
 const lineColumns = [
@@ -248,32 +260,73 @@ const displayColumns = computed(() => withProductMergeColumns(lineColumns, lineR
 const relatedColumns = [
   { title: '单据类型', key: 'docType', width: 110 },
   { title: '单据编号', key: 'docNo', width: 180 },
+  { title: '盘点仓库', dataIndex: 'warehouse', width: 120, ellipsis: true },
+  { title: '数量', key: 'qtySummary', width: 160 },
+  { title: '单据日期', dataIndex: 'docDate', width: 170 },
+  { title: '创建人', dataIndex: 'creator', width: 100 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 170 },
+]
+
+const logColumns = [
+  { title: '操作时间', dataIndex: 'operatedAt', width: 180 },
+  { title: '操作人', dataIndex: 'operator', width: 120 },
+  { title: '操作', dataIndex: 'action', width: 140 },
   { title: '说明', dataIndex: 'remark', ellipsis: true },
 ]
 
+const operationLogs = computed(() => record.value?.operationLogs || [])
+
+function resolveLineUnit(lines = []) {
+  const units = [
+    ...new Set(lines.map((l) => String(l.unit || l.stockUnit || '').trim()).filter(Boolean)),
+  ]
+  return units.length === 1 ? units[0] : ''
+}
+
+function formatRelatedQtySummary(order, qtyField = 'qty') {
+  const lines = order?.lineItems || []
+  const itemCount = lines.length
+  const total = lines.reduce((s, l) => s + (Number(l[qtyField] ?? l.qty ?? l.shipQty) || 0), 0)
+  const unit = resolveLineUnit(lines)
+  const qtyText = unit ? formatQtyWithUnit(total, unit) : formatQty(total)
+  return `${qtyText} / ${itemCount}`
+}
+
 const relatedDocs = computed(() => {
+  void inboundOrderState.orders
+  void outboundState.orders
   const r = record.value
   if (!r) return []
   const rows = []
   ;(r.linkedInboundIds || []).forEach((id, i) => {
-    const docNo = r.linkedInboundDocNos?.[i] || id
+    const order = getInboundOrderById(id)
+    const docNo = order?.docNo || r.linkedInboundDocNos?.[i] || id
     rows.push({
       key: `in-${id}`,
       id,
       docNo,
       docType: '盘点入库',
-      remark: '盘盈入库（自由备货）',
+      warehouse: order?.warehouse || r.warehouse || '—',
+      qtySummary: order ? formatRelatedQtySummary(order, 'qty') : '—',
+      docDate: order?.confirmedAt || order?.inboundDate || '—',
+      creator: order?.creator || '—',
+      createdAt: order?.createdAt || '—',
       path: `/inventory/inbound/${id}`,
     })
   })
   ;(r.linkedOutboundIds || []).forEach((id, i) => {
-    const docNo = r.linkedOutboundDocNos?.[i] || id
+    const order = getOutboundOrderById(id)
+    const docNo = order?.docNo || r.linkedOutboundDocNos?.[i] || id
     rows.push({
       key: `out-${id}`,
       id,
       docNo,
       docType: '盘点出库',
-      remark: '盘亏出库',
+      warehouse: order?.warehouse || r.warehouse || '—',
+      qtySummary: order ? formatRelatedQtySummary(order, 'shipQty') : '—',
+      docDate: order?.auditDate || order?.outboundTime || order?.completedAt || '—',
+      creator: order?.creator || '—',
+      createdAt: order?.createdAt || '—',
       path: `/inventory/outbound/${id}`,
     })
   })
@@ -313,6 +366,30 @@ function openEdit() {
 function goRelated(row) {
   openTab(row.path, row.docNo || '关联单据')
   router.push(row.path)
+}
+
+function handleSubmit() {
+  Modal.confirm({
+    title: `提交盘点单 ${record.value.docNo}？`,
+    content: '提交后进入待审核，可审核、拒绝或撤回。',
+    onOk: () => {
+      const { count, blocked } = submitStocktake([record.value.id])
+      if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
+      if (count) message.success('已提交')
+    },
+  })
+}
+
+function handleWithdraw() {
+  Modal.confirm({
+    title: `撤回盘点单 ${record.value.docNo}？`,
+    content: '撤回后回到待提交，可继续编辑。',
+    onOk: () => {
+      const { count, blocked } = withdrawStocktake([record.value.id])
+      if (blocked?.length) message.warning(blocked.map((b) => b.message).join('；'))
+      if (count) message.success('已撤回')
+    },
+  })
 }
 
 function handleApprove() {
@@ -361,64 +438,98 @@ function onRefuseConfirm(reason) {
 </script>
 
 <style lang="less" scoped>
-.detail-page {
+.stocktake-detail-page {
   margin: -12px;
-  padding: 12px 0 24px;
+  padding: 12px;
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
   background: #f5f6f8;
-  min-height: calc(100vh - 112px);
-  box-sizing: border-box;
-}
-.page-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-top: none;
-  border-radius: 0;
-  margin-bottom: 12px;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.detail-sticky-bar {
+  flex-shrink: 0;
   position: sticky;
   top: 0;
   z-index: 30;
+  background: #f5f6f8;
 }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
 .header-left {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
-.page-title {
+
+.order-no {
   font-size: 16px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
 }
+
 .sub {
   color: rgba(0, 0, 0, 0.45);
   font-size: 13px;
 }
-.posting-alert {
-  margin: 0 12px 12px;
+
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
 }
-.detail-tabs-wrap {
-  padding: 0 12px;
+
+.posting-alert {
   margin-bottom: 8px;
 }
+
 .tab-body {
-  padding: 0 12px;
+  flex: 1;
+  min-height: 0;
+  padding: 8px 12px 16px;
+  overflow: auto;
 }
-.basic-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+
+.section-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
 .link-code {
   color: #1677ff;
   cursor: pointer;
 }
+
 .pos {
   color: #52c41a;
 }
+
 .neg {
   color: #ff4d4f;
 }

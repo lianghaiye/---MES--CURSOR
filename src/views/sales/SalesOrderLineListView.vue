@@ -741,7 +741,7 @@ function openDetail(record) {
 
 .filter-card {
   padding: 12px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .horizontal-form {

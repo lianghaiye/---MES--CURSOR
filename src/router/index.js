@@ -631,12 +631,22 @@ const routes = [
         meta: { title: '盘点单详情' },
       },
       {
-        path: 'inventory/in-out-detail',
-        name: 'inventory-in-out-detail',
-        component: () => import('@/views/inventory/InOutDetailView.vue'),
-        meta: { title: '出入库详情' },
+        path: 'inventory/outbound-details',
+        name: 'inventory-outbound-details',
+        component: () => import('@/views/inventory/IoCompletedDetailListView.vue'),
+        meta: { title: '出库详情', ioKind: 'outbound' },
       },
-      { path: 'inventory/in-out', redirect: '/inventory/in-out-detail' },
+      {
+        path: 'inventory/inbound-details',
+        name: 'inventory-inbound-details',
+        component: () => import('@/views/inventory/IoCompletedDetailListView.vue'),
+        meta: { title: '入库详情', ioKind: 'inbound' },
+      },
+      {
+        path: 'inventory/in-out-detail',
+        redirect: '/inventory/outbound-details',
+      },
+      { path: 'inventory/in-out', redirect: '/inventory/outbound-details' },
       {
         path: 'inventory/ship-attachment-query',
         name: 'inventory-ship-attachment-query',

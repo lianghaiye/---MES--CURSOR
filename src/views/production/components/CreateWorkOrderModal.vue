@@ -915,7 +915,7 @@ export default { name: 'CreateWorkOrderModal' }
 
   .info-grid-row {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px 12px;
     margin-bottom: 8px;
   }

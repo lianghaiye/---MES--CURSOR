@@ -1,18 +1,10 @@
 <template>
-  <div class="inventory-deduct-record-page">
-    <div class="stats-row">
-      <div v-for="card in statCards" :key="card.key" class="stat-card" :class="card.tone">
-        <div class="stat-title">{{ card.title }}</div>
-        <div class="stat-value">{{ card.value }}</div>
-        <div class="stat-sub">{{ card.sub }}</div>
-      </div>
-    </div>
-
-    <a-alert
-      type="info"
-      show-icon
-      class="rule-alert"
-      message="确认单据后 30 天内可执行撤销操作；超过 30 天后系统将锁定单据，不可再进行操作。"
+  <div class="inventory-deduct-record-page list-page">
+    <ListPeriodStatsPanel
+      :cards="statCards"
+      :show-period="false"
+      tip="确认单据后 30 天内可执行撤销操作；超过 30 天后系统将锁定单据，不可再进行操作。"
+      storage-key="i_doms_inventory_deduct_stats_collapsed"
     />
 
     <div class="filter-card">
@@ -212,6 +204,7 @@ import {
   isMaterialDeductLocked,
 } from '@/store/materialRequisitionStore'
 import { useTabs } from '@/composables/useTabs'
+import ListPeriodStatsPanel from '@/components/ListPeriodStatsPanel.vue'
 import InventoryDeductEditModal from './components/InventoryDeductEditModal.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useListExport } from '@/composables/useListExport'
@@ -266,30 +259,30 @@ const statCards = computed(() => [
   {
     key: 'today',
     title: '今日扣减笔数',
-    value: stats.value.todayCount,
-    sub: `成功 ${stats.value.todaySuccess} / 失败 ${stats.value.todayFailed}`,
-    tone: 'tone-green',
+    value: String(stats.value.todayCount ?? 0),
+    compareText: `成功 ${stats.value.todaySuccess ?? 0} / 失败 ${stats.value.todayFailed ?? 0}`,
+    iconClass: 'icon-blue',
   },
   {
     key: 'pending',
     title: '待确认扣减',
-    value: stats.value.pendingAudit,
-    sub: '预扣锁定中，确认后转实扣',
-    tone: 'tone-orange',
+    value: String(stats.value.pendingAudit ?? 0),
+    compareText: '预扣锁定中，确认后转实扣',
+    iconClass: 'icon-warn',
   },
   {
     key: 'fail',
     title: '扣减失败 (库存不足)',
-    value: stats.value.failInsufficient,
-    sub: '需补料或调整后重试',
-    tone: 'tone-red',
+    value: String(stats.value.failInsufficient ?? 0),
+    compareText: '需补料或调整后重试',
+    iconClass: 'icon-purple',
   },
   {
     key: 'voided',
     title: '已作废扣减',
-    value: stats.value.revokedMonth,
-    sub: '本月累计',
-    tone: 'tone-gray',
+    value: String(stats.value.revokedMonth ?? 0),
+    compareText: '本月累计',
+    iconClass: 'icon-screen',
   },
 ])
 
@@ -563,90 +556,11 @@ function onSaved() {
 
 <style lang="less" scoped>
 .inventory-deduct-record-page {
-  padding: 0;
-}
-
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.stat-card {
-  background: linear-gradient(145deg, #f5f8ff 0%, #ffffff 70%);
-  border-radius: 8px;
-  padding: 16px 18px;
-  border: 1px solid #e8eef8;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  border-left-width: 3px;
-  border-left-style: solid;
-
-  &.tone-green {
-    border-left-color: #52c41a;
-    background: linear-gradient(145deg, #f6ffed 0%, #ffffff 70%);
-    border-color: #b7eb8f;
-    .stat-value {
-      color: #389e0d;
-    }
-  }
-
-  &.tone-orange {
-    border-left-color: #fa8c16;
-    background: linear-gradient(145deg, #fff7e6 0%, #ffffff 70%);
-    border-color: #ffd591;
-    .stat-value {
-      color: #d46b08;
-    }
-  }
-
-  &.tone-red {
-    border-left-color: #ff4d4f;
-    background: linear-gradient(145deg, #fff1f0 0%, #ffffff 70%);
-    border-color: #ffa39e;
-    .stat-value {
-      color: #cf1322;
-    }
-  }
-
-  &.tone-gray {
-    border-left-color: #8c8c8c;
-    background: linear-gradient(145deg, #fafafa 0%, #ffffff 70%);
-    border-color: #d9d9d9;
-    .stat-value {
-      color: #595959;
-    }
-  }
-}
-
-.stat-title {
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.45);
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 600;
-  line-height: 1.2;
-  margin-bottom: 6px;
-}
-
-.stat-sub {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-}
-
-.rule-alert {
-  margin-bottom: 12px;
+  /* 壳层由全局 .list-page 提供 */
 }
 
 .filter-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px 16px 4px;
-  margin-bottom: 12px;
-  border: 1px solid #f0f0f0;
+  /* 由 .list-page .filter-card 兜底 */
 }
 
 .filter-form {
@@ -662,19 +576,11 @@ function onSaved() {
 }
 
 .toolbar-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-  gap: 8px;
+  /* 由全局 .toolbar-row 白盒兜底 */
 }
 
 .table-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px 16px 16px;
-  border: 1px solid #f0f0f0;
+  /* 由 .list-page .table-card 兜底 */
 }
 
 .wo-cell {

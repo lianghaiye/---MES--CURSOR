@@ -10,6 +10,13 @@ alwaysApply: true
 
 与新增/编辑页分工：只读 + 业务动作 → 详情；填写保存 → `form-page-shell.mdc`。
 
+## 对齐与卡片间距
+
+| 项 | 约定 |
+|----|------|
+| 与全局标签 | 标题栏 / 内容白盒与 `GlobalTabs` **左右对齐**（页根 `margin:-12` + `padding:12`） |
+| 卡片间距 | 详情区块白盒之间垂直间距统一 **8px**（`DetailSectionCard` / `.section-card`） |
+
 参考：`SalesOrderDetailView.vue`、`ProductBomDetailView.vue`、`QcTaskDetailView.vue`、`WorkOrderProductionSections.vue`；胶囊 Tab 样式见 `detail-tabs-pill.less`。
 
 ## 页头

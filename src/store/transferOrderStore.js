@@ -19,11 +19,15 @@ import {
 } from '@/utils/transferConfirm'
 import { releaseTransferSoftLocksByOrderId } from '@/store/transferSoftLockStore'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
+import {
+  appendTransferOperationLog,
+  backfillTransferOperationLogs,
+} from '@/utils/transferOperationLog'
 
 const STORAGE_KEY = 'i_doms_transfer_orders'
 const SEED_VERSION_KEY = 'i_doms_transfer_orders_seed_v'
-/** v3：补齐各状态演示种子 */
-const CURRENT_SEED_VERSION = '3'
+/** v4：操作日志 */
+const CURRENT_SEED_VERSION = '4'
 
 function loadFromStorage() {
   try {
@@ -45,6 +49,11 @@ function migrateTransferOrder(order) {
   ;(order.lineItems || []).forEach((l) => {
     if (l.lineStatus === '已确认') l.lineStatus = TRANSFER_LINE_STATUS.DONE
   })
+  order.linkedOutboundIds = order.linkedOutboundIds || []
+  order.linkedInboundIds = order.linkedInboundIds || []
+  order.linkedOutboundDocNos = order.linkedOutboundDocNos || []
+  order.linkedInboundDocNos = order.linkedInboundDocNos || []
+  backfillTransferOperationLogs(order)
   return order
 }
 
@@ -132,6 +141,12 @@ export function addTransferOrder(payload) {
     status: TRANSFER_STATUS.PENDING,
     createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   })
+  appendTransferOperationLog(row, {
+    action: '创建',
+    operator: row.creator || row.applicant || 'admin1',
+    operatedAt: row.createdAt,
+    remark: `创建调拨单 ${row.docNo}，${row.fromWarehouse} → ${row.toWarehouse}`,
+  })
   transferOrderState.orders.unshift(row)
   return { ok: true, order: row }
 }
@@ -153,6 +168,11 @@ export function updateTransferOrder(id, patch) {
     )
   }
   Object.assign(order, patch, { fromWarehouse, toWarehouse })
+  appendTransferOperationLog(order, {
+    action: '编辑',
+    operator: patch.updater || order.updater || order.applicant || 'admin1',
+    remark: '更新调拨单',
+  })
   return { ok: true, order }
 }
 
@@ -209,6 +229,12 @@ export function confirmTransfer(ids, { operator = 'admin1' } = {}) {
     }
     linkOutboundInbound(order, res)
     recomputeTransferStatusFromLines(order, operator)
+    appendTransferOperationLog(order, {
+      action: '确认调拨',
+      operator,
+      operatedAt: order.confirmedAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      remark: '出库方确认调拨，生成调拨出库/入库',
+    })
     count += 1
   })
   return { count, blocked }
@@ -248,6 +274,12 @@ export function voidTransfer(ids, { reason = '', operator = 'admin1' } = {}) {
     order.voidedBy = operator
     order.voidedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
     releaseTransferSoftLocksByOrderId(order.id)
+    appendTransferOperationLog(order, {
+      action: '作废',
+      operator,
+      operatedAt: order.voidedAt,
+      remark: `作废理由：${reasonText}`,
+    })
     count += 1
   })
   return { count, blocked }

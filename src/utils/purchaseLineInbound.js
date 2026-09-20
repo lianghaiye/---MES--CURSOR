@@ -3,12 +3,16 @@
  * 两条路径共用采购数量池：
  * - 先收货再入库 / 质检后入库
  * - 直接入库
- * 已申请入库（收货）= 有效收货单占用 + 有效入库单占用
- * 已入库 = 已确认入库数量
+ *
+ * 进度格式：已入库 / 待入占用 / 采购数量
+ * - 已入库 = 已确认入库数量
+ * - 待入占用 = 收货单未结清占用 + 未确认入库单占用
+ *   （收货 openOccupy 已扣除挂在该收货下的未确认入库量，避免双计）
  *
  * 注意：不顶层 import inboundOrderStore，避免与 purchaseOrderStore 循环依赖导致 TDZ。
  */
 import { purchaseReceiptState } from '@/store/purchaseReceiptStore'
+import { calcReceiptLineOpenOccupyQty } from '@/utils/purchaseReceiptSettle'
 import { formatNumber } from '@/utils/numberFormat'
 
 function getInboundOrders() {
@@ -29,6 +33,12 @@ function isActiveInboundOrder(order) {
 
 function isConfirmedInboundOrder(order) {
   return order?.status === '已完成' || order?.status === '已入库' || order?.status === '已确认'
+}
+
+function isPendingInboundOrder(order) {
+  if (!isActiveInboundOrder(order) || isConfirmedInboundOrder(order)) return false
+  const status = order.status || ''
+  return status === '待入库' || status === '部分入库' || status === '入库中'
 }
 
 function isActivePurchaseReceipt(receipt) {
@@ -54,38 +64,48 @@ function listPurchaseReceiptsForPo(po) {
   )
 }
 
-/** 已生成收货单占用数量（有效收货单） */
+/**
+ * 收货单对待入池的占用（已完成收货单=0；已入库/已释放部分不占）
+ */
 export function calcPoLineAppliedReceiptQty(po, line) {
   if (!line) return 0
   const lineId = line.id
   let total = 0
   listPurchaseReceiptsForPo(po).forEach((receipt) => {
     ;(receipt.lineItems || []).forEach((li) => {
-      if (lineIdMatches(li, lineId)) total += Number(li.receiptQty) || 0
+      if (!lineIdMatches(li, lineId)) return
+      total += calcReceiptLineOpenOccupyQty(receipt, li)
     })
   })
   return total
 }
 
-/** 已申请入库数量（含待入库入库单） */
+/** @deprecated 兼容旧名：现为未确认入库单占用 */
 export function calcPoLineAppliedInboundQty(po, line) {
+  return calcPoLinePendingInboundQty(po, line)
+}
+
+/** 未确认入库单占用数量 */
+export function calcPoLinePendingInboundQty(po, line) {
   if (!line) return 0
   const lineId = line.id
   let total = 0
   listInboundOrdersForPo(po).forEach((order) => {
+    if (!isPendingInboundOrder(order)) return
     ;(order.lineItems || []).forEach((li) => {
-      if (lineIdMatches(li, lineId)) total += Number(li.qty) || 0
+      if (!lineIdMatches(li, lineId)) return
+      if ((li.lineStatus || '待入库') === '已入库' || (li.lineStatus || '') === '已拒绝') return
+      total += Number(li.qty) || 0
     })
   })
   return total
 }
 
 /**
- * 已申请入库（收货）= 入库单占用 + 收货单占用
- * 两种路径共用采购数量，不可重复占用
+ * 待入占用 = 收货未结清占用 + 未确认入库单占用
  */
 export function calcPoLineAppliedOccupyQty(po, line) {
-  return calcPoLineAppliedInboundQty(po, line) + calcPoLineAppliedReceiptQty(po, line)
+  return calcPoLineAppliedReceiptQty(po, line) + calcPoLinePendingInboundQty(po, line)
 }
 
 /** 已确认入库数量 */
@@ -102,13 +122,13 @@ export function calcPoLineReceivedQty(po, line) {
   return Math.max(fromField, fromOrders)
 }
 
-/** 剩余可收货 / 可申请入库数量（取已申请占用与已入库的较大值，避免已入库未计入占用时仍可操作） */
+/** 剩余可收货 / 可申请入库数量 */
 export function calcPoLineRemainInboundQty(po, line) {
   const purchaseQty = Number(line?.purchaseQty) || 0
   const applied = calcPoLineAppliedOccupyQty(po, line)
   const received = calcPoLineReceivedQty(po, line)
-  const used = Math.max(applied, received)
-  return Math.max(0, purchaseQty - used)
+  // applied 已不含已确认入库，占用与已入库相加
+  return Math.max(0, purchaseQty - (applied + received))
 }
 
 /** 明细是否已占满（置灰，不可再收货/入库） */
@@ -135,12 +155,13 @@ export function calcPoHeaderInboundStatus(po) {
   return '部分入库'
 }
 
-/** 入库进度：已入库 / 已申请入库（收货） / 采购数量 */
+/** 入库进度：已入库 / 待入占用 / 采购数量 */
 export function formatInboundProgress(receivedQty, appliedQty, purchaseQty) {
   return `${formatNumber(receivedQty, 4, { empty: '-' })} / ${formatNumber(appliedQty, 4, { empty: '-' })} / ${formatNumber(purchaseQty, 4, { empty: '-' })}`
 }
 
-export const INBOUND_PROGRESS_TOOLTIP = '格式：已入库数量 / 已申请入库（收货）数量 / 采购数量'
+export const INBOUND_PROGRESS_TOOLTIP =
+  '格式：已入库数量 / 待入占用（收货未结清+未确认入库单） / 采购数量'
 
 export function poLineInboundStatusColor(status) {
   const map = {

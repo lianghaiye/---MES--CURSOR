@@ -817,7 +817,7 @@ defineExpose({
 
 <style lang="less" scoped>
 .section-block {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 
   &:last-child {
     margin-bottom: 0;
@@ -834,7 +834,7 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .th-tip-icon {

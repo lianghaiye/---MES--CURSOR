@@ -1020,7 +1020,7 @@ function onExportMenu({ key }) {
 <style lang="less" scoped>
 .product-bom-page {
   margin: -12px;
-  padding: 12px 0 8px;
+  padding: 12px;
   background: #f5f6f8;
 }
 

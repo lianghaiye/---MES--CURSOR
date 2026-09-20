@@ -201,7 +201,7 @@ function onDelete() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   background: #fff;
   padding: 12px 16px;
   border-radius: 8px;

@@ -1,7 +1,5 @@
 <template>
   <div class="salary-detail-page">
-    <SalaryStatsNav active="detail" />
-
     <div class="filter-card">
       <a-form layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -72,17 +70,7 @@
     </div>
 
     <div class="toolbar-row">
-      <a-dropdown>
-        <a-button size="small">
-          批量操作
-          <DownOutlined />
-        </a-button>
-        <template #overlay>
-          <a-menu @click="onBatchAction">
-            <a-menu-item key="export">导出 Excel</a-menu-item>
-          </a-menu>
-        </template>
-      </a-dropdown>
+      <a-button type="primary" size="small" @click="openExportModal">批量导出</a-button>
       <a-space :size="4">
         <TableColumnSettingButton @click="columnDrawerOpen = true" />
         <a-tooltip title="刷新">
@@ -176,8 +164,7 @@ export default { name: 'SalaryDetailView' }
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
-import { ClearOutlined, DownOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
-import SalaryStatsNav from './components/SalaryStatsNav.vue'
+import { ClearOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -461,10 +448,6 @@ function handleReset() {
   handleSearch()
 }
 
-function onBatchAction({ key }) {
-  if (key === 'export') openExportModal()
-}
-
 watch(
   () => ({ ...route.query }),
   () => {
@@ -482,7 +465,7 @@ watch(
     border: 1px solid #f0f0f0;
     border-radius: 8px;
     padding: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .toolbar-row {

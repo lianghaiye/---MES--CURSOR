@@ -167,12 +167,12 @@ function openEdit() {
     background: #fff;
     border-radius: 4px;
     padding: 16px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .section-title {
     font-weight: 500;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .detail-thumb {

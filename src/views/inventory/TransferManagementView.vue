@@ -1,5 +1,5 @@
 <template>
-  <div class="transfer-page">
+  <div class="transfer-page list-page">
     <div class="filter-card">
       <a-form layout="inline" :model="filters" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -63,113 +63,111 @@
       </a-form>
     </div>
 
-    <div class="list-panel">
-      <div class="toolbar-row">
-        <a-space wrap :size="8">
-          <a-button type="primary" size="small" @click="openCreate">
-            <PlusOutlined />
-            新增
-          </a-button>
-          <a-button size="small" @click="handleConfirmSelected">
-            <CheckOutlined />
-            确认调拨
-          </a-button>
-          <a-button size="small" danger @click="handleVoidSelected">
-            <StopOutlined />
-            作废
-          </a-button>
-          <a-button size="small" @click="handleBatchDelete">
-            <DeleteOutlined />
-            删除
-          </a-button>
-        </a-space>
-      </div>
+    <div class="toolbar-row">
+      <a-space wrap :size="8">
+        <a-button type="primary" size="small" @click="openCreate">
+          <PlusOutlined />
+          新增
+        </a-button>
+        <a-button size="small" @click="handleConfirmSelected">
+          <CheckOutlined />
+          确认调拨
+        </a-button>
+        <a-button size="small" danger @click="handleVoidSelected">
+          <StopOutlined />
+          作废
+        </a-button>
+        <a-button size="small" @click="handleBatchDelete">
+          <DeleteOutlined />
+          删除
+        </a-button>
+      </a-space>
+    </div>
 
-      <a-alert type="info" show-icon class="summary-bar" :banner="false">
-        <template #message>
-          <span>
-            当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
-            <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
-          </span>
-        </template>
-      </a-alert>
+    <a-alert type="info" show-icon class="summary-bar" :banner="false">
+      <template #message>
+        <span>
+          当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
+          <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
+        </span>
+      </template>
+    </a-alert>
 
-      <div class="table-card">
-        <a-table
-          :columns="columns"
-          :data-source="pagedList"
-          row-key="id"
-          size="small"
-          bordered
-          :pagination="false"
-          :row-selection="rowSelection"
-          :scroll="{ x: 1280 }"
-        >
-          <template #bodyCell="{ column, record, index }">
-            <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
-            <template v-else-if="column.key === 'docNo'">
-              <a class="link-code" @click="goDetail(record)">{{ record.docNo }}</a>
-            </template>
-            <template v-else-if="column.key === 'status'">
-              <a-tag :color="transferStatusColor(record.status)">{{ record.status }}</a-tag>
-            </template>
-            <template v-else-if="column.key === 'sourceChannel'">
-              {{ transferSourceLabel(record.sourceChannel) }}
-            </template>
-            <template v-else-if="column.key === 'transferQty'">
-              <a-tooltip title="已签收数量 / 全部数量">
-                {{ formatTransferQtyRatio(record) }}
-              </a-tooltip>
-            </template>
-            <template v-else-if="column.key === 'action'">
-              <a-space :size="0" wrap>
-                <a-button
-                  v-if="canEditTransfer(record)"
-                  type="link"
-                  size="small"
-                  @click="openEdit(record)"
-                >
-                  编辑
-                </a-button>
-                <a-button
-                  v-if="canConfirmTransfer(record)"
-                  type="link"
-                  size="small"
-                  @click="handleConfirmOne(record)"
-                >
-                  确认调拨
-                </a-button>
-                <a-button
-                  v-if="canVoidTransfer(record)"
-                  type="link"
-                  size="small"
-                  danger
-                  @click="openVoid([record])"
-                >
-                  作废
-                </a-button>
-                <a-button
-                  v-if="canDeleteTransfer(record)"
-                  type="link"
-                  size="small"
-                  danger
-                  @click="confirmDelete(record)"
-                >
-                  删除
-                </a-button>
-              </a-space>
-            </template>
+    <div class="table-card">
+      <a-table
+        :columns="columns"
+        :data-source="pagedList"
+        row-key="id"
+        size="small"
+        bordered
+        :pagination="false"
+        :row-selection="rowSelection"
+        :scroll="{ x: 1280 }"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
+          <template v-else-if="column.key === 'docNo'">
+            <a class="link-code" @click="goDetail(record)">{{ record.docNo }}</a>
           </template>
-        </a-table>
-        <div class="table-pagination">
-          <a-pagination
-            v-model:current="pagination.current"
-            v-model:page-size="pagination.pageSize"
-            :total="filteredList.length"
-            show-size-changer
-            :show-total="(t) => `共 ${t} 条`"
-          />
-        </div>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="transferStatusColor(record.status)">{{ record.status }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'sourceChannel'">
+            {{ transferSourceLabel(record.sourceChannel) }}
+          </template>
+          <template v-else-if="column.key === 'transferQty'">
+            <a-tooltip title="已签收数量 / 全部数量">
+              {{ formatTransferQtyRatio(record) }}
+            </a-tooltip>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space :size="0" wrap>
+              <a-button
+                v-if="canEditTransfer(record)"
+                type="link"
+                size="small"
+                @click="openEdit(record)"
+              >
+                编辑
+              </a-button>
+              <a-button
+                v-if="canConfirmTransfer(record)"
+                type="link"
+                size="small"
+                @click="handleConfirmOne(record)"
+              >
+                确认调拨
+              </a-button>
+              <a-button
+                v-if="canVoidTransfer(record)"
+                type="link"
+                size="small"
+                danger
+                @click="openVoid([record])"
+              >
+                作废
+              </a-button>
+              <a-button
+                v-if="canDeleteTransfer(record)"
+                type="link"
+                size="small"
+                danger
+                @click="confirmDelete(record)"
+              >
+                删除
+              </a-button>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
+      <div class="table-pagination">
+        <a-pagination
+          v-model:current="pagination.current"
+          v-model:page-size="pagination.pageSize"
+          :total="filteredList.length"
+          show-size-changer
+          :show-total="(t) => `共 ${t} 条`"
+        />
       </div>
     </div>
 
@@ -411,7 +409,6 @@ function handleBatchDelete() {
 }
 
 .filter-card,
-.list-panel,
 .table-card {
   background: #fff;
   border-radius: 6px;
@@ -419,12 +416,8 @@ function handleBatchDelete() {
 }
 
 .filter-card {
-  padding: 10px 12px 6px;
+  padding: 12px 16px;
   margin-bottom: 8px;
-}
-
-.list-panel {
-  padding: 10px 12px 12px;
 }
 
 .toolbar-row {
@@ -445,7 +438,7 @@ function handleBatchDelete() {
 }
 
 .table-card {
-  padding: 0;
+  padding: 8px 12px 12px;
 
   :deep(.ant-table-thead > tr > th) {
     background: #fafafa;

@@ -1294,7 +1294,7 @@ export default {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 24px;
   border-top: 1px solid #e5e7eb;
 }
@@ -1525,7 +1525,7 @@ export default {
 .new-app-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
   padding-top: 24px;
   border-top: 1px solid #e5e7eb;
   margin-top: 24px;
@@ -1563,7 +1563,7 @@ export default {
 }
 .detail-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid #e5e7eb;

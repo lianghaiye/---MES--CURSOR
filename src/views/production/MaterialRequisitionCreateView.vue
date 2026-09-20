@@ -975,21 +975,21 @@ syncReceiveWarehouse()
   border: 1px solid #f0f0f0;
   border-radius: 8px;
   padding: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .section-title {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 8px;
 
   .section-title {
     margin-bottom: 0;

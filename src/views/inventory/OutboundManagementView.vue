@@ -1,8 +1,19 @@
 <template>
-  <div class="outbound-page">
+  <div class="outbound-page list-page">
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="状态">
+              <a-select
+                v-model:value="filters.status"
+                allow-clear
+                placeholder="请选择 状态"
+                size="small"
+                :options="statusOpts"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="出库单号">
               <a-input
@@ -82,17 +93,6 @@
                 allow-clear
                 placeholder="请输入 销售单号"
                 size="small"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="状态">
-              <a-select
-                v-model:value="filters.status"
-                allow-clear
-                placeholder="请选择 状态"
-                size="small"
-                :options="statusOpts"
               />
             </a-form-item>
           </a-col>
@@ -246,7 +246,7 @@
     </div>
 
     <!-- 表格视图 -->
-    <div v-else class="list-panel">
+    <template v-else>
       <div class="toolbar-row">
         <a-space wrap :size="8">
           <a-button type="primary" size="small" @click="openCreate">
@@ -436,7 +436,7 @@
           />
         </div>
       </div>
-    </div>
+    </template>
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -1002,7 +1002,6 @@ function handleBatchInitiateQc() {
 }
 
 .filter-card,
-.list-panel,
 .table-card,
 .list-card,
 .detail-card {
@@ -1012,12 +1011,8 @@ function handleBatchInitiateQc() {
 }
 
 .filter-card {
-  padding: 10px 12px 6px;
+  padding: 12px 16px;
   margin-bottom: 8px;
-}
-
-.list-panel {
-  padding: 10px 12px 12px;
 }
 
 .horizontal-form {
@@ -1083,7 +1078,7 @@ function handleBatchInitiateQc() {
 
 .summary-bar {
   margin-bottom: 8px;
-  padding: 0;
+  padding: 6px 12px;
 
   :deep(.ant-alert-message) {
     font-size: 13px;
@@ -1091,7 +1086,7 @@ function handleBatchInitiateQc() {
 }
 
 .table-card {
-  padding: 0;
+  padding: 8px 12px 12px;
 
   :deep(.ant-table-thead > tr > th) {
     background: #fafafa;

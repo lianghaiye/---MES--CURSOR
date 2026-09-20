@@ -65,7 +65,7 @@ const columns = [
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 6px;
 }
 

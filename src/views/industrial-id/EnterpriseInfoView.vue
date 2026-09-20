@@ -459,7 +459,7 @@ export default {
 }
 .banner-title-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 12px;
@@ -534,7 +534,7 @@ export default {
 .address-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 8px;
 }
 .addr-select {
   width: 100%;
@@ -717,7 +717,7 @@ export default {
 .review-title-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 12px;
 }
 .review-title-row h3 {

@@ -1,9 +1,11 @@
 <template>
-  <div class="inventory-detail-page">
-    <a-tabs v-model:activeKey="viewTab" size="small" class="view-tabs">
-      <a-tab-pane key="ledger" tab="库存台账" />
-      <a-tab-pane key="batches" tab="按批次查询" />
-    </a-tabs>
+  <div class="inventory-detail-page list-page">
+    <div class="view-tabs-bar">
+      <a-tabs v-model:activeKey="viewTab" class="view-tabs" :tab-bar-style="{ margin: 0 }">
+        <a-tab-pane key="ledger" tab="库存台账" />
+        <a-tab-pane key="batches" tab="按批次查询" />
+      </a-tabs>
+    </div>
 
     <template v-if="viewTab === 'ledger'">
       <div class="filter-card">
@@ -1474,39 +1476,72 @@ watch(
 
 <style scoped>
 .inventory-detail-page {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 100%;
+  /* 壳层由全局 .list-page 提供 */
 }
 
-.view-tabs {
+.view-tabs-bar {
+  margin-bottom: 8px;
   background: #fff;
-  padding: 0 12px;
-  border-radius: 4px;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-bottom: none;
+  border-radius: 6px;
+  padding: 0 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.filter-card {
-  background: #fff;
-  padding: 12px 12px 4px;
-  border-radius: 4px;
-}
-
-.toolbar-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 4px;
-}
-
-.summary-bar {
+.view-tabs-bar :deep(.view-tabs.ant-tabs) {
   margin: 0;
 }
 
+/* 去掉 Ant Tabs 默认下方空隙，让指示线贴白盒底边 */
+.view-tabs-bar :deep(.ant-tabs-nav) {
+  margin: 0 !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-nav::before) {
+  left: -16px !important;
+  right: -16px !important;
+  border-bottom: 1px solid var(--divider, #e5e6eb) !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-tab) {
+  padding: 14px 0 !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-tab-btn) {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 22px !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  font-weight: 700 !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-ink-bar) {
+  height: 3px !important;
+  bottom: 0 !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-content-holder) {
+  display: none !important;
+}
+
+.filter-card {
+  /* 由 .list-page > .filter-card 兜底；此处保留兼容非直子场景 */
+}
+
+.toolbar-row {
+  /* 由全局 .toolbar-row 白盒兜底 */
+}
+
+.summary-bar {
+  margin-bottom: 8px;
+  padding: 6px 12px;
+}
+
 .table-card {
-  background: #fff;
-  padding: 8px 12px 12px;
-  border-radius: 4px;
+  /* 由 .list-page > .table-card 兜底 */
 }
 
 .table-pagination {
@@ -1572,7 +1607,7 @@ watch(
 .batch-drawer-toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 10px;
 }
 

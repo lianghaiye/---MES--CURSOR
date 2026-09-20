@@ -414,7 +414,7 @@ function onFormSaved() {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .header-left {
@@ -434,7 +434,7 @@ function onFormSaved() {
     border: 1px solid #f0f0f0;
     border-radius: 8px;
     padding: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .section-title {
@@ -443,7 +443,7 @@ function onFormSaved() {
   }
 
   .overall-alert {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .wage-summary-wrap {

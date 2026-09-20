@@ -100,7 +100,7 @@ function handleDelete(record) {
     padding: 12px;
   }
   .toolbar-row {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
   .danger-link {
     color: #ff4d4f;

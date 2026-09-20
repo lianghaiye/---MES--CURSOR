@@ -114,7 +114,7 @@ function onAnchorClick(e, link) {
 .section-head {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 12px;
   flex-shrink: 0;
 }
@@ -133,7 +133,7 @@ function onAnchorClick(e, link) {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: stretch;
 }
 

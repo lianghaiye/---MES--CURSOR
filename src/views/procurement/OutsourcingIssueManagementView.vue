@@ -266,7 +266,7 @@ function truncate(text, max) {
   background: #fff;
   border-radius: 8px;
   padding: 12px 16px 4px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border: 1px solid #f0f0f0;
 }
 
@@ -284,7 +284,7 @@ function truncate(text, max) {
 }
 
 .table-toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .table-footer {

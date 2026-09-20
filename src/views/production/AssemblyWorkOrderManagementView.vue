@@ -77,29 +77,49 @@
               :options="workCenterOpts"
             />
           </a-form-item>
-          <template v-if="layoutMode === 'split'" #toolbar>
-            <a-button type="primary" size="small" @click="openCreate">
-              <PlusOutlined />
-              新增总装工单
-            </a-button>
-            <a-dropdown>
-              <a-button size="small">
-                批量操作
-                <DownOutlined />
-              </a-button>
-              <template #overlay>
-                <a-menu @click="onBatchMenu">
-                  <a-menu-item key="import">批量导入</a-menu-item>
-                  <a-menu-item key="export">批量导出</a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
-            <a-button class="batch-dispatch-btn" size="small" @click="handleBatchDispatch">
-              批量下发
-            </a-button>
-          </template>
         </ListFilterBar>
       </a-form>
+    </div>
+
+    <!-- 卡片视图：搜索下方独立操作条 -->
+    <div v-if="layoutMode === 'split'" class="split-action-card">
+      <a-space wrap :size="8" class="split-action-left">
+        <a-button type="primary" size="small" @click="openCreate">
+          <PlusOutlined />
+          新增总装工单
+        </a-button>
+        <a-dropdown>
+          <a-button size="small">
+            批量操作
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onBatchMenu">
+              <a-menu-item key="import">批量导入</a-menu-item>
+              <a-menu-item key="export">批量导出</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+        <a-button class="batch-dispatch-btn" size="small" @click="handleBatchDispatch">
+          批量下发
+        </a-button>
+      </a-space>
+      <div class="split-action-right">
+        <a-radio-group
+          :value="layoutMode"
+          button-style="solid"
+          class="layout-mode-switch"
+          @change="onLayoutModeChange"
+        >
+          <a-radio-button value="split">主从视图</a-radio-button>
+          <a-radio-button value="table">列表视图</a-radio-button>
+        </a-radio-group>
+        <a-tooltip title="刷新">
+          <a-button type="text" class="layout-toggle-btn" @click="handleSearch">
+            <ReloadOutlined />
+          </a-button>
+        </a-tooltip>
+      </div>
     </div>
 
     <!-- 主从布局 / 列表布局 -->
@@ -116,23 +136,6 @@
           <span v-if="selectedIds.length" class="selected-count"
             >已选 {{ selectedIds.length }}</span
           >
-          <div class="list-title-actions">
-            <a-radio-group
-              :value="layoutMode"
-              button-style="solid"
-              size="small"
-              class="layout-mode-switch"
-              @change="onLayoutModeChange"
-            >
-              <a-radio-button value="split">主从视图</a-radio-button>
-              <a-radio-button value="table">列表视图</a-radio-button>
-            </a-radio-group>
-            <a-tooltip title="刷新">
-              <a-button type="text" size="small" class="layout-toggle-btn" @click="handleSearch">
-                <ReloadOutlined />
-              </a-button>
-            </a-tooltip>
-          </div>
         </div>
         <div class="list-body">
           <div
@@ -150,17 +153,15 @@
             />
             <div class="card-content">
               <div class="card-head">
-                <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
-                <a-tag v-if="isScheduleIncomplete(wo)" color="processing" class="status-tag">
-                  未排完
-                </a-tag>
-                <a-tag
-                  v-if="convertSideLabelOf(wo)"
-                  :color="getWorkOrderConvertSideTagColor(convertSideLabelOf(wo))"
-                  class="status-tag"
-                >
-                  {{ convertSideLabelOf(wo) }}
-                </a-tag>
+                <div class="card-head-tags">
+                  <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
+                  <a-tag :color="scheduleStatusColor(wo)" class="status-tag">
+                    {{ scheduleStatusLabel(wo) }}
+                  </a-tag>
+                  <a-tag :color="urgencyTagColor(wo.urgency)" class="status-tag">
+                    {{ urgencyLabel(wo.urgency) }}
+                  </a-tag>
+                </div>
                 <a-dropdown :trigger="['click']">
                   <a-button type="text" size="small" class="more-btn" @click.stop>
                     <EllipsisOutlined />
@@ -197,29 +198,21 @@
                       >
                         转外协
                       </a-menu-item>
+                      <a-menu-item v-if="['已下发', '执行中'].includes(wo.status)" key="complete">
+                        标记已完成
+                      </a-menu-item>
                     </a-menu>
                   </template>
                 </a-dropdown>
               </div>
               <div class="card-code">{{ wo.code }}</div>
-              <div class="card-name">{{ wo.name }}</div>
-              <div class="card-meta">
-                <span>订单 {{ wo.sourceOrderNo || '-' }}</span>
-                <span class="meta-divider">·</span>
-                <span>数量 {{ formatScheduleProgress(wo) }}</span>
-                <template v-if="isScheduleIncomplete(wo)">
-                  <span class="meta-divider">·</span>
-                  <span>未排完</span>
-                </template>
-                <template v-if="convertSideLabelOf(wo)">
-                  <span class="meta-divider">·</span>
-                  <span>{{ convertSideLabelOf(wo) }}</span>
-                </template>
+              <div class="card-product">{{ formatCardProductLine(wo) }}</div>
+              <div class="card-meta">来源单号 {{ wo.sourceOrderNo || '—' }}</div>
+              <div class="card-schedule">
+                已排产 {{ scheduleQtyOf(wo) }} / 计划 {{ planQtyOf(wo) }}
               </div>
-              <div class="card-tags">
-                <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
-                  {{ urgencyLabel(wo.urgency) }}
-                </a-tag>
+              <div class="card-category">
+                <a-tag class="category-tag">{{ wo.orderCategory || '总装工单' }}</a-tag>
               </div>
             </div>
           </div>
@@ -395,18 +388,16 @@ import {
   canEditWorkOrder,
 } from '@/utils/workOrderDispatchHelpers'
 import {
-  formatScheduleProgress,
   isScheduleIncomplete,
   getActiveScheduleBatch,
+  getBatchesScheduledQty,
+  getWorkOrderPlanQty,
+  getRemainScheduleQty,
 } from '@/utils/workOrderScheduleBatch'
 import {
   ensureProcessOutsourceOrdersAfterDispatch,
   resolveProcessOpOutsource,
 } from '@/utils/workOrderProcessOutsource'
-import {
-  getWorkOrderConvertSideLabel,
-  getWorkOrderConvertSideTagColor,
-} from '@/utils/workOrderConvertOccupy'
 import { tipMessageIfScheduleOverSales } from '@/utils/scheduleOverSalesTip'
 import {
   WORK_ORDER_STATUSES,
@@ -606,10 +597,6 @@ function statusColor(status) {
   return workOrderStatusColor(status)
 }
 
-function convertSideLabelOf(wo) {
-  return getWorkOrderConvertSideLabel(wo)
-}
-
 function urgencyTagColor(urgency) {
   if (urgency === '紧急' || urgency === '加急') return 'error'
   return 'default'
@@ -618,6 +605,33 @@ function urgencyTagColor(urgency) {
 function urgencyLabel(urgency) {
   if (urgency === '紧急' || urgency === '加急') return '紧急'
   return '不紧急'
+}
+
+function scheduleQtyOf(wo) {
+  return getBatchesScheduledQty(wo)
+}
+
+function planQtyOf(wo) {
+  return getWorkOrderPlanQty(wo)
+}
+
+/** 排产状态：未排产 / 未排完 / 已排完 */
+function scheduleStatusLabel(wo) {
+  if (isScheduleIncomplete(wo)) return '未排完'
+  if (scheduleQtyOf(wo) <= 0) return '未排产'
+  if (getRemainScheduleQty(wo) <= 0) return '已排完'
+  return '未排产'
+}
+
+function scheduleStatusColor(wo) {
+  const label = scheduleStatusLabel(wo)
+  if (label === '未排完') return 'processing'
+  if (label === '已排完') return 'success'
+  return 'default'
+}
+
+function formatCardProductLine(wo) {
+  return [wo.productName || wo.name, wo.specModel, wo.material].filter(Boolean).join(' / ') || '—'
 }
 
 function selectOrder(id) {
@@ -1220,6 +1234,7 @@ async function onScheduleBatchSubmit(payload) {
 </script>
 
 <style lang="less" scoped>
+@import '@/styles/split-order-card.less';
 .work-order-page {
   margin: -12px;
   padding: 12px;
@@ -1236,7 +1251,7 @@ async function onScheduleBatchSubmit(payload) {
 }
 
 .filter-card {
-  padding: 8px 12px 6px;
+  padding: 12px 16px;
   margin-bottom: 8px;
 }
 
@@ -1333,9 +1348,9 @@ async function onScheduleBatchSubmit(payload) {
 }
 
 .list-card {
-  width: 22%;
-  min-width: 220px;
-  max-width: 268px;
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1345,53 +1360,25 @@ async function onScheduleBatchSubmit(payload) {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 10px 6px;
+    padding: 8px 12px 6px;
     border-bottom: 1px solid #f0f0f0;
-
-    .list-title {
-      font-weight: 600;
-      font-size: 14px;
-      flex: 1;
-    }
 
     .selected-count {
       font-size: 12px;
       color: #1677ff;
-    }
-
-    .list-title-actions {
       margin-left: auto;
-      display: inline-flex;
-      align-items: center;
-      flex-shrink: 0;
-      gap: 8px;
-
-      .layout-mode-switch {
-        display: inline-flex;
-        align-items: center;
-      }
-
-      .ant-radio-button-wrapper {
-        height: 28px;
-        line-height: 26px;
-        font-size: 13px;
-        padding-inline: 10px;
-      }
     }
 
-    .layout-toggle-btn {
-      color: rgba(0, 0, 0, 0.45);
-
-      &:hover {
-        color: #1677ff;
-      }
+    .list-title {
+      font-weight: 600;
+      font-size: 14px;
     }
   }
 
   .list-body {
     flex: 1;
     overflow-y: auto;
-    padding: 6px;
+    padding: 8px;
   }
 
   .list-pagination {
@@ -1405,36 +1392,18 @@ async function onScheduleBatchSubmit(payload) {
 .order-card {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 8px;
   border: 1px solid #e8eef8;
   border-radius: 6px;
-  padding: 6px 8px 6px 6px;
-  margin-bottom: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
   cursor: pointer;
-  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
   transition: all 0.2s;
-  border-left: 3px solid transparent;
-  box-sizing: border-box;
-
-  &:hover {
-    border-color: #91caff;
-    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.12);
-  }
-
-  &.active {
-    border-color: #1677ff;
-    border-left-color: #1677ff;
-    background: linear-gradient(180deg, #e6f4ff 0%, #f5faff 55%, #ffffff 100%);
-    box-shadow: 0 1px 6px rgba(22, 119, 255, 0.16);
-  }
-
-  &.checked {
-    border-color: #91caff;
-  }
+  .order-card-split-gradient();
 
   .card-checkbox {
     flex-shrink: 0;
-    margin-top: 1px;
+    margin-top: 2px;
   }
 
   .card-content {
@@ -1444,9 +1413,18 @@ async function onScheduleBatchSubmit(payload) {
 
   .card-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 4px;
+    gap: 4px;
+    margin-bottom: 6px;
+
+    .card-head-tags {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
 
     .status-tag {
       margin: 0;
@@ -1456,6 +1434,7 @@ async function onScheduleBatchSubmit(payload) {
     }
 
     .more-btn {
+      flex-shrink: 0;
       padding: 0 2px;
       height: 22px;
       color: rgba(0, 0, 0, 0.45);
@@ -1466,15 +1445,15 @@ async function onScheduleBatchSubmit(payload) {
     font-weight: 600;
     font-size: 13px;
     color: rgba(0, 0, 0, 0.88);
-    margin-bottom: 2px;
+    margin-bottom: 4px;
     line-height: 1.3;
   }
 
-  .card-name {
+  .card-product {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.65);
     margin-bottom: 4px;
-    line-height: 1.35;
+    line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -1482,23 +1461,31 @@ async function onScheduleBatchSubmit(payload) {
   }
 
   .card-meta {
-    font-size: 11px;
+    font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
-    line-height: 1.4;
-
-    .meta-divider {
-      margin: 0 4px;
-    }
+    line-height: 1.5;
+    margin-bottom: 4px;
   }
 
-  .card-tags {
-    margin-top: 4px;
+  .card-schedule {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.65);
+    line-height: 1.4;
+    margin-bottom: 6px;
+  }
 
-    .urgency-tag {
+  .card-category {
+    display: flex;
+    align-items: center;
+
+    .category-tag {
       margin: 0;
       font-size: 11px;
       line-height: 18px;
       padding-inline: 6px;
+      color: #1677ff;
+      background: #e6f4ff;
+      border-color: #91caff;
     }
   }
 }
@@ -1531,6 +1518,7 @@ async function onScheduleBatchSubmit(payload) {
 
   .list-card {
     width: 100%;
+    min-width: 0;
     max-width: none;
     max-height: 240px;
   }

@@ -305,7 +305,7 @@ watch(
 }
 .section-title {
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding-left: 8px;
   border-left: 3px solid #1677ff;
 }

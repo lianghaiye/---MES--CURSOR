@@ -33,6 +33,7 @@ import {
   updateMobileWageStatus,
   upsertMobileWageItemFromProcessReport,
 } from '@/utils/mobileLaborWagePush'
+import { persistJson, safeRemoveItem, safeSetItem } from '@/utils/safeStorage'
 
 function syncRecordToMobile(record) {
   if (!isPushedToMobile(record.pushStatus)) return
@@ -59,6 +60,20 @@ function syncRecordToMobile(record) {
   if (line) upsertMobileWageItemFromProcessReport(bundle, line)
 }
 
+function clearProcessReportStorage() {
+  safeRemoveItem(PROCESS_REPORT_STORAGE_KEY)
+  safeRemoveItem(PROCESS_REPORT_SEED_VERSION_KEY)
+  safeRemoveItem(PROCESS_REPORT_WO_LOG_KEY)
+  safeRemoveItem(PROCESS_REPORT_QUICK_LOG_KEY)
+}
+
+function persistSeedBundle(seed) {
+  persistJson(PROCESS_REPORT_STORAGE_KEY, seed)
+  safeSetItem(PROCESS_REPORT_SEED_VERSION_KEY, PROCESS_REPORT_SEED_VERSION)
+  persistJson(PROCESS_REPORT_WO_LOG_KEY, createProcessReportWoLogSeed())
+  persistJson(PROCESS_REPORT_QUICK_LOG_KEY, createProcessReportQuickLogSeed())
+}
+
 function shouldReseed() {
   return localStorage.getItem(PROCESS_REPORT_SEED_VERSION_KEY) !== PROCESS_REPORT_SEED_VERSION
 }
@@ -68,24 +83,20 @@ function loadRecords() {
     return loadRecordsInner()
   } catch (err) {
     console.error('[process-report] load records failed, reseeding', err)
-    localStorage.removeItem(PROCESS_REPORT_STORAGE_KEY)
-    localStorage.removeItem(PROCESS_REPORT_SEED_VERSION_KEY)
-    localStorage.removeItem(PROCESS_REPORT_WO_LOG_KEY)
-    localStorage.removeItem(PROCESS_REPORT_QUICK_LOG_KEY)
-    return loadRecordsInner()
+    clearProcessReportStorage()
+    try {
+      return loadRecordsInner()
+    } catch (err2) {
+      console.error('[process-report] reseed failed, using in-memory seed', err2)
+      return createProcessReportSeed()
+    }
   }
 }
 
 function loadRecordsInner() {
   if (shouldReseed()) {
     const seed = createProcessReportSeed()
-    localStorage.setItem(PROCESS_REPORT_STORAGE_KEY, JSON.stringify(seed))
-    localStorage.setItem(PROCESS_REPORT_SEED_VERSION_KEY, PROCESS_REPORT_SEED_VERSION)
-    localStorage.setItem(PROCESS_REPORT_WO_LOG_KEY, JSON.stringify(createProcessReportWoLogSeed()))
-    localStorage.setItem(
-      PROCESS_REPORT_QUICK_LOG_KEY,
-      JSON.stringify(createProcessReportQuickLogSeed()),
-    )
+    persistSeedBundle(seed)
     return seed
   }
   try {
@@ -100,13 +111,7 @@ function loadRecordsInner() {
     /* ignore */
   }
   const seed = createProcessReportSeed()
-  localStorage.setItem(PROCESS_REPORT_STORAGE_KEY, JSON.stringify(seed))
-  localStorage.setItem(PROCESS_REPORT_SEED_VERSION_KEY, PROCESS_REPORT_SEED_VERSION)
-  localStorage.setItem(PROCESS_REPORT_WO_LOG_KEY, JSON.stringify(createProcessReportWoLogSeed()))
-  localStorage.setItem(
-    PROCESS_REPORT_QUICK_LOG_KEY,
-    JSON.stringify(createProcessReportQuickLogSeed()),
-  )
+  persistSeedBundle(seed)
   return seed
 }
 
@@ -121,7 +126,7 @@ function loadQuickLogs() {
 }
 
 function saveQuickLogs(map) {
-  localStorage.setItem(PROCESS_REPORT_QUICK_LOG_KEY, JSON.stringify(map))
+  persistJson(PROCESS_REPORT_QUICK_LOG_KEY, map)
 }
 
 function loadWoLogs() {
@@ -135,11 +140,11 @@ function loadWoLogs() {
 }
 
 function saveWoLogs(map) {
-  localStorage.setItem(PROCESS_REPORT_WO_LOG_KEY, JSON.stringify(map))
+  persistJson(PROCESS_REPORT_WO_LOG_KEY, map)
 }
 
 function saveRecords(records) {
-  localStorage.setItem(PROCESS_REPORT_STORAGE_KEY, JSON.stringify(records))
+  persistJson(PROCESS_REPORT_STORAGE_KEY, records)
 }
 
 export const processReportState = reactive({
@@ -152,10 +157,7 @@ export function reloadProcessReports() {
 
 /** 重置工序报工本地演示数据（localStorage 损坏或页面空白时可调用） */
 export function resetProcessReportMockData() {
-  localStorage.removeItem(PROCESS_REPORT_STORAGE_KEY)
-  localStorage.removeItem(PROCESS_REPORT_SEED_VERSION_KEY)
-  localStorage.removeItem(PROCESS_REPORT_WO_LOG_KEY)
-  localStorage.removeItem(PROCESS_REPORT_QUICK_LOG_KEY)
+  clearProcessReportStorage()
   processReportState.records = loadRecords()
 }
 

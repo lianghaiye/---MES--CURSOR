@@ -36,7 +36,7 @@ export function createStocktakeLine(partial = {}) {
     bookQty: 0,
     actualQty: 0,
     diffQty: 0,
-    lineStatus: STOCKTAKE_STATUS.PENDING_APPROVAL,
+    lineStatus: STOCKTAKE_STATUS.DRAFT,
     refuseReason: '',
     linkedOutboundId: '',
     linkedInboundId: '',
@@ -51,7 +51,7 @@ export function createStocktakeOrder(partial = {}) {
   return {
     id: '',
     docNo: '',
-    status: STOCKTAKE_STATUS.PENDING_APPROVAL,
+    status: STOCKTAKE_STATUS.DRAFT,
     sourceChannel: STOCKTAKE_SOURCE.MANUAL,
     warehouse: '',
     stocktakeType: STOCKTAKE_TYPE.OTHER,
@@ -75,6 +75,7 @@ export function createStocktakeOrder(partial = {}) {
     linkedOutboundDocNos: [],
     linkedInboundDocNos: [],
     lineItems: [],
+    operationLogs: [],
     ...partial,
   }
 }
@@ -95,7 +96,7 @@ function withDiff(partial) {
 }
 
 /**
- * 盘点单演示种子：待审核 / 审核通过(待过账) / 已过账 / 已拒绝 / 过账失败
+ * 盘点单演示种子：待提交 / 待审核 / 审核通过(待过账) / 过账成功 / 已拒绝 / 过账失败
  */
 export function cloneStocktakeSeedOrders() {
   const today = dayjs().format('YYYY-MM-DD')
@@ -104,6 +105,31 @@ export function cloneStocktakeSeedOrders() {
   const threeDaysAgo = dayjs().subtract(3, 'day').format('YYYY-MM-DD')
 
   return [
+    createStocktakeOrder({
+      id: 'st-seed-draft',
+      docNo: 'PD20260919000',
+      status: STOCKTAKE_STATUS.DRAFT,
+      stocktakeType: STOCKTAKE_TYPE.OTHER,
+      sourceChannel: STOCKTAKE_SOURCE.MANUAL,
+      warehouse: '原料仓',
+      stocktakeDate: today,
+      applicant: 'admin1',
+      creator: '管理员',
+      createdAt: `${today} 08:20:00`,
+      remark: '演示：待提交，可编辑后提交审核',
+      lineItems: [
+        withDiff({
+          id: 'st-seed-draft-l1',
+          itemCode: SIMPLE_UNIT_DEMO_CODE,
+          itemName: SIMPLE_UNIT_DEMO_NAME,
+          unit: '件',
+          bookQty: 20,
+          actualQty: 20,
+          dedicated: false,
+        }),
+      ],
+    }),
+
     createStocktakeOrder({
       id: 'st-seed-pending',
       docNo: 'PD20260918001',
@@ -115,6 +141,7 @@ export function cloneStocktakeSeedOrders() {
       applicant: 'admin1',
       creator: '管理员',
       createdAt: `${today} 09:30:00`,
+      submittedAt: `${today} 09:35:00`,
       remark: '演示：原料仓期末盘点，待审核',
       lineItems: [
         withDiff({
@@ -127,6 +154,7 @@ export function cloneStocktakeSeedOrders() {
           bookQty: 50,
           actualQty: 48,
           dedicated: false,
+          lineStatus: STOCKTAKE_STATUS.PENDING_APPROVAL,
         }),
         withDiff({
           id: 'st-seed-pending-l2',
@@ -138,6 +166,7 @@ export function cloneStocktakeSeedOrders() {
           bookQty: 48,
           actualQty: 52,
           dedicated: false,
+          lineStatus: STOCKTAKE_STATUS.PENDING_APPROVAL,
         }),
         withDiff({
           id: 'st-seed-pending-l3',
@@ -149,6 +178,7 @@ export function cloneStocktakeSeedOrders() {
           bookQty: 200,
           actualQty: 200,
           dedicated: false,
+          lineStatus: STOCKTAKE_STATUS.PENDING_APPROVAL,
         }),
       ],
     }),
@@ -184,7 +214,7 @@ export function cloneStocktakeSeedOrders() {
     createStocktakeOrder({
       id: 'st-seed-posted',
       docNo: 'PD20260916003',
-      status: STOCKTAKE_STATUS.POSTED,
+      status: STOCKTAKE_STATUS.APPROVED,
       postingStatus: STOCKTAKE_POSTING.SUCCESS,
       stocktakeType: STOCKTAKE_TYPE.CLOSING,
       sourceChannel: STOCKTAKE_SOURCE.MANUAL,
@@ -198,7 +228,7 @@ export function cloneStocktakeSeedOrders() {
       confirmer: '李四',
       confirmedAt: `${twoDaysAgo} 17:20:00`,
       postedAt: `${twoDaysAgo} 17:20:00`,
-      remark: '演示：已过账',
+      remark: '演示：审核通过且过账成功',
       linkedOutboundIds: ['ob-st-seed-done'],
       linkedInboundIds: ['ib-st-seed-done'],
       linkedOutboundDocNos: ['CK202609160P03'],
@@ -211,7 +241,7 @@ export function cloneStocktakeSeedOrders() {
           unit: '件',
           bookQty: 10,
           actualQty: 12,
-          lineStatus: STOCKTAKE_STATUS.POSTED,
+          lineStatus: STOCKTAKE_STATUS.APPROVED,
           dedicated: false,
           linkedInboundId: 'ib-st-seed-done',
           linkedInboundDocNo: 'RK202609160P03',
@@ -223,7 +253,7 @@ export function cloneStocktakeSeedOrders() {
           unit: 'kg',
           bookQty: 80,
           actualQty: 75,
-          lineStatus: STOCKTAKE_STATUS.POSTED,
+          lineStatus: STOCKTAKE_STATUS.APPROVED,
           dedicated: false,
           linkedOutboundId: 'ob-st-seed-done',
           linkedOutboundDocNo: 'CK202609160P03',

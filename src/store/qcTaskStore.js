@@ -484,6 +484,12 @@ function syncSourceReceiptAfterQcSubmit(task) {
   }
   if (task.bizScope === '来料质检' || task.sourceType === 'purchase_receipt' || !task.bizScope) {
     updatePurchaseReceipt(task.sourceDocId, patch)
+    try {
+      const { releaseReceiptQtyByQcResult } = require('@/utils/purchaseReceiptSettle')
+      releaseReceiptQtyByQcResult(task.sourceDocId, task)
+    } catch {
+      /* ignore */
+    }
   }
 }
 

@@ -253,7 +253,7 @@ function goBack() {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     padding: 16px;
     background: #fff;
     border-radius: 6px;
@@ -277,7 +277,7 @@ function goBack() {
   }
 
   .detail-tabs {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .section-card {

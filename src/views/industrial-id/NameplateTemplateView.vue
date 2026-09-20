@@ -1526,7 +1526,7 @@ export default {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 24px;
   border-top: 1px solid #e5e7eb;
 }
@@ -1779,7 +1779,7 @@ export default {
 /* ---- 产品选择弹窗 ---- */
 .filter-bar {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: flex-end;
   margin-bottom: 16px;
   flex-wrap: wrap;
@@ -1801,7 +1801,7 @@ export default {
 .product-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 8px;
   max-height: 360px;
   overflow-y: auto;
 }
@@ -2001,7 +2001,7 @@ export default {
 .preview-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 .preview-radio,
 .preview-check {

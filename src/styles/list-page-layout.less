@@ -1,0 +1,63 @@
+/**
+ * 列表页壳层：对齐销售订单列表（SalesOrderView）
+ * 用法：根节点加 class="list-page"（可与业务页 class 并存）
+ * 结构：.filter-card → .toolbar-row → .summary-bar（可选）→ .table-card
+ * 勿再外包一层 .list-panel 白盒（会与 toolbar-row / table-card 叠层）
+ */
+.list-page {
+  margin: -12px;
+  padding: 12px;
+  background: #f5f6f8;
+  min-height: calc(100vh - 112px);
+  box-sizing: border-box;
+}
+
+.list-page .filter-card {
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.list-page .table-card {
+  padding: 8px 12px 12px;
+  margin-bottom: 0;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.list-page .table-card .ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 500;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.list-page .table-card .ant-table-tbody > tr > td {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.list-page .summary-bar {
+  margin-bottom: 8px;
+  padding: 6px 12px;
+}
+
+.list-page .summary-bar .ant-alert-message {
+  font-size: 13px;
+}
+
+.list-page .table-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.list-page .link-code {
+  color: #1677ff;
+  cursor: pointer;
+}

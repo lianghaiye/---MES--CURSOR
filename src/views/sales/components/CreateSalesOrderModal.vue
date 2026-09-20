@@ -672,12 +672,9 @@
           </div>
         </div>
 
-        <div class="attachment-section">
-          <div class="attachment-section-header">
-            <span class="section-title">图片文档信息</span>
-          </div>
-          <a-divider class="section-divider" />
-          <a-form layout="inline" class="attachment-form horizontal-form">
+        <div class="section-block attachment-section">
+          <div class="section-title">图片文档信息</div>
+          <a-form layout="horizontal" class="attachment-form horizontal-form">
             <a-form-item label="文件上传">
               <div class="upload-field">
                 <a-upload v-model:file-list="fileList" :before-upload="beforeUpload" multiple>
@@ -1870,7 +1867,7 @@ function handleSave() {
   .price-summary-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     padding: 10px 16px;
     background: #fff;
     cursor: pointer;
@@ -2145,30 +2142,14 @@ function handleSave() {
 }
 
 .attachment-section {
-  margin: 0;
-  border: 1px solid #e5e6eb;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-
-  .attachment-section-header {
-    padding: 10px 16px 0;
-
-    .section-title {
-      font-weight: 600;
-      font-size: 14px;
-      color: #1f1f1f;
-    }
-  }
-
-  .section-divider {
-    margin: 10px 0 0;
+  /* 卡片外观由 FormCreateShell .section-block 统一 */
+  .section-title {
+    margin-bottom: 12px;
   }
 }
 
 .attachment-form {
-  padding: 12px;
+  width: 100%;
 
   :deep(.ant-form-item) {
     width: 100%;
@@ -2212,24 +2193,24 @@ function handleSave() {
     color: rgba(0, 0, 0, 0.45);
     line-height: 1.5;
   }
+}
 
-  .readonly-cell {
-    font-size: 13px;
-    color: rgba(0, 0, 0, 0.65);
-  }
+.readonly-cell {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
 
-  .variant-field-link {
-    display: inline-block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #1677ff;
-    cursor: pointer;
+.variant-field-link {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1677ff;
+  cursor: pointer;
 
-    &:hover {
-      color: #4096ff;
-    }
+  &:hover {
+    color: #4096ff;
   }
 }
 </style>

@@ -584,7 +584,7 @@ function judgeHint(field) {
 .inspect-fields-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 @media (max-width: 1280px) {

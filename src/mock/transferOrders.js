@@ -61,6 +61,7 @@ export function createTransferOrder(partial = {}) {
     linkedOutboundDocNos: [],
     linkedInboundDocNos: [],
     lineItems: [],
+    operationLogs: [],
     ...partial,
   }
 }

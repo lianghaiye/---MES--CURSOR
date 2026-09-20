@@ -174,7 +174,10 @@ const innerStyle = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
 }
@@ -236,8 +239,11 @@ const innerStyle = computed(() => {
 .page-header.is-detail {
   border: 1px solid #e8eef8;
   border-radius: 8px;
-  margin-bottom: 12px;
-  padding: 12px 16px;
+  margin-bottom: 0;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   position: static;
   background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
 
@@ -256,7 +262,7 @@ const innerStyle = computed(() => {
 .tab-body {
   flex: 1;
   min-height: 0;
-  padding: 12px 0 16px;
+  padding: 8px 0 16px;
   overflow: auto;
 }
 
@@ -275,14 +281,17 @@ const innerStyle = computed(() => {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
   border: 1px solid #e8eef8;
   border-radius: 8px;
@@ -330,12 +339,12 @@ const innerStyle = computed(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 
   :deep(.form-layout) {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   :deep(.section-block) {
@@ -350,7 +359,7 @@ const innerStyle = computed(() => {
     .section-title {
       font-size: 14px;
       font-weight: 600;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       color: #1f1f1f;
     }
 

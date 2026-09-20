@@ -13,16 +13,33 @@
         :tab="tab.title"
         :closable="tab.closable"
       />
+      <template #rightExtra>
+        <a-dropdown :trigger="['click']" placement="bottomRight">
+          <a class="tabs-ops-trigger" @click.prevent>
+            <EllipsisOutlined />
+          </a>
+          <template #overlay>
+            <a-menu @click="onOpsMenuClick">
+              <a-menu-item key="close-all">关闭所有</a-menu-item>
+              <a-menu-item key="close-others">关闭其他</a-menu-item>
+              <a-menu-item key="clear-cache">清除缓存</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </template>
     </a-tabs>
   </div>
 </template>
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { message, Modal } from 'ant-design-vue'
+import { EllipsisOutlined } from '@ant-design/icons-vue'
 import { useTabs } from '@/composables/useTabs'
+import { clearAllCreatePageDrafts } from '@/utils/createPageDraft'
 
 const router = useRouter()
-const { tabState, closeTab, setActive, getTabNavigateTo } = useTabs()
+const { tabState, closeTab, closeAllTabs, closeOtherTabs, setActive, getTabNavigateTo } = useTabs()
 
 function onTabChange(key) {
   setActive(key)
@@ -37,6 +54,32 @@ function onTabEdit(targetKey, action) {
     if (closingActive) {
       router.push(getTabNavigateTo(tabState.activePath))
     }
+  }
+}
+
+function onOpsMenuClick({ key }) {
+  if (key === 'close-all') {
+    closeAllTabs()
+    router.push(getTabNavigateTo(tabState.activePath))
+    return
+  }
+  if (key === 'close-others') {
+    closeOtherTabs()
+    router.push(getTabNavigateTo(tabState.activePath))
+    return
+  }
+  if (key === 'clear-cache') {
+    Modal.confirm({
+      title: '清除缓存',
+      content: '将清除页面草稿等临时缓存并刷新，是否继续？',
+      okText: '清除并刷新',
+      cancelText: '取消',
+      onOk: () => {
+        clearAllCreatePageDrafts()
+        message.success('缓存已清除，正在刷新…')
+        window.location.reload()
+      },
+    })
   }
 }
 </script>
@@ -77,6 +120,44 @@ function onTabEdit(targetKey, action) {
     display: flex;
     align-items: center;
     gap: 4px;
+  }
+
+  :deep(.ant-tabs-extra-content) {
+    display: flex;
+    align-items: center;
+    margin-left: 8px;
+    flex-shrink: 0;
+  }
+
+  :deep(.ant-tabs-nav-operations) {
+    .ant-tabs-nav-more {
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+  }
+
+  .tabs-ops-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid #e5e6eb;
+    background: #f5f7fa;
+    color: rgba(0, 0, 0, 0.65);
+    font-size: 18px;
+    line-height: 1;
+    transition:
+      background 0.2s,
+      color 0.2s,
+      border-color 0.2s;
+
+    &:hover {
+      background: #e6f4ff;
+      border-color: #91caff;
+      color: #1677ff;
+    }
   }
 
   :deep(.ant-tabs-tab) {
@@ -138,13 +219,6 @@ function onTabEdit(targetKey, action) {
 
   :deep(.ant-tabs-ink-bar) {
     display: none !important;
-  }
-
-  :deep(.ant-tabs-nav-operations) {
-    .ant-tabs-nav-more {
-      padding: 4px 8px;
-      border-radius: 6px;
-    }
   }
 
   :deep(.ant-tabs-content-holder) {

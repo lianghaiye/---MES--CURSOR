@@ -153,6 +153,15 @@ export const TRANSFER_REQUIRE_INBOUND_CONFIRM_DESCRIPTION =
   '自动：调拨出库确认后系统自动完成入库，无需入库方再签收。'
 
 /**
+ * 盘点：审核通过后是否自动生成盘盈盘亏并过账
+ * - true：审核通过后立即过账
+ * - false：审核通过后停留待过账，需手动点「生成盘盈盘亏」
+ */
+export const STOCKTAKE_AUTO_POST_ON_APPROVE_DESCRIPTION =
+  '自动：盘点单审核通过后立即生成盘盈入库 / 盘亏出库并入账；失败则仍保持审核通过并标记过账失败，可手工重试。' +
+  '手动：审核通过后需在列表或详情点击「生成盘盈盘亏」才会过账。'
+
+/**
  * 下料结算相关发料策略（仅作用于勾选「需要下料结算」能力的物料场景；普通料不受本项影响）
  * 业务口径：确认出库一律按出库单数量扣库存；本项只区分发料后余料是否还要走下料结算回库。
  * - partial：无需下料结算（余料留线边仓等，不再回库结算）
@@ -552,6 +561,12 @@ export const FUNCTION_PARAM_ROWS = [
     description: TRANSFER_REQUIRE_INBOUND_CONFIRM_DESCRIPTION,
   },
   {
+    key: 'stocktakeAutoPostOnApprove',
+    category: 'inventory',
+    scenario: '盘点审核通过后过账',
+    description: STOCKTAKE_AUTO_POST_ON_APPROVE_DESCRIPTION,
+  },
+  {
     key: 'dualUnitIssueStrategy',
     category: 'inventory',
     scenario: '是否需要下料结算',
@@ -677,6 +692,26 @@ function normalizeTransferRequireInboundConfirm(value, legacyFallback) {
   return true
 }
 
+/** 兼容旧版盘点页工具栏开关（i_doms_stocktake_settings） */
+function readLegacyStocktakeAutoPostOnApprove() {
+  try {
+    const raw = localStorage.getItem('i_doms_stocktake_settings')
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw)
+    const v = parsed?.settings?.autoPostOnApprove
+    if (typeof v === 'boolean') return v
+  } catch {
+    /* ignore */
+  }
+  return undefined
+}
+
+function normalizeStocktakeAutoPostOnApprove(value, legacyFallback) {
+  if (typeof value === 'boolean') return value
+  if (typeof legacyFallback === 'boolean') return legacyFallback
+  return true
+}
+
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -707,6 +742,10 @@ function loadFromStorage() {
           transferRequireInboundConfirm: normalizeTransferRequireInboundConfirm(
             parsed.transferRequireInboundConfirm,
             legacyTransferConfirm,
+          ),
+          stocktakeAutoPostOnApprove: normalizeStocktakeAutoPostOnApprove(
+            parsed.stocktakeAutoPostOnApprove,
+            readLegacyStocktakeAutoPostOnApprove(),
           ),
           dualUnitIssueStrategy: normalizeDualUnitIssueStrategy(parsed.dualUnitIssueStrategy),
           blankSizeAssistTools,
@@ -740,6 +779,10 @@ export const functionParamState = reactive({
     transferRequireInboundConfirm: normalizeTransferRequireInboundConfirm(
       undefined,
       readLegacyTransferRequireInboundConfirm(),
+    ),
+    stocktakeAutoPostOnApprove: normalizeStocktakeAutoPostOnApprove(
+      undefined,
+      readLegacyStocktakeAutoPostOnApprove(),
     ),
     dualUnitIssueStrategy: DUAL_UNIT_ISSUE_STRATEGIES.PARTIAL,
     blankSizeAssistTools: createDefaultBlankSizeAssistTools(),
@@ -906,6 +949,16 @@ export function isTransferRequireInboundConfirm() {
 
 export function setTransferRequireInboundConfirm(value) {
   functionParamState.params.transferRequireInboundConfirm = Boolean(value)
+  return { ok: true }
+}
+
+/** 盘点审核通过后是否自动过账（默认自动） */
+export function isStocktakeAutoPostOnApprove() {
+  return normalizeStocktakeAutoPostOnApprove(functionParamState.params.stocktakeAutoPostOnApprove)
+}
+
+export function setStocktakeAutoPostOnApprove(value) {
+  functionParamState.params.stocktakeAutoPostOnApprove = Boolean(value)
   return { ok: true }
 }
 

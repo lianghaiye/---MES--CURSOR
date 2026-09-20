@@ -299,9 +299,6 @@
                 <a-button type="link" size="small" @click="openPriceChangeForOrder(record)">{{
                   rowPriceChangeLabel(record)
                 }}</a-button>
-                <a-button type="link" size="small" @click="openChangeDeliveryModeForOrder(record)"
-                  >变更交付方式</a-button
-                >
               </template>
             </a-space>
             <span v-else class="action-disabled">-</span>
@@ -965,7 +962,7 @@ function confirmDelete(record) {
 
 .filter-card {
   padding: 12px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .horizontal-form {

@@ -2390,9 +2390,9 @@ function handleSaveAndMaintainBom() {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-/* 名称/能力外白盒 与 Tab 白盒间距 12px */
+/* 名称/能力外白盒 与 Tab 白盒间距：由 FormCreateShell gap:8px 承担，勿再叠加 margin */
 .master-form-header-card {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .entity-name-header {
@@ -2478,7 +2478,7 @@ function handleSaveAndMaintainBom() {
 }
 
 .entity-capability-panel {
-  margin-top: 12px;
+  margin-top: 8px;
   background: #f0f5ff;
 }
 

@@ -8,44 +8,43 @@
     class="sales-order-select-modal"
     @cancel="handleCancel"
   >
-    <a-form layout="inline" class="filter-form">
-      <a-form-item label="销售订单号">
-        <a-input
-          v-model:value="filters.orderNo"
-          allow-clear
-          size="small"
-          placeholder="请输入销售订单号"
-          style="width: 160px"
-          @press-enter="handleSearch"
-        />
-      </a-form-item>
-      <a-form-item label="客户名称">
-        <a-input
-          v-model:value="filters.customerName"
-          allow-clear
-          size="small"
-          placeholder="请输入客户名称"
-          style="width: 140px"
-          @press-enter="handleSearch"
-        />
-      </a-form-item>
-      <a-form-item label="业务员">
-        <a-input
-          v-model:value="filters.salesperson"
-          allow-clear
-          size="small"
-          placeholder="请输入业务员"
-          style="width: 120px"
-          @press-enter="handleSearch"
-        />
-      </a-form-item>
-      <a-form-item>
-        <a-space :size="8">
-          <a-button type="primary" size="small" @click="handleSearch">搜索</a-button>
-          <a-button size="small" @click="handleReset">重置</a-button>
-        </a-space>
-      </a-form-item>
-    </a-form>
+    <div class="filter-card">
+      <a-form layout="inline" class="picker-filter-form">
+        <a-form-item label="销售订单号">
+          <a-input
+            v-model:value="filters.orderNo"
+            allow-clear
+            size="small"
+            placeholder="请输入销售订单号"
+            @press-enter="handleSearch"
+          />
+        </a-form-item>
+        <a-form-item label="客户名称">
+          <a-input
+            v-model:value="filters.customerName"
+            allow-clear
+            size="small"
+            placeholder="请输入客户名称"
+            @press-enter="handleSearch"
+          />
+        </a-form-item>
+        <a-form-item label="业务员">
+          <a-input
+            v-model:value="filters.salesperson"
+            allow-clear
+            size="small"
+            placeholder="请输入业务员"
+            @press-enter="handleSearch"
+          />
+        </a-form-item>
+        <a-form-item class="filter-actions-item">
+          <a-space :size="8">
+            <a-button type="primary" size="small" @click="handleSearch">搜索</a-button>
+            <a-button size="small" @click="handleReset">重置</a-button>
+          </a-space>
+        </a-form-item>
+      </a-form>
+    </div>
 
     <div class="picker-body">
       <div class="table-panel">
@@ -233,11 +232,64 @@ export default { name: 'SalesOrderSelectModal' }
 </script>
 
 <style lang="less" scoped>
-.filter-form {
+.filter-card {
   margin-bottom: 12px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.picker-filter-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  width: 100%;
 
   :deep(.ant-form-item) {
-    margin-bottom: 8px;
+    margin-bottom: 0;
+    margin-inline-end: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label) {
+    flex: 0 0 auto;
+    padding: 0;
+
+    > label {
+      height: 24px;
+      line-height: 24px;
+      font-size: 13px;
+      white-space: nowrap;
+
+      &::after {
+        margin-inline: 2px 8px;
+      }
+    }
+  }
+
+  :deep(.ant-form-item-control) {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  :deep(.ant-input),
+  :deep(.ant-input-affix-wrapper) {
+    width: 200px;
+  }
+
+  :deep(.filter-actions-item) {
+    margin-left: auto;
+
+    .ant-form-item-label {
+      display: none;
+    }
   }
 }
 

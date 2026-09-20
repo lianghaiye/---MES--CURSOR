@@ -536,7 +536,7 @@ function onBatchMenu({ key }) {
 
 .filter-card {
   padding: 12px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .selection-bar {
@@ -544,7 +544,7 @@ function onBatchMenu({ key }) {
 }
 
 .toolbar-row {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .table-card {

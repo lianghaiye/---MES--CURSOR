@@ -148,6 +148,14 @@
               >
                 草稿
               </a-button>
+              <a-button
+                v-if="canApproveRow(record)"
+                type="link"
+                size="small"
+                @click="handleApproveRow(record)"
+              >
+                审核
+              </a-button>
             </a-space>
           </template>
           <template v-else>
@@ -299,13 +307,21 @@ function handleReset() {
 }
 
 function canStartDesign(record) {
-  return record.status === DESIGN_TASK_STATUS.PENDING && canOpenEbomDesign(record)
+  if (!canOpenEbomDesign(record)) return false
+  if (record.status === DESIGN_TASK_STATUS.PENDING) return true
+  // 已驳回且尚无草稿时，重新进入设计
+  return record.status === DESIGN_TASK_STATUS.REJECTED && !record.hasEbomDraft
 }
 
 function canOpenDraft(record) {
+  if (!canOpenEbomDesign(record) || !record.hasEbomDraft) return false
   return (
-    record.hasEbomDraft && canOpenEbomDesign(record) && record.status !== DESIGN_TASK_STATUS.PENDING
+    record.status === DESIGN_TASK_STATUS.DESIGNING || record.status === DESIGN_TASK_STATUS.REJECTED
   )
+}
+
+function canApproveRow(record) {
+  return record.status === DESIGN_TASK_STATUS.PENDING_AUDIT
 }
 
 function openDetail(record) {
@@ -326,14 +342,20 @@ function openEbomDesign(record) {
   router.push(resolved)
 }
 
-function handleApprove() {
-  if (!selectedRowKeys.value.length) {
+function confirmApprove(ids) {
+  const selectedTasks = designTaskState.tasks.filter((t) => ids.includes(t.id))
+  if (!selectedTasks.length) {
     message.warning('请先选择待审核的设计任务')
     return
   }
-  const selectedTasks = designTaskState.tasks.filter((t) => selectedRowKeys.value.includes(t.id))
-  const canPublishAny = selectedTasks.some((t) => designTaskCanPublishProductBom(t))
+  const pendingOnly = selectedTasks.filter((t) => t.status === DESIGN_TASK_STATUS.PENDING_AUDIT)
+  if (!pendingOnly.length) {
+    message.warning('仅「待审核」状态的设计任务可审核')
+    return
+  }
+  const canPublishAny = pendingOnly.some((t) => designTaskCanPublishProductBom(t))
   const publishProductBom = ref(true)
+  const idsToApprove = pendingOnly.map((t) => t.id)
 
   Modal.confirm({
     title: '审核设计任务',
@@ -342,7 +364,7 @@ function handleApprove() {
         h(
           'p',
           { style: 'margin: 0 0 8px' },
-          `确认审核通过已选的 ${selectedRowKeys.value.length} 条设计任务？审核通过后将更新或生成生产计划。`,
+          `确认审核通过已选的 ${idsToApprove.length} 条设计任务？审核通过后将更新或生成生产计划。`,
         ),
         canPublishAny
           ? h(
@@ -360,16 +382,28 @@ function handleApprove() {
     okText: '通过',
     cancelText: '取消',
     onOk: () => {
-      const results = approveDesignTasks(selectedRowKeys.value, 'admin1', {
+      const results = approveDesignTasks(idsToApprove, 'admin1', {
         publishProductBom: canPublishAny && publishProductBom.value,
       })
       const ok = results.filter((r) => r.ok)
       const fail = results.filter((r) => !r.ok)
       ok.forEach((r) => message.success(r.message))
       fail.forEach((r) => message.warning(r.message))
-      selectedRowKeys.value = []
+      selectedRowKeys.value = selectedRowKeys.value.filter((id) => !idsToApprove.includes(id))
     },
   })
+}
+
+function handleApprove() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择待审核的设计任务')
+    return
+  }
+  confirmApprove([...selectedRowKeys.value])
+}
+
+function handleApproveRow(record) {
+  confirmApprove([record.id])
 }
 
 function handleWithdraw() {
@@ -404,11 +438,11 @@ function handleWithdraw() {
 
 .filter-card {
   padding: 12px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .toolbar-row {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .table-card {

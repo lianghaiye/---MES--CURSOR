@@ -2,170 +2,202 @@
   <div class="process-report-detail-page">
     <a-spin :spinning="loading">
       <template v-if="bundle">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="page-title">【{{ bundle.materialName }}】</span>
-            <a-tag :color="statusColor(bundle.taskStatus)">{{ bundle.taskStatus }}</a-tag>
-            <a-tag color="blue">快速报工</a-tag>
-          </div>
-          <a-space>
-            <a-button size="small" @click="reload">刷新</a-button>
-            <a-button size="small" @click="handleBack">返回列表</a-button>
-          </a-space>
-        </div>
-
-        <DetailSectionCard title="基础信息">
-          <a-descriptions bordered size="small" :column="3">
-            <a-descriptions-item label="物品编码">{{ bundle.materialCode }}</a-descriptions-item>
-            <a-descriptions-item label="物品名称">{{ bundle.materialName }}</a-descriptions-item>
-            <a-descriptions-item label="规格型号">{{ bundle.specModel }}</a-descriptions-item>
-            <a-descriptions-item label="工作中心">{{ bundle.workCenter }}</a-descriptions-item>
-            <a-descriptions-item label="负责人">{{ bundle.owner }}</a-descriptions-item>
-            <a-descriptions-item label="工艺路线">{{
-              bundle.processRouteName
-            }}</a-descriptions-item>
-            <a-descriptions-item label="EBOM" :span="3">{{ bundle.ebomLabel }}</a-descriptions-item>
-          </a-descriptions>
-        </DetailSectionCard>
-
-        <div class="section-card">
-          <div class="detail-toolbar">
-            <a-radio-group v-model:value="activeTab" button-style="solid" size="small">
-              <a-radio-button value="report">报工详情</a-radio-button>
-              <a-radio-button value="log">操作日志</a-radio-button>
-            </a-radio-group>
-            <a-space v-if="activeTab === 'report'">
-              <a-button
-                v-if="manualPushMode"
-                size="small"
-                :disabled="!selectedPushableIds.length"
-                @click="handleBatchPush"
-              >
-                批量推送
-              </a-button>
-              <a-button
-                type="primary"
-                size="small"
-                :disabled="!selectedAuditableIds.length"
-                @click="handleBatchApprove"
-              >
-                批量审核
-              </a-button>
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">【{{ bundle.materialName }}】</span>
+              <a-tag :color="statusColor(bundle.taskStatus)">{{ bundle.taskStatus }}</a-tag>
+              <a-tag color="blue">快速报工</a-tag>
+            </div>
+            <a-space :size="8">
+              <a-button size="small" @click="reload">刷新</a-button>
+              <a-button size="small" @click="handleBack">返回列表</a-button>
             </a-space>
           </div>
 
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="activeTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="report" tab="报工详情" />
+              <a-tab-pane key="log" tab="操作日志" />
+            </a-tabs>
+          </div>
+        </div>
+
+        <div class="tab-body">
           <template v-if="activeTab === 'report'">
+            <DetailSectionCard title="基本信息">
+              <a-descriptions bordered size="small" :column="3">
+                <a-descriptions-item label="物品编码">{{
+                  bundle.materialCode
+                }}</a-descriptions-item>
+                <a-descriptions-item label="物品名称">{{
+                  bundle.materialName
+                }}</a-descriptions-item>
+                <a-descriptions-item label="规格型号">{{ bundle.specModel }}</a-descriptions-item>
+                <a-descriptions-item label="工作中心">{{ bundle.workCenter }}</a-descriptions-item>
+                <a-descriptions-item label="负责人">{{ bundle.owner }}</a-descriptions-item>
+                <a-descriptions-item label="工艺路线">{{
+                  bundle.processRouteName
+                }}</a-descriptions-item>
+                <a-descriptions-item label="EBOM" :span="3">{{
+                  bundle.ebomLabel
+                }}</a-descriptions-item>
+              </a-descriptions>
+            </DetailSectionCard>
+
+            <div class="section-card">
+              <div class="detail-toolbar">
+                <span class="toolbar-title">报工明细</span>
+                <a-space>
+                  <a-button
+                    v-if="manualPushMode"
+                    size="small"
+                    :disabled="!selectedPushableIds.length"
+                    @click="handleBatchPush"
+                  >
+                    批量推送
+                  </a-button>
+                  <a-button
+                    type="primary"
+                    size="small"
+                    :disabled="!selectedAuditableIds.length"
+                    @click="handleBatchApprove"
+                  >
+                    批量审核
+                  </a-button>
+                </a-space>
+              </div>
+
+              <a-table
+                :columns="lineColumns"
+                :data-source="bundle.lines"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 2200 }"
+                :row-selection="rowSelection"
+                :custom-row="customRow"
+                :row-class-name="rowClassName"
+              >
+                <template #headerCell="{ column }">
+                  <ColumnHeaderWithHint
+                    v-if="column.key === 'reporter'"
+                    :title="column.title"
+                    :hint="processReportExecutorHint"
+                  />
+                  <ColumnHeaderWithHint
+                    v-else-if="column.key === 'operator'"
+                    :title="column.title"
+                    :hint="processReportOperatorHint"
+                  />
+                </template>
+                <template #bodyCell="{ column, record: line, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'taskStatus'">
+                    <a-badge :status="taskStatusBadge(line.taskStatus)" :text="line.taskStatus" />
+                  </template>
+                  <template v-else-if="column.key === 'pushStatus'">
+                    <a-tag :color="pushStatusColor(line.pushStatus)">{{ line.pushStatus }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'scheduleQty'">
+                    <span class="schedule-qty-cell">
+                      <a-tooltip v-if="isLineOverSchedule(line)" title="报工数量超过排产数">
+                        <ExclamationCircleOutlined class="schedule-qty-warn" />
+                      </a-tooltip>
+                      <span>{{ formatScheduleQty(line.scheduleQty) }}</span>
+                    </span>
+                  </template>
+                  <template v-else-if="column.key === 'listAccountHours'">
+                    {{ formatAccountHours(line.listAccountHours) }}
+                  </template>
+                  <template v-else-if="column.key === 'salaryAmount'">
+                    {{ formatMoney(line.salaryAmount) }}
+                  </template>
+                  <template v-else-if="column.key === 'sceneImages'">
+                    <ProcessReportSceneImages
+                      :images="line.images"
+                      :file-prefix="`${line.taskNo || '现场图片'}`"
+                    />
+                  </template>
+                  <template v-else-if="column.key === 'action'">
+                    <a-space v-if="line.taskStatus !== TASK_STATUS.AUDITED" :size="0">
+                      <a-button type="link" size="small" @click.stop="openAdjust(line)"
+                        >调整</a-button
+                      >
+                      <a-button
+                        v-if="manualPushMode && canPush(line)"
+                        type="link"
+                        size="small"
+                        @click.stop="handlePushOne(line)"
+                        >推送</a-button
+                      >
+                      <a-button type="link" size="small" @click.stop="openAudit(line)"
+                        >审核</a-button
+                      >
+                    </a-space>
+                    <span v-else class="locked-text">已锁定</span>
+                  </template>
+                  <template v-else>
+                    {{ formatLineCell(line, column) }}
+                  </template>
+                </template>
+                <template #summary>
+                  <a-table-summary>
+                    <a-table-summary-row>
+                      <a-table-summary-cell
+                        v-for="cell in summaryCells"
+                        :key="cell.index"
+                        :index="cell.index"
+                        :align="cell.align"
+                        :class="{ 'summary-label-cell': cell.index === 1 }"
+                      >
+                        {{ cell.content }}
+                      </a-table-summary-cell>
+                    </a-table-summary-row>
+                  </a-table-summary>
+                </template>
+              </a-table>
+            </div>
+          </template>
+
+          <div v-else class="section-card">
             <a-table
-              :columns="lineColumns"
-              :data-source="bundle.lines"
+              :columns="logColumns"
+              :data-source="bundle.logs || []"
               row-key="id"
               size="small"
               bordered
               :pagination="false"
-              :scroll="{ x: 2200 }"
-              :row-selection="rowSelection"
-              :custom-row="customRow"
-              :row-class-name="rowClassName"
-            >
-              <template #headerCell="{ column }">
-                <ColumnHeaderWithHint
-                  v-if="column.key === 'reporter'"
-                  :title="column.title"
-                  :hint="processReportExecutorHint"
-                />
-                <ColumnHeaderWithHint
-                  v-else-if="column.key === 'operator'"
-                  :title="column.title"
-                  :hint="processReportOperatorHint"
-                />
-              </template>
-              <template #bodyCell="{ column, record: line, index }">
-                <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-                <template v-else-if="column.key === 'taskStatus'">
-                  <a-badge :status="taskStatusBadge(line.taskStatus)" :text="line.taskStatus" />
-                </template>
-                <template v-else-if="column.key === 'pushStatus'">
-                  <a-tag :color="pushStatusColor(line.pushStatus)">{{ line.pushStatus }}</a-tag>
-                </template>
-                <template v-else-if="column.key === 'scheduleQty'">
-                  <span class="schedule-qty-cell">
-                    <a-tooltip v-if="isLineOverSchedule(line)" title="报工数量超过排产数">
-                      <ExclamationCircleOutlined class="schedule-qty-warn" />
-                    </a-tooltip>
-                    <span>{{ formatScheduleQty(line.scheduleQty) }}</span>
-                  </span>
-                </template>
-                <template v-else-if="column.key === 'listAccountHours'">
-                  {{ formatAccountHours(line.listAccountHours) }}
-                </template>
-                <template v-else-if="column.key === 'salaryAmount'">
-                  {{ formatMoney(line.salaryAmount) }}
-                </template>
-                <template v-else-if="column.key === 'sceneImages'">
-                  <ProcessReportSceneImages
-                    :images="line.images"
-                    :file-prefix="`${line.taskNo || '现场图片'}`"
-                  />
-                </template>
-                <template v-else-if="column.key === 'action'">
-                  <a-space v-if="line.taskStatus !== TASK_STATUS.AUDITED" :size="0">
-                    <a-button type="link" size="small" @click.stop="openAdjust(line)"
-                      >调整</a-button
-                    >
-                    <a-button
-                      v-if="manualPushMode && canPush(line)"
-                      type="link"
-                      size="small"
-                      @click.stop="handlePushOne(line)"
-                      >推送</a-button
-                    >
-                    <a-button type="link" size="small" @click.stop="openAudit(line)">审核</a-button>
-                  </a-space>
-                  <span v-else class="locked-text">已锁定</span>
-                </template>
-                <template v-else>
-                  {{ formatLineCell(line, column) }}
-                </template>
-              </template>
-              <template #summary>
-                <a-table-summary>
-                  <a-table-summary-row>
-                    <a-table-summary-cell
-                      v-for="cell in summaryCells"
-                      :key="cell.index"
-                      :index="cell.index"
-                      :align="cell.align"
-                      :class="{ 'summary-label-cell': cell.index === 1 }"
-                    >
-                      {{ cell.content }}
-                    </a-table-summary-cell>
-                  </a-table-summary-row>
-                </a-table-summary>
-              </template>
-            </a-table>
-
-            <div v-if="summaryLine" class="wage-summary-wrap">
-              <ProcessReportWageSummary
-                :line="summaryLine"
-                :editable="summaryLine?.taskStatus !== TASK_STATUS.AUDITED"
-                @updated="reload"
-              />
-            </div>
-          </template>
-
-          <a-table
-            v-else
-            :columns="logColumns"
-            :data-source="bundle.logs || []"
-            row-key="id"
-            size="small"
-            bordered
-            :pagination="false"
-          />
+            />
+          </div>
         </div>
       </template>
       <a-empty v-else-if="!loading" description="未找到工序报工记录" />
     </a-spin>
+
+    <a-drawer
+      v-model:open="wageDrawerOpen"
+      title="工资计算汇总"
+      placement="right"
+      :width="720"
+      :mask="false"
+      :get-container="false"
+      root-class-name="wage-summary-drawer"
+    >
+      <ProcessReportWageSummary
+        v-if="summaryLine"
+        :key="summaryLine.id"
+        layout="side"
+        :line="summaryLine"
+        :editable="summaryLine?.taskStatus !== TASK_STATUS.AUDITED"
+        @updated="onWageUpdated"
+      />
+      <a-empty v-else description="请选择报工行" />
+    </a-drawer>
 
     <ProcessReportAdjustModal
       v-model:open="adjustOpen"
@@ -225,6 +257,7 @@ const bundle = ref(null)
 const activeTab = ref('report')
 const selectedLineIds = ref([])
 const highlightedLineId = ref('')
+const wageDrawerOpen = ref(false)
 const adjustOpen = ref(false)
 const auditOpen = ref(false)
 const modalLine = ref(null)
@@ -341,6 +374,7 @@ function customRow(record) {
   return {
     onClick: () => {
       highlightedLineId.value = record.id
+      wageDrawerOpen.value = true
     },
   }
 }
@@ -355,9 +389,14 @@ function reload() {
   const lines = bundle.value?.lines || []
   if (!lines.some((l) => l.id === highlightedLineId.value)) {
     highlightedLineId.value = lines[0]?.id || ''
+    if (!highlightedLineId.value) wageDrawerOpen.value = false
   }
   selectedLineIds.value = []
   loading.value = false
+}
+
+function onWageUpdated() {
+  reload()
 }
 
 watch(() => route.params.id, reload, { immediate: true })
@@ -458,72 +497,118 @@ function handleBatchPush() {
 
 <style lang="less" scoped>
 .process-report-detail-page {
-  .page-header {
+  margin: -12px;
+  padding: 12px;
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
+  background: #f5f6f8;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
+    flex-direction: column;
   }
+}
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #f5f6f8;
+}
 
-  .page-title {
-    font-size: 16px;
-    font-weight: 600;
-  }
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
 
-  .section-card {
-    background: #fff;
-    border: 1px solid #f0f0f0;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 12px;
-  }
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 
-  .section-title {
-    font-weight: 600;
-    margin-bottom: 10px;
-  }
+.order-no {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
 
-  .detail-toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-  }
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
 
-  .locked-text {
-    color: #8c8c8c;
-    font-size: 12px;
-  }
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 0 16px;
+  overflow: auto;
+}
 
-  :deep(.summary-label-cell) {
-    font-weight: 600;
-  }
+.section-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
 
-  :deep(.row-active) {
-    td {
-      background: #e6f4ff !important;
-    }
-  }
+.detail-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
 
-  .schedule-qty-cell {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 4px;
-    width: 100%;
-  }
+.toolbar-title {
+  font-weight: 600;
+  font-size: 14px;
+}
 
-  .schedule-qty-warn {
-    color: #fa8c16;
-    font-size: 14px;
-    flex-shrink: 0;
+.locked-text {
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+:deep(.summary-label-cell) {
+  font-weight: 600;
+}
+
+:deep(.row-active) {
+  td {
+    background: #e6f4ff !important;
   }
+}
+
+.schedule-qty-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 100%;
+}
+
+.schedule-qty-warn {
+  color: #fa8c16;
+  font-size: 14px;
+  flex-shrink: 0;
 }
 </style>
 

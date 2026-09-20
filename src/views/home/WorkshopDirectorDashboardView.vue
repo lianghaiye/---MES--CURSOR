@@ -200,7 +200,7 @@ export default { name: 'WorkshopDirectorDashboardView' }
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   background: #fff;
   border-radius: 8px;
   padding: 16px 20px;
@@ -211,7 +211,7 @@ export default { name: 'WorkshopDirectorDashboardView' }
 .toolbar-left {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 8px;
 }
 
 .page-title {
@@ -298,7 +298,7 @@ export default { name: 'WorkshopDirectorDashboardView' }
   background: #fff;
   border-radius: 8px;
   padding: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 

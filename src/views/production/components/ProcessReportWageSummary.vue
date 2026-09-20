@@ -1,6 +1,6 @@
 <template>
-  <div v-if="line" class="wage-summary-section">
-    <div class="wage-summary-head">
+  <div v-if="line" class="wage-summary-section" :class="{ 'is-side': layout === 'side' }">
+    <div v-if="layout !== 'side'" class="wage-summary-head">
       <span class="section-title">工资计算汇总</span>
       <a-popover placement="bottomLeft" trigger="click" overlay-class-name="wage-formula-popover">
         <template #content>
@@ -15,7 +15,24 @@
         <ExclamationCircleOutlined class="formula-help-icon" title="查看计算公式" />
       </a-popover>
     </div>
-    <a-descriptions bordered size="small" :column="4" class="wage-desc">
+    <div v-else class="wage-summary-head is-drawer-head">
+      <a-popover placement="bottomLeft" trigger="click" overlay-class-name="wage-formula-popover">
+        <template #content>
+          <div class="wage-formula-popover-content">
+            <div v-for="item in activeWageFormulas" :key="item.key" class="wage-formula-item">
+              <div class="wage-formula-item-title">{{ item.title }}</div>
+              <div class="wage-formula-item-body">{{ item.formula }}</div>
+              <div v-if="item.note" class="wage-formula-item-note">{{ item.note }}</div>
+            </div>
+          </div>
+        </template>
+        <a-button type="link" size="small" class="formula-link">
+          <ExclamationCircleOutlined />
+          查看计算公式
+        </a-button>
+      </a-popover>
+    </div>
+    <a-descriptions bordered size="small" :column="layout === 'side' ? 2 : 4" class="wage-desc">
       <a-descriptions-item label="任务编号">{{ line.taskNo || '—' }}</a-descriptions-item>
       <a-descriptions-item label="报工类型">{{ line.reportType || '—' }}</a-descriptions-item>
       <a-descriptions-item label="计薪方式">
@@ -114,13 +131,22 @@
 
     <div
       class="wage-cards"
-      :style="{ gridTemplateColumns: `repeat(${wageSummaryCards.length}, 1fr)` }"
+      :class="{ 'is-side-cards': layout === 'side' }"
+      :style="{
+        gridTemplateColumns:
+          layout === 'side'
+            ? 'repeat(2, minmax(0, 1fr))'
+            : `repeat(${wageSummaryCards.length}, 1fr)`,
+      }"
     >
       <div
         v-for="card in wageSummaryCards"
         :key="card.key"
         class="wage-card"
-        :class="{ 'wage-card-total': card.isTotal }"
+        :class="{
+          'wage-card-total': card.isTotal,
+          'wage-card-deduction': card.isDeduction,
+        }"
       >
         <div class="wage-card-label">{{ card.label }}</div>
         <div
@@ -227,6 +253,8 @@ import {
 const props = defineProps({
   line: { type: Object, default: null },
   editable: { type: Boolean, default: false },
+  /** block=下方横铺；side=右侧栏竖排 */
+  layout: { type: String, default: 'block' },
 })
 
 const emit = defineEmits(['updated'])
@@ -424,6 +452,12 @@ function formatSubsidyAmount(val) {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid #f0f0f0;
+
+  &.is-side {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
 }
 
 .wage-summary-head {
@@ -431,6 +465,11 @@ function formatSubsidyAmount(val) {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+
+  &.is-drawer-head {
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
 }
 
 .section-title {
@@ -447,6 +486,12 @@ function formatSubsidyAmount(val) {
   &:hover {
     color: #d48806;
   }
+}
+
+.formula-link {
+  padding: 0;
+  height: auto;
+  color: #1677ff;
 }
 
 .wage-desc {
@@ -521,18 +566,31 @@ function formatSubsidyAmount(val) {
 .wage-cards {
   display: grid;
   gap: 12px;
+
+  &.is-side-cards {
+    .wage-card-total {
+      grid-column: 1 / -1;
+    }
+  }
 }
 
 .wage-card {
-  background: #f5f5f5;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
+  border: 1px solid #e8eef8;
   border-radius: 8px;
   padding: 16px 20px;
   min-height: 88px;
+  box-sizing: border-box;
+}
+
+.wage-card-deduction {
+  background: linear-gradient(180deg, #fff2f0 0%, #ffffff 100%);
+  border-color: #ffccc7;
 }
 
 .wage-card-total {
-  background: #fff;
-  border: 1px solid #f0f0f0;
+  background: linear-gradient(180deg, #e6f4ff 0%, #f5faff 55%, #ffffff 100%);
+  border: 1px solid #91caff;
 }
 
 .wage-card-label {

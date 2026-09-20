@@ -840,14 +840,14 @@ function handleInitiateQc() {
     border: 1px solid #f0f0f0;
     border-radius: 6px;
     padding: 14px 16px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
   .section-title {
     font-weight: 600;
     font-size: 14px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     color: rgba(0, 0, 0, 0.85);
   }
 

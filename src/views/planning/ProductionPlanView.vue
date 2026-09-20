@@ -1539,7 +1539,7 @@ function handleReset() {
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 12px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .horizontal-form {
@@ -1572,7 +1572,7 @@ function handleReset() {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: stretch;
 }
 

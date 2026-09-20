@@ -1,5 +1,5 @@
 <template>
-  <div class="pending-inbound-page">
+  <div class="pending-inbound-page list-page">
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -46,12 +46,13 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="物品名称">
-              <a-input
-                v-model:value="filters.itemName"
+            <a-form-item label="入库仓库">
+              <a-select
+                v-model:value="filters.warehouse"
                 allow-clear
-                placeholder="请输入"
+                placeholder="请选择"
                 size="small"
+                :options="warehouseOpts"
               />
             </a-form-item>
           </a-col>
@@ -66,13 +67,12 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="入库仓库">
-              <a-select
-                v-model:value="filters.warehouse"
+            <a-form-item label="物品名称">
+              <a-input
+                v-model:value="filters.itemName"
                 allow-clear
-                placeholder="请选择"
+                placeholder="请输入"
                 size="small"
-                :options="warehouseOpts"
               />
             </a-form-item>
           </a-col>
@@ -271,7 +271,7 @@
     </div>
 
     <!-- 表格视图 -->
-    <div v-else class="list-panel">
+    <template v-else>
       <div class="toolbar-row">
         <a-space wrap :size="8">
           <a-button type="primary" size="small" @click="openCreate">
@@ -466,7 +466,7 @@
           />
         </div>
       </div>
-    </div>
+    </template>
 
     <InboundRefuseModal
       v-model:open="refuseModalOpen"
@@ -1009,7 +1009,6 @@ function handleRefuseInbound() {
 }
 
 .filter-card,
-.list-panel,
 .table-card,
 .list-card,
 .detail-card {
@@ -1019,12 +1018,8 @@ function handleRefuseInbound() {
 }
 
 .filter-card {
-  padding: 10px 12px 6px;
+  padding: 12px 16px;
   margin-bottom: 8px;
-}
-
-.list-panel {
-  padding: 10px 12px 12px;
 }
 
 .horizontal-form {
@@ -1090,7 +1085,7 @@ function handleRefuseInbound() {
 
 .summary-bar {
   margin-bottom: 8px;
-  padding: 0;
+  padding: 6px 12px;
 
   :deep(.ant-alert-message) {
     font-size: 13px;
@@ -1098,7 +1093,7 @@ function handleRefuseInbound() {
 }
 
 .table-card {
-  padding: 0;
+  padding: 8px 12px 12px;
 
   :deep(.ant-table-thead > tr > th) {
     background: #fafafa;

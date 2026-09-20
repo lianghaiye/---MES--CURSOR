@@ -1330,7 +1330,7 @@ async function doSubmit() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding: 12px 16px;
   background: #fff;
   border-radius: 6px;
@@ -1352,7 +1352,7 @@ async function doSubmit() {
 }
 
 .section-card {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding: 12px 16px 16px;
   background: #fff;
   border-radius: 6px;
@@ -1392,7 +1392,7 @@ async function doSubmit() {
 .line-card-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .line-card {
@@ -1405,7 +1405,7 @@ async function doSubmit() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 16px;
   background: #fafbfc;
   border-bottom: 1px solid #f0f0f0;
@@ -1422,7 +1422,7 @@ async function doSubmit() {
 .line-card-head-main {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
   flex: 1;
 }
@@ -1683,7 +1683,7 @@ async function doSubmit() {
 .inspect-fields-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 @media (max-width: 1280px) {

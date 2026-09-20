@@ -1,81 +1,114 @@
 <template>
-  <div class="material-req-page">
+  <div class="material-req-page list-page">
     <div class="filter-card">
-      <a-form layout="inline" class="filter-form" :model="filters">
-        <a-form-item label="申请单号">
-          <a-input
-            v-model:value="filters.reqNo"
-            allow-clear
-            placeholder="搜索申请单号"
-            style="width: 160px"
-          />
-        </a-form-item>
-        <a-form-item label="申请状态">
-          <a-select
-            v-model:value="filters.auditStatus"
-            allow-clear
-            placeholder="全部"
-            :options="auditStatusOptions"
-            style="width: 140px"
-          />
-        </a-form-item>
-        <a-form-item label="领料方式">
-          <a-select
-            v-model:value="filters.mode"
-            allow-clear
-            placeholder="全部"
-            :options="modeOptions"
-            style="width: 140px"
-          />
-        </a-form-item>
-        <a-form-item label="出库状态">
-          <a-select
-            v-model:value="filters.outboundStatus"
-            allow-clear
-            placeholder="全部"
-            :options="statusOptions"
-            style="width: 140px"
-          />
-        </a-form-item>
-        <a-form-item label="工单号">
-          <a-input
-            v-model:value="filters.workOrderNo"
-            allow-clear
-            placeholder="关联工单"
-            style="width: 160px"
-          />
-        </a-form-item>
-        <a-form-item label="申请人">
-          <a-input
-            v-model:value="filters.applicant"
-            allow-clear
-            placeholder="申请人"
-            style="width: 120px"
-          />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="handleSearch">搜索</a-button>
-            <a-button @click="handleReset">清空</a-button>
-          </a-space>
-        </a-form-item>
+      <a-form layout="inline" class="filter-form horizontal-form" :model="filters">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="申请单号">
+              <a-input
+                v-model:value="filters.reqNo"
+                allow-clear
+                placeholder="搜索申请单号"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="申请状态">
+              <a-select
+                v-model:value="filters.auditStatus"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                :options="auditStatusOptions"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="领料方式">
+              <a-select
+                v-model:value="filters.mode"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                :options="modeOptions"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="出库状态">
+              <a-select
+                v-model:value="filters.outboundStatus"
+                allow-clear
+                placeholder="全部"
+                size="small"
+                :options="statusOptions"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="工单号">
+              <a-input
+                v-model:value="filters.workOrderNo"
+                allow-clear
+                placeholder="关联工单"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="申请人">
+              <a-input
+                v-model:value="filters.applicant"
+                allow-clear
+                placeholder="申请人"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="handleSearch">搜索</a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
       </a-form>
     </div>
 
-    <div class="table-card">
-      <div class="table-toolbar">
-        <a-space>
-          <a-button type="primary" @click="goCreate">申请领料</a-button>
-          <a-button @click="handleRefresh">刷新</a-button>
-          <a-button @click="openExportModal">导出</a-button>
-        </a-space>
-      </div>
+    <div class="toolbar-row">
+      <a-space wrap :size="8">
+        <a-button type="primary" size="small" @click="goCreate">申请领料</a-button>
+        <a-button size="small" @click="openExportModal">导出</a-button>
+      </a-space>
+      <a-space :size="4" class="toolbar-icons">
+        <a-tooltip title="刷新">
+          <a-button type="text" size="small" @click="handleRefresh">
+            <ReloadOutlined />
+          </a-button>
+        </a-tooltip>
+      </a-space>
+    </div>
 
+    <a-alert type="info" show-icon class="summary-bar" :banner="false">
+      <template #message>
+        <span>
+          当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
+          <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
+          共计 {{ filteredList.length }} 条数据
+        </span>
+      </template>
+    </a-alert>
+
+    <div class="table-card">
       <a-table
         :columns="columns"
         :data-source="pagedList"
         row-key="id"
-        size="middle"
+        size="small"
+        bordered
         :pagination="false"
         :scroll="{ x: 1200 }"
         :row-selection="rowSelection"
@@ -88,7 +121,7 @@
             <a-badge :status="statusBadge(record.outboundStatus)" :text="record.outboundStatus" />
           </template>
           <template v-else-if="column.key === 'reqNo'">
-            <a @click="goDetail(record)">{{ record.reqNo }}</a>
+            <a class="link-code" @click="goDetail(record)">{{ record.reqNo }}</a>
           </template>
           <template v-else-if="column.key === 'mode'">
             <a-tag :color="modeColor(record.mode)">{{ record.modeLabel }}</a-tag>
@@ -108,6 +141,7 @@
               <a
                 v-for="(link, idx) in outboundLinksOf(record)"
                 :key="link.id || link.docNo"
+                class="link-code"
                 @click="goOutbound(link)"
               >
                 {{ link.docNo
@@ -131,11 +165,7 @@
         </template>
       </a-table>
 
-      <div class="table-footer">
-        <span class="page-summary">
-          共 {{ filteredList.length }} 条
-          <template v-if="selectedRowKeys.length">（已选 {{ selectedRowKeys.length }}）</template>
-        </span>
+      <div class="table-pagination">
         <a-pagination
           v-model:current="pagination.current"
           v-model:page-size="pagination.pageSize"
@@ -143,6 +173,8 @@
           size="small"
           show-size-changer
           :page-size-options="['10', '20', '50']"
+          :show-total="(t) => `共 ${t} 条`"
+          show-quick-jumper
         />
       </div>
     </div>
@@ -166,6 +198,7 @@ export default { name: 'MaterialRequisitionManagementView' }
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
+import { ReloadOutlined } from '@ant-design/icons-vue'
 import {
   listMobileMaterialReqs,
   refreshMobileMaterialReqs,
@@ -452,46 +485,52 @@ function truncate(text, max) {
 </script>
 
 <style lang="less" scoped>
-.material-req-page {
-  padding: 0;
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    height: 24px;
+    line-height: 24px;
+    font-size: 13px;
+  }
+
+  .filter-actions-item {
+    :deep(.ant-form-item-label) {
+      display: none;
+    }
+  }
 }
 
-.filter-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px 16px 4px;
-  margin-bottom: 12px;
-  border: 1px solid #f0f0f0;
-}
-
-.filter-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-}
-
-.table-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px 16px 16px;
-  border: 1px solid #f0f0f0;
-}
-
-.table-toolbar {
-  margin-bottom: 12px;
-}
-
-.table-footer {
+.toolbar-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-  margin-top: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+
+  .toolbar-icons {
+    color: rgba(0, 0, 0, 0.45);
+  }
 }
 
-.page-summary {
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.45);
+.summary-bar {
+  margin-bottom: 8px;
+  padding: 6px 12px;
+
+  :deep(.ant-alert-message) {
+    font-size: 13px;
+  }
 }
 
 .muted {

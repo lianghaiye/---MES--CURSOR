@@ -1,5 +1,5 @@
 <template>
-  <div class="ship-attachment-query-page">
+  <div class="ship-attachment-query-page list-page">
     <a-tabs v-model:active-key="mode" class="query-mode-tabs" @change="onModeChange">
       <a-tab-pane key="delivery" tab="按发货单" />
       <a-tab-pane key="product" tab="按产品" />
@@ -530,16 +530,25 @@ function openShipAttachment(id) {
 </script>
 
 <style lang="less" scoped>
+.ship-attachment-query-page {
+  /* 壳层由全局 .list-page 提供 */
+}
+
 .query-mode-tabs {
   margin-bottom: 8px;
+  background: #fff;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--divider, #e5e6eb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .scene-alert {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .filter-card {
-  margin-bottom: 12px;
+  /* 由 .list-page .filter-card 兜底 */
 }
 
 .item-pick-row {
@@ -554,7 +563,7 @@ function openShipAttachment(id) {
   color: rgba(0, 0, 0, 0.45);
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 
 .table-card {
@@ -565,7 +574,7 @@ function openShipAttachment(id) {
 .result-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .result-card {

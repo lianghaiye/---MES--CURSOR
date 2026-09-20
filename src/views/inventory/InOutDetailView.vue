@@ -1,5 +1,5 @@
 <template>
-  <div class="in-out-detail-page">
+  <div class="in-out-detail-page list-page">
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -106,105 +106,103 @@
       </a-form>
     </div>
 
-    <div class="list-panel">
-      <div class="toolbar-row">
-        <a-dropdown>
-          <a-button size="small" @click.prevent>
-            批量操作
-            <DownOutlined />
-          </a-button>
-          <template #overlay>
-            <a-menu @click="onBatchMenu">
-              <a-menu-item key="export">导出</a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
-        <a-space :size="4" class="toolbar-icons">
-          <a-tooltip title="刷新">
-            <a-button type="text" size="small" @click="handleSearch">
-              <ReloadOutlined />
-            </a-button>
-          </a-tooltip>
-          <TableColumnSettingButton @click="columnDrawerOpen = true" />
-        </a-space>
-      </div>
-
-      <a-alert type="info" show-icon class="summary-bar" :banner="false">
-        <template #message>
-          <span>
-            当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
-            <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
-          </span>
+    <div class="toolbar-row">
+      <a-dropdown>
+        <a-button size="small" @click.prevent>
+          批量操作
+          <DownOutlined />
+        </a-button>
+        <template #overlay>
+          <a-menu @click="onBatchMenu">
+            <a-menu-item key="export">导出</a-menu-item>
+          </a-menu>
         </template>
-      </a-alert>
+      </a-dropdown>
+      <a-space :size="4" class="toolbar-icons">
+        <a-tooltip title="刷新">
+          <a-button type="text" size="small" @click="handleSearch">
+            <ReloadOutlined />
+          </a-button>
+        </a-tooltip>
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
+      </a-space>
+    </div>
 
-      <div class="table-card">
-        <a-table
-          :columns="displayColumns"
-          :data-source="pagedList"
-          row-key="id"
-          size="small"
-          bordered
-          :scroll="{ x: tableScrollX }"
-          :pagination="false"
-          :row-selection="rowSelection"
-        >
-          <template #bodyCell="{ column, record, index }">
-            <template v-if="column.key === 'index'">
-              {{ rowIndex(index) }}
-            </template>
-            <template v-else-if="column.key === 'docNo'">
-              <a class="link-code" @click="navigateOrderDetail(record)">{{ record.docNo }}</a>
-            </template>
-            <template v-else-if="column.key === 'docStatus'">
-              <a-tag :color="inOutDocStatusColor(record.docStatus)">{{
-                record.docStatus || '—'
-              }}</a-tag>
-            </template>
-            <template v-else-if="column.key === 'ioStatus'">
-              <a-tag v-if="record.ioStatus" :color="ioStatusColor(record.ioStatus)">
-                {{ record.ioStatus }}
-              </a-tag>
-              <span v-else>—</span>
-            </template>
-            <template v-else-if="column.key === 'qty'">
-              <span :class="{ 'qty-negative': Number(record.qty) < 0 }">{{ record.qty }}</span>
-            </template>
-            <template v-else-if="column.key === 'action'">
-              <template v-if="record.businessType === '入库单'">
-                <a-button
-                  v-if="canEditInboundLine(record)"
-                  type="link"
-                  size="small"
-                  @click="openEdit(record)"
-                >
-                  编辑
-                </a-button>
-                <a-button
-                  v-else-if="record.ioStatus === '全部入库'"
-                  type="link"
-                  size="small"
-                  @click="navigateOrderDetail(record)"
-                >
-                  详情
-                </a-button>
-              </template>
+    <a-alert type="info" show-icon class="summary-bar" :banner="false">
+      <template #message>
+        <span>
+          当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
+          <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
+        </span>
+      </template>
+    </a-alert>
+
+    <div class="table-card">
+      <a-table
+        :columns="displayColumns"
+        :data-source="pagedList"
+        row-key="id"
+        size="small"
+        bordered
+        :scroll="{ x: tableScrollX }"
+        :pagination="false"
+        :row-selection="rowSelection"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">
+            {{ rowIndex(index) }}
+          </template>
+          <template v-else-if="column.key === 'docNo'">
+            <a class="link-code" @click="navigateOrderDetail(record)">{{ record.docNo }}</a>
+          </template>
+          <template v-else-if="column.key === 'docStatus'">
+            <a-tag :color="inOutDocStatusColor(record.docStatus)">{{
+              record.docStatus || '—'
+            }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'ioStatus'">
+            <a-tag v-if="record.ioStatus" :color="ioStatusColor(record.ioStatus)">
+              {{ record.ioStatus }}
+            </a-tag>
+            <span v-else>—</span>
+          </template>
+          <template v-else-if="column.key === 'qty'">
+            <span :class="{ 'qty-negative': Number(record.qty) < 0 }">{{ record.qty }}</span>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <template v-if="record.businessType === '入库单'">
+              <a-button
+                v-if="canEditInboundLine(record)"
+                type="link"
+                size="small"
+                @click="openEdit(record)"
+              >
+                编辑
+              </a-button>
+              <a-button
+                v-else-if="record.ioStatus === '全部入库'"
+                type="link"
+                size="small"
+                @click="navigateOrderDetail(record)"
+              >
+                详情
+              </a-button>
             </template>
           </template>
-        </a-table>
+        </template>
+      </a-table>
 
-        <div class="table-pagination">
-          <a-pagination
-            v-model:current="pagination.current"
-            v-model:page-size="pagination.pageSize"
-            :total="filteredList.length"
-            size="small"
-            show-size-changer
-            :page-size-options="['10', '20', '50', '100']"
-            :show-total="(t) => `共 ${t} 条`"
-            show-quick-jumper
-          />
-        </div>
+      <div class="table-pagination">
+        <a-pagination
+          v-model:current="pagination.current"
+          v-model:page-size="pagination.pageSize"
+          :total="filteredList.length"
+          size="small"
+          show-size-changer
+          :page-size-options="['10', '20', '50', '100']"
+          :show-total="(t) => `共 ${t} 条`"
+          show-quick-jumper
+        />
       </div>
     </div>
 
@@ -448,7 +446,6 @@ function stubAction(key) {
 }
 
 .filter-card,
-.list-panel,
 .table-card {
   background: #fff;
   border-radius: 6px;
@@ -456,12 +453,8 @@ function stubAction(key) {
 }
 
 .filter-card {
-  padding: 10px 12px 6px;
+  padding: 12px 16px;
   margin-bottom: 8px;
-}
-
-.list-panel {
-  padding: 10px 12px 12px;
 }
 
 .toolbar-row {

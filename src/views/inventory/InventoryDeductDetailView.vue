@@ -402,21 +402,21 @@ function onRetry() {
 }
 
 .phase-alert {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .section-card {
   background: #fff;
   border-radius: 8px;
   padding: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border: 1px solid #f0f0f0;
 }
 
 .section-title {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .status-tag {

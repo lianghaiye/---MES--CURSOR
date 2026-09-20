@@ -379,7 +379,7 @@ onUnmounted(() => {
   overflow: hidden;
   background: #f5f6f8;
   box-sizing: border-box;
-  gap: 12px;
+  gap: 8px;
 
   :deep(.ant-spin-nested-loading),
   :deep(.ant-spin-container) {
@@ -388,7 +388,7 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    gap: 12px;
+    gap: 8px;
   }
 }
 
@@ -397,7 +397,10 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px 12px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   flex-shrink: 0;
   /* 渐变由 detail-page-header.less 统一覆盖 */
   background: #fff;
@@ -490,7 +493,7 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   overflow: hidden;
 
   :deep(.detail-section-card) {

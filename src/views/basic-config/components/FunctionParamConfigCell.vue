@@ -135,6 +135,14 @@
     />
 
     <a-switch
+      v-else-if="record.key === 'stocktakeAutoPostOnApprove'"
+      :checked="stocktakeAutoPostOnApprove"
+      checked-children="自动"
+      un-checked-children="手动"
+      @change="onStocktakeAutoPostOnApproveChange"
+    />
+
+    <a-switch
       v-else-if="record.displayOnly && record.controlType === 'switch'"
       :checked="Boolean(displayParams[displaySwitchKey(record)])"
       checked-children="开"
@@ -224,6 +232,8 @@ import {
   setEnableBomLevelMts,
   isTransferRequireInboundConfirm,
   setTransferRequireInboundConfirm,
+  isStocktakeAutoPostOnApprove,
+  setStocktakeAutoPostOnApprove,
   getQcGatePolicyMap,
   setQcGatePolicyByBizScope,
   getDisplayParams,
@@ -242,6 +252,7 @@ const shipAttachmentDecideStage = computed(() => getShipAttachmentDecideStage())
 const dualUnitIssueStrategy = computed(() => getDualUnitIssueStrategy())
 const enableBomLevelMts = computed(() => isBomLevelMtsEnabled())
 const transferRequireInboundConfirm = computed(() => isTransferRequireInboundConfirm())
+const stocktakeAutoPostOnApprove = computed(() => isStocktakeAutoPostOnApprove())
 
 const displayParams = computed(() => {
   void functionParamState.params.displayParams
@@ -318,6 +329,12 @@ function onTransferRequireInboundConfirmChange(checked) {
   toastSave(
     setTransferRequireInboundConfirm(checked),
     checked ? '已开启：调拨出库后需入库方签收' : '已关闭：调拨出库后自动入库完结',
+  )
+}
+function onStocktakeAutoPostOnApproveChange(checked) {
+  toastSave(
+    setStocktakeAutoPostOnApprove(checked),
+    checked ? '已开启：盘点审核通过后自动过账' : '已关闭：盘点审核通过后需手动过账',
   )
 }
 function onQcGatePolicyChange(scope, policy) {

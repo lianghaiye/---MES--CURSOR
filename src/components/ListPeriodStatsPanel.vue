@@ -3,6 +3,7 @@
     <div class="stats-header">
       <div class="stats-header-left">
         <span class="stats-title">{{ title }}</span>
+        <span v-if="tip" class="stats-tip">{{ tip }}</span>
         <a-select
           v-if="showPeriod"
           v-model:value="period"
@@ -62,6 +63,8 @@ import { STAT_PERIOD_OPTIONS } from '@/utils/deliveryStats'
 
 const props = defineProps({
   title: { type: String, default: '统计概览' },
+  /** 标题右侧提示文案（无外框） */
+  tip: { type: String, default: '' },
   period: { type: String, default: '本周' },
   cards: { type: Array, default: () => [] },
   /** 是否显示周期切换 */
@@ -141,7 +144,7 @@ export default { name: 'ListPeriodStatsPanel' }
   background: #fff;
   border-radius: 8px;
   padding: 12px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border: 1px solid #e5e6eb;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
@@ -163,6 +166,7 @@ export default { name: 'ListPeriodStatsPanel' }
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1;
 }
 
 .stats-title {
@@ -170,6 +174,15 @@ export default { name: 'ListPeriodStatsPanel' }
   font-weight: 600;
   color: rgba(0, 0, 0, 0.85);
   white-space: nowrap;
+}
+
+.stats-tip {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
 }
 
 .period-select {

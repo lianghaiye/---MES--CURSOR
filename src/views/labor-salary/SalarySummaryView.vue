@@ -1,7 +1,5 @@
 <template>
   <div class="salary-summary-page">
-    <SalaryStatsNav active="summary" />
-
     <div class="filter-card">
       <a-form layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -48,17 +46,7 @@
     </div>
 
     <div class="toolbar-row">
-      <a-dropdown>
-        <a-button size="small">
-          批量操作
-          <DownOutlined />
-        </a-button>
-        <template #overlay>
-          <a-menu @click="onBatchAction">
-            <a-menu-item key="export">导出 Excel</a-menu-item>
-          </a-menu>
-        </template>
-      </a-dropdown>
+      <a-button type="primary" size="small" @click="openExportModal">批量导出</a-button>
       <a-space :size="4">
         <a-tooltip title="刷新">
           <a-button type="text" size="small" @click="handleSearch">
@@ -153,8 +141,7 @@ export default { name: 'SalarySummaryView' }
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
-import { ClearOutlined, DownOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
-import SalaryStatsNav from './components/SalaryStatsNav.vue'
+import { ClearOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { employeeNameOptions } from '@/utils/employeeProfileResolver'
 import { querySalaryStats } from '@/utils/salaryStatsAggregate'
 import { reloadProcessReports } from '@/store/processReportStore'
@@ -346,10 +333,6 @@ function openDetail(record) {
   router.push({ path: '/report-management/salary-detail', query })
 }
 
-function onBatchAction({ key }) {
-  if (key === 'export') openExportModal()
-}
-
 onMounted(() => {
   handleSearch()
 })
@@ -362,7 +345,7 @@ onMounted(() => {
     border: 1px solid #f0f0f0;
     border-radius: 8px;
     padding: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .toolbar-row {

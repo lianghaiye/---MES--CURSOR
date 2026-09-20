@@ -1,6 +1,6 @@
 <template>
   <div class="product-bom-create-page">
-    <div class="page-sticky-head">
+    <div class="page-sticky-head page-header">
       <div class="head-left">
         <a-tooltip :title="leftSidebarCollapsed ? '展开结构树' : '收起结构树'">
           <a-button type="text" size="small" class="head-tree-toggle-btn" @click="toggleLeft">
@@ -1962,10 +1962,14 @@ function handleCancel() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 12px;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  min-height: 48px;
+  padding: 8px 16px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
+  border: 1px solid #e8eef8;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  margin-bottom: 0;
 
   .head-left {
     display: flex;
@@ -2017,7 +2021,8 @@ function handleCancel() {
   flex-direction: row;
   align-items: stretch;
   gap: 0;
-  padding: 8px;
+  /* 仅顶距；左右与标题栏同宽对齐 */
+  padding: 12px 0 0;
   overflow: hidden;
 }
 
@@ -2046,7 +2051,7 @@ function handleCancel() {
 .panel-resizer {
   flex: 0 0 6px;
   align-self: stretch;
-  margin: 0 2px;
+  margin: 0 6px;
   cursor: col-resize;
   border-radius: 3px;
   position: relative;
@@ -2116,7 +2121,7 @@ function handleCancel() {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
     margin-bottom: 8px;
 
     .head-left {

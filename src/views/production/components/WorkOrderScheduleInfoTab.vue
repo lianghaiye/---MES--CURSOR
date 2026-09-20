@@ -301,7 +301,7 @@ function saveExecutor() {
   .tab-head {
     display: flex;
     align-items: baseline;
-    gap: 12px;
+    gap: 8px;
     margin-bottom: 12px;
   }
 

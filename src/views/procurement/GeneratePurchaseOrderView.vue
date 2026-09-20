@@ -1029,8 +1029,8 @@ function handleConfirm() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  gap: 12px;
+  margin-bottom: 8px;
+  gap: 8px;
 
   .header-left {
     display: flex;
@@ -1060,7 +1060,7 @@ function handleConfirm() {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
-  gap: 12px;
+  gap: 8px;
 }
 
 .toolbar-label {

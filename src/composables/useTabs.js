@@ -67,6 +67,42 @@ export function useTabs() {
     }
   }
 
+  /** 关闭所有可关标签，仅保留首页 */
+  function closeAllTabs() {
+    const kept = state.tabs.filter((t) => !t.closable)
+    const closing = state.tabs.filter((t) => t.closable)
+    closing.forEach((t) => {
+      const base = tabBasePath(t.path)
+      if (base.endsWith('/new')) clearCreatePageDraft(base)
+    })
+    state.tabs = kept.length
+      ? kept
+      : [{ path: '/home/dashboard', fullPath: '/home/dashboard', title: '首页', closable: false }]
+    state.activePath = state.tabs[0]?.path || '/home/dashboard'
+  }
+
+  /** 关闭除当前选中外的所有可关标签；首页始终保留 */
+  function closeOtherTabs() {
+    const active = tabBasePath(state.activePath)
+    const next = []
+    state.tabs.forEach((t) => {
+      const base = tabBasePath(t.path)
+      const keep = !t.closable || base === active
+      if (keep) {
+        next.push(t)
+      } else if (base.endsWith('/new')) {
+        clearCreatePageDraft(base)
+      }
+    })
+    state.tabs = next.length
+      ? next
+      : [{ path: '/home/dashboard', fullPath: '/home/dashboard', title: '首页', closable: false }]
+    const stillActive = state.tabs.some((t) => tabBasePath(t.path) === active)
+    if (!stillActive) {
+      state.activePath = state.tabs[0]?.path || '/home/dashboard'
+    }
+  }
+
   function setActive(pathOrFull) {
     const tab = findTabByPath(pathOrFull)
     state.activePath = tab?.path || tabBasePath(pathOrFull)
@@ -92,6 +128,8 @@ export function useTabs() {
     tabState: readonly(state),
     openTab,
     closeTab,
+    closeAllTabs,
+    closeOtherTabs,
     setActive,
     syncTabWithRoute,
     getTabNavigateTo,

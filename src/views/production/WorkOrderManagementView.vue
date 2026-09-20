@@ -166,17 +166,15 @@
             />
             <div class="card-content">
               <div class="card-head">
-                <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
-                <a-tag v-if="isScheduleIncomplete(wo)" color="processing" class="status-tag">
-                  未排完
-                </a-tag>
-                <a-tag
-                  v-if="convertSideLabelOf(wo)"
-                  :color="getWorkOrderConvertSideTagColor(convertSideLabelOf(wo))"
-                  class="status-tag"
-                >
-                  {{ convertSideLabelOf(wo) }}
-                </a-tag>
+                <div class="card-head-tags">
+                  <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
+                  <a-tag :color="scheduleStatusColor(wo)" class="status-tag">
+                    {{ scheduleStatusLabel(wo) }}
+                  </a-tag>
+                  <a-tag :color="urgencyTagColor(wo.urgency)" class="status-tag">
+                    {{ urgencyLabel(wo.urgency) }}
+                  </a-tag>
+                </div>
                 <a-dropdown :trigger="['click']">
                   <a-button type="text" size="small" class="more-btn" @click.stop>
                     <EllipsisOutlined />
@@ -221,24 +219,13 @@
                 </a-dropdown>
               </div>
               <div class="card-code">{{ wo.code }}</div>
-              <div class="card-name">{{ wo.name }}</div>
-              <div class="card-meta">
-                <span>来源 {{ wo.sourceOrderNo || '-' }}</span>
-                <span class="meta-divider">·</span>
-                <span>数量 {{ formatScheduleProgress(wo) }}</span>
-                <template v-if="isScheduleIncomplete(wo)">
-                  <span class="meta-divider">·</span>
-                  <span>未排完</span>
-                </template>
-                <template v-if="convertSideLabelOf(wo)">
-                  <span class="meta-divider">·</span>
-                  <span>{{ convertSideLabelOf(wo) }}</span>
-                </template>
+              <div class="card-product">{{ formatCardProductLine(wo) }}</div>
+              <div class="card-meta">来源单号 {{ wo.sourceOrderNo || '—' }}</div>
+              <div class="card-schedule">
+                已排产 {{ scheduleQtyOf(wo) }} / 计划 {{ planQtyOf(wo) }}
               </div>
-              <div class="card-tags">
-                <a-tag :color="urgencyTagColor(wo.urgency)" class="urgency-tag">
-                  {{ urgencyLabel(wo.urgency) }}
-                </a-tag>
+              <div class="card-category">
+                <a-tag class="category-tag">{{ wo.orderCategory || '生产工单' }}</a-tag>
               </div>
             </div>
           </div>
@@ -424,18 +411,16 @@ import {
   canEditWorkOrder,
 } from '@/utils/workOrderDispatchHelpers'
 import {
-  formatScheduleProgress,
   isScheduleIncomplete,
   getActiveScheduleBatch,
+  getBatchesScheduledQty,
+  getWorkOrderPlanQty,
+  getRemainScheduleQty,
 } from '@/utils/workOrderScheduleBatch'
 import {
   ensureProcessOutsourceOrdersAfterDispatch,
   resolveProcessOpOutsource,
 } from '@/utils/workOrderProcessOutsource'
-import {
-  getWorkOrderConvertSideLabel,
-  getWorkOrderConvertSideTagColor,
-} from '@/utils/workOrderConvertOccupy'
 import { tipMessageIfScheduleOverSales } from '@/utils/scheduleOverSalesTip'
 import {
   WORK_ORDER_STATUSES,
@@ -635,10 +620,6 @@ function statusColor(status) {
   return workOrderStatusColor(status)
 }
 
-function convertSideLabelOf(wo) {
-  return getWorkOrderConvertSideLabel(wo)
-}
-
 function urgencyTagColor(urgency) {
   if (urgency === '紧急' || urgency === '加急') return 'error'
   return 'default'
@@ -647,6 +628,33 @@ function urgencyTagColor(urgency) {
 function urgencyLabel(urgency) {
   if (urgency === '紧急' || urgency === '加急') return '紧急'
   return '不紧急'
+}
+
+function scheduleQtyOf(wo) {
+  return getBatchesScheduledQty(wo)
+}
+
+function planQtyOf(wo) {
+  return getWorkOrderPlanQty(wo)
+}
+
+/** 排产状态：未排产 / 未排完 / 已排完 */
+function scheduleStatusLabel(wo) {
+  if (isScheduleIncomplete(wo)) return '未排完'
+  if (scheduleQtyOf(wo) <= 0) return '未排产'
+  if (getRemainScheduleQty(wo) <= 0) return '已排完'
+  return '未排产'
+}
+
+function scheduleStatusColor(wo) {
+  const label = scheduleStatusLabel(wo)
+  if (label === '未排完') return 'processing'
+  if (label === '已排完') return 'success'
+  return 'default'
+}
+
+function formatCardProductLine(wo) {
+  return [wo.productName || wo.name, wo.specModel, wo.material].filter(Boolean).join(' / ') || '—'
 }
 
 function selectOrder(id) {
@@ -1281,7 +1289,7 @@ async function onScheduleBatchSubmit(payload) {
 
 .filter-card {
   padding: 12px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .filter-footer {
@@ -1442,9 +1450,18 @@ async function onScheduleBatchSubmit(payload) {
 
   .card-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 4px;
     margin-bottom: 6px;
+
+    .card-head-tags {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
 
     .status-tag {
       margin: 0;
@@ -1454,6 +1471,7 @@ async function onScheduleBatchSubmit(payload) {
     }
 
     .more-btn {
+      flex-shrink: 0;
       padding: 0 2px;
       height: 22px;
       color: rgba(0, 0, 0, 0.45);
@@ -1468,10 +1486,10 @@ async function onScheduleBatchSubmit(payload) {
     line-height: 1.3;
   }
 
-  .card-name {
+  .card-product {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.65);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -1483,20 +1501,28 @@ async function onScheduleBatchSubmit(payload) {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
     line-height: 1.5;
-
-    .meta-divider {
-      margin: 0 4px;
-    }
+    margin-bottom: 4px;
   }
 
-  .card-tags {
-    margin-top: 6px;
+  .card-schedule {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.65);
+    line-height: 1.4;
+    margin-bottom: 6px;
+  }
 
-    .urgency-tag {
+  .card-category {
+    display: flex;
+    align-items: center;
+
+    .category-tag {
       margin: 0;
       font-size: 11px;
       line-height: 18px;
       padding-inline: 6px;
+      color: #1677ff;
+      background: #e6f4ff;
+      border-color: #91caff;
     }
   }
 }

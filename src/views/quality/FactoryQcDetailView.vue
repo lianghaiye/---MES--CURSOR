@@ -199,7 +199,7 @@ function openInspect() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding: 12px 16px;
   background: #fff;
   border-radius: 6px;
@@ -223,12 +223,12 @@ function openInspect() {
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 12px 16px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 
   .section-title {
     font-weight: 600;
     font-size: 14px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     color: rgba(0, 0, 0, 0.88);
   }
 }

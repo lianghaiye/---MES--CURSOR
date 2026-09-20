@@ -1,8 +1,122 @@
 <template>
-  <div class="cut-settle-page">
-    <div class="toolbar">
-      <div class="title">下料结算</div>
-      <a-space>
+  <div class="cut-settle-page list-page">
+    <div class="filter-card">
+      <a-form layout="inline" class="filter-form horizontal-form" :model="filters">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="结算单号">
+              <a-input
+                v-model:value="filters.docNo"
+                allow-clear
+                size="small"
+                placeholder="结算单号"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="工单编号">
+              <a-input
+                v-model:value="filters.workOrderNo"
+                allow-clear
+                size="small"
+                placeholder="工单编号"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="出库单号">
+              <a-input
+                v-model:value="filters.outboundDocNo"
+                allow-clear
+                size="small"
+                placeholder="出库单号"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="物料名称">
+              <a-input
+                v-model:value="filters.itemName"
+                allow-clear
+                size="small"
+                placeholder="物料名称"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="编码">
+              <a-input
+                v-model:value="filters.itemCode"
+                allow-clear
+                size="small"
+                placeholder="物料编码"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="型号规格">
+              <a-input
+                v-model:value="filters.specModel"
+                allow-clear
+                size="small"
+                placeholder="型号规格"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="图号">
+              <a-input
+                v-model:value="filters.drawingNo"
+                allow-clear
+                size="small"
+                placeholder="图号"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="材质">
+              <a-input
+                v-model:value="filters.material"
+                allow-clear
+                size="small"
+                placeholder="材质"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="下料尺寸">
+              <a-input
+                v-model:value="filters.blankSizeText"
+                allow-clear
+                size="small"
+                placeholder="下料尺寸"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8">
+            <a-form-item label="出库时间">
+              <a-range-picker
+                v-model:value="filters.outboundTimeRange"
+                size="small"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="applyFilters">查询</a-button>
+                <a-button size="small" @click="resetFilters">重置</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </div>
+
+    <div class="toolbar-row">
+      <a-space wrap :size="8">
         <a-button type="primary" size="small" @click="createOpen = true">从出库单创建</a-button>
       </a-space>
     </div>
@@ -10,142 +124,54 @@
     <a-alert
       type="info"
       show-icon
-      class="scene-alert"
+      class="summary-bar"
       message="从出库单创建：工单含「下料工序」且物料勾选「需要下料结算」时可结算。确认时可选择「余料留线边」（主）或「余料退回发料仓」。"
     />
 
-    <div class="filter-card">
-      <a-form layout="inline" class="filter-form" :model="filters">
-        <a-form-item label="结算单号">
-          <a-input
-            v-model:value="filters.docNo"
-            allow-clear
-            placeholder="结算单号"
-            style="width: 140px"
-          />
-        </a-form-item>
-        <a-form-item label="工单编号">
-          <a-input
-            v-model:value="filters.workOrderNo"
-            allow-clear
-            placeholder="工单编号"
-            style="width: 140px"
-          />
-        </a-form-item>
-        <a-form-item label="出库单号">
-          <a-input
-            v-model:value="filters.outboundDocNo"
-            allow-clear
-            placeholder="出库单号"
-            style="width: 140px"
-          />
-        </a-form-item>
-        <a-form-item label="物料名称">
-          <a-input
-            v-model:value="filters.itemName"
-            allow-clear
-            placeholder="物料名称"
-            style="width: 130px"
-          />
-        </a-form-item>
-        <a-form-item label="编码">
-          <a-input
-            v-model:value="filters.itemCode"
-            allow-clear
-            placeholder="物料编码"
-            style="width: 130px"
-          />
-        </a-form-item>
-        <a-form-item label="型号规格">
-          <a-input
-            v-model:value="filters.specModel"
-            allow-clear
-            placeholder="型号规格"
-            style="width: 120px"
-          />
-        </a-form-item>
-        <a-form-item label="图号">
-          <a-input
-            v-model:value="filters.drawingNo"
-            allow-clear
-            placeholder="图号"
-            style="width: 120px"
-          />
-        </a-form-item>
-        <a-form-item label="材质">
-          <a-input
-            v-model:value="filters.material"
-            allow-clear
-            placeholder="材质"
-            style="width: 100px"
-          />
-        </a-form-item>
-        <a-form-item label="下料尺寸">
-          <a-input
-            v-model:value="filters.blankSizeText"
-            allow-clear
-            placeholder="下料尺寸"
-            style="width: 140px"
-          />
-        </a-form-item>
-        <a-form-item label="出库时间">
-          <a-range-picker
-            v-model:value="filters.outboundTimeRange"
-            value-format="YYYY-MM-DD"
-            style="width: 240px"
-          />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="applyFilters">查询</a-button>
-            <a-button @click="resetFilters">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+    <div class="table-card">
+      <a-table
+        :columns="columns"
+        :data-source="pagedRows"
+        row-key="rowKey"
+        size="small"
+        bordered
+        :scroll="{ x: 2080 }"
+        :pagination="pagination"
+        @change="onTableChange"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'status'">
+            <a-tag :color="record.status === '已确认' ? 'green' : 'orange'">{{
+              record.status || '—'
+            }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'docNo'">
+            <a @click.prevent="openDetailTab(record)">{{ record.docNo || '—' }}</a>
+          </template>
+          <template v-else-if="column.key === 'blankSizeText'">
+            {{ record.blankSizeText || '—' }}
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space v-if="record.status === '待确认'" :size="8">
+              <a @click.prevent="openConfirmTab(record)">确认结算</a>
+            </a-space>
+            <span v-else class="action-disabled">—</span>
+          </template>
+          <template v-else-if="column.key === 'pickedLength'">
+            {{ formatQtyWithUnit(record.pickedLength, lineUnit(record)) }}
+          </template>
+          <template v-else-if="column.key === 'demandMeters'">
+            {{ formatQtyWithUnit(record.demandMeters, lineUnit(record)) }}
+          </template>
+          <template v-else-if="column.key === 'actualConsumeMeters'">
+            {{ formatQtyWithUnit(record.actualConsumeMeters, lineUnit(record)) }}
+          </template>
+          <template v-else-if="column.key === 'remnantLength'">
+            {{ formatQtyWithUnit(record.remnantLength, lineUnit(record)) }}
+          </template>
+        </template>
+      </a-table>
     </div>
-
-    <a-table
-      :columns="columns"
-      :data-source="pagedRows"
-      row-key="rowKey"
-      size="small"
-      bordered
-      :scroll="{ x: 2080 }"
-      :pagination="pagination"
-      @change="onTableChange"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === '已确认' ? 'green' : 'orange'">{{
-            record.status || '—'
-          }}</a-tag>
-        </template>
-        <template v-else-if="column.key === 'docNo'">
-          <a @click.prevent="openDetailTab(record)">{{ record.docNo || '—' }}</a>
-        </template>
-        <template v-else-if="column.key === 'blankSizeText'">
-          {{ record.blankSizeText || '—' }}
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space v-if="record.status === '待确认'" :size="8">
-            <a @click.prevent="openConfirmTab(record)">确认结算</a>
-          </a-space>
-          <span v-else class="action-disabled">—</span>
-        </template>
-        <template v-else-if="column.key === 'pickedLength'">
-          {{ formatQtyWithUnit(record.pickedLength, lineUnit(record)) }}
-        </template>
-        <template v-else-if="column.key === 'demandMeters'">
-          {{ formatQtyWithUnit(record.demandMeters, lineUnit(record)) }}
-        </template>
-        <template v-else-if="column.key === 'actualConsumeMeters'">
-          {{ formatQtyWithUnit(record.actualConsumeMeters, lineUnit(record)) }}
-        </template>
-        <template v-else-if="column.key === 'remnantLength'">
-          {{ formatQtyWithUnit(record.remnantLength, lineUnit(record)) }}
-        </template>
-      </template>
-    </a-table>
 
     <a-modal
       v-model:open="createOpen"
@@ -335,32 +361,7 @@ function onCreate() {
 
 <style scoped>
 .cut-settle-page {
-  padding: 12px;
-  background: #fff;
-  min-height: 100%;
-}
-.scene-alert {
-  margin-bottom: 12px;
-}
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.title {
-  font-size: 16px;
-  font-weight: 600;
-}
-.filter-card {
-  margin-bottom: 12px;
-  padding: 12px 12px 0;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-}
-.filter-form :deep(.ant-form-item) {
-  margin-bottom: 12px;
+  /* 壳层由全局 .list-page 提供 */
 }
 .action-disabled {
   color: #bfbfbf;

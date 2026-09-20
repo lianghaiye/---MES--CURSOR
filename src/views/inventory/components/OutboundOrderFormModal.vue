@@ -16,7 +16,7 @@
         <div class="section-title">基本信息</div>
         <a-form :model="form" layout="inline" class="header-form horizontal-form">
           <a-row :gutter="[12, 12]" style="width: 100%">
-            <a-col :span="8">
+            <a-col :span="6">
               <a-form-item label="出库单号" required>
                 <a-input
                   v-model:value="form.docNo"
@@ -26,7 +26,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :span="6">
               <a-form-item label="出库类型" required>
                 <a-select
                   v-model:value="form.outboundType"
@@ -37,7 +37,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :span="6">
               <a-form-item label="出库时间">
                 <a-date-picker
                   v-model:value="form.outboundTime"
@@ -51,7 +51,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :span="6">
               <a-form-item label="出库仓库">
                 <a-select
                   v-model:value="form.warehouse"
@@ -63,7 +63,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col v-if="showReceiveWarehouse" :span="8">
+            <a-col v-if="showReceiveWarehouse" :span="6">
               <a-form-item label="领入仓库">
                 <a-select
                   v-model:value="form.receiveWarehouse"
@@ -75,7 +75,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col v-if="!isSalesOutbound" :span="8">
+            <a-col v-if="!isSalesOutbound" :span="6">
               <a-form-item label="申请部门">
                 <a-select
                   v-model:value="form.requisitionDept"
@@ -87,7 +87,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :span="6">
               <a-form-item label="出库总重量(kg)">
                 <a-input-number
                   v-model:value="form.totalWeight"
@@ -99,7 +99,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col :span="8">
+            <a-col :span="6">
               <a-form-item label="销售订单">
                 <a-input-group compact>
                   <a-input
@@ -119,7 +119,7 @@
                 </a-input-group>
               </a-form-item>
             </a-col>
-            <a-col v-if="!isSalesOutbound" :span="8">
+            <a-col v-if="!isSalesOutbound" :span="6">
               <a-form-item label="合同编号">
                 <a-input
                   v-model:value="form.contractNo"

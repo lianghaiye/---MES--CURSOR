@@ -315,7 +315,7 @@ function onDelete(record) {
   background: #fff;
   border-radius: 8px;
   padding: 12px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .table-toolbar {
   margin-bottom: 8px;

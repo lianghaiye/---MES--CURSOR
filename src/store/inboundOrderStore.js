@@ -605,6 +605,21 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
     })
     syncSalesAllocationAfterInbound(order, pendingLines)
     recomputeInboundOrderStatus(order, operator)
+    try {
+      const { syncPurchaseReceiptAfterInboundConfirm } = require('@/utils/purchaseReceiptSettle')
+      syncPurchaseReceiptAfterInboundConfirm(order)
+    } catch {
+      /* ignore */
+    }
+    try {
+      if (order.purchaseOrderId) {
+        syncPurchaseOrderInboundStatus(
+          purchaseOrderState.orders.find((o) => o.id === order.purchaseOrderId),
+        )
+      }
+    } catch {
+      /* ignore */
+    }
     count += 1
   })
   return { count, blocked }
@@ -648,6 +663,21 @@ export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
   line.lineStatus = '已入库'
   syncSalesAllocationAfterInbound(order, [line])
   recomputeInboundOrderStatus(order, operator)
+  try {
+    const { syncPurchaseReceiptAfterInboundConfirm } = require('@/utils/purchaseReceiptSettle')
+    syncPurchaseReceiptAfterInboundConfirm(order)
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (order.purchaseOrderId) {
+      syncPurchaseOrderInboundStatus(
+        purchaseOrderState.orders.find((o) => o.id === order.purchaseOrderId),
+      )
+    }
+  } catch {
+    /* ignore */
+  }
   return { ok: true, order, line }
 }
 
@@ -926,6 +956,7 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
       sourceOrderNo: po.orderNo,
       sourceType: '采购订单',
       purchaseOrderId: po.id,
+      purchaseReceiptId: payload.purchaseReceiptId || '',
       invoiceNo: payload.invoiceNo || '',
       remark: groups.size > 1 ? `${remarkBase}（仓库：${warehouse}）` : remarkBase,
       handler: payload.handler || 'admin1',

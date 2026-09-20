@@ -526,7 +526,7 @@ function onOutsourcingInboundSaved() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding: 12px 16px;
   background: #fff;
   border-radius: 8px;
@@ -553,7 +553,7 @@ function onOutsourcingInboundSaved() {
 }
 
 .section-card {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding: 12px 16px 16px;
   background: #fff;
   border-radius: 8px;

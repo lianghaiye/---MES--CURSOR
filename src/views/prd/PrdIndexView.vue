@@ -162,7 +162,7 @@ function statusColor(status) {
 .card-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
   font-size: 12px;
   color: #999;
   margin-bottom: 8px;
@@ -171,7 +171,7 @@ function statusColor(status) {
 .card-scope {
   font-size: 12px;
   color: #aaa;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .card-link {

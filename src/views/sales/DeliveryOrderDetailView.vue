@@ -649,7 +649,10 @@ function goSalesOrder() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
 }
@@ -689,7 +692,7 @@ function goSalesOrder() {
 .section-title {
   font-weight: 600;
   font-size: 14px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .delivery-line-table {

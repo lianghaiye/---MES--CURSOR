@@ -236,7 +236,7 @@ function openStorage() {
 
   .section-title {
     font-weight: 600;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .item-count {

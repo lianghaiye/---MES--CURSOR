@@ -905,14 +905,14 @@ function submit() {
   background: #fff;
   border-radius: 6px;
   padding: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .section-title {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   color: #1f1f1f;
 }
 
@@ -920,7 +920,7 @@ function submit() {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 
   .section-title {
     margin-bottom: 0;

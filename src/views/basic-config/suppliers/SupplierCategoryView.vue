@@ -104,11 +104,11 @@ function openEdit(record) {
     background: #fff;
     border-radius: 4px;
     padding: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .toolbar-row {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 }
 

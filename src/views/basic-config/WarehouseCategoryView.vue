@@ -197,14 +197,14 @@ function confirmDelete(record) {
     background: #fff;
     border-radius: 4px;
     padding: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .toolbar-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .link-code {

@@ -2128,7 +2128,10 @@ function openBomDetail(bomId, bomName) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
 }
@@ -2158,7 +2161,7 @@ function openBomDetail(bomId, bomName) {
 }
 
 .pending-price-alert {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .section-card {
@@ -2172,15 +2175,15 @@ function openBomDetail(bomId, bomName) {
 .section-title {
   font-weight: 600;
   font-size: 14px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .section-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .section-title-row .section-title {
@@ -2195,7 +2198,7 @@ function openBomDetail(bomId, bomName) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
@@ -2404,7 +2407,7 @@ function openBomDetail(bomId, bomName) {
 
 .il-qr-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 8px;
   font-size: 13px;
   color: rgba(0, 0, 0, 0.88);

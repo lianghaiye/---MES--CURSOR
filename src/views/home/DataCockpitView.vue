@@ -77,7 +77,7 @@ export default { name: 'DataCockpitView' }
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 14px;
   margin-bottom: 12px;
   background: #fff;
@@ -88,7 +88,7 @@ export default { name: 'DataCockpitView' }
 .toolbar-left {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 

@@ -1150,7 +1150,7 @@ export default { name: 'CreateOutsourcingOrderModal' }
   background: #fff;
   border-radius: 6px;
   padding: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border: 1px solid #f0f0f0;
 
   .section-title-row {

@@ -597,7 +597,7 @@ function handleDelete() {
   .section-title {
     font-weight: 600;
     font-size: 14px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .link-code {

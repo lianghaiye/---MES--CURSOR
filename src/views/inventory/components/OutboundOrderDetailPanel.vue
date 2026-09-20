@@ -20,25 +20,16 @@
     </div>
 
     <div v-if="hasActions" class="detail-action-bar">
-      <a-space :size="8" wrap>
-        <a-button
-          v-if="canApproveOutbound(record)"
-          type="primary"
-          size="small"
-          @click="emit('approve')"
-        >
+      <a-space :size="8">
+        <a-button v-if="canApproveOutbound(record)" type="primary" @click="emit('approve')">
           审批
         </a-button>
-        <a-button v-if="canConfirm" type="primary" size="small" @click="emit('confirm')">
-          确认出库
-        </a-button>
-        <a-button v-if="canRefuseOutbound(record)" size="small" danger @click="emit('refuse')">
+        <a-button v-if="canConfirm" type="primary" @click="emit('confirm')"> 确认出库 </a-button>
+        <a-button v-if="canRefuseOutbound(record)" danger @click="emit('refuse')">
           拒绝出库
         </a-button>
-        <a-button v-if="canDeleteOutbound(record)" size="small" danger @click="emit('delete')">
-          删除
-        </a-button>
-        <a-button v-if="canInitiateFactoryQc(record)" size="small" @click="emit('initiate-qc')">
+        <a-button v-if="canDeleteOutbound(record)" danger @click="emit('delete')"> 删除 </a-button>
+        <a-button v-if="canInitiateFactoryQc(record)" @click="emit('initiate-qc')">
           {{ initiateQcLabel }}
         </a-button>
       </a-space>
@@ -629,7 +620,7 @@ export default { name: 'OutboundOrderDetailPanel' }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 10px;
   padding: 0;
   border-bottom: none;
@@ -678,8 +669,35 @@ export default { name: 'OutboundOrderDetailPanel' }
 
 .detail-action-bar {
   margin-bottom: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  :deep(.ant-space) {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  :deep(.ant-space-item) {
+    margin-bottom: 0 !important;
+  }
+
+  :deep(.ant-btn) {
+    height: 32px;
+    padding: 0 15px;
+    font-size: 14px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
 }
 
 .detail-tabs {
@@ -730,7 +748,7 @@ export default { name: 'OutboundOrderDetailPanel' }
   border: 1px solid #f0f0f0;
   border-radius: 6px;
   padding: 14px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 
   &:last-child {

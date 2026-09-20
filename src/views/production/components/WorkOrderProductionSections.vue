@@ -248,7 +248,7 @@ const detailFields = computed(() => {
         },
         {
           key: 'alreadyScheduledQty',
-          label: '已排产数量',
+          label: '已排产',
           getValue: () => displayValue(getBatchesScheduledQty(wo)),
         },
       )
@@ -259,7 +259,7 @@ const detailFields = computed(() => {
     fields.push(
       { key: 'processRouteName', label: '工艺路线', value: wo.processRouteName },
       { key: 'planQty', label: '计划数量', value: getWorkOrderPlanQty(wo) },
-      { key: 'scheduleQty', label: '已排产数量', value: getBatchesScheduledQty(wo) },
+      { key: 'scheduleQty', label: '已排产', value: getBatchesScheduledQty(wo) },
     )
   }
 
