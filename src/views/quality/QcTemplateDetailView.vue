@@ -3,30 +3,42 @@
     <a-spin :spinning="loading">
       <a-empty v-if="!loading && !record" description="模板不存在或已删除" />
       <template v-else-if="record">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="page-title">{{ pageTitle }}</span>
-            <a-tag :color="record.isSystem ? 'blue' : 'processing'">
-              {{ record.type || '—' }}
-            </a-tag>
-            <a-tag
-              v-if="!record.isSystem"
-              :color="record.status === '启用' ? 'success' : 'default'"
-            >
-              {{ record.status || '—' }}
-            </a-tag>
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ pageTitle }}</span>
+              <a-tag :color="record.isSystem ? 'blue' : 'processing'">
+                {{ record.type || '—' }}
+              </a-tag>
+              <a-tag
+                v-if="!record.isSystem"
+                :color="record.status === '启用' ? 'success' : 'default'"
+              >
+                {{ record.status || '—' }}
+              </a-tag>
+            </div>
+            <a-space :size="8">
+              <a-button v-if="record.isSystem" type="primary" size="small" @click="handleCopy">
+                复制
+              </a-button>
+              <a-button v-else type="primary" size="small" @click="handleEdit">编辑</a-button>
+            </a-space>
           </div>
-          <a-space>
-            <a-button v-if="record.isSystem" type="primary" size="small" @click="handleCopy">
-              复制
-            </a-button>
-            <a-button v-else type="primary" size="small" @click="handleEdit">编辑</a-button>
-          </a-space>
+
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="activeTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="detail" tab="模板详情" />
+              <a-tab-pane key="fill" tab="填写预览" />
+            </a-tabs>
+          </div>
         </div>
 
-        <DetailSectionCard title="模板详情">
-          <QcTemplateDetailPanel :record="record" :table-scroll-y="560" />
-        </DetailSectionCard>
+        <div class="tab-body">
+          <QcTemplateDetailPanel :record="record" :active-tab="activeTab" :table-scroll-y="560" />
+        </div>
       </template>
     </a-spin>
   </div>
@@ -37,7 +49,6 @@ export default { name: 'QcTemplateDetailView' }
 </script>
 
 <script setup>
-import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
@@ -59,6 +70,7 @@ const qcTemplateCreatePage = findCreatePageByListPath('/quality/qc-template')
 
 const loading = ref(false)
 const record = ref(null)
+const activeTab = ref('detail')
 
 const pageTitle = computed(() => {
   const code = record.value?.code
@@ -73,6 +85,7 @@ function loadRecord() {
     ensureQcTemplateDemoSeed()
     const id = String(route.params.id || '').trim()
     record.value = id ? getQcTemplateById(id) : null
+    activeTab.value = 'detail'
   } finally {
     loading.value = false
   }
@@ -116,17 +129,45 @@ watch(
 
 <style lang="less" scoped>
 .qc-template-detail-page {
-  padding: 16px;
+  margin: -12px;
+  padding: 12px;
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
   background: var(--page-bg, #f0f2f5);
-  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--page-bg, #f0f2f5);
 }
 
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .header-left {
@@ -136,16 +177,20 @@ watch(
   min-width: 0;
 }
 
-.page-title {
+.order-no {
   font-size: 16px;
   font-weight: 600;
-  color: #1f2329;
+  color: rgba(0, 0, 0, 0.88);
 }
 
-.section-card {
-  background: #fff;
-  border: 1px solid #e5e6eb;
-  border-radius: 8px;
-  padding: 12px 16px 16px;
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
+
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 12px 16px;
+  overflow: auto;
 }
 </style>
