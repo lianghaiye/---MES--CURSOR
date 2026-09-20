@@ -2,7 +2,7 @@
   <div class="outbound-order-basic-section">
     <div class="meta-bar">
       <div v-for="item in metaItems" :key="item.key" class="meta-item">
-        <span class="field-label">{{ item.label }}：</span>
+        <span class="field-label">{{ item.label }}</span>
         <span class="field-value" :title="item.value">{{ item.value }}</span>
       </div>
     </div>
@@ -14,7 +14,7 @@
         class="info-item"
         :class="{ 'info-item-full': field.fullRow }"
       >
-        <span class="field-label">{{ field.label }}：</span>
+        <span class="field-label">{{ field.label }}</span>
         <span v-if="field.slot === 'sourceOrderNo'" class="field-value">
           <slot name="sourceOrderNo" />
         </span>
@@ -114,10 +114,10 @@ export default { name: 'OutboundOrderBasicInfoSection' }
 @label-width: 108px;
 
 .outbound-order-basic-section {
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
 }
 
 .field-label {

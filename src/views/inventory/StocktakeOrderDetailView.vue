@@ -178,6 +178,7 @@
       v-model:open="postModeModalOpen"
       :title="postModeModalTitle"
       :hint="postModeModalHint"
+      :disabled-modes="postModeDisabled"
       @confirm="onPostModeConfirm"
     />
   </div>
@@ -216,6 +217,10 @@ import {
 import { getInboundOrderById, inboundOrderState } from '@/store/inboundOrderStore'
 import { getOutboundOrderById, outboundState } from '@/store/outboundStore'
 import { isStocktakeAutoPostOnApprove } from '@/store/stocktakeSettingsStore'
+import {
+  buildStocktakeContinuePostHint,
+  resolveStocktakePostModeDisabled,
+} from '@/utils/stocktakeConfirm'
 import InventoryDocRefuseModal from './components/InventoryDocRefuseModal.vue'
 import StocktakePostModeModal from './components/StocktakePostModeModal.vue'
 import StocktakeOrderBasicInfoSection from './components/StocktakeOrderBasicInfoSection.vue'
@@ -235,6 +240,7 @@ const refuseModalOpen = ref(false)
 const postModeModalOpen = ref(false)
 const postModeModalTitle = ref('生成盘盈盘亏')
 const postModeModalHint = ref('请选择本次要生成的单据范围。')
+const postModeDisabled = ref({})
 const infoTab = ref('basic')
 
 const record = computed(() => {
@@ -437,8 +443,9 @@ function handlePost() {
   postModeModalHint.value = isRetry
     ? record.value.postingError || '请选择本次要重新生成的单据范围。'
     : isPartial
-      ? '当前为部分过账，请选择要继续生成的单据范围。'
+      ? buildStocktakeContinuePostHint(record.value)
       : '请选择本次要生成的单据范围。'
+  postModeDisabled.value = resolveStocktakePostModeDisabled(record.value, { isPartial })
   postModeModalOpen.value = true
 }
 

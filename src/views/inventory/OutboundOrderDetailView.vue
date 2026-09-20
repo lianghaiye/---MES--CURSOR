@@ -2,77 +2,76 @@
   <div class="outbound-detail-page">
     <a-spin :spinning="loading">
       <template v-if="record">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="page-title">{{ record.docNo }}</span>
-            <a-tag :color="outboundStatusColor(record.status)">{{ record.status }}</a-tag>
-            <span class="sub-type">{{ record.outboundType }}</span>
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ record.docNo }}</span>
+              <a-tag :color="outboundStatusColor(record.status)">{{ record.status }}</a-tag>
+              <span class="sub">{{ record.outboundType }}</span>
+            </div>
+            <a-space :size="8">
+              <a-button size="small" @click="openPrint">打印</a-button>
+              <a-button
+                v-if="canApproveOutbound(record)"
+                type="primary"
+                size="small"
+                @click="handleApprove"
+              >
+                审批
+              </a-button>
+              <a-button
+                v-if="canConfirm(record)"
+                type="primary"
+                size="small"
+                @click="handleConfirmOutbound"
+              >
+                确认出库
+              </a-button>
+              <a-button
+                v-if="canRefuseOutbound(record)"
+                size="small"
+                danger
+                @click="handleRefuseOutbound"
+              >
+                拒绝出库
+              </a-button>
+              <a-button v-if="canEditOutbound(record)" size="small" @click="openEdit">
+                编辑
+              </a-button>
+              <a-button v-if="canDeleteOutbound(record)" size="small" danger @click="handleDelete">
+                删除
+              </a-button>
+              <a-button v-if="canInitiateFactoryQc(record)" size="small" @click="handleInitiateQc">
+                {{ initiateQcActionLabel(record) }}
+              </a-button>
+              <a-button size="small" @click="goBack">返回列表</a-button>
+            </a-space>
           </div>
-          <a-space>
-            <a-button type="link" size="small" @click="openPrint">
-              <PrinterOutlined />
-              打印
-            </a-button>
-            <a-button
-              v-if="canApproveOutbound(record)"
-              type="primary"
-              size="small"
-              @click="handleApprove"
-            >
-              审批
-            </a-button>
-            <a-button
-              v-if="canConfirm(record)"
-              type="primary"
-              size="small"
-              @click="handleConfirmOutbound"
-            >
-              确认出库
-            </a-button>
-            <a-button
-              v-if="canRefuseOutbound(record)"
-              size="small"
-              danger
-              @click="handleRefuseOutbound"
-            >
-              拒绝出库
-            </a-button>
-            <a-button v-if="canEditOutbound(record)" size="small" @click="openEdit">
-              编辑
-            </a-button>
-            <a-button v-if="canDeleteOutbound(record)" size="small" danger @click="handleDelete">
-              删除
-            </a-button>
-            <a-button v-if="canInitiateFactoryQc(record)" size="small" @click="handleInitiateQc">
-              {{ initiateQcActionLabel(record) }}
-            </a-button>
-            <a-button size="small" @click="goBack">返回列表</a-button>
-          </a-space>
-        </div>
 
-        <div class="detail-tabs-wrap">
-          <a-tabs
-            v-model:active-key="infoTab"
-            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-          >
-            <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane
-              v-if="isMaterialReqOutbound"
-              key="related"
-              :tab="`关联单据 (${relatedInbounds.length})`"
-            />
-            <a-tab-pane
-              v-if="isPurchaseReturnOutbound"
-              key="related"
-              :tab="`关联单据 (${relatedPurchaseReturns.length})`"
-            />
-            <a-tab-pane
-              v-if="isMaterialReqOutbound"
-              key="cutSettle"
-              :tab="`下料结算 (${relatedCutSettleLines.length})`"
-            />
-            <a-tab-pane key="logs" tab="操作日志" />
-          </a-tabs>
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="infoTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane
+                v-if="isMaterialReqOutbound"
+                key="related"
+                :tab="`关联单据 (${relatedInbounds.length})`"
+              />
+              <a-tab-pane
+                v-if="isPurchaseReturnOutbound"
+                key="related"
+                :tab="`关联单据 (${relatedPurchaseReturns.length})`"
+              />
+              <a-tab-pane
+                v-if="isMaterialReqOutbound"
+                key="cutSettle"
+                :tab="`下料结算 (${relatedCutSettleLines.length})`"
+              />
+              <a-tab-pane key="logs" tab="操作日志" />
+            </a-tabs>
+          </div>
         </div>
 
         <div class="tab-body">
@@ -412,7 +411,7 @@ import {
   normalizePieceSerialNos,
   resolveOutboundStockUnit,
 } from '@/utils/outboundLineHelpers'
-import { InfoCircleOutlined, PrinterOutlined } from '@ant-design/icons-vue'
+import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import OutboundOrderBasicInfoSection from './components/OutboundOrderBasicInfoSection.vue'
 import OutboundRefuseModal from './components/OutboundRefuseModal.vue'
 import OutboundOrderPrintModal from './components/OutboundOrderPrintModal.vue'
@@ -801,113 +800,147 @@ function handleInitiateQc() {
 
 <style lang="less" scoped>
 .outbound-detail-page {
-  .page-header {
+  margin: -12px;
+  padding: 12px;
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
+  background: var(--page-bg, #f0f2f5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 12px;
-    background: #fff;
-    border-bottom: 1px solid #e8e8e8;
+    flex-direction: column;
   }
+}
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--page-bg, #f0f2f5);
+}
 
-  .page-title {
-    font-size: 18px;
-    font-weight: 600;
-  }
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
 
-  .sub-type {
-    color: #8c8c8c;
-  }
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 
-  .detail-tabs-wrap {
-    padding-bottom: 8px;
-  }
+.order-no {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
 
-  .tab-body {
-    margin-top: 0;
-    padding: 0 12px 16px;
-    background: var(--page-bg, #f0f2f5);
-  }
+.sub {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+}
 
-  .section-card {
-    background: #fff;
-    border: 1px solid #f0f0f0;
-    border-radius: 6px;
-    padding: 14px 16px;
-    margin-bottom: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  }
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
 
-  .section-title {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 8px;
-    color: rgba(0, 0, 0, 0.85);
-  }
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 12px 16px;
+  overflow: auto;
+}
 
-  .link-code {
-    color: #1677ff;
-    cursor: pointer;
-  }
+.section-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
 
-  .delivery-remark-cell {
-    display: inline-block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: bottom;
-  }
+.section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: rgba(0, 0, 0, 0.85);
+}
 
-  .col-title-with-tip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
+.link-code {
+  color: #1677ff;
+  cursor: pointer;
+}
 
-  .col-tip-icon {
-    color: rgba(0, 0, 0, 0.45);
-    font-size: 12px;
-    cursor: help;
-  }
+.delivery-remark-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
 
-  .unit-suffix {
-    margin-left: 4px;
-    color: rgba(0, 0, 0, 0.45);
-    font-size: 12px;
-  }
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
-  .blank-size-hint {
-    margin-top: 2px;
-    font-size: 11px;
-    color: #d46b08;
-    line-height: 1.25;
-    word-break: break-all;
-  }
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
+}
 
-  .manual-pick-tag {
-    margin-bottom: 2px;
-    font-size: 11px;
-    color: #1677ff;
-  }
+.unit-suffix {
+  margin-left: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
 
-  .piece-serials {
-    margin-top: 4px;
-    font-size: 12px;
-    color: rgba(0, 0, 0, 0.45);
-    line-height: 1.4;
-    word-break: break-all;
-  }
+.blank-size-hint {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #d46b08;
+  line-height: 1.25;
+  word-break: break-all;
+}
 
-  :deep(.line-summary-row .ant-table-cell) {
-    background: #fafafa;
-    font-weight: 600;
-  }
+.manual-pick-tag {
+  margin-bottom: 2px;
+  font-size: 11px;
+  color: #1677ff;
+}
+
+.piece-serials {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+:deep(.line-summary-row .ant-table-cell) {
+  background: #fafafa;
+  font-weight: 600;
 }
 </style>

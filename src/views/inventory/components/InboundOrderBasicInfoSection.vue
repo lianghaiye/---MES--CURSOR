@@ -2,7 +2,7 @@
   <div class="inbound-order-basic-section">
     <div class="meta-bar">
       <div v-for="item in metaItems" :key="item.key" class="meta-item">
-        <span class="field-label">{{ item.label }}：</span>
+        <span class="field-label">{{ item.label }}</span>
         <span class="field-value" :title="item.value">{{ item.value }}</span>
       </div>
     </div>
@@ -14,7 +14,7 @@
         class="info-item"
         :class="{ 'info-item-full': field.fullRow }"
       >
-        <span class="field-label">{{ field.label }}：</span>
+        <span class="field-label">{{ field.label }}</span>
         <span v-if="field.slot === 'sourceOrderNo'" class="field-value">
           <slot name="sourceOrderNo" />
         </span>

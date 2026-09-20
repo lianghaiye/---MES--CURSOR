@@ -237,6 +237,7 @@
       v-model:open="postModeModalOpen"
       :title="postModeModalTitle"
       :hint="postModeModalHint"
+      :disabled-modes="postModeDisabled"
       @confirm="onPostModeConfirm"
     />
   </div>
@@ -282,8 +283,13 @@ import {
   refuseStocktake,
   withdrawStocktake,
   deleteStocktakeOrder,
+  getStocktakeOrderById,
 } from '@/store/stocktakeOrderStore'
 import { isStocktakeAutoPostOnApprove } from '@/store/stocktakeSettingsStore'
+import {
+  buildStocktakeContinuePostHint,
+  resolveStocktakePostModeDisabled,
+} from '@/utils/stocktakeConfirm'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { useTabs } from '@/composables/useTabs'
@@ -310,6 +316,7 @@ const refuseTargets = ref([])
 const postModeModalOpen = ref(false)
 const postModeModalTitle = ref('生成盘盈盘亏')
 const postModeModalHint = ref('请选择本次要生成的单据范围。')
+const postModeDisabled = ref({})
 const postTargetIds = ref([])
 
 const warehouseOpts = computed(() => getWarehouseSelectOptions())
@@ -420,9 +427,10 @@ function reportPostResult({ count, blocked, partialCount }) {
   }
 }
 
-function openPostModeModal({ title, hint, ids }) {
+function openPostModeModal({ title, hint, ids, disabledModes = {} }) {
   postModeModalTitle.value = title
   postModeModalHint.value = hint
+  postModeDisabled.value = disabledModes
   postTargetIds.value = ids || []
   postModeModalOpen.value = true
 }
@@ -436,6 +444,7 @@ function onPostModeConfirm(mode) {
     selectedRowKeys.value = selectedRowKeys.value.filter((id) => !ids.includes(id))
   }
   postTargetIds.value = []
+  postModeDisabled.value = {}
 }
 
 function handlePostOne(record) {
@@ -450,9 +459,10 @@ function handlePostOne(record) {
     hint: isRetry
       ? record.postingError || '请选择本次要重新生成的单据范围。'
       : isPartial
-        ? '当前为部分过账，请选择要继续生成的单据范围。'
+        ? buildStocktakeContinuePostHint(record)
         : '请选择本次要生成的单据范围。',
     ids: [record.id],
+    disabledModes: resolveStocktakePostModeDisabled(record, { isPartial }),
   })
 }
 
@@ -461,10 +471,21 @@ function handlePostSelected() {
     message.warning('请先选择盘点单')
     return
   }
+  // 批量时仅在全部为同一部分过账侧时才禁用；否则保持全可选
+  const rows = selectedRowKeys.value.map((id) => getStocktakeOrderById(id)).filter(Boolean)
+  const allPartial =
+    rows.length > 0 && rows.every((r) => r.postingStatus === STOCKTAKE_POSTING.PARTIAL)
+  const disabledModes = allPartial
+    ? resolveStocktakePostModeDisabled(rows[0], { isPartial: true })
+    : {}
+  const hint = allPartial
+    ? buildStocktakeContinuePostHint(rows[0])
+    : '仅「审核通过」且待过账/过账失败的单据会执行；请选择生成范围。'
   openPostModeModal({
     title: '对所选盘点单生成盘盈盘亏',
-    hint: '仅「审核通过」且待过账/过账失败的单据会执行；请选择生成范围。',
+    hint,
     ids: [...selectedRowKeys.value],
+    disabledModes,
   })
 }
 

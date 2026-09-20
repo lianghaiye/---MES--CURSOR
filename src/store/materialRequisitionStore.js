@@ -148,9 +148,13 @@ export function createMaterialDeductRecord(payload = {}) {
     deductSource: payload.deductSource || MATERIAL_DEDUCT_SOURCES.WORK_ORDER,
     deductNo: payload.deductNo || generateMaterialDeductNo(),
     productName: payload.productName || '',
+    productCode: payload.productCode || '',
     productSpec: payload.productSpec || '',
     material: payload.material || '',
     drawingNo: payload.drawingNo || '',
+    variantSummary: payload.variantSummary || '',
+    ebomName: payload.ebomName || '',
+    ebomVersion: payload.ebomVersion || '',
     reportQty: Number(payload.reportQty) || 0,
     deductTime: '',
     warehouseName: payload.warehouseName || '',
@@ -230,15 +234,40 @@ function shouldReseed() {
   return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
 }
 
-function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      records: materialRequisitionState.records,
-      stats: materialRequisitionState.stats,
-    }),
+function isQuotaExceededError(err) {
+  if (!err) return false
+  return (
+    err.name === 'QuotaExceededError' ||
+    err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    err.code === 22 ||
+    err.code === 1014
   )
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+}
+
+function persist() {
+  const payload = JSON.stringify({
+    records: materialRequisitionState.records,
+    stats: materialRequisitionState.stats,
+  })
+  try {
+    localStorage.setItem(STORAGE_KEY, payload)
+    localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+    return
+  } catch (err) {
+    if (!isQuotaExceededError(err)) return
+  }
+  // 配额不足：清掉本 key 再写；仍失败则放弃持久化，不抛错打断页面操作
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.setItem(STORAGE_KEY, payload)
+    localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  } catch {
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 function createInitial() {

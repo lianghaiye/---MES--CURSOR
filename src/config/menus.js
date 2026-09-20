@@ -10,6 +10,7 @@ export const topModules = [
   { key: 'inventory', label: '库存管理', path: '/inventory' },
   { key: 'quality', label: '质量管理', path: '/quality' },
   { key: 'procurement', label: '采购管理', path: '/procurement' },
+  { key: 'outsourcing', label: '外协管理', path: '/procurement/outsourcing-orders' },
   { key: 'engineering-change', label: '工程变更', path: '/engineering-change/ecn-list' },
   { key: 'after-sales', label: '售后管理', path: '/after-sales' },
   { key: 'industrial-id', label: '工业标识', path: '/industrial-id' },
@@ -138,6 +139,8 @@ export const sideMenus = {
     { key: 'purchase-settle-rules', label: '结算规则', path: '/procurement/purchase-settle-rules' },
     { key: 'purchase-returns', label: '采购退货', path: '/procurement/purchase-returns' },
     { key: 'purchase-details', label: '采购明细', path: '/procurement/purchase-details' },
+  ],
+  outsourcing: [
     { key: 'outsourcing-orders', label: '外协订单', path: '/procurement/outsourcing-orders' },
     {
       key: 'outsourcing-issue',
@@ -259,6 +262,8 @@ export function findSideMenuItemByPath(path) {
 
 /** 根据路由路径解析所属顶栏模块 key */
 export function resolveModuleKey(path) {
+  // 外协页面仍挂在 /procurement/outsourcing-*，顶栏归「外协管理」
+  if (path.startsWith('/procurement/outsourcing')) return 'outsourcing'
   const segment = path.split('/').filter(Boolean)[0]
   if (!segment) return 'home'
   const all = [...topModules, ...moreModules]

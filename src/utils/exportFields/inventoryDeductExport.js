@@ -1,9 +1,6 @@
 import { cell } from './exportFieldHelpers'
 import { lineVariantSummary } from '@/utils/spuLineResolve'
-import {
-  resolveInventoryDeductDocNo,
-  resolveDeductSourceLabel,
-} from '@/mock/materialRequisitionRecords'
+import { resolveInventoryDeductDocNo } from '@/mock/materialRequisitionRecords'
 
 function lineVariantText(line = {}) {
   return lineVariantSummary(line) || line.variantSummary || ''
@@ -17,7 +14,7 @@ export const inventoryDeductExportFields = [
     getValue: (row) => cell(row, 'docNo') || cell(row, 'workOrderNo'),
   },
   { key: 'deductNo', title: '扣减单号', getValue: (row) => cell(row, 'deductNo') },
-  { key: 'deductSource', title: '扣减来源', getValue: (row) => cell(row, 'deductSource') },
+  { key: 'status', title: '扣减状态', getValue: (row) => cell(row, 'status') },
   { key: 'productName', title: '产品名称', getValue: (row) => cell(row, 'productName') },
   { key: 'productSpec', title: '规格型号', getValue: (row) => cell(row, 'productSpec') },
   { key: 'material', title: '材质', getValue: (row) => cell(row, 'material') },
@@ -26,7 +23,6 @@ export const inventoryDeductExportFields = [
   { key: 'deductTime', title: '扣减时间', getValue: (row) => cell(row, 'deductTime') },
   { key: 'warehouseName', title: '仓库', getValue: (row) => cell(row, 'warehouseName') },
   { key: 'warehouseCode', title: '仓库编码', getValue: (row) => cell(row, 'warehouseCode') },
-  { key: 'status', title: '扣减状态', getValue: (row) => cell(row, 'status') },
   { key: 'materialCode', title: '物料编码', getValue: (row) => cell(row, 'materialCode') },
   { key: 'materialName', title: '物料名称', getValue: (row) => cell(row, 'materialName') },
   { key: 'issueMode', title: '发料方式', getValue: (row) => cell(row, 'issueMode') },
@@ -60,7 +56,6 @@ export function flattenInventoryDeductRows(records = []) {
         docNo,
         workOrderNo: docNo,
         deductNo: r.deductNo,
-        deductSource: resolveDeductSourceLabel(r),
         productName: r.productName,
         productSpec: r.productSpec,
         material: r.material || '',
@@ -90,7 +85,6 @@ export function flattenInventoryDeductRows(records = []) {
         docNo,
         workOrderNo: docNo,
         deductNo: r.deductNo,
-        deductSource: resolveDeductSourceLabel(r),
         productName: r.productName,
         productSpec: r.productSpec,
         material: r.material || '',

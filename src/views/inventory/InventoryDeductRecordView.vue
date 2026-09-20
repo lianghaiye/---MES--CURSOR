@@ -8,58 +8,63 @@
     />
 
     <div class="filter-card">
-      <a-form layout="inline" class="filter-form" :model="filters">
-        <a-form-item label="工单/领料单号">
-          <a-input
-            v-model:value="filters.workOrderNo"
-            allow-clear
-            placeholder="搜索工单号或领料单号"
-            style="width: 180px"
-            @press-enter="handleSearch"
-          />
-        </a-form-item>
-        <a-form-item label="扣减状态">
-          <a-select
-            v-model:value="filters.status"
-            :options="statusOptions"
-            style="width: 140px"
-            placeholder="全部"
-          />
-        </a-form-item>
-        <a-form-item label="扣减来源">
-          <a-select
-            v-model:value="filters.deductSource"
-            :options="sourceOptions"
-            style="width: 140px"
-            placeholder="全部"
-          />
-        </a-form-item>
-        <a-form-item label="仓库">
-          <a-select
-            v-model:value="filters.warehouse"
-            :options="warehouseOptions"
-            style="width: 140px"
-            placeholder="全部仓库"
-          />
-        </a-form-item>
-        <a-form-item label="日期">
-          <a-date-picker
-            v-model:value="filters.date"
-            allow-clear
-            value-format="YYYY-MM-DD"
-            placeholder="选择日期"
-            style="width: 140px"
-          />
-        </a-form-item>
-        <a-form-item class="filter-actions">
-          <a-space :size="8">
-            <a-button type="primary" size="small" @click="handleSearch">
-              <SearchOutlined />
-              搜索
-            </a-button>
-            <a-button size="small" @click="handleReset">清空</a-button>
-          </a-space>
-        </a-form-item>
+      <a-form layout="inline" class="filter-form horizontal-form" :model="filters">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="工单/领料单号">
+              <a-input
+                v-model:value="filters.workOrderNo"
+                allow-clear
+                size="small"
+                placeholder="搜索工单号或领料单号"
+                @press-enter="handleSearch"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="扣减状态">
+              <a-select
+                v-model:value="filters.status"
+                :options="statusOptions"
+                size="small"
+                placeholder="全部"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="仓库">
+              <a-select
+                v-model:value="filters.warehouse"
+                :options="warehouseOptions"
+                size="small"
+                placeholder="全部仓库"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="日期">
+              <a-date-picker
+                v-model:value="filters.date"
+                allow-clear
+                size="small"
+                value-format="YYYY-MM-DD"
+                placeholder="选择日期"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item class="filter-actions-item">
+              <a-space :size="8">
+                <a-button type="primary" size="small" @click="handleSearch">
+                  <SearchOutlined />
+                  搜索
+                </a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
       </a-form>
     </div>
 
@@ -84,16 +89,25 @@
         row-key="id"
         size="middle"
         :pagination="false"
+        :scroll="{ x: 1680 }"
         :row-selection="rowSelection"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'workOrderNo'">
-            <div class="wo-cell">
-              <a class="wo-link" @click.prevent="openDetail(record)">
-                {{ resolveDocNo(record) }}
-              </a>
-              <div class="deduct-no">{{ record.deductNo }}</div>
-            </div>
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'status'">
+            <span class="status-tag" :class="statusClass(record.status)">{{ record.status }}</span>
+          </template>
+          <template v-else-if="column.key === 'index'">
+            {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
+          </template>
+          <template v-else-if="column.key === 'deductNo'">
+            <a class="wo-link" @click.prevent="openDetail(record)">
+              {{ record.deductNo || '—' }}
+            </a>
+          </template>
+          <template v-else-if="column.key === 'workOrderNo'">
+            <a class="wo-link" @click.prevent="openSourceDoc(record)">
+              {{ resolveDocNo(record) }}
+            </a>
           </template>
           <template v-else-if="column.key === 'product'">
             <span>{{ record.productName || '—' }}</span>
@@ -113,14 +127,8 @@
           <template v-else-if="column.key === 'warehouse'">
             {{ record.warehouseName }} ({{ record.warehouseCode }})
           </template>
-          <template v-else-if="column.key === 'deductSource'">
-            {{ resolveDeductSourceLabel(record) }}
-          </template>
           <template v-else-if="column.key === 'materialRows'">
             {{ record.materialDone }}/{{ record.materialTotal }}
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <span class="status-tag" :class="statusClass(record.status)">{{ record.status }}</span>
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space :size="8">
@@ -187,10 +195,7 @@ import { ExclamationCircleOutlined, SearchOutlined } from '@ant-design/icons-vue
 import {
   MATERIAL_DEDUCT_STATUS,
   MATERIAL_DEDUCT_STATUS_OPTIONS,
-  MATERIAL_DEDUCT_SOURCE_OPTIONS,
   resolveInventoryDeductDocNo,
-  resolveDeductSource,
-  resolveDeductSourceLabel,
   isQuickMaterialDeduct,
 } from '@/mock/materialRequisitionRecords'
 import {
@@ -204,6 +209,7 @@ import {
 } from '@/store/materialRequisitionStore'
 import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
+import { openInventoryDeductSourceDoc } from '@/utils/openInventoryDeductSourceDoc'
 import ListPeriodStatsPanel from '@/components/ListPeriodStatsPanel.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useListExport } from '@/composables/useListExport'
@@ -220,7 +226,6 @@ const STATUS = MATERIAL_DEDUCT_STATUS
 const filters = reactive({
   workOrderNo: '',
   status: '',
-  deductSource: '',
   warehouse: '',
   date: undefined,
 })
@@ -234,7 +239,6 @@ const pagination = reactive({
 const selectedRowKeys = ref([])
 
 const statusOptions = MATERIAL_DEDUCT_STATUS_OPTIONS
-const sourceOptions = MATERIAL_DEDUCT_SOURCE_OPTIONS
 
 const warehouseOptions = computed(() => {
   const map = new Map()
@@ -284,7 +288,10 @@ const statCards = computed(() => [
 ])
 
 const columns = [
-  { title: '工单/领料单号', key: 'workOrderNo', width: 180 },
+  { title: '序号', key: 'index', width: 64, align: 'center', fixed: 'left' },
+  { title: '扣减状态', key: 'status', width: 110, fixed: 'left' },
+  { title: '扣减单号', key: 'deductNo', width: 150 },
+  { title: '工单/领料单号', key: 'workOrderNo', width: 160 },
   { title: '产品名称', key: 'product', width: 120, ellipsis: true },
   { title: '规格型号', key: 'productSpec', width: 120, ellipsis: true },
   { title: '材质', key: 'material', width: 100, ellipsis: true },
@@ -292,9 +299,7 @@ const columns = [
   { title: '报工数量', dataIndex: 'reportQty', key: 'reportQty', width: 100, align: 'right' },
   { title: '扣减时间', key: 'deductTime', width: 170 },
   { title: '仓库', key: 'warehouse', width: 160 },
-  { title: '扣减来源', key: 'deductSource', width: 100 },
   { title: '物料行数', key: 'materialRows', width: 100, align: 'center' },
-  { title: '扣减状态', key: 'status', width: 110 },
   { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
@@ -319,7 +324,6 @@ const filteredList = computed(() => {
     )
       return false
     if (f.status && r.status !== f.status) return false
-    if (f.deductSource && resolveDeductSource(r) !== f.deductSource) return false
     if (f.warehouse) {
       const key = `${r.warehouseName}|${r.warehouseCode}`
       if (key !== f.warehouse) return false
@@ -346,7 +350,6 @@ function handleSearch() {
 function handleReset() {
   filters.workOrderNo = ''
   filters.status = ''
-  filters.deductSource = ''
   filters.warehouse = ''
   filters.date = undefined
   handleSearch()
@@ -388,7 +391,7 @@ const {
   defaultExportFieldSettings,
   doExport,
 } = useListExport({
-  storageKey: 'inventory-deduct-record-list-v4',
+  storageKey: 'inventory-deduct-record-list-v5',
   fieldDefinitions: inventoryDeductExportFields,
   getFilteredRows: () => exportFlatRows.value,
   getSelectedRows: () => selectedExportFlatRows.value,
@@ -427,6 +430,10 @@ function openDetail(record) {
   const path = `/inventory/deduct-records/${record.id}`
   openTab(path, record.deductNo || '扣减记录详情')
   router.push(path)
+}
+
+function openSourceDoc(record) {
+  openInventoryDeductSourceDoc(record, { router, openTab })
 }
 
 function openEdit(record) {
@@ -539,47 +546,9 @@ function onRetry(record) {
 </script>
 
 <style lang="less" scoped>
-.inventory-deduct-record-page {
-  /* 壳层由全局 .list-page 提供 */
-}
-
-.filter-card {
-  /* 由 .list-page .filter-card 兜底 */
-}
-
-.filter-form {
-  width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 4px;
-}
-
-.filter-actions {
-  margin-left: 0;
-}
-
-.toolbar-row {
-  /* 由全局 .toolbar-row 白盒兜底 */
-}
-
-.table-card {
-  /* 由 .list-page .table-card 兜底 */
-}
-
-.wo-cell {
-  line-height: 1.35;
-}
-
 .wo-link {
   color: #1677ff;
   cursor: pointer;
-}
-
-.deduct-no {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-  margin-top: 2px;
 }
 
 .status-tag {
@@ -642,21 +611,5 @@ function onRetry(record) {
 .page-summary {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.45);
-}
-
-@media (max-width: 1100px) {
-  .stats-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .stats-row {
-    grid-template-columns: 1fr;
-  }
-
-  .filter-actions {
-    margin-left: 0;
-  }
 }
 </style>

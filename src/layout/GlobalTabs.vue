@@ -92,9 +92,11 @@ function onOpsMenuClick({ key }) {
   padding: 8px 0 0;
   background: transparent;
   z-index: 40;
+  min-width: 0;
 
   :deep(.ant-tabs) {
     color: rgba(0, 0, 0, 0.65);
+    min-width: 0;
   }
 
   :deep(.ant-tabs-nav) {
@@ -105,6 +107,10 @@ function onOpsMenuClick({ key }) {
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     box-sizing: border-box;
+    display: flex !important;
+    align-items: center;
+    flex-wrap: nowrap;
+    min-width: 0;
 
     &::before {
       display: none !important;
@@ -112,8 +118,11 @@ function onOpsMenuClick({ key }) {
     }
   }
 
+  /* 标签可横向滚动/收纳，为右侧操作区留出空间 */
   :deep(.ant-tabs-nav-wrap) {
-    overflow: visible !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
   }
 
   :deep(.ant-tabs-nav-list) {
@@ -122,18 +131,24 @@ function onOpsMenuClick({ key }) {
     gap: 4px;
   }
 
-  :deep(.ant-tabs-extra-content) {
-    display: flex;
-    align-items: center;
-    margin-left: 8px;
-    flex-shrink: 0;
-  }
-
   :deep(.ant-tabs-nav-operations) {
+    flex-shrink: 0;
+    align-self: center;
+
     .ant-tabs-nav-more {
       padding: 4px 8px;
       border-radius: 6px;
+      margin-inline-end: 4px;
     }
+  }
+
+  :deep(.ant-tabs-extra-content) {
+    display: flex;
+    align-items: center;
+    margin-left: 4px;
+    flex: 0 0 auto !important;
+    position: relative;
+    z-index: 2;
   }
 
   .tabs-ops-trigger {
@@ -166,6 +181,7 @@ function onOpsMenuClick({ key }) {
     background: transparent !important;
     border: none !important;
     border-radius: 6px !important;
+    flex-shrink: 0;
     transition:
       background 0.2s,
       color 0.2s;
@@ -179,6 +195,10 @@ function onOpsMenuClick({ key }) {
       font-size: 13px;
       line-height: 20px;
       text-shadow: none;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .ant-tabs-tab-remove {

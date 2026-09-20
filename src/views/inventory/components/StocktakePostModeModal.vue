@@ -5,6 +5,7 @@
     ok-text="确认"
     cancel-text="取消"
     destroy-on-close
+    :ok-button-props="{ disabled: !canConfirm }"
     @ok="handleOk"
     @cancel="emit('update:open', false)"
   >
@@ -14,36 +15,59 @@
         v-for="opt in STOCKTAKE_POST_MODE_OPTIONS"
         :key="opt.value"
         :value="opt.value"
+        :disabled="Boolean(disabledMap[opt.value])"
         class="post-mode-item"
       >
-        {{ opt.label }}
+        <span>{{ opt.label }}</span>
+        <span
+          v-if="disabledMap[opt.value] && opt.value !== STOCKTAKE_POST_MODE.BOTH"
+          class="opt-tip"
+        >
+          （已生成）
+        </span>
       </a-radio>
     </a-radio-group>
   </a-modal>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { STOCKTAKE_POST_MODE, STOCKTAKE_POST_MODE_OPTIONS } from '@/utils/stocktakeConfirm'
+import { computed, ref, watch } from 'vue'
+import {
+  STOCKTAKE_POST_MODE,
+  STOCKTAKE_POST_MODE_OPTIONS,
+  resolveDefaultStocktakePostMode,
+} from '@/utils/stocktakeConfirm'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   title: { type: String, default: '生成盘盈盘亏' },
   hint: { type: String, default: '请选择本次要生成的单据范围。' },
+  /** { gain, loss, both } 为 true 时禁用 */
+  disabledModes: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
 
 const mode = ref(STOCKTAKE_POST_MODE.BOTH)
 
+const disabledMap = computed(() => ({
+  [STOCKTAKE_POST_MODE.GAIN]: Boolean(props.disabledModes?.[STOCKTAKE_POST_MODE.GAIN]),
+  [STOCKTAKE_POST_MODE.LOSS]: Boolean(props.disabledModes?.[STOCKTAKE_POST_MODE.LOSS]),
+  [STOCKTAKE_POST_MODE.BOTH]: Boolean(props.disabledModes?.[STOCKTAKE_POST_MODE.BOTH]),
+}))
+
+const canConfirm = computed(() => !disabledMap.value[mode.value])
+
 watch(
-  () => props.open,
-  (v) => {
-    if (v) mode.value = STOCKTAKE_POST_MODE.BOTH
+  () => [props.open, props.disabledModes],
+  ([v]) => {
+    if (!v) return
+    mode.value = resolveDefaultStocktakePostMode(disabledMap.value)
   },
 )
 
 function handleOk() {
+  if (!canConfirm.value) return
   emit('confirm', mode.value)
   emit('update:open', false)
 }
@@ -58,6 +82,7 @@ export default { name: 'StocktakePostModeModal' }
   margin: 0 0 12px;
   color: rgba(0, 0, 0, 0.65);
   font-size: 13px;
+  line-height: 1.5;
 }
 
 .post-mode-group {
@@ -68,5 +93,11 @@ export default { name: 'StocktakePostModeModal' }
 
 .post-mode-item {
   margin-inline-end: 0;
+}
+
+.opt-tip {
+  margin-left: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

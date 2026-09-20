@@ -2,51 +2,52 @@
   <div class="inbound-detail-page">
     <a-spin :spinning="loading">
       <template v-if="record">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="page-title">{{ record.docNo }}</span>
-            <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
-            <span class="sub-type">{{ record.inboundType }}</span>
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ record.docNo }}</span>
+              <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+              <span class="sub">{{ record.inboundType }}</span>
+            </div>
+            <a-space :size="8">
+              <a-button size="small" @click="openPrint">打印</a-button>
+              <template v-if="canApproveInbound(record)">
+                <a-button type="primary" size="small" @click="handleApprovePass">通过</a-button>
+                <a-button size="small" danger @click="handleApproveReject">拒绝</a-button>
+                <a-button size="small" @click="goBack">返回列表</a-button>
+              </template>
+              <template v-else>
+                <a-button
+                  v-if="canConfirmInbound(record)"
+                  type="primary"
+                  size="small"
+                  @click="handleConfirmInbound"
+                >
+                  确认入库
+                </a-button>
+                <a-button v-if="canRefuseInbound(record)" size="small" danger @click="openRefuse">
+                  拒绝入库
+                </a-button>
+                <a-button v-if="canEditInbound(record)" size="small" @click="openEdit"
+                  >编辑</a-button
+                >
+                <a-button v-if="canDeleteInbound(record)" size="small" danger @click="handleDelete">
+                  删除
+                </a-button>
+                <a-button size="small" @click="goBack">返回列表</a-button>
+              </template>
+            </a-space>
           </div>
-          <a-space>
-            <a-button type="link" size="small" @click="openPrint">
-              <PrinterOutlined />
-              打印
-            </a-button>
-            <template v-if="canApproveInbound(record)">
-              <a-button type="primary" size="small" @click="handleApprovePass">通过</a-button>
-              <a-button size="small" danger @click="handleApproveReject">拒绝</a-button>
-              <a-button size="small" @click="goBack">返回列表</a-button>
-            </template>
-            <template v-else>
-              <a-button
-                v-if="canConfirmInbound(record)"
-                type="primary"
-                size="small"
-                @click="handleConfirmInbound"
-              >
-                确认入库
-              </a-button>
-              <a-button v-if="canRefuseInbound(record)" size="small" danger @click="openRefuse">
-                拒绝入库
-              </a-button>
-              <a-button v-if="canEditInbound(record)" size="small" @click="openEdit">编辑</a-button>
-              <a-button v-if="canDeleteInbound(record)" size="small" danger @click="handleDelete">
-                删除
-              </a-button>
-              <a-button size="small" @click="goBack">返回列表</a-button>
-            </template>
-          </a-space>
-        </div>
 
-        <div class="detail-tabs-wrap">
-          <a-tabs
-            v-model:active-key="activeTab"
-            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-          >
-            <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane key="batches" :tab="`批次详情 (${batchList.length})`" />
-          </a-tabs>
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="activeTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="batches" :tab="`批次详情 (${batchList.length})`" />
+            </a-tabs>
+          </div>
         </div>
 
         <div class="tab-body">
@@ -308,7 +309,6 @@ import InboundOrderBasicInfoSection from './components/InboundOrderBasicInfoSect
 import InboundWorkOrderList from './components/InboundWorkOrderList.vue'
 import InboundRefuseModal from './components/InboundRefuseModal.vue'
 import InboundOrderPrintModal from './components/InboundOrderPrintModal.vue'
-import { PrinterOutlined } from '@ant-design/icons-vue'
 import { resolveInboundWorkOrders } from '@/utils/inboundWorkOrders'
 
 const route = useRoute()
@@ -556,121 +556,160 @@ function handleDelete() {
 
 <style lang="less" scoped>
 .inbound-detail-page {
-  .page-header {
+  margin: -12px;
+  padding: 12px;
+  height: calc(100vh - 112px);
+  max-height: calc(100vh - 112px);
+  min-height: 0;
+  background: var(--page-bg, #f0f2f5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 12px;
-    background: #fff;
-    border-bottom: 1px solid #e8e8e8;
+    flex-direction: column;
   }
+}
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--page-bg, #f0f2f5);
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.order-no {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.sub {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+}
+
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
+
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 12px 16px;
+  overflow: auto;
+}
+
+.section-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.link-code {
+  color: #1677ff;
+  cursor: pointer;
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
+}
+
+.unit-suffix {
+  margin-left: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.piece-hint {
+  margin-left: 4px;
+  color: #1677ff;
+  font-size: 12px;
+}
+
+.empty-inline {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.batch-item-block {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
   }
+}
 
-  .page-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: rgba(0, 0, 0, 0.88);
-  }
+.batch-item-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+}
 
-  .sub-type {
-    color: #8c8c8c;
-  }
+.batch-item-code {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
 
-  .tab-body {
-    padding: 8px 12px 16px;
-  }
+.batch-item-name {
+  color: rgba(0, 0, 0, 0.75);
+}
 
-  .section-card {
-    background: #fff;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  }
+.batch-item-material {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 
-  .section-title {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 8px;
-  }
-
-  .link-code {
-    color: #1677ff;
-    cursor: pointer;
-  }
-
-  .col-title-with-tip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .col-tip-icon {
-    color: rgba(0, 0, 0, 0.45);
-    font-size: 12px;
-    cursor: help;
-  }
-
-  .unit-suffix {
-    margin-left: 4px;
-    color: rgba(0, 0, 0, 0.45);
-    font-size: 12px;
-  }
-
-  .piece-hint {
-    margin-left: 4px;
-    color: #1677ff;
-    font-size: 12px;
-  }
-
-  .empty-inline {
-    color: rgba(0, 0, 0, 0.45);
-    font-size: 12px;
-  }
-
-  .batch-item-block {
-    margin-bottom: 16px;
-
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
-
-  .batch-item-head {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 8px;
-    padding: 8px 10px;
-    background: #fafafa;
-    border: 1px solid #f0f0f0;
-    border-radius: 4px;
-  }
-
-  .batch-item-code {
-    font-weight: 600;
-    color: rgba(0, 0, 0, 0.88);
-  }
-
-  .batch-item-name {
-    color: rgba(0, 0, 0, 0.75);
-  }
-
-  .batch-item-material {
-    color: rgba(0, 0, 0, 0.45);
-    font-size: 12px;
-
-    &::before {
-      content: '·';
-      margin-right: 6px;
-    }
+  &::before {
+    content: '·';
+    margin-right: 6px;
   }
 }
 </style>

@@ -10,6 +10,7 @@
 import { materialInfoState } from '@/store/materialInfoStore'
 import { getWarehouseSelectOptions } from '@/store/warehouseStore'
 import { warehouseState } from '@/store/warehouseStore'
+import { mobileMaterialReqState } from '@/store/mobileMaterialReqStore'
 import { resolveWorkOrderAllMaterialLines } from '@/utils/materialReqEbom'
 import { isBackflushMaterial } from '@/utils/backflushMaterial'
 import { resolveNeedsBlankingSettle } from '@/utils/blankingSettleMaterial'
@@ -29,12 +30,20 @@ function lookupMaterial(code) {
 
 /**
  * 默认完工扣减仓（单据上仍可改）：
- * - 自主领料模式 → 线边仓 / 工单收料仓
+ * - 自主领料：优先领料单「领入仓库」→ 工单工作中心关联仓 → 工单收料/线边仓
  * - 无领料完工直扣 → 发料仓 / 工单仓库
  */
 export function resolveBackflushWarehouse(workOrder = {}) {
   void warehouseState.warehouses
   if (isInventoryDeductByActual()) {
+    const fromReq = resolveReceiveWarehouseFromMaterialReq(workOrder)
+    if (fromReq) {
+      return { warehouseName: fromReq, warehouseCode: resolveWarehouseCode(fromReq) }
+    }
+    const fromCenter = resolveWarehouseByWorkCenter(workOrder.workCenter)
+    if (fromCenter) {
+      return { warehouseName: fromCenter.name, warehouseCode: fromCenter.code || '' }
+    }
     const preferred = workOrder.receiveWarehouse || workOrder.lineWarehouse || ''
     if (preferred) {
       return { warehouseName: preferred, warehouseCode: resolveWarehouseCode(preferred) }
@@ -73,10 +82,58 @@ export function resolveBackflushWarehouse(workOrder = {}) {
   }
 }
 
+/** 从工单关联领料单取领入仓库（取最近一条有仓的） */
+export function resolveReceiveWarehouseFromMaterialReq(workOrder = {}) {
+  const woNo = String(workOrder.code || workOrder.workOrderNo || '').trim()
+  const woId = String(workOrder.id || '').trim()
+  if (!woNo && !woId) return ''
+  void mobileMaterialReqState.items
+  const items = mobileMaterialReqState.items || []
+  const hits = items.filter((r) => {
+    if (!r?.receiveWarehouse) return false
+    if (woId && r.workOrderId === woId) return true
+    if (woNo && (r.workOrderCode === woNo || r.sourceOrderNo === woNo)) return true
+    if ((r.workOrders || []).some((w) => w.id === woId || w.code === woNo)) return true
+    return (r.lines || []).some(
+      (l) =>
+        l.workOrderNo === woNo ||
+        l.workOrderCode === woNo ||
+        (woId && (l.workOrderId === woId || l.sourceWorkOrderId === woId)),
+    )
+  })
+  return hits[0]?.receiveWarehouse || ''
+}
+
+export function resolveWarehouseByWorkCenter(workCenter) {
+  const center = String(workCenter || '').trim()
+  if (!center) return null
+  return (
+    (warehouseState.warehouses || []).find(
+      (w) => w.enabled !== false && String(w.workCenter || '').trim() === center,
+    ) || null
+  )
+}
+
 function resolveWarehouseCode(name) {
   if (!name) return ''
   const hit = (warehouseState.warehouses || []).find((w) => w.name === name)
   return hit?.code || ''
+}
+
+/** EBOM 展示：名称 + 版本 */
+export function formatDeductEbomLabel(source = {}) {
+  const name =
+    source.ebomName || source.bomName || source.ebomSnapshot?.bomName || source.productBomName || ''
+  const ver =
+    source.ebomVersion ||
+    source.bomVersion ||
+    source.ebomSnapshot?.bomVersion ||
+    source.version ||
+    ''
+  const n = String(name || '').trim()
+  const v = String(ver || '').trim()
+  if (n && v) return `${n} ${v}`
+  return n || v || ''
 }
 
 export function resolveLineIssueMode(line, material) {
@@ -180,15 +237,23 @@ export function buildWorkOrderCompletionDeductDraft(workOrder, finishedQty) {
   const backflushCount = lines.filter((l) => l.isBackflush).length
   const issueCount = lines.length - backflushCount
   const cutSettleCount = lines.filter((l) => l.viaCutSettle).length
+  const ebomName =
+    workOrder.ebomSnapshot?.bomName || workOrder.bomName || workOrder.productBomName || ''
+  const ebomVersion =
+    workOrder.ebomSnapshot?.bomVersion || workOrder.bomVersion || workOrder.version || ''
   return {
     ok: true,
     draft: {
       workOrderNo: workOrder.code || workOrder.workOrderNo || '',
       workOrderId: workOrder.id || '',
       productName: workOrder.productName || '',
+      productCode: workOrder.materialCode || workOrder.productCode || workOrder.itemCode || '',
       productSpec: workOrder.specModel || workOrder.productSpec || '',
       material: workOrder.material || '',
       drawingNo: workOrder.drawingNo || '',
+      variantSummary: workOrder.variantSummary || '',
+      ebomName,
+      ebomVersion,
       reportQty,
       warehouseName: wh.warehouseName,
       warehouseCode: wh.warehouseCode,

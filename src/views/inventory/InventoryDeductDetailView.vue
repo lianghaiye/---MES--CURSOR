@@ -69,47 +69,11 @@
         />
 
         <DetailSectionCard title="基本信息">
-          <a-descriptions :column="3" size="small" bordered>
-            <a-descriptions-item label="工单/领料单号">
-              {{ resolveInventoryDeductDocNo(record) || '—' }}
-            </a-descriptions-item>
-            <a-descriptions-item label="扣减单号">{{ record.deductNo }}</a-descriptions-item>
-            <a-descriptions-item label="扣减来源">{{
-              resolveDeductSourceLabel(record)
-            }}</a-descriptions-item>
-            <a-descriptions-item label="扣减状态">
-              <span class="status-tag" :class="statusClass(record.status)">{{
-                record.status
-              }}</span>
-            </a-descriptions-item>
-            <a-descriptions-item label="产品名称">{{
-              record.productName || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="规格型号">{{
-              record.productSpec || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="材质">{{ record.material || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="图号">{{ record.drawingNo || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="报工数量">{{ record.reportQty }}</a-descriptions-item>
-            <a-descriptions-item label="扣减时间">{{
-              record.deductTime || '—'
-            }}</a-descriptions-item>
-            <a-descriptions-item label="仓库">
-              {{ record.warehouseName }} ({{ record.warehouseCode }})
-            </a-descriptions-item>
-            <a-descriptions-item label="物料行数">
-              {{ record.materialDone }}/{{ record.materialTotal }}
-            </a-descriptions-item>
-            <a-descriptions-item v-if="record.voidReason" label="作废说明">
-              {{ record.voidReason }}
-            </a-descriptions-item>
-            <a-descriptions-item v-if="record.revokeReason" label="撤销原因">
-              {{ record.revokeReason }}
-            </a-descriptions-item>
-            <a-descriptions-item v-if="record.revokeRemark" label="撤销说明" :span="2">
-              {{ record.revokeRemark }}
-            </a-descriptions-item>
-          </a-descriptions>
+          <InventoryDeductBasicInfoSection
+            :record="record"
+            :status-class="statusClass(record.status)"
+            @open-doc="openSourceDoc"
+          />
         </DetailSectionCard>
 
         <DetailSectionCard :title="`扣减明细（${record.lines?.length || 0}）`">
@@ -120,11 +84,30 @@
             size="small"
             bordered
             :pagination="false"
-            :scroll="{ x: 1440 }"
+            :scroll="{ x: 1680 }"
             :locale="{ emptyText: '暂无扣减明细' }"
           >
-            <template #bodyCell="{ column, record: line }">
-              <template v-if="column.key === 'issueMode'">
+            <template #headerCell="{ column }">
+              <template v-if="column.key === 'stockDisplay'">
+                <span class="col-title-with-tip">
+                  当前库存量
+                  <a-tooltip :title="STOCK_DISPLAY_TIP">
+                    <InfoCircleOutlined class="col-tip-icon" />
+                  </a-tooltip>
+                </span>
+              </template>
+              <template v-else>{{ column.title }}</template>
+            </template>
+            <template #bodyCell="{ column, record: line, index }">
+              <template v-if="column.key === 'index'">
+                {{ index + 1 }}
+              </template>
+              <template v-else-if="column.key === 'lineStatus'">
+                <span class="status-tag sm" :class="lineStatusClass(line.status)">
+                  {{ lineStatusLabel(line.status) }}
+                </span>
+              </template>
+              <template v-else-if="column.key === 'issueMode'">
                 <a-tag :color="lineIssueMode(line) === '倒冲' ? 'orange' : 'blue'" size="small">
                   {{ lineIssueMode(line) }}
                 </a-tag>
@@ -144,10 +127,17 @@
               <template v-else-if="column.key === 'blankSizeText'">
                 {{ line.blankSizeText || '—' }}
               </template>
-              <template v-else-if="column.key === 'status'">
-                <span class="status-tag sm" :class="statusClass(line.status)">{{
-                  line.status
-                }}</span>
+              <template v-else-if="column.key === 'stockDisplay'">
+                <span class="stock-display">{{ formatStockDisplay(line) }}</span>
+              </template>
+              <template v-else-if="column.key === 'unitUsage'">
+                {{ formatUnitUsage(line) }}
+              </template>
+              <template v-else-if="column.key === 'shouldQty'">
+                {{ formatShouldQty(line) }}
+              </template>
+              <template v-else-if="column.key === 'planQty'">
+                {{ formatQty(line.planQty) }}
               </template>
               <template v-else-if="column.key === 'failReason'">
                 {{ line.failReason || '—' }}
@@ -166,25 +156,31 @@ export default { name: 'InventoryDeductDetailView' }
 
 <script setup>
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
+import InventoryDeductBasicInfoSection from './components/InventoryDeductBasicInfoSection.vue'
 import { computed, createVNode, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { ExclamationCircleOutlined } from '@ant-design/icons-vue'
+import { ExclamationCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
 import {
   MATERIAL_DEDUCT_STATUS,
+  normalizeMaterialDeductStatus,
   resolveInventoryDeductDocNo,
-  resolveDeductSourceLabel,
   isQuickMaterialDeduct,
 } from '@/mock/materialRequisitionRecords'
 import {
   getMaterialDeductById,
+  getMaterialDeductLockedQty,
   confirmMaterialDeduct,
   undoConfirmMaterialDeduct,
   voidMaterialDeduct,
   retryMaterialDeduct,
   isMaterialDeductLocked,
+  materialRequisitionState,
 } from '@/store/materialRequisitionStore'
+import { getStockQty, stockState } from '@/store/stockStore'
 import { lineVariantSummary } from '@/utils/spuLineResolve'
+import { formatNumber } from '@/utils/numberFormat'
+import { openInventoryDeductSourceDoc } from '@/utils/openInventoryDeductSourceDoc'
 import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 
@@ -194,12 +190,17 @@ const { openTab } = useTabs()
 const STATUS = MATERIAL_DEDUCT_STATUS
 const tick = ref(0)
 
+const STOCK_DISPLAY_TIP =
+  '展示为 锁定量/库存量。锁定量=所选仓库下全部待确认扣减单对该物料的预扣合计（含本单及其他单，非仅本单）；库存量=所选仓库现存量。'
+
 const record = computed(() => {
   tick.value
   return getMaterialDeductById(String(route.params.id || ''))
 })
 
 const lineColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '状态', key: 'lineStatus', width: 96 },
   { title: '物料编码', dataIndex: 'materialCode', key: 'materialCode', width: 110 },
   { title: '物料名称', dataIndex: 'materialName', key: 'materialName', width: 120 },
   { title: '发料方式', key: 'issueMode', width: 88 },
@@ -208,9 +209,10 @@ const lineColumns = [
   { title: '图号', key: 'drawingNo', width: 110, ellipsis: true },
   { title: '变体属性', key: 'variantAttr', width: 140, ellipsis: true },
   { title: '下料尺寸', key: 'blankSizeText', width: 160, ellipsis: true },
-  { title: '应扣', dataIndex: 'planQty', key: 'planQty', width: 70, align: 'right' },
-  { title: '实扣', dataIndex: 'actualQty', key: 'actualQty', width: 70, align: 'right' },
-  { title: '状态', key: 'status', width: 88 },
+  { title: '当前库存量', key: 'stockDisplay', width: 130 },
+  { title: 'BOM单位用量', key: 'unitUsage', width: 110, align: 'right' },
+  { title: '应扣', key: 'shouldQty', width: 80, align: 'right' },
+  { title: '扣减数量', key: 'planQty', width: 90, align: 'right' },
   { title: '失败原因', key: 'failReason', width: 120, ellipsis: true },
 ]
 
@@ -243,6 +245,58 @@ function lineIssueMode(line) {
   return line?.isBackflush ? '倒冲' : '领料'
 }
 
+function lineStatusLabel(status) {
+  const s = normalizeMaterialDeductStatus(status)
+  if (s === STATUS.PENDING) return '待扣减'
+  if (s === STATUS.SUCCESS) return '扣减成功'
+  if (s === STATUS.FAILED) return '扣减失败'
+  return s || '待扣减'
+}
+
+function lineStatusClass(status) {
+  const s = normalizeMaterialDeductStatus(status)
+  if (s === STATUS.SUCCESS) return 'is-success'
+  if (s === STATUS.FAILED) return 'is-failed'
+  if (s === STATUS.PENDING) return 'is-pending'
+  return statusClass(s)
+}
+
+function resolveUnitUsage(line) {
+  const fromBom = Number(line?.unitUsage ?? line?.unitQty)
+  if (fromBom > 0) return fromBom
+  const rq = Number(record.value?.reportQty) || 0
+  const pq = Number(line?.planQty) || 0
+  if (rq > 0 && pq > 0) return Math.round((pq / rq) * 1000) / 1000
+  return pq > 0 ? pq : 0
+}
+
+function formatQty(val) {
+  return formatNumber(val, 3, { empty: '—' })
+}
+
+function formatUnitUsage(line) {
+  const n = resolveUnitUsage(line)
+  return n > 0 ? formatQty(n) : '—'
+}
+
+function formatShouldQty(line) {
+  const unitUsage = resolveUnitUsage(line)
+  const reportQty = Number(record.value?.reportQty) || 0
+  if (!(unitUsage > 0) || !(reportQty > 0)) return '—'
+  return formatQty(Math.round(unitUsage * reportQty * 1000) / 1000)
+}
+
+function formatStockDisplay(line) {
+  void materialRequisitionState.records
+  void stockState.records
+  const code = line?.materialCode
+  const wh = record.value?.warehouseName
+  if (!code || !wh) return '—'
+  const lockedQty = getMaterialDeductLockedQty(code, { warehouseName: wh })
+  const onHand = getStockQty(wh, code)
+  return `${formatQty(lockedQty)} / ${formatQty(onHand)}`
+}
+
 function statusClass(status) {
   const map = {
     [STATUS.SUCCESS]: 'is-success',
@@ -254,6 +308,10 @@ function statusClass(status) {
     [STATUS.CUT_SETTLE]: 'is-skipped',
   }
   return map[status] || ''
+}
+
+function openSourceDoc() {
+  openInventoryDeductSourceDoc(record.value, { router, openTab })
 }
 
 function goBack() {
@@ -460,5 +518,22 @@ function onRetry() {
     background: #f5f5f5;
     border-color: #d9d9d9;
   }
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
+}
+
+.stock-display {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 </style>

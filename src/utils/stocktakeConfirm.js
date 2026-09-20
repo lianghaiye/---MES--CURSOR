@@ -31,6 +31,58 @@ export function stocktakePostModeLabel(mode) {
   return STOCKTAKE_POST_MODE_OPTIONS.find((o) => o.value === mode)?.label || '同时生成盘盈盘亏单'
 }
 
+/** 盘点单是否已生成过盘盈 / 盘亏关联单 */
+export function resolveStocktakePostedSides(order) {
+  const hasGain =
+    (order?.linkedInboundIds || []).length > 0 ||
+    (order?.lineItems || []).some((l) => Boolean(l.linkedInboundId))
+  const hasLoss =
+    (order?.linkedOutboundIds || []).length > 0 ||
+    (order?.lineItems || []).some((l) => Boolean(l.linkedOutboundId))
+  return { hasGain, hasLoss }
+}
+
+/** 继续过账提示文案 */
+export function buildStocktakeContinuePostHint(order) {
+  const { hasGain, hasLoss } = resolveStocktakePostedSides(order)
+  if (hasGain && !hasLoss) {
+    return '当前为部分过账：已生成盘盈单，盘亏单尚未生成。请选择生成盘亏单。'
+  }
+  if (hasLoss && !hasGain) {
+    return '当前为部分过账：已生成盘亏单，盘盈单尚未生成。请选择生成盘盈单。'
+  }
+  if (hasGain && hasLoss) {
+    return '当前为部分过账：盘盈单与盘亏单均已生成过，请按剩余差异继续补生成。'
+  }
+  return '当前为部分过账，请选择要继续生成的单据范围。'
+}
+
+/**
+ * 继续过账时禁用已生成侧 +「同时生成」
+ * @returns {{ gain: boolean, loss: boolean, both: boolean }}
+ */
+export function resolveStocktakePostModeDisabled(order, { isPartial = false } = {}) {
+  if (!isPartial) {
+    return {
+      [STOCKTAKE_POST_MODE.GAIN]: false,
+      [STOCKTAKE_POST_MODE.LOSS]: false,
+      [STOCKTAKE_POST_MODE.BOTH]: false,
+    }
+  }
+  const { hasGain, hasLoss } = resolveStocktakePostedSides(order)
+  return {
+    [STOCKTAKE_POST_MODE.GAIN]: hasGain,
+    [STOCKTAKE_POST_MODE.LOSS]: hasLoss,
+    [STOCKTAKE_POST_MODE.BOTH]: hasGain || hasLoss,
+  }
+}
+
+/** 默认选中第一个未禁用的过账范围 */
+export function resolveDefaultStocktakePostMode(disabledMap = {}) {
+  const order = [STOCKTAKE_POST_MODE.GAIN, STOCKTAKE_POST_MODE.LOSS, STOCKTAKE_POST_MODE.BOTH]
+  return order.find((m) => !disabledMap[m]) || STOCKTAKE_POST_MODE.BOTH
+}
+
 function genDocNo(prefix) {
   return `${prefix}${dayjs().format('YYYYMMDDHHmmss')}${String(Math.floor(Math.random() * 90) + 10)}`
 }
