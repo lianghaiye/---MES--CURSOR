@@ -106,9 +106,9 @@
       <div class="fields-section">
         <div class="fields-header">
           <div>
-            <h4>模板字段</h4>
+            <h4>模板指标</h4>
             <div class="fields-hint">
-              模板字段由用户自行配置：可从「检验项库」选用系统默认项（质检方式、质检数量、检验备注）及其他检验项，或点「新增检验项」创建。「人工判定」时在下方配置结论选项；「全部达标
+              模板指标由用户自行配置：可从「检验项库」选用系统默认项（质检方式、质检数量、检验备注）及其他检验项，或点「新增检验项」创建。「人工判定」时在下方配置结论选项；「全部达标
               / 关键项达标」由系统自动给出合格/不合格。字段均可拖拽排序、删除。
             </div>
           </div>
@@ -1514,7 +1514,7 @@ function onConflictConfirm({ mode }) {
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   padding: 12px;
-  background: #fafbfc;
+  background: #fff;
 }
 
 .fields-header {

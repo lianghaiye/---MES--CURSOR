@@ -4,7 +4,6 @@
     :open="open"
     :title="shellTitle"
     width="1100px"
-    :page-side-padding="pageMode ? 120 : 12"
     :mask-closable="false"
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
