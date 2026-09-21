@@ -56,6 +56,11 @@
               <a-tab-pane key="basic" tab="基本信息" />
               <a-tab-pane
                 v-if="isSalesOutbound"
+                key="relatedDelivery"
+                :tab="`关联单据 (${relatedDeliveries.length})`"
+              />
+              <a-tab-pane
+                v-if="isSalesOutbound"
                 key="relatedQc"
                 :tab="`关联质检 (${relatedFactoryQcList.length})`"
               />
@@ -68,6 +73,16 @@
                 v-if="isMaterialReqOutbound"
                 key="related"
                 :tab="`关联单据 (${relatedInbounds.length})`"
+              />
+              <a-tab-pane
+                v-if="isTransferOutbound"
+                key="relatedTransfer"
+                :tab="`关联单据 (${relatedTransfers.length})`"
+              />
+              <a-tab-pane
+                v-if="isStocktakeOutbound"
+                key="relatedStocktake"
+                :tab="`关联单据 (${relatedStocktakes.length})`"
               />
               <a-tab-pane
                 v-if="isMaterialReqOutbound"
@@ -235,6 +250,48 @@
             </DetailSectionCard>
           </template>
 
+          <template v-else-if="infoTab === 'relatedDelivery' && isSalesOutbound">
+            <DetailSectionCard title="关联单据">
+              <a-table
+                :columns="relatedDeliveryColumns"
+                :data-source="relatedDeliveries"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1280 }"
+                :locale="{ emptyText: '暂无关联销售发货单' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'deliveryStatus'">
+                    <a-tag :color="deliveryStatusColor(row.deliveryStatus)">{{
+                      row.deliveryStatus || '—'
+                    }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'deliveryCode'">
+                    <a v-if="row.deliveryCode" class="link-code" @click.prevent="goDelivery(row)">
+                      {{ row.deliveryCode }}
+                    </a>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'applyShipQty'">
+                    {{ formatOutboundQtyInt(row.applyShipQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'actualOutboundQty'">
+                    {{ formatOutboundQtyInt(row.actualOutboundQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ formatDateTimeMinute(row.createdAt) || '—' }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
           <template v-else-if="infoTab === 'relatedQc' && isSalesOutbound">
             <DetailSectionCard title="关联质检">
               <a-table
@@ -301,6 +358,100 @@
                   </template>
                   <template v-else-if="column.key === 'docNo'">
                     <a class="link-code" @click.prevent="goInbound(row)">{{ row.docNo || '—' }}</a>
+                  </template>
+                  <template v-else-if="column.key === 'inboundAt'">
+                    {{
+                      formatDateTimeMinute(row.confirmedAt || row.inboundTime || row.createdAt) ||
+                      '—'
+                    }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
+          <template v-else-if="infoTab === 'relatedTransfer' && isTransferOutbound">
+            <DetailSectionCard title="关联单据">
+              <a-table
+                :columns="relatedTransferColumns"
+                :data-source="relatedTransfers"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1400 }"
+                :locale="{ emptyText: '暂无关联调拨单' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag :color="transferStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'docNo'">
+                    <a class="link-code" @click.prevent="goTransfer(row)">{{ row.docNo || '—' }}</a>
+                  </template>
+                  <template v-else-if="column.key === 'transferQty'">
+                    {{ formatQty(row.transferQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'transferDate'">
+                    {{ formatDateTimeMinute(row.transferDate) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ formatDateTimeMinute(row.createdAt) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'confirmedAt'">
+                    {{ formatDateTimeMinute(row.confirmedAt) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'inboundConfirmedAt'">
+                    {{ formatDateTimeMinute(row.inboundConfirmedAt) || '—' }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
+          <template v-else-if="infoTab === 'relatedStocktake' && isStocktakeOutbound">
+            <DetailSectionCard title="关联单据">
+              <a-table
+                :columns="relatedStocktakeColumns"
+                :data-source="relatedStocktakes"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1400 }"
+                :locale="{ emptyText: '暂无关联盘点单' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag :color="stocktakeStatusColor(row.status)">{{ row.status || '—' }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'docNo'">
+                    <a class="link-code" @click.prevent="goStocktake(row)">{{
+                      row.docNo || '—'
+                    }}</a>
+                  </template>
+                  <template v-else-if="column.key === 'stocktakeQty'">
+                    {{ formatQty(row.stocktakeQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'stocktakeDate'">
+                    {{ formatDateTimeMinute(row.stocktakeDate) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ formatDateTimeMinute(row.createdAt) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'approvedAt'">
+                    {{ formatDateTimeMinute(row.approvedAt) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'postedAt'">
+                    {{ formatDateTimeMinute(row.postedAt || row.confirmedAt) || '—' }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] || '—' }}
@@ -495,9 +646,18 @@ import { flattenCutSettleLines } from '@/utils/cutSettleLines'
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { inboundStatusColor } from '@/mock/inboundOptions'
 import { purchaseReturnState } from '@/store/purchaseReturnStore'
+import { deliveryOrderState } from '@/store/deliveryOrderStore'
+import { transferOrderState } from '@/store/transferOrderStore'
+import { stocktakeOrderState } from '@/store/stocktakeOrderStore'
+import { transferStatusColor } from '@/mock/transferOptions'
+import { stocktakeStatusColor } from '@/mock/stocktakeOptions'
+import { deliveryStatusColor, formatOutboundQtyInt } from '@/utils/deliveryOrder'
 import {
   listRelatedInboundsForOutbound,
   listRelatedPurchaseReturnsForOutbound,
+  listRelatedDeliveriesForOutbound,
+  listRelatedTransfersForOutbound,
+  listRelatedStocktakesForOutbound,
 } from '@/utils/outboundRelatedDocs'
 
 const route = useRoute()
@@ -512,11 +672,28 @@ const printModalOpen = ref(false)
 const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领料出库')
 const isPurchaseReturnOutbound = computed(() => record.value?.outboundType === '采购退货')
 const isSalesOutbound = computed(() => record.value?.outboundType === '销售出库')
+const isTransferOutbound = computed(() => record.value?.outboundType === '调拨出库')
+const isStocktakeOutbound = computed(() => record.value?.outboundType === '盘点出库')
 
 const relatedFactoryQcList = computed(() => {
   void factoryQcState.records
   if (!isSalesOutbound.value || !record.value) return []
   return listFactoryQcByOutbound(record.value)
+})
+
+const relatedDeliveries = computed(() => {
+  void deliveryOrderState.orders
+  return listRelatedDeliveriesForOutbound(record.value)
+})
+
+const relatedTransfers = computed(() => {
+  void transferOrderState.orders
+  return listRelatedTransfersForOutbound(record.value)
+})
+
+const relatedStocktakes = computed(() => {
+  void stocktakeOrderState.orders
+  return listRelatedStocktakesForOutbound(record.value)
 })
 
 const relatedQcColumns = [
@@ -529,6 +706,19 @@ const relatedQcColumns = [
   { title: '质检数量', key: 'qcQty', width: 90, align: 'right' },
   { title: '质检人', dataIndex: 'inspector', width: 90 },
   { title: '质检时间', key: 'inspectedAt', width: 150 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', width: 150 },
+]
+
+const relatedDeliveryColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '发货状态', key: 'deliveryStatus', width: 96 },
+  { title: '发货单号', key: 'deliveryCode', width: 150 },
+  { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true },
+  { title: '销售单号', dataIndex: 'salesOrderNo', width: 140 },
+  { title: '申请发货数量', key: 'applyShipQty', width: 110, align: 'right' },
+  { title: '实际出库数量', key: 'actualOutboundQty', width: 110, align: 'right' },
+  { title: '交货方式', dataIndex: 'shipmentMethod', width: 100 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', width: 150 },
 ]
@@ -568,9 +758,39 @@ const relatedInboundColumns = [
   { title: '入库单号', key: 'docNo', width: 160 },
   { title: '入库类型', dataIndex: 'inboundType', width: 110 },
   { title: '入库仓库', dataIndex: 'warehouse', width: 110 },
-  { title: '源单号', dataIndex: 'sourceOrderNo', width: 140 },
+  { title: '入库时间', key: 'inboundAt', width: 160 },
+]
+
+const relatedTransferColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '状态', key: 'status', width: 90 },
+  { title: '调拨单号', key: 'docNo', width: 150 },
+  { title: '调出仓库', dataIndex: 'fromWarehouse', width: 120 },
+  { title: '调入仓库', dataIndex: 'toWarehouse', width: 120 },
+  { title: '调拨数量', key: 'transferQty', width: 100, align: 'right' },
+  { title: '调拨日期', key: 'transferDate', width: 120 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+  { title: '创建时间', key: 'createdAt', width: 150 },
+  { title: '确认人', dataIndex: 'confirmer', width: 90 },
+  { title: '确认时间', key: 'confirmedAt', width: 150 },
+  { title: '入库方确认人', dataIndex: 'inboundConfirmer', width: 110 },
+  { title: '入库方确认时间', key: 'inboundConfirmedAt', width: 150 },
+]
+
+const relatedStocktakeColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '状态', key: 'status', width: 90 },
+  { title: '盘点单号', key: 'docNo', width: 150 },
+  { title: '盘点仓库', dataIndex: 'warehouse', width: 120 },
+  { title: '盘点类型', dataIndex: 'stocktakeType', width: 100 },
+  { title: '盘点数量', key: 'stocktakeQty', width: 100, align: 'right' },
+  { title: '盘点日期', key: 'stocktakeDate', width: 120 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', width: 150 },
+  { title: '审核人', dataIndex: 'approver', width: 90 },
+  { title: '审核时间', key: 'approvedAt', width: 150 },
+  { title: '过账人', dataIndex: 'poster', width: 90 },
+  { title: '过账时间', key: 'postedAt', width: 150 },
 ]
 
 const relatedPurchaseReturnColumns = [
@@ -803,6 +1023,27 @@ function goInbound(row) {
   const path = `/inventory/inbound/${row.id}`
   openTab(path, row.docNo || '入库单详情')
   router.push(path)
+}
+
+function goDelivery(row) {
+  if (!row?.id) return
+  const path = `/sales/delivery/${row.id}`
+  openTab(path, `发货单 ${row.deliveryCode || ''}`.trim())
+  router.push(path)
+}
+
+function goTransfer(row) {
+  if (!row?.id) return
+  const path = `/inventory/transfer/${row.id}`
+  openTab(path, `调拨单 ${row.docNo || ''}`.trim())
+  router.push({ name: 'inventory-transfer-detail', params: { id: row.id } })
+}
+
+function goStocktake(row) {
+  if (!row?.id) return
+  const path = `/inventory/stocktake/${row.id}`
+  openTab(path, `盘点单 ${row.docNo || ''}`.trim())
+  router.push({ name: 'inventory-stocktake-detail', params: { id: row.id } })
 }
 
 function goPurchaseReturn(row) {

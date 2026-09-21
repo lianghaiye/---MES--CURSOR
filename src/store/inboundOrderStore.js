@@ -26,6 +26,11 @@ import {
   resolveWorkOrderNoFromInbound,
 } from '@/utils/salesOrderDedicatedStock'
 import {
+  appendInboundOperationLog,
+  backfillInboundOperationLogs,
+  summarizeInboundLines,
+} from '@/utils/inboundOperationLog'
+import {
   normalizeInboundStatus,
   resolveInboundSourceChannel,
   INBOUND_SOURCE,
@@ -90,6 +95,8 @@ function normalizeLegacyOrder(order) {
   row.status = normalizeInboundStatus(row.status)
   row.sourceChannel = resolveInboundSourceChannel(row)
   if (!Array.isArray(row.lineItems)) row.lineItems = []
+  if (!Array.isArray(row.operationLogs)) row.operationLogs = []
+  backfillInboundOperationLogs(row)
   return row
 }
 
@@ -347,8 +354,17 @@ export function addInboundOrder(payload) {
       status: normalizeInboundStatus(payload.status) || '待入库',
       sourceChannel,
       createdAt: payload.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      operationLogs: Array.isArray(payload.operationLogs) ? payload.operationLogs : [],
     }),
   )
+  if (!row.operationLogs.length) {
+    appendInboundOperationLog(row, {
+      action: '创建',
+      operator: row.creator || 'admin1',
+      operatedAt: row.createdAt,
+      remark: `创建入库单 ${row.docNo}，类型 ${row.inboundType || '—'}`,
+    })
+  }
   inboundOrderState.orders.unshift(row)
   return row
 }
@@ -373,6 +389,11 @@ export function updateInboundOrder(id, patch) {
     patch.docNo = String(patch.docNo || '').trim() || row.docNo
   }
   Object.assign(row, patch)
+  appendInboundOperationLog(row, {
+    action: '编辑',
+    operator: patch.handler || patch.creator || row.creator || 'admin1',
+    remark: `保存入库单，明细 ${(row.lineItems || []).length} 行`,
+  })
   return { ok: true, order: row }
 }
 
@@ -559,6 +580,11 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
     })
     if (!pendingLines.length) {
       recomputeInboundOrderStatus(order, operator)
+      appendInboundOperationLog(order, {
+        action: '整单确认入库',
+        operator,
+        remark: '无待入库明细',
+      })
       count += 1
       return
     }
@@ -578,6 +604,7 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
       }
       recomputeInboundOrderStatus(order, operator)
       syncTransferOrderFromInbound(order, { operator })
+      appendInboundConfirmLog(order, operator, pendingLines)
       count += 1
       return
     }
@@ -615,9 +642,22 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
     } catch {
       /* ignore */
     }
+    appendInboundConfirmLog(order, operator, pendingLines)
     count += 1
   })
   return { count, blocked }
+}
+
+function appendInboundConfirmLog(order, operator, lines) {
+  const action = order.status === '部分入库' ? '部分确认入库' : '整单确认入库'
+  appendInboundOperationLog(order, {
+    action,
+    operator,
+    remark:
+      action === '部分确认入库'
+        ? `部分确认 ${lines.length} 行：${summarizeInboundLines(lines)}`
+        : `整单确认入库，本次 ${lines.length} 行`,
+  })
 }
 
 /** 按明细确认入库 */
@@ -646,6 +686,7 @@ export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
     if (!res.ok) return res
     recomputeInboundOrderStatus(order, operator)
     syncTransferOrderFromInbound(order, { operator })
+    appendInboundConfirmLog(order, operator, [line])
     return { ok: true, order, line }
   }
 
@@ -673,6 +714,7 @@ export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
   } catch {
     /* ignore */
   }
+  appendInboundConfirmLog(order, operator, [line])
   return { ok: true, order, line }
 }
 
@@ -719,6 +761,11 @@ export function approveInboundOrder(id, operator = 'admin1') {
   order.status = '待入库'
   order.approver = operator
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  appendInboundOperationLog(order, {
+    action: '审批通过',
+    operator,
+    remark: '审批通过，状态变为待入库',
+  })
   return { ok: true, order }
 }
 
@@ -731,6 +778,11 @@ export function rejectInboundOrder(id, operator = 'admin1') {
   order.approver = operator
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   resetMiniProgramInboundTask(order.miniProgramTaskId)
+  appendInboundOperationLog(order, {
+    action: '审批拒绝',
+    operator,
+    remark: '审批拒绝',
+  })
   return { ok: true, order }
 }
 
@@ -777,6 +829,11 @@ export function refuseInbound(ids, { reason = '', operator = 'admin1' } = {}) {
       order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
       recomputeInboundOrderStatus(order, operator)
       syncTransferOrderFromInbound(order, { operator })
+      appendInboundOperationLog(order, {
+        action: '拒绝入库',
+        operator,
+        remark: `拒绝理由：${reasonText}`,
+      })
       refused.push(order)
       count += 1
       return
@@ -796,6 +853,11 @@ export function refuseInbound(ids, { reason = '', operator = 'admin1' } = {}) {
       }
     })
     if (order.miniProgramTaskId) resetMiniProgramInboundTask(order.miniProgramTaskId)
+    appendInboundOperationLog(order, {
+      action: '拒绝入库',
+      operator,
+      remark: `拒绝理由：${reasonText}`,
+    })
     refused.push(order)
     count += 1
   })
@@ -827,6 +889,11 @@ export function refuseInboundLine(orderId, lineId, { reason = '', operator = 'ad
     order.refusedBy = operator
     order.refusedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
     syncTransferOrderFromInbound(order, { operator })
+    appendInboundOperationLog(order, {
+      action: '拒绝明细',
+      operator,
+      remark: `拒绝明细：${summarizeInboundLines([line])}；理由：${reasonText}`,
+    })
     return { ok: true, order, line }
   }
 
@@ -839,6 +906,11 @@ export function refuseInboundLine(orderId, lineId, { reason = '', operator = 'ad
   order.refuseReason = reasonText
   order.refusedBy = operator
   order.refusedAt = line.refusedAt
+  appendInboundOperationLog(order, {
+    action: '拒绝明细',
+    operator,
+    remark: `拒绝明细：${summarizeInboundLines([line])}；理由：${reasonText}`,
+  })
   return { ok: true, order, line }
 }
 

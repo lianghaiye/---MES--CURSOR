@@ -136,6 +136,9 @@
           <CloseCircleOutlined />
           拒绝出库
         </a-button>
+        <a-button size="small" type="primary" ghost @click="handleBatchInitiateQc">
+          发起出厂质检
+        </a-button>
         <a-button size="small" @click="stubAction('生成采购单')">
           <CheckOutlined />
           生成采购单
@@ -160,9 +163,6 @@
             </a-menu>
           </template>
         </a-dropdown>
-        <a-button size="small" type="primary" ghost @click="handleBatchInitiateQc">
-          发起出厂质检
-        </a-button>
       </a-space>
       <div class="split-action-right">
         <a-radio-group
@@ -290,6 +290,9 @@
             <CloseCircleOutlined />
             拒绝出库
           </a-button>
+          <a-button size="small" type="primary" ghost @click="handleBatchInitiateQc">
+            发起出厂质检
+          </a-button>
           <a-button size="small" @click="stubAction('生成采购单')">
             <CheckOutlined />
             生成采购单
@@ -314,9 +317,6 @@
               </a-menu>
             </template>
           </a-dropdown>
-          <a-button size="small" type="primary" ghost @click="handleBatchInitiateQc">
-            发起出厂质检
-          </a-button>
         </a-space>
         <a-space :size="8" class="toolbar-icons" align="center">
           <a-radio-group

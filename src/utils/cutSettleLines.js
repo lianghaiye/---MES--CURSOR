@@ -63,6 +63,7 @@ export function flattenCutSettleLines(records = []) {
         drawingNo: line.drawingNo || '',
         material: line.material || '',
         blankSizeText: line.blankSizeText || '',
+        variantSummary: line.variantSummary || '',
         demandMeters: line.demandMeters,
         actualConsumeMeters: line.actualConsumeMeters,
         remnantLength: line.remnantLength,

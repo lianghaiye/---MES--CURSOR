@@ -183,6 +183,9 @@
           <template v-else-if="column.key === 'orderNo'">
             <a class="link-code" @click.prevent="openDetail(record)">{{ record.orderNo }}</a>
           </template>
+          <template v-else-if="column.key === 'purchaseQty'">
+            {{ formatPurchaseQty(record) }}
+          </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
           </template>
@@ -439,6 +442,7 @@ const baseColumns = [
   { title: '采购申请单号', dataIndex: 'reqNo', width: 150, ellipsis: true },
   { title: '采购类型', dataIndex: 'applyType', width: 100 },
   { title: '供应商', dataIndex: 'supplier', width: 130, ellipsis: true },
+  { title: '采购数量', key: 'purchaseQty', width: 120 },
   { title: '合同编号', dataIndex: 'contractNo', width: 120, ellipsis: true },
   { title: '生产工单号', dataIndex: 'workOrderNo', width: 120, ellipsis: true },
   { title: '结算类型', dataIndex: 'settlementType', width: 110 },
@@ -459,7 +463,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-list-v8', baseColumns)
+  useTableColumnSettings('purchase-order-list-v9', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -508,6 +512,15 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys
   },
 }))
+
+function formatPurchaseQty(record) {
+  const lines = record?.lineItems || []
+  const total =
+    record?.totalQty != null && record.totalQty !== ''
+      ? Number(record.totalQty)
+      : lines.reduce((sum, line) => sum + (Number(line.purchaseQty) || 0), 0)
+  return `${formatQty(total)}/${lines.length}`
+}
 
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1

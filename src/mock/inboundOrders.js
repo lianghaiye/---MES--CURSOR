@@ -81,6 +81,7 @@ export function createInboundOrder(partial = {}) {
     /** 成品/半成品入库关联工单清单（来自小程序成品入库） */
     workOrders: [],
     lineItems: [],
+    operationLogs: [],
     ...partial,
   }
 }

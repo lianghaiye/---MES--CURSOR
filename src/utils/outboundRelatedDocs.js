@@ -1,11 +1,24 @@
 /**
- * 出库单关联单据查询（领料→领料入库、采购退货→采购退货单）
+ * 出库单关联单据查询（领料→领料入库、采购退货→采购退货单、销售→发货/出厂检、调拨/盘点）
  */
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { purchaseReturnState } from '@/store/purchaseReturnStore'
 import { factoryQcState, getFactoryQcById } from '@/store/factoryQcStore'
+import { deliveryOrderState, getDeliveryOrderById } from '@/store/deliveryOrderStore'
+import { getTransferOrderById, transferOrderState } from '@/store/transferOrderStore'
+import { getStocktakeOrderById, stocktakeOrderState } from '@/store/stocktakeOrderStore'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
 import { calcReturnQtySummary, formatReturnQtySummary } from '@/mock/purchaseReturns'
+
+function sumLineQty(lines, keys = ['qty', 'shipQty', 'countQty', 'bookQty']) {
+  return (lines || []).reduce((sum, line) => {
+    for (const key of keys) {
+      const n = Number(line?.[key])
+      if (Number.isFinite(n) && n !== 0) return sum + n
+    }
+    return sum
+  }, 0)
+}
 
 /** 领料出库确认后生成的领料入库单 */
 export function listRelatedInboundsForOutbound(outbound) {
@@ -64,6 +77,83 @@ export function listRelatedPurchaseReturnsForOutbound(outbound) {
       returnQtyText: formatReturnQtySummary(r),
       returnQtyTotal: calcReturnQtySummary(r).totalQty,
     }))
+}
+
+/** 销售出库 → 关联发货单 */
+export function listRelatedDeliveriesForOutbound(outbound) {
+  if (!outbound || outbound.outboundType !== '销售出库') return []
+  void deliveryOrderState.orders
+  const byId = new Map()
+  const push = (row) => {
+    if (row?.id) byId.set(row.id, row)
+  }
+
+  if (outbound.linkedDeliveryId) push(getDeliveryOrderById(outbound.linkedDeliveryId))
+  const code = String(outbound.linkedDeliveryCode || outbound.sourceOrderNo || '').trim()
+  if (code) {
+    const hit = (deliveryOrderState.orders || []).find((d) => d.deliveryCode === code)
+    push(hit)
+  }
+  ;(deliveryOrderState.orders || []).forEach((d) => {
+    const linked = findLinkedSalesOutbound(d)
+    if (linked && linked.id === outbound.id) push(d)
+  })
+
+  return [...byId.values()]
+}
+
+/** 调拨出库 → 关联调拨单 */
+export function listRelatedTransfersForOutbound(outbound) {
+  if (!outbound || outbound.outboundType !== '调拨出库') return []
+  void transferOrderState.orders
+  const byId = new Map()
+  const push = (row) => {
+    if (row?.id) byId.set(row.id, row)
+  }
+  if (outbound.transferOrderId) push(getTransferOrderById(outbound.transferOrderId))
+  const no = String(outbound.transferDocNo || outbound.sourceOrderNo || '').trim()
+  if (no) {
+    push((transferOrderState.orders || []).find((o) => o.docNo === no))
+  }
+  ;(transferOrderState.orders || []).forEach((o) => {
+    if (
+      (outbound.id && (o.linkedOutboundIds || []).includes(outbound.id)) ||
+      (outbound.docNo && (o.linkedOutboundDocNos || []).includes(outbound.docNo))
+    ) {
+      push(o)
+    }
+  })
+  return [...byId.values()].map((row) => ({
+    ...row,
+    transferQty: sumLineQty(row.lineItems || [], ['qty']),
+  }))
+}
+
+/** 盘点出库 → 关联盘点单 */
+export function listRelatedStocktakesForOutbound(outbound) {
+  if (!outbound || outbound.outboundType !== '盘点出库') return []
+  void stocktakeOrderState.orders
+  const byId = new Map()
+  const push = (row) => {
+    if (row?.id) byId.set(row.id, row)
+  }
+  if (outbound.stocktakeOrderId) push(getStocktakeOrderById(outbound.stocktakeOrderId))
+  const no = String(outbound.stocktakeDocNo || outbound.sourceOrderNo || '').trim()
+  if (no) {
+    push((stocktakeOrderState.orders || []).find((o) => o.docNo === no))
+  }
+  ;(stocktakeOrderState.orders || []).forEach((o) => {
+    if (
+      (outbound.id && (o.linkedOutboundIds || []).includes(outbound.id)) ||
+      (outbound.docNo && (o.linkedOutboundDocNos || []).includes(outbound.docNo))
+    ) {
+      push(o)
+    }
+  })
+  return [...byId.values()].map((row) => ({
+    ...row,
+    stocktakeQty: sumLineQty(row.lineItems || [], ['qty', 'countQty', 'bookQty']),
+  }))
 }
 
 /** 发货单关联的出厂质检（经销售出库） */
