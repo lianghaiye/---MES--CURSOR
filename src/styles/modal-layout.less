@@ -154,3 +154,31 @@
     }
   }
 }
+
+/* 生成入库单：矮屏时整窗落在视口内，正文内部滚动，标题和底栏不掉到屏幕外 */
+.generate-inbound-modal-wrap {
+  overflow: hidden;
+
+  .ant-modal {
+    top: 24px;
+    padding-bottom: 0;
+    max-width: calc(100vw - 32px);
+  }
+
+  .ant-modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 48px);
+  }
+
+  .ant-modal-header,
+  .ant-modal-footer {
+    flex: none;
+  }
+
+  .ant-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+}

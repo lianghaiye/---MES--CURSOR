@@ -7,6 +7,7 @@
     destroy-on-close
     class="generate-inbound-modal"
     wrap-class-name="generate-inbound-modal-wrap"
+    :style="{ top: '24px' }"
     @cancel="handleCancel"
   >
     <div class="modal-basic-card">
