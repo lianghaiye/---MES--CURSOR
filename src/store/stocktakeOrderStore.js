@@ -12,6 +12,7 @@ import {
   STOCKTAKE_POSTING,
   STOCKTAKE_TYPE,
   normalizeStocktakeStatus,
+  normalizeStocktakeType,
   isStocktakeBusinessSource,
   isStocktakeManualSource,
 } from '@/mock/stocktakeOptions'
@@ -36,7 +37,7 @@ function migrateOrder(order) {
   if (!order) return order
   const rawStatus = order.status
   order.status = normalizeStocktakeStatus(order.status)
-  if (!order.stocktakeType) order.stocktakeType = STOCKTAKE_TYPE.OTHER
+  order.stocktakeType = normalizeStocktakeType(order.stocktakeType)
   // 历史「已过账」→ 审核通过 + 过账成功
   if (rawStatus === '已过账' || rawStatus === '已确认') {
     order.postingStatus = STOCKTAKE_POSTING.SUCCESS

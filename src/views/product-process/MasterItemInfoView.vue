@@ -187,6 +187,10 @@
               <SyncOutlined />
               同步规格属性
             </a-button>
+            <a-button @click="openLabelPrint">
+              <PrinterOutlined />
+              打印标签
+            </a-button>
             <a-dropdown>
               <a-button>
                 批量操作
@@ -406,6 +410,8 @@
       @done="handleSearch"
     />
     <ImportExportHistoryModal v-model:open="historyOpen" />
+
+    <ProductLabelPrintModal v-model:open="labelPrintOpen" :items="labelPrintItems" />
   </div>
 </template>
 
@@ -424,6 +430,7 @@ import {
   DeleteOutlined,
   DownOutlined,
   SyncOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons-vue'
 import { filterCategoryTree } from '@/mock/productCategories'
 import {
@@ -449,6 +456,7 @@ import { materialInfoState } from '@/store/materialInfoStore'
 import MasterItemFormModal from './components/MasterItemFormModal.vue'
 import MasterItemCategoryFormModal from './components/MasterItemCategoryFormModal.vue'
 import MasterInfoRowActions from './components/MasterInfoRowActions.vue'
+import ProductLabelPrintModal from './components/ProductLabelPrintModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -555,6 +563,8 @@ const editRecord = ref(null)
 const editSpu = ref(null)
 const viewOnly = ref(false)
 const modalSessionKey = ref(0)
+const labelPrintOpen = ref(false)
+const labelPrintItems = ref([])
 const listViewMode = ref('sku')
 const matrixOpen = ref(false)
 const matrixSpu = ref(null)
@@ -1120,6 +1130,18 @@ function openBomMaintenance(record) {
 
 function handleSyncSpec() {
   message.info('同步规格属性功能开发中')
+}
+
+function openLabelPrint() {
+  const rows = selectedRowKeys.value.length
+    ? unifiedList.value.filter((r) => selectedRowKeys.value.includes(r.id))
+    : []
+  if (!rows.length) {
+    message.warning('请先勾选要打印标签的产品/物料')
+    return
+  }
+  labelPrintItems.value = rows
+  labelPrintOpen.value = true
 }
 
 const importOpen = ref(false)

@@ -41,7 +41,14 @@ export const stocktakeSourceOptions = [
 ]
 
 export function stocktakeSourceLabel(channel) {
-  if (channel === STOCKTAKE_SOURCE.MANUAL || channel === 'web') return '新增'
+  if (
+    channel === STOCKTAKE_SOURCE.MANUAL ||
+    channel === 'web' ||
+    channel === 'miniprogram' ||
+    channel === 'mobile'
+  ) {
+    return '新增'
+  }
   return '业务'
 }
 
@@ -56,10 +63,18 @@ export function isStocktakeBusinessSource(orderOrChannel) {
 }
 
 export const STOCKTAKE_TYPE = {
-  OPENING: '期初调整',
-  CLOSING: '期末调整',
+  OPENING: '期初盘点',
+  CLOSING: '期末盘点',
   COST: '成本调整',
   OTHER: '其他调整',
+}
+
+/** 兼容历史「期初调整 / 期末调整」 */
+export function normalizeStocktakeType(type) {
+  if (type === '期初调整') return STOCKTAKE_TYPE.OPENING
+  if (type === '期末调整') return STOCKTAKE_TYPE.CLOSING
+  if (Object.values(STOCKTAKE_TYPE).includes(type)) return type
+  return type || STOCKTAKE_TYPE.OTHER
 }
 
 export const stocktakeTypeOptions = [

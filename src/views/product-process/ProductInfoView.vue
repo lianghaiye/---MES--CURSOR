@@ -154,6 +154,10 @@
               <SyncOutlined />
               同步规格属性
             </a-button>
+            <a-button size="small" @click="openLabelPrint">
+              <PrinterOutlined />
+              打印标签
+            </a-button>
             <a-dropdown>
               <a-button size="small">
                 批量操作
@@ -285,6 +289,8 @@
       :selected-count="selectedRowKeys.length"
       @export="doExport"
     />
+
+    <ProductLabelPrintModal v-model:open="labelPrintOpen" :items="labelPrintItems" />
   </div>
 </template>
 
@@ -303,6 +309,7 @@ import {
   DeleteOutlined,
   DownOutlined,
   SyncOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons-vue'
 import {
   productCategoryTree,
@@ -319,6 +326,7 @@ import {
   cloneProduct,
 } from '@/store/productInfoStore'
 import ProductFormModal from './components/ProductFormModal.vue'
+import ProductLabelPrintModal from './components/ProductLabelPrintModal.vue'
 import MasterInfoRowActions from './components/MasterInfoRowActions.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -364,6 +372,8 @@ const formModalOpen = ref(false)
 const editRecord = ref(null)
 const viewOnly = ref(false)
 const modalSessionKey = ref(0)
+const labelPrintOpen = ref(false)
+const labelPrintItems = ref([])
 watch(formModalOpen, (open) => {
   if (!open) viewOnly.value = false
 })
@@ -639,6 +649,18 @@ function handleBatchDelete() {
       message.success('已删除')
     },
   })
+}
+
+function openLabelPrint() {
+  const rows = selectedRowKeys.value.length
+    ? productInfoState.products.filter((item) => selectedRowKeys.value.includes(item.id))
+    : []
+  if (!rows.length) {
+    message.warning('请先勾选要打印标签的产品')
+    return
+  }
+  labelPrintItems.value = rows
+  labelPrintOpen.value = true
 }
 
 function handleClone(record) {

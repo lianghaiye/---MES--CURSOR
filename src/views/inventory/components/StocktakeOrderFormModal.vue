@@ -76,7 +76,7 @@
           <a-space wrap>
             <a-button type="primary" size="small" :disabled="!form.warehouse" @click="openPicker">
               <PlusOutlined />
-              从库存添加
+              添加盘点物品
             </a-button>
             <a-button size="small" :disabled="!form.warehouse" @click="loadWarehouseStock">
               加载本仓库存

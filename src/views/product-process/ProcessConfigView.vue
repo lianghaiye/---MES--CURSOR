@@ -149,8 +149,6 @@
       </a-table>
     </div>
 
-    <ProcessConfigFormModal v-model:open="modalOpen" :record="editRecord" @saved="handleSearch" />
-
     <ProcessLaborConfigModal
       v-model:open="laborModalOpen"
       :process="laborProcess"
@@ -181,11 +179,13 @@ import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
-import ProcessConfigFormModal from './components/ProcessConfigFormModal.vue'
 import ProcessLaborConfigModal from './components/ProcessLaborConfigModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 import {
   processConfigState,
   filterProcessConfig,
@@ -210,6 +210,8 @@ const MINIMAL_PROCESS_OPERATION_KEYS = new Set([
 ])
 
 const router = useRouter()
+const { openTab } = useTabs()
+const processConfigCreatePage = findCreatePageByListPath('/product-process/process-config')
 const importOpen = ref(false)
 const historyOpen = ref(false)
 const filters = reactive({
@@ -224,8 +226,6 @@ const applied = reactive({
   resourceType: undefined,
   status: undefined,
 })
-const modalOpen = ref(false)
-const editRecord = ref(null)
 const laborModalOpen = ref(false)
 const laborProcess = ref(null)
 
@@ -294,13 +294,18 @@ function handleReset() {
 }
 
 function openCreate() {
-  editRecord.value = null
-  modalOpen.value = true
+  openCreateTab(router, openTab, {
+    path: processConfigCreatePage.newPath,
+    title: processConfigCreatePage.title,
+  })
 }
 
 function openEdit(record) {
-  editRecord.value = record
-  modalOpen.value = true
+  if (!record?.id) return
+  openCreateTab(router, openTab, {
+    path: `/product-process/process-config/${record.id}/edit`,
+    title: `编辑工序 ${record.code || record.name || ''}`.trim(),
+  })
 }
 
 function openLaborConfig(record) {

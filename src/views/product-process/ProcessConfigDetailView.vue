@@ -63,8 +63,6 @@
       </template>
       <a-empty v-else-if="!loading" description="未找到该工序" />
     </a-spin>
-
-    <ProcessConfigFormModal v-model:open="modalOpen" :record="record" @saved="reload" />
   </div>
 </template>
 
@@ -82,7 +80,8 @@ import {
   PROCESS_OPERATION_DEFS,
 } from '@/store/processConfigStore'
 import { getProductionMode, isMinimalReportMode } from '@/store/businessRuleStore'
-import ProcessConfigFormModal from './components/ProcessConfigFormModal.vue'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
 
 const MINIMAL_PROCESS_OPERATION_KEYS = new Set([
   'opQc',
@@ -93,9 +92,9 @@ const MINIMAL_PROCESS_OPERATION_KEYS = new Set([
 
 const route = useRoute()
 const router = useRouter()
+const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
-const modalOpen = ref(false)
 
 const isMinimalMode = computed(() => {
   const mode = getProductionMode()
@@ -134,7 +133,11 @@ function goBack() {
 }
 
 function openEdit() {
-  modalOpen.value = true
+  if (!record.value?.id) return
+  openCreateTab(router, openTab, {
+    path: `/product-process/process-config/${record.value.id}/edit`,
+    title: `编辑工序 ${record.value.code || record.value.name || ''}`.trim(),
+  })
 }
 </script>
 

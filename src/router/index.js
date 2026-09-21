@@ -203,6 +203,12 @@ const routes = [
         meta: { title: '产品信息' },
       },
       {
+        path: 'product-process/product-label-print-preview',
+        name: 'product-label-print-preview-inner',
+        component: () => import('@/views/product-process/ProductLabelPrintPreviewView.vue'),
+        meta: { title: '产品标签打印' },
+      },
+      {
         path: 'product-process/products/:id/edit',
         name: 'product-process-products-edit',
         component: () => import('@/views/product-process/MasterItemEditView.vue'),
@@ -279,6 +285,12 @@ const routes = [
         name: 'product-process-config',
         component: () => import('@/views/product-process/ProcessConfigView.vue'),
         meta: { title: '工序配置' },
+      },
+      {
+        path: 'product-process/process-config/:id/edit',
+        name: 'product-process-config-edit',
+        component: () => import('@/views/product-process/ProcessConfigEditView.vue'),
+        meta: { title: '编辑工序', listPath: '/product-process/process-config' },
       },
       {
         path: 'product-process/process-config/:id',
