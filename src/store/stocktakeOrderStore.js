@@ -29,8 +29,8 @@ import {
 
 const STORAGE_KEY = 'i_doms_stocktake_orders'
 const SEED_VERSION_KEY = 'i_doms_stocktake_orders_seed_v'
-/** v6：重做演示种子 + 修复刷新回滚（初始化立即落盘） */
-const CURRENT_SEED_VERSION = '6'
+/** v7：列表创建人 + 审核/过账人时间 */
+const CURRENT_SEED_VERSION = '7'
 
 function migrateOrder(order) {
   if (!order) return order
@@ -53,6 +53,7 @@ function migrateOrder(order) {
     if (st === '待确认' || st === '部分确认') l.lineStatus = STOCKTAKE_STATUS.DRAFT
     if (st === '已确认' || st === '已过账') l.lineStatus = STOCKTAKE_STATUS.APPROVED
   })
+  if (order.poster == null) order.poster = order.confirmer || ''
   backfillStocktakeOperationLogs(order)
   return order
 }
@@ -251,9 +252,10 @@ function markPosted(order, operator, { modeLabel = '生成盘盈盘亏并入账'
   order.postingStatus = partial ? STOCKTAKE_POSTING.PARTIAL : STOCKTAKE_POSTING.SUCCESS
   order.postingError = ''
   order.confirmer = operator
+  order.poster = operator
   order.confirmedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  order.postedAt = order.confirmedAt
   if (!partial) {
-    order.postedAt = order.confirmedAt
     ;(order.lineItems || []).forEach((l) => {
       l.lineStatus = STOCKTAKE_STATUS.APPROVED
     })

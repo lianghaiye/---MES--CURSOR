@@ -525,7 +525,7 @@
                       v-if="isLinePendingInbound(record)"
                       @click="handleConfirmLineInbound(record)"
                     >
-                      确认
+                      确认入库
                     </a>
                     <a
                       v-if="canRefuseLine(record)"

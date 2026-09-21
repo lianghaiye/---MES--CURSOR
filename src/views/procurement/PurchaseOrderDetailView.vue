@@ -2,70 +2,72 @@
   <div class="purchase-order-detail-page">
     <a-spin :spinning="loading">
       <template v-if="record">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="order-no">{{ record.orderNo }}</span>
-            <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
-            <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
-            <a-tag :color="overdueColor(overdueStatusOf(record))">
-              {{ overdueStatusOf(record) }}
-            </a-tag>
-          </div>
-          <a-space :size="8" wrap>
-            <template v-if="record.status === '待提交'">
-              <a-button type="primary" size="small" @click="handleEdit">编辑</a-button>
-              <a-button size="small" @click="handleSubmit">提交审核</a-button>
-              <a-button size="small" danger @click="handleVoid">作废</a-button>
-            </template>
-            <template v-else-if="record.status === '待审核'">
-              <a-button type="primary" size="small" @click="openApprove">审核</a-button>
-              <a-button size="small" @click="handleWithdraw">撤回</a-button>
-            </template>
-            <template v-else-if="record.status === '已拒绝'">
-              <a-button type="primary" size="small" @click="handleEdit">编辑</a-button>
-              <a-button size="small" @click="handleResubmit">重新提交</a-button>
-            </template>
-            <template v-else-if="record.status === '进行中'">
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ record.orderNo }}</span>
+              <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+              <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
+              <a-tag :color="overdueColor(overdueStatusOf(record))">
+                {{ overdueStatusOf(record) }}
+              </a-tag>
+            </div>
+            <a-space :size="8" wrap>
+              <template v-if="record.status === '待提交'">
+                <a-button type="primary" size="small" @click="handleEdit">编辑</a-button>
+                <a-button size="small" @click="handleSubmit">提交审核</a-button>
+                <a-button size="small" danger @click="handleVoid">作废</a-button>
+              </template>
+              <template v-else-if="record.status === '待审核'">
+                <a-button type="primary" size="small" @click="openApprove">审核</a-button>
+                <a-button size="small" @click="handleWithdraw">撤回</a-button>
+              </template>
+              <template v-else-if="record.status === '已拒绝'">
+                <a-button type="primary" size="small" @click="handleEdit">编辑</a-button>
+                <a-button size="small" @click="handleResubmit">重新提交</a-button>
+              </template>
+              <template v-else-if="record.status === '进行中'">
+                <a-button
+                  v-if="canGenerateReceipt(record)"
+                  type="primary"
+                  size="small"
+                  @click="openReceiptModal"
+                >
+                  生成收货
+                </a-button>
+                <a-button v-if="canGenerateInbound(record)" size="small" @click="openInboundModal">
+                  生成入库
+                </a-button>
+                <a-button size="small" @click="openSettleCreate">生成结算</a-button>
+                <a-button size="small" @click="openPurchaseReturnCreate">采购退货</a-button>
+                <a-button size="small" @click="handleComplete">完成</a-button>
+              </template>
               <a-button
-                v-if="canGenerateReceipt(record)"
-                type="primary"
+                v-if="canApplyPurchasePriceChange(record)"
                 size="small"
-                @click="openReceiptModal"
+                @click="handlePriceChange"
               >
-                生成收货
+                {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
               </a-button>
-              <a-button v-if="canGenerateInbound(record)" size="small" @click="openInboundModal">
-                生成入库
-              </a-button>
-              <a-button size="small" @click="openSettleCreate">生成结算</a-button>
-              <a-button size="small" @click="openPurchaseReturnCreate">采购退货</a-button>
-              <a-button size="small" @click="handleComplete">完成</a-button>
-            </template>
-            <a-button
-              v-if="canApplyPurchasePriceChange(record)"
-              size="small"
-              @click="handlePriceChange"
-            >
-              {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
-            </a-button>
-            <a-button size="small" @click="openPrint">打印</a-button>
-            <a-button size="small" @click="handleBack">返回列表</a-button>
-          </a-space>
-        </div>
+              <a-button size="small" @click="openPrint">打印</a-button>
+              <a-button size="small" @click="handleBack">返回列表</a-button>
+            </a-space>
+          </div>
 
-        <div class="detail-tabs-wrap">
-          <a-tabs
-            v-model:active-key="activeTab"
-            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-          >
-            <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
-            <a-tab-pane key="inbound" :tab="`入库信息 (${relatedInboundLines.length})`" />
-            <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
-            <a-tab-pane key="return" :tab="`退货信息 (${relatedReturnLines.length})`" />
-            <a-tab-pane key="settle" :tab="`结算信息 (${relatedSettleLines.length})`" />
-            <a-tab-pane key="approval" tab="审批信息" />
-          </a-tabs>
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="activeTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
+              <a-tab-pane key="inbound" :tab="`入库信息 (${relatedInboundLines.length})`" />
+              <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
+              <a-tab-pane key="return" :tab="`退货信息 (${relatedReturnLines.length})`" />
+              <a-tab-pane key="settle" :tab="`结算信息 (${relatedSettleLines.length})`" />
+              <a-tab-pane key="approval" tab="审批信息" />
+            </a-tabs>
+          </div>
         </div>
 
         <div class="tab-body">
@@ -1104,16 +1106,28 @@ function openApprove() {
   flex-direction: column;
 }
 
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--page-bg, #f0f2f5);
+}
+
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
+
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* 底部分隔线上方留白 6px */
-  padding: 10px 12px 6px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: #fff;
-  border-bottom: 1px solid #e8e8e8;
-  position: relative;
-  z-index: 2;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .header-left {

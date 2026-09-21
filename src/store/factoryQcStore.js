@@ -107,6 +107,22 @@ export function getFactoryQcById(id) {
   return factoryQcState.records.find((r) => r.id === id) || null
 }
 
+/** 出库单关联的全部出厂质检单（含历史复检） */
+export function listFactoryQcByOutbound(outbound) {
+  if (!outbound) return []
+  const docNo = String(outbound.docNo || '').trim()
+  const linkedId = outbound.factoryQcId
+  return factoryQcState.records
+    .filter((r) => {
+      if (linkedId && r.id === linkedId) return true
+      if (docNo && String(r.outboundDocNo || '').trim() === docNo) return true
+      if (docNo && String(r.sourceOrderNo || '').trim() === docNo) return true
+      return false
+    })
+    .slice()
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+}
+
 /** 阻止确认出库的质检结果 */
 export const QC_RESULTS_BLOCK_OUTBOUND = ['质检不通过', '部分通过']
 

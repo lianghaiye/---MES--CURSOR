@@ -381,6 +381,15 @@ export function syncTransferOrderFromInbound(inboundOrder, { operator = 'admin1'
     order.linkedInboundDocNos.push(inboundOrder.docNo)
   }
 
+  const inboundDone = (inboundOrder.lineItems || []).some(
+    (il) => (il.lineStatus || '') === '已入库',
+  )
+  if (inboundDone || inboundOrder.status === '已入库') {
+    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    order.inboundConfirmer = inboundOrder.confirmer || operator
+    order.inboundConfirmedAt = inboundOrder.confirmedAt || order.inboundConfirmedAt || now
+  }
+
   recomputeTransferStatusFromLines(order, operator)
   return order
 }

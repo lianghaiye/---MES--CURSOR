@@ -45,8 +45,8 @@ function resolveInboundSalesOrder(order) {
 
 const STORAGE_KEY = 'i_doms_inbound_orders'
 const SEED_VERSION_KEY = 'i_doms_inbound_orders_seed_v'
-/** v10：状态归一待入库/已入库；来源业务/新增；支持拒绝入库 */
-const CURRENT_SEED_VERSION = '11'
+/** v12：补齐各入库类型演示单 */
+const CURRENT_SEED_VERSION = '12'
 
 function loadFromStorage() {
   try {
@@ -475,15 +475,10 @@ function prepareAndApplyInboundLine(order, line) {
   const allPieces = []
   let manageByPiece = false
 
-  // 成品/半成品：按销售行未满足数量切开打单 vs 自由备货
-  if (isFinishedOrSemiInbound(order)) {
-    const salesOrder = resolveInboundSalesOrder(order)
-    if (!salesOrder) {
-      return {
-        ok: false,
-        message: `「${line.itemName || line.itemCode}」成品/半成品入库须关联可解析的销售订单`,
-      }
-    }
+  // 成品/半成品且已挂销售订单：按销售行未满足数量切开打单 vs 自由备货。
+  // 工单成品检未挂销售订单时，整批按自由备货入库，不在生成弹窗里再选销售订单。
+  const salesOrder = isFinishedOrSemiInbound(order) ? resolveInboundSalesOrder(order) : null
+  if (salesOrder) {
     const split = splitInboundPieceValuesForSalesOrder({
       salesOrder,
       itemCode: line.itemCode,
@@ -1112,11 +1107,19 @@ export function createInboundFromFinishedQc(task, partial = {}) {
     return { ok: false, message: `已关联入库单「${task.inboundOrderNo}」` }
   }
 
+  const overrides =
+    partial.lineOverrides && typeof partial.lineOverrides === 'object' ? partial.lineOverrides : {}
+
   const lineItems = (task.lineItems || [])
     .map((line, idx) => {
+      const override = overrides[line.id] || overrides[String(line.id)] || {}
       const qty =
-        Number(line.acceptInboundQty) || Number(line.inspectQty) || Number(line.receiptQty) || 0
+        override.qty != null && override.qty !== ''
+          ? Number(override.qty)
+          : Number(line.acceptInboundQty) || Number(line.inspectQty) || Number(line.receiptQty) || 0
       if (!(qty > 0)) return null
+      const warehouse =
+        override.warehouse || partial.warehouse || line.receivingWarehouse || '成品仓'
       return createInboundLine({
         id: `ib-fqc-${task.id}-${line.id || idx}`,
         itemCode: line.itemCode || task.itemCode || '',
@@ -1125,8 +1128,11 @@ export function createInboundFromFinishedQc(task, partial = {}) {
         material: line.material || task.material || '',
         qty,
         unit: line.unit || task.unit || '件',
-        warehouse: line.receivingWarehouse || '成品仓',
+        warehouse,
         lineSource: '生产',
+        salesOrderNo: partial.salesOrderNo || '',
+        salesOrderId: partial.salesOrderId || '',
+        salesLineId: override.salesLineId || '',
       })
     })
     .filter(Boolean)
@@ -1139,19 +1145,21 @@ export function createInboundFromFinishedQc(task, partial = {}) {
   const order = addInboundOrder({
     inboundType: '成品入库',
     status: '待入库',
-    warehouse: lineItems[0].warehouse || '成品仓',
+    warehouse: partial.warehouse || lineItems[0].warehouse || '成品仓',
     itemType: '产品',
     sourceOrderNo: workOrderNo,
     sourceType: '成品检',
-    handler: partial.creator || task.inspector || '管理员',
+    salesOrderNo: partial.salesOrderNo || '',
+    salesOrderId: partial.salesOrderId || '',
+    customerName: partial.customerName || '',
+    handler: partial.handler || partial.creator || task.inspector || '管理员',
     creator: partial.creator || '管理员',
     remark: partial.remark || `来自成品检 ${task.qcNo || ''}`.trim(),
-    inboundDate: dayjs().format('YYYY-MM-DD'),
+    inboundDate: partial.inboundDate || dayjs().format('YYYY-MM-DD'),
     workOrders: workOrderNo
       ? [{ workOrderNo, workOrderId: task.workOrderId || '', qty: lineItems[0].qty }]
       : [],
     lineItems,
-    ...partial,
   })
 
   // eslint-disable-next-line global-require

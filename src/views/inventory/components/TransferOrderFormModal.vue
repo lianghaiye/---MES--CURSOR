@@ -59,8 +59,8 @@
               </a-form-item>
             </a-col>
             <a-col :span="8">
-              <a-form-item label="申请人">
-                <a-input v-model:value="form.applicant" size="small" />
+              <a-form-item label="创建人">
+                <a-input v-model:value="form.creator" size="small" />
               </a-form-item>
             </a-col>
             <a-col :span="8">
@@ -198,7 +198,7 @@ const form = reactive({
   fromWarehouse: undefined,
   toWarehouse: undefined,
   transferDate: dayjs().format('YYYY-MM-DD'),
-  applicant: 'admin1',
+  creator: 'admin1',
   remark: '',
   lineItems: [],
 })
@@ -253,7 +253,7 @@ function resetForm() {
     fromWarehouse: undefined,
     toWarehouse: undefined,
     transferDate: dayjs().format('YYYY-MM-DD'),
-    applicant: 'admin1',
+    creator: 'admin1',
     remark: '',
     lineItems: [],
   })
@@ -265,7 +265,7 @@ function loadEdit(record) {
     fromWarehouse: record.fromWarehouse,
     toWarehouse: record.toWarehouse,
     transferDate: record.transferDate || dayjs().format('YYYY-MM-DD'),
-    applicant: record.applicant || 'admin1',
+    creator: record.creator || record.applicant || 'admin1',
     remark: record.remark || '',
     lineItems: (record.lineItems || []).map((l) => createTransferLine({ ...l })),
   })
@@ -335,7 +335,8 @@ function handleSave() {
     fromWarehouse: form.fromWarehouse,
     toWarehouse: form.toWarehouse,
     transferDate: form.transferDate,
-    applicant: form.applicant,
+    creator: form.creator,
+    applicant: form.creator,
     remark: form.remark,
     lineItems: form.lineItems,
   }
@@ -360,7 +361,8 @@ function handleSaveAndConfirm() {
     fromWarehouse: form.fromWarehouse,
     toWarehouse: form.toWarehouse,
     transferDate: form.transferDate,
-    applicant: form.applicant,
+    creator: form.creator,
+    applicant: form.creator,
     remark: form.remark,
     lineItems: form.lineItems,
   }

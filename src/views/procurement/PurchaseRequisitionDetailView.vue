@@ -2,45 +2,47 @@
   <div class="purchase-req-detail-page">
     <a-spin :spinning="loading">
       <template v-if="record">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="order-no">{{ record.reqNo }}</span>
-            <a-tag :color="docStatusColor(record.docStatus)">{{ record.docStatus }}</a-tag>
-            <a-tag v-if="activeDraft" color="purple"> 关联草稿 {{ activeDraft.orderNo }} </a-tag>
-            <a-tag :color="urgencyColor(record.urgency)">{{ record.urgency }}</a-tag>
-            <a-tag v-if="record.overdueStatus" :color="overdueStatusColor(record.overdueStatus)">
-              {{ record.overdueStatus }}
-            </a-tag>
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ record.reqNo }}</span>
+              <a-tag :color="docStatusColor(record.docStatus)">{{ record.docStatus }}</a-tag>
+              <a-tag v-if="activeDraft" color="purple"> 关联草稿 {{ activeDraft.orderNo }} </a-tag>
+              <a-tag :color="urgencyColor(record.urgency)">{{ record.urgency }}</a-tag>
+              <a-tag v-if="record.overdueStatus" :color="overdueStatusColor(record.overdueStatus)">
+                {{ record.overdueStatus }}
+              </a-tag>
+            </div>
+            <a-space>
+              <template v-if="isDraftLocked">
+                <a-button type="primary" @click="continuePoDraft">继续生成草稿</a-button>
+                <a-button danger @click="handleDeleteDraft">删除草稿</a-button>
+              </template>
+              <template v-else>
+                <a-button v-if="canEdit" type="default" @click="openEdit"> 编辑 </a-button>
+                <a-button v-if="showActions" class="btn-void" @click="handleInvalidate">
+                  <InfoCircleOutlined />
+                  作废
+                </a-button>
+                <a-button v-if="showActions" type="primary" @click="openGenerateModal">
+                  <CheckCircleOutlined />
+                  生成采购单
+                </a-button>
+              </template>
+              <a-button size="small" @click="openPrint">打印</a-button>
+              <a-button size="small" @click="handleBack">返回列表</a-button>
+            </a-space>
           </div>
-          <a-space>
-            <template v-if="isDraftLocked">
-              <a-button type="primary" @click="continuePoDraft">继续生成草稿</a-button>
-              <a-button danger @click="handleDeleteDraft">删除草稿</a-button>
-            </template>
-            <template v-else>
-              <a-button v-if="canEdit" type="default" @click="openEdit"> 编辑 </a-button>
-              <a-button v-if="showActions" class="btn-void" @click="handleInvalidate">
-                <InfoCircleOutlined />
-                作废
-              </a-button>
-              <a-button v-if="showActions" type="primary" @click="openGenerateModal">
-                <CheckCircleOutlined />
-                生成采购单
-              </a-button>
-            </template>
-            <a-button size="small" @click="openPrint">打印</a-button>
-            <a-button size="small" @click="handleBack">返回列表</a-button>
-          </a-space>
-        </div>
 
-        <div class="detail-tabs-wrap">
-          <a-tabs
-            v-model:active-key="activeTab"
-            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-          >
-            <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane key="purchase" :tab="`采购信息 (${relatedPurchaseOrders.length})`" />
-          </a-tabs>
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="activeTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="purchase" :tab="`采购信息 (${relatedPurchaseOrders.length})`" />
+            </a-tabs>
+          </div>
         </div>
 
         <div class="tab-body">
@@ -436,13 +438,28 @@ function openGenerateModal() {
   flex-direction: column;
 }
 
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--page-bg, #f0f2f5);
+}
+
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
+
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: #fff;
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .tab-body {

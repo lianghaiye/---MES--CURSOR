@@ -47,8 +47,8 @@ import {
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
-/** v11：领料入库关联 + 采购退货出库 */
-const CURRENT_SEED_VERSION = '11'
+/** v13：去掉出库类型「退货出库」 */
+const CURRENT_SEED_VERSION = '13'
 
 /** 领料/发料出库不再审批：历史「待处理」升为「待出库」；拒绝领料→已拒绝；来源归一 */
 function migrateSkipApprovalStatuses(orders) {

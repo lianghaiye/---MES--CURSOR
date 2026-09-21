@@ -221,6 +221,7 @@ const statusOpts = qcStatusOptions.map((v) => ({ label: v, value: v }))
 const resultOpts = qcResultOptions.map((v) => ({ label: v, value: v }))
 
 const baseColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '质检单号', key: 'qcNo', width: 150, fixed: 'left' },
   { title: '质检状态', key: 'qcStatus', width: 90 },
   { title: '质检结果', key: 'qcResult', width: 100 },

@@ -57,8 +57,8 @@
               </a-form-item>
             </a-col>
             <a-col :span="8">
-              <a-form-item label="申请人">
-                <a-input v-model:value="form.applicant" size="small" />
+              <a-form-item label="创建人">
+                <a-input v-model:value="form.creator" size="small" />
               </a-form-item>
             </a-col>
             <a-col :span="8">
@@ -203,7 +203,7 @@ const form = reactive({
   warehouse: undefined,
   stocktakeDate: dayjs().format('YYYY-MM-DD'),
   stocktakeType: STOCKTAKE_TYPE.OTHER,
-  applicant: 'admin1',
+  creator: 'admin1',
   remark: '',
   lineItems: [],
 })
@@ -354,7 +354,7 @@ function resetForm() {
     warehouse: undefined,
     stocktakeDate: dayjs().format('YYYY-MM-DD'),
     stocktakeType: STOCKTAKE_TYPE.OTHER,
-    applicant: 'admin1',
+    creator: 'admin1',
     remark: '',
     lineItems: [],
   })
@@ -366,7 +366,7 @@ function loadEdit(record) {
     warehouse: record.warehouse,
     stocktakeDate: record.stocktakeDate || dayjs().format('YYYY-MM-DD'),
     stocktakeType: record.stocktakeType || STOCKTAKE_TYPE.OTHER,
-    applicant: record.applicant || 'admin1',
+    creator: record.creator || record.applicant || 'admin1',
     remark: record.remark || '',
     lineItems: (record.lineItems || []).map((l) => createStocktakeLine({ ...l })),
   })
@@ -463,7 +463,8 @@ function handleSave() {
     warehouse: form.warehouse,
     stocktakeDate: form.stocktakeDate,
     stocktakeType: form.stocktakeType,
-    applicant: form.applicant,
+    creator: form.creator,
+    applicant: form.creator,
     remark: form.remark,
     lineItems: form.lineItems,
   }

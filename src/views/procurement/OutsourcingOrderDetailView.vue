@@ -2,89 +2,91 @@
   <div class="outsourcing-order-detail-page">
     <a-spin :spinning="loading">
       <template v-if="record">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="order-no">{{ record.orderNo }}</span>
-            <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
-            <a-tag :color="issueColor(record.issueStatus)">{{ record.issueStatus || '—' }}</a-tag>
-            <a-tag :color="returnColor(record.returnStatus)">{{
-              record.returnStatus || '—'
-            }}</a-tag>
-            <a-tag :color="record.overdueStatus === '已逾期' ? 'error' : 'default'">
-              {{ record.overdueStatus || '未逾期' }}
-            </a-tag>
-          </div>
-          <a-space :size="8" wrap>
-            <template v-if="record.status === '待提交'">
-              <a-button type="primary" size="small" @click="handleEdit">编辑</a-button>
-              <a-button size="small" @click="handleSubmit">提交审核</a-button>
-              <a-button size="small" danger @click="handleVoid">作废</a-button>
-            </template>
-            <template v-else-if="record.status === '待审核'">
-              <a-button type="primary" size="small" @click="openApprove">审核</a-button>
-              <a-button size="small" @click="handleWithdraw">撤回</a-button>
-            </template>
-            <template v-else-if="record.status === '已拒绝'">
-              <a-button type="primary" size="small" @click="handleEdit">编辑</a-button>
-              <a-button size="small" @click="handleResubmit">重新提交</a-button>
-            </template>
-            <template v-else-if="record.status === '进行中'">
-              <a-button type="primary" size="small" @click="openIssueModal">
-                生成发料出库
-              </a-button>
-              <a-button
-                v-if="canGenerateOutsourcingReceipt(record)"
-                size="small"
-                @click="openReceiptModal"
-              >
-                生成收货
-              </a-button>
-              <a-button
-                v-if="canGenerateOutsourcingInbound(record)"
-                size="small"
-                @click="openInboundModal"
-              >
-                生成入库
-              </a-button>
-              <a-button size="small" @click="openExceptionCreate">异常处理</a-button>
-              <a-button size="small" @click="handleComplete">完成</a-button>
-            </template>
-            <a-button
-              v-if="canApplyOutsourcingPriceChange(record)"
-              size="small"
-              @click="handlePriceChange"
-            >
-              {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
-            </a-button>
-            <a-dropdown>
-              <a-button size="small">
-                打印
-                <DownOutlined />
-              </a-button>
-              <template #overlay>
-                <a-menu @click="onPrintMenuClick">
-                  <a-menu-item key="派单工">打印派单工</a-menu-item>
-                  <a-menu-item key="发料出库单">打印发料出库单</a-menu-item>
-                </a-menu>
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ record.orderNo }}</span>
+              <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+              <a-tag :color="issueColor(record.issueStatus)">{{ record.issueStatus || '—' }}</a-tag>
+              <a-tag :color="returnColor(record.returnStatus)">{{
+                record.returnStatus || '—'
+              }}</a-tag>
+              <a-tag :color="record.overdueStatus === '已逾期' ? 'error' : 'default'">
+                {{ record.overdueStatus || '未逾期' }}
+              </a-tag>
+            </div>
+            <a-space :size="8" wrap>
+              <template v-if="record.status === '待提交'">
+                <a-button type="primary" size="small" @click="handleEdit">编辑</a-button>
+                <a-button size="small" @click="handleSubmit">提交审核</a-button>
+                <a-button size="small" danger @click="handleVoid">作废</a-button>
               </template>
-            </a-dropdown>
-            <a-button size="small" @click="handleBack">返回列表</a-button>
-          </a-space>
-        </div>
+              <template v-else-if="record.status === '待审核'">
+                <a-button type="primary" size="small" @click="openApprove">审核</a-button>
+                <a-button size="small" @click="handleWithdraw">撤回</a-button>
+              </template>
+              <template v-else-if="record.status === '已拒绝'">
+                <a-button type="primary" size="small" @click="handleEdit">编辑</a-button>
+                <a-button size="small" @click="handleResubmit">重新提交</a-button>
+              </template>
+              <template v-else-if="record.status === '进行中'">
+                <a-button type="primary" size="small" @click="openIssueModal">
+                  生成发料出库
+                </a-button>
+                <a-button
+                  v-if="canGenerateOutsourcingReceipt(record)"
+                  size="small"
+                  @click="openReceiptModal"
+                >
+                  生成收货
+                </a-button>
+                <a-button
+                  v-if="canGenerateOutsourcingInbound(record)"
+                  size="small"
+                  @click="openInboundModal"
+                >
+                  生成入库
+                </a-button>
+                <a-button size="small" @click="openExceptionCreate">异常处理</a-button>
+                <a-button size="small" @click="handleComplete">完成</a-button>
+              </template>
+              <a-button
+                v-if="canApplyOutsourcingPriceChange(record)"
+                size="small"
+                @click="handlePriceChange"
+              >
+                {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
+              </a-button>
+              <a-dropdown>
+                <a-button size="small">
+                  打印
+                  <DownOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu @click="onPrintMenuClick">
+                    <a-menu-item key="派单工">打印派单工</a-menu-item>
+                    <a-menu-item key="发料出库单">打印发料出库单</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+              <a-button size="small" @click="handleBack">返回列表</a-button>
+            </a-space>
+          </div>
 
-        <div class="detail-tabs-wrap">
-          <a-tabs
-            v-model:active-key="activeTab"
-            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-          >
-            <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
-            <a-tab-pane key="issue" :tab="`发料信息 (${issueApplicationRows.length})`" />
-            <a-tab-pane key="return" :tab="`回货信息 (${relatedInboundLines.length})`" />
-            <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
-            <a-tab-pane key="goodsReturn" :tab="`外协异常处理 (${relatedReturnLines.length})`" />
-            <a-tab-pane key="settle" :tab="`结算信息 (${relatedSettleLines.length})`" />
-          </a-tabs>
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="activeTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
+              <a-tab-pane key="issue" :tab="`发料信息 (${issueApplicationRows.length})`" />
+              <a-tab-pane key="return" :tab="`回货信息 (${relatedInboundLines.length})`" />
+              <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
+              <a-tab-pane key="goodsReturn" :tab="`外协异常处理 (${relatedReturnLines.length})`" />
+              <a-tab-pane key="settle" :tab="`结算信息 (${relatedSettleLines.length})`" />
+            </a-tabs>
+          </div>
         </div>
 
         <div class="tab-body">
@@ -855,15 +857,28 @@ function openExceptionCreate() {
   flex-direction: column;
 }
 
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--page-bg, #f0f2f5);
+}
+
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
+
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px 6px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: #fff;
-  border-bottom: 1px solid #e8e8e8;
-  position: relative;
-  z-index: 2;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .header-left {

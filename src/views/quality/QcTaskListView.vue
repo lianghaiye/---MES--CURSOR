@@ -220,6 +220,14 @@
               >
                 入库
               </a-button>
+              <a-button
+                v-if="isFinishedScope && canGenerateFinishedInboundFromQc(record)"
+                type="link"
+                size="small"
+                @click="openFinishedInboundForTasks([record])"
+              >
+                入库
+              </a-button>
               <a-button v-if="canPrintQc" type="link" size="small" @click="openPrint(record)">
                 打印
               </a-button>
@@ -263,6 +271,11 @@
       :qc-hint-bundles="inboundQcHintBundles"
       @saved="onInboundSaved"
     />
+    <FinishedQcInboundModal
+      v-model:open="finishedInboundOpen"
+      :tasks="finishedInboundTasks"
+      @saved="onFinishedInboundSaved"
+    />
 
     <OutsourcingGenerateInboundModal
       v-model:open="wxInboundModalOpen"
@@ -302,6 +315,7 @@ import QcTaskDetailDrawer from './components/QcTaskDetailDrawer.vue'
 import QcTaskCreateModal from './components/QcTaskCreateModal.vue'
 import QcTaskPrintModal from './components/QcTaskPrintModal.vue'
 import GenerateInboundOrderModal from '@/views/procurement/components/GenerateInboundOrderModal.vue'
+import FinishedQcInboundModal from './components/FinishedQcInboundModal.vue'
 import OutsourcingGenerateInboundModal from '@/views/procurement/components/OutsourcingGenerateInboundModal.vue'
 import { getPurchaseReceiptById, purchaseReceiptState } from '@/store/purchaseReceiptStore'
 import {
@@ -314,7 +328,6 @@ import {
   canGenerateOutsourcingInbound,
   getOutsourcingOrderById,
 } from '@/store/outsourcingOrderStore'
-import { createInboundFromFinishedQc } from '@/store/inboundOrderStore'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { useTabs } from '@/composables/useTabs'
 import { getQcTaskRouteBundle, isProcessQcBizScope } from '@/utils/qcTaskRoutes'
@@ -376,6 +389,8 @@ const wxInboundModalOpen = ref(false)
 const wxInboundOrder = ref(null)
 const wxInboundReceipt = ref(null)
 const printModalOpen = ref(false)
+const finishedInboundOpen = ref(false)
+const finishedInboundTasks = ref([])
 const printTask = ref(null)
 const printTasks = ref([])
 
@@ -629,33 +644,23 @@ function openGenerateFinishedInbound() {
     message.warning(failMessages[0] || '所选质检单均不可生成成品入库单')
     return
   }
+  if (failMessages.length) {
+    message.warning(failMessages[0])
+  }
+  openFinishedInboundForTasks(okTasks)
+}
 
-  let success = 0
-  const created = []
-  okTasks.forEach((task) => {
-    const result = createInboundFromFinishedQc(task)
-    if (result.ok) {
-      success += 1
-      created.push(result.order)
-    } else {
-      failMessages.push(`${task.qcNo || task.id}：${result.message}`)
-    }
-  })
+function openFinishedInboundForTasks(tasks) {
+  finishedInboundTasks.value = tasks
+  finishedInboundOpen.value = true
+}
 
-  if (success) {
-    message.success(
-      success === 1
-        ? `已生成成品入库单「${created[0]?.docNo || ''}」`
-        : `已生成 ${success} 张成品入库单`,
-    )
-    selectedRowKeys.value = []
-    if (created.length === 1 && created[0]?.id) {
-      const path = `/inventory/inbound/${created[0].id}`
-      openTab(path, `入库单 ${created[0].docNo || ''}`.trim())
-      router.push({ name: 'inventory-inbound-detail', params: { id: created[0].id } })
-    }
-  } else {
-    message.warning(failMessages[0] || '生成成品入库单失败')
+function onFinishedInboundSaved(orders) {
+  selectedRowKeys.value = []
+  if (orders?.length === 1 && orders[0]?.id) {
+    const path = `/inventory/inbound/${orders[0].id}`
+    openTab(path, `入库单 ${orders[0].docNo || ''}`.trim())
+    router.push({ name: 'inventory-inbound-detail', params: { id: orders[0].id } })
   }
 }
 

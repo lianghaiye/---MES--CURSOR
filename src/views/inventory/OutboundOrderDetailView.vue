@@ -55,14 +55,19 @@
             >
               <a-tab-pane key="basic" tab="基本信息" />
               <a-tab-pane
-                v-if="isMaterialReqOutbound"
-                key="related"
-                :tab="`关联单据 (${relatedInbounds.length})`"
+                v-if="isSalesOutbound"
+                key="relatedQc"
+                :tab="`关联质检 (${relatedFactoryQcList.length})`"
               />
               <a-tab-pane
                 v-if="isPurchaseReturnOutbound"
-                key="related"
+                key="relatedPurchaseReturn"
                 :tab="`关联单据 (${relatedPurchaseReturns.length})`"
+              />
+              <a-tab-pane
+                v-if="isMaterialReqOutbound"
+                key="related"
+                :tab="`关联单据 (${relatedInbounds.length})`"
               />
               <a-tab-pane
                 v-if="isMaterialReqOutbound"
@@ -230,6 +235,54 @@
             </DetailSectionCard>
           </template>
 
+          <template v-else-if="infoTab === 'relatedQc' && isSalesOutbound">
+            <DetailSectionCard title="关联质检">
+              <a-table
+                :columns="relatedQcColumns"
+                :data-source="relatedFactoryQcList"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1280 }"
+                :locale="{ emptyText: '暂无关联出厂质检单' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'qcNo'">
+                    <a v-if="row.qcNo" class="link-code" @click.prevent="openFactoryQcDetail(row)">
+                      {{ row.qcNo }}
+                    </a>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'qcStatus'">
+                    <a-tag :color="factoryQcStatusColor(row.qcStatus)">{{
+                      row.qcStatus || '—'
+                    }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'qcResult'">
+                    <a-tag v-if="row.qcResult" :color="factoryQcResultColor(row.qcResult)">{{
+                      row.qcResult
+                    }}</a-tag>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'qcQty'">
+                    {{ formatFactoryQcQty(row) }}
+                  </template>
+                  <template v-else-if="column.key === 'inspectedAt'">
+                    {{ formatDateTimeMinute(row.inspectedAt) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ formatDateTimeMinute(row.createdAt) || '—' }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
           <template v-else-if="infoTab === 'related' && isMaterialReqOutbound">
             <DetailSectionCard title="关联单据">
               <a-table
@@ -257,7 +310,7 @@
             </DetailSectionCard>
           </template>
 
-          <template v-else-if="infoTab === 'related' && isPurchaseReturnOutbound">
+          <template v-else-if="infoTab === 'relatedPurchaseReturn' && isPurchaseReturnOutbound">
             <DetailSectionCard title="关联单据">
               <a-table
                 :columns="relatedPurchaseReturnColumns"
@@ -277,7 +330,9 @@
                     }}</a-tag>
                   </template>
                   <template v-else-if="column.key === 'outboundStatus'">
-                    {{ row.outboundStatus || '—' }}
+                    <a-tag :color="purchaseReturnOutboundStatusColor(row.outboundStatus)">{{
+                      row.outboundStatus || '—'
+                    }}</a-tag>
                   </template>
                   <template v-else-if="column.key === 'returnNo'">
                     <a class="link-code" @click.prevent="goPurchaseReturn(row)">{{
@@ -286,6 +341,12 @@
                   </template>
                   <template v-else-if="column.key === 'returnQty'">
                     {{ row.returnQtyText || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ formatDateTimeMinute(row.createdAt) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'updatedAt'">
+                    {{ formatDateTimeMinute(row.updatedAt) || '—' }}
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] || '—' }}
@@ -400,10 +461,16 @@ import {
   deleteOutboundOrder,
 } from '@/store/outboundStore'
 import { cutSettleState } from '@/store/cutSettleStore'
-import { getFactoryQcById, qcResultBlocksOutbound } from '@/store/factoryQcStore'
+import {
+  factoryQcState,
+  getFactoryQcById,
+  listFactoryQcByOutbound,
+  qcResultBlocksOutbound,
+} from '@/store/factoryQcStore'
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
+import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { outboundDetailLineColumns, filterOutboundLineColumns } from '@/utils/outboundLineColumns'
 import {
   enrichOutboundLine,
@@ -444,6 +511,27 @@ const printModalOpen = ref(false)
 
 const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领料出库')
 const isPurchaseReturnOutbound = computed(() => record.value?.outboundType === '采购退货')
+const isSalesOutbound = computed(() => record.value?.outboundType === '销售出库')
+
+const relatedFactoryQcList = computed(() => {
+  void factoryQcState.records
+  if (!isSalesOutbound.value || !record.value) return []
+  return listFactoryQcByOutbound(record.value)
+})
+
+const relatedQcColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '质检单号', key: 'qcNo', width: 150 },
+  { title: '质检状态', key: 'qcStatus', width: 96 },
+  { title: '质检结果', key: 'qcResult', width: 100 },
+  { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true },
+  { title: '销售单号', dataIndex: 'salesOrderNo', width: 140 },
+  { title: '质检数量', key: 'qcQty', width: 90, align: 'right' },
+  { title: '质检人', dataIndex: 'inspector', width: 90 },
+  { title: '质检时间', key: 'inspectedAt', width: 150 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', width: 150 },
+]
 
 const operationLogs = computed(() => record.value?.operationLogs || [])
 
@@ -490,13 +578,13 @@ const relatedPurchaseReturnColumns = [
   { title: '状态', key: 'status', width: 90 },
   { title: '出库状态', key: 'outboundStatus', width: 100 },
   { title: '退货单号', key: 'returnNo', width: 150 },
-  { title: '采购单号', dataIndex: 'purchaseOrderNo', width: 140 },
-  { title: '供应商', dataIndex: 'supplier', width: 120, ellipsis: true },
+  { title: '采购单号', dataIndex: 'purchaseOrderNo', key: 'purchaseOrderNo', width: 140 },
+  { title: '供应商', dataIndex: 'supplier', key: 'supplier', width: 140, ellipsis: true },
   { title: '退货数量', key: 'returnQty', width: 110, align: 'right' },
-  { title: '创建人', dataIndex: 'creator', width: 90 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '更新人', dataIndex: 'updater', width: 90 },
-  { title: '更新时间', dataIndex: 'updatedAt', width: 160 },
+  { title: '创建人', dataIndex: 'creator', key: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
+  { title: '更新人', dataIndex: 'updater', key: 'updater', width: 90 },
+  { title: '更新时间', key: 'updatedAt', dataIndex: 'updatedAt', width: 150 },
 ]
 
 const relatedCutSettles = computed(() => {
@@ -677,9 +765,37 @@ function goSalesOrder() {
 
 function goFactoryQc() {
   if (!linkedQc.value) return
-  const path = `/quality/factory-qc/${linkedQc.value.id}`
-  openTab(path, linkedQc.value.qcNo || '出厂质检详情')
+  openFactoryQcDetail(linkedQc.value)
+}
+
+function openFactoryQcDetail(row) {
+  if (!row?.id) return
+  const path = `/quality/factory-qc/${row.id}`
+  openTab(path, row.qcNo || '出厂质检详情')
   router.push(path)
+}
+
+function factoryQcStatusColor(status) {
+  const map = { 待质检: 'processing', 已完成: 'success', 已终止: 'default' }
+  return map[status] || 'default'
+}
+
+function factoryQcResultColor(result) {
+  const map = { 质检通过: 'success', 质检不通过: 'error', 部分通过: 'warning' }
+  return map[result] || 'default'
+}
+
+function formatFactoryQcQty(row) {
+  const lines = row?.lineItems || []
+  if (!lines.length) return '—'
+  const total = lines.reduce(
+    (sum, line) => sum + (Number(line.inspectQty) || Number(line.shipQty) || 0),
+    0,
+  )
+  if (!(total > 0)) return '—'
+  const units = [...new Set(lines.map((l) => l.unit).filter(Boolean))]
+  const unit = units.length === 1 ? units[0] : ''
+  return unit ? `${total} ${unit}` : String(total)
 }
 
 function goInbound(row) {
@@ -701,6 +817,16 @@ function purchaseReturnStatusColor(status) {
   if (status === '进行中') return 'processing'
   if (status === '作废') return 'default'
   return 'warning'
+}
+
+function purchaseReturnOutboundStatusColor(status) {
+  const map = {
+    待出库: 'default',
+    出库中: 'processing',
+    部分出库: 'warning',
+    已出库: 'success',
+  }
+  return map[status] || 'default'
 }
 
 function handleApprove() {

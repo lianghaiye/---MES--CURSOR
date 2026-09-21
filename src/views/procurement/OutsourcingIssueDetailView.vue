@@ -1,36 +1,44 @@
 <template>
   <div class="outsourcing-issue-detail-page">
-    <div class="page-header">
-      <div class="header-left">
-        <template v-if="record">
-          <span class="page-title">{{ record.issueOrderNo }}</span>
-          <a-badge
-            :status="outsourcingIssueOutboundBadge(record.outboundStatus)"
-            :text="record.outboundStatus"
-          />
-        </template>
-        <span v-else class="page-title">发料申请详情</span>
-      </div>
-      <a-space :size="8">
-        <a-button size="small" @click="goBack">返回列表</a-button>
-      </a-space>
-    </div>
-
     <template v-if="!record">
+      <div class="detail-sticky-bar">
+        <div class="page-header">
+          <div class="header-left">
+            <span class="page-title">发料申请详情</span>
+          </div>
+          <a-space :size="8">
+            <a-button size="small" @click="goBack">返回列表</a-button>
+          </a-space>
+        </div>
+      </div>
       <div class="page-body">
         <a-empty description="发料申请单不存在或已删除" />
       </div>
     </template>
 
     <template v-else>
-      <div class="detail-tabs-wrap">
-        <a-tabs
-          v-model:active-key="activeTab"
-          class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-        >
-          <a-tab-pane key="basic" tab="基本信息" />
-          <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
-        </a-tabs>
+      <div class="detail-sticky-bar">
+        <div class="page-header">
+          <div class="header-left">
+            <span class="order-no">{{ record.issueOrderNo }}</span>
+            <a-badge
+              :status="outsourcingIssueOutboundBadge(record.outboundStatus)"
+              :text="record.outboundStatus"
+            />
+          </div>
+          <a-space :size="8">
+            <a-button size="small" @click="goBack">返回列表</a-button>
+          </a-space>
+        </div>
+        <div class="detail-tabs-wrap">
+          <a-tabs
+            v-model:active-key="activeTab"
+            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+          >
+            <a-tab-pane key="basic" tab="基本信息" />
+            <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
+          </a-tabs>
+        </div>
       </div>
 
       <div class="tab-body">
@@ -323,17 +331,28 @@ function goOutsourcingOrder() {
   overflow: hidden;
 }
 
-.page-header {
+.detail-sticky-bar {
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--page-bg, #f0f2f5);
+}
+
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
+
+.page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
-  z-index: 30;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .header-left {
@@ -344,6 +363,7 @@ function goOutsourcingOrder() {
   flex-wrap: wrap;
 }
 
+.order-no,
 .page-title {
   font-size: 16px;
   font-weight: 600;
@@ -356,13 +376,6 @@ function goOutsourcingOrder() {
   min-height: 0;
   overflow: auto;
   padding: 12px;
-}
-
-.detail-tabs-wrap {
-  flex-shrink: 0;
-  background: #fff;
-  padding: 0 16px;
-  border-bottom: 1px solid #f0f0f0;
 }
 
 .section-card {

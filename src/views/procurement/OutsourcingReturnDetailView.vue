@@ -2,41 +2,43 @@
   <div class="outsourcing-return-detail-page">
     <a-spin :spinning="loading">
       <template v-if="record">
-        <div class="page-header">
-          <div class="header-left">
-            <span class="order-no">{{ record.returnNo }}</span>
-            <a-tag :color="statusColor(record.status)">{{ record.status || '—' }}</a-tag>
+        <div class="detail-sticky-bar">
+          <div class="page-header">
+            <div class="header-left">
+              <span class="order-no">{{ record.returnNo }}</span>
+              <a-tag :color="statusColor(record.status)">{{ record.status || '—' }}</a-tag>
+            </div>
+            <a-space :size="8" wrap>
+              <a-button
+                v-if="canEditOutsourcingReturn(record)"
+                type="primary"
+                size="small"
+                @click="handleEdit"
+              >
+                编辑
+              </a-button>
+              <a-button
+                v-if="canVoidOutsourcingReturn(record)"
+                size="small"
+                danger
+                @click="handleVoid"
+              >
+                作废
+              </a-button>
+              <a-button size="small" @click="openPrint">打印</a-button>
+              <a-button size="small" @click="handleBack">返回列表</a-button>
+            </a-space>
           </div>
-          <a-space :size="8" wrap>
-            <a-button
-              v-if="canEditOutsourcingReturn(record)"
-              type="primary"
-              size="small"
-              @click="handleEdit"
-            >
-              编辑
-            </a-button>
-            <a-button
-              v-if="canVoidOutsourcingReturn(record)"
-              size="small"
-              danger
-              @click="handleVoid"
-            >
-              作废
-            </a-button>
-            <a-button size="small" @click="openPrint">打印</a-button>
-            <a-button size="small" @click="handleBack">返回列表</a-button>
-          </a-space>
-        </div>
 
-        <div class="detail-tabs-wrap">
-          <a-tabs
-            v-model:active-key="activeTab"
-            class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
-          >
-            <a-tab-pane key="basic" tab="基本信息" />
-            <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
-          </a-tabs>
+          <div class="detail-tabs-wrap">
+            <a-tabs
+              v-model:active-key="activeTab"
+              class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
+            >
+              <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="outbound" :tab="`出库信息 (${outboundRows.length})`" />
+            </a-tabs>
+          </div>
         </div>
 
         <div class="tab-body">
@@ -275,15 +277,28 @@ function openOutsourcingOrder() {
   flex-direction: column;
 }
 
+.detail-sticky-bar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--page-bg, #f0f2f5);
+}
+
+.detail-sticky-bar .detail-tabs-wrap {
+  flex-shrink: 0;
+}
+
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px 6px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: #fff;
-  border-bottom: 1px solid #e8e8e8;
-  position: relative;
-  z-index: 2;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .header-left {

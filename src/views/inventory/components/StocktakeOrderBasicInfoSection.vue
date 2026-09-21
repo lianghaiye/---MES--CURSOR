@@ -41,10 +41,11 @@ function fieldText(field) {
 const metaItems = computed(() => {
   const r = props.record
   return [
-    { key: 'applicant', label: '申请人', value: display(r.applicant || r.creator) },
-    { key: 'createdAt', label: '申请时间', value: display(r.createdAt) },
+    { key: 'creator', label: '创建人', value: display(r.creator || r.applicant) },
+    { key: 'createdAt', label: '创建时间', value: display(r.createdAt) },
     { key: 'approver', label: '审核人', value: display(r.approver) },
     { key: 'approvedAt', label: '审核时间', value: display(r.approvedAt) },
+    { key: 'poster', label: '过账人', value: display(r.poster || r.confirmer) },
     { key: 'postedAt', label: '过账时间', value: display(r.postedAt) },
   ]
 })

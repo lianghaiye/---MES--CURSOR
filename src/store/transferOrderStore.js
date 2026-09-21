@@ -26,8 +26,8 @@ import {
 
 const STORAGE_KEY = 'i_doms_transfer_orders'
 const SEED_VERSION_KEY = 'i_doms_transfer_orders_seed_v'
-/** v4：操作日志 */
-const CURRENT_SEED_VERSION = '4'
+/** v5：列表创建人/创建时间 + 确认人/入库方确认人 */
+const CURRENT_SEED_VERSION = '5'
 
 function loadFromStorage() {
   try {
@@ -53,6 +53,8 @@ function migrateTransferOrder(order) {
   order.linkedInboundIds = order.linkedInboundIds || []
   order.linkedOutboundDocNos = order.linkedOutboundDocNos || []
   order.linkedInboundDocNos = order.linkedInboundDocNos || []
+  if (order.inboundConfirmer == null) order.inboundConfirmer = ''
+  if (order.inboundConfirmedAt == null) order.inboundConfirmedAt = ''
   backfillTransferOperationLogs(order)
   return order
 }
@@ -228,11 +230,18 @@ export function confirmTransfer(ids, { operator = 'admin1' } = {}) {
       return
     }
     linkOutboundInbound(order, res)
+    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    order.confirmer = operator
+    order.confirmedAt = order.confirmedAt || now
+    if (res.autoCompleted) {
+      order.inboundConfirmer = operator
+      order.inboundConfirmedAt = order.inboundConfirmedAt || now
+    }
     recomputeTransferStatusFromLines(order, operator)
     appendTransferOperationLog(order, {
       action: '确认调拨',
       operator,
-      operatedAt: order.confirmedAt || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      operatedAt: order.confirmedAt || now,
       remark: '出库方确认调拨，生成调拨出库/入库',
     })
     count += 1

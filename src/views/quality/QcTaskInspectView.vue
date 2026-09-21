@@ -25,22 +25,60 @@
                   <a-input :value="task.qcNo" disabled size="small" />
                 </a-form-item>
               </a-col>
-              <a-col :span="6">
-                <a-form-item label="来源单号">
-                  <a-input :value="task.sourceDocNo" disabled size="small" />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
-                <a-form-item :label="isFactoryScope ? '客户名称' : '供应商'">
-                  <a-input :value="task.supplier" disabled size="small" />
-                </a-form-item>
-              </a-col>
+              <template v-if="isProductionScope">
+                <a-col :span="6">
+                  <a-form-item label="工单号">
+                    <a-input :value="productionHeader.workOrderNo || '—'" disabled size="small" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="6">
+                  <a-form-item label="工序">
+                    <a-input :value="productionHeader.processName || '—'" disabled size="small" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="6">
+                  <a-form-item label="工作中心">
+                    <a-input :value="productionHeader.workCenter || '—'" disabled size="small" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="6">
+                  <a-form-item label="工艺路线">
+                    <a-input :value="productionHeader.processRoute || '—'" disabled size="small" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="6">
+                  <a-form-item label="排产数量">
+                    <a-input
+                      :value="formatQty(productionHeader.scheduleQty)"
+                      disabled
+                      size="small"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="6">
+                  <a-form-item label="排产批次">
+                    <a-input :value="productionHeader.scheduleBatch || '—'" disabled size="small" />
+                  </a-form-item>
+                </a-col>
+              </template>
+              <template v-else>
+                <a-col :span="6">
+                  <a-form-item label="来源单号">
+                    <a-input :value="task.sourceDocNo" disabled size="small" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="6">
+                  <a-form-item :label="isFactoryScope ? '客户名称' : '供应商'">
+                    <a-input :value="task.supplier" disabled size="small" />
+                  </a-form-item>
+                </a-col>
+              </template>
               <a-col :span="6">
                 <a-form-item label="质检人">
                   <a-input v-model:value="form.inspector" size="small" placeholder="请输入质检人" />
                 </a-form-item>
               </a-col>
-              <a-col :span="12">
+              <a-col :span="isProductionScope ? 24 : 12">
                 <a-form-item label="备注" class="remark-item">
                   <a-textarea
                     v-model:value="form.remark"
@@ -82,7 +120,7 @@
                       <span>{{ sheetPassRuleLabel(resolveLineSheetPassRule(record, task)) }}</span>
                       <span class="meta-sep">·</span>
                       <span
-                        >{{ isFactoryScope ? '发货' : '收货' }}
+                        >{{ lineQtyLabel }}
                         {{ formatQty(record.receiptQty ?? record.shipQty) }}</span
                       >
                     </div>
@@ -452,6 +490,7 @@ import {
 } from '@/utils/qcTemplateSheetPass'
 import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 import { getQcLibraryFieldByCode, ensureQcLibraryDemoSeed } from '@/store/qcFieldLibraryStore'
+import { isProductionQcScope, resolveProductionQcHeader } from '@/utils/qcProductionContext'
 import { getQcTemplateByCode, ensureQcTemplateDemoSeed } from '@/store/qcTemplateStore'
 import { cloneTemplateFieldsSnapshot } from '@/store/qcTaskStore'
 import QcInspectComplexField from './components/QcInspectComplexField.vue'
@@ -462,6 +501,13 @@ const { closeTab } = useTabs()
 
 const bizScope = computed(() => route.meta.bizScope || task.value?.bizScope || '来料质检')
 const isFactoryScope = computed(() => bizScope.value === FACTORY_QC_BIZ_SCOPE)
+const isProductionScope = computed(() => isProductionQcScope(bizScope.value))
+const productionHeader = computed(() => resolveProductionQcHeader(task.value))
+const lineQtyLabel = computed(() => {
+  if (isProductionScope.value) return '排产'
+  if (isFactoryScope.value) return '发货'
+  return '收货'
+})
 const detailRouteName = computed(() => getQcTaskRouteBundle(bizScope.value).detailName)
 
 const loading = ref(false)

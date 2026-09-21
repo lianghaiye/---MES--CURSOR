@@ -206,7 +206,7 @@
 
       <a-tab-pane
         v-if="isPurchaseReturnOutbound"
-        key="related"
+        key="relatedPurchaseReturn"
         :tab="`关联单据 (${relatedPurchaseReturns.length})`"
       >
         <div class="tab-scroll-body">
@@ -228,6 +228,11 @@
                     row.status || '—'
                   }}</a-tag>
                 </template>
+                <template v-else-if="column.key === 'outboundStatus'">
+                  <a-tag :color="purchaseReturnOutboundStatusColor(row.outboundStatus)">{{
+                    row.outboundStatus || '—'
+                  }}</a-tag>
+                </template>
                 <template v-else-if="column.key === 'returnNo'">
                   <a class="link-code" @click.prevent="goPurchaseReturn(row)">{{
                     row.returnNo || '—'
@@ -236,8 +241,14 @@
                 <template v-else-if="column.key === 'returnQty'">
                   {{ row.returnQtyText || '—' }}
                 </template>
+                <template v-else-if="column.key === 'createdAt'">
+                  {{ formatDateTimeMinute(row.createdAt) || '—' }}
+                </template>
+                <template v-else-if="column.key === 'updatedAt'">
+                  {{ formatDateTimeMinute(row.updatedAt) || '—' }}
+                </template>
                 <template v-else>
-                  {{ row[column.dataIndex] || row[column.key] || '—' }}
+                  {{ row[column.dataIndex] || '—' }}
                 </template>
               </template>
             </a-table>
@@ -327,6 +338,7 @@ import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { InfoCircleOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
+import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { outboundStatusColor, outboundSourceLabel } from '@/mock/outboundOptions'
 import {
   outboundState,
@@ -494,15 +506,15 @@ const relatedInboundColumns = [
 const relatedPurchaseReturnColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '状态', key: 'status', width: 90 },
-  { title: '出库状态', key: 'outboundStatus', dataIndex: 'outboundStatus', width: 100 },
+  { title: '出库状态', key: 'outboundStatus', width: 100 },
   { title: '退货单号', key: 'returnNo', width: 150 },
-  { title: '采购单号', dataIndex: 'purchaseOrderNo', width: 140 },
-  { title: '供应商', dataIndex: 'supplier', width: 120, ellipsis: true },
+  { title: '采购单号', dataIndex: 'purchaseOrderNo', key: 'purchaseOrderNo', width: 140 },
+  { title: '供应商', dataIndex: 'supplier', key: 'supplier', width: 140, ellipsis: true },
   { title: '退货数量', key: 'returnQty', width: 110, align: 'right' },
-  { title: '创建人', dataIndex: 'creator', width: 90 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '更新人', dataIndex: 'updater', width: 90 },
-  { title: '更新时间', dataIndex: 'updatedAt', width: 160 },
+  { title: '创建人', dataIndex: 'creator', key: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
+  { title: '更新人', dataIndex: 'updater', key: 'updater', width: 90 },
+  { title: '更新时间', key: 'updatedAt', dataIndex: 'updatedAt', width: 150 },
 ]
 
 const relatedCutSettles = computed(() => {
@@ -545,6 +557,16 @@ function purchaseReturnStatusColor(status) {
   if (status === '进行中') return 'processing'
   if (status === '作废') return 'default'
   return 'warning'
+}
+
+function purchaseReturnOutboundStatusColor(status) {
+  const map = {
+    待出库: 'default',
+    出库中: 'processing',
+    部分出库: 'warning',
+    已出库: 'success',
+  }
+  return map[status] || 'default'
 }
 
 const cutSettleColumns = [

@@ -11,7 +11,6 @@ export const outboundTypeOptions = [
   '调拨出库',
   '装箱出库',
   '报废出库',
-  '退货出库',
   '其他出库',
 ]
 

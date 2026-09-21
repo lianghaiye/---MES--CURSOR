@@ -102,7 +102,7 @@
         bordered
         :pagination="false"
         :row-selection="rowSelection"
-        :scroll="{ x: 1280 }"
+        :scroll="{ x: 1680 }"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
@@ -119,6 +119,9 @@
             <a-tooltip title="已签收数量 / 全部数量">
               {{ formatTransferQtyRatio(record) }}
             </a-tooltip>
+          </template>
+          <template v-else-if="column.key === 'creator'">
+            {{ record.creator || record.applicant || '—' }}
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space :size="0" wrap>
@@ -245,8 +248,12 @@ const columns = [
   { title: '调入仓库', dataIndex: 'toWarehouse', width: 110 },
   { title: '调拨数量', key: 'transferQty', width: 130, align: 'right' },
   { title: '调拨日期', dataIndex: 'transferDate', width: 110 },
-  { title: '申请人', dataIndex: 'applicant', width: 90 },
+  { title: '创建人', key: 'creator', width: 90 },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+  { title: '确认人', dataIndex: 'confirmer', width: 90 },
+  { title: '确认时间', dataIndex: 'confirmedAt', width: 160 },
+  { title: '入库方确认人', dataIndex: 'inboundConfirmer', width: 110 },
+  { title: '入库方确认时间', dataIndex: 'inboundConfirmedAt', width: 160 },
   { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
 

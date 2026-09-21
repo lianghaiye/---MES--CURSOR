@@ -41,10 +41,16 @@ function fieldText(field) {
 const metaItems = computed(() => {
   const r = props.record
   return [
-    { key: 'applicant', label: '申请人', value: display(r.applicant || r.creator) },
-    { key: 'createdAt', label: '申请时间', value: display(r.createdAt) },
+    { key: 'creator', label: '创建人', value: display(r.creator || r.applicant) },
+    { key: 'createdAt', label: '创建时间', value: display(r.createdAt) },
     { key: 'confirmer', label: '确认人', value: display(r.confirmer) },
     { key: 'confirmedAt', label: '确认时间', value: display(r.confirmedAt) },
+    { key: 'inboundConfirmer', label: '入库方确认人', value: display(r.inboundConfirmer) },
+    {
+      key: 'inboundConfirmedAt',
+      label: '入库方确认时间',
+      value: display(r.inboundConfirmedAt),
+    },
   ]
 })
 

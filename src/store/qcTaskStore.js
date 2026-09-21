@@ -22,7 +22,7 @@ export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 const STORAGE_KEY = 'i_doms_qc_tasks'
 const STORAGE_VERSION = 3
 const SEED_VERSION_KEY = 'i_doms_qc_tasks_seed_v'
-const CURRENT_SEED_VERSION = '16'
+const CURRENT_SEED_VERSION = '18'
 
 export const QC_TASK_STATUS = {
   PENDING: '待质检',
@@ -371,6 +371,9 @@ export function createQcTask(partial = {}) {
     specModel: partial.specModel || '',
     unit: partial.unit || '',
     supplier: partial.supplier || '',
+    workCenter: partial.workCenter || '',
+    processRouteName: partial.processRouteName || '',
+    scheduleQty: partial.scheduleQty ?? null,
     inboundOrderNo: partial.inboundOrderNo || '',
     inboundOrderId: partial.inboundOrderId || '',
     inboundOrderIds: Array.isArray(partial.inboundOrderIds) ? [...partial.inboundOrderIds] : [],

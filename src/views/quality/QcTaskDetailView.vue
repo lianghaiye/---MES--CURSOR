@@ -22,6 +22,14 @@
             >
               生成入库单
             </a-button>
+            <a-button
+              v-if="canShowFinishedInbound"
+              type="primary"
+              size="small"
+              @click="openFinishedInbound"
+            >
+              生成入库单
+            </a-button>
             <a-button v-if="canInspect" type="primary" size="small" @click="openInspect">
               质检
             </a-button>
@@ -33,7 +41,7 @@
         <DetailSectionCard title="基本信息">
           <div class="basic-info-panel">
             <div class="meta-bar">
-              <a-space :size="8" wrap>
+              <a-space :size="32" wrap>
                 <span class="meta-item">
                   <span class="meta-label">创建人</span>
                   {{ displayText(task.creator) }}
@@ -176,6 +184,12 @@
       @saved="onOutsourcingInboundSaved"
     />
 
+    <FinishedQcInboundModal
+      v-model:open="finishedInboundOpen"
+      :tasks="finishedInboundTasks"
+      @saved="onFinishedInboundSaved"
+    />
+
     <QcTaskPrintModal v-model:open="printModalOpen" :task="task" />
   </div>
 </template>
@@ -204,6 +218,7 @@ import { tabStore, useTabs } from '@/composables/useTabs'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { formatQty } from '@/utils/numberFormat'
 import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
+import { isProductionQcScope, resolveProductionQcHeader } from '@/utils/qcProductionContext'
 import { evaluateQcInboundGate, resolveSourceReceiptForQcTask } from '@/utils/qcInboundFromReceipt'
 import { canGenerateInbound, getPurchaseOrderById } from '@/store/purchaseOrderStore'
 import {
@@ -215,6 +230,7 @@ import GenerateInboundOrderModal from '@/views/procurement/components/GenerateIn
 import OutsourcingGenerateInboundModal from '@/views/procurement/components/OutsourcingGenerateInboundModal.vue'
 import QcLineFieldValuesReadonly from './components/QcLineFieldValuesReadonly.vue'
 import QcTaskPrintModal from './components/QcTaskPrintModal.vue'
+import FinishedQcInboundModal from './components/FinishedQcInboundModal.vue'
 
 onMounted(() => {
   ensureQcLibraryDemoSeed()
@@ -238,6 +254,8 @@ const wxInboundModalOpen = ref(false)
 const wxInboundOrder = ref(null)
 const wxInboundReceipt = ref(null)
 const printModalOpen = ref(false)
+const finishedInboundOpen = ref(false)
+const finishedInboundTasks = ref([])
 
 const routeBundle = computed(() =>
   getQcTaskRouteBundle(route.meta.bizScope || task.value?.bizScope || '来料质检'),
@@ -250,21 +268,33 @@ const isInboundScope = computed(() =>
 const isOutsourcingScope = computed(
   () => (route.meta.bizScope || task.value?.bizScope) === '外协回货检',
 )
+const isProductionScope = computed(() =>
+  isProductionQcScope(route.meta.bizScope || task.value?.bizScope || ''),
+)
+const productionHeader = computed(() => resolveProductionQcHeader(task.value))
 
-const lineColumns = [
-  { title: '序号', key: 'index', width: 52, align: 'center' },
-  { title: '产品信息', key: 'productInfo', width: 260, ellipsis: true },
-  { title: '质检模板', dataIndex: 'templateName', width: 140, ellipsis: true },
-  { title: '质检方式', dataIndex: 'inspectMethod', width: 80 },
-  { title: '收货数量', key: 'receiptQty', width: 90, align: 'right' },
-  { title: '质检数量', key: 'inspectQty', width: 90, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 56 },
-  { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 100 },
-  { title: '质检结果', key: 'lineQcResult', width: 100 },
-  { title: '处理方案', dataIndex: 'treatmentPlan', width: 100, ellipsis: true },
-  { title: '合格入库数', key: 'acceptInboundQty', width: 100, align: 'right' },
-  { title: '退/换货', key: 'returnExchange', width: 120, ellipsis: true },
-]
+const lineColumns = computed(() => {
+  const qtyTitle = isProductionScope.value ? '排产数量' : '收货数量'
+  const cols = [
+    { title: '序号', key: 'index', width: 52, align: 'center' },
+    { title: '产品信息', key: 'productInfo', width: 260, ellipsis: true },
+    { title: '质检模板', dataIndex: 'templateName', width: 140, ellipsis: true },
+    { title: '质检方式', dataIndex: 'inspectMethod', width: 80 },
+    { title: qtyTitle, key: 'receiptQty', width: 90, align: 'right' },
+    { title: '质检数量', key: 'inspectQty', width: 90, align: 'right' },
+    { title: '单位', dataIndex: 'unit', width: 56 },
+  ]
+  if (!isProductionScope.value) {
+    cols.push({ title: '收货仓库', dataIndex: 'receivingWarehouse', width: 100 })
+  }
+  cols.push(
+    { title: '质检结果', key: 'lineQcResult', width: 100 },
+    { title: '处理方案', dataIndex: 'treatmentPlan', width: 100, ellipsis: true },
+    { title: '合格入库数', key: 'acceptInboundQty', width: 100, align: 'right' },
+    { title: '退/换货', key: 'returnExchange', width: 120, ellipsis: true },
+  )
+  return cols
+})
 
 function getPageScrollContainer() {
   return document.querySelector('.page-content') || window
@@ -293,15 +323,38 @@ const canShowGenerateInbound = computed(() => {
   return evaluateQcInboundGate(task.value).ok
 })
 
+const canShowFinishedInbound = computed(() => {
+  if (!task.value) return false
+  if ((route.meta.bizScope || task.value.bizScope) !== '成品检') return false
+  if (hasInboundOrder(task.value)) return false
+  if (task.value.qcStatus !== QC_TASK_STATUS.COMPLETED) return false
+  if (task.value.qcResult === QC_TASK_RESULT.FAIL) return false
+  return true
+})
+
 const basicFields = computed(() => {
   const t = task.value || {}
-  return [
+  const header = productionHeader.value
+  const fields = [
     { key: 'qcNo', label: '质检单号', value: t.qcNo },
     { key: 'bizScope', label: '质检类型', value: t.bizScope },
     { key: 'qcStatus', label: '质检状态' },
     { key: 'qcResult', label: '质检结果' },
-    { key: 'supplier', label: '供应商', value: t.supplier },
-    { key: 'sourceDocNo', label: '来源单号', value: t.sourceDocNo },
+  ]
+  if (isProductionScope.value) {
+    fields.push(
+      { key: 'sourceDocNo', label: '来源单号', value: t.sourceDocNo },
+      { key: 'workCenter', label: '工作中心', value: header.workCenter },
+      { key: 'processRoute', label: '工艺路线', value: header.processRoute },
+      { key: 'scheduleQty', label: '排产数量', value: formatQty(header.scheduleQty) },
+    )
+  } else {
+    fields.push(
+      { key: 'supplier', label: '供应商', value: t.supplier },
+      { key: 'sourceDocNo', label: '来源单号', value: t.sourceDocNo },
+    )
+  }
+  fields.push(
     { key: 'inboundOrderNo', label: '入库单号', value: t.inboundOrderNo },
     {
       key: 'inspectMethod',
@@ -310,7 +363,8 @@ const basicFields = computed(() => {
     },
     { key: 'templateName', label: '质检模板', value: t.templateName || t.templateCode },
     { key: 'remark', label: '备注', value: t.remark, span: 24, multiline: true },
-  ]
+  )
+  return fields
 })
 
 function displayText(val) {
@@ -411,6 +465,20 @@ function openPrint() {
 function applyInboundGateToHints(gate) {
   inboundQcQtyHints.value = gate.qtyHints || null
   inboundQcEnforceCap.value = Boolean(gate.enforceQtyCap && gate.qtyHints)
+}
+
+function openFinishedInbound() {
+  if (!task.value) return
+  finishedInboundTasks.value = [task.value]
+  finishedInboundOpen.value = true
+}
+
+function onFinishedInboundSaved(orders) {
+  if (orders?.length === 1 && orders[0]?.id) {
+    const path = `/inventory/inbound/${orders[0].id}`
+    openTab(path, `入库单 ${orders[0].docNo || ''}`.trim())
+    router.push({ name: 'inventory-inbound-detail', params: { id: orders[0].id } })
+  }
 }
 
 function openGenerateInbound() {
@@ -587,7 +655,7 @@ function onOutsourcingInboundSaved() {
 
   .meta-label {
     color: rgba(0, 0, 0, 0.45);
-    margin-right: 6px;
+    margin-right: 8px;
   }
 }
 

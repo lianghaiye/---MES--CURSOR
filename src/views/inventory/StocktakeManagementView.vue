@@ -118,7 +118,7 @@
         bordered
         :pagination="false"
         :row-selection="rowSelection"
-        :scroll="{ x: 1380 }"
+        :scroll="{ x: 1880 }"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
@@ -141,6 +141,12 @@
             <a-tooltip title="差异行数 / 全部行数">
               {{ formatStocktakeQtyRatio(record) }}
             </a-tooltip>
+          </template>
+          <template v-else-if="column.key === 'creator'">
+            {{ record.creator || record.applicant || '—' }}
+          </template>
+          <template v-else-if="column.key === 'poster'">
+            {{ record.poster || record.confirmer || '—' }}
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space :size="0" wrap>
@@ -335,8 +341,12 @@ const columns = [
   { title: '盘点仓库', dataIndex: 'warehouse', width: 110 },
   { title: '盘点数量', key: 'stocktakeQty', width: 120, align: 'right' },
   { title: '盘点日期', dataIndex: 'stocktakeDate', width: 110 },
-  { title: '申请人', dataIndex: 'applicant', width: 90 },
+  { title: '创建人', key: 'creator', width: 90 },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
+  { title: '审核人', dataIndex: 'approver', width: 90 },
+  { title: '审核时间', dataIndex: 'approvedAt', width: 160 },
+  { title: '过账人', key: 'poster', width: 90 },
+  { title: '过账时间', dataIndex: 'postedAt', width: 160 },
   { title: '操作', key: 'action', width: 280, fixed: 'right' },
 ]
 

@@ -462,7 +462,7 @@
                       v-if="isLinePendingOutbound(record)"
                       @click="handleConfirmLineOutbound(record)"
                     >
-                      确认
+                      确认出库
                     </a>
                     <a
                       v-if="canRefuseLine(record)"
