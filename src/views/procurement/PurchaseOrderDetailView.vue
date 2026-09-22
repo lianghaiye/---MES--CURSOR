@@ -38,16 +38,23 @@
                 <a-button v-if="canGenerateInbound(record)" size="small" @click="openInboundModal">
                   生成入库
                 </a-button>
-                <a-button size="small" @click="openSettleCreate">生成结算</a-button>
                 <a-button size="small" @click="openPurchaseReturnCreate">采购退货</a-button>
                 <a-button size="small" @click="handleComplete">完成</a-button>
+                <a-button size="small" danger @click="handleTerminate">终结</a-button>
+              </template>
+              <template v-else-if="record.status === '已完成'">
+                <a-button size="small" @click="openSettleCreate">生成结算</a-button>
+                <a-button size="small" @click="openPurchaseReturnCreate">采购退货</a-button>
+              </template>
+              <template v-else-if="record.status === '已终结'">
+                <a-button size="small" @click="openPurchaseReturnCreate">采购退货</a-button>
               </template>
               <a-button
                 v-if="canApplyPurchasePriceChange(record)"
                 size="small"
                 @click="handlePriceChange"
               >
-                {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
+                {{ pendingPriceChange ? '审核订单变更' : '订单变更' }}
               </a-button>
               <a-button size="small" @click="openPrint">打印</a-button>
               <a-button size="small" @click="handleBack">返回列表</a-button>
@@ -60,7 +67,7 @@
               class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
             >
               <a-tab-pane key="basic" tab="基本信息" />
-              <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
+              <a-tab-pane key="price-change" :tab="`订单变更 (${priceChangeCount})`" />
               <a-tab-pane key="inbound" :tab="`入库信息 (${relatedInboundLines.length})`" />
               <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
               <a-tab-pane key="return" :tab="`退货信息 (${relatedReturnLines.length})`" />
@@ -76,7 +83,7 @@
             type="warning"
             show-icon
             class="pending-price-alert"
-            :message="`价格变更「${pendingPriceChange.changeNo}」待审核，通过前不可收货 / 入库 / 结算。`"
+            :message="`订单变更「${pendingPriceChange.changeNo}」待审核，通过前不可收货 / 入库 / 结算。`"
             style="margin-bottom: 12px"
           />
           <template v-if="activeTab === 'basic'">
@@ -110,6 +117,7 @@
               <a-table
                 :columns="lineColumns"
                 :data-source="record.lineItems"
+                :row-class-name="(record) => (record.cancelled ? 'line-cancelled' : '')"
                 row-key="id"
                 size="small"
                 bordered
@@ -143,25 +151,25 @@
                     </a-tag>
                   </template>
                   <template v-else-if="column.key === 'productName'">
-                    {{ lineProductName(line) }}
+                    <span>{{ lineProductName(line) }}</span>
+                    <a-tag v-if="line.cancelled" color="default" class="cancelled-tag"
+                      >已取消</a-tag
+                    >
                   </template>
                   <template v-else-if="column.key === 'productCode'">
                     {{ lineProductCode(line) }}
                   </template>
                   <template v-else-if="column.key === 'purchaseQty'">
-                    {{ formatQty(line.purchaseQty) }}
+                    {{ formatQtyWithUnit(line.purchaseQty, line.unit) }}
                   </template>
-                  <template v-else-if="column.key === 'returnQty'">
-                    {{ formatQty(lineReturnQty(line)) }}
+                  <template v-else-if="column.key === 'inboundQty'">
+                    {{ formatQtyWithUnit(lineInboundQty(line), line.unit) }}
                   </template>
                   <template v-else-if="column.key === 'settleQty'">
-                    {{
-                      line.settleUnit
-                        ? line.settleQty != null && line.settleQty !== ''
-                          ? `${formatQty(line.settleQty)} ${line.settleUnit}`
-                          : '—'
-                        : '—'
-                    }}
+                    {{ lineSettleQtyText(line) }}
+                  </template>
+                  <template v-else-if="column.key === 'returnQty'">
+                    {{ formatQtyWithUnit(lineReturnQty(line), line.unit) }}
                   </template>
                   <template v-else-if="column.key === 'urgency'">
                     <a-tag :color="urgencyColor(line.urgency)">{{ line.urgency || '正常' }}</a-tag>
@@ -173,7 +181,9 @@
                     {{ line.sourceReqNo || (line.sourceReqNos || []).join(',') || '—' }}
                   </template>
                   <template v-else-if="column.key === 'taxRate'">
-                    {{ formatQty(line.taxRate) }}
+                    {{
+                      line.taxRate != null && line.taxRate !== '' ? formatQty(line.taxRate) : '—'
+                    }}
                   </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
                     {{ formatMoney(line.unitPriceExTax) }}
@@ -184,11 +194,23 @@
                   <template v-else-if="column.key === 'totalPriceExTax'">
                     {{ formatMoney(line.totalPriceExTax) }}
                   </template>
+                  <template v-else-if="column.key === 'totalPriceInTax'">
+                    {{ formatMoney(line.totalPriceInTax) }}
+                  </template>
                   <template v-else-if="column.key === 'inboundQcRequirement'">
                     {{ resolveLineInboundQcRequirement(line) }}
                   </template>
-                  <template v-else-if="column.key === 'totalPriceInTax'">
-                    {{ formatMoney(line.totalPriceInTax) }}
+                  <template v-else-if="column.key === 'qcResult'">
+                    <a-tag v-if="lineQcResult(line)" :color="qcResultColor(lineQcResult(line))">
+                      {{ lineQcResult(line) }}
+                    </a-tag>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'treatmentPlan'">
+                    {{ lineTreatmentPlan(line) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'receivingWarehouse'">
+                    {{ line.receivingWarehouse || '—' }}
                   </template>
                   <template v-else>
                     {{ line[column.dataIndex] ?? '—' }}
@@ -208,7 +230,7 @@
           </template>
 
           <template v-else-if="activeTab === 'price-change'">
-            <DetailSectionCard title="价格变更履历">
+            <DetailSectionCard title="订单变更履历">
               <PurchasePriceChangeHistoryPanel :order="record" />
             </DetailSectionCard>
           </template>
@@ -397,7 +419,7 @@
               <a-empty v-else description="暂无审批记录" />
             </DetailSectionCard>
 
-            <DetailSectionCard title="价格变更审批">
+            <DetailSectionCard title="订单变更审批">
               <a-divider style="margin: 12px 0" />
               <div v-if="priceChangeApprovalGroups.length">
                 <div
@@ -427,7 +449,7 @@
                   </div>
                 </div>
               </div>
-              <a-empty v-else description="暂无价格变更审批记录" />
+              <a-empty v-else description="暂无订单变更审批记录" />
             </DetailSectionCard>
           </template>
         </div>
@@ -462,7 +484,6 @@
 </template>
 
 <script>
-import { formatQty } from '@/utils/numberFormat'
 export default { name: 'PurchaseOrderDetailView' }
 </script>
 
@@ -478,11 +499,15 @@ import {
   getPurchaseOrderById,
   canGenerateReceipt,
   canGenerateInbound,
+  explainCannotGenerateReceiptOrInbound,
   submitPurchaseOrderForApprove,
   withdrawPurchaseOrder,
   resubmitPurchaseOrder,
   voidPurchaseOrder,
   completePurchaseOrder,
+  evaluatePurchaseOrderComplete,
+  terminatePurchaseOrder,
+  evaluatePurchaseOrderTerminate,
 } from '@/store/purchaseOrderStore'
 import { findPurchaseRequisitionByReqNo } from '@/store/purchaseRequisitionStore'
 import { findSalesOrderByOrderNo } from '@/store/salesOrderStore'
@@ -491,11 +516,13 @@ import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { getInboundOrdersByPurchaseOrder } from '@/store/inboundOrderStore'
 import {
   calcPoLineAppliedOccupyQty,
+  calcPoLineInboundSettleQty,
   calcPoLineInboundStatus,
   calcPoLineReceivedQty,
   formatInboundProgress,
   INBOUND_PROGRESS_TOOLTIP,
   poLineInboundStatusColor,
+  resolvePoLineSettleUnit,
 } from '@/utils/purchaseLineInbound'
 import {
   flattenPurchaseOrderInboundLines,
@@ -503,7 +530,12 @@ import {
   getInboundInfoLineScrollX,
 } from '@/utils/purchaseOrderInboundLines'
 import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
-import { listQcProductResultLinesForPurchaseOrders } from '@/utils/purchaseOrderQc'
+import {
+  calcPoLineQcReturnQty,
+  formatPoLineQcTreatmentSummary,
+  getPoLineLatestQcResult,
+  listQcProductResultLinesForPurchaseOrders,
+} from '@/utils/purchaseOrderQc'
 import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
 import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
@@ -512,6 +544,7 @@ import { listReturnLinesForPurchaseOrder, calcPoLineReturnQty } from '@/utils/or
 import { purchaseReceiptState } from '@/store/purchaseReceiptStore'
 import { purchaseReturnState } from '@/store/purchaseReturnStore'
 import { buildPoSettleTabRows, purchaseSettleState } from '@/store/purchaseSettleStore'
+import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import PurchaseOrderBasicInfoSection from './components/PurchaseOrderBasicInfoSection.vue'
@@ -596,7 +629,7 @@ const priceChangeApprovalGroups = computed(() =>
 )
 
 const lineColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center' },
+  { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '入库状态', key: 'lineInboundStatus', width: 90 },
   { title: '入库进度', key: 'inboundProgress', width: 180, ellipsis: true },
   { title: '产品名称', key: 'productName', width: 140, ellipsis: true },
@@ -611,12 +644,17 @@ const lineColumns = [
     ellipsis: true,
   },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-  { title: '收货仓库', dataIndex: 'receivingWarehouse', width: 110, ellipsis: true },
-  { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
-  { title: '退货数量', key: 'returnQty', width: 100, align: 'right' },
-  { title: '采购单位', dataIndex: 'unit', width: 80 },
-  { title: '结算单位', dataIndex: 'settleUnit', width: 80 },
-  { title: '预计结算数量', dataIndex: 'settleQty', key: 'settleQty', width: 110, align: 'right' },
+  { title: '采购数量', key: 'purchaseQty', width: 120, align: 'right' },
+  {
+    title: '收货仓库',
+    key: 'receivingWarehouse',
+    dataIndex: 'receivingWarehouse',
+    width: 110,
+    ellipsis: true,
+  },
+  { title: '入库数量', key: 'inboundQty', width: 120, align: 'right' },
+  { title: '结算数量', key: 'settleQty', width: 120, align: 'right' },
+  { title: '退货数量', key: 'returnQty', width: 120, align: 'right' },
   {
     title: '订货尺寸',
     key: 'orderSizeText',
@@ -624,14 +662,16 @@ const lineColumns = [
     width: 160,
     ellipsis: true,
   },
+  { title: '税率', key: 'taxRate', dataIndex: 'taxRate', width: 72, align: 'right' },
   { title: '不含税单价', key: 'unitPriceExTax', width: 100, align: 'right' },
-  { title: '税率(%)', dataIndex: 'taxRate', width: 80, align: 'right' },
   { title: '含税单价', key: 'unitPriceInTax', width: 100, align: 'right' },
-  { title: '总价（不含税）', key: 'totalPriceExTax', width: 110, align: 'right' },
-  { title: '总价（含税）', key: 'totalPriceInTax', width: 100, align: 'right' },
+  { title: '不含税总价', key: 'totalPriceExTax', width: 110, align: 'right' },
+  { title: '含税总价', key: 'totalPriceInTax', width: 100, align: 'right' },
+  { title: '入库质检要求', key: 'inboundQcRequirement', width: 110 },
+  { title: '质检结果', key: 'qcResult', width: 100 },
+  { title: '处理方案', key: 'treatmentPlan', width: 200, ellipsis: true },
   { title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { title: '紧急度', key: 'urgency', dataIndex: 'urgency', width: 90 },
-  { title: '入库质检要求', key: 'inboundQcRequirement', width: 110 },
   {
     title: '来源申请单号',
     key: 'sourceReqNo',
@@ -733,6 +773,10 @@ function openSettleDetail(row) {
 
 function openSettleCreate() {
   if (!record.value?.id) return
+  if (record.value.status !== '已完成') {
+    message.warning('仅已完成的采购单可生成结算单')
+    return
+  }
   const block = getPendingPurchasePriceChangeBlock(record.value.id, '生成结算')
   if (block) {
     message.warning(block)
@@ -748,7 +792,7 @@ function onSettleCreated() {
 function handlePriceChange() {
   if (!record.value) return
   if (!canApplyPurchasePriceChange(record.value)) {
-    message.warning('仅「进行中 / 已完成」的采购订单可申请价格变更')
+    message.warning('仅「进行中 / 已完成」的采购订单可申请订单变更')
     return
   }
   priceChangeOrder.value = record.value
@@ -862,9 +906,38 @@ function lineInboundProgress(line) {
   )
 }
 
+function lineInboundQty(line) {
+  void relatedInboundOrders.value
+  return calcPoLineReceivedQty(record.value, line)
+}
+
+function lineSettleQtyText(line) {
+  void relatedInboundOrders.value
+  const qty = calcPoLineInboundSettleQty(record.value, line)
+  const unit = resolvePoLineSettleUnit(record.value, line)
+  if (!(qty > 0) && !unit) return '—'
+  return formatQtyWithUnit(qty, unit)
+}
+
 function lineReturnQty(line) {
   void purchaseReturnState.returns
-  return calcPoLineReturnQty(record.value, line)
+  void purchaseReceiptState.receipts
+  void qcTaskState.tasks
+  const fromReturn = calcPoLineReturnQty(record.value, line)
+  const fromQc = calcPoLineQcReturnQty(record.value, line)
+  return fromReturn + fromQc
+}
+
+function lineQcResult(line) {
+  void purchaseReceiptState.receipts
+  void qcTaskState.tasks
+  return getPoLineLatestQcResult(record.value, line)
+}
+
+function lineTreatmentPlan(line) {
+  void purchaseReceiptState.receipts
+  void qcTaskState.tasks
+  return formatPoLineQcTreatmentSummary(record.value, line)
 }
 
 function statusColor(status) {
@@ -874,6 +947,7 @@ function statusColor(status) {
     进行中: 'processing',
     已拒绝: 'error',
     已完成: 'success',
+    已终结: 'warning',
     已作废: 'default',
   }
   return map[status] || 'default'
@@ -993,18 +1067,97 @@ function handleVoid() {
 
 function handleComplete() {
   if (!record.value) return
-  const result = completePurchaseOrder(record.value.id)
-  if (result.ok) {
-    message.success(result.message)
-    loadRecord()
-  } else {
+  const gate = evaluatePurchaseOrderComplete(record.value)
+  if (!gate.ok) {
+    if (gate.code === 'HAS_UNFINISHED_RELATED') {
+      Modal.warning({
+        title: '无法完成采购单',
+        content: gate.message,
+        okText: '知道了',
+      })
+      return
+    }
+    message.warning(gate.message)
+    return
+  }
+
+  const doComplete = (confirmShortClose) => {
+    const result = completePurchaseOrder(record.value.id, { confirmShortClose })
+    if (result.ok) {
+      message.success(result.message)
+      loadRecord()
+      return
+    }
+    if (result.code === 'HAS_UNFINISHED_RELATED') {
+      Modal.warning({
+        title: '无法完成采购单',
+        content: result.message,
+        okText: '知道了',
+      })
+      return
+    }
     message.warning(result.message)
   }
+
+  if (gate.shortClose) {
+    Modal.confirm({
+      title: '短结完成确认',
+      content: gate.message,
+      okText: '确认短结',
+      cancelText: '取消',
+      onOk: () => doComplete(true),
+    })
+    return
+  }
+  doComplete(false)
+}
+
+function handleTerminate() {
+  if (!record.value) return
+  const gate = evaluatePurchaseOrderTerminate(record.value)
+  if (!gate.ok) {
+    if (gate.code === 'HAS_UNFINISHED_RELATED') {
+      Modal.warning({
+        title: '无法终结采购单',
+        content: gate.message,
+        okText: '知道了',
+      })
+      return
+    }
+    message.warning(gate.message)
+    return
+  }
+  Modal.confirm({
+    title: '终结确认',
+    content: gate.message,
+    okText: '确认终结',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: () => {
+      const result = terminatePurchaseOrder(record.value.id, { confirmTerminate: true })
+      if (result.ok) {
+        message.success(result.message)
+        loadRecord()
+        return
+      }
+      if (result.code === 'HAS_UNFINISHED_RELATED') {
+        Modal.warning({
+          title: '无法终结采购单',
+          content: result.message,
+          okText: '知道了',
+        })
+        return
+      }
+      message.warning(result.message)
+    },
+  })
 }
 
 function openReceiptModal() {
   if (!record.value || !canGenerateReceipt(record.value)) {
-    message.warning('当前采购单不可生成收货单')
+    message.warning(
+      explainCannotGenerateReceiptOrInbound(record.value, '收货') || '当前采购单不可生成收货单',
+    )
     return
   }
   const block = getPendingPurchasePriceChangeBlock(record.value.id, '生成收货单')
@@ -1017,7 +1170,9 @@ function openReceiptModal() {
 
 function openInboundModal() {
   if (!record.value || !canGenerateInbound(record.value)) {
-    message.warning('当前采购单不可生成入库单')
+    message.warning(
+      explainCannotGenerateReceiptOrInbound(record.value, '入库') || '当前采购单不可生成入库单',
+    )
     return
   }
   const block = getPendingPurchasePriceChangeBlock(record.value.id, '生成入库单')
@@ -1302,5 +1457,16 @@ function openApprove() {
 .muted {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
+}
+
+.cancelled-tag {
+  margin-left: 6px;
+}
+
+:deep(.line-cancelled) {
+  color: rgba(0, 0, 0, 0.35);
+  td {
+    background: #fafafa !important;
+  }
 }
 </style>

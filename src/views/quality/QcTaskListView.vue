@@ -323,7 +323,11 @@ import {
   getOutsourcingReceiptById,
   outsourcingReceiptState,
 } from '@/store/outsourcingReceiptStore'
-import { canGenerateInbound, getPurchaseOrderById } from '@/store/purchaseOrderStore'
+import {
+  canGenerateInbound,
+  explainCannotGenerateReceiptOrInbound,
+  getPurchaseOrderById,
+} from '@/store/purchaseOrderStore'
 import {
   canGenerateOutsourcingInbound,
   getOutsourcingOrderById,
@@ -752,7 +756,11 @@ function openGenerateInboundForTasks(tasks = []) {
     }
     const po = getPurchaseOrderById(receipt.purchaseOrderId)
     if (!po || !canGenerateInbound(po)) {
-      failMessages.push(`${task.qcNo || task.id}：关联采购单不可生成入库单`)
+      failMessages.push(
+        `${task.qcNo || task.id}：${
+          explainCannotGenerateReceiptOrInbound(po, '入库') || '关联采购单不可生成入库单'
+        }`,
+      )
       continue
     }
     const existing = byReceipt.get(receipt.id)

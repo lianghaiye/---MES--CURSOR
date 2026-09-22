@@ -11,6 +11,77 @@ import { createEmptyWorkOrderProcessExtras } from '@/utils/workOrderProcessDispl
 export const MAX_ROUTE_STEPS = 150
 export const MAX_ROUTE_PARALLEL = 50
 
+/** 步骤完成方式：全部完成 | 选做完成 */
+export const COMPLETION_MODE_ALL = 'all'
+export const COMPLETION_MODE_ANY = 'any'
+export const COMPLETION_MODE_OPTIONS = [
+  { value: COMPLETION_MODE_ALL, label: '全部完成' },
+  { value: COMPLETION_MODE_ANY, label: '选做完成' },
+]
+
+export function normalizeCompletionMode(mode) {
+  return mode === COMPLETION_MODE_ANY ? COMPLETION_MODE_ANY : COMPLETION_MODE_ALL
+}
+
+export function formatCompletionModeLabel(mode) {
+  return normalizeCompletionMode(mode) === COMPLETION_MODE_ANY ? '选做完成' : '全部完成'
+}
+
+/** 按网格列数对齐 stepPolicies，缺省为全部完成 */
+export function syncStepPolicies(grid, policies) {
+  const g = normalizeGrid(grid)
+  const prev = Array.isArray(policies) ? policies : []
+  return g.map((_, i) => {
+    const stepNo = i + 1
+    const found = prev.find((p) => Number(p?.stepNo) === stepNo) || prev[i]
+    return {
+      stepNo,
+      completionMode: normalizeCompletionMode(found?.completionMode),
+    }
+  })
+}
+
+export function getCompletionModeAt(policies, stepIndex) {
+  const stepNo = Number(stepIndex) + 1
+  const found =
+    (policies || []).find((p) => Number(p?.stepNo) === stepNo) || (policies || [])[stepIndex]
+  return normalizeCompletionMode(found?.completionMode)
+}
+
+export function insertStepPolicyAfter(policies, afterIndex) {
+  const list = (policies || []).map((p, i) => ({
+    stepNo: i + 1,
+    completionMode: normalizeCompletionMode(p?.completionMode),
+  }))
+  const idx = Math.max(-1, Math.min(Number(afterIndex), list.length - 1))
+  list.splice(idx + 1, 0, { stepNo: 0, completionMode: COMPLETION_MODE_ALL })
+  return list.map((p, i) => ({
+    stepNo: i + 1,
+    completionMode: normalizeCompletionMode(p.completionMode),
+  }))
+}
+
+export function removeStepPolicyAt(policies, index) {
+  const list = (policies || []).map((p, i) => ({
+    stepNo: i + 1,
+    completionMode: normalizeCompletionMode(p?.completionMode),
+  }))
+  const idx = Number(index)
+  if (idx < 0 || idx >= list.length || list.length <= 1) {
+    return list
+  }
+  list.splice(idx, 1)
+  return list.map((p, i) => ({
+    stepNo: i + 1,
+    completionMode: normalizeCompletionMode(p.completionMode),
+  }))
+}
+
+/** 某步有效工序数 */
+export function countProcessesInStep(grid, stepIndex) {
+  return (grid?.[stepIndex] || []).filter((cell) => cell?.processId).length
+}
+
 /** 网格：steps[stepIndex].rows[rowIndex] = cell | null */
 export function createEmptyGrid(stepCount = 9, rowCount = 2) {
   return Array.from({ length: stepCount }, () => Array.from({ length: rowCount }, () => null))
@@ -48,6 +119,29 @@ export function insertRowAfter(grid, afterIndex) {
   return g
 }
 
+/** 删除指定步（列）；至少保留 1 步 */
+export function removeStepAt(grid, index) {
+  const g = normalizeGrid(grid)
+  if (g.length <= 1) return g
+  const idx = Number(index)
+  if (idx < 0 || idx >= g.length) return g
+  g.splice(idx, 1)
+  return g
+}
+
+/** 删除指定行；至少保留 1 行 */
+export function removeRowAt(grid, index) {
+  const g = normalizeGrid(grid)
+  const rows = Math.max(1, g[0]?.length || 1)
+  if (rows <= 1) return g
+  const idx = Number(index)
+  if (idx < 0 || idx >= rows) return g
+  g.forEach((step) => {
+    step.splice(idx, 1)
+  })
+  return g
+}
+
 export function countGridSteps(grid) {
   return (grid || []).filter((step) => step?.some((cell) => cell?.processId)).length
 }
@@ -76,17 +170,21 @@ export function validateProcessRouteGrid(grid) {
   return { ok: true }
 }
 
-export function flattenGridToSteps(grid) {
+export function flattenGridToSteps(grid, stepPolicies = null) {
+  const policies = syncStepPolicies(grid, stepPolicies)
+  const modeByStep = new Map(policies.map((p) => [p.stepNo, p.completionMode]))
   const result = []
   ;(grid || []).forEach((stepRows, stepIndex) => {
     ;(stepRows || []).forEach((cell, rowIndex) => {
       if (!cell?.processId) return
       const proc = getProcessById(cell.processId)
       const doc = cell.processFileId ? getProcessDocById(cell.processFileId) : null
+      const stepNo = stepIndex + 1
       result.push({
-        stepNo: stepIndex + 1,
+        stepNo,
         rowNo: rowIndex + 1,
         colNo: stepIndex + 1,
+        completionMode: modeByStep.get(stepNo) || COMPLETION_MODE_ALL,
         processId: cell.processId,
         processCode: proc?.code || '',
         name: proc?.name || cell.processName || '',
@@ -106,13 +204,16 @@ export function flattenGridToSteps(grid) {
 }
 
 /** 转为工单工序结构 */
-export function buildWorkOrderProcessesFromGrid(grid, routeId = '') {
-  const flat = flattenGridToSteps(grid)
+export function buildWorkOrderProcessesFromGrid(grid, routeId = '', stepPolicies = null) {
+  const policies = syncStepPolicies(grid, stepPolicies)
+  const flat = flattenGridToSteps(grid, policies)
   return flat.map((step, index) => ({
     id: `${routeId}-step-${step.stepNo}-${step.rowNo}`,
     index: index + 1,
     stepNo: step.stepNo,
     rowNo: step.rowNo,
+    completionMode: step.completionMode || COMPLETION_MODE_ALL,
+    includeInDispatch: true,
     name: step.name,
     processCode: step.processCode,
     processId: step.processId,
@@ -130,6 +231,53 @@ export function buildWorkOrderProcessesFromGrid(grid, routeId = '') {
     feedingMaterials: step.hasFeeding
       ? [{ id: `feed-${Date.now()}-${index}`, materialId: undefined, materialName: '', qty: null }]
       : [],
+  }))
+}
+
+/** 下发页：需要勾选的「选做完成」步（工序数 ≥ 2） */
+export function listAnyCompletionSteps(processes) {
+  const byStep = new Map()
+  for (const p of processes || []) {
+    const stepNo = Number(p.stepNo)
+    if (!Number.isFinite(stepNo) || stepNo < 1) continue
+    if (!byStep.has(stepNo)) byStep.set(stepNo, [])
+    byStep.get(stepNo).push(p)
+  }
+  const groups = []
+  for (const [stepNo, list] of byStep) {
+    const mode = normalizeCompletionMode(list[0]?.completionMode)
+    if (mode === COMPLETION_MODE_ANY && list.length >= 2) {
+      groups.push({ stepNo, processes: list })
+    }
+  }
+  return groups.sort((a, b) => a.stepNo - b.stepNo)
+}
+
+export function validateDispatchProcessSelection(processes) {
+  for (const group of listAnyCompletionSteps(processes)) {
+    const selected = group.processes.filter((p) => p.includeInDispatch !== false)
+    if (!selected.length) {
+      return {
+        ok: false,
+        message: `第 ${group.stepNo} 步为选做完成，请至少选择一道工序`,
+      }
+    }
+  }
+  return { ok: true }
+}
+
+/** 下发时过滤：选做步仅保留勾选项；全部完成步全留 */
+export function applyDispatchProcessFilter(processes) {
+  const anyStepNos = new Set(listAnyCompletionSteps(processes).map((g) => g.stepNo))
+  const filtered = (processes || []).filter((p) => {
+    const stepNo = Number(p.stepNo)
+    if (!anyStepNos.has(stepNo)) return true
+    return p.includeInDispatch !== false
+  })
+  return filtered.map((p, index) => ({
+    ...p,
+    index: index + 1,
+    includeInDispatch: true,
   }))
 }
 

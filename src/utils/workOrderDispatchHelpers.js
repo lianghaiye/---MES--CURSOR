@@ -1,5 +1,10 @@
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
+import {
+  listAnyCompletionSteps,
+  validateDispatchProcessSelection,
+  applyDispatchProcessFilter,
+} from '@/utils/processRouteGrid'
 import { dispatchWorkOrderToMobile } from '@/utils/mobileTaskDispatch'
 import { generateLinesFromWorkOrder } from '@/store/reportConfirmStore'
 import {
@@ -50,6 +55,11 @@ export function validateWorkOrderDispatchReady(workOrder) {
     message.error('请先选择工艺路线以生成工序')
     return false
   }
+  const selectionCheck = validateDispatchProcessSelection(workOrder.processes)
+  if (!selectionCheck.ok) {
+    message.error(selectionCheck.message)
+    return false
+  }
   const skipEbom =
     workOrder.skipEbom ||
     workOrder.orderCategory === '外协工单' ||
@@ -62,7 +72,9 @@ export function validateWorkOrderDispatchReady(workOrder) {
       return false
     }
   }
-  return validateProcessExecutors(workOrder.processes)
+  // 校验执行人时按「将实际下发」的工序集合
+  const dispatchProcesses = applyDispatchProcessFilter(workOrder.processes)
+  return validateProcessExecutors(dispatchProcesses)
 }
 
 /** 保存工序与执行人配置，工单保持待下发（草稿保存不校验必填项） */
@@ -71,6 +83,7 @@ export function saveDispatchDraft(updateFn, workOrder) {
   updateFn(workOrder.id, {
     processes: workOrder.processes,
     processRouteName: workOrder.processRouteName,
+    stepPolicies: workOrder.stepPolicies,
     status: '待下发',
   })
   message.success('工序配置已保存')
@@ -87,6 +100,8 @@ export function dispatchAndStartWorkOrder({ workOrder, orderCategory, updateFn }
     return false
   }
   const isFirstDispatch = status === '待下发'
+  const filteredProcesses = applyDispatchProcessFilter(workOrder.processes)
+  workOrder.processes = filteredProcesses
   const mobileCategories = ['生产工单', '总装工单', '拆解工单', '外协工单']
   const tasks = mobileCategories.includes(orderCategory)
     ? dispatchWorkOrderToMobile(workOrder, orderCategory)
@@ -95,8 +110,9 @@ export function dispatchAndStartWorkOrder({ workOrder, orderCategory, updateFn }
   const ebomSnapshot = buildWorkOrderDispatchEbomSnapshot(workOrder)
   // 下发后默认「已下发」；若任务无需领取（单人待开始）仍保持已下发，领取后再升执行中
   updateFn(workOrder.id, {
-    processes: workOrder.processes,
+    processes: filteredProcesses,
     processRouteName: workOrder.processRouteName,
+    stepPolicies: workOrder.stepPolicies,
     status: workOrder.hasClaimedTask ? '执行中' : '已下发',
     dispatchControl: isParallelTaskDispatch() ? 'parallel' : 'serial',
     ...(isFirstDispatch
@@ -117,3 +133,5 @@ export function dispatchAndStartWorkOrder({ workOrder, orderCategory, updateFn }
 export function canEditWorkOrder(row) {
   return row?.status === '待下发'
 }
+
+export { listAnyCompletionSteps }

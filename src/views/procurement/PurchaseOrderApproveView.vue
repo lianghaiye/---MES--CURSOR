@@ -236,6 +236,7 @@ function statusColor(status) {
     进行中: 'processing',
     已拒绝: 'error',
     已完成: 'success',
+    已终结: 'warning',
     已作废: 'default',
   }
   return map[status] || 'default'

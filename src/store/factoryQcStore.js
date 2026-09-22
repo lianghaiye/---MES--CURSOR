@@ -10,6 +10,7 @@ import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 import { aggregateLineConclusions, resolveQcResultFromFieldValues } from '@/utils/qcConclusionField'
 import { bindQcLineTemplate, summarizeTaskTemplates } from '@/store/qcTaskStore'
 import { ensureQcTemplateDemoSeed } from '@/store/qcTemplateStore'
+import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_factory_qc'
 const STORAGE_VERSION = 6
@@ -32,10 +33,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ version: STORAGE_VERSION, records: factoryQcState.records }),
-  )
+  persistJson(STORAGE_KEY, { version: STORAGE_VERSION, records: factoryQcState.records })
 }
 
 /** 生成出厂质检单号：CCZJ + yyyyMMdd + 4位流水（按当日已有单号递增） */

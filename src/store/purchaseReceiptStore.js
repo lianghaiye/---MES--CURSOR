@@ -5,10 +5,11 @@ import {
   createPurchaseReceipt,
   generatePurchaseReceiptNo,
 } from '@/mock/purchaseReceipts'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_purchase_receipts'
 const SEED_VERSION_KEY = 'i_doms_purchase_receipts_seed_v'
-const CURRENT_SEED_VERSION = '9'
+const CURRENT_SEED_VERSION = '10'
 
 const UNFINISHED_QC_STATUSES = new Set(['未质检', '质检中'])
 const UNFINISHED_INBOUND_STATUSES = new Set(['入库中', '部分入库'])
@@ -31,8 +32,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ receipts: purchaseReceiptState.receipts }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { receipts: purchaseReceiptState.receipts })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function migrateLegacyInboundStatus(receipt) {

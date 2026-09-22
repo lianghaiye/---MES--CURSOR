@@ -23,6 +23,7 @@ import { ensureSettleUnitDemoPurchaseRequisitions } from '@/mock/settleUnitPurch
 import { ensurePackageConvertDemoPurchaseRequisitions } from '@/mock/packageConvertPurchaseDemoSeed'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { convertStockDemandToPurchase } from '@/utils/purchaseUomConvert'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 function mapSalesUrgency(urgency) {
   if (urgency === '紧急') return '紧急'
@@ -62,11 +63,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ requisitions: purchaseRequisitionState.requisitions }),
-  )
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { requisitions: purchaseRequisitionState.requisitions })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function normalizeRequisitionLinePoStatus(requisitions) {

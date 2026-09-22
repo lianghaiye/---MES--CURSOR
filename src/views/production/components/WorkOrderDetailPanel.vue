@@ -158,7 +158,7 @@ import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { processRouteState } from '@/store/processRouteStore'
-import { buildProcessesFromRoute } from '@/mock/processRoutes'
+import { applyRouteSnapshotToWorkOrder } from '@/mock/processRoutes'
 import {
   ensureWorkOrderProcessRoute,
   getWorkOrderRouteSelectOptions,
@@ -320,7 +320,7 @@ function onWorkOrderFieldUpdate({ key, value }) {
 
 function onProcessRouteChange(routeName) {
   if (!workOrder.value || !routeName) return
-  workOrder.value.processes = buildProcessesFromRoute(routeName)
+  applyRouteSnapshotToWorkOrder(workOrder.value, routeName)
   emit('save-basic')
 }
 

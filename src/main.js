@@ -1,5 +1,7 @@
+import '@/utils/storageBootstrap'
 import { createApp } from 'vue'
 import Antd from 'ant-design-vue'
+import { isQuotaExceededError } from '@/utils/safeStorage'
 import App from './App.vue'
 import router from './router'
 import 'ant-design-vue/dist/reset.css'
@@ -21,11 +23,23 @@ function isResizeObserverNoise(message) {
   return RESIZE_OBSERVER_ERR.test(message || '')
 }
 
-// 开发环境：屏蔽 Ant Design 表格/树触发的无害 ResizeObserver 告警
+function isIgnorableRuntimeError(err) {
+  if (isQuotaExceededError(err)) return true
+  const msg = err?.message || String(err || '')
+  return isResizeObserverNoise(msg)
+}
+
+// 开发环境：屏蔽无害 ResizeObserver / 配额告警打断操作
 window.addEventListener(
   'error',
   (event) => {
-    if (isResizeObserverNoise(event.message)) {
+    if (
+      isIgnorableRuntimeError({
+        message: event.message,
+        name: event.error?.name,
+        code: event.error?.code,
+      })
+    ) {
       event.stopImmediatePropagation()
       event.preventDefault()
     }
@@ -34,8 +48,11 @@ window.addEventListener(
 )
 
 window.addEventListener('unhandledrejection', (event) => {
-  const msg = event.reason?.message || String(event.reason || '')
-  if (isResizeObserverNoise(msg)) {
+  const reason = event.reason
+  if (
+    isIgnorableRuntimeError(reason) ||
+    isResizeObserverNoise(reason?.message || String(reason || ''))
+  ) {
     event.preventDefault()
   }
 })
@@ -43,7 +60,7 @@ window.addEventListener('unhandledrejection', (event) => {
 const app = createApp(App)
 
 app.config.errorHandler = (err) => {
-  if (isResizeObserverNoise(err?.message || String(err))) return
+  if (isIgnorableRuntimeError(err)) return
   console.error(err)
 }
 

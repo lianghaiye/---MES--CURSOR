@@ -5,10 +5,15 @@ import { ensureCrossDemoInboundOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureMultiUnitFlowInboundOrders } from '@/mock/multiUnitFlowDemoSeed'
 import { ensureOneItemOneCodeInventoryInboundOrders } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import { ensurePeriodSettleDemoInboundOrders } from '@/mock/periodSettleDemoSeed'
-import { purchaseOrderState, syncPurchaseOrderInboundStatus } from '@/store/purchaseOrderStore'
+import {
+  purchaseOrderState,
+  syncPurchaseOrderInboundStatus,
+  explainCannotGenerateReceiptOrInbound,
+} from '@/store/purchaseOrderStore'
 import { calcPoLineRemainInboundQty } from '@/utils/purchaseLineInbound'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import { estimateSettleQty } from '@/utils/settleUnit'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 import { warehouseState } from '@/store/warehouseStore'
 import { applyInboundToStock } from '@/store/stockStore'
 import { applyInboundToSalesAllocation } from '@/store/salesStockAllocationStore'
@@ -71,8 +76,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: inboundOrderState.orders }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { orders: inboundOrderState.orders })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function normalizeLegacyOrder(order) {
@@ -935,6 +940,8 @@ export function resetMiniProgramInboundTask(taskId) {
 export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
   const po = purchaseOrderState.orders.find((o) => o.id === purchaseOrderId)
   if (!po) return { ok: false, message: '采购单不存在' }
+  const block = explainCannotGenerateReceiptOrInbound(po, '入库')
+  if (block) return { ok: false, message: block }
 
   const lines = payload.lineItems || []
   if (!lines.length) return { ok: false, message: '请至少添加一条入库明细' }

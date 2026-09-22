@@ -108,7 +108,7 @@ export function evaluateQcInboundGate(task) {
   if (task.qcStatus !== QC_TASK_STATUS.COMPLETED) {
     return {
       ok: false,
-      message: '请先完成质检后再生成入库单',
+      message: '已生成质检单但未完成质检，不可生成入库单',
       mode: 'unfinished',
       qtyHints: null,
       enforceQtyCap: false,

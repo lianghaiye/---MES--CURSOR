@@ -99,10 +99,15 @@
         <template #headerCell="{ column }">
           <template v-if="column.key === 'inboundProgress'">
             <span class="col-title-with-tip">
-              收货进度
+              入库进度
               <a-tooltip :title="INBOUND_PROGRESS_TOOLTIP">
                 <InfoCircleOutlined class="col-tip-icon" />
               </a-tooltip>
+            </span>
+          </template>
+          <template v-else-if="column.key === 'receiptQty' || column.key === 'receivingWarehouse'">
+            <span class="col-title-required">
+              <span class="required-star">*</span>{{ column.title }}
             </span>
           </template>
           <template v-else-if="column.required">
@@ -119,13 +124,16 @@
               formatInboundProgress(record.receivedQty, record.appliedOccupyQty, record.purchaseQty)
             }}
           </template>
-          <template v-else-if="column.key === 'productName'">
-            <span class="product-name" :title="record.productName">{{
-              record.productName || '—'
+          <template v-else-if="column.key === 'itemName'">
+            <span class="product-name" :title="formatProductName(record)">{{
+              formatProductName(record)
             }}</span>
           </template>
           <template v-else-if="column.key === 'purchaseQty'">
-            {{ formatQty(record.purchaseQty) }}
+            <span class="qty-with-unit-text">
+              {{ formatQty(record.purchaseQty) }}
+              <span v-if="record.unit" class="unit-suffix">{{ record.unit }}</span>
+            </span>
           </template>
           <template v-else-if="column.key === 'receivingWarehouse'">
             <a-select
@@ -139,15 +147,18 @@
             />
           </template>
           <template v-else-if="column.key === 'receiptQty'">
-            <a-input-number
-              v-model:value="record.receiptQty"
-              size="small"
-              :min="0"
-              :max="record.remainingQty"
-              :precision="2"
-              style="width: 100%"
-              :disabled="record.locked"
-            />
+            <div class="qty-with-unit">
+              <a-input-number
+                v-model:value="record.receiptQty"
+                size="small"
+                :min="0"
+                :max="record.remainingQty"
+                :precision="3"
+                style="flex: 1; min-width: 0"
+                :disabled="record.locked"
+              />
+              <span class="unit-suffix">{{ record.unit || '' }}</span>
+            </div>
           </template>
           <template v-else-if="column.key === 'inboundQcRequirement'">
             <a-select
@@ -160,32 +171,28 @@
               :disabled="record.locked"
             />
           </template>
-          <template v-else-if="column.key === 'settleUnit'">
-            {{ record.settleUnit || '—' }}
-          </template>
           <template v-else-if="column.key === 'settleQty'">
-            <a-input-number
-              v-if="record.settleUnit"
-              v-model:value="record.settleQty"
-              size="small"
-              :min="0"
-              :precision="4"
-              :formatter="inputNumberFormatter"
-              :parser="inputNumberParser"
-              style="width: 100%"
-              :disabled="record.locked"
-              placeholder="实重"
-            />
+            <div v-if="record.settleUnit" class="qty-with-unit">
+              <a-input-number
+                v-model:value="record.settleQty"
+                size="small"
+                :min="0"
+                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
+                style="flex: 1; min-width: 0"
+                :disabled="record.locked"
+                placeholder="实重"
+              />
+              <span class="unit-suffix">{{ record.settleUnit }}</span>
+            </div>
             <span v-else>—</span>
           </template>
-          <template v-else-if="column.key === 'receivingMode'">
-            <a-select
-              v-model:value="record.receivingMode"
-              size="small"
-              style="width: 100%"
-              :options="receivingModeOpts"
-              :disabled="record.locked"
-            />
+          <template v-else-if="column.key === 'unitPrice'">
+            {{ formatMoney(record.unitPrice) }}
+          </template>
+          <template v-else-if="column.key === 'totalPrice'">
+            {{ formatMoney(calcLineTotal(record)) }}
           </template>
           <template v-else-if="column.key === 'remark'">
             <LongTextEditCell
@@ -207,7 +214,7 @@
             </a-space>
           </template>
           <template v-else>
-            {{ record[column.dataIndex] || '—' }}
+            {{ record[column.dataIndex] || record[column.key] || '—' }}
           </template>
         </template>
       </a-table>
@@ -236,16 +243,16 @@
         <a-row :gutter="16">
           <a-col :span="8">
             <a-form-item label="产品名称">
-              <a-input :value="lineEditDraft.productName" disabled />
+              <a-input :value="lineEditDraft.itemName || lineEditDraft.productName" disabled />
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="编号">
-              <a-input :value="lineEditDraft.productCode" disabled />
+            <a-form-item label="物品编码">
+              <a-input :value="lineEditDraft.itemCode || lineEditDraft.productCode" disabled />
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="收货进度">
+            <a-form-item label="入库进度">
               <a-input
                 :value="
                   formatInboundProgress(
@@ -254,6 +261,14 @@
                     lineEditDraft.purchaseQty,
                   )
                 "
+                disabled
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="采购数量">
+              <a-input
+                :value="`${formatQty(lineEditDraft.purchaseQty)}${lineEditDraft.unit ? ` ${lineEditDraft.unit}` : ''}`"
                 disabled
               />
             </a-form-item>
@@ -280,12 +295,12 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="收货数量" required>
+            <a-form-item label="点收数量" required>
               <a-input-number
                 v-model:value="lineEditDraft.receiptQty"
                 :min="0"
                 :max="lineEditDraft.remainingQty"
-                :precision="2"
+                :precision="3"
                 style="width: 100%"
               />
             </a-form-item>
@@ -426,9 +441,10 @@ const warehouseOpts = computed(() => {
 })
 
 const columns = computed(() => {
+  // 与「生成入库单」明细列对齐；差异：入库进度紧跟序号，点收数量前加采购数量
   const cols = [
-    { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
-    { title: '收货进度', key: 'inboundProgress', width: 180, fixed: 'left' },
+    { title: '序号', key: 'index', width: 56, align: 'center' },
+    { title: '入库进度', key: 'inboundProgress', width: 180, ellipsis: true },
   ]
   if (isMultiOrder.value) {
     cols.push({
@@ -440,34 +456,28 @@ const columns = computed(() => {
     })
   }
   cols.push(
+    { title: '物品编码', key: 'itemCode', dataIndex: 'itemCode', width: 120, ellipsis: true },
+    { title: '产品名称', key: 'itemName', dataIndex: 'itemName', width: 220, ellipsis: true },
+    { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 110, ellipsis: true },
+    { title: '材质', dataIndex: 'material', key: 'material', width: 80, ellipsis: true },
     {
-      title: '产品名称',
-      key: 'productName',
-      dataIndex: 'productName',
+      title: '变体属性',
+      dataIndex: 'variantSummary',
+      key: 'variantAttr',
       width: 140,
       ellipsis: true,
-      fixed: isMultiOrder.value ? undefined : 'left',
     },
-    { title: '编号', key: 'productCode', dataIndex: 'productCode', width: 120, ellipsis: true },
-    { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-    { title: '材质', dataIndex: 'material', width: 80, ellipsis: true },
-    { title: '变体属性', dataIndex: 'variantSummary', width: 140, ellipsis: true },
-    { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-    { title: '采购数量', key: 'purchaseQty', width: 100, align: 'right' },
-    { title: '采购单位', dataIndex: 'unit', width: 90 },
-    { title: '收货仓库', key: 'receivingWarehouse', width: 120, required: true },
-    { title: '收货数量', key: 'receiptQty', width: 110 },
-    {
-      title: '入库质检要求',
-      key: 'inboundQcRequirement',
-      dataIndex: 'inboundQcRequirement',
-      width: 110,
-    },
-    { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
-    { title: '结算数量', key: 'settleQty', width: 110 },
-    { title: '收货模式', key: 'receivingMode', width: 120 },
-    { title: '备注', key: 'remark', width: 140 },
-    { title: '操作', key: 'action', width: 130, fixed: 'right' },
+    { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 90, ellipsis: true },
+    { title: '条码类型', dataIndex: 'barcodeType', key: 'barcodeType', width: 96 },
+    { title: '采购数量', key: 'purchaseQty', width: 110, align: 'right' },
+    { title: '点收数量', key: 'receiptQty', width: 120 },
+    { title: '结算数量', key: 'settleQty', width: 120 },
+    { title: '收货仓库', key: 'receivingWarehouse', width: 120 },
+    { title: '入库质检要求', key: 'inboundQcRequirement', width: 120 },
+    { title: '单价', key: 'unitPrice', width: 96, align: 'right' },
+    { title: '总价', key: 'totalPrice', width: 96, align: 'right' },
+    { title: '备注', key: 'remark', width: 140, ellipsis: true },
+    { title: '操作', key: 'action', width: 140, fixed: 'right' },
   )
   return cols
 })
@@ -476,6 +486,22 @@ const tableScrollX = computed(() => columns.value.reduce((sum, col) => sum + (co
 
 function formatQty(val) {
   return formatNumber(val, 4, { empty: '—' })
+}
+
+function formatMoney(val) {
+  const n = Number(val)
+  if (!Number.isFinite(n)) return '—'
+  return formatNumber(n, 4)
+}
+
+function formatProductName(record = {}) {
+  return String(record.itemName || record.productName || '').trim() || '—'
+}
+
+function calcLineTotal(record = {}) {
+  const qty = Number(record.receiptQty) || 0
+  const price = Number(record.unitPrice) || 0
+  return Math.round(qty * price * 10000) / 10000
 }
 
 function buildLine(po, line) {
@@ -498,8 +524,10 @@ function buildLine(po, line) {
     material: line.material || '',
     variantSummary: line.variantSummary || '',
     drawingNo: line.drawingNo || '',
+    barcodeType: line.barcodeType || '',
     purchaseQty,
     unit: line.unit || line.purchaseUnit || '',
+    unitPrice: Number(line.unitPriceExTax ?? line.unitPrice) || 0,
     settleUnit: String(line.settleUnit || '').trim(),
     settleQty: String(line.settleUnit || '').trim()
       ? Number(line.settleQty) > 0
@@ -528,7 +556,7 @@ function buildLine(po, line) {
 function buildLinesFromOrders(orders) {
   return orders.flatMap((po) =>
     (po.lineItems || [])
-      .filter((l) => (Number(l.purchaseQty) || 0) > 0)
+      .filter((l) => !l.cancelled && (Number(l.purchaseQty) || 0) > 0)
       .map((l) => buildLine(po, l)),
   )
 }
@@ -819,6 +847,25 @@ function handleConfirmAndCreateQc() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.qty-with-unit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.qty-with-unit-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.unit-suffix {
+  flex-shrink: 0;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 
 .locked-tip {

@@ -13,7 +13,7 @@
       type="warning"
       show-icon
       class="pending-alert"
-      message="待审核：通过后将回写采购订单有效单价；已入库数量仍按当时入库单价，未入库部分按新单价执行。通过前不可收货/入库/结算。"
+      message="待审核：通过后将回写采购订单；已入库数量仍按当时入库单价，未入库部分按新单价执行。通过前不可收货/入库/结算。"
     />
 
     <a-form layout="vertical" class="price-change-form">
@@ -33,7 +33,7 @@
             <a-input
               v-model:value="form.reason"
               :disabled="isReview"
-              placeholder="如：供应商调价，未入库部分按新单价执行（选填）"
+              placeholder="如：供应商调价 / 某物料不再采购（选填）"
             />
           </a-form-item>
         </a-col>
@@ -58,18 +58,24 @@
       size="small"
       bordered
       row-key="poLineId"
+      class="price-change-table"
       :columns="visibleColumns"
       :data-source="form.lines"
       :pagination="false"
+      :row-class-name="lineRowClassName"
       :scroll="{ x: tableScrollX, y: 'calc(100vh - 420px)' }"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="isMoneyKey(column.key)">
+        <template v-if="column.key === 'productName'">
+          <span>{{ record.productName || '—' }}</span>
+          <a-tag v-if="record.cancelled" color="default" class="cancelled-tag">已取消</a-tag>
+        </template>
+        <template v-else-if="isMoneyKey(column.key)">
           {{ formatPurchasePriceChangeAbsMoney(record[column.key]) }}
         </template>
         <template v-else-if="column.key === 'newUnitPriceExTax'">
           <a-input-number
-            v-if="!isReview && taxModeExcluding"
+            v-if="!isReview && taxModeExcluding && !record.cancelled"
             v-model:value="record.newUnitPriceExTax"
             :min="0"
             :precision="4"
@@ -82,7 +88,7 @@
         </template>
         <template v-else-if="column.key === 'newUnitPriceInTax'">
           <a-input-number
-            v-if="!isReview && !taxModeExcluding"
+            v-if="!isReview && !taxModeExcluding && !record.cancelled"
             v-model:value="record.newUnitPriceInTax"
             :min="0"
             :precision="4"
@@ -105,6 +111,32 @@
         </template>
         <template v-else-if="column.key === 'taxRate'">
           {{ record.taxRate != null && record.taxRate !== '' ? formatNumber(record.taxRate) : '—' }}
+        </template>
+        <template v-else-if="column.key === 'qty'">
+          {{ record.qty != null && record.qty !== '' ? formatNumber(record.qty) : '—' }}
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <template v-if="isReview">
+            <a-tag v-if="record.cancelled" color="default">已取消</a-tag>
+            <span v-else>—</span>
+          </template>
+          <a-button
+            v-else-if="record.cancelled"
+            type="link"
+            size="small"
+            @click="toggleCancelLine(record)"
+          >
+            恢复
+          </a-button>
+          <a-tooltip
+            v-else-if="!canCancelPurchasePriceChangeLine(record)"
+            title="该明细已生成收货单或入库单，无法取消行"
+          >
+            <a-button type="link" size="small" disabled>取消行</a-button>
+          </a-tooltip>
+          <a-button v-else type="link" size="small" danger @click="toggleCancelLine(record)">
+            取消行
+          </a-button>
         </template>
         <template v-else>
           {{ record[column.dataIndex] || '—' }}
@@ -140,7 +172,7 @@
       <span>已改 {{ summary.changedCount }} 行</span>
     </div>
     <p class="hint">
-      已入库数量仍按当时入库单价；未入库部分通过后按新单价执行。已生成的结算单不回溯改价。改单价仅互算含税/不含税金额。
+      「取消行」保留明细履历，该物料不再采购；已生成收货单/入库单的明细不可取消。已入库数量仍按当时入库单价；未入库部分通过后按新单价执行。改单价仅互算含税/不含税金额。
     </p>
 
     <template #footer>
@@ -166,6 +198,7 @@ import {
   PURCHASE_PRICE_CHANGE_REASON_OPTIONS,
   PURCHASE_PRICE_CHANGE_STATUS,
   buildPurchasePriceChangeDraftLines,
+  canCancelPurchasePriceChangeLine,
   formatPurchasePriceChangeAbsMoney,
   formatPurchasePriceChangeMoney,
   normalizePurchasePriceChangeLine,
@@ -209,8 +242,8 @@ const inTaxColumnKeys = new Set([
 
 const modalTitle = computed(() =>
   isReview.value
-    ? `审核价格变更 ${props.pendingChange?.changeNo || ''}`.trim()
-    : `价格变更 ${props.purchaseOrder?.orderNo || ''}`.trim(),
+    ? `审核订单变更 ${props.pendingChange?.changeNo || ''}`.trim()
+    : `订单变更 ${props.purchaseOrder?.orderNo || ''}`.trim(),
 )
 
 const taxModeHint = computed(() =>
@@ -239,11 +272,18 @@ function isMoneyKey(key) {
 }
 
 const allColumns = [
-  { title: '物料名称', dataIndex: 'productName', width: 150, ellipsis: true, fixed: 'left' },
+  {
+    title: '物料名称',
+    key: 'productName',
+    dataIndex: 'productName',
+    width: 168,
+    ellipsis: true,
+    fixed: 'left',
+  },
   { title: '物料编码', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
-  { title: '计价数量', dataIndex: 'qty', width: 88, align: 'right' },
+  { title: '计价数量', key: 'qty', dataIndex: 'qty', width: 88, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 64 },
   { title: '税率(%)', key: 'taxRate', width: 72, align: 'right' },
   { title: '原单价（不含税）', key: 'oldUnitPriceExTax', width: 122, align: 'right' },
@@ -256,6 +296,7 @@ const allColumns = [
   { title: '新金额（含税）', key: 'newAmountInTax', width: 110, align: 'right' },
   { title: '差额（不含税）', key: 'deltaAmountExTax', width: 118, align: 'right' },
   { title: '差额（含税）', key: 'deltaAmountInTax', width: 110, align: 'right' },
+  { title: '操作', key: 'action', width: 88, align: 'center', fixed: 'right' },
 ]
 
 const showExTaxColumns = computed(() => columnDisplayMode.value !== 'inTax')
@@ -274,6 +315,10 @@ const tableScrollX = computed(() =>
 )
 
 const summary = computed(() => summarizePurchasePriceChangeLines(form.lines))
+
+function lineRowClassName(record) {
+  return record.cancelled ? 'line-cancelled' : ''
+}
 
 watch(
   () => [props.open, props.purchaseOrder?.id, props.pendingChange?.id],
@@ -300,6 +345,25 @@ function onPriceChange(record) {
   recalcPurchasePriceChangeLine(record, {
     taxModeExcluding: taxModeExcluding.value,
   })
+}
+
+function toggleCancelLine(record) {
+  if (record.cancelled) {
+    record.cancelled = false
+    if (!record.oldCancelled) {
+      record.newQty = record.oldQty
+      record.newPurchaseQty = record.oldPurchaseQty
+    }
+    onPriceChange(record)
+    return
+  }
+  if (!canCancelPurchasePriceChangeLine(record)) {
+    message.warning('该明细已生成收货单或入库单，无法取消行')
+    return
+  }
+  record.cancelled = true
+  onPriceChange(record)
+  message.info('已标记取消行：该物料不再采购，明细仍保留在订单履历，审核通过后生效。')
 }
 
 watch(columnDisplayMode, (mode) => {
@@ -418,5 +482,16 @@ function handleReject() {
 
 .delta-down {
   color: #389e0d;
+}
+
+.cancelled-tag {
+  margin-left: 6px;
+}
+
+.price-change-table {
+  :deep(tr.line-cancelled > td) {
+    color: rgba(0, 0, 0, 0.35);
+    background: #fafafa;
+  }
 }
 </style>

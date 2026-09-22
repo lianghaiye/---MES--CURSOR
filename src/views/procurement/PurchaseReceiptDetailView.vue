@@ -239,8 +239,13 @@ import {
   canCompletePurchaseReceipt,
   voidPurchaseReceipt,
   completePurchaseReceipt,
+  hasReceiptQcSheet,
 } from '@/store/purchaseReceiptStore'
-import { getPurchaseOrderById, canGenerateInbound } from '@/store/purchaseOrderStore'
+import {
+  getPurchaseOrderById,
+  canGenerateInbound,
+  explainCannotGenerateReceiptOrInbound,
+} from '@/store/purchaseOrderStore'
 import { getInboundOrdersByReceipt } from '@/store/inboundOrderStore'
 import {
   flattenPurchaseOrderInboundLines,
@@ -396,7 +401,8 @@ function canOpenInboundFromReceipt(receipt) {
   if (receipt.inboundStatus === '已入库') return false
   const po = getPurchaseOrderById(receipt.purchaseOrderId)
   if (!(po && canGenerateInbound(po))) return false
-  if (receipt.qcNo) {
+  // 未生成质检单可直接入库；已生成须质检完成
+  if (hasReceiptQcSheet(receipt)) {
     return evaluateReceiptInboundByQc(receipt.id, {
       bizScope: '来料质检',
       receiptNo: receipt.receiptNo,
@@ -406,19 +412,35 @@ function canOpenInboundFromReceipt(receipt) {
 }
 
 function openInboundModal() {
-  if (!canOpenInboundFromReceipt(record.value)) {
-    const gate = evaluateReceiptInboundByQc(record.value?.id, {
-      bizScope: '来料质检',
-      receiptNo: record.value?.receiptNo,
-    })
-    message.warning(gate.message || '当前收货单不可生成入库单')
+  const receipt = record.value
+  if (!canOpenInboundFromReceipt(receipt)) {
+    const po = getPurchaseOrderById(receipt?.purchaseOrderId)
+    if (po && !canGenerateInbound(po)) {
+      message.warning(
+        explainCannotGenerateReceiptOrInbound(po, '入库') || '关联采购单不可生成入库单',
+      )
+      return
+    }
+    if (hasReceiptQcSheet(receipt)) {
+      const gate = evaluateReceiptInboundByQc(receipt?.id, {
+        bizScope: '来料质检',
+        receiptNo: receipt?.receiptNo,
+      })
+      message.warning(gate.message || '已生成质检单但未完成质检，不可生成入库单')
+      return
+    }
+    message.warning('当前收货单不可生成入库单')
     return
   }
-  const gate = evaluateReceiptInboundByQc(record.value.id, {
-    bizScope: '来料质检',
-    receiptNo: record.value.receiptNo,
-  })
-  inboundOrder.value = getPurchaseOrderById(record.value.purchaseOrderId)
+
+  let gate = { ok: true, mode: 'no_qc', qtyHints: null, enforceQtyCap: false, task: null }
+  if (hasReceiptQcSheet(receipt)) {
+    gate = evaluateReceiptInboundByQc(receipt.id, {
+      bizScope: '来料质检',
+      receiptNo: receipt.receiptNo,
+    })
+  }
+  inboundOrder.value = getPurchaseOrderById(receipt.purchaseOrderId)
   inboundQcQtyHints.value = gate.qtyHints || null
   inboundQcEnforceCap.value = Boolean(gate.enforceQtyCap && gate.qtyHints)
   inboundFromQcId.value = gate.task?.id || ''

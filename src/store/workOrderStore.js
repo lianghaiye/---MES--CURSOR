@@ -1,7 +1,11 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
-import { buildProcessesFromRoute, getDefaultProductRoute } from '@/mock/processRoutes'
+import {
+  buildProcessesFromRoute,
+  buildRouteDispatchSnapshot,
+  getDefaultProductRoute,
+} from '@/mock/processRoutes'
 import {
   resolveOrderField,
   generateProductionWorkOrderCode,
@@ -34,6 +38,7 @@ import {
   canContinueSchedule,
   isScheduleIncomplete,
 } from '@/utils/workOrderStatus'
+import { persistJson } from '@/utils/safeStorage'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -68,7 +73,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: workOrderState.orders }))
+  persistJson(STORAGE_KEY, { orders: workOrderState.orders })
 }
 
 function generateCode() {
@@ -520,6 +525,9 @@ export function createWorkOrderPayload(partial) {
   const routeName =
     partial.processRouteName ||
     (skipEbomCategory ? '' : getDefaultProductRoute(partial.productName))
+  const routeSnap = routeName
+    ? buildRouteDispatchSnapshot(routeName)
+    : { processes: [], stepPolicies: [] }
   const existingCodes = workOrderState.orders.map((o) => o.code)
   const category = partial.orderCategory || '生产工单'
   const productName = partial.productName?.trim() || ''
@@ -571,7 +579,8 @@ export function createWorkOrderPayload(partial) {
     ebomSnapshot: partial.ebomSnapshot || null,
     supplier: partial.supplier || '',
     skipEbom: Boolean(partial.skipEbom || skipEbomCategory),
-    processes: routeName ? buildProcessesFromRoute(routeName) : [],
+    processes: routeSnap.processes,
+    stepPolicies: routeSnap.stepPolicies,
     scheduleBatches: Array.isArray(partial.scheduleBatches) ? partial.scheduleBatches : [],
     activeScheduleBatchId: partial.activeScheduleBatchId || '',
     createdAt: dayjs().format('YYYY-MM-DD'),

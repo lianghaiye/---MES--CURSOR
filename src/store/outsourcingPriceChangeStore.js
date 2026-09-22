@@ -1,14 +1,16 @@
 /**
- * 外协订单价格变更：申请 / 审核 / 回写订单有效价
+ * 外协订单价格变更：申请 / 审核 / 回写订单有效价；支持「取消行」
  */
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { getOutsourcingOrderById } from '@/store/outsourcingOrderStore'
 import { recalcOutsourcingLine, recalcOutsourcingTotals } from '@/mock/outsourcingOrders'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
+import { wxLineHasReceiptOrInboundDoc } from '@/utils/outsourcingInbound'
 import {
   OUTSOURCING_PRICE_CHANGE_NO_PREFIX,
   OUTSOURCING_PRICE_CHANGE_STATUS,
+  isOutsourcingPriceChangeLineChanged,
   normalizeOutsourcingPriceChangeRecord,
   recalcOutsourcingPriceChangeLine,
   summarizeOutsourcingPriceChangeLines,
@@ -114,19 +116,31 @@ export function getPendingOutsourcingPriceChange(outsourcingOrderId) {
   )
 }
 
-/** 待审价格变更时阻断收货 / 入库 / 结算 */
+/** 待审订单变更时阻断收货 / 入库 / 结算 */
 export function getPendingOutsourcingPriceChangeBlock(
   outsourcingOrderId,
   actionLabel = '继续操作',
 ) {
   const pending = getPendingOutsourcingPriceChange(outsourcingOrderId)
   if (!pending) return ''
-  return `存在待审核的价格变更「${pending.changeNo}」，请先完成审核后再${actionLabel}`
+  return `存在待审核的订单变更「${pending.changeNo}」，请先完成审核后再${actionLabel}`
 }
 
 export function canApplyOutsourcingPriceChange(order) {
   const status = String(order?.status || '').trim()
   return status === '进行中' || status === '已完成'
+}
+
+function findOoLineForPriceChange(order, row) {
+  const lines = order?.lineItems || []
+  if (row?.ooLineId) {
+    const byId = lines.find((l) => l.id === row.ooLineId)
+    if (byId) return byId
+  }
+  const code = String(row?.productCode || '').trim()
+  if (!code) return null
+  const hits = lines.filter((l) => String(l.productCode || l.itemCode || '').trim() === code)
+  return hits.length === 1 ? hits[0] : null
 }
 
 export function submitOutsourcingPriceChange({
@@ -138,17 +152,27 @@ export function submitOutsourcingPriceChange({
   operator = 'admin1',
 }) {
   if (!canApplyOutsourcingPriceChange(outsourcingOrder)) {
-    return { ok: false, message: '仅「进行中 / 已完成」的外协订单可申请价格变更' }
+    return { ok: false, message: '仅「进行中 / 已完成」的外协订单可申请订单变更' }
   }
   if (getPendingOutsourcingPriceChange(outsourcingOrder.id)) {
-    return { ok: false, message: '已有待审核的价格变更，请先完成审核' }
+    return { ok: false, message: '已有待审核的订单变更，请先完成审核' }
   }
   const prepared = (lines || []).map((row) =>
     recalcOutsourcingPriceChangeLine({ ...row }, { taxModeExcluding: taxModeExcluding !== false }),
   )
+  for (const row of prepared) {
+    if (!row.cancelled || row.oldCancelled) continue
+    const line = findOoLineForPriceChange(outsourcingOrder, row)
+    if (line && wxLineHasReceiptOrInboundDoc(outsourcingOrder, line)) {
+      return {
+        ok: false,
+        message: `明细「${row.productName || row.productCode || row.ooLineId}」已生成收货单或入库单，无法取消行`,
+      }
+    }
+  }
   const summary = summarizeOutsourcingPriceChangeLines(prepared)
   if (!summary.changedCount) {
-    return { ok: false, message: '请至少修改一行单价或计费方式' }
+    return { ok: false, message: '请至少修改一行单价、计费方式或取消一行' }
   }
   if (!reasonType) {
     return { ok: false, message: '请选择变更原因' }
@@ -192,23 +216,11 @@ export function submitOutsourcingPriceChange({
       ok: true,
       record: approved.change,
       autoApproved: true,
-      message: '价格变更已自动审批通过，订单有效价已更新',
+      message: '订单变更已自动审批通过，订单信息已更新',
     }
   }
 
-  return { ok: true, record, message: '价格变更已提交审核' }
-}
-
-function findOoLineForPriceChange(order, row) {
-  const lines = order?.lineItems || []
-  if (row?.ooLineId) {
-    const byId = lines.find((l) => l.id === row.ooLineId)
-    if (byId) return byId
-  }
-  const code = String(row?.productCode || '').trim()
-  if (!code) return null
-  const hits = lines.filter((l) => String(l.productCode || l.itemCode || '').trim() === code)
-  return hits.length === 1 ? hits[0] : null
+  return { ok: true, record, message: '订单变更已提交审核' }
 }
 
 function applyApprovedPrices(change) {
@@ -218,29 +230,40 @@ function applyApprovedPrices(change) {
   let appliedCount = 0
   for (const row of change.lines || []) {
     const line = findOoLineForPriceChange(order, row)
-    if (!line) continue
-    const newEx = Number(row.newUnitPriceExTax)
-    const oldEx = Number(row.oldUnitPriceExTax)
-    const newIn = Number(row.newUnitPriceInTax)
-    const oldIn = Number(row.oldUnitPriceInTax)
+    if (!line || !isOutsourcingPriceChangeLineChanged(row)) continue
+
+    line.cancelled = Boolean(row.cancelled)
+    if (row.cancelled) {
+      line.planQty = 0
+    } else if (row.newPlanQty != null && Number.isFinite(Number(row.newPlanQty))) {
+      line.planQty = Number(row.newPlanQty) || 0
+    }
+
     const priceChanged =
-      (Number.isFinite(newEx) && Math.abs(newEx - oldEx) > 1e-9) ||
-      (Number.isFinite(newIn) && Math.abs(newIn - oldIn) > 1e-9)
+      Math.abs((Number(row.newUnitPriceExTax) || 0) - (Number(row.oldUnitPriceExTax) || 0)) >
+        1e-9 ||
+      Math.abs((Number(row.newUnitPriceInTax) || 0) - (Number(row.oldUnitPriceInTax) || 0)) > 1e-9
     const newBilling = String(row.billingMethod || '').trim()
     const oldBilling = String(row.oldBillingMethod || line.billingMethod || '').trim()
     const billingChanged = Boolean(newBilling) && newBilling !== oldBilling
-    if (!priceChanged && !billingChanged) continue
-    if (priceChanged) {
+
+    if (priceChanged && !row.cancelled) {
       if (taxModeExcluding) {
-        line.unitPriceExTax = newEx
-        recalcOutsourcingLine(line, { fromInTax: false })
+        const newEx = Number(row.newUnitPriceExTax)
+        if (Number.isFinite(newEx)) {
+          line.unitPriceExTax = newEx
+          recalcOutsourcingLine(line, { fromInTax: false })
+        }
       } else {
+        const newIn = Number(row.newUnitPriceInTax)
         const inTax = Number.isFinite(newIn) ? newIn : Number(line.unitPriceInTax) || 0
         line.unitPriceInTax = inTax
         recalcOutsourcingLine(line, { fromInTax: true })
       }
+    } else if (row.cancelled) {
+      recalcOutsourcingLine(line, { fromInTax: false })
     }
-    if (billingChanged) {
+    if (billingChanged && !row.cancelled) {
       line.billingMethod = newBilling
     }
     row.ooLineId = line.id
@@ -249,7 +272,7 @@ function applyApprovedPrices(change) {
   if (!appliedCount) {
     return {
       ok: false,
-      message: '未能回写订单（未匹配到外协明细行），请重新发起价格变更',
+      message: '未能回写订单（未匹配到外协明细行），请重新发起订单变更',
     }
   }
   recalcOutsourcingTotals(order)
@@ -261,7 +284,7 @@ function applyApprovedPrices(change) {
 
 export function approveOutsourcingPriceChange(id, operator = 'admin1', opinion = '', extra = {}) {
   const change = outsourcingPriceChangeState.orders.find((o) => o.id === id)
-  if (!change) return { ok: false, message: '价格变更单不存在' }
+  if (!change) return { ok: false, message: '订单变更单不存在' }
   if (change.status !== OUTSOURCING_PRICE_CHANGE_STATUS.PENDING) {
     return { ok: false, message: '仅待审核单据可通过' }
   }
@@ -273,12 +296,12 @@ export function approveOutsourcingPriceChange(id, operator = 'admin1', opinion =
   change.opinion = opinion || '同意'
   change.autoApproved = Boolean(extra.autoApproved)
   persist()
-  return { ok: true, change, message: '价格变更已通过，订单有效价已更新' }
+  return { ok: true, change, message: '订单变更已通过，订单信息已更新' }
 }
 
 export function rejectOutsourcingPriceChange(id, operator = 'admin1', opinion = '') {
   const change = outsourcingPriceChangeState.orders.find((o) => o.id === id)
-  if (!change) return { ok: false, message: '价格变更单不存在' }
+  if (!change) return { ok: false, message: '订单变更单不存在' }
   if (change.status !== OUTSOURCING_PRICE_CHANGE_STATUS.PENDING) {
     return { ok: false, message: '仅待审核单据可驳回' }
   }
@@ -287,5 +310,5 @@ export function rejectOutsourcingPriceChange(id, operator = 'admin1', opinion = 
   change.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
   change.opinion = opinion || '驳回'
   persist()
-  return { ok: true, change, message: '价格变更已驳回' }
+  return { ok: true, change, message: '订单变更已驳回' }
 }

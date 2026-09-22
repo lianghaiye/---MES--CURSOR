@@ -1,8 +1,9 @@
 /**
  * 外协订单价格变更：状态、重算、汇总、审批展示
- * 逻辑与样式对齐采购订单价格变更；计价数量取计划数量 planQty。
+ * 逻辑与样式对齐采购订单价格变更；计价数量取计划数量 planQty；支持「取消行」。
  */
 import { formatNumber, roundNumber } from '@/utils/numberFormat'
+import { wxLineHasReceiptOrInboundDoc } from '@/utils/outsourcingInbound'
 
 export const OUTSOURCING_PRICE_CHANGE_STATUS = {
   PENDING: '待审核',
@@ -47,11 +48,19 @@ function deriveExTax(inc, taxRate) {
   return rate >= 0 ? round2(inTax / (1 + rate / 100)) : round2(inTax)
 }
 
+/** 未生成收货/入库单时才可「取消行」 */
+export function canCancelOutsourcingPriceChangeLine(row) {
+  if (!row || row.cancelled || row.oldCancelled) return false
+  return !row.hasReceiptOrInbound
+}
+
 export function isOutsourcingPriceChangeLineChanged(row) {
   if (!row) return false
+  if (Boolean(row.cancelled) !== Boolean(row.oldCancelled)) return true
   const priceChanged = [
     [row.newUnitPriceExTax, row.oldUnitPriceExTax],
     [row.newUnitPriceInTax, row.oldUnitPriceInTax],
+    [row.newQty, row.oldQty],
   ].some(([a, b]) => Math.abs((Number(a) || 0) - (Number(b) || 0)) > 1e-9)
   if (priceChanged) return true
   const oldBilling = String(row.oldBillingMethod || '').trim()
@@ -70,6 +79,7 @@ export function buildOutsourcingPriceChangeDraftLines(order) {
         Number(line.unitPriceInTax) || deriveInTax(oldUnitPriceExTax, taxRate),
       )
       const billingMethod = String(line.billingMethod || '').trim() || '按件数'
+      const alreadyCancelled = Boolean(line.cancelled)
       const row = {
         ooLineId: line.id,
         productCode: line.productCode || line.itemCode || '',
@@ -78,10 +88,17 @@ export function buildOutsourcingPriceChangeDraftLines(order) {
         material: line.material || '',
         unit: line.unit || '',
         qty,
+        oldQty: qty,
+        newQty: qty,
         planQty: qty,
+        oldPlanQty: qty,
+        newPlanQty: qty,
         taxRate,
         oldBillingMethod: billingMethod,
         billingMethod,
+        oldCancelled: alreadyCancelled,
+        cancelled: alreadyCancelled,
+        hasReceiptOrInbound: wxLineHasReceiptOrInboundDoc(order, line),
         oldUnitPriceExTax,
         oldUnitPriceInTax,
         newUnitPriceExTax: oldUnitPriceExTax,
@@ -93,17 +110,27 @@ export function buildOutsourcingPriceChangeDraftLines(order) {
 
 export function recalcOutsourcingPriceChangeLine(row, options = {}) {
   const taxModeExcluding = options.taxModeExcluding !== false
-  const qty = Number(row.qty) || 0
+  const oldQty = Number(row.oldQty ?? row.qty) || 0
+  let newQty = Number(row.newQty ?? row.qty) || 0
+  if (row.cancelled) newQty = 0
+  const oldPlanQty = Number(row.oldPlanQty ?? row.planQty) || 0
+  let newPlanQty = Number(row.newPlanQty ?? row.planQty) || 0
+  if (row.cancelled) newPlanQty = 0
   const taxRate = Number(row.taxRate) || 0
   row.taxRate = taxRate
-  row.qty = qty
+  row.oldQty = oldQty
+  row.newQty = newQty
+  row.qty = newQty
+  row.oldPlanQty = oldPlanQty
+  row.newPlanQty = newPlanQty
+  row.planQty = newPlanQty
 
   row.oldUnitPriceExTax = round2(Number(row.oldUnitPriceExTax) || 0)
   row.oldUnitPriceInTax = round2(
     Number(row.oldUnitPriceInTax) || deriveInTax(row.oldUnitPriceExTax, taxRate),
   )
-  row.oldAmountExTax = lineChangeAmount(qty, row.oldUnitPriceExTax)
-  row.oldAmountInTax = lineChangeAmount(qty, row.oldUnitPriceInTax)
+  row.oldAmountExTax = lineChangeAmount(oldQty, row.oldUnitPriceExTax)
+  row.oldAmountInTax = lineChangeAmount(oldQty, row.oldUnitPriceInTax)
 
   if (taxModeExcluding) {
     row.newUnitPriceExTax = round2(Number(row.newUnitPriceExTax) || 0)
@@ -113,8 +140,8 @@ export function recalcOutsourcingPriceChangeLine(row, options = {}) {
     row.newUnitPriceExTax = deriveExTax(row.newUnitPriceInTax, taxRate)
   }
 
-  row.newAmountExTax = lineChangeAmount(qty, row.newUnitPriceExTax)
-  row.newAmountInTax = lineChangeAmount(qty, row.newUnitPriceInTax)
+  row.newAmountExTax = lineChangeAmount(newQty, row.newUnitPriceExTax)
+  row.newAmountInTax = lineChangeAmount(newQty, row.newUnitPriceInTax)
   row.deltaAmountExTax = round2(row.newAmountExTax - row.oldAmountExTax)
   row.deltaAmountInTax = round2(row.newAmountInTax - row.oldAmountInTax)
   return row
@@ -152,6 +179,13 @@ export function normalizeOutsourcingPriceChangeLine(row, taxModeExcluding = true
   const billing = String(next.billingMethod || next.oldBillingMethod || '').trim() || '按件数'
   if (!String(next.oldBillingMethod || '').trim()) next.oldBillingMethod = billing
   if (!String(next.billingMethod || '').trim()) next.billingMethod = billing
+  if (next.oldQty == null) next.oldQty = Number(next.qty) || 0
+  if (next.newQty == null) next.newQty = Number(next.qty) || 0
+  if (next.oldPlanQty == null) next.oldPlanQty = Number(next.planQty ?? next.qty) || 0
+  if (next.newPlanQty == null) next.newPlanQty = Number(next.planQty ?? next.qty) || 0
+  if (next.oldCancelled == null) next.oldCancelled = false
+  if (next.cancelled == null) next.cancelled = Boolean(next.oldCancelled)
+  if (next.hasReceiptOrInbound == null) next.hasReceiptOrInbound = false
   return recalcOutsourcingPriceChangeLine(next, { taxModeExcluding })
 }
 
@@ -204,7 +238,7 @@ export function buildOutsourcingPriceChangeApprovalGroups(changes = []) {
     const items = [
       {
         name: change.submitter || change.creator || '—',
-        role: '价格变更申请',
+        role: '订单变更申请',
         result: '已提交',
         time: change.submittedAt || change.createdAt || '—',
         opinion: [change.reasonType, change.reason].filter(Boolean).join('：'),
@@ -216,7 +250,7 @@ export function buildOutsourcingPriceChangeApprovalGroups(changes = []) {
     ) {
       items.push({
         name: change.approver || '—',
-        role: change.autoApproved ? '系统自动审批' : '价格变更审核',
+        role: change.autoApproved ? '系统自动审批' : '订单变更审核',
         result: change.status === OUTSOURCING_PRICE_CHANGE_STATUS.APPROVED ? '已通过' : '已驳回',
         time: change.approvedAt || '—',
         opinion: change.opinion || '',
@@ -224,7 +258,7 @@ export function buildOutsourcingPriceChangeApprovalGroups(changes = []) {
     } else {
       items.push({
         name: '—',
-        role: '价格变更审核',
+        role: '订单变更审核',
         result: '待审核',
         time: '',
         opinion: '',

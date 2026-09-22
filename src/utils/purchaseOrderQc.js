@@ -163,3 +163,93 @@ export function listQcProductResultLinesForPurchaseOrders(purchaseOrders) {
   })
   return rows
 }
+
+function resolveReceiptLinePoLineId(receipt, sourceLineId) {
+  if (!receipt || !sourceLineId) return ''
+  const hit = (receipt.lineItems || []).find((li) => String(li.id) === String(sourceLineId))
+  return hit?.poLineId || hit?.id || ''
+}
+
+function qcLineMatchesPoLine(qcLine, poLine, receipt) {
+  if (!qcLine || !poLine) return false
+  const lineId = poLine.id
+  const code = String(poLine.productCode || poLine.itemCode || '').trim()
+  if (qcLine.poLineId && lineId && qcLine.poLineId === lineId) return true
+  const sourcePoLineId = resolveReceiptLinePoLineId(receipt, qcLine.sourceLineId)
+  if (sourcePoLineId && lineId && sourcePoLineId === lineId) return true
+  const qcCode = String(qcLine.itemCode || qcLine.productCode || '').trim()
+  if (code && qcCode && code === qcCode) return true
+  return false
+}
+
+/**
+ * 采购行关联的来料质检明细（含源收货单上下文）
+ */
+export function listQcLinesForPurchaseOrderLine(po, line) {
+  if (!po || !line) return []
+  void purchaseReceiptState.receipts
+  const rows = []
+  const receipts = (purchaseReceiptState.receipts || []).filter((r) =>
+    isRelatedPurchaseReceipt(r, po),
+  )
+  receipts.forEach((receipt) => {
+    collectQcTasksForReceipt(receipt).forEach((task) => {
+      const lines = Array.isArray(task.lineItems) && task.lineItems.length ? task.lineItems : []
+      lines.forEach((qcLine, idx) => {
+        if (!qcLineMatchesPoLine(qcLine, line, receipt)) return
+        rows.push({
+          task,
+          qcLine,
+          receipt,
+          inspectedAt: task.inspectedAt || '',
+          createdAt: task.createdAt || '',
+          idx,
+        })
+      })
+    })
+  })
+  return rows
+}
+
+/** 最近一次质检结果（按质检时间 / 创建时间倒序） */
+export function getPoLineLatestQcResult(po, line) {
+  const rows = listQcLinesForPurchaseOrderLine(po, line)
+  if (!rows.length) return ''
+  rows.sort((a, b) =>
+    String(b.inspectedAt || b.createdAt || '').localeCompare(
+      String(a.inspectedAt || a.createdAt || ''),
+    ),
+  )
+  const top = rows[0]
+  return String(top.qcLine?.lineQcResult || top.task?.qcResult || '').trim()
+}
+
+/**
+ * 处理方案合计文案：合格入库：n/退货：n/换货：n（多次质检数量相加；全 0 返回空）
+ */
+export function formatPoLineQcTreatmentSummary(po, line) {
+  const rows = listQcLinesForPurchaseOrderLine(po, line)
+  if (!rows.length) return ''
+  let accept = 0
+  let ret = 0
+  let exchange = 0
+  rows.forEach(({ qcLine }) => {
+    accept += Number(qcLine?.acceptInboundQty) || 0
+    ret += Number(qcLine?.returnQty) || 0
+    exchange += Number(qcLine?.exchangeQty) || 0
+  })
+  if (accept <= 1e-9 && ret <= 1e-9 && exchange <= 1e-9) return ''
+  const fmt = (n) => {
+    const v = Number(n) || 0
+    return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(4)))
+  }
+  return `合格入库：${fmt(accept)}/退货：${fmt(ret)}/换货：${fmt(exchange)}`
+}
+
+/** 质检单中该采购行的退货数量合计 */
+export function calcPoLineQcReturnQty(po, line) {
+  return listQcLinesForPurchaseOrderLine(po, line).reduce(
+    (s, { qcLine }) => s + (Number(qcLine?.returnQty) || 0),
+    0,
+  )
+}

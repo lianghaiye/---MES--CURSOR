@@ -17,6 +17,7 @@ import {
 import { addOutsourcingReceipt } from '@/store/outsourcingReceiptStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import { normalizeOutsourceMode } from '@/utils/outsourcingMode'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_outsourcing_orders'
 const SEED_VERSION_KEY = 'i_doms_outsourcing_orders_seed_v'
@@ -41,8 +42,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: outsourcingOrderState.orders }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { orders: outsourcingOrderState.orders })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function nowText() {
@@ -630,7 +631,7 @@ export function batchSubmitOutsourcingOrders(ids = []) {
 
 function buildDefaultWxReceiptLines(order) {
   return (order.lineItems || [])
-    .filter((line) => (Number(line.planQty) || 0) > 0)
+    .filter((line) => !line.cancelled && (Number(line.planQty) || 0) > 0)
     .map((line) => {
       const remainingQty = calcWxLineRemainInboundQty(order, line)
       if (remainingQty <= 1e-9) return null
@@ -651,7 +652,7 @@ function buildDefaultWxReceiptLines(order) {
 
 function buildDefaultWxInboundLines(order) {
   return (order.lineItems || [])
-    .filter((line) => (Number(line.planQty) || 0) > 0)
+    .filter((line) => !line.cancelled && (Number(line.planQty) || 0) > 0)
     .map((line) => {
       const remainingQty = calcWxLineRemainInboundQty(order, line)
       if (remainingQty <= 1e-9) return null

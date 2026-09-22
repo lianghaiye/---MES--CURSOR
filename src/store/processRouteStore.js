@@ -2,7 +2,8 @@ import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { createProcessRouteSeed } from '@/mock/processRouteSeed'
 import { processConfigState } from '@/store/processConfigStore'
-import { normalizeGrid, validateProcessRouteGrid } from '@/utils/processRouteGrid'
+import { normalizeGrid, syncStepPolicies, validateProcessRouteGrid } from '@/utils/processRouteGrid'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_process_routes'
 const SEED_VERSION_KEY = 'i_doms_process_routes_seed_v'
@@ -31,8 +32,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ routes: processRouteState.routes }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { routes: processRouteState.routes })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 export function generateProcessRouteCode(existingCodes = []) {
@@ -120,6 +121,7 @@ export function addProcessRoute(payload) {
     productDisplay: payload.productDisplay || '',
     remark: payload.remark || '',
     grid: normalizeGrid(payload.grid),
+    stepPolicies: syncStepPolicies(payload.grid, payload.stepPolicies),
     createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   }
@@ -147,6 +149,7 @@ export function updateProcessRoute(id, payload) {
     productDisplay: payload.productDisplay || '',
     remark: payload.remark || '',
     grid: normalizeGrid(payload.grid),
+    stepPolicies: syncStepPolicies(payload.grid, payload.stepPolicies),
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   })
   const row = processRouteState.routes[idx]

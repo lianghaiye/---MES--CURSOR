@@ -173,6 +173,22 @@
           <template v-else-if="column.key === 'action'">
             <a-space :size="0">
               <a-button
+                v-if="canShowReceiptQcAction(record)"
+                type="link"
+                size="small"
+                @click="handleQc(record)"
+              >
+                质检
+              </a-button>
+              <a-button
+                v-if="canShowReceiptInboundAction(record)"
+                type="link"
+                size="small"
+                @click="openInboundForRow(record)"
+              >
+                入库
+              </a-button>
+              <a-button
                 v-if="canEditPurchaseReceipt(record)"
                 type="link"
                 size="small"
@@ -189,24 +205,6 @@
               >
                 作废
               </a-button>
-              <template v-if="record.receiptStatus === '进行中'">
-                <a-button
-                  v-if="canShowReceiptQcAction(record)"
-                  type="link"
-                  size="small"
-                  @click="handleQc(record)"
-                >
-                  质检
-                </a-button>
-                <a-button
-                  v-if="canShowReceiptInboundAction(record)"
-                  type="link"
-                  size="small"
-                  @click="openInboundForRow(record)"
-                >
-                  入库
-                </a-button>
-              </template>
               <span v-if="!hasRowActions(record)" class="action-disabled">-</span>
             </a-space>
           </template>
@@ -273,7 +271,11 @@ import {
   completePurchaseReceipt,
   hasReceiptQcSheet,
 } from '@/store/purchaseReceiptStore'
-import { canGenerateInbound, getPurchaseOrderById } from '@/store/purchaseOrderStore'
+import {
+  canGenerateInbound,
+  explainCannotGenerateReceiptOrInbound,
+  getPurchaseOrderById,
+} from '@/store/purchaseOrderStore'
 import { supplierOptions } from '@/mock/purchaseOrderOptions'
 import PurchaseReceiptPrintModal from './components/PurchaseReceiptPrintModal.vue'
 import GenerateIncomingQcModal from './components/GenerateIncomingQcModal.vue'
@@ -428,9 +430,9 @@ function canShowReceiptQcAction(record) {
   return (record.qcStatus || '未质检') === '未质检'
 }
 
-/** 进行中且入库未完成、关联采购单仍可入库；有关联质检时须通过门控 */
+/** 新建/进行中且入库未完成、关联采购单仍可入库；有关联质检时须通过门控 */
 function canShowReceiptInboundAction(record) {
-  if (record?.receiptStatus !== '进行中') return false
+  if (record?.receiptStatus !== '进行中' && record?.receiptStatus !== '新建') return false
   if (record.inboundStatus === '已入库') return false
   const po = getPurchaseOrderById(record.purchaseOrderId)
   if (!(po && canGenerateInbound(po))) return false
@@ -504,19 +506,26 @@ function openInboundForRow(receipt) {
     message.warning('该收货单已入库完成')
     return
   }
-  const gate = evaluateReceiptInboundByQc(receipt.id, {
-    bizScope: '来料质检',
-    receiptNo: receipt.receiptNo,
-  })
-  if (!gate.ok) {
-    message.warning(gate.message || '当前收货单不可生成入库单')
-    return
-  }
   const po = getPurchaseOrderById(receipt.purchaseOrderId)
   if (!po || !canGenerateInbound(po)) {
-    message.warning('关联采购单不可生成入库单（需进行中且仍有可入库数量）')
+    const tip = explainCannotGenerateReceiptOrInbound(po, '入库') || '关联采购单不可生成入库单'
+    message.warning(tip)
     return
   }
+
+  // 未生成质检单：可直接入库；已生成则须质检完成
+  let gate = { ok: true, mode: 'no_qc', qtyHints: null, enforceQtyCap: false, task: null }
+  if (hasReceiptQcSheet(receipt)) {
+    gate = evaluateReceiptInboundByQc(receipt.id, {
+      bizScope: '来料质检',
+      receiptNo: receipt.receiptNo,
+    })
+    if (!gate.ok) {
+      message.warning(gate.message || '已生成质检单但未完成质检，不可生成入库单')
+      return
+    }
+  }
+
   inboundReceipt.value = receipt
   inboundOrder.value = po
   inboundQcQtyHints.value = gate.qtyHints || null

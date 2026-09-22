@@ -1,5 +1,25 @@
 <template>
   <div class="dispatch-tab">
+    <div v-if="anyStepGroups.length" class="any-select-panel">
+      <div class="any-select-title">选做工序勾选</div>
+      <div class="any-select-hint">
+        以下步骤为「选做完成」，请勾选本次要下发的工序（可多选，默认全选，至少选一道）
+      </div>
+      <div v-for="group in anyStepGroups" :key="group.stepNo" class="any-select-group">
+        <div class="any-select-step">第 {{ group.stepNo }} 步</div>
+        <a-checkbox-group
+          :value="selectedIdsOf(group)"
+          class="any-select-checks"
+          @change="(ids) => onGroupSelect(group, ids)"
+        >
+          <a-checkbox v-for="proc in group.processes" :key="proc.id" :value="proc.id">
+            {{ proc.name }}
+            <span v-if="proc.processCode" class="proc-code">{{ proc.processCode }}</span>
+          </a-checkbox>
+        </a-checkbox-group>
+      </div>
+    </div>
+
     <a-table
       :columns="columns"
       :data-source="workOrder.processes"
@@ -21,6 +41,12 @@
             </span>
             <span>{{ record.name }}</span>
           </div>
+        </template>
+        <template v-else-if="column.key === 'stepNo'">
+          {{ record.stepNo || '—' }}
+        </template>
+        <template v-else-if="column.key === 'completionMode'">
+          {{ formatCompletionModeLabel(record.completionMode) }}
         </template>
         <template v-else-if="column.key === 'processConfig'">
           <div v-if="processConfigTags(record).length" class="config-tags">
@@ -110,10 +136,11 @@
 </template>
 
 <script setup>
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import ExecutorTagPicker from './ExecutorTagPicker.vue'
 import { validateWorkOrderDispatchReady } from '@/utils/workOrderDispatchHelpers'
+import { listAnyCompletionSteps, formatCompletionModeLabel } from '@/utils/processRouteGrid'
 import { getProcessByName } from '@/store/processConfigStore'
 import { normalizeReportMode } from '@/utils/reportMode'
 import {
@@ -143,9 +170,13 @@ watch(
   { immediate: true },
 )
 
+const anyStepGroups = computed(() => listAnyCompletionSteps(props.workOrder?.processes || []))
+
 const columns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '工序名称', key: 'process', width: 120 },
+  { title: '步骤', key: 'stepNo', width: 64, align: 'center' },
+  { title: '完成方式', key: 'completionMode', width: 88 },
   { title: '工序配置', key: 'processConfig', width: 360 },
   { title: '资源类型', key: 'resourceType', width: 90 },
   { title: '任务模式', key: 'executionMode', width: 96 },
@@ -154,6 +185,17 @@ const columns = [
   { title: '工序内容', key: 'processContent', width: 180 },
   { title: '操作', key: 'actions', width: 72, fixed: 'right' },
 ]
+
+function selectedIdsOf(group) {
+  return group.processes.filter((p) => p.includeInDispatch !== false).map((p) => p.id)
+}
+
+function onGroupSelect(group, ids) {
+  const set = new Set(ids || [])
+  group.processes.forEach((p) => {
+    p.includeInDispatch = set.has(p.id)
+  })
+}
 
 function processConfigTags(record) {
   return resolveWorkOrderProcessConfigTags(record)
@@ -212,6 +254,49 @@ function emitDispatchAndStart() {
 
 <style lang="less" scoped>
 .dispatch-tab {
+  .any-select-panel {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: #f6ffed;
+    border: 1px solid #b7eb8f;
+    border-radius: 6px;
+  }
+
+  .any-select-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.88);
+  }
+
+  .any-select-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+  }
+
+  .any-select-group {
+    margin-top: 10px;
+  }
+
+  .any-select-step {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: rgba(0, 0, 0, 0.65);
+  }
+
+  .any-select-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+
+  .proc-code {
+    margin-left: 4px;
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 12px;
+  }
+
   .process-table {
     margin-bottom: 12px;
   }

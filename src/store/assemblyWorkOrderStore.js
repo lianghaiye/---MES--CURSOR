@@ -1,6 +1,10 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { buildProcessesFromRoute, getDefaultProductRoute } from '@/mock/processRoutes'
+import {
+  buildProcessesFromRoute,
+  buildRouteDispatchSnapshot,
+  getDefaultProductRoute,
+} from '@/mock/processRoutes'
 import { syncWorkOrderBlankingMaterials } from '@/utils/blankingSettleMaterial'
 import {
   resolveOrderField,
@@ -20,6 +24,7 @@ import {
   getWorkOrderOperatorName,
 } from '@/utils/workOrderScheduleBatch'
 import { migrateWorkOrderStatusFields, canContinueSchedule } from '@/utils/workOrderStatus'
+import { persistJson } from '@/utils/safeStorage'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -54,7 +59,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: assemblyWorkOrderState.orders }))
+  persistJson(STORAGE_KEY, { orders: assemblyWorkOrderState.orders })
 }
 
 /** ZZGD + 年月日 + 3位流水 */
@@ -211,6 +216,9 @@ export function updateAssemblyWorkOrder(id, patch, options = {}) {
 
 export function createAssemblyWorkOrderPayload(partial) {
   const routeName = partial.processRouteName || getDefaultProductRoute(partial.productName)
+  const routeSnap = routeName
+    ? buildRouteDispatchSnapshot(routeName)
+    : { processes: [], stepPolicies: [] }
   const productName = partial.productName?.trim() || ''
   const existingCodes = assemblyWorkOrderState.orders.map((o) => o.code)
   const code = resolveOrderField(partial.code, () => generateAssemblyWorkOrderCode(existingCodes))
@@ -258,7 +266,8 @@ export function createAssemblyWorkOrderPayload(partial) {
     salesperson: partial.salesperson || '',
     componentLines: partial.componentLines || [],
     ebomSnapshot: partial.ebomSnapshot || null,
-    processes: routeName ? buildProcessesFromRoute(routeName) : [],
+    processes: routeSnap.processes,
+    stepPolicies: routeSnap.stepPolicies,
     scheduleBatches: Array.isArray(partial.scheduleBatches) ? partial.scheduleBatches : [],
     activeScheduleBatchId: partial.activeScheduleBatchId || '',
     createdAt: dayjs().format('YYYY-MM-DD'),

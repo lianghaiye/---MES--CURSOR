@@ -104,7 +104,7 @@
           审核
         </a-button>
         <a-button size="small" @click="handleBatchSubmit">批量提交</a-button>
-        <a-button size="small" @click="openToolbarPriceChangeApprove">审核价格变更</a-button>
+        <a-button size="small" @click="openToolbarPriceChangeApprove">审核订单变更</a-button>
         <a-button size="small" @click="openReceiptModal">
           <CheckCircleOutlined />
           生成收货单
@@ -118,6 +118,7 @@
           <CheckOutlined />
           完成
         </a-button>
+        <a-button size="small" danger @click="handleTerminate">终结</a-button>
         <a-dropdown>
           <a-button size="small">
             批量打印
@@ -362,6 +363,10 @@ import {
   approvePurchaseOrder,
   voidPurchaseOrder,
   completePurchaseOrder,
+  evaluatePurchaseOrderComplete,
+  canTerminatePurchaseOrder,
+  evaluatePurchaseOrderTerminate,
+  terminatePurchaseOrder,
   canEditPurchaseOrder,
   canApprovePurchaseOrder,
   canVoidPurchaseOrder,
@@ -481,7 +486,8 @@ const filteredList = computed(() => {
     待审核: 2,
     进行中: 3,
     已完成: 4,
-    已作废: 5,
+    已终结: 5,
+    已作废: 6,
   }
   return filterPurchaseOrders(purchaseOrderState.orders, f)
     .filter((o) => o.status !== '草稿')
@@ -534,6 +540,7 @@ function statusColor(status) {
     进行中: 'processing',
     已拒绝: 'error',
     已完成: 'success',
+    已终结: 'warning',
     已作废: 'default',
   }
   return map[status] || 'default'
@@ -556,6 +563,8 @@ function hasRowActions(record) {
   return (
     record.status === '草稿' ||
     record.status === '进行中' ||
+    record.status === '已完成' ||
+    record.status === '已终结' ||
     canEditPurchaseOrder(record) ||
     canSubmitPurchaseOrder(record) ||
     canWithdrawPurchaseOrder(record) ||
@@ -563,7 +572,9 @@ function hasRowActions(record) {
     canVoidPurchaseOrder(record) ||
     canGenerateReceipt(record) ||
     canGenerateInbound(record) ||
-    canApplyPurchasePriceChange(record)
+    canApplyPurchasePriceChange(record) ||
+    canCompletePurchaseOrder(record) ||
+    canTerminatePurchaseOrder(record)
   )
 }
 
@@ -769,12 +780,12 @@ function openInboundForRow(record) {
 }
 
 function rowPriceChangeLabel(order) {
-  return getPendingPurchasePriceChange(order?.id) ? '审核价格变更' : '价格变更'
+  return getPendingPurchasePriceChange(order?.id) ? '审核订单变更' : '订单变更'
 }
 
 function openPriceChangeForOrder(order) {
   if (!canApplyPurchasePriceChange(order)) {
-    message.warning('仅「进行中 / 已完成」的采购订单可申请价格变更')
+    message.warning('仅「进行中 / 已完成」的采购订单可申请订单变更')
     return
   }
   priceChangeOrder.value = order
@@ -783,7 +794,7 @@ function openPriceChangeForOrder(order) {
 
 function openToolbarPriceChangeApprove() {
   if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条待审核价格变更的采购订单')
+    message.warning('请勾选一条待审核订单变更的采购订单')
     return
   }
   const order = purchaseOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
@@ -792,7 +803,7 @@ function openToolbarPriceChangeApprove() {
     return
   }
   if (!getPendingPurchasePriceChange(order.id)) {
-    message.warning('所选采购单没有待审核的价格变更')
+    message.warning('所选采购单没有待审核的订单变更')
     return
   }
   priceChangeOrder.value = order
@@ -814,7 +825,7 @@ function openPurchaseReturnCreate(order) {
 
 function openPurchaseReturnFromToolbar() {
   if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条进行中的采购单后再采购退货')
+    message.warning('请勾选一条进行中、已完成或已终结的采购单后再采购退货')
     return
   }
   const order = purchaseOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
@@ -822,8 +833,8 @@ function openPurchaseReturnFromToolbar() {
     message.warning('未找到所选采购单')
     return
   }
-  if (order.status !== '进行中') {
-    message.warning('仅进行中的采购单可采购退货')
+  if (order.status !== '进行中' && order.status !== '已完成' && order.status !== '已终结') {
+    message.warning('仅进行中、已完成或已终结的采购单可采购退货')
     return
   }
   openPurchaseReturnCreate(order)
@@ -931,14 +942,134 @@ function handleComplete() {
     message.warning('请先选择要完成的采购单')
     return
   }
-  const targets = getPurchaseOrdersByIds(selectedRowKeys.value).filter(canCompletePurchaseOrder)
+  const selected = getPurchaseOrdersByIds(selectedRowKeys.value)
+  const targets = selected.filter(canCompletePurchaseOrder)
   if (!targets.length) {
-    message.warning('仅进行中的采购单可完成')
+    // 尽量给出第一条不可完成原因
+    const first = selected.find((o) => o.status === '进行中') || selected[0]
+    const gate = first ? evaluatePurchaseOrderComplete(first) : null
+    if (gate?.code === 'HAS_UNFINISHED_RELATED') {
+      Modal.warning({
+        title: '无法完成采购单',
+        content: gate.message,
+        okText: '知道了',
+      })
+      return
+    }
+    message.warning(gate?.message || '所选采购单均不可完成（需进行中且无未结清关联单）')
     return
   }
-  targets.forEach((o) => completePurchaseOrder(o.id))
-  message.success(`已完成 ${targets.length} 条采购单`)
-  selectedRowKeys.value = []
+
+  const shortCloseTargets = targets.filter((o) => evaluatePurchaseOrderComplete(o).shortClose)
+  const normalTargets = targets.filter((o) => !evaluatePurchaseOrderComplete(o).shortClose)
+
+  const runComplete = (list, confirmShortClose) => {
+    let okCount = 0
+    const blocked = []
+    list.forEach((o) => {
+      const result = completePurchaseOrder(o.id, { confirmShortClose })
+      if (result.ok) {
+        okCount += 1
+        return
+      }
+      blocked.push(`「${o.orderNo}」${result.message}`)
+    })
+    return { okCount, blocked }
+  }
+
+  const finishBatch = (normalResult, shortResult) => {
+    const okCount = (normalResult?.okCount || 0) + (shortResult?.okCount || 0)
+    const blocked = [...(normalResult?.blocked || []), ...(shortResult?.blocked || [])]
+    if (blocked.length) {
+      Modal.warning({
+        title: okCount ? `已完成 ${okCount} 条，其余无法完成` : '无法完成采购单',
+        content: blocked.join('\n'),
+        okText: '知道了',
+      })
+    } else if (okCount) {
+      message.success(`已完成 ${okCount} 条采购单`)
+    }
+    selectedRowKeys.value = []
+  }
+
+  const normalResult = normalTargets.length ? runComplete(normalTargets, false) : null
+
+  if (shortCloseTargets.length) {
+    Modal.confirm({
+      title: '短结完成确认',
+      content:
+        `有 ${shortCloseTargets.length} 条采购单入库数量不足采购数量。短结后入库数量将锁定，不可再更改。确认短结完成吗？\n` +
+        shortCloseTargets.map((o) => `· ${o.orderNo}`).join('\n'),
+      okText: '确认短结',
+      cancelText: '取消',
+      onOk: () => {
+        const shortResult = runComplete(shortCloseTargets, true)
+        finishBatch(normalResult, shortResult)
+      },
+      onCancel: () => {
+        if (normalResult) finishBatch(normalResult, null)
+        else selectedRowKeys.value = []
+      },
+    })
+    return
+  }
+
+  finishBatch(normalResult, null)
+}
+
+function handleTerminate() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择要终结的采购单')
+    return
+  }
+  const selected = getPurchaseOrdersByIds(selectedRowKeys.value)
+  const targets = selected.filter(canTerminatePurchaseOrder)
+  if (!targets.length) {
+    const first = selected.find((o) => o.status === '进行中') || selected[0]
+    const gate = first ? evaluatePurchaseOrderTerminate(first) : null
+    if (gate?.code === 'HAS_UNFINISHED_RELATED') {
+      Modal.warning({
+        title: '无法终结采购单',
+        content: gate.message,
+        okText: '知道了',
+      })
+      return
+    }
+    message.warning(gate?.message || '所选采购单均不可终结（需进行中、数量未结清且无未结清关联单）')
+    return
+  }
+
+  Modal.confirm({
+    title: '终结确认',
+    content:
+      `终结后订单不再继续，入库数量锁定且不进入结算。确认终结以下 ${targets.length} 条采购单吗？\n` +
+      targets.map((o) => `· ${o.orderNo}`).join('\n'),
+    okText: '确认终结',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: () => {
+      let okCount = 0
+      const blocked = []
+      targets.forEach((o) => {
+        const result = terminatePurchaseOrder(o.id, { confirmTerminate: true })
+        if (result.ok) {
+          okCount += 1
+          return
+        }
+        blocked.push(`「${o.orderNo}」${result.message}`)
+      })
+      if (blocked.length) {
+        Modal.warning({
+          title: okCount ? `已终结 ${okCount} 条，其余无法终结` : '无法终结采购单',
+          content: blocked.join('\n'),
+          okText: '知道了',
+        })
+      } else {
+        message.success(`已终结 ${okCount} 条采购单`)
+      }
+      selectedRowKeys.value = []
+    },
+  })
 }
 
 function onReceiptConfirmed() {

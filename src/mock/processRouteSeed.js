@@ -154,6 +154,28 @@ export function createProcessRouteSeed(getProcessIdByName) {
         [2, 1, p('质检')],
       ]),
     },
+    {
+      id: 'route-009',
+      code: 'GYLX0009',
+      name: '表面处理选做演示路线',
+      status: '使用中',
+      applyScope: '全部产品',
+      productDisplay: '',
+      remark: '第2步喷漆/包装为选做完成，下发时可勾选（可多选）',
+      grid: buildGrid([
+        [1, 1, p('下料')],
+        [2, 1, p('喷漆')],
+        [2, 2, p('包装')],
+        [3, 1, p('质检')],
+        [4, 1, p('入库')],
+      ]),
+      stepPolicies: [
+        { stepNo: 1, completionMode: 'all' },
+        { stepNo: 2, completionMode: 'any' },
+        { stepNo: 3, completionMode: 'all' },
+        { stepNo: 4, completionMode: 'all' },
+      ],
+    },
   ]
 
   return routes.map((r, i) => ({

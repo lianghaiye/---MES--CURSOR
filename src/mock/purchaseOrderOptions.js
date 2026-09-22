@@ -1,4 +1,12 @@
-export const poStatusOptions = ['待提交', '待审核', '已拒绝', '进行中', '已完成', '已作废']
+export const poStatusOptions = [
+  '待提交',
+  '待审核',
+  '已拒绝',
+  '进行中',
+  '已完成',
+  '已终结',
+  '已作废',
+]
 
 export const poSourceOptions = ['新增', '采购申请', '外购销售']
 

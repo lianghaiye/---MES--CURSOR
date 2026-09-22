@@ -5,6 +5,7 @@ import {
   createOutsourcingReceipt,
   generateOutsourcingReceiptNo,
 } from '@/mock/outsourcingReceipts'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_outsourcing_receipts'
 const SEED_VERSION_KEY = 'i_doms_outsourcing_receipts_seed_v'
@@ -31,8 +32,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ receipts: outsourcingReceiptState.receipts }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { receipts: outsourcingReceiptState.receipts })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function migrateLegacyInboundStatus(receipt) {

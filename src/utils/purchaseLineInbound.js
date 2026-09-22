@@ -122,8 +122,37 @@ export function calcPoLineReceivedQty(po, line) {
   return Math.max(fromField, fromOrders)
 }
 
+/**
+ * 采购行入库时填写的结算数量合计（有效入库单明细 settleQty 之和）
+ */
+export function calcPoLineInboundSettleQty(po, line) {
+  if (!po || !line) return 0
+  let total = 0
+  listInboundOrdersForPo(po).forEach((order) => {
+    ;(order.lineItems || []).forEach((li) => {
+      if (!lineIdMatches(li, line.id)) return
+      total += Number(li.settleQty) || 0
+    })
+  })
+  return total
+}
+
+/** 结算数量展示用单位：优先入库明细 settleUnit，否则采购行 settleUnit */
+export function resolvePoLineSettleUnit(po, line) {
+  if (!po || !line) return String(line?.settleUnit || '').trim()
+  for (const order of listInboundOrdersForPo(po)) {
+    for (const li of order.lineItems || []) {
+      if (!lineIdMatches(li, line.id)) continue
+      const u = String(li.settleUnit || '').trim()
+      if (u) return u
+    }
+  }
+  return String(line.settleUnit || '').trim()
+}
+
 /** 剩余可收货 / 可申请入库数量 */
 export function calcPoLineRemainInboundQty(po, line) {
+  if (line?.cancelled) return 0
   const purchaseQty = Number(line?.purchaseQty) || 0
   const applied = calcPoLineAppliedOccupyQty(po, line)
   const received = calcPoLineReceivedQty(po, line)
@@ -136,19 +165,59 @@ export function isPoLineOccupyFull(po, line) {
   return calcPoLineRemainInboundQty(po, line) <= 1e-9
 }
 
-/** 明细入库状态（按已确认入库） */
+/**
+ * 明细是否已生成过收货单或入库单（有效单据任一明细命中即 true）
+ * 用于订单变更「取消行」门控：有下游单据则不可取消
+ */
+export function poLineHasReceiptOrInboundDoc(po, line) {
+  if (!po || !line) return false
+  const lineId = line.id
+  if (!lineId) return false
+  for (const receipt of listPurchaseReceiptsForPo(po)) {
+    for (const li of receipt.lineItems || []) {
+      if (lineIdMatches(li, lineId)) return true
+    }
+  }
+  for (const order of listInboundOrdersForPo(po)) {
+    for (const li of order.lineItems || []) {
+      if (lineIdMatches(li, lineId)) return true
+    }
+  }
+  return false
+}
+
+/** 明细入库状态（按已确认入库；入库+已完成退货结清也视为已入库） */
 export function calcPoLineInboundStatus(po, line) {
+  if (line?.cancelled) return '已入库'
   const purchaseQty = Number(line?.purchaseQty) || 0
   const received = calcPoLineReceivedQty(po, line)
-  if (purchaseQty <= 0 || received <= 0) return '待入库'
+  if (purchaseQty <= 0) return '待入库'
+  if (received <= 0) {
+    // 仅退货结清（无入库）仍算已结清行
+    try {
+      // eslint-disable-next-line global-require
+      const { calcPoLineCompletedReturnQty } = require('@/utils/orderReturnLines')
+      if (calcPoLineCompletedReturnQty(po, line) >= purchaseQty - 1e-9) return '已入库'
+    } catch {
+      /* ignore */
+    }
+    return '待入库'
+  }
   if (received >= purchaseQty - 1e-9) return '已入库'
+  try {
+    // eslint-disable-next-line global-require
+    const { calcPoLineCompletedReturnQty } = require('@/utils/orderReturnLines')
+    if (received + calcPoLineCompletedReturnQty(po, line) >= purchaseQty - 1e-9) return '已入库'
+  } catch {
+    /* ignore */
+  }
   return '部分入库'
 }
 
 /** 整单入库状态 */
 export function calcPoHeaderInboundStatus(po) {
-  const lines = po?.lineItems || []
-  if (!lines.length) return '待入库'
+  const lines = (po?.lineItems || []).filter((l) => !l.cancelled)
+  if (!lines.length) return '已入库'
   const statuses = lines.map((l) => calcPoLineInboundStatus(po, l))
   if (statuses.every((s) => s === '已入库')) return '已入库'
   if (statuses.every((s) => s === '待入库')) return '待入库'

@@ -2,12 +2,15 @@
   <a-modal
     :open="open"
     title="生成质检单"
-    width="1100px"
+    width="96%"
     :mask-closable="false"
     destroy-on-close
     :confirm-loading="saving"
     ok-text="确认"
     cancel-text="取消"
+    class="generate-incoming-qc-modal"
+    wrap-class-name="generate-incoming-qc-modal-wrap"
+    :style="{ top: '24px' }"
     @cancel="handleCancel"
     @ok="handleOk"
   >
@@ -51,15 +54,8 @@
       </a-form>
     </div>
 
-    <div class="section-block">
+    <div class="section-block modal-basic-card">
       <div class="section-title">质检清单（{{ lines.length }}）</div>
-      <a-alert
-        type="info"
-        show-icon
-        class="tpl-tip"
-        message="确认后按各物料分别匹配质检模板并冻结；不同物料可使用不同模板。"
-        style="margin-bottom: 10px"
-      />
       <a-table
         :columns="columns"
         :data-source="lines"
@@ -67,7 +63,7 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 1100 }"
+        :scroll="{ x: 1220 }"
         :locale="{ emptyText: '暂无明细，请从收货单重新打开' }"
       >
         <template #bodyCell="{ column, record, index }">
@@ -86,6 +82,16 @@
           </template>
           <template v-else-if="column.key === 'warehouse'">
             {{ record.receivingWarehouse || record.warehouse || '—' }}
+          </template>
+          <template v-else-if="column.key === 'inboundQcRequirement'">
+            <a-select
+              v-model:value="record.inboundQcRequirement"
+              size="small"
+              style="width: 100%"
+              placeholder="请选择"
+              allow-clear
+              :options="inboundQcOpts"
+            />
           </template>
           <template v-else-if="column.key === 'action'">
             <a-button
@@ -114,11 +120,15 @@ import { createInboundQcFromReceipt } from '@/store/qcTaskStore'
 import {
   attachReceiptQcSheet as attachPurchaseReceiptQcSheet,
   hasReceiptQcSheet as hasPurchaseReceiptQcSheet,
+  updatePurchaseReceipt,
 } from '@/store/purchaseReceiptStore'
 import {
   attachReceiptQcSheet as attachOutsourcingReceiptQcSheet,
   hasReceiptQcSheet as hasOutsourcingReceiptQcSheet,
+  updateOutsourcingReceipt,
 } from '@/store/outsourcingReceiptStore'
+import { inboundQcOptions } from '@/mock/materialInfoOptions'
+import { resolveEditableInboundQcRequirement } from '@/utils/inboundQcRequirement'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -139,6 +149,7 @@ const form = reactive({
 const isOutsourcing = computed(() => props.bizScope === '外协回货检')
 const qcTypeLabel = computed(() => (isOutsourcing.value ? '外协回货检' : '来料质检'))
 const receiptNo = computed(() => props.receipt?.receiptNo || '—')
+const inboundQcOpts = inboundQcOptions.map((v) => ({ label: v, value: v }))
 
 const columns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
@@ -150,6 +161,7 @@ const columns = [
   { title: '采购数量', key: 'purchaseQty', width: 110, align: 'right' },
   { title: '收货数量', key: 'receiptQty', width: 110, align: 'right' },
   { title: '收货仓库', key: 'warehouse', width: 110, ellipsis: true },
+  { title: '入库质检要求', key: 'inboundQcRequirement', width: 120 },
   { title: '操作', key: 'action', width: 96, fixed: 'right', align: 'center' },
 ]
 
@@ -170,6 +182,7 @@ function cloneLines(receipt) {
       purchaseQty: l.purchaseQty ?? l.planQty,
       receiptQty: l.receiptQty ?? l.qty,
       receivingWarehouse: l.receivingWarehouse || l.warehouse || '',
+      inboundQcRequirement: resolveEditableInboundQcRequirement(l),
     }))
 }
 
@@ -218,6 +231,21 @@ function handleCancel() {
   emit('update:open', false)
 }
 
+function syncReceiptLineQcRequirement() {
+  const receipt = props.receipt
+  if (!receipt?.id) return
+  const byId = new Map(lines.value.map((l) => [String(l.id), l.inboundQcRequirement]))
+  const nextLines = (receipt.lineItems || []).map((l) => {
+    if (!byId.has(String(l.id))) return l
+    return { ...l, inboundQcRequirement: byId.get(String(l.id)) || '' }
+  })
+  if (isOutsourcing.value) {
+    updateOutsourcingReceipt(receipt.id, { lineItems: nextLines })
+  } else {
+    updatePurchaseReceipt(receipt.id, { lineItems: nextLines })
+  }
+}
+
 async function handleOk() {
   if (!props.receipt) {
     message.warning('未找到收货单')
@@ -253,6 +281,8 @@ async function handleOk() {
       message.warning(res.message || '生成失败')
       return Promise.reject()
     }
+
+    syncReceiptLineQcRequirement()
 
     const attach = isOutsourcing.value
       ? attachOutsourcingReceiptQcSheet
@@ -291,10 +321,10 @@ async function handleOk() {
 }
 
 .basic-form {
-  padding: 12px 14px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
 
   :deep(.remark-item) {
     width: 100%;
@@ -312,6 +342,19 @@ async function handleOk() {
     textarea {
       width: 100%;
     }
+  }
+}
+</style>
+
+<style lang="less">
+.generate-incoming-qc-modal-wrap {
+  .ant-modal {
+    max-width: 1440px;
+  }
+
+  .ant-modal-body {
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
   }
 }
 </style>

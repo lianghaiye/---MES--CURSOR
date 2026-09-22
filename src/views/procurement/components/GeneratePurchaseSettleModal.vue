@@ -120,11 +120,13 @@ const selectedKeys = ref([])
 const saving = ref(false)
 
 const poOpts = computed(() =>
-  purchaseOrderState.orders.map((o) => ({
-    label: `${o.orderNo} · ${o.supplier || ''}`,
-    value: o.id,
-    searchText: `${o.orderNo} ${o.supplier || ''}`,
-  })),
+  purchaseOrderState.orders
+    .filter((o) => o.status === '已完成')
+    .map((o) => ({
+      label: `${o.orderNo} · ${o.supplier || ''}`,
+      value: o.id,
+      searchText: `${o.orderNo} ${o.supplier || ''}`,
+    })),
 )
 
 const columns = [

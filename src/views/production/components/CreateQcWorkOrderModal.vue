@@ -101,7 +101,7 @@ import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { bomOptions } from '@/mock/workOrderMaster'
 import { createQcWorkOrderPayload, qcWorkOrderState } from '@/store/qcWorkOrderStore'
 import { isDuplicateOrderCode, generateQcWorkOrderName } from '@/utils/workOrderNaming'
-import { buildProcessesFromRoute, getActiveRouteOptions } from '@/mock/processRoutes'
+import { buildRouteDispatchSnapshot, getActiveRouteOptions } from '@/mock/processRoutes'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 
@@ -239,6 +239,12 @@ function handleSubmit() {
 
   if (isEdit.value) {
     const routeChanged = props.editRecord.processRouteName !== form.processRouteName
+    const routePatch = routeChanged
+      ? (() => {
+          const snap = buildRouteDispatchSnapshot(form.processRouteName)
+          return { processes: snap.processes, stepPolicies: snap.stepPolicies }
+        })()
+      : {}
     emit('updated', {
       id: props.editRecord.id,
       patch: {
@@ -255,7 +261,7 @@ function handleSubmit() {
         urgency: form.urgency,
         planDateRange,
         remark: form.remark,
-        ...(routeChanged ? { processes: buildProcessesFromRoute(form.processRouteName) } : {}),
+        ...routePatch,
       },
     })
     message.success('质检工单已更新')

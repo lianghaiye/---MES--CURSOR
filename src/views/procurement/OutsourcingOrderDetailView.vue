@@ -55,7 +55,7 @@
                 size="small"
                 @click="handlePriceChange"
               >
-                {{ pendingPriceChange ? '审核价格变更' : '价格变更' }}
+                {{ pendingPriceChange ? '审核订单变更' : '订单变更' }}
               </a-button>
               <a-dropdown>
                 <a-button size="small">
@@ -79,7 +79,7 @@
               class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
             >
               <a-tab-pane key="basic" tab="基本信息" />
-              <a-tab-pane key="price-change" :tab="`价格变更 (${priceChangeCount})`" />
+              <a-tab-pane key="price-change" :tab="`订单变更 (${priceChangeCount})`" />
               <a-tab-pane key="issue" :tab="`发料信息 (${issueApplicationRows.length})`" />
               <a-tab-pane key="return" :tab="`回货信息 (${relatedInboundLines.length})`" />
               <a-tab-pane key="qc" :tab="`质检信息 (${relatedQcRecords.length})`" />
@@ -95,7 +95,7 @@
             type="warning"
             show-icon
             class="pending-price-alert"
-            :message="`价格变更「${pendingPriceChange.changeNo}」待审核，通过前不可收货 / 入库 / 结算。`"
+            :message="`订单变更「${pendingPriceChange.changeNo}」待审核，通过前不可收货 / 入库 / 结算。`"
             style="margin-bottom: 12px"
           />
           <template v-if="activeTab === 'basic'">
@@ -115,11 +115,18 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :row-class-name="(record) => (record.cancelled ? 'line-cancelled' : '')"
                 :scroll="{ x: lineTableScrollX }"
                 :locale="{ emptyText: '暂无外协明细' }"
               >
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'productName'">
+                    <span>{{ line.productName || '—' }}</span>
+                    <a-tag v-if="line.cancelled" color="default" class="cancelled-tag"
+                      >已取消</a-tag
+                    >
+                  </template>
                   <template v-else-if="column.key === 'stockQty'">
                     {{ formatQty(line.stockQty) }}
                   </template>
@@ -172,7 +179,7 @@
               <a-empty v-else description="暂无审批记录" />
             </DetailSectionCard>
 
-            <DetailSectionCard title="价格变更审批">
+            <DetailSectionCard title="订单变更审批">
               <a-divider style="margin: 12px 0" />
               <div v-if="priceChangeApprovalGroups.length">
                 <div
@@ -202,12 +209,12 @@
                   </div>
                 </div>
               </div>
-              <a-empty v-else description="暂无价格变更审批记录" />
+              <a-empty v-else description="暂无订单变更审批记录" />
             </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'price-change'">
-            <DetailSectionCard title="价格变更履历">
+            <DetailSectionCard title="订单变更履历">
               <OutsourcingPriceChangeHistoryPanel :order="record" />
             </DetailSectionCard>
           </template>
@@ -515,7 +522,7 @@ const listPath = '/procurement/outsourcing-orders'
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
-  { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true },
+  { title: '产品名称', key: 'productName', dataIndex: 'productName', width: 140, ellipsis: true },
   { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
   { title: '变体属性', dataIndex: 'variantSummary', width: 120, ellipsis: true },
@@ -795,7 +802,7 @@ function handleComplete() {
 function handlePriceChange() {
   if (!record.value) return
   if (!canApplyOutsourcingPriceChange(record.value)) {
-    message.warning('仅「进行中 / 已完成」的外协订单可申请价格变更')
+    message.warning('仅「进行中 / 已完成」的外协订单可申请订单变更')
     return
   }
   priceChangeOrder.value = record.value
@@ -994,5 +1001,16 @@ function openExceptionCreate() {
 .muted {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
+}
+
+.cancelled-tag {
+  margin-left: 6px;
+}
+
+:deep(.line-cancelled) {
+  color: rgba(0, 0, 0, 0.35);
+  td {
+    background: #fafafa !important;
+  }
 }
 </style>

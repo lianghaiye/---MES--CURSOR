@@ -6,9 +6,11 @@ import dayjs from 'dayjs'
 import { getPurchaseOrderById, recalcPoLine } from '@/store/purchaseOrderStore'
 import { recalcPurchaseOrderTotals } from '@/mock/purchaseOrders'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
+import { poLineHasReceiptOrInboundDoc } from '@/utils/purchaseLineInbound'
 import {
   PURCHASE_PRICE_CHANGE_NO_PREFIX,
   PURCHASE_PRICE_CHANGE_STATUS,
+  isPurchasePriceChangeLineChanged,
   normalizePurchasePriceChangeRecord,
   recalcPurchasePriceChangeLine,
   summarizePurchasePriceChangeLines,
@@ -115,7 +117,7 @@ export function getPendingPurchasePriceChange(purchaseOrderId) {
 export function getPendingPurchasePriceChangeBlock(purchaseOrderId, actionLabel = '继续操作') {
   const pending = getPendingPurchasePriceChange(purchaseOrderId)
   if (!pending) return ''
-  return `存在待审核的价格变更「${pending.changeNo}」，请先完成审核后再${actionLabel}`
+  return `存在待审核的订单变更「${pending.changeNo}」，请先完成审核后再${actionLabel}`
 }
 
 export function canApplyPurchasePriceChange(order) {
@@ -132,17 +134,27 @@ export function submitPurchasePriceChange({
   operator = 'admin1',
 }) {
   if (!canApplyPurchasePriceChange(purchaseOrder)) {
-    return { ok: false, message: '仅「进行中 / 已完成」的采购订单可申请价格变更' }
+    return { ok: false, message: '仅「进行中 / 已完成」的采购订单可申请订单变更' }
   }
   if (getPendingPurchasePriceChange(purchaseOrder.id)) {
-    return { ok: false, message: '已有待审核的价格变更，请先完成审核' }
+    return { ok: false, message: '已有待审核的订单变更，请先完成审核' }
   }
   const prepared = (lines || []).map((row) =>
     recalcPurchasePriceChangeLine({ ...row }, { taxModeExcluding: taxModeExcluding !== false }),
   )
+  for (const row of prepared) {
+    if (!row.cancelled || row.oldCancelled) continue
+    const line = findPoLineForPriceChange(purchaseOrder, row)
+    if (line && poLineHasReceiptOrInboundDoc(purchaseOrder, line)) {
+      return {
+        ok: false,
+        message: `明细「${row.productName || row.productCode || row.poLineId}」已生成收货单或入库单，无法取消行`,
+      }
+    }
+  }
   const summary = summarizePurchasePriceChangeLines(prepared)
   if (!summary.changedCount) {
-    return { ok: false, message: '请至少修改一行单价' }
+    return { ok: false, message: '请至少修改一行单价或取消一行' }
   }
   if (!reasonType) {
     return { ok: false, message: '请选择变更原因' }
@@ -186,11 +198,11 @@ export function submitPurchasePriceChange({
       ok: true,
       record: approved.change,
       autoApproved: true,
-      message: '价格变更已自动审批通过，订单有效价已更新',
+      message: '订单变更已自动审批通过，订单信息已更新',
     }
   }
 
-  return { ok: true, record, message: '价格变更已提交审核' }
+  return { ok: true, record, message: '订单变更已提交审核' }
 }
 
 function findPoLineForPriceChange(order, row) {
@@ -212,30 +224,40 @@ function applyApprovedPrices(change) {
   let appliedCount = 0
   for (const row of change.lines || []) {
     const line = findPoLineForPriceChange(order, row)
-    if (!line) continue
-    const newEx = Number(row.newUnitPriceExTax)
-    const oldEx = Number(row.oldUnitPriceExTax)
-    const newIn = Number(row.newUnitPriceInTax)
-    const oldIn = Number(row.oldUnitPriceInTax)
-    const priceChanged =
-      (Number.isFinite(newEx) && Math.abs(newEx - oldEx) > 1e-9) ||
-      (Number.isFinite(newIn) && Math.abs(newIn - oldIn) > 1e-9)
-    if (!priceChanged) continue
-    if (taxModeExcluding) {
-      line.unitPriceExTax = newEx
-    } else {
-      const rate = Number(line.taxRate) || 0
-      const inTax = Number.isFinite(newIn) ? newIn : Number(line.unitPriceInTax) || 0
-      line.unitPriceInTax = inTax
-      line.unitPriceExTax = rate >= 0 ? Math.round((inTax / (1 + rate / 100)) * 100) / 100 : inTax
+    if (!line || !isPurchasePriceChangeLineChanged(row)) continue
+
+    line.cancelled = Boolean(row.cancelled)
+    if (row.cancelled) {
+      line.purchaseQty = 0
+      if (line.settleQty != null) line.settleQty = 0
+    } else if (row.newPurchaseQty != null && Number.isFinite(Number(row.newPurchaseQty))) {
+      line.purchaseQty = Number(row.newPurchaseQty) || 0
     }
+
+    const priceChanged =
+      Math.abs((Number(row.newUnitPriceExTax) || 0) - (Number(row.oldUnitPriceExTax) || 0)) >
+        1e-9 ||
+      Math.abs((Number(row.newUnitPriceInTax) || 0) - (Number(row.oldUnitPriceInTax) || 0)) > 1e-9
+
+    if (priceChanged && !row.cancelled) {
+      if (taxModeExcluding) {
+        const newEx = Number(row.newUnitPriceExTax)
+        if (Number.isFinite(newEx)) line.unitPriceExTax = newEx
+      } else {
+        const rate = Number(line.taxRate) || 0
+        const newIn = Number(row.newUnitPriceInTax)
+        const inTax = Number.isFinite(newIn) ? newIn : Number(line.unitPriceInTax) || 0
+        line.unitPriceInTax = inTax
+        line.unitPriceExTax = rate >= 0 ? Math.round((inTax / (1 + rate / 100)) * 100) / 100 : inTax
+      }
+    }
+
     recalcPoLine(line)
-    // 同步变更单上的行 id，避免后续再审/履历对不上
     row.poLineId = line.id
     appliedCount += 1
   }
   if (!appliedCount) {
-    return { ok: false, message: '未能回写订单单价（未匹配到采购明细行），请重新发起价格变更' }
+    return { ok: false, message: '未能回写订单（未匹配到采购明细行），请重新发起订单变更' }
   }
   recalcPurchaseOrderTotals(order)
   order.updater = change.approver || change.submitter || order.updater || 'admin1'
@@ -247,7 +269,7 @@ function applyApprovedPrices(change) {
 
 export function approvePurchasePriceChange(id, operator = 'admin1', opinion = '', extra = {}) {
   const change = purchasePriceChangeState.orders.find((o) => o.id === id)
-  if (!change) return { ok: false, message: '价格变更单不存在' }
+  if (!change) return { ok: false, message: '订单变更单不存在' }
   if (change.status !== PURCHASE_PRICE_CHANGE_STATUS.PENDING) {
     return { ok: false, message: '仅待审核单据可通过' }
   }
@@ -259,12 +281,12 @@ export function approvePurchasePriceChange(id, operator = 'admin1', opinion = ''
   change.opinion = opinion || '同意'
   change.autoApproved = Boolean(extra.autoApproved)
   persist()
-  return { ok: true, change, message: '价格变更已通过，订单有效价已更新' }
+  return { ok: true, change, message: '订单变更已通过，订单信息已更新' }
 }
 
 export function rejectPurchasePriceChange(id, operator = 'admin1', opinion = '') {
   const change = purchasePriceChangeState.orders.find((o) => o.id === id)
-  if (!change) return { ok: false, message: '价格变更单不存在' }
+  if (!change) return { ok: false, message: '订单变更单不存在' }
   if (change.status !== PURCHASE_PRICE_CHANGE_STATUS.PENDING) {
     return { ok: false, message: '仅待审核单据可驳回' }
   }
@@ -273,5 +295,5 @@ export function rejectPurchasePriceChange(id, operator = 'admin1', opinion = '')
   change.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
   change.opinion = opinion || '驳回'
   persist()
-  return { ok: true, change, message: '价格变更已驳回' }
+  return { ok: true, change, message: '订单变更已驳回' }
 }

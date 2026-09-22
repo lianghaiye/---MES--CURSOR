@@ -50,6 +50,17 @@ export function listReturnLinesForPurchaseOrder(po) {
  * 采购订单行累计退货数量（有效退货单；优先 poLineId，其次产品编号）
  */
 export function calcPoLineReturnQty(po, line) {
+  return sumPoLineReturnQty(po, line, () => true)
+}
+
+/**
+ * 仅统计「已完成」退货单数量（用于入库+退货结清判定）
+ */
+export function calcPoLineCompletedReturnQty(po, line) {
+  return sumPoLineReturnQty(po, line, (ret) => ret.status === '已完成')
+}
+
+function sumPoLineReturnQty(po, line, retFilter) {
   if (!po || !line) return 0
   void purchaseReturnState.returns
   const lineId = line.id
@@ -58,6 +69,7 @@ export function calcPoLineReturnQty(po, line) {
   ;(purchaseReturnState.returns || []).forEach((ret) => {
     if (
       !isActivePurchaseReturn(ret) ||
+      (typeof retFilter === 'function' && !retFilter(ret)) ||
       !(
         (po.id && ret.purchaseOrderId === po.id) ||
         (po.orderNo && ret.purchaseOrderNo === po.orderNo)

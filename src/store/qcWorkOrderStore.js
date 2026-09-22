@@ -1,6 +1,10 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
-import { buildProcessesFromRoute, getDefaultProductRoute } from '@/mock/processRoutes'
+import {
+  buildProcessesFromRoute,
+  buildRouteDispatchSnapshot,
+  getDefaultProductRoute,
+} from '@/mock/processRoutes'
 import {
   resolveOrderField,
   generateQcWorkOrderCode,
@@ -8,6 +12,7 @@ import {
 } from '@/utils/workOrderNaming'
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { createLaborDemoQcOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
+import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_qc_work_orders'
 let codeSeq = 1
@@ -26,7 +31,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: qcWorkOrderState.orders }))
+  persistJson(STORAGE_KEY, { orders: qcWorkOrderState.orders })
 }
 
 /** ZJGD + 6位年月日 + 3位流水，如 ZJGD20250528001 */
@@ -162,6 +167,7 @@ export function updateQcWorkOrder(id, patch) {
 
 export function createQcWorkOrderPayload(partial) {
   const routeName = partial.processRouteName || getDefaultProductRoute(partial.productName)
+  const routeSnap = buildRouteDispatchSnapshot(routeName)
   const productName = partial.productName?.trim() || ''
   const existingCodes = qcWorkOrderState.orders.map((o) => o.code)
   const code = resolveOrderField(partial.code, () => generateQcWorkOrderCode(existingCodes))
@@ -188,7 +194,8 @@ export function createQcWorkOrderPayload(partial) {
     processRouteName: routeName,
     source: partial.source || 'manual',
     sourceOrderNo: partial.sourceOrderNo || '',
-    processes: buildProcessesFromRoute(routeName),
+    processes: routeSnap.processes,
+    stepPolicies: routeSnap.stepPolicies,
     createdAt: dayjs().format('YYYY-MM-DD'),
   }
 }

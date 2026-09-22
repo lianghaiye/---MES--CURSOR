@@ -1,5 +1,43 @@
 /** 外协回货/入库占用（与采购入库进度口径类似） */
 
+import { outsourcingReceiptState } from '@/store/outsourcingReceiptStore'
+
+function getInboundOrdersByOutsourcingOrderFn() {
+  // eslint-disable-next-line global-require
+  const { getInboundOrdersByOutsourcingOrder } = require('@/store/inboundOrderStore')
+  return getInboundOrdersByOutsourcingOrder
+}
+
+function lineIdMatches(row, lineId) {
+  if (!lineId) return false
+  return (
+    row.wxLineId === lineId || row.poLineId === lineId || row.lineId === lineId || row.id === lineId
+  )
+}
+
+function isActiveOutsourcingReceipt(receipt) {
+  if (!receipt) return false
+  const status = receipt.receiptStatus || ''
+  return status !== '已作废' && status !== '作废' && status !== '已取消'
+}
+
+function isActiveInboundOrder(order) {
+  if (!order) return false
+  const status = order.status || ''
+  return status !== '已作废' && status !== '已取消'
+}
+
+function listOutsourcingReceiptsForOrder(order) {
+  if (!order) return []
+  return (outsourcingReceiptState.receipts || []).filter(
+    (r) =>
+      isActiveOutsourcingReceipt(r) &&
+      (r.outsourcingOrderId === order.id ||
+        r.outsourcingOrderNo === order.orderNo ||
+        r.purchaseOrderId === order.id),
+  )
+}
+
 export function calcWxLineReceivedQty(order, line) {
   return Number(line?.receivedQty) || 0
 }
@@ -11,6 +49,7 @@ export function calcWxLineAppliedOccupyQty(order, line) {
 }
 
 export function calcWxLineRemainInboundQty(order, line) {
+  if (line?.cancelled) return 0
   const planQty = Number(line?.planQty) || 0
   const used = calcWxLineAppliedOccupyQty(order, line)
   return Math.max(0, planQty - used)
@@ -20,7 +59,37 @@ export function isWxLineOccupyFull(order, line) {
   return calcWxLineRemainInboundQty(order, line) <= 1e-9
 }
 
+/**
+ * 明细是否已生成过收货单或入库单（有效单据任一明细命中，或行上已有回货占用）
+ * 用于订单变更「取消行」门控
+ */
+export function wxLineHasReceiptOrInboundDoc(order, line) {
+  if (!order || !line) return false
+  const lineId = line.id
+  if ((Number(line.receivedQty) || 0) > 1e-9) return true
+  if ((Number(line.appliedReceiptQty) || 0) > 1e-9) return true
+  if (!lineId) return false
+  for (const receipt of listOutsourcingReceiptsForOrder(order)) {
+    for (const li of receipt.lineItems || []) {
+      if (lineIdMatches(li, lineId)) return true
+    }
+  }
+  try {
+    const listFn = getInboundOrdersByOutsourcingOrderFn()
+    for (const inbound of listFn(order) || []) {
+      if (!isActiveInboundOrder(inbound)) continue
+      for (const li of inbound.lineItems || []) {
+        if (lineIdMatches(li, lineId)) return true
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return false
+}
+
 export function calcWxLineReturnStatus(order, line) {
+  if (line?.cancelled) return '已入库'
   const planQty = Number(line?.planQty) || 0
   const received = calcWxLineReceivedQty(order, line)
   if (planQty <= 0 || received <= 0) return '待入库'
@@ -29,8 +98,8 @@ export function calcWxLineReturnStatus(order, line) {
 }
 
 export function calcWxHeaderReturnStatus(order) {
-  const lines = order?.lineItems || []
-  if (!lines.length) return '待入库'
+  const lines = (order?.lineItems || []).filter((l) => !l.cancelled)
+  if (!lines.length) return '已入库'
   const statuses = lines.map((l) => calcWxLineReturnStatus(order, l))
   if (statuses.every((s) => s === '已入库')) return '已入库'
   if (statuses.every((s) => s === '待入库')) return '待入库'
@@ -50,6 +119,7 @@ export function calcWxLineAppliedIssueQty(order, line) {
 }
 
 export function calcWxLineRemainIssueQty(order, line) {
+  if (line?.cancelled) return 0
   const planQty = Number(line?.planQty) || 0
   const used = calcWxLineAppliedIssueQty(order, line)
   return Math.max(0, planQty - used)
@@ -60,8 +130,8 @@ export function isWxLineIssueFull(order, line) {
 }
 
 export function calcWxHeaderIssueStatus(order) {
-  const lines = order?.lineItems || []
-  if (!lines.length) return '待出库'
+  const lines = (order?.lineItems || []).filter((l) => !l.cancelled)
+  if (!lines.length) return '已出库'
   const plan = lines.reduce((s, l) => s + (Number(l.planQty) || 0), 0)
   const applied = lines.reduce((s, l) => s + calcWxLineAppliedIssueQty(order, l), 0)
   if (plan <= 0 || applied <= 0) return '待出库'

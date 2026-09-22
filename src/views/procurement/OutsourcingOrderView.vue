@@ -159,7 +159,7 @@
           审核
         </a-button>
         <a-button size="small" @click="handleBatchSubmit">批量提交</a-button>
-        <a-button size="small" @click="openToolbarPriceChangeApprove">审核价格变更</a-button>
+        <a-button size="small" @click="openToolbarPriceChangeApprove">审核订单变更</a-button>
         <a-button size="small" @click="handleGenerateIssue">
           <ExportOutlined />
           生成发料出库单
@@ -787,12 +787,12 @@ function openInboundForRow(record) {
 }
 
 function rowPriceChangeLabel(order) {
-  return getPendingOutsourcingPriceChange(order?.id) ? '审核价格变更' : '价格变更'
+  return getPendingOutsourcingPriceChange(order?.id) ? '审核订单变更' : '订单变更'
 }
 
 function openPriceChangeForOrder(order) {
   if (!canApplyOutsourcingPriceChange(order)) {
-    message.warning('仅「进行中 / 已完成」的外协订单可申请价格变更')
+    message.warning('仅「进行中 / 已完成」的外协订单可申请订单变更')
     return
   }
   priceChangeOrder.value = order
@@ -801,7 +801,7 @@ function openPriceChangeForOrder(order) {
 
 function openToolbarPriceChangeApprove() {
   if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条待审核价格变更的外协订单')
+    message.warning('请勾选一条待审核订单变更的外协订单')
     return
   }
   const order = outsourcingOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
@@ -810,7 +810,7 @@ function openToolbarPriceChangeApprove() {
     return
   }
   if (!getPendingOutsourcingPriceChange(order.id)) {
-    message.warning('所选外协单没有待审核的价格变更')
+    message.warning('所选外协单没有待审核的订单变更')
     return
   }
   priceChangeOrder.value = order

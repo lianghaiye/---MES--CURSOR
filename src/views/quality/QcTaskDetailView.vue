@@ -220,7 +220,11 @@ import { formatQty } from '@/utils/numberFormat'
 import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
 import { isProductionQcScope, resolveProductionQcHeader } from '@/utils/qcProductionContext'
 import { evaluateQcInboundGate, resolveSourceReceiptForQcTask } from '@/utils/qcInboundFromReceipt'
-import { canGenerateInbound, getPurchaseOrderById } from '@/store/purchaseOrderStore'
+import {
+  canGenerateInbound,
+  explainCannotGenerateReceiptOrInbound,
+  getPurchaseOrderById,
+} from '@/store/purchaseOrderStore'
 import {
   canGenerateOutsourcingInbound,
   getOutsourcingOrderById,
@@ -512,7 +516,7 @@ function openGeneratePurchaseInbound(row, gate) {
   }
   const po = getPurchaseOrderById(receipt.purchaseOrderId)
   if (!po || !canGenerateInbound(po)) {
-    message.warning('关联采购单不可生成入库单')
+    message.warning(explainCannotGenerateReceiptOrInbound(po, '入库') || '关联采购单不可生成入库单')
     return
   }
   inboundOrders.value = [po]

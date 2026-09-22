@@ -280,7 +280,7 @@ watch(
     lineScope.value = 'pending'
     inboundLines.value = sourceOrders.value.flatMap((order) =>
       (order.lineItems || [])
-        .filter((l) => (Number(l.planQty) || 0) > 0)
+        .filter((l) => !l.cancelled && (Number(l.planQty) || 0) > 0)
         .map((l) => buildLine(order, l)),
     )
     applyQcQtyHintsToInboundLines(inboundLines.value, props.qcQtyHints, {

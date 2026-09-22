@@ -19,6 +19,7 @@ import {
 } from '@/store/functionParamStore'
 import { buildWorkOrderCompletionDeductDraft } from '@/utils/backflushDeduct'
 import { ensureCrossDemoDeductRecords } from '@/mock/crossModuleDemoSeed'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_material_requisition'
 const SEED_VERSION_KEY = 'i_doms_material_requisition_seed_v'
@@ -234,40 +235,12 @@ function shouldReseed() {
   return localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION
 }
 
-function isQuotaExceededError(err) {
-  if (!err) return false
-  return (
-    err.name === 'QuotaExceededError' ||
-    err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
-    err.code === 22 ||
-    err.code === 1014
-  )
-}
-
 function persist() {
-  const payload = JSON.stringify({
+  const ok = persistJson(STORAGE_KEY, {
     records: materialRequisitionState.records,
     stats: materialRequisitionState.stats,
   })
-  try {
-    localStorage.setItem(STORAGE_KEY, payload)
-    localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
-    return
-  } catch (err) {
-    if (!isQuotaExceededError(err)) return
-  }
-  // 配额不足：清掉本 key 再写；仍失败则放弃持久化，不抛错打断页面操作
-  try {
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.setItem(STORAGE_KEY, payload)
-    localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
-  } catch {
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-    } catch {
-      /* ignore */
-    }
-  }
+  if (ok) safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function createInitial() {

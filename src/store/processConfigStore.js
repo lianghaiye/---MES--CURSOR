@@ -12,6 +12,7 @@ import { getActiveCategoryNames } from '@/store/processCategoryStore'
 import { normalizeReportMode } from '@/utils/reportMode'
 import { normalizeTaskExecutionMode } from '@/utils/taskExecutionMode'
 import { defaultQcConfigsFromOperations, normalizeProcessQcConfigs } from '@/utils/qcProcessConfig'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_process_config'
 const SEED_VERSION_KEY = 'i_doms_process_config_seed_v'
@@ -45,8 +46,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ processes: processConfigState.processes }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { processes: processConfigState.processes })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function normalizeOperations(ops = {}) {

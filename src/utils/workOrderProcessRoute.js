@@ -1,7 +1,7 @@
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { processRouteState } from '@/store/processRouteStore'
-import { buildProcessesFromRoute, getActiveRouteOptions } from '@/mock/processRoutes'
+import { applyRouteSnapshotToWorkOrder, getActiveRouteOptions } from '@/mock/processRoutes'
 
 function findWorkOrderProductMaster(workOrder = {}) {
   void productInfoState.products
@@ -53,7 +53,6 @@ export function ensureWorkOrderProcessRoute(workOrder) {
       ? defaultRoute
       : options[0]?.value || defaultRoute
   if (!routeName) return false
-  workOrder.processRouteName = routeName
-  workOrder.processes = buildProcessesFromRoute(routeName)
+  applyRouteSnapshotToWorkOrder(workOrder, routeName)
   return true
 }

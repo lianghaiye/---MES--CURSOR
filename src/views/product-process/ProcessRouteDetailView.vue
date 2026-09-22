@@ -62,7 +62,12 @@ import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProcessRouteById } from '@/store/processRouteStore'
-import { flattenGridToSteps, formatApplyScopeLabel } from '@/utils/processRouteGrid'
+import {
+  flattenGridToSteps,
+  formatApplyScopeLabel,
+  formatCompletionModeLabel,
+  syncStepPolicies,
+} from '@/utils/processRouteGrid'
 
 const route = useRoute()
 const router = useRouter()
@@ -72,6 +77,7 @@ const record = ref(null)
 const stepCols = [
   { title: '步骤', dataIndex: 'stepNo', width: 70 },
   { title: '行号', dataIndex: 'rowNo', width: 70 },
+  { title: '完成方式', dataIndex: 'completionModeLabel', width: 100 },
   { title: '工序编码', dataIndex: 'processCode', width: 120 },
   { title: '工序名称', dataIndex: 'name', width: 120 },
   { title: '工艺文件', key: 'processFile', width: 180 },
@@ -79,9 +85,11 @@ const stepCols = [
 
 const flatSteps = computed(() => {
   if (!record.value?.grid) return []
-  return flattenGridToSteps(record.value.grid).map((s, i) => ({
+  const policies = syncStepPolicies(record.value.grid, record.value.stepPolicies)
+  return flattenGridToSteps(record.value.grid, policies).map((s, i) => ({
     ...s,
     id: `${s.stepNo}-${s.rowNo}-${i}`,
+    completionModeLabel: formatCompletionModeLabel(s.completionMode),
   }))
 })
 

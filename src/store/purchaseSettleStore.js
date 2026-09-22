@@ -446,6 +446,12 @@ export function createSettlesFromPeriod(selectedGroups = [], options = {}) {
 export function createSettleFromPurchaseOrder(purchaseOrderId, payload = {}) {
   const po = purchaseOrderState.orders.find((o) => o.id === purchaseOrderId)
   if (!po) return { ok: false, message: '采购单不存在' }
+  if (po.status !== '已完成') {
+    return {
+      ok: false,
+      message: po.status === '已终结' ? '已终结的采购单不进入结算' : '仅已完成的采购单可生成结算单',
+    }
+  }
   const selected = payload.lineItems || []
   if (!selected.length) return { ok: false, message: '请至少选择一行结算明细' }
 

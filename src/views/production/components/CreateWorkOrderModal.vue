@@ -267,7 +267,7 @@ import {
   generateProductionWorkOrderName,
   generateAssemblyWorkOrderName,
 } from '@/utils/workOrderNaming'
-import { buildProcessesFromRoute, getActiveRouteOptions } from '@/mock/processRoutes'
+import { buildRouteDispatchSnapshot, getActiveRouteOptions } from '@/mock/processRoutes'
 import {
   applyBomSelectionToForm,
   applyPickerItemToForm,
@@ -696,6 +696,12 @@ function handleSubmit() {
 
   if (isEdit.value) {
     const routeChanged = props.editRecord.processRouteName !== form.processRouteName
+    const routePatch = routeChanged
+      ? (() => {
+          const snap = buildRouteDispatchSnapshot(form.processRouteName)
+          return { processes: snap.processes, stepPolicies: snap.stepPolicies }
+        })()
+      : {}
     emit('updated', {
       id: props.editRecord.id,
       patch: {
@@ -717,7 +723,7 @@ function handleSubmit() {
         salesOrderId: form.salesOrderId,
         sourceOrderNo: form.salesOrderNo,
         ...createExtras,
-        ...(routeChanged ? { processes: buildProcessesFromRoute(form.processRouteName) } : {}),
+        ...routePatch,
       },
     })
     message.success(isAssembly.value ? '总装工单已更新' : '工单已更新')

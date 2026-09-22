@@ -9,6 +9,7 @@ import {
   flattenReturnOutboundLines,
   generatePurchaseReturnNo,
 } from '@/mock/purchaseReturns'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_purchase_returns'
 const SEED_VERSION_KEY = 'i_doms_purchase_returns_seed_v'
@@ -32,8 +33,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ returns: purchaseReturnState.returns }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { returns: purchaseReturnState.returns })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 /**
@@ -375,7 +376,29 @@ export function syncReturnOutboundStatus(id, outboundOrderId, outboundStatus) {
   }
   row.updater = 'admin1'
   row.updatedAt = nowText()
-  return normalizeReturn(row)
+  const normalized = normalizeReturn(row)
+  if (
+    normalized.status === '已完成' &&
+    (normalized.purchaseOrderId || normalized.purchaseOrderNo)
+  ) {
+    try {
+      // eslint-disable-next-line global-require
+      const {
+        purchaseOrderState,
+        syncPurchaseOrderInboundStatus,
+      } = require('@/store/purchaseOrderStore')
+      const po =
+        (normalized.purchaseOrderId &&
+          purchaseOrderState.orders.find((o) => o.id === normalized.purchaseOrderId)) ||
+        (normalized.purchaseOrderNo &&
+          purchaseOrderState.orders.find((o) => o.orderNo === normalized.purchaseOrderNo)) ||
+        null
+      if (po) syncPurchaseOrderInboundStatus(po)
+    } catch {
+      /* ignore */
+    }
+  }
+  return normalized
 }
 
 export function listReturnOutboundLines(row) {

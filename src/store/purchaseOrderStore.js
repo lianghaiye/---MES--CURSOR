@@ -16,9 +16,10 @@ import {
   calcPoLineInboundStatus,
   calcPoLineRemainInboundQty,
 } from '@/utils/purchaseLineInbound'
-import { addPurchaseReceipt } from '@/store/purchaseReceiptStore'
+import { addPurchaseReceipt, purchaseReceiptState } from '@/store/purchaseReceiptStore'
 import { estimateSettleQty, hasSettleUnit, resolvePricingQty } from '@/utils/settleUnit'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 /** 由 purchaseRequisitionStore 注册，避免循环依赖导致 bind 未生效 */
 let draftBindApi = {
@@ -59,8 +60,8 @@ function shouldReseed() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders: purchaseOrderState.orders }))
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
+  persistJson(STORAGE_KEY, { orders: purchaseOrderState.orders })
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function initPurchaseOrders() {
@@ -173,20 +174,267 @@ export function canReverseApprovePurchaseOrder() {
   return false
 }
 
+/** 采购单是否仍有可收货/可申请入库数量 */
+export function hasPurchaseOrderRemainInboundQty(order) {
+  return (order?.lineItems || []).some((line) => calcPoLineRemainInboundQty(order, line) > 1e-9)
+}
+
+/**
+ * 不可生成收货/入库的原因（用于按钮禁用提示与拦截文案）
+ * 两条路径共用采购数量池：收货占用 + 直接入库占用都会扣减剩余可入量
+ */
+export function explainCannotGenerateReceiptOrInbound(order, actionLabel = '收货/入库') {
+  if (!order) return '未找到采购单'
+  if (order.status === '已作废') return `已作废的采购单不支持生成${actionLabel}`
+  if (order.status === '草稿') return `草稿采购单不可生成${actionLabel}，请先提交并审核`
+  if (order.status === '待提交' || order.status === '待审核' || order.status === '已拒绝') {
+    return `采购单「${order.status}」不可生成${actionLabel}，需审核通过（进行中）后操作`
+  }
+  if (order.status === '已完成') return `已完成的采购单不可再生成${actionLabel}`
+  if (order.status === '已终结') return `已终结的采购单不可再生成${actionLabel}`
+  if (order.status !== '进行中') {
+    return `采购单状态为「${order.status}」，不可生成${actionLabel}`
+  }
+  if (!hasPurchaseOrderRemainInboundQty(order)) {
+    return `采购单无可${actionLabel === '入库' ? '入库' : '收货'}数量（收货占用与已入库已占满采购数量）`
+  }
+  return ''
+}
+
 export function canGenerateReceipt(order) {
-  if (order?.status !== '进行中') return false
-  return (order.lineItems || []).some((line) => calcPoLineRemainInboundQty(order, line) > 1e-9)
+  return !explainCannotGenerateReceiptOrInbound(order, '收货')
 }
 
 export function canGenerateInbound(order) {
-  return canGenerateReceipt(order)
+  return !explainCannotGenerateReceiptOrInbound(order, '入库')
+}
+
+/** 关联未完成收货单（新建/进行中） */
+export function listUnfinishedReceiptsForPurchaseOrder(order) {
+  if (!order) return []
+  return (purchaseReceiptState.receipts || []).filter((r) => {
+    if (!r) return false
+    const st = r.receiptStatus || ''
+    if (st !== '新建' && st !== '进行中') return false
+    return r.purchaseOrderId === order.id || r.purchaseOrderNo === order.orderNo
+  })
+}
+
+/** 关联未完成来料质检单（待质检） */
+export function listUnfinishedQcTasksForPurchaseOrder(order) {
+  if (!order) return []
+  // lazy require：避免与 qcTaskStore 循环依赖
+  // eslint-disable-next-line global-require
+  const { QC_TASK_STATUS, listQcTasks } = require('@/store/qcTaskStore')
+  const receipts = listUnfinishedReceiptsForPurchaseOrder(order)
+  const receiptIds = new Set(receipts.map((r) => r.id).filter(Boolean))
+  const receiptNos = new Set(receipts.map((r) => String(r.receiptNo || '').trim()).filter(Boolean))
+  // 已完成收货单上仍挂着未完成质检，也需拦截
+  ;(purchaseReceiptState.receipts || []).forEach((r) => {
+    if (!r) return
+    if (r.purchaseOrderId !== order.id && r.purchaseOrderNo !== order.orderNo) return
+    if (r.receiptStatus === '作废' || r.receiptStatus === '已作废') return
+    if (r.id) receiptIds.add(r.id)
+    if (r.receiptNo) receiptNos.add(String(r.receiptNo).trim())
+  })
+
+  return listQcTasks({ bizScope: '来料质检' }).filter((t) => {
+    if (!t || t.qcStatus === QC_TASK_STATUS.COMPLETED || t.qcStatus === QC_TASK_STATUS.CANCELLED) {
+      return false
+    }
+    if (t.sourceDocId && receiptIds.has(t.sourceDocId)) return true
+    const srcNo = String(t.sourceDocNo || '').trim()
+    if (srcNo && receiptNos.has(srcNo)) return true
+    if (t.purchaseOrderId && t.purchaseOrderId === order.id) return true
+    if (t.purchaseOrderNo && t.purchaseOrderNo === order.orderNo) return true
+    return false
+  })
+}
+
+/** 关联未确认采购入库单 */
+export function listUnfinishedInboundOrdersForPurchaseOrder(order) {
+  if (!order) return []
+  // eslint-disable-next-line global-require
+  const { inboundOrderState } = require('@/store/inboundOrderStore')
+  return (inboundOrderState?.orders || []).filter((o) => {
+    if (!o) return false
+    if (!(o.purchaseOrderId === order.id || o.purchaseOrderNo === order.orderNo)) return false
+    const st = o.status || ''
+    if (st === '已作废' || st === '已取消') return false
+    if (st === '已完成' || st === '已入库' || st === '已确认') return false
+    return true
+  })
+}
+
+/** 关联未完成采购退货单（新建/进行中） */
+export function listUnfinishedPurchaseReturnsForPurchaseOrder(order) {
+  if (!order) return []
+  // eslint-disable-next-line global-require
+  const { purchaseReturnState } = require('@/store/purchaseReturnStore')
+  return (purchaseReturnState?.returns || []).filter((r) => {
+    if (!r) return false
+    if (!(r.purchaseOrderId === order.id || r.purchaseOrderNo === order.orderNo)) return false
+    const st = r.status || ''
+    return st === '新建' || st === '进行中'
+  })
+}
+
+/** 采购行是否已自然结清：入库数量 + 已完成退货数量 ≥ 采购数量 */
+export function isPoLineNaturallySettled(order, line) {
+  if (line?.cancelled) return true
+  const purchaseQty = Number(line?.purchaseQty) || 0
+  if (purchaseQty <= 0) return true
+  // eslint-disable-next-line global-require
+  const { calcPoLineReceivedQty } = require('@/utils/purchaseLineInbound')
+  // eslint-disable-next-line global-require
+  const { calcPoLineCompletedReturnQty } = require('@/utils/orderReturnLines')
+  const received = calcPoLineReceivedQty(order, line)
+  const returned = calcPoLineCompletedReturnQty(order, line)
+  return received + returned >= purchaseQty - 1e-9
+}
+
+/** 整单是否已自然结清（可自动完成） */
+export function isPurchaseOrderNaturallySettled(order) {
+  const lines = order?.lineItems || []
+  if (!lines.length) return false
+  return lines.every((line) => isPoLineNaturallySettled(order, line))
+}
+
+export function getPurchaseOrderUnfinishedRelatedDocs(order) {
+  // eslint-disable-next-line global-require
+  const { getPendingPurchasePriceChange } = require('@/store/purchasePriceChangeStore')
+  const receipts = listUnfinishedReceiptsForPurchaseOrder(order)
+  const qcTasks = listUnfinishedQcTasksForPurchaseOrder(order)
+  const inboundOrders = listUnfinishedInboundOrdersForPurchaseOrder(order)
+  const returns = listUnfinishedPurchaseReturnsForPurchaseOrder(order)
+  const pendingPriceChange = getPendingPurchasePriceChange(order?.id) || null
+  return { receipts, qcTasks, inboundOrders, returns, pendingPriceChange }
+}
+
+function formatUnfinishedRelatedMessage(unfinished = {}) {
+  const parts = []
+  if (unfinished.pendingPriceChange) {
+    parts.push(
+      `待审核价格变更：${unfinished.pendingPriceChange.changeNo || unfinished.pendingPriceChange.id}`,
+    )
+  }
+  const receiptNos = (unfinished.receipts || []).map((r) => r.receiptNo || r.id).filter(Boolean)
+  if (receiptNos.length) parts.push(`未完成收货单：${receiptNos.join('、')}`)
+  const qcNos = (unfinished.qcTasks || []).map((t) => t.qcNo || t.id).filter(Boolean)
+  if (qcNos.length) parts.push(`未完成质检单：${qcNos.join('、')}`)
+  const inboundNos = (unfinished.inboundOrders || []).map((o) => o.docNo || o.id).filter(Boolean)
+  if (inboundNos.length) parts.push(`未完成入库单：${inboundNos.join('、')}`)
+  const returnNos = (unfinished.returns || []).map((r) => r.returnNo || r.id).filter(Boolean)
+  if (returnNos.length) parts.push(`未完成采购退货单：${returnNos.join('、')}`)
+  return parts
+}
+
+/**
+ * 评估手动完成：进行中 + 无未结清关联单。
+ * shortClose=true 表示入库(+退货)仍不足采购数量，需短结确认。
+ */
+export function evaluatePurchaseOrderComplete(order) {
+  if (!order) return { ok: false, message: '未找到采购单' }
+  if (order.status !== '进行中') {
+    return { ok: false, message: '仅「进行中」的采购单可手动完成' }
+  }
+  const unfinished = getPurchaseOrderUnfinishedRelatedDocs(order)
+  const parts = formatUnfinishedRelatedMessage(unfinished)
+  if (parts.length) {
+    return {
+      ok: false,
+      code: 'HAS_UNFINISHED_RELATED',
+      message: '有关联的未完成单据，请完成、作废/终止这些单据后再手动完成。\n' + parts.join('\n'),
+      unfinished,
+    }
+  }
+  const shortClose = !isPurchaseOrderNaturallySettled(order)
+  return {
+    ok: true,
+    shortClose,
+    message: shortClose
+      ? '当前入库数量不足采购数量，短结后入库数量将锁定，不可再更改，订单可进入结算。确认短结完成该采购单吗？'
+      : '',
+  }
 }
 
 export function canCompletePurchaseOrder(order) {
-  return order?.status === '进行中' && order?.inboundStatus === '已入库'
+  return evaluatePurchaseOrderComplete(order).ok
 }
 
-/** 回写整单/明细入库状态与逾期状态 */
+/**
+ * 评估终结：进行中 + 无未结清关联单。
+ * 与短结区别：终结后不进入结算；数量未结清时通常使用终结（短结走「完成」且可结算）。
+ */
+export function evaluatePurchaseOrderTerminate(order) {
+  if (!order) return { ok: false, message: '未找到采购单' }
+  if (order.status !== '进行中') {
+    return { ok: false, message: '仅「进行中」的采购单可终结' }
+  }
+  if (isPurchaseOrderNaturallySettled(order)) {
+    return {
+      ok: false,
+      code: 'ALREADY_SETTLED',
+      message: '订单数量已结清（入库+退货=采购），请使用「完成」归档，无需终结',
+    }
+  }
+  const unfinished = getPurchaseOrderUnfinishedRelatedDocs(order)
+  const parts = formatUnfinishedRelatedMessage(unfinished)
+  if (parts.length) {
+    return {
+      ok: false,
+      code: 'HAS_UNFINISHED_RELATED',
+      message: '有关联的未完成单据，请完成、作废/终止这些单据后再终结。\n' + parts.join('\n'),
+      unfinished,
+    }
+  }
+  return {
+    ok: true,
+    message: '终结后订单不再继续采购，入库数量将锁定且不可再更改，且该订单不进入结算。确认终结吗？',
+  }
+}
+
+export function canTerminatePurchaseOrder(order) {
+  return evaluatePurchaseOrderTerminate(order).ok
+}
+
+/** 标记采购单已完成（内部） */
+function markPurchaseOrderCompleted(order, { mode = '正常结案' } = {}) {
+  order.status = '已完成'
+  order.overdueStatus = '未逾期'
+  order.completedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  order.completeMode = mode
+  order.terminatedAt = ''
+  return order
+}
+
+/** 标记采购单已终结（内部）：锁定执行、不进入结算 */
+function markPurchaseOrderTerminated(order) {
+  order.status = '已终结'
+  order.overdueStatus = '未逾期'
+  order.terminatedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  order.completeMode = '终结'
+  return order
+}
+
+/**
+ * 自然结清时自动完成：入库(+已完成退货)=采购，且无未结清关联单。
+ * @returns {{ ok: boolean, message?: string }|null} null 表示未触发
+ */
+export function tryAutoCompletePurchaseOrder(orderOrId) {
+  const order =
+    typeof orderOrId === 'string'
+      ? purchaseOrderState.orders.find((o) => o.id === orderOrId)
+      : orderOrId
+  if (!order || order.status !== '进行中') return null
+  if (!isPurchaseOrderNaturallySettled(order)) return null
+  const unfinished = getPurchaseOrderUnfinishedRelatedDocs(order)
+  if (formatUnfinishedRelatedMessage(unfinished).length) return null
+  markPurchaseOrderCompleted(order, { mode: '正常结案' })
+  return { ok: true, message: `采购单「${order.orderNo}」已自动完成` }
+}
+
+/** 回写整单/明细入库状态与逾期状态；满足条件时自动完成 */
 export function syncPurchaseOrderInboundStatus(orderOrId) {
   const order =
     typeof orderOrId === 'string'
@@ -198,6 +446,7 @@ export function syncPurchaseOrderInboundStatus(orderOrId) {
   })
   order.inboundStatus = calcPoHeaderInboundStatus(order)
   order.overdueStatus = computePurchaseOrderOverdueStatus(order)
+  tryAutoCompletePurchaseOrder(order)
   return order
 }
 
@@ -308,17 +557,61 @@ export function voidPurchaseOrder(id) {
   return { ok: true, message: `采购单「${order.orderNo}」已作废` }
 }
 
-/** 完成采购单 */
-export function completePurchaseOrder(id) {
+/**
+ * 手动完成采购单。
+ * - 正常结清（入库+退货=采购）也可手动点完成（一般会先被自动完成）
+ * - 短结：入库不足时需 confirmShortClose=true
+ */
+export function completePurchaseOrder(id, { confirmShortClose = false } = {}) {
   const order = purchaseOrderState.orders.find((o) => o.id === id)
   if (!order) return { ok: false, message: '采购单不存在' }
-  if (!canCompletePurchaseOrder(order)) {
-    return { ok: false, message: `采购单「${order.orderNo}」需入库完成后才可完成` }
+
+  const gate = evaluatePurchaseOrderComplete(order)
+  if (!gate.ok) return gate
+
+  if (gate.shortClose && !confirmShortClose) {
+    return {
+      ok: false,
+      code: 'NEED_SHORT_CLOSE_CONFIRM',
+      shortClose: true,
+      message: gate.message,
+    }
   }
-  order.status = '已完成'
-  order.overdueStatus = '未逾期'
-  order.completedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-  return { ok: true, message: `采购单「${order.orderNo}」已完成` }
+
+  markPurchaseOrderCompleted(order, { mode: gate.shortClose ? '短结' : '正常结案' })
+  return {
+    ok: true,
+    shortClose: Boolean(gate.shortClose),
+    message: gate.shortClose
+      ? `采购单「${order.orderNo}」已短结完成，入库数量已锁定`
+      : `采购单「${order.orderNo}」已完成`,
+  }
+}
+
+/**
+ * 终结采购单：审核通过后因故不再继续，可能已有部分入库。
+ * 与短结区别：终结后不进入结算。
+ */
+export function terminatePurchaseOrder(id, { confirmTerminate = false } = {}) {
+  const order = purchaseOrderState.orders.find((o) => o.id === id)
+  if (!order) return { ok: false, message: '采购单不存在' }
+
+  const gate = evaluatePurchaseOrderTerminate(order)
+  if (!gate.ok) return gate
+
+  if (!confirmTerminate) {
+    return {
+      ok: false,
+      code: 'NEED_TERMINATE_CONFIRM',
+      message: gate.message,
+    }
+  }
+
+  markPurchaseOrderTerminated(order)
+  return {
+    ok: true,
+    message: `采购单「${order.orderNo}」已终结，不进入结算`,
+  }
 }
 
 /** 从采购申请合并行按供应商创建采购单 */
@@ -677,7 +970,10 @@ export function submitReceipt(orderId, receiptLines, extra = {}) {
   const order = purchaseOrderState.orders.find((o) => o.id === orderId)
   if (!order) return { ok: false, message: '采购单不存在' }
   if (!canGenerateReceipt(order)) {
-    return { ok: false, message: '仅进行中且仍有可收货数量的采购单可生成收货单' }
+    return {
+      ok: false,
+      message: explainCannotGenerateReceiptOrInbound(order, '收货') || '当前采购单不可生成收货单',
+    }
   }
   if (!receiptLines?.length) return { ok: false, message: '没有可收货的明细' }
 
@@ -972,7 +1268,7 @@ export function batchSubmitPurchaseOrders(ids = []) {
 export function buildDefaultPurchaseReceiptLines(order) {
   if (!order) return []
   return (order.lineItems || [])
-    .filter((line) => (Number(line.purchaseQty) || 0) > 0)
+    .filter((line) => !line.cancelled && (Number(line.purchaseQty) || 0) > 0)
     .map((line) => {
       const remainingQty = calcPoLineRemainInboundQty(order, line)
       if (remainingQty <= 1e-9) return null

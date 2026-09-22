@@ -7,7 +7,7 @@
       :columns="columns"
       :data-source="records"
       :pagination="false"
-      :locale="{ emptyText: '暂无价格变更记录' }"
+      :locale="{ emptyText: '暂无订单变更记录' }"
       :scroll="{ x: 1280 }"
     >
       <template #bodyCell="{ column, record }">
@@ -47,7 +47,11 @@
           :scroll="{ x: 1200 }"
         >
           <template #bodyCell="{ column, record: line }">
-            <template v-if="isLineMoney(column.key)">
+            <template v-if="column.key === 'productName'">
+              <span>{{ line.productName || '—' }}</span>
+              <a-tag v-if="line.cancelled" color="default" class="cancelled-tag">已取消</a-tag>
+            </template>
+            <template v-else-if="isLineMoney(column.key)">
               {{ formatOutsourcingPriceChangeAbsMoney(line[column.key]) }}
             </template>
             <template v-else-if="column.key === 'deltaAmountExTax'">
@@ -125,7 +129,7 @@ function isLineMoney(key) {
 }
 
 const lineColumns = [
-  { title: '物料名称', dataIndex: 'productName', width: 140, ellipsis: true },
+  { title: '物料名称', key: 'productName', dataIndex: 'productName', width: 168, ellipsis: true },
   { title: '物料编码', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 88, ellipsis: true },
@@ -160,5 +164,9 @@ function deltaClass(val) {
 
 .delta-down {
   color: #389e0d;
+}
+
+.cancelled-tag {
+  margin-left: 6px;
 }
 </style>

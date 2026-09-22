@@ -225,7 +225,7 @@ export function enrichOutsourcingMaterialIssueProgress(order, rows = []) {
 export function buildOutsourcingIssueProductRows(order) {
   if (!order) return []
   return (order.lineItems || [])
-    .filter((l) => (Number(l.planQty) || 0) > 0)
+    .filter((l) => !l.cancelled && (Number(l.planQty) || 0) > 0)
     .map((line, index) => {
       const planQty = Number(line.planQty) || 0
       const issuedQty = calcWxLineIssuedQty(order, line)

@@ -118,11 +118,17 @@
     </div>
 
     <div v-else class="section-block">
-      <div class="section-title">
-        采购订单 ({{ orderRows.length }})
-        <span class="section-hint">{{ orderSectionHint }}</span>
+      <div class="section-title source-section-head">
+        <span>
+          采购订单 ({{ orderRows.length }})
+          <span class="section-hint">{{ orderSectionHint }}</span>
+        </span>
+        <a-button type="link" size="small" @click="orderSectionExpanded = !orderSectionExpanded">
+          {{ orderSectionExpanded ? '收起' : '展开' }}
+        </a-button>
       </div>
       <a-table
+        v-show="orderSectionExpanded"
         :columns="orderColumns"
         :data-source="orderRows"
         row-key="id"
@@ -266,6 +272,17 @@
               :disabled="isLineCompleted(record)"
             />
           </template>
+          <template v-else-if="column.key === 'inboundQcRequirement'">
+            <a-select
+              v-model:value="record.inboundQcRequirement"
+              size="small"
+              style="width: 100%"
+              placeholder="请选择"
+              allow-clear
+              :options="inboundQcOpts"
+              :disabled="isLineCompleted(record) || isReceiptSource"
+            />
+          </template>
           <template v-else-if="column.key === 'qty'">
             <div class="qty-with-unit">
               <a-input-number
@@ -323,8 +340,13 @@
         </template>
       </a-table>
 
-      <div class="line-summary">
-        合计数量：<strong>{{ totalQty.toLocaleString() }}</strong>
+      <div class="line-summary-row">
+        <div class="line-summary">
+          合计数量：<strong>{{ totalQty.toLocaleString() }}</strong>
+        </div>
+        <div v-if="!isReceiptSource" class="qc-action-tip">
+          「确认并生成质检任务」：免检明细直接生成采购入库单；抽检/全检明细生成采购收货单并自动生成来料质检单。
+        </div>
       </div>
     </div>
 
@@ -452,10 +474,16 @@
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :loading="saving" @click="handleSave">
-        <CheckOutlined />
-        保存
+      <a-button
+        v-if="!isReceiptSource"
+        type="primary"
+        ghost
+        :loading="saving"
+        @click="handleConfirmAndCreateQc"
+      >
+        确认并生成质检任务
       </a-button>
+      <a-button type="primary" :loading="saving" @click="handleSave">确定</a-button>
     </template>
   </a-modal>
 </template>
@@ -464,13 +492,15 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { CheckOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
+import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { createInboundFromPurchaseOrder } from '@/store/inboundOrderStore'
-import { getPurchaseOrderById } from '@/store/purchaseOrderStore'
+import { getPurchaseOrderById, submitReceipt } from '@/store/purchaseOrderStore'
 import { getPendingPurchasePriceChangeBlock } from '@/store/purchasePriceChangeStore'
-import { updatePurchaseReceipt } from '@/store/purchaseReceiptStore'
+import { updatePurchaseReceipt, attachReceiptQcSheet } from '@/store/purchaseReceiptStore'
+import { createIncomingQcFromReceipt } from '@/store/qcTaskStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
+import { resolveEditableInboundQcRequirement } from '@/utils/inboundQcRequirement'
 import { inboundFormLineColumns } from '@/utils/inboundLineColumns'
 import { syncInboundLineTotalFromUnit } from '@/utils/inboundLineHelpers'
 import { estimateSettleQty } from '@/utils/settleUnit'
@@ -487,11 +517,9 @@ import InboundLineScopeToggle from '@/components/InboundLineScopeToggle.vue'
 import { filterInboundLinesByScope, isInboundLineCompleted } from '@/utils/inboundLineScope'
 import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import { applyQcQtyHintsToInboundLines } from '@/utils/qcInboundFromReceipt'
-import {
-  listQcProductResultLinesForPurchaseOrders,
-  listQcProductResultLinesForReceipt,
-} from '@/utils/purchaseOrderQc'
+import { listQcProductResultLinesForReceipt } from '@/utils/purchaseOrderQc'
 import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
+import { inboundQcOptions } from '@/mock/materialInfoOptions'
 
 /** 采购场景生成入库：不展示状态/库存换算/货位相关列 */
 const HIDDEN_LINE_KEYS = new Set([
@@ -532,8 +560,9 @@ const prevHeaderWarehouse = ref(undefined)
 const lineEditOpen = ref(false)
 const lineEditDraft = ref(null)
 const lineEditId = ref('')
-const qcResultExpanded = ref(true)
+const qcResultExpanded = ref(false)
 const receiptSectionExpanded = ref(false)
+const orderSectionExpanded = ref(false)
 
 const sourceReceipts = computed(() => {
   if (Array.isArray(props.purchaseReceipts) && props.purchaseReceipts.length) {
@@ -592,12 +621,11 @@ const receiptSectionHint = computed(() =>
 )
 
 const qcResultRows = computed(() => {
-  if (isReceiptSource.value) {
-    return sourceReceipts.value.flatMap((r) => listQcProductResultLinesForReceipt(r))
-  }
-  return listQcProductResultLinesForPurchaseOrders(sourceOrders.value)
+  // 仅收货单 / 质检单入库时展示质检结果；采购单直入走「收货→质检→再入库」
+  if (!isReceiptSource.value) return []
+  return sourceReceipts.value.flatMap((r) => listQcProductResultLinesForReceipt(r))
 })
-const showQcResultSection = computed(() => qcResultRows.value.length > 0)
+const showQcResultSection = computed(() => isReceiptSource.value && qcResultRows.value.length > 0)
 const showQcQtyHintAlert = computed(() => {
   if (props.qcEnforceQtyCap && props.qcQtyHints) return true
   return (props.qcHintBundles || []).some((b) => b?.enforceQtyCap && b?.hints)
@@ -745,6 +773,8 @@ const warehouseOpts = computed(() => {
   return getWarehouseSelectOptions()
 })
 
+const inboundQcOpts = inboundQcOptions.map((v) => ({ label: v, value: v }))
+
 const columns = computed(() => {
   const base = inboundFormLineColumns
     .filter((c) => !HIDDEN_LINE_KEYS.has(c.key))
@@ -765,6 +795,18 @@ const columns = computed(() => {
     itemNameIdx >= 0
       ? [...base.slice(0, itemNameIdx), progressCol, ...base.slice(itemNameIdx)]
       : [progressCol, ...base]
+  // 入库仓库后插入「入库质检要求」
+  const whIdx = withProgress.findIndex((c) => c.key === 'warehouse')
+  const qcReqCol = {
+    title: '入库质检要求',
+    key: 'inboundQcRequirement',
+    width: 120,
+  }
+  if (whIdx >= 0) {
+    withProgress = [...withProgress.slice(0, whIdx + 1), qcReqCol, ...withProgress.slice(whIdx + 1)]
+  } else {
+    withProgress = [...withProgress, qcReqCol]
+  }
   if (isMultiOrder.value || isMultiReceipt.value) {
     const codeIdx = withProgress.findIndex((c) => c.key === 'itemCode')
     const extraCols = []
@@ -825,8 +867,9 @@ watch(
               .join('、')}`
     }
     lineScope.value = 'pending'
-    qcResultExpanded.value = true
+    qcResultExpanded.value = false
     receiptSectionExpanded.value = false
+    orderSectionExpanded.value = false
     if (isReceiptSource.value) {
       inboundLines.value = sourceReceipts.value.flatMap((receipt) => {
         const order =
@@ -916,6 +959,7 @@ function buildPurchaseInboundLine(line, order) {
     purchaseQty: undefined,
     totalValue: undefined,
     inboundEntryMode: undefined,
+    inboundQcRequirement: resolveEditableInboundQcRequirement(line),
     settleUnit: settleUnit || '',
     settleQty: settleUnit
       ? Number(line.settleQty) > 0
@@ -934,7 +978,7 @@ function buildPurchaseInboundLine(line, order) {
 
 function buildLinesFromPurchaseOrder(order) {
   return (order.lineItems || [])
-    .filter((line) => (Number(line.purchaseQty) || 0) > 0)
+    .filter((line) => !line.cancelled && (Number(line.purchaseQty) || 0) > 0)
     .map((line) => buildPurchaseInboundLine(line, order))
 }
 
@@ -980,6 +1024,8 @@ function buildLinesFromPurchaseReceipt(order, receipt) {
     inbound.receiptNo = receipt.receiptNo || ''
     inbound.rowKey = `${receipt.id}__${order.id}__${poLine.id}`
     if (rLine.receivingWarehouse) inbound.warehouse = rLine.receivingWarehouse
+    inbound.inboundQcRequirement =
+      resolveEditableInboundQcRequirement(rLine) || inbound.inboundQcRequirement
     if (rLine.itemName || rLine.productName) {
       inbound.itemName = rLine.itemName || rLine.productName
     }
@@ -1098,31 +1144,32 @@ function mapSubmitLine(line) {
     settleQty: line.settleQty,
     standardUnitWeight: line.standardUnitWeight,
     settledSettleQty: 0,
+    inboundQcRequirement: line.inboundQcRequirement || '',
   }
 }
 
-function handleSave() {
-  if (!sourceOrders.value.length && !sourceReceipts.value.length) return
+function collectSubmitLines() {
+  if (!sourceOrders.value.length && !sourceReceipts.value.length) return null
   for (const order of sourceOrders.value) {
     const block = getPendingPurchasePriceChangeBlock(order.id, '生成入库单')
     if (block) {
       message.warning(block)
-      return
+      return null
     }
   }
   if (!form.receiptDate) {
     message.warning('请选择收货日期')
-    return
+    return null
   }
   const editableLines = inboundLines.value.filter((line) => !isInboundLineCompleted(line))
   if (!editableLines.length) {
     message.warning('没有可入库的明细')
-    return
+    return null
   }
   const submitLines = editableLines.filter((line) => Number(line.qty) > 0)
   if (!submitLines.length) {
     message.warning('请至少填写一行点收数量')
-    return
+    return null
   }
   const overQcCap = submitLines.find(
     (line) => line.qcMaxQty != null && Number(line.qty) > Number(line.qcMaxQty) + 1e-9,
@@ -1131,40 +1178,74 @@ function handleSave() {
     message.warning(
       `「${overQcCap.itemName}」点收数量不可超过质检合格入库数量（${overQcCap.qcMaxQty}）`,
     )
-    return
+    return null
   }
   const invalidWarehouse = submitLines.find((line) => !line.warehouse)
   if (invalidWarehouse) {
     message.warning(`请为「${invalidWarehouse.itemName}」选择入库仓库`)
-    return
+    return null
   }
   const settleInvalid = submitLines.find(
     (line) => String(line.settleUnit || '').trim() && !(Number(line.settleQty) > 0),
   )
   if (settleInvalid) {
     message.warning(`请为「${settleInvalid.itemName}」填写结算数量（${settleInvalid.settleUnit}）`)
-    return
+    return null
   }
+  return submitLines
+}
 
-  saving.value = true
+function mapInboundLineToReceiptLine(line) {
+  return {
+    id: line.poLineId || line.id,
+    itemName: line.itemName,
+    itemCode: line.itemCode,
+    itemType: line.itemType,
+    specModel: line.specModel,
+    specAttr: line.specAttr,
+    material: line.material,
+    variantSummary: line.variantSummary,
+    drawingNo: line.drawingNo,
+    purchaseQty: line.poPurchaseQty,
+    unit: line.unit,
+    settleUnit: line.settleUnit || '',
+    settleQty: line.settleQty,
+    receivingMode: '正常收货',
+    receivingWarehouse: line.warehouse,
+    receiptQty: Number(line.qty) || 0,
+    inboundQcRequirement: line.inboundQcRequirement || '',
+    remark: '',
+  }
+}
+
+function isExemptQcRequirement(val) {
+  return String(val || '').trim() === '免检'
+}
+
+function isInspectQcRequirement(val) {
+  const v = String(val || '').trim()
+  return v === '抽检' || v === '全检'
+}
+
+function linkReceiptInbound(receipt, createdList) {
+  if (!receipt?.id || !createdList.length) return
+  const ids = [...new Set([...(receipt.inboundOrderIds || []), ...createdList.map((o) => o.id)])]
+  const docNos = createdList.map((o) => o.docNo).filter(Boolean)
+  const prevNos = String(receipt.inboundOrderNo || '')
+    .split(/[、,，]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  updatePurchaseReceipt(receipt.id, {
+    inboundOrderIds: ids,
+    inboundOrderNo: [...new Set([...prevNos, ...docNos])].join('、') || receipt.inboundOrderNo,
+    inboundStatus: '入库中',
+  })
+}
+
+function createInboundsForLines(submitLines) {
   const allCreated = []
   const errors = []
   let okCount = 0
-
-  const linkReceipt = (receipt, createdList) => {
-    if (!receipt?.id || !createdList.length) return
-    const ids = [...new Set([...(receipt.inboundOrderIds || []), ...createdList.map((o) => o.id)])]
-    const docNos = createdList.map((o) => o.docNo).filter(Boolean)
-    const prevNos = String(receipt.inboundOrderNo || '')
-      .split(/[、,，]/)
-      .map((s) => s.trim())
-      .filter(Boolean)
-    updatePurchaseReceipt(receipt.id, {
-      inboundOrderIds: ids,
-      inboundOrderNo: [...new Set([...prevNos, ...docNos])].join('、') || receipt.inboundOrderNo,
-      inboundStatus: '入库中',
-    })
-  }
 
   if (isReceiptSource.value) {
     const byReceipt = new Map()
@@ -1196,7 +1277,7 @@ function handleSave() {
         const created = result.orders?.length ? result.orders : result.order ? [result.order] : []
         const tagged = created.map((o) => ({ ...o, purchaseReceiptId: receiptId }))
         allCreated.push(...tagged)
-        linkReceipt(receipt, tagged)
+        linkReceiptInbound(receipt, tagged)
       } else {
         errors.push(result.message || `收货单「${receipt?.receiptNo || receiptId}」生成失败`)
       }
@@ -1227,22 +1308,139 @@ function handleSave() {
       }
     }
   }
-  saving.value = false
 
-  if (okCount) {
-    const nos = allCreated
-      .map((o) => o.docNo)
-      .filter(Boolean)
-      .join('、')
-    message.success(
-      nos ? `已创建 ${allCreated.length} 张入库单：${nos}` : `已创建 ${okCount} 张入库单`,
-    )
-    emit('saved', allCreated[0] || null, allCreated)
-    emit('update:open', false)
+  return { allCreated, errors, okCount }
+}
+
+function handleSave() {
+  const submitLines = collectSubmitLines()
+  if (!submitLines) return
+
+  saving.value = true
+  try {
+    const { allCreated, errors, okCount } = createInboundsForLines(submitLines)
+    if (okCount) {
+      const nos = allCreated
+        .map((o) => o.docNo)
+        .filter(Boolean)
+        .join('、')
+      message.success(
+        nos ? `已创建 ${allCreated.length} 张入库单：${nos}` : `已创建 ${okCount} 张入库单`,
+      )
+      emit('saved', allCreated[0] || null, allCreated)
+      emit('update:open', false)
+    }
+    if (errors.length) {
+      const preview = errors.slice(0, 3).join('；')
+      message.warning(errors.length > 3 ? `${preview}…等 ${errors.length} 条失败` : preview)
+    }
+  } finally {
+    saving.value = false
   }
-  if (errors.length) {
-    const preview = errors.slice(0, 3).join('；')
-    message.warning(errors.length > 3 ? `${preview}…等 ${errors.length} 条失败` : preview)
+}
+
+/** 按入库质检要求分流：免检→入库单；抽检/全检→收货单+来料质检单 */
+function handleConfirmAndCreateQc() {
+  if (isReceiptSource.value) {
+    message.warning('从收货单入库请使用「确定」')
+    return
+  }
+  const submitLines = collectSubmitLines()
+  if (!submitLines) return
+
+  const missingReq = submitLines.find((l) => !String(l.inboundQcRequirement || '').trim())
+  if (missingReq) {
+    message.warning(`请为「${missingReq.itemName || missingReq.itemCode}」选择入库质检要求`)
+    return
+  }
+  const unknownReq = submitLines.find(
+    (l) =>
+      !isExemptQcRequirement(l.inboundQcRequirement) &&
+      !isInspectQcRequirement(l.inboundQcRequirement),
+  )
+  if (unknownReq) {
+    message.warning(
+      `「${unknownReq.itemName || unknownReq.itemCode}」入库质检要求须为免检、抽检或全检`,
+    )
+    return
+  }
+
+  const exemptLines = submitLines.filter((l) => isExemptQcRequirement(l.inboundQcRequirement))
+  const inspectLines = submitLines.filter((l) => isInspectQcRequirement(l.inboundQcRequirement))
+
+  saving.value = true
+  try {
+    const inboundNos = []
+    const receiptNos = []
+    const qcNos = []
+    const errors = []
+
+    if (exemptLines.length) {
+      const { allCreated, errors: inboundErrors } = createInboundsForLines(exemptLines)
+      allCreated.forEach((o) => {
+        if (o.docNo) inboundNos.push(o.docNo)
+      })
+      errors.push(...inboundErrors)
+    }
+
+    if (inspectLines.length) {
+      const byOrder = new Map()
+      inspectLines.forEach((line) => {
+        const oid = line.purchaseOrderId
+        if (!byOrder.has(oid)) byOrder.set(oid, [])
+        byOrder.get(oid).push(line)
+      })
+      let index = 0
+      for (const [orderId, lines] of byOrder) {
+        index += 1
+        const order = sourceOrders.value.find((o) => o.id === orderId)
+        const result = submitReceipt(orderId, lines.map(mapInboundLineToReceiptLine), {
+          remark:
+            form.remark?.trim() ||
+            (order?.orderNo ? `采购单 ${order.orderNo} 生成（需质检）` : '') ||
+            `批量入库分流第 ${index} 单`,
+        })
+        if (!result.ok) {
+          errors.push(result.message || `采购单「${order?.orderNo || orderId}」生成收货单失败`)
+          continue
+        }
+        if (result.receipt?.receiptNo) receiptNos.push(result.receipt.receiptNo)
+        const qcRes = createIncomingQcFromReceipt({
+          receipt: result.receipt,
+          remark: form.remark || '',
+        })
+        if (qcRes.ok) {
+          attachReceiptQcSheet(result.receipt.id, {
+            qcNo: qcRes.task.qcNo,
+            qcStatus: '质检中',
+          })
+          if (qcRes.task?.qcNo) qcNos.push(qcRes.task.qcNo)
+        } else {
+          errors.push(
+            qcRes.message || `收货单「${result.receipt.receiptNo}」已生成，但质检单生成失败`,
+          )
+        }
+      }
+    }
+
+    const parts = []
+    if (inboundNos.length) parts.push(`入库单：${inboundNos.join('、')}`)
+    if (receiptNos.length) parts.push(`收货单：${receiptNos.join('、')}`)
+    if (qcNos.length) parts.push(`质检单：${qcNos.join('、')}`)
+
+    if (parts.length) {
+      message.success(`已生成相关单据。${parts.join('；')}`)
+      emit('saved', null, [])
+      emit('update:open', false)
+    } else if (!errors.length) {
+      message.warning('未生成任何单据')
+    }
+    if (errors.length) {
+      const preview = errors.slice(0, 3).join('；')
+      message.warning(errors.length > 3 ? `${preview}…等 ${errors.length} 条失败` : preview)
+    }
+  } finally {
+    saving.value = false
   }
 }
 </script>
@@ -1324,9 +1522,17 @@ function handleSave() {
   cursor: help;
 }
 
-.line-summary {
+.line-summary-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin-top: 10px;
-  text-align: right;
+}
+
+.line-summary {
+  flex-shrink: 0;
+  text-align: left;
   font-size: 13px;
   color: #595959;
 
@@ -1335,6 +1541,16 @@ function handleSave() {
     font-size: 15px;
     margin-left: 4px;
   }
+}
+
+.qc-action-tip {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #1677ff;
+  text-align: right;
 }
 
 .locked-tip {

@@ -1,5 +1,9 @@
 import { getProcessByName, resolveDefaultExecutors } from '@/store/processConfigStore'
-import { buildWorkOrderProcessesFromGrid } from '@/utils/processRouteGrid'
+import {
+  buildWorkOrderProcessesFromGrid,
+  syncStepPolicies,
+  COMPLETION_MODE_ALL,
+} from '@/utils/processRouteGrid'
 import { createEmptyWorkOrderProcessExtras } from '@/utils/workOrderProcessDisplay'
 
 function getProcessRouteByNameLazy(name) {
@@ -124,18 +128,27 @@ export const disassemblyProcessDefs = [
   },
 ]
 
-export function buildProcessesFromRoute(routeName) {
+/** 从工艺路线生成工单工序 + 步骤完成方式快照 */
+export function buildRouteDispatchSnapshot(routeName) {
   const route = getProcessRouteByNameLazy(routeName)
   if (route?.grid) {
-    return buildWorkOrderProcessesFromGrid(route.grid, route.id)
+    const stepPolicies = syncStepPolicies(route.grid, route.stepPolicies)
+    return {
+      processes: buildWorkOrderProcessesFromGrid(route.grid, route.id, stepPolicies),
+      stepPolicies,
+    }
   }
 
   const legacy = processRouteMaster[routeName] || processRouteMaster['机加标准路线']
-  return legacy.steps.map((step, index) => {
+  const processes = legacy.steps.map((step, index) => {
     const proc = getProcessByName(step.name)
     return {
       id: `${legacy.id}-step-${index + 1}`,
       index: index + 1,
+      stepNo: index + 1,
+      rowNo: 1,
+      completionMode: COMPLETION_MODE_ALL,
+      includeInDispatch: true,
       name: step.name,
       processCode: proc?.code || step.code,
       processId: proc?.id,
@@ -158,6 +171,27 @@ export function buildProcessesFromRoute(routeName) {
         : [],
     }
   })
+  return {
+    processes,
+    stepPolicies: processes.map((p) => ({
+      stepNo: p.stepNo,
+      completionMode: COMPLETION_MODE_ALL,
+    })),
+  }
+}
+
+export function buildProcessesFromRoute(routeName) {
+  return buildRouteDispatchSnapshot(routeName).processes
+}
+
+/** 将路线快照写入工单（工序 + stepPolicies） */
+export function applyRouteSnapshotToWorkOrder(workOrder, routeName) {
+  if (!workOrder || !routeName) return false
+  const snap = buildRouteDispatchSnapshot(routeName)
+  workOrder.processRouteName = routeName
+  workOrder.processes = snap.processes
+  workOrder.stepPolicies = snap.stepPolicies
+  return true
 }
 
 export function buildDisassemblyProcesses() {

@@ -19,12 +19,12 @@
           :wrapper-col="{ style: { flex: 1 } }"
         >
           <a-row :gutter="[16, 0]" style="width: 100%">
-            <a-col :span="24">
-              <a-form-item label="工艺路线名称" required>
-                <a-input v-model:value="form.name" size="small" placeholder="请输入 工艺路线名称" />
+            <a-col :xs="24" :md="12">
+              <a-form-item label="路线名称" required>
+                <a-input v-model:value="form.name" size="small" placeholder="请输入 路线名称" />
               </a-form-item>
             </a-col>
-            <a-col :span="24">
+            <a-col :xs="24" :md="12">
               <a-form-item label="适用范围" required>
                 <a-radio-group v-model:value="form.applyScope" size="small" @change="onScopeChange">
                   <a-radio value="全部产品">全局</a-radio>
@@ -88,6 +88,7 @@
 
       <ProcessRouteGridEditor
         v-model:grid="form.grid"
+        v-model:step-policies="form.stepPolicies"
         v-model:selected-step="selectedStep"
         v-model:selected-row="selectedRow"
       />
@@ -113,7 +114,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
-import { createEmptyGrid } from '@/utils/processRouteGrid'
+import { createEmptyGrid, syncStepPolicies } from '@/utils/processRouteGrid'
 import { addProcessRoute, updateProcessRoute } from '@/store/processRouteStore'
 import { productCategoryState } from '@/store/productCategoryStore'
 import { materialCategoryState } from '@/store/materialCategoryStore'
@@ -153,6 +154,7 @@ const form = reactive({
   productDisplay: '',
   remark: '',
   grid: createEmptyGrid(9, 2),
+  stepPolicies: syncStepPolicies(createEmptyGrid(9, 2), []),
 })
 
 const productOpts = computed(() =>
@@ -200,6 +202,7 @@ function onProductSelect(id) {
 function resetForm() {
   const r = props.editRecord
   if (r) {
+    const grid = r.grid?.length ? r.grid : createEmptyGrid(9, 2)
     Object.assign(form, {
       name: r.name || '',
       applyScope: r.applyScope || '全部产品',
@@ -212,9 +215,11 @@ function resetForm() {
       categoryName: r.categoryName || '',
       productDisplay: r.productDisplay || '',
       remark: r.remark || '',
-      grid: r.grid?.length ? r.grid : createEmptyGrid(9, 2),
+      grid,
+      stepPolicies: syncStepPolicies(grid, r.stepPolicies),
     })
   } else {
+    const grid = createEmptyGrid(9, 2)
     Object.assign(form, {
       name: '',
       applyScope: '全部产品',
@@ -227,7 +232,8 @@ function resetForm() {
       categoryName: '',
       productDisplay: '',
       remark: '',
-      grid: createEmptyGrid(9, 2),
+      grid,
+      stepPolicies: syncStepPolicies(grid, []),
     })
   }
   selectedStep.value = -1

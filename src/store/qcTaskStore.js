@@ -16,6 +16,7 @@ import { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS } from '@/constants/qcTaskResult
 import { cloneMockIncomingQcTasks } from '@/mock/qcTasks'
 import { buildSharedQcTaskSeed } from '@/mock/qcSharedDemoSeed'
 import { getQcTemplateByCode } from '@/store/qcTemplateStore'
+import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 
@@ -49,17 +50,7 @@ function shouldReseed() {
 }
 
 function markSeeded() {
-  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
-}
-
-function isQuotaExceededError(err) {
-  if (!err) return false
-  return (
-    err.name === 'QuotaExceededError' ||
-    err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
-    err.code === 22 ||
-    err.code === 1014
-  )
+  safeSetItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 /** 落盘瘦身：不存 templateFields / fieldMap（可按 templateCode 回填），避免撑爆 localStorage */
@@ -141,62 +132,36 @@ function initTasks() {
     markSeeded()
     const seeded = mergeSharedDemoTasks(cloneMockIncomingQcTasks())
     // 立刻按瘦身格式写入，腾出配额并避免首屏 deep watch 再写膨胀数据
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ version: STORAGE_VERSION, tasks: slimTasksForStorage(seeded) }),
-      )
-    } catch {
-      /* ignore */
-    }
+    persistJson(STORAGE_KEY, {
+      version: STORAGE_VERSION,
+      tasks: slimTasksForStorage(seeded),
+    })
     return hydrateTasksAfterLoad(seeded)
   }
   const loaded = loadFromStorage()
   if (loaded) {
     const merged = mergeSharedDemoTasks(loaded)
     // 补齐同源演示单并回写（不改 seed 版本）
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ version: STORAGE_VERSION, tasks: slimTasksForStorage(merged) }),
-      )
-    } catch {
-      /* ignore */
-    }
+    persistJson(STORAGE_KEY, {
+      version: STORAGE_VERSION,
+      tasks: slimTasksForStorage(merged),
+    })
     return hydrateTasksAfterLoad(merged)
   }
   return hydrateTasksAfterLoad(mergeSharedDemoTasks(cloneMockIncomingQcTasks()))
 }
 
 function persist() {
-  const payload = JSON.stringify({
+  const ok = persistJson(STORAGE_KEY, {
     version: STORAGE_VERSION,
     tasks: slimTasksForStorage(qcTaskState.tasks),
   })
-  try {
-    localStorage.setItem(STORAGE_KEY, payload)
-    return
-  } catch (err) {
-    if (!isQuotaExceededError(err)) return
-  }
-  // 配额不足：清掉本 key 再写；仍失败则放弃持久化，不抛错打断页面
-  try {
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.setItem(STORAGE_KEY, payload)
-  } catch {
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          version: STORAGE_VERSION,
-          tasks: slimTasksForStorage(cloneMockIncomingQcTasks()),
-        }),
-      )
-    } catch {
-      /* ignore */
-    }
-  }
+  if (ok) return
+  // 仍失败：尝试只留 seed 体积，保证后续可读
+  persistJson(STORAGE_KEY, {
+    version: STORAGE_VERSION,
+    tasks: slimTasksForStorage(cloneMockIncomingQcTasks()),
+  })
 }
 
 export function generateQcTaskNo(bizScope) {
@@ -733,6 +698,7 @@ export function createInboundQcFromReceipt(payload = {}) {
         purchaseQty: line.purchaseQty ?? line.planQty,
         receiptQty: line.receiptQty ?? line.qty,
         receivingWarehouse: line.receivingWarehouse || line.warehouse || '',
+        inboundQcRequirement: line.inboundQcRequirement || '',
         inspectQty: line.receiptQty ?? line.qty ?? 0,
       },
       { bizScope },

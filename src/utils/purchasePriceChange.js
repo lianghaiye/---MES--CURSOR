@@ -1,9 +1,10 @@
 /**
  * 采购订单价格变更：状态、重算、汇总、审批展示
- * 交互对齐销售订单价格变更；采购无行折扣，仅改单价。
+ * 交互对齐销售订单价格变更；采购无行折扣，仅改单价；支持「取消行」。
  */
 import { formatNumber, roundNumber } from '@/utils/numberFormat'
 import { resolvePricingQty } from '@/utils/settleUnit'
+import { poLineHasReceiptOrInboundDoc } from '@/utils/purchaseLineInbound'
 
 export const PURCHASE_PRICE_CHANGE_STATUS = {
   PENDING: '待审核',
@@ -48,11 +49,19 @@ function deriveExTax(inc, taxRate) {
   return rate >= 0 ? round2(inTax / (1 + rate / 100)) : round2(inTax)
 }
 
+/** 未生成收货/入库单时才可「取消行」 */
+export function canCancelPurchasePriceChangeLine(row) {
+  if (!row || row.cancelled || row.oldCancelled) return false
+  return !row.hasReceiptOrInbound
+}
+
 export function isPurchasePriceChangeLineChanged(row) {
   if (!row) return false
+  if (Boolean(row.cancelled) !== Boolean(row.oldCancelled)) return true
   const checks = [
     [row.newUnitPriceExTax, row.oldUnitPriceExTax],
     [row.newUnitPriceInTax, row.oldUnitPriceInTax],
+    [row.newQty, row.oldQty],
   ]
   return checks.some(([a, b]) => Math.abs((Number(a) || 0) - (Number(b) || 0)) > 1e-9)
 }
@@ -67,6 +76,7 @@ export function buildPurchasePriceChangeDraftLines(order) {
       const oldUnitPriceInTax = round2(
         Number(line.unitPriceInTax) || deriveInTax(oldUnitPriceExTax, taxRate),
       )
+      const alreadyCancelled = Boolean(line.cancelled)
       const row = {
         poLineId: line.id,
         productCode: line.productCode || line.itemCode || '',
@@ -75,9 +85,16 @@ export function buildPurchasePriceChangeDraftLines(order) {
         material: line.material || '',
         unit: line.settleUnit || line.unit || '',
         qty,
+        oldQty: qty,
+        newQty: qty,
         purchaseQty: Number(line.purchaseQty) || 0,
+        oldPurchaseQty: Number(line.purchaseQty) || 0,
+        newPurchaseQty: Number(line.purchaseQty) || 0,
         settleUnit: line.settleUnit || '',
         taxRate,
+        oldCancelled: alreadyCancelled,
+        cancelled: alreadyCancelled,
+        hasReceiptOrInbound: poLineHasReceiptOrInboundDoc(order, line),
         oldUnitPriceExTax,
         oldUnitPriceInTax,
         newUnitPriceExTax: oldUnitPriceExTax,
@@ -89,17 +106,27 @@ export function buildPurchasePriceChangeDraftLines(order) {
 
 export function recalcPurchasePriceChangeLine(row, options = {}) {
   const taxModeExcluding = options.taxModeExcluding !== false
-  const qty = Number(row.qty) || 0
+  const oldQty = Number(row.oldQty ?? row.qty) || 0
+  let newQty = Number(row.newQty ?? row.qty) || 0
+  if (row.cancelled) newQty = 0
+  const oldPurchaseQty = Number(row.oldPurchaseQty ?? row.purchaseQty) || 0
+  let newPurchaseQty = Number(row.newPurchaseQty ?? row.purchaseQty) || 0
+  if (row.cancelled) newPurchaseQty = 0
   const taxRate = Number(row.taxRate) || 0
   row.taxRate = taxRate
-  row.qty = qty
+  row.oldQty = oldQty
+  row.newQty = newQty
+  row.qty = newQty
+  row.oldPurchaseQty = oldPurchaseQty
+  row.newPurchaseQty = newPurchaseQty
+  row.purchaseQty = newPurchaseQty
 
   row.oldUnitPriceExTax = round2(Number(row.oldUnitPriceExTax) || 0)
   row.oldUnitPriceInTax = round2(
     Number(row.oldUnitPriceInTax) || deriveInTax(row.oldUnitPriceExTax, taxRate),
   )
-  row.oldAmountExTax = lineChangeAmount(qty, row.oldUnitPriceExTax)
-  row.oldAmountInTax = lineChangeAmount(qty, row.oldUnitPriceInTax)
+  row.oldAmountExTax = lineChangeAmount(oldQty, row.oldUnitPriceExTax)
+  row.oldAmountInTax = lineChangeAmount(oldQty, row.oldUnitPriceInTax)
 
   if (taxModeExcluding) {
     row.newUnitPriceExTax = round2(Number(row.newUnitPriceExTax) || 0)
@@ -109,8 +136,8 @@ export function recalcPurchasePriceChangeLine(row, options = {}) {
     row.newUnitPriceExTax = deriveExTax(row.newUnitPriceInTax, taxRate)
   }
 
-  row.newAmountExTax = lineChangeAmount(qty, row.newUnitPriceExTax)
-  row.newAmountInTax = lineChangeAmount(qty, row.newUnitPriceInTax)
+  row.newAmountExTax = lineChangeAmount(newQty, row.newUnitPriceExTax)
+  row.newAmountInTax = lineChangeAmount(newQty, row.newUnitPriceInTax)
   row.deltaAmountExTax = round2(row.newAmountExTax - row.oldAmountExTax)
   row.deltaAmountInTax = round2(row.newAmountInTax - row.oldAmountInTax)
   return row
@@ -145,6 +172,13 @@ export function summarizePurchasePriceChangeLines(lines = []) {
 export function normalizePurchasePriceChangeLine(row, taxModeExcluding = true) {
   const next = { ...row }
   if (next.taxRate == null || next.taxRate === '') next.taxRate = 13
+  if (next.oldQty == null) next.oldQty = Number(next.qty) || 0
+  if (next.newQty == null) next.newQty = Number(next.qty) || 0
+  if (next.oldPurchaseQty == null) next.oldPurchaseQty = Number(next.purchaseQty) || 0
+  if (next.newPurchaseQty == null) next.newPurchaseQty = Number(next.purchaseQty) || 0
+  if (next.oldCancelled == null) next.oldCancelled = false
+  if (next.cancelled == null) next.cancelled = Boolean(next.oldCancelled)
+  if (next.hasReceiptOrInbound == null) next.hasReceiptOrInbound = false
   return recalcPurchasePriceChangeLine(next, { taxModeExcluding })
 }
 
