@@ -6,22 +6,20 @@
 
     <div class="editor-main">
       <!-- 左侧：工序分类 + 工序列表 -->
-      <div class="left-panel">
-        <div class="panel-box category-box">
-          <div class="box-title">工序</div>
-          <ul class="category-list">
-            <li
-              v-for="cat in activeCategories"
-              :key="cat"
-              class="category-item"
-              :class="{ active: activeCategory === cat }"
-              @click="activeCategory = cat"
-            >
-              {{ cat }}
-            </li>
-          </ul>
-        </div>
-        <div class="panel-box process-gallery-box">
+      <div class="left-panel panel-box" :style="{ width: `${leftWidth}px` }">
+        <div class="box-title">工序</div>
+        <ul class="category-list">
+          <li
+            v-for="cat in activeCategories"
+            :key="cat"
+            class="category-item"
+            :class="{ active: activeCategory === cat }"
+            @click="activeCategory = cat"
+          >
+            {{ cat }}
+          </li>
+        </ul>
+        <div class="process-gallery-box">
           <div class="process-gallery">
             <div
               v-for="proc in currentProcesses"
@@ -38,96 +36,114 @@
           </div>
         </div>
       </div>
+      <div class="resize-handle" title="拖动调整宽度" @mousedown.prevent="startResize" />
 
-      <!-- 中间：流程网格 + 基本信息 -->
-      <div class="center-panel">
-        <div class="grid-area panel-box">
+      <!-- 中间：流程网格 -->
+      <div class="center-panel panel-box">
+        <div class="grid-area">
           <div class="grid-scroll">
             <div class="grid-header">
               <div class="corner-cell" />
-              <div v-for="col in stepCount" :key="col" class="step-header">
-                <span>第{{ col }}步</span>
+              <template v-for="col in stepCount" :key="`h-${col}`">
+                <div class="step-header">第{{ col }}步</div>
                 <a-button
-                  v-if="col === stepCount"
                   type="link"
                   size="small"
-                  class="step-add-btn"
+                  class="gap-add-btn"
                   :disabled="stepCount >= MAX_ROUTE_STEPS"
-                  @click="addStep"
+                  title="在此之后插入一步"
+                  @click="insertStepAt(col - 1)"
+                >
+                  +
+                </a-button>
+              </template>
+            </div>
+            <template v-for="row in rowCount" :key="`r-${row}`">
+              <div class="grid-row">
+                <div class="row-label">{{ row }}</div>
+                <template v-for="col in stepCount" :key="`${row}-${col}`">
+                  <div
+                    class="grid-cell"
+                    :class="{
+                      selected: isSelected(col - 1, row - 1),
+                      filled: hasCell(col - 1, row - 1),
+                    }"
+                    @click="onCellClick(col - 1, row - 1)"
+                    @dragover.prevent
+                    @drop="onDrop(col - 1, row - 1, $event)"
+                  >
+                    <template v-if="getCellProcess(col - 1, row - 1)">
+                      <div class="cell-tile">
+                        <CloseOutlined
+                          class="cell-remove"
+                          @click.stop="removeCell(col - 1, row - 1)"
+                        />
+                        <span class="cell-name">{{ getCellProcess(col - 1, row - 1).name }}</span>
+                      </div>
+                    </template>
+                  </div>
+                  <div v-if="col < stepCount" class="cell-gap-spacer" />
+                </template>
+              </div>
+              <div class="row-gap">
+                <div class="corner-cell" />
+                <a-button
+                  type="link"
+                  size="small"
+                  class="gap-add-btn row-gap-btn"
+                  :disabled="rowCount >= MAX_ROUTE_PARALLEL"
+                  title="在此之后插入一行"
+                  @click="insertRowAt(row - 1)"
                 >
                   +
                 </a-button>
               </div>
-            </div>
-            <div v-for="row in rowCount" :key="row" class="grid-row">
-              <div class="row-label">{{ row }}</div>
-              <div
-                v-for="col in stepCount"
-                :key="`${row}-${col}`"
-                class="grid-cell"
-                :class="{
-                  selected: isSelected(col - 1, row - 1),
-                  filled: hasCell(col - 1, row - 1),
-                }"
-                @click="onCellClick(col - 1, row - 1)"
-                @dragover.prevent
-                @drop="onDrop(col - 1, row - 1, $event)"
-              >
-                <template v-if="getCellProcess(col - 1, row - 1)">
-                  <div class="cell-tile">
-                    <CloseOutlined class="cell-remove" @click.stop="removeCell(col - 1, row - 1)" />
-                    <span class="cell-name">{{ getCellProcess(col - 1, row - 1).name }}</span>
-                  </div>
-                </template>
-              </div>
-              <a-button
-                v-if="row === rowCount"
-                type="link"
-                size="small"
-                class="row-add-btn"
-                :disabled="rowCount >= MAX_ROUTE_PARALLEL"
-                @click="addRow"
-              >
-                +
-              </a-button>
-            </div>
+            </template>
           </div>
-        </div>
-
-        <div v-if="$slots.basic" class="basic-area panel-box">
-          <slot name="basic" />
         </div>
       </div>
 
       <!-- 右侧：工序信息 + 文件配置 -->
       <div class="right-panel panel-box">
         <template v-if="selectedMeta">
-          <div class="panel-title">工序信息</div>
-          <a-form
-            layout="horizontal"
-            :label-col="{ span: 8 }"
-            :wrapper-col="{ span: 16 }"
-            size="small"
-          >
-            <a-form-item label="工序名称">
-              <a-input :value="selectedMeta.processName" disabled size="small" />
-            </a-form-item>
-            <a-form-item label="所属步骤">
-              <span class="meta-text">
-                第{{ selectedMeta.stepNo }}步 行号：{{ selectedMeta.rowNo }} 列号：{{
-                  selectedMeta.colNo
-                }}
+          <div class="box-title">工序信息</div>
+          <div class="info-rows">
+            <div class="info-row">
+              <span class="k">工序名称：</span>
+              <span class="v">{{ selectedMeta.processName || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="k">工序编号：</span>
+              <span class="v">{{ selectedMeta.processCode || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="k">资源类型：</span>
+              <span class="v">{{ selectedMeta.resourceType || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="k">报工类型：</span>
+              <span class="v">{{ selectedMeta.reportMode || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="k">工序配置项：</span>
+              <span class="v">
+                <template v-if="selectedMeta.configLabels?.length">
+                  <a-tag
+                    v-for="label in selectedMeta.configLabels"
+                    :key="label"
+                    color="blue"
+                    class="config-tag"
+                  >
+                    {{ label }}
+                  </a-tag>
+                </template>
+                <template v-else>—</template>
               </span>
-            </a-form-item>
-          </a-form>
+            </div>
+          </div>
 
-          <div class="panel-title">文件配置</div>
-          <a-form
-            layout="horizontal"
-            :label-col="{ span: 8 }"
-            :wrapper-col="{ span: 16 }"
-            size="small"
-          >
+          <div class="box-title sub-title">文件配置</div>
+          <a-form layout="vertical" size="small" class="file-form">
             <a-form-item label="工艺文件">
               <a-select
                 :value="selectedMeta.processFileId"
@@ -136,6 +152,7 @@
                 size="small"
                 placeholder="请选择 工艺文件"
                 :options="docOpts"
+                :filter-option="filterDocOption"
                 @change="onDocChange"
               />
             </a-form-item>
@@ -162,6 +179,8 @@ import {
   MAX_ROUTE_STEPS,
   normalizeGrid,
   getSelectedCellMeta,
+  insertStepAfter,
+  insertRowAfter,
 } from '@/utils/processRouteGrid'
 
 const props = defineProps({
@@ -176,6 +195,7 @@ const activeCategories = computed(() => getActiveProcessCategories())
 const activeCategory = ref('')
 const pendingProcessId = ref('')
 const dragProcessId = ref('')
+const leftWidth = ref(220)
 
 const localGrid = ref(normalizeGrid(props.grid))
 
@@ -291,15 +311,27 @@ function removeCell(step, row) {
   }
 }
 
-function addStep() {
-  if (localGrid.value.length >= MAX_ROUTE_STEPS) return
-  localGrid.value.push(Array.from({ length: rowCount.value }, () => null))
+function insertStepAt(afterIndex) {
+  if (stepCount.value >= MAX_ROUTE_STEPS) {
+    message.warning(`最大步数 ${MAX_ROUTE_STEPS}`)
+    return
+  }
+  localGrid.value = insertStepAfter(localGrid.value, afterIndex)
+  if (props.selectedStep > afterIndex) {
+    emit('update:selectedStep', props.selectedStep + 1)
+  }
   emitGrid()
 }
 
-function addRow() {
-  if (rowCount.value >= MAX_ROUTE_PARALLEL) return
-  localGrid.value.forEach((step) => step.push(null))
+function insertRowAt(afterIndex) {
+  if (rowCount.value >= MAX_ROUTE_PARALLEL) {
+    message.warning(`最大并行数 ${MAX_ROUTE_PARALLEL}`)
+    return
+  }
+  localGrid.value = insertRowAfter(localGrid.value, afterIndex)
+  if (props.selectedRow > afterIndex) {
+    emit('update:selectedRow', props.selectedRow + 1)
+  }
   emitGrid()
 }
 
@@ -311,20 +343,41 @@ function onDocChange(docId) {
   cell.processFileId = docId || ''
   emitGrid()
 }
+
+function filterDocOption(input, option) {
+  const kw = String(input || '')
+    .trim()
+    .toLowerCase()
+  if (!kw) return true
+  return String(option?.label || '')
+    .toLowerCase()
+    .includes(kw)
+}
+
+function startResize(e) {
+  const startX = e.clientX
+  const startW = leftWidth.value
+  const onMove = (ev) => {
+    leftWidth.value = Math.min(360, Math.max(180, startW + (ev.clientX - startX)))
+  }
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
 </script>
 
 <style scoped>
 .route-editor-layout {
-  background: var(--page-bg, #f0f2f5);
-  border-radius: 4px;
+  background: transparent;
 }
 
 .grid-tip {
-  padding: 10px 16px;
+  padding: 8px 0 12px;
   font-size: 13px;
   color: #666;
-  background: #fff;
-  border-bottom: 1px solid #e8e8e8;
 }
 
 .editor-main {
@@ -337,29 +390,29 @@ function onDocChange(docId) {
 .panel-box {
   background: #fff;
   border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .left-panel {
-  width: 200px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #e8e8e8;
+  min-height: 480px;
 }
 
-.category-box {
-  border-bottom: 1px solid #e8e8e8;
-  border-left: none;
-  border-top: none;
-  border-radius: 0;
+.resize-handle {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  align-self: stretch;
+  margin: 0 4px;
+  border-radius: 3px;
+  background: transparent;
 }
 
-.process-gallery-box {
-  flex: 1;
-  border: none;
-  border-radius: 0;
-  overflow: auto;
-  min-height: 200px;
+.resize-handle:hover {
+  background: #bae0ff;
 }
 
 .box-title {
@@ -370,10 +423,18 @@ function onDocChange(docId) {
   background: #fafafa;
 }
 
+.box-title.sub-title {
+  margin-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
 .category-list {
   list-style: none;
   margin: 0;
   padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+  max-height: 160px;
+  overflow: auto;
 }
 
 .category-item {
@@ -392,6 +453,12 @@ function onDocChange(docId) {
   background: #e6f4ff;
   color: #1677ff;
   font-weight: 500;
+}
+
+.process-gallery-box {
+  flex: 1;
+  overflow: auto;
+  min-height: 200px;
 }
 
 .process-gallery {
@@ -429,23 +496,15 @@ function onDocChange(docId) {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  border-right: 1px solid #e8e8e8;
+  margin-left: 4px;
+  margin-right: 8px;
 }
 
 .grid-area {
   flex: 1;
-  border: none;
-  border-bottom: 1px solid #e8e8e8;
-  border-radius: 0;
   overflow: auto;
   padding: 12px;
   min-height: 280px;
-}
-
-.basic-area {
-  border: none;
-  border-radius: 0;
-  padding: 12px 16px 4px;
 }
 
 .grid-scroll {
@@ -456,8 +515,8 @@ function onDocChange(docId) {
 .grid-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 0;
+  margin-bottom: 0;
 }
 
 .corner-cell,
@@ -476,17 +535,30 @@ function onDocChange(docId) {
   font-weight: 500;
   color: #333;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
 }
 
-.step-add-btn,
-.row-add-btn {
-  padding: 0 4px;
+.gap-add-btn {
+  padding: 0 2px;
   height: auto;
   line-height: 1;
+  flex-shrink: 0;
+  min-width: 20px;
+}
+
+.cell-gap-spacer {
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.row-gap {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  margin: 2px 0;
+}
+
+.row-gap-btn {
+  margin-left: 0;
 }
 
 .grid-cell {
@@ -545,25 +617,44 @@ function onDocChange(docId) {
 }
 
 .right-panel {
-  width: 260px;
+  width: 280px;
   flex-shrink: 0;
-  padding: 12px;
-  border: none;
-  border-radius: 0;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
-.panel-title {
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 10px;
-  padding-left: 8px;
-  border-left: 3px solid #1677ff;
+.info-rows {
+  padding: 12px 14px;
 }
 
-.meta-text {
-  font-size: 12px;
-  color: #666;
+.info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 6px;
+}
+
+.info-row .k {
+  color: rgba(0, 0, 0, 0.45);
+  flex-shrink: 0;
+}
+
+.info-row .v {
+  color: rgba(0, 0, 0, 0.88);
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+
+.config-tag {
+  margin-bottom: 4px;
+}
+
+.file-form {
+  padding: 0 14px 12px;
 }
 
 .right-empty {

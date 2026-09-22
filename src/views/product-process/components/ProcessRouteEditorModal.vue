@@ -8,101 +8,90 @@
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
-    <ProcessRouteGridEditor
-      v-model:grid="form.grid"
-      v-model:selected-step="selectedStep"
-      v-model:selected-row="selectedRow"
-    >
-      <template #basic>
-        <div class="modal-basic-card">
-          <div class="section-title">基本信息</div>
-          <a-form
-            :model="form"
-            layout="horizontal"
-            class="route-basic-form horizontal-form"
-            :label-col="{ style: { width: '110px' } }"
-            :wrapper-col="{ style: { flex: 1 } }"
-          >
-            <a-row :gutter="[16, 0]" style="width: 100%">
-              <a-col :span="24">
-                <a-form-item label="工艺路线名称" required>
-                  <a-input
-                    v-model:value="form.name"
+    <div class="route-editor-page">
+      <div class="form-section-box modal-basic-card">
+        <div class="section-label">基本信息</div>
+        <a-form
+          :model="form"
+          layout="horizontal"
+          class="route-basic-form horizontal-form"
+          :label-col="{ style: { width: '110px' } }"
+          :wrapper-col="{ style: { flex: 1 } }"
+        >
+          <a-row :gutter="[16, 0]" style="width: 100%">
+            <a-col :span="24">
+              <a-form-item label="工艺路线名称" required>
+                <a-input v-model:value="form.name" size="small" placeholder="请输入 工艺路线名称" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="24">
+              <a-form-item label="适用范围" required>
+                <a-radio-group v-model:value="form.applyScope" size="small" @change="onScopeChange">
+                  <a-radio value="全部产品">全局</a-radio>
+                  <a-radio value="单个物品">单产品</a-radio>
+                  <a-radio value="物品类别">产品类别</a-radio>
+                </a-radio-group>
+              </a-form-item>
+            </a-col>
+            <a-col v-if="form.applyScope === '单个物品'" :span="24">
+              <a-form-item label="适用对象" required>
+                <div class="scope-target-row">
+                  <a-select
+                    :value="form.itemId || undefined"
+                    show-search
+                    allow-clear
                     size="small"
-                    placeholder="请输入 工艺路线名称"
+                    placeholder="输入编码/名称搜索"
+                    :options="productOpts"
+                    :filter-option="filterProductOption"
+                    style="flex: 1"
+                    @change="onProductSelect"
                   />
-                </a-form-item>
-              </a-col>
+                  <a class="link-more" @click.prevent="itemPickerOpen = true">查看更多</a>
+                </div>
+              </a-form-item>
+            </a-col>
+            <template v-if="form.applyScope === '物品类别'">
               <a-col :span="24">
-                <a-form-item label="工艺应用范围" required>
-                  <a-radio-group
-                    v-model:value="form.applyScope"
-                    size="small"
-                    @change="onScopeChange"
-                  >
-                    <a-radio value="全部产品">全部产品</a-radio>
-                    <a-radio value="单个物品">单个物品</a-radio>
-                    <a-radio value="物品类别">物品类别</a-radio>
-                  </a-radio-group>
-                </a-form-item>
-              </a-col>
-              <a-col v-if="form.applyScope === '单个物品'" :span="24">
-                <a-form-item label="物品" required>
-                  <a-input-group compact style="width: 100%">
-                    <a-input
-                      :value="form.itemName ? `${form.itemName}` : ''"
-                      readonly
-                      size="small"
-                      placeholder="请选择 物品"
-                      style="width: calc(100% - 72px)"
-                    />
-                    <a-button size="small" @click="itemPickerOpen = true">选择</a-button>
-                  </a-input-group>
-                </a-form-item>
-              </a-col>
-              <template v-if="form.applyScope === '物品类别'">
-                <a-col :span="24">
-                  <a-form-item label="类别类型" required>
-                    <a-radio-group
-                      v-model:value="form.categoryType"
-                      size="small"
-                      @change="onCategoryTypeChange"
-                    >
-                      <a-radio value="产品">产品类别</a-radio>
-                      <a-radio value="物料">物料类别</a-radio>
-                    </a-radio-group>
-                  </a-form-item>
-                </a-col>
-                <a-col :span="24">
-                  <a-form-item label="物品类别" required>
+                <a-form-item label="适用对象" required>
+                  <div class="scope-target-row">
                     <a-tree-select
                       v-model:value="form.categoryKey"
                       :tree-data="categoryTree"
-                      placeholder="请选择 物品类别"
+                      placeholder="输入编码/名称搜索"
                       tree-default-expand-all
+                      show-search
                       allow-clear
+                      tree-node-filter-prop="title"
                       size="small"
-                      style="width: 100%"
+                      style="flex: 1"
                       @change="onCategoryChange"
                     />
-                  </a-form-item>
-                </a-col>
-              </template>
-              <a-col :span="24">
-                <a-form-item label="备注">
-                  <a-textarea
-                    v-model:value="form.remark"
-                    :rows="2"
-                    size="small"
-                    placeholder="请输入 备注"
-                  />
+                    <a class="link-more muted">查看更多</a>
+                  </div>
                 </a-form-item>
               </a-col>
-            </a-row>
-          </a-form>
-        </div>
-      </template>
-    </ProcessRouteGridEditor>
+            </template>
+            <a-col :span="24">
+              <a-form-item label="备注">
+                <a-textarea
+                  v-model:value="form.remark"
+                  :rows="2"
+                  size="small"
+                  placeholder="请输入 备注"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-form>
+      </div>
+
+      <ProcessRouteGridEditor
+        v-model:grid="form.grid"
+        v-model:selected-step="selectedStep"
+        v-model:selected-row="selectedRow"
+      />
+    </div>
 
     <SelectProductMaterialModal
       v-if="isActive"
@@ -128,6 +117,7 @@ import { createEmptyGrid } from '@/utils/processRouteGrid'
 import { addProcessRoute, updateProcessRoute } from '@/store/processRouteStore'
 import { productCategoryState } from '@/store/productCategoryStore'
 import { materialCategoryState } from '@/store/materialCategoryStore'
+import { productInfoState } from '@/store/productInfoStore'
 import ProcessRouteGridEditor from './ProcessRouteGridEditor.vue'
 import SelectProductMaterialModal from './SelectProductMaterialModal.vue'
 
@@ -165,22 +155,53 @@ const form = reactive({
   grid: createEmptyGrid(9, 2),
 })
 
+const productOpts = computed(() =>
+  (productInfoState.products || []).map((p) => ({
+    label: `${p.code || ''} ${p.name || ''}`.trim(),
+    value: p.id,
+    code: p.code,
+    name: p.name,
+  })),
+)
+
 const categoryTree = computed(() => {
   const tree = form.categoryType === '物料' ? materialCategoryState.tree : productCategoryState.tree
-  const mapNode = (n) => ({
-    title: n.title,
-    value: n.key,
-    key: n.key,
-    children: n.children?.map(mapNode),
-  })
-  return tree.map(mapNode)
+  return tree || []
 })
+
+function filterProductOption(input, option) {
+  const kw = String(input || '')
+    .trim()
+    .toLowerCase()
+  if (!kw) return true
+  const label = String(option?.label || '').toLowerCase()
+  const code = String(option?.code || '').toLowerCase()
+  const name = String(option?.name || '').toLowerCase()
+  return label.includes(kw) || code.includes(kw) || name.includes(kw)
+}
+
+function onProductSelect(id) {
+  if (!id) {
+    form.itemId = ''
+    form.itemName = ''
+    form.itemCode = ''
+    form.productDisplay = ''
+    return
+  }
+  const row = (productInfoState.products || []).find((p) => p.id === id)
+  if (!row) return
+  form.itemType = '产品'
+  form.itemId = row.id
+  form.itemName = row.name || ''
+  form.itemCode = row.code || ''
+  form.productDisplay = row.name || ''
+}
 
 function resetForm() {
   const r = props.editRecord
   if (r) {
     Object.assign(form, {
-      name: r.name,
+      name: r.name || '',
       applyScope: r.applyScope || '全部产品',
       itemType: r.itemType || '产品',
       itemId: r.itemId || '',
@@ -191,12 +212,12 @@ function resetForm() {
       categoryName: r.categoryName || '',
       productDisplay: r.productDisplay || '',
       remark: r.remark || '',
-      grid: JSON.parse(JSON.stringify(r.grid || createEmptyGrid(9, 2))),
+      grid: r.grid?.length ? r.grid : createEmptyGrid(9, 2),
     })
   } else {
     Object.assign(form, {
       name: '',
-      applyScope: '单个物品',
+      applyScope: '全部产品',
       itemType: '产品',
       itemId: '',
       itemName: '',
@@ -219,11 +240,7 @@ function onScopeChange() {
   form.itemCode = ''
   form.categoryKey = undefined
   form.categoryName = ''
-}
-
-function onCategoryTypeChange() {
-  form.categoryKey = undefined
-  form.categoryName = ''
+  form.productDisplay = ''
 }
 
 function onCategoryChange(key) {
@@ -278,12 +295,26 @@ watch(
 </script>
 
 <style scoped>
-.section-title {
+.route-editor-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-section-box {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+}
+
+.section-label {
+  margin-bottom: 10px;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 12px;
-  padding-left: 8px;
-  border-left: 3px solid #1677ff;
+  color: rgba(0, 0, 0, 0.88);
 }
 
 .route-basic-form :deep(.ant-form-item) {
@@ -294,12 +325,24 @@ watch(
   font-size: 13px;
 }
 
-.route-basic-form
-  :deep(
-    .ant-form-item-label
-      > label.ant-form-item-required:not(.ant-form-item-required-mark-hidden)::before
-  ) {
-  margin-inline-end: 4px;
+.scope-target-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.link-more {
+  color: #1677ff;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.link-more.muted {
+  color: rgba(0, 0, 0, 0.25);
+  cursor: default;
+  pointer-events: none;
 }
 </style>
 

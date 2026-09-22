@@ -1,4 +1,8 @@
-import { getProcessById, resolveDefaultExecutors } from '@/store/processConfigStore'
+import {
+  getProcessById,
+  getOperationLabels,
+  resolveDefaultExecutors,
+} from '@/store/processConfigStore'
 import { normalizeReportMode } from '@/utils/reportMode'
 import { normalizeTaskExecutionMode } from '@/utils/taskExecutionMode'
 import { getProcessDocById } from '@/store/processDocStore'
@@ -19,6 +23,29 @@ export function normalizeGrid(grid) {
   return grid.map((step) =>
     Array.isArray(step) ? step.map((cell) => (cell ? { ...cell } : null)) : [],
   )
+}
+
+/** 在 afterIndex（0-based）之后插入一列空步；afterIndex === -1 插到最前 */
+export function insertStepAfter(grid, afterIndex) {
+  const g = normalizeGrid(grid)
+  const rows = Math.max(1, g[0]?.length || 1)
+  if (g.length >= MAX_ROUTE_STEPS) return g
+  const empty = Array.from({ length: rows }, () => null)
+  const idx = Math.max(-1, Math.min(Number(afterIndex), g.length - 1))
+  g.splice(idx + 1, 0, empty)
+  return g
+}
+
+/** 在每步的 afterIndex 之后插入空行；afterIndex === -1 插到最上 */
+export function insertRowAfter(grid, afterIndex) {
+  const g = normalizeGrid(grid)
+  const rows = Math.max(1, g[0]?.length || 1)
+  if (rows >= MAX_ROUTE_PARALLEL) return g
+  const idx = Math.max(-1, Math.min(Number(afterIndex), rows - 1))
+  g.forEach((step) => {
+    step.splice(idx + 1, 0, null)
+  })
+  return g
 }
 
 export function countGridSteps(grid) {
@@ -110,12 +137,28 @@ export function getSelectedCellMeta(grid, stepIndex, rowIndex) {
   const cell = grid?.[stepIndex]?.[rowIndex]
   if (!cell?.processId) return null
   const proc = getProcessById(cell.processId)
+  const configLabels = [...(proc?.isBlanking ? ['下料'] : []), ...getOperationLabels(proc)]
   return {
     stepNo: stepIndex + 1,
     rowNo: rowIndex + 1,
     colNo: stepIndex + 1,
-    processName: proc?.name || '',
+    processName: proc?.name || cell.processName || '',
+    processCode: proc?.code || '',
     processId: cell.processId,
     processFileId: cell.processFileId || undefined,
+    resourceType: proc?.resourceType || '',
+    reportMode: proc?.reportMode || '',
+    isBlanking: Boolean(proc?.isBlanking),
+    configLabels,
   }
+}
+
+/** 列表/详情展示用 */
+export function formatApplyScopeLabel(scope) {
+  const map = {
+    全部产品: '全局',
+    单个物品: '单产品',
+    物品类别: '产品类别',
+  }
+  return map[scope] || scope || '—'
 }

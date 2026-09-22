@@ -16,8 +16,10 @@
             <a-descriptions-item label="工艺路线编号">{{ record.code }}</a-descriptions-item>
             <a-descriptions-item label="名称">{{ record.name }}</a-descriptions-item>
             <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
-            <a-descriptions-item label="工艺应用范围">{{ record.applyScope }}</a-descriptions-item>
-            <a-descriptions-item label="产品/物品">
+            <a-descriptions-item label="适用范围">{{
+              formatApplyScopeLabel(record.applyScope)
+            }}</a-descriptions-item>
+            <a-descriptions-item label="适用对象">
               {{ record.productDisplay || record.itemName || record.categoryName || '—' }}
             </a-descriptions-item>
             <a-descriptions-item label="备注">{{ record.remark || '—' }}</a-descriptions-item>
@@ -60,7 +62,7 @@ import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProcessRouteById } from '@/store/processRouteStore'
-import { flattenGridToSteps } from '@/utils/processRouteGrid'
+import { flattenGridToSteps, formatApplyScopeLabel } from '@/utils/processRouteGrid'
 
 const route = useRoute()
 const router = useRouter()

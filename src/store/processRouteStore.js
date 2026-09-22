@@ -87,12 +87,12 @@ export function filterProcessRoutes(list, filters = {}) {
 
 function validateRouteForm(payload) {
   if (!payload.name?.trim()) return { ok: false, message: '请输入工艺路线名称' }
-  if (!payload.applyScope) return { ok: false, message: '请选择工艺应用范围' }
+  if (!payload.applyScope) return { ok: false, message: '请选择适用范围' }
   if (payload.applyScope === '单个物品') {
-    if (!payload.itemId) return { ok: false, message: '请选择物品' }
+    if (!payload.itemId) return { ok: false, message: '请选择适用对象' }
   }
   if (payload.applyScope === '物品类别') {
-    if (!payload.categoryKey) return { ok: false, message: '请选择物品类别' }
+    if (!payload.categoryKey) return { ok: false, message: '请选择适用对象' }
   }
   const gridCheck = validateProcessRouteGrid(payload.grid)
   if (!gridCheck.ok) return gridCheck

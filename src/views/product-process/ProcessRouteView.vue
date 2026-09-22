@@ -77,7 +77,7 @@
             {{ record.productDisplay || '—' }}
           </template>
           <template v-else-if="column.key === 'applyScope'">
-            {{ record.applyScope === '物品类别' ? '产品类别' : record.applyScope }}
+            {{ formatApplyScopeLabel(record.applyScope) }}
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
@@ -153,6 +153,7 @@ import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
+import { formatApplyScopeLabel } from '@/utils/processRouteGrid'
 import ImportExcelModal from '@/components/ImportExcelModal.vue'
 import ImportExportHistoryModal from '@/components/ImportExportHistoryModal.vue'
 import { processRouteBundleImportDef } from '@/utils/importDefs/processRouteBundleImport'
@@ -174,7 +175,7 @@ const baseColumns = [
   { title: '工艺路线编号', key: 'code', width: 120 },
   { title: '名称', dataIndex: 'name', width: 160 },
   { title: '产品', key: 'product', width: 120 },
-  { title: '工艺应用范围', key: 'applyScope', dataIndex: 'applyScope', width: 120 },
+  { title: '适用范围', key: 'applyScope', dataIndex: 'applyScope', width: 120 },
   { title: '状态', key: 'status', width: 90 },
   { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
   { title: '创建日期', dataIndex: 'createdAt', width: 160 },
