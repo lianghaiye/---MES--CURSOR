@@ -231,6 +231,12 @@
           <template v-else-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'changeStatus'">
+            <template v-if="resolveChangeStatus(record) === '-'">-</template>
+            <a-tag v-else :color="changeStatusColor(resolveChangeStatus(record))">
+              {{ resolveChangeStatus(record) }}
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'outsourceMode'">
             <a-tag :color="record.outsourceMode === 'process' ? 'blue' : 'default'">
               {{ outsourceModeLabel(record.outsourceMode) }}
@@ -465,7 +471,10 @@ import {
   canApplyOutsourcingPriceChange,
   getPendingOutsourcingPriceChange,
   getPendingOutsourcingPriceChangeBlock,
+  outsourcingPriceChangeState,
+  resolveOutsourcingOrderChangeStatus,
 } from '@/store/outsourcingPriceChangeStore'
+import { outsourcingOrderChangeStatusColor } from '@/utils/outsourcingPriceChange'
 import { OUTSOURCING_PRINT_TEMPLATE } from '@/utils/outsourcingOrderPrintPreview'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -527,6 +536,7 @@ const outsourceModeOpts = outsourcingModeFilterOptions
 const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 90, fixed: 'left' },
+  { title: '变更状态', key: 'changeStatus', width: 100 },
   { title: '外协单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
   { title: '外协类型', key: 'outsourceMode', width: 96 },
   { title: '外协工序', key: 'sourceProcessName', width: 110, ellipsis: true },
@@ -557,7 +567,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('outsourcing-order-list-v7', baseColumns)
+  useTableColumnSettings('outsourcing-order-list-v8', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -788,6 +798,15 @@ function openInboundForRow(record) {
 
 function rowPriceChangeLabel(order) {
   return getPendingOutsourcingPriceChange(order?.id) ? '审核订单变更' : '订单变更'
+}
+
+function resolveChangeStatus(order) {
+  void outsourcingPriceChangeState.orders
+  return resolveOutsourcingOrderChangeStatus(order?.id)
+}
+
+function changeStatusColor(label) {
+  return outsourcingOrderChangeStatusColor(label)
 }
 
 function openPriceChangeForOrder(order) {

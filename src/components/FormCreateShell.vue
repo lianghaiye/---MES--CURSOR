@@ -37,7 +37,7 @@
       <slot />
     </div>
   </div>
-  <div v-else-if="pageMode" class="form-create-page">
+  <div v-else-if="pageMode" class="form-create-page" :class="rootClass">
     <div class="form-create-inner" :style="innerStyle">
       <div class="page-header">
         <div class="header-left">
@@ -62,6 +62,7 @@
     :width="width"
     :mask-closable="maskClosable"
     :destroy-on-close="destroyOnClose"
+    :class="rootClass"
     @cancel="$emit('cancel')"
     @update:open="(val) => $emit('update:open', val)"
   >
@@ -75,8 +76,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, useAttrs } from 'vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps({
   pageMode: { type: Boolean, default: false },
@@ -96,6 +99,9 @@ const props = defineProps({
 })
 
 defineEmits(['cancel', 'update:open'])
+
+const attrs = useAttrs()
+const rootClass = computed(() => attrs.class)
 
 const innerStyle = computed(() => {
   const pad =
@@ -273,6 +279,10 @@ const innerStyle = computed(() => {
   background: var(--page-bg, #f0f2f5);
   min-height: calc(100vh - 112px);
   box-sizing: border-box;
+  /* 明细随内容撑开，整页滚动；勿锁高度导致表内滚动 */
+  height: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .form-create-inner {

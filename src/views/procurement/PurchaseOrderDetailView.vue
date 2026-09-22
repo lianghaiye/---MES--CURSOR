@@ -7,6 +7,9 @@
             <div class="header-left">
               <span class="order-no">{{ record.orderNo }}</span>
               <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+              <a-tag v-if="changeStatusLabel !== '-'" :color="changeStatusColor(changeStatusLabel)">
+                {{ changeStatusLabel }}
+              </a-tag>
               <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
               <a-tag :color="overdueColor(overdueStatusOf(record))">
                 {{ overdueStatusOf(record) }}
@@ -556,6 +559,7 @@ import PurchasePriceChangeModal from './components/PurchasePriceChangeModal.vue'
 import PurchasePriceChangeHistoryPanel from './components/PurchasePriceChangeHistoryPanel.vue'
 import {
   buildPurchasePriceChangeApprovalGroups,
+  purchaseOrderChangeStatusColor,
   purchasePriceChangeStatusColor,
 } from '@/utils/purchasePriceChange'
 import {
@@ -564,6 +568,7 @@ import {
   getPendingPurchasePriceChangeBlock,
   listPurchasePriceChangesByOrderId,
   purchasePriceChangeState,
+  resolvePurchaseOrderChangeStatus,
 } from '@/store/purchasePriceChangeStore'
 
 const DocNoLinks = defineComponent({
@@ -618,6 +623,13 @@ const pendingPriceChange = computed(() => {
   void purchasePriceChangeState.orders
   return getPendingPurchasePriceChange(record.value?.id)
 })
+const changeStatusLabel = computed(() => {
+  void purchasePriceChangeState.orders
+  return resolvePurchaseOrderChangeStatus(record.value?.id)
+})
+function changeStatusColor(label) {
+  return purchaseOrderChangeStatusColor(label)
+}
 const priceChangePending = computed(() => getPendingPurchasePriceChange(priceChangeOrder.value?.id))
 const priceChangeRecords = computed(() => {
   void purchasePriceChangeState.orders

@@ -113,6 +113,20 @@ export function getPendingPurchasePriceChange(purchaseOrderId) {
   )
 }
 
+/**
+ * 订单变更状态（列表用）：
+ * 未发起 → `-`；待审核 → `变更审核中`；最近一次已审结 → `已通过` / `已拒绝`
+ */
+export function resolvePurchaseOrderChangeStatus(purchaseOrderId) {
+  if (!purchaseOrderId) return '-'
+  if (getPendingPurchasePriceChange(purchaseOrderId)) return '变更审核中'
+  const latest = listPurchasePriceChangesByOrderId(purchaseOrderId)[0]
+  if (!latest) return '-'
+  if (latest.status === PURCHASE_PRICE_CHANGE_STATUS.APPROVED) return '已通过'
+  if (latest.status === PURCHASE_PRICE_CHANGE_STATUS.REJECTED) return '已拒绝'
+  return '-'
+}
+
 /** 待审价格变更时阻断收货 / 入库 / 结算 */
 export function getPendingPurchasePriceChangeBlock(purchaseOrderId, actionLabel = '继续操作') {
   const pending = getPendingPurchasePriceChange(purchaseOrderId)

@@ -507,6 +507,7 @@ function resetForm() {
   form.remark = ''
   form.lineItems = []
   prevHeaderReceivingWarehouse.value = undefined
+  addBlankLine()
 }
 
 function loadEditForm(record) {
@@ -904,18 +905,12 @@ function handleSave() {
 
 <style lang="less" scoped>
 :deep(.form-create-page.purchase-req-form-modal) {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 112px);
-  max-height: calc(100vh - 112px);
-  min-height: 0;
-  overflow: hidden;
-  padding-bottom: 0;
+  height: auto;
+  max-height: none;
+  overflow: visible;
 
   .form-body {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     padding-bottom: 12px;
@@ -923,8 +918,6 @@ function handleSave() {
 }
 
 .form-layout {
-  flex: 1;
-  min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -969,8 +962,6 @@ function handleSave() {
   }
 
   &.section-block--lines {
-    flex: 1;
-    min-height: 0;
     min-width: 0;
     display: flex;
     flex-direction: column;

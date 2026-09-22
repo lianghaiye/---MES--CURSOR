@@ -7,6 +7,9 @@
             <div class="header-left">
               <span class="order-no">{{ record.orderNo }}</span>
               <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+              <a-tag v-if="changeStatusLabel !== '-'" :color="changeStatusColor(changeStatusLabel)">
+                {{ changeStatusLabel }}
+              </a-tag>
               <a-tag :color="issueColor(record.issueStatus)">{{ record.issueStatus || '—' }}</a-tag>
               <a-tag :color="returnColor(record.returnStatus)">{{
                 record.returnStatus || '—'
@@ -494,6 +497,7 @@ import OutsourcingPriceChangeModal from './components/OutsourcingPriceChangeModa
 import OutsourcingPriceChangeHistoryPanel from './components/OutsourcingPriceChangeHistoryPanel.vue'
 import {
   buildOutsourcingPriceChangeApprovalGroups,
+  outsourcingOrderChangeStatusColor,
   outsourcingPriceChangeStatusColor,
 } from '@/utils/outsourcingPriceChange'
 import {
@@ -502,6 +506,7 @@ import {
   getPendingOutsourcingPriceChangeBlock,
   listOutsourcingPriceChangesByOrderId,
   outsourcingPriceChangeState,
+  resolveOutsourcingOrderChangeStatus,
 } from '@/store/outsourcingPriceChangeStore'
 
 const route = useRoute()
@@ -605,6 +610,13 @@ const pendingPriceChange = computed(() => {
   void outsourcingPriceChangeState.orders
   return getPendingOutsourcingPriceChange(record.value?.id)
 })
+const changeStatusLabel = computed(() => {
+  void outsourcingPriceChangeState.orders
+  return resolveOutsourcingOrderChangeStatus(record.value?.id)
+})
+function changeStatusColor(label) {
+  return outsourcingOrderChangeStatusColor(label)
+}
 const priceChangePending = computed(() =>
   getPendingOutsourcingPriceChange(priceChangeOrder.value?.id),
 )

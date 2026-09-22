@@ -6,7 +6,7 @@
     width="96%"
     :mask-closable="false"
     destroy-on-close
-    class="apply-delivery-modal"
+    class="apply-delivery-form"
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
@@ -163,329 +163,357 @@
       </a-form>
     </div>
 
-    <div v-if="form.lineItems.length" class="section-block">
+    <div v-if="form.lineItems.length" class="section-block section-block--lines">
       <div class="section-title">整机发货</div>
       <a-divider class="section-divider" />
-      <a-table
-        :columns="lineColumns"
-        :data-source="form.lineItems"
-        row-key="id"
-        size="small"
-        bordered
-        :pagination="false"
-        :scroll="{ x: 2900 }"
-        :row-class-name="deliveryLineRowClassName"
+      <div
+        ref="lineTablePanelRef"
+        class="line-table-panel"
+        :class="{ 'panel-scrolling': isLineTableScrolling }"
+        :style="lineTablePanelStyle"
       >
-        <template #headerCell="{ column }">
-          <template v-if="column.key === 'shipProgress'">
-            <span class="th-nowrap">
-              发货进度
-              <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
-                <QuestionCircleOutlined class="th-tip-icon" />
-              </a-tooltip>
-            </span>
-          </template>
-          <template v-else>
-            <span class="th-nowrap">{{ column.title }}</span>
-          </template>
-        </template>
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-          <template v-else-if="column.key === 'productName'">
-            <span>{{ record.productName || '—' }}</span>
-            <a-tag
-              v-if="lineHasShipAttachmentHint(record)"
-              color="orange"
-              class="ship-att-hint-tag"
-            >
-              有发货附件
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'lineShipStatus'">
-            <a-tag :color="lineShipStatusColor(record.lineShipStatus)">
-              {{ record.lineShipStatus }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'shipProgress'">
-            {{
-              formatShipProgress(
-                record.confirmedOutboundQty ?? record.shippedQty,
-                record.appliedShipQty ?? record.shippedQty,
-                record.orderQty,
-              )
-            }}
-          </template>
-          <template v-else-if="column.key === 'orderQty'">
-            {{ formatDeliveryQty(record.orderQty) }}
-          </template>
-          <template v-else-if="column.key === 'unitPriceExTax'">
-            {{ formatDeliveryPrice(record.unitPriceExTax) }}
-          </template>
-          <template v-else-if="column.key === 'unitPriceInTax'">
-            {{ formatDeliveryPrice(record.unitPriceInTax) }}
-          </template>
-          <template v-else-if="column.key === 'deliveryMode'">
-            <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
-              {{ record.deliveryMode || '整机' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'variantAttr'">
-            <a-tooltip v-if="record.variantAttr" :title="record.variantAttr">
-              <span>{{ record.variantAttr }}</span>
-            </a-tooltip>
-            <span v-else>—</span>
-          </template>
-          <template v-else-if="column.key === 'shipQty'">
-            <a-input-number
-              v-model:value="record.shipQty"
-              size="small"
-              :min="0"
-              :max="lineRemainShipQty(record)"
-              :precision="4"
-              :formatter="deliveryDecimalFormatter"
-              :parser="deliveryDecimalParser"
-              style="width: 100%"
-              :disabled="isDeliveryLineShipLocked(record)"
-              @change="onLineCalc(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'barcodeBatchNo'">
-            <span :title="record.barcodeBatchNo || ''">{{ record.barcodeBatchNo || '—' }}</span>
-          </template>
-          <template v-else-if="column.key === 'shipWeight'">
-            <a-input-number
-              v-model:value="record.shipWeight"
-              size="small"
-              :min="0"
-              :precision="4"
-              :formatter="deliveryDecimalFormatter"
-              :parser="deliveryDecimalParser"
-              style="width: 100%"
-              :disabled="isDeliveryLineShipLocked(record)"
-              @change="onLineCalc(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'deliveryAmountExTax'">
-            {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
-          </template>
-          <template v-else-if="column.key === 'deliveryAmountInTax'">
-            {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
-          </template>
-          <template v-else-if="column.key === 'shipWarehouse'">
-            <a-select
-              v-model:value="record.shipWarehouse"
-              allow-clear
-              size="small"
-              placeholder="请选择"
-              style="width: 100%"
-              :options="warehouseOpts"
-              :disabled="isDeliveryLineShipLocked(record)"
-              @change="() => onLineWarehouseChange(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'stockQty'">
-            {{ formatDeliveryQty(record.stockQty) }}
-          </template>
-          <template v-else-if="column.key === 'warehouseStockQty'">
-            {{ formatDeliveryQty(record.warehouseStockQty) }}
-          </template>
-          <template v-else-if="column.key === 'lineRemark'">
-            <SalesLineLongTextCell
-              v-if="!isDeliveryLineShipLocked(record)"
-              :value="record.lineRemark"
-              @edit="openLongTextEdit(record, 'lineRemark')"
-            />
-            <span v-else>{{ record.lineRemark || '—' }}</span>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
-              <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="removeWholeLineFromOrder(index)">
-                移出本单
-              </a-button>
-            </a-space>
-            <span v-else class="line-locked-hint">{{ deliveryLineLockedHint(record) }}</span>
-          </template>
-          <template v-else>{{ displayCell(record, column) }}</template>
-        </template>
-      </a-table>
-    </div>
-
-    <div v-if="form.scatterShipments.length" class="section-block">
-      <div class="section-title">散件发运</div>
-      <a-divider class="section-divider" />
-      <a-table
-        :columns="scatterLineColumns"
-        :data-source="form.scatterShipments"
-        row-key="salesLineId"
-        size="small"
-        bordered
-        :pagination="false"
-        :scroll="{ x: 2800 }"
-        v-model:expanded-row-keys="expandedScatterRowKeys"
-        :row-class-name="deliveryLineRowClassName"
-      >
-        <template #headerCell="{ column }">
-          <template v-if="column.key === 'shipProgress'">
-            <span class="th-nowrap">
-              发货进度
-              <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
-                <QuestionCircleOutlined class="th-tip-icon" />
-              </a-tooltip>
-            </span>
-          </template>
-          <template v-else>
-            <span class="th-nowrap">{{ column.title }}</span>
-          </template>
-        </template>
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-          <template v-else-if="column.key === 'productName'">
-            <span>{{ record.productName || '—' }}</span>
-            <a-tag
-              v-if="lineHasShipAttachmentHint(record)"
-              color="orange"
-              class="ship-att-hint-tag"
-            >
-              有发货附件
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'lineShipStatus'">
-            <a-tag :color="lineShipStatusColor(record.lineShipStatus)">
-              {{ record.lineShipStatus }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'shipProgress'">
-            {{
-              formatShipProgress(
-                record.confirmedOutboundQty ?? record.shippedQty,
-                record.appliedShipQty ?? record.shippedQty,
-                record.orderQty,
-              )
-            }}
-          </template>
-          <template v-else-if="column.key === 'orderQty'">
-            {{ formatDeliveryQty(record.orderQty) }}
-          </template>
-          <template v-else-if="column.key === 'unitPriceExTax'">
-            {{ formatDeliveryPrice(record.unitPriceExTax) }}
-          </template>
-          <template v-else-if="column.key === 'unitPriceInTax'">
-            {{ formatDeliveryPrice(record.unitPriceInTax) }}
-          </template>
-          <template v-else-if="column.key === 'deliveryMode'">
-            <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
-              {{ record.deliveryMode || '散件' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'variantAttr'">
-            <a-tooltip v-if="record.variantAttr" :title="record.variantAttr">
-              <span>{{ record.variantAttr }}</span>
-            </a-tooltip>
-            <span v-else>—</span>
-          </template>
-          <template v-else-if="column.key === 'shipWeight'">
-            <a-input-number
-              v-model:value="record.shipWeight"
-              size="small"
-              :min="0"
-              :precision="4"
-              :formatter="deliveryDecimalFormatter"
-              :parser="deliveryDecimalParser"
-              style="width: 100%"
-              :disabled="isDeliveryLineShipLocked(record)"
-              @change="onScatterLinePriceChange(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'deliveryAmountExTax'">
-            {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
-          </template>
-          <template v-else-if="column.key === 'deliveryAmountInTax'">
-            {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
-          </template>
-          <template v-else-if="column.key === 'shipWarehouse'">
-            <a-select
-              v-model:value="record.shipWarehouse"
-              allow-clear
-              size="small"
-              placeholder="请选择"
-              style="width: 100%"
-              :options="warehouseOpts"
-              :disabled="isDeliveryLineShipLocked(record)"
-              @change="() => onLineWarehouseChange(record)"
-            />
-          </template>
-          <template v-else-if="column.key === 'stockQty'">
-            {{ formatDeliveryQty(record.stockQty) }}
-          </template>
-          <template v-else-if="column.key === 'warehouseStockQty'">
-            {{ formatDeliveryQty(record.warehouseStockQty) }}
-          </template>
-          <template v-else-if="column.key === 'lineRemark'">
-            <SalesLineLongTextCell
-              v-if="!isDeliveryLineShipLocked(record)"
-              :value="record.lineRemark"
-              @edit="openLongTextEdit(record, 'lineRemark')"
-            />
-            <span v-else>{{ record.lineRemark || '—' }}</span>
-          </template>
-          <template v-else-if="column.key === 'scatterAction'">
-            <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
-              <a-button type="link" size="small" @click="openScatterLineEdit(record)"
-                >编辑</a-button
-              >
-              <a-button type="link" size="small" @click="openScatterDrawer(record)">
-                选择发运物料
-              </a-button>
-              <a-button type="link" size="small" danger @click="removeScatterLineFromOrder(index)">
-                移出本单
-              </a-button>
-            </a-space>
-            <span v-else class="line-locked-hint">{{ deliveryLineLockedHint(record) }}</span>
-          </template>
-          <template v-else>{{ displayCell(record, column) }}</template>
-        </template>
-        <template #expandedRowRender="{ record }">
-          <div class="scatter-picks-panel">
-            <div class="scatter-picks-title">已选发运物料</div>
-            <a-table
-              v-if="selectedMaterialPicks(record).length"
-              :columns="scatterPickColumns"
-              :data-source="selectedMaterialPicks(record)"
-              :row-key="(r) => r.materialId"
-              size="small"
-              bordered
-              :pagination="false"
-            >
-              <template #bodyCell="{ column, record: mat }">
-                <template v-if="column.key === 'shipProgress'">
-                  {{
-                    formatMaterialShipProgress(
-                      mat.shippedQty,
-                      mat.appliedQty,
-                      mat.orderDemandQty ?? mat.demandQty,
-                    )
-                  }}
-                </template>
-                <template v-else-if="column.key === 'pickAction'">
+        <div class="line-table-body" :class="{ 'is-scrolling': isLineTableScrolling }">
+          <a-table
+            :columns="lineColumns"
+            :data-source="form.lineItems"
+            row-key="id"
+            size="small"
+            bordered
+            :pagination="false"
+            :scroll="lineTableScroll"
+            :row-class-name="deliveryLineRowClassName"
+          >
+            <template #headerCell="{ column }">
+              <template v-if="column.key === 'shipProgress'">
+                <span class="th-nowrap">
+                  发货进度
+                  <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
+                    <QuestionCircleOutlined class="th-tip-icon" />
+                  </a-tooltip>
+                </span>
+              </template>
+              <template v-else>
+                <span class="th-nowrap">{{ column.title }}</span>
+              </template>
+            </template>
+            <template #bodyCell="{ column, record, index }">
+              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'productName'">
+                <span>{{ record.productName || '—' }}</span>
+                <a-tag
+                  v-if="lineHasShipAttachmentHint(record)"
+                  color="orange"
+                  class="ship-att-hint-tag"
+                >
+                  有发货附件
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'lineShipStatus'">
+                <a-tag :color="lineShipStatusColor(record.lineShipStatus)">
+                  {{ record.lineShipStatus }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'shipProgress'">
+                {{
+                  formatShipProgress(
+                    record.confirmedOutboundQty ?? record.shippedQty,
+                    record.appliedShipQty ?? record.shippedQty,
+                    record.orderQty,
+                  )
+                }}
+              </template>
+              <template v-else-if="column.key === 'orderQty'">
+                {{ formatDeliveryQty(record.orderQty) }}
+              </template>
+              <template v-else-if="column.key === 'unitPriceExTax'">
+                {{ formatDeliveryPrice(record.unitPriceExTax) }}
+              </template>
+              <template v-else-if="column.key === 'unitPriceInTax'">
+                {{ formatDeliveryPrice(record.unitPriceInTax) }}
+              </template>
+              <template v-else-if="column.key === 'deliveryMode'">
+                <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
+                  {{ record.deliveryMode || '整机' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'variantAttr'">
+                <a-tooltip v-if="record.variantAttr" :title="record.variantAttr">
+                  <span>{{ record.variantAttr }}</span>
+                </a-tooltip>
+                <span v-else>—</span>
+              </template>
+              <template v-else-if="column.key === 'shipQty'">
+                <a-input-number
+                  v-model:value="record.shipQty"
+                  size="small"
+                  :min="0"
+                  :max="lineRemainShipQty(record)"
+                  :precision="4"
+                  :formatter="deliveryDecimalFormatter"
+                  :parser="deliveryDecimalParser"
+                  style="width: 100%"
+                  :disabled="isDeliveryLineShipLocked(record)"
+                  @change="onLineCalc(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'barcodeBatchNo'">
+                <span :title="record.barcodeBatchNo || ''">{{ record.barcodeBatchNo || '—' }}</span>
+              </template>
+              <template v-else-if="column.key === 'shipWeight'">
+                <a-input-number
+                  v-model:value="record.shipWeight"
+                  size="small"
+                  :min="0"
+                  :precision="4"
+                  :formatter="deliveryDecimalFormatter"
+                  :parser="deliveryDecimalParser"
+                  style="width: 100%"
+                  :disabled="isDeliveryLineShipLocked(record)"
+                  @change="onLineCalc(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'deliveryAmountExTax'">
+                {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
+              </template>
+              <template v-else-if="column.key === 'deliveryAmountInTax'">
+                {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
+              </template>
+              <template v-else-if="column.key === 'shipWarehouse'">
+                <a-select
+                  v-model:value="record.shipWarehouse"
+                  allow-clear
+                  size="small"
+                  placeholder="请选择"
+                  style="width: 100%"
+                  :options="warehouseOpts"
+                  :disabled="isDeliveryLineShipLocked(record)"
+                  @change="() => onLineWarehouseChange(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'stockQty'">
+                {{ formatDeliveryQty(record.stockQty) }}
+              </template>
+              <template v-else-if="column.key === 'warehouseStockQty'">
+                {{ formatDeliveryQty(record.warehouseStockQty) }}
+              </template>
+              <template v-else-if="column.key === 'lineRemark'">
+                <SalesLineLongTextCell
+                  v-if="!isDeliveryLineShipLocked(record)"
+                  :value="record.lineRemark"
+                  @edit="openLongTextEdit(record, 'lineRemark')"
+                />
+                <span v-else>{{ record.lineRemark || '—' }}</span>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
+                  <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
                   <a-button
                     type="link"
                     size="small"
                     danger
-                    @click="removeScatterMaterialPick(record, mat)"
+                    @click="removeWholeLineFromOrder(index)"
                   >
-                    删除
+                    移出本单
                   </a-button>
-                </template>
+                </a-space>
+                <span v-else class="line-locked-hint">{{ deliveryLineLockedHint(record) }}</span>
               </template>
-            </a-table>
-            <a-empty v-else description="请点击「选择发运物料」勾选 EBOM" :image="false" />
-            <div v-if="record.remark" class="scatter-line-remark">
-              发运备注：{{ record.remark }}
-            </div>
-          </div>
-        </template>
-      </a-table>
+              <template v-else>{{ displayCell(record, column) }}</template>
+            </template>
+          </a-table>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="form.scatterShipments.length" class="section-block section-block--lines">
+      <div class="section-title">散件发运</div>
+      <a-divider class="section-divider" />
+      <div
+        ref="scatterTablePanelRef"
+        class="line-table-panel"
+        :class="{ 'panel-scrolling': isScatterTableScrolling }"
+        :style="scatterTablePanelStyle"
+      >
+        <div class="line-table-body" :class="{ 'is-scrolling': isScatterTableScrolling }">
+          <a-table
+            :columns="scatterLineColumns"
+            :data-source="form.scatterShipments"
+            row-key="salesLineId"
+            size="small"
+            bordered
+            :pagination="false"
+            :scroll="scatterTableScroll"
+            v-model:expanded-row-keys="expandedScatterRowKeys"
+            :row-class-name="deliveryLineRowClassName"
+          >
+            <template #headerCell="{ column }">
+              <template v-if="column.key === 'shipProgress'">
+                <span class="th-nowrap">
+                  发货进度
+                  <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
+                    <QuestionCircleOutlined class="th-tip-icon" />
+                  </a-tooltip>
+                </span>
+              </template>
+              <template v-else>
+                <span class="th-nowrap">{{ column.title }}</span>
+              </template>
+            </template>
+            <template #bodyCell="{ column, record, index }">
+              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'productName'">
+                <span>{{ record.productName || '—' }}</span>
+                <a-tag
+                  v-if="lineHasShipAttachmentHint(record)"
+                  color="orange"
+                  class="ship-att-hint-tag"
+                >
+                  有发货附件
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'lineShipStatus'">
+                <a-tag :color="lineShipStatusColor(record.lineShipStatus)">
+                  {{ record.lineShipStatus }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'shipProgress'">
+                {{
+                  formatShipProgress(
+                    record.confirmedOutboundQty ?? record.shippedQty,
+                    record.appliedShipQty ?? record.shippedQty,
+                    record.orderQty,
+                  )
+                }}
+              </template>
+              <template v-else-if="column.key === 'orderQty'">
+                {{ formatDeliveryQty(record.orderQty) }}
+              </template>
+              <template v-else-if="column.key === 'unitPriceExTax'">
+                {{ formatDeliveryPrice(record.unitPriceExTax) }}
+              </template>
+              <template v-else-if="column.key === 'unitPriceInTax'">
+                {{ formatDeliveryPrice(record.unitPriceInTax) }}
+              </template>
+              <template v-else-if="column.key === 'deliveryMode'">
+                <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
+                  {{ record.deliveryMode || '散件' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'variantAttr'">
+                <a-tooltip v-if="record.variantAttr" :title="record.variantAttr">
+                  <span>{{ record.variantAttr }}</span>
+                </a-tooltip>
+                <span v-else>—</span>
+              </template>
+              <template v-else-if="column.key === 'shipWeight'">
+                <a-input-number
+                  v-model:value="record.shipWeight"
+                  size="small"
+                  :min="0"
+                  :precision="4"
+                  :formatter="deliveryDecimalFormatter"
+                  :parser="deliveryDecimalParser"
+                  style="width: 100%"
+                  :disabled="isDeliveryLineShipLocked(record)"
+                  @change="onScatterLinePriceChange(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'deliveryAmountExTax'">
+                {{ formatDeliveryPrice(record.deliveryAmountExTax) }}
+              </template>
+              <template v-else-if="column.key === 'deliveryAmountInTax'">
+                {{ formatDeliveryPrice(record.deliveryAmountInTax) }}
+              </template>
+              <template v-else-if="column.key === 'shipWarehouse'">
+                <a-select
+                  v-model:value="record.shipWarehouse"
+                  allow-clear
+                  size="small"
+                  placeholder="请选择"
+                  style="width: 100%"
+                  :options="warehouseOpts"
+                  :disabled="isDeliveryLineShipLocked(record)"
+                  @change="() => onLineWarehouseChange(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'stockQty'">
+                {{ formatDeliveryQty(record.stockQty) }}
+              </template>
+              <template v-else-if="column.key === 'warehouseStockQty'">
+                {{ formatDeliveryQty(record.warehouseStockQty) }}
+              </template>
+              <template v-else-if="column.key === 'lineRemark'">
+                <SalesLineLongTextCell
+                  v-if="!isDeliveryLineShipLocked(record)"
+                  :value="record.lineRemark"
+                  @edit="openLongTextEdit(record, 'lineRemark')"
+                />
+                <span v-else>{{ record.lineRemark || '—' }}</span>
+              </template>
+              <template v-else-if="column.key === 'scatterAction'">
+                <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
+                  <a-button type="link" size="small" @click="openScatterLineEdit(record)"
+                    >编辑</a-button
+                  >
+                  <a-button type="link" size="small" @click="openScatterDrawer(record)">
+                    选择发运物料
+                  </a-button>
+                  <a-button
+                    type="link"
+                    size="small"
+                    danger
+                    @click="removeScatterLineFromOrder(index)"
+                  >
+                    移出本单
+                  </a-button>
+                </a-space>
+                <span v-else class="line-locked-hint">{{ deliveryLineLockedHint(record) }}</span>
+              </template>
+              <template v-else>{{ displayCell(record, column) }}</template>
+            </template>
+            <template #expandedRowRender="{ record }">
+              <div class="scatter-picks-panel">
+                <div class="scatter-picks-title">已选发运物料</div>
+                <a-table
+                  v-if="selectedMaterialPicks(record).length"
+                  :columns="scatterPickColumns"
+                  :data-source="selectedMaterialPicks(record)"
+                  :row-key="(r) => r.materialId"
+                  size="small"
+                  bordered
+                  :pagination="false"
+                >
+                  <template #bodyCell="{ column, record: mat }">
+                    <template v-if="column.key === 'shipProgress'">
+                      {{
+                        formatMaterialShipProgress(
+                          mat.shippedQty,
+                          mat.appliedQty,
+                          mat.orderDemandQty ?? mat.demandQty,
+                        )
+                      }}
+                    </template>
+                    <template v-else-if="column.key === 'pickAction'">
+                      <a-button
+                        type="link"
+                        size="small"
+                        danger
+                        @click="removeScatterMaterialPick(record, mat)"
+                      >
+                        删除
+                      </a-button>
+                    </template>
+                  </template>
+                </a-table>
+                <a-empty v-else description="请点击「选择发运物料」勾选 EBOM" :image="false" />
+                <div v-if="record.remark" class="scatter-line-remark">
+                  发运备注：{{ record.remark }}
+                </div>
+              </div>
+            </template>
+          </a-table>
+        </div>
+      </div>
     </div>
 
     <DeliveryShipAttachmentSection
@@ -584,6 +612,7 @@ import DeliveryLineEditModal from './DeliveryLineEditModal.vue'
 import SalesLineLongTextCell from './SalesLineLongTextCell.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
+import { useInventoryLineTableScroll } from '@/composables/useInventoryLineTableScroll'
 import DeliveryShipAttachmentSection from './DeliveryShipAttachmentSection.vue'
 import { productHasShipBom, enrichShipAttachmentsWithShipStatus } from '@/utils/shipBomAttachments'
 import { calcSalesLineAvailableQty } from '@/utils/salesLineShipped'
@@ -618,7 +647,11 @@ const salesOrderLocked = computed(
 )
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/sales/delivery',
-  getTitle: () => (isEdit.value ? '编辑发货单' : '新增发货单'),
+  getTitle: () => {
+    if (props.record?.id) return '编辑发货单'
+    if (props.mode === 'apply' || props.initialSalesOrderId) return '申请发货'
+    return '新增发货单'
+  },
 })
 const saving = ref(false)
 const scatterDrawerOpen = ref(false)
@@ -703,6 +736,26 @@ const form = reactive({
   lineItems: [],
   scatterShipments: [],
   shipAttachments: [],
+})
+
+const {
+  panelRef: lineTablePanelRef,
+  panelStyle: lineTablePanelStyle,
+  tableScroll: lineTableScroll,
+  isScrolling: isLineTableScrolling,
+} = useInventoryLineTableScroll({
+  scrollX: 2900,
+  getRowCount: () => form.lineItems?.length || 0,
+})
+
+const {
+  panelRef: scatterTablePanelRef,
+  panelStyle: scatterTablePanelStyle,
+  tableScroll: scatterTableScroll,
+  isScrolling: isScatterTableScrolling,
+} = useInventoryLineTableScroll({
+  scrollX: 2800,
+  getRowCount: () => form.scatterShipments?.length || 0,
 })
 
 const prevHeaderWarehouse = ref(undefined)
@@ -1396,6 +1449,48 @@ export default { name: 'DeliveryFormModal' }
 </script>
 
 <style lang="less" scoped>
+@import '@/views/inventory/components/inventoryLineTablePanel.less';
+
+:deep(.form-create-page.apply-delivery-form) {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+
+  .form-body {
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 12px;
+  }
+}
+
+:deep(.ant-modal.apply-delivery-form) {
+  .ant-modal-body {
+    max-height: calc(100vh - 160px);
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding-bottom: 12px;
+  }
+}
+
+.section-block {
+  background: #fff;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+
+  &.section-block--lines {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+  }
+}
+
 .section-title {
   font-weight: 600;
   font-size: 14px;

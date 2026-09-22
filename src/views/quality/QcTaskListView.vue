@@ -358,7 +358,7 @@ const canPrintQc = computed(() => isInboundScope.value || isProductionScope.valu
 const showCreateButton = computed(() => false)
 
 const sourceDocLabel = computed(() =>
-  bizScope.value === '外协回货检' ? '外协收货单号' : '采购收货单号',
+  bizScope.value === '外协回货检' ? '外协收货单号' : '来源单号',
 )
 
 const filters = reactive({

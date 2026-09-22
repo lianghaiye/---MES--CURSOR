@@ -95,7 +95,7 @@
           size="small"
           bordered
           :pagination="false"
-          :scroll="{ x: 1280, y: 360 }"
+          :scroll="{ x: 1280 }"
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>

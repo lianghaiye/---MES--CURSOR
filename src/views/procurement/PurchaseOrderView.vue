@@ -190,6 +190,12 @@
           <template v-else-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'changeStatus'">
+            <template v-if="resolveChangeStatus(record) === '-'">-</template>
+            <a-tag v-else :color="changeStatusColor(resolveChangeStatus(record))">
+              {{ resolveChangeStatus(record) }}
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'inboundStatus'">
             <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
           </template>
@@ -406,7 +412,10 @@ import {
   canApplyPurchasePriceChange,
   getPendingPurchasePriceChange,
   getPendingPurchasePriceChangeBlock,
+  purchasePriceChangeState,
+  resolvePurchaseOrderChangeStatus,
 } from '@/store/purchasePriceChangeStore'
+import { purchaseOrderChangeStatusColor } from '@/utils/purchasePriceChange'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -441,6 +450,7 @@ const overdueOpts = overdueStatusOptions.map((v) => ({ label: v, value: v }))
 const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 90, fixed: 'left' },
+  { title: '变更状态', key: 'changeStatus', width: 100 },
   { title: '采购单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
   { title: '入库状态', key: 'inboundStatus', width: 90 },
   { title: '逾期状态', key: 'overdueStatus', width: 90 },
@@ -468,7 +478,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-list-v9', baseColumns)
+  useTableColumnSettings('purchase-order-list-v10', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -781,6 +791,15 @@ function openInboundForRow(record) {
 
 function rowPriceChangeLabel(order) {
   return getPendingPurchasePriceChange(order?.id) ? '审核订单变更' : '订单变更'
+}
+
+function resolveChangeStatus(order) {
+  void purchasePriceChangeState.orders
+  return resolvePurchaseOrderChangeStatus(order?.id)
+}
+
+function changeStatusColor(label) {
+  return purchaseOrderChangeStatusColor(label)
 }
 
 function openPriceChangeForOrder(order) {

@@ -1338,6 +1338,7 @@ function resetForm() {
     lineItems: [],
   })
   prevHeaderWarehouse.value = undefined
+  addBlankLine()
 }
 
 function formatMoney(val) {
@@ -1855,7 +1856,19 @@ function handleSaveAndConfirm() {
 </style>
 
 <style lang="less" scoped>
-:deep(.form-create-page.outbound-form-modal),
+:deep(.form-create-page.outbound-form-modal) {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+
+  .form-body {
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 12px;
+  }
+}
+
 :deep(.form-embedded-panel.outbound-form-modal),
 :deep(.form-embedded-content-only.outbound-form-modal),
 .form-embedded-panel,
@@ -1865,7 +1878,7 @@ function handleSaveAndConfirm() {
   height: 100%;
   max-height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   padding-bottom: 0;
 
   .form-body,
@@ -1873,39 +1886,25 @@ function handleSaveAndConfirm() {
     flex: 1;
     min-height: 0;
     min-width: 0;
-    overflow: hidden;
+    overflow: auto;
     display: flex;
     flex-direction: column;
     padding-bottom: 12px;
   }
-}
-
-:deep(.form-create-page.outbound-form-modal) {
-  height: calc(100vh - 112px);
-  max-height: calc(100vh - 112px);
 }
 
 :deep(.ant-modal.outbound-form-modal) {
   .ant-modal-body {
     max-height: calc(100vh - 160px);
-    overflow: hidden;
+    overflow: auto;
     display: flex;
     flex-direction: column;
     min-height: 0;
     padding-bottom: 12px;
   }
-
-  .form-layout {
-    flex: 1;
-    min-height: 0;
-    min-width: 0;
-    overflow: hidden;
-  }
 }
 
 .form-layout {
-  flex: 1;
-  min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1927,8 +1926,6 @@ function handleSaveAndConfirm() {
   }
 
   &.section-block--lines {
-    flex: 1;
-    min-height: 0;
     min-width: 0;
     display: flex;
     flex-direction: column;

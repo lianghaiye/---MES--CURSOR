@@ -29,6 +29,21 @@ export function outsourcingPriceChangeStatusColor(status) {
   return 'default'
 }
 
+/** 外协订单列表「变更状态」展示文案 */
+export function outsourcingOrderChangeStatusLabel(status) {
+  if (status === OUTSOURCING_PRICE_CHANGE_STATUS.PENDING) return '变更审核中'
+  if (status === OUTSOURCING_PRICE_CHANGE_STATUS.APPROVED) return '已通过'
+  if (status === OUTSOURCING_PRICE_CHANGE_STATUS.REJECTED) return '已拒绝'
+  return '-'
+}
+
+export function outsourcingOrderChangeStatusColor(label) {
+  if (label === '已通过') return 'success'
+  if (label === '已拒绝') return 'error'
+  if (label === '变更审核中') return 'warning'
+  return 'default'
+}
+
 export function round2(n) {
   const r = roundNumber(Number(n) || 0, 4)
   return Number.isFinite(r) ? r : 0

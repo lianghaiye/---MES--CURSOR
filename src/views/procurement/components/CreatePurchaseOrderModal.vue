@@ -988,6 +988,7 @@ function resetForm() {
   form.lineItems = []
   selectedLineKeys.value = []
   syncHeaderTrackers()
+  addBlankLine()
 }
 
 function loadEditForm(record) {
@@ -1533,29 +1534,16 @@ function handleSave() {
 .po-form-shell {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
   min-width: 0;
-  overflow: hidden;
-}
-
-:deep(.ant-modal-body) .po-form-shell {
-  max-height: calc(100vh - 200px);
 }
 
 :deep(.form-create-page.purchase-order-form-modal) {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 112px);
-  max-height: calc(100vh - 112px);
-  min-height: 0;
-  overflow: hidden;
-  padding-bottom: 0;
+  height: auto;
+  max-height: none;
+  overflow: visible;
 
   .form-body {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     padding-bottom: 12px;
@@ -1565,27 +1553,18 @@ function handleSave() {
 :deep(.ant-modal.purchase-order-form-modal) {
   .ant-modal-body {
     max-height: calc(100vh - 160px);
-    overflow: hidden;
+    overflow: auto;
     display: flex;
     flex-direction: column;
     min-height: 0;
     padding-bottom: 12px;
-  }
-
-  .form-layout {
-    flex: 1;
-    min-height: 0;
-    min-width: 0;
-    overflow: hidden;
   }
 }
 
 .form-layout {
   display: flex;
   flex-direction: column;
-  min-height: 0;
   min-width: 0;
-  height: 100%;
 }
 
 .section-block {
@@ -1631,8 +1610,6 @@ function handleSave() {
   }
 
   &.section-block--lines {
-    flex: 1;
-    min-height: 0;
     min-width: 0;
     display: flex;
     flex-direction: column;

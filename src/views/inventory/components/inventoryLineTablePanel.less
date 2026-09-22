@@ -1,24 +1,20 @@
 .line-table-panel {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   border: 1px solid #f0f0f0;
   border-radius: 4px;
-  overflow: hidden;
+  overflow: visible;
   background: #fff;
 }
 
 .line-table-body {
-  flex: 1 1 auto;
-  min-height: 0;
   min-width: 0;
   width: 100%;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
 
   .ant-table-wrapper,
   .ant-spin-nested-loading,
@@ -37,24 +33,10 @@
     max-width: 100%;
   }
 
-  /* Ant Design Vue 4：无纵向滚动时在 content，有纵向滚动时在 body */
+  /* 横向由 ant-table scroll.x 处理；纵向不限高，避免表内纵向滚动条 */
   .ant-table-content,
   .ant-table-body {
-    overflow-x: auto !important;
     max-width: 100%;
-  }
-
-  &.is-scrolling {
-    .ant-table-wrapper,
-    .ant-spin-nested-loading,
-    .ant-spin-container,
-    .ant-table {
-      height: 100%;
-    }
-
-    .ant-table-body {
-      overflow-y: auto !important;
-    }
   }
 }
 
