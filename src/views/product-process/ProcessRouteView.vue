@@ -111,8 +111,6 @@
       </a-table>
     </div>
 
-    <ProcessRouteEditorModal v-model:open="editorOpen" :edit-record="editRecord" @saved="onSaved" />
-
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -146,7 +144,6 @@ import {
   cloneProcessRoute,
   ROUTE_STATUS,
 } from '@/store/processRouteStore'
-import ProcessRouteEditorModal from './components/ProcessRouteEditorModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -163,8 +160,6 @@ const { openTab } = useTabs()
 const processRouteCreatePage = findCreatePageByListPath('/product-process/routing')
 const filters = reactive({ code: '', name: '', status: undefined })
 const applied = reactive({ code: '', name: '', status: undefined })
-const editorOpen = ref(false)
-const editRecord = ref(null)
 const importOpen = ref(false)
 const historyOpen = ref(false)
 
@@ -215,8 +210,11 @@ function openCreate() {
 }
 
 function openEdit(record) {
-  editRecord.value = record
-  editorOpen.value = true
+  if (!record?.id) return
+  openCreateTab(router, openTab, {
+    path: `/product-process/routing/${record.id}/edit`,
+    title: `编辑工艺路线 ${record.code || record.name || ''}`.trim(),
+  })
 }
 
 function goDetail(record) {
@@ -258,7 +256,7 @@ function handleClone(record) {
 }
 
 function onSaved() {
-  editRecord.value = null
+  handleSearch()
 }
 </script>
 

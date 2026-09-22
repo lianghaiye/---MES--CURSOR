@@ -275,6 +275,12 @@ const routes = [
         meta: { title: '工艺路线' },
       },
       {
+        path: 'product-process/routing/:id/edit',
+        name: 'product-process-routing-edit',
+        component: () => import('@/views/product-process/ProcessRouteEditView.vue'),
+        meta: { title: '编辑工艺路线', listPath: '/product-process/routing' },
+      },
+      {
         path: 'product-process/routing/:id',
         name: 'product-process-routing-detail',
         component: () => import('@/views/product-process/ProcessRouteDetailView.vue'),
