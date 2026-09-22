@@ -119,6 +119,7 @@
           <RollbackOutlined />
           反审
         </a-button>
+        <a-button size="small" @click="openToolbarPriceChange">订单变更</a-button>
         <a-button size="small" @click="openToolbarPriceChangeApprove">审核订单变更</a-button>
         <a-button size="small" @click="openDeliveryModal">
           <FileTextOutlined />
@@ -198,6 +199,12 @@
             <a-tag :color="salesOrderStatusColor(record.progressStatus)">{{
               record.progressStatus
             }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'changeStatus'">
+            <template v-if="resolveChangeStatus(record) === '-'">-</template>
+            <a-tag v-else :color="changeStatusColor(resolveChangeStatus(record))">
+              {{ resolveChangeStatus(record) }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'deliveryStatus'">
             <a-tag :color="salesDeliveryStatusColor(record.deliveryStatus)">{{
@@ -293,9 +300,14 @@
                 >
               </template>
               <template v-else-if="isInProgressSalesOrder(record)">
-                <a-button type="link" size="small" @click="openDeliveryForOrder(record)"
-                  >发货</a-button
+                <a-button
+                  v-if="!getPendingPriceChange(record.id)"
+                  type="link"
+                  size="small"
+                  @click="openDeliveryForOrder(record)"
                 >
+                  发货
+                </a-button>
                 <a-button type="link" size="small" @click="openPriceChangeForOrder(record)">{{
                   rowPriceChangeLabel(record)
                 }}</a-button>
@@ -419,7 +431,9 @@ import {
   canApplySalesPriceChange,
   getPendingPriceChange,
   getPendingPriceChangeDeliveryBlock,
+  resolveSalesOrderChangeStatus,
 } from '@/store/salesPriceChangeStore'
+import { salesOrderChangeStatusColor } from '@/utils/salesPriceChange'
 import {
   normalizeSalesOrderProgressStatus,
   salesDeliveryStatusColor,
@@ -462,6 +476,7 @@ const baseColumns = [
   { title: '状态', key: 'progressStatus', dataIndex: 'progressStatus', width: 90, fixed: 'left' },
   { title: '销售单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
   { title: '客户名称', dataIndex: 'customerName', width: 140, ellipsis: true, fixed: 'left' },
+  { title: '变更状态', key: 'changeStatus', width: 100 },
   { title: '发货状态', key: 'deliveryStatus', dataIndex: 'deliveryStatus', width: 90 },
   {
     title: '销售数量',
@@ -545,7 +560,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('sales-order-list-v2', baseColumns, { minScrollX: 3200 })
+  useTableColumnSettings('sales-order-list-v3', baseColumns, { minScrollX: 3300 })
 
 const { exportModalOpen, exportFieldSettings, defaultExportFieldSettings, doExport } =
   useListExport({
@@ -847,6 +862,14 @@ function rowPriceChangeLabel(order) {
   return getPendingPriceChange(order?.id) ? '审核订单变更' : '订单变更'
 }
 
+function resolveChangeStatus(order) {
+  return resolveSalesOrderChangeStatus(order?.id)
+}
+
+function changeStatusColor(label) {
+  return salesOrderChangeStatusColor(label)
+}
+
 function openPriceChangeForOrder(order) {
   if (!canApplySalesPriceChange(order)) {
     message.warning('仅「进行中」的销售订单可申请订单变更')
@@ -854,6 +877,19 @@ function openPriceChangeForOrder(order) {
   }
   priceChangeOrder.value = order
   priceChangeOpen.value = true
+}
+
+function openToolbarPriceChange() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条销售订单后再申请订单变更')
+    return
+  }
+  const order = salesOrderState.orders.find((o) => o.id === selectedRowKeys.value[0])
+  if (!order) {
+    message.warning('未找到所选订单')
+    return
+  }
+  openPriceChangeForOrder(order)
 }
 
 function openToolbarPriceChangeApprove() {

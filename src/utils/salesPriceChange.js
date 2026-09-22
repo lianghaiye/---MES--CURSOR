@@ -145,6 +145,21 @@ export function priceChangeStatusColor(status) {
   return 'default'
 }
 
+/** 销售订单列表「变更状态」展示文案 */
+export function salesOrderChangeStatusLabel(status) {
+  if (status === PRICE_CHANGE_STATUS.PENDING) return '变更审核中'
+  if (status === PRICE_CHANGE_STATUS.APPROVED) return '已通过'
+  if (status === PRICE_CHANGE_STATUS.REJECTED) return '已拒绝'
+  return '-'
+}
+
+export function salesOrderChangeStatusColor(label) {
+  if (label === '已通过') return 'success'
+  if (label === '已拒绝') return 'error'
+  if (label === '变更审核中') return 'warning'
+  return 'default'
+}
+
 export function lineChangeAmount(qty, unitPrice) {
   return round2((Number(qty) || 0) * (Number(unitPrice) || 0))
 }

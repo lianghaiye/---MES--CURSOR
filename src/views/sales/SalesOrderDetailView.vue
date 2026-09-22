@@ -40,11 +40,16 @@
               </template>
               <template v-else-if="canRevokeSalesOrderApproval(order)">
                 <a-button size="small" @click="handleRevokeApprove">反审</a-button>
-                <a-button type="primary" size="small" @click="handleApplyDelivery"
-                  >申请发货</a-button
-                >
                 <a-button size="small" @click="handlePriceChange">
                   {{ pendingPriceChange ? '审核订单变更' : '订单变更' }}
+                </a-button>
+                <a-button
+                  v-if="!pendingPriceChange"
+                  type="primary"
+                  size="small"
+                  @click="handleApplyDelivery"
+                >
+                  申请发货
                 </a-button>
                 <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
                 <a-button size="small" @click="handleComplete">完成</a-button>

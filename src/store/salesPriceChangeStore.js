@@ -117,6 +117,20 @@ export function getPendingPriceChange(salesOrderId) {
   )
 }
 
+/**
+ * 订单变更状态（列表用）：
+ * 未发起 → `-`；待审核 → `变更审核中`；最近一次已审结 → `已通过` / `已拒绝`
+ */
+export function resolveSalesOrderChangeStatus(salesOrderId) {
+  if (!salesOrderId) return '-'
+  if (getPendingPriceChange(salesOrderId)) return '变更审核中'
+  const latest = listPriceChangesByOrderId(salesOrderId)[0]
+  if (!latest) return '-'
+  if (latest.status === PRICE_CHANGE_STATUS.APPROVED) return '已通过'
+  if (latest.status === PRICE_CHANGE_STATUS.REJECTED) return '已拒绝'
+  return '-'
+}
+
 export function getPendingPriceChangeDeliveryBlock(salesOrderId) {
   const pending = getPendingPriceChange(salesOrderId)
   if (!pending) return ''
