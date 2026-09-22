@@ -40,21 +40,22 @@
             </a-form-item>
           </a-col>
           <a-col :span="6">
-            <a-form-item label="默认执行人/工组">
+            <a-form-item label="默认执行人/工组" name="defaultExecutors" required>
               <ExecutorTagPicker
                 :executors="form.defaultExecutors"
                 :resource-type="form.resourceType"
                 placeholder="请选择默认执行人/工组"
-                @update:executors="(v) => (form.defaultExecutors = v)"
+                @update:executors="onDefaultExecutorsChange"
               />
             </a-form-item>
           </a-col>
           <a-col :span="6">
-            <a-form-item label="岗位" name="position" required>
+            <a-form-item label="岗位" name="position">
               <a-select
                 v-model:value="form.position"
+                allow-clear
                 show-search
-                placeholder="请选择岗位"
+                placeholder="请选择岗位（选填）"
                 :options="positionOpts"
               />
             </a-form-item>
@@ -307,8 +308,21 @@ function onOpSwitchChange(key, checked) {
 const rules = {
   name: [{ required: true, message: '请输入工序名称', trigger: 'blur' }],
   category: [{ required: true, message: '请选择工序分类', trigger: 'change' }],
-  position: [{ required: true, message: '请选择岗位', trigger: 'change' }],
   resourceType: [{ required: true, message: '请选择资源类型', trigger: 'change' }],
+  defaultExecutors: [
+    {
+      required: true,
+      type: 'array',
+      min: 1,
+      message: '请选择默认执行人/工组',
+      trigger: 'change',
+    },
+  ],
+}
+
+function onDefaultExecutorsChange(v) {
+  form.defaultExecutors = v || []
+  formRef.value?.validateFields(['defaultExecutors']).catch(() => {})
 }
 
 function filterDefectOption(input, option) {

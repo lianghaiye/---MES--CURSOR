@@ -178,8 +178,10 @@ export function filterProcessConfig(list, filters = {}) {
 function validateProcessForm(payload, editingId) {
   if (!payload.name?.trim()) return { ok: false, message: '请输入工序名称' }
   if (!payload.category) return { ok: false, message: '请选择工序分类' }
-  if (!payload.position) return { ok: false, message: '请选择岗位' }
   if (!payload.resourceType) return { ok: false, message: '请选择资源类型' }
+  if (!payload.defaultExecutors?.length) {
+    return { ok: false, message: '请选择默认执行人/工组' }
+  }
 
   const code = payload.code?.trim()
   if (code) {
