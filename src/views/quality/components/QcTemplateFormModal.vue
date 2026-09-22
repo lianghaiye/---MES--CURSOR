@@ -10,6 +10,7 @@
   >
     <div class="modal-form-body">
       <div class="basic-info-box">
+        <div class="section-title">基本信息</div>
         <div class="form-row-pair">
           <div class="form-row">
             <label class="form-label required">模板名称</label>
@@ -1431,6 +1432,14 @@ function onConflictConfirm({ mode }) {
   padding: 16px 16px 0;
   margin-bottom: 16px;
   background: #fff;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  margin-bottom: 12px;
+  line-height: 22px;
 }
 
 .form-row-pair {
