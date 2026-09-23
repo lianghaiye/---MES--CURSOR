@@ -145,8 +145,11 @@
               <template v-else-if="column.key === 'inspectQty'">
                 {{ formatQty(record.inspectQty) }}
               </template>
+              <template v-else-if="column.key === 'treatmentPlan'">
+                {{ formatLineTreatmentPlan(record) || '—' }}
+              </template>
               <template v-else-if="column.key === 'acceptInboundQty'">
-                {{ formatDispositionQty(record.acceptInboundQty) }}
+                {{ formatAcceptInboundDisplay(record) }}
               </template>
               <template v-else-if="column.key === 'returnExchange'">
                 {{ formatReturnExchange(record) }}
@@ -179,6 +182,7 @@
     <OutsourcingGenerateInboundModal
       v-model:open="wxInboundModalOpen"
       :outsourcing-order="wxInboundOrder"
+      :outsourcing-receipt="wxInboundReceipt"
       :qc-qty-hints="inboundQcQtyHints"
       :qc-enforce-qty-cap="inboundQcEnforceCap"
       @saved="onOutsourcingInboundSaved"
@@ -217,6 +221,12 @@ import { ensureQcLibraryDemoSeed } from '@/store/qcFieldLibraryStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { formatQty } from '@/utils/numberFormat'
+import {
+  formatDispositionSecondaryQty,
+  formatTreatmentPlanDisplay,
+  getDispositionFieldLabels,
+  isMultiBucketDisposition,
+} from '@/utils/qcTreatmentPlan'
 import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
 import { isProductionQcScope, resolveProductionQcHeader } from '@/utils/qcProductionContext'
 import { evaluateQcInboundGate, resolveSourceReceiptForQcTask } from '@/utils/qcInboundFromReceipt'
@@ -272,6 +282,9 @@ const isInboundScope = computed(() =>
 const isOutsourcingScope = computed(
   () => (route.meta.bizScope || task.value?.bizScope) === '外协回货检',
 )
+const isMultiBucketScope = computed(() =>
+  isMultiBucketDisposition(route.meta.bizScope || task.value?.bizScope),
+)
 const isProductionScope = computed(() =>
   isProductionQcScope(route.meta.bizScope || task.value?.bizScope || ''),
 )
@@ -291,12 +304,23 @@ const lineColumns = computed(() => {
   if (!isProductionScope.value) {
     cols.push({ title: '收货仓库', dataIndex: 'receivingWarehouse', width: 100 })
   }
-  cols.push(
-    { title: '质检结果', key: 'lineQcResult', width: 100 },
-    { title: '处理方案', dataIndex: 'treatmentPlan', width: 100, ellipsis: true },
-    { title: '合格入库数', key: 'acceptInboundQty', width: 100, align: 'right' },
-    { title: '退/换货', key: 'returnExchange', width: 120, ellipsis: true },
-  )
+  cols.push({ title: '质检结果', key: 'lineQcResult', width: 100 })
+  if (isMultiBucketScope.value) {
+    // 来料/外协：处理方案已汇总四桶数量，不再拆「合格/让步」「退换/返工报废」列
+    cols.push({ title: '处理方案', key: 'treatmentPlan', width: 260, ellipsis: true })
+  } else {
+    cols.push(
+      { title: '处理方案', dataIndex: 'treatmentPlan', width: 140, ellipsis: true },
+      { title: '合格入库数', key: 'acceptInboundQty', width: 100, align: 'right' },
+      {
+        title: getDispositionFieldLabels(route.meta.bizScope || task.value?.bizScope)
+          .columnReturnExchange,
+        key: 'returnExchange',
+        width: 120,
+        ellipsis: true,
+      },
+    )
+  }
   return cols
 })
 
@@ -392,13 +416,26 @@ function formatDispositionQty(val) {
   return formatQty(val)
 }
 
+/** 来料/外协：合格+让步展示可入库数 */
+function formatAcceptInboundDisplay(record = {}) {
+  if (isMultiBucketScope.value) {
+    const a = Number(record.acceptInboundQty)
+    const c = Number(record.concessionQty)
+    const parts = []
+    if (Number.isFinite(a) && a > 0) parts.push(`合格 ${formatQty(a)}`)
+    if (Number.isFinite(c) && c > 0) parts.push(`让步 ${formatQty(c)}`)
+    if (!parts.length) return '—'
+    return parts.join(' / ')
+  }
+  return formatDispositionQty(record.acceptInboundQty)
+}
+
 function formatReturnExchange(record = {}) {
-  const parts = []
-  const r = Number(record.returnQty)
-  const e = Number(record.exchangeQty)
-  if (Number.isFinite(r) && r > 0) parts.push(`退货 ${formatQty(r)}`)
-  if (Number.isFinite(e) && e > 0) parts.push(`换货 ${formatQty(e)}`)
-  return parts.length ? parts.join(' / ') : '—'
+  return formatDispositionSecondaryQty(route.meta.bizScope || task.value?.bizScope, record)
+}
+
+function formatLineTreatmentPlan(record = {}) {
+  return formatTreatmentPlanDisplay(route.meta.bizScope || task.value?.bizScope, record, formatQty)
 }
 
 function hasEnteredValues(line) {

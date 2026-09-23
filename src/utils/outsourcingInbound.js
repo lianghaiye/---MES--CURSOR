@@ -150,6 +150,56 @@ export function formatWxInboundProgress(receivedQty, appliedQty, planQty) {
 
 export const WX_INBOUND_PROGRESS_TOOLTIP = '格式：已入库数量 / 已申请入库（收货）数量 / 计划数量'
 
+function listActiveInboundOrdersForWx(order) {
+  try {
+    const listFn = getInboundOrdersByOutsourcingOrderFn()
+    return (listFn(order) || []).filter((o) => isActiveInboundOrder(o))
+  } catch {
+    return []
+  }
+}
+
+/** 外协行入库结算数量合计（有效入库单明细 settleQty 之和） */
+export function calcWxLineInboundSettleQty(order, line) {
+  if (!order || !line) return 0
+  let total = 0
+  listActiveInboundOrdersForWx(order).forEach((inbound) => {
+    ;(inbound.lineItems || []).forEach((li) => {
+      if (!lineIdMatches(li, line.id)) return
+      total += Number(li.settleQty) || 0
+    })
+  })
+  return total
+}
+
+/** 结算数量展示单位：优先入库明细 settleUnit，否则行上 settleUnit */
+export function resolveWxLineSettleUnit(order, line) {
+  if (!order || !line) return String(line?.settleUnit || '').trim()
+  for (const inbound of listActiveInboundOrdersForWx(order)) {
+    for (const li of inbound.lineItems || []) {
+      if (!lineIdMatches(li, line.id)) continue
+      const u = String(li.settleUnit || '').trim()
+      if (u) return u
+    }
+  }
+  return String(line.settleUnit || '').trim()
+}
+
+/** 回货仓库：行字段 / 收货明细 / 订单预入仓库 */
+export function resolveWxLineReturnWarehouse(order, line) {
+  const fromLine = String(line?.receivingWarehouse || line?.returnWarehouse || '').trim()
+  if (fromLine) return fromLine
+  if (!order || !line?.id) return String(order?.shipWarehouse || '').trim()
+  for (const receipt of listOutsourcingReceiptsForOrder(order)) {
+    for (const li of receipt.lineItems || []) {
+      if (!lineIdMatches(li, line.id)) continue
+      const wh = String(li.receivingWarehouse || '').trim()
+      if (wh) return wh
+    }
+  }
+  return String(order?.shipWarehouse || '').trim()
+}
+
 /** 发货进度：已出库数量 / 已申请数量 / 计划数量（对齐销售发货进度） */
 export function formatWxIssueProgress(issuedQty, appliedIssueQty, planQty) {
   return formatWxInboundProgress(issuedQty, appliedIssueQty, planQty)

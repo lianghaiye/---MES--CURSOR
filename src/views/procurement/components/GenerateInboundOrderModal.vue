@@ -160,7 +160,9 @@
       <div class="section-title qc-result-head">
         <span>
           质检结果 ({{ qcResultRows.length }})
-          <span class="section-hint">一个产品一行；可对照合格入库数填写下方入库明细</span>
+          <span class="section-hint"
+            >一个产品一行；可对照处理方案中的合格/让步数量填写下方入库明细</span
+          >
         </span>
         <a-button type="link" size="small" @click="qcResultExpanded = !qcResultExpanded">
           {{ qcResultExpanded ? '收起' : '展开' }}
@@ -189,12 +191,15 @@
           <template v-else-if="column.key === 'productInfo'">
             <span :title="formatQcProductInfo(record)">{{ formatQcProductInfo(record) }}</span>
           </template>
-          <template v-else-if="column.key === 'inspectQty' || column.key === 'acceptInboundQty'">
+          <template v-else-if="column.key === 'inspectQty'">
             {{
               record[column.key] === '' || record[column.key] == null
                 ? '—'
                 : formatQty(record[column.key])
             }}
+          </template>
+          <template v-else-if="column.key === 'treatmentPlan'">
+            {{ record.treatmentPlan || '—' }}
           </template>
           <template v-else>
             {{ record[column.dataIndex] ?? record[column.key] ?? '—' }}
@@ -203,7 +208,7 @@
       </a-table>
     </div>
 
-    <div class="section-block">
+    <div class="section-block modal-basic-card">
       <div class="section-title">
         入库明细 ({{ displayLines.length }})
         <span v-if="purchaseReceipt || isReceiptSource" class="section-hint"
@@ -638,15 +643,7 @@ const qcResultColumns = [
   { title: '产品信息', key: 'productInfo', width: 280, ellipsis: true },
   { title: '质检方式', dataIndex: 'inspectMethod', key: 'inspectMethod', width: 90 },
   { title: '质检数量', key: 'inspectQty', width: 90, align: 'right' },
-  { title: '处理方案', dataIndex: 'treatmentPlan', key: 'treatmentPlan', width: 100 },
-  { title: '合格入库数', key: 'acceptInboundQty', width: 100, align: 'right' },
-  {
-    title: '退/换货',
-    dataIndex: 'returnExchange',
-    key: 'returnExchange',
-    width: 120,
-    ellipsis: true,
-  },
+  { title: '处理方案', key: 'treatmentPlan', width: 260, ellipsis: true },
 ]
 
 function formatQcProductInfo(record = {}) {

@@ -43,7 +43,7 @@
 
     <a-alert type="info" show-icon class="issue-tip" :message="issueTipMessage" />
 
-    <div class="section-block">
+    <div class="section-block modal-basic-card">
       <div class="section-title">
         外协产品清单 ({{ productRows.length }})
         <span class="section-hint">默认全选可发产品；取消勾选则不发该产品物料</span>
@@ -99,7 +99,7 @@
       </a-table>
     </div>
 
-    <div class="section-block">
+    <div class="section-block modal-basic-card">
       <div class="section-title">
         发料物料明细 ({{ issueLines.length }})
         <span class="section-hint">左侧色条与上方产品对应；共用物料为橙色</span>
@@ -256,7 +256,7 @@ const remarkDraft = ref('')
 
 const issueTipMessage = computed(() =>
   isProcessOutsourceOrder(props.outsourcingOrder)
-    ? '工序外协：勾选产品并填写本次套数后，优先按工序投料生成发料物料；无投料时发外协产品本身（不按 BOM 展开下级）。'
+    ? '工序外协：勾选产品并填写本次套数后，优先按工序投料生成发料物料；无投料时按源工单 EBOM 关联的下级物料展开发料。'
     : '勾选上方外协产品并填写本次套数后，系统按产品 BOM 自动生成下方发料物料；改套数将覆盖重算物料数量。橙色表示多产品共用物料。',
 )
 const remarkTargetId = ref('')

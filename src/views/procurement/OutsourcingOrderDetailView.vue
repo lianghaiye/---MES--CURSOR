@@ -82,6 +82,7 @@
               class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
             >
               <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="approval" tab="审批信息" />
               <a-tab-pane key="price-change" :tab="`订单变更 (${priceChangeCount})`" />
               <a-tab-pane key="issue" :tab="`发料信息 (${issueApplicationRows.length})`" />
               <a-tab-pane key="return" :tab="`回货信息 (${relatedInboundLines.length})`" />
@@ -122,22 +123,43 @@
                 :scroll="{ x: lineTableScrollX }"
                 :locale="{ emptyText: '暂无外协明细' }"
               >
+                <template #headerCell="{ column }">
+                  <template v-if="column.key === 'inboundProgress'">
+                    <span class="col-title-with-tip">
+                      入库进度
+                      <a-tooltip :title="WX_INBOUND_PROGRESS_TOOLTIP">
+                        <InfoCircleOutlined class="col-tip-icon" />
+                      </a-tooltip>
+                    </span>
+                  </template>
+                  <template v-else>{{ column.title }}</template>
+                </template>
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'lineInboundStatus'">
+                    <a-tag :color="poLineInboundStatusColor(lineInboundStatus(line))">
+                      {{ lineInboundStatus(line) }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'inboundProgress'">
+                    {{ lineInboundProgress(line) }}
+                  </template>
                   <template v-else-if="column.key === 'productName'">
-                    <span>{{ line.productName || '—' }}</span>
+                    <span>{{ line.productName || line.itemName || '—' }}</span>
                     <a-tag v-if="line.cancelled" color="default" class="cancelled-tag"
                       >已取消</a-tag
                     >
                   </template>
-                  <template v-else-if="column.key === 'stockQty'">
-                    {{ formatQty(line.stockQty) }}
+                  <template v-else-if="column.key === 'productCode'">
+                    {{ line.productCode || line.itemCode || '—' }}
                   </template>
                   <template v-else-if="column.key === 'planQty'">
-                    {{ formatQty(line.planQty) }}
+                    {{ formatQtyWithUnit(line.planQty, line.unit) }}
                   </template>
                   <template v-else-if="column.key === 'taxRate'">
-                    {{ formatQty(line.taxRate) }}
+                    {{
+                      line.taxRate != null && line.taxRate !== '' ? formatQty(line.taxRate) : '—'
+                    }}
                   </template>
                   <template v-else-if="column.key === 'unitPriceExTax'">
                     {{ formatMoney(line.unitPriceExTax) }}
@@ -151,6 +173,27 @@
                   <template v-else-if="column.key === 'totalPriceInTax'">
                     {{ formatMoney(line.totalPriceInTax) }}
                   </template>
+                  <template v-else-if="column.key === 'returnWarehouse'">
+                    {{ lineReturnWarehouse(line) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'returnQty'">
+                    {{ formatQtyWithUnit(lineReturnQty(line), line.unit) }}
+                  </template>
+                  <template v-else-if="column.key === 'settleQty'">
+                    {{ lineSettleQtyText(line) }}
+                  </template>
+                  <template v-else-if="column.key === 'inboundQcRequirement'">
+                    {{ resolveLineInboundQcRequirement(line) }}
+                  </template>
+                  <template v-else-if="column.key === 'qcResult'">
+                    <a-tag v-if="lineQcResult(line)" :color="qcResultColor(lineQcResult(line))">
+                      {{ lineQcResult(line) }}
+                    </a-tag>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'treatmentPlan'">
+                    {{ lineTreatmentPlan(line) || '—' }}
+                  </template>
                   <template v-else>
                     {{ line[column.dataIndex] ?? '—' }}
                   </template>
@@ -161,6 +204,23 @@
                 <span class="summary-item">数量：{{ formatQty(summary.totalQty) }}</span>
                 <span class="summary-item">不含税：{{ formatMoney(summary.amountExTax) }}</span>
                 <span class="summary-item">含税：{{ formatMoney(summary.amountInTax) }}</span>
+              </div>
+            </DetailSectionCard>
+          </template>
+
+          <template v-else-if="activeTab === 'approval'">
+            <DetailSectionCard title="审批摘要">
+              <div class="approval-summary-grid">
+                <div class="approval-summary-item">
+                  <span class="approval-summary-label">审批人：</span>
+                  <span class="approval-summary-value">{{ record.approverName || '—' }}</span>
+                </div>
+                <div class="approval-summary-item">
+                  <span class="approval-summary-label">审批时间：</span>
+                  <span class="approval-summary-value">{{
+                    resolveApprovalTime(record) || '—'
+                  }}</span>
+                </div>
               </div>
             </DetailSectionCard>
 
@@ -454,8 +514,9 @@ import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { DownOutlined } from '@ant-design/icons-vue'
-import { formatQty } from '@/utils/numberFormat'
+import { DownOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
+import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
+import { resolveApprovalTime } from '@/utils/dateTimeDisplay'
 import { OUTSOURCING_PRINT_TEMPLATE } from '@/utils/outsourcingOrderPrintPreview'
 import {
   getOutsourcingOrderById,
@@ -482,10 +543,27 @@ import {
   createInboundInfoLineColumns,
   getInboundInfoLineScrollX,
 } from '@/utils/purchaseOrderInboundLines'
-import { listInboundQcForOutsourcingOrder } from '@/utils/purchaseOrderQc'
+import {
+  listInboundQcForOutsourcingOrder,
+  getWxLineLatestQcResult,
+  formatWxLineQcTreatmentSummary,
+} from '@/utils/purchaseOrderQc'
 import { listReturnLinesForOutsourcingOrder } from '@/utils/orderReturnLines'
 import { outsourcingReceiptState } from '@/store/outsourcingReceiptStore'
 import { outsourcingReturnState } from '@/store/outsourcingReturnStore'
+import { qcTaskState, QC_TASK_RESULT } from '@/store/qcTaskStore'
+import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
+import { poLineInboundStatusColor } from '@/utils/purchaseLineInbound'
+import {
+  calcWxLineAppliedOccupyQty,
+  calcWxLineInboundSettleQty,
+  calcWxLineReceivedQty,
+  calcWxLineReturnStatus,
+  formatWxInboundProgress,
+  resolveWxLineReturnWarehouse,
+  resolveWxLineSettleUnit,
+  WX_INBOUND_PROGRESS_TOOLTIP,
+} from '@/utils/outsourcingInbound'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import OutsourcingOrderBasicInfoSection from './components/OutsourcingOrderBasicInfoSection.vue'
@@ -527,21 +605,34 @@ const listPath = '/procurement/outsourcing-orders'
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '入库状态', key: 'lineInboundStatus', width: 90 },
+  { title: '入库进度', key: 'inboundProgress', width: 180, ellipsis: true },
   { title: '产品名称', key: 'productName', dataIndex: 'productName', width: 140, ellipsis: true },
-  { title: '编号', dataIndex: 'productCode', width: 120, ellipsis: true },
+  { title: '编号', key: 'productCode', dataIndex: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
-  { title: '变体属性', dataIndex: 'variantSummary', width: 120, ellipsis: true },
   { title: '材质', dataIndex: 'material', width: 90, ellipsis: true },
+  {
+    title: '变体属性',
+    dataIndex: 'variantSummary',
+    key: 'variantAttr',
+    width: 140,
+    ellipsis: true,
+  },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-  { title: '库存数量', key: 'stockQty', width: 90, align: 'right' },
-  { title: '计划数量', key: 'planQty', width: 100, align: 'right' },
-  { title: '单位', dataIndex: 'unit', width: 80 },
+  { title: '计划数量', key: 'planQty', width: 120, align: 'right' },
   { title: '出货仓库', dataIndex: 'shipWarehouse', width: 110, ellipsis: true },
   { title: '计费方式', dataIndex: 'billingMethod', width: 90 },
-  { title: '加工单价(不含税)', key: 'unitPriceExTax', width: 120, align: 'right' },
-  { title: '加工单价(含税)', key: 'unitPriceInTax', width: 110, align: 'right' },
-  { title: '加工总价(不含税)', key: 'totalPriceExTax', width: 120, align: 'right' },
-  { title: '加工总价(含税)', key: 'totalPriceInTax', width: 110, align: 'right' },
+  { title: '税率', key: 'taxRate', dataIndex: 'taxRate', width: 72, align: 'right' },
+  { title: '加工单价（不含税）', key: 'unitPriceExTax', width: 130, align: 'right' },
+  { title: '加工单价（含税）', key: 'unitPriceInTax', width: 120, align: 'right' },
+  { title: '加工总价（不含税）', key: 'totalPriceExTax', width: 130, align: 'right' },
+  { title: '加工总价（含税）', key: 'totalPriceInTax', width: 120, align: 'right' },
+  { title: '回货仓库', key: 'returnWarehouse', width: 110, ellipsis: true },
+  { title: '回货数量', key: 'returnQty', width: 120, align: 'right' },
+  { title: '结算数量', key: 'settleQty', width: 120, align: 'right' },
+  { title: '入库质检要求', key: 'inboundQcRequirement', width: 110 },
+  { title: '质检结果', key: 'qcResult', width: 100 },
+  { title: '处理方案', key: 'treatmentPlan', width: 240, ellipsis: true },
   { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
 ]
 
@@ -660,6 +751,56 @@ watch(() => route.params.id, loadRecord, { immediate: true })
 
 function formatMoney(val) {
   return formatQty(val)
+}
+
+function lineInboundStatus(line) {
+  return calcWxLineReturnStatus(record.value, line)
+}
+
+function lineInboundProgress(line) {
+  return formatWxInboundProgress(
+    calcWxLineReceivedQty(record.value, line),
+    calcWxLineAppliedOccupyQty(record.value, line),
+    Number(line.planQty) || 0,
+  )
+}
+
+function lineReturnQty(line) {
+  void relatedInboundOrders.value
+  return calcWxLineReceivedQty(record.value, line)
+}
+
+function lineReturnWarehouse(line) {
+  void relatedInboundOrders.value
+  void outsourcingReceiptState.receipts
+  return resolveWxLineReturnWarehouse(record.value, line)
+}
+
+function lineSettleQtyText(line) {
+  void relatedInboundOrders.value
+  const qty = calcWxLineInboundSettleQty(record.value, line)
+  const unit = resolveWxLineSettleUnit(record.value, line)
+  if (!(qty > 0) && !unit) return '—'
+  return formatQtyWithUnit(qty, unit || line.unit)
+}
+
+function lineQcResult(line) {
+  void outsourcingReceiptState.receipts
+  void qcTaskState.tasks
+  return getWxLineLatestQcResult(record.value, line)
+}
+
+function lineTreatmentPlan(line) {
+  void outsourcingReceiptState.receipts
+  void qcTaskState.tasks
+  return formatWxLineQcTreatmentSummary(record.value, line)
+}
+
+function qcResultColor(result) {
+  if (result === QC_TASK_RESULT.PASS || result === '合格') return 'success'
+  if (result === QC_TASK_RESULT.PARTIAL || result === '部分合格') return 'processing'
+  if (result === QC_TASK_RESULT.FAIL || result === '不合格') return 'error'
+  return 'default'
 }
 
 function statusColor(status) {
@@ -1013,6 +1154,55 @@ function openExceptionCreate() {
 .muted {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
+}
+
+.approval-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 20px;
+  row-gap: 10px;
+  padding: 4px 0 2px;
+}
+
+.approval-summary-item {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.approval-summary-label {
+  flex: 0 0 72px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  line-height: 22px;
+  text-align: right;
+  padding-right: 8px;
+}
+
+.approval-summary-value {
+  flex: 1;
+  min-width: 0;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 13px;
+  line-height: 22px;
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
+}
+
+@media (max-width: 1200px) {
+  .approval-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .cancelled-tag {

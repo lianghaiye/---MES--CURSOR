@@ -9,7 +9,7 @@ import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_outsourcing_receipts'
 const SEED_VERSION_KEY = 'i_doms_outsourcing_receipts_seed_v'
-const CURRENT_SEED_VERSION = '2'
+const CURRENT_SEED_VERSION = '5'
 
 const UNFINISHED_QC_STATUSES = new Set(['未质检', '质检中'])
 const UNFINISHED_INBOUND_STATUSES = new Set(['入库中', '部分入库'])
@@ -155,6 +155,7 @@ export function attachReceiptQcSheet(id, { qcNo, qcStatus = '质检中' } = {}) 
   return updateOutsourcingReceipt(id, {
     qcNo: String(qcNo).trim(),
     qcStatus,
+    qcResult: '',
   })
 }
 

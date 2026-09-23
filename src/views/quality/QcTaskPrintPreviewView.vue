@@ -62,8 +62,14 @@
                   <span>仓库：{{ block.receivingWarehouse || '—' }}</span>
                   <span>质检结果：{{ block.lineQcResult || '—' }}</span>
                   <span>处理方案：{{ block.treatmentPlan || '—' }}</span>
-                  <span>合格入库：{{ block.acceptInboundQty || '—' }}</span>
-                  <span>退/换货：{{ block.returnExchange || '—' }}</span>
+                  <template v-if="!block.isMultiBucket">
+                    <span>合格入库数：{{ block.acceptInboundQty || '—' }}</span>
+                    <span
+                      >{{ block.returnExchangeLabel || '退/换货' }}：{{
+                        block.returnExchange || '—'
+                      }}</span
+                    >
+                  </template>
                 </div>
 
                 <div v-if="block.inspectRows?.length" class="table-wrap">

@@ -1,383 +1,501 @@
 <template>
-  <a-form layout="vertical" class="qc-field-editor-form">
-    <div class="form-section-box modal-basic-card">
-      <div class="section-label">基本信息</div>
-      <a-row :gutter="[12, 8]">
-        <a-col v-if="showCode" :span="6">
-          <a-form-item label="指标编码" :required="codeRequired">
-            <a-input
-              :value="model.code"
-              allow-clear
-              placeholder="空则自动生成"
-              :disabled="codeDisabled"
-              @update:value="(v) => update('code', v)"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="指标类型" required>
-            <a-radio-group
-              :value="indicatorKind"
-              :disabled="typeDisabled"
-              @update:value="onIndicatorKindChange"
-            >
-              <a-radio value="basic">基础</a-radio>
-              <a-radio value="composite">复合</a-radio>
-            </a-radio-group>
-          </a-form-item>
-        </a-col>
-        <template v-if="indicatorKind === 'basic'">
-          <a-col :span="6">
-            <a-form-item label="指标名称" required>
+  <a-config-provider component-size="small">
+    <a-form
+      layout="horizontal"
+      class="qc-field-editor-form"
+      :label-col="{ flex: '0 0 88px' }"
+      :wrapper-col="{ flex: '1 1 auto' }"
+    >
+      <div class="form-section-box modal-basic-card">
+        <div class="section-label">基本信息</div>
+        <a-row :gutter="[12, 12]">
+          <a-col v-if="showCode" :span="6">
+            <a-form-item label="指标编码" :required="codeRequired">
               <a-input
-                :value="model.name"
+                :value="model.code"
                 allow-clear
-                placeholder="请输入指标名称"
-                @update:value="(v) => update('name', v)"
+                placeholder="空则自动生成"
+                :disabled="codeDisabled"
+                @update:value="(v) => update('code', v)"
               />
             </a-form-item>
           </a-col>
           <a-col :span="6">
-            <a-form-item label="字段类型" required>
-              <a-select
-                :value="model.type"
-                placeholder="请选择"
-                :options="basicTypeOpts"
+            <a-form-item label="指标类型" required>
+              <a-radio-group
+                :value="indicatorKind"
                 :disabled="typeDisabled"
-                @change="onBasicTypeChange"
-              />
-            </a-form-item>
-          </a-col>
-        </template>
-        <template v-else>
-          <a-col :span="6">
-            <a-form-item label="父项名称" required>
-              <a-input
-                :value="model.name"
-                allow-clear
-                placeholder="请输入父项名称"
-                @update:value="(v) => update('name', v)"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
-            <a-form-item label="是否必填">
-              <a-radio-group :value="model.required" @update:value="(v) => update('required', v)">
-                <a-radio :value="true">是</a-radio>
-                <a-radio :value="false">否</a-radio>
+                @update:value="onIndicatorKindChange"
+              >
+                <a-radio value="basic">基础</a-radio>
+                <a-radio value="composite">复合</a-radio>
               </a-radio-group>
             </a-form-item>
           </a-col>
-        </template>
-      </a-row>
-
-      <template v-if="indicatorKind === 'basic'">
-        <a-row :gutter="[12, 8]">
-          <a-col :span="6">
-            <a-form-item label="是否必填">
-              <a-radio-group :value="model.required" @update:value="(v) => update('required', v)">
-                <a-radio :value="true">是</a-radio>
-                <a-radio :value="false">否</a-radio>
-              </a-radio-group>
-            </a-form-item>
-          </a-col>
-          <a-col :span="model.withUnit ? 12 : 6">
-            <a-form-item label="是否带单位">
-              <div class="unit-inline-row">
-                <a-checkbox :checked="model.withUnit" @update:checked="(v) => onWithUnitChange(v)">
-                  带单位
-                </a-checkbox>
-                <template v-if="model.withUnit">
-                  <a-select
-                    :value="model.unitPosition"
-                    class="unit-pos-select"
-                    :options="unitPositionOpts"
-                    @update:value="(v) => update('unitPosition', v)"
-                  />
-                  <a-input
-                    :value="model.unit"
-                    placeholder="如 mm、¥"
-                    allow-clear
-                    class="unit-value-input"
-                    @update:value="(v) => update('unit', v)"
-                  />
-                </template>
-              </div>
-            </a-form-item>
-          </a-col>
-          <a-col v-if="model.type === 'number'" :span="6">
-            <a-form-item label="数字设置">
-              <a-checkbox
-                :checked="model.allowDecimal"
-                @update:checked="(v) => update('allowDecimal', v)"
-              >
-                允许小数
-              </a-checkbox>
-            </a-form-item>
-          </a-col>
-          <a-col v-if="showFormatField" :span="6">
-            <a-form-item label="字段格式">
-              <a-input
-                :value="model.format"
-                :placeholder="formatPlaceholder"
-                allow-clear
-                @update:value="(v) => update('format', v)"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
-            <a-form-item label="输入提示">
-              <a-input
-                :value="model.placeholder"
-                placeholder="请输入提示文案"
-                @update:value="(v) => update('placeholder', v)"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="['text', 'textarea', 'number'].includes(model.type)" :span="6">
-            <a-form-item label="默认值">
-              <a-input
-                :value="model.defaultValue"
-                placeholder="请输入默认值"
-                @update:value="(v) => update('defaultValue', v)"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="model.type === 'text' || model.type === 'textarea'" :span="6">
-            <a-form-item label="字符限制">
-              <a-input-number
-                :value="model.charLimit"
-                :min="1"
-                style="width: 100%"
-                placeholder="最大字符数"
-                @update:value="(v) => update('charLimit', v)"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="字段描述">
-              <a-input
-                :value="model.description"
-                allow-clear
-                placeholder="选填"
-                @update:value="(v) => update('description', v)"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-form-item v-if="isChoice" label="选项列表" required>
-          <div v-for="(opt, i) in model.optionRows" :key="i" class="option-row conclusion-opt">
-            <a-input
-              :value="opt.value"
-              placeholder="选项值"
-              @update:value="(v) => updateOptionValue(i, v)"
-            />
-            <a-checkbox
-              :checked="Boolean(opt.isDefault)"
-              @change="(e) => setOptionDefault(i, e.target.checked)"
-            >
-              设为默认值
-            </a-checkbox>
-            <a-button type="text" danger @click="removeOption(i)">删除</a-button>
-          </div>
-          <a-button type="link" size="small" @click="addOption">+ 添加选项</a-button>
-        </a-form-item>
-      </template>
-      <template v-else>
-        <a-row :gutter="[12, 8]">
-          <a-col :span="12">
-            <a-form-item label="字段描述">
-              <a-input
-                :value="model.description"
-                allow-clear
-                placeholder="选填"
-                @update:value="(v) => update('description', v)"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </template>
-    </div>
-
-    <div v-if="indicatorKind === 'composite'" class="form-section-box">
-      <div class="section-label">子项配置</div>
-      <div v-for="(child, i) in model.children || []" :key="i" class="complex-child-card">
-        <div class="child-card-head">
-          <span class="child-idx">子项 {{ i + 1 }}</span>
-          <a-button type="text" danger size="small" @click="removeChild(i)">删除</a-button>
-        </div>
-        <a-row :gutter="[12, 8]">
-          <a-col :span="6">
-            <a-form-item label="子项名称" required>
-              <a-input
-                :value="child.name"
-                placeholder="子项名称"
-                @update:value="(v) => updateChild(i, 'name', v)"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
-            <a-form-item label="子项类型" required>
-              <a-select
-                :value="child.type || 'number'"
-                :options="childTypeOpts"
-                @update:value="(v) => onChildTypeChange(i, v)"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
-            <a-form-item label="是否必填">
-              <a-checkbox
-                :checked="child.required !== false"
-                @update:checked="(v) => updateChild(i, 'required', v)"
-              >
-                必填
-              </a-checkbox>
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
-            <a-form-item label="单位">
-              <div class="unit-inline-row">
-                <a-select
-                  :value="child.unitPosition || 'suffix'"
-                  class="unit-pos-select"
-                  :options="unitPositionOpts"
-                  @update:value="(v) => updateChild(i, 'unitPosition', v)"
-                />
-                <a-input
-                  :value="child.unit"
-                  placeholder="可空"
-                  allow-clear
-                  class="unit-value-input"
-                  @update:value="(v) => updateChild(i, 'unit', v)"
-                />
-              </div>
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-row
-          v-if="
-            child.type === 'date' ||
-            child.type === 'datetime' ||
-            child.type === 'number' ||
-            child.type === 'text' ||
-            child.type === 'textarea'
-          "
-          :gutter="[12, 8]"
-        >
-          <a-col v-if="child.type === 'date' || child.type === 'datetime'" :span="6">
-            <a-form-item label="字段格式">
-              <a-input
-                :value="child.format"
-                :placeholder="child.type === 'datetime' ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd'"
-                @update:value="(v) => updateChild(i, 'format', v)"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="child.type === 'number'" :span="6">
-            <a-form-item label="数字设置">
-              <a-checkbox
-                :checked="child.allowDecimal !== false"
-                @update:checked="(v) => updateChild(i, 'allowDecimal', v)"
-              >
-                允许小数
-              </a-checkbox>
-            </a-form-item>
-          </a-col>
-          <a-col v-if="child.type === 'text' || child.type === 'textarea'" :span="6">
-            <a-form-item label="字符限制">
-              <a-input-number
-                :value="child.charLimit"
-                :min="1"
-                style="width: 100%"
-                placeholder="最大字符数"
-                @update:value="(v) => updateChild(i, 'charLimit', v)"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <template v-if="child.type === 'radio' || child.type === 'checkbox'">
-          <a-form-item label="选项列表" required>
-            <div
-              v-for="(opt, oi) in child.optionRows || []"
-              :key="oi"
-              class="option-row conclusion-opt"
-            >
-              <a-input
-                :value="opt.value"
-                placeholder="选项值"
-                @update:value="(v) => updateChildOptionValue(i, oi, v)"
-              />
-              <a-checkbox
-                :checked="Boolean(opt.isDefault)"
-                @change="(e) => setChildOptionDefault(i, oi, e.target.checked)"
-              >
-                默认
-              </a-checkbox>
-              <a-button type="text" danger @click="removeChildOption(i, oi)">删除</a-button>
-            </div>
-            <a-button type="link" size="small" @click="addChildOption(i)">+ 添加选项</a-button>
-          </a-form-item>
-        </template>
-        <a-row :gutter="[12, 8]" class="child-judge-block">
-          <a-col :span="6">
-            <a-form-item label="判定方式">
-              <a-select
-                :value="child.judgeRule || 'none'"
-                :options="judgeRuleOpts"
-                @update:value="(v) => onChildJudgeRuleChange(i, v)"
-              />
-            </a-form-item>
-          </a-col>
-          <template v-if="child.judgeRule === 'range'">
+          <template v-if="indicatorKind === 'basic'">
             <a-col :span="6">
-              <a-form-item label="下限（含）">
-                <a-input-number
-                  :value="child.standardMin"
-                  style="width: 100%"
-                  placeholder="可空"
-                  @update:value="(v) => updateChild(i, 'standardMin', v)"
+              <a-form-item label="指标名称" required>
+                <a-input
+                  :value="model.name"
+                  allow-clear
+                  placeholder="请输入指标名称"
+                  @update:value="(v) => update('name', v)"
                 />
               </a-form-item>
             </a-col>
             <a-col :span="6">
-              <a-form-item label="上限（含）">
-                <a-input-number
-                  :value="child.standardMax"
-                  style="width: 100%"
-                  placeholder="可空"
-                  @update:value="(v) => updateChild(i, 'standardMax', v)"
+              <a-form-item label="字段类型" required>
+                <a-select
+                  :value="model.type"
+                  placeholder="请选择"
+                  :options="basicTypeOpts"
+                  :disabled="typeDisabled"
+                  @change="onBasicTypeChange"
                 />
               </a-form-item>
             </a-col>
           </template>
-          <a-col v-else-if="child.judgeRule === 'equals'" :span="6">
-            <a-form-item label="标准值">
+          <template v-else>
+            <a-col :span="6">
+              <a-form-item label="父项名称" required>
+                <a-input
+                  :value="model.name"
+                  allow-clear
+                  placeholder="请输入父项名称"
+                  @update:value="(v) => update('name', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="是否必填">
+                <a-radio-group :value="model.required" @update:value="(v) => update('required', v)">
+                  <a-radio :value="true">是</a-radio>
+                  <a-radio :value="false">否</a-radio>
+                </a-radio-group>
+              </a-form-item>
+            </a-col>
+          </template>
+        </a-row>
+
+        <template v-if="indicatorKind === 'basic'">
+          <a-row :gutter="[12, 12]">
+            <a-col :span="6">
+              <a-form-item label="是否必填">
+                <a-radio-group :value="model.required" @update:value="(v) => update('required', v)">
+                  <a-radio :value="true">是</a-radio>
+                  <a-radio :value="false">否</a-radio>
+                </a-radio-group>
+              </a-form-item>
+            </a-col>
+            <a-col :span="model.withUnit ? 12 : 6">
+              <a-form-item label="是否带单位">
+                <div class="unit-inline-row">
+                  <a-checkbox
+                    :checked="model.withUnit"
+                    @update:checked="(v) => onWithUnitChange(v)"
+                  >
+                    带单位
+                  </a-checkbox>
+                  <template v-if="model.withUnit">
+                    <a-select
+                      :value="model.unitPosition"
+                      class="unit-pos-select"
+                      :options="unitPositionOpts"
+                      @update:value="(v) => update('unitPosition', v)"
+                    />
+                    <a-input
+                      :value="model.unit"
+                      placeholder="如 mm、¥"
+                      allow-clear
+                      class="unit-value-input"
+                      @update:value="(v) => update('unit', v)"
+                    />
+                  </template>
+                </div>
+              </a-form-item>
+            </a-col>
+            <a-col v-if="model.type === 'number'" :span="6">
+              <a-form-item label="数字设置">
+                <a-checkbox
+                  :checked="model.allowDecimal"
+                  @update:checked="(v) => update('allowDecimal', v)"
+                >
+                  允许小数
+                </a-checkbox>
+              </a-form-item>
+            </a-col>
+            <a-col v-if="showFormatField" :span="6">
+              <a-form-item label="字段格式">
+                <a-input
+                  :value="model.format"
+                  :placeholder="formatPlaceholder"
+                  allow-clear
+                  @update:value="(v) => update('format', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="输入提示">
+                <a-input
+                  :value="model.placeholder"
+                  placeholder="请输入提示文案"
+                  @update:value="(v) => update('placeholder', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col v-if="['text', 'textarea', 'number'].includes(model.type)" :span="6">
+              <a-form-item label="默认值">
+                <a-input
+                  :value="model.defaultValue"
+                  placeholder="请输入默认值"
+                  @update:value="(v) => update('defaultValue', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col v-if="model.type === 'text' || model.type === 'textarea'" :span="6">
+              <a-form-item label="字符限制">
+                <a-input-number
+                  :value="model.charLimit"
+                  :min="1"
+                  style="width: 100%"
+                  placeholder="最大字符数"
+                  @update:value="(v) => update('charLimit', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="字段描述">
+                <a-input
+                  :value="model.description"
+                  allow-clear
+                  placeholder="选填"
+                  @update:value="(v) => update('description', v)"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item v-if="isChoice" label="选项列表" required class="block-form-item">
+            <div v-for="(opt, i) in model.optionRows" :key="i" class="option-row conclusion-opt">
               <a-input
-                :value="child.standardValue"
-                placeholder="等于该值则合格"
-                @update:value="(v) => updateChild(i, 'standardValue', v)"
+                :value="opt.value"
+                placeholder="选项值"
+                @update:value="(v) => updateOptionValue(i, v)"
+              />
+              <a-checkbox
+                :checked="Boolean(opt.isDefault)"
+                @change="(e) => setOptionDefault(i, e.target.checked)"
+              >
+                设为默认值
+              </a-checkbox>
+              <a-button type="text" danger @click="removeOption(i)">删除</a-button>
+            </div>
+            <a-button type="link" size="small" @click="addOption">+ 添加选项</a-button>
+          </a-form-item>
+        </template>
+        <template v-else>
+          <a-row :gutter="[12, 12]">
+            <a-col :span="12">
+              <a-form-item label="字段描述">
+                <a-input
+                  :value="model.description"
+                  allow-clear
+                  placeholder="选填"
+                  @update:value="(v) => update('description', v)"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </template>
+      </div>
+
+      <div v-if="indicatorKind === 'composite'" class="form-section-box">
+        <div class="section-label">子项配置</div>
+        <div v-for="(child, i) in model.children || []" :key="i" class="complex-child-card">
+          <div class="child-card-head">
+            <span class="child-idx">子项 {{ i + 1 }}</span>
+            <a-button type="text" danger size="small" @click="removeChild(i)">删除</a-button>
+          </div>
+          <a-row :gutter="[12, 12]">
+            <a-col :span="6">
+              <a-form-item label="子项名称" required>
+                <a-input
+                  :value="child.name"
+                  placeholder="子项名称"
+                  @update:value="(v) => updateChild(i, 'name', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="子项类型" required>
+                <a-select
+                  :value="child.type || 'number'"
+                  :options="childTypeOpts"
+                  @update:value="(v) => onChildTypeChange(i, v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="是否必填">
+                <a-checkbox
+                  :checked="child.required !== false"
+                  @update:checked="(v) => updateChild(i, 'required', v)"
+                >
+                  必填
+                </a-checkbox>
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="单位">
+                <div class="unit-inline-row">
+                  <a-select
+                    :value="child.unitPosition || 'suffix'"
+                    class="unit-pos-select"
+                    :options="unitPositionOpts"
+                    @update:value="(v) => updateChild(i, 'unitPosition', v)"
+                  />
+                  <a-input
+                    :value="child.unit"
+                    placeholder="可空"
+                    allow-clear
+                    class="unit-value-input"
+                    @update:value="(v) => updateChild(i, 'unit', v)"
+                  />
+                </div>
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-row
+            v-if="
+              child.type === 'date' ||
+              child.type === 'datetime' ||
+              child.type === 'number' ||
+              child.type === 'text' ||
+              child.type === 'textarea'
+            "
+            :gutter="[12, 12]"
+          >
+            <a-col v-if="child.type === 'date' || child.type === 'datetime'" :span="6">
+              <a-form-item label="字段格式">
+                <a-input
+                  :value="child.format"
+                  :placeholder="child.type === 'datetime' ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd'"
+                  @update:value="(v) => updateChild(i, 'format', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col v-if="child.type === 'number'" :span="6">
+              <a-form-item label="数字设置">
+                <a-checkbox
+                  :checked="child.allowDecimal !== false"
+                  @update:checked="(v) => updateChild(i, 'allowDecimal', v)"
+                >
+                  允许小数
+                </a-checkbox>
+              </a-form-item>
+            </a-col>
+            <a-col v-if="child.type === 'text' || child.type === 'textarea'" :span="6">
+              <a-form-item label="字符限制">
+                <a-input-number
+                  :value="child.charLimit"
+                  :min="1"
+                  style="width: 100%"
+                  placeholder="最大字符数"
+                  @update:value="(v) => updateChild(i, 'charLimit', v)"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <template v-if="child.type === 'radio' || child.type === 'checkbox'">
+            <a-form-item label="选项列表" required>
+              <div
+                v-for="(opt, oi) in child.optionRows || []"
+                :key="oi"
+                class="option-row conclusion-opt"
+              >
+                <a-input
+                  :value="opt.value"
+                  placeholder="选项值"
+                  @update:value="(v) => updateChildOptionValue(i, oi, v)"
+                />
+                <a-checkbox
+                  :checked="Boolean(opt.isDefault)"
+                  @change="(e) => setChildOptionDefault(i, oi, e.target.checked)"
+                >
+                  默认
+                </a-checkbox>
+                <a-button type="text" danger @click="removeChildOption(i, oi)">删除</a-button>
+              </div>
+              <a-button type="link" size="small" @click="addChildOption(i)">+ 添加选项</a-button>
+            </a-form-item>
+          </template>
+          <a-row :gutter="[12, 12]" class="child-judge-block">
+            <a-col :span="6">
+              <a-form-item label="判定方式">
+                <a-select
+                  :value="child.judgeRule || 'none'"
+                  :options="judgeRuleOpts"
+                  @update:value="(v) => onChildJudgeRuleChange(i, v)"
+                />
+              </a-form-item>
+            </a-col>
+            <template v-if="child.judgeRule === 'range'">
+              <a-col :span="6">
+                <a-form-item label="下限（含）">
+                  <a-input-number
+                    :value="child.standardMin"
+                    style="width: 100%"
+                    placeholder="可空"
+                    @update:value="(v) => updateChild(i, 'standardMin', v)"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="上限（含）">
+                  <a-input-number
+                    :value="child.standardMax"
+                    style="width: 100%"
+                    placeholder="可空"
+                    @update:value="(v) => updateChild(i, 'standardMax', v)"
+                  />
+                </a-form-item>
+              </a-col>
+            </template>
+            <a-col v-else-if="child.judgeRule === 'equals'" :span="6">
+              <a-form-item label="标准值">
+                <a-input
+                  :value="child.standardValue"
+                  placeholder="等于该值则合格"
+                  @update:value="(v) => updateChild(i, 'standardValue', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col v-else-if="child.judgeRule === 'optionPass'" :span="6">
+              <a-form-item label="合格选项">
+                <a-select
+                  :value="child.passOptions || []"
+                  mode="multiple"
+                  allow-clear
+                  placeholder="勾选合格值"
+                  style="width: 100%"
+                  :options="childPassOptionOpts(child)"
+                  @update:value="(v) => updateChild(i, 'passOptions', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col v-else-if="child.judgeRule === 'manual'" :span="24">
+              <a-form-item label="结论选项（含结果映射）" required>
+                <div class="manual-options-panel">
+                  <div
+                    v-for="(item, oi) in ensureChildManualOptions(child, i)"
+                    :key="oi"
+                    class="option-row manual-opt"
+                  >
+                    <a-input
+                      :value="item.value"
+                      placeholder="选项文案"
+                      class="manual-opt-label"
+                      @update:value="(v) => updateChildManualOption(i, oi, 'value', v)"
+                    />
+                    <a-select
+                      :value="item.result"
+                      placeholder="对应结果"
+                      class="manual-opt-result"
+                      :options="manualResultOpts"
+                      @update:value="(v) => updateChildManualOption(i, oi, 'result', v)"
+                    />
+                    <a-checkbox
+                      :checked="Boolean(item.isDefault)"
+                      @change="(e) => setChildManualDefault(i, oi, e.target.checked)"
+                    >
+                      默认
+                    </a-checkbox>
+                    <a-button
+                      type="text"
+                      danger
+                      size="small"
+                      :disabled="isLockedManualOption(item)"
+                      @click="removeChildManualOption(i, oi)"
+                    >
+                      删除
+                    </a-button>
+                  </div>
+                  <a-button type="link" size="small" @click="addChildManualOption(i)">
+                    + 添加选项
+                  </a-button>
+                  <div class="option-map-hint">
+                    「合格 / 不合格」文案可改、不可删除；「让步合格 /
+                    部分合格」可删。可追加选项。映射支持质检通过 / 质检不通过 / 部分通过。
+                  </div>
+                </div>
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="标准说明">
+                <a-input
+                  :value="child.standardText"
+                  placeholder="选填"
+                  @update:value="(v) => updateChild(i, 'standardText', v)"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </div>
+        <a-button type="dashed" block size="small" class="add-child-btn" @click="addChild">
+          + 添加子项
+        </a-button>
+      </div>
+
+      <div class="form-section-box">
+        <div class="section-label">合格标准</div>
+        <a-row :gutter="[12, 12]">
+          <a-col :span="6">
+            <a-form-item label="判定方式">
+              <a-select
+                :value="model.judgeRule"
+                :options="judgeRuleOpts"
+                placeholder="请选择"
+                @update:value="onJudgeRuleChange"
               />
             </a-form-item>
           </a-col>
-          <a-col v-else-if="child.judgeRule === 'optionPass'" :span="6">
+          <a-col v-if="model.judgeRule === 'range'" :span="6">
+            <a-form-item label="下限（含）">
+              <a-input-number
+                :value="model.standardMin"
+                style="width: 100%"
+                placeholder="可空"
+                @update:value="(v) => update('standardMin', v)"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="model.judgeRule === 'range'" :span="6">
+            <a-form-item label="上限（含）">
+              <a-input-number
+                :value="model.standardMax"
+                style="width: 100%"
+                placeholder="可空"
+                @update:value="(v) => update('standardMax', v)"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="model.judgeRule === 'optionPass'" :span="6">
             <a-form-item label="合格选项">
               <a-select
-                :value="child.passOptions || []"
+                :value="model.passOptions"
                 mode="multiple"
                 allow-clear
                 placeholder="勾选合格值"
                 style="width: 100%"
-                :options="childPassOptionOpts(child)"
-                @update:value="(v) => updateChild(i, 'passOptions', v)"
+                :options="passOptionOpts"
+                @update:value="(v) => update('passOptions', v)"
               />
             </a-form-item>
           </a-col>
-          <a-col v-else-if="child.judgeRule === 'manual'" :span="24">
+          <a-col v-if="model.judgeRule === 'manual'" :span="24">
             <a-form-item label="结论选项（含结果映射）" required>
               <div class="manual-options-panel">
                 <div
-                  v-for="(item, oi) in ensureChildManualOptions(child, i)"
+                  v-for="(item, oi) in ensureManualOptions()"
                   :key="oi"
                   class="option-row manual-opt"
                 >
@@ -385,18 +503,18 @@
                     :value="item.value"
                     placeholder="选项文案"
                     class="manual-opt-label"
-                    @update:value="(v) => updateChildManualOption(i, oi, 'value', v)"
+                    @update:value="(v) => updateManualOption(oi, 'value', v)"
                   />
                   <a-select
                     :value="item.result"
                     placeholder="对应结果"
                     class="manual-opt-result"
                     :options="manualResultOpts"
-                    @update:value="(v) => updateChildManualOption(i, oi, 'result', v)"
+                    @update:value="(v) => updateManualOption(oi, 'result', v)"
                   />
                   <a-checkbox
                     :checked="Boolean(item.isDefault)"
-                    @change="(e) => setChildManualDefault(i, oi, e.target.checked)"
+                    @change="(e) => setManualDefault(oi, e.target.checked)"
                   >
                     默认
                   </a-checkbox>
@@ -405,170 +523,62 @@
                     danger
                     size="small"
                     :disabled="isLockedManualOption(item)"
-                    @click="removeChildManualOption(i, oi)"
+                    @click="removeManualOption(oi)"
                   >
                     删除
                   </a-button>
                 </div>
-                <a-button type="link" size="small" @click="addChildManualOption(i)">
-                  + 添加选项
-                </a-button>
+                <a-button type="link" size="small" @click="addManualOption">+ 添加选项</a-button>
                 <div class="option-map-hint">
                   「合格 / 不合格」文案可改、不可删除；「让步合格 /
-                  部分合格」可删。可追加选项。映射支持质检通过 / 质检不通过 / 部分通过。
+                  部分合格」可删。可追加选项。映射支持质检通过 / 质检不通过 / 部分通过。可勾选默认。
                 </div>
               </div>
+            </a-form-item>
+          </a-col>
+          <a-col v-if="model.judgeRule === 'equals'" :span="6">
+            <a-form-item label="标准值">
+              <a-input
+                :value="model.standardValue"
+                allow-clear
+                placeholder="等于则合格"
+                @update:value="(v) => update('standardValue', v)"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="6">
             <a-form-item label="标准说明">
               <a-input
-                :value="child.standardText"
-                placeholder="选填"
-                @update:value="(v) => updateChild(i, 'standardText', v)"
+                :value="model.standardText"
+                allow-clear
+                placeholder="选填，不填则自动生成"
+                @update:value="(v) => update('standardText', v)"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="showSyncToLibrary" :span="6">
+            <a-form-item label="同步到库">
+              <a-switch
+                :checked="model.syncToLibrary"
+                checked-children="是"
+                un-checked-children="否"
+                @update:checked="(v) => update('syncToLibrary', v)"
               />
             </a-form-item>
           </a-col>
         </a-row>
+        <div class="option-map-hint standard-hint">
+          {{
+            indicatorKind === 'composite'
+              ? '父项级标准；子项另有判定。人工判定项在录入时选择合格/不合格/让步合格/部分合格。'
+              : model.judgeRule === 'manual'
+                ? '录入时除实测值外，须选择本项结论（可自定义选项文案，并映射质检通过/不通过/部分通过）。'
+                : '单项合格提示；可配合模板「整单合格规则」约束判定通过。'
+          }}
+        </div>
       </div>
-      <a-button type="dashed" block size="small" class="add-child-btn" @click="addChild">
-        + 添加子项
-      </a-button>
-    </div>
-
-    <div class="form-section-box">
-      <div class="section-label">合格标准</div>
-      <a-row :gutter="[12, 8]">
-        <a-col :span="6">
-          <a-form-item label="判定方式">
-            <a-select
-              :value="model.judgeRule"
-              :options="judgeRuleOpts"
-              placeholder="请选择"
-              @update:value="onJudgeRuleChange"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="model.judgeRule === 'range'" :span="6">
-          <a-form-item label="下限（含）">
-            <a-input-number
-              :value="model.standardMin"
-              style="width: 100%"
-              placeholder="可空"
-              @update:value="(v) => update('standardMin', v)"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="model.judgeRule === 'range'" :span="6">
-          <a-form-item label="上限（含）">
-            <a-input-number
-              :value="model.standardMax"
-              style="width: 100%"
-              placeholder="可空"
-              @update:value="(v) => update('standardMax', v)"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="model.judgeRule === 'optionPass'" :span="6">
-          <a-form-item label="合格选项">
-            <a-select
-              :value="model.passOptions"
-              mode="multiple"
-              allow-clear
-              placeholder="勾选合格值"
-              style="width: 100%"
-              :options="passOptionOpts"
-              @update:value="(v) => update('passOptions', v)"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="model.judgeRule === 'manual'" :span="24">
-          <a-form-item label="结论选项（含结果映射）" required>
-            <div class="manual-options-panel">
-              <div
-                v-for="(item, oi) in ensureManualOptions()"
-                :key="oi"
-                class="option-row manual-opt"
-              >
-                <a-input
-                  :value="item.value"
-                  placeholder="选项文案"
-                  class="manual-opt-label"
-                  @update:value="(v) => updateManualOption(oi, 'value', v)"
-                />
-                <a-select
-                  :value="item.result"
-                  placeholder="对应结果"
-                  class="manual-opt-result"
-                  :options="manualResultOpts"
-                  @update:value="(v) => updateManualOption(oi, 'result', v)"
-                />
-                <a-checkbox
-                  :checked="Boolean(item.isDefault)"
-                  @change="(e) => setManualDefault(oi, e.target.checked)"
-                >
-                  默认
-                </a-checkbox>
-                <a-button
-                  type="text"
-                  danger
-                  size="small"
-                  :disabled="isLockedManualOption(item)"
-                  @click="removeManualOption(oi)"
-                >
-                  删除
-                </a-button>
-              </div>
-              <a-button type="link" size="small" @click="addManualOption">+ 添加选项</a-button>
-              <div class="option-map-hint">
-                「合格 / 不合格」文案可改、不可删除；「让步合格 /
-                部分合格」可删。可追加选项。映射支持质检通过 / 质检不通过 / 部分通过。可勾选默认。
-              </div>
-            </div>
-          </a-form-item>
-        </a-col>
-        <a-col v-if="model.judgeRule === 'equals'" :span="6">
-          <a-form-item label="标准值">
-            <a-input
-              :value="model.standardValue"
-              allow-clear
-              placeholder="等于则合格"
-              @update:value="(v) => update('standardValue', v)"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="6">
-          <a-form-item label="标准说明">
-            <a-input
-              :value="model.standardText"
-              allow-clear
-              placeholder="选填，不填则自动生成"
-              @update:value="(v) => update('standardText', v)"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="showSyncToLibrary" :span="6">
-          <a-form-item label="同步到库">
-            <a-switch
-              :checked="model.syncToLibrary"
-              checked-children="是"
-              un-checked-children="否"
-              @update:checked="(v) => update('syncToLibrary', v)"
-            />
-          </a-form-item>
-        </a-col>
-      </a-row>
-      <div class="option-map-hint standard-hint">
-        {{
-          indicatorKind === 'composite'
-            ? '父项级标准；子项另有判定。人工判定项在录入时选择合格/不合格/让步合格/部分合格。'
-            : model.judgeRule === 'manual'
-              ? '录入时除实测值外，须选择本项结论（可自定义选项文案，并映射质检通过/不通过/部分通过）。'
-              : '单项合格提示；可配合模板「整单合格规则」约束判定通过。'
-        }}
-      </div>
-    </div>
-  </a-form>
+    </a-form>
+  </a-config-provider>
 </template>
 
 <script>
@@ -995,22 +1005,64 @@ function setChildOptionDefault(childIndex, optIndex, checked) {
   .form-section-box {
     width: 100%;
     margin-bottom: 8px;
-    padding: 12px 14px;
+    padding: 16px;
     background: #fff;
     border: 1px solid #f0f0f0;
     border-radius: 6px;
   }
 
   .section-label {
-    margin-bottom: 10px;
-    font-size: 13px;
+    margin-bottom: 12px;
+    font-size: 14px;
     font-weight: 600;
     color: rgba(0, 0, 0, 0.88);
   }
 
-  /* 与新增工序一致：沿用 Ant Design 表单项默认行距（约 24px） */
+  /* 标签与控件水平排列；行距统一 12px；控件对齐采购单 small=24 */
+  :deep(.ant-form-item) {
+    margin-bottom: 0;
+    width: 100%;
+  }
+
+  /* 独立 a-row 之间 gutter 不生效，显式补 12px（与同行内 rowGap 一致） */
+  :deep(.ant-row + .ant-row:not(.child-judge-block)) {
+    margin-top: 12px;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
   :deep(.ant-form-item-label) {
-    padding-bottom: 4px;
+    padding: 0;
+    white-space: nowrap;
+
+    > label {
+      height: 24px;
+      min-height: 24px;
+      line-height: 24px;
+      font-size: 13px;
+    }
+  }
+
+  :deep(.ant-form-item-control) {
+    min-width: 0;
+  }
+
+  /* radio / checkbox 与 small 输入框垂直居中 */
+  :deep(.ant-form-item-control-input) {
+    min-height: 24px;
+  }
+
+  :deep(.ant-radio-wrapper),
+  :deep(.ant-checkbox-wrapper) {
+    font-size: 13px;
+    line-height: 24px;
+  }
+
+  .block-form-item {
+    margin-top: 12px;
   }
 }
 
@@ -1018,7 +1070,7 @@ function setChildOptionDefault(childIndex, optIndex, checked) {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
+  min-height: 24px;
   flex-wrap: wrap;
 }
 
@@ -1058,7 +1110,7 @@ function setChildOptionDefault(childIndex, optIndex, checked) {
 
 .complex-child-card {
   margin-bottom: 12px;
-  padding: 12px 14px 4px;
+  padding: 12px 14px;
   background: #fafafa;
   border: 1px solid #f0f0f0;
   border-radius: 6px;
@@ -1068,7 +1120,7 @@ function setChildOptionDefault(childIndex, optIndex, checked) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 12px;
 }
 
 .child-idx {
@@ -1078,12 +1130,12 @@ function setChildOptionDefault(childIndex, optIndex, checked) {
 }
 
 .complex-child-card :deep(.ant-form-item) {
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .child-judge-block {
-  margin-top: 2px;
-  padding-top: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px dashed #e8e8e8;
 }
 

@@ -53,7 +53,9 @@ export function resolveSourceReceiptForQcTask(task) {
 }
 
 /**
- * 取收货单关联的有效质检单（优先已完成，再按更新时间）
+ * 取收货单关联的有效质检单：
+ * - 有未完成质检（待质检/质检中）优先，避免「不通过后再发质检」仍命中旧完成单
+ * - 否则取最新已完成单
  * @param {string} receiptId
  * @param {{ bizScope?: string, receiptNo?: string }} [opts]
  */
@@ -73,22 +75,45 @@ export function findInboundQcTaskForReceipt(receiptId, opts = {}) {
   }
 
   if (!list.length) return null
+  const byUpdatedDesc = (a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+  const unfinished = list.filter((t) => t.qcStatus !== QC_TASK_STATUS.COMPLETED)
+  if (unfinished.length) {
+    return [...unfinished].sort(byUpdatedDesc)[0]
+  }
   const completed = list.filter((t) => t.qcStatus === QC_TASK_STATUS.COMPLETED)
-  const pool = completed.length ? completed : list
-  return [...pool].sort((a, b) =>
-    String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')),
-  )[0]
+  return [...completed].sort(byUpdatedDesc)[0] || null
 }
 
-/** 按行汇总合格入库数量：itemCode → qty */
+/**
+ * 收货单是否可发起质检（含质检不通过后再次发起）
+ * @param {object} receipt
+ */
+export function canStartReceiptQc(receipt) {
+  if (!receipt) return false
+  if (receipt.receiptStatus !== '新建' && receipt.receiptStatus !== '进行中') return false
+  const st = String(receipt.qcStatus || '未质检').trim()
+  if (st === '质检中' || st === '待质检') return false
+  if (!String(receipt.qcNo || '').trim() || st === '未质检') return true
+  if (st === '质检不通过') return true
+  return false
+}
+
+/** 按行汇总可入库数量（合格入库 + 让步入库）：itemCode → qty */
 export function buildQcAcceptInboundQtyHints(task) {
   const hints = {}
   ;(task?.lineItems || []).forEach((line) => {
     const code = String(line.itemCode || line.productCode || '').trim()
     if (!code) return
-    if (line.acceptInboundQty == null || line.acceptInboundQty === '') return
-    const q = Number(line.acceptInboundQty)
-    if (!Number.isFinite(q) || q < 0) return
+    let q = 0
+    if (line.acceptInboundQty != null && line.acceptInboundQty !== '') {
+      const a = Number(line.acceptInboundQty)
+      if (Number.isFinite(a) && a > 0) q += a
+    }
+    if (line.concessionQty != null && line.concessionQty !== '') {
+      const c = Number(line.concessionQty)
+      if (Number.isFinite(c) && c > 0) q += c
+    }
+    if (q <= 0) return
     hints[code] = (hints[code] || 0) + q
   })
   return Object.keys(hints).length ? hints : null

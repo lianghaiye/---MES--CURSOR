@@ -221,6 +221,14 @@
                 入库
               </a-button>
               <a-button
+                v-if="isOutsourcingScope && canGenerateOutsourcingInboundFromQc(record)"
+                type="link"
+                size="small"
+                @click="openGenerateOutsourcingInboundFromRow(record)"
+              >
+                入库
+              </a-button>
+              <a-button
                 v-if="isFinishedScope && canGenerateFinishedInboundFromQc(record)"
                 type="link"
                 size="small"
@@ -280,6 +288,7 @@
     <OutsourcingGenerateInboundModal
       v-model:open="wxInboundModalOpen"
       :outsourcing-order="wxInboundOrder"
+      :outsourcing-receipt="wxInboundReceipt"
       :qc-qty-hints="inboundQcQtyHints"
       :qc-enforce-qty-cap="inboundQcEnforceCap"
       @saved="onOutsourcingInboundSaved"
@@ -675,6 +684,20 @@ function canGenerateInboundFromQc(task) {
   return evaluateQcInboundGate(task).ok
 }
 
+/** 外协回货：质检通过/部分通过，且关联收货待入库、外协单可入库 */
+function canGenerateOutsourcingInboundFromQc(task) {
+  if (!task) return false
+  if (task.qcStatus === QC_TASK_STATUS.CANCELLED) return false
+  if (task.qcStatus !== QC_TASK_STATUS.COMPLETED) return false
+  if (!evaluateQcInboundGate(task).ok) return false
+  const receipt = resolveSourceReceiptForQcTask(task)
+  if (!receipt) return false
+  if (receipt.receiptStatus === '作废' || receipt.receiptStatus === '已完成') return false
+  if (receipt.inboundStatus === '已入库') return false
+  const order = getOutsourcingOrderById(receipt.outsourcingOrderId || receipt.purchaseOrderId)
+  return Boolean(order && canGenerateOutsourcingInbound(order))
+}
+
 function taskInboundStatus(task) {
   return resolveQcTaskInboundStatus(task)
 }
@@ -830,12 +853,24 @@ function onInboundSaved(order, allCreated = []) {
 }
 
 /** 外协回货检 → 生成外协入库单（弹窗与外协订单侧一致） */
+function openGenerateOutsourcingInboundFromRow(record) {
+  openGenerateOutsourcingInboundForTask(record)
+}
+
 function openGenerateOutsourcingInbound() {
   if (selectedRowKeys.value.length !== 1) {
     message.warning('请勾选一条质检单后再生成外协入库单')
     return
   }
   const task = qcTaskState.tasks.find((t) => t.id === selectedRowKeys.value[0])
+  if (!task) {
+    message.warning('未找到质检单')
+    return
+  }
+  openGenerateOutsourcingInboundForTask(task)
+}
+
+function openGenerateOutsourcingInboundForTask(task) {
   if (!task) {
     message.warning('未找到质检单')
     return

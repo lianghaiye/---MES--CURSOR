@@ -182,3 +182,31 @@
     overflow: auto;
   }
 }
+
+/* 生成收货单：与入库弹窗同壳层 */
+.generate-receipt-modal-wrap {
+  overflow: hidden;
+
+  .ant-modal {
+    top: 24px;
+    padding-bottom: 0;
+    max-width: calc(100vw - 32px);
+  }
+
+  .ant-modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 48px);
+  }
+
+  .ant-modal-header,
+  .ant-modal-footer {
+    flex: none;
+  }
+
+  .ant-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+}

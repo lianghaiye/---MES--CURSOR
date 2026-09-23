@@ -88,6 +88,7 @@
         <a-button size="small" @click="openGenerateQcModal">生成质检单</a-button>
         <a-button size="small" @click="openInboundModal">生成入库单</a-button>
         <a-button size="small" type="primary" @click="handleComplete">完成</a-button>
+        <a-button size="small" danger @click="handleBatchVoid">作废</a-button>
         <a-dropdown>
           <a-button size="small">
             批量打印
@@ -173,6 +174,22 @@
           <template v-else-if="column.key === 'action'">
             <a-space :size="0">
               <a-button
+                v-if="canShowReceiptQcAction(record)"
+                type="link"
+                size="small"
+                @click="handleQc(record)"
+              >
+                质检
+              </a-button>
+              <a-button
+                v-if="canShowReceiptInboundAction(record)"
+                type="link"
+                size="small"
+                @click="openInboundForRow(record)"
+              >
+                入库
+              </a-button>
+              <a-button
                 v-if="canEditOutsourcingReceipt(record)"
                 type="link"
                 size="small"
@@ -189,24 +206,6 @@
               >
                 作废
               </a-button>
-              <template v-if="record.receiptStatus === '进行中'">
-                <a-button
-                  v-if="canShowReceiptQcAction(record)"
-                  type="link"
-                  size="small"
-                  @click="handleQc(record)"
-                >
-                  质检
-                </a-button>
-                <a-button
-                  v-if="canShowReceiptInboundAction(record)"
-                  type="link"
-                  size="small"
-                  @click="openInboundForRow(record)"
-                >
-                  入库
-                </a-button>
-              </template>
               <span v-if="!hasRowActions(record)" class="action-disabled">-</span>
             </a-space>
           </template>
@@ -232,6 +231,7 @@
     <OutsourcingGenerateInboundModal
       v-model:open="inboundModalOpen"
       :outsourcing-order="inboundOrder"
+      :outsourcing-receipt="inboundReceipt"
       :qc-qty-hints="inboundQcQtyHints"
       :qc-enforce-qty-cap="inboundQcEnforceCap"
       @saved="onInboundSaved"
@@ -291,7 +291,7 @@ import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
-import { evaluateReceiptInboundByQc } from '@/utils/qcInboundFromReceipt'
+import { evaluateReceiptInboundByQc, canStartReceiptQc } from '@/utils/qcInboundFromReceipt'
 import { attachQcTaskInboundOrder } from '@/store/qcTaskStore'
 
 const router = useRouter()
@@ -429,15 +429,14 @@ function openOutsourcingOrder(record) {
   })
 }
 
-/** 进行中且质检未完成 → 展示「质检」 */
+/** 新建/进行中：未质检可发起；质检不通过可再次发起 */
 function canShowReceiptQcAction(record) {
-  if (record?.receiptStatus !== '进行中') return false
-  return ['未质检', '质检中'].includes(record.qcStatus || '未质检')
+  return canStartReceiptQc(record)
 }
 
-/** 进行中且入库未完成、关联外协单仍可入库；有关联质检时须通过门控 */
+/** 新建/进行中且入库未完成、关联外协单仍可入库；有关联质检时须通过门控 */
 function canShowReceiptInboundAction(record) {
-  if (record?.receiptStatus !== '进行中') return false
+  if (record?.receiptStatus !== '进行中' && record?.receiptStatus !== '新建') return false
   if (record.inboundStatus === '已入库') return false
   const order = getOutsourcingOrderById(record.outsourcingOrderId)
   if (!(order && canGenerateOutsourcingInbound(order))) return false
@@ -468,12 +467,17 @@ function openQcForReceipt(receipt) {
     message.warning('未找到收货单')
     return
   }
-  if (hasReceiptQcSheet(receipt)) {
-    message.warning('该收货单已生成质检单')
-    return
-  }
   if (!canShowReceiptQcAction(receipt)) {
-    message.warning('当前收货单不可生成质检单')
+    if (
+      hasReceiptQcSheet(receipt) &&
+      (receipt.qcStatus === '质检中' || receipt.qcStatus === '待质检')
+    ) {
+      message.warning('该收货单已有进行中的质检单')
+    } else if (hasReceiptQcSheet(receipt) && receipt.qcStatus !== '质检不通过') {
+      message.warning('当前收货单不可再次生成质检单')
+    } else {
+      message.warning('当前收货单不可生成质检单')
+    }
     return
   }
   if (!(receipt.lineItems || []).some((l) => (Number(l.receiptQty) || 0) > 0)) {
@@ -576,6 +580,35 @@ function handleVoid(record) {
     onOk: () => {
       const result = voidOutsourcingReceipt(record.id)
       result.ok ? message.success(result.message) : message.warning(result.message)
+    },
+  })
+}
+
+function handleBatchVoid() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择要作废的收货单')
+    return
+  }
+  const targets = selectedRowKeys.value
+    .map((id) => outsourcingReceiptState.receipts.find((r) => r.id === id))
+    .filter(Boolean)
+  const voidable = targets.filter(canVoidOutsourcingReceipt)
+  if (!voidable.length) {
+    message.warning('所选收货单均不可作废（仅新建且未生成质检单/入库单可作废）')
+    return
+  }
+  Modal.confirm({
+    title: '确认作废',
+    content: `确定作废选中的 ${voidable.length} 条收货单吗？`,
+    okType: 'danger',
+    onOk: () => {
+      let okCount = 0
+      voidable.forEach((row) => {
+        const result = voidOutsourcingReceipt(row.id)
+        if (result.ok) okCount += 1
+      })
+      message.success(`已作废 ${okCount} 条收货单`)
+      selectedRowKeys.value = []
     },
   })
 }

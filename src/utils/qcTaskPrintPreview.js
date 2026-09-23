@@ -17,6 +17,12 @@ import {
   normalizeComplexValue,
 } from '@/utils/qcComplexField'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
+import {
+  formatDispositionSecondaryQty,
+  formatTreatmentPlanDisplay,
+  getDispositionFieldLabels,
+  isMultiBucketDisposition,
+} from '@/utils/qcTreatmentPlan'
 
 const STORAGE_PREFIX = 'qc-task-print-preview:'
 
@@ -52,13 +58,20 @@ function formatProductInfo(line = {}) {
     .join('/')
 }
 
-function formatReturnExchange(line = {}) {
-  const parts = []
-  const r = Number(line.returnQty)
-  const e = Number(line.exchangeQty)
-  if (Number.isFinite(r) && r > 0) parts.push(`退货 ${formatPrintQty(r)}`)
-  if (Number.isFinite(e) && e > 0) parts.push(`换货 ${formatPrintQty(e)}`)
-  return parts.join(' / ')
+function formatReturnExchange(line = {}, bizScope = '来料质检') {
+  return formatDispositionSecondaryQty(bizScope, line)
+}
+
+function formatAcceptInboundPrint(line = {}, bizScope = '来料质检') {
+  if (isMultiBucketDisposition(bizScope)) {
+    const parts = []
+    const a = Number(line.acceptInboundQty)
+    const c = Number(line.concessionQty)
+    if (Number.isFinite(a) && a > 0) parts.push(`合格 ${formatPrintQty(a)}`)
+    if (Number.isFinite(c) && c > 0) parts.push(`让步 ${formatPrintQty(c)}`)
+    return parts.length ? parts.join(' / ') : ''
+  }
+  return formatPrintQty(line.acceptInboundQty)
 }
 
 function resolveFields(line, task) {
@@ -172,9 +185,15 @@ function buildLineSheetBlock(line, index, task) {
     unit: formatPrintFieldValue(line.unit),
     receivingWarehouse: formatPrintFieldValue(line.receivingWarehouse),
     lineQcResult: formatPrintFieldValue(line.lineQcResult),
-    treatmentPlan: formatPrintFieldValue(line.treatmentPlan),
-    acceptInboundQty: formatPrintQty(line.acceptInboundQty),
-    returnExchange: formatReturnExchange(line),
+    treatmentPlan:
+      formatTreatmentPlanDisplay(task?.bizScope, line, formatPrintQty) ||
+      formatPrintFieldValue(line.treatmentPlan),
+    isMultiBucket: isMultiBucketDisposition(task?.bizScope),
+    acceptInboundQty: formatAcceptInboundPrint(line, task?.bizScope),
+    returnExchange: formatReturnExchange(line, task?.bizScope),
+    returnExchangeLabel: isMultiBucketDisposition(task?.bizScope)
+      ? getDispositionFieldLabels(task?.bizScope).columnReturnExchange
+      : '退/换货',
     inspectRows,
   }
 }

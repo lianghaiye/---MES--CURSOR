@@ -13,6 +13,7 @@ import { addOutsourcingOrder, outsourcingOrderState } from '@/store/outsourcingO
 import { createOutsourcingLine, recalcOutsourcingLine } from '@/mock/outsourcingOrders'
 import { getProcessById, getProcessByName } from '@/store/processConfigStore'
 import { resolveWorkOrderProcurementSource } from '@/constants/procurementDocSource'
+import { resolveWorkOrderAllMaterialLines } from '@/utils/materialReqEbom'
 
 function getWorkOrderById(id) {
   if (!id) return null
@@ -349,7 +350,7 @@ export async function ensureProcessOutsourceOrdersAfterDispatch({
   return result
 }
 
-/** 工序外协发料物料：优先工序投料；无投料则发外协产品本身（不展开 BOM） */
+/** 工序外协发料物料：优先工序投料；否则取源工单 EBOM 下级；再否则产品 BOM；最后才发产品本身 */
 export function resolveMaterialsForProcessOutsource(order, setQty = 1, productLine = null) {
   const qty = Number(setQty) || 0
   if (qty <= 0 || !isProcessOutsourceOrder(order)) return []
@@ -358,6 +359,10 @@ export function resolveMaterialsForProcessOutsource(order, setQty = 1, productLi
     (order.lineItems || []).find((l) => l.id && productLine?.id && l.id === productLine.id) ||
     (order.lineItems || [])[0] ||
     {}
+
+  const roundQty = (n) => Math.round((Number(n) || 0) * 10000) / 10000
+  const shipWh = line.shipWarehouse || order.shipWarehouse || ''
+
   const wo = getWorkOrderById(order.sourceWorkOrderId)
   const process = (wo?.processes || []).find((p) => String(p.id) === String(order.sourceProcessId))
   const feeds = (process?.feedingMaterials || []).filter(
@@ -374,16 +379,51 @@ export function resolveMaterialsForProcessOutsource(order, setQty = 1, productLi
         specModel: mat.specModel || '',
         material: mat.material || '',
         drawingNo: mat.drawingNo || '',
+        variantSummary: mat.variantSummary || '',
+        blankSizeText: mat.blankSizeText || '',
+        barcodeType: mat.barcodeType || '',
         unit: mat.unit || '件',
         unitUsage,
-        planIssueQty: Math.round(unitUsage * qty * 10000) / 10000,
-        shipWarehouse: mat.shipWarehouse || line.shipWarehouse || order.shipWarehouse || '',
-        sourceProductLineIds: line.id ? [line.id] : [],
-        lineId: line.id || '',
+        issueQty: roundQty(unitUsage * qty),
+        shipWarehouse: mat.shipWarehouse || shipWh || undefined,
+        remark: '',
+        sourceProductLineId: line.id,
         fromProcessFeeding: true,
       }
     })
   }
+
+  // 无投料：取源工单 EBOM / componentLines / bomId 关联的下级物料
+  if (wo && !wo.skipEbom) {
+    const ebomMats = resolveWorkOrderAllMaterialLines(wo)
+    if (ebomMats.length) {
+      return ebomMats.map((mat, index) => {
+        const unitUsage = Number(mat.unitUsage) || 1
+        return {
+          id: `proc-ebom-${order.id}-${line.id || index}-${mat.itemCode || index}`,
+          itemCode: mat.itemCode || mat.materialCode || '',
+          itemName: mat.itemName || '',
+          specModel: mat.specModel || '',
+          material: mat.material || '',
+          drawingNo: mat.drawingNo || '',
+          variantSummary: mat.variantSummary || '',
+          blankSizeText: mat.blankSizeText || '',
+          barcodeType: mat.barcodeType || '',
+          unit: mat.unit || '件',
+          unitUsage,
+          issueQty: roundQty(unitUsage * qty),
+          shipWarehouse: mat.shipWarehouse || shipWh || undefined,
+          remark: '',
+          sourceProductLineId: line.id,
+          fromProcessEbom: true,
+        }
+      })
+    }
+  }
+
+  // 工单无 EBOM 时：回退订单行内联下级 / 产品 BOM（与整件外协同口径）
+  const fromProductBom = resolveProcessFallbackProductBom(line, qty)
+  if (fromProductBom.length) return fromProductBom
 
   const itemCode = line.productCode || line.itemCode || ''
   const itemName = line.productName || line.itemName || ''
@@ -396,13 +436,48 @@ export function resolveMaterialsForProcessOutsource(order, setQty = 1, productLi
       specModel: line.specModel || '',
       material: line.material || '',
       drawingNo: line.drawingNo || '',
+      variantSummary: line.variantSummary || '',
+      blankSizeText: line.blankSizeText || '',
+      barcodeType: line.barcodeType || '',
       unit: line.unit || '件',
       unitUsage: 1,
-      planIssueQty: Math.round(qty * 10000) / 10000,
-      shipWarehouse: line.shipWarehouse || order.shipWarehouse || '',
-      sourceProductLineIds: line.id ? [line.id] : [],
-      lineId: line.id || '',
+      issueQty: roundQty(qty),
+      shipWarehouse: shipWh || undefined,
+      remark: '',
+      sourceProductLineId: line.id,
       fromProcessProduct: true,
     },
   ]
+}
+
+/** 工序外协无工单 EBOM 时，按订单行 componentLines / 产品生效 BOM 展开 */
+function resolveProcessFallbackProductBom(line, setQty) {
+  const qty = Number(setQty) || 0
+  if (qty <= 0 || !line) return []
+  const roundQty = (n) => Math.round((Number(n) || 0) * 10000) / 10000
+  const fromInline = line.componentLines || line.issueBomLines
+  if (Array.isArray(fromInline) && fromInline.length) {
+    return fromInline.map((mat, index) => {
+      const unitUsage = Number(mat.unitUsage ?? mat.unitQty) || 1
+      return {
+        id: `${line.id}-mat-${mat.id || mat.itemCode || index}`,
+        itemCode: mat.itemCode || mat.materialCode || mat.productCode || '',
+        itemName: mat.itemName || mat.productName || mat.name || '',
+        specModel: mat.specModel || '',
+        material: mat.material || '',
+        drawingNo: mat.drawingNo || '',
+        variantSummary: mat.variantSummary || '',
+        blankSizeText: mat.blankSizeText || '',
+        barcodeType: mat.barcodeType || '',
+        unit: mat.unit || '件',
+        unitUsage,
+        issueQty: roundQty(unitUsage * qty),
+        shipWarehouse: mat.shipWarehouse || line.shipWarehouse || undefined,
+        remark: '',
+        sourceProductLineId: line.id,
+        fromProcessEbom: true,
+      }
+    })
+  }
+  return []
 }

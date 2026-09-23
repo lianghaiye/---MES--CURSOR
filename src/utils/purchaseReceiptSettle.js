@@ -167,13 +167,16 @@ export function calcReceiptLineOpenOccupyQty(receipt, receiptLine) {
 }
 
 /**
- * 按质检结果释放「不可入库」数量（不通过 / 部分通过超出合格入库的部分）
- * 若无可入库量且无未完成入库，则自动结清为「已完成」
+ * 按质检结果释放「不可入库」数量（部分通过超出合格入库的部分）
+ * 质检不通过：不结清收货单，允许再次发起质检
+ * 若无可入库量且无未完成入库，则自动结清为「已完成」（仅部分通过且合格入库数为 0）
  */
 export function releaseReceiptQtyByQcResult(receiptId, task) {
   const receipt = getPurchaseReceiptById(receiptId)
   if (!receipt || receipt.receiptStatus === '作废') return null
   if (!task || task.qcStatus !== QC_TASK_STATUS.COMPLETED) return null
+  // 不通过：保留收货占用，等待再次质检或人工处理，不自动完成
+  if (task.qcResult === QC_TASK_RESULT.FAIL) return null
 
   const lineItems = (receipt.lineItems || []).map((li) => {
     const receiptQty = round4(Number(li.receiptQty) || 0)
@@ -281,8 +284,11 @@ export function syncPurchaseReceiptAfterInboundConfirm(inboundOrder) {
 
   const allInboundableDone =
     totals.inboundable <= 1e-9 || totals.inbounded + 1e-9 >= totals.inboundable
+  // 入库数量已达收货数量时同样结清
+  const allReceiptQtyInbounded =
+    totals.receiptQty > 1e-9 && totals.inbounded + 1e-9 >= totals.receiptQty
 
-  if (qcDone && inboundDone && allInboundableDone) {
+  if (qcDone && inboundDone && (allInboundableDone || allReceiptQtyInbounded)) {
     // 结清：释放一切剩余占用
     patch.lineItems = lineItems.map((li) => {
       const receiptQty = round4(Number(li.receiptQty) || 0)

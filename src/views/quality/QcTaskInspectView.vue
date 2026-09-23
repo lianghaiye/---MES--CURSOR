@@ -340,35 +340,26 @@
                   </div>
                   <div class="line-treatment-row">
                     <div class="line-treatment-label">
-                      <span v-if="needTreatmentForLine(record)" class="req">*</span>处理方案
-                      <span class="line-treatment-tip">来料处置字段，不属于质检模板指标</span>
+                      <span v-if="needDispositionQtyForLine(record)" class="req">*</span>数量处置
+                      <span class="line-treatment-tip">{{ dispositionLabels.treatmentTip }}</span>
                     </div>
-                    <a-select
-                      v-model:value="record.treatmentPlan"
-                      size="middle"
-                      allow-clear
-                      placeholder="请选择处理方案"
-                      style="width: 220px"
-                      :options="planOpts"
-                      :disabled="!needTreatmentForLine(record)"
-                      @change="onTreatmentPlanChange(record)"
-                    />
-                    <span v-if="!needTreatmentForLine(record)" class="line-treatment-idle"
+                    <span v-if="!needDispositionQtyForLine(record)" class="line-treatment-idle"
                       >合格时无需填写</span
                     >
                   </div>
                   <div v-if="needDispositionQtyForLine(record)" class="line-disposition-row">
                     <div class="line-treatment-label">
-                      数量处置
                       <span class="line-treatment-tip"
-                        >合格入库 + 退货 + 换货 ≤ 质检数量（{{
+                        >{{ dispositionLabels.tip }}（{{
                           formatQty(lineInspectQty(record), 4)
                         }}）</span
                       >
                     </div>
                     <div class="line-disposition-fields">
                       <div class="line-disposition-item">
-                        <span class="line-disposition-item-label">合格入库</span>
+                        <span class="line-disposition-item-label">{{
+                          dispositionLabels.accept
+                        }}</span>
                         <a-input-number
                           v-model:value="record.acceptInboundQty"
                           size="middle"
@@ -378,11 +369,29 @@
                           :parser="qtyParser"
                           placeholder="数量"
                           style="width: 120px"
-                          @change="() => onAcceptInboundQtyChange(record)"
+                          @change="() => onDispositionQtyChange(record, 'accept')"
                         />
                       </div>
                       <div class="line-disposition-item">
-                        <span class="line-disposition-item-label">退货</span>
+                        <span class="line-disposition-item-label">{{
+                          dispositionLabels.concession
+                        }}</span>
+                        <a-input-number
+                          v-model:value="record.concessionQty"
+                          size="middle"
+                          :min="0"
+                          :precision="4"
+                          :formatter="qtyFormatter"
+                          :parser="qtyParser"
+                          placeholder="数量"
+                          style="width: 120px"
+                          @change="() => onDispositionQtyChange(record, 'concession')"
+                        />
+                      </div>
+                      <div class="line-disposition-item">
+                        <span class="line-disposition-item-label">{{
+                          dispositionLabels.secondary
+                        }}</span>
                         <a-input-number
                           v-model:value="record.returnQty"
                           size="middle"
@@ -392,11 +401,13 @@
                           :parser="qtyParser"
                           placeholder="数量"
                           style="width: 120px"
-                          @change="() => onReturnOrExchangeQtyChange(record, 'return')"
+                          @change="() => onDispositionQtyChange(record, 'return')"
                         />
                       </div>
                       <div class="line-disposition-item">
-                        <span class="line-disposition-item-label">换货</span>
+                        <span class="line-disposition-item-label">{{
+                          dispositionLabels.tertiary
+                        }}</span>
                         <a-input-number
                           v-model:value="record.exchangeQty"
                           size="middle"
@@ -406,9 +417,15 @@
                           :parser="qtyParser"
                           placeholder="数量"
                           style="width: 120px"
-                          @change="() => onReturnOrExchangeQtyChange(record, 'exchange')"
+                          @change="() => onDispositionQtyChange(record, 'exchange')"
                         />
                       </div>
+                    </div>
+                    <div v-if="multiBucketDispositionHint(record)" class="line-disposition-hint">
+                      {{ multiBucketDispositionHint(record) }}
+                    </div>
+                    <div v-if="record.treatmentPlan" class="line-disposition-summary">
+                      方案汇总：{{ record.treatmentPlan }}
                     </div>
                   </div>
                 </div>
@@ -458,6 +475,11 @@ import {
   toFactoryQcInspectTask,
 } from '@/store/factoryQcStore'
 import { formatQty } from '@/utils/numberFormat'
+import {
+  getDispositionFieldLabels,
+  isMultiBucketDisposition,
+  buildTreatmentPlanSummary,
+} from '@/utils/qcTreatmentPlan'
 import { useTabs, tabStore } from '@/composables/useTabs'
 import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
 import {
@@ -520,21 +542,11 @@ const form = reactive({
   lineItems: [],
 })
 
-/** 来料：退货/换货/让步接收；外协回货另含返工（不含换批次） */
-const planOpts = computed(() => {
-  const opts = [
-    { label: '退货', value: '退货' },
-    { label: '换货', value: '换货' },
-    { label: '让步接收', value: '让步接收' },
-  ]
-  if (task.value?.bizScope === '外协回货检') {
-    opts.push({ label: '返工', value: '返工' })
-  }
-  return opts
-})
+/** 来料 / 外协：多数量桶（无单选方案） */
+const dispositionLabels = computed(() => getDispositionFieldLabels(task.value?.bizScope))
 
 function supportsDispositionBizScope(scope) {
-  return scope === '来料质检' || scope === '外协回货检'
+  return isMultiBucketDisposition(scope)
 }
 
 function isLineExpanded(id) {
@@ -717,6 +729,7 @@ function hydrateLineDraft(line, t) {
     inspectQty: Number(fieldMap.QC_INSPECT_QTY ?? line.inspectQty ?? line.receiptQty ?? 0),
     treatmentPlan: line.treatmentPlan || undefined,
     acceptInboundQty: line.acceptInboundQty != null ? Number(line.acceptInboundQty) : undefined,
+    concessionQty: line.concessionQty != null ? Number(line.concessionQty) : undefined,
     returnQty: line.returnQty != null ? Number(line.returnQty) : undefined,
     exchangeQty: line.exchangeQty != null ? Number(line.exchangeQty) : undefined,
     fieldMap,
@@ -873,10 +886,18 @@ function syncAutoConclusion(line) {
     clearDispositionQty(line)
     return
   }
-  // 自动判为不合格时默认退货（可改）
-  if (mappedConclusionResult(line) === QC_TASK_RESULT.FAIL && !line.treatmentPlan) {
-    line.treatmentPlan = '退货'
-    suggestDispositionQty(line)
+  // 自动判为不合格时：按多桶预填（来料默认退货、外协默认返工）
+  if (mappedConclusionResult(line) === QC_TASK_RESULT.FAIL) {
+    if (
+      line.acceptInboundQty == null &&
+      line.concessionQty == null &&
+      line.returnQty == null &&
+      line.exchangeQty == null
+    ) {
+      suggestDispositionQty(line)
+    } else {
+      syncTreatmentPlanSummary(line)
+    }
   }
 }
 
@@ -985,7 +1006,7 @@ function needTreatmentForLine(line) {
   return false
 }
 
-/** 需填写数量处置时展示：合格入库 / 退货 / 换货 */
+/** 需填写数量处置时展示：合格入库 + 退货/返工 + 换货/报废 */
 function needDispositionQtyForLine(line) {
   if (!supportsDispositionBizScope(task.value?.bizScope)) return false
   return needTreatmentForLine(line)
@@ -998,6 +1019,7 @@ function lineInspectQty(line) {
 function clearDispositionQty(line) {
   if (!line) return
   line.acceptInboundQty = undefined
+  line.concessionQty = undefined
   line.returnQty = undefined
   line.exchangeQty = undefined
 }
@@ -1008,23 +1030,38 @@ function clampQty(n) {
   return v
 }
 
-/** 按处理方案把「剩余数量」落到退货或换货 */
-function applyRemainToReturnOrExchange(line, remain) {
-  const plan = String(line.treatmentPlan || '').trim()
-  const r = Math.max(0, remain)
-  if (plan === '换货') {
-    line.exchangeQty = r
-    line.returnQty = 0
-    return
+function syncTreatmentPlanSummary(line) {
+  if (!isMultiBucketDisposition(task.value?.bizScope)) return
+  line.treatmentPlan = buildTreatmentPlanSummary(task.value?.bizScope, line, (n) => formatQty(n, 4))
+}
+
+function multiBucketDispositionHint(line) {
+  if (!needDispositionQtyForLine(line)) return ''
+  const mapped = mappedConclusionResult(line)
+  const a = clampQty(line.acceptInboundQty)
+  const c = clampQty(line.concessionQty)
+  const r = clampQty(line.returnQty)
+  const s = clampQty(line.exchangeQty)
+  const inbound = a + c
+  const reject = r + s
+  const buckets = [a > 0, c > 0, r > 0, s > 0].filter(Boolean).length
+  if (buckets >= 2 && inbound > 0 && reject > 0) {
+    return '当前为混合处置（部分可入库、部分退换/返工报废）。整单结论由检验项规则判定；数量可按实物拆分，二者含义不同。'
   }
-  // 退货 / 未选 / 其它：剩余优先记退货
-  line.returnQty = r
-  line.exchangeQty = 0
+  if (mapped === QC_TASK_RESULT.FAIL && inbound > 0) {
+    return '检验项未全达标故整单为不合格，仍可将部分数量记为让步入库，其余退货/换货或返工/报废。'
+  }
+  if (mapped === QC_TASK_RESULT.PARTIAL) {
+    return '部分通过：请按实物拆分合格入库、让步入库及次要处置数量。'
+  }
+  return ''
 }
 
 /**
- * 默认数量：质检数量全部落到退货或换货；合格入库为 0。
- * 部分合格同样预填，便于再改合格入库时联动扣减。
+ * 默认数量（多桶）：
+ * - 不合格默认全进退货（来料）或返工（外协）
+ * - 让步结论默认全进让步入库
+ * - 部分通过不预填
  */
 function suggestDispositionQty(line) {
   if (!needDispositionQtyForLine(line)) {
@@ -1033,68 +1070,54 @@ function suggestDispositionQty(line) {
   }
   const base = lineInspectQty(line)
   const mapped = mappedConclusionResult(line)
-  const plan = String(line.treatmentPlan || '').trim()
+  const raw = String(getConclusionValue(line) || '').trim()
 
-  if (plan === '让步接收' || (mapped === QC_TASK_RESULT.PASS && plan.includes('让步'))) {
-    line.acceptInboundQty = base
-    line.returnQty = 0
-    line.exchangeQty = 0
-    return
-  }
-  if (plan === '换货') {
-    line.acceptInboundQty = 0
-    line.returnQty = 0
-    line.exchangeQty = base
-    return
-  }
-  // 退货（默认）
   line.acceptInboundQty = 0
-  line.returnQty = base
+  line.concessionQty = 0
+  line.returnQty = 0
   line.exchangeQty = 0
+  if (raw.includes('让步')) {
+    line.concessionQty = base
+  } else if (mapped === QC_TASK_RESULT.PARTIAL) {
+    // 部分通过：不预填，由用户拆分
+  } else {
+    line.returnQty = base
+  }
+  syncTreatmentPlanSummary(line)
 }
 
-/** 填写合格入库 → 退/换货自动变为「质检数量 - 合格入库」 */
-function onAcceptInboundQtyChange(line) {
+/** 多桶：改任一数量 */
+function onDispositionQtyChange(line, which) {
   if (!needDispositionQtyForLine(line)) return
+  if (!isMultiBucketDisposition(task.value?.bizScope)) return
   const base = lineInspectQty(line)
-  let accept = clampQty(line.acceptInboundQty)
-  if (accept > base) {
-    accept = base
-    line.acceptInboundQty = accept
+  line.acceptInboundQty = clampQty(line.acceptInboundQty)
+  line.concessionQty = clampQty(line.concessionQty)
+  line.returnQty = clampQty(line.returnQty)
+  line.exchangeQty = clampQty(line.exchangeQty)
+  const sum = line.acceptInboundQty + line.concessionQty + line.returnQty + line.exchangeQty
+  if (sum > base + 1e-9) {
+    const others =
+      sum -
+      (which === 'accept'
+        ? line.acceptInboundQty
+        : which === 'concession'
+          ? line.concessionQty
+          : which === 'return'
+            ? line.returnQty
+            : line.exchangeQty)
+    const maxCur = Math.max(0, base - others)
+    if (which === 'accept') line.acceptInboundQty = maxCur
+    else if (which === 'concession') line.concessionQty = maxCur
+    else if (which === 'return') line.returnQty = maxCur
+    else line.exchangeQty = maxCur
   }
-  applyRemainToReturnOrExchange(line, base - accept)
-}
-
-/** 改退货/换货时，合格入库 = 质检数量 - 退 - 换（保证合计不超） */
-function onReturnOrExchangeQtyChange(line, which) {
-  if (!needDispositionQtyForLine(line)) return
-  const base = lineInspectQty(line)
-  let ret = clampQty(line.returnQty)
-  let exch = clampQty(line.exchangeQty)
-  if (which === 'return' && ret > base) {
-    ret = base
-    line.returnQty = ret
-    exch = 0
-    line.exchangeQty = 0
-  } else if (which === 'exchange' && exch > base) {
-    exch = base
-    line.exchangeQty = exch
-    ret = 0
-    line.returnQty = 0
-  } else if (ret + exch > base) {
-    if (which === 'return') {
-      ret = Math.max(0, base - exch)
-      line.returnQty = ret
-    } else {
-      exch = Math.max(0, base - ret)
-      line.exchangeQty = exch
-    }
-  }
-  line.acceptInboundQty = Math.max(0, base - ret - exch)
+  syncTreatmentPlanSummary(line)
 }
 
 function validateDispositionQty(line) {
   if (!needDispositionQtyForLine(line)) return { ok: true }
+  const labels = dispositionLabels.value
   const base = lineInspectQty(line)
   const parseOne = (raw, label) => {
     if (raw == null || raw === '') return { ok: true, n: 0, empty: true }
@@ -1104,21 +1127,26 @@ function validateDispositionQty(line) {
     }
     return { ok: true, n, empty: false }
   }
-  const aRes = parseOne(line.acceptInboundQty, '合格入库数量')
+  const aRes = parseOne(line.acceptInboundQty, `${labels.accept}数量`)
   if (!aRes.ok) return aRes
-  const rRes = parseOne(line.returnQty, '退货数量')
+  const cRes = parseOne(line.concessionQty, `${labels.concession}数量`)
+  if (!cRes.ok) return cRes
+  const rRes = parseOne(line.returnQty, `${labels.secondary}数量`)
   if (!rRes.ok) return rRes
-  const eRes = parseOne(line.exchangeQty, '换货数量')
+  const eRes = parseOne(line.exchangeQty, `${labels.tertiary}数量`)
   if (!eRes.ok) return eRes
-  const sum = aRes.n + rRes.n + eRes.n
+  const sum = aRes.n + cRes.n + rRes.n + eRes.n
   if (sum > base + 1e-9) {
     return {
       ok: false,
-      message: `合格入库+退货+换货（${formatQty(sum, 4)}）不可超过质检数量（${formatQty(base, 4)}）`,
+      message: `${labels.accept}+${labels.concession}+${labels.secondary}+${labels.tertiary}（${formatQty(sum, 4)}）不可超过质检数量（${formatQty(base, 4)}）`,
     }
   }
-  if (mappedConclusionResult(line) === QC_TASK_RESULT.PARTIAL && sum <= 0) {
-    return { ok: false, message: '部分合格请至少填写一项处置数量（合格入库/退货/换货）' }
+  if (sum <= 0) {
+    return {
+      ok: false,
+      message: `请至少填写一项处置数量（${labels.accept}/${labels.concession}/${labels.secondary}/${labels.tertiary}）`,
+    }
   }
   return { ok: true }
 }
@@ -1141,24 +1169,9 @@ function onConclusionChange(line) {
     clearDispositionQty(line)
     return
   }
-  const mapped = mappedConclusionResult(line)
-  const raw = String(getConclusionValue(line) || '').trim()
-  // 不合格 / 部分合格：默认退货，可改；让步类默认让步接收
-  if (mapped === QC_TASK_RESULT.FAIL || mapped === QC_TASK_RESULT.PARTIAL) {
-    line.treatmentPlan = '退货'
-  } else if (raw === QC_CONCLUSION_CONCESSION_OPTION || raw.includes('让步')) {
-    line.treatmentPlan = '让步接收'
-  }
+  // 多桶：不强制单选方案，按结论预填数量
+  line.treatmentPlan = undefined
   clearDispositionQty(line)
-  suggestDispositionQty(line)
-}
-
-function onTreatmentPlanChange(line) {
-  if (!needDispositionQtyForLine(line)) {
-    clearDispositionQty(line)
-    return
-  }
-  // 切换方案时按新方案重建议（默认整单退/换）
   suggestDispositionQty(line)
 }
 
@@ -1277,9 +1290,12 @@ async function handleOk() {
       message.warning(`请为「${line.itemName || line.itemCode}」选择整单结论`)
       return
     }
-    if (needTreatmentForLine(line) && !String(line.treatmentPlan || '').trim()) {
-      message.warning(`请为「${line.itemName || line.itemCode}」选择处理方案`)
-      return
+    if (needDispositionQtyForLine(line)) {
+      syncTreatmentPlanSummary(line)
+      if (!String(line.treatmentPlan || '').trim()) {
+        message.warning(`请为「${line.itemName || line.itemCode}」填写数量处置`)
+        return
+      }
     }
     const qtyCheck = validateDispositionQty(line)
     if (!qtyCheck.ok) {
@@ -1330,6 +1346,7 @@ async function doSubmit() {
       acceptInboundQty: needDispositionQtyForLine(line)
         ? Number(line.acceptInboundQty) || 0
         : undefined,
+      concessionQty: needDispositionQtyForLine(line) ? Number(line.concessionQty) || 0 : undefined,
       returnQty: needDispositionQtyForLine(line) ? Number(line.returnQty) || 0 : undefined,
       exchangeQty: needDispositionQtyForLine(line) ? Number(line.exchangeQty) || 0 : undefined,
       sheetPassRule: resolveLineSheetPassRule(line, task.value),
@@ -1680,6 +1697,18 @@ async function doSubmit() {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.65);
   min-width: 56px;
+}
+
+.line-disposition-hint {
+  font-size: 12px;
+  color: #d48806;
+  line-height: 1.5;
+  max-width: 720px;
+}
+
+.line-disposition-summary {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .auto-conclusion-box {

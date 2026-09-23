@@ -181,7 +181,9 @@ export function calcOutsourcingMaterialIssueProgress(order, itemCode) {
   let issuedFromSets = 0
 
   for (const line of order.lineItems || []) {
-    const mats = resolveMaterialsForOutsourcingProduct(line, 1)
+    const mats = isProcessOutsourceOrder(order)
+      ? resolveMaterialsForProcessOutsource(order, 1, line)
+      : resolveMaterialsForOutsourcingProduct(line, 1)
     const hit = mats.find((m) => String(m.itemCode || '') === code)
     if (!hit) continue
     const unitUsage = Number(hit.unitUsage) || 0
@@ -224,6 +226,7 @@ export function enrichOutsourcingMaterialIssueProgress(order, rows = []) {
 /** 构建弹窗上方外协产品行 */
 export function buildOutsourcingIssueProductRows(order) {
   if (!order) return []
+  const isProcess = isProcessOutsourceOrder(order)
   return (order.lineItems || [])
     .filter((l) => !l.cancelled && (Number(l.planQty) || 0) > 0)
     .map((line, index) => {
@@ -233,10 +236,20 @@ export function buildOutsourcingIssueProductRows(order) {
       const remainQty = calcWxLineRemainIssueQty(order, line)
       const locked = isWxLineIssueFull(order, line)
       const color = WX_ISSUE_PRODUCT_COLORS[index % WX_ISSUE_PRODUCT_COLORS.length]
-      const bomLabel = resolveOutsourcingLineBomLabel(line)
-      const hasBom = Boolean(
+      let bomLabel = resolveOutsourcingLineBomLabel(line)
+      let hasBom = Boolean(
         (line.componentLines || line.issueBomLines)?.length || resolveOutsourcingLineBom(line),
       )
+      if (isProcess) {
+        const mats = resolveMaterialsForProcessOutsource(order, 1, line)
+        const fromEbom = mats.some((m) => m.fromProcessEbom)
+        const fromFeed = mats.some((m) => m.fromProcessFeeding)
+        if (fromEbom || fromFeed) hasBom = true
+        if (!bomLabel) {
+          if (fromFeed) bomLabel = '工序投料'
+          else if (fromEbom) bomLabel = '工单EBOM'
+        }
+      }
       return {
         id: line.id,
         orderNo: order.orderNo || '',
@@ -277,7 +290,7 @@ export function buildOutsourcingIssueMaterialRows(productRows = [], order = null
   for (const p of selected) {
     let mats = []
     if (isProcess) {
-      // 工序外协：投料优先，否则发产品本身；绝不展开 BOM
+      // 工序外协：投料优先，否则取工单 EBOM 下级物料
       mats = resolveMaterialsForProcessOutsource(order, p.setQty, p.raw || p)
     } else {
       mats = resolveMaterialsForOutsourcingProduct(p.raw || p, p.setQty)

@@ -82,7 +82,7 @@
       </a-table>
     </div>
 
-    <div class="section-block">
+    <div class="section-block modal-basic-card">
       <div class="section-title">收货明细 ({{ displayLines.length }})</div>
       <InboundLineScopeToggle v-model="lineScope" />
 

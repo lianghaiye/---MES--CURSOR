@@ -26,7 +26,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
+import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { normalizeProcurementDocSource } from '@/constants/procurementDocSource'
 import { outsourceModeLabel, normalizeOutsourceMode } from '@/utils/outsourcingMode'
 
@@ -48,8 +48,8 @@ const metaItems = computed(() => {
   return [
     { key: 'creator', label: '创建人', value: display(o.creator) },
     { key: 'createdAt', label: '创建时间', value: formatDateTimeMinute(o.createdAt) },
-    { key: 'approverName', label: '审核人', value: display(o.approverName) },
-    { key: 'approvedAt', label: '审批时间', value: resolveApprovalTime(o) },
+    { key: 'updater', label: '更新人', value: display(o.updater) },
+    { key: 'updatedAt', label: '更新时间', value: formatDateTimeMinute(o.updatedAt) },
   ]
 })
 
@@ -105,12 +105,6 @@ const fields = computed(() => [
   { key: 'settlementCycle', label: '结算周期' },
   { key: 'settlementMethod', label: '结算方式' },
   { key: 'shipWarehouse', label: '预入仓库' },
-  { key: 'updater', label: '更新人' },
-  {
-    key: 'updatedAt',
-    label: '更新时间',
-    format: (o) => formatDateTimeMinute(o.updatedAt),
-  },
   { key: 'remark', label: '备注', fullRow: true },
 ])
 </script>

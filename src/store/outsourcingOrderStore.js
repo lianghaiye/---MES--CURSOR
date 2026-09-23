@@ -21,7 +21,7 @@ import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_outsourcing_orders'
 const SEED_VERSION_KEY = 'i_doms_outsourcing_orders_seed_v'
-/** v9：工序外协发料改为产品本身（不再挂 BOM 下级 componentLines） */
+/** v10：工序外协发料无投料时取工单 EBOM 下级物料 */
 const CURRENT_SEED_VERSION = '9'
 
 function loadFromStorage() {
@@ -331,6 +331,8 @@ export function submitOutsourcingReceipt(orderId, lines = [], extra = {}) {
       planQty: Number(line?.planQty) || 0,
       purchaseQty: Number(line?.planQty) || 0,
       unit: line?.unit || '',
+      settleUnit: item.settleUnit || line?.settleUnit || '',
+      settleQty: item.settleQty,
       receivingWarehouse: item.receivingWarehouse || '',
       receiptQty: Number(item.receiptQty) || 0,
       inboundQcRequirement: String(item.inboundQcRequirement || '').trim(),

@@ -23,7 +23,7 @@ export { QC_TASK_RESULT, QC_TASK_RESULT_OPTIONS }
 const STORAGE_KEY = 'i_doms_qc_tasks'
 const STORAGE_VERSION = 3
 const SEED_VERSION_KEY = 'i_doms_qc_tasks_seed_v'
-const CURRENT_SEED_VERSION = '18'
+const CURRENT_SEED_VERSION = '22'
 
 export const QC_TASK_STATUS = {
   PENDING: '待质检',
@@ -196,6 +196,7 @@ export function createQcTaskLineItem(partial = {}) {
     lineQcResult: partial.lineQcResult,
     treatmentPlan: partial.treatmentPlan,
     acceptInboundQty: partial.acceptInboundQty,
+    concessionQty: partial.concessionQty,
     returnQty: partial.returnQty,
     exchangeQty: partial.exchangeQty,
     fieldValues: Array.isArray(partial.fieldValues) ? [...partial.fieldValues] : [],
@@ -699,7 +700,10 @@ export function createInboundQcFromReceipt(payload = {}) {
         receiptQty: line.receiptQty ?? line.qty,
         receivingWarehouse: line.receivingWarehouse || line.warehouse || '',
         inboundQcRequirement: line.inboundQcRequirement || '',
-        inspectQty: line.receiptQty ?? line.qty ?? 0,
+        inspectQty:
+          Number(line.inspectQty) > 0
+            ? Number(line.inspectQty)
+            : Number(line.receiptQty ?? line.qty) || 0,
       },
       { bizScope },
     )
