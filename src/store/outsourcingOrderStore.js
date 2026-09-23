@@ -153,6 +153,12 @@ export function canGenerateOutsourcingInbound(order) {
   return canGenerateOutsourcingReceipt(order)
 }
 
+/** 进行中且仍有可发套数时可生成发料出库（已终结/已完成等锁定） */
+export function canGenerateOutsourcingIssue(order) {
+  if (order?.status !== '进行中') return false
+  return (order.lineItems || []).some((line) => calcWxLineRemainIssueQty(order, line) > 1e-9)
+}
+
 export function canCompleteOutsourcingOrder(order) {
   return order?.status === '进行中' && order?.returnStatus === '已入库'
 }
@@ -272,10 +278,32 @@ export function listUnfinishedReturnsForOutsourcingOrder(order) {
   })
 }
 
+/** 关联未完成发料出库申请（出库中 / 部分出库） */
+export function listUnfinishedIssueOrdersForOutsourcingOrder(order) {
+  if (!order) return []
+  return (order.issueOrders || []).filter((io) => {
+    if (!io) return false
+    const st = String(io.outboundStatus || io.status || '').trim()
+    if (
+      !st ||
+      st === '已出库' ||
+      st === '已完成' ||
+      st === '已拒绝' ||
+      st === '已作废' ||
+      st === '已取消'
+    ) {
+      return false
+    }
+    // 出库中、部分出库、待出库等均视为未完成发料
+    return true
+  })
+}
+
 export function getOutsourcingOrderUnfinishedRelatedDocs(order) {
   // eslint-disable-next-line global-require
   const { getPendingOutsourcingPriceChange } = require('@/store/outsourcingPriceChangeStore')
   return {
+    issueOrders: listUnfinishedIssueOrdersForOutsourcingOrder(order),
     receipts: listUnfinishedReceiptsForOutsourcingOrder(order),
     qcTasks: listUnfinishedQcTasksForOutsourcingOrder(order),
     inboundOrders: listUnfinishedInboundOrdersForOutsourcingOrder(order),
@@ -291,6 +319,10 @@ function formatOutsourcingUnfinishedRelatedMessage(unfinished = {}) {
       `待审核订单变更：${unfinished.pendingPriceChange.changeNo || unfinished.pendingPriceChange.id}`,
     )
   }
+  const issueNos = (unfinished.issueOrders || [])
+    .map((io) => io.issueOrderNo || io.docNo || io.id)
+    .filter(Boolean)
+  if (issueNos.length) parts.push(`未完成发料出库单：${issueNos.join('、')}`)
   const receiptNos = (unfinished.receipts || []).map((r) => r.receiptNo || r.id).filter(Boolean)
   if (receiptNos.length) parts.push(`未完成收货单：${receiptNos.join('、')}`)
   const qcNos = (unfinished.qcTasks || []).map((t) => t.qcNo || t.id).filter(Boolean)
@@ -331,7 +363,7 @@ export function evaluateOutsourcingOrderTerminate(order) {
   return {
     ok: true,
     message:
-      '终结后订单不再继续外协回货，入库数量将锁定且不可再更改，且该订单不进入结算。确认终结吗？',
+      '终结后订单不再继续，不可发料/收货/入库，回货入库数量将锁定，且该订单不进入结算。确认终结吗？',
   }
 }
 
@@ -508,6 +540,9 @@ export function submitOutsourcingReceipt(orderId, lines = [], extra = {}) {
   const order = getOutsourcingOrderById(orderId)
   if (!order) return { ok: false, message: '外协订单不存在' }
   if (!canGenerateOutsourcingReceipt(order)) {
+    if (order.status === '已终结') {
+      return { ok: false, message: '已终结的外协订单不可再生成收货单' }
+    }
     return { ok: false, message: '当前外协订单不可生成收货单' }
   }
   const submitLines = (lines || []).filter((item) => (Number(item.receiptQty) || 0) > 0)
@@ -597,6 +632,9 @@ export function submitOutsourcingInbound(orderId, lines = []) {
   const order = getOutsourcingOrderById(orderId)
   if (!order) return { ok: false, message: '外协订单不存在' }
   if (!canGenerateOutsourcingInbound(order)) {
+    if (order.status === '已终结') {
+      return { ok: false, message: '已终结的外协订单不可再生成入库单' }
+    }
     return { ok: false, message: '当前外协订单不可生成入库单' }
   }
   lines.forEach((item) => {
@@ -634,8 +672,14 @@ function nextIssueOrderSeq(existingNos = []) {
 export function submitOutsourcingIssue(orderId, payload = [], extra = {}) {
   const order = getOutsourcingOrderById(orderId)
   if (!order) return { ok: false, message: '外协订单不存在' }
-  if (order.status !== '进行中') {
-    return { ok: false, message: '仅进行中的外协订单可生成发料出库单' }
+  if (!canGenerateOutsourcingIssue(order)) {
+    if (order.status === '已终结') {
+      return { ok: false, message: '已终结的外协订单不可再发料出库' }
+    }
+    if (order.status !== '进行中') {
+      return { ok: false, message: '仅进行中的外协订单可生成发料出库单' }
+    }
+    return { ok: false, message: '当前外协订单无可发料数量' }
   }
   const shipDate = String(extra.shipDate || '').trim()
   if (!shipDate) return { ok: false, message: '请选择出货日期' }

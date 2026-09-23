@@ -33,7 +33,12 @@
                 <a-button size="small" @click="handleResubmit">重新提交</a-button>
               </template>
               <template v-else-if="record.status === '进行中'">
-                <a-button type="primary" size="small" @click="openIssueModal">
+                <a-button
+                  v-if="canGenerateOutsourcingIssue(record)"
+                  type="primary"
+                  size="small"
+                  @click="openIssueModal"
+                >
                   生成发料出库
                 </a-button>
                 <a-button
@@ -526,6 +531,7 @@ import {
   getOutsourcingOrderById,
   canGenerateOutsourcingReceipt,
   canGenerateOutsourcingInbound,
+  canGenerateOutsourcingIssue,
   evaluateOutsourcingOrderTerminate,
   submitOutsourcingOrderForApprove,
   withdrawOutsourcingOrder,
@@ -1016,6 +1022,14 @@ function onPriceChangeDone() {
 }
 
 function openIssueModal() {
+  if (!record.value || !canGenerateOutsourcingIssue(record.value)) {
+    message.warning(
+      record.value?.status === '已终结'
+        ? '已终结的外协订单不可再发料出库'
+        : '仅进行中且仍有可发料数量的外协订单可生成发料出库单',
+    )
+    return
+  }
   issueModalOpen.value = true
 }
 

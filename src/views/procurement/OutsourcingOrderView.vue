@@ -324,7 +324,12 @@
                 作废
               </a-button>
               <template v-if="record.status === '进行中'">
-                <a-button type="link" size="small" @click="openIssueForRow(record)">
+                <a-button
+                  v-if="canGenerateOutsourcingIssue(record)"
+                  type="link"
+                  size="small"
+                  @click="openIssueForRow(record)"
+                >
                   发料
                 </a-button>
                 <a-button
@@ -452,6 +457,7 @@ import {
   canApproveOutsourcingOrder,
   canGenerateOutsourcingReceipt,
   canGenerateOutsourcingInbound,
+  canGenerateOutsourcingIssue,
   canCompleteOutsourcingOrder,
   canTerminateOutsourcingOrder,
   evaluateOutsourcingOrderTerminate,
@@ -658,6 +664,7 @@ function hasRowActions(record) {
     canWithdrawOutsourcingOrder(record) ||
     canResubmitOutsourcingOrder(record) ||
     canVoidOutsourcingOrder(record) ||
+    canGenerateOutsourcingIssue(record) ||
     canGenerateOutsourcingReceipt(record) ||
     canGenerateOutsourcingInbound(record) ||
     canApplyOutsourcingPriceChange(record)
@@ -873,8 +880,12 @@ function openExceptionFromToolbar() {
 }
 
 function openIssueForRow(record) {
-  if (!record || record.status !== '进行中') {
-    message.warning('仅进行中的外协订单可发料出库')
+  if (!canGenerateOutsourcingIssue(record)) {
+    message.warning(
+      record?.status === '已终结'
+        ? '已终结的外协订单不可再发料出库'
+        : '仅进行中且仍有可发料数量的外协订单可发料出库',
+    )
     return
   }
   issueOrder.value = record
@@ -1014,7 +1025,7 @@ function handleTerminate() {
   Modal.confirm({
     title: '终结确认',
     content:
-      `终结后订单不再继续，回货入库数量锁定且不进入结算。确认终结以下 ${targets.length} 条外协订单吗？\n` +
+      `终结后订单不再继续，不可发料/收货/入库，回货入库数量锁定且不进入结算。确认终结以下 ${targets.length} 条外协订单吗？\n` +
       targets.map((o) => `· ${o.orderNo}`).join('\n'),
     okText: '确认终结',
     okType: 'danger',
