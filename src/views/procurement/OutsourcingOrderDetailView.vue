@@ -52,6 +52,10 @@
                 </a-button>
                 <a-button size="small" @click="openExceptionCreate">异常处理</a-button>
                 <a-button size="small" @click="handleComplete">完成</a-button>
+                <a-button size="small" danger @click="handleTerminate">终结</a-button>
+              </template>
+              <template v-else-if="record.status === '已终结'">
+                <a-button size="small" @click="openExceptionCreate">异常处理</a-button>
               </template>
               <a-button
                 v-if="canApplyOutsourcingPriceChange(record)"
@@ -522,11 +526,13 @@ import {
   getOutsourcingOrderById,
   canGenerateOutsourcingReceipt,
   canGenerateOutsourcingInbound,
+  evaluateOutsourcingOrderTerminate,
   submitOutsourcingOrderForApprove,
   withdrawOutsourcingOrder,
   resubmitOutsourcingOrder,
   voidOutsourcingOrder,
   completeOutsourcingOrder,
+  terminateOutsourcingOrder,
 } from '@/store/outsourcingOrderStore'
 import { flattenOutsourcingIssueOutboundLines } from '@/mock/outsourcingOrders'
 import {
@@ -623,10 +629,10 @@ const lineColumns = [
   { title: '出货仓库', dataIndex: 'shipWarehouse', width: 110, ellipsis: true },
   { title: '计费方式', dataIndex: 'billingMethod', width: 90 },
   { title: '税率', key: 'taxRate', dataIndex: 'taxRate', width: 72, align: 'right' },
-  { title: '加工单价（不含税）', key: 'unitPriceExTax', width: 130, align: 'right' },
-  { title: '加工单价（含税）', key: 'unitPriceInTax', width: 120, align: 'right' },
-  { title: '加工总价（不含税）', key: 'totalPriceExTax', width: 130, align: 'right' },
-  { title: '加工总价（含税）', key: 'totalPriceInTax', width: 120, align: 'right' },
+  { title: '不含税单价', key: 'unitPriceExTax', width: 110, align: 'right' },
+  { title: '含税单价', key: 'unitPriceInTax', width: 100, align: 'right' },
+  { title: '不含税总价', key: 'totalPriceExTax', width: 110, align: 'right' },
+  { title: '含税总价', key: 'totalPriceInTax', width: 100, align: 'right' },
   { title: '回货仓库', key: 'returnWarehouse', width: 110, ellipsis: true },
   { title: '回货数量', key: 'returnQty', width: 120, align: 'right' },
   { title: '结算数量', key: 'settleQty', width: 120, align: 'right' },
@@ -810,6 +816,7 @@ function statusColor(status) {
     进行中: 'processing',
     已拒绝: 'error',
     已完成: 'success',
+    已终结: 'warning',
     已作废: 'default',
   }
   return map[status] || 'default'
@@ -950,6 +957,47 @@ function handleComplete() {
   const result = completeOutsourcingOrder(record.value.id)
   result.ok ? message.success(result.message) : message.warning(result.message)
   loadRecord()
+}
+
+function handleTerminate() {
+  if (!record.value) return
+  const gate = evaluateOutsourcingOrderTerminate(record.value)
+  if (!gate.ok) {
+    if (gate.code === 'HAS_UNFINISHED_RELATED') {
+      Modal.warning({
+        title: '无法终结外协订单',
+        content: gate.message,
+        okText: '知道了',
+      })
+      return
+    }
+    message.warning(gate.message)
+    return
+  }
+  Modal.confirm({
+    title: '终结确认',
+    content: gate.message,
+    okText: '确认终结',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: () => {
+      const result = terminateOutsourcingOrder(record.value.id, { confirmTerminate: true })
+      if (result.ok) {
+        message.success(result.message)
+        loadRecord()
+        return
+      }
+      if (result.code === 'HAS_UNFINISHED_RELATED') {
+        Modal.warning({
+          title: '无法终结外协订单',
+          content: result.message,
+          okText: '知道了',
+        })
+        return
+      }
+      message.warning(result.message)
+    },
+  })
 }
 
 function handlePriceChange() {

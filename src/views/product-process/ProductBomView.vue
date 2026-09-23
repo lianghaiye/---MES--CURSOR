@@ -921,10 +921,10 @@ function handleToggleShipStatus(record) {
   message.success('已启用')
 }
 
-function onShipConflictConfirm({ mode }) {
+function onShipConflictConfirm(resolution) {
   if (!pendingShipEnableId.value) return
   const res = enableShipAttachment(pendingShipEnableId.value, {
-    conflictResolution: { mode },
+    conflictResolution: resolution,
   })
   pendingShipEnableId.value = ''
   if (!res.ok) {

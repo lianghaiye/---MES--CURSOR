@@ -6,7 +6,15 @@ import { formatLineBarcodeBatchNo } from '@/utils/outboundIssueLines'
 import { formatQty, roundNumber } from '@/utils/numberFormat'
 import { OUTSOURCE_MODE, normalizeOutsourceMode } from '@/utils/outsourcingMode'
 
-export const outsourcingStatusOptions = ['待提交', '待审核', '已拒绝', '进行中', '已完成', '已作废']
+export const outsourcingStatusOptions = [
+  '待提交',
+  '待审核',
+  '已拒绝',
+  '进行中',
+  '已完成',
+  '已终结',
+  '已作废',
+]
 
 export const outsourcingIssueStatusOptions = ['待出库', '部分出库', '已出库']
 export const outsourcingReturnStatusOptions = ['待入库', '部分入库', '已入库']

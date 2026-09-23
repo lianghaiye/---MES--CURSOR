@@ -177,6 +177,7 @@
           <CheckOutlined />
           完成
         </a-button>
+        <a-button size="small" danger @click="handleTerminate">终结</a-button>
         <a-dropdown>
           <a-button size="small">
             批量打印
@@ -452,12 +453,15 @@ import {
   canGenerateOutsourcingReceipt,
   canGenerateOutsourcingInbound,
   canCompleteOutsourcingOrder,
+  canTerminateOutsourcingOrder,
+  evaluateOutsourcingOrderTerminate,
   canVoidOutsourcingOrder,
   submitOutsourcingOrderForApprove,
   withdrawOutsourcingOrder,
   resubmitOutsourcingOrder,
   voidOutsourcingOrder,
   completeOutsourcingOrder,
+  terminateOutsourcingOrder,
   getOutsourcingOrdersByIds,
   batchSubmitOutsourcingOrders,
 } from '@/store/outsourcingOrderStore'
@@ -585,7 +589,8 @@ const filteredList = computed(() => {
     待审核: 2,
     进行中: 3,
     已完成: 4,
-    已作废: 5,
+    已终结: 5,
+    已作废: 6,
   }
   return filterOutsourcingOrders(outsourcingOrderState.orders, f).sort((a, b) => {
     const ra = statusRank[a.status] ?? 99
@@ -629,6 +634,7 @@ function statusColor(status) {
     进行中: 'processing',
     已拒绝: 'error',
     已完成: 'success',
+    已终结: 'warning',
     已作废: 'default',
   }
   return map[status] || 'default'
@@ -979,6 +985,63 @@ function handleComplete() {
   targets.forEach((o) => completeOutsourcingOrder(o.id))
   message.success(`已完成 ${targets.length} 条外协订单`)
   selectedRowKeys.value = []
+}
+
+function handleTerminate() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择要终结的外协订单')
+    return
+  }
+  const selected = getOutsourcingOrdersByIds(selectedRowKeys.value)
+  const targets = selected.filter(canTerminateOutsourcingOrder)
+  if (!targets.length) {
+    const first = selected.find((o) => o.status === '进行中') || selected[0]
+    const gate = first ? evaluateOutsourcingOrderTerminate(first) : null
+    if (gate?.code === 'HAS_UNFINISHED_RELATED') {
+      Modal.warning({
+        title: '无法终结外协订单',
+        content: gate.message,
+        okText: '知道了',
+      })
+      return
+    }
+    message.warning(
+      gate?.message || '所选外协订单均不可终结（需进行中、回货未结清且无未结清关联单）',
+    )
+    return
+  }
+
+  Modal.confirm({
+    title: '终结确认',
+    content:
+      `终结后订单不再继续，回货入库数量锁定且不进入结算。确认终结以下 ${targets.length} 条外协订单吗？\n` +
+      targets.map((o) => `· ${o.orderNo}`).join('\n'),
+    okText: '确认终结',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: () => {
+      let okCount = 0
+      const blocked = []
+      targets.forEach((o) => {
+        const result = terminateOutsourcingOrder(o.id, { confirmTerminate: true })
+        if (result.ok) {
+          okCount += 1
+          return
+        }
+        blocked.push(`「${o.orderNo}」${result.message}`)
+      })
+      if (blocked.length) {
+        Modal.warning({
+          title: okCount ? `已终结 ${okCount} 条，其余无法终结` : '无法终结外协订单',
+          content: blocked.join('\n'),
+          okText: '知道了',
+        })
+      } else {
+        message.success(`已终结 ${okCount} 条外协订单`)
+      }
+      selectedRowKeys.value = []
+    },
+  })
 }
 
 function onPrintMenuClick({ key }) {

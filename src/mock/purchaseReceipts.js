@@ -17,7 +17,7 @@ export const receiptQcStatusOptions = [
 export const receiptInboundStatusOptions = ['待入库', '入库中', '部分入库', '已入库']
 
 /** 单据状态 */
-export const receiptDocStatusOptions = ['新建', '进行中', '已完成', '作废']
+export const receiptDocStatusOptions = ['新建', '进行中', '已完成', '已终结', '作废']
 
 export function createPurchaseReceipt(partial = {}) {
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -34,7 +34,7 @@ export function createPurchaseReceipt(partial = {}) {
     qcResult: '',
     inspector: '',
     inspectedAt: '',
-    /** 单据状态：新建 | 进行中 | 已完成 | 作废 */
+    /** 单据状态：新建 | 进行中 | 已完成 | 已终结 | 作废 */
     receiptStatus: '新建',
     /** 入库状态 */
     inboundStatus: '待入库',

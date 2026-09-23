@@ -556,6 +556,16 @@
               />
             </a-form-item>
           </a-col>
+          <a-col v-if="indicatorKind === 'basic'" :span="6">
+            <a-form-item label="按数量统计">
+              <a-switch
+                :checked="Boolean(model.countByQty)"
+                checked-children="开"
+                un-checked-children="关"
+                @update:checked="(v) => update('countByQty', Boolean(v))"
+              />
+            </a-form-item>
+          </a-col>
           <a-col v-if="showSyncToLibrary" :span="6">
             <a-form-item label="同步到库">
               <a-switch
@@ -571,9 +581,11 @@
           {{
             indicatorKind === 'composite'
               ? '父项级标准；子项另有判定。人工判定项在录入时选择合格/不合格/让步合格/部分合格。'
-              : model.judgeRule === 'manual'
-                ? '录入时除实测值外，须选择本项结论（可自定义选项文案，并映射质检通过/不通过/部分通过）。'
-                : '单项合格提示；可配合模板「整单合格规则」约束判定通过。'
+              : model.countByQty
+                ? '开启「按数量统计」后，录入时填写合格数/不合格数：不合格数大于 0 则本项未达标；合计不超过质检数量。'
+                : model.judgeRule === 'manual'
+                  ? '录入时除实测值外，须选择本项结论（可自定义选项文案，并映射质检通过/不通过/部分通过）。'
+                  : '单项合格提示；可配合模板「整单合格规则」约束判定通过。'
           }}
         </div>
       </div>
@@ -806,6 +818,7 @@ function onIndicatorKindChange(kind) {
       children,
       matrixColumns: [],
       matrixRows: [],
+      countByQty: false,
       ...pickComplexFieldProps({ type: 'composite', children, ...props.model }),
       judgeRule: props.model.judgeRule || QC_FIELD_JUDGE_RULE.NONE,
       standardMin: props.model.standardMin,

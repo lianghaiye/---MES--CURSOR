@@ -11,13 +11,12 @@ import {
   upsertSheetConclusionField,
 } from '@/utils/qcConclusionField'
 import {
-  applyQcTemplateConflictReplace,
-  filterObjectsSkippingConflicts,
+  applyQcTemplateConflictResolution,
   findQcTemplateConflicts,
 } from '@/utils/qcTemplateConflictService'
 
 const TEMPLATE_SEED_KEY = 'i_doms_qc_templates_seed_v'
-const TEMPLATE_SEED_VERSION = '12'
+const TEMPLATE_SEED_VERSION = '13'
 /** 与小程序共用：模板快照落盘，供移动端回填 templateFields */
 const TEMPLATE_STORAGE_KEY = 'i_doms_qc_templates'
 const TEMPLATE_STORAGE_VERSION = 1
@@ -169,7 +168,9 @@ export function previewQcTemplateConflicts(payload = {}) {
 }
 
 /**
- * 启用模板。若有冲突需先传入 conflictResolution: { mode: 'replace'|'skip' }
+ * 启用模板。若有冲突需先传入 conflictResolution：
+ * - { mode: 'replace'|'skip' } 整单
+ * - { mode: 'mixed', decisions: [{ key, mode }] } 逐行
  */
 export function enableQcTemplate(id, { conflictResolution, operator = 'admin1' } = {}) {
   const row = getQcTemplateById(id)
@@ -188,14 +189,18 @@ export function enableQcTemplate(id, { conflictResolution, operator = 'admin1' }
     return { ok: false, needConflict: true, conflict, template: row }
   }
 
-  if (conflict.hasConflict && conflictResolution?.mode === 'replace') {
-    applyQcTemplateConflictReplace(qcTemplateState.templates, conflict.conflicts, operator)
-  } else if (conflict.hasConflict && conflictResolution?.mode === 'skip') {
-    const nextObjects = filterObjectsSkippingConflicts(row.objects || [], conflict.conflicts)
-    if (row.scopeType !== QC_TEMPLATE_SCOPE_TYPE.GLOBAL && !nextObjects.length) {
+  if (conflict.hasConflict && conflictResolution) {
+    const { objectsToSave } = applyQcTemplateConflictResolution(
+      qcTemplateState.templates,
+      row.objects || [],
+      conflict.conflicts,
+      conflictResolution,
+      operator,
+    )
+    if (row.scopeType !== QC_TEMPLATE_SCOPE_TYPE.GLOBAL && !objectsToSave.length) {
       return { ok: false, message: '跳过冲突后无剩余适用对象，无法启用' }
     }
-    row.objects = nextObjects
+    row.objects = objectsToSave
   }
 
   row.status = '启用'
@@ -303,10 +308,15 @@ export function updateQcTemplate(
     }
 
     let objectsToSave = nextObjects
-    if (conflict.hasConflict && conflictResolution?.mode === 'replace') {
-      applyQcTemplateConflictReplace(qcTemplateState.templates, conflict.conflicts, operator)
-    } else if (conflict.hasConflict && conflictResolution?.mode === 'skip') {
-      objectsToSave = filterObjectsSkippingConflicts(nextObjects, conflict.conflicts)
+    if (conflict.hasConflict && conflictResolution) {
+      const resolved = applyQcTemplateConflictResolution(
+        qcTemplateState.templates,
+        nextObjects,
+        conflict.conflicts,
+        conflictResolution,
+        operator,
+      )
+      objectsToSave = resolved.objectsToSave
       if (nextScopeType !== QC_TEMPLATE_SCOPE_TYPE.GLOBAL && !objectsToSave.length) {
         return { ok: false, message: '跳过冲突后无剩余适用对象，无法保存启用' }
       }

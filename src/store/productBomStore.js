@@ -47,8 +47,7 @@ import {
   SHIP_ATTACHMENT_STATUS,
 } from '@/utils/shipAttachmentScope'
 import {
-  applyShipAttachmentConflictReplace,
-  filterObjectsSkippingConflicts,
+  applyShipAttachmentConflictResolution,
   findShipAttachmentConflicts,
   hydrateShipAttachmentScope,
 } from '@/utils/shipAttachmentConflict'
@@ -390,10 +389,15 @@ function resolveShipAttachmentEnableConflict(
     return { ok: false, needConflict: true, conflict, record: row }
   }
   let nextObjects = objects
-  if (conflict.hasConflict && conflictResolution?.mode === 'replace') {
-    applyShipAttachmentConflictReplace(productBomState.boms, conflict.conflicts, operator)
-  } else if (conflict.hasConflict && conflictResolution?.mode === 'skip') {
-    nextObjects = filterObjectsSkippingConflicts(objects, conflict.conflicts)
+  if (conflict.hasConflict && conflictResolution) {
+    const resolved = applyShipAttachmentConflictResolution(
+      productBomState.boms,
+      objects,
+      conflict.conflicts,
+      conflictResolution,
+      operator,
+    )
+    nextObjects = resolved.objectsToSave
     if (scopeType !== SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL && !nextObjects.length) {
       return { ok: false, message: '跳过冲突后无剩余适用对象，无法启用' }
     }

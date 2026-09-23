@@ -15,13 +15,9 @@ function round4(n) {
   return Math.round((Number(n) || 0) * 10000) / 10000
 }
 
-function lineKey(line) {
-  return String(line?.poLineId || line?.id || line?.itemCode || '').trim()
-}
-
 function matchReceiptLine(receiptLine, inboundLine) {
-  const a = lineKey(receiptLine)
-  const b = String(inboundLine?.poLineId || '').trim()
+  const a = String(receiptLine?.wxLineId || receiptLine?.poLineId || receiptLine?.id || '').trim()
+  const b = String(inboundLine?.wxLineId || inboundLine?.poLineId || inboundLine?.id || '').trim()
   if (a && b && a === b) return true
   const codeA = String(receiptLine?.itemCode || receiptLine?.productCode || '').trim()
   const codeB = String(inboundLine?.itemCode || inboundLine?.productCode || '').trim()
@@ -55,6 +51,7 @@ export function listInboundOrdersForReceipt(receipt) {
   return getInboundOrdersLazy().filter((o) => {
     if (!isActiveInboundOrder(o)) return false
     if (o.purchaseReceiptId && o.purchaseReceiptId === receipt.id) return true
+    if (o.outsourcingReceiptId && o.outsourcingReceiptId === receipt.id) return true
     if (idSet.has(o.id)) return true
     if (nos.length && nos.includes(String(o.docNo || '').trim())) return true
     return false
@@ -158,12 +155,38 @@ export function calcReceiptLinePendingInboundQty(receipt, receiptLine) {
 /** 收货行当前对采购池的占用（已入库、已释放、已挂未确认入库单的部分不占） */
 export function calcReceiptLineOpenOccupyQty(receipt, receiptLine) {
   if (!receipt || !receiptLine) return 0
-  if (receipt.receiptStatus === '已完成' || receipt.receiptStatus === '作废') return 0
+  if (
+    receipt.receiptStatus === '已完成' ||
+    receipt.receiptStatus === '已终结' ||
+    receipt.receiptStatus === '作废'
+  ) {
+    return 0
+  }
   const receiptQty = round4(Number(receiptLine.receiptQty) || 0)
   const released = round4(Number(receiptLine.releasedQty) || 0)
   const inbounded = calcReceiptLineConfirmedInboundQty(receipt, receiptLine)
   const pending = calcReceiptLinePendingInboundQty(receipt, receiptLine)
   return Math.max(0, round4(receiptQty - released - inbounded - pending))
+}
+
+/**
+ * 关闭收货单时释放未入库占用：releasedQty = max(原释放, 收货数−已入库)
+ * 返回 { lineItems, releaseByWxLineId }（外协用 release 量扣减订单 appliedReceiptQty）
+ */
+export function buildReceiptCloseRelease(receipt) {
+  const releaseByWxLineId = {}
+  const lineItems = (receipt?.lineItems || []).map((li) => {
+    const receiptQty = round4(Number(li.receiptQty) || 0)
+    const inbounded = calcReceiptLineConfirmedInboundQty(receipt, li)
+    const free = Math.max(0, round4(receiptQty - inbounded))
+    const releasedQty = Math.max(round4(Number(li.releasedQty) || 0), free)
+    const wxLineId = li.wxLineId || li.poLineId || ''
+    if (wxLineId && free > 1e-9) {
+      releaseByWxLineId[wxLineId] = round4((releaseByWxLineId[wxLineId] || 0) + free)
+    }
+    return { ...li, releasedQty }
+  })
+  return { lineItems, releaseByWxLineId }
 }
 
 /**

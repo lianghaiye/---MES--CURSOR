@@ -88,6 +88,7 @@
         <a-button size="small" @click="openGenerateQcModal">生成质检单</a-button>
         <a-button size="small" @click="openInboundModal">生成入库单</a-button>
         <a-button size="small" type="primary" @click="handleComplete">完成</a-button>
+        <a-button size="small" @click="handleTerminate">终结</a-button>
         <a-button size="small" danger @click="handleBatchVoid">作废</a-button>
         <a-dropdown>
           <a-button size="small">
@@ -268,8 +269,10 @@ import {
   canEditPurchaseReceipt,
   canVoidPurchaseReceipt,
   canCompletePurchaseReceipt,
+  canTerminatePurchaseReceipt,
   voidPurchaseReceipt,
   completePurchaseReceipt,
+  terminatePurchaseReceipt,
   hasReceiptQcSheet,
 } from '@/store/purchaseReceiptStore'
 import {
@@ -386,6 +389,7 @@ function docStatusColor(status) {
     新建: 'default',
     进行中: 'processing',
     已完成: 'success',
+    已终结: 'warning',
     作废: 'default',
   }
   return map[status] || 'default'
@@ -502,8 +506,12 @@ function openInboundForRow(receipt) {
     message.warning('未找到所选收货单')
     return
   }
-  if (receipt.receiptStatus === '作废' || receipt.receiptStatus === '已完成') {
-    message.warning('已完成或作废的收货单不可生成入库单')
+  if (
+    receipt.receiptStatus === '作废' ||
+    receipt.receiptStatus === '已完成' ||
+    receipt.receiptStatus === '已终结'
+  ) {
+    message.warning('已完成、已终结或作废的收货单不可生成入库单')
     return
   }
   if (receipt.inboundStatus === '已入库') {
@@ -641,6 +649,34 @@ function handleComplete() {
         if (result.ok) okCount += 1
       })
       message.success(`已完成 ${okCount} 条收货单`)
+      selectedRowKeys.value = []
+    },
+  })
+}
+
+function handleTerminate() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择收货单')
+    return
+  }
+  const targets = selectedRowKeys.value
+    .map((id) => purchaseReceiptState.receipts.find((r) => r.id === id))
+    .filter(Boolean)
+  const terminable = targets.filter(canTerminatePurchaseReceipt)
+  if (!terminable.length) {
+    message.warning('所选收货单均不可终结（需无未完成的来料质检单、采购入库单）')
+    return
+  }
+  Modal.confirm({
+    title: '确认终结',
+    content: `确定终结选中的 ${terminable.length} 条收货单吗？未入库占用将释放，采购订单可重新生成收货单。`,
+    onOk: () => {
+      let okCount = 0
+      terminable.forEach((row) => {
+        const result = terminatePurchaseReceipt(row.id)
+        if (result.ok) okCount += 1
+      })
+      message.success(`已终结 ${okCount} 条收货单`)
       selectedRowKeys.value = []
     },
   })

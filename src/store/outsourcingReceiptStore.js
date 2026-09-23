@@ -64,6 +64,9 @@ export function deriveReceiptDocStatus(receipt, preferredStatus) {
   ) {
     return '作废'
   }
+  if (preferredStatus === '已终结' || receipt?.receiptStatus === '已终结') {
+    return '已终结'
+  }
   if (preferredStatus === '已完成') return '已完成'
 
   const inboundStatus = receipt?.inboundStatus || '待入库'
@@ -79,7 +82,9 @@ function normalizeReceipt(row) {
   if (r.receiptStatus === '已作废' || r.receiptStatus === '入库中') {
     if (r.receiptStatus === '已作废') r.receiptStatus = '作废'
   }
-  if (r.receiptStatus !== '作废') {
+  if (r.receiptStatus === '作废' || r.receiptStatus === '已终结') {
+    // keep closed statuses
+  } else {
     r.receiptStatus = deriveReceiptDocStatus(r, r.receiptStatus === '已完成' ? '已完成' : undefined)
   }
   if (!r.outsourcingOrderNo && r.purchaseOrderNo) r.outsourcingOrderNo = r.purchaseOrderNo
@@ -228,6 +233,34 @@ export function canCompleteOutsourcingReceipt(receipt) {
   return true
 }
 
+export function canTerminateOutsourcingReceipt(receipt) {
+  return canCompleteOutsourcingReceipt(receipt)
+}
+
+function releaseOutsourcingOrderOccupy(receipt, releaseByWxLineId) {
+  const orderId = receipt.outsourcingOrderId || receipt.purchaseOrderId
+  if (!orderId || !releaseByWxLineId || !Object.keys(releaseByWxLineId).length) return
+  // eslint-disable-next-line global-require
+  const {
+    getOutsourcingOrderById,
+    syncOutsourcingReturnStatus,
+  } = require('@/store/outsourcingOrderStore')
+  const order = getOutsourcingOrderById(orderId)
+  if (!order) return
+  Object.entries(releaseByWxLineId).forEach(([wxLineId, free]) => {
+    const qty = Number(free) || 0
+    if (qty <= 1e-9) return
+    const line = (order.lineItems || []).find((l) => l.id === wxLineId)
+    if (!line) return
+    const nextApplied = Math.max(
+      Number(line.receivedQty) || 0,
+      Math.round(((Number(line.appliedReceiptQty) || 0) - qty) * 10000) / 10000,
+    )
+    line.appliedReceiptQty = nextApplied
+  })
+  syncOutsourcingReturnStatus(order)
+}
+
 export function voidOutsourcingReceipt(id) {
   const receipt = getOutsourcingReceiptById(id)
   if (!receipt) return { ok: false, message: '收货单不存在' }
@@ -237,6 +270,10 @@ export function voidOutsourcingReceipt(id) {
     }
     return { ok: false, message: `收货单「${receipt.receiptNo}」不可作废` }
   }
+  // eslint-disable-next-line global-require
+  const { buildReceiptCloseRelease } = require('@/utils/purchaseReceiptSettle')
+  const { releaseByWxLineId } = buildReceiptCloseRelease(receipt)
+  releaseOutsourcingOrderOccupy(receipt, releaseByWxLineId)
   updateOutsourcingReceipt(id, { receiptStatus: '作废' })
   return { ok: true, message: `收货单「${receipt.receiptNo}」已作废` }
 }
@@ -246,13 +283,40 @@ export function completeOutsourcingReceipt(id) {
   if (!receipt) return { ok: false, message: '收货单不存在' }
   if (!canCompleteOutsourcingReceipt(receipt)) {
     if (hasUnfinishedReceiptQc(receipt)) {
-      return { ok: false, message: '存在未完成的来料质检单，不可完成' }
+      return { ok: false, message: '存在未完成的外协回货检，不可完成' }
     }
     if (hasUnfinishedReceiptInbound(receipt)) {
       return { ok: false, message: '存在未完成的外协入库单，不可完成' }
     }
     return { ok: false, message: `收货单「${receipt.receiptNo}」不可完成` }
   }
-  updateOutsourcingReceipt(id, { receiptStatus: '已完成' })
+  // eslint-disable-next-line global-require
+  const { buildReceiptCloseRelease } = require('@/utils/purchaseReceiptSettle')
+  const { lineItems, releaseByWxLineId } = buildReceiptCloseRelease(receipt)
+  releaseOutsourcingOrderOccupy(receipt, releaseByWxLineId)
+  updateOutsourcingReceipt(id, { receiptStatus: '已完成', lineItems })
   return { ok: true, message: `收货单「${receipt.receiptNo}」已完成` }
+}
+
+export function terminateOutsourcingReceipt(id) {
+  const receipt = getOutsourcingReceiptById(id)
+  if (!receipt) return { ok: false, message: '收货单不存在' }
+  if (!canTerminateOutsourcingReceipt(receipt)) {
+    if (hasUnfinishedReceiptQc(receipt)) {
+      return { ok: false, message: '存在未完成的外协回货检，不可终结' }
+    }
+    if (hasUnfinishedReceiptInbound(receipt)) {
+      return { ok: false, message: '存在未完成的外协入库单，不可终结' }
+    }
+    return { ok: false, message: `收货单「${receipt.receiptNo}」不可终结` }
+  }
+  // eslint-disable-next-line global-require
+  const { buildReceiptCloseRelease } = require('@/utils/purchaseReceiptSettle')
+  const { lineItems, releaseByWxLineId } = buildReceiptCloseRelease(receipt)
+  releaseOutsourcingOrderOccupy(receipt, releaseByWxLineId)
+  updateOutsourcingReceipt(id, { receiptStatus: '已终结', lineItems })
+  return {
+    ok: true,
+    message: `收货单「${receipt.receiptNo}」已终结，未入库占用已释放，可在外协订单重新收货`,
+  }
 }

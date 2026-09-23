@@ -1842,9 +1842,9 @@ async function handleSave() {
   await persistBom({ closeAfter: true })
 }
 
-function onShipSaveConflictConfirm({ mode }) {
-  pendingShipConflictResolution.value = { mode }
-  persistBom({ closeAfter: true, conflictResolution: { mode } })
+function onShipSaveConflictConfirm(resolution) {
+  pendingShipConflictResolution.value = resolution
+  persistBom({ closeAfter: true, conflictResolution: resolution })
 }
 
 function doEnableBom(record, upgradeParentRefs = false, parentRefs = []) {

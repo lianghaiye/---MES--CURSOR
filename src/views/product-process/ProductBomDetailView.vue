@@ -504,9 +504,9 @@ function handleToggleShipStatus() {
   message.success('已启用')
 }
 
-function onShipConflictConfirm({ mode }) {
+function onShipConflictConfirm(resolution) {
   if (!pendingShipEnable.value || !record.value) return
-  const res = enableShipAttachment(record.value.id, { conflictResolution: { mode } })
+  const res = enableShipAttachment(record.value.id, { conflictResolution: resolution })
   pendingShipEnable.value = false
   if (!res.ok) {
     message.warning(res.message || '启用失败')

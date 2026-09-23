@@ -1,6 +1,7 @@
 import { isShipBomType } from '@/mock/bomMaterialColumns'
 import {
   applyQcTemplateConflictReplace,
+  applyQcTemplateConflictResolution,
   filterObjectsSkippingConflicts,
   findEnabledScopeConflicts,
 } from '@/utils/qcTemplateConflictService'
@@ -54,6 +55,30 @@ export function applyShipAttachmentConflictReplace(boms = [], conflicts = [], op
     if (row.status === '停用') row.status = SHIP_ATTACHMENT_STATUS.DISABLED
   })
   return { ok: true }
+}
+
+/** 随货附件：按整单或逐行决议处理冲突 */
+export function applyShipAttachmentConflictResolution(
+  boms = [],
+  objects = [],
+  conflicts = [],
+  resolution = {},
+  operator = 'admin',
+) {
+  const { objectsToSave, replaceConflicts, skipConflicts } = applyQcTemplateConflictResolution(
+    boms,
+    objects,
+    conflicts,
+    resolution,
+    operator,
+  )
+  ;(replaceConflicts || []).forEach((c) => {
+    const row = (boms || []).find((t) => t.id === c.currentTemplateId)
+    if (!row || !isShipBomType(row.bomType)) return
+    hydrateShipAttachmentScope(row)
+    if (row.status === '停用') row.status = SHIP_ATTACHMENT_STATUS.DISABLED
+  })
+  return { objectsToSave, replaceConflicts, skipConflicts }
 }
 
 export { filterObjectsSkippingConflicts }

@@ -17,7 +17,7 @@ export const receiptQcStatusOptions = [
 export const receiptInboundStatusOptions = ['待入库', '入库中', '部分入库', '已入库']
 
 /** 单据状态 */
-export const receiptDocStatusOptions = ['新建', '进行中', '已完成', '作废']
+export const receiptDocStatusOptions = ['新建', '进行中', '已完成', '已终结', '作废']
 
 export function createOutsourcingReceipt(partial = {}) {
   const now = dayjs().format('YYYY-MM-DD HH:mm')

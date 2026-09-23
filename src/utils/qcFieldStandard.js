@@ -1,6 +1,11 @@
 /**
  * 检验项/模板字段共用：单位位置、合格判定标准
  */
+import {
+  isCountByQtyField,
+  evaluateCountByQtyValue,
+  formatCountByQtyDisplay,
+} from '@/utils/qcFieldCountByQty'
 import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 
 export const QC_UNIT_POSITION = {
@@ -263,41 +268,49 @@ export function normalizeJudgeRule(rule, fieldType) {
 }
 
 export function buildStandardText(field = {}) {
-  if (field.standardText) return String(field.standardText).trim()
-  const rule = normalizeJudgeRule(field.judgeRule, field.type)
-  if (rule === QC_FIELD_JUDGE_RULE.RANGE) {
-    const min = field.standardMin
-    const max = field.standardMax
-    const unit = field.withUnit ? String(field.unit || '').trim() : ''
-    const pos = normalizeUnitPosition(field.unitPosition)
-    const fmt = (n) => {
-      if (n == null || n === '') return ''
-      const s = String(n)
-      if (!unit) return s
-      return pos === QC_UNIT_POSITION.PREFIX ? `${unit}${s}` : `${s}${unit}`
+  let text = ''
+  if (field.standardText) {
+    text = String(field.standardText).trim()
+  } else {
+    const rule = normalizeJudgeRule(field.judgeRule, field.type)
+    if (rule === QC_FIELD_JUDGE_RULE.RANGE) {
+      const min = field.standardMin
+      const max = field.standardMax
+      const unit = field.withUnit ? String(field.unit || '').trim() : ''
+      const pos = normalizeUnitPosition(field.unitPosition)
+      const fmt = (n) => {
+        if (n == null || n === '') return ''
+        const s = String(n)
+        if (!unit) return s
+        return pos === QC_UNIT_POSITION.PREFIX ? `${unit}${s}` : `${s}${unit}`
+      }
+      if (min !== '' && min != null && max !== '' && max != null) text = `${fmt(min)} ~ ${fmt(max)}`
+      else if (min !== '' && min != null) text = `≥ ${fmt(min)}`
+      else if (max !== '' && max != null) text = `≤ ${fmt(max)}`
+    } else if (rule === QC_FIELD_JUDGE_RULE.OPTION_PASS) {
+      const opts = Array.isArray(field.passOptions) ? field.passOptions.filter(Boolean) : []
+      text = opts.length ? `合格选项：${opts.join('、')}` : ''
+    } else if (rule === QC_FIELD_JUDGE_RULE.EQUALS) {
+      const v = field.standardValue
+      text = v != null && String(v).trim() !== '' ? `标准值：${v}` : ''
+    } else if (rule === QC_FIELD_JUDGE_RULE.MANUAL) {
+      const labels = normalizeManualOptionItems(field)
+        .map((o) => o.value)
+        .filter(Boolean)
+      text = labels.length
+        ? `人工判定：${labels.join(' / ')}`
+        : '人工判定（合格 / 不合格 / 让步合格 / 部分合格）'
     }
-    if (min !== '' && min != null && max !== '' && max != null) return `${fmt(min)} ~ ${fmt(max)}`
-    if (min !== '' && min != null) return `≥ ${fmt(min)}`
-    if (max !== '' && max != null) return `≤ ${fmt(max)}`
-    return ''
   }
-  if (rule === QC_FIELD_JUDGE_RULE.OPTION_PASS) {
-    const opts = Array.isArray(field.passOptions) ? field.passOptions.filter(Boolean) : []
-    return opts.length ? `合格选项：${opts.join('、')}` : ''
-  }
-  if (rule === QC_FIELD_JUDGE_RULE.EQUALS) {
-    const v = field.standardValue
-    return v != null && String(v).trim() !== '' ? `标准值：${v}` : ''
-  }
-  if (rule === QC_FIELD_JUDGE_RULE.MANUAL) {
-    const labels = normalizeManualOptionItems(field)
-      .map((o) => o.value)
-      .filter(Boolean)
-    return labels.length
-      ? `人工判定：${labels.join(' / ')}`
-      : '人工判定（合格 / 不合格 / 让步合格 / 部分合格）'
-  }
-  return ''
+  return appendCountByQtyHint(text, field)
+}
+
+function appendCountByQtyHint(text, field) {
+  if (!isCountByQtyField(field)) return text
+  const tip = '按数量统计（合格数/不合格数）'
+  if (!text) return tip
+  if (String(text).includes('按数量统计')) return text
+  return `${text}；${tip}`
 }
 
 /**
@@ -305,6 +318,9 @@ export function buildStandardText(field = {}) {
  * @returns {'pass'|'fail'|''} 空表示无法自动判定
  */
 export function evaluateFieldAgainstStandard(field = {}, rawValue) {
+  if (isCountByQtyField(field)) {
+    return evaluateCountByQtyValue(rawValue)
+  }
   const rule = normalizeJudgeRule(field.judgeRule, field.type)
   if (rule === QC_FIELD_JUDGE_RULE.NONE) return ''
 
@@ -352,6 +368,9 @@ export function evaluateFieldAgainstStandard(field = {}, rawValue) {
 
 /** 按单位前后缀格式化展示值 */
 export function formatFieldValueWithUnit(field = {}, rawValue) {
+  if (isCountByQtyField(field)) {
+    return formatCountByQtyDisplay(rawValue)
+  }
   const raw = isManualJudgeField(field) ? parseManualFieldValue(rawValue) : null
   const measured = raw ? raw.measured : rawValue
   const judgment = raw ? raw.judgment : ''
@@ -423,6 +442,7 @@ export function pickFieldStandardProps(partial = {}) {
     standardValue: partial.standardValue ?? '',
     passOptions: Array.isArray(partial.passOptions) ? [...partial.passOptions] : [],
     standardText: partial.standardText || '',
+    countByQty: Boolean(partial.countByQty),
   }
   if (judgeRule === QC_FIELD_JUDGE_RULE.MANUAL) {
     base.manualOptionItems = normalizeManualOptionItems(partial)

@@ -241,56 +241,97 @@
                           </template>
                           <template v-else>合格标准：未设置（仅记录实测值）</template>
                         </div>
-                        <div class="field-input-wrap">
-                          <span v-if="unitPrefix(field)" class="unit-affix">{{
-                            unitPrefix(field)
-                          }}</span>
-                          <a-select
-                            v-if="isSelectLike(field)"
-                            :value="getMeasuredValue(record, field)"
-                            size="middle"
-                            allow-clear
-                            :placeholder="field.placeholder || `请选择${field.name}`"
-                            :options="fieldOptions(field)"
-                            style="flex: 1; min-width: 0"
-                            @update:value="(v) => setMeasuredValue(record, field, v)"
-                          />
-                          <a-input-number
-                            v-else-if="field.type === 'number'"
-                            :value="getMeasuredValue(record, field)"
-                            size="middle"
-                            :min="0"
-                            style="flex: 1; min-width: 0"
-                            :formatter="qtyFormatter"
-                            :parser="qtyParser"
-                            :placeholder="field.placeholder || `请输入${field.name}`"
-                            @update:value="(v) => setMeasuredValue(record, field, v)"
-                          />
-                          <a-input
-                            v-else
-                            :value="getMeasuredValue(record, field)"
-                            size="middle"
-                            allow-clear
-                            style="flex: 1; min-width: 0"
-                            :placeholder="field.placeholder || `请输入${field.name}`"
-                            @update:value="(v) => setMeasuredValue(record, field, v)"
-                          />
-                          <span v-if="unitSuffix(field)" class="unit-affix">{{
-                            unitSuffix(field)
-                          }}</span>
+                        <div v-if="isCountByQtyField(field)" class="count-by-qty-row">
+                          <div class="count-by-qty-item">
+                            <span class="count-by-qty-label"
+                              ><span v-if="field.required !== false" class="req">*</span
+                              >合格数</span
+                            >
+                            <a-input-number
+                              :value="getCountByQtyPass(record, field)"
+                              size="middle"
+                              :min="0"
+                              :precision="4"
+                              :formatter="qtyFormatter"
+                              :parser="qtyParser"
+                              placeholder="数量"
+                              style="width: 120px"
+                              @update:value="(v) => setCountByQtyPass(record, field, v)"
+                            />
+                          </div>
+                          <div class="count-by-qty-item">
+                            <span class="count-by-qty-label"
+                              ><span v-if="field.required !== false" class="req">*</span
+                              >不合格数</span
+                            >
+                            <a-input-number
+                              :value="getCountByQtyFail(record, field)"
+                              size="middle"
+                              :min="0"
+                              :precision="4"
+                              :formatter="qtyFormatter"
+                              :parser="qtyParser"
+                              placeholder="数量"
+                              style="width: 120px"
+                              @update:value="(v) => setCountByQtyFail(record, field, v)"
+                            />
+                          </div>
+                          <span class="count-by-qty-cap"
+                            >合计 ≤ 质检数量（{{ formatQty(lineInspectQty(record), 4) }}）</span
+                          >
                         </div>
-                        <div v-if="isManualJudgeField(field)" class="manual-judgment-row">
-                          <span class="manual-label"><span class="req">*</span>本项结论</span>
-                          <a-select
-                            :value="getManualJudgment(record, field)"
-                            size="middle"
-                            allow-clear
-                            placeholder="请选择本项结论"
-                            :options="listManualJudgmentSelectOptions(field)"
-                            style="flex: 1; min-width: 0"
-                            @update:value="(v) => setManualJudgment(record, field, v)"
-                          />
-                        </div>
+                        <template v-else>
+                          <div class="field-input-wrap">
+                            <span v-if="unitPrefix(field)" class="unit-affix">{{
+                              unitPrefix(field)
+                            }}</span>
+                            <a-select
+                              v-if="isSelectLike(field)"
+                              :value="getMeasuredValue(record, field)"
+                              size="middle"
+                              allow-clear
+                              :placeholder="field.placeholder || `请选择${field.name}`"
+                              :options="fieldOptions(field)"
+                              style="flex: 1; min-width: 0"
+                              @update:value="(v) => setMeasuredValue(record, field, v)"
+                            />
+                            <a-input-number
+                              v-else-if="field.type === 'number'"
+                              :value="getMeasuredValue(record, field)"
+                              size="middle"
+                              :min="0"
+                              style="flex: 1; min-width: 0"
+                              :formatter="qtyFormatter"
+                              :parser="qtyParser"
+                              :placeholder="field.placeholder || `请输入${field.name}`"
+                              @update:value="(v) => setMeasuredValue(record, field, v)"
+                            />
+                            <a-input
+                              v-else
+                              :value="getMeasuredValue(record, field)"
+                              size="middle"
+                              allow-clear
+                              style="flex: 1; min-width: 0"
+                              :placeholder="field.placeholder || `请输入${field.name}`"
+                              @update:value="(v) => setMeasuredValue(record, field, v)"
+                            />
+                            <span v-if="unitSuffix(field)" class="unit-affix">{{
+                              unitSuffix(field)
+                            }}</span>
+                          </div>
+                          <div v-if="isManualJudgeField(field)" class="manual-judgment-row">
+                            <span class="manual-label"><span class="req">*</span>本项结论</span>
+                            <a-select
+                              :value="getManualJudgment(record, field)"
+                              size="middle"
+                              allow-clear
+                              placeholder="请选择本项结论"
+                              :options="listManualJudgmentSelectOptions(field)"
+                              style="flex: 1; min-width: 0"
+                              @update:value="(v) => setManualJudgment(record, field, v)"
+                            />
+                          </div>
+                        </template>
                       </div>
                     </template>
                   </div>
@@ -494,6 +535,12 @@ import {
   pickFieldStandardProps,
   wrapManualFieldValue,
 } from '@/utils/qcFieldStandard'
+import {
+  isCountByQtyField,
+  parseCountByQtyValue,
+  wrapCountByQtyValue,
+  validateCountByQtyValue,
+} from '@/utils/qcFieldCountByQty'
 import {
   collectAllFailingStandardHints,
   evaluateComplexOrSimpleField,
@@ -931,6 +978,7 @@ function fieldOptions(field) {
 }
 
 function getMeasuredValue(line, field) {
+  if (isCountByQtyField(field)) return undefined
   if (isManualJudgeField(field)) {
     return parseManualFieldValue(line.fieldMap?.[field.code]).measured
   }
@@ -938,12 +986,33 @@ function getMeasuredValue(line, field) {
 }
 
 function setMeasuredValue(line, field, v) {
+  if (isCountByQtyField(field)) return
   if (isManualJudgeField(field)) {
     const prev = parseManualFieldValue(line.fieldMap?.[field.code])
     line.fieldMap[field.code] = wrapManualFieldValue(v, prev.judgment)
   } else {
     line.fieldMap[field.code] = v
   }
+  onFieldChange(line, field)
+}
+
+function getCountByQtyPass(line, field) {
+  return parseCountByQtyValue(line.fieldMap?.[field.code]).passQty
+}
+
+function getCountByQtyFail(line, field) {
+  return parseCountByQtyValue(line.fieldMap?.[field.code]).failQty
+}
+
+function setCountByQtyPass(line, field, v) {
+  const prev = parseCountByQtyValue(line.fieldMap?.[field.code])
+  line.fieldMap[field.code] = wrapCountByQtyValue(v, prev.failQty)
+  onFieldChange(line, field)
+}
+
+function setCountByQtyFail(line, field, v) {
+  const prev = parseCountByQtyValue(line.fieldMap?.[field.code])
+  line.fieldMap[field.code] = wrapCountByQtyValue(prev.passQty, v)
   onFieldChange(line, field)
 }
 
@@ -1241,6 +1310,19 @@ async function handleOk() {
         if (isComplexValueEmpty(field, val)) {
           message.warning(
             `请填写「${line.itemName || line.itemCode}」的${field.name || field.code}`,
+          )
+          return
+        }
+        continue
+      }
+      if (isCountByQtyField(field)) {
+        const checked = validateCountByQtyValue(val, {
+          inspectQty: lineInspectQty(line),
+          required: field.required !== false,
+        })
+        if (!checked.ok) {
+          message.warning(
+            `「${line.itemName || line.itemCode}」的${field.name || field.code}：${checked.message}`,
           )
           return
         }
@@ -1842,6 +1924,30 @@ async function doSubmit() {
   align-items: center;
   gap: 8px;
   margin-top: 8px;
+}
+
+.count-by-qty-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+
+.count-by-qty-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.count-by-qty-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+}
+
+.count-by-qty-cap {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .manual-label {

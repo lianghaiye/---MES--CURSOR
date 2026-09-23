@@ -429,10 +429,10 @@ function handleToggleStatus(record) {
   message.success('已启用')
 }
 
-function onConflictConfirm({ mode }) {
+function onConflictConfirm(resolution) {
   if (!pendingEnableId.value) return
   const res = enableQcTemplate(pendingEnableId.value, {
-    conflictResolution: { mode },
+    conflictResolution: resolution,
   })
   pendingEnableId.value = ''
   if (!res.ok) {

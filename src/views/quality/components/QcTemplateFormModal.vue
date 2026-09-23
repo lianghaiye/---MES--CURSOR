@@ -758,6 +758,7 @@ function emptyFieldForm() {
     matrixAllowAddRow: true,
     syncToLibrary: true,
     manualOptionItems: [],
+    countByQty: false,
   }
 }
 
@@ -1238,6 +1239,7 @@ function saveField() {
     ...fieldForm,
     options: optionValues,
     passOptions: fieldForm.passOptions || [],
+    countByQty: fieldForm.type === 'composite' ? false : Boolean(fieldForm.countByQty),
   })
   const complex = pickComplexFieldProps({ ...fieldForm, children })
   const payload = {
@@ -1386,7 +1388,7 @@ function handleSave(conflictResolution = null) {
         message.warning(res.message || '保存失败')
         return
       }
-      message.success(`已创建模板 ${res.template.code}（默认停用）`)
+      message.success(`已创建模板 ${res.template.code}，请在列表完成启用。`)
       emit('saved', res.template)
       closeAfterSave()
       return
@@ -1415,9 +1417,9 @@ function handleSave(conflictResolution = null) {
   }
 }
 
-function onConflictConfirm({ mode }) {
-  pendingConflictResolution.value = { mode }
-  handleSave({ mode })
+function onConflictConfirm(resolution) {
+  pendingConflictResolution.value = resolution
+  handleSave(resolution)
 }
 </script>
 

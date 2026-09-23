@@ -94,6 +94,7 @@ function hasEvaluableStandard(field = {}) {
     const children = field.children || []
     return children.some((c) => hasEvaluableStandard(c))
   }
+  if (field.countByQty) return true
   const rule = String(field.judgeRule || '').trim()
   if (rule && rule !== 'none') return true
   return Boolean(String(buildStandardText(field) || '').trim())

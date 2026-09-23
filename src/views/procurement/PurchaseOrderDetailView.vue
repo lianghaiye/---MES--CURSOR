@@ -137,6 +137,14 @@
                       </a-tooltip>
                     </span>
                   </template>
+                  <template v-else-if="column.key === 'returnQty'">
+                    <span class="col-title-with-tip">
+                      退货数量
+                      <a-tooltip title="采购退货数量与质检退货数量之和">
+                        <InfoCircleOutlined class="col-tip-icon" />
+                      </a-tooltip>
+                    </span>
+                  </template>
                   <template v-else>{{ column.title }}</template>
                 </template>
                 <template #bodyCell="{ column, record: line, index }">
@@ -658,16 +666,6 @@ const lineColumns = [
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '采购数量', key: 'purchaseQty', width: 120, align: 'right' },
   {
-    title: '收货仓库',
-    key: 'receivingWarehouse',
-    dataIndex: 'receivingWarehouse',
-    width: 110,
-    ellipsis: true,
-  },
-  { title: '入库数量', key: 'inboundQty', width: 120, align: 'right' },
-  { title: '结算数量', key: 'settleQty', width: 120, align: 'right' },
-  { title: '退货数量', key: 'returnQty', width: 120, align: 'right' },
-  {
     title: '订货尺寸',
     key: 'orderSizeText',
     dataIndex: 'orderSizeText',
@@ -679,6 +677,16 @@ const lineColumns = [
   { title: '含税单价', key: 'unitPriceInTax', width: 100, align: 'right' },
   { title: '不含税总价', key: 'totalPriceExTax', width: 110, align: 'right' },
   { title: '含税总价', key: 'totalPriceInTax', width: 100, align: 'right' },
+  {
+    title: '收货仓库',
+    key: 'receivingWarehouse',
+    dataIndex: 'receivingWarehouse',
+    width: 110,
+    ellipsis: true,
+  },
+  { title: '入库数量', key: 'inboundQty', width: 120, align: 'right' },
+  { title: '结算数量', key: 'settleQty', width: 120, align: 'right' },
+  { title: '退货数量', key: 'returnQty', width: 120, align: 'right' },
   { title: '入库质检要求', key: 'inboundQcRequirement', width: 110 },
   { title: '质检结果', key: 'qcResult', width: 100 },
   { title: '处理方案', key: 'treatmentPlan', width: 200, ellipsis: true },

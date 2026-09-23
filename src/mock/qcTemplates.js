@@ -321,12 +321,12 @@ export const mockQcTemplates = [
         {
           code: 'QC_APPEARANCE',
           name: '外观检查',
-          type: 'radio',
-          options: ['合格', '轻微缺陷', '不合格'],
-          judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
-          passOptions: ['合格', '轻微缺陷'],
+          type: 'text',
+          judgeRule: QC_FIELD_JUDGE_RULE.NONE,
+          countByQty: true,
           keyForSheetPass: true,
           sortOrder: 10,
+          placeholder: '按件数填写合格/不合格数',
         },
         {
           code: 'QC_HARDNESS',
@@ -701,11 +701,11 @@ export const mockQcTemplates = [
         {
           code: 'QC_WX_SURFACE',
           name: '回货外观',
-          type: 'radio',
-          options: ['合格', '轻微缺陷', '不合格'],
-          judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
-          passOptions: ['合格', '轻微缺陷'],
+          type: 'text',
+          judgeRule: QC_FIELD_JUDGE_RULE.NONE,
+          countByQty: true,
           sortOrder: 10,
+          placeholder: '按件数填写合格/不合格数',
         },
         {
           code: 'QC_WX_DIM',
@@ -775,6 +775,238 @@ export const mockQcTemplates = [
       createdAt: '2026-08-25 11:00:00',
       updater: '赵六',
       updatedAt: '2026-08-25 11:00:00',
+    })
+  })(),
+
+  /**
+   * 适用范围冲突演示（同业务类型 + 同范围类型 + 对象重叠 → 保存时弹冲突）
+   * 验证方式：
+   * 1) 新建成品检·产品类别·勾选「清水泵」→ 与 QCT-CF-CAT-01 冲突
+   * 2) 新建成品检·产品类别·勾选「离心泵」→ 与 QCT-CF-CAT-02 冲突（多选中含离心泵）
+   * 3) 新建成品检·单产品·选 CP2610001 → 与 QCT-CF-ITEM-01 冲突
+   * 4) 新建成品检·单产品·选 CP2610010 → 与 QCT-CF-ITEM-02 冲突（多选中含该产品）
+   * 5) 同类别但业务类型不同（如来料质检+清水泵）→ 不与成品检冲突
+   */
+  (() => {
+    const fields = buildTemplateFields({
+      method: true,
+      qty: true,
+      remark: true,
+      conclusion: true,
+      extras: [
+        {
+          code: 'QC_CF_APPEARANCE',
+          name: '外观（冲突演示）',
+          type: 'radio',
+          options: ['合格', '不合格'],
+          judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
+          passOptions: ['合格'],
+          sortOrder: 10,
+        },
+      ],
+    })
+    return createQcTemplate({
+      id: 'qct-cf-cat-01',
+      code: 'QCT-CF-CAT-01',
+      name: '【冲突演示】清水泵类别·成品检（已占用）',
+      status: '启用',
+      type: '自定义模板',
+      isSystem: false,
+      scopeType: QC_TEMPLATE_SCOPE_TYPE.CATEGORY,
+      bizScope: '成品检',
+      objects: [{ type: 'productCategory', value: 'pcat-008', code: '008', label: '清水泵' }],
+      fields,
+      sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.MANUAL,
+      sheetConclusionOptionItems: SHEET_CONCLUSION_MANUAL_DEMO.map((o) => ({ ...o })),
+      creator: '冲突演示',
+      createdAt: '2026-09-22 10:00:00',
+      updater: '冲突演示',
+      updatedAt: '2026-09-22 10:00:00',
+    })
+  })(),
+  (() => {
+    const fields = buildTemplateFields({
+      method: true,
+      qty: true,
+      remark: false,
+      conclusion: true,
+      extras: [
+        {
+          code: 'QC_CF_PRESSURE',
+          name: '压力试验（冲突演示）',
+          type: 'number',
+          allowDecimal: true,
+          withUnit: true,
+          unit: 'MPa',
+          unitPosition: QC_UNIT_POSITION.SUFFIX,
+          judgeRule: QC_FIELD_JUDGE_RULE.RANGE,
+          standardMin: 0.8,
+          standardMax: 1.6,
+          sortOrder: 10,
+        },
+      ],
+    })
+    return createQcTemplate({
+      id: 'qct-cf-cat-02',
+      code: 'QCT-CF-CAT-02',
+      name: '【冲突演示】离心泵+电机泵类别·成品检（已占用）',
+      status: '启用',
+      type: '自定义模板',
+      isSystem: false,
+      scopeType: QC_TEMPLATE_SCOPE_TYPE.CATEGORY,
+      bizScope: '成品检',
+      objects: [
+        { type: 'productCategory', value: 'pcat-004', code: '004', label: '离心泵' },
+        { type: 'productCategory', value: 'pcat-004-003', code: '003', label: '电机泵' },
+      ],
+      fields,
+      sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.KEY_FIELDS,
+      sheetConclusionOptionItems: SHEET_CONCLUSION_STRICT.map((o) => ({ ...o })),
+      creator: '冲突演示',
+      createdAt: '2026-09-22 10:05:00',
+      updater: '冲突演示',
+      updatedAt: '2026-09-22 10:05:00',
+    })
+  })(),
+  (() => {
+    const fields = buildTemplateFields({
+      method: true,
+      qty: true,
+      remark: true,
+      conclusion: true,
+      extras: [
+        {
+          code: 'QC_CF_NOISE',
+          name: '异响（冲突演示）',
+          type: 'radio',
+          options: ['无异响', '有异响'],
+          judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
+          passOptions: ['无异响'],
+          sortOrder: 10,
+        },
+      ],
+    })
+    return createQcTemplate({
+      id: 'qct-cf-item-01',
+      code: 'QCT-CF-ITEM-01',
+      name: '【冲突演示】ISG50-160 单产品·成品检（已占用）',
+      status: '启用',
+      type: '自定义模板',
+      isSystem: false,
+      scopeType: QC_TEMPLATE_SCOPE_TYPE.SINGLE,
+      bizScope: '成品检',
+      objects: [
+        {
+          type: 'item',
+          value: 'CP2610001',
+          code: 'CP2610001',
+          label: '清水离心泵 ISG50-160',
+          specModel: 'ISG50-160',
+          categoryKey: 'pcat-008',
+          categoryName: '清水泵',
+        },
+      ],
+      fields,
+      sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.ALL_PASS,
+      sheetConclusionOptionItems: SHEET_CONCLUSION_STRICT.map((o) => ({ ...o })),
+      creator: '冲突演示',
+      createdAt: '2026-09-22 10:10:00',
+      updater: '冲突演示',
+      updatedAt: '2026-09-22 10:10:00',
+    })
+  })(),
+  (() => {
+    const fields = buildTemplateFields({
+      method: true,
+      qty: true,
+      remark: false,
+      conclusion: true,
+      extras: [
+        {
+          code: 'QC_CF_SEAL',
+          name: '密封检查（冲突演示）',
+          type: 'radio',
+          options: ['完好', '渗漏'],
+          judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
+          passOptions: ['完好'],
+          sortOrder: 10,
+        },
+      ],
+    })
+    return createQcTemplate({
+      id: 'qct-cf-item-02',
+      code: 'QCT-CF-ITEM-02',
+      name: '【冲突演示】双产品·成品检（含磁力泵已占用）',
+      status: '启用',
+      type: '自定义模板',
+      isSystem: false,
+      scopeType: QC_TEMPLATE_SCOPE_TYPE.SINGLE,
+      bizScope: '成品检',
+      objects: [
+        {
+          type: 'item',
+          value: 'CP2610009',
+          code: 'CP2610009',
+          label: '隔膜计量泵 JMX-A',
+          specModel: 'JMX-A/50',
+          categoryKey: 'pcat-008',
+          categoryName: '清水泵',
+        },
+        {
+          type: 'item',
+          value: 'CP2610010',
+          code: 'CP2610010',
+          label: '磁力驱动泵 CQ32-25',
+          specModel: 'CQ32-25-145',
+          categoryKey: 'pcat-004',
+          categoryName: '离心泵',
+        },
+      ],
+      fields,
+      sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.MANUAL,
+      sheetConclusionOptionItems: SHEET_CONCLUSION_MANUAL_DEMO.map((o) => ({ ...o })),
+      creator: '冲突演示',
+      createdAt: '2026-09-22 10:15:00',
+      updater: '冲突演示',
+      updatedAt: '2026-09-22 10:15:00',
+    })
+  })(),
+  (() => {
+    /** 对照：同「清水泵」类别但业务类型不同，保存成品检同类别模板时不应与本条冲突 */
+    const fields = buildTemplateFields({
+      method: true,
+      qty: true,
+      remark: false,
+      conclusion: true,
+      extras: [
+        {
+          code: 'QC_CF_INCOMING',
+          name: '来料外观（业务隔离对照）',
+          type: 'radio',
+          options: ['合格', '不合格'],
+          judgeRule: QC_FIELD_JUDGE_RULE.OPTION_PASS,
+          passOptions: ['合格'],
+          sortOrder: 10,
+        },
+      ],
+    })
+    return createQcTemplate({
+      id: 'qct-cf-cat-ll',
+      code: 'QCT-CF-CAT-LL',
+      name: '【冲突对照】清水泵类别·来料质检（不同业务不冲突）',
+      status: '启用',
+      type: '自定义模板',
+      isSystem: false,
+      scopeType: QC_TEMPLATE_SCOPE_TYPE.CATEGORY,
+      bizScope: '来料质检',
+      objects: [{ type: 'productCategory', value: 'pcat-008', code: '008', label: '清水泵' }],
+      fields,
+      sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.MANUAL,
+      sheetConclusionOptionItems: SHEET_CONCLUSION_MANUAL_DEMO.map((o) => ({ ...o })),
+      creator: '冲突演示',
+      createdAt: '2026-09-22 10:20:00',
+      updater: '冲突演示',
+      updatedAt: '2026-09-22 10:20:00',
     })
   })(),
 ]

@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     :title="title"
-    :width="kind === 'global' ? 520 : 720"
+    :width="kind === 'global' ? 520 : 880"
     :mask-closable="false"
     destroy-on-close
     @cancel="handleCancel"
@@ -17,7 +17,11 @@
             entityLabel
           }}？
         </div>
-        <div v-else class="conflict-desc">{{ listHint }}</div>
+        <div v-else class="conflict-desc">
+          {{ listHint }}请
+          <strong>逐行</strong>
+          选择每个{{ objectNoun }}的处理方式后确认。
+        </div>
       </div>
     </div>
 
@@ -31,24 +35,32 @@
       :data-source="conflicts"
       row-key="key"
     >
-      <template #bodyCell="{ column }">
+      <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'current'">
           {{ currentTemplateName || '—' }}
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <a-select
+            v-model:value="rowModes[record.key]"
+            size="small"
+            style="width: 100%"
+            :options="actionOptions"
+          />
         </template>
       </template>
     </a-table>
 
-    <div v-if="kind !== 'global'" class="resolve-block">
-      <div class="resolve-label">请选择处理方式：</div>
-      <a-radio-group v-model:value="resolveMode" class="resolve-radios">
-        <a-radio value="replace" class="resolve-radio">
-          <span class="radio-strong">【推荐】自动替换：</span>
-          {{ replaceHint }}
-        </a-radio>
-        <a-radio value="skip" class="resolve-radio">
-          {{ skipHint }}
-        </a-radio>
-      </a-radio-group>
+    <div v-if="kind !== 'global'" class="action-hint">
+      <div>
+        <strong>自动替换</strong>
+        ：将该{{ objectNoun }}的生效{{ entityLabel }}替换为当前{{ entityLabel }}；原{{
+          entityLabel
+        }}保留但解除对应绑定，若绑定清空则停用。
+      </div>
+      <div>
+        <strong>跳过冲突</strong>
+        ：当前{{ entityLabel }}不绑定该{{ objectNoun }}，维持原有生效{{ entityLabel }}不变。
+      </div>
     </div>
   </a-modal>
 </template>
@@ -58,7 +70,7 @@ export default { name: 'QcTemplateConflictModal' }
 </script>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { ExclamationCircleFilled } from '@ant-design/icons-vue'
 import { QC_TEMPLATE_SCOPE_TYPE } from '@/mock/qcTemplates'
 
@@ -73,51 +85,45 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'confirm', 'cancel'])
 
-const resolveMode = ref('replace')
+/** @type {Record<string, 'replace'|'skip'>} */
+const rowModes = reactive({})
+
+const isCategory = computed(() => props.kind === QC_TEMPLATE_SCOPE_TYPE.CATEGORY)
+
+const objectNoun = computed(() => (isCategory.value ? '类别' : '产品'))
+
+const listHint = computed(() =>
+  isCategory.value
+    ? `本次${props.entityLabel}中，以下产品类别已关联其他生效的类别${props.entityLabel}。`
+    : `本次${props.entityLabel}中，以下产品型号已关联其他生效的单产品${props.entityLabel}。`,
+)
+
+const actionOptions = computed(() => [
+  { value: 'replace', label: '自动替换' },
+  { value: 'skip', label: `跳过冲突（保持原${props.entityLabel}）` },
+])
+
+const columns = computed(() => {
+  const objectTitle = isCategory.value ? '产品类别' : '产品信息'
+  return [
+    { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
+    { title: objectTitle, dataIndex: 'objectLabel', ellipsis: true, width: 160 },
+    { title: `当前生效${props.entityLabel}`, dataIndex: 'currentTemplateName', ellipsis: true },
+    { title: `本次操作${props.entityLabel}`, key: 'current', ellipsis: true, width: 140 },
+    { title: '处理方式', key: 'action', width: 200 },
+  ]
+})
 
 watch(
   () => props.open,
   (v) => {
-    if (v) resolveMode.value = 'replace'
+    if (!v) return
+    Object.keys(rowModes).forEach((k) => delete rowModes[k])
+    ;(props.conflicts || []).forEach((c) => {
+      rowModes[c.key] = 'replace'
+    })
   },
 )
-
-const isCategory = computed(() => props.kind === QC_TEMPLATE_SCOPE_TYPE.CATEGORY)
-
-const listHint = computed(() =>
-  isCategory.value
-    ? `本次${props.entityLabel}中，以下产品类别已关联其他生效的类别${props.entityLabel}：`
-    : `本次${props.entityLabel}中，以下产品型号已关联其他生效的单产品${props.entityLabel}：`,
-)
-
-const replaceHint = computed(() =>
-  isCategory.value
-    ? `以上类别的生效${props.entityLabel}将由旧${props.entityLabel}替换为当前${props.entityLabel}。原${props.entityLabel}保留但自动解除对应类别绑定；若绑定清空则停用。`
-    : `将以上产品的生效${props.entityLabel}替换为本次操作${props.entityLabel}，原${props.entityLabel}保留但自动停用对应产品的绑定关系。`,
-)
-
-const skipHint = computed(() =>
-  isCategory.value
-    ? `跳过冲突类别：仅为无冲突的类别启用当前${props.entityLabel}，冲突类别维持原有${props.entityLabel}不变。`
-    : `跳过冲突产品：仅为无冲突的产品启用${props.entityLabel}，冲突产品维持原有${props.entityLabel}不变。`,
-)
-
-const columns = computed(() => {
-  if (isCategory.value) {
-    return [
-      { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
-      { title: '产品类别', dataIndex: 'objectLabel', ellipsis: true },
-      { title: `当前生效${props.entityLabel}`, dataIndex: 'currentTemplateName', ellipsis: true },
-      { title: `本次操作${props.entityLabel}`, key: 'current', ellipsis: true },
-    ]
-  }
-  return [
-    { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
-    { title: '产品信息', dataIndex: 'objectLabel', ellipsis: true },
-    { title: `当前生效${props.entityLabel}`, dataIndex: 'currentTemplateName', ellipsis: true },
-    { title: `本次操作${props.entityLabel}`, key: 'current', ellipsis: true },
-  ]
-})
 
 function handleCancel() {
   emit('update:open', false)
@@ -125,8 +131,27 @@ function handleCancel() {
 }
 
 function handleOk() {
+  if (props.kind === 'global') {
+    emit('confirm', { mode: 'replace' })
+    emit('update:open', false)
+    return
+  }
+
+  const decisions = []
+  const replaceConflicts = []
+  const skipConflicts = []
+  ;(props.conflicts || []).forEach((c) => {
+    const mode = rowModes[c.key] || 'replace'
+    decisions.push({ key: c.key, mode })
+    if (mode === 'skip') skipConflicts.push(c)
+    else replaceConflicts.push(c)
+  })
+
   emit('confirm', {
-    mode: props.kind === 'global' ? 'replace' : resolveMode.value,
+    mode: 'mixed',
+    decisions,
+    replaceConflicts,
+    skipConflicts,
   })
   emit('update:open', false)
 }
@@ -159,33 +184,15 @@ function handleOk() {
 }
 
 .conflict-table {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.resolve-block {
-  margin-top: 4px;
-}
-
-.resolve-label {
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.88);
-}
-
-.resolve-radios {
+.action-hint {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.7;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.resolve-radio {
-  align-items: flex-start;
-  white-space: normal;
-  line-height: 1.5;
-  height: auto;
-}
-
-.radio-strong {
-  font-weight: 600;
+  gap: 4px;
 }
 </style>

@@ -38,6 +38,13 @@
               >
                 完成
               </a-button>
+              <a-button
+                v-if="canTerminateOutsourcingReceipt(record)"
+                size="small"
+                @click="handleTerminate"
+              >
+                终结
+              </a-button>
               <a-button size="small" @click="openPrint">打印</a-button>
               <a-button size="small" @click="handleBack">返回列表</a-button>
             </a-space>
@@ -193,8 +200,10 @@ import {
   canEditOutsourcingReceipt,
   canVoidOutsourcingReceipt,
   canCompleteOutsourcingReceipt,
+  canTerminateOutsourcingReceipt,
   voidOutsourcingReceipt,
   completeOutsourcingReceipt,
+  terminateOutsourcingReceipt,
 } from '@/store/outsourcingReceiptStore'
 import { getInboundOrdersByReceipt } from '@/store/inboundOrderStore'
 import {
@@ -277,7 +286,13 @@ function loadRecord() {
 watch(() => route.params.id, loadRecord, { immediate: true })
 
 function docStatusColor(status) {
-  const map = { 新建: 'default', 进行中: 'processing', 已完成: 'success', 作废: 'default' }
+  const map = {
+    新建: 'default',
+    进行中: 'processing',
+    已完成: 'success',
+    已终结: 'warning',
+    作废: 'default',
+  }
   return map[status] || 'default'
 }
 
@@ -348,6 +363,23 @@ function handleComplete() {
     content: `确定完成收货单「${record.value.receiptNo}」吗？`,
     onOk: () => {
       const result = completeOutsourcingReceipt(record.value.id)
+      if (result.ok) {
+        message.success(result.message)
+        loadRecord()
+      } else {
+        message.warning(result.message)
+      }
+    },
+  })
+}
+
+function handleTerminate() {
+  if (!record.value) return
+  Modal.confirm({
+    title: '确认终结',
+    content: `确定终结收货单「${record.value.receiptNo}」吗？未入库占用将释放，外协订单可重新生成收货单。`,
+    onOk: () => {
+      const result = terminateOutsourcingReceipt(record.value.id)
       if (result.ok) {
         message.success(result.message)
         loadRecord()

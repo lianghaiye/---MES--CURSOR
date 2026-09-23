@@ -398,7 +398,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item :label="taxModeExcluding ? '加工单价(不含税)' : '加工单价(含税)'">
+            <a-form-item :label="taxModeExcluding ? '不含税单价' : '含税单价'">
               <a-input-number
                 v-if="taxModeExcluding"
                 v-model:value="lineEditDraft.unitPriceExTax"
@@ -625,10 +625,10 @@ const lineColumns = [
   { title: '单位', key: 'unit', width: 90, required: true },
   { title: '预入仓库', key: 'shipWarehouse', width: 120, required: true },
   { title: '计费方式', key: 'billingMethod', width: 100 },
-  { title: '加工单价(不含税)', key: 'unitPriceExTax', width: 120 },
-  { title: '加工单价(含税)', key: 'unitPriceInTax', width: 120 },
-  { title: '加工总价(不含税)', key: 'totalPriceExTax', width: 120, align: 'right' },
-  { title: '加工总价(含税)', key: 'totalPriceInTax', width: 120, align: 'right' },
+  { title: '不含税单价', key: 'unitPriceExTax', width: 120 },
+  { title: '含税单价', key: 'unitPriceInTax', width: 120 },
+  { title: '不含税总价', key: 'totalPriceExTax', width: 120, align: 'right' },
+  { title: '含税总价', key: 'totalPriceInTax', width: 120, align: 'right' },
   { title: '备注', key: 'remark', width: 120 },
   { title: '操作', key: 'action', width: 160, fixed: 'right' },
 ]

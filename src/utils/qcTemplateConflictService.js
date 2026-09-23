@@ -136,3 +136,58 @@ export function filterObjectsSkippingConflicts(objects = [], conflicts = []) {
   const conflictKeys = new Set((conflicts || []).map((c) => objectKey(c.object)))
   return (objects || []).filter((o) => !conflictKeys.has(objectKey(o)))
 }
+
+/**
+ * 将冲突决议拆成「替换 / 跳过」两组。
+ * - mode=replace|skip：整单处理（兼容旧逻辑）
+ * - decisions: [{ key, mode }]：逐行处理
+ */
+export function resolveConflictBuckets(conflicts = [], resolution = {}) {
+  const list = Array.isArray(conflicts) ? conflicts : []
+  if (!resolution) return { replaceConflicts: [], skipConflicts: [] }
+
+  const decisions = Array.isArray(resolution.decisions) ? resolution.decisions : null
+  if (decisions?.length) {
+    const modeByKey = new Map(decisions.map((d) => [d.key, d.mode]))
+    const replaceConflicts = []
+    const skipConflicts = []
+    list.forEach((c) => {
+      const mode = modeByKey.get(c.key) || 'replace'
+      if (mode === 'skip') skipConflicts.push(c)
+      else replaceConflicts.push(c)
+    })
+    return { replaceConflicts, skipConflicts }
+  }
+
+  if (Array.isArray(resolution.replaceConflicts) || Array.isArray(resolution.skipConflicts)) {
+    return {
+      replaceConflicts: resolution.replaceConflicts || [],
+      skipConflicts: resolution.skipConflicts || [],
+    }
+  }
+
+  if (resolution.mode === 'skip') {
+    return { replaceConflicts: [], skipConflicts: list }
+  }
+  // replace / global / 默认
+  return { replaceConflicts: list, skipConflicts: [] }
+}
+
+/** 按决议处理冲突，返回保存用的 objects */
+export function applyQcTemplateConflictResolution(
+  templates = [],
+  objects = [],
+  conflicts = [],
+  resolution = {},
+  operator = 'admin1',
+) {
+  const { replaceConflicts, skipConflicts } = resolveConflictBuckets(conflicts, resolution)
+  if (replaceConflicts.length) {
+    applyQcTemplateConflictReplace(templates, replaceConflicts, operator)
+  }
+  let objectsToSave = objects
+  if (skipConflicts.length) {
+    objectsToSave = filterObjectsSkippingConflicts(objects, skipConflicts)
+  }
+  return { objectsToSave, replaceConflicts, skipConflicts }
+}

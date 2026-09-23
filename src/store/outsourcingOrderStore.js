@@ -11,6 +11,7 @@ import {
   calcWxHeaderIssueStatus,
   calcWxHeaderReturnStatus,
   calcWxLineAppliedIssueQty,
+  calcWxLineReceivedQty,
   calcWxLineRemainInboundQty,
   calcWxLineRemainIssueQty,
 } from '@/utils/outsourcingInbound'
@@ -156,6 +157,188 @@ export function canCompleteOutsourcingOrder(order) {
   return order?.status === '进行中' && order?.returnStatus === '已入库'
 }
 
+/** 外协行是否已自然结清：已入库数量 ≥ 计划数量 */
+export function isOutsourcingLineNaturallySettled(order, line) {
+  if (line?.cancelled) return true
+  const planQty = Number(line?.planQty) || 0
+  if (planQty <= 0) return true
+  const received = calcWxLineReceivedQty(order, line)
+  return received >= planQty - 1e-9
+}
+
+export function isOutsourcingOrderNaturallySettled(order) {
+  const lines = (order?.lineItems || []).filter((l) => !l.cancelled)
+  if (!lines.length) return true
+  return lines.every((line) => isOutsourcingLineNaturallySettled(order, line))
+}
+
+/** 关联未完成收货单（新建/进行中） */
+export function listUnfinishedReceiptsForOutsourcingOrder(order) {
+  if (!order) return []
+  // eslint-disable-next-line global-require
+  const { outsourcingReceiptState } = require('@/store/outsourcingReceiptStore')
+  return (outsourcingReceiptState.receipts || []).filter((r) => {
+    if (!r) return false
+    const st = r.receiptStatus || ''
+    if (st !== '新建' && st !== '进行中') return false
+    return (
+      r.outsourcingOrderId === order.id ||
+      r.outsourcingOrderNo === order.orderNo ||
+      r.purchaseOrderId === order.id ||
+      r.purchaseOrderNo === order.orderNo
+    )
+  })
+}
+
+/** 关联未完成外协回货检 */
+export function listUnfinishedQcTasksForOutsourcingOrder(order) {
+  if (!order) return []
+  // eslint-disable-next-line global-require
+  const { QC_TASK_STATUS, listQcTasks } = require('@/store/qcTaskStore')
+  // eslint-disable-next-line global-require
+  const { outsourcingReceiptState } = require('@/store/outsourcingReceiptStore')
+  const receiptIds = new Set()
+  const receiptNos = new Set()
+  ;(outsourcingReceiptState.receipts || []).forEach((r) => {
+    if (!r) return
+    if (
+      r.outsourcingOrderId !== order.id &&
+      r.outsourcingOrderNo !== order.orderNo &&
+      r.purchaseOrderId !== order.id &&
+      r.purchaseOrderNo !== order.orderNo
+    ) {
+      return
+    }
+    if (r.receiptStatus === '作废' || r.receiptStatus === '已作废') return
+    if (r.id) receiptIds.add(r.id)
+    if (r.receiptNo) receiptNos.add(String(r.receiptNo).trim())
+  })
+
+  return listQcTasks({ bizScope: '外协回货检' }).filter((t) => {
+    if (!t || t.qcStatus === QC_TASK_STATUS.COMPLETED || t.qcStatus === QC_TASK_STATUS.CANCELLED) {
+      return false
+    }
+    if (t.sourceDocId && receiptIds.has(t.sourceDocId)) return true
+    const srcNo = String(t.sourceDocNo || '').trim()
+    if (srcNo && receiptNos.has(srcNo)) return true
+    if (t.outsourcingOrderId && t.outsourcingOrderId === order.id) return true
+    if (t.outsourcingOrderNo && t.outsourcingOrderNo === order.orderNo) return true
+    return false
+  })
+}
+
+/** 关联未确认外协入库单 */
+export function listUnfinishedInboundOrdersForOutsourcingOrder(order) {
+  if (!order) return []
+  // eslint-disable-next-line global-require
+  const { inboundOrderState } = require('@/store/inboundOrderStore')
+  return (inboundOrderState?.orders || []).filter((o) => {
+    if (!o) return false
+    if (
+      !(
+        o.outsourcingOrderId === order.id ||
+        o.outsourcingOrderNo === order.orderNo ||
+        o.purchaseOrderId === order.id ||
+        o.sourceOrderNo === order.orderNo
+      )
+    ) {
+      return false
+    }
+    const st = o.status || ''
+    if (st === '已作废' || st === '已取消') return false
+    if (st === '已完成' || st === '已入库' || st === '已确认') return false
+    return true
+  })
+}
+
+/** 关联未完成外协异常处理单（新建/进行中） */
+export function listUnfinishedReturnsForOutsourcingOrder(order) {
+  if (!order) return []
+  // eslint-disable-next-line global-require
+  const { outsourcingReturnState } = require('@/store/outsourcingReturnStore')
+  return (outsourcingReturnState?.returns || []).filter((r) => {
+    if (!r) return false
+    if (
+      !(
+        r.outsourcingOrderId === order.id ||
+        r.outsourcingOrderNo === order.orderNo ||
+        r.purchaseOrderId === order.id
+      )
+    ) {
+      return false
+    }
+    const st = r.status || ''
+    return st === '新建' || st === '进行中'
+  })
+}
+
+export function getOutsourcingOrderUnfinishedRelatedDocs(order) {
+  // eslint-disable-next-line global-require
+  const { getPendingOutsourcingPriceChange } = require('@/store/outsourcingPriceChangeStore')
+  return {
+    receipts: listUnfinishedReceiptsForOutsourcingOrder(order),
+    qcTasks: listUnfinishedQcTasksForOutsourcingOrder(order),
+    inboundOrders: listUnfinishedInboundOrdersForOutsourcingOrder(order),
+    returns: listUnfinishedReturnsForOutsourcingOrder(order),
+    pendingPriceChange: getPendingOutsourcingPriceChange(order?.id) || null,
+  }
+}
+
+function formatOutsourcingUnfinishedRelatedMessage(unfinished = {}) {
+  const parts = []
+  if (unfinished.pendingPriceChange) {
+    parts.push(
+      `待审核订单变更：${unfinished.pendingPriceChange.changeNo || unfinished.pendingPriceChange.id}`,
+    )
+  }
+  const receiptNos = (unfinished.receipts || []).map((r) => r.receiptNo || r.id).filter(Boolean)
+  if (receiptNos.length) parts.push(`未完成收货单：${receiptNos.join('、')}`)
+  const qcNos = (unfinished.qcTasks || []).map((t) => t.qcNo || t.id).filter(Boolean)
+  if (qcNos.length) parts.push(`未完成质检单：${qcNos.join('、')}`)
+  const inboundNos = (unfinished.inboundOrders || []).map((o) => o.docNo || o.id).filter(Boolean)
+  if (inboundNos.length) parts.push(`未完成入库单：${inboundNos.join('、')}`)
+  const returnNos = (unfinished.returns || []).map((r) => r.returnNo || r.id).filter(Boolean)
+  if (returnNos.length) parts.push(`未完成异常处理单：${returnNos.join('、')}`)
+  return parts
+}
+
+/**
+ * 评估终结：进行中 + 数量未结清 + 无未结清关联单。
+ * 与「完成」区别：完成要求回货已入库；终结用于中途不再继续，且不进入结算。
+ */
+export function evaluateOutsourcingOrderTerminate(order) {
+  if (!order) return { ok: false, message: '未找到外协订单' }
+  if (order.status !== '进行中') {
+    return { ok: false, message: '仅「进行中」的外协订单可终结' }
+  }
+  if (isOutsourcingOrderNaturallySettled(order)) {
+    return {
+      ok: false,
+      code: 'ALREADY_SETTLED',
+      message: '订单回货数量已结清，请使用「完成」归档，无需终结',
+    }
+  }
+  const unfinished = getOutsourcingOrderUnfinishedRelatedDocs(order)
+  const parts = formatOutsourcingUnfinishedRelatedMessage(unfinished)
+  if (parts.length) {
+    return {
+      ok: false,
+      code: 'HAS_UNFINISHED_RELATED',
+      message: '有关联的未完成单据，请完成、作废/终结这些单据后再终结。\n' + parts.join('\n'),
+      unfinished,
+    }
+  }
+  return {
+    ok: true,
+    message:
+      '终结后订单不再继续外协回货，入库数量将锁定且不可再更改，且该订单不进入结算。确认终结吗？',
+  }
+}
+
+export function canTerminateOutsourcingOrder(order) {
+  return evaluateOutsourcingOrderTerminate(order).ok
+}
+
 function pushApprovalRecord(order, { result, opinion }) {
   if (!Array.isArray(order.approvalRecords)) order.approvalRecords = []
   order.approvalRecords.unshift({
@@ -280,9 +463,44 @@ export function completeOutsourcingOrder(id) {
     return { ok: false, message: `外协订单「${order.orderNo}」需回货入库完成后才可完成` }
   }
   order.status = '已完成'
+  order.completeMode = '正常结案'
+  order.completedAt = nowText()
+  order.terminatedAt = ''
+  order.overdueStatus = '未逾期'
   order.updater = 'admin1'
   order.updatedAt = nowText()
   return { ok: true, message: `外协订单「${order.orderNo}」已完成` }
+}
+
+/**
+ * 终结外协订单：进行中因故不再继续，可能已有部分回货入库。
+ * 与完成区别：终结后不进入结算。
+ */
+export function terminateOutsourcingOrder(id, { confirmTerminate = false } = {}) {
+  const order = getOutsourcingOrderById(id)
+  if (!order) return { ok: false, message: '外协订单不存在' }
+
+  const gate = evaluateOutsourcingOrderTerminate(order)
+  if (!gate.ok) return gate
+
+  if (!confirmTerminate) {
+    return {
+      ok: false,
+      code: 'NEED_TERMINATE_CONFIRM',
+      message: gate.message,
+    }
+  }
+
+  order.status = '已终结'
+  order.completeMode = '终结'
+  order.terminatedAt = nowText()
+  order.overdueStatus = '未逾期'
+  order.updater = 'admin1'
+  order.updatedAt = nowText()
+  return {
+    ok: true,
+    message: `外协订单「${order.orderNo}」已终结，不进入结算`,
+  }
 }
 
 /** 生成收货：创建收货单并占用 appliedReceiptQty */

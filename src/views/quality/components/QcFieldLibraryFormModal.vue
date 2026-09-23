@@ -137,6 +137,7 @@ function emptyForm() {
     matrixAllowAddRow: true,
     syncToLibrary: false,
     manualOptionItems: [],
+    countByQty: false,
   }
 }
 
@@ -283,6 +284,7 @@ function handleSave() {
     ...form,
     options,
     passOptions: form.passOptions || [],
+    countByQty: form.type === 'composite' ? false : Boolean(form.countByQty),
   })
   const complex = pickComplexFieldProps({ ...form, children })
   const payload = {

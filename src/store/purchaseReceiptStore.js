@@ -60,9 +60,10 @@ export function hasReceiptInboundOrder(receipt) {
 
 /**
  * 根据关联单据推导单据状态：
+ * - 作废 / 已终结 / 显式已完成：保持
  * - 已入库 → 已完成
  * - 已生成质检单或入库单 → 进行中
- * - 否则保持新建（不覆盖作废/已完成）
+ * - 否则保持新建
  */
 export function deriveReceiptDocStatus(receipt, preferredStatus) {
   if (
@@ -71,6 +72,9 @@ export function deriveReceiptDocStatus(receipt, preferredStatus) {
     receipt?.receiptStatus === '已作废'
   ) {
     return '作废'
+  }
+  if (preferredStatus === '已终结' || receipt?.receiptStatus === '已终结') {
+    return '已终结'
   }
   if (preferredStatus === '已完成') return '已完成'
 
@@ -88,8 +92,8 @@ function normalizeReceipt(row) {
     // 入库中曾被误用作单据状态
     if (r.receiptStatus === '已作废') r.receiptStatus = '作废'
   }
-  if (r.receiptStatus === '作废') {
-    // keep
+  if (r.receiptStatus === '作废' || r.receiptStatus === '已终结') {
+    // keep closed statuses
   } else {
     r.receiptStatus = deriveReceiptDocStatus(r, r.receiptStatus === '已完成' ? '已完成' : undefined)
   }
@@ -248,6 +252,11 @@ export function canCompletePurchaseReceipt(receipt) {
   return true
 }
 
+/** 终结：门控同完成；用于有未入库量时关单并释放占用，允许订单再开收货 */
+export function canTerminatePurchaseReceipt(receipt) {
+  return canCompletePurchaseReceipt(receipt)
+}
+
 export function voidPurchaseReceipt(id) {
   const receipt = getPurchaseReceiptById(id)
   if (!receipt) return { ok: false, message: '收货单不存在' }
@@ -273,6 +282,31 @@ export function completePurchaseReceipt(id) {
     }
     return { ok: false, message: `收货单「${receipt.receiptNo}」不可完成` }
   }
-  updatePurchaseReceipt(id, { receiptStatus: '已完成' })
+  // eslint-disable-next-line global-require
+  const { buildReceiptCloseRelease } = require('@/utils/purchaseReceiptSettle')
+  const { lineItems } = buildReceiptCloseRelease(receipt)
+  updatePurchaseReceipt(id, { receiptStatus: '已完成', lineItems })
   return { ok: true, message: `收货单「${receipt.receiptNo}」已完成` }
+}
+
+export function terminatePurchaseReceipt(id) {
+  const receipt = getPurchaseReceiptById(id)
+  if (!receipt) return { ok: false, message: '收货单不存在' }
+  if (!canTerminatePurchaseReceipt(receipt)) {
+    if (hasUnfinishedReceiptQc(receipt)) {
+      return { ok: false, message: '存在未完成的来料质检单，不可终结' }
+    }
+    if (hasUnfinishedReceiptInbound(receipt)) {
+      return { ok: false, message: '存在未完成的采购入库单，不可终结' }
+    }
+    return { ok: false, message: `收货单「${receipt.receiptNo}」不可终结` }
+  }
+  // eslint-disable-next-line global-require
+  const { buildReceiptCloseRelease } = require('@/utils/purchaseReceiptSettle')
+  const { lineItems } = buildReceiptCloseRelease(receipt)
+  updatePurchaseReceipt(id, { receiptStatus: '已终结', lineItems })
+  return {
+    ok: true,
+    message: `收货单「${receipt.receiptNo}」已终结，未入库占用已释放，可在采购订单重新收货`,
+  }
 }
