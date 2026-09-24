@@ -161,6 +161,68 @@ export function resetProcessReportMockData() {
   processReportState.records = loadRecords()
 }
 
+/** 批量导入报工记录（Excel） */
+export function importProcessReportRecords(payloads = []) {
+  if (!Array.isArray(payloads) || !payloads.length) {
+    return { ok: false, message: '无有效导入数据', records: [] }
+  }
+  const stamp = Date.now()
+  const woIdByNo = new Map()
+  const records = payloads.map((payload, index) => {
+    const goodQty = Number(payload.goodQty) || 0
+    const defectQty = Number(payload.defectQty) || 0
+    const source = payload.source === 'quick' ? 'quick' : 'workorder'
+    const createdAt = payload.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss')
+    let workOrderId = ''
+    if (source === 'workorder') {
+      const woNo = String(payload.workOrderNo || '').trim()
+      if (woNo && woIdByNo.has(woNo)) {
+        workOrderId = woIdByNo.get(woNo)
+      } else {
+        workOrderId = payload.workOrderId || `wo-import-${stamp}-${index}`
+        if (woNo) woIdByNo.set(woNo, workOrderId)
+      }
+    }
+    return normalizeProcessReport({
+      id: `pr-import-${stamp}-${index}`,
+      source,
+      workOrderId,
+      workOrderNo: payload.workOrderNo || '',
+      taskNo:
+        payload.taskNo ||
+        `T${dayjs(createdAt).format('YYYYMMDD')}${String(index + 1).padStart(3, '0')}`,
+      productCode: payload.productCode || '',
+      productName: payload.productName || '',
+      processName: payload.processName || '',
+      reporter: payload.reporter || '',
+      operator: payload.operator || payload.reporter || '导入',
+      goodQty,
+      defectQty,
+      finishedQty: payload.finishedQty != null ? Number(payload.finishedQty) : goodQty + defectQty,
+      reportMode: payload.reportMode || '批量计件',
+      team: payload.team || '',
+      status: payload.status || '待审核',
+      remark: payload.remark || '',
+      startTime: payload.startTime || '',
+      endTime: payload.endTime || '',
+      taskStartTime: payload.taskStartTime || '',
+      taskEndTime: payload.taskEndTime || '',
+      createdAt,
+      defectItemIds: [],
+      defectItemNames: [],
+      defectReason: '',
+      rejectReason: '',
+      images: [],
+      reportQtyMode: 'schedule',
+      wageQtyMode: 'reported',
+      workItems: [],
+    })
+  })
+  processReportState.records = [...records, ...processReportState.records]
+  saveRecords(processReportState.records)
+  return { ok: true, message: `成功导入 ${records.length} 条`, records }
+}
+
 export function getProcessReportStats() {
   return calcProcessReportStats(processReportState.records)
 }

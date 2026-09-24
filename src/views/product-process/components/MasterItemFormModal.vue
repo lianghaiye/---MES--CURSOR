@@ -2451,14 +2451,16 @@ function handleSaveAndMaintainBom() {
 }
 
 .master-data-mode-row {
-  margin-top: 8px;
+  margin-top: 0;
   margin-bottom: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-height: 24px;
 }
 .mode-label {
   font-size: 12px;
+  line-height: 22px;
   color: rgba(0, 0, 0, 0.65);
 }
 .spu-code-row {
@@ -2560,6 +2562,10 @@ function handleSaveAndMaintainBom() {
   border-radius: 8px;
 }
 
+.entity-capability-panel {
+  padding: 6px 12px;
+}
+
 .entity-identity-panel {
   margin: 0;
   background: #fff;
@@ -2580,27 +2586,41 @@ function handleSaveAndMaintainBom() {
 .entity-capability-panel {
   margin-top: 8px;
   background: #f0f5ff;
+
+  :deep(.ant-checkbox-wrapper) {
+    font-size: 13px;
+    line-height: 22px;
+  }
+
+  :deep(.ant-radio-button-wrapper) {
+    height: 24px;
+    line-height: 22px;
+    padding-inline: 10px;
+    font-size: 12px;
+  }
 }
 
 .entity-capability-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 24px;
+  gap: 4px 16px;
   margin-top: 0;
   padding-top: 0;
   align-items: center;
+  min-height: 22px;
 }
 
 .entity-capability-panel .master-data-mode-row {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 4px;
+  padding-top: 4px;
   border-top: 1px dashed #91caff;
 }
 
 .derived-type-tag {
   font-size: 12px;
+  line-height: 22px;
   color: rgba(0, 0, 0, 0.65);
-  margin-left: 8px;
+  margin-left: 4px;
 }
 
 .detail-product-name {

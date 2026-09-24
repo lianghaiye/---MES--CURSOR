@@ -15,9 +15,12 @@ import {
   createMockWorkOrderProgressRows,
 } from '@/mock/workbench'
 
+import { getCurrentTenantId } from '@/mock/tenants'
+
 const STORAGE_KEY = 'i_doms_workbench'
 const SEED_VERSION_KEY = 'i_doms_workbench_seed_v'
-const CURRENT_SEED_VERSION = '3'
+const REACTION_KEY = 'i_doms_workbench_release_reactions'
+const CURRENT_SEED_VERSION = '4'
 
 function loadFromStorage() {
   try {
@@ -66,6 +69,47 @@ function upgradeVisibleProcessIds(ids) {
   return [...ids]
 }
 
+function normalizeRelease(row = {}) {
+  const contentHtml =
+    row.contentHtml || (row.content ? `<p>${String(row.content).replace(/\n/g, '<br/>')}</p>` : '')
+  let status = row.status
+  if (!status) {
+    status = row.enabled === false ? 'draft' : 'published'
+  }
+  return {
+    id: row.id,
+    versionTag: row.versionTag || '',
+    title: row.title || '未命名发布',
+    publishDate: row.publishDate || dayjs().format('YYYY-MM-DD'),
+    publishedAt: row.publishedAt || '',
+    publisher: row.publisher || '系统管理员',
+    contentHtml,
+    status: status === 'published' ? 'published' : 'draft',
+    scopeType: row.scopeType === 'tenants' ? 'tenants' : 'all',
+    tenantIds: Array.isArray(row.tenantIds) ? [...row.tenantIds] : [],
+    likeCount: Number(row.likeCount || 0),
+    dislikeCount: Number(row.dislikeCount || 0),
+    sort: row.sort || 1,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
+
+function loadReactions() {
+  try {
+    const raw = localStorage.getItem(REACTION_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveReactions(map) {
+  safeSetItem(REACTION_KEY, JSON.stringify(map || {}))
+}
+
 function initState() {
   const stored = loadFromStorage()
   if (!stored) return buildSeed()
@@ -74,7 +118,9 @@ function initState() {
     favorites: Array.isArray(stored.favorites) ? stored.favorites : createDefaultFavorites(),
     visibleProcessIds: upgradeVisibleProcessIds(stored.visibleProcessIds),
     scenarios: Array.isArray(stored.scenarios) ? stored.scenarios : createMockScenarios(),
-    releases: Array.isArray(stored.releases) ? stored.releases : createMockReleases(),
+    releases: (Array.isArray(stored.releases) ? stored.releases : createMockReleases()).map(
+      normalizeRelease,
+    ),
     guides: Array.isArray(stored.guides) ? stored.guides : createMockGuides(),
     feedbacks: Array.isArray(stored.feedbacks) ? stored.feedbacks : createMockFeedbacks(),
     workOrderRows: Array.isArray(stored.workOrderRows)
@@ -83,11 +129,14 @@ function initState() {
     refreshedAt: stored.refreshedAt || nowText(),
   }
 
-  // v3：补齐工单进度数量字段（不覆盖已有收藏等内容）
   if (shouldReseed()) {
     const hasQty = (base.workOrderRows || []).some((r) => r.planQty != null)
     if (!hasQty) base.workOrderRows = createMockWorkOrderProgressRows()
     base.visibleProcessIds = upgradeVisibleProcessIds(base.visibleProcessIds)
+    // v4：场景/新手改为外站链接；月度发布升级为站内消息结构
+    base.scenarios = createMockScenarios()
+    base.guides = createMockGuides()
+    base.releases = createMockReleases()
   }
 
   return base
@@ -215,34 +264,97 @@ export function removeScenario(id) {
   return { ok: true, message: '已删除' }
 }
 
-export function listEnabledReleases() {
-  return sortEnabled(workbenchState.releases)
+export function listEnabledReleases(tenantId = getCurrentTenantId()) {
+  void workbenchState.releases
+  return [...(workbenchState.releases || [])]
+    .filter((item) => item.status === 'published')
+    .filter((item) => {
+      if (item.scopeType !== 'tenants') return true
+      return (item.tenantIds || []).includes(tenantId)
+    })
+    .sort((a, b) => (a.sort || 0) - (b.sort || 0))
 }
 
 export function listAllReleases() {
   return [...(workbenchState.releases || [])].sort((a, b) => (a.sort || 0) - (b.sort || 0))
 }
 
+export function getReleaseById(id) {
+  void workbenchState.releases
+  return (workbenchState.releases || []).find((r) => r.id === id) || null
+}
+
 export function saveRelease(partial = {}) {
-  if (partial.id) {
-    const idx = workbenchState.releases.findIndex((s) => s.id === partial.id)
-    if (idx < 0) return { ok: false, message: '记录不存在' }
-    Object.assign(workbenchState.releases[idx], partial, { updatedAt: nowText() })
-    return { ok: true, message: '已保存' }
-  }
-  const row = {
-    id: uid('rel'),
+  const payload = {
     versionTag: partial.versionTag || '',
     title: partial.title || '未命名发布',
     publishDate: partial.publishDate || dayjs().format('YYYY-MM-DD'),
-    content: partial.content || '',
+    publisher: partial.publisher || '系统管理员',
+    contentHtml: partial.contentHtml || '',
+    scopeType: partial.scopeType === 'tenants' ? 'tenants' : 'all',
+    tenantIds: Array.isArray(partial.tenantIds) ? [...partial.tenantIds] : [],
+    sort: partial.sort,
+  }
+  if (payload.scopeType === 'tenants' && !payload.tenantIds.length) {
+    return { ok: false, message: '请选择可见租户' }
+  }
+  if (partial.id) {
+    const idx = workbenchState.releases.findIndex((s) => s.id === partial.id)
+    if (idx < 0) return { ok: false, message: '记录不存在' }
+    const prev = workbenchState.releases[idx]
+    Object.assign(workbenchState.releases[idx], payload, {
+      status: partial.status || prev.status || 'draft',
+      publishedAt: partial.publishedAt !== undefined ? partial.publishedAt : prev.publishedAt,
+      likeCount: prev.likeCount || 0,
+      dislikeCount: prev.dislikeCount || 0,
+      updatedAt: nowText(),
+    })
+    workbenchState.releases[idx] = normalizeRelease(workbenchState.releases[idx])
+    return { ok: true, message: '已保存' }
+  }
+  const row = normalizeRelease({
+    id: uid('rel'),
+    ...payload,
+    status: 'draft',
+    publishedAt: '',
+    likeCount: 0,
+    dislikeCount: 0,
     sort: partial.sort ?? workbenchState.releases.length + 1,
-    enabled: partial.enabled !== false,
     createdAt: nowText(),
     updatedAt: nowText(),
-  }
+  })
   workbenchState.releases.push(row)
-  return { ok: true, message: '已新增', row }
+  return { ok: true, message: '已保存为草稿', row }
+}
+
+export function publishRelease(id) {
+  const idx = workbenchState.releases.findIndex((s) => s.id === id)
+  if (idx < 0) return { ok: false, message: '记录不存在' }
+  const row = workbenchState.releases[idx]
+  if (!String(row.title || '').trim()) return { ok: false, message: '请先填写标题' }
+  if (
+    !String(row.contentHtml || '')
+      .replace(/<[^>]+>/g, '')
+      .trim()
+  ) {
+    return { ok: false, message: '请先填写正文' }
+  }
+  if (row.scopeType === 'tenants' && !(row.tenantIds || []).length) {
+    return { ok: false, message: '请选择可见租户' }
+  }
+  row.status = 'published'
+  row.publishedAt = nowText()
+  row.publishDate = row.publishDate || dayjs().format('YYYY-MM-DD')
+  row.updatedAt = nowText()
+  return { ok: true, message: '已发布，工作台可见' }
+}
+
+export function unpublishRelease(id) {
+  const idx = workbenchState.releases.findIndex((s) => s.id === id)
+  if (idx < 0) return { ok: false, message: '记录不存在' }
+  workbenchState.releases[idx].status = 'draft'
+  workbenchState.releases[idx].updatedAt = nowText()
+  return { ok: true, message: '已撤回发布' }
 }
 
 export function removeRelease(id) {
@@ -250,6 +362,34 @@ export function removeRelease(id) {
   if (idx < 0) return { ok: false, message: '记录不存在' }
   workbenchState.releases.splice(idx, 1)
   return { ok: true, message: '已删除' }
+}
+
+export function getReleaseReaction(releaseId) {
+  const map = loadReactions()
+  return map[releaseId] || ''
+}
+
+export function reactRelease(releaseId, type) {
+  const idx = workbenchState.releases.findIndex((s) => s.id === releaseId)
+  if (idx < 0) return { ok: false, message: '消息不存在' }
+  if (type !== 'like' && type !== 'dislike') return { ok: false, message: '无效操作' }
+  const row = workbenchState.releases[idx]
+  const map = loadReactions()
+  const prev = map[releaseId] || ''
+  if (prev === type) {
+    map[releaseId] = ''
+    if (type === 'like') row.likeCount = Math.max(0, (row.likeCount || 0) - 1)
+    else row.dislikeCount = Math.max(0, (row.dislikeCount || 0) - 1)
+    saveReactions(map)
+    return { ok: true, message: '已取消' }
+  }
+  if (prev === 'like') row.likeCount = Math.max(0, (row.likeCount || 0) - 1)
+  if (prev === 'dislike') row.dislikeCount = Math.max(0, (row.dislikeCount || 0) - 1)
+  map[releaseId] = type
+  if (type === 'like') row.likeCount = (row.likeCount || 0) + 1
+  else row.dislikeCount = (row.dislikeCount || 0) + 1
+  saveReactions(map)
+  return { ok: true, message: type === 'like' ? '感谢点赞' : '已反馈' }
 }
 
 export function listEnabledGuides() {

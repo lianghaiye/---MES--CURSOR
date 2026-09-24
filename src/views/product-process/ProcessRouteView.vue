@@ -260,15 +260,38 @@ function onSaved() {
 }
 </script>
 
-<style scoped>
+<style lang="less" scoped>
 .process-route-page {
   padding: 0;
 }
+
+.filter-card,
+.table-card {
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.filter-card {
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
 .toolbar-row {
   display: flex;
   justify-content: space-between;
-  margin: 12px 0;
+  align-items: center;
+  margin-bottom: 8px;
 }
+
+.table-card {
+  width: 100%;
+  min-height: 320px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+
 .link-code {
   color: #1677ff;
   cursor: pointer;

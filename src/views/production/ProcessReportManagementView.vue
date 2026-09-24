@@ -77,6 +77,9 @@
         <a-button size="small" :disabled="!selectedIds.length" @click="openBatchReject">
           批量拒绝
         </a-button>
+        <a-button size="small" @click="importOpen = true">导入报工记录</a-button>
+        <a-button size="small" @click="openExportModal">导出报工明细</a-button>
+        <a-button size="small" @click="historyOpen = true">导入导出历史</a-button>
       </a-space>
       <a-space :size="4" class="toolbar-icons">
         <a-button type="text" size="small" @click="handleSearch">
@@ -146,6 +149,21 @@
       v-model:settings="columnSettings"
       :default-settings="defaultColumnSettings"
     />
+
+    <ImportExcelModal
+      v-model:open="importOpen"
+      :import-def="processReportImportDef"
+      @done="onImportDone"
+    />
+    <ImportExportHistoryModal v-model:open="historyOpen" />
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="filteredList.length"
+      :selected-count="selectedIds.length"
+      @export="doExport"
+    />
   </div>
 </template>
 
@@ -160,7 +178,13 @@ import { Modal, message } from 'ant-design-vue'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import ImportExcelModal from '@/components/ImportExcelModal.vue'
+import ImportExportHistoryModal from '@/components/ImportExportHistoryModal.vue'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { useListExport } from '@/composables/useListExport'
+import { processReportExportFields } from '@/utils/exportFields/processReportExport'
+import { processReportImportDef } from '@/utils/importDefs/processReportImport'
 import {
   batchApproveProcessReports,
   batchRejectProcessReports,
@@ -186,6 +210,8 @@ const appliedFilters = ref({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const selectedIds = ref([])
 const rejectOpen = ref(false)
+const importOpen = ref(false)
+const historyOpen = ref(false)
 const pageError = ref('')
 
 const statusOptions = [
@@ -226,6 +252,21 @@ const stats = computed(() => {
 const filteredList = computed(() => {
   void processReportState.records
   return getProcessReports(appliedFilters.value)
+})
+
+const {
+  exportModalOpen,
+  openExportModal,
+  exportFieldSettings,
+  defaultExportFieldSettings,
+  doExport,
+} = useListExport({
+  storageKey: 'process-report-list-export',
+  fieldDefinitions: processReportExportFields,
+  getFilteredRows: () => filteredList.value,
+  getSelectedRows: () => filteredList.value.filter((r) => selectedIds.value.includes(r.id)),
+  fileNamePrefix: '报工明细',
+  sheetName: '报工明细',
 })
 
 function safeReload() {
@@ -313,6 +354,10 @@ function handleReset() {
   handleSearch()
 }
 
+function onImportDone() {
+  handleSearch()
+}
+
 function openWorkOrderDetail(record) {
   if (!record.workOrderId) {
     message.warning('缺少工单关联')
@@ -368,6 +413,19 @@ function onRejectConfirm(reason) {
     margin-bottom: 12px;
   }
 
+  .filter-card,
+  .table-card {
+    background: #fff;
+    border: 1px solid var(--divider, #e5e6eb);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .filter-card {
+    padding: 12px 16px;
+    margin-bottom: 8px;
+  }
+
   .toolbar-row {
     display: flex;
     justify-content: space-between;
@@ -377,6 +435,13 @@ function onRejectConfirm(reason) {
 
   .toolbar-icons {
     flex-shrink: 0;
+  }
+
+  .table-card {
+    width: 100%;
+    min-height: 320px;
+    padding: 8px 12px;
+    box-sizing: border-box;
   }
 
   .table-pagination {

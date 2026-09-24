@@ -290,7 +290,7 @@ export function createMockScenarios() {
       id: 'sc-1',
       title: '外协管理全流程',
       summary: '从外协下单、发料、回货质检到入库结算',
-      link: '/procurement/outsourcing-orders',
+      link: 'https://blacklake.feishu.cn/wiki/GNCuwm2QRiVdQdkEclvc4Cr7nLh',
       sort: 1,
       enabled: true,
     },
@@ -298,7 +298,7 @@ export function createMockScenarios() {
       id: 'sc-2',
       title: '需求计划与补货',
       summary: '库存预警驱动补货与采购申请',
-      link: '/planning/replenish-center',
+      link: 'https://blacklake.feishu.cn/wiki/GNCuwm2QRiVdQdkEclvc4Cr7nLh',
       sort: 2,
       enabled: true,
     },
@@ -306,7 +306,7 @@ export function createMockScenarios() {
       id: 'sc-3',
       title: '工单执行与报工',
       summary: '工单下发、工序任务领取与报工确认',
-      link: '/production/work-orders',
+      link: 'https://blacklake.feishu.cn/wiki/GNCuwm2QRiVdQdkEclvc4Cr7nLh',
       sort: 3,
       enabled: true,
     },
@@ -314,7 +314,7 @@ export function createMockScenarios() {
       id: 'sc-4',
       title: '来料质检闭环',
       summary: '收货、质检、入库与不合格处置',
-      link: '/quality/incoming-qc',
+      link: 'https://blacklake.feishu.cn/wiki/GNCuwm2QRiVdQdkEclvc4Cr7nLh',
       sort: 4,
       enabled: true,
     },
@@ -326,29 +326,60 @@ export function createMockReleases() {
     {
       id: 'rel-1',
       versionTag: '2609',
-      title: '采购/外协收货终结与质检处理方案',
+      title: '【产品功能升级提醒】采购/外协收货终结与质检处理方案',
       publishDate: '2026-09-23',
-      content: '收货单支持终结并释放占用；质检处理方案四桶汇总展示。',
+      publishedAt: '2026-09-23 10:30:00',
+      publisher: 'I-DOMS',
+      contentHtml: `<p>尊敬的用户，本次更新的内容有：</p>
+<ol>
+<li>【采购管理】收货单支持终结并释放占用</li>
+<li>【质量管理】质检处理方案四桶汇总展示，处置上限按收货数量</li>
+<li>【外协管理】外协订单终结规则与发料锁定</li>
+</ol>
+<h3>1. 【采购管理】收货终结</h3>
+<p>进行中的收货单可终结未完成行，释放订单占用数量，允许再次开立收货。</p>
+<h3>2. 【质量管理】处理方案</h3>
+<p>来料/外协质检按合格入库、让步、退换/返工报废拆分数量，详情与打印同步展示。</p>`,
+      status: 'published',
+      scopeType: 'all',
+      tenantIds: [],
+      likeCount: 3,
+      dislikeCount: 0,
       sort: 1,
-      enabled: true,
     },
     {
       id: 'rel-2',
       versionTag: '2608',
       title: '【产品功能升级提醒】订单变更与结案',
       publishDate: '2026-09-10',
-      content: '采购/外协订单支持取消行、短结与终结规则完善。',
+      publishedAt: '2026-09-10 10:45:46',
+      publisher: 'I-DOMS',
+      contentHtml: `<p>采购/外协订单支持取消行、短结与终结规则完善。</p>
+<ul>
+<li>订单行取消与短结</li>
+<li>终结前门禁校验</li>
+</ul>`,
+      status: 'published',
+      scopeType: 'tenants',
+      tenantIds: ['tenant-demo', 'tenant-zb'],
+      likeCount: 8,
+      dislikeCount: 1,
       sort: 2,
-      enabled: true,
     },
     {
       id: 'rel-3',
       versionTag: '2608',
-      title: '车间主任工作台上线',
+      title: '车间主任工作台上线（草稿示例）',
       publishDate: '2026-08-28',
-      content: '按车间维度汇总待办与快捷入口。',
+      publishedAt: '',
+      publisher: 'I-DOMS',
+      contentHtml: `<p>按车间维度汇总待办与快捷入口。此条为草稿，不会出现在工作台。</p>`,
+      status: 'draft',
+      scopeType: 'all',
+      tenantIds: [],
+      likeCount: 0,
+      dislikeCount: 0,
       sort: 3,
-      enabled: true,
     },
   ]
 }
@@ -359,7 +390,7 @@ export function createMockGuides() {
       id: 'gd-1',
       title: '开局必知',
       summary: '登录、组织切换与常用入口',
-      link: '/home/prd',
+      link: 'https://blacklake.feishu.cn/wiki/GNCuwm2QRiVdQdkEclvc4Cr7nLh',
       sort: 1,
       enabled: true,
     },
@@ -367,7 +398,7 @@ export function createMockGuides() {
       id: 'gd-2',
       title: '弄懂系统术语',
       summary: '工单、工序任务、收货、质检等概念',
-      link: '/home/prd/v151',
+      link: 'https://blacklake.feishu.cn/wiki/GNCuwm2QRiVdQdkEclvc4Cr7nLh',
       sort: 2,
       enabled: true,
     },
@@ -375,7 +406,7 @@ export function createMockGuides() {
       id: 'gd-3',
       title: '上传数据检查清单',
       summary: '主数据导入前的准备事项',
-      link: '/home/prd/v15',
+      link: 'https://blacklake.feishu.cn/wiki/GNCuwm2QRiVdQdkEclvc4Cr7nLh',
       sort: 3,
       enabled: true,
     },

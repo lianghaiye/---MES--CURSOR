@@ -306,6 +306,8 @@ const createPageRouteTitles = Object.fromEntries(
 export const routeTitles = {
   '/home/dashboard': '工作台',
   '/home/workbench-admin': '工作台内容管理',
+  '/home/workbench-admin/releases/new': '新增功能发布',
+  '/home/workbench-admin/releases/:id/edit': '编辑功能发布',
   '/home/data-cockpit': '数据驾驶舱',
   '/home/director-dashboard': '车间主任工作台',
   '/home/prd': 'IDOMS PRD',

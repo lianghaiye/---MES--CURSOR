@@ -109,6 +109,12 @@ export function filterPurchaseDetailLines(rows, filters = {}) {
     ) {
       return false
     }
+    if (
+      filters.productCode &&
+      !String(row.productCode || '').includes(String(filters.productCode).trim())
+    ) {
+      return false
+    }
     if (filters.specModel && !String(row.specModel).includes(String(filters.specModel).trim())) {
       return false
     }
@@ -123,6 +129,30 @@ export function filterPurchaseDetailLines(rows, filters = {}) {
     }
     if (filters.purchaser && row.purchaser !== filters.purchaser) {
       return false
+    }
+    if (filters.deliveryDateRange?.length === 2) {
+      const [start, end] = filters.deliveryDateRange
+      const startStr = typeof start === 'string' ? start : start?.format?.('YYYY-MM-DD')
+      const endStr = typeof end === 'string' ? end : end?.format?.('YYYY-MM-DD')
+      if (!row.deliveryDate || !startStr || !endStr) return false
+      if (
+        dayjs(row.deliveryDate).isBefore(startStr, 'day') ||
+        dayjs(row.deliveryDate).isAfter(endStr, 'day')
+      ) {
+        return false
+      }
+    }
+    if (filters.createdAtRange?.length === 2) {
+      const [start, end] = filters.createdAtRange
+      const startStr = typeof start === 'string' ? start : start?.format?.('YYYY-MM-DD HH:mm:ss')
+      const endStr = typeof end === 'string' ? end : end?.format?.('YYYY-MM-DD HH:mm:ss')
+      if (!row.createdAt || !startStr || !endStr) return false
+      if (
+        dayjs(row.createdAt).isBefore(dayjs(startStr)) ||
+        dayjs(row.createdAt).isAfter(dayjs(endStr))
+      ) {
+        return false
+      }
     }
     if (filters.documentDateRange?.length === 2) {
       const [start, end] = filters.documentDateRange

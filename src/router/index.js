@@ -158,6 +158,18 @@ const routes = [
         meta: { title: '工作台内容管理' },
       },
       {
+        path: 'home/workbench-admin/releases/new',
+        name: 'home-workbench-release-new',
+        component: () => import('@/views/home/WorkbenchReleaseEditView.vue'),
+        meta: { title: '新增功能发布', listPath: '/home/workbench-admin?tab=releases' },
+      },
+      {
+        path: 'home/workbench-admin/releases/:id/edit',
+        name: 'home-workbench-release-edit',
+        component: () => import('@/views/home/WorkbenchReleaseEditView.vue'),
+        meta: { title: '编辑功能发布', listPath: '/home/workbench-admin?tab=releases' },
+      },
+      {
         path: 'home/data-cockpit',
         name: 'home-data-cockpit',
         component: () => import('@/views/home/DataCockpitView.vue'),

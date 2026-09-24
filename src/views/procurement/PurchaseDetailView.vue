@@ -37,6 +37,16 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="产品编码">
+              <a-input
+                v-model:value="filters.productCode"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="规格型号">
               <a-input
                 v-model:value="filters.specModel"
@@ -78,9 +88,9 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="8">
-            <a-form-item label="采购日期">
+            <a-form-item label="交货日期">
               <a-range-picker
-                v-model:value="filters.documentDateRange"
+                v-model:value="filters.deliveryDateRange"
                 size="small"
                 style="width: 100%"
               />
@@ -94,6 +104,26 @@
                 placeholder="请选择"
                 size="small"
                 :options="purchaserOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8">
+            <a-form-item label="创建时间">
+              <a-range-picker
+                v-model:value="filters.createdAtRange"
+                show-time
+                format="YYYY-MM-DD HH:mm"
+                size="small"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8">
+            <a-form-item label="采购日期">
+              <a-range-picker
+                v-model:value="filters.documentDateRange"
+                size="small"
+                style="width: 100%"
               />
             </a-form-item>
           </a-col>
@@ -269,12 +299,15 @@ const filters = reactive({
   orderNo: '',
   supplier: undefined,
   productName: '',
+  productCode: '',
   specModel: '',
   material: '',
   drawingNo: '',
   receivingWarehouse: undefined,
-  documentDateRange: null,
+  deliveryDateRange: null,
   purchaser: undefined,
+  createdAtRange: null,
+  documentDateRange: null,
 })
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
@@ -413,12 +446,15 @@ function handleReset() {
     orderNo: '',
     supplier: undefined,
     productName: '',
+    productCode: '',
     specModel: '',
     material: '',
     drawingNo: '',
     receivingWarehouse: undefined,
-    documentDateRange: null,
+    deliveryDateRange: null,
     purchaser: undefined,
+    createdAtRange: null,
+    documentDateRange: null,
   })
   appliedFilters.value = { ...filters }
   pagination.current = 1

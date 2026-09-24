@@ -103,12 +103,7 @@ export function validateProcessWorkItemConfig({
   const wage = normalizeWageQtyMode(wageQtyMode)
   const templates = normalizeWorkItemTemplates(workItemTemplates)
 
-  if (report === REPORT_QTY_MODE.ITEMIZED && wage === WAGE_QTY_MODE.REPORTED) {
-    return {
-      ok: false,
-      message: '报工口径为「按分项作业」时，计薪口径不能为「按报工数」',
-    }
-  }
+  // 四种口径组合均允许；分项报工或分项计薪时必须有模板
   if (
     (report === REPORT_QTY_MODE.ITEMIZED || wage === WAGE_QTY_MODE.ITEMIZED) &&
     !templates.length
@@ -141,25 +136,52 @@ export function listMissingWorkItemPrices(mergedItems = []) {
   return (mergedItems || []).filter((item) => !item.hasPrice)
 }
 
+/** 仅「计薪按分项」才强制填写分项数量、并要求产品侧分项单价 */
 export function needsWorkItemPricing(reportQtyMode, wageQtyMode) {
-  return (
-    normalizeReportQtyMode(reportQtyMode) === REPORT_QTY_MODE.ITEMIZED ||
-    normalizeWageQtyMode(wageQtyMode) === WAGE_QTY_MODE.ITEMIZED
-  )
+  void reportQtyMode
+  return normalizeWageQtyMode(wageQtyMode) === WAGE_QTY_MODE.ITEMIZED
 }
 
+/** 报工时必须填写分项数量：仅分项计薪 */
+export function requiresWorkItemQty(reportQtyMode, wageQtyMode) {
+  void reportQtyMode
+  return normalizeWageQtyMode(wageQtyMode) === WAGE_QTY_MODE.ITEMIZED
+}
+
+/** @deprecated 使用 requiresWorkItemQty */
 export function requiresWorkItemReport(reportQtyMode, wageQtyMode) {
-  const report = normalizeReportQtyMode(reportQtyMode)
-  const wage = normalizeWageQtyMode(wageQtyMode)
-  return report === REPORT_QTY_MODE.ITEMIZED || wage === WAGE_QTY_MODE.ITEMIZED
+  return requiresWorkItemQty(reportQtyMode, wageQtyMode)
+}
+
+/**
+ * 报工 UI 分项录入方式
+ * - none: 无分项
+ * - select: 仅勾选分项（排产+报工 或 分项+报工；不填数量）
+ * - qty: 填写分项数量（计薪按分项时）
+ */
+export function resolveWorkItemEntryMode(reportQtyMode, wageQtyMode, hasTemplates = false) {
+  if (requiresWorkItemQty(reportQtyMode, wageQtyMode)) return 'qty'
+  // 按报工数计薪 + 有模板：勾选分项（不填量）；分项报工时另填总报工数
+  if (hasTemplates && !isItemizedWageMode(wageQtyMode)) {
+    return 'select'
+  }
+  return 'none'
 }
 
 export function isScheduleReportMode(reportQtyMode) {
   return normalizeReportQtyMode(reportQtyMode) === REPORT_QTY_MODE.SCHEDULE
 }
 
+export function isItemizedReportMode(reportQtyMode) {
+  return normalizeReportQtyMode(reportQtyMode) === REPORT_QTY_MODE.ITEMIZED
+}
+
 export function isItemizedWageMode(wageQtyMode) {
   return normalizeWageQtyMode(wageQtyMode) === WAGE_QTY_MODE.ITEMIZED
+}
+
+export function sumWorkItemQty(workItems = []) {
+  return round2((workItems || []).reduce((sum, row) => sum + (Number(row.qty) || 0), 0))
 }
 
 /** 报工分项行规范化（含单价快照） */
@@ -173,6 +195,7 @@ export function normalizeReportWorkItems(list = [], snapshotCatalog = []) {
       if (!itemCode) return null
       const hit = catalog.get(itemCode)
       const qty = Number(row.qty) || 0
+      const selected = row.selected === true || qty > 0
       const unitPrice =
         row.unitPriceSnapshot != null && row.unitPriceSnapshot !== ''
           ? Number(row.unitPriceSnapshot)
@@ -182,6 +205,7 @@ export function normalizeReportWorkItems(list = [], snapshotCatalog = []) {
         itemName: String(row.itemName || hit?.name || itemCode),
         unit: String(row.unit || hit?.unit || '个'),
         qty,
+        selected,
         unitPriceSnapshot: unitPrice,
       }
     })
@@ -207,8 +231,26 @@ export function validateReportWorkItems({
   workItems = [],
   catalog = [],
 } = {}) {
-  if (!requiresWorkItemReport(reportQtyMode, wageQtyMode)) return { ok: true }
+  const mode = resolveWorkItemEntryMode(
+    reportQtyMode,
+    wageQtyMode,
+    (catalog || []).length > 0 || (workItems || []).length > 0,
+  )
+  if (mode === 'none') return { ok: true }
+
   const normalized = normalizeReportWorkItems(workItems, catalog)
+
+  if (mode === 'select') {
+    // 分项+报工：必须至少勾选一条；排产+报工：勾选可选
+    if (isItemizedReportMode(reportQtyMode)) {
+      const selected = normalized.filter((r) => r.selected)
+      if (!selected.length) {
+        return { ok: false, message: '请至少勾选一条作业分项' }
+      }
+    }
+    return { ok: true }
+  }
+
   const positive = normalized.filter((r) => r.qty > 0)
   if (!positive.length) {
     return { ok: false, message: '请至少填写一条作业分项数量' }
@@ -240,6 +282,11 @@ export function buildWorkItemDispatchSnapshot({
   return {
     reportQtyMode,
     wageQtyMode,
+    workItemEntryMode: resolveWorkItemEntryMode(
+      reportQtyMode,
+      wageQtyMode,
+      workItemTemplates.length > 0,
+    ),
     workItems,
   }
 }

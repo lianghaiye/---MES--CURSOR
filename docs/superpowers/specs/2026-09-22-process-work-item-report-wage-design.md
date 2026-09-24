@@ -24,7 +24,9 @@
 | 分项模板              | 挂在**工序主数据**（code / name / unit，无价）                                          |
 | 分项单价 / 可选计划量 | 挂在**产品/物料 laborRows**（按模板 code；计划量为**单件** `plannedQtyPerPiece`）       |
 | 极简非时序            | 分项**不做**齐套门控，不拦截其它工序                                                    |
-| 禁止组合              | `reportQtyMode=itemized` + `wageQtyMode=reported`（一期）                               |
+| 禁止组合              | **无**（四种口径组合均支持）                                                            |
+| 排产+报工 × 分项模板  | 有模板时可**勾选分项**（不填数量，仅记录作业类型）；计薪仍按报工件数 × 工序单价         |
+| 分项+报工             | 勾选分项（不填数量）+ 另填总报工数（良品数）；工资 = 总报工数 × 工序单价                |
 | 分项计薪与报工类型    | `wageQtyMode=itemized` 一期仅配合批量计件；时长报工保持 `reported`                      |
 | 快速报工              | 一期仅 `schedule + reported`；分项只开放任务报工                                        |
 
@@ -44,9 +46,10 @@ process
 
 **配置校验：**
 
-- `reportQtyMode=itemized` 且 `wageQtyMode=reported` → 禁止保存；
-- 任一口径为 `itemized` → `workItemTemplates` 至少 1 条；
-- 两者均为非分项 → 可不配模板（现网默认）。
+- 四种口径组合**均可保存**；
+- `reportQtyMode=itemized` 或 `wageQtyMode=itemized` → `workItemTemplates` 至少 1 条；
+- `schedule + reported` → 模板可选（有模板则报工可勾选分项）；
+- 两者均为非分项且无模板 → 现网默认。
 
 **默认值（迁移）：** 已有工序 `reportQtyMode=schedule`，`wageQtyMode=reported`，`workItemTemplates=[]`。
 
@@ -65,7 +68,7 @@ laborRow
 
 **合并规则：** 报工/下发需要分项时 = 工序 `workItemTemplates` 按 `itemCode` 左连本产品该工序 `workItemRates`。
 
-**缺价策略：** 任一口径为 `itemized` 时，下发前对模板分项**拦截**缺价（须配齐 `unitPrice`）。
+**缺价策略：** 仅当 `wageQtyMode=itemized` 时，下发前对模板分项**拦截**缺价（须配齐 `unitPrice`）。`itemized + reported` 不要求分项单价（走工序 `pieceRate`）。
 
 **与报工类型关系：** `wageQtyMode=itemized` 一期仅允许配合「批量计件」类报工；「时长报工」须保持 `wageQtyMode=reported`（走现有计时公式）。
 
@@ -73,12 +76,12 @@ laborRow
 
 ```
 processReport
-  goodQty / defectQty              // schedule 口径下主数量；itemized 下可空或辅助
+  goodQty / defectQty              // schedule 口径下主数量；itemized+reported 时可回写为分项数量合计
   workItems[]?:
     - itemCode / itemName / unit
-    - qty: number
-    - unitPriceSnapshot: number    // 提交时快照
-  // 可选：分项行级 override 标记（审核改价）
+    - qty: number                  // select 模式可为 0
+    - selected?: boolean           // 排产+报工勾选分项
+    - unitPriceSnapshot: number    // 分项计薪时提交快照；按报工数计薪时可无价
 ```
 
 ### 3.4 任务快照（下发 enrichment）
@@ -96,7 +99,7 @@ processReport
 | -------------------------------- | ----------------------------------------------------------------- |
 | 任务条数 / ID                    | **不变**（`mt-{workOrderId}-{processSeq}`；协作时长例外按现规则） |
 | 极简并行 / 领取 / 单人直达待报工 | **不变**                                                          |
-| 下发前校验                       | 口径含 `itemized` 时校验本产品分项单价齐全                        |
+| 下发前校验                       | 仅 `wageQtyMode=itemized` 时校验本产品分项单价齐全                |
 | 按分项拆任务                     | **不做**                                                          |
 | 排产批次                         | **不**因分项再生成任务                                            |
 
@@ -106,7 +109,7 @@ processReport
 dispatch 工序
   → 读工序 reportQtyMode / wageQtyMode / workItemTemplates
   → 合并产品 workItemRates
-  → itemized 且缺价 → fail
+  → wageQtyMode=itemized 且缺价 → fail
   → 生成 1 条 mobile task（带口径与分项快照）
 ```
 
@@ -114,12 +117,12 @@ dispatch 工序
 
 ## 5. 报工 / 计薪行为矩阵
 
-| reportQtyMode | wageQtyMode | 报工 UI                      | 计薪取数                                          |
-| ------------- | ----------- | ---------------------------- | ------------------------------------------------- |
-| `schedule`    | `reported`  | 只报良/不良件数（现网）      | 现网公式：`(折算报工数) × pieceRate` 或计时公式   |
-| `schedule`    | `itemized`  | 报件数 **且** 必填分项明细   | `Σ(分项 qty × unitPriceSnapshot)`；件数不参与乘价 |
-| `itemized`    | `itemized`  | 主界面为分项明细；件数可不填 | 同上分项求和                                      |
-| `itemized`    | `reported`  | —                            | **配置禁止**                                      |
+| reportQtyMode | wageQtyMode | 报工 UI                                         | 计薪取数                                          |
+| ------------- | ----------- | ----------------------------------------------- | ------------------------------------------------- |
+| `schedule`    | `reported`  | 报良/不良件数；有模板时可**勾选**分项（无数量） | 现网公式：`(折算报工数) × pieceRate` 或计时公式   |
+| `schedule`    | `itemized`  | 报件数 **且** 必填分项数量                      | `Σ(分项 qty × unitPriceSnapshot)`；件数不参与乘价 |
+| `itemized`    | `itemized`  | 主界面为分项数量；件数可不填                    | 同上分项求和                                      |
+| `itemized`    | `reported`  | **勾选**分项（不填数量）+ 另填总报工数（良品）  | 总报工数 × 工序 `pieceRate`（现网公式）           |
 
 ### 5.1 补充规则
 
@@ -128,15 +131,16 @@ dispatch 工序
 3. **审核：** 可改件数和/或分项数量、分项单价；已审核锁定。
 4. **快速报工：** 一期不支持分项口径。
 5. **不良：** 分项计薪一期不做分项级不良折扣；可用整单质量扣款 / 固定扣款。
+6. **排产+报工的分项勾选：** 可选；仅写入 `workItems[].selected`，不影响计薪。
 
 ## 6. 工资汇总与公式
 
 在 `calcProcessReportWage`（或等价入口）按任务/报工快照的 `wageQtyMode` 分支：
 
-| wageQtyMode | 公式                                                         |
-| ----------- | ------------------------------------------------------------ |
-| `reported`  | 现网三套不变（批量计件×计件 / 批量计件×计时 / 时长×计时）    |
-| `itemized`  | `Σ(workItems.qty × unitPriceSnapshot) + 固定补贴 − 质量扣款` |
+| wageQtyMode | 公式                                                                                   |
+| ----------- | -------------------------------------------------------------------------------------- |
+| `reported`  | 现网三套；`itemized + reported` 时件数取工人填写的总报工数（良品等），分项仅作勾选记录 |
+| `itemized`  | `Σ(workItems.qty × unitPriceSnapshot) + 固定补贴 − 质量扣款`                           |
 
 ### 6.1 展示与台账
 
@@ -158,17 +162,18 @@ dispatch 工序
 
 - 按分项拆任务 / 分项齐套门控（与极简非时序一致）
 - 快速报工分项
-- `itemized + reported` 组合
 - 分项级不良折扣矩阵
 - 工序模板在产品侧随意增删分项（产品只维护模板内单价与计划量）
 
 ## 9. 验收要点
 
 - [x] 默认工序下发/报工/计薪与现网一致
-- [x] 工序可配置两口径；非法组合无法保存
-- [x] 分项模板在工序维护；单价在产品 labor 维护；缺价下发拦截
-- [x] `schedule + itemized`：件数与分项均可录；工资按分项求和
+- [x] 四种口径组合均可配置保存
+- [x] 分项模板在工序维护；仅分项计薪时要求产品 labor 单价齐全
+- [x] `schedule + reported`：可勾选分项（无数量）；工资按件数
+- [x] `schedule + itemized`：件数与分项数量均可录；工资按分项求和
 - [x] `itemized + itemized`：以分项为主报工；工资按分项求和
+- [x] `itemized + reported`：勾选分项 + 填总报工数；工资按总报工数 × 工序单价
 - [ ] 多人领取同一任务，各自报不同分项，工资分别归属（沿用任务池，需联调验证）
 - [x] 已下发任务不受事后主数据改价影响（快照）
 - [ ] 审核可调分项数量/单价并重算；审核后锁定（P1：本期仅展示分项明细）

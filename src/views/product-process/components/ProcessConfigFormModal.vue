@@ -152,13 +152,16 @@
           </a-col>
           <a-col :span="24">
             <div class="field-hint field-hint-block">
-              报工口径决定工人怎么填数量；计薪口径决定工资怎么算。分项模板只定义「有哪些活」，单价在产品工时配置中维护。
+              {{ workItemModeHint }}
             </div>
           </a-col>
         </a-row>
-        <div v-if="showWorkItemTemplates" class="work-item-block">
+        <div class="work-item-block">
           <div class="work-item-head">
-            <span class="work-item-title">作业分项模板</span>
+            <span class="work-item-title">
+              作业分项模板
+              <span v-if="workItemTemplatesRequired" class="required-mark">*</span>
+            </span>
             <a-button type="dashed" size="small" @click="addWorkItemTemplate">
               <PlusOutlined />
               添加分项
@@ -186,7 +189,15 @@
               删除
             </a-button>
           </div>
-          <div v-if="!form.workItemTemplates.length" class="field-hint">请添加至少一条作业分项</div>
+          <div
+            v-if="workItemTemplatesRequired && !form.workItemTemplates.length"
+            class="field-hint"
+          >
+            请添加至少一条作业分项
+          </div>
+          <div v-else-if="!form.workItemTemplates.length" class="field-hint">
+            可选：配置后，排产+报工时可勾选分项（不填数量，仅记录做了什么）
+          </div>
         </div>
       </div>
 
@@ -268,7 +279,7 @@ import {
   REPORT_QTY_MODE_OPTIONS,
   WAGE_QTY_MODE,
   WAGE_QTY_MODE_OPTIONS,
-  needsWorkItemPricing,
+  requiresWorkItemQty,
   normalizeProcessWorkItemFields,
   normalizeWorkItemTemplates,
   validateProcessWorkItemConfig,
@@ -333,9 +344,33 @@ const taskExecutionModeOpts = TASK_EXECUTION_MODES.map((item) => ({
 }))
 const defectItemOpts = computed(() => getDefectItemOptions())
 
-const showWorkItemTemplates = computed(() =>
-  needsWorkItemPricing(form.reportQtyMode, form.wageQtyMode),
-)
+const workItemTemplatesRequired = computed(() => {
+  const report = form.reportQtyMode
+  const wage = form.wageQtyMode
+  return (
+    report === REPORT_QTY_MODE.ITEMIZED ||
+    wage === WAGE_QTY_MODE.ITEMIZED ||
+    requiresWorkItemQty(report, wage)
+  )
+})
+
+const workItemModeHint = computed(() => {
+  const report = form.reportQtyMode
+  const wage = form.wageQtyMode
+  if (report === REPORT_QTY_MODE.SCHEDULE && wage === WAGE_QTY_MODE.REPORTED) {
+    return '排产+报工：按件数计薪；若配置了分项模板，报工时可勾选分项（不填数量，仅记录作业类型）。'
+  }
+  if (report === REPORT_QTY_MODE.SCHEDULE && wage === WAGE_QTY_MODE.ITEMIZED) {
+    return '排产+分项计薪：报件数且填分项数量；工资按分项数量×分项单价求和（产品工时中维护单价）。'
+  }
+  if (report === REPORT_QTY_MODE.ITEMIZED && wage === WAGE_QTY_MODE.ITEMIZED) {
+    return '分项+分项：以分项数量报工；工资按分项数量×分项单价求和。'
+  }
+  if (report === REPORT_QTY_MODE.ITEMIZED && wage === WAGE_QTY_MODE.REPORTED) {
+    return '分项+报工：勾选分项（不填数量），并另填总报工数（良品数）；工资=总报工数×工序单价。'
+  }
+  return '报工口径决定工人怎么填数量；计薪口径决定工资怎么算。'
+})
 
 const showTaskExecutionMode = computed(
   () =>
@@ -399,9 +434,7 @@ function onOpSwitchChange(key, checked) {
 }
 
 function onWorkItemModeChange() {
-  if (!showWorkItemTemplates.value) {
-    form.workItemTemplates = []
-  }
+  // 四种组合均支持；模板在「排产+报工」下可选保留，不清空
 }
 
 function addWorkItemTemplate() {
@@ -649,6 +682,11 @@ async function handleSave() {
     font-size: 13px;
     font-weight: 500;
     color: rgba(0, 0, 0, 0.88);
+  }
+
+  .required-mark {
+    margin-left: 2px;
+    color: #ff4d4f;
   }
 
   .work-item-row {

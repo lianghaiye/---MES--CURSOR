@@ -1,6 +1,6 @@
 <template>
   <div class="workbench-dashboard page-shell">
-    <a-row :gutter="[12, 12]">
+    <a-row :gutter="[12, 8]">
       <a-col :xs="24" :xl="18">
         <div class="main-stack">
           <!-- 工序任务 -->
@@ -235,7 +235,11 @@
               <a class="more-link" @click.prevent="goAdmin('scenarios')">更多</a>
             </div>
             <ul v-if="scenarios.length" class="side-list">
-              <li v-for="item in scenarios" :key="item.id" @click="goPath(item.link, item.title)">
+              <li
+                v-for="item in scenarios"
+                :key="item.id"
+                @click="goExternalOrPath(item.link, item.title)"
+              >
                 <span class="side-marker scenario" />
                 <div class="side-text">
                   <div class="side-item-title">{{ item.title }}</div>
@@ -299,7 +303,7 @@
               <li
                 v-for="(item, idx) in guides"
                 :key="item.id"
-                @click="goPath(item.link, item.title)"
+                @click="goExternalOrPath(item.link, item.title)"
               >
                 <span class="guide-icon" :class="`g-${idx % 4}`">
                   <BookOutlined v-if="idx % 4 === 0" />
@@ -322,19 +326,7 @@
 
     <WorkbenchFavoriteModal v-model:open="favoriteModalOpen" />
     <WorkbenchProcessConfigModal v-model:open="processModalOpen" />
-
-    <a-modal
-      v-model:open="releaseModalOpen"
-      :title="activeRelease?.title || '功能发布'"
-      :footer="null"
-      width="520px"
-    >
-      <p class="release-meta">
-        <span class="ver-pill">{{ activeRelease?.versionTag }}</span>
-        <span>{{ activeRelease?.publishDate }}</span>
-      </p>
-      <p class="release-content">{{ activeRelease?.content }}</p>
-    </a-modal>
+    <WorkbenchReleaseMessageModal v-model:open="releaseModalOpen" :release="activeRelease" />
   </div>
 </template>
 
@@ -383,8 +375,10 @@ import {
   submitFeedback,
   workbenchState,
 } from '@/store/workbenchStore'
+import { openExternalLink } from '@/utils/externalLink'
 import WorkbenchFavoriteModal from '@/views/home/components/WorkbenchFavoriteModal.vue'
 import WorkbenchProcessConfigModal from '@/views/home/components/WorkbenchProcessConfigModal.vue'
+import WorkbenchReleaseMessageModal from '@/views/home/components/WorkbenchReleaseMessageModal.vue'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -577,6 +571,21 @@ function onRefresh() {
   }
 }
 
+function goExternalOrPath(link, title) {
+  const raw = String(link || '').trim()
+  if (!raw) {
+    message.info('暂无跳转链接')
+    return
+  }
+  // 外站文档：新标签打开
+  if (/^https?:\/\//i.test(raw) || (!raw.startsWith('/') && raw.includes('.'))) {
+    const res = openExternalLink(raw)
+    if (!res.ok) message.warning(res.message)
+    return
+  }
+  goPath(raw, title)
+}
+
 function openRelease(item) {
   activeRelease.value = item
   releaseModalOpen.value = true
@@ -620,6 +629,7 @@ export default { name: 'WorkbenchDashboardView' }
   border: 1px solid @border;
   border-radius: 10px;
   padding: 16px 18px;
+  margin: 0;
   box-shadow: 0 1px 2px rgba(15, 35, 95, 0.04);
 }
 
@@ -627,7 +637,7 @@ export default { name: 'WorkbenchDashboardView' }
 .side-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px; /* 盒子与盒子行间距 */
 }
 
 .panel-header {
@@ -714,7 +724,7 @@ export default { name: 'WorkbenchDashboardView' }
   display: grid;
   /* 参考图双栏排版较宽，一行最多 5 张；不足不拉伸 */
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
   justify-content: start;
 }
 
@@ -934,7 +944,7 @@ export default { name: 'WorkbenchDashboardView' }
 .favorite-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .favorite-card {
@@ -1165,7 +1175,7 @@ export default { name: 'WorkbenchDashboardView' }
 .side-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px; /* 与主栏一致：盒子行间距 8px */
 }
 
 .side-panel {
