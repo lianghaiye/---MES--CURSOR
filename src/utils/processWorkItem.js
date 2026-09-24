@@ -1,7 +1,18 @@
 /**
  * 工序作业分项：报工口径 / 计薪口径 / 分项模板与产品单价
  * @see docs/superpowers/specs/2026-09-22-process-work-item-report-wage-design.md
+ *
+ * 分档：
+ * - basic（一期）：固定 schedule+reported；模板可选勾选，不计薪
+ * - wage（二期）：开放分项计薪等增强能力
  */
+
+/** @type {'basic' | 'wage'} */
+export const WORK_ITEM_PHASE = 'basic'
+
+export function isWorkItemWagePhaseEnabled() {
+  return WORK_ITEM_PHASE === 'wage'
+}
 
 export const REPORT_QTY_MODE = {
   SCHEDULE: 'schedule',
@@ -84,8 +95,13 @@ export function normalizeWorkItemRates(list = []) {
 
 /** 工序口径 + 模板规范化（迁移默认：schedule + reported） */
 export function normalizeProcessWorkItemFields(process = {}) {
-  const reportQtyMode = normalizeReportQtyMode(process.reportQtyMode)
-  const wageQtyMode = normalizeWageQtyMode(process.wageQtyMode)
+  let reportQtyMode = normalizeReportQtyMode(process.reportQtyMode)
+  let wageQtyMode = normalizeWageQtyMode(process.wageQtyMode)
+  // 一期基础档：对外能力锁死为排产+报工，字段仍写入便于二期扩展
+  if (!isWorkItemWagePhaseEnabled()) {
+    reportQtyMode = REPORT_QTY_MODE.SCHEDULE
+    wageQtyMode = WAGE_QTY_MODE.REPORTED
+  }
   const workItemTemplates = normalizeWorkItemTemplates(process.workItemTemplates)
   return { reportQtyMode, wageQtyMode, workItemTemplates }
 }
@@ -103,7 +119,13 @@ export function validateProcessWorkItemConfig({
   const wage = normalizeWageQtyMode(wageQtyMode)
   const templates = normalizeWorkItemTemplates(workItemTemplates)
 
-  // 四种口径组合均允许；分项报工或分项计薪时必须有模板
+  if (!isWorkItemWagePhaseEnabled()) {
+    // 一期：允许任意传入口径，保存前会规范化；模板名称非空即可
+    const emptyName = templates.find((t) => !String(t.name || '').trim())
+    if (emptyName) return { ok: false, message: '作业分项名称不能为空' }
+    return { ok: true }
+  }
+
   if (
     (report === REPORT_QTY_MODE.ITEMIZED || wage === WAGE_QTY_MODE.ITEMIZED) &&
     !templates.length

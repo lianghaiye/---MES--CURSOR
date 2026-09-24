@@ -128,8 +128,11 @@
       </div>
 
       <div class="form-section-box">
-        <div class="section-label">报工 / 计薪口径与作业分项</div>
-        <a-row :gutter="[12, 12]" style="width: 100%">
+        <div class="section-label">作业分项</div>
+        <div class="field-hint field-hint-block">
+          {{ workItemModeHint }}
+        </div>
+        <a-row v-if="showWorkItemModeSelectors" :gutter="[12, 12]" style="width: 100%">
           <a-col :span="8">
             <a-form-item label="报工口径">
               <a-select
@@ -149,11 +152,6 @@
                 @change="onWorkItemModeChange"
               />
             </a-form-item>
-          </a-col>
-          <a-col :span="24">
-            <div class="field-hint field-hint-block">
-              {{ workItemModeHint }}
-            </div>
           </a-col>
         </a-row>
         <div class="work-item-block">
@@ -196,7 +194,7 @@
             请添加至少一条作业分项
           </div>
           <div v-else-if="!form.workItemTemplates.length" class="field-hint">
-            可选：配置后，排产+报工时可勾选分项（不填数量，仅记录做了什么）
+            可选：配置后，工人报工时可勾选分项（不填数量，仅记录做了什么；计薪仍按工序单价）
           </div>
         </div>
       </div>
@@ -279,6 +277,7 @@ import {
   REPORT_QTY_MODE_OPTIONS,
   WAGE_QTY_MODE,
   WAGE_QTY_MODE_OPTIONS,
+  isWorkItemWagePhaseEnabled,
   requiresWorkItemQty,
   normalizeProcessWorkItemFields,
   normalizeWorkItemTemplates,
@@ -344,7 +343,10 @@ const taskExecutionModeOpts = TASK_EXECUTION_MODES.map((item) => ({
 }))
 const defectItemOpts = computed(() => getDefectItemOptions())
 
+const showWorkItemModeSelectors = computed(() => isWorkItemWagePhaseEnabled())
+
 const workItemTemplatesRequired = computed(() => {
+  if (!isWorkItemWagePhaseEnabled()) return false
   const report = form.reportQtyMode
   const wage = form.wageQtyMode
   return (
@@ -355,6 +357,9 @@ const workItemTemplatesRequired = computed(() => {
 })
 
 const workItemModeHint = computed(() => {
+  if (!isWorkItemWagePhaseEnabled()) {
+    return '一期：计薪仍按工序报工数×工序单价。配置分项模板后，工人报工时可勾选「做了哪些活」（不填数量），便于追溯；后续可扩展按分项数量×分项单价计薪。'
+  }
   const report = form.reportQtyMode
   const wage = form.wageQtyMode
   if (report === REPORT_QTY_MODE.SCHEDULE && wage === WAGE_QTY_MODE.REPORTED) {

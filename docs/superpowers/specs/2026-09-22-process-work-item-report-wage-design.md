@@ -1,192 +1,170 @@
-# 工序作业分项 · 报工口径与计薪口径设计
+# 工序作业分项 · 报工与计薪设计
 
 **日期：** 2026-09-22  
 **仓库：** i-doms-web  
-**状态：** 实现中  
-**背景：** 客户存在「同一工序内多种作业内容、多人认领、按类型计价」场景（如钻孔：大孔/小孔/内角孔）。旧做法拆成多道工序不灵活；现网计件仅支持报工数量 × 单一单价。
+**状态：** 一期基础档（实现中）  
+**背景：** 客户存在「同一工序内多种作业内容、多人认领」场景（如钻孔：大孔/小孔/内角孔）。不拆工序任务的前提下，需要先能**记录做了什么**；后续再支持**按分项差异计价**。
 
 ## 1. 目标
 
-在**不拆工序任务粒度**的前提下：
+在**不拆工序任务粒度**（仍为 `工单 × 工序` 一条）的前提下：
 
-1. 支持工序级可配置的**报工口径**与**计薪口径**；
-2. 支持工序**作业分项模板** + 产品侧**分项单价**；
-3. 与现有极简模式（非时序、任务池领取）兼容；
-4. 未启用分项的工序行为与现网完全一致。
+1. **一期（基础档）：** 现网计件不变；可选维护分项模板，报工时**勾选分项（不填数量）**，仅记账/追溯；
+2. **二期（增强档）：** 在同一数据模型上打开「按分项数量 × 分项单价」计薪，以及必要的报工录入增强；
+3. 与极简模式（非时序、任务池领取）兼容；
+4. **未配模板的工序行为与现网完全一致。**
 
-## 2. 决策摘要
+## 2. 分档决策（产品策略）
 
-| 项                    | 选择                                                                                    |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| 任务粒度              | 仍为 `工单 × 工序` 一条；**不按分项、不按人**拆任务（协作时长报工按人拆条的现规则保留） |
-| 多人协作              | 沿用 `claimTargets` 任务池；有空领取后报自己的分项                                      |
-| 报工口径 / 计薪口径   | **两项独立配置**，挂在**工序主数据**                                                    |
-| 分项模板              | 挂在**工序主数据**（code / name / unit，无价）                                          |
-| 分项单价 / 可选计划量 | 挂在**产品/物料 laborRows**（按模板 code；计划量为**单件** `plannedQtyPerPiece`）       |
-| 极简非时序            | 分项**不做**齐套门控，不拦截其它工序                                                    |
-| 禁止组合              | **无**（四种口径组合均支持）                                                            |
-| 排产+报工 × 分项模板  | 有模板时可**勾选分项**（不填数量，仅记录作业类型）；计薪仍按报工件数 × 工序单价         |
-| 分项+报工             | 勾选分项（不填数量）+ 另填总报工数（良品数）；工资 = 总报工数 × 工序单价                |
-| 分项计薪与报工类型    | `wageQtyMode=itemized` 一期仅配合批量计件；时长报工保持 `reported`                      |
-| 快速报工              | 一期仅 `schedule + reported`；分项只开放任务报工                                        |
+| 档位            | 用户感知                               | 计薪                      | 分项在报工上的作用                   |
+| --------------- | -------------------------------------- | ------------------------- | ------------------------------------ |
+| **一期 · 基础** | 工序仍按件数报工；可勾选「做了哪些活」 | `件数 × 工序单价`（现网） | **标签**：可选勾选，无数量、无分项价 |
+| **二期 · 增强** | 可按分项数量报工/计薪                  | `Σ(分项量 × 分项单价)` 等 | **定额行**：要数量 + 产品侧单价      |
 
-## 3. 配置与数据模型
+**一期不做：** 报工口径 / 计薪口径双下拉的四种组合配置（降低配置成本与培训成本）。  
+**一期预留：** 字段与快照结构按二期可扩展设计，避免推倒重来。
 
-### 3.1 工序主数据新增
+## 3. 决策摘要（跨期不变）
+
+| 项                | 选择                                                             |
+| ----------------- | ---------------------------------------------------------------- |
+| 任务粒度          | 仍为 `工单 × 工序` 一条；**不按分项、不按人**拆任务              |
+| 多人协作          | 沿用 `claimTargets` 任务池                                       |
+| 分项模板          | 挂在**工序主数据**（code / name / unit，**无价**）               |
+| 分项单价 / 计划量 | 挂在**产品 laborRows.workItemRates**（二期启用；一期可存可不填） |
+| 极简非时序        | 分项**不做**齐套门控                                             |
+| 快速报工          | 一期不强制分项勾选                                               |
+
+## 4. 数据模型（一期落地 + 二期扩展点）
+
+### 4.1 工序主数据
 
 ```
 process
-  reportQtyMode: 'schedule' | 'itemized'   // 报工口径：按排产数量 | 按分项明细
-  wageQtyMode:   'reported' | 'itemized'   // 计薪口径：按报工数 | 按分项明细
+  reportQtyMode: 'schedule' | 'itemized'   // 一期固定写 'schedule'；二期可开放
+  wageQtyMode:   'reported' | 'itemized'   // 一期固定写 'reported'；二期可开放
   workItemTemplates[]:
     - code: string
     - name: string
     - unit: string
 ```
 
-**配置校验：**
+**一期配置面：** 只维护 `workItemTemplates`（可选）。口径字段入库但**不对业务用户暴露双下拉**，保存时规范化为 `schedule + reported`。
 
-- 四种口径组合**均可保存**；
-- `reportQtyMode=itemized` 或 `wageQtyMode=itemized` → `workItemTemplates` 至少 1 条；
-- `schedule + reported` → 模板可选（有模板则报工可勾选分项）；
-- 两者均为非分项且无模板 → 现网默认。
+**二期配置面：** 再开放口径（或改为更业务化的「计薪方式：按工序单价 / 按分项单价」单选项，内部映射到上述字段）。
 
-**默认值（迁移）：** 已有工序 `reportQtyMode=schedule`，`wageQtyMode=reported`，`workItemTemplates=[]`。
-
-### 3.2 产品 laborRows 扩展
-
-在现有「物品编码 × 工序名」工时行上增加：
+### 4.2 产品 laborRows（二期主用，一期预留）
 
 ```
 laborRow
-  // 保留：reportType / salaryMethod / pieceRate / standardHourlyRate / …
   workItemRates[]:
-    - itemCode: string          // 对齐工序模板 code
-    - unitPrice: number         // 分项单价
-    - plannedQtyPerPiece?: number  // 可选：单件计划分项量；任务总计划 = 该值 × 本批/工单排产数
+    - itemCode: string
+    - unitPrice: number
+    - plannedQtyPerPiece?: number
 ```
 
-**合并规则：** 报工/下发需要分项时 = 工序 `workItemTemplates` 按 `itemCode` 左连本产品该工序 `workItemRates`。
+- **一期：** 表单可不强调；有数据也不参与计薪、不下发缺价拦截。
+- **二期：** `wageQtyMode=itemized` 时下发前校验单价齐全。
 
-**缺价策略：** 仅当 `wageQtyMode=itemized` 时，下发前对模板分项**拦截**缺价（须配齐 `unitPrice`）。`itemized + reported` 不要求分项单价（走工序 `pieceRate`）。
-
-**与报工类型关系：** `wageQtyMode=itemized` 一期仅允许配合「批量计件」类报工；「时长报工」须保持 `wageQtyMode=reported`（走现有计时公式）。
-
-### 3.3 报工记录扩展
+### 4.3 报工记录
 
 ```
 processReport
-  goodQty / defectQty              // schedule 口径下主数量；itemized+reported 时可回写为分项数量合计
+  goodQty / defectQty
+  reportQtyMode / wageQtyMode          // 自任务快照落入，保证在制规则稳定
   workItems[]?:
     - itemCode / itemName / unit
-    - qty: number                  // select 模式可为 0
-    - selected?: boolean           // 排产+报工勾选分项
-    - unitPriceSnapshot: number    // 分项计薪时提交快照；按报工数计薪时可无价
+    - selected?: boolean               // 一期：勾选
+    - qty?: number                     // 二期：分项数量；一期为 0/空
+    - unitPriceSnapshot?: number       // 二期计薪快照；一期可无
 ```
 
-### 3.4 任务快照（下发 enrichment）
+### 4.4 任务快照（下发 enrichment）
 
-小程序任务在现有字段外可选写入：
+始终写入（即使一期口径固定）：
 
-- `reportQtyMode`、`wageQtyMode`
-- 合并后的分项清单：`code / name / unit / unitPrice / plannedQtyPerPiece`（以及按排产数算出的 `plannedQtyTotal`）
+- `reportQtyMode`、`wageQtyMode`、`workItemEntryMode`
+- 分项清单：`code / name / unit`（及二期才有意义的 `unitPrice / plannedQty*`）
 
-**在制任务以快照为准**，事后改工序主数据或 labor 单价不影响已下发任务的报工/计薪规则。
+**在制任务以快照为准**——这是二期改价不回刷在制任务的扩展基础。
 
-## 4. 下发改动点
+## 5. 一期行为（基础档）
 
-| 环节                             | 行为                                                              |
-| -------------------------------- | ----------------------------------------------------------------- |
-| 任务条数 / ID                    | **不变**（`mt-{workOrderId}-{processSeq}`；协作时长例外按现规则） |
-| 极简并行 / 领取 / 单人直达待报工 | **不变**                                                          |
-| 下发前校验                       | 仅 `wageQtyMode=itemized` 时校验本产品分项单价齐全                |
-| 按分项拆任务                     | **不做**                                                          |
-| 排产批次                         | **不**因分项再生成任务                                            |
+| 环节     | 行为                                                 |
+| -------- | ---------------------------------------------------- |
+| 工序配置 | 可选维护作业分项模板；口径固定 `schedule + reported` |
+| 下发     | 仍 1 条任务；带模板快照；**不**校验分项单价          |
+| 报工 UI  | 报良/不良件数；有模板则**可选勾选**分项（不填数量）  |
+| 计薪     | 现网公式，**忽略**分项勾选                           |
+| 工资汇总 | 与现网一致；分项可作为备注/明细展示（可选）          |
 
-伪流程：
+## 6. 二期扩展路径（增强档 · 设计预留）
 
-```
-dispatch 工序
-  → 读工序 reportQtyMode / wageQtyMode / workItemTemplates
-  → 合并产品 workItemRates
-  → wageQtyMode=itemized 且缺价 → fail
-  → 生成 1 条 mobile task（带口径与分项快照）
-```
+推荐用**业务单选项**升级，而不是一上来恢复「四宫格」：
 
-涉及实现落点（参考现网）：`mobileTaskDispatch.js`、`workOrderDispatchHelpers.js`、工序配置表单、物料/产品 laborRows 表单。
+| 用户选项（示例）   | 内部映射                                       | 报工                | 计薪              |
+| ------------------ | ---------------------------------------------- | ------------------- | ----------------- |
+| 按工序单价（默认） | `schedule + reported`                          | 件数 + 可选勾选分项 | 件数 × 工序价     |
+| 按分项单价         | `schedule + itemized` 或 `itemized + itemized` | 件数和/或分项数量   | `Σ(qty × 分项价)` |
 
-## 5. 报工 / 计薪行为矩阵
+扩展时优先复用：
 
-| reportQtyMode | wageQtyMode | 报工 UI                                         | 计薪取数                                          |
-| ------------- | ----------- | ----------------------------------------------- | ------------------------------------------------- |
-| `schedule`    | `reported`  | 报良/不良件数；有模板时可**勾选**分项（无数量） | 现网公式：`(折算报工数) × pieceRate` 或计时公式   |
-| `schedule`    | `itemized`  | 报件数 **且** 必填分项数量                      | `Σ(分项 qty × unitPriceSnapshot)`；件数不参与乘价 |
-| `itemized`    | `itemized`  | 主界面为分项数量；件数可不填                    | 同上分项求和                                      |
-| `itemized`    | `reported`  | **勾选**分项（不填数量）+ 另填总报工数（良品）  | 总报工数 × 工序 `pieceRate`（现网公式）           |
+1. 已有 `workItemTemplates` / `workItemRates` / `workItems`；
+2. `resolveWorkItemEntryMode`：`select`（一期）→ 增加 `qty`（二期）；
+3. `calcProcessReportWage` 已具备 `wageQtyMode=itemized` 分支；
+4. 下发 `validateDispatchWorkItemPricing`（仅分项计薪开启）。
 
-### 5.1 补充规则
+**二期仍建议谨慎开放** `itemized + reported` 等冷门组合，除非有明确客户故事。
 
-1. **分项剩余（P1，可降级）：** 有 `plannedQtyPerPiece` 时，任务分项总计划 = `plannedQtyPerPiece × 排产数`，校验累计报工 ≤ 总计划；未配置计划量则仅正数校验。降级时不做累计上限，只保留正数校验。
-2. **多人共享任务：** 各人各自提交报工记录 + 分项；工资按报工人归集。
-3. **审核：** 可改件数和/或分项数量、分项单价；已审核锁定。
-4. **快速报工：** 一期不支持分项口径。
-5. **不良：** 分项计薪一期不做分项级不良折扣；可用整单质量扣款 / 固定扣款。
-6. **排产+报工的分项勾选：** 可选；仅写入 `workItems[].selected`，不影响计薪。
+## 7. 扩展设计原则（避免一期埋坑）
 
-## 6. 工资汇总与公式
+1. **任务粒度永不按分项拆**——二期只加录入与计薪分支，不加「按分项下发」。
+2. **口径进快照**——一期也写字段，二期改主数据不影响在制。
+3. **模板与单价分离**——工序无价、产品有价；一期只配模板即可。
+4. **报工行结构一次定好**——`selected` + `qty` + `unitPriceSnapshot` 并存，一期只用 `selected`。
+5. **计薪只认快照口径**——禁止二期用「当前主数据」重算历史已审核单（除非显式重算工具）。
+6. **配置面渐进暴露**——一期隐藏口径矩阵，降低误配；二期用业务语言打开能力。
 
-在 `calcProcessReportWage`（或等价入口）按任务/报工快照的 `wageQtyMode` 分支：
+## 8. 兼容与迁移
 
-| wageQtyMode | 公式                                                                                   |
-| ----------- | -------------------------------------------------------------------------------------- |
-| `reported`  | 现网三套；`itemized + reported` 时件数取工人填写的总报工数（良品等），分项仅作勾选记录 |
-| `itemized`  | `Σ(workItems.qty × unitPriceSnapshot) + 固定补贴 − 质量扣款`                           |
+| 对象           | 策略                                                                   |
+| -------------- | ---------------------------------------------------------------------- |
+| 已有工序       | 默认 `schedule + reported`，无模板                                     |
+| 已有 laborRows | 无 `workItemRates` 不影响一期                                          |
+| 已有报工       | 无 `workItems` 走现网                                                  |
+| 一 → 二期      | 补模板（若无）→ 补 `workItemRates` → 打开分项计薪 → **新下发**任务生效 |
 
-### 6.1 展示与台账
+## 9. 一期不做 / 二期再议
 
-- `wageQtyMode=itemized`：工资汇总展示分项合计表；「单件计价单价」标为不适用或隐藏。
-- 推送小程序「工时工资」：一期可只推汇总金额；Web 工资详情可下钻 `workItems`。
-- `salaryStatsAggregate`：分项模式用分项求和结果，禁止再对 `goodQty × pieceRate`。
+**一期不做**
 
-## 7. 兼容与迁移
+- 报工/计薪口径四组合配置 UI
+- 分项数量录入、分项单价计薪、缺价下发拦截
+- 按分项拆任务 / 分项齐套
+- 快速报工强制分项
+- 分项级不良折扣
 
-| 对象           | 策略                                            |
-| -------------- | ----------------------------------------------- |
-| 已有工序       | 默认 `schedule` + `reported`，无模板            |
-| 已有 laborRows | 无 `workItemRates`，行为不变                    |
-| 已有报工记录   | 无 `workItems`，走 `reported` 路径              |
-| 启用分项顺序   | 改工序口径+模板 → 补产品分项单价 → 再下发新任务 |
-| 在制任务       | 以任务快照口径为准                              |
+**二期再议**
 
-## 8. 一期不做
+- `itemized + reported` 等冷门组合是否产品化
+- 分项累计上限（`plannedQtyPerPiece`）
+- 审核改分项数量/单价并重算
 
-- 按分项拆任务 / 分项齐套门控（与极简非时序一致）
-- 快速报工分项
-- 分项级不良折扣矩阵
-- 工序模板在产品侧随意增删分项（产品只维护模板内单价与计划量）
+## 10. 一期验收要点
 
-## 9. 验收要点
+- [ ] 无模板：下发/报工/计薪与现网一致
+- [ ] 有模板：报工可勾选分项；不填数量；计薪仍按件数 × 工序单价
+- [ ] 勾选结果写入报工 `workItems`（`selected`），台账可查
+- [ ] 任务快照含口径字段与分项清单（为二期铺路）
+- [ ] 工序配置不出现易误导的「四宫格」口径组合
 
-- [x] 默认工序下发/报工/计薪与现网一致
-- [x] 四种口径组合均可配置保存
-- [x] 分项模板在工序维护；仅分项计薪时要求产品 labor 单价齐全
-- [x] `schedule + reported`：可勾选分项（无数量）；工资按件数
-- [x] `schedule + itemized`：件数与分项数量均可录；工资按分项求和
-- [x] `itemized + itemized`：以分项为主报工；工资按分项求和
-- [x] `itemized + reported`：勾选分项 + 填总报工数；工资按总报工数 × 工序单价
-- [ ] 多人领取同一任务，各自报不同分项，工资分别归属（沿用任务池，需联调验证）
-- [x] 已下发任务不受事后主数据改价影响（快照）
-- [ ] 审核可调分项数量/单价并重算；审核后锁定（P1：本期仅展示分项明细）
+## 11. 关联现网模块
 
-## 10. 关键现网模块（实现时对照）
-
-| 主题       | 路径                                                                           |
-| ---------- | ------------------------------------------------------------------------------ |
-| 任务下发   | `src/utils/mobileTaskDispatch.js`、`workOrderDispatchHelpers.js`               |
-| 执行模式   | `src/utils/taskExecutionMode.js`                                               |
-| labor 解析 | `src/utils/laborConfigResolver.js`                                             |
-| 工资计算   | `src/utils/processReportWageCalc.js`、`constants/processReportWageFormulas.js` |
-| 报工 store | `src/store/processReportStore.js`                                              |
-| 工资 UI    | `src/views/production/components/ProcessReportWageSummary.vue`                 |
-| 工序配置   | `src/views/product-process/components/ProcessConfigFormModal.vue`              |
-| labor 表单 | `MasterItemFormModal.vue` / `ProductFormModal.vue`                             |
+| 主题       | 路径                                                               |
+| ---------- | ------------------------------------------------------------------ |
+| 分项工具   | `src/utils/processWorkItem.js`（含 `WORK_ITEM_PHASE`）             |
+| 任务下发   | `src/utils/mobileTaskDispatch.js`、`workOrderDispatchHelpers.js`   |
+| 工资计算   | `src/utils/processReportWageCalc.js`                               |
+| 工序配置   | `ProcessConfigFormModal.vue`                                       |
+| labor 表单 | `MasterItemFormModal.vue` / `ProductFormModal.vue`（二期强化单价） |
+| 小程序报工 | `i-doms-mobile/.../process-report/execute.vue`                     |

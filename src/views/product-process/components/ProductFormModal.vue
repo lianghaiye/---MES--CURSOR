@@ -567,7 +567,10 @@
                       />
                     </a-form-item>
                   </a-col>
-                  <a-col v-if="laborWorkItemCatalog(row).length" :span="24">
+                  <a-col
+                    v-if="isWorkItemWagePhaseEnabled() && laborWorkItemCatalog(row).length"
+                    :span="24"
+                  >
                     <div class="work-item-rates-block">
                       <div class="work-item-rates-title">作业分项单价</div>
                       <div
@@ -790,6 +793,7 @@ import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStor
 import { getProcessRouteSelectOptions } from '@/utils/productionPlanMaterial'
 import { getProcessByName } from '@/store/processConfigStore'
 import {
+  isWorkItemWagePhaseEnabled,
   mergeWorkItemTemplatesWithRates,
   normalizeWorkItemRates,
   normalizeProcessWorkItemFields,
