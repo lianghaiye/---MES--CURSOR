@@ -140,15 +140,24 @@ export function evaluateQcInboundGate(task) {
     }
   }
   if (task.qcResult === QC_TASK_RESULT.FAIL) {
+    const qtyHints = buildQcAcceptInboundQtyHints(task)
+    const hasQty = qtyHints && Object.values(qtyHints).some((q) => Number(q) > 0)
+    if (hasQty) {
+      return { ok: true, mode: 'fail_partial_inbound', qtyHints, enforceQtyCap: true }
+    }
     return {
       ok: false,
-      message: '质检不通过的单据不可生成入库单',
+      message: '质检不通过且无可入库数量（合格入库/让步入库），不可生成入库单',
       mode: 'fail',
       qtyHints: null,
       enforceQtyCap: false,
     }
   }
   if (task.qcResult === QC_TASK_RESULT.PASS) {
+    const qtyHints = buildQcAcceptInboundQtyHints(task)
+    if (qtyHints && Object.values(qtyHints).some((q) => Number(q) > 0)) {
+      return { ok: true, mode: 'pass', qtyHints, enforceQtyCap: true }
+    }
     return { ok: true, mode: 'pass', qtyHints: null, enforceQtyCap: false }
   }
   if (task.qcResult === QC_TASK_RESULT.PARTIAL) {

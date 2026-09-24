@@ -49,49 +49,57 @@
               </div>
             </div>
 
-            <div class="process-grid" :class="{ collapsed: !processExpanded }">
+            <div class="process-grid">
               <div
-                v-for="card in processCards"
+                v-for="card in visibleProcessCards"
                 :key="card.id"
                 class="process-card"
                 :class="`tone-${card.tone}`"
                 @click="goProcessReport"
               >
-                <div class="process-card-top">
-                  <span class="process-badge">{{ card.name }}</span>
-                  <span class="process-pct">{{ card.progress }}%</span>
-                </div>
-                <div class="process-card-main">
-                  <span class="process-card-num">{{ formatNum(card.taskCount) }}</span>
-                  <span class="process-card-unit">生产任务数</span>
-                </div>
-                <div class="process-card-stats">
-                  <div class="stat-row">
-                    <span class="stat-label">计划数</span>
-                    <span class="stat-value">{{ formatNum(card.planQty) }}</span>
+                <span class="process-ribbon">{{ card.name }}</span>
+                <div class="process-body">
+                  <div class="process-left">
+                    <div class="process-num">{{ formatNum(card.taskCount) }}</div>
+                    <div class="process-unit">生产任务数</div>
                   </div>
-                  <div class="stat-row">
-                    <span class="stat-label">良品数</span>
-                    <span class="stat-value good">{{ formatNum(card.goodQty) }}</span>
-                  </div>
-                  <div class="stat-row">
-                    <span class="stat-label">不良品数</span>
-                    <span class="stat-value bad">{{ formatNum(card.badQty) }}</span>
+                  <div class="process-right">
+                    <div class="stat-line">
+                      <span>计划数</span>
+                      <b>{{ formatNum(card.planQty) }}</b>
+                    </div>
+                    <div class="stat-line">
+                      <span class="good">良品数</span>
+                      <b class="good">{{ formatNum(card.goodQty) }}</b>
+                    </div>
+                    <div class="stat-line">
+                      <span class="warn">不良品数</span>
+                      <b class="warn">{{ formatNum(card.badQty) }}</b>
+                    </div>
                   </div>
                 </div>
-                <div class="process-progress">
-                  <a-progress
-                    :percent="card.progress"
-                    :show-info="false"
-                    :stroke-width="6"
-                    :stroke-color="toneColor(card.tone)"
-                    trail-color="rgba(0,0,0,0.06)"
-                  />
+                <div class="process-foot">
+                  <span class="progress-label">进度</span>
+                  <div class="progress-track">
+                    <a-progress
+                      :percent="card.progress"
+                      :show-info="false"
+                      :stroke-width="6"
+                      :stroke-color="toneColor(card.tone)"
+                      trail-color="rgba(0,0,0,0.06)"
+                    />
+                  </div>
+                  <span class="progress-pct">{{ card.progress }}%</span>
                 </div>
               </div>
             </div>
-            <button type="button" class="expand-bar" @click="processExpanded = !processExpanded">
-              <span>{{ processExpanded ? '收起' : '展开更多工序' }}</span>
+            <button
+              v-if="canExpandProcess"
+              type="button"
+              class="expand-bar"
+              @click="processExpanded = !processExpanded"
+            >
+              <span>{{ processExpanded ? '收起' : `展开更多工序（${hiddenProcessCount}）` }}</span>
               <DownOutlined v-if="!processExpanded" />
               <UpOutlined v-else />
             </button>
@@ -383,7 +391,8 @@ const { openTab } = useTabs()
 
 const period = ref('today')
 const includeNotStarted = ref(true)
-const processExpanded = ref(true)
+const processExpanded = ref(false)
+const PROCESS_ROW_SIZE = 5
 const woTab = ref('notStarted')
 const favoriteModalOpen = ref(false)
 const processModalOpen = ref(false)
@@ -402,6 +411,15 @@ const processCards = computed(() => {
     visibleIds: listVisibleProcessIds(),
   })
 })
+
+const visibleProcessCards = computed(() => {
+  if (processExpanded.value) return processCards.value
+  return processCards.value.slice(0, PROCESS_ROW_SIZE)
+})
+
+const canExpandProcess = computed(() => processCards.value.length > PROCESS_ROW_SIZE)
+
+const hiddenProcessCount = computed(() => Math.max(0, processCards.value.length - PROCESS_ROW_SIZE))
 
 const favorites = computed(() => {
   void workbenchState.favorites
@@ -693,176 +711,190 @@ export default { name: 'WorkbenchDashboardView' }
 }
 
 .process-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  /* 参考图双栏排版较宽，一行最多 5 张；不足不拉伸 */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
-
-  &.collapsed {
-    max-height: none;
-    overflow: visible;
-  }
+  justify-content: start;
 }
 
 .process-card {
   position: relative;
-  flex: 1 1 calc((100% - 72px) / 7);
-  min-width: 118px;
-  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
   border-radius: 10px;
-  padding: 12px 12px 10px;
+  padding: 0;
   cursor: pointer;
-  border: 1px solid transparent;
-  background: linear-gradient(180deg, #f7faff 0%, #fff 55%);
+  border: 1px solid #e8eef5;
+  background: linear-gradient(180deg, #f7faff 0%, #fff 48%);
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
     border-color 0.18s ease;
 
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 3px;
-    border-radius: 10px 10px 0 0;
-    background: @primary;
-  }
-
   &:hover {
-    transform: translateY(-2px);
-    border-color: #d6e4ff;
-    box-shadow: 0 8px 20px rgba(22, 119, 255, 0.1);
+    transform: translateY(-1px);
+    border-color: #91caff;
+    box-shadow: 0 6px 16px rgba(22, 119, 255, 0.1);
   }
 
   &.tone-cyan {
-    background: linear-gradient(180deg, #f0fffe 0%, #fff 55%);
-    &::before {
+    background: linear-gradient(180deg, #f0fffe 0%, #fff 48%);
+    .process-ribbon {
       background: #13c2c2;
-    }
-    .process-badge {
-      color: #08979c;
-      background: #e6fffb;
     }
   }
   &.tone-orange {
-    background: linear-gradient(180deg, #fff8f0 0%, #fff 55%);
-    &::before {
+    background: linear-gradient(180deg, #fff8f0 0%, #fff 48%);
+    .process-ribbon {
       background: #fa8c16;
-    }
-    .process-badge {
-      color: #d46b08;
-      background: #fff7e6;
     }
   }
   &.tone-purple {
-    background: linear-gradient(180deg, #f9f0ff 0%, #fff 55%);
-    &::before {
+    background: linear-gradient(180deg, #f9f0ff 0%, #fff 48%);
+    .process-ribbon {
       background: #722ed1;
-    }
-    .process-badge {
-      color: #531dab;
-      background: #f9f0ff;
     }
   }
   &.tone-green {
-    background: linear-gradient(180deg, #f6ffed 0%, #fff 55%);
-    &::before {
+    background: linear-gradient(180deg, #f6ffed 0%, #fff 48%);
+    .process-ribbon {
       background: #52c41a;
-    }
-    .process-badge {
-      color: #389e0d;
-      background: #f6ffed;
     }
   }
   &.tone-magenta {
-    background: linear-gradient(180deg, #fff0f6 0%, #fff 55%);
-    &::before {
+    background: linear-gradient(180deg, #fff0f6 0%, #fff 48%);
+    .process-ribbon {
       background: #eb2f96;
     }
-    .process-badge {
-      color: #c41d7f;
-      background: #fff0f6;
+  }
+  &.tone-blue {
+    background: linear-gradient(180deg, #f7faff 0%, #fff 48%);
+    .process-ribbon {
+      background: @primary;
     }
   }
-  &.tone-blue .process-badge {
-    color: #0958d9;
-    background: #e6f4ff;
-  }
 }
 
-.process-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.process-badge {
+.process-ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.process-pct {
+  height: 24px;
+  padding: 0 12px 0 10px;
+  border-radius: 0 0 10px 0;
+  background: @primary;
+  color: #fff;
   font-size: 12px;
   font-weight: 600;
-  color: @text-secondary;
-  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
-.process-card-main {
+.process-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  min-height: 92px;
+  padding: 32px 12px 12px;
+}
+
+.process-left {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 10px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-right: 8px;
+  text-align: center;
 }
 
-.process-card-num {
+.process-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding-left: 10px;
+  border-left: 1px dashed #d9e2ef;
+}
+
+.process-num {
   font-size: 28px;
   font-weight: 700;
-  line-height: 1;
-  color: @text;
+  line-height: 1.1;
+  color: rgba(0, 0, 0, 0.85);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.5px;
 }
 
-.process-card-unit {
+.process-unit {
+  margin-top: 4px;
   font-size: 12px;
   color: @text-secondary;
+  line-height: 1.2;
 }
 
-.process-card-stats {
+.stat-line {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-
-.stat-row {
-  display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  align-items: center;
+  gap: 6px;
   font-size: 12px;
   line-height: 1.3;
-}
-
-.stat-label {
   color: @text-secondary;
+
+  b {
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.75);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .good,
+  b.good {
+    color: #52c41a;
+  }
+
+  .warn,
+  b.warn {
+    color: #fa8c16;
+  }
 }
 
-.stat-value {
-  color: @text;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
+.process-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid #f0f3f8;
+}
 
-  &.good {
-    color: #389e0d;
+.progress-label,
+.progress-pct {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: @text-secondary;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-track {
+  flex: 1;
+  min-width: 0;
+
+  :deep(.ant-progress) {
+    margin: 0;
+    line-height: 1;
   }
-  &.bad {
-    color: #cf1322;
+
+  :deep(.ant-progress-outer) {
+    padding-inline-end: 0;
+    margin: 0;
+  }
+
+  :deep(.ant-progress-inner) {
+    border-radius: 3px;
   }
 }
 
@@ -883,6 +915,18 @@ export default { name: 'WorkbenchDashboardView' }
 
   &:hover {
     color: #4096ff;
+  }
+}
+
+@media (max-width: 1200px) {
+  .process-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .process-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

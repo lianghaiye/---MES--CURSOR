@@ -75,9 +75,10 @@ export function getDispositionFieldLabels(bizScope) {
       concession: '让步入库',
       secondary: '返工',
       tertiary: '报废',
-      tip: '合格入库 + 让步入库 + 返工 + 报废 ≤ 质检数量（可拆分混合处置；料废计入报废）',
+      tip: '合格入库 + 让步入库 + 返工 + 报废 ≤ 收货数量（抽检时按整批收货拆分，非质检数量；料废计入报废）',
       columnReturnExchange: '返工/报废',
-      treatmentTip: '按数量拆分处置；处理方案由数量自动汇总，无需单选',
+      treatmentTip: '按数量拆分处置；上限为收货数量；处理方案由数量自动汇总，无需单选',
+      passOptionalTip: '合格可不填，默认全量合格入库；也可按需拆分',
       mode: 'multi_bucket',
     }
   }
@@ -86,9 +87,10 @@ export function getDispositionFieldLabels(bizScope) {
     concession: '让步入库',
     secondary: '退货',
     tertiary: '换货',
-    tip: '合格入库 + 让步入库 + 退货 + 换货 ≤ 质检数量（可拆分混合处置）',
+    tip: '合格入库 + 让步入库 + 退货 + 换货 ≤ 收货数量（抽检时按整批收货拆分，非质检数量）',
     columnReturnExchange: '退/换货',
-    treatmentTip: '按数量拆分处置；处理方案由数量自动汇总，无需单选',
+    treatmentTip: '按数量拆分处置；上限为收货数量；处理方案由数量自动汇总，无需单选',
+    passOptionalTip: '合格可不填，默认全量合格入库；也可按需拆分',
     mode: 'multi_bucket',
   }
 }
