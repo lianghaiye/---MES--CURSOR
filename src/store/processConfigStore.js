@@ -13,10 +13,14 @@ import { normalizeReportMode } from '@/utils/reportMode'
 import { normalizeTaskExecutionMode } from '@/utils/taskExecutionMode'
 import { defaultQcConfigsFromOperations, normalizeProcessQcConfigs } from '@/utils/qcProcessConfig'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
+import {
+  normalizeProcessWorkItemFields,
+  validateProcessWorkItemConfig,
+} from '@/utils/processWorkItem'
 
 const STORAGE_KEY = 'i_doms_process_config'
 const SEED_VERSION_KEY = 'i_doms_process_config_seed_v'
-const CURRENT_SEED_VERSION = '9'
+const CURRENT_SEED_VERSION = '10'
 
 export {
   PROCESS_OPERATION_DEFS,
@@ -77,6 +81,7 @@ function normalizeProcessList(list) {
       defectItemIds: Array.isArray(p.defectItemIds) ? [...p.defectItemIds] : [],
       operations,
       qcConfigs,
+      ...normalizeProcessWorkItemFields(p),
     }
   })
 }
@@ -194,6 +199,10 @@ function validateProcessForm(payload, editingId) {
   if (!activeCats.includes(payload.category)) {
     return { ok: false, message: '所选工序分类不可用' }
   }
+
+  const workItemCheck = validateProcessWorkItemConfig(payload)
+  if (!workItemCheck.ok) return workItemCheck
+
   return { ok: true }
 }
 
@@ -208,6 +217,8 @@ export function addProcessConfig(payload) {
   )
   if (qcConfigs.length) operations.opQc = true
   else operations.opQc = false
+
+  const workItemFields = normalizeProcessWorkItemFields(payload)
 
   const row = {
     id: `proc-${Date.now()}`,
@@ -226,6 +237,7 @@ export function addProcessConfig(payload) {
     taskExecutionMode: normalizeTaskExecutionMode(payload.taskExecutionMode),
     defectItemIds: Array.isArray(payload.defectItemIds) ? [...payload.defectItemIds] : [],
     qcConfigs: operations.opQc ? qcConfigs : [],
+    ...workItemFields,
     createdAt: dayjs().format('YYYY-MM-DD'),
     updatedAt: dayjs().format('YYYY-MM-DD'),
   }
@@ -269,6 +281,7 @@ export function updateProcessConfig(id, payload) {
     ),
     defectItemIds: Array.isArray(payload.defectItemIds) ? [...payload.defectItemIds] : [],
     qcConfigs: operations.opQc ? qcConfigs : [],
+    ...normalizeProcessWorkItemFields(payload),
     updatedAt: dayjs().format('YYYY-MM-DD'),
   })
   return { ok: true, process: row }

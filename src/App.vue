@@ -36,6 +36,9 @@ const antdTheme = computed(() => ({
       : antdThemeToken.defaultAlgorithm,
   token: {
     colorPrimary: effectiveTheme.value === 'dark' ? '#4096ff' : '#1677ff',
+    /* 表单控件统一 32px（含 size="small"，对齐 form-fields.mdc） */
+    controlHeight: 32,
+    controlHeightSM: 32,
   },
 }))
 </script>

@@ -11,6 +11,13 @@ import {
 } from '@/utils/workOrderProcessDisplay'
 import { formatBlankingMaterialsSummary } from '@/utils/blankingSettleMaterial'
 import { buildWorkOrderDispatchEbomSnapshot } from '@/utils/workOrderEbomTree'
+import {
+  WORK_ORDER_QR_MODE,
+  WORK_ORDER_QR_SCOPE,
+  buildWorkOrderQrScanPath,
+  issueWorkOrderQrToken,
+} from '@/utils/workOrderQrToken'
+import QRCode from 'qrcode'
 
 const STORAGE_PREFIX = 'work-order-print-preview:'
 
@@ -61,6 +68,22 @@ function formatPrintQty(val) {
   return String(Math.round(n * 10000) / 10000)
 }
 
+async function buildQrBlock({ token, tip }) {
+  if (!token) return null
+  const path = buildWorkOrderQrScanPath(token)
+  let dataUrl = ''
+  try {
+    dataUrl = await QRCode.toDataURL(path, {
+      width: 160,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+    })
+  } catch {
+    dataUrl = ''
+  }
+  return { token, tip: tip || '', path, dataUrl }
+}
+
 /** 将 EBOM 物料树展平为打印清单行（含子件层级） */
 export function flattenWorkOrderPrintBomMaterials(materials = [], out = []) {
   for (const m of materials || []) {
@@ -92,8 +115,20 @@ function buildPrintBomLines(workOrder) {
   }))
 }
 
+function normalizeQrOptions(options = {}) {
+  const qrEnabled = Boolean(options.qrEnabled)
+  const qrMode = [
+    WORK_ORDER_QR_MODE.ORDER,
+    WORK_ORDER_QR_MODE.PROCESS,
+    WORK_ORDER_QR_MODE.BOTH,
+  ].includes(options.qrMode)
+    ? options.qrMode
+    : WORK_ORDER_QR_MODE.ORDER
+  return { qrEnabled, qrMode }
+}
+
 /** 构建工单打印/预览数据 */
-export function buildWorkOrderPrintPayload(workOrder, options = {}) {
+export async function buildWorkOrderPrintPayload(workOrder, options = {}) {
   if (!workOrder) return null
 
   const printContent =
@@ -101,18 +136,45 @@ export function buildWorkOrderPrintPayload(workOrder, options = {}) {
       ? WORK_ORDER_PRINT_CONTENT.ORDER_WITH_BOM
       : WORK_ORDER_PRINT_CONTENT.ORDER_ONLY
 
+  const { qrEnabled, qrMode } = normalizeQrOptions(options)
+  const needOrderQr =
+    qrEnabled && (qrMode === WORK_ORDER_QR_MODE.ORDER || qrMode === WORK_ORDER_QR_MODE.BOTH)
+  const needProcessQr =
+    qrEnabled && (qrMode === WORK_ORDER_QR_MODE.PROCESS || qrMode === WORK_ORDER_QR_MODE.BOTH)
+
   const detail = buildWorkOrderDetail(workOrder)
-  const processes = (detail?.processes || workOrder.processes || []).map((p, index) => ({
-    seq: index + 1,
-    name: printProcessText(p.name),
-    processConfig: printProcessText(formatWorkOrderProcessConfigText(p)),
-    resourceType: printProcessText(p.resourceType || '工人'),
-    executionMode: printProcessText(formatWorkOrderProcessExecutionMode(p)),
-    executors: printProcessExecutors(p),
-    blankingMaterials: printBlankingMaterials(p),
-    outsourceStatus: printOutsourceStatus(p),
-    processContent: printProcessText(p.processContent),
-  }))
+  const rawProcesses = detail?.processes || workOrder.processes || []
+  const processes = []
+  for (let index = 0; index < rawProcesses.length; index += 1) {
+    const p = rawProcesses[index]
+    const seq = Number(p.seq) > 0 ? Number(p.seq) : index + 1
+    const row = {
+      seq,
+      id: p.id || '',
+      name: printProcessText(p.name),
+      processConfig: printProcessText(formatWorkOrderProcessConfigText(p)),
+      resourceType: printProcessText(p.resourceType || '工人'),
+      executionMode: printProcessText(formatWorkOrderProcessExecutionMode(p)),
+      executors: printProcessExecutors(p),
+      blankingMaterials: printBlankingMaterials(p),
+      outsourceStatus: printOutsourceStatus(p),
+      processContent: printProcessText(p.processContent),
+      qr: null,
+    }
+    if (needProcessQr && workOrder.id) {
+      const token = issueWorkOrderQrToken({
+        scope: WORK_ORDER_QR_SCOPE.PROCESS,
+        workOrderId: workOrder.id,
+        processSeq: seq,
+        processName: p.name,
+      })
+      row.qr = await buildQrBlock({
+        token,
+        tip: `${formatPrintFieldValue(workOrder.code)} · ${printProcessText(p.name) || `工序${seq}`}`,
+      })
+    }
+    processes.push(row)
+  }
 
   const basicFields = [
     { label: '销售单号', value: workOrder.sourceOrderNo },
@@ -126,11 +188,12 @@ export function buildWorkOrderPrintPayload(workOrder, options = {}) {
     { label: '工作中心', value: workOrder.workCenter },
     { label: '预入仓库', value: workOrder.warehouse },
     { label: '紧急度', value: workOrder.urgency },
+    { label: '负责人', value: workOrder.owner },
     {
       label: '计划日期',
       value: formatPrintPlanDateRange(workOrder.planDateRange),
+      wide: true,
     },
-    { label: '负责人', value: workOrder.owner },
     { label: '技术参数', value: workOrder.techParams, wide: true },
     { label: '配套要求', value: workOrder.matchingRequirements, wide: true },
     { label: '工单备注', value: workOrder.remark, wide: true },
@@ -142,7 +205,20 @@ export function buildWorkOrderPrintPayload(workOrder, options = {}) {
   const bomLines =
     printContent === WORK_ORDER_PRINT_CONTENT.ORDER_WITH_BOM ? buildPrintBomLines(workOrder) : []
 
+  let qrOrder = null
+  if (needOrderQr && workOrder.id) {
+    const token = issueWorkOrderQrToken({
+      scope: WORK_ORDER_QR_SCOPE.ORDER,
+      workOrderId: workOrder.id,
+    })
+    qrOrder = await buildQrBlock({
+      token,
+      tip: `工单 ${formatPrintFieldValue(workOrder.code)} · 扫码查看工序任务`,
+    })
+  }
+
   return {
+    workOrderId: workOrder.id || '',
     code: formatPrintFieldValue(workOrder.code),
     name: formatPrintFieldValue(workOrder.name),
     productName: formatPrintFieldValue(workOrder.productName || workOrder.name),
@@ -150,6 +226,9 @@ export function buildWorkOrderPrintPayload(workOrder, options = {}) {
     basicFields,
     processes,
     bomLines,
+    qrOrder,
+    qrEnabled,
+    qrMode,
     printContent,
     includeBom: printContent === WORK_ORDER_PRINT_CONTENT.ORDER_WITH_BOM,
     paper: options.paper || 'A4',
@@ -159,14 +238,19 @@ export function buildWorkOrderPrintPayload(workOrder, options = {}) {
 }
 
 /** 构建批量工单打印数据 */
-export function buildWorkOrderBatchPrintPayload(workOrders, options = {}) {
-  const sheets = (workOrders || [])
-    .map((wo) => buildWorkOrderPrintPayload(wo, options))
-    .filter(Boolean)
+export async function buildWorkOrderBatchPrintPayload(workOrders, options = {}) {
+  const sheets = []
+  for (const wo of workOrders || []) {
+    const sheet = await buildWorkOrderPrintPayload(wo, options)
+    if (sheet) sheets.push(sheet)
+  }
   if (!sheets.length) return null
+  const { qrEnabled, qrMode } = normalizeQrOptions(options)
   return {
     sheets,
     printContent: options.printContent || WORK_ORDER_PRINT_CONTENT.ORDER_ONLY,
+    qrEnabled,
+    qrMode,
     paper: options.paper || 'A4',
     orientation: options.orientation || 'portrait',
     printedAt: new Date().toISOString(),
@@ -198,8 +282,8 @@ export function openWorkOrderPrintPreview(router, payload, { autoPrint = false }
   window.open(href, '_blank')
 }
 
-export function openWorkOrderBatchPrintPreview(router, workOrders, options = {}) {
-  const payload = buildWorkOrderBatchPrintPayload(workOrders, options)
+export async function openWorkOrderBatchPrintPreview(router, workOrders, options = {}) {
+  const payload = await buildWorkOrderBatchPrintPayload(workOrders, options)
   if (!payload) return
   openWorkOrderPrintPreview(router, payload, options)
 }

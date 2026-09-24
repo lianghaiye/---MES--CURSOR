@@ -1,0 +1,53 @@
+/**
+ * 表单输入控件统一高度 32px（对齐 form-fields.mdc）
+ * 覆盖 size="small" 默认 24px；不含 TextArea / 多选 Select
+ */
+.ant-input-affix-wrapper,
+.ant-input-affix-wrapper-sm,
+.ant-input-number,
+.ant-input-number-sm,
+.ant-picker,
+.ant-picker-small {
+  min-height: 32px;
+  height: 32px;
+  box-sizing: border-box;
+}
+
+/* 裸 Input（无 affix）；排除 textarea */
+input.ant-input:not(textarea),
+.ant-input-sm:not(textarea):not(.ant-input-affix-wrapper) {
+  min-height: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  line-height: 1.5715;
+}
+
+.ant-input-affix-wrapper > input.ant-input,
+.ant-input-affix-wrapper-sm > input.ant-input {
+  height: auto;
+  min-height: 0;
+  line-height: 1.5715;
+}
+
+.ant-select-single:not(.ant-select-customize-input) .ant-select-selector {
+  height: 32px !important;
+}
+
+.ant-select-single .ant-select-selector .ant-select-selection-item,
+.ant-select-single .ant-select-selector .ant-select-selection-placeholder {
+  line-height: 30px !important;
+}
+
+.ant-select-single:not(.ant-select-customize-input)
+  .ant-select-selector
+  .ant-select-selection-search-input {
+  height: 30px !important;
+}
+
+.ant-input-number-input {
+  height: 30px !important;
+}
+
+.ant-picker .ant-picker-input > input {
+  height: 30px;
+}

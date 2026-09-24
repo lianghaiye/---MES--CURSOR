@@ -317,10 +317,15 @@ function handleDelete(record) {
   min-height: calc(100vh - 112px);
 }
 
-.filter-card,
-.table-card {
+.filter-card {
   background: #fff;
   padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.table-card {
+  background: #fff;
+  padding: 8px 12px 12px;
   margin-bottom: 8px;
 }
 
@@ -328,7 +333,7 @@ function handleDelete(record) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 16px;
+  padding: 8px 12px;
   background: #fff;
   margin-bottom: 8px;
 }

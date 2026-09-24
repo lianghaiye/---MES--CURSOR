@@ -28,6 +28,16 @@
             <a-radio-group v-model:value="form.printContent" :options="contentOptions" />
           </a-form-item>
         </a-col>
+        <a-col :span="24">
+          <a-form-item label="报工二维码">
+            <a-checkbox v-model:checked="form.qrEnabled">打印报工二维码</a-checkbox>
+          </a-form-item>
+        </a-col>
+        <a-col v-if="form.qrEnabled" :span="24">
+          <a-form-item label="二维码粒度">
+            <a-radio-group v-model:value="form.qrMode" :options="qrModeOptions" />
+          </a-form-item>
+        </a-col>
       </a-row>
     </a-form>
 
@@ -37,15 +47,18 @@
         预览包含工单基本信息、工序配置与 BOM 清单，可在预览页再次调起浏览器打印。
       </template>
       <template v-else>预览包含工单基本信息与工序配置，可在预览页再次调起浏览器打印。</template>
+      <template v-if="form.qrEnabled">
+        二维码供小程序扫码报工；演示期为 path+token，正式环境可换成微信小程序码。
+      </template>
     </div>
 
     <div class="print-actions">
-      <button type="button" class="action-card" @click="openPreview(false)">
+      <button type="button" class="action-card" :disabled="building" @click="openPreview(false)">
         <EyeOutlined class="action-icon" />
         <span class="action-title">预览</span>
         <span class="action-desc">打开预览页查看打印效果</span>
       </button>
-      <button type="button" class="action-card" @click="openPreview(true)">
+      <button type="button" class="action-card" :disabled="building" @click="openPreview(true)">
         <PrinterOutlined class="action-icon" />
         <span class="action-title">直接打印</span>
         <span class="action-desc">打开预览页并调起浏览器打印</span>
@@ -59,8 +72,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import { EyeOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 import {
   WORK_ORDER_PRINT_CONTENT,
@@ -69,6 +83,12 @@ import {
   buildWorkOrderPrintPayload,
   openWorkOrderPrintPreview,
 } from '@/utils/workOrderPrintPreview'
+import {
+  WORK_ORDER_QR_MODE,
+  WORK_ORDER_QR_MODE_OPTIONS,
+  loadWorkOrderQrPrintPrefs,
+  saveWorkOrderQrPrintPrefs,
+} from '@/utils/workOrderQrToken'
 
 const props = defineProps({
   open: Boolean,
@@ -79,11 +99,14 @@ const props = defineProps({
 const emit = defineEmits(['update:open'])
 
 const router = useRouter()
+const building = ref(false)
 
 const form = reactive({
   paper: 'A4',
   orientation: 'portrait',
   printContent: WORK_ORDER_PRINT_CONTENT.ORDER_ONLY,
+  qrEnabled: false,
+  qrMode: WORK_ORDER_QR_MODE.ORDER,
 })
 
 const paperOptions = [
@@ -92,6 +115,7 @@ const paperOptions = [
 ]
 
 const contentOptions = WORK_ORDER_PRINT_CONTENT_OPTIONS
+const qrModeOptions = WORK_ORDER_QR_MODE_OPTIONS
 
 const targetOrders = computed(() => {
   if (props.workOrders?.length) return props.workOrders
@@ -107,25 +131,42 @@ watch(
     form.paper = 'A4'
     form.orientation = 'portrait'
     form.printContent = WORK_ORDER_PRINT_CONTENT.ORDER_ONLY
+    const prefs = loadWorkOrderQrPrintPrefs()
+    form.qrEnabled = prefs.qrEnabled
+    form.qrMode = prefs.qrMode
   },
 )
 
-function openPreview(autoPrint) {
+async function openPreview(autoPrint) {
   const orders = targetOrders.value
   if (!orders.length) return
   const options = {
     paper: form.paper,
     orientation: form.orientation,
     printContent: form.printContent,
+    qrEnabled: form.qrEnabled,
+    qrMode: form.qrMode,
     autoPrint,
   }
-  const payload =
-    orders.length === 1
-      ? buildWorkOrderPrintPayload(orders[0], options)
-      : buildWorkOrderBatchPrintPayload(orders, options)
-  if (!payload) return
-  openWorkOrderPrintPreview(router, payload, { autoPrint })
-  emit('update:open', false)
+  building.value = true
+  try {
+    saveWorkOrderQrPrintPrefs({ qrEnabled: form.qrEnabled, qrMode: form.qrMode })
+    const payload =
+      orders.length === 1
+        ? await buildWorkOrderPrintPayload(orders[0], options)
+        : await buildWorkOrderBatchPrintPayload(orders, options)
+    if (!payload) {
+      message.warning('无法生成打印数据')
+      return
+    }
+    openWorkOrderPrintPreview(router, payload, { autoPrint })
+    emit('update:open', false)
+  } catch (e) {
+    console.error(e)
+    message.error('生成打印预览失败')
+  } finally {
+    building.value = false
+  }
 }
 </script>
 
@@ -167,9 +208,14 @@ function openPreview(autoPrint) {
       border-color 0.2s,
       box-shadow 0.2s;
 
-    &:hover {
+    &:hover:not(:disabled) {
       border-color: #1677ff;
       box-shadow: 0 2px 8px rgba(22, 119, 255, 0.12);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
 
     .action-icon {

@@ -88,6 +88,7 @@ export function createDefaultLaborRow() {
     salaryMethod: undefined,
     standardHourlyRate: 0,
     pieceRate: 0,
+    workItemRates: [],
   }
 }
 

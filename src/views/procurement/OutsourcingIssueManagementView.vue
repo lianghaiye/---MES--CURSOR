@@ -279,7 +279,7 @@ function truncate(text, max) {
 .table-card {
   background: #fff;
   border-radius: 8px;
-  padding: 12px 16px 16px;
+  padding: 8px 12px 12px;
   border: 1px solid #f0f0f0;
 }
 

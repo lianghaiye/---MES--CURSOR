@@ -145,7 +145,18 @@ const routes = [
     component: MainLayout,
     redirect: '/home/dashboard',
     children: [
-      { path: 'home/dashboard', ...emptyChild('home-dashboard', '首页') },
+      {
+        path: 'home/dashboard',
+        name: 'home-dashboard',
+        component: () => import('@/views/home/WorkbenchDashboardView.vue'),
+        meta: { title: '工作台' },
+      },
+      {
+        path: 'home/workbench-admin',
+        name: 'home-workbench-admin',
+        component: () => import('@/views/home/WorkbenchContentAdminView.vue'),
+        meta: { title: '工作台内容管理' },
+      },
       {
         path: 'home/data-cockpit',
         name: 'home-data-cockpit',

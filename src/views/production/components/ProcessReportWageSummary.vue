@@ -65,6 +65,9 @@
           </a-button>
         </span>
       </a-descriptions-item>
+      <a-descriptions-item v-else-if="line.wageQtyMode === 'itemized'" label="单件计价单价">
+        分项计薪（不适用）
+      </a-descriptions-item>
       <a-descriptions-item v-if="line.wageRateMode === 'hourly'" label="标准计时单价">
         <span class="rate-cell">
           {{ formatMoney(line.effectiveStandardHourlyRate) }}/时
@@ -126,6 +129,22 @@
           </template>
         </span>
         <span v-else class="defect-wage-detail-calc muted">不折算</span>
+      </div>
+    </div>
+
+    <div v-if="line.workItemWageDetails?.length" class="defect-wage-details">
+      <div class="defect-wage-details-title">作业分项计薪明细</div>
+      <div
+        v-for="detail in line.workItemWageDetails"
+        :key="detail.itemCode"
+        class="defect-wage-detail-row"
+      >
+        <span class="defect-wage-detail-name">{{ detail.itemName }}</span>
+        <span class="defect-wage-detail-meta"
+          >（{{ formatQty(detail.qty) }}{{ detail.unit || '' }} ×
+          {{ formatMoney(detail.unitPriceSnapshot) }}）</span
+        >
+        <span class="defect-wage-detail-calc">{{ formatMoney(detail.amount) }}</span>
       </div>
     </div>
 
@@ -386,15 +405,17 @@ const wageSummaryCards = computed(() => {
   }
   cards.push({
     key: 'good',
-    label: '良品工资',
+    label: line.wageQtyMode === 'itemized' ? '分项工资合计' : '良品工资',
     value: formatMoney(line.goodWage),
     formula: line.goodWageFormula ? `${line.goodWageFormula}=${formatMoney(line.goodWage)}` : '',
   })
-  cards.push({
-    key: 'defect',
-    label: '不良品工资 (折扣后)',
-    value: formatMoney(line.defectWage),
-  })
+  if (line.wageQtyMode !== 'itemized') {
+    cards.push({
+      key: 'defect',
+      label: '不良品工资 (折扣后)',
+      value: formatMoney(line.defectWage),
+    })
+  }
   if (Number(line.fixedDefectWage) > 0) {
     cards.push({
       key: 'fixed-defect',

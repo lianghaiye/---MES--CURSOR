@@ -1,7 +1,7 @@
 /** 产品/物料工时配置种子（仅演示物料有预设，其余默认关闭） */
 import { LABOR_CONFIG_BY_CODE as DEMO_LABOR_CONFIG } from '@/mock/laborHourDemoSeed'
 
-export const LABOR_CONFIG_VERSION = 6
+export const LABOR_CONFIG_VERSION = 7
 
 export { LABOR_CONFIG_BY_CODE } from '@/mock/laborHourDemoSeed'
 
@@ -18,6 +18,9 @@ export function createLaborRow(partial = {}) {
     setupMinutesPerBatch: partial.setupMinutesPerBatch ?? 0,
     standardHourlyRate: partial.standardHourlyRate ?? 0,
     pieceRate: partial.pieceRate ?? 0,
+    workItemRates: Array.isArray(partial.workItemRates)
+      ? partial.workItemRates.map((r) => ({ ...r }))
+      : [],
   }
 }
 

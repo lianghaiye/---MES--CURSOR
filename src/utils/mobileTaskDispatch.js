@@ -14,6 +14,8 @@ import {
 } from '@/utils/taskExecutionMode'
 import { isParallelTaskDispatch } from '@/store/businessRuleStore'
 import { resolveProcessOpOutsource } from '@/utils/workOrderProcessOutsource'
+import { resolveLaborConfig } from '@/utils/laborConfigResolver'
+import { buildWorkItemDispatchSnapshot } from '@/utils/processWorkItem'
 
 export const MOBILE_TASK_SYNC_KEY = 'i_doms_mobile_tasks_sync'
 
@@ -112,7 +114,25 @@ function enrichProcessForTask(process) {
     taskExecutionMode: resolveProcessExecutionMode({
       taskExecutionMode: process.taskExecutionMode ?? procConfig?.taskExecutionMode,
     }),
+    reportQtyMode: process.reportQtyMode || procConfig?.reportQtyMode,
+    wageQtyMode: process.wageQtyMode || procConfig?.wageQtyMode,
+    workItemTemplates: process.workItemTemplates || procConfig?.workItemTemplates || [],
   }
+}
+
+function resolveWorkItemSnapshot(workOrder, process, product) {
+  const labor =
+    resolveLaborConfig(
+      product.itemCode || workOrder.productCode || workOrder.itemCode,
+      process.name,
+    ) || {}
+  const scheduleQty =
+    Number(product.expectedQty) || Number(workOrder.planQty) || Number(workOrder.scheduleQty) || 0
+  return buildWorkItemDispatchSnapshot({
+    process,
+    laborRow: labor,
+    scheduleQty,
+  })
 }
 
 function buildCollaborativeTasks(
@@ -128,6 +148,7 @@ function buildCollaborativeTasks(
   const executors = process.executors || []
   const taskGroupId = buildTaskGroupId(workOrder.id, processSeq)
   const baseTaskNo = buildStandardTaskNo(dateStr, processSeq)
+  const workItemSnapshot = resolveWorkItemSnapshot(workOrder, process, product)
 
   return executors.map((executorName, index) => {
     const slot = index + 1
@@ -149,6 +170,9 @@ function buildCollaborativeTasks(
       processRoute: workOrder.processRouteName || '',
       resourceType: process.resourceType || '工人',
       reportMode: process.reportMode || '',
+      reportQtyMode: workItemSnapshot.reportQtyMode,
+      wageQtyMode: workItemSnapshot.wageQtyMode,
+      workItems: workItemSnapshot.workItems,
       executors: [...executors],
       orderCategory: workOrder.orderCategory,
       orderSource: workOrder.orderSource || workOrder.source || '',
@@ -185,6 +209,7 @@ function buildSingleTask(
 ) {
   const placement = resolvePlacement(process, process.executors)
   const taskGroupId = buildTaskGroupId(workOrder.id, processSeq)
+  const workItemSnapshot = resolveWorkItemSnapshot(workOrder, process, product)
 
   return {
     id: buildStandardTaskId(workOrder.id, processSeq),
@@ -204,6 +229,9 @@ function buildSingleTask(
     processRoute: workOrder.processRouteName || '',
     resourceType: process.resourceType || '工人',
     reportMode: process.reportMode || '',
+    reportQtyMode: workItemSnapshot.reportQtyMode,
+    wageQtyMode: workItemSnapshot.wageQtyMode,
+    workItems: workItemSnapshot.workItems,
     executors: [...(process.executors || [])],
     orderCategory,
     orderSource: workOrder.orderSource || workOrder.source || '',

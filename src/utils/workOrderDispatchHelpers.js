@@ -16,7 +16,10 @@ import { normalizeReportMode } from '@/utils/reportMode'
 import { shouldSplitCollaborativeTasks } from '@/utils/taskExecutionMode'
 import { isParallelTaskDispatch } from '@/store/businessRuleStore'
 import { resolveProcessOpOutsource } from '@/utils/workOrderProcessOutsource'
+import { resolveLaborConfig } from '@/utils/laborConfigResolver'
+import * as processWorkItem from '@/utils/processWorkItem'
 
+/** 校验工序执行人；协作时长报工至少 2 人 */
 export function validateProcessExecutors(processes) {
   const needExecutors = (processes || []).filter((p) => !resolveProcessOpOutsource(p))
   const missing = needExecutors.filter((p) => !p.executors?.length)
@@ -39,6 +42,35 @@ export function validateProcessExecutors(processes) {
     }
   }
 
+  return true
+}
+
+/** 分项口径下发前校验产品 labor 单价齐全 */
+export function validateWorkItemPricingForDispatch(workOrder, processes) {
+  const itemCode = workOrder.productCode || workOrder.itemCode || ''
+  const scheduleQty = Number(workOrder.planQty) || Number(workOrder.scheduleQty) || 0
+  for (const process of processes || []) {
+    if (resolveProcessOpOutsource(process)) continue
+    const procConfig = getProcessByName(process.name) || {}
+    const enriched = {
+      ...procConfig,
+      ...process,
+      reportQtyMode: process.reportQtyMode || procConfig.reportQtyMode,
+      wageQtyMode: process.wageQtyMode || procConfig.wageQtyMode,
+      workItemTemplates: process.workItemTemplates || procConfig.workItemTemplates || [],
+    }
+    const labor = resolveLaborConfig(itemCode, process.name) || {}
+    const snapshot = processWorkItem.buildWorkItemDispatchSnapshot({
+      process: enriched,
+      laborRow: labor,
+      scheduleQty,
+    })
+    const check = processWorkItem.validateDispatchWorkItemPricing(snapshot)
+    if (!check.ok) {
+      message.error(`工序「${process.name}」${check.message}`)
+      return false
+    }
+  }
   return true
 }
 
@@ -74,7 +106,8 @@ export function validateWorkOrderDispatchReady(workOrder) {
   }
   // 校验执行人时按「将实际下发」的工序集合
   const dispatchProcesses = applyDispatchProcessFilter(workOrder.processes)
-  return validateProcessExecutors(dispatchProcesses)
+  if (!validateProcessExecutors(dispatchProcesses)) return false
+  return validateWorkItemPricingForDispatch(workOrder, dispatchProcesses)
 }
 
 /** 保存工序与执行人配置，工单保持待下发（草稿保存不校验必填项） */

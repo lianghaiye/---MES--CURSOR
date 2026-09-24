@@ -22,8 +22,17 @@
           :class="{ 'sheet-page-break': index > 0 }"
         >
           <header class="sheet-header">
-            <h1 class="sheet-title">{{ sheet.productName }}</h1>
-            <div class="sheet-subtitle">{{ sheet.orderCategory }}</div>
+            <div class="sheet-header-spacer" aria-hidden="true" />
+            <div class="sheet-header-main">
+              <h1 class="sheet-title">{{ sheet.productName }}</h1>
+              <div class="sheet-subtitle">{{ sheet.orderCategory }}</div>
+              <div v-if="sheet.code" class="sheet-wo-code">工单号：{{ sheet.code }}</div>
+            </div>
+            <div v-if="sheet.qrOrder?.dataUrl" class="sheet-qr-order">
+              <img :src="sheet.qrOrder.dataUrl" alt="报工二维码" class="qr-img" />
+              <div class="qr-tip">{{ sheet.qrOrder.tip || '扫码报工' }}</div>
+            </div>
+            <div v-else class="sheet-header-spacer" aria-hidden="true" />
           </header>
 
           <section class="sheet-meta">
@@ -51,8 +60,8 @@
                     <th>任务模式</th>
                     <th>执行人</th>
                     <th class="col-blanking">下料物料</th>
-                    <th>外协状态</th>
                     <th class="col-process-content">工序内容</th>
+                    <th v-if="sheetHasProcessQr(sheet)" class="col-qr">报工码</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -64,8 +73,14 @@
                     <td>{{ row.executionMode || '—' }}</td>
                     <td>{{ row.executors || '—' }}</td>
                     <td class="col-blanking">{{ row.blankingMaterials || '—' }}</td>
-                    <td>{{ row.outsourceStatus || '—' }}</td>
                     <td class="col-process-content">{{ row.processContent || '—' }}</td>
+                    <td v-if="sheetHasProcessQr(sheet)" class="col-qr">
+                      <div v-if="row.qr?.dataUrl" class="process-qr">
+                        <img :src="row.qr.dataUrl" alt="工序报工码" class="qr-img-sm" />
+                        <div class="qr-tip-sm">{{ row.name || `工序${row.seq}` }}</div>
+                      </div>
+                      <span v-else>—</span>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -164,6 +179,10 @@ function handleClose() {
   window.close()
 }
 
+function sheetHasProcessQr(sheet) {
+  return (sheet?.processes || []).some((p) => p?.qr?.dataUrl)
+}
+
 onMounted(() => {
   if (route.query.autoPrint === '1' && payload.value) {
     window.setTimeout(() => handlePrint(), 300)
@@ -176,7 +195,9 @@ html,
 body,
 #app {
   min-height: 100%;
+  height: auto;
   margin: 0;
+  overflow: auto;
 }
 </style>
 
@@ -185,6 +206,8 @@ body,
 <style lang="less" scoped>
 .work-order-print-preview-page {
   min-height: 100vh;
+  height: auto;
+  overflow: visible;
   background: #ececec;
 }
 
@@ -212,6 +235,7 @@ body,
   align-items: center;
   gap: 24px;
   overflow-x: auto;
+  overflow-y: visible;
 }
 
 @media print {

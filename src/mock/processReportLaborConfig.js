@@ -67,6 +67,20 @@ export const PROCESS_REPORT_LABOR_BY_CODE = {
         setupMinutesPerBatch: 30,
         standardHourlyRate: 40,
       }),
+      createLaborRow({
+        processName: '钻孔',
+        reportType: '批量计件',
+        salaryMethod: '计件工资',
+        pieceRate: 0,
+        standardMinutesPerPiece: 10,
+        setupMinutesPerBatch: 20,
+        standardHourlyRate: 40,
+        workItemRates: [
+          { itemCode: 'HOLE-L', unitPrice: 1.2, plannedQtyPerPiece: 2 },
+          { itemCode: 'HOLE-S', unitPrice: 0.6, plannedQtyPerPiece: 4 },
+          { itemCode: 'HOLE-C', unitPrice: 1.8, plannedQtyPerPiece: 1 },
+        ],
+      }),
     ],
   },
   CP2510003: {

@@ -2,6 +2,8 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { legacyReportTypeMap, legacySalaryMethodMap } from '@/mock/materialInfoOptions'
 import { PROCESS_REPORT_LABOR_BY_CODE } from '@/mock/processReportLaborConfig'
+import { mergeWorkItemTemplatesWithRates, normalizeWorkItemRates } from '@/utils/processWorkItem'
+import { getProcessByName } from '@/store/processConfigStore'
 
 function normalizeLaborRow(row = {}) {
   if (!row) return null
@@ -13,6 +15,7 @@ function normalizeLaborRow(row = {}) {
     setupMinutesPerBatch: Number(row.setupMinutesPerBatch) || 0,
     standardHourlyRate: Number(row.standardHourlyRate) || 0,
     pieceRate: Number(row.pieceRate) || 0,
+    workItemRates: normalizeWorkItemRates(row.workItemRates),
   }
 }
 
@@ -87,4 +90,11 @@ export function normalizeSalaryMethodForReportType(reportType = '', salaryMethod
 
 export function canEditSalaryMethod(config = {}) {
   return resolveSalaryMethodOptions(config.reportType).length > 1
+}
+
+/** 解析某产品工序的分项单价清单（对齐工序模板） */
+export function resolveWorkItemRateCatalog(materialCode, processName) {
+  const labor = resolveLaborConfig(materialCode, processName) || {}
+  const process = getProcessByName(processName) || {}
+  return mergeWorkItemTemplatesWithRates(process.workItemTemplates || [], labor.workItemRates || [])
 }

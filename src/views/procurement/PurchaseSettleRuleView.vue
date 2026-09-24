@@ -251,7 +251,7 @@ function onDelete(record) {
 .table-card {
   background: #fff;
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 8px 12px 12px;
   margin-bottom: 8px;
 }
 .table-toolbar {

@@ -3,7 +3,9 @@ import { routeTitles } from '@/config/menus'
 import { clearCreatePageDraft } from '@/utils/createPageDraft'
 
 const state = reactive({
-  tabs: [{ path: '/home/dashboard', fullPath: '/home/dashboard', title: '首页', closable: false }],
+  tabs: [
+    { path: '/home/dashboard', fullPath: '/home/dashboard', title: '工作台', closable: false },
+  ],
   activePath: '/home/dashboard',
 })
 
@@ -77,7 +79,7 @@ export function useTabs() {
     })
     state.tabs = kept.length
       ? kept
-      : [{ path: '/home/dashboard', fullPath: '/home/dashboard', title: '首页', closable: false }]
+      : [{ path: '/home/dashboard', fullPath: '/home/dashboard', title: '工作台', closable: false }]
     state.activePath = state.tabs[0]?.path || '/home/dashboard'
   }
 
@@ -96,7 +98,7 @@ export function useTabs() {
     })
     state.tabs = next.length
       ? next
-      : [{ path: '/home/dashboard', fullPath: '/home/dashboard', title: '首页', closable: false }]
+      : [{ path: '/home/dashboard', fullPath: '/home/dashboard', title: '工作台', closable: false }]
     const stillActive = state.tabs.some((t) => tabBasePath(t.path) === active)
     if (!stillActive) {
       state.activePath = state.tabs[0]?.path || '/home/dashboard'

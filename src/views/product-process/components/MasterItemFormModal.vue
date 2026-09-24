@@ -700,6 +700,7 @@
                             :options="processOpts"
                             placeholder="请选择工序"
                             style="width: 100%"
+                            @change="() => onLaborProcessChange(row)"
                           />
                         </a-form-item>
                       </a-col>
@@ -789,6 +790,50 @@
                             addon-after="元/件"
                           />
                         </a-form-item>
+                      </a-col>
+                      <a-col v-if="laborWorkItemCatalog(row).length" :span="24">
+                        <div class="work-item-rates-block">
+                          <div class="work-item-rates-title">作业分项单价</div>
+                          <div class="work-item-rates-hint">
+                            分项来自工序模板；请维护本产品单价（及可选单件计划量）
+                          </div>
+                          <div
+                            v-for="item in laborWorkItemCatalog(row)"
+                            :key="item.code"
+                            class="work-item-rate-row"
+                          >
+                            <span class="work-item-rate-name"
+                              >{{ item.name }}
+                              <span class="work-item-rate-code">({{ item.code }})</span></span
+                            >
+                            <a-input-number
+                              :value="getLaborWorkItemRate(row, item.code, 'unitPrice')"
+                              size="small"
+                              :min="0"
+                              :precision="2"
+                              :disabled="viewOnly"
+                              placeholder="单价"
+                              style="width: 120px"
+                              addon-after="元"
+                              @update:value="
+                                (v) => setLaborWorkItemRate(row, item.code, 'unitPrice', v)
+                              "
+                            />
+                            <a-input-number
+                              :value="getLaborWorkItemRate(row, item.code, 'plannedQtyPerPiece')"
+                              size="small"
+                              :min="0"
+                              :precision="2"
+                              :disabled="viewOnly"
+                              placeholder="单件计划量"
+                              style="width: 140px"
+                              :addon-after="item.unit || '个'"
+                              @update:value="
+                                (v) => setLaborWorkItemRate(row, item.code, 'plannedQtyPerPiece', v)
+                              "
+                            />
+                          </div>
+                        </div>
                       </a-col>
                       <a-col
                         v-if="!viewOnly && form.laborRows.length > 1"
@@ -977,6 +1022,12 @@ import {
   createDefaultProductionControl,
   createDefaultAlertConfig,
 } from '@/mock/materialInfoOptions'
+import { getProcessByName } from '@/store/processConfigStore'
+import {
+  mergeWorkItemTemplatesWithRates,
+  normalizeWorkItemRates,
+  normalizeProcessWorkItemFields,
+} from '@/utils/processWorkItem'
 import { unitState, getInventoryUnitOptions } from '@/store/unitStore'
 import { saveMasterItem, resolveMasterItemEditRecord } from '@/utils/masterItemSave'
 import { openCreateTab } from '@/utils/openCreateTab'
@@ -1645,8 +1696,14 @@ function loadEditRecord(record) {
   form.laborEnabled = source.laborEnabled ?? false
   form.laborRows =
     source.laborRows?.length > 0
-      ? JSON.parse(JSON.stringify(source.laborRows))
+      ? JSON.parse(JSON.stringify(source.laborRows)).map((row) => ({
+          ...row,
+          workItemRates: normalizeWorkItemRates(row.workItemRates),
+        }))
       : [createDefaultLaborRow()]
+  form.laborRows.forEach((row) => {
+    if (row.processName) onLaborProcessChange(row)
+  })
   form.production = {
     ...createDefaultProductionControl(),
     ...(source.production || {}),
@@ -1817,6 +1874,49 @@ function addLaborRow() {
 
 function removeLaborRow(index) {
   form.laborRows.splice(index, 1)
+}
+
+function laborWorkItemCatalog(row) {
+  if (!row?.processName) return []
+  const process = getProcessByName(row.processName)
+  if (!process) return []
+  const { workItemTemplates } = normalizeProcessWorkItemFields(process)
+  if (!workItemTemplates.length) return []
+  return mergeWorkItemTemplatesWithRates(workItemTemplates, row.workItemRates || [])
+}
+
+function onLaborProcessChange(row) {
+  const catalog = laborWorkItemCatalog(row)
+  const prev = new Map(normalizeWorkItemRates(row.workItemRates).map((r) => [r.itemCode, r]))
+  row.workItemRates = catalog.map((item) => {
+    const hit = prev.get(item.code)
+    return {
+      itemCode: item.code,
+      unitPrice: hit ? Number(hit.unitPrice) || 0 : 0,
+      plannedQtyPerPiece: hit?.plannedQtyPerPiece ?? null,
+    }
+  })
+}
+
+function getLaborWorkItemRate(row, itemCode, field) {
+  const hit = (row.workItemRates || []).find((r) => r.itemCode === itemCode)
+  if (!hit) return field === 'unitPrice' ? 0 : null
+  return hit[field]
+}
+
+function setLaborWorkItemRate(row, itemCode, field, value) {
+  if (!Array.isArray(row.workItemRates)) row.workItemRates = []
+  let hit = row.workItemRates.find((r) => r.itemCode === itemCode)
+  if (!hit) {
+    hit = { itemCode, unitPrice: 0, plannedQtyPerPiece: null }
+    row.workItemRates.push(hit)
+  }
+  if (field === 'plannedQtyPerPiece') {
+    hit.plannedQtyPerPiece =
+      value != null && value !== '' && Number(value) > 0 ? Number(value) : null
+  } else {
+    hit.unitPrice = Number(value) || 0
+  }
 }
 
 function validate() {
@@ -2824,6 +2924,46 @@ function handleSaveAndMaintainBom() {
   padding: 12px 12px 4px;
   margin-bottom: 12px;
   background: #fafafa;
+}
+
+.work-item-rates-block {
+  width: 100%;
+  padding: 8px 10px 4px;
+  background: #fff;
+  border: 1px dashed #d9d9d9;
+  border-radius: 6px;
+}
+
+.work-item-rates-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #262626;
+  margin-bottom: 2px;
+}
+
+.work-item-rates-hint {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 8px;
+}
+
+.work-item-rate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.work-item-rate-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #434343;
+}
+
+.work-item-rate-code {
+  color: #8c8c8c;
+  margin-left: 4px;
 }
 
 .add-labor-row-btn {

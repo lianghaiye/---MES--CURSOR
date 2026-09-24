@@ -7,6 +7,11 @@ import {
   resolveEffectiveLaborConfig,
   resolveWageRateDisplayMode,
 } from '@/utils/laborConfigResolver'
+import {
+  isItemizedWageMode,
+  normalizeReportWorkItems,
+  sumWorkItemWage,
+} from '@/utils/processWorkItem'
 
 function round2(val) {
   return Math.round((Number(val) || 0) * 100) / 100
@@ -316,6 +321,7 @@ export function calcProcessReportWage(config, line = {}) {
   const subsidyMethod = resolveSubsidyMethod(line)
   const subsidyQty = getSubsidyPieceQty(line)
   const subsidyFixedAmount = resolveSubsidyFixedAmount(line)
+  const wageQtyMode = line.wageQtyMode || config?.wageQtyMode
 
   const { discountWeighted, fixedDeductionQty, fixedDeductionSum } = aggregateDefectBucket(
     breakdownRules,
@@ -339,6 +345,58 @@ export function calcProcessReportWage(config, line = {}) {
   let prepWage = 0
   let fixedDefectWage = 0
   let subsidyWage = 0
+  let workItemWageDetails = []
+
+  if (isItemizedWageMode(wageQtyMode)) {
+    const catalog = line.workItemCatalog || line.workItems || []
+    const workItems = normalizeReportWorkItems(line.workItems || [], catalog)
+    workItemWageDetails = workItems
+      .filter((row) => (Number(row.qty) || 0) > 0)
+      .map((row) => ({
+        itemCode: row.itemCode,
+        itemName: row.itemName,
+        unit: row.unit,
+        qty: row.qty,
+        unitPriceSnapshot: row.unitPriceSnapshot,
+        amount: round2((Number(row.qty) || 0) * (Number(row.unitPriceSnapshot) || 0)),
+      }))
+    goodWage = sumWorkItemWage(workItems)
+    subsidyWage = subsidyMethod === 'fixed' ? subsidyFixedAmount : 0
+    qualityDeduction = round2(fixedDeductionSum + manualQualityDeduction)
+    salaryAmount = round2(goodWage + subsidyWage - qualityDeduction)
+    defectWage = 0
+    defectWageDetails.length = 0
+    const goodWageFormula = workItemWageDetails.length
+      ? workItemWageDetails
+          .map((r) => `${formatFormulaNum(r.qty)}×${formatFormulaNum(r.unitPriceSnapshot)}`)
+          .join('+')
+      : ''
+    const formulaKeys = resolveWageFormulaKeys(config, breakdownRules)
+    return {
+      goodWage,
+      goodWageFormula,
+      unitWage: 0,
+      defectWage: 0,
+      defectWageOriginal: 0,
+      defectDiscountRateDisplay: null,
+      defectWageDetails: [],
+      qualityDeduction,
+      defectConvertedWage: 0,
+      prepWage: 0,
+      prepWageFormula: '',
+      fixedDefectWage: 0,
+      subsidyWage,
+      salaryAmount: round2(Math.max(0, salaryAmount)),
+      accountHours: 0,
+      formulaKeys,
+      finalPieceQty: calcFinalPieceQty(line),
+      adjustedGoodQty: goodQty,
+      adjustedDefectQty: defectQty,
+      adjustedWorkHours: getApprovedWorkHours(line, config),
+      workItemWageDetails,
+      wageQtyMode: 'itemized',
+    }
+  }
 
   if (salaryMethod === '计件工资' && reportType === '批量计件') {
     const bucket = round2(goodQty + discountWeighted + fixedDeductionQty + subsidyQty)
@@ -436,6 +494,8 @@ export function calcProcessReportWage(config, line = {}) {
     adjustedGoodQty: goodQty,
     adjustedDefectQty: defectQty,
     adjustedWorkHours: getApprovedWorkHours(line, config),
+    workItemWageDetails,
+    wageQtyMode: wageQtyMode || 'reported',
   }
 }
 
@@ -505,7 +565,8 @@ function buildHourlyBatchFormula({
 export function enrichProcessReportLine(line, config) {
   const effectiveConfig = resolveEffectiveLaborConfig(config, line)
   const wage = calcProcessReportWage(effectiveConfig, line)
-  const wageRateMode = resolveWageRateDisplayMode(effectiveConfig)
+  const itemized = isItemizedWageMode(line.wageQtyMode || wage.wageQtyMode)
+  const wageRateMode = itemized ? null : resolveWageRateDisplayMode(effectiveConfig)
   const pieceOverridden = line.overridePieceRate != null && line.overridePieceRate !== ''
   const hourlyOverridden =
     line.overrideStandardHourlyRate != null && line.overrideStandardHourlyRate !== ''
@@ -524,6 +585,10 @@ export function enrichProcessReportLine(line, config) {
         ? `${effectiveReportType}+${effectiveSalaryMethod}`
         : line.calcMethod || '—',
     wageRateMode,
+    wageQtyMode: wage.wageQtyMode || line.wageQtyMode || 'reported',
+    reportQtyMode: line.reportQtyMode || 'schedule',
+    workItems: line.workItems || [],
+    workItemWageDetails: wage.workItemWageDetails || [],
     masterPieceRate: config?.pieceRate ?? 0,
     masterStandardHourlyRate: config?.standardHourlyRate ?? 0,
     effectivePieceRate: effectiveConfig?.pieceRate ?? 0,

@@ -457,6 +457,10 @@ function stubAction(key) {
   margin-bottom: 8px;
 }
 
+.table-card {
+  padding: 8px 12px 12px;
+}
+
 .toolbar-row {
   display: flex;
   align-items: center;

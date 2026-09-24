@@ -57,6 +57,9 @@ export function normalizeProcessReport(row) {
     source: row.source || 'quick',
     status: row.status || '待审核',
     rejectReason: row.rejectReason || '',
+    reportQtyMode: row.reportQtyMode || 'schedule',
+    wageQtyMode: row.wageQtyMode || 'reported',
+    workItems: Array.isArray(row.workItems) ? row.workItems : [],
     ...legacy,
     defectReason: row.defectReason || legacy.defectReasonLabel,
   })

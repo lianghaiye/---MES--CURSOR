@@ -106,26 +106,38 @@ export function createProcessConfigSeed() {
     ['组装', '装配', { opStart: true, opFinish: true }],
   ]
 
-  return defs.map(([category, name, ops, defaultExecutors = []], index) => ({
-    id: `proc-${String(index + 1).padStart(3, '0')}`,
-    code: padCode(index + 1),
-    name,
-    category,
-    resourceType: resolveResourceType(category, name),
-    position: category === '组装' ? '装配工岗' : category === '系统工序' ? '质检岗' : '机加工岗',
-    image: MOCK_IMAGE,
-    remark: '',
-    status: '使用中',
-    /** 下料工序：路线含此工序的工单可进下料结算；具体物料看主数据「需要下料结算」 */
-    isBlanking: name === '下料',
-    operations: defaultOperations(ops),
-    defaultExecutors: [...defaultExecutors],
-    reportMode: PROCESS_REPORT_MODE_MAP[name] || '',
-    taskExecutionMode: COLLABORATIVE_DURATION_PROCESSES.has(name)
-      ? 'collaborative'
-      : 'single_claim',
-    defectItemIds: [...(PROCESS_DEFECT_ITEM_MAP[name] || [])],
-    createdAt: '2026-05-01',
-    updatedAt: '2026-06-01',
-  }))
+  return defs.map(([category, name, ops, defaultExecutors = []], index) => {
+    const isDrill = name === '钻孔'
+    return {
+      id: `proc-${String(index + 1).padStart(3, '0')}`,
+      code: padCode(index + 1),
+      name,
+      category,
+      resourceType: resolveResourceType(category, name),
+      position: category === '组装' ? '装配工岗' : category === '系统工序' ? '质检岗' : '机加工岗',
+      image: MOCK_IMAGE,
+      remark: '',
+      status: '使用中',
+      /** 下料工序：路线含此工序的工单可进下料结算；具体物料看主数据「需要下料结算」 */
+      isBlanking: name === '下料',
+      operations: defaultOperations(ops),
+      defaultExecutors: [...defaultExecutors],
+      reportMode: PROCESS_REPORT_MODE_MAP[name] || '',
+      taskExecutionMode: COLLABORATIVE_DURATION_PROCESSES.has(name)
+        ? 'collaborative'
+        : 'single_claim',
+      defectItemIds: [...(PROCESS_DEFECT_ITEM_MAP[name] || [])],
+      reportQtyMode: isDrill ? 'schedule' : 'schedule',
+      wageQtyMode: isDrill ? 'itemized' : 'reported',
+      workItemTemplates: isDrill
+        ? [
+            { code: 'HOLE-L', name: '大孔', unit: '个' },
+            { code: 'HOLE-S', name: '小孔', unit: '个' },
+            { code: 'HOLE-C', name: '内角孔', unit: '个' },
+          ]
+        : [],
+      createdAt: '2026-05-01',
+      updatedAt: '2026-06-01',
+    }
+  })
 }

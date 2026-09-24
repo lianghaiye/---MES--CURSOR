@@ -117,6 +117,69 @@
       </div>
 
       <div class="form-section-box">
+        <div class="section-label">报工 / 计薪口径与作业分项</div>
+        <a-row :gutter="[12, 8]">
+          <a-col :span="8">
+            <a-form-item label="报工口径">
+              <a-select
+                v-model:value="form.reportQtyMode"
+                :options="reportQtyModeOpts"
+                placeholder="请选择报工口径"
+                @change="onWorkItemModeChange"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="计薪口径">
+              <a-select
+                v-model:value="form.wageQtyMode"
+                :options="wageQtyModeOpts"
+                placeholder="请选择计薪口径"
+                @change="onWorkItemModeChange"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="24">
+            <div class="field-hint">
+              报工口径决定工人怎么填数量；计薪口径决定工资怎么算。分项模板只定义「有哪些活」，单价在产品工时配置中维护。
+            </div>
+          </a-col>
+        </a-row>
+        <div v-if="showWorkItemTemplates" class="work-item-block">
+          <div class="work-item-head">
+            <span class="work-item-title">作业分项模板</span>
+            <a-button type="dashed" size="small" @click="addWorkItemTemplate">
+              <PlusOutlined />
+              添加分项
+            </a-button>
+          </div>
+          <div
+            v-for="(item, index) in form.workItemTemplates"
+            :key="`${item.code}-${index}`"
+            class="work-item-row"
+          >
+            <a-input
+              v-model:value="item.code"
+              size="small"
+              placeholder="编码"
+              style="width: 120px"
+            />
+            <a-input v-model:value="item.name" size="small" placeholder="名称" style="flex: 1" />
+            <a-input
+              v-model:value="item.unit"
+              size="small"
+              placeholder="单位"
+              style="width: 80px"
+            />
+            <a-button type="link" size="small" danger @click="removeWorkItemTemplate(index)">
+              删除
+            </a-button>
+          </div>
+          <div v-if="!form.workItemTemplates.length" class="field-hint">请添加至少一条作业分项</div>
+        </div>
+      </div>
+
+      <div class="form-section-box">
         <div class="section-label">工序操作</div>
         <div v-if="isMinimalMode" class="ops-hint">极简模式仅配置下料、质检、外协、拆解相关项</div>
         <a-row :gutter="[16, 12]" class="ops-grid">
@@ -189,6 +252,16 @@ import {
   processQcBizScopeOptions,
 } from '@/utils/qcProcessConfig'
 import ExecutorTagPicker from '@/views/production/components/ExecutorTagPicker.vue'
+import {
+  REPORT_QTY_MODE,
+  REPORT_QTY_MODE_OPTIONS,
+  WAGE_QTY_MODE,
+  WAGE_QTY_MODE_OPTIONS,
+  needsWorkItemPricing,
+  normalizeProcessWorkItemFields,
+  normalizeWorkItemTemplates,
+  validateProcessWorkItemConfig,
+} from '@/utils/processWorkItem'
 
 const MOCK_IMAGE =
   'data:image/svg+xml,' +
@@ -232,17 +305,26 @@ const form = reactive({
   defectItemIds: [],
   operations: defaultOps(),
   qcConfigs: [],
+  reportQtyMode: REPORT_QTY_MODE.SCHEDULE,
+  wageQtyMode: WAGE_QTY_MODE.REPORTED,
+  workItemTemplates: [],
 })
 
 const categoryOpts = computed(() => getActiveCategoryOptions())
 const resourceTypeOpts = RESOURCE_TYPES.map((v) => ({ label: v, value: v }))
 const positionOpts = MOCK_POSITIONS.map((v) => ({ label: v, value: v }))
 const reportModeOpts = REPORT_MODES.map((v) => ({ label: v, value: v }))
+const reportQtyModeOpts = REPORT_QTY_MODE_OPTIONS
+const wageQtyModeOpts = WAGE_QTY_MODE_OPTIONS
 const taskExecutionModeOpts = TASK_EXECUTION_MODES.map((item) => ({
   label: item.label,
   value: item.value,
 }))
 const defectItemOpts = computed(() => getDefectItemOptions())
+
+const showWorkItemTemplates = computed(() =>
+  needsWorkItemPricing(form.reportQtyMode, form.wageQtyMode),
+)
 
 const showTaskExecutionMode = computed(
   () =>
@@ -305,6 +387,25 @@ function onOpSwitchChange(key, checked) {
   }
 }
 
+function onWorkItemModeChange() {
+  if (!showWorkItemTemplates.value) {
+    form.workItemTemplates = []
+  }
+}
+
+function addWorkItemTemplate() {
+  const seq = form.workItemTemplates.length + 1
+  form.workItemTemplates.push({
+    code: `WI${String(seq).padStart(2, '0')}`,
+    name: '',
+    unit: '个',
+  })
+}
+
+function removeWorkItemTemplate(index) {
+  form.workItemTemplates.splice(index, 1)
+}
+
 const rules = {
   name: [{ required: true, message: '请输入工序名称', trigger: 'blur' }],
   category: [{ required: true, message: '请选择工序分类', trigger: 'change' }],
@@ -358,6 +459,10 @@ watch(
       form.operations.opQc = true
     }
     form.qcConfigs = loadedQcConfigs
+    const workItem = normalizeProcessWorkItemFields(r || {})
+    form.reportQtyMode = workItem.reportQtyMode
+    form.wageQtyMode = workItem.wageQtyMode
+    form.workItemTemplates = workItem.workItemTemplates.map((t) => ({ ...t }))
   },
   { immediate: true },
 )
@@ -396,6 +501,11 @@ async function handleSave() {
     message.warning('请至少勾选一种质检类型')
     return
   }
+  const workItemCheck = validateProcessWorkItemConfig(form)
+  if (!workItemCheck.ok) {
+    message.warning(workItemCheck.message)
+    return
+  }
   saving.value = true
   // 极简模式：只持久化允许配置的操作项，其余保持原值（编辑）或默认 false（新增）
   let baseOps = { ...form.operations }
@@ -406,10 +516,15 @@ async function handleSave() {
       baseOps[key] = Boolean(form.operations[key])
     })
   }
+  const workItem = normalizeProcessWorkItemFields({
+    ...form,
+    workItemTemplates: normalizeWorkItemTemplates(form.workItemTemplates),
+  })
   const payload = {
     ...form,
     operations: baseOps,
     qcConfigs: form.operations.opQc ? normalizeProcessQcConfigs(form.qcConfigs) : [],
+    ...workItem,
   }
   const res = isEdit.value
     ? updateProcessConfig(props.record.id, payload)
@@ -497,6 +612,31 @@ async function handleSave() {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
     line-height: 1.4;
+  }
+
+  .work-item-block {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #f0f0f0;
+  }
+
+  .work-item-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .work-item-title {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .work-item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
   }
 }
 </style>
