@@ -7,10 +7,16 @@
     @cancel="handleCancel"
     @update:open="(val) => emit('update:open', val)"
   >
-    <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" class="process-form">
+    <a-form
+      ref="formRef"
+      :model="form"
+      :rules="rules"
+      layout="inline"
+      class="process-form horizontal-form"
+    >
       <div class="form-section-box modal-basic-card">
         <div class="section-label">基本信息</div>
-        <a-row :gutter="[12, 8]">
+        <a-row :gutter="[12, 12]" style="width: 100%">
           <a-col :span="6">
             <a-form-item label="工序编码" name="code">
               <a-input v-model:value="form.code" placeholder="留空则自动生成 GX+流水" />
@@ -40,7 +46,12 @@
             </a-form-item>
           </a-col>
           <a-col :span="6">
-            <a-form-item label="默认执行人/工组" name="defaultExecutors" required>
+            <a-form-item
+              label="默认执行人/工组"
+              name="defaultExecutors"
+              required
+              class="label-wide"
+            >
               <ExecutorTagPicker
                 :executors="form.defaultExecutors"
                 :resource-type="form.resourceType"
@@ -71,7 +82,7 @@
             </a-form-item>
           </a-col>
           <a-col v-if="showTaskExecutionMode" :span="6">
-            <a-form-item label="任务执行模式" name="taskExecutionMode">
+            <a-form-item label="任务执行模式" name="taskExecutionMode" class="label-wide">
               <a-select
                 v-model:value="form.taskExecutionMode"
                 placeholder="请选择任务执行模式"
@@ -109,7 +120,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="24">
-            <a-form-item label="备注">
+            <a-form-item label="备注" class="remark-item">
               <a-textarea v-model:value="form.remark" placeholder="请输入备注" :rows="2" />
             </a-form-item>
           </a-col>
@@ -118,7 +129,7 @@
 
       <div class="form-section-box">
         <div class="section-label">报工 / 计薪口径与作业分项</div>
-        <a-row :gutter="[12, 8]">
+        <a-row :gutter="[12, 12]" style="width: 100%">
           <a-col :span="8">
             <a-form-item label="报工口径">
               <a-select
@@ -140,7 +151,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="24">
-            <div class="field-hint">
+            <div class="field-hint field-hint-block">
               报工口径决定工人怎么填数量；计薪口径决定工资怎么算。分项模板只定义「有哪些活」，单价在产品工时配置中维护。
             </div>
           </a-col>
@@ -542,6 +553,8 @@ async function handleSave() {
 
 <style lang="less" scoped>
 .process-form {
+  width: 100%;
+
   .form-section-box {
     width: 100%;
     margin-bottom: 12px;
@@ -614,6 +627,11 @@ async function handleSave() {
     line-height: 1.4;
   }
 
+  .field-hint-block {
+    margin-top: 0;
+    margin-bottom: 4px;
+  }
+
   .work-item-block {
     margin-top: 8px;
     padding-top: 8px;
@@ -630,6 +648,7 @@ async function handleSave() {
   .work-item-title {
     font-size: 13px;
     font-weight: 500;
+    color: rgba(0, 0, 0, 0.88);
   }
 
   .work-item-row {
@@ -637,6 +656,61 @@ async function handleSave() {
     align-items: center;
     gap: 8px;
     margin-bottom: 8px;
+  }
+}
+
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-inline-end: 0;
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label) {
+    flex: 0 0 72px;
+    max-width: 72px;
+    padding: 0;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    height: auto;
+    min-height: 32px;
+    line-height: 32px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  :deep(
+    .ant-form-item-label
+      > label.ant-form-item-required:not(.ant-form-item-required-mark-optional)::before
+  ) {
+    margin-inline-end: 4px;
+  }
+
+  :deep(.ant-form-item-control) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .label-wide {
+    :deep(.ant-form-item-label) {
+      flex: 0 0 120px;
+      max-width: 120px;
+    }
+  }
+
+  .remark-item {
+    :deep(.ant-form-item-label) {
+      flex: 0 0 72px;
+      max-width: 72px;
+    }
   }
 }
 </style>
