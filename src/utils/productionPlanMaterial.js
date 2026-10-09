@@ -11,9 +11,13 @@ import { supplierOptions as poSupplierOptions } from '@/mock/purchaseOrderOption
 import { supplierOptions as reqSupplierOptions } from '@/mock/purchaseRequisitionOptions'
 import { formatBlankSizeText } from '@/utils/bomBlankSize'
 import { SUPPLY_FORM_OPTIONS } from '@/utils/masterDataMigrate'
-import { flattenMaterials } from '@/utils/material'
+import { flattenMaterials, calcDemandQty } from '@/utils/material'
 import { createPlanMaterial, resolveMaterialsFromEbomSnapshot } from '@/utils/ebomSnapshot'
-import { calcDefaultPlanQty } from '@/utils/productionPlanWorkItem'
+import {
+  calcDefaultPlanQty,
+  calcPlanQtyFromDemand,
+  isDeductInventoryEnabled,
+} from '@/utils/productionPlanWorkItem'
 
 export const supplyTypeOptions = SUPPLY_FORM_OPTIONS.map((v) => ({ label: v, value: v }))
 
@@ -46,13 +50,38 @@ export function cascadeMaterialPlanQtyFromParent(parentPlanQty, children) {
   })
 }
 
-export function resolveWorkItemPlanQty(workItem) {
+export function resolveWorkItemPlanQty(workItem, deductInventory = true) {
   const orderQty = Number(workItem?.orderQty ?? workItem?.salesQty ?? 0)
   const stockQty = Number(workItem?.stockQty ?? 0)
   if (workItem?.planQty != null && workItem.planQty !== '') {
     return Number(workItem.planQty)
   }
-  return calcDefaultPlanQty(orderQty, stockQty)
+  return calcDefaultPlanQty(orderQty, stockQty, deductInventory)
+}
+
+/**
+ * 按「扣减库存」开关重算工作项及物料树计划数（覆盖已有计划数）
+ * 开启：计划数 = 单位用量×订单排产数量 − 库存数量；关闭：= 单位用量×订单排产数量
+ */
+export function applyPlanQtyByDeductMode(workItem, deductInventory = true) {
+  if (!workItem) return
+  const orderQty = Number(workItem.orderQty ?? workItem.salesQty ?? 0)
+  const stockQty = Number(workItem.stockQty ?? 0)
+  workItem.planQty = calcDefaultPlanQty(orderQty, stockQty, deductInventory)
+
+  const walk = (nodes) => {
+    nodes?.forEach((m) => {
+      const demand =
+        m.demandQty != null && m.demandQty !== ''
+          ? Number(m.demandQty)
+          : calcDemandQty(m.unitUsage, orderQty)
+      m.demandQty = demand
+      const inv = Number(m.stockQty ?? 0)
+      m.planQty = calcPlanQtyFromDemand(demand, inv, deductInventory)
+      if (m.children?.length) walk(m.children)
+    })
+  }
+  walk(workItem.materials)
 }
 
 /** 订单是否已下达单据（计划数量锁定） */
@@ -70,11 +99,29 @@ export function lockOrderPlanQty(order) {
   if (order) order.planQtyLocked = true
 }
 
-export function syncWorkItemMaterialPlanQty(workItem) {
+export function syncWorkItemMaterialPlanQty(workItem, deductInventory = true) {
   if (!workItem) return
-  const planQty = resolveWorkItemPlanQty(workItem)
+  const planQty = resolveWorkItemPlanQty(workItem, deductInventory)
   workItem.planQty = planQty
   cascadeMaterialPlanQtyFromParent(planQty, workItem.materials)
+}
+
+/** 对订单下全部工作项按扣减库存开关重算计划数 */
+export function applyOrderPlanQtyByDeductMode(order) {
+  if (!order) return
+  const deduct = isDeductInventoryEnabled(order)
+  ;(order.workItems || []).forEach((wi) => {
+    const orderQty = Number(wi.orderQty ?? wi.salesQty ?? 0)
+    const materials = resolveWorkItemMaterials(wi)
+    const walkDemand = (nodes) => {
+      nodes?.forEach((m) => {
+        m.demandQty = calcDemandQty(m.unitUsage, orderQty)
+        if (m.children?.length) walkDemand(m.children)
+      })
+    }
+    walkDemand(materials)
+    applyPlanQtyByDeductMode(wi, deduct)
+  })
 }
 
 export function resolveWorkItemMaterials(workItem) {

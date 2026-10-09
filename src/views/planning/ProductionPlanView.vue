@@ -315,6 +315,20 @@
                   />
                   <span>调整紧急度</span>
                   <a-select style="width: 100px" placeholder="选择" />
+                  <span class="deduct-inventory-label">
+                    扣减库存
+                    <a-tooltip
+                      title="开启：计划数 = 单位用量 × 订单排产数量 − 库存数量；关闭：计划数 = 单位用量 × 订单排产数量（不减库存）"
+                    >
+                      <InfoCircleOutlined class="col-tip-icon" />
+                    </a-tooltip>
+                  </span>
+                  <a-switch
+                    :checked="deductInventoryEnabled"
+                    size="small"
+                    :disabled="!selectedOrder || isPlanQtyLocked"
+                    @change="onDeductInventoryChange"
+                  />
                   <a-button type="primary" @click="openAssemblyWorkOrderModal"
                     >生成总装/部装工单</a-button
                   >
@@ -500,6 +514,9 @@
                         placeholder="补充说明"
                         allow-clear
                       />
+                    </template>
+                    <template v-else-if="column.key === 'unitUsage'">
+                      {{ formatUnitUsageWithUnit(record) }}
                     </template>
                     <template v-else-if="column.key === 'availableStock'">
                       <span>{{ formatAvailableStockText(record) }}</span>
@@ -727,12 +744,13 @@ import {
   getSelfMadeMaterialsForPlan,
   getAssemblyMaterialsForPlan,
   buildDisplayMaterialTree,
+  applyOrderPlanQtyByDeductMode,
+  applyPlanQtyByDeductMode,
   cascadeMaterialPlanQtyFromParent,
   collectAllMaterialRowKeys,
   isOrderPlanQtyLocked,
   lockOrderPlanQty,
   resolveWorkItemMaterials,
-  syncWorkItemMaterialPlanQty,
   isPurchasedOrOutsourced,
   onMaterialDesignateSupplierChange,
   onMaterialStandardCycleChange,
@@ -861,8 +879,7 @@ const baseMaterialColumns = [
   { title: '规格属性', dataIndex: 'specAttr', width: 90 },
   { title: '材质', dataIndex: 'material', width: 80 },
   { title: '物料类型', dataIndex: 'type', width: 90 },
-  { title: '单位用量', dataIndex: 'unitUsage', width: 90 },
-  { title: '库存单位', dataIndex: 'unit', width: 90 },
+  { title: '单位用量', key: 'unitUsage', dataIndex: 'unitUsage', width: 110 },
   { title: '下料尺寸', dataIndex: 'blankSizeText', width: 160, ellipsis: true },
   { title: '供应型态', key: 'supplyType', dataIndex: 'supplyType', width: 100 },
   { title: '库存数量', dataIndex: 'stockQty', width: 90 },
@@ -897,8 +914,8 @@ const {
   displayColumns: displayMaterialColumns,
   tableScrollX: materialTableScrollX,
   defaultColumnSettings: defaultMaterialColumnSettings,
-} = useTableColumnSettings('production-plan-material-list', baseMaterialColumns, {
-  minScrollX: 2600,
+} = useTableColumnSettings('production-plan-material-list-v2', baseMaterialColumns, {
+  minScrollX: 2500,
 })
 
 const processRouteOpts = computed(() => getProcessRouteSelectOptions())
@@ -937,6 +954,9 @@ const planOrderTreeData = computed(() => {
 })
 
 const isPlanQtyLocked = computed(() => isOrderPlanQtyLocked(selectedOrder.value))
+
+/** 扣减库存：默认开启 */
+const deductInventoryEnabled = computed(() => selectedOrder.value?.deductInventory !== false)
 
 const activeWorkItem = computed(() => {
   const order = selectedOrder.value
@@ -1140,8 +1160,36 @@ function onPlanCompleteDateChange(date) {
   selectedOrder.value.planCompleteDate = date ? date.format('YYYY-MM-DD') : ''
 }
 
+function onDeductInventoryChange(checked) {
+  const order = selectedOrder.value
+  if (!order || isPlanQtyLocked.value) return
+  order.deductInventory = !!checked
+  applyOrderPlanQtyByDeductMode(order)
+  const wi = activeWorkItem.value
+  if (wi) {
+    wi._topMaterial = null
+    const materials = resolveWorkItemMaterials(wi)
+    const baseQty = wi.orderQty ?? wi.salesQty ?? order.productQty ?? 0
+    const walk = (nodes) => {
+      nodes?.forEach((m) => {
+        m.demandQty = calcDemandQty(m.unitUsage, baseQty)
+        m.gapQty = calcGapQty(m.demandQty, m.availableStock)
+        if (m.children?.length) walk(m.children)
+      })
+    }
+    walk(materials)
+    enrichPlanMaterialTree(materials, order, wi)
+  }
+  message.success(
+    checked
+      ? '已开启扣减库存：计划数 = 单位用量×订单排产数量 − 库存'
+      : '已关闭扣减库存：计划数 = 单位用量×订单排产数量',
+  )
+}
+
 function refreshWorkItemMaterials(wi, order) {
   const baseQty = wi.orderQty ?? wi.salesQty ?? order?.productQty ?? 0
+  const deduct = order?.deductInventory !== false
   const materials = resolveWorkItemMaterials(wi)
   const walk = (nodes) => {
     nodes?.forEach((m) => {
@@ -1151,7 +1199,10 @@ function refreshWorkItemMaterials(wi, order) {
     })
   }
   walk(materials)
-  syncWorkItemMaterialPlanQty(wi)
+  // 无计划数时按扣减库存公式初始化；已有值保留（含开关重算与手工改数）
+  if (wi.planQty == null || wi.planQty === '') {
+    applyPlanQtyByDeductMode(wi, deduct)
+  }
   enrichPlanMaterialTree(materials, order, wi)
 }
 
@@ -1271,6 +1322,14 @@ function materialStatusColor(status) {
 }
 
 /** 可用库存列：工单占用/可用库存 */
+/** 单位用量列：数量 + 库存单位，如 2 件 */
+function formatUnitUsageWithUnit(record) {
+  if (record?.unitUsage == null || record.unitUsage === '') return '—'
+  const qty = formatQty(record.unitUsage)
+  const unit = record.unit || ''
+  return unit ? `${qty} ${unit}` : String(qty)
+}
+
 function formatAvailableStockText(record) {
   if (!record || record.isTopLevel) return '—'
   const allocated = formatQty(record.woAllocatedQty ?? 0)
@@ -1742,6 +1801,12 @@ function handleReset() {
     min-width: 0;
     word-break: break-all;
   }
+}
+
+.deduct-inventory-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .action-row {

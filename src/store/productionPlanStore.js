@@ -29,6 +29,7 @@ function normalizePlanStatuses(orders) {
     }
     if (plan.orderStatus === '待排产') plan.orderStatus = '待下达'
     if (plan.orderStatus === '生产中') plan.orderStatus = '执行中'
+    if (plan.deductInventory == null) plan.deductInventory = true
     if (Array.isArray(plan.tags)) {
       plan.tags = plan.tags.map((t) => {
         if (t === '待排产') return '待下达'
@@ -38,7 +39,7 @@ function normalizePlanStatuses(orders) {
     }
     plan.workItems?.forEach((wi, idx) => {
       const salesLine = resolveSalesLineForWorkItem(plan, wi)
-      Object.assign(wi, enrichWorkItem(wi, salesLine, idx))
+      Object.assign(wi, enrichWorkItem(wi, salesLine, idx, plan.deductInventory !== false))
       if (wi.expanded == null) wi.expanded = idx === 0
     })
     plan.workItems?.forEach((wi) => {
@@ -220,6 +221,7 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
     daysToDelivery,
     planAssemblyDate: '',
     planCompleteDate: deliveryDate,
+    deductInventory: true,
     workItems,
   }
 
@@ -310,6 +312,7 @@ export function createProductionPlanFromStockReplenish(suggestionRows = [], opti
     daysToDelivery: Math.max(0, dayjs(deliveryDate).diff(dayjs(), 'day')),
     planAssemblyDate: '',
     planCompleteDate: deliveryDate,
+    deductInventory: true,
     workItems,
   }
 

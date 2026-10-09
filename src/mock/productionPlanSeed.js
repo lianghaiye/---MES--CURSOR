@@ -95,6 +95,7 @@ function buildPlanFromSalesOrder(salesOrder, bomsById, planIndex = 0) {
     daysToDelivery,
     planAssemblyDate: '',
     planCompleteDate: deliveryDate,
+    deductInventory: true,
     workItems,
   }
 }

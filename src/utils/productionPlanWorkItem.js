@@ -28,9 +28,30 @@ export function resolveWorkItemProductId(wi, salesLine = null) {
   return product?.id || ''
 }
 
-/** 计划数量默认：订单数量 − 库存数量，小于 0 取 0 */
-export function calcDefaultPlanQty(orderQty, stockQty) {
-  return Math.max(0, (Number(orderQty) || 0) - (Number(stockQty) || 0))
+/**
+ * 计划数量默认（成品/工作项）
+ * @param {boolean} [deductInventory=true] 为 true 时：订单排产数量 − 库存；为 false 时：仅订单排产数量
+ */
+export function calcDefaultPlanQty(orderQty, stockQty, deductInventory = true) {
+  const order = Math.max(0, Number(orderQty) || 0)
+  if (!deductInventory) return order
+  return Math.max(0, order - (Number(stockQty) || 0))
+}
+
+/**
+ * 物料计划数：单位用量×订单排产数量（即需求数）可选再减库存数量
+ * @param {boolean} [deductInventory=true]
+ */
+export function calcPlanQtyFromDemand(demandQty, stockQty, deductInventory = true) {
+  const demand = Math.max(0, Number(demandQty) || 0)
+  if (!deductInventory) return demand
+  return Math.max(0, demand - (Number(stockQty) || 0))
+}
+
+/** 订单是否开启「扣减库存」（默认开启） */
+export function isDeductInventoryEnabled(orderOrFlag) {
+  if (typeof orderOrFlag === 'boolean') return orderOrFlag
+  return orderOrFlag?.deductInventory !== false
 }
 
 /** 演示用成品库存（无真实库存接口时） */
@@ -45,14 +66,17 @@ export function demoStockQty(orderQty, seed = 0) {
  * @param {object} wi 工作项
  * @param {object|null} salesLine 销售明细（可选）
  * @param {number} index 行序号（用于演示库存）
+ * @param {boolean} [deductInventory=true] 计划数是否扣减库存
  */
-export function enrichWorkItem(wi, salesLine = null, index = 0) {
+export function enrichWorkItem(wi, salesLine = null, index = 0, deductInventory = true) {
   const line = salesLine || wi
   const orderQty = Number(wi.orderQty ?? wi.salesQty ?? line.salesQty ?? line.qty ?? 0)
   const hasStock = wi.stockQty != null && wi.stockQty !== ''
   const stockQty = hasStock ? Number(wi.stockQty) : demoStockQty(orderQty, index)
   const hasPlan = wi.planQty != null && wi.planQty !== ''
-  const planQty = hasPlan ? Number(wi.planQty) : calcDefaultPlanQty(orderQty, stockQty)
+  const planQty = hasPlan
+    ? Number(wi.planQty)
+    : calcDefaultPlanQty(orderQty, stockQty, deductInventory)
 
   return {
     ...wi,

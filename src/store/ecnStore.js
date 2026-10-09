@@ -44,19 +44,33 @@ export function completeEcnExecution(id, operator = '张工') {
   return { ...res, bomUpgrade: bomRes }
 }
 
-export function cancelEcn(id) {
+export function canWithdrawEcn(order) {
+  return order?.status === ECN_STATUS.APPROVING || order?.status === ECN_STATUS.PENDING
+}
+
+/** 撤回：待审批 / 审批中 → 草稿（等同采购「待审核」撤回） */
+export function withdrawEcn(id) {
   const row = findEcnById(id)
   if (!row) return { ok: false, message: '变更单不存在' }
-  if (row.status !== ECN_STATUS.APPROVING && row.status !== ECN_STATUS.PENDING) {
-    return { ok: false, message: '当前状态不可撤销' }
+  if (!canWithdrawEcn(row)) {
+    return { ok: false, message: '仅待审批/审批中的变更单可撤回' }
   }
   row.status = ECN_STATUS.DRAFT
+  row.reviewer = ''
+  row.reviewTime = ''
   row.approvalFlow?.forEach((step) => {
-    if (step.status === '审批中' || step.status === '待审批') {
+    if (step.status === '审批中' || step.status === '待审批' || step.status === '已通过') {
       step.status = '待审批'
+      step.opinion = ''
+      step.time = ''
     }
   })
   return { ok: true, record: row }
+}
+
+/** @deprecated 使用 withdrawEcn */
+export function cancelEcn(id) {
+  return withdrawEcn(id)
 }
 
 export function archiveEcn(id) {
@@ -68,4 +82,7 @@ export function archiveEcn(id) {
 export const ecnStoreApi = {
   ...api,
   completeExecution: completeEcnExecution,
+  withdraw: withdrawEcn,
+  canWithdraw: canWithdrawEcn,
+  cancel: withdrawEcn,
 }

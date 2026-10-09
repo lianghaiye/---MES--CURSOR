@@ -299,6 +299,14 @@
                 提交审核
               </a-button>
               <a-button
+                v-if="canApproveOutsourcingOrder(record)"
+                type="link"
+                size="small"
+                @click="openApproveForOrder(record)"
+              >
+                审核
+              </a-button>
+              <a-button
                 v-if="canResubmitOutsourcingOrder(record)"
                 type="link"
                 size="small"
@@ -676,6 +684,7 @@ function hasRowActions(record) {
     record.status === '进行中' ||
     canEditOutsourcingOrder(record) ||
     canSubmitOutsourcingOrder(record) ||
+    canApproveOutsourcingOrder(record) ||
     canWithdrawOutsourcingOrder(record) ||
     canResubmitOutsourcingOrder(record) ||
     canVoidOutsourcingOrder(record) ||
@@ -720,6 +729,16 @@ function openCreate() {
   openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
+function openApproveForOrder(record) {
+  if (!canApproveOutsourcingOrder(record)) {
+    message.warning('仅「待审核」状态的外协订单可审核')
+    return
+  }
+  const path = `/procurement/outsourcing-orders/${record.id}/approve`
+  openTab(path, `审核外协订单 ${record.orderNo || ''}`.trim())
+  router.push({ name: 'procurement-outsourcing-orders-approve', params: { id: record.id } })
+}
+
 function openToolbarApprove() {
   if (selectedRowKeys.value.length !== 1) {
     message.warning('请勾选一条待审核的外协订单后再审核')
@@ -730,13 +749,7 @@ function openToolbarApprove() {
     message.warning('未找到所选外协订单')
     return
   }
-  if (!canApproveOutsourcingOrder(order)) {
-    message.warning('仅「待审核」状态的外协订单可审核')
-    return
-  }
-  const path = `/procurement/outsourcing-orders/${order.id}/approve`
-  openTab(path, `审核外协订单 ${order.orderNo || ''}`.trim())
-  router.push({ name: 'procurement-outsourcing-orders-approve', params: { id: order.id } })
+  openApproveForOrder(order)
 }
 
 function openEdit(record) {

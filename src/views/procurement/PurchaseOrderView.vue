@@ -246,6 +246,14 @@
                 提交审核
               </a-button>
               <a-button
+                v-if="canApprovePurchaseOrder(record)"
+                type="link"
+                size="small"
+                @click="openApproveForOrder(record)"
+              >
+                审核
+              </a-button>
+              <a-button
                 v-if="canWithdrawPurchaseOrder(record)"
                 type="link"
                 size="small"
@@ -592,6 +600,7 @@ function hasRowActions(record) {
     record.status === '已终结' ||
     canEditPurchaseOrder(record) ||
     canSubmitPurchaseOrder(record) ||
+    canApprovePurchaseOrder(record) ||
     canWithdrawPurchaseOrder(record) ||
     canResubmitPurchaseOrder(record) ||
     canVoidPurchaseOrder(record) ||
@@ -700,6 +709,16 @@ function openCreate() {
   openCreateTab(router, openTab, { path: page.newPath, title: page.title })
 }
 
+function openApproveForOrder(record) {
+  if (!canApprovePurchaseOrder(record)) {
+    message.warning('仅「待审核」状态的采购单可审核')
+    return
+  }
+  const path = `/procurement/purchase-orders/${record.id}/approve`
+  openTab(path, `审核采购单 ${record.orderNo || ''}`.trim())
+  router.push({ name: 'procurement-purchase-orders-approve', params: { id: record.id } })
+}
+
 function openToolbarApprove() {
   if (selectedRowKeys.value.length !== 1) {
     message.warning('请勾选一条待审核的采购单后再审核')
@@ -710,13 +729,7 @@ function openToolbarApprove() {
     message.warning('未找到所选采购单')
     return
   }
-  if (!canApprovePurchaseOrder(order)) {
-    message.warning('仅「待审核」状态的采购单可审核')
-    return
-  }
-  const path = `/procurement/purchase-orders/${order.id}/approve`
-  openTab(path, `审核采购单 ${order.orderNo || ''}`.trim())
-  router.push({ name: 'procurement-purchase-orders-approve', params: { id: order.id } })
+  openApproveForOrder(order)
 }
 
 function openEdit(record) {

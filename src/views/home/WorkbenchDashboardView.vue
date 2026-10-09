@@ -105,6 +105,27 @@
             </button>
           </section>
 
+          <!-- 待办事项 -->
+          <section class="panel-card todo-panel">
+            <div class="panel-header">
+              <span class="panel-title">待办事项</span>
+              <span class="panel-hint">共 {{ todoTotal }} 项待处理</span>
+            </div>
+            <div class="todo-grid">
+              <button
+                v-for="item in todoCards"
+                :key="item.key"
+                type="button"
+                class="todo-card"
+                :class="[`todo-tone-${item.tone}`, { 'is-empty': !item.count }]"
+                @click="goTodo(item)"
+              >
+                <div class="todo-count">{{ item.count }}</div>
+                <div class="todo-label">{{ item.label }}</div>
+              </button>
+            </div>
+          </section>
+
           <!-- 我的收藏 -->
           <section class="panel-card favorite-panel">
             <div class="panel-header">
@@ -154,27 +175,6 @@
                   添加收藏
                 </a-button>
               </a-empty>
-            </div>
-          </section>
-
-          <!-- 待办事项 -->
-          <section class="panel-card todo-panel">
-            <div class="panel-header">
-              <span class="panel-title">待办事项</span>
-              <span class="panel-hint">共 {{ todoTotal }} 项待处理</span>
-            </div>
-            <div class="todo-grid">
-              <button
-                v-for="item in todoCards"
-                :key="item.key"
-                type="button"
-                class="todo-card"
-                :class="[`todo-tone-${item.tone}`, { 'is-empty': !item.count }]"
-                @click="goTodo(item)"
-              >
-                <div class="todo-count">{{ item.count }}</div>
-                <div class="todo-label">{{ item.label }}</div>
-              </button>
             </div>
           </section>
 
@@ -991,19 +991,22 @@ export default { name: 'WorkbenchDashboardView' }
 
 .todo-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  /* 桌面：8 张卡片同一行 */
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .todo-card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  min-height: 72px;
-  padding: 12px 14px;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 10px;
   border: 1px solid #e8eef5;
-  border-radius: 10px;
+  border-radius: 8px;
   background: linear-gradient(180deg, #f7faff 0%, #fff 55%);
   cursor: pointer;
   text-align: left;
@@ -1015,7 +1018,7 @@ export default { name: 'WorkbenchDashboardView' }
   &:hover {
     transform: translateY(-1px);
     border-color: #91caff;
-    box-shadow: 0 6px 16px rgba(22, 119, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(22, 119, 255, 0.1);
   }
 
   &.is-empty {
@@ -1049,7 +1052,7 @@ export default { name: 'WorkbenchDashboardView' }
 }
 
 .todo-count {
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.1;
   color: rgba(0, 0, 0, 0.85);
@@ -1057,12 +1060,16 @@ export default { name: 'WorkbenchDashboardView' }
 }
 
 .todo-label {
-  font-size: 13px;
+  font-size: 12px;
   color: @text-secondary;
-  line-height: 1.3;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
   .todo-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }

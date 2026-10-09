@@ -176,6 +176,23 @@
               </template>
               <template v-else-if="record.status === ECN_STATUS.APPROVING">
                 <a-button type="link" size="small" @click="openApprove(record)">审批</a-button>
+                <a-button
+                  v-if="canWithdrawAction"
+                  type="link"
+                  size="small"
+                  @click="handleWithdraw(record)"
+                  >撤回</a-button
+                >
+              </template>
+              <template v-else-if="record.status === ECN_STATUS.PENDING">
+                <a-button
+                  v-if="canWithdrawAction"
+                  type="link"
+                  size="small"
+                  @click="handleWithdraw(record)"
+                  >撤回</a-button
+                >
+                <a-button type="link" size="small" @click="openApprove(record)">审批</a-button>
               </template>
               <template v-else-if="record.status === ECN_STATUS.APPROVED">
                 <a-button type="link" size="small" @click="openExecute(record)">执行</a-button>
@@ -245,6 +262,7 @@ const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 const moduleConfig = resolveChangeRequestModule(route)
+const canWithdrawAction = Boolean(moduleConfig.store?.withdraw || moduleConfig.store?.cancel)
 
 const defaultFilters = () => ({
   docNo: '',
@@ -367,6 +385,23 @@ function handleSubmitApproval(record) {
       const res = moduleConfig.store.submitForApproval(record.id)
       if (res.ok) message.success('已提交审批')
       else message.warning(res.message)
+    },
+  })
+}
+
+function handleWithdraw(record) {
+  const withdraw = moduleConfig.store.withdraw || moduleConfig.store.cancel
+  if (!withdraw) {
+    message.warning('当前模块不支持撤回')
+    return
+  }
+  Modal.confirm({
+    title: '确认撤回',
+    content: `确定撤回变更单「${getDocNo(record, moduleConfig)}」吗？撤回后将恢复为草稿，可重新编辑并提交。`,
+    onOk: () => {
+      const res = withdraw(record.id)
+      if (res.ok) message.success('已撤回，单据已恢复为草稿')
+      else message.warning(res.message || '撤回失败')
     },
   })
 }
