@@ -593,26 +593,39 @@ watch(filteredOrders, (list) => {
   }
 })
 
-function applyCodeFromRouteQuery() {
+function applyFiltersFromRouteQuery() {
   const code = route.query.code
-  if (!code) return
-  const codeStr = String(code)
-  const wo = workOrderState.orders.find((o) => o.code === codeStr)
-  if (!wo) return
-  filters.code = codeStr
-  appliedFilters.value = { ...filters }
-  selectedId.value = wo.id
-  pagination.current = 1
-  if (layoutMode.value === 'table') {
-    detailDrawerOpen.value = true
-  } else {
-    detailCollapsed.value = false
+  const status = String(route.query.status || '').trim()
+  let changed = false
+
+  if (code) {
+    const codeStr = String(code)
+    const wo = workOrderState.orders.find((o) => o.code === codeStr)
+    if (wo) {
+      filters.code = codeStr
+      selectedId.value = wo.id
+      changed = true
+      if (layoutMode.value === 'table') {
+        detailDrawerOpen.value = true
+      } else {
+        detailCollapsed.value = false
+      }
+    }
   }
+
+  if (status) {
+    filters.status = status
+    changed = true
+  }
+
+  if (!changed) return
+  appliedFilters.value = { ...filters }
+  pagination.current = 1
 }
 
 watch(
-  () => route.query.code,
-  () => applyCodeFromRouteQuery(),
+  () => [route.query.code, route.query.status],
+  () => applyFiltersFromRouteQuery(),
   { immediate: true },
 )
 

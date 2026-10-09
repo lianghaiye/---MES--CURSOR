@@ -8,7 +8,23 @@
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
             <span class="sub-code">{{ record.code }}</span>
           </div>
-          <a-button size="small" @click="goBack">返回列表</a-button>
+          <a-space class="header-actions" :size="8">
+            <a-button size="small" :disabled="record.status === '已归档'" @click="openEdit">
+              编辑
+            </a-button>
+            <a-button
+              v-if="record.status === '使用中' || record.status === '新建'"
+              size="small"
+              @click="handleArchive"
+            >
+              归档
+            </a-button>
+            <a-button v-if="record.status === '已归档'" size="small" @click="handleUnarchive">
+              取消归档
+            </a-button>
+            <a-button size="small" @click="handleClone">克隆</a-button>
+            <a-button size="small" @click="goBack">返回列表</a-button>
+          </a-space>
         </div>
 
         <DetailSectionCard title="基本信息">
@@ -61,7 +77,15 @@ export default { name: 'ProcessRouteDetailView' }
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getProcessRouteById } from '@/store/processRouteStore'
+import { Modal, message } from 'ant-design-vue'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import {
+  getProcessRouteById,
+  archiveProcessRoute,
+  unarchiveProcessRoute,
+  cloneProcessRoute,
+} from '@/store/processRouteStore'
 import {
   flattenGridToSteps,
   formatApplyScopeLabel,
@@ -71,6 +95,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
 
@@ -99,6 +124,60 @@ function statusColor(status) {
   return 'default'
 }
 
+function reloadRecord() {
+  record.value = getProcessRouteById(route.params.id)
+}
+
+function openEdit() {
+  if (!record.value?.id) return
+  if (record.value.status === '已归档') {
+    message.warning('已归档的工艺路线不可编辑，请先取消归档')
+    return
+  }
+  openCreateTab(router, openTab, {
+    path: `/product-process/routing/${record.value.id}/edit`,
+    title: `编辑工艺路线 ${record.value.code || record.value.name || ''}`.trim(),
+  })
+}
+
+function handleArchive() {
+  if (!record.value) return
+  Modal.confirm({
+    title: '确认归档',
+    content: `确定归档工艺路线「${record.value.name}」吗？归档后不可用于新工单下发。`,
+    onOk: () => {
+      const res = archiveProcessRoute(record.value.id)
+      if (!res.ok) {
+        message.warning(res.message)
+        return
+      }
+      message.success('已归档')
+      reloadRecord()
+    },
+  })
+}
+
+function handleUnarchive() {
+  if (!record.value) return
+  const res = unarchiveProcessRoute(record.value.id)
+  if (!res.ok) message.warning(res.message)
+  else {
+    message.success('已取消归档')
+    reloadRecord()
+  }
+}
+
+function handleClone() {
+  if (!record.value) return
+  const res = cloneProcessRoute(record.value.id)
+  if (!res.ok) {
+    message.warning(res.message)
+    return
+  }
+  message.success(`已克隆为 ${res.route.code}`)
+  router.push(`/product-process/routing/${res.route.id}`)
+}
+
 function goBack() {
   router.push('/product-process/routing')
 }
@@ -114,36 +193,43 @@ watch(
 )
 </script>
 
-<style scoped>
+<style scoped lang="less">
+.process-route-detail-page {
+  :deep(.detail-section-card) {
+    margin-bottom: 8px;
+  }
+
+  :deep(.detail-section-card:last-child) {
+    margin-bottom: 0;
+  }
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
+
 .header-left {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
+
+.header-actions {
+  flex-shrink: 0;
+}
+
 .page-title {
   font-size: 18px;
   font-weight: 600;
 }
+
 .sub-code {
   color: #888;
   font-size: 13px;
-}
-.section-card {
-  background: #fff;
-  padding: 16px;
-  border-radius: 4px;
-  margin-bottom: 16px;
-}
-.section-title {
-  font-weight: 600;
-  margin-bottom: 8px;
-  padding-left: 8px;
-  border-left: 3px solid #1677ff;
 }
 </style>

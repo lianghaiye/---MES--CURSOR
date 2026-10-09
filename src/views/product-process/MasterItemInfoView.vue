@@ -183,6 +183,11 @@
               <DeleteOutlined />
               删除
             </a-button>
+            <a-button v-if="listTab === 'active'" @click="handleBatchArchive">
+              <InboxOutlined />
+              归档
+            </a-button>
+            <a-button v-else @click="handleBatchUnarchive">取消归档</a-button>
             <a-button @click="handleSyncSpec">
               <SyncOutlined />
               同步规格属性
@@ -222,6 +227,17 @@
             <TableColumnSettingButton @click="columnDrawerOpen = true" />
           </a-space>
         </div>
+
+        <a-tabs
+          v-if="listViewMode === 'sku'"
+          v-model:activeKey="listTab"
+          size="small"
+          class="list-status-tabs"
+          @change="onListTabChange"
+        >
+          <a-tab-pane key="active" tab="启用" />
+          <a-tab-pane key="archived" tab="已归档" />
+        </a-tabs>
 
         <div class="table-card">
           <div ref="tableWrapRef" class="table-wrap">
@@ -297,12 +313,25 @@
                 <template v-else-if="column.key === 'creator'">
                   {{ record.creator || '—' }}
                 </template>
+                <template v-else-if="column.key === 'status'">
+                  <a-tag
+                    v-if="isProductSideRecord(record)"
+                    :color="productStatusColor(record.status)"
+                  >
+                    {{ normalizeProductStatus(record.status) }}
+                  </a-tag>
+                  <span v-else>—</span>
+                </template>
                 <template v-else-if="column.key === 'action'">
                   <MasterInfoRowActions
+                    :show-archive="isProductSideRecord(record) && isProductActive(record)"
+                    :show-unarchive="isProductSideRecord(record) && isProductArchived(record)"
                     @edit="openEdit(record)"
                     @bom="openBomMaintenance(record)"
                     @delete="confirmDelete(record)"
                     @clone="handleClone(record)"
+                    @archive="confirmArchive(record)"
+                    @unarchive="handleUnarchive(record)"
                   />
                 </template>
               </template>
@@ -431,6 +460,7 @@ import {
   DownOutlined,
   SyncOutlined,
   PrinterOutlined,
+  InboxOutlined,
 } from '@ant-design/icons-vue'
 import { filterCategoryTree } from '@/mock/productCategories'
 import {
@@ -451,7 +481,13 @@ import {
 } from '@/store/materialCategoryStore'
 import { buildCategoryItemCountMap, sortCategoryTreeForDisplay } from '@/utils/categoryTreeSort'
 import { barcodeTypeOptions, workCenterOpts } from '@/mock/materialInfoOptions'
-import { productInfoState } from '@/store/productInfoStore'
+import { productInfoState, archiveProduct, unarchiveProduct } from '@/store/productInfoStore'
+import {
+  isProductActive,
+  isProductArchived,
+  normalizeProductStatus,
+  productStatusColor,
+} from '@/utils/productStatus'
 import { materialInfoState } from '@/store/materialInfoStore'
 import MasterItemFormModal from './components/MasterItemFormModal.vue'
 import MasterItemCategoryFormModal from './components/MasterItemCategoryFormModal.vue'
@@ -566,6 +602,8 @@ const modalSessionKey = ref(0)
 const labelPrintOpen = ref(false)
 const labelPrintItems = ref([])
 const listViewMode = ref('sku')
+/** 启用 / 已归档（产品侧；纯物料始终出现在启用） */
+const listTab = ref('active')
 const matrixOpen = ref(false)
 const matrixSpu = ref(null)
 const matrixPreviewRef = ref(null)
@@ -817,14 +855,31 @@ const unifiedList = computed(() => {
   return buildUnifiedListRows(productInfoState.products, materialInfoState.materials)
 })
 
-const filteredList = computed(() =>
-  filterUnifiedListRows(
+const filteredList = computed(() => {
+  let rows = filterUnifiedListRows(
     unifiedList.value,
     appliedFilters.value,
     selectedCategoryKey.value,
     categoryTreeMode.value,
-  ),
-)
+  )
+  if (listTab.value === 'archived') {
+    // 已归档：仅产品侧且状态为已归档
+    rows = rows.filter((r) => isProductSideRecord(r) && isProductArchived(r))
+  } else {
+    // 启用：排除已归档产品；纯物料照常展示
+    rows = rows.filter((r) => !isProductSideRecord(r) || isProductActive(r))
+  }
+  return rows
+})
+
+function isProductSideRecord(record) {
+  return (productInfoState.products || []).some((p) => p.id === record?.id)
+}
+
+function onListTabChange() {
+  pagination.current = 1
+  selectedRowKeys.value = []
+}
 
 const filteredTemplateList = computed(() => {
   void spuState.spus
@@ -953,11 +1008,12 @@ const baseColumns = [
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
   { title: '创建人', key: 'creator', width: 88 },
+  { title: '状态', key: 'status', width: 88 },
   { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('master-item-list-v2', baseColumns, { minScrollX: 2820 })
+  useTableColumnSettings('master-item-list-v3', baseColumns, { minScrollX: 2920 })
 
 const tableColumns = computed(() =>
   displayColumns.value.map((col) => {
@@ -1119,6 +1175,61 @@ function handleBatchDelete() {
 function handleClone(record) {
   const cloned = cloneMasterItem(record)
   if (cloned) message.success('已克隆')
+}
+
+function confirmArchive(record) {
+  if (!isProductSideRecord(record)) {
+    message.warning('仅产品信息支持归档')
+    return
+  }
+  Modal.confirm({
+    title: '确认归档',
+    content: `确定归档「${record.name}」吗？归档后选品时不再展示，已被 BOM/工单/订单引用不受影响。`,
+    onOk: () => {
+      archiveProduct(record.id)
+      selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== record.id)
+      message.success('已归档')
+    },
+  })
+}
+
+function handleUnarchive(record) {
+  if (!isProductSideRecord(record)) return
+  unarchiveProduct(record.id)
+  selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== record.id)
+  message.success('已取消归档')
+}
+
+function handleBatchArchive() {
+  const rows = filteredList.value.filter(
+    (r) => selectedRowKeys.value.includes(r.id) && isProductSideRecord(r) && isProductActive(r),
+  )
+  if (!rows.length) {
+    message.warning('请先勾选要归档的产品')
+    return
+  }
+  Modal.confirm({
+    title: '批量归档',
+    content: `确定归档选中的 ${rows.length} 条产品吗？归档后选品时不再展示，已被引用不受影响。`,
+    onOk: () => {
+      rows.forEach((r) => archiveProduct(r.id))
+      selectedRowKeys.value = []
+      message.success(`已归档 ${rows.length} 条`)
+    },
+  })
+}
+
+function handleBatchUnarchive() {
+  const rows = filteredList.value.filter(
+    (r) => selectedRowKeys.value.includes(r.id) && isProductSideRecord(r) && isProductArchived(r),
+  )
+  if (!rows.length) {
+    message.warning('请先勾选要取消归档的产品')
+    return
+  }
+  rows.forEach((r) => unarchiveProduct(r.id))
+  selectedRowKeys.value = []
+  message.success(`已取消归档 ${rows.length} 条`)
 }
 
 function openBomMaintenance(record) {
@@ -1387,6 +1498,25 @@ onBeforeUnmount(() => {
 
 .toolbar-row {
   flex-shrink: 0;
+}
+
+.list-status-tabs {
+  flex-shrink: 0;
+  margin-bottom: 0;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 0 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  :deep(.ant-tabs-nav) {
+    margin: 0;
+  }
+}
+
+.list-status-tabs + .table-card {
+  border-radius: 0 0 6px 6px;
 }
 
 .table-card {

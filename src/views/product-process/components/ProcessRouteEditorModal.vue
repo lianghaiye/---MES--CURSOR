@@ -158,12 +158,14 @@ const form = reactive({
 })
 
 const productOpts = computed(() =>
-  (productInfoState.products || []).map((p) => ({
-    label: `${p.code || ''} ${p.name || ''}`.trim(),
-    value: p.id,
-    code: p.code,
-    name: p.name,
-  })),
+  (productInfoState.products || [])
+    .filter((p) => p?.status !== '已归档' && p?.status !== 'archived')
+    .map((p) => ({
+      label: `${p.code || ''} ${p.name || ''}`.trim(),
+      value: p.id,
+      code: p.code,
+      name: p.name,
+    })),
 )
 
 const categoryTree = computed(() => {

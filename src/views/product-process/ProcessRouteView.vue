@@ -84,12 +84,16 @@
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space :size="0" wrap>
-              <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="confirmDelete(record)"
-                >删除</a-button
-              >
               <a-button
-                v-if="record.status === '使用中'"
+                type="link"
+                size="small"
+                :disabled="record.status === '已归档'"
+                @click="openEdit(record)"
+              >
+                编辑
+              </a-button>
+              <a-button
+                v-if="record.status === '使用中' || record.status === '新建'"
                 type="link"
                 size="small"
                 @click="handleArchive(record)"
@@ -133,12 +137,11 @@ export default { name: 'ProcessRouteView' }
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Modal, message } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   processRouteState,
   filterProcessRoutes,
-  deleteProcessRoute,
   archiveProcessRoute,
   unarchiveProcessRoute,
   cloneProcessRoute,
@@ -211,6 +214,10 @@ function openCreate() {
 
 function openEdit(record) {
   if (!record?.id) return
+  if (record.status === '已归档') {
+    message.warning('已归档的工艺路线不可编辑，请先取消归档')
+    return
+  }
   openCreateTab(router, openTab, {
     path: `/product-process/routing/${record.id}/edit`,
     title: `编辑工艺路线 ${record.code || record.name || ''}`.trim(),
@@ -219,22 +226,6 @@ function openEdit(record) {
 
 function goDetail(record) {
   router.push(`/product-process/routing/${record.id}`)
-}
-
-function confirmDelete(record) {
-  Modal.confirm({
-    title: '确认删除',
-    content: `确定删除工艺路线「${record.name}」吗？`,
-    okType: 'danger',
-    onOk: () => {
-      const res = deleteProcessRoute(record.id)
-      if (!res.ok) {
-        message.warning(res.message)
-        return
-      }
-      message.success('已删除')
-    },
-  })
 }
 
 function handleArchive(record) {

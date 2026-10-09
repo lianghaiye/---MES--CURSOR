@@ -157,6 +157,27 @@
             </div>
           </section>
 
+          <!-- 待办事项 -->
+          <section class="panel-card todo-panel">
+            <div class="panel-header">
+              <span class="panel-title">待办事项</span>
+              <span class="panel-hint">共 {{ todoTotal }} 项待处理</span>
+            </div>
+            <div class="todo-grid">
+              <button
+                v-for="item in todoCards"
+                :key="item.key"
+                type="button"
+                class="todo-card"
+                :class="[`todo-tone-${item.tone}`, { 'is-empty': !item.count }]"
+                @click="goTodo(item)"
+              >
+                <div class="todo-count">{{ item.count }}</div>
+                <div class="todo-label">{{ item.label }}</div>
+              </button>
+            </div>
+          </section>
+
           <!-- 工单进度报表 -->
           <section class="panel-card wo-panel">
             <div class="panel-header">
@@ -376,6 +397,11 @@ import {
   workbenchState,
 } from '@/store/workbenchStore'
 import { openExternalLink } from '@/utils/externalLink'
+import {
+  buildWorkbenchTodoFullPath,
+  listWorkbenchTodoCards,
+  touchWorkbenchTodoSources,
+} from '@/utils/workbenchTodos'
 import WorkbenchFavoriteModal from '@/views/home/components/WorkbenchFavoriteModal.vue'
 import WorkbenchProcessConfigModal from '@/views/home/components/WorkbenchProcessConfigModal.vue'
 import WorkbenchReleaseMessageModal from '@/views/home/components/WorkbenchReleaseMessageModal.vue'
@@ -419,6 +445,14 @@ const favorites = computed(() => {
   void workbenchState.favorites
   return listFavorites()
 })
+
+const todoCards = computed(() => {
+  void refreshTick.value
+  touchWorkbenchTodoSources()
+  return listWorkbenchTodoCards()
+})
+
+const todoTotal = computed(() => todoCards.value.reduce((sum, item) => sum + (item.count || 0), 0))
 
 const scenarios = computed(() => {
   void workbenchState.scenarios
@@ -527,6 +561,16 @@ function goPath(path, title) {
   }
   openTab(path, title || '页面')
   router.push(path)
+}
+
+function goTodo(item) {
+  if (!item?.path) {
+    message.info('暂无跳转链接')
+    return
+  }
+  const fullPath = buildWorkbenchTodoFullPath(item)
+  openTab(fullPath, item.title || item.label)
+  router.push({ path: item.path, query: { ...(item.query || {}) } })
 }
 
 function goProcessReport() {
@@ -936,6 +980,96 @@ export default { name: 'WorkbenchDashboardView' }
 
 @media (max-width: 768px) {
   .process-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* —— 待办事项 —— */
+.todo-panel {
+  margin-bottom: 0;
+}
+
+.todo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.todo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px solid #e8eef5;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f7faff 0%, #fff 55%);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: #91caff;
+    box-shadow: 0 6px 16px rgba(22, 119, 255, 0.1);
+  }
+
+  &.is-empty {
+    opacity: 0.72;
+  }
+
+  &.todo-tone-blue {
+    background: linear-gradient(180deg, #f7faff 0%, #fff 55%);
+  }
+  &.todo-tone-orange {
+    background: linear-gradient(180deg, #fff8f0 0%, #fff 55%);
+  }
+  &.todo-tone-purple {
+    background: linear-gradient(180deg, #f9f0ff 0%, #fff 55%);
+  }
+  &.todo-tone-cyan {
+    background: linear-gradient(180deg, #f0fffe 0%, #fff 55%);
+  }
+  &.todo-tone-green {
+    background: linear-gradient(180deg, #f6ffed 0%, #fff 55%);
+  }
+  &.todo-tone-magenta {
+    background: linear-gradient(180deg, #fff0f6 0%, #fff 55%);
+  }
+  &.todo-tone-gold {
+    background: linear-gradient(180deg, #fffbe6 0%, #fff 55%);
+  }
+  &.todo-tone-geekblue {
+    background: linear-gradient(180deg, #f0f5ff 0%, #fff 55%);
+  }
+}
+
+.todo-count {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: rgba(0, 0, 0, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.todo-label {
+  font-size: 13px;
+  color: @text-secondary;
+  line-height: 1.3;
+}
+
+@media (max-width: 1200px) {
+  .todo-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .todo-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

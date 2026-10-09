@@ -421,8 +421,8 @@ export default { name: 'OutsourcingOrderView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import {
@@ -499,6 +499,7 @@ import {
   normalizeProcurementDocSource,
 } from '@/constants/procurementDocSource'
 
+const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
@@ -533,6 +534,20 @@ const printOrders = ref([])
 const receiptOrders = ref([])
 const inboundOrders = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
+
+function applyFiltersFromRouteQuery() {
+  const status = String(route.query.status || '').trim()
+  if (!status) return
+  filters.status = status
+  appliedFilters.value = { ...filters }
+  pagination.current = 1
+}
+
+watch(
+  () => route.query.status,
+  () => applyFiltersFromRouteQuery(),
+  { immediate: true },
+)
 
 const supplierOpts = supplierOptions
 const statusOpts = outsourcingStatusOptions.map((v) => ({ label: v, value: v }))

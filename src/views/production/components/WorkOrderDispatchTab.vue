@@ -1,5 +1,27 @@
 <template>
   <div class="dispatch-tab">
+    <div class="structure-toolbar">
+      <div class="structure-toolbar-text">
+        <span class="structure-title">本单工序</span>
+        <span class="structure-hint">
+          {{
+            canEditStructure
+              ? '派工请在下表操作；增删工序、并行与完成方式请用网格调整（仅本单）'
+              : '当前状态不可调整工序结构（需待下发且尚未生成小程序任务）'
+          }}
+        </span>
+      </div>
+      <a-button
+        v-if="canEditStructure"
+        type="primary"
+        ghost
+        size="small"
+        @click="gridModalOpen = true"
+      >
+        用网格调整本单工序
+      </a-button>
+    </div>
+
     <div v-if="anyStepGroups.length" class="any-select-panel">
       <div class="any-select-title">选做工序勾选</div>
       <div class="any-select-hint">
@@ -27,7 +49,7 @@
       size="small"
       bordered
       :pagination="false"
-      :scroll="{ x: 1280 }"
+      :scroll="{ x: 1200 }"
       class="process-table"
     >
       <template #bodyCell="{ column, record, index }">
@@ -119,9 +141,6 @@
             placeholder="请输入工序内容"
           />
         </template>
-        <template v-else-if="column.key === 'actions'">
-          <a class="danger-link muted-action">删除</a>
-        </template>
       </template>
     </a-table>
 
@@ -132,15 +151,23 @@
         <a-button size="small" @click="emit('cancel')">取消</a-button>
       </a-space>
     </div>
+
+    <WorkOrderProcessGridEditModal
+      v-model:open="gridModalOpen"
+      :work-order="workOrder"
+      @applied="onGridApplied"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import ExecutorTagPicker from './ExecutorTagPicker.vue'
+import WorkOrderProcessGridEditModal from './WorkOrderProcessGridEditModal.vue'
 import { validateWorkOrderDispatchReady } from '@/utils/workOrderDispatchHelpers'
 import { listAnyCompletionSteps, formatCompletionModeLabel } from '@/utils/processRouteGrid'
+import { canEditWorkOrderProcessStructure } from '@/utils/workOrderProcessGrid'
 import { getProcessByName } from '@/store/processConfigStore'
 import { normalizeReportMode } from '@/utils/reportMode'
 import {
@@ -162,6 +189,8 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'dispatch-and-start', 'cancel'])
 
+const gridModalOpen = ref(false)
+
 watch(
   () => props.workOrder,
   (wo) => {
@@ -169,6 +198,8 @@ watch(
   },
   { immediate: true },
 )
+
+const canEditStructure = computed(() => canEditWorkOrderProcessStructure(props.workOrder))
 
 const anyStepGroups = computed(() => listAnyCompletionSteps(props.workOrder?.processes || []))
 
@@ -183,8 +214,11 @@ const columns = [
   { title: '选择执行人', key: 'executors', width: 220 },
   { title: '下料物料', key: 'blankingMaterials', width: 220 },
   { title: '工序内容', key: 'processContent', width: 180 },
-  { title: '操作', key: 'actions', width: 72, fixed: 'right' },
 ]
+
+function onGridApplied() {
+  emit('save')
+}
 
 function selectedIdsOf(group) {
   return group.processes.filter((p) => p.includeInDispatch !== false).map((p) => p.id)
@@ -254,6 +288,37 @@ function emitDispatchAndStart() {
 
 <style lang="less" scoped>
 .dispatch-tab {
+  .structure-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: #fafafa;
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+  }
+
+  .structure-toolbar-text {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .structure-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.88);
+  }
+
+  .structure-hint {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+  }
+
   .any-select-panel {
     margin-bottom: 12px;
     padding: 10px 12px;
@@ -356,15 +421,6 @@ function emitDispatchAndStart() {
 
   .muted {
     color: rgba(0, 0, 0, 0.25);
-  }
-
-  .danger-link {
-    color: #ff4d4f;
-  }
-
-  .muted-action {
-    cursor: default;
-    opacity: 0.65;
   }
 
   .dispatch-footer {

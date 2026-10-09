@@ -354,7 +354,7 @@ watch(
 )
 
 function onProcessRouteChange(value) {
-  emit('update-field', { key: 'processRouteName', value })
+  // 不在此处直接改 processRouteName：由父级二次确认后再写入并重置工序列
   emit('process-route-change', value)
 }
 

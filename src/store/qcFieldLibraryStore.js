@@ -12,7 +12,7 @@ import { isQcSystemFixedField } from '@/utils/qcConclusionField'
 import { qcTemplateState } from '@/store/qcTemplateStore'
 
 const LIBRARY_SEED_KEY = 'i_doms_qc_field_library_seed_v'
-const LIBRARY_SEED_VERSION = '7'
+const LIBRARY_SEED_VERSION = '9'
 
 function nowText() {
   return dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -62,6 +62,13 @@ export function ensureQcLibraryDemoSeed() {
     (f) => String(f.code || '').toUpperCase() !== 'QC_FIELD_REMARK',
   )
   if (qcFieldLibraryState.fields.length !== beforeRemark) changed = true
+
+  // 下线「选项+其它说明」演示项，改由复合项覆盖「选项+补充文本」场景
+  const beforeSeal = qcFieldLibraryState.fields.length
+  qcFieldLibraryState.fields = qcFieldLibraryState.fields.filter(
+    (f) => String(f.code || '').toUpperCase() !== 'QC_SEAL_REQ',
+  )
+  if (qcFieldLibraryState.fields.length !== beforeSeal) changed = true
 
   const ensureCodes = [...SYSTEM_LIBRARY_CODES, 'QC_RUN_TEST']
   ensureCodes.forEach((code) => {

@@ -369,8 +369,8 @@ export default { name: 'SalesOrderView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useTabs } from '@/composables/useTabs'
@@ -441,6 +441,7 @@ import {
   SALES_ORDER_STATUS,
 } from '@/utils/salesOrderStatus'
 
+const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
@@ -464,6 +465,20 @@ const priceChangeOpen = ref(false)
 const priceChangeOrder = ref(null)
 const priceChangePending = computed(() => getPendingPriceChange(priceChangeOrder.value?.id))
 const pagination = reactive({ current: 1, pageSize: 10 })
+
+function applyFiltersFromRouteQuery() {
+  const progressStatus = String(route.query.progressStatus || '').trim()
+  if (!progressStatus) return
+  filters.progressStatus = progressStatus
+  appliedFilters.value = { ...filters }
+  pagination.current = 1
+}
+
+watch(
+  () => route.query.progressStatus,
+  () => applyFiltersFromRouteQuery(),
+  { immediate: true },
+)
 
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 const orderSourceOpts = orderSourceOptions.map((v) => ({ label: v, value: v }))

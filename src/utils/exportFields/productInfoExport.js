@@ -69,4 +69,14 @@ export const productInfoExportFields = [
   { key: 'createdAt', title: '创建日期', getValue: (row) => formatDate(row.createdAt) },
   { key: 'updatedAt', title: '更新日期', getValue: (row) => formatDate(row.updatedAt) },
   { key: 'creator', title: '创建人', getValue: (row) => cell(row, 'creator') },
+  {
+    key: 'status',
+    title: '状态',
+    getValue: (row) => {
+      if (row?.status === '已归档' || row?.status === 'archived') return '已归档'
+      // 纯物料行无产品状态
+      if (row?.itemKind === '物料' && !row?.canSell) return ''
+      return row?.status || '启用'
+    },
+  },
 ]

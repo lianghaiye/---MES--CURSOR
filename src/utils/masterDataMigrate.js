@@ -89,8 +89,13 @@ export function migrateProductRecord(record) {
     ...(record.production || {}),
   }
   if (!production.planStrategy) production.planStrategy = 'mto'
+  const status =
+    record.status === '已归档' || record.status === 'archived' || record.status === '停用'
+      ? '已归档'
+      : '启用'
   return {
     ...record,
+    status,
     materialType: record.materialType
       ? normalizeMaterialType(record.materialType)
       : record.materialType,

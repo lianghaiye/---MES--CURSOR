@@ -9,6 +9,7 @@ import { productCategoryState } from '@/store/productCategoryStore'
 import { findSpuById, spuState } from '@/store/spuStore'
 import { formatVariantSummary, formatVariantTooltip } from '@/utils/spuVariant'
 import { isProductSyncedMirror } from '@/utils/bomMaterialPicker'
+import { isProductActive, isProductArchived } from '@/utils/productStatus'
 
 function resolveBomItemType(itemType) {
   return itemType === '产品' ? 'product' : 'material'
@@ -127,13 +128,18 @@ export function buildBomSubItemPickerRows(options = {}) {
   const dedupeProductMaterial = options.dedupeProductMaterial !== false
   const includeSpuTemplates = options.includeSpuTemplates === true
   const spuCanSellOnly = options.spuCanSellOnly !== false
-  const cacheKey = `${productInfoState.products?.length || 0}-${materialInfoState.materials?.length || 0}-${spuState.spus?.length || 0}-${skipSubItemCount ? 1 : 0}-${dedupeProductMaterial ? 1 : 0}-${includeSpuTemplates ? 1 : 0}-${spuCanSellOnly ? 1 : 0}`
+  const productsSrc = productInfoState.products || []
+  const archivedSig = productsSrc.reduce((n, p) => n + (isProductArchived(p) ? 1 : 0), 0)
+  const cacheKey = `${productsSrc.length}-${archivedSig}-${materialInfoState.materials?.length || 0}-${spuState.spus?.length || 0}-${skipSubItemCount ? 1 : 0}-${dedupeProductMaterial ? 1 : 0}-${includeSpuTemplates ? 1 : 0}-${spuCanSellOnly ? 1 : 0}`
   if (pickerRowsCache && pickerRowsCacheKey === cacheKey) {
     return pickerRowsCache
   }
 
   const mapOpts = { skipSubItemCount }
-  const products = (productInfoState.products || []).map((p) => mapMasterRow(p, '产品', mapOpts))
+  // 选品不展示已归档产品
+  const products = productsSrc
+    .filter((p) => isProductActive(p))
+    .map((p) => mapMasterRow(p, '产品', mapOpts))
   const seen = new Set(products.map((r) => r.itemId))
   const rows = [...products]
 

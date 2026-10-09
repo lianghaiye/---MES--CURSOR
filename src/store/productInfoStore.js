@@ -9,10 +9,18 @@ import {
 } from '@/utils/productMaterialSync'
 import { applyLaborConfigSeed } from '@/mock/laborConfigSeed'
 import { persistJson } from '@/utils/safeStorage'
+import {
+  PRODUCT_STATUS,
+  isProductActive,
+  isProductArchived,
+  normalizeProductStatus,
+} from '@/utils/productStatus'
 
 const STORAGE_KEY = 'i_doms_product_info'
-/** v12：工业标识演示产品 */
-const DATA_VERSION = 12
+/** v13：产品信息启用/已归档状态 */
+const DATA_VERSION = 13
+
+export { PRODUCT_STATUS, isProductActive, isProductArchived, normalizeProductStatus }
 let codeSeq = 20000
 
 /** 内联注入，避免 import blankSizeBomDemoSeed 在启动早期拉起 BOM 循环依赖 */
@@ -125,12 +133,27 @@ export function addProduct(record) {
   const row = {
     ...record,
     id,
+    status: normalizeProductStatus(record.status),
     createdAt: now,
     updatedAt: now,
   }
   productInfoState.products.unshift(row)
   syncAfterProductSave(row, { isEdit: false })
   return row
+}
+
+/** 可选产品（选品弹窗等）：排除已归档 */
+export function getSelectableProducts() {
+  return productInfoState.products.filter((p) => isProductActive(p))
+}
+
+/** 归档仅为状态变更，不校验 BOM/工单/订单引用 */
+export function archiveProduct(id) {
+  return updateProduct(id, { status: PRODUCT_STATUS.ARCHIVED })
+}
+
+export function unarchiveProduct(id) {
+  return updateProduct(id, { status: PRODUCT_STATUS.ACTIVE })
 }
 
 export function updateProduct(id, patch) {
@@ -166,6 +189,7 @@ export function cloneProduct(id) {
   cloned.code = generateProductCode()
   cloned.name = `${source.name}-克隆`
   cloned.isProductMaterial = false
+  cloned.status = PRODUCT_STATUS.ACTIVE
   const now = dayjs().format('YYYY-MM-DD')
   cloned.createdAt = now
   cloned.updatedAt = now

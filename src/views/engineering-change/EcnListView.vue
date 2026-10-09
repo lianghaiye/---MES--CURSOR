@@ -221,7 +221,7 @@ export default { name: 'EcnListView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
@@ -234,6 +234,7 @@ import {
   resolveEcnChangeReason,
   resolveExecConfigLabel,
 } from '@/constants/ecn'
+import { ECN_TODO_STATUSES } from '@/utils/workbenchTodos'
 import { resolveChangeRequestModule, getDocNo } from '@/constants/changeRequestModule'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -259,6 +260,27 @@ const defaultFilters = () => ({
 const filters = reactive(defaultFilters())
 const appliedFilters = ref({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
+
+function applyFiltersFromRouteQuery() {
+  const status = String(route.query.status || '').trim()
+  const todo = String(route.query.todo || '').trim()
+  if (todo === '1') {
+    filters.status = undefined
+    appliedFilters.value = { ...filters, statusIn: [...ECN_TODO_STATUSES] }
+    pagination.current = 1
+    return
+  }
+  if (!status) return
+  filters.status = status
+  appliedFilters.value = { ...filters }
+  pagination.current = 1
+}
+
+watch(
+  () => [route.query.status, route.query.todo],
+  () => applyFiltersFromRouteQuery(),
+  { immediate: true },
+)
 
 const statusOpts = ecnStatusOptions.filter((o) => o.value !== '')
 const typeOpts = ecnTypeOptions.filter((o) => o.value !== '')
@@ -308,6 +330,9 @@ function handleReset() {
   Object.assign(filters, defaultFilters())
   appliedFilters.value = { ...filters }
   pagination.current = 1
+  if (route.query.todo || route.query.status) {
+    router.replace({ path: route.path, query: {} })
+  }
 }
 
 function handleRefresh() {

@@ -2,104 +2,86 @@
   <div class="product-bom-page">
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
-        <a-row :gutter="[12, 8]" style="width: 100%">
-          <a-col :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item :label="isShipList ? '编号' : 'BOM编号'">
-              <a-input
-                v-model:value="filters.bomNo"
-                allow-clear
-                size="small"
-                :placeholder="isShipList ? '请输入编号' : '请输入 BOM 编号'"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item :label="isShipList ? '名称' : 'BOM名称'">
-              <a-input
-                v-model:value="filters.bomName"
-                allow-clear
-                size="small"
-                :placeholder="isShipList ? '请输入名称' : '请输入 BOM 名称'"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="isShipList" :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item label="适用范围">
-              <a-select
-                v-model:value="filters.scopeType"
-                allow-clear
-                size="small"
-                placeholder="请选择"
-                :options="shipAttachmentScopeTypeOptions"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-else :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item label="物品名称">
-              <a-select
-                v-model:value="filters.itemId"
-                allow-clear
-                show-search
-                size="small"
-                placeholder="请选择物品"
-                :filter-option="filterItem"
-                :options="itemFilterOptions"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item :label="isShipList ? '状态' : 'BOM状态'">
-              <a-select
-                v-model:value="filters.status"
-                allow-clear
-                size="small"
-                placeholder="请选择状态"
-                :options="isShipList ? shipAttachmentStatusOptions : bomStatusOptions"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="!isShipList" :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item label="规格型号">
-              <a-input
-                v-model:value="filters.specModel"
-                allow-clear
-                size="small"
-                placeholder="请输入规格型号"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="!isShipList" :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item label="材质">
-              <a-input
-                v-model:value="filters.material"
-                allow-clear
-                size="small"
-                placeholder="请输入材质"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="!isShipList" :xs="24" :sm="12" :md="6" :lg="5">
-            <a-form-item label="图号">
-              <a-input
-                v-model:value="filters.drawingNo"
-                allow-clear
-                size="small"
-                placeholder="请输入图号"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :xs="24" :sm="12" :md="6" :lg="4">
-            <a-form-item class="filter-actions-item">
-              <a-space>
-                <a-button type="primary" size="small" @click="handleSearch">
-                  <SearchOutlined />
-                  搜索
-                </a-button>
-                <a-button size="small" @click="handleReset">清空</a-button>
-              </a-space>
-            </a-form-item>
-          </a-col>
-        </a-row>
+        <ListFilterBar
+          :field-count="filterFieldCount"
+          search-text="搜索"
+          reset-text="清空"
+          @search="handleSearch"
+          @reset="handleReset"
+        >
+          <a-form-item :label="isShipList ? '编号' : 'BOM编号'">
+            <a-input
+              v-model:value="filters.bomNo"
+              allow-clear
+              size="small"
+              :placeholder="isShipList ? '请输入编号' : '请输入 BOM 编号'"
+            />
+          </a-form-item>
+          <a-form-item :label="isShipList ? '名称' : 'BOM名称'">
+            <a-input
+              v-model:value="filters.bomName"
+              allow-clear
+              size="small"
+              :placeholder="isShipList ? '请输入名称' : '请输入 BOM 名称'"
+            />
+          </a-form-item>
+          <a-form-item v-if="isShipList" label="适用范围">
+            <a-select
+              v-model:value="filters.scopeType"
+              allow-clear
+              size="small"
+              placeholder="请选择"
+              :options="shipAttachmentScopeTypeOptions"
+            />
+          </a-form-item>
+          <a-form-item v-else label="物品名称">
+            <a-select
+              v-model:value="filters.itemId"
+              allow-clear
+              show-search
+              size="small"
+              placeholder="请选择物品"
+              :filter-option="filterItem"
+              :options="itemFilterOptions"
+            />
+          </a-form-item>
+          <a-form-item
+            v-if="isShipList || listTab === 'all'"
+            :label="isShipList ? '状态' : 'BOM状态'"
+          >
+            <a-select
+              v-model:value="filters.status"
+              allow-clear
+              size="small"
+              placeholder="请选择状态"
+              :options="statusFilterOptions"
+            />
+          </a-form-item>
+          <a-form-item v-if="!isShipList" label="规格型号">
+            <a-input
+              v-model:value="filters.specModel"
+              allow-clear
+              size="small"
+              placeholder="请输入规格型号"
+            />
+          </a-form-item>
+          <a-form-item v-if="!isShipList" label="材质">
+            <a-input
+              v-model:value="filters.material"
+              allow-clear
+              size="small"
+              placeholder="请输入材质"
+            />
+          </a-form-item>
+          <a-form-item v-if="!isShipList" label="图号">
+            <a-input
+              v-model:value="filters.drawingNo"
+              allow-clear
+              size="small"
+              placeholder="请输入图号"
+            />
+          </a-form-item>
+        </ListFilterBar>
       </a-form>
     </div>
 
@@ -149,6 +131,18 @@
         <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
+
+    <a-tabs
+      v-if="!isShipList"
+      v-model:activeKey="listTab"
+      size="small"
+      class="list-status-tabs"
+      @change="onListTabChange"
+    >
+      <a-tab-pane key="all" tab="全部" />
+      <a-tab-pane key="pending" tab="待发布" />
+      <a-tab-pane key="archived" tab="已归档" />
+    </a-tabs>
 
     <div class="table-card">
       <a-table
@@ -368,7 +362,6 @@ import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import {
   PlusOutlined,
-  SearchOutlined,
   ReloadOutlined,
   DeleteOutlined,
   CopyOutlined,
@@ -378,8 +371,10 @@ import {
   DownOutlined,
   CheckOutlined,
 } from '@ant-design/icons-vue'
+import ListFilterBar from '@/components/ListFilterBar.vue'
 import { filterProductBoms } from '@/mock/productBom'
 import {
+  BOM_STATUS,
   bomStatusOptions,
   bomStatusColor,
   isBomPending,
@@ -451,8 +446,23 @@ const filters = reactive({
   drawingNo: '',
 })
 const appliedFilters = ref({ ...filters })
+/** 产品 BOM 列表 Tab：全部(生效+待发布) / 待发布 / 已归档 */
+const listTab = ref('all')
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
+
+const statusFilterOptions = computed(() => {
+  if (isShipList.value) return shipAttachmentStatusOptions
+  // 「全部」Tab 内仅可再筛生效 / 待发布
+  return bomStatusOptions.filter((opt) => opt.value !== BOM_STATUS.ARCHIVED)
+})
+
+/** 筛选条件数（供 ListFilterBar 展开/收起） */
+const filterFieldCount = computed(() => {
+  if (isShipList.value) return 4 // 编号、名称、适用范围、状态
+  // 产品 BOM：编号、名称、物品 + 规格/材质/图号；「全部」Tab 另含状态
+  return listTab.value === 'all' ? 7 : 6
+})
 const versionOpen = ref(false)
 const versionRecord = ref(null)
 const enableRefOpen = ref(false)
@@ -477,10 +487,13 @@ const pendingShipEnableId = ref('')
 const probeOpen = ref(false)
 
 const itemFilterOptions = computed(() => {
-  const products = productInfoState.products.slice(0, 150).map((p) => ({
-    label: p.name,
-    value: p.id,
-  }))
+  const products = productInfoState.products
+    .filter((p) => p?.status !== '已归档' && p?.status !== 'archived')
+    .slice(0, 150)
+    .map((p) => ({
+      label: p.name,
+      value: p.id,
+    }))
   if (isShipList.value) return products
   const materials = materialInfoState.materials.slice(0, 80).map((m) => ({
     label: m.name,
@@ -499,13 +512,23 @@ const masterLookup = computed(() =>
 
 const enrichedList = computed(() => enrichProductBomList(productBomState.boms, masterLookup.value))
 
-const filteredList = computed(() =>
-  filterProductBoms(enrichedList.value, {
+const filteredList = computed(() => {
+  let rows = filterProductBoms(enrichedList.value, {
     ...appliedFilters.value,
     onlyShip: isShipList.value,
     excludeShip: !isShipList.value,
-  }),
-)
+  })
+  if (!isShipList.value) {
+    if (listTab.value === 'all') {
+      rows = rows.filter((r) => isBomPending(r) || isBomActive(r))
+    } else if (listTab.value === 'pending') {
+      rows = rows.filter((r) => isBomPending(r))
+    } else if (listTab.value === 'archived') {
+      rows = rows.filter((r) => isBomArchived(r))
+    }
+  }
+  return rows
+})
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -601,6 +624,7 @@ function formatShipBomItemLabel(record) {
 function handleSearch() {
   appliedFilters.value = { ...filters }
   pagination.current = 1
+  selectedRowKeys.value = []
 }
 
 function handleReset() {
@@ -613,6 +637,14 @@ function handleReset() {
   filters.drawingNo = ''
   filters.scopeType = undefined
   handleSearch()
+}
+
+function onListTabChange() {
+  // 切换 Tab 时清空状态筛选项，避免与 Tab 语义冲突
+  filters.status = undefined
+  appliedFilters.value = { ...filters, status: undefined }
+  pagination.current = 1
+  selectedRowKeys.value = []
 }
 
 function openDetail(record) {
@@ -1055,12 +1087,6 @@ function onExportMenu({ key }) {
     font-size: 13px;
     white-space: nowrap;
   }
-
-  .filter-actions-item {
-    :deep(.ant-form-item-label) {
-      display: none;
-    }
-  }
 }
 
 .toolbar-row {
@@ -1070,6 +1096,28 @@ function onExportMenu({ key }) {
   margin-bottom: 8px;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.list-status-tabs {
+  margin-bottom: 0;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 0 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  :deep(.ant-tabs-nav) {
+    margin: 0;
+  }
+
+  :deep(.ant-tabs-nav::before) {
+    border-bottom-color: #f0f0f0;
+  }
+}
+
+.list-status-tabs + .table-card {
+  border-radius: 0 0 6px 6px;
 }
 
 .table-card {

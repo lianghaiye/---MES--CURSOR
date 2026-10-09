@@ -56,7 +56,11 @@ export function createChangeRequestStore(options) {
       const workOrderNo = String(filters.workOrderNo || '').trim()
       if (workOrderNo && !String(row.workOrderNo || '').includes(workOrderNo)) return false
 
-      if (filters.status && row.status !== filters.status) return false
+      if (Array.isArray(filters.statusIn) && filters.statusIn.length) {
+        if (!filters.statusIn.includes(row.status)) return false
+      } else if (filters.status && row.status !== filters.status) {
+        return false
+      }
       if (filters.type && row.type !== filters.type) return false
       const productName = String(filters.productName || '').trim()
       if (productName && !row.productName?.includes(productName)) return false

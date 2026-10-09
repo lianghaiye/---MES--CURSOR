@@ -478,6 +478,17 @@ const rowSelection = computed(() => ({
   },
 }))
 
+function applyFiltersFromRouteQuery() {
+  const qcStatus = String(route.query.qcStatus || '').trim()
+  if (!qcStatus) return
+  filters.qcStatus = qcStatus
+  appliedFilters.value = {
+    ...filters,
+    bizScope: bizScope.value,
+  }
+  pagination.current = 1
+}
+
 watch(
   () => bizScope.value,
   (scope) => {
@@ -494,6 +505,12 @@ watch(
     selectedRowKeys.value = []
     pagination.current = 1
   },
+)
+
+watch(
+  () => route.query.qcStatus,
+  () => applyFiltersFromRouteQuery(),
+  { immediate: true },
 )
 
 watch(

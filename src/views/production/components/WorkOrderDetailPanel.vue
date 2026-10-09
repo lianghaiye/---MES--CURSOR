@@ -151,6 +151,7 @@
 
 <script setup>
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { Modal } from 'ant-design-vue'
 import { DownOutlined, PrinterOutlined, UpOutlined } from '@ant-design/icons-vue'
 import { workOrderState } from '@/store/workOrderStore'
 import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
@@ -159,6 +160,7 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { processRouteState } from '@/store/processRouteStore'
 import { applyRouteSnapshotToWorkOrder } from '@/mock/processRoutes'
+import { syncWorkOrderBlankingMaterials } from '@/utils/blankingSettleMaterial'
 import {
   ensureWorkOrderProcessRoute,
   getWorkOrderRouteSelectOptions,
@@ -320,8 +322,19 @@ function onWorkOrderFieldUpdate({ key, value }) {
 
 function onProcessRouteChange(routeName) {
   if (!workOrder.value || !routeName) return
-  applyRouteSnapshotToWorkOrder(workOrder.value, routeName)
-  emit('save-basic')
+  if (routeName === workOrder.value.processRouteName) return
+
+  Modal.confirm({
+    title: '更换工艺路线',
+    content: '更换路线将重置本单工序列，是否继续？',
+    okText: '确认更换',
+    cancelText: '取消',
+    onOk: () => {
+      applyRouteSnapshotToWorkOrder(workOrder.value, routeName)
+      syncWorkOrderBlankingMaterials(workOrder.value)
+      emit('save-basic')
+    },
+  })
 }
 
 function statusTagColor(status) {

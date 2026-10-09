@@ -7,6 +7,18 @@
       <a class="action-link" @click.prevent>操作</a>
       <template #overlay>
         <a-menu class="master-info-action-menu" @click="onMenuClick">
+          <a-menu-item v-if="showArchive" key="archive">
+            <span class="menu-item-inner">
+              <InboxOutlined />
+              归档
+            </span>
+          </a-menu-item>
+          <a-menu-item v-if="showUnarchive" key="unarchive">
+            <span class="menu-item-inner">
+              <RollbackOutlined />
+              取消归档
+            </span>
+          </a-menu-item>
           <a-menu-item key="delete" danger>
             <span class="menu-item-inner">
               <DeleteOutlined />
@@ -20,12 +32,19 @@
 </template>
 
 <script setup>
-import { DeleteOutlined } from '@ant-design/icons-vue'
+import { DeleteOutlined, InboxOutlined, RollbackOutlined } from '@ant-design/icons-vue'
 
-const emit = defineEmits(['edit', 'bom', 'delete', 'clone'])
+defineProps({
+  showArchive: { type: Boolean, default: false },
+  showUnarchive: { type: Boolean, default: false },
+})
+
+const emit = defineEmits(['edit', 'bom', 'delete', 'clone', 'archive', 'unarchive'])
 
 function onMenuClick({ key }) {
   if (key === 'delete') emit('delete')
+  else if (key === 'archive') emit('archive')
+  else if (key === 'unarchive') emit('unarchive')
 }
 </script>
 

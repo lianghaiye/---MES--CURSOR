@@ -22,6 +22,8 @@ import { ensureMaterialReqDemoWorkOrders } from '@/mock/materialReqWorkOrderSeed
 import { ensureCrossDemoWorkOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureBlankSizeDemoWorkOrders } from '@/mock/blankSizeBomDemoSeed'
 import { ensureBlankingDispatchDemoWorkOrders } from '@/mock/blankingDispatchDemoSeed'
+import { ensureSerialRouteDispatchDemoWorkOrders } from '@/mock/serialRouteDispatchDemoSeed'
+import { ensureParallelRouteDispatchDemoWorkOrders } from '@/mock/parallelRouteDispatchDemoSeed'
 import { ensureMultiUnitFlowWorkOrders } from '@/mock/multiUnitFlowDemoSeed'
 import { ensureWorkOrderControlDemoOrders } from '@/mock/workOrderControlDemoSeed'
 import {
@@ -367,11 +369,15 @@ function ensureLaborDemoProductionOrders(orders) {
   const rest = orders.filter((o) => !isLaborDemoWorkOrder(o.id))
   return ensureWorkOrderControlDemoOrders(
     ensureMultiUnitFlowWorkOrders(
-      ensureBlankingDispatchDemoWorkOrders(
-        ensureBlankSizeDemoWorkOrders(
-          ensureCrossDemoWorkOrders(
-            ensureMaterialReqDemoWorkOrders(
-              ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+      ensureParallelRouteDispatchDemoWorkOrders(
+        ensureSerialRouteDispatchDemoWorkOrders(
+          ensureBlankingDispatchDemoWorkOrders(
+            ensureBlankSizeDemoWorkOrders(
+              ensureCrossDemoWorkOrders(
+                ensureMaterialReqDemoWorkOrders(
+                  ensureProductionPlanOrderTreeDemoWorkOrders([...demos, ...rest]),
+                ),
+              ),
             ),
           ),
         ),

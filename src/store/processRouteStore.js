@@ -1,6 +1,8 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { createProcessRouteSeed } from '@/mock/processRouteSeed'
+import { ensureSerialRouteDemo } from '@/mock/serialRouteDispatchDemoSeed'
+import { ensureParallelRouteDemo } from '@/mock/parallelRouteDispatchDemoSeed'
 import { processConfigState } from '@/store/processConfigStore'
 import { normalizeGrid, syncStepPolicies, validateProcessRouteGrid } from '@/utils/processRouteGrid'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
@@ -52,6 +54,14 @@ export const processRouteState = reactive({
     ? createProcessRouteSeed(getProcessIdByName)
     : loadFromStorage() || createProcessRouteSeed(getProcessIdByName),
 })
+
+// 本地已有路线缓存时，仍补齐串行/并行演示路线
+try {
+  ensureSerialRouteDemo()
+  ensureParallelRouteDemo()
+} catch (e) {
+  console.warn('[processRouteStore] ensure route demos failed', e)
+}
 
 watch(
   () => processRouteState.routes,
@@ -157,17 +167,18 @@ export function updateProcessRoute(id, payload) {
   return { ok: true, route: row }
 }
 
-export function deleteProcessRoute(id) {
-  const idx = processRouteState.routes.findIndex((r) => r.id === id)
-  if (idx === -1) return { ok: false, message: '工艺路线不存在' }
-  processRouteState.routes.splice(idx, 1)
-  return { ok: true }
+/** 工艺路线不允许物理删除，请使用归档 */
+export function deleteProcessRoute() {
+  return { ok: false, message: '工艺路线不可删除，请使用归档' }
 }
 
 export function archiveProcessRoute(id) {
   const row = getProcessRouteById(id)
   if (!row) return { ok: false, message: '工艺路线不存在' }
-  if (row.status !== '使用中') return { ok: false, message: '仅使用中的路线可归档' }
+  if (row.status === '已归档') return { ok: false, message: '该路线已归档' }
+  if (row.status !== '使用中' && row.status !== '新建') {
+    return { ok: false, message: '仅新建或使用中的路线可归档' }
+  }
   row.status = '已归档'
   row.updatedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   return { ok: true }
