@@ -152,6 +152,12 @@ const routes = [
         meta: { title: '工作台' },
       },
       {
+        path: 'home/feedback',
+        name: 'home-feedback',
+        component: () => import('@/views/home/FeedbackListView.vue'),
+        meta: { title: '意见反馈' },
+      },
+      {
         path: 'home/workbench-admin',
         name: 'home-workbench-admin',
         component: () => import('@/views/home/WorkbenchContentAdminView.vue'),

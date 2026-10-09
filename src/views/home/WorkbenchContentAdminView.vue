@@ -3,7 +3,9 @@
     <section class="toolbar-card">
       <div class="toolbar-left">
         <h2 class="page-title">工作台内容管理</h2>
-        <span class="updated-at">场景/新手维护外站文档链接；月度发布为站内消息（发布后展示）</span>
+        <span class="updated-at"
+          >运营配置：场景/新手维护外站文档链接；月度发布为站内消息。意见反馈请使用独立菜单。</span
+        >
       </div>
       <a-button @click="goDashboard">返回工作台</a-button>
     </section>
@@ -118,31 +120,6 @@
           </template>
         </a-table>
       </a-tab-pane>
-
-      <a-tab-pane key="feedbacks" tab="意见反馈">
-        <a-table
-          :columns="feedbackColumns"
-          :data-source="feedbacks"
-          row-key="id"
-          size="small"
-          bordered
-          :pagination="{ pageSize: 10, size: 'small' }"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'status'">
-              <a-tag :color="record.status === '已回复' ? 'green' : 'orange'">{{
-                record.status
-              }}</a-tag>
-            </template>
-            <template v-else-if="column.key === 'actions'">
-              <a-space :size="12">
-                <a @click="openFeedback(record)">回复</a>
-                <a class="danger-link" @click="onRemoveFeedback(record)">删除</a>
-              </a-space>
-            </template>
-          </template>
-        </a-table>
-      </a-tab-pane>
     </a-tabs>
 
     <!-- 场景编辑 -->
@@ -206,30 +183,6 @@
         </a-form-item>
       </a-form>
     </a-modal>
-
-    <!-- 反馈回复 -->
-    <a-modal
-      v-model:open="feedbackModalOpen"
-      title="回复意见反馈"
-      ok-text="保存"
-      @ok="saveFeedbackForm"
-    >
-      <p class="fb-content">{{ feedbackForm.content }}</p>
-      <a-form layout="vertical">
-        <a-form-item label="状态">
-          <a-select
-            v-model:value="feedbackForm.status"
-            :options="[
-              { label: '待处理', value: '待处理' },
-              { label: '已回复', value: '已回复' },
-            ]"
-          />
-        </a-form-item>
-        <a-form-item label="回复内容">
-          <a-textarea v-model:value="feedbackForm.reply" :rows="4" placeholder="填写回复" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
   </div>
 </template>
 
@@ -245,16 +198,13 @@ import {
   listAllGuides,
   listAllReleases,
   listAllScenarios,
-  listFeedbacks,
   publishRelease,
-  removeFeedback,
   removeGuide,
   removeRelease,
   removeScenario,
   saveGuide,
   saveScenario,
   unpublishRelease,
-  updateFeedback,
   workbenchState,
 } from '@/store/workbenchStore'
 
@@ -262,18 +212,25 @@ const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
-const TAB_KEYS = ['scenarios', 'releases', 'guides', 'feedbacks']
+const TAB_KEYS = ['scenarios', 'releases', 'guides']
 const activeTab = ref(normalizeTab(route.query.tab))
 
 watch(
   () => route.query.tab,
   (tab) => {
+    if (tab === 'feedbacks') {
+      openTab('/home/feedback', '意见反馈')
+      router.replace('/home/feedback')
+      return
+    }
     activeTab.value = normalizeTab(tab)
   },
+  { immediate: true },
 )
 
 watch(activeTab, (tab) => {
   if (route.query.tab === tab) return
+  if (route.path !== '/home/workbench-admin') return
   router.replace({ path: '/home/workbench-admin', query: { tab } })
 })
 
@@ -292,10 +249,6 @@ const releases = computed(() => {
 const guides = computed(() => {
   void workbenchState.guides
   return listAllGuides()
-})
-const feedbacks = computed(() => {
-  void workbenchState.feedbacks
-  return listFeedbacks()
 })
 
 const scenarioColumns = [
@@ -326,30 +279,16 @@ const guideColumns = [
   { title: '操作', key: 'actions', width: 120 },
 ]
 
-const feedbackColumns = [
-  { title: '反馈内容', dataIndex: 'content', ellipsis: true },
-  { title: '提交人', dataIndex: 'creator', width: 100 },
-  { title: '提交时间', dataIndex: 'createdAt', width: 160 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '回复', dataIndex: 'reply', ellipsis: true },
-  { title: '操作', key: 'actions', width: 120 },
-]
-
 const scenarioModalOpen = ref(false)
 const scenarioForm = reactive(emptyScenario())
 const guideModalOpen = ref(false)
 const guideForm = reactive(emptyGuide())
-const feedbackModalOpen = ref(false)
-const feedbackForm = reactive(emptyFeedback())
 
 function emptyScenario() {
   return { id: '', title: '', summary: '', link: '', sort: 1, enabled: true }
 }
 function emptyGuide() {
   return { id: '', title: '', summary: '', link: '', sort: 1, enabled: true }
-}
-function emptyFeedback() {
-  return { id: '', content: '', status: '待处理', reply: '' }
 }
 
 function assignForm(target, source, factory) {
@@ -490,38 +429,6 @@ function onRemoveGuide(record) {
   })
 }
 
-function openFeedback(record) {
-  assignForm(feedbackForm, record, emptyFeedback)
-  feedbackModalOpen.value = true
-}
-
-function saveFeedbackForm() {
-  const status =
-    feedbackForm.reply && feedbackForm.status === '待处理' ? '已回复' : feedbackForm.status
-  const res = updateFeedback(feedbackForm.id, {
-    status,
-    reply: feedbackForm.reply,
-  })
-  if (!res.ok) {
-    message.warning(res.message)
-    return Promise.reject()
-  }
-  message.success(res.message)
-  feedbackModalOpen.value = false
-}
-
-function onRemoveFeedback(record) {
-  Modal.confirm({
-    title: '删除反馈',
-    content: '确认删除这条意见反馈？',
-    onOk: () => {
-      const res = removeFeedback(record.id)
-      if (res.ok) message.success(res.message)
-      else message.warning(res.message)
-    },
-  })
-}
-
 function goDashboard() {
   openTab('/home/dashboard', '工作台')
   router.push('/home/dashboard')
@@ -595,15 +502,5 @@ export default { name: 'WorkbenchContentAdminView' }
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
-}
-
-.fb-content {
-  padding: 10px 12px;
-  background: #f7f9fc;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  color: rgba(0, 0, 0, 0.75);
-  white-space: pre-wrap;
 }
 </style>

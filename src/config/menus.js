@@ -32,6 +32,11 @@ export const sideMenus = {
   home: [
     { key: 'dashboard', label: '工作台', path: '/home/dashboard' },
     {
+      key: 'feedback',
+      label: '意见反馈',
+      path: '/home/feedback',
+    },
+    {
       key: 'workbench-admin',
       label: '工作台内容管理',
       path: '/home/workbench-admin',
@@ -305,6 +310,7 @@ const createPageRouteTitles = Object.fromEntries(
 
 export const routeTitles = {
   '/home/dashboard': '工作台',
+  '/home/feedback': '意见反馈',
   '/home/workbench-admin': '工作台内容管理',
   '/home/workbench-admin/releases/new': '新增功能发布',
   '/home/workbench-admin/releases/:id/edit': '编辑功能发布',

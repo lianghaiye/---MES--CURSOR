@@ -292,6 +292,7 @@
           <section class="panel-card side-panel feedback-panel">
             <div class="panel-header">
               <span class="panel-title">意见反馈</span>
+              <a class="more-link" @click.prevent="goFeedbackList">更多</a>
             </div>
             <div class="feedback-box">
               <a-textarea
@@ -590,6 +591,11 @@ function goAdmin(tab) {
   router.push({ path: '/home/workbench-admin', query: { tab } })
 }
 
+function goFeedbackList() {
+  openTab('/home/feedback', '意见反馈')
+  router.push('/home/feedback')
+}
+
 function onRemoveFavorite(fav) {
   Modal.confirm({
     title: '取消收藏',
@@ -639,7 +645,9 @@ function onSubmitFeedback() {
   feedbackSubmitting.value = true
   try {
     const user = getUser()
-    const res = submitFeedback(feedbackText.value, user?.displayName || user?.name || '当前用户')
+    const res = submitFeedback(feedbackText.value, user?.displayName || user?.name || '当前用户', {
+      creatorId: user?.id || user?.username || '',
+    })
     if (!res.ok) {
       message.warning(res.message)
       return

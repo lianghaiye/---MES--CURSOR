@@ -434,13 +434,14 @@ export function listFeedbacks() {
   )
 }
 
-export function submitFeedback(content, creator = '当前用户') {
+export function submitFeedback(content, creator = '当前用户', extra = {}) {
   const text = String(content || '').trim()
   if (!text) return { ok: false, message: '请填写反馈内容' }
   const row = {
     id: uid('fb'),
     content: text,
     creator,
+    creatorId: String(extra.creatorId || '').trim(),
     createdAt: nowText(),
     status: '待处理',
     reply: '',
