@@ -14,6 +14,11 @@
       <a-form-item label="每项打印份数">
         <a-input-number v-model:value="copies" :min="1" :max="99" style="width: 120px" />
       </a-form-item>
+      <a-form-item label="一行标签数">
+        <a-radio-group v-model:value="perRow" button-style="solid" size="small">
+          <a-radio-button v-for="n in perRowOptions" :key="n" :value="n">{{ n }} 个</a-radio-button>
+        </a-radio-group>
+      </a-form-item>
       <div class="hint">二维码内容为产品/物料编码，贴标后可用小程序扫码盘点。</div>
     </a-form>
     <template #footer>
@@ -27,7 +32,11 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTabs } from '@/composables/useTabs'
-import { openProductLabelPrintPreview } from '@/utils/productLabelPrintPreview'
+import {
+  DEFAULT_PRODUCT_LABEL_PER_ROW,
+  PRODUCT_LABEL_PER_ROW_OPTIONS,
+  openProductLabelPrintPreview,
+} from '@/utils/productLabelPrintPreview'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -39,11 +48,16 @@ const emit = defineEmits(['update:open'])
 const router = useRouter()
 const { openTab } = useTabs()
 const copies = ref(1)
+const perRow = ref(DEFAULT_PRODUCT_LABEL_PER_ROW)
+const perRowOptions = PRODUCT_LABEL_PER_ROW_OPTIONS
 
 watch(
   () => props.open,
   (v) => {
-    if (v) copies.value = 1
+    if (v) {
+      copies.value = 1
+      perRow.value = DEFAULT_PRODUCT_LABEL_PER_ROW
+    }
   },
 )
 
@@ -54,6 +68,7 @@ function handleClose() {
 function handlePreview() {
   const result = openProductLabelPrintPreview(router, openTab, props.items, {
     copies: copies.value,
+    perRow: perRow.value,
   })
   if (result?.ok) handleClose()
 }

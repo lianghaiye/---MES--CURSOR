@@ -295,33 +295,34 @@
                   </a-col>
                 </a-row>
               </div>
-
-              <div class="form-product-material-section basic-info-box modal-basic-card">
-                <a-row :gutter="[12, 12]" style="width: 100%">
-                  <a-col :span="24">
-                    <a-form-item label="技术参数" class="remark-item">
-                      <a-textarea
-                        v-model:value="form.techParams"
-                        :rows="3"
-                        size="small"
-                        placeholder="请输入技术参数"
-                        allow-clear
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="24">
-                    <a-form-item label="配置要求" class="remark-item">
-                      <a-textarea
-                        v-model:value="form.matchingRequirements"
-                        :rows="2"
-                        size="small"
-                        placeholder="请输入配置要求"
-                        :maxlength="200"
-                        show-count
-                      />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
+            </a-form>
+            <a-form layout="horizontal" class="stacked-remark-form">
+              <div
+                class="form-product-material-section basic-info-box modal-basic-card stacked-remark-box"
+              >
+                <a-form-item label="技术参数" class="remark-item stacked-remark-item">
+                  <a-textarea
+                    v-model:value="form.techParams"
+                    :rows="2"
+                    :auto-size="false"
+                    size="small"
+                    class="stacked-remark-textarea"
+                    placeholder="请输入技术参数"
+                    allow-clear
+                  />
+                </a-form-item>
+                <a-form-item label="配置要求" class="remark-item stacked-remark-item">
+                  <a-textarea
+                    v-model:value="form.matchingRequirements"
+                    :rows="2"
+                    :auto-size="false"
+                    size="small"
+                    class="stacked-remark-textarea"
+                    placeholder="请输入配置要求"
+                    :maxlength="200"
+                    show-count
+                  />
+                </a-form-item>
               </div>
             </a-form>
           </div>
@@ -938,6 +939,43 @@
           </div>
         </a-tab-pane>
 
+        <a-tab-pane v-if="showProductFields" key="productMaterials" tab="产品资料">
+          <div class="tab-pane-body">
+            <div class="form-product-material-section basic-info-box modal-basic-card">
+              <a-form layout="inline" class="horizontal-form">
+                <a-row :gutter="[12, 12]" style="width: 100%">
+                  <a-col :span="24">
+                    <a-form-item label="产品资料" class="remark-item product-materials-item">
+                      <a-upload
+                        v-model:file-list="productMaterialList"
+                        list-type="text"
+                        :accept="PRODUCT_MATERIAL_ACCEPT_ATTR"
+                        :disabled="viewOnly"
+                        :max-count="PRODUCT_MATERIAL_MAX"
+                        :show-upload-list="{ showRemoveIcon: !viewOnly }"
+                        :before-upload="beforeUploadProductMaterial"
+                        @preview="onPreviewProductMaterial"
+                        @remove="onRemoveProductMaterial"
+                      >
+                        <a-button
+                          v-if="!viewOnly && productMaterialList.length < PRODUCT_MATERIAL_MAX"
+                          size="small"
+                        >
+                          <UploadOutlined />
+                          上传文件
+                        </a-button>
+                      </a-upload>
+                      <div class="upload-hint">
+                        支持图片、视频、Word、Excel，最多 {{ PRODUCT_MATERIAL_MAX }} 个文件
+                      </div>
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+              </a-form>
+            </div>
+          </div>
+        </a-tab-pane>
+
         <a-tab-pane v-if="isEdit" key="bom" tab="BOM信息">
           <div class="tab-pane-body">
             <div class="form-product-material-section basic-info-box modal-basic-card">
@@ -993,13 +1031,14 @@
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { computed, h, nextTick, reactive, ref, watch } from 'vue'
+import { message, Modal } from 'ant-design-vue'
 import {
   CloseOutlined,
   DeleteOutlined,
   InfoCircleOutlined,
   PlusOutlined,
+  UploadOutlined,
 } from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
@@ -1475,10 +1514,174 @@ const form = reactive({
   laborRows: [],
   production: createDefaultProductionControl(),
   alert: createDefaultAlertConfig(),
+  productMaterials: [],
 })
 
 const unitManageTabRef = ref(null)
 const bomDraftPanelRef = ref(null)
+const productMaterialList = ref([])
+
+const PRODUCT_MATERIAL_MAX = 9
+const PRODUCT_MATERIAL_ACCEPT_ATTR =
+  '.jpg,.jpeg,.png,.webp,.gif,.mp4,.webm,.mov,.avi,.doc,.docx,.xls,.xlsx,image/*,video/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const PRODUCT_MATERIAL_EXT_RE = /\.(jpe?g|png|webp|gif|mp4|webm|mov|avi|docx?|xlsx?)$/i
+const PRODUCT_MATERIAL_MIME = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+  'image/gif',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+])
+
+function resolveProductMaterialsSource(source = {}) {
+  if (Array.isArray(source.productMaterials) && source.productMaterials.length) {
+    return source.productMaterials
+  }
+  if (Array.isArray(source.productImages) && source.productImages.length) {
+    return source.productImages
+  }
+  return source.productMaterials || source.productImages || []
+}
+
+function getProductMaterialKind(name = '', type = '') {
+  const lower = String(name).toLowerCase()
+  const mime = String(type || '').toLowerCase()
+  if (mime.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(lower)) return 'image'
+  if (mime.startsWith('video/') || /\.(mp4|webm|mov|avi)$/i.test(lower)) return 'video'
+  if (mime.includes('word') || mime === 'application/msword' || /\.docx?$/i.test(lower)) {
+    return 'word'
+  }
+  if (mime.includes('excel') || mime.includes('spreadsheet') || /\.xlsx?$/i.test(lower)) {
+    return 'excel'
+  }
+  return 'file'
+}
+
+function isAllowedProductMaterial(file) {
+  const type = String(file?.type || '')
+  const name = String(file?.name || '')
+  if (type && PRODUCT_MATERIAL_MIME.has(type)) return true
+  if (type.startsWith('image/') || type.startsWith('video/')) return true
+  return PRODUCT_MATERIAL_EXT_RE.test(name)
+}
+
+function normalizeProductMaterials(list = []) {
+  return (Array.isArray(list) ? list : [])
+    .map((item, i) => {
+      const url = item.url || item.thumbUrl || item.dataUrl || ''
+      if (!url && !item.name) return null
+      const name = item.name || `产品资料${i + 1}`
+      const fileType = item.type || item.fileType || ''
+      return {
+        uid: item.uid || `file-${i}-${Date.now()}`,
+        name,
+        status: 'done',
+        url,
+        thumbUrl: item.thumbUrl || (getProductMaterialKind(name, fileType) === 'image' ? url : ''),
+        type: fileType,
+        fileType: getProductMaterialKind(name, fileType),
+      }
+    })
+    .filter(Boolean)
+    .slice(0, PRODUCT_MATERIAL_MAX)
+}
+
+function syncProductMaterialsFromList() {
+  form.productMaterials = productMaterialList.value.map((f) => ({
+    uid: f.uid,
+    name: f.name,
+    url: f.url || f.thumbUrl || '',
+    thumbUrl: f.thumbUrl || '',
+    type: f.type || '',
+    fileType: f.fileType || getProductMaterialKind(f.name, f.type),
+  }))
+}
+
+function beforeUploadProductMaterial(file) {
+  if (productMaterialList.value.length >= PRODUCT_MATERIAL_MAX) {
+    message.warning(`最多上传 ${PRODUCT_MATERIAL_MAX} 个文件`)
+    return false
+  }
+  if (!isAllowedProductMaterial(file)) {
+    message.warning('仅支持图片、视频、Word、Excel')
+    return false
+  }
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const url = String(e.target?.result || '')
+    const kind = getProductMaterialKind(file.name, file.type)
+    productMaterialList.value = [
+      ...productMaterialList.value,
+      {
+        uid: file.uid || `file-${Date.now()}`,
+        name: file.name,
+        status: 'done',
+        url,
+        thumbUrl: kind === 'image' ? url : '',
+        type: file.type || '',
+        fileType: kind,
+      },
+    ].slice(0, PRODUCT_MATERIAL_MAX)
+    syncProductMaterialsFromList()
+  }
+  reader.readAsDataURL(file)
+  return false
+}
+
+function onRemoveProductMaterial(file) {
+  productMaterialList.value = productMaterialList.value.filter((f) => f.uid !== file.uid)
+  syncProductMaterialsFromList()
+}
+
+function onPreviewProductMaterial(file) {
+  const url = file.url || file.thumbUrl
+  if (!url) return
+  const name = file.name || '产品资料'
+  const kind = file.fileType || getProductMaterialKind(name, file.type)
+  if (kind === 'image') {
+    Modal.info({
+      title: name,
+      icon: null,
+      width: 640,
+      content: h('img', {
+        src: url,
+        alt: name,
+        style: 'max-width:100%;display:block;margin:0 auto;',
+      }),
+      okText: '关闭',
+    })
+    return
+  }
+  if (kind === 'video') {
+    Modal.info({
+      title: name,
+      icon: null,
+      width: 720,
+      content: h('video', {
+        src: url,
+        controls: true,
+        style: 'max-width:100%;display:block;margin:0 auto;',
+      }),
+      okText: '关闭',
+    })
+    return
+  }
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
 
 function onUnitManageFlatChange(flat) {
   if (!flat) return
@@ -1604,6 +1807,8 @@ function resetForm() {
   form.laborRows = []
   form.production = createDefaultProductionControl()
   form.alert = createDefaultAlertConfig()
+  form.productMaterials = []
+  productMaterialList.value = []
   activeTabKey.value = 'basic'
   // 产品信息入口新增：默认可销售，以便展示产品字段/计划策略
   if (isProductEntry.value) {
@@ -1731,6 +1936,8 @@ function loadEditRecord(record) {
     ...createDefaultAlertConfig(),
     ...(source.alert || {}),
   }
+  productMaterialList.value = normalizeProductMaterials(resolveProductMaterialsSource(source))
+  syncProductMaterialsFromList()
   if (source.requisitionAttr !== undefined && source.requisitionAttr !== '') {
     form.production.requisitionEnabled = Boolean(Number(source.requisitionAttr))
   }
@@ -1782,6 +1989,13 @@ function loadEditSpu(spu) {
     form.auxUnits = hydrated.auxUnits
   }
   onUnitManageFlatChange(applyUnitManageToFlat(form.inventoryUnit, form.auxUnits))
+  productMaterialList.value = normalizeProductMaterials(
+    resolveProductMaterialsSource({
+      ...shared,
+      productImages: shared.productImages || spu.productImages,
+    }),
+  )
+  syncProductMaterialsFromList()
   activeTabKey.value = 'variant'
 }
 
@@ -2132,6 +2346,7 @@ function buildProductPayload() {
     laborRows: form.laborEnabled ? JSON.parse(JSON.stringify(form.laborRows)) : [],
     production: JSON.parse(JSON.stringify(form.production)),
     alert: JSON.parse(JSON.stringify(form.alert)),
+    productMaterials: JSON.parse(JSON.stringify(form.productMaterials || [])),
   }
 }
 
@@ -2222,6 +2437,7 @@ function buildMaterialPayload() {
     laborRows,
     production: JSON.parse(JSON.stringify(form.production)),
     alert: JSON.parse(JSON.stringify(form.alert)),
+    productMaterials: JSON.parse(JSON.stringify(form.productMaterials || [])),
   }
 }
 
@@ -2267,6 +2483,7 @@ function buildSpuPayloadFromForm() {
       parentCategoryKey: parentKey,
       categoryName: cat?.title || '',
       production: JSON.parse(JSON.stringify(form.production)),
+      productMaterials: JSON.parse(JSON.stringify(form.productMaterials || [])),
     },
   }
 }
@@ -2367,6 +2584,7 @@ function tryPersistBomDraftOnCreate(result) {
 
 function handleOk() {
   if (!validate()) return
+  syncProductMaterialsFromList()
   if (isMultiVariantMode.value && !isEdit.value) {
     saveMultiVariantMaster()
     return
@@ -2779,6 +2997,114 @@ function handleSaveAndMaintainBom() {
       max-width: 96px;
     }
   }
+
+  .product-materials-item {
+    :deep(.ant-form-item-control-input-content) {
+      display: block;
+    }
+  }
+}
+
+/*
+ * 技术参数 / 配置要求：
+ * - 外层盒子高度自适应（height:auto），不是写死的
+ * - 初始 textarea 54px，允许纵向拖拽；拖拽后由浏览器写 inline height，包裹层跟着撑开，下方字段下移
+ * - 两字段间距固定 12px（flex gap）
+ * 注意：不要对 textarea 使用 height/max-height !important，否则会压住拖拽产生的 inline height
+ */
+.stacked-remark-form {
+  width: 100%;
+  margin-top: 12px;
+  height: auto;
+}
+
+.stacked-remark-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+}
+
+.stacked-remark-form :deep(.stacked-remark-item) {
+  width: 100%;
+  height: auto;
+  margin-bottom: 0 !important;
+}
+
+.stacked-remark-form :deep(.ant-form-item-row) {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.stacked-remark-form :deep(.ant-form-item-label) {
+  flex: 0 0 96px;
+  max-width: 96px;
+  text-align: right;
+}
+
+.stacked-remark-form :deep(.ant-form-item-label > label) {
+  height: auto;
+  min-height: 24px;
+  line-height: 32px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.stacked-remark-form :deep(.ant-form-item-control) {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+}
+
+/* 关键 Design 包裹层必须随 textarea 实际高度撑开，否则拖高后会溢出盖住下一字段 */
+.stacked-remark-form :deep(.ant-form-item-control-input),
+.stacked-remark-form :deep(.ant-form-item-control-input-content),
+.stacked-remark-form :deep(.ant-input-textarea),
+.stacked-remark-form :deep(.ant-input-affix-wrapper),
+.stacked-remark-form :deep(.ant-input-textarea-affix-wrapper),
+.stacked-remark-form :deep(.ant-input-textarea-show-count) {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.stacked-remark-form :deep(textarea.ant-input),
+.stacked-remark-form :deep(.stacked-remark-textarea),
+.stacked-remark-form :deep(.ant-input-textarea textarea) {
+  resize: vertical;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 54px;
+  height: 54px; /* 初始高度；勿加 !important，否则拖拽无效 */
+  max-height: none;
+  line-height: 1.5715;
+  overflow-y: auto;
+}
+
+.stacked-remark-form :deep(.ant-input-textarea-show-count) {
+  position: relative;
+  display: block;
+}
+
+.stacked-remark-form :deep(.ant-input-textarea-show-count::after) {
+  position: static !important;
+  display: block;
+  margin-top: 4px;
+  float: none;
+  text-align: right;
+}
+
+.upload-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
+}
+
+.upload-text {
+  margin-top: 4px;
+  font-size: 12px;
 }
 
 .variant-bom-form {

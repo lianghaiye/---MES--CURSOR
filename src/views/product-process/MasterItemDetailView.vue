@@ -112,6 +112,29 @@
           <DetailSectionCard title="预警信息">
             <DetailInfoGrid :fields="alertFields" flush />
           </DetailSectionCard>
+          <DetailSectionCard v-if="showProductMaterialsSection" title="产品资料">
+            <div v-if="productMaterials.length" class="product-material-list">
+              <div
+                v-for="(file, idx) in productMaterials"
+                :key="file.uid || file.url || idx"
+                class="product-material-item"
+              >
+                <a-image
+                  v-if="file.fileType === 'image'"
+                  :src="file.url || file.thumbUrl"
+                  :alt="file.name"
+                  class="product-material-thumb"
+                />
+                <div v-else class="product-material-file">
+                  <a-tag>{{ productMaterialTypeLabel(file.fileType) }}</a-tag>
+                  <a class="product-material-link" :href="file.url" :download="file.name">{{
+                    file.name
+                  }}</a>
+                </div>
+              </div>
+            </div>
+            <div v-else class="product-material-empty">暂无产品资料</div>
+          </DetailSectionCard>
         </template>
 
         <div v-else-if="activeTab === 'labor'" class="section-card">
@@ -598,6 +621,64 @@ const alertFields = computed(() => {
   return fields
 })
 
+const showProductMaterialsSection = computed(
+  () =>
+    kind.value === ITEM_KIND.PRODUCT ||
+    kind.value === ITEM_KIND.PRODUCT_MATERIAL ||
+    Boolean(record.value?.canSell),
+)
+
+function resolveProductMaterialKind(name = '', type = '') {
+  const lower = String(name).toLowerCase()
+  const mime = String(type || '').toLowerCase()
+  if (mime.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(lower)) return 'image'
+  if (mime.startsWith('video/') || /\.(mp4|webm|mov|avi)$/i.test(lower)) return 'video'
+  if (mime.includes('word') || mime === 'application/msword' || /\.docx?$/i.test(lower)) {
+    return 'word'
+  }
+  if (mime.includes('excel') || mime.includes('spreadsheet') || /\.xlsx?$/i.test(lower)) {
+    return 'excel'
+  }
+  return 'file'
+}
+
+function productMaterialTypeLabel(kind) {
+  return (
+    {
+      image: '图片',
+      video: '视频',
+      word: 'Word',
+      excel: 'Excel',
+      file: '文件',
+    }[kind] || '文件'
+  )
+}
+
+const productMaterials = computed(() => {
+  const r = record.value || {}
+  const list = Array.isArray(r.productMaterials)
+    ? r.productMaterials
+    : Array.isArray(r.productImages)
+      ? r.productImages
+      : []
+  return list
+    .map((item, i) => {
+      const name = item?.name || `产品资料${i + 1}`
+      const url = item?.url || item?.thumbUrl || item?.dataUrl || ''
+      const type = item?.type || item?.fileType || ''
+      const fileType = item?.fileType || resolveProductMaterialKind(name, type)
+      return {
+        uid: item?.uid || `detail-file-${i}`,
+        name,
+        url,
+        thumbUrl: item?.thumbUrl || (fileType === 'image' ? url : ''),
+        fileType,
+      }
+    })
+    .filter((item) => item.url)
+    .slice(0, 9)
+})
+
 watch(
   record,
   (row) => {
@@ -713,6 +794,50 @@ function handleBack() {
 
 .detail-sub-table {
   margin-top: 12px;
+}
+
+.product-material-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.product-material-item {
+  display: flex;
+  align-items: center;
+}
+
+.product-material-thumb :deep(.ant-image),
+.product-material-item :deep(.ant-image) {
+  width: 104px;
+  height: 104px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.product-material-item :deep(.ant-image-img) {
+  width: 104px;
+  height: 104px;
+  object-fit: cover;
+}
+
+.product-material-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.product-material-link {
+  color: #1677ff;
+  word-break: break-all;
+}
+
+.product-material-empty {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 22px;
 }
 
 .overview-cards {

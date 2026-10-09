@@ -1,0 +1,91 @@
+{
+  "version": "2026-10-09",
+  "product": "I-DOMS",
+  "description": "知识库导入清单：按 priority 决定向量库权重与是否进生产 Agent",
+  "collections": [
+    {
+      "name": "structured",
+      "priority": 0,
+      "files": [
+        "structured/menu-tree.json",
+        "structured/status-edges.json",
+        "structured/function-params.json",
+        "structured/error-codes.json"
+      ],
+      "chunk": "json_record"
+    },
+    {
+      "name": "errors",
+      "priority": 0,
+      "files": ["errors/报错信息库.md"],
+      "chunk": "h3_section"
+    },
+    {
+      "name": "faq",
+      "priority": 0,
+      "files": ["faq/FAQ-客户常见问题.md", "faq/FAQ-实施顾问常见问题.md"],
+      "chunk": "h3_question"
+    },
+    {
+      "name": "reference",
+      "priority": 0,
+      "files": [
+        "reference/01-功能参数与业务规则.md",
+        "reference/00-系统总览与模块地图.md",
+        "reference/02-角色权限与术语表.md",
+        "reference/03-状态机速查.md",
+        "reference/04-Agent检索与切片建议.md"
+      ],
+      "chunk": "h2_section"
+    },
+    {
+      "name": "manuals",
+      "priority": 1,
+      "files": [
+        "manuals/01-快速入门.md",
+        "manuals/02-产品工艺操作手册.md",
+        "manuals/03-销售与发货操作手册.md",
+        "manuals/04-计划排产操作手册.md",
+        "manuals/05-生产与报工操作手册.md",
+        "manuals/06-工时工资操作手册.md",
+        "manuals/07-库存出入库操作手册.md",
+        "manuals/08-采购外协操作手册.md",
+        "manuals/09-质量管理操作手册.md",
+        "manuals/10-小程序操作手册.md",
+        "manuals/11-系统管理与基础配置.md"
+      ],
+      "chunk": "h2_section"
+    },
+    {
+      "name": "processes",
+      "priority": 1,
+      "files": [
+        "processes/P01-报工工资闭环.md",
+        "processes/P02-销售订单到发货.md",
+        "processes/P03-领料入库与库存扣减.md",
+        "processes/P04-采购闭环.md",
+        "processes/P05-质检五类.md",
+        "processes/P06-五场景选型与扩场景.md"
+      ],
+      "chunk": "whole_plus_acceptance"
+    },
+    {
+      "name": "agent",
+      "priority": 0,
+      "files": ["agent/SYSTEM_PROMPT.md"],
+      "chunk": "do_not_embed",
+      "note": "用作系统提示词，不建议整篇向量化"
+    },
+    {
+      "name": "implementation_supplement",
+      "priority": 2,
+      "files": [
+        "../implementation/I-DOMS场景化实施手册.md",
+        "../implementation/attachments/计薪口径确认表.md",
+        "../implementation/attachments/实施配置备忘-库存相关.md"
+      ],
+      "chunk": "h2_section"
+    }
+  ],
+  "excludeFromProduction": ["../superpowers/specs/", "../superpowers/plans/"]
+}

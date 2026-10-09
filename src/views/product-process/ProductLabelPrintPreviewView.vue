@@ -8,14 +8,21 @@
         </a-button>
         <a-button @click="goBack">关闭</a-button>
       </a-space>
-      <span class="toolbar-hint">共 {{ labels.length }} 张标签 · 二维码=产品编码</span>
+      <span class="toolbar-hint">
+        共 {{ labels.length }} 张标签 · 一行 {{ perRow }} 个 · 二维码=产品编码
+      </span>
     </div>
 
     <div v-if="!labels.length" class="empty no-print">
       <a-empty description="无打印数据，请从产品信息重新选择后打印" />
     </div>
 
-    <div v-else class="label-sheet">
+    <div
+      v-else
+      class="label-sheet"
+      :class="`cols-${perRow}`"
+      :style="{ '--label-cols': String(perRow) }"
+    >
       <div v-for="(label, idx) in labels" :key="`${label.code}-${idx}`" class="label-card">
         <div class="label-qr">
           <img v-if="qrMap[label.code]" :src="qrMap[label.code]" alt="QR" />
@@ -38,7 +45,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { PrinterOutlined } from '@ant-design/icons-vue'
 import QRCode from 'qrcode'
-import { loadProductLabelPrintPayload } from '@/utils/productLabelPrintPreview'
+import {
+  loadProductLabelPrintPayload,
+  normalizeLabelPerRow,
+} from '@/utils/productLabelPrintPreview'
 import { useTabs } from '@/composables/useTabs'
 
 defineOptions({ name: 'ProductLabelPrintPreviewView' })
@@ -49,6 +59,8 @@ const { closeTab } = useTabs()
 
 const payload = ref(null)
 const qrMap = reactive({})
+
+const perRow = computed(() => normalizeLabelPerRow(payload.value?.perRow))
 
 const labels = computed(() => {
   const items = payload.value?.items || []
@@ -125,7 +137,7 @@ function goBack() {
 
 .label-sheet {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(var(--label-cols, 3), minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -149,6 +161,40 @@ function goBack() {
     width: 100%;
     height: 100%;
     display: block;
+  }
+}
+
+.label-sheet.cols-5,
+.label-sheet.cols-6 {
+  gap: 8px;
+
+  .label-card {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .label-qr {
+    width: 72px;
+    height: 72px;
+  }
+
+  .label-code {
+    font-size: 12px;
+  }
+
+  .label-name {
+    font-size: 12px;
+  }
+
+  .label-sub {
+    font-size: 11px;
+  }
+}
+
+.label-sheet.cols-4 {
+  .label-qr {
+    width: 84px;
+    height: 84px;
   }
 }
 
@@ -192,8 +238,8 @@ function goBack() {
   }
 
   .label-sheet {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(var(--label-cols, 3), minmax(0, 1fr));
+    gap: 6px;
   }
 
   .label-card {

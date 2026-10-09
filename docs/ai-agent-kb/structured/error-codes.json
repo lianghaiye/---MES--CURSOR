@@ -1,0 +1,334 @@
+{
+  "version": "2026-10-09",
+  "matchStrategy": "优先精确匹配 message；其次 includes 关键词；再按 module 过滤",
+  "errors": [
+    {
+      "id": "INV_STOCK_SHORT",
+      "message": "库存不足",
+      "module": "inventory",
+      "severity": ["库存不够", "没库存"],
+      "meaning": "目标仓库存不够完成本次扣减或出库",
+      "causes": ["未入库", "仓选错", "被占用", "批次不足"],
+      "steps": [
+        "打开 库存管理 → 库存明细 核对仓与批次",
+        "必要时采购入库/调拨/改出库数量",
+        "按单发货时检查是否本单批次不足"
+      ],
+      "kb": "errors/报错信息库.md#11-库存不足"
+    },
+    {
+      "id": "INV_AVAILABLE_SHORT",
+      "message": "可用库存不足（需 X，可用 Y）",
+      "module": "inventory",
+      "pattern": "可用库存不足",
+      "meaning": "可用量（可能已扣软占用）小于需求",
+      "steps": ["对比现存量与他单占用", "跨单调拨占用或补货", "调整单据数量"]
+    },
+    {
+      "id": "INV_BY_ORDER_SHORT",
+      "message": "强制按单：本单按单库存不足（需 X，可用 Y）",
+      "module": "sales",
+      "pattern": "本单按单库存不足",
+      "meaning": "按单发货或强制按单生产，本单可发批次不够",
+      "steps": [
+        "完成本单成品入库",
+        "勿拿他单货凑（除非走占用调拨且规则允许）",
+        "评估是否改发货规则（管理员）"
+      ]
+    },
+    {
+      "id": "INV_ORDER_HINT_SHORT",
+      "message": "「{产品}」库存 X，订单 Y，库存不足请先补货或改数量",
+      "module": "sales",
+      "pattern": "库存不足请先补货",
+      "steps": ["改订单数量", "计划排产 → 库存预警补货", "安排生产/采购"]
+    },
+    {
+      "id": "DED_SKIP_NO_ISSUE",
+      "message": "当前为「不领料」模式，不生成工单完工库存扣减",
+      "module": "inventory",
+      "audience": "internal",
+      "meaning": "inventoryDeductMode=no_issue",
+      "steps": ["若业务需要倒冲/领料扣减，评估改功能参数库存扣减方式"]
+    },
+    {
+      "id": "DED_ONLY_PENDING",
+      "message": "仅待确认记录可确认",
+      "module": "inventory",
+      "steps": ["打开待确认的库存扣减记录", "确认状态未被他人处理"]
+    },
+    {
+      "id": "DED_EMPTY_LINES",
+      "message": "扣减明细不能为空",
+      "module": "inventory",
+      "steps": ["检查工单完工数量与BOM是否生成明细"]
+    },
+    {
+      "id": "DED_LOCKED",
+      "message": "确认已超过 N 天，单据已锁定，不可再操作",
+      "module": "inventory",
+      "pattern": "单据已锁定",
+      "steps": ["走制度内冲正，勿强改历史单"]
+    },
+    {
+      "id": "REQ_QTY_GT0",
+      "message": "「{物料}」领料数量须大于 0",
+      "module": "production",
+      "pattern": "领料数量须大于 0",
+      "steps": ["填写大于0的领料数量"]
+    },
+    {
+      "id": "REQ_SELECT_WH",
+      "message": "请选择领入仓库",
+      "module": "production",
+      "steps": ["选择线边仓或目标仓"]
+    },
+    {
+      "id": "RPT_ALREADY_AUDITED",
+      "message": "该记录已审核",
+      "module": "report",
+      "steps": ["已审数据锁定；制度内调整"]
+    },
+    {
+      "id": "RPT_AUDITED_NO_REJECT",
+      "message": "已审核记录不可拒绝",
+      "module": "report",
+      "steps": ["不能对已审记录点拒绝"]
+    },
+    {
+      "id": "RPT_NEED_REJECT_REASON",
+      "message": "请填写拒绝原因",
+      "module": "report",
+      "steps": ["拒绝时填写原因便于工人重报"]
+    },
+    {
+      "id": "RPT_AUDITED_NO_EDIT",
+      "message": "已审核数据不可调整",
+      "module": "report",
+      "aliases": ["已审核数据不可修改单价", "已审核数据不可修改计薪方式"],
+      "steps": ["审核前调整；或专项修正流程"]
+    },
+    {
+      "id": "SAL_SELECT_PUSH",
+      "message": "请选择待推送明细",
+      "module": "salary",
+      "steps": ["在工资核算勾选未推送且状态允许的明细"]
+    },
+    {
+      "id": "SAL_PUSH_STATE",
+      "message": "所选明细当前状态不可推送",
+      "module": "salary",
+      "steps": ["检查是否已推送/未审核", "核对工资推送模式"]
+    },
+    {
+      "id": "RPT_ONLY_REPORTED_AUDIT",
+      "message": "仅已报工数据可审核",
+      "module": "report",
+      "steps": ["确认工人已提交报工"]
+    },
+    {
+      "id": "RPT_DURATION_ONLY_TIME",
+      "message": "时长报工仅支持计时工资",
+      "module": "report",
+      "steps": ["改计薪为计时，或改用批量计件报工"]
+    },
+    {
+      "id": "RPT_NEED_WORK_ITEM",
+      "message": "请至少勾选一条作业分项",
+      "module": "report",
+      "steps": ["勾选作业分项后再提交"]
+    },
+    {
+      "id": "RPT_WORK_ITEM_NO_PRICE",
+      "message": "分项「xxx」缺少单价，无法计薪",
+      "module": "report",
+      "pattern": "缺少单价，无法计薪",
+      "steps": ["补齐分项单价主数据"]
+    },
+    {
+      "id": "RPT_QTY_OVER",
+      "message": "报工数量不能超过待报 {n} 件",
+      "module": "report",
+      "pattern": "报工数量不能超过待报",
+      "steps": ["降低数量", "检查是否重复报工"]
+    },
+    {
+      "id": "RPT_DEFECT_ALLOC",
+      "message": "请分配全部不良原因",
+      "module": "report",
+      "steps": ["不良分摊合计等于不良数"]
+    },
+    {
+      "id": "SCAN_QR_INVALID",
+      "message": "二维码无效或已损坏",
+      "module": "mobile",
+      "steps": ["Web重新打印清晰二维码", "确认扫的是本系统工单/工序码"]
+    },
+    {
+      "id": "SCAN_WO_CLOSED_7D",
+      "message": "工单已关闭超过 7 天",
+      "module": "mobile",
+      "steps": ["超期不可扫码报；Web侧按制度处理"]
+    },
+    {
+      "id": "SCAN_NEED_CLAIM",
+      "message": "请先领取任务后再报工",
+      "module": "mobile",
+      "steps": ["工序报工 → 待领 → 领取后再报"]
+    },
+    {
+      "id": "SCAN_ALREADY_REPORTED",
+      "message": "该工序已报工",
+      "module": "mobile",
+      "steps": ["查看我的记录", "被拒后按口径重报"]
+    },
+    {
+      "id": "INB_QTY_GT0",
+      "message": "入库数量须大于 0",
+      "module": "inventory",
+      "steps": ["填写正数"]
+    },
+    {
+      "id": "INB_WO_INVALID",
+      "message": "工单不存在或未完成",
+      "module": "inventory",
+      "steps": ["核对工单号与完成状态"]
+    },
+    {
+      "id": "STOCKTAKE_GOTO_PC",
+      "message": "已提交，请到 PC 审核",
+      "module": "mobile",
+      "meaning": "盘点小程序提交成功，非失败",
+      "steps": ["电脑端盘点管理审核", "按参数决定是否手动过账"]
+    },
+    {
+      "id": "QC_ONLY_PENDING",
+      "message": "仅待质检任务可提交",
+      "module": "quality",
+      "steps": ["刷新任务状态"]
+    },
+    {
+      "id": "QC_DISPOSE_OVER",
+      "message": "合格入库+退货+换货不可超过质检数量",
+      "module": "quality",
+      "steps": ["调整处置数量合计"]
+    },
+    {
+      "id": "QC_PARTIAL_NEED_QTY",
+      "message": "部分合格请至少填写一项处置数量",
+      "module": "quality",
+      "steps": ["填写至少一项处置数量"]
+    },
+    {
+      "id": "QC_UPSTREAM_PENDING",
+      "message": "上游工序质检待完成",
+      "module": "quality",
+      "pattern": "上游工序质检待完成",
+      "meaning": "弱管控预警文案",
+      "steps": ["完成上游检或按制度放行"]
+    },
+    {
+      "id": "QC_UPSTREAM_FAIL",
+      "message": "上游工序质检不合格",
+      "module": "quality",
+      "pattern": "上游工序质检不合格",
+      "steps": ["处理不合格后再报工/流转"]
+    },
+    {
+      "id": "QC_TEMPLATE_FAIL",
+      "message": "按模板规则「xxx」，以下项未达标，不能判定通过",
+      "module": "quality",
+      "pattern": "不能判定通过",
+      "steps": ["补测或判不通过", "检查模板关键项"]
+    },
+    {
+      "id": "QC_NO_CRITICAL",
+      "message": "模板规则为「关键项必须达标」，但未勾选任何关键项，请先编辑模板",
+      "module": "quality",
+      "steps": ["编辑质检模板勾选关键项"]
+    },
+    {
+      "id": "SO_CHANGE_BLOCKS_SHIP",
+      "message": "存在待审核的订单变更，通过前不可申请发货",
+      "module": "sales",
+      "steps": ["先完成订单变更审核"]
+    },
+    {
+      "id": "SO_CHANGE_ONLY_IN_PROGRESS",
+      "message": "仅「进行中」的销售订单可申请订单变更",
+      "module": "sales",
+      "steps": ["确认订单状态为进行中"]
+    },
+    {
+      "id": "SO_CHANGE_PENDING_EXISTS",
+      "message": "已有待审核的订单变更，请先完成审核",
+      "module": "sales",
+      "steps": ["先审完现有变更单"]
+    },
+    {
+      "id": "SO_CHANGE_QTY_LT_SHIP",
+      "message": "「{产品}」销售数量不能小于已占用发货数量",
+      "module": "sales",
+      "pattern": "不能小于已占用发货数量",
+      "steps": ["变更数量不得小于已发/已占用发货量"]
+    },
+    {
+      "id": "SO_REVERSE_SN_BLOCK",
+      "message": "存在已装牌或已出库的工业标识，禁止反审",
+      "module": "sales",
+      "steps": ["先处理SN/出库再反审"]
+    },
+    {
+      "id": "AUDIT_ONLY_PENDING",
+      "message": "仅「待审核」状态可审核",
+      "module": "common",
+      "steps": ["刷新单据状态，确认未被他人处理"]
+    },
+    {
+      "id": "ROUTE_NEED_STEP",
+      "message": "请至少配置一个工序步骤",
+      "module": "product-process",
+      "steps": ["在工艺路线中添加工序"]
+    },
+    {
+      "id": "SN_VOID",
+      "message": "已作废的 SN 不可修改",
+      "module": "industrial-id",
+      "aliases": ["该标识已作废，不可装牌"],
+      "steps": ["更换有效SN"]
+    },
+    {
+      "id": "SN_FORMAT",
+      "message": "SN 码须为 4–64 位字母/数字/下划线/短横线",
+      "module": "industrial-id",
+      "steps": ["按规则重录SN"]
+    },
+    {
+      "id": "SN_DUP",
+      "message": "SN「xxx」已被使用，请更换",
+      "module": "industrial-id",
+      "pattern": "已被使用，请更换",
+      "steps": ["更换未占用的SN"]
+    },
+    {
+      "id": "PLAN_SUPPLIER_UNIT",
+      "message": "已指定供应商的「xxx」需填写供方单位",
+      "module": "planning",
+      "pattern": "需填写供方单位",
+      "steps": ["补填供方单位"]
+    },
+    {
+      "id": "ECN_WITHDRAW_STATE",
+      "message": "仅待审批/审批中的变更单可撤回",
+      "module": "engineering-change",
+      "steps": ["确认ECN状态允许撤回"]
+    },
+    {
+      "id": "WO_EDIT_AFTER_REPORT",
+      "message": "当前已有任务完成报工，不允许修改报工数量，请撤回任务报工状态后再修改",
+      "module": "production",
+      "pattern": "已有任务完成报工",
+      "steps": ["先撤回报工状态再改数量"]
+    }
+  ]
+}

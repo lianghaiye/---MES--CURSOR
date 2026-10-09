@@ -1,0 +1,325 @@
+{
+  "version": "2026-10-09",
+  "description": "单据状态与可操作边；Agent 用于回答「能不能做某操作」",
+  "domains": [
+    {
+      "id": "sales_order",
+      "label": "销售订单",
+      "states": ["待提交", "待审核", "进行中", "已完成", "已拒绝", "已作废"],
+      "edges": [
+        { "from": "待提交", "action": "提交", "to": "待审核" },
+        {
+          "from": "待审核",
+          "action": "审核通过",
+          "to": "进行中",
+          "effects": ["软占用库存", "可触发自动生成下游单据"]
+        },
+        { "from": "待审核", "action": "审核拒绝", "to": "已拒绝" },
+        { "from": "进行中", "action": "申请订单变更", "to": "进行中", "guard": "无其他待审变更" },
+        { "from": "进行中", "action": "申请发货", "to": "进行中", "guard": "无待审订单变更" },
+        {
+          "from": "进行中",
+          "action": "反审",
+          "to": "待审核",
+          "guard": "无已装牌或已出库SN等约束",
+          "effects": ["释放整单软占用"]
+        },
+        { "from": "进行中", "action": "作废", "to": "已作废", "effects": ["释放占用"] },
+        { "from": "进行中", "action": "标记完成", "to": "已完成" }
+      ],
+      "related": {
+        "lineShipStatus": ["未发货", "部分发货", "已发货"],
+        "deliveryOrderStatus": ["待发货", "待出库", "已发货"]
+      }
+    },
+    {
+      "id": "sales_order_change",
+      "label": "销售订单变更",
+      "states": ["待审核", "已通过", "已驳回"],
+      "edges": [
+        {
+          "from": "*",
+          "action": "提交变更",
+          "to": "待审核",
+          "guard": "订单为进行中且无其他待审变更"
+        },
+        {
+          "from": "待审核",
+          "action": "通过",
+          "to": "已通过",
+          "effects": ["回写订单基本信息与明细"]
+        },
+        { "from": "待审核", "action": "驳回", "to": "已驳回" }
+      ],
+      "blocks": [{ "when": "存在待审核变更", "blockAction": "申请发货" }]
+    },
+    {
+      "id": "design_task",
+      "label": "设计任务",
+      "states": ["待设计", "设计中", "待审核", "审核通过", "已驳回"],
+      "edges": [
+        { "from": "待设计", "action": "开始设计", "to": "设计中" },
+        { "from": "设计中", "action": "提交审核", "to": "待审核" },
+        { "from": "待审核", "action": "通过", "to": "审核通过" },
+        { "from": "待审核", "action": "驳回", "to": "已驳回" }
+      ]
+    },
+    {
+      "id": "production_plan",
+      "label": "生产计划",
+      "states": ["待下达", "部分下达", "执行中", "已完成"],
+      "edges": [
+        {
+          "from": "待下达",
+          "action": "下达",
+          "to": "部分下达|执行中",
+          "effects": ["可生成工单/采购申请"]
+        },
+        { "from": "部分下达", "action": "继续下达", "to": "执行中" },
+        { "from": "执行中", "action": "完成", "to": "已完成" }
+      ]
+    },
+    {
+      "id": "work_order",
+      "label": "生产工单",
+      "states": ["待下发", "已下发", "执行中", "已完成", "暂停", "终止"],
+      "edges": [
+        { "from": "待下发", "action": "下发", "to": "已下发", "effects": ["小程序待领可见"] },
+        { "from": "已下发", "action": "领取/开工", "to": "执行中" },
+        {
+          "from": "执行中",
+          "action": "标记完成",
+          "to": "已完成",
+          "effects": ["可能触发完工库存扣减"]
+        },
+        { "from": "已下发|执行中", "action": "暂停", "to": "暂停" },
+        { "from": "暂停", "action": "恢复", "to": "执行中" },
+        { "from": "已下发|执行中|暂停", "action": "终止", "to": "终止" }
+      ]
+    },
+    {
+      "id": "dispatch_task",
+      "label": "派工/小程序任务",
+      "states": ["待领取", "待报工", "待开始", "执行中", "已报工", "已终止"],
+      "edges": [
+        { "from": "待领取", "action": "领取", "to": "待报工|待开始" },
+        { "from": "待报工|待开始|执行中", "action": "提交报工", "to": "已报工" },
+        {
+          "from": "*",
+          "action": "暂停|终止|终止保留",
+          "to": "已终止|暂停",
+          "note": "控制类动作以现场版本为准"
+        }
+      ]
+    },
+    {
+      "id": "process_report",
+      "label": "工序报工",
+      "states": ["待审核", "已审核", "已拒绝"],
+      "sources": ["任务报工", "快速报工"],
+      "edges": [
+        { "from": "*", "action": "工人提交", "to": "待审核" },
+        {
+          "from": "待审核",
+          "action": "审核通过",
+          "to": "已审核",
+          "effects": ["on_audit时可推送工资可见"]
+        },
+        { "from": "待审核", "action": "拒绝", "to": "已拒绝", "guard": "须填拒绝原因" },
+        { "from": "已审核", "action": "改数量/单价/计薪方式", "to": "已审核", "allowed": false }
+      ]
+    },
+    {
+      "id": "report_confirm",
+      "label": "报工确认",
+      "states": ["待确认", "待工人确认", "已确认"],
+      "edges": [{ "from": "待确认", "action": "主任确认/调整/补贴", "to": "已确认|待工人确认" }]
+    },
+    {
+      "id": "salary_push",
+      "label": "工资推送标记",
+      "states": ["未推送", "已推送", "已自动推送"],
+      "edges": [
+        {
+          "from": "未推送",
+          "action": "手动推送",
+          "to": "已推送",
+          "whenParam": "salaryPushMode=manual"
+        },
+        {
+          "from": "未推送",
+          "action": "报工自动",
+          "to": "已自动推送",
+          "whenParam": "salaryPushMode=on_report"
+        },
+        {
+          "from": "未推送",
+          "action": "审核自动",
+          "to": "已自动推送",
+          "whenParam": "salaryPushMode=on_audit"
+        }
+      ]
+    },
+    {
+      "id": "material_requisition",
+      "label": "领料申请",
+      "states": ["待处理", "待审核", "已通过", "已拒绝"],
+      "edges": [
+        {
+          "from": "*",
+          "action": "提交",
+          "to": "待审核|已通过",
+          "note": "自动审批开启则直接已通过"
+        },
+        { "from": "待审核", "action": "通过", "to": "已通过", "effects": ["进入出库"] },
+        { "from": "待审核", "action": "拒绝", "to": "已拒绝" }
+      ]
+    },
+    {
+      "id": "outbound",
+      "label": "出库单",
+      "states": ["待出库", "部分出库", "已出库", "已拒绝", "待申领人确认"],
+      "edges": [
+        {
+          "from": "待出库",
+          "action": "确认出库",
+          "to": "已出库|部分出库",
+          "effects": ["按规则扣库存"]
+        },
+        { "from": "待出库", "action": "拒绝", "to": "已拒绝" }
+      ]
+    },
+    {
+      "id": "inbound",
+      "label": "入库单",
+      "states": ["待入库", "待审批", "部分入库", "已入库", "已拒绝"],
+      "edges": [
+        { "from": "待入库|待审批", "action": "审核入库", "to": "已入库|部分入库" },
+        { "from": "待入库|待审批", "action": "拒绝", "to": "已拒绝" }
+      ],
+      "note": "小程序成品入库常表现为待审批"
+    },
+    {
+      "id": "inventory_deduct",
+      "label": "库存扣减记录",
+      "audience": "internal",
+      "states": ["待确认", "已确认", "失败"],
+      "edges": [
+        {
+          "from": "*",
+          "action": "工单完工生成",
+          "to": "待确认|已确认",
+          "guard": "inventoryDeductMode≠no_issue",
+          "note": "self_issue且自动审批可直接已确认；post_complete永远待确认"
+        },
+        {
+          "from": "待确认",
+          "action": "确认",
+          "to": "已确认|失败",
+          "guard": "明细非空；库存足够则成功"
+        },
+        {
+          "from": "已确认",
+          "action": "再操作",
+          "to": "已确认",
+          "allowed": false,
+          "guard": "超时N天锁定"
+        }
+      ]
+    },
+    {
+      "id": "transfer",
+      "label": "调拨",
+      "states": ["待确认", "待入库方确认", "部分确认", "已完成", "已拒绝", "已作废"],
+      "edges": [
+        {
+          "from": "待确认",
+          "action": "确认出库侧",
+          "to": "待入库方确认|已完成",
+          "note": "是否需入库方签收看参数"
+        },
+        { "from": "待入库方确认", "action": "入库方签收", "to": "已完成|部分确认" },
+        { "from": "*", "action": "拒绝|作废", "to": "已拒绝|已作废" }
+      ]
+    },
+    {
+      "id": "stocktake",
+      "label": "盘点",
+      "states": ["待提交", "待审核", "审核通过", "已拒绝"],
+      "edges": [
+        { "from": "待提交", "action": "提交(可小程序)", "to": "待审核" },
+        {
+          "from": "待审核",
+          "action": "审核通过(PC)",
+          "to": "审核通过",
+          "effects": ["可自动或手动过账"]
+        },
+        { "from": "待审核", "action": "拒绝", "to": "已拒绝" },
+        {
+          "from": "审核通过",
+          "action": "生成盘盈盘亏",
+          "to": "审核通过",
+          "whenParam": "stocktakeAutoPostOnApprove=false"
+        }
+      ]
+    },
+    {
+      "id": "purchase_req",
+      "label": "采购申请",
+      "states": ["草稿", "待处理", "处理中", "处理完成", "已作废"],
+      "edges": [
+        { "from": "草稿", "action": "提交", "to": "待处理" },
+        { "from": "待处理", "action": "转采购订单", "to": "处理中" },
+        { "from": "处理中", "action": "完成", "to": "处理完成" },
+        { "from": "*", "action": "作废", "to": "已作废" }
+      ]
+    },
+    {
+      "id": "purchase_order",
+      "label": "采购订单",
+      "states": ["待提交", "待审核", "已拒绝", "进行中", "已完成", "已终结", "已作废"],
+      "edges": [
+        {
+          "from": "待提交",
+          "action": "提交审核",
+          "to": "待审核|进行中",
+          "note": "自动审批可直达进行中"
+        },
+        { "from": "待审核", "action": "通过", "to": "进行中" },
+        { "from": "待审核", "action": "拒绝", "to": "已拒绝" },
+        { "from": "待审核|进行中", "action": "撤回", "to": "待提交" },
+        { "from": "进行中", "action": "收货/入库推进", "to": "进行中|已完成" },
+        { "from": "*", "action": "作废", "to": "已作废" }
+      ]
+    },
+    {
+      "id": "qc_task",
+      "label": "质检任务",
+      "states": ["待质检", "已完成", "已终止"],
+      "results": ["质检通过", "不通过", "部分通过"],
+      "scopes": ["来料质检", "外协回货检", "生产过程检", "成品检", "出厂质检"],
+      "edges": [
+        { "from": "待质检", "action": "提交检验", "to": "已完成", "guard": "部分通过须填处置数量" },
+        { "from": "待质检", "action": "终止", "to": "已终止" }
+      ]
+    },
+    {
+      "id": "ecn",
+      "label": "工程变更ECN",
+      "states": ["草稿", "待审批", "审批中", "已通过", "已驳回"],
+      "edges": [
+        { "from": "草稿", "action": "提交", "to": "待审批|审批中" },
+        { "from": "待审批|审批中", "action": "撤回", "to": "草稿" },
+        { "from": "待审批|审批中", "action": "通过", "to": "已通过" },
+        { "from": "待审批|审批中", "action": "驳回", "to": "已驳回" }
+      ]
+    }
+  ],
+  "agentChecklistWhenBlocked": [
+    "当前单据状态是否允许该动作？",
+    "是否存在关联待审单据（如订单变更）？",
+    "功能参数/业务规则是否关闭该路径？",
+    "角色是否有菜单/按钮权限？",
+    "库存/数量/SN 等业务校验是否触发？"
+  ]
+}

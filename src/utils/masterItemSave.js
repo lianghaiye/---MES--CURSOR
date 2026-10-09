@@ -72,6 +72,14 @@ export function resolveMasterItemEditRecord(record) {
     supplyForm: materialRow?.supplyForm ?? record.supplyForm,
     production: productRow?.production || materialRow?.production || record.production,
     alert: productRow?.alert || materialRow?.alert || record.alert,
+    productMaterials:
+      productRow?.productMaterials ||
+      materialRow?.productMaterials ||
+      productRow?.productImages ||
+      materialRow?.productImages ||
+      record.productMaterials ||
+      record.productImages ||
+      [],
     laborEnabled: productRow?.laborEnabled ?? materialRow?.laborEnabled ?? record.laborEnabled,
     laborRows: productRow?.laborRows || materialRow?.laborRows || record.laborRows,
     _productRow: productRow,

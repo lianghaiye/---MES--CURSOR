@@ -7,11 +7,20 @@ import { message } from 'ant-design-vue'
 const STORAGE_PREFIX = 'product-label-print-preview:'
 export const PRODUCT_LABEL_PRINT_PATH = '/product-process/product-label-print-preview'
 
+/** 一行可打标签数 */
+export const PRODUCT_LABEL_PER_ROW_OPTIONS = [3, 4, 5, 6]
+export const DEFAULT_PRODUCT_LABEL_PER_ROW = 3
+
+export function normalizeLabelPerRow(value) {
+  const n = Number(value)
+  return PRODUCT_LABEL_PER_ROW_OPTIONS.includes(n) ? n : DEFAULT_PRODUCT_LABEL_PER_ROW
+}
+
 /**
  * @param {import('vue-router').Router} router
  * @param {(path: string, title?: string) => void} openTab
  * @param {Array<object>} items
- * @param {{ copies?: number }} [opts]
+ * @param {{ copies?: number, perRow?: number }} [opts]
  */
 export function openProductLabelPrintPreview(router, openTab, items = [], opts = {}) {
   const list = (Array.isArray(items) ? items : [])
@@ -22,9 +31,11 @@ export function openProductLabelPrintPreview(router, openTab, items = [], opts =
     return { ok: false }
   }
   const copies = Math.min(99, Math.max(1, Number(opts.copies) || 1))
+  const perRow = normalizeLabelPerRow(opts.perRow)
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const payload = {
     copies,
+    perRow,
     items: list,
     createdAt: new Date().toISOString(),
   }

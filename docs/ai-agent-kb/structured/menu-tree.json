@@ -1,0 +1,444 @@
+{
+  "version": "2026-10-09",
+  "product": "I-DOMS",
+  "source": "i-doms-web/src/config/menus.js",
+  "topModules": [
+    { "key": "home", "label": "首页", "path": "/home", "maturity": "ga" },
+    { "key": "product-process", "label": "产品工艺", "path": "/product-process", "maturity": "ga" },
+    { "key": "sales", "label": "销售管理", "path": "/sales", "maturity": "ga" },
+    { "key": "planning", "label": "计划排产", "path": "/planning", "maturity": "ga" },
+    { "key": "production", "label": "生产管理", "path": "/production", "maturity": "ga" },
+    {
+      "key": "report-management",
+      "label": "报工管理",
+      "path": "/report-management",
+      "maturity": "ga"
+    },
+    { "key": "labor-salary", "label": "工时工资", "path": "/labor-salary", "maturity": "ga" },
+    { "key": "inventory", "label": "库存管理", "path": "/inventory", "maturity": "ga" },
+    { "key": "quality", "label": "质量管理", "path": "/quality", "maturity": "ga" },
+    { "key": "procurement", "label": "采购管理", "path": "/procurement", "maturity": "ga" },
+    {
+      "key": "outsourcing",
+      "label": "外协管理",
+      "path": "/procurement/outsourcing-orders",
+      "maturity": "ga"
+    },
+    {
+      "key": "engineering-change",
+      "label": "工程变更",
+      "path": "/engineering-change/ecn-list",
+      "maturity": "ga"
+    },
+    {
+      "key": "after-sales",
+      "label": "售后管理",
+      "path": "/after-sales",
+      "maturity": "placeholder"
+    },
+    { "key": "industrial-id", "label": "工业标识", "path": "/industrial-id", "maturity": "ga" },
+    { "key": "basic-config", "label": "基础配置", "path": "/basic-config", "maturity": "ga" },
+    { "key": "system", "label": "系统管理", "path": "/system", "maturity": "ga" }
+  ],
+  "moreModules": [
+    { "key": "board", "label": "看板管理", "path": "/board", "maturity": "partial" },
+    { "key": "wms", "label": "仓储管理 WMS", "path": "/wms", "maturity": "placeholder" },
+    { "key": "qms", "label": "质量追溯 QMS", "path": "/qms", "maturity": "placeholder" },
+    { "key": "equipment", "label": "设备管理", "path": "/equipment", "maturity": "placeholder" },
+    { "key": "report", "label": "报表中心", "path": "/report", "maturity": "placeholder" }
+  ],
+  "sideMenus": {
+    "home": [
+      { "key": "dashboard", "label": "工作台", "path": "/home/dashboard" },
+      { "key": "feedback", "label": "意见反馈", "path": "/home/feedback" },
+      { "key": "workbench-admin", "label": "工作台内容管理", "path": "/home/workbench-admin" },
+      { "key": "data-cockpit", "label": "数据驾驶舱", "path": "/home/data-cockpit" },
+      { "key": "director-dashboard", "label": "车间主任工作台", "path": "/home/director-dashboard" }
+    ],
+    "product-process": [
+      {
+        "key": "products",
+        "label": "产品信息",
+        "path": "/product-process/products",
+        "kb": "manuals/02"
+      },
+      { "key": "bom", "label": "产品BOM", "path": "/product-process/bom", "kb": "manuals/02" },
+      {
+        "key": "ship-attachments",
+        "label": "随货附件",
+        "path": "/product-process/ship-attachments"
+      },
+      {
+        "key": "routing",
+        "label": "工艺路线",
+        "path": "/product-process/routing",
+        "kb": "manuals/02"
+      },
+      {
+        "key": "process-config",
+        "label": "工序配置",
+        "path": "/product-process/process-config",
+        "kb": "manuals/02"
+      },
+      { "key": "process-doc", "label": "工艺文件", "path": "/product-process/process-doc" },
+      {
+        "key": "process-category",
+        "label": "工序分类",
+        "path": "/product-process/process-category"
+      },
+      { "key": "process-form", "label": "工序表单模板", "path": "/product-process/process-form" }
+    ],
+    "sales": [
+      {
+        "key": "orders",
+        "label": "销售订单",
+        "path": "/sales/orders",
+        "kb": "manuals/03",
+        "process": "P02"
+      },
+      { "key": "sales-lines", "label": "销售明细", "path": "/sales/sales-lines" },
+      {
+        "key": "delivery",
+        "label": "发货管理",
+        "path": "/sales/delivery",
+        "kb": "manuals/03",
+        "process": "P02"
+      },
+      { "key": "framework-contracts", "label": "框架合同", "path": "/sales/framework-contracts" }
+    ],
+    "planning": [
+      {
+        "key": "production-plan",
+        "label": "生产计划",
+        "path": "/planning/production-plan",
+        "kb": "manuals/04"
+      },
+      {
+        "key": "design-task",
+        "label": "设计任务",
+        "path": "/planning/design-task",
+        "kb": "manuals/04"
+      },
+      {
+        "key": "replenish-center",
+        "label": "库存预警",
+        "path": "/planning/replenish-center",
+        "aliases": ["补货中心"]
+      },
+      { "key": "replenish-ledger", "label": "补货台账", "path": "/planning/replenish-ledger" }
+    ],
+    "labor-salary": [
+      {
+        "key": "labor-hour",
+        "label": "工时管理",
+        "path": "/labor-salary/labor-hour",
+        "kb": "manuals/06"
+      }
+    ],
+    "production": [
+      {
+        "key": "work-orders",
+        "label": "生产工单",
+        "path": "/production/work-orders",
+        "kb": "manuals/05",
+        "process": "P01"
+      },
+      {
+        "key": "assembly-work-orders",
+        "label": "总装工单",
+        "path": "/production/assembly-work-orders"
+      },
+      {
+        "key": "disassembly-work-orders",
+        "label": "拆解工单",
+        "path": "/production/disassembly-work-orders"
+      },
+      { "key": "qc-work-orders", "label": "质检工单", "path": "/production/qc-work-orders" },
+      {
+        "key": "material-requisition",
+        "label": "领料管理",
+        "path": "/production/material-requisition",
+        "kb": "manuals/07",
+        "process": "P03"
+      }
+    ],
+    "report-management": [
+      {
+        "key": "report-work",
+        "label": "报工确认",
+        "path": "/report-management/report-work",
+        "kb": "manuals/05"
+      },
+      {
+        "key": "process-report",
+        "label": "工序报工",
+        "path": "/report-management/process-report",
+        "kb": "manuals/05",
+        "process": "P01"
+      },
+      {
+        "key": "salary-summary",
+        "label": "工资核算",
+        "path": "/report-management/salary-summary",
+        "kb": "manuals/06"
+      },
+      {
+        "key": "salary-detail",
+        "label": "核算详情",
+        "path": "/report-management/salary-detail",
+        "kb": "manuals/06"
+      }
+    ],
+    "inventory": [
+      { "key": "pending-outbound", "label": "待出库列表", "path": "/inventory/pending-outbound" },
+      { "key": "outbound", "label": "出库管理", "path": "/inventory/outbound", "kb": "manuals/07" },
+      { "key": "pending-inbound", "label": "待入库列表", "path": "/inventory/pending-inbound" },
+      { "key": "inbound", "label": "入库管理", "path": "/inventory/inbound", "kb": "manuals/07" },
+      { "key": "transfer", "label": "调拨管理", "path": "/inventory/transfer" },
+      { "key": "stocktake", "label": "盘点管理", "path": "/inventory/stocktake" },
+      { "key": "stock-detail", "label": "库存明细", "path": "/inventory/stock-detail" },
+      { "key": "outbound-details", "label": "出库详情", "path": "/inventory/outbound-details" },
+      { "key": "inbound-details", "label": "入库详情", "path": "/inventory/inbound-details" },
+      {
+        "key": "ship-attachment-query",
+        "label": "随货查询",
+        "path": "/inventory/ship-attachment-query"
+      },
+      {
+        "key": "deduct-records",
+        "label": "库存扣减记录",
+        "path": "/inventory/deduct-records",
+        "kb": "manuals/07",
+        "process": "P03",
+        "audience": "internal",
+        "note": "对外不作为独立卖点场景"
+      },
+      { "key": "cut-settle", "label": "下料结算", "path": "/inventory/cut-settle" }
+    ],
+    "quality": [
+      {
+        "key": "incoming-qc",
+        "label": "来料质检",
+        "path": "/quality/incoming-qc",
+        "process": "P05"
+      },
+      {
+        "key": "outsourcing-qc",
+        "label": "外协回货检",
+        "path": "/quality/outsourcing-qc",
+        "process": "P05"
+      },
+      {
+        "key": "process-qc",
+        "label": "生产过程检",
+        "path": "/quality/process-qc",
+        "process": "P05"
+      },
+      { "key": "finished-qc", "label": "成品检", "path": "/quality/finished-qc", "process": "P05" },
+      { "key": "factory-qc", "label": "出厂质检", "path": "/quality/factory-qc", "process": "P05" },
+      { "key": "scrap-orders", "label": "报废品管理", "path": "/quality/scrap-orders" },
+      { "key": "qc-template", "label": "质检模板", "path": "/quality/qc-template" },
+      { "key": "qc-field-library", "label": "检验项库", "path": "/quality/qc-field-library" }
+    ],
+    "procurement": [
+      {
+        "key": "purchase-req",
+        "label": "采购申请",
+        "path": "/procurement/purchase-req",
+        "process": "P04"
+      },
+      {
+        "key": "purchase-orders",
+        "label": "采购订单",
+        "path": "/procurement/purchase-orders",
+        "process": "P04"
+      },
+      { "key": "purchase-receipts", "label": "采购收货", "path": "/procurement/purchase-receipts" },
+      { "key": "purchase-settles", "label": "采购结算", "path": "/procurement/purchase-settles" },
+      {
+        "key": "purchase-settle-rules",
+        "label": "结算规则",
+        "path": "/procurement/purchase-settle-rules"
+      },
+      { "key": "purchase-returns", "label": "采购退货", "path": "/procurement/purchase-returns" },
+      { "key": "purchase-details", "label": "采购明细", "path": "/procurement/purchase-details" }
+    ],
+    "outsourcing": [
+      {
+        "key": "outsourcing-orders",
+        "label": "外协订单",
+        "path": "/procurement/outsourcing-orders"
+      },
+      { "key": "outsourcing-issue", "label": "发料管理", "path": "/procurement/outsourcing-issue" },
+      {
+        "key": "outsourcing-receipts",
+        "label": "外协收货",
+        "path": "/procurement/outsourcing-receipts"
+      },
+      {
+        "key": "outsourcing-returns",
+        "label": "外协异常处理",
+        "path": "/procurement/outsourcing-returns"
+      },
+      {
+        "key": "outsourcing-details",
+        "label": "外协明细",
+        "path": "/procurement/outsourcing-details"
+      }
+    ],
+    "engineering-change": [
+      { "key": "ecn-list", "label": "ECN列表", "path": "/engineering-change/ecn-list" },
+      { "key": "ecr-request", "label": "ECR申请", "path": "/engineering-change/ecr-request" }
+    ],
+    "after-sales": [
+      {
+        "key": "service-orders",
+        "label": "服务工单",
+        "path": "/after-sales/service-orders",
+        "maturity": "placeholder"
+      },
+      {
+        "key": "returns",
+        "label": "退换货",
+        "path": "/after-sales/returns",
+        "maturity": "placeholder"
+      }
+    ],
+    "industrial-id": [
+      { "key": "label-request", "label": "标识申请", "path": "/industrial-id/label-request" },
+      { "key": "label-management", "label": "标识管理", "path": "/industrial-id/label-management" },
+      {
+        "key": "enterprise-info",
+        "label": "企业信息",
+        "path": "/industrial-id/base-config/enterprise-info"
+      },
+      {
+        "key": "nameplate-template",
+        "label": "产品信息模板",
+        "path": "/industrial-id/base-config/nameplate-template"
+      }
+    ],
+    "basic-config": [
+      { "key": "employee-groups", "label": "员工组别", "path": "/basic-config/employee-groups" },
+      { "key": "defect-items", "label": "不良品项", "path": "/basic-config/defect-items" },
+      { "key": "material-grades", "label": "材质管理", "path": "/basic-config/material-grades" },
+      { "key": "units", "label": "单位管理", "path": "/basic-config/units" },
+      { "key": "packaging", "label": "包装管理", "path": "/basic-config/packaging" },
+      { "key": "business-dict", "label": "业务字典", "path": "/basic-config/business-dict" },
+      {
+        "key": "warehouses",
+        "label": "仓库列表",
+        "path": "/basic-config/warehouses",
+        "parent": "仓库管理"
+      },
+      {
+        "key": "warehouse-locations",
+        "label": "货位管理",
+        "path": "/basic-config/warehouse-locations",
+        "parent": "仓库管理"
+      },
+      {
+        "key": "warehouse-categories",
+        "label": "仓库分类",
+        "path": "/basic-config/warehouse-categories",
+        "parent": "仓库管理"
+      },
+      {
+        "key": "customers",
+        "label": "客户档案",
+        "path": "/basic-config/customers",
+        "parent": "客户管理"
+      },
+      {
+        "key": "customer-types",
+        "label": "客户类型",
+        "path": "/basic-config/customer-types",
+        "parent": "客户管理"
+      },
+      {
+        "key": "suppliers",
+        "label": "供应商档案",
+        "path": "/basic-config/suppliers",
+        "parent": "供应商管理"
+      },
+      {
+        "key": "supplier-categories",
+        "label": "供应商分类",
+        "path": "/basic-config/supplier-categories",
+        "parent": "供应商管理"
+      }
+    ],
+    "system": [
+      { "key": "dict", "label": "系统字典", "path": "/system/dict" },
+      {
+        "key": "business-rules",
+        "label": "业务规则",
+        "path": "/system/business-rules",
+        "kb": "reference/01"
+      },
+      {
+        "key": "function-params",
+        "label": "功能参数",
+        "path": "/system/function-params",
+        "kb": "reference/01"
+      }
+    ],
+    "board": [
+      { "key": "catalog", "label": "看板列表", "path": "/board/catalog" },
+      { "key": "carousel", "label": "轮播管理", "path": "/board/carousel" },
+      { "key": "work-order-monitor", "label": "工单监管看板", "path": "/board/work-order-monitor" }
+    ]
+  },
+  "mobileWorkbench": [
+    { "key": "process-report", "label": "工序报工", "kb": "manuals/10", "process": "P01" },
+    { "key": "report-confirm", "label": "报工确认", "role": "director", "kb": "manuals/10" },
+    { "key": "labor-salary", "label": "工时工资", "kb": "manuals/06" },
+    { "key": "material-requisition", "label": "领料管理", "kb": "manuals/10", "process": "P03" },
+    { "key": "finished-inbound", "label": "成品入库", "kb": "manuals/10" },
+    { "key": "qc-tasks", "label": "质检任务", "kb": "manuals/09", "process": "P05" },
+    { "key": "stocktake", "label": "盘点管理", "note": "审核过账在PC" },
+    { "key": "todo-tasks", "label": "待办任务" },
+    { "key": "scan-query", "label": "扫码查单" },
+    { "key": "nameplate", "label": "铭牌任务" },
+    { "key": "approval", "label": "审批管理", "maturity": "placeholder" }
+  ],
+  "menuPathTemplates": [
+    {
+      "intent": "salary_push_config",
+      "pathText": "系统管理 → 功能参数 → 工资推送",
+      "path": "/system/function-params"
+    },
+    {
+      "intent": "production_mode_config",
+      "pathText": "系统管理 → 业务规则 → 生产模式",
+      "path": "/system/business-rules"
+    },
+    {
+      "intent": "inventory_deduct_config",
+      "pathText": "系统管理 → 功能参数 → 库存扣减",
+      "path": "/system/function-params",
+      "audience": "internal"
+    },
+    {
+      "intent": "inventory_deduct_confirm",
+      "pathText": "库存管理 → 库存扣减记录",
+      "path": "/inventory/deduct-records",
+      "audience": "internal"
+    },
+    {
+      "intent": "worker_report",
+      "pathText": "小程序 → 工序报工",
+      "client": "mobile"
+    },
+    {
+      "intent": "audit_report",
+      "pathText": "报工管理 → 工序报工",
+      "path": "/report-management/process-report"
+    },
+    {
+      "intent": "replenish",
+      "pathText": "计划排产 → 库存预警（补货中心）",
+      "path": "/planning/replenish-center"
+    }
+  ]
+}

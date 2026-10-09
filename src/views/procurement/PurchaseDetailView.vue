@@ -1,5 +1,5 @@
 <template>
-  <div class="purchase-detail-page">
+  <div class="purchase-detail-page list-page">
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -474,47 +474,6 @@ function openPurchaseOrderDetail(record) {
 </script>
 
 <style scoped>
-.purchase-detail-page {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 100%;
-}
-
-.filter-card {
-  background: #fff;
-  padding: 12px 12px 4px;
-  border-radius: 4px;
-}
-
-.toolbar-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 4px;
-}
-
-.summary-bar {
-  margin: 0;
-}
-
-.table-card {
-  background: #fff;
-  padding: 8px 12px 12px;
-  border-radius: 4px;
-}
-
-.table-pagination {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-.link-code {
-  color: #1677ff;
-  cursor: pointer;
-}
-
 .link-code:hover {
   text-decoration: underline;
 }
