@@ -63,8 +63,11 @@
                     <a-select
                       v-model:value="form.categoryKey"
                       size="small"
+                      show-search
                       :options="categoryOpts"
-                      placeholder="请选择 类别"
+                      :filter-option="filterSelectOption"
+                      option-filter-prop="label"
+                      placeholder="请搜索或选择类别"
                     />
                   </a-form-item>
                 </a-col>
@@ -165,8 +168,11 @@
                       <a-select
                         v-model:value="form.materialCategoryKey"
                         size="small"
+                        show-search
                         :options="materialCategoryOpts"
-                        placeholder="请选择 物料类别"
+                        :filter-option="filterSelectOption"
+                        option-filter-prop="label"
+                        placeholder="请搜索或选择物料类别"
                       />
                     </a-form-item>
                   </a-col>

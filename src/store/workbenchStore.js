@@ -15,12 +15,12 @@ import {
   createMockWorkOrderProgressRows,
 } from '@/mock/workbench'
 
-import { getCurrentTenantId } from '@/mock/tenants'
+import { getCurrentTenantId, getTenantName } from '@/mock/tenants'
 
 const STORAGE_KEY = 'i_doms_workbench'
 const SEED_VERSION_KEY = 'i_doms_workbench_seed_v'
 const REACTION_KEY = 'i_doms_workbench_release_reactions'
-const CURRENT_SEED_VERSION = '4'
+const CURRENT_SEED_VERSION = '5'
 
 function loadFromStorage() {
   try {
@@ -429,22 +429,37 @@ export function removeGuide(id) {
 }
 
 export function listFeedbacks() {
-  return [...(workbenchState.feedbacks || [])].sort((a, b) =>
-    String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
-  )
+  return [...(workbenchState.feedbacks || [])]
+    .map((row) => ({
+      ...row,
+      tenantName:
+        row.tenantName ||
+        (row.tenantId ? getTenantName(row.tenantId) : '') ||
+        getTenantName(getCurrentTenantId()),
+      replyBy: row.replyBy || '',
+      replyAt: row.replyAt || '',
+    }))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
 }
 
 export function submitFeedback(content, creator = '当前用户', extra = {}) {
   const text = String(content || '').trim()
   if (!text) return { ok: false, message: '请填写反馈内容' }
+  const tenantId = String(extra.tenantId || getCurrentTenantId() || '').trim()
+  const tenantName =
+    String(extra.tenantName || '').trim() || (tenantId ? getTenantName(tenantId) : '') || '—'
   const row = {
     id: uid('fb'),
     content: text,
+    tenantId,
+    tenantName,
     creator,
     creatorId: String(extra.creatorId || '').trim(),
     createdAt: nowText(),
     status: '待处理',
     reply: '',
+    replyBy: '',
+    replyAt: '',
   }
   workbenchState.feedbacks.unshift(row)
   return { ok: true, message: '反馈已提交，感谢你的意见', row }
@@ -457,11 +472,9 @@ export function updateFeedback(id, patch = {}) {
   return { ok: true, message: '已更新' }
 }
 
-export function removeFeedback(id) {
-  const idx = workbenchState.feedbacks.findIndex((f) => f.id === id)
-  if (idx < 0) return { ok: false, message: '反馈不存在' }
-  workbenchState.feedbacks.splice(idx, 1)
-  return { ok: true, message: '已删除' }
+/** 运营不可删除用户提交的反馈 */
+export function removeFeedback() {
+  return { ok: false, message: '不允许删除用户提交的反馈' }
 }
 
 export function listWorkOrderProgressRows(tabKey = 'notStarted') {

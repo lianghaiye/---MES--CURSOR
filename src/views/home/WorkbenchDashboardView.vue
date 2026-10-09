@@ -398,6 +398,7 @@ import {
   workbenchState,
 } from '@/store/workbenchStore'
 import { openExternalLink } from '@/utils/externalLink'
+import { getCurrentTenantId, getTenantName } from '@/mock/tenants'
 import {
   buildWorkbenchTodoFullPath,
   listWorkbenchTodoCards,
@@ -645,8 +646,11 @@ function onSubmitFeedback() {
   feedbackSubmitting.value = true
   try {
     const user = getUser()
+    const tenantId = getCurrentTenantId()
     const res = submitFeedback(feedbackText.value, user?.displayName || user?.name || '当前用户', {
       creatorId: user?.id || user?.username || '',
+      tenantId,
+      tenantName: getTenantName(tenantId),
     })
     if (!res.ok) {
       message.warning(res.message)

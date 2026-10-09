@@ -241,7 +241,7 @@
       </a-table>
     </div>
 
-    <a-empty v-if="!rows.length" description="当前物料清单无供应型态为「外购件」的物料" />
+    <a-empty v-if="!rows.length" description="当前物料清单无供应型态为「外购件 / 外购」的物料" />
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>

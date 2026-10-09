@@ -21,10 +21,11 @@ import {
 
 export const supplyTypeOptions = SUPPLY_FORM_OPTIONS.map((v) => ({ label: v, value: v }))
 
-/** 顶级物料供应型态（组装 / 自制件） */
+/** 顶级物料供应型态（组装 / 自制件 / 外购） */
 export const topLevelSupplyTypeOptions = [
   { label: '组装', value: '组装' },
   { label: '自制件', value: '自制件' },
+  { label: '外购', value: '外购' },
 ]
 
 export function resolveWorkItemProduct(wi) {
@@ -334,7 +335,7 @@ const supplierOptionMap = new Map()
 export const planSupplierOptions = [...supplierOptionMap.values()]
 
 export function isPurchasedOrOutsourced(supplyType) {
-  return supplyType === '外购件' || supplyType === '外协件'
+  return supplyType === '外购件' || supplyType === '外购' || supplyType === '外协件'
 }
 
 export function getProcessRouteSelectOptions() {

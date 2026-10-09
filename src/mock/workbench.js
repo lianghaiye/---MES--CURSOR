@@ -418,18 +418,26 @@ export function createMockFeedbacks() {
     {
       id: 'fb-1',
       content: '希望工作台能自定义工序任务卡片顺序',
+      tenantId: 'tenant-demo',
+      tenantName: '演示工厂',
       creator: '张三',
       createdAt: '2026-09-20 10:22:00',
       status: '待处理',
       reply: '',
+      replyBy: '',
+      replyAt: '',
     },
     {
       id: 'fb-2',
       content: '收藏入口希望支持拖拽排序',
+      tenantId: 'tenant-zb',
+      tenantName: '淄博泵业',
       creator: '李四',
       createdAt: '2026-09-18 15:08:00',
       status: '已回复',
       reply: '已纳入后续迭代，感谢反馈。',
+      replyBy: '运营小王',
+      replyAt: '2026-09-19 09:30:00',
     },
   ]
 }

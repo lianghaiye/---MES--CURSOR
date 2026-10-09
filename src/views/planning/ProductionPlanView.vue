@@ -1450,7 +1450,7 @@ function generatePurchaseReq() {
     return
   }
   if (!purchasedMaterialsForReq.value.length) {
-    message.info('当前物料清单没有供应型态为「外购件」的物料')
+    message.info('当前物料清单没有供应型态为「外购件 / 外购」的物料')
     return
   }
   purchaseReqModalOpen.value = true

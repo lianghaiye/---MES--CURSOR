@@ -100,9 +100,13 @@ export function getOutsourcedMaterialsFromWorkItem(workItem) {
   return all.filter((m) => m.supplyType === '外协件')
 }
 
+function isPurchasedSupplyType(supplyType) {
+  return supplyType === '外购件' || supplyType === '外购'
+}
+
 function filterPurchasedWithGap(materials, productQty) {
   return materials.filter((m) => {
-    if (m.supplyType !== '外购件') return false
+    if (!isPurchasedSupplyType(m.supplyType)) return false
     const gap = calcGapQty(m.demandQty ?? calcDemandQty(m.unitUsage, productQty), m.availableStock)
     return gap > 0
   })
@@ -117,12 +121,34 @@ export function getPurchasedMaterials(order) {
   return filterPurchasedWithGap(all, order?.productQty)
 }
 
-/** 从单个工作项筛选外购件（全部外购件，不限缺口） */
+/** 从单个工作项筛选外购件（全部外购件，不限缺口；含顶级「外购」） */
 export function getPurchasedMaterialsFromWorkItem(workItem) {
   const all = []
   flattenMaterials(workItem?.materials, all)
+  const topType = workItem?.topLevelSupplyType
+  if (isPurchasedSupplyType(topType)) {
+    const topCode = workItem.productCode || ''
+    if (topCode && !all.some((m) => m.code === topCode && m.isTopLevel)) {
+      all.unshift({
+        id: `top-${workItem.id}`,
+        isTopLevel: true,
+        code: topCode,
+        name: workItem.productName || '',
+        spec: workItem.specModel || workItem.model || '',
+        unit: workItem.unit || '件',
+        supplyType: topType,
+        unitUsage: 1,
+        stockQty: Number(workItem.stockQty) || 0,
+        availableStock: Number(workItem.stockQty) || 0,
+        demandQty: Number(workItem.orderQty ?? workItem.salesQty ?? 0),
+        planQty: Number(workItem.planQty) || 0,
+        designateSupplier: false,
+        supplier: '',
+      })
+    }
+  }
   return all
-    .filter((m) => m.supplyType === '外购件')
+    .filter((m) => isPurchasedSupplyType(m.supplyType))
     .map((m) => {
       const hit = getInTransitOrWipForPlanMaterial(m)
       const alloc = getWoAllocatedForMaterialCode(m.code)

@@ -1,5 +1,5 @@
 <template>
-  <div class="feedback-list-page page-shell">
+  <div class="feedback-list-page">
     <div class="filter-card">
       <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
@@ -8,8 +8,8 @@
               <a-input
                 v-model:value="filters.keyword"
                 allow-clear
+                placeholder="反馈内容 / 提交人 / 租户"
                 size="small"
-                placeholder="反馈内容 / 提交人"
               />
             </a-form-item>
           </a-col>
@@ -18,8 +18,8 @@
               <a-select
                 v-model:value="filters.status"
                 allow-clear
-                size="small"
                 placeholder="请选择"
+                size="small"
                 :options="statusOpts"
               />
             </a-form-item>
@@ -44,28 +44,37 @@
       </a-form>
     </div>
 
-    <div class="table-card">
-      <div class="table-toolbar">
-        <a-space>
-          <a-button type="primary" size="small" @click="openSubmit">
-            <PlusOutlined />
-            提交反馈
-          </a-button>
-          <a-button size="small" @click="handleRefresh">
+    <div class="toolbar-row">
+      <a-space wrap :size="8">
+        <a-button type="primary" size="small" @click="openSubmit">
+          <PlusOutlined />
+          提交反馈
+        </a-button>
+      </a-space>
+      <a-space :size="4" class="toolbar-icons">
+        <a-tooltip title="刷新">
+          <a-button type="text" size="small" @click="handleRefresh">
             <ReloadOutlined />
-            刷新
           </a-button>
-        </a-space>
-        <span class="toolbar-hint">共 {{ filteredList.length }} 条</span>
-      </div>
+        </a-tooltip>
+      </a-space>
+    </div>
 
+    <a-alert type="info" show-icon class="summary-bar" :banner="false">
+      <template #message>
+        <span>共计 {{ filteredList.length }} 条反馈</span>
+      </template>
+    </a-alert>
+
+    <div class="table-card">
       <a-table
         :columns="columns"
         :data-source="pagedList"
         row-key="id"
-        size="middle"
+        size="small"
+        bordered
+        :scroll="{ x: 1280 }"
         :pagination="false"
-        :scroll="{ x: 960 }"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">
@@ -79,13 +88,16 @@
           <template v-else-if="column.key === 'reply'">
             <span :class="{ muted: !record.reply }">{{ record.reply || '—' }}</span>
           </template>
+          <template v-else-if="column.key === 'replyBy'">
+            {{ record.replyBy || '—' }}
+          </template>
+          <template v-else-if="column.key === 'replyAt'">
+            {{ record.replyAt || '—' }}
+          </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space :size="12">
-              <a @click="openReply(record)">{{
-                record.status === '已回复' ? '查看/回复' : '回复'
-              }}</a>
-              <a class="danger-link" @click="onRemove(record)">删除</a>
-            </a-space>
+            <a @click="openReply(record)">{{
+              record.status === '已回复' ? '查看/回复' : '回复'
+            }}</a>
           </template>
         </template>
       </a-table>
@@ -121,6 +133,7 @@
 
     <a-modal v-model:open="replyOpen" title="回复意见反馈" ok-text="保存" @ok="saveReply">
       <div class="fb-meta">
+        <div><span class="meta-label">租户</span>{{ replyForm.tenantName || '—' }}</div>
         <div><span class="meta-label">提交人</span>{{ replyForm.creator || '—' }}</div>
         <div><span class="meta-label">提交时间</span>{{ replyForm.createdAt || '—' }}</div>
       </div>
@@ -145,12 +158,13 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { Modal, message } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
+import dayjs from 'dayjs'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { getUser } from '@/utils/auth'
+import { getCurrentTenantId, getTenantName } from '@/mock/tenants'
 import {
   listFeedbacks,
-  removeFeedback,
   submitFeedback,
   updateFeedback,
   workbenchState,
@@ -180,6 +194,7 @@ const replyOpen = ref(false)
 const replyForm = reactive({
   id: '',
   content: '',
+  tenantName: '',
   creator: '',
   createdAt: '',
   status: '待处理',
@@ -187,13 +202,16 @@ const replyForm = reactive({
 })
 
 const columns = [
-  { title: '序号', key: 'index', width: 60, align: 'center' },
+  { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '反馈内容', dataIndex: 'content', key: 'content', ellipsis: true },
+  { title: '租户名称', dataIndex: 'tenantName', width: 120, ellipsis: true },
   { title: '提交人', dataIndex: 'creator', width: 100 },
   { title: '提交时间', dataIndex: 'createdAt', width: 160 },
   { title: '状态', key: 'status', width: 90 },
   { title: '回复', key: 'reply', dataIndex: 'reply', ellipsis: true },
-  { title: '操作', key: 'actions', width: 140, fixed: 'right' },
+  { title: '回复人', key: 'replyBy', dataIndex: 'replyBy', width: 100 },
+  { title: '回复时间', key: 'replyAt', dataIndex: 'replyAt', width: 160 },
+  { title: '操作', key: 'actions', width: 100, fixed: 'right' },
 ]
 
 function currentUserNames() {
@@ -213,7 +231,7 @@ const filteredList = computed(() => {
     }
     const kw = String(f.keyword || '').trim()
     if (kw) {
-      const hay = `${row.content || ''} ${row.creator || ''} ${row.reply || ''}`
+      const hay = `${row.content || ''} ${row.creator || ''} ${row.tenantName || ''} ${row.reply || ''}`
       if (!hay.includes(kw)) return false
     }
     return true
@@ -252,8 +270,11 @@ async function saveSubmit() {
   submitLoading.value = true
   try {
     const user = getUser()
+    const tenantId = getCurrentTenantId()
     const res = submitFeedback(submitText.value, user?.displayName || user?.name || '当前用户', {
       creatorId: user?.id || user?.username || '',
+      tenantId,
+      tenantName: getTenantName(tenantId),
     })
     if (!res.ok) {
       message.warning(res.message)
@@ -271,6 +292,7 @@ function openReply(record) {
   Object.assign(replyForm, {
     id: record.id,
     content: record.content,
+    tenantName: record.tenantName,
     creator: record.creator,
     createdAt: record.createdAt,
     status: record.status || '待处理',
@@ -280,29 +302,25 @@ function openReply(record) {
 }
 
 function saveReply() {
-  const status = replyForm.reply && replyForm.status === '待处理' ? '已回复' : replyForm.status
-  const res = updateFeedback(replyForm.id, {
+  const user = getUser()
+  const replyBy = user?.displayName || user?.name || '运营'
+  const hasReply = Boolean(String(replyForm.reply || '').trim())
+  const status = hasReply && replyForm.status === '待处理' ? '已回复' : replyForm.status
+  const patch = {
     status,
     reply: replyForm.reply,
-  })
+  }
+  if (hasReply) {
+    patch.replyBy = replyBy
+    patch.replyAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  }
+  const res = updateFeedback(replyForm.id, patch)
   if (!res.ok) {
     message.warning(res.message)
     return Promise.reject()
   }
   message.success(res.message)
   replyOpen.value = false
-}
-
-function onRemove(record) {
-  Modal.confirm({
-    title: '删除反馈',
-    content: '确认删除这条意见反馈？',
-    onOk: () => {
-      const res = removeFeedback(record.id)
-      if (res.ok) message.success(res.message)
-      else message.warning(res.message)
-    },
-  })
 }
 </script>
 
@@ -312,20 +330,73 @@ export default { name: 'FeedbackListView' }
 
 <style lang="less" scoped>
 .feedback-list-page {
-  padding: 4px 4px 20px;
+  margin: -12px;
+  padding: 12px;
+  background: var(--page-bg, #f0f2f5);
+  min-height: calc(100vh - 112px);
 }
 
-.table-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+.filter-card,
+.table-card {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.toolbar-hint {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+.filter-card {
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    height: 24px;
+    line-height: 24px;
+    font-size: 13px;
+  }
+
+  .filter-actions-item {
+    :deep(.ant-form-item-label) {
+      display: none;
+    }
+  }
+}
+
+.summary-bar {
+  margin-bottom: 8px;
+  padding: 6px 12px;
+
+  :deep(.ant-alert-message) {
+    font-size: 13px;
+  }
+}
+
+.table-card {
+  padding: 8px 12px 12px;
+
+  :deep(.ant-table-thead > tr > th) {
+    background: #fafafa;
+    font-weight: 500;
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-tbody > tr > td) {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
 }
 
 .table-pagination {
@@ -336,10 +407,6 @@ export default { name: 'FeedbackListView' }
 
 .muted {
   color: rgba(0, 0, 0, 0.25);
-}
-
-.danger-link {
-  color: #ff4d4f;
 }
 
 .fb-meta {
