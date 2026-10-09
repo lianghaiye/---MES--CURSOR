@@ -69,6 +69,8 @@ function buildSerialDemoRoute() {
     remark: '纯串行：下料→粗车→钻孔→铣削→质检→入库；下发页「步骤」列为 1～6',
     grid,
     stepPolicies,
+    creator: '张工艺',
+    updater: '张工艺',
     createdAt: '2026-10-08 10:00:00',
     updatedAt: now,
   }

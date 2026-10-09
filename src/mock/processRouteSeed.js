@@ -227,9 +227,15 @@ export function createProcessRouteSeed(getProcessIdByName) {
     },
   ]
 
-  return routes.map((r, i) => ({
-    ...r,
-    createdAt: dayjs('2026-05-01').add(i, 'day').format('YYYY-MM-DD HH:mm:ss'),
-    updatedAt: now,
-  }))
+  const creators = ['张工艺', '李工艺', '王工艺', '赵工艺']
+  return routes.map((r, i) => {
+    const creator = creators[i % creators.length]
+    return {
+      ...r,
+      creator,
+      updater: creator,
+      createdAt: dayjs('2026-05-01').add(i, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      updatedAt: now,
+    }
+  })
 }

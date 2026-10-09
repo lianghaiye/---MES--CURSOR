@@ -19,6 +19,16 @@ export const COMPLETION_MODE_OPTIONS = [
   { value: COMPLETION_MODE_ANY, label: '选做完成' },
 ]
 
+/** 工序调度策略：一期仅手动调度 */
+export const DISPATCH_STRATEGY_MANUAL = 'manual'
+export const DISPATCH_STRATEGY_LABELS = {
+  [DISPATCH_STRATEGY_MANUAL]: '手动调度',
+}
+
+export function formatDispatchStrategyLabel(strategy) {
+  return DISPATCH_STRATEGY_LABELS[strategy] || DISPATCH_STRATEGY_LABELS[DISPATCH_STRATEGY_MANUAL]
+}
+
 export function normalizeCompletionMode(mode) {
   return mode === COMPLETION_MODE_ANY ? COMPLETION_MODE_ANY : COMPLETION_MODE_ALL
 }
@@ -144,6 +154,17 @@ export function removeRowAt(grid, index) {
 
 export function countGridSteps(grid) {
   return (grid || []).filter((step) => step?.some((cell) => cell?.processId)).length
+}
+
+/** 网格中已配置的工序格数量 */
+export function countGridProcesses(grid) {
+  let n = 0
+  for (const step of grid || []) {
+    for (const cell of step || []) {
+      if (cell?.processId) n += 1
+    }
+  }
+  return n
 }
 
 export function countGridParallel(grid) {
@@ -298,6 +319,8 @@ export function getSelectedCellMeta(grid, stepIndex, rowIndex) {
     reportMode: proc?.reportMode || '',
     isBlanking: Boolean(proc?.isBlanking),
     configLabels,
+    dispatchStrategy: DISPATCH_STRATEGY_MANUAL,
+    dispatchStrategyLabel: formatDispatchStrategyLabel(DISPATCH_STRATEGY_MANUAL),
   }
 }
 

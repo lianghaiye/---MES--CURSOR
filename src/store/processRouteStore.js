@@ -6,6 +6,19 @@ import { ensureParallelRouteDemo } from '@/mock/parallelRouteDispatchDemoSeed'
 import { processConfigState } from '@/store/processConfigStore'
 import { normalizeGrid, syncStepPolicies, validateProcessRouteGrid } from '@/utils/processRouteGrid'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
+import { getUser } from '@/utils/auth'
+
+function resolveOperatorName() {
+  const user = getUser()
+  return user?.name || user?.username || user?.realName || 'admin1'
+}
+
+function normalizeRouteRow(row) {
+  if (!row) return row
+  if (!row.creator) row.creator = 'admin1'
+  if (!row.updater) row.updater = row.creator || 'admin1'
+  return row
+}
 
 const STORAGE_KEY = 'i_doms_process_routes'
 const SEED_VERSION_KEY = 'i_doms_process_routes_seed_v'
@@ -49,10 +62,15 @@ export function generateProcessRouteCode(existingCodes = []) {
 export const ROUTE_STATUS = ['新建', '使用中', '已归档']
 export const APPLY_SCOPES = ['全部产品', '单个物品', '物品类别']
 
-export const processRouteState = reactive({
-  routes: shouldReseed()
+function loadInitialRoutes() {
+  const routes = shouldReseed()
     ? createProcessRouteSeed(getProcessIdByName)
-    : loadFromStorage() || createProcessRouteSeed(getProcessIdByName),
+    : loadFromStorage() || createProcessRouteSeed(getProcessIdByName)
+  return (routes || []).map((r) => normalizeRouteRow({ ...r }))
+}
+
+export const processRouteState = reactive({
+  routes: loadInitialRoutes(),
 })
 
 // 本地已有路线缓存时，仍补齐串行/并行演示路线
@@ -62,6 +80,7 @@ try {
 } catch (e) {
   console.warn('[processRouteStore] ensure route demos failed', e)
 }
+processRouteState.routes.forEach((r) => normalizeRouteRow(r))
 
 watch(
   () => processRouteState.routes,
@@ -115,6 +134,8 @@ export function addProcessRoute(payload) {
   if (!check.ok) return check
 
   const codes = processRouteState.routes.map((r) => r.code)
+  const operator = resolveOperatorName()
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const row = {
     id: `route-${Date.now()}`,
     code: payload.code || generateProcessRouteCode(codes),
@@ -132,8 +153,10 @@ export function addProcessRoute(payload) {
     remark: payload.remark || '',
     grid: normalizeGrid(payload.grid),
     stepPolicies: syncStepPolicies(payload.grid, payload.stepPolicies),
-    createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-    updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    creator: operator,
+    updater: operator,
+    createdAt: now,
+    updatedAt: now,
   }
   row.productDisplay = resolveRouteProductDisplay(row) || row.productDisplay
   processRouteState.routes.unshift(row)
@@ -160,6 +183,7 @@ export function updateProcessRoute(id, payload) {
     remark: payload.remark || '',
     grid: normalizeGrid(payload.grid),
     stepPolicies: syncStepPolicies(payload.grid, payload.stepPolicies),
+    updater: resolveOperatorName(),
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   })
   const row = processRouteState.routes[idx]
@@ -180,6 +204,7 @@ export function archiveProcessRoute(id) {
     return { ok: false, message: '仅新建或使用中的路线可归档' }
   }
   row.status = '已归档'
+  row.updater = resolveOperatorName()
   row.updatedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   return { ok: true }
 }
@@ -189,6 +214,7 @@ export function unarchiveProcessRoute(id) {
   if (!row) return { ok: false, message: '工艺路线不存在' }
   if (row.status !== '已归档') return { ok: false, message: '仅已归档的路线可取消归档' }
   row.status = '使用中'
+  row.updater = resolveOperatorName()
   row.updatedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   return { ok: true }
 }
@@ -197,14 +223,18 @@ export function cloneProcessRoute(id) {
   const source = getProcessRouteById(id)
   if (!source) return { ok: false, message: '工艺路线不存在' }
   const codes = processRouteState.routes.map((r) => r.code)
+  const operator = resolveOperatorName()
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const cloned = {
     ...JSON.parse(JSON.stringify(source)),
     id: `route-${Date.now()}`,
     code: generateProcessRouteCode(codes),
     name: `${source.name}-副本`,
     status: '新建',
-    createdAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-    updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    creator: operator,
+    updater: operator,
+    createdAt: now,
+    updatedAt: now,
   }
   processRouteState.routes.unshift(cloned)
   return { ok: true, route: cloned }

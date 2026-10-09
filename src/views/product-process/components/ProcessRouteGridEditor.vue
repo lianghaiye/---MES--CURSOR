@@ -1,8 +1,8 @@
 <template>
-  <div class="route-editor-layout">
+  <div class="route-editor-layout" :class="{ 'is-readonly': readonly }">
     <div class="editor-main">
       <!-- 左侧：工序分类 + 工序列表 -->
-      <div class="left-panel panel-box" :style="{ width: `${leftWidth}px` }">
+      <div v-if="!readonly" class="left-panel panel-box" :style="{ width: `${leftWidth}px` }">
         <div class="box-title">工序</div>
         <ul class="category-list">
           <li
@@ -35,12 +35,17 @@
           </div>
         </div>
       </div>
-      <div class="resize-handle" title="拖动调整宽度" @mousedown.prevent="startResize" />
+      <div
+        v-if="!readonly"
+        class="resize-handle"
+        title="拖动调整宽度"
+        @mousedown.prevent="startResize"
+      />
 
       <!-- 中间：配置工艺路线 -->
       <div class="center-panel panel-box">
-        <div class="box-title">配置工艺路线</div>
-        <div class="grid-tip">
+        <div class="box-title">{{ readonly ? '工艺路线' : '配置工艺路线' }}</div>
+        <div v-if="!readonly" class="grid-tip">
           温馨提示：目前支持最大并行数: {{ MAX_ROUTE_PARALLEL }}，最大步数: {{ MAX_ROUTE_STEPS }}
         </div>
         <div class="grid-area">
@@ -50,6 +55,7 @@
               <div v-for="col in stepCount" :key="`h-${col}`" class="step-ctrl">
                 <div class="step-ctrl-row">
                   <button
+                    v-if="!readonly"
                     type="button"
                     class="ctrl-btn ctrl-minus"
                     :disabled="stepCount <= 1"
@@ -60,6 +66,7 @@
                   </button>
                   <span class="ctrl-label">第{{ col }}步</span>
                   <button
+                    v-if="!readonly"
                     type="button"
                     class="ctrl-btn ctrl-plus"
                     :disabled="stepCount >= MAX_ROUTE_STEPS"
@@ -70,7 +77,7 @@
                   </button>
                 </div>
                 <a-select
-                  v-if="countProcessesInStep(localGrid, col - 1) >= 2"
+                  v-if="!readonly && countProcessesInStep(localGrid, col - 1) >= 2"
                   size="small"
                   class="completion-select"
                   :value="getCompletionModeAt(localPolicies, col - 1)"
@@ -78,8 +85,20 @@
                   :title="completionHint(col - 1)"
                   @change="(v) => setCompletionMode(col - 1, v)"
                 />
-                <div v-else class="completion-placeholder" title="单工序默认为全部完成">
-                  全部完成
+                <div
+                  v-else
+                  class="completion-placeholder"
+                  :title="
+                    countProcessesInStep(localGrid, col - 1) >= 2
+                      ? completionHint(col - 1)
+                      : '单工序默认为全部完成'
+                  "
+                >
+                  {{
+                    countProcessesInStep(localGrid, col - 1) >= 2
+                      ? completionModeLabel(col - 1)
+                      : '全部完成'
+                  }}
                 </div>
               </div>
             </div>
@@ -87,6 +106,7 @@
               <div class="grid-row">
                 <div class="row-ctrl">
                   <button
+                    v-if="!readonly"
                     type="button"
                     class="ctrl-btn ctrl-plus"
                     :disabled="rowCount >= MAX_ROUTE_PARALLEL"
@@ -97,6 +117,7 @@
                   </button>
                   <span class="ctrl-label">{{ row }}</span>
                   <button
+                    v-if="!readonly"
                     type="button"
                     class="ctrl-btn ctrl-minus"
                     :disabled="rowCount <= 1"
@@ -115,12 +136,13 @@
                     filled: hasCell(col - 1, row - 1),
                   }"
                   @click="onCellClick(col - 1, row - 1)"
-                  @dragover.prevent
+                  @dragover="onCellDragOver"
                   @drop="onDrop(col - 1, row - 1, $event)"
                 >
                   <template v-if="getCellProcess(col - 1, row - 1)">
                     <div class="cell-tile">
                       <CloseOutlined
+                        v-if="!readonly"
                         class="cell-remove"
                         @click.stop="removeCell(col - 1, row - 1)"
                       />
@@ -172,6 +194,14 @@
                   <template v-else>—</template>
                 </span>
               </div>
+              <div class="info-row">
+                <span class="k">所属步骤：</span>
+                <span class="v">{{ selectedStepPosText }}</span>
+              </div>
+              <div class="info-row">
+                <span class="k">调度策略：</span>
+                <span class="v">{{ selectedMeta.dispatchStrategyLabel || '手动调度' }}</span>
+              </div>
             </div>
           </template>
           <div v-else class="right-empty">请点击网格中的工序</div>
@@ -179,24 +209,53 @@
 
         <div class="right-panel panel-box file-config-panel">
           <div class="box-title">文件配置</div>
-          <a-form v-if="selectedMeta" layout="vertical" size="small" class="file-form">
-            <a-form-item label="工艺文件">
-              <a-select
-                :value="selectedMeta.processFileId"
-                allow-clear
-                show-search
-                size="small"
-                placeholder="请选择 工艺文件"
-                :options="docOpts"
-                :filter-option="filterDocOption"
-                @change="onDocChange"
-              />
-            </a-form-item>
-          </a-form>
+          <template v-if="selectedMeta">
+            <a-form v-if="!readonly" layout="vertical" size="small" class="file-form">
+              <a-form-item label="工艺文件">
+                <a-select
+                  :value="selectedMeta.processFileId"
+                  allow-clear
+                  show-search
+                  size="small"
+                  placeholder="请选择 工艺文件"
+                  :options="docOpts"
+                  :filter-option="filterDocOption"
+                  @change="onDocChange"
+                />
+              </a-form-item>
+            </a-form>
+            <div v-else class="file-readonly-line">
+              <span class="file-readonly-label">工艺文件：</span>
+              <a
+                v-if="selectedMeta.processFileId && selectedProcessFileName !== '—'"
+                class="file-link"
+                @click.prevent="openProcessDocDetail"
+                >{{ selectedProcessFileName }}</a
+              >
+              <span v-else class="file-readonly-empty">—</span>
+            </div>
+          </template>
           <div v-else class="right-empty compact">请先选择工序</div>
         </div>
       </div>
     </div>
+
+    <a-modal
+      v-model:open="docDetailOpen"
+      title="工艺文件详情"
+      :footer="null"
+      destroy-on-close
+      width="480px"
+    >
+      <a-descriptions v-if="docDetail" bordered size="small" :column="1">
+        <a-descriptions-item label="文件编号">{{ docDetail.code || '—' }}</a-descriptions-item>
+        <a-descriptions-item label="文件名称">{{ docDetail.name || '—' }}</a-descriptions-item>
+        <a-descriptions-item label="版本">{{ docDetail.version || '—' }}</a-descriptions-item>
+        <a-descriptions-item label="分类">{{ docDetail.category || '—' }}</a-descriptions-item>
+        <a-descriptions-item label="状态">{{ docDetail.status || '—' }}</a-descriptions-item>
+      </a-descriptions>
+      <a-empty v-else description="未找到该工艺文件" />
+    </a-modal>
   </div>
 </template>
 
@@ -209,7 +268,7 @@ import {
   getProcessesByCategory,
   getProcessById,
 } from '@/store/processConfigStore'
-import { getEnabledProcessDocs } from '@/store/processDocStore'
+import { getEnabledProcessDocs, getProcessDocById } from '@/store/processDocStore'
 import {
   MAX_ROUTE_PARALLEL,
   MAX_ROUTE_STEPS,
@@ -226,6 +285,7 @@ import {
   getCompletionModeAt,
   countProcessesInStep,
   normalizeCompletionMode,
+  formatCompletionModeLabel,
 } from '@/utils/processRouteGrid'
 
 const props = defineProps({
@@ -233,6 +293,7 @@ const props = defineProps({
   stepPolicies: { type: Array, default: () => [] },
   selectedStep: { type: Number, default: -1 },
   selectedRow: { type: Number, default: -1 },
+  readonly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -304,6 +365,39 @@ const selectedMeta = computed(() => {
   return getSelectedCellMeta(localGrid.value, props.selectedStep, props.selectedRow)
 })
 
+const selectedStepPosText = computed(() => {
+  const m = selectedMeta.value
+  if (!m) return '—'
+  return `第${m.stepNo}步，行号：${m.rowNo}，列号：${m.colNo}`
+})
+
+const selectedProcessFileName = computed(() => {
+  const id = selectedMeta.value?.processFileId
+  if (!id) return '—'
+  return getProcessDocById(id)?.name || docOpts.value.find((d) => d.value === id)?.label || '—'
+})
+
+const docDetailOpen = ref(false)
+const docDetail = ref(null)
+
+function openProcessDocDetail() {
+  const id = selectedMeta.value?.processFileId
+  if (!id) {
+    message.warning('未关联工艺文件')
+    return
+  }
+  docDetail.value = getProcessDocById(id)
+  if (!docDetail.value) {
+    message.warning('未找到该工艺文件')
+    return
+  }
+  docDetailOpen.value = true
+}
+
+function completionModeLabel(stepIndex) {
+  return formatCompletionModeLabel(getCompletionModeAt(localPolicies.value, stepIndex))
+}
+
 function emitGrid() {
   emit('update:grid', normalizeGrid(localGrid.value))
 }
@@ -354,6 +448,7 @@ function onDragStart(proc, e) {
 }
 
 function placeProcess(step, row, processId) {
+  if (props.readonly) return
   if (!processId) return
   if (step >= MAX_ROUTE_STEPS) {
     message.warning(`最大步数 ${MAX_ROUTE_STEPS}`)
@@ -377,6 +472,11 @@ function placeProcess(step, row, processId) {
 }
 
 function onCellClick(step, row) {
+  if (props.readonly) {
+    emit('update:selectedStep', step)
+    emit('update:selectedRow', row)
+    return
+  }
   if (pendingProcessId.value) {
     placeProcess(step, row, pendingProcessId.value)
     pendingProcessId.value = ''
@@ -386,7 +486,13 @@ function onCellClick(step, row) {
   emit('update:selectedRow', row)
 }
 
+function onCellDragOver(e) {
+  if (props.readonly) return
+  e.preventDefault()
+}
+
 function onDrop(step, row, e) {
+  if (props.readonly) return
   const id = e.dataTransfer?.getData('text/plain') || dragProcessId.value
   placeProcess(step, row, id)
   dragProcessId.value = ''
@@ -509,6 +615,7 @@ function removeRowAtIndex(index) {
 }
 
 function onDocChange(docId) {
+  if (props.readonly) return
   const step = props.selectedStep
   const row = props.selectedRow
   const cell = localGrid.value[step]?.[row]
@@ -545,6 +652,16 @@ function startResize(e) {
 <style scoped>
 .route-editor-layout {
   background: transparent;
+
+  &.is-readonly {
+    .editor-main {
+      min-height: 360px;
+    }
+
+    .center-panel {
+      margin-left: 0;
+    }
+  }
 }
 
 .grid-tip {
@@ -896,6 +1013,31 @@ function startResize(e) {
 
 .file-form {
   padding: 0 14px 12px;
+}
+
+.file-readonly-line {
+  padding: 4px 14px 14px;
+  font-size: 13px;
+  line-height: 22px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.file-readonly-label {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.file-readonly-empty {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.file-link {
+  color: #1677ff;
+  cursor: pointer;
+  word-break: break-all;
+
+  &:hover {
+    color: #4096ff;
+  }
 }
 
 .right-empty {

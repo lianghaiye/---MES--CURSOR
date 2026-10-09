@@ -73,14 +73,23 @@
           <template v-else-if="column.key === 'code'">
             <a class="link-code" @click="goDetail(record)">{{ record.code }}</a>
           </template>
-          <template v-else-if="column.key === 'product'">
-            {{ record.productDisplay || '—' }}
-          </template>
           <template v-else-if="column.key === 'applyScope'">
             {{ formatApplyScopeLabel(record.applyScope) }}
           </template>
+          <template v-else-if="column.key === 'product'">
+            {{ record.productDisplay || record.itemName || record.categoryName || '—' }}
+          </template>
+          <template v-else-if="column.key === 'processCount'">
+            {{ countGridProcesses(record.grid) }}
+          </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'creator'">
+            {{ record.creator || '—' }}
+          </template>
+          <template v-else-if="column.key === 'updater'">
+            {{ record.updater || '—' }}
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space :size="0" wrap>
@@ -153,7 +162,7 @@ import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useTabs } from '@/composables/useTabs'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
-import { formatApplyScopeLabel } from '@/utils/processRouteGrid'
+import { countGridProcesses, formatApplyScopeLabel } from '@/utils/processRouteGrid'
 import ImportExcelModal from '@/components/ImportExcelModal.vue'
 import ImportExportHistoryModal from '@/components/ImportExportHistoryModal.vue'
 import { processRouteBundleImportDef } from '@/utils/importDefs/processRouteBundleImport'
@@ -169,20 +178,22 @@ const historyOpen = ref(false)
 const statusOpts = ROUTE_STATUS.map((v) => ({ label: v, value: v }))
 
 const baseColumns = [
-  { title: '#', key: 'index', width: 48, align: 'center' },
-  { title: '工艺路线编号', key: 'code', width: 120 },
-  { title: '名称', dataIndex: 'name', width: 160 },
-  { title: '产品', key: 'product', width: 120 },
-  { title: '适用范围', key: 'applyScope', dataIndex: 'applyScope', width: 120 },
+  { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '状态', key: 'status', width: 90 },
-  { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
+  { title: '路线编码', key: 'code', width: 120 },
+  { title: '路线名称', dataIndex: 'name', width: 160 },
+  { title: '适用范围', key: 'applyScope', dataIndex: 'applyScope', width: 100 },
+  { title: '适用对象', key: 'product', width: 120, ellipsis: true },
+  { title: '工序数量', key: 'processCount', width: 88, align: 'right' },
+  { title: '创建人', key: 'creator', dataIndex: 'creator', width: 90 },
   { title: '创建日期', dataIndex: 'createdAt', width: 160 },
+  { title: '更新人', key: 'updater', dataIndex: 'updater', width: 90 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 160 },
   { title: '操作', key: 'actions', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('process-route-list', baseColumns)
+  useTableColumnSettings('process-route-list-v2', baseColumns, { minScrollX: 1400 })
 
 const filteredList = computed(() => filterProcessRoutes(processRouteState.routes, applied))
 

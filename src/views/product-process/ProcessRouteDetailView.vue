@@ -28,40 +28,40 @@
         </div>
 
         <DetailSectionCard title="基本信息">
-          <a-descriptions bordered size="small" :column="3">
-            <a-descriptions-item label="工艺路线编号">{{ record.code }}</a-descriptions-item>
-            <a-descriptions-item label="名称">{{ record.name }}</a-descriptions-item>
-            <a-descriptions-item label="状态">{{ record.status }}</a-descriptions-item>
-            <a-descriptions-item label="适用范围">{{
-              formatApplyScopeLabel(record.applyScope)
-            }}</a-descriptions-item>
-            <a-descriptions-item label="适用对象">
-              {{ record.productDisplay || record.itemName || record.categoryName || '—' }}
-            </a-descriptions-item>
-            <a-descriptions-item label="备注">{{ record.remark || '—' }}</a-descriptions-item>
-            <a-descriptions-item label="创建日期">{{ record.createdAt }}</a-descriptions-item>
-            <a-descriptions-item label="更新日期">{{ record.updatedAt }}</a-descriptions-item>
-          </a-descriptions>
+          <DetailInfoGrid :meta-items="basicMeta" :fields="basicFields" flush />
         </DetailSectionCard>
 
-        <DetailSectionCard title="工序流程（只读）">
-          <a-table
-            :columns="stepCols"
-            :data-source="flatSteps"
-            row-key="id"
-            size="small"
-            bordered
-            :pagination="false"
-          >
-            <template #bodyCell="{ column, record: row }">
-              <template v-if="column.key === 'processFile'">
-                {{ row.processFileName || '—' }}
-              </template>
-              <template v-else>
-                {{ row[column.dataIndex] ?? '—' }}
-              </template>
-            </template>
-          </a-table>
+        <DetailSectionCard title="工序流程">
+          <a-tabs v-model:active-key="flowTab" class="detail-tabs detail-tabs-pill">
+            <a-tab-pane key="grid" tab="网格展示">
+              <ProcessRouteGridEditor
+                :grid="record.grid || []"
+                :step-policies="record.stepPolicies || []"
+                v-model:selected-step="selectedStep"
+                v-model:selected-row="selectedRow"
+                readonly
+              />
+            </a-tab-pane>
+            <a-tab-pane key="flat" tab="扁平展示">
+              <a-table
+                :columns="stepCols"
+                :data-source="flatSteps"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+              >
+                <template #bodyCell="{ column, record: row }">
+                  <template v-if="column.key === 'processFile'">
+                    {{ row.processFileName || '—' }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] ?? '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </a-tab-pane>
+          </a-tabs>
         </DetailSectionCard>
       </template>
       <a-empty v-else-if="!loading" description="未找到该工艺路线" />
@@ -92,12 +92,47 @@ import {
   formatCompletionModeLabel,
   syncStepPolicies,
 } from '@/utils/processRouteGrid'
+import DetailInfoGrid from './components/DetailInfoGrid.vue'
+import ProcessRouteGridEditor from './components/ProcessRouteGridEditor.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 const loading = ref(false)
 const record = ref(null)
+const flowTab = ref('grid')
+const selectedStep = ref(-1)
+const selectedRow = ref(-1)
+
+function display(val) {
+  return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '—'
+}
+
+const basicMeta = computed(() => {
+  const r = record.value || {}
+  return [
+    { key: 'status', label: '状态', value: display(r.status) },
+    { key: 'creator', label: '创建人', value: display(r.creator) },
+    { key: 'createdAt', label: '创建日期', value: display(r.createdAt) },
+    { key: 'updater', label: '更新人', value: display(r.updater) },
+    { key: 'updatedAt', label: '更新日期', value: display(r.updatedAt) },
+  ]
+})
+
+const basicFields = computed(() => {
+  const r = record.value || {}
+  return [
+    { key: 'code', label: '路线编码', value: display(r.code) },
+    { key: 'name', label: '路线名称', value: display(r.name) },
+    { key: 'applyScope', label: '适用范围', value: formatApplyScopeLabel(r.applyScope) },
+    {
+      key: 'productDisplay',
+      label: '适用对象',
+      value: display(r.productDisplay || r.itemName || r.categoryName),
+    },
+    { key: 'remark', label: '备注', value: display(r.remark), fullRow: true },
+  ]
+})
 
 const stepCols = [
   { title: '步骤', dataIndex: 'stepNo', width: 70 },
@@ -187,6 +222,9 @@ watch(
   (id) => {
     loading.value = true
     record.value = getProcessRouteById(id)
+    flowTab.value = 'grid'
+    selectedStep.value = -1
+    selectedRow.value = -1
     loading.value = false
   },
   { immediate: true },

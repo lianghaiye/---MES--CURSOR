@@ -68,6 +68,8 @@ function buildParallelDemoRoute() {
     remark: '第2步粗车/钻孔并行且全部完成；下发页两行步骤号均为 2，完成方式均为「全部完成」',
     grid,
     stepPolicies,
+    creator: '李工艺',
+    updater: '李工艺',
     createdAt: '2026-10-08 10:30:00',
     updatedAt: now,
   }
