@@ -5,13 +5,6 @@
         class="category-panel"
         :style="{ width: `${categoryPanelWidth}px`, flexBasis: `${categoryPanelWidth}px` }"
       >
-        <div class="category-tree-toggle">
-          <a-radio-group v-model:value="categoryTreeMode" size="small" button-style="solid">
-            <a-radio-button :value="CATEGORY_TREE_MODE.ALL">全部</a-radio-button>
-            <a-radio-button :value="CATEGORY_TREE_MODE.PRODUCT">产品</a-radio-button>
-            <a-radio-button :value="CATEGORY_TREE_MODE.MATERIAL">物料</a-radio-button>
-          </a-radio-group>
-        </div>
         <div class="category-search">
           <a-input v-model:value="categoryKeyword" allow-clear size="small" placeholder="搜索类别">
             <template #suffix>
@@ -543,7 +536,7 @@ let categoryResizing = false
 let categoryResizeStartX = 0
 let categoryResizeStartWidth = 0
 
-const categoryTreeMode = ref(CATEGORY_TREE_MODE.ALL)
+const categoryTreeMode = ref(CATEGORY_TREE_MODE.PRODUCT)
 const categoryKeyword = ref('')
 const selectedCategoryKey = ref('')
 const expandedKeys = ref([])
@@ -682,11 +675,9 @@ const sortedCategoryTree = computed(() => {
   ]
 })
 
-function pickDefaultCategoryKey(tree) {
-  // 「全部」默认不选中，展示全量列表
-  if (categoryTreeMode.value === CATEGORY_TREE_MODE.ALL) return ''
-  const first = tree?.[0]
-  return first?.key || ''
+function pickDefaultCategoryKey() {
+  // 产品分类树默认不选中，右侧展示全量列表
+  return ''
 }
 
 watch(
@@ -694,11 +685,7 @@ watch(
   (tree) => {
     if (!selectedCategoryKey.value && tree?.length) {
       selectedCategoryKey.value = pickDefaultCategoryKey(tree)
-      if (categoryTreeMode.value === CATEGORY_TREE_MODE.ALL) {
-        expandedKeys.value = [CATEGORY_TREE_ALL_ROOT.PRODUCT, CATEGORY_TREE_ALL_ROOT.MATERIAL]
-      } else {
-        expandedKeys.value = selectedCategoryKey.value ? [selectedCategoryKey.value] : []
-      }
+      expandedKeys.value = (tree || []).map((n) => n.key).filter(Boolean)
     }
   },
   { immediate: true },
@@ -1376,22 +1363,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-
-  .category-tree-toggle {
-    margin-bottom: 8px;
-    flex-shrink: 0;
-
-    :deep(.ant-radio-group) {
-      display: flex;
-      width: 100%;
-    }
-
-    :deep(.ant-radio-button-wrapper) {
-      flex: 1;
-      text-align: center;
-      padding-inline: 0;
-    }
-  }
 
   .category-search {
     display: flex;

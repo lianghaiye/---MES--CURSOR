@@ -443,7 +443,60 @@ export function listLabelsBySalesOrder(salesOrderNo) {
 }
 
 export function getLabelByCode(labelCode) {
-  return industrialLabelState.labels.find((l) => l.labelCode === labelCode) || null
+  const code = String(labelCode || '').trim()
+  if (!code) return null
+  return (
+    industrialLabelState.labels.find(
+      (l) => String(l.labelCode || '').toLowerCase() === code.toLowerCase(),
+    ) || null
+  )
+}
+
+/** 全局校验 SN 是否已被占用（含作废记录，排除自身） */
+export function isLabelCodeInUse(labelCode, { excludeId = '' } = {}) {
+  const code = String(labelCode || '').trim()
+  if (!code) return false
+  const exclude = String(excludeId || '')
+  return industrialLabelState.labels.some(
+    (l) =>
+      String(l.id) !== exclude && String(l.labelCode || '').toLowerCase() === code.toLowerCase(),
+  )
+}
+
+/**
+ * 修改 SN 码（审核通过后可改；已装牌/已出库不可改）
+ * @returns {{ ok: boolean, message: string, label?: object }}
+ */
+export function updateLabelCode(labelId, nextCode, { operator = '当前用户' } = {}) {
+  const label = industrialLabelState.labels.find((l) => String(l.id) === String(labelId))
+  if (!label) return { ok: false, message: '未找到该 SN' }
+  if (label.status === LABEL_STATUS.VOID) return { ok: false, message: '已作废的 SN 不可修改' }
+  if (labelHasBlockingLifecycle(label)) {
+    return { ok: false, message: '该 SN 已装牌或已出库，不可修改' }
+  }
+  const code = String(nextCode || '').trim()
+  if (!code) return { ok: false, message: '请输入新的 SN 码' }
+  if (!/^[A-Za-z0-9_-]{4,64}$/.test(code)) {
+    return { ok: false, message: 'SN 码须为 4–64 位字母/数字/下划线/短横线' }
+  }
+  if (String(label.labelCode || '').toLowerCase() === code.toLowerCase()) {
+    return { ok: true, message: 'SN 码未变化', label }
+  }
+  if (isLabelCodeInUse(code, { excludeId: label.id })) {
+    return { ok: false, message: `SN「${code}」已被使用，请更换` }
+  }
+  const prev = label.labelCode
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  label.labelCode = code
+  label.operationLogs = label.operationLogs || []
+  label.operationLogs.unshift({
+    type: '修改SN',
+    detail: `SN 由 ${prev} 修改为 ${code}`,
+    operator: operator || '当前用户',
+    time: now,
+  })
+  persist()
+  return { ok: true, message: 'SN 码已更新', label }
 }
 
 /**
@@ -536,18 +589,40 @@ export function createLabelRequestFromSalesOrder(order, options = {}) {
     return { ok: true, message: '无需申请工业标识', request: null, labels: [], lineResults: [] }
   }
 
-  const productDetails = lines.map((line) => ({
-    salesLineId: line.id,
-    productCode: line.productCode || '',
-    productName: line.productName || '',
-    specModel: line.specModel || '',
-    material: line.material || '',
-    batchNo: order.orderNo,
-    quantity: salesLineIndustrialLabelNeedQty(line),
-    successCount: 0,
-    failCount: 0,
-    templateName: '标准泵铭牌',
-  }))
+  // 按缺口申请：反审作废后再审会全量重生成；若仍有有效 SN 则只补齐差额，避免重复
+  const productDetails = lines
+    .map((line) => {
+      const need = salesLineIndustrialLabelNeedQty(line)
+      const activeCount = listLabels({
+        salesOrderNo: order.orderNo,
+        salesLineId: line.id,
+        activeOnly: true,
+      }).length
+      const quantity = Math.max(0, need - activeCount)
+      return {
+        salesLineId: line.id,
+        productCode: line.productCode || '',
+        productName: line.productName || '',
+        specModel: line.specModel || '',
+        material: line.material || '',
+        batchNo: order.orderNo,
+        quantity,
+        successCount: 0,
+        failCount: 0,
+        templateName: '标准泵铭牌',
+      }
+    })
+    .filter((d) => d.quantity > 0)
+
+  if (!productDetails.length) {
+    return {
+      ok: true,
+      message: '本单有效工业标识已齐，无需重新申请',
+      request: null,
+      labels: [],
+      lineResults: [],
+    }
+  }
 
   const req = {
     id: `ilreq-${Date.now()}`,
@@ -669,6 +744,135 @@ export function voidLabelsBySalesOrder(salesOrderNo) {
       r.status = REQUEST_STATUS.VOIDED
     })
   return { ok: true, voidedCount: labels.length }
+}
+
+/** 订单变更改数量后：让「现货+排产」与销售数量对齐，便于 SN 需求量跟随 */
+function realignIndustrialNeedSplit(line) {
+  if (!line) return
+  const salesQty = Math.max(0, Math.floor(Number(line.salesQty ?? line.qty) || 0))
+  const hasSplit = line.stockTakeQty != null || line.planProduceQty != null
+  if (!hasSplit) return
+  const stockN = Math.max(0, Math.floor(Number(line.stockTakeQty) || 0))
+  const nextStock = Math.min(stockN, salesQty)
+  line.stockTakeQty = nextStock
+  line.planProduceQty = Math.max(0, salesQty - nextStock)
+}
+
+/**
+ * 作废行上多余的未装牌/未出库 SN（优先作废较新的）
+ * @returns {{ ok: boolean, voidedCount: number, warning?: string }}
+ */
+export function voidExcessActiveLabelsForLine(order, line, keepCount, options = {}) {
+  if (!order?.orderNo || !line?.id) return { ok: false, voidedCount: 0, warning: '参数无效' }
+  const keep = Math.max(0, Math.floor(Number(keepCount) || 0))
+  const active = listLabels({
+    salesOrderNo: order.orderNo,
+    salesLineId: line.id,
+    activeOnly: true,
+  })
+  const excess = active.length - keep
+  if (excess <= 0) return { ok: true, voidedCount: 0 }
+
+  const free = active
+    .filter((l) => !labelHasBlockingLifecycle(l))
+    .sort((a, b) => String(b.regTime || '').localeCompare(String(a.regTime || '')))
+  const blockingCount = active.length - free.length
+  const canVoid = Math.min(excess, free.length)
+  const toVoid = free.slice(0, canVoid)
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const reason = options.reason || '订单变更作废多余 SN'
+  const operator = options.operator || 'system'
+  toVoid.forEach((l) => {
+    l.status = LABEL_STATUS.VOID
+    l.operationLogs = l.operationLogs || []
+    l.operationLogs.unshift({
+      type: '作废',
+      detail: reason,
+      operator,
+      time: now,
+    })
+  })
+
+  let warning
+  if (canVoid < excess) {
+    warning = `「${line.productName || line.productCode || '明细'}」需减少 ${excess} 个 SN，但有 ${blockingCount} 个已装牌/已出库不可作废，仅作废 ${canVoid} 个`
+  }
+  return { ok: !warning, voidedCount: toVoid.length, warning }
+}
+
+/**
+ * 订单变更审核通过后：按新销售数量同步工业标识
+ * - 数量增加：自动补申请缺口 SN
+ * - 数量减少：作废多余且未装牌/未出库的 SN
+ */
+export function syncIndustrialLabelsAfterOrderQtyChange(order, options = {}) {
+  if (!order?.orderNo) return { ok: false, message: '销售订单无效' }
+  const operator = options.operator || 'system'
+  const onlyLineIds = Array.isArray(options.lineIds) ? new Set(options.lineIds.map(String)) : null
+  let supplemented = 0
+  let voided = 0
+  const warnings = []
+  const lineHints = []
+
+  for (const line of order.lineItems || []) {
+    if (!line.needIndustrialLabel) continue
+    if (onlyLineIds && !onlyLineIds.has(String(line.id))) continue
+
+    realignIndustrialNeedSplit(line)
+
+    const need = line.cancelled ? 0 : salesLineIndustrialLabelNeedQty(line)
+    const active = listLabels({
+      salesOrderNo: order.orderNo,
+      salesLineId: line.id,
+      activeOnly: true,
+    })
+
+    if (active.length < need) {
+      const gap = need - active.length
+      const res = supplementLabelRequest(order, line, gap, {
+        remark: options.remark || '订单变更数量增加补申请 SN',
+      })
+      if (res.ok) {
+        const n = res.labels?.length || res.request?.successCount || gap
+        supplemented += n
+        if (res.request?.orderNo) line.industrialLabelRequestNo = res.request.orderNo
+        lineHints.push(`「${line.productName || line.productCode}」补 ${n} 个`)
+      } else {
+        warnings.push(`「${line.productName || line.productCode}」补申请失败：${res.message}`)
+      }
+      continue
+    }
+
+    if (active.length > need) {
+      const r = voidExcessActiveLabelsForLine(order, line, need, {
+        operator,
+        reason: options.voidReason || '订单变更数量减少作废多余 SN',
+      })
+      voided += r.voidedCount || 0
+      if (r.voidedCount) {
+        lineHints.push(`「${line.productName || line.productCode}」作废 ${r.voidedCount} 个`)
+      }
+      if (r.warning) warnings.push(r.warning)
+    }
+  }
+
+  refreshSalesLineLabelSummary(order)
+
+  const parts = []
+  if (supplemented) parts.push(`补申请 SN ${supplemented} 个`)
+  if (voided) parts.push(`作废多余 SN ${voided} 个`)
+  if (!parts.length && !warnings.length) {
+    return { ok: true, supplemented: 0, voided: 0, warnings: [], message: '工业标识数量无需调整' }
+  }
+  const message = [...parts, ...warnings].filter(Boolean).join('；') || '工业标识已同步'
+  return {
+    ok: warnings.length === 0,
+    supplemented,
+    voided,
+    warnings,
+    lineHints,
+    message,
+  }
 }
 
 /**

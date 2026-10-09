@@ -7,6 +7,7 @@
           <div class="header-left">
             <span class="order-no">{{ display(record.code) }}</span>
             <span v-if="record.name" class="product-name">{{ record.name }}</span>
+            <a-tag :color="productStatusColor(record.status)">{{ productStatusLabel }}</a-tag>
             <a-tag v-if="kindLabel">{{ kindLabel }}</a-tag>
             <a-tag v-if="record.supplyForm">{{ record.supplyForm }}</a-tag>
             <a-tag v-if="record.materialType">{{ record.materialType }}</a-tag>
@@ -33,6 +34,23 @@
 
       <div class="tab-body">
         <template v-if="activeTab === 'basic'">
+          <div class="overview-cards">
+            <div
+              v-for="card in overviewCards"
+              :key="card.key"
+              class="overview-card"
+              :class="[`tone-${card.tone}`, { clickable: card.clickable }]"
+              @click="onOverviewCardClick(card)"
+            >
+              <div class="overview-label">
+                {{ card.label }}
+                <a-tooltip v-if="card.tip" :title="card.tip">
+                  <InfoCircleOutlined class="overview-tip" />
+                </a-tooltip>
+              </div>
+              <div class="overview-value">{{ card.value }}</div>
+            </div>
+          </div>
           <DetailSectionCard title="基本信息">
             <DetailInfoGrid :meta-items="capabilityMeta" :fields="basicFields" flush />
           </DetailSectionCard>
@@ -119,6 +137,36 @@
           <ItemBomInfoTab :item-type="bomItemType" :item-id="record.id || ''" />
         </div>
       </div>
+
+      <a-modal
+        v-model:open="bomRefModalOpen"
+        title="BOM引用"
+        width="760px"
+        :footer="null"
+        destroy-on-close
+      >
+        <p class="bom-ref-hint">该产品作为子件被以下 BOM 引用，点击 BOM 编码可打开详情。</p>
+        <a-table
+          :columns="bomRefColumns"
+          :data-source="overview.bomRefs"
+          row-key="id"
+          size="small"
+          bordered
+          :pagination="false"
+        >
+          <template #bodyCell="{ column, record: row }">
+            <template v-if="column.key === 'bomNo'">
+              <a class="bom-ref-link" @click.prevent="openBomDetail(row)">{{ row.bomNo }}</a>
+            </template>
+            <template v-else-if="column.key === 'bomStatus'">
+              <a-tag :color="bomStatusColor(row.bomStatus)">{{ row.bomStatus }}</a-tag>
+            </template>
+            <template v-else>
+              {{ row[column.dataIndex] ?? '—' }}
+            </template>
+          </template>
+        </a-table>
+      </a-modal>
     </template>
   </div>
 </template>
@@ -127,6 +175,7 @@
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productCategoryState } from '@/store/productCategoryStore'
@@ -134,6 +183,7 @@ import { materialCategoryState } from '@/store/materialCategoryStore'
 import { getMaterialGradeById } from '@/store/materialGradeStore'
 import { resolveMasterItemEditRecord } from '@/utils/masterItemSave'
 import { ITEM_KIND, itemKindLabel, resolveItemKind } from '@/utils/masterItemKind'
+import { normalizeProductStatus, productStatusColor } from '@/utils/productStatus'
 import { flattenCategoryNodes } from '@/mock/materialCategories'
 import { PLAN_STRATEGY_OPTIONS, isPlanStrategyMts } from '@/mock/productInfoOptions'
 import { inboundQcOptions } from '@/mock/materialInfoOptions'
@@ -148,6 +198,16 @@ import { openCreateTab } from '@/utils/openCreateTab'
 import { useTabs, tabStore } from '@/composables/useTabs'
 import DetailInfoGrid from './components/DetailInfoGrid.vue'
 import ItemBomInfoTab from './components/ItemBomInfoTab.vue'
+import { buildProductMasterOverview, formatOverviewQty } from '@/utils/productMasterOverview'
+import { bomStatusColor } from '@/mock/productBomOptions'
+import { stockState } from '@/store/stockStore'
+import { inboundOrderState } from '@/store/inboundOrderStore'
+import { outboundState } from '@/store/outboundStore'
+import { purchaseOrderState } from '@/store/purchaseOrderStore'
+import { salesOrderState } from '@/store/salesOrderStore'
+import { workOrderState } from '@/store/workOrderStore'
+import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
+import { productBomState } from '@/store/productBomStore'
 
 defineOptions({ name: 'MasterItemDetailView' })
 
@@ -176,10 +236,122 @@ const kind = computed(() =>
   resolveItemKind({ canSell: record.value?.canSell, canProduce: record.value?.canProduce }),
 )
 const kindLabel = computed(() => (kind.value ? itemKindLabel(kind.value) : ''))
+const productStatusLabel = computed(() => normalizeProductStatus(record.value?.status))
 const showBomAction = computed(
   () => kind.value === ITEM_KIND.PRODUCT || kind.value === ITEM_KIND.PRODUCT_MATERIAL,
 )
 const bomItemType = computed(() => (kind.value === ITEM_KIND.MATERIAL ? 'material' : 'product'))
+const bomRefModalOpen = ref(false)
+
+const overview = computed(() => {
+  void stockState.records
+  void inboundOrderState.orders
+  void outboundState.orders
+  void purchaseOrderState.orders
+  void salesOrderState.orders
+  void workOrderState.orders
+  void assemblyWorkOrderState.orders
+  void productBomState.boms
+  if (!record.value) {
+    return {
+      unit: '件',
+      stockText: '—',
+      inTransitText: '—',
+      ioText: '—',
+      bomRefCount: 0,
+      bomRefs: [],
+      manufacturedQty: 0,
+      purchasedQty: 0,
+      soldQty: 0,
+    }
+  }
+  return buildProductMasterOverview(record.value)
+})
+
+const overviewCards = computed(() => {
+  const o = overview.value
+  const unit = o.unit || '件'
+  const monthTip = '当月'
+  return [
+    {
+      key: 'bomRef',
+      label: 'BOM引用',
+      value: `${o.bomRefCount} 个`,
+      tone: 'orange',
+      tip: '作为子件被其他 BOM 引用的数量，多个时可查看明细',
+      clickable: o.bomRefCount > 0,
+    },
+    {
+      key: 'stock',
+      label: '库存量',
+      value: o.stockText,
+      tone: 'blue',
+      tip: '当前现存量（库存单位）',
+    },
+    {
+      key: 'inTransit',
+      label: '在途',
+      value: o.inTransitText,
+      tone: 'cyan',
+      tip: '采购在途 + 在制未完工数量（库存单位）',
+    },
+    {
+      key: 'io',
+      label: '出入库量',
+      value: o.ioText,
+      tone: 'purple',
+      tip: monthTip,
+    },
+    {
+      key: 'made',
+      label: '已制造',
+      value: `${formatOverviewQty(o.manufacturedQty)} ${unit}`,
+      tone: 'green',
+      tip: monthTip,
+    },
+    {
+      key: 'bought',
+      label: '已采购',
+      value: `${formatOverviewQty(o.purchasedQty)} ${unit}`,
+      tone: 'gold',
+      tip: monthTip,
+    },
+    {
+      key: 'sold',
+      label: '已销售',
+      value: `${formatOverviewQty(o.soldQty)} ${unit}`,
+      tone: 'red',
+      tip: monthTip,
+    },
+  ]
+})
+
+const bomRefColumns = [
+  { title: 'BOM编码', dataIndex: 'bomNo', key: 'bomNo', width: 140 },
+  { title: 'BOM名称', dataIndex: 'bomName', key: 'bomName', ellipsis: true },
+  { title: '状态', dataIndex: 'bomStatus', key: 'bomStatus', width: 88 },
+  { title: '母件名称', dataIndex: 'itemName', key: 'itemName', ellipsis: true },
+  { title: '版本', dataIndex: 'version', key: 'version', width: 80 },
+  { title: '单位用量', dataIndex: 'unitQty', key: 'unitQty', width: 90, align: 'right' },
+]
+
+function openBomDetail(row) {
+  if (!row?.bomId && !row?.detailPath) return
+  const path = row.detailPath || `/product-process/bom/${row.bomId}`
+  openTab(path, row.bomName || 'BOM详情')
+  router.push(path)
+  bomRefModalOpen.value = false
+}
+
+function onOverviewCardClick(card) {
+  if (card.key !== 'bomRef' || !card.clickable) return
+  const refs = overview.value.bomRefs || []
+  if (refs.length === 1) {
+    openBomDetail(refs[0])
+    return
+  }
+  if (refs.length > 1) bomRefModalOpen.value = true
+}
 
 function display(val) {
   return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '—'
@@ -243,6 +415,7 @@ const basicFields = computed(() => {
   const grade = getMaterialGradeById(r.materialGradeId)
   const fields = [
     { key: 'code', label: '编号', value: display(r.code) },
+    { key: 'status', label: '状态', value: productStatusLabel.value },
     { key: 'barcodeType', label: '条码类型', value: display(r.barcodeType) },
     { key: 'materialType', label: '类型', value: display(r.materialType) },
     { key: 'supplyForm', label: '供应型态', value: display(r.supplyForm) },
@@ -540,5 +713,97 @@ function handleBack() {
 
 .detail-sub-table {
   margin-top: 12px;
+}
+
+.overview-cards {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.overview-card {
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e5e6eb;
+  padding: 10px 12px;
+  min-height: 72px;
+}
+
+.overview-card.clickable {
+  cursor: pointer;
+}
+
+.overview-card.clickable:hover {
+  border-color: #91caff;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.08);
+}
+
+.overview-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 18px;
+}
+
+.overview-tip {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.overview-value {
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  line-height: 22px;
+  word-break: break-all;
+}
+
+.overview-card.tone-blue {
+  border-top: 3px solid #1677ff;
+}
+.overview-card.tone-cyan {
+  border-top: 3px solid #13c2c2;
+}
+.overview-card.tone-purple {
+  border-top: 3px solid #722ed1;
+}
+.overview-card.tone-orange {
+  border-top: 3px solid #fa8c16;
+}
+.overview-card.tone-green {
+  border-top: 3px solid #52c41a;
+}
+.overview-card.tone-gold {
+  border-top: 3px solid #d4b106;
+}
+.overview-card.tone-red {
+  border-top: 3px solid #f5222d;
+}
+
+.bom-ref-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.bom-ref-link {
+  color: #1677ff;
+  cursor: pointer;
+}
+
+@media (max-width: 1400px) {
+  .overview-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .overview-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

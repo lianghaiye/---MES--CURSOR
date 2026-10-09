@@ -2,6 +2,7 @@ import { reactive, watch } from 'vue'
 import { persistJson } from '@/utils/safeStorage'
 import dayjs from 'dayjs'
 import { getSalesOrderById, recalcOrderAmounts } from '@/store/salesOrderStore'
+import { syncIndustrialLabelsAfterOrderQtyChange } from '@/store/industrialLabelStore'
 import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
 import { recalcSalesLinePricing } from '@/utils/salesOrderPricing'
 import {
@@ -245,7 +246,9 @@ export function submitSalesPriceChange({
       ok: true,
       record: approved.change,
       autoApproved: true,
-      message: '订单变更已自动审批通过，订单信息已更新',
+      message: approved.message
+        ? approved.message.replace('订单变更已通过', '订单变更已自动审批通过')
+        : '订单变更已自动审批通过，订单信息已更新',
     }
   }
 
@@ -303,13 +306,44 @@ export function approveSalesPriceChange(id, operator = 'admin1', opinion = '', e
   }
   const applied = applyApprovedPrices(change)
   if (!applied.ok) return applied
+
+  let industrialHint = ''
+  try {
+    const qtyTouchedLineIds = (change.lines || [])
+      .filter((row) => {
+        if (!isPriceChangeLineChanged(row)) return false
+        if (row.cancelled) return true
+        const oldQty = Number(row.oldQty)
+        const newQty = Number(row.newQty)
+        return Number.isFinite(newQty) && (!Number.isFinite(oldQty) || oldQty !== newQty)
+      })
+      .map((row) => row.salesLineId)
+      .filter(Boolean)
+    if (qtyTouchedLineIds.length) {
+      const syncRes = syncIndustrialLabelsAfterOrderQtyChange(applied.order, {
+        operator,
+        lineIds: qtyTouchedLineIds,
+        remark: `订单变更 ${change.changeNo || ''} 数量调整补申请 SN`.trim(),
+        voidReason: `订单变更 ${change.changeNo || ''} 数量减少作废多余 SN`.trim(),
+      })
+      if (syncRes?.message && syncRes.message !== '工业标识数量无需调整') {
+        industrialHint = syncRes.message
+      }
+    }
+  } catch {
+    industrialHint = '工业标识同步异常，请在订单详情核对 SN'
+  }
+
   change.status = PRICE_CHANGE_STATUS.APPROVED
   change.approver = operator
   change.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
   change.opinion = opinion || '同意'
   change.autoApproved = Boolean(extra.autoApproved)
   persist()
-  return { ok: true, change, message: '订单变更已通过，订单信息已更新' }
+  const message = industrialHint
+    ? `订单变更已通过，订单信息已更新；${industrialHint}`
+    : '订单变更已通过，订单信息已更新'
+  return { ok: true, change, message, industrialHint }
 }
 
 export function rejectSalesPriceChange(id, operator = 'admin1', opinion = '') {

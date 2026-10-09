@@ -858,7 +858,15 @@
                     </div>
                   </template>
                   <template v-else-if="column.key === 'action'">
-                    <a class="link-code" @click.prevent="goLabelDetail(row)">标识管理</a>
+                    <a-space :size="8">
+                      <a
+                        v-if="canEditIndustrialSn(row)"
+                        class="link-code"
+                        @click.prevent="openEditIndustrialSn(row)"
+                        >修改SN</a
+                      >
+                      <a class="link-code" @click.prevent="goLabelDetail(row)">标识管理</a>
+                    </a-space>
                   </template>
                   <template v-else>
                     {{ row[column.dataIndex] ?? '—' }}
@@ -962,6 +970,31 @@
         </a-form-item>
         <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px">
           默认 = 申请数量 − 已成功数；批次号使用销售单号。
+        </div>
+      </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="editSnOpen"
+      title="修改 SN 码"
+      ok-text="保存"
+      cancel-text="取消"
+      @ok="confirmEditIndustrialSn"
+    >
+      <p style="margin-bottom: 12px; color: rgba(0, 0, 0, 0.65)">
+        原 SN：{{ editSnRow?.labelCode || '—' }}
+      </p>
+      <a-form layout="vertical">
+        <a-form-item label="新 SN 码" required>
+          <a-input
+            v-model:value="editSnCode"
+            allow-clear
+            placeholder="请输入新的 SN 码"
+            :maxlength="64"
+          />
+        </a-form-item>
+        <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px">
+          修改后将做全局唯一校验；已装牌或已出库的 SN 不可修改。
         </div>
       </a-form>
     </a-modal>
@@ -1102,6 +1135,7 @@ import SalesOrderPrintModal from './components/SalesOrderPrintModal.vue'
 import SalesOrderEbomDiffSection from './components/SalesOrderEbomDiffSection.vue'
 import IndustrialLabelQrMock from './components/IndustrialLabelQrMock.vue'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
+import { getUser } from '@/utils/auth'
 import {
   industrialLabelState,
   listLabelsBySalesOrder,
@@ -1109,6 +1143,8 @@ import {
   supplementLabelRequest,
   applyLabelSummaryToSalesLines,
   salesLineIndustrialLabelNeedQty,
+  labelHasBlockingLifecycle,
+  updateLabelCode,
 } from '@/store/industrialLabelStore'
 import {
   formatDiscountRatePercent,
@@ -1141,6 +1177,9 @@ const supplementLabelLine = ref(null)
 const supplementLabelQty = ref(1)
 const supplementLabelMax = ref(99)
 const industrialQrOpen = ref(false)
+const editSnOpen = ref(false)
+const editSnRow = ref(null)
+const editSnCode = ref('')
 const industrialQrLabel = ref(null)
 
 const pendingPriceChange = computed(() => {
@@ -1317,7 +1356,7 @@ const industrialLabelSnColumns = [
   { key: 'qrStatus', title: '二维码状态', width: 100 },
   { key: 'engraveStatus', title: '刻录状态', width: 100 },
   { key: 'regTime', title: '注册时间', dataIndex: 'regTime', width: 160 },
-  { key: 'action', title: '操作', width: 100, fixed: 'right' },
+  { key: 'action', title: '操作', width: 160, fixed: 'right' },
 ]
 
 const canOperateIndustrialLabel = computed(() => {
@@ -1438,6 +1477,35 @@ function goLabelDetail(lbl) {
     path,
     query: { labelCode: lbl.labelCode, batchNo: lbl.batchNo || '' },
   })
+}
+
+function canEditIndustrialSn(row) {
+  if (!canOperateIndustrialLabel.value) return false
+  if (!row || row.status === '作废') return false
+  return !labelHasBlockingLifecycle(row)
+}
+
+function openEditIndustrialSn(row) {
+  editSnRow.value = row
+  editSnCode.value = row?.labelCode || ''
+  editSnOpen.value = true
+}
+
+function confirmEditIndustrialSn() {
+  if (!editSnRow.value) {
+    editSnOpen.value = false
+    return
+  }
+  const user = getUser()
+  const res = updateLabelCode(editSnRow.value.id, editSnCode.value, {
+    operator: user?.displayName || user?.name || '当前用户',
+  })
+  if (!res.ok) {
+    message.warning(res.message)
+    return Promise.reject()
+  }
+  message.success(res.message)
+  editSnOpen.value = false
 }
 
 function handleRetryIndustrialLabel(row) {

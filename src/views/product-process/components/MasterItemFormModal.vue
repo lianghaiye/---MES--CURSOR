@@ -181,7 +181,7 @@
                       />
                     </a-form-item>
                   </a-col>
-                  <a-col :span="6">
+                  <a-col v-else :span="6">
                     <a-form-item label="物料类别">
                       <a-select
                         v-model:value="form.categoryKey"
