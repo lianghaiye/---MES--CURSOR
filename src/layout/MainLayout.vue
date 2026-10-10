@@ -14,6 +14,7 @@
         </a-layout-content>
       </a-layout>
     </a-layout>
+    <BengXiaozhiChat />
   </a-layout>
 </template>
 
@@ -23,6 +24,7 @@ import { useRoute } from 'vue-router'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 import GlobalTabs from './GlobalTabs.vue'
+import BengXiaozhiChat from '@/components/agent/BengXiaozhiChat.vue'
 import { sideMenus, resolveModuleKey } from '@/config/menus'
 import { createPageRegistry } from '@/config/createPages'
 import { enhanceListFilterBars, startListFilterBarObserver } from '@/utils/listFilterEnhance'

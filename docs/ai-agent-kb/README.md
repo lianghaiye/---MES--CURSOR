@@ -43,6 +43,7 @@ ai-agent-kb/
 | 文件                                                                 | 说明                                     |
 | -------------------------------------------------------------------- | ---------------------------------------- |
 | [agent/SYSTEM_PROMPT.md](./agent/SYSTEM_PROMPT.md)                   | 可复制 System Prompt + Few-shot + 评测题 |
+| [agent/WEB接入扣子说明.md](./agent/WEB接入扣子说明.md)               | Web 悬浮窗 + agent-proxy 调扣子流式 API  |
 | [structured/menu-tree.json](./structured/menu-tree.json)             | 顶栏/侧栏/小程序菜单树与路径模板         |
 | [structured/status-edges.json](./structured/status-edges.json)       | 单据状态机与可操作边                     |
 | [structured/function-params.json](./structured/function-params.json) | 功能参数/业务规则枚举与场景检查清单      |

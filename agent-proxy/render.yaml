@@ -1,0 +1,22 @@
+# Render 一键部署泵小智代理（PAT 只放 Render 环境变量，勿提交仓库）
+# 文档：https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: i-doms-agent-proxy
+    runtime: node
+    rootDir: agent-proxy
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: COZE_API_BASE
+        value: https://api.coze.cn
+      - key: COZE_BOT_ID
+        value: "7694601564438396962"
+      - key: REQUIRE_AUTH
+        value: "true"
+      - key: COZE_PAT
+        sync: false

@@ -7,6 +7,8 @@ yarn-error.log*
 pnpm-debug.log*
 .env.local
 .env.*.local
+agent-proxy/.env
+agent-proxy/node_modules
 .idea
 .vscode
 *.local

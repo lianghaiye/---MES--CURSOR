@@ -8,7 +8,9 @@
     "build": "vue-cli-service build && cp dist/index.html dist/404.html",
     "lint": "vue-cli-service lint",
     "format": "prettier --write \"src/**/*.{js,vue,less,css}\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "agent:proxy": "npm --prefix agent-proxy start",
+    "agent:proxy:install": "npm --prefix agent-proxy install"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",

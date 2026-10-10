@@ -35,6 +35,9 @@ jobs:
         env:
           VUE_APP_BUILD_SHA: ${{ github.sha }}
           VUE_APP_BUILD_TIME: ${{ github.run_number }}
+          # 演示站问答：仓库 Secrets 配公网代理地址（勿把 PAT 写进前端）
+          # 例：https://i-doms-agent-proxy.onrender.com
+          VUE_APP_AGENT_BASE_URL: ${{ secrets.VUE_APP_AGENT_BASE_URL }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

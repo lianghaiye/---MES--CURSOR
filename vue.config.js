@@ -16,6 +16,14 @@ module.exports = defineConfig({
         runtimeErrors: (error) => !/ResizeObserver loop/.test(error?.message || ''),
       },
     },
+    // 泵小智本地代理（agent-proxy），PAT 不进前端
+    proxy: {
+      '/agent-api': {
+        target: 'http://127.0.0.1:3100',
+        changeOrigin: true,
+        pathRewrite: { '^/agent-api': '' },
+      },
+    },
   },
   css: {
     loaderOptions: {
