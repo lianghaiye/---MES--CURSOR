@@ -1,7 +1,8 @@
 const { defineConfig } = require('@vue/cli-service')
 
 const isProd = process.env.NODE_ENV === 'production'
-const publicPath = isProd ? '/---MES--CURSOR/' : '/'
+// GitHub Pages 默认子路径；阿里云根路径部署：VUE_APP_PUBLIC_PATH=/ npm run build
+const publicPath = process.env.VUE_APP_PUBLIC_PATH || (isProd ? '/---MES--CURSOR/' : '/')
 
 module.exports = defineConfig({
   transpileDependencies: true,

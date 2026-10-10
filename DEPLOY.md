@@ -52,6 +52,15 @@ Actions 详情页两步均为绿色 ✓：
 - 账号：`admin`
 - 密码：任意（Mock）
 
+## 阿里云整站部署（推荐自建）
+
+前端 + `agent-proxy` 都放同一台 ECS/轻量，不依赖 Pages 也能问答。  
+步骤见 [`deploy/ALIYUN.md`](./deploy/ALIYUN.md)，Nginx 模板见 [`deploy/nginx-aliyun.conf`](./deploy/nginx-aliyun.conf)。
+
+构建命令：`VUE_APP_PUBLIC_PATH=/ npm run build`。
+
+---
+
 ## 演示站启用泵小智问答（必做一次）
 
 GitHub Pages **只能托管前端**，不能跑 `agent-proxy`。要让  
