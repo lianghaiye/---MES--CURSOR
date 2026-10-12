@@ -32,108 +32,35 @@
               </a-radio-group>
             </a-form-item>
           </a-col>
-          <template v-if="indicatorKind === 'basic'">
-            <a-col :span="6">
-              <a-form-item label="指标名称" required>
-                <a-input
-                  :value="model.name"
-                  allow-clear
-                  placeholder="请输入指标名称"
-                  @update:value="(v) => update('name', v)"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="字段类型" required>
-                <a-select
-                  :value="model.type"
-                  placeholder="请选择"
-                  :options="basicTypeOpts"
-                  :disabled="typeDisabled"
-                  @change="onBasicTypeChange"
-                />
-              </a-form-item>
-            </a-col>
-          </template>
-          <template v-else>
-            <a-col :span="6">
-              <a-form-item label="父项名称" required>
-                <a-input
-                  :value="model.name"
-                  allow-clear
-                  placeholder="请输入父项名称"
-                  @update:value="(v) => update('name', v)"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="是否必填">
-                <a-radio-group :value="model.required" @update:value="(v) => update('required', v)">
-                  <a-radio :value="true">是</a-radio>
-                  <a-radio :value="false">否</a-radio>
-                </a-radio-group>
-              </a-form-item>
-            </a-col>
-          </template>
-        </a-row>
-
-        <template v-if="indicatorKind === 'basic'">
-          <a-row :gutter="[12, 12]">
-            <a-col :span="6">
-              <a-form-item label="是否必填">
-                <a-radio-group :value="model.required" @update:value="(v) => update('required', v)">
-                  <a-radio :value="true">是</a-radio>
-                  <a-radio :value="false">否</a-radio>
-                </a-radio-group>
-              </a-form-item>
-            </a-col>
-            <a-col :span="model.withUnit ? 12 : 6">
-              <a-form-item label="是否带单位">
-                <div class="unit-inline-row">
-                  <a-checkbox
-                    :checked="model.withUnit"
-                    @update:checked="(v) => onWithUnitChange(v)"
-                  >
-                    带单位
-                  </a-checkbox>
-                  <template v-if="model.withUnit">
-                    <a-select
-                      :value="model.unitPosition"
-                      class="unit-pos-select"
-                      :options="unitPositionOpts"
-                      @update:value="(v) => update('unitPosition', v)"
-                    />
-                    <a-input
-                      :value="model.unit"
-                      placeholder="如 mm、¥"
-                      allow-clear
-                      class="unit-value-input"
-                      @update:value="(v) => update('unit', v)"
-                    />
-                  </template>
-                </div>
-              </a-form-item>
-            </a-col>
-            <a-col v-if="model.type === 'number'" :span="6">
-              <a-form-item label="数字设置">
-                <a-checkbox
-                  :checked="model.allowDecimal"
-                  @update:checked="(v) => update('allowDecimal', v)"
-                >
-                  允许小数
-                </a-checkbox>
-              </a-form-item>
-            </a-col>
-            <a-col v-if="showFormatField" :span="6">
-              <a-form-item label="字段格式">
-                <a-input
-                  :value="model.format"
-                  :placeholder="formatPlaceholder"
-                  allow-clear
-                  @update:value="(v) => update('format', v)"
-                />
-              </a-form-item>
-            </a-col>
+          <a-col :span="6">
+            <a-form-item :label="indicatorKind === 'basic' ? '指标名称' : '父项名称'" required>
+              <a-input
+                :value="model.name"
+                allow-clear
+                :placeholder="indicatorKind === 'basic' ? '请输入指标名称' : '请输入父项名称'"
+                @update:value="(v) => update('name', v)"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="是否必填" required>
+              <a-radio-group :value="model.required" @update:value="(v) => update('required', v)">
+                <a-radio :value="true">是</a-radio>
+                <a-radio :value="false">否</a-radio>
+              </a-radio-group>
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="字段描述">
+              <a-input
+                :value="model.description"
+                allow-clear
+                placeholder="请输入字段描述"
+                @update:value="(v) => update('description', v)"
+              />
+            </a-form-item>
+          </a-col>
+          <template v-if="indicatorKind === 'composite'">
             <a-col :span="6">
               <a-form-item label="输入提示">
                 <a-input
@@ -143,7 +70,7 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col v-if="['text', 'textarea', 'number'].includes(model.type)" :span="6">
+            <a-col :span="6">
               <a-form-item label="默认值">
                 <a-input
                   :value="model.defaultValue"
@@ -152,60 +79,129 @@
                 />
               </a-form-item>
             </a-col>
-            <a-col v-if="model.type === 'text' || model.type === 'textarea'" :span="6">
-              <a-form-item label="字符限制">
-                <a-input-number
-                  :value="model.charLimit"
-                  :min="1"
-                  style="width: 100%"
-                  placeholder="最大字符数"
-                  @update:value="(v) => update('charLimit', v)"
-                />
-              </a-form-item>
-            </a-col>
-            <a-col :span="12">
-              <a-form-item label="字段描述">
-                <a-input
-                  :value="model.description"
-                  allow-clear
-                  placeholder="选填"
-                  @update:value="(v) => update('description', v)"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-          <a-form-item v-if="isChoice" label="选项列表" required class="block-form-item">
-            <div v-for="(opt, i) in model.optionRows" :key="i" class="option-row conclusion-opt">
-              <a-input
-                :value="opt.value"
-                placeholder="选项值"
-                @update:value="(v) => updateOptionValue(i, v)"
+          </template>
+        </a-row>
+      </div>
+
+      <div v-if="indicatorKind === 'basic'" class="form-section-box">
+        <div class="section-label">指标配置</div>
+        <a-row :gutter="[12, 12]">
+          <a-col :span="6">
+            <a-form-item label="字段类型" required>
+              <a-select
+                :value="model.type"
+                placeholder="请选择"
+                :options="basicTypeOpts"
+                :disabled="typeDisabled"
+                @change="onBasicTypeChange"
               />
+            </a-form-item>
+          </a-col>
+          <a-col :span="model.withUnit ? 12 : 6">
+            <a-form-item label="是否带单位">
+              <div class="unit-inline-row">
+                <a-checkbox :checked="model.withUnit" @update:checked="(v) => onWithUnitChange(v)">
+                  带单位
+                </a-checkbox>
+                <template v-if="model.withUnit">
+                  <a-select
+                    :value="model.unitPosition"
+                    class="unit-pos-select"
+                    :options="unitPositionOpts"
+                    @update:value="(v) => update('unitPosition', v)"
+                  />
+                  <a-input
+                    :value="model.unit"
+                    placeholder="如 mm、¥"
+                    allow-clear
+                    class="unit-value-input"
+                    @update:value="(v) => update('unit', v)"
+                  />
+                </template>
+              </div>
+            </a-form-item>
+          </a-col>
+          <a-col v-if="model.type === 'number'" :span="6">
+            <a-form-item label="数字设置">
               <a-checkbox
-                :checked="Boolean(opt.isDefault)"
-                @change="(e) => setOptionDefault(i, e.target.checked)"
+                :checked="model.allowDecimal"
+                @update:checked="(v) => update('allowDecimal', v)"
               >
-                设为默认值
+                允许小数
               </a-checkbox>
-              <a-button type="text" danger @click="removeOption(i)">删除</a-button>
-            </div>
-            <a-button type="link" size="small" @click="addOption">+ 添加选项</a-button>
-          </a-form-item>
-        </template>
-        <template v-else>
-          <a-row :gutter="[12, 12]">
-            <a-col :span="12">
-              <a-form-item label="字段描述">
-                <a-input
-                  :value="model.description"
-                  allow-clear
-                  placeholder="选填"
-                  @update:value="(v) => update('description', v)"
-                />
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </template>
+            </a-form-item>
+          </a-col>
+          <a-col v-if="showFormatField" :span="6">
+            <a-form-item label="字段格式">
+              <a-input
+                :value="model.format"
+                :placeholder="formatPlaceholder"
+                allow-clear
+                @update:value="(v) => update('format', v)"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="['text', 'textarea', 'number'].includes(model.type)" :span="6">
+            <a-form-item label="默认值">
+              <a-input
+                :value="model.defaultValue"
+                placeholder="请输入默认值"
+                @update:value="(v) => update('defaultValue', v)"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="model.type === 'text' || model.type === 'textarea'" :span="6">
+            <a-form-item label="字符限制">
+              <a-input-number
+                :value="model.charLimit"
+                :min="1"
+                style="width: 100%"
+                placeholder="最大字符数"
+                @update:value="(v) => update('charLimit', v)"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="输入提示">
+              <a-input
+                :value="model.placeholder"
+                placeholder="请输入输入提示"
+                @update:value="(v) => update('placeholder', v)"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item v-if="isChoice" label="选项列表" required class="block-form-item">
+          <div v-for="(opt, i) in model.optionRows" :key="i" class="option-row conclusion-opt">
+            <a-input
+              :value="opt.value"
+              placeholder="选项值"
+              @update:value="(v) => updateOptionValue(i, v)"
+            />
+            <a-checkbox
+              :checked="Boolean(opt.isDefault)"
+              @change="(e) => setOptionDefault(i, e.target.checked)"
+            >
+              设为默认值
+            </a-checkbox>
+            <a-checkbox
+              :checked="Boolean(opt.allowFill)"
+              @change="(e) => setOptionAllowFill(i, e.target.checked)"
+            >
+              填空
+            </a-checkbox>
+            <a-input
+              v-if="opt.allowFill"
+              :value="opt.fillPlaceholder"
+              class="fill-placeholder-input"
+              placeholder="填空提示，如：请注明"
+              allow-clear
+              @update:value="(v) => updateOptionFillPlaceholder(i, v)"
+            />
+            <a-button type="text" danger @click="removeOption(i)">删除</a-button>
+          </div>
+          <a-button type="link" size="small" @click="addOption">+ 添加选项</a-button>
+        </a-form-item>
       </div>
 
       <div v-if="indicatorKind === 'composite'" class="form-section-box">
@@ -270,9 +266,12 @@
               child.type === 'datetime' ||
               child.type === 'number' ||
               child.type === 'text' ||
-              child.type === 'textarea'
+              child.type === 'textarea' ||
+              child.type === 'radio' ||
+              child.type === 'checkbox'
             "
             :gutter="[12, 12]"
+            class="child-extra-row"
           >
             <a-col v-if="child.type === 'date' || child.type === 'datetime'" :span="6">
               <a-form-item label="字段格式">
@@ -293,6 +292,27 @@
                 </a-checkbox>
               </a-form-item>
             </a-col>
+            <a-col :span="6">
+              <a-form-item label="输入提示">
+                <a-input
+                  :value="child.placeholder"
+                  placeholder="请输入提示文案"
+                  @update:value="(v) => updateChild(i, 'placeholder', v)"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col
+              v-if="child.type === 'text' || child.type === 'textarea' || child.type === 'number'"
+              :span="6"
+            >
+              <a-form-item label="默认值">
+                <a-input
+                  :value="child.defaultValue"
+                  placeholder="请输入默认值"
+                  @update:value="(v) => updateChild(i, 'defaultValue', v)"
+                />
+              </a-form-item>
+            </a-col>
             <a-col v-if="child.type === 'text' || child.type === 'textarea'" :span="6">
               <a-form-item label="字符限制">
                 <a-input-number
@@ -306,7 +326,7 @@
             </a-col>
           </a-row>
           <template v-if="child.type === 'radio' || child.type === 'checkbox'">
-            <a-form-item label="选项列表" required>
+            <a-form-item label="选项列表" required class="child-options-block">
               <div
                 v-for="(opt, oi) in child.optionRows || []"
                 :key="oi"
@@ -323,6 +343,20 @@
                 >
                   默认
                 </a-checkbox>
+                <a-checkbox
+                  :checked="Boolean(opt.allowFill)"
+                  @change="(e) => setChildOptionAllowFill(i, oi, e.target.checked)"
+                >
+                  填空
+                </a-checkbox>
+                <a-input
+                  v-if="opt.allowFill"
+                  :value="opt.fillPlaceholder"
+                  class="fill-placeholder-input"
+                  placeholder="填空提示，如：请注明"
+                  allow-clear
+                  @update:value="(v) => updateChildOptionFillPlaceholder(i, oi, v)"
+                />
                 <a-button type="text" danger @click="removeChildOption(i, oi)">删除</a-button>
               </div>
               <a-button type="link" size="small" @click="addChildOption(i)">+ 添加选项</a-button>
@@ -881,30 +915,60 @@ function onWithUnitChange(checked) {
   })
 }
 
+function normalizeOptionRow(o = {}) {
+  return {
+    value: String(o?.value ?? ''),
+    isDefault: Boolean(o?.isDefault),
+    allowFill: Boolean(o?.allowFill),
+    fillPlaceholder: String(o?.fillPlaceholder ?? ''),
+  }
+}
+
 function addOption() {
-  patch({ optionRows: [...(props.model.optionRows || []), { value: '', isDefault: false }] })
+  patch({
+    optionRows: [
+      ...(props.model.optionRows || []).map(normalizeOptionRow),
+      normalizeOptionRow({ value: '', isDefault: false }),
+    ],
+  })
 }
 
 function removeOption(index) {
   const rows = [...(props.model.optionRows || [])]
   rows.splice(index, 1)
-  patch({ optionRows: rows })
+  patch({ optionRows: rows.map(normalizeOptionRow) })
 }
 
 function updateOptionValue(index, value) {
   const rows = (props.model.optionRows || []).map((o, i) =>
-    i === index ? { ...o, value } : { ...o },
+    i === index ? { ...normalizeOptionRow(o), value } : normalizeOptionRow(o),
   )
   patch({ optionRows: rows })
 }
 
 function setOptionDefault(index, checked) {
   const rows = (props.model.optionRows || []).map((o, i) => ({
-    ...o,
+    ...normalizeOptionRow(o),
     isDefault: checked ? i === index : false,
   }))
   const def = checked ? String(rows[index]?.value || '').trim() : ''
   patch({ optionRows: rows, defaultValue: def })
+}
+
+function setOptionAllowFill(index, checked) {
+  const rows = (props.model.optionRows || []).map((o, i) => ({
+    ...normalizeOptionRow(o),
+    allowFill: i === index ? Boolean(checked) : Boolean(o.allowFill),
+    fillPlaceholder: i === index && !checked ? '' : String(o.fillPlaceholder || ''),
+  }))
+  patch({ optionRows: rows })
+}
+
+function updateOptionFillPlaceholder(index, value) {
+  const rows = (props.model.optionRows || []).map((o, i) =>
+    i === index ? { ...normalizeOptionRow(o), fillPlaceholder: value } : normalizeOptionRow(o),
+  )
+  patch({ optionRows: rows })
 }
 
 function addChild() {
@@ -948,9 +1012,16 @@ function onChildTypeChange(index, type) {
       optionRows:
         type === 'radio' || type === 'checkbox'
           ? c.optionRows?.length
-            ? c.optionRows
-            : (c.options || []).map((v) => ({ value: String(v), isDefault: false }))
+            ? c.optionRows.map(normalizeOptionRow)
+            : (c.options || []).map((v) => normalizeOptionRow({ value: String(v) }))
           : [],
+      placeholder: c.placeholder || '',
+      defaultValue:
+        type === 'text' || type === 'textarea' || type === 'number'
+          ? (c.defaultValue ?? '')
+          : type === 'radio' || type === 'checkbox'
+            ? (c.defaultValue ?? '')
+            : '',
       passOptions: type === 'radio' || type === 'checkbox' ? c.passOptions || [] : [],
       allowDecimal: type === 'number',
       format: type === 'date' ? 'yyyy-MM-dd' : type === 'datetime' ? 'yyyy-MM-dd HH:mm:ss' : '',
@@ -970,7 +1041,10 @@ function addChildOption(childIndex) {
     if (i !== childIndex) return { ...c }
     return {
       ...c,
-      optionRows: [...(c.optionRows || []), { value: '', isDefault: false }],
+      optionRows: [
+        ...(c.optionRows || []).map(normalizeOptionRow),
+        normalizeOptionRow({ value: '', isDefault: false }),
+      ],
     }
   })
   patch({ children })
@@ -981,7 +1055,7 @@ function removeChildOption(childIndex, optIndex) {
     if (i !== childIndex) return { ...c }
     const optionRows = [...(c.optionRows || [])]
     optionRows.splice(optIndex, 1)
-    return { ...c, optionRows }
+    return { ...c, optionRows: optionRows.map(normalizeOptionRow) }
   })
   patch({ children })
 }
@@ -990,7 +1064,7 @@ function updateChildOptionValue(childIndex, optIndex, value) {
   const children = (props.model.children || []).map((c, i) => {
     if (i !== childIndex) return { ...c }
     const optionRows = (c.optionRows || []).map((o, oi) =>
-      oi === optIndex ? { ...o, value } : { ...o },
+      oi === optIndex ? { ...normalizeOptionRow(o), value } : normalizeOptionRow(o),
     )
     return { ...c, optionRows }
   })
@@ -1001,11 +1075,37 @@ function setChildOptionDefault(childIndex, optIndex, checked) {
   const children = (props.model.children || []).map((c, i) => {
     if (i !== childIndex) return { ...c }
     const optionRows = (c.optionRows || []).map((o, oi) => ({
-      ...o,
+      ...normalizeOptionRow(o),
       isDefault: checked ? oi === optIndex : false,
     }))
     const def = checked ? String(optionRows[optIndex]?.value || '').trim() : ''
     return { ...c, optionRows, defaultValue: def }
+  })
+  patch({ children })
+}
+
+function setChildOptionAllowFill(childIndex, optIndex, checked) {
+  const children = (props.model.children || []).map((c, i) => {
+    if (i !== childIndex) return { ...c }
+    const optionRows = (c.optionRows || []).map((o, oi) => ({
+      ...normalizeOptionRow(o),
+      allowFill: oi === optIndex ? Boolean(checked) : Boolean(o.allowFill),
+      fillPlaceholder: oi === optIndex && !checked ? '' : String(o.fillPlaceholder || ''),
+    }))
+    return { ...c, optionRows }
+  })
+  patch({ children })
+}
+
+function updateChildOptionFillPlaceholder(childIndex, optIndex, value) {
+  const children = (props.model.children || []).map((c, i) => {
+    if (i !== childIndex) return { ...c }
+    const optionRows = (c.optionRows || []).map((o, oi) =>
+      oi === optIndex
+        ? { ...normalizeOptionRow(o), fillPlaceholder: value }
+        : normalizeOptionRow(o),
+    )
+    return { ...c, optionRows }
   })
   patch({ children })
 }
@@ -1025,10 +1125,23 @@ function setChildOptionDefault(childIndex, optIndex, checked) {
   }
 
   .section-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 12px;
     font-size: 14px;
     font-weight: 600;
     color: rgba(0, 0, 0, 0.88);
+    line-height: 22px;
+
+    &::before {
+      content: '';
+      width: 3px;
+      height: 14px;
+      border-radius: 2px;
+      background: #1677ff;
+      flex-shrink: 0;
+    }
   }
 
   /* 标签与控件水平排列；行距统一 12px；控件对齐采购单 small=24 */
@@ -1097,6 +1210,22 @@ function setChildOptionDefault(childIndex, optIndex, checked) {
 .option-row.conclusion-opt > :deep(.ant-input) {
   flex: 1;
   min-width: 0;
+}
+
+.option-row.conclusion-opt > .fill-placeholder-input {
+  flex: 0 1 180px;
+  width: 180px;
+  min-width: 120px;
+}
+
+.child-extra-row {
+  margin-top: 4px;
+}
+
+.child-options-block {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed #e8e8e8;
 }
 
 .manual-options-panel {

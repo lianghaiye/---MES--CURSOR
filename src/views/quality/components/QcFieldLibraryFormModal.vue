@@ -141,23 +141,33 @@ function emptyForm() {
   }
 }
 
-function toOptionRows(options = [], defaultValue = '') {
+function toOptionRows(options = [], defaultValue = '', optionRows = null) {
+  if (Array.isArray(optionRows) && optionRows.length) {
+    return optionRows.map((o) => ({
+      value: String(o?.value ?? o ?? ''),
+      isDefault: Boolean(o?.isDefault),
+      allowFill: Boolean(o?.allowFill),
+      fillPlaceholder: String(o?.fillPlaceholder ?? ''),
+    }))
+  }
   const list = Array.isArray(options) ? options : []
   if (!list.length) return []
   return list.map((v) => ({
     value: String(v || ''),
     isDefault: Boolean(defaultValue && String(v) === String(defaultValue)),
+    allowFill: false,
+    fillPlaceholder: '',
   }))
 }
 
 function loadChildrenForEdit(children = []) {
   return (children || []).map((c) => {
-    const optionRows = Array.isArray(c.optionRows)
-      ? c.optionRows
-      : toOptionRows(c.options || [], c.defaultValue)
+    const optionRows = toOptionRows(c.options || [], c.defaultValue, c.optionRows)
     return {
       ...c,
       optionRows,
+      placeholder: c.placeholder || '',
+      defaultValue: c.defaultValue ?? '',
       unitPosition: c.unitPosition === 'prefix' ? 'prefix' : 'suffix',
     }
   })
@@ -176,7 +186,7 @@ function loadRecord(record) {
     allowDecimal: record.allowDecimal !== false,
     placeholder: record.placeholder || '',
     description: record.description || '',
-    optionRows: toOptionRows(record.options || [], record.defaultValue),
+    optionRows: toOptionRows(record.options || [], record.defaultValue, record.optionRows),
     defaultValue: record.defaultValue || '',
     format: record.format || '',
     charLimit: record.charLimit ?? null,
@@ -264,9 +274,17 @@ function handleSave() {
     return
   }
   const isChoice = form.type === 'radio' || form.type === 'checkbox'
-  const options = isChoice
-    ? (form.optionRows || []).map((o) => String(o.value || '').trim()).filter(Boolean)
+  const optionRows = isChoice
+    ? (form.optionRows || [])
+        .map((o) => ({
+          value: String(o.value || '').trim(),
+          isDefault: Boolean(o.isDefault),
+          allowFill: Boolean(o.allowFill),
+          fillPlaceholder: String(o.fillPlaceholder || '').trim(),
+        }))
+        .filter((o) => o.value)
     : []
+  const options = optionRows.map((o) => o.value)
   if (isChoice && !options.length) {
     message.warning('请至少添加一个选项')
     return
@@ -274,7 +292,7 @@ function handleSave() {
   if (!validateParentStandard()) return
 
   const defaultValue = isChoice
-    ? String(form.optionRows?.find((o) => o.isDefault)?.value || form.defaultValue || '').trim()
+    ? String(optionRows.find((o) => o.isDefault)?.value || form.defaultValue || '').trim()
     : form.defaultValue || ''
 
   const children =
@@ -297,6 +315,7 @@ function handleSave() {
     placeholder: form.placeholder || '',
     description: form.description || '',
     options,
+    optionRows,
     defaultValue,
     format: form.format || '',
     charLimit: form.charLimit,

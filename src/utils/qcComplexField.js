@@ -44,12 +44,16 @@ export function createEmptyChildField(partial = {}) {
     ? partial.optionRows.map((o) => ({
         value: String(o?.value ?? o ?? ''),
         isDefault: Boolean(o?.isDefault),
+        allowFill: Boolean(o?.allowFill),
+        fillPlaceholder: String(o?.fillPlaceholder ?? ''),
       }))
     : []
   if (!optionRows.length && options.length) {
     optionRows = options.map((v) => ({
       value: String(v),
       isDefault: String(v) === String(partial.defaultValue || ''),
+      allowFill: false,
+      fillPlaceholder: '',
     }))
   }
   const row = {
@@ -101,16 +105,24 @@ export function ensureChildFieldCodes(children = []) {
     }
     used.add(code)
     const isChoice = child.type === 'radio' || child.type === 'checkbox'
-    const options = isChoice
-      ? (child.optionRows || []).map((o) => String(o.value || '').trim()).filter(Boolean)
-      : child.options || []
+    const optionRows = isChoice
+      ? (child.optionRows || []).map((o) => ({
+          value: String(o?.value ?? '').trim(),
+          isDefault: Boolean(o?.isDefault),
+          allowFill: Boolean(o?.allowFill),
+          fillPlaceholder: String(o?.fillPlaceholder ?? ''),
+        }))
+      : []
+    const options = isChoice ? optionRows.map((o) => o.value).filter(Boolean) : child.options || []
     const defaultValue = isChoice
-      ? String(child.optionRows?.find((o) => o.isDefault)?.value || child.defaultValue || '').trim()
+      ? String(optionRows.find((o) => o.isDefault)?.value || child.defaultValue || '').trim()
       : child.defaultValue
     return {
       ...child,
       code,
       options,
+      optionRows: isChoice ? optionRows : [],
+      placeholder: child.placeholder || '',
       defaultValue,
       withUnit: Boolean(String(child.unit || '').trim()),
       standardText:

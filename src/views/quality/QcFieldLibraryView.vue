@@ -92,10 +92,14 @@
             {{ record.name || '—' }}
           </template>
           <template v-else-if="column.key === 'type'">
-            {{ qcFieldTypeLabel(record.type) }}
+            <a-tag :color="fieldTypeTagColor(record.type)">
+              {{ qcFieldTypeLabel(record.type) }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'required'">
-            {{ record.required ? '是' : '否' }}
+            <a-tag :color="record.required ? 'blue' : 'default'">
+              {{ record.required ? '必填' : '非必填' }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'unit'">
             {{ displayUnit(record) }}
@@ -157,6 +161,7 @@ import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import {
+  fieldTypeTagColor,
   qcFieldLibraryStatusOptions,
   qcFieldLibraryTypeOptions,
   qcFieldTypeLabel,
@@ -203,7 +208,7 @@ const columns = [
   { title: '指标编码', dataIndex: 'code', width: 140, fixed: 'left' },
   { title: '名称', dataIndex: 'name', width: 140, ellipsis: true },
   { title: '字段类型', key: 'type', width: 110 },
-  { title: '必填', key: 'required', width: 56, align: 'center' },
+  { title: '必填', key: 'required', width: 80, align: 'center' },
   { title: '单位', key: 'unit', width: 96 },
   { title: '合格标准', key: 'standard', width: 160, ellipsis: true },
   { title: '创建人', dataIndex: 'creator', width: 90 },

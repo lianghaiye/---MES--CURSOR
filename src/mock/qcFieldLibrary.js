@@ -47,8 +47,43 @@ export function qcFieldTypeLabel(type) {
   return qcFieldLibraryTypeOptions.find((o) => o.value === type)?.label || type || '—'
 }
 
+/** 列表/详情中字段类型 Tag 色：对齐「本单工序-资源类型」边框标签风格 */
+export function fieldTypeTagColor(type) {
+  if (type === 'composite') return 'blue'
+  if (type === 'matrix') return 'processing'
+  if (type === 'radio' || type === 'checkbox') return 'geekblue'
+  if (type === 'number') return 'cyan'
+  return 'default'
+}
+
+function normalizeOptionRows(partial = {}) {
+  const options = Array.isArray(partial.options) ? [...partial.options] : []
+  const isChoice = partial.type === 'radio' || partial.type === 'checkbox'
+  if (!isChoice) return []
+  const rows = Array.isArray(partial.optionRows)
+    ? partial.optionRows.map((o) => ({
+        value: String(o?.value ?? o ?? '').trim(),
+        isDefault: Boolean(o?.isDefault),
+        allowFill: Boolean(o?.allowFill),
+        fillPlaceholder: String(o?.fillPlaceholder ?? ''),
+      }))
+    : []
+  if (rows.length) return rows.filter((o) => o.value)
+  const def = String(partial.defaultValue ?? '').trim()
+  return options
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .map((value) => ({
+      value,
+      isDefault: Boolean(def && value === def),
+      allowFill: false,
+      fillPlaceholder: '',
+    }))
+}
+
 export function createQcLibraryField(partial = {}) {
   const options = Array.isArray(partial.options) ? [...partial.options] : []
+  const optionRows = normalizeOptionRows({ ...partial, options })
   const standard = pickFieldStandardProps({ ...partial, options })
   const complex = pickComplexFieldProps(partial)
   const row = {
@@ -63,6 +98,7 @@ export function createQcLibraryField(partial = {}) {
     description: partial.description || '',
     placeholder: partial.placeholder || '',
     options,
+    optionRows,
     defaultValue: partial.defaultValue ?? '',
     format: partial.format || '',
     charLimit: partial.charLimit ?? null,
@@ -374,6 +410,7 @@ export function templateFieldToLibraryPayload(field = {}) {
     description: field.description || '',
     placeholder: field.placeholder || '',
     options: field.options ? [...field.options] : [],
+    optionRows: normalizeOptionRows(field),
     defaultValue: field.defaultValue ?? '',
     format: field.format || '',
     charLimit: field.charLimit ?? null,
@@ -417,6 +454,7 @@ export function libraryFieldToTemplateField(lib = {}) {
     description: lib.description || '',
     placeholder: lib.placeholder || '',
     options: lib.options ? [...lib.options] : [],
+    optionRows: normalizeOptionRows(lib),
     defaultValue: lib.defaultValue ?? '',
     format: lib.format || '',
     charLimit: lib.charLimit ?? null,

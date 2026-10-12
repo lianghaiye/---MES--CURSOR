@@ -98,6 +98,11 @@ export const sideMenus = {
       label: '领料管理',
       path: '/production/material-requisition',
     },
+    {
+      key: 'finished-inbound',
+      label: '成品入库',
+      path: '/production/finished-inbound',
+    },
   ],
   'report-management': [
     { key: 'report-work', label: '报工确认', path: '/report-management/report-work' },
@@ -370,6 +375,9 @@ export const routeTitles = {
   '/production/material-requisition': '领料管理',
   '/production/material-requisition/create': '申请领料',
   '/production/material-requisition/:id': '领料申请详情',
+  '/production/finished-inbound': '成品入库',
+  '/production/finished-inbound/create': '申请成品入库',
+  '/production/finished-inbound/:id': '成品入库申请详情',
   '/inventory/deduct-records': '库存扣减记录',
   '/inventory/deduct-records/:id/edit': '编辑扣减记录',
   '/inventory/deduct-records/:id': '扣减记录详情',

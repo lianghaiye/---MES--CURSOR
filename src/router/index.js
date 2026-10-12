@@ -498,6 +498,24 @@ const routes = [
         meta: { title: '领料申请详情', listPath: '/production/material-requisition' },
       },
       {
+        path: 'production/finished-inbound',
+        name: 'production-finished-inbound',
+        component: () => import('@/views/production/FinishedInboundManagementView.vue'),
+        meta: { title: '成品入库' },
+      },
+      {
+        path: 'production/finished-inbound/create',
+        name: 'production-finished-inbound-create',
+        component: () => import('@/views/production/FinishedInboundCreateView.vue'),
+        meta: { title: '申请成品入库', listPath: '/production/finished-inbound' },
+      },
+      {
+        path: 'production/finished-inbound/:id',
+        name: 'production-finished-inbound-detail',
+        component: () => import('@/views/production/FinishedInboundDetailView.vue'),
+        meta: { title: '成品入库申请详情', listPath: '/production/finished-inbound' },
+      },
+      {
         path: 'report-management/report-work',
         name: 'report-management-report-work',
         component: () => import('@/views/production/ReportWorkManagementView.vue'),

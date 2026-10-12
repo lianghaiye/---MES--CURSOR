@@ -74,11 +74,6 @@ const fields = computed(() => {
     },
     { key: 'workshop', label: '领用车间' },
     { key: 'receiveWarehouse', label: '领入仓库' },
-    {
-      key: 'qtySummary',
-      label: '合计数量',
-      format: () => `${r.lineCount || 0} 行 / ${r.totalQty || 0}`,
-    },
     ...(r.auditStatus === MATERIAL_REQ_AUDIT.REJECTED && r.rejectReason
       ? [{ key: 'rejectReason', label: '驳回原因', fullRow: true }]
       : []),

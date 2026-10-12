@@ -101,13 +101,14 @@
                 <span v-if="unitPrefix(field)" class="unit-affix">{{ unitPrefix(field) }}</span>
                 <a-select
                   v-if="isSelectLike(field)"
-                  :value="getMeasuredValue(field)"
+                  :value="getChoiceSelected(field)"
                   allow-clear
                   size="middle"
+                  :mode="field.type === 'checkbox' ? 'multiple' : undefined"
                   :placeholder="field.placeholder || `请选择${field.name}`"
                   :options="fieldOptions(field)"
                   style="flex: 1; min-width: 0"
-                  @update:value="(v) => setMeasuredValue(field, v)"
+                  @update:value="(v) => setChoiceSelected(field, v)"
                 />
                 <a-input-number
                   v-else-if="field.type === 'number'"
@@ -128,6 +129,17 @@
                   @update:value="(v) => setMeasuredValue(field, v)"
                 />
                 <span v-if="unitSuffix(field)" class="unit-affix">{{ unitSuffix(field) }}</span>
+              </div>
+              <div v-if="activeFillOption(field)" class="choice-fill-row">
+                <span class="fill-label">填空</span>
+                <a-input
+                  :value="getChoiceFillText(field)"
+                  allow-clear
+                  size="middle"
+                  style="flex: 1; min-width: 0"
+                  :placeholder="activeFillOption(field).fillPlaceholder || '请填写'"
+                  @update:value="(v) => setChoiceFillText(field, v)"
+                />
               </div>
               <div v-if="isManualJudgeField(field)" class="manual-judgment-row">
                 <span class="manual-label"><span class="req">*</span>本项结论</span>
@@ -216,8 +228,10 @@ import {
   isManualJudgeField,
   listManualJudgmentSelectOptions,
   normalizeUnitPosition,
+  parseChoiceFillValue,
   parseManualFieldValue,
   pickFieldStandardProps,
+  wrapChoiceFillValue,
   wrapManualFieldValue,
 } from '@/utils/qcFieldStandard'
 import {
@@ -386,6 +400,13 @@ function onFieldChange(field) {
 }
 
 function enrichInspectField(field = {}) {
+  const lib = getQcLibraryFieldByCode(field.code)
+  const optionRows =
+    Array.isArray(field.optionRows) && field.optionRows.length
+      ? field.optionRows
+      : Array.isArray(lib?.optionRows)
+        ? lib.optionRows
+        : []
   const hasStandard =
     Boolean(field.judgeRule && field.judgeRule !== 'none') ||
     Boolean(buildStandardText(field)) ||
@@ -395,18 +416,23 @@ function enrichInspectField(field = {}) {
     return {
       ...field,
       ...standard,
-      children: field.children,
+      optionRows,
+      children: field.children?.length
+        ? field.children
+        : lib?.children?.length
+          ? lib.children
+          : field.children,
       standardText: field.standardText || buildStandardText({ ...field, ...standard }),
     }
   }
-  const lib = getQcLibraryFieldByCode(field.code)
-  if (!lib) return { ...field, ...pickFieldStandardProps(field) }
+  if (!lib) return { ...field, optionRows, ...pickFieldStandardProps(field) }
   const standard = pickFieldStandardProps({ ...lib, ...field })
   return {
     ...field,
     ...standard,
-    children: field.children,
+    children: field.children?.length ? field.children : lib.children || [],
     options: field.options?.length ? field.options : lib.options ? [...lib.options] : [],
+    optionRows,
     standardText:
       field.standardText ||
       lib.standardText ||
@@ -424,9 +450,23 @@ function fieldOptions(field) {
   if (isQcConclusionField(field)) {
     return normalizeConclusionOptionItems(field).map((o) => ({ label: o.value, value: o.value }))
   }
+  const rows = Array.isArray(field.optionRows) ? field.optionRows : []
+  if (rows.length) {
+    return rows
+      .map((o) => String(o.value || '').trim())
+      .filter(Boolean)
+      .map((v) => ({ label: v, value: v }))
+  }
   return (field.options || []).map((v) =>
     typeof v === 'string' ? { label: v, value: v } : { label: v.label || v.value, value: v.value },
   )
+}
+
+function optionMeta(field, selected) {
+  const key = String(selected || '').trim()
+  if (!key) return null
+  const rows = Array.isArray(field.optionRows) ? field.optionRows : []
+  return rows.find((o) => String(o.value || '').trim() === key) || null
 }
 
 function getMeasuredValue(field) {
@@ -444,6 +484,76 @@ function setMeasuredValue(field, v) {
     fieldMap[field.code] = v
   }
   onFieldChange(field)
+}
+
+function getChoiceSelected(field) {
+  const raw = getMeasuredValue(field)
+  if (field.type === 'checkbox') {
+    const list = Array.isArray(raw) ? raw : raw ? [raw] : []
+    return list.map((v) => parseChoiceFillValue(v).selected).filter(Boolean)
+  }
+  return parseChoiceFillValue(raw).selected || undefined
+}
+
+function setChoiceSelected(field, selected) {
+  if (field.type === 'checkbox') {
+    const prevRaw = getMeasuredValue(field)
+    const prevList = Array.isArray(prevRaw) ? prevRaw : prevRaw ? [prevRaw] : []
+    const prevFillMap = {}
+    prevList.forEach((v) => {
+      const { selected: sel, fillText } = parseChoiceFillValue(v)
+      if (sel) prevFillMap[sel] = fillText
+    })
+    const next = (selected || []).map((sel) => {
+      const meta = optionMeta(field, sel)
+      return wrapChoiceFillValue(sel, meta?.allowFill ? prevFillMap[sel] || '' : '')
+    })
+    setMeasuredValue(field, next)
+    return
+  }
+  const prev = parseChoiceFillValue(getMeasuredValue(field))
+  const meta = optionMeta(field, selected)
+  setMeasuredValue(field, wrapChoiceFillValue(selected, meta?.allowFill ? prev.fillText : ''))
+}
+
+function getChoiceFillText(field) {
+  const raw = getMeasuredValue(field)
+  if (field.type === 'checkbox') {
+    const list = Array.isArray(raw) ? raw : []
+    const hit = list.find((v) => optionMeta(field, parseChoiceFillValue(v).selected)?.allowFill)
+    return hit ? parseChoiceFillValue(hit).fillText : ''
+  }
+  return parseChoiceFillValue(raw).fillText
+}
+
+function setChoiceFillText(field, fillText) {
+  const raw = getMeasuredValue(field)
+  if (field.type === 'checkbox') {
+    const list = Array.isArray(raw) ? raw : []
+    const next = list.map((v) => {
+      const { selected } = parseChoiceFillValue(v)
+      const meta = optionMeta(field, selected)
+      return wrapChoiceFillValue(selected, meta?.allowFill ? fillText : '')
+    })
+    setMeasuredValue(field, next)
+    return
+  }
+  const { selected } = parseChoiceFillValue(raw)
+  setMeasuredValue(field, wrapChoiceFillValue(selected, fillText))
+}
+
+function activeFillOption(field) {
+  if (!isSelectLike(field) || isQcConclusionField(field)) return null
+  if (field.type === 'checkbox') {
+    const sels = getChoiceSelected(field) || []
+    for (const sel of sels) {
+      const meta = optionMeta(field, sel)
+      if (meta?.allowFill) return meta
+    }
+    return null
+  }
+  const meta = optionMeta(field, getChoiceSelected(field))
+  return meta?.allowFill ? meta : null
 }
 
 function getManualJudgment(field) {
@@ -648,6 +758,20 @@ function judgeHint(field) {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
+}
+
+.choice-fill-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fill-label {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
 }
 
 .field-input-wrap {

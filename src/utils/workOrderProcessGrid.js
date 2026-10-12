@@ -4,6 +4,7 @@
  */
 import { listMobileTasksForWorkOrder } from '@/utils/workOrderStatus'
 import { getProcessByName } from '@/store/processConfigStore'
+import { getProcessRouteByName, updateProcessRouteStructure } from '@/store/processRouteStore'
 import {
   buildWorkOrderProcessesFromGrid,
   createEmptyGrid,
@@ -155,4 +156,52 @@ export function applyGridToWorkOrder(workOrder, grid, stepPolicies) {
   workOrder.processes = next
   workOrder.stepPolicies = policies
   return { ok: true }
+}
+
+/**
+ * 本单网格写回工单，并同步更新关联工艺路线主数据
+ * @returns {{ ok: boolean, message?: string, routeName?: string }}
+ */
+export function applyGridToWorkOrderAndMasterRoute(workOrder, grid, stepPolicies) {
+  const woResult = applyGridToWorkOrder(workOrder, grid, stepPolicies)
+  if (!woResult.ok) return woResult
+
+  const routeName = String(workOrder?.processRouteName || '').trim()
+  if (!routeName) {
+    return {
+      ok: false,
+      message: '本单未关联工艺路线，无法更新主数据；已写入本单工序',
+      appliedWorkOrder: true,
+    }
+  }
+
+  const route = getProcessRouteByName(routeName)
+  if (!route) {
+    return {
+      ok: false,
+      message: `未找到工艺路线「${routeName}」，无法更新主数据；已写入本单工序`,
+      appliedWorkOrder: true,
+    }
+  }
+  if (route.status === '已归档') {
+    return {
+      ok: false,
+      message: `工艺路线「${routeName}」已归档，无法更新主数据；已写入本单工序`,
+      appliedWorkOrder: true,
+    }
+  }
+
+  const routeResult = updateProcessRouteStructure(route.id, { grid, stepPolicies })
+  if (!routeResult.ok) {
+    return {
+      ok: false,
+      message: routeResult.message || '更新工艺路线主数据失败；已写入本单工序',
+      appliedWorkOrder: true,
+    }
+  }
+  return {
+    ok: true,
+    message: `已写入本单工序，并更新工艺路线「${routeName}」`,
+    routeName,
+  }
 }

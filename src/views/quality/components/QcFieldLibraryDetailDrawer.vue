@@ -27,7 +27,11 @@
             </a-col>
             <a-col :span="12">
               <span class="info-label">指标类型：</span>
-              <span class="info-value">{{ indicatorKindLabel }}</span>
+              <span class="info-value">
+                <a-tag :color="record.type === 'composite' ? 'blue' : 'default'">
+                  {{ indicatorKindLabel }}
+                </a-tag>
+              </span>
             </a-col>
           </a-row>
         </div>
@@ -43,11 +47,19 @@
             </a-col>
             <a-col :span="12">
               <span class="info-label">字段类型：</span>
-              <span class="info-value">{{ qcFieldTypeLabel(record.type) }}</span>
+              <span class="info-value">
+                <a-tag :color="fieldTypeTagColor(record.type)">
+                  {{ qcFieldTypeLabel(record.type) }}
+                </a-tag>
+              </span>
             </a-col>
             <a-col :span="12">
               <span class="info-label">是否必填：</span>
-              <span class="info-value">{{ record.required ? '是' : '否' }}</span>
+              <span class="info-value">
+                <a-tag :color="record.required ? 'blue' : 'default'">
+                  {{ record.required ? '必填' : '非必填' }}
+                </a-tag>
+              </span>
             </a-col>
             <a-col :span="12">
               <span class="info-label">单位：</span>
@@ -99,10 +111,14 @@
               <template #bodyCell="{ column, record: row, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                 <template v-else-if="column.key === 'type'">
-                  {{ qcFieldTypeLabel(row.type) }}
+                  <a-tag :color="fieldTypeTagColor(row.type)">
+                    {{ qcFieldTypeLabel(row.type) }}
+                  </a-tag>
                 </template>
                 <template v-else-if="column.key === 'required'">
-                  {{ row.required === false ? '否' : '是' }}
+                  <a-tag :color="row.required === false ? 'default' : 'blue'">
+                    {{ row.required === false ? '非必填' : '必填' }}
+                  </a-tag>
                 </template>
                 <template v-else-if="column.key === 'unit'">
                   {{ displayUnit(row) }}
@@ -163,7 +179,7 @@ export default { name: 'QcFieldLibraryDetailDrawer' }
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed } from 'vue'
 import { useDrawerWidth } from '@/composables/useDrawerWidth'
-import { qcFieldTypeLabel } from '@/mock/qcFieldLibrary'
+import { fieldTypeTagColor, qcFieldTypeLabel } from '@/mock/qcFieldLibrary'
 import {
   QC_FIELD_JUDGE_RULE,
   QC_FIELD_JUDGE_RULE_OPTIONS,

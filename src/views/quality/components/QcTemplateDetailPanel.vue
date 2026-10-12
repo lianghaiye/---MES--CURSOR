@@ -98,13 +98,17 @@
               <span :title="row.name">{{ row.name || '—' }}</span>
             </template>
             <template v-else-if="column.key === 'type'">
-              <template v-if="row.type === 'composite'">
-                复合项（{{ (row.childFields || []).length }} 子项）
-              </template>
-              <template v-else>{{ fieldTypeLabel(row.type) }}</template>
+              <a-tag :color="fieldTypeTagColor(row.type)">
+                <template v-if="row.type === 'composite'">
+                  复合项（{{ (row.childFields || []).length }} 子项）
+                </template>
+                <template v-else>{{ fieldTypeLabel(row.type) }}</template>
+              </a-tag>
             </template>
             <template v-else-if="column.key === 'required'">
-              {{ row.required ? '是' : '否' }}
+              <a-tag :color="row.required ? 'blue' : 'default'">
+                {{ row.required ? '必填' : '非必填' }}
+              </a-tag>
             </template>
             <template v-else-if="column.key === 'unit'">
               {{ displayUnit(row) }}
@@ -137,10 +141,14 @@
                 <template #bodyCell="{ column, record: child, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                   <template v-else-if="column.key === 'type'">
-                    {{ fieldTypeLabel(child.type) }}
+                    <a-tag :color="fieldTypeTagColor(child.type)">
+                      {{ fieldTypeLabel(child.type) }}
+                    </a-tag>
                   </template>
                   <template v-else-if="column.key === 'required'">
-                    {{ child.required === false ? '否' : '是' }}
+                    <a-tag :color="child.required === false ? 'default' : 'blue'">
+                      {{ child.required === false ? '非必填' : '必填' }}
+                    </a-tag>
                   </template>
                   <template v-else-if="column.key === 'unit'">
                     {{ displayUnit(child) }}
@@ -179,6 +187,7 @@ export default { name: 'QcTemplateDetailPanel' }
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed } from 'vue'
 import { QC_TEMPLATE_SCOPE_TYPE, qcTemplateScopeTypeLabel } from '@/mock/qcTemplates'
+import { fieldTypeTagColor } from '@/mock/qcFieldLibrary'
 import { buildStandardText } from '@/utils/qcFieldStandard'
 import {
   isQcConclusionField,
@@ -215,8 +224,8 @@ const fieldColumns = computed(() => {
     { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
     { title: '字段编码', key: 'code', dataIndex: 'code', width: 150, ellipsis: true },
     { title: '字段名称', key: 'name', dataIndex: 'name', width: 130, ellipsis: true },
-    { title: '字段类型', key: 'type', width: 130 },
-    { title: '必填', key: 'required', width: 56, align: 'center' },
+    { title: '字段类型', key: 'type', width: 140 },
+    { title: '必填', key: 'required', width: 80, align: 'center' },
     { title: '单位', key: 'unit', width: 72 },
     { title: '合格标准', key: 'standard', width: 160, ellipsis: true },
   ]
@@ -231,8 +240,8 @@ const childColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '编码', dataIndex: 'code', width: 120 },
   { title: '名称', dataIndex: 'name', width: 120, ellipsis: true },
-  { title: '类型', key: 'type', width: 90 },
-  { title: '必填', key: 'required', width: 56, align: 'center' },
+  { title: '类型', key: 'type', width: 100 },
+  { title: '必填', key: 'required', width: 80, align: 'center' },
   { title: '单位', key: 'unit', width: 72 },
   { title: '合格标准', key: 'standard', ellipsis: true },
 ]

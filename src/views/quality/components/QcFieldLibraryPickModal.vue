@@ -60,10 +60,14 @@
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">{{ rowIndex(index) }}</template>
             <template v-else-if="column.key === 'type'">
-              {{ qcFieldTypeLabel(record.type) }}
+              <a-tag :color="fieldTypeTagColor(record.type)">
+                {{ qcFieldTypeLabel(record.type) }}
+              </a-tag>
             </template>
             <template v-else-if="column.key === 'required'">
-              {{ record.required ? '是' : '否' }}
+              <a-tag :color="record.required ? 'blue' : 'default'">
+                {{ record.required ? '必填' : '非必填' }}
+              </a-tag>
             </template>
             <template v-else-if="column.key === 'unit'">
               {{ displayUnit(record) }}
@@ -138,7 +142,11 @@ export default { name: 'QcFieldLibraryPickModal' }
 import { computed, reactive, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import { CloseOutlined } from '@ant-design/icons-vue'
-import { qcFieldLibraryTypeOptions, qcFieldTypeLabel } from '@/mock/qcFieldLibrary'
+import {
+  fieldTypeTagColor,
+  qcFieldLibraryTypeOptions,
+  qcFieldTypeLabel,
+} from '@/mock/qcFieldLibrary'
 import { listQcLibraryFields } from '@/store/qcFieldLibraryStore'
 import { buildStandardText } from '@/utils/qcFieldStandard'
 
@@ -169,7 +177,7 @@ const columns = [
   { title: '编码', dataIndex: 'code', width: 130 },
   { title: '名称', dataIndex: 'name', width: 140, ellipsis: true },
   { title: '类型', key: 'type', width: 100 },
-  { title: '必填', key: 'required', width: 56, align: 'center' },
+  { title: '必填', key: 'required', width: 80, align: 'center' },
   { title: '单位', key: 'unit', width: 88 },
   { title: '合格标准', key: 'standard', width: 140, ellipsis: true },
   { title: '状态', key: 'inTemplate', width: 90, align: 'center' },

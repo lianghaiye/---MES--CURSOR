@@ -5,7 +5,11 @@ import dayjs from 'dayjs'
 import { getActiveScheduleBatch } from '@/utils/workOrderScheduleBatch'
 import { materialRequisitionState } from '@/store/materialRequisitionStore'
 import { listMobileMaterialReqs } from '@/store/mobileMaterialReqStore'
-import { inboundOrderState } from '@/store/inboundOrderStore'
+import { inboundOrderState, getInboundOrderById } from '@/store/inboundOrderStore'
+import {
+  listMobileFinishedInbounds,
+  relatedProductText as finishedInboundProductText,
+} from '@/store/mobileFinishedInboundStore'
 import { outboundState } from '@/store/outboundStore'
 import { getPurchaseOrdersByRequisition } from '@/store/purchaseOrderStore'
 import { listMobileTasksForWorkOrder } from '@/utils/workOrderStatus'
@@ -368,51 +372,194 @@ function relatedMobileSummary(r, workOrder) {
   return workOrder.productName || '—'
 }
 
-/** 入库信息 */
+function finishedInboundMatchesWorkOrder(req, workOrder) {
+  if (!req || !workOrder) return false
+  const id = workOrder.id
+  const code = String(workOrder.code || '').trim()
+  if (id && (req.workOrderId === id || (req.workOrderIds || []).includes(id))) return true
+  if (code && req.workOrderCode === code) return true
+  if (
+    (req.workOrders || []).some(
+      (w) => (id && w.id === id) || (code && String(w.code || '') === code),
+    )
+  ) {
+    return true
+  }
+  return (req.lines || []).some(
+    (l) =>
+      (id && l.sourceWorkOrderId === id) || (code && String(l.sourceWorkOrderCode || '') === code),
+  )
+}
+
+function inboundOrderMatchesWorkOrder(order, workOrder) {
+  if (!order || !workOrder) return false
+  const id = workOrder.id
+  const code = String(workOrder.code || '').trim()
+  if (order.finishedInboundReqId || order.finishedInboundReqNo) {
+    const apps = listMobileFinishedInbounds()
+    if (
+      apps.some(
+        (r) =>
+          finishedInboundMatchesWorkOrder(r, workOrder) &&
+          (r.id === order.finishedInboundReqId || r.reqNo === order.finishedInboundReqNo),
+      )
+    ) {
+      return true
+    }
+  }
+  if (
+    (order.workOrders || []).some(
+      (w) => (id && w.id === id) || (code && String(w.code || '') === code),
+    )
+  ) {
+    return true
+  }
+  const src = String(order.sourceOrderNo || '')
+  if (code && src.includes(code)) return true
+  return (order.lineItems || []).some((l) => code && String(l.sourceDocNo || '').includes(code))
+}
+
+function isConfirmedInboundOrder(order) {
+  const status = order?.status || ''
+  return status === '已完成' || status === '已入库' || status === '已确认'
+}
+
+/** 工单详情 · 入库申请（成品入库申请） */
+export function buildWorkOrderFinishedInboundAppRows(workOrder) {
+  if (!workOrder) return []
+  return listMobileFinishedInbounds()
+    .filter((r) => finishedInboundMatchesWorkOrder(r, workOrder))
+    .map((r, idx) => ({
+      id: r.id,
+      index: idx + 1,
+      status: r.auditStatus || '—',
+      reqId: r.id,
+      reqNo: r.reqNo || '—',
+      modeLabel: r.modeLabel || '—',
+      summary: finishedInboundProductText(r) || workOrder.productName || '—',
+      applyQty: r.totalQty ?? sumLineQty(r.lines) ?? 0,
+      workshop: r.workshop || '—',
+      warehouse: r.warehouse || '—',
+      inboundDocNo: r.inboundDocNo || '—',
+      inboundOrders: Array.isArray(r.inboundOrders) ? r.inboundOrders : [],
+      inboundId: r.inboundId || '',
+      inboundStatus: r.inboundStatus || '—',
+      applicant: r.applicant || '—',
+      createdAt: r.createdAt || '—',
+    }))
+}
+
+/** 工单详情 · 入库信息（一产品一行） */
 export function buildWorkOrderInboundRows(workOrder) {
   if (!workOrder) return []
-  const woCode = String(workOrder.code || '')
-  const product = String(workOrder.productName || '')
-  const list = (inboundOrderState.orders || []).filter((o) => {
-    const src = String(o.sourceOrderNo || o.salesOrderNo || '')
-    const name = String(o.productName || o.lineItems?.[0]?.itemName || '')
-    return (woCode && src.includes(woCode)) || (product && name.includes(product))
+  const relatedApps = listMobileFinishedInbounds().filter((r) =>
+    finishedInboundMatchesWorkOrder(r, workOrder),
+  )
+  const orderMap = new Map()
+  relatedApps.forEach((app) => {
+    ;(app.inboundOrders || []).forEach((ref) => {
+      const live = ref.id ? getInboundOrderById(ref.id) : null
+      const order = live || (inboundOrderState.orders || []).find((o) => o.docNo === ref.docNo)
+      if (order?.id) orderMap.set(order.id, order)
+    })
+    if (app.inboundId) {
+      const live = getInboundOrderById(app.inboundId)
+      if (live?.id) orderMap.set(live.id, live)
+    }
   })
-  if (list.length) {
-    return list.map((o, idx) => ({
-      id: o.id || `ib-${idx}`,
-      index: idx + 1,
-      status: o.status || '待处理',
-      docNo: o.docNo || '—',
-      docId: o.id,
-      summary: o.lineItems?.[0]?.itemName || o.productName || workOrder.productName || '—',
-      qty: sumLineQty(o.lineItems) || o.totalQty || 0,
-      warehouse: o.warehouse || workOrder.warehouse || '—',
-      creator: o.creator || o.handler || '—',
-      createdAt: o.createdAt || '—',
-      confirmer: o.confirmer || '—',
-      confirmedAt: o.confirmedAt || '—',
-    }))
+  ;(inboundOrderState.orders || []).forEach((o) => {
+    if (o?.id && inboundOrderMatchesWorkOrder(o, workOrder)) orderMap.set(o.id, o)
+  })
+
+  const rows = []
+  ;[...orderMap.values()].forEach((order) => {
+    const confirmed = isConfirmedInboundOrder(order)
+    const lines = order.lineItems || []
+    if (!lines.length) {
+      rows.push({
+        id: `${order.id}-empty`,
+        status: order.status || '—',
+        docNo: order.docNo || '—',
+        docId: order.id,
+        itemName: order.productName || workOrder.productName || '—',
+        itemCode: '',
+        specModel: '',
+        material: '',
+        applyQty: order.totalQty || 0,
+        actualQty: confirmed ? order.totalQty || 0 : 0,
+        warehouse: order.warehouse || '—',
+        inboundAt: order.confirmedAt || order.inboundDate || '—',
+        confirmer: order.confirmer || '—',
+        confirmedAt: order.confirmedAt || '—',
+      })
+      return
+    }
+    lines.forEach((line, idx) => {
+      const applyQty = Number(line.applyQty ?? line.qty) || 0
+      const actualQty = confirmed
+        ? Number(line.actualQty ?? line.receivedQty ?? line.qty) || 0
+        : Number(line.actualQty ?? line.receivedQty) || 0
+      rows.push({
+        id: `${order.id}-${line.id || idx}`,
+        status: order.status || line.lineStatus || '—',
+        docNo: order.docNo || '—',
+        docId: order.id,
+        itemName: line.itemName || line.productName || workOrder.productName || '—',
+        itemCode: line.itemCode || line.productCode || '',
+        specModel: line.specModel || '',
+        material: line.material || '',
+        applyQty,
+        actualQty,
+        warehouse: line.warehouse || order.warehouse || '—',
+        inboundAt: order.confirmedAt || order.inboundDate || '—',
+        confirmer: order.confirmer || '—',
+        confirmedAt: order.confirmedAt || '—',
+      })
+    })
+  })
+  return rows.map((r, idx) => ({ ...r, index: idx + 1 }))
+}
+
+/** 成品入库申请详情 · 入库信息行 */
+export function flattenFinishedInboundDetailLines(record) {
+  if (!record) return []
+  const refs = Array.isArray(record.inboundOrders) ? record.inboundOrders : []
+  const orders = []
+  refs.forEach((ref) => {
+    const live = ref.id ? getInboundOrderById(ref.id) : null
+    if (live) orders.push(live)
+  })
+  if (!orders.length && record.inboundId) {
+    const live = getInboundOrderById(record.inboundId)
+    if (live) orders.push(live)
   }
-  if ((workOrder.scheduleBatches || []).some((b) => b.status === '完成' || b.status === '执行中')) {
-    return [
-      {
-        id: `ib-demo-${workOrder.id}`,
-        index: 1,
-        status: '待入库',
-        docNo: `1-${dayjs().format('YYYYMMDD')}-001`,
-        docId: '',
-        summary: workOrder.productName || '—',
-        qty: workOrder.scheduleQty || 0,
-        warehouse: workOrder.warehouse || '成品仓',
-        creator: workOrder.owner || 'admin',
-        createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
-        confirmer: '—',
-        confirmedAt: '—',
-      },
-    ]
-  }
-  return []
+  const rows = []
+  orders.forEach((order) => {
+    const confirmed = isConfirmedInboundOrder(order)
+    ;(order.lineItems || []).forEach((line, idx) => {
+      const applyQty = Number(line.applyQty ?? line.qty) || 0
+      const actualQty = confirmed
+        ? Number(line.actualQty ?? line.receivedQty ?? line.qty) || 0
+        : Number(line.actualQty ?? line.receivedQty) || 0
+      rows.push({
+        id: `${order.id}-${line.id || idx}`,
+        status: order.status || line.lineStatus || '—',
+        docNo: order.docNo || '—',
+        docId: order.id,
+        itemName: line.itemName || '',
+        itemCode: line.itemCode || '',
+        specModel: line.specModel || '',
+        material: line.material || '',
+        applyQty,
+        actualQty,
+        warehouse: line.warehouse || order.warehouse || '—',
+        inboundAt: order.confirmedAt || order.inboundDate || '—',
+        confirmer: order.confirmer || '—',
+        confirmedAt: order.confirmedAt || '—',
+      })
+    })
+  })
+  return rows
 }
 
 /** 质检信息 */

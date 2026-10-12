@@ -88,6 +88,7 @@ const EVICTABLE_KEYS = [
   'i_doms_process_report_quick_log',
   'i_doms_mobile_disassembly_tasks',
   'i_doms_mobile_material_req',
+  'i_doms_mobile_finished_inbounds',
   'i_doms_sales_stock_allocations',
   'i_doms_stock_batches',
   'i_doms_stock_pieces',

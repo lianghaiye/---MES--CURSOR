@@ -11,13 +11,7 @@
           }}
         </span>
       </div>
-      <a-button
-        v-if="canEditStructure"
-        type="primary"
-        ghost
-        size="small"
-        @click="gridModalOpen = true"
-      >
+      <a-button v-if="canEditStructure" type="primary" ghost size="small" @click="openGridModal()">
         调整工艺路线
       </a-button>
     </div>
@@ -54,7 +48,7 @@
     >
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'index'">
-          {{ index + 1 }}
+          {{ record.stepNo || index + 1 }}
         </template>
         <template v-else-if="column.key === 'process'">
           <div class="process-cell">
@@ -63,9 +57,6 @@
             </span>
             <span>{{ record.name }}</span>
           </div>
-        </template>
-        <template v-else-if="column.key === 'stepNo'">
-          {{ record.stepNo || '—' }}
         </template>
         <template v-else-if="column.key === 'completionMode'">
           {{ formatCompletionModeLabel(record.completionMode) }}
@@ -191,6 +182,10 @@ const emit = defineEmits(['save', 'dispatch-and-start', 'cancel'])
 
 const gridModalOpen = ref(false)
 
+function openGridModal() {
+  gridModalOpen.value = true
+}
+
 watch(
   () => props.workOrder,
   (wo) => {
@@ -204,9 +199,8 @@ const canEditStructure = computed(() => canEditWorkOrderProcessStructure(props.w
 const anyStepGroups = computed(() => listAnyCompletionSteps(props.workOrder?.processes || []))
 
 const columns = [
-  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '序号', key: 'index', width: 64, align: 'center' },
   { title: '工序名称', key: 'process', width: 120 },
-  { title: '步骤', key: 'stepNo', width: 64, align: 'center' },
   { title: '完成方式', key: 'completionMode', width: 88 },
   { title: '工序配置', key: 'processConfig', width: 360 },
   { title: '资源类型', key: 'resourceType', width: 90 },

@@ -313,6 +313,52 @@ function appendCountByQtyHint(text, field) {
   return `${text}；${tip}`
 }
 
+/** 选项+填空：存储格式 `选项值|@@FILL@@填空内容` */
+export const QC_CHOICE_FILL_SEP = '|@@FILL@@'
+
+export function parseChoiceFillValue(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'selected' in raw) {
+    return {
+      selected: String(raw.selected ?? '').trim(),
+      fillText: String(raw.fillText ?? '').trim(),
+    }
+  }
+  const s = String(raw ?? '')
+  const i = s.indexOf(QC_CHOICE_FILL_SEP)
+  if (i < 0) return { selected: s.trim(), fillText: '' }
+  return {
+    selected: s.slice(0, i).trim(),
+    fillText: s.slice(i + QC_CHOICE_FILL_SEP.length),
+  }
+}
+
+export function wrapChoiceFillValue(selected, fillText = '') {
+  const sel = String(selected ?? '').trim()
+  const fill = String(fillText ?? '')
+  if (!sel) return ''
+  if (!fill) return sel
+  return `${sel}${QC_CHOICE_FILL_SEP}${fill}`
+}
+
+export function formatChoiceFillDisplay(raw) {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((v) => formatChoiceFillDisplay(v))
+      .filter(Boolean)
+      .join('、')
+  }
+  const { selected, fillText } = parseChoiceFillValue(raw)
+  if (!selected) return ''
+  return fillText ? `${selected}（${fillText}）` : selected
+}
+
+function unwrapChoiceForJudge(measured) {
+  if (Array.isArray(measured)) {
+    return measured.map((v) => parseChoiceFillValue(v).selected).filter(Boolean)
+  }
+  return parseChoiceFillValue(measured).selected
+}
+
 /**
  * 根据录入值与标准粗判单项是否合格。
  * @returns {'pass'|'fail'|''} 空表示无法自动判定
@@ -346,11 +392,12 @@ export function evaluateFieldAgainstStandard(field = {}, rawValue) {
   if (rule === QC_FIELD_JUDGE_RULE.OPTION_PASS) {
     const passSet = new Set((field.passOptions || []).map((o) => String(o).trim()).filter(Boolean))
     if (!passSet.size) return ''
-    if (Array.isArray(measured)) {
-      if (!measured.length) return ''
-      return measured.every((v) => passSet.has(String(v).trim())) ? 'pass' : 'fail'
+    const unwrapped = unwrapChoiceForJudge(measured)
+    if (Array.isArray(unwrapped)) {
+      if (!unwrapped.length) return ''
+      return unwrapped.every((v) => passSet.has(String(v).trim())) ? 'pass' : 'fail'
     }
-    const v = String(measured ?? '').trim()
+    const v = String(unwrapped ?? '').trim()
     if (!v) return ''
     return passSet.has(v) ? 'pass' : 'fail'
   }
@@ -358,7 +405,7 @@ export function evaluateFieldAgainstStandard(field = {}, rawValue) {
   if (rule === QC_FIELD_JUDGE_RULE.EQUALS) {
     const expect = String(field.standardValue ?? '').trim()
     if (!expect) return ''
-    const v = String(measured ?? '').trim()
+    const v = String(unwrapChoiceForJudge(measured) ?? '').trim()
     if (!v) return ''
     return v === expect ? 'pass' : 'fail'
   }
@@ -379,12 +426,15 @@ export function formatFieldValueWithUnit(field = {}, rawValue) {
 
   let text = '—'
   if (!isMeasuredEmpty(measured)) {
-    text = Array.isArray(measured)
-      ? measured
-          .map((v) => String(v).trim())
-          .filter(Boolean)
-          .join('、')
-      : String(measured).trim()
+    const isChoice = field.type === 'radio' || field.type === 'checkbox' || field.type === 'select'
+    text = isChoice
+      ? formatChoiceFillDisplay(measured)
+      : Array.isArray(measured)
+        ? measured
+            .map((v) => String(v).trim())
+            .filter(Boolean)
+            .join('、')
+        : String(measured).trim()
     const unit = field.withUnit || field.unit ? String(field.unit || '').trim() : ''
     if (unit && text) {
       text =

@@ -287,13 +287,14 @@
                             }}</span>
                             <a-select
                               v-if="isSelectLike(field)"
-                              :value="getMeasuredValue(record, field)"
+                              :value="getChoiceSelected(record, field)"
                               size="middle"
                               allow-clear
+                              :mode="field.type === 'checkbox' ? 'multiple' : undefined"
                               :placeholder="field.placeholder || `请选择${field.name}`"
                               :options="fieldOptions(field)"
                               style="flex: 1; min-width: 0"
-                              @update:value="(v) => setMeasuredValue(record, field, v)"
+                              @update:value="(v) => setChoiceSelected(record, field, v)"
                             />
                             <a-input-number
                               v-else-if="field.type === 'number'"
@@ -318,6 +319,19 @@
                             <span v-if="unitSuffix(field)" class="unit-affix">{{
                               unitSuffix(field)
                             }}</span>
+                          </div>
+                          <div v-if="activeFillOption(record, field)" class="choice-fill-row">
+                            <span class="fill-label">填空</span>
+                            <a-input
+                              :value="getChoiceFillText(record, field)"
+                              size="middle"
+                              allow-clear
+                              style="flex: 1; min-width: 0"
+                              :placeholder="
+                                activeFillOption(record, field).fillPlaceholder || '请填写'
+                              "
+                              @update:value="(v) => setChoiceFillText(record, field, v)"
+                            />
                           </div>
                           <div v-if="isManualJudgeField(field)" class="manual-judgment-row">
                             <span class="manual-label"><span class="req">*</span>本项结论</span>
@@ -535,8 +549,10 @@ import {
   isManualJudgmentMissing,
   listManualJudgmentSelectOptions,
   normalizeUnitPosition,
+  parseChoiceFillValue,
   parseManualFieldValue,
   pickFieldStandardProps,
+  wrapChoiceFillValue,
   wrapManualFieldValue,
 } from '@/utils/qcFieldStandard'
 import {
@@ -865,6 +881,13 @@ function extraFields(line) {
 
 /** 补齐单位/合格标准：优先用行内冻结模板，缺省时回落检验项库 */
 function enrichInspectField(field = {}) {
+  const lib = getQcLibraryFieldByCode(field.code)
+  const optionRows =
+    Array.isArray(field.optionRows) && field.optionRows.length
+      ? field.optionRows
+      : Array.isArray(lib?.optionRows)
+        ? lib.optionRows
+        : []
   const hasStandard =
     Boolean(field.judgeRule && field.judgeRule !== 'none') ||
     Boolean(buildStandardText(field)) ||
@@ -874,16 +897,23 @@ function enrichInspectField(field = {}) {
     return {
       ...field,
       ...standard,
+      optionRows,
+      children: field.children?.length
+        ? field.children
+        : lib?.children?.length
+          ? lib.children
+          : field.children,
       standardText: field.standardText || buildStandardText({ ...field, ...standard }),
     }
   }
-  const lib = getQcLibraryFieldByCode(field.code)
-  if (!lib) return { ...field, ...pickFieldStandardProps(field) }
+  if (!lib) return { ...field, optionRows, ...pickFieldStandardProps(field) }
   const standard = pickFieldStandardProps({ ...lib, ...field })
   return {
     ...field,
     ...standard,
     options: field.options?.length ? field.options : lib.options ? [...lib.options] : [],
+    optionRows,
+    children: field.children?.length ? field.children : lib.children || [],
     standardText:
       field.standardText ||
       lib.standardText ||
@@ -966,7 +996,7 @@ function conclusionHintFor(line) {
 
 function isSelectLike(field) {
   if (isQcConclusionField(field)) return true
-  if (field.type === 'radio' || field.type === 'select') return true
+  if (field.type === 'radio' || field.type === 'select' || field.type === 'checkbox') return true
   return Array.isArray(field.options) && field.options.length > 0
 }
 
@@ -974,9 +1004,23 @@ function fieldOptions(field) {
   if (isQcConclusionField(field)) {
     return normalizeConclusionOptionItems(field).map((o) => ({ label: o.value, value: o.value }))
   }
+  const rows = Array.isArray(field.optionRows) ? field.optionRows : []
+  if (rows.length) {
+    return rows
+      .map((o) => String(o.value || '').trim())
+      .filter(Boolean)
+      .map((v) => ({ label: v, value: v }))
+  }
   return (field.options || []).map((v) =>
     typeof v === 'string' ? { label: v, value: v } : { label: v.label || v.value, value: v.value },
   )
+}
+
+function optionMeta(field, selected) {
+  const key = String(selected || '').trim()
+  if (!key) return null
+  const rows = Array.isArray(field.optionRows) ? field.optionRows : []
+  return rows.find((o) => String(o.value || '').trim() === key) || null
 }
 
 function getMeasuredValue(line, field) {
@@ -996,6 +1040,76 @@ function setMeasuredValue(line, field, v) {
     line.fieldMap[field.code] = v
   }
   onFieldChange(line, field)
+}
+
+function getChoiceSelected(line, field) {
+  const raw = getMeasuredValue(line, field)
+  if (field.type === 'checkbox') {
+    const list = Array.isArray(raw) ? raw : raw ? [raw] : []
+    return list.map((v) => parseChoiceFillValue(v).selected).filter(Boolean)
+  }
+  return parseChoiceFillValue(raw).selected || undefined
+}
+
+function setChoiceSelected(line, field, selected) {
+  if (field.type === 'checkbox') {
+    const prevRaw = getMeasuredValue(line, field)
+    const prevList = Array.isArray(prevRaw) ? prevRaw : prevRaw ? [prevRaw] : []
+    const prevFillMap = {}
+    prevList.forEach((v) => {
+      const { selected: sel, fillText } = parseChoiceFillValue(v)
+      if (sel) prevFillMap[sel] = fillText
+    })
+    const next = (selected || []).map((sel) => {
+      const meta = optionMeta(field, sel)
+      return wrapChoiceFillValue(sel, meta?.allowFill ? prevFillMap[sel] || '' : '')
+    })
+    setMeasuredValue(line, field, next)
+    return
+  }
+  const prev = parseChoiceFillValue(getMeasuredValue(line, field))
+  const meta = optionMeta(field, selected)
+  setMeasuredValue(line, field, wrapChoiceFillValue(selected, meta?.allowFill ? prev.fillText : ''))
+}
+
+function getChoiceFillText(line, field) {
+  const raw = getMeasuredValue(line, field)
+  if (field.type === 'checkbox') {
+    const list = Array.isArray(raw) ? raw : []
+    const hit = list.find((v) => optionMeta(field, parseChoiceFillValue(v).selected)?.allowFill)
+    return hit ? parseChoiceFillValue(hit).fillText : ''
+  }
+  return parseChoiceFillValue(raw).fillText
+}
+
+function setChoiceFillText(line, field, fillText) {
+  const raw = getMeasuredValue(line, field)
+  if (field.type === 'checkbox') {
+    const list = Array.isArray(raw) ? raw : []
+    const next = list.map((v) => {
+      const { selected } = parseChoiceFillValue(v)
+      const meta = optionMeta(field, selected)
+      return wrapChoiceFillValue(selected, meta?.allowFill ? fillText : '')
+    })
+    setMeasuredValue(line, field, next)
+    return
+  }
+  const { selected } = parseChoiceFillValue(raw)
+  setMeasuredValue(line, field, wrapChoiceFillValue(selected, fillText))
+}
+
+function activeFillOption(line, field) {
+  if (!isSelectLike(field) || isQcConclusionField(field)) return null
+  if (field.type === 'checkbox') {
+    const sels = getChoiceSelected(line, field) || []
+    for (const sel of sels) {
+      const meta = optionMeta(field, sel)
+      if (meta?.allowFill) return meta
+    }
+    return null
+  }
+  const meta = optionMeta(field, getChoiceSelected(line, field))
+  return meta?.allowFill ? meta : null
 }
 
 function getCountByQtyPass(line, field) {
@@ -1968,6 +2082,20 @@ async function doSubmit() {
   gap: 8px;
   width: 100%;
   max-width: 100%;
+}
+
+.choice-fill-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fill-label {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
 }
 
 .manual-judgment-row {

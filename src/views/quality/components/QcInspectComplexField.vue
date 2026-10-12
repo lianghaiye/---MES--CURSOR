@@ -56,24 +56,24 @@
                 />
                 <a-select
                   v-else-if="record.child.type === 'radio'"
-                  :value="childMeasured(record)"
+                  :value="choiceSelected(record)"
                   size="middle"
                   allow-clear
                   style="flex: 1; min-width: 0"
-                  :placeholder="`请选择${record.name}`"
+                  :placeholder="record.child.placeholder || `请选择${record.name}`"
                   :options="radioOpts(record.child)"
-                  @update:value="(v) => onChildMeasured(record.code, record.child, v)"
+                  @update:value="(v) => onChildChoiceChange(record.code, record.child, v)"
                 />
                 <a-select
                   v-else-if="record.child.type === 'checkbox'"
-                  :value="asArray(childMeasured(record))"
+                  :value="choiceSelectedList(record)"
                   mode="multiple"
                   size="middle"
                   allow-clear
                   style="flex: 1; min-width: 0"
-                  :placeholder="`请选择${record.name}`"
+                  :placeholder="record.child.placeholder || `请选择${record.name}`"
                   :options="radioOpts(record.child)"
-                  @update:value="(v) => onChildMeasured(record.code, record.child, v)"
+                  @update:value="(v) => onChildChoiceListChange(record.code, record.child, v)"
                 />
                 <a-input
                   v-else-if="record.child.type === 'date' || record.child.type === 'datetime'"
@@ -81,7 +81,8 @@
                   size="middle"
                   style="flex: 1; min-width: 0"
                   :placeholder="
-                    record.child.type === 'datetime' ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd'
+                    record.child.placeholder ||
+                    (record.child.type === 'datetime' ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd')
                   "
                   @update:value="(v) => onChildMeasured(record.code, record.child, v)"
                 />
@@ -91,7 +92,7 @@
                   :rows="2"
                   allow-clear
                   style="flex: 1; min-width: 0"
-                  :placeholder="`请输入${record.name}`"
+                  :placeholder="record.child.placeholder || `请输入${record.name}`"
                   @update:value="(v) => onChildMeasured(record.code, record.child, v)"
                 />
                 <a-input
@@ -100,7 +101,7 @@
                   size="middle"
                   allow-clear
                   style="flex: 1; min-width: 0"
-                  :placeholder="`请输入${record.name}`"
+                  :placeholder="record.child.placeholder || `请输入${record.name}`"
                   @update:value="(v) => onChildMeasured(record.code, record.child, v)"
                 />
                 <span
@@ -108,6 +109,17 @@
                   class="unit-affix"
                   >{{ record.unit }}</span
                 >
+              </div>
+              <div v-if="activeFillOption(record)" class="choice-fill-row">
+                <span class="fill-label">填空</span>
+                <a-input
+                  :value="choiceFillText(record)"
+                  size="middle"
+                  allow-clear
+                  style="flex: 1; min-width: 0"
+                  :placeholder="activeFillOption(record).fillPlaceholder || '请填写'"
+                  @update:value="(v) => onChildFillText(record.code, record.child, v)"
+                />
               </div>
               <div v-if="isManualJudgeField(record.child)" class="manual-judgment-row">
                 <span class="manual-label"><span class="req">*</span>本项结论</span>
@@ -194,7 +206,9 @@ import {
   evaluateFieldAgainstStandard,
   isManualJudgeField,
   listManualJudgmentSelectOptions,
+  parseChoiceFillValue,
   parseManualFieldValue,
+  wrapChoiceFillValue,
   wrapManualFieldValue,
 } from '@/utils/qcFieldStandard'
 import {
@@ -305,13 +319,107 @@ watch(
 )
 
 function radioOpts(child) {
+  const rows = Array.isArray(child.optionRows) ? child.optionRows : []
+  if (rows.length) {
+    return rows
+      .map((o) => String(o.value || '').trim())
+      .filter(Boolean)
+      .map((v) => ({ label: v, value: v }))
+  }
   return (child.options || []).map((v) => ({ label: String(v), value: String(v) }))
 }
 
-function asArray(val) {
-  if (Array.isArray(val)) return val
-  if (val === undefined || val === null || val === '') return []
-  return [val]
+function optionMeta(child, selected) {
+  const key = String(selected || '').trim()
+  if (!key) return null
+  const rows = Array.isArray(child.optionRows) ? child.optionRows : []
+  return rows.find((o) => String(o.value || '').trim() === key) || null
+}
+
+function choiceSelected(record) {
+  const raw = childMeasured(record)
+  if (record.child.type === 'checkbox') return undefined
+  return parseChoiceFillValue(raw).selected || undefined
+}
+
+function choiceSelectedList(record) {
+  const raw = childMeasured(record)
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : []
+  return list.map((v) => parseChoiceFillValue(v).selected).filter(Boolean)
+}
+
+function choiceFillText(record) {
+  const raw = childMeasured(record)
+  if (record.child.type === 'checkbox') {
+    const list = Array.isArray(raw) ? raw : []
+    const hit = list.find((v) => {
+      const { selected } = parseChoiceFillValue(v)
+      return optionMeta(record.child, selected)?.allowFill
+    })
+    return hit ? parseChoiceFillValue(hit).fillText : ''
+  }
+  return parseChoiceFillValue(raw).fillText
+}
+
+function activeFillOption(record) {
+  if (record.child.type === 'radio') {
+    const sel = choiceSelected(record)
+    const meta = optionMeta(record.child, sel)
+    return meta?.allowFill ? meta : null
+  }
+  if (record.child.type === 'checkbox') {
+    const sels = choiceSelectedList(record)
+    for (const sel of sels) {
+      const meta = optionMeta(record.child, sel)
+      if (meta?.allowFill) return meta
+    }
+  }
+  return null
+}
+
+function rawChildValue(code, child) {
+  return childMeasured({ child, value: localValue.value?.children?.[code] })
+}
+
+function onChildChoiceChange(code, child, selected) {
+  const prev = parseChoiceFillValue(rawChildValue(code, child))
+  const meta = optionMeta(child, selected)
+  const fillText = meta?.allowFill ? prev.fillText : ''
+  onChildMeasured(code, child, wrapChoiceFillValue(selected, fillText))
+}
+
+function onChildChoiceListChange(code, child, selectedList) {
+  const prevRaw = rawChildValue(code, child)
+  const prevList = Array.isArray(prevRaw) ? prevRaw : prevRaw ? [prevRaw] : []
+  const prevFillMap = {}
+  prevList.forEach((v) => {
+    const { selected, fillText } = parseChoiceFillValue(v)
+    if (selected) prevFillMap[selected] = fillText
+  })
+  const next = (selectedList || []).map((sel) => {
+    const meta = optionMeta(child, sel)
+    const fillText = meta?.allowFill ? prevFillMap[sel] || '' : ''
+    return wrapChoiceFillValue(sel, fillText)
+  })
+  onChildMeasured(code, child, next)
+}
+
+function onChildFillText(code, child, fillText) {
+  const raw = rawChildValue(code, child)
+  if (child.type === 'checkbox') {
+    const list = Array.isArray(raw) ? raw : []
+    const next = list.map((v) => {
+      const { selected } = parseChoiceFillValue(v)
+      const meta = optionMeta(child, selected)
+      return meta?.allowFill
+        ? wrapChoiceFillValue(selected, fillText)
+        : wrapChoiceFillValue(selected, '')
+    })
+    onChildMeasured(code, child, next)
+    return
+  }
+  const { selected } = parseChoiceFillValue(raw)
+  onChildMeasured(code, child, wrapChoiceFillValue(selected, fillText))
 }
 
 function colMeta(code) {
@@ -453,6 +561,20 @@ function addMatrixRow() {
   gap: 8px;
   width: 100%;
   max-width: 100%;
+}
+
+.choice-fill-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fill-label {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
 }
 
 .manual-judgment-row {

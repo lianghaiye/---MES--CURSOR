@@ -160,6 +160,13 @@
         "path": "/production/material-requisition",
         "kb": "manuals/07",
         "process": "P03"
+      },
+      {
+        "key": "finished-inbound",
+        "label": "成品入库",
+        "path": "/production/finished-inbound",
+        "kb": "manuals/07",
+        "process": "P03"
       }
     ],
     "report-management": [

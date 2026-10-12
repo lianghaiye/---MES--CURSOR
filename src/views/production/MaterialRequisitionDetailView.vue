@@ -74,9 +74,7 @@
             </a-table>
           </DetailSectionCard>
 
-          <DetailSectionCard
-            :title="`领料明细（${record.lineCount || 0} 项 / 合计 ${record.totalQty || 0}）`"
-          >
+          <DetailSectionCard :title="`领料明细（${record.lineCount || 0} 项）`">
             <a-table
               :columns="lineColumns"
               :data-source="record.lines || []"
@@ -84,11 +82,12 @@
               size="small"
               bordered
               :pagination="false"
-              :scroll="{ x: 1400 }"
+              :scroll="{ x: 1460 }"
               :locale="{ emptyText: '暂无领料明细' }"
             >
-              <template #bodyCell="{ column, record: line }">
-                <template v-if="column.key === 'material'">
+              <template #bodyCell="{ column, record: line, index }">
+                <template v-if="column.key === 'seq'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'material'">
                   {{ line.material || '—' }}
                 </template>
                 <template v-else-if="column.key === 'variantAttr'">
@@ -122,25 +121,23 @@
                   <span v-else>{{ line.lineSource === 'EBOM' ? '工单 EBOM' : '手工添加' }}</span>
                 </template>
               </template>
+              <template #summary>
+                <a-table-summary v-if="(record.lines || []).length">
+                  <a-table-summary-row class="line-summary-row">
+                    <a-table-summary-cell
+                      v-for="(col, colIndex) in lineColumns"
+                      :key="col.key"
+                      :index="colIndex"
+                      :align="col.align"
+                    >
+                      <template v-if="col.key === 'seq'">合计</template>
+                      <template v-else-if="col.key === 'shipQty'">{{ lineQtyTotal }}</template>
+                    </a-table-summary-cell>
+                  </a-table-summary-row>
+                </a-table-summary>
+              </template>
             </a-table>
           </DetailSectionCard>
-
-          <div class="tip-card">
-            <template v-if="record.auditStatus === MATERIAL_REQ_AUDIT.PENDING">
-              当前申请待审核。审核通过后将按领料仓库自动生成领料出库单（一仓一张；状态为「待出库」，仓管直接确认出库）。
-            </template>
-            <template v-else-if="record.auditStatus === MATERIAL_REQ_AUDIT.REJECTED">
-              申请已驳回，未生成出库单。
-            </template>
-            <template
-              v-else-if="record.outboundStatus === '拒绝领料' || record.outboundStatus === '已拒绝'"
-            >
-              关联出库单已拒绝出库，出库状态已回写为本申请单。
-            </template>
-            <template v-else
-              >审核已通过。关联出库单可在「出库信息」或「出库管理」中继续处理。</template
-            >
-          </div>
         </template>
 
         <template v-else-if="activeTab === 'outbound'">
@@ -297,6 +294,7 @@ const woColumns = [
 ]
 
 const lineColumns = [
+  { title: '序号', key: 'seq', width: 56, align: 'center', fixed: 'left' },
   { title: '物料编码', dataIndex: 'itemCode', key: 'itemCode', width: 120 },
   { title: '物料名称', dataIndex: 'itemName', key: 'itemName', width: 150 },
   { title: '规格型号', dataIndex: 'specModel', key: 'specModel', width: 110 },
@@ -316,6 +314,10 @@ const lineColumns = [
   },
   { title: '来源', key: 'source', width: 200 },
 ]
+
+const lineQtyTotal = computed(() =>
+  (record.value?.lines || []).reduce((sum, line) => sum + (Number(line.shipQty) || 0), 0),
+)
 
 onMounted(() => {
   refreshMobileMaterialReqs()
@@ -469,19 +471,14 @@ function statusBadge(status) {
   cursor: pointer;
 }
 
-.tip-card {
-  background: #e6f4ff;
-  border: 1px solid #91caff;
-  border-radius: 8px;
-  padding: 12px 16px;
-  color: rgba(0, 0, 0, 0.65);
-  font-size: 13px;
-}
-
 .blank-size-hint {
   margin-top: 2px;
   font-size: 11px;
   color: #d46b08;
   line-height: 1.25;
+}
+
+.line-summary-row {
+  font-weight: 600;
 }
 </style>

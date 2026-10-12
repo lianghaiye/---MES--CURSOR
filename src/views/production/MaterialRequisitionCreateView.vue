@@ -3,7 +3,6 @@
     <div class="page-header">
       <div class="header-left">
         <span class="page-title">申请领料</span>
-        <span class="page-sub">提交后生成领料申请，并在出库管理生成领料出库单</span>
       </div>
       <a-space :size="12">
         <a-button size="small" @click="goBack">取消</a-button>
@@ -926,23 +925,29 @@ syncReceiveWarehouse()
   margin: -12px;
   padding: 12px;
   height: calc(100vh - 56px - 40px - 24px);
+  min-width: 0;
   background: var(--page-bg, #f0f2f5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .page-header {
   flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 8px;
   padding: 10px 16px;
   background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
   z-index: 30;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .header-left {
@@ -958,24 +963,45 @@ syncReceiveWarehouse()
   color: rgba(0, 0, 0, 0.88);
 }
 
-.page-sub {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-}
-
 .page-body {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 12px;
+  /* 左右不再加 padding，与上方标题栏同宽 */
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  box-sizing: border-box;
 }
 
 .section-card {
+  /* min-width:0 避免宽表格把卡片撑得比「申请信息」更宽 */
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  flex: 0 0 auto;
+  align-self: stretch;
+  box-sizing: border-box;
   background: #fff;
   border: 1px solid #f0f0f0;
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 8px;
+  overflow-x: auto;
+}
+
+.section-card :deep(.ant-table-wrapper),
+.section-card :deep(.ant-spin-nested-loading),
+.section-card :deep(.ant-table) {
+  max-width: 100%;
+}
+
+.head-form {
+  :deep(.ant-form-item) {
+    margin-bottom: 0;
+  }
 }
 
 .section-title {

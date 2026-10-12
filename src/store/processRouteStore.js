@@ -191,6 +191,21 @@ export function updateProcessRoute(id, payload) {
   return { ok: true, route: row }
 }
 
+/** 仅更新工艺路线网格结构（工单下发「保存并更新主数据」） */
+export function updateProcessRouteStructure(id, { grid, stepPolicies } = {}) {
+  const idx = processRouteState.routes.findIndex((r) => r.id === id)
+  if (idx === -1) return { ok: false, message: '工艺路线不存在' }
+  const gridCheck = validateProcessRouteGrid(grid)
+  if (!gridCheck.ok) return gridCheck
+
+  const row = processRouteState.routes[idx]
+  row.grid = normalizeGrid(grid)
+  row.stepPolicies = syncStepPolicies(grid, stepPolicies)
+  row.updater = resolveOperatorName()
+  row.updatedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  return { ok: true, route: row }
+}
+
 /** 工艺路线不允许物理删除，请使用归档 */
 export function deleteProcessRoute() {
   return { ok: false, message: '工艺路线不可删除，请使用归档' }

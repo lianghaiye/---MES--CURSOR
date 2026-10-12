@@ -241,6 +241,14 @@ export function updateQcLibraryField(id, payload = {}, operator = 'admin1') {
     description: payload.description != null ? payload.description : row.description,
     placeholder: payload.placeholder != null ? payload.placeholder : row.placeholder,
     options: Array.isArray(payload.options) ? [...payload.options] : row.options,
+    optionRows: Array.isArray(payload.optionRows)
+      ? payload.optionRows.map((o) => ({
+          value: String(o?.value ?? '').trim(),
+          isDefault: Boolean(o?.isDefault),
+          allowFill: Boolean(o?.allowFill),
+          fillPlaceholder: String(o?.fillPlaceholder ?? ''),
+        }))
+      : row.optionRows || [],
     defaultValue: payload.defaultValue != null ? payload.defaultValue : row.defaultValue,
     format: payload.format != null ? payload.format : row.format,
     charLimit: payload.charLimit !== undefined ? payload.charLimit : row.charLimit,

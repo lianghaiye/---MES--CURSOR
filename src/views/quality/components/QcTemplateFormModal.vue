@@ -140,10 +140,14 @@
             </template>
             <template v-else-if="column.key === 'index'">{{ index + 1 }}</template>
             <template v-else-if="column.key === 'type'">
-              {{ fieldTypeMap[record.type] || record.type || '—' }}
+              <a-tag :color="fieldTypeTagColor(record.type)">
+                {{ fieldTypeMap[record.type] || record.type || '—' }}
+              </a-tag>
             </template>
             <template v-else-if="column.key === 'required'">
-              {{ record.required ? '是' : '否' }}
+              <a-tag :color="record.required ? 'blue' : 'default'">
+                {{ record.required ? '必填' : '非必填' }}
+              </a-tag>
             </template>
             <template v-else-if="column.key === 'unit'">
               {{ displayFieldUnit(record) }}
@@ -394,6 +398,7 @@ import {
   pickLibraryFieldsForTemplate,
   syncTemplateFieldToLibrary,
 } from '@/store/qcFieldLibraryStore'
+import { fieldTypeTagColor } from '@/mock/qcFieldLibrary'
 import {
   QC_FIELD_JUDGE_RULE,
   QC_UNIT_POSITION,
@@ -646,9 +651,9 @@ const fieldColumns = computed(() => {
     { title: '', key: 'drag', width: 36, align: 'center' },
     { title: '序号', key: 'index', width: 56, align: 'center' },
     { title: '字段名称', dataIndex: 'name', width: 120 },
-    { title: '字段类型', key: 'type', width: 90 },
+    { title: '字段类型', key: 'type', width: 110 },
     { title: '类型', key: 'fieldKind', width: 80, align: 'center' },
-    { title: '必填', key: 'required', width: 56, align: 'center' },
+    { title: '必填', key: 'required', width: 80, align: 'center' },
     { title: '单位', key: 'unit', width: 88 },
     { title: '合格标准', key: 'standard', width: 140, ellipsis: true },
   ]
@@ -786,18 +791,33 @@ function generateFieldCode(existingFields = []) {
   return code
 }
 
-function toOptionRows(options = [], defaultValue = '') {
+function toOptionRows(options = [], defaultValue = '', optionRows = null) {
+  if (Array.isArray(optionRows) && optionRows.length) {
+    return optionRows.map((o) => ({
+      value: String(o?.value ?? ''),
+      isDefault: Boolean(o?.isDefault),
+      allowFill: Boolean(o?.allowFill),
+      fillPlaceholder: String(o?.fillPlaceholder ?? ''),
+    }))
+  }
   const list = Array.isArray(options) ? options : []
   const def = String(defaultValue || '').trim()
   return list.map((o) => {
     if (typeof o === 'string') {
       const value = String(o || '').trim()
-      return { value, isDefault: Boolean(value && value === def) }
+      return {
+        value,
+        isDefault: Boolean(value && value === def),
+        allowFill: false,
+        fillPlaceholder: '',
+      }
     }
     const value = String(o?.value ?? '').trim()
     return {
       value,
       isDefault: Boolean(o?.isDefault) || Boolean(value && value === def),
+      allowFill: Boolean(o?.allowFill),
+      fillPlaceholder: String(o?.fillPlaceholder ?? ''),
     }
   })
 }
@@ -1093,7 +1113,7 @@ function openFieldModal(recordOrIndex) {
       description: f.description || '',
       enabled: f.enabled !== false,
       placeholder: f.placeholder || '',
-      optionRows: toOptionRows(f.options || [], f.defaultValue),
+      optionRows: toOptionRows(f.options || [], f.defaultValue, f.optionRows),
       optionItems,
       defaultValue: f.defaultValue || '',
       charLimit: f.charLimit ?? null,
@@ -1101,9 +1121,9 @@ function openFieldModal(recordOrIndex) {
       ...pickComplexFieldProps(f),
       children: (f.children || []).map((c) => ({
         ...c,
-        optionRows: Array.isArray(c.optionRows)
-          ? c.optionRows
-          : toOptionRows(c.options || [], c.defaultValue),
+        optionRows: toOptionRows(c.options || [], c.defaultValue, c.optionRows),
+        placeholder: c.placeholder || '',
+        defaultValue: c.defaultValue ?? '',
         unitPosition: c.unitPosition === 'prefix' ? 'prefix' : 'suffix',
       })),
     })
@@ -1223,11 +1243,19 @@ function saveField() {
   const code = String(existingCode || fieldForm.code || '').trim() || generateFieldCode(form.fields)
 
   const isChoice = fieldForm.type === 'radio' || fieldForm.type === 'checkbox'
-  const optionValues = isChoice
-    ? (fieldForm.optionRows || []).map((o) => String(o.value || '').trim()).filter(Boolean)
+  const optionRows = isChoice
+    ? (fieldForm.optionRows || [])
+        .map((o) => ({
+          value: String(o.value || '').trim(),
+          isDefault: Boolean(o.isDefault),
+          allowFill: Boolean(o.allowFill),
+          fillPlaceholder: String(o.fillPlaceholder || '').trim(),
+        }))
+        .filter((o) => o.value)
     : []
+  const optionValues = optionRows.map((o) => o.value)
   const defaultValue = isChoice
-    ? resolveDefaultFromOptionRows(fieldForm.optionRows)
+    ? resolveDefaultFromOptionRows(optionRows)
     : fieldForm.defaultValue || ''
 
   const children =
@@ -1254,6 +1282,7 @@ function saveField() {
     isConclusion: false,
     placeholder: fieldForm.placeholder || '',
     options: optionValues,
+    optionRows,
     defaultValue,
     charLimit: fieldForm.charLimit,
     ...standard,
