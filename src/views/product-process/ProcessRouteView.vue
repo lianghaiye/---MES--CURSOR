@@ -13,17 +13,6 @@
               <a-input v-model:value="filters.name" allow-clear size="small" placeholder="请输入" />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="状态">
-              <a-select
-                v-model:value="filters.status"
-                allow-clear
-                size="small"
-                placeholder="请选择"
-                :options="statusOpts"
-              />
-            </a-form-item>
-          </a-col>
           <a-col :xs="24" :sm="12" :md="8">
             <a-form-item class="filter-actions-item">
               <a-space>
@@ -57,6 +46,11 @@
         <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
+
+    <a-tabs v-model:activeKey="listTab" size="small" class="list-status-tabs">
+      <a-tab-pane key="active" tab="使用中" />
+      <a-tab-pane key="archived" tab="已归档" />
+    </a-tabs>
 
     <div class="table-card">
       <a-table
@@ -154,7 +148,6 @@ import {
   archiveProcessRoute,
   unarchiveProcessRoute,
   cloneProcessRoute,
-  ROUTE_STATUS,
 } from '@/store/processRouteStore'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -170,12 +163,11 @@ import { processRouteBundleImportDef } from '@/utils/importDefs/processRouteBund
 const router = useRouter()
 const { openTab } = useTabs()
 const processRouteCreatePage = findCreatePageByListPath('/product-process/routing')
-const filters = reactive({ code: '', name: '', status: undefined })
-const applied = reactive({ code: '', name: '', status: undefined })
+const filters = reactive({ code: '', name: '' })
+const applied = reactive({ code: '', name: '' })
+const listTab = ref('active')
 const importOpen = ref(false)
 const historyOpen = ref(false)
-
-const statusOpts = ROUTE_STATUS.map((v) => ({ label: v, value: v }))
 
 const baseColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
@@ -195,7 +187,14 @@ const baseColumns = [
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
   useTableColumnSettings('process-route-list-v2', baseColumns, { minScrollX: 1400 })
 
-const filteredList = computed(() => filterProcessRoutes(processRouteState.routes, applied))
+const filteredList = computed(() => {
+  const base = filterProcessRoutes(processRouteState.routes, applied)
+  if (listTab.value === 'archived') {
+    return base.filter((r) => r.status === '已归档')
+  }
+  // 使用中：含「新建」「使用中」，排除已归档
+  return base.filter((r) => r.status !== '已归档')
+})
 
 function statusColor(status) {
   if (status === '使用中') return 'processing'
@@ -206,13 +205,11 @@ function statusColor(status) {
 function handleSearch() {
   applied.code = filters.code.trim()
   applied.name = filters.name.trim()
-  applied.status = filters.status
 }
 
 function handleReset() {
   filters.code = ''
   filters.name = ''
-  filters.status = undefined
   handleSearch()
 }
 
@@ -285,6 +282,28 @@ function onSaved() {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+}
+
+.list-status-tabs {
+  margin-bottom: 0;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 0 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  :deep(.ant-tabs-nav) {
+    margin: 0;
+  }
+
+  :deep(.ant-tabs-nav::before) {
+    border-bottom-color: #f0f0f0;
+  }
+}
+
+.list-status-tabs + .table-card {
+  border-radius: 0 0 6px 6px;
 }
 
 .table-card {
