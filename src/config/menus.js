@@ -21,8 +21,6 @@ export const topModules = [
 /** 顶栏「更多」下拉模块（WMS/QMS 等扩展入口） */
 export const moreModules = [
   { key: 'board', label: '看板管理', path: '/board' },
-  { key: 'wms', label: '仓储管理 WMS', path: '/wms' },
-  { key: 'qms', label: '质量追溯 QMS', path: '/qms' },
   { key: 'equipment', label: '设备管理', path: '/equipment' },
   { key: 'report', label: '报表中心', path: '/report' },
 ]
@@ -252,7 +250,17 @@ export const sideMenus = {
   ],
   wms: [{ key: 'warehouse', label: '仓库作业', path: '/wms/warehouse' }],
   qms: [{ key: 'trace', label: '质量追溯', path: '/qms/trace' }],
-  equipment: [{ key: 'devices', label: '设备台账', path: '/equipment/devices' }],
+  equipment: [
+    { key: 'devices', label: '设备台账', path: '/equipment/devices' },
+    {
+      key: 'inspection-standards',
+      label: '点检标准',
+      path: '/equipment/inspection-standards',
+    },
+    { key: 'inspection-tasks', label: '点检任务', path: '/equipment/inspection-tasks' },
+    { key: 'maintain-orders', label: '保养工单', path: '/equipment/maintain-orders' },
+    { key: 'repair-orders', label: '维修工单', path: '/equipment/repair-orders' },
+  ],
   report: [{ key: 'overview', label: '综合报表', path: '/report/overview' }],
 }
 
@@ -465,7 +473,11 @@ export const routeTitles = {
   '/industrial-id/label-management': '标识管理',
   '/wms/warehouse': '仓储管理',
   '/qms/trace': '质量追溯',
-  '/equipment/devices': '设备管理',
+  '/equipment/devices': '设备台账',
+  '/equipment/inspection-standards': '点检标准',
+  '/equipment/inspection-tasks': '点检任务',
+  '/equipment/maintain-orders': '保养工单',
+  '/equipment/repair-orders': '维修工单',
   '/report/overview': '报表中心',
   '/board/catalog': '看板列表',
   '/board/carousel': '轮播管理',

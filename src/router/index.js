@@ -1177,7 +1177,36 @@ const routes = [
       },
       { path: 'wms/warehouse', ...emptyChild('wms-warehouse', '仓储管理') },
       { path: 'qms/trace', ...emptyChild('qms-trace', '质量追溯') },
-      { path: 'equipment/devices', ...emptyChild('equipment-devices', '设备管理') },
+      {
+        path: 'equipment/devices',
+        name: 'equipment-devices',
+        component: () => import('@/views/equipment/EquipmentDeviceView.vue'),
+        meta: { title: '设备台账' },
+      },
+      {
+        path: 'equipment/inspection-standards',
+        name: 'equipment-inspection-standards',
+        component: () => import('@/views/equipment/EquipmentInspectionStandardView.vue'),
+        meta: { title: '点检标准' },
+      },
+      {
+        path: 'equipment/inspection-tasks',
+        name: 'equipment-inspection-tasks',
+        component: () => import('@/views/equipment/EquipmentInspectionTaskView.vue'),
+        meta: { title: '点检任务' },
+      },
+      {
+        path: 'equipment/maintain-orders',
+        name: 'equipment-maintain-orders',
+        component: () => import('@/views/equipment/EquipmentMaintainView.vue'),
+        meta: { title: '保养工单' },
+      },
+      {
+        path: 'equipment/repair-orders',
+        name: 'equipment-repair-orders',
+        component: () => import('@/views/equipment/EquipmentRepairView.vue'),
+        meta: { title: '维修工单' },
+      },
       { path: 'report/overview', ...emptyChild('report-overview', '报表中心') },
       {
         path: 'basic-config/employee-groups',

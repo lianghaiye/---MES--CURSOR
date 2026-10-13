@@ -42,9 +42,7 @@
   ],
   "moreModules": [
     { "key": "board", "label": "看板管理", "path": "/board", "maturity": "partial" },
-    { "key": "wms", "label": "仓储管理 WMS", "path": "/wms", "maturity": "placeholder" },
-    { "key": "qms", "label": "质量追溯 QMS", "path": "/qms", "maturity": "placeholder" },
-    { "key": "equipment", "label": "设备管理", "path": "/equipment", "maturity": "placeholder" },
+    { "key": "equipment", "label": "设备管理", "path": "/equipment", "maturity": "partial" },
     { "key": "report", "label": "报表中心", "path": "/report", "maturity": "placeholder" }
   ],
   "sideMenus": {
@@ -394,6 +392,17 @@
       { "key": "catalog", "label": "看板列表", "path": "/board/catalog" },
       { "key": "carousel", "label": "轮播管理", "path": "/board/carousel" },
       { "key": "work-order-monitor", "label": "工单监管看板", "path": "/board/work-order-monitor" }
+    ],
+    "equipment": [
+      { "key": "devices", "label": "设备台账", "path": "/equipment/devices" },
+      {
+        "key": "inspection-standards",
+        "label": "点检标准",
+        "path": "/equipment/inspection-standards"
+      },
+      { "key": "inspection-tasks", "label": "点检任务", "path": "/equipment/inspection-tasks" },
+      { "key": "maintain-orders", "label": "保养工单", "path": "/equipment/maintain-orders" },
+      { "key": "repair-orders", "label": "维修工单", "path": "/equipment/repair-orders" }
     ]
   },
   "mobileWorkbench": [

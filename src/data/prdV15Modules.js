@@ -668,10 +668,10 @@ export const PRD_V15_MODULES = [
       },
       {
         name: '设备管理',
-        status: 'planned',
+        status: 'in_progress',
         background: '生产设备台账与维保计划。',
-        description: ['设备台账、点检、维保工单。'],
-        rules: ['设备状态影响工序可用性（可选）。'],
+        description: ['设备台账、点检标准/任务、保养工单、维修工单（一期）。'],
+        rules: ['点检异常可转维修；维修中设备状态联动；设备状态影响工序可用性（可选）。'],
       },
       {
         name: '报表中心',
