@@ -14,6 +14,7 @@ import {
   createMockScenarios,
   createMockWorkOrderProgressRows,
 } from '@/mock/workbench'
+import { getDefaultWorkbenchTodoKeys } from '@/utils/workbenchTodos'
 
 import { getCurrentTenantId, getTenantName } from '@/mock/tenants'
 
@@ -47,10 +48,18 @@ function nowText() {
   return dayjs().format('YYYY-MM-DD HH:mm:ss')
 }
 
+function normalizeTodoVisibleKeys(keys) {
+  const defaults = getDefaultWorkbenchTodoKeys()
+  const defaultSet = new Set(defaults)
+  const list = (Array.isArray(keys) ? keys : []).filter((k) => defaultSet.has(k))
+  return list.length ? list : [...defaults]
+}
+
 function buildSeed() {
   return {
     favorites: createDefaultFavorites(),
     visibleProcessIds: createDefaultVisibleProcessIds(),
+    todoVisibleKeys: getDefaultWorkbenchTodoKeys(),
     scenarios: createMockScenarios(),
     releases: createMockReleases(),
     guides: createMockGuides(),
@@ -117,6 +126,7 @@ function initState() {
   const base = {
     favorites: Array.isArray(stored.favorites) ? stored.favorites : createDefaultFavorites(),
     visibleProcessIds: upgradeVisibleProcessIds(stored.visibleProcessIds),
+    todoVisibleKeys: normalizeTodoVisibleKeys(stored.todoVisibleKeys),
     scenarios: Array.isArray(stored.scenarios) ? stored.scenarios : createMockScenarios(),
     releases: (Array.isArray(stored.releases) ? stored.releases : createMockReleases()).map(
       normalizeRelease,
@@ -148,6 +158,7 @@ function persist() {
   persistJson(STORAGE_KEY, {
     favorites: workbenchState.favorites,
     visibleProcessIds: workbenchState.visibleProcessIds,
+    todoVisibleKeys: workbenchState.todoVisibleKeys,
     scenarios: workbenchState.scenarios,
     releases: workbenchState.releases,
     guides: workbenchState.guides,
@@ -214,6 +225,18 @@ export function saveVisibleProcessIds(ids = []) {
   if (!next.length) return { ok: false, message: '请至少选择一道工序' }
   workbenchState.visibleProcessIds = next
   return { ok: true, message: '工序展示已更新' }
+}
+
+export function listTodoVisibleKeys() {
+  void workbenchState.todoVisibleKeys
+  return normalizeTodoVisibleKeys(workbenchState.todoVisibleKeys)
+}
+
+export function saveTodoVisibleKeys(keys = []) {
+  const next = normalizeTodoVisibleKeys(keys)
+  if (!next.length) return { ok: false, message: '请至少选择一项待办' }
+  workbenchState.todoVisibleKeys = next
+  return { ok: true, message: '待办展示已更新' }
 }
 
 export function refreshWorkbenchData() {

@@ -108,21 +108,58 @@
           <!-- 待办事项 -->
           <section class="panel-card todo-panel">
             <div class="panel-header">
-              <span class="panel-title">待办事项</span>
-              <span class="panel-hint">共 {{ todoTotal }} 项待处理</span>
+              <div class="panel-header-left">
+                <span class="panel-title">待办事项</span>
+                <span class="panel-hint">共 {{ todoTotal }} 项待处理</span>
+              </div>
+              <a-button
+                type="link"
+                size="small"
+                class="header-action"
+                @click="todoConfigOpen = true"
+              >
+                <SettingOutlined />
+                配置
+              </a-button>
             </div>
             <div class="todo-grid">
-              <button
+              <div
                 v-for="item in todoCards"
                 :key="item.key"
-                type="button"
-                class="todo-card"
-                :class="[`todo-tone-${item.tone}`, { 'is-empty': !item.count }]"
-                @click="goTodo(item)"
+                class="todo-card-wrap"
+                @mouseenter="item.hoverExpand ? (qcFlyoutKey = item.key) : null"
+                @mouseleave="item.hoverExpand ? (qcFlyoutKey = '') : null"
               >
-                <div class="todo-count">{{ item.count }}</div>
-                <div class="todo-label">{{ item.label }}</div>
-              </button>
+                <button
+                  type="button"
+                  class="todo-card"
+                  :class="[
+                    `todo-tone-${item.tone}`,
+                    { 'is-empty': !item.count, 'is-flyout-host': item.hoverExpand },
+                  ]"
+                  @click="onTodoCardClick(item)"
+                >
+                  <div class="todo-count">{{ item.count }}</div>
+                  <div class="todo-label">{{ item.label }}</div>
+                </button>
+                <div
+                  v-if="item.hoverExpand && qcFlyoutKey === item.key"
+                  class="todo-qc-flyout"
+                  @click.stop
+                >
+                  <button
+                    v-for="row in qcBreakdown"
+                    :key="row.key"
+                    type="button"
+                    class="todo-qc-row"
+                    :class="{ 'is-empty': !row.count }"
+                    @click="goTodo(row)"
+                  >
+                    <span class="todo-qc-label">{{ row.label }}</span>
+                    <span class="todo-qc-count">{{ row.count }}</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -348,6 +385,7 @@
 
     <WorkbenchFavoriteModal v-model:open="favoriteModalOpen" />
     <WorkbenchProcessConfigModal v-model:open="processModalOpen" />
+    <WorkbenchTodoConfigModal v-model:open="todoConfigOpen" />
     <WorkbenchReleaseMessageModal v-model:open="releaseModalOpen" :release="activeRelease" />
   </div>
 </template>
@@ -390,6 +428,7 @@ import {
   listEnabledReleases,
   listEnabledScenarios,
   listFavorites,
+  listTodoVisibleKeys,
   listVisibleProcessIds,
   listWorkOrderProgressRows,
   refreshWorkbenchData,
@@ -401,11 +440,13 @@ import { openExternalLink } from '@/utils/externalLink'
 import { getCurrentTenantId, getTenantName } from '@/mock/tenants'
 import {
   buildWorkbenchTodoFullPath,
+  listWorkbenchQcBreakdown,
   listWorkbenchTodoCards,
   touchWorkbenchTodoSources,
 } from '@/utils/workbenchTodos'
 import WorkbenchFavoriteModal from '@/views/home/components/WorkbenchFavoriteModal.vue'
 import WorkbenchProcessConfigModal from '@/views/home/components/WorkbenchProcessConfigModal.vue'
+import WorkbenchTodoConfigModal from '@/views/home/components/WorkbenchTodoConfigModal.vue'
 import WorkbenchReleaseMessageModal from '@/views/home/components/WorkbenchReleaseMessageModal.vue'
 
 const router = useRouter()
@@ -418,6 +459,8 @@ const PROCESS_ROW_SIZE = 5
 const woTab = ref('notStarted')
 const favoriteModalOpen = ref(false)
 const processModalOpen = ref(false)
+const todoConfigOpen = ref(false)
+const qcFlyoutKey = ref('')
 const feedbackText = ref('')
 const feedbackSubmitting = ref(false)
 const releaseModalOpen = ref(false)
@@ -450,11 +493,18 @@ const favorites = computed(() => {
 
 const todoCards = computed(() => {
   void refreshTick.value
+  void workbenchState.todoVisibleKeys
   touchWorkbenchTodoSources()
-  return listWorkbenchTodoCards()
+  return listWorkbenchTodoCards(listTodoVisibleKeys())
 })
 
 const todoTotal = computed(() => todoCards.value.reduce((sum, item) => sum + (item.count || 0), 0))
+
+const qcBreakdown = computed(() => {
+  void refreshTick.value
+  touchWorkbenchTodoSources()
+  return listWorkbenchQcBreakdown()
+})
 
 const scenarios = computed(() => {
   void workbenchState.scenarios
@@ -573,6 +623,12 @@ function goTodo(item) {
   const fullPath = buildWorkbenchTodoFullPath(item)
   openTab(fullPath, item.title || item.label)
   router.push({ path: item.path, query: { ...(item.query || {}) } })
+  qcFlyoutKey.value = ''
+}
+
+function onTodoCardClick(item) {
+  if (item?.hoverExpand) return
+  goTodo(item)
 }
 
 function goProcessReport() {
@@ -1003,9 +1059,13 @@ export default { name: 'WorkbenchDashboardView' }
 
 .todo-grid {
   display: grid;
-  /* 桌面：8 张卡片同一行 */
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 6px;
+}
+
+.todo-card-wrap {
+  position: relative;
+  min-width: 0;
 }
 
 .todo-card {
@@ -1014,6 +1074,7 @@ export default { name: 'WorkbenchDashboardView' }
   align-items: flex-start;
   justify-content: center;
   gap: 2px;
+  width: 100%;
   min-width: 0;
   min-height: 52px;
   padding: 8px 10px;
@@ -1031,6 +1092,10 @@ export default { name: 'WorkbenchDashboardView' }
     transform: translateY(-1px);
     border-color: #91caff;
     box-shadow: 0 4px 12px rgba(22, 119, 255, 0.1);
+  }
+
+  &.is-flyout-host {
+    cursor: default;
   }
 
   &.is-empty {
@@ -1081,10 +1146,51 @@ export default { name: 'WorkbenchDashboardView' }
   max-width: 100%;
 }
 
-@media (max-width: 1400px) {
-  .todo-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+.todo-qc-flyout {
+  position: absolute;
+  left: 0;
+  top: calc(100% - 2px);
+  z-index: 20;
+  min-width: 180px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e8eef5;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.todo-qc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    background: #f5f9ff;
   }
+
+  &.is-empty {
+    opacity: 0.65;
+  }
+}
+
+.todo-qc-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.todo-qc-count {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(0, 0, 0, 0.85);
 }
 
 @media (max-width: 768px) {

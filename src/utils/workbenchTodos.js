@@ -9,6 +9,7 @@ import { workOrderState } from '@/store/workOrderStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { outboundState } from '@/store/outboundStore'
 import { qcTaskState, QC_TASK_STATUS } from '@/store/qcTaskStore'
+import { factoryQcState } from '@/store/factoryQcStore'
 import { ecnState } from '@/store/ecnStore'
 import { SALES_ORDER_STATUS, normalizeSalesOrderProgressStatus } from '@/utils/salesOrderStatus'
 import { normalizeInboundStatus } from '@/mock/inboundOptions'
@@ -71,9 +72,11 @@ export const WORKBENCH_TODO_ITEMS = [
     key: 'pending-qc',
     label: '待质检',
     tone: 'gold',
-    path: '/quality/incoming-qc',
-    query: { qcStatus: '待质检' },
-    title: '来料质检',
+    path: '',
+    query: {},
+    title: '待质检',
+    /** 主卡不跳转，悬停展开分项 */
+    hoverExpand: true,
   },
   {
     key: 'ecn-todo',
@@ -84,6 +87,58 @@ export const WORKBENCH_TODO_ITEMS = [
     title: 'ECN列表',
   },
 ]
+
+/** 待质检悬停分项（顺序固定） */
+export const WORKBENCH_QC_BREAKDOWN = [
+  {
+    key: 'qc-incoming',
+    label: '来料质检',
+    path: '/quality/incoming-qc',
+    query: { qcStatus: '待质检' },
+    title: '来料质检',
+    bizScope: '来料质检',
+  },
+  {
+    key: 'qc-outsourcing',
+    label: '外协回货检',
+    path: '/quality/outsourcing-qc',
+    query: { qcStatus: '待质检' },
+    title: '外协回货检',
+    bizScope: '外协回货检',
+  },
+  {
+    key: 'qc-process',
+    label: '生产过程检',
+    path: '/quality/process-qc',
+    query: { qcStatus: '待质检' },
+    title: '生产过程检',
+    bizScope: '生产过程检',
+  },
+  {
+    key: 'qc-finished',
+    label: '成品检',
+    path: '/quality/finished-qc',
+    query: { qcStatus: '待质检' },
+    title: '成品检',
+    bizScope: '成品检',
+  },
+  {
+    key: 'qc-factory',
+    label: '出厂检',
+    path: '/quality/factory-qc',
+    query: { qcStatus: '待质检' },
+    title: '出厂检',
+    factory: true,
+  },
+]
+
+export function getDefaultWorkbenchTodoKeys() {
+  return WORKBENCH_TODO_ITEMS.map((item) => item.key)
+}
+
+function isPendingQcStatus(status) {
+  return status === QC_TASK_STATUS.PENDING || status === '检验中' || status === '检测中'
+}
 
 function countSalesPendingApprove() {
   return (salesOrderState.orders || []).filter(
@@ -115,10 +170,27 @@ function countPendingOutboundDocs() {
   ).length
 }
 
-function countPendingQcDocs() {
-  return (qcTaskState.tasks || []).filter(
-    (t) => t.qcStatus === QC_TASK_STATUS.PENDING && (!t.bizScope || t.bizScope === '来料质检'),
+function countPendingQcByScope(bizScope) {
+  return (qcTaskState.tasks || []).filter((t) => {
+    if (!isPendingQcStatus(t.qcStatus)) return false
+    const scope = t.bizScope || '来料质检'
+    return scope === bizScope
+  }).length
+}
+
+function countFactoryPendingQc() {
+  return (factoryQcState.records || []).filter(
+    (r) => r.qcStatus === '待质检' || r.qcStatus === '检验中' || r.qcStatus === '检测中',
   ).length
+}
+
+function countQcBreakdownItem(item) {
+  if (item.factory) return countFactoryPendingQc()
+  return countPendingQcByScope(item.bizScope)
+}
+
+function countPendingQcTotal() {
+  return WORKBENCH_QC_BREAKDOWN.reduce((sum, item) => sum + countQcBreakdownItem(item), 0)
 }
 
 function countEcnTodos() {
@@ -140,7 +212,7 @@ export function countWorkbenchTodo(key) {
     case 'pending-outbound':
       return countPendingOutboundDocs()
     case 'pending-qc':
-      return countPendingQcDocs()
+      return countPendingQcTotal()
     case 'ecn-todo':
       return countEcnTodos()
     default:
@@ -158,21 +230,43 @@ export function touchWorkbenchTodoSources() {
     inboundOrderState.orders?.length,
     outboundState.orders?.length,
     qcTaskState.tasks?.length,
+    factoryQcState.records?.length,
     ecnState.items?.length,
   ]
 }
 
-export function listWorkbenchTodoCards() {
+export function listWorkbenchQcBreakdown() {
   touchWorkbenchTodoSources()
-  return WORKBENCH_TODO_ITEMS.map((item) => ({
+  return WORKBENCH_QC_BREAKDOWN.map((item) => ({
     ...item,
-    count: countWorkbenchTodo(item.key),
+    count: countQcBreakdownItem(item),
   }))
+}
+
+/**
+ * @param {string[]} [visibleKeys] 有序可见 key；缺省为全部默认顺序
+ */
+export function listWorkbenchTodoCards(visibleKeys) {
+  touchWorkbenchTodoSources()
+  const defaults = getDefaultWorkbenchTodoKeys()
+  const keys =
+    Array.isArray(visibleKeys) && visibleKeys.length
+      ? visibleKeys.filter((k) => defaults.includes(k))
+      : defaults
+  const byKey = new Map(WORKBENCH_TODO_ITEMS.map((item) => [item.key, item]))
+  return keys
+    .map((key) => byKey.get(key))
+    .filter(Boolean)
+    .map((item) => ({
+      ...item,
+      count: countWorkbenchTodo(item.key),
+    }))
 }
 
 export function buildWorkbenchTodoFullPath(item) {
   const q = item?.query || {}
   const keys = Object.keys(q)
+  if (!item?.path) return ''
   if (!keys.length) return item.path
   const search = keys
     .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(String(q[k]))}`)
