@@ -10,21 +10,29 @@
   >
     <div class="drawer-section">
       <div class="section-title-row">
-        <div class="section-title">EBOM 物料</div>
-        <div class="ship-sets-field">
-          <span class="ship-sets-label">发货套数：</span>
-          <a-input-number
-            v-model:value="localShipSets"
-            size="small"
-            :min="0"
-            :max="maxShipSets"
-            :precision="0"
-            style="width: 120px"
-            @change="onShipSetsChange"
-          />
-          <span class="ship-sets-hint"
-            >不可大于可发套数 {{ maxShipSets }}（订单 {{ orderQty }}）</span
-          >
+        <div class="section-title">发运物料</div>
+        <div class="section-title-actions">
+          <a-button size="small" :loading="generatingFromPo" @click="generateFromPurchase">
+            从采购生成简易 EBOM
+          </a-button>
+          <a-button size="small" type="primary" ghost @click="materialPickerOpen = true">
+            添加物料
+          </a-button>
+          <div class="ship-sets-field">
+            <span class="ship-sets-label">发货套数：</span>
+            <a-input-number
+              v-model:value="localShipSets"
+              size="small"
+              :min="0"
+              :max="maxShipSets"
+              :precision="0"
+              style="width: 120px"
+              @change="onShipSetsChange"
+            />
+            <span class="ship-sets-hint"
+              >不可大于可发套数 {{ maxShipSets }}（订单 {{ orderQty }}）</span
+            >
+          </div>
         </div>
       </div>
       <a-table
@@ -36,6 +44,7 @@
         :pagination="false"
         :scroll="{ y: 420, x: 1100 }"
         table-layout="fixed"
+        :locale="{ emptyText: emptyEbomText }"
       >
         <template #headerCell="{ column }">
           <template v-if="column.key === 'selected'">
@@ -132,12 +141,19 @@
           </template>
         </template>
       </a-table>
-      <a-empty v-if="!displayRows.length" description="无 EBOM 物料，请确认订单已审核并生成 EBOM" />
     </div>
 
     <a-form-item label="发运备注" class="remark-field">
       <a-textarea v-model:value="localRemark" :rows="2" placeholder="选填" />
     </a-form-item>
+
+    <SelectBomMaterialModal
+      v-model:open="materialPickerOpen"
+      title="添加发运物料"
+      :multiple="true"
+      :include-spu-templates="false"
+      @selected="onMaterialsPicked"
+    />
 
     <template #footer>
       <div class="drawer-footer-actions">
@@ -170,9 +186,17 @@ import {
   unselectDescendantPicks,
 } from '@/utils/shipEbom'
 import {
+  buildFlatEbomSnapshotFromPickRows,
+  buildFlatEbomSnapshotFromPurchaseLines,
+  createManualShipPickFromMaterial,
+  listPurchaseMaterialLinesForSalesOrder,
+  writeSalesLineEbomSnapshot,
+} from '@/utils/scatterShipNoEbom'
+import {
   calcScatterMaterialAppliedQty,
   calcScatterMaterialShippedQty,
 } from '@/utils/salesLineShipped'
+import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -184,10 +208,15 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'save'])
 
+const emptyEbomText = '暂无发运物料：可「从采购生成简易 EBOM」，或点「添加物料」从主数据勾选后发货'
+
 const allMaterialRows = ref([])
 const expandedMaterialIds = ref([])
 const localRemark = ref('')
 const localShipSets = ref(0)
+const localSnapshot = ref(null)
+const materialPickerOpen = ref(false)
+const generatingFromPo = ref(false)
 
 const lineLabel = computed(() => {
   const s = props.shipment
@@ -291,59 +320,155 @@ function onShipSetsChange(val) {
   applyExpandAndSelectability()
 }
 
+function resolveSalesLine() {
+  const lineId = props.shipment?.salesLineId || props.shipment?.id
+  return (props.salesOrder?.lineItems || []).find((l) => l.id === lineId) || null
+}
+
+function rebuildRowsFromSnapshot(snapshot, saved = []) {
+  if (!snapshot?.materials?.length) {
+    allMaterialRows.value = saved.length ? JSON.parse(JSON.stringify(saved)) : []
+    return
+  }
+  const built = buildShipMaterialRowsFromSnapshot(snapshot).map((row) => {
+    const orderDemand = Number(row.demandQty) || 0
+    const oq = Math.max(1, orderQty.value)
+    const unitDemand = Math.round((orderDemand / oq) * 10000) / 10000
+    return {
+      ...row,
+      unitDemandQty: unitDemand,
+      orderDemandQty: orderDemand,
+    }
+  })
+  allMaterialRows.value = saved.length ? mergeMaterialPicksWithSaved(built, saved) : built
+}
+
+function applySetsAndProgress(saved = []) {
+  const temp = {
+    ...props.shipment,
+    materialPicks: allMaterialRows.value,
+    maxShipSets: maxShipSets.value,
+    orderQty: orderQty.value,
+  }
+  applyScatterShipSets(temp, localShipSets.value)
+  if (saved.length) {
+    const savedMap = new Map(saved.map((r) => [r.materialId, r]))
+    temp.materialPicks.forEach((row) => {
+      const prev = savedMap.get(row.materialId)
+      if (prev?.selected) {
+        row.selected = true
+        row.shipQty = Number(prev.shipQty) || row.demandQty
+      }
+    })
+  }
+  allMaterialRows.value = enrichMaterialProgress(temp.materialPicks)
+  expandedMaterialIds.value = resolveInitialExpandedMaterialIds(allMaterialRows.value, saved)
+  applyExpandAndSelectability()
+}
+
 watch(
   () => props.open,
   (val) => {
     if (!val || !props.shipment) return
+    const salesLine = resolveSalesLine()
     const snapshot =
       props.shipment.ebomSnapshot ||
+      salesLine?.ebomSnapshot ||
       (props.shipment.materials?.length ? { materials: props.shipment.materials } : null)
+    localSnapshot.value = snapshot
 
     const saved = props.shipment.materialPicks || []
-    let built
-    if (snapshot?.materials?.length) {
-      built = buildShipMaterialRowsFromSnapshot(snapshot).map((row) => {
-        const orderDemand = Number(row.demandQty) || 0
-        const oq = Math.max(1, orderQty.value)
-        const unitDemand = Math.round((orderDemand / oq) * 10000) / 10000
-        return {
-          ...row,
-          unitDemandQty: unitDemand,
-          orderDemandQty: orderDemand,
-        }
-      })
-      allMaterialRows.value = saved.length ? mergeMaterialPicksWithSaved(built, saved) : built
-    } else {
-      allMaterialRows.value = JSON.parse(JSON.stringify(saved))
-    }
+    rebuildRowsFromSnapshot(snapshot, saved)
 
     const initialSets =
       props.shipment.shipSets != null ? Number(props.shipment.shipSets) : maxShipSets.value
     localShipSets.value = Math.min(Math.max(0, initialSets), maxShipSets.value)
-    const temp = {
-      ...props.shipment,
-      materialPicks: allMaterialRows.value,
-      maxShipSets: maxShipSets.value,
-      orderQty: orderQty.value,
-    }
-    applyScatterShipSets(temp, localShipSets.value)
-    // 保留已保存的勾选发运量
-    if (saved.length) {
-      const savedMap = new Map(saved.map((r) => [r.materialId, r]))
-      temp.materialPicks.forEach((row) => {
-        const prev = savedMap.get(row.materialId)
-        if (prev?.selected) {
-          row.selected = true
-          row.shipQty = Number(prev.shipQty) || row.demandQty
-        }
-      })
-    }
-    allMaterialRows.value = enrichMaterialProgress(temp.materialPicks)
-    expandedMaterialIds.value = resolveInitialExpandedMaterialIds(allMaterialRows.value, saved)
+    applySetsAndProgress(saved)
     localRemark.value = props.shipment.remark || ''
-    applyExpandAndSelectability()
   },
 )
+
+function generateFromPurchase() {
+  if (!props.salesOrder) {
+    message.warning('缺少销售订单')
+    return
+  }
+  generatingFromPo.value = true
+  try {
+    const warehouse = props.shipment?.shipWarehouse || ''
+    const purchaseLines = listPurchaseMaterialLinesForSalesOrder(props.salesOrder, { warehouse })
+    if (!purchaseLines.length) {
+      message.warning('未找到关联本销售单的采购订单/采购申请物料，请先建采购或改用「添加物料」')
+      return
+    }
+    const salesLine = resolveSalesLine()
+    const snapshot = buildFlatEbomSnapshotFromPurchaseLines(
+      purchaseLines,
+      salesLine || props.shipment,
+      orderQty.value,
+    )
+    localSnapshot.value = snapshot
+    writeSalesLineEbomSnapshot(
+      props.salesOrder,
+      props.shipment?.salesLineId || props.shipment?.id,
+      snapshot,
+    )
+    rebuildRowsFromSnapshot(snapshot, [])
+    applySetsAndProgress([])
+    allMaterialRows.value.forEach((row) => {
+      if (row.selectable === false) return
+      row.selected = true
+      row.shipQty = Math.max(0, Number(row.demandQty) || 0)
+      row.pickSource = 'purchase'
+    })
+    message.success(`已从采购生成 ${purchaseLines.length} 项简易发运物料，并默认全选`)
+  } finally {
+    generatingFromPo.value = false
+  }
+}
+
+function onMaterialsPicked(items) {
+  const list = Array.isArray(items) ? items : items ? [items] : []
+  if (!list.length) return
+  const warehouse = props.shipment?.shipWarehouse || ''
+  const existCodes = new Set(allMaterialRows.value.map((r) => String(r.code || '')))
+  let added = 0
+  list.forEach((mat) => {
+    const code = mat?.code || ''
+    if (!code || existCodes.has(code)) return
+    const row = createManualShipPickFromMaterial(mat, {
+      shipSets: localShipSets.value,
+      orderQty: orderQty.value,
+      warehouse,
+      unitDemandQty: 1,
+    })
+    allMaterialRows.value.push(row)
+    existCodes.add(code)
+    added += 1
+  })
+  if (!added) {
+    message.info('所选物料已在列表中')
+    return
+  }
+  allMaterialRows.value = enrichMaterialProgress(allMaterialRows.value)
+  applyExpandAndSelectability()
+  // 无正式 EBOM 时，把手工清单回写成销售行简易快照，便于下次打开
+  if (!localSnapshot.value?.materials?.length || localSnapshot.value?.source === 'manual-flat') {
+    const salesLine = resolveSalesLine()
+    const snapshot = buildFlatEbomSnapshotFromPickRows(
+      allMaterialRows.value,
+      salesLine || props.shipment,
+      orderQty.value,
+    )
+    localSnapshot.value = snapshot
+    writeSalesLineEbomSnapshot(
+      props.salesOrder,
+      props.shipment?.salesLineId || props.shipment?.id,
+      snapshot,
+    )
+  }
+  message.success(`已添加 ${added} 项物料`)
+}
 
 watch(expandedMaterialIds, applyExpandAndSelectability, { deep: true })
 
@@ -464,7 +589,7 @@ function validatePicks() {
     (r) => r.selectable !== false && r.selected && Number(r.shipQty) > 0,
   )
   if (!matOk) {
-    message.warning('请至少勾选一项 EBOM 物料，并填写本次发运数量')
+    message.warning('请至少勾选一项发运物料，并填写本次发运数量')
     return false
   }
   for (const r of allMaterialRows.value) {
@@ -472,8 +597,10 @@ function validatePicks() {
       message.warning(`物料「${r.name}」已勾选，请填写发运数量`)
       return false
     }
-    if (r.selected) {
-      const remain = (Number(r.orderDemandQty) || 0) - (Number(r.appliedQty) || 0)
+    if (r.selected && r.pickSource !== 'manual') {
+      const orderDemand = Number(r.orderDemandQty) || 0
+      if (orderDemand <= 0) continue
+      const remain = orderDemand - (Number(r.appliedQty) || 0)
       if (Number(r.shipQty) > remain + 1e-9) {
         message.warning(
           `物料「${r.name}」本次发运不能超过剩余可发 ${remain}（订单需求 ${r.orderDemandQty}，已申请 ${r.appliedQty}）`,
@@ -487,10 +614,30 @@ function validatePicks() {
 
 function handleOk() {
   if (!validatePicks()) return
+  const salesLine = resolveSalesLine()
+  let snapshot = localSnapshot.value
+  if (
+    (!snapshot?.materials?.length || snapshot?.source === 'manual-flat') &&
+    allMaterialRows.value.length
+  ) {
+    snapshot = buildFlatEbomSnapshotFromPickRows(
+      allMaterialRows.value,
+      salesLine || props.shipment,
+      orderQty.value,
+    )
+    localSnapshot.value = snapshot
+    writeSalesLineEbomSnapshot(
+      props.salesOrder,
+      props.shipment?.salesLineId || props.shipment?.id,
+      snapshot,
+    )
+  }
   emit('save', {
     materialPicks: JSON.parse(JSON.stringify(allMaterialRows.value)),
     remark: localRemark.value,
     shipSets: localShipSets.value,
+    ebomSnapshot: snapshot ? JSON.parse(JSON.stringify(snapshot)) : props.shipment?.ebomSnapshot,
+    ebomSnapshotId: snapshot?.snapshotId || props.shipment?.ebomSnapshotId,
   })
   emit('update:open', false)
 }
@@ -536,6 +683,14 @@ function handleOk() {
 .section-title {
   font-weight: 600;
   font-size: 14px;
+}
+
+.section-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .ship-sets-field {

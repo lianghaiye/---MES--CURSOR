@@ -206,7 +206,7 @@
               v-if="!ecnNewMaterialMode && !onlyWithBom && !hideAddMaterial"
               type="primary"
               size="small"
-              @click="materialFormOpen = true"
+              @click="openAddMasterItem"
             >
               <PlusOutlined />
               添加产品/物料
@@ -292,11 +292,6 @@
       </a-button>
     </template>
 
-    <MaterialFormModal
-      v-if="!onlyWithBom && !hideAddMaterial"
-      v-model:open="materialFormOpen"
-      @saved="onMaterialSaved"
-    />
     <BomSubItemColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -311,6 +306,7 @@
 
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { SettingOutlined, PlusOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons-vue'
 import ListFilterBar from '@/components/ListFilterBar.vue'
@@ -327,11 +323,12 @@ import {
   bomSubItemFilterFields,
   bomSubItemFilterOperatorOptions,
 } from '@/mock/bomSubItemFilterFields'
-import { addMaterial } from '@/store/materialInfoStore'
 import { defaultBomSubItemPickerColumns } from '@/mock/bomSubItemPickerColumns'
-import MaterialFormModal from './MaterialFormModal.vue'
 import BomSubItemColumnSettingDrawer from './BomSubItemColumnSettingDrawer.vue'
 import BomSubItemFilterModal from './BomSubItemFilterModal.vue'
+import { findCreatePageByListPath } from '@/config/createPages'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { tabStore, useTabs } from '@/composables/useTabs'
 
 const props = defineProps({
   open: Boolean,
@@ -351,6 +348,10 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'selected'])
 
+const router = useRouter()
+const { openTab } = useTabs()
+const productCreatePage = findCreatePageByListPath('/product-process/products')
+
 const keyword = ref('')
 const quickItemType = ref(undefined)
 const catalogKindFilter = ref(undefined)
@@ -358,7 +359,6 @@ const loading = ref(false)
 const confirming = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
-const materialFormOpen = ref(false)
 const columnDrawerOpen = ref(false)
 const filterModalOpen = ref(false)
 
@@ -725,18 +725,42 @@ function handleConfirm() {
   })
 }
 
-function onMaterialSaved({ isEdit, data }) {
-  if (isEdit) return
-  const row = addMaterial(data)
-  listVersion.value += 1
-  invalidateBomSubItemPickerRowsCache()
-  const picked = buildBomSubItemPickerRows().find((r) => r.rowKey === `物料-${row.id}`)
-  if (picked && !selectedRowKeys.value.includes(picked.rowKey)) {
-    selectedRowKeys.value = [...selectedRowKeys.value, picked.rowKey]
-    selectedRows.value = [...selectedRows.value, picked]
+/** 打开最新「新增产品」页（MasterItem）；须先关选品弹窗，否则遮罩挡住新标签 */
+function openAddMasterItem() {
+  if (!productCreatePage?.newPath) {
+    message.warning('未找到新增产品页面配置')
+    return
   }
-  message.success('物料已保存并加入已选列表')
+  const path = productCreatePage.newPath
+  const title = productCreatePage.title || '新增产品'
+  emit('update:open', false)
+  nextTick(() => {
+    openCreateTab(router, openTab, { path, title }).catch(() => {
+      // 重复导航等场景忽略
+    })
+  })
 }
+
+function refreshPickerList() {
+  invalidateBomSubItemPickerRowsCache()
+  listVersion.value += 1
+}
+
+/** 从新增产品标签切回时刷新选品列表，便于选到刚建的档案 */
+watch(
+  () => tabStore.activePath,
+  (path, prev) => {
+    if (!props.open) return
+    const prevBase = String(prev || '').split('?')[0]
+    const nextBase = String(path || '').split('?')[0]
+    if (
+      prevBase === '/product-process/products/new' &&
+      nextBase !== '/product-process/products/new'
+    ) {
+      refreshPickerList()
+    }
+  },
+)
 </script>
 
 <style lang="less" scoped>
