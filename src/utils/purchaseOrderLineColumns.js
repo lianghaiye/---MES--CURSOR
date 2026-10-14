@@ -33,8 +33,9 @@ export const purchaseOrderFormLineColumns = [
   { title: '含税单价', key: 'unitPriceInTax', width: 100 },
   { title: '总价（不含税）', key: 'totalPriceExTax', width: 110, align: 'right' },
   { title: '总价（含税）', key: 'totalPriceInTax', width: 100, align: 'right' },
+  { title: '销售订单号', key: 'salesOrderNo', width: 160 },
   { title: '交货日期', key: 'deliveryDate', width: 120 },
   { title: '紧急度', key: 'urgency', width: 90 },
   { title: '备注', key: 'remark', width: 120, ellipsis: true },
-  { title: '操作', key: 'actions', width: 110 },
+  { title: '操作', key: 'actions', width: 140 },
 ]

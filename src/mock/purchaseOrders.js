@@ -62,6 +62,7 @@ export function createPoLineItem(partial = {}) {
     totalPriceExTax: roundNumber(pricingQty * ex, 4),
     totalPriceInTax: roundNumber(pricingQty * inTax, 4),
     deliveryDate: '',
+    salesOrderNo: '',
     urgency: '正常',
     receivingMode: '正常收货',
     receivingWarehouse: '',

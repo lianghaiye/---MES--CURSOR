@@ -40,7 +40,10 @@
               </a-col>
               <a-col :span="6">
                 <a-form-item label="销售订单">
-                  <SalesOrderSearchSelect v-model:value="form.salesOrderNo" />
+                  <SalesOrderSearchSelect
+                    :value="form.salesOrderNo"
+                    @update:value="onSalesOrderNoChange"
+                  />
                 </a-form-item>
               </a-col>
               <a-col :span="6">
@@ -473,6 +476,9 @@
                   <template v-else-if="column.key === 'totalPriceInTax'">
                     {{ formatMoney(record.totalPriceInTax) }}
                   </template>
+                  <template v-else-if="column.key === 'salesOrderNo'">
+                    <SalesOrderSearchSelect v-model:value="record.salesOrderNo" size="small" />
+                  </template>
                   <template v-else-if="column.key === 'deliveryDate'">
                     <InventoryLineEditableCell
                       :active="isLineCellEditing(record.id, 'deliveryDate')"
@@ -572,6 +578,7 @@
                   <template v-else-if="column.key === 'actions'">
                     <a-space :size="4">
                       <a @click="openLineEdit(record)">编辑</a>
+                      <a @click="copyLine(record)">复制</a>
                       <a class="danger-link" @click="removeLine(record.id)">删除</a>
                     </a-space>
                   </template>
@@ -843,8 +850,8 @@ function filterUnitOption(input, option) {
 }
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-form-lines-v6', purchaseOrderFormLineColumns, {
-    minScrollX: 2200,
+  useTableColumnSettings('purchase-order-form-lines-v7', purchaseOrderFormLineColumns, {
+    minScrollX: 2360,
     pinEdgeColumns: false,
     pinActionColumn: true,
   })
@@ -954,6 +961,7 @@ function normalizeLineItems(items) {
     drawingNo: line.drawingNo || '',
     stockQty: line.stockQty ?? 0,
     deliveryDate: line.deliveryDate || '',
+    salesOrderNo: line.salesOrderNo || '',
     urgency: line.urgency || '正常',
     receivingWarehouse: line.receivingWarehouse || '',
     remark: line.remark || '',
@@ -1076,6 +1084,7 @@ function mapPickerToPoLine(payload) {
     unitPriceExTax: unitPrice,
     taxRate,
     deliveryDate: headerDeliveryDateStr(),
+    salesOrderNo: form.salesOrderNo || '',
     receivingWarehouse: form.receivingWarehouse || '',
     urgency: '正常',
     remark: '',
@@ -1122,6 +1131,7 @@ function onSpuDraftSelected(rows) {
       itemCode: '',
       purchaseQty: 1,
       deliveryDate: headerDeliveryDateStr(),
+      salesOrderNo: form.salesOrderNo || '',
       receivingWarehouse: form.receivingWarehouse || '',
       remark: '',
     })
@@ -1225,10 +1235,37 @@ function onProductsSelected(rows) {
 function addBlankLine() {
   const line = createPoLineItem({
     deliveryDate: headerDeliveryDateStr(),
+    salesOrderNo: form.salesOrderNo || '',
     receivingWarehouse: form.receivingWarehouse || '',
   })
   recalcLineWithMode(line)
   form.lineItems.push(line)
+}
+
+function onSalesOrderNoChange(orderNo) {
+  const prev = form.salesOrderNo
+  const next = orderNo || ''
+  form.salesOrderNo = next
+  form.lineItems.forEach((line) => {
+    if (!String(line.salesOrderNo || '').trim() || line.salesOrderNo === prev) {
+      line.salesOrderNo = next
+    }
+  })
+}
+
+function copyLine(record) {
+  const copy = createPoLineItem({
+    ...record,
+    id: undefined,
+    receivedQty: 0,
+    appliedReceiptQty: 0,
+    inboundQty: 0,
+  })
+  recalcLineWithMode(copy)
+  const idx = form.lineItems.findIndex((l) => l.id === record.id)
+  if (idx >= 0) form.lineItems.splice(idx + 1, 0, copy)
+  else form.lineItems.push(copy)
+  message.success('已复制一行明细')
 }
 
 function syncLineDeliveryDates(dateStr) {
