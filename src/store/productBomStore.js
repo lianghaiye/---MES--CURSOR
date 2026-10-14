@@ -6,6 +6,7 @@ import {
   hydrateCatalogBom,
   injectBomArchiveDemoMocks,
   injectBomParentReferenceMocks,
+  ensureMultiBomRefDemo,
   injectBomUpgradeSyncDemoMocks,
   isCatalogSeedBom,
 } from '@/mock/productBomSeed'
@@ -119,7 +120,7 @@ function loadInitialBoms() {
   const withDemos = ensureShipBomDemos(
     ensureBlankSizeDemoBoms(injectBomUpgradeSyncDemoMocks(injectBomArchiveDemoMocks(base))),
   )
-  return ensureManualBomEditDemo(withDemos)
+  return ensureMultiBomRefDemo(ensureManualBomEditDemo(withDemos))
 }
 
 export const productBomState = reactive({

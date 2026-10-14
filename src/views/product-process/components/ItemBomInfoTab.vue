@@ -19,25 +19,6 @@
         <div v-if="variantHint" class="bom-variant-hint">{{ variantHint }}</div>
         <div v-if="spuTemplateHint" class="bom-template-hint">{{ spuTemplateHint }}</div>
       </div>
-      <a-space wrap>
-        <a-button
-          v-if="itemId"
-          type="primary"
-          size="small"
-          :disabled="disabled"
-          @click="openCreateBom"
-        >
-          新建 BOM
-        </a-button>
-        <a-button
-          v-if="activeBom"
-          size="small"
-          :disabled="disabled"
-          @click="openBomDetail(activeBom)"
-        >
-          编辑/查看生效版
-        </a-button>
-      </a-space>
     </div>
 
     <div class="section-label">版本列表</div>
@@ -49,7 +30,7 @@
       size="small"
       bordered
       :pagination="false"
-      :scroll="{ x: 1180 }"
+      :scroll="{ x: 1320 }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -57,6 +38,12 @@
         </template>
         <template v-else-if="column.key === 'bomNo'">
           <a class="link-code" @click.prevent="openBomDetail(record)">{{ record.bomNo }}</a>
+        </template>
+        <template v-else-if="column.key === 'levelCount'">
+          {{ record.levelCount ?? '—' }}
+        </template>
+        <template v-else-if="column.key === 'materialCount'">
+          {{ record.materialCount ?? '—' }}
         </template>
         <template v-else-if="column.key === 'effectiveAt'">
           {{ record.effectiveAt || '—' }}
@@ -83,6 +70,7 @@ import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { findSpuById } from '@/store/spuStore'
 import { bomStatusColor } from '@/mock/productBomOptions'
+import { enrichProductBomForList } from '@/utils/productBomListEnrich'
 import { useTabs } from '@/composables/useTabs'
 
 const props = defineProps({
@@ -111,7 +99,7 @@ const activeBom = computed(() => {
 const rows = computed(() => {
   void productBomState.boms
   if (!props.itemId) return []
-  return getBomsForItem(props.itemType, props.itemId)
+  return getBomsForItem(props.itemType, props.itemId).map((bom) => enrichProductBomForList(bom))
 })
 
 const variantHint = computed(() => {
@@ -133,8 +121,10 @@ const spuTemplateHint = computed(() => {
 
 const columns = [
   { title: '状态', key: 'status', width: 88, fixed: 'left' },
-  { title: 'BOM编码', key: 'bomNo', width: 160, ellipsis: true },
+  { title: 'BOM编码', key: 'bomNo', width: 140, ellipsis: true },
   { title: 'BOM名称', dataIndex: 'bomName', width: 180, ellipsis: true },
+  { title: '层级数', key: 'levelCount', width: 72, align: 'center' },
+  { title: '物料数', key: 'materialCount', width: 72, align: 'center' },
   { title: 'BOM版本', dataIndex: 'version', width: 100 },
   { title: '创建人', dataIndex: 'creator', width: 88 },
   { title: '创建时间', dataIndex: 'createdAt', width: 150 },
@@ -150,30 +140,10 @@ function openBomDetail(record) {
   openTab(resolved.path, record.bomName || 'BOM详情')
   router.push(resolved)
 }
-
-function openCreateBom() {
-  if (!props.itemId) return
-  const master = masterRecord.value
-  const resolved = router.resolve({
-    path: '/product-process/bom/new',
-    query: {
-      itemType: props.itemType,
-      itemId: String(props.itemId),
-      itemName: master?.name || '',
-      bomType: '产品BOM',
-    },
-  })
-  openTab(resolved.path, '新建产品BOM')
-  router.push(resolved)
-}
 </script>
 
 <style lang="less" scoped>
 .bom-status-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
   margin-bottom: 12px;
   padding: 10px 12px;
   background: #fafafa;

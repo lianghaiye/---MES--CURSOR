@@ -222,6 +222,62 @@ export function injectBomParentReferenceMocks(boms) {
 }
 
 /**
+ * Mock：潜水电泵 QJ200-40/3（CP2610004 / prod-00004）作为子件被多个母件 BOM 引用，
+ * 供产品详情「BOM引用」卡片演示多引用明细。
+ */
+export function ensureMultiBomRefDemo(boms) {
+  if (!Array.isArray(boms)) return boms
+
+  const childBom = boms.find(
+    (b) =>
+      b.itemType === 'product' &&
+      (b.itemId === 'prod-00004' || b.itemCode === 'CP2610004') &&
+      b.status === BOM_STATUS.ACTIVE &&
+      (b.lineItems?.length || b.treeNodes?.length),
+  )
+  if (!childBom) return boms
+
+  const parentItemIds = ['prod-00001', 'prod-00002', 'prod-00005']
+  let injected = 0
+
+  parentItemIds.forEach((itemId) => {
+    const parent = boms.find(
+      (b) =>
+        b.itemType === 'product' &&
+        b.itemId === itemId &&
+        b.status === BOM_STATUS.ACTIVE &&
+        Array.isArray(b.lineItems),
+    )
+    if (!parent) return
+
+    const already = (parent.lineItems || []).some(
+      (line) =>
+        line.childBomId === childBom.id ||
+        String(line.referencedItemId || '') === String(childBom.itemId) ||
+        String(line.materialCode || '') === String(childBom.itemCode),
+    )
+    if (already) {
+      injected += 1
+      return
+    }
+
+    const rootId = parent.treeNodes?.find((n) => n.isRoot)?.id || parent.treeNodes?.[0]?.id || ''
+    if (!rootId) return
+
+    const { refNode } = appendBomRefWithChildren(parent, rootId, childBom, {
+      remark: 'Mock：CP2610004 被多 BOM 引用演示',
+      subordinateCount: 1,
+    })
+    if (!refNode) return
+    parent.updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+    injected += 1
+  })
+
+  if (injected > 0) childBom._mockMultiBomRefsInjected = true
+  return boms
+}
+
+/**
  * 在母件根下挂子件 BOM 引用，并可选展开若干下级物料行（便于验证「仅保留本级，移除下级」）
  */
 function appendBomRefWithChildren(parent, rootId, childBom, options = {}) {
