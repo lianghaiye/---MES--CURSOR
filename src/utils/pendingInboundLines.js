@@ -1,7 +1,7 @@
 /** 待入库列表：入库单展平为明细行 + 订单级 rowspan */
 
 import dayjs from 'dayjs'
-import { normalizeInboundStatus } from '@/mock/inboundOptions'
+import { inboundSourceLabel, normalizeInboundStatus } from '@/mock/inboundOptions'
 
 export const PENDING_INBOUND_STATUSES = ['待入库', '部分入库']
 
@@ -15,6 +15,8 @@ export const PENDING_INBOUND_ORDER_MERGE_KEYS = [
   'salesOrderNo',
   'supplier',
   'inboundDate',
+  'sourceChannel',
+  'invoiceNo',
   'createdAt',
   'creator',
   'confirmedAt',
@@ -22,6 +24,27 @@ export const PENDING_INBOUND_ORDER_MERGE_KEYS = [
   'warehouseKeeper',
   'action',
 ]
+
+function orderLevelFields(order, status, inboundQtyTotalText) {
+  return {
+    status,
+    docNo: order.docNo || '',
+    inboundType: order.inboundType || '',
+    inboundQtyTotal: inboundQtyTotalText,
+    sourceOrderNo: order.sourceOrderNo || '',
+    salesOrderNo: order.salesOrderNo || '',
+    supplier: order.supplier || '',
+    inboundDate: order.inboundDate || '',
+    sourceChannel: order.sourceChannel || '',
+    sourceChannelLabel: inboundSourceLabel(order.sourceChannel),
+    invoiceNo: order.invoiceNo || '',
+    createdAt: order.createdAt || '',
+    creator: order.creator || '',
+    confirmedAt: order.confirmedAt || '',
+    confirmer: order.confirmer || '',
+    warehouseKeeper: order.warehouseKeeper || '',
+  }
+}
 
 function includesText(haystack, needle) {
   if (!needle) return true
@@ -77,19 +100,7 @@ export function flattenPendingInboundLines(orders = []) {
         id: `${order.id}__empty`,
         orderId: order.id,
         lineId: '',
-        status,
-        docNo: order.docNo || '',
-        inboundType: order.inboundType || '',
-        inboundQtyTotal: inboundQtyTotalText,
-        sourceOrderNo: order.sourceOrderNo || '',
-        salesOrderNo: order.salesOrderNo || '',
-        supplier: order.supplier || '',
-        inboundDate: order.inboundDate || '',
-        createdAt: order.createdAt || '',
-        creator: order.creator || '',
-        confirmedAt: order.confirmedAt || '',
-        confirmer: order.confirmer || '',
-        warehouseKeeper: order.warehouseKeeper || '',
+        ...orderLevelFields(order, status, inboundQtyTotalText),
         itemCode: '',
         itemName: '',
         specModel: '',
@@ -108,19 +119,7 @@ export function flattenPendingInboundLines(orders = []) {
         orderId: order.id,
         lineId: line.id || '',
         lineIndex,
-        status,
-        docNo: order.docNo || '',
-        inboundType: order.inboundType || '',
-        inboundQtyTotal: inboundQtyTotalText,
-        sourceOrderNo: order.sourceOrderNo || '',
-        salesOrderNo: order.salesOrderNo || '',
-        supplier: order.supplier || '',
-        inboundDate: order.inboundDate || '',
-        createdAt: order.createdAt || '',
-        creator: order.creator || '',
-        confirmedAt: order.confirmedAt || '',
-        confirmer: order.confirmer || '',
-        warehouseKeeper: order.warehouseKeeper || '',
+        ...orderLevelFields(order, status, inboundQtyTotalText),
         itemCode: line.itemCode || '',
         itemName: line.itemName || '',
         specModel: line.specModel || line.specAttr || '',

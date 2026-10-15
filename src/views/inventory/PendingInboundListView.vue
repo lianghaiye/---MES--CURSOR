@@ -395,6 +395,15 @@
             <template v-else-if="column.key === 'supplier'">
               {{ record.supplier || '—' }}
             </template>
+            <template v-else-if="column.key === 'sourceChannel'">
+              {{ record.sourceChannelLabel || inboundSourceLabel(record.sourceChannel) || '—' }}
+            </template>
+            <template v-else-if="column.key === 'invoiceNo'">
+              {{ record.invoiceNo || '—' }}
+            </template>
+            <template v-else-if="column.key === 'inboundDate'">
+              {{ record.inboundDate || '—' }}
+            </template>
             <template v-else-if="column.key === 'action'">
               <a-space :size="0" wrap>
                 <a-button
@@ -643,7 +652,9 @@ const baseColumns = [
   { title: '源单号', key: 'sourceOrderNo', dataIndex: 'sourceOrderNo', width: 140, ellipsis: true },
   { title: '销售单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '供应商', key: 'supplier', dataIndex: 'supplier', width: 120, ellipsis: true },
-  { title: '入库日期', key: 'inboundDate', dataIndex: 'inboundDate', width: 110 },
+  { title: '入库时间', key: 'inboundDate', dataIndex: 'inboundDate', width: 120 },
+  { title: '来源', key: 'sourceChannel', width: 80 },
+  { title: '发票号', key: 'invoiceNo', dataIndex: 'invoiceNo', width: 120, ellipsis: true },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 160 },
   { title: '创建人', key: 'creator', dataIndex: 'creator', width: 80 },
   { title: '确认时间', key: 'confirmedAt', dataIndex: 'confirmedAt', width: 160 },
@@ -653,7 +664,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('pending-inbound-list-v2', baseColumns, { minScrollX: 2800 })
+  useTableColumnSettings('pending-inbound-list-v3', baseColumns, { minScrollX: 3000 })
 
 const pageOrderRowSpans = computed(() => buildPendingInboundLineRowSpans(pagedList.value))
 const orderMergeKeySet = new Set(PENDING_INBOUND_ORDER_MERGE_KEYS)
