@@ -163,7 +163,41 @@
       </a-form>
     </div>
 
-    <div v-if="form.lineItems.length" class="section-block section-block--lines">
+    <a-alert
+      v-if="isAccessoryReship"
+      type="info"
+      show-icon
+      class="accessory-reship-alert"
+      message="配件补发：可不带整机/散件产品行。请勾选本次要补发的随货配件并填写数量；整机已发完也可提交。"
+    />
+
+    <div v-if="isAccessoryReship" class="section-block">
+      <div class="section-title">补发信息</div>
+      <a-divider class="section-divider" />
+      <a-form
+        layout="horizontal"
+        class="horizontal-form"
+        :label-col="{ style: { width: '100px' } }"
+      >
+        <a-row :gutter="16">
+          <a-col :span="8">
+            <a-form-item label="补发原因" required>
+              <a-select
+                v-model:value="form.accessoryReshipReason"
+                placeholder="请选择"
+                allow-clear
+                :options="ACCESSORY_RESHIP_REASON_OPTIONS"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </div>
+
+    <div
+      v-if="!isAccessoryReship && form.lineItems.length"
+      class="section-block section-block--lines"
+    >
       <div class="section-title">整机发货</div>
       <a-divider class="section-divider" />
       <div
@@ -325,7 +359,10 @@
       </div>
     </div>
 
-    <div v-if="form.scatterShipments.length" class="section-block section-block--lines">
+    <div
+      v-if="!isAccessoryReship && form.scatterShipments.length"
+      class="section-block section-block--lines"
+    >
       <div class="section-title">散件发运</div>
       <a-divider class="section-divider" />
       <div
@@ -517,7 +554,7 @@
     </div>
 
     <DeliveryShipAttachmentSection
-      v-if="showShipAttachmentUi"
+      v-if="showShipAttachmentUi || isAccessoryReship"
       ref="attachmentSectionRef"
       v-model="form.shipAttachments"
       :line-items="form.lineItems"
@@ -525,6 +562,11 @@
       :sales-order="currentSalesOrder()"
       :sales-order-id="form.salesOrderId || ''"
       :warehouse="form.outboundWarehouse || ''"
+      :accessory-reship="isAccessoryReship"
+      :anchor-line-items="accessoryReshipAnchorLines"
+      :show-bring-standard-kit="isAccessoryReship"
+      title="随货配件"
+      empty-description="暂无随货配件：请确认订单有标准包快照或产品已配置随货配件，或点击「带出标准包」"
     />
 
     <ScatterShipDrawer
@@ -626,6 +668,12 @@ import {
   formatAllocationsBarcode,
   preallocateDeliveryBatches,
 } from '@/utils/salesOrderDedicatedStock'
+import {
+  ACCESSORY_RESHIP_REASON_OPTIONS,
+  DELIVERY_KIND,
+  buildAccessoryReshipSeed,
+  salesOrderLinesAsAttachmentAnchors,
+} from '@/utils/accessoryReship'
 
 const props = defineProps({
   open: Boolean,
@@ -635,12 +683,19 @@ const props = defineProps({
   /** create=发货管理新增；apply=销售订单申请发货 */
   mode: { type: String, default: 'create' },
   initialSalesOrderId: { type: String, default: '' },
+  /** normal | accessory_reship */
+  deliveryKind: { type: String, default: DELIVERY_KIND.NORMAL },
 })
 
 const emit = defineEmits(['update:open', 'saved', 'confirmed'])
 
 const isApplyMode = computed(() => props.mode === 'apply')
 const isEdit = computed(() => Boolean(props.record?.id))
+const isAccessoryReship = computed(
+  () =>
+    props.deliveryKind === DELIVERY_KIND.ACCESSORY_RESHIP ||
+    props.record?.deliveryKind === DELIVERY_KIND.ACCESSORY_RESHIP,
+)
 /** 编辑或已从销售订单带入时，锁定源销售订单 */
 const salesOrderLocked = computed(
   () => isEdit.value || isApplyMode.value || Boolean(props.initialSalesOrderId),
@@ -648,7 +703,10 @@ const salesOrderLocked = computed(
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/sales/delivery',
   getTitle: () => {
-    if (props.record?.id) return '编辑发货单'
+    if (props.record?.id) {
+      return isAccessoryReship.value ? '编辑配件补发' : '编辑发货单'
+    }
+    if (isAccessoryReship.value) return '配件补发'
     if (props.mode === 'apply' || props.initialSalesOrderId) return '申请发货'
     return '新增发货单'
   },
@@ -736,6 +794,7 @@ const form = reactive({
   lineItems: [],
   scatterShipments: [],
   shipAttachments: [],
+  accessoryReshipReason: undefined,
 })
 
 const {
@@ -763,8 +822,14 @@ const attachmentSectionRef = ref(null)
 
 const showShipAttachmentUi = computed(() => {
   void functionParamState.params.shipAttachmentDecideStage
+  if (isAccessoryReship.value) return true
   // 申请发货且配置为仓管确定时，不展示附件能力
   return !isApplyMode.value || isShipAttachmentDecidedAtApply()
+})
+
+const accessoryReshipAnchorLines = computed(() => {
+  if (!isAccessoryReship.value) return []
+  return salesOrderLinesAsAttachmentAnchors(currentSalesOrder())
 })
 
 function excludeDeliveryIds() {
@@ -840,7 +905,13 @@ const contactOpts = computed(() => {
 })
 
 watch(
-  () => [isActive.value, props.initialSalesOrderId, props.mode, props.record?.id],
+  () => [
+    isActive.value,
+    props.initialSalesOrderId,
+    props.mode,
+    props.record?.id,
+    props.deliveryKind,
+  ],
   ([active]) => {
     if (!active) return
     if (props.record) {
@@ -850,7 +921,7 @@ watch(
     if (isApplyMode.value) {
       const soId = props.initialSalesOrderId
       // 切回标签时保留用户已填内容；仅在订单变化时重载
-      if (form.salesOrderId || form.lineItems.length) {
+      if (form.salesOrderId || form.lineItems.length || form.shipAttachments.length) {
         if (soId && form.salesOrderId && soId !== form.salesOrderId) {
           resetForm()
           const so = salesOrderState.orders.find((o) => o.id === soId)
@@ -897,6 +968,7 @@ function resetForm() {
   form.lineItems = []
   form.scatterShipments = []
   form.shipAttachments = []
+  form.accessoryReshipReason = undefined
   expandedScatterRowKeys.value = []
   prevHeaderWarehouse.value = undefined
 }
@@ -956,6 +1028,7 @@ function loadFromRecord(record) {
   form.driverPhone = record.driverPhone || ''
   form.plateNo = record.plateNo || ''
   form.remark = record.remark || ''
+  form.accessoryReshipReason = record.accessoryReshipReason || undefined
   form.lineItems = JSON.parse(JSON.stringify(record.lineItems || [])).map((line) => {
     line.shipWeight = roundDeliveryDecimal(line.shipWeight ?? line.itemWeightKg ?? 0, 4)
     line.unitPriceInTax = roundDeliveryDecimal(line.unitPriceInTax ?? 0, 4)
@@ -1090,6 +1163,10 @@ function populateFromSalesOrder(so) {
   form.contactPhone = so.contactPhone || ''
   form.deliveryAddress = so.deliveryAddress || ''
   form.shipmentMethod = resolveDefaultShipmentMethod(so.customerName, so.deliveryMethod)
+  if (isAccessoryReship.value) {
+    populateAccessoryReshipFromSalesOrder(so)
+    return
+  }
   // 再次申请：已发完产品仍展示（置灰），未发完可继续填写剩余数量
   form.lineItems = (so.lineItems || [])
     .map((line) => mapSalesLineToDeliveryLine(line, so))
@@ -1106,6 +1183,19 @@ function populateFromSalesOrder(so) {
     form.shipAttachments = []
   }
   syncExpandedScatterRows()
+}
+
+function populateAccessoryReshipFromSalesOrder(so) {
+  form.lineItems = []
+  form.scatterShipments = []
+  form.accessoryReshipReason = form.accessoryReshipReason || '少发'
+  form.applyOutbound = true
+  form.shipAttachments = buildAccessoryReshipSeed(so, {
+    warehouse: form.outboundWarehouse || '',
+  })
+  nextTick(() => {
+    attachmentSectionRef.value?.rebuildFromCurrentDelivery?.({ merge: true })
+  })
 }
 
 function onSalesOrderChange(id) {
@@ -1349,27 +1439,42 @@ function handleOk() {
     return
   }
 
-  const wholeLines = savableWholeLines()
-  const scatterLines = savableScatterShipments()
+  const wholeLines = isAccessoryReship.value ? [] : savableWholeLines()
+  const scatterLines = isAccessoryReship.value ? [] : savableScatterShipments()
   const unlockedWhole = (form.lineItems || []).filter((l) => !isDeliveryLineShipLocked(l))
   const unlockedScatter = (form.scatterShipments || []).filter((s) => !isDeliveryLineShipLocked(s))
 
-  if (!form.lineItems.length && !form.scatterShipments.length) {
-    message.warning('请选择销售订单并确认有可发运明细')
-    return
-  }
-  if (!unlockedWhole.length && !unlockedScatter.length) {
-    message.warning('本单产品均已发完，无法再次申请发货')
-    return
-  }
-  if (!wholeLines.length && !scatterLines.length) {
-    message.warning('请至少填写一条未发完产品的发货数量，或不发的产品请移出本单')
-    return
-  }
+  if (isAccessoryReship.value) {
+    if (!form.accessoryReshipReason) {
+      message.warning('请选择补发原因')
+      return
+    }
+    const selectedAtt = (form.shipAttachments || []).filter(
+      (a) => a.selected !== false && (Number(a.shipQty) || 0) > 0,
+    )
+    if (!selectedAtt.length) {
+      message.warning('请至少勾选一项随货配件并填写补发数量')
+      return
+    }
+    if (!validateShipAttachments()) return
+  } else {
+    if (!form.lineItems.length && !form.scatterShipments.length) {
+      message.warning('请选择销售订单并确认有可发运明细')
+      return
+    }
+    if (!unlockedWhole.length && !unlockedScatter.length) {
+      message.warning('本单产品均已发完，无法再次申请发货。如需补发配件，请使用「配件补发」。')
+      return
+    }
+    if (!wholeLines.length && !scatterLines.length) {
+      message.warning('请至少填写一条未发完产品的发货数量，或不发的产品请移出本单')
+      return
+    }
 
-  if (unlockedWhole.length && !validateWholeMachineLines()) return
-  if (unlockedScatter.length && !validateScatterShipments()) return
-  if (!validateShipAttachments()) return
+    if (unlockedWhole.length && !validateWholeMachineLines()) return
+    if (unlockedScatter.length && !validateScatterShipments()) return
+    if (!validateShipAttachments()) return
+  }
 
   if (isEdit.value) {
     const linked = findLinkedSalesOutbound(props.record)
@@ -1380,6 +1485,11 @@ function handleOk() {
   }
 
   wholeLines.forEach(recalcDeliveryLine)
+
+  const selectedShipAttachments = (form.shipAttachments || []).filter(
+    (a) => a.selected !== false && (Number(a.shipQty) || 0) > 0,
+  )
+  const accessoryQty = selectedShipAttachments.reduce((s, a) => s + (Number(a.shipQty) || 0), 0)
 
   const payload = {
     salesOrderId: form.salesOrderId,
@@ -1398,10 +1508,16 @@ function handleOk() {
     driverPhone: form.driverPhone,
     plateNo: form.plateNo,
     remark: form.remark,
+    deliveryKind: isAccessoryReship.value ? DELIVERY_KIND.ACCESSORY_RESHIP : DELIVERY_KIND.NORMAL,
+    accessoryReshipReason: isAccessoryReship.value ? form.accessoryReshipReason || '' : '',
     lineItems: JSON.parse(JSON.stringify(wholeLines)),
     scatterShipments: JSON.parse(JSON.stringify(scatterLines)),
     shipAttachments: JSON.parse(
-      JSON.stringify(showShipAttachmentUi.value || isEdit.value ? form.shipAttachments || [] : []),
+      JSON.stringify(
+        showShipAttachmentUi.value || isEdit.value || isAccessoryReship.value
+          ? form.shipAttachments || []
+          : [],
+      ),
     ),
   }
 
@@ -1427,14 +1543,14 @@ function handleOk() {
       )
       addDeliveryApplication(payload.salesOrderId, {
         ...payload,
-        totalShipQty: wholeQty + scatterQty,
+        totalShipQty: isAccessoryReship.value ? accessoryQty : wholeQty + scatterQty,
       })
-      message.success('发货申请已记录')
+      message.success(isAccessoryReship.value ? '配件补发已提交' : '发货申请已记录')
       emit('confirmed', payload)
       emit('saved')
     } else {
       createDeliveryOrder(payload)
-      message.success('发货单已创建')
+      message.success(isAccessoryReship.value ? '配件补发单已创建' : '发货单已创建')
       emit('saved')
     }
     closeAfterSave()

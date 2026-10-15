@@ -771,6 +771,12 @@ function persist() {
   persistJson(STORAGE_KEY, functionParamState.params)
 }
 
+/** 显式保存当前功能参数（页头「保存」按钮） */
+export function saveFunctionParams() {
+  persist()
+  return { ok: true }
+}
+
 export const functionParamState = reactive({
   params: loadFromStorage() || {
     salaryPushMode: SALARY_PUSH_MODES.MANUAL,

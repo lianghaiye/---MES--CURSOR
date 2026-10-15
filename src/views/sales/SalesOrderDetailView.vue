@@ -51,6 +51,13 @@
                 >
                   申请发货
                 </a-button>
+                <a-button
+                  v-if="!pendingPriceChange && showAccessoryReshipAction"
+                  size="small"
+                  @click="handleAccessoryReship"
+                >
+                  配件补发
+                </a-button>
                 <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
                 <a-button size="small" @click="handleComplete">完成</a-button>
                 <a-button size="small" danger @click="handleTerminate">作废</a-button>
@@ -394,6 +401,13 @@
                       {{ row.deliveryCode }}
                     </a>
                     <span v-else>{{ row.deliveryCode || '—' }}</span>
+                    <a-tag
+                      v-if="isAccessoryReshipDelivery(row)"
+                      color="purple"
+                      class="delivery-kind-tag"
+                    >
+                      配件补发{{ row.accessoryReshipReason ? `·${row.accessoryReshipReason}` : '' }}
+                    </a-tag>
                   </template>
                   <template v-else-if="column.key === 'applyShipQty'">
                     {{ formatOutboundQtyInt(row.applyShipQty) }}
@@ -1106,7 +1120,12 @@ import {
   resubmitSalesOrder,
   updateSalesOrder,
 } from '@/store/salesOrderStore'
-import { functionParamState, isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
+import {
+  functionParamState,
+  isShipAttachmentDecidedAtApply,
+  isShipAttachmentDecidedAtOrder,
+} from '@/store/functionParamStore'
+import { DELIVERY_KIND, isAccessoryReshipDelivery } from '@/utils/accessoryReship'
 import {
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
   hasSalesOrderRevokeBlockers,
@@ -1239,6 +1258,12 @@ const shippingTabCount = computed(
 const showShipAccessoriesTab = computed(() => {
   void functionParamState.params.shipAttachmentDecideStage
   return isShipAttachmentDecidedAtOrder()
+})
+
+/** 申请发货/订单阶段确定配件时，允许从详情发起配件补发 */
+const showAccessoryReshipAction = computed(() => {
+  void functionParamState.params.shipAttachmentDecideStage
+  return isShipAttachmentDecidedAtApply()
 })
 
 const shipAccessoryCount = computed(() => (order.value?.shipAccessories || []).length)
@@ -2074,6 +2099,23 @@ function handleApplyDelivery() {
   })
 }
 
+function handleAccessoryReship() {
+  if (!order.value) return
+  const block = getPendingPriceChangeDeliveryBlock(order.value.id)
+  if (block) {
+    message.warning(block)
+    return
+  }
+  openCreateTab(router, openTab, {
+    path: '/sales/delivery/new',
+    title: `配件补发 ${order.value.orderNo || ''}`.trim(),
+    query: {
+      salesOrderId: order.value.id,
+      deliveryKind: DELIVERY_KIND.ACCESSORY_RESHIP,
+    },
+  })
+}
+
 function handlePriceChange() {
   if (!order.value) return
   if (!canApplySalesPriceChange(order.value)) {
@@ -2201,6 +2243,11 @@ function openBomDetail(bomId, bomName) {
 </script>
 
 <style lang="less" scoped>
+.delivery-kind-tag {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .link-code {
   color: #1677ff;
   cursor: pointer;

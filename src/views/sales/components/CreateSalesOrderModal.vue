@@ -672,6 +672,14 @@
           </div>
         </div>
 
+        <div v-if="showShipAccessoriesSection" class="section-block ship-accessory-section">
+          <div class="section-title">随货配件</div>
+          <p class="ship-accessory-tip">
+            按产品匹配已启用的随货配件标准包；可勾选纳入、调整套数，库存不足时可转采购申请。
+          </p>
+          <SalesOrderShipAccessorySection :order="form" @change="onShipAccessoriesChange" />
+        </div>
+
         <div class="section-block attachment-section">
           <div class="section-title">图片文档信息</div>
           <a-form layout="horizontal" class="attachment-form horizontal-form">
@@ -778,8 +786,9 @@ import {
   salesOrderState,
   updateSalesOrder,
 } from '@/store/salesOrderStore'
-import { isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
+import { functionParamState, isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
 import { syncSalesOrderShipAccessories } from '@/utils/salesOrderShipAccessories'
+import SalesOrderShipAccessorySection from './SalesOrderShipAccessorySection.vue'
 import { ensureStockTransferDemoMocksForOrder } from '@/store/salesStockAllocationStore'
 import {
   STOCK_FULFILLMENT_MODE,
@@ -970,7 +979,26 @@ const form = reactive({
   orderDiscountAmount: 0,
   orderDiscountReason: '',
   lineItems: [],
+  shipAccessories: [],
 })
+
+const showShipAccessoriesSection = computed(() => {
+  void functionParamState.params.shipAttachmentDecideStage
+  return isShipAttachmentDecidedAtOrder()
+})
+
+function onShipAccessoriesChange(list) {
+  form.shipAccessories = Array.isArray(list) ? list : form.shipAccessories || []
+}
+
+function syncShipAccessoriesFromLines() {
+  if (!isShipAttachmentDecidedAtOrder()) {
+    form.shipAccessories = []
+    return
+  }
+  if (!form.lineItems.some((l) => l.productCode || l.productId)) return
+  syncSalesOrderShipAccessories(form, { defaultSelected: true })
+}
 
 const displayColumns = computed(() =>
   columnDefs
@@ -1191,8 +1219,12 @@ watch(
         lineItems: JSON.parse(JSON.stringify(r.lineItems || [])).map((line) =>
           normalizeLineItem(line, r.businessType),
         ),
+        shipAccessories: JSON.parse(JSON.stringify(r.shipAccessories || [])),
       })
       recalcAll()
+      if (isShipAttachmentDecidedAtOrder() && !form.shipAccessories?.length) {
+        syncShipAccessoriesFromLines()
+      }
       fileList.value = (r.attachments || []).map((file) => ({
         uid: file.uid || file.name,
         name: file.name,
@@ -1271,6 +1303,7 @@ function resetForm() {
   form.orderDiscountAmount = 0
   form.orderDiscountReason = ''
   form.lineItems = []
+  form.shipAccessories = []
   form.orderAmount = 0
   form.totalDiscountAmount = 0
   form.lineDiscountTotal = 0
@@ -1279,6 +1312,19 @@ function resetForm() {
   taxModeExcluding.value = false
   priceSummaryCollapsed.value = true
 }
+
+watch(
+  () =>
+    form.lineItems
+      .map(
+        (l) => `${l.id}|${l.productId || ''}|${l.productCode || ''}|${l.salesQty ?? l.qty ?? ''}`,
+      )
+      .join(';'),
+  () => {
+    if (!showShipAccessoriesSection.value) return
+    syncShipAccessoriesFromLines()
+  },
+)
 
 function beforeUpload(file) {
   if (file.size > MAX_FILE_SIZE) {
@@ -2144,6 +2190,15 @@ function handleSave() {
   font-size: 12px;
   line-height: 1.6;
   color: #1677ff;
+}
+
+.ship-accessory-section {
+  .ship-accessory-tip {
+    margin: 0 0 12px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+    line-height: 1.5;
+  }
 }
 
 .attachment-section {

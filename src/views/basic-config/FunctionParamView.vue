@@ -1,8 +1,11 @@
 <template>
   <div class="function-param-page">
-    <div class="section-head">
-      <span class="section-title">参数配置</span>
-      <span class="section-hint">左侧选择分类，右侧定位到对应配置</span>
+    <div class="page-header section-head">
+      <div class="section-head-left">
+        <span class="section-title">参数配置</span>
+        <span class="section-hint">左侧选择分类，右侧定位到对应配置</span>
+      </div>
+      <a-button type="primary" @click="handleSave">保存</a-button>
     </div>
 
     <div class="param-layout">
@@ -60,7 +63,8 @@ export default { name: 'FunctionParamView' }
 
 <script setup>
 import { computed, nextTick, ref } from 'vue'
-import { getFunctionParamCategoryGroups } from '@/store/functionParamStore'
+import { message } from 'ant-design-vue'
+import { getFunctionParamCategoryGroups, saveFunctionParams } from '@/store/functionParamStore'
 import FunctionParamConfigCell from './components/FunctionParamConfigCell.vue'
 
 const columns = [
@@ -100,6 +104,15 @@ function onAnchorClick(e, link) {
     container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
   })
 }
+
+function handleSave() {
+  const res = saveFunctionParams()
+  if (res?.ok === false) {
+    message.warning(res.message || '保存失败')
+    return
+  }
+  message.success('功能参数已保存')
+}
 </script>
 
 <style scoped>
@@ -113,10 +126,20 @@ function onAnchorClick(e, link) {
 
 .section-head {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 4px 0 8px;
+  flex-shrink: 0;
+  background: #f0f2f5;
+}
+
+.section-head-left {
+  display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 12px;
-  flex-shrink: 0;
+  min-width: 0;
 }
 
 .section-title {

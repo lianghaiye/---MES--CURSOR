@@ -177,7 +177,14 @@ function handleConvertPurchase() {
 }
 
 watch(
-  () => props.order?.id,
+  () => [
+    props.order?.id,
+    (props.order?.lineItems || [])
+      .map(
+        (l) => `${l.id}|${l.productId || ''}|${l.productCode || ''}|${l.salesQty ?? l.qty ?? ''}`,
+      )
+      .join(';'),
+  ],
   () => {
     if (!props.order) return
     if (!props.order.shipAccessories?.length) {
@@ -185,6 +192,7 @@ watch(
         warehouse: props.warehouse,
         defaultSelected: true,
       })
+      if (props.order.shipAccessories?.length) emit('change', props.order.shipAccessories)
     } else {
       props.order.shipAccessories.forEach((r) => enrichShipAccessoryStock(r, props.warehouse))
     }

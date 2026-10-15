@@ -193,6 +193,10 @@ export function createDeliveryOrder(payload) {
     (s, ship) => s + sumSelectedShipQty(ship),
     0,
   )
+  const accessoryQty = (payload.shipAttachments || [])
+    .filter((a) => a.selected !== false)
+    .reduce((s, a) => s + (Number(a.shipQty) || 0), 0)
+  const isAccessoryReship = payload.deliveryKind === 'accessory_reship'
   const now = dayjs().format('YYYY-MM-DD HH:mm')
   const operator = payload.operator || payload.creator || 'admin1'
   const appPayload = {
@@ -215,12 +219,14 @@ export function createDeliveryOrder(payload) {
     applyOutbound: Boolean(payload.applyOutbound),
     outboundWarehouse: payload.outboundWarehouse || '成品仓',
     remark: payload.remark || '',
+    deliveryKind: payload.deliveryKind || 'normal',
+    accessoryReshipReason: payload.accessoryReshipReason || '',
     lineItems: payload.lineItems || [],
     scatterShipments: payload.scatterShipments || [],
     shipAttachments: payload.shipAttachments || [],
     salesOrderId: so?.id || payload.salesOrderId,
     salesOrderNo: so?.orderNo || payload.salesOrderNo,
-    totalShipQty: wholeQty + scatterQty,
+    totalShipQty: isAccessoryReship ? accessoryQty : wholeQty + scatterQty,
     status: '已提交',
   }
 

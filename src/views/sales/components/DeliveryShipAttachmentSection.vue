@@ -309,6 +309,10 @@ const props = defineProps({
   showOutboundStatus: { type: Boolean, default: false },
   delivery: { type: Object, default: null },
   expandAllByDefault: { type: Boolean, default: false },
+  /** 配件补发：锚点含已发完产品行，不因本票无整机发运而裁剪 */
+  accessoryReship: { type: Boolean, default: false },
+  /** 补发时用销售订单明细作分组锚点（可含已发完） */
+  anchorLineItems: { type: Array, default: () => [] },
   emptyDescription: {
     type: String,
     default: '暂无随货配件（选择销售订单后，有标准包的产品会按产品分组列出）',
@@ -445,9 +449,9 @@ const shipAttachmentAlertMessage = computed(() => {
 
 function currentDeliveryLinesForAttachments() {
   const lines = []
-  const push = (row) => {
+  const push = (row, { ignoreLock = false } = {}) => {
     if (!row) return
-    if (isDeliveryLineShipLocked(row)) return
+    if (!ignoreLock && isDeliveryLineShipLocked(row)) return
     const productId = row.productId || row.itemId
     const productCode = row.productCode || row.itemCode || ''
     if (!productId && !productCode) return
@@ -458,8 +462,15 @@ function currentDeliveryLinesForAttachments() {
       productName: row.productName || row.itemName || '',
       salesQty: row.orderQty ?? row.salesQty ?? row.qty,
       qty: row.orderQty ?? row.salesQty ?? row.qty,
-      orderQty: row.orderQty,
+      orderQty: row.orderQty ?? row.salesQty ?? row.qty,
     })
+  }
+  if (props.accessoryReship) {
+    const anchors = props.anchorLineItems?.length
+      ? props.anchorLineItems
+      : [...(props.lineItems || []), ...(props.scatterShipments || [])]
+    anchors.forEach((row) => push(row, { ignoreLock: true }))
+    return lines
   }
   ;(props.lineItems || []).forEach(push)
   ;(props.scatterShipments || []).forEach(push)
@@ -670,7 +681,24 @@ function pruneToCurrentDelivery() {
 function rebuildFromCurrentDelivery({ merge = false } = {}) {
   const so = props.salesOrder
   let seed
-  if (isShipAttachmentDecidedAtOrder() && so?.shipAccessories?.length) {
+  if (props.accessoryReship) {
+    // 补发种子由外层注入时勿覆盖；无数据时再按订单带出
+    if (!merge && attachments.value?.length) {
+      attachments.value = enrichShipAttachmentsWithShipStatus(attachments.value, so, {
+        preserveShipQty: true,
+      })
+      pruneToCurrentDelivery()
+      activateGroups()
+      return
+    }
+    if (isShipAttachmentDecidedAtOrder() && so?.shipAccessories?.length) {
+      seed = cloneOrderShipAccessoriesForDelivery(so, { warehouse: props.warehouse })
+    } else {
+      seed = collectShipAttachmentsFromSalesLines(currentDeliveryLinesForAttachments(), {
+        warehouse: props.warehouse,
+      })
+    }
+  } else if (isShipAttachmentDecidedAtOrder() && so?.shipAccessories?.length) {
     seed = cloneOrderShipAccessoriesForDelivery(so, { warehouse: props.warehouse })
   } else {
     seed = collectShipAttachmentsFromSalesLines(currentDeliveryLinesForAttachments(), {
@@ -688,7 +716,7 @@ function rebuildFromCurrentDelivery({ merge = false } = {}) {
     attachments.value = fromBom
   }
   pruneToCurrentDelivery()
-  syncKitSetsFromWholeLines()
+  if (!props.accessoryReship) syncKitSetsFromWholeLines()
   activateGroups()
 }
 

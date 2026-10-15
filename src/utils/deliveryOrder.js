@@ -157,6 +157,8 @@ export function mapApplicationToDeliveryOrder(application, salesOrder) {
     lineItems: application.lineItems || [],
     scatterShipments: application.scatterShipments || [],
     shipAttachments: application.shipAttachments || [],
+    deliveryKind: application.deliveryKind || 'normal',
+    accessoryReshipReason: application.accessoryReshipReason || '',
     rawApplication: application,
   }
   row.actualOutboundQty = calcActualOutboundQty(row)
