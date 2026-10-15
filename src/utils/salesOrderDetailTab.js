@@ -8,6 +8,7 @@ export const SALES_ORDER_DETAIL_TABS = [
   'production',
   'outsourcing',
   'attachments',
+  'ship-accessories',
   'ebom-info',
   'price-change',
   'industrial-label',

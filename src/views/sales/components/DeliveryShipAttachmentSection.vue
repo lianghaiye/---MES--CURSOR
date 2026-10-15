@@ -17,7 +17,7 @@
           带出标准包
         </a-button>
         <a-button size="small" :disabled="disabled" @click="openAddFromShipBom">
-          从随货附件添加
+          从随货配件添加
         </a-button>
         <a-button
           type="primary"
@@ -228,7 +228,7 @@
 
   <a-modal
     v-model:open="shipBomAddOpen"
-    title="从随货附件添加"
+    title="从随货配件添加"
     ok-text="添加"
     destroy-on-close
     @ok="confirmAddFromShipBom"
@@ -286,6 +286,8 @@ import {
 import { getActiveShipBomForProduct } from '@/store/productBomStore'
 import { outboundState } from '@/store/outboundStore'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
+import { isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
+import { cloneOrderShipAccessoriesForDelivery } from '@/utils/salesOrderShipAccessories'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 
 const props = defineProps({
@@ -296,11 +298,11 @@ const props = defineProps({
   warehouse: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
   showBringStandardKit: { type: Boolean, default: false },
-  title: { type: String, default: '发货附件' },
+  title: { type: String, default: '随货配件' },
   titleTip: {
     type: String,
     default:
-      '勾选「纳入本单」即本票执行清单。套数展示为「已选择套数/订单套数」；可通过「从随货附件添加」多次累加套数（可大于订单套数，用于赠送）。',
+      '勾选「纳入本单」即本票执行清单。套数展示为「已选择套数/订单套数」；可通过「从随货配件添加」多次累加套数（可大于订单套数，用于赠送）。配置为「销售订单时确定」时，默认继承订单随货配件快照。',
   },
   hideInnerAlert: { type: Boolean, default: false },
   hideProductSourceColumns: { type: Boolean, default: false },
@@ -309,7 +311,7 @@ const props = defineProps({
   expandAllByDefault: { type: Boolean, default: false },
   emptyDescription: {
     type: String,
-    default: '暂无发货附件（选择销售订单后，有随货附件的产品会按产品分组列出）',
+    default: '暂无随货配件（选择销售订单后，有标准包的产品会按产品分组列出）',
   },
 })
 
@@ -438,7 +440,7 @@ const shipAttachmentAlertMessage = computed(() => {
   const total = groups.reduce((s, g) => s + g.total, 0)
   const done = (attachments.value || []).filter((r) => r.shipStatus === '已发完').length
   const doneHint = done ? `其中 ${done} 项历史已发完，后续发货可不勾选。` : ''
-  return `本单 ${groups.length} 组发货附件（${names.join('、')}），共 ${total} 项；已纳入 ${picked} 项。${doneHint}仅展示本单整机/散件产品的附件，请按产品填写发货套数并勾选是否随货发出。`
+  return `本单 ${groups.length} 组随货配件（${names.join('、')}），共 ${total} 项；已纳入 ${picked} 项。${doneHint}仅展示本单整机/散件产品的配件，请按产品填写发货套数并勾选是否随货发出。`
 })
 
 function currentDeliveryLinesForAttachments() {
@@ -667,12 +669,15 @@ function pruneToCurrentDelivery() {
 
 function rebuildFromCurrentDelivery({ merge = false } = {}) {
   const so = props.salesOrder
-  const fromBom = enrichShipAttachmentsWithShipStatus(
-    collectShipAttachmentsFromSalesLines(currentDeliveryLinesForAttachments(), {
+  let seed
+  if (isShipAttachmentDecidedAtOrder() && so?.shipAccessories?.length) {
+    seed = cloneOrderShipAccessoriesForDelivery(so, { warehouse: props.warehouse })
+  } else {
+    seed = collectShipAttachmentsFromSalesLines(currentDeliveryLinesForAttachments(), {
       warehouse: props.warehouse,
-    }),
-    so,
-  )
+    })
+  }
+  const fromBom = enrichShipAttachmentsWithShipStatus(seed, so)
   if (merge) {
     attachments.value = enrichShipAttachmentsWithShipStatus(
       mergeShipAttachmentLists(fromBom, attachments.value),
@@ -693,7 +698,7 @@ function openAddFromShipBom() {
     return
   }
   if (!shipBomAddProductOpts.value.length) {
-    message.warning('本单产品均无生效随货附件，请先配置或使用手工添加')
+    message.warning('本单产品均无生效随货配件，请先配置或使用手工添加')
     return
   }
   shipBomAddForm.productKey = shipBomAddProductOpts.value[0]?.value
@@ -714,7 +719,7 @@ function confirmAddFromShipBom() {
   }
   const shipBom = getActiveShipBomForProduct(opt.productId)
   if (!shipBom) {
-    message.warning(`产品「${opt.productName}」无生效随货附件`)
+    message.warning(`产品「${opt.productName}」无生效随货配件`)
     return Promise.reject()
   }
   attachments.value = enrichShipAttachmentsWithShipStatus(
@@ -740,7 +745,7 @@ function confirmAddFromShipBom() {
         (opt.productCode && r.productCode === opt.productCode),
     )?.kitSets ?? addSets
   message.success(
-    `已为「${opt.productName}」添加 ${addSets} 套随货附件（当前套数：${curSets}/${opt.orderSets}）`,
+    `已为「${opt.productName}」添加 ${addSets} 套随货配件（当前套数：${curSets}/${opt.orderSets}）`,
   )
 }
 

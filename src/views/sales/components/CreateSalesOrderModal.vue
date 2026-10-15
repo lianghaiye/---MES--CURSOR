@@ -778,6 +778,8 @@ import {
   salesOrderState,
   updateSalesOrder,
 } from '@/store/salesOrderStore'
+import { isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
+import { syncSalesOrderShipAccessories } from '@/utils/salesOrderShipAccessories'
 import { ensureStockTransferDemoMocksForOrder } from '@/store/salesStockAllocationStore'
 import {
   STOCK_FULFILLMENT_MODE,
@@ -1703,6 +1705,9 @@ function handleSave() {
   }
 
   const pricing = orderPricing.value
+  if (isShipAttachmentDecidedAtOrder()) {
+    syncSalesOrderShipAccessories(form, { defaultSelected: true })
+  }
   const payload = {
     ...JSON.parse(JSON.stringify(form)),
     businessType: deriveOrderBusinessType(form.lineItems),

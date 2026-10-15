@@ -72,6 +72,11 @@
               <a-tab-pane key="production" :tab="`生产 (${productionTabCount})`" />
               <a-tab-pane key="outsourcing" :tab="`外协 (${relations.outsourcingOrders.length})`" />
               <a-tab-pane key="attachments" :tab="`附件 (${relations.attachments.length})`" />
+              <a-tab-pane
+                v-if="showShipAccessoriesTab"
+                key="ship-accessories"
+                :tab="`随货配件 (${shipAccessoryCount})`"
+              />
               <a-tab-pane key="ebom-info">
                 <template #tab>
                   <span>EBOM信息</span>
@@ -287,6 +292,20 @@
                   </template>
                 </template>
               </a-table>
+            </DetailSectionCard>
+          </template>
+
+          <template v-else-if="activeTab === 'ship-accessories'">
+            <DetailSectionCard title="随货配件">
+              <div class="section-hint">
+                按产品匹配已启用的随货配件标准包；可勾选纳入、调整套数，库存不足时可转采购申请。
+              </div>
+              <SalesOrderShipAccessorySection
+                v-if="order"
+                :order="order"
+                :readonly="!canEditShipAccessories"
+                @change="onShipAccessoriesChange"
+              />
             </DetailSectionCard>
           </template>
 
@@ -1085,7 +1104,9 @@ import {
   submitSalesOrderForApprove,
   withdrawSalesOrder,
   resubmitSalesOrder,
+  updateSalesOrder,
 } from '@/store/salesOrderStore'
+import { functionParamState, isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
 import {
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
   hasSalesOrderRevokeBlockers,
@@ -1133,6 +1154,7 @@ import BomVersionInfoSection from '@/components/BomVersionInfoSection.vue'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
 import SalesOrderPrintModal from './components/SalesOrderPrintModal.vue'
 import SalesOrderEbomDiffSection from './components/SalesOrderEbomDiffSection.vue'
+import SalesOrderShipAccessorySection from './components/SalesOrderShipAccessorySection.vue'
 import IndustrialLabelQrMock from './components/IndustrialLabelQrMock.vue'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
 import { getUser } from '@/utils/auth'
@@ -1213,6 +1235,22 @@ const outboundRows = computed(() =>
 const shippingTabCount = computed(
   () => (relations.value.deliveryApplications?.length || 0) + outboundRows.value.length,
 )
+
+const showShipAccessoriesTab = computed(() => {
+  void functionParamState.params.shipAttachmentDecideStage
+  return isShipAttachmentDecidedAtOrder()
+})
+
+const shipAccessoryCount = computed(() => (order.value?.shipAccessories || []).length)
+
+const canEditShipAccessories = computed(() => !!order.value && canEditSalesOrder(order.value))
+
+function onShipAccessoriesChange(list) {
+  if (!order.value?.id) return
+  const next = Array.isArray(list) ? list : order.value.shipAccessories || []
+  order.value.shipAccessories = next
+  updateSalesOrder(order.value.id, { shipAccessories: next })
+}
 
 const inboundRows = computed(() => {
   void inboundOrderState.orders

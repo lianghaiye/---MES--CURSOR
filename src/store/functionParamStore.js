@@ -129,16 +129,19 @@ export const SALES_OUTBOUND_ISSUE_RULE_DESCRIPTION =
  * 无论哪种配置，「库存 → 随货配件查询」都可以维护本票配件
  */
 export const SHIP_ATTACHMENT_DECIDE_STAGES = {
+  ORDER: 'order',
   APPLY: 'apply',
   WAREHOUSE: 'warehouse',
 }
 
 export const SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS = [
+  { value: SHIP_ATTACHMENT_DECIDE_STAGES.ORDER, label: '销售订单时确定' },
   { value: SHIP_ATTACHMENT_DECIDE_STAGES.APPLY, label: '申请发货时确定' },
   { value: SHIP_ATTACHMENT_DECIDE_STAGES.WAREHOUSE, label: '仓管发货时确定' },
 ]
 
 export const SHIP_ATTACHMENT_DECIDE_STAGE_DESCRIPTION =
+  '销售订单时确定：下单即带出标准随货配件包，可看库存缺口并转采购；申请发货默认继承订单清单。' +
   '申请发货时确定：销售在申请发货页勾选纳入、填写套数。' +
   '仓管发货时确定：申请发货页不展示随货配件及相关提示。' +
   '无论哪种配置，仓管都可在「库存 → 随货配件查询」维护本票纳入清单；纳入后随同一张销售出库单出库。'
@@ -963,9 +966,17 @@ export function setStocktakeAutoPostOnApprove(value) {
   return { ok: true }
 }
 
-/** 销售申请发货时确定附件（展示申请页附件能力） */
+/** 销售订单时即确定随货配件 */
+export function isShipAttachmentDecidedAtOrder() {
+  return getShipAttachmentDecideStage() === SHIP_ATTACHMENT_DECIDE_STAGES.ORDER
+}
+
+/** 销售申请发货时确定附件（展示申请页附件能力；含订单时确定） */
 export function isShipAttachmentDecidedAtApply() {
-  return getShipAttachmentDecideStage() === SHIP_ATTACHMENT_DECIDE_STAGES.APPLY
+  const stage = getShipAttachmentDecideStage()
+  return (
+    stage === SHIP_ATTACHMENT_DECIDE_STAGES.APPLY || stage === SHIP_ATTACHMENT_DECIDE_STAGES.ORDER
+  )
 }
 
 /** 仓管发货时才确定附件（申请页隐藏，随货查询可维护） */
