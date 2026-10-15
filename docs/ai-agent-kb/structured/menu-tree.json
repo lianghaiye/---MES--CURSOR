@@ -63,7 +63,7 @@
       { "key": "bom", "label": "产品BOM", "path": "/product-process/bom", "kb": "manuals/02" },
       {
         "key": "ship-attachments",
-        "label": "随货附件",
+        "label": "随货配件",
         "path": "/product-process/ship-attachments"
       },
       {
@@ -206,7 +206,7 @@
       { "key": "inbound-details", "label": "入库详情", "path": "/inventory/inbound-details" },
       {
         "key": "ship-attachment-query",
-        "label": "随货查询",
+        "label": "随货配件查询",
         "path": "/inventory/ship-attachment-query"
       },
       {

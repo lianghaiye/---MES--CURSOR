@@ -45,6 +45,12 @@ const routes = [
     meta: { title: 'BOM预览', standalone: true },
   },
   {
+    path: '/product-process/product-label-print-preview',
+    name: 'product-process-product-label-preview',
+    component: () => import('@/views/product-process/ProductLabelPrintPreviewView.vue'),
+    meta: { title: '产品标签打印', standalone: true },
+  },
+  {
     path: '/production/work-orders/preview',
     name: 'production-work-order-preview',
     component: () => import('@/views/production/WorkOrderPrintPreviewView.vue'),
@@ -232,12 +238,6 @@ const routes = [
         meta: { title: '产品信息' },
       },
       {
-        path: 'product-process/product-label-print-preview',
-        name: 'product-label-print-preview-inner',
-        component: () => import('@/views/product-process/ProductLabelPrintPreviewView.vue'),
-        meta: { title: '产品标签打印' },
-      },
-      {
         path: 'product-process/products/:id/edit',
         name: 'product-process-products-edit',
         component: () => import('@/views/product-process/MasterItemEditView.vue'),
@@ -277,25 +277,25 @@ const routes = [
         path: 'product-process/ship-attachments',
         name: 'product-process-ship-attachments',
         component: () => import('@/views/product-process/ProductBomView.vue'),
-        meta: { title: '随货附件' },
+        meta: { title: '随货配件' },
       },
       {
         path: 'product-process/ship-attachments/new',
         name: 'product-process-ship-attachments-new',
         component: () => import('@/views/product-process/ProductBomCreateView.vue'),
-        meta: { title: '新增随货附件', listPath: '/product-process/ship-attachments' },
+        meta: { title: '新增随货配件', listPath: '/product-process/ship-attachments' },
       },
       {
         path: 'product-process/ship-attachments/:id/edit',
         name: 'product-process-ship-attachments-edit',
         component: () => import('@/views/product-process/ProductBomCreateView.vue'),
-        meta: { title: '编辑随货附件', listPath: '/product-process/ship-attachments' },
+        meta: { title: '编辑随货配件', listPath: '/product-process/ship-attachments' },
       },
       {
         path: 'product-process/ship-attachments/:id',
         name: 'product-process-ship-attachments-detail',
         component: () => import('@/views/product-process/ProductBomDetailView.vue'),
-        meta: { title: '随货附件详情', listPath: '/product-process/ship-attachments' },
+        meta: { title: '随货配件详情', listPath: '/product-process/ship-attachments' },
       },
       {
         path: 'product-process/routing',
@@ -716,7 +716,7 @@ const routes = [
         path: 'inventory/ship-attachment-query',
         name: 'inventory-ship-attachment-query',
         component: () => import('@/views/inventory/ShipAttachmentQueryView.vue'),
-        meta: { title: '随货查询' },
+        meta: { title: '随货配件查询' },
       },
       {
         path: 'inventory/deduct-records',

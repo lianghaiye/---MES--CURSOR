@@ -1,11 +1,12 @@
 /**
- * 产品/物料标签打印：sessionStorage + 页内预览打印
+ * 产品/物料标签打印：sessionStorage + 独立窗口预览打印（standalone）
  * 二维码内容 = 产品/物料编码，供小程序扫码匹配
  */
 import { message } from 'ant-design-vue'
 
 const STORAGE_PREFIX = 'product-label-print-preview:'
 export const PRODUCT_LABEL_PRINT_PATH = '/product-process/product-label-print-preview'
+export const PRODUCT_LABEL_PRINT_ROUTE_NAME = 'product-process-product-label-preview'
 
 /** 一行可打标签数 */
 export const PRODUCT_LABEL_PER_ROW_OPTIONS = [3, 4, 5, 6]
@@ -18,11 +19,10 @@ export function normalizeLabelPerRow(value) {
 
 /**
  * @param {import('vue-router').Router} router
- * @param {(path: string, title?: string) => void} openTab
  * @param {Array<object>} items
  * @param {{ copies?: number, perRow?: number }} [opts]
  */
-export function openProductLabelPrintPreview(router, openTab, items = [], opts = {}) {
+export function openProductLabelPrintPreview(router, items = [], opts = {}) {
   const list = (Array.isArray(items) ? items : [])
     .map((item) => normalizeLabelItem(item))
     .filter((item) => item.code)
@@ -46,10 +46,16 @@ export function openProductLabelPrintPreview(router, openTab, items = [], opts =
     message.error('无法打开打印预览')
     return { ok: false }
   }
-  const path = `${PRODUCT_LABEL_PRINT_PATH}?token=${encodeURIComponent(token)}`
-  openTab?.(path, `打印标签(${list.length})`)
-  router.push(path)
-  return { ok: true, path }
+  const { href } = router.resolve({
+    name: PRODUCT_LABEL_PRINT_ROUTE_NAME,
+    query: { token },
+  })
+  const win = window.open(href, '_blank')
+  if (!win) {
+    message.warning('浏览器拦截了新窗口，请允许弹窗后重试')
+    return { ok: false }
+  }
+  return { ok: true, href }
 }
 
 export function loadProductLabelPrintPayload(token) {

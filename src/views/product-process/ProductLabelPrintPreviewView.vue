@@ -6,11 +6,18 @@
           <PrinterOutlined />
           打印
         </a-button>
-        <a-button @click="goBack">关闭</a-button>
+        <a-button @click="handleClose">关闭</a-button>
       </a-space>
       <span class="toolbar-hint">
         共 {{ labels.length }} 张标签 · 一行 {{ perRow }} 个 · 二维码=产品编码
       </span>
+      <div class="toolbar-per-row">
+        <a-radio-group v-model:value="perRow" button-style="solid" size="small">
+          <a-radio-button v-for="n in perRowOptions" :key="n" :value="n">
+            {{ n }}个
+          </a-radio-button>
+        </a-radio-group>
+      </div>
     </div>
 
     <div v-if="!labels.length" class="empty no-print">
@@ -41,26 +48,25 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { PrinterOutlined } from '@ant-design/icons-vue'
 import QRCode from 'qrcode'
 import {
+  DEFAULT_PRODUCT_LABEL_PER_ROW,
+  PRODUCT_LABEL_PER_ROW_OPTIONS,
   loadProductLabelPrintPayload,
   normalizeLabelPerRow,
 } from '@/utils/productLabelPrintPreview'
-import { useTabs } from '@/composables/useTabs'
 
 defineOptions({ name: 'ProductLabelPrintPreviewView' })
 
 const route = useRoute()
-const router = useRouter()
-const { closeTab } = useTabs()
 
 const payload = ref(null)
 const qrMap = reactive({})
-
-const perRow = computed(() => normalizeLabelPerRow(payload.value?.perRow))
+const perRow = ref(DEFAULT_PRODUCT_LABEL_PER_ROW)
+const perRowOptions = PRODUCT_LABEL_PER_ROW_OPTIONS
 
 const labels = computed(() => {
   const items = payload.value?.items || []
@@ -86,12 +92,14 @@ async function ensureQr(code) {
 }
 
 onMounted(async () => {
+  document.title = '产品标签打印'
   const token = String(route.query.token || '')
   payload.value = loadProductLabelPrintPayload(token)
   if (!payload.value?.items?.length) {
     message.warning('打印数据已失效，请重新选择产品后打印')
     return
   }
+  perRow.value = normalizeLabelPerRow(payload.value.perRow)
   const codes = [...new Set(payload.value.items.map((i) => i.code).filter(Boolean))]
   await Promise.all(codes.map((c) => ensureQr(c)))
 })
@@ -100,23 +108,24 @@ function handlePrint() {
   window.print()
 }
 
-function goBack() {
-  closeTab(route.fullPath || route.path)
-  router.push('/product-process/products')
+function handleClose() {
+  window.close()
 }
 </script>
 
 <style lang="less" scoped>
 .product-label-print-page {
-  min-height: 100%;
+  min-height: 100vh;
   padding: 12px 16px 24px;
   background: #f5f6f8;
+  box-sizing: border-box;
 }
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   margin-bottom: 12px;
   padding: 10px 12px;
   background: #fff;
@@ -127,6 +136,10 @@ function goBack() {
 .toolbar-hint {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.45);
+}
+
+.toolbar-per-row {
+  margin-left: auto;
 }
 
 .empty {
@@ -150,6 +163,7 @@ function goBack() {
   border: 1px solid #d9d9d9;
   border-radius: 6px;
   page-break-inside: avoid;
+  break-inside: avoid;
 }
 
 .label-qr {
@@ -229,6 +243,7 @@ function goBack() {
 
 @media print {
   .product-label-print-page {
+    min-height: auto;
     padding: 0;
     background: #fff;
   }
@@ -245,6 +260,27 @@ function goBack() {
   .label-card {
     border: 1px solid #000;
     border-radius: 0;
+  }
+}
+</style>
+
+<style lang="less">
+/* standalone 窗口：打印时去掉页面默认边距，仅输出标签区 */
+@media print {
+  @page {
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body > #app {
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }
 </style>

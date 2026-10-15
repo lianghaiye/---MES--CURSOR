@@ -31,7 +31,6 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useTabs } from '@/composables/useTabs'
 import {
   DEFAULT_PRODUCT_LABEL_PER_ROW,
   PRODUCT_LABEL_PER_ROW_OPTIONS,
@@ -46,7 +45,6 @@ const props = defineProps({
 const emit = defineEmits(['update:open'])
 
 const router = useRouter()
-const { openTab } = useTabs()
 const copies = ref(1)
 const perRow = ref(DEFAULT_PRODUCT_LABEL_PER_ROW)
 const perRowOptions = PRODUCT_LABEL_PER_ROW_OPTIONS
@@ -66,7 +64,7 @@ function handleClose() {
 }
 
 function handlePreview() {
-  const result = openProductLabelPrintPreview(router, openTab, props.items, {
+  const result = openProductLabelPrintPreview(router, props.items, {
     copies: copies.value,
     perRow: perRow.value,
   })

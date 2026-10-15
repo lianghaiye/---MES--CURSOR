@@ -123,10 +123,10 @@ export const SALES_OUTBOUND_ISSUE_RULE_DESCRIPTION =
   '先进先出（FIFO）：发货时不管批次是不是本单生产的，按仓库里批次先后扣减，适合不需要按订单锁货的场景。'
 
 /**
- * 随货附件在哪一环节确定纳入清单
+ * 随货配件在哪一环节确定纳入清单
  * - apply：销售申请发货时勾选纳入、填写套数
- * - warehouse：申请发货不展示附件；仓管在发货环节（随货查询）确定
- * 无论哪种配置，「库存 → 随货查询」都可以维护本票附件
+ * - warehouse：申请发货不展示配件；仓管在发货环节（随货配件查询）确定
+ * 无论哪种配置，「库存 → 随货配件查询」都可以维护本票配件
  */
 export const SHIP_ATTACHMENT_DECIDE_STAGES = {
   APPLY: 'apply',
@@ -140,8 +140,8 @@ export const SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS = [
 
 export const SHIP_ATTACHMENT_DECIDE_STAGE_DESCRIPTION =
   '申请发货时确定：销售在申请发货页勾选纳入、填写套数。' +
-  '仓管发货时确定：申请发货页不展示发货附件及相关提示。' +
-  '无论哪种配置，仓管都可在「库存 → 随货查询」维护本票纳入清单；纳入后随同一张销售出库单出库。'
+  '仓管发货时确定：申请发货页不展示随货配件及相关提示。' +
+  '无论哪种配置，仓管都可在「库存 → 随货配件查询」维护本票纳入清单；纳入后随同一张销售出库单出库。'
 
 /**
  * 调拨：出库确认后是否还需入库方签收
@@ -552,7 +552,7 @@ export const FUNCTION_PARAM_ROWS = [
   {
     key: 'shipAttachmentDecideStage',
     category: 'inventory',
-    scenario: '随货附件确定环节',
+    scenario: '随货配件确定环节',
     description: SHIP_ATTACHMENT_DECIDE_STAGE_DESCRIPTION,
   },
   {
@@ -935,7 +935,7 @@ export function getShipAttachmentDecideStage() {
 export function setShipAttachmentDecideStage(mode) {
   const normalized = normalizeShipAttachmentDecideStage(mode)
   if (!SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS.some((item) => item.value === normalized)) {
-    return { ok: false, message: '无效的随货附件确定环节' }
+    return { ok: false, message: '无效的随货配件确定环节' }
   }
   functionParamState.params.shipAttachmentDecideStage = normalized
   return { ok: true }

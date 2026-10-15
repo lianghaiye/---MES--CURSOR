@@ -1,7 +1,7 @@
 import { isShipBomType, BOM_TYPE } from '@/mock/bomMaterialColumns'
 
 /** 菜单与页面展示名；落库仍用 bomType = 发运BOM */
-export const SHIP_ATTACHMENT_DISPLAY_NAME = '随货附件'
+export const SHIP_ATTACHMENT_DISPLAY_NAME = '随货配件'
 
 export const SHIP_ATTACHMENT_LIST_PATH = '/product-process/ship-attachments'
 
