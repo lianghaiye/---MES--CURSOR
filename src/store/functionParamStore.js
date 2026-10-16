@@ -117,16 +117,16 @@ export const SALES_OUTBOUND_ISSUE_RULE_OPTIONS = [
 
 export const SALES_OUTBOUND_ISSUE_RULE_DESCRIPTION =
   '只作用于销售发货出库，领料、外协发料仍走上方「出库规则」。' +
-  '按单发货：成品/半成品入库时挂了本销售单的批次，发货时优先（或必须）扣这些批次，不能用全仓先进先出把别人订单的货发出去。' +
-  '支持分批发货，但发货量不可超过本单的已入库量。' +
-  '销售行若是「强制按单生产」，不够的部分也不能拿自由备货或其他订单的货来凑。' +
+  '按单发货：成品/半成品入库时挂了本销售单的批次，发货时优先扣这些批次，不能用全仓先进先出把别人订单的货发出去。' +
+  '本单按单批不足时，可用自由备货补足（含归属已转自由后的库存）；仍禁止扣他单按单批。' +
+  '「强制按单生产/采购」只约束审核时全量排产或采购、不新占自由备货，发货扣批与「优先现货」相同（先本单再自由）。' +
   '先进先出（FIFO）：发货时不管批次是不是本单生产的，按仓库里批次先后扣减，适合不需要按订单锁货的场景。'
 
 /**
  * 随货配件在哪一环节确定纳入清单
- * - apply：销售申请发货时勾选纳入、填写套数
- * - warehouse：申请发货不展示配件；仓管在发货环节（随货配件查询）确定
- * 无论哪种配置，「库存 → 随货配件查询」都可以维护本票配件
+ * - order：销售订单时确定清单与采购；发货继承，本票仅勾选发哪些/改数量，不可新增配件
+ * - apply：申请发货时确定，发货单可添加配件（能力对齐销售订单随货配件）
+ * - warehouse：仓管发货时确定（暂隐藏，未开放）
  */
 export const SHIP_ATTACHMENT_DECIDE_STAGES = {
   ORDER: 'order',
@@ -134,17 +134,16 @@ export const SHIP_ATTACHMENT_DECIDE_STAGES = {
   WAREHOUSE: 'warehouse',
 }
 
+/** 页面可选（仓管发货时确定暂不开放） */
 export const SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS = [
   { value: SHIP_ATTACHMENT_DECIDE_STAGES.ORDER, label: '销售订单时确定' },
   { value: SHIP_ATTACHMENT_DECIDE_STAGES.APPLY, label: '申请发货时确定' },
-  { value: SHIP_ATTACHMENT_DECIDE_STAGES.WAREHOUSE, label: '仓管发货时确定' },
 ]
 
 export const SHIP_ATTACHMENT_DECIDE_STAGE_DESCRIPTION =
-  '销售订单时确定：下单即带出标准随货配件包，可看库存缺口并转采购；申请发货默认继承订单清单。' +
-  '申请发货时确定：销售在申请发货页勾选纳入、填写套数。' +
-  '仓管发货时确定：申请发货页不展示随货配件及相关提示。' +
-  '无论哪种配置，仓管都可在「库存 → 随货配件查询」维护本票纳入清单；纳入后随同一张销售出库单出库。'
+  '销售订单时确定：下单维护随货配件并可转采购；发货继承订单清单，本票仅勾选发哪些、调整发货数量，不可新增配件。' +
+  '申请发货时确定：新增/编辑发货单时可添加配件（配件包、从主数据添加），能力与销售订单随货配件一致。' +
+  '「仓管发货时确定」暂未开放。'
 
 /**
  * 调拨：出库确认后是否还需入库方签收
@@ -662,6 +661,10 @@ function normalizeSalesOutboundIssueRule(mode) {
 }
 
 function normalizeShipAttachmentDecideStage(mode) {
+  // 仓管环节暂隐藏：历史配置自动回落到「申请发货时确定」
+  if (mode === SHIP_ATTACHMENT_DECIDE_STAGES.WAREHOUSE) {
+    return SHIP_ATTACHMENT_DECIDE_STAGES.APPLY
+  }
   if (SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS.some((item) => item.value === mode)) return mode
   return SHIP_ATTACHMENT_DECIDE_STAGES.APPLY
 }

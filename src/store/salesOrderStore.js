@@ -70,6 +70,7 @@ import {
 import { ensureDedicatedShipDemoSalesOrders } from '@/mock/dedicatedShipDemoSeed'
 import { ensureScatterEbomShipDemoSalesOrders } from '@/mock/scatterEbomShipDemoSeed'
 import { ensureSalesLineShipInfoDemoSalesOrders } from '@/mock/salesLineShipInfoDemoSeed'
+import { ensureShipAccessoryDemoSalesOrders } from '@/mock/shipAccessoryDemoSeed'
 import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
@@ -126,10 +127,12 @@ function persist() {
 function loadInitialSalesOrders() {
   ensureEcnDemoBootstrap()
   const orders = migrateSalesOrderStatuses(loadFromStorage() || buildMockSalesOrders(mockProducts))
-  return ensureIndustrialLabelDemoSalesOrder(
-    ensureScatterEbomShipDemoSalesOrders(
-      ensureDedicatedShipDemoSalesOrders(
-        ensureSalesLineShipInfoDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+  return ensureShipAccessoryDemoSalesOrders(
+    ensureIndustrialLabelDemoSalesOrder(
+      ensureScatterEbomShipDemoSalesOrders(
+        ensureDedicatedShipDemoSalesOrders(
+          ensureSalesLineShipInfoDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+        ),
       ),
     ),
   )
@@ -679,7 +682,23 @@ export function approveSalesOrder(id, opinion = '') {
     }
   }
 
-  if (purchaseLines.length) {
+  // 随货配件库存 enrichment，供外购合并与后续履约使用
+  // eslint-disable-next-line global-require
+  const {
+    enrichShipAccessoryList,
+    buildShipAccessoryPurchaseLineItems,
+    mergePurchaseLineItems,
+    fulfillShipAccessoryGapsBySupply,
+    getShipAccessoryPurchaseGapRows,
+    markAccessoryBucketConverted,
+  } = require('@/utils/salesOrderShipAccessories')
+  const warehouse = order.defaultWarehouse || ''
+  if (Array.isArray(order.shipAccessories) && order.shipAccessories.length) {
+    order.shipAccessories = enrichShipAccessoryList(order.shipAccessories, warehouse)
+  }
+  const accessoryPurchaseGaps = getShipAccessoryPurchaseGapRows(order, warehouse)
+
+  if (purchaseLines.length || accessoryPurchaseGaps.length) {
     if (order.purchaseRequisitionNo) {
       return { ok: false, message: `订单「${order.orderNo}」已关联采购申请` }
     }
@@ -689,11 +708,51 @@ export function approveSalesOrder(id, opinion = '') {
       buildRequisitionFromSalesOrder,
       addPurchaseRequisition,
     } = require('@/store/purchaseRequisitionStore')
-    const requisition = buildRequisitionFromSalesOrder({ ...order, lineItems: purchaseLines })
+    let requisition
+    if (purchaseLines.length) {
+      requisition = buildRequisitionFromSalesOrder({ ...order, lineItems: purchaseLines })
+    } else {
+      requisition = buildRequisitionFromSalesOrder({ ...order, lineItems: [] })
+      requisition.source = '销售订单随货配件'
+      requisition.remark = `由销售订单 ${order.orderNo || ''} 随货配件缺口生成`
+      requisition.lineItems = []
+    }
+    if (accessoryPurchaseGaps.length) {
+      const accLines = buildShipAccessoryPurchaseLineItems(order, accessoryPurchaseGaps, {
+        warehouse,
+      })
+      requisition.lineItems = mergePurchaseLineItems(requisition.lineItems || [], accLines)
+      const tip = `含随货配件外购缺口 ${accLines.length} 项`
+      if (!String(requisition.remark || '').includes('随货配件')) {
+        requisition.remark = requisition.remark ? `${requisition.remark}；${tip}` : tip
+      }
+      if (purchaseLines.length) {
+        requisition.source = '销售订单'
+      }
+      markAccessoryBucketConverted(accessoryPurchaseGaps, 'purchase')
+    }
+    if (!(requisition.lineItems || []).length) {
+      return {
+        ok: false,
+        message: `订单「${order.orderNo}」外购明细与配件缺口均为空，无法生成采购申请`,
+      }
+    }
     addPurchaseRequisition(requisition)
     order.purchaseRequisitionNo = requisition.reqNo
     order.purchaseRequisitionId = requisition.id
     purchaseReqNo = requisition.reqNo
+  }
+
+  // 审核通过时：随货配件自制/外协缺口自动转工单；外购已合并进上方采购申请
+  let shipAccessoryFulfillHint = ''
+  if (Array.isArray(order.shipAccessories) && order.shipAccessories.length) {
+    const accRes = fulfillShipAccessoryGapsBySupply(order, order.shipAccessories, {
+      warehouse,
+      skipPurchase: true,
+    })
+    if (accRes.ok) {
+      shipAccessoryFulfillHint = accRes.message
+    }
   }
 
   if (outsourcingLines.length) {
@@ -788,7 +847,16 @@ export function approveSalesOrder(id, opinion = '') {
   }
 
   const hints = []
-  if (purchaseReqNo) hints.push(`已自动生成采购申请 ${purchaseReqNo}`)
+  if (purchaseReqNo) {
+    hints.push(
+      accessoryPurchaseGaps.length && purchaseLines.length
+        ? `已自动生成采购申请 ${purchaseReqNo}（含随货配件外购缺口）`
+        : accessoryPurchaseGaps.length
+          ? `已自动生成采购申请 ${purchaseReqNo}（随货配件外购缺口）`
+          : `已自动生成采购申请 ${purchaseReqNo}`,
+    )
+  }
+  if (shipAccessoryFulfillHint) hints.push(shipAccessoryFulfillHint)
   if (planOrderNo) {
     let planHint = `已自动生成生产计划 ${planOrderNo}`
     if (designTaskCount > 0) {

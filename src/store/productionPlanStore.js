@@ -12,10 +12,12 @@ import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
 import { applyCrossDemoStockToPlanMaterials } from '@/mock/crossModuleDemoSeed'
 import { ensurePackageConvertDemoOnPlans } from '@/mock/packageConvertPurchaseDemoSeed'
 import { PLAN_SOURCE } from '@/utils/planSource'
+import { MATERIAL_RELEASE_STATUS } from '@/constants/ecnPlanReschedule'
+import { flattenMaterials } from '@/utils/material'
 
 const STORAGE_KEY = 'i_doms_production_plans'
-/** v10：包装换算演示物料挂到计划（105个→2盒） */
-const DATA_VERSION = 10
+/** v11：物料投产状态 releasable/pending_spec + 分批计划字段 */
+const DATA_VERSION = 11
 
 function normalizePlanStatuses(orders) {
   const normalized = (orders || []).map((o) => {
@@ -43,11 +45,37 @@ function normalizePlanStatuses(orders) {
       if (wi.expanded == null) wi.expanded = idx === 0
     })
     plan.workItems?.forEach((wi) => {
+      if (!wi.planBatch) wi.planBatch = plan.planBatch || 1
       resolveWorkItemMaterials(wi)
       applyCrossDemoStockToPlanMaterials(wi.materials)
+      const flat = []
+      flattenMaterials(wi.materials, flat)
+      flat.forEach((m) => {
+        if (!m.releaseStatus) m.releaseStatus = MATERIAL_RELEASE_STATUS.RELEASABLE
+      })
     })
+    if (!plan.planBatch) plan.planBatch = 1
     return plan
   })
+
+  // 演示：首个销售计划的首条非顶级料标为「待定」，便于二期分批联调（仅未打标时）
+  const firstSales = normalized.find((p) => p.planSource !== PLAN_SOURCE.STOCK_REPLENISH)
+  if (firstSales && !firstSales._pendingDemoApplied) {
+    const wi = firstSales.workItems?.[0]
+    const flat = []
+    flattenMaterials(wi?.materials, flat)
+    const demoMat = flat.find(
+      (m) =>
+        !m.isTopLevel &&
+        (m.supplyType === '自制件' || m.supplyType === '外购件' || m.supplyType === '外购'),
+    )
+    if (demoMat) {
+      demoMat.releaseStatus = MATERIAL_RELEASE_STATUS.PENDING_SPEC
+      demoMat.joinPlan = '否'
+    }
+    firstSales._pendingDemoApplied = true
+  }
+
   return ensurePackageConvertDemoOnPlans(normalized)
 }
 
@@ -398,4 +426,17 @@ export function filterProductionPlans(list, filters) {
     }
     return true
   })
+}
+
+/** 终止生产计划；关联的未完成设计任务由调用方作废 */
+export function terminateProductionPlan(id) {
+  const plan = productionPlanState.orders.find((o) => o.id === id)
+  if (!plan) return { ok: false, message: '生产计划不存在' }
+  if (plan.orderStatus === '已终止') return { ok: false, message: '生产计划已终止' }
+  plan.orderStatus = '已终止'
+  plan.terminatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  ;(plan.workItems || []).forEach((wi) => {
+    if (wi.status !== '已完成') wi.status = '已终止'
+  })
+  return { ok: true, plan, message: `生产计划「${plan.orderNo || ''}」已终止` }
 }

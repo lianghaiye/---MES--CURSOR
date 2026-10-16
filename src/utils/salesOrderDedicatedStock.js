@@ -62,6 +62,29 @@ export function getLineUnmetDedicatedQty(salesOrder, salesLine) {
  * 按物料编码匹配销售行，同编码多行按顺序占未满足数量，切开本次入库 pieceValues
  * @returns {{ segments: Array<{ salesLineId, salesOrderId, salesOrderNo, pieceValues, dedicatedQty }>, freePieceValues: number[], dedicatedTotal: number, freeTotal: number }}
  */
+/** 从件数队列前部取出不超过 qty 的数量，余数留在队列里 */
+export function takePieceValuesUpTo(queue, qty) {
+  let left = roundQty(qty)
+  const taken = []
+  if (!(left > 0)) return taken
+  while (queue.length && left > 1e-9) {
+    const next = Number(queue[0]) || 0
+    if (!(next > 0)) {
+      queue.shift()
+      continue
+    }
+    if (next <= left + 1e-9) {
+      taken.push(queue.shift())
+      left = roundQty(left - next)
+    } else {
+      taken.push(left)
+      queue[0] = roundQty(next - left)
+      left = 0
+    }
+  }
+  return taken
+}
+
 export function splitInboundPieceValuesForSalesOrder({
   salesOrder,
   itemCode,
@@ -190,7 +213,11 @@ export function allocateFromBatches(batches, demandQty) {
 
 /**
  * 销售发货预分配
- * force_mto：仅本单按单批；prefer_stock：先本单再自由；stock_only：仅自由
+ * - stock_only：仅自由备货
+ * - prefer_stock / force_mto：发货时均「先本单按单批，缺口再自由备货」
+ *   （force_mto 只约束审核排产必须全量生产，不禁止发货用自由库存；
+ *    归属转移到自由/他单后，原单仍可用自由备货发货）
+ * 始终禁止扣他单按单批。
  */
 export function preallocateDeliveryBatches({
   salesOrder,
@@ -218,19 +245,6 @@ export function preallocateDeliveryBatches({
     itemCode: code,
   })
 
-  if (mode === STOCK_FULFILLMENT_MODE.FORCE_MTO) {
-    const res = allocateFromBatches(dedicated, need)
-    if (!res.ok) {
-      return {
-        ok: false,
-        message: `强制按单：本单按单库存不足（需 ${need}，可用 ${res.available}）`,
-        allocations: [],
-        available: res.available,
-      }
-    }
-    return { ...res, mode }
-  }
-
   if (mode === STOCK_FULFILLMENT_MODE.STOCK_ONLY) {
     const res = allocateFromBatches(free, need)
     if (!res.ok) {
@@ -244,7 +258,7 @@ export function preallocateDeliveryBatches({
     return { ...res, mode }
   }
 
-  // prefer_stock：先本单，再自由
+  // prefer_stock / force_mto：先本单，再自由
   const dedQty = roundQty(dedicated.reduce((s, b) => s + (Number(b.currentLength) || 0), 0))
   const takeDed = Math.min(need, dedQty)
   const allocations = []
@@ -257,9 +271,10 @@ export function preallocateDeliveryBatches({
   if (remain > 0) {
     const r2 = allocateFromBatches(free, remain)
     if (!r2.ok) {
+      const modeLabel = mode === STOCK_FULFILLMENT_MODE.FORCE_MTO ? '强制按单生产/采购' : '优先现货'
       return {
         ok: false,
-        message: `优先现货：本单 ${takeDed} + 自由备货不足（还需 ${remain}，自由可用 ${r2.available}）`,
+        message: `${modeLabel}：本单按单 ${takeDed} + 自由备货不足（还需 ${remain}，自由可用 ${r2.available}）`,
         allocations: [],
         available: roundQty(takeDed + r2.available),
       }

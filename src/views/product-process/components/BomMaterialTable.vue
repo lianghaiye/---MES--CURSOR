@@ -6,7 +6,7 @@
         <template v-if="!readonly">
           <template v-if="shipAttachmentMode">
             <a-button size="small" @click="emit('import-ship-attachment')">
-              从其他附件导入
+              从其他配件包导入
             </a-button>
           </template>
           <template v-else>
@@ -174,6 +174,11 @@
               <template v-else-if="column.key === 'substitutePart'">
                 {{ formatSubstitute(record) }}
               </template>
+              <template v-else-if="column.key === 'releaseStatus'">
+                <a-tag :color="record.releaseStatus === 'pending_spec' ? 'orange' : 'success'">
+                  {{ record.releaseStatus === 'pending_spec' ? '待定' : '可投' }}
+                </a-tag>
+              </template>
               <template v-else>{{ formatCell(record[column.dataIndex]) }}</template>
             </template>
             <template v-else-if="column.key === 'itemName'">
@@ -310,6 +315,20 @@
                 style="width: 100%"
                 value-format="YYYY-MM-DD"
                 @change="(v) => (record.effectiveEnd = v || '')"
+              />
+            </template>
+            <template v-else-if="column.key === 'releaseStatus'">
+              <a-select
+                :value="record.releaseStatus || 'releasable'"
+                size="small"
+                style="width: 100%"
+                :options="releaseStatusOpts"
+                @change="
+                  (v) => {
+                    record.releaseStatus = v || 'releasable'
+                    emitBomRefDescendantEdit(record.id)
+                  }
+                "
               />
             </template>
             <template v-else-if="column.key === 'remark'">
@@ -468,7 +487,7 @@ const props = defineProps({
   hideToolbar: { type: Boolean, default: false },
   emptyVariant: { type: String, default: 'default' },
   hideSwitchProduct: { type: Boolean, default: false },
-  /** 随货附件编辑：隐藏模板/按BOM，改为从其他附件导入 */
+  /** 随货配件编辑：隐藏模板/按BOM，改为从其他附件导入 */
   shipAttachmentMode: { type: Boolean, default: false },
   /** 根产品/物料展示名（信息条左侧） */
   rootItemLabel: { type: String, default: '' },
@@ -581,6 +600,10 @@ const emit = defineEmits([
 
 const processDocOpts = processDocOptions
 const processRouteOpts = processRouteOptions
+const releaseStatusOpts = [
+  { label: '可投', value: 'releasable' },
+  { label: '待定', value: 'pending_spec' },
+]
 
 const isTreeMode = computed(
   () => props.flatNodes.length > 0 && props.lineItems.length >= 0 && !props.lines.length,
@@ -705,6 +728,7 @@ const widthMap = {
   categoryName: 90,
   materialType: 90,
   supplyForm: 90,
+  releaseStatus: 88,
   material: 90,
   variantAttr: 140,
   drawingNo: 100,

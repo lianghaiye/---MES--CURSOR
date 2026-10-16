@@ -7,10 +7,6 @@ const PRODUCT_TYPE = {
   MATERIAL: '物料',
 }
 
-function roundMoney(val) {
-  return Math.round((Number(val) || 0) * 100) / 100
-}
-
 function roundQty(val) {
   return Math.round((Number(val) || 0) * 1000) / 1000
 }
@@ -132,10 +128,10 @@ function buildDemoStockRecords(products = [], materials = [], warehouses = []) {
 
 function enrichStockRow(row, master) {
   const qty = roundQty(row.qty)
-  const unitPrice =
-    master.unitPrice != null && master.unitPrice !== '' ? Number(master.unitPrice) : null
-  const totalAmount = unitPrice != null ? roundMoney(qty * unitPrice) : null
   const locationNo = resolveOutboundLocationNo(row.warehouse, row.itemCode)
+  // 金额改由库存明细页按在库批次 unitCost 汇总；此处仅保留主数据标准单价作参考回退
+  const standardUnitPrice =
+    master.unitPrice != null && master.unitPrice !== '' ? Number(master.unitPrice) : null
 
   return {
     id: row.id || row.key,
@@ -152,8 +148,9 @@ function enrichStockRow(row, master) {
     unit: row.unit || master.unit || '件',
     stockQty: qty,
     locationNo,
-    unitPrice,
-    totalAmount,
+    standardUnitPrice,
+    unitPrice: null,
+    totalAmount: null,
     spuCode: master.spuCode,
     isVariantSku: master.isVariantSku,
   }

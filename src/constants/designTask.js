@@ -5,6 +5,7 @@ export const DESIGN_TASK_STATUS = {
   PENDING_AUDIT: '待审核',
   APPROVED: '审核通过',
   REJECTED: '已驳回',
+  VOIDED: '已作废',
 }
 
 /** 设计任务来源 */
@@ -27,6 +28,7 @@ export function designTaskStatusColor(status) {
     待审核: 'processing',
     审核通过: 'success',
     已驳回: 'error',
+    已作废: 'default',
   }
   return map[status] || 'default'
 }

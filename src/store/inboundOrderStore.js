@@ -16,7 +16,10 @@ import { estimateSettleQty } from '@/utils/settleUnit'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
 import { warehouseState } from '@/store/warehouseStore'
 import { applyInboundToStock } from '@/store/stockStore'
-import { applyInboundToSalesAllocation } from '@/store/salesStockAllocationStore'
+import {
+  applyInboundToSalesAllocation,
+  takeRepayInboundSegments,
+} from '@/store/salesStockAllocationStore'
 import { applyInboundBatchesFromRoots } from '@/store/stockBatchStore'
 import { buildLineUomConvert } from '@/utils/batchUomConvert'
 import {
@@ -44,6 +47,20 @@ import {
 function isFinishedOrSemiInbound(order) {
   const t = order?.inboundType || ''
   return t === '成品入库' || t === '半成品入库'
+}
+
+/** 入库行 → 批次实际成本（每库存单位） */
+function resolveInboundLineUnitCost(line) {
+  if (!line) return null
+  const stockQty = Number(line.stockQty) || Number(line.qty) || 0
+  const total = line.totalPrice ?? line.totalValue
+  if (total != null && total !== '' && stockQty > 0) {
+    return Math.round((Number(total) / stockQty) * 10000) / 10000
+  }
+  const p = line.unitPriceExTax ?? line.unitPrice ?? line.unitPriceInTax
+  if (p == null || p === '') return null
+  const n = Number(p)
+  return Number.isFinite(n) ? Math.round(n * 10000) / 10000 : null
 }
 
 function resolveInboundSalesOrder(order) {
@@ -487,6 +504,8 @@ function prepareAndApplyInboundLine(order, line) {
     stockUnit: line.stockUnit || line.unit,
     purchaseQty: Number(line.purchaseQty) || 0,
     lineStockQty: Number(line.stockQty) || Number(line.qty) || 0,
+    /** 批次实际成本：优先行总价÷库存数量，否则取不含税/行单价 */
+    unitCost: resolveInboundLineUnitCost(line),
     workOrderNo: resolveWorkOrderNoFromInbound(order) || line.workOrderNo || '',
     attrs: {
       material: line.material,
@@ -505,10 +524,31 @@ function prepareAndApplyInboundLine(order, line) {
   // 工单成品检未挂销售订单时，整批按自由备货入库，不在生成弹窗里再选销售订单。
   const salesOrder = isFinishedOrSemiInbound(order) ? resolveInboundSalesOrder(order) : null
   if (salesOrder) {
+    const repay = takeRepayInboundSegments({
+      debtorOrderId: salesOrder.id,
+      itemCode: line.itemCode,
+      pieceValues,
+      itemName: line.itemName || line.productName || '',
+    })
+    for (const seg of repay.segments) {
+      const res = applyInboundBatchesFromRoots({
+        ...basePayload,
+        pieceValues: seg.pieceValues,
+        pieceLengths: seg.pieceValues,
+        salesOrderId: seg.salesOrderId,
+        salesOrderNo: seg.salesOrderNo,
+        salesLineId: seg.salesLineId,
+        uomConvert: lineUomConvert,
+      })
+      if (!res.ok) return { ok: false, message: res.message }
+      allBatches.push(...(res.batches || []))
+      allPieces.push(...(res.pieces || []))
+      if (res.manageByPiece) manageByPiece = true
+    }
     const split = splitInboundPieceValuesForSalesOrder({
       salesOrder,
       itemCode: line.itemCode,
-      pieceValues,
+      pieceValues: repay.restPieceValues,
       preferredSalesLineId: line.salesLineId || '',
     })
     line.dedicatedInboundQty = split.dedicatedTotal

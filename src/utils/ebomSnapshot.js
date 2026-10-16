@@ -59,6 +59,8 @@ export function createPlanMaterial(partial = {}) {
     warehouse: '',
     urgency: '',
     workOrderRemark: '',
+    /** releasable | pending_spec：一期可投 / 规格待定 */
+    releaseStatus: 'releasable',
     children: [],
     ...partial,
   }
@@ -103,6 +105,7 @@ function lineToMaterial(line, flatNodes, lineItems, demandQty) {
     processRoute: line.processRoute || '',
     joinPlan: supplyType === '自制件' ? '是' : '否',
     remark: line.remark || '',
+    releaseStatus: line.releaseStatus || 'releasable',
     children,
   })
 }

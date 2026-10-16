@@ -11,7 +11,7 @@ function buildLineStockReminder(line, order) {
 export const STOCK_FULFILLMENT_MODE = {
   /** 优先吃自由备货，缺口再进生产计划；可填占用现货数 */
   PREFER_STOCK: 'prefer_stock',
-  /** 即使有自由备货也按全量排产，不占用自由备货 */
+  /** 审核时全量排产/采购、不新占自由备货；发货时仍先本单按单批、缺口可用自由备货 */
   FORCE_MTO: 'force_mto',
   /** 仅吃现货；自由备货不足则审核失败 */
   STOCK_ONLY: 'stock_only',
@@ -19,7 +19,7 @@ export const STOCK_FULFILLMENT_MODE = {
 
 export const STOCK_FULFILLMENT_MODE_LABELS = {
   [STOCK_FULFILLMENT_MODE.PREFER_STOCK]: '优先现货',
-  [STOCK_FULFILLMENT_MODE.FORCE_MTO]: '强制按单生产',
+  [STOCK_FULFILLMENT_MODE.FORCE_MTO]: '强制按单生产/采购',
   [STOCK_FULFILLMENT_MODE.STOCK_ONLY]: '仅现货',
 }
 

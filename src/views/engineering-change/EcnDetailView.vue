@@ -9,6 +9,9 @@
             <span class="page-sub">{{ record.type }} · {{ record.productName }}</span>
           </div>
           <a-space>
+            <a-button v-if="showPlanImpactEntry" type="primary" size="small" @click="goPlanImpact">
+              计划影响与重排
+            </a-button>
             <a-button size="small" @click="printModalOpen = true">
               <PrinterOutlined />
               打印
@@ -98,6 +101,11 @@ const showPostApprovalSections = computed(() => {
   return status && status !== ECN_STATUS.DRAFT && status !== ECN_STATUS.APPROVING
 })
 
+const showPlanImpactEntry = computed(() => {
+  const status = record.value?.status
+  return status === ECN_STATUS.EXECUTED || status === ECN_STATUS.COMPLETED
+})
+
 watch(
   record,
   (row) => {
@@ -116,6 +124,16 @@ function approvalResultColor(result) {
 
 function goBack() {
   router.push(moduleConfig.listPath)
+}
+
+function goPlanImpact() {
+  const path = moduleConfig.impactPath?.(route.params.id)
+  if (!path) {
+    message.info('当前模块未配置计划影响页')
+    return
+  }
+  openTab(path, '计划影响与重排')
+  router.push(path)
 }
 
 function handleViewBom(item) {

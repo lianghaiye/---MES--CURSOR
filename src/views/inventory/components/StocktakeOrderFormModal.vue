@@ -76,7 +76,10 @@
           <a-space wrap>
             <a-button type="primary" size="small" :disabled="!form.warehouse" @click="openPicker">
               <PlusOutlined />
-              添加盘点物品
+              选择本仓物品
+            </a-button>
+            <a-button size="small" :disabled="!form.warehouse" @click="openMasterPicker">
+              从主数据添加
             </a-button>
             <a-button size="small" :disabled="!form.warehouse" @click="loadWarehouseStock">
               加载本仓库存
@@ -107,7 +110,8 @@
               <a-input-number
                 v-model:value="record.actualQty"
                 :min="0"
-                :precision="4"
+                :formatter="inputNumberFormatter"
+                :parser="inputNumberParser"
                 size="small"
                 style="width: 100%"
                 @change="() => syncDiff(record)"
@@ -115,7 +119,7 @@
             </template>
             <template v-else-if="column.key === 'diffQty'">
               <span :class="{ 'diff-pos': record.diffQty > 0, 'diff-neg': record.diffQty < 0 }">
-                {{ record.diffQty }}
+                {{ formatQty(record.diffQty) }}
               </span>
             </template>
             <template v-else-if="column.key === 'salesOrderNo'">
@@ -143,10 +147,18 @@
 
   <TransferStockPickModal
     v-model:open="pickerOpen"
-    title="选择盘点库存"
+    title="选择本仓物品"
     :warehouse="form.warehouse"
     ignore-soft-lock
     @confirm="onPickerConfirm"
+  />
+
+  <SelectBomMaterialModal
+    v-model:open="masterPickerOpen"
+    title="从主数据添加"
+    hide-add-material
+    :include-spu-templates="false"
+    @selected="onMasterConfirm"
   />
 </template>
 
@@ -158,6 +170,8 @@ import { CheckOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import TransferStockPickModal from '@/views/inventory/components/TransferStockPickModal.vue'
+import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import { getWarehouseSelectOptions } from '@/store/warehouseStore'
 import { stockState } from '@/store/stockStore'
 import { listBatches, listFreeBatches, sumFreeQty } from '@/store/stockBatchStore'
@@ -197,6 +211,7 @@ const {
 
 const saving = ref(false)
 const pickerOpen = ref(false)
+const masterPickerOpen = ref(false)
 
 const form = reactive({
   docNo: '',
@@ -248,10 +263,14 @@ function displayCell(val) {
 function formatBookQty(record) {
   const qty = record?.bookQty
   if (qty == null || qty === '') return '—'
-  const n = Number(qty)
-  const q = Number.isFinite(n) ? n : qty
-  const unit = String(record?.unit || '').trim()
-  return unit ? `${q} ${unit}` : String(q)
+  return formatQtyWithUnitSafe(qty, record?.unit)
+}
+
+function formatQtyWithUnitSafe(qty, unit) {
+  const q = formatQty(qty)
+  const u = String(unit || '').trim()
+  if (q === '—') return u ? `— ${u}` : '—'
+  return u ? `${q} ${u}` : q
 }
 
 function resolveItemMeta(itemCode, batch) {
@@ -394,6 +413,14 @@ function openPicker() {
   pickerOpen.value = true
 }
 
+function openMasterPicker() {
+  if (!form.warehouse) {
+    message.warning('请先选择盘点仓库')
+    return
+  }
+  masterPickerOpen.value = true
+}
+
 function pushStockRow(row) {
   const exists = form.lineItems.some(
     (l) =>
@@ -432,6 +459,48 @@ function onPickerConfirm(rows) {
     if (pushStockRow(row)) n += 1
   })
   if (n) message.success(`已添加 ${n} 行`)
+}
+
+function onMasterConfirm(rows) {
+  let n = 0
+  let skipped = 0
+  ;(rows || []).forEach((row) => {
+    if (row?.isSpuTemplate || row?.pickType === 'spu') {
+      skipped += 1
+      return
+    }
+    const code = row.code || row.itemCode
+    if (!code) return
+    const free = sumFreeQty({ warehouse: form.warehouse, itemCode: code })
+    const whQty = getWarehouseStockQty(form.warehouse, code)
+    if (free > 0 || whQty > 0) {
+      skipped += 1
+      return
+    }
+    const exists = form.lineItems.some((l) => l.itemCode === code && !isDedicated(l) && !l.batchId)
+    if (exists) {
+      skipped += 1
+      return
+    }
+    form.lineItems.push(
+      createStocktakeLine({
+        itemCode: code,
+        itemName: row.name || row.itemName || code,
+        itemType: row.itemType || '物料',
+        specModel: row.specModel || '',
+        material: row.material || '',
+        variantSummary: row.variantSummary || '',
+        unit: row.inventoryUnit || row.unit || '件',
+        bookQty: 0,
+        actualQty: 0,
+        diffQty: 0,
+        dedicated: false,
+      }),
+    )
+    n += 1
+  })
+  if (n) message.success(`已从主数据添加 ${n} 行（账面为 0）`)
+  else if (skipped) message.info('所选物品本仓已有库存、已在清单中，或不能添加产品族模板')
 }
 
 function loadWarehouseStock() {

@@ -2,7 +2,7 @@ import { productBomState } from '@/store/productBomStore'
 import { isBomActive, isBomPending } from '@/mock/productBomOptions'
 import { isShipBomType } from '@/mock/bomMaterialColumns'
 
-/** 解析产品/物料对应的 BOM 维护入口（不含随货附件） */
+/** 解析产品/物料对应的 BOM 维护入口（不含随货配件） */
 export function resolveItemBomNavigation(itemType, itemId) {
   void productBomState.boms
   const boms = productBomState.boms.filter(

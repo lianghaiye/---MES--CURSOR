@@ -64,7 +64,7 @@ function orderDate(order, keys) {
   return ''
 }
 
-/** 引用该产品作为子件的 BOM（不含自身 BOM、已归档、随货附件） */
+/** 引用该产品作为子件的 BOM（不含自身 BOM、已归档、随货配件） */
 export function findBomsReferencingItem(record) {
   const id = String(record?.id || '')
   const code = String(record?.code || '').trim()

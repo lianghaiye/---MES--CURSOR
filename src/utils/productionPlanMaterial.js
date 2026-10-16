@@ -18,6 +18,7 @@ import {
   calcPlanQtyFromDemand,
   isDeductInventoryEnabled,
 } from '@/utils/productionPlanWorkItem'
+import { isMaterialReleasable } from '@/constants/ecnPlanReschedule'
 
 export const supplyTypeOptions = SUPPLY_FORM_OPTIONS.map((v) => ({ label: v, value: v }))
 
@@ -286,7 +287,12 @@ export function getSelfMadeMaterialsForPlan(order) {
     flattenMaterials(wi.materials, flat)
     flat.forEach((m) => all.push(withWorkItemBomIdentity(m, wi)))
   })
-  return all.filter((m) => m.supplyType === '自制件' || m.supplyType === '自制')
+  return all.filter(
+    (m) =>
+      (m.supplyType === '自制件' || m.supplyType === '自制') &&
+      isMaterialReleasable(m) &&
+      !m.phase2Deferred,
+  )
 }
 
 export function isTopLevelSelfMade(supplyType) {
@@ -305,10 +311,10 @@ export function getAssemblyMaterialsForPlan(order) {
     const flat = []
     flattenMaterials(wi.materials, flat)
     flat
-      .filter((m) => m.supplyType === '组装')
+      .filter((m) => m.supplyType === '组装' && isMaterialReleasable(m) && !m.phase2Deferred)
       .forEach((m) => all.push(withWorkItemBomIdentity(m, wi, { orderCategory: '部装工单' })))
   })
-  return all
+  return all.filter((m) => isMaterialReleasable(m) && !m.phase2Deferred)
 }
 
 /** 按物料行 / 编码回找生产计划工作项 */

@@ -97,7 +97,7 @@
         </a-button>
         <a-button v-if="isShipList" type="primary" size="small" @click="openCreateShipBom">
           <PlusOutlined />
-          新增随货附件
+          新增随货配件
         </a-button>
         <a-button v-if="isShipList" size="small" @click="probeOpen = true">匹配试算</a-button>
         <a-button v-if="!isShipList" size="small" @click="handleBatchEnable">
@@ -331,8 +331,8 @@
 
     <QcTemplateConflictModal
       v-model:open="shipConflictOpen"
-      title="随货附件冲突"
-      entity-label="随货附件"
+      title="随货配件冲突"
+      entity-label="随货配件"
       :kind="shipConflictKind"
       :conflicts="shipConflictRows"
       :current-template-name="shipConflictName"
@@ -649,7 +649,7 @@ function onListTabChange() {
 
 function openDetail(record) {
   const path = bomWorkspaceDetailPath(record)
-  openTab(path, record.bomName || (isShipList.value ? '随货附件详情' : 'BOM详情'))
+  openTab(path, record.bomName || (isShipList.value ? '随货配件详情' : 'BOM详情'))
   router.push(path)
 }
 
@@ -704,7 +704,7 @@ function onPendingAction(key, record) {
   if (key === 'delete') {
     Modal.confirm({
       title: '确认删除',
-      content: `确定删除${isShipBomType(record.bomType) ? '随货附件' : 'BOM'}「${record.bomName}」吗？`,
+      content: `确定删除${isShipBomType(record.bomType) ? '随货配件' : 'BOM'}「${record.bomName}」吗？`,
       okType: 'danger',
       onOk: () => {
         const res = deleteProductBom(record.id)
@@ -804,7 +804,7 @@ function handleBatchEnable() {
   if (!targets.length) {
     message.warning(
       isShipList.value
-        ? '所选记录中没有「待发布」状态的随货附件'
+        ? '所选记录中没有「待发布」状态的随货配件'
         : '所选记录中没有「待发布」状态的 BOM',
     )
     return
@@ -818,7 +818,7 @@ function handleBatchEnable() {
     else withoutRefs.push(row)
   })
 
-  const entityLabel = isShipList.value ? '随货附件' : 'BOM'
+  const entityLabel = isShipList.value ? '随货配件' : 'BOM'
   Modal.confirm({
     title: '批量审核发布',
     content:
@@ -879,7 +879,7 @@ function handleBatchArchive() {
     content:
       withRefs.length > 0
         ? `将归档 ${targets.length} 条记录，其中 ${withRefs.length} 条被母件引用，需逐条确认如何处理母件中的子件。`
-        : `确定归档选中的 ${targets.length} 条${isShipList.value ? '随货附件' : 'BOM'}吗？`,
+        : `确定归档选中的 ${targets.length} 条${isShipList.value ? '随货配件' : 'BOM'}吗？`,
     onOk: () => {
       withoutRefs.forEach((row) => archiveProductBom(row.id))
       selectedRowKeys.value = []
@@ -923,8 +923,8 @@ function handleToggleShipStatus(record) {
     Modal.confirm({
       title: '停用确认',
       content: referenced
-        ? '当前随货附件已被引用，停用后，发货将按优先级匹配已启用的随货附件。是否确认停用？'
-        : `确定要停用随货附件「${record.bomName}」吗？`,
+        ? '当前随货配件已被引用，停用后，发货将按优先级匹配已启用的随货配件。是否确认停用？'
+        : `确定要停用随货配件「${record.bomName}」吗？`,
       onOk: () => {
         const res = disableShipAttachment(record.id, { force: true })
         if (!res.ok) {

@@ -18,6 +18,7 @@ export const salesOrderDetailLineColumns = [
     fixed: 'left',
   },
   { key: 'businessType', title: '业务类型', width: 110 },
+  { key: 'shipAccessories', title: '随货配件', width: 130 },
   { key: 'productAttr', title: '产品属性', dataIndex: 'productAttr', width: 90 },
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 100 },
   { key: 'material', title: '材质', dataIndex: 'material', width: 80 },
@@ -39,7 +40,7 @@ export const salesOrderDetailLineColumns = [
   },
   { key: 'salesQty', title: '销售数量', dataIndex: 'salesQty', width: 90, align: 'right' },
   { key: 'deliveryMode', title: '交付方式', width: 100 },
-  { key: 'stockFulfillmentMode', title: '库存履约', width: 120 },
+  { key: 'stockFulfillmentMode', title: '库存履约', width: 168 },
   {
     key: 'preferStockTakeQty',
     title: '占用现货数',

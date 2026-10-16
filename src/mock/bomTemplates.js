@@ -24,6 +24,8 @@ export function createBomLineItem(partial = {}) {
     categoryName: '零件',
     materialType: '零部件',
     supplyForm: '自制件',
+    /** releasable=可投；pending_spec=规格待定（先投部分料） */
+    releaseStatus: 'releasable',
     material: '',
     drawingNo: '',
     unitQty: 1,

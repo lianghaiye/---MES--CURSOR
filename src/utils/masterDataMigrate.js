@@ -9,6 +9,7 @@ export const MATERIAL_TYPE_OPTIONS = [
   '毛胚',
   '半成品',
   '虚拟件',
+  '配件',
 ]
 
 /** 供应型态（与表单下拉一致） */

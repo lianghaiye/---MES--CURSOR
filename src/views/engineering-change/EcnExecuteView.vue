@@ -78,13 +78,27 @@ function goBack() {
 function handleExecute() {
   submitting.value = true
   const res = moduleConfig.store.startExecution(record.value.id, {})
-  submitting.value = false
   if (!res.ok) {
+    submitting.value = false
     message.warning(res.message)
     return
   }
-  moduleConfig.store.completeExecution(record.value.id)
-  message.success('变更已执行')
+  const done = moduleConfig.store.completeExecution(record.value.id)
+  submitting.value = false
+  if (!done?.ok) {
+    message.warning(done?.message || '执行失败')
+    return
+  }
+  const can = done.planImpact?.summary?.workItemCanReschedule || 0
+  const started = done.planImpact?.summary?.workItemStarted || 0
+  message.success(
+    can || started ? `变更已执行，发现 ${can} 项可重排、${started} 项已开工` : '变更已执行',
+  )
+  const impactPath = moduleConfig.impactPath?.(record.value.id)
+  if (impactPath) {
+    router.push(impactPath)
+    return
+  }
   goBack()
 }
 </script>

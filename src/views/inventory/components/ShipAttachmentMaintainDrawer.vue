@@ -18,15 +18,12 @@
       :sales-order-id="draft.salesOrderId || ''"
       :warehouse="draft.outboundWarehouse || ''"
       :disabled="!editable"
-      show-bring-standard-kit
+      :show-bring-standard-kit="true"
       expand-all-by-default
-      title="本单纳入附件"
-      title-tip="勾选「纳入本单」即本票要发的附件。待出库时可保存并再次同步到出库单；出库单已出库后不可再改。"
-      hide-inner-alert
+      title="本单纳入配件"
       hide-product-source-columns
       show-outbound-status
       :delivery="delivery"
-      empty-description="暂无附件。可点「带出标准包」按本单产品带出（默认不纳入），再勾选纳入。"
     />
 
     <div class="kit-wrap">

@@ -19,7 +19,7 @@ function resolveStock(warehouse, code) {
   }
 }
 
-/** 产品是否配置了已启用随货附件 */
+/** 产品是否配置了已启用随货配件 */
 export function productHasShipBom(productId) {
   if (productId == null || productId === '') return false
   return Boolean(getActiveShipBomForProduct(productId))
@@ -67,6 +67,8 @@ export function createShipAttachmentLine(partial = {}) {
         ? partial.warehouseStockQty
         : resolveStock(partial.warehouse, partial.materialCode || partial.itemCode),
     remark: partial.remark || '',
+    /** 来自销售订单随货配件快照，发货时保留，不因产品行匹配失败被裁掉 */
+    fromOrderSnapshot: partial.fromOrderSnapshot === true,
   }
 }
 

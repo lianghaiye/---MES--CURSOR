@@ -13,6 +13,35 @@ export const DELIVERY_KIND = {
   ACCESSORY_RESHIP: 'accessory_reship',
 }
 
+/** 发货单头「发货类型」。历史 normal 视为销售发货 */
+export const DELIVERY_TYPE = {
+  SALES: 'sales',
+  ACCESSORY_RESHIP: 'accessory_reship',
+  AFTER_SALES: 'after_sales',
+  OTHER: 'other',
+}
+
+export const DELIVERY_TYPE_OPTIONS = [
+  { value: DELIVERY_TYPE.SALES, label: '销售发货' },
+  { value: DELIVERY_TYPE.ACCESSORY_RESHIP, label: '配件补发' },
+  { value: DELIVERY_TYPE.AFTER_SALES, label: '售后发货' },
+  { value: DELIVERY_TYPE.OTHER, label: '其他' },
+]
+
+export function normalizeDeliveryType(value) {
+  if (value === DELIVERY_TYPE.ACCESSORY_RESHIP || value === DELIVERY_KIND.ACCESSORY_RESHIP) {
+    return DELIVERY_TYPE.ACCESSORY_RESHIP
+  }
+  if (value === DELIVERY_TYPE.AFTER_SALES) return DELIVERY_TYPE.AFTER_SALES
+  if (value === DELIVERY_TYPE.OTHER) return DELIVERY_TYPE.OTHER
+  return DELIVERY_TYPE.SALES
+}
+
+export function deliveryTypeLabel(value) {
+  const type = normalizeDeliveryType(value)
+  return DELIVERY_TYPE_OPTIONS.find((item) => item.value === type)?.label || '销售发货'
+}
+
 export const ACCESSORY_RESHIP_REASON_OPTIONS = [
   { value: '少发', label: '少发' },
   { value: '错发换发', label: '错发换发' },
@@ -21,10 +50,9 @@ export const ACCESSORY_RESHIP_REASON_OPTIONS = [
 ]
 
 export function isAccessoryReshipDelivery(row) {
-  return (
-    row?.deliveryKind === DELIVERY_KIND.ACCESSORY_RESHIP ||
-    row?.rawApplication?.deliveryKind === DELIVERY_KIND.ACCESSORY_RESHIP
-  )
+  const type = row?.deliveryType || row?.rawApplication?.deliveryType
+  const kind = row?.deliveryKind || row?.rawApplication?.deliveryKind
+  return normalizeDeliveryType(type || kind) === DELIVERY_TYPE.ACCESSORY_RESHIP
 }
 
 /** 销售明细 → 配件分组锚点（含已发完行） */

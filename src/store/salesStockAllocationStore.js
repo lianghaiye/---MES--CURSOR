@@ -387,15 +387,221 @@ export function confirmStockTransfer(payload) {
     salesLineId: payload.fromLineId,
     itemCode: payload.itemCode,
   })
-  transferBatchOwnership({
+  const batchRes = transferBatchOwnership({
     batchIds: fromBatches.map((b) => b.id),
     toSalesOrderId: payload.toOrderId,
     toSalesOrderNo: payload.toOrderNo,
     toSalesLineId: payload.toLineId,
     qty,
   })
+  if (!batchRes.ok) {
+    return { ok: false, message: batchRes.message || '批次归属转移失败' }
+  }
 
-  return { ok: true, transfer }
+  return { ok: true, transfer, batches: batchRes.batches }
+}
+
+/**
+ * 库存明细：按单批次转自由 / 转他单。
+ * 只改批次挂在哪张销售单上，占用数量跟着这批货走。不记欠账，不自动偿还。
+ * @param {{
+ *   mode: 'free'|'order',
+ *   batchIds: string[],
+ *   qty: number,
+ *   toOrderId?: string,
+ *   toOrderNo?: string,
+ *   toLineId?: string,
+ *   itemCode?: string,
+ *   itemName?: string,
+ *   remark?: string,
+ * }} payload
+ */
+export function confirmBatchOwnershipTransfer(payload = {}) {
+  const mode = payload.mode === 'order' ? 'order' : 'free'
+  const qty = Number(payload.qty) || 0
+  if (!(qty > 0)) return { ok: false, message: '转移数量须大于 0' }
+  const batchIds = Array.isArray(payload.batchIds) ? payload.batchIds.filter(Boolean) : []
+  if (!batchIds.length) return { ok: false, message: '请选择要转移的批次' }
+
+  const { getBatchById, transferBatchOwnership } = require('@/store/stockBatchStore')
+  const batches = batchIds.map((id) => getBatchById(id)).filter(Boolean)
+  if (!batches.length) return { ok: false, message: '批次不存在' }
+
+  const notDedicated = batches.find((b) => !b.salesOrderId && !b.salesOrderNo)
+  if (notDedicated) {
+    return { ok: false, message: `批次 ${notDedicated.batchNo} 已是自由备货，无需再转` }
+  }
+  const fromOrderId = batches[0].salesOrderId || ''
+  const fromOrderNo = batches[0].salesOrderNo || ''
+  const fromLineId = batches[0].salesLineId || ''
+  const mixed = batches.some(
+    (b) =>
+      (b.salesOrderId || '') !== fromOrderId ||
+      (b.salesOrderNo || '') !== fromOrderNo ||
+      (b.salesLineId || '') !== fromLineId,
+  )
+  if (mixed) {
+    return { ok: false, message: '请选择同一销售单（及同一销售行）的按单批次再转移' }
+  }
+
+  if (mode === 'order') {
+    if (!payload.toOrderId || !payload.toOrderNo) {
+      return { ok: false, message: '请选择目标销售订单' }
+    }
+    if (!payload.toLineId) {
+      return { ok: false, message: '请选择目标销售明细行' }
+    }
+    const { salesOrderState } = require('@/store/salesOrderStore')
+    const targetOrder = salesOrderState.orders.find((o) => o.id === payload.toOrderId)
+    const targetLine = (targetOrder?.lineItems || []).find((l) => l.id === payload.toLineId)
+    const targetCode = String(
+      targetLine?.productCode || targetLine?.itemCode || targetLine?.materialCode || '',
+    ).trim()
+    const sourceCode = String(payload.itemCode || batches[0]?.itemCode || '').trim()
+    if (!targetLine || !sourceCode || targetCode !== sourceCode) {
+      return {
+        ok: false,
+        message: `目标销售单没有编码 ${sourceCode || '—'} 的明细，不能转他单`,
+      }
+    }
+    if (payload.toOrderId === fromOrderId && payload.toLineId === fromLineId) {
+      return { ok: false, message: '目标与源销售行相同，无需转移' }
+    }
+  }
+
+  const batchRes = transferBatchOwnership({
+    batchIds,
+    toSalesOrderId: mode === 'order' ? payload.toOrderId : '',
+    toSalesOrderNo: mode === 'order' ? payload.toOrderNo : '',
+    toSalesLineId: mode === 'order' ? payload.toLineId : '',
+    qty,
+  })
+  if (!batchRes.ok) return { ok: false, message: batchRes.message }
+
+  let softMoved = 0
+  if (fromOrderId && fromLineId) {
+    const fromAlloc = getLineAllocatedQty(fromOrderId, fromLineId)
+    softMoved = Math.min(qty, fromAlloc)
+    if (softMoved > 0) {
+      decreaseLineAllocation(fromOrderId, fromLineId, softMoved)
+      if (mode === 'order') {
+        increaseLineAllocation({
+          salesOrderId: payload.toOrderId,
+          salesOrderNo: payload.toOrderNo,
+          salesLineId: payload.toLineId,
+          itemCode: payload.itemCode || batches[0].itemCode,
+          itemName: payload.itemName || batches[0].itemName,
+          qty: softMoved,
+        })
+      }
+    }
+  }
+
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
+  const transfer = {
+    id: `bot-${Date.now()}`,
+    type: mode === 'free' ? 'to_free' : 'to_order',
+    fromOrderId,
+    fromOrderNo,
+    fromLineId,
+    toOrderId: mode === 'order' ? payload.toOrderId : '',
+    toOrderNo: mode === 'order' ? payload.toOrderNo : '',
+    toLineId: mode === 'order' ? payload.toLineId : '',
+    itemCode: payload.itemCode || batches[0].itemCode,
+    itemName: payload.itemName || batches[0].itemName,
+    qty: batchRes.qty || qty,
+    softMoved,
+    batchNos: (batchRes.batches || []).map((b) => b.batchNo).filter(Boolean),
+    remark: payload.remark || '',
+    requireRepay: mode === 'order' && payload.requireRepay === true,
+    status: 'confirmed',
+    createdAt: now,
+    source: 'inventory_batch',
+  }
+  salesStockAllocationState.transfers.unshift(transfer)
+
+  if (transfer.requireRepay) {
+    const owedQty = Number(batchRes.qty) || qty
+    salesStockAllocationState.debts.unshift({
+      id: `ssd-${Date.now()}`,
+      transferId: transfer.id,
+      itemCode: transfer.itemCode,
+      itemName: transfer.itemName || '',
+      creditorOrderId: fromOrderId,
+      creditorOrderNo: fromOrderNo,
+      creditorLineId: fromLineId,
+      debtorOrderId: payload.toOrderId,
+      debtorOrderNo: payload.toOrderNo,
+      debtorLineId: payload.toLineId,
+      owedQty,
+      repaidQty: 0,
+      status: 'open',
+      urgency: '普通',
+      deliveryDate: '',
+      createdAt: now,
+      updatedAt: now,
+    })
+  }
+
+  return { ok: true, transfer, batches: batchRes.batches, softMoved }
+}
+
+/**
+ * 借方生产入库：按未还欠量把件数先挂回被借方，并补上被借方软占用。
+ * @returns {{ segments: Array, restPieceValues: number[] }}
+ */
+export function takeRepayInboundSegments({
+  debtorOrderId,
+  itemCode,
+  pieceValues = [],
+  itemName = '',
+} = {}) {
+  const queue = (pieceValues || []).map(Number).filter((v) => v > 0)
+  const code = String(itemCode || '').trim()
+  if (!debtorOrderId || !code || !queue.length) {
+    return { segments: [], restPieceValues: queue }
+  }
+  const openDebts = (salesStockAllocationState.debts || [])
+    .filter(
+      (d) =>
+        d.status === 'open' &&
+        d.debtorOrderId === debtorOrderId &&
+        d.itemCode === code &&
+        (Number(d.owedQty) || 0) > 0,
+    )
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
+
+  const { takePieceValuesUpTo } = require('@/utils/salesOrderDedicatedStock')
+  const segments = []
+  for (const debt of openDebts) {
+    if (!queue.length) break
+    const taken = takePieceValuesUpTo(queue, Number(debt.owedQty) || 0)
+    const pay = taken.reduce((s, n) => s + (Number(n) || 0), 0)
+    if (!(pay > 0)) continue
+    increaseLineAllocation({
+      salesOrderId: debt.creditorOrderId,
+      salesOrderNo: debt.creditorOrderNo,
+      salesLineId: debt.creditorLineId,
+      itemCode: code,
+      itemName: itemName || debt.itemName,
+      qty: pay,
+    })
+    debt.owedQty = Math.max(0, (Number(debt.owedQty) || 0) - pay)
+    debt.repaidQty = (Number(debt.repaidQty) || 0) + pay
+    if (debt.owedQty <= 1e-9) {
+      debt.owedQty = 0
+      debt.status = 'closed'
+    }
+    debt.updatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+    segments.push({
+      salesOrderId: debt.creditorOrderId,
+      salesOrderNo: debt.creditorOrderNo,
+      salesLineId: debt.creditorLineId,
+      pieceValues: taken,
+      dedicatedQty: pay,
+    })
+  }
+  return { segments, restPieceValues: queue }
 }
 
 /** 发货出库后释放本行占用 */

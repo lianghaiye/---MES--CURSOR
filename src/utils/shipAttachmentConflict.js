@@ -57,7 +57,7 @@ export function applyShipAttachmentConflictReplace(boms = [], conflicts = [], op
   return { ok: true }
 }
 
-/** 随货附件：按整单或逐行决议处理冲突 */
+/** 随货配件：按整单或逐行决议处理冲突 */
 export function applyShipAttachmentConflictResolution(
   boms = [],
   objects = [],

@@ -467,7 +467,7 @@ export function importBomByReference(
   }
 }
 
-/** 随货附件：取出可拷贝的子项（保留顶级明细，不剥顶层物料） */
+/** 随货配件：取出可拷贝的子项（保留顶级明细，不剥顶层物料） */
 export function resolveShipAttachmentImportStructure(bom) {
   if (!bom) return null
   const { flatNodes, lineItems } = loadBomDetailStructure(bom)
@@ -489,7 +489,7 @@ export function resolveShipAttachmentImportStructure(bom) {
   return { treeNodes, lineItems: lines }
 }
 
-/** 将其他随货附件的明细追加到当前根下（不改名称/适用范围） */
+/** 将其他随货配件的明细追加到当前根下（不改名称/适用范围） */
 export function importShipAttachmentLines(sourceBom, flatNodes, lineItems) {
   const structure = resolveShipAttachmentImportStructure(sourceBom)
   if (!structure) return null

@@ -11,7 +11,7 @@
           <span v-if="kit.bomName" class="kit-bom">
             {{ kit.bomName }}（{{ kit.bomNo }}）· {{ kit.materialCount }} 项
           </span>
-          <span v-else class="kit-bom muted">未命中已启用随货附件</span>
+          <span v-else class="kit-bom muted">未命中已启用随货配件</span>
         </div>
         <a-table
           v-if="kit.lines.length"

@@ -43,8 +43,22 @@ import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_stock_batches'
 const SEED_VERSION_KEY = 'i_doms_stock_batches_seed_v'
-/** v28：一类/一批补三口径（根/米/kg）在库批与件码 */
-const CURRENT_SEED_VERSION = '29'
+/** v30：批次实际成本 unitCost（库存单位） */
+const CURRENT_SEED_VERSION = '30'
+
+function roundMoney4(val) {
+  return Math.round((Number(val) || 0) * 10000) / 10000
+}
+
+function roundMoney2(val) {
+  return Math.round((Number(val) || 0) * 100) / 100
+}
+
+function normalizeUnitCost(val) {
+  if (val == null || val === '') return null
+  const n = Number(val)
+  return Number.isFinite(n) ? roundMoney4(n) : null
+}
 
 export const BATCH_STATUS = {
   IN_STOCK: '在库',
@@ -260,31 +274,160 @@ export function sumDedicatedQty(filters = {}) {
   )
 }
 
-/** 跨单调拨：转移批次所有权 */
+/**
+ * 在库批次实际成本汇总（仅统计已写入 unitCost 的批）
+ * @returns {{ totalAmount: number|null, unitCost: number|null, qtyWithCost: number, qtyTotal: number }}
+ */
+export function sumOnHandBatchCost({ warehouse, itemCode } = {}) {
+  const batches = listBatches({ warehouse, itemCode, inStockOnly: true })
+  let amount = 0
+  let qtyWithCost = 0
+  let qtyTotal = 0
+  for (const b of batches) {
+    const q = Number(b.currentLength) || 0
+    qtyTotal += q
+    const cost = normalizeUnitCost(b.unitCost)
+    if (cost == null || q <= 0) continue
+    amount += q * cost
+    qtyWithCost += q
+  }
+  if (!(qtyWithCost > 0)) {
+    return { totalAmount: null, unitCost: null, qtyWithCost: 0, qtyTotal: roundMeters(qtyTotal) }
+  }
+  return {
+    totalAmount: roundMoney2(amount),
+    unitCost: roundMoney4(amount / qtyWithCost),
+    qtyWithCost: roundMeters(qtyWithCost),
+    qtyTotal: roundMeters(qtyTotal),
+  }
+}
+
+/**
+ * 按数量从源批切出一块（不改台账总量），用于归属转移。
+ * 整批则只改归属；部分则源批减量并新建目标批。
+ */
+function takeQtyFromBatchWithOwnership(batch, takeQty, ownership = {}) {
+  const avail = roundMeters(Number(batch.currentLength) || 0)
+  const take = roundMeters(takeQty)
+  if (!(take > 0) || take > avail + 1e-9) {
+    return { ok: false, message: '转移数量无效' }
+  }
+  const manageByPiece = Boolean(batch.attrs?.manageByPiece)
+  if (manageByPiece && take < avail - 1e-9) {
+    return {
+      ok: false,
+      message: `批次 ${batch.batchNo} 按件管理，请整批转移`,
+    }
+  }
+
+  const now = new Date().toISOString()
+  const targetOwn = {
+    salesOrderId: ownership.salesOrderId || '',
+    salesOrderNo: ownership.salesOrderNo || '',
+    salesLineId: ownership.salesLineId || '',
+  }
+
+  if (take >= avail - 1e-9) {
+    batch.salesOrderId = targetOwn.salesOrderId
+    batch.salesOrderNo = targetOwn.salesOrderNo
+    batch.salesLineId = targetOwn.salesLineId
+    batch.updatedAt = now
+    return { ok: true, batch, created: false }
+  }
+
+  batch.currentLength = roundMeters(avail - take)
+  batch.updatedAt = now
+  const created = {
+    id: nid(),
+    batchNo: generateBatchNo(),
+    warehouse: batch.warehouse || '',
+    itemCode: batch.itemCode || '',
+    itemName: batch.itemName || '',
+    currentLength: take,
+    inboundQty: take,
+    inboundPurchaseQty: null,
+    purchaseUnit: batch.purchaseUnit || '',
+    unit: batch.unit || '米',
+    status: BATCH_STATUS.IN_STOCK,
+    sourceType: batch.sourceType || '归属转移',
+    sourceDocNo: batch.sourceDocNo || '',
+    salesOrderId: targetOwn.salesOrderId,
+    salesOrderNo: targetOwn.salesOrderNo,
+    salesLineId: targetOwn.salesLineId,
+    workOrderNo: batch.workOrderNo || '',
+    attrs: { ...(batch.attrs || {}), ownershipSplitFrom: batch.batchNo },
+    uomConvert: batch.uomConvert || null,
+    unitCost: normalizeUnitCost(batch.unitCost),
+    parentBatchId: batch.id,
+    createdAt: now,
+    updatedAt: now,
+  }
+  stockBatchState.batches.unshift(created)
+  return { ok: true, batch: created, created: true }
+}
+
+/**
+ * 跨单 / 转自由：按数量转移批次销售归属（支持拆批；台账数量不变）
+ * toSalesOrderId 为空表示转自由备货。
+ */
 export function transferBatchOwnership({
   batchIds = [],
-  toSalesOrderId,
-  toSalesOrderNo,
-  toSalesLineId,
+  toSalesOrderId = '',
+  toSalesOrderNo = '',
+  toSalesLineId = '',
   qty,
 } = {}) {
-  const need = roundMeters(Number(qty) || 0)
-  let left = need > 0 ? need : Infinity
-  const transferred = []
-  for (const id of batchIds) {
-    if (!(left > 0)) break
+  const ids = [...new Set((batchIds || []).filter(Boolean))]
+  if (!ids.length) return { ok: false, message: '请选择要转移的批次', batches: [] }
+
+  const candidates = []
+  for (const id of ids) {
     const b = getBatchById(id)
     if (!b || b.status !== BATCH_STATUS.IN_STOCK) continue
     const avail = roundMeters(Number(b.currentLength) || 0)
     if (!(avail > 0)) continue
-    b.salesOrderId = toSalesOrderId || ''
-    b.salesOrderNo = toSalesOrderNo || ''
-    b.salesLineId = toSalesLineId || ''
-    b.updatedAt = new Date().toISOString()
-    transferred.push(b)
-    if (Number.isFinite(left)) left = roundMeters(left - avail)
+    candidates.push(b)
   }
-  return { ok: true, batches: transferred }
+  if (!candidates.length) return { ok: false, message: '所选批次无可转移在库数量', batches: [] }
+
+  const totalAvail = roundMeters(candidates.reduce((s, b) => s + (Number(b.currentLength) || 0), 0))
+  const need = Number(qty) > 0 ? roundMeters(Number(qty)) : totalAvail
+  if (need > totalAvail + 1e-9) {
+    return {
+      ok: false,
+      message: `可转移数量不足（需 ${need}，可用 ${totalAvail}）`,
+      batches: [],
+    }
+  }
+
+  let left = need
+  const transferred = []
+  for (const b of candidates) {
+    if (!(left > 0)) break
+    const avail = roundMeters(Number(b.currentLength) || 0)
+    const take = Math.min(avail, left)
+    const res = takeQtyFromBatchWithOwnership(b, take, {
+      salesOrderId: toSalesOrderId,
+      salesOrderNo: toSalesOrderNo,
+      salesLineId: toSalesLineId,
+    })
+    if (!res.ok) return { ok: false, message: res.message, batches: transferred }
+    transferred.push(res.batch)
+    left = roundMeters(left - take)
+  }
+
+  return { ok: true, batches: transferred, qty: need }
+}
+
+/** 按单批 → 自由备货 */
+export function transferBatchesToFree({ batchIds = [], qty } = {}) {
+  return transferBatchOwnership({
+    batchIds,
+    toSalesOrderId: '',
+    toSalesOrderNo: '',
+    toSalesLineId: '',
+    qty,
+  })
 }
 
 export function getBatchById(id) {
@@ -336,6 +479,8 @@ export function createBatch(partial = {}) {
     attrs: partial.attrs || {},
     /** 按批次覆盖：入库过磅沉淀的换算快照（库存明细展示，不进主数据） */
     uomConvert: partial.uomConvert || null,
+    /** 批次实际成本（每库存单位）；入库时按入库行价写入，库存金额按批汇总 */
+    unitCost: normalizeUnitCost(partial.unitCost),
     parentBatchId: partial.parentBatchId || '',
     createdAt: partial.createdAt || new Date().toISOString(),
     updatedAt: partial.updatedAt || new Date().toISOString(),
@@ -373,6 +518,7 @@ export function applyInboundBatchesFromRoots(payload) {
     workOrderNo: payload.workOrderNo || '',
   }
   const lineUomConvert = payload.uomConvert || null
+  const unitCost = normalizeUnitCost(payload.unitCost)
   const thisCallStock = roundMeters(values.reduce((s, l) => s + l, 0))
   const lineStockTotal =
     Number(payload.lineStockQty) > 0 ? roundMeters(Number(payload.lineStockQty)) : thisCallStock
@@ -408,6 +554,7 @@ export function applyInboundBatchesFromRoots(payload) {
       inboundPurchaseQty: inboundPurchaseFor(total, values.length),
       purchaseUnit,
       unit,
+      unitCost,
       sourceType: payload.sourceType || '采购入库',
       sourceDocNo: payload.sourceDocNo || '',
       ...lineage,
@@ -449,6 +596,7 @@ export function applyInboundBatchesFromRoots(payload) {
       inboundPurchaseQty: inboundPurchaseFor(val, 0),
       purchaseUnit,
       unit,
+      unitCost,
       sourceType: payload.sourceType || '采购入库',
       sourceDocNo: payload.sourceDocNo || '',
       ...lineage,
@@ -611,6 +759,7 @@ export function receiveRemnantBatch({
     inboundQty: len,
     purchaseUnit: source.purchaseUnit || '',
     unit: source.unit || '米',
+    unitCost: source.unitCost,
     sourceType,
     sourceDocNo,
     // 原批已整出离仓：余料用新批次号，但血缘挂回原批，并标识余料

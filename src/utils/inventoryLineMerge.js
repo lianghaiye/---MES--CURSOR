@@ -3,35 +3,50 @@
  */
 
 export const INVENTORY_PRODUCT_MERGE_KEYS = new Set([
+  'warehouse',
   'itemName',
   'itemCode',
+  'materialType',
   'specModel',
   'material',
   'variantSummary',
+  'drawingNo',
+  'softAllocated',
+  'availableQty',
+  'unitPrice',
+  'totalAmount',
+  'locationNo',
 ])
 
 export function isDedicatedInventoryLine(line) {
   return Boolean(line?.dedicated || line?.salesOrderId || line?.salesOrderNo)
 }
 
+/** 同仓同编码分组键 */
+export function inventoryGroupKey(row) {
+  return `${String(row?.warehouse || '')}||${String(row?.itemCode || '')}`
+}
+
 /** 同编码聚拢：自由在前、按单在后 */
 export function sortInventoryLinesByItemCode(rows = []) {
   return [...rows].sort((a, b) => {
+    const whCmp = String(a.warehouse || '').localeCompare(String(b.warehouse || ''), 'zh-CN')
+    if (whCmp !== 0) return whCmp
     const codeCmp = String(a.itemCode || '').localeCompare(String(b.itemCode || ''), 'zh-CN')
     if (codeCmp !== 0) return codeCmp
     return Number(isDedicatedInventoryLine(a)) - Number(isDedicatedInventoryLine(b))
   })
 }
 
-/** 连续相同 itemCode 的 rowspan：首行 span=n，其余 0 */
-export function buildItemCodeRowSpans(rows = []) {
+/** 连续相同分组键的 rowspan：首行 span=n，其余 0 */
+export function buildInventoryGroupRowSpans(rows = [], keyFn = inventoryGroupKey) {
   const spans = new Array(rows.length).fill(1)
   let i = 0
   while (i < rows.length) {
-    const key = String(rows[i]?.itemCode || '')
+    const key = keyFn(rows[i])
     let j = i + 1
     while (j < rows.length) {
-      if (String(rows[j]?.itemCode || '') !== key) break
+      if (keyFn(rows[j]) !== key) break
       j += 1
     }
     const span = j - i
@@ -40,6 +55,11 @@ export function buildItemCodeRowSpans(rows = []) {
     i = j
   }
   return spans
+}
+
+/** 连续相同 itemCode 的 rowspan：首行 span=n，其余 0 */
+export function buildItemCodeRowSpans(rows = []) {
+  return buildInventoryGroupRowSpans(rows, (r) => String(r?.itemCode || ''))
 }
 
 /**

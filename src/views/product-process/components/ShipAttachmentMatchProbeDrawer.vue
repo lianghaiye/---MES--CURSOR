@@ -51,7 +51,7 @@
         <div class="section-title">当前生效附件</div>
         <a-empty
           v-if="!probeResult.template"
-          :description="probeResult.message || '未命中已启用的随货附件'"
+          :description="probeResult.message || '未命中已启用的随货配件'"
         />
         <a-descriptions v-else bordered size="small" :column="1" class="winner-block">
           <a-descriptions-item label="编号">

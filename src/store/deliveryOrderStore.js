@@ -219,6 +219,7 @@ export function createDeliveryOrder(payload) {
     applyOutbound: Boolean(payload.applyOutbound),
     outboundWarehouse: payload.outboundWarehouse || '成品仓',
     remark: payload.remark || '',
+    deliveryType: payload.deliveryType || '',
     deliveryKind: payload.deliveryKind || 'normal',
     accessoryReshipReason: payload.accessoryReshipReason || '',
     lineItems: payload.lineItems || [],
@@ -226,7 +227,7 @@ export function createDeliveryOrder(payload) {
     shipAttachments: payload.shipAttachments || [],
     salesOrderId: so?.id || payload.salesOrderId,
     salesOrderNo: so?.orderNo || payload.salesOrderNo,
-    totalShipQty: isAccessoryReship ? accessoryQty : wholeQty + scatterQty,
+    totalShipQty: isAccessoryReship ? wholeQty + scatterQty + accessoryQty : wholeQty + scatterQty,
     status: '已提交',
   }
 

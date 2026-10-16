@@ -1,6 +1,7 @@
 /** 物料树工具函数 */
 
 import dayjs from 'dayjs'
+import { isMaterialReleasable } from '@/constants/ecnPlanReschedule'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import { getMasterDefaults } from '@/utils/productionPlanMaterial'
 import { materialInfoState } from '@/store/materialInfoStore'
@@ -79,7 +80,12 @@ export function getSelfMadeMaterials(order) {
   order?.workItems?.forEach((wi) => {
     flattenMaterials(wi.materials, all)
   })
-  return all.filter((m) => m.supplyType === '自制件' || m.supplyType === '自制')
+  return all.filter(
+    (m) =>
+      (m.supplyType === '自制件' || m.supplyType === '自制') &&
+      isMaterialReleasable(m) &&
+      !m.phase2Deferred,
+  )
 }
 
 /** 筛选供应型态为「外协件」的物料（扁平；优先当前工作项，否则整单） */
@@ -90,14 +96,18 @@ export function getOutsourcedMaterials(order, workItem = null) {
   } else {
     order?.workItems?.forEach((wi) => flattenMaterials(wi.materials, all))
   }
-  return all.filter((m) => m.supplyType === '外协件')
+  return all.filter(
+    (m) => m.supplyType === '外协件' && isMaterialReleasable(m) && !m.phase2Deferred,
+  )
 }
 
-/** 从单个工作项筛选外协件 */
+/** 从单个工作项筛选外协件（排除规格待定） */
 export function getOutsourcedMaterialsFromWorkItem(workItem) {
   const all = []
   flattenMaterials(workItem?.materials, all)
-  return all.filter((m) => m.supplyType === '外协件')
+  return all.filter(
+    (m) => m.supplyType === '外协件' && isMaterialReleasable(m) && !m.phase2Deferred,
+  )
 }
 
 function isPurchasedSupplyType(supplyType) {
@@ -107,6 +117,7 @@ function isPurchasedSupplyType(supplyType) {
 function filterPurchasedWithGap(materials, productQty) {
   return materials.filter((m) => {
     if (!isPurchasedSupplyType(m.supplyType)) return false
+    if (!isMaterialReleasable(m) || m.phase2Deferred) return false
     const gap = calcGapQty(m.demandQty ?? calcDemandQty(m.unitUsage, productQty), m.availableStock)
     return gap > 0
   })
@@ -148,7 +159,9 @@ export function getPurchasedMaterialsFromWorkItem(workItem) {
     }
   }
   return all
-    .filter((m) => isPurchasedSupplyType(m.supplyType))
+    .filter(
+      (m) => isPurchasedSupplyType(m.supplyType) && isMaterialReleasable(m) && !m.phase2Deferred,
+    )
     .map((m) => {
       const hit = getInTransitOrWipForPlanMaterial(m)
       const alloc = getWoAllocatedForMaterialCode(m.code)

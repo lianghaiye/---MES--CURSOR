@@ -1,12 +1,14 @@
 import { ECN_STATUS } from '@/constants/ecn'
+import { ECN_RESCHEDULE_STATUS } from '@/constants/ecnPlanReschedule'
 import { buildMockEcnRecords } from '@/mock/ecnSeed'
 import { createChangeRequestStore } from '@/store/changeRequestStore'
 import { executeEcnBomVersionUpgrade } from '@/utils/ecnBomExecution'
 import { buildBomVersionHistoryFromGroup } from '@/utils/ecnBomVersionHistory'
+import { analyzeEcnPlanImpact } from '@/utils/ecnPlanImpact'
 
 const api = createChangeRequestStore({
   storageKey: 'i_doms_ecn',
-  dataVersion: 9,
+  dataVersion: 10,
   buildMockRecords: buildMockEcnRecords,
   docNoField: 'ecnNo',
   docNoPrefix: 'ECN',
@@ -33,6 +35,7 @@ export function completeEcnExecution(id, operator = '张工') {
   if (!res.ok) return res
 
   if (bomRes.ok) {
+    row.previousBomId = row.bomId || bomRes.oldBomId || ''
     row.bomId = bomRes.newBomId
     row.bomVersion = bomRes.newVersion
     row.versionGroupId = bomRes.versionGroupId
@@ -41,7 +44,14 @@ export function completeEcnExecution(id, operator = '张工') {
     row.executor = operator
   }
 
-  return { ...res, bomUpgrade: bomRes }
+  const impact = analyzeEcnPlanImpact(row)
+  row.planImpactSnapshot = {
+    at: new Date().toISOString(),
+    summary: impact.summary,
+  }
+  row.rescheduleStatus = ECN_RESCHEDULE_STATUS.PENDING
+
+  return { ...res, bomUpgrade: bomRes, planImpact: impact }
 }
 
 export function canWithdrawEcn(order) {

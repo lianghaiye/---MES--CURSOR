@@ -201,6 +201,7 @@
                 <a-button type="link" size="small" @click="openDetailInNewTab(record)"
                   >详情</a-button
                 >
+                <a-button type="link" size="small" @click="goPlanImpact(record)">重排</a-button>
               </template>
               <template v-else-if="record.status === ECN_STATUS.REJECTED">
                 <a-button type="link" size="small" @click="goEdit(record)">编辑</a-button>
@@ -375,6 +376,16 @@ function openApprove(record) {
 
 function openExecute(record) {
   router.push(moduleConfig.executePath(record.id))
+}
+
+function goPlanImpact(record) {
+  const path = moduleConfig.impactPath?.(record.id)
+  if (!path) {
+    message.info('当前模块未配置计划影响页')
+    return
+  }
+  openTab(path, '计划影响与重排')
+  router.push(path)
 }
 
 function handleSubmitApproval(record) {

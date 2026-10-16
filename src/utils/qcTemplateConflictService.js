@@ -37,7 +37,7 @@ export function formatObjectLabel(obj = {}, scopeType) {
 }
 
 /**
- * 同范围类型下的启用冲突（质检模板 / 随货附件共用）。
+ * 同范围类型下的启用冲突（质检模板 / 随货配件共用）。
  * bizScope 有值时仅在相同业务类型内比较。
  */
 export function findEnabledScopeConflicts(

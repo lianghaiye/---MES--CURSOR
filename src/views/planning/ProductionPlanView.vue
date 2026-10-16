@@ -63,6 +63,7 @@
                 <a-select-option value="待下达">待下达</a-select-option>
                 <a-select-option value="执行中">执行中</a-select-option>
                 <a-select-option value="已完成">已完成</a-select-option>
+                <a-select-option value="已终止">已终止</a-select-option>
               </a-select>
             </a-form-item>
           </a-col>
@@ -238,7 +239,9 @@
                             ? 'orange'
                             : record.status === '待BOM'
                               ? 'gold'
-                              : 'default'
+                              : record.status === '已终止'
+                                ? 'default'
+                                : 'default'
                       "
                     >
                       {{ record.status }}
@@ -274,7 +277,15 @@
                       <a-button type="link" size="small" @click="toggleWorkItemExpand(record)">
                         {{ expandedWorkItemId === record.id ? '收起' : '展开' }}
                       </a-button>
-                      <a-button type="link" size="small" danger>终止</a-button>
+                      <a-button
+                        type="link"
+                        size="small"
+                        danger
+                        :disabled="selectedOrder.orderStatus === '已终止'"
+                        @click="onTerminatePlan"
+                      >
+                        终止
+                      </a-button>
                     </a-space>
                   </template>
                   <template
@@ -337,6 +348,7 @@
                   <a-button type="primary" @click="openOutsourceWorkOrderModal"
                     >生成外协工单</a-button
                   >
+                  <a-button @click="handleCreatePhase2Plan">生成二期计划（待定料）</a-button>
                 </a-space>
               </div>
 
@@ -408,6 +420,19 @@
                         style="width: 100%"
                         @change="onMaterialSupplyTypeChange(record)"
                       />
+                    </template>
+                    <template v-else-if="column.key === 'releaseStatus'">
+                      <a-select
+                        v-if="!record.isTopLevel"
+                        :value="record.releaseStatus || 'releasable'"
+                        size="small"
+                        style="width: 100%"
+                        :options="materialReleaseStatusOptions"
+                        :disabled="!!record.phase2Deferred"
+                        @change="(v) => onMaterialReleaseStatusChange(record, v)"
+                      />
+                      <a-tag v-else-if="record.phase2Deferred" color="default">已拆二期</a-tag>
+                      <span v-else class="muted">—</span>
                     </template>
                     <template v-else-if="column.key === 'planQty'">
                       <a-input-number
@@ -699,13 +724,20 @@ export default {
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch, nextTick } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { InfoCircleOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
-import { productionPlanState, filterProductionPlans } from '@/store/productionPlanStore'
+import {
+  productionPlanState,
+  filterProductionPlans,
+  terminateProductionPlan,
+} from '@/store/productionPlanStore'
+import { voidIncompleteDesignTasksForPlan } from '@/store/designTaskStore'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
+import { materialReleaseStatusOptions } from '@/constants/ecnPlanReschedule'
+import { createPhase2PlanFromPending, setMaterialReleaseStatus } from '@/utils/ecnPlanImpact'
 import { useTabs } from '@/composables/useTabs'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
 import GenerateAssemblyWorkOrderModal from './components/GenerateAssemblyWorkOrderModal.vue'
@@ -882,6 +914,7 @@ const baseMaterialColumns = [
   { title: '单位用量', key: 'unitUsage', dataIndex: 'unitUsage', width: 110 },
   { title: '下料尺寸', dataIndex: 'blankSizeText', width: 160, ellipsis: true },
   { title: '供应型态', key: 'supplyType', dataIndex: 'supplyType', width: 100 },
+  { title: '投产状态', key: 'releaseStatus', dataIndex: 'releaseStatus', width: 96 },
   { title: '库存数量', dataIndex: 'stockQty', width: 90 },
   {
     title: '可用库存',
@@ -914,8 +947,8 @@ const {
   displayColumns: displayMaterialColumns,
   tableScrollX: materialTableScrollX,
   defaultColumnSettings: defaultMaterialColumnSettings,
-} = useTableColumnSettings('production-plan-material-list-v2', baseMaterialColumns, {
-  minScrollX: 2500,
+} = useTableColumnSettings('production-plan-material-list-v3', baseMaterialColumns, {
+  minScrollX: 2600,
 })
 
 const processRouteOpts = computed(() => getProcessRouteSelectOptions())
@@ -1305,6 +1338,34 @@ function toggleWorkItemExpand(record) {
   selectWorkItem(record)
 }
 
+function onTerminatePlan() {
+  const plan = selectedOrder.value
+  if (!plan) return
+  if (plan.orderStatus === '已终止') {
+    message.warning('生产计划已终止')
+    return
+  }
+  Modal.confirm({
+    title: `终止生产计划「${plan.orderNo || ''}」？`,
+    content: '终止后，该计划下未审核通过的设计任务将自动变为已作废。',
+    okText: '终止',
+    okType: 'danger',
+    onOk() {
+      const res = terminateProductionPlan(plan.id)
+      if (!res.ok) {
+        message.warning(res.message)
+        return
+      }
+      const voided = voidIncompleteDesignTasksForPlan(res.plan)
+      message.success(
+        voided.count
+          ? `${res.message}，${voided.count} 条设计任务已作废`
+          : `${res.message}，没有需要作废的设计任务`,
+      )
+    },
+  })
+}
+
 watch(filteredOrders, (list) => {
   if (!list.find((o) => o.id === selectedId.value)) {
     selectedId.value = list[0]?.id || null
@@ -1319,6 +1380,28 @@ function materialStatusColor(status) {
     已完成: 'success',
   }
   return map[status] || 'default'
+}
+
+function onMaterialReleaseStatusChange(record, value) {
+  setMaterialReleaseStatus(record, value)
+}
+
+function handleCreatePhase2Plan() {
+  if (!selectedOrder.value) {
+    message.warning('请先选择订单')
+    return
+  }
+  if (!activeWorkItem.value) {
+    message.warning('请先展开工作项查看物料清单')
+    return
+  }
+  const res = createPhase2PlanFromPending(selectedOrder.value.id, activeWorkItem.value.id)
+  if (!res.ok) {
+    message.warning(res.message)
+    return
+  }
+  selectedId.value = res.plan.id
+  message.success(`已生成二期计划 ${res.plan.orderNo}，共 ${res.materialCount} 项物料`)
 }
 
 /** 可用库存列：工单占用/可用库存 */
@@ -1542,6 +1625,11 @@ function onFullscreenKeydown(event) {
 
 onMounted(() => {
   window.addEventListener('keydown', onFullscreenKeydown)
+  const qPlanId = String(route.query.planId || '').trim()
+  if (qPlanId) {
+    const byId = productionPlanState.plans.find((p) => p.id === qPlanId)
+    if (byId) selectedId.value = byId.id
+  }
   const qOrderNo = String(route.query.orderNo || '').trim()
   if (qOrderNo) {
     filters.orderNo = qOrderNo

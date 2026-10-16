@@ -426,12 +426,25 @@ function demoInboundPurchase(itemCode) {
   return null
 }
 
+/** 期初演示批成本（库存单位），模拟历史入库实际价 */
+const DEMO_BATCH_UNIT_COST = {
+  [STEEL_PIPE_CODE]: 85,
+  [STEEL_PLATE_CODE]: 480,
+  [STEEL_WEIGHT_BAR_CODE]: 9.5,
+  [CASTING_BLANK_SETTLE_CODE]: 8.2,
+  [CASTING_NORATE_SETTLE_CODE]: 9.5,
+  [PIPE_TRIPLE_UNIT_CODE]: 6.8,
+  [PIPE_TRIPLE_CAT_CODE]: 6.8,
+  [SIMPLE_UNIT_DEMO_CODE]: 28,
+  'WL-BAR-45-20': 42,
+}
+
 function seedBatch(partial) {
   const currentLength = Number(partial.currentLength) || 0
   const fromConvertStock = Number(partial.uomConvert?.stockQty)
   const fromConvertPiece = Number(partial.uomConvert?.pieceCount)
   const demoPurchase = demoInboundPurchase(partial.itemCode)
-  return {
+  const row = {
     parentBatchId: '',
     createdAt: '2026-07-01T00:00:00.000Z',
     updatedAt: '2026-07-01T00:00:00.000Z',
@@ -450,6 +463,10 @@ function seedBatch(partial) {
     purchaseUnit: partial.purchaseUnit || demoPurchase?.unit || '',
     ...partial,
   }
+  if (row.unitCost == null || row.unitCost === '') {
+    row.unitCost = DEMO_BATCH_UNIT_COST[row.itemCode] ?? null
+  }
+  return row
 }
 
 /**

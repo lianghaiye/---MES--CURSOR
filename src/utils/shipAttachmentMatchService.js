@@ -83,7 +83,7 @@ function resolveMatchSource(winner, explicit) {
 }
 
 /**
- * 匹配试算：与发货取随货附件相同规则
+ * 匹配试算：与发货取随货配件相同规则
  * 产品指定绑定 > 单产品 > 产品类别 > 全局
  */
 export function probeShipAttachmentMatch(params = {}) {
@@ -172,7 +172,7 @@ export function probeShipAttachmentMatch(params = {}) {
     matchSourceLabel: SHIP_ATTACHMENT_MATCH_SOURCE_LABELS[matchSource] || matchSource,
     priorityTip: '优先级：产品指定绑定 > 单产品 > 产品类别 > 全局',
     layers,
-    message: winner ? '' : '该产品没有命中已启用的随货附件',
+    message: winner ? '' : '该产品没有命中已启用的随货配件',
   }
 }
 

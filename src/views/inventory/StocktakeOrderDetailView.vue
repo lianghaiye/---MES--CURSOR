@@ -100,9 +100,12 @@
                   <template v-else-if="column.key === 'bookQty'">
                     {{ formatBookQty(line) }}
                   </template>
+                  <template v-else-if="column.key === 'actualQty'">
+                    {{ formatQty(line.actualQty) }}
+                  </template>
                   <template v-else-if="column.key === 'diffQty'">
                     <span :class="{ pos: line.diffQty > 0, neg: line.diffQty < 0 }">{{
-                      line.diffQty
+                      formatQty(line.diffQty)
                     }}</span>
                   </template>
                   <template v-else-if="column.key === 'salesOrderNo'">
@@ -271,7 +274,7 @@ const lineColumns = [
     ellipsis: true,
   },
   { title: '当前账面数量', key: 'bookQty', width: 120, align: 'right' },
-  { title: '实盘', dataIndex: 'actualQty', width: 100, align: 'right' },
+  { title: '实盘', key: 'actualQty', width: 100, align: 'right' },
   { title: '差异', key: 'diffQty', width: 88, align: 'right' },
   { title: '销售单号', key: 'salesOrderNo', width: 140, ellipsis: true },
 ]
@@ -368,10 +371,9 @@ function displayCell(val) {
 function formatBookQty(line) {
   const qty = line?.bookQty
   if (qty == null || qty === '') return '—'
-  const n = Number(qty)
-  const q = Number.isFinite(n) ? n : qty
+  const q = formatQty(qty)
   const unit = String(line?.unit || '').trim()
-  return unit ? `${q} ${unit}` : String(q)
+  return unit ? `${q} ${unit}` : q
 }
 
 function goBack() {

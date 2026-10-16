@@ -171,7 +171,7 @@
           <div class="section-title">命中的标准随货包</div>
           <a-empty
             v-if="!productResult.kit"
-            :description="productResult.probe.message || '该产品没有命中已启用的随货附件'"
+            :description="productResult.probe.message || '该产品没有命中已启用的随货配件'"
           />
           <template v-else>
             <a-descriptions bordered size="small" :column="2" class="winner-block">
@@ -194,7 +194,7 @@
                   size="small"
                   @click="openShipAttachment(productResult.kit.id)"
                 >
-                  查看随货附件
+                  查看随货配件
                 </a-button>
               </a-descriptions-item>
             </a-descriptions>
@@ -298,9 +298,9 @@ const { openTab } = useTabs()
 const mode = ref('delivery')
 const modeHint = computed(() => {
   if (mode.value === 'product') {
-    return '按产品匹配已启用的随货附件模板（单产品 > 类别 > 全局）。这是标准包，不是某一票发货单。相关发货单可点「维护附件」查看纳入清单与标准随货包。'
+    return '按产品匹配已启用的随货配件模板（单产品 > 类别 > 全局）。这是标准包，不是某一票发货单。相关发货单可点「维护附件」查看纳入清单与标准随货包。'
   }
-  return '按发货单维护本票随货附件。点「维护附件」查看纳入清单、标准随货包，并勾选本票要发的附件。待发货/待出库可保存；已出库后仅可查看。'
+  return '按发货单维护本票随货配件。若功能参数为「销售订单时确定」，清单继承订单快照，此处仅勾选本票发哪些并调数量；若为「申请发货时确定」，可添加配件。待发货/待出库可保存；已出库后仅可查看。'
 })
 
 const deliveryFilters = reactive({
@@ -524,7 +524,7 @@ function onMaintainSaved() {
 function openShipAttachment(id) {
   if (!id) return
   const path = shipAttachmentDetailPath(id)
-  openTab(path, '随货附件详情')
+  openTab(path, '随货配件详情')
   router.push(path)
 }
 </script>

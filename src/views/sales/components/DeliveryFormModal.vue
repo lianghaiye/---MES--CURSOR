@@ -23,6 +23,16 @@
       <a-form layout="inline" class="horizontal-form">
         <a-row :gutter="[12, 8]" style="width: 100%">
           <a-col :span="6">
+            <a-form-item label="发货类型" required>
+              <a-select
+                v-model:value="form.deliveryType"
+                size="small"
+                placeholder="请选择 发货类型"
+                :options="DELIVERY_TYPE_OPTIONS"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
             <a-form-item label="源销售订单" required>
               <a-select
                 v-if="!salesOrderLocked"
@@ -163,41 +173,7 @@
       </a-form>
     </div>
 
-    <a-alert
-      v-if="isAccessoryReship"
-      type="info"
-      show-icon
-      class="accessory-reship-alert"
-      message="配件补发：可不带整机/散件产品行。请勾选本次要补发的随货配件并填写数量；整机已发完也可提交。"
-    />
-
-    <div v-if="isAccessoryReship" class="section-block">
-      <div class="section-title">补发信息</div>
-      <a-divider class="section-divider" />
-      <a-form
-        layout="horizontal"
-        class="horizontal-form"
-        :label-col="{ style: { width: '100px' } }"
-      >
-        <a-row :gutter="16">
-          <a-col :span="8">
-            <a-form-item label="补发原因" required>
-              <a-select
-                v-model:value="form.accessoryReshipReason"
-                placeholder="请选择"
-                allow-clear
-                :options="ACCESSORY_RESHIP_REASON_OPTIONS"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </a-form>
-    </div>
-
-    <div
-      v-if="!isAccessoryReship && form.lineItems.length"
-      class="section-block section-block--lines"
-    >
+    <div v-if="form.lineItems.length" class="section-block section-block--lines">
       <div class="section-title">整机发货</div>
       <a-divider class="section-divider" />
       <div
@@ -226,12 +202,27 @@
                   </a-tooltip>
                 </span>
               </template>
+              <template v-else-if="column.key === 'selected'">
+                <span class="th-nowrap">
+                  纳入本单
+                  <a-tooltip title="勾选后本票发运该产品；取消勾选则本行不发货，置灰且不可编辑。">
+                    <QuestionCircleOutlined class="th-tip-icon" />
+                  </a-tooltip>
+                </span>
+              </template>
               <template v-else>
                 <span class="th-nowrap">{{ column.title }}</span>
               </template>
             </template>
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'selected'">
+                <a-checkbox
+                  :checked="isDeliveryLineIncluded(record)"
+                  :disabled="isDeliveryLineShipLocked(record)"
+                  @change="(e) => onDeliveryLineIncludeChange(record, e.target.checked)"
+                />
+              </template>
               <template v-else-if="column.key === 'productName'">
                 <span>{{ record.productName || '—' }}</span>
                 <a-tag
@@ -286,7 +277,7 @@
                   :formatter="deliveryDecimalFormatter"
                   :parser="deliveryDecimalParser"
                   style="width: 100%"
-                  :disabled="isDeliveryLineShipLocked(record)"
+                  :disabled="isDeliveryLineFieldsDisabled(record)"
                   @change="onLineCalc(record)"
                 />
               </template>
@@ -302,7 +293,7 @@
                   :formatter="deliveryDecimalFormatter"
                   :parser="deliveryDecimalParser"
                   style="width: 100%"
-                  :disabled="isDeliveryLineShipLocked(record)"
+                  :disabled="isDeliveryLineFieldsDisabled(record)"
                   @change="onLineCalc(record)"
                 />
               </template>
@@ -320,7 +311,7 @@
                   placeholder="请选择"
                   style="width: 100%"
                   :options="warehouseOpts"
-                  :disabled="isDeliveryLineShipLocked(record)"
+                  :disabled="isDeliveryLineFieldsDisabled(record)"
                   @change="() => onLineWarehouseChange(record)"
                 />
               </template>
@@ -332,24 +323,22 @@
               </template>
               <template v-else-if="column.key === 'lineRemark'">
                 <SalesLineLongTextCell
-                  v-if="!isDeliveryLineShipLocked(record)"
+                  v-if="!isDeliveryLineFieldsDisabled(record)"
                   :value="record.lineRemark"
                   @edit="openLongTextEdit(record, 'lineRemark')"
                 />
                 <span v-else>{{ record.lineRemark || '—' }}</span>
               </template>
               <template v-else-if="column.key === 'action'">
-                <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
-                  <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
-                  <a-button
-                    type="link"
-                    size="small"
-                    danger
-                    @click="removeWholeLineFromOrder(index)"
-                  >
-                    移出本单
-                  </a-button>
-                </a-space>
+                <a-button
+                  v-if="!isDeliveryLineShipLocked(record)"
+                  type="link"
+                  size="small"
+                  :disabled="!isDeliveryLineIncluded(record)"
+                  @click="openLineEdit(record)"
+                >
+                  编辑
+                </a-button>
                 <span v-else class="line-locked-hint">{{ deliveryLineLockedHint(record) }}</span>
               </template>
               <template v-else>{{ displayCell(record, column) }}</template>
@@ -359,10 +348,7 @@
       </div>
     </div>
 
-    <div
-      v-if="!isAccessoryReship && form.scatterShipments.length"
-      class="section-block section-block--lines"
-    >
+    <div v-if="form.scatterShipments.length" class="section-block section-block--lines">
       <div class="section-title">散件发运</div>
       <a-divider class="section-divider" />
       <div
@@ -392,12 +378,27 @@
                   </a-tooltip>
                 </span>
               </template>
+              <template v-else-if="column.key === 'selected'">
+                <span class="th-nowrap">
+                  纳入本单
+                  <a-tooltip title="勾选后本票发运该产品；取消勾选则本行不发货，置灰且不可编辑。">
+                    <QuestionCircleOutlined class="th-tip-icon" />
+                  </a-tooltip>
+                </span>
+              </template>
               <template v-else>
                 <span class="th-nowrap">{{ column.title }}</span>
               </template>
             </template>
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'selected'">
+                <a-checkbox
+                  :checked="isDeliveryLineIncluded(record)"
+                  :disabled="isDeliveryLineShipLocked(record)"
+                  @change="(e) => onDeliveryLineIncludeChange(record, e.target.checked)"
+                />
+              </template>
               <template v-else-if="column.key === 'productName'">
                 <span>{{ record.productName || '—' }}</span>
                 <a-tag
@@ -451,7 +452,7 @@
                   :formatter="deliveryDecimalFormatter"
                   :parser="deliveryDecimalParser"
                   style="width: 100%"
-                  :disabled="isDeliveryLineShipLocked(record)"
+                  :disabled="isDeliveryLineFieldsDisabled(record)"
                   @change="onScatterLinePriceChange(record)"
                 />
               </template>
@@ -469,7 +470,7 @@
                   placeholder="请选择"
                   style="width: 100%"
                   :options="warehouseOpts"
-                  :disabled="isDeliveryLineShipLocked(record)"
+                  :disabled="isDeliveryLineFieldsDisabled(record)"
                   @change="() => onLineWarehouseChange(record)"
                 />
               </template>
@@ -481,7 +482,7 @@
               </template>
               <template v-else-if="column.key === 'lineRemark'">
                 <SalesLineLongTextCell
-                  v-if="!isDeliveryLineShipLocked(record)"
+                  v-if="!isDeliveryLineFieldsDisabled(record)"
                   :value="record.lineRemark"
                   @edit="openLongTextEdit(record, 'lineRemark')"
                 />
@@ -489,19 +490,21 @@
               </template>
               <template v-else-if="column.key === 'scatterAction'">
                 <a-space v-if="!isDeliveryLineShipLocked(record)" :size="0">
-                  <a-button type="link" size="small" @click="openScatterLineEdit(record)"
-                    >编辑</a-button
+                  <a-button
+                    type="link"
+                    size="small"
+                    :disabled="!isDeliveryLineIncluded(record)"
+                    @click="openScatterLineEdit(record)"
                   >
-                  <a-button type="link" size="small" @click="openScatterDrawer(record)">
-                    选择发运物料
+                    编辑
                   </a-button>
                   <a-button
                     type="link"
                     size="small"
-                    danger
-                    @click="removeScatterLineFromOrder(index)"
+                    :disabled="!isDeliveryLineIncluded(record)"
+                    @click="openScatterDrawer(record)"
                   >
-                    移出本单
+                    选择发运物料
                   </a-button>
                 </a-space>
                 <span v-else class="line-locked-hint">{{ deliveryLineLockedHint(record) }}</span>
@@ -535,6 +538,7 @@
                         type="link"
                         size="small"
                         danger
+                        :disabled="isDeliveryLineFieldsDisabled(record)"
                         @click="removeScatterMaterialPick(record, mat)"
                       >
                         删除
@@ -566,7 +570,6 @@
       :anchor-line-items="accessoryReshipAnchorLines"
       :show-bring-standard-kit="isAccessoryReship"
       title="随货配件"
-      empty-description="暂无随货配件：请确认订单有标准包快照或产品已配置随货配件，或点击「带出标准包」"
     />
 
     <ScatterShipDrawer
@@ -661,6 +664,7 @@ import { calcSalesLineAvailableQty } from '@/utils/salesLineShipped'
 import {
   isSalesOutboundByOrder,
   isShipAttachmentDecidedAtApply,
+  isShipAttachmentDecidedAtOrder,
   functionParamState,
 } from '@/store/functionParamStore'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
@@ -669,11 +673,13 @@ import {
   preallocateDeliveryBatches,
 } from '@/utils/salesOrderDedicatedStock'
 import {
-  ACCESSORY_RESHIP_REASON_OPTIONS,
   DELIVERY_KIND,
-  buildAccessoryReshipSeed,
+  DELIVERY_TYPE,
+  DELIVERY_TYPE_OPTIONS,
+  normalizeDeliveryType,
   salesOrderLinesAsAttachmentAnchors,
 } from '@/utils/accessoryReship'
+import { cloneOrderShipAccessoriesForDelivery } from '@/utils/salesOrderShipAccessories'
 
 const props = defineProps({
   open: Boolean,
@@ -691,11 +697,6 @@ const emit = defineEmits(['update:open', 'saved', 'confirmed'])
 
 const isApplyMode = computed(() => props.mode === 'apply')
 const isEdit = computed(() => Boolean(props.record?.id))
-const isAccessoryReship = computed(
-  () =>
-    props.deliveryKind === DELIVERY_KIND.ACCESSORY_RESHIP ||
-    props.record?.deliveryKind === DELIVERY_KIND.ACCESSORY_RESHIP,
-)
 /** 编辑或已从销售订单带入时，锁定源销售订单 */
 const salesOrderLocked = computed(
   () => isEdit.value || isApplyMode.value || Boolean(props.initialSalesOrderId),
@@ -703,10 +704,7 @@ const salesOrderLocked = computed(
 const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
   listPath: '/sales/delivery',
   getTitle: () => {
-    if (props.record?.id) {
-      return isAccessoryReship.value ? '编辑配件补发' : '编辑发货单'
-    }
-    if (isAccessoryReship.value) return '配件补发'
+    if (props.record?.id) return '编辑发货单'
     if (props.mode === 'apply' || props.initialSalesOrderId) return '申请发货'
     return '新增发货单'
   },
@@ -728,6 +726,7 @@ const longTextEdit = reactive({
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 52, align: 'center', fixed: 'left' },
+  { title: '纳入本单', key: 'selected', width: 100, align: 'center', fixed: 'left' },
   { title: '产品名称', dataIndex: 'productName', width: 140, ellipsis: true, fixed: 'left' },
   { title: '发货状态', key: 'lineShipStatus', width: 88, align: 'center' },
   { title: '发货进度', key: 'shipProgress', width: 160, align: 'right' },
@@ -751,14 +750,14 @@ const lineColumns = [
   { title: '包装形式', dataIndex: 'packagingForm', width: 88, ellipsis: true },
   { title: '交付方式', key: 'deliveryMode', width: 88, align: 'center' },
   { title: '备注', key: 'lineRemark', width: 140 },
-  { title: '操作', key: 'action', width: 140, fixed: 'right' },
+  { title: '操作', key: 'action', width: 72, fixed: 'right' },
 ]
 
 const scatterLineColumns = computed(() =>
   lineColumns
     .filter((c) => c.key !== 'shipQty')
     .map((c) =>
-      c.key === 'action' ? { title: '操作', key: 'scatterAction', width: 240, fixed: 'right' } : c,
+      c.key === 'action' ? { title: '操作', key: 'scatterAction', width: 168, fixed: 'right' } : c,
     ),
 )
 
@@ -777,6 +776,7 @@ const scatterPickColumns = [
 const form = reactive({
   salesOrderId: undefined,
   salesOrderNo: '',
+  deliveryType: DELIVERY_TYPE.SALES,
   deliveryCode: '',
   customerName: undefined,
   shipmentMethod: undefined,
@@ -794,8 +794,9 @@ const form = reactive({
   lineItems: [],
   scatterShipments: [],
   shipAttachments: [],
-  accessoryReshipReason: undefined,
 })
+
+const isAccessoryReship = computed(() => form.deliveryType === DELIVERY_TYPE.ACCESSORY_RESHIP)
 
 const {
   panelRef: lineTablePanelRef,
@@ -822,7 +823,9 @@ const attachmentSectionRef = ref(null)
 
 const showShipAttachmentUi = computed(() => {
   void functionParamState.params.shipAttachmentDecideStage
-  if (isAccessoryReship.value) return true
+  if (isAccessoryReship.value) return Boolean(form.salesOrderId || isEdit.value)
+  // 申请发货时确定：空白新增单不展示，选定销售订单后再加载
+  if (!isShipAttachmentDecidedAtOrder() && !isEdit.value && !form.salesOrderId) return false
   // 申请发货且配置为仓管确定时，不展示附件能力
   return !isApplyMode.value || isShipAttachmentDecidedAtApply()
 })
@@ -951,6 +954,7 @@ watch(
 function resetForm() {
   form.salesOrderId = undefined
   form.salesOrderNo = ''
+  form.deliveryType = normalizeDeliveryType(props.deliveryKind)
   form.deliveryCode = ''
   form.customerName = undefined
   form.shipmentMethod = undefined
@@ -968,7 +972,6 @@ function resetForm() {
   form.lineItems = []
   form.scatterShipments = []
   form.shipAttachments = []
-  form.accessoryReshipReason = undefined
   expandedScatterRowKeys.value = []
   prevHeaderWarehouse.value = undefined
 }
@@ -1013,6 +1016,7 @@ function onLineWarehouseChange(line) {
 function loadFromRecord(record) {
   form.salesOrderId = record.salesOrderId
   form.salesOrderNo = record.salesOrderNo || record.sourceOrderNo || ''
+  form.deliveryType = normalizeDeliveryType(record.deliveryType || record.deliveryKind)
   form.deliveryCode = record.deliveryCode || ''
   form.customerName = record.customerName
   form.shipmentMethod = resolveDefaultShipmentMethod(record.customerName, record.shipmentMethod)
@@ -1028,8 +1032,8 @@ function loadFromRecord(record) {
   form.driverPhone = record.driverPhone || ''
   form.plateNo = record.plateNo || ''
   form.remark = record.remark || ''
-  form.accessoryReshipReason = record.accessoryReshipReason || undefined
   form.lineItems = JSON.parse(JSON.stringify(record.lineItems || [])).map((line) => {
+    if (line.selected == null) line.selected = true
     line.shipWeight = roundDeliveryDecimal(line.shipWeight ?? line.itemWeightKg ?? 0, 4)
     line.unitPriceInTax = roundDeliveryDecimal(line.unitPriceInTax ?? 0, 4)
     if (!line.shipWarehouse) line.shipWarehouse = form.outboundWarehouse || ''
@@ -1040,6 +1044,7 @@ function loadFromRecord(record) {
   })
   form.scatterShipments = JSON.parse(JSON.stringify(record.scatterShipments || []))
   form.scatterShipments.forEach((s) => {
+    if (s.selected == null) s.selected = true
     s.shipWeight = roundDeliveryDecimal(s.shipWeight ?? s.itemWeightKg ?? 0, 4)
     s.unitPriceInTax = roundDeliveryDecimal(s.unitPriceInTax ?? 0, 4)
     if (!s.shipWarehouse) s.shipWarehouse = form.outboundWarehouse || ''
@@ -1053,14 +1058,59 @@ function loadFromRecord(record) {
     salesOrderState.orders.find((o) => o.id === record.salesOrderId) || null,
     { preserveShipQty: true },
   )
+  restoreExcludedSalesLines()
   pruneShipAttachmentsToCurrentDelivery()
   syncExpandedScatterRows()
+}
+
+function restoreExcludedSalesLines() {
+  const so = currentSalesOrder()
+  if (!so) return
+  const wholeIds = new Set((form.lineItems || []).map((line) => line.salesLineId || line.id))
+  ;(so.lineItems || []).forEach((line) => {
+    const mapped = mapSalesLineToDeliveryLine(line, so)
+    if (!mapped) return
+    const id = mapped.salesLineId || mapped.id
+    if (!id || wholeIds.has(id)) return
+    mapped.selected = false
+    if (!mapped.shipWarehouse) mapped.shipWarehouse = form.outboundWarehouse || ''
+    refreshDeliveryLineStock(mapped)
+    form.lineItems.push(mapped)
+  })
+  const scatterIds = new Set(
+    (form.scatterShipments || []).map((line) => line.salesLineId || line.id),
+  )
+  ;(so.lineItems || []).forEach((line) => {
+    const mapped = initScatterShipment(line, so)
+    if (!mapped) return
+    const id = mapped.salesLineId || mapped.id
+    if (!id || scatterIds.has(id)) return
+    mapped.selected = false
+    if (!mapped.shipWarehouse) mapped.shipWarehouse = form.outboundWarehouse || ''
+    refreshDeliveryLineStock(mapped)
+    form.scatterShipments.push(mapped)
+  })
+}
+
+function isDeliveryLineIncluded(record) {
+  return record?.selected !== false
+}
+
+function isDeliveryLineFieldsDisabled(record) {
+  return isDeliveryLineShipLocked(record) || !isDeliveryLineIncluded(record)
+}
+
+function onDeliveryLineIncludeChange(record, checked) {
+  if (!record || isDeliveryLineShipLocked(record)) return
+  record.selected = checked
+  pruneShipAttachmentsToCurrentDelivery()
 }
 
 function currentDeliveryLinesForAttachments() {
   const lines = []
   const push = (row) => {
     if (!row) return
+    if (!isDeliveryLineIncluded(row)) return
     // 已发完产品不再带出发货附件
     if (isDeliveryLineShipLocked(row)) return
     const productId = row.productId || row.itemId
@@ -1082,7 +1132,10 @@ function currentDeliveryLinesForAttachments() {
 }
 
 function deliveryLineRowClassName(record) {
-  return isDeliveryLineShipLocked(record) ? 'delivery-line-locked' : ''
+  if (isDeliveryLineShipLocked(record) || !isDeliveryLineIncluded(record)) {
+    return 'delivery-line-locked'
+  }
+  return ''
 }
 
 function deliveryLineLockedHint(record) {
@@ -1103,18 +1156,23 @@ function lineRemainShipQty(record) {
 
 function savableWholeLines() {
   return (form.lineItems || []).filter(
-    (line) => !isDeliveryLineShipLocked(line) && Number(line.shipQty) > 0,
+    (line) =>
+      isDeliveryLineIncluded(line) && !isDeliveryLineShipLocked(line) && Number(line.shipQty) > 0,
   )
 }
 
 function savableScatterShipments() {
   return (form.scatterShipments || []).filter(
-    (ship) => !isDeliveryLineShipLocked(ship) && getSelectedMaterialPicks(ship).length > 0,
+    (ship) =>
+      isDeliveryLineIncluded(ship) &&
+      !isDeliveryLineShipLocked(ship) &&
+      getSelectedMaterialPicks(ship).length > 0,
   )
 }
 
 function isAttachmentOnCurrentDelivery(att) {
   if (!att) return false
+  if (att.fromOrderSnapshot) return true
   // 未关联产品的手工附件保留
   if (!att.productId && !att.productCode && !att.productName && !att.salesLineId) return true
   const lines = currentDeliveryLinesForAttachments()
@@ -1122,8 +1180,16 @@ function isAttachmentOnCurrentDelivery(att) {
     if (att.salesLineId && (att.salesLineId === line.id || att.salesLineId === line.salesLineId)) {
       return true
     }
-    if (att.productId && String(att.productId) === String(line.productId)) return true
-    if (att.productCode && att.productCode === line.productCode) return true
+    if (
+      att.productId &&
+      (String(att.productId) === String(line.productId) ||
+        String(att.productId) === String(line.id))
+    ) {
+      return true
+    }
+    const attCode = att.productCode || ''
+    const lineCode = line.productCode || line.itemCode || ''
+    if (attCode && lineCode && attCode === lineCode) return true
     return false
   })
 }
@@ -1139,20 +1205,16 @@ function pruneShipAttachmentsToCurrentDelivery() {
 
 function rebuildShipAttachmentsFromCurrentDelivery({ merge = false } = {}) {
   if (!showShipAttachmentUi.value) return
-  const run = () => attachmentSectionRef.value?.rebuildFromCurrentDelivery({ merge })
-  if (attachmentSectionRef.value) run()
-  else nextTick(run)
+  // 等销售订单和随货配件快照传到子组件后再重建，避免用空清单覆盖订单快照
+  nextTick(() => {
+    attachmentSectionRef.value?.rebuildFromCurrentDelivery({ merge })
+  })
 }
 
-function removeWholeLineFromOrder(index) {
-  form.lineItems.splice(index, 1)
-  pruneShipAttachmentsToCurrentDelivery()
-}
-
-function removeScatterLineFromOrder(index) {
-  form.scatterShipments.splice(index, 1)
-  pruneShipAttachmentsToCurrentDelivery()
-  syncExpandedScatterRows()
+function markDeliveryLinesIncluded(lines) {
+  ;(lines || []).forEach((line) => {
+    if (line.selected == null) line.selected = true
+  })
 }
 
 function populateFromSalesOrder(so) {
@@ -1163,10 +1225,6 @@ function populateFromSalesOrder(so) {
   form.contactPhone = so.contactPhone || ''
   form.deliveryAddress = so.deliveryAddress || ''
   form.shipmentMethod = resolveDefaultShipmentMethod(so.customerName, so.deliveryMethod)
-  if (isAccessoryReship.value) {
-    populateAccessoryReshipFromSalesOrder(so)
-    return
-  }
   // 再次申请：已发完产品仍展示（置灰），未发完可继续填写剩余数量
   form.lineItems = (so.lineItems || [])
     .map((line) => mapSalesLineToDeliveryLine(line, so))
@@ -1175,27 +1233,20 @@ function populateFromSalesOrder(so) {
     .map((line) => initScatterShipment(line, so))
     .filter(Boolean)
   form.scatterShipments.forEach((s) => refreshScatterShipmentMeta(s))
+  markDeliveryLinesIncluded(form.lineItems)
+  markDeliveryLinesIncluded(form.scatterShipments)
   applyDefaultWarehouseToLines(form.lineItems)
   applyDefaultWarehouseToLines(form.scatterShipments)
+  form.shipAttachments =
+    showShipAttachmentUi.value && so.shipAccessories?.length
+      ? cloneOrderShipAccessoriesForDelivery(so, {
+          warehouse: form.outboundWarehouse || '',
+        })
+      : []
   if (showShipAttachmentUi.value) {
     rebuildShipAttachmentsFromCurrentDelivery({ merge: false })
-  } else {
-    form.shipAttachments = []
   }
   syncExpandedScatterRows()
-}
-
-function populateAccessoryReshipFromSalesOrder(so) {
-  form.lineItems = []
-  form.scatterShipments = []
-  form.accessoryReshipReason = form.accessoryReshipReason || '少发'
-  form.applyOutbound = true
-  form.shipAttachments = buildAccessoryReshipSeed(so, {
-    warehouse: form.outboundWarehouse || '',
-  })
-  nextTick(() => {
-    attachmentSectionRef.value?.rebuildFromCurrentDelivery?.({ merge: true })
-  })
 }
 
 function onSalesOrderChange(id) {
@@ -1214,8 +1265,8 @@ function syncExpandedScatterRows() {
 }
 
 function openScatterDrawer(ship) {
-  if (isDeliveryLineShipLocked(ship)) {
-    message.info('该产品已发完，不可再选择发运物料')
+  if (!isDeliveryLineIncluded(ship) || isDeliveryLineShipLocked(ship)) {
+    message.info('该产品已发完或未纳入本单，不可再选择发运物料')
     return
   }
   activeScatterShipment.value = ship
@@ -1223,8 +1274,8 @@ function openScatterDrawer(ship) {
 }
 
 function openLineEdit(record) {
-  if (isDeliveryLineShipLocked(record)) {
-    message.info('该产品已发完，不可编辑')
+  if (!isDeliveryLineIncluded(record) || isDeliveryLineShipLocked(record)) {
+    message.info('该产品已发完或未纳入本单，不可编辑')
     return
   }
   lineEditTarget.value = record
@@ -1248,8 +1299,8 @@ function confirmLongTextEdit() {
 }
 
 function openScatterLineEdit(record) {
-  if (isDeliveryLineShipLocked(record)) {
-    message.info('该产品已发完，不可编辑')
+  if (!isDeliveryLineIncluded(record) || isDeliveryLineShipLocked(record)) {
+    message.info('该产品已发完或未纳入本单，不可编辑')
     return
   }
   lineEditTarget.value = record
@@ -1363,7 +1414,9 @@ function onCustomerChange(name) {
 
 function validateWholeMachineLines() {
   const so = currentSalesOrder()
-  const lines = (form.lineItems || []).filter((line) => !isDeliveryLineShipLocked(line))
+  const lines = (form.lineItems || []).filter(
+    (line) => isDeliveryLineIncluded(line) && !isDeliveryLineShipLocked(line),
+  )
   if (!lines.length) return true
   for (const line of lines) {
     const shipQty = Number(line.shipQty)
@@ -1372,7 +1425,7 @@ function validateWholeMachineLines() {
       return false
     }
     if (shipQty <= 0) {
-      message.warning(`「${line.productName}」本次发货数量须大于 0；若不发此产品请移出本单`)
+      message.warning(`「${line.productName}」本次发货数量须大于 0；若不发此产品请取消纳入本单`)
       return false
     }
     const salesLine = (so?.lineItems || []).find(
@@ -1397,10 +1450,12 @@ function validateWholeMachineLines() {
 }
 
 function validateScatterShipments() {
-  const ships = (form.scatterShipments || []).filter((ship) => !isDeliveryLineShipLocked(ship))
+  const ships = (form.scatterShipments || []).filter(
+    (ship) => isDeliveryLineIncluded(ship) && !isDeliveryLineShipLocked(ship),
+  )
   for (const ship of ships) {
     if (!getSelectedMaterialPicks(ship).length) {
-      message.warning(`散件行「${ship.productName}」请选择发运物料；若不发请移出本单`)
+      message.warning(`散件行「${ship.productName}」请选择发运物料；若不发请取消纳入本单`)
       return false
     }
     const sets = Number(ship.shipSets)
@@ -1430,6 +1485,10 @@ function handleOk() {
     message.warning(pendingPriceChangeBlock.value)
     return
   }
+  if (!form.deliveryType) {
+    message.warning('请选择发货类型')
+    return
+  }
   if (!form.customerName) {
     message.warning('请选择客户名称')
     return
@@ -1439,42 +1498,38 @@ function handleOk() {
     return
   }
 
-  const wholeLines = isAccessoryReship.value ? [] : savableWholeLines()
-  const scatterLines = isAccessoryReship.value ? [] : savableScatterShipments()
-  const unlockedWhole = (form.lineItems || []).filter((l) => !isDeliveryLineShipLocked(l))
-  const unlockedScatter = (form.scatterShipments || []).filter((s) => !isDeliveryLineShipLocked(s))
+  const wholeLines = savableWholeLines()
+  const scatterLines = savableScatterShipments()
+  const unlockedWhole = (form.lineItems || []).filter(
+    (l) => isDeliveryLineIncluded(l) && !isDeliveryLineShipLocked(l),
+  )
+  const unlockedScatter = (form.scatterShipments || []).filter(
+    (s) => isDeliveryLineIncluded(s) && !isDeliveryLineShipLocked(s),
+  )
+  const selectedAtt = (form.shipAttachments || []).filter(
+    (a) => a.selected !== false && (Number(a.shipQty) || 0) > 0,
+  )
 
-  if (isAccessoryReship.value) {
-    if (!form.accessoryReshipReason) {
-      message.warning('请选择补发原因')
-      return
-    }
-    const selectedAtt = (form.shipAttachments || []).filter(
-      (a) => a.selected !== false && (Number(a.shipQty) || 0) > 0,
-    )
-    if (!selectedAtt.length) {
-      message.warning('请至少勾选一项随货配件并填写补发数量')
-      return
-    }
-    if (!validateShipAttachments()) return
-  } else {
-    if (!form.lineItems.length && !form.scatterShipments.length) {
-      message.warning('请选择销售订单并确认有可发运明细')
-      return
-    }
-    if (!unlockedWhole.length && !unlockedScatter.length) {
-      message.warning('本单产品均已发完，无法再次申请发货。如需补发配件，请使用「配件补发」。')
-      return
-    }
-    if (!wholeLines.length && !scatterLines.length) {
-      message.warning('请至少填写一条未发完产品的发货数量，或不发的产品请移出本单')
-      return
-    }
-
-    if (unlockedWhole.length && !validateWholeMachineLines()) return
-    if (unlockedScatter.length && !validateScatterShipments()) return
-    if (!validateShipAttachments()) return
+  if (!form.lineItems.length && !form.scatterShipments.length && !selectedAtt.length) {
+    message.warning('请选择销售订单并确认有可发运明细或随货配件')
+    return
   }
+  if (!wholeLines.length && !scatterLines.length && !selectedAtt.length) {
+    message.warning(
+      isAccessoryReship.value
+        ? '请至少纳入一条未发完产品，或勾选随货配件并填写数量'
+        : '本单没有可发的产品。若只需补发配件，请将发货类型改为「配件补发」后再添加配件',
+    )
+    return
+  }
+  if (!isAccessoryReship.value && !wholeLines.length && !scatterLines.length) {
+    message.warning('请至少纳入一条未发完产品并填写发货数量')
+    return
+  }
+
+  if (unlockedWhole.length && !validateWholeMachineLines()) return
+  if (unlockedScatter.length && !validateScatterShipments()) return
+  if (!validateShipAttachments()) return
 
   if (isEdit.value) {
     const linked = findLinkedSalesOutbound(props.record)
@@ -1486,10 +1541,7 @@ function handleOk() {
 
   wholeLines.forEach(recalcDeliveryLine)
 
-  const selectedShipAttachments = (form.shipAttachments || []).filter(
-    (a) => a.selected !== false && (Number(a.shipQty) || 0) > 0,
-  )
-  const accessoryQty = selectedShipAttachments.reduce((s, a) => s + (Number(a.shipQty) || 0), 0)
+  const accessoryQty = selectedAtt.reduce((s, a) => s + (Number(a.shipQty) || 0), 0)
 
   const payload = {
     salesOrderId: form.salesOrderId,
@@ -1508,8 +1560,8 @@ function handleOk() {
     driverPhone: form.driverPhone,
     plateNo: form.plateNo,
     remark: form.remark,
+    deliveryType: form.deliveryType || DELIVERY_TYPE.SALES,
     deliveryKind: isAccessoryReship.value ? DELIVERY_KIND.ACCESSORY_RESHIP : DELIVERY_KIND.NORMAL,
-    accessoryReshipReason: isAccessoryReship.value ? form.accessoryReshipReason || '' : '',
     lineItems: JSON.parse(JSON.stringify(wholeLines)),
     scatterShipments: JSON.parse(JSON.stringify(scatterLines)),
     shipAttachments: JSON.parse(
@@ -1543,14 +1595,14 @@ function handleOk() {
       )
       addDeliveryApplication(payload.salesOrderId, {
         ...payload,
-        totalShipQty: isAccessoryReship.value ? accessoryQty : wholeQty + scatterQty,
+        totalShipQty: wholeQty + scatterQty + accessoryQty,
       })
-      message.success(isAccessoryReship.value ? '配件补发已提交' : '发货申请已记录')
+      message.success('发货申请已记录')
       emit('confirmed', payload)
       emit('saved')
     } else {
       createDeliveryOrder(payload)
-      message.success(isAccessoryReship.value ? '配件补发单已创建' : '发货单已创建')
+      message.success('发货单已创建')
       emit('saved')
     }
     closeAfterSave()

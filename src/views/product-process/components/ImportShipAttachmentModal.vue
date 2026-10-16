@@ -1,7 +1,7 @@
 <template>
   <a-modal
     :open="open"
-    title="从其他附件导入"
+    title="从其他配件包导入"
     width="960px"
     :mask-closable="false"
     destroy-on-close
@@ -214,7 +214,7 @@ watch(
 
 function confirm() {
   if (!selectedRow.value) {
-    message.warning('请选择要导入的随货附件')
+    message.warning('请选择要导入的随货配件')
     return
   }
   emit('confirm', selectedRow.value)

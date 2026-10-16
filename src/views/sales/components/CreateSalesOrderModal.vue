@@ -310,6 +310,7 @@
                 <a-button class="tax-toggle-btn" @click="toggleTaxMode">
                   切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
                 </a-button>
+                <a-button @click="openStockRemindDrawer()">查看库存提醒</a-button>
                 <span class="tax-hint">{{ taxModeHint }}</span>
               </a-space>
               <a-popover trigger="click" placement="bottomRight">
@@ -634,7 +635,7 @@
                 </template>
 
                 <template v-else-if="column.key === 'action'">
-                  <a-space :size="0">
+                  <a-space :size="0" wrap>
                     <a-button type="link" size="small" @click="openLineEdit(record)">编辑</a-button>
                     <a-button type="link" size="small" danger @click="removeLine(index)"
                       >删除</a-button
@@ -650,18 +651,26 @@
             </a-table>
             <div class="fulfillment-hint">
               库存履约说明：优先现货 —
-              自由备货能覆盖则不排产，缺口才进生产计划；可填「占用现货数」控制用多少现货，其余排产（空则尽量占满）；强制按单生产
+              自由备货能覆盖则不排产，缺口才进生产计划；可填「占用现货数」控制用多少现货，其余排产（空则尽量占满）；强制按单生产/采购
               — 全量排产且不新占自由备货；仅现货 —
               必须被自由备货覆盖，否则无法通过审核。审核时确认占用与排产结果。
             </div>
           </div>
         </div>
 
-        <div
-          v-if="form.lineItems.some((l) => l.productCode)"
-          class="stock-remind-section"
-          :class="{ 'is-collapsed': stockRemindCollapsed }"
-        >
+        <div v-if="showShipAccessoriesSection" class="section-block ship-accessory-section">
+          <div class="section-title">随货配件</div>
+          <p class="ship-accessory-tip">
+            审核通过时按库存履约转单：优先现货只转缺口；强制按单生产/采购即使库存足够也全量转采购/生产/外协。外购与外购销售合并一张采购申请。
+          </p>
+          <SalesOrderShipAccessorySection
+            :order="form"
+            :allow-convert-purchase="false"
+            @change="onShipAccessoriesChange"
+          />
+        </div>
+
+        <div class="stock-remind-section" :class="{ 'is-collapsed': stockRemindCollapsed }">
           <div class="stock-remind-header" @click="stockRemindCollapsed = !stockRemindCollapsed">
             <span class="section-title">库存提醒</span>
             <DownOutlined :class="{ rotated: stockRemindCollapsed }" class="collapse-icon" />
@@ -672,13 +681,27 @@
           </div>
         </div>
 
-        <div v-if="showShipAccessoriesSection" class="section-block ship-accessory-section">
-          <div class="section-title">随货配件</div>
-          <p class="ship-accessory-tip">
-            按产品匹配已启用的随货配件标准包；可勾选纳入、调整套数，库存不足时可转采购申请。
+        <a-drawer
+          v-model:open="stockRemindDrawerOpen"
+          title="库存提醒"
+          placement="right"
+          :width="960"
+          :destroy-on-close="false"
+        >
+          <p class="stock-remind-tip">
+            按当前现存量与他单软占用计算，便于下单前判断是否缺货。
+            <template v-if="stockRemindFocusLine">
+              当前聚焦：{{ stockRemindFocusLine.productName || stockRemindFocusLine.productCode }}
+            </template>
           </p>
-          <SalesOrderShipAccessorySection :order="form" @change="onShipAccessoriesChange" />
-        </div>
+          <SalesOrderStockRemindPanel
+            :order="stockRemindOrder"
+            :focus-line-id="stockRemindFocusLineId"
+          />
+          <div v-if="shipAccessoryGapHint" class="ship-acc-stock-hint">
+            {{ shipAccessoryGapHint }}
+          </div>
+        </a-drawer>
 
         <div class="section-block attachment-section">
           <div class="section-title">图片文档信息</div>
@@ -787,8 +810,8 @@ import {
   updateSalesOrder,
 } from '@/store/salesOrderStore'
 import { functionParamState, isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
-import { syncSalesOrderShipAccessories } from '@/utils/salesOrderShipAccessories'
 import SalesOrderShipAccessorySection from './SalesOrderShipAccessorySection.vue'
+import { summarizeShipAccessoryGaps } from '@/utils/salesOrderShipAccessories'
 import { ensureStockTransferDemoMocksForOrder } from '@/store/salesStockAllocationStore'
 import {
   STOCK_FULFILLMENT_MODE,
@@ -853,6 +876,11 @@ const detailCollapsed = ref(false)
 const priceSummaryCollapsed = ref(true)
 /** 默认展开，便于录入时查看现货/他单占用 */
 const stockRemindCollapsed = ref(false)
+const stockRemindDrawerOpen = ref(false)
+const stockRemindFocusLineId = ref('')
+const stockRemindFocusLine = computed(() =>
+  (form.lineItems || []).find((l) => String(l.id) === String(stockRemindFocusLineId.value)),
+)
 const productPickerOpen = ref(false)
 const variantConfigOpen = ref(false)
 const variantConfigSpuId = ref('')
@@ -916,7 +944,7 @@ const columnDefs = [
   { key: 'matchingRequirements', title: '配套要求', width: 120, ellipsis: true },
   { key: 'salesQty', title: '销售数量', width: 90 },
   { key: 'deliveryMode', title: '交付方式', width: 100 },
-  { key: 'stockFulfillmentMode', title: '库存履约', width: 130 },
+  { key: 'stockFulfillmentMode', title: '库存履约', width: 168 },
   { key: 'preferStockTakeQty', title: '占用现货数', width: 118 },
   { key: 'deliveryDate', title: '交货日期', width: 120 },
   { key: 'unit', title: '单位', width: 70 },
@@ -989,15 +1017,6 @@ const showShipAccessoriesSection = computed(() => {
 
 function onShipAccessoriesChange(list) {
   form.shipAccessories = Array.isArray(list) ? list : form.shipAccessories || []
-}
-
-function syncShipAccessoriesFromLines() {
-  if (!isShipAttachmentDecidedAtOrder()) {
-    form.shipAccessories = []
-    return
-  }
-  if (!form.lineItems.some((l) => l.productCode || l.productId)) return
-  syncSalesOrderShipAccessories(form, { defaultSelected: true })
 }
 
 const displayColumns = computed(() =>
@@ -1120,7 +1139,20 @@ const stockRemindOrder = computed(() => ({
   id: props.editRecord?.id || '',
   orderNo: form.orderNo || props.editRecord?.orderNo || '',
   lineItems: form.lineItems,
+  shipAccessories: form.shipAccessories || [],
 }))
+
+const shipAccessoryGapHint = computed(() => {
+  const s = summarizeShipAccessoryGaps(form.shipAccessories || [])
+  if (!s.total) return ''
+  if (!s.gapCount) return `随货配件共 ${s.total} 项，暂无库存缺口。`
+  return `随货配件共 ${s.total} 项，其中缺口 ${s.gapCount} 项（缺口量 ${s.gapQty}）；明细见上方「随货配件」区。`
+})
+
+function openStockRemindDrawer(line) {
+  stockRemindFocusLineId.value = line?.id ? String(line.id) : ''
+  stockRemindDrawerOpen.value = true
+}
 
 watch(
   () =>
@@ -1222,9 +1254,6 @@ watch(
         shipAccessories: JSON.parse(JSON.stringify(r.shipAccessories || [])),
       })
       recalcAll()
-      if (isShipAttachmentDecidedAtOrder() && !form.shipAccessories?.length) {
-        syncShipAccessoriesFromLines()
-      }
       fileList.value = (r.attachments || []).map((file) => ({
         uid: file.uid || file.name,
         name: file.name,
@@ -1312,19 +1341,6 @@ function resetForm() {
   taxModeExcluding.value = false
   priceSummaryCollapsed.value = true
 }
-
-watch(
-  () =>
-    form.lineItems
-      .map(
-        (l) => `${l.id}|${l.productId || ''}|${l.productCode || ''}|${l.salesQty ?? l.qty ?? ''}`,
-      )
-      .join(';'),
-  () => {
-    if (!showShipAccessoriesSection.value) return
-    syncShipAccessoriesFromLines()
-  },
-)
 
 function beforeUpload(file) {
   if (file.size > MAX_FILE_SIZE) {
@@ -1751,9 +1767,7 @@ function handleSave() {
   }
 
   const pricing = orderPricing.value
-  if (isShipAttachmentDecidedAtOrder()) {
-    syncSalesOrderShipAccessories(form, { defaultSelected: true })
-  }
+  // 配件清单由用户手工维护，保存时不再自动同步标准包
   const payload = {
     ...JSON.parse(JSON.stringify(form)),
     businessType: deriveOrderBusinessType(form.lineItems),
@@ -2183,6 +2197,23 @@ function handleSave() {
     color: rgba(0, 0, 0, 0.45);
     line-height: 1.5;
   }
+}
+
+.stock-remind-tip {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
+}
+
+.ship-acc-stock-hint {
+  margin-top: 16px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  line-height: 1.5;
 }
 
 .fulfillment-hint {

@@ -51,13 +51,6 @@
                 >
                   申请发货
                 </a-button>
-                <a-button
-                  v-if="!pendingPriceChange && showAccessoryReshipAction"
-                  size="small"
-                  @click="handleAccessoryReship"
-                >
-                  配件补发
-                </a-button>
                 <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
                 <a-button size="small" @click="handleComplete">完成</a-button>
                 <a-button size="small" danger @click="handleTerminate">作废</a-button>
@@ -225,6 +218,9 @@
             </DetailSectionCard>
 
             <DetailSectionCard title="销售明细">
+              <div v-if="unassignedShipAccessorySummary.text" class="section-hint">
+                {{ unassignedShipAccessorySummary.text }}
+              </div>
               <a-table
                 :columns="lineColumns"
                 :data-source="order.lineItems || []"
@@ -245,6 +241,17 @@
                   </template>
                   <template v-else-if="column.key === 'businessType'">
                     {{ resolveLineBusinessType(line, order) }}
+                  </template>
+                  <template v-else-if="column.key === 'shipAccessories'">
+                    <a-tooltip
+                      v-if="lineShipAccessorySummary(line).count"
+                      :title="lineShipAccessorySummary(line).names.join('、')"
+                    >
+                      <a class="ship-acc-link" @click.prevent="activeTab = 'ship-accessories'">
+                        {{ lineShipAccessorySummary(line).text }}
+                      </a>
+                    </a-tooltip>
+                    <span v-else>—</span>
                   </template>
                   <template v-else-if="column.key === 'needIndustrialLabel'">
                     {{ line.needIndustrialLabel ? '是' : '否' }}
@@ -304,15 +311,7 @@
 
           <template v-else-if="activeTab === 'ship-accessories'">
             <DetailSectionCard title="随货配件">
-              <div class="section-hint">
-                按产品匹配已启用的随货配件标准包；可勾选纳入、调整套数，库存不足时可转采购申请。
-              </div>
-              <SalesOrderShipAccessorySection
-                v-if="order"
-                :order="order"
-                :readonly="!canEditShipAccessories"
-                @change="onShipAccessoriesChange"
-              />
+              <SalesOrderShipAccessorySection v-if="order" :order="order" :readonly="true" />
             </DetailSectionCard>
           </template>
 
@@ -402,11 +401,11 @@
                     </a>
                     <span v-else>{{ row.deliveryCode || '—' }}</span>
                     <a-tag
-                      v-if="isAccessoryReshipDelivery(row)"
+                      v-if="deliveryTypeOf(row) !== 'sales'"
                       color="purple"
                       class="delivery-kind-tag"
                     >
-                      配件补发{{ row.accessoryReshipReason ? `·${row.accessoryReshipReason}` : '' }}
+                      {{ deliveryTypeLabel(deliveryTypeOf(row)) }}
                     </a-tag>
                   </template>
                   <template v-else-if="column.key === 'applyShipQty'">
@@ -1118,14 +1117,9 @@ import {
   submitSalesOrderForApprove,
   withdrawSalesOrder,
   resubmitSalesOrder,
-  updateSalesOrder,
 } from '@/store/salesOrderStore'
-import {
-  functionParamState,
-  isShipAttachmentDecidedAtApply,
-  isShipAttachmentDecidedAtOrder,
-} from '@/store/functionParamStore'
-import { DELIVERY_KIND, isAccessoryReshipDelivery } from '@/utils/accessoryReship'
+import { functionParamState, isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
+import { deliveryTypeLabel, normalizeDeliveryType } from '@/utils/accessoryReship'
 import {
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
   hasSalesOrderRevokeBlockers,
@@ -1174,6 +1168,10 @@ import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.
 import SalesOrderPrintModal from './components/SalesOrderPrintModal.vue'
 import SalesOrderEbomDiffSection from './components/SalesOrderEbomDiffSection.vue'
 import SalesOrderShipAccessorySection from './components/SalesOrderShipAccessorySection.vue'
+import {
+  summarizeLineShipAccessories,
+  summarizeUnassignedShipAccessories,
+} from '@/utils/salesOrderShipAccessories'
 import IndustrialLabelQrMock from './components/IndustrialLabelQrMock.vue'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
 import { getUser } from '@/utils/auth'
@@ -1260,22 +1258,19 @@ const showShipAccessoriesTab = computed(() => {
   return isShipAttachmentDecidedAtOrder()
 })
 
-/** 申请发货/订单阶段确定配件时，允许从详情发起配件补发 */
-const showAccessoryReshipAction = computed(() => {
-  void functionParamState.params.shipAttachmentDecideStage
-  return isShipAttachmentDecidedAtApply()
-})
-
 const shipAccessoryCount = computed(() => (order.value?.shipAccessories || []).length)
 
-const canEditShipAccessories = computed(() => !!order.value && canEditSalesOrder(order.value))
-
-function onShipAccessoriesChange(list) {
-  if (!order.value?.id) return
-  const next = Array.isArray(list) ? list : order.value.shipAccessories || []
-  order.value.shipAccessories = next
-  updateSalesOrder(order.value.id, { shipAccessories: next })
+function deliveryTypeOf(row) {
+  return normalizeDeliveryType(row?.deliveryType || row?.deliveryKind)
 }
+
+function lineShipAccessorySummary(line) {
+  return summarizeLineShipAccessories(order.value?.shipAccessories, line?.id)
+}
+
+const unassignedShipAccessorySummary = computed(() =>
+  summarizeUnassignedShipAccessories(order.value?.shipAccessories),
+)
 
 const inboundRows = computed(() => {
   void inboundOrderState.orders
@@ -2099,23 +2094,6 @@ function handleApplyDelivery() {
   })
 }
 
-function handleAccessoryReship() {
-  if (!order.value) return
-  const block = getPendingPriceChangeDeliveryBlock(order.value.id)
-  if (block) {
-    message.warning(block)
-    return
-  }
-  openCreateTab(router, openTab, {
-    path: '/sales/delivery/new',
-    title: `配件补发 ${order.value.orderNo || ''}`.trim(),
-    query: {
-      salesOrderId: order.value.id,
-      deliveryKind: DELIVERY_KIND.ACCESSORY_RESHIP,
-    },
-  })
-}
-
 function handlePriceChange() {
   if (!order.value) return
   if (!canApplySalesPriceChange(order.value)) {
@@ -2435,6 +2413,11 @@ function openBomDetail(bomId, bomName) {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.5;
+}
+
+.ship-acc-link {
+  color: #1677ff;
+  cursor: pointer;
 }
 
 .bom-line-head {

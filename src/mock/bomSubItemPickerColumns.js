@@ -2,7 +2,7 @@
 export const defaultBomSubItemPickerColumns = [
   { key: 'name', title: '产品名称', hidden: false, frozen: true, order: 0 },
   { key: 'code', title: '产品编号', hidden: false, frozen: false, order: 1 },
-  { key: 'itemType', title: '类型', hidden: false, frozen: false, order: 2 },
+  { key: 'materialType', title: '类型', hidden: false, frozen: false, order: 2 },
   { key: 'categoryName', title: '类别', hidden: false, frozen: false, order: 3 },
   { key: 'specModel', title: '规格型号', hidden: false, frozen: false, order: 4 },
   { key: 'material', title: '材质', hidden: false, frozen: false, order: 5 },

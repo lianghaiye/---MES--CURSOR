@@ -108,6 +108,13 @@
       </a-space>
     </div>
 
+    <a-tabs v-model:activeKey="listTab" size="small" class="list-status-tabs" @change="onTabChange">
+      <a-tab-pane key="all" tab="全部" />
+      <a-tab-pane key="pending" tab="待设计" />
+      <a-tab-pane key="approved" tab="审核通过" />
+      <a-tab-pane key="voided" tab="已作废" />
+    </a-tabs>
+
     <div class="table-card">
       <a-table
         :columns="displayColumns"
@@ -233,8 +240,11 @@ const filters = reactive({
 
 const pagination = reactive({ current: 1, pageSize: 20 })
 const selectedRowKeys = ref([])
+const listTab = ref('all')
 
-const statusOpts = Object.values(DESIGN_TASK_STATUS).map((v) => ({ label: v, value: v }))
+const statusOpts = Object.values(DESIGN_TASK_STATUS)
+  .filter((v) => v !== DESIGN_TASK_STATUS.VOIDED)
+  .map((v) => ({ label: v, value: v }))
 const urgencyOpts = ['紧急', '加急', '普通'].map((v) => ({ label: v, value: v }))
 const orderTypeOpts = ['标准订单', '项目订单', '备件订单'].map((v) => ({ label: v, value: v }))
 
@@ -271,7 +281,14 @@ const filteredList = computed(() => {
   } else {
     f.orderDateRange = null
   }
-  return filterDesignTasks(designTaskState.tasks, f)
+  if (listTab.value === 'pending') f.status = DESIGN_TASK_STATUS.PENDING
+  else if (listTab.value === 'approved') f.status = DESIGN_TASK_STATUS.APPROVED
+  else if (listTab.value === 'voided') f.status = DESIGN_TASK_STATUS.VOIDED
+  const rows = filterDesignTasks(designTaskState.tasks, f)
+  if (listTab.value === 'all') {
+    return rows.filter((row) => row.status !== DESIGN_TASK_STATUS.VOIDED)
+  }
+  return rows
 })
 
 const pagedList = computed(() => {
@@ -294,6 +311,11 @@ function openCreate() {
 
 function handleSearch() {
   pagination.current = 1
+}
+
+function onTabChange() {
+  pagination.current = 1
+  selectedRowKeys.value = []
 }
 
 function handleReset() {
@@ -443,6 +465,28 @@ function handleWithdraw() {
 
 .toolbar-row {
   margin-bottom: 8px;
+}
+
+.list-status-tabs {
+  margin-bottom: 0;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 0 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  :deep(.ant-tabs-nav) {
+    margin: 0;
+  }
+
+  :deep(.ant-tabs-nav::before) {
+    border-bottom-color: #f0f0f0;
+  }
+}
+
+.list-status-tabs + .table-card {
+  border-radius: 0 0 6px 6px;
 }
 
 .table-card {

@@ -160,8 +160,8 @@
 
         <QcTemplateConflictModal
           v-model:open="shipConflictOpen"
-          title="随货附件冲突"
-          entity-label="随货附件"
+          title="随货配件冲突"
+          entity-label="随货配件"
           :kind="shipConflictKind"
           :conflicts="shipConflictRows"
           :current-template-name="record?.bomName || ''"
@@ -177,7 +177,7 @@
       </template>
       <a-empty
         v-else-if="!loading"
-        :description="isShipAttachmentPath(route.path) ? '未找到该随货附件' : '未找到该 BOM'"
+        :description="isShipAttachmentPath(route.path) ? '未找到该随货配件' : '未找到该 BOM'"
       />
     </a-spin>
   </div>
@@ -382,7 +382,7 @@ function loadDetail() {
     selectedNodeId.value = structure.flatNodes.find((n) => n.isRoot)?.id || ROOT_ID
 
     const tab = tabStore.tabs.find((t) => t.path === route.path)
-    if (tab) tab.title = bom.bomName || (isShipBomType(bom.bomType) ? '随货附件详情' : 'BOM详情')
+    if (tab) tab.title = bom.bomName || (isShipBomType(bom.bomType) ? '随货配件详情' : 'BOM详情')
   }
   loading.value = false
   if (bom && isShipBomType(bom.bomType) && !isShipAttachmentPath(route.path)) {
@@ -399,7 +399,7 @@ watch(() => route.params.id, loadDetail, { immediate: true })
 function openBomDetail(row) {
   if (row.id === record.value?.id) return
   const path = bomWorkspaceDetailPath(row)
-  openTab(path, row.bomName || (isShipBomType(row.bomType) ? '随货附件详情' : 'BOM详情'))
+  openTab(path, row.bomName || (isShipBomType(row.bomType) ? '随货配件详情' : 'BOM详情'))
   router.push(path)
 }
 
@@ -474,8 +474,8 @@ function handleToggleShipStatus() {
     Modal.confirm({
       title: '停用确认',
       content: referenced
-        ? '当前随货附件已被引用，停用后，发货将按优先级匹配已启用的随货附件。是否确认停用？'
-        : `确定要停用随货附件「${row.bomName}」吗？`,
+        ? '当前随货配件已被引用，停用后，发货将按优先级匹配已启用的随货配件。是否确认停用？'
+        : `确定要停用随货配件「${row.bomName}」吗？`,
       onOk: () => {
         const res = disableShipAttachment(row.id, { force: true })
         if (!res.ok) {
@@ -526,7 +526,7 @@ function handleArchive() {
   }
   Modal.confirm({
     title: '确认归档',
-    content: `确定归档${isShipBom.value ? '随货附件' : 'BOM'}「${record.value.bomName}」吗？`,
+    content: `确定归档${isShipBom.value ? '随货配件' : 'BOM'}「${record.value.bomName}」吗？`,
     onOk: () => {
       const res = archiveProductBom(record.value.id)
       if (!res) {

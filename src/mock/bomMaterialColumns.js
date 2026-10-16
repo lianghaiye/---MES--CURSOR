@@ -10,14 +10,15 @@ export const defaultBomColumnSettings = [
   { key: 'blankSizeText', title: '下料尺寸', hidden: false, frozen: false, order: 7 },
   { key: 'unit', title: '库存单位', hidden: false, frozen: false, order: 8 },
   { key: 'supplyForm', title: '供应型态', hidden: false, frozen: false, order: 9 },
-  { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 10 },
-  { key: 'materialType', title: '物料类型', hidden: false, frozen: false, order: 11 },
-  { key: 'remark', title: '备注', hidden: false, frozen: false, order: 12 },
-  { key: 'substitutePart', title: '替代件', hidden: false, frozen: false, order: 13 },
-  { key: 'childBom', title: '子件BOM', hidden: false, frozen: false, order: 14 },
-  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 15 },
-  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 16 },
-  { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 17 },
+  { key: 'releaseStatus', title: '投产状态', hidden: false, frozen: false, order: 10 },
+  { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 11 },
+  { key: 'materialType', title: '物料类型', hidden: false, frozen: false, order: 12 },
+  { key: 'remark', title: '备注', hidden: false, frozen: false, order: 13 },
+  { key: 'substitutePart', title: '替代件', hidden: false, frozen: false, order: 14 },
+  { key: 'childBom', title: '子件BOM', hidden: false, frozen: false, order: 15 },
+  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 16 },
+  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 17 },
+  { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 18 },
 ]
 
 /** 历史误藏「下料尺寸」列：合并配置时强制恢复可见（用户仍可再藏） */
@@ -44,13 +45,13 @@ export function formatSubstitutePartLabel(line) {
   return name || code || ''
 }
 
-/** 产品 BOM：挂 SKU/单品；基准 BOM：挂产品族（族模板）；发运 BOM：可共用的随货附件清单 */
+/** 产品 BOM：挂 SKU/单品；基准 BOM：挂产品族（族模板）；发运 BOM：可共用的随货配件清单 */
 export const BOM_TYPE = {
   PRODUCT: '产品BOM',
   BASELINE: '基准BOM',
   ORDER: '订单BOM',
   CONFIG: '配置BOM',
-  /** 发运随货附件清单；可被多个产品共用，不参与生产 */
+  /** 发运随货配件清单；可被多个产品共用，不参与生产 */
   SHIP: '发运BOM',
 }
 
@@ -66,11 +67,11 @@ export const bomTypeOptions = [
 ]
 
 export const bomTypeSelectOptions = bomTypeOptions.map((v) => ({
-  label: v === BOM_TYPE.SHIP ? '随货附件' : v,
+  label: v === BOM_TYPE.SHIP ? '随货配件' : v,
   value: v,
 }))
 
-/** 产品 BOM 创建页可选类型（不含订单/配置/随货附件） */
+/** 产品 BOM 创建页可选类型（不含订单/配置/随货配件） */
 export const productBomCreateTypeOptions = [
   { label: BOM_TYPE.PRODUCT, value: BOM_TYPE.PRODUCT },
   { label: BOM_TYPE.BASELINE, value: BOM_TYPE.BASELINE },

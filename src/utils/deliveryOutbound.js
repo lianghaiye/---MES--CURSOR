@@ -28,6 +28,7 @@ export function buildOutboundLinesFromDelivery(delivery) {
   const headerWarehouse = delivery.outboundWarehouse || delivery.warehouse || ''
   const lines = []
   for (const li of delivery.lineItems || []) {
+    if (li.selected === false) continue
     const qty = Number(li.shipQty) || 0
     if (qty <= 0) continue
     const allocations = Array.isArray(li.batchAllocations) ? li.batchAllocations : []
@@ -58,6 +59,7 @@ export function buildOutboundLinesFromDelivery(delivery) {
     )
   }
   for (const ship of delivery.scatterShipments || []) {
+    if (ship.selected === false) continue
     for (const pick of getSelectedMaterialPicks(ship)) {
       const qty = Number(pick.shipQty) || 0
       if (qty <= 0) continue

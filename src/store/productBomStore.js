@@ -189,7 +189,7 @@ export function getOwnActiveBomForItemByType(itemType, itemId, bomType) {
   return row ? ensureBomStructure(row) : null
 }
 
-/** 产品关联的已启用随货附件（单产品 > 产品类别 > 全局） */
+/** 产品关联的已启用随货配件（单产品 > 产品类别 > 全局） */
 export function getActiveShipBomForProduct(productId) {
   if (productId == null || productId === '') return null
   const pid = String(productId)
@@ -204,7 +204,7 @@ export function getActiveShipBomForProduct(productId) {
   return matched ? ensureBomStructure(matched) : null
 }
 
-/** 全部已启用的随货附件（供产品关联下拉） */
+/** 全部已启用的随货配件（供产品关联下拉） */
 export function listActiveSharedShipBoms() {
   return productBomState.boms.filter(isShipAttachmentEnabled).map(ensureBomStructure)
 }
@@ -219,7 +219,7 @@ export function getActiveBomForItem(itemType, itemId) {
   return resolveActiveBomForItem(itemType, itemId)
 }
 
-/** 产品/物料关联的全部产品 BOM 版本（含生效、待发布、已归档，不含随货附件） */
+/** 产品/物料关联的全部产品 BOM 版本（含生效、待发布、已归档，不含随货配件） */
 export function getBomsForItem(itemType, itemId) {
   if (!itemType || itemId == null || itemId === '') return []
   const id = String(itemId)
@@ -466,24 +466,15 @@ export function saveShipAttachment(id, payload, { conflictResolution, operator =
   return { ok: true, record: row, created: false }
 }
 
-export function enableShipAttachment(id, { conflictResolution, operator = 'admin' } = {}) {
-  hydrateAllShipAttachmentScopes()
+export function enableShipAttachment(id, { operator = 'admin' } = {}) {
   const row = productBomState.boms.find((b) => b.id === id)
   if (!row) return { ok: false, message: '记录不存在' }
-  if (!isShipBomType(row.bomType)) return { ok: false, message: '仅随货附件可启用' }
+  if (!isShipBomType(row.bomType)) return { ok: false, message: '仅随货配件可启用' }
   hydrateShipAttachmentScope(row)
   if (isShipAttachmentEnabled(row)) return { ok: true, record: row }
 
-  const scopeType = row.scopeType
-  const objects = [...(row.objects || [])]
-  const resolved = resolveShipAttachmentEnableConflict(
-    row,
-    { scopeType, objects },
-    conflictResolution,
-    operator,
-  )
-  if (!resolved.ok) return resolved
-  applyShipScopeToRecord(row, { scopeType, objects: resolved.objects })
+  // 配件包为订单手工选用的模板，允许多个同时启用，不再按适用范围互斥停用
+  if (!row.scopeType) row.scopeType = SHIP_ATTACHMENT_SCOPE_TYPE.GLOBAL
   row.status = SHIP_ATTACHMENT_STATUS.ENABLED
   row.isDefault = true
   row.effectiveAt = row.effectiveAt || nowStr()
@@ -496,7 +487,7 @@ export function enableShipAttachment(id, { conflictResolution, operator = 'admin
 export function disableShipAttachment(id, { force = false, operator = 'admin' } = {}) {
   const row = productBomState.boms.find((b) => b.id === id)
   if (!row) return { ok: false, message: '记录不存在' }
-  if (!isShipBomType(row.bomType)) return { ok: false, message: '仅随货附件可停用' }
+  if (!isShipBomType(row.bomType)) return { ok: false, message: '仅随货配件可停用' }
   if (!isShipAttachmentEnabled(row)) return { ok: true, record: row }
   if (!force) return { ok: false, needConfirm: true, record: row }
   row.status = SHIP_ATTACHMENT_STATUS.DISABLED

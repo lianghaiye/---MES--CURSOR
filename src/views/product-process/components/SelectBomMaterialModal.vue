@@ -23,10 +23,12 @@
         >
           <a-form-item label="类型">
             <a-select
-              v-model:value="quickItemType"
+              v-model:value="quickMaterialType"
+              allow-clear
               size="small"
+              placeholder="全部"
               class="type-select"
-              :options="itemTypeOpts"
+              :options="materialTypeOpts"
             />
           </a-form-item>
           <a-form-item label="物品名称">
@@ -95,12 +97,12 @@
         >
           <a-form-item label="类型">
             <a-select
-              v-model:value="quickItemType"
+              v-model:value="quickMaterialType"
               allow-clear
               size="small"
               placeholder="全部"
               class="type-select"
-              :options="itemTypeOpts"
+              :options="materialTypeOpts"
             />
           </a-form-item>
           <a-form-item v-if="includeSpuTemplates" label="产品族/SKU">
@@ -229,9 +231,8 @@
           size="small"
           bordered
           :loading="loading"
-          :pagination="pagination"
+          :pagination="false"
           :scroll="{ x: tableScrollX, y: tableScrollY }"
-          @change="onTableChange"
         >
           <template #bodyCell="{ column, text, record }">
             <template v-if="column.key === 'variantSummary'">
@@ -245,6 +246,18 @@
             </template>
           </template>
         </a-table>
+        <div class="table-pager">
+          <a-pagination
+            v-model:current="page"
+            v-model:page-size="pageSize"
+            size="small"
+            :total="filteredRows.length"
+            show-size-changer
+            show-quick-jumper
+            :page-size-options="['20', '50', '100']"
+            :show-total="(total) => `共 ${total} 条（产品信息 + 物料信息）`"
+          />
+        </div>
       </div>
 
       <div class="selected-panel">
@@ -324,11 +337,15 @@ import {
   bomSubItemFilterOperatorOptions,
 } from '@/mock/bomSubItemFilterFields'
 import { defaultBomSubItemPickerColumns } from '@/mock/bomSubItemPickerColumns'
+import { MATERIAL_TYPE_OPTIONS } from '@/utils/masterDataMigrate'
 import BomSubItemColumnSettingDrawer from './BomSubItemColumnSettingDrawer.vue'
 import BomSubItemFilterModal from './BomSubItemFilterModal.vue'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { tabStore, useTabs } from '@/composables/useTabs'
+
+/** 历史 prop：产品/物料 = 主数据目录；其余视为主数据「类型」(materialType) */
+const CATALOG_ITEM_TYPES = new Set(['产品', '物料'])
 
 const props = defineProps({
   open: Boolean,
@@ -353,7 +370,7 @@ const { openTab } = useTabs()
 const productCreatePage = findCreatePageByListPath('/product-process/products')
 
 const keyword = ref('')
-const quickItemType = ref(undefined)
+const quickMaterialType = ref(undefined)
 const catalogKindFilter = ref(undefined)
 const loading = ref(false)
 const confirming = ref(false)
@@ -384,10 +401,20 @@ const selectedRows = ref([])
 const listVersion = ref(0)
 const appliedFilterConditions = ref([])
 
-const itemTypeOpts = [
-  { label: '产品', value: '产品' },
-  { label: '物料', value: '物料' },
-]
+const materialTypeOpts = MATERIAL_TYPE_OPTIONS.map((v) => ({ label: v, value: v }))
+
+function resolveDefaultMaterialTypeFilter() {
+  const v = String(props.pickerDefaultItemType || '').trim()
+  if (!v || CATALOG_ITEM_TYPES.has(v)) return undefined
+  return MATERIAL_TYPE_OPTIONS.includes(v) ? v : undefined
+}
+
+function resolvePreferredCatalogType() {
+  const v = String(props.pickerDefaultItemType || '').trim()
+  if (CATALOG_ITEM_TYPES.has(v)) return v
+  if (props.ecnNewMaterialMode) return '物料'
+  return ''
+}
 
 const catalogKindOpts = [
   { label: '产品族', value: 'spu' },
@@ -398,7 +425,7 @@ const widthMap = {
   name: 160,
   code: 120,
   specModel: 110,
-  itemType: 100,
+  materialType: 100,
   categoryName: 100,
   material: 80,
   variantSummary: 180,
@@ -435,12 +462,10 @@ const allRows = computed(() => {
 
 const filteredRows = computed(() => {
   let rows = allRows.value
-  if (quickItemType.value) {
-    // 产品 → 含产品物料（产品行）；物料 → 含产品物料（物料镜像行）
-    rows = rows.filter((r) => r.itemType === quickItemType.value)
-  } else {
-    // 全部 → 去掉同 ID 镜像，优先留产品行
-    rows = dedupePickerRowsPreferProduct(rows)
+  // 默认去重镜像行；再按主数据「类型」(materialType) 筛选
+  rows = dedupePickerRowsPreferProduct(rows)
+  if (quickMaterialType.value) {
+    rows = rows.filter((r) => r.materialType === quickMaterialType.value)
   }
   if (props.includeSpuTemplates && catalogKindFilter.value) {
     rows = rows.filter((r) => (r.catalogKind || 'sku') === catalogKindFilter.value)
@@ -505,17 +530,7 @@ const tableScrollX = computed(() => {
   return Math.max(sum, 900)
 })
 
-const tableScrollY = computed(() => 520)
-
-const pagination = computed(() => ({
-  current: page.value,
-  pageSize: pageSize.value,
-  total: filteredRows.value.length,
-  showSizeChanger: true,
-  pageSizeOptions: ['20', '50', '100'],
-  showTotal: (total) => `共 ${total} 条（产品信息 + 物料信息）`,
-  size: 'small',
-}))
+const tableScrollY = computed(() => 440)
 
 const pagedRows = computed(() => {
   const start = (page.value - 1) * pageSize.value
@@ -587,7 +602,7 @@ const rowSelection = computed(() => ({
   },
 }))
 
-watch(quickItemType, () => {
+watch(quickMaterialType, () => {
   page.value = 1
 })
 
@@ -602,8 +617,7 @@ watch(
     keyword.value = ''
     Object.assign(ecnFilters, emptyEcnFilters())
     Object.assign(appliedEcnFilters, emptyEcnFilters())
-    quickItemType.value =
-      props.pickerDefaultItemType || (props.ecnNewMaterialMode ? '物料' : undefined)
+    quickMaterialType.value = resolveDefaultMaterialTypeFilter()
     catalogKindFilter.value = undefined
     page.value = 1
     appliedFilterConditions.value = []
@@ -614,7 +628,7 @@ watch(
   },
 )
 
-/** 按 initialSelectedIds 回显已选（优先匹配当前类型筛选下的行） */
+/** 按 initialSelectedIds 回显已选（优先匹配历史目录偏好：产品/物料） */
 function seedInitialSelection() {
   const ids = (props.initialSelectedIds || []).map(String).filter(Boolean)
   if (!ids.length) {
@@ -623,17 +637,17 @@ function seedInitialSelection() {
     return
   }
   const idSet = new Set(ids)
-  const preferredType = props.pickerDefaultItemType || ''
+  const preferredCatalog = resolvePreferredCatalogType()
   const matches = []
   const seen = new Set()
   for (const row of allRows.value) {
     const id = String(row.itemId || '')
     if (!idSet.has(id) || seen.has(id)) continue
-    if (preferredType && row.itemType !== preferredType) continue
+    if (preferredCatalog && row.itemType !== preferredCatalog) continue
     matches.push(row)
     seen.add(id)
   }
-  // 未命中首选类型时再兜底任意类型
+  // 未命中首选目录时再兜底任意行
   if (matches.length < ids.length) {
     for (const row of allRows.value) {
       const id = String(row.itemId || '')
@@ -685,11 +699,6 @@ function removeFilterCondition(id) {
 function clearFilterConditions() {
   appliedFilterConditions.value = []
   page.value = 1
-}
-
-function onTableChange(pag) {
-  page.value = pag.current
-  pageSize.value = pag.pageSize
 }
 
 function removeSelected(rowKey) {
@@ -807,9 +816,8 @@ watch(
   .picker-body {
     display: flex;
     gap: 12px;
-    height: 580px;
-    max-height: calc(86vh - 220px);
-    min-height: 520px;
+    align-items: stretch;
+    min-height: 480px;
   }
 
   .table-panel {
@@ -820,12 +828,19 @@ watch(
     flex-direction: column;
   }
 
+  .table-pager {
+    display: flex;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    margin-top: 12px;
+  }
+
   .list-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
     flex-shrink: 0;
   }
 
@@ -839,14 +854,14 @@ watch(
   .selected-panel {
     width: 260px;
     flex-shrink: 0;
-    height: 100%;
+    align-self: stretch;
     min-height: 0;
+    overflow: hidden;
     border: 1px solid #f0f0f0;
     border-radius: 4px;
     display: flex;
     flex-direction: column;
     background: #fafafa;
-    overflow: hidden;
   }
 
   .selected-head {

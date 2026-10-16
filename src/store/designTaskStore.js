@@ -328,6 +328,43 @@ export function approveDesignTasks(ids, checker = 'admin1', options = {}) {
   })
 }
 
+/** 生产计划终止后：未审核通过的设计任务自动作废 */
+export function voidIncompleteDesignTasksForPlan(plan) {
+  if (!plan) return { count: 0, tasks: [] }
+  const taskIds = new Set()
+  if (plan.designTaskId) taskIds.add(plan.designTaskId)
+  const lineIds = new Set()
+  ;(plan.workItems || []).forEach((wi) => {
+    if (wi?.designTaskId) taskIds.add(wi.designTaskId)
+    if (wi?.salesLineId) lineIds.add(wi.salesLineId)
+  })
+
+  const tasks = designTaskState.tasks.filter((task) => {
+    if (task.status === DESIGN_TASK_STATUS.APPROVED || task.status === DESIGN_TASK_STATUS.VOIDED) {
+      return false
+    }
+    if (taskIds.has(task.id)) return true
+    if (plan.id && task.productionPlanId === plan.id) return true
+    if (
+      plan.salesOrderNo &&
+      task.salesOrderNo === plan.salesOrderNo &&
+      task.salesLineId &&
+      lineIds.has(task.salesLineId)
+    ) {
+      return true
+    }
+    return false
+  })
+
+  const now = dayjs().format('YYYY-MM-DD HH:mm')
+  tasks.forEach((task) => {
+    task.status = DESIGN_TASK_STATUS.VOIDED
+    task.voidedAt = now
+    task.voidReason = '生产计划已终止'
+  })
+  return { count: tasks.length, tasks }
+}
+
 export function filterDesignTasks(list, filters) {
   return list.filter((row) => {
     if (filters.status && row.status !== filters.status) return false

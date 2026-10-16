@@ -261,7 +261,75 @@ export const sideMenus = {
     { key: 'maintain-orders', label: '保养工单', path: '/equipment/maintain-orders' },
     { key: 'repair-orders', label: '维修工单', path: '/equipment/repair-orders' },
   ],
-  report: [{ key: 'overview', label: '综合报表', path: '/report/overview' }],
+  report: [
+    { key: 'overview', label: '报表目录', path: '/report/overview' },
+    {
+      key: 'sales-reports',
+      label: '销售报表',
+      children: [
+        { key: 'sales-order-exec', label: '销售订单执行表', path: '/report/sales-order-exec' },
+        { key: 'sales-line-summary', label: '销售明细汇总表', path: '/report/sales-line-summary' },
+        {
+          key: 'sales-delivery-achieve',
+          label: '发货达成表',
+          path: '/report/sales-delivery-achieve',
+        },
+        {
+          key: 'sales-order-cost',
+          label: '销售订单成本表',
+          path: '/report/sales-order-cost',
+        },
+      ],
+    },
+    {
+      key: 'production-reports',
+      label: '生产报表',
+      children: [
+        {
+          key: 'work-order-progress',
+          label: '工单进度表',
+          path: '/report/work-order-progress',
+        },
+        {
+          key: 'work-order-cost',
+          label: '生产工单成本表',
+          path: '/report/work-order-cost',
+        },
+      ],
+    },
+    {
+      key: 'procurement-reports',
+      label: '采购/外协报表',
+      children: [
+        {
+          key: 'purchase-order-exec',
+          label: '采购订单执行表',
+          path: '/report/purchase-order-exec',
+        },
+        {
+          key: 'outsourcing-order-exec',
+          label: '外协订单执行表',
+          path: '/report/outsourcing-order-exec',
+        },
+      ],
+    },
+    {
+      key: 'inventory-reports',
+      label: '库存报表',
+      children: [
+        {
+          key: 'inventory-io-balance',
+          label: '库存收发存表',
+          path: '/report/inventory-io-balance',
+        },
+      ],
+    },
+    {
+      key: 'quality-reports',
+      label: '质检报表',
+      children: [{ key: 'qc-task-stats', label: '质检任务统计表', path: '/report/qc-task-stats' }],
+    },
+  ],
 }
 
 /** 按 path 查找侧栏菜单项（含嵌套） */
@@ -478,7 +546,17 @@ export const routeTitles = {
   '/equipment/inspection-tasks': '点检任务',
   '/equipment/maintain-orders': '保养工单',
   '/equipment/repair-orders': '维修工单',
-  '/report/overview': '报表中心',
+  '/report/overview': '报表目录',
+  '/report/sales-order-exec': '销售订单执行表',
+  '/report/sales-line-summary': '销售明细汇总表',
+  '/report/sales-delivery-achieve': '发货达成表',
+  '/report/sales-order-cost': '销售订单成本表',
+  '/report/work-order-progress': '工单进度表',
+  '/report/work-order-cost': '生产工单成本表',
+  '/report/purchase-order-exec': '采购订单执行表',
+  '/report/outsourcing-order-exec': '外协订单执行表',
+  '/report/inventory-io-balance': '库存收发存表',
+  '/report/qc-task-stats': '质检任务统计表',
   '/board/catalog': '看板列表',
   '/board/carousel': '轮播管理',
   '/board/carousel/new': '新建轮播方案',
@@ -501,6 +579,8 @@ export const routeTitles = {
 export const dynamicRouteTitles = [
   { pattern: /^\/engineering-change\/ecn\/[^/]+\/detail$/, title: 'ECN详情' },
   { pattern: /^\/engineering-change\/ecr\/[^/]+\/detail$/, title: 'ECR详情' },
+  { pattern: /^\/engineering-change\/ecn\/[^/]+\/plan-impact$/, title: '计划影响与重排' },
+  { pattern: /^\/engineering-change\/ecr\/[^/]+\/plan-impact$/, title: '计划影响与重排' },
   { pattern: /^\/engineering-change\/ecn\/[^/]+\/approve$/, title: '审批工程变更' },
   { pattern: /^\/engineering-change\/ecn\/[^/]+\/execute$/, title: '执行工程变更' },
   { pattern: /^\/engineering-change\/ecr\/[^/]+\/approve$/, title: '审批工程变更' },
