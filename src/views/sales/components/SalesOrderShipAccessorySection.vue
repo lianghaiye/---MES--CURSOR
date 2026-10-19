@@ -882,7 +882,7 @@ watch(
 .picker-body {
   display: flex;
   gap: 12px;
-  min-height: 480px;
+  align-items: stretch;
 }
 
 .table-panel {
@@ -907,6 +907,10 @@ watch(
 }
 
 .package-pick-table {
+  :deep(.ant-table-body) {
+    min-height: 360px;
+  }
+
   :deep(.ant-table-tbody > tr) {
     cursor: pointer;
   }
@@ -915,6 +919,8 @@ watch(
 .selected-panel {
   width: 260px;
   flex-shrink: 0;
+  align-self: stretch;
+  min-height: 0;
   border: 1px solid #f0f0f0;
   border-radius: 4px;
   display: flex;

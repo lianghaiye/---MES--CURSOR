@@ -113,10 +113,6 @@
           />
         </template>
 
-        <template v-else-if="column.key === 'settleUnit'">
-          {{ record.settleUnit || '—' }}
-        </template>
-
         <template v-else-if="column.key === 'settleQty'">
           <div v-if="hasSettleUnit(record)" class="settle-qty-cell">
             <a-input-number

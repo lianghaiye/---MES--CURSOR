@@ -826,6 +826,10 @@ watch(
     min-height: 0;
     display: flex;
     flex-direction: column;
+
+    :deep(.ant-table-body) {
+      min-height: 440px;
+    }
   }
 
   .table-pager {
