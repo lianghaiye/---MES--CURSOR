@@ -114,6 +114,14 @@
                       </a-tooltip>
                     </span>
                   </template>
+                  <template v-else-if="column.key === 'unitPrice'">
+                    <span class="col-title-with-tip">
+                      入库成本价
+                      <a-tooltip :title="INBOUND_COST_PRICE_TIP">
+                        <InfoCircleOutlined class="col-tip-icon" />
+                      </a-tooltip>
+                    </span>
+                  </template>
                   <template v-else>{{ column.title }}</template>
                 </template>
                 <template #bodyCell="{ column, record: line, index }">
@@ -630,6 +638,7 @@ import {
   inboundDetailLineColumns,
   RECEIVE_QTY_TIP,
   STOCK_UNIT_QTY_TIP,
+  INBOUND_COST_PRICE_TIP,
   SETTLE_QTY_TIP,
 } from '@/utils/inboundLineColumns'
 import {

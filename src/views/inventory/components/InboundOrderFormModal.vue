@@ -224,6 +224,14 @@
                     </a-tooltip>
                   </span>
                 </template>
+                <template v-else-if="column.key === 'unitPrice'">
+                  <span class="col-title-with-tip">
+                    入库成本价
+                    <a-tooltip :title="INBOUND_COST_PRICE_TIP">
+                      <InfoCircleOutlined class="col-tip-icon" />
+                    </a-tooltip>
+                  </span>
+                </template>
                 <template v-else>{{ column.title }}</template>
               </template>
               <template #bodyCell="{ column, record, index }">
@@ -381,6 +389,7 @@
                         autofocus
                         @blur="endEdit"
                         @pressEnter="endEdit"
+                        @change="() => onLineQtyChange(record)"
                       />
                       <a-input-number
                         v-else
@@ -477,16 +486,16 @@
                   >
                     <template #edit="{ endEdit }">
                       <a-input-number
-                        v-model:value="record.settleQty"
+                        :value="record.settleQty"
                         :min="0"
                         :precision="4"
                         size="small"
                         style="width: 100%"
                         autofocus
-                        placeholder="结算数量"
+                        placeholder="结算合计"
+                        @update:value="(v) => onLineSettleTotalInput(record, v)"
                         @blur="endEdit"
                         @pressEnter="endEdit"
-                        @change="() => onLineSettleQtyChange(record)"
                       />
                     </template>
                   </InventoryLineEditableCell>
@@ -715,6 +724,7 @@ import {
   STOCK_UNIT_QTY_TIP,
   SETTLE_QTY_TIP,
   RECEIVE_QTY_TIP,
+  INBOUND_COST_PRICE_TIP,
 } from '@/utils/inboundLineColumns'
 import { normalizeInventoryPickerItem } from '@/utils/inventoryLineItemPicker'
 import { warehouseOptionLabel } from '@/utils/inventoryFormLineDisplay'
@@ -733,6 +743,8 @@ import {
   resolveInboundQtyUnit,
   resolveInboundStockUnit,
   syncInboundLineTotalFromUnit,
+  validateSettleEntry,
+  SETTLE_ENTRY_MODE,
 } from '@/utils/inboundLineHelpers'
 import { hasSettleUnit } from '@/utils/settleUnit'
 import { createInboundLine } from '@/mock/inboundOrders'
@@ -1190,7 +1202,11 @@ function onLineUnitPriceChange(line) {
   syncInboundLineTotalFromUnit(line)
 }
 
-function onLineSettleQtyChange(line) {
+function onLineSettleTotalInput(line, value) {
+  line.settleEntryMode = SETTLE_ENTRY_MODE.TOTAL
+  line.settleQty = value
+  line.settleUniformValue = undefined
+  line.settlePieceValues = undefined
   syncInboundLineTotalFromUnit(line)
 }
 
@@ -1477,6 +1493,16 @@ function validateInboundForm() {
     )
     return false
   }
+  const invalidSettle = validLines.find((line) => {
+    if (!hasSettleUnit(line)) return false
+    return !validateSettleEntry(line).ok
+  })
+  if (invalidSettle) {
+    const check = validateSettleEntry(invalidSettle)
+    message.warning(`${invalidSettle.itemName || '明细'}：${check.message}`)
+    return false
+  }
+  validLines.forEach((line) => syncInboundLineTotalFromUnit(line))
   return true
 }
 

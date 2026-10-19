@@ -21,10 +21,10 @@ export const inboundFormLineColumns = [
   /** 入库数量：按库存单位入账，如「36 米」；单单位同点收数量 */
   { title: '入库数量', key: 'stockUnitQty', width: 130 },
   /** 有结算单位时展示，如「55.5 kg」 */
-  { title: '结算数量', key: 'settleQty', width: 120 },
+  { title: '结算数量', key: 'settleQty', width: 150 },
   { title: '入库仓库', key: 'warehouse', width: 120 },
   { title: '货位号', key: 'locationNo', dataIndex: 'locationNo', width: 110, ellipsis: true },
-  { title: '单价', key: 'unitPrice', width: 96, align: 'right' },
+  { title: '入库成本价', key: 'unitPrice', width: 120, align: 'right' },
   { title: '总价', key: 'totalPrice', width: 96, align: 'right' },
   { title: '当前库存数', key: 'stockQty', width: 120, align: 'right' },
   { title: '当前仓库数量', key: 'warehouseStockQty', width: 130, align: 'right' },
@@ -43,4 +43,8 @@ export const STOCK_UNIT_QTY_TIP =
 
 /** 结算数量列提示 */
 export const SETTLE_QTY_TIP =
-  '仅当物料结算单位≠库存单位时填写，用于与供应商计价；未启用结算单位时本列为空。'
+  '仅当物料结算单位≠库存单位时填写，本列展示结算数量合计。编辑明细可选三种录入：统一单件 = 单件结算数量 × 入库件数；逐件 = 各件结算数量之和；直接填合计 = 合计数量。列表里直接改本列，按合计保存。'
+
+/** 入库成本价列提示 */
+export const INBOUND_COST_PRICE_TIP =
+  '入库的成本价。无结算单位时，总价 = 入库成本价 × 入库数量。采购单位≠库存单位时，入库数量按录入方式合计：统一单件 = 单件数量 × 入库件数；逐件 = 各件数量之和；直接填合计 = 合计数量。有结算单位时，总价 = 入库成本价 × 结算数量合计。结算数量同样支持统一单件、逐件、直接填合计，与入库数量的录入方式分开。'

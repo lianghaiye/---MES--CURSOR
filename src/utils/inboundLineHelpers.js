@@ -175,7 +175,109 @@ export function applyDualUnitFieldsToInboundLine(line = {}, itemCode = '') {
   return line
 }
 
+/** 结算数量录入方式（与入库数量的录入方式分开） */
+export const SETTLE_ENTRY_MODE = {
+  UNIFORM: 'uniform',
+  PIECE: 'piece',
+  TOTAL: 'total',
+}
+
+export function getSettleEntryModeOptions() {
+  return [
+    { label: '统一单件', value: SETTLE_ENTRY_MODE.UNIFORM },
+    { label: '逐件数量', value: SETTLE_ENTRY_MODE.PIECE },
+    { label: '直接填合计', value: SETTLE_ENTRY_MODE.TOTAL },
+  ]
+}
+
+/** 未写过录入方式的旧行，按「直接填合计」使用已有 settleQty */
+export function resolveSettleEntryMode(line = {}) {
+  const mode = String(line?.settleEntryMode || '')
+  if (
+    mode === SETTLE_ENTRY_MODE.UNIFORM ||
+    mode === SETTLE_ENTRY_MODE.PIECE ||
+    mode === SETTLE_ENTRY_MODE.TOTAL
+  ) {
+    return mode
+  }
+  return SETTLE_ENTRY_MODE.TOTAL
+}
+
+/**
+ * 结算录入用的入库件数。
+ * 采购单位≠库存单位时取点收件数；否则取整数入库数量。
+ */
+export function resolveInboundPieceCount(line = {}) {
+  if (isInboundDualUnitLine(line)) {
+    const n = Number(line.purchaseQty)
+    if (!Number.isFinite(n) || n <= 0) return 0
+    return Math.round(n)
+  }
+  const n = Number(line.qty)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  if (Math.abs(n - Math.round(n)) > 1e-6) return 0
+  return Math.round(n)
+}
+
+function roundSettleQty(val) {
+  return Math.round((Number(val) || 0) * 10000) / 10000
+}
+
+/** 按当前录入方式回写结算数量合计；输入不完整时保留原合计 */
+export function materializeSettleQty(line = {}) {
+  if (!hasSettleUnit(line)) return line.settleQty
+  const mode = resolveSettleEntryMode(line)
+  if (mode === SETTLE_ENTRY_MODE.UNIFORM) {
+    const n = resolveInboundPieceCount(line)
+    const per = Number(line.settleUniformValue)
+    if (n > 0 && per > 0) line.settleQty = roundSettleQty(per * n)
+  } else if (mode === SETTLE_ENTRY_MODE.PIECE) {
+    const pieces = Array.isArray(line.settlePieceValues) ? line.settlePieceValues.map(Number) : []
+    const sum = pieces.reduce((acc, v) => acc + (v > 0 ? v : 0), 0)
+    if (sum > 0) line.settleQty = roundSettleQty(sum)
+  }
+  return line.settleQty
+}
+
+/** 校验并回写结算数量合计 */
+export function validateSettleEntry(line = {}) {
+  if (!hasSettleUnit(line)) return { ok: true }
+  const unit = line.settleUnit || 'kg'
+  const mode = resolveSettleEntryMode(line)
+  line.settleEntryMode = mode
+  const n = resolveInboundPieceCount(line)
+  if (mode === SETTLE_ENTRY_MODE.UNIFORM) {
+    const per = Number(line.settleUniformValue)
+    if (!(n > 0)) {
+      return { ok: false, message: '请先填写整数入库件数，或改用直接填合计' }
+    }
+    if (!(per > 0)) return { ok: false, message: `请填写单件结算数量（${unit}）` }
+    line.settleQty = roundSettleQty(per * n)
+    line.settlePieceValues = undefined
+    return { ok: true, settleQty: line.settleQty }
+  }
+  if (mode === SETTLE_ENTRY_MODE.PIECE) {
+    const pieces = Array.isArray(line.settlePieceValues) ? line.settlePieceValues.map(Number) : []
+    if (!(n > 0)) {
+      return { ok: false, message: '请先填写整数入库件数，或改用直接填合计' }
+    }
+    if (pieces.length !== n || pieces.some((v) => !(v > 0))) {
+      return { ok: false, message: `须录入 ${n} 条结算数量（${unit}），且每条大于 0` }
+    }
+    line.settleQty = roundSettleQty(pieces.reduce((sum, v) => sum + v, 0))
+    line.settleUniformValue = undefined
+    return { ok: true, settleQty: line.settleQty }
+  }
+  const total = Number(line.settleQty)
+  if (!(total > 0)) return { ok: false, message: `请填写结算数量合计（${unit}）` }
+  line.settleQty = roundSettleQty(total)
+  line.settleUniformValue = undefined
+  line.settlePieceValues = undefined
+  return { ok: true, settleQty: line.settleQty }
+}
+
 export function calcInboundLineTotalPrice(line = {}) {
+  if (hasSettleUnit(line)) materializeSettleQty(line)
   const qty = hasSettleUnit(line)
     ? resolvePricingQty(line)
     : Number(getStockUnitQtyValue(line)) || 0

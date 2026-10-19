@@ -104,6 +104,24 @@
             />
           </a-form-item>
         </a-col>
+        <a-col v-if="isVariableLengthLine" :span="8">
+          <a-form-item required>
+            <template #label>
+              <span class="field-label">
+                <UnorderedListOutlined />
+                点收数量（{{ purchaseUnitLabel }}）
+              </span>
+            </template>
+            <a-input-number
+              v-model:value="draft.purchaseQty"
+              :min="1"
+              :precision="0"
+              :placeholder="`按${purchaseUnitLabel}计`"
+              style="width: 100%"
+              @change="onPurchaseQtyChange"
+            />
+          </a-form-item>
+        </a-col>
         <a-col v-if="!isVariableLengthLine" :span="8">
           <a-form-item required>
             <template #label>
@@ -124,37 +142,15 @@
             />
           </a-form-item>
         </a-col>
-        <a-col v-if="!isVariableLengthLine && hasSettleUnitLine" :span="8">
-          <a-form-item required>
-            <template #label>
-              <span class="field-label">
-                <UnorderedListOutlined />
-                结算数量（{{ draft.settleUnit || 'kg' }}）
-              </span>
-            </template>
-            <a-input-number
-              v-model:value="draft.settleQty"
-              :min="0"
-              :precision="4"
-              :formatter="inputNumberFormatter"
-              :parser="inputNumberParser"
-              placeholder="与供应商计价用"
-              style="width: 100%"
-              @change="onSettleQtyChange"
-            />
-            <div class="vl-tip">
-              结算单位（{{ draft.settleUnit || 'kg' }}）与库存单位（{{
-                stockUnitLabel
-              }}）不同：请再填结算数量，用于与供应商算钱。
-            </div>
-          </a-form-item>
+        <a-col v-if="!isVariableLengthLine && hasSettleUnitLine" :span="24">
+          <InboundSettleQtyEditor :line="draft" @patch="onSettlePatch" />
         </a-col>
         <a-col v-if="!isVariableLengthLine" :span="8">
           <a-form-item>
             <template #label>
               <span class="field-label">
                 <DollarOutlined />
-                单价{{ hasSettleUnitLine ? `（元/${draft.settleUnit || 'kg'}）` : '' }}
+                入库成本价{{ hasSettleUnitLine ? `（元/${draft.settleUnit || 'kg'}）` : '' }}
               </span>
             </template>
             <a-input-number
@@ -181,57 +177,34 @@
       </a-row>
 
       <template v-if="isVariableLengthLine">
-        <a-row :gutter="16">
-          <a-col :span="8">
-            <a-form-item required>
-              <template #label>
-                <span class="field-label">
-                  <UnorderedListOutlined />
-                  点收数量（{{ purchaseUnitLabel }}）
-                </span>
-              </template>
-              <a-input-number
-                v-model:value="draft.purchaseQty"
-                :min="1"
-                :precision="0"
-                :placeholder="`按${purchaseUnitLabel}计`"
-                style="width: 100%"
-                @change="onPurchaseQtyChange"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="16">
-            <a-form-item required>
-              <template #label>
-                <span class="field-label">
-                  <UnorderedListOutlined />
-                  入库数量怎么填
-                </span>
-              </template>
-              <a-radio-group
-                v-model:value="draft.inboundEntryMode"
-                :options="entryModeOpts"
-                @change="onEntryModeChange"
-              />
-              <div class="vl-tip">
-                采购单位（{{ purchaseUnitLabel }}）与库存单位（{{
-                  stockUnitLabel
-                }}）不同：先填点收数量，再填入库数量。
-                <template v-if="showAreaShortcut">
-                  库存单位为面积时，可用「长 × 宽」换算，也可直接填合计{{ stockUnitLabel }}。
-                </template>
-                <template v-if="isPieceManagedBarcode">
-                  一物一码须按件填写，不支持「直接填合计」。确认入库后 1 个父批，件码为批次号+四位
-                  SN。
-                </template>
-                <template v-else>
-                  「直接填合计」只生成一个批次、无 SN。选「统一单件」或「逐件」时，同一物一码：1
-                  个父批 + 四位 SN 件码。
-                </template>
-              </div>
-            </a-form-item>
-          </a-col>
-        </a-row>
+        <a-form-item required class="entry-mode-item">
+          <template #label>
+            <span class="field-label">
+              <UnorderedListOutlined />
+              入库数量怎么填
+            </span>
+          </template>
+          <a-radio-group
+            v-model:value="draft.inboundEntryMode"
+            :options="entryModeOpts"
+            @change="onEntryModeChange"
+          />
+          <div class="vl-tip">
+            采购单位（{{ purchaseUnitLabel }}）与库存单位（{{
+              stockUnitLabel
+            }}）不同：先填点收数量，再填入库数量。
+            <template v-if="showAreaShortcut">
+              库存单位为面积时，可用「长 × 宽」换算，也可直接填合计{{ stockUnitLabel }}。
+            </template>
+            <template v-if="isPieceManagedBarcode">
+              一物一码须按件填写，不支持「直接填合计」。确认入库后 1 个父批，件码为批次号+四位 SN。
+            </template>
+            <template v-else>
+              「直接填合计」只生成一个批次、无 SN。选「统一单件」或「逐件」时，同一物一码：1 个父批
+              + 四位 SN 件码。
+            </template>
+          </div>
+        </a-form-item>
 
         <a-form-item v-if="showAreaShortcut && (isUniformMode || isPieceMode)" label="尺寸单位">
           <a-radio-group
@@ -486,37 +459,15 @@
         </div>
 
         <a-row :gutter="16">
-          <a-col v-if="hasSettleUnitLine" :span="8">
-            <a-form-item required>
-              <template #label>
-                <span class="field-label">
-                  <UnorderedListOutlined />
-                  结算数量（{{ draft.settleUnit || 'kg' }}）
-                </span>
-              </template>
-              <a-input-number
-                v-model:value="draft.settleQty"
-                :min="0"
-                :precision="4"
-                :formatter="inputNumberFormatter"
-                :parser="inputNumberParser"
-                placeholder="与供应商计价用"
-                style="width: 100%"
-                @change="onSettleQtyChange"
-              />
-              <div class="vl-tip">
-                结算单位（{{ draft.settleUnit || 'kg' }}）与库存单位（{{
-                  stockUnitLabel
-                }}）不同：请再填结算数量，用于与供应商算钱。
-              </div>
-            </a-form-item>
+          <a-col v-if="hasSettleUnitLine" :span="24">
+            <InboundSettleQtyEditor :line="draft" @patch="onSettlePatch" />
           </a-col>
           <a-col :span="8">
             <a-form-item>
               <template #label>
                 <span class="field-label">
                   <DollarOutlined />
-                  单价{{ hasSettleUnitLine ? `（元/${draft.settleUnit || 'kg'}）` : '' }}
+                  入库成本价{{ hasSettleUnitLine ? `（元/${draft.settleUnit || 'kg'}）` : '' }}
                 </span>
               </template>
               <a-input-number
@@ -569,7 +520,12 @@ import {
 } from '@ant-design/icons-vue'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { getLocationSelectOptions, warehouseLocationState } from '@/store/warehouseLocationStore'
-import { enrichInboundLine, syncInboundLineTotalFromUnit } from '@/utils/inboundLineHelpers'
+import {
+  enrichInboundLine,
+  syncInboundLineTotalFromUnit,
+  validateSettleEntry,
+} from '@/utils/inboundLineHelpers'
+import InboundSettleQtyEditor from './InboundSettleQtyEditor.vue'
 import { hasSettleUnit } from '@/utils/settleUnit'
 import { isPlateAreaMeasureEnabled } from '@/store/functionParamStore'
 import { materialInfoState } from '@/store/materialInfoStore'
@@ -997,8 +953,9 @@ function onUnitPriceChange() {
   syncInboundLineTotalFromUnit(draft.value)
 }
 
-function onSettleQtyChange() {
+function onSettlePatch(partial) {
   if (!draft.value) return
+  Object.assign(draft.value, partial || {})
   syncInboundLineTotalFromUnit(draft.value)
 }
 
@@ -1014,10 +971,6 @@ function handleOk() {
   }
   if (!draft.value.warehouse) {
     message.warning('请选择入库仓库')
-    return
-  }
-  if (hasSettleUnit(draft.value) && !(Number(draft.value.settleQty) > 0)) {
-    message.warning(`请填写结算数量（${draft.value.settleUnit || 'kg'}）`)
     return
   }
   if (isVariableLengthLine.value) {
@@ -1088,6 +1041,13 @@ function handleOk() {
     message.warning('请输入入库数量')
     return
   }
+  if (hasSettleUnit(draft.value)) {
+    const settleCheck = validateSettleEntry(draft.value)
+    if (!settleCheck.ok) {
+      message.warning(settleCheck.message)
+      return
+    }
+  }
   syncInboundLineTotalFromUnit(draft.value)
   emit('confirm', enrichInboundLine({ ...draft.value }))
   emit('update:open', false)
@@ -1096,6 +1056,10 @@ function handleOk() {
 
 <style lang="less" scoped>
 @import './inventoryLineEditModal.less';
+
+.entry-mode-item {
+  margin-bottom: 12px;
+}
 
 .vl-tip {
   margin-top: 6px;
