@@ -203,12 +203,12 @@
               </a-form-item>
             </a-col>
             <a-col :span="6">
-              <a-form-item label="提醒日期" :class="{ 'is-changed': !!headerDiffs.reminderDate }">
+              <a-form-item label="交货日期" :class="{ 'is-changed': !!headerDiffs.reminderDate }">
                 <a-date-picker
                   v-model:value="form.header.reminderDate"
                   size="small"
                   style="width: 100%"
-                  placeholder="请选择 提醒日期"
+                  placeholder="请选择 交货日期"
                 />
                 <FieldChangeHint :diff="headerDiffs.reminderDate" />
               </a-form-item>

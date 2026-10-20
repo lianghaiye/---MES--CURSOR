@@ -52,7 +52,7 @@ export const ORDER_CHANGE_HEADER_LABELS = {
   deliveryAddress: '交货地址',
   deliveryMethod: '交货方式',
   techSpecCode: '技术规范编码',
-  reminderDate: '提醒日期',
+  reminderDate: '交货日期',
   salesperson: '业务员',
   settlementType: '结算类型',
   paymentRatio: '付款比例',

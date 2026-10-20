@@ -87,7 +87,7 @@ const fields = computed(() => {
         o.orderDiscountTotal > 0 ? `￥${Number(o.orderDiscountTotal).toFixed(2)}` : '—',
     },
     { key: 'techSpecCode', label: '技术规范编码' },
-    { key: 'reminderDate', label: '提醒日期' },
+    { key: 'reminderDate', label: '交货日期' },
     { key: 'salesperson', label: '业务员' },
     { key: 'settlementType', label: '结算类型' },
     { key: 'paymentRatio', label: '付款比例' },

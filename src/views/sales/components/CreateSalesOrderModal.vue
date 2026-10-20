@@ -129,12 +129,13 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="提醒日期">
+                <a-form-item label="交货日期">
                   <a-date-picker
                     v-model:value="form.reminderDate"
                     size="small"
                     style="width: 100%"
-                    placeholder="请选择 提醒日期"
+                    placeholder="请选择 交货日期"
+                    @change="onHeaderDeliveryDateChange"
                   />
                 </a-form-item>
               </a-col>
@@ -776,7 +777,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { message, Upload } from 'ant-design-vue'
+import { message, Modal, Upload } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import {
   PlusOutlined,
@@ -1223,6 +1224,7 @@ watch(
         return
       }
       const r = props.editRecord
+      prevHeaderDeliveryDate.value = r.reminderDate || ''
       Object.assign(form, {
         orderNo: r.orderNo,
         urgency: r.urgency,
@@ -1320,6 +1322,7 @@ function resetForm() {
   form.deliveryMethod = '送货'
   form.techSpecCode = ''
   form.reminderDate = null
+  prevHeaderDeliveryDate.value = ''
   form.salesperson = 'admin1'
   form.settlementType = undefined
   form.paymentRatio = undefined
@@ -1459,6 +1462,39 @@ function onLineDateChange(record, date) {
   record.deliveryDate = date ? date.format('YYYY-MM-DD') : ''
 }
 
+const prevHeaderDeliveryDate = ref(null)
+
+function headerDeliveryDateText() {
+  return form.reminderDate ? form.reminderDate.format('YYYY-MM-DD') : ''
+}
+
+/** 表头交货日期变更：询问是否同步明细（对齐入库单表头仓库） */
+function onHeaderDeliveryDateChange(date) {
+  const newVal = date ? date.format('YYYY-MM-DD') : ''
+  const oldVal = prevHeaderDeliveryDate.value || ''
+  prevHeaderDeliveryDate.value = newVal
+  if (newVal === oldVal || !form.lineItems.length) return
+  Modal.confirm({
+    title: '交货日期已修改，是否同步修改明细交货日期？',
+    okText: '是',
+    cancelText: '否',
+    onOk: () => {
+      form.lineItems.forEach((line) => {
+        line.deliveryDate = newVal
+      })
+    },
+  })
+}
+
+function applyHeaderDeliveryDateToLine(line) {
+  if (!line) return line
+  const headerDate = headerDeliveryDateText()
+  if (headerDate && !line.deliveryDate) {
+    line.deliveryDate = headerDate
+  }
+  return line
+}
+
 function toggleTaxMode() {
   taxModeExcluding.value = !taxModeExcluding.value
   recalcAll()
@@ -1588,7 +1624,9 @@ function onSpuDraftSelected(rows) {
       salesQty: 1,
       taxRate: 13,
       bomFulfillmentPath: BOM_FULFILLMENT_PATH.DESIGN_REQUIRED,
+      deliveryDate: headerDeliveryDateText(),
     })
+    applyHeaderDeliveryDateToLine(line)
     recalcLine(line)
     form.lineItems.push(line)
     added += 1
@@ -1658,6 +1696,7 @@ function mapPickerToSalesLine(payload) {
     priceSource: pricing.priceSource,
     unitPriceExTax: 0,
     unitPriceInTax: 0,
+    deliveryDate: headerDeliveryDateText(),
   })
 }
 
@@ -1696,6 +1735,7 @@ function addManualProductLine() {
     salesQty: 1,
     taxRate: 13,
     unit: '件',
+    deliveryDate: headerDeliveryDateText(),
   })
   recalcLine(line)
   form.lineItems.push(line)
