@@ -89,7 +89,7 @@ const bomStrategyOpts = Object.entries(SPU_BOM_STRATEGY_LABELS).map(([value, lab
 const bomStrategyHelp = computed(
   () =>
     SPU_BOM_STRATEGY_HELPS[form.bomStrategy] ||
-    '同类变体共用结构 → 建族模板 +「继承」；特殊 SKU 再建独立 BOM。销售投产仅认 SKU 自有生效 BOM。',
+    '同类变体共用结构 → 建族模板 +「继承」；SKU 建产品 BOM / 设计任务可带入族基准；特殊 SKU 再建独立 BOM。销售投产仅认 SKU 自有生效 BOM。',
 )
 
 const axisSourceOpts = [

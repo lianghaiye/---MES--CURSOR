@@ -24,7 +24,10 @@
           </a-col>
           <a-col :span="6">
             <a-form-item label="货位编码" name="code" required>
-              <a-input v-model:value="form.code" placeholder="如 YL-A-01-01-01" />
+              <a-input
+                v-model:value="form.code"
+                placeholder="如 YL-A-01-01-01 或带位 YL-A-01-01-01-01"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="6">
@@ -93,7 +96,7 @@
           </a-col>
           <a-col :span="6">
             <a-form-item label="位">
-              <a-input v-model:value="form.bin" placeholder="01" />
+              <a-input v-model:value="form.bin" allow-clear placeholder="可选，不填则不管到位" />
             </a-form-item>
           </a-col>
           <a-col :span="6">
@@ -183,7 +186,7 @@ const form = reactive({
   aisle: '01',
   rack: '01',
   level: '01',
-  bin: '01',
+  bin: '',
   maxQty: null,
   maxWeight: null,
   enabled: true,
@@ -229,7 +232,7 @@ watch(
     form.aisle = r?.aisle || '01'
     form.rack = r?.rack || '01'
     form.level = r?.level || '01'
-    form.bin = r?.bin || '01'
+    form.bin = r?.bin != null ? String(r.bin) : ''
     form.maxQty = r?.maxQty ?? null
     form.maxWeight = r?.maxWeight ?? null
     form.enabled = r?.enabled !== false

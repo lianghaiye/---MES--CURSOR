@@ -8,8 +8,14 @@ import {
 } from '@/constants/ecnPlanReschedule'
 import { productionPlanState, addProductionPlan } from '@/store/productionPlanStore'
 import { getOwnActiveBomForItem, getProductBomById } from '@/store/productBomStore'
-import { workOrderState, updateWorkOrder } from '@/store/workOrderStore'
-import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
+import {
+  workOrderState,
+  updateWorkOrder,
+  addWorkOrdersFromPlanRows,
+  addOutsourceWorkOrdersFromPlanRows,
+} from '@/store/workOrderStore'
+import { buildEbomSnapshotFromBom, createPlanMaterial } from '@/utils/ebomSnapshot'
+import { ECN_CHANGE_ITEM_TYPE } from '@/constants/ecn'
 import { flattenMaterials } from '@/utils/material'
 import { enrichWorkItem } from '@/utils/productionPlanWorkItem'
 import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
@@ -18,8 +24,27 @@ function matchProduct(wi, ecn) {
   if (!wi || !ecn) return false
   if (ecn.productId && wi.productId && String(wi.productId) === String(ecn.productId)) return true
   if (ecn.productCode && wi.productCode && wi.productCode === ecn.productCode) return true
-  if (ecn.previousBomId && wi.bomId && String(wi.bomId) === String(ecn.previousBomId)) return true
   return false
+}
+
+/** 计划必须落在本张 ECN 选定的销售订单上（有单号时） */
+function planInEcnScope(plan, ecn) {
+  const so = String(ecn?.salesOrderNo || '').trim()
+  if (!so) return true
+  return plan?.salesOrderNo === so || plan?.orderNo === so
+}
+
+function workOrderInEcnScope(wo, ecn) {
+  const so = String(ecn?.salesOrderNo || '').trim()
+  if (so) {
+    const src = wo?.sourceOrderNo || wo?.salesOrderNo || ''
+    if (src && src !== so) return false
+  }
+  if (ecn?.originType === 'work_order') {
+    const code = ecn.workOrderCode || ecn.workOrderNo
+    if (code && wo?.code !== code && String(wo?.id) !== String(ecn.workOrderId || '')) return false
+  }
+  return true
 }
 
 function collectReleaseStatusMap(materials) {
@@ -82,6 +107,7 @@ export function analyzeEcnPlanImpact(ecn) {
   const pendingSpecRows = []
 
   productionPlanState.plans.forEach((plan) => {
+    if (!planInEcnScope(plan, ecn)) return
     ;(plan.workItems || []).forEach((wi) => {
       if (!matchProduct(wi, ecn)) return
 
@@ -130,6 +156,7 @@ export function analyzeEcnPlanImpact(ecn) {
 
   const workOrderRows = []
   workOrderState.orders.forEach((wo) => {
+    if (!workOrderInEcnScope(wo, ecn)) return
     const byProduct =
       (ecn.productId && String(wo.productId) === String(ecn.productId)) ||
       (ecn.productCode && wo.productCode === ecn.productCode)
@@ -200,12 +227,232 @@ export function refreshWorkItemFromActiveBom(workItem, ecn, options = {}) {
   return { ok: true, bomId: bom.id, bomVersion: workItem.bomVersion }
 }
 
+function listScopedWorkItems(ecn) {
+  const rows = []
+  productionPlanState.plans.forEach((plan) => {
+    if (!planInEcnScope(plan, ecn)) return
+    ;(plan.workItems || []).forEach((wi) => {
+      if (!matchProduct(wi, ecn)) return
+      rows.push({ plan, wi })
+    })
+  })
+  return rows
+}
+
+function findWorkOrdersByCode(ecn, code) {
+  const materialCode = String(code || '').trim()
+  if (!materialCode) return []
+  return workOrderState.orders.filter((wo) => {
+    if (!workOrderInEcnScope(wo, ecn)) return false
+    if (wo.status === '终止') return false
+    return wo.materialCode === materialCode || wo.productCode === materialCode
+  })
+}
+
+function findPlanMaterialsByCode(pairs, code) {
+  const materialCode = String(code || '').trim()
+  if (!materialCode) return []
+  const hits = []
+  pairs.forEach(({ plan, wi }) => {
+    const flat = []
+    flattenMaterials(wi.materials || [], flat)
+    flat.forEach((material) => {
+      if (material.code === materialCode) hits.push({ plan, wi, material })
+    })
+  })
+  return hits
+}
+
+function materialLabel(code, name, spec, qty) {
+  if (!code && !name) return '—'
+  const head = [code, name].filter(Boolean).join(' ')
+  const tail = [spec, qty != null && qty !== '' ? `用量 ${qty}` : ''].filter(Boolean).join(' · ')
+  return tail ? `${head}（${tail}）` : head
+}
+
+function isStartedWorkOrder(wo) {
+  return wo && !['待下发', '已完成', '完成', '终止'].includes(wo.status)
+}
+
 /**
- * 重排选中的计划工作项，并可选作废待下发工单
+ * 按 ECN 变更项对比旧料执行情况：未下发可取消、待下发可作废、新料可排产
+ */
+export function buildEcnChangeLineRows(ecn) {
+  if (!ecn) return []
+  const pairs = listScopedWorkItems(ecn)
+  return (ecn.changeItems || []).map((item, index) => {
+    const changeType = item.changeType || ECN_CHANGE_ITEM_TYPE.MODIFY
+    const beforeCode = item.origMaterialCode || ''
+    const afterCode = item.newMaterialCode || ''
+    const dropsOld =
+      changeType === ECN_CHANGE_ITEM_TYPE.REMOVE || changeType === ECN_CHANGE_ITEM_TYPE.REPLACE
+    const bringsNew =
+      changeType === ECN_CHANGE_ITEM_TYPE.ADD || changeType === ECN_CHANGE_ITEM_TYPE.REPLACE
+    const oldWos = findWorkOrdersByCode(ecn, beforeCode)
+    const pendingWo = oldWos.find((wo) => wo.status === '待下发')
+    const startedWo = oldWos.find((wo) => isStartedWorkOrder(wo))
+    const planHits = findPlanMaterialsByCode(pairs, beforeCode)
+    const newHits = findPlanMaterialsByCode(pairs, afterCode)
+    const supplyForm =
+      item.supplyForm || planHits[0]?.material?.supplyType || newHits[0]?.material?.supplyType || ''
+
+    let oldSituation = '计划中无此料'
+    if (changeType === ECN_CHANGE_ITEM_TYPE.ADD) {
+      oldSituation = '新增，无旧料'
+    } else if (startedWo) {
+      oldSituation = `工单 ${startedWo.code} ${startedWo.status}`
+    } else if (pendingWo) {
+      oldSituation = `工单 ${pendingWo.code} 待下发`
+    } else if (planHits.length) {
+      oldSituation = '计划未下发'
+    }
+
+    const canVoid = Boolean(pendingWo) && (dropsOld || changeType === ECN_CHANGE_ITEM_TYPE.MODIFY)
+    const canCancelPlan = dropsOld && planHits.length > 0 && !pendingWo && !startedWo
+    const canSchedule =
+      bringsNew && Boolean(afterCode) && !findWorkOrdersByCode(ecn, afterCode).length
+    const blocked = Boolean(startedWo) && dropsOld
+
+    let suggest = '随计划重排更新'
+    if (blocked) suggest = '已开工，需人工处理'
+    else if (changeType === ECN_CHANGE_ITEM_TYPE.REMOVE && canVoid) suggest = '作废待下发工单'
+    else if (changeType === ECN_CHANGE_ITEM_TYPE.REMOVE && canCancelPlan) suggest = '取消未下发排产'
+    else if (changeType === ECN_CHANGE_ITEM_TYPE.REMOVE) suggest = '旧料未开单，随新 BOM 移除'
+    else if (changeType === ECN_CHANGE_ITEM_TYPE.REPLACE) {
+      const parts = []
+      if (canVoid) parts.push('作废旧工单')
+      if (canCancelPlan) parts.push('取消旧料排产')
+      if (canSchedule) parts.push('新料排产')
+      suggest = parts.join('，') || '替换后按新料排产'
+    } else if (changeType === ECN_CHANGE_ITEM_TYPE.ADD) {
+      suggest = canSchedule ? '新料可排产' : '新料已有工单'
+    } else if (canVoid) {
+      suggest = '作废待下发后按新 BOM 重排'
+    }
+
+    return {
+      key: item.id || `ci-${index}`,
+      changeType,
+      beforeText: materialLabel(
+        beforeCode,
+        item.origMaterialName,
+        item.origSpecModel,
+        item.origUnitQty,
+      ),
+      afterText:
+        changeType === ECN_CHANGE_ITEM_TYPE.REMOVE
+          ? '—'
+          : materialLabel(afterCode, item.newMaterialName, item.newSpecModel, item.newUnitQty),
+      oldSituation,
+      suggest,
+      supplyForm,
+      canVoid,
+      canCancelPlan,
+      canSchedule,
+      blocked,
+      pendingWoId: pendingWo?.id || '',
+      beforeCode,
+      afterCode,
+      planId: (planHits[0] || newHits[0] || pairs[0])?.plan?.id || '',
+      workItemId: (planHits[0] || newHits[0] || pairs[0])?.wi?.id || '',
+    }
+  })
+}
+
+function cancelUnreleasedMaterial(ecn, row) {
+  const pairs = listScopedWorkItems(ecn)
+  const hits = findPlanMaterialsByCode(pairs, row.beforeCode)
+  hits.forEach(({ material }) => {
+    material.joinPlan = '否'
+    material.status = '不转产'
+    material.planQty = 0
+    material.cancelledByEcnNo = ecn.ecnNo || ecn.ecrNo || ''
+  })
+  return hits.length
+}
+
+function ensureNewPlanMaterial(ecn, row) {
+  const pairs = listScopedWorkItems(ecn)
+  const existing = findPlanMaterialsByCode(pairs, row.afterCode)
+  if (existing.length) return existing[0]
+  const host = pairs[0]
+  if (!host) return null
+  const item = (ecn.changeItems || []).find((ci) => (ci.id || '') === row.key) || {}
+  const qty = Number(host.wi.planQty ?? host.wi.orderQty ?? host.wi.salesQty) || 1
+  const unitUsage = Number(item.newUnitQty) || 1
+  const supplyType = item.supplyForm || '自制件'
+  const material = createPlanMaterial({
+    name: item.newMaterialName || row.afterCode,
+    code: row.afterCode,
+    spec: item.newSpecModel || '',
+    material: item.newMaterial || '',
+    drawingNo: item.newDrawingNo || '',
+    unitUsage,
+    supplyType,
+    demandQty: unitUsage * qty,
+    planQty: unitUsage * qty,
+    joinPlan: '是',
+    status: '待下达',
+    remark: `ECN ${ecn.ecnNo || ''} 新增`,
+  })
+  if (!Array.isArray(host.wi.materials)) host.wi.materials = []
+  host.wi.materials.push(material)
+  return { plan: host.plan, wi: host.wi, material }
+}
+
+function scheduleNewMaterial(ecn, row) {
+  const hit = ensureNewPlanMaterial(ecn, row)
+  if (!hit) return { scheduled: false, message: '没有可挂接的生产计划' }
+  const { plan, material } = hit
+  material.joinPlan = '是'
+  material.status = '待下达'
+  material.releaseStatus = MATERIAL_RELEASE_STATUS.RELEASABLE
+  material.phase2Deferred = false
+  const supply = material.supplyType || row.supplyForm || ''
+  const sourceOrder = {
+    orderNo: plan.salesOrderNo || plan.orderNo,
+    planSource: plan.planSource || '',
+    salesOrderId: plan.salesOrderId || '',
+  }
+  const planRow = {
+    code: material.code,
+    productName: material.name,
+    planQty: material.planQty,
+    spec: material.spec,
+    material: material.material,
+    drawingNo: material.drawingNo,
+    workCenter: material.workCenter,
+    warehouse: material.warehouse,
+    urgency: plan.urgency,
+    remark: material.remark,
+    processRoute: material.processRoute,
+    supplier: material.supplier,
+    workItemId: hit.wi.id,
+    bomId: hit.wi.bomId,
+  }
+  if (supply === '外协件') {
+    addOutsourceWorkOrdersFromPlanRows([planRow], sourceOrder)
+  } else if (supply === '外购件' || supply === '外购') {
+    return { scheduled: true, purchase: true }
+  } else {
+    addWorkOrdersFromPlanRows([planRow], sourceOrder)
+  }
+  return { scheduled: true, purchase: false }
+}
+
+/**
+ * 重排选中的计划工作项，并按变更行作废 / 取消 / 排产
  * @param {object} ecn
- * @param {{ workItemKeys?: string[], cancelWorkOrderIds?: string[] }} selection
+ * @param {{ workItemKeys?: string[], cancelWorkOrderIds?: string[], lineActionKeys?: string[] }} selection
  */
 export function rescheduleEcnImpact(ecn, selection = {}) {
+  const lineRows = buildEcnChangeLineRows(ecn)
+  const actionKeys = new Set(selection.lineActionKeys || [])
+  const voidIds = new Set(selection.cancelWorkOrderIds || [])
+  lineRows.forEach((row) => {
+    if (actionKeys.has(`void:${row.key}`) && row.pendingWoId) voidIds.add(row.pendingWoId)
+  })
+
   const impact = analyzeEcnPlanImpact(ecn)
   const keySet = new Set(selection.workItemKeys || [])
   const targets = impact.workItemRows.filter((r) => r.canReschedule && keySet.has(r.key))
@@ -229,7 +476,7 @@ export function rescheduleEcnImpact(ecn, selection = {}) {
   })
 
   let cancelledWo = 0
-  ;(selection.cancelWorkOrderIds || []).forEach((id) => {
+  voidIds.forEach((id) => {
     const wo = workOrderState.orders.find((o) => o.id === id)
     if (!wo || wo.status !== '待下发') return
     updateWorkOrder(id, {
@@ -240,6 +487,19 @@ export function rescheduleEcnImpact(ecn, selection = {}) {
       supersededByEcnNo: ecn.ecnNo || '',
     })
     cancelledWo += 1
+  })
+
+  let cancelledPlan = 0
+  let scheduled = 0
+  lineRows.forEach((row) => {
+    if (actionKeys.has(`cancel:${row.key}`)) {
+      const n = cancelUnreleasedMaterial(ecn, row)
+      cancelledPlan += n > 0 ? 1 : 0
+    }
+    if (actionKeys.has(`schedule:${row.key}`)) {
+      const res = scheduleNewMaterial(ecn, row)
+      if (res.scheduled) scheduled += 1
+    }
   })
 
   if (ecn) {
@@ -255,11 +515,20 @@ export function rescheduleEcnImpact(ecn, selection = {}) {
     ecn.rescheduleSummary = {
       refreshed,
       cancelledWo,
+      cancelledPlan,
+      scheduled,
       errors: errors.length,
     }
   }
 
-  return { ok: errors.length === 0 || refreshed > 0, refreshed, cancelledWo, errors }
+  return {
+    ok: errors.length === 0 || refreshed > 0 || cancelledWo > 0 || scheduled > 0,
+    refreshed,
+    cancelledWo,
+    cancelledPlan,
+    scheduled,
+    errors,
+  }
 }
 
 /**

@@ -446,11 +446,64 @@ function finalizeOrders(orders) {
     migrateWorkOrderStatusFields(normalizeWorkOrderScheduleFields(o)),
   )
 }
+function ensureEcnCoverDemoWorkOrders(orders) {
+  const specs = [
+    {
+      id: 'wo-ecn-cover-impeller',
+      code: 'WO-ECN-COVER-01',
+      productName: '叶轮',
+      materialCode: '010050003',
+      status: '待下发',
+      planQty: 3,
+      remark: 'ECN演示：叶轮用量变更，待下发可作废',
+    },
+    {
+      id: 'wo-ecn-cover-seal',
+      code: 'WO-ECN-COVER-02',
+      productName: '机械密封组件',
+      materialCode: '010050004',
+      status: '执行中',
+      planQty: 3,
+      scheduleQty: 3,
+      remark: 'ECN演示：旧密封已开工，替换需人工处理',
+    },
+    {
+      id: 'wo-ecn-cover-bolt',
+      code: 'WO-ECN-COVER-03',
+      productName: '地脚螺栓组',
+      materialCode: '010050006',
+      status: '待下发',
+      planQty: 3,
+      remark: 'ECN演示：取消地脚螺栓，待下发可作废',
+    },
+  ]
+  specs.forEach((spec) => {
+    const row = {
+      orderCategory: '生产工单',
+      scheduleQty: 0,
+      actualQty: 0,
+      workCenter: '机加车间',
+      source: 'production-plan',
+      sourceOrderNo: '1-20260512-005',
+      createdAt: '2026-06-20',
+      processes: [],
+      scheduleBatches: [],
+      ...spec,
+    }
+    const existing = orders.find((o) => o.id === spec.id)
+    if (existing) Object.assign(existing, row)
+    else orders.unshift(row)
+  })
+  return orders
+}
+
 export const workOrderState = reactive({
   orders: finalizeOrders(
-    loadedOrders
-      ? ensureDemoWorkOrder(ensureLaborDemoProductionOrders(loadedOrders))
-      : createInitialOrders(),
+    ensureEcnCoverDemoWorkOrders(
+      loadedOrders
+        ? ensureDemoWorkOrder(ensureLaborDemoProductionOrders(loadedOrders))
+        : createInitialOrders(),
+    ),
   ),
 })
 

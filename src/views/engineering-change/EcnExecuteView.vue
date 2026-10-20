@@ -8,7 +8,9 @@
               <ArrowLeftOutlined />
             </a-button>
             <span class="page-title">执行工程变更</span>
-            <a-tag color="success">审批已通过</a-tag>
+            <a-tag :color="isExecuted ? 'success' : 'blue'">
+              {{ isExecuted ? record.status : '审批已通过' }}
+            </a-tag>
           </div>
         </div>
 
@@ -31,11 +33,21 @@
           <span v-else class="empty-text">—</span>
         </div>
 
-        <div v-if="!isReadonly" class="page-footer">
+        <div class="section-card">
+          <EcnExecuteRescheduleSection
+            :record="record"
+            :readonly="rescheduleDone"
+            :refresh-key="refreshKey"
+            v-model:work-item-keys="workItemKeys"
+            v-model:line-action-keys="lineActionKeys"
+          />
+        </div>
+
+        <div v-if="!rescheduleDone" class="page-footer">
           <a-space>
             <a-button @click="goBack">取消</a-button>
             <a-button type="primary" :loading="submitting" @click="handleExecute">
-              确认执行
+              {{ isExecuted ? '确认重排' : '确认执行并重排' }}
             </a-button>
           </a-space>
         </div>
@@ -54,51 +66,70 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { ECN_STATUS, findExecConfigOption } from '@/constants/ecn'
+import { ECN_RESCHEDULE_STATUS } from '@/constants/ecnPlanReschedule'
 import { resolveChangeRequestModule } from '@/constants/changeRequestModule'
+import { rescheduleEcnImpact } from '@/utils/ecnPlanImpact'
 import EcnChangeItemsReadonlyTable from './components/EcnChangeItemsReadonlyTable.vue'
+import EcnExecuteRescheduleSection from './components/EcnExecuteRescheduleSection.vue'
 
 const route = useRoute()
 const router = useRouter()
 const moduleConfig = resolveChangeRequestModule(route)
 const submitting = ref(false)
+const refreshKey = ref(0)
+const workItemKeys = ref([])
+const lineActionKeys = ref([])
 
 const record = computed(() => moduleConfig.store.findById(route.params.id))
 const changeItems = computed(() => record.value?.changeItems || [])
 const execConfig = computed(() => findExecConfigOption(record.value?.wipHandling))
 
-const isReadonly = computed(
+const isExecuted = computed(
   () =>
     record.value?.status === ECN_STATUS.EXECUTING || record.value?.status === ECN_STATUS.EXECUTED,
 )
+
+const rescheduleDone = computed(() => record.value?.rescheduleStatus === ECN_RESCHEDULE_STATUS.DONE)
 
 function goBack() {
   router.push(moduleConfig.listPath)
 }
 
+function applyReschedule() {
+  return rescheduleEcnImpact(record.value, {
+    workItemKeys: workItemKeys.value,
+    lineActionKeys: lineActionKeys.value,
+  })
+}
+
 function handleExecute() {
   submitting.value = true
-  const res = moduleConfig.store.startExecution(record.value.id, {})
-  if (!res.ok) {
-    submitting.value = false
-    message.warning(res.message)
-    return
+  const wasExecuted = isExecuted.value
+  if (!wasExecuted) {
+    const res = moduleConfig.store.startExecution(record.value.id, {})
+    if (!res.ok) {
+      submitting.value = false
+      message.warning(res.message)
+      return
+    }
+    const done = moduleConfig.store.completeExecution(record.value.id)
+    if (!done?.ok) {
+      submitting.value = false
+      message.warning(done?.message || '执行失败')
+      return
+    }
   }
-  const done = moduleConfig.store.completeExecution(record.value.id)
+  const reshaped = applyReschedule()
   submitting.value = false
-  if (!done?.ok) {
-    message.warning(done?.message || '执行失败')
-    return
-  }
-  const can = done.planImpact?.summary?.workItemCanReschedule || 0
-  const started = done.planImpact?.summary?.workItemStarted || 0
-  message.success(
-    can || started ? `变更已执行，发现 ${can} 项可重排、${started} 项已开工` : '变更已执行',
-  )
-  const impactPath = moduleConfig.impactPath?.(record.value.id)
-  if (impactPath) {
-    router.push(impactPath)
-    return
-  }
+  refreshKey.value += 1
+  const parts = []
+  if (!wasExecuted) parts.push('变更已执行')
+  if (reshaped.refreshed) parts.push(`已重排 ${reshaped.refreshed} 个工作项`)
+  if (reshaped.cancelledWo) parts.push(`已作废 ${reshaped.cancelledWo} 张待下发工单`)
+  if (reshaped.cancelledPlan) parts.push(`已取消 ${reshaped.cancelledPlan} 条未下发物料`)
+  if (reshaped.scheduled) parts.push(`已排产 ${reshaped.scheduled} 条新料`)
+  if (!parts.length) parts.push('没有勾选可重排项')
+  message.success(parts.join('，'))
   goBack()
 }
 </script>

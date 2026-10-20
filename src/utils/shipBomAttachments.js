@@ -355,13 +355,14 @@ export function attachmentShipStatusColor(status) {
   return map[status] || 'default'
 }
 
-/** 格式：已发/已申请/计划 */
+/** 格式：已出库 / 待发货占用 / 计划（对齐整机发货进度） */
 export function formatAttachmentShipProgress(shippedQty, appliedQty, planQty) {
   const shipped = Number(shippedQty) || 0
   const applied = Number(appliedQty) || 0
+  const pending = Math.max(0, Math.round((applied - shipped) * 10000) / 10000)
   const plan = Number(planQty) || 0
   if (!plan && !applied && !shipped) return '—'
-  return `${shipped} / ${applied} / ${plan || '—'}`
+  return `${shipped} / ${pending} / ${plan || '—'}`
 }
 
 /**

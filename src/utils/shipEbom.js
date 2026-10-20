@@ -330,9 +330,12 @@ function formatProgressQty(val) {
   return n.toFixed(3).replace(/\.?0+$/, '')
 }
 
-/** 物料发货进度：已发 / 已申请 / 订单需求（与整机口径一致） */
+/** 物料发货进度：已出库 / 待发货占用 / 订单需求（与整机口径一致） */
 export function formatMaterialShipProgress(shippedQty, appliedQty, orderDemandQty) {
-  return `${formatProgressQty(shippedQty)} / ${formatProgressQty(appliedQty)} / ${formatProgressQty(orderDemandQty)}`
+  const shipped = Number(shippedQty) || 0
+  const applied = Number(appliedQty) || 0
+  const pending = Math.max(0, Math.round((applied - shipped) * 10000) / 10000)
+  return `${formatProgressQty(shipped)} / ${formatProgressQty(pending)} / ${formatProgressQty(orderDemandQty)}`
 }
 
 /** 散件发货进度：已发物料数 / EBOM 需发物料需求数之和 */

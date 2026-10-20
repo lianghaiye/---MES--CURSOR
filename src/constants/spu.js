@@ -11,7 +11,7 @@ export const SPU_BOM_STRATEGY_LABELS = {
 
 export const SPU_BOM_STRATEGY_HELPS = {
   [SPU_BOM_STRATEGY.INHERIT]:
-    '族模板供设计任务预填参考；销售投产仅认 SKU 自有生效 BOM。结构共用时推荐；特殊 SKU 再建独立 BOM。',
+    '族基准 BOM 可供设计任务、以及为族下 SKU 配置产品 BOM 时带入骨架；销售投产仍仅认 SKU 自有生效 BOM。结构共用时推荐；特殊 SKU 再建独立 BOM。',
   [SPU_BOM_STRATEGY.INDEPENDENT]: '不走族模板，每个 SKU 各自维护 BOM。',
 }
 

@@ -19,6 +19,11 @@
           </a-space>
         </div>
 
+        <p class="scope-line">
+          范围仅限本单：销售订单 {{ record.salesOrderNo || '—' }} · 产品
+          {{ record.productName || record.productCode || '—' }}
+        </p>
+
         <div class="summary-row">
           <div class="summary-card">
             <div class="n">{{ impact.summary.planCount }}</div>
@@ -347,6 +352,11 @@ function goPlan(planId) {
 
 .page-sub {
   color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+}
+
+.scope-line {
+  margin: 0 0 12px;
   font-size: 13px;
 }
 

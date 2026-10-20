@@ -87,7 +87,9 @@
             <template v-if="column.key === 'shipProgress'">
               <span>
                 发货进度
-                <a-tooltip title="已发货数量 / 已申请数量 / 计划数量（订单套数×单位用量）">
+                <a-tooltip
+                  title="已出库数量 / 待发货（待出库申请占用） / 计划数量（订单套数×单位用量）"
+                >
                   <QuestionCircleOutlined class="th-tip-icon" />
                 </a-tooltip>
               </span>

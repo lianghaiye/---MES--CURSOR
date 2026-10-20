@@ -9,7 +9,9 @@
     @ok="handleOk"
     @cancel="emit('update:open', false)"
   >
-    <p class="hint">按库区、通道、货架、层、位生成编码，格式：前缀-库区-通道-货架-层-位。</p>
+    <p class="hint">
+      按库区、通道、货架、层生成编码；勾选「生成到位」时追加位段：前缀-库区-通道-货架-层[-位]。
+    </p>
     <a-form layout="vertical" :model="form">
       <a-form-item label="所属仓库" required>
         <a-select
@@ -66,13 +68,24 @@
         <a-col :span="12">
           <a-form-item label="位（起-止）">
             <a-input-group compact>
-              <a-input-number v-model:value="form.binFrom" :min="1" style="width: 50%" />
-              <a-input-number v-model:value="form.binTo" :min="1" style="width: 50%" />
+              <a-input-number
+                v-model:value="form.binFrom"
+                :min="1"
+                :disabled="!form.includeBin"
+                style="width: 50%"
+              />
+              <a-input-number
+                v-model:value="form.binTo"
+                :min="1"
+                :disabled="!form.includeBin"
+                style="width: 50%"
+              />
             </a-input-group>
           </a-form-item>
         </a-col>
       </a-row>
-      <a-space>
+      <a-space wrap>
+        <a-checkbox v-model:checked="form.includeBin">生成到位（不勾选则管到层）</a-checkbox>
         <a-checkbox v-model:checked="form.mixSku">允许混放SKU</a-checkbox>
         <a-checkbox v-model:checked="form.mixBatch">允许混放批次</a-checkbox>
       </a-space>
@@ -110,6 +123,7 @@ const form = reactive({
   rackTo: 1,
   levelFrom: 1,
   levelTo: 1,
+  includeBin: true,
   binFrom: 1,
   binTo: 2,
   mixSku: true,
@@ -141,6 +155,7 @@ watch(
     form.rackTo = 1
     form.levelFrom = 1
     form.levelTo = 1
+    form.includeBin = true
     form.binFrom = 1
     form.binTo = 2
   },

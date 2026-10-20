@@ -45,6 +45,19 @@
                 :pagination="false"
                 :scroll="{ x: wholeTableScrollX }"
               >
+                <template #headerCell="{ column }">
+                  <template v-if="column.key === 'shipProgress'">
+                    <span class="th-nowrap">
+                      发货进度
+                      <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
+                        <QuestionCircleOutlined class="th-tip-icon" />
+                      </a-tooltip>
+                    </span>
+                  </template>
+                  <template v-else>
+                    <span class="th-nowrap">{{ column.title }}</span>
+                  </template>
+                </template>
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                   <template v-else-if="column.key === 'lineShipStatus'">
@@ -103,6 +116,19 @@
                 :scroll="{ x: scatterTableScrollX }"
                 :default-expand-all-rows="true"
               >
+                <template #headerCell="{ column }">
+                  <template v-if="column.key === 'shipProgress'">
+                    <span class="th-nowrap">
+                      发货进度
+                      <a-tooltip :title="SHIP_PROGRESS_TOOLTIP">
+                        <QuestionCircleOutlined class="th-tip-icon" />
+                      </a-tooltip>
+                    </span>
+                  </template>
+                  <template v-else>
+                    <span class="th-nowrap">{{ column.title }}</span>
+                  </template>
+                </template>
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                   <template v-else-if="column.key === 'lineShipStatus'">
@@ -192,6 +218,21 @@
                 bordered
                 :pagination="false"
               >
+                <template #headerCell="{ column }">
+                  <template v-if="column.key === 'shipProgress'">
+                    <span class="th-nowrap">
+                      发货进度
+                      <a-tooltip
+                        title="已出库数量 / 待发货（待出库申请占用） / 计划数量（订单套数×单位用量）"
+                      >
+                        <QuestionCircleOutlined class="th-tip-icon" />
+                      </a-tooltip>
+                    </span>
+                  </template>
+                  <template v-else>
+                    <span class="th-nowrap">{{ column.title }}</span>
+                  </template>
+                </template>
                 <template #bodyCell="{ column, record: line, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
                   <template v-else-if="column.key === 'source'">
@@ -316,6 +357,7 @@ export default { name: 'DeliveryOrderDetailView' }
 
 <script setup>
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
+import { QuestionCircleOutlined } from '@ant-design/icons-vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tabStore, useTabs } from '@/composables/useTabs'
@@ -339,6 +381,7 @@ import {
   formatDeliveryPrice,
   formatDeliveryWeight,
   formatShipProgress,
+  SHIP_PROGRESS_TOOLTIP,
   lineShipStatusColor,
   recalcDeliveryLine,
 } from '@/utils/deliveryLine'
@@ -699,6 +742,19 @@ function goSalesOrder() {
   :deep(.ant-table-thead > tr > th) {
     white-space: nowrap;
   }
+}
+
+.th-nowrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.th-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
 }
 
 .scatter-picks-panel {

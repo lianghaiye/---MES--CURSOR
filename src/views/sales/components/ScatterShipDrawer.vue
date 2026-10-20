@@ -71,7 +71,7 @@
           <template v-else-if="column.key === 'shipProgress'">
             <span>
               发货进度
-              <a-tooltip title="已确认出库数量 / 已申请数量 / 订单需求数量">
+              <a-tooltip title="已出库数量 / 待发货（待出库申请占用） / 订单需求数量">
                 <QuestionCircleOutlined class="th-tip-icon" />
               </a-tooltip>
             </span>

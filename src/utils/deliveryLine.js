@@ -61,14 +61,27 @@ export function formatDeliveryQtyInt(val) {
 }
 
 /**
- * 发货进度：已确认出库数量 / 已占用数量（待出库申请+实际出库） / 订单数量
+ * 待发货占用 = 已占用总量 − 已出库（对齐采购「待入占用」）
+ * 例：申请出库未确认 → 0/申请量/销售；已出库 → 已出库/0/销售
  */
-export function formatShipProgress(confirmedOutboundQty, appliedShipQty, orderQty) {
-  return `${formatNumber(confirmedOutboundQty, 4, { empty: '-' })} / ${formatNumber(appliedShipQty, 4, { empty: '-' })} / ${formatNumber(orderQty, 4, { empty: '-' })}`
+export function calcPendingShipOccupyQty(confirmedOutboundQty, appliedShipQty) {
+  const confirmed = Number(confirmedOutboundQty) || 0
+  const applied = Number(appliedShipQty) || 0
+  return Math.max(0, Math.round((applied - confirmed) * 10000) / 10000)
 }
 
-export const SHIP_PROGRESS_TOOLTIP =
-  '格式：已确认出库数量 / 已占用数量（待出库按申请量占用，已出库按实际量占用） / 订单数量'
+/**
+ * 发货进度：已出库数量 / 待发货占用 / 销售数量（对齐采购入库进度）
+ * @param confirmedOutboundQty 已确认出库数量
+ * @param appliedShipQty 已占用总量（待出库申请 + 已出库）；展示时会折成待发货占用
+ * @param orderQty 销售数量
+ */
+export function formatShipProgress(confirmedOutboundQty, appliedShipQty, orderQty) {
+  const pending = calcPendingShipOccupyQty(confirmedOutboundQty, appliedShipQty)
+  return `${formatNumber(confirmedOutboundQty, 4, { empty: '-' })} / ${formatNumber(pending, 4, { empty: '-' })} / ${formatNumber(orderQty, 4, { empty: '-' })}`
+}
+
+export const SHIP_PROGRESS_TOOLTIP = '已出库数量 / 待发货（待出库申请占用，未确认出库） / 销售数量'
 
 /**
  * 是否锁定不可再申请：

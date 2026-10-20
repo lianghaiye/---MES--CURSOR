@@ -10,7 +10,7 @@
           </div>
           <a-space>
             <a-button v-if="showPlanImpactEntry" type="primary" size="small" @click="goPlanImpact">
-              计划影响与重排
+              继续重排
             </a-button>
             <a-button size="small" @click="printModalOpen = true">
               <PrinterOutlined />
@@ -127,13 +127,7 @@ function goBack() {
 }
 
 function goPlanImpact() {
-  const path = moduleConfig.impactPath?.(route.params.id)
-  if (!path) {
-    message.info('当前模块未配置计划影响页')
-    return
-  }
-  openTab(path, '计划影响与重排')
-  router.push(path)
+  router.push(moduleConfig.executePath(route.params.id))
 }
 
 function handleViewBom(item) {

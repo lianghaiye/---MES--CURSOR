@@ -167,7 +167,13 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'shipProgress'">
-            {{ formatShipProgress(record.shippedQty, record.orderQty) }}
+            {{
+              formatShipProgress(
+                record.confirmedOutboundQty ?? record.shippedQty,
+                record.appliedShipQty ?? record.shippedQty,
+                record.orderQty,
+              )
+            }}
           </template>
           <template v-else-if="column.key === 'orderQty'">
             {{ formatDeliveryQty(record.orderQty) }}

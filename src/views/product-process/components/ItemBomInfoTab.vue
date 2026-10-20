@@ -13,7 +13,7 @@
         <template v-else>
           <div class="bom-status-title is-empty">未关联自有生效 BOM</div>
           <div class="bom-status-meta">
-            销售「使用产品 BOM」需本 SKU 自有生效版本；族模板仅作设计参考，不可直接投产。
+            销售「使用产品 BOM」需本 SKU 自有生效版本；族基准可带入骨架，不可直接投产。
           </div>
         </template>
         <div v-if="variantHint" class="bom-variant-hint">{{ variantHint }}</div>
@@ -116,7 +116,7 @@ const spuTemplateHint = computed(() => {
   if (!spu?.baseBomId) return ''
   const tpl = getProductBomById(spu.baseBomId)
   const label = tpl?.bomNo || tpl?.bomName || spu.baseBomId
-  return `族模板：${label}（仅作设计参考，不直接投产）`
+  return `族模板：${label}（可带入 SKU 产品 BOM / 设计任务骨架，不直接投产）`
 })
 
 const columns = [

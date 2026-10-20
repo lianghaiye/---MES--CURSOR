@@ -8,7 +8,7 @@ import { analyzeEcnPlanImpact } from '@/utils/ecnPlanImpact'
 
 const api = createChangeRequestStore({
   storageKey: 'i_doms_ecn',
-  dataVersion: 10,
+  dataVersion: 11,
   buildMockRecords: buildMockEcnRecords,
   docNoField: 'ecnNo',
   docNoPrefix: 'ECN',

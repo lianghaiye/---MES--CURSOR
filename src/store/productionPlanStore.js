@@ -6,7 +6,7 @@ import { mockMaterials } from '@/mock/materialInfo'
 import { buildMockSalesOrders } from '@/mock/salesOrderSeed'
 import { buildInitialProductionPlans } from '@/mock/productionPlanSeed'
 import { getOwnActiveBomForItem, getProductBomById } from '@/store/productBomStore'
-import { buildEbomSnapshotFromBom } from '@/utils/ebomSnapshot'
+import { buildEbomSnapshotFromBom, createPlanMaterial } from '@/utils/ebomSnapshot'
 import { enrichWorkItem, resolveSalesLineForWorkItem } from '@/utils/productionPlanWorkItem'
 import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
 import { applyCrossDemoStockToPlanMaterials } from '@/mock/crossModuleDemoSeed'
@@ -76,7 +76,46 @@ function normalizePlanStatuses(orders) {
     firstSales._pendingDemoApplied = true
   }
 
-  return ensurePackageConvertDemoOnPlans(normalized)
+  return ensurePackageConvertDemoOnPlans(ensureEcnCoverPlanMaterials(normalized))
+}
+
+/** 让 ECN-DEMO-COVER 的修改/替换/取消能对上这张订单的计划物料 */
+function ensureEcnCoverPlanMaterials(plans) {
+  const plan = (plans || []).find(
+    (p) => p.salesOrderNo === '1-20260512-005' || p.orderNo === '1-20260512-005',
+  )
+  const wi = plan?.workItems?.find(
+    (w) => String(w.productName || '').includes('ISG50-160') || w.productCode === 'CP2610001',
+  )
+  if (!wi) return plans
+  if (!Array.isArray(wi.materials)) wi.materials = []
+  const flat = []
+  flattenMaterials(wi.materials, flat)
+  const codes = new Set(flat.map((m) => m.code))
+  const qty = Number(wi.planQty ?? wi.orderQty ?? wi.salesQty) || 1
+  const extras = [
+    { code: '010050003', name: '叶轮', supplyType: '自制件', spec: 'ISG50-160' },
+    { code: '010050004', name: '机械密封组件', supplyType: '外购件', spec: 'φ25×180mm' },
+    { code: '010050002', name: '泵盖', supplyType: '自制件', spec: 'ISG50-160' },
+    { code: '010050006', name: '地脚螺栓组', supplyType: '外购件', spec: 'M16' },
+  ]
+  extras.forEach((row) => {
+    if (codes.has(row.code)) return
+    wi.materials.push(
+      createPlanMaterial({
+        name: row.name,
+        code: row.code,
+        spec: row.spec,
+        supplyType: row.supplyType,
+        unitUsage: 1,
+        demandQty: qty,
+        planQty: qty,
+        joinPlan: '是',
+        status: '待下达',
+      }),
+    )
+  })
+  return plans
 }
 
 function loadFromStorage() {

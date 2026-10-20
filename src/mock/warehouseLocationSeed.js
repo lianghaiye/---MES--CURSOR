@@ -12,7 +12,7 @@ function loc(partial) {
     aisle: partial.aisle || '01',
     rack: partial.rack || '01',
     level: partial.level || '01',
-    bin: partial.bin || '01',
+    bin: partial.bin != null ? partial.bin : '01',
     mixSku: partial.mixSku !== false,
     mixBatch: partial.mixBatch !== false,
     maxQty: partial.maxQty ?? null,

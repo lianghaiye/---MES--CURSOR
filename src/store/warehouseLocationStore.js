@@ -42,13 +42,26 @@ watch(
   { deep: true },
 )
 
-function pad2(n) {
-  return String(n).padStart(2, '0')
+function normalizeSegment(v) {
+  if (v == null) return ''
+  return String(v).trim()
 }
 
+function pad2(n) {
+  const s = normalizeSegment(n)
+  if (!s) return ''
+  const num = Number(s)
+  if (Number.isFinite(num)) return String(Math.trunc(num)).padStart(2, '0')
+  return s
+}
+
+/** 编码：前缀-库区-通道-货架-层[-位]；位为空时不拼最后一段 */
 export function buildLocationCode({ prefix, zone, aisle, rack, level, bin }) {
   const zoneKey = String(zone || 'A').replace(/区$/, '')
-  return [prefix, zoneKey, pad2(aisle), pad2(rack), pad2(level), pad2(bin)].join('-')
+  const parts = [prefix, zoneKey, pad2(aisle), pad2(rack), pad2(level)].filter(Boolean)
+  const binSeg = pad2(bin)
+  if (binSeg) parts.push(binSeg)
+  return parts.join('-')
 }
 
 export function generateLocationPrefix(warehouse) {
@@ -137,7 +150,7 @@ function toRow(payload, warehouse, extra = {}) {
     aisle: payload.aisle || '01',
     rack: payload.rack || '01',
     level: payload.level || '01',
-    bin: payload.bin || '01',
+    bin: normalizeSegment(payload.bin),
     mixSku: payload.mixSku !== false,
     mixBatch: payload.mixBatch !== false,
     maxQty: payload.maxQty === '' || payload.maxQty == null ? null : Number(payload.maxQty),
@@ -208,7 +221,8 @@ export function setWarehouseLocationOccupy(id, occupyStatus) {
 }
 
 /**
- * 按库区/通道/货架/层/位批量生成货位（WMS 常见能力）
+ * 按库区/通道/货架/层[/位]批量生成货位。
+ * includeBin=false 时只生成到层，位为空、编码不含位段。
  */
 export function batchCreateWarehouseLocations(payload) {
   const warehouse = getWarehouseById(payload.warehouseId)
@@ -219,19 +233,26 @@ export function batchCreateWarehouseLocations(payload) {
   const rackTo = Number(payload.rackTo) || rackFrom
   const levelFrom = Number(payload.levelFrom) || 1
   const levelTo = Number(payload.levelTo) || levelFrom
+  const includeBin = payload.includeBin !== false
   const binFrom = Number(payload.binFrom) || 1
   const binTo = Number(payload.binTo) || binFrom
-  if (aisleTo < aisleFrom || rackTo < rackFrom || levelTo < levelFrom || binTo < binFrom) {
+  if (aisleTo < aisleFrom || rackTo < rackFrom || levelTo < levelFrom) {
     return { ok: false, message: '起止范围不正确' }
+  }
+  if (includeBin && binTo < binFrom) {
+    return { ok: false, message: '位起止范围不正确' }
   }
   const prefix = payload.prefix?.trim() || generateLocationPrefix(warehouse)
   const zone = payload.zone || 'A区'
   const created = []
   const skipped = []
+  const binValues = includeBin
+    ? Array.from({ length: binTo - binFrom + 1 }, (_, i) => binFrom + i)
+    : [null]
   for (let aisle = aisleFrom; aisle <= aisleTo; aisle += 1) {
     for (let rack = rackFrom; rack <= rackTo; rack += 1) {
       for (let level = levelFrom; level <= levelTo; level += 1) {
-        for (let bin = binFrom; bin <= binTo; bin += 1) {
+        for (const bin of binValues) {
           const code = buildLocationCode({ prefix, zone, aisle, rack, level, bin })
           if (getWarehouseLocationByCode(warehouse.id, code)) {
             skipped.push(code)
@@ -246,7 +267,7 @@ export function batchCreateWarehouseLocations(payload) {
               aisle: pad2(aisle),
               rack: pad2(rack),
               level: pad2(level),
-              bin: pad2(bin),
+              bin: bin == null ? '' : pad2(bin),
               mixSku: payload.mixSku !== false,
               mixBatch: payload.mixBatch !== false,
               enabled: true,

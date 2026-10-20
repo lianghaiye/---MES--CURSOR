@@ -342,7 +342,9 @@ import {
   loadBomDetailStructure,
   importBomByReference,
   importShipAttachmentLines,
+  applyBomTemplateImport,
 } from '@/utils/bomImport'
+import { resolveSpuTemplateBomForSku } from '@/utils/designBomBaseline'
 import {
   defaultBomColumnSettings,
   restoreBomBlankSizeColumn,
@@ -746,6 +748,7 @@ function applyItemFromQuery(itemType, itemId, itemName) {
       itemCode: '',
       specModel: '',
     })
+    tryPrefillFromSpuTemplate(itemType, itemId, { silent: true })
     return true
   }
   form.itemId = `${itemType}:${itemId}`
@@ -756,6 +759,7 @@ function applyItemFromQuery(itemType, itemId, itemName) {
     itemCode: master.code,
     specModel: master.specModel || '',
   })
+  tryPrefillFromSpuTemplate(itemType, itemId)
   return true
 }
 
@@ -1032,6 +1036,30 @@ function applySelectedItem(opt, { preserveChildren = false } = {}) {
   }
 }
 
+/** 新建 SKU 产品 BOM：从产品族基准 BOM 带入子级骨架（保留当前根） */
+function tryPrefillFromSpuTemplate(itemType, itemId, { silent = false } = {}) {
+  if (isEditMode.value || isBaselineBomMode.value || isShipBomMode.value) return false
+  if (itemType !== 'product' && itemType !== 'material') return false
+  if ((lineItems.value || []).length) return false
+  const resolved = resolveSpuTemplateBomForSku(itemType, itemId)
+  if (!resolved?.bom) return false
+  const result = applyBomTemplateImport(resolved.bom, true, flatNodes.value)
+  if (!result?.lineItems?.length && !(result?.flatNodes?.length > 1)) return false
+  flatNodes.value = result.flatNodes
+  lineItems.value = result.lineItems
+  templateRef.value = result.templateRef || {
+    source: 'spu_template',
+    bomId: resolved.bom.id,
+    bomNo: resolved.bom.bomNo,
+    spuId: resolved.spu?.id,
+  }
+  selectedNodeId.value = getRootTreeId(flatNodes.value) || ROOT_ID
+  if (!silent) {
+    message.info('已从产品族基准 BOM 带入骨架，请按本 SKU 调整后保存')
+  }
+  return true
+}
+
 function openSwitchProduct() {
   if (isShipBomMode.value) {
     message.info('随货配件不绑定单一产品，请在「适用产品」中多选')
@@ -1085,6 +1113,9 @@ function onRootCatalogSelected(item) {
     )
     if (item.material) form.material = item.material
     if (item.drawingNo) form.drawingNo = item.drawingNo
+    if (!preserveChildren) {
+      tryPrefillFromSpuTemplate(item.itemType, item.id)
+    }
   })
   if (preserveChildren) {
     message.success('已切换根产品，子级结构已保留')
@@ -1255,19 +1286,24 @@ function onSwitchProductConfirm(row) {
   }
   const itemType = row.itemType === '物料' ? 'material' : 'product'
   const preserveChildren = hasRoot.value
-  form.itemId = `${itemType}:${row.id}`
-  applySelectedItem(
-    {
-      itemType,
-      itemId: row.id,
-      itemName: row.name,
-      itemCode: row.code,
-      specModel: row.specModel || '',
-    },
-    { preserveChildren },
-  )
-  if (row.material) form.material = row.material
-  if (row.drawingNo) form.drawingNo = row.drawingNo
+  withUndo(() => {
+    form.itemId = `${itemType}:${row.id}`
+    applySelectedItem(
+      {
+        itemType,
+        itemId: row.id,
+        itemName: row.name,
+        itemCode: row.code,
+        specModel: row.specModel || '',
+      },
+      { preserveChildren },
+    )
+    if (row.material) form.material = row.material
+    if (row.drawingNo) form.drawingNo = row.drawingNo
+    if (!preserveChildren) {
+      tryPrefillFromSpuTemplate(itemType, row.id)
+    }
+  })
   if (preserveChildren) {
     message.success('已切换产品，仅更新顶级物料，子级结构已保留')
   }

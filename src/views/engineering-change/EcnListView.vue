@@ -379,13 +379,7 @@ function openExecute(record) {
 }
 
 function goPlanImpact(record) {
-  const path = moduleConfig.impactPath?.(record.id)
-  if (!path) {
-    message.info('当前模块未配置计划影响页')
-    return
-  }
-  openTab(path, '计划影响与重排')
-  router.push(path)
+  router.push(moduleConfig.executePath(record.id))
 }
 
 function handleSubmitApproval(record) {
