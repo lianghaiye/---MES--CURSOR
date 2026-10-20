@@ -627,15 +627,14 @@ export function approveSalesOrder(id, opinion = '') {
       forceFullPlanLineIds: new Set(),
       getAllocatedQty: (line) => getLineAllocatedQty(order.id, line.id),
     })
-    const shortfalls = listStockOnlyShortfalls(fulfillmentRows)
-    if (shortfalls.length) {
-      const detail = shortfalls
-        .map((r) => `「${r.productName || r.productCode}」缺 ${r.shortfall}`)
-        .join('；')
-      return {
-        ok: false,
-        message: `订单「${order.orderNo}」存在「仅现货」行但自由备货不足：${detail}。请改履约方式或补货后再审`,
-      }
+    // 仅现货库存不足仍允许审核：按现有自由备货占用，缺口记库存状态，不拦截、不排产
+    const stockOnlyShortfalls = listStockOnlyShortfalls(fulfillmentRows)
+    if (stockOnlyShortfalls.length) {
+      stockHints.push(
+        `「仅现货」自由备货不足仍已通过：${stockOnlyShortfalls
+          .map((r) => `「${r.productName || r.productCode}」缺 ${r.shortfall}`)
+          .join('；')}`,
+      )
     }
 
     const fulfillByLineId = new Map(fulfillmentRows.map((r) => [r.lineId, r]))

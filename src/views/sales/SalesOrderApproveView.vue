@@ -345,31 +345,29 @@ function buildApproveConfirmContent() {
   const planQty = fulfillmentSummary.value.planQty
   const stockItemCnt = rows.filter((r) => (Number(r.stockTake) || 0) > 0).length
   const planItemCnt = rows.filter((r) => (Number(r.planQty) || 0) > 0).length
+  const shortfalls = listStockOnlyShortfalls(rows)
 
-  const text = [
+  const lines = [
     '通过后将按明细「库存履约」拆分处理：',
     `用自由备货发货：${stockItemCnt}项，共${formatQty(stockTake)}件。`,
     `需要安排生产：${planItemCnt}项，排产数量${formatQty(planQty)}`,
-  ].join('\n')
+  ]
+  if (shortfalls.length) {
+    lines.push(
+      '',
+      '以下「仅现货」行自由备货不足，仍可审核通过（按现有量占用，缺口记缺货，不排产）：',
+      ...shortfalls.map((r) => `· ${r.productName || r.productCode}：缺 ${formatQty(r.shortfall)}`),
+    )
+  }
 
   return h(
     'div',
     { style: 'line-height: 1.7; white-space: pre-line; color: rgba(0,0,0,0.88)' },
-    text,
+    lines.join('\n'),
   )
 }
 
 function handleApprove() {
-  const shortfalls = listStockOnlyShortfalls(fulfillmentPreviewRows.value)
-  if (shortfalls.length) {
-    message.warning(
-      `「仅现货」自由备货不足：${shortfalls
-        .map((r) => `${r.productName || r.productCode} 缺 ${r.shortfall}`)
-        .join('；')}`,
-    )
-    return
-  }
-
   Modal.confirm({
     title: '确认审核通过？',
     content: buildApproveConfirmContent(),
