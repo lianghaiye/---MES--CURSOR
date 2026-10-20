@@ -21,6 +21,13 @@
           <template v-else-if="column.key === 'defaultDiscountRate'">
             {{ formatDiscount(record.defaultDiscountRate) }}
           </template>
+          <template v-else-if="column.key === 'paymentTermDays'">
+            {{
+              record.paymentTermDays != null && record.paymentTermDays !== ''
+                ? `${record.paymentTermDays} 天`
+                : '—'
+            }}
+          </template>
           <template v-else-if="column.key === 'validRange'">
             {{ record.validFrom || '—' }} ~ {{ record.validTo || '—' }}
           </template>
@@ -55,6 +62,8 @@ const columns = [
   { title: '合同名称', dataIndex: 'contractName', width: 180 },
   { title: '客户名称', dataIndex: 'customerName', width: 160 },
   { title: '默认折扣', key: 'defaultDiscountRate', width: 90 },
+  { title: '账期起算', dataIndex: 'paymentTermStart', width: 100 },
+  { title: '账期天数', key: 'paymentTermDays', width: 90 },
   { title: '有效期', key: 'validRange', width: 200 },
   { title: '状态', dataIndex: 'status', width: 90 },
   { title: '操作', key: 'actions', width: 120 },

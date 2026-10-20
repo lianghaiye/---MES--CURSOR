@@ -25,6 +25,8 @@ export function createDefaultSupplierForm(partial = {}) {
     settlementMethod: undefined,
     settlementType: undefined,
     settlementCycle: undefined,
+    paymentTermStart: undefined,
+    paymentTermDays: undefined,
     paymentMethod: undefined,
     supplyCycleDays: undefined,
     minOrderQty: undefined,
@@ -74,6 +76,33 @@ export function normalizeSupplierRecord(row = {}) {
   if (!form.invoiceName && form.name) form.invoiceName = form.name
   if (!form.invoiceTaxNo && form.unifiedSocialCreditCode) {
     form.invoiceTaxNo = form.unifiedSocialCreditCode
+  }
+  // 旧「付款方式」与结算方式/结算类型重复：加载时迁到正确字段后清空
+  const legacyPay = String(form.paymentMethod || '').trim()
+  if (legacyPay) {
+    const instrumentMap = {
+      现金: '现金结算',
+      现金结算: '现金结算',
+      银行转账: '银行转账',
+      承兑汇票: '承兑汇票',
+    }
+    const tradeMap = {
+      款到发货: '先款后货',
+      货到付款: '先货后款',
+      预付款: '预付款+发货付',
+      预付定金发货前付款: '预付款+发货付',
+      先款后货: '先款后货',
+      先货后款: '先货后款',
+      '预付款+货到付': '预付款+货到付',
+      '预付款+发货付': '预付款+发货付',
+    }
+    if (!form.settlementMethod && instrumentMap[legacyPay]) {
+      form.settlementMethod = instrumentMap[legacyPay]
+    }
+    if (!form.settlementType && tradeMap[legacyPay]) {
+      form.settlementType = tradeMap[legacyPay]
+    }
+    form.paymentMethod = undefined
   }
   return {
     ...row,

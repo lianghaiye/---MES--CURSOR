@@ -11,26 +11,30 @@
           </a-space>
         </div>
       </div>
-      <a-space :size="4" class="header-actions">
+      <a-space :size="8" class="header-actions">
+        <a-button
+          v-if="canApproveOutbound(record)"
+          type="primary"
+          size="small"
+          @click="emit('approve')"
+        >
+          审批
+        </a-button>
+        <a-button v-if="canConfirm" type="primary" size="small" @click="emit('confirm')">
+          确认出库
+        </a-button>
+        <a-button v-if="canRefuseOutbound(record)" size="small" danger @click="emit('refuse')">
+          拒绝出库
+        </a-button>
+        <a-button v-if="canDeleteOutbound(record)" size="small" danger @click="emit('delete')">
+          删除
+        </a-button>
+        <a-button v-if="canInitiateFactoryQc(record)" size="small" @click="emit('initiate-qc')">
+          {{ initiateQcLabel }}
+        </a-button>
         <a-button type="link" size="small" class="header-action-btn" @click="emit('print')">
           <PrinterOutlined />
           打印
-        </a-button>
-      </a-space>
-    </div>
-
-    <div v-if="hasActions" class="detail-action-bar">
-      <a-space :size="8">
-        <a-button v-if="canApproveOutbound(record)" type="primary" @click="emit('approve')">
-          审批
-        </a-button>
-        <a-button v-if="canConfirm" type="primary" @click="emit('confirm')"> 确认出库 </a-button>
-        <a-button v-if="canRefuseOutbound(record)" danger @click="emit('refuse')">
-          拒绝出库
-        </a-button>
-        <a-button v-if="canDeleteOutbound(record)" danger @click="emit('delete')"> 删除 </a-button>
-        <a-button v-if="canInitiateFactoryQc(record)" @click="emit('initiate-qc')">
-          {{ initiateQcLabel }}
         </a-button>
       </a-space>
     </div>
@@ -690,18 +694,6 @@ const relatedStocktakes = computed(() => {
 
 const canConfirm = computed(() => record.value && validateOutboundForConfirm(record.value).ok)
 
-const hasActions = computed(() => {
-  const r = record.value
-  if (!r) return false
-  return (
-    canApproveOutbound(r) ||
-    canConfirm.value ||
-    canRefuseOutbound(r) ||
-    canDeleteOutbound(r) ||
-    canInitiateFactoryQc(r)
-  )
-})
-
 const linkedQcNo = computed(() => {
   const qc = getFactoryQcById(record.value?.factoryQcId)
   return qc?.qcNo || ''
@@ -1041,39 +1033,6 @@ export default { name: 'OutboundOrderDetailPanel' }
   .header-tags {
     display: inline-flex;
     align-items: center;
-  }
-}
-
-.detail-action-bar {
-  margin-bottom: 8px;
-  padding: 8px 12px;
-  background: #fff;
-  border: 1px solid #e5e6eb;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-
-  :deep(.ant-space) {
-    display: inline-flex;
-    align-items: center;
-  }
-
-  :deep(.ant-space-item) {
-    margin-bottom: 0 !important;
-  }
-
-  :deep(.ant-btn) {
-    height: 32px;
-    padding: 0 15px;
-    font-size: 14px;
-    border-radius: 6px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
   }
 }
 

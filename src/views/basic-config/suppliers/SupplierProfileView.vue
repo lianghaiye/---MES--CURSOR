@@ -109,6 +109,13 @@
           <template v-else-if="column.key === 'supplyCycleDays'">
             {{ formatSupplyCycle(record.supplyCycleDays) }}
           </template>
+          <template v-else-if="column.key === 'paymentTermDays'">
+            {{
+              record.paymentTermDays != null && record.paymentTermDays !== ''
+                ? `${record.paymentTermDays} 天`
+                : '—'
+            }}
+          </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="supplierStatusColor(record.status)">{{ record.status || '—' }}</a-tag>
           </template>
@@ -158,7 +165,8 @@ const columns = [
   { title: '结算方式', dataIndex: 'settlementMethod', width: 100 },
   { title: '结算类型', dataIndex: 'settlementType', width: 110 },
   { title: '结算周期', dataIndex: 'settlementCycle', width: 90 },
-  { title: '付款方式', dataIndex: 'paymentMethod', width: 100 },
+  { title: '账期起算', dataIndex: 'paymentTermStart', width: 100 },
+  { title: '账期天数', key: 'paymentTermDays', width: 90 },
   { title: '状态', key: 'status', width: 80 },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建日期', key: 'createdAt', width: 150 },

@@ -60,8 +60,13 @@
               <a-descriptions-item label="结算周期">{{
                 record.settlementCycle || '—'
               }}</a-descriptions-item>
-              <a-descriptions-item label="付款方式">{{
-                record.paymentMethod || '—'
+              <a-descriptions-item label="账期起算">{{
+                record.paymentTermStart || '—'
+              }}</a-descriptions-item>
+              <a-descriptions-item label="账期天数">{{
+                record.paymentTermDays != null && record.paymentTermDays !== ''
+                  ? `${record.paymentTermDays} 天`
+                  : '—'
               }}</a-descriptions-item>
               <a-descriptions-item label="供货周期">{{
                 record.supplyCycleDays != null ? `${record.supplyCycleDays}天` : '—'

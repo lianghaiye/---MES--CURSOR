@@ -38,6 +38,26 @@ export const settlementCycleOptions = [
   { label: '无', value: '无' },
 ]
 
+/** 账期起算：从哪一天开始算账期天数（客户默认账期与合同共用） */
+export const paymentTermStartOptions = [
+  { label: '开票日', value: '开票日' },
+  { label: '发货日', value: '发货日' },
+  { label: '验收日', value: '验收日' },
+  { label: '对账日', value: '对账日' },
+  { label: '合同签订日', value: '合同签订日' },
+]
+
+/** 常用账期天数快捷选项；表单仍可手填其他天数 */
+export const paymentTermDaysOptions = [
+  { label: '0（现结）', value: 0 },
+  { label: '7 天', value: 7 },
+  { label: '15 天', value: 15 },
+  { label: '30 天', value: 30 },
+  { label: '45 天', value: 45 },
+  { label: '60 天', value: 60 },
+  { label: '90 天', value: 90 },
+]
+
 export const settlementTypeOptions = [
   { label: '先款后货', value: '先款后货' },
   { label: '先货后款', value: '先货后款' },

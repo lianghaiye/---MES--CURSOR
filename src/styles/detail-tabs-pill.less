@@ -44,8 +44,8 @@
     gap: 4px;
     margin: 0 !important;
     padding: 4px;
-    background: #e6f4ff;
-    border: 1px solid #91caff;
+    background: color-mix(in srgb, var(--primary) 10%, #fff);
+    border: 1px solid color-mix(in srgb, var(--primary) 42%, #fff);
     border-radius: 8px;
     box-sizing: border-box;
     overflow: visible !important;
@@ -63,19 +63,19 @@
       box-shadow 0.2s;
 
     .ant-tabs-tab-btn {
-      color: #0958d9;
+      color: var(--primary);
       font-size: 13px;
       text-shadow: none;
     }
 
     &:hover .ant-tabs-tab-btn {
-      color: #003eb3;
+      color: color-mix(in srgb, var(--primary) 72%, #000);
     }
   }
 
   > .ant-tabs-nav .ant-tabs-tab-active {
-    background: #1677ff !important;
-    box-shadow: 0 1px 4px rgba(22, 119, 255, 0.35);
+    background: var(--primary) !important;
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--primary) 35%, transparent);
 
     .ant-tabs-tab-btn {
       color: #fff !important;

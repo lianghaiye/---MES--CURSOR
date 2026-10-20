@@ -103,6 +103,8 @@ export function createDefaultCustomerForm(partial = {}) {
     currency: 'CNY',
     settlementMethod: undefined,
     settlementCycle: undefined,
+    paymentTermStart: undefined,
+    paymentTermDays: undefined,
     settlementType: undefined,
     creditLimit: undefined,
     creditAvailableBalance: undefined,

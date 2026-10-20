@@ -36,6 +36,18 @@ export const settlementTypeOptions = [
   { label: '预付款+发货付', value: '预付款+发货付' },
 ]
 
+/** 账期起算：与客户主数据同源口径 */
+export const paymentTermStartOptions = [
+  { label: '开票日', value: '开票日' },
+  { label: '发货日', value: '发货日' },
+  { label: '验收日', value: '验收日' },
+  { label: '对账日', value: '对账日' },
+  { label: '合同签订日', value: '合同签订日' },
+]
+
+/**
+ * @deprecated 已与结算类型/结算方式重复，界面不再展示；normalize 时迁移到对应字段
+ */
 export const paymentMethodOptions = [
   { label: '款到发货', value: '款到发货' },
   { label: '货到付款', value: '货到付款' },

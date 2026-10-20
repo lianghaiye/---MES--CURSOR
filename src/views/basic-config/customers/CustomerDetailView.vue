@@ -145,6 +145,14 @@
               <a-descriptions-item label="结算周期">{{
                 record.settlementCycle || '—'
               }}</a-descriptions-item>
+              <a-descriptions-item label="账期起算">{{
+                record.paymentTermStart || '—'
+              }}</a-descriptions-item>
+              <a-descriptions-item label="账期天数">{{
+                record.paymentTermDays != null && record.paymentTermDays !== ''
+                  ? `${record.paymentTermDays} 天`
+                  : '—'
+              }}</a-descriptions-item>
               <a-descriptions-item label="结算类型">{{
                 record.settlementType || '—'
               }}</a-descriptions-item>

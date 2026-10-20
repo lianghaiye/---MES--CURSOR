@@ -25,6 +25,7 @@
               show-search
               :options="customerOpts"
               placeholder="请选择客户"
+              @change="onCustomerChange"
             />
           </a-form-item>
         </a-col>
@@ -35,6 +36,39 @@
               :min="1"
               :max="100"
               :precision="2"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="结算周期">
+            <a-select
+              v-model:value="form.settlementCycle"
+              allow-clear
+              :options="settlementCycleOptions"
+              placeholder="对账频率，可选"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="账期起算">
+            <a-select
+              v-model:value="form.paymentTermStart"
+              allow-clear
+              :options="paymentTermStartOptions"
+              placeholder="从哪一天起算"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="账期天数">
+            <a-input-number
+              v-model:value="form.paymentTermDays"
+              :min="0"
+              :precision="0"
+              placeholder="如 30、60"
               style="width: 100%"
             />
           </a-form-item>
@@ -100,8 +134,9 @@
 import { computed, reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
-import { getCustomerOptions } from '@/store/customerStore'
+import { getCustomerByName, getCustomerOptions } from '@/store/customerStore'
 import { addFrameworkContract, updateFrameworkContract } from '@/store/frameworkContractStore'
+import { paymentTermStartOptions, settlementCycleOptions } from '@/constants/customerMaster'
 import { normalizeDiscountRate } from '@/utils/salesOrderPricing'
 
 const props = defineProps({
@@ -132,11 +167,35 @@ const form = reactive({
   contractName: '',
   customerName: undefined,
   defaultDiscountPercent: 100,
+  settlementCycle: undefined,
+  paymentTermStart: undefined,
+  paymentTermDays: undefined,
   validFrom: null,
   validTo: null,
   remark: '',
   priceItems: [],
 })
+
+function applyCustomerPaymentTerms(customerName, { force = false } = {}) {
+  const customer = getCustomerByName(customerName)
+  if (!customer) return
+  if (force || !form.settlementCycle) {
+    form.settlementCycle = customer.settlementCycle || undefined
+  }
+  if (force || !form.paymentTermStart) {
+    form.paymentTermStart = customer.paymentTermStart || undefined
+  }
+  if (force || form.paymentTermDays == null || form.paymentTermDays === '') {
+    form.paymentTermDays =
+      customer.paymentTermDays != null && customer.paymentTermDays !== ''
+        ? Number(customer.paymentTermDays)
+        : undefined
+  }
+}
+
+function onCustomerChange(name) {
+  applyCustomerPaymentTerms(name, { force: true })
+}
 
 watch(
   () => props.open,
@@ -149,6 +208,12 @@ watch(
     form.defaultDiscountPercent = r?.defaultDiscountRate
       ? Number((r.defaultDiscountRate * 100).toFixed(2))
       : 100
+    form.settlementCycle = r?.settlementCycle || undefined
+    form.paymentTermStart = r?.paymentTermStart || undefined
+    form.paymentTermDays =
+      r?.paymentTermDays != null && r?.paymentTermDays !== ''
+        ? Number(r.paymentTermDays)
+        : undefined
     form.validFrom = r?.validFrom ? dayjs(r.validFrom) : null
     form.validTo = r?.validTo ? dayjs(r.validTo) : null
     form.remark = r?.remark || ''
@@ -159,6 +224,9 @@ watch(
           ? Number((normalizeDiscountRate(item.agreementDiscountRate) * 100).toFixed(2))
           : null,
     }))
+    if (!isEdit.value && form.customerName) {
+      applyCustomerPaymentTerms(form.customerName)
+    }
   },
 )
 
@@ -186,6 +254,12 @@ function handleSave() {
     customerName: form.customerName,
     contractType: '框架合同',
     defaultDiscountRate: normalizeDiscountRate(form.defaultDiscountPercent / 100, 1),
+    settlementCycle: form.settlementCycle || '',
+    paymentTermStart: form.paymentTermStart || '',
+    paymentTermDays:
+      form.paymentTermDays != null && form.paymentTermDays !== ''
+        ? Number(form.paymentTermDays)
+        : null,
     validFrom: form.validFrom ? form.validFrom.format('YYYY-MM-DD') : '',
     validTo: form.validTo ? form.validTo.format('YYYY-MM-DD') : '',
     remark: form.remark,

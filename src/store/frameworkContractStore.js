@@ -13,6 +13,9 @@ function seedContracts() {
       customerName: '华东机械制造有限公司',
       contractType: '框架合同',
       defaultDiscountRate: 0.95,
+      settlementCycle: '月结',
+      paymentTermStart: '开票日',
+      paymentTermDays: 30,
       validFrom: '2026-01-01',
       validTo: '2026-12-31',
       priceItems: [
@@ -129,6 +132,12 @@ export function addFrameworkContract(payload) {
     customerName: payload.customerName?.trim() || '',
     contractType: payload.contractType || '框架合同',
     defaultDiscountRate: payload.defaultDiscountRate ?? 1,
+    settlementCycle: payload.settlementCycle || '',
+    paymentTermStart: payload.paymentTermStart || '',
+    paymentTermDays:
+      payload.paymentTermDays != null && payload.paymentTermDays !== ''
+        ? Number(payload.paymentTermDays)
+        : null,
     validFrom: payload.validFrom || '',
     validTo: payload.validTo || '',
     priceItems: payload.priceItems || [],

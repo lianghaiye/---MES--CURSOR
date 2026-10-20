@@ -54,7 +54,7 @@
       </a-row>
     </div>
 
-    <a-tabs v-model:active-key="activeTab" type="card" class="form-tabs">
+    <a-tabs v-model:active-key="activeTab" class="form-tabs detail-tabs detail-tabs-pill">
       <a-tab-pane key="business" tab="商务/采购">
         <a-row :gutter="[12, 12]">
           <a-col :span="8">
@@ -85,16 +85,29 @@
               allow-clear
               :options="settlementCycleOptions"
               style="width: 100%"
+              placeholder="存量对账频率，可继续使用"
             />
           </a-col>
           <a-col :span="8">
-            <div class="field-label">付款方式</div>
+            <div class="field-label">账期起算</div>
             <a-select
-              v-model:value="form.paymentMethod"
+              v-model:value="form.paymentTermStart"
               size="small"
               allow-clear
-              :options="paymentMethodOptions"
+              :options="paymentTermStartOptions"
               style="width: 100%"
+              placeholder="从哪一天起算"
+            />
+          </a-col>
+          <a-col :span="8">
+            <div class="field-label">账期天数</div>
+            <a-input-number
+              v-model:value="form.paymentTermDays"
+              size="small"
+              :min="0"
+              :precision="0"
+              style="width: 100%"
+              placeholder="如 30、60"
             />
           </a-col>
           <a-col :span="8">
@@ -247,7 +260,7 @@ import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import {
   enterpriseScaleOptions,
   invoiceTypeOptions,
-  paymentMethodOptions,
+  paymentTermStartOptions,
   quoteMethodOptions,
   settlementCycleOptions,
   settlementMethodOptions,
@@ -256,7 +269,7 @@ import {
 } from '@/constants/supplierMaster'
 import { getSupplierCategoryOptions } from '@/store/supplierCategoryStore'
 import { addSupplier, updateSupplier } from '@/store/supplierStore'
-import { createDefaultSupplierForm } from '@/utils/supplierMaster'
+import { createDefaultSupplierForm, normalizeSupplierRecord } from '@/utils/supplierMaster'
 import CustomerContactTable from '@/views/basic-config/customers/components/CustomerContactTable.vue'
 import BusinessLicenseUpload from '@/views/basic-config/customers/components/BusinessLicenseUpload.vue'
 import SupplierMainMaterialTable from './SupplierMainMaterialTable.vue'
@@ -291,10 +304,13 @@ const establishedDateValue = computed({
 })
 
 function loadForm(record) {
-  const base = createDefaultSupplierForm(record || {})
+  const base = record?.id
+    ? normalizeSupplierRecord(record)
+    : createDefaultSupplierForm(record || {})
   Object.keys(form).forEach((key) => {
     if (key in base) form[key] = base[key]
   })
+  form.paymentMethod = undefined
   form.businessLicenseFiles = [...(base.businessLicenseFiles || [])]
   form.contacts = [...(base.contacts || [])]
   form.mainMaterials = [...(base.mainMaterials || [])]
@@ -339,6 +355,7 @@ function buildPayload() {
     invoiceName: form.invoiceName?.trim() || form.name.trim(),
     invoiceTaxNo: form.invoiceTaxNo?.trim() || form.unifiedSocialCreditCode?.trim() || '',
     mainMaterials: (form.mainMaterials || []).filter((item) => item.materialCode?.trim()),
+    paymentMethod: undefined,
     status: form.status || '启用',
   }
 }
@@ -381,9 +398,25 @@ function handleSave() {
   }
 
   .form-tabs {
-    background: #fff;
-    border-radius: 6px;
-    padding: 0 12px 12px;
+    background: transparent;
+    padding: 0 !important;
+    box-shadow: none;
+
+    :deep(> .ant-tabs-nav) {
+      margin: 0 0 12px !important;
+    }
+
+    :deep(> .ant-tabs-content-holder) {
+      border: 1px solid var(--divider, #e5e6eb) !important;
+      border-radius: 6px;
+      background: var(--card-bg, #fff);
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    :deep(.ant-tabs-tabpane) {
+      padding: 0 !important;
+    }
   }
 
   .section-subtitle {
