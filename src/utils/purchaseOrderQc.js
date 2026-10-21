@@ -173,6 +173,29 @@ export function listQcProductResultLinesForOutsourcingReceipt(receipt) {
 }
 
 /**
+ * 外协订单生成入库：质检结果明细（一个产品一行）
+ * @param {object|object[]} outsourcingOrders
+ */
+export function listQcProductResultLinesForOutsourcingOrders(outsourcingOrders) {
+  const orders = (
+    Array.isArray(outsourcingOrders) ? outsourcingOrders : [outsourcingOrders]
+  ).filter(Boolean)
+  if (!orders.length) return []
+  void outsourcingReceiptState.receipts
+
+  const rows = []
+  orders.forEach((order) => {
+    const receipts = (outsourcingReceiptState.receipts || []).filter((r) =>
+      isRelatedOutsourcingReceipt(r, order),
+    )
+    receipts.forEach((receipt) => {
+      appendQcResultRowsForReceipt(rows, receipt, order.orderNo || '', '外协回货检')
+    })
+  })
+  return rows
+}
+
+/**
  * 采购订单生成入库：质检结果明细（一个产品一行）
  * @param {object|object[]} purchaseOrders
  */

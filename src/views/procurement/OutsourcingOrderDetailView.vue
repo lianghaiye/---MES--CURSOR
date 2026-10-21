@@ -411,6 +411,7 @@
                 size="small"
                 bordered
                 :pagination="false"
+                :scroll="{ x: 1400 }"
                 :locale="{ emptyText: '暂无质检单' }"
               >
                 <template #bodyCell="{ column, record: row }">
@@ -424,10 +425,28 @@
                     <a-tag :color="qcStatusColor(row.qcStatus)">{{ row.qcStatus || '—' }}</a-tag>
                   </template>
                   <template v-else-if="column.key === 'qcResult'">
-                    {{ row.qcResult || '—' }}
+                    <a-tag v-if="row.qcResult" :color="qcResultColor(row.qcResult)">
+                      {{ row.qcResult }}
+                    </a-tag>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'productInfo'">
+                    <span :title="row.productInfo || ''">{{ row.productInfo || '—' }}</span>
+                  </template>
+                  <template
+                    v-else-if="column.key === 'inspectQty' || column.key === 'acceptInboundQty'"
+                  >
+                    {{
+                      row[column.key] === '' || row[column.key] == null || row[column.key] === '—'
+                        ? '—'
+                        : formatQty(row[column.key])
+                    }}
+                  </template>
+                  <template v-else-if="column.key === 'inspectedAt'">
+                    {{ formatDateTimeMinute(row.inspectedAt) || '—' }}
                   </template>
                   <template v-else>
-                    {{ row[column.dataIndex] || '—' }}
+                    {{ row[column.dataIndex] ?? row[column.key] ?? '—' }}
                   </template>
                 </template>
               </a-table>
@@ -556,10 +575,12 @@ import {
   getInboundInfoLineScrollX,
 } from '@/utils/purchaseOrderInboundLines'
 import {
-  listInboundQcForOutsourcingOrder,
+  listQcProductResultLinesForOutsourcingOrders,
   getWxLineLatestQcResult,
   formatWxLineQcTreatmentSummary,
 } from '@/utils/purchaseOrderQc'
+import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
+import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
 import { listReturnLinesForOutsourcingOrder } from '@/utils/orderReturnLines'
 import { outsourcingReceiptState } from '@/store/outsourcingReceiptStore'
 import { outsourcingReturnState } from '@/store/outsourcingReturnStore'
@@ -666,11 +687,17 @@ const returnColumns = createInboundInfoLineColumns()
 const returnTableScrollX = getInboundInfoLineScrollX(returnColumns)
 
 const qcColumns = [
-  { title: '质检单号', key: 'qcNo', width: 160 },
-  { title: '质检状态', key: 'qcStatus', width: 110 },
-  { title: '质检结果', key: 'qcResult', dataIndex: 'qcResult', width: 110 },
-  { title: '质检人', dataIndex: 'inspector', width: 100 },
-  { title: '质检时间', dataIndex: 'inspectedAt', width: 160 },
+  { title: '质检单号', key: 'qcNo', width: 150, ellipsis: true },
+  { title: '质检状态', key: 'qcStatus', width: 90 },
+  { title: '质检结果', key: 'qcResult', width: 100 },
+  { title: '产品信息', key: 'productInfo', width: 240, ellipsis: true },
+  { title: '质检方式', dataIndex: 'inspectMethod', width: 90 },
+  { title: '质检数量', key: 'inspectQty', width: 90, align: 'right' },
+  { title: '处理方案', dataIndex: 'treatmentPlan', width: 100, ellipsis: true },
+  { title: '合格入库数', key: 'acceptInboundQty', width: 100, align: 'right' },
+  { title: '退/换货', dataIndex: 'returnExchange', width: 120, ellipsis: true },
+  { title: '质检人', dataIndex: 'inspector', width: 90 },
+  { title: '质检时间', key: 'inspectedAt', width: 150 },
 ]
 
 const goodsReturnColumns = [
@@ -741,7 +768,8 @@ const relatedInboundLines = computed(() =>
 )
 const relatedQcRecords = computed(() => {
   void outsourcingReceiptState.receipts
-  return listInboundQcForOutsourcingOrder(record.value)
+  void qcTaskState.tasks
+  return listQcProductResultLinesForOutsourcingOrders(record.value)
 })
 const relatedReturnLines = computed(() => {
   void outsourcingReturnState.returns
@@ -846,20 +874,32 @@ function approvalResultColor(result) {
 
 function qcStatusColor(status) {
   const map = {
+    待质检: 'warning',
+    检验中: 'processing',
+    已完成: 'success',
+    已终止: 'default',
     未质检: 'default',
     质检中: 'processing',
     质检通过: 'success',
+    部分通过: 'warning',
     质检不通过: 'error',
   }
   return map[status] || 'default'
 }
 
 function openQcDetail(row) {
-  if (!row?.qcNo) {
+  if (!row?.taskId && !row?.qcNo) {
     message.info('暂无质检单号')
     return
   }
-  message.info(`入库质检详情「${row.qcNo}」开发中`)
+  const bundle = getQcTaskRouteBundle('外协回货检')
+  if (row.taskId) {
+    const path = `${bundle.listPath}/${row.taskId}`
+    openTab(path, row.qcNo || bundle.detailTitle)
+    router.push({ name: bundle.detailName, params: { id: row.taskId } })
+    return
+  }
+  message.info(`未找到质检单「${row.qcNo}」`)
 }
 
 function goInboundDetailById(orderId) {
