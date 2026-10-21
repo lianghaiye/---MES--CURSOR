@@ -26,7 +26,12 @@
     </template>
   </a-select>
 
-  <WorkOrderSelectModal v-model:open="pickerOpen" @confirm="onPickedFromModal" />
+  <WorkOrderSelectModal
+    v-model:open="pickerOpen"
+    :orders="orderPool"
+    :category-options="categoryOptions"
+    @confirm="onPickedFromModal"
+  />
 </template>
 
 <script setup>
@@ -47,15 +52,23 @@ const props = defineProps({
   open: { type: Boolean, default: undefined },
   autoOpen: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
+  /** 自定义工单池；不传则用生产工单 */
+  orders: { type: Array, default: null },
+  /** 弹窗可选工单类型；不传则展示全部类型筛选项 */
+  categoryOptions: { type: Array, default: null },
 })
 
-const emit = defineEmits(['update:value', 'change', 'dropdown-visible-change'])
+const emit = defineEmits(['update:value', 'change', 'dropdown-visible-change', 'select'])
 
 const pickerOpen = ref(false)
 const searchKeyword = ref('')
 const innerOpen = ref(false)
 
-const allOptions = computed(() => getAllWorkOrderOptions(workOrderState.orders))
+const orderPool = computed(() =>
+  Array.isArray(props.orders) ? props.orders : workOrderState.orders,
+)
+
+const allOptions = computed(() => getAllWorkOrderOptions(orderPool.value))
 
 const displayOptions = computed(() =>
   buildWorkOrderDisplayOptions({
@@ -93,9 +106,15 @@ function onDropdownVisibleChange(visible) {
   emit('dropdown-visible-change', visible)
 }
 
+function findWorkOrderByCode(code) {
+  if (!code) return null
+  return orderPool.value.find((o) => o.code === code || o.id === code) || null
+}
+
 function onSelectChange(nextValue) {
   emit('update:value', nextValue || '')
   emit('change', nextValue || '')
+  emit('select', findWorkOrderByCode(nextValue || ''))
 }
 
 function openPicker() {
@@ -109,6 +128,7 @@ function onPickedFromModal(workOrder) {
   if (!workOrder?.code) return
   emit('update:value', workOrder.code)
   emit('change', workOrder.code)
+  emit('select', workOrder)
 }
 </script>
 

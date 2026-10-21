@@ -47,12 +47,19 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { frameworkContractState, deleteFrameworkContract } from '@/store/frameworkContractStore'
 import { formatDiscountRatePercent } from '@/utils/salesOrderPricing'
+import { CONTRACT_TYPE } from '@/constants/salesContract'
+import { findCreatePageByListPath } from '@/config/createPages'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { useTabs } from '@/composables/useTabs'
 import FrameworkContractFormModal from './components/FrameworkContractFormModal.vue'
 
+const router = useRouter()
+const { openTab } = useTabs()
 const modalOpen = ref(false)
 const editRecord = ref(null)
 
@@ -75,8 +82,13 @@ function formatDiscount(rate) {
 }
 
 function openCreate() {
-  editRecord.value = null
-  modalOpen.value = true
+  const page = findCreatePageByListPath('/sales/contracts')
+  if (!page) return
+  openCreateTab(router, openTab, {
+    path: page.newPath,
+    title: '新增框架合同',
+    query: { type: CONTRACT_TYPE.FRAMEWORK },
+  })
 }
 
 function openEdit(record) {

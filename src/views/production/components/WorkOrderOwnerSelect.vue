@@ -6,6 +6,7 @@
     option-filter-prop="label"
     :placeholder="placeholder"
     :size="size"
+    :disabled="disabled"
     :options="selectOptions"
     :dropdown-match-select-width="true"
     style="width: 100%"
@@ -16,13 +17,18 @@
         <a-divider style="margin: 4px 0" />
         <div class="more-row" @mousedown.prevent @click="openPicker">
           <SearchOutlined />
-          搜索更多
+          {{ props.moreText }}
         </div>
       </div>
     </template>
   </a-select>
 
-  <SelectPersonModal v-model:open="pickerOpen" :selected="presetNames" @confirm="onPicked" />
+  <SelectPersonModal
+    v-model:open="pickerOpen"
+    :selected="presetNames"
+    :multiple="false"
+    @confirm="onPicked"
+  />
 </template>
 
 <script setup>
@@ -35,18 +41,25 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   placeholder: { type: String, default: '请选择创建人' },
   size: { type: String, default: 'small' },
+  moreText: { type: String, default: '选择更多' },
+  disabled: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue', 'select'])
 
 const pickerOpen = ref(false)
 
-const selectOptions = computed(() =>
-  mockEmployees.map((emp) => ({
+const selectOptions = computed(() => {
+  const opts = mockEmployees.map((emp) => ({
     label: emp.name,
     value: emp.name,
-  })),
-)
+  }))
+  const current = String(props.modelValue || '').trim()
+  if (current && !opts.some((o) => o.value === current)) {
+    opts.unshift({ label: current, value: current })
+  }
+  return opts
+})
 
 const innerValue = computed({
   get() {

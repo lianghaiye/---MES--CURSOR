@@ -8,6 +8,7 @@
           <a-space :size="6" class="header-tags">
             <a-tag>{{ workOrder.orderCategory || '生产工单' }}</a-tag>
             <a-tag :color="statusTagColor(workOrder.status)">{{ workOrder.status }}</a-tag>
+            <a-tag v-if="hasOpenRework" color="orange">返工</a-tag>
             <a-tag v-if="isScheduleIncomplete(workOrder)" color="processing">未排完</a-tag>
             <a-tag
               v-if="convertSideLabel"
@@ -72,6 +73,9 @@
         <a-button v-if="canComplete" class="btn-complete" @click="emitAction('complete')">
           完成
         </a-button>
+        <a-button v-if="canCreateRework" type="primary" ghost @click="emitAction('create-rework')">
+          发起返工
+        </a-button>
       </a-space>
     </div>
 
@@ -131,6 +135,9 @@
         <a-tab-pane key="qc-info" tab="质检信息">
           <WorkOrderQcInfoTab :work-order="workOrder" />
         </a-tab-pane>
+        <a-tab-pane key="rework-info" tab="返工信息">
+          <WorkOrderReworkInfoTab :work-order="workOrder" />
+        </a-tab-pane>
         <a-tab-pane v-if="!hideBomRelatedTabs" key="ebom" tab="EBOM">
           <WorkOrderEbomTreeTab :work-order="workOrder" :variant="variant" />
         </a-tab-pane>
@@ -173,6 +180,7 @@ import WorkOrderPurchaseInfoTab from './WorkOrderPurchaseInfoTab.vue'
 import WorkOrderOutsourcingInfoTab from './WorkOrderOutsourcingInfoTab.vue'
 import WorkOrderInboundInfoTab from './WorkOrderInboundInfoTab.vue'
 import WorkOrderQcInfoTab from './WorkOrderQcInfoTab.vue'
+import WorkOrderReworkInfoTab from './WorkOrderReworkInfoTab.vue'
 import WorkOrderEbomTreeTab from './WorkOrderEbomTreeTab.vue'
 import WorkOrderCurrentBomTab from './WorkOrderCurrentBomTab.vue'
 import WorkOrderBomVersionTab from './WorkOrderBomVersionTab.vue'
@@ -185,6 +193,7 @@ import {
   isScheduleIncomplete,
 } from '@/utils/workOrderScheduleBatch'
 import { canShowEditScheduleQty } from '@/utils/workOrderStatus'
+import { reworkOrderState, workOrderHasOpenRework } from '@/store/reworkOrderStore'
 import { canConvertWorkOrderToPurchaseOrOutsource } from '@/utils/workOrderConvert'
 import {
   getWorkOrderConvertSideLabel,
@@ -289,7 +298,17 @@ const canConvertPurchaseOrOutsource = computed(() =>
 
 const convertSideLabel = computed(() => getWorkOrderConvertSideLabel(workOrder.value))
 
+const hasOpenRework = computed(() => {
+  void reworkOrderState.orders
+  return workOrderHasOpenRework(workOrder.value)
+})
+
 const canComplete = computed(() => ['已下发', '执行中'].includes(workOrder.value?.status))
+
+/** 执行中 / 已完成：车间可直接发起返工单（有未结束返工时仍可再开） */
+const canCreateRework = computed(() =>
+  ['执行中', '已完成', '完成'].includes(workOrder.value?.status),
+)
 
 const showDetailActionBar = computed(
   () =>
@@ -299,7 +318,8 @@ const showDetailActionBar = computed(
     canResume.value ||
     canTerminate.value ||
     canConvertPurchaseOrOutsource.value ||
-    canComplete.value,
+    canComplete.value ||
+    canCreateRework.value,
 )
 
 function emitAction(key) {
@@ -342,6 +362,7 @@ function statusTagColor(status) {
     待下发: 'warning',
     已下发: 'processing',
     执行中: 'processing',
+    返工中: 'orange',
     已完成: 'success',
     完成: 'success',
     暂停: 'default',

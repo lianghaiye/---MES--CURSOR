@@ -49,10 +49,22 @@
               </a-col>
               <a-col :span="6">
                 <a-form-item label="合同编号">
-                  <a-input
+                  <a-select
+                    v-if="form.contractType !== '临时合同'"
                     v-model:value="form.contractNo"
                     size="small"
-                    placeholder="请输入 合同编号"
+                    allow-clear
+                    show-search
+                    :options="contractNoOpts"
+                    placeholder="选择生效合同"
+                    style="width: 100%"
+                    @change="onContractNoChange"
+                  />
+                  <a-input
+                    v-else
+                    v-model:value="form.contractNo"
+                    size="small"
+                    placeholder="临时合同可手填编号"
                   />
                 </a-form-item>
               </a-col>
@@ -549,6 +561,7 @@
                     :max="100"
                     :precision="2"
                     style="width: 100%"
+                    :disabled="isContractPriceLocked(record)"
                     @update:value="(v) => setLineDiscountPercent(record, v)"
                   />
                   <span v-else>—</span>
@@ -578,7 +591,7 @@
                     :precision="4"
                     :formatter="inputNumberFormatter"
                     :parser="inputNumberParser"
-                    :disabled="!taxModeExcluding"
+                    :disabled="!taxModeExcluding || isContractPriceLocked(record)"
                     style="width: 100%"
                     @change="onUnitPriceExTaxChange(record)"
                   />
@@ -592,7 +605,7 @@
                     :precision="4"
                     :formatter="inputNumberFormatter"
                     :parser="inputNumberParser"
-                    :disabled="taxModeExcluding"
+                    :disabled="taxModeExcluding || isContractPriceLocked(record)"
                     style="width: 100%"
                     @change="onUnitPriceInTaxChange(record)"
                   />
@@ -820,7 +833,11 @@ import {
   normalizeStockFulfillmentMode,
 } from '@/utils/salesStockFulfillment'
 import { getCustomerOptions, getCustomerByName } from '@/store/customerStore'
-import { getFrameworkContractByNo } from '@/store/frameworkContractStore'
+import {
+  checkContractQuotaWarning,
+  getActiveSalesContractOptions,
+  getSalesContractByNo,
+} from '@/store/salesContractStore'
 import { resolveSalesLinePrice } from '@/utils/customerPrice'
 import {
   DISCOUNT_STRATEGIES,
@@ -1112,6 +1129,29 @@ function lineBusinessTypeOpts(record) {
 
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const contractTypeOpts = contractTypeOptions.map((v) => ({ label: v, value: v }))
+
+const contractNoOpts = computed(() => {
+  const type =
+    form.contractType === '标准合同' || form.contractType === '框架合同' ? form.contractType : ''
+  return getActiveSalesContractOptions(form.customerName || '', type)
+})
+
+function isContractPriceLocked(record) {
+  return record?.priceSource === 'contract'
+}
+
+function onContractNoChange() {
+  repriceLinesForCustomer()
+}
+
+watch(
+  () => form.contractType,
+  () => {
+    if (form.contractType === '临时合同') return
+    const stillValid = contractNoOpts.value.some((o) => o.value === form.contractNo)
+    if (!stillValid) form.contractNo = undefined
+  },
+)
 const currencyOpts = settlementCurrencyOptions.map((v) => ({ label: v, value: v }))
 const orderTypeOpts = orderTypeOptions.map((v) => ({ label: v, value: v }))
 const deliveryMethodOpts = deliveryMethodOptions.map((v) => ({ label: v, value: v }))
@@ -1502,7 +1542,7 @@ function toggleTaxMode() {
 
 function repriceLinesForCustomer() {
   const customer = getCustomerByName(form.customerName)
-  const contract = form.contractNo ? getFrameworkContractByNo(form.contractNo) : null
+  const contract = form.contractNo ? getSalesContractByNo(form.contractNo) : null
   form.lineItems.forEach((line) => {
     if (line.isManualLine) return
     const master = line.productId
@@ -1653,7 +1693,7 @@ function mapPickerToSalesLine(payload) {
   const listPrice = master?.unitPrice ?? payload.unitPrice ?? 0
   const taxRate = master?.outputTaxRate ?? 13
   const customer = getCustomerByName(form.customerName)
-  const contract = form.contractNo ? getFrameworkContractByNo(form.contractNo) : null
+  const contract = form.contractNo ? getSalesContractByNo(form.contractNo) : null
   const pricing = resolveSalesLinePrice({
     customer,
     contract,
@@ -1793,8 +1833,6 @@ function handleSave() {
   }
   recalcAll()
 
-  const orderNo = form.orderNo?.trim() || generateSalesOrderNo()
-
   if (!form.lineItems.length) {
     message.warning('请至少添加一条销售明细')
     return
@@ -1806,6 +1844,28 @@ function handleSave() {
     return
   }
 
+  const pricing = orderPricing.value
+  const contract = form.contractNo ? getSalesContractByNo(form.contractNo) : null
+  const quotaWarn = checkContractQuotaWarning(
+    contract,
+    pricing.amountInTax || pricing.orderAmount || 0,
+    pricing.totalQty || 0,
+  )
+  if (quotaWarn.warn) {
+    Modal.confirm({
+      title: '合同额度预警',
+      content: quotaWarn.message,
+      okText: '仍要保存',
+      cancelText: '返回修改',
+      onOk: () => persistOrder(),
+    })
+    return
+  }
+  persistOrder()
+}
+
+function persistOrder() {
+  const orderNo = form.orderNo?.trim() || generateSalesOrderNo()
   const pricing = orderPricing.value
   // 配件清单由用户手工维护，保存时不再自动同步标准包
   const payload = {

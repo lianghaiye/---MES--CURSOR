@@ -136,12 +136,15 @@
           <template v-else-if="column.key === 'productInfo'">
             <span :title="formatQcProductInfo(record)">{{ formatQcProductInfo(record) }}</span>
           </template>
-          <template v-else-if="column.key === 'inspectQty' || column.key === 'acceptInboundQty'">
+          <template v-else-if="column.key === 'inspectQty'">
             {{
-              record[column.key] === '' || record[column.key] == null
+              record.inspectQty === '' || record.inspectQty == null
                 ? '—'
-                : formatQty(record[column.key])
+                : formatQty(record.inspectQty)
             }}
+          </template>
+          <template v-else-if="column.key === 'acceptInboundQty'">
+            {{ formatAcceptConcession(record) }}
           </template>
           <template v-else>
             {{ record[column.dataIndex] ?? record[column.key] ?? '—' }}
@@ -159,7 +162,7 @@
         type="info"
         show-icon
         class="qc-qty-hint-alert"
-        message="已按质检「合格入库数量」带入本次入库数量，可改小，不可超过可入库数量。"
+        message="已按质检「合格数 + 让步合格数」带入本次入库数量，可改小，不可超过可入库数量。"
       />
       <a-table
         :columns="lineColumns"
@@ -295,9 +298,9 @@ const qcResultColumns = [
   { title: '质检方式', dataIndex: 'inspectMethod', key: 'inspectMethod', width: 90 },
   { title: '质检数量', key: 'inspectQty', width: 90, align: 'right' },
   { title: '处理方案', dataIndex: 'treatmentPlan', key: 'treatmentPlan', width: 100 },
-  { title: '合格入库数', key: 'acceptInboundQty', width: 100, align: 'right' },
+  { title: '合格/让步', key: 'acceptInboundQty', width: 120, align: 'right' },
   {
-    title: '退/换货',
+    title: '返工/报废',
     dataIndex: 'returnExchange',
     key: 'returnExchange',
     width: 120,
@@ -342,7 +345,33 @@ const workOrderText = computed(() =>
 const totalQty = computed(() => lines.value.reduce((sum, line) => sum + (Number(line.qty) || 0), 0))
 
 function lineMaxQty(line) {
+  const a = Number(line.acceptInboundQty)
+  const c = Number(line.concessionQty)
+  let sum = 0
+  if (Number.isFinite(a) && a > 0) sum += a
+  if (Number.isFinite(c) && c > 0) sum += c
+  if (sum > 0) return sum
   return Number(line.acceptInboundQty) || Number(line.inspectQty) || Number(line.receiptQty) || 0
+}
+
+function formatAcceptConcession(record = {}) {
+  const a = Number(record.acceptInboundQty)
+  const c = Number(record.concessionQty)
+  const parts = []
+  if (Number.isFinite(a) && a > 0) parts.push(`合格 ${formatQty(a)}`)
+  if (Number.isFinite(c) && c > 0) parts.push(`让步 ${formatQty(c)}`)
+  if (parts.length) return parts.join(' / ')
+  if (record.acceptInboundQty === '' || record.acceptInboundQty == null) return '—'
+  return formatQty(record.acceptInboundQty)
+}
+
+function formatReturnScrap(line = {}) {
+  const r = Number(line.returnQty)
+  const e = Number(line.exchangeQty)
+  const parts = []
+  if (Number.isFinite(r) && r > 0) parts.push(`返工 ${formatQty(r)}`)
+  if (Number.isFinite(e) && e > 0) parts.push(`报废 ${formatQty(e)}`)
+  return parts.length ? parts.join(' / ') : '—'
 }
 
 function listWorkOrders() {
@@ -448,7 +477,8 @@ const qcResultRows = computed(() =>
       inspectQty: line.inspectQty,
       treatmentPlan: line.treatmentPlan || '',
       acceptInboundQty: line.acceptInboundQty,
-      returnExchange: line.returnExchange || '',
+      concessionQty: line.concessionQty,
+      returnExchange: line.returnExchange || formatReturnScrap(line),
     })),
   ),
 )

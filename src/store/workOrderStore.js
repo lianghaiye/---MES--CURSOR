@@ -562,7 +562,7 @@ export function updateWorkOrder(id, patch, options = {}) {
     prevStatus !== '完成' &&
     prevStatus !== '已完成' &&
     (row.status === '完成' || row.status === '已完成')
-  if (becameComplete) {
+  if (becameComplete && !options.skipCompletionDeduct) {
     if (row.status === '完成') row.status = '已完成'
     const finishedQty =
       Number(row.finishedQty) || Number(row.scheduleQty) || Number(row.planQty) || 0

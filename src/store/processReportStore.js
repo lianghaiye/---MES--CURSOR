@@ -34,6 +34,7 @@ import {
   upsertMobileWageItemFromProcessReport,
 } from '@/utils/mobileLaborWagePush'
 import { persistJson, safeRemoveItem, safeSetItem } from '@/utils/safeStorage'
+import { pushMobileTasks } from '@/utils/mobileTaskDispatch'
 
 function syncRecordToMobile(record) {
   if (!isPushedToMobile(record.pushStatus)) return
@@ -159,6 +160,177 @@ export function reloadProcessReports() {
 export function resetProcessReportMockData() {
   clearProcessReportStorage()
   processReportState.records = loadRecords()
+}
+
+/** 返工单关联的工序报工任务 */
+export function listProcessReportsByReworkOrderId(reworkOrderId) {
+  if (!reworkOrderId) return []
+  return processReportState.records
+    .filter((r) => r.reworkOrderId === reworkOrderId)
+    .map(enrichProcessReportRecord)
+}
+
+/**
+ * 创建返工单后：按重做工序生成工序报工「待报工」任务，并同步小程序待办
+ */
+export function createReworkProcessReportTasks(reworkOrder, workOrder = null) {
+  if (!reworkOrder?.id || !(reworkOrder.processes || []).length) {
+    return { ok: false, message: '返工单无重做工序', records: [], mobileCount: 0 }
+  }
+  const wo = workOrder
+  const stamp = Date.now()
+  const dateStr = dayjs().format('YYYYMMDD')
+  const createdAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const records = []
+  const mobileTasks = []
+
+  ;(reworkOrder.processes || []).forEach((line, index) => {
+    const processName = line.processName
+    const targetQty = Math.max(0, Number(line.qty) || Number(reworkOrder.qty) || 0)
+    const woProc = (wo?.processes || []).find((p) => p.name === processName)
+    const originalExecutors = line.originalExecutors?.length
+      ? [...line.originalExecutors]
+      : [...(woProc?.executors || [])]
+    const reporter = String(line.reworkAssignee || '').trim() || originalExecutors[0] || ''
+    const taskExecutors = reporter ? [reporter] : [...originalExecutors]
+    const team =
+      woProc?.resourceType === '工人小组' || woProc?.resourceType === '小组'
+        ? originalExecutors.join('、')
+        : wo?.workCenter || ''
+    const taskNo = `RW${dateStr}${String((stamp % 1000) + index + 1).padStart(3, '0')}`
+    const id = `pr-rw-${reworkOrder.id}-${index}`
+
+    records.push(
+      normalizeProcessReport({
+        id,
+        source: 'workorder',
+        isRework: true,
+        reworkOrderId: reworkOrder.id,
+        reworkNo: reworkOrder.reworkNo,
+        workOrderId: reworkOrder.workOrderId || wo?.id || '',
+        workOrderNo: reworkOrder.workOrderNo || wo?.code || '',
+        taskNo,
+        productCode: reworkOrder.productCode || wo?.productCode || wo?.materialCode || '',
+        productName: reworkOrder.productName || wo?.productName || '',
+        processName,
+        reporter,
+        operator: reporter || '系统',
+        originalExecutors,
+        reworkAssignee: reporter,
+        goodQty: 0,
+        defectQty: 0,
+        finishedQty: 0,
+        scheduleQty: targetQty,
+        targetQty,
+        reportMode: woProc?.reportMode || '批量计件',
+        team,
+        status: '待报工',
+        taskStatus: '待报工',
+        remark: `返工：${reworkOrder.reason || ''}`.trim(),
+        createdAt,
+        reportedAt: '',
+        defectItemIds: [],
+        defectItemNames: [],
+        defectReason: '',
+        rejectReason: '',
+        images: [],
+        reportQtyMode: 'schedule',
+        wageQtyMode: 'reported',
+        workItems: [],
+        reworkAppliedQty: 0,
+      }),
+    )
+
+    mobileTasks.push({
+      id: `mobile-rw-${reworkOrder.id}-${index}`,
+      taskNo,
+      workOrderId: reworkOrder.workOrderId || wo?.id || '',
+      workOrderCode: reworkOrder.workOrderNo || wo?.code || '',
+      workOrderName: wo?.name || '',
+      processName,
+      processSeq: line.processIndex || index + 1,
+      productName: reworkOrder.productName || wo?.productName || '',
+      itemCode: reworkOrder.productCode || wo?.productCode || '',
+      expectedQty: targetQty,
+      scheduleQty: targetQty,
+      executor: reporter,
+      executors: taskExecutors,
+      claimTargets: [],
+      taskStatus: '待报工',
+      placement: 'todo',
+      isRework: true,
+      reworkOrderId: reworkOrder.id,
+      reworkNo: reworkOrder.reworkNo,
+      processReportId: id,
+      orderCategory: wo?.orderCategory || '生产工单',
+      createdAt,
+      remark: `返工任务 · ${reworkOrder.reworkNo}`,
+    })
+  })
+
+  processReportState.records = [...records, ...processReportState.records]
+  saveRecords(processReportState.records)
+  const mobileCount = pushMobileTasks(mobileTasks)
+  reworkOrder.processReportTaskIds = records.map((r) => r.id)
+  return { ok: true, records, mobileCount, message: `已生成 ${records.length} 条返工任务` }
+}
+
+/** 工序报工：对待报工返工任务提交报工，并冲减返工单待重做 */
+export function submitReworkProcessReportTask(recordId, payload = {}, operator = 'admin1') {
+  const row = processReportState.records.find((r) => r.id === recordId)
+  if (!row) return { ok: false, message: '任务不存在' }
+  if (!row.isRework) return { ok: false, message: '非返工任务' }
+  if (row.status !== '待报工') return { ok: false, message: '仅待报工任务可提交' }
+  const goodQty = Number(payload.goodQty)
+  if (!(goodQty > 0)) return { ok: false, message: '报工数量须大于 0' }
+  const target = Math.max(0, Number(row.targetQty ?? row.scheduleQty) || 0)
+  if (target > 0 && goodQty > target + 1e-9) {
+    return { ok: false, message: `超过待重做数量（${target}）` }
+  }
+
+  // eslint-disable-next-line global-require
+  const { reportAgainstReworkOrder } = require('@/store/reworkOrderStore')
+  const applyRes = reportAgainstReworkOrder(row.reworkOrderId, {
+    processName: row.processName,
+    goodQty,
+    reporter: payload.reporter || row.reporter || operator,
+    remark: payload.remark || '',
+    processReportId: row.id,
+    taskNo: row.taskNo,
+  })
+  if (!applyRes.ok) return applyRes
+
+  const updated = updateRecord(recordId, {
+    goodQty,
+    defectQty: Number(payload.defectQty) || 0,
+    finishedQty: goodQty + (Number(payload.defectQty) || 0),
+    status: '待审核',
+    taskStatus: TASK_STATUS.REPORTED,
+    reporter: payload.reporter || row.reporter || operator,
+    operator: payload.reporter || row.reporter || operator,
+    remark: payload.remark != null ? payload.remark : row.remark,
+    reworkAppliedQty: goodQty,
+    reportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+  })
+  return { ok: true, record: updated, message: applyRes.message }
+}
+
+/** 关闭返工单时取消尚未报工的返工任务 */
+export function cancelReworkProcessReportTasks(reworkOrderId) {
+  if (!reworkOrderId) return 0
+  let count = 0
+  processReportState.records.forEach((row, idx) => {
+    if (row.reworkOrderId !== reworkOrderId || row.status !== '待报工') return
+    processReportState.records[idx] = {
+      ...row,
+      status: '已取消',
+      taskStatus: '已取消',
+      updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    }
+    count += 1
+  })
+  if (count) saveRecords(processReportState.records)
+  return count
 }
 
 /** 批量导入报工记录（Excel） */
@@ -309,6 +481,12 @@ function updateRecord(id, patch) {
 export function approveProcessReport(id, operator = 'admin1') {
   const row = processReportState.records.find((r) => r.id === id)
   if (!row) return { ok: false, message: '记录不存在' }
+  if (row.status === '待报工') {
+    return { ok: false, message: '待报工任务请先报工再审核' }
+  }
+  if (row.status === '已取消') {
+    return { ok: false, message: '已取消任务不可审核' }
+  }
   if (row.taskStatus === TASK_STATUS.AUDITED || row.status === '已审核') {
     return { ok: false, message: '该记录已审核' }
   }
@@ -341,12 +519,28 @@ export function rejectProcessReport(id, reason, operator = 'admin1') {
   if (row.taskStatus === TASK_STATUS.AUDITED || row.status === '已审核') {
     return { ok: false, message: '已审核记录不可拒绝' }
   }
+  if (row.status === '待报工' || row.status === '已取消') {
+    return { ok: false, message: '待报工/已取消任务不可审核拒绝' }
+  }
   if (!reason?.trim()) return { ok: false, message: '请填写拒绝原因' }
+
+  // 返工任务已冲减待重做：拒绝时回滚
+  if (row.isRework && Number(row.reworkAppliedQty) > 0 && row.reworkOrderId) {
+    // eslint-disable-next-line global-require
+    const { rollbackReworkOrderReport } = require('@/store/reworkOrderStore')
+    rollbackReworkOrderReport(row.reworkOrderId, {
+      processName: row.processName,
+      goodQty: row.reworkAppliedQty,
+      remark: `工序报工拒绝回滚：${reason.trim()}`,
+    })
+  }
+
   const updated = updateRecord(id, {
     status: '已拒绝',
     rejectReason: reason.trim(),
     auditedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     auditor: operator,
+    reworkAppliedQty: 0,
   })
   appendRecordLog(row, {
     operator,

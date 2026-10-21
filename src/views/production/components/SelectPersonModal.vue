@@ -91,6 +91,7 @@ import { mockEmployees } from '@/mock/workOrderMaster'
 const props = defineProps({
   open: { type: Boolean, default: false },
   selected: { type: Array, default: () => [] },
+  multiple: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -115,10 +116,27 @@ const filteredList = computed(() =>
   }),
 )
 
+function applySingle(record) {
+  if (!record) {
+    selectedRowKeys.value = []
+    selectedRows.value = []
+    return
+  }
+  selectedRowKeys.value = [record.id]
+  selectedRows.value = [record]
+}
+
 const rowSelection = computed(() => ({
+  type: props.multiple ? 'checkbox' : 'radio',
   selectedRowKeys: selectedRowKeys.value,
   preserveSelectedRowKeys: true,
   onChange: (keys, rows) => {
+    if (!props.multiple) {
+      const key = keys[keys.length - 1]
+      const row = rows.find((r) => r.id === key) || mockEmployees.find((r) => r.id === key)
+      applySingle(row)
+      return
+    }
     selectedRowKeys.value = keys
     const map = new Map(selectedRows.value.map((r) => [r.id, r]))
     rows.forEach((r) => map.set(r.id, r))
@@ -130,6 +148,10 @@ const rowSelection = computed(() => ({
 
 function toggleRow(record) {
   const key = record.id
+  if (!props.multiple) {
+    applySingle(selectedRowKeys.value[0] === key ? null : record)
+    return
+  }
   const idx = selectedRowKeys.value.indexOf(key)
   if (idx >= 0) {
     selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== key)
@@ -148,6 +170,8 @@ function customRow(record) {
       if (
         target?.closest?.('.ant-checkbox-wrapper') ||
         target?.closest?.('.ant-checkbox') ||
+        target?.closest?.('.ant-radio-wrapper') ||
+        target?.closest?.('.ant-radio') ||
         target?.closest?.('input')
       ) {
         return

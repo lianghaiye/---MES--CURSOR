@@ -30,8 +30,20 @@
             >
               生成入库单
             </a-button>
+            <a-button
+              v-if="canShowProcessInbound"
+              type="primary"
+              size="small"
+              :loading="processInboundSaving"
+              @click="openProcessInbound"
+            >
+              生成入库单
+            </a-button>
             <a-button v-if="canInspect" type="primary" size="small" @click="openInspect">
               质检
+            </a-button>
+            <a-button v-if="canCreateRework" type="primary" size="small" ghost @click="openRework">
+              发起返工
             </a-button>
             <a-button v-if="canPrint" size="small" @click="openPrint">打印</a-button>
             <a-button size="small" @click="handleBack">返回列表</a-button>
@@ -226,7 +238,9 @@ import {
   formatTreatmentPlanDisplay,
   getDispositionFieldLabels,
   isMultiBucketDisposition,
+  resolveInboundableQty,
 } from '@/utils/qcTreatmentPlan'
+import { createInboundFromProcessQc } from '@/store/inboundOrderStore'
 import { getQcTaskRouteBundle } from '@/utils/qcTaskRoutes'
 import { isProductionQcScope, resolveProductionQcHeader } from '@/utils/qcProductionContext'
 import { evaluateQcInboundGate, resolveSourceReceiptForQcTask } from '@/utils/qcInboundFromReceipt'
@@ -245,6 +259,10 @@ import OutsourcingGenerateInboundModal from '@/views/procurement/components/Outs
 import QcLineFieldValuesReadonly from './components/QcLineFieldValuesReadonly.vue'
 import QcTaskPrintModal from './components/QcTaskPrintModal.vue'
 import FinishedQcInboundModal from './components/FinishedQcInboundModal.vue'
+import { REWORK_ORDER_SOURCE } from '@/constants/reworkOrder'
+import { getWorkOrders } from '@/store/workOrderStore'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { findCreatePageByListPath } from '@/config/createPages'
 
 onMounted(() => {
   ensureQcLibraryDemoSeed()
@@ -351,13 +369,53 @@ const canShowGenerateInbound = computed(() => {
   return evaluateQcInboundGate(task.value).ok
 })
 
+function productionTaskHasInboundableQty(row) {
+  if (!row) return false
+  return (row.lineItems || []).some((line) => {
+    if (resolveInboundableQty(line) > 0) return true
+    return Number(line.acceptInboundQty) > 0
+  })
+}
+
 const canShowFinishedInbound = computed(() => {
   if (!task.value) return false
   if ((route.meta.bizScope || task.value.bizScope) !== '成品检') return false
   if (hasInboundOrder(task.value)) return false
   if (task.value.qcStatus !== QC_TASK_STATUS.COMPLETED) return false
-  if (task.value.qcResult === QC_TASK_RESULT.FAIL) return false
+  if (task.value.qcResult === QC_TASK_RESULT.FAIL && !productionTaskHasInboundableQty(task.value)) {
+    return false
+  }
   return true
+})
+
+const processInboundSaving = ref(false)
+const canShowProcessInbound = computed(() => {
+  if (!task.value) return false
+  if ((route.meta.bizScope || task.value.bizScope) !== '生产过程检') return false
+  if (hasInboundOrder(task.value)) return false
+  if (task.value.qcStatus !== QC_TASK_STATUS.COMPLETED) return false
+  if (task.value.qcResult === QC_TASK_RESULT.FAIL && !productionTaskHasInboundableQty(task.value)) {
+    return false
+  }
+  return true
+})
+
+function sumQcReworkQty(row) {
+  return (row?.lineItems || []).reduce((sum, line) => {
+    const n = Number(line.returnQty)
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0)
+  }, 0)
+}
+
+/** 过程检 / 成品检完成后：有返工数，或不通过/部分通过时可发起返工 */
+const canCreateRework = computed(() => {
+  if (!task.value || !isProductionScope.value) return false
+  if (task.value.qcStatus !== QC_TASK_STATUS.COMPLETED) return false
+  if (String(task.value.reworkOrderNo || '').trim()) return false
+  if (sumQcReworkQty(task.value) > 0) return true
+  return (
+    task.value.qcResult === QC_TASK_RESULT.FAIL || task.value.qcResult === QC_TASK_RESULT.PARTIAL
+  )
 })
 
 const basicFields = computed(() => {
@@ -384,6 +442,9 @@ const basicFields = computed(() => {
   }
   fields.push(
     { key: 'inboundOrderNo', label: '入库单号', value: t.inboundOrderNo },
+    ...(isProductionScope.value
+      ? [{ key: 'reworkOrderNo', label: '返工单号', value: t.reworkOrderNo }]
+      : []),
     {
       key: 'inspectMethod',
       label: '质检方式',
@@ -503,6 +564,63 @@ function openPrint() {
   printModalOpen.value = true
 }
 
+function resolveTaskWorkOrder(t) {
+  if (!t) return null
+  const list = getWorkOrders() || []
+  if (t.workOrderId) {
+    const byId = list.find((o) => o.id === t.workOrderId)
+    if (byId) return byId
+  }
+  const nos = [t.workOrderNo, t.sourceDocNo].map((v) => String(v || '').trim()).filter(Boolean)
+  if (!nos.length) return null
+  return list.find((o) => nos.includes(String(o.code || o.orderNo || '').trim())) || null
+}
+
+function openRework() {
+  const t = task.value
+  if (!t) return
+  const wo = resolveTaskWorkOrder(t)
+  const header = productionHeader.value
+  const reworkQty = sumQcReworkQty(t)
+  const qty =
+    Math.max(
+      1,
+      reworkQty ||
+        Number(t.lineItems?.[0]?.inspectQty) ||
+        Number(header.scheduleQty) ||
+        Number(t.scheduleQty) ||
+        1,
+    ) || 1
+  const source =
+    (route.meta.bizScope || t.bizScope) === '成品检'
+      ? REWORK_ORDER_SOURCE.FINISHED_QC
+      : REWORK_ORDER_SOURCE.PROCESS_QC
+  const processNames = []
+  if (header.processName) processNames.push(header.processName)
+  else if (t.processName) processNames.push(t.processName)
+  else if (wo?.processes?.length) {
+    wo.processes.forEach((p) => {
+      const name = String(p.name || p.processName || '').trim()
+      if (name) processNames.push(name)
+    })
+  }
+  const page = findCreatePageByListPath('/production/rework-orders')
+  if (!page) return
+  openCreateTab(router, openTab, {
+    path: page.newPath,
+    title: page.title,
+    query: {
+      workOrderId: wo?.id || t.workOrderId || '',
+      qty: String(qty),
+      reason: t.treatmentPlan || t.remark || t.qcResult || '',
+      source,
+      processNames: processNames.join(','),
+      qcTaskId: t.id,
+      qcTaskNo: t.qcNo,
+    },
+  })
+}
+
 function applyInboundGateToHints(gate) {
   inboundQcQtyHints.value = gate.qtyHints || null
   inboundQcEnforceCap.value = Boolean(gate.enforceQtyCap && gate.qtyHints)
@@ -512,6 +630,27 @@ function openFinishedInbound() {
   if (!task.value) return
   finishedInboundTasks.value = [task.value]
   finishedInboundOpen.value = true
+}
+
+function openProcessInbound() {
+  if (!task.value || processInboundSaving.value) return
+  processInboundSaving.value = true
+  try {
+    const result = createInboundFromProcessQc(task.value)
+    if (!result.ok) {
+      message.warning(result.message || '生成半成品入库单失败')
+      return
+    }
+    message.success(result.message || '已生成半成品入库单')
+    loadTask()
+    if (result.order?.id) {
+      const path = `/inventory/inbound/${result.order.id}`
+      openTab(path, `入库单 ${result.order.docNo || ''}`.trim())
+      router.push({ name: 'inventory-inbound-detail', params: { id: result.order.id } })
+    }
+  } finally {
+    processInboundSaving.value = false
+  }
 }
 
 function onFinishedInboundSaved(orders) {

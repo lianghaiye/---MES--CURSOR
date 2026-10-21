@@ -1,0 +1,217 @@
+import dayjs from 'dayjs'
+import { REWORK_ORDER_STATUS, REWORK_ORDER_SOURCE } from '@/constants/reworkOrder'
+
+export function createReworkProcessLine(partial = {}) {
+  const qty = Number(partial.qty) || 0
+  const doneQty = Number(partial.doneQty) || 0
+  const rest = { ...partial }
+  delete rest.pendingQty
+  return {
+    processId: '',
+    processName: '',
+    processIndex: 0,
+    originalExecutors: [],
+    reworkAssignee: '',
+    ...rest,
+    qty,
+    doneQty,
+    pendingQty: Math.max(0, qty - doneQty),
+  }
+}
+
+export function createReworkOrder(partial = {}) {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const { processes: inputProcesses, ...rest } = partial
+  const processes = (inputProcesses || []).map((p) => createReworkProcessLine(p))
+  const qty = Number(rest.qty) || processes[0]?.qty || 0
+  return {
+    id: '',
+    reworkNo: '',
+    status: REWORK_ORDER_STATUS.PENDING,
+    source: REWORK_ORDER_SOURCE.WORKSHOP_WEB,
+    workOrderId: '',
+    workOrderNo: '',
+    workOrderCategory: '',
+    productName: '',
+    productCode: '',
+    specModel: '',
+    material: '',
+    drawingNo: '',
+    workCenter: '',
+    processRouteName: '',
+    scheduleQty: 0,
+    planQty: 0,
+    reason: '',
+    remark: '',
+    qcTaskId: '',
+    qcTaskNo: '',
+    creator: 'admin1',
+    createdAt: now,
+    updatedAt: now,
+    completedAt: '',
+    reportLogs: [],
+    ...rest,
+    qty,
+    processes,
+  }
+}
+
+export const REWORK_ORDER_SEED_VERSION = '2'
+export const REWORK_ORDER_SEED_VERSION_KEY = 'i_doms_rework_orders_seed_v'
+
+export function seedReworkOrders() {
+  const today = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss')
+  const twoDaysAgo = dayjs().subtract(2, 'day').format('YYYY-MM-DD HH:mm:ss')
+  return [
+    createReworkOrder({
+      id: 'rw-demo-1',
+      reworkNo: 'FG20261021001',
+      status: REWORK_ORDER_STATUS.PENDING,
+      source: REWORK_ORDER_SOURCE.PROCESS_QC,
+      workOrderId: 'wo-rework-mock-1',
+      workOrderNo: 'WO-RW-001',
+      workOrderCategory: '生产工单',
+      productName: '潜水电泵 QJ200-40/3',
+      productCode: 'CP2610004',
+      specModel: 'QJ200-40/3',
+      material: 'HT200',
+      drawingNo: 'DWG-QJ200',
+      workCenter: '机加车间',
+      processRouteName: '机加标准路线',
+      scheduleQty: 20,
+      planQty: 20,
+      qty: 2,
+      creator: '质检员',
+      createdAt: today,
+      updatedAt: today,
+      reason: '尺寸超差',
+      processes: [
+        {
+          processName: '粗车',
+          processIndex: 2,
+          qty: 2,
+          doneQty: 0,
+          originalExecutors: ['李四'],
+          reworkAssignee: '张三',
+        },
+        {
+          processName: '精车',
+          processIndex: 3,
+          qty: 2,
+          doneQty: 0,
+          originalExecutors: ['李四'],
+          reworkAssignee: '张三',
+        },
+      ],
+      processReportTaskIds: ['pr-rw-demo-1-0', 'pr-rw-demo-1-1'],
+      remark: '过程检判定超差，指定张三返工',
+    }),
+    createReworkOrder({
+      id: 'rw-demo-2',
+      reworkNo: 'FG20261021002',
+      status: REWORK_ORDER_STATUS.IN_PROGRESS,
+      source: REWORK_ORDER_SOURCE.WORKSHOP_WEB,
+      workOrderId: 'wo-lh-demo-1',
+      workOrderNo: 'WO202605270-LH01',
+      workOrderCategory: '生产工单',
+      productName: '工时演示-批量计件计件',
+      productCode: 'LH-MAT-01',
+      specModel: 'DEMO-BC-P',
+      material: 'HT250',
+      drawingNo: 'LH-01-DWG',
+      workCenter: '机加车间',
+      processRouteName: '机加标准路线',
+      scheduleQty: 10,
+      planQty: 10,
+      qty: 3,
+      creator: 'admin1',
+      createdAt: yesterday,
+      updatedAt: today,
+      reason: '气孔超标',
+      processes: [
+        {
+          processName: '机加工',
+          processIndex: 1,
+          qty: 3,
+          doneQty: 1,
+          originalExecutors: ['张三'],
+          reworkAssignee: '张三',
+        },
+      ],
+      processReportTaskIds: ['pr-rw-demo-2-0'],
+      remark: '已报 1 件，剩余待返工',
+    }),
+    createReworkOrder({
+      id: 'rw-demo-3',
+      reworkNo: 'FG20261020003',
+      status: REWORK_ORDER_STATUS.DONE,
+      source: REWORK_ORDER_SOURCE.FINISHED_QC,
+      workOrderId: 'wo-pr-1',
+      workOrderNo: 'WO-062',
+      workOrderCategory: '生产工单',
+      productName: '货架支架',
+      productCode: 'SJ-2024-A',
+      specModel: '1200×600mm',
+      material: 'Q235',
+      drawingNo: 'SJ-2024-A-DWG',
+      workCenter: '焊接车间',
+      processRouteName: '标准焊接工艺 v2',
+      scheduleQty: 25,
+      planQty: 25,
+      qty: 4,
+      creator: '质检员',
+      createdAt: twoDaysAgo,
+      updatedAt: yesterday,
+      completedAt: yesterday,
+      reason: '焊缝未熔合',
+      processes: [
+        {
+          processName: '点焊',
+          processIndex: 1,
+          qty: 4,
+          doneQty: 4,
+          originalExecutors: ['张三'],
+          reworkAssignee: '张三',
+        },
+      ],
+      processReportTaskIds: ['pr-rw-demo-3-0'],
+      remark: '成品检返工已全部报完',
+    }),
+    createReworkOrder({
+      id: 'rw-demo-4',
+      reworkNo: 'FG20261019004',
+      status: REWORK_ORDER_STATUS.CLOSED,
+      source: REWORK_ORDER_SOURCE.WORKSHOP_MOBILE,
+      workOrderId: 'wo-rework-mock-2',
+      workOrderNo: 'WO-RW-002',
+      workOrderCategory: '生产工单',
+      productName: '立式多级离心泵',
+      productCode: 'CP2610002',
+      specModel: 'ISG80-160',
+      material: 'HT250',
+      drawingNo: 'ISG80-160-DWG',
+      workCenter: '机加车间',
+      processRouteName: '机加标准路线',
+      scheduleQty: 10,
+      planQty: 10,
+      qty: 1,
+      creator: '车间工人',
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+      reason: '',
+      processes: [
+        {
+          processName: '钻孔',
+          processIndex: 4,
+          qty: 1,
+          doneQty: 0,
+          originalExecutors: ['王五'],
+          reworkAssignee: '王五',
+        },
+      ],
+      processReportTaskIds: [],
+      remark: '现场关闭，未继续返工',
+    }),
+  ]
+}

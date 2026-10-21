@@ -180,10 +180,11 @@
               :precision="4"
               :formatter="inputNumberFormatter"
               :parser="inputNumberParser"
-              :disabled="!props.taxModeExcluding"
+              :disabled="!props.taxModeExcluding || contractPriceLocked"
               style="width: 100%"
               @change="onUnitPriceExTaxEdit"
             />
+            <div v-if="contractPriceLocked" class="field-hint">合同协议价不可改</div>
           </a-form-item>
         </a-col>
         <a-col :span="8">
@@ -195,7 +196,7 @@
               :precision="4"
               :formatter="inputNumberFormatter"
               :parser="inputNumberParser"
-              :disabled="props.taxModeExcluding"
+              :disabled="props.taxModeExcluding || contractPriceLocked"
               style="width: 100%"
               @change="onUnitPriceInTaxEdit"
             />
@@ -423,7 +424,10 @@ const linkedCatalogBom = computed(() => {
   return getOwnActiveBomForItem('product', draft.productId)
 })
 
-const lineDiscountReadOnly = computed(() => isLineDiscountDisabled(props.discountStrategy))
+const contractPriceLocked = computed(() => draft.priceSource === 'contract')
+const lineDiscountReadOnly = computed(
+  () => isLineDiscountDisabled(props.discountStrategy) || contractPriceLocked.value,
+)
 
 const priceEditMode = ref('unitPriceInTax') // unitPriceExTax | unitPriceInTax | discount
 

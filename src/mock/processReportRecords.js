@@ -11,11 +11,11 @@ import { createProcessReportQuickSeed } from '@/mock/processReportQuickSeed'
 
 export const PROCESS_REPORT_STORAGE_KEY = 'i_doms_mobile_process_report_records'
 export const PROCESS_REPORT_SEED_VERSION_KEY = 'i_doms_process_report_seed_v'
-export const PROCESS_REPORT_SEED_VERSION = '13'
+export const PROCESS_REPORT_SEED_VERSION = '14'
 export const PROCESS_REPORT_WO_LOG_KEY = 'i_doms_process_report_wo_logs'
 export const PROCESS_REPORT_QUICK_LOG_KEY = 'i_doms_process_report_quick_logs'
 
-export const RECORD_STATUS = ['待审核', '已审核', '已拒绝']
+export const RECORD_STATUS = ['待报工', '待审核', '已审核', '已拒绝', '已取消']
 
 export function formatReportDate(d = new Date()) {
   const y = d.getFullYear()
@@ -80,8 +80,13 @@ export function filterProcessReports(list, filters = {}) {
   if (filters.status) {
     rows = rows.filter((r) => r.status === filters.status)
   }
-  if (filters.source) {
-    rows = rows.filter((r) => r.source === filters.source)
+  if (filters.source === 'rework') {
+    rows = rows.filter((r) => r.isRework)
+  } else if (filters.source) {
+    rows = rows.filter((r) => r.source === filters.source && !r.isRework)
+  }
+  if (filters.reworkOrderId) {
+    rows = rows.filter((r) => r.reworkOrderId === filters.reworkOrderId)
   }
   if (filters.keyword?.trim()) {
     const kw = filters.keyword.trim().toLowerCase()
@@ -91,7 +96,9 @@ export function filterProcessReports(list, filters = {}) {
         r.productName?.toLowerCase().includes(kw) ||
         r.productCode?.toLowerCase().includes(kw) ||
         r.processName?.toLowerCase().includes(kw) ||
-        r.reporter?.toLowerCase().includes(kw),
+        r.reporter?.toLowerCase().includes(kw) ||
+        r.reworkNo?.toLowerCase().includes(kw) ||
+        r.taskNo?.toLowerCase().includes(kw),
     )
   }
   if (filters.dateRange?.length === 2) {

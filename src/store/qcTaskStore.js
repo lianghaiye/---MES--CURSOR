@@ -570,6 +570,24 @@ export function attachQcTaskInboundOrder(id, { inboundOrderNo, inboundOrderId } 
   return row
 }
 
+/** 质检单回写返工单号 */
+export function attachQcTaskReworkOrder(id, { reworkOrderNo, reworkOrderId } = {}) {
+  const row = getQcTaskById(id)
+  if (!row) return null
+  const nos = String(row.reworkOrderNo || '')
+    .split(/[、,，]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const nextNo = String(reworkOrderNo || '').trim()
+  if (nextNo && !nos.includes(nextNo)) nos.push(nextNo)
+  Object.assign(row, {
+    reworkOrderNo: nos.join('、'),
+    reworkOrderId: reworkOrderId || row.reworkOrderId || '',
+    updatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+  })
+  return row
+}
+
 export const QC_TASK_STATUS_OPTIONS = Object.values(QC_TASK_STATUS)
 
 export function filterQcTasks(list = [], filters = {}) {

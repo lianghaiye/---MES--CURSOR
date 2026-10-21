@@ -1,5 +1,4 @@
 import { createBomLineItem, createBomTreeNode } from '@/mock/bomTemplates'
-import { createSpuLineDraft } from '@/utils/spuLineResolve'
 
 const ROOT_ID = 'bom-root'
 
@@ -195,6 +194,9 @@ export function addChildMaterial(flatNodes, lineItems, parentId, material) {
   let nodeTitle
 
   if (isSpu) {
+    // 延迟加载，避免 productBomSeed → bomTree → spuLineResolve → … → productionPlanStore 循环依赖
+    // eslint-disable-next-line global-require
+    const { createSpuLineDraft } = require('@/utils/spuLineResolve')
     const draft = createSpuLineDraft(material)
     line = createBomLineItem({
       parentTreeId: parentId,

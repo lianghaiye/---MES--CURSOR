@@ -1,12 +1,15 @@
 /**
- * 来料 / 外协回货检：处理方案与数量处置
+ * 质检数量处置（多数量桶）
  *
- * 两者均以「多数量桶」为主：合格/让步 + 次要/再次要处置；
+ * - 来料 / 外协回货：合格/让步 + 退换或返工报废
+ * - 生产过程检 / 成品检：合格数/让步合格数 + 返工数/报废数
  * treatmentPlan 由数量自动汇总，无需手选单一方案。
  */
 
 export const QC_BIZ_INCOMING = '来料质检'
 export const QC_BIZ_OUTSOURCING = '外协回货检'
+export const QC_BIZ_PROCESS = '生产过程检'
+export const QC_BIZ_FINISHED = '成品检'
 
 export const TREATMENT_REWORK = '返工'
 export const TREATMENT_SCRAP = '报废'
@@ -24,14 +27,22 @@ export function isIncomingQcScope(bizScope) {
   return bizScope === QC_BIZ_INCOMING
 }
 
-/** 来料 / 外协：数量拆分处置（无单选方案） */
+export function isProductionDispositionScope(bizScope) {
+  return bizScope === QC_BIZ_PROCESS || bizScope === QC_BIZ_FINISHED
+}
+
+/** 来料 / 外协 / 过程检 / 成品检：数量拆分处置（无单选方案） */
 export function isMultiBucketDisposition(bizScope) {
-  return isIncomingQcScope(bizScope) || isOutsourcingQcScope(bizScope)
+  return (
+    isIncomingQcScope(bizScope) ||
+    isOutsourcingQcScope(bizScope) ||
+    isProductionDispositionScope(bizScope)
+  )
 }
 
 /** @deprecated 选项仅作兼容；多桶模式下录入不再展示 */
 export function getQcTreatmentPlanOptions(bizScope) {
-  if (isOutsourcingQcScope(bizScope)) {
+  if (isOutsourcingQcScope(bizScope) || isProductionDispositionScope(bizScope)) {
     return [
       { label: TREATMENT_REWORK, value: TREATMENT_REWORK },
       { label: TREATMENT_SCRAP, value: TREATMENT_SCRAP },
@@ -47,9 +58,12 @@ export function getQcTreatmentPlanOptions(bizScope) {
   ]
 }
 
-/** 不合格时数量默认落入次要桶（来料退货 / 外协返工） */
+/** 不合格时数量默认落入次要桶（来料退货 / 外协·过程·成品返工） */
 export function getDefaultFailTreatmentPlan(bizScope) {
-  return isOutsourcingQcScope(bizScope) ? TREATMENT_REWORK : TREATMENT_RETURN
+  if (isOutsourcingQcScope(bizScope) || isProductionDispositionScope(bizScope)) {
+    return TREATMENT_REWORK
+  }
+  return TREATMENT_RETURN
 }
 
 export function isConcessionTreatmentPlan(plan) {
@@ -62,13 +76,27 @@ export function isConcessionTreatmentPlan(plan) {
  */
 export function remainGoesToScrapField(bizScope, plan) {
   const p = String(plan || '').trim()
-  if (isOutsourcingQcScope(bizScope)) {
+  if (isOutsourcingQcScope(bizScope) || isProductionDispositionScope(bizScope)) {
     return p === TREATMENT_SCRAP || p === TREATMENT_SCRAP_CLAIM
   }
   return p === TREATMENT_EXCHANGE
 }
 
 export function getDispositionFieldLabels(bizScope) {
+  if (isProductionDispositionScope(bizScope)) {
+    return {
+      accept: '合格数',
+      concession: '让步合格数',
+      secondary: '返工数',
+      tertiary: '报废数',
+      tip: '合格数 + 让步合格数 + 返工数 + 报废数 ≤ 排产数量（抽检时按整批排产拆分，非质检数量）',
+      columnReturnExchange: '返工/报废',
+      treatmentTip: '按数量拆分处置；上限为排产数量；处理方案由数量自动汇总，无需单选',
+      passOptionalTip: '合格可不填，默认全量合格；也可按需拆分',
+      qtyCapLabel: '排产',
+      mode: 'multi_bucket',
+    }
+  }
   if (isOutsourcingQcScope(bizScope)) {
     return {
       accept: '合格入库',
@@ -79,6 +107,7 @@ export function getDispositionFieldLabels(bizScope) {
       columnReturnExchange: '返工/报废',
       treatmentTip: '按数量拆分处置；上限为收货数量；处理方案由数量自动汇总，无需单选',
       passOptionalTip: '合格可不填，默认全量合格入库；也可按需拆分',
+      qtyCapLabel: '收货',
       mode: 'multi_bucket',
     }
   }
@@ -91,6 +120,7 @@ export function getDispositionFieldLabels(bizScope) {
     columnReturnExchange: '退/换货',
     treatmentTip: '按数量拆分处置；上限为收货数量；处理方案由数量自动汇总，无需单选',
     passOptionalTip: '合格可不填，默认全量合格入库；也可按需拆分',
+    qtyCapLabel: '收货',
     mode: 'multi_bucket',
   }
 }
@@ -105,6 +135,7 @@ function fmtQty(n, formatNumber) {
  * 由数量桶汇总处理方案文案（存 treatmentPlan）
  * 外协例：合格2/让步2/返工2/报废4
  * 来料例：合格2/让步2/退货2/换货2
+ * 过程/成品例：合格2/让步2/返工2/报废4
  */
 export function buildTreatmentPlanSummary(bizScope, line = {}, formatNumber) {
   const labels = getDispositionFieldLabels(bizScope)
@@ -115,15 +146,13 @@ export function buildTreatmentPlanSummary(bizScope, line = {}, formatNumber) {
   const s = Number(line.exchangeQty) || 0
   if (a > 0) parts.push(`合格${fmtQty(a, formatNumber)}`)
   if (c > 0) parts.push(`让步${fmtQty(c, formatNumber)}`)
-  if (r > 0) parts.push(`${labels.secondary}${fmtQty(r, formatNumber)}`)
-  if (s > 0) parts.push(`${labels.tertiary}${fmtQty(s, formatNumber)}`)
+  if (r > 0) parts.push(`${labels.secondary.replace(/数$/, '')}${fmtQty(r, formatNumber)}`)
+  if (s > 0) parts.push(`${labels.tertiary.replace(/数$/, '')}${fmtQty(s, formatNumber)}`)
   return parts.length ? parts.join('/') : ''
 }
 
 /**
  * 详情/列表展示用处理方案（完整标签；有数量桶则优先重算，否则回退已存文案）
- * 来料：合格入库：n/让步接收：n/退货：n/换货：n
- * 外协：合格入库：n/让步接收：n/返工：n/报废：n
  */
 export function formatTreatmentPlanDisplay(bizScope, line = {}, formatNumber) {
   const a = Number(line.acceptInboundQty) || 0
@@ -131,15 +160,14 @@ export function formatTreatmentPlanDisplay(bizScope, line = {}, formatNumber) {
   const r = Number(line.returnQty) || 0
   const s = Number(line.exchangeQty) || 0
   const hasQty = a > 1e-9 || c > 1e-9 || r > 1e-9 || s > 1e-9
-  if (hasQty && (isIncomingQcScope(bizScope) || isOutsourcingQcScope(bizScope))) {
+  if (hasQty && isMultiBucketDisposition(bizScope)) {
     const fmt = (n) => fmtQty(n, formatNumber)
-    const secondary = isOutsourcingQcScope(bizScope) ? '返工' : '退货'
-    const tertiary = isOutsourcingQcScope(bizScope) ? '报废' : '换货'
+    const labels = getDispositionFieldLabels(bizScope)
     return [
-      `合格入库：${fmt(a)}`,
-      `让步接收：${fmt(c)}`,
-      `${secondary}：${fmt(r)}`,
-      `${tertiary}：${fmt(s)}`,
+      `${labels.accept}：${fmt(a)}`,
+      `${labels.concession}：${fmt(c)}`,
+      `${labels.secondary}：${fmt(r)}`,
+      `${labels.tertiary}：${fmt(s)}`,
     ].join('/')
   }
   const stored = String(line.treatmentPlan || '').trim()

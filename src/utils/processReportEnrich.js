@@ -32,7 +32,11 @@ function resolveReporterWorkCenter(reporter) {
 function buildFallbackEnrichedRecord(record) {
   return {
     ...record,
-    reportSourceLabel: record.source === 'workorder' ? '任务报工' : '快速报工',
+    reportSourceLabel: record.isRework
+      ? '返工任务'
+      : record.source === 'workorder'
+        ? '任务报工'
+        : '快速报工',
     reportDate: (record.createdAt || '').slice(0, 10) || '—',
     specModel: '—',
     material: '—',
@@ -43,7 +47,7 @@ function buildFallbackEnrichedRecord(record) {
     salaryMethod: '—',
     calcMethod: '—',
     salaryAmount: 0,
-    scheduleQty: resolveListScheduleQty(record, record.source === 'workorder'),
+    scheduleQty: resolveListScheduleQty(record, record.source === 'workorder' || record.isRework),
   }
 }
 
@@ -62,7 +66,11 @@ export function enrichProcessReportRecord(record) {
     return {
       ...record,
       ...legacy,
-      reportSourceLabel: record.source === 'workorder' ? '任务报工' : '快速报工',
+      reportSourceLabel: record.isRework
+        ? '返工任务'
+        : record.source === 'workorder'
+          ? '任务报工'
+          : '快速报工',
       reportDate: (record.createdAt || '').slice(0, 10) || '—',
       specModel: master?.specModel || '—',
       material: master?.material || '—',
@@ -77,7 +85,7 @@ export function enrichProcessReportRecord(record) {
           ? `${config.reportType}+${config.salaryMethod}`
           : '—',
       salaryAmount: wage.salaryAmount,
-      scheduleQty: resolveListScheduleQty(record, record.source === 'workorder'),
+      scheduleQty: resolveListScheduleQty(record, record.source === 'workorder' || record.isRework),
     }
   } catch (err) {
     console.error('[process-report] enrich record failed:', record?.id, err)

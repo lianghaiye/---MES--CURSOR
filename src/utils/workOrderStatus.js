@@ -2,6 +2,7 @@
  * 工单执行主状态 + 排产旁显
  * 主状态：待下发 / 已下发 / 执行中 / 已完成 / 暂停 / 终止
  * 「部分下发」不再作为主状态；未排完用排产进度旁显
+ * 返工不改主状态，用「返工」标签旁显
  */
 import { MOBILE_TASK_SYNC_KEY } from '@/utils/mobileTaskDispatch'
 import { getWorkOrderConvertOccupyQty } from '@/utils/workOrderConvertOccupy'
@@ -73,6 +74,7 @@ export function workOrderStatusColor(status) {
     待下发: 'warning',
     已下发: 'processing',
     执行中: 'blue',
+    返工中: 'orange',
     已完成: 'success',
     完成: 'success',
     暂停: 'default',
@@ -192,6 +194,16 @@ export function workOrderHasClaimEvidence(workOrder) {
  */
 export function syncWorkOrderExecutionStatus(workOrder) {
   if (!workOrder) return workOrder
+  if (workOrder.status === '返工中') {
+    const restore = workOrder.statusBeforeRework || '执行中'
+    workOrder.status =
+      restore === '已完成' || restore === '完成'
+        ? '已完成'
+        : restore === '暂停' || restore === '终止' || restore === '返工中'
+          ? '执行中'
+          : restore
+    workOrder.statusBeforeRework = ''
+  }
   if (isWorkOrderStatusLocked(workOrder.status)) return workOrder
 
   const batches = workOrder.scheduleBatches || []

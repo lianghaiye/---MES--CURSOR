@@ -1211,16 +1211,45 @@ export function createInboundFromScrap(scrap, partial = {}) {
   return order
 }
 
+function resolveProductionQcInboundLineQty(line, override = {}) {
+  if (override.qty != null && override.qty !== '') {
+    const n = Number(override.qty)
+    return Number.isFinite(n) && n > 0 ? n : 0
+  }
+  // eslint-disable-next-line global-require
+  const { resolveInboundableQty } = require('@/utils/qcTreatmentPlan')
+  const inboundable = resolveInboundableQty(line)
+  if (inboundable > 0) return inboundable
+  // 历史单据未填多桶处置时，回落质检/排产数量
+  return (
+    Number(line.acceptInboundQty) ||
+    Number(line.inspectQty) ||
+    Number(line.receiptQty) ||
+    Number(line.scheduleQty) ||
+    0
+  )
+}
+
+function taskHasProductionInboundableQty(task) {
+  // eslint-disable-next-line global-require
+  const { resolveInboundableQty } = require('@/utils/qcTreatmentPlan')
+  return (task?.lineItems || []).some((line) => {
+    if (resolveInboundableQty(line) > 0) return true
+    // 无处置桶时允许用历史合格入库数回落（不含纯质检数量，避免不通过整批误入）
+    return Number(line.acceptInboundQty) > 0
+  })
+}
+
 /**
- * 成品检 → 生成成品入库单
+ * 成品检 → 生成成品入库单（数量优先：合格数 + 让步合格数）
  * @param {object} task 成品检质检单
  */
 export function createInboundFromFinishedQc(task, partial = {}) {
   if (!task) return { ok: false, message: '质检单不存在' }
   if (task.bizScope !== '成品检') return { ok: false, message: '仅成品检可生成成品入库单' }
   if (task.qcStatus !== '已完成') return { ok: false, message: '仅已完成的成品检可生成入库单' }
-  if (task.qcResult === '质检不通过') {
-    return { ok: false, message: '质检不通过不可生成成品入库单' }
+  if (task.qcResult === '质检不通过' && !taskHasProductionInboundableQty(task)) {
+    return { ok: false, message: '质检不通过且无可入库数量（合格数/让步合格数）' }
   }
   if (String(task.inboundOrderNo || '').trim()) {
     return { ok: false, message: `已关联入库单「${task.inboundOrderNo}」` }
@@ -1232,10 +1261,7 @@ export function createInboundFromFinishedQc(task, partial = {}) {
   const lineItems = (task.lineItems || [])
     .map((line, idx) => {
       const override = overrides[line.id] || overrides[String(line.id)] || {}
-      const qty =
-        override.qty != null && override.qty !== ''
-          ? Number(override.qty)
-          : Number(line.acceptInboundQty) || Number(line.inspectQty) || Number(line.receiptQty) || 0
+      const qty = resolveProductionQcInboundLineQty(line, override)
       if (!(qty > 0)) return null
       const warehouse =
         override.warehouse || partial.warehouse || line.receivingWarehouse || '成品仓'
@@ -1257,7 +1283,7 @@ export function createInboundFromFinishedQc(task, partial = {}) {
     .filter(Boolean)
 
   if (!lineItems.length) {
-    return { ok: false, message: '无可入库数量（请检查合格入库数/质检数量）' }
+    return { ok: false, message: '无可入库数量（请检查合格数/让步合格数）' }
   }
 
   const workOrderNo = task.workOrderNo || task.sourceDocNo || ''
@@ -1289,6 +1315,417 @@ export function createInboundFromFinishedQc(task, partial = {}) {
   })
 
   return { ok: true, order, message: `已生成成品入库单「${order.docNo}」` }
+}
+
+/**
+ * 生产过程检 → 生成半成品入库单（数量优先：合格数 + 让步合格数）
+ * @param {object} task 生产过程检质检单
+ */
+export function createInboundFromProcessQc(task, partial = {}) {
+  if (!task) return { ok: false, message: '质检单不存在' }
+  if (task.bizScope !== '生产过程检') {
+    return { ok: false, message: '仅生产过程检可生成半成品入库单' }
+  }
+  if (task.qcStatus !== '已完成') return { ok: false, message: '仅已完成的生产过程检可生成入库单' }
+  if (task.qcResult === '质检不通过' && !taskHasProductionInboundableQty(task)) {
+    return { ok: false, message: '质检不通过且无可入库数量（合格数/让步合格数）' }
+  }
+  if (String(task.inboundOrderNo || '').trim()) {
+    return { ok: false, message: `已关联入库单「${task.inboundOrderNo}」` }
+  }
+
+  const overrides =
+    partial.lineOverrides && typeof partial.lineOverrides === 'object' ? partial.lineOverrides : {}
+
+  const lineItems = (task.lineItems || [])
+    .map((line, idx) => {
+      const override = overrides[line.id] || overrides[String(line.id)] || {}
+      const qty = resolveProductionQcInboundLineQty(line, override)
+      if (!(qty > 0)) return null
+      const warehouse =
+        override.warehouse || partial.warehouse || line.receivingWarehouse || '半成品仓'
+      return createInboundLine({
+        id: `ib-pqc-${task.id}-${line.id || idx}`,
+        itemCode: line.itemCode || task.itemCode || '',
+        itemName: line.itemName || task.itemName || '',
+        specModel: line.specModel || task.specModel || '',
+        material: line.material || task.material || '',
+        qty,
+        unit: line.unit || task.unit || '件',
+        warehouse,
+        lineSource: '生产',
+        salesOrderNo: partial.salesOrderNo || '',
+        salesOrderId: partial.salesOrderId || '',
+        salesLineId: override.salesLineId || '',
+      })
+    })
+    .filter(Boolean)
+
+  if (!lineItems.length) {
+    return { ok: false, message: '无可入库数量（请检查合格数/让步合格数）' }
+  }
+
+  const workOrderNo = task.workOrderNo || task.sourceDocNo || ''
+  const order = addInboundOrder({
+    inboundType: '半成品入库',
+    status: '待入库',
+    warehouse: partial.warehouse || lineItems[0].warehouse || '半成品仓',
+    itemType: '产品',
+    sourceOrderNo: workOrderNo,
+    sourceType: '生产过程检',
+    salesOrderNo: partial.salesOrderNo || '',
+    salesOrderId: partial.salesOrderId || '',
+    customerName: partial.customerName || '',
+    handler: partial.handler || partial.creator || task.inspector || '管理员',
+    creator: partial.creator || '管理员',
+    remark: partial.remark || `来自生产过程检 ${task.qcNo || ''}`.trim(),
+    inboundDate: partial.inboundDate || dayjs().format('YYYY-MM-DD'),
+    workOrders: workOrderNo
+      ? [{ workOrderNo, workOrderId: task.workOrderId || '', qty: lineItems[0].qty }]
+      : [],
+    lineItems,
+  })
+
+  // eslint-disable-next-line global-require
+  const { attachQcTaskInboundOrder } = require('@/store/qcTaskStore')
+  attachQcTaskInboundOrder(task.id, {
+    inboundOrderNo: order.docNo,
+    inboundOrderId: order.id,
+  })
+
+  return { ok: true, order, message: `已生成半成品入库单「${order.docNo}」` }
+}
+
+/**
+ * 过程检 / 成品检完成后一键生成待入库单（与 createInboundFromIncomingQc 返回结构对齐）
+ */
+export function createInboundFromProductionQc(task) {
+  if (!task) return { ok: false, skipped: true, message: '质检单不存在' }
+  const scope = String(task.bizScope || '')
+  if (scope !== '成品检' && scope !== '生产过程检') {
+    return { ok: false, skipped: true, message: '仅生产过程检/成品检支持完成后生成入库单' }
+  }
+  if (String(task.inboundOrderNo || '').trim()) {
+    return {
+      ok: false,
+      skipped: true,
+      message: `已关联入库单「${task.inboundOrderNo}」`,
+    }
+  }
+  const result =
+    scope === '成品检' ? createInboundFromFinishedQc(task) : createInboundFromProcessQc(task)
+  if (result.ok) {
+    return {
+      ok: true,
+      orders: result.order ? [result.order] : [],
+      message: result.message,
+    }
+  }
+  return { ok: false, skipped: false, message: result.message || '未生成入库单' }
+}
+
+/**
+ * 来料质检 / 外协回货检完成后：按合格入库 + 让步入库数量一键生成「待入库」入库单
+ * @param {object} task 已完成的质检单
+ */
+export function createInboundFromIncomingQc(task) {
+  if (!task) return { ok: false, skipped: true, message: '质检单不存在' }
+  const bizScope = String(task.bizScope || '')
+  const isWx = bizScope === '外协回货检' || task.sourceType === 'outsourcing_receipt'
+  const isIncoming = bizScope === '来料质检' || task.sourceType === 'purchase_receipt' || !bizScope
+  if (!isWx && !isIncoming) {
+    return { ok: false, skipped: true, message: '仅来料质检/外协回货检支持完成后生成入库单' }
+  }
+  if (String(task.inboundOrderNo || '').trim()) {
+    return {
+      ok: false,
+      skipped: true,
+      message: `已关联入库单「${task.inboundOrderNo}」`,
+    }
+  }
+
+  // eslint-disable-next-line global-require
+  const {
+    evaluateQcInboundGate,
+    resolveSourceReceiptForQcTask,
+    buildQcAcceptInboundQtyHints,
+  } = require('@/utils/qcInboundFromReceipt')
+  const gate = evaluateQcInboundGate(task)
+  if (!gate.ok) {
+    return { ok: false, skipped: false, message: gate.message || '当前质检结果不可生成入库单' }
+  }
+  const qtyHints = gate.qtyHints || buildQcAcceptInboundQtyHints(task)
+  const hasQty = qtyHints && Object.values(qtyHints).some((q) => Number(q) > 0)
+  if (!hasQty && gate.enforceQtyCap) {
+    return { ok: false, skipped: false, message: '合格入库与让步入库数量均为 0，未生成入库单' }
+  }
+
+  const receipt = resolveSourceReceiptForQcTask(task)
+  if (!receipt) {
+    return { ok: false, skipped: false, message: '未找到关联收货单' }
+  }
+  if (receipt.receiptStatus === '作废' || receipt.receiptStatus === '已完成') {
+    return { ok: false, skipped: false, message: '关联收货单已完成或作废' }
+  }
+  if (receipt.inboundStatus === '已入库') {
+    return { ok: false, skipped: false, message: '关联收货单已入库完成' }
+  }
+
+  if (isWx) {
+    return createOutsourcingInboundFromQcTask(task, receipt, qtyHints, gate.enforceQtyCap)
+  }
+  return createPurchaseInboundFromQcTask(task, receipt, qtyHints, gate.enforceQtyCap)
+}
+
+function matchPoLineForReceiptLine(order, receiptLine) {
+  const lines = order?.lineItems || []
+  if (receiptLine?.poLineId) {
+    const hit = lines.find((l) => l.id === receiptLine.poLineId)
+    if (hit) return hit
+  }
+  if (receiptLine?.sourceLineId) {
+    const hit = lines.find((l) => l.id === receiptLine.sourceLineId)
+    if (hit) return hit
+  }
+  const code = String(receiptLine?.itemCode || receiptLine?.productCode || '').trim()
+  if (!code) return null
+  return lines.find((l) => String(l.itemCode || l.productCode || '').trim() === code) || null
+}
+
+function createPurchaseInboundFromQcTask(task, receipt, qtyHints, enforceQtyCap) {
+  // eslint-disable-next-line global-require
+  const {
+    getPurchaseOrderById,
+    canGenerateInbound,
+    explainCannotGenerateReceiptOrInbound,
+  } = require('@/store/purchaseOrderStore')
+  const po = getPurchaseOrderById(receipt.purchaseOrderId)
+  if (!po || !canGenerateInbound(po)) {
+    return {
+      ok: false,
+      skipped: false,
+      message: explainCannotGenerateReceiptOrInbound(po, '入库') || '关联采购单不可生成入库单',
+    }
+  }
+
+  const lineItems = []
+  const remainingHints = qtyHints ? { ...qtyHints } : null
+  ;(receipt.lineItems || []).forEach((rLine) => {
+    const receiptQty = Number(rLine.receiptQty) || 0
+    if (receiptQty <= 0) return
+    const poLine = matchPoLineForReceiptLine(po, rLine)
+    if (!poLine) return
+    const code = String(
+      rLine.itemCode || rLine.productCode || poLine.itemCode || poLine.productCode || '',
+    ).trim()
+    const remain = calcPoLineRemainInboundQty(po, poLine)
+    const cap = Math.min(remain, receiptQty)
+    let qty = cap
+    if (remainingHints && code in remainingHints) {
+      qty = Math.min(Number(remainingHints[code]) || 0, cap)
+      remainingHints[code] = Math.max(0, (Number(remainingHints[code]) || 0) - qty)
+    } else if (enforceQtyCap) {
+      qty = 0
+    }
+    if (!(qty > 0)) return
+    const warehouse =
+      rLine.receivingWarehouse ||
+      poLine.receivingWarehouse ||
+      resolveDefaultWarehouseByMaterialCode(code) ||
+      ''
+    if (!warehouse) return
+    const purchaseUnit = poLine.unit || rLine.unit || '个'
+    const settleUnit = String(poLine.settleUnit || rLine.settleUnit || '').trim()
+    const unitPrice = poLine.unitPriceInTax ?? poLine.unitPriceExTax ?? null
+    const settleQty = settleUnit
+      ? Number(rLine.settleQty) > 0
+        ? Number(rLine.settleQty)
+        : estimateSettleQty({ ...poLine, ...rLine }, qty)
+      : undefined
+    lineItems.push({
+      poLineId: poLine.id,
+      itemCode: code,
+      itemName: rLine.itemName || rLine.productName || poLine.itemName || poLine.productName || '',
+      itemType: poLine.itemType || '物料',
+      specModel: rLine.specModel || poLine.specModel || '',
+      material: rLine.material || poLine.material || '',
+      drawingNo: rLine.drawingNo || poLine.drawingNo || '',
+      unit: purchaseUnit,
+      stockUnit: purchaseUnit,
+      purchaseUnit,
+      unitPrice,
+      totalPrice: unitPrice != null ? Math.round(Number(unitPrice) * qty * 100) / 100 : null,
+      warehouse,
+      qty,
+      settleUnit: settleUnit || '',
+      settleQty,
+      standardUnitWeight: poLine.standardUnitWeight,
+      settledSettleQty: 0,
+    })
+  })
+
+  if (!lineItems.length) {
+    return { ok: false, skipped: false, message: '无可入库数量（合格入库/让步入库）' }
+  }
+
+  const result = createInboundFromPurchaseOrder(po.id, {
+    purchaseReceiptId: receipt.id,
+    remark: `质检单 ${task.qcNo || ''} 完成后自动生成`.trim(),
+    handler: task.inspector || 'admin1',
+    creator: task.inspector || 'admin1',
+    lineItems,
+  })
+  if (!result.ok) return { ok: false, skipped: false, message: result.message }
+
+  const created = result.orders?.length ? result.orders : result.order ? [result.order] : []
+  // eslint-disable-next-line global-require
+  const { attachReceiptInboundOrder } = require('@/store/purchaseReceiptStore')
+  // eslint-disable-next-line global-require
+  const { attachQcTaskInboundOrder } = require('@/store/qcTaskStore')
+  const nos = created.map((o) => o.docNo).filter(Boolean)
+  created.forEach((o) => {
+    attachReceiptInboundOrder(receipt.id, {
+      inboundOrderNo: o.docNo,
+      inboundOrderId: o.id,
+      inboundStatus: '入库中',
+    })
+  })
+  attachQcTaskInboundOrder(task.id, {
+    inboundOrderNo: nos.join('、'),
+    inboundOrderId: created[0]?.id,
+  })
+
+  return {
+    ok: true,
+    order: created[0] || null,
+    orders: created,
+    message: `已生成入库单「${nos.join('、')}」`,
+  }
+}
+
+function matchWxLineForReceiptLine(order, receiptLine) {
+  const lines = order?.lineItems || []
+  if (receiptLine?.wxLineId) {
+    const hit = lines.find((l) => l.id === receiptLine.wxLineId)
+    if (hit) return hit
+  }
+  if (receiptLine?.poLineId) {
+    const hit = lines.find((l) => l.id === receiptLine.poLineId)
+    if (hit) return hit
+  }
+  const code = String(receiptLine?.itemCode || receiptLine?.productCode || '').trim()
+  if (!code) return null
+  return lines.find((l) => String(l.productCode || l.itemCode || '').trim() === code) || null
+}
+
+function createOutsourcingInboundFromQcTask(task, receipt, qtyHints, enforceQtyCap) {
+  // eslint-disable-next-line global-require
+  const {
+    getOutsourcingOrderById,
+    canGenerateOutsourcingInbound,
+  } = require('@/store/outsourcingOrderStore')
+  // eslint-disable-next-line global-require
+  const { calcWxLineRemainInboundQty } = require('@/utils/outsourcingInbound')
+  const order = getOutsourcingOrderById(receipt.outsourcingOrderId || receipt.purchaseOrderId)
+  if (!order || !canGenerateOutsourcingInbound(order)) {
+    return {
+      ok: false,
+      skipped: false,
+      message: '关联外协订单不可生成入库单（需进行中且仍有可回货数量）',
+    }
+  }
+
+  const lineItems = []
+  const remainingHints = qtyHints ? { ...qtyHints } : null
+  ;(receipt.lineItems || []).forEach((rLine) => {
+    const receiptQty = Number(rLine.receiptQty) || 0
+    if (receiptQty <= 0) return
+    const wxLine = matchWxLineForReceiptLine(order, rLine)
+    if (!wxLine) return
+    const code = String(
+      rLine.itemCode || rLine.productCode || wxLine.productCode || wxLine.itemCode || '',
+    ).trim()
+    const remain = calcWxLineRemainInboundQty(order, wxLine)
+    const cap = Math.min(remain, receiptQty)
+    let qty = cap
+    if (remainingHints && code in remainingHints) {
+      qty = Math.min(Number(remainingHints[code]) || 0, cap)
+      remainingHints[code] = Math.max(0, (Number(remainingHints[code]) || 0) - qty)
+    } else if (enforceQtyCap) {
+      qty = 0
+    }
+    if (!(qty > 0)) return
+    const warehouse =
+      rLine.receivingWarehouse ||
+      wxLine.receivingWarehouse ||
+      resolveDefaultWarehouseByMaterialCode(code) ||
+      ''
+    if (!warehouse) return
+    lineItems.push(
+      createInboundLine({
+        poLineId: wxLine.id,
+        itemCode: code,
+        itemName:
+          rLine.itemName || rLine.productName || wxLine.productName || wxLine.itemName || '',
+        itemType: '物料',
+        specModel: rLine.specModel || wxLine.specModel || '',
+        material: rLine.material || wxLine.material || '',
+        qty,
+        unit: rLine.unit || wxLine.unit || '件',
+        warehouse,
+        settleUnit: String(rLine.settleUnit || wxLine.settleUnit || '').trim(),
+        settleQty: Number(rLine.settleQty) > 0 ? Number(rLine.settleQty) : undefined,
+        lineSource: '外协',
+      }),
+    )
+  })
+
+  if (!lineItems.length) {
+    return { ok: false, skipped: false, message: '无可入库数量（合格入库/让步入库）' }
+  }
+
+  const warehouse = lineItems[0].warehouse
+  const inbound = addInboundOrder({
+    inboundType: '外协入库',
+    status: '待入库',
+    warehouse,
+    warehouseKeeper: resolveWarehouseKeeper(warehouse),
+    inboundDate: dayjs().format('YYYY-MM-DD'),
+    deliveryDate: dayjs().format('YYYY-MM-DD'),
+    itemType: '物料',
+    supplier: order.supplier || receipt.supplier || '',
+    sourceOrderNo: order.orderNo,
+    sourceType: '外协订单',
+    purchaseOrderId: order.id,
+    outsourcingOrderId: order.id,
+    outsourcingOrderNo: order.orderNo,
+    purchaseReceiptId: receipt.id,
+    remark: `质检单 ${task.qcNo || ''} 完成后自动生成`.trim(),
+    handler: task.inspector || 'admin1',
+    creator: task.inspector || 'admin1',
+    lineItems,
+  })
+
+  // eslint-disable-next-line global-require
+  const { attachReceiptInboundOrder } = require('@/store/outsourcingReceiptStore')
+  // eslint-disable-next-line global-require
+  const { attachQcTaskInboundOrder } = require('@/store/qcTaskStore')
+  attachReceiptInboundOrder(receipt.id, {
+    inboundOrderNo: inbound.docNo,
+    inboundOrderId: inbound.id,
+    inboundStatus: '入库中',
+  })
+  attachQcTaskInboundOrder(task.id, {
+    inboundOrderNo: inbound.docNo,
+    inboundOrderId: inbound.id,
+  })
+
+  return {
+    ok: true,
+    order: inbound,
+    orders: [inbound],
+    message: `已生成入库单「${inbound.docNo}」`,
+  }
 }
 
 export { canDeleteInbound, canEditInbound, canConfirmInbound, canApproveInbound }

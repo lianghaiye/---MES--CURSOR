@@ -39,7 +39,7 @@
         :columns="columns"
         :data-source="group.rows"
         :pagination="false"
-        :scroll="{ x: 1520 }"
+        :scroll="{ x: 1600 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'processConfig'">
@@ -57,6 +57,12 @@
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="scheduleTaskStatusColor(record.status)">{{ record.status }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'reworkQty'">
+            <a-tag v-if="pendingReworkOf(record) > 0" color="orange">
+              {{ pendingReworkOf(record) }}
+            </a-tag>
+            <span v-else class="muted">0</span>
           </template>
           <template v-else-if="column.key === 'outsourceStatus'">
             <a-tag
@@ -129,6 +135,7 @@ import {
 import { batchStatusColor } from '@/utils/workOrderScheduleBatch'
 import { resetWorkOrderScheduleTask, terminateWorkOrderScheduleTask } from '@/utils/workOrderStatus'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
+import { getProcessPendingReworkQty, reworkOrderState } from '@/store/reworkOrderStore'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -162,11 +169,17 @@ const columns = [
   { title: '报工数量', dataIndex: 'reportQty', width: 88, align: 'right' },
   { title: '良品数', dataIndex: 'goodQty', width: 80, align: 'right' },
   { title: '不良品数', dataIndex: 'badQty', width: 88, align: 'right' },
+  { title: '返工数', key: 'reworkQty', width: 80, align: 'right' },
   { title: '报工时长', dataIndex: 'reportDuration', width: 90 },
   { title: '报工时间', dataIndex: 'reportedAt', width: 140 },
   { title: '外协状态', key: 'outsourceStatus', width: 100 },
   { title: '操作', key: 'actions', width: 300, fixed: 'right' },
 ]
+
+function pendingReworkOf(record) {
+  void reworkOrderState.orders
+  return getProcessPendingReworkQty(props.workOrder?.id, record.processName)
+}
 
 function isBatchCompleted(status) {
   return status === '完成' || status === '已完成'

@@ -105,6 +105,16 @@
           <template v-if="column.key === 'status'">
             <a-badge :status="statusBadge(record.status)" :text="record.status" />
           </template>
+          <template v-else-if="column.key === 'reportSourceLabel'">
+            <a-tag v-if="record.isRework" color="orange">返工任务</a-tag>
+            <span v-else>{{ record.reportSourceLabel || '—' }}</span>
+          </template>
+          <template v-else-if="column.key === 'workOrderNo'">
+            <span>{{ record.workOrderNo || '—' }}</span>
+            <a-tag v-if="record.isRework && record.reworkNo" color="orange" class="rework-no-tag">
+              {{ record.reworkNo }}
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'scheduleQty'">
             {{ formatScheduleQty(record.scheduleQty) }}
           </template>
@@ -112,17 +122,27 @@
             {{ formatSalaryAmount(record.salaryAmount) }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button
-              v-if="isTaskReport(record)"
-              type="link"
-              size="small"
-              @click.stop="openWorkOrderDetail(record)"
-            >
-              详情
-            </a-button>
-            <a-button v-else type="link" size="small" @click.stop="openQuickDetail(record)">
-              详情
-            </a-button>
+            <a-space :size="4">
+              <a-button
+                v-if="record.isRework && record.status === '待报工'"
+                type="link"
+                size="small"
+                @click.stop="openReworkSubmit(record)"
+              >
+                报工
+              </a-button>
+              <a-button
+                v-if="isTaskReport(record)"
+                type="link"
+                size="small"
+                @click.stop="openWorkOrderDetail(record)"
+              >
+                详情
+              </a-button>
+              <a-button v-else type="link" size="small" @click.stop="openQuickDetail(record)">
+                详情
+              </a-button>
+            </a-space>
           </template>
           <template v-else>
             {{ formatCell(record, column) }}
@@ -143,6 +163,11 @@
     </div>
 
     <ProcessReportRejectModal v-model:open="rejectOpen" @confirm="onRejectConfirm" />
+    <ProcessReportReworkSubmitModal
+      v-model:open="reworkSubmitOpen"
+      :task="reworkSubmitTask"
+      @done="onReworkSubmitDone"
+    />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -173,7 +198,7 @@ export default { name: 'ProcessReportManagementView' }
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
@@ -197,7 +222,9 @@ import {
 import { useTabs } from '@/composables/useTabs'
 import ProcessReportStatsPanel from './components/ProcessReportStatsPanel.vue'
 import ProcessReportRejectModal from './components/ProcessReportRejectModal.vue'
+import ProcessReportReworkSubmitModal from './components/ProcessReportReworkSubmitModal.vue'
 
+const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
@@ -213,16 +240,21 @@ const rejectOpen = ref(false)
 const importOpen = ref(false)
 const historyOpen = ref(false)
 const pageError = ref('')
+const reworkSubmitOpen = ref(false)
+const reworkSubmitTask = ref(null)
 
 const statusOptions = [
+  { label: '待报工', value: '待报工' },
   { label: '待审核', value: '待审核' },
   { label: '已审核', value: '已审核' },
   { label: '已拒绝', value: '已拒绝' },
+  { label: '已取消', value: '已取消' },
 ]
 
 const sourceOptions = [
   { label: '任务报工', value: 'workorder' },
   { label: '快速报工', value: 'quick' },
+  { label: '返工任务', value: 'rework' },
 ]
 
 const baseColumns = [
@@ -238,7 +270,7 @@ const baseColumns = [
   { title: '工作中心', key: 'workCenter', dataIndex: 'workCenter', width: 110 },
   { title: '计薪(元)', key: 'salaryAmount', dataIndex: 'salaryAmount', width: 100, align: 'right' },
   { title: '备注', key: 'remark', dataIndex: 'remark', width: 120, ellipsis: true },
-  { title: '操作', key: 'action', width: 80, fixed: 'right' },
+  { title: '操作', key: 'action', width: 120, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -285,7 +317,13 @@ function handleResetData() {
   message.success('已重置工序报工演示数据')
 }
 
-onMounted(() => safeReload())
+onMounted(() => {
+  if (route.query.source === 'rework') {
+    filters.source = 'rework'
+    appliedFilters.value = { ...filters }
+  }
+  safeReload()
+})
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -303,7 +341,7 @@ const rowSelection = computed(() => ({
 }))
 
 function isTaskReport(record) {
-  return record.source === 'workorder'
+  return record.source === 'workorder' || record.isRework
 }
 
 function customRow(record) {
@@ -318,8 +356,18 @@ function customRow(record) {
 
 function statusBadge(status) {
   if (status === '已审核') return 'success'
-  if (status === '已拒绝') return 'error'
+  if (status === '已拒绝' || status === '已取消') return 'error'
+  if (status === '待报工') return 'warning'
   return 'processing'
+}
+
+function openReworkSubmit(record) {
+  reworkSubmitTask.value = record
+  reworkSubmitOpen.value = true
+}
+
+function onReworkSubmitDone() {
+  handleSearch()
 }
 
 function formatCell(record, column) {
@@ -409,6 +457,10 @@ function onRejectConfirm(reason) {
 
 <style lang="less" scoped>
 .process-report-page {
+  .rework-no-tag {
+    margin-left: 6px;
+  }
+
   .page-error-alert {
     margin-bottom: 12px;
   }

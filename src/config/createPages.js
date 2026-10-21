@@ -49,6 +49,14 @@ export const createPageRegistry = [
     keepAlive: 'SalesOrderCreateView',
   },
   {
+    listPath: '/sales/contracts',
+    newPath: '/sales/contracts/new',
+    title: '新增合同',
+    name: 'sales-contracts-new',
+    view: () => import('@/views/sales/SalesContractCreateView.vue'),
+    keepAlive: 'SalesContractCreateView',
+  },
+  {
     listPath: '/sales/delivery',
     newPath: '/sales/delivery/new',
     title: '新增发货单',
@@ -79,6 +87,14 @@ export const createPageRegistry = [
     name: 'production-qc-work-orders-new',
     view: () => import('@/views/production/QcWorkOrderCreateView.vue'),
     keepAlive: 'QcWorkOrderCreateView',
+  },
+  {
+    listPath: '/production/rework-orders',
+    newPath: '/production/rework-orders/new',
+    title: '新建返工单',
+    name: 'production-rework-orders-new',
+    view: () => import('@/views/production/ReworkOrderCreateView.vue'),
+    keepAlive: 'ReworkOrderCreateView',
   },
   {
     listPath: '/production/disassembly-work-orders',

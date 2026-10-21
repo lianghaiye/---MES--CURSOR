@@ -168,6 +168,7 @@
               <div class="card-head">
                 <div class="card-head-tags">
                   <a-tag :color="statusColor(wo.status)" class="status-tag">{{ wo.status }}</a-tag>
+                  <a-tag v-if="hasOpenRework(wo)" color="orange" class="status-tag">返工</a-tag>
                   <a-tag :color="scheduleStatusColor(wo)" class="status-tag">
                     {{ scheduleStatusLabel(wo) }}
                   </a-tag>
@@ -405,6 +406,7 @@ import {
   removeWorkOrderScheduleBatch,
   setActiveWorkOrderScheduleBatch,
 } from '@/store/workOrderStore'
+import { reworkOrderState, workOrderHasOpenRework } from '@/store/reworkOrderStore'
 import {
   saveDispatchDraft,
   dispatchAndStartWorkOrder,
@@ -444,6 +446,7 @@ import WorkOrderPrintModal from './components/WorkOrderPrintModal.vue'
 import WorkOrderTableLayout from './components/WorkOrderTableLayout.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import ListFilterBar from '@/components/ListFilterBar.vue'
+import { REWORK_ORDER_SOURCE } from '@/constants/reworkOrder'
 import { useTabs } from '@/composables/useTabs'
 import { useListExport } from '@/composables/useListExport'
 import { workOrderExportFields } from '@/utils/exportFields/workOrderExport'
@@ -631,6 +634,11 @@ watch(
 
 function statusColor(status) {
   return workOrderStatusColor(status)
+}
+
+function hasOpenRework(wo) {
+  void reworkOrderState.orders
+  return workOrderHasOpenRework(wo)
 }
 
 function urgencyTagColor(urgency) {
@@ -1122,6 +1130,20 @@ function confirmUrgency() {
 
 async function onDetailAction({ key, workOrder: wo, record, patch }) {
   if (!wo) return
+  if (key === 'create-rework') {
+    const page = findCreatePageByListPath('/production/rework-orders')
+    if (!page) return
+    openCreateTab(router, openTab, {
+      path: page.newPath,
+      title: page.title,
+      query: {
+        workOrderId: wo.id,
+        qty: String(Math.max(1, Number(wo.scheduleQty) || Number(wo.planQty) || 1)),
+        source: REWORK_ORDER_SOURCE.WORKSHOP_WEB,
+      },
+    })
+    return
+  }
   if (key === 'process-outsource' || key === 'create-process-outsource') {
     const process =
       key === 'create-process-outsource'

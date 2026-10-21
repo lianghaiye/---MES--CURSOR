@@ -116,6 +116,15 @@
           生成成品入库单
         </a-button>
         <a-button
+          v-if="isProcessOnlyScope"
+          size="small"
+          :disabled="!selectedRowKeys.length"
+          :loading="processInboundSaving"
+          @click="openGenerateProcessInbound"
+        >
+          生成半成品入库单
+        </a-button>
+        <a-button
           v-if="canPrintQc"
           size="small"
           :disabled="!selectedRowKeys.length"
@@ -362,6 +371,7 @@ const isIncomingScope = computed(() => bizScope.value === '来料质检')
 const isOutsourcingScope = computed(() => bizScope.value === '外协回货检')
 const isProductionScope = computed(() => isProcessQcBizScope(bizScope.value))
 const isFinishedScope = computed(() => bizScope.value === '成品检')
+const isProcessOnlyScope = computed(() => bizScope.value === '生产过程检')
 const canPrintQc = computed(() => isInboundScope.value || isProductionScope.value)
 /** 各业务质检列表均不支持手工新增（由上游单据/报工等生成） */
 const showCreateButton = computed(() => false)
@@ -643,12 +653,88 @@ function openPrintSelected() {
   printModalOpen.value = true
 }
 
+function productionTaskHasInboundableQty(task) {
+  if (!task) return false
+  return (task.lineItems || []).some((line) => {
+    const a = Number(line.acceptInboundQty)
+    const c = Number(line.concessionQty)
+    if ((Number.isFinite(a) && a > 0) || (Number.isFinite(c) && c > 0)) return true
+    return false
+  })
+}
+
 function canGenerateFinishedInboundFromQc(task) {
   if (!task || task.bizScope !== '成品检') return false
   if (task.qcStatus !== QC_TASK_STATUS.COMPLETED) return false
-  if (task.qcResult === QC_TASK_RESULT.FAIL) return false
+  if (task.qcResult === QC_TASK_RESULT.FAIL && !productionTaskHasInboundableQty(task)) return false
   if (String(task.inboundOrderNo || '').trim()) return false
   return true
+}
+
+function canGenerateProcessInboundFromQc(task) {
+  if (!task || task.bizScope !== '生产过程检') return false
+  if (task.qcStatus !== QC_TASK_STATUS.COMPLETED) return false
+  if (task.qcResult === QC_TASK_RESULT.FAIL && !productionTaskHasInboundableQty(task)) return false
+  if (String(task.inboundOrderNo || '').trim()) return false
+  return true
+}
+
+const processInboundSaving = ref(false)
+
+function openGenerateProcessInbound() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请勾选生产过程检质检单后再生成入库单')
+    return
+  }
+  const tasks = selectedRowKeys.value.map((id) => getQcTaskById(id)).filter(Boolean)
+  if (!tasks.length) {
+    message.warning('未找到质检单')
+    return
+  }
+  const okTasks = []
+  const failMessages = []
+  tasks.forEach((task) => {
+    if (!canGenerateProcessInboundFromQc(task)) {
+      failMessages.push(`${task.qcNo || task.id}：需已完成、有可入库数量、且尚未关联入库单`)
+      return
+    }
+    okTasks.push(task)
+  })
+  if (!okTasks.length) {
+    message.warning(failMessages[0] || '所选质检单均不可生成半成品入库单')
+    return
+  }
+  if (processInboundSaving.value) return
+  processInboundSaving.value = true
+  try {
+    // eslint-disable-next-line global-require
+    const { createInboundFromProcessQc } = require('@/store/inboundOrderStore')
+    const created = []
+    const errors = []
+    okTasks.forEach((task) => {
+      const result = createInboundFromProcessQc(task)
+      if (result.ok) created.push(result.order)
+      else errors.push(`${task.qcNo || task.id}：${result.message || '失败'}`)
+    })
+    if (errors.length) message.warning(errors[0])
+    if (!created.length) {
+      if (!errors.length) message.warning('未生成入库单')
+      return
+    }
+    message.success(
+      created.length === 1
+        ? `已生成半成品入库单「${created[0].docNo || ''}」`
+        : `已生成 ${created.length} 张半成品入库单`,
+    )
+    selectedRowKeys.value = []
+    if (created.length === 1 && created[0]?.id) {
+      const path = `/inventory/inbound/${created[0].id}`
+      openTab(path, `入库单 ${created[0].docNo || ''}`.trim())
+      router.push({ name: 'inventory-inbound-detail', params: { id: created[0].id } })
+    }
+  } finally {
+    processInboundSaving.value = false
+  }
 }
 
 function openGenerateFinishedInbound() {

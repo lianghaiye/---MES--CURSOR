@@ -9,6 +9,18 @@
             <a-tag :color="statusColor(task.qcStatus)">{{ task.qcStatus }}</a-tag>
           </div>
           <a-space>
+            <label v-if="showAutoInboundSwitch" class="auto-inbound-switch">
+              <a-checkbox v-model:checked="autoCreateInbound">完成后生成入库单</a-checkbox>
+              <span class="auto-inbound-tip"
+                >按{{ dispositionLabels.accept }}+{{
+                  dispositionLabels.concession
+                }}数量生成待入库单据</span
+              >
+            </label>
+            <label v-if="showAutoReworkSwitch" class="auto-inbound-switch">
+              <a-checkbox v-model:checked="autoCreateRework">完成后生成返工单</a-checkbox>
+              <span class="auto-inbound-tip">按返工数生成返工单及重做工序任务</span>
+            </label>
             <a-button size="small" @click="handleCancel">取消</a-button>
             <a-button type="primary" size="small" :loading="saving" @click="handleOk">
               确认
@@ -409,7 +421,9 @@
                     <div class="line-disposition-row">
                       <div class="line-treatment-label">
                         <span class="line-treatment-tip"
-                          >{{ dispositionLabels.tip }}（收货
+                          >{{ dispositionLabels.tip }}（{{
+                            dispositionLabels.qtyCapLabel || '收货'
+                          }}
                           {{ formatQty(lineReceiptQty(record), 4) }}）</span
                         >
                       </div>
@@ -537,6 +551,7 @@ import { formatQty } from '@/utils/numberFormat'
 import {
   getDispositionFieldLabels,
   isMultiBucketDisposition,
+  isProductionDispositionScope,
   buildTreatmentPlanSummary,
 } from '@/utils/qcTreatmentPlan'
 import { useTabs, tabStore } from '@/composables/useTabs'
@@ -582,6 +597,11 @@ import { getQcLibraryFieldByCode, ensureQcLibraryDemoSeed } from '@/store/qcFiel
 import { isProductionQcScope, resolveProductionQcHeader } from '@/utils/qcProductionContext'
 import { getQcTemplateByCode, ensureQcTemplateDemoSeed } from '@/store/qcTemplateStore'
 import { cloneTemplateFieldsSnapshot } from '@/store/qcTaskStore'
+import {
+  createInboundFromIncomingQc,
+  createInboundFromProductionQc,
+} from '@/store/inboundOrderStore'
+import { createReworkFromProductionQc } from '@/store/reworkOrderStore'
 import QcInspectComplexField from './components/QcInspectComplexField.vue'
 
 const route = useRoute()
@@ -591,6 +611,10 @@ const { closeTab } = useTabs()
 const bizScope = computed(() => route.meta.bizScope || task.value?.bizScope || '来料质检')
 const isFactoryScope = computed(() => bizScope.value === FACTORY_QC_BIZ_SCOPE)
 const isProductionScope = computed(() => isProductionQcScope(bizScope.value))
+/** 来料/外协/成品检默认勾选；生产过程检默认不勾选 */
+const autoCreateInbound = ref(true)
+/** 过程检/成品检：有返工数时默认勾选生成返工单 */
+const autoCreateRework = ref(true)
 const productionHeader = computed(() => resolveProductionQcHeader(task.value))
 const lineQtyLabel = computed(() => {
   if (isProductionScope.value) return '排产'
@@ -609,12 +633,34 @@ const form = reactive({
   lineItems: [],
 })
 
-/** 来料 / 外协：多数量桶（无单选方案） */
-const dispositionLabels = computed(() => getDispositionFieldLabels(task.value?.bizScope))
+/** 来料 / 外协 / 过程检 / 成品检：多数量桶（无单选方案） */
+const dispositionLabels = computed(() =>
+  getDispositionFieldLabels(task.value?.bizScope || bizScope.value),
+)
 
 function supportsDispositionBizScope(scope) {
   return isMultiBucketDisposition(scope)
 }
+
+/** 来料 / 外协 / 过程检 / 成品检：完成后可一键生成入库单 */
+const showAutoInboundSwitch = computed(() => supportsDispositionBizScope(bizScope.value))
+
+/** 过程检 / 成品检：完成后可按返工数生成返工单与返工任务 */
+const showAutoReworkSwitch = computed(() => isProductionDispositionScope(bizScope.value))
+
+watch(
+  () => bizScope.value,
+  (scope) => {
+    if (supportsDispositionBizScope(scope)) {
+      // 生产过程检默认不勾选入库；其余支持处置的业务默认勾选
+      autoCreateInbound.value = scope !== '生产过程检'
+    }
+    if (isProductionDispositionScope(scope)) {
+      autoCreateRework.value = true
+    }
+  },
+  { immediate: true },
+)
 
 function isLineExpanded(id) {
   return expandedKeys.value.includes(id)
@@ -1191,9 +1237,9 @@ function needTreatmentForLine(line) {
   return false
 }
 
-/** 来料/外协：始终展示数量处置（合格也可填） */
+/** 来料/外协/过程检/成品检：始终展示数量处置（合格也可填） */
 function showDispositionForLine() {
-  return supportsDispositionBizScope(task.value?.bizScope)
+  return supportsDispositionBizScope(task.value?.bizScope || bizScope.value)
 }
 
 /** 不合格/部分/让步：处置必填；合格可选 */
@@ -1206,8 +1252,23 @@ function lineInspectQty(line) {
   return Number(line?.fieldMap?.QC_INSPECT_QTY ?? line?.inspectQty ?? line?.receiptQty ?? 0) || 0
 }
 
-/** 处置上限：收货/到货数量（抽检时不等于质检数量） */
+/** 处置上限：收货/排产数量（抽检时不等于质检数量） */
 function lineReceiptQty(line) {
+  if (
+    isProductionScope.value ||
+    isProductionDispositionScope(task.value?.bizScope || bizScope.value)
+  ) {
+    const raw =
+      line?.scheduleQty ??
+      line?.receiptQty ??
+      productionHeader.value?.scheduleQty ??
+      task.value?.scheduleQty ??
+      line?.fieldMap?.QC_RECEIPT_QTY ??
+      line?.inspectQty ??
+      line?.fieldMap?.QC_INSPECT_QTY ??
+      0
+    return Number(raw) || 0
+  }
   const raw =
     line?.receiptQty ??
     line?.shipQty ??
@@ -1256,14 +1317,17 @@ function multiBucketDispositionHint(line) {
   if (buckets >= 2 && inbound > 0 && reject > 0) {
     return '当前为混合处置（部分可入库、部分退换/返工报废）。整单结论由检验项规则判定；数量按收货实物拆分，二者含义不同。'
   }
+  const capLabel = dispositionLabels.value.qtyCapLabel || '收货'
   if (mapped === QC_TASK_RESULT.FAIL && inbound > 0) {
-    return '检验项未全达标故整单为不合格，仍可将部分数量记为让步入库，其余退货/换货或返工/报废。'
+    return isProductionScope.value
+      ? '检验项未全达标故整单为不合格，仍可将部分数量记为让步合格，其余返工/报废。'
+      : '检验项未全达标故整单为不合格，仍可将部分数量记为让步入库，其余退货/换货或返工/报废。'
   }
   if (mapped === QC_TASK_RESULT.PARTIAL) {
-    return '部分通过：请按收货实物拆分合格入库、让步入库及次要处置数量。'
+    return `部分通过：请按${capLabel}数量拆分${dispositionLabels.value.accept}、${dispositionLabels.value.concession}及次要处置数量。`
   }
   if (mapped === QC_TASK_RESULT.PASS && !hasAnyDispositionQty(line)) {
-    return '抽检合格时可不填；提交默认按收货数量全量合格入库。若需部分退换/让步，请在此拆分。'
+    return `抽检合格时可不填；提交默认按${capLabel}数量全量${dispositionLabels.value.accept}。若需部分处置/让步，请在此拆分。`
   }
   return ''
 }
@@ -1352,9 +1416,10 @@ function validateDispositionQty(line) {
   if (!eRes.ok) return eRes
   const sum = aRes.n + cRes.n + rRes.n + eRes.n
   if (sum > base + 1e-9) {
+    const capLabel = `${labels.qtyCapLabel || '收货'}数量`
     return {
       ok: false,
-      message: `${labels.accept}+${labels.concession}+${labels.secondary}+${labels.tertiary}（${formatQty(sum, 4)}）不可超过收货数量（${formatQty(base, 4)}）`,
+      message: `${labels.accept}+${labels.concession}+${labels.secondary}+${labels.tertiary}（${formatQty(sum, 4)}）不可超过${capLabel}（${formatQty(base, 4)}）`,
     }
   }
   if (requireDispositionQtyForLine(line) && sum <= 0) {
@@ -1615,7 +1680,38 @@ async function doSubmit() {
       message.warning(res.message || '提交失败')
       return
     }
-    message.success(`质检完成：${res.qcResult}`)
+    const doneTask = res.task || getQcTaskById(task.value.id)
+    const extras = []
+    if (showAutoInboundSwitch.value && autoCreateInbound.value) {
+      const inboundRes = isProductionDispositionScope(doneTask?.bizScope || bizScope.value)
+        ? createInboundFromProductionQc(doneTask)
+        : createInboundFromIncomingQc(doneTask)
+      if (inboundRes.ok) {
+        const nos = (inboundRes.orders || [])
+          .map((o) => o.docNo)
+          .filter(Boolean)
+          .join('、')
+        extras.push(nos ? `待入库单 ${nos}` : inboundRes.message || '已生成待入库单')
+      } else if (!inboundRes.skipped) {
+        message.warning(
+          `质检已完成（${res.qcResult}），但未生成入库单：${inboundRes.message || '请稍后在列表手工生成'}`,
+        )
+      }
+    }
+    if (showAutoReworkSwitch.value && autoCreateRework.value) {
+      const reworkRes = createReworkFromProductionQc(getQcTaskById(task.value.id) || doneTask)
+      if (reworkRes.ok) {
+        extras.push(reworkRes.message || `返工单 ${reworkRes.order?.reworkNo || ''}`)
+      } else if (!reworkRes.skipped) {
+        message.warning(
+          `质检已完成（${res.qcResult}），但未生成返工单：${reworkRes.message || '请稍后在详情手工发起'}`,
+        )
+      }
+    }
+    const successText = extras.length
+      ? `质检完成：${res.qcResult}，${extras.join('；')}`
+      : `质检完成：${res.qcResult}`
+    message.success(successText)
     const path = route.path
     closeTab(path)
     router.push({ name: detailRouteName.value, params: { id: task.value.id } })
@@ -1644,6 +1740,21 @@ async function doSubmit() {
   padding: 12px 16px;
   background: #fff;
   border-radius: 6px;
+}
+
+.auto-inbound-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 4px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+}
+
+.auto-inbound-tip {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .header-left {

@@ -60,6 +60,7 @@
               <a-tag :color="statusColor(record.status)">
                 {{ formatCell(record.status) }}
               </a-tag>
+              <a-tag v-if="hasOpenRework(record)" color="orange" class="partial-tag">返工</a-tag>
             </template>
             <template v-else-if="column.key === 'customerName'">
               {{ formatCell(resolveWorkOrderSalesMeta(record).customerName) }}
@@ -163,6 +164,7 @@ import {
   getWorkOrderConvertSideTagColor,
 } from '@/utils/workOrderConvertOccupy'
 import { workOrderStatusColor } from '@/utils/workOrderStatus'
+import { reworkOrderState, workOrderHasOpenRework } from '@/store/reworkOrderStore'
 
 const props = defineProps({
   dataSource: { type: Array, default: () => [] },
@@ -191,7 +193,7 @@ const baseColumns = [
   { title: '#', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '工单编号', dataIndex: 'code', key: 'code', width: 150, ellipsis: true, fixed: 'left' },
   { title: '工单名称', dataIndex: 'name', key: 'name', width: 180, ellipsis: true },
-  { title: '状态', key: 'progress', width: 90 },
+  { title: '状态', key: 'progress', width: 140 },
   {
     title: '销售订单号',
     dataIndex: 'sourceOrderNo',
@@ -277,6 +279,11 @@ function onPageSizeChange(_current, size) {
 
 function statusColor(status) {
   return workOrderStatusColor(status)
+}
+
+function hasOpenRework(record) {
+  void reworkOrderState.orders
+  return workOrderHasOpenRework(record)
 }
 
 /** 待下发始终可下发；已下发/执行中仅未排完时可继续下发 */

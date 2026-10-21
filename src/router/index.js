@@ -408,10 +408,32 @@ const routes = [
         redirect: '/basic-config/customers',
       },
       {
+        path: 'sales/contracts',
+        name: 'sales-contracts',
+        component: () => import('@/views/sales/SalesContractView.vue'),
+        meta: { title: '合同管理' },
+      },
+      {
+        path: 'sales/contracts/:id',
+        name: 'sales-contract-detail',
+        component: () => import('@/views/sales/SalesContractDetailView.vue'),
+        meta: { title: '合同详情', listPath: '/sales/contracts' },
+      },
+      {
+        path: 'sales/contract-changes',
+        name: 'sales-contract-changes',
+        component: () => import('@/views/sales/SalesContractChangeView.vue'),
+        meta: { title: '合同变更单' },
+      },
+      {
+        path: 'sales/payments',
+        name: 'sales-payments',
+        component: () => import('@/views/sales/SalesPaymentView.vue'),
+        meta: { title: '回款管理' },
+      },
+      {
         path: 'sales/framework-contracts',
-        name: 'sales-framework-contracts',
-        component: () => import('@/views/sales/FrameworkContractView.vue'),
-        meta: { title: '框架合同' },
+        redirect: '/sales/contracts',
       },
       {
         path: 'planning/production-plan',
@@ -478,6 +500,18 @@ const routes = [
         name: 'production-qc-work-orders',
         component: () => import('@/views/production/QcWorkOrderManagementView.vue'),
         meta: { title: '质检工单' },
+      },
+      {
+        path: 'production/rework-orders',
+        name: 'production-rework-orders',
+        component: () => import('@/views/production/ReworkOrderView.vue'),
+        meta: { title: '返工管理' },
+      },
+      {
+        path: 'production/rework-orders/:id',
+        name: 'production-rework-orders-detail',
+        component: () => import('@/views/production/ReworkOrderDetailView.vue'),
+        meta: { title: '返工单详情', listPath: '/production/rework-orders' },
       },
       {
         path: 'production/material-requisition',
