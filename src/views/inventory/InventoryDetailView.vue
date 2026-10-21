@@ -460,6 +460,25 @@
             :expandable="drawerBatchExpandable"
             :row-selection="drawerBatchRowSelection"
           >
+            <template #headerCell="{ column }">
+              <template v-if="column.key === 'currentLength'">
+                <span class="col-title-with-tip">
+                  在库数量
+                  <a-tooltip :title="BATCH_ON_HAND_QTY_TIP">
+                    <InfoCircleOutlined class="col-tip-icon" />
+                  </a-tooltip>
+                </span>
+              </template>
+              <template v-else-if="column.key === 'inboundQty'">
+                <span class="col-title-with-tip">
+                  点收数量
+                  <a-tooltip :title="BATCH_RECEIVE_QTY_TIP">
+                    <InfoCircleOutlined class="col-tip-icon" />
+                  </a-tooltip>
+                </span>
+              </template>
+              <template v-else>{{ column.title }}</template>
+            </template>
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'fifoIndex'">
                 {{ index + 1 }}
@@ -673,7 +692,12 @@ import { computed, h, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
-import { SearchOutlined, ReloadOutlined, DownOutlined } from '@ant-design/icons-vue'
+import {
+  SearchOutlined,
+  ReloadOutlined,
+  DownOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons-vue'
 import { stockState } from '@/store/stockStore'
 import {
   listBatches,
@@ -1193,6 +1217,11 @@ const drawerItemUnits = computed(() => {
     hasSettle: hasSettleUnit(master) || hasSettleOnBatches,
   }
 })
+
+const BATCH_ON_HAND_QTY_TIP =
+  '本批当前还剩多少，按库存单位计。入库建批后出库会扣减本列；顶栏「在库合计」为本列在库批次之和。'
+const BATCH_RECEIVE_QTY_TIP =
+  '本批建账时点收的数量，出库不扣。采购单位与库存单位相同时即当时入账量；不相同时按采购单位显示，并另列「入库数量」表示折成库存单位的建账量。'
 
 const drawerBatchColumns = computed(() => {
   const cols = [
@@ -1989,6 +2018,18 @@ watch(
 
 .batch-soft-tip {
   margin-bottom: 12px;
+}
+
+.col-title-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
 }
 </style>
 

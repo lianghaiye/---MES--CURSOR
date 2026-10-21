@@ -2,7 +2,8 @@
   <a-modal
     :open="open"
     :title="title"
-    width="1480px"
+    width="min(1480px, 94vw)"
+    wrap-class-name="select-bom-material-modal-wrap"
     :mask-closable="false"
     destroy-on-close
     class="select-bom-material-modal"
@@ -222,30 +223,32 @@
             </a-tooltip>
           </div>
         </div>
-        <a-table
-          :row-selection="rowSelection"
-          :columns="tableColumns"
-          :data-source="pagedRows"
-          :custom-row="customRow"
-          row-key="rowKey"
-          size="small"
-          bordered
-          :loading="loading"
-          :pagination="false"
-          :scroll="{ x: tableScrollX, y: tableScrollY }"
-        >
-          <template #bodyCell="{ column, text, record }">
-            <template v-if="column.key === 'variantSummary'">
-              <a-tooltip v-if="record.variantTooltip || text">
-                <template #title>
-                  <div class="variant-tip-title">{{ tooltipTitle(record) }}</div>
-                </template>
-                <span class="variant-summary-cell">{{ text || '—' }}</span>
-              </a-tooltip>
-              <span v-else class="variant-summary-cell is-empty">—</span>
+        <div ref="tableWrapRef" class="table-wrap">
+          <a-table
+            :row-selection="rowSelection"
+            :columns="tableColumns"
+            :data-source="pagedRows"
+            :custom-row="customRow"
+            row-key="rowKey"
+            size="small"
+            bordered
+            :loading="loading"
+            :pagination="false"
+            :scroll="{ x: tableScrollX, y: tableScrollY }"
+          >
+            <template #bodyCell="{ column, text, record }">
+              <template v-if="column.key === 'variantSummary'">
+                <a-tooltip v-if="record.variantTooltip || text">
+                  <template #title>
+                    <div class="variant-tip-title">{{ tooltipTitle(record) }}</div>
+                  </template>
+                  <span class="variant-summary-cell">{{ text || '—' }}</span>
+                </a-tooltip>
+                <span v-else class="variant-summary-cell is-empty">—</span>
+              </template>
             </template>
-          </template>
-        </a-table>
+          </a-table>
+        </div>
         <div class="table-pager">
           <a-pagination
             v-model:current="page"
@@ -318,7 +321,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { SettingOutlined, PlusOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons-vue'
@@ -378,6 +381,9 @@ const page = ref(1)
 const pageSize = ref(20)
 const columnDrawerOpen = ref(false)
 const filterModalOpen = ref(false)
+const tableWrapRef = ref(null)
+const tableScrollY = ref(360)
+let tableResizeObserver = null
 
 const emptyEcnFilters = () => ({
   itemName: '',
@@ -530,7 +536,29 @@ const tableScrollX = computed(() => {
   return Math.max(sum, 900)
 })
 
-const tableScrollY = computed(() => 440)
+function syncTableScrollY() {
+  const el = tableWrapRef.value
+  if (!el) return
+  const header = el.querySelector('.ant-table-header') || el.querySelector('.ant-table-thead')
+  const headerH = header?.offsetHeight || 39
+  tableScrollY.value = Math.max(240, Math.floor(el.clientHeight - headerH))
+}
+
+function unbindTableResize() {
+  tableResizeObserver?.disconnect()
+  tableResizeObserver = null
+}
+
+function bindTableResize() {
+  unbindTableResize()
+  const el = tableWrapRef.value
+  if (!el) return
+  if (typeof ResizeObserver !== 'undefined') {
+    tableResizeObserver = new ResizeObserver(() => syncTableScrollY())
+    tableResizeObserver.observe(el)
+  }
+  syncTableScrollY()
+}
 
 const pagedRows = computed(() => {
   const start = (page.value - 1) * pageSize.value
@@ -612,8 +640,11 @@ watch(catalogKindFilter, () => {
 
 watch(
   () => props.open,
-  (visible) => {
-    if (!visible) return
+  async (visible) => {
+    if (!visible) {
+      unbindTableResize()
+      return
+    }
     keyword.value = ''
     Object.assign(ecnFilters, emptyEcnFilters())
     Object.assign(appliedEcnFilters, emptyEcnFilters())
@@ -625,8 +656,12 @@ watch(
     listVersion.value += 1
     invalidateBomSubItemPickerRowsCache()
     seedInitialSelection()
+    await nextTick()
+    bindTableResize()
   },
 )
+
+onBeforeUnmount(unbindTableResize)
 
 /** 按 initialSelectedIds 回显已选（优先匹配历史目录偏好：产品/物料） */
 function seedInitialSelection() {
@@ -774,8 +809,9 @@ watch(
 
 <style lang="less" scoped>
 .select-bom-material-modal {
-  :deep(.ant-modal-body) {
-    padding-top: 16px;
+  .filter-card {
+    flex-shrink: 0;
+    margin-bottom: 12px;
   }
 
   .ecn-filter-form {
@@ -800,6 +836,7 @@ watch(
     background: #f6ffed;
     border: 1px solid #d9f7be;
     border-radius: 4px;
+    flex-shrink: 0;
   }
 
   .filter-tags-label {
@@ -817,7 +854,10 @@ watch(
     display: flex;
     gap: 12px;
     align-items: stretch;
+    flex: 1;
     min-height: 480px;
+    height: 560px;
+    max-height: calc(90vh - 200px);
   }
 
   .table-panel {
@@ -826,9 +866,19 @@ watch(
     min-height: 0;
     display: flex;
     flex-direction: column;
+  }
 
-    :deep(.ant-table-body) {
-      min-height: 440px;
+  .table-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+
+    :deep(.ant-table-wrapper),
+    :deep(.ant-spin-nested-loading),
+    :deep(.ant-spin-container),
+    :deep(.ant-table),
+    :deep(.ant-table-container) {
+      height: 100%;
     }
   }
 
@@ -837,6 +887,7 @@ watch(
     justify-content: flex-end;
     flex-shrink: 0;
     margin-top: 12px;
+    padding-top: 4px;
   }
 
   .list-toolbar {
@@ -964,6 +1015,28 @@ watch(
 </style>
 
 <style lang="less">
+.select-bom-material-modal-wrap {
+  .ant-modal {
+    max-width: min(1480px, 94vw);
+    top: 24px;
+    padding-bottom: 0;
+  }
+
+  .ant-modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: 92vh;
+  }
+
+  .ant-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 .variant-tip-title {
   white-space: pre-line;
   max-width: 320px;

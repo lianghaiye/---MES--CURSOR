@@ -130,10 +130,10 @@
     <a-modal
       v-model:open="packageOpen"
       title="添加随货配件包"
-      width="1480px"
+      width="min(1480px, 94vw)"
       :mask-closable="false"
       destroy-on-close
-      wrap-class-name="select-ship-package-modal"
+      wrap-class-name="select-ship-package-modal-wrap"
       class="select-ship-package-modal"
       ok-text="添加"
       :ok-button-props="{ disabled: !packageForm.bomId }"
@@ -198,7 +198,7 @@
 
       <div class="picker-body">
         <div class="table-panel">
-          <div class="table-frame">
+          <div ref="tableWrapRef" class="table-wrap">
             <a-table
               class="package-pick-table"
               :columns="packageColumns"
@@ -209,7 +209,7 @@
               :pagination="false"
               :row-selection="packageRowSelection"
               :custom-row="packageCustomRow"
-              :scroll="{ x: 860, y: 360 }"
+              :scroll="{ x: 860, y: tableScrollY }"
               :locale="{ emptyText: '暂无已启用的随货配件包' }"
             >
               <template #bodyCell="{ column, index }">
@@ -280,7 +280,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { Empty, message } from 'ant-design-vue'
 import { CloseOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
@@ -300,6 +300,7 @@ import {
   stockFulfillmentModeLabel,
 } from '@/utils/salesStockFulfillment'
 import { useTabs } from '@/composables/useTabs'
+import { useTableScrollY } from '@/composables/useTableScrollY'
 import ListFilterBar from '@/components/ListFilterBar.vue'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 
@@ -317,6 +318,7 @@ const router = useRouter()
 const { openTab } = useTabs()
 const converting = ref(false)
 const packageOpen = ref(false)
+const { tableWrapRef, tableScrollY, bindTableResize, unbindTableResize } = useTableScrollY()
 const pickerOpen = ref(false)
 /** null=顶栏「从主数据添加」独立组；有值=向指定配件包追加明细 */
 const pickerTargetGroup = ref(null)
@@ -588,6 +590,15 @@ function removeRow(record) {
   persist()
 }
 
+watch(packageOpen, async (open) => {
+  if (!open) {
+    unbindTableResize()
+    return
+  }
+  await nextTick()
+  bindTableResize()
+})
+
 function openAddPackage() {
   if (!allPackageRows.value.length) {
     message.warning('暂无已启用的随货配件包，请先在「随货配件」维护')
@@ -810,6 +821,7 @@ watch(
   align-items: center;
   gap: 24px;
   margin: 0 0 12px;
+  flex-shrink: 0;
 }
 
 .package-settings-item {
@@ -841,6 +853,7 @@ watch(
 }
 
 .filter-card {
+  flex-shrink: 0;
   margin-bottom: 12px;
   padding: 12px;
   background: #fafafa;
@@ -883,6 +896,10 @@ watch(
   display: flex;
   gap: 12px;
   align-items: stretch;
+  flex: 1;
+  min-height: 360px;
+  height: 480px;
+  max-height: calc(90vh - 260px);
 }
 
 .table-panel {
@@ -893,24 +910,31 @@ watch(
   min-height: 0;
 }
 
-.table-frame {
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid #f0f0f0;
   border-radius: 4px;
   background: #fff;
-  overflow: hidden;
+
+  :deep(.ant-table-wrapper),
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container),
+  :deep(.ant-table),
+  :deep(.ant-table-container) {
+    height: 100%;
+  }
 }
 
 .table-pager {
   display: flex;
   justify-content: flex-end;
   padding-top: 8px;
+  flex-shrink: 0;
 }
 
 .package-pick-table {
-  :deep(.ant-table-body) {
-    min-height: 360px;
-  }
-
   :deep(.ant-table-tbody > tr) {
     cursor: pointer;
   }
@@ -1002,5 +1026,29 @@ watch(
   align-items: center;
   justify-content: center;
   padding: 24px 0;
+}
+</style>
+
+<style lang="less">
+.select-ship-package-modal-wrap {
+  .ant-modal {
+    max-width: min(1480px, 94vw);
+    top: 24px;
+    padding-bottom: 0;
+  }
+
+  .ant-modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: 92vh;
+  }
+
+  .ant-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
 }
 </style>

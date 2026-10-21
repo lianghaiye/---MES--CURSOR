@@ -2,7 +2,7 @@
   <a-modal
     :open="open"
     :title="title"
-    width="1360px"
+    width="min(1360px, 94vw)"
     :mask-closable="false"
     destroy-on-close
     class="transfer-stock-pick-modal"
@@ -88,37 +88,39 @@
 
     <div class="picker-body">
       <div class="table-panel">
-        <a-table
-          :columns="displayColumns"
-          :data-source="pagedRows"
-          row-key="rowKey"
-          size="small"
-          bordered
-          :pagination="false"
-          :scroll="{ x: tableScrollX, y: tableScrollY }"
-          :row-selection="rowSelection"
-          :custom-row="customRow"
-        >
-          <template #bodyCell="{ column, record, index }">
-            <template v-if="column.key === 'index'">
-              {{ (page - 1) * pageSize + index + 1 }}
+        <div ref="tableWrapRef" class="table-wrap">
+          <a-table
+            :columns="displayColumns"
+            :data-source="pagedRows"
+            row-key="rowKey"
+            size="small"
+            bordered
+            :pagination="false"
+            :scroll="{ x: tableScrollX, y: tableScrollY }"
+            :row-selection="rowSelection"
+            :custom-row="customRow"
+          >
+            <template #bodyCell="{ column, record, index }">
+              <template v-if="column.key === 'index'">
+                {{ (page - 1) * pageSize + index + 1 }}
+              </template>
+              <template v-else-if="column.key === 'ownership'">
+                <a-tag :color="record.dedicated ? 'orange' : 'blue'">
+                  {{ record.dedicated ? '按单' : '自由' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'qtyText'">
+                {{ record.qtyText }}
+              </template>
+              <template v-else-if="column.key === 'salesOrderNo'">
+                {{ record.dedicated ? record.salesOrderNo || '—' : '—' }}
+              </template>
+              <template v-else>
+                {{ displayCell(record[column.dataIndex]) }}
+              </template>
             </template>
-            <template v-else-if="column.key === 'ownership'">
-              <a-tag :color="record.dedicated ? 'orange' : 'blue'">
-                {{ record.dedicated ? '按单' : '自由' }}
-              </a-tag>
-            </template>
-            <template v-else-if="column.key === 'qtyText'">
-              {{ record.qtyText }}
-            </template>
-            <template v-else-if="column.key === 'salesOrderNo'">
-              {{ record.dedicated ? record.salesOrderNo || '—' : '—' }}
-            </template>
-            <template v-else>
-              {{ displayCell(record[column.dataIndex]) }}
-            </template>
-          </template>
-        </a-table>
+          </a-table>
+        </div>
         <div class="table-pagination">
           <a-pagination
             v-model:current="page"
@@ -179,7 +181,8 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { useTableScrollY } from '@/composables/useTableScrollY'
 import { message } from 'ant-design-vue'
 import { CloseOutlined } from '@ant-design/icons-vue'
 import ListFilterBar from '@/components/ListFilterBar.vue'
@@ -248,9 +251,7 @@ const baseColumns = [
 ]
 
 const tableScrollX = computed(() => baseColumns.reduce((s, c) => s + (c.width || 90), 0))
-/** ant-table size=small 约 40px/行，保证默认 10 条无需纵向滚动 */
-const TABLE_BODY_ROW_H = 40
-const tableScrollY = TABLE_BODY_ROW_H * 10
+const { tableWrapRef, tableScrollY, bindTableResize, unbindTableResize } = useTableScrollY()
 
 /** 当前页内按物料编码合并产品信息列 */
 function buildItemCodeRowSpans(rows = []) {
@@ -542,8 +543,14 @@ function resetState() {
 
 watch(
   () => props.open,
-  (open) => {
-    if (open) resetState()
+  async (open) => {
+    if (!open) {
+      unbindTableResize()
+      return
+    }
+    resetState()
+    await nextTick()
+    bindTableResize()
   },
 )
 
@@ -569,7 +576,12 @@ function handleConfirm() {
 </script>
 
 <style lang="less" scoped>
+.filter-card {
+  flex-shrink: 0;
+}
+
 .ownership-tabs {
+  flex-shrink: 0;
   margin: 0 0 8px !important;
 
   :deep(> .ant-tabs-nav) {
@@ -588,13 +600,32 @@ function handleConfirm() {
   display: flex;
   align-items: stretch;
   gap: 12px;
+  flex: 1;
+  min-height: 420px;
+  height: 520px;
+  max-height: calc(90vh - 220px);
 }
 
 .table-panel {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+
+  :deep(.ant-table-wrapper),
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container),
+  :deep(.ant-table),
+  :deep(.ant-table-container) {
+    height: 100%;
+  }
 }
 
 .table-pagination {
@@ -706,13 +737,23 @@ function handleConfirm() {
 <style lang="less">
 .transfer-stock-pick-modal-wrap {
   .ant-modal {
-    top: 40px;
+    max-width: min(1360px, 94vw);
+    top: 24px;
     padding-bottom: 0;
   }
 
+  .ant-modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: 92vh;
+  }
+
   .ant-modal-body {
-    max-height: calc(100vh - 120px);
-    overflow: auto;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 }
 </style>
