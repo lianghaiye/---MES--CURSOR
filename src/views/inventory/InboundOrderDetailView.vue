@@ -392,6 +392,80 @@
             </DetailSectionCard>
           </template>
 
+          <template v-else-if="isOutsourcingType">
+            <DetailSectionCard title="关联单据">
+              <a-table
+                :columns="relatedOutsourcingColumns"
+                :data-source="relatedOutsourcingOrders"
+                :row-key="(r) => r.id || r.orderNo"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1280 }"
+                :locale="{ emptyText: '暂无关联外协订单' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'orderNo'">
+                    <a
+                      v-if="row.orderNo"
+                      class="link-code"
+                      @click.prevent="goOutsourcingOrder(row)"
+                    >
+                      {{ row.orderNo }}
+                    </a>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'outsourceMode'">
+                    {{ row.outsourceModeText || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'qtySummary'">
+                    {{ row.qtySummary || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'applyInboundQty'">
+                    {{ formatQty(row.applyInboundQty) }}
+                  </template>
+                  <template v-else-if="column.key === 'planDate'">
+                    {{ row.planDateText || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ formatDateTimeMinute(row.createdAt) || '—' }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
+          <template v-else-if="isCustomerSupplyType">
+            <DetailSectionCard title="关联单据">
+              <a-table
+                :columns="relatedSalesOrderColumns"
+                :data-source="relatedSalesOrders"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :locale="{ emptyText: '暂无关联销售订单' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'orderNo'">
+                    <a v-if="row.orderNo" class="link-code" @click.prevent="goSalesOrder(row)">
+                      {{ row.orderNo }}
+                    </a>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
           <template v-else-if="activeTab === 'qc' && showQcTab">
             <DetailSectionCard title="质检信息">
               <a-table
@@ -663,6 +737,8 @@ import {
   isStocktakeInbound,
   isTransferInbound,
   isRemnantInbound,
+  isOutsourcingInbound,
+  isCustomerSupplyInbound,
   listRelatedOutboundsForInbound,
   listRelatedPurchaseOrdersForInbound,
   listRelatedPurchaseReceiptsForInbound,
@@ -671,6 +747,8 @@ import {
   listRelatedStocktakesForInbound,
   listRelatedTransfersForInbound,
   listRelatedCutSettleLinesForInbound,
+  listRelatedOutsourcingOrdersForInbound,
+  listRelatedSalesOrdersForInbound,
 } from '@/utils/inboundRelatedDocs'
 import InboundOrderBasicInfoSection from './components/InboundOrderBasicInfoSection.vue'
 import InboundWorkOrderList from './components/InboundWorkOrderList.vue'
@@ -718,12 +796,18 @@ const isFinishedType = computed(() => isFinishedOrSemiInbound(record.value))
 const isStocktakeType = computed(() => isStocktakeInbound(record.value))
 const isTransferType = computed(() => isTransferInbound(record.value))
 const isRemnantType = computed(() => isRemnantInbound(record.value))
+const isOutsourcingType = computed(() => isOutsourcingInbound(record.value))
+const isCustomerSupplyType = computed(() => isCustomerSupplyInbound(record.value))
 
 const relatedOutbounds = computed(() => listRelatedOutboundsForInbound(record.value))
 const relatedPurchaseOrders = computed(() => listRelatedPurchaseOrdersForInbound(record.value))
 const relatedPurchaseReceipts = computed(() => listRelatedPurchaseReceiptsForInbound(record.value))
 const relatedStocktakes = computed(() => listRelatedStocktakesForInbound(record.value))
 const relatedTransfers = computed(() => listRelatedTransfersForInbound(record.value))
+const relatedOutsourcingOrders = computed(() =>
+  listRelatedOutsourcingOrdersForInbound(record.value),
+)
+const relatedSalesOrders = computed(() => listRelatedSalesOrdersForInbound(record.value))
 const cutSettleLines = computed(() => listRelatedCutSettleLinesForInbound(record.value))
 
 const purchaseQcLines = computed(() => listPurchaseQcLinesForInbound(record.value))
@@ -737,7 +821,9 @@ const showRelatedTab = computed(
     isMaterialReqType.value ||
     isPurchaseType.value ||
     isStocktakeType.value ||
-    isTransferType.value,
+    isTransferType.value ||
+    isOutsourcingType.value ||
+    isCustomerSupplyType.value,
 )
 const showQcTab = computed(() => isPurchaseType.value || isFinishedType.value)
 const showCutSettleTab = computed(() => isRemnantType.value)
@@ -748,6 +834,8 @@ const relatedTabCount = computed(() => {
     return relatedPurchaseOrders.value.length + relatedPurchaseReceipts.value.length
   if (isStocktakeType.value) return relatedStocktakes.value.length
   if (isTransferType.value) return relatedTransfers.value.length
+  if (isOutsourcingType.value) return relatedOutsourcingOrders.value.length
+  if (isCustomerSupplyType.value) return relatedSalesOrders.value.length
   return 0
 })
 
@@ -820,6 +908,28 @@ const relatedTransferColumns = [
   { title: '确认时间', key: 'confirmedAt', width: 150 },
   { title: '入库方确认人', dataIndex: 'inboundConfirmer', width: 110 },
   { title: '入库方确认时间', key: 'inboundConfirmedAt', width: 150 },
+]
+
+const relatedOutsourcingColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '外协单号', key: 'orderNo', width: 150 },
+  { title: '外协类型', key: 'outsourceMode', width: 96 },
+  { title: '供应商', dataIndex: 'supplier', width: 140, ellipsis: true },
+  { title: '外协数量', key: 'qtySummary', width: 110 },
+  { title: '申请入库数量', key: 'applyInboundQty', width: 120, align: 'right' },
+  { title: '销售单号', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
+  { title: '计划日期', key: 'planDate', width: 180 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', width: 150 },
+]
+
+const relatedSalesOrderColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '销售单号', key: 'orderNo', width: 160 },
+  { title: '客户', dataIndex: 'customerName', width: 160, ellipsis: true },
+  { title: '状态', dataIndex: 'status', width: 90 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
 ]
 
 const purchaseQcColumns = [
@@ -926,6 +1036,22 @@ function goTransfer(row) {
   const path = `/inventory/transfer/${row.id}`
   openTab(path, `调拨单 ${row.docNo || ''}`.trim())
   router.push({ name: 'inventory-transfer-detail', params: { id: row.id } })
+}
+
+function goOutsourcingOrder(row) {
+  const id = row?.id
+  if (!id) return
+  const path = `/procurement/outsourcing-orders/${id}`
+  openTab(path, `外协订单 ${row.orderNo || ''}`.trim())
+  router.push({ name: 'procurement-outsourcing-orders-detail', params: { id } })
+}
+
+function goSalesOrder(row) {
+  const id = row?.id
+  if (!id) return
+  const path = `/sales/orders/${id}`
+  openTab(path, `销售订单 ${row.orderNo || ''}`.trim())
+  router.push(path)
 }
 
 function goQcDetail(row) {

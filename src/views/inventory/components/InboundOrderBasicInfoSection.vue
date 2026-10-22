@@ -59,21 +59,28 @@ const metaItems = computed(() => {
   ]
 })
 
-const fields = computed(() => [
-  { key: 'docNo', label: '入库单号' },
-  { key: 'inboundType', label: '入库类型' },
-  { key: 'inboundDate', label: '入库日期' },
-  { key: 'deliveryDate', label: '送货日期' },
-  { key: 'warehouse', label: '入库仓库' },
-  { key: 'warehouseKeeper', label: '仓管员' },
-  { key: 'itemType', label: '物品类型' },
-  { key: 'supplier', label: '供应商' },
-  { key: 'sourceOrderNo', label: '源单号', slot: 'sourceOrderNo' },
-  { key: 'sourceWorkshop', label: '来源车间' },
-  { key: 'invoiceNo', label: '发票号码' },
-  { key: 'handler', label: '经手人' },
-  { key: 'remark', label: '备注', fullRow: true },
-])
+const fields = computed(() => {
+  const isCustomerSupply = props.record?.inboundType === '客供料入库'
+  return [
+    { key: 'docNo', label: '入库单号' },
+    { key: 'inboundType', label: '入库类型' },
+    { key: 'inboundDate', label: '入库日期' },
+    { key: 'deliveryDate', label: '送货日期' },
+    { key: 'warehouse', label: '入库仓库' },
+    { key: 'warehouseKeeper', label: '仓管员' },
+    { key: 'itemType', label: '物品类型' },
+    {
+      key: isCustomerSupply ? 'customerName' : 'supplier',
+      label: isCustomerSupply ? '客户' : '供应商',
+      format: isCustomerSupply ? (row) => display(row.customerName || row.supplier) : undefined,
+    },
+    { key: 'sourceOrderNo', label: '源单号', slot: 'sourceOrderNo' },
+    { key: 'sourceWorkshop', label: '来源车间' },
+    { key: 'invoiceNo', label: '发票号码' },
+    { key: 'handler', label: '经手人' },
+    { key: 'remark', label: '备注', fullRow: true },
+  ]
+})
 </script>
 
 <script>

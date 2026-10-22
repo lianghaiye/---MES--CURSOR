@@ -85,6 +85,16 @@
                 :tab="`关联单据 (${relatedStocktakes.length})`"
               />
               <a-tab-pane
+                v-if="isIssueOutbound"
+                key="relatedIssue"
+                :tab="`关联单据 (${relatedOutsourcingOrders.length})`"
+              />
+              <a-tab-pane
+                v-if="showGenericRelatedTab"
+                key="relatedGeneric"
+                :tab="`关联单据 (${relatedGenericDocs.length})`"
+              />
+              <a-tab-pane
                 v-if="isMaterialReqOutbound"
                 key="cutSettle"
                 :tab="`下料结算 (${relatedCutSettleLines.length})`"
@@ -122,10 +132,6 @@
 
             <div v-if="workOrderList.length" class="section-card">
               <OutboundWorkOrderList :work-orders="workOrderList" />
-            </div>
-
-            <div v-if="outsourcingOrderList.length" class="section-card">
-              <OutboundOutsourcingOrderList :outsourcing-orders="outsourcingOrderList" />
             </div>
 
             <DetailSectionCard title="出库明细">
@@ -507,6 +513,71 @@
             </DetailSectionCard>
           </template>
 
+          <template v-else-if="infoTab === 'relatedIssue' && isIssueOutbound">
+            <DetailSectionCard title="关联单据">
+              <a-table
+                :columns="relatedOutsourcingColumns"
+                :data-source="relatedOutsourcingOrders"
+                :row-key="(r) => r.id || r.orderNo"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1280 }"
+                :locale="{ emptyText: '暂无关联外协订单' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'orderNo'">
+                    <a
+                      v-if="row.orderNo"
+                      class="link-code"
+                      @click.prevent="goOutsourcingOrder(row)"
+                    >
+                      {{ row.orderNo }}
+                    </a>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'outsourceMode'">
+                    {{ row.outsourceModeText || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'qtySummary'">
+                    {{ row.qtySummary || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'planDate'">
+                    {{ row.planDateText || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ formatDateTimeMinute(row.createdAt) || '—' }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
+          <template v-else-if="infoTab === 'relatedGeneric' && showGenericRelatedTab">
+            <DetailSectionCard title="关联单据">
+              <a-table
+                :columns="relatedGenericColumns"
+                :data-source="relatedGenericDocs"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :locale="{ emptyText: '暂无关联单据' }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
           <template v-else-if="infoTab === 'cutSettle'">
             <DetailSectionCard title="下料结算">
               <a-table
@@ -634,13 +705,11 @@ import OutboundOrderBasicInfoSection from './components/OutboundOrderBasicInfoSe
 import OutboundRefuseModal from './components/OutboundRefuseModal.vue'
 import OutboundOrderPrintModal from './components/OutboundOrderPrintModal.vue'
 import OutboundWorkOrderList from './components/OutboundWorkOrderList.vue'
-import OutboundOutsourcingOrderList from './components/OutboundOutsourcingOrderList.vue'
 import {
   mobileMaterialReqState,
   syncMaterialReqOnOutboundRefuse,
 } from '@/store/mobileMaterialReqStore'
 import { resolveOutboundWorkOrders } from '@/utils/outboundWorkOrders'
-import { resolveOutboundOutsourcingOrders } from '@/utils/outboundOutsourcingOrders'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
 import { flattenCutSettleLines } from '@/utils/cutSettleLines'
 import { inboundOrderState } from '@/store/inboundOrderStore'
@@ -658,6 +727,7 @@ import {
   listRelatedDeliveriesForOutbound,
   listRelatedTransfersForOutbound,
   listRelatedStocktakesForOutbound,
+  listRelatedOutsourcingOrdersForOutbound,
 } from '@/utils/outboundRelatedDocs'
 
 const route = useRoute()
@@ -674,6 +744,17 @@ const isPurchaseReturnOutbound = computed(() => record.value?.outboundType === '
 const isSalesOutbound = computed(() => record.value?.outboundType === '销售出库')
 const isTransferOutbound = computed(() => record.value?.outboundType === '调拨出库')
 const isStocktakeOutbound = computed(() => record.value?.outboundType === '盘点出库')
+const isIssueOutbound = computed(() => record.value?.outboundType === '发料出库')
+const showGenericRelatedTab = computed(
+  () =>
+    Boolean(record.value) &&
+    !isSalesOutbound.value &&
+    !isPurchaseReturnOutbound.value &&
+    !isMaterialReqOutbound.value &&
+    !isTransferOutbound.value &&
+    !isStocktakeOutbound.value &&
+    !isIssueOutbound.value,
+)
 
 const relatedFactoryQcList = computed(() => {
   void factoryQcState.records
@@ -695,6 +776,29 @@ const relatedStocktakes = computed(() => {
   void stocktakeOrderState.orders
   return listRelatedStocktakesForOutbound(record.value)
 })
+
+const relatedOutsourcingOrders = computed(() => {
+  void outsourcingOrderState.orders
+  return listRelatedOutsourcingOrdersForOutbound(record.value)
+})
+
+const relatedGenericDocs = computed(() => [])
+const relatedGenericColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '单据号', dataIndex: 'docNo', width: 160 },
+]
+
+const relatedOutsourcingColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '外协单号', key: 'orderNo', width: 150 },
+  { title: '外协类型', key: 'outsourceMode', width: 96 },
+  { title: '供应商', dataIndex: 'supplier', width: 140, ellipsis: true },
+  { title: '外协数量', key: 'qtySummary', width: 110 },
+  { title: '销售单号', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
+  { title: '计划日期', key: 'planDate', width: 180 },
+  { title: '创建人', dataIndex: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', width: 150 },
+]
 
 const relatedQcColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
@@ -735,11 +839,6 @@ const logColumns = [
 const workOrderList = computed(() => {
   void mobileMaterialReqState.items
   return resolveOutboundWorkOrders(record.value, mobileMaterialReqState.items)
-})
-
-const outsourcingOrderList = computed(() => {
-  void outsourcingOrderState.orders
-  return resolveOutboundOutsourcingOrders(record.value)
 })
 
 const relatedInbounds = computed(() => {
@@ -1016,6 +1115,14 @@ function formatFactoryQcQty(row) {
   const units = [...new Set(lines.map((l) => l.unit).filter(Boolean))]
   const unit = units.length === 1 ? units[0] : ''
   return unit ? `${total} ${unit}` : String(total)
+}
+
+function goOutsourcingOrder(row) {
+  const id = row?.id || row?.outsourcingOrderId
+  if (!id) return
+  const path = `/procurement/outsourcing-orders/${id}`
+  openTab(path, `外协订单 ${row.orderNo || ''}`.trim())
+  router.push({ name: 'procurement-outsourcing-orders-detail', params: { id } })
 }
 
 function goInbound(row) {

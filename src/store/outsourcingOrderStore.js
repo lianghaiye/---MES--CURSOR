@@ -637,6 +637,7 @@ export function submitOutsourcingInbound(orderId, lines = []) {
     }
     return { ok: false, message: '当前外协订单不可生成入库单' }
   }
+  const inboundLines = []
   lines.forEach((item) => {
     const line = (order.lineItems || []).find((l) => l.id === item.poLineId || l.id === item.lineId)
     if (!line) return
@@ -647,11 +648,59 @@ export function submitOutsourcingInbound(orderId, lines = []) {
       Number(line.appliedReceiptQty) || 0,
       Number(line.receivedQty) || 0,
     )
+    const code = String(line.productCode || line.itemCode || '').trim()
+    const warehouse =
+      item.warehouse || line.receivingWarehouse || resolveDefaultWarehouseByMaterialCode(code) || ''
+    inboundLines.push({
+      poLineId: line.id,
+      itemCode: code,
+      itemName: line.productName || line.itemName || '',
+      itemType: '物料',
+      specModel: line.specModel || '',
+      material: line.material || '',
+      qty,
+      unit: line.unit || '件',
+      warehouse,
+      settleUnit: String(item.settleUnit || line.settleUnit || '').trim(),
+      settleQty: Number(item.settleQty) > 0 ? Number(item.settleQty) : undefined,
+      lineSource: '外协',
+    })
   })
   order.updater = 'admin1'
   order.updatedAt = nowText()
   syncOutsourcingReturnStatus(order)
-  return { ok: true, message: '已生成外协入库单' }
+
+  if (!inboundLines.length) {
+    return { ok: false, message: '无可入库明细' }
+  }
+  const missingWh = inboundLines.find((l) => !String(l.warehouse || '').trim())
+  if (missingWh) {
+    return { ok: false, message: `「${missingWh.itemName || missingWh.itemCode}」缺少入库仓库` }
+  }
+
+  // eslint-disable-next-line global-require
+  const { addInboundOrder } = require('@/store/inboundOrderStore')
+  const warehouse = inboundLines[0].warehouse
+  const inbound = addInboundOrder({
+    inboundType: '外协入库',
+    status: '待入库',
+    warehouse,
+    inboundDate: dayjs().format('YYYY-MM-DD'),
+    deliveryDate: dayjs().format('YYYY-MM-DD'),
+    itemType: '物料',
+    supplier: order.supplier || '',
+    sourceOrderNo: order.orderNo,
+    sourceType: '外协订单',
+    purchaseOrderId: order.id,
+    outsourcingOrderId: order.id,
+    outsourcingOrderNo: order.orderNo,
+    salesOrderNo: order.salesOrderNo || '',
+    remark: `外协回货生成（${order.orderNo}）`,
+    handler: 'admin1',
+    creator: 'admin1',
+    lineItems: inboundLines,
+  })
+  return { ok: true, message: `已生成外协入库单「${inbound.docNo}」`, inbound }
 }
 
 function nextIssueOrderSeq(existingNos = []) {

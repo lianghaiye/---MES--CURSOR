@@ -9,6 +9,16 @@ import { getTransferOrderById, transferOrderState } from '@/store/transferOrderS
 import { getStocktakeOrderById, stocktakeOrderState } from '@/store/stocktakeOrderStore'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
 import { calcReturnQtySummary, formatReturnQtySummary } from '@/mock/purchaseReturns'
+import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
+import {
+  formatOutsourcingPlanDateDisplay,
+  formatOutsourcingQtySummary,
+} from '@/mock/outsourcingOrders'
+import { outsourceModeLabel } from '@/utils/outsourcingMode'
+import {
+  findLinkedOutsourcingOrder,
+  resolveOutboundOutsourcingOrders,
+} from '@/utils/outboundOutsourcingOrders'
 
 function sumLineQty(lines, keys = ['qty', 'shipQty', 'countQty', 'bookQty']) {
   return (lines || []).reduce((sum, line) => {
@@ -127,6 +137,38 @@ export function listRelatedTransfersForOutbound(outbound) {
     ...row,
     transferQty: sumLineQty(row.lineItems || [], ['qty']),
   }))
+}
+
+/** 发料出库 → 关联外协订单（订单维度，不按产品拆行） */
+export function listRelatedOutsourcingOrdersForOutbound(outbound) {
+  if (!outbound || outbound.outboundType !== '发料出库') return []
+  void outsourcingOrderState.orders
+  const byId = new Map()
+  const push = (wx) => {
+    if (!wx?.id || byId.has(wx.id)) return
+    byId.set(wx.id, {
+      ...wx,
+      outsourceModeText: outsourceModeLabel(wx.outsourceMode),
+      qtySummary: formatOutsourcingQtySummary(wx),
+      planDateText: formatOutsourcingPlanDateDisplay(wx) || '—',
+    })
+  }
+
+  resolveOutboundOutsourcingOrders(outbound).forEach((row) => {
+    push(findLinkedOutsourcingOrder(row))
+  })
+  if (outbound.outsourcingOrderId || outbound.outsourcingOrderNo || outbound.sourceOrderNo) {
+    push(
+      findLinkedOutsourcingOrder({
+        id: outbound.outsourcingOrderId,
+        orderNo: outbound.outsourcingOrderNo || outbound.sourceOrderNo,
+      }),
+    )
+  }
+
+  return [...byId.values()].sort((a, b) =>
+    String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
+  )
 }
 
 /** 盘点出库 → 关联盘点单 */

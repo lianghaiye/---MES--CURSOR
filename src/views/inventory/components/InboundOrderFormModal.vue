@@ -59,8 +59,19 @@
               </a-form-item>
             </a-col>
             <a-col :span="6">
-              <a-form-item label="供应商">
+              <a-form-item :label="isCustomerSupplyType ? '客户' : '供应商'">
                 <a-select
+                  v-if="isCustomerSupplyType"
+                  v-model:value="form.customerName"
+                  allow-clear
+                  show-search
+                  size="small"
+                  placeholder="请选择客户"
+                  :options="customerOpts"
+                  @change="onCustomerSupplyChange"
+                />
+                <a-select
+                  v-else
                   v-model:value="form.supplier"
                   allow-clear
                   show-search
@@ -706,6 +717,7 @@ import InventoryLineEditableCell from './InventoryLineEditableCell.vue'
 import InventoryLineTableFooter from './InventoryLineTableFooter.vue'
 import { inboundTypeOptions, handlerOptions, INBOUND_SOURCE } from '@/mock/inboundOptions'
 import { supplierOptions } from '@/mock/purchaseRequisitionOptions'
+import { customerOptions } from '@/mock/salesOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { getLocationSelectOptions, warehouseLocationState } from '@/store/warehouseLocationStore'
 import {
@@ -844,10 +856,16 @@ const refuseLineDocNos = computed(() => {
 const inboundTypeOpts = inboundTypeOptions.map((v) => ({ label: v, value: v }))
 const handlerOpts = handlerOptions.map((v) => ({ label: v, value: v }))
 const supplierOpts = supplierOptions
+const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 
 const isFinishedOrSemiType = computed(
   () => form.inboundType === '成品入库' || form.inboundType === '半成品入库',
 )
+const isCustomerSupplyType = computed(() => form.inboundType === '客供料入库')
+
+function onCustomerSupplyChange(val) {
+  form.supplier = val || undefined
+}
 
 function linePieceValuesForPreview(line) {
   if (line.isVariableLength || (line.pieceValues || line.pieceLengths || []).length) {
@@ -1421,7 +1439,7 @@ function buildPayload() {
     warehouseKeeper: resolveWarehouseKeeper(form.warehouse),
     inboundDate: form.inboundDate?.format?.('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
     deliveryDate: form.deliveryDate?.format?.('YYYY-MM-DD') || '',
-    supplier: form.supplier,
+    supplier: isCustomerSupplyType.value ? form.customerName || form.supplier : form.supplier,
     handler: form.handler,
     invoiceNo: form.invoiceNo?.trim(),
     salesOrderNo: form.salesOrderNo?.trim() || '',
@@ -1435,6 +1453,8 @@ function buildPayload() {
   if (!isEdit.value) {
     payload.sourceChannel = INBOUND_SOURCE.MANUAL
   }
+  if (form.inboundType === '外协入库') payload.sourceType = '外协订单'
+  if (form.inboundType === '客供料入库') payload.sourceType = '销售订单'
   return payload
 }
 

@@ -14,6 +14,12 @@ import {
 } from '@/utils/purchaseOrderQc'
 import { findRelatedInboundQcTasks } from '@/utils/qcGateEnforceService'
 import { listQcTasks, QC_TASK_STATUS } from '@/store/qcTaskStore'
+import { getOutsourcingOrderById, outsourcingOrderState } from '@/store/outsourcingOrderStore'
+import {
+  formatOutsourcingPlanDateDisplay,
+  formatOutsourcingQtySummary,
+} from '@/mock/outsourcingOrders'
+import { outsourceModeLabel } from '@/utils/outsourcingMode'
 
 function sumLineQty(lines, keys = ['qty', 'purchaseQty', 'receiptQty', 'planQty']) {
   return (lines || []).reduce((sum, line) => {
@@ -36,6 +42,19 @@ export function isPurchaseInbound(order) {
     order?.sourceType === '采购单' ||
     order?.sourceType === '采购收货'
   )
+}
+
+export function isOutsourcingInbound(order) {
+  return (
+    order?.inboundType === '外协入库' ||
+    order?.sourceType === '外协订单' ||
+    order?.sourceType === '外协单' ||
+    Boolean(order?.outsourcingOrderId)
+  )
+}
+
+export function isCustomerSupplyInbound(order) {
+  return order?.inboundType === '客供料入库'
 }
 
 export function isFinishedOrSemiInbound(order) {
@@ -273,4 +292,38 @@ export function listRelatedCutSettleLinesForInbound(inbound) {
     ...row,
     variantSummary: row.variantSummary || '',
   }))
+}
+
+/** 外协入库 → 关联外协订单 */
+export function listRelatedOutsourcingOrdersForInbound(inbound) {
+  if (!inbound || !isOutsourcingInbound(inbound)) return []
+  void outsourcingOrderState.orders
+  const byId = new Map()
+  const push = (wx) => {
+    if (!wx?.id || byId.has(wx.id)) return
+    byId.set(wx.id, {
+      ...wx,
+      outsourceModeText: outsourceModeLabel(wx.outsourceMode),
+      qtySummary: formatOutsourcingQtySummary(wx),
+      planDateText: formatOutsourcingPlanDateDisplay(wx) || '—',
+      applyInboundQty: calcInboundApplyQty(inbound),
+    })
+  }
+  if (inbound.outsourcingOrderId) push(getOutsourcingOrderById(inbound.outsourcingOrderId))
+  const no = String(inbound.outsourcingOrderNo || inbound.sourceOrderNo || '').trim()
+  if (no) {
+    push((outsourcingOrderState.orders || []).find((o) => o.orderNo === no))
+  }
+  return [...byId.values()]
+}
+
+/** 客供料入库 → 关联销售订单 */
+export function listRelatedSalesOrdersForInbound(inbound) {
+  if (!inbound || !isCustomerSupplyInbound(inbound)) return []
+  const no = String(inbound.salesOrderNo || inbound.sourceOrderNo || '').trim()
+  if (!no) return []
+  // eslint-disable-next-line global-require
+  const { salesOrderState } = require('@/store/salesOrderStore')
+  const hit = (salesOrderState.orders || []).find((o) => String(o.orderNo || '').trim() === no)
+  return hit ? [hit] : []
 }

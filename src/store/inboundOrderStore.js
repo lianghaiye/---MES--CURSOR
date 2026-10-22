@@ -72,8 +72,8 @@ function resolveInboundSalesOrder(order) {
 
 const STORAGE_KEY = 'i_doms_inbound_orders'
 const SEED_VERSION_KEY = 'i_doms_inbound_orders_seed_v'
-/** v12：补齐各入库类型演示单 */
-const CURRENT_SEED_VERSION = '12'
+/** v13：补外协入库、客供料入库演示单 */
+const CURRENT_SEED_VERSION = '13'
 
 function loadFromStorage() {
   try {
