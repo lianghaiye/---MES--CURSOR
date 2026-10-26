@@ -224,6 +224,21 @@
           <div class="qc-scopes-label">质检类型</div>
           <a-checkbox-group v-model:value="qcBizScopes" :options="processQcBizScopeOptions()" />
           <div class="field-hint">可多选；工单下发时按勾选项分别生成质检任务</div>
+          <div v-for="cfg in form.qcConfigs" :key="cfg.bizScope" class="qc-template-row">
+            <div class="qc-template-label">{{ cfg.bizScope }}模板</div>
+            <a-select
+              :value="cfg.templateCode || undefined"
+              allow-clear
+              show-search
+              option-filter-prop="label"
+              :options="listProcessQcTemplateOptions(cfg.bizScope)"
+              :placeholder="`请选择${cfg.bizScope}模板`"
+              @update:value="(val) => (cfg.templateCode = val || '')"
+            />
+          </div>
+          <div class="field-hint">
+            每道工序各自指定模板（如机加用尺寸表、热处理用硬度表）。不选则按产品适用范围匹配，同类型质检会套同一张表。
+          </div>
         </div>
       </div>
     </a-form>
@@ -268,6 +283,7 @@ import { getDefectItemOptions } from '@/store/defectItemStore'
 import {
   createProcessQcConfig,
   defaultQcConfigsFromOperations,
+  listProcessQcTemplateOptions,
   normalizeProcessQcConfigs,
   processQcBizScopeOptions,
 } from '@/utils/qcProcessConfig'
@@ -635,6 +651,24 @@ async function handleSave() {
     margin-bottom: 6px;
     font-size: 13px;
     color: rgba(0, 0, 0, 0.88);
+  }
+
+  .qc-template-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .qc-template-label {
+    flex: 0 0 120px;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.88);
+  }
+
+  .qc-template-row :deep(.ant-select) {
+    flex: 1;
+    min-width: 0;
   }
 
   .image-upload-mock {

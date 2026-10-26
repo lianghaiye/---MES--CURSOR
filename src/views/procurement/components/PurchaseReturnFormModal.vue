@@ -65,6 +65,15 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
+            <a-form-item label="申请出库">
+              <a-switch
+                v-model:checked="form.applyOutbound"
+                size="small"
+                :disabled="!canToggleApplyOutbound"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
             <a-form-item label="备注" class="remark-item">
               <a-input
                 v-model:value="form.remark"
@@ -98,7 +107,7 @@
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 1680 }"
+        :scroll="{ x: 1760 }"
         :row-selection="rowSelection"
       >
         <template #headerCell="{ column }">
@@ -117,10 +126,20 @@
           <template v-else-if="column.key === 'receivedQty'">
             {{ formatQtyWithUnit(record.receivedQty, record.purchaseUnit || record.unit) }}
           </template>
+          <template v-else-if="column.key === 'returnType'">
+            <a-select
+              v-model:value="record.returnType"
+              size="small"
+              style="width: 100%"
+              :options="returnTypeOpts"
+              placeholder="请选择"
+            />
+          </template>
           <template v-else-if="column.key === 'returnQty'">
             <a-input-number
               v-model:value="record.returnQty"
               :min="0"
+              :max="remainMaxOf(record)"
               :precision="4"
               size="small"
               style="width: 100%"
@@ -160,17 +179,9 @@
               v-model:value="record.shipWarehouse"
               size="small"
               style="width: 100%"
+              :disabled="!isInboundReturnType(record.returnType)"
               :options="warehouseOpts"
-              placeholder="请选择"
-            />
-          </template>
-          <template v-else-if="column.key === 'returnType'">
-            <a-select
-              v-model:value="record.returnType"
-              size="small"
-              style="width: 100%"
-              :options="returnTypeOpts"
-              placeholder="请选择"
+              :placeholder="isInboundReturnType(record.returnType) ? '请选择' : '无需出库'"
             />
           </template>
           <template v-else-if="column.key === 'remark'">
@@ -194,6 +205,7 @@
     <PurchaseReturnLineEditModal
       v-model:open="lineEditOpen"
       :line="lineEditTarget"
+      :remain="lineEditRemain"
       @saved="onLineEditSaved"
     />
 
@@ -223,12 +235,26 @@ import { useFormCreateModal } from '@/composables/useFormCreateModal.js'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
 import { getDictOptions, systemDictState } from '@/store/systemDictStore'
+import dayjs from 'dayjs'
 import {
   addPurchaseReturn,
   updatePurchaseReturn,
   canEditPurchaseReturn,
+  canGeneratePurchaseReturnOutbound,
+  generateOutboundFromReturn,
+  getPurchaseReturnById,
+  hasReturnOutboundOrder,
+  purchaseReturnState,
 } from '@/store/purchaseReturnStore'
 import { buildReturnLinesFromPurchaseOrder, formatQtyWithUnit } from '@/utils/purchaseReturnLine'
+import {
+  calcReturnRemain,
+  isInboundReturnType,
+  normalizeReturnLineQty,
+  PURCHASE_RETURN_TYPE_OPTIONS,
+  remainMaxForLine,
+  sumOtherReturnSplit,
+} from '@/utils/purchaseReturnStock'
 import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import PurchaseOrderSearchSelect from './PurchaseOrderSearchSelect.vue'
 import PurchaseReturnLineEditModal from './PurchaseReturnLineEditModal.vue'
@@ -250,6 +276,9 @@ const selectedRowKeys = ref([])
 const lineItems = ref([])
 const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
+const lineEditRemain = computed(() =>
+  lineEditTarget.value ? remainOf(lineEditTarget.value) : { uninboundRemain: 0, inboundRemain: 0 },
+)
 const remarkOpen = ref(false)
 const remarkDraft = ref('')
 const remarkTargetId = ref('')
@@ -263,6 +292,7 @@ const form = reactive({
   returnAddress: '',
   remark: '',
   shipWarehouse: '',
+  applyOutbound: false,
 })
 
 const { shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
@@ -272,15 +302,18 @@ const { shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, e
 
 const warehouseOpts = warehouseOptions
 
+const hasInboundLine = computed(() =>
+  lineItems.value.some((l) => isInboundReturnType(l.returnType)),
+)
+const outboundAlreadyGenerated = computed(() => hasReturnOutboundOrder(props.record))
+const canToggleApplyOutbound = computed(
+  () => hasInboundLine.value && !outboundAlreadyGenerated.value,
+)
+
 const returnTypeOpts = computed(() => {
   void systemDictState.dicts
   const opts = getDictOptions('purchase_return_type')
-  return opts.length
-    ? opts
-    : [
-        { label: '换货', value: '换货' },
-        { label: '退货', value: '退货' },
-      ]
+  return opts.length ? opts : PURCHASE_RETURN_TYPE_OPTIONS.map((v) => ({ label: v, value: v }))
 })
 
 const lineColumns = [
@@ -293,12 +326,12 @@ const lineColumns = [
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '采购数量', key: 'purchaseQty', width: 110 },
   { title: '已入库数量', key: 'receivedQty', width: 110 },
+  { title: '退货类型', key: 'returnType', width: 130, required: true },
   { title: '退货数量', key: 'returnQty', width: 120, required: true },
   { title: '单位', key: 'unit', width: 100, required: true },
   { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
   { title: '结算数量', key: 'settleQty', width: 110 },
-  { title: '出货仓库', key: 'shipWarehouse', width: 120, required: true },
-  { title: '退货类型', key: 'returnType', width: 110, required: true },
+  { title: '出货仓库', key: 'shipWarehouse', width: 120 },
   { title: '备注', key: 'remark', width: 140 },
   { title: '操作', key: 'action', width: 140, fixed: 'right' },
 ]
@@ -319,6 +352,7 @@ function resetForm() {
   form.returnAddress = ''
   form.remark = ''
   form.shipWarehouse = ''
+  form.applyOutbound = false
   lineItems.value = []
   selectedRowKeys.value = []
 }
@@ -332,8 +366,9 @@ function loadRecord(record) {
   form.returnAddress = record.returnAddress || ''
   form.remark = record.remark || ''
   form.shipWarehouse = record.shipWarehouse || ''
+  form.applyOutbound = Boolean(record.applyOutbound) || hasReturnOutboundOrder(record)
   lineItems.value = (record.lineItems || []).map((l) => ({
-    ...l,
+    ...normalizeReturnLineQty(l),
     unitOptions: l.unitOptions?.length ? [...l.unitOptions] : [l.unit].filter(Boolean),
   }))
   selectedRowKeys.value = []
@@ -358,6 +393,15 @@ watch(
   },
   { immediate: true },
 )
+
+watch(hasInboundLine, (yes, prev) => {
+  if (outboundAlreadyGenerated.value) {
+    form.applyOutbound = true
+    return
+  }
+  if (yes && !prev) form.applyOutbound = true
+  if (!yes) form.applyOutbound = false
+})
 
 function findPoByOrderNo(orderNo) {
   const no = String(orderNo || '').trim()
@@ -432,6 +476,48 @@ function onLineEditSaved(patch) {
   const target = lineItems.value.find((l) => l.id === lineEditTarget.value?.id)
   if (!target) return
   Object.assign(target, patch)
+  syncLineQty(target)
+}
+
+function remainMaxOf(record) {
+  return remainMaxForLine(record, remainOf(record))
+}
+
+function remainOf(record) {
+  const po =
+    purchaseOrderState.orders.find((o) => o.id === form.purchaseOrderId) ||
+    purchaseOrderState.orders.find((o) => o.orderNo === form.purchaseOrderNo) ||
+    null
+  const poLine = (po?.lineItems || []).find((l) => record.poLineId && l.id === record.poLineId) || {
+    id: record.poLineId,
+    productCode: record.productCode,
+    purchaseQty: record.purchaseQty,
+    receivedQty: record.receivedQty,
+  }
+  const others = sumOtherReturnSplit(
+    purchaseReturnState.returns,
+    po || { id: form.purchaseOrderId, orderNo: form.purchaseOrderNo },
+    poLine,
+    props.record?.id || '',
+  )
+  return calcReturnRemain(
+    po,
+    {
+      ...poLine,
+      purchaseQty: Number(record.purchaseQty) || 0,
+      receivedQty: Number(record.receivedQty) || 0,
+    },
+    others,
+  )
+}
+
+function syncLineQty(record) {
+  if (!record) return
+  const next = normalizeReturnLineQty(record)
+  record.returnType = next.returnType
+  record.returnQty = next.returnQty
+  record.uninboundReturnQty = next.uninboundReturnQty
+  record.inboundReturnQty = next.inboundReturnQty
 }
 
 function openRemark(record) {
@@ -455,9 +541,25 @@ function validate() {
     message.warning('退货清单不能为空')
     return false
   }
-  const invalidQty = lineItems.value.find((l) => !(Number(l.returnQty) > 0))
+  const invalidType = lineItems.value.find((l) => !l.returnType)
+  if (invalidType) {
+    message.warning(`请选择「${invalidType.productName || invalidType.productCode}」的退货类型`)
+    return false
+  }
+  const invalidQty = lineItems.value.find((l) => {
+    syncLineQty(l)
+    return !(Number(l.returnQty) > 0)
+  })
   if (invalidQty) {
     message.warning(`请填写「${invalidQty.productName || invalidQty.productCode}」的退货数量`)
+    return false
+  }
+  const overRemain = lineItems.value.find((l) => Number(l.returnQty) > remainMaxOf(l) + 1e-9)
+  if (overRemain) {
+    const tip = isInboundReturnType(overRemain.returnType)
+      ? '已入库退货不能超过已入库可退数量'
+      : '未入库退货不能超过采购待收数量'
+    message.warning(`「${overRemain.productName || overRemain.productCode}」${tip}`)
     return false
   }
   const settleInvalid = lineItems.value.find(
@@ -474,7 +576,9 @@ function validate() {
     message.warning(`请选择「${invalidUnit.productName || invalidUnit.productCode}」的单位`)
     return false
   }
-  const invalidWh = lineItems.value.find((l) => !l.shipWarehouse)
+  const invalidWh = lineItems.value.find(
+    (l) => isInboundReturnType(l.returnType) && !l.shipWarehouse,
+  )
   if (invalidWh) {
     message.warning(`请选择「${invalidWh.productName || invalidWh.productCode}」的出货仓库`)
     return false
@@ -492,6 +596,7 @@ function buildPayload() {
     purchaser: form.purchaser,
     returnAddress: String(form.returnAddress || '').trim(),
     remark: String(form.remark || '').trim(),
+    applyOutbound: Boolean(form.applyOutbound) && hasInboundLine.value,
     shipWarehouse: warehouses[0] || form.shipWarehouse || '',
     lineItems: lineItems.value.map((l) => ({ ...l })),
   }
@@ -502,19 +607,35 @@ async function handleOk() {
   saving.value = true
   try {
     const payload = buildPayload()
+    let saved = null
     if (isEdit.value) {
-      const updated = updatePurchaseReturn(props.record.id, payload)
-      if (!updated) {
+      saved = updatePurchaseReturn(props.record.id, payload)
+      if (!saved) {
         message.error('保存失败')
         return
       }
-      message.success('采购退货单已保存')
-      emit('saved', updated)
     } else {
-      const created = addPurchaseReturn(payload)
-      message.success(`已创建退货单 ${created.returnNo}`)
-      emit('saved', created)
+      saved = addPurchaseReturn(payload)
     }
+    if (payload.applyOutbound && canGeneratePurchaseReturnOutbound(saved)) {
+      const result = generateOutboundFromReturn(saved.id, null, {
+        shipDate: dayjs().format('YYYY-MM-DD'),
+        remark: saved.remark || '',
+      })
+      saved = getPurchaseReturnById(saved.id) || saved
+      if (result.ok) {
+        message.success(
+          `${isEdit.value ? '采购退货单已保存' : `已创建退货单 ${saved.returnNo}`}，已自动生成退货出库单`,
+        )
+      } else {
+        message.warning(
+          `${isEdit.value ? '采购退货单已保存' : `已创建退货单 ${saved.returnNo}`}，但出库单未生成：${result.message}`,
+        )
+      }
+    } else {
+      message.success(isEdit.value ? '采购退货单已保存' : `已创建退货单 ${saved.returnNo}`)
+    }
+    emit('saved', saved)
     closeAfterSave()
   } finally {
     saving.value = false
@@ -529,9 +650,11 @@ export default { name: 'PurchaseReturnFormModal' }
 <style lang="less" scoped>
 .section-block {
   background: #fff;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 12px 16px 16px;
-  margin: 0 12px 12px;
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 

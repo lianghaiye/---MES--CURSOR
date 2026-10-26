@@ -110,6 +110,7 @@
           <PlusOutlined />
           新增
         </a-button>
+        <a-button size="small" @click="handleConfirmUninbound">确认退货</a-button>
         <a-button size="small" @click="handleGenerateOutbound">生成出库单</a-button>
         <a-dropdown>
           <a-button size="small">
@@ -179,6 +180,9 @@
             </a>
             <span v-else>{{ record.purchaseOrderNo || '—' }}</span>
           </template>
+          <template v-else-if="column.key === 'returnType'">
+            <span :title="formatReturnTypes(record)">{{ formatReturnTypes(record) || '—' }}</span>
+          </template>
           <template v-else-if="column.key === 'productInfo'">
             <span :title="formatReturnProductInfo(record)">{{
               formatReturnProductInfo(record)
@@ -204,6 +208,22 @@
                 编辑
               </a-button>
               <a-button
+                v-if="canConfirmUninboundPurchaseReturn(record)"
+                type="link"
+                size="small"
+                @click="handleConfirmUninboundRow(record)"
+              >
+                确认
+              </a-button>
+              <a-button
+                v-if="canGeneratePurchaseReturnOutbound(record)"
+                type="link"
+                size="small"
+                @click="openGenerateOutbound(record)"
+              >
+                出库
+              </a-button>
+              <a-button
                 v-if="canVoidPurchaseReturn(record)"
                 type="link"
                 size="small"
@@ -213,7 +233,12 @@
                 作废
               </a-button>
               <span
-                v-if="!canEditPurchaseReturn(record) && !canVoidPurchaseReturn(record)"
+                v-if="
+                  !canEditPurchaseReturn(record) &&
+                  !canVoidPurchaseReturn(record) &&
+                  !canConfirmUninboundPurchaseReturn(record) &&
+                  !canGeneratePurchaseReturnOutbound(record)
+                "
                 class="action-disabled"
               >
                 -
@@ -273,6 +298,9 @@ import {
   purchaseReturnState,
   canEditPurchaseReturn,
   canVoidPurchaseReturn,
+  canConfirmUninboundPurchaseReturn,
+  canGeneratePurchaseReturnOutbound,
+  confirmUninboundPurchaseReturn,
   voidPurchaseReturn,
   listReturnOperators,
 } from '@/store/purchaseReturnStore'
@@ -287,6 +315,7 @@ import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { formatReturnProductInfo } from '@/utils/returnProductInfo'
+import { formatReturnTypes } from '@/utils/purchaseReturnStock'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -325,6 +354,7 @@ const baseColumns = [
   { title: '退货单号', key: 'returnNo', dataIndex: 'returnNo', width: 150 },
   { title: '采购单号', key: 'purchaseOrderNo', dataIndex: 'purchaseOrderNo', width: 140 },
   { title: '供应商', dataIndex: 'supplier', width: 160, ellipsis: true },
+  { title: '退货类型', key: 'returnType', width: 140, ellipsis: true },
   { title: '产品信息', key: 'productInfo', width: 180, ellipsis: true },
   { title: '退货数量', key: 'qtySummary', width: 120 },
   { title: '出货仓库', dataIndex: 'shipWarehouse', width: 110 },
@@ -332,11 +362,11 @@ const baseColumns = [
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
   { title: '更新人', dataIndex: 'updater', width: 90 },
   { title: '更新时间', key: 'updatedAt', dataIndex: 'updatedAt', width: 150 },
-  { title: '操作', key: 'action', width: 120, fixed: 'right' },
+  { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-return-list-v3', baseColumns)
+  useTableColumnSettings('purchase-return-list-v6', baseColumns)
 
 const filteredList = computed(() =>
   filterPurchaseReturns(purchaseReturnState.returns, appliedFilters.value),
@@ -375,6 +405,7 @@ function outboundStatusColor(status) {
     出库中: 'processing',
     部分出库: 'warning',
     已出库: 'success',
+    无需出库: 'cyan',
   }
   return map[status] || 'default'
 }
@@ -446,18 +477,54 @@ function handleVoid(record) {
   })
 }
 
-function handleGenerateOutbound() {
+function handleConfirmUninboundRow(record) {
+  if (!canConfirmUninboundPurchaseReturn(record)) {
+    message.warning('仅「新建」且全部为未入库退货的单据可确认完成')
+    return
+  }
+  Modal.confirm({
+    title: '确认退货',
+    content: `未入库退货确认后将完成单据「${record.returnNo}」，无需出库。确定继续吗？`,
+    onOk: () => {
+      const result = confirmUninboundPurchaseReturn(record.id)
+      result.ok ? message.success(result.message) : message.warning(result.message)
+    },
+  })
+}
+
+function handleConfirmUninbound() {
   if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条「新建」状态的退货单后再生成出库单')
+    message.warning('请勾选一条全部为未入库退货的「新建」退货单后再确认')
     return
   }
   const record = purchaseReturnState.returns.find((r) => r.id === selectedRowKeys.value[0])
-  if (!record || record.status !== '新建') {
-    message.warning('仅「新建」状态的退货单可生成出库单')
+  if (!record) {
+    message.warning('未找到退货单')
+    return
+  }
+  handleConfirmUninboundRow(record)
+}
+
+function openGenerateOutbound(record) {
+  if (!canGeneratePurchaseReturnOutbound(record)) {
+    message.warning('仅「新建」且含已入库退货的退货单可生成出库单')
     return
   }
   outboundReturn.value = record
   outboundModalOpen.value = true
+}
+
+function handleGenerateOutbound() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条含已入库退货的「新建」退货单后再生成出库单')
+    return
+  }
+  const record = purchaseReturnState.returns.find((r) => r.id === selectedRowKeys.value[0])
+  if (!record) {
+    message.warning('未找到退货单')
+    return
+  }
+  openGenerateOutbound(record)
 }
 
 function onOutboundConfirmed() {

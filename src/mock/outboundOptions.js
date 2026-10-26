@@ -3,6 +3,7 @@ export const outboundTypeOptions = [
   '领料出库',
   '盘点出库',
   '采购退货',
+  '外协退货',
   '半成品出库',
   '投料出库',
   '发料出库',

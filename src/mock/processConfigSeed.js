@@ -55,6 +55,12 @@ export const TASK_EXECUTION_MODES = [
 /** 默认多人协作的时长报工工序（演示） */
 const COLLABORATIVE_DURATION_PROCESSES = new Set(['装配', '热处理', '整机调试'])
 
+/** 过程检按工序绑模板：同一业务类型下机加/热处理用不同表 */
+const PROCESS_QC_BINDINGS = {
+  车削: [{ bizScope: '生产过程检', templateCode: 'QCT-USR-002' }],
+  热处理: [{ bizScope: '生产过程检', templateCode: 'QCT-USR-HT-001' }],
+}
+
 /** 机泵行业常用工序 */
 export function createProcessConfigSeed() {
   const defs = [
@@ -64,7 +70,11 @@ export function createProcessConfigSeed() {
     ['机械', '钻孔', { opStart: true, opFinish: true }],
     ['机械', '铣削', { opStart: true, opFinish: true }],
     ['机械', '磨削', { opStart: true, opFinish: true }],
-    ['机械', '热处理', { opStart: true, opFinish: true, opAutoFinish: true, opOutsource: true }],
+    [
+      '机械',
+      '热处理',
+      { opStart: true, opFinish: true, opAutoFinish: true, opOutsource: true, opQc: true },
+    ],
     ['机械', '动平衡粗调', { opStart: true, opFinish: true, opQc: true }],
     ['组装', '领料', { opStart: true, opFeeding: true, opInbound: true }, ['总装小组']],
     ['组装', '叶轮装配', { opStart: true, opFinish: true }],
@@ -101,7 +111,7 @@ export function createProcessConfigSeed() {
     ['系统工序', '配比', { opStart: true, opFinish: true, opFeeding: true, opAttrModify: true }],
     ['机械', '点焊', { opStart: true, opFinish: true }],
     ['机械', '打磨', { opStart: true, opFinish: true }],
-    ['机械', '车削', { opStart: true, opFinish: true }],
+    ['机械', '车削', { opStart: true, opFinish: true, opQc: true }],
     ['机械', '铣削', { opStart: true, opFinish: true }],
     ['组装', '装配', { opStart: true, opFinish: true }],
   ]
@@ -121,6 +131,7 @@ export function createProcessConfigSeed() {
       /** 下料工序：路线含此工序的工单可进下料结算；具体物料看主数据「需要下料结算」 */
       isBlanking: name === '下料',
       operations: defaultOperations(ops),
+      qcConfigs: PROCESS_QC_BINDINGS[name] || [],
       defaultExecutors: [...defaultExecutors],
       reportMode: PROCESS_REPORT_MODE_MAP[name] || '',
       taskExecutionMode: COLLABORATIVE_DURATION_PROCESSES.has(name)

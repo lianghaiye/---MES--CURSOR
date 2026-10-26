@@ -16,7 +16,7 @@ import {
 } from '@/utils/qcTemplateConflictService'
 
 const TEMPLATE_SEED_KEY = 'i_doms_qc_templates_seed_v'
-const TEMPLATE_SEED_VERSION = '13'
+const TEMPLATE_SEED_VERSION = '14'
 /** 与小程序共用：模板快照落盘，供移动端回填 templateFields */
 const TEMPLATE_STORAGE_KEY = 'i_doms_qc_templates'
 const TEMPLATE_STORAGE_VERSION = 1

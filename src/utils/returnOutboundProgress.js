@@ -18,9 +18,11 @@ export function calcReturnLineOutboundQty(returnRow, line) {
 }
 
 export function calcReturnLineRemainOutboundQty(returnRow, line) {
-  const returnQty = Number(line?.returnQty) || 0
+  const planQty = Object.prototype.hasOwnProperty.call(line || {}, 'inboundReturnQty')
+    ? Number(line.inboundReturnQty) || 0
+    : Number(line?.returnQty) || 0
   const { appliedQty } = calcReturnLineOutboundQty(returnRow, line)
-  return Math.max(0, returnQty - appliedQty)
+  return Math.max(0, planQty - appliedQty)
 }
 
 export function isReturnLineOutboundFull(returnRow, line) {

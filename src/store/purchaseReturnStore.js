@@ -10,10 +10,15 @@ import {
   generatePurchaseReturnNo,
 } from '@/mock/purchaseReturns'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
+import {
+  hasUninboundReturn,
+  needsOutbound,
+  normalizeReturnLineQty,
+} from '@/utils/purchaseReturnStock'
 
 const STORAGE_KEY = 'i_doms_purchase_returns'
 const SEED_VERSION_KEY = 'i_doms_purchase_returns_seed_v'
-const CURRENT_SEED_VERSION = '4'
+const CURRENT_SEED_VERSION = '7'
 
 function loadFromStorage() {
   try {
@@ -38,12 +43,14 @@ function persist() {
 }
 
 /**
- * 关联退货出库单已出库 → 退货单已完成；已生成出库单 → 进行中
+ * 未入库退货确认即完成（无需出库）；已入库退货以出库完成为准
  */
 export function deriveReturnDocStatus(row, preferredStatus) {
   if (preferredStatus === '作废' || row?.status === '作废') return '作废'
-  if (preferredStatus === '已完成') return '已完成'
-
+  if (!needsOutbound(row) && !hasReturnOutboundOrder(row)) {
+    if (preferredStatus === '已完成' || row?.status === '已完成') return '已完成'
+    return '新建'
+  }
   const outboundStatus = row?.outboundStatus || '待出库'
   if (outboundStatus === '已出库') return '已完成'
   if (hasReturnOutboundOrder(row) || outboundStatus === '出库中' || outboundStatus === '部分出库') {
@@ -112,9 +119,18 @@ function syncOutboundHeaderFields(row) {
 function normalizeReturn(row) {
   const r = { ...row }
   if (!Array.isArray(r.lineItems)) r.lineItems = []
+  r.lineItems = r.lineItems.map((l) => normalizeReturnLineQty(l))
   r.outboundOrders = migrateLegacyOutboundOrders(r)
-  if (r.outboundOrders.length) syncOutboundHeaderFields(r)
-  else if (!r.outboundStatus) r.outboundStatus = '待出库'
+  r.applyOutbound = hasReturnOutboundOrder(r) || Boolean(r.applyOutbound)
+  if (r.outboundOrders.length) {
+    syncOutboundHeaderFields(r)
+  } else if (!needsOutbound(r)) {
+    r.outboundStatus = '无需出库'
+    r.outboundOrderNo = ''
+    r.outboundOrderId = ''
+  } else if (!r.outboundStatus || r.outboundStatus === '无需出库') {
+    r.outboundStatus = '待出库'
+  }
   if (!r.creator) r.creator = r.purchaser || 'admin1'
   if (!r.updater) r.updater = r.creator
   if (!r.updatedAt) r.updatedAt = r.createdAt || dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -162,6 +178,14 @@ export function canVoidPurchaseReturn(row) {
   return row?.status === '新建'
 }
 
+export function canGeneratePurchaseReturnOutbound(row) {
+  return row?.status === '新建' && needsOutbound(row)
+}
+
+export function canConfirmUninboundPurchaseReturn(row) {
+  return row?.status === '新建' && !needsOutbound(row) && hasUninboundReturn(row)
+}
+
 export function addPurchaseReturn(partial = {}) {
   const returnNo =
     String(partial.returnNo || '').trim() || generatePurchaseReturnNo(purchaseReturnState.returns)
@@ -169,13 +193,13 @@ export function addPurchaseReturn(partial = {}) {
     ...partial,
     returnNo,
     status: '新建',
-    outboundStatus: '待出库',
     outboundOrders: [],
     createdAt: nowText(),
     updatedAt: nowText(),
   })
-  purchaseReturnState.returns.unshift(normalizeReturn(row))
-  return row
+  const normalized = normalizeReturn(row)
+  purchaseReturnState.returns.unshift(normalized)
+  return normalized
 }
 
 export function updatePurchaseReturn(id, patch = {}) {
@@ -220,6 +244,53 @@ export function voidPurchaseReturn(id) {
   return { ok: true, message: '已作废' }
 }
 
+function trySyncPoInbound(normalized) {
+  if (
+    normalized.status !== '已完成' ||
+    !(normalized.purchaseOrderId || normalized.purchaseOrderNo)
+  ) {
+    return
+  }
+  try {
+    // eslint-disable-next-line global-require
+    const {
+      purchaseOrderState,
+      syncPurchaseOrderInboundStatus,
+    } = require('@/store/purchaseOrderStore')
+    const po =
+      (normalized.purchaseOrderId &&
+        purchaseOrderState.orders.find((o) => o.id === normalized.purchaseOrderId)) ||
+      (normalized.purchaseOrderNo &&
+        purchaseOrderState.orders.find((o) => o.orderNo === normalized.purchaseOrderNo)) ||
+      null
+    if (po) syncPurchaseOrderInboundStatus(po)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 仅未入库退货：确认后单据完成，不出库 */
+export function confirmUninboundPurchaseReturn(id) {
+  const row = getPurchaseReturnById(id)
+  if (!row) return { ok: false, message: '退货单不存在' }
+  if (!canConfirmUninboundPurchaseReturn(row)) {
+    if (row.status !== '新建') return { ok: false, message: '仅「新建」状态的退货单可确认' }
+    if (needsOutbound(row)) {
+      return { ok: false, message: '存在已入库退货，请申请出库后再完成' }
+    }
+    return { ok: false, message: '请先填写未入库退货数量' }
+  }
+  row.status = '已完成'
+  row.outboundStatus = '无需出库'
+  row.updater = 'admin1'
+  row.updatedAt = nowText()
+  const normalized = normalizeReturn(row)
+  const idx = purchaseReturnState.returns.findIndex((r) => r.id === id)
+  if (idx >= 0) purchaseReturnState.returns[idx] = normalized
+  trySyncPoInbound(normalized)
+  return { ok: true, message: '已确认，退货完成（无需出库）' }
+}
+
 function nextOutboundSeq(existingNos = []) {
   let max = 0
   existingNos.forEach((no) => {
@@ -242,6 +313,9 @@ export function generateOutboundFromReturn(id, lines = null, extra = {}) {
   if (row.status !== '新建') {
     return { ok: false, message: '仅「新建」状态的退货单可生成出库单' }
   }
+  if (!needsOutbound(row)) {
+    return { ok: false, message: '本单无已入库退货，无需出库，请直接确认退货' }
+  }
   const shipDate = String(extra.shipDate || '').trim()
   if (!shipDate) return { ok: false, message: '请选择出货日期' }
 
@@ -253,13 +327,15 @@ export function generateOutboundFromReturn(id, lines = null, extra = {}) {
   const submitItems =
     Array.isArray(lines) && lines.length
       ? lines.filter((item) => (Number(item.issueQty) || 0) > 0)
-      : sourceLines.map((l) => ({
-          lineId: l.id,
-          issueQty: Number(l.returnQty) || 0,
-          shipWarehouse: l.shipWarehouse,
-          remark: l.remark,
-          unit: l.unit,
-        }))
+      : sourceLines
+          .filter((l) => (Number(l.inboundReturnQty) || 0) > 0)
+          .map((l) => ({
+            lineId: l.id,
+            issueQty: Number(l.inboundReturnQty) || 0,
+            shipWarehouse: l.shipWarehouse,
+            remark: l.remark,
+            unit: l.unit,
+          }))
 
   if (!submitItems.length) return { ok: false, message: '请至少填写一行出库数量' }
 
@@ -273,11 +349,11 @@ export function generateOutboundFromReturn(id, lines = null, extra = {}) {
       }
     }
     const qty = Number(item.issueQty) || 0
-    const maxQty = Number(line.returnQty) || 0
+    const maxQty = Number(line.inboundReturnQty) || 0
     if (qty > maxQty + 1e-9) {
       return {
         ok: false,
-        message: `物料「${line.productName || line.productCode}」出库数量不能超过退货数量`,
+        message: `物料「${line.productName || line.productCode}」出库数量不能超过已入库退货数量`,
       }
     }
   }
@@ -377,27 +453,7 @@ export function syncReturnOutboundStatus(id, outboundOrderId, outboundStatus) {
   row.updater = 'admin1'
   row.updatedAt = nowText()
   const normalized = normalizeReturn(row)
-  if (
-    normalized.status === '已完成' &&
-    (normalized.purchaseOrderId || normalized.purchaseOrderNo)
-  ) {
-    try {
-      // eslint-disable-next-line global-require
-      const {
-        purchaseOrderState,
-        syncPurchaseOrderInboundStatus,
-      } = require('@/store/purchaseOrderStore')
-      const po =
-        (normalized.purchaseOrderId &&
-          purchaseOrderState.orders.find((o) => o.id === normalized.purchaseOrderId)) ||
-        (normalized.purchaseOrderNo &&
-          purchaseOrderState.orders.find((o) => o.orderNo === normalized.purchaseOrderNo)) ||
-        null
-      if (po) syncPurchaseOrderInboundStatus(po)
-    } catch {
-      /* ignore */
-    }
-  }
+  trySyncPoInbound(normalized)
   return normalized
 }
 

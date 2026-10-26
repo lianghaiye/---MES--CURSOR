@@ -1,14 +1,22 @@
 /**
- * 出库单关联单据查询（领料→领料入库、采购退货→采购退货单、销售→发货/出厂检、调拨/盘点）
+ * 出库单关联单据查询（领料→领料入库、采购退货→采购退货单、外协退货→异常处理单、销售→发货/出厂检、调拨/盘点）
  */
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { purchaseReturnState } from '@/store/purchaseReturnStore'
+import { outsourcingReturnState } from '@/store/outsourcingReturnStore'
 import { factoryQcState, getFactoryQcById } from '@/store/factoryQcStore'
 import { deliveryOrderState, getDeliveryOrderById } from '@/store/deliveryOrderStore'
 import { getTransferOrderById, transferOrderState } from '@/store/transferOrderStore'
 import { getStocktakeOrderById, stocktakeOrderState } from '@/store/stocktakeOrderStore'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
-import { calcReturnQtySummary, formatReturnQtySummary } from '@/mock/purchaseReturns'
+import {
+  calcReturnQtySummary as calcPurchaseReturnQtySummary,
+  formatReturnQtySummary as formatPurchaseReturnQtySummary,
+} from '@/mock/purchaseReturns'
+import {
+  calcReturnQtySummary as calcOutsourcingReturnQtySummary,
+  formatReturnQtySummary as formatOutsourcingReturnQtySummary,
+} from '@/mock/outsourcingReturns'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
 import {
   formatOutsourcingPlanDateDisplay,
@@ -84,8 +92,40 @@ export function listRelatedPurchaseReturnsForOutbound(outbound) {
     })
     .map((r) => ({
       ...r,
-      returnQtyText: formatReturnQtySummary(r),
-      returnQtyTotal: calcReturnQtySummary(r).totalQty,
+      returnQtyText: formatPurchaseReturnQtySummary(r),
+      returnQtyTotal: calcPurchaseReturnQtySummary(r).totalQty,
+    }))
+}
+
+/** 外协退货出库关联的外协异常处理单 */
+export function listRelatedOutsourcingReturnsForOutbound(outbound) {
+  if (!outbound || outbound.outboundType !== '外协退货') return []
+  const id = outbound.id
+  const docNo = outbound.docNo
+  const sourceNo = outbound.sourceOrderNo
+  const list = outsourcingReturnState.returns || []
+
+  return list
+    .filter((r) => {
+      if (sourceNo && (r.returnNo === sourceNo || r.id === outbound.outsourcingReturnId)) {
+        return true
+      }
+      if (outbound.outsourcingReturnId && r.id === outbound.outsourcingReturnId) return true
+      if (id && (r.outboundOrderId === id || (r.outboundOrders || []).some((o) => o.id === id)))
+        return true
+      if (
+        docNo &&
+        (r.outboundOrderNo === docNo ||
+          (r.outboundOrders || []).some((o) => o.outboundOrderNo === docNo))
+      ) {
+        return true
+      }
+      return false
+    })
+    .map((r) => ({
+      ...r,
+      returnQtyText: formatOutsourcingReturnQtySummary(r),
+      returnQtyTotal: calcOutsourcingReturnQtySummary(r).totalQty,
     }))
 }
 

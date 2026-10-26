@@ -21,6 +21,21 @@
                 编辑
               </a-button>
               <a-button
+                v-if="canConfirmUninboundPurchaseReturn(record)"
+                type="primary"
+                size="small"
+                @click="handleConfirmUninbound"
+              >
+                确认退货
+              </a-button>
+              <a-button
+                v-if="canGeneratePurchaseReturnOutbound(record)"
+                size="small"
+                @click="openGenerateOutbound"
+              >
+                生成出库单
+              </a-button>
+              <a-button
                 v-if="canVoidPurchaseReturn(record)"
                 size="small"
                 danger
@@ -106,7 +121,9 @@
                 bordered
                 :pagination="false"
                 :scroll="{ x: outboundTableScrollX }"
-                :locale="{ emptyText: '暂无出库信息' }"
+                :locale="{
+                  emptyText: record.outboundStatus === '无需出库' ? '本单无需出库' : '暂无出库信息',
+                }"
               >
                 <template #bodyCell="{ column, record: row, index }">
                   <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -129,6 +146,12 @@
         </div>
 
         <PurchaseReturnPrintModal v-model:open="printModalOpen" :purchase-return="record" />
+        <ReturnGenerateOutboundModal
+          v-model:open="outboundModalOpen"
+          return-type="purchase"
+          :return-record="record"
+          @confirmed="loadRecord"
+        />
       </template>
       <a-empty v-else-if="!loading" description="未找到该退货单" />
     </a-spin>
@@ -155,11 +178,15 @@ import {
   getPurchaseReturnById,
   canEditPurchaseReturn,
   canVoidPurchaseReturn,
+  canConfirmUninboundPurchaseReturn,
+  canGeneratePurchaseReturnOutbound,
+  confirmUninboundPurchaseReturn,
   voidPurchaseReturn,
 } from '@/store/purchaseReturnStore'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import PurchaseReturnBasicInfoSection from './components/PurchaseReturnBasicInfoSection.vue'
 import PurchaseReturnPrintModal from './components/PurchaseReturnPrintModal.vue'
+import ReturnGenerateOutboundModal from './components/ReturnGenerateOutboundModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -169,6 +196,7 @@ const loading = ref(false)
 const record = ref(null)
 const activeTab = ref('basic')
 const printModalOpen = ref(false)
+const outboundModalOpen = ref(false)
 
 const lineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
@@ -180,10 +208,10 @@ const lineColumns = [
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '采购数量', key: 'purchaseQty', width: 110 },
   { title: '已入库数量', key: 'receivedQty', width: 110 },
+  { title: '退货类型', dataIndex: 'returnType', width: 120 },
   { title: '退货数量', key: 'returnQty', width: 100, align: 'right' },
   { title: '单位', dataIndex: 'unit', width: 80 },
   { title: '出货仓库', dataIndex: 'shipWarehouse', width: 110, ellipsis: true },
-  { title: '退货类型', dataIndex: 'returnType', width: 90 },
   { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
 ]
 
@@ -224,6 +252,7 @@ function outboundStatusColor(status) {
     出库中: 'processing',
     部分出库: 'warning',
     已出库: 'success',
+    无需出库: 'cyan',
   }
   return map[status] || 'default'
 }
@@ -237,6 +266,27 @@ function handleEdit() {
   const path = `/procurement/purchase-returns/${record.value.id}/edit`
   openTab(path, `编辑退货单 ${record.value.returnNo || ''}`)
   router.push({ name: 'procurement-purchase-returns-edit', params: { id: record.value.id } })
+}
+
+function handleConfirmUninbound() {
+  if (!record.value) return
+  Modal.confirm({
+    title: '确认退货',
+    content: `未入库退货确认后将完成单据「${record.value.returnNo}」，无需出库。确定继续吗？`,
+    onOk: () => {
+      const result = confirmUninboundPurchaseReturn(record.value.id)
+      if (result.ok) {
+        message.success(result.message)
+        loadRecord()
+      } else {
+        message.warning(result.message)
+      }
+    },
+  })
+}
+
+function openGenerateOutbound() {
+  outboundModalOpen.value = true
 }
 
 function handleVoid() {

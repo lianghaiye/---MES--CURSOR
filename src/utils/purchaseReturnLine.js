@@ -53,7 +53,7 @@ export function mapPoLineToReturnLine(po, poLine) {
     settleUnit: settleUnit || '',
     settleQty: undefined,
     shipWarehouse: warehouse,
-    returnType: '退货',
+    returnType: receivedQty > 0 ? '已入库退货' : '未入库退货',
     remark: '',
   })
 }

@@ -12,10 +12,19 @@
       <a-form-item label="产品">
         <a-input :value="displayName" disabled size="small" />
       </a-form-item>
+      <a-form-item label="退货类型" required>
+        <a-select
+          v-model:value="form.returnType"
+          size="small"
+          :options="returnTypeOpts"
+          placeholder="请选择退货类型"
+        />
+      </a-form-item>
       <a-form-item label="退货数量" required>
         <a-input-number
           v-model:value="form.returnQty"
           :min="0"
+          :max="qtyMax"
           :precision="4"
           size="small"
           style="width: 100%"
@@ -41,21 +50,14 @@
           placeholder="请选择单位"
         />
       </a-form-item>
-      <a-form-item label="出货仓库" required>
+      <a-form-item label="出货仓库" :required="inboundType">
         <a-select
           v-model:value="form.shipWarehouse"
           size="small"
           allow-clear
+          :disabled="!inboundType"
           :options="warehouseOpts"
-          placeholder="请选择出货仓库"
-        />
-      </a-form-item>
-      <a-form-item label="退货类型" required>
-        <a-select
-          v-model:value="form.returnType"
-          size="small"
-          :options="returnTypeOpts"
-          placeholder="请选择退货类型"
+          :placeholder="inboundType ? '请选择出货仓库' : '未入库退货无需出库'"
         />
       </a-form-item>
       <a-form-item label="备注">
@@ -71,10 +73,20 @@ import { message } from 'ant-design-vue'
 import { warehouseOptions } from '@/mock/purchaseOrderOptions'
 import { getDictOptions } from '@/store/systemDictStore'
 import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
+import {
+  isInboundReturnType,
+  PURCHASE_RETURN_TYPE_OPTIONS,
+  remainMaxForLine,
+  RETURN_TYPE_UNINBOUND,
+} from '@/utils/purchaseReturnStock'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   line: { type: Object, default: null },
+  remain: {
+    type: Object,
+    default: () => ({ uninboundRemain: 0, inboundRemain: 0 }),
+  },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -85,20 +97,23 @@ const form = reactive({
   settleQty: undefined,
   unit: '',
   shipWarehouse: '',
-  returnType: '退货',
+  returnType: RETURN_TYPE_UNINBOUND,
   remark: '',
 })
 
 const warehouseOpts = warehouseOptions
 const returnTypeOpts = computed(() => {
   const opts = getDictOptions('purchase_return_type')
-  return opts.length
-    ? opts
-    : [
-        { label: '换货', value: '换货' },
-        { label: '退货', value: '退货' },
-      ]
+  return opts.length ? opts : PURCHASE_RETURN_TYPE_OPTIONS.map((v) => ({ label: v, value: v }))
 })
+
+const remain = computed(() => ({
+  uninboundRemain: Number(props.remain?.uninboundRemain) || 0,
+  inboundRemain: Number(props.remain?.inboundRemain) || 0,
+}))
+
+const inboundType = computed(() => isInboundReturnType(form.returnType))
+const qtyMax = computed(() => remainMaxForLine(form, remain.value))
 
 const displayName = computed(() => {
   const l = props.line
@@ -122,7 +137,7 @@ watch(
     form.settleQty = props.line.settleQty
     form.unit = props.line.unit || ''
     form.shipWarehouse = props.line.shipWarehouse || ''
-    form.returnType = props.line.returnType || '退货'
+    form.returnType = props.line.returnType || RETURN_TYPE_UNINBOUND
     form.remark = props.line.remark || ''
   },
 )
@@ -132,8 +147,13 @@ function handleCancel() {
 }
 
 function handleOk() {
-  if (!(Number(form.returnQty) > 0)) {
+  const qty = Number(form.returnQty) || 0
+  if (!(qty > 0)) {
     message.warning('请填写退货数量')
+    return
+  }
+  if (!form.returnType) {
+    message.warning('请选择退货类型')
     return
   }
   if (form.settleUnit && !(Number(form.settleQty) > 0)) {
@@ -144,17 +164,13 @@ function handleOk() {
     message.warning('请选择单位')
     return
   }
-  if (!form.shipWarehouse) {
-    message.warning('请选择出货仓库')
-    return
-  }
-  if (!form.returnType) {
-    message.warning('请选择退货类型')
+  if (isInboundReturnType(form.returnType) && !form.shipWarehouse) {
+    message.warning('已入库退货请选择出货仓库')
     return
   }
   emit('saved', {
     ...form,
-    returnQty: Number(form.returnQty) || 0,
+    returnQty: qty,
     settleQty: form.settleUnit ? Number(form.settleQty) || 0 : undefined,
     remark: String(form.remark || '').trim(),
   })

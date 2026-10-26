@@ -1,8 +1,13 @@
 import { reactive, watch } from 'vue'
 import { topModules } from '@/config/menus'
 
-const STORAGE_KEY = 'i_doms_system_dict_v3'
-const LEGACY_STORAGE_KEYS = ['i_doms_system_dict_v2', 'i_doms_system_dict']
+const STORAGE_KEY = 'i_doms_system_dict_v5'
+const LEGACY_STORAGE_KEYS = [
+  'i_doms_system_dict_v4',
+  'i_doms_system_dict_v3',
+  'i_doms_system_dict_v2',
+  'i_doms_system_dict',
+]
 
 export const DICT_STATUS = {
   ENABLED: '启用',
@@ -43,7 +48,7 @@ const BUILTIN_SEED = [
     code: 'purchase_return_type',
     name: '退货类型',
     module: '采购管理',
-    values: ['换货', '退货'],
+    values: ['未入库退货', '已入库退货'],
   },
 ]
 
@@ -158,7 +163,7 @@ function ensureDictModules(dicts = []) {
     return createDict({
       ...d,
       module: d.module || seed?.module || '',
-      items,
+      items: d.code === 'purchase_return_type' && seed?.items?.length ? seed.items : items,
     })
   })
   const existing = new Set(normalized.map((d) => d.code))
@@ -193,7 +198,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 3, dicts: systemDictState.dicts }))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 5, dicts: systemDictState.dicts }))
 }
 
 export const systemDictState = reactive({

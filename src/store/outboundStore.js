@@ -47,8 +47,8 @@ import {
 
 const STORAGE_KEY = 'i_doms_outbound_orders'
 const SEED_VERSION_KEY = 'i_doms_outbound_orders_seed_v'
-/** v13：去掉出库类型「退货出库」 */
-const CURRENT_SEED_VERSION = '13'
+/** v14：补出库类型「外协退货」及演示单 CKWXTH-260805-001 */
+const CURRENT_SEED_VERSION = '14'
 
 /** 领料/发料出库不再审批：历史「待处理」升为「待出库」；拒绝领料→已拒绝；来源归一 */
 function migrateSkipApprovalStatuses(orders) {

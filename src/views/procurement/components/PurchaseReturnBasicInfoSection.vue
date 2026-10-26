@@ -56,6 +56,11 @@ const fields = computed(() => [
   { key: 'purchaseOrderNo', label: '采购单号', slot: 'purchaseOrderNo' },
   { key: 'supplier', label: '供应商' },
   { key: 'purchaser', label: '采购员' },
+  {
+    key: 'applyOutbound',
+    label: '申请出库',
+    format: (r) => (r.applyOutbound ? '是' : '否'),
+  },
   { key: 'shipWarehouse', label: '出货仓库' },
   {
     key: 'outboundOrderNo',

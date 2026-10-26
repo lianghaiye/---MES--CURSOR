@@ -634,6 +634,39 @@ export const mockOutboundOrders = [
       }),
     ],
   }),
+  /** 外协退货出库（关联外协异常处理单 WXTH-260805001） */
+  createOutboundOrder({
+    id: 'ob-wxrtn-1',
+    docNo: 'CKWXTH-260805-001',
+    outboundType: '外协退货',
+    warehouse: '半成品仓',
+    sourceChannel: OUTBOUND_SOURCE.BUSINESS,
+    sourceOrderNo: 'WXTH-260805001',
+    outsourcingReturnId: 'wxrtn-2',
+    outsourcingOrderId: 'wx-4',
+    outsourcingOrderNo: 'WX-260805001',
+    requisitionDept: '外协组',
+    status: '部分出库',
+    createdAt: '2026-08-05',
+    outboundTime: '2026-08-05 14:30:00',
+    remark: '由外协异常处理单 WXTH-260805001 生成（料废索赔退回供应商）',
+    lineItems: [
+      createOutboundLine({
+        id: 'ob-wxrtn-1-l1',
+        itemName: '精密轴',
+        itemCode: 'SEMI-SHAFT-01',
+        itemType: '物料',
+        shipQty: 1,
+        unit: '根',
+        shipWarehouse: '半成品仓',
+        locationNo: 'BCP-03',
+        lineSource: '外协',
+        lineStatus: '待出库',
+        purpose: '外协退货',
+        sourceDocNo: 'WXTH-260805001',
+      }),
+    ],
+  }),
 
   // ——— 类型覆盖：补齐选项中尚缺演示单的出库类型 ———
   createOutboundOrder({

@@ -165,7 +165,7 @@ export function calcReturnQtySummary(row) {
 export function formatReturnQtySummary(row) {
   const { lineCount, totalQty } = calcReturnQtySummary(row)
   const qtyText = Number.isFinite(totalQty) ? String(Number(totalQty.toFixed(4)).toString()) : '0'
-  return `${lineCount}行/${qtyText}`
+  return `${qtyText}/${lineCount}`
 }
 
 export function generateOutsourcingReturnNo(existingList = [], at = dayjs()) {

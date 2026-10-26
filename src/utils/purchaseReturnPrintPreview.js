@@ -44,6 +44,7 @@ export function buildPurchaseReturnPrintPayload(row, options = {}) {
     { label: '采购员', value: row.purchaser },
     { label: '状态', value: row.status },
     { label: '出库状态', value: row.outboundStatus },
+    { label: '申请出库', value: row.applyOutbound ? '是' : '否' },
     { label: '出库单号', value: row.outboundOrderNo },
     { label: '退货地址', value: row.returnAddress, wide: true },
     { label: '备注', value: row.remark, wide: true },

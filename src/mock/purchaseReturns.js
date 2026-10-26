@@ -8,7 +8,13 @@ import { formatLineBarcodeBatchNo } from '@/utils/outboundIssueLines'
 export const purchaseReturnStatusOptions = ['新建', '进行中', '已完成', '作废']
 
 /** 出库状态 */
-export const purchaseReturnOutboundStatusOptions = ['待出库', '出库中', '部分出库', '已出库']
+export const purchaseReturnOutboundStatusOptions = [
+  '待出库',
+  '出库中',
+  '部分出库',
+  '已出库',
+  '无需出库',
+]
 
 export function createPurchaseReturn(partial = {}) {
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -25,6 +31,8 @@ export function createPurchaseReturn(partial = {}) {
     status: '新建',
     /** 出库状态 */
     outboundStatus: '待出库',
+    /** 已入库退货时申请生成退货出库单 */
+    applyOutbound: false,
     shipWarehouse: '',
     outboundOrderNo: '',
     outboundOrderId: '',
@@ -147,8 +155,8 @@ export function createPurchaseReturnLine(partial = {}) {
     unit: '',
     unitOptions: [],
     shipWarehouse: '',
-    /** 退货类型：换货 | 退货 */
-    returnType: '退货',
+    /** 退货类型：未入库退货 | 已入库退货 */
+    returnType: '未入库退货',
     remark: '',
     ...partial,
   }
@@ -164,7 +172,7 @@ export function calcReturnQtySummary(row) {
 export function formatReturnQtySummary(row) {
   const { lineCount, totalQty } = calcReturnQtySummary(row)
   const qtyText = Number.isFinite(totalQty) ? String(Number(totalQty.toFixed(4)).toString()) : '0'
-  return `${lineCount}行/${qtyText}`
+  return `${qtyText}/${lineCount}`
 }
 
 /**
@@ -300,7 +308,7 @@ export const mockPurchaseReturns = [
         unit: '张',
         unitOptions: ['张'],
         shipWarehouse: '原材料仓',
-        returnType: '退货',
+        returnType: '已入库退货',
       }),
       createPurchaseReturnLine({
         id: 'prtn-1-l2',
@@ -316,7 +324,7 @@ export const mockPurchaseReturns = [
         unit: '张',
         unitOptions: ['张'],
         shipWarehouse: '原材料仓',
-        returnType: '换货',
+        returnType: '已入库退货',
       }),
     ],
   }),
@@ -345,7 +353,7 @@ export const mockPurchaseReturns = [
         unit: '套',
         unitOptions: ['套'],
         shipWarehouse: '原材料仓',
-        returnType: '退货',
+        returnType: '已入库退货',
       }),
     ],
     outboundOrders: [
@@ -399,7 +407,7 @@ export const mockPurchaseReturns = [
         unit: '片',
         unitOptions: ['片'],
         shipWarehouse: '原材料仓',
-        returnType: '换货',
+        returnType: '已入库退货',
       }),
     ],
     outboundOrders: [
@@ -460,7 +468,7 @@ export const mockPurchaseReturns = [
         unit: '张',
         unitOptions: ['张'],
         shipWarehouse: '原材料仓',
-        returnType: '退货',
+        returnType: '已入库退货',
       }),
       createPurchaseReturnLine({
         id: 'prtn-4-l2',
@@ -475,7 +483,7 @@ export const mockPurchaseReturns = [
         unit: '根',
         unitOptions: ['根'],
         shipWarehouse: '原材料仓',
-        returnType: '换货',
+        returnType: '已入库退货',
       }),
       createPurchaseReturnLine({
         id: 'prtn-4-l3',
@@ -490,7 +498,7 @@ export const mockPurchaseReturns = [
         unit: '片',
         unitOptions: ['片'],
         shipWarehouse: '半成品仓',
-        returnType: '退货',
+        returnType: '已入库退货',
       }),
       createPurchaseReturnLine({
         id: 'prtn-4-l4',
@@ -505,7 +513,7 @@ export const mockPurchaseReturns = [
         unit: '套',
         unitOptions: ['套'],
         shipWarehouse: '半成品仓',
-        returnType: '换货',
+        returnType: '已入库退货',
       }),
     ],
     outboundOrders: [
@@ -576,6 +584,69 @@ export const mockPurchaseReturns = [
             unit: '套',
           }),
         ],
+      }),
+    ],
+  }),
+  createPurchaseReturn({
+    id: 'prtn-5',
+    returnNo: 'CGTH-261026001',
+    purchaseOrderNo: 'CG20260728001',
+    purchaseOrderId: 'po-5',
+    supplier: '标准件供应商',
+    purchaser: 'admin1',
+    status: '已完成',
+    outboundStatus: '无需出库',
+    shipWarehouse: '',
+    remark: '货未到仓，确认后扣减采购数量，无需出库',
+    createdAt: '2026-10-26 09:10:00',
+    updatedAt: '2026-10-26 09:20:00',
+    lineItems: [
+      createPurchaseReturnLine({
+        id: 'prtn-5-l1',
+        poLineId: '',
+        productName: '标准螺栓组',
+        productCode: 'MAT-STD-100',
+        specModel: 'M12×40',
+        material: '钢',
+        purchaseQty: 500,
+        purchaseUnit: '件',
+        receivedQty: 0,
+        returnQty: 20,
+        unit: '件',
+        unitOptions: ['件'],
+        shipWarehouse: '',
+        returnType: '未入库退货',
+      }),
+    ],
+  }),
+  createPurchaseReturn({
+    id: 'prtn-6',
+    returnNo: 'CGTH-261026002',
+    purchaseOrderNo: 'CG20260728001',
+    purchaseOrderId: 'po-5',
+    supplier: '标准件供应商',
+    purchaser: 'admin1',
+    status: '新建',
+    outboundStatus: '无需出库',
+    shipWarehouse: '',
+    remark: '未入库退货，确认后退货完成',
+    createdAt: '2026-10-26 10:00:00',
+    updatedAt: '2026-10-26 10:00:00',
+    lineItems: [
+      createPurchaseReturnLine({
+        id: 'prtn-6-l1',
+        productName: '平垫圈',
+        productCode: 'MAT-STD-101',
+        specModel: 'M12',
+        material: '钢',
+        purchaseQty: 500,
+        purchaseUnit: '件',
+        receivedQty: 0,
+        returnQty: 30,
+        unit: '件',
+        unitOptions: ['件'],
+        shipWarehouse: '',
+        returnType: '未入库退货',
       }),
     ],
   }),

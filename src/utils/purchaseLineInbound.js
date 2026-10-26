@@ -119,7 +119,14 @@ export function calcPoLineReceivedQty(po, line) {
       if (lineIdMatches(li, line.id)) fromOrders += Number(li.qty) || 0
     })
   })
-  return Math.max(fromField, fromOrders)
+  const raw = Math.max(fromField, fromOrders)
+  try {
+    // eslint-disable-next-line global-require
+    const { calcPoLineCompletedInboundReturnQty } = require('@/utils/orderReturnLines')
+    return Math.max(0, raw - (calcPoLineCompletedInboundReturnQty(po, line) || 0))
+  } catch {
+    return raw
+  }
 }
 
 /**
@@ -156,8 +163,16 @@ export function calcPoLineRemainInboundQty(po, line) {
   const purchaseQty = Number(line?.purchaseQty) || 0
   const applied = calcPoLineAppliedOccupyQty(po, line)
   const received = calcPoLineReceivedQty(po, line)
-  // applied 已不含已确认入库，占用与已入库相加
-  return Math.max(0, purchaseQty - (applied + received))
+  let uninboundReturn = 0
+  try {
+    // eslint-disable-next-line global-require
+    const { calcPoLineUninboundReturnQty } = require('@/utils/orderReturnLines')
+    uninboundReturn = calcPoLineUninboundReturnQty(po, line) || 0
+  } catch {
+    uninboundReturn = 0
+  }
+  // applied 已不含已确认入库；未入库退货扣待收
+  return Math.max(0, purchaseQty - (applied + received + uninboundReturn))
 }
 
 /** 明细是否已占满（置灰，不可再收货/入库） */

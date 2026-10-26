@@ -4,6 +4,11 @@
 import { purchaseReturnState } from '@/store/purchaseReturnStore'
 import { outsourcingReturnState } from '@/store/outsourcingReturnStore'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
+import {
+  lineInboundQty,
+  lineUninboundQty,
+  normalizeReturnLineQty,
+} from '@/utils/purchaseReturnStock'
 
 function isActivePurchaseReturn(ret) {
   if (!ret) return false
@@ -38,7 +43,7 @@ export function listReturnLinesForPurchaseOrder(po) {
       itemCode: line.productCode || line.itemCode || '',
       purchaseQty: Number(line.purchaseQty) || Number(line.planQty) || 0,
       qty: Number(line.returnQty) || 0,
-      returnType: line.returnType || '',
+      returnType: normalizeReturnLineQty(line).returnType || '',
       shipWarehouse: line.shipWarehouse || '',
       creator: ret.creator || '',
       createdAt: formatDateTimeMinute(ret.createdAt),
@@ -53,14 +58,24 @@ export function calcPoLineReturnQty(po, line) {
   return sumPoLineReturnQty(po, line, () => true)
 }
 
-/**
- * 仅统计「已完成」退货单数量（用于入库+退货结清判定）
- */
-export function calcPoLineCompletedReturnQty(po, line) {
-  return sumPoLineReturnQty(po, line, (ret) => ret.status === '已完成')
+/** 有效未入库退货占用（扣采购待收） */
+export function calcPoLineUninboundReturnQty(po, line) {
+  return sumPoLineReturnQty(po, line, () => true, 'uninbound')
 }
 
-function sumPoLineReturnQty(po, line, retFilter) {
+/** 已完成入库退货（确认出库后扣实际入库数量） */
+export function calcPoLineCompletedInboundReturnQty(po, line) {
+  return sumPoLineReturnQty(po, line, (ret) => ret.status === '已完成', 'inbound')
+}
+
+/**
+ * 仅统计「已完成」未入库退货数量（用于待收结清判定；入库退货已从已入库数量扣除）
+ */
+export function calcPoLineCompletedReturnQty(po, line) {
+  return sumPoLineReturnQty(po, line, (ret) => ret.status === '已完成', 'uninbound')
+}
+
+function sumPoLineReturnQty(po, line, retFilter, kind) {
   if (!po || !line) return 0
   void purchaseReturnState.returns
   const lineId = line.id
@@ -80,7 +95,10 @@ function sumPoLineReturnQty(po, line, retFilter) {
     ;(ret.lineItems || []).forEach((rl) => {
       const byId = lineId && rl.poLineId && rl.poLineId === lineId
       const byCode = !rl.poLineId && code && (rl.productCode === code || rl.itemCode === code)
-      if (byId || byCode) total += Number(rl.returnQty) || 0
+      if (!(byId || byCode)) return
+      if (kind === 'uninbound') total += lineUninboundQty(rl)
+      else if (kind === 'inbound') total += lineInboundQty(rl)
+      else total += Number(normalizeReturnLineQty(rl).returnQty) || 0
     })
   })
   return total

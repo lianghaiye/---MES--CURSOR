@@ -70,6 +70,11 @@
                 :tab="`关联单据 (${relatedPurchaseReturns.length})`"
               />
               <a-tab-pane
+                v-if="isOutsourcingReturnOutbound"
+                key="relatedOutsourcingReturn"
+                :tab="`关联单据 (${relatedOutsourcingReturns.length})`"
+              />
+              <a-tab-pane
                 v-if="isMaterialReqOutbound"
                 key="related"
                 :tab="`关联单据 (${relatedInbounds.length})`"
@@ -513,6 +518,69 @@
             </DetailSectionCard>
           </template>
 
+          <template
+            v-else-if="infoTab === 'relatedOutsourcingReturn' && isOutsourcingReturnOutbound"
+          >
+            <DetailSectionCard title="关联单据">
+              <a-table
+                :columns="relatedOutsourcingReturnColumns"
+                :data-source="relatedOutsourcingReturns"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :locale="{ emptyText: '暂无关联的外协异常处理单' }"
+                :scroll="{ x: 1400 }"
+              >
+                <template #bodyCell="{ column, record: row, index }">
+                  <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag :color="outsourcingReturnStatusColor(row.status)">{{
+                      row.status || '—'
+                    }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'outboundStatus'">
+                    <a-tag :color="purchaseReturnOutboundStatusColor(row.outboundStatus)">{{
+                      row.outboundStatus || '—'
+                    }}</a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'returnNo'">
+                    <a class="link-code" @click.prevent="goOutsourcingReturn(row)">{{
+                      row.returnNo || '—'
+                    }}</a>
+                  </template>
+                  <template v-else-if="column.key === 'outsourcingOrderNo'">
+                    <a
+                      v-if="row.outsourcingOrderId || row.outsourcingOrderNo"
+                      class="link-code"
+                      @click.prevent="
+                        goOutsourcingOrder({
+                          id: row.outsourcingOrderId,
+                          orderNo: row.outsourcingOrderNo,
+                        })
+                      "
+                    >
+                      {{ row.outsourcingOrderNo || '—' }}
+                    </a>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'returnQty'">
+                    {{ row.returnQtyText || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ formatDateTimeMinute(row.createdAt) || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'updatedAt'">
+                    {{ formatDateTimeMinute(row.updatedAt) || '—' }}
+                  </template>
+                  <template v-else>
+                    {{ row[column.dataIndex] || '—' }}
+                  </template>
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
           <template v-else-if="infoTab === 'relatedIssue' && isIssueOutbound">
             <DetailSectionCard title="关联单据">
               <a-table
@@ -715,6 +783,7 @@ import { flattenCutSettleLines } from '@/utils/cutSettleLines'
 import { inboundOrderState } from '@/store/inboundOrderStore'
 import { inboundStatusColor } from '@/mock/inboundOptions'
 import { purchaseReturnState } from '@/store/purchaseReturnStore'
+import { outsourcingReturnState } from '@/store/outsourcingReturnStore'
 import { deliveryOrderState } from '@/store/deliveryOrderStore'
 import { transferOrderState } from '@/store/transferOrderStore'
 import { stocktakeOrderState } from '@/store/stocktakeOrderStore'
@@ -724,6 +793,7 @@ import { deliveryStatusColor, formatOutboundQtyInt } from '@/utils/deliveryOrder
 import {
   listRelatedInboundsForOutbound,
   listRelatedPurchaseReturnsForOutbound,
+  listRelatedOutsourcingReturnsForOutbound,
   listRelatedDeliveriesForOutbound,
   listRelatedTransfersForOutbound,
   listRelatedStocktakesForOutbound,
@@ -741,6 +811,7 @@ const printModalOpen = ref(false)
 
 const isMaterialReqOutbound = computed(() => record.value?.outboundType === '领料出库')
 const isPurchaseReturnOutbound = computed(() => record.value?.outboundType === '采购退货')
+const isOutsourcingReturnOutbound = computed(() => record.value?.outboundType === '外协退货')
 const isSalesOutbound = computed(() => record.value?.outboundType === '销售出库')
 const isTransferOutbound = computed(() => record.value?.outboundType === '调拨出库')
 const isStocktakeOutbound = computed(() => record.value?.outboundType === '盘点出库')
@@ -750,6 +821,7 @@ const showGenericRelatedTab = computed(
     Boolean(record.value) &&
     !isSalesOutbound.value &&
     !isPurchaseReturnOutbound.value &&
+    !isOutsourcingReturnOutbound.value &&
     !isMaterialReqOutbound.value &&
     !isTransferOutbound.value &&
     !isStocktakeOutbound.value &&
@@ -852,6 +924,11 @@ const relatedPurchaseReturns = computed(() => {
   return listRelatedPurchaseReturnsForOutbound(record.value)
 })
 
+const relatedOutsourcingReturns = computed(() => {
+  void outsourcingReturnState.returns
+  return listRelatedOutsourcingReturnsForOutbound(record.value)
+})
+
 const relatedInboundColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '状态', key: 'status', width: 90 },
@@ -900,7 +977,21 @@ const relatedPurchaseReturnColumns = [
   { title: '退货单号', key: 'returnNo', width: 150 },
   { title: '采购单号', dataIndex: 'purchaseOrderNo', key: 'purchaseOrderNo', width: 140 },
   { title: '供应商', dataIndex: 'supplier', key: 'supplier', width: 140, ellipsis: true },
-  { title: '退货数量', key: 'returnQty', width: 110, align: 'right' },
+  { title: '退货数量', key: 'returnQty', width: 120, align: 'right' },
+  { title: '创建人', dataIndex: 'creator', key: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
+  { title: '更新人', dataIndex: 'updater', key: 'updater', width: 90 },
+  { title: '更新时间', key: 'updatedAt', dataIndex: 'updatedAt', width: 150 },
+]
+
+const relatedOutsourcingReturnColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
+  { title: '状态', key: 'status', width: 90 },
+  { title: '出库状态', key: 'outboundStatus', width: 100 },
+  { title: '异常处理单号', key: 'returnNo', width: 150 },
+  { title: '外协单号', key: 'outsourcingOrderNo', width: 140 },
+  { title: '供应商', dataIndex: 'supplier', key: 'supplier', width: 140, ellipsis: true },
+  { title: '退货数量', key: 'returnQty', width: 120, align: 'right' },
   { title: '创建人', dataIndex: 'creator', key: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
   { title: '更新人', dataIndex: 'updater', key: 'updater', width: 90 },
@@ -1161,11 +1252,25 @@ function goPurchaseReturn(row) {
   router.push(path)
 }
 
+function goOutsourcingReturn(row) {
+  if (!row?.id) return
+  const path = `/procurement/outsourcing-returns/${row.id}`
+  openTab(path, `异常处理 ${row.returnNo || ''}`.trim())
+  router.push(path)
+}
+
 function purchaseReturnStatusColor(status) {
   if (status === '已完成') return 'success'
   if (status === '进行中') return 'processing'
   if (status === '作废') return 'default'
   return 'warning'
+}
+
+function outsourcingReturnStatusColor(status) {
+  if (status === '已完成') return 'success'
+  if (status === '进行中') return 'processing'
+  if (status === '作废') return 'default'
+  return 'default'
 }
 
 function purchaseReturnOutboundStatusColor(status) {

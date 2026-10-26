@@ -59,6 +59,21 @@
               >未配置任何操作</span
             >
           </div>
+          <a-descriptions
+            v-if="record.qcConfigs?.length"
+            bordered
+            size="small"
+            :column="1"
+            class="qc-bind-desc"
+          >
+            <a-descriptions-item
+              v-for="cfg in record.qcConfigs"
+              :key="cfg.bizScope"
+              :label="`${cfg.bizScope}模板`"
+            >
+              {{ formatProcessQcTemplateLabel(cfg.templateCode) }}
+            </a-descriptions-item>
+          </a-descriptions>
         </DetailSectionCard>
       </template>
       <a-empty v-else-if="!loading" description="未找到该工序" />
@@ -80,6 +95,7 @@ import {
   PROCESS_OPERATION_DEFS,
 } from '@/store/processConfigStore'
 import { getProductionMode, isMinimalReportMode } from '@/store/businessRuleStore'
+import { formatProcessQcTemplateLabel } from '@/utils/qcProcessConfig'
 import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 
@@ -188,6 +204,10 @@ function openEdit() {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+  }
+
+  .qc-bind-desc {
+    margin-top: 12px;
   }
 
   .empty-ops {

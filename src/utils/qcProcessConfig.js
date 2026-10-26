@@ -1,4 +1,6 @@
 import { qcTemplateBizScopeOptions } from '@/mock/qcTemplates'
+import { qcTemplateState } from '@/store/qcTemplateStore'
+import { getQcTemplateByCode } from '@/utils/qcTemplateMatchService'
 
 const PROCESS_QC_BIZ_SCOPES = ['生产过程检', '成品检']
 
@@ -13,7 +15,7 @@ export function createProcessQcConfig(partial = {}) {
     // 列表有即生效；不用则删除。不再单独做启用开关
     enabled: true,
     bizScope: isProcessQcBizScope(bizScope) ? bizScope : '生产过程检',
-    templateCode: '',
+    templateCode: String(partial.templateCode || '').trim(),
     remark: partial.remark || '',
   }
 }
@@ -41,4 +43,26 @@ export function processQcBizScopeOptions() {
 export function defaultQcConfigsFromOperations(operations = {}) {
   if (!operations?.opQc) return []
   return [createProcessQcConfig({ bizScope: '生产过程检' })]
+}
+
+/** 工序绑定模板：启用中、且业务类型匹配（含系统通用） */
+export function listProcessQcTemplateOptions(bizScope) {
+  const scope = String(bizScope || '').trim()
+  return (qcTemplateState.templates || [])
+    .filter((t) => {
+      if (t.status !== '启用') return false
+      if (t.isUniversal || t.bizScope === '通用') return true
+      return t.bizScope === scope
+    })
+    .map((t) => ({
+      label: `${t.code} ${t.name}`,
+      value: t.code,
+    }))
+}
+
+export function formatProcessQcTemplateLabel(templateCode) {
+  const code = String(templateCode || '').trim()
+  if (!code) return '未指定（按下发产品匹配）'
+  const tpl = getQcTemplateByCode(code)
+  return tpl ? `${tpl.code} ${tpl.name}` : code
 }

@@ -145,7 +145,6 @@ import {
   calcReturnLineRemainOutboundQty,
   formatReturnOutboundProgress,
   isReturnLineOutboundFull,
-  RETURN_OUTBOUND_PROGRESS_TOOLTIP,
 } from '@/utils/returnOutboundProgress'
 import { formatNumber } from '@/utils/numberFormat'
 import OutsourcingIssueLineEditModal from './OutsourcingIssueLineEditModal.vue'
@@ -165,7 +164,7 @@ const docNoLabel = computed(() => (isOutsourcing.value ? '异常处理单号' : 
 const progressTooltip = computed(() =>
   isOutsourcing.value
     ? '格式：已出库数量 / 已申请数量 / 处理数量'
-    : RETURN_OUTBOUND_PROGRESS_TOOLTIP,
+    : '格式：已出库数量 / 已申请数量 / 已入库退货数量',
 )
 
 const form = reactive({
@@ -226,7 +225,9 @@ function refreshLineStock(line) {
 }
 
 function buildLine(returnRow, line) {
-  const planQty = Number(line.returnQty) || 0
+  const planQty = Object.prototype.hasOwnProperty.call(line || {}, 'inboundReturnQty')
+    ? Number(line.inboundReturnQty) || 0
+    : Number(line.returnQty) || 0
   const { issuedQty, appliedQty } = calcReturnLineOutboundQty(returnRow, line)
   const remainingQty = calcReturnLineRemainOutboundQty(returnRow, line)
   const locked = isReturnLineOutboundFull(returnRow, line)
@@ -263,7 +264,12 @@ watch(
     form.shipDate = dayjs()
     form.remark = props.returnRecord.remark || ''
     outboundLines.value = (props.returnRecord.lineItems || [])
-      .filter((l) => (Number(l.returnQty) || 0) > 0)
+      .filter((l) => {
+        const plan = Object.prototype.hasOwnProperty.call(l || {}, 'inboundReturnQty')
+          ? Number(l.inboundReturnQty) || 0
+          : Number(l.returnQty) || 0
+        return plan > 0
+      })
       .map((l) => buildLine(props.returnRecord, l))
   },
 )
