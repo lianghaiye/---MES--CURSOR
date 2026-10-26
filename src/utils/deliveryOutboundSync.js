@@ -73,10 +73,12 @@ export function syncDeliveryAfterOutboundConfirm(outbound) {
 
   const actualQty = sumOutboundLineQty(outbound)
   // 明细 actualShipQty 已原地写回；此处只更新状态，避免「已出库不可改数量」拦截
-  delivery.deliveryStatus = '已发货'
+  // 已上传回货单则为已收货，出库确认不再回退
+  const nextStatus = delivery.deliveryStatus === '已收货' ? '已收货' : '已发货'
+  delivery.deliveryStatus = nextStatus
   delivery.actualOutboundQty = actualQty
   updateDeliveryOrder(delivery.id, {
-    deliveryStatus: '已发货',
+    deliveryStatus: nextStatus,
     actualOutboundQty: actualQty,
   })
 
@@ -89,7 +91,7 @@ export function syncDeliveryAfterOutboundConfirm(outbound) {
     (a) => a.deliveryCode === delivery.deliveryCode || a.id === delivery.id,
   )
   if (app) {
-    app.status = '已发货'
+    if (app.status !== '已收货') app.status = '已发货'
     app.actualShipQty = actualQty
     app.totalShipQty = calcApplyShipQty(app)
     app.lineItems = JSON.parse(JSON.stringify(delivery.lineItems || []))
@@ -117,11 +119,16 @@ export function syncDeliveryAfterOutboundConfirm(outbound) {
 
 export function refreshDeliveryMetrics(row) {
   const ob = findLinkedSalesOutbound(row)
+  const received =
+    row.deliveryStatus === '已收货' ||
+    (Array.isArray(row.returnReceipts) && row.returnReceipts.length > 0)
   if (ob?.status === '已出库') {
     row.actualOutboundQty = sumOutboundLineQty(ob)
-    row.deliveryStatus = '已发货'
+    row.deliveryStatus = received ? '已收货' : '已发货'
   } else if (row.applyOutbound && ob) {
-    row.deliveryStatus = '待出库'
+    if (!received) row.deliveryStatus = '待出库'
+  } else if (received) {
+    row.deliveryStatus = '已收货'
   } else {
     row.deliveryStatus = row.deliveryStatus === '已发货' ? '已发货' : '待发货'
   }

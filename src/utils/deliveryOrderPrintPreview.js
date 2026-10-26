@@ -66,6 +66,7 @@ export function buildDeliveryOrderPrintPayload(row, options = {}) {
     { label: '单据日期', value: row.documentDate },
     { label: '交货方式', value: row.shipmentMethod },
     { label: '物流单号', value: row.logisticsNo },
+    { label: '运费', value: formatPrintMoney(row.freightAmount) },
     { label: '客户联系人', value: row.contactPerson },
     { label: '联系方式', value: row.contactPhone },
     { label: '司机姓名', value: row.driverName },

@@ -22,6 +22,7 @@
               class="detail-tabs detail-tabs-pill detail-tabs-pill--nav-only"
             >
               <a-tab-pane key="basic" tab="基本信息" />
+              <a-tab-pane key="returnReceipt" :tab="`回货信息 (${returnReceiptCount})`" />
               <a-tab-pane key="factoryQc" :tab="`出厂质检 (${factoryQcList.length})`" />
               <a-tab-pane key="outbound" :tab="`出库信息 (${outboundList.length})`" />
             </a-tabs>
@@ -269,6 +270,12 @@
             />
           </template>
 
+          <template v-else-if="activeTab === 'returnReceipt'">
+            <DetailSectionCard title="回货附件">
+              <DeliveryReturnReceiptSection :order="record" />
+            </DetailSectionCard>
+          </template>
+
           <template v-else-if="activeTab === 'factoryQc'">
             <DetailSectionCard title="出厂质检">
               <a-table
@@ -388,6 +395,7 @@ import {
 import { attachmentShipStatusColor, formatAttachmentShipProgress } from '@/utils/shipBomAttachments'
 import DeliveryOrderPrintModal from './components/DeliveryOrderPrintModal.vue'
 import DeliveryOrderBasicInfoSection from './components/DeliveryOrderBasicInfoSection.vue'
+import DeliveryReturnReceiptSection from './components/DeliveryReturnReceiptSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -397,6 +405,8 @@ const loading = ref(false)
 const record = ref(null)
 const activeTab = ref('basic')
 const printModalOpen = ref(false)
+
+const returnReceiptCount = computed(() => record.value?.returnReceipts?.length || 0)
 
 const wholeColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },

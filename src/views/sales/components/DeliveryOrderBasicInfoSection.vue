@@ -100,6 +100,11 @@ const fields = computed(() => {
     },
     { key: 'shipmentMethod', label: '交货方式' },
     { key: 'logisticsNo', label: '物流单号' },
+    {
+      key: 'freightAmount',
+      label: '运费',
+      format: () => `￥${formatAmountExTax(o.freightAmount)}`,
+    },
     { key: 'outboundWarehouse', label: '出库仓库' },
     { key: 'contactPerson', label: '客户联系人' },
     { key: 'contactPhone', label: '联系方式' },
@@ -107,6 +112,7 @@ const fields = computed(() => {
     { key: 'driverName', label: '司机姓名' },
     { key: 'driverPhone', label: '司机联系方式' },
     { key: 'plateNo', label: '车牌号' },
+    { key: 'receivedAt', label: '收货时间' },
     { key: 'remark', label: '备注', fullRow: true },
   ]
 })

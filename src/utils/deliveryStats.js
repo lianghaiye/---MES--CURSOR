@@ -58,7 +58,7 @@ function sumDeliveryQtyInRange(start, end) {
   let deliveryAmount = 0
   for (const row of deliveryOrderState.orders || []) {
     if (!inRange(row.documentDate, start, end)) continue
-    if (row.deliveryStatus === '已发货') {
+    if (row.deliveryStatus === '已发货' || row.deliveryStatus === '已收货') {
       shipped += Number(row.actualOutboundQty) || 0
       deliveryAmount += Number(row.totalAmountExTax) || 0
     } else {

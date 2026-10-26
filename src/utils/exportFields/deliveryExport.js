@@ -33,6 +33,11 @@ export const deliveryExportFields = [
   },
   { key: 'shipmentMethod', title: '交货方式', getValue: (row) => cell(row, 'shipmentMethod') },
   { key: 'logisticsNo', title: '物流单号', getValue: (row) => cell(row, 'logisticsNo') },
+  {
+    key: 'freightAmount',
+    title: '运费',
+    getValue: (row) => formatAmountExTax(row.freightAmount),
+  },
   { key: 'contactPerson', title: '客户联系人', getValue: (row) => cell(row, 'contactPerson') },
   { key: 'contactPhone', title: '联系方式', getValue: (row) => cell(row, 'contactPhone') },
   { key: 'deliveryAddress', title: '交货地址', getValue: (row) => cell(row, 'deliveryAddress') },

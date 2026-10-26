@@ -87,6 +87,20 @@
             </a-form-item>
           </a-col>
           <a-col :span="6">
+            <a-form-item label="运费">
+              <a-input-number
+                v-model:value="form.freightAmount"
+                size="small"
+                :min="0"
+                :precision="2"
+                :controls="false"
+                style="width: 100%"
+                placeholder="请输入 运费"
+                addon-after="元"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
             <a-form-item label="客户联系人">
               <a-select
                 v-model:value="form.contactPerson"
@@ -781,6 +795,7 @@ const form = reactive({
   customerName: undefined,
   shipmentMethod: undefined,
   logisticsNo: '',
+  freightAmount: null,
   contactPerson: undefined,
   contactPhone: '',
   deliveryDate: null,
@@ -959,8 +974,8 @@ function resetForm() {
   form.customerName = undefined
   form.shipmentMethod = undefined
   form.logisticsNo = ''
-  form.contactPerson = undefined
-  form.contactPhone = ''
+  form.freightAmount = null
+  ;((form.contactPerson = undefined), (form.contactPhone = ''))
   form.deliveryDate = null
   form.deliveryAddress = ''
   form.applyOutbound = true
@@ -1021,6 +1036,12 @@ function loadFromRecord(record) {
   form.customerName = record.customerName
   form.shipmentMethod = resolveDefaultShipmentMethod(record.customerName, record.shipmentMethod)
   form.logisticsNo = record.logisticsNo || ''
+  form.freightAmount =
+    record.freightAmount === undefined ||
+    record.freightAmount === null ||
+    record.freightAmount === ''
+      ? null
+      : Number(record.freightAmount)
   form.contactPerson = record.contactPerson || undefined
   form.contactPhone = record.contactPhone || ''
   form.deliveryDate = record.documentDate ? dayjs(record.documentDate) : null
@@ -1551,6 +1572,7 @@ function handleOk() {
     customerName: form.customerName,
     shipmentMethod: form.shipmentMethod,
     logisticsNo: form.logisticsNo,
+    freightAmount: Number(form.freightAmount) || 0,
     contactPerson: form.contactPerson || '',
     contactPhone: form.contactPhone,
     deliveryAddress: form.deliveryAddress,

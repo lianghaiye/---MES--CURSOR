@@ -175,6 +175,8 @@ function app(partial, salesOrder) {
       status: partial.deliveryStatus || partial.status || '待发货',
       shipmentMethod: partial.shipmentMethod || '送货',
       logisticsNo: partial.logisticsNo || '',
+      freightAmount: Number(partial.freightAmount) || 0,
+      returnReceipts: Array.isArray(partial.returnReceipts) ? partial.returnReceipts : [],
       contactPerson: partial.contactPerson || salesOrder?.contactPerson || '',
       contactPhone: partial.contactPhone || salesOrder?.contactPhone || '',
       deliveryAddress: partial.deliveryAddress || '',
@@ -436,6 +438,7 @@ export function buildDeliveryOrderSeed() {
         deliveryDate: '2026-06-05',
         shipmentMethod: '物流',
         logisticsNo: 'SF1234567890',
+        freightAmount: 280,
         driverName: '张师傅',
         driverPhone: '13800138000',
         plateNo: '沪A12345',
@@ -762,8 +765,18 @@ export function buildDeliveryOrderSeed() {
         shipmentMethod: '自提',
         contactPerson: '孙自提',
         contactPhone: '13177778888',
-        remark: '演示：纯散件已发货（客户自提密封件包）',
-        deliveryStatus: '已发货',
+        remark: '演示：纯散件已发货并已上传回货单',
+        deliveryStatus: '已收货',
+        receivedAt: '2026-09-10 14:20',
+        freightAmount: 0,
+        returnReceipts: [
+          {
+            uid: 'rr-seed-1',
+            name: '回货单-密封检修包.pdf',
+            size: '1.2MB',
+            uploadedAt: '2026-09-10 14:20',
+          },
+        ],
         lineItems: [],
         scatterShipments: [
           demoScatterShipment({

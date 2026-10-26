@@ -37,6 +37,11 @@ function migrateOrders(orders) {
     if (!row.creator) row.creator = row.salesperson || 'admin1'
     if (!row.operator) row.operator = row.updater || row.creator || 'admin1'
     if (!row.operatedAt) row.operatedAt = row.updatedAt || row.createdAt || ''
+    if (row.freightAmount == null || row.freightAmount === '') row.freightAmount = 0
+    if (!Array.isArray(row.returnReceipts)) row.returnReceipts = []
+    if (row.returnReceipts.length && row.deliveryStatus === '已发货') {
+      row.deliveryStatus = '已收货'
+    }
     refreshDeliveryMetrics(row)
     row.actualOutboundQty = row.actualOutboundQty ?? 0
     row.totalAmountExTax = calcDeliveryAmountExTax(row)
@@ -210,6 +215,8 @@ export function createDeliveryOrder(payload) {
     customerName: payload.customerName || so?.customerName,
     shipmentMethod: payload.shipmentMethod || '送货',
     logisticsNo: payload.logisticsNo || '',
+    freightAmount: Number(payload.freightAmount) || 0,
+    returnReceipts: Array.isArray(payload.returnReceipts) ? payload.returnReceipts : [],
     contactPerson: payload.contactPerson || so?.contactPerson || '',
     contactPhone: payload.contactPhone || so?.contactPhone || '',
     deliveryAddress: payload.deliveryAddress || so?.deliveryAddress || '',
@@ -307,7 +314,10 @@ export function updateDeliveryOrder(id, patch) {
     }
   } else if (row.salesOrderId && patch.deliveryStatus) {
     updateDeliveryApplication(row.salesOrderId, row.id, {
-      status: patch.deliveryStatus === '已发货' ? '已发货' : undefined,
+      status:
+        patch.deliveryStatus === '已发货' || patch.deliveryStatus === '已收货'
+          ? patch.deliveryStatus
+          : undefined,
       actualShipQty: patch.actualOutboundQty,
     })
   }
@@ -338,6 +348,10 @@ export function deleteDeliveryOrder(id) {
 
 export function canEditDeliveryOrder(row) {
   return row?.deliveryStatus === '待发货' || row?.deliveryStatus === '待出库'
+}
+
+export function canUploadReturnReceipt(row) {
+  return row?.deliveryStatus === '已发货' || row?.deliveryStatus === '已收货'
 }
 
 export function canDeleteDeliveryOrder(row) {

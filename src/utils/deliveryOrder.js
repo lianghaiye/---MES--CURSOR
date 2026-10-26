@@ -3,7 +3,11 @@ import dayjs from 'dayjs'
 import { findLinkedSalesOutbound, sumOutboundLineQty } from '@/utils/deliveryOutbound'
 import { sumSelectedShipQty } from '@/utils/shipEbom'
 
-export const DELIVERY_STATUS_OPTIONS = ['待发货', '待出库', '已发货']
+export const DELIVERY_STATUS_OPTIONS = ['待发货', '待出库', '已发货', '已收货']
+
+export function hasReturnReceipts(row) {
+  return Array.isArray(row?.returnReceipts) && row.returnReceipts.length > 0
+}
 /** 申请发货数量 */
 export function calcApplyShipQty(application) {
   if (!application) return 0
@@ -65,6 +69,7 @@ export function calcActualOutboundQty(deliveryRow) {
 }
 
 export function resolveDeliveryOrderStatus(row) {
+  if (row.deliveryStatus === '已收货' || hasReturnReceipts(row)) return '已收货'
   if (row.deliveryStatus === '已发货') return '已发货'
   const ob = findLinkedSalesOutbound(row)
   if (ob?.status === '已出库') return '已发货'
@@ -77,6 +82,7 @@ export function deliveryStatusColor(status) {
     待发货: 'default',
     待出库: 'processing',
     已发货: 'success',
+    已收货: 'cyan',
     已出库: 'success',
     已提交: 'processing',
     部分发货: 'warning',
@@ -131,6 +137,9 @@ export function mapApplicationToDeliveryOrder(application, salesOrder) {
     totalAmountExTax,
     shipmentMethod: application.shipmentMethod || '',
     logisticsNo: application.logisticsNo || '',
+    freightAmount: Number(application.freightAmount) || 0,
+    returnReceipts: Array.isArray(application.returnReceipts) ? application.returnReceipts : [],
+    receivedAt: application.receivedAt || '',
     contactPerson: application.contactPerson || salesOrder?.contactPerson || '',
     contactPhone: application.contactPhone || salesOrder?.contactPhone || '',
     deliveryAddress: application.deliveryAddress || '',

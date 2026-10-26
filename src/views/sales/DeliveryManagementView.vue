@@ -166,6 +166,9 @@
           <template v-else-if="column.key === 'shipWeight'">
             {{ formatShipWeight(record.shipWeight) }}
           </template>
+          <template v-else-if="column.key === 'freightAmount'">
+            {{ formatAmountExTax(record.freightAmount) }}
+          </template>
           <template v-else-if="column.key === 'totalAmountInTax'">
             {{ formatAmountExTax(record.totalAmountInTax) }}
           </template>
@@ -199,11 +202,20 @@
               >
                 删除
               </a-button>
+              <a-button
+                v-if="canUploadReturnReceipt(record)"
+                type="link"
+                size="small"
+                @click="openReturnReceipt(record)"
+              >
+                上传回货单
+              </a-button>
               <span
                 v-if="
                   !canGenerateOutboundForRow(record) &&
                   !canEditDeliveryOrder(record) &&
-                  !canDeleteDeliveryOrder(record)
+                  !canDeleteDeliveryOrder(record) &&
+                  !canUploadReturnReceipt(record)
                 "
                 class="action-muted"
               >
@@ -246,6 +258,7 @@
     />
 
     <DeliveryOrderPrintModal v-model:open="printModalOpen" :delivery-orders="printOrders" />
+    <DeliveryReturnReceiptModal v-model:open="returnReceiptOpen" :order="returnReceiptTarget" />
   </div>
 </template>
 
@@ -268,6 +281,7 @@ import {
   generateOutboundForDelivery,
   canEditDeliveryOrder,
   canDeleteDeliveryOrder,
+  canUploadReturnReceipt,
 } from '@/store/deliveryOrderStore'
 import { hasLinkedSalesOutbound } from '@/utils/deliveryOutbound'
 import {
@@ -280,6 +294,7 @@ import {
 } from '@/utils/deliveryOrder'
 import DeliveryStatsPanel from './components/DeliveryStatsPanel.vue'
 import DeliveryOrderPrintModal from './components/DeliveryOrderPrintModal.vue'
+import DeliveryReturnReceiptModal from './components/DeliveryReturnReceiptModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
@@ -307,6 +322,8 @@ const pagination = reactive({ current: 1, pageSize: 10 })
 const selectedRowKeys = ref([])
 const printModalOpen = ref(false)
 const printOrders = ref([])
+const returnReceiptOpen = ref(false)
+const returnReceiptTarget = ref(null)
 
 const customerOpts = customerOptions.map((c) => ({ label: c.label, value: c.value }))
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
@@ -324,6 +341,7 @@ const baseColumns = [
   { title: '发货总额（不含税）', key: 'totalAmountExTax', width: 140, align: 'right' },
   { title: '交货方式', dataIndex: 'shipmentMethod', width: 88 },
   { title: '物流单号', dataIndex: 'logisticsNo', width: 130, ellipsis: true },
+  { title: '运费', key: 'freightAmount', width: 96, align: 'right' },
   { title: '客户联系人', dataIndex: 'contactPerson', width: 100 },
   { title: '联系方式', dataIndex: 'contactPhone', width: 120 },
   { title: '交货地址', dataIndex: 'deliveryAddress', width: 180, ellipsis: true },
@@ -334,7 +352,7 @@ const baseColumns = [
   { title: '创建时间', dataIndex: 'createdAt', width: 150 },
   { title: '操作人', dataIndex: 'operator', width: 90 },
   { title: '操作时间', dataIndex: 'operatedAt', width: 150 },
-  { title: '操作', key: 'action', width: 200, fixed: 'right' },
+  { title: '操作', key: 'action', width: 260, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -436,6 +454,15 @@ function openEdit(record) {
     path: `/sales/delivery/${record.id}/edit`,
     title: `编辑发货单 ${record.deliveryCode || ''}`.trim(),
   })
+}
+
+function openReturnReceipt(record) {
+  if (!canUploadReturnReceipt(record)) {
+    message.warning('仅已发货或已收货的发货单可上传回货单')
+    return
+  }
+  returnReceiptTarget.value = record
+  returnReceiptOpen.value = true
 }
 
 function canGenerateOutboundForRow(row) {
